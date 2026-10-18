@@ -141,7 +141,11 @@ describe("AccessControl tests with RevokeWins resolution", () => {
 			Vertex.create({
 				hash: "",
 				peerId: "peer1",
-				operation: Operation.create({ opType: "grant", value: "peer3", drpType: DrpType.ACL }),
+				operation: Operation.create({
+					opType: "grant",
+					value: ["peer3", ACLGroup.Writer],
+					drpType: DrpType.ACL,
+				}),
 				dependencies: [],
 				signature: new Uint8Array(),
 				timestamp: 0,
@@ -149,7 +153,11 @@ describe("AccessControl tests with RevokeWins resolution", () => {
 			Vertex.create({
 				hash: "",
 				peerId: "peer2",
-				operation: Operation.create({ opType: "revoke", value: "peer3", drpType: DrpType.ACL }),
+				operation: Operation.create({
+					opType: "revoke",
+					value: ["peer3", ACLGroup.Writer],
+					drpType: DrpType.ACL,
+				}),
 				dependencies: [],
 				signature: new Uint8Array(),
 				timestamp: 0,
@@ -157,6 +165,76 @@ describe("AccessControl tests with RevokeWins resolution", () => {
 		];
 		const result = acl.resolveConflicts?.(vertices);
 		expect(result?.action).toBe(ActionType.DropLeft);
+	});
+
+	test("RevokeWins uses target identity across different ACL groups", () => {
+		const grantAdmin = Vertex.create({
+			hash: "",
+			peerId: "peer1",
+			operation: Operation.create({
+				opType: "grant",
+				value: ["peer3", ACLGroup.Admin],
+				drpType: DrpType.ACL,
+			}),
+			dependencies: [],
+			signature: new Uint8Array(),
+			timestamp: 0,
+		});
+		const revokeFinality = Vertex.create({
+			hash: "",
+			peerId: "peer2",
+			operation: Operation.create({
+				opType: "revoke",
+				value: ["peer3", ACLGroup.Finality],
+				drpType: DrpType.ACL,
+			}),
+			dependencies: [],
+			signature: new Uint8Array(),
+			timestamp: 0,
+		});
+
+		expect(acl.resolveConflicts?.([grantAdmin, revokeFinality]).action).toBe(ActionType.DropLeft);
+		expect(acl.resolveConflicts?.([revokeFinality, grantAdmin]).action).toBe(ActionType.DropRight);
+	});
+
+	test("ACL-to-DRP conflict identity remains target-based", () => {
+		const revokeFinality = Vertex.create({
+			hash: "",
+			peerId: "peer1",
+			operation: Operation.create({
+				opType: "revoke",
+				value: ["peer3", ACLGroup.Finality],
+				drpType: DrpType.ACL,
+			}),
+			dependencies: [],
+			signature: new Uint8Array(),
+			timestamp: 0,
+		});
+		const drpGrantNamedOperation = Vertex.create({
+			hash: "",
+			peerId: "peer2",
+			operation: Operation.create({
+				opType: "grant",
+				value: ["peer3"],
+				drpType: DrpType.DRP,
+			}),
+			dependencies: [],
+			signature: new Uint8Array(),
+			timestamp: 0,
+		});
+
+		expect(acl.resolveConflicts?.([revokeFinality, drpGrantNamedOperation]).action).toBe(ActionType.DropRight);
+	});
+
+	test("Revoking an absent group from an admin is rejected", () => {
+		acl.context = { caller: "peer1" };
+		acl.grant("peer3", ACLGroup.Admin);
+
+		expect(() => acl.revoke("peer3", ACLGroup.Finality)).toThrow(
+			"Cannot revoke permissions from a peer with admin privileges."
+		);
+		expect(acl.query_isAdmin("peer3")).toBe(true);
+		expect(acl.query_isFinalitySigner("peer3")).toBe(false);
 	});
 });
 

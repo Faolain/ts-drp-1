@@ -1,0 +1,15 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "vitest",
+    "run",
+    "/Users/aristotle/Documents/Projects/ts-drp-1/tests/protocol-v3-creator-author-issuance-frontiers.test.ts",
+    "--no-file-parallelism",
+    "--coverage.enabled=false",
+    "--reporter=json",
+    "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-71bca5d5/retained-50/result.json"
+  ],
+  "start": "2026-09-06T06:26:05.522Z"
+}

@@ -1,0 +1,34 @@
+{
+	"extends": "../../../tsconfig.json",
+	"compilerOptions": {
+		"baseUrl": "../../..",
+		"composite": false,
+		"declaration": false,
+		"declarationMap": false,
+		"noEmit": true,
+		"paths": {
+			"@ts-drp/blueprint-catalog": ["packages/blueprint-catalog/src/index.ts"],
+			"@ts-drp/canonical": ["packages/canonical/src/index.ts"],
+			"@ts-drp/compaction": ["packages/compaction/src/index.ts"],
+			"@ts-drp/control-plane": ["packages/control-plane/src/index.ts"],
+			"@ts-drp/issuance-store": ["packages/issuance-store/src/index.ts"],
+			"@ts-drp/live-journal": ["packages/live-journal/src/index.ts"],
+			"@ts-drp/logger": ["packages/logger/src/index.ts"],
+			"@ts-drp/message-queue": ["packages/message-queue/src/index.ts"],
+			"@ts-drp/protocol-v3": ["packages/protocol-v3/src/public.ts"],
+			"@ts-drp/protocol-v3/registry/registry-v1.json": ["packages/protocol-v3/registry/registry-v1.json"],
+			"@ts-drp/storage": ["packages/storage/src/index.ts"],
+			"@ts-drp/types": ["packages/types/src/index.ts"],
+			"@ts-drp/utils": ["packages/utils/src/index.ts"]
+		},
+		"rootDir": "../../.."
+	},
+	"files": [
+		"model-contract.ts",
+		"oracle.ts",
+		"schedules.ts",
+		"../shared/observed-message-queue.ts",
+		"../../phase-3-exit-small-graph-schedule-red.test.ts"
+	],
+	"include": ["driver.ts"]
+}

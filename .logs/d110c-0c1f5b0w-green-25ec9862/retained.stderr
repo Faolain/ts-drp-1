@@ -1,0 +1,363 @@
+(node:28486) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+stderr | tests/phase-3h-v3-room-rehearsal-red.test.ts > Phase 3h shared-room reversible rehearsal RED > rejects noncreator and creator-signed malformed decisions before the exact creator activation
+::v3-ingress admission-rejected
+
+stderr | tests/phase-3h-v3-room-rehearsal-red.test.ts > Phase 3h shared-room reversible rehearsal RED > rejects noncreator and creator-signed malformed decisions before the exact creator activation
+::v3-ingress admission-rejected
+
+stderr | tests/phase-3h-v3-room-rehearsal-red.test.ts > Phase 3h shared-room reversible rehearsal RED > rejects noncreator and creator-signed malformed decisions before the exact creator activation
+::v3-ingress admission-rejected
+
+stderr | tests/phase-3h-v3-room-rehearsal-red.test.ts > Phase 3h shared-room reversible rehearsal RED > rejects noncreator and creator-signed malformed decisions before the exact creator activation
+::v3-ingress admission-rejected
+
+stderr | tests/phase-3h-v3-room-rehearsal-red.test.ts > Phase 3h shared-room reversible rehearsal RED > recovers irreversible activation commits without reopening source authority
+::v3-ingress sink-rejected
+
+stderr | tests/phase-3h-v3-room-rehearsal-red.test.ts > Phase 3h shared-room reversible rehearsal RED > recovers irreversible activation commits without reopening source authority
+::v3-ingress sink-rejected
+
+stderr | tests/phase-3h-v3-room-rehearsal-red.test.ts > Phase 3h shared-room reversible rehearsal RED > recovers irreversible activation commits without reopening source authority
+::v3-ingress sink-rejected
+
+stderr | tests/phase-3h-v3-room-rehearsal-red.test.ts > Phase 3h shared-room reversible rehearsal RED > recovers irreversible activation commits without reopening source authority
+::v3-ingress sink-rejected
+
+stderr | tests/phase-3h-v3-room-rehearsal-red.test.ts > Phase 3h shared-room reversible rehearsal RED > recovers irreversible activation commits without reopening source authority
+::v3-ingress sink-rejected
+
+stderr | tests/phase-3h-v3-room-rehearsal-red.test.ts > Phase 3h shared-room reversible rehearsal RED > recovers irreversible activation commits without reopening source authority
+::v3-ingress journal-rejected
+
+(node:28575) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:28583) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:28595) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:28683) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 18 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > separates plane-local stores, authenticates both anchors and bootstraps the empty target once
+TypeError: truncated canonical value
+ ❯ assertSupportedGenesisLineagePolicy examples/v3-room/src/index.ts:636:21
+    634| 
+    635| function assertSupportedGenesisLineagePolicy(exactCanonicalParametersC…
+    636|  const parameters = decodeCanonical(exactCanonicalParametersCarrierByt…
+       |                     ^
+    637|  if (parameters === null || typeof parameters !== "object" || Array.is…
+    638|  if (!Object.hasOwn(parameters, "lineagePolicy")) return;
+ ❯ decodeCreatorInvite examples/v3-room/src/index.ts:701:2
+ ❯ createV3RoomSessionOwned examples/v3-room/src/index.ts:1578:19
+ ❯ createV3RoomSession examples/v3-room/src/index.ts:1518:9
+ ❯ tests/phase-3g-v3-room-rebase-red.test.ts:444:23
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'CANONICAL_DECODING' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/18]⎯
+
+ FAIL  tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > recovers a committed target bootstrap after a pre-journal crash without issuing a duplicate
+TypeError: truncated canonical value
+ ❯ assertSupportedGenesisLineagePolicy examples/v3-room/src/index.ts:636:21
+    634| 
+    635| function assertSupportedGenesisLineagePolicy(exactCanonicalParametersC…
+    636|  const parameters = decodeCanonical(exactCanonicalParametersCarrierByt…
+       |                     ^
+    637|  if (parameters === null || typeof parameters !== "object" || Array.is…
+    638|  if (!Object.hasOwn(parameters, "lineagePolicy")) return;
+ ❯ decodeCreatorInvite examples/v3-room/src/index.ts:701:2
+ ❯ createV3RoomSessionOwned examples/v3-room/src/index.ts:1578:19
+ ❯ createV3RoomSession examples/v3-room/src/index.ts:1518:9
+ ❯ tests/phase-3g-v3-room-rebase-red.test.ts:481:27
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'CANONICAL_DECODING' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/18]⎯
+
+ FAIL  tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > does not bootstrap an inconsistent issuance lineage after recovery installs journal genesis
+AssertionError: expected [Function] to throw error including 'issuance-rejected' but got 'truncated canonical value'
+
+Expected: "issuance-rejected"
+Received: "truncated canonical value"
+
+ ❯ tests/phase-3g-v3-room-rebase-red.test.ts:499:3
+    497|    input: unknown
+    498|   ) => Promise<{ close(): Promise<void> }>;
+    499|   await expect(create(roomInput())).rejects.toThrow("issuance-rejected…
+       |   ^
+    500|   expect(probe.bootstrapIssues).toBe(0);
+    501|   expect(probe.recoveryInputs).toHaveLength(1);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/18]⎯
+
+ FAIL  tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > rejects wrong readiness scope and snapshot scope before bootstrap or recovery
+AssertionError: expected [Function] to throw error including 'readiness' but got 'truncated canonical value'
+
+Expected: "readiness"
+Received: "truncated canonical value"
+
+ ❯ tests/phase-3g-v3-room-rebase-red.test.ts:530:4
+    528|     },
+    529|    };
+    530|    await expect(create(roomInput())).rejects.toThrow("readiness");
+       |    ^
+    531|    expect(probe.bootstrapIssues).toBe(0);
+    532|    expect(probe.recoveryInputs).toEqual([]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/18]⎯
+
+ FAIL  tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > retires structural source rows, accepts the full configured plane bound, and gates new issue on rebase
+TypeError: truncated canonical value
+ ❯ assertSupportedGenesisLineagePolicy examples/v3-room/src/index.ts:636:21
+    634| 
+    635| function assertSupportedGenesisLineagePolicy(exactCanonicalParametersC…
+    636|  const parameters = decodeCanonical(exactCanonicalParametersCarrierByt…
+       |                     ^
+    637|  if (parameters === null || typeof parameters !== "object" || Array.is…
+    638|  if (!Object.hasOwn(parameters, "lineagePolicy")) return;
+ ❯ decodeCreatorInvite examples/v3-room/src/index.ts:701:2
+ ❯ createV3RoomSessionOwned examples/v3-room/src/index.ts:1578:19
+ ❯ createV3RoomSession examples/v3-room/src/index.ts:1518:9
+ ❯ tests/phase-3g-v3-room-rebase-red.test.ts:550:25
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'CANONICAL_DECODING' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/18]⎯
+
+ FAIL  tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > orders exact rebase and transform inputs while expire and held review perform no issue
+TypeError: truncated canonical value
+ ❯ assertSupportedGenesisLineagePolicy examples/v3-room/src/index.ts:636:21
+    634| 
+    635| function assertSupportedGenesisLineagePolicy(exactCanonicalParametersC…
+    636|  const parameters = decodeCanonical(exactCanonicalParametersCarrierByt…
+       |                     ^
+    637|  if (parameters === null || typeof parameters !== "object" || Array.is…
+    638|  if (!Object.hasOwn(parameters, "lineagePolicy")) return;
+ ❯ decodeCreatorInvite examples/v3-room/src/index.ts:701:2
+ ❯ createV3RoomSessionOwned examples/v3-room/src/index.ts:1578:19
+ ❯ createV3RoomSession examples/v3-room/src/index.ts:1518:9
+ ❯ tests/phase-3g-v3-room-rebase-red.test.ts:606:23
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'CANONICAL_DECODING' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/18]⎯
+
+ FAIL  tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > closes one source exactly once after every child has a terminal outcome
+TypeError: truncated canonical value
+ ❯ assertSupportedGenesisLineagePolicy examples/v3-room/src/index.ts:636:21
+    634| 
+    635| function assertSupportedGenesisLineagePolicy(exactCanonicalParametersC…
+    636|  const parameters = decodeCanonical(exactCanonicalParametersCarrierByt…
+       |                     ^
+    637|  if (parameters === null || typeof parameters !== "object" || Array.is…
+    638|  if (!Object.hasOwn(parameters, "lineagePolicy")) return;
+ ❯ decodeCreatorInvite examples/v3-room/src/index.ts:701:2
+ ❯ createV3RoomSessionOwned examples/v3-room/src/index.ts:1578:19
+ ❯ createV3RoomSession examples/v3-room/src/index.ts:1518:9
+ ❯ tests/phase-3g-v3-room-rebase-red.test.ts:672:25
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'CANONICAL_DECODING' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/18]⎯
+
+ FAIL  tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > preserves published source work and completes pending work only after target acceptance
+TypeError: truncated canonical value
+ ❯ assertSupportedGenesisLineagePolicy examples/v3-room/src/index.ts:636:21
+    634| 
+    635| function assertSupportedGenesisLineagePolicy(exactCanonicalParametersC…
+    636|  const parameters = decodeCanonical(exactCanonicalParametersCarrierByt…
+       |                     ^
+    637|  if (parameters === null || typeof parameters !== "object" || Array.is…
+    638|  if (!Object.hasOwn(parameters, "lineagePolicy")) return;
+ ❯ decodeCreatorInvite examples/v3-room/src/index.ts:701:2
+ ❯ createV3RoomSessionOwned examples/v3-room/src/index.ts:1578:19
+ ❯ createV3RoomSession examples/v3-room/src/index.ts:1518:9
+ ❯ tests/phase-3g-v3-room-rebase-red.test.ts:706:25
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'CANONICAL_DECODING' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/18]⎯
+
+ FAIL  tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > batches sixteen compatible rebases behind one target signature
+TypeError: truncated canonical value
+ ❯ assertSupportedGenesisLineagePolicy examples/v3-room/src/index.ts:636:21
+    634| 
+    635| function assertSupportedGenesisLineagePolicy(exactCanonicalParametersC…
+    636|  const parameters = decodeCanonical(exactCanonicalParametersCarrierByt…
+       |                     ^
+    637|  if (parameters === null || typeof parameters !== "object" || Array.is…
+    638|  if (!Object.hasOwn(parameters, "lineagePolicy")) return;
+ ❯ decodeCreatorInvite examples/v3-room/src/index.ts:701:2
+ ❯ createV3RoomSessionOwned examples/v3-room/src/index.ts:1578:19
+ ❯ createV3RoomSession examples/v3-room/src/index.ts:1518:9
+ ❯ tests/phase-3g-v3-room-rebase-red.test.ts:746:25
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'CANONICAL_DECODING' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/18]⎯
+
+ FAIL  tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > splits seventeen compatible rebases into sixteen plus one
+TypeError: truncated canonical value
+ ❯ assertSupportedGenesisLineagePolicy examples/v3-room/src/index.ts:636:21
+    634| 
+    635| function assertSupportedGenesisLineagePolicy(exactCanonicalParametersC…
+    636|  const parameters = decodeCanonical(exactCanonicalParametersCarrierByt…
+       |                     ^
+    637|  if (parameters === null || typeof parameters !== "object" || Array.is…
+    638|  if (!Object.hasOwn(parameters, "lineagePolicy")) return;
+ ❯ decodeCreatorInvite examples/v3-room/src/index.ts:701:2
+ ❯ createV3RoomSessionOwned examples/v3-room/src/index.ts:1578:19
+ ❯ createV3RoomSession examples/v3-room/src/index.ts:1518:9
+ ❯ tests/phase-3g-v3-room-rebase-red.test.ts:792:23
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'CANONICAL_DECODING' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/18]⎯
+
+ FAIL  tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > refuses a foreign-author displaced intent before signing or issuing
+TypeError: truncated canonical value
+ ❯ assertSupportedGenesisLineagePolicy examples/v3-room/src/index.ts:636:21
+    634| 
+    635| function assertSupportedGenesisLineagePolicy(exactCanonicalParametersC…
+    636|  const parameters = decodeCanonical(exactCanonicalParametersCarrierByt…
+       |                     ^
+    637|  if (parameters === null || typeof parameters !== "object" || Array.is…
+    638|  if (!Object.hasOwn(parameters, "lineagePolicy")) return;
+ ❯ decodeCreatorInvite examples/v3-room/src/index.ts:701:2
+ ❯ createV3RoomSessionOwned examples/v3-room/src/index.ts:1578:19
+ ❯ createV3RoomSession examples/v3-room/src/index.ts:1518:9
+ ❯ tests/phase-3g-v3-room-rebase-red.test.ts:828:25
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'CANONICAL_DECODING' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/18]⎯
+
+ FAIL  tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > sorts displaced pages before assigning fresh target logical times
+TypeError: truncated canonical value
+ ❯ assertSupportedGenesisLineagePolicy examples/v3-room/src/index.ts:636:21
+    634| 
+    635| function assertSupportedGenesisLineagePolicy(exactCanonicalParametersC…
+    636|  const parameters = decodeCanonical(exactCanonicalParametersCarrierByt…
+       |                     ^
+    637|  if (parameters === null || typeof parameters !== "object" || Array.is…
+    638|  if (!Object.hasOwn(parameters, "lineagePolicy")) return;
+ ❯ decodeCreatorInvite examples/v3-room/src/index.ts:701:2
+ ❯ createV3RoomSessionOwned examples/v3-room/src/index.ts:1578:19
+ ❯ createV3RoomSession examples/v3-room/src/index.ts:1518:9
+ ❯ tests/phase-3g-v3-room-rebase-red.test.ts:880:25
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'CANONICAL_DECODING' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/18]⎯
+
+ FAIL  tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > suppresses an accepted exact identity before issue and rejects changed bytes
+TypeError: truncated canonical value
+ ❯ assertSupportedGenesisLineagePolicy examples/v3-room/src/index.ts:636:21
+    634| 
+    635| function assertSupportedGenesisLineagePolicy(exactCanonicalParametersC…
+    636|  const parameters = decodeCanonical(exactCanonicalParametersCarrierByt…
+       |                     ^
+    637|  if (parameters === null || typeof parameters !== "object" || Array.is…
+    638|  if (!Object.hasOwn(parameters, "lineagePolicy")) return;
+ ❯ decodeCreatorInvite examples/v3-room/src/index.ts:701:2
+ ❯ createV3RoomSessionOwned examples/v3-room/src/index.ts:1578:19
+ ❯ createV3RoomSession examples/v3-room/src/index.ts:1518:9
+ ❯ tests/phase-3g-v3-room-rebase-red.test.ts:904:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'CANONICAL_DECODING' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/18]⎯
+
+ FAIL  tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > keeps the source pending and terminally exposes target issue or publication failure
+TypeError: truncated canonical value
+ ❯ assertSupportedGenesisLineagePolicy examples/v3-room/src/index.ts:636:21
+    634| 
+    635| function assertSupportedGenesisLineagePolicy(exactCanonicalParametersC…
+    636|  const parameters = decodeCanonical(exactCanonicalParametersCarrierByt…
+       |                     ^
+    637|  if (parameters === null || typeof parameters !== "object" || Array.is…
+    638|  if (!Object.hasOwn(parameters, "lineagePolicy")) return;
+ ❯ decodeCreatorInvite examples/v3-room/src/index.ts:701:2
+ ❯ createV3RoomSessionOwned examples/v3-room/src/index.ts:1578:19
+ ❯ createV3RoomSession examples/v3-room/src/index.ts:1518:9
+ ❯ tests/phase-3g-v3-room-rebase-red.test.ts:957:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'CANONICAL_DECODING' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/18]⎯
+
+ FAIL  tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > keeps a failed source completion pending and retries it on reopen
+TypeError: truncated canonical value
+ ❯ assertSupportedGenesisLineagePolicy examples/v3-room/src/index.ts:636:21
+    634| 
+    635| function assertSupportedGenesisLineagePolicy(exactCanonicalParametersC…
+    636|  const parameters = decodeCanonical(exactCanonicalParametersCarrierByt…
+       |                     ^
+    637|  if (parameters === null || typeof parameters !== "object" || Array.is…
+    638|  if (!Object.hasOwn(parameters, "lineagePolicy")) return;
+ ❯ decodeCreatorInvite examples/v3-room/src/index.ts:701:2
+ ❯ createV3RoomSessionOwned examples/v3-room/src/index.ts:1578:19
+ ❯ createV3RoomSession examples/v3-room/src/index.ts:1518:9
+ ❯ tests/phase-3g-v3-room-rebase-red.test.ts:1008:34
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'CANONICAL_DECODING' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/18]⎯
+
+ FAIL  tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > fails unknown policy and unstable transform identity before target issuance
+TypeError: truncated canonical value
+ ❯ assertSupportedGenesisLineagePolicy examples/v3-room/src/index.ts:636:21
+    634| 
+    635| function assertSupportedGenesisLineagePolicy(exactCanonicalParametersC…
+    636|  const parameters = decodeCanonical(exactCanonicalParametersCarrierByt…
+       |                     ^
+    637|  if (parameters === null || typeof parameters !== "object" || Array.is…
+    638|  if (!Object.hasOwn(parameters, "lineagePolicy")) return;
+ ❯ decodeCreatorInvite examples/v3-room/src/index.ts:701:2
+ ❯ createV3RoomSessionOwned examples/v3-room/src/index.ts:1578:19
+ ❯ createV3RoomSession examples/v3-room/src/index.ts:1518:9
+ ❯ tests/phase-3g-v3-room-rebase-red.test.ts:1108:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'CANONICAL_DECODING' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/18]⎯
+
+ FAIL  tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > keeps a transformed source pending when the product projection rejects its replacement
+TypeError: truncated canonical value
+ ❯ assertSupportedGenesisLineagePolicy examples/v3-room/src/index.ts:636:21
+    634| 
+    635| function assertSupportedGenesisLineagePolicy(exactCanonicalParametersC…
+    636|  const parameters = decodeCanonical(exactCanonicalParametersCarrierByt…
+       |                     ^
+    637|  if (parameters === null || typeof parameters !== "object" || Array.is…
+    638|  if (!Object.hasOwn(parameters, "lineagePolicy")) return;
+ ❯ decodeCreatorInvite examples/v3-room/src/index.ts:701:2
+ ❯ createV3RoomSessionOwned examples/v3-room/src/index.ts:1578:19
+ ❯ createV3RoomSession examples/v3-room/src/index.ts:1518:9
+ ❯ tests/phase-3g-v3-room-rebase-red.test.ts:1163:25
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'CANONICAL_DECODING' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/18]⎯
+
+ FAIL  tests/phase-3g-v3-room-rebase-red.test.ts > Phase 3g room-owned rebase scheduling RED > keeps a recovered projection-rejected replacement and its source pending without reissue
+TypeError: truncated canonical value
+ ❯ assertSupportedGenesisLineagePolicy examples/v3-room/src/index.ts:636:21
+    634| 
+    635| function assertSupportedGenesisLineagePolicy(exactCanonicalParametersC…
+    636|  const parameters = decodeCanonical(exactCanonicalParametersCarrierByt…
+       |                     ^
+    637|  if (parameters === null || typeof parameters !== "object" || Array.is…
+    638|  if (!Object.hasOwn(parameters, "lineagePolicy")) return;
+ ❯ decodeCreatorInvite examples/v3-room/src/index.ts:701:2
+ ❯ createV3RoomSessionOwned examples/v3-room/src/index.ts:1578:19
+ ❯ createV3RoomSession examples/v3-room/src/index.ts:1518:9
+ ❯ tests/phase-3g-v3-room-rebase-red.test.ts:1217:25
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'CANONICAL_DECODING' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/18]⎯
+

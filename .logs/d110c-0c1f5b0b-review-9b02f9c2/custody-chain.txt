@@ -1,0 +1,8 @@
+882a3dc1de1a550003b0e105fbbb89444e915b2e 0cf461041fbfc0191030ed563b727edb0453008a G test(node): add author settlement red
+42c629d530548c247be93ade52295da1118a2e9a 882a3dc1de1a550003b0e105fbbb89444e915b2e G test(hardening): record node settlement red
+de1eed2a6be65ed022f8b502e4cdd6208a234dd1 42c629d530548c247be93ade52295da1118a2e9a G test(node): correct fence restart red
+aaa2abd70f93d1e72e2f81b9f59a172e134464ba de1eed2a6be65ed022f8b502e4cdd6208a234dd1 G test(hardening): record corrected node red
+f7f693b7ec3eddcc68694ad093e807067b9333a7 aaa2abd70f93d1e72e2f81b9f59a172e134464ba G test(node): avoid private fence exports
+504ca351653701af9dd45ad99f725307994c8e1f f7f693b7ec3eddcc68694ad093e807067b9333a7 G test(hardening): record final node red
+93585bf3ba62ae662c2963fd13be2ee051451fa2 504ca351653701af9dd45ad99f725307994c8e1f G feat(node): implement author settlement
+9b02f9c27d6173b92265b23ccd205405c9383741 93585bf3ba62ae662c2963fd13be2ee051451fa2 G test(hardening): record node settlement green

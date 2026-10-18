@@ -1,0 +1,317 @@
+{
+  "config": {
+    "argv": [
+      "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+      "/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@playwright+test@1.62.1/node_modules/@playwright/test/cli.js",
+      "test",
+      "--config",
+      "packages/storage-browser/playwright.phase-6a-creator-adoption-commit.config.ts",
+      "--reporter=json"
+    ],
+    "configFile": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/playwright.phase-6a-creator-adoption-commit.config.ts",
+    "rootDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": true,
+    "fullyParallel": false,
+    "globalSetup": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-adoption-commit-global-setup.ts",
+    "globalTeardown": null,
+    "globalTimeout": 3600000,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-6a-creator-adoption-commit.pw.ts"
+        ],
+        "timeout": 1200000
+      },
+      {
+        "outputDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-6a-creator-adoption-commit.pw.ts"
+        ],
+        "timeout": 1200000
+      },
+      {
+        "outputDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit",
+        "name": "webkit",
+        "testDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-6a-creator-adoption-commit.pw.ts"
+        ],
+        "timeout": 1200000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.62.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "phase-6a-creator-adoption-commit.pw.ts",
+      "file": "phase-6a-creator-adoption-commit.pw.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "runs the complete ordinary request/terminal matrix in every engine",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 1200000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 958,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:19:57.703Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "83ef7608af955caeb9a4-4baa4de64a0332a4cd8b",
+          "file": "phase-6a-creator-adoption-commit.pw.ts",
+          "line": 179,
+          "column": 1
+        },
+        {
+          "title": "uses genuine process-group SIGKILL and exact reopen in every engine",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 1200000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 20986,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:19:58.904Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "83ef7608af955caeb9a4-8afbaaa5fdc06e783216",
+          "file": "phase-6a-creator-adoption-commit.pw.ts",
+          "line": 204,
+          "column": 1
+        },
+        {
+          "title": "runs the complete ordinary request/terminal matrix in every engine",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 1200000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1798,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:20:20.428Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "83ef7608af955caeb9a4-e1a41c01219e23b9c688",
+          "file": "phase-6a-creator-adoption-commit.pw.ts",
+          "line": 179,
+          "column": 1
+        },
+        {
+          "title": "uses genuine process-group SIGKILL and exact reopen in every engine",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 1200000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 79109,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:20:22.750Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "83ef7608af955caeb9a4-2cfb409a5ca44574627d",
+          "file": "phase-6a-creator-adoption-commit.pw.ts",
+          "line": 204,
+          "column": 1
+        },
+        {
+          "title": "runs the complete ordinary request/terminal matrix in every engine",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 1200000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1679,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:21:42.603Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "83ef7608af955caeb9a4-74bd9ae2ba82f3ca7122",
+          "file": "phase-6a-creator-adoption-commit.pw.ts",
+          "line": 179,
+          "column": 1
+        },
+        {
+          "title": "uses genuine process-group SIGKILL and exact reopen in every engine",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 1200000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 43215,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T05:21:44.595Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "83ef7608af955caeb9a4-5c0fbb798243aeebe971",
+          "file": "phase-6a-creator-adoption-commit.pw.ts",
+          "line": 204,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-02T05:19:57.279Z",
+    "duration": 150616.252,
+    "expected": 6,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

@@ -7,6 +7,9 @@
 		"url": "git+https://github.com/drp-tech/ts-drp.git"
 	},
 	"type": "module",
+	"bin": {
+		"ts-drp-node": "./dist/src/run.js"
+	},
 	"types": "./dist/src/index.d.ts",
 	"files": [
 		"src",
@@ -22,6 +25,74 @@
 		"./runtime": {
 			"types": "./dist/src/runtime.d.ts",
 			"import": "./dist/src/runtime.js"
+		},
+		"./v3-live": {
+			"types": "./dist/src/v3-live.d.ts",
+			"import": "./dist/src/v3-live.js"
+		},
+		"./v3-room": {
+			"types": "./dist/src/v3-room.d.ts",
+			"import": "./dist/src/v3-room.js"
+		},
+		"./v3-room-host": {
+			"types": "./dist/src/v3-room-host.d.ts",
+			"import": "./dist/src/v3-room-host.js"
+		},
+		"./rpc/v3-room-registry": {
+			"types": "./dist/src/rpc/v3-room-registry.d.ts",
+			"import": "./dist/src/rpc/v3-room-registry.js"
+		},
+		"./rpc/v3-service": {
+			"types": "./dist/src/rpc/v3-service.d.ts",
+			"import": "./dist/src/rpc/v3-service.js"
+		},
+		"./rpc/v3-daemon": {
+			"types": "./dist/src/rpc/v3-daemon.d.ts",
+			"import": "./dist/src/rpc/v3-daemon.js"
+		},
+		"./applications/canvas": {
+			"types": "./dist/src/applications/canvas.d.ts",
+			"import": "./dist/src/applications/canvas.js"
+		},
+		"./cli/v3-canvas": {
+			"types": "./dist/src/cli/v3-canvas.d.ts",
+			"import": "./dist/src/cli/v3-canvas.js"
+		},
+		"./snapshot-transfer": {
+			"types": "./dist/src/snapshot-transfer.d.ts",
+			"import": "./dist/src/snapshot-transfer.js"
+		},
+		"./creator-seal": {
+			"types": "./dist/src/creator-seal.d.ts",
+			"import": "./dist/src/creator-seal.js"
+		},
+		"./creator-close": {
+			"types": "./dist/src/creator-close.d.ts",
+			"import": "./dist/src/creator-close.js"
+		},
+		"./creator-adoption": {
+			"types": "./dist/src/creator-adoption.d.ts",
+			"import": "./dist/src/creator-adoption.js"
+		},
+		"./creator-adoption-commit": {
+			"types": "./dist/src/creator-adoption-commit.d.ts",
+			"import": "./dist/src/creator-adoption-commit.js"
+		},
+		"./creator-adoption-stage": {
+			"types": "./dist/src/creator-adoption-stage.d.ts",
+			"import": "./dist/src/creator-adoption-stage.js"
+		},
+		"./creator-adoption-recover": {
+			"types": "./dist/src/creator-adoption-recover.d.ts",
+			"import": "./dist/src/creator-adoption-recover.js"
+		},
+		"./internal/creator-adoption-recover": {
+			"types": "./dist/src/internal/creator-adoption-recover.d.ts",
+			"import": "./dist/src/internal/creator-adoption-recover.js"
+		},
+		"./creator-adoption-activate": {
+			"types": "./dist/src/creator-adoption-activate.d.ts",
+			"import": "./dist/src/creator-adoption-activate.js"
 		}
 	},
 	"scripts": {
@@ -34,7 +105,8 @@
 		"prebuild": "node -p \"'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'\" > src/version.ts",
 		"prepack": "tsc -b",
 		"test": "pnpm --dir ../.. exec vitest run packages/node/tests",
-		"typecheck": "tsc --noEmit",
+		"typecheck": "tsc --noEmit && pnpm typecheck:producer-presign-tests",
+		"typecheck:producer-presign-tests": "tsc -p ../../tests/fixtures/producer-presign-retention/tsconfig.json",
 		"watch": "tsc -b -w"
 	},
 	"devDependencies": {
@@ -57,20 +129,29 @@
 		"@multiformats/multiaddr": "^13.0.3",
 		"@noble/hashes": "^1.7.1",
 		"@noble/secp256k1": "^2.2.3",
+		"@ts-drp/blueprint-catalog": "0.11.0",
 		"@ts-drp/blueprints": "0.11.0",
+		"@ts-drp/canonical": "0.11.0",
+		"@ts-drp/compaction": "0.11.0",
 		"@ts-drp/control-plane": "workspace:*",
+		"@ts-drp/ephemeral": "workspace:*",
 		"@ts-drp/interval-discovery": "0.11.0",
 		"@ts-drp/interval-reconnect": "0.11.0",
 		"@ts-drp/interval-runner": "0.11.0",
+		"@ts-drp/issuance-store": "0.11.0",
 		"@ts-drp/keychain": "0.11.0",
+		"@ts-drp/live-journal": "0.11.0",
 		"@ts-drp/logger": "0.11.0",
 		"@ts-drp/message-queue": "0.11.0",
 		"@ts-drp/network": "0.11.0",
-		"@ts-drp/object": "0.11.0",
+		"@ts-drp/protocol-v3": "0.11.0",
 		"@ts-drp/relay-policy": "workspace:*",
 		"@ts-drp/rendezvous": "workspace:*",
 		"@ts-drp/routing-browser": "workspace:*",
 		"@ts-drp/routing-node": "workspace:*",
+		"@ts-drp/seal": "0.11.0",
+		"@ts-drp/storage": "0.11.0",
+		"@ts-drp/storage-node": "0.11.0",
 		"@ts-drp/tracer": "0.11.0",
 		"@ts-drp/types": "0.11.0",
 		"@ts-drp/utils": "0.11.0",

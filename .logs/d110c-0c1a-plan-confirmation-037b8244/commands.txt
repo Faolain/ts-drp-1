@@ -1,0 +1,8 @@
+Grok exact-session confirmation:
+grok --resume 01a0649a-9cee-7dd1-8241-41f673464078 --cwd /Users/aristotle/Documents/Projects/ts-drp-1 --model grok-4.6 --reasoning-effort high --disable-web-search --no-subagents --no-plan --max-turns 24 --output-format streaming-json --verbatim --prompt-file /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1a-plan-confirmation-037b8244/prompt.md --permission-mode dontAsk --tools read_file,grep,list_dir
+
+Kimi exact-session confirmation:
+KIMI_LOOP_MAX_STEPS_PER_TURN=100 kimi --session session_3047d80e-87b6-4dfb-a756-6f1e351b13f5 --prompt <prompt.md> --output-format stream-json
+
+Opus exact-session confirmation:
+CLAUDE_CONFIG_DIR=/Users/aristotle/.claude-phel claude -p --resume 5091c63d-4245-41cc-b3e3-d6e6eb194674 --model opus --effort xhigh --permission-mode dontAsk --allowedTools Read,Grep,Glob --disallowedTools Bash,Write,Edit,NotebookEdit,Agent,WebFetch,WebSearch --output-format json --json-schema <schema.json> <prompt.md

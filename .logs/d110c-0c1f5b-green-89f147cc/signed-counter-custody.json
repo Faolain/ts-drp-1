@@ -1,0 +1,6 @@
+{
+  "head": "89f147cc351d3de156f861dc0a72bc900aef4676",
+  "signedFileSha256": "cf1235b6d7e6944b19b9536d1ca9d911326ae86ce8252632df51c9aa270d462d",
+  "counter": "function countHistoricalIssuanceRow(context: HistoricalIssuanceContext | undefined, authorSequence: number): boolean {\n\tif (context === undefined) return false;\n\tif (ReflectApply(SetPrototypeHas, context.countedSequences, [authorSequence]) === true) return true;\n\tcontext.count += 1;\n\tReflectApply(SetPrototypeAdd, context.countedSequences, [authorSequence]);\n\tconst maxHistoricalIssuanceRows = context.maxEpochVertices;\n\treturn context.count <= maxHistoricalIssuanceRows;\n}\n",
+  "currentTestByteIdenticalToSigned": true
+}

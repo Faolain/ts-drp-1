@@ -1,0 +1,11 @@
+{
+  "cwd": "/tmp/d110c-f5b-retained-settlement-codec-ZQ34f1/checkout",
+  "command": "pnpm",
+  "args": [
+    "install",
+    "--offline",
+    "--frozen-lockfile",
+    "--ignore-scripts"
+  ],
+  "start": "2026-09-06T01:11:45.167Z"
+}

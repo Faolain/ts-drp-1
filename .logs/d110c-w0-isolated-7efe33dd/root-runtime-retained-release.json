@@ -1,0 +1,7 @@
+{
+  "gate": "runtime-retained",
+  "baseline": "7efe33dd350deab922c3fea7e9fcd1c968f4e474",
+  "runtimeRosterSha256": "74032e771abc2b90c42ffaf16628152d4960fd7f0c523946833b0a7537820a6d",
+  "sourcePatchSha256": "138cb170776d5f2af780375adc78fee0c9029776656579cd1fb190a8d6fadda4",
+  "maxInvocations": 1
+}

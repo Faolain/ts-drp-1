@@ -1,0 +1,14 @@
+grok active elapsed=0s events=0 bytes=0
+grok active elapsed=30s events=251 bytes=154339
+grok active elapsed=60s events=500 bytes=610201
+grok active elapsed=90s events=536 bytes=612073
+grok active elapsed=120s events=625 bytes=968745
+grok active elapsed=150s events=635 bytes=969522
+grok active elapsed=180s events=652 bytes=1050355
+grok active elapsed=210s events=671 bytes=1051222
+grok active elapsed=240s events=671 bytes=1051222
+grok active elapsed=270s events=767 bytes=1184968
+grok active elapsed=300s events=767 bytes=1184968
+grok active elapsed=330s events=767 bytes=1184968
+grok active elapsed=360s events=810 bytes=1256189
+{"classification": "NO_VERDICT", "duration_seconds": 390.174, "events": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0b0b-confirmation-1db11664/grok/events.jsonl", "exit_code": 0, "public": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0b0b-confirmation-1db11664/grok/public.txt", "stop_reason": "end_turn", "timed_out": false}

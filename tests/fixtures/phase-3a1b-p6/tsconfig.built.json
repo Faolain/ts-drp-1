@@ -1,0 +1,15 @@
+{
+	"extends": "../../../tsconfig.json",
+	"compilerOptions": {
+		"composite": false,
+		"declaration": false,
+		"declarationMap": false,
+		"exactOptionalPropertyTypes": true,
+		"noEmit": true,
+		"baseUrl": "../../..",
+		"paths": {
+			"@ts-drp/protocol-v3/author-authorization": ["packages/protocol-v3/dist/src/author-authorization.d.ts"]
+		}
+	},
+	"files": ["built-type-audit.ts"]
+}

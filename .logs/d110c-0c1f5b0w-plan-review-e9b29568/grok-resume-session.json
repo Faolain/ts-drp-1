@@ -1,0 +1,8 @@
+{
+	"initial_classification": "NO_VERDICT",
+	"initial_stop_reason": "cancelled",
+	"initial_reason": "max_turns_reached",
+	"session_id": "01a07189-5776-77e2-a047-e60b61899a6c",
+	"resume_exit_code": 0,
+	"resume_stop_reason": "end_turn"
+}

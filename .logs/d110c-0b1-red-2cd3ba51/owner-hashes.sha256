@@ -1,0 +1,10 @@
+d82fce506469e41e284d71883926a2b544b92cf36b1781314a1b636422d3722a  tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts
+cd256efef049f7e8f53d761dee5eb3044f9b0eb22effcba13f5dc980d34e8c59  tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts
+4eb1cf3d78b96e9756d358031b79c04f30713c44457dd81608190975272a9ead  tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts
+6dd4a1f12e8f90de4e01aed71b1aaacf4045eb4e2b69cfec51affa749afaa87f  packages/protocol-v3/src/index.ts
+3ce920765e0fd99bd925deb754371e393afa96cadc7e90db2688ea7aca5b103d  packages/protocol-v3/src/anchor-trust-singleton.ts
+abb54cdabda724888aabed2119df45c8678623e6d701f8366a9f7919f018c95b  packages/protocol-v3/src/creator-close.ts
+645c42578fd23bbf5466c706973834a608e36c32bbd9a489b1c92526a345ea60  packages/control-plane/src/creator-trust-advance.ts
+5796b88209a18380bebebb74932a8a6a258146748a66698edced1715742440fd  packages/node/src/creator-adoption.ts
+0c57932b8336fbe9e98f244d57118d8b95944934edf04cf2fe0598c74abc93c9  packages/node/src/creator-adoption-activate.ts
+a3366232465e248f3e7d875ec68b687bd7787a26e9dbb92a2b0634c039898d7c  packages/node/src/creator-close.ts

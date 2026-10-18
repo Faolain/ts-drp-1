@@ -1,0 +1,60 @@
+{
+  "baseline": "7c19a4792eb63eecb85e4ac7a1484df88c77c984",
+  "checkedAt": "2026-09-06T11:11:49.777Z",
+  "sourceAndBuildHashesExact": true,
+  "compilerInputsExact": true,
+  "inheritedProfilingAbsent": true,
+  "nodeV8CoverageAbsent": true,
+  "noCompetingTaskProcesses": true,
+  "numericOnlyProcessInspection": true,
+  "processes": [
+    {
+      "pid": 3663,
+      "numericStatus": "3663  3637 S",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall/packages/db"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 3666,
+      "numericStatus": "3666  3663 S",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall/packages/db"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 15739,
+      "numericStatus": "15739  3666 S",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall/packages/db"
+      ],
+      "relevant": false
+    }
+  ],
+  "ports": [
+    {
+      "port": 4174,
+      "pids": [],
+      "noTcpListener": true
+    },
+    {
+      "port": 4175,
+      "pids": [],
+      "noTcpListener": true
+    },
+    {
+      "port": 51000,
+      "pids": [],
+      "noTcpListener": true
+    },
+    {
+      "port": 51002,
+      "pids": [],
+      "noTcpListener": true
+    }
+  ],
+  "runtimeNotReleased": true,
+  "requiresImmediatePreExecutionRecheck": true
+}

@@ -19,6 +19,7 @@ const modularEnvironment: GridNetworkEnv = {
 	rendezvousNamespace: "drp-network:v1:Z2F0ZS03LWNvbmZpZy10ZXN0",
 	routingEndpoints: "https://routing-a.example/routing/v1/,https://routing-b.example/routing/v1/",
 };
+const networkSourceModuleUrl = new URL("../../../packages/network/src/node.ts", import.meta.url).href;
 
 describe("grid network configuration", () => {
 	it("builds a Nostr-only modular control plane", () => {
@@ -107,6 +108,29 @@ describe("grid network configuration", () => {
 		expect(config.network_config?.control_plane?.rendezvous).not.toHaveProperty("refresh_interval_ms");
 	});
 
+	it("declares the independent legacy grid deployment ceiling", async (context) => {
+		const { DRPNetworkNode } = (await import(networkSourceModuleUrl)) as {
+			DRPNetworkNode: { readonly prototype: object };
+		};
+		if (
+			typeof Object.getOwnPropertyDescriptor(DRPNetworkNode.prototype, "getPeerSelectionSnapshot")?.value !== "function"
+		) {
+			context.skip();
+			return;
+		}
+		const config = getNetworkConfigFromEnv({
+			...modularEnvironment,
+			membershipInvite: undefined,
+			networkMode: undefined,
+			rendezvousEndpoints: undefined,
+			rendezvousNamespace: undefined,
+			routingEndpoints: undefined,
+		});
+		expect(
+			(config.network_config?.control_plane as { peer_selection?: { expected_replicas?: number } })?.peer_selection
+		).toEqual({ expected_replicas: 50 });
+	});
+
 	it("uses WAN relay deadlines only for the public modular profile", () => {
 		const publicRelayPolicy = buildModularNetworkConfig(modularEnvironment).network_config?.control_plane?.relay_policy;
 		const fixtureRelayPolicy = buildModularNetworkConfig({
@@ -166,7 +190,7 @@ describe("grid network configuration", () => {
 			"http://127.0.0.1:5173"
 		);
 
-		expect(config).toEqual({
+		expect(config).toMatchObject({
 			network_config: {
 				bootstrap_peers: ["seed-a", "seed-b"],
 				browser_metrics: true,

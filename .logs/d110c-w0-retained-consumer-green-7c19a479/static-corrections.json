@@ -1,0 +1,28 @@
+{
+  "revisions": [
+    {
+      "phase": "source inspection before lint/typecheck/runtime",
+      "initial": "Projection used a hand-typed aggregate kind missing its -state suffix.",
+      "evidence": "Initial consumers.json source hash retained; inspection of the protocol constant identified the spelling mismatch.",
+      "correction": "Import and use both existing protocol kind constants after genuine full transition authentication.",
+      "testsExecuted": 0
+    },
+    {
+      "phase": "first equivalence script execution",
+      "initial": "An unanchored five-tab pin-line selector also matched the six-tab site's substring and rejected its uniqueness check.",
+      "evidence": "equivalence/status.json and equivalence/stderr retain the failed attempt; equivalence.mjs is preserved unchanged.",
+      "correction": "equivalence-accepted.mjs anchors both exact lines with their preceding newline; three-owner normalized AST comparison then passes.",
+      "productionOrFixtureChangesForThisCorrection": 0,
+      "testsExecuted": 0
+    }
+    ,
+    {
+      "phase": "first readiness freeze execution",
+      "initial": "The checker required identical TypeScript traversal ordering although new direct fixture imports legitimately reorder the same source set.",
+      "evidence": "freeze/status.json and freeze/stderr retain the failed attempt; freeze.mjs is preserved unchanged; both full program identity inventories are retained.",
+      "correction": "freeze-accepted.mjs compares the sorted physical source sets while retaining exact 16 roots, 909 sources, compiler options, version, per-source hashes and diagnostics.",
+      "productionOrFixtureChangesForThisCorrection": 0,
+      "testsExecuted": 0
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+	"schemaVersion": "ts-drp-ed25519-profile-freeze-v1",
+	"profileId": "ts-drp-ed25519-acceptance-v1",
+	"frozenTuple": {
+		"checkpoint": "907fae437e558145f63614cd6b5de925ea4bd8c2",
+		"freezePolicyPath": "packages/protocol-v3/conformance/freeze-policy-v3.json",
+		"freezePolicySha256": "fa2a69d4113f73bbd657d4490189b472a2ae04b5bdc88d35d2de5c87e572ccc3",
+		"protectedPathCount": 47,
+		"protectedPathStatesSha256": "023e7b50c11eff2d5fd4d0d8c5ea6da8d54ad095d73d24b7d3badea2e3769637"
+	},
+	"protectedArtifacts": [
+		"docs/protocol/ed25519-acceptance-profile-v3.md",
+		"docs/protocol/ed25519-acceptance-profile-v3.json",
+		"packages/protocol-v3/supplements/ed25519-acceptance-profile-v1/vectors.json",
+		"packages/protocol-v3/conformance/freeze-policy-ed25519-profile-v1.json",
+		"packages/protocol-v3/scripts/check-ed25519-profile-freeze.mjs",
+		".github/workflows/protocol-v3-ed25519-profile.yml",
+		"tests/protocol-v3-ed25519-acceptance-profile-0g2s.test.ts",
+		"tests/fixtures/phase-0g2s/ed25519-acceptance-profile-contract.json"
+	],
+	"checkerSha256": "137f058914d284f891a8f77d31f51c1ce74ff6c38c49969aec82c306eb1b445d",
+	"artifactSha256": {
+		"docs/protocol/ed25519-acceptance-profile-v3.md": "fcbdee7a1597c1e6d212a4e83b074fff52a0ec62693d512513e4ffc2ad093bc5",
+		"docs/protocol/ed25519-acceptance-profile-v3.json": "36a65af5e3788c68483c360b831e132d24e4ef38ab8c121fd077a0232285c6e3",
+		"packages/protocol-v3/supplements/ed25519-acceptance-profile-v1/vectors.json": "31975a9ef6d16e9cdd836fe9b87b2b369aab0ede69e1d6763a8f75ad46bafc56",
+		"packages/protocol-v3/scripts/check-ed25519-profile-freeze.mjs": "137f058914d284f891a8f77d31f51c1ce74ff6c38c49969aec82c306eb1b445d",
+		".github/workflows/protocol-v3-ed25519-profile.yml": "e343d76a83fa6a0b8d08d9aeeff3256e240f0c684fb0bee3638f7485591d183a",
+		"tests/protocol-v3-ed25519-acceptance-profile-0g2s.test.ts": "26c24d2fc3ac38ee55ca0f092d855a434382230825341cd6380fb1cd332dc938",
+		"tests/fixtures/phase-0g2s/ed25519-acceptance-profile-contract.json": "42baf0e200234eedf31bd0e16f4e23f55a463b3a50578b13e168c929ce9f29a2"
+	}
+}

@@ -1,0 +1,729 @@
+
+Running 1 test using 1 worker
+
+
+
+[1/1] [chromium] › packages/storage-browser/tests/phase-6b-settlement-progress-red.pw.ts:35:1 › Chromium preserves atomic settlement progress and exact CAS refusal across reopen
+  1) [chromium] › packages/storage-browser/tests/phase-6b-settlement-progress-red.pw.ts:35:1 › Chromium preserves atomic settlement progress and exact CAS refusal across reopen 
+
+    Error: D110C_F5B0U_BROWSER_zero-origin
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 82
+    + Received  +  4
+
+    @@ -1,49 +1,10 @@
+      Object {
+        "after": Object {
+          "entries": Array [
+            Object {
+              "disposition": "rebase",
+    -         "replacementProgress": Object {
+    -           "chunks": Array [],
+    -           "intentCount": 2,
+    -           "intentDigest": Array [
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -           ],
+    -           "version": 1,
+    -         },
+              "replacementSequence": null,
+              "sourceDigest": Array [
+                209,
+                209,
+                209,
+    @@ -79,19 +40,19 @@
+              ],
+              "sourceSequence": 7,
+            },
+          ],
+          "fenceSequence": 4,
+    -     "revision": 1,
+    +     "revision": 0,
+          "scope": Object {
+            "author": "author:browser-progress",
+            "objectId": "room:browser-progress",
+          },
+        },
+        "attempt": Object {
+    -     "errorCode": null,
+    -     "ok": true,
+    +     "errorCode": "ISSUANCE_INVALID_ARGUMENT",
+    +     "ok": false,
+        },
+        "before": Object {
+          "entries": Array [
+            Object {
+              "disposition": "rebase",
+    @@ -153,49 +114,10 @@
+        "outboxSequences": Array [],
+        "reopened": Object {
+          "entries": Array [
+            Object {
+              "disposition": "rebase",
+    -         "replacementProgress": Object {
+    -           "chunks": Array [],
+    -           "intentCount": 2,
+    -           "intentDigest": Array [
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -           ],
+    -           "version": 1,
+    -         },
+              "replacementSequence": null,
+              "sourceDigest": Array [
+                209,
+                209,
+                209,
+    @@ -231,11 +153,11 @@
+              ],
+              "sourceSequence": 7,
+            },
+          ],
+          "fenceSequence": 4,
+    -     "revision": 1,
+    +     "revision": 0,
+          "scope": Object {
+            "author": "author:browser-progress",
+            "objectId": "room:browser-progress",
+          },
+        },
+
+      151 | 		expect
+      152 | 			.soft(result[index], "D110C_F5B0U_BROWSER_" + expected.name)
+    > 153 | 			.toEqual({ ...expected, reopened: expected.after });
+          | 			 ^
+      154 | 	}
+      155 | });
+      156 |
+        at /private/tmp/d110c-browser-progress-red-CY5hdf/checkout/packages/storage-browser/tests/phase-6b-settlement-progress-red.pw.ts:153:5
+
+    Error: D110C_F5B0U_BROWSER_nonempty-origin
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 1
+
+    @@ -47,11 +47,11 @@
+            "author": "author:browser-progress",
+            "objectId": "room:browser-progress",
+          },
+        },
+        "attempt": Object {
+    -     "errorCode": "ISSUANCE_RETRY_REQUIRED",
+    +     "errorCode": "ISSUANCE_INVALID_ARGUMENT",
+          "ok": false,
+        },
+        "before": Object {
+          "entries": Array [
+            Object {
+
+      151 | 		expect
+      152 | 			.soft(result[index], "D110C_F5B0U_BROWSER_" + expected.name)
+    > 153 | 			.toEqual({ ...expected, reopened: expected.after });
+          | 			 ^
+      154 | 	}
+      155 | });
+      156 |
+        at /private/tmp/d110c-browser-progress-red-CY5hdf/checkout/packages/storage-browser/tests/phase-6b-settlement-progress-red.pw.ts:153:5
+
+    Error: D110C_F5B0U_BROWSER_partial
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 143
+    + Received  +  10
+
+    @@ -1,55 +1,10 @@
+      Object {
+        "after": Object {
+          "entries": Array [
+            Object {
+              "disposition": "rebase",
+    -         "replacementProgress": Object {
+    -           "chunks": Array [
+    -             Object {
+    -               "lastLogicalTime": 7,
+    -               "replacementSequence": 0,
+    -               "throughIntent": 1,
+    -             },
+    -           ],
+    -           "intentCount": 2,
+    -           "intentDigest": Array [
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -           ],
+    -           "version": 1,
+    -         },
+              "replacementSequence": null,
+              "sourceDigest": Array [
+                209,
+                209,
+                209,
+    @@ -85,63 +40,24 @@
+              ],
+              "sourceSequence": 7,
+            },
+          ],
+          "fenceSequence": 4,
+    -     "revision": 2,
+    +     "revision": 0,
+          "scope": Object {
+            "author": "author:browser-progress",
+            "objectId": "room:browser-progress",
+          },
+        },
+        "attempt": Object {
+    -     "errorCode": null,
+    -     "ok": true,
+    +     "errorCode": "ISSUANCE_COMMIT_INVALID",
+    +     "ok": false,
+        },
+        "before": Object {
+          "entries": Array [
+            Object {
+              "disposition": "rebase",
+    -         "replacementProgress": Object {
+    -           "chunks": Array [],
+    -           "intentCount": 2,
+    -           "intentDigest": Array [
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -           ],
+    -           "version": 1,
+    -         },
+              "replacementSequence": null,
+              "sourceDigest": Array [
+                209,
+                209,
+                209,
+    @@ -177,80 +93,31 @@
+              ],
+              "sourceSequence": 7,
+            },
+          ],
+          "fenceSequence": 4,
+    -     "revision": 1,
+    +     "revision": 0,
+          "scope": Object {
+            "author": "author:browser-progress",
+            "objectId": "room:browser-progress",
+          },
+        },
+        "beforeLineage": Object {
+          "exhausted": false,
+          "next": 0,
+        },
+    -   "issuedSequences": Array [
+    -     0,
+    -   ],
+    +   "issuedSequences": Array [],
+        "lineage": Object {
+          "exhausted": false,
+    -     "next": 1,
+    +     "next": 0,
+        },
+        "name": "partial",
+    -   "outboxSequences": Array [
+    -     0,
+    -   ],
+    +   "outboxSequences": Array [],
+        "reopened": Object {
+          "entries": Array [
+            Object {
+              "disposition": "rebase",
+    -         "replacementProgress": Object {
+    -           "chunks": Array [
+    -             Object {
+    -               "lastLogicalTime": 7,
+    -               "replacementSequence": 0,
+    -               "throughIntent": 1,
+    -             },
+    -           ],
+    -           "intentCount": 2,
+    -           "intentDigest": Array [
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -           ],
+    -           "version": 1,
+    -         },
+              "replacementSequence": null,
+              "sourceDigest": Array [
+                209,
+                209,
+                209,
+    @@ -286,11 +153,11 @@
+              ],
+              "sourceSequence": 7,
+            },
+          ],
+          "fenceSequence": 4,
+    -     "revision": 2,
+    +     "revision": 0,
+          "scope": Object {
+            "author": "author:browser-progress",
+            "objectId": "room:browser-progress",
+          },
+        },
+    @@ -298,10 +165,10 @@
+          Object {
+            "errorCode": null,
+            "ok": true,
+          },
+          Object {
+    -       "errorCode": null,
+    -       "ok": true,
+    +       "errorCode": "ISSUANCE_INVALID_ARGUMENT",
+    +       "ok": false,
+          },
+        ],
+      }
+
+      151 | 		expect
+      152 | 			.soft(result[index], "D110C_F5B0U_BROWSER_" + expected.name)
+    > 153 | 			.toEqual({ ...expected, reopened: expected.after });
+          | 			 ^
+      154 | 	}
+      155 | });
+      156 |
+        at /private/tmp/d110c-browser-progress-red-CY5hdf/checkout/packages/storage-browser/tests/phase-6b-settlement-progress-red.pw.ts:153:5
+
+    Error: D110C_F5B0U_BROWSER_final
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 166
+    + Received  +  15
+
+    @@ -1,61 +1,11 @@
+      Object {
+        "after": Object {
+          "entries": Array [
+            Object {
+              "disposition": "rebase",
+    -         "replacementProgress": Object {
+    -           "chunks": Array [
+    -             Object {
+    -               "lastLogicalTime": 7,
+    -               "replacementSequence": 0,
+    -               "throughIntent": 1,
+    -             },
+    -             Object {
+    -               "lastLogicalTime": 9,
+    -               "replacementSequence": 1,
+    -               "throughIntent": 2,
+    -             },
+    -           ],
+    -           "intentCount": 2,
+    -           "intentDigest": Array [
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -           ],
+    -           "version": 1,
+    -         },
+    -         "replacementSequence": 1,
+    +         "replacementSequence": null,
+              "sourceDigest": Array [
+                209,
+                209,
+                209,
+                209,
+    @@ -90,69 +40,24 @@
+              ],
+              "sourceSequence": 7,
+            },
+          ],
+          "fenceSequence": 4,
+    -     "revision": 3,
+    +     "revision": 0,
+          "scope": Object {
+            "author": "author:browser-progress",
+            "objectId": "room:browser-progress",
+          },
+        },
+        "attempt": Object {
+    -     "errorCode": null,
+    -     "ok": true,
+    +     "errorCode": "ISSUANCE_COMMIT_INVALID",
+    +     "ok": false,
+        },
+        "before": Object {
+          "entries": Array [
+            Object {
+              "disposition": "rebase",
+    -         "replacementProgress": Object {
+    -           "chunks": Array [
+    -             Object {
+    -               "lastLogicalTime": 7,
+    -               "replacementSequence": 0,
+    -               "throughIntent": 1,
+    -             },
+    -           ],
+    -           "intentCount": 2,
+    -           "intentDigest": Array [
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -           ],
+    -           "version": 1,
+    -         },
+              "replacementSequence": null,
+              "sourceDigest": Array [
+                209,
+                209,
+                209,
+    @@ -188,88 +93,32 @@
+              ],
+              "sourceSequence": 7,
+            },
+          ],
+          "fenceSequence": 4,
+    -     "revision": 2,
+    +     "revision": 0,
+          "scope": Object {
+            "author": "author:browser-progress",
+            "objectId": "room:browser-progress",
+          },
+        },
+        "beforeLineage": Object {
+          "exhausted": false,
+    -     "next": 1,
+    +     "next": 0,
+        },
+    -   "issuedSequences": Array [
+    -     0,
+    -     1,
+    -   ],
+    +   "issuedSequences": Array [],
+        "lineage": Object {
+          "exhausted": false,
+    -     "next": 2,
+    +     "next": 0,
+        },
+        "name": "final",
+    -   "outboxSequences": Array [
+    -     0,
+    -     1,
+    -   ],
+    +   "outboxSequences": Array [],
+        "reopened": Object {
+          "entries": Array [
+            Object {
+              "disposition": "rebase",
+    -         "replacementProgress": Object {
+    -           "chunks": Array [
+    -             Object {
+    -               "lastLogicalTime": 7,
+    -               "replacementSequence": 0,
+    -               "throughIntent": 1,
+    -             },
+    -             Object {
+    -               "lastLogicalTime": 9,
+    -               "replacementSequence": 1,
+    -               "throughIntent": 2,
+    -             },
+    -           ],
+    -           "intentCount": 2,
+    -           "intentDigest": Array [
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -             165,
+    -           ],
+    -           "version": 1,
+    -         },
+    -         "replacementSequence": 1,
+    +         "replacementSequence": null,
+              "sourceDigest": Array [
+                209,
+                209,
+                209,
+                209,
+    @@ -304,11 +153,11 @@
+              ],
+              "sourceSequence": 7,
+            },
+          ],
+          "fenceSequence": 4,
+    -     "revision": 3,
+    +     "revision": 0,
+          "scope": Object {
+            "author": "author:browser-progress",
+            "objectId": "room:browser-progress",
+          },
+        },
+    @@ -316,14 +165,14 @@
+          Object {
+            "errorCode": null,
+            "ok": true,
+          },
+          Object {
+    -       "errorCode": null,
+    -       "ok": true,
+    +       "errorCode": "ISSUANCE_INVALID_ARGUMENT",
+    +       "ok": false,
+          },
+          Object {
+    -       "errorCode": null,
+    -       "ok": true,
+    +       "errorCode": "ISSUANCE_COMMIT_INVALID",
+    +       "ok": false,
+          },
+        ],
+      }
+
+      151 | 		expect
+      152 | 			.soft(result[index], "D110C_F5B0U_BROWSER_" + expected.name)
+    > 153 | 			.toEqual({ ...expected, reopened: expected.after });
+          | 			 ^
+      154 | 	}
+      155 | });
+      156 |
+        at /private/tmp/d110c-browser-progress-red-CY5hdf/checkout/packages/storage-browser/tests/phase-6b-settlement-progress-red.pw.ts:153:5
+
+    Error Context: ../../../../Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0u-browser-progress-red-54111eb7/artifacts/phase-6b-settlement-progre-e3737-t-CAS-refusal-across-reopen-chromium/error-context.md
+
+    Error Context: ../../../../Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0u-browser-progress-red-54111eb7/artifacts/phase-6b-settlement-progre-e3737-t-CAS-refusal-across-reopen-chromium/error-context.md
+
+
+  1 failed
+    [chromium] › packages/storage-browser/tests/phase-6b-settlement-progress-red.pw.ts:35:1 › Chromium preserves atomic settlement progress and exact CAS refusal across reopen 

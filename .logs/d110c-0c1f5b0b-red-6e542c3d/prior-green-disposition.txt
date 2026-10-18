@@ -1,0 +1,8 @@
+prior_green_reporter_sha256=9332fff25f5f432f7ff4f85a2555b166a2a26e1b05b45eb9a453fcd60be2b520
+prior_green_matrix=14 selected / 13 passed / 1 failed / 0 skipped
+prior_green_intent_assertion=passed
+prior_green_actual_completion=undefined
+prior_green_expected_completion={kind:published,ok:true}
+disposition=superseded stale retained expectation
+immutable_prior_result_changed=no
+replacement_expectation=completion is undefined for a nonempty application-visible intent

@@ -1,0 +1,17 @@
+[
+  {
+    "root": ".logs/d110c-0c1f5b0z-plan-609ee4ba",
+    "entries": 3,
+    "sha256": "c0b8948b67776b17595a6195927e4c61a5386e192f6d450af66e85d40e9cf172"
+  },
+  {
+    "root": ".logs/d110c-0c1f5b0z-plan-correction-7eb2a8df",
+    "entries": 3,
+    "sha256": "ba31e601dbd9b29c77ed3209be4d40e7336acc5ab2b6a6ff2c368b98dcc7a119"
+  },
+  {
+    "root": ".logs/d110c-0c1f5b0z-red-1eba4f90",
+    "entries": 81,
+    "sha256": "9e56180ab6f58e05a0b443629fbe9acc066614ca84ad56755b28643ea53864ef"
+  }
+]

@@ -1,0 +1,12 @@
+file:///Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-w0-retained-consumer-green-7c19a479/equivalence.mjs:25
+    if (normalized.split(from).length !== 2) throw Error('Expected unique reversal: ' + reason);
+                                                   ^
+
+Error: Expected unique reversal: Detached original bootstrap at indentation 5
+    at replaceOnce (file:///Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-w0-retained-consumer-green-7c19a479/equivalence.mjs:25:52)
+    at file:///Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-w0-retained-consumer-green-7c19a479/equivalence.mjs:35:58
+    at ModuleJob.run (node:internal/modules/esm/module_job:274:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:644:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:116:5)
+
+Node.js v22.15.0

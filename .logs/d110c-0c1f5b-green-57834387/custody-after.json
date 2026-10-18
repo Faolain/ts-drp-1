@@ -1,0 +1,13 @@
+{
+  "head": "57834387c6222189757fce0e7e125914f8d181d8",
+  "changedSinceResume": [],
+  "productionPatchUnchanged": true,
+  "stashesUnchanged": true,
+  "stashCount": 27,
+  "missingUntracked": [],
+  "staged": "",
+  "priorManifestHashes": {
+    "79743f98": "2a3a138665854862c75846d2930141c47f88e1b6c8b9b9729137687e76e9e650",
+    "f031b166": "f8104d640f96c23fb6d8c0d3b42aa414bd62bd13b35bd6244bee9d75945b83c2"
+  }
+}

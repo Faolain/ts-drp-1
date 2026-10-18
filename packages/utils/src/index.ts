@@ -107,6 +107,8 @@ export function processSequentially<T, C>(
 	return context;
 }
 
+export { serializedValuesEqual, serializeValue } from "./serialization/equality.js";
+
 function processRemainingAsync<T, C>(
 	initialPromise: Promise<unknown>,
 	items: T[],

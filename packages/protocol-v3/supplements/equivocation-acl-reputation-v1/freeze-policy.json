@@ -1,0 +1,38 @@
+{
+	"schemaVersion": "ts-drp-equivocation-acl-reputation-freeze-v1",
+	"profile": "equivocation-acl-reputation-v1",
+	"baseProfile": "equivocation-author-projection-v1",
+	"checker": "check-freeze.mjs",
+	"workflow": ".github/workflows/protocol-v3-equivocation-acl-reputation.yml",
+	"protectedArtifacts": [
+		"packages/protocol-v3/supplements/equivocation-acl-reputation-v1/check-freeze.mjs",
+		"packages/protocol-v3/supplements/equivocation-acl-reputation-v1/freeze-policy.json",
+		"packages/protocol-v3/supplements/equivocation-acl-reputation-v1/profile.json",
+		"packages/protocol-v3/supplements/equivocation-acl-reputation-v1/spec.md",
+		".github/workflows/protocol-v3-equivocation-acl-reputation.yml",
+		"tests/protocol-v3-equivocation-acl-reputation-0o-b3.test.ts",
+		"tests/fixtures/phase-0o-b3-v3/acl-reputation-contract.json",
+		"tests/fixtures/phase-0o-b3-v3/controlled-acl-reputation.ts",
+		"tests/fixtures/phase-0o-b3-v3/public-reexport-mutant.ts",
+		"tests/fixtures/phase-0o-b3-v3/public-entry-type-audit.ts",
+		"tests/fixtures/phase-0o-b3-v3/built-package-type-audit.ts",
+		"tests/fixtures/phase-0o-b3-v3/tsconfig.public-entry-audit.json",
+		"tests/fixtures/phase-0o-b3-v3/tsconfig.built-package-audit.json",
+		"tests/fixtures/phase-0o-b3-v3/public-export-contract.mjs"
+	],
+	"checkerSha256": "7f351f3007941432a7fb401d0edc4d84c9eae774c2fbae6069673096922d9ad6",
+	"artifactSha256": {
+		"packages/protocol-v3/supplements/equivocation-acl-reputation-v1/profile.json": "cf7bab5fb8ca441f1b18693cc73f7c6133ba75c31c2d46f907b577a0c084e8a3",
+		"packages/protocol-v3/supplements/equivocation-acl-reputation-v1/spec.md": "46817b87543b5f8106b1ff4365d3b33ce779315b630be485b363411f9ce957eb",
+		".github/workflows/protocol-v3-equivocation-acl-reputation.yml": "d41cce74479575202a89f32947abc1572a1e8c2839cd8122d2b8f0347c45222e",
+		"tests/protocol-v3-equivocation-acl-reputation-0o-b3.test.ts": "ffbc8b3df991b90b0ed7a765307f2c425492ef9c14f3a052290396c5d9b5c665",
+		"tests/fixtures/phase-0o-b3-v3/acl-reputation-contract.json": "24333df238b9a4dd97b4ab031176a31301a9c6b5661fcaa9051896245451c376",
+		"tests/fixtures/phase-0o-b3-v3/controlled-acl-reputation.ts": "84a048b6d91a2d1ebe60eb2c6ef9f2d985a6c5c869161dc20c68ba4f9d4eaa97",
+		"tests/fixtures/phase-0o-b3-v3/public-reexport-mutant.ts": "2d7f5f83e45136ee92b33c68f4e22f23604a196f42033baff49178d420b5d678",
+		"tests/fixtures/phase-0o-b3-v3/public-entry-type-audit.ts": "ef7db1624547befd05a012a4d2de9fb1ace3d2ac1854f015919335b970aef9b4",
+		"tests/fixtures/phase-0o-b3-v3/built-package-type-audit.ts": "c28ab4d2c6967ac1613424b1017c3ae26fd22844dbd1a92e03aec6fc1b23a09f",
+		"tests/fixtures/phase-0o-b3-v3/tsconfig.public-entry-audit.json": "c076cff3e73d6a80d343d8cf4515718fbf4ac5c671f7a55b2960261f3668ad4a",
+		"tests/fixtures/phase-0o-b3-v3/tsconfig.built-package-audit.json": "91cefa1fc53375117c05c69c9340d5cb727d9da0c88fbc4208939a0248e8b5a2",
+		"tests/fixtures/phase-0o-b3-v3/public-export-contract.mjs": "d3b7013e38aabdb8267f8a26ef67c62a0e6100f7de15640b5117ae5e1d8d7e26"
+	}
+}

@@ -1,0 +1,43 @@
+{
+  "scope": "Capture readiness, not product leak confirmation or memory acceptance",
+  "originalReviews": {
+    "Sol": "Terminal findings: staged-source custody and mixed-known/unknown epoch classification",
+    "Fable": "Conditional readiness; three P1 requirements closed below, not unconditional approval",
+    "Grok": "NO_VERDICT: tool-based max-turn exhaustion; complete-source-packet retry pending"
+  },
+  "corrections": [
+    {"finding":"Staged and required untracked sources missing from custody","resolution":"HEAD diff plus explicit required files, including launcher and baseline copies; seven custody controls pass"},
+    {"finding":"Known plus unknown epoch classified shared","resolution":"Unknown dominates; mixed and distinct-known encoded AHE controls pass"},
+    {"finding":"Scalar census array could survive into snapshot","resolution":"Separate recordCensus async frame emits summaries and returns void before settle/GC"},
+    {"finding":"Real runtime owner access untested","resolution":"Genuine two-writer transition, creator adoption and follower reopen; real handle counts and exact nine-database inventory pass"},
+    {"finding":"Fixture/runtime baseline equivalence unverified","resolution":"Preserved original copies have exact completed100 hashes; correction review packet includes observational-only diffs"},
+    {"finding":"Snapshot failure closes descriptor before in-flight I/O completes","resolution":"Await writer close on failure; skip duplicate close after destroy; focused source-error identity/partial-evidence/close control passes"},
+    {"finding":"Observer cost mixed into timing","resolution":"Explicit observerDurationMs; clean profile transition-memory record remains separate from post-observer workload sample"},
+    {"finding":"Missing inventory/registration totals","resolution":"Unfiltered totalDatabaseCount and existing network registration map size added as scalars"},
+    {"finding":"Rollback lineage untested","resolution":"Encoded actual head plus two ancestors, older and disconnected superseded generations classified separately"},
+    {"finding":"Weak path could abort entire analysis report","resolution":"Generic analyzer records unproven-weak-edge terminal reason"},
+    {"finding":"Type/lint failures","resolution":"Independent test author corrected test types/imports; GREEN annotations corrected; whole program type check and focused lint/format pass"}
+  ],
+  "limitations": [
+    "MessageQueueManager depth is not exposed; gate presence is not queue depth",
+    "Current-owner census does not prove retired owners unreachable",
+    "No heap-limit increase applied, including for offline controls",
+    "GRID100_DIAGNOSTIC event kind retained for shared-runner continuity; targetTransitions and test title explicitly identify fixed30",
+    "No actual fixed30 snapshots or product retaining-owner conclusions yet"
+  ],
+  "verification": {
+    "focusedTests": ".logs/grid-memory-attribution/correction-final-controls/",
+    "typeCheck": ".logs/grid-memory-attribution/correction-final-types/",
+    "lint": ".logs/grid-memory-attribution/correction-final-lint/",
+    "format": ".logs/grid-memory-attribution/correction-final-format/",
+    "realSnapshotSmoke": ".logs/grid-memory-attribution/corrected-profiler-smoke-v2/",
+    "originalBaseline": ".logs/d110c-grid-authority/grid100-diagnostic-terminal-lifecycle-repaired/"
+  },
+  "preservedFailedChecks": [
+    "corrected-profiler-smoke: missing output environment",
+    "correction-existing-controls: expose-gc conflicts with mocked gc controls",
+    "correction-types: omitted existing Vite ambient declaration",
+    "runtime-owner-control: follower incorrectly called creator-only adoption API",
+    "runtime-owner-control-v2: oracle omitted legitimate creator seal-vote/evidence database"
+  ]
+}

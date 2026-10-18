@@ -1,0 +1,20 @@
+{
+  "head": "623c415ed3ac2814d071bae59720456a92c804c0",
+  "patchSha256": "245c2b251c5dfc9389c9732319c8e1b474cf2740252dff3d107320121e6564ed",
+  "total": 10,
+  "passed": 10,
+  "failed": 0,
+  "skipped": 0,
+  "exactTitles": true,
+  "executions": 1,
+  "sourceChanged": false,
+  "runtimeChanged": false,
+  "rebuilt": false,
+  "protectedPaths": 86522,
+  "stashCount": 27,
+  "reporterSha256": "2d17f2f286e99e6d28fb63039cfb709b6ac33ba1aa07561567c833d6e168c14f",
+  "stdoutBytes": 131,
+  "stderrBytes": 0,
+  "committed": false,
+  "parentClosed": false
+}

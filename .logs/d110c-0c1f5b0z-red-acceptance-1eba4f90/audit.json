@@ -1,0 +1,20 @@
+{
+  "accepted": true,
+  "testCommit": "1eba4f9065d220afb0d77d90aac4a05b250a05bb",
+  "evidenceCommit": "5ab259fedeea24a102d1e3309d7282da81a3b224",
+  "evidenceManifestSha256": "9e56180ab6f58e05a0b443629fbe9acc066614ca84ad56755b28643ea53864ef",
+  "manifestEntries": 81,
+  "cases": 16,
+  "discoveryFailures": 11,
+  "refusalFailures": 3,
+  "compatibilityPasses": 2,
+  "executionCount": 1,
+  "targetTypeDiagnostics": 0,
+  "packageTypecheckPassClaimed": false,
+  "childRawStreamsInRed": false,
+  "cleanCheckout": "/private/tmp/d110c-f5b0z-red-isolated-8et9Mc/checkout",
+  "unchangedNativeRuntimes": 8,
+  "partialParentFilesPreserved": 7,
+  "protectedPathsPresent": 86522,
+  "stashes": 27
+}

@@ -1,0 +1,43 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 1,
+  "passed": 1,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-23/result.json",
+  "baselineSha256": "78d30a75d1f2ac50eb63ddd54b439595b0e7e0153cb1f0fce0a3b9c7f61f20e1",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-b-hot-adoption.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-b-hot-adoption.test.ts",
+      "ancestorTitles": [
+        "D.110c-b general hot adoption GREEN"
+      ],
+      "fullName": "D.110c-b general hot adoption GREEN advances the genuine epoch-one close to one exact epoch-two active owner",
+      "status": "passed",
+      "title": "advances the genuine epoch-one close to one exact epoch-two active owner",
+      "duration": 4519.16025,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "12f934f3a6a8131205d22d2b0f32f9283f7eb6e8e99311dc0e1745a893839ec7",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

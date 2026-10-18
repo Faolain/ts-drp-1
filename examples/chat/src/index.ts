@@ -1,384 +1,448 @@
+import { openTrustedBlueprintCatalogBytes } from "@ts-drp/blueprint-catalog/bytes";
+import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import {
+	acquireBrowserIdentity,
 	createModularBrowserNetwork,
 	getNetworkConfigFromEnv,
 	isModularNetworkEnv,
 	type ModularBrowserNetworkSession,
 	readBrowserNetworkEnv,
 } from "@ts-drp/example-browser-network";
+import {
+	createV3RoomCreatorInviteMaterial,
+	createV3RoomSession,
+	type V3RoomCreatorInviteMaterial,
+	type V3RoomHeadAuthority,
+	type V3RoomSession,
+} from "@ts-drp/example-v3-room";
 import { DRPNode } from "@ts-drp/node";
-import type { IDRPObject } from "@ts-drp/types";
+import { authenticateV3RoomCreatorInvite } from "@ts-drp/node/v3-room";
 import { DRP_DISCOVERY_TOPIC } from "@ts-drp/types";
 
-import { Chat } from "./objects/chat";
+import catalogMaterial from "./chat-catalog-material.json" with { type: "json" };
 import { setupCopyButton } from "./util/clipboard";
 import { createPeerNameElement, formatPeerItem, shortenId, styleMessageElement } from "./util/peerIdentity";
 import { initializeToastContainer, showToast, ToastType } from "./util/toast";
+import {
+	captureShippingChatOperation,
+	createShippingChatGenesisStateBytes,
+	createShippingV3ChatApplication,
+	type ShippingChatMessageOperation,
+	type ShippingChatProjection,
+} from "./v3-chat-application";
 
-// Helper function to set up collapsible sections
+type ChatHeadFactory = (
+	context: Readonly<{
+		author: string;
+		creatorInvite: string | V3RoomCreatorInviteMaterial;
+		objectId: string;
+		operation: "create" | "join";
+	}>
+) => V3RoomHeadAuthority | Promise<V3RoomHeadAuthority>;
+type ChatSettlementApproval = NonNullable<
+	Parameters<typeof createV3RoomSession<ShippingChatProjection>>[0]["approveSettlementSourceSelection"]
+>;
+declare global {
+	interface Window {
+		__TS_DRP_CHAT_ROOM_HEAD_AUTHORITY_FOR_OPEN__?: ChatHeadFactory;
+		__TS_DRP_CHAT_SETTLEMENT_SOURCE_APPROVAL__?: ChatSettlementApproval;
+		__TS_DRP_CHAT_SESSION__?: ModularBrowserNetworkSession;
+	}
+}
+
+const hex = (value: Uint8Array): string => Array.from(value, (byte) => byte.toString(16).padStart(2, "0")).join("");
+function bytes(value: string): Uint8Array {
+	if (!/^(?:[0-9a-f]{2})+$/u.test(value)) throw new TypeError("Chat bytes are invalid");
+	return Uint8Array.from(value.match(/../gu) as string[], (byte) => Number.parseInt(byte, 16));
+}
+const catalog = openTrustedBlueprintCatalogBytes({
+	catalogBytes: Uint8Array.from(atob(catalogMaterial.catalogBytes), (byte) => byte.charCodeAt(0)),
+	assets: Object.fromEntries(
+		Object.entries(catalogMaterial.assets).map(([name, value]) => [
+			name,
+			Uint8Array.from(atob(value), (byte) => byte.charCodeAt(0)),
+		])
+	),
+});
+const blueprintDigest = catalog.blueprintDigests[0];
+if (blueprintDigest === undefined || catalog.blueprintDigests.length !== 1)
+	throw new TypeError("Chat requires its exact shipping catalog");
+
+let node: DRPNode | undefined;
+let room: V3RoomSession<ShippingChatProjection> | undefined;
+let projection: ShippingChatProjection | undefined;
+let openTask: Promise<void> | undefined;
+let issueTask: Promise<void> | undefined;
+let closing = false;
+let observer = true;
+let renderInterval: ReturnType<typeof setInterval> | undefined;
+let renderedRoomId: string | undefined;
+let pendingSend: Readonly<{ author: string; operation: ShippingChatMessageOperation }> | undefined;
+const createButton = document.getElementById("createRoom") as HTMLButtonElement;
+const joinButton = document.getElementById("joinRoom") as HTMLButtonElement;
+const sendButton = document.getElementById("sendMessage") as HTMLButtonElement;
+const roomInput = document.getElementById("roomInput") as HTMLInputElement;
+const messageInput = document.getElementById("messageInput") as HTMLInputElement;
+
+function status(message: string, state: "joining" | "ready" | "error"): void {
+	const element = document.getElementById("chatStatus") as HTMLElement;
+	element.textContent = message;
+	element.dataset.state = state;
+}
+
 function setupCollapsibleSections(): void {
-	const infoToggle = document.getElementById("infoToggle");
-	const infoContainer = document.querySelector(".info-container");
-
-	if (infoToggle && infoContainer) {
-		const toggleText = infoToggle.querySelector(".toggle-text");
-
-		infoToggle.addEventListener("click", () => {
-			infoContainer.classList.toggle("expanded");
-
-			// Update toggle button text
-			if (toggleText instanceof HTMLElement) {
-				if (infoContainer.classList.contains("expanded")) {
-					toggleText.textContent = "Hide Connection Info";
-				} else {
-					toggleText.textContent = "Show Connection Info";
-				}
-			}
-		});
-
-		// Check if we need to initialize the expanded state based on screen size
-		const updateExpandedState = (): void => {
-			if (window.innerWidth > 767) {
-				infoContainer.classList.add("expanded");
-			} else {
-				infoContainer.classList.remove("expanded");
-			}
-		};
-
-		// Run initially and on resize
-		updateExpandedState();
-		window.addEventListener("resize", updateExpandedState);
-	}
+	const toggle = document.getElementById("infoToggle");
+	const container = document.querySelector(".info-container");
+	if (toggle === null || container === null) return;
+	const updateLabel = (): void => {
+		const label = toggle.querySelector(".toggle-text");
+		if (label !== null)
+			label.textContent = container.classList.contains("expanded") ? "Hide Connection Info" : "Show Connection Info";
+	};
+	toggle.addEventListener("click", () => {
+		container.classList.toggle("expanded");
+		updateLabel();
+	});
+	const resize = (): void => {
+		container.classList.toggle("expanded", window.innerWidth > 767);
+		updateLabel();
+	};
+	resize();
+	window.addEventListener("resize", resize);
 }
 
-class ChatStateManager {
-	_node: DRPNode;
-	_drpObject: IDRPObject<Chat> | undefined = undefined;
-
-	constructor(node: DRPNode) {
-		this._node = node;
-	}
-
-	hasChat(): boolean {
-		try {
-			if (!this.chat) {
-				return false;
-			}
-			return true;
-		} catch {
-			return false;
-		}
-	}
-
-	get chat(): Chat {
-		if (!this.drp.drp) {
-			throw new Error("Chat DRP not initialized");
-		}
-		return this.drp.drp;
-	}
-
-	get drp(): IDRPObject<Chat> {
-		if (!this._drpObject) {
-			throw new Error("DRP object not initialized");
-		}
-		return this._drpObject;
-	}
-
-	get node(): DRPNode {
-		return this._node;
-	}
-
-	get peers(): string[] {
-		return this._node.networkNode.getAllPeers();
-	}
-
-	get discoveryPeers(): string[] {
-		return this._node.networkNode.getGroupPeers(DRP_DISCOVERY_TOPIC);
-	}
-
-	get objectPeers(): string[] {
-		if (!this._drpObject) return [];
-		try {
-			return this._node.networkNode.getGroupPeers(this.drp.id);
-		} catch (e) {
-			console.warn(e);
-			return [];
-		}
-	}
+function renderPeerList(id: string, peers: readonly string[]): void {
+	(document.getElementById(id) as HTMLElement).replaceChildren(...peers.map((peer) => formatPeerItem(peer)));
+}
+function isWriter(acl: unknown, author: string): boolean {
+	if (acl === null || typeof acl !== "object") return false;
+	if (Reflect.get(acl, "permissionless") === true) return true;
+	const members: unknown = Reflect.get(acl, "members");
+	return (
+		Array.isArray(members) &&
+		members.some(
+			(member: unknown) =>
+				member !== null &&
+				typeof member === "object" &&
+				Reflect.get(member, "author") === author &&
+				Array.isArray(Reflect.get(member, "groups")) &&
+				Reflect.get(member, "groups").includes("writer")
+		)
+	);
+}
+function currentWriter(): boolean {
+	return (
+		!observer &&
+		room !== undefined &&
+		node !== undefined &&
+		isWriter(Reflect.get(room.previewLatchedAcl(), "current"), node.keychain.localAuthorId)
+	);
 }
 
-const element_peers = <HTMLDivElement>document.getElementById("peers");
-const element_discoveryPeers = <HTMLDivElement>document.getElementById("discoveryPeers");
-const element_objectPeers = <HTMLDivElement>document.getElementById("objectPeers");
-const element_peerId = <HTMLDivElement>document.getElementById("peerId");
-const element_chatId = <HTMLDivElement>document.getElementById("chatId");
-const element_chat = <HTMLDivElement>document.getElementById("chat");
-
-const renderPeers = (chatState: ChatStateManager): void => {
-	element_peers.innerHTML = "";
-	chatState.peers.forEach((peerId) => {
-		element_peers.appendChild(formatPeerItem(peerId));
-	});
-};
-
-const renderDiscoveryPeers = (chatState: ChatStateManager): void => {
-	element_discoveryPeers.innerHTML = "";
-	chatState.discoveryPeers.forEach((peerId) => {
-		element_discoveryPeers.appendChild(formatPeerItem(peerId));
-	});
-};
-
-const renderObjectPeers = (chatState: ChatStateManager): void => {
-	element_objectPeers.innerHTML = "";
-	chatState.objectPeers.forEach((peerId) => {
-		element_objectPeers.appendChild(formatPeerItem(peerId));
-	});
-};
-
-const renderPeerId = (chatState: ChatStateManager): void => {
-	element_peerId.innerHTML = "";
-	element_peerId.appendChild(formatPeerItem(chatState.node.networkNode.peerId));
-};
-
-const renderChatId = (chatState: ChatStateManager): void => {
-	if (!chatState.drp) return;
-	const shortenedId = shortenId(chatState.drp.id);
-	element_chatId.innerHTML = `<span>${shortenedId}</span>`;
-	element_chatId.setAttribute("data-full-id", chatState.drp.id);
-};
-
-const renderChat = (chatState: ChatStateManager): void => {
-	const chat = chatState.chat.query_messages();
-	element_chat.innerHTML = "";
-
-	if (chat.size === 0) {
-		const div = document.createElement("div");
-		div.innerHTML = "No messages yet";
-		div.className = "no-messages";
-		div.style.padding = "10px";
-		div.style.textAlign = "center";
-		div.style.color = "#6c757d";
-		element_chat.appendChild(div);
-		return;
+function render(): void {
+	if (node !== undefined) {
+		renderPeerList("peers", node.networkNode.getAllPeers());
+		renderPeerList("discoveryPeers", node.networkNode.getGroupPeers(DRP_DISCOVERY_TOPIC));
+		renderPeerList("objectPeers", room?.connectedPeers() ?? []);
+		(document.getElementById("peerId") as HTMLElement).replaceChildren(formatPeerItem(node.networkNode.peerId));
 	}
-
-	// Get current user's peer ID
-	const currentPeerId = chatState.node.networkNode.peerId;
-
-	// Parse and sort messages by timestamp
-	const parsedMessages = [...chat]
-		.map((message) => {
-			const match = message.match(/^\(([^,]+), (.*), ([^)]+)\)$/);
-			if (match) {
-				const [_, timestamp, content, peerId] = match;
-				return {
-					original: message,
-					timestamp: parseInt(timestamp),
-					content,
-					peerId,
-					isSelf: peerId === currentPeerId,
-				};
-			}
-			return {
-				original: message,
-				timestamp: 0,
-				content: message,
-				peerId: "unknown",
-				isSelf: false,
-			};
-		})
-		.sort((a, b) => a.timestamp - b.timestamp);
-
-	for (const parsedMessage of parsedMessages) {
-		const messageDiv = document.createElement("div");
-		messageDiv.className = `message ${parsedMessage.isSelf ? "self" : ""}`;
-
-		if (parsedMessage.timestamp > 0) {
-			// Format timestamp
-			const date = new Date(parsedMessage.timestamp);
-			const formattedDate = `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
-
-			// Create timestamp element
-			const timestampDiv = document.createElement("div");
-			timestampDiv.className = "message-timestamp";
-			timestampDiv.textContent = formattedDate;
-
-			// Create sender element
-			const senderDiv = document.createElement("div");
-			senderDiv.className = "message-sender";
-			senderDiv.appendChild(createPeerNameElement(parsedMessage.peerId));
-
-			// Create content element
-			const contentDiv = document.createElement("div");
-			contentDiv.className = "message-content";
-			contentDiv.textContent = parsedMessage.content;
-
-			// Append all elements to message div
-			messageDiv.appendChild(timestampDiv);
-			messageDiv.appendChild(senderDiv);
-			messageDiv.appendChild(contentDiv);
-
-			// Style the message with the peer's color
-			styleMessageElement(messageDiv, parsedMessage.peerId);
-		} else {
-			// Fallback if message format doesn't match
-			messageDiv.textContent = parsedMessage.original;
+	if (room?.objectId !== renderedRoomId) {
+		const roomId = document.getElementById("chatId") as HTMLElement;
+		roomId.textContent = room === undefined ? "" : shortenId(room.objectId);
+		roomId.dataset.fullId = room?.objectId ?? "";
+		roomId.dataset.invite = room?.invite ?? "";
+		(document.getElementById("chatInvite") as HTMLTextAreaElement).value = room?.invite ?? "";
+		(document.getElementById("chatInviteRow") as HTMLElement).hidden = room === undefined;
+		renderedRoomId = room?.objectId;
+	}
+	const chat = document.getElementById("chat") as HTMLElement;
+	chat.replaceChildren();
+	if (projection === undefined || projection.messages.length === 0) {
+		const empty = document.createElement("div");
+		empty.className = "no-messages";
+		empty.textContent = room === undefined ? "Create or join a chat room to begin." : "No messages yet";
+		chat.appendChild(empty);
+	} else {
+		const messages = [...projection.messages].sort(
+			(a, b) =>
+				a.displayTimeMs - b.displayTimeMs ||
+				a.author.localeCompare(b.author) ||
+				a.clientOperationId.localeCompare(b.clientOperationId)
+		);
+		for (const message of messages) {
+			const row = document.createElement("div");
+			row.className = "message" + (message.author === node?.keychain.localAuthorId ? " self" : "");
+			row.dataset.author = message.author;
+			row.dataset.clientOperationId = message.clientOperationId;
+			row.dataset.displayTimeMs = String(message.displayTimeMs);
+			const timestamp = document.createElement("div");
+			timestamp.className = "message-timestamp";
+			const date = new Date(message.displayTimeMs);
+			timestamp.textContent = date.toLocaleDateString() + " " + date.toLocaleTimeString();
+			const sender = document.createElement("div");
+			sender.className = "message-sender";
+			sender.appendChild(createPeerNameElement(message.author));
+			const content = document.createElement("div");
+			content.className = "message-content";
+			content.textContent = message.text;
+			row.append(timestamp, sender, content);
+			styleMessageElement(row, message.author);
+			chat.appendChild(row);
 		}
-
-		element_chat.appendChild(messageDiv);
+		chat.scrollTop = chat.scrollHeight;
 	}
+	sendButton.disabled = closing || issueTask !== undefined || !currentWriter();
+	messageInput.disabled = closing || !currentWriter();
+	createButton.disabled = closing || openTask !== undefined || room !== undefined;
+	joinButton.disabled = createButton.disabled;
+}
 
-	// Auto-scroll to bottom
-	element_chat.scrollTop = element_chat.scrollHeight;
-};
-
-const render = (chatState: ChatStateManager): void => {
-	renderPeers(chatState);
-	renderDiscoveryPeers(chatState);
-	renderObjectPeers(chatState);
-	renderPeerId(chatState);
-	if (!chatState.hasChat()) return;
-	renderChatId(chatState);
-	renderChat(chatState);
-};
-
-function sendMessage(message: string, chatState: ChatStateManager): void {
-	const timestamp: string = Date.now().toString();
-	if (!chatState.drp.drp) {
-		showToast("Please create or join a chat room first", ToastType.ERROR, 5000);
-		return;
-	}
-
+async function openChat(operation: "create" | "join"): Promise<void> {
+	const selectedNode = node;
+	if (selectedNode === undefined || closing || room !== undefined) return;
+	status(operation === "create" ? "Creating chat…" : "Joining chat…", "joining");
+	let opened: V3RoomSession<ShippingChatProjection> | undefined;
 	try {
-		chatState.chat.addMessage(timestamp, message, chatState.node.networkNode.peerId);
-		render(chatState);
+		const author = selectedNode.keychain.localAuthorId;
+		let objectId: string;
+		let invite: string | V3RoomCreatorInviteMaterial;
+		let exactCanonicalLatchedAclBytes: Uint8Array;
+		if (operation === "create") {
+			objectId = selectedNode.networkNode.peerId + ":" + hex(crypto.getRandomValues(new Uint8Array(16)));
+			exactCanonicalLatchedAclBytes = encodeCanonical({
+				epoch: 0,
+				kind: "drp-v3-latched-acl",
+				members: [{ author, finalityKey: author, groups: ["admin", "finality", "writer"] }],
+				objectId,
+				permissionless: false,
+				version: 3,
+			});
+			const signers = [{ publicKey: author, signerId: "creator" }];
+			invite = await createV3RoomCreatorInviteMaterial({
+				objectId,
+				blueprintDigest,
+				exactCanonicalApplicationStateBytes: createShippingChatGenesisStateBytes({ exactCanonicalLatchedAclBytes }),
+				exactCanonicalLatchedAclBytes,
+				exactCanonicalParametersCarrierBytes: encodeCanonical({
+					maxDependencies: 16,
+					maxEpochBytes: 8_388_608,
+					maxEpochVertices: 8192,
+					maxPendingBytes: 16_777_216,
+					maxPendingEntries: 4096,
+					maxSnapshotBytes: 268_435_456,
+					snapshotChunkBytes: 131_072,
+				}),
+				exactCanonicalProfileBytes: encodeCanonical({
+					cryptoSuiteId: "ed25519-sha256-v3",
+					profileId: "creator-trusted-settlement-v1",
+					quorum: 1,
+					signers,
+				}),
+				exactCanonicalSignerSetBytes: encodeCanonical(signers),
+				signGenesisAnchorDigest: (digest) => selectedNode.keychain.signWithLocalAuthor(digest),
+			});
+		} else {
+			invite = roomInput.value.trim();
+			const identity = authenticateV3RoomCreatorInvite({
+				creatorInvite: invite,
+				application: {
+					catalog,
+					canonicalBlueprintPackageBytes: catalog.resolve(blueprintDigest).canonicalBlueprintPackageBytes,
+				},
+			});
+			objectId = identity.objectId;
+			const material = decodeCanonical(bytes(invite)) as Record<string, unknown>;
+			if (!(material.exactCanonicalLatchedAclBytes instanceof Uint8Array))
+				throw new TypeError("Chat invite ACL is missing");
+			exactCanonicalLatchedAclBytes = material.exactCanonicalLatchedAclBytes;
+		}
+		const application = await createShippingV3ChatApplication({
+			catalog,
+			blueprintDigest,
+			exactCanonicalGenesisLatchedAclBytes: exactCanonicalLatchedAclBytes,
+		});
+		const factory = window.__TS_DRP_CHAT_ROOM_HEAD_AUTHORITY_FOR_OPEN__;
+		if (typeof factory !== "function")
+			throw new TypeError("Chat room-head authority is unavailable: the application host must configure its factory");
+		const approveSettlementSourceSelection = window.__TS_DRP_CHAT_SETTLEMENT_SOURCE_APPROVAL__;
+		if (approveSettlementSourceSelection !== undefined && typeof approveSettlementSourceSelection !== "function")
+			throw new TypeError("Chat settlement approval policy is invalid");
+		const authority = await factory(Object.freeze({ author, creatorInvite: invite, objectId, operation }));
+		// Signed genesis membership selects acquisition, not portable Writer
+		// authority. Recovery and each ordinary operation recheck the native ACL.
+		const enrolledWriter = isWriter(decodeCanonical(exactCanonicalLatchedAclBytes), author);
+		const databaseName =
+			"ts-drp-v3-chat--" + hex(hashDomain("ts-drp/chat-database/v1", new TextEncoder().encode(objectId)));
+		opened = await createV3RoomSession<ShippingChatProjection>({
+			application,
+			author,
+			creatorInvite: invite,
+			objectId,
+			databaseName,
+			issuanceDatabaseName: databaseName,
+			migrationDatabaseNamespace: author + ":" + objectId,
+			initialLogicalTime: 3,
+			...(!enrolledWriter ? { receiveOnly: true as const } : {}),
+			...(operation === "create"
+				? { creatorFinalitySigner: await selectedNode.keychain.acquireLocalAuthorFinalitySigner() }
+				: {}),
+			roomHeadAuthority: authority,
+			publicKeyBytes: bytes(author),
+			createOperationAdmissionPolicy: application.createOperationAdmissionPolicy,
+			// The host explicitly decides only after the shared owner authenticates
+			// the exact proposal. No policy means protected work awaits approval.
+			...(approveSettlementSourceSelection === undefined ? {} : { approveSettlementSourceSelection }),
+			signRegisteredVertexDigest: (digest) => selectedNode.keychain.signWithLocalAuthor(digest),
+			openTransport: (id) => selectedNode.openRoomNetwork(id),
+			onAcceptedVertex: () => undefined,
+			onProjection: (value) => {
+				projection = value;
+				render();
+			},
+		});
+		if (closing) throw new TypeError("Chat closed during open");
+		room = opened;
+		observer = !enrolledWriter;
+		projection = opened.projection();
+		status(
+			observer
+				? "Connected as an observer; this chat is read-only."
+				: "Connected as an enrolled Writer. Creator-trusted chat; not Byzantine-fault-tolerant.",
+			"ready"
+		);
+		render();
 	} catch (error) {
-		showToast(error instanceof Error ? error.message : "Failed to send message", ToastType.ERROR, 5000);
+		await opened?.close();
+		projection = undefined;
+		status(
+			error instanceof Error ? error.message : "Could not open chat. Check the signed invite and configured host.",
+			"error"
+		);
+		showToast("Could not open chat. Check the signed invite and host configuration.", ToastType.ERROR, 5000);
+		console.error("Chat open failed", error);
 	}
 }
 
-function createConnectHandlers(chatState: ChatStateManager): void {
-	const node = chatState.node;
-	node.messageQueueManager.subscribe(chatState.drp.id, () => {
-		// on create/connect
-		renderChat(chatState);
-	});
-
-	node.subscribe(chatState.drp.id, () => {
-		renderChat(chatState);
-	});
+function startOpen(operation: "create" | "join"): void {
+	if (closing || openTask !== undefined || room !== undefined) return;
+	const task = openChat(operation);
+	openTask = task;
+	render();
+	void task
+		.finally(() => {
+			if (openTask === task) openTask = undefined;
+			render();
+		})
+		.catch((error: unknown) => console.error("Chat open cleanup failed", error));
 }
 
-const button_create = <HTMLButtonElement>document.getElementById("createRoom");
-const button_connect = <HTMLButtonElement>document.getElementById("joinRoom");
-const button_send = <HTMLButtonElement>document.getElementById("sendMessage");
-const room_input: HTMLInputElement = <HTMLInputElement>document.getElementById("roomInput");
-const message_input: HTMLInputElement = <HTMLInputElement>document.getElementById("messageInput");
-
-function run(chatState: ChatStateManager): void {
-	initializeToastContainer();
-	setupCopyButton();
-	setupCollapsibleSections(); // Initialize collapsible sections
-
-	// 1st render
-	render(chatState);
-
-	chatState.node.messageQueueManager.subscribe(DRP_DISCOVERY_TOPIC, () => {
-		render(chatState);
-	});
-
-	const create = async (): Promise<void> => {
-		chatState._drpObject = await chatState.node.createObject({ drp: new Chat() });
-		createConnectHandlers(chatState);
-
-		// The object creator can sign for finality
-		if (chatState.node?.keychain.blsPublicKey) {
-			chatState.drp.acl.setKey(chatState.node?.keychain.blsPublicKey);
+async function issueMessage(): Promise<void> {
+	const selected = room;
+	const author = node?.keychain.localAuthorId;
+	if (selected === undefined || author === undefined || closing || !currentWriter()) return;
+	const text = messageInput.value;
+	if (text.length === 0) {
+		showToast("Please enter a message", ToastType.ERROR, 5000);
+		return;
+	}
+	try {
+		if (pendingSend === undefined || pendingSend.author !== author || pendingSend.operation.text !== text) {
+			pendingSend = Object.freeze({
+				author,
+				operation: captureShippingChatOperation(
+					{ action: "message", clientOperationId: crypto.randomUUID(), displayTimeMs: Date.now(), text },
+					author
+				),
+			});
 		}
-		render(chatState);
-	};
-
-	const connect = async (): Promise<void> => {
-		const objectId = room_input.value;
-		if (!objectId) {
-			showToast("Please enter a room ID", ToastType.ERROR, 5000);
-			return;
-		}
-
-		try {
-			chatState._drpObject = await chatState.node.connectObject({ id: objectId, drp: new Chat() });
-			createConnectHandlers(chatState);
-			render(chatState);
-		} catch (error) {
-			showToast(error instanceof Error ? error.message : "Failed to connect to room", ToastType.ERROR, 5000);
-		}
-	};
-
-	const sendMessageListener = (): void => {
-		const message: string = message_input.value;
-		message_input.value = "";
-		if (!message) {
-			showToast("Please enter a message", ToastType.ERROR, 5000);
-			return;
-		}
-
-		try {
-			sendMessage(message, chatState);
-		} catch (error) {
-			showToast(error instanceof Error ? error.message : "Failed to send message", ToastType.ERROR, 5000);
-		}
-	};
-
-	button_create.addEventListener("click", () => {
-		if (room_input.value) {
-			void connect();
-		} else {
-			void create();
-		}
-		room_input.value = "";
-	});
-	button_connect.addEventListener("click", () => void connect());
-	button_send.addEventListener("click", () => void sendMessageListener());
-
-	// periodically render the peers
-	setInterval(() => {
-		renderPeers(chatState);
-		renderDiscoveryPeers(chatState);
-		renderObjectPeers(chatState);
-		if (!chatState.hasChat()) return;
-		renderChatId(chatState);
-	}, 3000);
-
-	setInterval(() => {
-		if (!chatState.hasChat()) return;
-		render(chatState);
-	}, 10_000);
+		const command = pendingSend;
+		await selected.issue({ ...command.operation });
+		if (room !== selected) return;
+		if (messageInput.value === command.operation.text) messageInput.value = "";
+		if (pendingSend === command) pendingSend = undefined;
+		status("Message accepted locally; remote delivery follows the room transport.", "ready");
+	} catch (error) {
+		// Complete author/identity/time payload and text survive a refused retry.
+		status(error instanceof Error ? error.message : "Message refused. Retained text can be retried.", "error");
+		showToast("Message refused. Your text is retained for retry.", ToastType.ERROR, 5000);
+	}
+}
+function startIssue(): void {
+	if (closing || issueTask !== undefined) return;
+	const task = issueMessage();
+	issueTask = task;
+	render();
+	void task
+		.finally(() => {
+			if (issueTask === task) issueTask = undefined;
+			render();
+		})
+		.catch((error: unknown) => console.error("Chat issue cleanup failed", error));
 }
 
 async function main(): Promise<void> {
-	const environment = readBrowserNetworkEnv(import.meta.env);
-	const networkConfig = getNetworkConfigFromEnv(environment, window.location.origin);
-	const modularSession = isModularNetworkEnv(environment)
-		? createModularBrowserNetwork(networkConfig, environment)
-		: undefined;
-	const chatState = new ChatStateManager(modularSession?.node ?? new DRPNode(networkConfig));
-
-	let hasRun = false;
-	await chatState.node.start();
-	if (modularSession !== undefined) exposeModularSession(modularSession);
-	await chatState.node.networkNode.isDialable(() => {
-		if (hasRun) return;
-		hasRun = true;
-		run(chatState);
+	initializeToastContainer();
+	setupCollapsibleSections();
+	const identity = await acquireBrowserIdentity({
+		lockPrefix: "ts-drp:chat:v3:identity-slot",
+		seedKey: "ts-drp:chat:v3:identity-seed",
 	});
+	let modular: ModularBrowserNetworkSession | undefined;
+	let disposeCopy: (() => void) | undefined;
+	try {
+		const environment = readBrowserNetworkEnv(import.meta.env);
+		const selected = getNetworkConfigFromEnv(environment, window.location.origin);
+		const config = { ...selected, keychain_config: { ...selected.keychain_config, private_key_seed: identity.seed } };
+		modular = isModularNetworkEnv(environment) ? createModularBrowserNetwork(config, environment) : undefined;
+		node = modular?.node ?? new DRPNode(config);
+		await node.start();
+		if (modular !== undefined) {
+			window.__TS_DRP_CHAT_SESSION__ = modular;
+			window.dispatchEvent(new CustomEvent("ts-drp:chat-ready", { detail: modular.snapshot() }));
+		}
+		window.addEventListener(
+			"beforeunload",
+			() => {
+				closing = true;
+				if (renderInterval !== undefined) clearInterval(renderInterval);
+				disposeCopy?.();
+				void (async (): Promise<void> => {
+					await openTask;
+					await issueTask;
+					await room?.close();
+					await (modular?.stop() ?? node?.stop());
+					identity.release();
+				})().catch((error: unknown) =>
+					console.error("Chat shutdown failed; custody retained until document termination", error)
+				);
+			},
+			{ once: true }
+		);
+		let bound = false;
+		await node.networkNode.isDialable(() => {
+			if (bound) return;
+			bound = true;
+			disposeCopy = setupCopyButton();
+			createButton.addEventListener("click", () => startOpen("create"));
+			joinButton.addEventListener("click", () => startOpen("join"));
+			sendButton.addEventListener("click", startIssue);
+			roomInput.addEventListener("keydown", (event) => {
+				if (event.key === "Enter") startOpen("join");
+			});
+			messageInput.addEventListener("keydown", (event) => {
+				if (event.key === "Enter") startIssue();
+			});
+			status("Create a chat or paste a signed invite to join.", "ready");
+			render();
+			renderInterval = setInterval(render, 3000);
+		});
+	} catch (error) {
+		await node?.stop();
+		identity.release();
+		throw error;
+	}
 }
-
-function exposeModularSession(session: ModularBrowserNetworkSession): void {
-	const target = window as typeof window & {
-		__TS_DRP_CHAT_SESSION__?: ModularBrowserNetworkSession;
-	};
-	target.__TS_DRP_CHAT_SESSION__ = session;
-	window.addEventListener("beforeunload", () => void session.stop(), { once: true });
-	window.dispatchEvent(new CustomEvent("ts-drp:chat-ready", { detail: session.snapshot() }));
-}
-
-void main();
+void main().catch((error: unknown) => {
+	status("Chat could not start. Check the configured catalog, identity and network.", "error");
+	console.error("Chat startup failed", error);
+});

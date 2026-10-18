@@ -1,0 +1,46 @@
+{
+  "scope": "W0 current-profile reconciliation, observation-only tests-owned RED",
+  "freeze": "0bca5b6d45dfaec66a3726d89093d0bc5d55c013",
+  "patchCommit": "d1aa3d9d99b032f6ba6e306f7b989a4485dd4f4c",
+  "patchSignature": "G",
+  "patchOriginExact": true,
+  "patchSha256": "7f1a115d0e81f426f1705948260cdc76e91463e73d086d47ee99edb9947e9c68",
+  "owners": [
+    "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+    "tests/fixtures/phase-6b-d110c-0c1k/w0-runtime-contract.ts"
+  ],
+  "change": "Nine additive typed observations and complete JSON assertion diagnostic; original title, assertion expectation, routing, profile, writers, parameters and workload preserved.",
+  "historicalCausalRed": {
+    "executionRoot": ".logs/d110c-0c1f5b-green-71bca5d5/retained-58",
+    "head": "71bca5d580ef0bab9bd17aaf7b51df99810b61c1",
+    "tests": 6,
+    "passed": 5,
+    "failed": 1,
+    "reporterSha256": "4926a150b2355c8f908c89085ed6fd89070c03faf66498c8cc32de9b0914fc2b",
+    "commandSha256": "dfe6d69cc74a86b2d62eada4d1ab69144e667a39569285c2994bcf344e2737cc",
+    "limitation": "The reporter proves only the aggregate mismatch. It does not measure or report the nine new fields, nor identify a differing numeric field. Historical signed test/helper hashes equal frozen pre-edit source hashes; new source identities are separately captured."
+  },
+  "newEvidence": {
+    "testExecutions": 0,
+    "saturationExecutions": 0,
+    "newObservationValuesMeasured": false,
+    "typecheckBefore": { "exitCode": 0, "diagnostics": 0, "sourceInputs": 883 },
+    "typecheckAfter": { "exitCode": 0, "diagnostics": 0, "sourceInputs": 883 },
+    "lint": { "exitCode": 0, "errors": 0, "unchangedWarnings": 1 },
+    "format": { "exitCode": 0 },
+    "diffCheck": { "exitCode": 0 },
+    "semanticEquivalence": { "exitCode": 0, "proof": "AST printer identities match frozen source after removing only the enumerated observation declarations, observation assignments, output fields and assertion diagnostic." }
+  },
+  "custody": {
+    "beforeAfterFinalPassed": true,
+    "pendingProductionOwnersUnchanged": 8,
+    "builtOutputsUnchanged": 7,
+    "stashesUnchanged": 27,
+    "protectedPathsPreserved": 86522,
+    "sealedManifestRootsVerified": 39,
+    "sharedCreatorAdoptionFixtureChanged": false,
+    "indexEmptyAfterPatch": true
+  },
+  "nextOwner": "Distinct GREEN owner implements only the frozen profile selector, legacy refusal reconciliation, genuine offender-owned settlement fence companion and frozen exact accounting/retained/isolation gates.",
+  "manifest": "manifest.sha256 covers every file in this evidence root except itself; seal output and subsequent evidence commit identity are reported externally to avoid rewriting sealed evidence."
+}

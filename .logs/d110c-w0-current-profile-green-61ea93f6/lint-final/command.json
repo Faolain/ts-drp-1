@@ -1,0 +1,12 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "eslint",
+    "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+    "tests/fixtures/phase-6b-d110c-0c1k/w0-runtime-contract.ts",
+    "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts"
+  ],
+  "start": "2026-09-06T09:55:47.987Z"
+}

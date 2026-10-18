@@ -1,0 +1,13 @@
+{
+  "cwd": "/tmp/d110c-f5b0u-green-75Jm2F/checkout",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "playwright",
+    "test",
+    "--config",
+    "packages/storage-browser/playwright.phase-6b-settlement-progress.config.ts",
+    "--reporter=json"
+  ],
+  "start": "2026-09-05T06:48:13.068Z"
+}

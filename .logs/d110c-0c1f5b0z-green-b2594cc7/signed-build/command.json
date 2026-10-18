@@ -1,0 +1,8 @@
+{
+  "cwd": "/tmp/d110c-f5b0z-green-signed-REUkBZ/checkout",
+  "command": "pnpm",
+  "args": [
+    "build:packages"
+  ],
+  "start": "2026-09-05T20:03:57.677Z"
+}

@@ -1,0 +1,2221 @@
+Warning: [loop_control] 'max_retries_per_step' is deprecated and no longer used; rename it to 'max_attempts_per_step'. Run /update-config to fix it.
+.logs/d110c-0c1f2-red-f488f1f6/:
+commands.txt
+diagnostic-ledger.md
+manifest.sha256
+product-red.final.txt
+protocol-red.final.txt
+result.json
+static-gates.txt
+
+.logs/d110c-0c1f24-clean-9e1781e0/:
+SHA256SUMS
+proof.md
+
+.logs/d110c-0c1f24-codex-precommit-review/:
+SHA256SUMS
+result.md
+
+.logs/d110c-0c1f24-f5-combined-review-f3617a82/:
+grok
+kimi
+opus
+prompt.md
+schema.json
+
+.logs/d110c-0c1f24-green-working-fcd8735c/:
+SHA256SUMS
+commands.md
+focused-vitest.json
+playwright.json
+retained-vitest.json
+validation.md
+
+.logs/d110c-0c1f4-red-causal-1033e22e/:
+SHA256SUMS
+commands.md
+ledger.md
+listing.txt
+manifest-validation.txt
+playwright.json
+reporter-validation.md
+source-shape.md
+static-gates.md
+
+.logs/d110c-0c1f5-source-audit-fcd8735c/:
+SHA256SUMS
+audit.md
+
+.logs/d110c-trajectory-fable51-high-oneoff-20260903/:
+SHA256SUMS
+prompt.md
+result.md
+schema.json
+verification.md
+19:## 0. What changed, and what is now established fact
+21:### 0.1 Evidence produced on this machine (not inherited)
+70:### 0.2 The inherited-evidence problem is larger than the browser gate
+87:### 0.3 Corrections to round 1 (verified against source at `bf7d351`)
+139:### 0.4 The verdict, restated
+162:### 0.5 Two release trains — do not merge the claims
+183:### 0.6 The honest scope statement
+243:## 1. Principles
+292:## 2. Package topology and the AHE port map
+294:### 2.1 Packages
+329:### 2.2 Port map — what happens to each of the 13 reference modules
+364:### 2.3 The oracle architecture
+402:### 2.4 Three live defects in the reference, confirmed by execution here
+443:### 2.5 The typing rules for a semantics-preserving JS→TS port
+462:### 2.6 Crypto profile: sync `@noble/hashes`, and why §19's benchmark narrative is an artifact
+488:### 2.7 Wire format: the existing proto shape cannot carry v2
+501:## 3. The phase graph
+509:Phase 7 while Phase 6 already validates history continuity.
+527:    P7["Phase 7<br/>Archive / Discord profile"]
+560:## Phase −1 — Normative freeze (ATOMIC — nothing else starts)
+579:### The frozen decisions
+596:### −1g amendment log — signature-suite reservation
+603:### Exit gate (Phase −1)
+667:### Phase −1a–c runtime hardening boundary
+690:## Gate 0 — Oracles, divergence manifest, CI topology
+719:### Test tiering (every gate is assigned a tier — an unassigned gate does not exist)
+738:## Phase −1′ — Protocol-v3 normative freeze (ATOMIC successor line)
+774:## Phase 0 — Determinism core (= the pure-module port) + live-bug fixes
+996:### Exit gate (Phase 0)
+1012:## Phase 1 — Sync, auth, capacity, and operational infrastructure
+1046:### Measured wall order (fix in this order; numbers are per-object)
+1061:### Exit gate (Phase 1)
+1075:## Phase 2 — Durable substrate, Worker host, hard-kill driver, browser gate
+1105:### Phase 2f assumption-correction quorum — executable worker-host v2
+1135:#### Ownership and package boundary
+1156:#### One coded error taxonomy
+1184:#### Slice 2f-a — bounded executor and telemetry
+1247:##### Phase 2f-a accepted and closed
+1305:#### Slice 2f-b — byte-bounded wire and host lifecycle
+1403:#### Slice 2f-b browser handshake gate
+1421:##### Phase 2f-b accepted and closed
+1486:#### Slice 2f-c — emitted graph and real workload
+1533:##### Phase 2f-c and Phase 2f accepted and closed
+1593:#### Slice gates, budgets and deferred 2f-d
+1620:### Phase 2g assumption-correction quorum — executable capacity seam v1
+1645:#### 2g-a — neutral capacity facts and sole browser binding
+1738:##### Phase 2g-a accepted and closed
+1837:#### 2g-b — bounded stage admission and metadata-only dedup
+2021:##### 2g-b implementation closure — bounded admission accepted
+2106:#### 2g-c — trace-derived quota-fault acceptance
+2180:##### 2g-c implementation closure — native-failure oracle accepted
+2304:#### Receipt correction and named 7b-r deferral
+2323:4. Phase 7b's committed availability policy; and
+2340:#### Closure, preservation and Phase 2 exit
+2377:### Phase 2h assumption-correction quorum — browser validation composite v4
+2416:#### Ratification lineage and evidence custody
+2482:#### Nonblocking implementation clarifications
+2509:#### Merged normative Phase 2h contract
+2511:#### 1. Finite TDD decomposition
+2539:#### 2. Exact engines and required 69-tuple registry
+2594:#### 3. Closed evidence primitives and source-owned types
+2606:#### 4. Closed record, engine, OS/device and modes
+2628:#### 5. Ready protocol and responsiveness
+2638:#### 6. Required scenarioEvidence union
+2676:#### 7. Exact process-death and WebKit arming evidence
+2694:#### 8. Aggregate, run binding, diagnostic identity and output ownership — v4 replacement
+2841:#### 9. Config, server, CI, coverage and timing truth
+2855:#### 10. Truthful boundaries and stop conditions
+2866:#### Phase 2h-a implementation closure — aggregate contract accepted
+2983:#### Phase 2h-b implementation closure — browser surfaces accepted
+3107:#### Phase 2h-c implementation closure — capacity and representative quota accepted
+3254:#### Phase 2h-d assumption-correction quorum — host/content authority v6
+3417:#### Phase 2h-d assumption-correction quorum — CI trigger registration v1
+3478:#### Phase 2h-d assumption-correction quorum — passive PGID-zero observation v3
+3569:#### Phase 2h-d implementation closure — native x64 accepted
+3721:#### Phase 2h-e implementation closure — activation gate accepted
+3840:### Phase 2i assumption correction — election moves to its first real consumers
+3931:### Phase 2j assumption correction — preserve the storage aggregate
+4046:#### Phase 2j implementation closure — accepted companion evidence
+4147:### Phase 2k assumption-correction quorum — honest browser currency v1
+4173:#### Policy, clocks and channel truth
+4197:#### Authorities and recoverable custody
+4245:#### Currency is not the AHE browser matrix
+4258:#### One dependency and refresh owner
+4279:#### Report, artifact and failure semantics
+4309:#### Honest pre-publication boundary and Electron lifecycle
+4338:#### TDD sequence and bounded proof
+4400:#### Phase 2k / 2h corrective requalification — invocation-owned Playwright version
+4545:#### Phase 2k closure — Playwright 1.62.1 requalified without widening evidence
+4631:### Phase 2l assumption-correction quorum — durable issuance v1
+4648:#### Ownership and freeze boundary
+4670:#### Separate greenfield database identities and exact schemas
+4734:#### Public API, validation and transaction algorithm
+4873:#### Ambiguous acknowledgement and durable outbox lifecycle
+4923:#### Physical evidence and finite matrices
+4983:#### Four TDD checkpoints and acceptance
+5013:#### Quorum evidence and one-off sense-check
+5080:#### Phase 2l-a shared-contract closure
+5134:#### Phase 2l-b browser factory, closed options and lifecycle amendment
+5143:##### Exact public surface and packaging
+5174:##### Closed options and opaque identity
+5210:##### Resolution and strict-durability gate
+5236:##### One connection and close semantics
+5269:##### Browser primary-identity opacity addendum
+5336:#### Phase 2l-b browser-adapter closure
+5395:#### Phase 2l-c Node factory, SQLite admission and lifecycle amendment
+5407:##### Exact public surface and options
+5456:##### One exact SQLite-v1 authority
+5511:##### One connection, exact transaction and readback
+5589:#### Phase 2l-c closure evidence
+5645:#### Phase 2l-d parity and aggregate Phase 2l closure evidence
+5716:### D.93 — Track P2 trusted blueprint authoring and application catalog
+5729:#### D.93.1 — Ownership and preserved boundaries
+5760:#### D.93.2 — Private CLI and atomic products
+5791:#### D.93.3 — Closed read-once authoring input
+5837:#### D.93.4 — Deterministic artifact and lint evidence
+5930:#### D.93.5 — Package and evidence identities
+6004:#### D.93.6 — Unchanged 0j-c child and closed receipt
+6107:#### D.93.7 — Canonical flat catalog and verification
+6164:#### D.93.8 — Public resolver and closed taxonomy
+6254:#### D.93.9 — Exact Phase-3a handoff
+6277:#### D.93.10 — Goldens, CI and ordered TDD slices
+6334:#### D.93.11 — P2-a closure evidence
+6381:#### D.93.12 — P2-b closure evidence
+6413:#### D.93.13 — P2-c closure evidence
+6455:#### D.93.14 — P2-d closure evidence
+6490:#### D.93.15 — Phase-3a current-anchor authentication seam
+6633:#### D.93.16 — P2-e and Track P2 closure evidence
+6681:#### D.93.17 — Phase 3a-0 creator trust root and durable current-anchor context
+6697:##### Codec, anchor schema and availability
+6717:##### Trust identity and creator authority
+6760:##### Canonical durable record
+6791:##### Protocol-v3 package-root surface
+6938:##### Shared closure scanner and preservation check
+7039:##### One durable head and exact CAS
+7161:##### Creator API precedence and future certified profiles
+7188:##### Slice order, no effects and TDD
+7254:##### Quorum evidence and authorization
+7271:#### D.93.18 — Phase 3a-0-A closure evidence and Phase 3a-0-B handoff
+7362:#### D.93.19 — Phase 3a-0-B durable genesis rejection and fixed-owner admission
+7386:##### Corrected closed result surface
+7433:##### Exact fresh-install order and authority handoff
+7492:##### RED evidence and sustainable test boundary
+7556:#### D.93.20 — Phase 3a-0-B closure evidence and Phase 3a-0-C handoff
+7661:#### D.93.21 — Phase 3a-0-C closure evidence and Phase 3a-0-D handoff
+7759:#### D.93.22 — Phase 3a-0-D closure evidence and Phase 3a-1 handoff
+7851:#### D.93.23 — Phase 3a-1 creator preparation and activation split
+7867:##### Owner, surface and dependencies
+7977:##### Authentication, parameters and catalog preparation
+8080:##### Owned graph, projection and opaque authority
+8202:##### One combined authority transition and reopen
+8265:##### Zero effects, tests and B handoff
+8329:#### D.93.24 — Phase 3a-1A-a closure evidence and Phase 3a-1A-b handoff
+8395:#### D.93.25 — Phase 3a-1A-b closure evidence and Phase 3a-1A-c handoff
+8455:#### D.93.26 — Phase 3a-1A-c closure evidence and blocked Phase 3a-1B handoff
+8571:#### D.93.27 — Phase 3a-1B prerequisite seam 1: authenticated vertex extraction
+8591:##### Public contract
+8635:##### One decision and two compatible projections
+8678:##### Closed failure taxonomy and precedence
+8704:##### Detached result ownership
+8733:##### Root surface and compatibility pins
+8760:##### Bounded 1B handoff and legacy non-authority
+8777:##### TDD slices, gates and causal mutants
+8826:#### D.93.28 — Phase 3a-1B seam 1 closure ledger
+8909:#### D.93.29 — Phase 3a-1B prerequisite seam 2: durable outbox publication transition
+8921:##### Owner, API and types
+8966:##### Closed input validation
+8981:##### State machine and meaning of `published`
+9007:##### Backend transition and readback
+9074:##### Classification ownership, precedence and closed taxonomy
+9151:##### Concurrency
+9166:##### Compatibility, surfaces and deliberate supersessions
+9213:##### RED owners, mutants and gates
+9294:##### Authorization
+9302:#### D.93.30 — Phase 3a-1B seam 2 closure ledger
+9398:#### D.93.31 — Phase 3a-1B prerequisite seam 3: exact legacy/v2/v3 transport, topic, subscription and outbox-publication composition
+9408:##### Closed three-plane and ownership model
+9450:##### Exact network and generated-wire widening
+9505:##### Closed private activation surface
+9591:##### Atomic activation, registration and rollback
+9669:##### Received ingress and exact Seam-1 handoff
+9733:##### Durable-record-authoritative outbound publication
+9802:##### Error, restart and compatibility boundaries
+9826:##### Authorized paths, RED slices and causal mutants
+9890:##### Supersession and authorization boundary
+9905:#### D.93.32 — Phase 3a-1B seam-3 generated-wire ownership and oracle correction
+9915:##### Sole package-boundary correction
+9935:##### Generator and wire-oracle correction
+9975:##### Corrected TDD and authorization boundary
+9991:#### D.93.33 — Phase 3a-1B seam-3 closure ledger
+10082:#### D.93.34 — Phase 3a-1B prerequisite seam 4: durable accepted-vertex journal and replay
+10101:##### Why a separate substrate is required
+10117:##### Package, adapters and exact public surface
+10192:##### Scope and exact installation input
+10247:##### Received carrier and local reference rows
+10315:##### Deduplication, idempotence and conflict
+10358:##### One durable owner and one order
+10385:##### Results and failure precedence
+10451:##### Closed input, copies and hostile totality
+10467:##### Readiness token and deterministic replay pages
+91568:#### D.110c — blocking repeated same-room authenticated epoch lifecycle
+91572:D.110c preserves D.108, D.109, and D.110a exactly as accepted. D.108 proves the
+91580:D.110c is a blocking coordinated production-lifecycle umbrella owned by the
+91620:| Archive and cold paging                                  | The current anchor/cut schemas carry `archiveIndexRoot`, but protocol-v3 creator close requires the next input root to equal the current anchor root. Phase 7 archive segmentation/paging is not implemented in the production packages.                                                                                                                                                      | D.110c can supply a genuine multi-epoch producer and preserve an existing root, but cannot silently evolve archive lineage or cold-page messages. Evolving the committed archive root is a separate Phase-7 wire/authority reslice. The Discord golden path stays blocked until that downstream slice consumes D.110c output.                                                                   |
+91626:bounded authenticated current-trust checkpoint. D.110c is a coordinated
+91635:##### D.110c-0b Hedera/Hiero comparative authority-lineage audit
+91691:| Evolving roster and proof keys  | Evolving room ACL/authority                     | In D.110c's `creator-trusted-v1` scope, the creator checkpoint signer/profile/signer set stays fixed while the signed anchor's ACL digest may evolve. |
+91740:The D.110c-0b candidate decision is:
+91744:| Stable genesis/root authority signs the current checkpoint  | Directly authenticates a current anchor under the creator key committed by a separately pin-verified genesis anchor carrier. Supports evolving ACL/state/history fields while the `creator-trusted-v1` signer remains invariant; does not solve future seal-key rotation. | O(1) existing-v1 current-record bytes, one fixed caller-held genesis invite carrier, and fixed rollback generations, plus the existing RFC 9162 accumulator's absolute safe-integer ceiling of at most 53 peaks; existing Ed25519 plus anchor/QC/history checks. | Browser-feasible with existing primitives, record schema, and no new crypto dependency or wire field. It still requires a new reviewed protocol-v3 checkpoint opener, closure-law contract, durable compatibility transition, and authenticated freshness floor. | Untrusted genesis-carrier/current-record bytes are fully reverified and cross-bound. A caller-held authenticated expected head/floor is required to reject a valid stale checkpoint; a new client with only genesis cannot infer latestness. The bounded immediate-predecessor rollback closure supplies the genuine epoch-N-1 trust needed to verify the retained N-1→N QC. Archive bytes grow separately. Prune only after authentic durable replacement, head installation, snapshot/availability/outbox gates, and two rollback generations. **Selected for creator-only integrity/control compaction, conditional on D.110c-0b0 selecting a real freshness-floor owner.** |
+91745:| Periodically certified checkpoint with external pin         | Can authenticate current authority and freshness if the external pin is trusted.                                                                                                                                                                                          | O(1) local control state; external service/state evolves.                                                                                                                                                                                                        | Introduces a new authority/availability carrier, API, migration, and operational dependency.                                                                                                                                                                     | Useful only as a separately accepted Phase-7 bootstrap/freshness design. **Rejected for D.110c-0b.**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+91750:The selected D.110c-0b architecture is therefore a **bounded dual-anchor creator
+91776:shape; D.110c-c/d count its exact items and bytes as bootstrap control state,
+91794:head-advancing generation, D.110c-0b1 must stop and reslice the rollback window
+91817:`CurrentAnchorTrust` minting remains protocol-v3 custody. D.110c-0b0b therefore
+91819:control-plane bounded-advance predicate before implementation; D.110c-0b1 owns
+91828:D.110c-0b1 is limited to stable `creator-trusted-v1`; rotating creator/seal
+91840:the latest checkpoint after complete hostile rollback. **D.110c-0b0** now owns
+91844:authority. Until then, D.110c may claim bounded authentic recovery with an
+91848:D.110c-0b1 executable RED is deliberately sequenced **after D.110c-0b0,
+91849:D.110c-0a, D.110c-a, and D.110c-b GREEN, after D.110c-0b0b design acceptance,
+91850:and before D.110c-c RED**. It consumes their real
+91889:mutants. D.110c-c consumes the accepted opener and pruning law; D.110c-d proves
+91892:availability, cold paging, and brand-new-client freshness. No D.110c-0b result
+91900:order is: current 0b architecture decision; D.110c-0b0 design acceptance;
+91901:D.110c-0a GREEN; D.110c-0b0 RED/GREEN; D.110c-0b0b design acceptance;
+91902:D.110c-a GREEN; D.110c-b GREEN; executable D.110c-0b1 RED/GREEN;
+91903:D.110c-0c; D.110c-c; then D.110c-d. The hot
+91910:1. **D.110c-0a — epoch-relative creator seal custody.** Owner:
+91932:   availability, and outbox gates. Those four stores enter the D.110c-c/d
+91934:   closes before D.110c-a RED.
+91935:2. **D.110c-0b0 — authenticated freshness-floor authority prerequisite.**
+91950:   D.110c-c/d durable censuses. No candidate is silently selected by this audit.
+91972:3. **D.110c-0b — bounded authenticated trust checkpoint and control-proof
+91983:   authority solution, conditional on D.110c-0b0 supplying the missing floor.
+91984:   D.110c-0b0b freezes the reviewed non-root epoch-N checkpoint opener and
+91985:   bounded-advance public contracts before a/b production edits. D.110c-0b1
+91990:   D.110c-c RED and D.110c-d freeze.
+91991:4. **D.110c-0c — durable pending-adoption resume decision.** Owner: creator
+91998:   reviewed, not smuggled into D.110c-c. It closes before the post-close and
+91999:   pre-adoption restart gates and executes only after D.110c-0b1 GREEN.
+92000:5. **D.110c-a — authenticated repeat-close state carrier.** Owner:
+92015:   Deadline: before D.110c-b RED.
+92016:6. **D.110c-b — general hot adoption, activation, and product custody.** Owner:
+92028:   new epoch-N controls are additive. Deadline: before D.110c-c RED.
+92029:7. **D.110c-c — bounded cold reopen, repeated cleanup, restart, and custody.**
+92040:   change, D.110c-c stops and reslices it explicitly before implementation.
+92057:   demonstrates an owner defect. Deadline: before D.110c-d RED.
+92058:8. **D.110c-d — retained long-horizon and golden-path prerequisite gate.**
+92059:   Owner: tests and test/build infrastructure only after D.110c-a/b/c GREEN. One
+92071:##### D.110c-0a bounded epoch-relative seal-custody plan
+92092:D.110c-0a is one security-authority TDD slice with two diagnostic batches and
+92125:by `bindCreatorLiveClose`, remain owned by D.110c-a and are explicitly out of
+92218:- row enumeration is exact by epoch for actor resume and later D.110c-c
+92219:  retirement/census. 0a does not delete old rows. D.110c-c may retire them only
+92235:retained D.110c-0a mutant preserves the existing exact protocol/storage error
+92271:the widened exports and D.110c-a exclusion, preserving aggregate observation
+92294:and D.110c-0a RED is authorized. Grok's first confirmation request was canceled
+92350:the frozen D.110c-0a GREEN batches described above.
+92352:The D.110c-0a GREEN implementation now closes that causal RED without widening
+92432:dispatcher execution belongs to D.110c-a/b while the exact mechanical key
+92456:D.110c-0a is closed; later slices may consume its genuine epoch-relative seal
+92459:##### D.110c-0b0 owner-selection design
+92489:| Library-selected external checkpoint service     | Could supply a monotonic authenticated pin and brand-new-client bootstrap.                                                    | Adds a service, availability policy, credential protocol, dependency, and migration chosen by ts-drp.                        | Rejected for D.110c-0b0. Phase 7 may bind the application capability to a separately reviewed service, but ts-drp does not silently choose one here. |
+92495:close/adoption owners. D.110c-0b0 first plumbs the provider and a copied exact
+92498:bounded checkpoint opener only when D.110c-0b1 implements that later consumer;
+92616:transition history is retained. D.110c does not implement permanent provider
+92621:D.110c-0b0 RED/GREEN is frozen accordingly. RED uses the real first transition
+92644:  the exact step-5 commit, step 6 gates publication, and the D.110c-c/d censuses
+92680:and reslice before production edits. After reviewed 0b0 GREEN, D.110c-a/b must
+92682:stable exact floor for bounded cold trust opening; D.110c-c/d prove retirement,
+92686:The D.110c-0b0 executable RED is now frozen without reopening the accepted
+92749:The RED gate is closed and the next authorized state is the narrow D.110c-0b0
+92758:browser-only rollback resistance. Therefore D.110c-c/d and Phase 7 may claim
+92762:already required D.110c-0b1 private-opener stop-check; they do not reopen the
+92777:are accepted prospectively: D.110c-0b1 must declare the genuinely required
+92793:primary Hiero sources and the existing D.110c decision without editing the
+92807:Its sole material prospective caution is accepted as a D.110c-0b1 gate: no
+92824:##### D.110c-0b0a staged adoption and pending-recovery prerequisite
+92843:weaken crash acceptance or hide provider I/O in Node. **D.110c-0b0a** owns it,
+92845:D.110c-a production work, or multi-epoch execution. Its source owner is the
+2690:The only passing shape is outcome:supported, workerCrossOriginIsolated:true, workerScope:DedicatedWorkerGlobalScope, armHitCount:1, cellAtHit:1, blockedForMs>=100, transactionTerminalWhileBlocked:false, notifyWoken:1, finalCellValue:2, transactionTerminalAfterResume:complete and detail:null. The three engine measurements are retained verbatim; every process-death record for an engine carries byte-identical armingMeasurement evidence.
+18030:| **6b**   | Enumerated-structure cleanup: closed-epoch `vertices`, `forwardEdges`, `frontier`, `vertexDistances`, causality caches, snapshots, checkpoints, finality state, pending indexes, sync inventories, rollback artifacts — **only after** verified commit QC + durable adoption + ≥2 rollback generations + availability policy satisfied + outbox fully categorized. Browser cleanup scheduling reuses the exact 5c primary-dispatch owner/port and introduces no second election mechanism; holding the advisory lease grants no deletion authority, and every cleanup precondition is transactionally rechecked immediately before deletion.                                                                                                                       | consensus-v3 | Archival-vs-compacted differential over ≥100 epochs; raw-dependency audit instrumentation; Locks on/off/unavailable and takeover yield the same eligible deletion set, while a stale lease holder or changed precondition deletes nothing                                                                                                                             |
+18131:Every number names its harness. **Cold join is measured on a fixture with ≥100 _compacted_ epochs of
+18332:- [ ] Profile-table numbers met in `benchmark.yml`, cold join measured on a **≥100-compacted-epoch** fixture.
+87505:6. **D.109f exit:** ≥100-epoch archival-versus-compacted differential,
+94918:across ≥100 transitions. No GREEN claim includes physical pruning, pending
+95110:blocking D.110c-0c/D.110c-d debt before the ≥100-transition gate and is not
+95212:issuance durability consequence before the ≥100-transition gate. The next
+95222:but full GREEN is blocked on the newly demonstrated D.110c-0c1 predecessor-
+95356:D.110c-0c1 plan prospectively absorbs only the logical-scan reset and one
+95362:intermediate-epoch issuance rows remains D.110c-c, before D.110c-d's ≥100
+95519:##### D.110c-0c1 authenticated intermediate-epoch issuance prerequisite
+95523:remaining multi-author boundary has been isolated by D.110c-0c1f's source
+95525:production edit begins before the stopped D.110c-0c1f1 design and its explicit
+95526:D.110c-0c1f2 compact-encoding reslice are signed, pushed, reviewed, and
+95599:After D.110c-0c1a and D.110c-0c1b closure, D.110c-0c1 RED remains tests-only and
+95890:classification matrix and is not accepted as D.110c-0c1 RED. Playwright exited
+95904:D.110c-0c1 may resume.** Owner:
+95908:D.110c-0c1 causal RED resumes, before D.110c-0c production integration, and
+95945:any D.110c-0c1 historical classification. GREEN runs a dedicated control-only
+95949:real downstream successor reopen exactly once. The D.110c-0c1 differential
+95991:requiring the later D.110c-0c1 run to reach its distinct historical-row
+96024:One fresh one-test/one-file D.110c-0c1 execution now reaches the separately
+96029:close or mask D.110c-0c1. The effective D.110c-0c1 executable assertion anchor
+96070:re-anchor the effective D.110c-0c1 assertions as stated above. Grok's and Kimi's
+96106:change the D.110c-0c1 RED or authorize broader product behavior.
+96277:those predicates authenticate. The future D.110c-0c1 consumer uses one
+96295:`prunedThroughAuthorSequence === displacedIssuanceBoundary`; D.110c-0c1 leaves
+96333:before D.110c-0c1d or parent D.110c-0c1 closes, before D.110c-0c resumes, and
+96339:parent D.110c-0c1 regression. Its hot creator 0→1 adoption passed, but the
+96383:activated registration in the same order. Same-author D.110c-0c1 behavior is
+96399:Chromium product file as a combined retained gate. The D.110c-0c1 historical
+96413:D.110c-0c1f below and remains blocking before parent D.110c-0c1, Phase-6 exit,
+96537:D.110c-0c1 closes, before 0c1f RED, before D.110c-0c resumes, and before
+96741:D.110c-0c1 GREEN review covers 0c1e, 0c1d, and 0c1g together; this prerequisite
+96909:≥100-transition gate; the passing D.93.46b semantics suite remains the current
+96924:parent 0c1: D.110c-0c1f remains blocking for multi-author historical issuance.
+96944:may claim the MMORPG-style ≥100-transition golden path, and before Phase-6 exit.
+96976:###### D.110c-0c1f multi-author historical-issuance authority prerequisite
+96981:Production work is stopped pending acceptance of the D.110c-0c1f2 compact
+96982:encoding reslice after D.110c-0c1f1's maximum-shape stop below.** Owner: the
+96986:before D.110c-0c1 closes, before the ≥100-transition same-room gate, before
+97024:###### D.110c-0c1f1 bounded multi-author issuance-frontier carrier prerequisite
+97029:97 bytes above the unchanged 8,192-byte ceiling. D.110c-0c1f2 below owns the
+97052:D.110c-c cleanup/close work, before D.110c-d's ≥100 transitions, and before
+97265:###### D.110c-0c1f2 compact issuance-frontier encoding reslice
+97395:emits no D.110c-0c1f2 changed-path diagnostic; it is recorded honestly and is
+97401:**D.110c-0c1f2 GREEN diagnostic stop:** the first narrow implementation draft
+97432:###### D.110c-0c1f3 noncreator genesis-issuance bootstrap authority reslice
+97436:D.110c-0c1f4 below, while the original RED remains causal and D.110c-0c1f2
+97586:###### D.110c-0c1f4 exact pinned-genesis bootstrap recovery authority prerequisite
+97593:signed, finally reviewed, or closed. D.110c-0c1f5 below is a newly demonstrated
+97609:parent 0c1/0c or the ≥100-transition gate, Phase-6 exit, or Phase-7
+97783:final Grok/Kimi/Opus review remain required, and D.110c-0c1f5 remains blocking
+97817:###### D.110c-0c1f5 authenticated rebase-supersession frontier prerequisite
+97822:exact-design selection before final closure of D.110c-0c1f2/f4, parent
+97823:D.110c-0c1/0c, the same-room ≥100-transition gate, Phase-6 exit, or Phase-7
+97998:`.logs/d110c-0c1f5-source-audit-fcd8735c/audit.md`. It pins signed/pushed RED
+98019:D.110c-0c1 browser differential. The already-reviewed `v3-live.ts` historical
+98021:owned by D.110c-0c1 and is not redesigned here. Deadline: GREEN before
+f3617a82 docs: amend rebase frontier liveness plan
+da3e7551 test: record isolated frontier recovery proof
+9e1781e0 feat: authenticate multi-author recovery frontiers
+fcd8735c test: freeze bootstrap authority causal red
+1033e22e docs: close bootstrap authority confirmation
+a3bd4e07 docs: freeze bootstrap policy compatibility
+ddfb2a9f docs: freeze bootstrap recovery authority
+50b281e3 docs: reslice noncreator bootstrap authority
+f3617a8284af6d149441f0531ddec520370a34fe
+96b8a0af82409bae4e4582469e9f82dc6c79b491
+?? .agents/
+?? .claude/
+?? .logs/d108e4-complete-config-a5ac938f/
+?? .logs/d108e4-plan-grok-50fd6fd5/
+?? .logs/d108e4a-green-reviews-3f10ac71/
+?? .logs/d108e4a-plan-reviews-1a90eff2/
+?? .logs/d108e4a-red-reviews-e91cf5e3/
+?? .logs/d108e4aa-green/
+?? .logs/d108e4aa-plan-review-8463378c/
+?? .logs/d108e4aa-red/
+     999 /Users/aristotle/.kimi-code/sessions/wd_ts-drp-1_cd3f86280794/session_e2d5e95e-311a-4a67-a092-1350cfa7ac58/agents/main/tool-results/Read-tool_0wlzML9DXP1KTOz4fkpALp1H-7dc477c2-0f0c-47c1-98a1-e4908f2b0beb.txt
+97503	must cover both the safe bootstrap-only case and the refused prior-application-
+97504	history case. This replaces the overly broad 0c1f1 statement that every
+97505	remove/re-add is refused; it does not allow a lineage reset, erase old rows, or
+97506	hide an issuance gap.
+97507	
+97508	Candidate 1 is rejected because it makes the signed RED unimplementable.
+97509	Candidate 4 is rejected because making joins reach the creator would alter
+97510	ordinary publication/census behavior, would not deterministically authenticate
+97511	an offline writer before the first close, and would still strand later-added
+97512	writers whose locally issued sequence zero is anchored at genesis. Candidate
+97513	3's sticky initial-only proof class is rejected for the selected uniform rule:
+97514	it would require membership-incarnation/tombstone semantics and still needs an
+97515	exact bootstrap-operation authority, while the reserved slot-zero base plus
+97516	the `>1` gap refusal distinguishes safe zero-history additions from hidden
+97517	application history without growing the carrier. A new carrier field remains
+97518	the fallback only if the exact prerequisite review disproves that invariant.
+97519	
+97520	The audit also proves the existing pinned-genesis predicate is too broad for
+97521	this selected use: today it accepts any valid local-author registered vertex
+97522	at epoch zero and the pinned genesis anchor. It does not require sequence zero,
+97523	the exact one dependency, logical time one, or equality to the
+97524	product's configured bootstrap operation. Neither the blueprint (which admits
+97525	multiple application actions), ACL membership, local signature, issuance
+97526	lineage, nor `V3OperationAdmissionPolicy.reserve(operation)` supplies that
+97527	missing exact policy fact. The trusted `V3RoomApplication.bootstrapOperation`
+97528	does, but `RecoverV3LiveReplicaInput` and private successor-reopen/live
+97529	material do not carry it. Tightening this securely therefore requires an
+97530	explicit public compatibility boundary and cannot be folded silently into the
+97531	already-authorized 0c1f2 draft.
+97532	
+97533	The governing review inspected signed/pushed plan commit
+97534	`50b281e3dd9732a2dd7403992ec5336dcd96a0ce`, its signed RED and diagnostic
+97535	trace, and the uncommitted draft only as non-GREEN evidence. Grok 4.6/high
+97536	session `01a06823-4340-76b0-98da-431ed42d01f4` returned
+97537	`CHANGES_REQUIRED`, P0/P1/P2 `2/2/0`; Kimi K3/100-step session
+97538	`session_9c1b5118-1c1b-4c98-bf0f-ac00d96b419a` returned
+97539	`CHANGES_REQUIRED`, `0/4/2`; and Opus xhigh session
+97540	`78381cf7-4d72-4289-a155-3650fbd059ab` returned `CHANGES_REQUIRED`,
+97541	`3/6/2`. All three accepted the original RED as causal. Their blocking union
+97542	is dispositioned above: freeze one implementable rule and both its close and
+97543	recovery consumers; forbid covered-historical slot zero; tighten the exact
+97544	pinned-genesis predicate; prove the complete dense chain rather than a count;
+97545	state the changed aggregate semantics and dual-carrier equality; add the
+97546	missing RED preconditions; and gate draft behavior away from legacy paths.
+97547	Grok preferred candidate 3 because the prior text did not specify a uniform
+97548	later-addition bootstrap rule; the corrected invariant above answers that
+97549	concern without silent schema growth. Kimi and Opus preferred constrained
+97550	candidate 2 but likewise required the exact compatibility boundary now owned
+97551	by 0c1f4. P2 dispositions require the real maximum-shape/export checks at
+97552	GREEN and retain local-lineage asymmetry as an explicitly tested non-authority
+97553	fact. Raw prompt, schema, trace, terminal summaries, commands, session IDs, and
+97554	available transcript hashes are under
+97555	`.logs/d110c-0c1f3-plan-review-50b281e3/`. Its six-entry self-excluding
+97556	manifest validates and its SHA-256 is
+97557	`429c829e0602c15e0d7b5d5ce73c97c9f4c83f434e91226d9d334667a7b16f0d`.
+97558	
+97559	No diagnostic production draft is accepted or committed. The single material
+97560	confirmation reviewed signed/pushed commit
+97561	`a3bd4e07bce71876fd98ed4e6ded30c1aef49cd3`. Grok 4.6/high exact session
+97562	`01a06843-5bb3-7102-8434-e3d6282eafce` returned `CHANGES_REQUIRED`,
+97563	P0/P1/P2 `0/2/4`; its bounded runner recorded `NO_VERDICT` only because progress
+97564	prose preceded the terminal object, and the same session re-emitted the already
+97565	reached verdict under the frozen schema without reinspection. Kimi K3/100-step
+97566	exact session `session_2fd7efbd-c126-42d5-8bef-835bb338fe37` returned
+97567	`APPROVED`, `0/0/3`, and completed a same-session schema-only re-emission. Opus
+97568	xhigh exact session `0ce5164c-a3ef-4e88-8c95-8395ecd424e0` returned
+97569	`CHANGES_REQUIRED`, `0/1/5`. The blocking findings required removal of the
+97570	unjustified `action === "join"` narrowing and exact ownership of the exported
+97571	cold-reopen input/key surface and private hot-adoption policy custody; both are
+97572	frozen below. P2 dispositions below also freeze cross-process policy stability,
+97573	the displaced-source branch, historical-only null-frontier handling, an exact
+97574	epoch-N mismatch RED, clean isolation of the held draft, and supplemental RED
+97575	preconditions without changing immutable 0c1f2 evidence. This was the one
+97576	permitted material confirmation: deterministic audit closes its corrected
+97577	blocking union, and the combined final GREEN review inspects the correction.
+97578	No reviewer is relaunched for bookkeeping or disposition prose.
+97579	The prompt, schema, Grok runner artifacts, exact external transcript paths and
+97580	hashes, terminal results, finding dispositions, commands, and corrected local
+97581	audit are retained under
+97582	`.logs/d110c-0c1f4-plan-confirmation-a3bd4e07/`. Its 13-entry self-excluding
+97583	manifest validates and has SHA-256
+97584	`6f5f2977986784ce4958fc8890e45ead3ef49ba2984d1e3b8ac40dc838bee0f9`.
+97585	
+97586	###### D.110c-0c1f4 exact pinned-genesis bootstrap recovery authority prerequisite
+97587	
+97588	**Status: clean-isolated tests-only RED complete at corrected signed/pushed plan
+97589	anchor `1033e22eaa152a1a1a26d1fc057564ac75b68192`; its causal matrix and
+97590	supplemental immutable-0c1f2 preconditions are recorded below, with zero
+97591	production-source change. The combined 0c1f4-plus-0c1f2 implementation now
+97592	passes its frozen focused unit and two-title browser matrix, but it is not yet
+97593	signed, finally reviewed, or closed. D.110c-0c1f5 below is a newly demonstrated
+97594	blocking design gap that must be settled before this aggregate-frontier work or
+97595	parent 0c1 can claim general historical rebase safety.** Owner: the public
+97596	`@ts-drp/node/v3-live` `RecoverV3LiveReplicaInput` and closed input snapshot;
+97597	the public `@ts-drp/node/creator-adoption-activate`
+97598	`reopenCreatorSuccessorAdoption()` cold-input exact-key capture; the private
+97599	`CreatorSuccessorReopenInput`, recovered live payload/registration,
+97600	creator-close sealed facts and `CreatorSuccessorLiveMaterial` needed to retain
+97601	the policy across hot adoption and cold reopen; `examples/v3-room` canonical
+97602	capture and wiring from `V3RoomApplication.bootstrapOperation`; the two
+97603	existing `authenticatedPinnedGenesisOutboxRow()` consumers, including the
+97604	displaced-source filtered-store branch; and focused Node/room compatibility
+97605	tests. `recoverPendingCreatorSuccessorAdoption()` is explicitly excluded: it
+97606	only republishes pending AHE/head state and performs no live historical-row
+97607	classification; the subsequent cold reopen supplies the policy. Deadline:
+97608	GREEN before any 0c1f2 draft resumes, before
+97609	parent 0c1/0c or the ≥100-transition gate, Phase-6 exit, or Phase-7
+97610	multi-author cold join.
+97611	
+97612	The compatibility contract adds one detached, bounded, exact-canonical
+97613	bootstrap-operation policy value to recovery custody. Its frozen semantic name
+97614	is `exactCanonicalPinnedGenesisBootstrapOperationBytes`. It is trusted local
+97615	application policy, not a signed wire field, persisted control carrier, public
+97616	room API, or statement that the creator observed the operation. The room must
+97617	canonicalize a detached copy of `application.bootstrapOperation`, enforce the
+97618	opened blueprint's existing operation-byte budget and the enclosing v3
+97619	vertex's existing canonical depth/item/byte limits, and supply the same bytes
+97620	to fresh recovery and cold successor reopen. Hot adoption copies those bytes
+97621	from the source registration through sealed close facts and private successor
+97622	live material without adding a new hot public input key. Private and closed
+97623	input snapshots must copy rather than alias the bytes. The configured canonical
+97624	value must be byte-stable for the same application, author, and object across
+97625	process restart; a different application version or value is a fail-closed
+97626	compatibility mismatch and stops for an explicit migration reslice rather than
+97627	silently changing bootstrap authority. A caller that omits, mutates, supplies
+97628	noncanonical/oversized bytes,
+97629	or changes them across a successor boundary cannot obtain pinned-genesis
+97630	bootstrap classification on a historical aggregate path. Existing recovery
+97631	paths with no pinned-genesis row or no historical aggregate remain behaviorally
+97632	unchanged. The field is optional in the exported TypeScript input so recovery
+97633	that never needs a pinned-genesis row retains source compatibility, but it is
+97634	mandatory at runtime for every pinned-genesis classification: absence returns
+97635	the existing typed authentication/recovery refusal. No call may retain the
+97636	current permissive predicate as a fallback. This optional-with-fail-closed-use
+97637	rule is the frozen compatibility choice. Exact-record compatibility is frozen,
+97638	not weakened: `recoverV3LiveReplica()` accepts exactly base keys, base plus
+97639	`operationAdmissionPolicy`, base plus
+97640	`exactCanonicalPinnedGenesisBootstrapOperationBytes`, or base plus both
+97641	optional keys, and rejects every other extra key.
+97642	`reopenCreatorSuccessorAdoption()` accepts exactly its existing 17 cold keys or
+97643	those keys plus the bootstrap policy and rejects every other extra key. Its
+97644	private `CreatorSuccessorReopenInput` mirrors the optional value. The existing
+97645	six-key hot activation surface and the 11-key pending-recovery surface remain
+97646	unchanged.
+97647	
+97648	The selected implementation must use one exact predicate at both current-row
+97649	classification and filtered issuance-store classification. In addition to the
+97650	existing registered-vertex checks, it requires row and extracted sequence
+97651	zero, epoch zero, exact pinned genesis anchor, exact scope object/author, exact
+97652	dependencies `[pinnedGenesisAnchorDigest]`, logical time one, and canonical
+97653	operation bytes equal to the detached trusted policy bytes. Exact byte equality
+97654	is the product authority; no hard-coded action name may narrow a valid custom
+97655	application's configured bootstrap operation.
+97656	`authenticatedCoveredHistoricalOutboxRow()` rejects sequence zero
+97657	unconditionally. No caller-provided author/sequence number, local lineage,
+97658	signature, generic reducer success, admission reservation, or current ACL
+97659	membership substitutes for these checks.
+97660	
+97661	The causal tests-only RED first opens epoch zero with configured bootstrap bytes
+97662	`A`, advances through the genuine product close/adopt path to epoch `N > 0`,
+97663	then reopens the same author, object, database, blueprint, and catalog with a
+97664	different blueprint-valid configured bootstrap value `B`. Its retained genuine
+97665	sequence-zero epoch-zero vertex remains signed and registered but differs from
+97666	the reopened application policy. The broad current predecessor/filtered
+97667	historical path classifies that row and then the test emits exact
+97668	`D110C_0C1F4_EXACT_BOOTSTRAP_AUTHORITY_REQUIRED`. A paired control uses `A`
+97669	across reopen. RED must reach pinned-genesis historical classification at epoch
+97670	`N > 0` through the exported recovery path and the genuine
+97671	predecessor-validation/filtered-store consumer rather than test the genesis
+97672	current-row path, call a private helper, or manufacture a verified capability.
+97673	It also adds the supplemental immutable-0c1f2 precondition case: Bob's sequence
+97674	zero is pending and absent from Alice's graph before Bob's sequence one is
+97675	admitted, after which the unchanged 0c1f2 token remains the treatment. Any
+97676	failure before the accepted broad classification, a different token, a change
+97677	to the signed 0c1f2 commit/evidence, or a production-source change is noncausal
+97678	and stops. The held diagnostic GREEN draft stays untouched in the main
+97679	workspace; RED is authored and executed from a temporary clean worktree rooted
+97680	at this signed plan commit so draft production files cannot leak into causality.
+97681	
+97682	The accepted clean-isolated RED uses one Alice creator plus two genuine Bob
+97683	replicas with distinct durable databases. Both Bob sequence-zero rows are
+97684	exact pending epoch-zero rows and are absent from Alice's accepted journal.
+97685	Alice advances the genuine room to epoch three, and both Bob databases receive
+97686	the same genuine epoch-three successor state. The control retains Bob's
+97687	configured canonical bootstrap bytes `A`; the treatment keeps the same Bob
+97688	signing identity and durable database but configures distinct blueprint-valid
+97689	bootstrap bytes `B`. Both recovery traces reach exact sequence zero,
+97690	`pinned-genesis`, owner `predecessor-validation`, and payload epoch three.
+97691	That equality is the causal RED: the unmodified product cannot distinguish the
+97692	configured authority mismatch. The test then emits exact
+97693	`D110C_0C1F4_EXACT_BOOTSTRAP_AUTHORITY_REQUIRED` as an observation pass.
+97694	
+97695	The held 0c1f2 aggregate-carrier draft is deliberately absent from this clean
+97696	worktree. Consequently both A and B proceed beyond the intended 0c1f4 seam and
+97697	later stop at the separately owned `issuance-rejected` boundary. The retained
+97698	0c1f2 test remains the invocation's one unexpected result at unchanged exact
+97699	`D110C_0C1F1_MULTI_AUTHOR_FRONTIER_CARRIER_REQUIRED`; its new assertions prove
+97700	one pending Bob sequence-zero row, its absence from Alice before and after Bob
+97701	sequence one, and Alice's genuine receipt of Bob sequence one. The accepted
+97702	matrix is therefore one 0c1f4 observation pass plus one exact retained causal
+97703	failure, zero skips/flakes/top-level errors, and zero production-source changes.
+97704	It does not claim the A control completes recovery before 0c1f2 GREEN is
+97705	integrated. The three earlier diagnostic reporters are retained honestly: an
+97706	epoch-one creator case reached covered/displaced authority rather than the
+97707	pinned-genesis seam; an epoch-one noncreator case still authenticated through
+97708	the displaced source; and the first epoch-three case incorrectly required full
+97709	reopen despite the known downstream aggregate-carrier RED.
+97710	
+97711	Complete reporters, commands, source-shape checks, attachment validation, and
+97712	diagnostic dispositions are under
+97713	`.logs/d110c-0c1f4-red-causal-1033e22e/`; its self-excluding manifest validates.
+97714	The 12-entry manifest SHA-256 is
+97715	`e029304a2ad63bfdebb3fdbdc2cbf9a482fc8a2f940394e66ebfcd6a5880bd3f`.
+97716	The exact accepted reporter SHA-256 is
+97717	`d4f7c8c6f798e45094ae4a5241552871de28eafecfc78f08b2b37277902af041`.
+97718	The three diagnostic reporter hashes are
+97719	`396f6ad16bde84ca5d652627bc19bb3474f10ed94e7c93712db908f309bf0d60`,
+97720	`9ee3216ab5cb91cbf42a2abdcca459b3bb5233f0df906250e667a63822de7bb4`,
+97721	and `3184d38a6444191e4489f5957f76461d347296416e06f8fefe8d54636adb235f`.
+97722	
+97723	GREEN implements the 0c1f4 policy prerequisite first. Its focused authority
+97724	gates must prove that A passes the new exact predicate and B fails with the
+97725	existing typed recovery/authorization failure before journal installation,
+97726	activation, publication suppression, or rebase completion. The browser-level
+97727	claim that the exact A control fully recovers is deferred to the combined
+97728	0c1f4-plus-0c1f2 GREEN because immutable RED proves the missing 0c1f2 aggregate
+97729	carrier is the later independent blocker; this is not a weakening of either
+97730	acceptance condition. Mutants cover missing policy, noncanonical bytes, aliased
+97731	post-capture mutation, oversized/deep/item-heavy operation, action substitution,
+97732	same action with changed application field, cross-process configured-value
+97733	mismatch, wrong sequence/epoch/anchor/object/
+97734	author/dependency/logical time, digest/signature mutation, issued/outbox
+97735	substitution, use of sequence zero through covered-historical authority,
+97736	hot-adoption policy loss, cold-reopen policy loss, and cross-application reopen.
+97737	Pending recovery is retained as a no-classification control, not given a new
+97738	field. The same-room transport-handoff mutant proves its filtered store uses
+97739	the matching source registration's pinned genesis anchor and policy, never the
+97740	target registration's values or `undefined`, and cannot stale-publish a source
+97741	sequence-zero row. The cross-object displaced-source structure currently
+97742	copies a target-derived policy into an unconsumed field; no f4 behavior or
+97743	authority claim relies on that field, and removing or source-deriving it is
+97744	owned only by a later change that otherwise touches that cross-object branch.
+97745	Current-epoch rows retain their existing path; the
+97746	null-frontier post-bootstrap refusal applies only to historical rows. The full
+97747	legacy recovery roster must prove the declared compatibility mode. Exact
+97748	source-shape gates prove there is one shared predicate, the four recovery-input
+97749	key combinations and two cold-reopen key combinations are closed, hot/pending
+97750	key surfaces remain unchanged, and no tests-only bypass exists.
+97751	
+97752	After the 0c1f4 implementation is signed/pushed and its focused/static/retained
+97753	authority gates pass, the held 0c1f2 draft may be rebased onto the reviewed
+97754	policy. Its functional
+97755	GREEN must then make the unchanged signed product RED pass without an extra
+97756	setup write. It must prove exact rows `0...S`, slot-zero bootstrap authority,
+97757	creator-covered slots `1...S`, matching terminal proof/counts, and both safe
+97758	bootstrap-only re-entry and refused prior-application-history re-entry. The
+97759	combined browser gate must finally prove A fully recovers while B refuses at
+97760	the 0c1f4 authority boundary. The
+97761	combined final Grok/Kimi/Opus review covers 0c1f3 audit, 0c1f4 RED/GREEN, and
+97762	0c1f2 causal RED-to-GREEN closure. Only P0/P1 blocks; one material plan
+97763	confirmation was consumed because authority and public compatibility changed.
+97764	Its executable corrections are now closed mechanically; documentation-only
+97765	dispositions do not recurse and no second plan confirmation is permitted.
+97766	
+97767	No protocol carrier or vertex wire field, digest/signing domain, creator or ACL
+97768	authority, dependency, threshold, workload, memory/timing ceiling, join
+97769	publication behavior, or application bootstrap value changes. If review shows
+97770	that exact policy cannot be carried through all hot/cold/pending paths without
+97771	a wire/schema change, new signing authority, dependency, or migration protocol,
+97772	stop and reslice that demonstrated requirement. Preserve protected paths, all
+97773	27 stashes, signed commits, pushed refs, immutable evidence, and the prohibition
+97774	on Fable or collaboration subagents absent express user authorization.
+97775	
+97776	The corrected combined working GREEN now passes 41/41 focused Vitest
+97777	assertions in six files, 195/195 retained assertions in the frozen 20-file
+97778	roster, and both named Chromium product tests with zero skips, unexpected
+97779	results, flakes, or top-level errors. Protocol-v3 build/typecheck and public
+97780	entry audits, Node build, room build/typecheck, storage-browser build,
+97781	exact-owner ESLint/Prettier, and `git diff --check` pass. These are local
+97782	pre-commit results, not closure: the signed clean-isolated replay and combined
+97783	final Grok/Kimi/Opus review remain required, and D.110c-0c1f5 remains blocking
+97784	for the broader historical-rebase claim. Working evidence is
+97785	`.logs/d110c-0c1f24-green-working-fcd8735c/`; its five-entry self-excluding
+97786	manifest validates and has SHA-256
+97787	`f999b3fcfeec8a6da770975033c0c3d3d77c0057895cc50702ade7f573a2bcee`.
+97788	
+97789	The exact signed/pushed GREEN commit
+97790	`9e1781e0966953d7adce8cf6b0a4d9e56d12299a` was then checked out detached in
+97791	`/tmp/ts-drp-d110c-f24-clean.vc0NSD`. A frozen offline install from pnpm's
+97792	existing global content store downloaded nothing, rebuilt all 40 workspace
+97793	packages plus the affected examples, and the isolated checkout passed the same
+97794	41/41 focused assertions and both Chromium titles. Its tracked status remained
+97795	empty; the unrelated local Phase-0g RED files and `.agents` directory were
+97796	absent. The first command that forced the repo-local partial store stopped only
+97797	because that cache lacked `fake-indexeddb@6.2.5`; the corrected global-store
+97798	offline command passed and is the accepted proof. Evidence is
+97799	`.logs/d110c-0c1f24-clean-9e1781e0/`; its one-entry self-excluding manifest
+97800	validates and has SHA-256
+97801	`162941d3d0881a8fa5e4eebc01840b1b1d6abed78b8289822d83658e6d0b00e8`.
+97802	
+97803	A narrow transition diagnostic also rejected an invalid attempted check rather
+97804	than widening the carrier. The proposed transition closure contains the
+97805	successor trust, Cut, QC, retirement, and aggregate candidates, but not a
+97806	detached successor-ACL candidate. Requiring that absent object made every
+97807	genuine close fail `TRUST_CLOSURE_INVALID`. The attempt was removed. Exact
+97808	successor-writer-set derivation remains enforced by the close owner from the
+97809	authenticated successor snapshot ACL before the creator signs the aggregate;
+97810	the transition verifier authenticates that creator-signed record and its
+97811	current/successor ACL digests. No ACL bytes, new carrier field, or alternate
+97812	authority were invented merely to duplicate close-time derivation. Whether an
+97813	independently rederivable transition-side writer-set proof is required is a
+97814	high-risk design question for the final review/f5 audit, not an implicit GREEN
+97815	change.
+97816	
+97817	###### D.110c-0c1f5 authenticated rebase-supersession frontier prerequisite
+97818	
+97819	**Status: bounded source/architecture audit and targeted close-liveness
+97820	addendum complete with no safe production repair selected; BLOCKED pending one
+97821	combined governing high-risk review of the signed f2/f4 checkpoint and f5
+97822	exact-design selection before final closure of D.110c-0c1f2/f4, parent
+97823	D.110c-0c1/0c, the same-room ≥100-transition gate, Phase-6 exit, or Phase-7
+97824	multi-author cold join. No f5 production edit is authorized.** Owner: the
+97825	interaction among
+97826	`examples/v3-room/src/index.ts::drainRebaseOutbox()`, the fresh-sequence local
+97827	issue path and `completeRebaseSource()` disposition, the authenticated close
+97828	graph captured by `packages/node/src/v3-live.ts`,
+97829	`packages/node/src/creator-close.ts::authorIssuanceFrontiersCandidate()`, the
+97830	creator-signed aggregate transition verifier, and both
+97831	`authenticatedCoveredHistoricalOutboxRow()` consumers. Deadline: audited,
+97832	reviewed, causally RED, and GREEN before any named parent or golden-path claim
+97833	above. This is prospective and does not reopen the signed 0c1f2/f4 plans or RED
+97834	evidence.
+97835	
+97836	The bounded source audit has established a concrete incompatibility that the
+97837	current focused GREEN matrix does not exercise. A displaced historical row is
+97838	reduced to an application intent and reissued by the room through the ordinary
+97839	local issue queue, which allocates a fresh author sequence. Only after the
+97840	replacement issue completes does the room call `completeRebaseSource()` and
+97841	mark the old outbox row published. The next creator close observes the fresh
+97842	replacement vertex, not an authenticated statement that every skipped older
+97843	sequence was preserved, transformed, expired, or deliberately held. The
+97844	current aggregate algorithm advances only an adjacent creator-observed prefix:
+97845	from prior boundary `S` it accepts `S+1`, `S+2`, and so on. If intervening local
+97846	allocations cause old rows 5 and 6 to be reissued as fresh rows 7 and 8 while
+97847	the prior aggregate is 4, observing 7 and 8 leaves the boundary at 4 forever.
+97848	Subsequent valid writes remain above the same hole and signerless cold recovery
+97849	cannot authenticate them.
+97850	
+97851	The targeted addendum establishes three related close-wide liveness failures,
+97852	not merely another cold-recovery symptom. When a prior aggregate contains an
+97853	author with a null boundary, a first creator-observed sequence greater than one
+97854	throws `LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED`; when the author is absent from
+97855	an otherwise present prior aggregate, the same shape throws
+97856	`AUTHOR_REENTRY_PROOF_REQUIRED`. An admitted foreign-author sequence at or
+97857	below a numeric prior boundary throws `creator issuance-frontier boundary
+97858	regressed`, and duplicate `(author, sequence)` identities throw `creator
+97859	issuance-frontier author slot is ambiguous`. In each case the exception aborts
+97860	the creator's whole close, while the accepted offending vertex remains in that
+97861	epoch graph and makes an unchanged retry fail again. Receive-side ingress does
+97862	not enforce a per-author contiguous issuance prefix, and genuine rebase assigns
+97863	fresh target sequences before completing the displaced source, so these states
+374:97817	###### D.110c-0c1f5 authenticated rebase-supersession frontier prerequisite
+97817	###### D.110c-0c1f5 authenticated rebase-supersession frontier prerequisite
+97818	
+97819	**Status: bounded source/architecture audit and targeted close-liveness
+97820	addendum complete with no safe production repair selected; BLOCKED pending one
+97821	combined governing high-risk review of the signed f2/f4 checkpoint and f5
+97822	exact-design selection before final closure of D.110c-0c1f2/f4, parent
+97823	D.110c-0c1/0c, the same-room ≥100-transition gate, Phase-6 exit, or Phase-7
+97824	multi-author cold join. No f5 production edit is authorized.** Owner: the
+97825	interaction among
+97826	`examples/v3-room/src/index.ts::drainRebaseOutbox()`, the fresh-sequence local
+97827	issue path and `completeRebaseSource()` disposition, the authenticated close
+97828	graph captured by `packages/node/src/v3-live.ts`,
+97829	`packages/node/src/creator-close.ts::authorIssuanceFrontiersCandidate()`, the
+97830	creator-signed aggregate transition verifier, and both
+97831	`authenticatedCoveredHistoricalOutboxRow()` consumers. Deadline: audited,
+97832	reviewed, causally RED, and GREEN before any named parent or golden-path claim
+97833	above. This is prospective and does not reopen the signed 0c1f2/f4 plans or RED
+97834	evidence.
+97835	
+97836	The bounded source audit has established a concrete incompatibility that the
+97837	current focused GREEN matrix does not exercise. A displaced historical row is
+97838	reduced to an application intent and reissued by the room through the ordinary
+97839	local issue queue, which allocates a fresh author sequence. Only after the
+97840	replacement issue completes does the room call `completeRebaseSource()` and
+97841	mark the old outbox row published. The next creator close observes the fresh
+97842	replacement vertex, not an authenticated statement that every skipped older
+97843	sequence was preserved, transformed, expired, or deliberately held. The
+97844	current aggregate algorithm advances only an adjacent creator-observed prefix:
+97845	from prior boundary `S` it accepts `S+1`, `S+2`, and so on. If intervening local
+97846	allocations cause old rows 5 and 6 to be reissued as fresh rows 7 and 8 while
+97847	the prior aggregate is 4, observing 7 and 8 leaves the boundary at 4 forever.
+97848	Subsequent valid writes remain above the same hole and signerless cold recovery
+97849	cannot authenticate them.
+97850	
+97851	The targeted addendum establishes three related close-wide liveness failures,
+97852	not merely another cold-recovery symptom. When a prior aggregate contains an
+97853	author with a null boundary, a first creator-observed sequence greater than one
+97854	throws `LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED`; when the author is absent from
+97855	an otherwise present prior aggregate, the same shape throws
+97856	`AUTHOR_REENTRY_PROOF_REQUIRED`. An admitted foreign-author sequence at or
+97857	below a numeric prior boundary throws `creator issuance-frontier boundary
+97858	regressed`, and duplicate `(author, sequence)` identities throw `creator
+97859	issuance-frontier author slot is ambiguous`. In each case the exception aborts
+97860	the creator's whole close, while the accepted offending vertex remains in that
+97861	epoch graph and makes an unchanged retry fail again. Receive-side ingress does
+97862	not enforce a per-author contiguous issuance prefix, and genuine rebase assigns
+97863	fresh target sequences before completing the displaced source, so these states
+97864	are reachable through ordinary offline noncreator behavior rather than only by
+97865	a fabricated fixture.
+97866	
+97867	The required close-liveness invariant is therefore explicit: a foreign
+97868	author's missing, duplicate, regressed, or noncontiguous admitted rows may
+97869	prevent that author's frontier from advancing, or may produce an exact reviewed
+97870	per-author refusal/disposition, but must not by themselves prevent the creator
+97871	from closing the room. Any treatment must remain fail closed for that author,
+97872	must not authenticate the anomalous row or cross a gap implicitly, and must
+97873	preserve creator close/adoption availability for the other valid authors. The
+97874	existing null-boundary branch also emits the legacy-migration code where the
+97875	earlier plan assigns the author-reentry code; f5 GREEN owns exact causal tests
+97876	and the reviewed error-code correction rather than hiding it in a separate
+97877	slice.
+97878	
+97879	Replacing the prefix with an observed maximum is explicitly rejected. Seeing
+97880	sequence 7 does not prove that unobserved sequences 5 and 6 were represented by
+97881	the admitted replacement, nor that their operation bytes, disposition, and
+97882	source identity agree. A maximum would let an unseen or substituted local row
+97883	below it pass `authenticatedCoveredHistoricalOutboxRow()` solely because its
+97884	number is below a creator-signed high-water mark. That would turn a liveness
+97885	defect into an authority defect.
+97886	
+97887	Design selection must nevertheless begin from the actual consumer contract,
+97888	not silently strengthen it. A covered-historical row is an authenticated
+97889	candidate for reissue under the current ACL, admission policy, canonical
+97890	operation transformation, and displaced-operation identity deduplication; it
+97891	does not directly install application state. The current predicate already
+97892	accepts an author-signed historical row at or below the creator-attested
+97893	boundary without a per-sequence digest commitment. The governing review must
+97894	decide exactly which source disposition fact is necessary for safe reissue and
+97895	frontier settlement before selecting a per-gap receipt, settled prefix, or
+97896	accumulator. This qualification does not authorize the bare maximum or weaken
+97897	the six proof obligations below; it prevents choosing an O(rebase) proof log or
+97898	new cryptography to satisfy a stronger authority claim than any production
+97899	consumer needs.
+97900	
+97901	The f5 audit must compare at least: (1) a creator-authenticated supersession
+97902	commitment binding each skipped source `(author, sequence, digest)` to its exact
+97903	admitted replacement or terminal disposition; (2) a bounded settled-prefix
+97904	construction in which every gap is closed by authenticated evidence before the
+97905	watermark advances; (3) a compact range/Merkle accumulator with explicit
+97906	membership or consistency proofs and bounded ordinary reopen state; and (4)
+97907	any simpler construction already available from the signed vertex preimage,
+97908	application displaced-operation identity, close-set/history commitments, and
+97909	the current aggregate carrier. For each family the audit must state who signs
+97910	the evidence, how the creator independently verifies it, what is retained
+97911	across close/adoption/restart, when old evidence is safe to prune, and whether
+97912	proof or active-state size grows with epoch count or rebase count.
+97913	
+97914	The selected design must preserve these proof obligations:
+97915	
+97916	1. no frontier advances across a sequence whose exact authenticated
+97917	   disposition is unknown;
+97918	2. rebase and transform bind the old author/sequence/digest and canonical
+97919	   operation identity to the exact admitted replacement; expire and
+97920	   manual-review remain distinguishable and fail closed under their existing
+97921	   application policy;
+97922	3. missing, duplicate, substituted, forked, replayed, cross-author,
+97923	   cross-object, cross-epoch, partial, or reordered disposition evidence cannot
+97924	   advance the settled boundary;
+97925	4. crash/restart before replacement publication or before source completion
+97926	   cannot falsely settle the source row;
+97927	5. creator close, successor adoption, cold reopen, and later pruning all agree
+97928	   on the same authenticated settled state; and
+97929	6. ordinary cold reopen and active control custody remain bounded rather than
+97930	   hiding an O(N) supersession log in an uncounted store.
+97931	
+97932	The deterministic RED must use the genuine product path, not a fabricated
+97933	frontier or tests-only durable record. One noncreator writer must create a
+97934	known settled prefix, retain at least two displaced rows, allocate intervening
+97935	sequences so their genuine rebase replacements appear above a gap, and have
+97936	those replacements admitted by the creator. The creator then performs at least
+97937	two further real close/adopt transitions. A second genuine null-boundary case
+97938	must keep the writer offline across the first close, reissue its displaced row
+97939	at a first observed sequence greater than one, admit it at the creator, and
+97940	prove the next creator close aborts at the exact current refusal. Focused
+97941	mutants cover an absent prior-author entry, a foreign-author sequence at or
+97942	below a numeric prior boundary, and a duplicate `(author, sequence)` slot; each
+97943	must demonstrate current close-wide failure while the no-gap control remains
+97944	green. After restart, the unchanged writer database cold reopens at the
+97945	resulting successor and attempts one new issue/publish. RED is causal only if
+97946	exact evidence proves the old rows, fresh replacement rows, creator
+97947	observations, aggregate boundary, close result, and recovery refusal, and the
+97948	tests emit exact
+97949	`D110C_0C1F5_REBASE_SUPERSESSION_FRONTIER_REQUIRED` for the numeric/cold-reopen
+97950	case and exact `D110C_0C1F5_FOREIGN_AUTHOR_CLOSE_LIVENESS_REQUIRED` for the
+97951	null, absent, regression, and duplicate close-wide cases after first asserting
+97952	their current product outcomes. Timing, transport, fixture, or unrelated
+97953	recovery failures are noncausal and stop.
+97954	
+97955	GREEN must make that unchanged RED and control pass while proving exact state
+97956	and operation accounting. Adversarial mutants cover each proof obligation
+97957	above plus stale predecessor evidence, wrong replacement operation bytes,
+97958	wrong disposition policy, a replacement admitted on a different anchor,
+97959	failure between replacement admission and old-row completion, and restart at
+97960	each side of that boundary. Retained gates include the complete 0c1f2/f4 suite,
+97961	creator adoption/activation, offline/rebase outbox continuity, transition
+97962	normalization, package builds/typechecks, exact-owner lint/format/diff, isolated
+97963	clean-checkout execution, protected paths, and 27-stash custody.
+97964	
+97965	The one-off Fable 5.1/high course review that exposed this gap is advisory,
+97966	not a substitute for the governing high-risk review. Its exact session is
+97967	`70a1e8cb-353d-467b-8c7a-768a9363fbb1`; the external JSONL transcript SHA-256
+97968	is `739b7cd23e9a27700da5f12539c32ebf96a6882d6cc08fc562c3a98deda55994`.
+97969	It also identified the already-corrected first-observed-sequence-one predicate
+97970	and nonblocking empty-writer/byte-budget/pending-custody test obligations. No
+97971	further Fable run was authorized by that result. A later expressly authorized
+97972	one-off Fable 5.1/high trajectory review, session
+97973	`8323a0e9-296a-4f5f-b981-cf2c034725b6`, returned `CORRECT_NARROWLY`, P0/P1/P2
+97974	`0/1/5`; its external transcript SHA-256 is
+97975	`b0f317390e0b023063b344a282383c08ee3a880e1f67db907677c8461bdc2b8e`.
+97976	Local source inspection confirmed its blocking close-liveness paths above. Its
+97977	nonblocking dispositions are also explicit above: use the real historical-row
+97978	consumer contract, describe the exact writer set as creator-attested, narrow
+97979	the f4 source-policy claim to the tested same-room handoff, and retain the
+97980	cross-object unused field as separately owned cleanup. No further Fable run is
+97981	authorized without new express user instruction.
+97982	
+97983	The next single governing plan review—Grok 4.6/high, direct Kimi K3 with
+97984	`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh—must occur before any f5
+97985	production edit and cover both the signed f2/f4 plan→RED→GREEN history as a
+97986	narrow implementation checkpoint and f5 exact-design selection under the
+97987	amended causal matrix. It may accept f2/f4 checkpoint evidence without
+97988	claiming general historical-rebase safety, but f2/f4 final semantic closure
+97989	remains held by f5. This combined review avoids recursively reviewing the same
+97990	aggregate carrier in two rounds and does not reopen or alter immutable
+97991	RED/GREEN evidence.
+97992	If the selected construction needs a carrier/wire change,
+97993	new authority statement, dependency, public API, threshold change, or migration
+97994	protocol, stop after the audit and create the corresponding explicit high-risk
+97995	prerequisite instead of widening f5 silently.
+97996	
+97997	The bounded audit is
+97998	`.logs/d110c-0c1f5-source-audit-fcd8735c/audit.md`. It pins signed/pushed RED
+97999	anchor `fcd8735c8316b048166560ab904704102ce90705`, traces the exact room reissue,
+98000	same-store completion, close-graph capture, aggregate advancement, and both
+98001	historical consumers, and rejects a bare observed maximum because it would
+98002	authenticate unseen rows below that maximum. It selects no production repair;
+98003	the four candidate families and six proof obligations above must be decided by
+98004	the required plan review first. Its one-entry self-excluding manifest validates
+98005	and has SHA-256
+98006	`f53ae45b110472fc83e90c4e8113330ef3b70e6ee89b26f085d1ab2e65a94485`.
+98007	
+98008	###### D.110c-0c1d successor-reopen historical-rebase orchestration prerequisite
+98009	
+98010	**Status: CLOSED at signed/pushed combined GREEN commit
+98011	`c05679e3f53f21673b4e7327dca05848ed42ebe1`; the bounded source/architecture
+98012	audit, governing plan review, sole material confirmation, causal tests-only
+98013	RED, two-predicate GREEN, focused/retained gates, and combined final review pass
+98014	with an empty P0/P1 union. Parent 0c1 remains open only for its separately
+98015	owned prerequisites.** Owner:
+98016	`examples/v3-room/src/index.ts::createV3RoomSessionOwned()` at the
+98017	`rebasePromise` startup predicate and the same function's published-displaced
+98018	identity-verification predicate inside `drainRebaseOutbox()`, plus the existing
+98019	D.110c-0c1 browser differential. The already-reviewed `v3-live.ts` historical
+98020	classification, publication, rebase, and completion implementation remains
+98021	owned by D.110c-0c1 and is not redesigned here. Deadline: GREEN before
+98022	D.110c-0c1 can close, before D.110c-0c resumes, and before D.110c-c/d or Phase
+98023	7 relies on a reopened epoch-N room.
+98024	
+98025	The focused 0c1 GREEN attempt established a separate orchestration defect after
+98026	the intended historical classifier began working. An ordinary successor cold
+98027	reopen supplies `successorSnapshotDeclaration` and leaves
+98028	`rebaseSourceInvite` absent, so `sourceMaterial === undefined`. The room
+98029	therefore constructs `rebasePromise` as `Promise.resolve()` and never calls
+98030	`publishAccepted()` followed by `drainRebaseOutbox()`. Public `issue()` does
+98031	await that promise, so this is not a test timing race. The Node plane correctly
+98032	keeps authenticated pending pinned-genesis and covered-historical rows out of
+98033	direct stale-anchor publication and exposes them through `readRebaseOutbox()`,
+98034	but the room has no caller for that custody on this ordinary successor-reopen
+98035	path. The first pending assertion consequently observes `pending` after the
+98036	new current-epoch issue succeeds. Running the test again, weakening the pending
+98037	assertion, directly marking the old row published, or adding a delay cannot
+98038	close that missing call path.
+98039	
+98040	This seam is outside D.110c-0c1's frozen production owner list, so the parent
+98041	slice's explicit stop-and-reslice rule governs. The first review proved that a
+98042	startup-predicate-only repair is insufficient. Same-room successor recovery
+98043	retains authenticated immediate-predecessor custody, so
+98044	`readRebaseOutbox()` also returns its already-`published` row as `displaced`.
+98045	Unlike migration rebase, successor snapshot recovery authenticates application
+98046	state but does not populate the room's per-vertex `acceptedVertices` map with
+98047	the predecessor journal. Applying the unchanged migration-only
+98048	published-displaced identity check would therefore throw
+98049	`v3 room published displaced operation is absent from target` before the
+98050	pending historical reissue and would regress the already-green control and
+98051	treatment.
+98052	
+98053	The corrected selected repair owns exactly two predicates in the same room
+98054	function. First, broaden the existing startup rebase task predicate: run the
+98055	unchanged ordered
+98056	`waitForRetainedBootstrap()` → terminal check → `publishAccepted()` →
+98057	`drainRebaseOutbox()` task when either a migration `sourceMaterial` exists or
+98058	an authenticated `successorSnapshotDeclaration` is opening the successor.
+98059	Fresh/genesis opens with neither input keep the resolved no-op. Existing
+98060	migration-source behavior remains on the same single task. Second, run the
+98061	existing published-displaced `acceptedIdentityRows()` verification only for
+98062	its original explicit rebase-source/migration case:
+98063	`redirectSource === undefined && sourceMaterial !== undefined`. An ordinary
+commit f3617a8284af6d149441f0531ddec520370a34fe
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Thu Sep 3 16:01:06 2026 -0400
+
+    docs: amend rebase frontier liveness plan
+
+ .../SHA256SUMS                                     |   4 +
+ .../prompt.md                                      |  95 +++++++++++++++
+ .../result.md                                      |  67 +++++++++++
+ .../schema.json                                    |  55 +++++++++
+ .../verification.md                                |  40 +++++++
+ .../production-hardening-tdd-plan-v2.md            | 129 +++++++++++++++++----
+ 6 files changed, 365 insertions(+), 25 deletions(-)
+gpg: Signature made Thu Sep  3 16:01:08 2026 AST
+gpg:                using RSA key 55E22F154FBAF8C84F378304761B99CEA81C6289
+gpg: Good signature from "Faolain <Faolain@users.noreply.github.com>" [ultimate]
+commit f3617a8284af6d149441f0531ddec520370a34fe
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Thu Sep 3 16:01:06 2026 -0400
+
+    docs: amend rebase frontier liveness plan
+
+diff --git a/docs/production-hardening/production-hardening-tdd-plan-v2.md b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+index 1e7a3f8c..9e05cefd 100644
+--- a/docs/production-hardening/production-hardening-tdd-plan-v2.md
++++ b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+@@ -97283,12 +97283,15 @@ record field from 0c1f1. Only `frontiers` changes from an array of repeated-key
+ objects to an author-sorted array of exact two-element canonical arrays:
+ `[author, admittedAuthorSequence]`, where `author` is one lowercase 64-hex
+ Ed25519 public key and `admittedAuthorSequence` is either null or a nonnegative
+-safe integer. The outer vector must contain exactly the permissionless-aware
+-successor write-authorized set, and every inner value must be an ordinary exact
+-two-element decoded array with no holes, extra properties, duplicate author,
+-reordering, coercion, or alternate object/map form. The semantic identity and
+-signature preimage remain one-to-one; compact syntax does not omit or weaken a
+-frontier fact.
++safe integer. The creator close must attest exactly the permissionless-aware
++successor write-authorized set in the outer vector, and every inner value must
++be an ordinary exact two-element decoded array with no holes, extra properties,
++duplicate author, reordering, coercion, or alternate object/map form. The
++opener authenticates that creator attestation and consumers fail closed when a
++required author is absent; the transition verifier cannot independently
++rederive the set because its closure contains no detached successor-ACL
++candidate. The semantic identity and signature preimage remain one-to-one;
++compact syntax does not omit or weaken a frontier fact.
+ 
+ The carrier's `objectId` is additionally constrained by the independently
+ opened current and successor latched ACLs, whose canonical grammar permits at
+@@ -97732,10 +97735,14 @@ author/dependency/logical time, digest/signature mutation, issued/outbox
+ substitution, use of sequence zero through covered-historical authority,
+ hot-adoption policy loss, cold-reopen policy loss, and cross-application reopen.
+ Pending recovery is retained as a no-classification control, not given a new
+-field. A displaced-source/migration mutant proves its filtered store uses the
+-matching source registration's pinned genesis anchor and policy, never the
++field. The same-room transport-handoff mutant proves its filtered store uses
++the matching source registration's pinned genesis anchor and policy, never the
+ target registration's values or `undefined`, and cannot stale-publish a source
+-sequence-zero row. Current-epoch rows retain their existing path; the
++sequence-zero row. The cross-object displaced-source structure currently
++copies a target-derived policy into an unconsumed field; no f4 behavior or
++authority claim relies on that field, and removing or source-deriving it is
++owned only by a later change that otherwise touches that cross-object branch.
++Current-epoch rows retain their existing path; the
+ null-frontier post-bootstrap refusal applies only to historical rows. The full
+ legacy recovery roster must prove the declared compatibility mode. Exact
+ source-shape gates prove there is one shared predicate, the four recovery-input
+@@ -97809,11 +97816,13 @@ change.
+ 
+ ###### D.110c-0c1f5 authenticated rebase-supersession frontier prerequisite
+ 
+-**Status: bounded source/architecture audit complete with no safe production
+-repair selected; BLOCKED pending the governing high-risk plan/design review
+-before final closure of D.110c-0c1f2/f4, parent D.110c-0c1/0c, the same-room
+-≥100-transition gate, Phase-6 exit, or Phase-7 multi-author cold join. No f5
+-production edit is authorized.** Owner: the interaction among
++**Status: bounded source/architecture audit and targeted close-liveness
++addendum complete with no safe production repair selected; BLOCKED pending one
++combined governing high-risk review of the signed f2/f4 checkpoint and f5
++exact-design selection before final closure of D.110c-0c1f2/f4, parent
++D.110c-0c1/0c, the same-room ≥100-transition gate, Phase-6 exit, or Phase-7
++multi-author cold join. No f5 production edit is authorized.** Owner: the
++interaction among
+ `examples/v3-room/src/index.ts::drainRebaseOutbox()`, the fresh-sequence local
+ issue path and `completeRebaseSource()` disposition, the authenticated close
+ graph captured by `packages/node/src/v3-live.ts`,
+@@ -97839,6 +97848,34 @@ the prior aggregate is 4, observing 7 and 8 leaves the boundary at 4 forever.
+ Subsequent valid writes remain above the same hole and signerless cold recovery
+ cannot authenticate them.
+ 
++The targeted addendum establishes three related close-wide liveness failures,
++not merely another cold-recovery symptom. When a prior aggregate contains an
++author with a null boundary, a first creator-observed sequence greater than one
++throws `LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED`; when the author is absent from
++an otherwise present prior aggregate, the same shape throws
++`AUTHOR_REENTRY_PROOF_REQUIRED`. An admitted foreign-author sequence at or
++below a numeric prior boundary throws `creator issuance-frontier boundary
++regressed`, and duplicate `(author, sequence)` identities throw `creator
++issuance-frontier author slot is ambiguous`. In each case the exception aborts
++the creator's whole close, while the accepted offending vertex remains in that
++epoch graph and makes an unchanged retry fail again. Receive-side ingress does
++not enforce a per-author contiguous issuance prefix, and genuine rebase assigns
++fresh target sequences before completing the displaced source, so these states
++are reachable through ordinary offline noncreator behavior rather than only by
++a fabricated fixture.
++
++The required close-liveness invariant is therefore explicit: a foreign
++author's missing, duplicate, regressed, or noncontiguous admitted rows may
++prevent that author's frontier from advancing, or may produce an exact reviewed
++per-author refusal/disposition, but must not by themselves prevent the creator
++from closing the room. Any treatment must remain fail closed for that author,
++must not authenticate the anomalous row or cross a gap implicitly, and must
++preserve creator close/adoption availability for the other valid authors. The
++existing null-boundary branch also emits the legacy-migration code where the
++earlier plan assigns the author-reentry code; f5 GREEN owns exact causal tests
++and the reviewed error-code correction rather than hiding it in a separate
++slice.
++
+ Replacing the prefix with an observed maximum is explicitly rejected. Seeing
+ sequence 7 does not prove that unobserved sequences 5 and 6 were represented by
+ the admitted replacement, nor that their operation bytes, disposition, and
+@@ -97847,6 +97884,20 @@ below it pass `authenticatedCoveredHistoricalOutboxRow()` solely because its
+ number is below a creator-signed high-water mark. That would turn a liveness
+ defect into an authority defect.
+ 
++Design selection must nevertheless begin from the actual consumer contract,
++not silently strengthen it. A covered-historical row is an authenticated
++candidate for reissue under the current ACL, admission policy, canonical
++operation transformation, and displaced-operation identity deduplication; it
++does not directly install application state. The current predicate already
++accepts an author-signed historical row at or below the creator-attested
++boundary without a per-sequence digest commitment. The governing review must
++decide exactly which source disposition fact is necessary for safe reissue and
++frontier settlement before selecting a per-gap receipt, settled prefix, or
++accumulator. This qualification does not authorize the bare maximum or weaken
++the six proof obligations below; it prevents choosing an O(rebase) proof log or
++new cryptography to satisfy a stronger authority claim than any production
++consumer needs.
++
+ The f5 audit must compare at least: (1) a creator-authenticated supersession
+ commitment binding each skipped source `(author, sequence, digest)` to its exact
+ admitted replacement or terminal disposition; (2) a bounded settled-prefix
+@@ -97883,13 +97934,23 @@ frontier or tests-only durable record. One noncreator writer must create a
+ known settled prefix, retain at least two displaced rows, allocate intervening
+ sequences so their genuine rebase replacements appear above a gap, and have
+ those replacements admitted by the creator. The creator then performs at least
+-two further real close/adopt transitions. After restart, the unchanged writer
+-database cold reopens at the resulting successor and attempts one new
+-issue/publish. RED is causal only if exact evidence proves the old rows, fresh
+-replacement rows, creator observations, aggregate boundary, and recovery
+-refusal, and the terminal failure is the frozen f5 token rather than timing,
+-transport, fixture, or unrelated recovery failure. A no-gap control must stay
+-green.
++two further real close/adopt transitions. A second genuine null-boundary case
++must keep the writer offline across the first close, reissue its displaced row
++at a first observed sequence greater than one, admit it at the creator, and
++prove the next creator close aborts at the exact current refusal. Focused
++mutants cover an absent prior-author entry, a foreign-author sequence at or
++below a numeric prior boundary, and a duplicate `(author, sequence)` slot; each
++must demonstrate current close-wide failure while the no-gap control remains
++green. After restart, the unchanged writer database cold reopens at the
++resulting successor and attempts one new issue/publish. RED is causal only if
++exact evidence proves the old rows, fresh replacement rows, creator
++observations, aggregate boundary, close result, and recovery refusal, and the
++tests emit exact
++`D110C_0C1F5_REBASE_SUPERSESSION_FRONTIER_REQUIRED` for the numeric/cold-reopen
++case and exact `D110C_0C1F5_FOREIGN_AUTHOR_CLOSE_LIVENESS_REQUIRED` for the
++null, absent, regression, and duplicate close-wide cases after first asserting
++their current product outcomes. Timing, transport, fixture, or unrelated
++recovery failures are noncausal and stop.
+ 
+ GREEN must make that unchanged RED and control pass while proving exact state
+ and operation accounting. Adversarial mutants cover each proof obligation
+@@ -97907,10 +97968,28 @@ not a substitute for the governing high-risk review. Its exact session is
+ is `739b7cd23e9a27700da5f12539c32ebf96a6882d6cc08fc562c3a98deda55994`.
+ It also identified the already-corrected first-observed-sequence-one predicate
+ and nonblocking empty-writer/byte-budget/pending-custody test obligations. No
+-further Fable run is authorized. The f5 source audit and exact design require
+-the governing Grok 4.6/high, direct Kimi K3 with
+-`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh plan review before any f5
+-production edit. If the selected construction needs a carrier/wire change,
++further Fable run was authorized by that result. A later expressly authorized
++one-off Fable 5.1/high trajectory review, session
++`8323a0e9-296a-4f5f-b981-cf2c034725b6`, returned `CORRECT_NARROWLY`, P0/P1/P2
++`0/1/5`; its external transcript SHA-256 is
++`b0f317390e0b023063b344a282383c08ee3a880e1f67db907677c8461bdc2b8e`.
++Local source inspection confirmed its blocking close-liveness paths above. Its
++nonblocking dispositions are also explicit above: use the real historical-row
++consumer contract, describe the exact writer set as creator-attested, narrow
++the f4 source-policy claim to the tested same-room handoff, and retain the
++cross-object unused field as separately owned cleanup. No further Fable run is
++authorized without new express user instruction.
++
++The next single governing plan review—Grok 4.6/high, direct Kimi K3 with
++`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh—must occur before any f5
++production edit and cover both the signed f2/f4 plan→RED→GREEN history as a
++narrow implementation checkpoint and f5 exact-design selection under the
++amended causal matrix. It may accept f2/f4 checkpoint evidence without
++claiming general historical-rebase safety, but f2/f4 final semantic closure
++remains held by f5. This combined review avoids recursively reviewing the same
++aggregate carrier in two rounds and does not reopen or alter immutable
++RED/GREEN evidence.
++If the selected construction needs a carrier/wire change,
+ new authority statement, dependency, public API, threshold change, or migration
+ protocol, stop after the audit and create the corresponding explicit high-risk
+ prerequisite instead of widening f5 silently.
+
+**Batch 1 — protocol and control boundaries.** Add only the two reviewed
+non-root subpaths, their package export-map entries, and the minimum private
+protocol-v3 singleton-custody callback needed by the checkpoint opener. Keep
+root exports and all current APIs exact. Unit controls authenticate a genuine
+epoch-2 checkpoint from the pinned genesis carrier plus only its immediate
+predecessor/current pair; return exactly the genuine predecessor/current opaque
+capability pair; prove no N-2 record/QC is read; prove standalone built-subpath
+singleton initialization; and cover every
+genesis, carrier, signature, room, epoch, link, CutValue, QC, expected-head,
+custody-unavailable, ambiguity, replay, fork, skipped-epoch, and stale-floor
+mutant with the frozen reason roster. Bounded-advance controls prove the exact
+retiring/new proof epochs, exact stale predecessor-ACL retirement,
+byte-for-byte preservation of unrelated refs, constant post-adoption closure
+count after the first transition, and all omission/substitution/duplication/
+wrong-kind/wrong-phase/wrong-epoch/cross-object/still-retained/extra-deletion
+mutants. The exact two boundary tests run once after this batch.
+
+**Batch 2 — Node composition and genuine cold reopen.** For epoch 0→1,
+`creator-close.ts` and adoption retain the existing successor opener and
+unbounded compatibility predicate byte-for-byte. For every epoch N≥1 close,
+Node derives the unique authenticated prior CutValue/commit-QC pair and stale
+predecessor ACL from the current candidates, builds the bounded proposed
+closure, and requires the new predicate before staging. The one private
+`inspectCreatorTransitionAdvance` classifier is also used by hot adoption's
+`verifyChain`, creator-adoption commit, and active cold reopen for every N≥1
+current→proposed pair; only 0→1 continues to call
+`inspectCreatorTrustAdvance`. Cold reopen at epoch 1 retains the existing
+genesis/one-step path. Cold reopen at epoch N≥2 consumes the reviewed
+checkpoint opener's authenticated predecessor/current pair, the independently
+captured expected room head, the older/floor immediate-predecessor closure, and
+the newer current/adoption closure. Projection and ACL checks derive exact
+predecessor/current epochs instead of using 0/1 literals. The verifier never
+walks N-2 state, chooses a largest stored epoch, or activates/deletes before
+checkpoint, snapshot, manifest, ACL, recovery, and floor verification.
+Pending-adoption recovery remains byte-compatible for 0→1 and does not gain an
+epoch≥2 success path here. D.110c-0c's first causal RED must terminate a genuine
+epoch≥1 close before adoption and prove that exact pending branch remains
+unavailable before it is generalized and restart-tested.
+
+The full focused GREEN runs once after Batch 2 and must prove: a genuine room
+cold reopens at epoch 2 after 0→1, restart-equivalent owner teardown, and 1→2;
+the reopened room has exact state, semantic digest, ACL/writer authority,
+anchor, history root/size, archive root, snapshot/manifest, journal, operation
+accounting, issuance continuity, and successful issue/publish; the active epoch-2
+closure has the exact five-kind census of one current trust, one 1→2 CutValue,
+one 1→2 commit QC, one epoch-2 live projection, and one epoch-1 predecessor ACL,
+with no epoch-0 CutValue, QC, or ACL; the older/floor rollback generation still
+contains the epoch-1 trust immediately before reclamation;
+there are exactly two AHE head advances with exact revision deltas for each
+transition; stale/forked floors and every frozen adversarial mutant fail before
+activation or deletion; and active/control closure ref count and decoded-kind
+multiset are exactly equal at epochs 1 and 2. The evidence enumerates every
+per-kind ref and byte length and the exact epoch-1→epoch-2 deltas; bytes may
+differ only within the fixed existing schemas for successor trust, CutValue,
+QC, live projection, and predecessor ACL. No journal, bootstrap, registration,
+metadata, sibling store, or qualitative “content difference” may absorb another
+control item. D.110c-d later proves the same fixed census and per-kind ceilings
+across ≥100 transitions. No GREEN claim includes physical pruning, pending
+restart success, or a third transition.
+
+After the focused GREEN, the retained gate runs once and includes the complete
+D.110c-0b1 file; D.110c-0b0 floor/stage/recovery; protocol-v3 creator trust and
+seal vectors; control-plane trust closure; D.110c-0a seal custody; D.110c-a
+repeat close; D.110c-b hot adoption and its browser lock/failure controls;
+Phase-6a adoption/commit/activation/reopen; D.109 cleanup/rollback/
+availability/outbox non-consuming validators; and snapshot-substitution tests.
+Protocol-v3, control-plane, Node, storage-node, and storage-browser builds and
+exact source typechecks; v3-room/v3-chat typechecks; exact package export
+rosters; exact-owner ESLint/Prettier/diff/source-shape; runtime import identity;
+protected paths, all 27 stashes, process/port predicates, signed commits,
+pushed refs, hashes, and a self-excluding manifest are mandatory. D.110a's
+consumed preflight/full worker and every long campaign remain excluded.
+
+The bounded plan is signed and pushed before one Grok 4.6/high, standard direct
+Kimi K3 with `KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh review. If Grok
+cancels, resume the exact session. Only P0/P1 findings block; material findings
+are corrected in one batch with at most one confirmation when they change the
+public security contract, causal RED, scope, or acceptance behavior. P2 receives
+an owner/disposition without recursive prose review. The signed GREEN then
+receives the one governing formal plan→RED→GREEN review; it must prove causal
+RED closure, fixed-creator authority integrity, bounded control ownership,
+compatibility, retained behavior, and evidence custody. No Fable or
+collaboration subagent is invoked.
+
+The first bounded plan review inspected signed/pushed commit
+`22ee1c59b3163e4f5b23c5cb299570cdeda08a03`, tree
+`dbe24f09507aa59c4f6e9d46829ad53f3500aaf9`, from
+`.logs/d110c-0b1-plan-review-22ee1c59/`. Prompt SHA-256 is
+`cc60165ab248ef116b700004c88ef22136dfec3d34728459ba8baaa6a2b1b211`.
+Grok 4.6/high session `01a0639a-57a5-7c41-b048-bbbe265cc1df` ended
+normally after 600.123 seconds with `stop_reason=end_turn`, no timeout or
+cancellation. Its strict runner honestly classified leading inspection prose
+as `NO_VERDICT`; the embedded terminal object was `CHANGES_REQUIRED`, P0=0,
+P1=1, P2=3. Event, public, and status SHA-256 values are
+`63a497775892d995b520a1393a1df5dffeeb3fedfe05df7f8e60fd9577f0b3d9`,
+`468c4177732a8d10554e3836292e54e5bb296ed0f481482bf06bdd3df9c1b8e5`,
+and `39b0369eaba277284ce20874eab7c4d58dbfdb00db2378cc84cd44bbf547a68e`.
+Direct `kimi-code/k3` session
+`session_427fa052-3c94-4fda-9d8f-784e03bc7c53`, with
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, returned schema-clean `APPROVED`, P0=0,
+P1=0, P2=2; stream and stderr SHA-256 values are
+`645b6b8467dcf4646d3fc728ddd14ad9f0034568aef2345bac831c5982e1e344`
+and `dd61ac99b20dcf6091345b05451cb77c69db4c43b0ee6b5d11705be5613a0dbb`.
+Opus xhigh session `f6bb7cfd-ac15-491d-9da1-91e819a6f608` ended normally,
+spawned zero subagents, and returned `CHANGES_REQUIRED`, P0=0/P1=2/P2=3;
+raw-result SHA-256 is
+`2f2031592ef05ca662fb18f8dfca84e20562967319f0960d8187b0e0c9cae38f`.
+
+The material union is accepted in one correction. Grok proved that every
+downstream N≥1 classifier would reject the bounded staged closure unless it,
+not only close staging, uses the new predicate. Opus proved that the active
+closure also accumulates one epoch-tagged predecessor ACL and that the existing
+live-material consumer requires a genuine predecessor trust capability. The
+correction above therefore names one shared Node classifier for close, hot
+verify, commit, and cold reopen; retires the exact stale predecessor ACL with
+the stale proof pair; and returns the bounded authenticated
+predecessor/current capability pair. The correction also adopts the P2 union:
+exact retiring/new proof epochs, a named sole-caller private minter, standalone
+subpath singleton initialization, a behavioral opener RED before the missing-
+seam token, a closed five-kind census with exact per-kind byte deltas, and an
+explicit D.110c-0c owner for the still-unproven epoch≥2 pending-recovery path.
+No finding changes the fixed creator, v1 wire, floor authority, rollback count,
+dependency, threshold, product API, pruning authority, or campaign boundary.
+Because the accepted correction changes the public success output and bounded
+retirement contract, one confirmation of the signed/pushed correction is
+required. The completed first sessions are not relaunched or relabelled, and
+no closure prose receives recursive review.
+
+The single permitted correction confirmation inspected signed/pushed commit
+`627f98d118fa22e935f31023171d38c6075e3bc0`, tree
+`20f41aaf2adccd2029649aaece9d728ef2ff61e9`, from
+`.logs/d110c-0b1-plan-confirmation-627f98d1/`; prompt SHA-256 is
+`c56d6d3397b218544776700b66bca585794417eb1d3a3fc467bd1f6bae938eca`.
+Grok 4.6/high session `01a063aa-e998-72d2-a25f-ecc46110cc89` ended normally
+with `stop_reason=end_turn`, no timeout or cancellation, and embedded terminal
+`APPROVED`, P0=0/P1=0/P2=0. Its strict runner recorded `NO_VERDICT` only
+because inspection prose preceded that JSON. The exact same session was
+resumed once without another review and emitted the identical schema-clean
+object with no tools or changed verdict. Initial event/public/status SHA-256
+values are
+`adf2b6bf8cbaa75b5b627c3e52c69c6308616c6da47255d8bc0402212a3326e9`,
+`4b85ab2533bd9f32fa8f4684d861f1423f76bdca69b2dbe2b67bf21b466b8130`,
+and `bdace531f7e46138a74bf533e5145d2913c0a6513dfb9f3be2733175d28d8d35`;
+resume event/stderr/public-object SHA-256 values are
+`63b1cb3c8d156a41ef71c8f0b9ffec1d4d4f4700a24126e135d598909f675d2d`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`,
+and `fd669ea6c8e67fb6a135d03c48f8f1856099a212cc25b7d92eb00481e7032cc3`.
+Direct Kimi K3 session `session_dc7c1710-1504-4134-8d92-980a061aa416`, with
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, returned schema-clean `APPROVED`,
+P0=0/P1=0/P2=0; stream/stderr SHA-256 values are
+`0a1f646588eb134dee629263ad146b09eb7ba0f6bb722cceeb8deb4f7fa1ff01`
+and `d706c8d7e11485fc37c89e3f063366d873cfb416fd6ce1a35fa41e5f146432f8`.
+Opus xhigh session `8cf547ac-e93f-4841-bf6f-d291740e415c` ended normally,
+spawned zero subagents, and returned `APPROVED`, P0=0/P1=0/P2=2; raw-result
+SHA-256 is
+`68d50e305bdfa5da77392135ac68cc9c5ef2e642c34f539cc12ab2d848ceac74`.
+Its two nonblocking P2s are dispositioned in the preceding contract without a
+new review: the five-key bounded input now explicitly supersedes 0b0b's
+four-key sentence prospectively, and the frozen opener failure roster has one
+unambiguous final conjunction. The confirmation blocking union is empty;
+D.110c-0b1 deterministic RED is authorized, while production GREEN, pruning,
+pending epoch≥2 recovery, third transition, and long campaigns remain
+unauthorized. The confirmation ledger is
+`.logs/d110c-0b1-plan-confirmation-627f98d1/confirmation-ledger.md`; the
+validating self-excluding manifest SHA-256 is
+`4612d8032ba24a5071ba0f5eecc480892792948251cb40e70d91601af902384b`.
+`git diff --check`, the established 12 GiB Prettier check, exact contract-token
+checks, protected-path/stash/process/port checks, and manifest validation pass.
+The first default-heap Prettier attempt exhausted its approximately 4 GiB Node
+heap and is recorded only as a corrected diagnostic-capacity failure, not a
+formatting or code failure.
+
+The deterministic tests-only RED is signed from accepted plan/confirmation
+base `2cd3ba512a62595a314b1806b70b0eac9092f09c` with evidence root
+`.logs/d110c-0b1-red-2cd3ba51/`. Its sole focused command was exactly:
+
+```text
+pnpm exec vitest run tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts --coverage.enabled=false --reporter=json --outputFile=.logs/d110c-0b1-red-2cd3ba51/vitest.json
+```
+
+It exited `1` with one result file, three selected tests, three intended
+failures, zero passed/pending/todo tests, no result-level top-level message,
+and each frozen complete token exactly once:
+`D110C_0B1_CHECKPOINT_OPENER_MISSING`,
+`D110C_0B1_BOUNDED_ADVANCE_MISSING`, and
+`D110C_0B1_COLD_REOPEN_EPOCH_PINNED`. All preceding semantic assertions
+passed before those terminal tokens: both genuine epoch-1/epoch-2 records were
+rejected by the epoch-0 opener as `trust-state-inconsistent`; attempting the
+real 1→2 evidence with the remaining genesis capability rejected as
+`EPOCH_GAP`; the current additive predicate accepted and retained the stale
+0→1 Cut/QC plus epoch-0 ACL while closure census grew exactly 5→7→8; and
+the real installed cold-reopen owner received the captured second-close
+snapshot/store, issuance, journal, genesis, parameters, runtime, and epoch-2
+floor inputs after hot-owner deactivation and returned exact fail-closed
+`chain-invalid` without a handle. The exact head revisions advanced once for
+close and once for adoption.
+
+The JSON reporter does not serialize arbitrary successful assertion operands,
+so the random runtime ref digests and numeric head revisions validated in
+memory were not copied into the evidence root before the terminal failures.
+The sole invocation is not retried to repair that evidence-capture omission.
+Owner/disposition: D.110c-0b1 GREEN must serialize the exact current, proposed,
+and active refs, decoded census, and head revisions before its terminal proof;
+the final plan→RED→GREEN review must treat this RED limitation honestly and
+confirm causality from the signed test source, its hash, assertion ordering,
+reporter stacks, and GREEN's exact comparison. This is diagnostic custody debt,
+not permission to weaken any GREEN bounded-census gate.
+
+The deterministic validator records one file, three tests, the exact failure
+matrix, zero top-level result messages, and all three token counts. The source-
+shape audit records both new subpaths absent, the epoch-0/1 literals and
+generation selectors present, both old unbounded classifier call sites
+present, and both retirement inputs absent. Exact-owner ESLint, Prettier,
+`git diff --check`, and the three-test read-only listing pass. An ad hoc deep
+fixture `tsc` probe was discarded after it could not resolve inherited bare
+workspace imports; it nevertheless exposed one real wrong singleton import,
+which was corrected before the sole execution. It is not reported as a code
+or authoritative typecheck failure. No production source, API, wire/schema,
+dependency, threshold, floor, rollback, pruning, pending-recovery, campaign,
+D.110a invocation, Fable run, or collaboration subagent changed or ran.
+The RED ledger is `.logs/d110c-0b1-red-2cd3ba51/red-ledger.md`; the validating
+self-excluding manifest SHA-256 is
+`38df4ad95ef80941f786a6c8ec1ab020b81063ddcf765a56a311d1acb718a399`.
+
+The D.110c-0b1 GREEN implementation closes those three causal seams without
+changing the fixed creator profile, any wire record, authority/floor owner,
+rollback count, dependency, threshold, product API, or pruning authority.
+`@ts-drp/protocol-v3/creator-checkpoint` now authenticates the exact pinned
+genesis carrier, genuine immediate predecessor/current v1 trust pair, 1→2
+CutValue/commit-QC, previous-anchor link, and copied room head, returning only
+the two opaque capabilities. Its private predecessor minter is reachable only
+through that checked opener. `@ts-drp/control-plane/creator-trust-checkpoint-advance`
+now requires the exact stale Cut/QC and predecessor-ACL refs, removes all three
+with the old trust ref, preserves every unrelated ref, and admits only the new
+trust plus exact new Cut/QC. Neither symbol is added to a package root export.
+
+One Node-private `inspectCreatorTransitionAdvance` owns the epoch-relative
+choice for close staging, hot verification, adoption commit, and active cold
+reopen. Epoch 0 retains the existing additive predicate; epoch N≥1 derives and
+retires the exact N-1 proof pair and ACL before using the bounded predicate.
+Active cold reopen now authenticates the stored epoch-1/epoch-2 pair through
+the checkpoint opener and derives projection/ACL epochs instead of assuming
+0/1. Pending-adoption recovery deliberately retains its literal 0→1 branch for
+D.110c-0c. The cold epoch-2 recovery path also filters only cryptographically
+authenticated pinned-genesis issuance rows from the epoch-2 verifier, after
+cross-binding their anchor, room, author, sequence, and digest against the
+durable issued row. Malformed or substituted rows remain visible and fail
+closed. This is intentionally sufficient only for the genuine 0→1→2 contract;
+general retirement/recovery of arbitrary intermediate issuance epochs remains
+blocking D.110c-0c/D.110c-d debt before the ≥100-transition gate and is not
+claimed here.
+
+Development evidence is preserved, not overwritten, under
+`.logs/d110c-0b1-green-9457680d-final/development/`. Batch 1 first passed its
+two boundary tests. The initial full focused run then failed only in active
+cold reopen. Its first diagnostic isolated the stale literal issuance ACL;
+after that correction, the next diagnostic reached the genuine recovery owner
+and reported `v3 recovery vertex is not authenticated`. Exact retained bytes
+showed a valid pinned-genesis epoch-0 outbox row being presented to the epoch-1
+verifier. The authenticated pinned-genesis filter closed that cause. A first
+retained run then exposed two stale tests-only expectations: D.110c-a still
+expected additive positive closure growth, and the protocol source-graph test
+omitted the already imported private seal-custody owner. Those expectations
+were corrected to the bounded `delta=-318` result and complete source graph;
+the corresponding correction test and full retained roster passed. No failed
+run was discarded or relabelled.
+
+Before custody closure, the boundary gate was strengthened in place to cover
+the complete practical frozen reason/retirement families: malformed input,
+genesis/predecessor/current rejection, replay/lineage, Cut/QC rejection,
+7. **D.110c-c — bounded cold reopen, repeated cleanup, restart, and custody.**
+   Owner: the existing D.109 cleanup/reclamation orchestrators and installed-v3
+   registration custody, consuming approved 0b/0c designs. This slice also owns
+   the currently missing close-capability composition after cold reopen: today
+   `successorSnapshotDeclaration` and `creatorFinalitySigner` are mutually
+   exclusive and the room binds creator close only on the non-declaration path.
+   Its reviewed RED must prove a genuinely authenticated cold-reopened active
+   epoch-N successor cannot invoke the existing close/adopt path; GREEN must
+   re-establish exact current finality/close custody without weakening the
+   declaration trust, accepting a caller-selected signer, or creating a second
+   close owner. If that needs a new authority carrier, public API, or wire
+   change, D.110c-c stops and reslices it explicitly before implementation.
+   RED/GREEN otherwise cover
+   fresh-process pre-close, post-close, pre-adoption, post-adoption, and
+   post-prune boundaries; age-independent trust reopen; offline/rebase outbox;
+   sequential prune plus one skipped-prune catch-up; two rollback generations;
+   availability refusal; receipt replay/staleness; active-owner uniqueness;
+   predecessor terminalization; bounded hot/control closure; and bounded live
+   registration/close ownership through at least three genuine transitions. Its
+   close/reopen gate compares the room application's exact canonical state to
+   the blueprint snapshot exported for that same close before it becomes an
+   authenticated successor base; a mismatch refuses the transition rather than
+   signing divergent state. Its
+   exact durable census includes browser `sealEvidence`, `voteSlots`,
+   `signerState`, and `voteOutbox` rows by epoch plus the selected 0b0 freshness
+   floor owner, and proves their authenticated, rollback-safe retirement rather
+   than merely counting AHE generations.
+   Physical store deletion authority remains unchanged unless a separate RED
+   demonstrates an owner defect. Deadline: before D.110c-d RED.
+8. **D.110c-d — retained long-horizon and golden-path prerequisite gate.**
+   Owner: tests and test/build infrastructure only after D.110c-a/b/c GREEN. One
+   room performs at least 100 genuine authenticated transitions. The exact bound
+   remains 100 unless this high-risk plan review approves another explicit value
+   before RED. It runs no adaptive retry and cannot replace real close/adopt
+   calls with synthetic maintenance. The retained durable census includes all
+   four creator-seal browser stores, the selected 0b0 freshness-floor owner,
+   and the Node control owners. At each selected close/restart boundary it also
+   proves the exported blueprint state bytes and digest equal the application's
+   exact canonical state, so projector/machine divergence cannot be deferred to
+   the next cold reopen. Deadline:
+   before Phase-6 exit or Phase-7a execution.
+
+##### D.110c-0a bounded epoch-relative seal-custody plan
+
+The completed source audit pins the exact defect and prevents a broader seal
+redesign. `packages/protocol-v3/src/seal.ts` holds `SealAuthorityState.epoch` as
+literal `0`, rejects genuine creator trust when `material.currentEpoch !== 0`,
+and registers every authority identity at epoch 0. `packages/seal` repeats that
+literal in voter enrollment, vote/round-change intent, pacemaker event, and
+creator-close evidence types. The browser `voteSlots`, `signerState`,
+`voteOutbox`, and `sealEvidence` schemas already key by epoch under schema v3,
+but their adapters validate, read, and write only epoch 0. Finally,
+`openBrowserSealEvidenceStore().servePeerEvidence({objectId, signerId})`
+hardcodes `[objectId, 0, signerId]`, while the Node recovery request already
+carries the authority's authenticated epoch. The actor additionally calls an
+unscoped evidence `readAll()` and enforces `rows.length <= 1` across the whole
+database, so a retained epoch-0 record can block or be resumed by an epoch-1
+actor even after the literal authority guard is removed. The vote dispatcher
+also encodes `row.epoch` but marks `[objectId, 0, ...]` dispatched. The
+production seam is therefore composition, exact-row selection, and literal
+narrowing across existing owners; no wire record, cryptographic rule, or
+database schema change is indicated.
+
+D.110c-0a is one security-authority TDD slice with two diagnostic batches and
+one final GREEN review. Its owner paths are:
+
+- `packages/protocol-v3/src/seal.ts` and private seal-authority identity/custody;
+- `packages/seal/src/creator.ts`, `pacemaker.ts`, and private creator-close,
+  vote-intent, evidence-enumeration, and storage-port custody;
+- `packages/node/src/creator-seal.ts` and only the actor-opening binding in
+  `packages/node/src/creator-close.ts`, without changing network request bytes
+  or the exported close result;
+- `packages/storage-browser/src/seal-vote.ts`, `seal-evidence.ts`, and the
+  internal vote/evidence adapters, including `seal-vote-dispatch.ts`;
+- `packages/storage-browser/src/internal/seal-vote-test-control.ts` only as a
+  deterministic tests-only carrier/helper owner; it does not define product
+  authority or acceptance; and
+- schema-v3 only as a source-shape invariant: its existing epoch-bearing keys
+  remain byte-for-byte and no version bump is expected.
+
+The public compatibility decision is exact. The evidence-serving selector
+becomes the closed union
+`{objectId, signerId} | {objectId, epoch, signerId}`. The legacy two-field form
+means epoch 0 only; it never means latest, maximum, active, or any other stored
+epoch. The three-field form requires a nonnegative safe-integer epoch and reads
+the exact `[objectId, epoch, signerId]` row. Extra keys, malformed epoch, and
+cross-object/signer inputs fail before I/O under the existing public
+`TypeError("peer evidence identity is invalid")` owner. The internal evidence
+adapter always requires explicit epoch. This selector union is the only planned
+new public input shape in 0a. The exported fields that widen from literal `0`
+to a nonnegative safe integer are exactly `SealAuthorityState.epoch`,
+`SealAuthorityIdentity.epoch`, `SealVoterEnrollmentData.epoch`,
+values are
+`adf2b6bf8cbaa75b5b627c3e52c69c6308616c6da47255d8bc0402212a3326e9`,
+`4b85ab2533bd9f32fa8f4684d861f1423f76bdca69b2dbe2b67bf21b466b8130`,
+and `bdace531f7e46138a74bf533e5145d2913c0a6513dfb9f3be2733175d28d8d35`;
+resume event/stderr/public-object SHA-256 values are
+`63b1cb3c8d156a41ef71c8f0b9ffec1d4d4f4700a24126e135d598909f675d2d`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`,
+and `fd669ea6c8e67fb6a135d03c48f8f1856099a212cc25b7d92eb00481e7032cc3`.
+Direct Kimi K3 session `session_dc7c1710-1504-4134-8d92-980a061aa416`, with
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, returned schema-clean `APPROVED`,
+P0=0/P1=0/P2=0; stream/stderr SHA-256 values are
+`0a1f646588eb134dee629263ad146b09eb7ba0f6bb722cceeb8deb4f7fa1ff01`
+and `d706c8d7e11485fc37c89e3f063366d873cfb416fd6ce1a35fa41e5f146432f8`.
+Opus xhigh session `8cf547ac-e93f-4841-bf6f-d291740e415c` ended normally,
+spawned zero subagents, and returned `APPROVED`, P0=0/P1=0/P2=2; raw-result
+SHA-256 is
+`68d50e305bdfa5da77392135ac68cc9c5ef2e642c34f539cc12ab2d848ceac74`.
+Its two nonblocking P2s are dispositioned in the preceding contract without a
+new review: the five-key bounded input now explicitly supersedes 0b0b's
+four-key sentence prospectively, and the frozen opener failure roster has one
+unambiguous final conjunction. The confirmation blocking union is empty;
+D.110c-0b1 deterministic RED is authorized, while production GREEN, pruning,
+pending epoch≥2 recovery, third transition, and long campaigns remain
+unauthorized. The confirmation ledger is
+`.logs/d110c-0b1-plan-confirmation-627f98d1/confirmation-ledger.md`; the
+validating self-excluding manifest SHA-256 is
+`4612d8032ba24a5071ba0f5eecc480892792948251cb40e70d91601af902384b`.
+`git diff --check`, the established 12 GiB Prettier check, exact contract-token
+checks, protected-path/stash/process/port checks, and manifest validation pass.
+The first default-heap Prettier attempt exhausted its approximately 4 GiB Node
+heap and is recorded only as a corrected diagnostic-capacity failure, not a
+formatting or code failure.
+
+The deterministic tests-only RED is signed from accepted plan/confirmation
+base `2cd3ba512a62595a314b1806b70b0eac9092f09c` with evidence root
+`.logs/d110c-0b1-red-2cd3ba51/`. Its sole focused command was exactly:
+
+```text
+pnpm exec vitest run tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts --coverage.enabled=false --reporter=json --outputFile=.logs/d110c-0b1-red-2cd3ba51/vitest.json
+```
+
+It exited `1` with one result file, three selected tests, three intended
+failures, zero passed/pending/todo tests, no result-level top-level message,
+and each frozen complete token exactly once:
+`D110C_0B1_CHECKPOINT_OPENER_MISSING`,
+`D110C_0B1_BOUNDED_ADVANCE_MISSING`, and
+`D110C_0B1_COLD_REOPEN_EPOCH_PINNED`. All preceding semantic assertions
+passed before those terminal tokens: both genuine epoch-1/epoch-2 records were
+rejected by the epoch-0 opener as `trust-state-inconsistent`; attempting the
+real 1→2 evidence with the remaining genesis capability rejected as
+`EPOCH_GAP`; the current additive predicate accepted and retained the stale
+0→1 Cut/QC plus epoch-0 ACL while closure census grew exactly 5→7→8; and
+the real installed cold-reopen owner received the captured second-close
+snapshot/store, issuance, journal, genesis, parameters, runtime, and epoch-2
+floor inputs after hot-owner deactivation and returned exact fail-closed
+`chain-invalid` without a handle. The exact head revisions advanced once for
+close and once for adoption.
+
+The JSON reporter does not serialize arbitrary successful assertion operands,
+so the random runtime ref digests and numeric head revisions validated in
+memory were not copied into the evidence root before the terminal failures.
+The sole invocation is not retried to repair that evidence-capture omission.
+Owner/disposition: D.110c-0b1 GREEN must serialize the exact current, proposed,
+and active refs, decoded census, and head revisions before its terminal proof;
+the final plan→RED→GREEN review must treat this RED limitation honestly and
+confirm causality from the signed test source, its hash, assertion ordering,
+reporter stacks, and GREEN's exact comparison. This is diagnostic custody debt,
+not permission to weaken any GREEN bounded-census gate.
+
+The deterministic validator records one file, three tests, the exact failure
+matrix, zero top-level result messages, and all three token counts. The source-
+shape audit records both new subpaths absent, the epoch-0/1 literals and
+generation selectors present, both old unbounded classifier call sites
+present, and both retirement inputs absent. Exact-owner ESLint, Prettier,
+`git diff --check`, and the three-test read-only listing pass. An ad hoc deep
+fixture `tsc` probe was discarded after it could not resolve inherited bare
+workspace imports; it nevertheless exposed one real wrong singleton import,
+which was corrected before the sole execution. It is not reported as a code
+or authoritative typecheck failure. No production source, API, wire/schema,
+dependency, threshold, floor, rollback, pruning, pending-recovery, campaign,
+D.110a invocation, Fable run, or collaboration subagent changed or ran.
+The RED ledger is `.logs/d110c-0b1-red-2cd3ba51/red-ledger.md`; the validating
+self-excluding manifest SHA-256 is
+`38df4ad95ef80941f786a6c8ec1ab020b81063ddcf765a56a311d1acb718a399`.
+
+The D.110c-0b1 GREEN implementation closes those three causal seams without
+changing the fixed creator profile, any wire record, authority/floor owner,
+rollback count, dependency, threshold, product API, or pruning authority.
+`@ts-drp/protocol-v3/creator-checkpoint` now authenticates the exact pinned
+genesis carrier, genuine immediate predecessor/current v1 trust pair, 1→2
+CutValue/commit-QC, previous-anchor link, and copied room head, returning only
+the two opaque capabilities. Its private predecessor minter is reachable only
+through that checked opener. `@ts-drp/control-plane/creator-trust-checkpoint-advance`
+now requires the exact stale Cut/QC and predecessor-ACL refs, removes all three
+with the old trust ref, preserves every unrelated ref, and admits only the new
+trust plus exact new Cut/QC. Neither symbol is added to a package root export.
+
+One Node-private `inspectCreatorTransitionAdvance` owns the epoch-relative
+choice for close staging, hot verification, adoption commit, and active cold
+reopen. Epoch 0 retains the existing additive predicate; epoch N≥1 derives and
+retires the exact N-1 proof pair and ACL before using the bounded predicate.
+Active cold reopen now authenticates the stored epoch-1/epoch-2 pair through
+the checkpoint opener and derives projection/ACL epochs instead of assuming
+0/1. Pending-adoption recovery deliberately retains its literal 0→1 branch for
+D.110c-0c. The cold epoch-2 recovery path also filters only cryptographically
+authenticated pinned-genesis issuance rows from the epoch-2 verifier, after
+cross-binding their anchor, room, author, sequence, and digest against the
+durable issued row. Malformed or substituted rows remain visible and fail
+closed. This is intentionally sufficient only for the genuine 0→1→2 contract;
+general retirement/recovery of arbitrary intermediate issuance epochs remains
+blocking D.110c-0c/D.110c-d debt before the ≥100-transition gate and is not
+claimed here.
+
+Development evidence is preserved, not overwritten, under
+`.logs/d110c-0b1-green-9457680d-final/development/`. Batch 1 first passed its
+two boundary tests. The initial full focused run then failed only in active
+cold reopen. Its first diagnostic isolated the stale literal issuance ACL;
+after that correction, the next diagnostic reached the genuine recovery owner
+and reported `v3 recovery vertex is not authenticated`. Exact retained bytes
+showed a valid pinned-genesis epoch-0 outbox row being presented to the epoch-1
+verifier. The authenticated pinned-genesis filter closed that cause. A first
+retained run then exposed two stale tests-only expectations: D.110c-a still
+expected additive positive closure growth, and the protocol source-graph test
+omitted the already imported private seal-custody owner. Those expectations
+were corrected to the bounded `delta=-318` result and complete source graph;
+the corresponding correction test and full retained roster passed. No failed
+run was discarded or relabelled.
+
+Before custody closure, the boundary gate was strengthened in place to cover
+the complete practical frozen reason/retirement families: malformed input,
+genesis/predecessor/current rejection, replay/lineage, Cut/QC rejection,
+18057:## Phase 7 — Archive / Discord profile
+97442:long-horizon gate, Phase-6 exit, or Phase-7 multi-author cold join.
+97610:multi-author cold join.
+97824:multi-author cold join. No f5 production edit is authorized.** Owner: the
+## Phase 7 — Archive / Discord profile
+
+**Goal:** for chat the messages _are_ the state; a snapshot alone cannot remove them. Two-tier hot/cold.
+The root **codecs** already landed in Phase 3e — this phase is segmentation, paging and retention.
+
+| Slice    | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | RED test → GREEN                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **7a**   | Immutable content-addressed **archive segments** under the Merkle archive index; hot snapshot = recent window + edit/tombstone overlay + archive root; demand paging with inclusion proofs; attachment manifests. The source room must have completed the blocking 6c-r repeated authenticated lifecycle; one oversized epoch and synthetic archive records are forbidden substitutes.                                                                                                                                                              | Corrupt/missing/withheld/tampered segment → verification fails; cold-join of a genuinely multi-epoch 1M-message room after safely pruning early epochs downloads O(hot + window), verified by **network-byte accounting** in the chat e2e                                                                                                                                                                                                                                                  |
+| **7b**   | Availability policy as a **committed** value. `availabilityPolicyDigest` is a committed `CutValue` field from Phase 3 onward and binds to a successor anchor transitively through its certified `cutDigest`; the frozen sixteen-field `drp-epoch-anchor` never carries it (D.93.17). The initial no-mirror profile is a valid **explicit** policy: `mode:"local-only", minRollbackGenerations:2, minLocalCopies:1, minMirrorReceipts:0`. Receipts are signed artifact-bound local pruning evidence — **not consensus, and not a permanence claim**. | `availability-policy.test.ts`: a no-mirror room prunes only with a local snapshot and two rollback generations; a receipt for the wrong artifact/object/epoch never satisfies policy                                                                                                                                                                                                                                                                                                       |
+| **7b-r** | **Receipt-authenticated rollback release, after its prerequisites and a governed protocol-v3 registry bump.** Canonically verify artifact-bound availability receipts before retention arithmetic, derive a module-private release intent bound to observed revision, and atomically recheck head/generation/policy/storage revisions plus usable rollback facts before updating release state only. `releaseRollbackGeneration` never deletes; Phase 6b remains the sole physical deletion authority.                                              | Forged/malformed/wrongly bound/untrusted/replayed/bad-signature receipts return `RECEIPT_INVALID` before arithmetic or release mutation. Only an authenticated but policy-unsafe release returns `ROLLBACK_PINNED`. No receipt alone deletes bytes; 6b still requires verified QC, durable adoption, minimum usable rollbacks, satisfied availability and categorized outbox. This row is blocked on Phase 3, 5c, 6a, 7b and the receipt registry bump detailed in the Phase 2g amendment. |
+| **7c**   | Privacy/retention: per-segment encryption, certified key-erasure, honest deletion UX                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Certified key-erasure renders retained ciphertext unreadable to conforming clients; documented residual-risk statement                                                                                                                                                                                                                                                                                                                                                                     |
+
+> Round 1's _"randomized deletion/churn retains ≥1 valid copy at target probability"_ is a property of the
+> **availability model**, verifiable by the model alone — as a code gate it is vacuous, and an unspecified
+> churn distribution can produce any desired number. Keep the probability claim as a committed design
+> artifact (model run + parameters + seeds + owner). The **code** gate is a repair-loop integration test:
+> kill mirrors on a churn schedule, assert the challenge/repair path fires, every certified segment stays
+> fetchable, and **deletion is refused while the policy is unsatisfied**.
+
+**Rule:** enable chat-history deletion **only after** availability + archive verification are green — a valid
+QC proves agreement on digests, not retrievability.
+
+**Deletion is a product decision that is needed long before Phase 7.** The honest answer — deletion is
+provably impossible from untrusted holders; key-erasure only blinds _conforming_ clients; prior recipients
+keep plaintext — must be written as a decision record in **Phase 1**, before any chat-profile deployment,
+and consumed by 7c. Otherwise it gets invented under pressure after the first user request, and the UX copy
+promises something the system cannot honor.
+
+---
+
+## Train S — the fabric tracks (E, S, T)
+
+Round 1 compressed the entire non-AHE half of the product goal into one eight-row table scheduled last, while
+its own text said these must stand up early as regression gates. That self-contradiction is resolved here:
+**Phase 8 ceases to exist**; its rows are redistributed into Phase 0/1/2 (where they are prerequisites) and
+three first-class tracks with real protocols.
+
+| Round-1 row              | Disposition                                                                                                                                          |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 8a ephemeral             | → **Track E**, starting with Phase 1                                                                                                                 |
+| 8b sharding              | → **Track S**, design before Phase 6                                                                                                                 |
+| 8c resource governance   | **split**: frame caps, invalid-vertex budget, permissioned default → Phase 1 (1g/1k/1l); NOP + epoch-capacity accounting → Phase 3                   |
+| 8d benchmarks            | → **Profile gates**, standing from Gate 0                                                                                                            |
+| 8e browser matrix        | → Phase 2h, standing from Phase 2                                                                                                                    |
+| 8f blueprint determinism | → **Phase 0j** (it is a Phase-4 soak prerequisite)                                                                                                   |
+| 8g topology              | → **Track T**, starting with Phase 1                                                                                                                 |
+| 8h crypto pipeline       | → Phase 2f owns only the `worker-host` boundary; optional 2f-d opens on the measured real-consumer trigger and is not a Phase 2f closure requirement |
+
+### Profile gates — the scale goal as acceptance criteria
+
+Round 1's only numbers — _"32 writers, 100 durable ops/s, 1h session cold-join < 30 s and < 50 MB, p99 apply
+< 50 ms, heap < 512 MB"_ — describe a 32-writer co-op room, not either stated product. Two specific defects:
+the cold-join budget is stated **per "1h session"**, which quietly re-admits `O(history-age)` joins — the exact
+failure AHE exists to remove; and "p99 apply < 50 ms" is three dropped frames, fine for chat and
+disqualifying for a game client, where the budget must be a **max main-thread task** bound.
+
+Replaced by two profile tables. **Anything not in a profile table is not a supported scale claim.**
+
+| Metric                      | **Profile D** — Discord channel (1 channel = 1 object)    | **Profile M** — MMORPG zone (1 zone instance = 1 object)         |
+| --------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------- |
+| Active writers              | ≤ 128 per 5-min window                                    | ≤ 64 durable                                                     |
+| Durable ops/s               | ≤ 25 sustained, 100 peak (10 s)                           | ≤ 32 sustained, 128 peak                                         |
+| Ephemeral rate              | typing/presence 1–10 Hz                                   | **20–30 Hz, zero durable vertices**                              |
+| Online replicas / object    | ≥ 1,000 browser-only; 5,000 with relay spine              | —                                                                |
+| Epoch                       | ≤ 8,192 vertices (AHE default)                            | ≤ 8,192                                                          |
+| Hot snapshot                | ≤ 64 MiB                                                  | ≤ 8 MiB                                                          |
+| **Cold join**               | **< 10 MB and < 10 s p95 — independent of room age**      | **< 20 MB, < 5 s to playable**                                   |
+| Channel switch / zone enter | < 1 s warm                                                | < 5 s                                                            |
+| Per-peer connections        | ≤ 8 mesh/room, ≤ 48 total                                 | ≤ 8 mesh, ≤ 48 total                                             |
+| Main thread                 | no task > 50 ms                                           | **≤ 2 ms/frame p99** on a CPU-throttled mid-tier Android profile |
+| Heap                        | ≤ 512 MB at 20 open rooms                                 | game budget ≤ 150–250 MB                                         |
+| Idle bandwidth              | ≤ 5 KB/s/room                                             | —                                                                |
+| Fabric                      | N channel objects/process; guild roster a separate object | N zone objects; cross-shard conservation                         |
+
+Every number names its harness. **Cold join is measured on a fixture with ≥100 _compacted_ epochs of
+synthetic age**, not a 1 h session — otherwise the gate proves nothing about a six-month-old room, which is
+the actual product case.
+
+**Comparative honesty gate (CMP).** Against Yjs/Automerge on the same semantic chat workload, DRP wins only
+on _signed application commands with ACL-gated custom concurrency_. Sync efficiency, durability, snapshots,
+archive paging, ephemeral separation and mesh budgets are all **table stakes** those ecosystems already ship.
+Run the comparison **before** Phase 7 feature sprawl, and encode a kill criterion: if DRP cannot reach ≤2×
+Yjs latency at 50 msg/s with signatures on, the honest label is _"signed, moderated rooms ≤ N writers"_ —
+not "Discord-like at scale."
+
+### Track E — the ephemeral simulation plane
+
+The repo has **no** ephemeral capability today: transports are `circuitRelayTransport(), webRTC(),
+webSockets()` (`network/src/node.ts:534`); js-libp2p WebRTC multiplexes **reliable, ordered** streams;
+`DRPNetworkNode` exposes only protobuf `Message` broadcast/send. Meanwhile the flagship example writes **a
+signed durable vertex per keystroke** (`examples/grid/src/index.ts:28-33`) — the repo's own demo violates the
+rule this track exists to enforce.
+
+**Class boundary** (the design round 1 left as one line):
+     439 packages/protocol-v3/src/creator-author-issuance-frontiers.ts
+    1152 packages/node/src/creator-close.ts
+     541 packages/node/src/internal/creator-transition-advance.ts
+    8082 packages/node/src/v3-live.ts
+    1595 packages/node/src/creator-adoption.ts
+     505 packages/node/src/creator-adoption-activate.ts
+    4204 examples/v3-room/src/index.ts
+   16518 total
+     277 tests/protocol-v3-creator-author-issuance-frontiers.test.ts
+      18 tests/phase-6b-d110c-0c1f2-multi-author-frontier.test.ts
+     159 tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts
+     454 total
+phase-6a-creator-successor-activation-global-setup.ts
+phase-6a-creator-successor-activation.pw.ts
+phase-6a-creator-successor-product.pw.ts
+phase-6a-successor-epoch.pw.ts
+multi-author-frontier-contract.ts
+     155 tests/fixtures/phase-6b-d110c-0c1f2/multi-author-frontier-contract.ts
+.logs/d110c-0c1f24-green-working-fcd8735c/focused-vitest.json True 41 41 0 0
+files: ['/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-red.test.ts', '/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-activation-red.test.ts', '/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts', '/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f2-multi-author-frontier.test.ts', '/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts', '/Users/aristotle/Documents/Projects/ts-drp-1/tests/protocol-v3-creator-author-issuance-frontiers.test.ts']
+.logs/d110c-0c1f24-green-working-fcd8735c/retained-vitest.json True 195 195 0 0
+files: ['/Users/aristotle/Documents/Projects/ts-drp-1/tests/e5-01-v3-operation-admission-red.test.ts', '/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3a1b-p2-outbox-publication-contract.test.ts', '/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-rebase-outbox-red.test.ts', '/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-4b-v3-live-snapshot-composition-red.test.ts', '/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-commit-red.test.ts', '/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-red.test.ts', '/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-activation-red.test.ts', '/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-epoch-red.test.ts', '/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-ahe-reclamation-red.test.ts', '/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts', '/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts', '/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f2-multi-author-frontier.test.ts', '/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts', '/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-a-repeat-close-red.test.ts', '/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-b-hot-adoption.test.ts', '/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-issuance-retention-red.test.ts', '/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-runtime-reclamation-red.test.ts', '/Users/aristotle/Documents/Projects/ts-drp-1/tests/protocol-v3-creator-author-issuance-frontiers.test.ts', '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6b-ahe-reclamation-red.test.ts', '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts']
+playwright stats: {'startTime': '2026-09-03T19:20:02.981Z', 'duration': 6210.382, 'expected': 2, 'skipped': 0, 'unexpected': 0, 'flaky': 0}
+commands.md: OK
+focused-vitest.json: OK
+playwright.json: OK
+retained-vitest.json: OK
+validation.md: OK
+proof.md: OK
+result.md: OK
+audit.md: OK
+.logs/d110c-0c1f2-red-f488f1f6/product-red.final.txt: FAILED open or read
+shasum: .logs/d110c-0c1f2-red-f488f1f6/protocol-red.final.txt: No such file or directory
+.logs/d110c-0c1f2-red-f488f1f6/protocol-red.final.txt: FAILED open or read
+shasum: .logs/d110c-0c1f2-red-f488f1f6/result.json: No such file or directory
+.logs/d110c-0c1f2-red-f488f1f6/result.json: FAILED open or read
+shasum: .logs/d110c-0c1f2-red-f488f1f6/static-gates.txt: No such file or directory
+.logs/d110c-0c1f2-red-f488f1f6/static-gates.txt: FAILED open or read
+shasum: WARNING: 6 listed files could not be read
+shasum: packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts: No such file or directory
+packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts: FAILED open or read
+shasum: packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts: No such file or directory
+packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts: FAILED open or read
+shasum: .logs/d110c-0c1f4-red-1033e22e/playwright.json: No such file or directory
+.logs/d110c-0c1f4-red-1033e22e/playwright.json: FAILED open or read
+shasum: .logs/d110c-0c1f4-red-corrected-1033e22e/playwright.json: No such file or directory
+.logs/d110c-0c1f4-red-corrected-1033e22e/playwright.json: FAILED open or read
+shasum: .logs/d110c-0c1f4-red-final-1033e22e/playwright.json: No such file or directory
+.logs/d110c-0c1f4-red-final-1033e22e/playwright.json: FAILED open or read
+shasum: .logs/d110c-0c1f4-red-causal-1033e22e/playwright.json: No such file or directory
+.logs/d110c-0c1f4-red-causal-1033e22e/playwright.json: FAILED open or read
+shasum: .logs/d110c-0c1f4-red-causal-1033e22e/ledger.md: No such file or directory
+.logs/d110c-0c1f4-red-causal-1033e22e/ledger.md: FAILED open or read
+shasum: .logs/d110c-0c1f4-red-causal-1033e22e/commands.md: No such file or directory
+.logs/d110c-0c1f4-red-causal-1033e22e/commands.md: FAILED open or read
+shasum: .logs/d110c-0c1f4-red-causal-1033e22e/listing.txt: No such file or directory
+.logs/d110c-0c1f4-red-causal-1033e22e/listing.txt: FAILED open or read
+shasum: .logs/d110c-0c1f4-red-causal-1033e22e/reporter-validation.md: No such file or directory
+.logs/d110c-0c1f4-red-causal-1033e22e/reporter-validation.md: FAILED open or read
+shasum: .logs/d110c-0c1f4-red-causal-1033e22e/source-shape.md: No such file or directory
+.logs/d110c-0c1f4-red-causal-1033e22e/source-shape.md: FAILED open or read
+shasum: .logs/d110c-0c1f4-red-causal-1033e22e/static-gates.md: No such file or directory
+.logs/d110c-0c1f4-red-causal-1033e22e/static-gates.md: FAILED open or read
+shasum: WARNING: 12 listed files could not be read
+stats: {'startTime': '2026-09-03T18:04:40.581Z', 'duration': 5435.898, 'expected': 1, 'skipped': 0, 'unexpected': 1, 'flaky': 0}
+.logs/d110c-0c1f2-red-f488f1f6/commands.txt: OK
+.logs/d110c-0c1f2-red-f488f1f6/diagnostic-ledger.md: OK
+.logs/d110c-0c1f2-red-f488f1f6/product-red.final.txt: OK
+.logs/d110c-0c1f2-red-f488f1f6/protocol-red.final.txt: OK
+.logs/d110c-0c1f2-red-f488f1f6/result.json: OK
+.logs/d110c-0c1f2-red-f488f1f6/static-gates.txt: OK
+packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts: FAILED
+packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts: FAILED
+.logs/d110c-0c1f4-red-1033e22e/playwright.json: OK
+.logs/d110c-0c1f4-red-corrected-1033e22e/playwright.json: OK
+.logs/d110c-0c1f4-red-final-1033e22e/playwright.json: OK
+.logs/d110c-0c1f4-red-causal-1033e22e/playwright.json: OK
+.logs/d110c-0c1f4-red-causal-1033e22e/ledger.md: OK
+.logs/d110c-0c1f4-red-causal-1033e22e/commands.md: OK
+.logs/d110c-0c1f4-red-causal-1033e22e/listing.txt: OK
+.logs/d110c-0c1f4-red-causal-1033e22e/reporter-validation.md: OK
+.logs/d110c-0c1f4-red-causal-1033e22e/source-shape.md: OK
+.logs/d110c-0c1f4-red-causal-1033e22e/static-gates.md: OK
+shasum: WARNING: 2 computed checksums did NOT match
+ .../phase-6a-creator-successor-product-entry.ts    |   4 +
+ .../tests/phase-6a-creator-successor-product.pw.ts | 144 +++++++++++++--------
+ 2 files changed, 95 insertions(+), 53 deletions(-)
+== 1502d4d81e1769a75bc3c416937b53e57dc3390b
+gpg: Good signature from "Faolain <Faolain@users.noreply.github.com>" [ultimate]
+== c584b76bb7376fe2cbf4664dfdebacab8c153568
+gpg: Good signature from "Faolain <Faolain@users.noreply.github.com>" [ultimate]
+== fcd8735c8316b048166560ab904704102ce90705
+gpg: Good signature from "Faolain <Faolain@users.noreply.github.com>" [ultimate]
+== 9e1781e0966953d7adce8cf6b0a4d9e56d12299a
+gpg: Good signature from "Faolain <Faolain@users.noreply.github.com>" [ultimate]
+== da3e75514e3921b71d57d611d9e2b61785124b07
+gpg: Good signature from "Faolain <Faolain@users.noreply.github.com>" [ultimate]
+terminal error: D110C_0C1F1_MULTI_AUTHOR_FRONTIER_CARRIER_REQUIRED
+evidence: {"aggregateCarrierCount":0,"closeSetCount":3,"creator":"abf3b213db1a0e37cf3f0f1b7a00be503dec3650080f5c3536678e9887d7be1d","legacyCarrierCount":1,"secondWriter":"332dc74a0b2687513b0fb05c73568882cac57a02594569d1bb266be8074bb136","secondWriterAdmittedRows":1,"successorEpoch":1,"writerCount":2}
+unexpected errors: 0
+flaky tests: 0
+retries: 0
+---
+- The exact Bob epoch-1 digest is classified against current epoch 3 and refused by predecessor-validation against displaced epoch 2.
+- Product refusal: v3 room successor reopen failed: recovery-rejected: creator predecessor recovery failed: admission-rejected.
+unexpected errors: 0
+flaky tests: 0
+retries: 0
+6:	const anchorHash = hex(hashDomain("ts-drp/epoch-anchor/v3", captured.anchorBytes));
+73:	if (previousAccumulator.size !== anchor.historySize || hex(previousAccumulator.root()) !== anchor.historyRoot) {
+105:		closeSetRoot: hex(closeSetTree.root),
+106:		historyRoot: hex(previousAccumulator.root()),
+	for (const key of captured.charges.keys())
+		if (!closed.has(key)) invalidCharges("byte charge keyset differs from the close set");
+	if (totalBytes > captured.maxEpochBytes) {
+		throw new LinearizationError("EPOCH_CAPACITY_EXCEEDED", "close set exceeds maxEpochBytes");
+	}
+	if (closeSetOrder.length > Number.MAX_SAFE_INTEGER - anchor.historySize) {
+		throw new RangeError("history size exceeds the safe-integer range");
+	}
+	let previousAccumulator: CompactMerkleAccumulator;
+	try {
+		previousAccumulator = CompactMerkleAccumulator.fromSnapshot(captured.previousHistorySnapshot);
+	} catch (error) {
+		if (error instanceof RangeError) throw error;
+		throw new TypeError("previous history snapshot is invalid", { cause: error });
+	}
+	if (previousAccumulator.size !== anchor.historySize || hex(previousAccumulator.root()) !== anchor.historyRoot) {
+		invalidAnchor("previous history snapshot does not match the authenticated anchor");
+	}
+	const closeSetEntries = closeSetOrder.map(
+		(vertexHash, index): CloseSetHistoryEntry => ({
+			authenticatedCanonicalPreimageByteLength: captured.charges.get(vertexHash) as number,
+			exactCanonicalHistoryLeafBytes: encodeCanonical({
+				epoch: anchor.epoch,
+				kind: "drp-history-leaf",
+				objectId: anchor.objectId,
+				ordinal: anchor.historySize + index,
+				protocolMajor: 3,
+				vertexHash,
+			}),
+			ordinal: anchor.historySize + index,
+			vertexHash,
+		})
+	);
+	const closeSetTree = await buildMerkleTree(closeSetEntries.map((entry) => entry.exactCanonicalHistoryLeafBytes));
+	await previousAccumulator.appendMany(closeSetEntries.map((entry) => entry.exactCanonicalHistoryLeafBytes));
+	return Object.freeze({
+		anchorHash,
+		closeSetCount: closeSetEntries.length,
+		closeSetEntries: Object.freeze(
+			closeSetEntries.map((entry) =>
+				Object.freeze({
+					...entry,
+					exactCanonicalHistoryLeafBytes: new Uint8Array(entry.exactCanonicalHistoryLeafBytes),
+				})
+			)
+		),
+		closeSetOrder: Object.freeze([...closeSetOrder]),
+		closeSetRoot: hex(closeSetTree.root),
+		historyRoot: hex(previousAccumulator.root()),
+		historySize: previousAccumulator.size,
+		historySnapshot: previousAccumulator.snapshot(),
+	});
+}
+	if (
+		value.kind !== AUTHOR_AUTHORIZATION_KIND ||
+		value.protocolMajor !== 3 ||
+		!isSafeNonnegative(value.epoch) ||
+		!isSafeNonnegative(value.version) ||
+		!isStorageObjectIdText(value.objectId) ||
+		typeof value.profileId !== "string" ||
+		!Array.isArray(value.authors) ||
+		value.authors.length < 1 ||
+		value.authors.length > 64
+	) {
+		return false;
+	}
+	let previous: string | undefined;
+	for (const author of value.authors) {
+		if (typeof author !== "string" || !PUBLIC_KEY_HEX.test(author) || (previous !== undefined && previous >= author)) {
+			return false;
+		}
+		previous = author;
+	}
+	return true;
+}
+
+interface CreatorCarriers {
+	readonly profileId: string;
+	readonly publicKey: Uint8Array;
+packages/protocol-v3/src/latched-acl.ts:133:		record.members.length === 0 ||
+packages/protocol-v3/src/latched-acl.ts:134:		record.members.length > 64
+phase-6b-d110c-0a-authority-red.test.ts
+phase-6b-d110c-0a-browser-custody-red.test.ts
+phase-6b-d110c-0b0-floor-red.test.ts
+phase-6b-d110c-0b0a-staged-handoff-red.test.ts
+phase-6b-d110c-0b1-boundaries.test.ts
+phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts
+phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts
+phase-6b-d110c-0c1b-committed-issuance-red.test.ts
+phase-6b-d110c-0c1f2-multi-author-frontier-red.test.ts
+phase-6b-d110c-0c1f2-multi-author-frontier.test.ts
+phase-6b-d110c-0c1f4-bootstrap-policy.test.ts
+phase-6b-d110c-a-repeat-close-red.test.ts
+phase-6b-d110c-b-hot-adoption.test.ts
+import "fake-indexeddb/auto";
+
+import { describe, expect, it } from "vitest";
+
+import {
+	D110C_A_HOSTILE_CARRIERS,
+	openD110cARepeatCloseFixture,
+} from "./fixtures/phase-6b-d110c-a/repeat-close-contract.js";
+
+describe("D.110c-a authenticated repeat-close carrier RED", () => {
+	it("extends authenticated compact history through one genuine adopted epoch-one close", async () => {
+		Object.defineProperty(navigator, "storage", {
+			configurable: true,
+			value: Object.freeze({ estimate: () => Promise.resolve({ quota: 1_000_000_000_000, usage: 0 }) }),
+		});
+		const fixture = await openD110cARepeatCloseFixture();
+		try {
+			const evidence = fixture.evidence;
+			if (process.env.D110C_A_RECORD_EVIDENCE === "1") {
+				process.stdout.write(
+					`D110C_A_GREEN_EVIDENCE=${JSON.stringify({
+						afterReferenceCount: evidence.afterHead.references.length,
+						beforeReferenceCount: evidence.beforeHead.references.length,
+						closeOrder: evidence.independentHistory.closeOrder,
+						closureBytes: evidence.closureBytes,
+						epoch: evidence.closeResult.epoch,
+						historyRoot: evidence.independentHistory.historyRoot,
+						historySize: evidence.independentHistory.historySize,
+						previousHistoryRoot: evidence.independentHistory.previousRoot,
+						previousHistorySize: evidence.independentHistory.previous.size,
+						successorEpoch: evidence.closeResult.successorEpoch,
+					})}\n`
+				);
+			}
+			expect(evidence.issued).toMatchObject({ kind: "accepted", ok: true });
+			expect(evidence.published).toEqual({ kind: "published", ok: true });
+			expect(evidence.hostileCarrierRefusals).toHaveLength(D110C_A_HOSTILE_CARRIERS.length);
+			expect(evidence.hostileCarrierRefusals.map(({ carrier }) => carrier)).toEqual(D110C_A_HOSTILE_CARRIERS);
+			for (const refusal of evidence.hostileCarrierRefusals) {
+				expect(refusal).toEqual({
+		const commit = bytesForRef(first.proposed, first.closeResult.commitQcRef);
+		const successorTrust = bytesForRef(first.proposed, first.closeResult.successorTrustRef);
+		const foreignCut = bytesForRef(second.proposed, second.closeResult.cutValueRef);
+		const foreignCommit = bytesForRef(second.proposed, second.closeResult.commitQcRef);
+		const foreignTrust = bytesForRef(second.proposed, second.closeResult.successorTrustRef);
+		const oldTrust = bytesForRef(first.current, first.closeResult.currentTrustRef);
+		const verify = (
+			exactCanonicalCutValueBytes: Uint8Array,
+			exactCanonicalCommitQcBytes: Uint8Array,
+			exactCanonicalTrustStateRecordBytes: Uint8Array
+		): ReturnType<typeof openCreatorSuccessorTrust> =>
+			openCreatorSuccessorTrust({
+				currentTrust: first.currentTrust,
+				exactCanonicalCommitQcBytes,
+				exactCanonicalCutValueBytes,
+				exactCanonicalTrustStateRecordBytes,
+			});
+
+		expect(verify(cut, commit, successorTrust), "genuine").toEqual(expect.objectContaining({ ok: true }));
+		expect(verify(foreignCut, commit, successorTrust), "cut-swap").toEqual(expect.objectContaining({ ok: false }));
+		expect(verify(cut, foreignCommit, successorTrust), "qc-swap").toEqual(expect.objectContaining({ ok: false }));
+		expect(verify(cut, commit, oldTrust), "trust-old").toEqual(expect.objectContaining({ ok: false }));
+		expect(verify(cut, commit, foreignTrust), "trust-foreign").toEqual(expect.objectContaining({ ok: false }));
+		expect(verify(cut, signedQc(first.currentTrust, cut, "prepare"), successorTrust), "qc-prepare-as-commit").toEqual({
+			ok: false,
+			reason: "COMMIT_QC_REQUIRED",
+		});
+		const decodedCommit = decodeCanonical(commit) as Readonly<{ readonly votes: readonly unknown[] }>;
+		const duplicateSignerQc = encodeCanonical({
+			...(decodeCanonical(commit) as Readonly<Record<string, unknown>>),
+			votes: [decodedCommit.votes[0], decodedCommit.votes[0]],
+		});
+		expect(verify(cut, duplicateSignerQc, successorTrust), "qc-duplicate-signer").toEqual({
+			ok: false,
+			reason: "COMMIT_QC_REJECTED",
+		});
+
+		const controlRefs = new Set(
+			first.proposed.candidates.flatMap((candidate) => {
+				const value = decodeCanonical(candidate.bytes) as Readonly<Record<string, unknown>>;
+				return value.kind === "drp-creator-issuance-retirement-state" ||
+					value.kind === "drp-creator-author-issuance-frontiers-state"
+					? [candidate.ref.digest]
+					: [];
+			})
+		);
+		const normalizedCandidates = first.proposed.candidates.filter(
+			(candidate) => !controlRefs.has(candidate.ref.digest)
+		);
+		const advance = (
+			proposedReferences: typeof first.proposed.references
+		): ReturnType<typeof inspectCreatorTrustAdvance> =>
+			inspectCreatorTrustAdvance({
+				current: { candidates: first.current.candidates, closure: first.current.references },
+				proofRefs: [first.closeResult.cutValueRef, first.closeResult.commitQcRef],
+				proposed: {
+					candidates: normalizedCandidates,
+					closure: proposedReferences.filter((ref) => !controlRefs.has(ref.digest)),
+				},
+			});
+		expect(advance(first.proposed.references)).toEqual({ kind: "successor", ok: true });
+		const lengthMutant = first.proposed.references.map((ref) =>
+			ref.digest === first.closeResult.cutValueRef.digest ? { ...ref, byteLength: ref.byteLength + 1 } : ref
+		);
+		const digestMutant = first.proposed.references.map((ref) =>
+			ref.digest === first.closeResult.cutValueRef.digest
+				? { ...ref, digest: "f".repeat(64) as typeof ref.digest }
+				: ref
+		);
+		expect(advance(lengthMutant), "pending-head-ref-length").toEqual({ ok: false, reason: "TRUST_CLOSURE_INVALID" });
+		expect(advance(digestMutant), "pending-head-ref-digest").toEqual({ ok: false, reason: "TRUST_CLOSURE_INVALID" });
+	});
+
+	it("executes predecessor-lineage, close-order and append-only history mutants", async () => {
+		const { closeResult, current, generations, history, proposed } = genuine.evidence;
+		expect(validGenerationLineage(generations, current.head, proposed.head), "genuine-lineage").toBe(true);
+		expect(
+			validGenerationLineage(
+				generations.filter(({ generationId }) => generationId !== current.head.generationId),
+				current.head,
+				proposed.head
+			),
+			"predecessor-link-missing"
+		).toBe(false);
+		expect(
+			validGenerationLineage([...generations, generations[0] as GenerationRecord], current.head, proposed.head),
+			"predecessor-link-duplicate"
+		).toBe(false);
+		const proposedGeneration = generations.find(({ generationId }) => generationId === proposed.head.generationId);
+		if (proposedGeneration === undefined || proposedGeneration.baseExpectedHead.kind !== "present") {
+			throw new TypeError("D.108b proposed generation is unavailable");
+		}
+		const cycle = generations.map((generation) =>
+			generation === proposedGeneration ? { ...generation, baseExpectedHead: { ...proposed.head } } : generation
+		) as readonly GenerationRecord[];
+		const skipped = generations.map((generation) =>
+			generation === proposedGeneration
+				? {
+						...generation,
+						baseExpectedHead: { ...proposedGeneration.baseExpectedHead, revision: current.head.revision - 1 },
+					}
+				: generation
+		) as readonly GenerationRecord[];
+		expect(validGenerationLineage(cycle, current.head, proposed.head), "predecessor-link-cycle").toBe(false);
+		expect(validGenerationLineage(skipped, current.head, proposed.head), "predecessor-link-skipped").toBe(false);
+
+		const cut = decodeCanonical(bytesForRef(proposed, closeResult.cutValueRef)) as Readonly<Record<string, unknown>>;
+		expect(history.closeSetCount).toBe(cut.closeSetCount);
+		expect(history.closeSetRoot).toBe(cut.closeSetRoot);
+		expect(history.historyRoot).toBe(cut.historyRoot);
+		expect(history.historySize).toBe(cut.historySize);
+{
+ ".": {
+  "types": "./dist/src/index.d.ts",
+  "import": "./dist/src/index.js"
+ },
+ "./blueprint-fold": {
+  "types": "./dist/src/blueprint-fold.d.ts",
+  "import": "./dist/src/blueprint-fold.js"
+ },
+ "./blueprint-snapshot": {
+  "types": "./dist/src/blueprint-snapshot.d.ts",
+  "import": "./dist/src/blueprint-snapshot.js"
+ },
+ "./snapshot-stream": {
+  "types": "./dist/src/snapshot-stream.d.ts",
+  "import": "./dist/src/snapshot-stream.js"
+ },
+ "./snapshot-quarantine-receipt": {
+  "types": "./dist/src/snapshot-quarantine-receipt.d.ts",
+  "import": "./dist/src/snapshot-quarantine-receipt.js"
+ }
+}
+deps of node: True
+export { CausalityIndex, LinearizationError, linearizeEpoch, topologicalOrder } from "./linearize.js";
+export {
+	CompactMerkleAccumulator,
+	EMPTY_MERKLE_ROOT,
+	buildMerkleTree,
+	consistencyProof,
+	inclusionProof,
+	merkleLeafHash,
+	merkleNodeHash,
+	verifyConsistency,
+	verifyInclusion,
+} from "./ct-merkle.js";
+export { stateDigest } from "./state.js";
+export { deriveCloseSetHistoryCommitment } from "./history-commitment.js";
+export type {
+	AccumulatorSnapshot,
+	BatchOptions,
+	CausalityIndexOptions,
+	ConflictAction,
+	ConflictResult,

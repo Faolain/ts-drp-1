@@ -1,0 +1,44 @@
+I'll inspect the signed D.110c-0b1 plan commit, the audit ledger, and the relevant current source before judging whether the bounded checkpoint opener is RED-ready.The commit is plan-only; next I’ll read the rest of the new section and the current owners it claims to compose.I’ll now check the current protocol, control-plane, and Node owners against the plan’s claimed seams.The current owners match the audit’s missing-path claim; I’m reading the successor opener, adoption pins, and rollback/floor owners next.I’ve got the consumer graph and generation topology; I’ll check one remaining close/adoption classifier mismatch before writing the verdict.```json
+{
+  "verdict": "CHANGES_REQUIRED",
+  "summary": "The dual-anchor opener, independent expected head, 3-failure RED, 0→1 compatibility, and two-advance/two-rollback mapping are sound against current source. Batch 2 is not implementable as written: a bounded N≥1 staged closure is still classified by unbounded inspectCreatorTrustAdvance in hot adoption, adoption-commit, and cold/pending reopen, which will reject the only 1→2 path 0b1 must prove.",
+  "findings": [
+    {
+      "severity": "P1",
+      "title": "Bounded advance is required only before close staging, not at the Node classifiers that accept that staged pair",
+      "path": "docs/production-hardening/production-hardening-tdd-plan-v2.md",
+      "line": 94828,
+      "evidence": "Batch 2 freezes 0→1 on inspectCreatorTrustAdvance and requires inspectBoundedCreatorTrustAdvance only for N≥1 close staging. Current unbounded consumers remain creator-close.ts:586, creator-adoption.ts:357 (hot verifyChain on facts.currentReferences→facts.proposedReferences), creator-adoption.ts:1005 and :1297 (cold/pending), and creator-adoption-commit.ts:390. Unbounded exactCombinedClosure keeps every non-trust ref and expects proposed.length === current.length+2. Bounded retirement yields proposed.length === current.length, so those classifiers return TRUST_CLOSURE_INVALID and GREEN cannot adopt or cold-reopen a genuine bounded epoch-2 room. The shared N≥2 verifier is told to consume the checkpoint opener and floor, not the bounded predicate.",
+      "required_action": "State that every N≥1/N≥2 inspectCreatorTrustAdvance consumer of the staged current→proposed pair—creator-close.ts, creator-adoption.ts verifyChain/cold/pending, and creator-adoption-commit.ts—must call inspectBoundedCreatorTrustAdvance with the unique current-candidate retiring pair, while 0→1 remains the existing unbounded predicate byte-for-byte."
+    },
+    {
+      "severity": "P2",
+      "title": "Retiring-proof wrong-epoch rule is not tied to currentEpoch-1",
+      "path": "docs/production-hardening/production-hardening-tdd-plan-v2.md",
+      "line": 94774,
+      "evidence": "The predicate must decode “exactly one current drp-hard-epoch-cut” and fail closed on wrong-epoch. prepareCreatorClose sets cut.epoch from predecessor material.currentEpoch, and successorAnchor uses cut.epoch+1. At 1→2 the unique retiring pair in the current closure is the 0→1 cut/QC with epoch 0, not currentEpoch 1.",
+      "required_action": "D.110c-0b1 Batch 1 owner: freeze retiring cut/QC.epoch === current.currentEpoch-1 and new pair epoch === current.currentEpoch; do not treat “current cut” as cut.epoch === current.currentEpoch."
+    },
+    {
+      "severity": "P2",
+      "title": "GREEN byte-equality allowlist is not frozen",
+      "path": "docs/production-hardening/production-hardening-tdd-plan-v2.md",
+      "line": 94848,
+      "evidence": "Focused GREEN requires active/control counts and bytes equal at epochs 1 and 2 “apart from explicitly enumerated bounded projection/content differences.” Count equality bounds extra control refs, but the plan never lists the allowed byte diffs. Adoption already replaces the predecessor live projection 1-for-1 and may insert predecessor ACL.",
+      "required_action": "D.110c-0b1 focused GREEN owner: freeze the allowlist to successor trust bytes, new CutValue/QC bytes, live-projection bytes, and the existing optional predecessor-ACL insertion; forbid journal/bootstrap/registration/metadata growth from counting as a content difference."
+    },
+    {
+      "severity": "P2",
+      "title": "Internal predecessor minter is required but unnamed",
+      "path": "docs/production-hardening/production-hardening-tdd-plan-v2.md",
+      "line": 94732,
+      "evidence": "openCurrentAnchorTrust rejects currentEpoch !== 0, and mintCreatorAnchorTrustSuccessor requires an already genuine currentTrust. The checkpoint opener therefore needs a new unexported singleton mint to materialize verified epoch N-1 before reusing openCreatorSuccessorTrust. The plan forbids a naked/public constructor but does not name the callback or confine its only caller.",
+      "required_action": "D.110c-0b1 protocol Batch 1 owner: name the unexported minter, take only already-verified predecessor material, and allow openCreatorCheckpointTrust as its sole caller; drop the capability on any later opener failure."
+    }
+  ],
+  "plan_causal": true,
+  "scope_preserved": true,
+  "red_ready": false,
+  "blocking_union_closed": false
+}
+```

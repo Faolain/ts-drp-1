@@ -1,0 +1,28 @@
+{
+	"extends": "../../../tsconfig.json",
+	"compilerOptions": {
+		"composite": false,
+		"noEmit": true,
+		"rootDir": "../../..",
+		"target": "ES2023",
+		"paths": {
+			"@ts-drp/*": ["../../../packages/*/dist/src/index.d.ts", "../../../packages/*"],
+			"@ts-drp/protocol-v3": ["../../../packages/protocol-v3/dist/src/public.d.ts"]
+		}
+	},
+	"files": [
+		"cases.ts",
+		"contract.ts",
+		"node-owner.ts",
+		"node-child.ts",
+		"browser-owner.ts",
+		"build.ts",
+		"browser-server.ts",
+		"browser-red.pw.ts",
+		"playwright.config.ts",
+		"vitest.config.mts",
+		"vitest.workspace.ts",
+		"../../snapshot-recovery-read-native-red.test.ts"
+	],
+	"include": []
+}

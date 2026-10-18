@@ -1,0 +1,449 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 39,
+  "passed": 39,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6b-ahe-reclamation-red.test.ts",
+      "message": ""
+    }
+  ],
+  "topLevelErrors": [],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED freezes the native lineage/reference/count and hard-kill matrices",
+      "status": "passed",
+      "title": "freezes the native lineage/reference/count and hard-kill matrices",
+      "duration": 1.442624999999964,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED [RED readiness] requires the Node identity owner and atomic reclamation transaction",
+      "status": "passed",
+      "title": "[RED readiness] requires the Node identity owner and atomic reclamation transaction",
+      "duration": 0.43720799999999826,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED reclaims a genuine five-generation prefix, reopens and replays idempotently",
+      "status": "passed",
+      "title": "reclaims a genuine five-generation prefix, reopens and replays idempotently",
+      "duration": 168.42008400000003,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED resolves only the exact strict facade and denies copy, proxy and memory facades",
+      "status": "passed",
+      "title": "resolves only the exact strict facade and denies copy, proxy and memory facades",
+      "duration": 28.88820800000002,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED refuses the frozen native mutant head-different with zero committed deletion",
+      "status": "passed",
+      "title": "refuses the frozen native mutant head-different with zero committed deletion",
+      "duration": 23.6764169999999,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED refuses the frozen native mutant revision-stale with zero committed deletion",
+      "status": "passed",
+      "title": "refuses the frozen native mutant revision-stale with zero committed deletion",
+      "duration": 40.22625000000005,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED refuses the frozen native mutant active-mismatch with zero committed deletion",
+      "status": "passed",
+      "title": "refuses the frozen native mutant active-mismatch with zero committed deletion",
+      "duration": 36.66433299999994,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED refuses the frozen native mutant rollback-insufficient with zero committed deletion",
+      "status": "passed",
+      "title": "refuses the frozen native mutant rollback-insufficient with zero committed deletion",
+      "duration": 55.26866600000005,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED refuses the frozen native mutant rollback-wrong-countable-pair with zero committed deletion",
+      "status": "passed",
+      "title": "refuses the frozen native mutant rollback-wrong-countable-pair with zero committed deletion",
+      "duration": 47.35608400000001,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED refuses the frozen native mutant identity-duplicate with zero committed deletion",
+      "status": "passed",
+      "title": "refuses the frozen native mutant identity-duplicate with zero committed deletion",
+      "duration": 86.01120800000001,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED refuses the frozen native mutant closure-changed with zero committed deletion",
+      "status": "passed",
+      "title": "refuses the frozen native mutant closure-changed with zero committed deletion",
+      "duration": 25.224207999999976,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED refuses the frozen native mutant state-changed with zero committed deletion",
+      "status": "passed",
+      "title": "refuses the frozen native mutant state-changed with zero committed deletion",
+      "duration": 48.126333000000045,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED refuses the frozen native mutant floor-wrong with zero committed deletion",
+      "status": "passed",
+      "title": "refuses the frozen native mutant floor-wrong with zero committed deletion",
+      "duration": 32.52558399999998,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED refuses the frozen native mutant former-parent-wrong with zero committed deletion",
+      "status": "passed",
+      "title": "refuses the frozen native mutant former-parent-wrong with zero committed deletion",
+      "duration": 31.029166999999916,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED refuses the frozen native mutant lineage-gap with zero committed deletion",
+      "status": "passed",
+      "title": "refuses the frozen native mutant lineage-gap with zero committed deletion",
+      "duration": 52.671875,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED refuses the frozen native mutant lineage-cycle with zero committed deletion",
+      "status": "passed",
+      "title": "refuses the frozen native mutant lineage-cycle with zero committed deletion",
+      "duration": 53.209458999999924,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED refuses the frozen native mutant surviving-branch with zero committed deletion",
+      "status": "passed",
+      "title": "refuses the frozen native mutant surviving-branch with zero committed deletion",
+      "duration": 52.31666599999994,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED refuses the frozen native mutant extra-target-row with zero committed deletion",
+      "status": "passed",
+      "title": "refuses the frozen native mutant extra-target-row with zero committed deletion",
+      "duration": 35.14241700000002,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED refuses the frozen native mutant post-state-dangling-parent with zero committed deletion",
+      "status": "passed",
+      "title": "refuses the frozen native mutant post-state-dangling-parent with zero committed deletion",
+      "duration": 31.522208999999975,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED refuses the frozen native mutant retained-blob-missing with zero committed deletion",
+      "status": "passed",
+      "title": "refuses the frozen native mutant retained-blob-missing with zero committed deletion",
+      "duration": 35.76304200000004,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED refuses the frozen native mutant retained-blob-corrupt with zero committed deletion",
+      "status": "passed",
+      "title": "refuses the frozen native mutant retained-blob-corrupt with zero committed deletion",
+      "duration": 39.18554100000006,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED refuses the frozen native mutant promotion-missing with zero committed deletion",
+      "status": "passed",
+      "title": "refuses the frozen native mutant promotion-missing with zero committed deletion",
+      "duration": 100.45499999999993,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED refuses the frozen native mutant promotion-extra with zero committed deletion",
+      "status": "passed",
+      "title": "refuses the frozen native mutant promotion-extra with zero committed deletion",
+      "duration": 32.64795900000013,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED refuses the frozen native mutant promotion-wrong-digest with zero committed deletion",
+      "status": "passed",
+      "title": "refuses the frozen native mutant promotion-wrong-digest with zero committed deletion",
+      "duration": 30.579750000000104,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED refuses the frozen native mutant target-generation-malformed with zero committed deletion",
+      "status": "passed",
+      "title": "refuses the frozen native mutant target-generation-malformed with zero committed deletion",
+      "duration": 28.925707999999986,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED refuses the frozen native mutant unrelated-generation-malformed with zero committed deletion",
+      "status": "passed",
+      "title": "refuses the frozen native mutant unrelated-generation-malformed with zero committed deletion",
+      "duration": 32.547374999999874,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED refuses the frozen native mutant generation-key-record-mismatch with zero committed deletion",
+      "status": "passed",
+      "title": "refuses the frozen native mutant generation-key-record-mismatch with zero committed deletion",
+      "duration": 39.25525000000016,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED refuses the frozen native mutant partial-replay with zero committed deletion",
+      "status": "passed",
+      "title": "refuses the frozen native mutant partial-replay with zero committed deletion",
+      "duration": 29.835583999999926,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED refuses the frozen native mutant floor-update-count with zero committed deletion",
+      "status": "passed",
+      "title": "refuses the frozen native mutant floor-update-count with zero committed deletion",
+      "duration": 30.419624999999996,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED refuses the frozen native mutant promotion-delete-count with zero committed deletion",
+      "status": "passed",
+      "title": "refuses the frozen native mutant promotion-delete-count with zero committed deletion",
+      "duration": 31.073292000000038,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED refuses the frozen native mutant generation-delete-count with zero committed deletion",
+      "status": "passed",
+      "title": "refuses the frozen native mutant generation-delete-count with zero committed deletion",
+      "duration": 24.672250000000076,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED refuses the frozen native mutant blob-delete-count with zero committed deletion",
+      "status": "passed",
+      "title": "refuses the frozen native mutant blob-delete-count with zero committed deletion",
+      "duration": 35.63704100000018,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED proves the frozen native reference case retained-shared-blob",
+      "status": "passed",
+      "title": "proves the frozen native reference case retained-shared-blob",
+      "duration": 29.14695800000004,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED proves the frozen native reference case cross-object-shared-blob",
+      "status": "passed",
+      "title": "proves the frozen native reference case cross-object-shared-blob",
+      "duration": 43.853207999999995,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED proves the frozen native reference case candidate-only-blob",
+      "status": "passed",
+      "title": "proves the frozen native reference case candidate-only-blob",
+      "duration": 58.46620800000005,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED proves the frozen native reference case unrelated-orphan-retained",
+      "status": "passed",
+      "title": "proves the frozen native reference case unrelated-orphan-retained",
+      "duration": 67.43791699999997,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED proves the frozen native reference case staged-partial-promotions",
+      "status": "passed",
+      "title": "proves the frozen native reference case staged-partial-promotions",
+      "duration": 43.61075000000005,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED proves the frozen native reference case discarded-partial-promotions",
+      "status": "passed",
+      "title": "proves the frozen native reference case discarded-partial-promotions",
+      "duration": 32.03045899999984,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109c Node AHE-reclamation causal RED"
+      ],
+      "fullName": "D.109c Node AHE-reclamation causal RED owns six genuine SIGKILL edges with old XOR complete-new reopen state",
+      "status": "passed",
+      "title": "owns six genuine SIGKILL edges with old XOR complete-new reopen state",
+      "duration": 859.8150830000002,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ]
+}

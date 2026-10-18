@@ -1,0 +1,9 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "node",
+  "args": [
+    ".logs/d110c-0c1f5b-green-replay-budget-1809157e/runtime.mjs",
+    "freeze"
+  ],
+  "start": "2026-09-06T05:53:36.634Z"
+}

@@ -1,0 +1,1072 @@
+{
+  "focused-01": {
+    "total": 45,
+    "passed": 27,
+    "failed": 1,
+    "filtered": 17,
+    "topLevelErrors": [],
+    "success": false,
+    "assertions": [
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition snapshot oracle removes controls before Kahn while ACL vertices retain their ordering effect",
+        "status": "passed",
+        "title": "snapshot oracle removes controls before Kahn while ACL vertices retain their ordering effect",
+        "duration": 3.267917000000125,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition snapshot oracle preserves prior state atomic batch entry order and duplicate effects",
+        "status": "passed",
+        "title": "snapshot oracle preserves prior state atomic batch entry order and duplicate effects",
+        "duration": 1.2234169999999267,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition retains checkpoint-terminal open progress through cold recovery across three transitions",
+        "status": "passed",
+        "title": "retains checkpoint-terminal open progress through cold recovery across three transitions",
+        "duration": 2509.193209,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition composes 64 active writers with universal plan fence and exact state accounting across three transitions",
+        "status": "failed",
+        "title": "composes 64 active writers with universal plan fence and exact state accounting across three transitions",
+        "duration": 20894.330833,
+        "failureMessages": [
+          "AssertionError: F5B_64_EVERY_AUTHOR_EVERY_EPOCH_EXACT_ONE_FENCE: expected [] to have a length of 1 but got +0\n    at Proxy.<anonymous> (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1166:20)\n    at Proxy.<anonymous> (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:944:14)\n    at Proxy.methodWrapper (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/chai@5.2.0/node_modules/chai/chai.js:1618:25)\n    at accountEpoch (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:1350:70)\n    at sixtyFourWriterGoldenPath (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:1508:3)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+        ],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition case 1 withholds a distinct dependent author sequence until its delayed predecessor is settled",
+        "status": "passed",
+        "title": "case 1 withholds a distinct dependent author sequence until its delayed predecessor is settled",
+        "duration": 705.4237920000014,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition cases 6-9 authenticate same-key removal and same-device and fresh-device readmission",
+        "status": "passed",
+        "title": "cases 6-9 authenticate same-key removal and same-device and fresh-device readmission",
+        "duration": 1600.9078339999978,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition case 11 retains the hold across close and cold reopen until authenticated author-wide readmission",
+        "status": "passed",
+        "title": "case 11 retains the hold across close and cold reopen until authenticated author-wide readmission",
+        "duration": 2195.7210830000004,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition case 12 scans the largest valid fence without burning another author space",
+        "status": "passed",
+        "title": "case 12 scans the largest valid fence without burning another author space",
+        "duration": 940.8760839999995,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition case 12 ignores a stale fence at or below the authenticated terminal boundary",
+        "status": "passed",
+        "title": "case 12 ignores a stale fence at or below the authenticated terminal boundary",
+        "duration": 831.5702920000003,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition case 23 freezes only the equivocating author below a fence",
+        "status": "passed",
+        "title": "case 23 freezes only the equivocating author below a fence",
+        "duration": 819.793999999998,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition cases 4 15 16 preserve unpublished-fence custody",
+        "status": "passed",
+        "title": "cases 4 15 16 preserve unpublished-fence custody",
+        "duration": 699.7284999999974,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition cases 4 15 16 preserve delayed-replacement custody",
+        "status": "passed",
+        "title": "cases 4 15 16 preserve delayed-replacement custody",
+        "duration": 955.0258329999997,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition cases 4 15 16 preserve delayed-fence custody",
+        "status": "passed",
+        "title": "cases 4 15 16 preserve delayed-fence custody",
+        "duration": 934.002416000003,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition case 17 closes an authenticated null-boundary member without a fence or slot zero",
+        "status": "passed",
+        "title": "case 17 closes an authenticated null-boundary member without a fence or slot zero",
+        "duration": 777.1909589999996,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition cases 19-21 retain displaced control and sole plan completion ownership",
+        "status": "passed",
+        "title": "cases 19-21 retain displaced control and sole plan completion ownership",
+        "duration": 506.4232919999995,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition case 24a rejects a stale local head without regressing the authenticated floor",
+        "status": "passed",
+        "title": "case 24a rejects a stale local head without regressing the authenticated floor",
+        "duration": 932.2548330000063,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition case 25 accounts exact surviving fence publication with committed=false",
+        "status": "passed",
+        "title": "case 25 accounts exact surviving fence publication with committed=false",
+        "duration": 586.3877920000014,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition case 25 accounts exact surviving fence publication with committed=true",
+        "status": "passed",
+        "title": "case 25 accounts exact surviving fence publication with committed=true",
+        "duration": 584.0840410000019,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition case 25 accounts exact surviving replacement publication with committed=false",
+        "status": "passed",
+        "title": "case 25 accounts exact surviving replacement publication with committed=false",
+        "duration": 615.5735409999979,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition case 25 accounts exact surviving replacement publication with committed=true",
+        "status": "passed",
+        "title": "case 25 accounts exact surviving replacement publication with committed=true",
+        "duration": 641.7735829999947,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition case 25 retains custody when bounded authenticated recovery cannot read durable truth",
+        "status": "passed",
+        "title": "case 25 retains custody when bounded authenticated recovery cannot read durable truth",
+        "duration": 873.7982919999995,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition case 13 prunes only beyond the fully retained authenticated rollback window",
+        "status": "passed",
+        "title": "case 13 prunes only beyond the fully retained authenticated rollback window",
+        "duration": 1512.2492920000004,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition case 17 retains the exact legacy v1 reentry guard source custody",
+        "status": "passed",
+        "title": "case 17 retains the exact legacy v1 reentry guard source custody",
+        "duration": 6.246374999995169,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition keeps the genuine v1 room issue, close, adoption and cold reopen control unchanged",
+        "status": "passed",
+        "title": "keeps the genuine v1 room issue, close, adoption and cold reopen control unchanged",
+        "duration": 1075.187417000001,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0w durable manual-review hold semantics"
+        ],
+        "fullName": "D.110c-0c1f5b0w durable manual-review hold semantics parent f5b P2 non-hold same-message application failure retains generic activation mapping",
+        "status": "passed",
+        "title": "parent f5b P2 non-hold same-message application failure retains generic activation mapping",
+        "duration": 446.0493749999998,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0w durable manual-review hold semantics"
+        ],
+        "fullName": "D.110c-0c1f5b0w durable manual-review hold semantics parent f5b P2 closed-session precedence is consistent for issue",
+        "status": "passed",
+        "title": "parent f5b P2 closed-session precedence is consistent for issue",
+        "duration": 488.1020000000003,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0w durable manual-review hold semantics"
+        ],
+        "fullName": "D.110c-0c1f5b0w durable manual-review hold semantics parent f5b P2 closed-session precedence is consistent for rehearse",
+        "status": "passed",
+        "title": "parent f5b P2 closed-session precedence is consistent for rehearse",
+        "duration": 456.1215000000002,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0w durable manual-review hold semantics"
+        ],
+        "fullName": "D.110c-0c1f5b0w durable manual-review hold semantics parent f5b P2 closed-session precedence is consistent for activate",
+        "status": "passed",
+        "title": "parent f5b P2 closed-session precedence is consistent for activate",
+        "duration": 602.7678329999999,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0w durable manual-review hold semantics"
+        ],
+        "fullName": "D.110c-0c1f5b0w durable manual-review hold semantics refuses held issue promptly after the real durable plan write without an issuance effect",
+        "status": "skipped",
+        "title": "refuses held issue promptly after the real durable plan write without an issuance effect",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0w durable manual-review hold semantics"
+        ],
+        "fullName": "D.110c-0c1f5b0w durable manual-review hold semantics creator-held seal succeeds through the genuine close owner with unchanged hold custody",
+        "status": "skipped",
+        "title": "creator-held seal succeeds through the genuine close owner with unchanged hold custody",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0w durable manual-review hold semantics"
+        ],
+        "fullName": "D.110c-0c1f5b0w durable manual-review hold semantics no-hold creator seal succeeds through exactly one genuine close-owner call",
+        "status": "skipped",
+        "title": "no-hold creator seal succeeds through exactly one genuine close-owner call",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0w durable manual-review hold semantics"
+        ],
+        "fullName": "D.110c-0c1f5b0w durable manual-review hold semantics same-epoch shutdown and reopen preserve exact hold scope revision source disposition and null link",
+        "status": "skipped",
+        "title": "same-epoch shutdown and reopen preserve exact hold scope revision source disposition and null link",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0w durable manual-review hold semantics"
+        ],
+        "fullName": "D.110c-0c1f5b0w durable manual-review hold semantics held source refuses rehearsal without target import or terminal effect",
+        "status": "skipped",
+        "title": "held source refuses rehearsal without target import or terminal effect",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0w durable manual-review hold semantics"
+        ],
+        "fullName": "D.110c-0c1f5b0w durable manual-review hold semantics held source refuses activation without target import or terminal effect",
+        "status": "skipped",
+        "title": "held source refuses activation without target import or terminal effect",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0w durable manual-review hold semantics"
+        ],
+        "fullName": "D.110c-0c1f5b0w durable manual-review hold semantics changed retained held policy remains terminal source-diff refusal rather than redisposition",
+        "status": "skipped",
+        "title": "changed retained held policy remains terminal source-diff refusal rather than redisposition",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0w durable manual-review hold semantics"
+        ],
+        "fullName": "D.110c-0c1f5b0w durable manual-review hold semantics single-generation internal redirect pins target hold refusal and orderly source cleanup",
+        "status": "skipped",
+        "title": "single-generation internal redirect pins target hold refusal and orderly source cleanup",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0u genuine room Node settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b0u genuine room Node settlement composition transforms 2 actual source intents and persists exact real Node batch times",
+        "status": "skipped",
+        "title": "transforms 2 actual source intents and persists exact real Node batch times",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0u genuine room Node settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b0u genuine room Node settlement composition transforms 16 actual source intents and persists exact real Node batch times",
+        "status": "skipped",
+        "title": "transforms 16 actual source intents and persists exact real Node batch times",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0u genuine room Node settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b0u genuine room Node settlement composition recovers one genuinely signed before-commit failure onto a fresh active owner",
+        "status": "skipped",
+        "title": "recovers one genuinely signed before-commit failure onto a fresh active owner",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0u genuine room Node settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b0u genuine room Node settlement composition recovers one genuinely signed partial-unknown failure onto a fresh active owner",
+        "status": "skipped",
+        "title": "recovers one genuinely signed partial-unknown failure onto a fresh active owner",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0u genuine room Node settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b0u genuine room Node settlement composition recovers one genuinely signed final-unknown failure onto a fresh active owner",
+        "status": "skipped",
+        "title": "recovers one genuinely signed final-unknown failure onto a fresh active owner",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0u genuine room Node settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b0u genuine room Node settlement composition queues migration rehearsal behind startup recovery without a nested lifetime-tail deadlock",
+        "status": "skipped",
+        "title": "queues migration rehearsal behind startup recovery without a nested lifetime-tail deadlock",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0u genuine room Node settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b0u genuine room Node settlement composition keeps a store-close cleanup failure terminal after signed recovery",
+        "status": "skipped",
+        "title": "keeps a store-close cleanup failure terminal after signed recovery",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0u genuine room Node settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b0u genuine room Node settlement composition rebinds creator-close to the fresh real plane or fails terminally (rebind failure false)",
+        "status": "skipped",
+        "title": "rebinds creator-close to the fresh real plane or fails terminally (rebind failure false)",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0u genuine room Node settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b0u genuine room Node settlement composition rebinds creator-close to the fresh real plane or fails terminally (rebind failure true)",
+        "status": "skipped",
+        "title": "rebinds creator-close to the fresh real plane or fails terminally (rebind failure true)",
+        "failureMessages": [],
+        "meta": {}
+      }
+    ]
+  },
+  "focused-02": {
+    "total": 45,
+    "passed": 27,
+    "failed": 1,
+    "filtered": 17,
+    "topLevelErrors": [],
+    "success": false,
+    "assertions": [
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition snapshot oracle removes controls before Kahn while ACL vertices retain their ordering effect",
+        "status": "passed",
+        "title": "snapshot oracle removes controls before Kahn while ACL vertices retain their ordering effect",
+        "duration": 2.919166000000132,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition snapshot oracle preserves prior state atomic batch entry order and duplicate effects",
+        "status": "passed",
+        "title": "snapshot oracle preserves prior state atomic batch entry order and duplicate effects",
+        "duration": 1.2035000000000764,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition retains checkpoint-terminal open progress through cold recovery across three transitions",
+        "status": "passed",
+        "title": "retains checkpoint-terminal open progress through cold recovery across three transitions",
+        "duration": 3440.13625,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition composes 64 active writers with universal plan fence and exact state accounting across three transitions",
+        "status": "failed",
+        "title": "composes 64 active writers with universal plan fence and exact state accounting across three transitions",
+        "duration": 25692.932709,
+        "failureMessages": [
+          "AssertionError: F5B_64_ADJACENT_CHECKPOINT_LINK: expected '68818699d90bc21512a74639c95b1f5b1baeb…' to be '9c50f972b22651dd3ca1b63cd852bca13bc7b…' // Object.is equality\n    at sixtyFourWriterGoldenPath (/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:1596:89)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+        ],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition case 1 withholds a distinct dependent author sequence until its delayed predecessor is settled",
+        "status": "passed",
+        "title": "case 1 withholds a distinct dependent author sequence until its delayed predecessor is settled",
+        "duration": 744.7275000000009,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition cases 6-9 authenticate same-key removal and same-device and fresh-device readmission",
+        "status": "passed",
+        "title": "cases 6-9 authenticate same-key removal and same-device and fresh-device readmission",
+        "duration": 1669.495417000002,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition case 11 retains the hold across close and cold reopen until authenticated author-wide readmission",
+        "status": "passed",
+        "title": "case 11 retains the hold across close and cold reopen until authenticated author-wide readmission",
+        "duration": 1824.388500000001,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition case 12 scans the largest valid fence without burning another author space",
+        "status": "passed",
+        "title": "case 12 scans the largest valid fence without burning another author space",
+        "duration": 1002.7017500000002,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition case 12 ignores a stale fence at or below the authenticated terminal boundary",
+        "status": "passed",
+        "title": "case 12 ignores a stale fence at or below the authenticated terminal boundary",
+        "duration": 1011.6128749999989,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition case 23 freezes only the equivocating author below a fence",
+        "status": "passed",
+        "title": "case 23 freezes only the equivocating author below a fence",
+        "duration": 1035.049708999999,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition cases 4 15 16 preserve unpublished-fence custody",
+        "status": "passed",
+        "title": "cases 4 15 16 preserve unpublished-fence custody",
+        "duration": 840.0069579999981,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition cases 4 15 16 preserve delayed-replacement custody",
+        "status": "passed",
+        "title": "cases 4 15 16 preserve delayed-replacement custody",
+        "duration": 1208.2333750000034,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition cases 4 15 16 preserve delayed-fence custody",
+        "status": "passed",
+        "title": "cases 4 15 16 preserve delayed-fence custody",
+        "duration": 1138.2349170000016,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition case 17 closes an authenticated null-boundary member without a fence or slot zero",
+        "status": "passed",
+        "title": "case 17 closes an authenticated null-boundary member without a fence or slot zero",
+        "duration": 906.7830000000031,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition cases 19-21 retain displaced control and sole plan completion ownership",
+        "status": "passed",
+        "title": "cases 19-21 retain displaced control and sole plan completion ownership",
+        "duration": 630.4980419999993,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition case 24a rejects a stale local head without regressing the authenticated floor",
+        "status": "passed",
+        "title": "case 24a rejects a stale local head without regressing the authenticated floor",
+        "duration": 1229.9442500000005,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition case 25 accounts exact surviving fence publication with committed=false",
+        "status": "passed",
+        "title": "case 25 accounts exact surviving fence publication with committed=false",
+        "duration": 732.7750420000011,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition case 25 accounts exact surviving fence publication with committed=true",
+        "status": "passed",
+        "title": "case 25 accounts exact surviving fence publication with committed=true",
+        "duration": 810.0062499999985,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition case 25 accounts exact surviving replacement publication with committed=false",
+        "status": "passed",
+        "title": "case 25 accounts exact surviving replacement publication with committed=false",
+        "duration": 775.3099169999987,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition case 25 accounts exact surviving replacement publication with committed=true",
+        "status": "passed",
+        "title": "case 25 accounts exact surviving replacement publication with committed=true",
+        "duration": 836.0865829999966,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition case 25 retains custody when bounded authenticated recovery cannot read durable truth",
+        "status": "passed",
+        "title": "case 25 retains custody when bounded authenticated recovery cannot read durable truth",
+        "duration": 1205.9677910000028,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition case 13 prunes only beyond the fully retained authenticated rollback window",
+        "status": "passed",
+        "title": "case 13 prunes only beyond the fully retained authenticated rollback window",
+        "duration": 2627.082374999998,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition case 17 retains the exact legacy v1 reentry guard source custody",
+        "status": "passed",
+        "title": "case 17 retains the exact legacy v1 reentry guard source custody",
+        "duration": 8.909499999994296,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b parent genuine settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b parent genuine settlement composition keeps the genuine v1 room issue, close, adoption and cold reopen control unchanged",
+        "status": "passed",
+        "title": "keeps the genuine v1 room issue, close, adoption and cold reopen control unchanged",
+        "duration": 1301.7377080000006,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0w durable manual-review hold semantics"
+        ],
+        "fullName": "D.110c-0c1f5b0w durable manual-review hold semantics parent f5b P2 non-hold same-message application failure retains generic activation mapping",
+        "status": "passed",
+        "title": "parent f5b P2 non-hold same-message application failure retains generic activation mapping",
+        "duration": 1340.2640420000002,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0w durable manual-review hold semantics"
+        ],
+        "fullName": "D.110c-0c1f5b0w durable manual-review hold semantics parent f5b P2 closed-session precedence is consistent for issue",
+        "status": "passed",
+        "title": "parent f5b P2 closed-session precedence is consistent for issue",
+        "duration": 513.7422500000002,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0w durable manual-review hold semantics"
+        ],
+        "fullName": "D.110c-0c1f5b0w durable manual-review hold semantics parent f5b P2 closed-session precedence is consistent for rehearse",
+        "status": "passed",
+        "title": "parent f5b P2 closed-session precedence is consistent for rehearse",
+        "duration": 492.90670899999986,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0w durable manual-review hold semantics"
+        ],
+        "fullName": "D.110c-0c1f5b0w durable manual-review hold semantics parent f5b P2 closed-session precedence is consistent for activate",
+        "status": "passed",
+        "title": "parent f5b P2 closed-session precedence is consistent for activate",
+        "duration": 454.90370800000073,
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0w durable manual-review hold semantics"
+        ],
+        "fullName": "D.110c-0c1f5b0w durable manual-review hold semantics refuses held issue promptly after the real durable plan write without an issuance effect",
+        "status": "skipped",
+        "title": "refuses held issue promptly after the real durable plan write without an issuance effect",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0w durable manual-review hold semantics"
+        ],
+        "fullName": "D.110c-0c1f5b0w durable manual-review hold semantics creator-held seal succeeds through the genuine close owner with unchanged hold custody",
+        "status": "skipped",
+        "title": "creator-held seal succeeds through the genuine close owner with unchanged hold custody",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0w durable manual-review hold semantics"
+        ],
+        "fullName": "D.110c-0c1f5b0w durable manual-review hold semantics no-hold creator seal succeeds through exactly one genuine close-owner call",
+        "status": "skipped",
+        "title": "no-hold creator seal succeeds through exactly one genuine close-owner call",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0w durable manual-review hold semantics"
+        ],
+        "fullName": "D.110c-0c1f5b0w durable manual-review hold semantics same-epoch shutdown and reopen preserve exact hold scope revision source disposition and null link",
+        "status": "skipped",
+        "title": "same-epoch shutdown and reopen preserve exact hold scope revision source disposition and null link",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0w durable manual-review hold semantics"
+        ],
+        "fullName": "D.110c-0c1f5b0w durable manual-review hold semantics held source refuses rehearsal without target import or terminal effect",
+        "status": "skipped",
+        "title": "held source refuses rehearsal without target import or terminal effect",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0w durable manual-review hold semantics"
+        ],
+        "fullName": "D.110c-0c1f5b0w durable manual-review hold semantics held source refuses activation without target import or terminal effect",
+        "status": "skipped",
+        "title": "held source refuses activation without target import or terminal effect",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0w durable manual-review hold semantics"
+        ],
+        "fullName": "D.110c-0c1f5b0w durable manual-review hold semantics changed retained held policy remains terminal source-diff refusal rather than redisposition",
+        "status": "skipped",
+        "title": "changed retained held policy remains terminal source-diff refusal rather than redisposition",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0w durable manual-review hold semantics"
+        ],
+        "fullName": "D.110c-0c1f5b0w durable manual-review hold semantics single-generation internal redirect pins target hold refusal and orderly source cleanup",
+        "status": "skipped",
+        "title": "single-generation internal redirect pins target hold refusal and orderly source cleanup",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0u genuine room Node settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b0u genuine room Node settlement composition transforms 2 actual source intents and persists exact real Node batch times",
+        "status": "skipped",
+        "title": "transforms 2 actual source intents and persists exact real Node batch times",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0u genuine room Node settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b0u genuine room Node settlement composition transforms 16 actual source intents and persists exact real Node batch times",
+        "status": "skipped",
+        "title": "transforms 16 actual source intents and persists exact real Node batch times",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0u genuine room Node settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b0u genuine room Node settlement composition recovers one genuinely signed before-commit failure onto a fresh active owner",
+        "status": "skipped",
+        "title": "recovers one genuinely signed before-commit failure onto a fresh active owner",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0u genuine room Node settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b0u genuine room Node settlement composition recovers one genuinely signed partial-unknown failure onto a fresh active owner",
+        "status": "skipped",
+        "title": "recovers one genuinely signed partial-unknown failure onto a fresh active owner",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0u genuine room Node settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b0u genuine room Node settlement composition recovers one genuinely signed final-unknown failure onto a fresh active owner",
+        "status": "skipped",
+        "title": "recovers one genuinely signed final-unknown failure onto a fresh active owner",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0u genuine room Node settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b0u genuine room Node settlement composition queues migration rehearsal behind startup recovery without a nested lifetime-tail deadlock",
+        "status": "skipped",
+        "title": "queues migration rehearsal behind startup recovery without a nested lifetime-tail deadlock",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0u genuine room Node settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b0u genuine room Node settlement composition keeps a store-close cleanup failure terminal after signed recovery",
+        "status": "skipped",
+        "title": "keeps a store-close cleanup failure terminal after signed recovery",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0u genuine room Node settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b0u genuine room Node settlement composition rebinds creator-close to the fresh real plane or fails terminally (rebind failure false)",
+        "status": "skipped",
+        "title": "rebinds creator-close to the fresh real plane or fails terminally (rebind failure false)",
+        "failureMessages": [],
+        "meta": {}
+      },
+      {
+        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+        "ancestorTitles": [
+          "D.110c-0c1f5b0u genuine room Node settlement composition"
+        ],
+        "fullName": "D.110c-0c1f5b0u genuine room Node settlement composition rebinds creator-close to the fresh real plane or fails terminally (rebind failure true)",
+        "status": "skipped",
+        "title": "rebinds creator-close to the fresh real plane or fails terminally (rebind failure true)",
+        "failureMessages": [],
+        "meta": {}
+      }
+    ]
+  }
+}

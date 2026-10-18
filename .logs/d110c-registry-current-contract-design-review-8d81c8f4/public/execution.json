@@ -1,0 +1,65 @@
+{
+  "statuses": {
+    "sol": {
+      "status": 0,
+      "signal": null,
+      "timedOut": false,
+      "cleanup": [],
+      "remaining": [],
+      "quiescent": true,
+      "start": "2026-09-06T12:54:51.087Z",
+      "finish": "2026-09-06T12:55:35.723Z",
+      "verdictNotInferredFromExitCode": true
+    },
+    "sol-continuation": {
+      "session": "01a076c9-3227-7cc0-aba9-598e6382685c",
+      "status": 0,
+      "signal": null,
+      "timedOut": false,
+      "cleanup": [],
+      "remaining": [],
+      "quiescent": true,
+      "start": "2026-09-06T12:56:51.233Z",
+      "finish": "2026-09-06T13:07:02.597Z",
+      "verdictNotInferredFromExitCode": true
+    },
+    "grok-runner": {
+      "status": 2,
+      "signal": null,
+      "timedOut": false,
+      "cleanup": [],
+      "remaining": [],
+      "quiescent": true,
+      "start": "2026-09-06T12:54:51.093Z",
+      "finish": "2026-09-06T13:05:38.339Z",
+      "verdictNotInferredFromExitCode": true
+    },
+    "fable": {
+      "status": 0,
+      "signal": null,
+      "timedOut": false,
+      "cleanup": [],
+      "remaining": [],
+      "quiescent": true,
+      "start": "2026-09-06T12:54:51.096Z",
+      "finish": "2026-09-06T13:06:13.671Z",
+      "verdictNotInferredFromExitCode": true
+    }
+  },
+  "fableSession": "029f6685-4e59-439f-a8cc-cbfb6c248d2c",
+  "solSession": "01a076c9-3227-7cc0-aba9-598e6382685c",
+  "sameSolSessionContinuation": true,
+  "grokOriginalWrapper": {
+    "classification": "NO_VERDICT",
+    "duration_seconds": 645.371,
+    "events": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-registry-current-contract-design-review-8d81c8f4/grok/events.jsonl",
+    "exit_code": 0,
+    "public": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-registry-current-contract-design-review-8d81c8f4/grok/public.txt",
+    "stop_reason": "end_turn",
+    "timed_out": false
+  },
+  "grokRootClassification": "Schema-valid terminal FAIL from normal end_turn; original wrapper NO_VERDICT/status 2 preserved unchanged.",
+  "noTestsBuildsOrCompilersRun": true,
+  "noCleanupOrTimeouts": true,
+  "allOwnedGroupsQuiescentNow": true
+}

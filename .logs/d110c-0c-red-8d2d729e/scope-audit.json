@@ -1,0 +1,9 @@
+{
+  "checks": {
+    "closingAnchorOwnsScope": true,
+    "closingEpochOwnsScope": true,
+    "productSourceUnchanged": true,
+    "snapshotPayloadComesFromRealClose": true
+  },
+  "ok": true
+}

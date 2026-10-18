@@ -1,0 +1,114 @@
+
+> ts-drp@0.11.0 typecheck /Users/aristotle/Documents/Projects/ts-drp-1
+> pnpm --parallel typecheck
+
+Scope: 47 of 48 workspace projects
+examples/canvas typecheck$ tsc --noEmit
+examples/chat typecheck$ tsc --noEmit
+examples/grid typecheck$ tsc --noEmit
+examples/local-bootstrap typecheck$ tsc --noEmit
+examples/network-spike typecheck$ tsc --noEmit
+examples/v3-chat typecheck$ tsc --noEmit
+examples/v3-room typecheck$ tsc --noEmit
+packages/blueprint-catalog typecheck$ tsc --noEmit
+packages/blueprint-toolchain typecheck$ tsc --noEmit
+examples/browser-network typecheck$ tsc --noEmit
+packages/canonical typecheck$ tsc --noEmit
+packages/compaction typecheck$ tsc --noEmit
+packages/control-plane typecheck$ tsc --noEmit
+packages/ephemeral typecheck$ tsc --noEmit
+packages/errors typecheck$ tsc --noEmit
+packages/eslint-plugin-ts-drp typecheck$ tsc --noEmit
+packages/interval-discovery typecheck$ tsc --noEmit
+packages/interval-reconnect typecheck$ tsc --noEmit
+packages/interval-runner typecheck$ tsc --noEmit
+packages/issuance-store typecheck$ tsc --noEmit
+packages/keychain typecheck$ tsc --noEmit
+packages/live-journal typecheck$ tsc --noEmit
+packages/logger typecheck$ tsc --noEmit
+packages/membership typecheck$ tsc --noEmit
+packages/message-queue typecheck$ tsc --noEmit
+packages/network typecheck$ tsc --noEmit
+packages/network-spike typecheck$ tsc --noEmit
+packages/node typecheck$ tsc --noEmit
+packages/object typecheck$ tsc --noEmit
+packages/outcome-commit typecheck$ tsc --noEmit
+packages/protocol-v2 typecheck$ tsc --noEmit
+packages/relay-policy typecheck$ tsc --noEmit
+packages/rendezvous typecheck$ tsc --noEmit
+packages/protocol-v3 typecheck$ tsc --noEmit && pnpm typecheck:public-entry-audit
+packages/blueprints typecheck$ tsc --noEmit
+packages/routing-browser typecheck$ tsc --noEmit
+packages/routing-node typecheck$ tsc --noEmit
+packages/seal typecheck$ tsc --noEmit
+packages/storage typecheck$ tsc --noEmit
+packages/storage-browser typecheck$ tsc --noEmit
+packages/storage-node typecheck$ tsc --noEmit
+packages/test-utils typecheck$ tsc --noEmit
+packages/tracer typecheck$ tsc --noEmit
+packages/types typecheck$ tsc --noEmit
+packages/validation typecheck$ tsc --noEmit
+packages/utils typecheck$ tsc --noEmit
+packages/worker-host typecheck$ tsc --noEmit
+packages/interval-runner typecheck: Done
+packages/outcome-commit typecheck: Done
+packages/seal typecheck: Done
+packages/issuance-store typecheck: Done
+packages/eslint-plugin-ts-drp typecheck: Done
+packages/blueprint-catalog typecheck: Done
+packages/live-journal typecheck: Done
+packages/membership typecheck: Done
+packages/errors typecheck: Done
+packages/ephemeral typecheck: Done
+packages/test-utils typecheck: Done
+packages/routing-node typecheck: Done
+packages/keychain typecheck: Done
+packages/interval-reconnect typecheck: Done
+packages/logger typecheck: Done
+packages/utils typecheck: Done
+packages/storage typecheck: Done
+packages/blueprint-toolchain typecheck: Done
+packages/interval-discovery typecheck: Done
+packages/rendezvous typecheck: Done
+packages/blueprints typecheck: Done
+packages/message-queue typecheck: Done
+packages/compaction typecheck: Done
+packages/relay-policy typecheck: Done
+packages/routing-browser typecheck: Done
+packages/validation typecheck: Done
+packages/worker-host typecheck: Done
+packages/protocol-v2 typecheck: Done
+packages/control-plane typecheck: Done
+packages/canonical typecheck: Done
+packages/tracer typecheck: Done
+packages/types typecheck: Done
+packages/protocol-v3 typecheck: > @ts-drp/protocol-v3@0.11.0 typecheck:public-entry-audit /Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3
+packages/protocol-v3 typecheck: > tsc -p ../../tests/fixtures/phase-0i-v3/tsconfig.public-entry-audit.json && tsc -p ../../tests/fixtures/phase-0j-b-v3/tsconfig.public-entry-audit.json && tsc -p ../../tests/fixtures/phase-3a0-v3/tsconfig.public-entry-audit.json
+examples/browser-network typecheck: Done
+examples/network-spike typecheck: Done
+examples/canvas typecheck: Done
+examples/chat typecheck: Done
+packages/network typecheck: Done
+packages/object typecheck: tests/compact-history-observer-1i-b-red.test.ts(83,3): error TS2322: Type 'string' is not assignable to type '"full" | "compact" | undefined'.
+packages/object typecheck: tests/compact-history-observer-1i-b-red.test.ts(131,6): error TS2322: Type '{ history_storage: "archive"; log_config: { level: "silent"; }; replica_mode: "observer"; }' is not assignable to type 'DRPObjectConfig | undefined'.
+packages/object typecheck:   Types of property 'history_storage' are incompatible.
+packages/object typecheck:     Type '"archive"' is not assignable to type '"full" | "compact" | undefined'.
+packages/object typecheck: tests/compact-history-observer-1i-b-red.test.ts(132,7): error TS2322: Type '"archive"' is not assignable to type '"full" | "compact" | undefined'.
+packages/object typecheck: tests/helpers/compact-history-observer-1i-b.ts(56,4): error TS1360: Type '{ history_storage: "full" | "compact" | undefined; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' does not satisfy the expected type 'DRPObjectConfig'.
+packages/object typecheck:   Type '{ history_storage: "full" | "compact" | undefined; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' is not assignable to type 'DRPObjectConfigBase & { history_storage: "compact"; replica_mode: "observer"; }'.
+packages/object typecheck:     Type '{ history_storage: "full" | "compact" | undefined; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' is not assignable to type '{ history_storage: "compact"; replica_mode: "observer"; }'.
+packages/object typecheck:       Types of property 'history_storage' are incompatible.
+packages/object typecheck:         Type '"full" | "compact" | undefined' is not assignable to type '"compact"'.
+packages/object typecheck:           Type 'undefined' is not assignable to type '"compact"'.
+packages/object typecheck: tests/helpers/compact-history-observer-1i-b.ts(61,3): error TS2322: Type '{ history_storage: "full" | "compact" | undefined; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' is not assignable to type 'DRPObjectConfig | undefined'.
+packages/object typecheck:   Type '{ history_storage: "full" | "compact" | undefined; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' is not assignable to type '(DRPObjectConfigBase & { history_storage?: "full" | undefined; replica_mode?: ReplicaMode | undefined; }) | (DRPObjectConfigBase & { ...; })'.
+packages/object typecheck:     Type '{ history_storage: "full" | "compact" | undefined; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' is not assignable to type 'DRPObjectConfigBase & { history_storage: "compact"; replica_mode: "observer"; }'.
+packages/object typecheck:       Type '{ history_storage: "full" | "compact" | undefined; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' is not assignable to type '{ history_storage: "compact"; replica_mode: "observer"; }'.
+packages/object typecheck:         Types of property 'history_storage' are incompatible.
+packages/object typecheck:           Type '"full" | "compact" | undefined' is not assignable to type '"compact"'.
+packages/object typecheck:             Type 'undefined' is not assignable to type '"compact"'.
+packages/object typecheck: Failed
+/Users/aristotle/Documents/Projects/ts-drp-1/packages/object:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @ts-drp/object@0.11.0 typecheck: `tsc --noEmit`
+Exit status 1
+ ELIFECYCLE  Command failed with exit code 1.

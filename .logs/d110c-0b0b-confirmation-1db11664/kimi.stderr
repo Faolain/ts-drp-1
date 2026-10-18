@@ -1,0 +1,1701 @@
+Warning: [loop_control] 'max_retries_per_step' is deprecated and no longer used; rename it to 'max_attempts_per_step'. Run /update-config to fix it.
+1db116646c764065084b6eb57a1949d369d14055
+commit
+1db116646c764065084b6eb57a1949d369d14055 e1eb953668bcba47c9bdceb46a84279893c2960f 2291725250ff60ae5784ef53acf761e494f57409 Faolain Faolain@users.noreply.github.com docs: correct D.110c-0b0b genesis carrier contract
+GPG:G SIG:Faolain <Faolain@users.noreply.github.com>
+ .../grok-runner.exit                               |    1 +
+ .../grok-runner.stderr                             |    0
+ .../grok-runner.stdout                             |   22 +
+ .../grok-terminal.json                             |   14 +
+ .../grok/command.json                              |   26 +
+ .../grok/events.jsonl                              | 1824 ++++++
+ .../grok/input-packet.md                           |  131 +
+ .../grok/public.txt                                |   14 +
+ .../grok/review.diff                               | 6279 ++++++++++++++++++++
+ .../grok/status.json                               |    9 +
+ .../kimi-substantive.exit                          |    1 +
+ .../kimi-substantive.stderr                        |  394 ++
+ .../kimi-substantive.stream.jsonl                  |   40 +
+ .../kimi-terminal.json                             |    7 +
+ .logs/d110c-0b0b-design-review-22917252/kimi.exit  |    1 +
+ .../d110c-0b0b-design-review-22917252/kimi.stderr  |    3 +
+ .../kimi.stream.jsonl                              |    1 +
+ .../manifest.sha256                                |   24 +
+ .../opus-terminal.json                             |    1 +
+ .logs/d110c-0b0b-design-review-22917252/opus.exit  |    1 +
+ .../d110c-0b0b-design-review-22917252/opus.stderr  |    0
+ .../opus.stream.jsonl                              |  511 ++
+ .logs/d110c-0b0b-design-review-22917252/prompt.md  |  118 +
+ .../review-ledger.md                               |   44 +
+ .../production-hardening-tdd-plan-v2.md            |  201 +-
+ 25 files changed, 9606 insertions(+), 61 deletions(-)
+diff --git a/docs/production-hardening/production-hardening-tdd-plan-v2.md b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+index 253dec1f..7053f04a 100644
+--- a/docs/production-hardening/production-hardening-tdd-plan-v2.md
++++ b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+@@ -91735,44 +91735,60 @@ target participation for liveness, and available state/block distribution.
+ 
+ The D.110c-0b candidate decision is:
+ 
+-| Candidate                                                   | Genesis authentication and evolving authority                                                                                                                                                                                                                           | Epoch growth / costs                                                                                                                                                                                                      | Browser, dependency, and contract impact                                                                                                                                                                                                                         | Restart, replay, archive, and pruning disposition                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+-| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+-| Stable genesis/root authority signs the current checkpoint  | Directly authenticates a current anchor under the creator key committed by a separately pin-verified genesis trust record. Supports evolving ACL/state/history fields while the `creator-trusted-v1` signer remains invariant; does not solve future seal-key rotation. | O(1) existing-v1 genesis/current record bytes and fixed rollback generations, plus the existing RFC 9162 accumulator's absolute safe-integer ceiling of at most 53 peaks; existing Ed25519 plus anchor/QC/history checks. | Browser-feasible with existing primitives, record schema, and no new crypto dependency or wire field. It still requires a new reviewed protocol-v3 checkpoint opener, closure-law contract, durable compatibility transition, and authenticated freshness floor. | Untrusted genesis/current bytes are fully reverified and cross-bound. A caller-held authenticated expected head/floor is required to reject a valid stale checkpoint; a new client with only genesis cannot infer latestness. The bounded immediate-predecessor rollback closure supplies the genuine epoch-N-1 trust needed to verify the retained N-1→N QC. Archive bytes grow separately. Prune only after authentic durable replacement, head installation, snapshot/availability/outbox gates, and two rollback generations. **Selected for creator-only integrity/control compaction, conditional on D.110c-0b0 selecting a real freshness-floor owner.** |
+-| Periodically certified checkpoint with external pin         | Can authenticate current authority and freshness if the external pin is trusted.                                                                                                                                                                                        | O(1) local control state; external service/state evolves.                                                                                                                                                                 | Introduces a new authority/availability carrier, API, migration, and operational dependency.                                                                                                                                                                     | Useful only as a separately accepted Phase-7 bootstrap/freshness design. **Rejected for D.110c-0b.**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+-| WRAPS-like recursively accumulated transition proof         | Authenticates arbitrary changing authority from genesis when each transition is encoded and authorized.                                                                                                                                                                 | Constant-size public proof and fixed verification; nontrivial recursive proving/update work plus retained prior uncompressed proof and proving artifacts.                                                                 | New recursive-SNARK/native dependency, verifier/prover keys or setup artifacts, wire fields, browser cost, compatibility, and migration.                                                                                                                         | Strong compact lineage, but freshness/availability remain separate and operational state is not zero. **Rejected as disproportionate for per-room creator-only scope; any future rotated-authority use is a separate high-risk design.**                                                                                                                                                                                                                                                                                                                                                                                                                        |
+-| Merkle/skip consistency proof                               | Proves inclusion/append consistency, not authority transition without separately certified keys.                                                                                                                                                                        | O(log N) proof/state or an equivalent retained accumulator/index.                                                                                                                                                         | Hash-only and browser-friendly, but new schema and control-proof semantics.                                                                                                                                                                                      | RFC 9162 already helps history consistency; this does not independently authenticate changing authority and fails the strict bounded-control target if its required path grows. **Rejected as the authority solution.**                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+-| Existing anchor + cut/QC + RFC 9162 history root, unchanged | Existing bytes authenticate the first creator transition and append-only history under current assumptions.                                                                                                                                                             | Current closure retains every old cut/QC and therefore grows O(N); opener is epoch-0/first-successor-specific.                                                                                                            | No new dependency, but the unchanged form cannot meet the acceptance contract.                                                                                                                                                                                   | Useful primitives for the selected checkpoint, not a complete age-independent opener. **Rejected unchanged.**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
++| Candidate                                                   | Genesis authentication and evolving authority                                                                                                                                                                                                                             | Epoch growth / costs                                                                                                                                                                                                                                             | Browser, dependency, and contract impact                                                                                                                                                                                                                         | Restart, replay, archive, and pruning disposition                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
++| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
++| Stable genesis/root authority signs the current checkpoint  | Directly authenticates a current anchor under the creator key committed by a separately pin-verified genesis anchor carrier. Supports evolving ACL/state/history fields while the `creator-trusted-v1` signer remains invariant; does not solve future seal-key rotation. | O(1) existing-v1 current-record bytes, one fixed caller-held genesis invite carrier, and fixed rollback generations, plus the existing RFC 9162 accumulator's absolute safe-integer ceiling of at most 53 peaks; existing Ed25519 plus anchor/QC/history checks. | Browser-feasible with existing primitives, record schema, and no new crypto dependency or wire field. It still requires a new reviewed protocol-v3 checkpoint opener, closure-law contract, durable compatibility transition, and authenticated freshness floor. | Untrusted genesis-carrier/current-record bytes are fully reverified and cross-bound. A caller-held authenticated expected head/floor is required to reject a valid stale checkpoint; a new client with only genesis cannot infer latestness. The bounded immediate-predecessor rollback closure supplies the genuine epoch-N-1 trust needed to verify the retained N-1→N QC. Archive bytes grow separately. Prune only after authentic durable replacement, head installation, snapshot/availability/outbox gates, and two rollback generations. **Selected for creator-only integrity/control compaction, conditional on D.110c-0b0 selecting a real freshness-floor owner.** |
++| Periodically certified checkpoint with external pin         | Can authenticate current authority and freshness if the external pin is trusted.                                                                                                                                                                                          | O(1) local control state; external service/state evolves.                                                                                                                                                                                                        | Introduces a new authority/availability carrier, API, migration, and operational dependency.                                                                                                                                                                     | Useful only as a separately accepted Phase-7 bootstrap/freshness design. **Rejected for D.110c-0b.**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
++| WRAPS-like recursively accumulated transition proof         | Authenticates arbitrary changing authority from genesis when each transition is encoded and authorized.                                                                                                                                                                   | Constant-size public proof and fixed verification; nontrivial recursive proving/update work plus retained prior uncompressed proof and proving artifacts.                                                                                                        | New recursive-SNARK/native dependency, verifier/prover keys or setup artifacts, wire fields, browser cost, compatibility, and migration.                                                                                                                         | Strong compact lineage, but freshness/availability remain separate and operational state is not zero. **Rejected as disproportionate for per-room creator-only scope; any future rotated-authority use is a separate high-risk design.**                                                                                                                                                                                                                                                                                                                                                                                                                                       |
++| Merkle/skip consistency proof                               | Proves inclusion/append consistency, not authority transition without separately certified keys.                                                                                                                                                                          | O(log N) proof/state or an equivalent retained accumulator/index.                                                                                                                                                                                                | Hash-only and browser-friendly, but new schema and control-proof semantics.                                                                                                                                                                                      | RFC 9162 already helps history consistency; this does not independently authenticate changing authority and fails the strict bounded-control target if its required path grows. **Rejected as the authority solution.**                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
++| Existing anchor + cut/QC + RFC 9162 history root, unchanged | Existing bytes authenticate the first creator transition and append-only history under current assumptions.                                                                                                                                                               | Current closure retains every old cut/QC and therefore grows O(N); opener is epoch-0/first-successor-specific.                                                                                                                                                   | No new dependency, but the unchanged form cannot meet the acceptance contract.                                                                                                                                                                                   | Useful primitives for the selected checkpoint, not a complete age-independent opener. **Rejected unchanged.**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+ 
+ The selected D.110c-0b architecture is therefore a **bounded dual-anchor creator
+-checkpoint with a fixed rollback window**, not Hiero/WRAPS. It reuses the
+-existing v1 trust-record bytes: one immutable genesis record opened against the
+-pinned genesis digest, one current record, the current cut/QC and exact recovery
+-descriptor, and exactly two complete rollback generations. The opener first
+-authenticates the genesis record and extracts its creator/profile/signer-set
+-material; it then requires byte-identical profile/signer-set carriers and
+-digests in the current record, verifies the current anchor and creator
+-signature, and verifies current cut/QC, ACL, history root and size,
++checkpoint with a fixed rollback window**, not Hiero/WRAPS. It reuses one
++existing v1 current trust-record, the caller's existing immutable genesis invite
++carrier, the current cut/QC and exact recovery descriptor, and exactly two
++complete rollback generations. The invite carrier is the already-shaped
++`pinnedGenesisAnchorDigest`, expected object ID, exact canonical genesis-anchor
++preimage, and detached genesis signature; it is not a second trust-state member
++of the active closure. The opener hashes the genesis preimage to the pin,
++requires its object ID, epoch-0/zero-predecessor fields, profile digest, and
++signer-set digest to be exact, derives the creator public key from the current
++record's profile/signer-set carriers only after their hashes equal those pinned
++genesis fields, and verifies the genesis signature. It then requires identical
++profile/signer-set carrier bytes and the same object ID and genesis-anchor
++digest in the predecessor and current records, verifies both current anchor
++signatures, and verifies current cut/QC, ACL, history root and size,
+ archive-index root, state/snapshot/manifest, and recovery bindings. A
+ self-contained hash or self-signature cannot nominate its own trust key or
+ claim to be latest.
+ 
+ The logical retention law is exact even though implementation ref names remain
+-owned by their existing stores. At epoch N the active generation retains one
+-pin-verifiable genesis trust record, one current trust record, one current live
+-projection, the current snapshot/manifest/ACL and recovery refs required by the
+-existing reopen owner, and only the cut/QC for transition N-1→N. It retains no
+-earlier transition cut/QC. Exactly two complete prior closures remain in
+-`Superseded` rollback generations under D.109; no third rollback closure, copied
+-journal chain, bootstrap chain, or sibling registration is permitted. Archive
+-segments and application history are separately growing content-addressed data
+-and are not required to authenticate the current creator key. The expected-head
+-input is an authenticated `(objectId, epoch, currentAnchorDigest)` supplied
+-outside the untrusted checkpoint bytes; absence or mismatch is a fail-closed
+-freshness result, not permission to choose the largest stored epoch.
+-
+-For epoch N>0, the newest bounded `Superseded` rollback closure must retain and
+-reopen the genuine epoch-N-1 creator trust long enough to verify the retained
+-N-1→N commit QC through the ordinary epoch-relative seal authority. The cold
++owned by their existing stores. At epoch N the active generation retains
++exactly one current trust record, one current live projection, the current
++snapshot/manifest/ACL and recovery refs required by the existing reopen owner,
++and only the cut/QC for transition N-1→N. It retains no genesis trust-state
++member and no earlier transition cut/QC. The caller retains exactly one bounded
++immutable genesis invite carrier per room through the existing reopen input
++shape; D.110c-c/d count its exact items and bytes as bootstrap control state,
++and Phase 7 separately owns delivery of that carrier to a brand-new client.
++Exactly two complete prior closures remain in `Superseded` rollback generations
++under D.109; no third rollback closure, copied journal chain, bootstrap chain,
++or sibling registration is permitted. Archive segments and application history
++are separately growing content-addressed data and are not required to
++authenticate the current creator key. The expected-head input is an
++authenticated `(objectId, epoch, currentAnchorDigest)` supplied outside the
++untrusted checkpoint bytes; absence or mismatch is a fail-closed freshness
++result, not permission to choose the largest stored epoch.
++
++For epoch N>0, the older/floor member of the two bounded `Superseded` rollback
++closures must retain and reopen the genuine epoch-N-1 creator trust long enough
++to verify the retained N-1→N commit QC through the ordinary epoch-relative seal
++authority. The newer `Superseded` member is the epoch-N adoption closure that
++holds current trust plus the transition pair, while the active member is the
++epoch-N successor-live closure. This exact mapping depends on the reviewed
++two-head-advances-per-transition composition; if 0b0/a/b produce another
++head-advancing generation, D.110c-0b1 must stop and reslice the rollback window
++before reclamation rather than evicting the predecessor carrier. The cold
+ opener may not mint an authority directly from a naked key/anchor/epoch tuple or
+ silently downgrade the QC to unverified recovery metadata. This uses one of the
+ already-required two bounded rollback generations; it does not retain an O(N)
+@@ -93093,33 +93109,46 @@ The selected compatibility design adds two non-root package boundaries while
+ preserving every existing root and first-transition export:
+ 
+ 1. `@ts-drp/protocol-v3/creator-checkpoint` exports exactly
+-   `openCreatorCheckpointTrust`. Its exact closed input carries one already
+-   pin-authenticated epoch-0 `genesisTrust`, the immediate predecessor and
+-   current `creator-trusted-v1` trust-state record bytes, the exact current
+-   transition CutValue and commit-QC bytes, and copied expected current
+-   `(objectId, epoch, currentAnchorDigest)` values. It accepts no chain, store,
+-   provider, AHE head, or activation owner. Internally it requires both records'
+-   profile and signer-set carriers to be byte-identical to the genesis trust
+-   material, verifies both creator signatures, requires the predecessor epoch
+-   to equal current epoch minus one, requires the current anchor's
+-   `previousAnchor` to equal the predecessor digest, verifies the exact current
+-   CutValue/commit QC under the predecessor's creator seal authority, verifies
+-   the successor anchor derivation and copied expected tuple, and only then
+-   returns the current `CurrentAnchorTrust`. The transient predecessor trust is
+-   never returned. Missing predecessor state is a fail-closed availability
+-   result; its own older QC is deliberately not replayed. Epoch 0 continues to
+-   use `openCurrentAnchorTrust`, and the existing `openCreatorSuccessorTrust`
+-   remains byte- and behavior-compatible.
++   `openCreatorCheckpointTrust`. Its exact closed input carries the existing
++   caller-held genesis invite fields—`pinnedGenesisAnchorDigest`, expected
++   object ID, exact canonical genesis-anchor preimage bytes, and detached
++   genesis signature—the immediate predecessor and current
++   `creator-trusted-v1` trust-state record bytes, the exact current transition
++   CutValue and commit-QC bytes, and copied expected current
++   `(objectId, epoch, currentAnchorDigest)` values. Node maps the already
++   existing `CreatorSuccessorReopenInput` anchor/signature fields to this fixed
++   genesis meaning for repeated reopen; no product-input field is added. The
++   opener accepts no trust chain, store, provider, AHE head, or activation
++   owner. Internally it hashes and structurally validates the epoch-0 genesis
++   preimage against the pin, verifies its signature using carriers whose hashes
++   equal the genesis anchor's profile/signer-set digests, requires both records'
++   `objectId` and `genesisAnchorDigest` to equal the genesis material, requires
++   both records' profile and signer-set carrier bytes to be identical, verifies
++   both creator signatures, requires the predecessor epoch to equal current
++   epoch minus one, requires the current anchor's `previousAnchor` to equal the
++   predecessor digest, verifies the exact current CutValue/commit QC under the
++   predecessor's creator seal authority, verifies the successor anchor
++   derivation and copied expected tuple, and only then returns the current
++   `CurrentAnchorTrust`. No genesis or transient predecessor trust capability is
++   supplied or returned. Missing predecessor state or missing/malformed genesis
++   invite material is a fail-closed availability/authentication result; the
++   predecessor's own older QC is deliberately not replayed. Epoch 0 continues
++   to use `openCurrentAnchorTrust`, and the existing
++   `openCreatorSuccessorTrust` remains byte- and behavior-compatible.
+ 2. `@ts-drp/control-plane/creator-trust-checkpoint-advance` exports exactly
+    `inspectBoundedCreatorTrustAdvance`. Its exact closed input is
+    `{current,proofRefs,proposed,retiringProofRefs}`. Each proof-ref tuple has
+    exactly one CutValue ref and one commit-QC ref, with no duplicate digest.
+-   After the Node/protocol owner has authenticated the current checkpoint and
+-   identified the current transition pair, the predicate accepts exactly the
+-   current closure minus its one current trust ref and the exact two retiring
+-   proof refs, plus one successor trust ref and the exact two new proof refs;
++   The retiring proof refs must be the exact digests/lengths of the one decoded
++   `drp-hard-epoch-cut` and one decoded commit-phase `drp-seal-qc` among the
++   current closure candidates, already authenticated as the prior transition
++   pair by the Node/protocol owner; caller-declared refs alone never establish
++   retirement authority. The predicate accepts exactly the current closure
++   minus its one current trust ref and those exact two retiring proof refs, plus
++   one successor trust ref and the exact two newly authenticated proof refs;
+    every other ref is byte-for-byte preserved. Missing, extra, duplicated,
+-   substituted, non-current, or still-retained retiring refs fail closed. The
++   substituted, wrong-kind, wrong-epoch, non-current, or still-retained
++   retiring refs fail closed. The
+    existing `inspectCreatorTrustAdvance` remains unchanged and owns epoch 0→1;
+    the bounded predicate owns epoch N→N+1 for N≥1.
+ 
+@@ -93130,18 +93159,23 @@ No dependency, recursive proof, CRS, threshold, record kind/version/field,
+ provider operation, product API, or migration format is added. The external
+ 0b0 floor remains the sole latestness owner: the protocol opener authenticates
+ the copied expected tuple but neither fetches nor invents it. Its security
+-assumptions are the authentic pinned genesis record, uncompromised fixed creator
+-key, strict existing cryptography, an honest application/account floor for
+-latestness, hostile room storage, and availability of the immediate predecessor
+-rollback closure. It does not claim creator-key rotation, a dishonest-provider
+-defense, brand-new-client freshness, lone-fork detection without a floor,
+-archive-root evolution, or chain-verified historical application data.
++assumptions are the authentic caller-held pinned genesis invite carrier,
++uncompromised fixed creator key, strict existing cryptography, an honest
++application/account floor for latestness, hostile room storage, and availability
++of the immediate predecessor rollback closure. It does not claim creator-key
++rotation, a dishonest-provider defense, brand-new-client freshness, lone-fork
++detection without a floor, archive-root evolution, or chain-verified historical
++application data.
+ 
+ The retained-current versus rollback law is exact. Active epoch N retains one
+ current trust record and only the CutValue/QC for N-1→N, plus the already
+ required live projection, ACL, snapshot/manifest, recovery, and bounded hot
+-refs. The immediate predecessor trust record needed by the opener resides in
+-the newest of exactly two complete `Superseded` rollback generations. Older
++refs. The immutable caller-held genesis invite carrier is one separately
++counted O(1) bootstrap item, not a closure member. Under the frozen
++two-head-advances-per-transition composition, the immediate predecessor trust
++record needed by the opener resides in the older/floor member of exactly two
++complete `Superseded` rollback generations; the newer member is the epoch-N
++adoption closure. Older
+ transition pairs remain recoverable only while inside that two-generation
+ window; after authentic current-head installation, exact floor commit, two
+ complete rollback generations, and every D.109 availability/snapshot/outbox
+@@ -93229,6 +93263,51 @@ scope, causal acceptance, or the public authority contract changes. No
+ production edit, RED, further Fable invocation, collaboration subagent, or long
+ workload runs before that gate is accepted.
+ 
++The first high-risk D.110c-0b0b review inspected signed/pushed checkpoint
++`2291725250ff60ae5784ef53acf761e494f57409` in clean detached checkout
++`3bbf0091f25eb492a96c2f8a99ca4a78b6bc6803`. Prompt SHA-256 is
++`60b001b71c2a40f8618d211f3e28d247f9457e1a8d2bf905a698bcf842d07ce9`.
++Grok 4.6/high completed normally after 630.282 seconds with
++`stop_reason=end_turn`, no timeout or cancellation, but emitted inspection
++prose before its terminal object, so the strict runner classified it honestly
++as `NO_VERDICT`. Its terminal object was `APPROVED`, P0=0/P1=0/P2=1; event,
++public, status, and extracted-terminal SHA-256 values are
++`c67ced14f9eb78087135a5af8cd3fa618158154cfdf2e4abcdc21ce6b01f6021`,
++`b701179ee124a34fd92a0d4970c3a818b886d8a6e3a0803deb1e099af7edd75f`,
++`38bcafd62eb9086ed3570026e91a06bf99065661c3ff6fc43827fd7aa7dd3486`,
++and `ee52395fc1c73deb55002cdb2790da9fa9f98509f8883865af7bdf403e7227ae`.
++Standard direct Kimi K3 session
++`session_ef3538ff-a75a-469d-b114-020e68398e4e` with the exact 100-step control
++returned `APPROVED`, P0=0/P1=0/P2=0; stream and extracted-terminal SHA-256
++values are
++`5e9701e609d7ae51fbf5cdba7541be8ee5badf0b5456be4bb611c744f745d111`
++and `14b1cf3d6031fef717796e7b1f5718ddfd3d0628c08e28b023864638dd5b8a01`.
++Its first parse-only CLI attempt used the unconfigured shorthand `k3` and
++started no model session; the preserved substantive invocation used the
++configured `kimi-code/k3` alias. Opus xhigh session
++`dfab6dec-9212-4ac9-815b-acef8ee180f1` returned `CHANGES_REQUIRED`,
++P0=0/P1=1/P2=3; stream and extracted-terminal SHA-256 values are
++`08092d65b0eb94d04558f61618e36c876a85f4596b99ba64b9f456f39fafd6b5`
++and `b987b18eecc7ece6b7bc6b97400013c509419133f23e1b983123178181063b00`.
++
++Opus's P1 is accepted. The original frozen opener required an epoch-0
++`genesisTrust` capability after the retention law had allowed the epoch-0
++generation and blob to be reclaimed. The correction above instead consumes the
++already shaped caller-held genesis invite fields, authenticates their preimage
++against the pin, derives and verifies the creator carrier before opening the
++two retained records, and counts that one fixed bootstrap carrier explicitly.
++It adds no product-input field, closure member, record kind, wire field,
++dependency, or authority. The P2 union is corrected in the same batch: the
++older/floor rollback generation—not the newer one—owns the predecessor trust;
++the two-head-advance mapping is load-bearing and fail-closed; both retained
++records must match genesis object ID and digest; retiring refs derive from the
++decoded authenticated prior CutValue/QC candidates; and the older umbrella
++sketch no longer claims two trust-state records in one active closure. Grok's
++P2 is the same two-trust sketch and is closed by that correction. Because the
++P1 correction changes the frozen security input and retention contract, one
++bounded confirmation of the signed/pushed correction is required before
++D.110c-0b0b acceptance. Grok's session did not cancel, so no resume is required.
++
+ The owner-selection review inspected signed/pushed plan-only commit
+ `65912fbc6fc128fb4cc648c7f028924bd36cb865` from
+ `.logs/d110c-0b0-owner-design-review-65912fbc`; prompt SHA-256 is
+
+function presentBase(generation: GenerationRecord): PresentHead | undefined {
+	return generation.baseExpectedHead.kind === "present" ? Object.freeze({ ...generation.baseExpectedHead }) : undefined;
+}
+
+type AuthenticatedSuccessorIssuanceScopeResult =
+	| Readonly<{ readonly ok: true; readonly scope: DurableIssueScope }>
+	| Readonly<{ readonly ok: false; readonly reason: "authority" | "lineage" | "possession" }>;
+
+async function authenticatedSuccessorIssuanceScope(
+	input: CreatorSuccessorReopenInput,
+	objectId: StorageObjectId,
+	expectedAclDigest: string,
+	exactCanonicalLatchedAclBytes: Uint8Array
+): Promise<AuthenticatedSuccessorIssuanceScopeResult> {
+	let writers: readonly string[];
+	try {
+		const opened = openCanonicalLatchedAclSnapshot({
+			exactCanonicalLatchedAclBytes,
+			expectedAclDigest,
+			expectedEpoch: 1,
+			expectedObjectId: objectId,
+		});
+		if (!opened.ok) return Object.freeze({ ok: false as const, reason: "authority" as const });
+		writers = opened.snapshot.members.flatMap(({ author, groups }) => (groups.includes("writer") ? [author] : []));
+		if (
+			writers.length === 0 ||
+			new Set(writers).size !== writers.length ||
+			!ED25519_PUBLIC_KEY_HEX.test(input.author) ||
+			!writers.includes(input.author)
+		) {
+			return Object.freeze({ ok: false as const, reason: "authority" as const });
+		}
+	} catch {
+		return Object.freeze({ ok: false as const, reason: "authority" as const });
+	}
+	try {
+		const webCrypto = globalThis.crypto;
+		if (
+			webCrypto === undefined ||
+			typeof webCrypto.getRandomValues !== "function" ||
+			webCrypto.subtle === undefined ||
+			typeof webCrypto.subtle.importKey !== "function" ||
+			typeof webCrypto.subtle.verify !== "function"
+		) {
+			return Object.freeze({ ok: false as const, reason: "possession" as const });
+		}
+		const challenge = new Uint8Array(32);
+		webCrypto.getRandomValues(challenge);
+		const retainedChallenge = Uint8Array.from(challenge);
+		const signerChallenge = Uint8Array.from(challenge);
+		const signature = await input.signRegisteredVertexDigest(signerChallenge);
+		if (
+			!sameBytes(signerChallenge, retainedChallenge) ||
+			!(signature instanceof Uint8Array) ||
+			Object.getPrototypeOf(signature) !== Uint8Array.prototype ||
+			signature.byteOffset !== 0 ||
+			signature.byteLength !== 64 ||
+			signature.buffer.byteLength !== 64
+		) {
+			return Object.freeze({ ok: false as const, reason: "possession" as const });
+		}
+		const authorBytes = Uint8Array.from(input.author.match(/.{2}/gu)?.map((byte) => Number.parseInt(byte, 16)) ?? []);
+		const publicKey = await webCrypto.subtle.importKey("raw", authorBytes, { name: "Ed25519" }, false, ["verify"]);
+		if (!(await webCrypto.subtle.verify({ name: "Ed25519" }, publicKey, signature, retainedChallenge))) {
+			return Object.freeze({ ok: false as const, reason: "possession" as const });
+		}
+	} catch {
+		return Object.freeze({ ok: false as const, reason: "possession" as const });
+	}
+	try {
+		for (const author of writers) {
+			const scope = Object.freeze({ author, objectId });
+			const lineage = await input.issuanceStore.readLineage(scope);
+			if (lineage.exhausted !== false || !Number.isSafeInteger(lineage.next) || lineage.next < 0) {
+				return Object.freeze({ ok: false as const, reason: "lineage" as const });
+			}
+			if (author !== input.author && lineage.next !== 0) {
+				return Object.freeze({ ok: false as const, reason: "lineage" as const });
+			}
+		}
+		return Object.freeze({ ok: true as const, scope: Object.freeze({ author: input.author, objectId }) });
+	} catch {
+		return Object.freeze({ ok: false as const, reason: "lineage" as const });
+	}
+}
+
+async function reopenCreatorSuccessorMaterial(
+	input: CreatorSuccessorReopenInput
+): Promise<CreatorSuccessorReopenResult> {
+	try {
+		const parsedObjectId = parseStorageObjectId(input.snapshotDeclaration.scope.objectId);
+		if (!parsedObjectId.ok) return coldFailure("chain-invalid", "creator successor object identity is invalid");
+		const objectId = parsedObjectId.value;
+		const recovered = await input.store.recoverActiveGeneration(objectId);
+		if (!recovered.ok || recovered.value.kind !== "active") {
+			return coldFailure("storage-failed", "creator successor durable generation is unavailable");
+		}
+		const active = recovered.value;
+		const proposedHead = presentBase(active.adoptedGeneration);
+		const lineage = await readGenerationLineage(input.store, objectId);
+		const proposedGeneration = lineage?.find((generation) => generation.generationId === proposedHead?.generationId);
+		const currentHead = proposedGeneration === undefined ? undefined : presentBase(proposedGeneration);
+		const currentGeneration = lineage?.find((generation) => generation.generationId === currentHead?.generationId);
+		if (
+			proposedHead === undefined ||
+			currentHead === undefined ||
+			proposedGeneration === undefined ||
+			currentGeneration === undefined ||
+			active.head.revision !== proposedHead.revision + 1 ||
+			proposedHead.revision !== currentHead.revision + 1 ||
+			!sameClosure(active.references, active.adoptedGeneration.closure)
+		) {
+			return coldFailure("chain-invalid", "creator successor generation lineage is invalid");
+		}
+		const [currentCandidates, proposedCandidates, activeCandidates] = await Promise.all([
+			loadClosure(input.store, currentGeneration.closure),
+			loadClosure(input.store, proposedGeneration.closure),
+			loadClosure(input.store, active.references),
+		]);
+		if (currentCandidates === undefined || proposedCandidates === undefined || activeCandidates === undefined) {
+			return coldFailure("storage-failed", "creator successor closure is unavailable");
+		}
+		const currentProjection = uniqueCandidateByKind(currentCandidates, "v3-live-generation-1");
+		const successorProjection = uniqueCandidateByKind(activeCandidates, "v3-live-generation-2");
+		const currentTrustCandidate = uniqueCandidateByKind(currentCandidates, "drp-anchor-trust-state");
+		const successorTrustCandidate = uniqueCandidateByKind(proposedCandidates, "drp-anchor-trust-state");
+		const cutCandidate = uniqueCandidateByKind(proposedCandidates, "drp-hard-epoch-cut");
+		if (
+			currentProjection === undefined ||
+			successorProjection === undefined ||
+			currentTrustCandidate === undefined ||
+			successorTrustCandidate === undefined ||
+			cutCandidate === undefined
+		) {
+			return coldFailure("chain-invalid", "creator successor authenticated closure is incomplete");
+		}
+		const openedCurrent = openCurrentAnchorTrust({
+			exactCanonicalTrustStateRecordBytes: currentTrustCandidate.bytes,
+			expectedObjectId: objectId,
+			pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest,
+		});
+		if (!openedCurrent.ok) return coldFailure("chain-invalid", "creator genesis trust is invalid");
+		const qcs = proposedCandidates.flatMap((candidate) =>
+			canonicalRecord(candidate.bytes)?.kind === "drp-seal-qc" ? [candidate] : []
+		);
+		const openedSuccessors = qcs.flatMap((candidate) => {
+			const opened = openCreatorSuccessorTrust({
+				currentTrust: openedCurrent.trust,
+				exactCanonicalCommitQcBytes: candidate.bytes,
+				exactCanonicalCutValueBytes: cutCandidate.bytes,
+				exactCanonicalTrustStateRecordBytes: successorTrustCandidate.bytes,
+			});
+			return opened.ok ? [Object.freeze({ qc: candidate, trust: opened.trust })] : [];
+		});
+		if (openedSuccessors.length !== 1) return coldFailure("chain-invalid", "creator successor QC is invalid");
+		const openedSuccessor = openedSuccessors[0] as (typeof openedSuccessors)[number];
+		if (
+			!inspectCreatorTrustAdvance({
+				current: { candidates: currentCandidates, closure: currentGeneration.closure },
+				proofRefs: [cutCandidate.ref, openedSuccessor.qc.ref],
+				proposed: { candidates: proposedCandidates, closure: proposedGeneration.closure },
+			}).ok
+		) {
+			return coldFailure("chain-invalid", "creator successor trust advance is invalid");
+		}
+		const currentTrustRecord = currentTrustCandidate.record;
+		const successorTrustRecord = successorTrustCandidate.record;
+		if (
+			!(currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes instanceof Uint8Array) ||
+			!(currentTrustRecord.detachedCurrentAnchorSignature instanceof Uint8Array) ||
+			!(successorTrustRecord.exactCanonicalCurrentAnchorPreimageBytes instanceof Uint8Array) ||
+			!(successorTrustRecord.detachedCurrentAnchorSignature instanceof Uint8Array) ||
+			!sameBytes(
+				input.exactCanonicalAnchorPreimageBytes,
+				currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes
+			) ||
+			!sameBytes(input.detachedSignature, currentTrustRecord.detachedCurrentAnchorSignature)
+		) {
+			return coldFailure("chain-invalid", "creator genesis carriers do not match durable trust");
+		}
+import { createBrowserAheDurableStore } from "@ts-drp/storage-browser";
+import { createBrowserDurableIssuanceStore } from "@ts-drp/storage-browser/issuance";
+import { createBrowserDurableLiveJournalStore } from "@ts-drp/storage-browser/live-journal";
+import { openBrowserSealEvidenceStore } from "@ts-drp/storage-browser/seal-evidence";
+import { openBrowserSealVoteStore } from "@ts-drp/storage-browser/seal-vote";
+import { createBrowserSnapshotQuarantineStore } from "@ts-drp/storage-browser/snapshot-transfer";
+import type { DRPNetworkNode, Message } from "@ts-drp/types";
+
+const CREATOR_INVITE_KEYS = Object.freeze([
+	"detachedGenesisSignature",
+	"exactCanonicalLatchedAclBytes",
+	"exactCanonicalGenesisAnchorPreimageBytes",
+	"exactCanonicalParametersCarrierBytes",
+	"exactCanonicalProfileBytes",
+	"exactCanonicalSignerSetBytes",
+	"kind",
+	"pinnedGenesisAnchorDigest",
+	"version",
+]);
+const CREATOR_INVITE_BYTE_FIELDS = Object.freeze([
+	"detachedGenesisSignature",
+	"exactCanonicalLatchedAclBytes",
+	"exactCanonicalGenesisAnchorPreimageBytes",
+	"exactCanonicalParametersCarrierBytes",
+	"exactCanonicalProfileBytes",
+	"exactCanonicalSignerSetBytes",
+] as const);
+const CREATOR_INVITE_MATERIAL_KEYS = Object.freeze([...CREATOR_INVITE_BYTE_FIELDS, "pinnedGenesisAnchorDigest"]);
+// Object framing plus the nine encoded keys and the fixed kind, digest and version values.
+// The retained exact 65_536/65_537 boundary pair pins this codec-specific arithmetic.
+const CREATOR_INVITE_FIXED_CANONICAL_BYTE_LENGTH = 346;
+const MIGRATION_RECORD_KEYS = Object.freeze([
+	"applicationStateDigest",
+	"archivePolicy",
+	"authorityKind",
+	"exactCanonicalApplicationStateBytes",
+	"kind",
+	"rehearsalNonce",
+	"sourceAcceptedOperationCount",
+	"sourceAcceptedOperationsDigest",
+	"sourceAnchorDigest",
+---
+		width += 1;
+		remaining = Math.floor(remaining / 128);
+	}
+	return width;
+}
+
+export interface V3RoomCreatorInviteMaterial {
+	readonly detachedGenesisSignature: Uint8Array;
+	readonly exactCanonicalLatchedAclBytes: Uint8Array;
+	readonly exactCanonicalGenesisAnchorPreimageBytes: Uint8Array;
+	readonly exactCanonicalParametersCarrierBytes: Uint8Array;
+	readonly exactCanonicalProfileBytes: Uint8Array;
+	readonly exactCanonicalSignerSetBytes: Uint8Array;
+	readonly pinnedGenesisAnchorDigest: string;
+}
+
+type GenesisAnchorSigner = (digest: Uint8Array) => Promise<Uint8Array>;
+
+export interface V3RoomCreatorInviteMaterialInput {
+	readonly blueprintDigest: string;
+	readonly exactCanonicalApplicationStateBytes: Uint8Array;
+	readonly exactCanonicalLatchedAclBytes: Uint8Array;
+	readonly exactCanonicalParametersCarrierBytes: Uint8Array;
+	readonly exactCanonicalProfileBytes: Uint8Array;
+	readonly exactCanonicalSignerSetBytes: Uint8Array;
+	readonly objectId: string;
+	readonly signGenesisAnchorDigest: GenesisAnchorSigner;
+}
+
+export type V3RoomAcceptedVertex = AdmittedReceivedVertexView;
+
+			}
+		>
+	>;
+	readonly cryptoSuites: {
+		readonly active: readonly {
+			readonly role: string;
+			readonly suiteId: string;
+		}[];
+	};
+}
+
+export interface RawEd25519PublicKey {
+	readonly bytes: Uint8Array;
+	readonly format: "raw";
+}
+
+export const ANCHOR_TRUST_STATE_MAX_RECORD_BYTES = 8192 as const;
+
+export interface CurrentAnchorTrust {
+	readonly currentAnchorDigest: string;
+	readonly currentEpoch: number;
+	readonly genesisAnchorDigest: string;
+	readonly objectId: string;
+	readonly profileId: "creator-trusted-v1";
+}
+
+export interface CertifiedAnchorTrust {
+	readonly currentAnchorDigest: string;
+	readonly currentEpoch: 0;
+	readonly genesisAnchorDigest: string;
+	readonly objectId: string;
+	readonly profileId: "attested-bft-v1" | "delegated-trusted-v1";
+	readonly quorum: number;
+	readonly signerCount: number;
+}
+
+export interface InstallCertifiedAnchorTrustRootInput {
+	readonly exactCanonicalCertifiedGenesisCertificateBytes: Uint8Array;
+	readonly exactCanonicalGenesisAnchorPreimageBytes: Uint8Array;
+	readonly exactCanonicalProfileBytes: Uint8Array;
+	readonly exactCanonicalSignerSetBytes: Uint8Array;
+	readonly pinnedGenesisAnchorDigest: string;
+}
+
+export type InstallCertifiedAnchorTrustRootFailureReason =
+	| "malformed-input"
+	| "anchor-decode-failed"
+	| "noncanonical-anchor"
+	| "anchor-schema-invalid"
+	| "inactive-crypto-suite"
+	| "not-genesis-anchor"
+	| "object-id-invalid"
+	| "object-id-too-long"
+	| "genesis-pin-mismatch"
+	| "profile-digest-mismatch"
+	| "signer-set-digest-mismatch"
+	| "unsupported-trust-profile"
+	| "signer-set-profile-mismatch"
+	| "invalid-quorum"
+	| "too-many-signers"
+	| "signer-id-too-long"
+	| "certificate-decode-failed"
+	| "noncanonical-certificate"
+	| "certificate-schema-invalid"
+	| "certificate-binding-mismatch"
+	| "certificate-signer-mismatch"
+	| "invalid-signature"
+	| "trust-state-too-large";
+
+export type InstallCertifiedAnchorTrustRootResult =
+	| { readonly ok: false; readonly reason: InstallCertifiedAnchorTrustRootFailureReason }
+	| {
+			readonly exactCanonicalTrustStateRecordBytes: Uint8Array;
+			readonly ok: true;
+			readonly trust: CertifiedAnchorTrust;
+	  };
+
+export interface OpenCertifiedAnchorTrustInput {
+	readonly exactCanonicalTrustStateRecordBytes: Uint8Array;
+	readonly expectedObjectId: string;
+	readonly pinnedGenesisAnchorDigest: string;
+}
+
+export type OpenCertifiedAnchorTrustFailureReason =
+	| InstallCertifiedAnchorTrustRootFailureReason
+	| "record-decode-failed"
+	| "noncanonical-record"
+	| "record-schema-invalid"
+	| "unsupported-trust-state-version"
+	| "object-id-mismatch"
+	| "trust-state-inconsistent";
+
+export type OpenCertifiedAnchorTrustResult =
+	| { readonly ok: false; readonly reason: OpenCertifiedAnchorTrustFailureReason }
+	| { readonly ok: true; readonly trust: CertifiedAnchorTrust };
+
+export interface InstallCreatorAnchorTrustRootInput {
+	readonly detachedGenesisSignature: Uint8Array;
+	readonly exactCanonicalGenesisAnchorPreimageBytes: Uint8Array;
+	readonly exactCanonicalProfileBytes: Uint8Array;
+	readonly exactCanonicalSignerSetBytes: Uint8Array;
+	readonly pinnedGenesisAnchorDigest: string;
+}
+
+export type InstallCreatorAnchorTrustRootFailureReason =
+	| "malformed-input"
+	| "anchor-decode-failed"
+	| "noncanonical-anchor"
+	| "anchor-schema-invalid"
+	| "inactive-crypto-suite"
+	| "not-genesis-anchor"
+	| "object-id-invalid"
+	| "genesis-pin-mismatch"
+	| "signer-set-digest-mismatch"
+	| "profile-digest-mismatch"
+	| "unsupported-trust-profile"
+	| "signer-set-profile-mismatch"
+	| "trust-state-too-large"
+	| "invalid-signature";
+
+export type InstallCreatorAnchorTrustRootResult =
+	| { readonly ok: false; readonly reason: InstallCreatorAnchorTrustRootFailureReason }
+	| {
+			readonly ok: true;
+			readonly exactCanonicalTrustStateRecordBytes: Uint8Array;
+			readonly trust: CurrentAnchorTrust;
+	  };
+
+export interface OpenCurrentAnchorTrustInput {
+	readonly exactCanonicalTrustStateRecordBytes: Uint8Array;
+	readonly expectedObjectId: string;
+	readonly pinnedGenesisAnchorDigest: string;
+}
+
+export type OpenCurrentAnchorTrustFailureReason =
+	| "malformed-input"
+	| "record-decode-failed"
+	| "noncanonical-record"
+	| "record-schema-invalid"
+	| "unsupported-trust-state-version"
+	| "object-id-mismatch"
+	| "genesis-pin-mismatch"
+	| "unsupported-trust-profile"
+	| "trust-state-inconsistent"
+	| "invalid-signature";
+
+export type OpenCurrentAnchorTrustResult =
+	| { readonly ok: false; readonly reason: OpenCurrentAnchorTrustFailureReason }
+	| { readonly ok: true; readonly trust: CurrentAnchorTrust };
+
+export interface AuthenticateCurrentEpochAnchorInput {
+	): InstallCertifiedAnchorTrustRootResult => {
+		try {
+			const values = snapshotClosedInput(input, CERTIFIED_ANCHOR_TRUST_INPUT_KEYS, CERTIFIED_ANCHOR_TRUST_BYTE_KEYS);
+			if (values === undefined) return anchorTrustFailure("malformed-input");
+			const validation = validateCertifiedMaterial(values);
+			if (!validation.ok) return validation;
+			const material = validation.material;
+			const recordBytes = encodeCanonical({
+				currentAnchorDigest: material.anchorDigest,
+				currentEpoch: 0,
+				exactCanonicalCertifiedGenesisCertificateBytes: material.certificateBytes,
+				exactCanonicalCurrentAnchorPreimageBytes: material.anchorBytes,
+				exactCanonicalProfileBytes: material.profileBytes,
+				exactCanonicalSignerSetBytes: material.signerSetBytes,
+				genesisAnchorDigest: material.anchorDigest,
+				kind: CERTIFIED_TRUST_STATE_KIND,
+				objectId: material.objectId,
+				profileId: material.profileId,
+				quorum: material.quorum,
+				signerCount: material.signerCount,
+				version: CERTIFIED_TRUST_STATE_VERSION,
+			});
+			if (recordBytes.byteLength > ANCHOR_TRUST_STATE_MAX_RECORD_BYTES) {
+				return anchorTrustFailure("trust-state-too-large");
+			}
+			const trust = mintCertifiedAnchorTrust(certifiedRegistry, material);
+			return Object.freeze({
+				exactCanonicalTrustStateRecordBytes: new Uint8Array(recordBytes),
+				ok: true as const,
+				trust,
+			});
+		} catch {
+			return anchorTrustFailure("malformed-input");
+		}
+	};
+
+	const openCertifiedAnchorTrust = (input: OpenCertifiedAnchorTrustInput): OpenCertifiedAnchorTrustResult => {
+		try {
+			const values = snapshotClosedInput(
+				input,
+				OPEN_TRUST_INPUT_KEYS,
+				new Set(["exactCanonicalTrustStateRecordBytes"])
+			);
+			if (
+				values === undefined ||
+				!isStorageObjectIdText(values.expectedObjectId) ||
+				typeof values.pinnedGenesisAnchorDigest !== "string" ||
+				!DIGEST_HEX.test(values.pinnedGenesisAnchorDigest)
+			) {
+				return anchorTrustFailure("malformed-input");
+			}
+			const recordBytes = values.exactCanonicalTrustStateRecordBytes as Uint8Array;
+			if (recordBytes.byteLength > ANCHOR_TRUST_STATE_MAX_RECORD_BYTES) {
+				return anchorTrustFailure("trust-state-too-large");
+			}
+			if (recordBytes.byteLength === 0) return anchorTrustFailure("malformed-input");
+			const decoded = decodeExact(recordBytes);
+			if (!decoded.ok) {
+				return anchorTrustFailure(decoded.reason === "noncanonical" ? "noncanonical-record" : "record-decode-failed");
+			}
+			if (!isClosedDataRecord(decoded.value, CERTIFIED_TRUST_RECORD_KEYS)) {
+				return anchorTrustFailure("record-schema-invalid");
+			}
+			const record = decoded.value;
+			if (record.kind !== CERTIFIED_TRUST_STATE_KIND) return anchorTrustFailure("record-schema-invalid");
+			if (record.version !== CERTIFIED_TRUST_STATE_VERSION) {
+				return anchorTrustFailure("unsupported-trust-state-version");
+			}
+			if (record.objectId !== values.expectedObjectId) return anchorTrustFailure("object-id-mismatch");
+			if (record.genesisAnchorDigest !== values.pinnedGenesisAnchorDigest) {
+				return anchorTrustFailure("genesis-pin-mismatch");
+			}
+			if (
+				!(record.exactCanonicalCertifiedGenesisCertificateBytes instanceof Uint8Array) ||
+				!(record.exactCanonicalCurrentAnchorPreimageBytes instanceof Uint8Array) ||
+				!(record.exactCanonicalProfileBytes instanceof Uint8Array) ||
+				!(record.exactCanonicalSignerSetBytes instanceof Uint8Array)
+			) {
+				return anchorTrustFailure("record-schema-invalid");
+			}
+			const validation = validateCertifiedMaterial({
+				exactCanonicalCertifiedGenesisCertificateBytes: record.exactCanonicalCertifiedGenesisCertificateBytes,
+				exactCanonicalGenesisAnchorPreimageBytes: record.exactCanonicalCurrentAnchorPreimageBytes,
+				exactCanonicalProfileBytes: record.exactCanonicalProfileBytes,
+				exactCanonicalSignerSetBytes: record.exactCanonicalSignerSetBytes,
+				pinnedGenesisAnchorDigest: record.genesisAnchorDigest,
+			});
+			if (!validation.ok) return anchorTrustFailure("trust-state-inconsistent");
+			const material = validation.material;
+			if (
+				record.currentAnchorDigest !== material.anchorDigest ||
+				record.currentEpoch !== 0 ||
+				record.genesisAnchorDigest !== material.anchorDigest ||
+				record.objectId !== material.objectId ||
+				record.profileId !== material.profileId ||
+				record.quorum !== material.quorum ||
+				record.signerCount !== material.signerCount
+			) {
+				return anchorTrustFailure("trust-state-inconsistent");
+			}
+			const trust = mintCertifiedAnchorTrust(certifiedRegistry, material);
+			return Object.freeze({ ok: true as const, trust });
+		} catch {
+			return anchorTrustFailure("malformed-input");
+		}
+	};
+
+	const installCreatorAnchorTrustRoot = (
+		input: InstallCreatorAnchorTrustRootInput
+	): InstallCreatorAnchorTrustRootResult => {
+		try {
+			const values = snapshotClosedInput(
+				input,
+				ANCHOR_TRUST_INPUT_KEYS,
+				new Set([
+					"detachedGenesisSignature",
+					"exactCanonicalGenesisAnchorPreimageBytes",
+					"exactCanonicalProfileBytes",
+					"exactCanonicalSignerSetBytes",
+				])
+			);
+			if (
+				values === undefined ||
+				typeof values.pinnedGenesisAnchorDigest !== "string" ||
+				!DIGEST_HEX.test(values.pinnedGenesisAnchorDigest)
+			) {
+				return anchorTrustFailure("malformed-input");
+			}
+			const signature = values.detachedGenesisSignature as Uint8Array;
+			const anchorBytes = values.exactCanonicalGenesisAnchorPreimageBytes as Uint8Array;
+			const profileBytes = values.exactCanonicalProfileBytes as Uint8Array;
+			const signerSetBytes = values.exactCanonicalSignerSetBytes as Uint8Array;
+			if (
+				signature.byteLength !== 64 ||
+				anchorBytes.byteLength === 0 ||
+				profileBytes.byteLength === 0 ||
+				signerSetBytes.byteLength === 0
+			) {
+				return anchorTrustFailure("malformed-input");
+			}
+			const anchorDecoded = decodeExact(anchorBytes);
+			if (!anchorDecoded.ok) {
+				return anchorTrustFailure(
+					anchorDecoded.reason === "noncanonical" ? "noncanonical-anchor" : "anchor-decode-failed"
+				);
+			}
+			if (!isAnchorRecord(anchorDecoded.value)) return anchorTrustFailure("anchor-schema-invalid");
+			const anchor = anchorDecoded.value;
+			if (anchor.cryptoSuiteId !== ACTIVE_ANCHOR_SUITE) return anchorTrustFailure("inactive-crypto-suite");
+			if (
+				anchor.epoch !== 0 ||
+				anchor.historySize !== 0 ||
+				anchor.previousAnchor !== ZERO_DIGEST ||
+				anchor.cutDigest !== ZERO_DIGEST
+			) {
+				return anchorTrustFailure("not-genesis-anchor");
+			}
+			if (!isStorageObjectIdText(anchor.objectId)) return anchorTrustFailure("object-id-invalid");
+			const anchorDigestBytes = hashDomain(ANCHOR_DIGEST_DOMAIN, anchorBytes);
+			const anchorDigest = bytesToHex(anchorDigestBytes);
+			if (anchorDigest !== values.pinnedGenesisAnchorDigest) return anchorTrustFailure("genesis-pin-mismatch");
+			if (bytesToHex(hashDomain(SIGNER_SET_DIGEST_DOMAIN, signerSetBytes)) !== anchor.signerSetDigest) {
+				return anchorTrustFailure("signer-set-digest-mismatch");
+			}
+			if (bytesToHex(hashDomain(PROFILE_DIGEST_DOMAIN, profileBytes)) !== anchor.profileDigest) {
+				return anchorTrustFailure("profile-digest-mismatch");
+			}
+			const profileId = decodedProfileId(profileBytes);
+			if (profileId !== undefined && profileId !== CREATOR_PROFILE) {
+				return anchorTrustFailure("unsupported-trust-profile");
+			}
+			const carriers = decodeCreatorCarriers(signerSetBytes, profileBytes);
+			if (carriers === undefined || carriers.quorum !== 1 || !carriers.signerSetMatchesProfile) {
+				return anchorTrustFailure("signer-set-profile-mismatch");
+			}
+			const recordBytes = encodeCanonical({
+				currentAnchorDigest: anchorDigest,
+				currentEpoch: 0,
+				detachedCurrentAnchorSignature: signature,
+				exactCanonicalCurrentAnchorPreimageBytes: anchorBytes,
+				exactCanonicalProfileBytes: profileBytes,
+				exactCanonicalSignerSetBytes: signerSetBytes,
+				genesisAnchorDigest: anchorDigest,
+				kind: "drp-anchor-trust-state",
+				objectId: anchor.objectId,
+				profileId: CREATOR_PROFILE,
+				quorum: 1,
+				version: 1,
+			});
+			if (recordBytes.byteLength > ANCHOR_TRUST_STATE_MAX_RECORD_BYTES) {
+				return anchorTrustFailure("trust-state-too-large");
+			}
+			if (!verifyStrictSignature(signature, anchorDigestBytes, carriers.publicKey)) {
+				return anchorTrustFailure("invalid-signature");
+			}
+			const trust = mintAnchorTrust(
+				registry,
+				{
+					currentAnchorDigest: anchorDigest,
+					currentEpoch: 0,
+					genesisAnchorDigest: anchorDigest,
+					objectId: anchor.objectId,
+					profileId: CREATOR_PROFILE,
+				},
+				{
+					detachedCurrentAnchorSignature: signature,
+					exactCanonicalCurrentAnchorPreimageBytes: anchorBytes,
+					exactCanonicalProfileBytes: profileBytes,
+					exactCanonicalSignerSetBytes: signerSetBytes,
+					publicKey: carriers.publicKey,
+					profileDigest: anchor.profileDigest,
+					quorum: 1,
+					signerSetDigest: anchor.signerSetDigest,
+				}
+			);
+			return Object.freeze({
+				exactCanonicalTrustStateRecordBytes: new Uint8Array(recordBytes),
+				ok: true as const,
+				trust,
+			});
+		} catch {
+			return anchorTrustFailure("malformed-input");
+		}
+	};
+
+	const openCurrentAnchorTrust = (input: OpenCurrentAnchorTrustInput): OpenCurrentAnchorTrustResult => {
+		try {
+			const values = snapshotClosedInput(
+				input,
+				OPEN_TRUST_INPUT_KEYS,
+				new Set(["exactCanonicalTrustStateRecordBytes"])
+			);
+			if (
+				values === undefined ||
+				!isStorageObjectIdText(values.expectedObjectId) ||
+				typeof values.pinnedGenesisAnchorDigest !== "string" ||
+				!DIGEST_HEX.test(values.pinnedGenesisAnchorDigest)
+			) {
+				return anchorTrustFailure("malformed-input");
+			}
+			const recordBytes = values.exactCanonicalTrustStateRecordBytes as Uint8Array;
+			if (recordBytes.byteLength === 0 || recordBytes.byteLength > ANCHOR_TRUST_STATE_MAX_RECORD_BYTES) {
+				return anchorTrustFailure("malformed-input");
+			}
+			const decoded = decodeExact(recordBytes);
+			if (!decoded.ok) {
+				return anchorTrustFailure(decoded.reason === "noncanonical" ? "noncanonical-record" : "record-decode-failed");
+			}
+			if (!trustRecordShape(decoded.value) || decoded.value.kind !== "drp-anchor-trust-state") {
+				return anchorTrustFailure("record-schema-invalid");
+			}
+			const record = decoded.value;
+			if (record.version !== 1) return anchorTrustFailure("unsupported-trust-state-version");
+			if (record.objectId !== values.expectedObjectId) return anchorTrustFailure("object-id-mismatch");
+			if (record.genesisAnchorDigest !== values.pinnedGenesisAnchorDigest)
+				return anchorTrustFailure("genesis-pin-mismatch");
+			if (record.profileId !== CREATOR_PROFILE) return anchorTrustFailure("unsupported-trust-profile");
+
+			const anchorBytes = new Uint8Array(record.exactCanonicalCurrentAnchorPreimageBytes);
+			const signature = new Uint8Array(record.detachedCurrentAnchorSignature);
+			const signerSetBytes = new Uint8Array(record.exactCanonicalSignerSetBytes);
+			const profileBytes = new Uint8Array(record.exactCanonicalProfileBytes);
+			const anchorDecoded = decodeExact(anchorBytes);
+			const profileId = decodedProfileId(profileBytes);
+			if (profileId !== undefined && profileId !== CREATOR_PROFILE) {
+				return anchorTrustFailure("unsupported-trust-profile");
+			}
+			const carriers = decodeCreatorCarriers(signerSetBytes, profileBytes);
+			if (
+				!anchorDecoded.ok ||
+				!isAnchorRecord(anchorDecoded.value) ||
+				anchorDecoded.value.cryptoSuiteId !== ACTIVE_ANCHOR_SUITE
+			) {
+				return anchorTrustFailure("trust-state-inconsistent");
+			}
+			const anchor = anchorDecoded.value;
+			const anchorDigestBytes = hashDomain(ANCHOR_DIGEST_DOMAIN, anchorBytes);
+			const anchorDigest = bytesToHex(anchorDigestBytes);
+			if (
+				!isStorageObjectIdText(record.objectId) ||
+				!DIGEST_HEX.test(record.genesisAnchorDigest) ||
+				!DIGEST_HEX.test(record.genesisAnchorDigest) ||
+				!isSafeNonnegative(record.currentEpoch) ||
+				!DIGEST_HEX.test(record.currentAnchorDigest) ||
+				record.quorum !== 1 ||
+				carriers === undefined ||
+				carriers.quorum !== 1 ||
+				!carriers.signerSetMatchesProfile ||
+				record.currentAnchorDigest !== record.genesisAnchorDigest ||
+				record.currentEpoch !== 0 ||
+				anchor.objectId !== record.objectId ||
+				anchor.epoch !== record.currentEpoch ||
+				anchor.historySize !== 0 ||
+				anchor.previousAnchor !== ZERO_DIGEST ||
+				anchor.cutDigest !== ZERO_DIGEST ||
+				anchorDigest !== record.currentAnchorDigest ||
+				bytesToHex(hashDomain(SIGNER_SET_DIGEST_DOMAIN, signerSetBytes)) !== anchor.signerSetDigest ||
+				bytesToHex(hashDomain(PROFILE_DIGEST_DOMAIN, profileBytes)) !== anchor.profileDigest
+			) {
+				return anchorTrustFailure("trust-state-inconsistent");
+			}
+			if (!verifyStrictSignature(signature, anchorDigestBytes, carriers.publicKey)) {
+				return anchorTrustFailure("invalid-signature");
+			}
+			const trust = mintAnchorTrust(
+				registry,
+				{
+					currentAnchorDigest: record.currentAnchorDigest,
+					currentEpoch: record.currentEpoch,
+					genesisAnchorDigest: record.genesisAnchorDigest,
+					objectId: record.objectId,
+					profileId: CREATOR_PROFILE,
+				},
+				{
+					detachedCurrentAnchorSignature: signature,
+					exactCanonicalCurrentAnchorPreimageBytes: anchorBytes,
+					exactCanonicalProfileBytes: profileBytes,
+					exactCanonicalSignerSetBytes: signerSetBytes,
+					publicKey: carriers.publicKey,
+					profileDigest: anchor.profileDigest,
+					quorum: 1,
+					signerSetDigest: anchor.signerSetDigest,
+				}
+			);
+			return Object.freeze({ ok: true as const, trust });
+		} catch {
+			return anchorTrustFailure("malformed-input");
+		}
+	};
+
+	const authenticateCurrentEpochAnchor = (
+		input: AuthenticateCurrentEpochAnchorInput
+	): AuthenticateCurrentEpochAnchorResult => {
+		try {
+			const values = snapshotClosedInput(
+				input,
+				AUTHENTICATE_ANCHOR_INPUT_KEYS,
+				new Set(["detachedSignature", "exactCanonicalAnchorPreimageBytes"])
+			);
+			if (values === undefined) return anchorTrustFailure("malformed-input");
+			const signature = values.detachedSignature as Uint8Array;
+			const anchorBytes = values.exactCanonicalAnchorPreimageBytes as Uint8Array;
+			if (signature.byteLength !== 64 || anchorBytes.byteLength === 0) return anchorTrustFailure("malformed-input");
+			const trust = values.trust as CurrentAnchorTrust;
+			const state = typeof trust === "object" && trust !== null ? registry.get(trust) : undefined;
+			if (state === undefined) return anchorTrustFailure("untrusted-context");
+			const decoded = decodeExact(anchorBytes);
+			if (!decoded.ok) {
+				return anchorTrustFailure(decoded.reason === "noncanonical" ? "noncanonical-anchor" : "anchor-decode-failed");
+			}
+			if (!isAnchorRecord(decoded.value)) return anchorTrustFailure("anchor-schema-invalid");
+			const anchor = decoded.value;
+			if (anchor.cryptoSuiteId !== ACTIVE_ANCHOR_SUITE) return anchorTrustFailure("inactive-crypto-suite");
+			if (anchor.objectId !== trust.objectId) return anchorTrustFailure("object-id-mismatch");
+			if (anchor.epoch !== trust.currentEpoch) return anchorTrustFailure("epoch-mismatch");
+			if (anchor.profileDigest !== state.profileDigest) return anchorTrustFailure("profile-digest-mismatch");
+			if (anchor.signerSetDigest !== state.signerSetDigest) return anchorTrustFailure("signer-set-digest-mismatch");
+			const anchorDigestBytes = hashDomain(ANCHOR_DIGEST_DOMAIN, anchorBytes);
+			const anchorDigest = bytesToHex(anchorDigestBytes);
+			if (anchorDigest !== trust.currentAnchorDigest) return anchorTrustFailure("anchor-not-current");
+			if (!verifyStrictSignature(signature, anchorDigestBytes, state.publicKey)) {
+				return anchorTrustFailure("invalid-signature");
+			}
+			const provenance = Object.freeze({
+				anchorDigest,
+				blueprintDigest: anchor.blueprintDigest,
+				epoch: anchor.epoch,
+				objectId: anchor.objectId,
+				parametersDigest: anchor.parametersDigest,
+				profileDigest: anchor.profileDigest,
+				signerSetDigest: anchor.signerSetDigest,
+			});
+			return Object.freeze({ ok: true as const, provenance });
+		} catch {
+			return anchorTrustFailure("malformed-input");
+		}
+	};
+
+	const openCurrentEpochAuthorAuthorization = (
+		input: OpenCurrentEpochAuthorAuthorizationInput
+	): OpenCurrentEpochAuthorAuthorizationResult => {
+		try {
+			const values = snapshotClosedInput(
+				input,
+				OPEN_AUTHOR_AUTHORIZATION_INPUT_KEYS,
+				OPEN_AUTHOR_AUTHORIZATION_BYTE_KEYS,
+				true
+			);
+			if (values === undefined) return anchorTrustFailure("malformed-input");
+			const detachedAnchorSignature = values.detachedAnchorSignature as Uint8Array;
+			const exactCanonicalAnchorPreimageBytes = values.exactCanonicalAnchorPreimageBytes as Uint8Array;
+			const exactCanonicalAuthorAuthorizationBytes = values.exactCanonicalAuthorAuthorizationBytes as Uint8Array;
+			if (
+				detachedAnchorSignature.byteLength !== 64 ||
+				exactCanonicalAnchorPreimageBytes.byteLength === 0 ||
+				exactCanonicalAuthorAuthorizationBytes.byteLength === 0 ||
+				exactCanonicalAuthorAuthorizationBytes.byteLength > AUTHOR_AUTHORIZATION_MAX_BYTES
+			) {
+				return anchorTrustFailure("malformed-input");
+			}
+			const trust = values.trust as CurrentAnchorTrust;
+			const authenticated = authenticateCurrentEpochAnchor({
+				detachedSignature: detachedAnchorSignature,
+				exactCanonicalAnchorPreimageBytes,
+				trust,
+			});
+			if (!authenticated.ok) {
+				return Object.freeze({
+					cause: authenticated.reason,
+					ok: false as const,
+					reason: "anchor-rejected" as const,
+				});
+	{ readonly ok: false }
+>["reason"];
+
+export type InstallCurrentAnchorTrustResult =
+	| Readonly<{ head: PresentHead; ok: true; trust: CurrentAnchorTrust; trustRef: GenerationRef }>
+	| Readonly<{ ok: false; reason: "already-installed" | "store-failed" | "trust-state-conflict" }>
+	| Readonly<{
+			cause: InstallCreatorAnchorTrustRootFailureReason;
+			ok: false;
+			reason: "genesis-rejected";
+	  }>
+	| Readonly<{ cause: TrustClosureRejection; ok: false; reason: "closure-rejected" }>
+	| Readonly<{ cause: OpenCurrentAnchorTrustFailureReason; ok: false; reason: "trust-rejected" }>;
+
+export type OpenDurableCurrentAnchorTrustResult =
+	| Readonly<{ head: PresentHead; ok: true; trust: CurrentAnchorTrust; trustRef: GenerationRef }>
+	| Readonly<{ ok: false; reason: "not-installed" | "store-failed" | "trust-state-unreadable" }>
+	| Readonly<{ cause: TrustClosureRejection; ok: false; reason: "closure-rejected" }>
+	| Readonly<{ cause: OpenCurrentAnchorTrustFailureReason; ok: false; reason: "trust-rejected" }>;
+
+export type CurrentAnchorTrustStoreOptions = Readonly<{
+	objectId: StorageObjectId;
+	pinnedGenesisAnchorDigest: string;
+	store: AheDurableStore;
+}>;
+
+export type CurrentAnchorTrustStore = Readonly<{
+	install(input: InstallCreatorAnchorTrustRootInput): Promise<InstallCurrentAnchorTrustResult>;
+	open(): Promise<OpenDurableCurrentAnchorTrustResult>;
+}>;
+
+type CopiedCandidate = Readonly<{ bytes: Uint8Array; ref: GenerationRef }>;
+
+type OpenedStoredTrust = Readonly<{
+	bytes: Uint8Array;
+	head: PresentHead;
+	trust: CurrentAnchorTrust;
+	trustRef: GenerationRef;
+}>;
+
+type OpenedStoredTrustResult =
+	| Readonly<{ ok: true; value: OpenedStoredTrust }>
+	| Readonly<{ ok: false; reason: "trust-state-unreadable" }>
+	| Readonly<{ cause: TrustClosureRejection; ok: false; reason: "closure-rejected" }>
+	| Readonly<{ cause: OpenCurrentAnchorTrustFailureReason; ok: false; reason: "trust-rejected" }>;
+
+type StoreResultSnapshot = Readonly<{ ok: true; value: unknown }> | Readonly<{ ok: false; reason: string }>;
+
+function failure<Reason extends string>(reason: Reason): Readonly<{ ok: false; reason: Reason }> {
+	return Object.freeze({ ok: false as const, reason });
+}
+
+function causedFailure<Reason extends string, Cause extends string>(
+	reason: Reason,
+	cause: Cause
+): Readonly<{ cause: Cause; ok: false; reason: Reason }> {
+	return Object.freeze({ cause, ok: false as const, reason });
+}
+
+function isRecord(value: unknown): value is Record<PropertyKey, unknown> {
+	return typeof value === "object" && value !== null;
+====
+	if (adopted === undefined || adopted.closureDigest !== head.closureDigest) return undefined;
+	return Object.freeze({ head, references });
+}
+
+function snapshotLoadedBlob(value: unknown): Uint8Array | undefined {
+	const result = snapshotStoreResult(value);
+	return result?.ok === true ? copyDetachedBytes(result.value) : undefined;
+}
+
+function successfulOpen(value: OpenedStoredTrust): OpenDurableCurrentAnchorTrustResult {
+	return Object.freeze({
+		head: Object.freeze({ ...value.head }),
+		ok: true as const,
+		trust: value.trust,
+		trustRef: Object.freeze({ ...value.trustRef }),
+	});
+}
+
+function freshGenerationId(): GenerationId | undefined {
+	try {
+		const bytes = new Uint8Array(32);
+		globalThis.crypto.getRandomValues(bytes);
+		const text = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+		const parsed = parseGenerationId(text);
+		return parsed.ok ? parsed.value : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+/**
+ * Creates the sole durable owner for creator current-anchor trust.
+ * @param options - Fixed storage owner, genesis pin, and strict durable AHE store.
+ * @returns The immutable install/open authority for the fixed object.
+ */
+export function createCurrentAnchorTrustStore(options: CurrentAnchorTrustStoreOptions): CurrentAnchorTrustStore {
+	const objectId = options.objectId;
+	const pinnedGenesisAnchorDigest = options.pinnedGenesisAnchorDigest;
+	const store = options.store;
+
+	const openAtHead = async (expectedHead: PresentHead): Promise<OpenedStoredTrustResult> => {
+		try {
+			const recovered = snapshotActiveRecovery(await store.recoverActiveGeneration(objectId), expectedHead);
+			if (recovered === undefined) return failure("trust-state-unreadable");
+			const candidates: DetachedClosureCandidate[] = [];
+			for (let index = 0; index < recovered.references.length; index += 1) {
+				const ref = recovered.references[index] as GenerationRef;
+				if (ref.byteLength > MAX_SCANNABLE_BYTES) continue;
+				const bytes = snapshotLoadedBlob(await store.getBlob(ref.digest));
+				if (bytes === undefined) return failure("trust-state-unreadable");
+				candidates.push(Object.freeze({ bytes, ref }));
+			}
+			const inspected = inspectTrustClosure({ candidates, closure: recovered.references });
+			if (!inspected.ok) return causedFailure("closure-rejected", inspected.reason);
+			const opened = openCurrentAnchorTrust({
+				exactCanonicalTrustStateRecordBytes: inspected.exactCanonicalTrustStateRecordBytes,
+				expectedObjectId: objectId,
+				pinnedGenesisAnchorDigest,
+			});
+			if (!opened.ok) return causedFailure("trust-rejected", opened.reason);
+			return Object.freeze({
+				ok: true as const,
+				value: Object.freeze({
+					bytes: inspected.exactCanonicalTrustStateRecordBytes,
+					head: recovered.head,
+					trust: opened.trust,
+					trustRef: inspected.trustRef,
+				}),
+			});
+		} catch {
+			return failure("trust-state-unreadable");
+		}
+	};
+
+	const open = async (): Promise<OpenDurableCurrentAnchorTrustResult> => {
+		if (!snapshotStrictDurability(store)) return failure("store-failed");
+		try {
+			const read = snapshotStoreResult(await store.readHead(objectId));
+			if (read === undefined || !read.ok) return failure("store-failed");
+			const head = snapshotExpectedHead(read.value, objectId);
+			if (head === undefined) return failure("store-failed");
+			if (head.kind === "none") return failure("not-installed");
+			const opened = await openAtHead(head);
+			return opened.ok ? successfulOpen(opened.value) : opened;
+		} catch {
+			return failure("store-failed");
+		}
+	};
+
+	const install = async (input: InstallCreatorAnchorTrustRootInput): Promise<InstallCurrentAnchorTrustResult> => {
+		const installed = installCreatorAnchorTrustRoot(input);
+		if (!installed.ok) return causedFailure("genesis-rejected", installed.reason);
+		const openedFresh = openCurrentAnchorTrust({
+			exactCanonicalTrustStateRecordBytes: installed.exactCanonicalTrustStateRecordBytes,
+			expectedObjectId: objectId,
+			pinnedGenesisAnchorDigest,
+		});
+		if (!openedFresh.ok) return causedFailure("trust-rejected", openedFresh.reason);
+		const exactBytes = new Uint8Array(installed.exactCanonicalTrustStateRecordBytes);
+		const digest = digestBlob(exactBytes);
+		if (!digest.ok) return failure("store-failed");
+		const trustRef = Object.freeze({ byteLength: exactBytes.byteLength, digest: digest.value });
+		const inspected = inspectTrustClosure({ candidates: [{ bytes: exactBytes, ref: trustRef }], closure: [trustRef] });
+		if (!inspected.ok) return causedFailure("closure-rejected", inspected.reason);
+		if (!snapshotStrictDurability(store)) return failure("store-failed");
+
+		try {
+			const read = snapshotStoreResult(await store.readHead(objectId));
+			if (read === undefined || !read.ok) return failure("store-failed");
+			const head = snapshotExpectedHead(read.value, objectId);
+			if (head === undefined) return failure("store-failed");
+			if (head.kind === "present") {
+				const existing = await openAtHead(head);
+				if (!existing.ok) return existing.reason === "trust-state-unreadable" ? failure("store-failed") : existing;
+				return sameBytes(existing.value.bytes, exactBytes)
+					? failure("already-installed")
+					: failure("trust-state-conflict");
+			}
+		} catch {
+			return failure("store-failed");
+		}
+
+		const generationId = freshGenerationId();
+		if (generationId === undefined) return failure("store-failed");
+		const baseExpectedHead: ExpectedHead = Object.freeze({ kind: "none", objectId });
+		try {
+			const begun = snapshotStoreResult(
+				await store.beginGeneration({
+					baseExpectedHead,
+					closure: [trustRef],
+					generationId,
+					objectId,
+				})
+			);
+			const begunRecord =
+				begun?.ok === true
+					? snapshotGenerationRecord(begun.value, {
+							baseExpectedHead,
+							closure: [trustRef],
+							generationId,
+							objectId,
+							state: "Staged",
+						})
+					: undefined;
+			if (begunRecord === undefined) return failure("store-failed");
+			const cached = snapshotStoreResult(
+				await store.putCachedBlob({ bytes: exactBytes, digest: trustRef.digest, generationId, objectId })
+			);
+			const cachedValue = cached?.ok === true ? snapshotClosedRecord(cached.value, ["inserted"]) : undefined;
+			if (cachedValue === undefined || typeof cachedValue.inserted !== "boolean") return failure("store-failed");
+			const promoted = snapshotStoreResult(
+				await store.promoteReference({ digest: trustRef.digest, generationId, objectId })
+			);
+			if (promoted?.ok !== true || promoted.value !== undefined) return failure("store-failed");
+			const completed = snapshotStoreResult(await store.completeGeneration({ generationId, objectId }));
+			const completedRecord =
+				completed?.ok === true
+					? snapshotGenerationRecord(completed.value, {
+							baseExpectedHead,
+							closure: [trustRef],
+							generationId,
+			hex(hashDomain("ts-drp/parameters/v3", parametersBytes)) !== currentAnchor.parametersDigest
+		) {
+			return failure("CUT_VALUE_MISMATCH");
+		}
+		const nextSignerSet = decodeCanonicalValue(signerSetBytes);
+		const parameters = decodeCanonicalValue(parametersBytes);
+		decodeCanonicalValue(availabilityBytes);
+		const exactCanonicalCutValueBytes = encodeCanonical({
+			aclDigest: input.aclDigest,
+			archiveIndexRoot: input.archiveIndexRoot,
+			availabilityPolicyDigest: hex(hashDomain("ts-drp/availability-policy/v3", availabilityBytes)),
+			blueprintDigest: input.blueprintDigest,
+			closeReason: input.closeReason,
+			closeSetCount: input.closeSetCount,
+			closeSetRoot: input.closeSetRoot,
+			encodingVersion: "drp-canonical-profile-1",
+			epoch: material.currentEpoch,
+			historyRoot: input.historyRoot,
+			historySize: input.historySize,
+			kind: "drp-hard-epoch-cut",
+			nextSignerSet,
+			objectId: material.objectId,
+			parameters,
+			previousAnchor: material.currentAnchorDigest,
+			previousCutDigest: currentAnchor.cutDigest,
+			previousHistoryRoot: currentAnchor.historyRoot,
+			previousHistorySize: currentAnchor.historySize,
+			protocolMajor: 3,
+			snapshotManifestDigest: input.snapshotManifestDigest,
+			stateDigest: input.stateDigest,
+		});
+		const valueDigest = hex(hashDomain(registry.kinds.cutValue?.domain ?? "", exactCanonicalCutValueBytes));
+		const close = Object.freeze({}) as VerifiedCreatorClose;
+		closeStates.set(
+			close,
+			Object.freeze({
+				currentAnchor,
+				currentTrust: input.currentTrust as CurrentAnchorTrust,
+				exactCanonicalCutValueBytes: Uint8Array.from(exactCanonicalCutValueBytes),
+				material,
+				valueDigest,
+			})
+		);
+		return Object.freeze({
+			close,
+			exactCanonicalCutValueBytes: Uint8Array.from(exactCanonicalCutValueBytes),
+			ok: true as const,
+			valueDigest,
+		});
+	} catch {
+		return failure("CUT_VALUE_MISMATCH");
+	}
+}
+
+/**
+ * Prepares the exact successor anchor only after a genuine commit QC verifies.
+ * @param input - Opaque close and authority plus exact commit-QC bytes.
+ * @returns A fieldless preparation/signing request pair, or a typed failure.
+ */
+export function prepareCreatorSuccessor(input: unknown): Readonly<
+	| { ok: false; reason: string }
+	| {
+			anchorDigest: string;
+			exactCanonicalAnchorPreimageBytes: Uint8Array;
+			ok: true;
+			preparation: CreatorAnchorPreparation;
+			signingRequest: CreatorAnchorSigningRequest;
+	  }
+> {
+	try {
+		if (!plainRecord(input) || !exactKeys(input, ["authority", "close", "exactCanonicalCommitQcBytes"])) {
+			return failure("COMMIT_QC_REJECTED");
+		}
+		const close = closeStates.get(input.close as VerifiedCreatorClose);
+		const identity = resolveSealAuthorityIdentity(input.authority);
+		const commitQcBytes = copyBytes(input.exactCanonicalCommitQcBytes, undefined, 65_536);
+		if (commitQcBytes === undefined || commitQcBytes.byteLength === 0) return failure("COMMIT_QC_REQUIRED");
+		if (
+			close === undefined ||
+			identity === undefined ||
+			identity.anchor !== close.material.currentAnchorDigest ||
+			identity.epoch !== close.material.currentEpoch ||
+			identity.objectId !== close.material.objectId ||
+			identity.signerId !== creatorSignerId(close.material)
+		) {
+			return failure("COMMIT_QC_REJECTED");
+		}
+		const verified = verifySealQC({ authority: input.authority as never, exactCanonicalQcBytes: commitQcBytes });
+		if (!verified.ok) return failure("COMMIT_QC_REJECTED");
+		if (verified.phase !== "commit") return failure("COMMIT_QC_REQUIRED");
+		if (verified.valueDigest !== close.valueDigest) return failure("CERTIFIED_VALUE_MISMATCH");
+		const cut = exactCanonicalRecord(close.exactCanonicalCutValueBytes, "cutValue");
+		if (cut === undefined) return failure("CERTIFIED_VALUE_MISMATCH");
+		const exactCanonicalAnchorPreimageBytes = successorAnchor(close.currentAnchor, cut);
+		const prepared = prepareCreatorAnchorSigningRequest({
+			exactCanonicalAnchorPreimageBytes,
+			exactCanonicalProfileBytes: close.material.exactCanonicalProfileBytes,
+			exactCanonicalSignerSetBytes: close.material.exactCanonicalSignerSetBytes,
+			signerPublicKey: close.material.publicKey,
+		});
+		if (!prepared.ok) return failure("CERTIFIED_VALUE_MISMATCH");
+		const preparation = Object.freeze({}) as CreatorAnchorPreparation;
+		preparationStates.set(
+			preparation,
+			Object.freeze({
+				anchorDigest: prepared.anchorDigest,
+				currentTrust: close.currentTrust,
+				exactCanonicalAnchorPreimageBytes: Uint8Array.from(exactCanonicalAnchorPreimageBytes),
+				material: close.material,
+			})
+		);
+		return Object.freeze({
+			anchorDigest: prepared.anchorDigest,
+			exactCanonicalAnchorPreimageBytes: Uint8Array.from(exactCanonicalAnchorPreimageBytes),
+			ok: true as const,
+			preparation,
+			signingRequest: prepared.signingRequest,
+		});
+	} catch {
+		return failure("COMMIT_QC_REJECTED");
+	}
+}
+
+/**
+ * Completes one prepared successor into the frozen v1 trust carrier.
+ * @param input - Opaque preparation and detached creator signature.
+ * @returns Exact frozen trust-state bytes, or a typed signature failure.
+ */
+export function completeCreatorSuccessor(
+	input: unknown
+): Readonly<{ exactCanonicalTrustStateRecordBytes: Uint8Array; ok: true } | { ok: false; reason: string }> {
+	try {
+		if (!plainRecord(input) || !exactKeys(input, ["detachedSignature", "preparation"])) {
+			return failure("INVALID_SUCCESSOR_SIGNATURE");
+		}
+		const state = preparationStates.get(input.preparation as CreatorAnchorPreparation);
+		const signature = copyBytes(input.detachedSignature, 64, 64);
+		if (state === undefined || signature === undefined) return failure("INVALID_SUCCESSOR_SIGNATURE");
+		preparationStates.delete(input.preparation as CreatorAnchorPreparation);
+		if (
+			!ed25519.verify(
+				signature,
+				Uint8Array.from(state.anchorDigest.match(/../gu) ?? [], (part) => Number.parseInt(part, 16)),
+				state.material.publicKey,
+				{ zip215: false }
+			)
+		) {
+			return failure("INVALID_SUCCESSOR_SIGNATURE");
+		}
+		const anchor = exactCanonicalRecord(state.exactCanonicalAnchorPreimageBytes, "epochAnchor");
+		if (anchor === undefined) return failure("CERTIFIED_VALUE_MISMATCH");
+		const exactCanonicalTrustStateRecordBytes = encodeCanonical({
+			currentAnchorDigest: state.anchorDigest,
+			currentEpoch: anchor.epoch,
+			detachedCurrentAnchorSignature: signature,
+			exactCanonicalCurrentAnchorPreimageBytes: state.exactCanonicalAnchorPreimageBytes,
+			exactCanonicalProfileBytes: state.material.exactCanonicalProfileBytes,
+			exactCanonicalSignerSetBytes: state.material.exactCanonicalSignerSetBytes,
+			genesisAnchorDigest: state.material.genesisAnchorDigest,
+			kind: "drp-anchor-trust-state",
+			objectId: state.material.objectId,
+			profileId: "creator-trusted-v1",
+			quorum: 1,
+			version: 1,
+		});
+		return Object.freeze({
+			exactCanonicalTrustStateRecordBytes: Uint8Array.from(exactCanonicalTrustStateRecordBytes),
+			ok: true as const,
+		});
+	} catch {
+		return failure("INVALID_SUCCESSOR_SIGNATURE");
+	}
+}
+
+/**
+ * Reopens one exact successor only when its CutValue and commit QC certify it.
+ * @param input - Current trust plus exact CutValue, commit-QC, and trust-state bytes.
+ * @returns A singleton-minted successor trust capability, or a typed rejection.
+ */
+export function openCreatorSuccessorTrust(
+	input: unknown
+): Readonly<{ ok: false; reason: string } | { ok: true; trust: CurrentAnchorTrust }> {
+	try {
+		if (
+			!plainRecord(input) ||
+			!exactKeys(input, [
+				"currentTrust",
+				"exactCanonicalCommitQcBytes",
+				"exactCanonicalCutValueBytes",
+				"exactCanonicalTrustStateRecordBytes",
+			])
+		) {
+			return failure("CERTIFIED_VALUE_MISMATCH");
+		}
+		const currentTrust = input.currentTrust as CurrentAnchorTrust;
+		const material = resolveCreatorAnchorTrustMaterial(currentTrust);
+		if (material === undefined) return failure("UNTRUSTED_CURRENT_ANCHOR");
+		const recordBytes = copyBytes(input.exactCanonicalTrustStateRecordBytes, undefined, 8192);
+		if (recordBytes === undefined) return failure("CERTIFIED_VALUE_MISMATCH");
+		const decodedRecord = decodeCanonicalValue(recordBytes);
+		if (!plainRecord(decodedRecord) || !exactKeys(decodedRecord, trustRecordFields)) {
+			return failure("CERTIFIED_VALUE_MISMATCH");
+		}
+		if (decodedRecord.version !== 1) return failure("UNSUPPORTED_TRUST_STATE_VERSION");
+		const anchorBytes = copyBytes(decodedRecord.exactCanonicalCurrentAnchorPreimageBytes, undefined, 65_536);
+		const signature = copyBytes(decodedRecord.detachedCurrentAnchorSignature, 64, 64);
+		const profileBytes = copyBytes(decodedRecord.exactCanonicalProfileBytes, undefined, 65_536);
+		const signerSetBytes = copyBytes(decodedRecord.exactCanonicalSignerSetBytes, undefined, 65_536);
+		const anchor = anchorBytes === undefined ? undefined : exactCanonicalRecord(anchorBytes, "epochAnchor");
+		if (
+			anchorBytes === undefined ||
+			signature === undefined ||
+			profileBytes === undefined ||
+			signerSetBytes === undefined ||
+			anchor === undefined ||
+			decodedRecord.kind !== "drp-anchor-trust-state" ||
+			decodedRecord.objectId !== material.objectId ||
+			decodedRecord.genesisAnchorDigest !== material.genesisAnchorDigest ||
+			decodedRecord.profileId !== "creator-trusted-v1" ||
+			decodedRecord.quorum !== 1 ||
+			compareBytes(profileBytes, material.exactCanonicalProfileBytes) !== 0 ||
+			compareBytes(signerSetBytes, material.exactCanonicalSignerSetBytes) !== 0
+		) {
+			return failure("CERTIFIED_VALUE_MISMATCH");
+		}
+		const anchorDigestBytes = hashDomain(registry.kinds.epochAnchor?.domain ?? "", anchorBytes);
+		const anchorDigest = hex(anchorDigestBytes);
+		if (
+			decodedRecord.currentAnchorDigest !== anchorDigest ||
+			decodedRecord.currentEpoch !== anchor.epoch ||
+			anchor.objectId !== material.objectId ||
+			!ed25519.verify(signature, anchorDigestBytes, material.publicKey, { zip215: false })
+		) {
+			return failure("CERTIFIED_VALUE_MISMATCH");
+		}
+		if ((anchor.epoch as number) > material.currentEpoch + 1) return failure("EPOCH_GAP");
+		if ((anchor.epoch as number) === material.currentEpoch && anchorDigest !== material.currentAnchorDigest) {
+			return failure("EPOCH_EQUIVOCATION");
+		}
+		if ((anchor.epoch as number) !== material.currentEpoch + 1) return failure("CERTIFIED_VALUE_MISMATCH");
+
+		const cutBytes = copyBytes(input.exactCanonicalCutValueBytes, undefined, 65_536);
+		const commitQcBytes = copyBytes(input.exactCanonicalCommitQcBytes, undefined, 65_536);
+		if (commitQcBytes === undefined || commitQcBytes.byteLength === 0) return failure("COMMIT_QC_REQUIRED");
+		if (cutBytes === undefined) return failure("CERTIFIED_VALUE_MISMATCH");
+		const cut = exactCanonicalRecord(cutBytes, "cutValue");
+		if (cut === undefined) return failure("CERTIFIED_VALUE_MISMATCH");
+		const opened = openSealAuthority({ signerPublicKey: material.publicKey, trust: currentTrust });
+		if (!opened.ok) return failure("COMMIT_QC_REJECTED");
+		const verified = verifySealQC({ authority: opened.authority, exactCanonicalQcBytes: commitQcBytes });
+		if (!verified.ok) return failure("COMMIT_QC_REJECTED");
+		if (verified.phase !== "commit") return failure("COMMIT_QC_REQUIRED");
+		const valueDigest = hex(hashDomain(registry.kinds.cutValue?.domain ?? "", cutBytes));
+		if (verified.valueDigest !== valueDigest) return failure("CERTIFIED_VALUE_MISMATCH");
+		const currentAnchor = exactCanonicalRecord(material.exactCanonicalCurrentAnchorPreimageBytes, "epochAnchor");
+		if (currentAnchor === undefined || compareBytes(successorAnchor(currentAnchor, cut), anchorBytes) !== 0) {
+			return failure("CERTIFIED_VALUE_MISMATCH");
+		}
+		const trust = mintCreatorAnchorTrustSuccessor(currentTrust, anchorBytes, signature);
+		return trust === undefined ? failure("CERTIFIED_VALUE_MISMATCH") : Object.freeze({ ok: true as const, trust });
+	} catch {
+		return failure("CERTIFIED_VALUE_MISMATCH");
+	}
+}
+		const openedTransport = input.openTransport(input.objectId);
+		transport = openedTransport;
+		if (input.successorSnapshotDeclaration === undefined) {
+			if (recovered === undefined) throw new TypeError("v3 room recovered genesis custody is unavailable");
+			const activated = activateV3LivePlane({
+				capability: recovered.capability,
+				messageQueueManager,
+				networkNode: openedTransport.networkNode,
+				onAdmittedVertex: admittedSink as unknown as V3AdmittedVertexSink,
+			});
+			if (!activated.ok) throw new TypeError(`v3 room activation failed: ${activated.kind}`);
+			activeHandle = activated.handle as RoomPlaneHandle;
+		} else {
+			const snapshotStore = await createBrowserSnapshotQuarantineStore({
+				primaryDatabaseName: input.databaseName,
+			});
+			creatorCloseStoreClosers.push(snapshotStore.close);
+			const reopened = await reopenCreatorSuccessorAdoption({
+				authenticationProfile: "creator-only",
+				author: input.author,
+				catalog: input.application.catalog,
+				detachedSignature: material.detachedGenesisSignature,
+				exactCanonicalAnchorPreimageBytes: material.exactCanonicalGenesisAnchorPreimageBytes,
+				exactCanonicalParametersCarrierBytes: material.exactCanonicalParametersCarrierBytes,
+				issuanceStore,
+				liveJournalStore: journalStore,
+				messageQueueManager,
+				networkNode: openedTransport.networkNode,
+				onAdmittedVertex: admittedSink as unknown as V3AdmittedVertexSink,
+				pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest,
+				signRegisteredVertexDigest: input.signRegisteredVertexDigest,
+				snapshotDeclaration: input.successorSnapshotDeclaration,
+				snapshotStore,
+				store: aheStores[0],
+			});
+			if (reopened.ok !== true) {
+				throw new TypeError(`v3 room successor reopen failed: ${String(reopened.kind)}: ${String(reopened.detail)}`);
+			}
+			activeHandle = reopened.handle as RoomPlaneHandle;
+			successorProjectionAuthority = successorAuthority(reopened.trust, activeHandle);
+		}
+====
+			const installed = await trustStore.install({
+				detachedGenesisSignature: selected.detachedGenesisSignature,
+				exactCanonicalGenesisAnchorPreimageBytes: selected.exactCanonicalGenesisAnchorPreimageBytes,
+				exactCanonicalProfileBytes: selected.exactCanonicalProfileBytes,
+				exactCanonicalSignerSetBytes: selected.exactCanonicalSignerSetBytes,
+				pinnedGenesisAnchorDigest: selected.pinnedGenesisAnchorDigest,
+			});
+			if (fresh && !installed.ok) {
+				throw new TypeError("v3 room migration target is already reserved");
+			}
+			if (!installed.ok && installed.reason !== "already-installed") {
+				throw new TypeError(`v3 room trust installation failed: ${installed.reason}`);
+			}
+			const openedTrust = installed.ok ? installed : await trustStore.open();
+			if (!openedTrust.ok || openedTrust.trust.profileId !== "creator-trusted-v1") {
+				throw new TypeError("v3 room verified trust profile is invalid");
+			}
+			const prepared = await prepareV3LiveGeneration({
+				authenticationProfile: "creator-only",
+				store,
+				objectId: selectedObjectId,
+				pinnedGenesisAnchorDigest: selected.pinnedGenesisAnchorDigest,
+				exactCanonicalAnchorPreimageBytes: selected.exactCanonicalGenesisAnchorPreimageBytes,
+				detachedSignature: selected.detachedGenesisSignature,
+				exactCanonicalParametersCarrierBytes: selected.exactCanonicalParametersCarrierBytes,
+				catalog: input.application.catalog,
+			});
+			if (!prepared.ok) throw new TypeError(`v3 room preparation failed: ${prepared.kind}`);
+			return prepared;
+		};
+		let prepared = await prepareMaterial(material, aheStore, requireFreshTrust);
+		let sourceAheStore: Awaited<ReturnType<typeof createBrowserAheDurableStore>> | undefined;
+		let sourcePrepared: Extract<Awaited<ReturnType<typeof prepareV3LiveGeneration>>, { readonly ok: true }> | undefined;
+		if (sourceMaterial !== undefined) {
+			sourceAheStore = await createBrowserAheDurableStore({
+				databaseName: `${input.databaseName}--rebase-${sourceMaterial.pinnedGenesisAnchorDigest}--ahe`,
+			});
+			aheStores.push(sourceAheStore);
+			sourcePrepared = await prepareMaterial(
+				sourceMaterial,
+				sourceAheStore,
+{
+  "verdict": "APPROVED",
+  "summary": "Authenticated signed/pushed docs-only checkpoint 2291725250ff60ae5784ef53acf761e494f57409 (parent 2b3080d6562881ecd2a129dc3d896e9e9a86650d). The gap is real: openCurrentAnchorTrust requires epoch 0 and currentDigest==genesisDigest; openCreatorSuccessorTrust needs a held predecessor capability; mintCreatorAnchorTrustSuccessor is protocol-v3 WeakMap custody and is not a package export; inspectCreatorTrustAdvance.exactCombinedClosure drops only the old trust and appends successor trust plus Cut/QC, so prior proof refs accumulate. openCreatorCheckpointTrust’s closed statement binds pin-authenticated genesisTrust, fixed profile/signer-set, predecessor and current v1 records, adjacent epochs, previousAnchor, current Cut/QC, successor derivation, and a caller-copied expected (objectId,epoch,currentAnchorDigest) before minting opaque current trust and never returning transient predecessor trust; latestness is not taken from room storage. Immediate predecessor is justified and sufficient: openSealAuthority/verifySealQC bind qc.epoch and cut.previousAnchor to predecessor epoch/anchor, so a genesis-only signature path cannot reuse existing QC verification; missing predecessor is fail-closed availability inside the two-Superseded-generation window, not a new trust root. inspectBoundedCreatorTrustAdvance is the exact set-algebra (current − currentTrust − retiring Cut/QC + successorTrust + new Cut/QC, unrelated refs preserved) that leaves one active trust plus one transition pair; 0→1 keeps inspectCreatorTrustAdvance. Rollback/deletion requires authenticated install, 0b0 floor commit, two complete Superseded generations, and D.109 gates; crash retains too much. Floor remains the sole latestness authority; Phase 7 still owns new-client delivery. New non-root subpaths are an explicit public-contract addition with no wire/schema/crypto/authority/threshold/provider/product/migration expansion. TDD order (0b0b freeze → a/b → 0b1 RED on genuine 0→1→2, no fixture epoch-2 mint) is causal. WRAPS remains genesis-descent/key-lineage under its setup, not latestness; no chain-wide consensus or recursive-proof dependency is implied. One non-blocking footgun: the earlier 0b retention sketch still says the active generation holds genesis+current trust records, which would violate inspectTrustClosure; 0b0b’s exactly-one law controls.",
+  "findings": [
+    {
+      "severity": "P2",
+      "title": "Pre-0b0b two-trust active-generation sketch must not be implemented",
+      "evidence": "docs/production-hardening/production-hardening-tdd-plan-v2.md:91759-91764 still says epoch-N active generation retains one pin-verifiable genesis trust record and one current trust record. 0b0b at 93092-93124 and 93140-93143 freezes exactly one active trust, caller-held genesisTrust (invite already carries genesis preimage/signature/profile/signer-set), and predecessor bytes in newest Superseded rollback. Two drp-anchor-trust-state members would fail inspectTrustClosure (anchor-trust.ts:404-406).",
+      "required_action": "Owner: D.110c-a/b close/adoption composition (consumed by D.110c-0b1). Implement 0b0b’s exactly-one active-trust law; do not add a second genesis trust record to the active closure. Do not rewrite accepted 0b prose."
+    }
+  ],
+  "counts": { "P0": 0, "P1": 0, "P2": 1 },
+  "next_slice": "D110C_0B0B_ACCEPTED"
+}
+{
+  "verdict": "APPROVED",
+  "summary": "Checkpoint authenticated: commit 22917252 carries tree 3bbf0091 with parent 2b3080d6, a valid GPG signature (Faolain, key 761B99CEA81C6289), and a plan-only diff (production-hardening-tdd-plan-v2.md plus .logs evidence). All source claims in the D.110c-0b0b section verified against local production code. (1) Gap is real: openCurrentAnchorTrust enforces currentEpoch===0 and pinned-genesis digest equality (packages/protocol-v3/src/index.ts:1438-1452); openCreatorSuccessorTrust requires an already-held predecessor capability and epoch exactly +1 (packages/protocol-v3/src/creator-close.ts:559-643); CurrentAnchorTrust minting is WeakMap-custody private to protocol-v3 (index.ts:828-846, creatorAnchorTrustSuccessorMinter internal symbol); inspectCreatorTrustAdvance's exactCombinedClosure retains every current ref except the old trust and adds the successor trust plus both proof refs, so CutValue/QC pairs accumulate O(N) (packages/control-plane/src/creator-trust-advance.ts:88-99). (2) The frozen openCreatorCheckpointTrust contract is complete and non-circular: it binds the pinned genesis capability, byte-identical profile/signer-set carriers, both creator signatures, exact adjacent epochs, previousAnchor lineage, current CutValue/commit QC, successor derivation, and a caller-copied expected tuple, returns only the current trust, and takes no store/AHE input. (3) Requiring the immediate predecessor record is justified under the fixed-creator model: it authenticates the previousAnchor link against held bytes and supplies the QC authority context; its availability obligation is bounded by the two-generation Superseded law and fails closed, so it is not circular, unsafe, or incompatible. (4) inspectBoundedCreatorTrustAdvance's retire/install semantics are deterministic and match the existing exactCombinedClosure idiom, with fail-closed handling of omission, substitution, duplication, extra deletion, and retained retiring refs. (5) The two-complete-Superseded rollback law keeps the epoch-(N-1) record available for every epoch-N reopen and gates deletion behind authenticated install, floor commit, and D.109 gates; crashes retain too much, never too little. (6) Freshness honesty is preserved: the 0b0 floor remains the sole latestness authority, stale-but-authentic checkpoints are rejected via the expected tuple, and brand-new-client floor delivery stays Phase 7. (7) Scope is clean: two non-root subpath exports follow the existing convention (protocol-v3 ./creator-close, control-plane ./creator-trust-advance), reuse the v1 schema, and add no wire/authority/dependency/threshold/migration change; root exports and the package smoke-test forbidden list remain untouched. (8) TDD causality is correct: design acceptance is sequenced after 0b0 RED/GREEN and before a/b production edits; 0b1 RED consumes the genuine 0→1→2 path and never fixture-mints epoch 2. (9) Adversarial/retained gates, the 100-transition census deferred to D.110c-d, archive separation, and restart boundaries are explicitly owned. (10) Hedera comparison verified: hip and crypto clones sit at the pinned commits, and all six newly recorded consensus blob hashes (V0730HistorySchema, WrapsMpcStateMachine, ProofControllerImpl, RosterTransitionWeights, TssConfig, DefaultSignedStateValidator) match files at the audited head 1aa1d6c1, consistent with the byte-identical refresh claim; the WRAPS characterization (genesis-descent lineage, not latestness) remains correctly limited.",
+  "findings": [],
+  "counts": { "P0": 0, "P1": 0, "P2": 0 },
+  "next_slice": "D110C_0B0B_ACCEPTED"
+}
+{"verdict":"CHANGES_REQUIRED","summary":"Reviewed the D.110c-0b0b section (plan lines 93065-93222, with 0b umbrella context at 91736-91888) against the local sources it cites. Note on authentication: no shell/git tool was available and the worktree gitdir is outside my permitted read scope, so I authenticated the checkpoint from the supplied clean detached checkout (HEAD 22917252, parent 2b3080d6, clean status) and reviewed its content; the tree SHA was not independently recomputable. Claim 1 is verified real: openCurrentAnchorTrust rejects any record with currentEpoch !== 0 or currentAnchorDigest !== genesisAnchorDigest (packages/protocol-v3/src/index.ts:1437-1438,1404-1405); successor minting is symbol-keyed private custody requiring an already-held predecessor capability (index.ts:1668-1717, internal/seal-authority-custody.ts, not in package.json exports), so Node cannot mint epoch-N trust privately; and inspectCreatorTrustAdvance's exactCombinedClosure removes only the old trust ref and appends the new trust plus two proof refs, retaining every earlier CutValue/QC pair (packages/control-plane/src/creator-trust-advance.ts:88-99,161-167) — the O(N) owner. The selected boundaries are non-root additions consistent with existing subpath precedent (protocol-v3 ./creator-close, control-plane ./creator-trust-advance) and add no wire field, record version, dependency, threshold, authority, or migration; root rosters (protocol-v3 package.json smoke:public-package) are untouched. The opener's authentication statement is non-circular: the predecessor is pinned by the authenticated current anchor's previousAnchor, and the QC is intrinsically bound to the predecessor's (objectId, epoch) via openSealAuthority/verifySealQC (seal.ts:303-321,450-460) with the cut fixed by successorAnchor byte equality (creator-close.ts:203-225,632-637); requiring the predecessor is conservative rather than unsafe, so criterion 3 yields no P1. Freshness honesty, archive separation, TDD ordering (0b0b design acceptance before a/b product RED, 0b1 RED/GREEN on the genuine 0->1->2 path), and the limited Hiero/WRAPS conclusion are internally consistent; upstream clones were not re-readable under this permission scope and the mechanical refresh was not required. One blocking gap remains: the frozen opener's first input (a pin-authenticated epoch-0 genesisTrust) has no named source that survives the design's own retention law at epoch N>=2.","findings":[{"severity":"P1","title":"Frozen epoch-N opener requires an epoch-0 genesisTrust with no named source beyond epoch 1","evidence":"Plan 93096-93100 makes 'one already pin-authenticated epoch-0 genesisTrust' the first closed input, and 93140-93145 states active epoch N retains only the current trust record plus the N-1->N Cut/QC and two Superseded rollback generations. Minting that capability requires the full epoch-0 trust-state record bytes (packages/protocol-v3/src/index.ts:1375-1405). The only production owner of those bytes is the epoch-0 generation closure (packages/control-plane/src/anchor-trust.ts:535-612 install/openAtHead), and control-plane forbids a second trust record per closure (anchor-trust.ts:404-406 'trust-state-ambiguous'), so genesis cannot ride along in the active closure. Per the real lineage used by cold reopen (packages/node/src/creator-adoption.ts:914-962), each transition advances two generations (adoption, then successor-live), so at epoch 2 the retained window is live(2)/adoption(2)/live(1) and the genesis generation and its blob are outside the active+two-Superseded window and eligible for deletion (packages/node/src/internal/closed-epoch-cleanup.ts:270-341; packages/storage/src/maintenance.ts:404-433 with deleteBlobDigests). Existing production caller input carries only the genesis anchor preimage and its signature (packages/node/src/v3-live.ts:134-143,2156-2178), not the assembled record. Plan 91760-91761 (0b) conversely asserts the active generation retains both a genesis and a current trust record, which the unchanged inspectTrustClosure rejects; 0b0b keeps that function unchanged (91801-91804).","required_action":"Documentation-only correction to the frozen 0b0b contract (no API/wire/authority widening): name the O(1) owner and retention/delivery path of the pinned genesis carrier at epoch N>=2 — either (a) an explicitly retained durable epoch-0 trust-state blob added to the retention law and the D.110c-c/d durable census, or (b) reduce the frozen input to the already caller-held pinned genesis anchor preimage plus the profile/signer-set carriers taken from the authenticated records, stating explicitly why carrier substitution is safe (genesis anchor commits profileDigest/signerSetDigest and its digest equals the pin) — and reconcile the 91760-91761 wording with the enforced one-trust-record closure law."},{"severity":"P2","title":"Predecessor-location sentence is off-by-one and the window margin is unstated","evidence":"Plan 93143-93145 says the immediate predecessor trust record 'resides in the newest of exactly two complete Superseded rollback generations'. Per packages/node/src/creator-adoption.ts:919-946 the predecessor trust record is read from currentGeneration, the older of the two retained Superseded closures (the newest Superseded holds the current trust plus the transition pair), and packages/node/src/internal/closed-epoch-cleanup.ts:279-297 retains exactly active plus two Superseded, leaving zero margin against any additional head-advancing generation.","required_action":"Restate the law with the exact generation-to-epoch mapping and the load-bearing invariant it depends on (bounded head-advancing generations per epoch; reclamation may never evict the closure carrying the immediate predecessor trust record). Disposition owner: D.110c-0b1 GREEN retention law, with the census carried into D.110c-c/d."},{"severity":"P2","title":"Opener statement omits explicit objectId and genesisAnchorDigest equality across the three records","evidence":"Plan 93101-93108 requires byte-identical profile/signer-set carriers, both creator signatures, adjacent epochs, previous-anchor linkage, cut/QC, successor derivation, and the copied expected tuple, but never states objectId or genesisAnchorDigest equality between genesisTrust, the predecessor record, and the current record. Both existing precedents check them (packages/protocol-v3/src/index.ts:1403-1405; packages/protocol-v3/src/creator-close.ts:596-597), and the adversarial gate list at 93170-93171 assumes cross-room/cross-genesis rejection.","required_action":"Add the two explicit equalities (objectId and genesisAnchorDigest of both records equal to the genesis trust material) to the frozen authentication statement and to the 0b1 RED vectors. Disposition owner: D.110c-0b0b design text, enforced by D.110c-0b1 RED."},{"severity":"P2","title":"Bounded advance accepts caller-declared retiring refs without a stated derivation binding","evidence":"Plan 93113-93122 defines inspectBoundedCreatorTrustAdvance as a structural delta over {current,proofRefs,proposed,retiringProofRefs} after the Node/protocol owner 'has identified the current transition pair'; 'non-current' rejection is not defined, and refs alone cannot distinguish a transition pair from any other preserved ref. Closure candidates already carry scannable bytes for every ref (packages/control-plane/src/anchor-trust.ts:390-406), so kind/epoch confirmation is available.","required_action":"State that retiringProofRefs must be derived from the digests of the authenticated prior-transition CutValue/commit-QC bytes, and/or that the predicate confirms via candidates that they decode to exactly one drp-hard-epoch-cut and one drp-seal-qc bound to the retiring epoch. Disposition owner: D.110c-0b1 GREEN (control-plane boundary plus Node composition)."}],"counts":{"P0":0,"P1":1,"P2":3},"next_slice":"D110C_0B0B_CORRECTION_REQUIRED"}
+====
+{
+  "classification": "NO_VERDICT",
+  "duration_seconds": 630.282,
+  "events": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0b0b-design-review-22917252/grok/events.jsonl",
+  "exit_code": 0,
+  "public": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0b0b-design-review-22917252/grok/public.txt",
+  "stop_reason": "end_turn",
+  "timed_out": false
+}
+58552:from the pinned creator genesis, the owner opens only the genesis record with
+93294:`genesisTrust` capability after the retention law had allowed the epoch-0

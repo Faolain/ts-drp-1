@@ -6,6 +6,7 @@ import {
 	type DRPNetworkHostConfigSnapshot,
 	type DRPNetworkHostFactory,
 	DRPNetworkNode,
+	extractSanitizedRtcEvidence,
 } from "@ts-drp/network";
 import { DRPNode } from "@ts-drp/node";
 import {
@@ -26,7 +27,6 @@ import {
 	type SignedDrpRecordV1,
 } from "@ts-drp/rendezvous";
 import { type BrowserRouting, type BrowserRoutingTrace, createBrowserRouting } from "@ts-drp/routing-browser";
-import { ActionType, type IDRP, type ResolveConflictsType, SemanticsType, type Vertex } from "@ts-drp/types";
 import type { Libp2p } from "libp2p";
 
 import { HttpGridRegistryEndpoint } from "./http-directory.js";
@@ -62,11 +62,11 @@ const REFUSAL_RELAYS = [
 	},
 ] as const;
 const RELAY_FIXTURES = [PRIMARY_RELAY, REPLACEMENT_RELAY, ...REFUSAL_RELAYS] as const;
-let activeGridMovementLog: GridBrowserTrace["movements"][number][] | undefined;
 
 export type GridBrowserScenario = "exhaustion" | "success";
 
 export interface GridBrowserTrace {
+	readonly invite: string;
 	readonly antiCheat: {
 		readonly preAuthPxCandidates: number;
 		readonly topologyDialAttempts: number;
@@ -128,6 +128,8 @@ export interface GridBrowserPeerSession {
 }
 
 export interface GridBrowserFixtureOptions {
+	readonly privateKeySeed: string;
+	application(node: DRPNode, movements: GridBrowserTrace["movements"][number][]): GridFixtureApplication;
 	readonly namespace?: string;
 	readonly objectId?: string;
 	readonly role: "creator" | "joiner";
@@ -135,21 +137,88 @@ export interface GridBrowserFixtureOptions {
 	readonly scenario: GridBrowserScenario;
 }
 
+/** Application-owned v3 lifecycle; transport never constructs portable authority. */
+export interface GridFixtureApplication {
+	readonly enrollment: string;
+	readonly invite: string;
+	create(enrollment: string): Promise<string>;
+	join(invite: string): Promise<string>;
+	moveUser(actor: string, direction: "D" | "L" | "R" | "U"): void;
+	position(actor: string): { readonly x: number; readonly y: number } | undefined;
+	close(): Promise<void>;
+}
+
+export interface GridBrowserPeerPreparation {
+	readonly enrollment: string;
+	start(input: {
+		readonly memberEnrollment?: string;
+		readonly invite?: string;
+		readonly namespace?: string;
+		readonly objectId?: string;
+	}): Promise<GridBrowserPeerSession>;
+	stop(): Promise<void>;
+}
+
 /**
- * Starts exactly one production DRP peer in the calling page. Creator and
- * joiner pages coordinate only through the signed HTTP registry and libp2p.
- * @param options
+ * Prepare real identity and application enrollment before creator genesis signing.
+ * @param options Selected transport policy and genuine application owner.
+ * @returns A staged, already started native network peer.
  */
-export async function createGridBrowserPeer(options: GridBrowserFixtureOptions): Promise<GridBrowserPeerSession> {
-	const namespace = options.namespace ?? createOpaqueNamespaceV1(crypto.getRandomValues(new Uint8Array(24)));
-	const objectId = options.objectId ?? `grid-${crypto.randomUUID()}`;
-	if (options.role === "joiner" && (options.namespace === undefined || options.objectId === undefined)) {
-		throw new Error("joiner requires only the namespace and object ID from the creator link");
-	}
+export async function prepareGridBrowserPeer(options: GridBrowserFixtureOptions): Promise<GridBrowserPeerPreparation> {
 	const rtcCapture = captureRtcPeerConnections();
 	const relayTraffic = captureRelayWebSocketTraffic();
 	const movements: GridBrowserTrace["movements"][number][] = [];
-	const runtime = createProductionRuntime(options.role, objectId, rtcCapture, relayTraffic, movements);
+	const runtime = createProductionRuntime(options, rtcCapture, relayTraffic, movements);
+	try {
+		await runtime.nodePort.start();
+		const application = runtime.grid;
+		if (application === undefined) throw new Error("v3 grid application did not initialize");
+		let entered = false;
+		return {
+			enrollment: application.enrollment,
+			async start(input): Promise<GridBrowserPeerSession> {
+				if (entered) throw new Error("grid preparation already entered");
+				entered = true;
+				return startPreparedGridBrowserPeer({ ...options, ...input }, runtime, rtcCapture, relayTraffic, movements);
+			},
+			async stop(): Promise<void> {
+				await runtime.nodePort.stop();
+				rtcCapture.stop();
+				relayTraffic.stop();
+			},
+		};
+	} catch (error) {
+		await runtime.nodePort.stop().catch(() => undefined);
+		rtcCapture.stop();
+		relayTraffic.stop();
+		throw error;
+	}
+}
+
+/**
+ * Starts exactly one production DRP peer in the calling page. Creator and
+ * joiner pages coordinate only through the signed HTTP registry and libp2p.
+ * @param options Prepared peer identity and selected scenario.
+ * @param runtime Started native network and application owners.
+ * @param rtcCapture Actual browser WebRTC observation.
+ * @param relayTraffic Actual relay traffic observation.
+ * @param movements Detached application movement evidence.
+ * @returns The one activated current Grid peer.
+ */
+async function startPreparedGridBrowserPeer(
+	options: GridBrowserFixtureOptions & { readonly memberEnrollment?: string; readonly invite?: string },
+	runtime: ProductionRuntime,
+	rtcCapture: RtcCapture,
+	relayTraffic: RelayTrafficCapture,
+	movements: GridBrowserTrace["movements"][number][]
+): Promise<GridBrowserPeerSession> {
+	const namespace = options.namespace ?? createOpaqueNamespaceV1(crypto.getRandomValues(new Uint8Array(24)));
+	let objectId = options.objectId ?? "";
+	if (options.role === "joiner" && (options.namespace === undefined || options.objectId === undefined)) {
+		throw new Error("joiner requires only the namespace and object ID from the creator link");
+	}
+	runtime.memberEnrollment = options.memberEnrollment;
+	runtime.creatorInvite = options.invite;
 	const directory = createDirectory(namespace, runtime.network.peerId);
 	const relay = createRelayPort(runtime, options.role === "joiner" ? options.scenario : "success");
 	let direct: DirectTransportProof | undefined;
@@ -195,6 +264,7 @@ export async function createGridBrowserPeer(options: GridBrowserFixtureOptions):
 
 	if (options.role === "creator") {
 		const created = await coordinator.startCreator(AbortSignal.timeout(15_000));
+		objectId = created.objectId;
 		record = created.record;
 		recordValidation = await validateFixtureRecord(record, namespace);
 		if (recordValidation !== "accepted") throw new Error(`registered creator record rejected: ${recordValidation}`);
@@ -241,7 +311,7 @@ export async function createGridBrowserPeer(options: GridBrowserFixtureOptions):
 					() => {
 						const pc = rtcCapture.outboundPeerConnections()[0];
 						return pc?.connectionState === "connected" &&
-							runtime.network.getGroupPeers(objectId).some((peer) => peer !== runtime.network.peerId)
+							runtime.nodePort.networkNode.getGroupPeers(objectId).some((peer) => peer !== runtime.network.peerId)
 							? true
 							: undefined;
 					},
@@ -283,6 +353,7 @@ export async function createGridBrowserPeer(options: GridBrowserFixtureOptions):
 					? successAssertions(runtime, direct, recovery, movements)
 					: exhaustionAssertions(fallbackInitiatedAtMs, relay.lastResult);
 			return {
+				invite: runtime.grid?.invite ?? "",
 				antiCheat: { ...runtime.antiCheat },
 				assertions,
 				bootstrapPeers: [],
@@ -329,16 +400,6 @@ async function setRelayFixtureRunning(peerId: string, running: boolean): Promise
 	if (!response.ok) throw new Error(`relay fixture control returned HTTP ${response.status}`);
 }
 
-/**
- * Compatibility wrapper used only by non-cross-page callers.
- * @param options
- * @deprecated Prefer createGridBrowserPeer so one page owns one peer.
- */
-export async function createGridBrowserFixture(options: GridBrowserFixtureOptions): Promise<GridBrowserTrace> {
-	const session = await createGridBrowserPeer(options);
-	return session.snapshot();
-}
-
 interface CircuitListenHost extends Libp2p {
 	readonly components: {
 		readonly transportManager: {
@@ -357,7 +418,9 @@ interface AntiCheatCounters {
 interface ProductionRuntime {
 	readonly antiCheat: AntiCheatCounters;
 	connect(address: string | readonly string[]): Promise<void>;
-	grid?: FixtureGrid;
+	grid?: GridFixtureApplication;
+	memberEnrollment: string | undefined;
+	creatorInvite: string | undefined;
 	readonly host: CircuitListenHost;
 	readonly network: DRPNetworkNode;
 	readonly node: DRPNode;
@@ -366,13 +429,12 @@ interface ProductionRuntime {
 }
 
 function createProductionRuntime(
-	role: "creator" | "joiner",
-	objectId: string,
+	options: GridBrowserFixtureOptions,
 	rtcCapture: RtcCapture,
 	relayTraffic: RelayTrafficCapture,
 	movements: GridBrowserTrace["movements"][number][]
 ): ProductionRuntime {
-	activeGridMovementLog = movements;
+	const role = options.role;
 	let host: CircuitListenHost | undefined;
 	let snapshot: DRPNetworkHostConfigSnapshot | undefined;
 	let topologyProbe = false;
@@ -415,10 +477,20 @@ function createProductionRuntime(
 			return (await deny?.(address)) ?? true;
 		},
 	};
-	const config = { bootstrap_peers: [], log_config: { level: "silent" as const } };
+	const config = {
+		bootstrap_peers: [],
+		// The bounded routing policy owns circuit reservations. A default
+		// /p2p-circuit search listener would acquire a competing reservation.
+		listen_addresses: ["/webrtc"],
+		log_config: { level: "silent" as const },
+	};
 	const network = new DRPNetworkNode(config, { hostFactory, hostPolicy });
 	const node = new DRPNode(
-		{ log_config: { level: "silent" }, network_config: config },
+		{
+			log_config: { level: "silent" },
+			network_config: config,
+			keychain_config: { private_key_seed: options.privateKeySeed },
+		},
 		{ networkNode: network, reconnect: false }
 	);
 	const runtime = {} as ProductionRuntime;
@@ -433,35 +505,37 @@ function createProductionRuntime(
 		return network.connect(typeof address === "string" ? address : [...address]);
 	};
 	const nodePort: GridNodePort = {
-		connectObject: async ({ id, sync }): Promise<GridObjectPort> => {
-			const object = await node.connectObject({
-				drp: new FixtureGrid(),
-				id,
-				...(sync === undefined ? {} : { sync }),
-			});
-			const grid = object.drp;
-			if (grid === undefined) throw new Error("joined production grid missing");
-			runtime.grid = grid;
-			grid.addUser(role);
+		connectObject: async ({ id }): Promise<GridObjectPort> => {
+			const grid = runtime.grid;
+			if (grid === undefined || runtime.creatorInvite === undefined)
+				throw new Error("signed v3 Grid invite is required");
+			const joinedId = await grid.join(runtime.creatorInvite);
+			if (joinedId !== id) throw new Error("signed v3 Grid invite names a different room");
 			return gridPort(id, grid, network.peerId, role);
 		},
-		createObject: async ({ id }): Promise<GridObjectPort> => {
-			const object = await node.createObject({ drp: new FixtureGrid(), id: id ?? objectId });
-			const grid = object.drp;
-			if (grid === undefined) throw new Error("created production grid missing");
-			runtime.grid = grid;
-			grid.addUser(role);
-			return gridPort(object.id, grid, network.peerId, role);
+		createObject: async (): Promise<GridObjectPort> => {
+			const grid = runtime.grid;
+			if (grid === undefined || runtime.memberEnrollment === undefined)
+				throw new Error("authenticated v3 Grid enrollment is required");
+			const id = await grid.create(runtime.memberEnrollment);
+			return gridPort(id, grid, network.peerId, role);
 		},
 		networkNode: {
 			connect,
 			getAllPeers: (): string[] => network.getAllPeers(),
-			getGroupPeers: (topic): string[] => network.getGroupPeers(topic),
+			getGroupPeers: (): string[] => {
+				// This fixture owns exactly one room. Select its actual installed v3
+				// topic; a control/discovery subscription cannot stand in for live mesh.
+				const topics = network.getSubscribedTopics().filter((topic) => topic.startsWith("drp/v3/1/"));
+				if (topics.length > 1) throw new Error("Grid fixture owns multiple live topics");
+				return topics[0] === undefined ? [] : network.getGroupPeers(topics[0]);
+			},
 			get peerId(): string {
 				return network.peerId;
 			},
 		},
 		start: async (): Promise<void> => {
+			if (runtime.grid !== undefined) return;
 			relayTraffic.markPeerStart();
 			rtcCapture.markPeerStart();
 			await node.start();
@@ -480,13 +554,25 @@ function createProductionRuntime(
 				topologyProbe = false;
 			}
 			Object.assign(runtime, { host: createdHost, snapshot: createdSnapshot });
+			runtime.grid = options.application(node, movements);
 		},
 		stop: async (): Promise<void> => {
-			await node.stop();
-			if (activeGridMovementLog === movements) activeGridMovementLog = undefined;
+			try {
+				await runtime.grid?.close();
+			} finally {
+				await node.stop();
+			}
 		},
 	};
-	Object.assign(runtime, { antiCheat, connect, network, node, nodePort });
+	Object.assign(runtime, {
+		antiCheat,
+		connect,
+		network,
+		node,
+		nodePort,
+		memberEnrollment: undefined,
+		creatorInvite: undefined,
+	});
 	return runtime;
 }
 
@@ -648,7 +734,7 @@ async function inspectDirectProof(
 	const baseline = await rtcCapture.baseline(pc);
 	const current = await waitForValue(
 		async () => {
-			const value = await rtcEvidence(pc);
+			const value = await extractSanitizedRtcEvidence(pc);
 			return value.bytesSent > baseline.sent && value.bytesReceived > baseline.received ? value : undefined;
 		},
 		5_000,
@@ -710,36 +796,12 @@ async function driveJoiner(runtime: ProductionRuntime, coordinator: ControlPlane
 	);
 }
 
-class FixtureGrid implements IDRP {
-	semanticsType = SemanticsType.pair;
-	readonly positions = new Map<string, { x: number; y: number }>();
-
-	addUser(actor: string): void {
-		if (!this.positions.has(actor)) this.positions.set(actor, { x: 0, y: 0 });
-	}
-
-	moveUser(actor: string, direction: "D" | "L" | "R" | "U"): void {
-		const position = this.positions.get(actor);
-		if (position === undefined) return;
-		if (direction === "R") position.x += 1;
-		if (direction === "L") position.x -= 1;
-		if (direction === "U") position.y += 1;
-		if (direction === "D") position.y -= 1;
-		if (actor === "creator" || actor === "joiner") {
-			activeGridMovementLog?.push({ actor, direction, x: position.x, y: position.y });
-		}
-	}
-
-	position(actor: string): { readonly x: number; readonly y: number } | undefined {
-		return this.positions.get(actor);
-	}
-
-	resolveConflicts(_vertices: Vertex[]): ResolveConflictsType {
-		return { action: ActionType.Nop };
-	}
-}
-
-function gridPort(id: string, grid: FixtureGrid, localPeerId: string, role: "creator" | "joiner"): GridObjectPort {
+function gridPort(
+	id: string,
+	grid: GridFixtureApplication,
+	localPeerId: string,
+	role: "creator" | "joiner"
+): GridObjectPort {
 	const actorFor = (actor: string): string => (actor === localPeerId ? role : actor);
 	return {
 		id,
@@ -867,46 +929,11 @@ function payloadBytes(data: string | ArrayBufferLike | Blob | ArrayBufferView): 
 	return data.byteLength;
 }
 
-async function rtcEvidence(pc: RTCPeerConnection): Promise<{
-	readonly bytesReceived: number;
-	readonly bytesSent: number;
-	readonly candidateTypes: DirectTransportProof["iceCandidateTypes"];
-	readonly dataChannelOpen: boolean;
-	readonly selectedPairId: string;
-}> {
-	const stats = await pc.getStats();
-	const pair = [...stats.values()].find(
-		(value) =>
-			value.type === "candidate-pair" &&
-			((value as RTCIceCandidatePairStats).nominated === true ||
-				(value as RTCIceCandidatePairStats).state === "succeeded")
-	) as (RTCIceCandidatePairStats & { localCandidateId?: string; remoteCandidateId?: string }) | undefined;
-	if (pair === undefined) throw new Error("selected RTC candidate pair missing");
-	const candidateTypes = [pair.localCandidateId, pair.remoteCandidateId].map((id) => {
-		if (id === undefined) throw new Error("selected RTC pair omitted a candidate ID");
-		const type = stats.get(id)?.candidateType;
-		if (type !== "host" && type !== "prflx" && type !== "relay" && type !== "srflx") {
-			throw new Error(`selected RTC pair reported unsupported candidate type ${String(type)}`);
-		}
-		return type;
-	});
-	const dataChannelOpen = [...stats.values()].some(
-		(value) => value.type === "data-channel" && (value as { state?: string }).state === "open"
-	);
-	return {
-		bytesReceived: pair.bytesReceived ?? 0,
-		bytesSent: pair.bytesSent ?? 0,
-		candidateTypes,
-		dataChannelOpen: dataChannelOpen || pc.sctp?.transport.state === "connected",
-		selectedPairId: pair.id,
-	};
-}
-
 async function selectedPairBytes(
 	pc: RTCPeerConnection | undefined
 ): Promise<{ readonly received: number; readonly sent: number }> {
 	if (pc === undefined) return { received: 0, sent: 0 };
-	const evidence = await rtcEvidence(pc);
+	const evidence = await extractSanitizedRtcEvidence(pc);
 	return { received: evidence.bytesReceived, sent: evidence.bytesSent };
 }
 
@@ -1005,7 +1032,7 @@ function isolatedSnapshot(snapshot: DRPNetworkHostConfigSnapshot): GridBrowserTr
 }
 
 function positionOrThrow(
-	grid: FixtureGrid | undefined,
+	grid: GridFixtureApplication | undefined,
 	actor: "creator" | "joiner"
 ): { readonly x: number; readonly y: number } {
 	const position = grid?.position(actor);
@@ -1013,7 +1040,7 @@ function positionOrThrow(
 	return { ...position };
 }
 
-function currentPositions(grid: FixtureGrid | undefined): GridBrowserTrace["positions"] {
+function currentPositions(grid: GridFixtureApplication | undefined): GridBrowserTrace["positions"] {
 	const creator = grid?.position("creator");
 	const joiner = grid?.position("joiner");
 	return {

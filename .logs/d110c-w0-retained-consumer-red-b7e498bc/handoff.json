@@ -1,0 +1,82 @@
+{
+  "status": "RED observation/assertion source and static freeze ready; zero runtime test executions; root release pending",
+  "baseline": "b7e498bcb4a4cd4ec7a7215cd151237e6ce005ec",
+  "sourcePatch": "red.patch",
+  "sourcePatchSha256": "de542f01a1eabbe1d215d10c2939150c55326d9510c62e3100d3e3f13483933a",
+  "sourceHashes": {
+    "packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs": "2486ee5e05f9f6cfcda21e7c268145a4ed16c23b768ada0b6783bd37673255a0",
+    "packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts": "f3d177abf638aa1711c4f63ebfe37e5196f98c5aefda6a59041e5c802e1d5de9",
+    "tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts": "44dc8f6ab301bbb2474a5e058e69e55546d99e6182e87a83e47958c7b64fcef5",
+    "tests/phase-6b-d110c-0b1-boundaries.test.ts": "5f0803176121ef6af6d3bf250fb992ab6bca3801b0e770cc2aa04b53b59be266",
+    "tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts": "5f7db7d9539acabefcdbd842f5833f5e41f790349f56c5045aa785b0ffdac1de",
+    "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts": "99e97911dada4795819dca5423f4d6bd4b851de6ee17b8e077c1766a8d6c01d8"
+  },
+  "sourceCommitted": false,
+  "static": {
+    "lintErrors": 0,
+    "lintWarnings": 0,
+    "formatPass": true,
+    "diffPass": true,
+    "sixOwnerObservationAssertionEquivalence": true,
+    "childImplementationByteIdentical": true,
+    "bothColdInputExpressionsUnchanged": true,
+    "typecheck": {
+      "classification": "baseline-equivalent typecheck, not whole-program pass",
+      "retainedDiagnostics": 26,
+      "newDiagnostics": 0,
+      "ownedDiagnostics": 3,
+      "inventory": "typecheck-delta-accepted.json",
+      "wholeProgramPass": false
+    }
+  },
+  "collection": {
+    "files": 14,
+    "cases": 51,
+    "inheritedCases": 46,
+    "addedCases": 2,
+    "supplementalCases": 3,
+    "result": "collection/stdout",
+    "authoritativeRoster": "runtime-roster.json",
+    "noDuplicateOrRelabeledIdentities": true
+  },
+  "custody": {
+    "protectedSources": 11,
+    "builtIdentities": 7,
+    "stashes": 27,
+    "protectedPaths": 86522,
+    "manifests": 41,
+    "inheritedInputs": 934,
+    "currentInputs": 942,
+    "allPreserved": true
+  },
+  "causalRed": {
+    "expensiveChild": "Historical boundedStoreShape:false retained failure; observation-only implementation equivalence; no heavy child replay.",
+    "checkpoint": "Historical TRUST_CLOSURE_INVALID and predecessor admission-rejected failures; new seven-case runtime not yet released.",
+    "currentSuccessorBootstrap": "Static-only same-input observer at failure-recovery site; no dynamic provenance claimed.",
+    "epochTwoBootstrap": "Dynamic provenance assertions written; not yet executed."
+  },
+  "proposedRedRuntime": {
+    "gate": "runtime-checkpoint",
+    "files": 2,
+    "cases": 7,
+    "budgetMs": 120000,
+    "predictedPassed": 4,
+    "predictedFailed": 3,
+    "released": false
+  },
+  "separateGreenOwners": [
+    "packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs",
+    "tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts",
+    "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts"
+  ],
+  "greenRequirements": [
+    "Spread real raw store before unchanged six overrides.",
+    "Authenticate unfiltered checkpoint/transition before projecting exact retirement and aggregate refs.",
+    "Supply the same originalBootstrap.operationBytes value at both cold-input sites; retain same-input observers.",
+    "Fresh GREEN source/input freeze, all 51 consumers including genuine skip-budget child once, then original W0 and retained gates with added cases distinguished."
+  ],
+  "corrections": "static-corrections.json",
+  "reviewersLaunched": 0,
+  "buildsLaunched": 0,
+  "testsExecuted": 0
+}

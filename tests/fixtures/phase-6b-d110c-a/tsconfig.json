@@ -1,0 +1,12 @@
+{
+	"extends": "../../../tsconfig.json",
+	"compilerOptions": {
+		"baseUrl": "../../..",
+		"composite": false,
+		"declaration": false,
+		"declarationMap": false,
+		"noEmit": true,
+		"target": "ES2022"
+	},
+	"files": ["creator-live-close-result-contract.ts"]
+}

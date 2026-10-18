@@ -1,0 +1,10 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "eslint",
+    "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts"
+  ],
+  "start": "2026-09-05T21:33:21.586Z"
+}

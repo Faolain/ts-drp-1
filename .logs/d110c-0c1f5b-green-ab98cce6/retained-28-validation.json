@@ -1,0 +1,75 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 5,
+  "passed": 5,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3h-v3-migration-record-red.test.ts",
+      "message": ""
+    }
+  ],
+  "topLevelErrors": [],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "ancestorTitles": [
+        "Phase 3h creator-owned migration record RED"
+      ],
+      "fullName": "Phase 3h creator-owned migration record RED keeps the activation decision distinct from the migration record",
+      "status": "passed",
+      "title": "keeps the activation decision distinct from the migration record",
+      "duration": 1.038833000000011,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 3h creator-owned migration record RED"
+      ],
+      "fullName": "Phase 3h creator-owned migration record RED derives one exact nonce-bound target object identity without caller selection",
+      "status": "passed",
+      "title": "derives one exact nonce-bound target object identity without caller selection",
+      "duration": 1.7213329999999871,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 3h creator-owned migration record RED"
+      ],
+      "fullName": "Phase 3h creator-owned migration record RED defines deterministic chat and zone application-state checkpoints",
+      "status": "passed",
+      "title": "defines deterministic chat and zone application-state checkpoints",
+      "duration": 1.3517089999999996,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 3h creator-owned migration record RED"
+      ],
+      "fullName": "Phase 3h creator-owned migration record RED rejects every duplicate chat or zone application identity before target creation",
+      "status": "passed",
+      "title": "rejects every duplicate chat or zone application identity before target creation",
+      "duration": 0.5039999999999907,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 3h creator-owned migration record RED"
+      ],
+      "fullName": "Phase 3h creator-owned migration record RED defines the exact closed migration record whose digest is content identity only",
+      "status": "passed",
+      "title": "defines the exact closed migration record whose digest is content identity only",
+      "duration": 1.2311659999999733,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ]
+}

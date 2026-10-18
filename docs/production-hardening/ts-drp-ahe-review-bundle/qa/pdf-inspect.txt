@@ -1,0 +1,27 @@
+PDF: /mnt/data/aec_review/report/rendered/ts-drp-history-at-scale-review.pdf
+Pages: 19
+Encrypted: False
+Page sizes (pt, rounded):
+  - 612 x 792 (19 page(s))
+Metadata:
+  /Author: OpenAI
+  /CreationDate: D:20260724180950Z'
+  /Creator: Writer
+  /Keywords: ts-drp, hashgraph, CRDT, compaction, snapshot, browser, IndexedDB, Merkle, BFT
+  /Producer: LibreOffice 25.2.3.2 (X86_64) / LibreOffice Community
+  /Subject: Browser-first compaction, snapshotting, checkpoints, and authenticated archives for ts-drp
+  /Title: ts-drp History at Scale: AEC v3.1 Review and Attested Hard Epochs Design
+Outline items: 90
+Form fields: 0
+Attachments: 0
+Annotations: 0
+
+Fonts (pdffonts, first 25 lines):
+name                                 type              encoding         emb sub uni object ID
+------------------------------------ ----------------- ---------------- --- --- --- ---------
+BAAAAA+LiberationSans-Bold           TrueType          WinAnsi          yes yes yes   1343  0
+CAAAAA+LiberationSans                TrueType          WinAnsi          yes yes yes   1333  0
+DAAAAA+LiberationSans-Italic         TrueType          WinAnsi          yes yes yes   1338  0
+EAAAAA+Carlito-Bold                  TrueType          WinAnsi          yes yes yes   1353  0
+FAAAAA+DejaVuSansMono                TrueType          WinAnsi          yes yes yes   1348  0
+GAAAAA+OpenSymbol                    TrueType          WinAnsi          yes yes yes   1358  0

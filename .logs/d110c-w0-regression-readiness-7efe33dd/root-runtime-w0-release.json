@@ -1,0 +1,9 @@
+{
+  "baseline": "7efe33dd350deab922c3fea7e9fcd1c968f4e474",
+  "gate": "runtime-w0",
+  "maxInvocations": 1,
+  "runtimeRosterSha256": "e7eddba484ad9aa2a659d2e3fafa2f8f4e0da7429351d14d6b292cdb91a114c4",
+  "sourcePatchSha256": "138cb170776d5f2af780375adc78fee0c9029776656579cd1fb190a8d6fadda4",
+  "scope": "Only the original seven-case W0 file once, 300000ms process ceiling with unchanged case timers. Immediate readiness/custody recheck. No retry, source edits, builds, reviewers, campaigns or later gates.",
+  "rootVerification": "Reviewed common, prepare and runtime scripts; independently verified exact historical and added 232-case collection, all 988 runtime inputs, 13 frozen artifacts, runtime binaries and exact full-index source patch."
+}

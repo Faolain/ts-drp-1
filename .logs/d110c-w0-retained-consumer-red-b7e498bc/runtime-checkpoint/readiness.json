@@ -1,0 +1,35 @@
+{
+  "checkedAt": "2026-09-06T10:55:00.564Z",
+  "head": "b7e498bcb4a4cd4ec7a7215cd151237e6ce005ec",
+  "signature": "G",
+  "indexEmpty": true,
+  "inputCount": 942,
+  "allInputsAndProtectedSourcesExact": true,
+  "runtimeBinariesExact": true,
+  "sourcePatchExact": true,
+  "stashes": 27,
+  "protectedPaths": 86522,
+  "manifestRoots": 41,
+  "inheritedProfilingAbsent": true,
+  "ports": [
+    {
+      "port": 4174,
+      "pids": []
+    },
+    {
+      "port": 4175,
+      "pids": []
+    },
+    {
+      "port": 51000,
+      "pids": []
+    },
+    {
+      "port": 51002,
+      "pids": []
+    }
+  ],
+  "processes": [],
+  "numericOnlyProcessInspection": true,
+  "noCompetingTaskProcesses": true
+}

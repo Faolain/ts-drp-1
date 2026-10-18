@@ -1,0 +1,20 @@
+{
+	"extends": "../../../tsconfig.json",
+	"compilerOptions": {
+		"baseUrl": "../../..",
+		"composite": false,
+		"declaration": false,
+		"declarationMap": false,
+		"exactOptionalPropertyTypes": true,
+		"noEmit": true,
+		"paths": {
+			"@ts-drp/canonical": ["packages/canonical/src/index.ts"]
+		},
+		"target": "ES2022"
+	},
+	"files": [
+		"browser-author-authorization-entry.ts",
+		"../../phase-3a1b-p6-author-authorization-browser.pw.ts",
+		"../../../playwright.phase-3a1b-p6-author-authorization.config.ts"
+	]
+}

@@ -1,0 +1,67 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 3,
+  "passed": 3,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-52/result.json",
+  "baselineSha256": "153ddeee6708ab02a7b1392c9e8d4a42e9399fd15aa7aacb19b4c3eed0535642",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f4 exact pinned-genesis bootstrap policy"
+      ],
+      "fullName": "D.110c-0c1f4 exact pinned-genesis bootstrap policy accepts only the four frozen recovery key combinations",
+      "status": "passed",
+      "title": "accepts only the four frozen recovery key combinations",
+      "duration": 131.40675,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f4 exact pinned-genesis bootstrap policy"
+      ],
+      "fullName": "D.110c-0c1f4 exact pinned-genesis bootstrap policy rejects malformed bounded policy bytes before consuming the prepared capability",
+      "status": "passed",
+      "title": "rejects malformed bounded policy bytes before consuming the prepared capability",
+      "duration": 53.72312499999998,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f4-bootstrap-policy.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f4 exact pinned-genesis bootstrap policy"
+      ],
+      "fullName": "D.110c-0c1f4 exact pinned-genesis bootstrap policy freezes the one shared exact predicate and its custody boundaries",
+      "status": "passed",
+      "title": "freezes the one shared exact predicate and its custody boundaries",
+      "duration": 2.340708000000177,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "4abdce316fe5b89a3c3562536f1ba4aa664cffffe1b0d1a1fa2a2a68feb289d8",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

@@ -10,10 +10,9 @@
 - [Update Pipelines](#update-pipelines)
 - [State Management](#state-management)
 
-
 ## Introduction
 
-A **DRPObject** represents a shared, real-time synchronized state within the Distributed Real-time Programs (DRP) network. It allows nodes (participants) to collaboratively modify state, ensuring eventual consistency, automatic conflict resolution, and decentralized finality. 
+A **DRPObject** represents a shared, real-time synchronized state within the Distributed Real-time Programs (DRP) network. It allows nodes (participants) to collaboratively modify state, ensuring eventual consistency, automatic conflict resolution, and decentralized finality.
 
 ### Characteristics
 
@@ -31,6 +30,7 @@ A **DRPObject** represents a shared, real-time synchronized state within the Dis
 - `FinalityStore`: Tracks the finality status of operations.
 
 Think of `DRPObject` as:
+
 - A function call interceptor.
 - A deterministic state transition machine.
 - A local CRDT + ACL + finality state snapshotter.
@@ -43,63 +43,64 @@ Defines the core properties and methods required to implement a **DRPObject**.
 
 ```typescript
 export interface IDRPObject<T extends IDRP> extends DRPObjectBase {
-  /** Unique identifier for the DRPObject instance */
-  readonly id: string;
+	/** Unique identifier for the DRPObject instance */
+	readonly id: string;
 
-  /** Access Control List (ACL) managing permissions for the object */
-  acl: IACL;
+	/** Access Control List (ACL) managing permissions for the object */
+	acl: IACL;
 
-  /** Application-specific DRP logic object */
-  drp?: T;
+	/** Application-specific DRP logic object */
+	drp?: T;
 
-  /** Array of vertices (operations) applied to this object */
-  vertices: Vertex[];
+	/** Array of vertices (operations) applied to this object */
+	vertices: Vertex[];
 
-  /** FinalityStore tracking the finalization status of vertices */
-  finalityStore: IFinalityStore;
+	/** FinalityStore tracking the finalization status of vertices */
+	finalityStore: IFinalityStore;
 
-  /**
-   * Retrieves DRP and ACL state associated with a specific vertex.
-   * @param vertexHash - Hash identifying the vertex.
-   * @returns Tuple containing `[DRPState, ACLState]`, undefined if state missing.
-   */
-  getStates(vertexHash: string): [DRPState | undefined, DRPState | undefined];
+	/**
+	 * Retrieves DRP and ACL state associated with a specific vertex.
+	 * @param vertexHash - Hash identifying the vertex.
+	 * @returns Tuple containing `[DRPState, ACLState]`, undefined if state missing.
+	 */
+	getStates(vertexHash: string): [DRPState | undefined, DRPState | undefined];
 
-  /**
-   * Sets the ACL state for a given vertex.
-   * @param vertexHash - Hash identifying the vertex.
-   * @param aclState - The ACL state to associate with this vertex.
-   */
-  setACLState(vertexHash: string, aclState: DRPState): void;
+	/**
+	 * Sets the ACL state for a given vertex.
+	 * @param vertexHash - Hash identifying the vertex.
+	 * @param aclState - The ACL state to associate with this vertex.
+	 */
+	setACLState(vertexHash: string, aclState: DRPState): void;
 
-  /**
-   * Sets the DRP state for a given vertex.
-   * @param vertexHash - Hash identifying the vertex.
-   * @param drpState - The DRP state to associate with this vertex.
-   */
-  setDRPState(vertexHash: string, drpState: DRPState): void;
+	/**
+	 * Sets the DRP state for a given vertex.
+	 * @param vertexHash - Hash identifying the vertex.
+	 * @param drpState - The DRP state to associate with this vertex.
+	 */
+	setDRPState(vertexHash: string, drpState: DRPState): void;
 
-  /**
-   * Subscribes a callback to be notified when the object state changes.
-   * @param callback - Function called upon state updates.
-   */
-  subscribe(callback: DRPObjectCallback<T>): void;
+	/**
+	 * Subscribes a callback to be notified when the object state changes.
+	 * @param callback - Function called upon state updates.
+	 * @returns An idempotent disposer for this exact callback.
+	 */
+	subscribe(callback: DRPObjectCallback<T>): () => void;
 
-  /**
-   * Applies a list of vertices (operations) to the local object state.
-   * Typically used for synchronizing remote state.
-   * @param vertices - Vertices to apply.
-   * @returns Result detailing applied/missing vertices.
-   */
-  applyVertices(vertices: Vertex[]): Promise<ApplyResult>;
+	/**
+	 * Applies a list of vertices (operations) to the local object state.
+	 * Typically used for synchronizing remote state.
+	 * @param vertices - Vertices to apply.
+	 * @returns Result detailing applied/missing vertices.
+	 */
+	applyVertices(vertices: Vertex[]): Promise<ApplyResult>;
 
-  /**
-   * @deprecated Use applyVertices instead.
-   * Merges a list of vertices into the local state.
-   * @param vertices - Vertices to merge.
-   * @returns Result detailing applied/missing vertices.
-   */
-  merge(vertices: Vertex[]): Promise<MergeResult>;
+	/**
+	 * @deprecated Use applyVertices instead.
+	 * Merges a list of vertices into the local state.
+	 * @param vertices - Vertices to merge.
+	 * @returns Result detailing applied/missing vertices.
+	 */
+	merge(vertices: Vertex[]): Promise<MergeResult>;
 }
 ```
 
@@ -109,18 +110,20 @@ The `DRPObject` is constructed using the following options:
 
 ```typescript
 interface DRPObjectOptions<T extends IDRP> {
-  peerId: string;                    // Required: Unique ID of the creating node
-  id?: string;                       // Optional: Explicit ID for the DRPObject (default derived from peerId)
-  acl?: IACL;                        // Optional: ACL instance managing access permissions (default permissionless)
-  drp: T;                            // Required: Application-specific DRP logic instance
-  config?: {                         // Optional: Configuration object
-    log_config?: LoggerOptions;      // Optional: Logger configuration
-    finality_config?: FinalityConfig;// Optional: Finality-related configuration
-  };
+	peerId: string; // Required: Unique ID of the creating node
+	id?: string; // Optional: Explicit ID for the DRPObject (default derived from peerId)
+	acl?: IACL; // Optional: ACL instance managing access permissions (default permissionless)
+	drp: T; // Required: Application-specific DRP logic instance
+	config?: {
+		// Optional: Configuration object
+		log_config?: LoggerOptions; // Optional: Logger configuration
+		finality_config?: FinalityConfig; // Optional: Finality-related configuration
+	};
 }
 ```
 
 The construction process:
+
 1. **Validation**: Confirms the required parameters (peerId, drp) are provided.
 
 2. **Object ID Initialization**: Generates a unique id from the provided peerId if an explicit id is not given.
@@ -129,11 +132,11 @@ The construction process:
 
 4. **HashGraph Setup**:
 
-  -  Initializes the HashGraph with the provided peerId.
+- Initializes the HashGraph with the provided peerId.
 
-  - Configures conflict resolution strategies using ACL and DRP methods.
+- Configures conflict resolution strategies using ACL and DRP methods.
 
-  - Sets the semantics type (semanticsType) from the provided DRP logic.
+- Sets the semantics type (semanticsType) from the provided DRP logic.
 
 5. **FinalityStore Setup**: Initializes tracking for the finalization status of vertices (operations).
 
@@ -146,14 +149,17 @@ The construction process:
 #### Core Methods
 
 1. **`get drp()`**
+
    - Retrieves the DRP logic object associated with this DRPObject.
    - **Returns:** `T | undefined` – The DRP instance or undefined if not set.
 
 2. **`get acl()`**
+
    - Retrieves the Access Control List (ACL) instance managing permissions.
    - **Returns:** `IACL` – The current ACL instance.
 
 3. **`get vertices()`**
+
    - Retrieves all vertices (operations) applied to the DRPObject.
    - **Returns:** `Vertex[]` – Array of vertices representing applied operations.
 
@@ -164,12 +170,14 @@ The construction process:
 #### State Management Methods
 
 5. **`getStates`**
+
    - Retrieves the ACL and DRP state snapshots for a given vertex hash.
    - **Parameters:**
      - `vertexHash: string` – Hash identifying the target vertex.
    - **Returns:** `[DRPState | undefined, DRPState | undefined]` – Tuple of ACL and DRP states.
 
 6. **`setACLState`**
+
    - Sets the ACL state snapshot associated with a given vertex hash.
    - **Parameters:**
      - `vertexHash: string` – Hash identifying the target vertex.
@@ -186,12 +194,13 @@ The construction process:
 #### Synchronization Methods
 
 8. **`applyVertices`**
+
    - Applies an array of vertices (remote operations) to synchronize the DRPObject.
    - **Parameters:**
      - `vertices: Vertex[]` – Vertices to apply.
    - **Returns:** `Promise<ApplyResult>` – Result detailing applied and missing vertices.
 
-9. **`merge`** *(deprecated)*
+9. **`merge`** _(deprecated)_
    - Deprecated method; use `applyVertices` instead.
    - Merges vertices into the DRPObject.
    - **Parameters:**
@@ -204,17 +213,16 @@ The construction process:
     - Subscribes a callback function to be invoked on object state changes.
     - **Parameters:**
       - `callback: DRPObjectCallback<T>` – Function invoked upon state updates.
-    - **Returns:** `void`
+    - **Returns:** `() => void` – Idempotently removes that exact callback.
 
-#### Internal Methods *(private)*
+#### Internal Methods _(private)_
 
-11. **`_notify`** *(internal use only)*
+11. **`_notify`** _(internal use only)_
     - Internally triggers subscribed callbacks after state changes.
     - **Parameters:**
       - `origin: string` – Origin of the notification event.
       - `vertices: Vertex[]` – Vertices triggering the notification.
     - **Returns:** `void`
-
 
 ### DRPObject Update Pipelines
 
@@ -292,19 +300,23 @@ Remote updates arrive as a set of vertices from peers. These are validated and m
    Finality tracking begins for newly applied vertices.
 
 8. **No Notification**  
-   Since the vertex originated remotely, subscribers are not notified.
+   After authenticated graph commit, subscribers are notified through the same
+   object-owned callback boundary used for local updates.
 
 ### Summary of Differences
 
 #### `callFnPipeline` (Local Updates)
+
 - Performs deep equality checks to detect no-op changes
 - Triggers local subscriber notifications after successful updates
 
 #### `applyVertices` (Remote Updates)
+
 - Skips already known vertices (deduplication)
-- Applies updates without notifying local subscribers
+- Applies authenticated updates and notifies local subscribers after graph commit
 
 #### Shared Logic in Both Pipelines
+
 - Validate operation structure and access permissions
 - Compute LCA and replay dependencies for consistent state
 - Execute and assign DRP/ACL state updates

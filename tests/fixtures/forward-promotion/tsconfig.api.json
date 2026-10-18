@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.fixture.json",
+  "files": ["api-contract.mts"],
+  "include": []
+}

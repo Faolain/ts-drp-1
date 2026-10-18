@@ -1,0 +1,75 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 5,
+  "passed": 5,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-differential-exit-red.test.ts",
+      "message": ""
+    }
+  ],
+  "topLevelErrors": [],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "ancestorTitles": [
+        "D.109f differential and Phase-6b exit RED"
+      ],
+      "fullName": "D.109f differential and Phase-6b exit RED freezes the exact RED and GREEN owner sets",
+      "status": "passed",
+      "title": "freezes the exact RED and GREEN owner sets",
+      "duration": 2.8370409999999993,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109f differential and Phase-6b exit RED"
+      ],
+      "fullName": "D.109f differential and Phase-6b exit RED runs all 128 deterministic archival-versus-compacted planner steps",
+      "status": "passed",
+      "title": "runs all 128 deterministic archival-versus-compacted planner steps",
+      "duration": 227.555292,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109f differential and Phase-6b exit RED"
+      ],
+      "fullName": "D.109f differential and Phase-6b exit RED freezes one sorted duplicate-free proof-kind registry",
+      "status": "passed",
+      "title": "freezes one sorted duplicate-free proof-kind registry",
+      "duration": 0.29691699999989396,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109f differential and Phase-6b exit RED"
+      ],
+      "fullName": "D.109f differential and Phase-6b exit RED deeply freezes the detached pruned-record error scope",
+      "status": "passed",
+      "title": "deeply freezes the detached pruned-record error scope",
+      "duration": 0.36429199999997763,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.109f differential and Phase-6b exit RED"
+      ],
+      "fullName": "D.109f differential and Phase-6b exit RED keeps the three GREEN defects confined to their named owners",
+      "status": "passed",
+      "title": "keeps the three GREEN defects confined to their named owners",
+      "duration": 0.6095000000000255,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ]
+}

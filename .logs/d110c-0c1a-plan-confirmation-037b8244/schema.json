@@ -1,0 +1,41 @@
+{
+	"type": "object",
+	"properties": {
+		"verdict": { "type": "string", "enum": ["APPROVED", "CHANGES_REQUIRED"] },
+		"summary": { "type": "string" },
+		"findings": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"properties": {
+					"severity": { "type": "string", "enum": ["P0", "P1", "P2"] },
+					"title": { "type": "string" },
+					"path": { "type": "string" },
+					"line": { "type": "integer", "minimum": 1 },
+					"evidence": { "type": "string" },
+					"required_action": { "type": "string" }
+				},
+				"required": ["severity", "title", "path", "line", "evidence", "required_action"],
+				"additionalProperties": false
+			}
+		},
+		"pending_liveness_closed": { "type": "boolean" },
+		"cross_epoch_pending_closed": { "type": "boolean" },
+		"lineage_bounds_closed": { "type": "boolean" },
+		"closure_law_closed": { "type": "boolean" },
+		"blocking_union_closed": { "type": "boolean" },
+		"next_state": { "type": "string", "enum": ["D110C_0C1A_RED_AUTHORIZED", "D110C_0C1A_PLAN_CORRECTION_REQUIRED"] }
+	},
+	"required": [
+		"verdict",
+		"summary",
+		"findings",
+		"pending_liveness_closed",
+		"cross_epoch_pending_closed",
+		"lineage_bounds_closed",
+		"closure_law_closed",
+		"blocking_union_closed",
+		"next_state"
+	],
+	"additionalProperties": false
+}

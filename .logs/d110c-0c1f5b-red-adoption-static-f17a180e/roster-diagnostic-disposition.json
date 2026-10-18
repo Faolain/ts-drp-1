@@ -1,0 +1,11 @@
+{
+  "initial": "freeze-combined-roster",
+  "status": 1,
+  "cause": "Literal-only AST scanner omitted it.skipIf(...)(D108D1A_HOT_BEHAVIOR, ...) in an accepted direct consumer.",
+  "classification": "DIAGNOSTIC_SCANNER_MISTAKE_NOT_SOURCE_COMPILER_OR_TEST_FAILURE",
+  "rootAuthorization": "Use corrected reporter-derived exact12/78 roster; retain initial scanner/status; freeze accepted title/fullName/file IDs and current source hashes. Actual GREEN reporters will confirm execution selection.",
+  "correction": "freeze-combined-roster-corrected",
+  "compilerExecutions": 1,
+  "noCompilerRuntimeOrListingRepeated": true,
+  "notClaimingStaticScanEqualsRuntimeListing": true
+}

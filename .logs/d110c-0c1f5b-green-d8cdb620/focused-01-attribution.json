@@ -1,0 +1,9 @@
+{
+  "classification": "Within-design production composition bug; not a RED/test/authority contract change",
+  "runtime": {"total":45,"passed":8,"failed":20,"filtered":17,"topLevelErrors":0},
+  "allRuntimeFailures": "creator trust advance failed: TRUST_CLOSURE_INVALID",
+  "cause": "The newly wired ACL advance check incorrectly required standalone current/successor ACL closure candidates before adoption. Close stage owns the successor ACL in the genuine staged snapshot payload; adoption owns it only after snapshot authentication. Existing proposed refs carry no standalone successor ACL.",
+  "correction": "Thread existing current/successor canonical ACL bytes through the private transition input. Require them during settlement stage. Preserve early cryptographic-only verify before snapshot I/O, then require final bounded ACL/adjacency validation after snapshot verification and before hot intent minting, cold material return, or pending candidate acceptance. Open both ACLs against bound object/epoch/profile/digests.",
+  "unchanged": ["public API", "wire", "durable schema", "closure references", "test files", "test expectations", "resource limits", "rollback policy"],
+  "validatorCorrection": "Original validator wrongly treated reporter skipped rows as active. Original validation preserved; future validation uses passed|failed as active. No runtime rerun is used to reclassify the first result."
+}

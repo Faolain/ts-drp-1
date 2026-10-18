@@ -15,6 +15,10 @@
 		"!**/*.tsbuildinfo"
 	],
 	"exports": {
+		"./v3-canvas": {
+			"types": "./dist/src/v3-canvas.d.ts",
+			"import": "./dist/src/v3-canvas.js"
+		},
 		".": {
 			"types": "./dist/src/index.d.ts",
 			"import": "./dist/src/index.js"
@@ -29,6 +33,7 @@
 		"watch": "tsc -b -w"
 	},
 	"dependencies": {
+		"@ts-drp/canonical": "0.11.0",
 		"@thi.ng/random": "^4.1.0",
 		"@ts-drp/types": "0.11.0"
 	}

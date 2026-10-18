@@ -1,0 +1,11 @@
+{
+  "status": "24-case browser collection exact; runtime awaits root release",
+  "baseline": "7efe33dd350deab922c3fea7e9fcd1c968f4e474",
+  "runtimeRosterSha256": "5214a38d6f881921051f7ad486920a903fa91e51728496c98550e89d51be9c66",
+  "sourcePatchSha256": "138cb170776d5f2af780375adc78fee0c9029776656579cd1fb190a8d6fadda4",
+  "cases": 24,
+  "inputCount": 1081,
+  "compilerSources": 1025,
+  "shimAbsent": true,
+  "testsExecuted": 0
+}

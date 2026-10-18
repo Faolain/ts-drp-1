@@ -1,0 +1,17 @@
+{
+	"bundleCutValue": "exact-canonical-required",
+	"decisionId": "PH-P5-D02",
+	"highestPrepareQCCustody": "complete-canonical-qc",
+	"highestPrepareQCSelection": "greatest-round-then-lowest-registered-qc-digest",
+	"leaderOrdering": "raw-utf8-ascending",
+	"maxFutureRoundGap": 8,
+	"newRoundCertificate": "exact-certified-quorum-no-truncation",
+	"profileId": "pacemaker-profile-v1",
+	"proposalAuthentication": "durable-leader-prepare-vote",
+	"protocolMajor": 3,
+	"registryVersion": 1,
+	"roundChangeDisposition": "distinct-registered-kind",
+	"roundTimeoutBaseMs": 1000,
+	"roundTimeoutMaxMs": 30000,
+	"sealVotePhases": ["prepare", "commit"]
+}

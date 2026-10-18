@@ -1,0 +1,39 @@
+{
+  "scope": "Design-time independent canonical parameter corpus; not supported Node runtime-profile assertions",
+  "domain": "ts-drp/parameters/v3",
+  "construction": "Frozen grammar tags, minimal varuint, BigInt zigzag, complete encoded-key sorting, explicit DRP-NUL/U32BE/U64BE framing and Node SHA-256; no project codec or hash helper was invoked",
+  "historicalCorroboration": "Absent case matches the preserved parameters-basic vector; present-four is new independent coverage",
+  "cases": [
+    {
+      "id": "absent",
+      "input": {
+        "maxEpochVertices": 1024,
+        "maxEpochBytes": 1048576,
+        "maxDependencies": 32,
+        "snapshotChunkBytes": 65536,
+        "maxSnapshotBytes": 16777216,
+        "maxPendingEntries": 4096,
+        "maxPendingBytes": 8388608
+      },
+      "byteLength": 153,
+      "canonicalHex": "0807050d6d617845706f636842797465730380808001050f6d6178446570656e64656e636965730340050f6d617850656e64696e674279746573038080800805106d617845706f6368566572746963657303801005106d6178536e617073686f744279746573038080801005116d617850656e64696e67456e74726965730380400512736e617073686f744368756e6b427974657303808008",
+      "digestHex": "faf2fab7116c9d2330364386dffaaa405cac8ec144b61c253a5da88dd834a72b"
+    },
+    {
+      "id": "present-four",
+      "input": {
+        "maxEpochVertices": 1024,
+        "maxEpochBytes": 1048576,
+        "maxDependencies": 32,
+        "snapshotChunkBytes": 65536,
+        "maxSnapshotBytes": 16777216,
+        "maxPendingEntries": 4096,
+        "maxPendingBytes": 8388608,
+        "authorShareMultiplier": 4
+      },
+      "byteLength": 178,
+      "canonicalHex": "0808050d6d617845706f636842797465730380808001050f6d6178446570656e64656e636965730340050f6d617850656e64696e674279746573038080800805106d617845706f6368566572746963657303801005106d6178536e617073686f744279746573038080801005116d617850656e64696e67456e74726965730380400512736e617073686f744368756e6b4279746573038080080515617574686f7253686172654d756c7469706c6965720308",
+      "digestHex": "6345d1d1d64dba8fc227dee1e4bd9983515de5f2ce185337f9d4af878567b530"
+    }
+  ]
+}

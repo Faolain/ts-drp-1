@@ -1,0 +1,16 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "eslint",
+    "examples/v3-room/src/index.ts",
+    "packages/issuance-store/src/conformance.ts",
+    "packages/issuance-store/src/contract.ts",
+    "packages/issuance-store/src/types.ts",
+    "packages/node/src/v3-live.ts",
+    "packages/storage-browser/src/internal/browser-issuance-store.ts",
+    "packages/storage-node/src/internal/node-issuance-store.ts"
+  ],
+  "start": "2026-09-05T06:06:06.013Z"
+}

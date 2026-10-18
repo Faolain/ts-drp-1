@@ -1,0 +1,61 @@
+{
+  "status": "Bounded consumer RED proven; separate GREEN required",
+  "baseline": "b7e498bcb4a4cd4ec7a7215cd151237e6ce005ec",
+  "sourceCommitted": false,
+  "evidenceCommitted": false,
+  "invocationCount": 1,
+  "gate": "runtime-checkpoint",
+  "runtimeRosterSha256": "e40a9fb79fb034f1b09376d7cde4e0e39324bf514879f50f583f98da9eb995a8",
+  "command": "runtime-checkpoint/command.json",
+  "result": "runtime-checkpoint/result.json",
+  "diagnostic": "runtime-checkpoint/diagnostic.json",
+  "validation": "runtime-checkpoint/validation.json",
+  "tests": 7,
+  "passed": 4,
+  "failed": 3,
+  "pending": 0,
+  "todo": 0,
+  "skipped": 0,
+  "elapsedMs": 5826,
+  "exactRoster": true,
+  "exactPredictedFailureSet": true,
+  "newAggregateControlsPassed": true,
+  "failureNames": [
+    "D.110c-0b1 bounded protocol and control boundaries > retires exactly the stale Cut QC and predecessor ACL from the genuine staged closure",
+    "D.110c-0b1 bounded checkpoint and control-proof GREEN > retires the stale proof pair and predecessor ACL under the bounded advance",
+    "D.110c-0b1 bounded checkpoint and control-proof GREEN > cold reopens the genuine active epoch-two room through the bounded checkpoint owner"
+  ],
+  "bootstrap": {
+    "epochTwo": "Genuine original epoch-zero bootstrap validated; actual supplied pin absent and unequal; original predecessor admission-rejected failure also preserved.",
+    "currentSuccessor": "Static-only observer wiring; no dynamic execution of the failure-recovery site claimed."
+  },
+  "publicStoreShape": "Historical retained boundedStoreShape:false remains causal RED; added observer not runtime-replayed; sameStoreShape and boundedRecoveryStore implementation bytes unchanged.",
+  "custody": "custody-after-runtime.json",
+  "sourcePatch": "red.patch",
+  "sourcePatchSha256": "de542f01a1eabbe1d215d10c2939150c55326d9510c62e3100d3e3f13483933a",
+  "protectedInputs": 942,
+  "allProtectedSourcesBuildsStashesPathsEvidencePreserved": true,
+  "static": {
+    "lint": "pass",
+    "format": "pass",
+    "diff": "pass",
+    "observationAssertionEquivalence": "pass",
+    "typecheck": "26 baseline diagnostics, zero new; not whole-program pass"
+  },
+  "priorStaticHandoffAndRosterUnmodified": true,
+  "retries": 0,
+  "heavyChildInvocations": 0,
+  "otherTestsExecuted": 0,
+  "builds": 0,
+  "reviewers": 0,
+  "indexEmpty": true,
+  "processGroupQuiescent": true,
+  "nextOwner": "Root for documentation/signing/push, then separate GREEN agent for only the three frozen fixture implementation corrections.",
+  "noMoreRuntimeReleased": true,
+  "futureGreenRoster": {
+    "files": 14,
+    "cases": 51,
+    "requiresNewSourceAndInputFreeze": true
+  },
+  "manifest": "manifest.sha256"
+}

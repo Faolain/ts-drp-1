@@ -1,0 +1,20 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {execFileSync,spawnSync} from 'node:child_process';
+const root='/Users/aristotle/Documents/Projects/ts-drp-1',out=path.dirname(new URL(import.meta.url).pathname),head='210fecb0bec1ac1d61b0325e2c72d8c42c251572';
+const hash=b=>crypto.createHash('sha256').update(b).digest('hex'),read=f=>fs.readFileSync(path.join(root,f)),git=(...a)=>execFileSync('git',a,{cwd:root,encoding:'utf8',maxBuffer:128*1024*1024}).trim(),prior=JSON.parse(fs.readFileSync(path.join(out,'custody-after.json'))),original=JSON.parse(read('.logs/d110c-0c1f5b-green-57834387/custody-before.json'));
+if(git('rev-parse','HEAD')!==head||git('log','-1','--format=%G?')!=='G'||git('ls-remote','origin','refs/heads/codex/phase3a1b-p6-golden-path').split(/\s/u)[0]!==head)throw Error('Signed/pushed identity');
+const testHashes={...prior.testHashes,...prior.fixtureHashes};
+for(const map of [prior.ownerHashes,prior.built,testHashes])for(const[f,d]of Object.entries(map))if(hash(read(f))!==d)throw Error('Custody drift '+f);
+for(const[f,d]of Object.entries(prior.fixtureHashes))if(hash(execFileSync('git',['show',head+':'+f],{cwd:root}))!==d)throw Error('Signed fixture drift');
+const patch=execFileSync('git',['diff','--binary','--full-index','--',...Object.keys(prior.ownerHashes)],{cwd:root,maxBuffer:128*1024*1024});if(hash(patch)!==prior.patchSha256)throw Error('Patch drift');
+if(git('diff','--cached','--name-only'))throw Error('Index nonempty');
+if(JSON.stringify(git('diff','--name-only').split('\n').sort())!==JSON.stringify([...Object.keys(prior.ownerHashes),"docs/production-hardening/production-hardening-tdd-plan-v2.md"].sort()))throw Error('Unexpected tracked owner');
+if(git('stash','list','--format=%H %gd %gs')!==original.stashes.trim())throw Error('Stashes');
+for(const f of original.untracked)if(!fs.existsSync(path.join(root,f)))throw Error('Protected missing '+f);
+for(const[dir,d]of Object.entries(prior.manifests)){const m=read(dir+'/manifest.sha256');if(hash(m)!==d)throw Error('Manifest drift');for(const line of m.toString().trim().split('\n')){const[,h,f]=line.match(/^([a-f0-9]{64})\s+(.+)$/u);if(hash(read(f.startsWith('.logs/')?f:dir+'/'+f))!==h)throw Error('Evidence drift '+f)}}
+const processState=spawnSync('ps',['-p','80642','-o','pid=,comm='],{encoding:'utf8'});
+if(![0,1].includes(processState.status)||processState.stdout.trim())throw Error('Runtime recorder still active or check failed');
+const data={...prior,stage:'final',rootOwnedPlanException:'docs/production-hardening/production-hardening-tdd-plan-v2.md',head,signature:'G',originExact:true,testHashes,fixtureHashes:prior.fixtureHashes,trackedStatus:git('status','--short','--untracked-files=no'),indexEmpty:true,runtimeRecorderTerminated:true,patchReference:'.logs/d110c-0c1f5b-green-room-guard-db8a8615/partial-production.patch'};
+fs.writeFileSync(path.join(out,'custody-final.json'),JSON.stringify(data,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify({head,owners:8,built:7,retainedAndFixtures:Object.keys(testHashes).length,protected:data.protectedPaths,stashes:27,patchSha256:data.patchSha256}));

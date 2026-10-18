@@ -1,0 +1,107 @@
+{
+  "environment": {
+    "runtime": "v22.16.0",
+    "platform": "linux",
+    "architecture": "x64"
+  },
+  "inputs": {
+    "messages": 10000,
+    "canonicalStateBytes": 1881246,
+    "snapshotChunks": 15,
+    "snapshotChunkBytes": 131072,
+    "archiveSegments": 10,
+    "archiveIndexRoot": "7341c284e48d4435362b92d13ba613a3834749e5f1fd662e189b80b37cadee4f",
+    "activeVertices": 8193,
+    "foldVertices": 4097,
+    "merkleLeaves": 8192,
+    "compactMerklePeaks": 1,
+    "compactMerkleRoot": "86cbb2aff568c4f87cb873a81d68772ea755bcbc384e100cabb012ab7e55cf2a"
+  },
+  "metrics": [
+    {
+      "name": "canonical_encode_10000_messages",
+      "iterations": 5,
+      "minMs": 128.599,
+      "medianMs": 132.688,
+      "maxMs": 133.756,
+      "meanMs": 131.52
+    },
+    {
+      "name": "state_sha256_10000_messages",
+      "iterations": 5,
+      "minMs": 129.932,
+      "medianMs": 138.558,
+      "maxMs": 193.154,
+      "meanMs": 147.081
+    },
+    {
+      "name": "snapshot_chunk_and_hash",
+      "iterations": 3,
+      "minMs": 6.901,
+      "medianMs": 7.723,
+      "maxMs": 10.199,
+      "meanMs": 8.274
+    },
+    {
+      "name": "snapshot_verify_and_assemble",
+      "iterations": 3,
+      "minMs": 4.804,
+      "medianMs": 6.148,
+      "maxMs": 7.048,
+      "meanMs": 6
+    },
+    {
+      "name": "archive_segment_and_index_10000_messages",
+      "iterations": 3,
+      "minMs": 153.375,
+      "medianMs": 158.885,
+      "maxMs": 159.815,
+      "meanMs": 157.358
+    },
+    {
+      "name": "archive_verify_1000_messages",
+      "iterations": 3,
+      "minMs": 5.684,
+      "medianMs": 6.896,
+      "maxMs": 15.532,
+      "meanMs": 9.371
+    },
+    {
+      "name": "merkle_materialize_8192",
+      "iterations": 3,
+      "minMs": 406.891,
+      "medianMs": 447.994,
+      "maxMs": 482.138,
+      "meanMs": 445.675
+    },
+    {
+      "name": "merkle_compact_accumulator_8192",
+      "iterations": 3,
+      "minMs": 581.368,
+      "medianMs": 739.823,
+      "maxMs": 797.307,
+      "meanMs": 706.166
+    },
+    {
+      "name": "kahn_linearize_8192",
+      "iterations": 5,
+      "minMs": 16.423,
+      "medianMs": 20.158,
+      "maxMs": 29.455,
+      "meanMs": 22.152
+    },
+    {
+      "name": "fold_4096_vertices",
+      "iterations": 3,
+      "minMs": 105.072,
+      "medianMs": 106.874,
+      "maxMs": 151.736,
+      "meanMs": 121.228
+    }
+  ],
+  "memory": {
+    "rssBytes": 211824640,
+    "heapUsedBytes": 21678536,
+    "externalBytes": 10037253
+  }
+}

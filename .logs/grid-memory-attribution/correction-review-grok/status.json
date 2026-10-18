@@ -1,0 +1,9 @@
+{
+  "classification": "NO_VERDICT",
+  "duration_seconds": 375.104,
+  "events": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/grid-memory-attribution/correction-review-grok/events.jsonl",
+  "exit_code": 0,
+  "public": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/grid-memory-attribution/correction-review-grok/public.txt",
+  "stop_reason": "end_turn",
+  "timed_out": false
+}

@@ -1,0 +1,9 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "node",
+  "args": [
+    ".logs/d110c-w0-current-profile-acceptance-61ea93f6/verify-regression-runtime.mjs",
+    "runtime-w0"
+  ],
+  "start": "2026-09-06T11:33:36.263Z"
+}

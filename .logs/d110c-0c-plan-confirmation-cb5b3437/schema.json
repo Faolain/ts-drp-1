@@ -1,0 +1,44 @@
+{
+	"type": "object",
+	"additionalProperties": false,
+	"required": [
+		"verdict",
+		"summary",
+		"findings",
+		"durable_floor_p1_closed",
+		"tests_only_feasible",
+		"fresh_process_causal",
+		"scope_preserved",
+		"blocking_union_closed",
+		"next_state"
+	],
+	"properties": {
+		"verdict": { "type": "string", "enum": ["APPROVED", "CHANGES_REQUIRED"] },
+		"summary": { "type": "string" },
+		"findings": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"additionalProperties": false,
+				"required": ["severity", "title", "path", "line", "evidence", "required_action"],
+				"properties": {
+					"severity": { "type": "string", "enum": ["P0", "P1", "P2"] },
+					"title": { "type": "string" },
+					"path": { "type": "string" },
+					"line": { "type": "integer" },
+					"evidence": { "type": "string" },
+					"required_action": { "type": "string" }
+				}
+			}
+		},
+		"durable_floor_p1_closed": { "type": "boolean" },
+		"tests_only_feasible": { "type": "boolean" },
+		"fresh_process_causal": { "type": "boolean" },
+		"scope_preserved": { "type": "boolean" },
+		"blocking_union_closed": { "type": "boolean" },
+		"next_state": {
+			"type": "string",
+			"enum": ["D110C_0C_RED_AUTHORIZED", "D110C_0C_PLAN_BLOCKED"]
+		}
+	}
+}

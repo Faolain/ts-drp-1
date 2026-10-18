@@ -1,34 +1,49 @@
-import * as grpc from "@grpc/grpc-js";
-import * as protoLoader from "@grpc/proto-loader";
-import path, { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-import { beforeAll, describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
-import { type GenericRespone, SubscribeDRPRequest } from "../src/proto/drp/node/v1/rpc_pb.js";
-import * as run from "../src/run.js";
+import { createCliProgram } from "../src/cli/index.js";
+import { captureV3CanvasCliConfig } from "../src/cli/v3-canvas.js";
+import { run } from "../src/run.js";
 
-const protoPath = path.resolve(dirname(fileURLToPath(import.meta.url)), "../src/proto/drp/node/v1/rpc.proto");
-const packageDefinition = protoLoader.loadSync(protoPath);
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const protoDescriptor = grpc.loadPackageDefinition(packageDefinition) as any;
-const service = protoDescriptor.drp.node.v1;
-
-describe("Run DRP with cli", () => {
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	let client: any;
-
-	beforeAll(async () => {
-		await run.run();
-		client = new service.DrpRpcService(`localhost:6969`, grpc.credentials.createInsecure());
+// The original test imported an auto-starting v1 host and never awaited its bare-ID
+// callback. That retired behavior is not evidence of v3 admission or CLI closure.
+// Actual configured Node/SQLite/gRPC acceptance lives in the existing R9 native fixture.
+describe("explicit v3 CLI entry", () => {
+	test("requires a configured file and rejects the removed mode option", () => {
+		const parser = createCliProgram().exitOverride();
+		parser.configureOutput({ writeErr: () => undefined });
+		expect(() => parser.parse(["node", "run"])).toThrow("required option");
+		expect(() => parser.parse(["node", "run", "--config", "local.json", "--mode", "bootstrap"])).toThrow(
+			"unknown option"
+		);
 	});
 
-	test("test client subscribe drp", () => {
-		const request = SubscribeDRPRequest.create({
-			drpId: "test-id",
-		});
-		client.SubscribeDRP(request, (error: grpc.ServiceError, response: GenericRespone) => {
-			expect(error).toBeNull();
-			console.log(response.returnCode);
-		});
+	test("has no default startup or v1 fallback", async () => {
+		await expect(run("")).rejects.toThrow("V3_CLI_CONFIG_REQUIRED");
+		await expect(run("/private/tmp/ts-drp-nonexistent-cli-config.json")).rejects.toThrow("ENOENT");
+		expect(() => captureV3CanvasCliConfig({})).toThrow();
+	});
+
+	test("rejects executable node config before invoking accessors", () => {
+		const getter = vi.fn(() => "not a seed");
+		const node = { keychain_config: Object.defineProperty({}, "private_key_seed", { enumerable: true, get: getter }) };
+		const config = {
+			node,
+			rpc: { port: 0, maxActiveEntries: 1, maxCustomGroups: 1, maxPayloadBytes: 8, maxNameBytes: 8 },
+			canvas: { width: 2, height: 2, directory: "/private/tmp/canvas-unused", rooms: [] },
+		};
+		expect(() => captureV3CanvasCliConfig(config)).toThrow("ROOM_HEAD_INVALID_RECORD");
+		expect(getter).not.toHaveBeenCalled();
+	});
+
+	test("rejects executable room array entries without invoking accessors", () => {
+		const getter = vi.fn(() => ({}));
+		const roomBindings = Object.defineProperty(new Array(1), "0", { enumerable: true, get: getter });
+		const config = {
+			node: {},
+			rpc: { port: 0, maxActiveEntries: 1, maxCustomGroups: 1, maxPayloadBytes: 8, maxNameBytes: 8 },
+			canvas: { width: 2, height: 2, directory: "/private/tmp/canvas-unused", rooms: roomBindings },
+		};
+		expect(() => captureV3CanvasCliConfig(config)).toThrow("V3_CLI_INVALID_NODE_CONFIG");
+		expect(getter).not.toHaveBeenCalled();
 	});
 });

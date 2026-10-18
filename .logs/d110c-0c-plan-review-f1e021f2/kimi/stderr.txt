@@ -1,0 +1,202 @@
+Warning: [loop_control] 'max_retries_per_step' is deprecated and no longer used; rename it to 'max_attempts_per_step'. Run /update-config to fix it.
+total 72
+drwxr-xr-x    11 aristotle  staff     352 Sep  2 17:45 .
+drwxr-xr-x  7853 aristotle  staff  251296 Sep  2 17:46 ..
+-rw-r--r--     1 aristotle  staff    2456 Sep  2 17:44 audit.md
+-rw-r--r--     1 aristotle  staff       2 Sep  2 17:45 manifest-validation.status
+-rw-r--r--     1 aristotle  staff     335 Sep  2 17:45 manifest-validation.txt
+-rw-r--r--     1 aristotle  staff     707 Sep  2 17:45 manifest.sha256
+-rw-r--r--     1 aristotle  staff     112 Sep  2 17:44 source-audit.command
+-rw-r--r--     1 aristotle  staff     627 Sep  2 17:43 source-audit.json
+-rw-r--r--     1 aristotle  staff    2754 Sep  2 17:43 source-audit.mjs
+-rw-r--r--     1 aristotle  staff       2 Sep  2 17:44 source-audit.status
+-rw-r--r--     1 aristotle  staff     309 Sep  2 17:44 state-audit.txt
+f1e021f283048e8e80771fa62347902c94a40227
+fa843fcd813076bbfac7163d6bbe0e30ed892db5
+ff1a9807528b1f29c8d1f381f0c093baf5a5d506
+G
+test: plan D.110c-0c pending restart recovery
+  origin/codex/phase3a1b-p6-golden-path
+    1527 packages/node/src/creator-adoption.ts
+      59 packages/node/src/creator-adoption-recover.ts
+      70 packages/node/src/internal/creator-adoption-recover.ts
+     114 packages/node/src/internal/creator-transition-advance.ts
+     486 packages/node/src/creator-adoption-activate.ts
+    4098 examples/v3-room/src/index.ts
+    7557 packages/node/src/v3-live.ts
+    1901 packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts
+    2283 packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts
+     341 tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts
+     936 tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts
+   19372 total
+track-p2-c-5d05c42-kimi3-high-100-review
+track-p2-c-5d05c42-opus-xhigh-review
+track-p2-c-9895307-independent-codex-high-review
+track-p2-c-staged-red-final-independent-codex-high-review
+track-p2-d-286b21d-grok46-high-review
+track-p2-d-286b21d-kimi3-high-100-review
+track-p2-d-286b21d-opus-xhigh-review
+track-p2-d93-fable-xhigh-review
+track-p2-d93-final-opus-xhigh-review
+track-p2-d93-grok46-high-review
+track-p2-d93-integrated-opus-xhigh-review
+track-p2-d93-integrated-opus-xhigh-review-obsolete-interrupted-20260812T1539
+track-p2-e-17446ca-grok46-high-review
+track-p2-e-17446ca-kimi3-high-100-review
+track-p2-e-17446ca-opus-xhigh-review
+track-p2-e-corrective-red-final-packet-review
+track-p2-e-de51786-grok46-high-final-review
+track-p2-e-de51786-kimi3-high-100-final-review
+track-p2-e-de51786-opus-xhigh-final-review
+track-p2-e-staged-red-independent-codex-high-review
+d110c-0a-final-review-93fe946a
+d110c-0a-green-0b7a1cf6
+d110c-0a-plan-confirmation-bc451706
+d110c-0a-plan-review-4984619d
+d110c-0a-red-5388f64d
+d110c-0b-hedera-fable-audit
+d110c-0b-hiero-confirmation-d12f57e2
+d110c-0b-hiero-fable-5-1-high
+d110c-0b-hiero-fable-51-high-93fe946a
+d110c-0b-hiero-fable-924afa1f
+d110c-0b-hiero-fable51-high-oneoff
+d110c-0b-hiero-fable51-parallel
+d110c-0b-hiero-fable51-parallel-20260902
+d110c-0b-hiero-kimi-final-e65d24de
+d110c-0b-hiero-plan-review-871c7782
+d110c-0b-hiero-refresh-92ea3b0c
+d110c-0b0-amendment-review-610d0f9e
+d110c-0b0-confirmation-340a6646
+d110c-0b0-confirmation-43290dab
+d110c-0b0-correction-213850db
+d110c-0b0-final-review-213850db
+d110c-0b0-green-798489fd
+d110c-0b0-owner-confirmation-49e8dcff
+d110c-0b0-owner-design-review-65912fbc
+d110c-0b0-red
+d110c-0b0a-final-review-2b3080d6
+d110c-0b0a-green-c1e443fc
+d110c-0b0a-green-debug
+d110c-0b0a-plan-confirmation-4f893654
+d110c-0b0a-plan-review-7f6d05d3
+d110c-0b0a-red-c47927f5
+d110c-0b0b-confirmation-1db11664
+d110c-0b0b-design-review-22917252
+d110c-0b1-final-review-420fd240
+d110c-0b1-green-9457680d
+d110c-0b1-green-9457680d-final
+d110c-0b1-green-working-9457680d
+d110c-0b1-plan-audit-80b2e65b
+d110c-0b1-plan-confirmation-627f98d1
+d110c-0b1-plan-correction-22ee1c59
+d110c-0b1-plan-review-22ee1c59
+d110c-0b1-red-2cd3ba51
+d110c-0c-plan-audit-ff1a9807
+d110c-0c-plan-review-f1e021f2
+d110c-a-final-review-a923c7d2
+d110c-a-green-29012528
+d110c-a-green-confirmation-cd665103
+d110c-a-plan-audit-7e6ec39f
+d110c-a-plan-confirmation-5638a9af
+d110c-a-plan-review-ec720f7d
+d110c-a-red-b784b3db
+d110c-b-final-review-f2066512
+d110c-b-green-90147e3c
+d110c-b-green-confirmation-5aa26cd4
+d110c-b-green-correction-f2066512
+d110c-b-green-working-90147e3c
+d110c-b-plan-audit-3118da76
+d110c-b-plan-confirmation-4b357a37
+d110c-b-plan-review-aa002e78
+d110c-b-red-7c1e71d2
+d110c-fable-high-plan-oneoff
+d110c-plan-review-d7c102b8
+total 24
+drwxr-xr-x     7 aristotle  staff     224 Sep  2 17:47 .
+drwxr-xr-x  7853 aristotle  staff  251296 Sep  2 17:46 ..
+drwxr-xr-x@    7 aristotle  staff     224 Sep  2 17:47 grok
+drwxr-xr-x     5 aristotle  staff     160 Sep  2 17:47 kimi
+drwxr-xr-x     5 aristotle  staff     160 Sep  2 17:47 opus
+-rw-r--r--     1 aristotle  staff    4100 Sep  2 17:46 prompt.md
+-rw-r--r--     1 aristotle  staff    1289 Sep  2 17:46 schema.json
+grok
+kimi
+opus
+prompt.md
+f1e021f283048e8e80771fa62347902c94a40227 G Faolain <Faolain@users.noreply.github.com>
+
+ .logs/d110c-0c-plan-audit-ff1a9807/audit.md        |  44 ++++++++
+ .../manifest-validation.status                     |   1 +
+ .../manifest-validation.txt                        |   6 +
+ .logs/d110c-0c-plan-audit-ff1a9807/manifest.sha256 |   6 +
+ .../source-audit.command                           |   1 +
+ .../d110c-0c-plan-audit-ff1a9807/source-audit.json |  19 ++++
+ .../d110c-0c-plan-audit-ff1a9807/source-audit.mjs  |  43 ++++++++
+ .../source-audit.status                            |   1 +
+ .logs/d110c-0c-plan-audit-ff1a9807/state-audit.txt |  11 ++
+ .../production-hardening-tdd-plan-v2.md            | 121 +++++++++++++++++++++
+ 10 files changed, 253 insertions(+)
+---
+f1e021f283048e8e80771fa62347902c94a40227
+---
+      27
+shasum: .logs/d110c-0c-plan-audit-ff1a9807/audit.md: No such file or directory
+shasum: .logs/d110c-0c-plan-audit-ff1a9807/source-audit.command: No such file or directory
+shasum: .logs/d110c-0c-plan-audit-ff1a9807/source-audit.json: No such file or directory
+shasum: .logs/d110c-0c-plan-audit-ff1a9807/source-audit.mjs: No such file or directory
+.logs/d110c-0c-plan-audit-ff1a9807/audit.md: FAILED open or read
+.logs/d110c-0c-plan-audit-ff1a9807/source-audit.command: FAILED open or read
+.logs/d110c-0c-plan-audit-ff1a9807/source-audit.json: FAILED open or read
+.logs/d110c-0c-plan-audit-ff1a9807/source-audit.mjs: FAILED open or read
+.logs/d110c-0c-plan-audit-ff1a9807/source-audit.status: FAILED open or read
+shasum: .logs/d110c-0c-plan-audit-ff1a9807/source-audit.status: No such file or directory
+shasum: .logs/d110c-0c-plan-audit-ff1a9807/state-audit.txt: No such file or directory
+shasum: WARNING: 6 listed files could not be read
+.logs/d110c-0c-plan-audit-ff1a9807/state-audit.txt: FAILED open or read
+.logs/d110c-0c-plan-audit-ff1a9807/audit.md: OK
+.logs/d110c-0c-plan-audit-ff1a9807/source-audit.command: OK
+.logs/d110c-0c-plan-audit-ff1a9807/source-audit.json: OK
+.logs/d110c-0c-plan-audit-ff1a9807/source-audit.mjs: OK
+.logs/d110c-0c-plan-audit-ff1a9807/source-audit.status: OK
+.logs/d110c-0c-plan-audit-ff1a9807/state-audit.txt: OK
+ae081775672303cb5a7fc740d6759710ba7b6d0d26034ad27f78203871f090fd  .logs/d110c-0c-plan-audit-ff1a9807/manifest.sha256
+0
+0
+2,18c2,18
+<   "base": "ff1a9807528b1f29c8d1f381f0c093baf5a5d506",
+<   "checks": {
+<     "additivePendingClassifierPinned": true,
+<     "combinedIssuanceCeilingAbsent": true,
+<     "existingPublicRecoveryExport": true,
+<     "genesisCarrierEqualityPinned": true,
+<     "genesisCurrentOpenerPinned": true,
+<     "oldAndNewAheFaultSeams": true,
+<     "pendingChainEpochsPinned": true,
+<     "pendingProjectionPinned": true,
+<     "publicRecoveryInputKeyCount": true,
+<     "roomCommitsFloorAfterPendingRecovery": true,
+<     "roomUsesExistingRecovery": true,
+<     "scanCountersOutsideRead": true,
+<     "sharedCheckpointOpenerAvailable": true,
+<     "sharedTransitionClassifierAvailable": true
+<   }
+---
+> 	"base": "ff1a9807528b1f29c8d1f381f0c093baf5a5d506",
+> 	"checks": {
+> 		"additivePendingClassifierPinned": true,
+> 		"combinedIssuanceCeilingAbsent": true,
+> 		"existingPublicRecoveryExport": true,
+> 		"genesisCarrierEqualityPinned": true,
+> 		"genesisCurrentOpenerPinned": true,
+> 		"oldAndNewAheFaultSeams": true,
+> 		"pendingChainEpochsPinned": true,
+> 		"pendingProjectionPinned": true,
+> 		"publicRecoveryInputKeyCount": true,
+> 		"roomCommitsFloorAfterPendingRecovery": true,
+> 		"roomUsesExistingRecovery": true,
+> 		"scanCountersOutsideRead": true,
+> 		"sharedCheckpointOpenerAvailable": true,
+> 		"sharedTransitionClassifierAvailable": true
+> 	}
+f1e021f283048e8e80771fa62347902c94a40227
+STATUS_DONE

@@ -1,0 +1,12 @@
+{
+	"extends": "../../../tsconfig.json",
+	"compilerOptions": { "composite": false, "noEmit": true, "rootDir": "../../..", "target": "ES2023" },
+	"files": [
+		"codec-provenance-cases.ts",
+		"codec-provenance-child.ts",
+		"vitest.codec-red.config.mts",
+		"vitest.codec-red.workspace.ts",
+		"../../snapshot-declaration-provenance-codec-red.test.ts"
+	],
+	"include": []
+}

@@ -1,0 +1,1130 @@
+Warning: [loop_control] 'max_retries_per_step' is deprecated and no longer used; rename it to 'max_attempts_per_step'. Run /update-config to fix it.
+.logs/d110c-0c1f5b0d-green-1063feca/:
+README.md
+browser-retained.exit
+browser-retained.json
+build-issuance-store.log
+build-node.log
+build-status.txt
+build-storage-browser.log
+build-storage-node.log
+changed-paths.txt
+commands.md
+custody-check.txt
+custody.md
+deferred.md
+design-manifest-check.exit
+design-manifest-check.log
+diff-check.log
+eslint.log
+focused.json
+inherited-f5b0a-corrective.exit
+inherited-f5b0a-corrective.json
+inherited.md
+isolated-focused.json
+isolated-retained.json
+manifest.sha256
+owner-blobs.txt
+prettier.log
+result.json
+retained-core.json
+retained-settlement-recovery.json
+source-shape-check.log
+source-shape-status.txt
+source-shape.md
+static-status.txt
+typecheck-issuance-store.log
+typecheck-node.log
+typecheck-status.txt
+typecheck-storage-browser.log
+typecheck-storage-node.log
+
+.logs/d110c-0c1f5b0d-red-9ab5924a/:
+README.md
+changed-paths.txt
+commands.md
+custody.md
+deferred.md
+eslint.json
+focused.json
+manifest.sha256
+matrix.md
+rejected-fixture-diagnostic.md
+result.json
+source-shape.md
+
+.logs/d110c-0c1f5b0r-design-3a156aca/:
+design.md
+manifest.sha256
+next-prompt.md
+pre-review.md
+packages/issuance-store/src/conformance.ts
+packages/issuance-store/src/maintenance.ts
+packages/node/src/v3-live.ts
+packages/storage-browser/src/internal/browser-issuance-store.ts
+packages/storage-node/src/internal/node-issuance-store.ts
+---
+tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts
+307825ef test(hardening): complete reclamation evidence logs
+352db789 test(hardening): record settlement reclamation green
+1063feca feat(hardening): reclaim authenticated settled issuance
+f05048f9 test(hardening): record settlement reclamation red
+9ab5924a test(node): pin settlement reclamation red
+?? .agents/
+?? .claude/
+?? .logs/d108e4-complete-config-a5ac938f/
+?? .logs/d108e4-plan-grok-50fd6fd5/
+?? .logs/d108e4a-green-reviews-3f10ac71/
+commit 1063feca39d60d24972ee101ab4051b4c1a23bb9
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Fri Sep 4 17:23:07 2026 -0400
+
+    feat(hardening): reclaim authenticated settled issuance
+
+ packages/issuance-store/src/conformance.ts         | 33 ++++++++-
+ packages/issuance-store/src/maintenance.ts         | 86 +++++++++++++++++++++-
+ packages/node/src/v3-live.ts                       | 51 ++++++++++++-
+ .../src/internal/browser-issuance-store.ts         | 46 ++++++++++--
+ .../src/internal/node-issuance-store.ts            | 47 +++++++++---
+ 5 files changed, 239 insertions(+), 24 deletions(-)
+commit 1063feca39d60d24972ee101ab4051b4c1a23bb9
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Fri Sep 4 17:23:07 2026 -0400
+
+    feat(hardening): reclaim authenticated settled issuance
+
+diff --git a/packages/issuance-store/src/maintenance.ts b/packages/issuance-store/src/maintenance.ts
+index 70ca2119..a7a113cc 100644
+--- a/packages/issuance-store/src/maintenance.ts
++++ b/packages/issuance-store/src/maintenance.ts
+@@ -7,7 +7,7 @@ import {
+ 	isClosedDurableIssuanceRecord,
+ 	isValidDurableAuthorSequence,
+ } from "./contract.js";
+-import type { DurableIssuanceError, DurableIssueScope, DurableLineage } from "./types.js";
++import type { DurableIssuanceError, DurableIssuanceStore, DurableIssueScope, DurableLineage } from "./types.js";
+ 
+ const HEX_DIGEST = /^[0-9a-f]{64}$/u;
+ 
+@@ -39,9 +39,93 @@ export interface DurableIssuancePruningReceipt {
+ 
+ export interface DurableIssuancePruningMaintenance {
+ 	inspectPruningState(scope: DurableIssueScope): Promise<DurableIssuancePruningState>;
++	pruneAuthenticatedSettledPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
+ 	prunePublishedPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
+ }
+ 
++const MAINTENANCE_REGISTRY = Symbol.for("@ts-drp/issuance-store/pruning-maintenance-v1");
++interface MaintenanceRegistry {
++	bind(store: DurableIssuanceStore, maintenance: DurableIssuancePruningMaintenance): boolean;
++	resolve(store: DurableIssuanceStore): DurableIssuancePruningMaintenance | undefined;
++}
++type MaintenanceGlobal = typeof globalThis & {
++	[MAINTENANCE_REGISTRY]?: MaintenanceRegistry;
++};
++const maintenanceGlobal = globalThis as MaintenanceGlobal;
++const maintenanceRegistry =
++	maintenanceGlobal[MAINTENANCE_REGISTRY] ??
++	((): MaintenanceRegistry => {
++		const maintenanceByStore = new WeakMap<DurableIssuanceStore, DurableIssuancePruningMaintenance>();
++		return Object.freeze({
++			bind(store: DurableIssuanceStore, maintenance: DurableIssuancePruningMaintenance): boolean {
++				if (maintenanceByStore.has(store)) return false;
++				maintenanceByStore.set(store, maintenance);
++				return true;
++			},
++			resolve(store: DurableIssuanceStore): DurableIssuancePruningMaintenance | undefined {
++				return maintenanceByStore.get(store);
++			},
++		});
++	})();
++if (maintenanceGlobal[MAINTENANCE_REGISTRY] === undefined) {
++	Object.defineProperty(maintenanceGlobal, MAINTENANCE_REGISTRY, {
++		configurable: false,
++		enumerable: false,
++		value: maintenanceRegistry,
++		writable: false,
++	});
++}
++
++/**
++ * Binds a backend-owned maintenance capability to its exact ordinary facade.
++ * This is a package-internal owner hook and is not re-exported by the ordinary store facade.
++ * @param store - Exact frozen store facade.
++ * @param maintenance - Backend-owned maintenance capability.
++ * @returns Whether this was the first binding for the facade.
++ */
++export function bindDurableIssuancePruningMaintenance(
++	store: DurableIssuanceStore,
++	maintenance: DurableIssuancePruningMaintenance
++): boolean {
++	return maintenanceRegistry.bind(store, maintenance);
++}
++
++/**
++ * Resolves maintenance for the exact facade without exposing mutation on it.
++ * This is a package-internal owner hook and is not re-exported by the ordinary store facade.
++ * @param store - Candidate ordinary store facade.
++ * @returns Its identity-bound backend maintenance capability.
++ */
++export function durableIssuancePruningMaintenanceForStore(
++	store: DurableIssuanceStore
++): DurableIssuancePruningMaintenance | undefined {
++	return maintenanceRegistry.resolve(store);
++}
++
++/**
++ * Tests whether one durable settlement plan permits authenticated prefix reclamation.
++ * @param plan - The transactionally observed plan, or no durable plan.
++ * @returns Whether every non-expiring source and the mandatory fence are linked.
++ */
++export function settlementPlanPermitsAuthenticatedPruning(
++	plan: Readonly<{
++		readonly entries: readonly Readonly<{
++			readonly disposition: "expire" | "manual-review" | "rebase" | "transform";
++			readonly replacementSequence: number | null;
++		}>[];
++		readonly fenceSequence: number | null;
++	}> | null
++): boolean {
++	return (
++		plan !== null &&
++		plan.fenceSequence !== null &&
++		plan.entries.every(
++			(entry) =>
++				entry.disposition === "expire" || (entry.disposition !== "manual-review" && entry.replacementSequence !== null)
++		)
++	);
++}
++
+ /** Exact non-poisoning evidence that a caller-known ordinal was already pruned. */
+ export class DurableIssuanceRecordPrunedError extends Error implements DurableIssuanceError {
+ 	readonly authorSequence: number;
+commit 1063feca39d60d24972ee101ab4051b4c1a23bb9
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Fri Sep 4 17:23:07 2026 -0400
+
+    feat(hardening): reclaim authenticated settled issuance
+
+diff --git a/packages/storage-node/src/internal/node-issuance-store.ts b/packages/storage-node/src/internal/node-issuance-store.ts
+index 20a0e08c..b3533b51 100644
+--- a/packages/storage-node/src/internal/node-issuance-store.ts
++++ b/packages/storage-node/src/internal/node-issuance-store.ts
+@@ -33,6 +33,7 @@ import {
+ 	type SettlementPlan,
+ } from "@ts-drp/issuance-store";
+ import {
++	bindDurableIssuancePruningMaintenance,
+ 	captureDurableIssuancePruningInput,
+ 	createDurableIssuancePruningReceipt,
+ 	createDurableIssuancePruningState,
+@@ -44,6 +45,7 @@ import {
+ 	type DurableIssuancePruningReceipt,
+ 	type DurableIssuancePruningState,
+ 	DurableIssuanceRecordPrunedError,
++	settlementPlanPermitsAuthenticatedPruning,
+ } from "@ts-drp/issuance-store/maintenance";
+ import { DatabaseSync, type StatementSync } from "node:sqlite";
+ 
+@@ -766,7 +768,15 @@ class NodeIssuanceImplementation {
+ 		}
+ 	}
+ 
++	pruneAuthenticatedSettledPrefix(input: unknown): Promise<DurableIssuancePruningReceipt> {
++		return this.#prunePrefix(input, true);
++	}
++
+ 	prunePublishedPrefix(input: unknown): Promise<DurableIssuancePruningReceipt> {
++		return this.#prunePrefix(input, false);
++	}
++
++	#prunePrefix(input: unknown, authenticatedSettled: boolean): Promise<DurableIssuancePruningReceipt> {
+ 		let captured: ReturnType<typeof captureDurableIssuancePruningInput>;
+ 		try {
+ 			captured = captureDurableIssuancePruningInput(input);
+@@ -781,6 +791,14 @@ class NodeIssuanceImplementation {
+ 			const current = readNativeLineage(this.#database, captured.scope, "writer");
+ 			if (current === undefined) throw this.#latchCorruption("stored lineage is malformed");
+ 			const lineage = { exhausted: current.exhausted, next: current.next };
++			let plan: SettlementPlan | null | undefined;
++			if (authenticatedSettled) {
++				plan = readSettlementPlanRow(this.#database, captured.scope);
++				if (plan === undefined) throw this.#latchCorruption("stored settlement plan is malformed");
++				if (!settlementPlanPermitsAuthenticatedPruning(plan)) {
++					throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan is incomplete");
++				}
++			}
+ 			if (
+ 				captured.expectedPrunedThroughAuthorSequence !== null &&
+ 				(captured.expectedPrunedThroughAuthorSequence > captured.throughAuthorSequence ||
+@@ -810,9 +828,12 @@ class NodeIssuanceImplementation {
+ 				throw invalid("selected pruning boundary is invalid");
+ 			}
+ 			const from = current.prunedThroughAuthorSequence === null ? 0 : current.prunedThroughAuthorSequence + 1;
+-			const plan = readSettlementPlanRow(this.#database, captured.scope);
+-			if (plan === undefined) throw this.#latchCorruption("stored settlement plan is malformed");
++			if (!authenticatedSettled) {
++				plan = readSettlementPlanRow(this.#database, captured.scope);
++				if (plan === undefined) throw this.#latchCorruption("stored settlement plan is malformed");
++			}
+ 			if (
++				!authenticatedSettled &&
+ 				plan?.entries.some(
+ 					(entry) =>
+ 						entry.replacementSequence === null &&
+@@ -851,10 +872,10 @@ class NodeIssuanceImplementation {
+ 					}
+ 					const decoded = decodeDurableIssuancePreimage(issued.canonicalPreimageBytes, captured.scope, authorSequence);
+ 					if (decoded === undefined) throw this.#latchCorruption("selected issuance preimage is malformed");
+-					if (decoded.epoch !== captured.closedEpoch) {
++					if (!authenticatedSettled && decoded.epoch !== captured.closedEpoch) {
+ 						throw invalid("selected issuance row belongs to another epoch");
+ 					}
+-					if (outbox.publishState === "pending") {
++					if (!authenticatedSettled && outbox.publishState === "pending") {
+ 						throw failure("ISSUANCE_RETRY_REQUIRED", "selected issuance prefix is not published");
+ 					}
+ 				}
+@@ -1269,6 +1290,7 @@ const maintenanceByStore = new WeakMap<
+ 	DurableIssuanceStore,
+ 	Readonly<{
+ 		inspectPruningState(scope: DurableIssueScope): Promise<DurableIssuancePruningState>;
++		pruneAuthenticatedSettledPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
+ 		prunePublishedPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
+ 	}>
+ >();
+@@ -1307,13 +1329,15 @@ export function createNodeDurableIssuanceStoreImplementation(options: unknown):
+ 				implementation.transactIssue(scope, buildAndSign),
+ 			transactWriteSettlementPlan: (input: unknown) => implementation.transactWriteSettlementPlan(input),
+ 		});
+-		maintenanceByStore.set(
+-			store,
+-			Object.freeze({
+-				inspectPruningState: (scope: DurableIssueScope) => implementation.inspectPruningState(scope),
+-				prunePublishedPrefix: (input: unknown) => implementation.prunePublishedPrefix(input),
+-			})
+-		);
++		const maintenance = Object.freeze({
++			inspectPruningState: (scope: DurableIssueScope) => implementation.inspectPruningState(scope),
++			pruneAuthenticatedSettledPrefix: (input: unknown) => implementation.pruneAuthenticatedSettledPrefix(input),
++			prunePublishedPrefix: (input: unknown) => implementation.prunePublishedPrefix(input),
++		});
++		maintenanceByStore.set(store, maintenance);
++		if (!bindDurableIssuancePruningMaintenance(store, maintenance)) {
++			throw new TypeError("node issuance maintenance was already bound");
++		}
+ 		return store;
+ 	} catch (error) {
+ 		try {
+@@ -1339,6 +1363,7 @@ export function createNodeDurableIssuanceStoreImplementation(options: unknown):
+ export function nodeIssuancePruningMaintenanceForStore(store: DurableIssuanceStore):
+ 	| Readonly<{
+ 			inspectPruningState(scope: DurableIssueScope): Promise<DurableIssuancePruningState>;
++			pruneAuthenticatedSettledPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
+ 			prunePublishedPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
+ 	  }>
+ 	| undefined {
+commit 1063feca39d60d24972ee101ab4051b4c1a23bb9
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Fri Sep 4 17:23:07 2026 -0400
+
+    feat(hardening): reclaim authenticated settled issuance
+
+diff --git a/packages/issuance-store/src/conformance.ts b/packages/issuance-store/src/conformance.ts
+index e9f6c44f..fd892545 100644
+--- a/packages/issuance-store/src/conformance.ts
++++ b/packages/issuance-store/src/conformance.ts
+@@ -21,6 +21,7 @@ import {
+ 	isValidDurableScopeField as validScopeField,
+ } from "./contract.js";
+ import {
++	bindDurableIssuancePruningMaintenance,
+ 	captureDurableIssuancePruningInput,
+ 	createDurableIssuancePruningReceipt,
+ 	createDurableIssuancePruningState,
+@@ -32,6 +33,7 @@ import {
+ 	type DurableIssuancePruningMaintenance,
+ 	type DurableIssuancePruningReceipt,
+ 	type DurableIssuancePruningState,
++	settlementPlanPermitsAuthenticatedPruning,
+ } from "./maintenance.js";
+ import { DEFAULT_DURABLE_ISSUANCE_PAGE_LIMIT, MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT } from "./types.js";
+ import type {
+@@ -353,13 +355,25 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
+ 		);
+ 	}
+ 
++	async pruneAuthenticatedSettledPrefix(input: unknown): Promise<DurableIssuancePruningReceipt> {
++		return this.#prunePrefix(input, true);
++	}
++
+ 	async prunePublishedPrefix(input: unknown): Promise<DurableIssuancePruningReceipt> {
++		return this.#prunePrefix(input, false);
++	}
++
++	async #prunePrefix(input: unknown, authenticatedSettled: boolean): Promise<DurableIssuancePruningReceipt> {
+ 		const captured = captureDurableIssuancePruningInput(input);
+ 		await Promise.resolve();
+ 		this.#assertAvailable();
+ 		const key = scopeKey(captured.scope);
+ 		const lineage = cloneLineage(this.#lineages.get(key) ?? { exhausted: false, next: 0 });
+ 		const watermark = this.#watermarks.get(key) ?? null;
++		const plan = this.#plans.get(key);
++		if (authenticatedSettled && !settlementPlanPermitsAuthenticatedPruning(plan ?? null)) {
++			throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan is incomplete");
++		}
+ 		if (
+ 			captured.expectedPrunedThroughAuthorSequence !== null &&
+ 			(captured.expectedPrunedThroughAuthorSequence > captured.throughAuthorSequence ||
+@@ -386,8 +400,8 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
+ 			throw new InvalidArgumentFailure("selected pruning boundary is invalid");
+ 		}
+ 		const from = watermark === null ? 0 : watermark + 1;
+-		const plan = this.#plans.get(key);
+ 		if (
++			!authenticatedSettled &&
+ 			plan?.entries.some(
+ 				(entry) =>
+ 					entry.replacementSequence === null &&
+@@ -417,10 +431,10 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
+ 			) {
+ 				throw this.#latchCorruption();
+ 			}
+-			if (decoded.epoch !== captured.closedEpoch) {
++			if (!authenticatedSettled && decoded.epoch !== captured.closedEpoch) {
+ 				throw new InvalidArgumentFailure("selected issuance row belongs to another epoch");
+ 			}
+-			if (outbox.publishState === "pending") {
++			if (!authenticatedSettled && outbox.publishState === "pending") {
+ 				throw failure("ISSUANCE_RETRY_REQUIRED", "selected issuance prefix is not published");
+ 			}
+ 		}
+@@ -466,6 +480,18 @@ export function createEphemeralDurableIssuanceStore(
+ 		transactWriteSettlementPlan: (input) => implementation.transactWriteSettlementPlan(input),
+ 	};
+ 	implementationByStore.set(store, implementation);
++	if (
++		!bindDurableIssuancePruningMaintenance(
++			store,
++			Object.freeze({
++				inspectPruningState: (scope: DurableIssueScope) => implementation.inspectPruningState(scope),
++				pruneAuthenticatedSettledPrefix: (input: unknown) => implementation.pruneAuthenticatedSettledPrefix(input),
++				prunePublishedPrefix: (input: unknown) => implementation.prunePublishedPrefix(input),
++			})
++		)
++	) {
++		throw new TypeError("ephemeral issuance maintenance was already bound");
++	}
+ 	return store;
+ }
+ 
+@@ -481,6 +507,7 @@ export function resolveEphemeralDurableIssuancePruningMaintenance(
+ 	if (implementation === undefined) return undefined;
+ 	return Object.freeze({
+ 		inspectPruningState: (scope: DurableIssueScope) => implementation.inspectPruningState(scope),
++		pruneAuthenticatedSettledPrefix: (input: unknown) => implementation.pruneAuthenticatedSettledPrefix(input),
+ 		prunePublishedPrefix: (input: unknown) => implementation.prunePublishedPrefix(input),
+ 	});
+ }
+diff --git a/packages/storage-browser/src/internal/browser-issuance-store.ts b/packages/storage-browser/src/internal/browser-issuance-store.ts
+index 4c4c1665..a90605d6 100644
+--- a/packages/storage-browser/src/internal/browser-issuance-store.ts
++++ b/packages/storage-browser/src/internal/browser-issuance-store.ts
+@@ -33,6 +33,7 @@ import {
+ 	type SettlementPlan,
+ } from "@ts-drp/issuance-store";
+ import {
++	bindDurableIssuancePruningMaintenance,
+ 	captureDurableIssuancePruningInput,
+ 	createDurableIssuancePruningReceipt,
+ 	createDurableIssuancePruningState,
+@@ -44,6 +45,7 @@ import {
+ 	type DurableIssuancePruningReceipt,
+ 	type DurableIssuancePruningState,
+ 	DurableIssuanceRecordPrunedError,
++	settlementPlanPermitsAuthenticatedPruning,
+ } from "@ts-drp/issuance-store/maintenance";
+ 
+ const DATABASE_SUFFIX = "--drp-issuance-v1";
+@@ -689,7 +691,15 @@ class BrowserIssuanceImplementation {
+ 		}
+ 	}
+ 
++	async pruneAuthenticatedSettledPrefix(input: unknown): Promise<DurableIssuancePruningReceipt> {
++		return this.#prunePrefix(input, true);
++	}
++
+ 	async prunePublishedPrefix(input: unknown): Promise<DurableIssuancePruningReceipt> {
++		return this.#prunePrefix(input, false);
++	}
++
++	async #prunePrefix(input: unknown, authenticatedSettled: boolean): Promise<DurableIssuancePruningReceipt> {
+ 		const captured = captureDurableIssuancePruningInput(input);
+ 		this.#assertAvailable();
+ 		const transaction = this.#startTransaction("readwrite");
+@@ -707,6 +717,17 @@ class BrowserIssuanceImplementation {
+ 					: copyNativeLineage(rawLineage, captured.scope);
+ 			if (current === undefined) throw this.#latchCorruption("stored lineage is malformed");
+ 			const lineage = { exhausted: current.exhausted, next: current.next };
++			let plan: SettlementPlan | null | undefined;
++			if (authenticatedSettled) {
++				const rawPlan = await requestResult(settlementPlans.get([captured.scope.objectId, captured.scope.author]));
++				plan = rawPlan === undefined ? null : copyNativeSettlementPlan(rawPlan, captured.scope);
++				if (rawPlan !== undefined && plan === undefined) {
++					throw this.#latchCorruption("stored settlement plan is malformed");
++				}
++				if (!settlementPlanPermitsAuthenticatedPruning(plan ?? null)) {
++					throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement plan is incomplete");
++				}
++			}
+ 			if (
+ 				captured.expectedPrunedThroughAuthorSequence !== null &&
+ 				(captured.expectedPrunedThroughAuthorSequence > captured.throughAuthorSequence ||
+@@ -735,12 +756,15 @@ class BrowserIssuanceImplementation {
+ 				throw invalid("selected pruning boundary is invalid");
+ 			}
+ 			const from = current.prunedThroughAuthorSequence === null ? 0 : current.prunedThroughAuthorSequence + 1;
+-			const rawPlan = await requestResult(settlementPlans.get([captured.scope.objectId, captured.scope.author]));
+-			const plan = rawPlan === undefined ? null : copyNativeSettlementPlan(rawPlan, captured.scope);
+-			if (rawPlan !== undefined && plan === undefined) {
+-				throw this.#latchCorruption("stored settlement plan is malformed");
++			if (!authenticatedSettled) {
++				const rawPlan = await requestResult(settlementPlans.get([captured.scope.objectId, captured.scope.author]));
++				plan = rawPlan === undefined ? null : copyNativeSettlementPlan(rawPlan, captured.scope);
++				if (rawPlan !== undefined && plan === undefined) {
++					throw this.#latchCorruption("stored settlement plan is malformed");
++				}
+ 			}
+ 			if (
++				!authenticatedSettled &&
+ 				plan?.entries.some(
+ 					(entry) =>
+ 						entry.replacementSequence === null &&
+@@ -772,10 +796,10 @@ class BrowserIssuanceImplementation {
+ 					}
+ 					const decoded = decodeDurableIssuancePreimage(issued.canonicalPreimageBytes, captured.scope, authorSequence);
+ 					if (decoded === undefined) throw this.#latchCorruption("selected issuance preimage is malformed");
+-					if (decoded.epoch !== captured.closedEpoch) {
++					if (!authenticatedSettled && decoded.epoch !== captured.closedEpoch) {
+ 						throw invalid("selected issuance row belongs to another epoch");
+ 					}
+-					if (outbox.publishState === "pending") {
++					if (!authenticatedSettled && outbox.publishState === "pending") {
+ 						throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "selected issuance prefix is not published");
+ 					}
+ 				}
+@@ -1338,6 +1362,14 @@ export async function createBrowserDurableIssuanceStoreImplementation(options: u
+ 			transactWriteSettlementPlan: (input: unknown) => implementation.transactWriteSettlementPlan(input),
+ 		});
+ 		implementationByStore.set(store, implementation);
++		const maintenance = Object.freeze({
++			inspectPruningState: (scope: DurableIssueScope) => implementation.inspectPruningState(scope),
++			pruneAuthenticatedSettledPrefix: (input: unknown) => implementation.pruneAuthenticatedSettledPrefix(input),
++			prunePublishedPrefix: (input: unknown) => implementation.prunePublishedPrefix(input),
++		});
++		if (!bindDurableIssuancePruningMaintenance(store, maintenance)) {
++			throw new TypeError("browser issuance maintenance was already bound");
++		}
+ 		return store;
+ 	} catch (error) {
+ 		database.onversionchange = null;
+@@ -1366,6 +1398,7 @@ export function browserIssuanceImplementationForTest(
+ export function browserIssuancePruningMaintenanceForStore(store: DurableIssuanceStore):
+ 	| Readonly<{
+ 			inspectPruningState(scope: DurableIssueScope): Promise<DurableIssuancePruningState>;
++			pruneAuthenticatedSettledPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
+ 			prunePublishedPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
+ 	  }>
+ 	| undefined {
+@@ -1373,6 +1406,7 @@ export function browserIssuancePruningMaintenanceForStore(store: DurableIssuance
+ 	if (implementation === undefined) return undefined;
+ 	return Object.freeze({
+ 		inspectPruningState: (scope: DurableIssueScope) => implementation.inspectPruningState(scope),
++		pruneAuthenticatedSettledPrefix: (input: unknown) => implementation.pruneAuthenticatedSettledPrefix(input),
+ 		prunePublishedPrefix: (input: unknown) => implementation.prunePublishedPrefix(input),
+ 	});
+ }
+commit 1063feca39d60d24972ee101ab4051b4c1a23bb9
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Fri Sep 4 17:23:07 2026 -0400
+
+    feat(hardening): reclaim authenticated settled issuance
+
+diff --git a/packages/node/src/v3-live.ts b/packages/node/src/v3-live.ts
+index df25dcd5..6e2a2680 100644
+--- a/packages/node/src/v3-live.ts
++++ b/packages/node/src/v3-live.ts
+@@ -23,7 +23,13 @@ import {
+ 	type DurableOutboxPageInput,
+ 	type DurableOutboxPublicationTransitionInput,
+ } from "@ts-drp/issuance-store";
+-import { durableIssuanceLineageConsumed, type DurableIssuancePruningReceipt } from "@ts-drp/issuance-store/maintenance";
++import {
++	bindDurableIssuancePruningMaintenance,
++	durableIssuanceLineageConsumed,
++	durableIssuanceLineagesEqual,
++	durableIssuancePruningMaintenanceForStore,
++	type DurableIssuancePruningReceipt,
++} from "@ts-drp/issuance-store/maintenance";
+ import type { DurableLiveJournalStore, LiveJournalScope } from "@ts-drp/live-journal";
+ import type { MessageQueueManager } from "@ts-drp/message-queue";
+ import {
+@@ -3172,6 +3178,39 @@ async function reclaimV3RuntimeKernel(input: D109dRuntimeReclamationInput): Prom
+ 			) {
+ 				return d109dFailure("D109D_RUNTIME_NOT_READY");
+ 			}
++			if (settlementProfileFor(initial.payload.trust.trust.profileId) === "v1") {
++				const maintenance = durableIssuancePruningMaintenanceForStore(initial.issuanceStore);
++				if (maintenance === undefined) return d109dFailure("D109D_INTERNAL_INVARIANT");
++				const deletedRange = receipts.issuance.deletedAuthorSequenceRange;
++				const expectedPriorWatermark =
++					deletedRange === null
++						? receipts.issuance.prunedThroughAuthorSequence
++						: deletedRange.from === 0
++							? null
++							: deletedRange.from - 1;
++				try {
++					// The receipt pair reaches this owner only after planClosedEpochCleanup(...) has
++					// authenticated adoption, rollback retention, availability and expected-head state.
++					const replay = await maintenance.pruneAuthenticatedSettledPrefix({
++						closedEpoch: receipts.issuance.closedEpoch,
++						commitQcRef: receipts.issuance.commitQcRef,
++						expectedLineage: receipts.issuance.observedLineage,
++						expectedPrunedThroughAuthorSequence: expectedPriorWatermark,
++						scope: receipts.issuance.scope,
++						snapshotManifestDigest: receipts.issuance.snapshotManifestDigest,
++						throughAuthorSequence: receipts.issuance.prunedThroughAuthorSequence,
++					});
++					if (
++						replay.deletedAuthorSequenceRange !== null ||
++						replay.prunedThroughAuthorSequence !== receipts.issuance.prunedThroughAuthorSequence ||
++						!durableIssuanceLineagesEqual(replay.observedLineage, receipts.issuance.observedLineage)
++					) {
++						return d109dFailure("D109D_RECEIPT_MISMATCH");
++					}
++				} catch {
++					return d109dFailure("D109D_RUNTIME_NOT_READY");
++				}
++			}
+ 
+ 			const predecessorReference = initial.hotPredecessor;
+ 			let predecessor = predecessorReference?.deref();
+@@ -4450,7 +4489,8 @@ function countHistoricalIssuanceRow(context: HistoricalIssuanceContext | undefin
+ 	if (ReflectApply(SetPrototypeHas, context.countedSequences, [authorSequence]) === true) return true;
+ 	context.count += 1;
+ 	ReflectApply(SetPrototypeAdd, context.countedSequences, [authorSequence]);
+-	return context.count <= context.maxEpochVertices;
++	const maxHistoricalIssuanceRows = context.maxEpochVertices * 3;
++	return context.count <= maxHistoricalIssuanceRows;
+ }
+ 
+ function recoveryFailure(
+@@ -5056,7 +5096,7 @@ function creatorFilteredIssuanceStore(
+ 	exactCanonicalPinnedGenesisBootstrapOperationBytes?: Uint8Array,
+ 	historicalIssuance?: HistoricalIssuanceContext
+ ): DurableIssuanceStore {
+-	return ObjectFreeze({
++	const filtered = ObjectFreeze({
+ 		close: () => issuanceStore.close(),
+ 		compareAndMarkOutboxPublished: (input: DurableOutboxPublicationTransitionInput) =>
+ 			issuanceStore.compareAndMarkOutboxPublished(input),
+@@ -5160,6 +5200,11 @@ function creatorFilteredIssuanceStore(
+ 		transactWriteSettlementPlan: (input: Parameters<DurableIssuanceStore["transactWriteSettlementPlan"]>[0]) =>
+ 			issuanceStore.transactWriteSettlementPlan(input),
+ 	});
++	const maintenance = durableIssuancePruningMaintenanceForStore(issuanceStore);
++	if (maintenance !== undefined && !bindDurableIssuancePruningMaintenance(filtered, maintenance)) {
++		throw new TypeError("filtered issuance maintenance was already bound");
++	}
++	return filtered;
+ }
+ 
+ function openRecoveryAuthorization(
+66:} from "./internal/runtime-reclamation.js";
+	type PresentHead,
+} from "@ts-drp/storage";
+import type { SnapshotQuarantineDeclaration, SnapshotQuarantineStore } from "@ts-drp/storage/snapshot-transfer";
+
+import { installCreatorAdoptionFacts, revokeCreatorAdoptionFacts } from "./internal/creator-adoption-intent.js";
+import { deriveCreatorIssuanceRetirementBoundary } from "./internal/creator-issuance-retirement-boundary.js";
+import { inspectCreatorTransitionAdvance } from "./internal/creator-transition-advance.js";
+import {
+	type CreatorCloseRuntimeReleaseCensus,
+	type CreatorCloseRuntimeReleasePlan,
+	installCreatorCloseRuntimeRelease,
+} from "./internal/runtime-reclamation.js";
+import type { V3PlaneHandle } from "./v3-live.js";
+
+const PROFILE: SnapshotTransferProfile = Object.freeze({
+	maxManifestBytes: 212_387,
+packages/node/dist/src/internal/runtime-reclamation.d.ts:83:export declare function reclaimInstalledV3Runtime(value: unknown): Promise<D109dRuntimeReclamationResult>;
+packages/node/src/internal/runtime-reclamation.ts:152:export function reclaimInstalledV3Runtime(value: unknown): Promise<D109dRuntimeReclamationResult> {
+./tests/fixtures/phase-6c/retained-heap-worker.ts
+./tests/fixtures/phase-6b/runtime-reclamation-contract.ts
+./tests/phase-6b-runtime-reclamation-red.test.ts
+./packages/node/src/internal/runtime-reclamation.ts
+tests: 21 passed: 2 failed: 19
+PASSED | pins the f5b0d boundary and hands non-issuance scope retirement to D.110c-c | 
+FAILED | installs one storage-neutral authenticated settled-prefix owner without relying on a missing import | AssertionError: D110C_0C1F5B0D_AUTHENTICATED_SETTLED_OWNER_MISSING: expected [ …(4) ] to deeply equal []
+FAILED | memory refuses a settlement-profile prefix when the durable plan is absent | AssertionError: D110C_0C1F5B0D_ABSENT_PLAN_PRUNE_ALLOWED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+FAILED | browser refuses a settlement-profile prefix when the durable plan is absent | AssertionError: D110C_0C1F5B0D_ABSENT_PLAN_PRUNE_ALLOWED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+FAILED | node refuses a settlement-profile prefix when the durable plan is absent | AssertionError: D110C_0C1F5B0D_ABSENT_PLAN_PRUNE_ALLOWED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+FAILED | memory refuses while the required fence link is incomplete | AssertionError: D110C_0C1F5B0D_FENCE_INCOMPLETE_PRUNE_ALLOWED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+FAILED | browser refuses while the required fence link is incomplete | AssertionError: D110C_0C1F5B0D_FENCE_INCOMPLETE_PRUNE_ALLOWED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+FAILED | node refuses while the required fence link is incomplete | AssertionError: D110C_0C1F5B0D_FENCE_INCOMPLETE_PRUNE_ALLOWED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+FAILED | memory refuses an unlinked entry outside the selected prefix and deletes nothing | AssertionError: D110C_0C1F5B0D_OUTSIDE_UNLINKED_ENTRY_IGNORED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+FAILED | browser refuses an unlinked entry outside the selected prefix and deletes nothing | AssertionError: D110C_0C1F5B0D_OUTSIDE_UNLINKED_ENTRY_IGNORED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+FAILED | node refuses an unlinked entry outside the selected prefix and deletes nothing | AssertionError: D110C_0C1F5B0D_OUTSIDE_UNLINKED_ENTRY_IGNORED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+FAILED | memory refuses manual review outside the selected prefix and deletes nothing | AssertionError: D110C_0C1F5B0D_MANUAL_REVIEW_PRUNE_ALLOWED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+FAILED | browser refuses manual review outside the selected prefix and deletes nothing | AssertionError: D110C_0C1F5B0D_MANUAL_REVIEW_PRUNE_ALLOWED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+FAILED | node refuses manual review outside the selected prefix and deletes nothing | AssertionError: D110C_0C1F5B0D_MANUAL_REVIEW_PRUNE_ALLOWED: expected undefined to be 'ISSUANCE_RETRY_REQUIRED' // Object.is equality
+FAILED | memory prunes one authenticated complete mixed-epoch pending/published prefix and replays monotonica | DurableIssuanceTypeError: selected issuance row belongs to another epoch
+FAILED | browser prunes one authenticated complete mixed-epoch pending/published prefix and replays monotonic | DurableIssuanceTypeError: selected issuance row belongs to another epoch
+FAILED | node prunes one authenticated complete mixed-epoch pending/published prefix and replays monotonicall | DurableIssuanceTypeError: selected issuance row belongs to another epoch
+PASSED | node rolls back both tables and the watermark when an authenticated prune crashes mid-transaction | 
+FAILED | invokes authenticated pruning only from the production cleanup path that owns verified adoption gate | AssertionError: D110C_0C1F5B0D_PRODUCTION_PRUNE_INVOCATION_MISSING: expected 'import type { TrustedBlueprintCatalog…' to contain '.pruneAuthenticatedS
+FAILED | removes the raw single-epoch historical issuance scan ceiling | AssertionError: D110C_0C1F5B0D_SINGLE_EPOCH_RECOVERY_SCAN_CAP_RETAINED: expected 'function countHistoricalIssuanceRow(c…' not to contain 'context.coun
+FAILED | bounds historical recovery by rollback generations or the authenticated settled watermark | AssertionError: D110C_0C1F5B0D_RECOVERY_SCAN_NOT_ROLLBACK_OR_WATERMARK_BOUNDED: expected false to be true // Object.is equality
+focused -> total: 21 passed: 21 failed: 0 suites: 2
+isolated-focused -> total: 21 passed: 21 failed: 0 suites: 2
+retained-core -> total: 124 passed: 124 failed: 0 suites: 12
+isolated-retained -> total: 124 passed: 124 failed: 0 suites: 12
+retained-settlement-recovery -> total: 112 passed: 112 failed: 0 suites: 18
+browser-retained -> total: None passed: None failed: None suites: None
+inherited-f5b0a-corrective -> total: 4 passed: 3 failed: 1 suites: 2
+PASSED | installs and reopens genuine settlement-profile trust without rewriting its profile, then settles with success
+PASSED | normalizes exactly one settlement checkpoint and no legacy carriers while retaining legacy cardinalities
+PASSED | uses the settlement author-authorization ceiling for 256 authors while preserving legacy byte and author caps
+FAILED | binds genesis advance to the exported settlement sentinel and retains settled-v1 digest adjacency
+    AssertionError: expected { ok: false, …(1) } to match object { ok: true } | (1 matching property omitted from actual) |     at Proxy.<anonymous> (file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js:1066:10) |     at Proxy.<anonymous> (file:///Users/aristotle/Documents
+---- browser-retained:
+{
+ "startTime": "2026-09-04T21:26:44.341Z",
+ "duration": 1451.527,
+ "expected": 4,
+ "skipped": 0,
+ "unexpected": 0,
+ "flaky": 0
+}
+1
+
+
+/Users/aristotle/Documents/Projects/ts-drp-1/tests/d110c-0c1f5b0a-corrective-red.test.ts
+390:	it("binds genesis advance to the exported settlement sentinel and retains settled-v1 digest adjacency", () => {
+import { ed25519 } from "@noble/curves/ed25519.js";
+import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { digestBlob, type GenerationRef } from "@ts-drp/storage";
+import { describe, expect, it } from "vitest";
+
+import {
+	contract as anchorContract,
+	bytesHex,
+	hexBytes,
+	independentHashDomain,
+	makeCreatorMaterial,
+} from "./fixtures/phase-3a0-v3/controlled-anchor-trust.js";
+import {
+	inspectCreatorAuthorSettlementAdvance,
+	inspectCreatorTransitionAdvance,
+} from "../packages/node/src/internal/creator-transition-advance.js";
+import { openCurrentEpochAuthorAuthorization } from "../packages/protocol-v3/src/author-authorization.js";
+import {
+	completeCreatorAuthorIssuanceFrontiers,
+	completeCreatorAuthorSettlement,
+	CREATOR_AUTHOR_ISSUANCE_FRONTIERS_GENESIS_SENTINEL,
+	CREATOR_AUTHOR_ISSUANCE_FRONTIERS_KIND,
+	CREATOR_AUTHOR_SETTLEMENT_GENESIS_SENTINEL,
+	openCreatorAuthorSettlement,
+	prepareCreatorAuthorIssuanceFrontiers,
+	prepareCreatorAuthorSettlement,
+} from "../packages/protocol-v3/src/creator-author-issuance-frontiers.js";
+import {
+	completeCreatorIssuanceRetirement,
+	CREATOR_ISSUANCE_RETIREMENT_GENESIS_SENTINEL,
+	CREATOR_ISSUANCE_RETIREMENT_KIND,
+	prepareCreatorIssuanceRetirement,
+} from "../packages/protocol-v3/src/creator-issuance-retirement.js";
+import { mintCreatorAnchorTrustSuccessor } from "../packages/protocol-v3/src/internal/seal-authority-custody.js";
+import {
+	type CurrentAnchorTrust,
+	installCreatorAnchorTrustRoot,
+	openCurrentAnchorTrust,
+} from "../packages/protocol-v3/src/public.js";
+
+1:import { decodeCanonical, hashDomain } from "@ts-drp/canonical";
+2:import type { DetachedClosureCandidate } from "@ts-drp/control-plane";
+3:import { inspectCreatorTrustAdvance } from "@ts-drp/control-plane/creator-trust-advance";
+4:import { inspectBoundedCreatorTrustAdvance } from "@ts-drp/control-plane/creator-trust-checkpoint-advance";
+5:import type { CurrentAnchorTrust } from "@ts-drp/protocol-v3";
+6:import {
+17:} from "@ts-drp/protocol-v3/creator-author-issuance-frontiers";
+18:import {
+24:} from "@ts-drp/protocol-v3/creator-issuance-retirement";
+25:import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
+26:import { digestBlob, type GenerationRef } from "@ts-drp/storage";
+---
+packages/node/src/internal/creator-transition-advance.ts:211:export function inspectCreatorAuthorSettlementAdvance(
+issuance-store=0
+storage-browser=1
+storage-node=1
+node=1
+issuance-store=0
+storage-browser=0
+storage-node=0
+node=0
+eslint=0
+prettier=0
+diff-check=0
+source-shape=0
+
+> @ts-drp/node@0.11.0 typecheck /Users/aristotle/Documents/Projects/ts-drp-1/packages/node
+> tsc --noEmit
+
+tests/browser/fixtures/blueprint-fold.page.ts(2,34): error TS6059: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/host.ts' is not under 'rootDir' '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/package.json' has field "type" with value "module"
+tests/browser/fixtures/blueprint-fold.page.ts(2,34): error TS6307: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/host.ts' is not listed within the file list of project '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/package.json' has field "type" with value "module"
+tests/browser/fixtures/blueprint-fold.worker.ts(2,56): error TS6059: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/worker.ts' is not under 'rootDir' '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/package.json' has field "type" with value "module"
+tests/browser/fixtures/blueprint-fold.worker.ts(2,56): error TS6307: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/worker.ts' is not listed within the file list of project '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+  File is ECMAScript module because '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/package.json' has field "type" with value "module"
+tests/ephemeral-webrtc-e3-02-red.test.ts(523,12): error TS2339: Property 'emit' does not exist on type 'DRPUnreliableWebRtcRoute'.
+tests/helpers/compact-history-scale-1i-b.ts(152,4): error TS1360: Type '{ history_storage: "full" | "compact"; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' does not satisfy the expected type 'DRPObjectConfig'.
+  Type '{ history_storage: "full" | "compact"; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' is not assignable to type 'DRPObjectConfigBase & { history_storage: "compact"; replica_mode: "observer"; }'.
+    Type '{ history_storage: "full" | "compact"; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' is not assignable to type '{ history_storage: "compact"; replica_mode: "observer"; }'.
+      Types of property 'history_storage' are incompatible.
+        Type '"full" | "compact"' is not assignable to type '"compact"'.
+          Type '"full"' is not assignable to type '"compact"'.
+tests/helpers/compact-history-scale-1i-b.ts(157,3): error TS2322: Type '{ history_storage: "full" | "compact"; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' is not assignable to type 'DRPObjectConfig | undefined'.
+  Type '{ history_storage: "full" | "compact"; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' is not assignable to type '(DRPObjectConfigBase & { history_storage?: "full" | undefined; replica_mode?: ReplicaMode | undefined; }) | (DRPObjectConfigBase & { ...; })'.
+    Type '{ history_storage: "full" | "compact"; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' is not assignable to type 'DRPObjectConfigBase & { history_storage: "compact"; replica_mode: "observer"; }'.
+      Type '{ history_storage: "full" | "compact"; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' is not assignable to type '{ history_storage: "compact"; replica_mode: "observer"; }'.
+        Types of property 'history_storage' are incompatible.
+          Type '"full" | "compact"' is not assignable to type '"compact"'.
+            Type '"full"' is not assignable to type '"compact"'.
+../worker-host/src/host.ts(1,62): error TS6059: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/error.ts' is not under 'rootDir' '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node'. 'rootDir' is expected to contain all source files.
+  The file is in the program because:
+    Imported via "./error.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/host.ts'
+    Imported via "./error.js" from file '/Users/aristotle/Documents/Projects/ts-drp-1/packages/worker-host/src/metrics.ts'
+===
+.logs/d110c-0c1f5b0d-green-1063feca/typecheck-node.log:13
+.logs/d110c-0c1f5b0d-green-1063feca/typecheck-storage-node.log:144
+.logs/d110c-0c1f5b0d-green-1063feca/typecheck-storage-browser.log:74
+tests/assets/phase-6b-ahe-reclamation-entry.ts(16,8): error TS2307: Cannot find module '#phase-6b-ahe-reclamation-maintenance' or its corresponding type declarations.
+tests/assets/phase-6b-ahe-reclamation-worker.ts(7,8): error TS2307: Cannot find module '#phase-6b-ahe-reclamation-maintenance' or its corresponding type declarations.
+tests/assets/phase-6b-issuance-retention-entry.ts(9,8): error TS2307: Cannot find module '#phase-6b-issuance-maintenance' or its corresponding type declarations.
+../node/src/creator-close.ts(67,36): error TS6059: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-live.ts' is not under 'rootDir' '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node'. 'rootDir' is expected to contain all source files.
+../node/src/creator-close.ts(67,36): error TS6307: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-live.ts' is not listed within the file list of project '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+../node/src/v3-live.ts(109,37): error TS6059: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/v3-topic.ts' is not under 'rootDir' '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node'. 'rootDir' is expected to contain all source files.
+../node/src/v3-live.ts(109,37): error TS6307: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/v3-topic.ts' is not listed within the file list of project '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+../node/src/v3-live.ts(110,41): error TS6059: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-envelope-scope.ts' is not under 'rootDir' '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node'. 'rootDir' is expected to contain all source files.
+../node/src/v3-live.ts(110,41): error TS6307: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-envelope-scope.ts' is not listed within the file list of project '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+../node/src/v3-live.ts(111,82): error TS6059: File '/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-live-recovered-authority.ts' is not under 'rootDir' '/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node'. 'rootDir' is expected to contain all source files.
+exit=0
+{
+ ".": {
+  "types": "./dist/src/index.d.ts",
+  "import": "./dist/src/index.js"
+ },
+ "./conformance": {
+  "types": "./dist/src/conformance.d.ts",
+  "import": "./dist/src/conformance.js"
+ },
+ "./maintenance": {
+  "types": "./dist/src/maintenance.d.ts",
+  "import": "./dist/src/maintenance.js"
+ }
+}
+899:const creatorHistoricalIssuanceHandoffs = new WeakMap<object, HistoricalIssuanceContext>();
+2686:	historicalIssuance?: HistoricalIssuanceContext;
+3711:		registration.historicalIssuance === recovered.historicalIssuance &&
+4373:	readonly historicalIssuance?: HistoricalIssuanceContext;
+4473:interface HistoricalIssuanceContext {
+4481:function beginHistoricalIssuanceScan(context: HistoricalIssuanceContext | undefined): void {
+4487:function countHistoricalIssuanceRow(context: HistoricalIssuanceContext | undefined, authorSequence: number): boolean {
+4492:	const maxHistoricalIssuanceRows = context.maxEpochVertices * 3;
+4493:	return context.count <= maxHistoricalIssuanceRows;
+4732:	historicalIssuance: HistoricalIssuanceContext | undefined,
+4807:	const historical = authenticatedCoveredHistoricalOutboxRow(row, row.scope, payload, historicalIssuance);
+5029:	historicalIssuance: HistoricalIssuanceContext | undefined
+5034:			historicalIssuance === undefined ||
+5041:		const identity = resolveVerifiedCreatorHistoricalIssuance(historicalIssuance.capability);
+5044:			historicalIssuance.scopeAuthorMatches !== true ||
+5097:	historicalIssuance?: HistoricalIssuanceContext
+5149:					historicalIssuance === undefined
+5151:						: resolveVerifiedCreatorHistoricalIssuance(historicalIssuance.capability);
+5155:						: authenticatedCoveredHistoricalOutboxRow(row, issuanceScope, filterPayload, historicalIssuance);
+5167:					if (!countHistoricalIssuanceRow(historicalIssuance, row.authorSequence)) return page;
+5302:		const historicalIssuance = creatorHistoricalIssuanceHandoffs.get(input.capability as object);
+5303:		if (historicalIssuance !== undefined) creatorHistoricalIssuanceHandoffs.delete(input.capability as object);
+5411:		if (historicalIssuance !== undefined) {
+5412:			const identity = resolveVerifiedCreatorHistoricalIssuance(historicalIssuance.capability);
+5419:				historicalIssuance.scopeAuthorMatches !== (identity.author === selectedScope.author) ||
+5683:		beginHistoricalIssuanceScan(historicalIssuance);
+5719:					historicalIssuance,
+5733:					!countHistoricalIssuanceRow(historicalIssuance, row.authorSequence) ||
+6004:			(historicalIssuance?.count ?? 0) === 0 &&
+6012:			((recoveredCount === 0 && (historicalIssuance?.count ?? 0) === 0) ||
+4. the Node close owner splits complete control∪application maps from the exact
+   application subset. Index, charges, frontier, close-set, history and creator
+   scanning use the complete union; only the application subset reaches the
+   unchanged compaction fold;
+5. blueprint preparation reserves `$drp.author-settlement.v1`. Local issue,
+   ingress, pinned-genesis, covered-historical, displaced/current and journal
+   paths receive exact settlement recognition/skip rules. Control issue uses a
+   dedicated Node transaction owner rather than the blueprint-bound issuer;
+6. the checkpoint carries distinct `admittedThrough` and `settledThrough` per
+   current member plus the authenticated retired-author registry root/count.
+   Settlement-profile genesis initializes both boundaries to null and uses the
+   empty registry; no legacy frontier is imported;
+7. `creator-trusted-settlement-v1` is selected in genesis profile bytes with
+   the same fixed one-of-one creator authority. Its closures contain neither
+   v1 aggregate nor legacy retirement. Existing `creator-trusted-v1` rooms
+   remain byte-compatible and cannot late-opt-in in this slice; and
+8. f5b0d owns `pruneAuthenticatedSettledPrefix`, a storage-neutral monotone CAS
+   deletion across old epochs and pending/published rows after authenticated
+   adoption/rollback/availability gates. Legacy v1 pruning is unchanged.
+
+The removed-key blocker is real and now has an exact proposed owner. Once a
+removed author is omitted from the current ≤64-member vector, no present
+authenticated state tells the creator whether that public key is globally new
+or is reusing a never-resetting sequence. D.110c-0c1f5b0p therefore selects a
+creator-authenticated content-addressed Merkle AVL dictionary of currently
+retired keys. Its root/count join the signed settlement checkpoint; membership
+restores the last boundaries, nonmembership alone permits sequence zero, and a
+separate strict-durability store supplies verified O(log R) paths only to the
+creator during ACL membership change. Ordinary cold reopen needs only the
+signed root/current vector. Reachable dictionary backing is explicit O(R)
+archive-tier control index state, counted separately rather than hidden as
+application archive or bootstrap. If confirmation requires O(1) durable bytes
+under unbounded distinct-key churn, the hash-only design stops and reslices to
+a cryptographic accumulator/recursive-proof prerequisite.
+
+(Superseded slice definitions: the f5b0a–f5b0d/f5b descriptions below carry
+the retired per-source grammar and are retained as evidence only; the
+authoritative slice list is design.md "TDD implementation slices" under
+D.110c-0c1f5b0r.) After an empty combined confirmation, implementation remains split by owner:
+f5b0p-a pure registry/profile codecs and f5b0p-b neutral memory/browser registry
+storage; f5b0a protocol carrier/checkpoint codecs/reservation/compatibility;
+f5b0b Node settlement authentication,
+transaction and close-graph split with compaction noninterference; f5b0c room
+policy, exact indexed replacements, zero-intent sources and migration-import
+manual review; f5b0d issuance-store/browser/cleanup settled-prefix reclamation;
+and f5b creator dual-frontier advancement, registry transition, recovery and
+gated pruning. Each gets causal tests-only RED before GREEN and bounded
+focused/static/retained/isolated evidence. The final f5b review covers the
+complete signed design→RED→GREEN history.
+
+RED still must use genuine signed vertices, durable source rows, normal
+reissue, creator ingress, close/adopt, restart and cold reopen; tests-only
+receipts/checkpoints/storage injection cannot satisfy causality. Required cases
+now include the 6,003-byte maximum and adjacent count/byte failures, batched
+entry substitution, zero-intent genesis gaps, settlement-in-history but not
+fold, creator and non-creator rows, old-profile noninterference, mixed-epoch
+pruning, same-key re-entry continuation, fresh-key sequence zero, manual review, cross-object migration refusal,
+crashes, incompatible peers and unchanged f5a foreign-author liveness.
+
+No production edit or RED is authorized until the amended combined design
+receives the one permitted material Grok 4.6/high, direct Kimi K3 100-step and
+Opus xhigh confirmation with an empty P0/P1 union. P2 receives an
+owner/disposition without recursive prose review. Do not invoke Fable or
+collaboration subagents without new express user authorization.
+
+###### D.110c-0c1f5b0p bounded removed-author identity-history prerequisite
+
+**Status: SUPERSEDED by D.110c-0c1f5b0r, which drops the Merkle AVL
+retired-author dictionary in favor of an `admissionEpoch` carried in the
+settlement checkpoint frontier; the signed checkpoint and its blocking union are
+retained as evidence, and its deadline clause is void: RED authorization now
+{
+	"record": "D.110c-0c1f5b0d",
+	"red": "9ab5924a34faf9cd1e0f42b79026ef5313318da8",
+	"green": "1063feca39d60d24972ee101ab4051b4c1a23bb9",
+	"greenSignature": "G",
+	"pushed": true,
+	"focused": { "passed": 21, "failed": 0, "skipped": 0 },
+	"retainedCore": { "passed": 124, "failed": 0, "skipped": 0 },
+	"retainedSettlementRecovery": { "passed": 112, "failed": 0, "skipped": 0 },
+	"browserRetained": { "passed": 4, "failed": 0 },
+	"isolatedFocused": { "passed": 21, "failed": 0, "skipped": 0 },
+	"isolatedRetained": { "passed": 124, "failed": 0, "skipped": 0 },
+	"builds": {
+		"issuanceStore": "pass",
+		"storageBrowser": "pass",
+		"storageNode": "pass",
+		"node": "pass"
+	},
+	"stopRuleFired": false,
+	"deferredScopeRetirement": "D.110c-c"
+}
+{
+	"baseCommit": "325e2c31b94dec78afb0a7574f45a91185208bb6",
+	"changedPaths": ["tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"],
+	"failed": 19,
+	"files": 1,
+	"passed": 2,
+	"redCommit": "9ab5924a34faf9cd1e0f42b79026ef5313318da8",
+	"skipped": 0,
+	"stopRuleFired": false,
+	"success": false,
+	"tests": 21,
+	"topLevelErrors": 0
+}
+===
+branch=codex/phase3a1b-p6-golden-path
+green=1063feca39d60d24972ee101ab4051b4c1a23bb9
+green-signature=G
+remote=1063feca39d60d24972ee101ab4051b4c1a23bb9
+stashes=27
+tracked-status:
+changed-paths:
+packages/issuance-store/src/conformance.ts
+packages/issuance-store/src/maintenance.ts
+packages/node/src/v3-live.ts
+packages/storage-browser/src/internal/browser-issuance-store.ts
+packages/storage-node/src/internal/node-issuance-store.ts
+===
+==> .logs/d110c-0c1f5b0d-green-1063feca/diff-check.log <==
+
+==> .logs/d110c-0c1f5b0d-green-1063feca/source-shape-check.log <==
+changed owners:
+packages/issuance-store/src/conformance.ts
+packages/issuance-store/src/maintenance.ts
+packages/node/src/v3-live.ts
+packages/storage-browser/src/internal/browser-issuance-store.ts
+packages/storage-node/src/internal/node-issuance-store.ts
+authenticated prune occurrences:
+packages/issuance-store/src/maintenance.ts:42:	pruneAuthenticatedSettledPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
+packages/issuance-store/src/conformance.ts:358:	async pruneAuthenticatedSettledPrefix(input: unknown): Promise<DurableIssuancePruningReceipt> {
+packages/issuance-store/src/conformance.ts:488:				pruneAuthenticatedSettledPrefix: (input: unknown) => implementation.pruneAuthenticatedSettledPrefix(input),
+packages/issuance-store/src/conformance.ts:510:		pruneAuthenticatedSettledPrefix: (input: unknown) => implementation.pruneAuthenticatedSettledPrefix(input),
+packages/storage-node/src/internal/node-issuance-store.ts:771:	pruneAuthenticatedSettledPrefix(input: unknown): Promise<DurableIssuancePruningReceipt> {
+packages/storage-node/src/internal/node-issuance-store.ts:1293:		pruneAuthenticatedSettledPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
+packages/storage-node/src/internal/node-issuance-store.ts:1334:			pruneAuthenticatedSettledPrefix: (input: unknown) => implementation.pruneAuthenticatedSettledPrefix(input),
+packages/storage-node/src/internal/node-issuance-store.ts:1366:			pruneAuthenticatedSettledPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
+packages/storage-browser/src/internal/browser-issuance-store.ts:694:	async pruneAuthenticatedSettledPrefix(input: unknown): Promise<DurableIssuancePruningReceipt> {
+packages/storage-browser/src/internal/browser-issuance-store.ts:1367:			pruneAuthenticatedSettledPrefix: (input: unknown) => implementation.pruneAuthenticatedSettledPrefix(input),
+packages/storage-browser/src/internal/browser-issuance-store.ts:1401:			pruneAuthenticatedSettledPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
+packages/storage-browser/src/internal/browser-issuance-store.ts:1409:		pruneAuthenticatedSettledPrefix: (input: unknown) => implementation.pruneAuthenticatedSettledPrefix(input),
+packages/node/src/v3-live.ts:3194:					const replay = await maintenance.pruneAuthenticatedSettledPrefix({
+gpg: Signature made Fri Sep  4 17:23:07 2026 AST
+gpg:                using RSA key 55E22F154FBAF8C84F378304761B99CEA81C6289
+gpg: Good signature from "Faolain <Faolain@users.noreply.github.com>" [ultimate]
+.logs/d110c-0c1f5b0d-red-9ab5924a/README.md
+.logs/d110c-0c1f5b0d-red-9ab5924a/changed-paths.txt
+.logs/d110c-0c1f5b0d-red-9ab5924a/commands.md
+.logs/d110c-0c1f5b0d-red-9ab5924a/custody.md
+.logs/d110c-0c1f5b0d-red-9ab5924a/deferred.md
+.logs/d110c-0c1f5b0d-red-9ab5924a/eslint.json
+.logs/d110c-0c1f5b0d-red-9ab5924a/focused.json
+.logs/d110c-0c1f5b0d-red-9ab5924a/manifest.sha256
+.logs/d110c-0c1f5b0d-red-9ab5924a/matrix.md
+.logs/d110c-0c1f5b0d-red-9ab5924a/rejected-fixture-diagnostic.md
+.logs/d110c-0c1f5b0d-red-9ab5924a/result.json
+.logs/d110c-0c1f5b0d-red-9ab5924a/source-shape.md
+packages/issuance-store/src/conformance.ts
+packages/issuance-store/src/maintenance.ts
+packages/node/src/v3-live.ts
+packages/storage-browser/src/internal/browser-issuance-store.ts
+packages/storage-node/src/internal/node-issuance-store.ts
+			try {
+				this.#database.exec("ROLLBACK");
+			} catch {
+				// Preserve the inspection failure.
+			}
+			throw this.#mapOperationError(error, "pruning-state inspection failed");
+		}
+	}
+
+	prunePublishedPrefix(input: unknown): Promise<DurableIssuancePruningReceipt> {
+		let captured: ReturnType<typeof captureDurableIssuancePruningInput>;
+		try {
+			captured = captureDurableIssuancePruningInput(input);
+			this.#assertAvailable();
+		} catch (error) {
+			return Promise.reject(error);
+		}
+		let began = false;
+		try {
+			this.#database.exec("BEGIN IMMEDIATE");
+			began = true;
+			const current = readNativeLineage(this.#database, captured.scope, "writer");
+			if (current === undefined) throw this.#latchCorruption("stored lineage is malformed");
+			const lineage = { exhausted: current.exhausted, next: current.next };
+			if (
+				captured.expectedPrunedThroughAuthorSequence !== null &&
+				(captured.expectedPrunedThroughAuthorSequence > captured.throughAuthorSequence ||
+					!durableIssuanceLineageConsumed(captured.expectedLineage, captured.expectedPrunedThroughAuthorSequence))
+			) {
+				throw invalid("expected pruning state is internally impossible");
+			}
+			if (
+				current.prunedThroughAuthorSequence === captured.throughAuthorSequence &&
+				durableIssuanceLineagesEqual(lineage, captured.expectedLineage)
+			) {
+				this.#database.exec("COMMIT");
+				began = false;
+				return Promise.resolve(createDurableIssuancePruningReceipt(captured, lineage, null));
+			}
+			if (
+				current.prunedThroughAuthorSequence !== captured.expectedPrunedThroughAuthorSequence ||
+				!durableIssuanceLineagesEqual(lineage, captured.expectedLineage)
+			) {
+				throw failure("ISSUANCE_RETRY_REQUIRED", "issuance pruning state changed");
+			}
+			if (
+				(current.prunedThroughAuthorSequence !== null &&
+					captured.throughAuthorSequence <= current.prunedThroughAuthorSequence) ||
+				!durableIssuanceLineageConsumed(lineage, captured.throughAuthorSequence)
+			) {
+				throw invalid("selected pruning boundary is invalid");
+			}
+			const from = current.prunedThroughAuthorSequence === null ? 0 : current.prunedThroughAuthorSequence + 1;
+			const plan = readSettlementPlanRow(this.#database, captured.scope);
+			if (plan === undefined) throw this.#latchCorruption("stored settlement plan is malformed");
+			if (
+				plan?.entries.some(
+					(entry) =>
+						entry.replacementSequence === null &&
+						entry.sourceSequence >= from &&
+						entry.sourceSequence <= captured.throughAuthorSequence
+				)
+			) {
+				throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan still references the selected prefix");
+			}
+			for (let pageFrom = from; pageFrom <= captured.throughAuthorSequence; pageFrom += 64) {
+				const pageThrough = Math.min(captured.throughAuthorSequence, pageFrom + 63);
+				const issuedRows = statement(
+					this.#database,
+					"SELECT object_id,author,author_sequence,canonical_preimage,digest,signature FROM issued_records WHERE object_id=? AND author=? AND author_sequence BETWEEN ? AND ? ORDER BY author_sequence"
+				).all(captured.scope.objectId, captured.scope.author, pageFrom, pageThrough);
+				const outboxRows = statement(
+					this.#database,
+					"SELECT object_id,author,author_sequence,digest,publish_state FROM issuance_outbox WHERE object_id=? AND author=? AND author_sequence BETWEEN ? AND ? ORDER BY author_sequence"
+				).all(captured.scope.objectId, captured.scope.author, pageFrom, pageThrough);
+				const expectedCount = pageThrough - pageFrom + 1;
+				if (issuedRows.length !== expectedCount || outboxRows.length !== expectedCount) {
+					throw this.#latchCorruption("selected issuance prefix is incomplete");
+				}
+				for (let index = 0; index < expectedCount; index += 1) {
+					const authorSequence = pageFrom + index;
+					const issued = copyIssuedRow(issuedRows[index]);
+					const outbox = copyOutboxRow(outboxRows[index]);
+					if (
+						issued === undefined ||
+						outbox === undefined ||
+						issued.authorSequence !== authorSequence ||
+						outbox.authorSequence !== authorSequence ||
+						!bytesEqual(issued.digest, outbox.digest)
+					) {
+						throw this.#latchCorruption("selected issuance prefix is malformed");
+					}
+					const decoded = decodeDurableIssuancePreimage(issued.canonicalPreimageBytes, captured.scope, authorSequence);
+					if (decoded === undefined) throw this.#latchCorruption("selected issuance preimage is malformed");
+					if (decoded.epoch !== captured.closedEpoch) {
+						throw invalid("selected issuance row belongs to another epoch");
+					}
+					if (outbox.publishState === "pending") {
+						throw failure("ISSUANCE_RETRY_REQUIRED", "selected issuance prefix is not published");
+					}
+				}

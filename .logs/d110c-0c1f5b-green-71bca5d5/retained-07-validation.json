@@ -1,0 +1,259 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 19,
+  "passed": 19,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-07/result.json",
+  "baselineSha256": "297c5a0ecd5e76e367e898379565a9c85d392d66e3eefe2ac3f1e6745fb7d360",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED pins the f5b0d boundary and hands non-issuance scope retirement to D.110c-c",
+      "status": "passed",
+      "title": "pins the f5b0d boundary and hands non-issuance scope retirement to D.110c-c",
+      "duration": 1.1455000000000837,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED installs one storage-neutral authenticated settled-prefix owner without relying on a missing import",
+      "status": "passed",
+      "title": "installs one storage-neutral authenticated settled-prefix owner without relying on a missing import",
+      "duration": 0.9668330000000651,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED memory refuses a settlement-profile prefix when the durable plan is absent",
+      "status": "passed",
+      "title": "memory refuses a settlement-profile prefix when the durable plan is absent",
+      "duration": 51.82416699999999,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED browser refuses a settlement-profile prefix when the durable plan is absent",
+      "status": "passed",
+      "title": "browser refuses a settlement-profile prefix when the durable plan is absent",
+      "duration": 62.82925,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED node refuses a settlement-profile prefix when the durable plan is absent",
+      "status": "passed",
+      "title": "node refuses a settlement-profile prefix when the durable plan is absent",
+      "duration": 32.91945800000008,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED memory refuses while the required fence link is incomplete",
+      "status": "passed",
+      "title": "memory refuses while the required fence link is incomplete",
+      "duration": 0.9822500000000218,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED browser refuses while the required fence link is incomplete",
+      "status": "passed",
+      "title": "browser refuses while the required fence link is incomplete",
+      "duration": 2.8563330000000633,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED node refuses while the required fence link is incomplete",
+      "status": "passed",
+      "title": "node refuses while the required fence link is incomplete",
+      "duration": 4.259916999999973,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED memory refuses an unlinked entry outside the selected prefix and deletes nothing",
+      "status": "passed",
+      "title": "memory refuses an unlinked entry outside the selected prefix and deletes nothing",
+      "duration": 1.025082999999995,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED browser refuses an unlinked entry outside the selected prefix and deletes nothing",
+      "status": "passed",
+      "title": "browser refuses an unlinked entry outside the selected prefix and deletes nothing",
+      "duration": 4.922709000000054,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED node refuses an unlinked entry outside the selected prefix and deletes nothing",
+      "status": "passed",
+      "title": "node refuses an unlinked entry outside the selected prefix and deletes nothing",
+      "duration": 5.741708000000017,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED memory refuses manual review outside the selected prefix and deletes nothing",
+      "status": "passed",
+      "title": "memory refuses manual review outside the selected prefix and deletes nothing",
+      "duration": 0.5454579999999396,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED browser refuses manual review outside the selected prefix and deletes nothing",
+      "status": "passed",
+      "title": "browser refuses manual review outside the selected prefix and deletes nothing",
+      "duration": 2.644042000000013,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED node refuses manual review outside the selected prefix and deletes nothing",
+      "status": "passed",
+      "title": "node refuses manual review outside the selected prefix and deletes nothing",
+      "duration": 4.115625000000023,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED memory prunes one authenticated complete mixed-epoch pending/published prefix and replays monotonically",
+      "status": "passed",
+      "title": "memory prunes one authenticated complete mixed-epoch pending/published prefix and replays monotonically",
+      "duration": 1.5998749999999973,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED browser prunes one authenticated complete mixed-epoch pending/published prefix and replays monotonically",
+      "status": "passed",
+      "title": "browser prunes one authenticated complete mixed-epoch pending/published prefix and replays monotonically",
+      "duration": 5.34516700000006,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED node prunes one authenticated complete mixed-epoch pending/published prefix and replays monotonically",
+      "status": "passed",
+      "title": "node prunes one authenticated complete mixed-epoch pending/published prefix and replays monotonically",
+      "duration": 5.9672500000000355,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED node rolls back both tables and the watermark when an authenticated prune crashes mid-transaction",
+      "status": "passed",
+      "title": "node rolls back both tables and the watermark when an authenticated prune crashes mid-transaction",
+      "duration": 8.025834000000032,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED"
+      ],
+      "fullName": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED keeps creator-trusted-v1 historical issuance within one maxEpochVertices window",
+      "status": "passed",
+      "title": "keeps creator-trusted-v1 historical issuance within one maxEpochVertices window",
+      "duration": 342.2752499999999,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "c73d62d6d57c380cb81aa5d28fd8194910f2467c16edbb12c90a53dc21fbae82",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

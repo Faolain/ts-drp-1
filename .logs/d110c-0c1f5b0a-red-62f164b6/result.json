@@ -1,0 +1,13 @@
+{
+  "record": "D.110c-0c1f5b0a",
+  "checkpoint": "RED-corrected",
+  "commit": "62f164b6cfff22983963846f4f164c23f7ae62de",
+  "files": 1,
+  "tests": 10,
+  "passed": 0,
+  "failed": 10,
+  "skipped": 0,
+  "causal": true,
+  "moduleResolutionFailure": false,
+  "fixtureFailure": false
+}

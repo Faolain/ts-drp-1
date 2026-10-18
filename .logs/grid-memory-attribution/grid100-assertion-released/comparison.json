@@ -1,0 +1,156 @@
+{
+  "scope": "Paired unprofiled 64-writer, 100-transition diagnostics; not memory acceptance",
+  "before": {
+    "directory": ".logs/d110c-grid-authority/grid100-diagnostic-terminal-lifecycle-repaired",
+    "status": {
+      "code": 0,
+      "signal": null,
+      "timedOut": false,
+      "cleanup": [],
+      "remaining": [],
+      "sourceCustodyExact": true,
+      "start": "2026-09-06T21:52:21.358Z",
+      "finish": "2026-09-06T22:18:15.274Z",
+      "elapsedMs": 1553910.940541
+    },
+    "diagnostic": {
+      "kind": "GRID100_DIAGNOSTIC",
+      "phase": "memory-diagnostic",
+      "scope": "aggregate-process-not-product-retained-memory-acceptance",
+      "postGc": true,
+      "referenceSlopeLimit": 165161,
+      "heapUsedSlope": 781111.1715542522,
+      "arrayBuffersSlope": 1476810.5163123168,
+      "ownedBytesSlope": 2257921.687866569,
+      "referenceCeiling": 512000000,
+      "referenceCeilingExceeded": false,
+      "acceptance": false
+    },
+    "settled": {
+      "kind": "GRID100_DIAGNOSTIC",
+      "phase": "settled",
+      "completed": true,
+      "transitions": 100,
+      "contributions": 6464,
+      "recoveredSources": 200,
+      "elapsedMs": 1551366.773083,
+      "acceptance": false
+    },
+    "sampleCount": 101,
+    "peakBytes": {
+      "heapUsed": 188036400,
+      "arrayBuffers": 168161346,
+      "external": 189794471,
+      "ownedBytes": 354150122,
+      "rss": 979697664
+    },
+    "finalMemory": {
+      "rss": 889307136,
+      "heapTotal": 251969536,
+      "heapUsed": 184525104,
+      "external": 188525454,
+      "arrayBuffers": 166892329,
+      "ownedBytes": 351417433,
+      "postGc": true
+    },
+    "sourceEvidenceHashes": {
+      "command.json": "f2b143d9b2a256fc91b17bd8fa75a63fb9e050e3a17fd9348bff2774c15ba785",
+      "status.json": "fc35bb93f4b920d365e194d32b116a3c565ce6c04317a56208854fd2d3fda05e",
+      "stdout.log": "656d09acfa35d67d0ec187fef053eb3efcd6c862f65bf32052d0607d717c5c22"
+    }
+  },
+  "after": {
+    "directory": ".logs/grid-memory-attribution/grid100-assertion-released",
+    "status": {
+      "code": 0,
+      "signal": null,
+      "timedOut": false,
+      "cleanup": [],
+      "remaining": [],
+      "sourceCustodyExact": true,
+      "start": "2026-09-07T01:16:27.259Z",
+      "finish": "2026-09-07T01:49:02.164Z",
+      "elapsedMs": 1954894.665208
+    },
+    "diagnostic": {
+      "kind": "GRID100_DIAGNOSTIC",
+      "phase": "memory-diagnostic",
+      "scope": "aggregate-process-not-product-retained-memory-acceptance",
+      "postGc": true,
+      "referenceSlopeLimit": 165161,
+      "heapUsedSlope": 536049.948680352,
+      "arrayBuffersSlope": 1316076.9494134898,
+      "ownedBytesSlope": 1852126.8980938417,
+      "referenceCeiling": 512000000,
+      "referenceCeilingExceeded": false,
+      "acceptance": false
+    },
+    "settled": {
+      "kind": "GRID100_DIAGNOSTIC",
+      "phase": "settled",
+      "completed": true,
+      "transitions": 100,
+      "contributions": 6464,
+      "recoveredSources": 200,
+      "elapsedMs": 1948502.734958,
+      "acceptance": false
+    },
+    "sampleCount": 101,
+    "peakBytes": {
+      "heapUsed": 164787208,
+      "arrayBuffers": 152054931,
+      "external": 173731777,
+      "ownedBytes": 313756507,
+      "rss": 924975104
+    },
+    "finalMemory": {
+      "rss": 867516416,
+      "heapTotal": 219758592,
+      "heapUsed": 160313136,
+      "external": 172380647,
+      "arrayBuffers": 150747522,
+      "ownedBytes": 311060658,
+      "postGc": true
+    },
+    "sourceEvidenceHashes": {
+      "command.json": "8555ed30a2538c3ca1dadeb39a335f2492dab8297adc9a098319e330e55d3154",
+      "status.json": "d64662ff9617d2dc77b70ecd175f26dc334df22682121bc7c2df2e53293c952f",
+      "stdout.log": "2d6c0c6191ff93125252b9438785a18d761c71726d95045e3f79c8e6a772888d"
+    }
+  },
+  "equivalence": {
+    "matchedEpochSamples": 101,
+    "matchedFields": [
+      "epoch",
+      "transitions",
+      "contributions",
+      "recoveredSources",
+      "creatorRestarts",
+      "objectId",
+      "worldDigest",
+      "worldBytes",
+      "durableRows",
+      "maxDurableRows",
+      "pruningReceipts",
+      "evidenceRecordsReleased",
+      "retainedRecoverySources",
+      "retainedObserverCommits",
+      "activeRoomOwners"
+    ],
+    "observerDurationZero": true,
+    "finalColdReopen": "Passed exact world/authority and no duplicate issue/publication assertions before memory-diagnostic record"
+  },
+  "slopeComparison": {
+    "definition": "OLS over last32 post-GC samples, indexed by sample; ownedBytes = heapUsed + arrayBuffers, not heapUsed + external + arrayBuffers",
+    "beforeBytesPerSample": 2257921.687866569,
+    "afterBytesPerSample": 1852126.8980938417,
+    "reductionPercent": 17.972048895821036,
+    "afterReferenceMultiple": 11.214069290533732
+  },
+  "limitations": [
+    "The aggregate metric includes fake IndexedDB persisted data and harness/runtime memory; it is not product-retained heap.",
+    "Shared runEpoch frame extraction and bounded diagnostic startup lookup also changed since original100; numeric before/after differences are not exclusively attributed to one fix.",
+    "Matching all epoch digests/counters establishes observed deterministic workload equivalence, not byte-identical DAG scheduling.",
+    "Profiled30 retaining-path and graph-partition evidence is separate; serialized payload bytes are never subtracted from process heap."
+  ]
+}

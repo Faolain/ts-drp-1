@@ -1,0 +1,329 @@
+{
+	"schemaVersion": "phase-3a1b-freeze-successor-red-v4",
+	"expectedPolicySchemaVersion": "ts-drp-protocol-v3-freeze-successor-v3",
+	"expectedProfileSchemaVersion": "ts-drp-protocol-v3-freeze-successor-profile-v3",
+	"externalBase": {
+		"commit": "d041baffcd56f16c8a20564133a4a7fc108e8331",
+		"tree": "c3e742e073db3fe077a349723ba9ba21f17ada09",
+		"parents": ["bf7d3516f6ed4be97a755698b4fb3a404e04dc0f", "9f76bc257da693a0ebbf03662c7cf9ebcab454e5"]
+	},
+	"provisionalInstall": {
+		"commit": "708db5c58c902ac9128251961cc8696a0feb864b",
+		"tree": "21bbefa2ec29ecbb22c0e39289daadafcd176b60",
+		"parent": "f0897b510c4d427b67d6524041cb31b05c677a1d"
+	},
+	"originalInstallPaths": [
+		".github/workflows/protocol-v3-blueprint-operation-budget.yml",
+		".github/workflows/protocol-v3-blueprint-work-budget.yml",
+		".github/workflows/protocol-v3-equivocation-acl-reputation.yml",
+		".github/workflows/protocol-v3-equivocation-author-projection.yml",
+		".github/workflows/protocol-v3-equivocation-gossip-budget.yml",
+		"packages/protocol-v3/conformance/freeze-successor-v1/check-freeze.mjs",
+		"packages/protocol-v3/conformance/freeze-successor-v1/freeze-policy.json",
+		"packages/protocol-v3/conformance/freeze-successor-v1/profile.json",
+		"packages/protocol-v3/conformance/freeze-successor-v1/spec.md"
+	],
+	"correctionPaths": [
+		".github/workflows/protocol-v3-blueprint-operation-budget.yml",
+		".github/workflows/protocol-v3-blueprint-work-budget.yml",
+		"packages/protocol-v3/conformance/freeze-successor-v1/check-freeze.mjs",
+		"packages/protocol-v3/conformance/freeze-successor-v1/freeze-policy.json",
+		"packages/protocol-v3/conformance/freeze-successor-v1/profile.json",
+		"packages/protocol-v3/conformance/freeze-successor-v1/spec.md"
+	],
+	"correctiveRed": {
+		"changedPaths": [
+			"tests/fixtures/phase-3a1b-freeze-successor-v1/successor-contract.json",
+			"tests/fixtures/phase-3a1b-freeze-successor-v1/successor-contract-type.ts",
+			"tests/fixtures/phase-3a1b-freeze-successor-v1/temporary-repository-harness.mjs",
+			"tests/protocol-v3-freeze-successor-v1-red.test.ts"
+		]
+	},
+	"rootFreezeEvidence": [
+		{
+			"id": "protocol-v2-root",
+			"checker": "packages/protocol-v2/scripts/check-protocol-freeze.mjs",
+			"baseline": "47426ab440f90253befbd42bace934159584e756",
+			"baselineTree": "b74fae1c23e65ffc0f49e5fcd227c66d9537bc76",
+			"directParent": "19b3d018bc4b0a72a3dd7475b0f54859a036f153",
+			"checkerBase": "19b3d018bc4b0a72a3dd7475b0f54859a036f153",
+			"checkerBaseTree": "687910e1953ea7538d1260d26210c1ce1eb5abeb",
+			"checkerBlob": "970d088bd99c2512be1d48530492df23f9666b0c",
+			"checkerSha256": "d6900fd1a1b871a537dd7be0eefff7e3143a63f89dbe1bcedcb946273ee8f3d7",
+			"environment": "PROTOCOL_FREEZE_REPOSITORY_ROOT",
+			"historicalStdout": "protocol freeze policy passed (19b3d018bc4b..working-tree)\n",
+			"currentStdout": "protocol freeze policy passed (47426ab440f9..working-tree)\n"
+		},
+		{
+			"id": "protocol-v3-root",
+			"checker": "packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs",
+			"baseline": "aaebf1de3dc198d396296d43a6afb03cb1ac984e",
+			"baselineTree": "77365dc5769779e06f8c72179b9a726641de426e",
+			"directParent": "e7d255c3609ff147e86a59e94dc926a8eb2db59c",
+			"checkerBase": "e7d255c3609ff147e86a59e94dc926a8eb2db59c",
+			"checkerBaseTree": "7fba2adfca06fd6a36ba33d0194e4ddae6fb55d7",
+			"checkerBlob": "7215d582baff73d2d45b1a5db5691bf274081235",
+			"checkerSha256": "0c54c747ca375591d7783b553ef8993d4d3f4932a831377bee3b7415345549de",
+			"environment": "PROTOCOL_V3_FREEZE_REPOSITORY_ROOT",
+			"historicalStdout": "protocol-v3 freeze policy passed (e7d255c3609f..working-tree)\n",
+			"currentStdout": "protocol-v3 freeze policy passed (aaebf1de3dc1..working-tree)\n"
+		}
+	],
+	"redBase": "5cdae2392a4eb3e2ebc2dc6761c8fdbd7fdaafc5",
+	"redBaseParent": "f0e3a861a2dc0e65e0444589b3688b72c4463f60",
+	"redBaseTree": "f90ebcbaa2303dd556e9c5699d06caf185e73d78",
+	"predecessorOracleTransition": {
+		"commit": "fef93323cb6cff8c46b96834dcbf60df080252e0",
+		"parent": "15d4e3e3858aff6b1e908570f251f572dc226b85",
+		"parentTree": "0d59e2352e474ad11fa7eca0cc3b3a9e24c06c90",
+		"changedPaths": [
+			"tests/fixtures/phase-3a1b-freeze-successor-v1/successor-contract-type.ts",
+			"tests/fixtures/phase-3a1b-freeze-successor-v1/successor-contract.json",
+			"tests/fixtures/phase-3a1b-freeze-successor-v1/temporary-repository-harness.mjs",
+			"tests/protocol-v3-blueprint-operation-budget-0p2.test.ts",
+			"tests/protocol-v3-blueprint-work-budget-0p0.test.ts",
+			"tests/protocol-v3-freeze-successor-v1-red.test.ts"
+		],
+		"governed": [
+			{
+				"id": "operation-budget-oracle",
+				"path": "tests/protocol-v3-blueprint-operation-budget-0p2.test.ts",
+				"oldBlob": "a35e4d21d18ed5d8e648d2032a5ffd6ed563617c",
+				"oldSha256": "09c550891ee04141cddd110bb58a740336e6380f7a43f3e8c66556a817de900c",
+				"currentBlob": "6cea0391c79d0186aa6ab137a8814bbc51193f41",
+				"currentSha256": "057538086e0dabea14a8ea5d52d5e7da566ebfd472cc39e138db5d391e3d33a0"
+			},
+			{
+				"id": "work-budget-oracle",
+				"path": "tests/protocol-v3-blueprint-work-budget-0p0.test.ts",
+				"oldBlob": "81e7269f3d3227ccf164aadb5500609820c34e6e",
+				"oldSha256": "30dc5ca7b10bc88143889acf02ac8e03f57c7eeab728cfba211e35cda994ce96",
+				"currentBlob": "68d8965cbaafbcfab7b2264b94b32e32b59987e6",
+				"currentSha256": "b5ca3e96692b9f8a4a509c8eecc580ee8cdeb47db0511a61545bf75ade8eaa59"
+			}
+		]
+	},
+	"intermediaryChain": [
+		{
+			"id": "root-drift-harness-correction",
+			"commit": "b0529c4badd60ce61b1a6974cdf99a3b31fe1187",
+			"tree": "cbf6d4479eca22940d5fccf2a64add5021377f0e",
+			"parent": "fef93323cb6cff8c46b96834dcbf60df080252e0",
+			"path": "tests/fixtures/phase-3a1b-freeze-successor-v1/temporary-repository-harness.mjs",
+			"blob": "80644a34d23f3fcb95fd98b80efa92e5b687dd8f",
+			"sha256": "d03dcb862c91fb8873305e7ee29a41320d9fa3eb89b98231a148c721b55da7de"
+		},
+		{
+			"id": "d93.35.11-plan",
+			"commit": "32653c327b24d0f587781ae85984c8123ba5c9bd",
+			"tree": "ec4f3ba934c2f3c9dbd141f8e3700674bf5ccb90",
+			"parent": "b0529c4badd60ce61b1a6974cdf99a3b31fe1187",
+			"path": "docs/production-hardening/production-hardening-tdd-plan-v2.md",
+			"blob": "22ca9bd690c01d19b0f23a0a836b6725855169dd",
+			"sha256": "9ad9641c31726f6de3bef21c45430190e450af648bc9cc369e059ce8f9992c39"
+		},
+		{
+			"id": "d93.35.12-plan",
+			"commit": "c11956b09a48dcf91a968549e87608a6982882d9",
+			"tree": "366b3346ddfb2ecf64a50e76f15bde3cd9f5628f",
+			"parent": "32653c327b24d0f587781ae85984c8123ba5c9bd",
+			"path": "docs/production-hardening/production-hardening-tdd-plan-v2.md",
+			"blob": "d3a77c1fd2c602321d17709238e3991596f4eddc",
+			"sha256": "194d0efc392b775ebe298d47e96235a647857ff3e278b4d3e949f799c65d1cf2"
+		},
+		{
+			"id": "d93.35.13-plan",
+			"commit": "336d75d4a3c817bef2db4ae6edc81e1df9c3b545",
+			"tree": "405f0d41f1c810d73ec2d9cff3fc021b23f5fb60",
+			"parent": "c11956b09a48dcf91a968549e87608a6982882d9",
+			"path": "docs/production-hardening/production-hardening-tdd-plan-v2.md",
+			"blob": "5574cf064343cd9747fab68d5453bb592bbb653c",
+			"sha256": "afe8404c87922d950321486bdd3c26f83d0ffde198c53b57cbf3256775d83122"
+		}
+	],
+	"gossipOracleTransition": {
+		"commit": "f0897b510c4d427b67d6524041cb31b05c677a1d",
+		"path": "tests/protocol-v3-equivocation-gossip-budget-0o-b2.test.ts",
+		"parent": "5cdae2392a4eb3e2ebc2dc6761c8fdbd7fdaafc5",
+		"tree": "1064d252807dec5067c22009359cd7060d529efb",
+		"oldBlob": "51122fb7622b39fffd6108a566e667df6dace403",
+		"oldSha256": "6265273fa2bd123133dc8580fe2a699792a2a9b004e3c81841c911f3f7e87b02",
+		"currentBlob": "4e297c2b986c8194a03defa1407a5590ffb779d4",
+		"currentSha256": "a2632fd7ab24fd5998d9571076bcefd273f0287d542eb6c2f99fb8114494a9ce"
+	},
+	"fixedAnchor": {
+		"commit": "dcac6b5cfb9fb74e704f997c16634a34c8d93ea9",
+		"tree": "4a4ac3346a2c6c1817a689207d5d120af9f5a484"
+	},
+	"ownerDirectory": "packages/protocol-v3/conformance/freeze-successor-v1",
+	"ownerFiles": ["check-freeze.mjs", "freeze-policy.json", "profile.json", "spec.md"],
+	"predecessors": [
+		{
+			"id": "operation-budget",
+			"policy": "packages/protocol-v3/conformance/blueprint-operation-budget-v1/freeze-policy.json",
+			"checker": "packages/protocol-v3/conformance/blueprint-operation-budget-v1/check-freeze.mjs",
+			"baseline": "80e2ea99a703a36b4c79af5f1fe46bd85b4dc357",
+			"baselineTree": "b15c8b5768aa10d54e53c1d78e450e4660fdad1e",
+			"directParent": "cfe52269427637e69c3707774c5c6e0ea7dc0c40",
+			"directParentTree": "d86b06102473f741c32bcf15429d73cbea5bf8a3",
+			"checkerBase": "cfe52269427637e69c3707774c5c6e0ea7dc0c40",
+			"environment": "PROTOCOL_V3_BLUEPRINT_OPERATION_BUDGET_REPOSITORY_ROOT"
+		},
+		{
+			"id": "work-budget",
+			"policy": "packages/protocol-v3/supplements/blueprint-work-budget-v1/freeze-policy.json",
+			"checker": "packages/protocol-v3/supplements/blueprint-work-budget-v1/check-freeze.mjs",
+			"baseline": "264fcd7cda3b878263bef964c977b89690126850",
+			"baselineTree": "7a422855f829d4ea61bb3876c6a48b39f307d5f3",
+			"directParent": "136af9f6c01b33701caf39db55498d10c95096da",
+			"directParentTree": "f3730ecf1c28ba33b51d2f2d6d62ef348db0a4fa",
+			"checkerBase": "136af9f6c01b33701caf39db55498d10c95096da",
+			"environment": "PROTOCOL_V3_BLUEPRINT_WORK_BUDGET_REPOSITORY_ROOT"
+		},
+		{
+			"id": "author-projection",
+			"policy": "packages/protocol-v3/supplements/equivocation-author-projection-v1/freeze-policy.json",
+			"checker": "packages/protocol-v3/supplements/equivocation-author-projection-v1/check-freeze.mjs",
+			"baseline": "636490a8a8ac6cd82495b0cabe773f039979cdfa",
+			"baselineTree": "23e3886bce74764a9d133b4da394e12214057db6",
+			"directParent": "021ac088f4273ad0521ffafebd1fe258744a41f4",
+			"directParentTree": "844ea4995830146d1ea867def68c35b85bad2fe9",
+			"checkerBase": "021ac088f4273ad0521ffafebd1fe258744a41f4",
+			"environment": "PROTOCOL_V3_EQUIVOCATION_AUTHOR_PROJECTION_REPOSITORY_ROOT"
+		},
+		{
+			"id": "gossip-budget",
+			"policy": "packages/protocol-v3/supplements/equivocation-gossip-budget-v1/freeze-policy.json",
+			"checker": "packages/protocol-v3/supplements/equivocation-gossip-budget-v1/check-freeze.mjs",
+			"baseline": "d9891718d99da132c8f6268c681688f238527f7b",
+			"baselineTree": "4712ffe78c277ce2a524dfac0655b59cd27e1b00",
+			"directParent": "fdb6765c2d292a86c0fba2d8ac3a2acef420e354",
+			"directParentTree": "7cdaa73c6fc91bfc83daed87c0bd6589f803c21a",
+			"checkerBase": "65144898541abb76951d2bc5357c4c30bae4f35e",
+			"environment": "PROTOCOL_V3_EQUIVOCATION_GOSSIP_BUDGET_REPOSITORY_ROOT"
+		},
+		{
+			"id": "acl-reputation",
+			"policy": "packages/protocol-v3/supplements/equivocation-acl-reputation-v1/freeze-policy.json",
+			"checker": "packages/protocol-v3/supplements/equivocation-acl-reputation-v1/check-freeze.mjs",
+			"baseline": "ab98831c236410da52a8a7a6b17579af0f7e6298",
+			"baselineTree": "63b25541e9a749fcacc3d86fce0c5c217623fc5a",
+			"directParent": "c0153727c45d3ab1f418b23a50c4a1daaffbde6d",
+			"directParentTree": "9e38badf0409b160b445dfab510efbf04210a990",
+			"checkerBase": "c0153727c45d3ab1f418b23a50c4a1daaffbde6d",
+			"environment": "PROTOCOL_V3_EQUIVOCATION_ACL_REPUTATION_REPOSITORY_ROOT"
+		}
+	],
+	"workflowIdentities": [
+		{
+			"path": ".github/workflows/protocol-v3-blueprint-operation-budget.yml",
+			"workflowName": "Protocol v3 blueprint operation budget freeze",
+			"jobKey": "protocol-v3-blueprint-operation-budget",
+			"jobName": "Require immutable protocol-v3 operation budget enforcement"
+		},
+		{
+			"path": ".github/workflows/protocol-v3-blueprint-work-budget.yml",
+			"workflowName": "Protocol v3 blueprint work budget freeze",
+			"jobKey": "protocol-v3-blueprint-work-budget",
+			"jobName": "Require immutable protocol-v3 blueprint work budget supplement"
+		},
+		{
+			"path": ".github/workflows/protocol-v3-equivocation-author-projection.yml",
+			"workflowName": "Protocol v3 equivocation author projection freeze",
+			"jobKey": "protocol-v3-equivocation-author-projection",
+			"jobName": "Require immutable protocol-v3 equivocation author projection supplement"
+		},
+		{
+			"path": ".github/workflows/protocol-v3-equivocation-gossip-budget.yml",
+			"workflowName": "Protocol v3 equivocation gossip budget freeze",
+			"jobKey": "protocol-v3-equivocation-gossip-budget",
+			"jobName": "Require immutable protocol-v3 equivocation gossip budget supplement"
+		},
+		{
+			"path": ".github/workflows/protocol-v3-equivocation-acl-reputation.yml",
+			"workflowName": "Protocol v3 equivocation ACL reputation freeze",
+			"jobKey": "protocol-v3-equivocation-acl-reputation",
+			"jobName": null
+		}
+	],
+	"gossipChain": [
+		{
+			"commit": "65144898541abb76951d2bc5357c4c30bae4f35e",
+			"tree": "2d20db99755856e330f1316f83e4e233bb5783c6"
+		},
+		{
+			"commit": "fdb6765c2d292a86c0fba2d8ac3a2acef420e354",
+			"tree": "7cdaa73c6fc91bfc83daed87c0bd6589f803c21a"
+		},
+		{
+			"commit": "d9891718d99da132c8f6268c681688f238527f7b",
+			"tree": "4712ffe78c277ce2a524dfac0655b59cd27e1b00"
+		}
+	],
+	"gossipFdbSha256": {
+		"tests/protocol-v3-equivocation-gossip-budget-0o-b2.test.ts": "61f1d9e6cb39cbf7d1cd7459402737fae2ed515a2f75691119862e76f0e026d6",
+		"packages/protocol-v3/supplements/equivocation-gossip-budget-v1/check-freeze.mjs": "114a181aa2aed0c3fb52094d9e4b0153f6490e4ad4afb31ecfd63e79040b63ec",
+		"packages/protocol-v3/supplements/equivocation-gossip-budget-v1/freeze-policy.json": "c97dee6f195bc0d41b68cc4d7e176f998a8e23ede7162507048b3761f92e66d9",
+		"tests/fixtures/phase-0o-b2-v3/gossip-budget-contract.json": "270779c7b7dd8e0e3f1b1e703a6a8cea9b40cf8c71ee34c883185f89e45a0fe7"
+	},
+	"historicalTransitions": [
+		{
+			"path": "tests/protocol-v3-blueprint-operation-budget-0p2.test.ts",
+			"commits": [
+				[
+					"80e2ea99a703a36b4c79af5f1fe46bd85b4dc357",
+					"72d395ef5c675ffd7d8f3894a5bd303ee959b8f6a564a46cabea0199f4993759"
+				],
+				[
+					"7ae254e0b74d4da7008db74be30510efa633abad",
+					"5703e27c1698f56d61326783f920fa5692210695d0a33a721d2186f01a23abae"
+				],
+				["6f5a1b070d34a26504d3b87f3c6883c3b73aa7c2", "09c550891ee04141cddd110bb58a740336e6380f7a43f3e8c66556a817de900c"]
+			]
+		},
+		{
+			"path": "tests/protocol-v3-blueprint-work-budget-0p0.test.ts",
+			"commits": [
+				[
+					"264fcd7cda3b878263bef964c977b89690126850",
+					"a364bde5a7d1be9b2dc04e6a022b400dfdfb71a756ec528b192a5a7898a7c371"
+				],
+				[
+					"7ae254e0b74d4da7008db74be30510efa633abad",
+					"82547fb63db900017ca210da3f5099d3fe9fb9c1cd5e1d60997aeef141c03aba"
+				],
+				["6f5a1b070d34a26504d3b87f3c6883c3b73aa7c2", "30dc5ca7b10bc88143889acf02ac8e03f57c7eeab728cfba211e35cda994ce96"]
+			]
+		},
+		{
+			"path": "tests/protocol-v3-equivocation-author-projection-0o-b1b.test.ts",
+			"commits": [
+				[
+					"636490a8a8ac6cd82495b0cabe773f039979cdfa",
+					"1a89654947396489ac110803ceab611756a4ae9c05059ee8450ed38c273fc517"
+				],
+				["392cf623a56f12fff74cebac46a7de40fea394b5", "e28bc7fd27574d6e3c7c0963784ed93a3c32c3a02aba4af33b70f5e1e3bd72aa"]
+			]
+		},
+		{
+			"path": "tests/protocol-v3-equivocation-gossip-budget-0o-b2.test.ts",
+			"commits": [
+				[
+					"fdb6765c2d292a86c0fba2d8ac3a2acef420e354",
+					"61f1d9e6cb39cbf7d1cd7459402737fae2ed515a2f75691119862e76f0e026d6"
+				],
+				[
+					"d9891718d99da132c8f6268c681688f238527f7b",
+					"24cc2e5a426de1e25a150196d822ae94cd4a63caabbaa9a697af28ae3d1d9855"
+				],
+				["392cf623a56f12fff74cebac46a7de40fea394b5", "6265273fa2bd123133dc8580fe2a699792a2a9b004e3c81841c911f3f7e87b02"]
+			]
+		}
+	],
+	"latentGossipBinding": {
+		"path": "tests/fixtures/phase-0o-b2-v3/gossip-budget-contract.json",
+		"sha256": "6b22b4e442ece82cf61aac6ef303aec7e3b74ba14a601b8f22c33769670d443f",
+		"staleAuthorHash": "1a89654947396489ac110803ceab611756a4ae9c05059ee8450ed38c273fc517",
+		"currentAuthorHash": "e28bc7fd27574d6e3c7c0963784ed93a3c32c3a02aba4af33b70f5e1e3bd72aa"
+	}
+}

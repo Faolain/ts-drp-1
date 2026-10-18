@@ -1,0 +1,4 @@
+tests/phase-6a-creator-successor-product-red.test.ts > D.108d2 public return AST oracle > accepts private computations and primitive comparisons without confusing operand names with returned authority
+tests/phase-6a-creator-successor-product-red.test.ts > D.108d2 public return AST oracle > rejects exact sensitive properties and values on exported returned shapes
+tests/phase-6a-creator-successor-product-red.test.ts > D.108d2 public return AST oracle > follows local returned aliases, helpers, methods, export aliases and global product surfaces
+tests/phase-6a-creator-successor-product-red.test.ts > D.108e2b creator successor room lifetime RED > keeps node-root and chat authority closed while assigning the room as sole node consumer

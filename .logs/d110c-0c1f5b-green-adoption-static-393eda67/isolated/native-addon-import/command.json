@@ -1,0 +1,10 @@
+{
+  "cwd": "/tmp/d110c-f5b-green-adoption-static-Eqj4VS/checkout",
+  "command": "node",
+  "args": [
+    "-e",
+    "const addon=require(process.argv[1]);if(typeof addon.PeerConnection!==\"function\")throw Error(\"Native PeerConnection export missing\");console.log(JSON.stringify({nativeAddonLoaded:true,PeerConnection:typeof addon.PeerConnection,node:process.version,napi:process.versions.napi}));",
+    "/tmp/d110c-f5b-green-adoption-static-Eqj4VS/checkout/node_modules/.pnpm/node-datachannel@0.32.3/node_modules/node-datachannel/build/Release/node_datachannel.node"
+  ],
+  "start": "2026-09-06T04:01:22.195Z"
+}

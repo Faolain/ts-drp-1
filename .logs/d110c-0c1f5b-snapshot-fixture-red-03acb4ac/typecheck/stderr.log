@@ -1,0 +1,22 @@
+[96mtests/fixtures/phase-4b-v3/live-snapshot.ts[0m:[93m85[0m:[93m2[0m - [91merror[0m[90m TS2741: [0mProperty 'installEpochAnchor' is missing in type 'Readonly<{ appendAccepted: Mock<(input: any) => Promise<Readonly<{ idempotent: true; journalSequence: number; ok: true; scope: LiveJournalScope; sourceKind: "received" | "local-issued"; vertexDigest: string; }>> | Promise<...>>; close: Mock<...>; installGenesis: Mock<...>; readiness: Mock<...>; readPage: Mock<...>; }>' but required in type 'DurableLiveJournalStore'.
+
+[7m85[0m  return Object.freeze({
+[7m  [0m [91m ~~~~~~[0m
+
+  [96mpackages/live-journal/dist/src/types.d.ts[0m:[93m103[0m:[93m5[0m
+    [7m103[0m     installEpochAnchor(input: InstallLiveJournalGenesisInput): Promise<InstallLiveJournalGenesisResult>;
+    [7m   [0m [96m    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+    'installEpochAnchor' is declared here.
+[96mtests/fixtures/phase-4b-v3/live-snapshot.ts[0m:[93m277[0m:[93m52[0m - [91merror[0m[90m TS7006: [0mParameter 'entry' implicitly has an 'any' type.
+
+[7m277[0m     entries: Object.freeze(input.plan.entries.map((entry) => Object.freeze({ ...entry }))),
+[7m   [0m [91m                                                   ~~~~~[0m
+[96mtests/fixtures/phase-4b-v3/live-snapshot.ts[0m:[93m284[0m:[93m2[0m - [91merror[0m[90m TS2322: [0mType 'Readonly<{ store: Readonly<{ close: Mock<() => Promise<void>>; compareAndMarkOutboxPublished: Mock<(input: any) => Promise<void>>; readIssued: Mock<(selectedScope: any, sequence: any) => Promise<...>>; ... 4 more ...; transactWriteSettlementPlan: Mock<...>; }>; vertexDigest: string; }>' is not assignable to type 'Readonly<{ readonly store: DurableIssuanceStore; readonly vertexDigest: string; }>'.
+  The types returned by 'store.transactWriteSettlementPlan(...)' are incompatible between these types.
+    Type 'Promise<SettlementPlan | null>' is not assignable to type 'Promise<SettlementPlan>'.
+      Type 'SettlementPlan | null' is not assignable to type 'SettlementPlan'.
+        Type 'null' is not assignable to type 'SettlementPlan'.
+
+[7m284[0m  return Object.freeze({ store, vertexDigest: lowerHex(carrier.digest) });
+[7m   [0m [91m ~~~~~~[0m
+

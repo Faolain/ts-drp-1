@@ -1,0 +1,9 @@
+{
+  "code": 0,
+  "signal": null,
+  "elapsedMs": 72746.883334,
+  "endedAt": "2026-09-06T07:56:22.975Z",
+  "watchdogActions": [],
+  "ownedProcessGroup": 64803,
+  "quiescent": true
+}

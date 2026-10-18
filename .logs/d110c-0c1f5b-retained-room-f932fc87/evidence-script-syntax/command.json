@@ -1,0 +1,10 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "node",
+  "args": [
+    "--input-type=module",
+    "-e",
+    "import {readdirSync} from \"node:fs\";import {execFileSync} from \"node:child_process\";const root=\"/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-retained-room-f932fc87\";const files=readdirSync(root).filter(f=>f.endsWith(\".mjs\"));for(const f of files)execFileSync(process.execPath,[\"--check\",root+\"/\"+f],{stdio:\"inherit\"});console.log(files.length+\" evidence scripts parse\");"
+  ],
+  "start": "2026-09-06T00:17:45.540Z"
+}

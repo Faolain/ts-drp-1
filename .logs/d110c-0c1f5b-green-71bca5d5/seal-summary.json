@@ -1,0 +1,57 @@
+{
+  "stopped": true,
+  "head": "71bca5d580ef0bab9bd17aaf7b51df99810b61c1",
+  "counts": {
+    "total": 882,
+    "passed": 872,
+    "failed": 5,
+    "pending": 5
+  },
+  "currentActive": 877,
+  "historicalActive": 876,
+  "files": 72,
+  "runtimeCommands": 71,
+  "commands": 80,
+  "nonzero": [
+    {
+      "file": "retained-30/status.json",
+      "status": 1
+    },
+    {
+      "file": "retained-40/status.json",
+      "status": 1
+    },
+    {
+      "file": "retained-58/status.json",
+      "status": 1
+    },
+    {
+      "file": "retained-71/status.json",
+      "status": 1
+    },
+    {
+      "file": "typecheck/status.json",
+      "status": 1
+    }
+  ],
+  "parentGate": "retained-71",
+  "parentCounts": {
+    "total": 45,
+    "passed": 44,
+    "failed": 1,
+    "pending": 0
+  },
+  "wideFailure": "Unchanged 60000 ms watchdog timeout; no measured internal progress or completion claim",
+  "wholeProgramStaticPass": false,
+  "staticExternalDiagnostics": 3,
+  "gridRemainsSeparatelyOpen": true,
+  "custody": "custody-after.json",
+  "effectiveTestHashCount": 85,
+  "parentPatchSha256": "6d0fd99cfcb383b82f3becae421b4691bb945639ef9d60b76e9968715df765cb",
+  "stashes": 27,
+  "protectedPaths": 86522,
+  "noSourceEdits": true,
+  "noRuntimeRetry": true,
+  "noBrowserReviewOrCampaign": true,
+  "parentClosed": false
+}

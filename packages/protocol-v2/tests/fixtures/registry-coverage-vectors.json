@@ -1,0 +1,197 @@
+[
+	{
+		"id": "signer-set-coverage",
+		"kind": "signerSet",
+		"covers": ["signers"]
+	},
+	{
+		"id": "parameters-coverage",
+		"kind": "parameters",
+		"covers": [
+			"maxEpochVertices",
+			"maxEpochBytes",
+			"maxDependencies",
+			"snapshotChunkBytes",
+			"maxSnapshotBytes",
+			"maxPendingEntries",
+			"maxPendingBytes"
+		]
+	},
+	{
+		"id": "parameters-lineage-policy-coverage",
+		"kind": "parameters",
+		"covers": ["lineagePolicy"]
+	},
+	{
+		"id": "vertex-coverage",
+		"kind": "vertex",
+		"covers": [
+			"kind",
+			"protocolMajor",
+			"objectId",
+			"epoch",
+			"anchor",
+			"author",
+			"logicalTime",
+			"dependencies",
+			"operation"
+		]
+	},
+	{
+		"id": "cut-value-coverage",
+		"kind": "cutValue",
+		"covers": [
+			"kind",
+			"protocolMajor",
+			"encodingVersion",
+			"objectId",
+			"epoch",
+			"previousAnchor",
+			"previousCutDigest",
+			"previousHistoryRoot",
+			"previousHistorySize",
+			"closeSetRoot",
+			"closeSetCount",
+			"historyRoot",
+			"historySize",
+			"stateDigest",
+			"aclDigest",
+			"snapshotManifestDigest",
+			"blueprintDigest",
+			"archiveIndexRoot",
+			"availabilityPolicyDigest",
+			"nextSignerSet",
+			"parameters",
+			"closeReason"
+		]
+	},
+	{
+		"id": "epoch-anchor-coverage",
+		"kind": "epochAnchor",
+		"covers": [
+			"kind",
+			"protocolMajor",
+			"objectId",
+			"epoch",
+			"previousAnchor",
+			"cutDigest",
+			"stateDigest",
+			"aclDigest",
+			"historyRoot",
+			"historySize",
+			"archiveIndexRoot",
+			"blueprintDigest",
+			"signerSetDigest",
+			"parametersDigest",
+			"profileDigest",
+			"cryptoSuiteId"
+		]
+	},
+	{
+		"id": "history-leaf-coverage",
+		"kind": "historyLeaf",
+		"covers": ["kind", "protocolMajor", "objectId", "epoch", "ordinal", "vertexHash"]
+	},
+	{
+		"id": "snapshot-payload-coverage",
+		"kind": "snapshotPayload",
+		"covers": [
+			"kind",
+			"protocolMajor",
+			"objectId",
+			"epoch",
+			"anchor",
+			"schemaVersion",
+			"blueprintDigest",
+			"archiveIndexRoot",
+			"application",
+			"acl"
+		]
+	},
+	{
+		"id": "snapshot-chunk-coverage",
+		"kind": "snapshotChunk",
+		"covers": ["index", "bytes"]
+	},
+	{
+		"id": "snapshot-manifest-coverage",
+		"kind": "snapshotManifest",
+		"covers": [
+			"kind",
+			"protocolMajor",
+			"encodingVersion",
+			"objectId",
+			"epoch",
+			"anchor",
+			"schemaVersion",
+			"stateDigest",
+			"aclDigest",
+			"payloadDigest",
+			"totalBytes",
+			"chunks"
+		]
+	},
+	{
+		"id": "archive-payload-coverage",
+		"kind": "archivePayload",
+		"covers": ["kind", "protocolMajor", "schemaVersion", "objectId", "epoch", "startOrdinal", "records"]
+	},
+	{
+		"id": "archive-chunk-coverage",
+		"kind": "archiveChunk",
+		"covers": ["objectId", "startOrdinal", "index", "bytes"]
+	},
+	{
+		"id": "archive-segment-coverage",
+		"kind": "archiveSegment",
+		"covers": [
+			"kind",
+			"protocolMajor",
+			"encodingVersion",
+			"schemaVersion",
+			"objectId",
+			"epoch",
+			"startOrdinal",
+			"endOrdinal",
+			"recordCount",
+			"payloadDigest",
+			"totalBytes",
+			"chunks"
+		]
+	},
+	{
+		"id": "seal-proposal-coverage",
+		"kind": "sealProposal",
+		"covers": ["kind", "objectId", "epoch", "round", "valueDigest"]
+	},
+	{
+		"id": "seal-vote-coverage",
+		"kind": "sealVote",
+		"covers": ["kind", "objectId", "epoch", "round", "phase", "proposalDigest", "proposalHash", "signerId"]
+	},
+	{
+		"id": "seal-qc-coverage",
+		"kind": "sealQC",
+		"covers": ["kind", "objectId", "epoch", "round", "phase", "proposalDigest", "proposalHash", "votes"]
+	},
+	{
+		"id": "round-change-coverage",
+		"kind": "roundChange",
+		"covers": ["kind", "objectId", "epoch", "round", "phase", "highestPrepareQC", "signerId"]
+	},
+	{
+		"id": "profile-coverage",
+		"kind": "profile",
+		"covers": ["profileId", "signers", "quorum", "cryptoSuiteId"]
+	},
+	{
+		"id": "availability-policy-coverage",
+		"kind": "availabilityPolicy",
+		"covers": ["mode", "minRollbackGenerations", "minLocalCopies", "minMirrorReceipts"]
+	},
+	{
+		"id": "state-coverage",
+		"kind": "state",
+		"covers": ["state"]
+	}
+]

@@ -1,0 +1,16 @@
+{
+  "readyForRootSourceSigning": true,
+  "head": "9ae0b4a88d789c2d8a01ac5b155611da09529869",
+  "changedPaths": [
+    "tests/phase-3a1b-p3-live-transport-red.test.ts"
+  ],
+  "testSha256": "6368a03369061aab9859160eb888cdbb0ee50012eaa55ee12e719fb95ee7511c",
+  "testPatchSha256": "819da052a7d0624094d5a25785a9903f51d0603419f39cd1728fea5a5610ee06",
+  "parentPatchSha256": "6d0fd99cfcb383b82f3becae421b4691bb945639ef9d60b76e9968715df765cb",
+  "sourceSnapshot": "phase-3a1b-p3-live-transport-red.test.ts.after",
+  "custodyBaseline": "custody-after.json",
+  "effectiveTestHashCount": 81,
+  "mainReporterSha256": "9187d70a1ddc6276f268dcf1a88e8529a73a7ca72af88bf4671b41a629fa5014",
+  "isolatedStagePending": true,
+  "noAgentCommit": true
+}

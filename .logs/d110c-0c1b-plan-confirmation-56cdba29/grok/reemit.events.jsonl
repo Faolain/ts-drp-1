@@ -1,0 +1,756 @@
+{"type":"available_commands","tools":["run_terminal_command","read_file","search_replace","list_dir","grep","kill_command_or_subagent","todo_write","get_command_or_subagent_output","spawn_subagent","scheduler_create","scheduler_delete","scheduler_list","monitor","search_tool","use_tool","workflow","enter_plan_mode","exit_plan_mode","ask_user_question","image_gen","image_edit","image_to_video","reference_to_video","write"],"commands":["compact","always-approve","context","hooks-trust","hooks-list","hooks-add","hooks-remove","hooks-untrust","plugins","reload-plugins","session-info","feedback","deep-research","workflow","goal","loop","claude","brave-search","close-spec","codex","compare-screenshots","dep-tldr","eval-skills","feature-slicing","find-skills","implement-spec","instruments-profiling","llm-tldr-dep-indexer","llm-tldr-usage","oracle","preview-shots","refactor-clean","renderer","screenshot-critique","skill-creator","swift-concurrency-expert","swiftui-liquid-glass","swiftui-performance-audit","swiftui-view-refactor","use-railway","video-transcript-downloader","write-docs","write-skills","explain-diff-html","skills-manager","twitter-clip","video-to-gif","build-with-ai","code-review","create-skill","create-workflow","design","execute-plan","bundled:imagine","implement","pr-babysit","resume-claude","resume-codex","resume-cursor","review","skill-design-principles","adversarial-spec","playground"]}
+{"type":"available_commands","tools":["run_terminal_command","read_file","search_replace","list_dir","grep","kill_command_or_subagent","todo_write","get_command_or_subagent_output","spawn_subagent","scheduler_create","scheduler_delete","scheduler_list","monitor","search_tool","use_tool","workflow","enter_plan_mode","exit_plan_mode","ask_user_question","image_gen","image_edit","image_to_video","reference_to_video","write"],"commands":["compact","always-approve","context","hooks-trust","hooks-list","hooks-add","hooks-remove","hooks-untrust","plugins","reload-plugins","session-info","feedback","deep-research","workflow","goal","loop","claude","brave-search","close-spec","codex","compare-screenshots","dep-tldr","eval-skills","feature-slicing","find-skills","implement-spec","instruments-profiling","llm-tldr-dep-indexer","llm-tldr-usage","oracle","preview-shots","refactor-clean","renderer","screenshot-critique","skill-creator","swift-concurrency-expert","swiftui-liquid-glass","swiftui-performance-audit","swiftui-view-refactor","use-railway","video-transcript-downloader","write-docs","write-skills","explain-diff-html","skills-manager","twitter-clip","video-to-gif","build-with-ai","code-review","create-skill","create-workflow","design","execute-plan","bundled:imagine","implement","pr-babysit","resume-claude","resume-codex","resume-cursor","review","skill-design-principles","adversarial-spec","playground"]}
+{"type":"thought","data":"The"}
+{"type":"thought","data":" user"}
+{"type":"thought","data":" wants"}
+{"type":"thought","data":" me"}
+{"type":"thought","data":" to"}
+{"type":"thought","data":" re"}
+{"type":"thought","data":"-"}
+{"type":"thought","data":"emit"}
+{"type":"thought","data":" the"}
+{"type":"thought","data":" exact"}
+{"type":"thought","data":" final"}
+{"type":"thought","data":" JSON"}
+{"type":"thought","data":" object"}
+{"type":"thought","data":" from"}
+{"type":"thought","data":" my"}
+{"type":"thought","data":" previous"}
+{"type":"thought","data":" D"}
+{"type":"thought","data":"."}
+{"type":"thought","data":"110"}
+{"type":"thought","data":"c"}
+{"type":"thought","data":"-"}
+{"type":"thought","data":"0"}
+{"type":"thought","data":"c"}
+{"type":"thought","data":"1"}
+{"type":"thought","data":"b"}
+{"type":"thought","data":" confirmation"}
+{"type":"thought","data":" unchanged"}
+{"type":"thought","data":"."}
+{"type":"thought","data":" No"}
+{"type":"thought","data":" prose"}
+{"type":"thought","data":","}
+{"type":"thought","data":" markdown"}
+{"type":"thought","data":","}
+{"type":"thought","data":" inspection"}
+{"type":"thought","data":","}
+{"type":"thought","data":" or"}
+{"type":"thought","data":" tool"}
+{"type":"thought","data":" calls"}
+{"type":"thought","data":"."}
+{"type":"text","data":"{\""}
+{"type":"text","data":"ver"}
+{"type":"text","data":"dict"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"APPRO"}
+{"type":"text","data":"VED"}
+{"type":"text","data":"\",\""}
+{"type":"text","data":"summary"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"All"}
+{"type":"text","data":" six"}
+{"type":"text","data":" material"}
+{"type":"text","data":" corrections"}
+{"type":"text","data":" match"}
+{"type":"text","data":" the"}
+{"type":"text","data":" live"}
+{"type":"text","data":" owners"}
+{"type":"text","data":":"}
+{"type":"text","data":" the"}
+{"type":"text","data":" "}
+{"type":"text","data":"0"}
+{"type":"text","data":"c"}
+{"type":"text","data":"1"}
+{"type":"text","data":"b"}
+{"type":"text","data":" token"}
+{"type":"text","data":" is"}
+{"type":"text","data":" a"}
+{"type":"text","data":" test"}
+{"type":"text","data":" case"}
+{"type":"text","data":" id"}
+{"type":"text","data":","}
+{"type":"text","data":" existing"}
+{"type":"text","data":" creator"}
+{"type":"text","data":"-"}
+{"type":"text","data":"close"}
+{"type":"text","data":" errors"}
+{"type":"text","data":" stay"}
+{"type":"text","data":" unchanged"}
+{"type":"text","data":","}
+{"type":"text","data":" exact"}
+{"type":"text","data":" ISS"}
+{"type":"text","data":"U"}
+{"type":"text","data":"ANCE"}
+{"type":"text","data":"_"}
+{"type":"text","data":"OUT"}
+{"type":"text","data":"COME"}
+{"type":"text","data":"_"}
+{"type":"text","data":"UNKNOWN"}
+{"type":"text","data":" after"}
+{"type":"text","data":" a"}
+{"type":"text","data":" real"}
+{"type":"text","data":"-"}
+{"type":"text","data":"store"}
+{"type":"text","data":" commit"}
+{"type":"text","data":" is"}
+{"type":"text","data":" the"}
+{"type":"text","data":" missing"}
+{"type":"text","data":" no"}
+{"type":"text","data":"-"}
+{"type":"text","data":"policy"}
+{"type":"text","data":" arm"}
+{"type":"text","data":","}
+{"type":"text","data":" seq"}
+{"type":"text","data":"0"}
+{"type":"text","data":"-"}
+{"type":"text","data":"then"}
+{"type":"text","data":"-"}
+{"type":"text","data":"seq"}
+{"type":"text","data":"1"}
+{"type":"text","data":" makes"}
+{"type":"text","data":" RED"}
+{"type":"text","data":" truncate"}
+{"type":"text","data":" a"}
+{"type":"text","data":" non"}
+{"type":"text","data":"-"}
+{"type":"text","data":"empty"}
+{"type":"text","data":" prefix"}
+{"type":"text","data":","}
+{"type":"text","data":" bind"}
+{"type":"text","data":"-"}
+{"type":"text","data":"time"}
+{"type":"text","data":" plus"}
+{"type":"text","data":" queued"}
+{"type":"text","data":" fold"}
+{"type":"text","data":"-"}
+{"type":"text","data":"time"}
+{"type":"text","data":" re"}
+{"type":"text","data":"check"}
+{"type":"text","data":" plus"}
+{"type":"text","data":" existing"}
+{"type":"text","data":" abort"}
+{"type":"text","data":" cover"}
+{"type":"text","data":" both"}
+{"type":"text","data":" order"}
+{"type":"text","data":"ings"}
+{"type":"text","data":","}
+{"type":"text","data":" halt"}
+{"type":"text","data":" reuse"}
+{"type":"text","data":" is"}
+{"type":"text","data":" fail"}
+{"type":"text","data":"-"}
+{"type":"text","data":"closed"}
+{"type":"text","data":","}
+{"type":"text","data":" and"}
+{"type":"text","data":" recover"}
+{"type":"text","data":"V"}
+{"type":"text","data":"3"}
+{"type":"text","data":"Live"}
+{"type":"text","data":"Replica"}
+{"type":"text","data":" remains"}
+{"type":"text","data":" the"}
+{"type":"text","data":" sole"}
+{"type":"text","data":" reconciliation"}
+{"type":"text","data":" owner"}
+{"type":"text","data":"."}
+{"type":"text","data":" No"}
+{"type":"text","data":" P"}
+{"type":"text","data":"0"}
+{"type":"text","data":"/"}
+{"type":"text","data":"P"}
+{"type":"text","data":"1"}
+{"type":"text","data":" remains"}
+{"type":"text","data":" against"}
+{"type":"text","data":" tests"}
+{"type":"text","data":"-"}
+{"type":"text","data":"only"}
+{"type":"text","data":" RED"}
+{"type":"text","data":"."}
+{"type":"text","data":"\",\""}
+{"type":"text","data":"find"}
+{"type":"text","data":"ings"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"[{\""}
+{"type":"text","data":"severity"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"P"}
+{"type":"text","data":"2"}
+{"type":"text","data":"\",\""}
+{"type":"text","data":"title"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"Abort"}
+{"type":"text","data":" clears"}
+{"type":"text","data":" close"}
+{"type":"text","data":"Task"}
+{"type":"text","data":","}
+{"type":"text","data":" so"}
+{"type":"text","data":" the"}
+{"type":"text","data":" same"}
+{"type":"text","data":" pre"}
+{"type":"text","data":"-"}
+{"type":"text","data":"bound"}
+{"type":"text","data":" handle"}
+{"type":"text","data":" can"}
+{"type":"text","data":" retry"}
+{"type":"text","data":" close"}
+{"type":"text","data":"()"}
+{"type":"text","data":"\",\""}
+{"type":"text","data":"evidence"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"packages"}
+{"type":"text","data":"/"}
+{"type":"text","data":"node"}
+{"type":"text","data":"/"}
+{"type":"text","data":"src"}
+{"type":"text","data":"/"}
+{"type":"text","data":"creator"}
+{"type":"text","data":"-"}
+{"type":"text","data":"close"}
+{"type":"text","data":".ts"}
+{"type":"text","data":":"}
+{"type":"text","data":"609"}
+{"type":"text","data":"-"}
+{"type":"text","data":"611"}
+{"type":"text","data":" ab"}
+{"type":"text","data":"orts"}
+{"type":"text","data":" and"}
+{"type":"text","data":" throws"}
+{"type":"text","data":" `"}
+{"type":"text","data":"creator"}
+{"type":"text","data":" snapshot"}
+{"type":"text","data":" export"}
+{"type":"text","data":" failed"}
+{"type":"text","data":":"}
+{"type":"text","data":" ${"}
+{"type":"text","data":"snapshot"}
+{"type":"text","data":"."}
+{"type":"text","data":"kind"}
+{"type":"text","data":"}`"}
+{"type":"text","data":" on"}
+{"type":"text","data":" fold"}
+{"type":"text","data":" failure"}
+{"type":"text","data":";"}
+{"type":"text","data":" the"}
+{"type":"text","data":" outer"}
+{"type":"text","data":" catch"}
+{"type":"text","data":" at"}
+{"type":"text","data":" "}
+{"type":"text","data":"804"}
+{"type":"text","data":"-"}
+{"type":"text","data":"808"}
+{"type":"text","data":" then"}
+{"type":"text","data":" sets"}
+{"type":"text","data":" close"}
+{"type":"text","data":"Task"}
+{"type":"text","data":"="}
+{"type":"text","data":"undefined"}
+{"type":"text","data":" and"}
+{"type":"text","data":" ab"}
+{"type":"text","data":"orts"}
+{"type":"text","data":" again"}
+{"type":"text","data":" if"}
+{"type":"text","data":" staged"}
+{"type":"text","data":"Snapshot"}
+{"type":"text","data":" is"}
+{"type":"text","data":" still"}
+{"type":"text","data":" undefined"}
+{"type":"text","data":"."}
+{"type":"text","data":" GREEN"}
+{"type":"text","data":" item"}
+{"type":"text","data":" "}
+{"type":"text","data":"3"}
+{"type":"text","data":" refuses"}
+{"type":"text","data":" in"}
+{"type":"text","data":" stage"}
+{"type":"text","data":"Closed"}
+{"type":"text","data":"Blueprint"}
+{"type":"text","data":"Epoch"}
+{"type":"text","data":" after"}
+{"type":"text","data":" the"}
+{"type":"text","data":" queue"}
+{"type":"text","data":" barrier"}
+{"type":"text","data":","}
+{"type":"text","data":" and"}
+{"type":"text","data":" abort"}
+{"type":"text","data":"Snapshot"}
+{"type":"text","data":"Stage"}
+{"type":"text","data":"()"}
+{"type":"text","data":" ("}
+{"type":"text","data":"v"}
+{"type":"text","data":"3"}
+{"type":"text","data":"-"}
+{"type":"text","data":"live"}
+{"type":"text","data":".ts"}
+{"type":"text","data":":"}
+{"type":"text","data":"699"}
+{"type":"text","data":"1"}
+{"type":"text","data":"-"}
+{"type":"text","data":"699"}
+{"type":"text","data":"5"}
+{"type":"text","data":")"}
+{"type":"text","data":" only"}
+{"type":"text","data":" clears"}
+{"type":"text","data":" blueprint"}
+{"type":"text","data":"Closing"}
+{"type":"text","data":"."}
+{"type":"text","data":"\",\""}
+{"type":"text","data":"impact"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"A"}
+{"type":"text","data":" GREEN"}
+{"type":"text","data":" that"}
+{"type":"text","data":" only"}
+{"type":"text","data":" asserts"}
+{"type":"text","data":" the"}
+{"type":"text","data":" first"}
+{"type":"text","data":" close"}
+{"type":"text","data":"()"}
+{"type":"text","data":" and"}
+{"type":"text","data":" a"}
+{"type":"text","data":" never"}
+{"type":"text","data":"-"}
+{"type":"text","data":"bound"}
+{"type":"text","data":" CRE"}
+{"type":"text","data":"ATOR"}
+{"type":"text","data":"_"}
+{"type":"text","data":"CLOSE"}
+{"type":"text","data":"_"}
+{"type":"text","data":"UN"}
+{"type":"text","data":"AVAILABLE"}
+{"type":"text","data":" could"}
+{"type":"text","data":" miss"}
+{"type":"text","data":" a"}
+{"type":"text","data":" same"}
+{"type":"text","data":"-"}
+{"type":"text","data":"handle"}
+{"type":"text","data":" retry"}
+{"type":"text","data":"."}
+{"type":"text","data":" Under"}
+{"type":"text","data":" the"}
+{"type":"text","data":" frozen"}
+{"type":"text","data":" repair"}
+{"type":"text","data":" that"}
+{"type":"text","data":" retry"}
+{"type":"text","data":" must"}
+{"type":"text","data":" still"}
+{"type":"text","data":" fail"}
+{"type":"text","data":" through"}
+{"type":"text","data":" the"}
+{"type":"text","data":" existing"}
+{"type":"text","data":" snapshot"}
+{"type":"text","data":"-"}
+{"type":"text","data":"export"}
+{"type":"text","data":" path"}
+{"type":"text","data":" while"}
+{"type":"text","data":" operation"}
+{"type":"text","data":"Admission"}
+{"type":"text","data":"H"}
+{"type":"text","data":"alted"}
+{"type":"text","data":" remains"}
+{"type":"text","data":" set"}
+{"type":"text","data":";"}
+{"type":"text","data":" close"}
+{"type":"text","data":"Task"}
+{"type":"text","data":" reset"}
+{"type":"text","data":" is"}
+{"type":"text","data":" not"}
+{"type":"text","data":" recovery"}
+{"type":"text","data":"."}
+{"type":"text","data":"\",\""}
+{"type":"text","data":"required"}
+{"type":"text","data":"_"}
+{"type":"text","data":"action"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"Owner"}
+{"type":"text","data":":"}
+{"type":"text","data":" D"}
+{"type":"text","data":"."}
+{"type":"text","data":"110"}
+{"type":"text","data":"c"}
+{"type":"text","data":"-"}
+{"type":"text","data":"0"}
+{"type":"text","data":"c"}
+{"type":"text","data":"1"}
+{"type":"text","data":"b"}
+{"type":"text","data":" GREEN"}
+{"type":"text","data":" tests"}
+{"type":"text","data":"."}
+{"type":"text","data":" Assert"}
+{"type":"text","data":" retry"}
+{"type":"text","data":" close"}
+{"type":"text","data":"()"}
+{"type":"text","data":" on"}
+{"type":"text","data":" the"}
+{"type":"text","data":" same"}
+{"type":"text","data":" pre"}
+{"type":"text","data":"-"}
+{"type":"text","data":"bound"}
+{"type":"text","data":" handle"}
+{"type":"text","data":" still"}
+{"type":"text","data":" throws"}
+{"type":"text","data":" `"}
+{"type":"text","data":"creator"}
+{"type":"text","data":" snapshot"}
+{"type":"text","data":" export"}
+{"type":"text","data":" failed"}
+{"type":"text","data":":"}
+{"type":"text","data":" not"}
+{"type":"text","data":"-"}
+{"type":"text","data":"active"}
+{"type":"text","data":"`,"}
+{"type":"text","data":" that"}
+{"type":"text","data":" halt"}
+{"type":"text","data":" remains"}
+{"type":"text","data":","}
+{"type":"text","data":" and"}
+{"type":"text","data":" that"}
+{"type":"text","data":" only"}
+{"type":"text","data":" deactivate"}
+{"type":"text","data":"/"}
+{"type":"text","data":"recover"}
+{"type":"text","data":" m"}
+{"type":"text","data":"ints"}
+{"type":"text","data":" a"}
+{"type":"text","data":" fresh"}
+{"type":"text","data":" close"}
+{"type":"text","data":"-"}
+{"type":"text","data":"capable"}
+{"type":"text","data":" registration"}
+{"type":"text","data":"."}
+{"type":"text","data":" No"}
+{"type":"text","data":" plan"}
+{"type":"text","data":" or"}
+{"type":"text","data":" production"}
+{"type":"text","data":"-"}
+{"type":"text","data":"scope"}
+{"type":"text","data":" change"}
+{"type":"text","data":".\""}
+{"type":"text","data":"},"}
+{"type":"text","data":"{\""}
+{"type":"text","data":"severity"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"P"}
+{"type":"text","data":"2"}
+{"type":"text","data":"\",\""}
+{"type":"text","data":"title"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"No"}
+{"type":"text","data":"-"}
+{"type":"text","data":"policy"}
+{"type":"text","data":" unknown"}
+{"type":"text","data":" case"}
+{"type":"text","data":" must"}
+{"type":"text","data":" throw"}
+{"type":"text","data":" after"}
+{"type":"text","data":" a"}
+{"type":"text","data":" real"}
+{"type":"text","data":" durable"}
+{"type":"text","data":" commit"}
+{"type":"text","data":","}
+{"type":"text","data":" not"}
+{"type":"text","data":" a"}
+{"type":"text","data":" pre"}
+{"type":"text","data":"-"}
+{"type":"text","data":"transaction"}
+{"type":"text","data":" mock"}
+{"type":"text","data":"\",\""}
+{"type":"text","data":"evidence"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"packages"}
+{"type":"text","data":"/"}
+{"type":"text","data":"issu"}
+{"type":"text","data":"ance"}
+{"type":"text","data":"-"}
+{"type":"text","data":"store"}
+{"type":"text","data":"/"}
+{"type":"text","data":"src"}
+{"type":"text","data":"/"}
+{"type":"text","data":"terminal"}
+{"type":"text","data":".ts"}
+{"type":"text","data":":"}
+{"type":"text","data":"126"}
+{"type":"text","data":" throws"}
+{"type":"text","data":" Durable"}
+{"type":"text","data":"Iss"}
+{"type":"text","data":"uance"}
+{"type":"text","data":"Unknown"}
+{"type":"text","data":"Outcome"}
+{"type":"text","data":"Error"}
+{"type":"text","data":" ("}
+{"type":"text","data":"code"}
+{"type":"text","data":" ISS"}
+{"type":"text","data":"U"}
+{"type":"text","data":"ANCE"}
+{"type":"text","data":"_"}
+{"type":"text","data":"OUT"}
+{"type":"text","data":"COME"}
+{"type":"text","data":"_"}
+{"type":"text","data":"UNKNOWN"}
+{"type":"text","data":")"}
+{"type":"text","data":" only"}
+{"type":"text","data":" on"}
+{"type":"text","data":" un"}
+{"type":"text","data":"readable"}
+{"type":"text","data":" post"}
+{"type":"text","data":"-"}
+{"type":"text","data":"commit"}
+{"type":"text","data":" read"}
+{"type":"text","data":"back"}
+{"type":"text","data":";"}
+{"type":"text","data":" node"}
+{"type":"text","data":"-"}
+{"type":"text","data":"issu"}
+{"type":"text","data":"ance"}
+{"type":"text","data":"-"}
+{"type":"text","data":"store"}
+{"type":"text","data":".ts"}
+{"type":"text","data":":"}
+{"type":"text","data":"801"}
+{"type":"text","data":"-"}
+{"type":"text","data":"819"}
+{"type":"text","data":" and"}
+{"type":"text","data":" browser"}
+{"type":"text","data":"-"}
+{"type":"text","data":"issu"}
+{"type":"text","data":"ance"}
+{"type":"text","data":"-"}
+{"type":"text","data":"store"}
+{"type":"text","data":".ts"}
+{"type":"text","data":":"}
+{"type":"text","data":"748"}
+{"type":"text","data":"-"}
+{"type":"text","data":"776"}
+{"type":"text","data":" are"}
+{"type":"text","data":" the"}
+{"type":"text","data":" real"}
+{"type":"text","data":" arms"}
+{"type":"text","data":"."}
+{"type":"text","data":" issue"}
+{"type":"text","data":"One"}
+{"type":"text","data":"Vertex"}
+{"type":"text","data":"()"}
+{"type":"text","data":" currently"}
+{"type":"text","data":" uses"}
+{"type":"text","data":" a"}
+{"type":"text","data":" bare"}
+{"type":"text","data":" catch"}
+{"type":"text","data":" ("}
+{"type":"text","data":"v"}
+{"type":"text","data":"3"}
+{"type":"text","data":"-"}
+{"type":"text","data":"live"}
+{"type":"text","data":".ts"}
+{"type":"text","data":":"}
+{"type":"text","data":"568"}
+{"type":"text","data":"2"}
+{"type":"text","data":"-"}
+{"type":"text","data":"569"}
+{"type":"text","data":"9"}
+{"type":"text","data":")"}
+{"type":"text","data":" and"}
+{"type":"text","data":","}
+{"type":"text","data":" because"}
+{"type":"text","data":" signer"}
+{"type":"text","data":"Resolved"}
+{"type":"text","data":" is"}
+{"type":"text","data":" already"}
+{"type":"text","data":" true"}
+{"type":"text","data":","}
+{"type":"text","data":" maps"}
+{"type":"text","data":" that"}
+{"type":"text","data":" throw"}
+{"type":"text","data":" to"}
+{"type":"text","data":" admission"}
+{"type":"text","data":"-"}
+{"type":"text","data":"rejected"}
+{"type":"text","data":" `"}
+{"type":"text","data":"v"}
+{"type":"text","data":"3"}
+{"type":"text","data":" local"}
+{"type":"text","data":" issue"}
+{"type":"text","data":" signature"}
+{"type":"text","data":" was"}
+{"type":"text","data":" not"}
+{"type":"text","data":" admitted"}
+{"type":"text","data":"`"}
+{"type":"text","data":" rather"}
+{"type":"text","data":" than"}
+{"type":"text","data":" outcome"}
+{"type":"text","data":"-"}
+{"type":"text","data":"unknown"}
+{"type":"text","data":"."}
+{"type":"text","data":"\",\""}
+{"type":"text","data":"impact"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"A"}
+{"type":"text","data":" mock"}
+{"type":"text","data":" that"}
+{"type":"text","data":" rejects"}
+{"type":"text","data":" trans"}
+{"type":"text","data":"act"}
+{"type":"text","data":"Issue"}
+{"type":"text","data":" with"}
+{"type":"text","data":" that"}
+{"type":"text","data":" code"}
+{"type":"text","data":" before"}
+{"type":"text","data":" COMMIT"}
+{"type":"text","data":" would"}
+{"type":"text","data":" halt"}
+{"type":"text","data":" under"}
+{"type":"text","data":" GREEN"}
+{"type":"text","data":" but"}
+{"type":"text","data":" leave"}
+{"type":"text","data":" no"}
+{"type":"text","data":" issued"}
+{"type":"text","data":"/"}
+{"type":"text","data":"pending"}
+{"type":"text","data":"-"}
+{"type":"text","data":"out"}
+{"type":"text","data":"box"}
+{"type":"text","data":" row"}
+{"type":"text","data":","}
+{"type":"text","data":" so"}
+{"type":"text","data":" recover"}
+{"type":"text","data":"-"}
+{"type":"text","data":"exactly"}
+{"type":"text","data":"-"}
+{"type":"text","data":"once"}
+{"type":"text","data":" and"}
+{"type":"text","data":" the"}
+{"type":"text","data":" omitted"}
+{"type":"text","data":"-"}
+{"type":"text","data":"row"}
+{"type":"text","data":" close"}
+{"type":"text","data":" defect"}
+{"type":"text","data":" would"}
+{"type":"text","data":" not"}
+{"type":"text","data":" be"}
+{"type":"text","data":" proven"}
+{"type":"text","data":"."}
+{"type":"text","data":" Ret"}
+{"type":"text","data":"arget"}
+{"type":"text","data":"ing"}
+{"type":"text","data":" the"}
+{"type":"text","data":" existing"}
+{"type":"text","data":" admission"}
+{"type":"text","data":"-"}
+{"type":"text","data":"rejected"}
+{"type":"text","data":" mapping"}
+{"type":"text","data":" would"}
+{"type":"text","data":" also"}
+{"type":"text","data":" breach"}
+{"type":"text","data":" the"}
+{"type":"text","data":" no"}
+{"type":"text","data":"-"}
+{"type":"text","data":"new"}
+{"type":"text","data":"-"}
+{"type":"text","data":"kind"}
+{"type":"text","data":" freeze"}
+{"type":"text","data":"."}
+{"type":"text","data":"\",\""}
+{"type":"text","data":"required"}
+{"type":"text","data":"_"}
+{"type":"text","data":"action"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"\""}
+{"type":"text","data":"Owner"}
+{"type":"text","data":":"}
+{"type":"text","data":" D"}
+{"type":"text","data":"."}
+{"type":"text","data":"110"}
+{"type":"text","data":"c"}
+{"type":"text","data":"-"}
+{"type":"text","data":"0"}
+{"type":"text","data":"c"}
+{"type":"text","data":"1"}
+{"type":"text","data":"b"}
+{"type":"text","data":" GREEN"}
+{"type":"text","data":" tests"}
+{"type":"text","data":"."}
+{"type":"text","data":" Drive"}
+{"type":"text","data":" the"}
+{"type":"text","data":" real"}
+{"type":"text","data":" terminal"}
+{"type":"text","data":"-"}
+{"type":"text","data":"sup"}
+{"type":"text","data":"pression"}
+{"type":"text","data":" un"}
+{"type":"text","data":"readable"}
+{"type":"text","data":" arm"}
+{"type":"text","data":" ("}
+{"type":"text","data":"or"}
+{"type":"text","data":" an"}
+{"type":"text","data":" adapter"}
+{"type":"text","data":" that"}
+{"type":"text","data":" throws"}
+{"type":"text","data":" the"}
+{"type":"text","data":" real"}
+{"type":"text","data":" Unknown"}
+{"type":"text","data":"Outcome"}
+{"type":"text","data":"Failure"}
+{"type":"text","data":" after"}
+{"type":"text","data":" the"}
+{"type":"text","data":" real"}
+{"type":"text","data":" commit"}
+{"type":"text","data":"),"}
+{"type":"text","data":" bind"}
+{"type":"text","data":" error"}
+{"type":"text","data":".code"}
+{"type":"text","data":","}
+{"type":"text","data":" keep"}
+{"type":"text","data":" the"}
+{"type":"text","data":" existing"}
+{"type":"text","data":" local"}
+{"type":"text","data":"-"}
+{"type":"text","data":"issue"}
+{"type":"text","data":" kind"}
+{"type":"text","data":"/"}
+{"type":"text","data":"detail"}
+{"type":"text","data":","}
+{"type":"text","data":" and"}
+{"type":"text","data":" still"}
+{"type":"text","data":" refuse"}
+{"type":"text","data":" close"}
+{"type":"text","data":"."}
+{"type":"text","data":" No"}
+{"type":"text","data":" new"}
+{"type":"text","data":" store"}
+{"type":"text","data":" API"}
+{"type":"text","data":".\""}
+{"type":"text","data":"}],"}
+{"type":"text","data":"\""}
+{"type":"text","data":"red"}
+{"type":"text","data":"_"}
+{"type":"text","data":"causal"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"true"}
+{"type":"text","data":",\""}
+{"type":"text","data":"green"}
+{"type":"text","data":"_"}
+{"type":"text","data":"closes"}
+{"type":"text","data":"_"}
+{"type":"text","data":"red"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"true"}
+{"type":"text","data":",\""}
+{"type":"text","data":"scope"}
+{"type":"text","data":"_"}
+{"type":"text","data":"preserved"}
+{"type":"text","data":"\":"}
+{"type":"text","data":"true"}
+{"type":"text","data":"}"}
+{"type":"available_commands","tools":["run_terminal_command","read_file","search_replace","list_dir","grep","kill_command_or_subagent","todo_write","get_command_or_subagent_output","spawn_subagent","scheduler_create","scheduler_delete","scheduler_list","monitor","search_tool","use_tool","workflow","enter_plan_mode","exit_plan_mode","ask_user_question","image_gen","image_edit","image_to_video","reference_to_video","write","railway__add_reference_variable","railway__connect_service_source","railway__create_bucket","railway__create_environment","railway__create_project","railway__create_service","railway__create_tcp_proxy","railway__create_volume","railway__delete_domain","railway__deploy","railway__deploy_template","railway__disconnect_service_source","railway__docs_fetch","railway__docs_search","railway__domain_status","railway__environment_status","railway__generate_domain","railway__get_logs","railway__get_service_config","railway__get_tcp_proxy","railway__http_error_rate","railway__http_requests","railway__http_response_time","railway__link_environment","railway__link_service","railway__list_deployments","railway__list_domains","railway__list_projects","railway__list_services","railway__list_tcp_proxies","railway__list_variables","railway__list_workspaces","railway__private_network_status","railway__private_network_update","railway__remove_bucket","railway__remove_service","railway__remove_tcp_proxy","railway__remove_volume","railway__retry_domain_certificate","railway__scale_service","railway__search_templates","railway__service_metrics","railway__set_variables","railway__update_domain","railway__update_service","railway__update_volume","railway__whoami","codex__codex","codex__codex-reply","react-grab-mcp__get_element_context"],"commands":["compact","always-approve","context","hooks-trust","hooks-list","hooks-add","hooks-remove","hooks-untrust","plugins","reload-plugins","session-info","feedback","deep-research","workflow","goal","loop","claude","brave-search","close-spec","codex","compare-screenshots","dep-tldr","eval-skills","feature-slicing","find-skills","implement-spec","instruments-profiling","llm-tldr-dep-indexer","llm-tldr-usage","oracle","preview-shots","refactor-clean","renderer","screenshot-critique","skill-creator","swift-concurrency-expert","swiftui-liquid-glass","swiftui-performance-audit","swiftui-view-refactor","use-railway","video-transcript-downloader","write-docs","write-skills","explain-diff-html","skills-manager","twitter-clip","video-to-gif","build-with-ai","code-review","create-skill","create-workflow","design","execute-plan","bundled:imagine","implement","pr-babysit","resume-claude","resume-codex","resume-cursor","review","skill-design-principles","adversarial-spec","playground"]}
+{"type":"usage","usage":{"input_tokens":132406,"output_tokens":758,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"reasoning_tokens":42},"signature":"FvIFC9/y+DDiYn7jwIC4kElZKIlTsFHor7aTO4towTAOkNRQz2QLKl08Kz6UgV6k99j+nUN+CfrkicSH2trNKCLhYA7DKUOp8p45IQSqIrA6oB4m3nY+3z58uoiJg6r9F9OApsoKQ5I3YyCcythJDnCxXgClpy9z4PfSsMwSUUnVcqSLns4llO1SnhoeFYPZnPxADMvHQC04FCHuZLkM7z6LRSWxUd48JcUSp65ZAJ7tabo1nlAMgw"}
+{"type":"end","stopReason":"end_turn","sessionId":"01a06562-a0eb-7593-a74b-756454b90574","requestId":"e14fbc36-cd88-4725-a621-092920d3090c","usage":{"input_tokens":132406,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"output_tokens":758,"reasoning_tokens":42,"total_tokens":133164},"num_turns":1,"total_cost_usd":0.0457912,"total_cost_usd_ticks":457912000,"modelUsage":{"grok-4.6-build":{"inputTokens":132406,"outputTokens":758,"cacheReadInputTokens":0,"cacheCreationInputTokens":0,"modelCalls":1,"costUSD":0.0457912}}}

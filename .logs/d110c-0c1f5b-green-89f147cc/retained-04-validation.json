@@ -1,0 +1,515 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 45,
+  "passed": 45,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts",
+      "message": ""
+    }
+  ],
+  "topLevelErrors": [],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED pins the exact contract owners and case inventory without importing future exports",
+      "status": "passed",
+      "title": "pins the exact contract owners and case inventory without importing future exports",
+      "duration": 2.220708000000002,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED memory exposes the two plan methods at runtime",
+      "status": "passed",
+      "title": "memory exposes the two plan methods at runtime",
+      "duration": 72.37591700000002,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED browser exposes the two plan methods at runtime",
+      "status": "passed",
+      "title": "browser exposes the two plan methods at runtime",
+      "duration": 59.11445800000007,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED node exposes the two plan methods at runtime",
+      "status": "passed",
+      "title": "node exposes the two plan methods at runtime",
+      "duration": 37.74362499999995,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED memory applies revision CAS and returns detached durable plans",
+      "status": "passed",
+      "title": "memory applies revision CAS and returns detached durable plans",
+      "duration": 2.1787910000000466,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED browser applies revision CAS and returns detached durable plans",
+      "status": "passed",
+      "title": "browser applies revision CAS and returns detached durable plans",
+      "duration": 5.861459000000082,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED node applies revision CAS and returns detached durable plans",
+      "status": "passed",
+      "title": "node applies revision CAS and returns detached durable plans",
+      "duration": 5.566082999999935,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED memory links a fence atomically with issuance",
+      "status": "passed",
+      "title": "memory links a fence atomically with issuance",
+      "duration": 3.356249999999932,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED browser links a fence atomically with issuance",
+      "status": "passed",
+      "title": "browser links a fence atomically with issuance",
+      "duration": 5.021582999999964,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED node links a fence atomically with issuance",
+      "status": "passed",
+      "title": "node links a fence atomically with issuance",
+      "duration": 7.493082999999956,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED memory links one replacement atomically and makes the source entry the restart idempotence key",
+      "status": "passed",
+      "title": "memory links one replacement atomically and makes the source entry the restart idempotence key",
+      "duration": 2.6771669999999403,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED browser links one replacement atomically and makes the source entry the restart idempotence key",
+      "status": "passed",
+      "title": "browser links one replacement atomically and makes the source entry the restart idempotence key",
+      "duration": 14.457874999999945,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED node links one replacement atomically and makes the source entry the restart idempotence key",
+      "status": "passed",
+      "title": "node links one replacement atomically and makes the source entry the restart idempotence key",
+      "duration": 8.664916000000062,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED memory refuses a fence when the durable plan is absent",
+      "status": "passed",
+      "title": "memory refuses a fence when the durable plan is absent",
+      "duration": 0.707416999999964,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED browser refuses a fence when the durable plan is absent",
+      "status": "passed",
+      "title": "browser refuses a fence when the durable plan is absent",
+      "duration": 3.5127499999999827,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED node refuses a fence when the durable plan is absent",
+      "status": "passed",
+      "title": "node refuses a fence when the durable plan is absent",
+      "duration": 7.495625000000018,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED memory refuses a fence when fenceSequence is already set",
+      "status": "passed",
+      "title": "memory refuses a fence when fenceSequence is already set",
+      "duration": 0.8995840000000044,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED browser refuses a fence when fenceSequence is already set",
+      "status": "passed",
+      "title": "browser refuses a fence when fenceSequence is already set",
+      "duration": 2.9818339999999353,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED node refuses a fence when fenceSequence is already set",
+      "status": "passed",
+      "title": "node refuses a fence when fenceSequence is already set",
+      "duration": 13.374000000000024,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED memory refuses a fence while manual review is unresolved",
+      "status": "passed",
+      "title": "memory refuses a fence while manual review is unresolved",
+      "duration": 1.081166000000053,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED browser refuses a fence while manual review is unresolved",
+      "status": "passed",
+      "title": "browser refuses a fence while manual review is unresolved",
+      "duration": 2.8238329999999223,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED node refuses a fence while manual review is unresolved",
+      "status": "passed",
+      "title": "node refuses a fence while manual review is unresolved",
+      "duration": 6.817165999999929,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED memory refuses a replacement for an absent entry",
+      "status": "passed",
+      "title": "memory refuses a replacement for an absent entry",
+      "duration": 0.9159160000000384,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED browser refuses a replacement for an absent entry",
+      "status": "passed",
+      "title": "browser refuses a replacement for an absent entry",
+      "duration": 3.0304159999999456,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED node refuses a replacement for an absent entry",
+      "status": "passed",
+      "title": "node refuses a replacement for an absent entry",
+      "duration": 8.669250000000034,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED memory refuses an already-linked replacement",
+      "status": "passed",
+      "title": "memory refuses an already-linked replacement",
+      "duration": 0.9752090000000635,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED browser refuses an already-linked replacement",
+      "status": "passed",
+      "title": "browser refuses an already-linked replacement",
+      "duration": 2.2554999999999836,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED node refuses an already-linked replacement",
+      "status": "passed",
+      "title": "node refuses an already-linked replacement",
+      "duration": 5.974375000000009,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED memory refuses a replacement for a manual-review entry",
+      "status": "passed",
+      "title": "memory refuses a replacement for a manual-review entry",
+      "duration": 0.7303339999999707,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED browser refuses a replacement for a manual-review entry",
+      "status": "passed",
+      "title": "browser refuses a replacement for a manual-review entry",
+      "duration": 3.68262500000003,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED node refuses a replacement for a manual-review entry",
+      "status": "passed",
+      "title": "node refuses a replacement for a manual-review entry",
+      "duration": 7.629249999999956,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED memory readback after a lost { kind: 'fence' } transaction receipt observes both the row and link or neither",
+      "status": "passed",
+      "title": "memory readback after a lost { kind: 'fence' } transaction receipt observes both the row and link or neither",
+      "duration": 0.9853339999999662,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED memory readback after a lost { kind: 'replacement', sourceSequence: 10 } transaction receipt observes both the row and link or neither",
+      "status": "passed",
+      "title": "memory readback after a lost { kind: 'replacement', sourceSequence: 10 } transaction receipt observes both the row and link or neither",
+      "duration": 0.27004199999998946,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED browser readback after a lost { kind: 'fence' } transaction receipt observes both the row and link or neither",
+      "status": "passed",
+      "title": "browser readback after a lost { kind: 'fence' } transaction receipt observes both the row and link or neither",
+      "duration": 2.810000000000059,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED browser readback after a lost { kind: 'replacement', sourceSequence: 10 } transaction receipt observes both the row and link or neither",
+      "status": "passed",
+      "title": "browser readback after a lost { kind: 'replacement', sourceSequence: 10 } transaction receipt observes both the row and link or neither",
+      "duration": 2.033625000000029,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED node readback after a lost { kind: 'fence' } transaction receipt observes both the row and link or neither",
+      "status": "passed",
+      "title": "node readback after a lost { kind: 'fence' } transaction receipt observes both the row and link or neither",
+      "duration": 6.931667000000061,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED node readback after a lost { kind: 'replacement', sourceSequence: 10 } transaction receipt observes both the row and link or neither",
+      "status": "passed",
+      "title": "node readback after a lost { kind: 'replacement', sourceSequence: 10 } transaction receipt observes both the row and link or neither",
+      "duration": 7.326165999999944,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED memory refuses corrupt plan shapes without creating state",
+      "status": "passed",
+      "title": "memory refuses corrupt plan shapes without creating state",
+      "duration": 0.5689169999999422,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED browser refuses corrupt plan shapes without creating state",
+      "status": "passed",
+      "title": "browser refuses corrupt plan shapes without creating state",
+      "duration": 1.3890830000000278,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED node refuses corrupt plan shapes without creating state",
+      "status": "passed",
+      "title": "node refuses corrupt plan shapes without creating state",
+      "duration": 5.141124999999988,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED memory refuses pruning a published source while an unlinked plan entry references it",
+      "status": "passed",
+      "title": "memory refuses pruning a published source while an unlinked plan entry references it",
+      "duration": 1.36099999999999,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED browser refuses pruning a published source while an unlinked plan entry references it",
+      "status": "passed",
+      "title": "browser refuses pruning a published source while an unlinked plan entry references it",
+      "duration": 3.551666999999952,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED node refuses pruning a published source while an unlinked plan entry references it",
+      "status": "passed",
+      "title": "node refuses pruning a published source while an unlinked plan entry references it",
+      "duration": 7.295749999999998,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED browser fresh schema is version 2 with exactly the fourth settlementPlans object store",
+      "status": "passed",
+      "title": "browser fresh schema is version 2 with exactly the fourth settlementPlans object store",
+      "duration": 0.73700000000008,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110c-0c1f5b0s settlement-plan contract RED"
+      ],
+      "fullName": "D.110c-0c1f5b0s settlement-plan contract RED node migrates the exact v2 authority to a v3 settlement_plans table in place",
+      "status": "passed",
+      "title": "node migrates the exact v2 authority to a v3 settlement_plans table in place",
+      "duration": 6.114500000000021,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+const root='/Users/aristotle/Documents/Projects/ts-drp-1',out=path.dirname(new URL(import.meta.url).pathname),file='tests/phase-3a1b-p3-live-transport-red.test.ts',hash=b=>crypto.createHash('sha256').update(b).digest('hex'),bytes=fs.readFileSync(path.join(root,file)),sha256=hash(bytes),json=f=>JSON.parse(fs.readFileSync(path.join(out,f)));
+const identity=json('program-identity.json'),input=identity.sources.find(s=>s.file===path.join(root,file));
+if(input?.sha256!==sha256||input.onDiskSha256!==sha256)throw Error('Stopped source differs from actual compiler input');
+const commands=Object.fromEntries(['custody-before','custody-before-corrected','format','lint','diff','compiler-green'].map(label=>[label,{command:json(label+'/command.json'),status:json(label+'/status.json')}]));
+if(commands['compiler-green'].status.code!==0||json('diagnostics.json').diagnosticCount!==0||commands.lint.status.code!==1||commands.format.status.code!==0||commands.diff.status.code!==0)throw Error('Stop status differs');
+fs.writeFileSync(path.join(out,'phase-3a1b-p3-live-transport-red.test.ts.stopped-nonnull'),bytes,{flag:'wx'});
+const data={file,sha256,bytes:bytes.length,compilerInputExact:true,compilerDiagnostics:0,lintErrors:7,lintRule:'@typescript-eslint/no-non-null-assertion',disposition:'Paused for root prospective syntax amendment; no source edit, compiler repeat, runtime, controls or whole-root seal in this capture.',commands};
+fs.writeFileSync(path.join(out,'stopped-nonnull.json'),JSON.stringify(data,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify({sha256,bytes:bytes.length,compilerInputExact:true,compiler:0,lint:1,lintErrors:7}));

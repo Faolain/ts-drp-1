@@ -1,0 +1,7 @@
+
+/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6b-d110c-0c1k/w0-runtime-contract.ts
+  56:1  warning  Missing JSDoc @param "shape" declaration  jsdoc/require-param
+
+✖ 1 problem (0 errors, 1 warning)
+  0 errors and 1 warning potentially fixable with the `--fix` option.
+

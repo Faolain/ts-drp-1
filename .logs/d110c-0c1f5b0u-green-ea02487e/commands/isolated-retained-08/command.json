@@ -1,0 +1,15 @@
+{
+  "cwd": "/tmp/d110c-f5b0u-green-75Jm2F/checkout",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "vitest",
+    "run",
+    "tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts",
+    "--no-file-parallelism",
+    "--coverage.enabled=false",
+    "--reporter=json",
+    "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0u-green-working-747ce566/isolated-retained-08/result.json"
+  ],
+  "start": "2026-09-05T06:49:01.002Z"
+}

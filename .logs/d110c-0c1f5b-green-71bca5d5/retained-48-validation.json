@@ -1,0 +1,139 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 9,
+  "passed": 9,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-48/result.json",
+  "baselineSha256": "6a7525505bbec69c259f74ebcf089d73b1b3620a48fbbf22fae6ce52611bf2ce",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6c-retained-heap-forensics-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6c-retained-heap-forensics-red.test.ts",
+      "ancestorTitles": [
+        "D.110a-x retained-heap failure forensics"
+      ],
+      "fullName": "D.110a-x retained-heap failure forensics uses the actual full launcher's frozen root, worker path, and seven-hour deadline",
+      "status": "passed",
+      "title": "uses the actual full launcher's frozen root, worker path, and seven-hour deadline",
+      "duration": 1.7299170000000004,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6c-retained-heap-forensics-red.test.ts",
+      "ancestorTitles": [
+        "D.110a-x retained-heap failure forensics"
+      ],
+      "fullName": "D.110a-x retained-heap failure forensics durably completes a normal miniature child and exactly reconciles its journal",
+      "status": "passed",
+      "title": "durably completes a normal miniature child and exactly reconciles its journal",
+      "duration": 273.682167,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6c-retained-heap-forensics-red.test.ts",
+      "ancestorTitles": [
+        "D.110a-x retained-heap failure forensics"
+      ],
+      "fullName": "D.110a-x retained-heap failure forensics retains completed progress and partial lifecycle evidence after controlled failure",
+      "status": "passed",
+      "title": "retains completed progress and partial lifecycle evidence after controlled failure",
+      "duration": 209.49795800000004,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6c-retained-heap-forensics-red.test.ts",
+      "ancestorTitles": [
+        "D.110a-x retained-heap failure forensics"
+      ],
+      "fullName": "D.110a-x retained-heap failure forensics records an explicit watchdog firing and preserves pre-kill output",
+      "status": "passed",
+      "title": "records an explicit watchdog firing and preserves pre-kill output",
+      "duration": 1084.102208,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6c-retained-heap-forensics-red.test.ts",
+      "ancestorTitles": [
+        "D.110a-x retained-heap failure forensics"
+      ],
+      "fullName": "D.110a-x retained-heap failure forensics fails closed for an explicit child error with a durable terminal record",
+      "status": "passed",
+      "title": "fails closed for an explicit child error with a durable terminal record",
+      "duration": 120.72741699999983,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6c-retained-heap-forensics-red.test.ts",
+      "ancestorTitles": [
+        "D.110a-x retained-heap failure forensics"
+      ],
+      "fullName": "D.110a-x retained-heap failure forensics flushes partial stdout and stderr without requiring newline termination",
+      "status": "passed",
+      "title": "flushes partial stdout and stderr without requiring newline termination",
+      "duration": 141.64579200000003,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6c-retained-heap-forensics-red.test.ts",
+      "ancestorTitles": [
+        "D.110a-x retained-heap failure forensics"
+      ],
+      "fullName": "D.110a-x retained-heap failure forensics drains a large final stderr burst before classifying child failure",
+      "status": "passed",
+      "title": "drains a large final stderr burst before classifying child failure",
+      "duration": 766.976666,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6c-retained-heap-forensics-red.test.ts",
+      "ancestorTitles": [
+        "D.110a-x retained-heap failure forensics"
+      ],
+      "fullName": "D.110a-x retained-heap failure forensics rejects missing, duplicate, malformed, and out-of-order journal records",
+      "status": "passed",
+      "title": "rejects missing, duplicate, malformed, and out-of-order journal records",
+      "duration": 281.27095800000006,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6c-retained-heap-forensics-red.test.ts",
+      "ancestorTitles": [
+        "D.110a-x retained-heap failure forensics"
+      ],
+      "fullName": "D.110a-x retained-heap failure forensics rejects terminal-proof and completed-sample memory disagreement",
+      "status": "passed",
+      "title": "rejects terminal-proof and completed-sample memory disagreement",
+      "duration": 290.4914580000004,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "ee611c1569f76baf522d3ba961dbbf044d472e3bcd358dc2719bd9df8e862f95",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

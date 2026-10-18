@@ -1,0 +1,161 @@
+{
+  "statuses": {
+    "authored-check": {
+      "code": 0,
+      "signal": null,
+      "pid": 98508,
+      "start": "2026-09-06T08:24:53.992Z",
+      "finish": "2026-09-06T08:24:55.130Z"
+    },
+    "custody-after": {
+      "code": 0,
+      "signal": null,
+      "pid": 96888,
+      "start": "2026-09-06T08:22:59.543Z",
+      "finish": "2026-09-06T08:23:01.041Z"
+    },
+    "custody-before": {
+      "code": 0,
+      "signal": null,
+      "pid": 88005,
+      "start": "2026-09-06T08:14:29.568Z",
+      "finish": "2026-09-06T08:14:36.123Z"
+    },
+    "custody-presign": {
+      "code": 0,
+      "signal": null,
+      "pid": 93371,
+      "start": "2026-09-06T08:19:16.905Z",
+      "finish": "2026-09-06T08:19:24.638Z"
+    },
+    "focused": {
+      "code": 1,
+      "signal": null,
+      "pid": 95946,
+      "start": "2026-09-06T08:21:58.242Z",
+      "finish": "2026-09-06T08:22:01.038Z"
+    },
+    "format": {
+      "code": 1,
+      "signal": null,
+      "pid": 89616,
+      "start": "2026-09-06T08:16:02.861Z",
+      "finish": "2026-09-06T08:16:03.363Z"
+    },
+    "format-final": {
+      "code": 0,
+      "signal": null,
+      "pid": 90597,
+      "start": "2026-09-06T08:17:13.485Z",
+      "finish": "2026-09-06T08:17:13.999Z"
+    },
+    "format-write": {
+      "code": 0,
+      "signal": null,
+      "pid": 89952,
+      "start": "2026-09-06T08:16:21.857Z",
+      "finish": "2026-09-06T08:16:22.286Z"
+    },
+    "lint": {
+      "code": 1,
+      "signal": null,
+      "pid": 89658,
+      "start": "2026-09-06T08:16:03.501Z",
+      "finish": "2026-09-06T08:16:21.987Z"
+    },
+    "lint-final": {
+      "code": 0,
+      "signal": null,
+      "pid": 91946,
+      "start": "2026-09-06T08:17:40.212Z",
+      "finish": "2026-09-06T08:18:07.577Z"
+    },
+    "readiness": {
+      "code": 1,
+      "signal": null,
+      "pid": 94804,
+      "start": "2026-09-06T08:20:55.291Z",
+      "finish": "2026-09-06T08:20:56.146Z"
+    },
+    "readiness-corrected": {
+      "code": 0,
+      "signal": null,
+      "pid": 95523,
+      "start": "2026-09-06T08:21:44.123Z",
+      "finish": "2026-09-06T08:21:45.543Z"
+    },
+    "signed-source": {
+      "code": 0,
+      "signal": null,
+      "pid": 94430,
+      "start": "2026-09-06T08:20:36.718Z",
+      "finish": "2026-09-06T08:20:37.467Z"
+    },
+    "source-freeze": {
+      "code": 0,
+      "signal": null,
+      "pid": 93019,
+      "start": "2026-09-06T08:19:03.212Z",
+      "finish": "2026-09-06T08:19:03.974Z"
+    },
+    "tests-commit": {
+      "code": 0,
+      "signal": null,
+      "pid": 93745,
+      "start": "2026-09-06T08:19:38.845Z",
+      "finish": "2026-09-06T08:19:39.765Z"
+    },
+    "tests-push": {
+      "code": 0,
+      "signal": null,
+      "pid": 93843,
+      "start": "2026-09-06T08:19:45.987Z",
+      "finish": "2026-09-06T08:19:47.625Z"
+    },
+    "tests-staged-check": {
+      "code": 0,
+      "signal": null,
+      "pid": 93310,
+      "start": "2026-09-06T08:19:16.542Z",
+      "finish": "2026-09-06T08:19:16.575Z"
+    },
+    "typecheck": {
+      "code": 1,
+      "signal": null,
+      "pid": 90495,
+      "start": "2026-09-06T08:17:12.251Z",
+      "finish": "2026-09-06T08:17:15.687Z"
+    },
+    "typecheck-matrix": {
+      "code": 0,
+      "signal": null,
+      "pid": 91910,
+      "start": "2026-09-06T08:17:39.667Z",
+      "finish": "2026-09-06T08:17:39.947Z"
+    },
+    "validate-runtime": {
+      "code": 1,
+      "signal": null,
+      "pid": 96288,
+      "start": "2026-09-06T08:22:17.352Z",
+      "finish": "2026-09-06T08:22:17.477Z"
+    },
+    "validate-runtime-corrected": {
+      "code": 0,
+      "signal": null,
+      "pid": 96849,
+      "start": "2026-09-06T08:22:59.282Z",
+      "finish": "2026-09-06T08:22:59.396Z"
+    }
+  },
+  "expectedNonzero": {
+    "format": 1,
+    "lint": 1,
+    "typecheck": 1,
+    "readiness": 1,
+    "focused": 1,
+    "validate-runtime": 1
+  },
+  "compilerFailureDistinctFromMatrixPass": true,
+  "oneRuntimeExecution": true
+}

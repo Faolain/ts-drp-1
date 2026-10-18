@@ -1,0 +1,28 @@
+{
+	"extends": "../../../tsconfig.json",
+	"compilerOptions": {
+		"composite": false,
+		"noEmit": true,
+		"rootDir": "../../..",
+		"target": "ES2023",
+		"paths": {
+			"@ts-drp/example-v3-room": ["../../../examples/v3-room/src/index.ts"],
+			"@ts-drp/*": ["../../../packages/*/dist/src/index.d.ts", "../../../packages/*"],
+			"@ts-drp/protocol-v3": ["../../../packages/protocol-v3/dist/src/public.d.ts"]
+		}
+	},
+	"files": [
+		"contract.ts",
+		"node-owner.ts",
+		"node-child.ts",
+		"browser-owner.ts",
+		"browser-entry.ts",
+		"browser-server.ts",
+		"producer-entry.ts",
+		"../../../packages/storage/tests/bounded-active-read-red.test.ts",
+		"../../../packages/storage-node/tests/bounded-active-read-red.test.ts",
+		"../../../packages/storage-browser/tests/bounded-active-read-red.pw.ts",
+		"../../../packages/storage-browser/playwright.bounded-active-read-red.config.ts"
+	],
+	"include": []
+}

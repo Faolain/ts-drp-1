@@ -1,0 +1,8 @@
+{
+	"initial_classification": "NO_VERDICT",
+	"initial_stop_reason": "end_turn",
+	"reason": "progress prose preceded valid terminal JSON",
+	"session_id": "01a07199-d34f-72e1-a484-2da7fc29ee0e",
+	"reemit_exit_code": 0,
+	"reemit_stop_reason": "end_turn"
+}

@@ -1,0 +1,20 @@
+Only packages/node/src/v3-live.ts changed.
+
+Observed corrective seams:
+- copySettlementPlan is imported from @ts-drp/issuance-store and applied to the
+  durable plan read before property access.
+- isControlOperation takes profileId and returns true only for settlement-v1.
+- every ingress, recovery, issue, rebase, and control-set call supplies the
+  authenticated/current profile.
+- legacy rebase intent reconstruction exempts join and causalJoin from the
+  reserved-action empty-intent path.
+- settlement join, causalJoin, and author fence remain control-only.
+- issued/outbox equality is checked for every recovery profile.
+- terminal transaction outcome-unknown handling precedes the generic ambiguous
+  issue result.
+- same-store sequence-zero rows surface; cross-object sequence-zero bootstrap
+  rows remain excluded; an authenticated activation digest is excluded in both
+  modes when present.
+
+No wire, protobuf, dependency, cryptography, API, threshold, fixture, room,
+pruning, W0, or campaign path changed.

@@ -1,0 +1,99 @@
+[
+  {
+    "name": "worktree",
+    "command": "git",
+    "args": [
+      "-C",
+      "/Users/aristotle/Documents/Projects/ts-drp-1",
+      "worktree",
+      "add",
+      "--detach",
+      "/tmp/d110c-f5b0u-corrective-red-zN4Qas/checkout",
+      "686a1cf9de5fbde64b990199e5ba2df9e5dac2e5"
+    ],
+    "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+    "startedAt": "2026-09-05T04:47:27.048Z",
+    "finishedAt": "2026-09-05T04:47:31.193Z",
+    "status": 0,
+    "signal": null
+  },
+  {
+    "name": "apply",
+    "command": "git",
+    "args": [
+      "-C",
+      "/tmp/d110c-f5b0u-corrective-red-zN4Qas/checkout",
+      "apply",
+      "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0u-red-539606eb/overlay/rejected-candidate.patch"
+    ],
+    "cwd": "/tmp/d110c-f5b0u-corrective-red-zN4Qas/checkout",
+    "startedAt": "2026-09-05T04:47:31.195Z",
+    "finishedAt": "2026-09-05T04:47:31.234Z",
+    "status": 0,
+    "signal": null
+  },
+  {
+    "name": "install",
+    "command": "pnpm",
+    "args": [
+      "install",
+      "--offline",
+      "--frozen-lockfile",
+      "--ignore-scripts"
+    ],
+    "cwd": "/tmp/d110c-f5b0u-corrective-red-zN4Qas/checkout",
+    "startedAt": "2026-09-05T04:47:31.440Z",
+    "finishedAt": "2026-09-05T04:47:57.384Z",
+    "status": 0,
+    "signal": null
+  },
+  {
+    "name": "build",
+    "command": "pnpm",
+    "args": [
+      "build:packages"
+    ],
+    "cwd": "/tmp/d110c-f5b0u-corrective-red-zN4Qas/checkout",
+    "startedAt": "2026-09-05T04:47:57.384Z",
+    "finishedAt": "2026-09-05T04:51:03.098Z",
+    "status": 0,
+    "signal": null
+  },
+  {
+    "name": "list",
+    "command": "pnpm",
+    "args": [
+      "exec",
+      "vitest",
+      "list",
+      "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+      "-t",
+      "queues migration rehearsal"
+    ],
+    "cwd": "/tmp/d110c-f5b0u-corrective-red-zN4Qas/checkout",
+    "startedAt": "2026-09-05T04:51:03.098Z",
+    "finishedAt": "2026-09-05T04:51:13.061Z",
+    "status": 0,
+    "signal": null
+  },
+  {
+    "name": "focused",
+    "command": "pnpm",
+    "args": [
+      "exec",
+      "vitest",
+      "run",
+      "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+      "-t",
+      "queues migration rehearsal",
+      "--coverage.enabled=false",
+      "--reporter=json",
+      "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0u-red-correction-686a1cf9/reporter.json"
+    ],
+    "cwd": "/tmp/d110c-f5b0u-corrective-red-zN4Qas/checkout",
+    "startedAt": "2026-09-05T04:51:13.061Z",
+    "finishedAt": "2026-09-05T04:51:23.328Z",
+    "status": 1,
+    "signal": null
+  }
+]

@@ -1,0 +1,153 @@
+{
+	"schemaVersion": "phase-n1prime-d2-blocker-remediation-inputs-v1",
+	"slice": "Phase -1'd2 RED",
+	"redAuthorAttestation": {
+		"authoredPhaseDRed": false,
+		"authoredOriginalReference": false,
+		"authoredRegeneratedReference": false,
+		"willAuthorRemediationGreen": false,
+		"willAuthorTypescriptPort": false,
+		"expectedOutputsSource": "authoritative grammar, registry, specification, formal lineage model and independent framing/Ed25519 derivation"
+	},
+	"immutableArtifacts": {
+		"phaseDRed": {
+			"path": "tests/protocol-v3-regenerated-reference-n1prime-d.test.ts",
+			"sha256": "d2026fc81c98c709da7ca0dc94d20cd05b56a5e871b35f6e715aec63920fd407"
+		},
+		"phaseDRedFixture": {
+			"path": "tests/fixtures/phase-n1prime-d/regenerated-reference-contract.json",
+			"sha256": "f46c4ee3be04f4b0a53d4180322c1e8f4ad201d280ef4f2c5f0beb0bdfd1ab83"
+		},
+		"replacementVectors": {
+			"path": "packages/protocol-v3/conformance/vectors/registry-v1.json",
+			"sha256": "8b84504ae98b37beae2d91ef8fa29f9a61299a236d32a12b63f24cb2757da741"
+		},
+		"registry": {
+			"path": "packages/protocol-v3/registry/registry-v1.json",
+			"sha256": "2fd6f51286e06f2c3c634c244a0242a55da186258664ec54a371f19b814a11d9"
+		},
+		"grammar": {
+			"path": "docs/protocol/canonical-tag-codec-v1.json",
+			"sha256": "64426584f7c3217a42e258ec5d2eaae368d209dd520c0653361a1aca82aa705e"
+		},
+		"specification": {
+			"path": "docs/protocol/attested-hard-epochs-v5.md",
+			"sha256": "a2d1c818eecf4524aac60d102aded73eafdab8cb613e7a53a91d79fff9ac9db8"
+		},
+		"formalLineage": {
+			"path": "packages/protocol-v3/formal/author-lineage-actions.qnt",
+			"sha256": "7971a025959164f609f4509bf4242f94fc4cc0b6974dde903bf462852983f038"
+		}
+	},
+	"remediationTargets": {
+		"regeneratedReference": {
+			"path": "packages/protocol-v3/conformance/regenerated-reference/reference.mjs",
+			"preRemediationSha256": "a81a0248032494b3abfb13f5201201ffd8d4b7577a1275b08ad682c110017580"
+		},
+		"regeneratedProvenance": {
+			"path": "packages/protocol-v3/conformance/regenerated-reference/provenance.json",
+			"preRemediationSha256": "7172f6dcb35280c666dcee0c0e58d00af9f7a73e99b75c4a4411b8f885affa77"
+		}
+	},
+	"normativeAdjudications": {
+		"candidateAuthorSequence": {
+			"owner": "specification decision PH-N1P-D02 plus formal local issuance action",
+			"requirement": "candidate sequence must already equal the internally selected next ordinal; mismatch rejects without mutation or work",
+			"retiresPhaseDNonclaim": "the five issuance cases do not independently kill deletion of the next-sequence branch"
+		},
+		"keypairBinding": {
+			"owner": "Ed25519 signing-capable local issuance transition",
+			"requirement": "the supplied private key must exist and derive the supplied public-key bytes"
+		},
+		"uppercasePublicKeyHex": {
+			"owner": "accepted neutral JSON CLI transport contract, distinct from the protocol's raw Ed25519 bytes",
+			"requirement": "publicKeyHex, like every neutral CLI hex field, is canonical lowercase transport; uppercase rejects without mutation or work"
+		},
+		"verifyReceived": {
+			"owner": "exact-received-byte registered digest and strict Ed25519 operation",
+			"requirement": "verification hashes and verifies the supplied bytes directly without a decode/re-encode gate"
+		},
+		"protoKey": {
+			"owner": "grammar rules OBJECT_PLAIN_NULL_PROTOTYPE, OBJECT_DATA_PROPERTIES and DECODE_REENCODE_IDENTITY",
+			"requirement": "an own enumerable __proto__ key is inert data and participates in canonical object encoding"
+		},
+		"uppercaseDecodeHex": {
+			"owner": "authoritative grammar hexadecimal transport and accepted neutral decode contract",
+			"requirement": "canonicalHex is lowercase even-length hexadecimal; uppercase transport rejects"
+		},
+		"unpairedSurrogate": {
+			"owner": "grammar rule STRING_UNPAIRED_SURROGATE",
+			"requirement": "a source string containing an unpaired surrogate rejects before encoding"
+		},
+		"directJsBoundary": {
+			"laterObligations": ["sparse-array", "non-plain-object", "accessor-property", "symbol-key"],
+			"reason": "JSON stdin cannot faithfully preserve those source-language shapes"
+		}
+	},
+	"issuance": {
+		"baseRequest": {
+			"before": {
+				"anchor": "4242424242424242424242424242424242424242424242424242424242424242",
+				"epoch": 9,
+				"exhausted": false,
+				"lastIssued": 7
+			},
+			"candidate": {
+				"anchor": "4242424242424242424242424242424242424242424242424242424242424242",
+				"author": "phase-n1prime-d2-author",
+				"authorSequence": 8,
+				"dependencies": ["5151515151515151515151515151515151515151515151515151515151515151"],
+				"epoch": 9,
+				"kind": "drp-vertex",
+				"logicalTime": 11,
+				"objectId": "object:phase-n1prime-d2",
+				"operation": {
+					"action": "set",
+					"key": "d2",
+					"value": true
+				},
+				"protocolMajor": 3
+			},
+			"privateKeyHex": "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dc",
+			"publicKeyHex": "755c4cb9256ca7cdc4acfdc6cfeeda849017e5b9f9514e99191bd67e0b0d4276"
+		},
+		"wrongSequence": 9,
+		"mismatchedPublicKeyHex": "9ca0da86726d8282ce4e0719df6d1f4db2902bdfe78632ac4890d0b9a8e38e27"
+	},
+	"verification": {
+		"kind": "state",
+		"canonicalInput": {
+			"state": "hello"
+		},
+		"flipByteIndex": 0,
+		"nonCanonicalReceivedHex": "ff",
+		"privateKeyHex": "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dc",
+		"publicKeyHex": "755c4cb9256ca7cdc4acfdc6cfeeda849017e5b9f9514e99191bd67e0b0d4276"
+	},
+	"grammarCases": {
+		"protoKey": {
+			"kind": "state",
+			"input": {
+				"state": {
+					"__proto__": {
+						"polluted": true
+					},
+					"safe": 1
+				}
+			}
+		},
+		"uppercaseDecode": {
+			"value": "😀"
+		},
+		"unpairedSurrogate": {
+			"kind": "state",
+			"input": {
+				"state": "\ud800"
+			}
+		}
+	},
+	"runtime": {
+		"peerInvocationMaxMs": 5000,
+		"focusedTestTimeoutMs": 20000
+	}
+}

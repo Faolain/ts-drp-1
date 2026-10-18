@@ -1,0 +1,13 @@
+diff --git a/tests/phase-5d-pacemaker-red.test.ts b/tests/phase-5d-pacemaker-red.test.ts
+index f2bb3286189ac0a390fa1dd81304e4c3daf88287..2de8c0bd362c3063589505c1d0d055c7217fc1e0 100644
+--- a/tests/phase-5d-pacemaker-red.test.ts
++++ b/tests/phase-5d-pacemaker-red.test.ts
+@@ -698,6 +698,7 @@ describe.sequential("Phase 5d model-first pacemaker RED", () => {
+ 					rmSync(temporary, { force: true, recursive: true });
+ 				}
+ 			}
+-		}
++		},
++		20_000
+ 	);
+ });

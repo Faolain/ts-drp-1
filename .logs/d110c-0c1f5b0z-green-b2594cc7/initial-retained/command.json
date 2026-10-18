@@ -1,0 +1,20 @@
+{
+  "cwd": "/private/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "vitest",
+    "run",
+    "tests/phase-6b-ahe-reclamation-red.test.ts",
+    "packages/storage-node/tests/phase-6b-ahe-reclamation-red.test.ts",
+    "tests/phase-6b-runtime-reclamation-red.test.ts",
+    "tests/phase-6b-cleanup-eligibility-red.test.ts",
+    "tests/phase-6b-issuance-retention-red.test.ts",
+    "packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts",
+    "--coverage.enabled=false",
+    "--reporter=json",
+    "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0z-green-b2594cc7/initial-retained.json"
+  ],
+  "start": "2026-09-05T20:01:05.956Z"
+}

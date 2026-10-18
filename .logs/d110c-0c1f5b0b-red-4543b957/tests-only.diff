@@ -1,0 +1,20 @@
+diff --git a/tests/phase-3g-v3-rebase-outbox-red.test.ts b/tests/phase-3g-v3-rebase-outbox-red.test.ts
+index d6672800..c519711e 100644
+--- a/tests/phase-3g-v3-rebase-outbox-red.test.ts
++++ b/tests/phase-3g-v3-rebase-outbox-red.test.ts
+@@ -75,7 +75,14 @@ describe("Phase 3g authenticated-plane rebase outbox RED", () => {
+ 			source: {
+ 				author: structural.sourceRowAuthor,
+ 				authorSequence: 1,
+-				intents: [{ logicalTime: 3, operation: { action: "causalJoin" } }],
++				intents: [
++					{
++						logicalTime: 3,
++						operation: { action: "causalJoin" },
++						operationCount: 1,
++						operationIndex: 0,
++					},
++				],
+ 				vertexDigest: structural.sourceDigest,
+ 			},
+ 		});

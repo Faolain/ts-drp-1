@@ -1,0 +1,76 @@
+{
+	"schemaVersion": "phase-n1prime-c-independent-reference-vectors-v1",
+	"redAuthorId": "codex-high-phase-n1prime-c-red-20260727",
+	"acceptedInputs": {
+		"registry": {
+			"path": "packages/protocol-v3/registry/registry-v1.json",
+			"sha256": "7d8ecd8f7ab373018bff7200ba1c287dd3964735c8290491fa4f8a552cf22b9a"
+		},
+		"schema": {
+			"path": "packages/protocol-v3/registry/registry-v1.schema.json",
+			"sha256": "6ab6f377457cbe43d79c0aee4b766683c7c202cd308481db66f04e723787fbdc"
+		},
+		"specification": {
+			"path": "docs/protocol/attested-hard-epochs-v5.md",
+			"sha256": "ef94d314f9fb080b69051a80769326f43b412fcdaf36633f68fe3da5a1fdf085"
+		},
+		"amendments": {
+			"path": "docs/protocol/amendments-v3.json",
+			"sha256": "6cf8b6e25064227df7665aea37ca2bcfd049b570fcfe9d867172d967e39ffe44"
+		},
+		"formalActions": {
+			"path": "packages/protocol-v3/formal/author-lineage-actions.qnt",
+			"sha256": "7971a025959164f609f4509bf4242f94fc4cc0b6974dde903bf462852983f038"
+		},
+		"formalDerivation": {
+			"path": "packages/protocol-v3/formal/signed-field-derivation.json",
+			"sha256": "e693b3fec5ef0d73299642d49e5ab7fdc969df80214f1d9891a05e188d1b7346"
+		},
+		"formalVariables": {
+			"path": "packages/protocol-v3/formal/registry-signed-envelope-variables.qnt",
+			"sha256": "f6dede1370a40a37d2dca526a27f3dc5c6884c9b8c23390da3372977c2bcef13"
+		},
+		"modelSignoff": {
+			"path": "packages/protocol-v3/formal/registry-model-signoff.json",
+			"sha256": "882b3ae23c5c65f10542dab961a154b94fc3ad55d16ebb421a974dcae83f56a4"
+		}
+	},
+	"targetArtifacts": {
+		"referenceSource": "packages/protocol-v3/conformance/original-reference/reference.mjs",
+		"referenceProvenance": "packages/protocol-v3/conformance/original-reference/provenance.json",
+		"vectors": "packages/protocol-v3/conformance/vectors/registry-v1.json"
+	},
+	"referenceProtocol": {
+		"transport": "one-json-request-on-stdin-one-json-response-on-stdout",
+		"operations": ["encode-corpus", "validate-cases", "issue-next", "digest-received"]
+	},
+	"issuanceEvidence": {
+		"algorithm": "Ed25519",
+		"registeredDigest": "raw-32-byte-domain-separated-vertex-digest",
+		"signatureEncoding": "lowercase-hex",
+		"publicKeyEncoding": "lowercase-hex",
+		"zip215": false
+	},
+	"fixtureCarrier": {
+		"bytesMarker": "$bytesHex",
+		"notice": "NONNORMATIVE fixture-only carrier. It does not select a protocol JSON projection; hydrated instances remain Uint8Array values governed by x-registry-type and x-registry-constraints."
+	},
+	"requiredNegativeCategories": [
+		"reserved-enum",
+		"malformed-author-sequence",
+		"mechanical-v2-author-sequence-omission",
+		"mechanical-v2-anchor-omission",
+		"v2-domain-on-v3",
+		"v3-domain-on-v2",
+		"v2-suite-on-v3",
+		"v3-suite-on-v2"
+	],
+	"forbiddenReferenceFragments": [
+		"protocol-v2",
+		"../src/index",
+		"registry-v1.json",
+		"conformance/vectors",
+		"request.registry",
+		"registryPath"
+	]
+}

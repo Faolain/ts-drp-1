@@ -2,6 +2,10 @@ import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 import type { GridBrowserTrace } from "@ts-drp/network-spike/grid/fixture";
 import { createRegistryFixture } from "@ts-drp/network-spike/registry/fixture";
 
+import { installGridRoomHeadAuthority } from "../../../tests/fixtures/phase-3a1b/grid-room-head-authority.js";
+
+const preparedJoiners = new WeakMap<Page, Page>();
+
 test.describe("Phase 07 two-page grid success", () => {
 	// Browser startup and teardown share the outer envelope; protocol-specific
 	// reservation/recovery deadlines remain asserted independently below.
@@ -168,7 +172,25 @@ async function openCreator(
 	scenario: "exhaustion" | "success",
 	repetition: number
 ): Promise<GridBrowserTrace> {
+	await installGridRoomHeadAuthority([page.context()]);
+	const joinerPage = await page.context().newPage();
+	preparedJoiners.set(page, joinerPage);
 	await page.goto(`/grid/creator?scenario=${scenario}&run=${repetition}`);
+	await joinerPage.goto(`/grid/joiner?scenario=${scenario}&run=${repetition}`);
+	await Promise.all([
+		page.waitForFunction(() => window.__TS_DRP_GRID_PREPARATION__ !== undefined),
+		joinerPage.waitForFunction(() => window.__TS_DRP_GRID_PREPARATION__ !== undefined),
+	]);
+	const enrollment = await joinerPage.evaluate(() => {
+		const prepared = window.__TS_DRP_GRID_PREPARATION__;
+		if (prepared === undefined) throw new Error("recipient preparation is unavailable");
+		return prepared.enrollment;
+	});
+	await page.evaluate((memberEnrollment) => {
+		const prepared = window.__TS_DRP_GRID_PREPARATION__;
+		if (prepared === undefined) throw new Error("creator preparation is unavailable");
+		return prepared.start({ memberEnrollment });
+	}, enrollment);
 	await expect(page.locator("[data-grid-ready]")).toHaveAttribute("data-role", "creator", { timeout: 30_000 });
 	await expect(page.locator("[data-join-url]")).toHaveAttribute("href", /namespace=.*object=/u);
 	return readTrace(page);
@@ -183,8 +205,35 @@ async function openJoiner(
 	expect(joinUrl).not.toContain("peerId=");
 	expect(joinUrl).not.toContain("peer=");
 	expect(joinUrl).not.toContain("record=");
-	const joinerPage = await context.newPage();
-	await joinerPage.goto(joinUrl);
+	const joinerPage = preparedJoiners.get(creatorPage);
+	if (joinerPage === undefined || joinerPage.context() !== context)
+		throw new Error("genuine recipient enrollment was not prepared");
+	const parsed = new URL(joinUrl, creatorPage.url());
+	const namespace = parsed.searchParams.get("namespace"),
+		objectId = parsed.searchParams.get("object"),
+		invite = parsed.searchParams.get("invite");
+	if (namespace === null || objectId === null || invite === null)
+		throw new Error("signed Grid join link is incomplete");
+	try {
+		await joinerPage.evaluate(
+			(input) => {
+				const prepared = window.__TS_DRP_GRID_PREPARATION__;
+				if (prepared === undefined) throw new Error("recipient preparation is unavailable");
+				return prepared.start(input);
+			},
+			{
+				namespace,
+				objectId,
+				invite,
+			}
+		);
+	} catch (error) {
+		await test.info().attach("original-grid-relay-outcome", {
+			body: JSON.stringify(await joinerPage.evaluate(() => Reflect.get(window, "__TS_DRP_GRID_RELAY_RESULT__"))),
+			contentType: "application/json",
+		});
+		throw error;
+	}
 	await expect(joinerPage.locator("[data-grid-ready]")).toHaveAttribute("data-role", "joiner", { timeout: 30_000 });
 	return { joiner: await readTrace(joinerPage), joinerPage };
 }

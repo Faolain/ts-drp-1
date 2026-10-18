@@ -1,0 +1,29 @@
+{
+  "verdict": "PASS",
+  "findings": [],
+  "checked_requirements": [
+    "Tests-only W0 reconciliation plus bounded retained-consumer repair; unfinished parent production repair, registry/grid authority, and 64-writer/100-transition campaign remain outside this batch",
+    "Optional creatorTrustProfileId selector on the shared adoption fixture is forwarded to genuine preparation; latchedAclVersion 3 is derived only for creator-trusted-settlement-v1; omission is byte-equivalent to the prior default",
+    "Legacy saturation keeps 22 writers, maxEpochVertices 8192, multiplier 4, share 1492, causal join, other-writer progress, and successful close, and now requires the reserved fence absent from application delivery and durable rows",
+    "Settlement companion uses a remote signed offender fence at sequence 0 plus 1491 ordinary adds, refuses the next valid add, lets another writer progress, and closes genuinely; it does not mint a local-plan fence",
+    "Independent admitted-input accumulation binds persisted preimage bytes/digests/signatures and authenticated close-set byte charges; expected application/journal work is not copied from observed totals; rejected reserved fence/overflow contribute no durable or application work",
+    "Global graph occupancy is journal rows plus the anchor; remaining capacity is 8192 minus occupancy; no private capacity counter is treated as evidence",
+    "First GREEN settlement failure was the application-sink waiter on a control fence; the authorized correction records the same signed fence, submits it through existing unchecked ingress, and uses the already-planned sequence-one add as the causal barrier",
+    "Node recovery facade spreads the genuine public store before six existing overrides, preserves untouched settlement function identities, and is not registered in private maintenance maps",
+    "Full checkpoint and unfiltered inspectCreatorTransitionAdvance authenticate aggregate-bearing closures before exact digest-and-length projection of retirement and aggregate refs for the trust-only predicate; durable census 7/6/7 and bounded 5/4 remain; hostile controls derive expected bindings from independent authenticated authority",
+    "Both cold-input sites receive detached bytes from one validated original epoch-zero bootstrap via the existing pin field; the value is not taken from the mutable recovery row, hardcoded, or a new shared API",
+    "RED and GREEN ownership stay distinct; historical consumed retained-58 and the first GREEN waiter timeout remain causal failures; no old assertion, timer, workload, or consumer was silently dropped",
+    "Main acceptance retains original W0 seven, historic retained 220 plus two new closure controls, three separately categorized bootstrap-policy supplements, and the existing 24 Chromium/Firefox/WebKit browser cases",
+    "Independent source-built isolation uses a fresh checkout, locked offline install, independent native preparation, and one source build without borrowing main node_modules/dist/native; compiler graph differences are derived ancestor declarations; both forty-root programs report 92 diagnostics with three targeted inherited fixture diagnostics, not a clean whole-program pass",
+    "Pending eight production owners, built artifacts, stashes, protected paths, and sealed evidence retain custody; this review does not accept a production/API widening"
+  ],
+  "limitations": [
+    "Read-only review: tests, builds, typechecks, and cryptographic hashes were not recomputed; reporter/command/source hashes were cross-checked against the freeze and sealed manifests rather than regenerated",
+    "Eight pending production owners in the eleven-file isolated overlay are protected inputs, not changes accepted here; parent production repair remains unfinished",
+    "The 64-writer/100-transition campaign and registry/grid acceptance are outside this batch's claim",
+    "The historical retained-58 JSON reporter proves only an aggregate toMatchObject mismatch; it does not name the differing numeric field. Later source and GREEN observations identify reserved-fence non-admission on the default profile",
+    "Forty-root compilation is baseline-equivalent with 92 diagnostics (three targeted inherited fixture diagnostics). That is not a clean whole-program pass and is not the earlier 26-diagnostic consumer scope",
+    "Browser acceptance used the existing Playwright config and in-memory test server, not an interactive browser substitution",
+    "Peer reviewer outputs were not inspected"
+  ]
+}

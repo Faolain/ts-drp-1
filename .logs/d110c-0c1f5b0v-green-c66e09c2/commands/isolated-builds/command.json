@@ -1,0 +1,8 @@
+{
+  "cwd": "/tmp/d110c-f5b0v-green-LLxy4p/checkout",
+  "command": "pnpm",
+  "args": [
+    "build:packages"
+  ],
+  "start": "2026-09-05T07:54:49.360Z"
+}

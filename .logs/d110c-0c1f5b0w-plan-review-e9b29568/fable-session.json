@@ -1,0 +1,9 @@
+{
+	"duration_api_ms": 681174,
+	"is_error": false,
+	"model": "claude-fable-5-1",
+	"requested_effort": "xhigh",
+	"session_id": "7f191cbf-c0a6-4ea9-9021-354dac36b128",
+	"stop_reason": "tool_use",
+	"terminal_reason": "completed"
+}

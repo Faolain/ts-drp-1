@@ -1,0 +1,783 @@
+{
+  "base": "18e6454593c8774c605bbba9359d4a89d50b7465",
+  "currentHead": "772e96bdad4f1b881fd547e09e849c97226cb980",
+  "sameCompilerProgramOptions": true,
+  "onlyBaselineFileSuppliedInMemory": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+  "currentSha256": "809c5b7858ac5d530179a35167b65bf2ec600b7adee78aa0d4ecb028f563056a",
+  "baselineSha256": "af39a32b2aa4e1ad372c01e60d33aba8776197e36f63324f8d8c42c8869490b5",
+  "options": {
+    "strict": true,
+    "allowJs": true,
+    "target": 9,
+    "module": 199,
+    "lib": [
+      "lib.es2023.d.ts",
+      "lib.es2023.array.d.ts",
+      "lib.dom.d.ts",
+      "lib.dom.iterable.d.ts",
+      "lib.webworker.d.ts"
+    ],
+    "esModuleInterop": true,
+    "moduleResolution": 99,
+    "declaration": false,
+    "declarationMap": false,
+    "composite": false,
+    "skipLibCheck": true,
+    "stripInternal": true,
+    "resolveJsonModule": true,
+    "paths": {
+      "@ts-drp/*": [
+        "./packages/*"
+      ],
+      "@ts-drp/blueprint-catalog": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/blueprint-catalog/dist/src/index.d.ts"
+      ],
+      "@ts-drp/blueprint-toolchain": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/blueprint-toolchain/dist/src/index.d.ts"
+      ],
+      "@ts-drp/blueprints": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/blueprints/dist/src/index.d.ts"
+      ],
+      "@ts-drp/canonical": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/canonical/dist/src/index.d.ts"
+      ],
+      "@ts-drp/canonical/domain-hash-stream": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/canonical/src/domain-hash-stream.ts"
+      ],
+      "@ts-drp/compaction": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/compaction/dist/src/index.d.ts"
+      ],
+      "@ts-drp/compaction/blueprint-fold": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/compaction/src/blueprint-fold.ts"
+      ],
+      "@ts-drp/compaction/blueprint-snapshot": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/compaction/src/blueprint-snapshot.ts"
+      ],
+      "@ts-drp/compaction/snapshot-stream": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/compaction/src/snapshot-stream.ts"
+      ],
+      "@ts-drp/compaction/snapshot-quarantine-receipt": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/compaction/dist/src/snapshot-quarantine-receipt.d.ts"
+      ],
+      "@ts-drp/control-plane": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/control-plane/src/index.ts"
+      ],
+      "@ts-drp/control-plane/creator-trust-advance": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/control-plane/src/creator-trust-advance.ts"
+      ],
+      "@ts-drp/control-plane/creator-trust-checkpoint-advance": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/control-plane/src/creator-trust-checkpoint-advance.ts"
+      ],
+      "@ts-drp/ephemeral": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/ephemeral/dist/src/index.d.ts"
+      ],
+      "@ts-drp/errors": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/errors/src/index.ts"
+      ],
+      "eslint-plugin-ts-drp": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/eslint-plugin-ts-drp/dist/src/index.d.ts"
+      ],
+      "@ts-drp/interval-discovery": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/interval-discovery/dist/src/index.d.ts"
+      ],
+      "@ts-drp/interval-reconnect": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/interval-reconnect/dist/src/index.d.ts"
+      ],
+      "@ts-drp/interval-runner": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/interval-runner/dist/src/index.d.ts"
+      ],
+      "@ts-drp/issuance-store": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/issuance-store/dist/src/index.d.ts"
+      ],
+      "@ts-drp/issuance-store/conformance": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/issuance-store/dist/src/conformance.d.ts"
+      ],
+      "@ts-drp/issuance-store/maintenance": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/issuance-store/dist/src/maintenance.d.ts"
+      ],
+      "@ts-drp/keychain": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/keychain/dist/src/index.d.ts"
+      ],
+      "@ts-drp/keychain/finality": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/keychain/src/finality.ts"
+      ],
+      "@ts-drp/live-journal": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/live-journal/dist/src/index.d.ts"
+      ],
+      "@ts-drp/logger": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/logger/dist/src/index.d.ts"
+      ],
+      "@ts-drp/membership": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/membership/src/index.ts"
+      ],
+      "@ts-drp/message-queue": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/message-queue/dist/src/index.d.ts"
+      ],
+      "@ts-drp/network": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/network/src/index.ts"
+      ],
+      "@ts-drp/network/snapshot-transfer": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/network/dist/src/snapshot-transfer.d.ts"
+      ],
+      "@ts-drp/network/seal": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/network/src/seal.ts"
+      ],
+      "@ts-drp/network-spike": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/network-spike/dist/src/index.d.ts"
+      ],
+      "@ts-drp/network-spike/probe": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/network-spike/dist/src/probe/index.d.ts"
+      ],
+      "@ts-drp/network-spike/browser-dht": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/network-spike/dist/src/browser-dht/index.d.ts"
+      ],
+      "@ts-drp/network-spike/record/fixture": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/network-spike/dist/src/record/fixture.d.ts"
+      ],
+      "@ts-drp/network-spike/registry/fixture": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/network-spike/dist/src/registry/fixture.d.ts"
+      ],
+      "@ts-drp/network-spike/relay/fixture": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/network-spike/dist/src/relay/fixture.d.ts"
+      ],
+      "@ts-drp/network-spike/grid": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/network-spike/dist/src/grid/index.d.ts"
+      ],
+      "@ts-drp/network-spike/grid/http-directory": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/network-spike/dist/src/grid/http-directory.d.ts"
+      ],
+      "@ts-drp/network-spike/grid/fixture": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/network-spike/dist/src/grid/fixture.d.ts"
+      ],
+      "@ts-drp/network-spike/failure-campaign": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/network-spike/dist/src/failure-campaign/index.d.ts"
+      ],
+      "@ts-drp/network-spike/public-campaign": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/network-spike/dist/src/public-campaign/index.d.ts"
+      ],
+      "@ts-drp/network-spike/public-only": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/network-spike/dist/src/public-only/index.d.ts"
+      ],
+      "@ts-drp/network-spike/public-only/node": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/network-spike/dist/src/public-only/node.d.ts"
+      ],
+      "@ts-drp/network-spike/public-only/browser": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/network-spike/dist/src/public-only/browser.d.ts"
+      ],
+      "@ts-drp/network-spike/public-only/browser-fixture": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/network-spike/dist/src/public-only/browser-fixture.d.ts"
+      ],
+      "@ts-drp/node": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/node/dist/src/index.d.ts"
+      ],
+      "@ts-drp/node/runtime": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/node/dist/src/runtime.d.ts"
+      ],
+      "@ts-drp/node/v3-live": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/node/src/v3-live.ts"
+      ],
+      "@ts-drp/node/snapshot-transfer": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/node/dist/src/snapshot-transfer.d.ts"
+      ],
+      "@ts-drp/node/creator-seal": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/node/src/creator-seal.ts"
+      ],
+      "@ts-drp/node/creator-close": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/node/src/creator-close.ts"
+      ],
+      "@ts-drp/node/creator-adoption": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/node/dist/src/creator-adoption.d.ts"
+      ],
+      "@ts-drp/node/creator-adoption-commit": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/node/dist/src/creator-adoption-commit.d.ts"
+      ],
+      "@ts-drp/node/creator-adoption-stage": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/node/dist/src/creator-adoption-stage.d.ts"
+      ],
+      "@ts-drp/node/creator-adoption-recover": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/node/dist/src/creator-adoption-recover.d.ts"
+      ],
+      "@ts-drp/node/creator-adoption-activate": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/node/dist/src/creator-adoption-activate.d.ts"
+      ],
+      "@ts-drp/object": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/object/src/index.ts"
+      ],
+      "@ts-drp/object/internal/authenticated-commit": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/object/src/authenticated-commit.ts"
+      ],
+      "@ts-drp/outcome-commit": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/outcome-commit/dist/src/index.d.ts"
+      ],
+      "@ts-drp/protocol-v2": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/protocol-v2/dist/src/index.d.ts"
+      ],
+      "@ts-drp/protocol-v2/registry/field-registry.json": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/protocol-v2/registry/field-registry.json"
+      ],
+      "@ts-drp/protocol-v3": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/protocol-v3/src/public.ts"
+      ],
+      "@ts-drp/protocol-v3/author-authorization": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/protocol-v3/src/author-authorization.ts"
+      ],
+      "@ts-drp/protocol-v3/blueprint-application": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/protocol-v3/src/blueprint-application.ts"
+      ],
+      "@ts-drp/protocol-v3/latched-acl": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/protocol-v3/src/latched-acl.ts"
+      ],
+      "@ts-drp/protocol-v3/creator-close": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/protocol-v3/src/creator-close.ts"
+      ],
+      "@ts-drp/protocol-v3/creator-checkpoint": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/protocol-v3/src/creator-checkpoint.ts"
+      ],
+      "@ts-drp/protocol-v3/creator-issuance-retirement": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/protocol-v3/src/creator-issuance-retirement.ts"
+      ],
+      "@ts-drp/protocol-v3/creator-author-issuance-frontiers": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/protocol-v3/src/creator-author-issuance-frontiers.ts"
+      ],
+      "@ts-drp/protocol-v3/settlement-profile": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/protocol-v3/src/settlement-profile.ts"
+      ],
+      "@ts-drp/protocol-v3/seal": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/protocol-v3/src/seal.ts"
+      ],
+      "@ts-drp/protocol-v3/internal/seal-signing-request": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/protocol-v3/src/internal/seal-signing-request.ts"
+      ],
+      "@ts-drp/protocol-v3/internal/creator-anchor-signing-request": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/protocol-v3/src/internal/creator-anchor-signing-request.ts"
+      ],
+      "@ts-drp/protocol-v3/internal/creator-issuance-retirement-signing-request": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/protocol-v3/src/internal/creator-issuance-retirement-signing-request.ts"
+      ],
+      "@ts-drp/protocol-v3/internal/received-vertex-authentication": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/protocol-v3/src/internal/received-vertex-authentication.ts"
+      ],
+      "@ts-drp/protocol-v3/internal/seal-authority-identity": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/protocol-v3/src/internal/seal-authority-identity.ts"
+      ],
+      "@ts-drp/protocol-v3/snapshot-transfer": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/protocol-v3/src/snapshot-transfer.ts"
+      ],
+      "@ts-drp/protocol-v3/registry/registry-v1.json": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/protocol-v3/registry/registry-v1.json"
+      ],
+      "@ts-drp/relay-policy": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/relay-policy/src/index.ts"
+      ],
+      "@ts-drp/rendezvous": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/rendezvous/src/index.ts"
+      ],
+      "@ts-drp/rendezvous/service": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/rendezvous/dist/src/service.d.ts"
+      ],
+      "@ts-drp/rendezvous/node": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/rendezvous/dist/src/node.d.ts"
+      ],
+      "@ts-drp/routing-browser": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/routing-browser/src/index.ts"
+      ],
+      "@ts-drp/routing-node": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/routing-node/src/index.ts"
+      ],
+      "@ts-drp/routing-node/constants": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/routing-node/src/constants.ts"
+      ],
+      "@ts-drp/seal": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/seal/src/index.ts"
+      ],
+      "@ts-drp/seal/pacemaker": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/seal/src/pacemaker.ts"
+      ],
+      "@ts-drp/seal/creator": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/seal/src/creator.ts"
+      ],
+      "@ts-drp/seal/internal/creator-close-intent": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/seal/src/internal/creator-close-intent.ts"
+      ],
+      "@ts-drp/seal/internal/storage-port": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/seal/src/storage-port.ts"
+      ],
+      "@ts-drp/storage": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/storage/dist/src/index.d.ts"
+      ],
+      "@ts-drp/storage/contract": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/storage/dist/src/contract.d.ts"
+      ],
+      "@ts-drp/storage/maintenance": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/storage/dist/src/maintenance.d.ts"
+      ],
+      "@ts-drp/storage/adapter": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/storage/dist/src/adapter.d.ts"
+      ],
+      "@ts-drp/storage/snapshot-transfer": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/storage/dist/src/snapshot-transfer.d.ts"
+      ],
+      "@ts-drp/storage-browser": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/storage-browser/dist/src/index.d.ts"
+      ],
+      "@ts-drp/storage-browser/issuance": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/storage-browser/dist/src/issuance.d.ts"
+      ],
+      "@ts-drp/storage-browser/issuance-maintenance": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/storage-browser/dist/src/issuance-maintenance.d.ts"
+      ],
+      "@ts-drp/storage-browser/live-journal": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/storage-browser/dist/src/live-journal.d.ts"
+      ],
+      "@ts-drp/storage-browser/maintenance": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/storage-browser/dist/src/maintenance.d.ts"
+      ],
+      "@ts-drp/storage-browser/seal-vote": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/storage-browser/src/seal-vote.ts"
+      ],
+      "@ts-drp/storage-browser/seal-evidence": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/storage-browser/src/seal-evidence.ts"
+      ],
+      "@ts-drp/storage-browser/snapshot-transfer": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/storage-browser/dist/src/snapshot-transfer.d.ts"
+      ],
+      "@ts-drp/storage-node": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/storage-node/dist/src/index.d.ts"
+      ],
+      "@ts-drp/storage-node/issuance": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/storage-node/dist/src/issuance.d.ts"
+      ],
+      "@ts-drp/storage-node/issuance-maintenance": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/storage-node/dist/src/issuance-maintenance.d.ts"
+      ],
+      "@ts-drp/storage-node/live-journal": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/storage-node/dist/src/live-journal.d.ts"
+      ],
+      "@ts-drp/storage-node/maintenance": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/storage-node/dist/src/maintenance.d.ts"
+      ],
+      "@ts-drp/storage-node/snapshot-transfer": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/storage-node/dist/src/snapshot-transfer.d.ts"
+      ],
+      "@ts-drp/test-utils": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/test-utils/src/index.ts"
+      ],
+      "@ts-drp/test-utils/shadow-comparison": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/test-utils/src/shadow-comparison.ts"
+      ],
+      "@ts-drp/test-utils/shadow-runner": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/test-utils/src/shadow-runner.ts"
+      ],
+      "@ts-drp/test-utils/shadow-telemetry": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/test-utils/src/shadow-telemetry.ts"
+      ],
+      "@ts-drp/tracer": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/tracer/dist/src/index.d.ts"
+      ],
+      "@ts-drp/types": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/types/dist/src/index.d.ts"
+      ],
+      "@ts-drp/utils": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/utils/dist/src/index.d.ts"
+      ],
+      "@ts-drp/utils/debug": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/utils/dist/src/debug/index.d.ts"
+      ],
+      "@ts-drp/utils/promise/deferred": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/utils/dist/src/promise/deferred/index.d.ts"
+      ],
+      "@ts-drp/utils/promise/timeout": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/utils/dist/src/promise/timeout/index.d.ts"
+      ],
+      "@ts-drp/utils/hash": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/utils/dist/src/hash/index.d.ts"
+      ],
+      "@ts-drp/utils/serialization": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/utils/src/serialization/index.ts"
+      ],
+      "@ts-drp/utils/serialization/equality": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/utils/src/serialization/equality.ts"
+      ],
+      "@ts-drp/utils/memory-benchmark": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/utils/dist/src/memory-benchmark/index.d.ts"
+      ],
+      "@ts-drp/validation": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/validation/src/index.ts"
+      ],
+      "@ts-drp/validation/vertex": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/validation/dist/src/vertex.d.ts"
+      ],
+      "@ts-drp/validation/message": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/validation/src/schemas/message.ts"
+      ],
+      "@ts-drp/validation/errors": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/validation/src/errors.ts"
+      ],
+      "@ts-drp/worker-host": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/worker-host/dist/src/index.d.ts"
+      ],
+      "@ts-drp/worker-host/host": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/worker-host/dist/src/host.d.ts"
+      ],
+      "@ts-drp/worker-host/worker": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/packages/worker-host/dist/src/worker.d.ts"
+      ],
+      "@ts-drp/example-browser-network": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/examples/browser-network/src/index.ts"
+      ],
+      "@ts-drp/example-browser-network/config": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/examples/browser-network/src/config.ts"
+      ],
+      "@ts-drp/example-browser-network/env": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/examples/browser-network/src/env.ts"
+      ],
+      "@ts-drp/example-browser-network/session": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/examples/browser-network/src/session.ts"
+      ],
+      "@ts-drp/example-v3-room": [
+        "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout/examples/v3-room/src/index.ts"
+      ]
+    },
+    "pathsBasePath": "/private/tmp/d110c-f5b-retained-transport-7dFMyG/checkout",
+    "noEmit": true
+  },
+  "hunks": [
+    {
+      "oldStart": 456,
+      "oldCount": 1,
+      "newStart": 456,
+      "newCount": 5
+    },
+    {
+      "oldStart": 460,
+      "oldCount": 1,
+      "newStart": 464,
+      "newCount": 10
+    },
+    {
+      "oldStart": 667,
+      "oldCount": 1,
+      "newStart": 680,
+      "newCount": 2
+    },
+    {
+      "oldStart": 669,
+      "oldCount": 5,
+      "newStart": 683,
+      "newCount": 4
+    },
+    {
+      "oldStart": 676,
+      "oldCount": 2,
+      "newStart": 689,
+      "newCount": 3
+    },
+    {
+      "oldStart": 1033,
+      "oldCount": 1,
+      "newStart": 1047,
+      "newCount": 7
+    },
+    {
+      "oldStart": 1039,
+      "oldCount": 1,
+      "newStart": 1059,
+      "newCount": 1
+    },
+    {
+      "oldStart": 1137,
+      "oldCount": 1,
+      "newStart": 1157,
+      "newCount": 1
+    },
+    {
+      "oldStart": 1763,
+      "oldCount": 1,
+      "newStart": 1783,
+      "newCount": 3
+    },
+    {
+      "oldStart": 1778,
+      "oldCount": 1,
+      "newStart": 1800,
+      "newCount": 6
+    },
+    {
+      "oldStart": 1803,
+      "oldCount": 1,
+      "newStart": 1830,
+      "newCount": 1
+    },
+    {
+      "oldStart": 1848,
+      "oldCount": 1,
+      "newStart": 1875,
+      "newCount": 1
+    },
+    {
+      "oldStart": 1869,
+      "oldCount": 4,
+      "newStart": 1896,
+      "newCount": 7
+    },
+    {
+      "oldStart": 1896,
+      "oldCount": 4,
+      "newStart": 1926,
+      "newCount": 7
+    },
+    {
+      "oldStart": 1924,
+      "oldCount": 4,
+      "newStart": 1957,
+      "newCount": 7
+    },
+    {
+      "oldStart": 1988,
+      "oldCount": 4,
+      "newStart": 2024,
+      "newCount": 7
+    },
+    {
+      "oldStart": 2007,
+      "oldCount": 4,
+      "newStart": 2046,
+      "newCount": 7
+    },
+    {
+      "oldStart": 2026,
+      "oldCount": 4,
+      "newStart": 2068,
+      "newCount": 7
+    },
+    {
+      "oldStart": 2256,
+      "oldCount": 2,
+      "newStart": 2301,
+      "newCount": 22
+    }
+  ],
+  "diagnosticMapping": [
+    {
+      "current": {
+        "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+        "code": 2345,
+        "line": 356,
+        "message": "Argument of type 'Expression | undefined' is not assignable to parameter of type 'Node'.\n  Type 'undefined' is not assignable to type 'Node'."
+      },
+      "baselineLine": 356,
+      "unchangedSourceLine": true,
+      "sourceLine": "\t\t\tts.isIdentifier(node.initializer) &&",
+      "owner": {
+        "kind": "ArrowFunction",
+        "startLine": 349
+      }
+    },
+    {
+      "current": {
+        "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+        "code": 2322,
+        "line": 461,
+        "message": "Type '{ transactIssue: DurableTransactIssue; compareAndMarkOutboxPublished: (input: DurableOutboxPublicationTransitionInput) => Promise<void>; ... 5 more ...; close: () => Promise<void>; }' is not assignable to type 'DurableIssuanceStore'.\n  Types of property 'readSettlementPlan' are incompatible.\n    Type '((scope: DurableIssueScope) => Promise<SettlementPlan | null>) | undefined' is not assignable to type '(scope: DurableIssueScope) => Promise<SettlementPlan | null>'.\n      Type 'undefined' is not assignable to type '(scope: DurableIssueScope) => Promise<SettlementPlan | null>'."
+      },
+      "baselineLine": 457,
+      "unchangedSourceLine": true,
+      "sourceLine": "\treturn {",
+      "owner": {
+        "kind": "FunctionDeclaration",
+        "name": "fakeIssuanceStore",
+        "startLine": 456
+      }
+    },
+    {
+      "current": {
+        "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+        "code": 2741,
+        "line": 564,
+        "message": "Property 'installEpochAnchor' is missing in type 'Readonly<{ installGenesis: Mock<() => Promise<Readonly<{ ok: true; scope: LiveJournalScope; parametersDigest: string; idempotent: false; }>>>; readiness: Mock<...>; readPage: Mock<...>; appendAccepted: Mock<...>; close: Mock<...>; }>' but required in type 'DurableLiveJournalStore'."
+      },
+      "baselineLine": 551,
+      "unchangedSourceLine": true,
+      "sourceLine": "\treturn Object.freeze({",
+      "owner": {
+        "kind": "FunctionDeclaration",
+        "name": "journalStoreForFixture",
+        "startLine": 546
+      }
+    },
+    {
+      "current": {
+        "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+        "code": 2322,
+        "line": 803,
+        "message": "Type 'number' is not assignable to type 'void'."
+      },
+      "baselineLine": 789,
+      "unchangedSourceLine": true,
+      "sourceLine": "\t\t\t\tsubscribe: (): void => effects.push(\"queue.subscribe\"),",
+      "owner": {
+        "kind": "ArrowFunction",
+        "startLine": 803
+      }
+    },
+    {
+      "current": {
+        "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+        "code": 2322,
+        "line": 804,
+        "message": "Type 'number' is not assignable to type 'void'."
+      },
+      "baselineLine": 790,
+      "unchangedSourceLine": true,
+      "sourceLine": "\t\t\t\tclose: (): void => effects.push(\"queue.close\"),",
+      "owner": {
+        "kind": "ArrowFunction",
+        "startLine": 804
+      }
+    },
+    {
+      "current": {
+        "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+        "code": 2722,
+        "line": 889,
+        "message": "Cannot invoke an object which is possibly 'undefined'."
+      },
+      "baselineLine": 875,
+      "unchangedSourceLine": true,
+      "sourceLine": "\t\t\t\tfirst = surface.activateV3LivePlane(candidate as V3PlaneActivationInputContract);",
+      "owner": {
+        "kind": "ArrowFunction",
+        "startLine": 888
+      }
+    },
+    {
+      "current": {
+        "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+        "code": 2722,
+        "line": 892,
+        "message": "Cannot invoke an object which is possibly 'undefined'."
+      },
+      "baselineLine": 878,
+      "unchangedSourceLine": true,
+      "sourceLine": "\t\t\t\tsecond = surface.activateV3LivePlane(candidate as V3PlaneActivationInputContract);",
+      "owner": {
+        "kind": "ArrowFunction",
+        "startLine": 891
+      }
+    },
+    {
+      "current": {
+        "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+        "code": 2722,
+        "line": 936,
+        "message": "Cannot invoke an object which is possibly 'undefined'."
+      },
+      "baselineLine": 922,
+      "unchangedSourceLine": true,
+      "sourceLine": "\t\t\t\t\tresult = surface.activateV3LivePlane(input);",
+      "owner": {
+        "kind": "ArrowFunction",
+        "startLine": 935
+      }
+    },
+    {
+      "current": {
+        "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+        "code": 2722,
+        "line": 1180,
+        "message": "Cannot invoke an object which is possibly 'undefined'."
+      },
+      "baselineLine": 1160,
+      "unchangedSourceLine": true,
+      "sourceLine": "\t\t\t\texpect(surface.routeV3Ingress(network, message)).toBe(expectedClaim);",
+      "owner": {
+        "kind": "ArrowFunction",
+        "startLine": 1171
+      }
+    },
+    {
+      "current": {
+        "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+        "code": 2532,
+        "line": 1251,
+        "message": "Object is possibly 'undefined'."
+      },
+      "baselineLine": 1231,
+      "unchangedSourceLine": true,
+      "sourceLine": "\t\t\texpect(readOutboxPage.mock.calls[0]?.[0].scope).not.toBe(scope);",
+      "owner": {
+        "kind": "ArrowFunction",
+        "startLine": 1039
+      }
+    },
+    {
+      "current": {
+        "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+        "code": 2532,
+        "line": 1252,
+        "message": "Object is possibly 'undefined'."
+      },
+      "baselineLine": 1232,
+      "unchangedSourceLine": true,
+      "sourceLine": "\t\t\texpect(readOutboxPage.mock.calls[1]?.[0].scope).not.toBe(scope);",
+      "owner": {
+        "kind": "ArrowFunction",
+        "startLine": 1039
+      }
+    },
+    {
+      "current": {
+        "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+        "code": 2722,
+        "line": 1792,
+        "message": "Cannot invoke an object which is possibly 'undefined'."
+      },
+      "baselineLine": 1770,
+      "unchangedSourceLine": true,
+      "sourceLine": "\t\t\t\treturn surface.activateV3LivePlane({",
+      "owner": {
+        "kind": "ArrowFunction",
+        "startLine": 1786
+      }
+    },
+    {
+      "current": {
+        "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+        "code": 2307,
+        "line": 2238,
+        "message": "Cannot find module '../packages/node/src/internal/v3-topic.js?d108e2c-hostile-text-encoder' or its corresponding type declarations."
+      },
+      "baselineLine": 2193,
+      "unchangedSourceLine": true,
+      "sourceLine": "\t\t\t\t\"../packages/node/src/internal/v3-topic.js?d108e2c-hostile-text-encoder\"",
+      "owner": {
+        "kind": "ArrowFunction",
+        "startLine": 2112
+      }
+    }
+  ],
+  "equal": true,
+  "changedLineDiagnostics": [],
+  "authorizedHelperOverlap": [
+    {
+      "file": "tests/phase-3a1b-p3-live-transport-red.test.ts",
+      "code": 2322,
+      "line": 461,
+      "character": 2,
+      "start": 17003,
+      "length": 6,
+      "message": "Type '{ transactIssue: DurableTransactIssue; compareAndMarkOutboxPublished: (input: DurableOutboxPublicationTransitionInput) => Promise<void>; ... 5 more ...; close: () => Promise<void>; }' is not assignable to type 'DurableIssuanceStore'.\n  Types of property 'readSettlementPlan' are incompatible.\n    Type '((scope: DurableIssueScope) => Promise<SettlementPlan | null>) | undefined' is not assignable to type '(scope: DurableIssueScope) => Promise<SettlementPlan | null>'.\n      Type 'undefined' is not assignable to type '(scope: DurableIssueScope) => Promise<SettlementPlan | null>'.",
+      "owner": {
+        "kind": "FunctionDeclaration",
+        "name": "fakeIssuanceStore",
+        "startLine": 456
+      },
+      "sourceLine": "\treturn {"
+    }
+  ],
+  "targetDiagnostics": 13,
+  "externalDiagnostics": 0,
+  "classification": "BASELINE_IDENTICAL_WITH_AUTHORIZED_HELPER_OVERLAP_REQUIRES_ROOT_DISPOSITION",
+  "notTypecheckPass": true,
+  "noRuntimeExecuted": true
+}

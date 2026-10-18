@@ -1,0 +1,29 @@
+Error: Internal error: {
+  "message": "API error (status 503 Service Unavailable): unavailable: Service temporarily unavailable. The model did not respond to this request.",
+  "http_status": 503,
+  "promptUsage": {
+    "inputTokens": 600960,
+    "outputTokens": 3446,
+    "totalTokens": 604406,
+    "cachedReadTokens": 356096,
+    "cacheCreationTokens": 0,
+    "reasoningTokens": 1916,
+    "modelCalls": 5,
+    "apiDurationMs": 1315652,
+    "costUsdTicks": 1170368400,
+    "modelUsage": {
+      "grok-4.6-build": {
+        "inputTokens": 600960,
+        "outputTokens": 3446,
+        "totalTokens": 604406,
+        "cachedReadTokens": 356096,
+        "cacheCreationTokens": 0,
+        "reasoningTokens": 1916,
+        "modelCalls": 5,
+        "apiDurationMs": 1315652,
+        "costUsdTicks": 1170368400
+      }
+    },
+    "numTurns": 5
+  }
+}

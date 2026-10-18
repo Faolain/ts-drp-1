@@ -1,0 +1,17 @@
+{
+  "executable": "pnpm",
+  "args": [
+    "--dir",
+    "/tmp/d110c-f5b0w-green-m7UvLk/checkout",
+    "--filter",
+    "@ts-drp/example-v3-room",
+    "--filter",
+    "@ts-drp/issuance-store",
+    "build"
+  ],
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "started": "2026-09-05T14:13:59.532Z",
+  "finished": "2026-09-05T14:14:01.926Z",
+  "status": 0,
+  "signal": null
+}

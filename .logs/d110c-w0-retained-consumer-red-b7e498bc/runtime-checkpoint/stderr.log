@@ -1,0 +1,106 @@
+(node:88915) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:88935) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/phase-6b-d110c-0b1-boundaries.test.ts > D.110c-0b1 bounded protocol and control boundaries > retires exactly the stale Cut QC and predecessor ACL from the genuine staged closure
+AssertionError: expected { ok: false, …(1) } to deeply equal { kind: 'successor', ok: true }
+
+- Expected
++ Received
+
+  {
+-   "kind": "successor",
+-   "ok": true,
++   "ok": false,
++   "reason": "TRUST_CLOSURE_INVALID",
+  }
+
+ ❯ tests/phase-6b-d110c-0b1-boundaries.test.ts:343:52
+    341|  it("retires exactly the stale Cut QC and predecessor ACL from the gen…
+    342|   const input = fixture.evidence.boundedInput;
+    343|   expect(inspectBoundedCreatorTrustAdvance(input)).toEqual({ kind: "su…
+       |                                                    ^
+    344|   expect(input.current.closure).toHaveLength(5);
+    345|   expect(input.proposed.closure).toHaveLength(4);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts > D.110c-0b1 bounded checkpoint and control-proof GREEN > retires the stale proof pair and predecessor ACL under the bounded advance
+AssertionError: expected { ok: false, …(1) } to deeply equal { kind: 'successor', ok: true }
+
+- Expected
++ Received
+
+  {
+-   "kind": "successor",
+-   "ok": true,
++   "ok": false,
++   "reason": "TRUST_CLOSURE_INVALID",
+  }
+
+ ❯ tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts:105:19
+    103|   const { activeCensus, currentCensus, existingAdvance, proposedCensus…
+    104|   expect(existingAdvance).toMatchObject({ ok: false, reason: "TRUST_CL…
+    105|   expect(bounded).toEqual({ kind: "successor", ok: true });
+       |                   ^
+    106|   expect(currentCensus).toHaveLength(7);
+    107|   expect(proposedCensus).toHaveLength(6);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts > D.110c-0b1 bounded checkpoint and control-proof GREEN > cold reopens the genuine active epoch-two room through the bounded checkpoint owner
+AssertionError: expected [ { pinMatchesOriginal: false, …(2) } ] to deeply equal [ { pinMatchesOriginal: true, …(2) } ]
+
+- Expected
++ Received
+
+  [
+    {
+-     "pinMatchesOriginal": true,
+-     "pinPresent": true,
++     "pinMatchesOriginal": false,
++     "pinPresent": false,
+      "site": "epoch-two",
+    },
+  ]
+
+ ❯ tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts:146:33
+    144|   expect(bootstrap.original.operationBytes.byteLength).toBeGreaterThan…
+    145|   // This lifecycle constructs only epoch-two input; current-successor…
+    146|   expect.soft(bootstrap.inputs).toEqual([{ pinMatchesOriginal: true, p…
+       |                                 ^
+    147|   expect(fixture.evidence.coldReopen).toMatchObject({
+    148|    handle: { epoch: 2 },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts > D.110c-0b1 bounded checkpoint and control-proof GREEN > cold reopens the genuine active epoch-two room through the bounded checkpoint owner
+AssertionError: expected { …(3) } to match object { handle: { epoch: 2 }, …(3) }
+(2 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "handle": {
+-     "epoch": 2,
+-   },
+-   "lifecycle": "active",
+-   "ok": true,
+-   "recovery": "active-new",
++   "ok": false,
+  }
+
+ ❯ tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts:147:39
+    145|   // This lifecycle constructs only epoch-two input; current-successor…
+    146|   expect.soft(bootstrap.inputs).toEqual([{ pinMatchesOriginal: true, p…
+    147|   expect(fixture.evidence.coldReopen).toMatchObject({
+       |                                       ^
+    148|    handle: { epoch: 2 },
+    149|    lifecycle: "active",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+

@@ -1,0 +1,14 @@
+import fs from 'node:fs';
+import path from 'node:path';
+const root='/Users/aristotle/Documents/Projects/ts-drp-1';
+const out=path.dirname(new URL(import.meta.url).pathname);
+const accepted=JSON.parse(fs.readFileSync(path.join(root,'.logs/d110c-0c1f5b-red-checkpoint-link-f83764c5/matrix.json')));
+const listed=JSON.parse(fs.readFileSync(path.join(out,'focused-list/stdout')));
+const old=JSON.parse(fs.readFileSync(path.join(root,'.logs/d110c-0c1f5b-green-d8cdb620/focused-list/stdout')));
+const selected=listed.filter(row=>new RegExp(accepted.filter).test(row.name));
+const names=selected.map(row=>row.name.replaceAll(' > ',' '));
+const expected=accepted.entries.map(row=>row.name);
+const pass=listed.length===45&&selected.length===28&&new Set(names).size===28&&JSON.stringify(listed)===JSON.stringify(old)&&JSON.stringify(names)===JSON.stringify(expected);
+fs.writeFileSync(path.join(out,'selected-name-validation.json'),JSON.stringify({pass,total:listed.length,selected:selected.length,filtered:listed.length-selected.length,completeListing:listed,selectedNames:names,expectedNames:expected},null,2)+'\n',{flag:'wx'});
+console.log(JSON.stringify({pass,total:listed.length,selected:selected.length}));
+process.exitCode=pass?0:1;

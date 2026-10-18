@@ -1,0 +1,21 @@
+{
+	"record": "D.110c-0c1f5b0d",
+	"red": "9ab5924a34faf9cd1e0f42b79026ef5313318da8",
+	"green": "1063feca39d60d24972ee101ab4051b4c1a23bb9",
+	"greenSignature": "G",
+	"pushed": true,
+	"focused": { "passed": 21, "failed": 0, "skipped": 0 },
+	"retainedCore": { "passed": 124, "failed": 0, "skipped": 0 },
+	"retainedSettlementRecovery": { "passed": 112, "failed": 0, "skipped": 0 },
+	"browserRetained": { "passed": 4, "failed": 0 },
+	"isolatedFocused": { "passed": 21, "failed": 0, "skipped": 0 },
+	"isolatedRetained": { "passed": 124, "failed": 0, "skipped": 0 },
+	"builds": {
+		"issuanceStore": "pass",
+		"storageBrowser": "pass",
+		"storageNode": "pass",
+		"node": "pass"
+	},
+	"stopRuleFired": false,
+	"deferredScopeRetirement": "D.110c-c"
+}

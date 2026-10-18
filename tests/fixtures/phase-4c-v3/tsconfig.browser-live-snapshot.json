@@ -1,0 +1,34 @@
+{
+	"extends": "../../../tsconfig.json",
+	"compilerOptions": {
+		"allowImportingTsExtensions": true,
+		"baseUrl": "../../..",
+		"composite": false,
+		"declaration": false,
+		"declarationMap": false,
+		"noEmit": true,
+		"paths": {
+			"@ts-drp/blueprint-catalog": ["packages/blueprint-catalog/dist/src/index.d.ts"],
+			"@ts-drp/canonical": ["packages/canonical/dist/src/index.d.ts"],
+			"@ts-drp/compaction": ["packages/compaction/dist/src/index.d.ts"],
+			"@ts-drp/compaction/blueprint-fold": ["packages/compaction/dist/src/blueprint-fold.d.ts"],
+			"@ts-drp/compaction/blueprint-snapshot": ["packages/compaction/dist/src/blueprint-snapshot.d.ts"],
+			"@ts-drp/control-plane": ["packages/control-plane/dist/src/index.d.ts"],
+			"@ts-drp/ephemeral": ["packages/ephemeral/dist/src/index.d.ts"],
+			"@ts-drp/example-v3-room": ["examples/v3-room/src/index.ts"],
+			"@ts-drp/issuance-store": ["packages/issuance-store/dist/src/index.d.ts"],
+			"@ts-drp/keychain": ["packages/keychain/dist/src/index.d.ts"],
+			"@ts-drp/live-journal": ["packages/live-journal/dist/src/index.d.ts"],
+			"@ts-drp/message-queue": ["packages/message-queue/dist/src/index.d.ts"],
+			"@ts-drp/node/v3-live": ["packages/node/src/v3-live.ts"],
+			"@ts-drp/protocol-v3": ["packages/protocol-v3/dist/src/public.d.ts"],
+			"@ts-drp/protocol-v3/author-authorization": ["packages/protocol-v3/dist/src/author-authorization.d.ts"],
+			"@ts-drp/protocol-v3/latched-acl": ["packages/protocol-v3/dist/src/latched-acl.d.ts"],
+			"@ts-drp/protocol-v3/registry/registry-v1.json": ["packages/protocol-v3/registry/registry-v1.json"],
+			"@ts-drp/storage": ["packages/storage/dist/src/index.d.ts"],
+			"@ts-drp/storage/adapter": ["packages/storage/dist/src/adapter.d.ts"],
+			"@ts-drp/types": ["packages/types/dist/src/index.d.ts"]
+		}
+	},
+	"files": ["browser-live-snapshot.ts"]
+}

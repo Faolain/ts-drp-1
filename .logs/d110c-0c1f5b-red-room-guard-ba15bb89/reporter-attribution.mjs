@@ -1,0 +1,10 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+const root='/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout',out=path.dirname(new URL(import.meta.url).pathname),hash=b=>crypto.createHash('sha256').update(b).digest('hex'),chunks=path.join(fs.realpathSync(path.join(root,'node_modules/vitest')),'dist/chunks');
+const reporterFile=path.join(chunks,'index.CwHmn5H5.js'),consoleFile=path.join(chunks,'console.D6t261w0.js'),reporterSource=fs.readFileSync(reporterFile,'utf8'),consoleSource=fs.readFileSync(consoleFile,'utf8'),start=reporterSource.indexOf('class JsonReporter {'),end=reporterSource.indexOf('\nclass IndentedLogger',start),body=reporterSource.slice(start,end);
+if(start<0||end<0||body.includes('onUserConsoleLog')||!consoleSource.includes('state().rpc.onUserConsoleLog('))throw Error('Reporter attribution mismatch');
+const report=JSON.parse(fs.readFileSync(path.join(out,'focused.json'),'utf8')),stdout=fs.readFileSync(path.join(out,'stdout.log'),'utf8'),stderr=fs.readFileSync(path.join(out,'stderr.log'),'utf8');
+const data={root,version:JSON.parse(fs.readFileSync(path.join(root,'node_modules/vitest/package.json'),'utf8')).version,reporterFile,reporterSha256:hash(reporterSource),consoleFile,consoleSha256:hash(consoleSource),jsonReporterBody:body,consoleRpcExcerpt:consoleSource.slice(consoleSource.indexOf('function sendLog('),consoleSource.indexOf('function sendLog(')+450),jsonReporterHasNoConsoleHandler:true,rawStdout:stdout,rawStderr:stderr,observationsAbsent:true,notCausalAcceptance:true,failedCases:report.testResults.flatMap(s=>s.assertionResults.filter(t=>t.status==='failed').map(t=>({title:t.title,failureMessages:t.failureMessages})))};
+if(stdout.includes('F5B_ROOM_GUARD_OBSERVATIONS')||data.failedCases.length!==2)throw Error('Raw stop attribution differs');
+fs.writeFileSync(path.join(out,'reporter-attribution.json'),JSON.stringify(data,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify({version:data.version,observationsAbsent:true,expectedFailedTitles:2,notCausalAcceptance:true}));

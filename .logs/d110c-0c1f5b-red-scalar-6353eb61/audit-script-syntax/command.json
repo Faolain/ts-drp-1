@@ -1,0 +1,9 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "node",
+  "args": [
+    "--check",
+    ".logs/d110c-0c1f5b-red-scalar-6353eb61/audit.mjs"
+  ],
+  "start": "2026-09-05T21:35:24.118Z"
+}

@@ -1,0 +1,37 @@
+
+Running 4 tests using 1 worker
+
+
+
+[1/4] [chromium] › packages/storage-browser/tests/phase-6b-ahe-reclamation-red.pw.ts:50:1 › [RED readiness] requires the browser identity owner and strict reclamation transaction
+  1) [chromium] › packages/storage-browser/tests/phase-6b-ahe-reclamation-red.pw.ts:50:1 › [RED readiness] requires the browser identity owner and strict reclamation transaction 
+
+    Error: D109C_BROWSER_MAINTENANCE_MISSING
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: true
+    Received: false
+
+      57 | 			)
+      58 | 		);
+    > 59 | 		expect(ready, "D109C_BROWSER_MAINTENANCE_MISSING").toBe(true);
+         | 		                                                   ^
+      60 | 	} finally {
+      61 | 		tokens.delete(issued.token);
+      62 | 	}
+        at /Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6b-ahe-reclamation-red.pw.ts:59:54
+
+    Error Context: packages/storage-browser/test-results/phase-6b-ahe-reclamation-r-6681f-ict-reclamation-transaction-chromium/error-context.md
+
+    Error Context: packages/storage-browser/test-results/phase-6b-ahe-reclamation-r-6681f-ict-reclamation-transaction-chromium/error-context.md
+
+
+
+
+[2/4] [chromium] › packages/storage-browser/tests/phase-6b-ahe-reclamation-red.pw.ts:65:1 › reclaims and replays a genuine five-generation IndexedDB lineage
+[3/4] [chromium] › packages/storage-browser/tests/phase-6b-ahe-reclamation-red.pw.ts:86:1 › refuses the frozen native mutant matrix without partial deletion
+[4/4] [chromium] › packages/storage-browser/tests/phase-6b-ahe-reclamation-red.pw.ts:91:1 › terminates at every live IndexedDB mutation edge and reopens old XOR complete-new
+  1 failed
+    [chromium] › packages/storage-browser/tests/phase-6b-ahe-reclamation-red.pw.ts:50:1 › [RED readiness] requires the browser identity owner and strict reclamation transaction 
+  3 skipped

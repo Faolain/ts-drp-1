@@ -1,0 +1,16 @@
+{
+  "record": "D.110c-0c1k-W0",
+  "checkpoint": "corrective-RED",
+  "commit": "f511a18bdb35f56a31757f9739338f48572f00df",
+  "focusedFiles": 2,
+  "focusedTests": 10,
+  "focusedPassed": 10,
+  "directAclFiles": 1,
+  "directAclTests": 7,
+  "directAclPassed": 6,
+  "directAclFailed": 1,
+  "causal": true,
+  "failure": "version-1 exact-four-group referee tuple accepted by production",
+  "moduleResolutionFailure": false,
+  "fixtureFailure": false
+}

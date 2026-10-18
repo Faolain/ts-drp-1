@@ -1,0 +1,7 @@
+{
+  "aheFingerprintDetectsMutation": true,
+  "aheFingerprintIgnoresKeyOrder": true,
+  "ahePredicatePresent": true,
+  "canonicalFloorPredicatePreserved": true,
+  "diagnosticContainsUndefined": true
+}

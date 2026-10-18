@@ -1,0 +1,10 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "git",
+  "args": [
+    "ls-remote",
+    "origin",
+    "refs/heads/codex/phase3a1b-p6-golden-path"
+  ],
+  "start": "2026-09-05T20:04:17.916Z"
+}

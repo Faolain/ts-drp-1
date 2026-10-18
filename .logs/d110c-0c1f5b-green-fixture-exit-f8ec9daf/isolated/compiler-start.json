@@ -1,0 +1,18 @@
+{
+  "startedAt": "2026-09-06T05:30:54.201Z",
+  "pid": 79963,
+  "root": "/private/tmp/d110c-f5b-green-fixture-exit-dtM3XF/checkout",
+  "files": [
+    "tests/genesis-profile.test.ts",
+    "tests/phase-5a-c-seal-safety-red.test.ts",
+    "tests/phase-5d-pacemaker-red.test.ts",
+    "tests/phase-3g-v3-room-rebase-red.test.ts"
+  ],
+  "compilerVersion": "5.8.2",
+  "nodeVersion": "v22.15.0",
+  "nodeExecutable": "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+  "programExecutions": 1,
+  "effectiveOptionsExactlyAccepted": true,
+  "acceptedDiagnosticFile": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-fixture-exit-f8ec9daf/diagnostics.json",
+  "acceptedSha256": "944982b11517514321907807536e945c550479d7b8a845992a11b8e825d52ee9"
+}

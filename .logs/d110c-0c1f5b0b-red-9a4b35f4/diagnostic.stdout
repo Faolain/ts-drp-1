@@ -1,0 +1,52 @@
+
+ RUN  v3.1.1 /Users/aristotle/Documents/Projects/ts-drp-1
+
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [control] pins settlement-v3 ACL as required from genesis while legacy retains v1
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [control] accepts an adjacent settled predecessor above epoch zero and rejects a gap
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [RED] rejects non-exact Node settlement frontier/ACL input: top-level extra key
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [RED] rejects non-exact Node settlement frontier/ACL input: ACL member extra key
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [RED] rejects non-exact Node settlement frontier/ACL input: accessor-backed ACL
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [RED] refuses fence causally from durable plan state: missing
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [RED] refuses fence causally from durable plan state: manual-review
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [RED] refuses fence causally from durable plan state: fence-already-set
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [RED] issues the fence first and atomically links the complete durable plan
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [RED] reopens SQLite issuance+journal truth and replays exactly one linked pending fence
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [RED] links one replacement exactly once across same-epoch retry and restart
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [RED] halts after outcome-unknown and reopens to the atomic row+link or neither
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [RED] makes completeRebaseSource unreachable under settlement while keeping the callable legacy seam
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [control] keeps creator-trusted-v1 fence issuance rejected before plan or issuance work
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [RED] rejects a genuine legacy-profile fence at ingress without journaling it
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [control] admits a huge valid settlement fence, rejects m > f, and never calls the application sink
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [control] uses the current anchor as admission authority for stale same-key ingress
+ × tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [RED] surfaces a published same-key displaced row under settlement 177ms
+   → expected { kind: 'displaced', ok: true, …(1) } to match object { kind: 'displaced', ok: true, …(1) }
+(2 matching properties omitted from actual)
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [control] classifies signed same-key cross-anchor causalJoin without application intents
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [RED] classifies signed same-key cross-anchor join without application intents
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [RED] surfaces a displaced ACL source before fence issuance
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [RED] Node owner materializes dedicated fence transaction + planEffect
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [RED] Node owner materializes anchor-agnostic any-older-epoch/old-incarnation classification
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [RED] Node owner materializes all own source rows regardless publication state
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [RED] Node owner materializes settlement-only completion gate
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [RED] Node owner materializes complete close graph and application/control split
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts > D.110c-0c1f5b0b Node settlement RED > [RED] Node owner materializes legacy-profile fence admission guard
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts > D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] preserves legacy causalJoin reservation, sink delivery, and blueprint fold membership
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts > D.110c-0c1f5b0b rejected-GREEN corrective RED > [control] preserves causalJoin ABI refusal on local generation and genuine signed ingress
+ × tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts > D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] preserves legacy join as an application-visible displaced operation 178ms
+   → expected { kind: 'displaced', ok: true, …(1) } to match object { kind: 'displaced', ok: true, …(1) }
+(2 matching properties omitted from actual)
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts > D.110c-0c1f5b0b rejected-GREEN corrective RED > [control] keeps settlement join control-only
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts > D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] surfaces an ordinary same-store non-creator sequence-zero row: legacy pending
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts > D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] surfaces an ordinary same-store non-creator sequence-zero row: settlement published
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts > D.110c-0c1f5b0b rejected-GREEN corrective RED > [control] excludes an authenticated activation vertex while surfacing later source work
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts > D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] refuses a settlement issued/outbox mismatch with the existing corruption classification
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts > D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] latches terminal state when the terminal transaction outcome is unknown
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts > D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] returns a typed failure for a malformed durable settlement plan: non-array entries
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts > D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] returns a typed failure for a malformed durable settlement plan: throwing entries accessor
+ ↓ tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts > D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] returns a typed failure for a malformed durable settlement plan: top-level extra key
+
+ Test Files  2 failed (2)
+      Tests  2 failed | 37 skipped (39)
+   Start at  06:08:12
+   Duration  1.41s (transform 838ms, setup 0ms, collect 1.87s, tests 356ms, environment 0ms, prepare 149ms)
+

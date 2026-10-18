@@ -1,0 +1,42 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 2,
+  "passed": 2,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6c-creator-replay-pagination-red.test.ts",
+      "message": ""
+    }
+  ],
+  "topLevelErrors": [],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "ancestorTitles": [
+        "D.110a-p creator durable-replay pagination RED"
+      ],
+      "fullName": "D.110a-p creator durable-replay pagination RED closes a genuine 129-row creator journal across the public page boundary",
+      "status": "passed",
+      "title": "closes a genuine 129-row creator journal across the public page boundary",
+      "duration": 2143.8236660000002,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.110a-p creator durable-replay pagination RED"
+      ],
+      "fullName": "D.110a-p creator durable-replay pagination RED keeps the public bound and requires bounded private-owner pagination",
+      "status": "passed",
+      "title": "keeps the public bound and requires bounded private-owner pagination",
+      "duration": 2.5385409999998956,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ]
+}

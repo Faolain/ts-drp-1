@@ -1,0 +1,4 @@
+{
+  "message": "Error: list unexpected status 1",
+  "stack": "Error: list unexpected status 1\n    at run (file:///Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0u-red-a9ba60ab/run-layer.mjs:52:63)\n    at async file:///Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0u-red-a9ba60ab/run-layer.mjs:67:3"
+}

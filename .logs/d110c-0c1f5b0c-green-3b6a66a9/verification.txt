@@ -1,0 +1,8 @@
+focused.json success=true total=9 passed=9 failed=0 pending=0
+retained87.json success=true total=87 passed=87 failed=0 pending=0
+legacy26.json success=true total=26 passed=26 failed=0 pending=0
+isolated-focused.json success=true total=9 passed=9 failed=0 pending=0
+isolated-retained87.json success=true total=87 passed=87 failed=0 pending=0
+example-v3-room build=0 typecheck=0 eslint=0 prettier=0 diff-check=0
+production signature=G remote-match=true changed-path-count=1
+design contradiction=none

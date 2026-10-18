@@ -1,0 +1,1104 @@
+{
+  "method": "Each sample weighted by corresponding timeDelta; inclusive functions counted at most once per sample stack, so recursion is not double-counted. Inclusive rows overlap and must not be summed. Weighted sampling time is not exact CPU accounting. Profiles remain separate; no inferred phase clock alignment.",
+  "primaryPid": 40665,
+  "profiles": [
+    {
+      "file": "CPU.20260906.033407.40665.0.001.cpuprofile",
+      "sha256": "35c134d64ff802985a426ddf840d064dab2005bad2f1f1648888657b5707529f",
+      "pid": 40665,
+      "threadId": 0,
+      "role": "primary-vite",
+      "nodeCount": 2826,
+      "samples": 52866,
+      "startTime": 3774384988001,
+      "endTime": 3774459412709,
+      "profileSpanMs": 74424.708,
+      "weightedSampleMs": 74423.6660000017,
+      "unallocatedTailMs": 1.0419999982987065,
+      "containsIntegrationSource": false,
+      "categories": [
+        {
+          "key": "idle",
+          "weightedMs": 70012.9230000018
+        },
+        {
+          "key": "GC",
+          "weightedMs": 1677.79
+        },
+        {
+          "key": "dependency-or-runner",
+          "weightedMs": 1380.161999999998
+        },
+        {
+          "key": "unattributed-or-runtime",
+          "weightedMs": 809.332
+        },
+        {
+          "key": "node-internal",
+          "weightedMs": 543.4590000000001
+        }
+      ],
+      "self": [
+        {
+          "key": "[\"(idle)\",\"\",-1,-1]",
+          "weightedMs": 70012.9230000018
+        },
+        {
+          "key": "[\"(garbage collector)\",\"\",-1,-1]",
+          "weightedMs": 1677.79
+        },
+        {
+          "key": "[\"(program)\",\"\",-1,-1]",
+          "weightedMs": 273.539
+        },
+        {
+          "key": "[\"addUneditedChunk\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",1298,17]",
+          "weightedMs": 74.12800000000001
+        },
+        {
+          "key": "[\"writeBuffer\",\"\",-1,-1]",
+          "weightedMs": 68.249
+        },
+        {
+          "key": "[\"withInlineSourcemap\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite-node@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite-node/dist/source-map.mjs\",849,28]",
+          "weightedMs": 68.082
+        },
+        {
+          "key": "[\"decode\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",857,15]",
+          "weightedMs": 63.70799999999999
+        },
+        {
+          "key": "[\"traceMappings\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",5332,22]",
+          "weightedMs": 58.085000000000015
+        },
+        {
+          "key": "[\"internalModuleStat\",\"\",-1,-1]",
+          "weightedMs": 55.33399999999999
+        },
+        {
+          "key": "[\"compileSourceTextModule\",\"node:internal/modules/esm/utils\",341,32]",
+          "weightedMs": 52.21000000000001
+        },
+        {
+          "key": "[\"readPackageJSON\",\"\",-1,-1]",
+          "weightedMs": 51.916999999999994
+        },
+        {
+          "key": "[\"visit\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",25454,6]",
+          "weightedMs": 51.913999999999994
+        },
+        {
+          "key": "[\"stat\",\"\",-1,-1]",
+          "weightedMs": 51.455999999999996
+        },
+        {
+          "key": "[\"enter\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",25915,9]",
+          "weightedMs": 50.62199999999999
+        },
+        {
+          "key": "[\"realpath\",\"\",-1,-1]",
+          "weightedMs": 37.083999999999996
+        },
+        {
+          "key": "[\"SyncWalker\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",25420,12]",
+          "weightedMs": 36.167
+        },
+        {
+          "key": "[\"getNearestParentPackageJSON\",\"\",-1,-1]",
+          "weightedMs": 33.501
+        },
+        {
+          "key": "[\"encode$1\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",909,17]",
+          "weightedMs": 32.417
+        },
+        {
+          "key": "[\"eachNext\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",997,9]",
+          "weightedMs": 30.665
+        },
+        {
+          "key": "[\"RegExp: ^(?:(?:^|\\\\/|(?:(?:(?!(?:^|\\\\/)\\\\.{1,2}(?:\\\\/|$)).)*?)\\\\/)(?!\\\\.{1,2}(?:\\\\/|$))(?=.)[^/]*?\\\\.(test|spec)\\\\.(?:c|m)?(?:\\\\[jt\\\\]|[jt])s(?:x)?)$\",\"\",-1,-1]",
+          "weightedMs": 29.706999999999994
+        },
+        {
+          "key": "[\"Socket.read\",\"node:net\",784,32]",
+          "weightedMs": 28.625
+        },
+        {
+          "key": "[\"originalPositionFor\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",5369,28]",
+          "weightedMs": 26.332000000000004
+        },
+        {
+          "key": "[\"nextTick\",\"node:internal/process/task_queues\",112,17]",
+          "weightedMs": 25.291
+        },
+        {
+          "key": "[\"existsSync\",\"\",-1,-1]",
+          "weightedMs": 23.710000000000004
+        },
+        {
+          "key": "[\"readableAddChunkPushByteMode\",\"node:internal/streams/readable\",462,37]",
+          "weightedMs": 22.042000000000005
+        },
+        {
+          "key": "[\"start\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vitest@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vitest/dist/chunks/cac.DK21mt6F.js\",1461,20]",
+          "weightedMs": 21.249999999999996
+        },
+        {
+          "key": "[\"traceSegment\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",5006,21]",
+          "weightedMs": 20.874000000000002
+        },
+        {
+          "key": "[\"cast\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",5166,13]",
+          "weightedMs": 20.792
+        },
+        {
+          "key": "[\"RegExp: \\\\w\",\"\",-1,-1]",
+          "weightedMs": 20.751
+        },
+        {
+          "key": "[\"readFileUtf8\",\"\",-1,-1]",
+          "weightedMs": 19.418
+        },
+        {
+          "key": "[\"wasm-function[20]\",\"wasm://wasm/f757504a\",0,1106]",
+          "weightedMs": 19.208000000000002
+        },
+        {
+          "key": "[\"convertNode\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/rollup@4.40.1/node_modules/rollup/dist/es/shared/parseAst.js\",2026,20]",
+          "weightedMs": 19.043
+        },
+        {
+          "key": "[\"(anonymous)\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vitest@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vitest/dist/chunks/cli-api.bwYuoT4p.js\",5683,21]",
+          "weightedMs": 18.583
+        },
+        {
+          "key": "[\"addSegmentInternal\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",5222,27]",
+          "weightedMs": 18.415
+        },
+        {
+          "key": "[\"dlopen\",\"\",-1,-1]",
+          "weightedMs": 17.999000000000002
+        }
+      ],
+      "inclusive": [
+        {
+          "key": "[\"(root)\",\"\",-1,-1]",
+          "weightedMs": 74423.6660000017
+        },
+        {
+          "key": "[\"(idle)\",\"\",-1,-1]",
+          "weightedMs": 70012.9230000018
+        },
+        {
+          "key": "[\"(garbage collector)\",\"\",-1,-1]",
+          "weightedMs": 1677.79
+        },
+        {
+          "key": "[\"ssrTransformScript\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",25593,33]",
+          "weightedMs": 648.1240000000001
+        },
+        {
+          "key": "[\"processTicksAndRejections\",\"node:internal/process/task_queues\",71,34]",
+          "weightedMs": 549.2069999999993
+        },
+        {
+          "key": "[\"runMicrotasks\",\"\",-1,-1]",
+          "weightedMs": 456.4159999999996
+        },
+        {
+          "key": "[\"combineSourcemaps\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",7014,26]",
+          "weightedMs": 295.8339999999999
+        },
+        {
+          "key": "[\"remapping\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",5486,18]",
+          "weightedMs": 292.0419999999998
+        },
+        {
+          "key": "[\"(program)\",\"\",-1,-1]",
+          "weightedMs": 273.539
+        },
+        {
+          "key": "[\"traceMappings\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",5332,22]",
+          "weightedMs": 258.62399999999997
+        },
+        {
+          "key": "[\"walk\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",25870,13]",
+          "weightedMs": 251.24299999999997
+        },
+        {
+          "key": "[\"visit\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",25454,6]",
+          "weightedMs": 238.49299999999997
+        },
+        {
+          "key": "[\"walk$1\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",25567,15]",
+          "weightedMs": 238.49299999999997
+        },
+        {
+          "key": "[\"transform\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",42277,17]",
+          "weightedMs": 234.834
+        },
+        {
+          "key": "[\"onStreamRead\",\"node:internal/stream_base_commons\",165,21]",
+          "weightedMs": 226.165
+        },
+        {
+          "key": "[\"readableAddChunkPushByteMode\",\"node:internal/streams/readable\",462,37]",
+          "weightedMs": 209.75
+        },
+        {
+          "key": "[\"Readable.push\",\"node:internal/streams/readable\",386,34]",
+          "weightedMs": 208.541
+        },
+        {
+          "key": "[\"emit\",\"node:events\",464,43]",
+          "weightedMs": 204.624
+        },
+        {
+          "key": "[\"addChunk\",\"node:internal/streams/readable\",549,17]",
+          "weightedMs": 187.708
+        },
+        {
+          "key": "[\"generateMap\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",1523,12]",
+          "weightedMs": 183.211
+        },
+        {
+          "key": "[\"evaluate\",\"\",-1,-1]",
+          "weightedMs": 169.958
+        },
+        {
+          "key": "[\"enter\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",25915,9]",
+          "weightedMs": 168.957
+        },
+        {
+          "key": "[\"run\",\"node:internal/modules/esm/module_job\",264,11]",
+          "weightedMs": 156.583
+        },
+        {
+          "key": "[\"generateDecodedMap\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",1479,19]",
+          "weightedMs": 149.044
+        },
+        {
+          "key": "[\"eachNext\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",997,9]",
+          "weightedMs": 138.67000000000002
+        },
+        {
+          "key": "[\"getModuleJobForImport\",\"node:internal/modules/esm/loader\",303,29]",
+          "weightedMs": 116.666
+        },
+        {
+          "key": "[\"transform\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",40404,19]",
+          "weightedMs": 112.49999999999999
+        },
+        {
+          "key": "[\"defaultResolve\",\"node:internal/modules/esm/loader\",769,16]",
+          "weightedMs": 109.749
+        },
+        {
+          "key": "[\"#cachedDefaultResolve\",\"node:internal/modules/esm/loader\",697,23]",
+          "weightedMs": 109.749
+        },
+        {
+          "key": "[\"resolve\",\"node:internal/modules/esm/loader\",677,9]",
+          "weightedMs": 109.749
+        },
+        {
+          "key": "[\"defaultResolve\",\"node:internal/modules/esm/resolve\",938,23]",
+          "weightedMs": 108.41499999999999
+        },
+        {
+          "key": "[\"(anonymous)\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",1492,27]",
+          "weightedMs": 108.00500000000002
+        },
+        {
+          "key": "[\"_getCombinedSourcemap\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",42631,23]",
+          "weightedMs": 106.5
+        },
+        {
+          "key": "[\"_link\",\"node:internal/modules/esm/module_job\",114,13]",
+          "weightedMs": 106.25
+        },
+        {
+          "key": "[\"resolveId\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",42180,17]",
+          "weightedMs": 102.45499999999998
+        }
+      ],
+      "modules": [
+        {
+          "key": "(idle)",
+          "weightedMs": 70012.9230000018
+        },
+        {
+          "key": "(garbage collector)",
+          "weightedMs": 1677.79
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js",
+          "weightedMs": 903.9110000000012
+        },
+        {
+          "key": "(program)",
+          "weightedMs": 273.539
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/rollup@4.40.1/node_modules/rollup/dist/es/shared/parseAst.js",
+          "weightedMs": 92.00300000000001
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vitest@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vitest/dist/chunks/cli-api.bwYuoT4p.js",
+          "weightedMs": 73.789
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite-node@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite-node/dist/source-map.mjs",
+          "weightedMs": 69.707
+        },
+        {
+          "key": "writeBuffer",
+          "weightedMs": 68.249
+        },
+        {
+          "key": "internalModuleStat",
+          "weightedMs": 55.33399999999999
+        },
+        {
+          "key": "node:internal/modules/esm/utils",
+          "weightedMs": 52.21000000000001
+        },
+        {
+          "key": "readPackageJSON",
+          "weightedMs": 51.916999999999994
+        },
+        {
+          "key": "stat",
+          "weightedMs": 51.455999999999996
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/esbuild@0.25.3/node_modules/esbuild/lib/main.js",
+          "weightedMs": 42.20800000000001
+        },
+        {
+          "key": "node:internal/fs/promises",
+          "weightedMs": 37.711000000000006
+        },
+        {
+          "key": "node:internal/streams/readable",
+          "weightedMs": 37.12700000000001
+        },
+        {
+          "key": "realpath",
+          "weightedMs": 37.083999999999996
+        },
+        {
+          "key": "node:internal/child_process",
+          "weightedMs": 35.123
+        },
+        {
+          "key": "node:net",
+          "weightedMs": 34.623999999999995
+        },
+        {
+          "key": "getNearestParentPackageJSON",
+          "weightedMs": 33.501
+        },
+        {
+          "key": "RegExp: ^(?:(?:^|\\/|(?:(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$)).)*?)\\/)(?!\\.{1,2}(?:\\/|$))(?=.)[^/]*?\\.(test|spec)\\.(?:c|m)?(?:\\[jt\\]|[jt])s(?:x)?)$",
+          "weightedMs": 29.706999999999994
+        },
+        {
+          "key": "node:internal/process/task_queues",
+          "weightedMs": 29.041
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vitest@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vitest/dist/chunks/cac.DK21mt6F.js",
+          "weightedMs": 24.709
+        },
+        {
+          "key": "node:buffer",
+          "weightedMs": 23.958
+        },
+        {
+          "key": "existsSync",
+          "weightedMs": 23.710000000000004
+        },
+        {
+          "key": "node:internal/streams/writable",
+          "weightedMs": 23.709
+        },
+        {
+          "key": "node:internal/stream_base_commons",
+          "weightedMs": 21.749000000000002
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@jridgewell+sourcemap-codec@1.5.5/node_modules/@jridgewell/sourcemap-codec/dist/sourcemap-codec.mjs",
+          "weightedMs": 21.040999999999997
+        },
+        {
+          "key": "RegExp: \\w",
+          "weightedMs": 20.751
+        },
+        {
+          "key": "wasm://wasm/f757504a",
+          "weightedMs": 20.417
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+mocker@3.1.1_vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0_/node_modules/@vitest/mocker/dist/node.js",
+          "weightedMs": 20.165
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/magic-string@0.30.17/node_modules/magic-string/dist/magic-string.es.mjs",
+          "weightedMs": 19.875999999999998
+        },
+        {
+          "key": "readFileUtf8",
+          "weightedMs": 19.418
+        },
+        {
+          "key": "dlopen",
+          "weightedMs": 17.999000000000002
+        },
+        {
+          "key": "node:internal/modules/esm/resolve",
+          "weightedMs": 16.708
+        },
+        {
+          "key": "node:fs",
+          "weightedMs": 16.249000000000002
+        }
+      ],
+      "sampleCounts": [
+        {
+          "key": "[\"(idle)\",\"\",-1,-1]",
+          "samples": 50615
+        },
+        {
+          "key": "[\"(garbage collector)\",\"\",-1,-1]",
+          "samples": 466
+        },
+        {
+          "key": "[\"(program)\",\"\",-1,-1]",
+          "samples": 113
+        },
+        {
+          "key": "[\"addUneditedChunk\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",1298,17]",
+          "samples": 56
+        },
+        {
+          "key": "[\"decode\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",857,15]",
+          "samples": 48
+        },
+        {
+          "key": "[\"compileSourceTextModule\",\"node:internal/modules/esm/utils\",341,32]",
+          "samples": 44
+        },
+        {
+          "key": "[\"internalModuleStat\",\"\",-1,-1]",
+          "samples": 42
+        },
+        {
+          "key": "[\"enter\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",25915,9]",
+          "samples": 42
+        },
+        {
+          "key": "[\"visit\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",25454,6]",
+          "samples": 41
+        },
+        {
+          "key": "[\"readPackageJSON\",\"\",-1,-1]",
+          "samples": 37
+        },
+        {
+          "key": "[\"stat\",\"\",-1,-1]",
+          "samples": 36
+        },
+        {
+          "key": "[\"withInlineSourcemap\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite-node@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite-node/dist/source-map.mjs\",849,28]",
+          "samples": 35
+        },
+        {
+          "key": "[\"realpath\",\"\",-1,-1]",
+          "samples": 28
+        },
+        {
+          "key": "[\"encode$1\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",909,17]",
+          "samples": 26
+        },
+        {
+          "key": "[\"eachNext\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",997,9]",
+          "samples": 25
+        },
+        {
+          "key": "[\"getNearestParentPackageJSON\",\"\",-1,-1]",
+          "samples": 22
+        },
+        {
+          "key": "[\"traceMappings\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",5332,22]",
+          "samples": 22
+        },
+        {
+          "key": "[\"RegExp: ^(?:(?:^|\\\\/|(?:(?:(?!(?:^|\\\\/)\\\\.{1,2}(?:\\\\/|$)).)*?)\\\\/)(?!\\\\.{1,2}(?:\\\\/|$))(?=.)[^/]*?\\\\.(test|spec)\\\\.(?:c|m)?(?:\\\\[jt\\\\]|[jt])s(?:x)?)$\",\"\",-1,-1]",
+          "samples": 20
+        },
+        {
+          "key": "[\"start\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vitest@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vitest/dist/chunks/cac.DK21mt6F.js\",1461,20]",
+          "samples": 17
+        },
+        {
+          "key": "[\"addSegmentInternal\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js\",5222,27]",
+          "samples": 17
+        }
+      ]
+    },
+    {
+      "file": "CPU.20260906.033408.40795.0.001.cpuprofile",
+      "sha256": "790358b92eb83f412dfbf1c951cbcf7eeb320e8b061a520246847916accebe57",
+      "pid": 40795,
+      "threadId": 0,
+      "role": "non-primary-profile",
+      "nodeCount": 21846,
+      "samples": 51864,
+      "startTime": 3774386177834,
+      "endTime": 3774459269626,
+      "profileSpanMs": 73091.792,
+      "weightedSampleMs": 73091.66700000151,
+      "unallocatedTailMs": 0.12499999848660082,
+      "containsIntegrationSource": true,
+      "categories": [
+        {
+          "key": "dependency-or-runner",
+          "weightedMs": 29555.126000001423
+        },
+        {
+          "key": "product",
+          "weightedMs": 24543.265000000596
+        },
+        {
+          "key": "idle",
+          "weightedMs": 5620.630000000007
+        },
+        {
+          "key": "node-internal",
+          "weightedMs": 5109.606000000013
+        },
+        {
+          "key": "GC",
+          "weightedMs": 4803.540000000016
+        },
+        {
+          "key": "unattributed-or-runtime",
+          "weightedMs": 3098.327999999997
+        },
+        {
+          "key": "fixture",
+          "weightedMs": 361.17199999999985
+        }
+      ],
+      "self": [
+        {
+          "key": "[\"mod\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/abstract/modular.js\",28,19]",
+          "weightedMs": 13875.084999999739
+        },
+        {
+          "key": "[\"encodeInternal\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js\",130,23]",
+          "weightedMs": 5831.007000000029
+        },
+        {
+          "key": "[\"(idle)\",\"\",-1,-1]",
+          "weightedMs": 5620.630000000007
+        },
+        {
+          "key": "[\"(garbage collector)\",\"\",-1,-1]",
+          "weightedMs": 4803.540000000016
+        },
+        {
+          "key": "[\"encode\",\"node:internal/encoding\",350,8]",
+          "weightedMs": 2720.300999999994
+        },
+        {
+          "key": "[\"concat\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js\",72,15]",
+          "weightedMs": 2392.8659999999954
+        },
+        {
+          "key": "[\"process\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+hashes@1.7.1/node_modules/@noble/hashes/esm/sha256.js\",62,11]",
+          "weightedMs": 2356.8069999999943
+        },
+        {
+          "key": "[\"pow2\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/abstract/modular.js\",70,20]",
+          "weightedMs": 1919.9599999999923
+        },
+        {
+          "key": "[\"encodeVarUint\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js\",96,22]",
+          "weightedMs": 1775.5959999999982
+        },
+        {
+          "key": "[\"decodeInternal\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js\",422,23]",
+          "weightedMs": 1772.873999999995
+        },
+        {
+          "key": "[\"double\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/abstract/edwards.js\",219,14]",
+          "weightedMs": 1444.380999999997
+        },
+        {
+          "key": "[\"structuredClone\",\"node:internal/worker/js_transferable\",111,24]",
+          "weightedMs": 1194.1689999999985
+        },
+        {
+          "key": "[\"take\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js\",309,8]",
+          "weightedMs": 1192.9969999999996
+        },
+        {
+          "key": "[\"copyDetachedBytes\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/control-plane/src/anchor-trust.ts\",37,26]",
+          "weightedMs": 1146.6700000000005
+        },
+        {
+          "key": "[\"add\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/abstract/edwards.js\",240,11]",
+          "weightedMs": 1118.4249999999997
+        },
+        {
+          "key": "[\"valueToKeyWithoutThrowing\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/fake-indexeddb@6.2.5/node_modules/fake-indexeddb/build/esm/lib/valueToKeyWithoutThrowing.js\",7,34]",
+          "weightedMs": 1098.0440000000012
+        },
+        {
+          "key": "[\"decodeCollection\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js\",349,25]",
+          "weightedMs": 1010.4490000000011
+        },
+        {
+          "key": "[\"decodeUTF8\",\"\",-1,-1]",
+          "weightedMs": 799.0570000000012
+        },
+        {
+          "key": "[\"(program)\",\"\",-1,-1]",
+          "weightedMs": 612.9119999999997
+        },
+        {
+          "key": "[\"Point\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/abstract/edwards.js\",99,19]",
+          "weightedMs": 601.7079999999999
+        },
+        {
+          "key": "[\"encodeUtf8String\",\"\",-1,-1]",
+          "weightedMs": 535.9449999999998
+        },
+        {
+          "key": "[\"_unsafeLadder\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/abstract/curve.js\",196,17]",
+          "weightedMs": 485.8739999999997
+        },
+        {
+          "key": "[\"decode\",\"node:internal/encoding\",439,10]",
+          "weightedMs": 471.7889999999996
+        },
+        {
+          "key": "[\"RegExp: ^[0-9a-f]{64}$\",\"\",-1,-1]",
+          "weightedMs": 390.66299999999956
+        },
+        {
+          "key": "[\"transaction\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/fake-indexeddb@6.2.5/node_modules/fake-indexeddb/build/esm/FDBDatabase.js\",123,13]",
+          "weightedMs": 374.83199999999977
+        },
+        {
+          "key": "[\"keys\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js\",284,13]",
+          "weightedMs": 326.00599999999974
+        },
+        {
+          "key": "[\"(anonymous)\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/fake-indexeddb@6.2.5/node_modules/fake-indexeddb/build/esm/lib/Database.js\",13,14]",
+          "weightedMs": 321.58799999999997
+        },
+        {
+          "key": "[\"hasCapturedSharedBacking\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3/src/index.ts\",235,33]",
+          "weightedMs": 311.9170000000001
+        },
+        {
+          "key": "[\"eq\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js\",186,11]",
+          "weightedMs": 297.6619999999999
+        },
+        {
+          "key": "[\"snapshotRecord\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/live-journal/dist/src/contract.js\",107,23]",
+          "weightedMs": 292.6179999999999
+        },
+        {
+          "key": "[\"lowerHex\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/live-journal/dist/src/contract.js\",153,17]",
+          "weightedMs": 259.83500000000004
+        },
+        {
+          "key": "[\"decodeCanonical\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js\",503,24]",
+          "weightedMs": 251.166
+        },
+        {
+          "key": "[\"_findRecords\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/fake-indexeddb@6.2.5/node_modules/fake-indexeddb/build/esm/lib/binarySearchTree.js\",169,15]",
+          "weightedMs": 231.543
+        },
+        {
+          "key": "[\"varUint\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js\",326,11]",
+          "weightedMs": 215.92200000000003
+        },
+        {
+          "key": "[\"_start\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/fake-indexeddb@6.2.5/node_modules/fake-indexeddb/build/esm/FDBTransaction.js\",167,8]",
+          "weightedMs": 203.743
+        }
+      ],
+      "inclusive": [
+        {
+          "key": "[\"(root)\",\"\",-1,-1]",
+          "weightedMs": 73091.66700000151
+        },
+        {
+          "key": "[\"processImmediate\",\"node:internal/timers\",436,27]",
+          "weightedMs": 36269.217000001794
+        },
+        {
+          "key": "[\"runMicrotasks\",\"\",-1,-1]",
+          "weightedMs": 28775.67800000116
+        },
+        {
+          "key": "[\"runNextTicks\",\"node:internal/process/task_queues\",62,21]",
+          "weightedMs": 27909.842000001103
+        },
+        {
+          "key": "[\"verify\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/abstract/edwards.js\",584,19]",
+          "weightedMs": 20404.935000000187
+        },
+        {
+          "key": "[\"multiplyUnsafe\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/abstract/edwards.js\",281,22]",
+          "weightedMs": 17489.349999999733
+        },
+        {
+          "key": "[\"unsafe\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/abstract/curve.js\",319,10]",
+          "weightedMs": 17436.64199999974
+        },
+        {
+          "key": "[\"_unsafeLadder\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/abstract/curve.js\",196,17]",
+          "weightedMs": 15702.950999999599
+        },
+        {
+          "key": "[\"mod\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/abstract/modular.js\",28,19]",
+          "weightedMs": 13875.084999999739
+        },
+        {
+          "key": "[\"create\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/abstract/modular.js\",569,10]",
+          "weightedMs": 13823.587999999743
+        },
+        {
+          "key": "[\"modP\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/abstract/edwards.js\",55,17]",
+          "weightedMs": 13817.088999999747
+        },
+        {
+          "key": "[\"encodeCanonical\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js\",294,24]",
+          "weightedMs": 13344.965999999871
+        },
+        {
+          "key": "[\"encodeInternal\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js\",130,23]",
+          "weightedMs": 13210.468999999875
+        },
+        {
+          "key": "[\"verifyEd25519RegisteredDigest\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3/src/index.ts\",1970,38]",
+          "weightedMs": 12211.67399999981
+        },
+        {
+          "key": "[\"authenticateReceivedVertex\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3/src/index.ts\",2141,35]",
+          "weightedMs": 12014.305999999824
+        },
+        {
+          "key": "[\"deriveLiveJournalSnapshot\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/live-journal/dist/src/contract.js\",895,34]",
+          "weightedMs": 11569.073999999928
+        },
+        {
+          "key": "[\"deriveToken\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/live-journal/dist/src/contract.js\",812,20]",
+          "weightedMs": 11049.841999999953
+        },
+        {
+          "key": "[\"double\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/abstract/edwards.js\",219,14]",
+          "weightedMs": 9723.82500000002
+        },
+        {
+          "key": "[\"extractAuthorizedV3Vertex\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-live.ts\",2427,34]",
+          "weightedMs": 9306.631000000012
+        },
+        {
+          "key": "[\"extractAdmittedReceivedVertex\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3/src/index.ts\",3257,38]",
+          "weightedMs": 9233.922000000017
+        },
+        {
+          "key": "[\"reopenCreatorSuccessorMaterial\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption.ts\",610,45]",
+          "weightedMs": 9127.289000000066
+        },
+        {
+          "key": "[\"decideReceivedVertex\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3/src/index.ts\",3095,29]",
+          "weightedMs": 8791.846000000065
+        },
+        {
+          "key": "[\"authenticateRecoveryVertex\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-live.ts\",2882,35]",
+          "weightedMs": 8367.678000000118
+        },
+        {
+          "key": "[\"fulfilled\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/dist/src/live-journal.js\",4,26]",
+          "weightedMs": 8116.672000000148
+        },
+        {
+          "key": "[\"_start\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/fake-indexeddb@6.2.5/node_modules/fake-indexeddb/build/esm/FDBTransaction.js\",167,8]",
+          "weightedMs": 7853.743000000074
+        },
+        {
+          "key": "[\"(anonymous)\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/dist/src/live-journal.js\",737,78]",
+          "weightedMs": 7462.799000000111
+        },
+        {
+          "key": "[\"add\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/abstract/edwards.js\",240,11]",
+          "weightedMs": 7294.360000000123
+        },
+        {
+          "key": "[\"activateCreatorSuccessorLive\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-live.ts\",6075,43]",
+          "weightedMs": 5904.508000000024
+        },
+        {
+          "key": "[\"recoverV3LiveReplica\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-live.ts\",3341,35]",
+          "weightedMs": 5714.045000000054
+        },
+        {
+          "key": "[\"decodeCanonical\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js\",503,24]",
+          "weightedMs": 5683.044000000064
+        },
+        {
+          "key": "[\"classifyPlaneVertex\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-live.ts\",2992,28]",
+          "weightedMs": 5668.377000000056
+        },
+        {
+          "key": "[\"validateReceived\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/live-journal/dist/src/contract.js\",403,25]",
+          "weightedMs": 5664.196000000044
+        },
+        {
+          "key": "[\"inspectCreatorTransitionAdvance\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts\",103,37]",
+          "weightedMs": 5656.127000000051
+        },
+        {
+          "key": "[\"inspectCreatorTransitionAdvance\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/internal/creator-transition-advance.ts\",578,40]",
+          "weightedMs": 5650.793000000052
+        },
+        {
+          "key": "[\"(idle)\",\"\",-1,-1]",
+          "weightedMs": 5620.630000000007
+        }
+      ],
+      "modules": [
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/abstract/modular.js",
+          "weightedMs": 15952.381999999567
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js",
+          "weightedMs": 15226.586999999694
+        },
+        {
+          "key": "(idle)",
+          "weightedMs": 5620.630000000007
+        },
+        {
+          "key": "(garbage collector)",
+          "weightedMs": 4803.540000000016
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/abstract/edwards.js",
+          "weightedMs": 3719.635999999995
+        },
+        {
+          "key": "node:internal/encoding",
+          "weightedMs": 3197.2979999999943
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+hashes@1.7.1/node_modules/@noble/hashes/esm/sha256.js",
+          "weightedMs": 2514.136999999995
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/live-journal/dist/src/contract.js",
+          "weightedMs": 1629.0709999999983
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/control-plane/src/anchor-trust.ts",
+          "weightedMs": 1317.754999999998
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/fake-indexeddb@6.2.5/node_modules/fake-indexeddb/build/esm/lib/valueToKeyWithoutThrowing.js",
+          "weightedMs": 1244.5009999999995
+        },
+        {
+          "key": "node:internal/worker/js_transferable",
+          "weightedMs": 1194.2109999999986
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3/src/index.ts",
+          "weightedMs": 972.8150000000019
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+expect@3.1.1/node_modules/@vitest/expect/dist/index.js",
+          "weightedMs": 956.259000000002
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/abstract/curve.js",
+          "weightedMs": 840.623000000001
+        },
+        {
+          "key": "decodeUTF8",
+          "weightedMs": 799.0570000000012
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-live.ts",
+          "weightedMs": 747.8340000000007
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room/src/index.ts",
+          "weightedMs": 666.592
+        },
+        {
+          "key": "(program)",
+          "weightedMs": 612.9119999999997
+        },
+        {
+          "key": "encodeUtf8String",
+          "weightedMs": 535.9449999999998
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/src/internal/browser-issuance-store.ts",
+          "weightedMs": 451.00799999999947
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/dist/src/live-journal.js",
+          "weightedMs": 442.2019999999997
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/dist/src/internal/idb-adapter.js",
+          "weightedMs": 433.4169999999998
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/fake-indexeddb@6.2.5/node_modules/fake-indexeddb/build/esm/FDBTransaction.js",
+          "weightedMs": 432.572
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/fake-indexeddb@6.2.5/node_modules/fake-indexeddb/build/esm/FDBDatabase.js",
+          "weightedMs": 409.5799999999998
+        },
+        {
+          "key": "RegExp: ^[0-9a-f]{64}$",
+          "weightedMs": 390.66299999999956
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3/src/latched-acl.ts",
+          "weightedMs": 382.8669999999996
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+hashes@1.7.1/node_modules/@noble/hashes/esm/_md.js",
+          "weightedMs": 365.3329999999998
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+          "weightedMs": 359.92199999999985
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/fake-indexeddb@6.2.5/node_modules/fake-indexeddb/build/esm/lib/Database.js",
+          "weightedMs": 347.421
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/storage/dist/src/internal/validation.js",
+          "weightedMs": 345.0099999999998
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/fake-indexeddb@6.2.5/node_modules/fake-indexeddb/build/esm/lib/binarySearchTree.js",
+          "weightedMs": 321.7490000000002
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/utils.js",
+          "weightedMs": 255.03699999999998
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/creator-adoption.ts",
+          "weightedMs": 244.76100000000005
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/ed25519.js",
+          "weightedMs": 229.209
+        },
+        {
+          "key": "file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vite-node@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite-node/dist/client.mjs",
+          "weightedMs": 212.293
+        }
+      ],
+      "sampleCounts": [
+        {
+          "key": "[\"mod\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/abstract/modular.js\",28,19]",
+          "samples": 10659
+        },
+        {
+          "key": "[\"encodeInternal\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js\",130,23]",
+          "samples": 4290
+        },
+        {
+          "key": "[\"(garbage collector)\",\"\",-1,-1]",
+          "samples": 3158
+        },
+        {
+          "key": "[\"(idle)\",\"\",-1,-1]",
+          "samples": 3134
+        },
+        {
+          "key": "[\"encode\",\"node:internal/encoding\",350,8]",
+          "samples": 1933
+        },
+        {
+          "key": "[\"process\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+hashes@1.7.1/node_modules/@noble/hashes/esm/sha256.js\",62,11]",
+          "samples": 1767
+        },
+        {
+          "key": "[\"concat\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js\",72,15]",
+          "samples": 1728
+        },
+        {
+          "key": "[\"pow2\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/abstract/modular.js\",70,20]",
+          "samples": 1482
+        },
+        {
+          "key": "[\"encodeVarUint\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js\",96,22]",
+          "samples": 1313
+        },
+        {
+          "key": "[\"decodeInternal\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js\",422,23]",
+          "samples": 1298
+        },
+        {
+          "key": "[\"double\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/abstract/edwards.js\",219,14]",
+          "samples": 1040
+        },
+        {
+          "key": "[\"take\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js\",309,8]",
+          "samples": 894
+        },
+        {
+          "key": "[\"structuredClone\",\"node:internal/worker/js_transferable\",111,24]",
+          "samples": 886
+        },
+        {
+          "key": "[\"add\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/abstract/edwards.js\",240,11]",
+          "samples": 861
+        },
+        {
+          "key": "[\"copyDetachedBytes\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/control-plane/src/anchor-trust.ts\",37,26]",
+          "samples": 838
+        },
+        {
+          "key": "[\"valueToKeyWithoutThrowing\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/fake-indexeddb@6.2.5/node_modules/fake-indexeddb/build/esm/lib/valueToKeyWithoutThrowing.js\",7,34]",
+          "samples": 762
+        },
+        {
+          "key": "[\"decodeCollection\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/packages/canonical/dist/src/index.js\",349,25]",
+          "samples": 747
+        },
+        {
+          "key": "[\"decodeUTF8\",\"\",-1,-1]",
+          "samples": 592
+        },
+        {
+          "key": "[\"encodeUtf8String\",\"\",-1,-1]",
+          "samples": 385
+        },
+        {
+          "key": "[\"Point\",\"file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@noble+curves@2.2.0/node_modules/@noble/curves/abstract/edwards.js\",99,19]",
+          "samples": 374
+        }
+      ]
+    }
+  ]
+}

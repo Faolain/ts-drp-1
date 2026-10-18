@@ -1,0 +1,36 @@
+{
+	"algorithm": "sha256",
+	"files": {
+		"provenance.json": "8b5e24c89dd32735ad95ca2a10a98e80dd2bb2623e0188b1355b51076bc90bc3",
+		"reference.mjs": "abb01f2f061b20428e1c412793380a0baf468bf9397c7ec2952a902f2aaf7bdc"
+	},
+	"provenanceBindings": {
+		"originalProvenance": {
+			"path": "packages/protocol-v3/conformance/original-reference/provenance.json",
+			"sha256": "8b5e24c89dd32735ad95ca2a10a98e80dd2bb2623e0188b1355b51076bc90bc3"
+		},
+		"originalSource": {
+			"path": "packages/protocol-v3/conformance/original-reference/reference.mjs",
+			"sha256": "abb01f2f061b20428e1c412793380a0baf468bf9397c7ec2952a902f2aaf7bdc"
+		},
+		"regeneratedProvenance": {
+			"path": "packages/protocol-v3/conformance/regenerated-reference/provenance.json",
+			"sha256": "1ea3a9e0da6d6df667101e7e8c5e208b6eca45da6954cbfaf9da1cef6e50eae4"
+		},
+		"regeneratedSource": {
+			"path": "packages/protocol-v3/conformance/regenerated-reference/reference.mjs",
+			"sha256": "0a7b199eec2f1a950d4b91d9041e382f02983e2d601a530de60e7311309ce84a"
+		},
+		"registry": {
+			"path": "packages/protocol-v3/registry/registry-v1.json",
+			"sha256": "2fd6f51286e06f2c3c634c244a0242a55da186258664ec54a371f19b814a11d9"
+		},
+		"vectors": {
+			"path": "packages/protocol-v3/conformance/vectors/registry-v1.json",
+			"sha256": "8b84504ae98b37beae2d91ef8fa29f9a61299a236d32a12b63f24cb2757da741"
+		}
+	},
+	"referenceRole": "original",
+	"schemaVersion": "protocol-v3-reference-lock-v1",
+	"treeRoot": "packages/protocol-v3/conformance/original-reference"
+}

@@ -1,0 +1,13 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "git",
+  "args": [
+    "commit",
+    "-S",
+    "--only",
+    "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+    "-m",
+    "test: add opt-in f5b wide phase diagnostics"
+  ],
+  "start": "2026-09-06T07:11:40.941Z"
+}

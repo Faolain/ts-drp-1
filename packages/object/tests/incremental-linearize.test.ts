@@ -1,3 +1,5 @@
+import "./helpers/trusted-vertex-ingest.js";
+
 /**
  * RED acceptance contracts for incremental linearization and snapshot pruning.
  *

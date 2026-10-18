@@ -1,0 +1,26 @@
+{
+	"extends": "../../../tsconfig.json",
+	"compilerOptions": {
+		"baseUrl": "../../..",
+		"composite": false,
+		"declaration": false,
+		"declarationMap": false,
+		"noEmit": true,
+		"paths": {
+			"@ts-drp/canonical": ["packages/canonical/src/index.ts"],
+			"@ts-drp/control-plane": ["packages/control-plane/src/index.ts"],
+			"@ts-drp/protocol-v3": ["packages/protocol-v3/src/public.ts"],
+			"@ts-drp/storage": ["packages/storage/src/index.ts"],
+			"@ts-drp/storage/*": ["packages/storage/src/*.ts"]
+		},
+		"rootDir": "../../.."
+	},
+	"files": [
+		"../../../packages/storage-browser/playwright.phase-3a0-d-anchor-trust.config.ts",
+		"./browser-entry.ts",
+		"../../../packages/storage-browser/tests/fixtures/phase-3a0-d-server.ts",
+		"../../../packages/storage-browser/tests/phase-3a0-d-anchor-trust-browser-parity-red.pw.ts",
+		"../../../packages/storage-browser/tests/phase-3a0-d-global-setup.ts",
+		"../../phase-3a0-d-anchor-trust-governance-red.test.ts"
+	]
+}

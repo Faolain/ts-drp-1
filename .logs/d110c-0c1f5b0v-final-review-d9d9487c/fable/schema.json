@@ -1,0 +1,42 @@
+{
+  "type": "object",
+  "properties": {
+    "verdict": { "type": "string", "enum": ["PASS", "CHANGES_REQUIRED"] },
+    "p0_count": { "type": "integer", "minimum": 0 },
+    "p1_count": { "type": "integer", "minimum": 0 },
+    "p2_count": { "type": "integer", "minimum": 0 },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "severity": { "type": "string", "enum": ["P0", "P1", "P2"] },
+          "title": { "type": "string" },
+          "evidence": { "type": "string" },
+          "impact": { "type": "string" },
+          "required_action": { "type": "string" }
+        },
+        "required": ["severity", "title", "evidence", "impact", "required_action"],
+        "additionalProperties": false
+      }
+    },
+    "red_green_causality": { "type": "string" },
+    "replay_contract_assessment": { "type": "string" },
+    "scope_assessment": { "type": "string" },
+    "evidence_assessment": { "type": "string" },
+    "parent_f5b_ready": { "type": "boolean" }
+  },
+  "required": [
+    "verdict",
+    "p0_count",
+    "p1_count",
+    "p2_count",
+    "findings",
+    "red_green_causality",
+    "replay_contract_assessment",
+    "scope_assessment",
+    "evidence_assessment",
+    "parent_f5b_ready"
+  ],
+  "additionalProperties": false
+}

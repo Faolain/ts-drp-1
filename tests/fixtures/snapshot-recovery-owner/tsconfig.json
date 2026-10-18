@@ -1,0 +1,25 @@
+{
+	"extends": "../../../tsconfig.json",
+	"compilerOptions": {
+		"composite": false,
+		"noEmit": true,
+		"rootDir": "../../.."
+	},
+	"files": [
+		"../snapshot-recovery-retention/contract.ts",
+		"../../../packages/storage-node/tests/snapshot-recovery-retention-red.test.ts",
+		"../../../packages/storage-node/tests/snapshot-recovery-retention-native-red.test.ts",
+		"../../../packages/storage-node/tests/fixtures/recovery-retention-child.ts",
+		"../../../packages/storage-browser/tests/assets/snapshot-recovery-retention-entry.ts",
+		"../../../packages/storage-browser/tests/snapshot-recovery-retention-red.pw.ts",
+		"../../../packages/storage-browser/playwright.snapshot-recovery-retention.config.ts",
+		"contract.ts",
+		"../../../packages/storage-node/tests/snapshot-recovery-owner-red.test.ts",
+		"../../../packages/storage-node/tests/fixtures/recovery-owner-migration-child.ts",
+		"../../../packages/storage-node/tests/fixtures/recovery-owner-policy-child.ts",
+		"../../../packages/storage-browser/tests/assets/snapshot-recovery-owner-entry.ts",
+		"../../../packages/storage-browser/tests/snapshot-recovery-owner-red.pw.ts",
+		"../../../packages/storage-browser/playwright.snapshot-recovery-owner.config.ts"
+	],
+	"include": []
+}

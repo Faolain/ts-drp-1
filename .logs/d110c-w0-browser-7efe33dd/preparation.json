@@ -1,0 +1,208 @@
+{
+  "status": "Read-only preparation only; no browser or collection executed; runtime not released",
+  "baseline": "7efe33dd350deab922c3fea7e9fcd1c968f4e474",
+  "signature": "G",
+  "historicalHandoff": ".logs/d110c-w0-current-profile-green-61ea93f6/browser-handoff.json",
+  "historicalHandoffSha256": "f15b8ac3ad478a099e41e0e8d37c5ae9274c69ae50b14ae6f856c3650d634414",
+  "sourceHashes": {
+    "packages/storage-browser/playwright.phase-6a-creator-successor-activation.config.ts": "ec57c6bfc0453ad2bf154b3c2da7a2359be721e04e5f0c038f8b54e2e0ae35bf",
+    "packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts": "08b3d4074aa00dee24e5ce5e12de5088c3e9f13cf79aa62f52a076a589a1136b",
+    "packages/storage-browser/tests/phase-6a-creator-successor-activation-global-setup.ts": "1afb2c4feb8cbdf305213930c7d60ce8466fa2f7d37ad0d46e907dca5628a5da",
+    "packages/storage-browser/tests/phase-4c-browser-server.ts": "67eef9e17c08d85f2f934714a25c6e0f50f67dbaac59bc1b686ca78a154bfb9b",
+    "packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts": "6f9fd31745c580ce8122571a8bb67d9fdb637869f9d22eb95dd235ccf8dc5bad",
+    "packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-worker.ts": "3a8850cb901b398ebc4c3a4848bbbbcf47dc1c9c1641a009dcfc2aa4feb1d2e4",
+    "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts": "8108ebe74f1cb31d2508bf0b80ad8ed79a5b79135f6a8e1cde7e6e7d96fe959b",
+    "tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts": "c07d7ed16b74cc23a13bee4a0b682fa3286f0fbc0a40f1f8ebdac6b0005d5599"
+  },
+  "historicalEntries": [
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "pins the complete browser behavior inventory",
+      "project": "chromium",
+      "timeout": 60000
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "dedicated worker holds the origin-wide lifetime lock against a Window contender then releases it",
+      "project": "chromium",
+      "timeout": 60000
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "missing or hostile worker LockManager authority fails closed before activation",
+      "project": "chromium",
+      "timeout": 60000
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "wrong-key and throwing browser possession fail before writer activation",
+      "project": "chromium",
+      "timeout": 60000
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "window probes distinguish production lock contention from fixture busy state and isolate possession failures",
+      "project": "chromium",
+      "timeout": 60000
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "window observes lock authority before durable store opening and possession probes use exact suffixed databases",
+      "project": "chromium",
+      "timeout": 60000
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "missing or hostile LockManager authority fails activation closed",
+      "project": "chromium",
+      "timeout": 60000
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "two tabs elect one lifetime-held writer then a freshly reverified loser wins after release",
+      "project": "chromium",
+      "timeout": 60000
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "pins the complete browser behavior inventory",
+      "project": "firefox",
+      "timeout": 60000
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "dedicated worker holds the origin-wide lifetime lock against a Window contender then releases it",
+      "project": "firefox",
+      "timeout": 60000
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "missing or hostile worker LockManager authority fails closed before activation",
+      "project": "firefox",
+      "timeout": 60000
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "wrong-key and throwing browser possession fail before writer activation",
+      "project": "firefox",
+      "timeout": 60000
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "window probes distinguish production lock contention from fixture busy state and isolate possession failures",
+      "project": "firefox",
+      "timeout": 60000
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "window observes lock authority before durable store opening and possession probes use exact suffixed databases",
+      "project": "firefox",
+      "timeout": 60000
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "missing or hostile LockManager authority fails activation closed",
+      "project": "firefox",
+      "timeout": 60000
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "two tabs elect one lifetime-held writer then a freshly reverified loser wins after release",
+      "project": "firefox",
+      "timeout": 60000
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "pins the complete browser behavior inventory",
+      "project": "webkit",
+      "timeout": 60000
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "dedicated worker holds the origin-wide lifetime lock against a Window contender then releases it",
+      "project": "webkit",
+      "timeout": 60000
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "missing or hostile worker LockManager authority fails closed before activation",
+      "project": "webkit",
+      "timeout": 60000
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "wrong-key and throwing browser possession fail before writer activation",
+      "project": "webkit",
+      "timeout": 60000
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "window probes distinguish production lock contention from fixture busy state and isolate possession failures",
+      "project": "webkit",
+      "timeout": 60000
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "window observes lock authority before durable store opening and possession probes use exact suffixed databases",
+      "project": "webkit",
+      "timeout": 60000
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "missing or hostile LockManager authority fails activation closed",
+      "project": "webkit",
+      "timeout": 60000
+    },
+    {
+      "file": "phase-6a-creator-successor-activation.pw.ts",
+      "title": "two tabs elect one lifetime-held writer then a freshly reverified loser wins after release",
+      "project": "webkit",
+      "timeout": 60000
+    }
+  ],
+  "expectedCases": 24,
+  "projects": [
+    "chromium",
+    "firefox",
+    "webkit"
+  ],
+  "retries": 0,
+  "workers": 1,
+  "globalTimeout": 300000,
+  "binaries": [
+    {
+      "name": "chromium",
+      "executable": "/Users/aristotle/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+      "sha256": "a596b1cfc6353e987fcec8d71a23a28cd6a9e7a6b4e20b908e4c4fcffe51158e"
+    },
+    {
+      "name": "firefox",
+      "executable": "/Users/aristotle/Library/Caches/ms-playwright/firefox-1538/firefox/Nightly.app/Contents/MacOS/firefox",
+      "sha256": "65ecab21ee6aa479836eb27aec213e15295f07ca21b5aa995d45bcaff4d09d7d"
+    },
+    {
+      "name": "webkit",
+      "executable": "/Users/aristotle/Library/Caches/ms-playwright/webkit-2336/pw_run.sh",
+      "sha256": "a85baad3d8c07173ac387a59b41500c382b21ed692afe0964d29aac247ccc63b"
+    }
+  ],
+  "shim": {
+    "root": "tests/fixtures/node_modules/@ts-drp",
+    "parent": "tests/fixtures/node_modules",
+    "rootAbsentNow": true,
+    "parentAbsentNow": true,
+    "requirePreAndPostAbsence": true,
+    "neverRemoveCallerOwnedShim": true
+  },
+  "bundleWrite": false,
+  "externalServerCommand": null,
+  "rootPreparationCorrection": "The root package does not expose bare playwright as a direct dependency; metadata is read from the installed @playwright/test exports. No installation, source edit or runtime retry.",
+  "prerequisites": [
+    "Original W0 gate accepted",
+    "Complete retained gate accepted",
+    "Supplemental bootstrap controls accounted for",
+    "Fresh exact collection and input freeze",
+    "Immediate readiness and custody recheck",
+    "Root one-shot runtime release"
+  ]
+}

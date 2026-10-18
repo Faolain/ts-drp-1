@@ -1,0 +1,62 @@
+{
+  "candidateGreenPatchSha256": "a0e72eee874611eba8bb1703c6ee28a1ad6064b200701efeb6991b78c7e50db0",
+  "legacyJoin": [
+    {
+      "kind": "displaced",
+      "ok": true,
+      "source": {
+        "author": "79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664",
+        "authorSequence": 1,
+        "intents": [],
+        "vertexDigest": "d0587ad95273c7e79e3690e26767e5eb5520347bd0b9d8f387808d8e15681d0e"
+      }
+    },
+    {
+      "kind": "empty",
+      "ok": true
+    }
+  ],
+  "publishedSettlement": [
+    {
+      "kind": "displaced",
+      "ok": true,
+      "source": {
+        "author": "79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664",
+        "authorSequence": 0,
+        "intents": [
+          {
+            "logicalTime": 1,
+            "operation": {
+              "value": 0,
+              "action": "add"
+            },
+            "operationCount": 1,
+            "operationIndex": 0
+          }
+        ],
+        "vertexDigest": "03b0c525861a30fcc33f8aed71488eda9f7db758889f2ec2e562a29399ca6ca9"
+      }
+    },
+    {
+      "kind": "displaced",
+      "ok": true,
+      "source": {
+        "author": "79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664",
+        "authorSequence": 1,
+        "intents": [
+          {
+            "logicalTime": 3,
+            "operation": {
+              "value": 1,
+              "action": "add"
+            },
+            "operationCount": 1,
+            "operationIndex": 0
+          }
+        ],
+        "vertexDigest": "cdff0040e53146bcd1a10f4b21968e1146bca7b3e990adac4765862318b6e1f0"
+      }
+    }
+  ]
+}
+

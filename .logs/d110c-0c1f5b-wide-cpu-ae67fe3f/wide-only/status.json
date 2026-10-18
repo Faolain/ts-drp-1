@@ -1,0 +1,35 @@
+{
+  "code": 1,
+  "signal": null,
+  "elapsedMs": 75083.345084,
+  "endedAt": "2026-09-06T07:35:21.785Z",
+  "watchdogActions": [],
+  "ownedProcessGroup": 40665,
+  "quiescent": true,
+  "observedOwnedMembers": [
+    {
+      "pid": 40665,
+      "ppid": 40447,
+      "pgid": 40665,
+      "status": "Ss",
+      "firstSeenMs": 1073.157167,
+      "lastSeenMs": 74210.390667
+    },
+    {
+      "pid": 40676,
+      "ppid": 40665,
+      "pgid": 40665,
+      "status": "S",
+      "firstSeenMs": 1073.167,
+      "lastSeenMs": 74210.394167
+    },
+    {
+      "pid": 40795,
+      "ppid": 40665,
+      "pgid": 40665,
+      "status": "R",
+      "firstSeenMs": 2270.842917,
+      "lastSeenMs": 74210.394459
+    }
+  ]
+}

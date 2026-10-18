@@ -1,0 +1,634 @@
+{
+  "valid": false,
+  "exactNames": true,
+  "exactFiles": true,
+  "success": false,
+  "total": 49,
+  "passed": 48,
+  "failed": 1,
+  "skipped": 0,
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suites": [
+    {
+      "file": "/private/tmp/d110c-f5b-green-fixture-exit-dtM3XF/checkout/tests/genesis-profile.test.ts",
+      "message": "",
+      "testExecError": null
+    },
+    {
+      "file": "/private/tmp/d110c-f5b-green-fixture-exit-dtM3XF/checkout/tests/phase-3g-v3-room-rebase-red.test.ts",
+      "message": "",
+      "testExecError": null
+    },
+    {
+      "file": "/private/tmp/d110c-f5b-green-fixture-exit-dtM3XF/checkout/tests/phase-5a-c-seal-safety-red.test.ts",
+      "message": "",
+      "testExecError": null
+    },
+    {
+      "file": "/private/tmp/d110c-f5b-green-fixture-exit-dtM3XF/checkout/tests/phase-5d-pacemaker-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "assertions": [
+    {
+      "file": "tests/genesis-profile.test.ts",
+      "ancestorTitles": [
+        "Phase 3b certified genesis"
+      ],
+      "fullName": "Phase 3b certified genesis [control] independently authors canonical all-signer genesis acceptance",
+      "status": "passed",
+      "title": "[control] independently authors canonical all-signer genesis acceptance",
+      "duration": 86.836333,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/genesis-profile.test.ts",
+      "ancestorTitles": [
+        "Phase 3b certified genesis"
+      ],
+      "fullName": "Phase 3b certified genesis [control] proves the exact bounded maximum record is 8190 bytes",
+      "status": "passed",
+      "title": "[control] proves the exact bounded maximum record is 8190 bytes",
+      "duration": 10.695750000000032,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/genesis-profile.test.ts",
+      "ancestorTitles": [
+        "Phase 3b certified genesis"
+      ],
+      "fullName": "Phase 3b certified genesis [RED readiness] requires exactly the two reserved certified APIs",
+      "status": "passed",
+      "title": "[RED readiness] requires exactly the two reserved certified APIs",
+      "duration": 0.19729200000000446,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/genesis-profile.test.ts",
+      "ancestorTitles": [
+        "Phase 3b certified genesis",
+        "GREEN-only certified capability behavior"
+      ],
+      "fullName": "Phase 3b certified genesis GREEN-only certified capability behavior installs and reopens delegated 2-of-3 and attested 3-of-4 material",
+      "status": "passed",
+      "title": "installs and reopens delegated 2-of-3 and attested 3-of-4 material",
+      "duration": 42.49287499999997,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/genesis-profile.test.ts",
+      "ancestorTitles": [
+        "Phase 3b certified genesis",
+        "GREEN-only certified capability behavior"
+      ],
+      "fullName": "Phase 3b certified genesis GREEN-only certified capability behavior rejects invalid quorum, signer cardinality and UTF-8 bounds",
+      "status": "passed",
+      "title": "rejects invalid quorum, signer cardinality and UTF-8 bounds",
+      "duration": 25.89991600000002,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/genesis-profile.test.ts",
+      "ancestorTitles": [
+        "Phase 3b certified genesis",
+        "GREEN-only certified capability behavior"
+      ],
+      "fullName": "Phase 3b certified genesis GREEN-only certified capability behavior rejects every anchor, carrier, certificate and signer cross-binding",
+      "status": "passed",
+      "title": "rejects every anchor, carrier, certificate and signer cross-binding",
+      "duration": 8.831291999999962,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/genesis-profile.test.ts",
+      "ancestorTitles": [
+        "Phase 3b certified genesis",
+        "GREEN-only certified capability behavior"
+      ],
+      "fullName": "Phase 3b certified genesis GREEN-only certified capability behavior rejects missing, duplicate, reordered and mismatched certificate signers",
+      "status": "passed",
+      "title": "rejects missing, duplicate, reordered and mismatched certificate signers",
+      "duration": 5.702584000000002,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/genesis-profile.test.ts",
+      "ancestorTitles": [
+        "Phase 3b certified genesis",
+        "GREEN-only certified capability behavior"
+      ],
+      "fullName": "Phase 3b certified genesis GREEN-only certified capability behavior installs and reopens the 8190-byte maximum and rejects open bounds and stored-scalar drift",
+      "status": "passed",
+      "title": "installs and reopens the 8190-byte maximum and rejects open bounds and stored-scalar drift",
+      "duration": 89.93379199999993,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/genesis-profile.test.ts",
+      "ancestorTitles": [
+        "Phase 3b certified genesis",
+        "GREEN-only certified capability behavior"
+      ],
+      "fullName": "Phase 3b certified genesis GREEN-only certified capability behavior keeps creator and certified records terminal and exports no live certified authority",
+      "status": "passed",
+      "title": "keeps creator and certified records terminal and exports no live certified authority",
+      "duration": 16.790250000000015,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED separates plane-local stores, authenticates both anchors and bootstraps the empty target once",
+      "status": "passed",
+      "title": "separates plane-local stores, authenticates both anchors and bootstraps the empty target once",
+      "duration": 1185.900917,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED recovers a committed target bootstrap after a pre-journal crash without issuing a duplicate",
+      "status": "passed",
+      "title": "recovers a committed target bootstrap after a pre-journal crash without issuing a duplicate",
+      "duration": 2.9500000000000455,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED does not bootstrap an inconsistent issuance lineage after recovery installs journal genesis",
+      "status": "passed",
+      "title": "does not bootstrap an inconsistent issuance lineage after recovery installs journal genesis",
+      "duration": 3.792417000000114,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED rejects wrong readiness scope and snapshot scope before bootstrap or recovery",
+      "status": "passed",
+      "title": "rejects wrong readiness scope and snapshot scope before bootstrap or recovery",
+      "duration": 5.223292000000129,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED retires structural source rows, accepts the full configured plane bound, and gates new issue on rebase",
+      "status": "passed",
+      "title": "retires structural source rows, accepts the full configured plane bound, and gates new issue on rebase",
+      "duration": 594.2965000000002,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED orders exact rebase and transform inputs while expire and held review perform no issue",
+      "status": "passed",
+      "title": "orders exact rebase and transform inputs while expire and held review perform no issue",
+      "duration": 7.7947499999997945,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED closes one source exactly once after every child has a terminal outcome",
+      "status": "passed",
+      "title": "closes one source exactly once after every child has a terminal outcome",
+      "duration": 2.8132079999995767,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED preserves published source work and completes pending work only after target acceptance",
+      "status": "passed",
+      "title": "preserves published source work and completes pending work only after target acceptance",
+      "duration": 5.035667000000103,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED batches sixteen compatible rebases behind one target signature",
+      "status": "passed",
+      "title": "batches sixteen compatible rebases behind one target signature",
+      "duration": 4.010041999999885,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED splits seventeen compatible rebases into sixteen plus one",
+      "status": "passed",
+      "title": "splits seventeen compatible rebases into sixteen plus one",
+      "duration": 4.4534169999997175,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED refuses a foreign-author displaced intent before signing or issuing",
+      "status": "passed",
+      "title": "refuses a foreign-author displaced intent before signing or issuing",
+      "duration": 1.6104580000001079,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED sorts displaced pages before assigning fresh target logical times",
+      "status": "passed",
+      "title": "sorts displaced pages before assigning fresh target logical times",
+      "duration": 2.2629589999996824,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED suppresses an accepted exact identity before issue and rejects changed bytes",
+      "status": "passed",
+      "title": "suppresses an accepted exact identity before issue and rejects changed bytes",
+      "duration": 3.6035839999999553,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED keeps the source pending and terminally exposes target issue or publication failure",
+      "status": "passed",
+      "title": "keeps the source pending and terminally exposes target issue or publication failure",
+      "duration": 11.133874999999989,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED keeps a failed source completion pending and retries it on reopen",
+      "status": "passed",
+      "title": "keeps a failed source completion pending and retries it on reopen",
+      "duration": 3.7112090000000535,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED fails unknown policy and unstable transform identity before target issuance",
+      "status": "passed",
+      "title": "fails unknown policy and unstable transform identity before target issuance",
+      "duration": 8.865374999999858,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED keeps a transformed source pending when the product projection rejects its replacement",
+      "status": "passed",
+      "title": "keeps a transformed source pending when the product projection rejects its replacement",
+      "duration": 2.0289590000002136,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED keeps a recovered projection-rejected replacement and its source pending without reissue",
+      "status": "passed",
+      "title": "keeps a recovered projection-rejected replacement and its source pending without reissue",
+      "duration": 1.6619170000003578,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED rejects partial, extra and accessor-backed policy evidence before consuming a source row",
+      "status": "passed",
+      "title": "rejects partial, extra and accessor-backed policy evidence before consuming a source row",
+      "duration": 2.096875000000182,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED keeps the reserved terminal activation outside the real chat and zone displacement policies",
+      "status": "passed",
+      "title": "keeps the reserved terminal activation outside the real chat and zone displacement policies",
+      "duration": 160.78229199999987,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5a-c atomic seal safety RED"
+      ],
+      "fullName": "Phase 5a-c atomic seal safety RED executes independent registry, identity, schema and transaction controls before readiness",
+      "status": "passed",
+      "title": "executes independent registry, identity, schema and transaction controls before readiness",
+      "duration": 10.257874999999956,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5a-c atomic seal safety RED"
+      ],
+      "fullName": "Phase 5a-c atomic seal safety RED typechecks and executes the exact bounded n=4 Quint witness",
+      "status": "passed",
+      "title": "typechecks and executes the exact bounded n=4 Quint witness",
+      "duration": 2592.7307090000004,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5a-c atomic seal safety RED"
+      ],
+      "fullName": "Phase 5a-c atomic seal safety RED [RED readiness] requires the complete four-owner atomic product graph",
+      "status": "passed",
+      "title": "[RED readiness] requires the complete four-owner atomic product graph",
+      "duration": 0.34429199999976845,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5a-c atomic seal safety RED"
+      ],
+      "fullName": "Phase 5a-c atomic seal safety RED binds a genuine certified roster key to its independent signer ID",
+      "status": "passed",
+      "title": "binds a genuine certified roster key to its independent signer ID",
+      "duration": 126.68208400000003,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5a-c atomic seal safety RED"
+      ],
+      "fullName": "Phase 5a-c atomic seal safety RED authenticates an exact sorted 3-of-4 QC and rejects mixed or duplicate votes",
+      "status": "passed",
+      "title": "authenticates an exact sorted 3-of-4 QC and rejects mixed or duplicate votes",
+      "duration": 36.604833000000326,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5a-c atomic seal safety RED"
+      ],
+      "fullName": "Phase 5a-c atomic seal safety RED releases only a detached durable carrier after the exact state-slot-outbox commit",
+      "status": "passed",
+      "title": "releases only a detached durable carrier after the exact state-slot-outbox commit",
+      "duration": 19.01616699999977,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-5a-c-seal-safety-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5a-c atomic seal safety RED"
+      ],
+      "fullName": "Phase 5a-c atomic seal safety RED rejects wrong authority, stale revision and conflicting same-slot bytes without release",
+      "status": "passed",
+      "title": "rejects wrong authority, stale revision and conflicting same-slot bytes without release",
+      "duration": 23.39883400000008,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-5d-pacemaker-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5d model-first pacemaker RED"
+      ],
+      "fullName": "Phase 5d model-first pacemaker RED pins the governed profile, exact runtime boundary, and causal mutant roster",
+      "status": "passed",
+      "title": "pins the governed profile, exact runtime boundary, and causal mutant roster",
+      "duration": 2.298416999999972,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-5d-pacemaker-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5d model-first pacemaker RED"
+      ],
+      "fullName": "Phase 5d model-first pacemaker RED causally rejects every named pacemaker mutant",
+      "status": "passed",
+      "title": "causally rejects every named pacemaker mutant",
+      "duration": 14.902166000000022,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-5d-pacemaker-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5d model-first pacemaker RED"
+      ],
+      "fullName": "Phase 5d model-first pacemaker RED authenticates the frozen proposal, leader vote, QCs and round-change evidence independently",
+      "status": "passed",
+      "title": "authenticates the frozen proposal, leader vote, QCs and round-change evidence independently",
+      "duration": 46.37141699999995,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-5d-pacemaker-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5d model-first pacemaker RED"
+      ],
+      "fullName": "Phase 5d model-first pacemaker RED hash-binds every closed ITF trace and rejects event-name-only state drift",
+      "status": "passed",
+      "title": "hash-binds every closed ITF trace and rejects event-name-only state drift",
+      "duration": 11972.692083,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-5d-pacemaker-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5d model-first pacemaker RED"
+      ],
+      "fullName": "Phase 5d model-first pacemaker RED typechecks and executes non-vacuous model actions before runtime readiness",
+      "status": "passed",
+      "title": "typechecks and executes non-vacuous model actions before runtime readiness",
+      "duration": 5765.378833000001,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-5d-pacemaker-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5d model-first pacemaker RED"
+      ],
+      "fullName": "Phase 5d model-first pacemaker RED typechecks the exact future fixture boundary before opening product readiness",
+      "status": "passed",
+      "title": "typechecks the exact future fixture boundary before opening product readiness",
+      "duration": 2119.821832999998,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-5d-pacemaker-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5d model-first pacemaker RED"
+      ],
+      "fullName": "Phase 5d model-first pacemaker RED executes the real pinned Apalache backend rather than a transcript",
+      "status": "passed",
+      "title": "executes the real pinned Apalache backend rather than a transcript",
+      "duration": 185790.115417,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-5d-pacemaker-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5d model-first pacemaker RED"
+      ],
+      "fullName": "Phase 5d model-first pacemaker RED runs a real fake-indexeddb additive schema-v3 control before runtime readiness",
+      "status": "passed",
+      "title": "runs a real fake-indexeddb additive schema-v3 control before runtime readiness",
+      "duration": 10.59666699997615,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-5d-pacemaker-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5d model-first pacemaker RED"
+      ],
+      "fullName": "Phase 5d model-first pacemaker RED keeps canonical CutValue and registered vote identities independently recomputable",
+      "status": "passed",
+      "title": "keeps canonical CutValue and registered vote identities independently recomputable",
+      "duration": 10.65333300002385,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-5d-pacemaker-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5d model-first pacemaker RED"
+      ],
+      "fullName": "Phase 5d model-first pacemaker RED [RED readiness] requires the complete nine-owner pacemaker runtime graph",
+      "status": "passed",
+      "title": "[RED readiness] requires the complete nine-owner pacemaker runtime graph",
+      "duration": 0.1720410000125412,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-5d-pacemaker-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5d model-first pacemaker RED"
+      ],
+      "fullName": "Phase 5d model-first pacemaker RED binds runtime exports to the governed timeout and UTF-8 leader profile",
+      "status": "passed",
+      "title": "binds runtime exports to the governed timeout and UTF-8 leader profile",
+      "duration": 127.77345799998147,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-5d-pacemaker-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5d model-first pacemaker RED"
+      ],
+      "fullName": "Phase 5d model-first pacemaker RED keeps registered protocol verification as the sole proposal and round-change authority",
+      "status": "passed",
+      "title": "keeps registered protocol verification as the sole proposal and round-change authority",
+      "duration": 2.986333000008017,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "tests/phase-5d-pacemaker-red.test.ts",
+      "ancestorTitles": [
+        "Phase 5d model-first pacemaker RED"
+      ],
+      "fullName": "Phase 5d model-first pacemaker RED replays every checked trace through the genuine voter, pacemaker, and fake-IDB store",
+      "status": "failed",
+      "title": "replays every checked trace through the genuine voter, pacemaker, and fake-IDB store",
+      "duration": 10927.524875000003,
+      "failureMessages": [
+        "Error: Test timed out in 10000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n    at makeTimeoutError (file:///private/tmp/d110c-f5b-green-fixture-exit-dtM3XF/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:915:16)\n    at rejectTimeoutError (file:///private/tmp/d110c-f5b-green-fixture-exit-dtM3XF/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:858:13)\n    at resolve (file:///private/tmp/d110c-f5b-green-fixture-exit-dtM3XF/checkout/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:865:6)"
+      ],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "94fbf00d33cf54fb73a1c8d92657ef545e1803556282d6002c154074d899e1bd"
+}

@@ -1,0 +1,15 @@
+docs/production-hardening/production-hardening-tdd-plan-v2.md
+examples/v3-room/src/index.ts
+packages/node/src/creator-adoption-activate.ts
+packages/node/src/creator-adoption-commit.ts
+packages/node/src/creator-adoption.ts
+packages/node/src/v3-live.ts
+packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts
+packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts
+packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts
+tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts
+tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts
+tests/fixtures/phase-6b-d110c-b/hot-adoption-contract.ts
+tests/fixtures/phase-6b-d110c-b/source-shape.mjs
+tests/fixtures/phase-6b/runtime-reclamation-contract.ts
+tests/phase-6b-d110c-b-hot-adoption.test.ts

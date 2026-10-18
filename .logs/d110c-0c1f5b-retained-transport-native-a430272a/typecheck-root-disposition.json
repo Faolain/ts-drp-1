@@ -1,0 +1,24 @@
+{
+  "authority": "Signed native-continuation plan a430272a0e8dd361c9139e66c140870d4ece7e1f and original root attribution",
+  "originalDisposition": ".logs/d110c-0c1f5b-retained-transport-772e96bd/typecheck-root-disposition.json",
+  "originalTests": "772e96bdad4f1b881fd547e09e849c97226cb980",
+  "signedCheckout": "a430272a0e8dd361c9139e66c140870d4ece7e1f",
+  "targetDiagnostics": 13,
+  "externalDiagnostics": 0,
+  "changedLineDiagnostics": 0,
+  "authorizedHelperRegionOverlap": true,
+  "overlap": {
+    "code": 2322,
+    "currentLine": 461,
+    "baselineLine": 457,
+    "token": "return",
+    "length": 6,
+    "owner": "fakeIssuanceStore",
+    "cause": "Inherited missing-required-settlement-method return typing"
+  },
+  "owner": "Retained transport fixture static contract",
+  "deadline": "Parent static closure",
+  "notTypecheckPass": true,
+  "preservePreflightStatus": 1,
+  "noTypeEdits": true
+}

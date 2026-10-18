@@ -1,0 +1,352 @@
+{
+	"schemaVersion": 1,
+	"profile": "drp-canonical-profile-1",
+	"format": "declarative-data-v1",
+	"authoritativeMarkdown": {
+		"path": "docs/protocol/canonical-tag-codec-v1.md",
+		"sha256": "40f817866619931cd13461393005ea2a796de343591e3ec88be404664e8e5036"
+	},
+	"recursiveProduction": {
+		"start": "value",
+		"alternatives": [
+			"null",
+			"false",
+			"true",
+			"integer",
+			"float64",
+			"string",
+			"bytes",
+			"array",
+			"object",
+			"map",
+			"set",
+			"float32-array",
+			"float64-array",
+			"int32-array",
+			"uint32-array"
+		],
+		"children": {
+			"array": ["value"],
+			"object": ["string", "value"],
+			"map": ["value", "value"],
+			"set": ["value"]
+		}
+	},
+	"tags": [
+		{ "name": "null", "octet": 0, "payload": "unit" },
+		{ "name": "false", "octet": 1, "payload": "unit" },
+		{ "name": "true", "octet": 2, "payload": "unit" },
+		{ "name": "integer", "octet": 3, "payload": "zigzag-varuint" },
+		{ "name": "float64", "octet": 4, "payload": "fixed-float64" },
+		{ "name": "string", "octet": 5, "payload": "varuint-byte-length-utf8" },
+		{ "name": "bytes", "octet": 6, "payload": "varuint-byte-length-bytes" },
+		{ "name": "array", "octet": 7, "payload": "varuint-count-values" },
+		{ "name": "object", "octet": 8, "payload": "varuint-count-key-values" },
+		{ "name": "map", "octet": 9, "payload": "varuint-count-key-values" },
+		{ "name": "set", "octet": 10, "payload": "varuint-count-values" },
+		{ "name": "float32-array", "octet": 11, "payload": "varuint-count-float32" },
+		{ "name": "float64-array", "octet": 12, "payload": "varuint-count-float64" },
+		{ "name": "int32-array", "octet": 13, "payload": "varuint-count-int32" },
+		{ "name": "uint32-array", "octet": 14, "payload": "varuint-count-uint32" }
+	],
+	"primitives": {
+		"varuint": {
+			"groupBits": 7,
+			"payloadMask": 127,
+			"continuationMask": 128,
+			"groupOrder": "least-significant-first",
+			"minimal": true,
+			"maxBytes": 9,
+			"maxValue": "18014398509481983"
+		},
+		"zigzag": {
+			"nonNegative": "2*n",
+			"negative": "-2*n-1",
+			"minimum": "-9007199254740991",
+			"maximum": "9007199254740991"
+		},
+		"numbers": {
+			"byteOrder": "big",
+			"scalarFloatWidth": 8,
+			"integerBeforeFloat": true,
+			"finiteOnly": true,
+			"negativeZero": "normalize-encode-reject-decode",
+			"unsafeIntegralFloatDecode": "unresolved-outside-governed-corpus"
+		},
+		"strings": {
+			"encoding": "utf-8",
+			"lengthUnit": "bytes",
+			"fatalDecode": true,
+			"rejectUnpairedSurrogates": true
+		}
+	},
+	"collections": {
+		"lengthEncoding": "varuint",
+		"arrays": {
+			"dense": true,
+			"children": "value"
+		},
+		"objects": {
+			"sourcePrototypes": ["ordinary-object-prototype", "null-prototype"],
+			"keys": "string-only",
+			"properties": "own-enumerable-data-only",
+			"decodedPrototype": "null"
+		},
+		"maps": {
+			"key": "value",
+			"value": "value"
+		},
+		"sets": {
+			"value": "value"
+		},
+		"typedArrays": {
+			"float32-array": {
+				"width": 4,
+				"element": "float32",
+				"byteOrder": "big",
+				"finiteOnly": true,
+				"negativeZero": "normalize-encode-reject-decode"
+			},
+			"float64-array": {
+				"width": 8,
+				"element": "float64",
+				"byteOrder": "big",
+				"finiteOnly": true,
+				"negativeZero": "normalize-encode-reject-decode"
+			},
+			"int32-array": {
+				"width": 4,
+				"element": "int32",
+				"byteOrder": "big",
+				"finiteOnly": false,
+				"negativeZero": "not-applicable"
+			},
+			"uint32-array": {
+				"width": 4,
+				"element": "uint32",
+				"byteOrder": "big",
+				"finiteOnly": false,
+				"negativeZero": "not-applicable"
+			}
+		}
+	},
+	"ordering": {
+		"comparator": "unsigned-lexicographic-full-encoded-bytes",
+		"direction": "ascending",
+		"mapObjectBy": "encoded-key-bytes",
+		"setBy": "encoded-value-bytes",
+		"duplicates": "reject-equal-encoded-bytes"
+	},
+	"limits": {
+		"defaults": {
+			"maxBytes": 268435456,
+			"maxDepth": 128,
+			"maxItems": 1000000
+		},
+		"depth": {
+			"root": 0,
+			"comparison": "greater-than"
+		},
+		"items": {
+			"comparison": "greater-than",
+			"valueCharge": 1,
+			"containerPrecharge": true,
+			"arraySetMultiplier": 1,
+			"objectMapMultiplier": 2,
+			"typedArrayMultiplier": 1,
+			"encodeImmediateKinds": ["array", "map", "set"]
+		},
+		"bytes": {
+			"comparison": "greater-than"
+		}
+	},
+	"rejectionPrecedence": {
+		"outer": ["BYTE_LIMIT", "VALUE", "TRAILING_BYTES"],
+		"valueEntry": ["DEPTH_LIMIT", "ITEM_LIMIT", "TRUNCATED", "UNKNOWN_TAG"],
+		"varuint": ["TRUNCATED", "VARUINT_RANGE_OCTETS", "VARUINT_NON_MINIMAL", "VARUINT_RANGE_VALUE"],
+		"integer": ["VARUINT", "INTEGER_RANGE"],
+		"float": ["TRUNCATED", "FLOAT_NON_FINITE", "FLOAT_NEGATIVE_ZERO", "FLOAT_SAFE_INTEGRAL"],
+		"keyValueEntry": ["KEY", "KEY_ORDER_OR_DUPLICATE", "VALUE", "OBJECT_KEY_TYPE"],
+		"set": ["DECODE_ELEMENT", "SET_ORDER_OR_DUPLICATE", "NEXT_ELEMENT"],
+		"typedArray": ["TRUNCATED", "ELEMENT_ORDER", "TYPED_NON_FINITE", "TYPED_NEGATIVE_ZERO"],
+		"finish": ["TRAILING_BYTES"]
+	},
+	"rules": [
+		{
+			"id": "TAG_TABLE_EXHAUSTIVE",
+			"statement": "Exactly the fifteen declared tag octets are governed, and every other initial octet is rejected."
+		},
+		{
+			"id": "VALUE_DISPATCH_EXACT",
+			"statement": "The initial tag selects exactly one payload production, which consumes bytes only according to that production."
+		},
+		{
+			"id": "VARUINT_MINIMAL",
+			"statement": "Varuints use minimal little-endian seven-bit groups with continuation bit 128 and no redundant terminal zero group."
+		},
+		{
+			"id": "VARUINT_RANGE",
+			"statement": "Varuint octet-count range is checked before minimality, while decoded-value range is checked after minimality."
+		},
+		{
+			"id": "ZIGZAG_SAFE_INTEGER",
+			"statement": "After varuint validation, safe integers map by twice n when non-negative and negative twice n minus one when negative."
+		},
+		{
+			"id": "LENGTHS_COUNTS_VARUINT",
+			"statement": "Every payload byte length and every collection or typed-array element count uses the governed varuint production."
+		},
+		{
+			"id": "BIG_ENDIAN_NUMERICS",
+			"statement": "All fixed-width scalar and typed numeric payloads place their most-significant octet first."
+		},
+		{
+			"id": "INTEGER_BEFORE_FLOAT",
+			"statement": "Every finite safe integral scalar uses the integer tag, while governed safe-integral Float64 payloads are rejected."
+		},
+		{
+			"id": "FLOAT_FINITE",
+			"statement": "Scalar Float64 values must be finite on both encoding and governed decoding."
+		},
+		{
+			"id": "NEGATIVE_ZERO_NORMALIZE",
+			"statement": "Floating negative zero normalizes to positive zero on encoding and is rejected when present in a floating payload."
+		},
+		{
+			"id": "STRING_UTF8",
+			"statement": "Strings contain Unicode scalar values and use fatal, shortest-form UTF-8 with an octet-count prefix; unavailable declared string payloads reject as UTF8_INVALID because acquisition and decoding form one validation step."
+		},
+		{
+			"id": "STRING_UNPAIRED_SURROGATE",
+			"statement": "A source string containing an unpaired UTF-16 surrogate is outside the encodable string domain."
+		},
+		{
+			"id": "BYTES_LENGTH",
+			"statement": "The bytes length is the exact number of following uninterpreted octets and is not a character count."
+		},
+		{
+			"id": "ARRAY_DENSE",
+			"statement": "Arrays contain every indexed element from zero through count minus one, in order, without holes."
+		},
+		{
+			"id": "OBJECT_PLAIN_NULL_PROTOTYPE",
+			"statement": "Only ordinary-prototype and null-prototype source objects encode, and decoded objects always have a null prototype."
+		},
+		{
+			"id": "OBJECT_STRING_KEYS",
+			"statement": "Every object key is a string encoded through the complete recursive string value production."
+		},
+		{
+			"id": "OBJECT_DATA_PROPERTIES",
+			"statement": "Objects encode own enumerable string-keyed data properties, reject symbol keys and enumerable accessors, and ignore non-enumerable strings."
+		},
+		{
+			"id": "MAP_ENCODED_KEY_ORDER",
+			"statement": "Object and map entries sort ascending by unsigned lexicographic comparison of each complete encoded key."
+		},
+		{
+			"id": "SET_ENCODED_VALUE_ORDER",
+			"statement": "Set elements sort ascending by unsigned lexicographic comparison of each complete encoded value."
+		},
+		{
+			"id": "DUPLICATE_CANONICAL_REJECT",
+			"statement": "Equal complete encoded map keys or set values are rejected on encoding and decoding."
+		},
+		{
+			"id": "TYPED_ARRAY_WIDTH",
+			"statement": "Float32, Int32 and Uint32 elements occupy four octets, while Float64 elements occupy eight octets."
+		},
+		{
+			"id": "TYPED_ARRAY_FINITE",
+			"statement": "Every floating typed-array element must be finite and must obey the governed negative-zero rule."
+		},
+		{
+			"id": "TRAILING_REJECT",
+			"statement": "A canonical input contains exactly one complete root value and no trailing octets."
+		},
+		{
+			"id": "UNKNOWN_TAG_REJECT",
+			"statement": "An initial octet not declared by the exhaustive tag table is rejected as an unknown tag."
+		},
+		{
+			"id": "NON_MINIMAL_REJECT",
+			"statement": "A non-minimal varuint is rejected wherever a signed payload, length or count consumes a varuint."
+		},
+		{
+			"id": "RESOURCE_LIMITS",
+			"statement": "Byte, depth and decoder-wide item limits use the declared defaults, root depth and container precharges."
+		},
+		{
+			"id": "CYCLE_REJECT",
+			"statement": "Encoding rejects re-entry into any value that is already active on the recursive traversal path."
+		},
+		{
+			"id": "UNSUPPORTED_TYPE_REJECT",
+			"statement": "A source value outside the declared primitive, collection, bytes and typed-array domain is rejected."
+		},
+		{
+			"id": "DECODE_REENCODE_IDENTITY",
+			"statement": "Every accepted byte string in the governed corpus decodes to a value that re-encodes to identical bytes."
+		},
+		{
+			"id": "EXAMPLES_SUBORDINATE",
+			"statement": "Binding examples test conformance but remain subordinate to the recursive productions for every combination."
+		},
+		{
+			"id": "UNSAFE_INTEGRAL_FLOAT_UNRESOLVED",
+			"statement": "Unsafe-integral scalar Float64 decoding is unresolved outside the governed corpus and is not ratified here."
+		}
+	],
+	"workedExamples": [
+		{
+			"id": "tag-null",
+			"value": null,
+			"hex": "00",
+			"bindsRules": ["TAG_TABLE_EXHAUSTIVE", "VALUE_DISPATCH_EXACT"]
+		},
+		{
+			"id": "integer-negative-one",
+			"value": -1,
+			"hex": "0301",
+			"bindsRules": ["INTEGER_BEFORE_FLOAT", "ZIGZAG_SAFE_INTEGER", "VARUINT_MINIMAL"]
+		},
+		{
+			"id": "float64-fraction",
+			"value": 1.5,
+			"hex": "043ff8000000000000",
+			"bindsRules": ["BIG_ENDIAN_NUMERICS", "FLOAT_FINITE", "INTEGER_BEFORE_FLOAT"]
+		},
+		{
+			"id": "string-astral",
+			"value": "😀",
+			"hex": "0504f09f9880",
+			"bindsRules": ["STRING_UTF8", "LENGTHS_COUNTS_VARUINT"]
+		},
+		{
+			"id": "object-encoded-key-order",
+			"value": {
+				"aa": 1,
+				"z": 2
+			},
+			"hex": "080205017a0304050261610302",
+			"bindsRules": ["MAP_ENCODED_KEY_ORDER", "OBJECT_STRING_KEYS", "DUPLICATE_CANONICAL_REJECT"]
+		},
+		{
+			"id": "float32-array-big-endian-normalized-zero",
+			"value": {
+				"$type": "typed-array",
+				"name": "float32-array",
+				"values": [1.5, -2.25, { "$number": "-0" }]
+			},
+			"hex": "0b033fc00000c010000000000000",
+			"bindsRules": ["TYPED_ARRAY_WIDTH", "BIG_ENDIAN_NUMERICS", "NEGATIVE_ZERO_NORMALIZE", "TYPED_ARRAY_FINITE"]
+		}
+	],
+	"conformance": {
+		"examples": "binding-but-subordinate-to-production-rules",
+		"novelCombinations": "evaluate-from-recursive-production-only",
+		"decoderProperty": "accepted-bytes-reencode-identically",
+		"implementationImports": false,
+		"executableSource": false
+	}
+}

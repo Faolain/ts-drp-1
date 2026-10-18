@@ -1,0 +1,11 @@
+# Bounded hot settlement readiness correction
+
+Root independently accepted the focused-01 missing-hot-drain attribution. Its full 45-assertion reporter remains untouched. This batch changes only the existing room production owner.
+
+Hot settlement adoption now invokes the existing `publishAccepted` and `drainRebaseOutbox` after authenticated projection-base installation/replay and current close rebind, inside the existing terminal-failure containment. The existing plan writer resets the old epoch fence based on genuine issued preimage epoch; existing atomic fence issue/publication precedes ordinary work and replacements. No new fence, plan, receipt, callback or authority representation is introduced.
+
+Concurrency source audit found that the constant startup `rebasePromise` is insufficient as a hot-adoption barrier: public `issue` awaits it, and queued issue drains run independently of the lifetime queue. The existing `creatorSuccessorAdoptionTask` is set synchronously when adoption is scheduled and cleared only after it settles. The settlement-only `issueOwned` gate now rejects queued ordinary requests while this task is pending, before dereferencing/invoking `activeHandle.issueLocal`, signing, or durable issue, using the existing `v3 room live plane is unavailable` error surface. It covers prequeued work, later queued work and split recursion. Internal `issueSettlement` remains direct, allowing the transition to establish its own readiness.
+
+There is no new waiting/retry policy: awaiting the adoption task from an application callback's issue request could self-deadlock. Requests already executing Node issue retain the registration captured by their invoked handle; they cannot change to the successor when room `activeHandle` changes. Node `issueLocal` rejects blueprint-closing/nonactive/terminal registrations, and `issueOneVertex` checks current registration again. The existing predecessor close/adoption ownership is unchanged. Root explicitly chose this fail-closed readiness composition and authorized one subsequent focused run after static/build checks.
+
+Legacy creator-trusted-v1 ordinary issue and hot adoption are unchanged. No accepted test, fixture, limit, callback contract or public token was changed. No claim is made that retained concurrency controls have yet passed; this is the source rationale for the bounded correction.

@@ -1,0 +1,16 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "git",
+  "args": [
+    "diff",
+    "--cached",
+    "--check",
+    "--",
+    ".",
+    ":(exclude).logs/d110c-w0-current-profile-acceptance-61ea93f6/combined-plan-format/stderr",
+    ":(exclude).logs/d110c-w0-isolated-7efe33dd/runtime-w0/stderr.log",
+    ":(exclude).logs/d110c-w0-isolated-7efe33dd/source-overlay.patch",
+    ":(exclude).logs/d110c-w0-regression-readiness-7efe33dd/runtime-w0/stderr.log"
+  ],
+  "start": "2026-09-06T12:19:45.472Z"
+}

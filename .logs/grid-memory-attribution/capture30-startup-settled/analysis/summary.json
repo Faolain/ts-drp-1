@@ -1,0 +1,2127 @@
+{
+  "status": "Completed read-only analysis of three completed snapshots; capture run later failed final accounting guard; full diagnostic completion and final cold reopen NOT verified.",
+  "analyzer": {
+    "name": "@memlab/heap-analysis",
+    "version": "2.0.5",
+    "dependencyLockHash": "49182cc863293accfeebf4235c303a58c42fcbcaac551d2a1de80e3aa799f949"
+  },
+  "currentFactory": {
+    "id": 220127,
+    "globalId": 6945,
+    "path": "synthetic root1 -> shortcut2 global6945 -> property indexedDB -> FDBFactory220127",
+    "databaseMapId": 349565
+  },
+  "data": [
+    {
+      "transition": 10,
+      "snapshotHash": "04559ceadae20eac4b7c99d6df6f12af647c51b6286d201fadf1063acf60f5f2",
+      "graphShallowBytes": 165733257,
+      "nodeCount": 879877,
+      "currentDatabaseCount": 257,
+      "currentRawStoreCount": 1097,
+      "recordsAndIndexesAnchors": 2194,
+      "recordsAndIndexesRetainedBytes": 24595715,
+      "rawStoreRetainedBytes": 26260411,
+      "rawDatabaseRetainedBytes": 26416411,
+      "rawDatabaseRemainderGraphBytes": 139316846,
+      "partitionGaps": [],
+      "unmatchedRawOwners": [],
+      "currentRooms": 64,
+      "totalRealRooms": 137,
+      "noncurrentRooms": 73,
+      "totalRealRegistrations": 137,
+      "currentRegistrations": 64,
+      "noncurrentStrongRoomPaths": {
+        "fixture-peer-input": 63,
+        "vitest-onFinished": 9,
+        "other-strong-path": 1
+      },
+      "onFinished": {
+        "id": 233205,
+        "type": "object",
+        "name": "Array",
+        "retainedSize": 34680,
+        "shallowSize": 32,
+        "properties": [
+          {
+            "name": "__proto__",
+            "target": {
+              "id": 74405,
+              "type": "object",
+              "name": "Array",
+              "retainedSize": 7376,
+              "shallowSize": 32
+            }
+          }
+        ],
+        "elementCount": 10
+      },
+      "observerContainers": [
+        {
+          "property": "stores",
+          "id": 582667,
+          "retained": 1864
+        },
+        {
+          "property": "planes",
+          "id": 582669,
+          "retained": 1864
+        },
+        {
+          "property": "commits",
+          "id": 582671,
+          "retained": 704
+        },
+        {
+          "property": "advances",
+          "id": 582673,
+          "retained": 1379419
+        },
+        {
+          "property": "issueAttempts",
+          "id": 582675,
+          "retained": 704
+        },
+        {
+          "property": "commitHandles",
+          "id": 582677,
+          "retained": 3656
+        },
+        {
+          "property": "issuePlans",
+          "id": 582679,
+          "retained": 23656
+        },
+        {
+          "property": "timeline",
+          "id": 582681,
+          "retained": 11128
+        },
+        {
+          "property": "ambiguities",
+          "id": 582683,
+          "retained": 32
+        },
+        {
+          "property": "publications",
+          "id": 582685,
+          "retained": 9680
+        },
+        {
+          "property": "planWrites",
+          "id": 582687,
+          "retained": 21504
+        },
+        {
+          "property": "prunes",
+          "id": 582689,
+          "retained": 136240
+        },
+        {
+          "property": "cleanup",
+          "id": 582691,
+          "retained": 391488
+        },
+        {
+          "property": "snapshots",
+          "id": 582693,
+          "retained": 32
+        },
+        {
+          "property": "closeGraphs",
+          "id": 582695,
+          "retained": 32
+        }
+      ],
+      "families": [
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:objects:records",
+          "retainedBytes": 52608
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:objects:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:generations:records",
+          "retainedBytes": 337886
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:generations:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:blobs:records",
+          "retainedBytes": 2805104
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:blobs:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:promotions:records",
+          "retainedBytes": 638672
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:promotions:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:storageMeta:records",
+          "retainedBytes": 24064
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:storageMeta:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:voteSlots:records",
+          "retainedBytes": 5632
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:voteSlots:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:signerState:records",
+          "retainedBytes": 5632
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:signerState:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:voteOutbox:records",
+          "retainedBytes": 5632
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:voteOutbox:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:sealEvidence:records",
+          "retainedBytes": 5632
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:sealEvidence:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-issuance-v1:lineages:records",
+          "retainedBytes": 41984
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-issuance-v1:lineages:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-issuance-v1:issuedRecords:records",
+          "retainedBytes": 1370084
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-issuance-v1:issuedRecords:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-issuance-v1:issuanceOutbox:records",
+          "retainedBytes": 653792
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-issuance-v1:issuanceOutbox:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-issuance-v1:settlementPlans:records",
+          "retainedBytes": 44672
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-issuance-v1:settlementPlans:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-live-journal-v1:scopes:records",
+          "retainedBytes": 1673792
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-live-journal-v1:scopes:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-live-journal-v1:acceptedEntries:records",
+          "retainedBytes": 2463160
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-live-journal-v1:acceptedEntries:rawIndexes",
+          "retainedBytes": 1340592
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:objects:records",
+          "retainedBytes": 88
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:objects:rawIndexes",
+          "retainedBytes": 184
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:generations:records",
+          "retainedBytes": 88
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:generations:rawIndexes",
+          "retainedBytes": 184
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:blobs:records",
+          "retainedBytes": 88
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:blobs:rawIndexes",
+          "retainedBytes": 184
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:promotions:records",
+          "retainedBytes": 88
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:promotions:rawIndexes",
+          "retainedBytes": 184
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:storageMeta:records",
+          "retainedBytes": 376
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:storageMeta:rawIndexes",
+          "retainedBytes": 184
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:voteSlots:records",
+          "retainedBytes": 25958
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:voteSlots:rawIndexes",
+          "retainedBytes": 184
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:signerState:records",
+          "retainedBytes": 31794
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:signerState:rawIndexes",
+          "retainedBytes": 184
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:voteOutbox:records",
+          "retainedBytes": 26222
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:voteOutbox:rawIndexes",
+          "retainedBytes": 184
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:sealEvidence:records",
+          "retainedBytes": 61203
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:sealEvidence:rawIndexes",
+          "retainedBytes": 184
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-snapshot-quarantine-v1:scopes:records",
+          "retainedBytes": 687872
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-snapshot-quarantine-v1:scopes:rawIndexes",
+          "retainedBytes": 112272
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-snapshot-quarantine-v1:chunks:records",
+          "retainedBytes": 12002432
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-snapshot-quarantine-v1:chunks:rawIndexes",
+          "retainedBytes": 11776
+        }
+      ],
+      "constructors": [
+        {
+          "key": "string:(string)",
+          "count": 174092,
+          "shallowSize": 53600608,
+          "maxRetainedSize": 1064800,
+          "representativeIds": [
+            77,
+            385,
+            387
+          ]
+        },
+        {
+          "key": "native:system / JSArrayBufferData",
+          "count": 16285,
+          "shallowSize": 52007976,
+          "maxRetainedSize": 17891328,
+          "representativeIds": [
+            75535,
+            75927,
+            78999
+          ]
+        },
+        {
+          "key": "code:(code)",
+          "count": 118240,
+          "shallowSize": 20578024,
+          "maxRetainedSize": 1118800,
+          "representativeIds": [
+            115,
+            317,
+            319
+          ]
+        },
+        {
+          "key": "object:Promise",
+          "count": 3282,
+          "shallowSize": 157520,
+          "maxRetainedSize": 148556,
+          "representativeIds": [
+            73717,
+            73719,
+            75791
+          ]
+        },
+        {
+          "key": "object:ObjectStore",
+          "count": 1097,
+          "shallowSize": 96536,
+          "maxRetainedSize": 3124472,
+          "representativeIds": [
+            77161,
+            77163,
+            77165
+          ]
+        },
+        {
+          "key": "object:FDBDatabase",
+          "count": 417,
+          "shallowSize": 43368,
+          "maxRetainedSize": 2008,
+          "representativeIds": [
+            78959,
+            80255,
+            80269
+          ]
+        },
+        {
+          "key": "object:Database",
+          "count": 257,
+          "shallowSize": 18504,
+          "maxRetainedSize": 3151449,
+          "representativeIds": [
+            78961,
+            80223,
+            80527
+          ]
+        },
+        {
+          "key": "object:CausalityIndex",
+          "count": 137,
+          "shallowSize": 13152,
+          "maxRetainedSize": 21080,
+          "representativeIds": [
+            144913,
+            147263,
+            162241
+          ]
+        },
+        {
+          "key": "object:MessageQueueManager",
+          "count": 137,
+          "shallowSize": 6576,
+          "maxRetainedSize": 10984,
+          "representativeIds": [
+            126685,
+            127055,
+            127217
+          ]
+        }
+      ]
+    },
+    {
+      "transition": 20,
+      "snapshotHash": "b90970cef4bada1d78d28ffe012a1d70b5482470baf45c6be0152b49c6537bec",
+      "graphShallowBytes": 189779623,
+      "nodeCount": 996585,
+      "currentDatabaseCount": 257,
+      "currentRawStoreCount": 1097,
+      "recordsAndIndexesAnchors": 2194,
+      "recordsAndIndexesRetainedBytes": 41664988,
+      "rawStoreRetainedBytes": 44750484,
+      "rawDatabaseRetainedBytes": 44906484,
+      "rawDatabaseRemainderGraphBytes": 144873139,
+      "partitionGaps": [],
+      "unmatchedRawOwners": [],
+      "currentRooms": 64,
+      "totalRealRooms": 147,
+      "noncurrentRooms": 83,
+      "totalRealRegistrations": 147,
+      "currentRegistrations": 64,
+      "noncurrentStrongRoomPaths": {
+        "fixture-peer-input": 63,
+        "vitest-onFinished": 19,
+        "other-strong-path": 1
+      },
+      "onFinished": {
+        "id": 233205,
+        "type": "object",
+        "name": "Array",
+        "retainedSize": 67904,
+        "shallowSize": 32,
+        "properties": [
+          {
+            "name": "__proto__",
+            "target": {
+              "id": 74405,
+              "type": "object",
+              "name": "Array",
+              "retainedSize": 7376,
+              "shallowSize": 32
+            }
+          }
+        ],
+        "elementCount": 20
+      },
+      "observerContainers": [
+        {
+          "property": "stores",
+          "id": 582667,
+          "retained": 1864
+        },
+        {
+          "property": "planes",
+          "id": 582669,
+          "retained": 1864
+        },
+        {
+          "property": "commits",
+          "id": 582671,
+          "retained": 704
+        },
+        {
+          "property": "advances",
+          "id": 582673,
+          "retained": 1375387
+        },
+        {
+          "property": "issueAttempts",
+          "id": 582675,
+          "retained": 704
+        },
+        {
+          "property": "commitHandles",
+          "id": 582677,
+          "retained": 3656
+        },
+        {
+          "property": "issuePlans",
+          "id": 582679,
+          "retained": 23416
+        },
+        {
+          "property": "timeline",
+          "id": 582681,
+          "retained": 11128
+        },
+        {
+          "property": "ambiguities",
+          "id": 582683,
+          "retained": 32
+        },
+        {
+          "property": "publications",
+          "id": 582685,
+          "retained": 9680
+        },
+        {
+          "property": "planWrites",
+          "id": 582687,
+          "retained": 21504
+        },
+        {
+          "property": "prunes",
+          "id": 582689,
+          "retained": 136240
+        },
+        {
+          "property": "cleanup",
+          "id": 582691,
+          "retained": 391488
+        },
+        {
+          "property": "snapshots",
+          "id": 582693,
+          "retained": 32
+        },
+        {
+          "property": "closeGraphs",
+          "id": 582695,
+          "retained": 32
+        }
+      ],
+      "families": [
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:objects:records",
+          "retainedBytes": 52608
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:objects:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:generations:records",
+          "retainedBytes": 331328
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:generations:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:blobs:records",
+          "retainedBytes": 2718350
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:blobs:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:promotions:records",
+          "retainedBytes": 634128
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:promotions:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:storageMeta:records",
+          "retainedBytes": 24064
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:storageMeta:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:voteSlots:records",
+          "retainedBytes": 5632
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:voteSlots:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:signerState:records",
+          "retainedBytes": 5632
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:signerState:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:voteOutbox:records",
+          "retainedBytes": 5632
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:voteOutbox:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:sealEvidence:records",
+          "retainedBytes": 5632
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:sealEvidence:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-issuance-v1:lineages:records",
+          "retainedBytes": 41984
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-issuance-v1:lineages:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-issuance-v1:issuedRecords:records",
+          "retainedBytes": 1212771
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-issuance-v1:issuedRecords:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-issuance-v1:issuanceOutbox:records",
+          "retainedBytes": 585504
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-issuance-v1:issuanceOutbox:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-issuance-v1:settlementPlans:records",
+          "retainedBytes": 44672
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-issuance-v1:settlementPlans:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-live-journal-v1:scopes:records",
+          "retainedBytes": 3188032
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-live-journal-v1:scopes:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-live-journal-v1:acceptedEntries:records",
+          "retainedBytes": 4255800
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-live-journal-v1:acceptedEntries:rawIndexes",
+          "retainedBytes": 2524592
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:objects:records",
+          "retainedBytes": 88
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:objects:rawIndexes",
+          "retainedBytes": 184
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:generations:records",
+          "retainedBytes": 88
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:generations:rawIndexes",
+          "retainedBytes": 184
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:blobs:records",
+          "retainedBytes": 88
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:blobs:rawIndexes",
+          "retainedBytes": 184
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:promotions:records",
+          "retainedBytes": 88
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:promotions:rawIndexes",
+          "retainedBytes": 184
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:storageMeta:records",
+          "retainedBytes": 376
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:storageMeta:rawIndexes",
+          "retainedBytes": 184
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:voteSlots:records",
+          "retainedBytes": 51428
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:voteSlots:rawIndexes",
+          "retainedBytes": 184
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:signerState:records",
+          "retainedBytes": 61684
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:signerState:rawIndexes",
+          "retainedBytes": 184
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:voteOutbox:records",
+          "retainedBytes": 51692
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:voteOutbox:rawIndexes",
+          "retainedBytes": 184
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:sealEvidence:records",
+          "retainedBytes": 121103
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:sealEvidence:rawIndexes",
+          "retainedBytes": 184
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-snapshot-quarantine-v1:scopes:records",
+          "retainedBytes": 1367552
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-snapshot-quarantine-v1:scopes:rawIndexes",
+          "retainedBytes": 199472
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-snapshot-quarantine-v1:chunks:records",
+          "retainedBytes": 23996672
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-snapshot-quarantine-v1:chunks:rawIndexes",
+          "retainedBytes": 11776
+        }
+      ],
+      "constructors": [
+        {
+          "key": "native:system / JSArrayBufferData",
+          "count": 22266,
+          "shallowSize": 66725150,
+          "maxRetainedSize": 17891328,
+          "representativeIds": [
+            75535,
+            75927,
+            455551
+          ]
+        },
+        {
+          "key": "string:(string)",
+          "count": 202664,
+          "shallowSize": 55476568,
+          "maxRetainedSize": 1064800,
+          "representativeIds": [
+            77,
+            385,
+            387
+          ]
+        },
+        {
+          "key": "code:(code)",
+          "count": 125015,
+          "shallowSize": 22264128,
+          "maxRetainedSize": 1118800,
+          "representativeIds": [
+            115,
+            317,
+            319
+          ]
+        },
+        {
+          "key": "object:Promise",
+          "count": 3462,
+          "shallowSize": 166160,
+          "maxRetainedSize": 148556,
+          "representativeIds": [
+            73717,
+            73719,
+            75791
+          ]
+        },
+        {
+          "key": "object:ObjectStore",
+          "count": 1097,
+          "shallowSize": 96536,
+          "maxRetainedSize": 5529112,
+          "representativeIds": [
+            87803,
+            87813,
+            87875
+          ]
+        },
+        {
+          "key": "object:FDBDatabase",
+          "count": 447,
+          "shallowSize": 46488,
+          "maxRetainedSize": 2008,
+          "representativeIds": [
+            252735,
+            323857,
+            341307
+          ]
+        },
+        {
+          "key": "object:Database",
+          "count": 257,
+          "shallowSize": 18504,
+          "maxRetainedSize": 5579749,
+          "representativeIds": [
+            83609,
+            84007,
+            87809
+          ]
+        },
+        {
+          "key": "object:CausalityIndex",
+          "count": 147,
+          "shallowSize": 14112,
+          "maxRetainedSize": 21080,
+          "representativeIds": [
+            1758823,
+            1758895,
+            1758979
+          ]
+        },
+        {
+          "key": "object:MessageQueueManager",
+          "count": 147,
+          "shallowSize": 7056,
+          "maxRetainedSize": 13632,
+          "representativeIds": [
+            450805,
+            1764363,
+            1764371
+          ]
+        }
+      ]
+    },
+    {
+      "transition": 30,
+      "snapshotHash": "58b51c026b674a08090112c67dc7cc4681ae482c0053a54923fb8fba747d8249",
+      "graphShallowBytes": 213075275,
+      "nodeCount": 1104925,
+      "currentDatabaseCount": 257,
+      "currentRawStoreCount": 1097,
+      "recordsAndIndexesAnchors": 2194,
+      "recordsAndIndexesRetainedBytes": 59026074,
+      "rawStoreRetainedBytes": 63532370,
+      "rawDatabaseRetainedBytes": 63688370,
+      "rawDatabaseRemainderGraphBytes": 149386905,
+      "partitionGaps": [],
+      "unmatchedRawOwners": [],
+      "currentRooms": 64,
+      "totalRealRooms": 157,
+      "noncurrentRooms": 93,
+      "totalRealRegistrations": 157,
+      "currentRegistrations": 64,
+      "noncurrentStrongRoomPaths": {
+        "fixture-peer-input": 63,
+        "vitest-onFinished": 29,
+        "other-strong-path": 1
+      },
+      "onFinished": {
+        "id": 233205,
+        "type": "object",
+        "name": "Array",
+        "retainedSize": 101808,
+        "shallowSize": 32,
+        "properties": [
+          {
+            "name": "__proto__",
+            "target": {
+              "id": 74405,
+              "type": "object",
+              "name": "Array",
+              "retainedSize": 7376,
+              "shallowSize": 32
+            }
+          }
+        ],
+        "elementCount": 30
+      },
+      "observerContainers": [
+        {
+          "property": "stores",
+          "id": 582667,
+          "retained": 1864
+        },
+        {
+          "property": "planes",
+          "id": 582669,
+          "retained": 1864
+        },
+        {
+          "property": "commits",
+          "id": 582671,
+          "retained": 704
+        },
+        {
+          "property": "advances",
+          "id": 582673,
+          "retained": 1385026
+        },
+        {
+          "property": "issueAttempts",
+          "id": 582675,
+          "retained": 704
+        },
+        {
+          "property": "commitHandles",
+          "id": 582677,
+          "retained": 3656
+        },
+        {
+          "property": "issuePlans",
+          "id": 582679,
+          "retained": 23416
+        },
+        {
+          "property": "timeline",
+          "id": 582681,
+          "retained": 11128
+        },
+        {
+          "property": "ambiguities",
+          "id": 582683,
+          "retained": 32
+        },
+        {
+          "property": "publications",
+          "id": 582685,
+          "retained": 9680
+        },
+        {
+          "property": "planWrites",
+          "id": 582687,
+          "retained": 21504
+        },
+        {
+          "property": "prunes",
+          "id": 582689,
+          "retained": 136240
+        },
+        {
+          "property": "cleanup",
+          "id": 582691,
+          "retained": 391488
+        },
+        {
+          "property": "snapshots",
+          "id": 582693,
+          "retained": 32
+        },
+        {
+          "property": "closeGraphs",
+          "id": 582695,
+          "retained": 32
+        }
+      ],
+      "families": [
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:objects:records",
+          "retainedBytes": 52608
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:objects:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:generations:records",
+          "retainedBytes": 337886
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:generations:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:blobs:records",
+          "retainedBytes": 2759291
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:blobs:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:promotions:records",
+          "retainedBytes": 632424
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:promotions:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:storageMeta:records",
+          "retainedBytes": 24064
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:storageMeta:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:voteSlots:records",
+          "retainedBytes": 5632
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:voteSlots:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:signerState:records",
+          "retainedBytes": 5632
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:signerState:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:voteOutbox:records",
+          "retainedBytes": 5632
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:voteOutbox:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:sealEvidence:records",
+          "retainedBytes": 5632
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--ahe:sealEvidence:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-issuance-v1:lineages:records",
+          "retainedBytes": 41984
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-issuance-v1:lineages:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-issuance-v1:issuedRecords:records",
+          "retainedBytes": 1162178
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-issuance-v1:issuedRecords:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-issuance-v1:issuanceOutbox:records",
+          "retainedBytes": 559120
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-issuance-v1:issuanceOutbox:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-issuance-v1:settlementPlans:records",
+          "retainedBytes": 44672
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-issuance-v1:settlementPlans:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-live-journal-v1:scopes:records",
+          "retainedBytes": 4702272
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-live-journal-v1:scopes:rawIndexes",
+          "retainedBytes": 11776
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-live-journal-v1:acceptedEntries:records",
+          "retainedBytes": 6048506
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-live-journal-v1:acceptedEntries:rawIndexes",
+          "retainedBytes": 3708592
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:objects:records",
+          "retainedBytes": 88
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:objects:rawIndexes",
+          "retainedBytes": 184
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:generations:records",
+          "retainedBytes": 88
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:generations:rawIndexes",
+          "retainedBytes": 184
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:blobs:records",
+          "retainedBytes": 88
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:blobs:rawIndexes",
+          "retainedBytes": 184
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:promotions:records",
+          "retainedBytes": 88
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:promotions:rawIndexes",
+          "retainedBytes": 184
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:storageMeta:records",
+          "retainedBytes": 376
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:storageMeta:rawIndexes",
+          "retainedBytes": 184
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:voteSlots:records",
+          "retainedBytes": 76898
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:voteSlots:rawIndexes",
+          "retainedBytes": 184
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:signerState:records",
+          "retainedBytes": 91574
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:signerState:rawIndexes",
+          "retainedBytes": 184
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:voteOutbox:records",
+          "retainedBytes": 77162
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:voteOutbox:rawIndexes",
+          "retainedBytes": 184
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:sealEvidence:records",
+          "retainedBytes": 181003
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N:sealEvidence:rawIndexes",
+          "retainedBytes": 184
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-snapshot-quarantine-v1:scopes:records",
+          "retainedBytes": 2047232
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-snapshot-quarantine-v1:scopes:rawIndexes",
+          "retainedBytes": 286144
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-snapshot-quarantine-v1:chunks:records",
+          "retainedBytes": 35990912
+        },
+        {
+          "key": "d110c-f5b-parent-1-peer-N--drp-snapshot-quarantine-v1:chunks:rawIndexes",
+          "retainedBytes": 11776
+        }
+      ],
+      "constructors": [
+        {
+          "key": "native:system / JSArrayBufferData",
+          "count": 28500,
+          "shallowSize": 81666026,
+          "maxRetainedSize": 17891328,
+          "representativeIds": [
+            75535,
+            75927,
+            84039
+          ]
+        },
+        {
+          "key": "string:(string)",
+          "count": 231150,
+          "shallowSize": 57354768,
+          "maxRetainedSize": 1064800,
+          "representativeIds": [
+            77,
+            385,
+            387
+          ]
+        },
+        {
+          "key": "code:(code)",
+          "count": 124207,
+          "shallowSize": 23062768,
+          "maxRetainedSize": 1118800,
+          "representativeIds": [
+            115,
+            317,
+            319
+          ]
+        },
+        {
+          "key": "object:Promise",
+          "count": 3642,
+          "shallowSize": 174800,
+          "maxRetainedSize": 148556,
+          "representativeIds": [
+            73717,
+            73719,
+            75791
+          ]
+        },
+        {
+          "key": "object:ObjectStore",
+          "count": 1097,
+          "shallowSize": 96536,
+          "maxRetainedSize": 7933818,
+          "representativeIds": [
+            77161,
+            77163,
+            77165
+          ]
+        },
+        {
+          "key": "object:FDBDatabase",
+          "count": 477,
+          "shallowSize": 49608,
+          "maxRetainedSize": 2008,
+          "representativeIds": [
+            256397,
+            303379,
+            113621
+          ]
+        },
+        {
+          "key": "object:Database",
+          "count": 257,
+          "shallowSize": 18504,
+          "maxRetainedSize": 8008115,
+          "representativeIds": [
+            83609,
+            84007,
+            87809
+          ]
+        },
+        {
+          "key": "object:CausalityIndex",
+          "count": 157,
+          "shallowSize": 15072,
+          "maxRetainedSize": 21080,
+          "representativeIds": [
+            462833,
+            1553571,
+            572545
+          ]
+        },
+        {
+          "key": "object:MessageQueueManager",
+          "count": 157,
+          "shallowSize": 7536,
+          "maxRetainedSize": 16312,
+          "representativeIds": [
+            300931,
+            361063,
+            1553577
+          ]
+        }
+      ]
+    }
+  ],
+  "delta10to30": {
+    "graphBytes": 47342018,
+    "recordsAndIndexesBytes": 34430359,
+    "rawDatabaseBytes": 37271959,
+    "rawDatabaseRemainderGraphBytes": 10070059
+  },
+  "causalEvidence": {
+    "growingHarnessOwner": {
+      "source": "tests/fixtures/grid-transition-workload.ts:313",
+      "assertion": "await expect(issue, \"GRID100_REAL_PENDING_PUBLICATION_FAILURE\").rejects.toThrow()",
+      "librarySource": "node_modules/.pnpm/@vitest+expect*/node_modules/@vitest/expect/dist/index.js:891-936,1520-1552",
+      "mechanism": "recordAsyncExpect appends onFinished callback; shared closure environment retains assertion promise; rejected-error Assertion.object retains lazy V8 stack CallSiteInfo and publishAccepted closure/context; that context reaches historical session. No ephemeron edge is needed for the recorded path.",
+      "representative": {
+        "id": 1898261,
+        "name": "Object",
+        "type": "object",
+        "shallow": 24,
+        "retained": 1840,
+        "current": false,
+        "strongPath": {
+          "terminal": "strong-root",
+          "path": [
+            {
+              "id": 1898261,
+              "name": "Object",
+              "type": "object",
+              "shallow": 24,
+              "retained": 1840,
+              "incoming": {
+                "from": 2480267,
+                "name": "owner",
+                "type": "property"
+              }
+            },
+            {
+              "id": 2480267,
+              "name": "Object",
+              "type": "object",
+              "shallow": 40,
+              "retained": 12443,
+              "incoming": {
+                "from": 2480269,
+                "name": "cell",
+                "type": "context"
+              }
+            },
+            {
+              "id": 2480269,
+              "name": "system / Context",
+              "type": "object",
+              "shallow": 48,
+              "retained": 12491,
+              "incoming": {
+                "from": 2418221,
+                "name": "context",
+                "type": "internal"
+              }
+            },
+            {
+              "id": 2418221,
+              "name": "",
+              "type": "closure",
+              "shallow": 56,
+              "retained": 16915,
+              "incoming": {
+                "from": 2418217,
+                "name": "onProjection",
+                "type": "property"
+              }
+            },
+            {
+              "id": 2418217,
+              "name": "Object",
+              "type": "object",
+              "shallow": 56,
+              "retained": 144,
+              "incoming": {
+                "from": 1892183,
+                "name": "inputWithoutRebase",
+                "type": "context"
+              }
+            },
+            {
+              "id": 1892183,
+              "name": "system / Context",
+              "type": "object",
+              "shallow": 944,
+              "retained": 160992,
+              "incoming": {
+                "from": 1892181,
+                "name": "context",
+                "type": "internal"
+              }
+            },
+            {
+              "id": 1892181,
+              "name": "publishAccepted",
+              "type": "closure",
+              "shallow": 56,
+              "retained": 56,
+              "incoming": {
+                "from": 2141759,
+                "name": "3",
+                "type": "hidden"
+              }
+            },
+            {
+              "id": 2141759,
+              "name": "system / CallSiteInfo",
+              "type": "hidden",
+              "shallow": 56,
+              "retained": 56,
+              "incoming": {
+                "from": 2141737,
+                "name": "0",
+                "type": "internal"
+              }
+            },
+            {
+              "id": 2141737,
+              "name": "",
+              "type": "array",
+              "shallow": 48,
+              "retained": 328,
+              "incoming": {
+                "from": 1855573,
+                "name": "<symbol>",
+                "type": "property"
+              }
+            },
+            {
+              "id": 1855573,
+              "name": "TypeError",
+              "type": "object",
+              "shallow": 48,
+              "retained": 408,
+              "incoming": {
+                "from": 2188515,
+                "name": "object",
+                "type": "property"
+              }
+            },
+            {
+              "id": 2188515,
+              "name": "Object",
+              "type": "object",
+              "shallow": 24,
+              "retained": 472,
+              "incoming": {
+                "from": 2189381,
+                "name": "__flags",
+                "type": "property"
+              }
+            },
+            {
+              "id": 2189381,
+              "name": "Assertion",
+              "type": "object",
+              "shallow": 32,
+              "retained": 504,
+              "incoming": {
+                "from": 1852031,
+                "name": "1",
+                "type": "hidden"
+              }
+            },
+            {
+              "id": 1852031,
+              "name": "system / JSProxy",
+              "type": "hidden",
+              "shallow": 32,
+              "retained": 928,
+              "incoming": {
+                "from": 1852029,
+                "name": "reactions_or_result",
+                "type": "internal"
+              }
+            },
+            {
+              "id": 1852029,
+              "name": "Promise",
+              "type": "object",
+              "shallow": 48,
+              "retained": 976,
+              "incoming": {
+                "from": 1852071,
+                "name": "promise",
+                "type": "context"
+              }
+            },
+            {
+              "id": 1852071,
+              "name": "system / Context",
+              "type": "object",
+              "shallow": 64,
+              "retained": 3080,
+              "incoming": {
+                "from": 1855749,
+                "name": "previous",
+                "type": "internal"
+              }
+            },
+            {
+              "id": 1855749,
+              "name": "system / Context",
+              "type": "object",
+              "shallow": 40,
+              "retained": 3320,
+              "incoming": {
+                "from": 1843253,
+                "name": "context",
+                "type": "internal"
+              }
+            },
+            {
+              "id": 1843253,
+              "name": "",
+              "type": "closure",
+              "shallow": 56,
+              "retained": 3376,
+              "incoming": {
+                "from": 233205,
+                "name": "14",
+                "type": "element"
+              }
+            },
+            {
+              "id": 233205,
+              "name": "Array",
+              "type": "object",
+              "shallow": 32,
+              "retained": 67904,
+              "incoming": {
+                "from": 210141,
+                "name": "onFinished",
+                "type": "property"
+              }
+            },
+            {
+              "id": 210141,
+              "name": "Object",
+              "type": "object",
+              "shallow": 128,
+              "retained": 69832,
+              "incoming": {
+                "from": 220045,
+                "name": "current",
+                "type": "property"
+              }
+            },
+            {
+              "id": 220045,
+              "name": "Object",
+              "type": "object",
+              "shallow": 104,
+              "retained": 1752,
+              "incoming": {
+                "from": 6945,
+                "name": "__vitest_worker__",
+                "type": "property"
+              }
+            },
+            {
+              "id": 6945,
+              "name": "global",
+              "type": "object",
+              "shallow": 32,
+              "retained": 140904,
+              "incoming": {
+                "from": 1,
+                "name": "2",
+                "type": "shortcut"
+              }
+            },
+            {
+              "id": 1,
+              "name": "",
+              "type": "synthetic",
+              "shallow": 0,
+              "retained": 189779623,
+              "incoming": null
+            }
+          ]
+        }
+      }
+    },
+    "boundedFixtureOwner": {
+      "mechanism": "Long-lived peer.input.onProjection closure captures the original projection cell whose owner points to the initially opened room; replacing peer.room does not replace peer.input.",
+      "representative": {
+        "id": 206765,
+        "name": "Object",
+        "type": "object",
+        "shallow": 24,
+        "retained": 1840,
+        "current": false,
+        "strongPath": {
+          "terminal": "strong-root",
+          "path": [
+            {
+              "id": 206765,
+              "name": "Object",
+              "type": "object",
+              "shallow": 24,
+              "retained": 1840,
+              "incoming": {
+                "from": 636975,
+                "name": "owner",
+                "type": "property"
+              }
+            },
+            {
+              "id": 636975,
+              "name": "Object",
+              "type": "object",
+              "shallow": 40,
+              "retained": 2189,
+              "incoming": {
+                "from": 636973,
+                "name": "cell",
+                "type": "context"
+              }
+            },
+            {
+              "id": 636973,
+              "name": "system / Context",
+              "type": "object",
+              "shallow": 48,
+              "retained": 2237,
+              "incoming": {
+                "from": 638583,
+                "name": "context",
+                "type": "internal"
+              }
+            },
+            {
+              "id": 638583,
+              "name": "",
+              "type": "closure",
+              "shallow": 56,
+              "retained": 2293,
+              "incoming": {
+                "from": 423355,
+                "name": "onProjection",
+                "type": "property"
+              }
+            },
+            {
+              "id": 423355,
+              "name": "Object",
+              "type": "object",
+              "shallow": 136,
+              "retained": 136,
+              "incoming": {
+                "from": 428993,
+                "name": "input",
+                "type": "property"
+              }
+            },
+            {
+              "id": 428993,
+              "name": "Object",
+              "type": "object",
+              "shallow": 40,
+              "retained": 264,
+              "incoming": {
+                "from": 374991,
+                "name": "35",
+                "type": "element"
+              }
+            },
+            {
+              "id": 374991,
+              "name": "Array",
+              "type": "object",
+              "shallow": 32,
+              "retained": 16808,
+              "incoming": {
+                "from": 374985,
+                "name": "peers",
+                "type": "property"
+              }
+            },
+            {
+              "id": 374985,
+              "name": "Object",
+              "type": "object",
+              "shallow": 160,
+              "retained": 2288,
+              "incoming": {
+                "from": 423973,
+                "name": "fixture",
+                "type": "context"
+              }
+            },
+            {
+              "id": 423973,
+              "name": "system / Context",
+              "type": "object",
+              "shallow": 136,
+              "retained": 16384,
+              "incoming": {
+                "from": 423957,
+                "name": "context",
+                "type": "internal"
+              }
+            },
+            {
+              "id": 423957,
+              "name": "Generator",
+              "type": "object",
+              "shallow": 88,
+              "retained": 7832,
+              "incoming": {
+                "from": 824491,
+                "name": "extension",
+                "type": "internal"
+              }
+            },
+            {
+              "id": 824491,
+              "name": "system / Context",
+              "type": "object",
+              "shallow": 40,
+              "retained": 7872,
+              "incoming": {
+                "from": 824487,
+                "name": "context",
+                "type": "internal"
+              }
+            },
+            {
+              "id": 824487,
+              "name": "",
+              "type": "closure",
+              "shallow": 56,
+              "retained": 56,
+              "incoming": {
+                "from": 824485,
+                "name": "1",
+                "type": "hidden"
+              }
+            },
+            {
+              "id": 824485,
+              "name": "system / PromiseReaction",
+              "type": "hidden",
+              "shallow": 48,
+              "retained": 8032,
+              "incoming": {
+                "from": 824483,
+                "name": "reactions_or_result",
+                "type": "internal"
+              }
+            },
+            {
+              "id": 824483,
+              "name": "Promise",
+              "type": "object",
+              "shallow": 48,
+              "retained": 8080,
+              "incoming": {
+                "from": 7125,
+                "name": "4",
+                "type": "hidden"
+              }
+            },
+            {
+              "id": 7125,
+              "name": "Generator",
+              "type": "object",
+              "shallow": 88,
+              "retained": 8336,
+              "incoming": {
+                "from": 41,
+                "name": "60",
+                "type": "internal"
+              }
+            },
+            {
+              "id": 41,
+              "name": "(Stack roots)",
+              "type": "synthetic",
+              "shallow": 0,
+              "retained": 1616,
+              "incoming": {
+                "from": 3,
+                "name": "19",
+                "type": "element"
+              }
+            },
+            {
+              "id": 3,
+              "name": "(GC roots)",
+              "type": "synthetic",
+              "shallow": 0,
+              "retained": 589682,
+              "incoming": {
+                "from": 1,
+                "name": "1",
+                "type": "element"
+              }
+            },
+            {
+              "id": 1,
+              "name": "",
+              "type": "synthetic",
+              "shallow": 0,
+              "retained": 165733257,
+              "incoming": null
+            }
+          ]
+        }
+      }
+    },
+    "latestGrowingRepresentative": {
+      "id": 1107325,
+      "name": "Object",
+      "type": "object",
+      "shallow": 24,
+      "retained": 1840,
+      "current": false,
+      "strongPath": {
+        "terminal": "strong-root",
+        "path": [
+          {
+            "id": 1107325,
+            "name": "Object",
+            "type": "object",
+            "shallow": 24,
+            "retained": 1840,
+            "incoming": {
+              "from": 1107321,
+              "name": "owner",
+              "type": "property"
+            }
+          },
+          {
+            "id": 1107321,
+            "name": "Object",
+            "type": "object",
+            "shallow": 40,
+            "retained": 12443,
+            "incoming": {
+              "from": 600875,
+              "name": "cell",
+              "type": "context"
+            }
+          },
+          {
+            "id": 600875,
+            "name": "system / Context",
+            "type": "object",
+            "shallow": 48,
+            "retained": 12491,
+            "incoming": {
+              "from": 600815,
+              "name": "context",
+              "type": "internal"
+            }
+          },
+          {
+            "id": 600815,
+            "name": "",
+            "type": "closure",
+            "shallow": 56,
+            "retained": 12547,
+            "incoming": {
+              "from": 600807,
+              "name": "onProjection",
+              "type": "property"
+            }
+          },
+          {
+            "id": 600807,
+            "name": "Object",
+            "type": "object",
+            "shallow": 56,
+            "retained": 144,
+            "incoming": {
+              "from": 265797,
+              "name": "inputWithoutRebase",
+              "type": "context"
+            }
+          },
+          {
+            "id": 265797,
+            "name": "system / Context",
+            "type": "object",
+            "shallow": 944,
+            "retained": 135784,
+            "incoming": {
+              "from": 1112767,
+              "name": "context",
+              "type": "internal"
+            }
+          },
+          {
+            "id": 1112767,
+            "name": "publishAccepted",
+            "type": "closure",
+            "shallow": 56,
+            "retained": 56,
+            "incoming": {
+              "from": 1576455,
+              "name": "3",
+              "type": "hidden"
+            }
+          },
+          {
+            "id": 1576455,
+            "name": "system / CallSiteInfo",
+            "type": "hidden",
+            "shallow": 56,
+            "retained": 56,
+            "incoming": {
+              "from": 1671183,
+              "name": "0",
+              "type": "internal"
+            }
+          },
+          {
+            "id": 1671183,
+            "name": "",
+            "type": "array",
+            "shallow": 48,
+            "retained": 328,
+            "incoming": {
+              "from": 1671181,
+              "name": "<symbol>",
+              "type": "property"
+            }
+          },
+          {
+            "id": 1671181,
+            "name": "TypeError",
+            "type": "object",
+            "shallow": 48,
+            "retained": 408,
+            "incoming": {
+              "from": 1576167,
+              "name": "object",
+              "type": "property"
+            }
+          },
+          {
+            "id": 1576167,
+            "name": "Object",
+            "type": "object",
+            "shallow": 24,
+            "retained": 472,
+            "incoming": {
+              "from": 1576165,
+              "name": "__flags",
+              "type": "property"
+            }
+          },
+          {
+            "id": 1576165,
+            "name": "Assertion",
+            "type": "object",
+            "shallow": 32,
+            "retained": 504,
+            "incoming": {
+              "from": 1576181,
+              "name": "1",
+              "type": "hidden"
+            }
+          },
+          {
+            "id": 1576181,
+            "name": "system / JSProxy",
+            "type": "hidden",
+            "shallow": 32,
+            "retained": 928,
+            "incoming": {
+              "from": 1577353,
+              "name": "reactions_or_result",
+              "type": "internal"
+            }
+          },
+          {
+            "id": 1577353,
+            "name": "Promise",
+            "type": "object",
+            "shallow": 48,
+            "retained": 976,
+            "incoming": {
+              "from": 1604703,
+              "name": "promise",
+              "type": "context"
+            }
+          },
+          {
+            "id": 1604703,
+            "name": "system / Context",
+            "type": "object",
+            "shallow": 64,
+            "retained": 3080,
+            "incoming": {
+              "from": 639787,
+              "name": "previous",
+              "type": "internal"
+            }
+          },
+          {
+            "id": 639787,
+            "name": "system / Context",
+            "type": "object",
+            "shallow": 40,
+            "retained": 3320,
+            "incoming": {
+              "from": 639785,
+              "name": "context",
+              "type": "internal"
+            }
+          },
+          {
+            "id": 639785,
+            "name": "",
+            "type": "closure",
+            "shallow": 56,
+            "retained": 3376,
+            "incoming": {
+              "from": 233205,
+              "name": "2",
+              "type": "element"
+            }
+          },
+          {
+            "id": 233205,
+            "name": "Array",
+            "type": "object",
+            "shallow": 32,
+            "retained": 101808,
+            "incoming": {
+              "from": 210141,
+              "name": "onFinished",
+              "type": "property"
+            }
+          },
+          {
+            "id": 210141,
+            "name": "Object",
+            "type": "object",
+            "shallow": 128,
+            "retained": 103736,
+            "incoming": {
+              "from": 220045,
+              "name": "current",
+              "type": "property"
+            }
+          },
+          {
+            "id": 220045,
+            "name": "Object",
+            "type": "object",
+            "shallow": 104,
+            "retained": 1856,
+            "incoming": {
+              "from": 6945,
+              "name": "__vitest_worker__",
+              "type": "property"
+            }
+          },
+          {
+            "id": 6945,
+            "name": "global",
+            "type": "object",
+            "shallow": 32,
+            "retained": 143896,
+            "incoming": {
+              "from": 1,
+              "name": "2",
+              "type": "shortcut"
+            }
+          },
+          {
+            "id": 1,
+            "name": "",
+            "type": "synthetic",
+            "shallow": 0,
+            "retained": 213075275,
+            "incoming": null
+          }
+        ]
+      }
+    }
+  },
+  "limitations": [
+    "Snapshot graph self/retained bytes include represented native backing. They are NOT heapUsed, external, RSS, or heapUsed+arrayBuffers; never subtract these partitions from process counters.",
+    "Records/index, raw-store, and raw-database totals are separately disjoint ALTERNATIVE partitions; do not add them. Each membership uses current factory Map key/value slots and rawDatabase backlink evidence.",
+    "Full strong paths exclude weak and every conditional ephemeron pair edge; current registration association instead uses a strongly rooted current handle plus its conditional key-to-value mapping. Raw WeakMap table paths are not independent roots.",
+    "One allocation-site room template and one allocation-site registration template are excluded by requiring actual closure/object handles; bare shape counts would overstate live instances.",
+    "Historical room paths establish retained harness owners but do not numerically attribute all residual graph growth or prove a product lifecycle violation.",
+    "onFinished retained sizes alone exclude multiply-owned subgraphs; do not read their small retained total as full historical-room cost.",
+    "Current observer container retained sizes overlap enclosing module-cache/other owners and must not be blindly summed.",
+    "owners.json is an exploratory artifact with a backlink-only classifier that cannot handle aliased plane handles; strong-owners*.json supersedes it."
+  ],
+  "artifacts": [
+    "top.json",
+    "top20.json",
+    "top30.json",
+    "stores.json",
+    "stores20.json",
+    "stores30.json",
+    "strong-owners.json",
+    "strong-owners20.json",
+    "strong-owners30.json",
+    "enclosing10.json",
+    "enclosing20.json",
+    "enclosing30.json"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+	"anchorDigestDomain": "ts-drp/epoch-anchor/v3",
+	"anchorSuiteId": "ed25519-sha256-v3",
+	"certificateKind": "drp-certified-genesis-certificate",
+	"certificateVersion": 1,
+	"delegatedProfileId": "delegated-trusted-v1",
+	"maximumObjectIdBytes": 1024,
+	"maximumRecordBytes": 8192,
+	"maximumSignerIdBytes": 64,
+	"maximumSigners": 8,
+	"objectId": "creator:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+	"profileDigestDomain": "ts-drp/profile/v3",
+	"profileSuiteId": "ed25519-seal-v3",
+	"signerSetDigestDomain": "ts-drp/signer-set/v3",
+	"trustStateKind": "drp-certified-anchor-trust-state",
+	"trustStateVersion": 1,
+	"zeroDigest": "0000000000000000000000000000000000000000000000000000000000000000"
+}

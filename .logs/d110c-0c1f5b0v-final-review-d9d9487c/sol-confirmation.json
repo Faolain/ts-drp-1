@@ -1,0 +1,35 @@
+{
+  "verdict": "PASS",
+  "p0_count": 0,
+  "p1_count": 0,
+  "p2_count": 3,
+  "findings": [
+    {
+      "severity": "P2",
+      "title": "Preserve the initial final-review union",
+      "evidence": "final-confirmation-prompt.md:52-65 records Grok and Fable wrapper NO_VERDICT classifications, their substantive PASS results, Sol's corrected P1, and Fable's two P2s.",
+      "impact": "Collapsing these outcomes during closure would lose the honest review audit trail.",
+      "required_action": "Post-confirmation plan/closure owner must retain the exact wrapper classifications, substantive results, Sol P1 correction, and P2 dispositions without recursive review."
+    },
+    {
+      "severity": "P2",
+      "title": "Resolve dormant open-progress exception",
+      "evidence": "packages/node/src/v3-live.ts:8242 calls readSettlementSources without a frontier, while lines 8822-8827 construct openProgressSources only when a frontier is supplied.",
+      "impact": "Authenticated frontier threading could activate an exception that has not yet received causal runtime coverage.",
+      "required_action": "Parent f5b owner must produce a causal RED for the authenticated open-progress path or delete the dormant openProgressSources branch before threading the frontier."
+    },
+    {
+      "severity": "P2",
+      "title": "Repair inherited Phase-3 publication test",
+      "evidence": "tests/phase-3a1b-p3-live-transport-red.test.ts:1223 fails at publishPending before sink installation; legacy-ingress/result.json and diagnostic-pre-comment/result.json record the identical failure at 3f47ced3 and untouched c66e09c2.",
+      "impact": "The stale Phase-3 harness weakens that test owner's retained coverage but does not implicate the comment-only correction.",
+      "required_action": "Phase-3 live-plane test owner must diagnose and repair the inherited publishPending expectation separately; it does not block this slice."
+    }
+  ],
+  "red_green_causality": "The production settlement/recovery candidate and AST correction retain their accepted causal history. RED 488a22a6 isolates replayed external notifications as d1,d1,d2 while canonical state, issuance, authority, and cleanup pass. RED e8e7b027 fails only NODE_CALLBACK_REJECTION_GUIDANCE_IS_SURFACE_SPECIFIC, and GREEN 3f47ced3 changes only the matching Node JSDoc; focused local and isolated checks pass 2/2.",
+  "replay_contract_assessment": "The corrected contract matches runtime: room-owned and successor-recovery rejection fail closed and deactivate their activation/session, while ordinary Node ingress and local issue catch, log, and continue. Canonical projection and durable issuance remain exact-once; external notifications are replayable and persistent consumers must deduplicate by authenticated vertex digest. No shipped consumer requires durable exactly-once external effects; any future requirement belongs in a separately reviewed application-owned atomic effect/idempotency port.",
+  "scope_assessment": "The nine-path production candidate is preserved, the 21-path implementation diff has the required binary SHA-256 0a215e343c56138ca46a514ad828a72645aa0fff03e85d28b9f7cd711ece4204, and 3f47ced3 changes exactly one Node JSDoc sentence set with identical runtime tokens and comment-free AST. No callback shape, export, API, schema, wire, authority, behavior, dependency, threshold, timeout, or workload changed in the corrective GREEN.",
+  "evidence_assessment": "All authoritative commits are in the signed linear history and report good signatures. Every file hash and self-excluding file inventory validates for all seven requested evidence manifests. Focused, retained, governance, build, typecheck-baseline, lint, format, diff, source-audit, and isolated evidence matches the stated results. The Grok/Fable NO_VERDICT wrapper classifications and the inherited pre-sink Phase-3 failure are preserved honestly.",
+  "parent_f5b_ready": true
+}
+

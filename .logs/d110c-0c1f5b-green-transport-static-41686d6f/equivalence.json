@@ -1,0 +1,181 @@
+{
+  "valid": true,
+  "beforeSha256": "809c5b7858ac5d530179a35167b65bf2ec600b7adee78aa0d4ecb028f563056a",
+  "afterSha256": "6368a03369061aab9859160eb888cdbb0ee50012eaa55ee12e719fb95ee7511c",
+  "exactSourceOutsideFrozenSpans": true,
+  "emittedOutsideThreeRejectorsAndGuardEqual": true,
+  "allSemanticAssertions": 295,
+  "acceptedSubset": 123,
+  "titles": 24,
+  "casts": [
+    {
+      "expression": "surface.activateV3LivePlane",
+      "type": "NonNullable<typeof surface.activateV3LivePlane>",
+      "start": 32478
+    },
+    {
+      "expression": "surface.activateV3LivePlane",
+      "type": "NonNullable<typeof surface.activateV3LivePlane>",
+      "start": 32668
+    },
+    {
+      "expression": "surface.activateV3LivePlane",
+      "type": "NonNullable<typeof surface.activateV3LivePlane>",
+      "start": 34593
+    },
+    {
+      "expression": "surface.routeV3Ingress",
+      "type": "NonNullable<typeof surface.routeV3Ingress>",
+      "start": 45256
+    },
+    {
+      "expression": "readOutboxPage.mock.calls[0]",
+      "type": "| readonly [NonNullable<Parameters<DurableIssuanceStore[\"readOutboxPage\"]>[0]>]\n\t\t\t\t\t\t| undefined",
+      "start": 48387
+    },
+    {
+      "expression": "readOutboxPage.mock.calls[1]",
+      "type": "| readonly [NonNullable<Parameters<DurableIssuanceStore[\"readOutboxPage\"]>[0]>]\n\t\t\t\t\t\t| undefined",
+      "start": 48584
+    },
+    {
+      "expression": "surface.activateV3LivePlane",
+      "type": "NonNullable<typeof surface.activateV3LivePlane>",
+      "start": 71122
+    },
+    {
+      "expression": "\"../packages/node/src/internal/v3-topic.js?d108e2c-hostile-text-encoder\"",
+      "type": "string",
+      "start": 89486
+    }
+  ],
+  "callbacks": [
+    "(): number => effects.push(\"queue.subscribe\")",
+    "(): number => effects.push(\"queue.close\")"
+  ],
+  "rejections": [
+    {
+      "method": "readSettlementPlan",
+      "error": "unexpected readSettlementPlan in transport fixture",
+      "calls": 1
+    },
+    {
+      "method": "transactWriteSettlementPlan",
+      "error": "unexpected transactWriteSettlementPlan in transport fixture",
+      "calls": 1
+    },
+    {
+      "method": "installEpochAnchor",
+      "error": "unexpected installEpochAnchor in transport fixture",
+      "calls": 1
+    }
+  ],
+  "overridesLastAndExact": true,
+  "spyModule": {
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+spy@3.1.1/node_modules/@vitest/spy/dist/index.js",
+    "sha256": "4d0aaa9398c593a486203653ac6e03cef47eb20e189cfe1c578fe4642bb026b0"
+  },
+  "initializerControls": [
+    {
+      "declaration": "const {capability} = input;",
+      "outerCapturedKeys": [
+        "capability"
+      ]
+    },
+    {
+      "declaration": "let uninitialized;",
+      "outerCapturedKeys": []
+    },
+    {
+      "declaration": "const {capability} = other;",
+      "outerCapturedKeys": []
+    }
+  ],
+  "actualInspection": {
+    "consumeCount": 1,
+    "consumePosition": 326422,
+    "directInputAfterConsume": 0,
+    "firstEffect": 331441,
+    "outerCapturedKeys": [
+      "capability",
+      "messageQueueManager",
+      "networkNode",
+      "onAdmittedVertex"
+    ],
+    "recoveredReferencesAfterConsume": 29
+  },
+  "liveSourceSha256": "389f6d9104b25ac58ef3f4b8e3b5fe6e33f4c516ae167926c9edbcc56265e602",
+  "optionalControls": [
+    {
+      "index": 0,
+      "kind": "absent"
+    },
+    {
+      "index": 0,
+      "kind": "empty",
+      "error": "TypeError"
+    },
+    {
+      "index": 0,
+      "kind": "missing",
+      "error": "TypeError"
+    },
+    {
+      "index": 0,
+      "kind": "valid",
+      "result": "scope-value"
+    },
+    {
+      "index": 1,
+      "kind": "absent"
+    },
+    {
+      "index": 1,
+      "kind": "empty",
+      "error": "TypeError"
+    },
+    {
+      "index": 1,
+      "kind": "missing",
+      "error": "TypeError"
+    },
+    {
+      "index": 1,
+      "kind": "valid",
+      "result": "scope-value"
+    }
+  ],
+  "receiverControls": [
+    {
+      "method": "activateV3LivePlane",
+      "getterReads": 1,
+      "calls": 1,
+      "originalReceiver": true
+    },
+    {
+      "method": "activateV3LivePlane",
+      "getterReads": 1,
+      "calls": 1,
+      "originalReceiver": true
+    },
+    {
+      "method": "activateV3LivePlane",
+      "getterReads": 1,
+      "calls": 1,
+      "originalReceiver": true
+    },
+    {
+      "method": "routeV3Ingress",
+      "getterReads": 1,
+      "calls": 1,
+      "originalReceiver": true
+    },
+    {
+      "method": "activateV3LivePlane",
+      "getterReads": 1,
+      "calls": 1,
+      "originalReceiver": true
+    }
+  ],
+  "initialTypeOnlySyntaxStopPreserved": true
+}

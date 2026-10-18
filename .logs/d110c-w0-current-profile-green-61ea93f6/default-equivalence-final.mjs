@@ -1,0 +1,14 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+const root='/Users/aristotle/Documents/Projects/ts-drp-1',out=path.dirname(new URL(import.meta.url).pathname),helper='tests/fixtures/phase-6a-v3/creator-adoption-contract.ts';
+const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
+const before=fs.readFileSync(path.join(out,'creator-adoption-contract.ts.before'),'utf8'),after=fs.readFileSync(path.join(root,helper),'utf8');
+const additions=[
+'\treadonly creatorTrustProfileId?: "creator-trusted-settlement-v1" | "creator-trusted-v1";\n',
+'\t\t...(options.creatorTrustProfileId === undefined ? {} : { creatorTrustProfileId: options.creatorTrustProfileId }),\n',
+'\t\t...(options.creatorTrustProfileId === "creator-trusted-settlement-v1" ? { latchedAclVersion: 3 as const } : {}),\n'];
+let normalized=after;for(const line of additions){if(normalized.split(line).length!==2)throw Error('Non-unique selector addition');normalized=normalized.replace(line,'');}if(normalized!==before)throw Error('Existing helper changed beyond optional seam');
+const callers=JSON.parse(fs.readFileSync(path.join(out,'consumers-final.json'))),campaign=['tests/fixtures/phase-6c/retained-heap-worker.ts','tests/fixtures/phase-6c/retained-heap-child.mjs','tests/fixtures/phase-6b/runtime-reclamation-contract.ts',helper,'package.json'];
+const result={helper,beforeSha256:hash(before),afterSha256:hash(after),normalizedSha256:hash(normalized),exactByteEquivalentAfterRemovingOnlyAdditions:true,additions,omittedSelector:{firstSpread:{},secondSpread:{},genuinePreparationArgumentsUnchanged:true},explicitLegacy:{profileId:'creator-trusted-v1',aclVersion:'existing default 1'},settlement:{profileId:'creator-trusted-settlement-v1',aclVersion:3},campaign:{executed:false,reason:'Consumed D.110a full/preflight/profile campaign identities remain excluded by the governing freeze; default fixture path is byte-equivalent.',path:'package.json test:phase-6c-memory -> retained-heap-child.mjs full -> dynamic import retained-heap-worker.ts -> openD109dHotFixture -> openD109dFixture in runtime-reclamation-contract.ts -> openGenuineCreatorAdoptionFixture(options.creator) with no creatorTrustProfileId; worker adoption import is type-only',sources:Object.fromEntries(campaign.map(f=>[f,hash(fs.readFileSync(path.join(root,f)))]))},dynamicConsumers:{browser:'phase-6a-creator-successor-activation.pw.ts beforeAll dynamically imports adoption and activation fixtures; root owns browser gate',nodeDifferential:'packages/storage-node/tests/phase-6b-differential-exit-red.test.ts spawns one genuine root runtime-reclamation lifecycle title; retained as a genuine bounded transitive consumer, not merely suffix collision'},consumerInventory:callers.transitiveConsumers};
+fs.writeFileSync(path.join(out,'default-equivalence-final.json'),JSON.stringify(result,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify(result));

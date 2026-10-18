@@ -1,0 +1,28 @@
+{
+  "classification": "expected causal fixture-contract RED observed",
+  "total": 1,
+  "passed": 0,
+  "failed": 1,
+  "skipped": 0,
+  "fullName": "D.110c-0c1f5b live snapshot fixture contract rejects unsupported epoch-anchor installation without mutating genuine epoch-zero recovery bindings",
+  "durationMs": 154.93879199999992,
+  "token": "F5B_SNAPSHOT_FIXTURE_SUCCESSOR_INSTALL_REJECTS_WITHOUT_MUTATION",
+  "actualObservation": "missing-required-rejection",
+  "expectedObservation": "asynchronous-rejection with exact Error",
+  "failureMessages": [
+    "AssertionError: F5B_SNAPSHOT_FIXTURE_SUCCESSOR_INSTALL_REJECTS_WITHOUT_MUTATION: expected { kind: 'missing-required-rejection' } to deeply equal { Object (kind, error, ...) }\n    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b-snapshot-fixture-contract-red.test.ts:95:92\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20"
+  ],
+  "controls": {
+    "precedingAssertionsPassed": 15,
+    "inputAndFixtureBytesUnchanged": true,
+    "journalStateAndRowsUnchanged": true,
+    "issuanceLineageIssuedOutboxPlanUnchanged": true,
+    "genesisFirstNonIdempotentSecondIdempotent": true,
+    "genuineEpochZeroRecoverySucceededOnce": true,
+    "evidence": "Sole failure occurs at final outcome assertion after all source-frozen controls; no earlier assertion or cleanup failure"
+  },
+  "rawSha256": "d872372b11c080c720ccd6d967b582d570934b8d06ad7876a2a241be7d1feabe",
+  "stdoutSha256": "b68a9cf11f2483a302f2dc7482edabc22d9ffb3ab177ae600cfaeb34cf7ef7a6",
+  "stderrSha256": "b915054cf03ae4d1515ece481f7d9fddd61dddea614086e77ded5f1abb14d5c3",
+  "noRuntimeRerun": true
+}

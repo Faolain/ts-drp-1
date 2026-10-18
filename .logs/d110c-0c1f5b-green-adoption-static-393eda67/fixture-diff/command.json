@@ -1,0 +1,13 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": [
+    "git",
+    "diff",
+    "--check",
+    "--",
+    "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+    "tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts"
+  ],
+  "startedAt": "2026-09-06T03:48:26.773Z",
+  "recorderPid": 60518
+}

@@ -1,0 +1,1 @@
+{"allElevenPreviousOutcomesMatch":true,"addedCases":[{"name":"D.108d2 public return AST oracle > tracks the returned operands of assignment, comma and logical assignment expressions","status":"passed","failureMessages":[]}],"failedCaseByteIdentical":true,"preludeByteIdentical":true}

@@ -1,0 +1,17 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "eslint",
+    "examples/v3-room/src/index.ts",
+    "packages/node/src/creator-adoption.ts",
+    "packages/node/src/creator-close.ts",
+    "packages/node/src/internal/creator-transition-advance.ts",
+    "packages/node/src/v3-live.ts",
+    "packages/protocol-v3/src/creator-checkpoint.ts",
+    "packages/protocol-v3/src/creator-close.ts",
+    "packages/node/src/internal/closed-epoch-cleanup.ts"
+  ],
+  "start": "2026-09-06T06:17:21.629Z"
+}

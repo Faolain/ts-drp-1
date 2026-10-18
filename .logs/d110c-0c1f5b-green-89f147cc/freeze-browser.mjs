@@ -1,0 +1,14 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+const root='/Users/aristotle/Documents/Projects/ts-drp-1',out=path.dirname(new URL(import.meta.url).pathname);
+const report=JSON.parse(fs.readFileSync(path.join(out,'browser-collection/stdout')));
+const walk=suite=>(suite.specs??[]).concat((suite.suites??[]).flatMap(walk));
+const specs=report.suites.flatMap(walk);
+const excluded='D.110c-0c resumes a genuine epoch-3 pending adoption after both process-death orderings';
+const selected=specs.filter(spec=>spec.title!==excluded);
+if(specs.length!==17||selected.length!==16||selected.some(spec=>spec.tests.length!==1||spec.tests[0].projectName!=='chromium'))throw Error('Browser inventory differs');
+const files=['packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts','packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts'];
+const command=['pnpm','exec','playwright','test','--config='+path.join(root,files[0]),'--project=chromium','--grep-invert='+excluded.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'--reporter=json','--output='+path.join(out,'browser-closed-artifacts')];
+fs.writeFileSync(path.join(out,'browser-roster.json'),JSON.stringify({command,expectedCount:16,selectedTitles:selected.map(spec=>spec.title),excludedTitle:excluded,reason:'Unclosed process-death campaign; only closed lifecycle/adoption/recovery controls selected',sourceHashes:Object.fromEntries(files.map(file=>[file,crypto.createHash('sha256').update(fs.readFileSync(path.join(root,file))).digest('hex')])),originalCollection:specs},null,2)+'\n',{flag:'wx'});
+console.log(JSON.stringify({selected:16,excluded:1,command}));

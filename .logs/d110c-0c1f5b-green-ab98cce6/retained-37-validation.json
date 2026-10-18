@@ -1,0 +1,123 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 9,
+  "passed": 9,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-4c-snapshot-quarantine-red.test.ts",
+      "message": ""
+    }
+  ],
+  "topLevelErrors": [],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "ancestorTitles": [
+        "Phase 4c-b durable snapshot quarantine RED"
+      ],
+      "fullName": "Phase 4c-b durable snapshot quarantine RED pins one backend-neutral resource contract and exact physical schemas",
+      "status": "passed",
+      "title": "pins one backend-neutral resource contract and exact physical schemas",
+      "duration": 1.5678340000000048,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 4c-b durable snapshot quarantine RED"
+      ],
+      "fullName": "Phase 4c-b durable snapshot quarantine RED keeps the independent missing-set and retention oracle non-prefix and boundary-exact",
+      "status": "passed",
+      "title": "keeps the independent missing-set and retention oracle non-prefix and boundary-exact",
+      "duration": 10.193375000000003,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 4c-b durable snapshot quarantine RED"
+      ],
+      "fullName": "Phase 4c-b durable snapshot quarantine RED pins one closed failure taxonomy used by the causal backend cases",
+      "status": "passed",
+      "title": "pins one closed failure taxonomy used by the causal backend cases",
+      "duration": 0.12437499999998636,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 4c-b durable snapshot quarantine RED"
+      ],
+      "fullName": "Phase 4c-b durable snapshot quarantine RED binds the signed 4c-a predecessor and leaves package roots outside the new authority graph",
+      "status": "passed",
+      "title": "binds the signed 4c-a predecessor and leaves package roots outside the new authority graph",
+      "duration": 30.859166999999985,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 4c-b durable snapshot quarantine RED"
+      ],
+      "fullName": "Phase 4c-b durable snapshot quarantine RED has exactly one readiness failure for the four missing non-root owners",
+      "status": "passed",
+      "title": "has exactly one readiness failure for the four missing non-root owners",
+      "duration": 0.11312499999999659,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 4c-b durable snapshot quarantine RED",
+        "dormant GREEN receipt and public-surface contract"
+      ],
+      "fullName": "Phase 4c-b durable snapshot quarantine RED dormant GREEN receipt and public-surface contract adds only the four explicit non-root runtime surfaces and exact future types",
+      "status": "passed",
+      "title": "adds only the four explicit non-root runtime surfaces and exact future types",
+      "duration": 1895.619208,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 4c-b durable snapshot quarantine RED",
+        "dormant GREEN receipt and public-surface contract"
+      ],
+      "fullName": "Phase 4c-b durable snapshot quarantine RED dormant GREEN receipt and public-surface contract mints only after genuine 4c-a completion and rejects forged, foreign, wrong-scope and replayed receipts",
+      "status": "passed",
+      "title": "mints only after genuine 4c-a completion and rejects forged, foreign, wrong-scope and replayed receipts",
+      "duration": 16.803082999999788,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 4c-b durable snapshot quarantine RED",
+        "dormant GREEN receipt and public-surface contract"
+      ],
+      "fullName": "Phase 4c-b durable snapshot quarantine RED dormant GREEN receipt and public-surface contract never mints a receipt for missing or corrupt genuine source bytes",
+      "status": "passed",
+      "title": "never mints a receipt for missing or corrupt genuine source bytes",
+      "duration": 11.032416000000012,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "Phase 4c-b durable snapshot quarantine RED",
+        "dormant GREEN receipt and public-surface contract"
+      ],
+      "fullName": "Phase 4c-b durable snapshot quarantine RED dormant GREEN receipt and public-surface contract binds the aborting port to the exact quarantine receiver without widening signed 4c-a",
+      "status": "passed",
+      "title": "binds the aborting port to the exact quarantine receiver without widening signed 4c-a",
+      "duration": 6.042124999999942,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ]
+}

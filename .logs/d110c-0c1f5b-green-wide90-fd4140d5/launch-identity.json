@@ -1,0 +1,8 @@
+{
+  "node": "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+  "nodeVersion": "v22.15.0",
+  "nodeSha256": "6a1137a572bc6648411bfe51032173a535e010576cad6da87547f414daa11fdb",
+  "vitest": "/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/vitest@3.1.1_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vitest/vitest.mjs",
+  "vitestSha256": "39db22f579acf5639bbb17a261408debbde03f4692c0c439e77e7f13aeba74d6",
+  "cpuProfiling": false
+}

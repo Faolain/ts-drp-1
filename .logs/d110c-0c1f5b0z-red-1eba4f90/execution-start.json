@@ -1,0 +1,18 @@
+{
+  "head": "1eba4f9065d220afb0d77d90aac4a05b250a05bb",
+  "remote": "1eba4f9065d220afb0d77d90aac4a05b250a05bb",
+  "signature": "G",
+  "matrixSha256": "464e04a81d2d3e798f9cdcb43321b28b0070009b4291f0ed1fd79c98ca7f422d",
+  "command": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+    "--coverage.enabled=false",
+    "--reporter=json",
+    "--outputFile=/private/tmp/d110c-f5b0z-red-preflight-mWpFAK/focused.json"
+  ],
+  "executionCount": 1,
+  "startedAt": "2026-09-05T19:43:55.555Z"
+}

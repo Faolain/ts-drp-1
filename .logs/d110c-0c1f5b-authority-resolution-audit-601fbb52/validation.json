@@ -1,0 +1,26 @@
+{
+  "head": "0994db2904c942b1b744f5e46b8a8a98a0f7c35f",
+  "signature": "G",
+  "originExact": true,
+  "indexEmpty": true,
+  "sourceRuntimeUnchanged": true,
+  "productionOwners": 8,
+  "builtOwners": 7,
+  "stashes": 27,
+  "protectedPaths": 86522,
+  "sessionId": "e8edce4f-a127-4dec-bd0b-224c8f8e3ded",
+  "is_error": false,
+  "stop_reason": "end_turn",
+  "total_cost_usd": 3.3438644999999996,
+  "tools": [
+    "Read",
+    "Grep",
+    "Glob"
+  ],
+  "model": "claude-fable-5-1[1m]",
+  "effort": "high",
+  "advisoryOnly": true,
+  "noFormalAcceptance": true,
+  "noWorkloadExecuted": true,
+  "sourceEdits": false
+}

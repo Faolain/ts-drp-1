@@ -1,0 +1,271 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 20,
+  "passed": 20,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-10/result.json",
+  "baselineSha256": "03121576c0692d9f9a29182e6292612b8574a7fe9504157ea8e61704bd29a905",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED separates plane-local stores, authenticates both anchors and bootstraps the empty target once",
+      "status": "passed",
+      "title": "separates plane-local stores, authenticates both anchors and bootstraps the empty target once",
+      "duration": 1388.086833,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED recovers a committed target bootstrap after a pre-journal crash without issuing a duplicate",
+      "status": "passed",
+      "title": "recovers a committed target bootstrap after a pre-journal crash without issuing a duplicate",
+      "duration": 3.947791000000052,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED does not bootstrap an inconsistent issuance lineage after recovery installs journal genesis",
+      "status": "passed",
+      "title": "does not bootstrap an inconsistent issuance lineage after recovery installs journal genesis",
+      "duration": 4.629625000000033,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED rejects wrong readiness scope and snapshot scope before bootstrap or recovery",
+      "status": "passed",
+      "title": "rejects wrong readiness scope and snapshot scope before bootstrap or recovery",
+      "duration": 4.795458999999937,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED retires structural source rows, accepts the full configured plane bound, and gates new issue on rebase",
+      "status": "passed",
+      "title": "retires structural source rows, accepts the full configured plane bound, and gates new issue on rebase",
+      "duration": 753.2465,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED orders exact rebase and transform inputs while expire and held review perform no issue",
+      "status": "passed",
+      "title": "orders exact rebase and transform inputs while expire and held review perform no issue",
+      "duration": 9.775125000000116,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED closes one source exactly once after every child has a terminal outcome",
+      "status": "passed",
+      "title": "closes one source exactly once after every child has a terminal outcome",
+      "duration": 3.625499999999647,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED preserves published source work and completes pending work only after target acceptance",
+      "status": "passed",
+      "title": "preserves published source work and completes pending work only after target acceptance",
+      "duration": 5.764000000000124,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED batches sixteen compatible rebases behind one target signature",
+      "status": "passed",
+      "title": "batches sixteen compatible rebases behind one target signature",
+      "duration": 4.835790999999972,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED splits seventeen compatible rebases into sixteen plus one",
+      "status": "passed",
+      "title": "splits seventeen compatible rebases into sixteen plus one",
+      "duration": 5.020416000000296,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED refuses a foreign-author displaced intent before signing or issuing",
+      "status": "passed",
+      "title": "refuses a foreign-author displaced intent before signing or issuing",
+      "duration": 1.8933329999999842,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED sorts displaced pages before assigning fresh target logical times",
+      "status": "passed",
+      "title": "sorts displaced pages before assigning fresh target logical times",
+      "duration": 2.586124999999811,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED suppresses an accepted exact identity before issue and rejects changed bytes",
+      "status": "passed",
+      "title": "suppresses an accepted exact identity before issue and rejects changed bytes",
+      "duration": 4.168999999999869,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED keeps the source pending and terminally exposes target issue or publication failure",
+      "status": "passed",
+      "title": "keeps the source pending and terminally exposes target issue or publication failure",
+      "duration": 14.906332999999904,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED keeps a failed source completion pending and retries it on reopen",
+      "status": "passed",
+      "title": "keeps a failed source completion pending and retries it on reopen",
+      "duration": 3.401875000000018,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED fails unknown policy and unstable transform identity before target issuance",
+      "status": "passed",
+      "title": "fails unknown policy and unstable transform identity before target issuance",
+      "duration": 10.785665999999765,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED keeps a transformed source pending when the product projection rejects its replacement",
+      "status": "passed",
+      "title": "keeps a transformed source pending when the product projection rejects its replacement",
+      "duration": 2.4302499999998872,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED keeps a recovered projection-rejected replacement and its source pending without reissue",
+      "status": "passed",
+      "title": "keeps a recovered projection-rejected replacement and its source pending without reissue",
+      "duration": 2.3893749999997453,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED rejects partial, extra and accessor-backed policy evidence before consuming a source row",
+      "status": "passed",
+      "title": "rejects partial, extra and accessor-backed policy evidence before consuming a source row",
+      "duration": 2.2858750000000327,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3g-v3-room-rebase-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3g room-owned rebase scheduling RED"
+      ],
+      "fullName": "Phase 3g room-owned rebase scheduling RED keeps the reserved terminal activation outside the real chat and zone displacement policies",
+      "status": "passed",
+      "title": "keeps the reserved terminal activation outside the real chat and zone displacement policies",
+      "duration": 150.22670800000014,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "5bd351529a782d05a9d3ff35d0cd9b3730aa0373a42f012bc424359c5dc79747",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

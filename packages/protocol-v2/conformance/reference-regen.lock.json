@@ -1,0 +1,25 @@
+{
+	"algorithm": "sha256",
+	"files": {
+		"README.md": "f56ee060be379e31d524d06554fbb10e86da9d339c30be8570d29d184ed7184c",
+		"package.json": "b39d107ae901c6f6f79ba1d38862ee1d28236d28f197c4576d414542127df16d",
+		"src/bytes.js": "8bdcb50cf86592225a1427dd829f83910dc5dbbaf138647173851129ac8665eb",
+		"src/canonical.js": "425d03ebc8a1a8a635842e0b56e310157801aa4895c739b4909a57516e1f5208",
+		"src/hash.js": "fba709e311c372a24650b1a1bde3fdd7cf0eb547f789be6ef07236d4c82f30aa",
+		"src/registry.js": "fe4c1293d86b34058c13886d9813d6e059ac51192fc0839ef25decf0156c1b81"
+	},
+	"provenance": {
+		"originalReferenceLock": {
+			"path": "packages/protocol-v2/conformance/reference.lock.json",
+			"sha256": "ada22a8aa8c5e190e41d5cd8de84ed288d5a0047b10ef579602c28e50f294ffd"
+		},
+		"registry": {
+			"path": "packages/protocol-v2/registry/field-registry.json",
+			"sha256": "d073c5b01dc31c121de5fcd0925697a8a3f0839bf9fcf2c7ddde15489b49f724"
+		},
+		"vectors": {
+			"path": "packages/protocol-v2/tests/fixtures/golden-vectors/registry-v5.json",
+			"sha256": "2635989755ac300c1643f327ee7278d7aa0c72c67310b80ef56bb1eabe42b13e"
+		}
+	}
+}

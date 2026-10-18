@@ -4,12 +4,20 @@ import { handlePromiseOrValue } from "@ts-drp/utils";
 
 import { Channel, ChannelClosedError } from "./channel.js";
 
+interface QueuedEntry<T> {
+	readonly message: T;
+	readonly joined?: Readonly<{ resolve(): void; reject(error: unknown): void }>;
+}
+
 /**
  * A message queue.
  */
 export class MessageQueue<T> implements IMessageQueue<T> {
 	private readonly options: Required<IMessageQueueOptions>;
-	private channel: Channel<T>;
+	private channel: Channel<QueuedEntry<T>>;
+	// Only unentered joined entries. Entered handlers retain custody until join,
+	// even if close discards the remainder of this generation.
+	private readonly unenteredJoined = new Set<QueuedEntry<T>>();
 	private isActive: boolean = true;
 	// List of subscriber handlers
 	private subscribers: Array<(message: T) => void | Promise<void>> = [];
@@ -25,7 +33,7 @@ export class MessageQueue<T> implements IMessageQueue<T> {
 	 */
 	constructor(options: IMessageQueueOptions = { id: "default" }) {
 		this.options = this.getOptions(options);
-		this.channel = new Channel<T>({ capacity: this.options.maxSize });
+		this.channel = new Channel<QueuedEntry<T>>({ capacity: this.options.maxSize });
 		this.logger = new Logger(`drp::message-queue::${this.options.id}`, this.options.logConfig);
 	}
 
@@ -47,7 +55,33 @@ export class MessageQueue<T> implements IMessageQueue<T> {
 		if (!this.isActive) {
 			throw new Error("Message queue is closed");
 		}
-		await this.channel.send(message);
+		if (message === undefined) throw new Error("Unexpected undefined value in channel");
+		await this.channel.send({ message });
+	}
+
+	/**
+	 * Enqueue with custody through all entered handlers. This is a lifetime join,
+	 * not an application-success acknowledgment. Unentered close/capacity refusal
+	 * rejects; a handler failure keeps the existing logged fanout semantics.
+	 * @param message - Message whose owner needs joined/discard completion.
+	 * @returns Completion after fanout joins, or rejection before entry.
+	 */
+	enqueueJoined(message: T): Promise<void> {
+		if (!this.isActive) return Promise.reject(new Error("Message queue is closed"));
+		if (message === undefined) return Promise.reject(new Error("Unexpected undefined value in channel"));
+		let resolve!: () => void;
+		let reject!: (error: unknown) => void;
+		const completion = new Promise<void>((ok, fail) => {
+			resolve = ok;
+			reject = fail;
+		});
+		const entry: QueuedEntry<T> = { message, joined: { resolve, reject } };
+		this.unenteredJoined.add(entry);
+		void this.channel.send(entry).catch((error: unknown) => {
+			this.unenteredJoined.delete(entry);
+			reject(error);
+		});
+		return completion;
 	}
 
 	/**
@@ -76,20 +110,31 @@ export class MessageQueue<T> implements IMessageQueue<T> {
 	 * @param channel - The channel owned by this fanout loop generation.
 	 * @param previousLoopDone - Completion of the preceding generation.
 	 */
-	private async runFanoutLoop(channel: Channel<T>, previousLoopDone: Promise<void>): Promise<void> {
+	private async runFanoutLoop(channel: Channel<QueuedEntry<T>>, previousLoopDone: Promise<void>): Promise<void> {
 		try {
 			await previousLoopDone;
 			while (this.isActive && channel === this.channel) {
 				try {
-					const message = await channel.receive();
-
-					for (const handler of this.subscribers) {
-						try {
-							await handlePromiseOrValue(handler, (handler) => handler(message));
-							this.logger.trace(`queue::processed message ${message}`);
-						} catch (error) {
-							this.logger.error(`queue::error processing message ${message}:`, error);
+					const entry = await channel.receive();
+					this.unenteredJoined.delete(entry);
+					// A receive may have resolved just before close. It has not entered
+					// any handler yet and must not execute after its discard/refund.
+					if (!this.isActive || channel !== this.channel) {
+						entry.joined?.reject(new ChannelClosedError());
+						break;
+					}
+					const message = entry.message;
+					try {
+						for (const handler of this.subscribers) {
+							try {
+								await handlePromiseOrValue(handler, (handler) => handler(message));
+								this.logger.trace(`queue::processed message ${message}`);
+							} catch (error) {
+								this.logger.error(`queue::error processing message ${message}:`, error);
+							}
 						}
+					} finally {
+						entry.joined?.resolve();
 					}
 				} catch (error) {
 					// When the channel is closed, exit the loop.
@@ -117,6 +162,8 @@ export class MessageQueue<T> implements IMessageQueue<T> {
 		}
 		this.isActive = false;
 		this.channel.close();
+		for (const entry of this.unenteredJoined) entry.joined?.reject(new ChannelClosedError());
+		this.unenteredJoined.clear();
 	}
 
 	/**
@@ -128,7 +175,7 @@ export class MessageQueue<T> implements IMessageQueue<T> {
 			return;
 		}
 		this.isActive = true;
-		this.channel = new Channel<T>({ capacity: this.options.maxSize, logOptions: this.options.logConfig });
+		this.channel = new Channel<QueuedEntry<T>>({ capacity: this.options.maxSize, logOptions: this.options.logConfig });
 		this.fanoutLoopStarted = false;
 		this.startFanoutLoop();
 	}

@@ -1,0 +1,455 @@
+commit fc384d1fe3d503bb9e3706e97bf62bea39fe8a7c
+Author:     Faolain <Faolain@users.noreply.github.com>
+AuthorDate: Wed Sep 2 20:07:30 2026 -0400
+Commit:     Faolain <Faolain@users.noreply.github.com>
+CommitDate: Wed Sep 2 20:07:30 2026 -0400
+
+    docs: freeze D110c issuance retirement checkpoint plan
+
+diff --git a/.logs/d110c-0c1-architecture-audit-d6f5de26/audit.json b/.logs/d110c-0c1-architecture-audit-d6f5de26/audit.json
+new file mode 100644
+index 00000000..c4abe58a
+--- /dev/null
++++ b/.logs/d110c-0c1-architecture-audit-d6f5de26/audit.json
+@@ -0,0 +1,13 @@
++{
++  "anchorCommit": "d6f5de263c5d0bcabe4df25532a0a8d3dcf0ccbd",
++  "anchorTree": "17ecf3edf922ca3b27e96a5c8b25ae7888f67146",
++  "currentAuthenticatedBoundarySufficient": false,
++  "decision": "creator-signed-cumulative-issuance-retirement-checkpoint",
++  "implementationAuthorized": false,
++  "newPublicProductApi": false,
++  "newProtocolControlCarrier": true,
++  "newWireOrRegistryContract": true,
++  "requiresHighRiskPrerequisite": true,
++  "selectedStorage": "one replaceable authenticated AHE closure candidate",
++  "storeSchemaChangeRequired": false
++}
+diff --git a/.logs/d110c-0c1-architecture-audit-d6f5de26/audit.md b/.logs/d110c-0c1-architecture-audit-d6f5de26/audit.md
+new file mode 100644
+index 00000000..87031555
+--- /dev/null
++++ b/.logs/d110c-0c1-architecture-audit-d6f5de26/audit.md
+@@ -0,0 +1,120 @@
++# D.110c-0c1 authenticated issuance-retirement architecture audit
++
++Anchor commit `d6f5de263c5d0bcabe4df25532a0a8d3dcf0ccbd`, tree
++`17ecf3edf922ca3b27e96a5c8b25ae7888f67146`.
++
++## Demonstrated seam
++
++`creatorFilteredIssuanceStore()` (`packages/node/src/v3-live.ts:4550-4624`)
++can authenticate current/successor-relative rows and the pinned genesis row.
++It cannot authenticate the genuine epoch-1 row during epoch-3 reopen.
++`recoverV3LiveReplica()` consequently rejects that row at
++`v3-live.ts:5097-5098`. Both predecessor and successor views are affected
++(`v3-live.ts:7377-7439`), as are later publication and rebase scans through the
++registered filtered view.
++
++## Existing proof inventory
++
++- `openCreatorCheckpointTrust()` authenticates pinned genesis plus exactly one
++  predecessor/current pair. The current anchor binds only its immediate
++  predecessor (`packages/protocol-v3/src/creator-checkpoint.ts:280-297`).
++- The hard-cut and epoch-anchor registries commit state, ACL, compact history,
++  snapshot, archive, signer, parameters, and the immediate previous anchor.
++  Neither schema carries a per-author resolved sequence frontier
++  (`packages/protocol-v3/src/creator-close.ts:64-80,387-410`).
++- `DurableIssuanceStore` exposes only six ordinary methods and `readLineage()`
++  omits the pruning watermark (`packages/issuance-store/src/types.ts:83-90`).
++- `prunedThroughAuthorSequence` is local maintenance state. Its receipt is
++  bound to a caller-supplied closed epoch, QC ref, snapshot digest, and lineage,
++  but it is not signed or authenticated from the pinned room genesis
++  (`packages/issuance-store/src/maintenance.ts:14-43`).
++- Physical pruning is implemented in Node/browser maintenance and tests, but no
++  product path under `packages/` or `examples/` invokes
++  `prunePublishedPrefix()`. Deletion alone also cannot authenticate a retained
++  or missing prefix after hostile storage rollback.
++- The compact RFC 9162 frontier authenticates history-root evolution, not the
++  proposition that a particular author's durable sequences through S are
++  completely represented and safe to retire.
++
++## Candidate decision
++
++| Family                                                    | Authentication                                                                                                                                 | Epoch growth                                          | Disposition                                                                                       |
++| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
++| Current/immediate-predecessor row filtering               | Authenticates only genesis and the bounded adjacent window                                                                                     | O(1)                                                  | Insufficient for arbitrary old retained rows.                                                     |
++| Decode/signature-check a claimed old epoch                | The row signs its own anchor claim but does not prove that anchor belongs to the accepted room lineage or that no unresolved address is hidden | O(1)                                                  | Rejected.                                                                                         |
++| Trust the database watermark or require physical deletion | Store-local state is not authenticated from genesis; failure may retain too much                                                               | O(1)                                                  | Rejected as sole authority; retained as an execution mechanism after authenticated authorization. |
++| Retain all old anchors/ACLs/cuts/QCs                      | Directly verifies every historical row                                                                                                         | O(N)                                                  | Rejected by the bounded control-state law.                                                        |
++| Add a cumulative creator-signed retirement checkpoint     | Stable creator authority signs the current cumulative resolved address frontier and binds it to the authenticated successor checkpoint         | One current candidate plus one transition predecessor | Selected, subject to a separate high-risk protocol-contract RED/GREEN.                            |
++
++## Selected control record
++
++D.110c-0c1a must define one canonical
++`drp-creator-issuance-retirement-state` record and a domain-separated
++`ts-drp/creator-issuance-retirement/v1` signature. The exact record binds:
++
++- protocol/version, object id, pinned genesis digest, creator issuance author;
++- closed/current epoch and anchor;
++- successor epoch and anchor;
++- exact cut-value, commit-QC, and snapshot-manifest digests;
++- the previous retirement-record digest (or the one frozen genesis sentinel);
++- previous inclusive resolved author sequence (nullable only for the initial
++  checkpoint), new inclusive resolved sequence, and observed lineage next.
++
++The record is signed by the existing stable `creator-trusted-v1` finality key,
++whose public key is authenticated by pinned genesis. It is stored as exactly one
++replaceable AHE closure candidate. It is not a database watermark and is not
++trusted because it is present in storage. Its opener reconstructs the creator
++authority from pinned genesis, verifies the detached signature, exact room and
++scope, exact current/successor heads, cut/QC/snapshot bindings, monotonic
++sequence relation, and previous-candidate digest during transition. Cold reopen
++requires the one current record bound to the independently authenticated room
++floor. Missing, duplicate, stale, future, cross-room, cross-author, forked, or
++malformed records fail closed.
++
++At close, the minting owner starts from the authenticated prior retirement
++checkpoint, reads the exact issuance lineage and the complete unretired prefix,
++requires issued/outbox byte equality, dense increasing addresses, canonical
++vertices, valid signatures, current room/anchor/epoch, `published` state, and
++membership of every newly covered digest in the captured close graph and
++durable replay. It sets `throughAuthorSequence = observedLineage.next - 1` and
++does not mint if any address is missing, pending, substituted, or outside the
++closed graph. The successor anchor and Cut/QC/snapshot identities are known
++before the deterministic Ed25519 signature is completed. The proposed AHE
++closure contains the new record and retires the previous record only through
++the shared bounded transition predicate.
++
++During recovery, an authenticated boundary authorizes classification only for
++addresses at or below `throughAuthorSequence`. The wrapper still requires an
++exact issued/outbox pair, canonical object/author/sequence, valid author
++signature and `published` state; it uses the creator certificate—not the row's
++claimed old anchor or database watermark—as the authority that the address is
++resolved. Rows above the boundary retain current/displaced admission and
++offline/rebase behavior. One per-scan combined hidden-row ceiling applies.
++
++Physical pruning remains D.109/D.110c-c execution after verified adoption,
++floor commit, snapshot availability, two rollback generations, outbox
++completion, and authenticated certificate match. Refusal or crash may retain
++certified rows. It may not advance the signed boundary, remove an uncertified
++address, or make partial progress look complete.
++
++## Compatibility boundary and required reslice
++
++This choice adds a protocol-v3 control-record/registry contract and a new
++protocol-owned finality signing request. It therefore requires the explicit
++high-risk D.110c-0c1a prerequisite before any filter implementation. It does
++not require a new product API, dependency, cryptographic primitive, epoch
++anchor/Cut wire field, or issuance database migration: the signed carrier is a
++bounded AHE closure blob and reuses Ed25519 plus the existing finality signer.
++
++Compatibility is limited deliberately. Fresh rooms create the initial
++checkpoint during 0→1 while the genuine epoch-0 close graph, durable replay,
++and pinned-genesis row are all present. Any inherited epoch≥1 closure without a
++retirement checkpoint fails closed and requires an explicit migration/recovery
++decision: bounded current trust can authenticate an old row's signature but
++does not prove its membership in the already-completed close. The repository
++has not shipped a genuine repeated-epoch producer, so it must not invent that
++proof silently.
++
++No production implementation is authorized by this audit. The next checkpoint
++is the signed plan and governing Grok/Kimi/Opus review of the exact 0c1a design,
++followed by a tests-only causal RED.
+diff --git a/.logs/d110c-0c1-architecture-audit-d6f5de26/commands.txt b/.logs/d110c-0c1-architecture-audit-d6f5de26/commands.txt
+new file mode 100644
+index 00000000..89da79a1
+--- /dev/null
++++ b/.logs/d110c-0c1-architecture-audit-d6f5de26/commands.txt
+@@ -0,0 +1,5 @@
++git rev-parse HEAD^{commit}
++git rev-parse HEAD^{tree}
++shasum -a 256 packages/node/src/v3-live.ts packages/node/src/creator-close.ts packages/node/src/internal/closed-epoch-cleanup.ts packages/issuance-store/src/types.ts packages/issuance-store/src/maintenance.ts packages/protocol-v3/src/creator-close.ts packages/protocol-v3/src/creator-checkpoint.ts packages/protocol-v3/registry/registry-v1.json examples/v3-room/src/index.ts
++rg -n "prunePublishedPrefix\\(" packages examples --glob '!**/tests/**' --glob '!**/test/**'
++rg -n "prunedThroughAuthorSequence|creatorFilteredIssuanceStore|readOutboxPage|readIssued|publishPending|readRebaseOutbox|previousAnchor|snapshotManifestDigest|historyRoot|authorSequence" packages/issuance-store/src packages/node/src packages/protocol-v3/src examples/v3-room/src
+diff --git a/.logs/d110c-0c1-architecture-audit-d6f5de26/manifest.sha256 b/.logs/d110c-0c1-architecture-audit-d6f5de26/manifest.sha256
+new file mode 100644
+index 00000000..66f458a6
+--- /dev/null
++++ b/.logs/d110c-0c1-architecture-audit-d6f5de26/manifest.sha256
+@@ -0,0 +1,4 @@
++ec57bb766bcafdc1c3c3a49bf2c8e498f36e173d02769bb1a4106c0722c265b0  audit.json
++3cb40fd36b74889c0101d2f388f6bc14df3547b4d54b1cab7896058a64f7d819  audit.md
++d0f16aa052e50c01ea756ccd48ff84dfa033065a32713984582752ae256387ac  commands.txt
++761f29d121ae63ad3ed2d5f25a9ba3d388c7f3d122ebde74c4bf7d3d1c30ac87  source-hashes.sha256
+diff --git a/.logs/d110c-0c1-architecture-audit-d6f5de26/source-hashes.sha256 b/.logs/d110c-0c1-architecture-audit-d6f5de26/source-hashes.sha256
+new file mode 100644
+index 00000000..20cde5e2
+--- /dev/null
++++ b/.logs/d110c-0c1-architecture-audit-d6f5de26/source-hashes.sha256
+@@ -0,0 +1,9 @@
++69a8134fe8ad895f388dc93d02bdafc2b216b35f1cd5d06b597fab2d59487f19  packages/node/src/v3-live.ts
++911350d1739a0659d28950193f2a48d2ae3d53e230ffe31707ea506976e54fe8  packages/node/src/creator-close.ts
++72b78915f65ee60b4b1f38be4edcebf662731dcf24f8f9edd91db931912c39fe  packages/node/src/internal/closed-epoch-cleanup.ts
++405ad160cf0bdb2ef6fb33dda81910f0435450fb7bb7ed85362ccd8605cdbf12  packages/issuance-store/src/types.ts
++31d4443ea1ac3753f589fe8153602a62fdaeb39a7a5d67fb21cffcd0b2eaefae  packages/issuance-store/src/maintenance.ts
++abb54cdabda724888aabed2119df45c8678623e6d701f8366a9f7919f018c95b  packages/protocol-v3/src/creator-close.ts
++4a44cb2d12788bb3aec5b692e0ca2479b7ab7e4ca3a64c97f41915a8860e62f2  packages/protocol-v3/src/creator-checkpoint.ts
++2fd6f51286e06f2c3c634c244a0242a55da186258664ec54a371f19b814a11d9  packages/protocol-v3/registry/registry-v1.json
++3926bbd008fb6b5791d2b0df3fed11cc7110c1b682ead0d3b17ba5f3c1281292  examples/v3-room/src/index.ts
+diff --git a/docs/production-hardening/production-hardening-tdd-plan-v2.md b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+index c4f6a4e5..76725521 100644
+--- a/docs/production-hardening/production-hardening-tdd-plan-v2.md
++++ b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+@@ -95499,8 +95499,9 @@ RED-to-GREEN closure and is prohibited.
+ 
+ ##### D.110c-0c1 authenticated intermediate-epoch issuance prerequisite
+ 
+-**Status: bounded decision/RED plan required before any `v3-live.ts` or
+-issuance-store production edit.** Owner: the predecessor and successor issuance
++**Status: bounded architecture decision complete; implementation and causal RED
++remain blocked on D.110c-0c1a GREEN before any `v3-live.ts` or issuance-store
++production edit.** Owner: the predecessor and successor issuance
+ views created by `packages/node/src/v3-live.ts::activateCreatorSuccessorLive()`,
+ `creatorFilteredIssuanceStore()`, their exact outbox classification inside
+ `recoverV3LiveReplica()`, and the registered view's `publishPending` and
+@@ -95527,7 +95528,7 @@ chain, manufacture displaced authority, mark an unpublished row published,
+ trust the issuance database as an authority, weaken the two-generation rollback
+ window, or hide growth outside the D.110c-c/d durable census.
+ 
+-Before production edits, the bounded architecture decision compares exactly:
++The bounded architecture audit compares exactly:
+ 
+ 1. authenticated discard-only classification of signed obsolete rows against
+    the retained current/immediate-predecessor trust and ACL material;
+@@ -95537,13 +95538,13 @@ Before production edits, the bounded architecture decision compares exactly:
+ 4. retaining older authority/projection material, which is rejected unless it
+    can meet the existing O(1) control-state law.
+ 
+-If options 2 or 3 require a new issuance-store method, browser schema/version,
+-wire field, public API, or migration, the decision stops and freezes that exact
+-high-risk prerequisite before implementation. Option 1 is acceptable only if
+-the audit proves a hostile-store substitution cannot cause a current or pending
+-row to be classified obsolete; a signed claimed epoch alone is not proof.
++The audit below rejects options 1, 3 as a sole authority, and 4; it selects a
++bounded signed-control form of option 2 and freezes its exact high-risk
++protocol-contract prerequisite as D.110c-0c1a before implementation. A signed
++claimed epoch alone remains insufficient.
+ 
+-RED remains tests-only. First, one corrected diagnostic invocation must retain
++After D.110c-0c1a GREEN, D.110c-0c1 RED remains tests-only. First, one corrected
++diagnostic invocation must retain
+ both old-AHE and new-AHE orderings after `active-new`, proving exact floor/AHE
+ effects and the identical post-commit reopen classification without aborting
+ after the first ordering. Then a deterministic real-store prefix differential
+@@ -95596,8 +95597,9 @@ durable commit and the separate post-commit seam; they are explicitly not a
+ GREEN or permission to edit `v3-live.ts`.
+ 
+ GREEN implements only the reviewed selected family. It must make the unchanged
+-epoch-0/1/2 fixture cold reopen epoch 3 and issue/publish its fourth message in
+-both crash orderings while preserving the exact first-transition pending matrix
++epoch-0/1/2 fixture complete its same-process post-commit epoch-3 reopen and
++issue/publish its fourth message in both crash orderings while preserving the
++exact first-transition pending matrix
+ and the signed D.110c-0c RED. The N≥1 pending authenticator also applies the
+ same commit-phase/current-epoch QC filtering used by the retained cold-reopen
+ owner before its exactly-one opener. Adversarial gates cover a forged lower epoch,
+@@ -95658,17 +95660,203 @@ self-excluding manifest SHA-256 is
+ This authorization is consumed; no further Fable review is permitted without
+ new express authorization.
+ 
++The bounded post-diagnostic source audit is now pinned to signed/pushed
++non-GREEN checkpoint `d6f5de263c5d0bcabe4df25532a0a8d3dcf0ccbd`, tree
++`17ecf3edf922ca3b27e96a5c8b25ae7888f67146`. It confirms that current data is
++not sufficient for a general age-independent intermediate-row decision.
++`openCreatorCheckpointTrust()` authenticates pinned genesis and exactly one
++predecessor/current pair; the current anchor commits only its immediate
++predecessor. The cut/anchor schemas authenticate state, ACL, compact history,
++snapshot, archive, signer, parameters, and adjacent lineage, but no per-author
++resolved sequence. `DurableIssuanceStore.readLineage()` omits the maintenance
++watermark, while `prunedThroughAuthorSequence` and its pruning receipt are
++store-held unsigned facts. No product path invokes `prunePublishedPrefix()`.
++The RFC 9162 history frontier authenticates accumulated history, not the claim
++that every local issuance address through one ordinal is represented and safe
++to retire.
++
++The decision matrix therefore rejects four incomplete constructions:
++
++1. current/immediate-predecessor filtering cannot authenticate an arbitrary
++   retained epoch;
++2. decoding and signature-checking a row's self-claimed old epoch/anchor does
++   not establish accepted room lineage or prefix completeness;
++3. a database watermark or physical deletion alone is not an authority under
++   the untrusted-durable-bytes model and cannot cover fail-safe retained rows;
++   and
++4. retaining all prior anchors, ACLs, cuts, or QCs violates the O(1)-in-epoch
++   control-state law.
++
++The selected family is one **creator-signed cumulative issuance-retirement
++checkpoint**, stored as exactly one replaceable AHE closure candidate. It is
++authenticated by the stable `creator-trusted-v1` finality key already rooted in
++the pinned genesis, binds the current local creator issuance scope to the
++authenticated successor checkpoint, and directly attests the inclusive
++resolved author-sequence frontier. It neither trusts the database watermark nor
++requires replay of an old authority chain. This selection is creator-only: a
++future rotating signer or independently reopening non-creator writer requires
++its own reviewed authority design and is not silently claimed here.
++
++The exact canonical
++`drp-creator-issuance-retirement-state` v1 record is signed over domain
++`ts-drp/creator-issuance-retirement/v1` and binds all of:
++
++- protocol/version, object id, pinned genesis digest, and creator issuance
++  author;
++- closed/current epoch and anchor plus successor epoch and anchor;
++- the exact cut-value digest, commit-QC ref, and snapshot-manifest digest;
++- the prior retirement-candidate digest or the frozen genesis sentinel;
++- prior inclusive resolved author sequence, nullable only for initialization;
++  and
++- new inclusive resolved author sequence plus the exact observed issuance
++  lineage `{ exhausted, next }` from which it is derived.
++
++The initial and advancing rules are exact. A fresh room emits its first
++checkpoint during 0→1 close while its genuine epoch-0 close graph, durable
++replay, and pinned-genesis issuance row are present. Any inherited epoch≥1 room
++with no checkpoint fails closed and requires a separate migration/recovery
++decision: bounded current trust can authenticate an old row's signature but
++cannot prove its membership in an already-completed close. No genuine
++repeated-epoch producer has shipped, so the plan does not invent compatibility
++evidence. Thereafter each close requires exactly one authenticated previous
++checkpoint and replaces it with exactly one successor checkpoint. The
++successor record directly authenticates the cumulative fact under the stable
++genesis signer; the prior digest is used to enforce transition continuity while
++both adjacent closures exist, not to create an O(N) proof chain.
++
++Minting starts from the authenticated prior checkpoint and exact issuance
++scope. It reads the lineage and every address strictly above the prior boundary
++through `lineage.exhausted ? lineage.next : lineage.next - 1`. Every new address
++must be dense and increasing and have one byte-identical issued/outbox pair, a
++canonical vertex, valid author signature, exact current room/anchor/epoch,
++`published` state, and a digest present in both the captured close graph and
++sealed durable replay. Missing, duplicate, pending, malformed, substituted,
++cross-scope, non-current, or non-member rows refuse signing. The successor
++anchor, Cut/QC, and snapshot identities are fixed before completing the
++deterministic Ed25519 signature. A close with no newly issued address carries
++the prior sequence forward while rebinding it to the new successor checkpoint.
++
++Cold reopen never trusts this record merely because storage returned it. The
++opener consumes pinned-genesis-derived creator trust plus the independently
++authenticated room floor, verifies the exact signature and all scope/head/
++Cut/QC/snapshot fields, and requires the one candidate selected from the
++bounded active closure. Missing, duplicate, stale, future, cross-room,
++cross-author, forked, malformed, or nonmonotonic candidates fail closed. An
++authenticated boundary permits old-address classification only at or below its
++inclusive sequence. The wrapper still requires exact issued/outbox equality,
++canonical object/author/sequence, a valid author signature, and `published`
++state; the creator checkpoint, not the row's claimed old anchor or database
++watermark, supplies the authority that the address is resolved. Rows above the
++boundary retain existing current/displaced admission and offline/rebase
++custody. One combined per-scan `maxEpochVertices` counter bounds all hidden
++rows.
++
++Physical pruning remains an execution mechanism owned by D.109/D.110c-c. It may
++run only after verified adoption, authenticated floor commit, snapshot
++availability, two complete rollback generations, outbox completion, and exact
++retirement-checkpoint agreement. Refusal or crash may retain certified rows;
++neither can advance the certificate, remove an uncertified address, or report a
++partial deletion as complete.
++
++This design introduces a protocol-v3 control-record/registry contract and a new
++protocol-owned finality signing request. That is a material high-risk
++compatibility boundary. It does not require a new cryptographic primitive,
++dependency, epoch-anchor/Cut field, product API, or issuance database schema:
++the signed record is one bounded AHE closure blob and reuses existing Ed25519,
++the existing creator finality signer, exact AHE blob/ref storage, and current
++room-floor authority. Per the stop rule, no production implementation begins
++inside D.110c-0c1. The new prerequisite below owns that contract first. The
++audit evidence is
++`.logs/d110c-0c1-architecture-audit-d6f5de26/`; its validated nine-source hash
++inventory is inside the root and its four-entry self-excluding manifest
++SHA-256 is
++`814f98305ea36ee3a0a37bdf07055dd4fbae8ac053b7bf5c58148904754bb1cd`.
++
++###### D.110c-0c1a creator-signed issuance-retirement checkpoint prerequisite
++
++**Status: plan review required; no production implementation authorized.**
++Owner: protocol-v3 creator retirement record/opener and one-use signing request,
++keychain finality signing dispatch, the creator-close row/graph/replay capture,
++the shared creator transition classifier's exact-one replacement law, and
++pending/reopen AHE closure preservation. Deadline: GREEN before D.110c-0c1 may
++change `creatorFilteredIssuanceStore()`, before D.110c-0c may claim its
++same-process epoch-3 reopen, and before D.110c-c/d or Phase 7 consumes repeated
++epochs.
++
++The tests-only RED uses a fresh genuine 0→1 creator close. It proves the current
++proposed closure contains zero authenticated
++`drp-creator-issuance-retirement-state` candidates even though the exact
++issuance lineage and published bootstrap row exist, and terminates only with
++`D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE`. A second product-shaped row
++extends the lineage before close and must leave the same exact causal failure;
++no fixture writes a carrier or mutates the AHE closure. The RED evidence records
++the exact row keys/digests, lineage, graph membership, durable-replay result,
++cut/QC/snapshot/successor identities, selected closure, one-test/one-file
++listing, reporter counts, and the complete token. Any earlier close failure,
++different missing candidate, or hidden source mutation stops the slice.
++
++GREEN implements only the reviewed carrier prerequisite:
++
++1. add the exact registry kind, canonical capture, prepare/complete/open APIs,
++   opaque verified capability, and one-use domain-separated signing request;
++2. extend finality-key custody only with the matching protocol-owned request;
++   arbitrary-digest signing remains impossible;
++3. derive the dense published boundary through genuine creator close graph,
++   issuance, and durable-replay owners before producing the successor-bound
++   record;
++4. stage exactly one signed record in the proposed AHE closure, preserve it
++   through pending process death, and replace the adjacent predecessor record
++   with no third live copy or uncounted sibling state;
++5. enforce fresh 0→1 initialization, ordinary monotonic advance,
++   same-boundary advance, and inherited epoch≥1 missing-record refusal pending
++   a separately reviewed migration;
++   and
++6. expose no filter/skip decision yet. D.110c-0c1 remains the sole consumer
++   that classifies old addresses from the verified capability.
++
++Adversarial GREEN rows cover wrong creator signer, altered signature/preimage,
++wrong object/genesis/author/current or successor head, wrong Cut/QC/snapshot,
++stale prior digest, decreased or jumped sequence, inconsistent exhausted/next,
++missing/duplicate record, duplicate/gapped issued address, issued/outbox
++substitution, pending row, valid same-room fork, graph/replay omission,
++post-capture mutation, ambiguous persistence, and replay after candidate
++replacement. The closure census proves exactly one active retirement candidate,
++at most one adjacent predecessor during atomic advance, and constant bytes with
++epoch count for fixed scope/field sizes.
++
++Focused protocol/keychain/control-plane/Node tests run once for RED and once for
++GREEN. GREEN then retains creator close/seal/QC, 0b0/0b1 checkpoint opening and
++bounded closure, 0c pending process-death, Phase-6a adoption/reopen,
++issuance/outbox/offline-rebase, AHE crash/CAS, snapshot, D.109 pruning/runtime
++reclamation, and current protocol-v3 canonical/registry suites. Exact affected
++package builds and production-source typechecks, exact-owner lint/format/diff,
++source/export shape, protected paths, 27 stashes, process/ports, signed commits,
++pushed refs, hashes, and self-excluding manifests remain mandatory. D.110a's
++consumed full/preflight identities and every retained campaign remain excluded.
++
++Because 0c1a changes a signed protocol control carrier adjacent to authority,
++restart, pruning, and compatibility, this plan-only checkpoint receives the
++governing Grok 4.6/high, standard direct Kimi K3 with
++`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh review before RED. Only P0/P1
++blocks. Corrections that alter carrier fields, authority, compatibility, or
++executable acceptance receive at most one confirmation; P2/bookkeeping does not
++recurse. The signed GREEN later receives the single complete plan→RED→GREEN
++review. If the review cannot accept this exact local signed carrier without an
++epoch-anchor/Cut wire change, public product API, new dependency, or different
++authority assumption, stop and reslice that demonstrated requirement rather
++than widening 0c1a. No Fable or collaboration subagent runs.
++
+ The complete confirmation evidence is retained under
+ `.logs/d110c-0c-plan-confirmation-cb5b3437/`. Its validating 34-entry
+ self-excluding manifest SHA-256 is
+ `5f932353bbd41bffc697424adfbe2c9a2835ac79de6f2dc9e51e6c455ae6a9e7`.
+ 
+-The four prerequisite decisions, including the newly demonstrated 0b0
+-freshness-floor authority question, are reviewed before their production edits;
+-each executable sub-slice receives its own bounded causal RED and GREEN. The
++The prerequisite decisions, including 0b0 freshness-floor authority and 0c1a
++issuance-retirement authority, are reviewed before their production edits; each
++executable sub-slice receives its own bounded causal RED and GREEN. The
+ umbrella's minimum functional GREEN is not satisfied until
+-D.110c-0a/0b0/0b/0b1/0c/a/b/c jointly prove one genuine room completes epoch 0→1,
+-restart/reopen, epoch 1→2,
++D.110c-0a/0b0/0b/0b1/0c1a/0c1/0c/a/b/c jointly prove one genuine room completes
++epoch 0→1, restart/reopen, epoch 1→2,
+ continued issue/publish after epoch 2, and cold recovery with exact application
+ state, ACL, writer authority, current anchor/trust, compact history,
+ archive-index root, snapshots, journals, and operation accounting. A second

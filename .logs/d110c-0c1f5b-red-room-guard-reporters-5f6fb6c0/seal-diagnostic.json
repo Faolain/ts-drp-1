@@ -1,0 +1,14 @@
+{
+  "initialSeal": {
+    "scriptSnapshot": "seal-before-prefix-normalization.mjs",
+    "exitCode": 1,
+    "message": "Resolved reporter smoke differs from frozen command",
+    "validationOrManifestWritten": false
+  },
+  "cause": "Locked parseCLI mutates supplied argv in place: first element becomes /index.js and node is prepended. Initial seal compared raw launcher prefixes, despite exact parsed/resolved options.",
+  "source": "vitest/dist/chunks/cac.DK21mt6F.js:1405-1412",
+  "correction": "Require recorded parser prefix exactly [node,/index.js], frozen launcher exactly [pnpm,exec,vitest], then compare run/file/all options/output suffix byte-for-byte.",
+  "runtimeExecutions": 1,
+  "noRuntimeOrSmokeOrPreflightRepeated": true,
+  "noTestSourceConfigChanges": true
+}

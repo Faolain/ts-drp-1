@@ -1,0 +1,13 @@
+{
+  "cwd": "/tmp/d110c-f5b0z-red-isolated-8et9Mc/checkout",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "vitest",
+    "list",
+    "tests/phase-6b-d110c-0c1f5b0z-maintenance-discovery-red.test.ts",
+    "--coverage.enabled=false",
+    "--json"
+  ],
+  "start": "2026-09-05T19:43:17.497Z"
+}

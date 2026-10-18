@@ -1,0 +1,2 @@
+{"name":"retained-exclusion-collection","status":0,"signal":null}
+{"pass":true,"ambiguousGates":3,"listedAssertions":27,"selectedFiles":3,"exclusions":["packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts","packages/storage-node/tests/phase-6b-ahe-reclamation-red.test.ts","packages/storage-node/tests/phase-6b-differential-exit-red.test.ts"]}

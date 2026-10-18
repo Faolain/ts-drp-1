@@ -1,0 +1,67 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 3,
+  "passed": 3,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-89f147cc/retained-03/result.json",
+  "baselineSha256": "25b6a3b3dff89d2f41f1112e6e60290233b0b6aa039547c1f1c0cdc1c1229b0b",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1b committed-issuance recovery-required RED"
+      ],
+      "fullName": "D.110c-0c1b committed-issuance recovery-required RED refuses a pre-bound close after a durable issue is omitted from live admission",
+      "status": "passed",
+      "title": "refuses a pre-bound close after a durable issue is omitted from live admission",
+      "duration": 631.346667,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1b committed-issuance recovery-required RED"
+      ],
+      "fullName": "D.110c-0c1b committed-issuance recovery-required RED halts a no-policy plane when the real issuance commit has an unknown return outcome",
+      "status": "passed",
+      "title": "halts a no-policy plane when the real issuance commit has an unknown return outcome",
+      "duration": 342.86516600000004,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts",
+      "ancestorTitles": [
+        "D.110c-0c1b committed-issuance recovery-required RED"
+      ],
+      "fullName": "D.110c-0c1b committed-issuance recovery-required RED releases a pre-durable byte-capacity reservation and preserves genuine close",
+      "status": "passed",
+      "title": "releases a pre-durable byte-capacity reservation and preserves genuine close",
+      "duration": 378.74508400000013,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "c13ccb88ed6cb8a45ed4cfe35b099ab7ad1a297c5dffbe56a485f90456947936",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

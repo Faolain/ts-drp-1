@@ -1,0 +1,22 @@
+{
+  "failed": [],
+  "predicates": {
+    "activationDefersRetirementDuringReplacement": true,
+    "activationPerformsExactOwnerCas": true,
+    "activationRetainsAuthenticatedOwnerHeadAndToken": true,
+    "activationReleasesOnlyTheCurrentOwnerLock": true,
+    "commitRequiresExactNextEpoch": true,
+    "currentProjectionKindIsEpochRelative": true,
+    "filteredIssuanceDelegatesToOneDurableOwner": true,
+    "inheritedPredecessorRecoverySourceIsOneUse": true,
+    "liveActivationUsesOneFilteredStoreOwner": true,
+    "productCloseIsReboundToReplacement": true,
+    "productHasNoPermanentFirstTransitionLatch": true,
+    "productPostTransferFailuresAreStalled": true,
+    "productCloseRebindFailureIsBehaviorallyInjected": true,
+    "productProofAuthenticatesVisibleAndRawEpochHeads": true,
+    "productProofClosesEpochTwoToThree": true,
+    "productPublicAuthorityEpochIsGeneral": true,
+    "testsOnlyAuthorityOracleIsExact": true
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "command": [
+    "zsh",
+    "-f",
+    "-c",
+    "alias claude-phel='CLAUDE_CONFIG_DIR=/Users/aristotle/.claude-phel claude'\neval 'claude-phel -p --restricted --strict-mcp-config --tools Read,Glob,Grep,Bash --allowedTools Read,Glob,Grep,Bash --model \"claude-fable-5-1[1m]\" --effort high --output-format stream-json --verbose'"
+  ],
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "start": "2026-09-06T06:50:54.148Z",
+  "pid": 92828,
+  "requestedModel": "claude-fable-5-1[1m]",
+  "requestedEffort": "high",
+  "purpose": "one-off user-authorized timeout investigation"
+}

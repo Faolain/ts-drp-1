@@ -1,0 +1,1292 @@
+Warning: [loop_control] 'max_retries_per_step' is deprecated and no longer used; rename it to 'max_attempts_per_step'. Run /update-config to fix it.
+.logs/d110c-0c1f5b0c-green-3b6a66a9/:
+README.md
+changed-paths.txt
+commands.md
+custody.md
+deferred.md
+focused.json
+inherited-current.json
+inherited-parent.json
+isolated-build.stderr
+isolated-build.stdout
+isolated-focused.json
+isolated-install.stderr
+isolated-install.stdout
+isolated-legacy26-diagnostic.json
+isolated-retained87.json
+legacy26.json
+manifest.sha256
+matrix.md
+production.diff
+result.json
+retained87.json
+source-audit.txt
+verification.txt
+
+.logs/d110c-0c1f5b0c-red-d062c5f6/:
+README.md
+changed-paths.txt
+commands.md
+custody.md
+deferred.md
+design-manifest.stderr
+design-manifest.stdout
+diagnostic-01-invalid-parameters.json
+diagnostic-02-node-mock-resolution.json
+diagnostic-03-storage-mock-resolution.json
+diagnostic-04-assertion-dereference.json
+diffcheck.stderr
+diffcheck.stdout
+eslint.stderr
+eslint.stdout
+focused-vitest.json
+manifest.sha256
+matrix.md
+prettier.stderr
+prettier.stdout
+result.json
+
+.logs/d110c-0c1f5b0r-design-3a156aca/:
+design.md
+manifest.sha256
+next-prompt.md
+pre-review.md
+d062c5f6 test(room): freeze settlement orchestration red
+fa254682 docs(hardening): require repeated 64-writer lifecycle
+6bbe5915 docs(hardening): close node settlement slice
+1f02d605 test(hardening): accept final node settlement review
+52d1819f test(hardening): record final settlement compatibility green
+802a647e fix(node): preserve legacy settlement compatibility
+eb302c07 test(hardening): record legacy settlement compatibility red
+a19e8454 test(hardening): pin legacy settlement compatibility red
+---
+3b6a66a9 feat(room): orchestrate durable author settlement
+9f55370c test(hardening): record room settlement red evidence
+d062c5f6 test(room): freeze settlement orchestration red
+fa254682 docs(hardening): require repeated 64-writer lifecycle
+6bbe5915 docs(hardening): close node settlement slice
+1f02d605 test(hardening): accept final node settlement review
+52d1819f test(hardening): record final settlement compatibility green
+802a647e fix(node): preserve legacy settlement compatibility
+---
+6f8e80cafbd5258dd2bfa7c23e103c6f75991506
+commit d062c5f64ad7255f67eb91d0eb1c8441acc147c1
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Fri Sep 4 15:52:03 2026 -0400
+
+    test(room): freeze settlement orchestration red
+
+ tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts | 675 +++++++++++++++++++++++++
+ 1 file changed, 675 insertions(+)
+===
+commit 3b6a66a9b5257c9011611fc2955ac6ee1ab90bfc
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Fri Sep 4 16:11:29 2026 -0400
+
+    feat(room): orchestrate durable author settlement
+
+ examples/v3-room/src/index.ts | 212 +++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 210 insertions(+), 2 deletions(-)
+/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts
+   failed [RED] durably builds the plan before a fence, then links rebase/transform replac
+   failed [RED] keeps manual-review durable and holds public issue before any fence or rep
+   failed [RED] preserves linked entries across same-epoch reopen and plans a displaced li
+   failed [RED] clears a displaced fence and drops terminal plan rows before issuing one l
+   failed [RED] rebases a published displaced source without requiring in-memory target-ma
+   failed [RED] surfaces an ACL source into a durable manual-review entry before any fence
+   failed [RED] covers reserved empty-intent rows with a settlement fence and never calls 
+   failed [RED] reads back an ambiguous atomic replacement link and never reissues it afte
+   passed keeps creator-trusted-v1 on the retained completion path with no settlement plan
+1
+2 2 9
+commit 3b6a66a9b5257c9011611fc2955ac6ee1ab90bfc
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Fri Sep 4 16:11:29 2026 -0400
+
+    feat(room): orchestrate durable author settlement
+
+diff --git a/examples/v3-room/src/index.ts b/examples/v3-room/src/index.ts
+index 3983a066..939665a0 100644
+--- a/examples/v3-room/src/index.ts
++++ b/examples/v3-room/src/index.ts
+@@ -1569,6 +1569,16 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 	const invite =
+ 		typeof input.creatorInvite === "string" ? input.creatorInvite : encodeCreatorInvite(input.creatorInvite);
+ 	const material = decodeCreatorInvite(invite);
++	const profileCarrier = decodeCanonical(material.exactCanonicalProfileBytes, {
++		maxBytes: 65_536,
++		maxDepth: 4,
++		maxItems: 128,
++	});
++	const profileId =
++		profileCarrier !== null && typeof profileCarrier === "object" && !Array.isArray(profileCarrier)
++			? Reflect.get(profileCarrier, "profileId")
++			: undefined;
++	const settlementProfile = typeof profileId === "string" ? settlementProfileFor(profileId) : "none";
+ 	const sourceInvite = input.rebaseSourceInvite;
+ 	const sourceMaterial =
+ 		sourceInvite === undefined
+@@ -1979,6 +1989,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 	let creatorSuccessorAdoptionTask: Promise<void> | undefined;
+ 	let redirectedSession: V3RoomSession<Projection> | undefined;
+ 	let redirectPromise: Promise<V3RoomSession<Projection>> | undefined;
++	let releaseSettlementHold: (() => void) | undefined;
++	const settlementHold = new Promise<void>((resolve) => {
++		releaseSettlementHold = resolve;
++	});
+ 	let retainedBootstrapReady = !retainedBootstrapHeld;
+ 	let resolveRetainedBootstrap: (() => void) | undefined;
+ 	let rejectRetainedBootstrap: ((reason: unknown) => void) | undefined;
+@@ -2815,6 +2829,191 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 		publishState?: "pending" | "published";
+ 		vertexDigest: string;
+ 	}>;
++	type RoomSettlementPlan = NonNullable<Awaited<ReturnType<typeof issuanceStore.readSettlementPlan>>>;
++	type RoomSettlementPlanEntry = RoomSettlementPlan["entries"][number];
++	const settlementScope = Object.freeze({ author: input.author, objectId: input.objectId });
++	const sameSettlementEntry = (left: RoomSettlementPlanEntry, right: RoomSettlementPlanEntry): boolean =>
++		left.sourceSequence === right.sourceSequence &&
++		left.disposition === right.disposition &&
++		left.replacementSequence === right.replacementSequence &&
++		sameBytes(left.sourceDigest, right.sourceDigest);
++	const settlementDisposition = (source: DisplacedSource): RoomSettlementPlanEntry["disposition"] | undefined => {
++		if (source.intents.length === 0) return undefined;
++		const policies = source.intents.map((intent) => {
++			const operation = detachedRoomOperation(intent.operation);
++			const action = operation === undefined ? undefined : Reflect.get(operation, "action");
++			if (operation === undefined || typeof action !== "string") {
++				throw new TypeError("v3 room displaced operation is invalid");
++			}
++			const policy = input.application.displacementPolicies[action];
++			if (policy === undefined) throw new TypeError("v3 room displacement policy is unavailable");
++			const identity = input.application.displacedOperationIdentity(operation);
++			if (
++				typeof identity !== "string" ||
++				identity.length === 0 ||
++				input.application.displacedOperationIdentity(operation) !== identity
++			) {
++				throw new TypeError("v3 room displaced operation identity is invalid");
++			}
++			return policy;
++		});
++		if (redirectSource !== undefined || policies.includes("manual-review")) return "manual-review";
++		if (policies.every((policy) => policy === "expire")) return "expire";
++		return policies.includes("transform") ? "transform" : "rebase";
++	};
++	const writeMergedSettlementPlan = async (sources: readonly DisplacedSource[]): Promise<RoomSettlementPlan> => {
++		const current = await issuanceStore.readSettlementPlan(settlementScope);
++		const priorEntries = new Map(current?.entries.map((entry) => [entry.sourceSequence, entry] as const));
++		const entries: RoomSettlementPlanEntry[] = [];
++		for (const source of [...sources].sort((left, right) => left.authorSequence - right.authorSequence)) {
++			const disposition = settlementDisposition(source);
++			if (disposition === undefined) continue;
++			const sourceDigest = bytes(source.vertexDigest);
++			if (sourceDigest.byteLength !== 32) throw new TypeError("v3 room displaced source digest is invalid");
++			const prior = priorEntries.get(source.authorSequence);
++			if (prior !== undefined && (!sameBytes(prior.sourceDigest, sourceDigest) || prior.disposition !== disposition)) {
++				throw new TypeError("v3 room settlement plan source differs");
++			}
++			entries.push(
++				Object.freeze({
++					disposition,
++					replacementSequence: prior?.replacementSequence ?? null,
++					sourceDigest,
++					sourceSequence: source.authorSequence,
++				})
++			);
++		}
++		const displacedSequences = new Set(sources.map((source) => source.authorSequence));
++		const fenceSequence =
++			current?.fenceSequence !== null &&
++			current?.fenceSequence !== undefined &&
++			displacedSequences.has(current.fenceSequence)
++				? null
++				: (current?.fenceSequence ?? null);
++		const unchanged =
++			current !== null &&
++			current.fenceSequence === fenceSequence &&
++			current.entries.length === entries.length &&
++			current.entries.every((entry, index) => {
++				const candidate = entries[index];
++				return candidate !== undefined && sameSettlementEntry(entry, candidate);
++			});
++		if (unchanged) return current;
++		const expectedRevision = current?.revision ?? null;
++		const plan = Object.freeze({
++			entries: Object.freeze(entries),
++			fenceSequence,
++			revision: expectedRevision === null ? 0 : expectedRevision + 1,
++			scope: settlementScope,
++		});
++		return issuanceStore.transactWriteSettlementPlan({ expectedRevision, plan, scope: settlementScope });
++	};
++	const readSettlementEffect = async (
++		effect: Readonly<{ readonly kind: "fence" } | { readonly kind: "replacement"; readonly sourceSequence: number }>
++	): Promise<boolean> => {
++		const plan = await issuanceStore.readSettlementPlan(settlementScope);
++		if (plan === null) return false;
++		if (effect.kind === "fence") return plan.fenceSequence !== null;
++		return plan.entries.some(
++			(entry) => entry.sourceSequence === effect.sourceSequence && entry.replacementSequence !== null
++		);
++	};
++	const issueSettlement = async (
++		operations: readonly Readonly<{
++			readonly logicalTime: number;
++			readonly operation: Readonly<Record<string, unknown>>;
++		}>[],
++		effect: Readonly<{ readonly kind: "fence" } | { readonly kind: "replacement"; readonly sourceSequence: number }>
++	): Promise<void> => {
++		if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
++		const issued = await activeHandle.issueLocal({
++			operations: Object.freeze(operations),
++			...(effect.kind === "replacement" ? { planEffect: effect } : {}),
++			signRegisteredVertexDigest: input.signRegisteredVertexDigest,
++		} as Parameters<RoomPlaneHandle["issueLocal"]>[0]);
++		if (!issued.ok) {
++			const linked = await readSettlementEffect(effect);
++			throw new TypeError(
++				linked
++					? `v3 room settlement issue outcome is unknown: ${issued.kind}`
++					: `v3 room settlement issue failed: ${issued.kind}`
++			);
++		}
++		await publishAccepted();
++	};
++	const drainSettlementOutbox = async (sources: readonly DisplacedSource[]): Promise<void> => {
++		let plan = await writeMergedSettlementPlan(sources);
++		if (plan.entries.some((entry) => entry.disposition === "manual-review")) {
++			await settlementHold;
++			return;
++		}
++		if (plan.fenceSequence === null) {
++			const lineage = await issuanceStore.readLineage(settlementScope);
++			if (!Number.isSafeInteger(lineage.next) || lineage.next < 0 || lineage.exhausted) {
++				throw new TypeError("v3 room settlement fence lineage is unavailable");
++			}
++			const fenceLogicalTime = logicalTime;
++			logicalTime += 2;
++			await issueSettlement(
++				Object.freeze([
++					Object.freeze({
++						logicalTime: fenceLogicalTime,
++						operation: Object.freeze({
++							action: "$drp.author-fence.v1",
++							fenceSequence: lineage.next,
++							version: 1,
++						}),
++					}),
++				]),
++				Object.freeze({ kind: "fence" })
++			);
++			plan = (await issuanceStore.readSettlementPlan(settlementScope)) ?? plan;
++		}
++		const sourceBySequence = new Map(sources.map((source) => [source.authorSequence, source] as const));
++		for (const entry of plan.entries) {
++			if (entry.disposition === "expire" || entry.replacementSequence !== null) continue;
++			const source = sourceBySequence.get(entry.sourceSequence);
++			if (source === undefined) throw new TypeError("v3 room settlement source is unavailable");
++			const operations = source.intents.flatMap((intent) => {
++				const operation = detachedRoomOperation(intent.operation);
++				const action = operation === undefined ? undefined : Reflect.get(operation, "action");
++				if (operation === undefined || typeof action !== "string") {
++					throw new TypeError("v3 room displaced operation is invalid");
++				}
++				const policy = input.application.displacementPolicies[action];
++				if (policy === "expire") return [];
++				if (policy !== "rebase" && policy !== "transform") {
++					throw new TypeError("v3 room settlement replacement policy is invalid");
++				}
++				let selected = operation;
++				if (policy === "transform") {
++					const transform = input.application.transformDisplacedOperation;
++					if (transform === undefined) throw new TypeError("v3 room displaced transform is unavailable");
++					const first = detachedRoomOperation(transform(operation));
++					const second = detachedRoomOperation(transform(operation));
++					const identity = input.application.displacedOperationIdentity(operation);
++					if (
++						first === undefined ||
++						second === undefined ||
++						!sameBytes(encodeCanonical(first), encodeCanonical(second)) ||
++						Reflect.get(first, "action") !== action ||
++						input.application.displacedOperationIdentity(first) !== identity
++					) {
++						throw new TypeError("v3 room displaced transform is unstable");
++					}
++					selected = first;
++				}
++				const selectedLogicalTime = logicalTime;
++				logicalTime += 2;
++				return [Object.freeze({ logicalTime: selectedLogicalTime, operation: selected })];
++			});
++			if (operations.length === 0) throw new TypeError("v3 room settlement replacement is empty");
++			await issueSettlement(
++				Object.freeze(operations),
++				Object.freeze({ kind: "replacement", sourceSequence: entry.sourceSequence })
++			);
++		}
++	};
+ 	const drainRebaseOutbox = async (): Promise<void> => {
+ 		if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
+ 		const sources: DisplacedSource[] = [];
+@@ -2832,7 +3031,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 			) {
+ 				throw new TypeError("v3 room rebase outbox did not advance");
+ 			}
+-			if (page.source.intents.length === 0 && page.source.publishState !== "published") {
++			if (
++				settlementProfile === "none" &&
++				page.source.intents.length === 0 &&
++				page.source.publishState !== "published"
++			) {
+ 				const completed = await activeHandle.completeRebaseSource({
+ 					authorSequence: page.source.authorSequence,
+ 					digest: page.source.vertexDigest,
+@@ -2840,6 +3043,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 				if (!completed.ok) throw new TypeError(`v3 room rebase completion failed: ${completed.kind}`);
+ 			}
+ 		}
++		if (settlementProfile === "v1") {
++			await drainSettlementOutbox(sources);
++			return;
++		}
+ 		const acceptedRows = acceptedIdentityRows();
+ 		const migrationImportRows = migrationImportIdentityRows();
+ 		if (redirectSource === undefined && sourceMaterial !== undefined) {
+@@ -2999,7 +3206,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 		}
+ 	};
+ 	const rebasePromise =
+-		sourceMaterial === undefined && input.successorSnapshotDeclaration === undefined
++		settlementProfile === "none" && sourceMaterial === undefined && input.successorSnapshotDeclaration === undefined
+ 			? Promise.resolve()
+ 			: Promise.resolve().then(async () => {
+ 					await waitForRetainedBootstrap();
+@@ -3778,6 +3985,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 		if (sessionCloseTask !== undefined) return sessionCloseTask;
+ 		closed = true;
+ 		cancelRedirectCreation();
++		releaseSettlementHold?.();
+ 		const task = (async (): Promise<void> => {
+ 			let primaryFailure: unknown;
+ 			let primaryFailed = false;
+42:import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
+491:			(typeof profileId !== "string" || settlementProfileFor(profileId) === "none")) ||
+1581:	const settlementProfile = typeof profileId === "string" ? settlementProfileFor(profileId) : "none";
+2962:							action: "$drp.author-fence.v1",
+3035:				settlementProfile === "none" &&
+3046:		if (settlementProfile === "v1") {
+3208:	const rebasePromise =
+3209:		settlementProfile === "none" && sourceMaterial === undefined && input.successorSnapshotDeclaration === undefined
+3217:	void rebasePromise.catch((error: unknown) => {
+3328:			await rebasePromise;
+3744:		await rebasePromise;
+3825:			await rebasePromise;
+3994:				await rebasePromise.catch(() => undefined);
+4074:				await rebasePromise;
+4136:			await rebasePromise;
+4218:					settlementProfileFor(openedTrust.trust.profileId) === "none")
+222:const LOCAL_ISSUE_WITH_PLAN_EFFECT_KEYS = ["operations", "planEffect", "signRegisteredVertexDigest"] as const;
+228:const AUTHOR_FENCE_ACTION = "$drp.author-fence.v1";
+246:	"planEffect",
+6027:	readonly planEffect?: NonNullable<DurableIssueCommit["planEffect"]>;
+6198:	let planEffect: NonNullable<DurableIssueCommit["planEffect"]> | undefined;
+6199:	if (ObjectGetOwnPropertyDescriptor(input, "planEffect") !== undefined) {
+6200:		const fence = snapshotClosedRecord(input.planEffect, ["kind"]);
+6202:			fence === undefined ? snapshotClosedRecord(input.planEffect, ["kind", "sourceSequence"]) : undefined;
+6204:			planEffect = ObjectFreeze({ kind: "fence" as const });
+6210:			planEffect = ObjectFreeze({ kind: "replacement" as const, sourceSequence: replacement.sourceSequence as number });
+6248:		if (authorFence && (settlementProfile !== "v1" || values.length !== 1 || planEffect !== undefined)) {
+6264:	if (planEffect !== undefined && settlementProfileFor(payload.trust.trust.profileId) !== "v1") {
+6269:		...(planEffect === undefined ? {} : { planEffect }),
+6281:	planEffect?: NonNullable<DurableIssueCommit["planEffect"]>
+6324:				if (planEffect === undefined) return committed;
+6333:				if (planEffect?.kind === "fence" && Reflect.get(operation, "fenceSequence") !== authorSequence) {
+6337:				const candidateCommit = planEffect === undefined ? builtCommit : ObjectFreeze({ ...builtCommit, planEffect });
+6382:		if (planEffect?.kind === "fence") {
+6612:	// issueOneVertex owns the transactIssue call; this dedicated path supplies the atomic fence planEffect.
+6646:		input.planEffect !== undefined &&
+6647:		(input.planEffect.kind !== "replacement" || isReservedBatchAction(String(Reflect.get(first.operation, "action"))))
+6698:				input.planEffect
+			return localIssueFailure("malformed-input", "v3 local issue operation is invalid");
+		}
+		const action = Reflect.get(operation, "action");
+		if (typeof action !== "string") {
+			return localIssueFailure("malformed-input", "v3 local issue operation is invalid");
+		}
+		const settlementProfile = settlementProfileFor(payload.trust.trust.profileId);
+		const authorFence = action === AUTHOR_FENCE_ACTION;
+		if (authorFence && (settlementProfile !== "v1" || values.length !== 1 || planEffect !== undefined)) {
+			return localIssueFailure("malformed-input", "v3 local issue operation is unknown");
+		}
+		if (
+			action === APPLICATION_BATCH_ACTION ||
+			action === "causalJoin" ||
+			(values.length > 1 && (action === "acl" || action === "join"))
+		) {
+			return localIssueFailure("authorization-rejected", "v3 local issue operation is reserved to the node");
+		}
+		if (!authorFence && typeof Reflect.get(payload.runtime.reducers, action) !== "function") {
+			return localIssueFailure("malformed-input", "v3 local issue operation is unknown");
+		}
+		priorLogicalTime = entry.logicalTime as number;
+		operations.push(ObjectFreeze({ logicalTime: priorLogicalTime, operation }));
+	}
+	if (planEffect !== undefined && settlementProfileFor(payload.trust.trust.profileId) !== "v1") {
+		return localIssueFailure("malformed-input", "v3 local issue plan effect is unavailable");
+	}
+	return ObjectFreeze({
+		operations: ObjectFreeze(operations),
+		...(planEffect === undefined ? {} : { planEffect }),
+		signRegisteredVertexDigest: input.signRegisteredVertexDigest as SignRegisteredVertexDigest,
+	});
+}
+
+async function issueOneVertex(
+	registration: V3PlaneRegistration,
+	input: CapturedLocalIssueInput,
+	dependencies: readonly string[],
+	logicalTime: number,
+	operation: Readonly<Record<string, unknown>>,
+	requireTerminalAuthorization = false,
+	planEffect?: NonNullable<DurableIssueCommit["planEffect"]>
+): Promise<InternalLocalIssueResult> {
+	if (!currentRegistration(registration)) return localIssueFailure("not-active", "v3 plane is not active");
+	if (registration.operationAdmissionHalted) {
+		return localIssueFailure("admission-rejected", "v3 operation admission is halted until recovery");
+	}
+	if (registration.index.size >= registration.payload.parameters.maxEpochVertices) {
+		return localIssueFailure("graph-rejected", "v3 local issue graph is at capacity");
+	}
+	if (dependencies.length === 0 || dependencies.length > registration.payload.parameters.maxDependencies) {
+		return localIssueFailure("admission-rejected", "v3 local issue dependency bound is invalid");
+	}
+	const scope = copiedScope(registration.issuanceScope);
+	if (scope === undefined || scope.objectId !== registration.payload.provenance.objectId) {
+		return localIssueFailure("authorization-rejected", "v3 local issue scope is invalid");
+	}
+	const authorized = resolveV3AuthorizedAuthor(registration.authorization, scope.author);
+	if (authorized === undefined) {
+		return localIssueFailure("authorization-rejected", "v3 local issue author is not authorized");
+	}
+		);
+	} catch {
+		registration.operationAdmissionHalted = true;
+		return localIssueFailure("issuance-rejected", "v3 author fence plan read failed");
+	}
+	if (
+		plan === undefined ||
+		plan.fenceSequence !== null ||
+		plan.entries.some((entry) => entry.disposition === "manual-review")
+	) {
+		return localIssueFailure("issuance-rejected", "v3 author fence requires a complete durable plan");
+	}
+	// issueOneVertex owns the transactIssue call; this dedicated path supplies the atomic fence planEffect.
+	const tips = registration.index.tips();
+	if (tips.length === 0 || tips.length > registration.payload.parameters.maxDependencies) {
+		return localIssueFailure("graph-rejected", "v3 author fence frontier is invalid");
+	}
+	const issued = await issueOneVertex(
+		registration,
+		input,
+		tips,
+		first.logicalTime,
+		first.operation,
+		false,
+		ObjectFreeze({ kind: "fence" as const })
+	);
+	if (issued.ok) await drainPendingIngress(registration);
+	return issued;
+}
+
+async function issueLocal(
+	registration: V3PlaneRegistration,
+	input: CapturedLocalIssueInput
+): Promise<V3LocalIssueResult> {
+	if (
+		!currentRegistration(registration) ||
+		registration.blueprintClosing ||
+		registration.terminalState !== "active" ||
+		registration.retainedBootstrapHold
+	) {
+		return localIssueFailure("not-active", "v3 plane is not accepting local issues");
+	}
+	const first = input.operations[0];
+	if (first === undefined) return localIssueFailure("malformed-input", "v3 local issue operations are invalid");
+	if (isAuthorFenceOperation(first.operation)) return issueAuthorFence(registration, input);
+	if (
+		input.planEffect !== undefined &&
+		(input.planEffect.kind !== "replacement" || isReservedBatchAction(String(Reflect.get(first.operation, "action"))))
+	) {
+		return localIssueFailure("malformed-input", "v3 local issue plan effect is invalid");
+	}
+	let applicationOperation = first.operation;
+	if (input.operations.length > 1) {
+		if (typeof Reflect.get(registration.payload.runtime.reducers, APPLICATION_BATCH_ACTION) !== "function") {
+			return localIssueFailure("malformed-input", "v3 local issue application batch reducer is unavailable");
+		}
+		const maximumPrefix = Math.min(input.operations.length, APPLICATION_BATCH_MAX_ENTRIES);
+		let prefixLength = maximumPrefix;
+		for (; prefixLength > 0; prefixLength -= 1) {
+			const candidate = applicationBatchOperation(input.operations.slice(0, prefixLength));
+			if (prefixLength === 1 || applicationBatchFits(candidate)) break;
+		}
+		if (prefixLength < input.operations.length) {
+			return prefixLength > 0
+				? localIssueSplit(prefixLength)
+				: localIssueFailure("malformed-input", "v3 local issue operation exceeds the application batch budget");
+		}
+		applicationOperation = applicationBatchOperation(input.operations);
+		if (!applicationBatchFits(applicationOperation)) {
+			return localIssueFailure("malformed-input", "v3 local issue application batch is invalid");
+		}
+	}
+	const initialTips = registration.index.tips();
+	const maxDependencies = registration.payload.parameters.maxDependencies;
+	if (initialTips.length === 0) return localIssueFailure("graph-rejected", "v3 local issue frontier is empty");
+	if (maxDependencies < 2 && initialTips.length > maxDependencies) {
+		return localIssueFailure("graph-rejected", "v3 local issue dependency bound cannot reduce the frontier");
+	}
+	const requiredJoins =
+		initialTips.length <= maxDependencies
+			? 0
+			: Math.ceil((initialTips.length - maxDependencies) / (maxDependencies - 1));
+	if (registration.index.size + requiredJoins + 1 > registration.payload.parameters.maxEpochVertices) {
+		return localIssueFailure("graph-rejected", "v3 local issue graph is at capacity");
+	}
+	if (!hasGraphCapacity(registration, registration.issuanceScope.author, undefined, requiredJoins + 1)) {
+		return localIssueFailure("graph-rejected", "v3 local issue author share is at capacity");
+	}
+	for (;;) {
+		const tips = registration.index.tips();
+		if (tips.length <= maxDependencies) {
+			const issued = await issueOneVertex(
+				registration,
+				input,
+				tips,
+				first.logicalTime,
+				applicationOperation,
+				false,
+				input.planEffect
+			);
+			if (issued.ok) await drainPendingIngress(registration);
+			return issued;
+		}
+		const joined = await issueOneVertex(
+			registration,
+			input,
+			tips.slice(0, maxDependencies),
+			first.logicalTime,
+			ObjectFreeze({ action: "causalJoin" })
+		);
+		if (!joined.ok) return joined;
+			}
+		}
+	};
+	const rebasePromise =
+		settlementProfile === "none" && sourceMaterial === undefined && input.successorSnapshotDeclaration === undefined
+			? Promise.resolve()
+			: Promise.resolve().then(async () => {
+					await waitForRetainedBootstrap();
+					if (terminalFailure !== undefined) throw terminalFailure;
+					await publishAccepted();
+					await drainRebaseOutbox();
+				});
+	void rebasePromise.catch((error: unknown) => {
+		terminalFailure = error;
+	});
+	if (recoveredActivation !== undefined) {
+		try {
+			await publishAccepted();
+			if (activeHandle === undefined) throw new TypeError("v3 room retained source plane is unavailable");
+			const replayed = await activeHandle.republishRetained();
+			if (!replayed.ok) throw new TypeError(`v3 room terminal replay failed: ${replayed.kind}`);
+			const redirect = ensureRedirect(recoveredActivation);
+			const startup = await Promise.race([
+				redirect.then(() => "ready" as const),
+				redirectBootstrapHold.then(() => "held" as const),
+			]);
+====
+		});
+		const ownedMigrationCompletion = new Promise<void>((resolve) => {
+			releaseMigrationCompletion = resolve;
+		});
+		migrationBarrier = ownedMigrationBarrier;
+		migrationCompletionBarrier = ownedMigrationCompletion;
+		migrationAcceptingFollowers = true;
+		try {
+			await rebasePromise;
+			await drainPendingIssues();
+			if (terminalFailure !== undefined) throw terminalFailure;
+			if (closed) throw new TypeError("v3 room session is closed");
+
+			const firstSnapshot = acceptedOperationSnapshot();
+			const exactCanonicalSourceRows = acceptedRowsEvidence(firstSnapshot);
+			if (firstSnapshot.length > 8192 || exactCanonicalSourceRows.byteLength > 8_388_608) {
+				throw new TypeError("v3 room migration source snapshot is unbounded");
+			}
+			const normalizeProjection = (value: V3RoomMigrationProjection): V3RoomMigrationProjection => {
+				const record = exactRecord(value, ["exactCanonicalApplicationStateBytes", "importOperations"]);
+				const imports = exactDenseArray(record?.importOperations);
+====
+					!sameBytes(encodeCanonical(Reflect.get(recoveredRecord.operation, "record")), exactCanonicalRecordBytes)
+				) {
+					throw new TypeError("v3 room migration activation record differs from rehearsed target");
+				}
+			} finally {
+				await target.close();
+			}
+		};
+		await verifyRehearsedTarget();
+		await rebasePromise;
+		await drainPendingIssues();
+		if (terminalFailure !== undefined) throw terminalFailure;
+		if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
+		const transition = await activeHandle.beginTerminalTransition();
+		if (!transition.ok) throw new TypeError(`v3 room migration activation failed: ${transition.kind}`);
+		let exactCurrentState: Uint8Array;
+		let currentRows: readonly V3RoomAcceptedOperation[];
+		try {
+			currentRows = acceptedOperationSnapshot();
+			exactCurrentState = normalizeApplicationStateBytes(
+				Reflect.apply(input.application.migration.canonicalStateBytes, input.application.migration, [
+====
+			}
+			return Object.freeze({
+				result: await performMigrationActivation(capturedInput),
+			});
+		});
+		return selected.result;
+	};
+	if (redirectSource !== undefined) {
+		try {
+			await waitForRetainedBootstrap();
+			await rebasePromise;
+			if (terminalFailure !== undefined) throw terminalFailure;
+		} catch (error) {
+			await shutdown().catch(() => undefined);
+			throw error;
+		}
+	}
+	const assertSessionOpen = (): void => {
+		if (closed) throw new TypeError("v3 room session is closed");
+	};
+	const performCreatorSuccessorAdoption = async (): Promise<void> => {
+			) {
+				throw new TypeError("v3 room migration record is invalid");
+			}
+			const priorMigrationBarrier = migrationBarrier;
+			const priorMigrationCompletion = migrationCompletionBarrier;
+			const joinsMigration = priorMigrationBarrier !== undefined && migrationAcceptingFollowers;
+			let settleFollower: ((result: MigrationFollowerResult) => void) | undefined;
+			const follower = joinsMigration
+				? new Promise<MigrationFollowerResult>((resolve) => {
+						settleFollower = resolve;
+					})
+				: undefined;
+			if (follower !== undefined) migrationFollowers.add(follower);
+			try {
+				await rebasePromise;
+				await (joinsMigration ? priorMigrationBarrier : priorMigrationCompletion);
+				if (terminalFailure !== undefined) throw terminalFailure;
+				if (closed) throw new TypeError("v3 room session is closed");
+				const current = logicalTime;
+				logicalTime += 2;
+				const promise = new Promise<void>((resolve, reject) => {
+					pendingIssues.push(Object.freeze({ logicalTime: current, operation: captured, reject, resolve }));
+				});
+				scheduleDrain();
+				await promise;
+				settleFollower?.(Object.freeze({ ok: true }));
+			} catch (error) {
+				settleFollower?.(Object.freeze({ ok: false, reason: error }));
+				throw error;
+			}
+		},
+		openEphemeral(options: EphemeralChannelOptions): EphemeralChannel {
+			if (redirectedSession !== undefined) return redirectedSession.openEphemeral(options);
+			if (terminalFailure !== undefined) throw terminalFailure;
+			if (closed) throw new TypeError("v3 room session is closed");
+			if (transport === undefined) throw new TypeError("v3 room transport is unavailable");
+			return transport.openEphemeral(
+				{
+					authorForPeer(peerId: string): string | undefined {
+						const matches = projection.transportPeerAuthors.filter((entry) => entry.peerId === peerId);
+						return matches.length === 1 ? matches[0]?.author : undefined;
+					},
+					currentAuthority() {
+						return activeHandle?.currentEphemeralAuthority();
+					},
+					isCurrentWriter(author: string): boolean {
+						return activeHandle?.currentEphemeralAuthority()?.isCurrentWriter(author) === true;
+					},
+				},
+				options
+			);
+		},
+		previewLatchedAcl(): Readonly<Record<string, unknown>> {
+			if (redirectedSession !== undefined) return redirectedSession.previewLatchedAcl();
+			if (terminalFailure !== undefined) throw terminalFailure;
+			if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
+			const preview = Reflect.get(activeHandle, "previewLatchedAcl");
+			if (typeof preview !== "function") throw new TypeError("v3 room latched ACL preview is unavailable");
+			const result = Reflect.apply(preview, activeHandle, []) as unknown;
+			if (typeof result !== "object" || result === null) {
+				throw new TypeError("v3 room latched ACL preview is invalid");
+			}
+			return result as Readonly<Record<string, unknown>>;
+		},
+		projection(): Projection {
+			if (redirectedSession !== undefined) return redirectedSession.projection();
+			if (terminalFailure !== undefined) throw terminalFailure;
+			return projection;
+		},
+		rehearseMigration,
+		async sealEpoch(): Promise<CreatorLiveCloseResult> {
+			if (redirectPromise !== undefined) await redirectPromise;
+			if (redirectedSession !== undefined) return redirectedSession.sealEpoch();
+			if (terminalFailure !== undefined) throw terminalFailure;
+			if (closed) throw new TypeError("v3 room session is closed");
+			if (creatorCloseHandle === undefined) throw new TypeError("creator close authority is unavailable");
+			await rebasePromise;
+			await migrationCompletionBarrier;
+			await drainPendingIssues();
+			return creatorCloseHandle.close();
+		},
+		status(): CreatorLiveCloseStatus {
+			if (redirectedSession !== undefined) return redirectedSession.status();
+			return (
+				creatorCloseHandle?.status() ??
+				unavailableCreatorCloseStatus(roomDescriptor.trustProfile, creatorCloseUnavailableContinuity)
+focused 9 9 0 0 success= True
+retained87 87 87 0 0 success= True
+legacy26 26 26 0 0 success= True
+isolated-focused 9 9 0 0 success= True
+isolated-retained87 87 87 0 0 success= True
+inherited-current total 43 pass 9 fail 34
+  failed count: 34
+   phase-3a1b-d9346-room-semantics-red.test.ts | accepts the exact Phase 3g application policy and split dura
+      TypeError: truncated canonical value     at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages
+   phase-3a1b-d9346-room-semantics-red.test.ts | coalesces two same-turn eligible requests into one node-owne
+      TypeError: truncated canonical value     at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages
+   phase-3a1b-d9346-room-semantics-red.test.ts | splits seventeen requests and never batches across a control
+      TypeError: truncated canonical value     at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages
+   phase-3a1b-d9346-room-semantics-red.test.ts | rejects one over-budget eligible head without dropping or co
+      TypeError: truncated canonical value     at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages
+   phase-3a1b-d9346-room-semantics-red.test.ts | retries the exact node-selected prefix and suffix after a by
+      TypeError: truncated canonical value     at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages
+   phase-3a1b-d9346-room-semantics-red.test.ts | expands one genuine batch once for recovery and live project
+      TypeError: truncated canonical value     at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/packages
+inherited-parent total 43 pass 8 fail 35
+  failed count: 35
+   phase-3a1b-d9346-room-semantics-red.test.ts | accepts the exact Phase 3g application policy and split dura
+      TypeError: truncated canonical value     at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/.tmp-f5b
+   phase-3a1b-d9346-room-semantics-red.test.ts | coalesces two same-turn eligible requests into one node-owne
+      TypeError: truncated canonical value     at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/.tmp-f5b
+   phase-3a1b-d9346-room-semantics-red.test.ts | splits seventeen requests and never batches across a control
+      TypeError: truncated canonical value     at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/.tmp-f5b
+   phase-3a1b-d9346-room-semantics-red.test.ts | rejects one over-budget eligible head without dropping or co
+      TypeError: truncated canonical value     at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/.tmp-f5b
+   phase-3a1b-d9346-room-semantics-red.test.ts | retries the exact node-selected prefix and suffix after a by
+      TypeError: truncated canonical value     at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/.tmp-f5b
+   phase-3a1b-d9346-room-semantics-red.test.ts | expands one genuine batch once for recovery and live project
+      TypeError: truncated canonical value     at Reader.take (/Users/aristotle/Documents/Projects/ts-drp-1/.tmp-f5b
+only in current: 0
+only in parent: 1
+   ('phase-3g-v3-room-rebase-red.test.ts', 'Phase 3g room-owned rebase scheduling RED keeps the reserved terminal activation outside the real chat and zone displacement policies')
+    Error: Failed to resolve entry for package "@ts-drp/outcome-commit". The package
+shared failures with differing message prefix: 0
+Counter({'phase-3g-v3-room-rebase-red.test.ts': 18, 'phase-3a1b-d9346-room-semantics-red.test.ts': 15, 'phase-6a-creator-successor-product-red.test.ts': 1})
+Counter({'lineagePolicy': 30, 'truncated': 3, 'other': 1})
+PASS phase-3g-v3-room-rebase-red.test.ts rejects partial, extra and accessor-backed policy evidence b
+PASS phase-3g-v3-room-rebase-red.test.ts keeps the reserved terminal activation outside the real chat
+PASS phase-6a-creator-successor-product-red.test.ts freezes exactly five RED owners, one GREEN owner and seven b
+PASS phase-6a-creator-successor-product-red.test.ts pins the exact seven-key successor authority and rejects pre
+PASS phase-6a-creator-successor-product-red.test.ts keeps node-root and chat authority closed while assigning th
+PASS phase-6a-creator-successor-product-red.test.ts runs all product behaviors without a source-pattern readines
+PASS phase-6a-creator-successor-product-red.test.ts freezes four test owners, one room GREEN owner and twelve ca
+PASS phase-6a-creator-successor-product-red.test.ts bounds migration activation bytes before constructing the ca
+PASS phase-6a-creator-successor-product-red.test.ts bounds every migration invite encode before copying caller-c
+green focused suites: 2 2 testResults entries: 1
+===
+diff-exit=0
+===
+examples/v3-room/src/index.ts
+===
+shasum: manifest.sha256: No such file or directory
+1 9 TypeError: truncated canonical value
+2 9 TypeError: v3 room preparation failed: trust-open-failed
+3 9 DurableIssuanceError: issuance database could not be opened
+4 8 AssertionError: expected [ Array(3) ] to deeply equal [ '$drp.author-fence.v1', …(3) ]
+manifest-exit=0
+['numTotalTestSuites', 'numPassedTestSuites', 'numFailedTestSuites', 'numPendingTestSuites', 'numTotalTests', 'numPassedTests', 'numFailedTests', 'numPendingTests', 'numTodoTests', 'snapshot', 'startTime', 'success', 'testResults']
+/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts
+assertions: 9
+vitest.workspace.ts
+30:		"e2e-test:canvas-chat": "pnpm exec playwright test --config playwright.canvas-chat.config.ts --fail-on-flaky-tests",
+31:		"e2e-test:platform": "pnpm exec playwright test --config playwright.platform-capability.config.ts",
+32:		"e2e-test:browser-currency": "pnpm exec playwright test --config playwright.browser-currency.config.ts",
+total 26 pass 25 fail 1
+phase-3f-b-chat-zone-causal-join-red.test.ts | uses the genuine zone package while retaining durable join t
+   Error: Failed to resolve entry for package "@ts-drp/outcome-commit". The package may have incorrect main/module/exports specified in its package.json.
+* [RED] durably builds the plan before a fence, then links reb
+    AssertionError: expected [ Array(3) ] to deeply equal [ '$drp.author-fence.v1', …(3) ]
+* [RED] keeps manual-review durable and holds public issue bef
+    AssertionError: expected null to match object { entries: [ { …(3) } ], …(1) }
+* [RED] preserves linked entries across same-epoch reopen and 
+    AssertionError: expected [] to deeply equal [ { kind: 'replacement', …(1) } ]
+* [RED] clears a displaced fence and drops terminal plan rows 
+    AssertionError: expected [] to have a length of 1 but got +0
+* [RED] rebases a published displaced source without requiring
+    TypeError: v3 room published displaced operation is absent from target
+* [RED] surfaces an ACL source into a durable manual-review en
+    AssertionError: expected 1 to be less than -1
+* [RED] covers reserved empty-intent rows with a settlement fe
+    AssertionError: expected [ 'message' ] to deeply equal [ '$drp.author-fence.v1', 'message' ]
+* [RED] reads back an ambiguous atomic replacement link and ne
+    AssertionError: expected null to match object { entries: [ { …(2) } ], …(1) }
+35:protocol carrier/checkpoint codecs", "f5b0c room policy, exact indexed replacements, zero-intent
+80:plan-change B.3 says "The room always issues one fence per open/adopt after the drain." The
+93:epoch in which a displaced source exists' is the verifier-side lower bound, not the room's
+115:gate) and f5b0c merge.
+195:  :326-328/:397-398; v3-room :2796-2990 (drain + rebasePromise), :2814, :2852-2857
+     224 .logs/d110c-0c1f5b0r-design-3a156aca/pre-review.md
+(and keep the existing genesis sentence as the worked case).
+
+### P2-4 — When exactly a fence must be issued is stated three incompatible ways
+Evidence: drain step 5 issues the fence unconditionally after the plan; the Compatibility section
+says "the fence action is mandatory from the first epoch in which a displaced source exists";
+plan-change B.3 says "The room always issues one fence per open/adopt after the drain." The
+difference is load-bearing at same-device re-entry (matrix row and RED case 7: "first fence at
+`lineage.next` establishes the base"): the returning author's old rows are **terminal**
+(`epoch < admissionEpoch`), not displaced, so its plan can be empty — under the
+"only-when-a-displaced-source-exists" reading no fence is issued, the null boundary can never
+advance (no fence, no slot 0), and case 7 fails. Node's refusal rule ("refuses a fence unless a
+durable plan exists with no `manual-review` entry and a null `fenceSequence`") must also be read
+as accepting an empty-entries plan, which is currently only implicit.
+
+Proposed design edit: in "Author drain, plan and fence", after step 5, add
+"A fence is issued at every open/adopt under the profile once the drain completes, including with
+an empty plan (a returning member with only terminal old-incarnation rows); Node's refusal rule
+accepts a durable empty-entries plan. The Compatibility sentence's 'mandatory from the first
+epoch in which a displaced source exists' is the verifier-side lower bound, not the room's
+issuing rule." (Or, if conditional issuance is intended, name the re-entry carve-out explicitly.)
+
+### P2-5 — Terminal-rule sentence contradicts the old-incarnation-terminal drain rule
+Evidence: "Recovery, terminal rule and pruning": "Rows above the boundary from an older epoch are
+displaced sources for the plan; they are never silently terminal" versus drain step 2:
+"`row.epoch < e`: old incarnation, terminal." Old-incarnation rows above the boundary ARE
+silently terminal by design (plan-change B.4 default). Two different rules for the same row.
+
+Proposed design edit: change that sentence to
+"Rows above the boundary from an older epoch **of the current incarnation
+(`admissionEpoch <= epoch < current`)** are displaced sources for the plan; they are never
+silently terminal. Old-incarnation rows (`epoch < admissionEpoch`) are terminal at re-admission
+and covered by the first fence."
+
+### P2-6 — No rule retires plan entries whose sources became terminal by incarnation change; unlinked entries then block pruning forever
+Evidence: `pruneAuthenticatedSettledPrefix` "refuses any row referenced by an unlinked plan
+entry" (design store section; plan-change §A.4/C.8). A member removed mid-plan and later
+re-added has unlinked `rebase`/`transform`/`manual-review` entries whose source rows now classify
+old-incarnation-terminal; neither design.md step 3's merge rules nor plan-change C.5 says those
+entries are dropped, so the prune gate refuses their rows permanently and the `manual-review`
+hold in step 4 could even re-arm against dead sources. Affects f5b0s conformance vectors (prune
+gate) and f5b0c merge.
+
+Proposed design edit: in drain step 3, add
+"An entry whose source row now classifies terminal (`seq <= s`, or
+`row.epoch < admissionEpoch`) is removed from the plan at merge — the boundary, not the plan,
+settled it — and no longer holds the prune gate."
+
+### P2-7 — Stale plan-line citation in "Retained findings absorbed"
+Evidence: design.md cites "plan `:98815-98823` predicate reopened" for the `readRebaseOutbox`
+published-rows finding. At HEAD those plan lines hold the f5b0q AVL acceptance matrix; the
+intended target — D.110c-0c1d's "state-selection predicate" freeze ("…omitted from reissue by the
+15:import { assertTrustPreserved, createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
+295:	| "trust-not-preserved"
+2613:			let preserved: unknown;
+2615:				preserved = assertTrustPreserved({
+2621:				return failure("trust-not-preserved", "creator trust preservation failed");
+2623:			const preservation = snapshotClosedRecord(preserved, ["exactCanonicalTrustStateRecordBytes", "ok", "trustRef"]);
+2624:			const preservedRef =
+2629:				preservedRef === undefined ||
+2630:				preservedRef.digest !== expectedTrustRef.digest ||
+2631:				preservedRef.byteLength !== expectedTrustRef.byteLength
+2633:				return failure("trust-not-preserved", "creator trust preservation failed");
+4720:			const reservedDisplaced = authenticatedSettlementSourceRow(
+4730:			if (matches(reservedDisplaced)) {
+4731:				return ObjectFreeze({ authenticated: reservedDisplaced, kind: "displaced" as const });
+6097:function isReservedBatchAction(action: string): boolean {
+6098:	return RESERVED_BATCH_ACTIONS.some((reserved) => reserved === action);
+6105:		!isReservedBatchAction(action) &&
+6256:			return localIssueFailure("authorization-rejected", "v3 local issue operation is reserved to the node");
+6647:		(input.planEffect.kind !== "replacement" || isReservedBatchAction(String(Reflect.get(first.operation, "action"))))
+6801:			isReservedBatchAction(action) &&
+8093:								? readSettlementSources(registration)
+8642:async function readSettlementSources(
+	settlementFrontier?: SettlementFrontierContext
+): ClassifiedPlaneVertex | undefined {
+	const matches = (
+		authenticated: AuthenticatedRecoveryVertex | undefined
+	): authenticated is AuthenticatedRecoveryVertex =>
+		authenticated !== undefined &&
+		authenticated.digest === lowerHexDigest(expectedDigest) &&
+		authenticated.author === expectedAuthor &&
+		authenticated.authorSequence === expectedAuthorSequence;
+	const current = authenticateRecoveryVertex(payload, authorization, canonicalPreimageBytes, signature);
+	if (matches(current)) return ObjectFreeze({ authenticated: current, kind: "current" as const });
+	if (displacedSource !== undefined) {
+		const displaced = authenticateRecoveryVertex(
+			displacedSource.prepared,
+			displacedSource.authorization,
+			canonicalPreimageBytes,
+			signature
+		);
+		if (matches(displaced)) return ObjectFreeze({ authenticated: displaced, kind: "displaced" as const });
+		if (settlementProfileFor(payload.trust.trust.profileId) === "v1") {
+			const reservedDisplaced = authenticatedSettlementSourceRow(
+				displacedSource.prepared,
+				displacedSource.authorization,
+				canonicalPreimageBytes,
+				signature,
+				expectedDigest,
+				expectedAuthor,
+				expectedAuthorSequence,
+				undefined
+			);
+			if (matches(reservedDisplaced)) {
+				return ObjectFreeze({ authenticated: reservedDisplaced, kind: "displaced" as const });
+			}
+		}
+	}
+	if (settlementProfileFor(payload.trust.trust.profileId) === "v1" && settlementFrontier !== undefined) {
+		const older = authenticatedSettlementSourceRow(
+			payload,
+			authorization,
+			canonicalPreimageBytes,
+			signature,
+			expectedDigest,
+			expectedAuthor,
+			expectedAuthorSequence,
+			settlementFrontier
+		);
+		if (matches(older)) return ObjectFreeze({ authenticated: older, kind: "displaced" as const });
+	}
+	const row = ObjectFreeze({
+		authorSequence: expectedAuthorSequence,
+		canonicalPreimageBytes,
+		digest: expectedDigest,
+		publishState: "pending" as const,
+		scope: ObjectFreeze({ author: expectedAuthor, objectId: payload.provenance.objectId }),
+		signature,
+	}) as SnapshottedOutboxRow;
+	const pinned =
+		pinnedGenesisAnchorDigest === undefined || exactCanonicalPinnedGenesisBootstrapOperationBytes === undefined
+			? undefined
+			: authenticatedPinnedGenesisOutboxRow(
+					row,
+====
+async function readSettlementSources(
+	registration: V3PlaneRegistration,
+	settlementFrontier?: SettlementFrontierContext
+): Promise<V3RebaseOutboxResult> {
+	// Until the checkpoint/room owner supplies its verified frontier, retain every authenticated source candidate.
+	return readRebaseOutbox(registration, true, settlementFrontier);
+}
+
+export { prepareV3LiveGeneration };
+589:	readonly intents: readonly Readonly<{
+6942:				const intents = rebaseIntents(historical ? registration.payload : displacedPayload, classified.authenticated);
+6943:				if (intents === undefined) {
+6981:	const intents = rebaseIntents(
+6985:	if (intents === undefined) {
+6995:		intents: ObjectFreeze(intents),
+			if (settlementFrontier !== undefined) {
+				const ownRowClass = settlementOwnRowClass(
+					classified.authenticated.admitted.epoch,
+					settlementFrontier.currentEpoch,
+					classified.row.authorSequence,
+					settlementFrontier.admissionEpoch,
+					settlementFrontier.terminalThrough
+				);
+				if (ownRowClass === "terminal" || ownRowClass === "old-incarnation") continue;
+			}
+			const historical = classified.kind === "covered-historical" || classified.kind === "pinned-genesis";
+			if (historical && !countHistoricalIssuanceRow(registration.historicalIssuance, classified.row.authorSequence)) {
+				return ObjectFreeze({
+					detail: "v3 rebase historical plane is at capacity",
+					kind: "record-rejected" as const,
+					ok: false as const,
+				});
+			}
+			if (classified.kind === "current") {
+				currentRecordCount += 1;
+				if (currentRecordCount > registration.payload.parameters.maxEpochVertices) {
+					return ObjectFreeze({
+						detail: "v3 rebase current plane is at capacity",
+						kind: "record-rejected" as const,
+						ok: false as const,
+					});
+				}
+				if (ReflectApply(SetPrototypeHas, registration.quarantinedDigests, [classified.authenticated.digest]) === true)
+					continue;
+			}
+			if (!validRebaseRow(registration, classified)) {
+				return ObjectFreeze({
+					detail: "v3 rebase outbox record is invalid",
+					kind: "record-rejected" as const,
+					ok: false as const,
+				});
+			}
+			if (classified.kind === "displaced" || historical) {
+				if (!includePublishedSources && historical && classified.row.publishState === "published") continue;
+				if (!includePublishedSources && crossSource === undefined && classified.row.publishState !== "pending")
+					continue;
+				const displacedPayload = registration.displacedSource?.prepared ?? registration.payload;
+				const intents = rebaseIntents(historical ? registration.payload : displacedPayload, classified.authenticated);
+				if (intents === undefined) {
+					return ObjectFreeze({
+						detail: "v3 rebase outbox intent is invalid",
+						kind: "record-rejected" as const,
+						ok: false as const,
+					});
+				}
+				if (
+					!historical &&
+					((crossSource !== undefined && classified.row.authorSequence === 0) ||
+						classified.authenticated.digest === registration.displacedSource?.activationVertexDigest)
+				) {
+					continue;
+				}
+				displacedRecordCount += 1;
+				const displacedLimit = historical
+					? registration.payload.parameters.maxEpochVertices
+					: displacedPayload.parameters.maxEpochVertices;
+				if (displacedRecordCount > displacedLimit) {
+					return ObjectFreeze({
+						detail: "v3 rebase displaced plane is at capacity",
+						kind: "record-rejected" as const,
+						ok: false as const,
+					});
+				}
+				displaced.push(classified);
+			}
+		}
+		registration.rebaseSnapshot = ObjectFreeze(displaced);
+	}
+	const snapshot = registration.rebaseSnapshot;
+	const selected = snapshot.find(
+		({ row }) => registration.rebaseCursor === undefined || row.authorSequence > registration.rebaseCursor
+	);
+	if (selected === undefined) return ObjectFreeze({ kind: "empty" as const, ok: true as const });
+	registration.rebaseCursor = selected.row.authorSequence;
+	const source = registration.displacedSource;
+	const historical = selected.kind === "covered-historical" || selected.kind === "pinned-genesis";
+	const intents = rebaseIntents(
+		historical ? registration.payload : (source?.prepared ?? registration.payload),
+		selected.authenticated
+	);
+	if (intents === undefined) {
+		return ObjectFreeze({
+			detail: "v3 rebase outbox intent is invalid",
+			kind: "record-rejected" as const,
+			ok: false as const,
+		});
+	}
+	const commonSource = {
+		author: selected.authenticated.author,
+		authorSequence: selected.row.authorSequence,
+		intents: ObjectFreeze(intents),
+		vertexDigest: selected.authenticated.digest,
+	};
+	return source?.issuanceStore === undefined
+		? ObjectFreeze({
+				kind: "displaced" as const,
+===
+6778:function rebaseIntents(
+function rebaseIntents(
+	payload: PreparedV3LivePayload,
+	authenticated: AuthenticatedRecoveryVertex
+):
+	| readonly Readonly<{
+			readonly logicalTime: number;
+			readonly operation: Readonly<Record<string, unknown>>;
+			readonly operationCount: number;
+			readonly operationIndex: number;
+	  }>[]
+	| undefined {
+	const sourceOperation = authenticated.vertex.operation;
+	if (sourceOperation === undefined) return undefined;
+	const action = Reflect.get(sourceOperation, "action");
+	const batch = applicationBatchEntries(payload, sourceOperation);
+	if (action === APPLICATION_BATCH_ACTION) {
+		return batch?.map((entry, operationIndex) =>
+			ObjectFreeze({ ...entry, operationCount: batch.length, operationIndex })
+		);
+	}
+	if (
+		isControlOperation(sourceOperation, payload.trust.trust.profileId) ||
+		(typeof action === "string" &&
+			isReservedBatchAction(action) &&
+			settlementProfileFor(payload.trust.trust.profileId) !== "v1")
+	) {
+		return ObjectFreeze([]);
+	}
+	const operation = detachedCanonicalOperation(sourceOperation);
+	return operation === undefined
+		? undefined
+		: ObjectFreeze([
+				ObjectFreeze({
+					logicalTime: authenticated.admitted.logicalTime,
+					operation,
+					operationCount: 1,
+					operationIndex: 0,
+				}),
+			]);
+}
+
+async function authenticatedOutboxRow(
+	registration: V3PlaneRegistration,
+	rawRow: unknown,
+	issuanceStore: DurableIssuanceStore = registration.issuanceStore,
+	issuanceScope: DurableIssueScope = registration.issuanceScope,
+	settlementFrontier?: SettlementFrontierContext
+): Promise<ClassifiedRebaseRow | undefined> {
+	const row = outboxRowSnapshot(rawRow, issuanceScope);
+	if (row === undefined) return undefined;
+	const issued = await issuanceStore.readIssued(issuanceScope, row.authorSequence);
+	const issuedRow = outboxRowSnapshot(ObjectFreeze({ commit: issued, publishState: row.publishState }), issuanceScope);
+	return issuedRow !== undefined && matchingOutboxRows(row, issuedRow)
+		? classifyRebaseRow(registration, row, settlementFrontier)
+		: undefined;
+}
+
+async function readRebaseOutbox(
+	registration: V3PlaneRegistration,
+	includePublishedSources = false,
+	settlementFrontier?: SettlementFrontierContext
+): Promise<V3RebaseOutboxResult> {
+	if (!currentRegistration(registration)) {
+231:const RESERVED_BATCH_ACTIONS = ObjectFreeze([
+231:const RESERVED_BATCH_ACTIONS = ObjectFreeze([
+232-	"acl",
+233-	APPLICATION_BATCH_ACTION,
+234-	AUTHOR_FENCE_ACTION,
+examples/v3-room/src/index.ts:359:	readonly displacementPolicies: Readonly<Record<string, "expire" | "manual-review" | "rebase" | "transform">>;
+examples/v3-room/src/index.ts:1339:	const policies = application.displacementPolicies;
+examples/v3-room/src/index.ts:2848:			const policy = input.application.displacementPolicies[action];
+examples/v3-room/src/index.ts:2983:				const policy = input.application.displacementPolicies[action];
+examples/v3-room/src/index.ts:3060:					const policy = input.application.displacementPolicies[action];
+examples/v3-room/src/index.ts:3121:			const policy = input.application.displacementPolicies[action];
+const RESERVED_BATCH_ACTIONS = ObjectFreeze([
+	"acl",
+	APPLICATION_BATCH_ACTION,
+	AUTHOR_FENCE_ACTION,
+	"causalJoin",
+	"join",
+] as const);
+const ISSUANCE_SCOPE_KEYS = ["objectId", "author"] as const;
+const OUTBOX_RECORD_KEYS = ["commit", "publishState"] as const;
+const ISSUE_COMMIT_KEYS = ["authorSequence", "envelope", "issuedRecord", "outboxEntry"] as const;
+===
+				operationIndex,
+				vertexDigest,
+			})
+		);
+	}
+	return Object.freeze(accepted);
+}
+
+function validateDisplacementPolicy(application: V3RoomApplication): void {
+	const policies = application.displacementPolicies;
+	if (
+		policies === null ||
+		typeof policies !== "object" ||
+		Array.isArray(policies) ||
+		!Object.isFrozen(policies) ||
+		(Object.getPrototypeOf(policies) !== Object.prototype && Object.getPrototypeOf(policies) !== null)
+	) {
+		throw new TypeError("v3 room displacement policy is invalid");
+	}
+	const keys = Reflect.ownKeys(policies);
+	if (
+		keys.length !== application.batchableOperationActions.length ||
+		keys.some((key, index) => key !== application.batchableOperationActions[index])
+	) {
+		throw new TypeError("v3 room displacement policy is invalid");
+	}
+	for (const key of keys) {
+		if (typeof key !== "string") throw new TypeError("v3 room displacement policy is invalid");
+		const descriptor = Object.getOwnPropertyDescriptor(policies, key);
+		const value = descriptor !== undefined && "value" in descriptor ? descriptor.value : undefined;
+		if (
+examples/v3-chat/src/index.ts
+examples/grid/src/v3-zone.ts
+examples/grid/src/v3-zone.ts:1270:		batchableOperationActions: Object.freeze(["placeBlock"]),
+498:		batchableOperationActions: Object.freeze(["message"]),
+509:		displacementPolicies: Object.freeze({ message: "rebase" as const }),
+===
+examples/v3-room/src/index.ts:354:	readonly batchableOperationActions: readonly string[];
+examples/v3-room/src/index.ts:1318:			!application.batchableOperationActions.includes(action)
+examples/v3-room/src/index.ts:1351:		keys.length !== application.batchableOperationActions.length ||
+examples/v3-room/src/index.ts:1352:		keys.some((key, index) => key !== application.batchableOperationActions[index])
+examples/v3-room/src/index.ts:1540:		!Array.isArray(input.application.batchableOperationActions) ||
+3502:function isControlOperation(value: unknown, profileId: string): boolean {
+function isControlOperation(value: unknown, profileId: string): boolean {
+	if (settlementProfileFor(profileId) !== "v1") return false;
+	if (!isObject(value)) return false;
+	const action = Reflect.get(value, "action");
+	return action === AUTHOR_FENCE_ACTION || action === "causalJoin" || action === "join";
+}
+
+function aclOperation(author: string, digest: string, value: unknown): StagedLatchedAclOperation | null | undefined {
+	if (!isObject(value)) return null;
+	const action = ObjectGetOwnPropertyDescriptor(value, "action");
+	if (action === undefined || !("value" in action) || action.value !== "acl") return null;
+	const record = snapshotClosedRecord(value, ["action", "group", "kind", "target"]);
+	if (
+		record === undefined ||
+		(record.kind !== "grant" && record.kind !== "revoke") ||
+		(record.group !== "admin" &&
+===
+0
+red-manifest-bad=1
+18424:- **f5b0c room** from accepted design
+18432:- **f5b0d** reclamation is dependency-ready but follows the requested f5b0c
+18433:  execution order. **f5b** creator settlement → f5b0c and f5b0d GREEN;
+98827:transaction and close-graph split with compaction noninterference; f5b0c room
+99122:f5b0b are CLOSED GREEN and reviewed as of 2026-09-04, so f5b0c tests-only RED
+99192:close-graph split with the `applicationVertices` rename); f5b0c room
+99197:f5b0b, then f5b0c; f5b0d after f5b0a and f5b0s; f5b after all five. The design
+99224:without a further design review; f5b0b, f5b0c, f5b0d and f5b are each
+99249:f5b0c owns room typecheck; W1 owns enlarged decode-limit parity and its ACL
+99269:and same-store activation-digest runtime coverage belong to f5b0c; the
+focused.json success=true total=9 passed=9 failed=0 pending=0
+retained87.json success=true total=87 passed=87 failed=0 pending=0
+legacy26.json success=true total=26 passed=26 failed=0 pending=0
+isolated-focused.json success=true total=9 passed=9 failed=0 pending=0
+isolated-retained87.json success=true total=87 passed=87 failed=0 pending=0
+example-v3-room build=0 typecheck=0 eslint=0 prettier=0 diff-check=0
+production signature=G remote-match=true changed-path-count=1
+design contradiction=none
+====
+record=D.110c-0c1f5b0c
+production=3b6a66a9b5257c9011611fc2955ac6ee1ab90bfc
+changed_path_count=1
+changed_path=examples/v3-room/src/index.ts
+public_room_issue_signature_changed=false
+protocol_v3_changed=false
+node_changed=false
+dependency_or_lockfile_changed=false
+settlement_plan_write_owner=examples/v3-room/src/index.ts:transactWriteSettlementPlan
+replacement_link_owner=examples/v3-room/src/index.ts:planEffect
+fence_action=$drp.author-fence.v1
+legacy_completion_owner_preserved=true
+settlement_completion_owner_calls_completeRebaseSource=false
+focused=9/9
+retained=87/87
+legacy=26/26
+isolated_focused=9/9
+isolated_retained=87/87
+stop_rule_triggered=false

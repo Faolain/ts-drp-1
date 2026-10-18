@@ -1,0 +1,15 @@
+{
+  "startedAt": "2026-09-06T04:54:03.917Z",
+  "pid": 37109,
+  "root": "/private/tmp/d110c-f5b-green-transport-static-z5iavL/checkout",
+  "files": [
+    "tests/phase-3a1b-p3-live-transport-red.test.ts"
+  ],
+  "compilerVersion": "5.8.2",
+  "nodeVersion": "v22.15.0",
+  "nodeExecutable": "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+  "programExecutions": 1,
+  "effectiveOptionsExactlyAccepted": true,
+  "acceptedDiagnosticFile": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-transport-static-41686d6f/corrected/diagnostics.json",
+  "acceptedSha256": "70b030964214f2ece4cc48b6ce2386e727c83ffb9672749637856e593052a96b"
+}

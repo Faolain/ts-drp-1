@@ -1,0 +1,12 @@
+e384a40cc9f30d4cb5f65b459e2be65858ce05e5 G test: align retained room mock module identities
+
+diff --git a/tests/phase-3g-v3-room-rebase-red.test.ts b/tests/phase-3g-v3-room-rebase-red.test.ts
+index abc3c72c..485e2897 100644
+--- a/tests/phase-3g-v3-room-rebase-red.test.ts
++++ b/tests/phase-3g-v3-room-rebase-red.test.ts
+@@ -123 +123 @@ vi.mock("../packages/storage-browser/dist/src/live-journal.js", async (importOri
+-vi.mock("../packages/protocol-v3/dist/src/public.js", async (importOriginal) => ({
++vi.mock("@ts-drp/protocol-v3", async (importOriginal) => ({
+@@ -135 +135 @@ vi.mock("../packages/protocol-v3/dist/src/public.js", async (importOriginal) =>
+-vi.mock("../packages/node/dist/src/v3-live.js", async (importOriginal) => ({
++vi.mock("@ts-drp/node/v3-live", async (importOriginal) => ({

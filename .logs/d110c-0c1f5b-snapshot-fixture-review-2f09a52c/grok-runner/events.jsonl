@@ -1,0 +1,22 @@
+grok active elapsed=0s events=0 bytes=0
+grok active elapsed=15s events=2 bytes=2202
+grok active elapsed=30s events=87 bytes=160317
+grok active elapsed=45s events=174 bytes=208014
+grok active elapsed=60s events=328 bytes=235485
+grok active elapsed=75s events=432 bytes=599303
+grok active elapsed=90s events=547 bytes=681347
+grok active elapsed=105s events=551 bytes=681823
+grok active elapsed=120s events=556 bytes=682421
+grok active elapsed=135s events=577 bytes=1065891
+grok active elapsed=150s events=589 bytes=1066546
+grok active elapsed=165s events=640 bytes=1708213
+grok active elapsed=180s events=655 bytes=1709047
+grok active elapsed=195s events=687 bytes=1746328
+grok active elapsed=210s events=692 bytes=1746845
+grok active elapsed=225s events=712 bytes=1859621
+grok active elapsed=240s events=727 bytes=1860667
+grok active elapsed=255s events=734 bytes=1861754
+grok active elapsed=270s events=792 bytes=1898217
+grok active elapsed=285s events=1297 bytes=1913761
+grok active elapsed=300s events=2221 bytes=1941522
+{"classification": "NO_VERDICT", "duration_seconds": 315.211, "events": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-snapshot-fixture-review-2f09a52c/grok/events.jsonl", "exit_code": 0, "public": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-snapshot-fixture-review-2f09a52c/grok/public.txt", "stop_reason": "end_turn", "timed_out": false}

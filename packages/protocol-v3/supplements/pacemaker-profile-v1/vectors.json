@@ -1,0 +1,191 @@
+{
+	"certificate": {
+		"quorum": 3,
+		"round": 3,
+		"roundChangeIds": ["round-change-null-a", "round-change-qc2a-z", "round-change-qc2b-private"],
+		"signerIds": ["a", "z", ""]
+	},
+	"crypto": {
+		"alternateValueDigestHex": "e682fba53c6673a5cc18270d008de458c66f1a1ce41520acd42472b374c986ba",
+		"anchor": "1111111111111111111111111111111111111111111111111111111111111111",
+		"cutValue": {
+			"aclDigest": "1616161616161616161616161616161616161616161616161616161616161616",
+			"archiveIndexRoot": "1919191919191919191919191919191919191919191919191919191919191919",
+			"availabilityPolicyDigest": "1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a",
+			"blueprintDigest": "1818181818181818181818181818181818181818181818181818181818181818",
+			"closeReason": "scheduled",
+			"closeSetCount": 3,
+			"closeSetRoot": "1313131313131313131313131313131313131313131313131313131313131313",
+			"encodingVersion": "drp-canonical-profile-1",
+			"epoch": 0,
+			"historyRoot": "1414141414141414141414141414141414141414141414141414141414141414",
+			"historySize": 7,
+			"kind": "drp-hard-epoch-cut",
+			"nextSignerSet": [
+				{ "publicKey": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c", "signerId": "a" },
+				{ "publicKey": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394", "signerId": "z" },
+				{ "publicKey": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1", "signerId": "" },
+				{ "publicKey": "ca93ac1705187071d67b83c7ff0efe8108e8ec4530575d7726879333dbdabe7c", "signerId": "𐀀" }
+			],
+			"objectId": "phase5:55555555555555555555555555555555",
+			"parameters": {
+				"maxDependencies": 32,
+				"maxEpochBytes": 1048576,
+				"maxEpochVertices": 1024,
+				"maxPendingBytes": 8388608,
+				"maxPendingEntries": 4096,
+				"maxSnapshotBytes": 16777216,
+				"snapshotChunkBytes": 65536
+			},
+			"previousAnchor": "1111111111111111111111111111111111111111111111111111111111111111",
+			"previousCutDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+			"previousHistoryRoot": "0000000000000000000000000000000000000000000000000000000000000000",
+			"previousHistorySize": 0,
+			"protocolMajor": 3,
+			"snapshotManifestDigest": "1717171717171717171717171717171717171717171717171717171717171717",
+			"stateDigest": "1515151515151515151515151515151515151515151515151515151515151515"
+		},
+		"leaderPrepareVote": {
+			"registeredDigestHex": "97931a633bd4aa61dd3d31c38601c9e6bda0f7c0e9bcaa1161dbffb706ea514b",
+			"signatureHex": "b58604cc75dd3ec9f31ae3dd4cef2da031a231423284d329fb0f4b0b170e871653d549e3daf47eaaa7deaa195d6f3e2b55fce5211d268ab17658e5a087298802",
+			"signerId": "𐀀"
+		},
+		"objectId": "phase5:55555555555555555555555555555555",
+		"proposal": {
+			"digestHex": "c1ee9a4ebb49a9d2359d6ee457874116046faf3066c2b642ed1978ac52cb47a1",
+			"round": 3
+		},
+		"qcs": [
+			{
+				"digestHex": "0f6e70967640f421444a7532662dd32b7480c3963b98fef5cb2155e5f21d366f",
+				"id": "prepare-r1",
+				"phase": "prepare",
+				"round": 1,
+				"signerIds": ["a", "z", ""],
+				"value": "primary"
+			},
+			{
+				"digestHex": "22ba16203d3525b5530f06613978900a0eb34804f1652f029099ef57b2a68fcc",
+				"id": "prepare-r2-a",
+				"phase": "prepare",
+				"round": 2,
+				"signerIds": ["a", "z", ""],
+				"value": "primary"
+			},
+			{
+				"digestHex": "73c96be45741e5cdfd5521f2df7b771f37dd8f99f3f420023b3bc0d4b87a6636",
+				"id": "prepare-r2-b",
+				"phase": "prepare",
+				"round": 2,
+				"signerIds": ["z", "", "𐀀"],
+				"value": "primary"
+			},
+			{
+				"digestHex": "c8e96243ef541adc49f32fc2ca133b3356c5375363e356d8a10c231e28bd72ec",
+				"id": "prepare-r2-conflict",
+				"phase": "prepare",
+				"round": 2,
+				"signerIds": ["a", "z", "𐀀"],
+				"value": "alternate"
+			},
+			{
+				"digestHex": "deabe4930d85c7138a1ec84f24401975df33a726a7d2365f9e5a2177c406bfee",
+				"id": "commit-r2",
+				"phase": "commit",
+				"round": 2,
+				"signerIds": ["a", "z", ""],
+				"value": "primary"
+			}
+		],
+		"roundChanges": [
+			{
+				"digestHex": "a3e97bcc0f71ea4e3c709a8be89726581bef11af3d272ab03f0f76c38d5e4b77",
+				"highestPrepareQC": null,
+				"id": "round-change-null-a",
+				"signatureHex": "4cac52306b76c4a926ae37ef35ae795465431c5201016316486fdf95d139bb08c30a9291a1f274783f136d3c5ca6d1ca88c9f0925d62777dbf6cdc89b8d1ac06",
+				"signerId": "a"
+			},
+			{
+				"digestHex": "62a1ae1bb29706063fd26aba8c2eded954685f841f16630b3d9f4490ec32284a",
+				"highestPrepareQC": "prepare-r2-a",
+				"id": "round-change-qc2a-z",
+				"signatureHex": "445191b63c90e747cfaf4dc4cf6b86ba5f9c4df15c3576732c45037a32caed22406add611ab2d7a23fee25a347e03c77810ec535488153e924ead51cfece7f0d",
+				"signerId": "z"
+			},
+			{
+				"digestHex": "a143a576931b2de753a2e07533b1cb99b3d0a556a455dc8e7a57f5df9123ccff",
+				"highestPrepareQC": "prepare-r2-b",
+				"id": "round-change-qc2b-private",
+				"signatureHex": "3b7c776868f7ae610aa17dfc123dea0627d15ee425149485c51cd98595f2b34321b4b80d15963f0bb5967ede6dfce6319c1b808a604d332f0814f75af64fe303",
+				"signerId": ""
+			},
+			{
+				"digestHex": "4dc4cc5130bd1807f107a6b22f01f4b7ea989539ca19600851f2138f3099d3b6",
+				"highestPrepareQC": null,
+				"id": "round-change-nonmember",
+				"signatureHex": "998596ff3d90d6cf4cf5239da337f4d7ac579601332aa6cc5ea10d3b81f0415c580869b3fae8cda761587533ebcf3284985c3a95b7c9363b6020e5d9cff7cc08",
+				"signerId": "outsider"
+			},
+			{
+				"digestHex": "7f51fd44c760cb249b7fb44fba1c2023aa38b2c982a5670bde548576ae143562",
+				"highestPrepareQC": null,
+				"id": "round-change-wrong-tuple",
+				"objectId": "object:wrong",
+				"signatureHex": "e96e0f776231f91d5073cedd1938ed30b8bc2cb6583d5608b5521eaeee56df2cd624a2c703f59ebc3faca8f4ebb8a2249d286a849b8358d047cc6660db12f50b",
+				"signerId": "a"
+			}
+		],
+		"selection": {
+			"candidates": ["prepare-r1", "prepare-r2-b", "prepare-r2-a"],
+			"conflictingCandidates": ["prepare-r2-a", "prepare-r2-conflict"],
+			"expected": "prepare-r2-a"
+		},
+		"signers": [
+			{
+				"privateKeySeedHex": "0101010101010101010101010101010101010101010101010101010101010101",
+				"publicKeyHex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+				"signerId": "a"
+			},
+			{
+				"privateKeySeedHex": "0202020202020202020202020202020202020202020202020202020202020202",
+				"publicKeyHex": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+				"signerId": "z"
+			},
+			{
+				"privateKeySeedHex": "0303030303030303030303030303030303030303030303030303030303030303",
+				"publicKeyHex": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1",
+				"signerId": ""
+			},
+			{
+				"privateKeySeedHex": "0404040404040404040404040404040404040404040404040404040404040404",
+				"publicKeyHex": "ca93ac1705187071d67b83c7ff0efe8108e8ec4530575d7726879333dbdabe7c",
+				"signerId": "𐀀"
+			},
+			{
+				"privateKeySeedHex": "0909090909090909090909090909090909090909090909090909090909090909",
+				"publicKeyHex": "fd1724385aa0c75b64fb78cd602fa1d991fdebf76b13c58ed702eac835e9f618",
+				"signerId": "outsider"
+			}
+		],
+		"valueDigestHex": "8921327a0f22b9e6ed7b276c03fe949ec96680153b1865512e1db2403bdb05ac"
+	},
+	"leaderRoster": ["a", "z", "", "𐀀"],
+	"leaders": ["a", "z", "", "𐀀", "a", "z", "", "𐀀"],
+	"parameters": {
+		"firstCappedRound": 5,
+		"maxFutureRoundGap": 8,
+		"roundTimeoutBaseMs": 1000,
+		"roundTimeoutMaxMs": 30000
+	},
+	"schemaVersion": "pacemaker-profile-vectors-v1",
+	"timeouts": [
+		{ "round": 0, "timeoutMs": 1000 },
+		{ "round": 1, "timeoutMs": 2000 },
+		{ "round": 2, "timeoutMs": 4000 },
+		{ "round": 3, "timeoutMs": 8000 },
+		{ "round": 4, "timeoutMs": 16000 },
+		{ "round": 5, "timeoutMs": 30000 },
+		{ "round": 6, "timeoutMs": 30000 },
+		{ "round": 9007199254740991, "timeoutMs": 30000 }
+	]
+}

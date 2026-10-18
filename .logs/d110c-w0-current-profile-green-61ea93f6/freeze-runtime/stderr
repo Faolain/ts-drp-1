@@ -1,0 +1,12 @@
+file:///Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-w0-current-profile-green-61ea93f6/runtime.mjs:6
+function environmentAndPorts(){const inherited=process.env.NODE_OPTIONS??'',profiling=/--(?:cpu[-_]prof|heap[-_]prof|prof(?:\b|[-_]))/u.test(inherited)||process.execArgv.some(a=>/--(?:cpu[-_]prof|heap[-_]prof|prof(?:\b|[-_]))/u.test(a));if(profiling||process.env.NODE_V8_COVERAGE)throw Error('Inherited profiling environment rejected');const ports=[];for(const port of [4174,4175,51000,51002]){const r=spawnSync('lsof',['-nP','-i:'+port,'-t'],{encoding:'utf8'});if(![0,1].includes(r.status))throw Error('Fixed-port query');const pids=r.stdout.trim().split(/\s/u).filter(s=>/^\d+$/u.test(s)).map(Number);ports.push({port,pids,unoccupied:pids.length===0});if(pids.length)throw Error('Fixed port occupied '+port);}return{profilingNodeOptionsRejected:true,inheritedProfilingDetected:false,nodeOptionsPresent:Boolean(inherited),nodeV8CoverageAbsent:true,diagnosticVariableExplicitlyUnsetForChild:true,sourceLoggingOptInRemainsUnchanged:true,ports,selectedFixtureUsesFakeNetworkAndNoFixedPortBinding:true};}
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   ^
+
+Error: Fixed port occupied 51000
+    at environmentAndPorts (file:///Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-w0-current-profile-green-61ea93f6/runtime.mjs:6:676)
+    at file:///Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-w0-current-profile-green-61ea93f6/runtime.mjs:16:38
+    at ModuleJob.run (node:internal/modules/esm/module_job:274:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:644:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:116:5)
+
+Node.js v22.15.0

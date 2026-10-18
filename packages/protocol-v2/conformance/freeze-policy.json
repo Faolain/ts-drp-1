@@ -1,0 +1,23 @@
+{
+	"version": 1,
+	"checker": {
+		"path": "packages/protocol-v2/scripts/check-protocol-freeze.mjs",
+		"sha256": "d6900fd1a1b871a537dd7be0eefff7e3143a63f89dbe1bcedcb946273ee8f3d7"
+	},
+	"protectedPaths": [
+		"packages/protocol-v2/conformance/ahe-reference/src/**",
+		"packages/protocol-v2/conformance/reference.lock.json",
+		"packages/protocol-v2/conformance/ahe-reference-regen/**",
+		"packages/protocol-v2/conformance/reference-regen.lock.json",
+		"packages/protocol-v2/tests/fixtures/golden-vectors/**",
+		"packages/protocol-v2/registry/**",
+		"packages/protocol-v2/scripts/check-protocol-freeze.mjs",
+		"packages/protocol-v2/conformance/freeze-policy.json",
+		"docs/production-hardening/ts-drp-ahe-review-bundle/SHA256SUMS.txt",
+		".github/CODEOWNERS",
+		"docs/CODEOWNERS"
+	],
+	"regenReferencePath": "packages/protocol-v2/conformance/ahe-reference-regen/**",
+	"regenLockPath": "packages/protocol-v2/conformance/reference-regen.lock.json",
+	"sourceChecksumsPath": "docs/production-hardening/ts-drp-ahe-review-bundle/SHA256SUMS.txt"
+}

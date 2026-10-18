@@ -1,0 +1,78 @@
+[
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > pins the f5b0d boundary and hands non-issuance scope retirement to D.110c-c",
+    "file": "/private/tmp/d110c-f5b-retained-counter-MFlKNz/checkout/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > installs one storage-neutral authenticated settled-prefix owner without relying on a missing import",
+    "file": "/private/tmp/d110c-f5b-retained-counter-MFlKNz/checkout/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > memory refuses a settlement-profile prefix when the durable plan is absent",
+    "file": "/private/tmp/d110c-f5b-retained-counter-MFlKNz/checkout/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > browser refuses a settlement-profile prefix when the durable plan is absent",
+    "file": "/private/tmp/d110c-f5b-retained-counter-MFlKNz/checkout/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > node refuses a settlement-profile prefix when the durable plan is absent",
+    "file": "/private/tmp/d110c-f5b-retained-counter-MFlKNz/checkout/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > memory refuses while the required fence link is incomplete",
+    "file": "/private/tmp/d110c-f5b-retained-counter-MFlKNz/checkout/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > browser refuses while the required fence link is incomplete",
+    "file": "/private/tmp/d110c-f5b-retained-counter-MFlKNz/checkout/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > node refuses while the required fence link is incomplete",
+    "file": "/private/tmp/d110c-f5b-retained-counter-MFlKNz/checkout/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > memory refuses an unlinked entry outside the selected prefix and deletes nothing",
+    "file": "/private/tmp/d110c-f5b-retained-counter-MFlKNz/checkout/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > browser refuses an unlinked entry outside the selected prefix and deletes nothing",
+    "file": "/private/tmp/d110c-f5b-retained-counter-MFlKNz/checkout/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > node refuses an unlinked entry outside the selected prefix and deletes nothing",
+    "file": "/private/tmp/d110c-f5b-retained-counter-MFlKNz/checkout/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > memory refuses manual review outside the selected prefix and deletes nothing",
+    "file": "/private/tmp/d110c-f5b-retained-counter-MFlKNz/checkout/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > browser refuses manual review outside the selected prefix and deletes nothing",
+    "file": "/private/tmp/d110c-f5b-retained-counter-MFlKNz/checkout/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > node refuses manual review outside the selected prefix and deletes nothing",
+    "file": "/private/tmp/d110c-f5b-retained-counter-MFlKNz/checkout/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > memory prunes one authenticated complete mixed-epoch pending/published prefix and replays monotonically",
+    "file": "/private/tmp/d110c-f5b-retained-counter-MFlKNz/checkout/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > browser prunes one authenticated complete mixed-epoch pending/published prefix and replays monotonically",
+    "file": "/private/tmp/d110c-f5b-retained-counter-MFlKNz/checkout/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > node prunes one authenticated complete mixed-epoch pending/published prefix and replays monotonically",
+    "file": "/private/tmp/d110c-f5b-retained-counter-MFlKNz/checkout/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > node rolls back both tables and the watermark when an authenticated prune crashes mid-transaction",
+    "file": "/private/tmp/d110c-f5b-retained-counter-MFlKNz/checkout/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > keeps creator-trusted-v1 historical issuance within one maxEpochVertices window",
+    "file": "/private/tmp/d110c-f5b-retained-counter-MFlKNz/checkout/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  }
+]

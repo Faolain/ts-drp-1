@@ -1,0 +1,23 @@
+{
+	"extends": "../../../tsconfig.json",
+	"compilerOptions": {
+		"baseUrl": "../../..",
+		"composite": false,
+		"declaration": false,
+		"declarationMap": false,
+		"exactOptionalPropertyTypes": true,
+		"noEmit": true,
+		"paths": {
+			"@ts-drp/canonical": ["packages/canonical/src/index.ts"]
+		},
+		"target": "ES2022"
+	},
+	"files": [
+		"../../protocol-v3-current-epoch-author-authorization-p6-red.test.ts",
+		"../../protocol-v3-author-authorization-p6-pack-red.test.ts",
+		"author-authorization-contract.ts",
+		"author-authorization-freeze-harness.ts",
+		"author-authorization-governance-analyzer.ts",
+		"author-authorization-source-analyzer.ts"
+	]
+}

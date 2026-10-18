@@ -1,0 +1,17 @@
+{
+  "record": "D.110c-0c1f5b0a",
+  "checkpoint": "GREEN",
+  "commit": "5bf45aabc390efcb04a8034062899531c971508d",
+  "focused": { "files": 1, "tests": 10, "passed": 10, "failed": 0 },
+  "retained": [
+    { "name": "protocol-v3", "passed": 44, "failed": 0 },
+    { "name": "node-adoption-0c1a", "passed": 31, "failed": 0 },
+    { "name": "protocol-v2-registry", "passed": 21, "failed": 0 },
+    { "name": "anchor-trust", "passed": 25, "failed": 0 },
+    { "name": "current-author-authorization", "passed": 16, "failed": 0 }
+  ],
+  "buildPackages": "pass",
+  "frozenInstall": "pass",
+  "signature": "G",
+  "pushed": true
+}

@@ -1,0 +1,5 @@
+458a2619995ef63774943a0ccfa17a04bc774072c861ef576f13c289b98c85bd  packages/node/src/v3-live.ts
+34e015ed01ba017cd5ec0ef6b0892d4d8251a552e1e04e0b00cc73434f76aca2  tests/fixtures/phase-3a1b-p3/live-fixture.ts
+b7fc7cee26395afe90e2fca595842424416b0e8d024ff799a65c92752c325232  tests/fixtures/phase-6a-v3/creator-adoption-contract.ts
+8f8d59395a48b339ebbf129bfde28396335e397c48f590270c7a3af6e32857a8  tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts
+150b3d01e56131c30d4697bfbe7cb9a9191d0a344b079605c3a053152e5e5ff5  tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts

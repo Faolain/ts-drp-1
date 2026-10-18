@@ -1,0 +1,11 @@
+{
+  "cwd": "/tmp/d110c-f5b0z-green-signed-REUkBZ/checkout",
+  "command": "pnpm",
+  "args": [
+    "install",
+    "--offline",
+    "--frozen-lockfile",
+    "--ignore-scripts"
+  ],
+  "start": "2026-09-05T20:03:35.187Z"
+}

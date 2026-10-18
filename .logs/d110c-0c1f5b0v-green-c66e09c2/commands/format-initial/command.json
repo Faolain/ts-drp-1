@@ -1,0 +1,14 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "prettier",
+    "--check",
+    "tests/phase-6b-d110c-0c1f5b0u-successor-replay-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts",
+    "examples/v3-room/src/index.ts",
+    "packages/node/src/v3-live.ts"
+  ],
+  "start": "2026-09-05T07:46:34.347Z"
+}

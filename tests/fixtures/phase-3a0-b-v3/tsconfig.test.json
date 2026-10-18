@@ -1,0 +1,19 @@
+{
+	"extends": "../../../tsconfig.json",
+	"compilerOptions": {
+		"baseUrl": "../../..",
+		"composite": false,
+		"declaration": false,
+		"declarationMap": false,
+		"exactOptionalPropertyTypes": true,
+		"noEmit": true,
+		"paths": {
+			"@ts-drp/canonical": ["packages/canonical/src/index.ts"],
+			"@ts-drp/protocol-v3": ["packages/protocol-v3/src/public.ts"],
+			"@ts-drp/storage": ["packages/storage/src/index.ts"],
+			"@ts-drp/storage/*": ["packages/storage/src/*.ts"]
+		},
+		"rootDir": "../../.."
+	},
+	"files": ["../../control-plane-anchor-trust-store-3a0-red.test.ts"]
+}

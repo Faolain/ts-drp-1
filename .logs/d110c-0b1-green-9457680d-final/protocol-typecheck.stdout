@@ -1,0 +1,8 @@
+
+> @ts-drp/protocol-v3@0.11.0 typecheck /Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3
+> tsc --noEmit && pnpm typecheck:public-entry-audit
+
+
+> @ts-drp/protocol-v3@0.11.0 typecheck:public-entry-audit /Users/aristotle/Documents/Projects/ts-drp-1/packages/protocol-v3
+> tsc -p ../../tests/fixtures/phase-0i-v3/tsconfig.public-entry-audit.json && tsc -p ../../tests/fixtures/phase-0j-b-v3/tsconfig.public-entry-audit.json && tsc -p ../../tests/fixtures/phase-3a0-v3/tsconfig.public-entry-audit.json
+

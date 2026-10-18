@@ -1,0 +1,20 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "git",
+  "args": [
+    "diff",
+    "--exit-code",
+    "772e96bdad4f1b881fd547e09e849c97226cb980",
+    "a430272a0e8dd361c9139e66c140870d4ece7e1f",
+    "--",
+    "packages",
+    "examples",
+    "tests",
+    "scripts",
+    ".npmrc",
+    "package.json",
+    "pnpm-lock.yaml",
+    "vite.config.mts"
+  ],
+  "start": "2026-09-06T01:59:56.098Z"
+}

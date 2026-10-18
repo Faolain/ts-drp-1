@@ -1,0 +1,102 @@
+{
+  "checkedAt": "2026-09-06T11:30:25.275Z",
+  "ports": [
+    {
+      "port": 4174,
+      "pids": []
+    },
+    {
+      "port": 4175,
+      "pids": []
+    },
+    {
+      "port": 51000,
+      "pids": []
+    },
+    {
+      "port": 51002,
+      "pids": []
+    }
+  ],
+  "processes": [
+    {
+      "pid": 19543,
+      "numericStatus": "19543 38746 S",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 35043,
+      "numericStatus": "35043 35017 S",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall/packages/db"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 35046,
+      "numericStatus": "35046 35043 S",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall/packages/db"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 40449,
+      "numericStatus": "40449 40425 S",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall.feat-social-url-ingest/packages/db"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 40452,
+      "numericStatus": "40452 40449 S",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall.feat-social-url-ingest/packages/db"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 40475,
+      "numericStatus": "40475 40452 S",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall.feat-social-url-ingest/packages/db"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 41806,
+      "numericStatus": "41806 35046 S",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall/packages/db"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 56881,
+      "numericStatus": "56881 56847 SN",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall/apps/marketing"
+      ],
+      "relevant": false
+    },
+    {
+      "pid": 56966,
+      "numericStatus": "56966 56850 SN",
+      "cwd": [
+        "/Users/aristotle/Documents/Projects/f/heimdall/apps/web"
+      ],
+      "relevant": false
+    }
+  ],
+  "noArgvCommOrEnvironmentDump": true,
+  "noCompetingTaskProcesses": true,
+  "inheritedProfilingAbsent": true,
+  "baseline": "7efe33dd350deab922c3fea7e9fcd1c968f4e474",
+  "runtimeRosterSha256": "e7eddba484ad9aa2a659d2e3fafa2f8f4e0da7429351d14d6b292cdb91a114c4",
+  "requiresImmediatePreExecutionRecheck": true,
+  "allRuntimeReleased": false
+}

@@ -1,0 +1,595 @@
+Scope: 5 of 48 workspace projects
+packages/issuance-store typecheck$ tsc --noEmit
+packages/issuance-store typecheck: Done
+packages/storage-node typecheck$ tsc --noEmit
+packages/node typecheck$ tsc --noEmit
+packages/storage-node typecheck: ../node/src/creator-adoption-activate.ts(1,8): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "./creator-adoption.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption-activate.ts'
+packages/storage-node typecheck:     Imported via "../../../packages/node/src/creator-adoption.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'
+packages/storage-node typecheck:     Imported via "../../../packages/node/src/creator-adoption.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../node/src/creator-adoption-activate.ts(1,8): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "./creator-adoption.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption-activate.ts'
+packages/storage-node typecheck:     Imported via "../../../packages/node/src/creator-adoption.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'
+packages/storage-node typecheck:     Imported via "../../../packages/node/src/creator-adoption.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../node/src/creator-adoption-commit.ts(25,76): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/internal/creator-adoption-stage.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../node/src/creator-adoption-commit.ts(25,76): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/internal/creator-adoption-stage.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../node/src/creator-adoption.ts(31,45): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-close.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "./creator-close.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption.ts'
+packages/storage-node typecheck:     Imported via "./creator-close.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/v3-live.ts'
+packages/storage-node typecheck:     Imported via "./creator-close.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption-commit.ts'
+packages/storage-node typecheck:     Imported via "../../../packages/node/src/creator-close.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../node/src/creator-adoption.ts(31,45): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-close.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "./creator-close.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption.ts'
+packages/storage-node typecheck:     Imported via "./creator-close.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/v3-live.ts'
+packages/storage-node typecheck:     Imported via "./creator-close.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption-commit.ts'
+packages/storage-node typecheck:     Imported via "../../../packages/node/src/creator-close.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../node/src/creator-adoption.ts(42,8): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/internal/creator-adoption-recover.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../node/src/creator-adoption.ts(42,8): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/internal/creator-adoption-recover.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../node/src/creator-close.ts(59,73): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/internal/creator-adoption-intent.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "./internal/creator-adoption-intent.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-close.ts'
+packages/storage-node typecheck:     Imported via "./internal/creator-adoption-intent.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption.ts'
+packages/storage-node typecheck:     Imported via "./internal/creator-adoption-intent.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption-activate.ts'
+packages/storage-node typecheck:     Imported via "./internal/creator-adoption-intent.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption-commit.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../node/src/creator-close.ts(59,73): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/internal/creator-adoption-intent.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "./internal/creator-adoption-intent.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-close.ts'
+packages/storage-node typecheck:     Imported via "./internal/creator-adoption-intent.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption.ts'
+packages/storage-node typecheck:     Imported via "./internal/creator-adoption-intent.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption-activate.ts'
+packages/storage-node typecheck:     Imported via "./internal/creator-adoption-intent.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption-commit.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../node/src/creator-close.ts(60,57): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/internal/creator-issuance-retirement-boundary.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../node/src/creator-close.ts(60,57): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/internal/creator-issuance-retirement-boundary.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../node/src/creator-close.ts(61,49): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/internal/creator-transition-advance.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "./internal/creator-transition-advance.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-close.ts'
+packages/storage-node typecheck:     Imported via "./internal/creator-transition-advance.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/v3-live.ts'
+packages/storage-node typecheck:     Imported via "./internal/creator-transition-advance.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption.ts'
+packages/storage-node typecheck:     Imported via "./internal/creator-transition-advance.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption-commit.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../node/src/creator-close.ts(61,49): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/internal/creator-transition-advance.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "./internal/creator-transition-advance.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-close.ts'
+packages/storage-node typecheck:     Imported via "./internal/creator-transition-advance.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/v3-live.ts'
+packages/storage-node typecheck:     Imported via "./internal/creator-transition-advance.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption.ts'
+packages/storage-node typecheck:     Imported via "./internal/creator-transition-advance.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption-commit.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../node/src/creator-close.ts(66,8): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/internal/runtime-reclamation.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "./internal/runtime-reclamation.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-close.ts'
+packages/storage-node typecheck:     Imported via "./internal/runtime-reclamation.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/v3-live.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../node/src/creator-close.ts(66,8): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/internal/runtime-reclamation.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "./internal/runtime-reclamation.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-close.ts'
+packages/storage-node typecheck:     Imported via "./internal/runtime-reclamation.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/v3-live.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../node/src/creator-close.ts(67,36): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/v3-live.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "./v3-live.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-close.ts'
+packages/storage-node typecheck:     Imported via "./v3-live.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption-activate.ts'
+packages/storage-node typecheck:     Imported via "../../../packages/node/src/v3-live.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'
+packages/storage-node typecheck:     Imported via "../../../packages/node/src/v3-live.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-3a1b-p3/live-fixture.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../node/src/creator-close.ts(67,36): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/v3-live.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "./v3-live.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-close.ts'
+packages/storage-node typecheck:     Imported via "./v3-live.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption-activate.ts'
+packages/storage-node typecheck:     Imported via "../../../packages/node/src/v3-live.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'
+packages/storage-node typecheck:     Imported via "../../../packages/node/src/v3-live.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-3a1b-p3/live-fixture.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../node/src/internal/creator-adoption-intent.ts(4,77): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/internal/creator-successor-live.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "./creator-successor-live.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/internal/creator-adoption-intent.ts'
+packages/storage-node typecheck:     Imported via "./internal/creator-successor-live.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/v3-live.ts'
+packages/storage-node typecheck:     Imported via "./internal/creator-successor-live.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption.ts'
+packages/storage-node typecheck:     Imported via "./internal/creator-successor-live.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption-activate.ts'
+packages/storage-node typecheck:     Imported via "./internal/creator-successor-live.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption-commit.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../node/src/internal/creator-adoption-intent.ts(4,77): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/internal/creator-successor-live.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "./creator-successor-live.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/internal/creator-adoption-intent.ts'
+packages/storage-node typecheck:     Imported via "./internal/creator-successor-live.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/v3-live.ts'
+packages/storage-node typecheck:     Imported via "./internal/creator-successor-live.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption.ts'
+packages/storage-node typecheck:     Imported via "./internal/creator-successor-live.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption-activate.ts'
+packages/storage-node typecheck:     Imported via "./internal/creator-successor-live.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption-commit.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../node/src/internal/creator-successor-live.ts(14,46): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/internal/creator-room-head.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "./creator-room-head.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/internal/creator-successor-live.ts'
+packages/storage-node typecheck:     Imported via "./internal/creator-room-head.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption-activate.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../node/src/internal/creator-successor-live.ts(14,46): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/internal/creator-room-head.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "./creator-room-head.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/internal/creator-successor-live.ts'
+packages/storage-node typecheck:     Imported via "./internal/creator-room-head.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption-activate.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../node/src/v3-live.ts(110,37): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/internal/v3-topic.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "./internal/v3-topic.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/v3-live.ts'
+packages/storage-node typecheck:     Imported via "./internal/v3-topic.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption-activate.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../node/src/v3-live.ts(110,37): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/internal/v3-topic.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "./internal/v3-topic.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/v3-live.ts'
+packages/storage-node typecheck:     Imported via "./internal/v3-topic.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption-activate.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../node/src/v3-live.ts(111,41): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/v3-envelope-scope.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../node/src/v3-live.ts(111,41): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/v3-envelope-scope.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../node/src/v3-live.ts(112,82): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/v3-live-recovered-authority.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../node/src/v3-live.ts(112,82): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/v3-live-recovered-authority.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../protocol-v3/src/index.ts(21,8): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/protocol-v3/src/internal/seal-authority-custody.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/protocol-v3/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../protocol-v3/src/index.ts(21,8): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/protocol-v3/src/internal/seal-authority-custody.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/protocol-v3/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../storage-browser/src/internal/seal-evidence-store.ts(12,8): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/src/internal/schema-idb.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "./schema-idb.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/src/internal/seal-evidence-store.ts'
+packages/storage-node typecheck:     Imported via "./schema-idb.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/src/internal/seal-vote-store.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../storage-browser/src/internal/seal-evidence-store.ts(12,8): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/src/internal/schema-idb.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "./schema-idb.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/src/internal/seal-evidence-store.ts'
+packages/storage-node typecheck:     Imported via "./schema-idb.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/src/internal/seal-vote-store.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../storage-browser/src/seal-evidence.ts(6,70): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/src/internal/seal-evidence-store.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "./internal/seal-evidence-store.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/src/seal-evidence.ts'
+packages/storage-node typecheck:     Imported via "./internal/seal-evidence-store.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/src/seal-evidence.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../storage-browser/src/seal-evidence.ts(6,70): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/src/internal/seal-evidence-store.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "./internal/seal-evidence-store.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/src/seal-evidence.ts'
+packages/storage-node typecheck:     Imported via "./internal/seal-evidence-store.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/src/seal-evidence.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../storage-browser/src/seal-vote.ts(9,43): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/src/internal/seal-vote-store.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../storage-browser/src/seal-vote.ts(9,43): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/src/internal/seal-vote-store.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/package.json' has field "type" with value "module"
+packages/storage-node typecheck: tests/phase-6a-creator-adoption-commit-death-red.test.ts(3,33): error TS2307: Cannot find module '@ts-drp/canonical' or its corresponding type declarations.
+packages/storage-node typecheck: tests/phase-6a-creator-adoption-commit-death-red.test.ts(14,8): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-adoption-commit-contract.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/package.json' has field "type" with value "module"
+packages/storage-node typecheck: tests/phase-6a-creator-adoption-commit-death-red.test.ts(14,8): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-adoption-commit-contract.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/package.json' has field "type" with value "module"
+packages/storage-node typecheck: tests/phase-6a-creator-adoption-commit-death-red.test.ts(15,51): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "../../../tests/fixtures/phase-6a-v3/creator-adoption-contract.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tests/phase-6a-creator-adoption-commit-death-red.test.ts'
+packages/storage-node typecheck:     Imported via "../../../tests/fixtures/phase-6a-v3/creator-adoption-contract.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts'
+packages/storage-node typecheck:     Imported via "./creator-adoption-contract.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'
+packages/storage-node typecheck:     Imported via "./creator-adoption-contract.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-oracle.ts'
+packages/storage-node typecheck:     Imported via "./creator-adoption-contract.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts'
+packages/storage-node typecheck:     Imported via "./creator-adoption-contract.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/package.json' has field "type" with value "module"
+packages/storage-node typecheck: tests/phase-6a-creator-adoption-commit-death-red.test.ts(15,51): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "../../../tests/fixtures/phase-6a-v3/creator-adoption-contract.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tests/phase-6a-creator-adoption-commit-death-red.test.ts'
+packages/storage-node typecheck:     Imported via "../../../tests/fixtures/phase-6a-v3/creator-adoption-contract.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts'
+packages/storage-node typecheck:     Imported via "./creator-adoption-contract.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'
+packages/storage-node typecheck:     Imported via "./creator-adoption-contract.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-oracle.ts'
+packages/storage-node typecheck:     Imported via "./creator-adoption-contract.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts'
+packages/storage-node typecheck:     Imported via "./creator-adoption-contract.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/package.json' has field "type" with value "module"
+packages/storage-node typecheck: tests/phase-6a-creator-successor-activation-death-red.test.ts(13,8): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "../../../tests/fixtures/phase-6a-v3/creator-successor-activation-contract.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts'
+packages/storage-node typecheck:     Imported via "./creator-successor-activation-contract.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts'
+packages/storage-node typecheck:     Imported via "../../../tests/fixtures/phase-6a-v3/creator-successor-activation-contract.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts'
+packages/storage-node typecheck:     Imported via "./creator-successor-activation-contract.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/package.json' has field "type" with value "module"
+packages/storage-node typecheck: tests/phase-6a-creator-successor-activation-death-red.test.ts(13,8): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "../../../tests/fixtures/phase-6a-v3/creator-successor-activation-contract.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts'
+packages/storage-node typecheck:     Imported via "./creator-successor-activation-contract.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts'
+packages/storage-node typecheck:     Imported via "../../../tests/fixtures/phase-6a-v3/creator-successor-activation-contract.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts'
+packages/storage-node typecheck:     Imported via "./creator-successor-activation-contract.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/package.json' has field "type" with value "module"
+packages/storage-node typecheck: tests/phase-6a-creator-successor-activation-death-red.test.ts(14,39): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/package.json' has field "type" with value "module"
+packages/storage-node typecheck: tests/phase-6a-creator-successor-activation-death-red.test.ts(14,39): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/package.json' has field "type" with value "module"
+packages/storage-node typecheck: tests/phase-6a-creator-successor-activation-death-red.test.ts(18,8): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-infrastructure-contract.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/package.json' has field "type" with value "module"
+packages/storage-node typecheck: tests/phase-6a-creator-successor-activation-death-red.test.ts(18,8): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-infrastructure-contract.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/package.json' has field "type" with value "module"
+packages/storage-node typecheck: tests/phase-6a-creator-successor-local-author-death-red.test.ts(18,8): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/package.json' has field "type" with value "module"
+packages/storage-node typecheck: tests/phase-6a-creator-successor-local-author-death-red.test.ts(18,8): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/package.json' has field "type" with value "module"
+packages/storage-node typecheck: tests/phase-6b-ahe-reclamation-red.test.ts(36,8): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6b/ahe-reclamation-contract.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/package.json' has field "type" with value "module"
+packages/storage-node typecheck: tests/phase-6b-ahe-reclamation-red.test.ts(36,8): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6b/ahe-reclamation-contract.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/package.json' has field "type" with value "module"
+packages/storage-node typecheck: tests/phase-6b-differential-exit-red.test.ts(21,8): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6b/differential-exit-contract.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/package.json' has field "type" with value "module"
+packages/storage-node typecheck: tests/phase-6b-differential-exit-red.test.ts(21,8): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6b/differential-exit-contract.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/package.json' has field "type" with value "module"
+packages/storage-node typecheck: tests/phase-6b-differential-exit-red.test.ts(22,47): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6b/issuance-retention-contract.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "../../../tests/fixtures/phase-6b/issuance-retention-contract.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tests/phase-6b-differential-exit-red.test.ts'
+packages/storage-node typecheck:     Imported via "../../../tests/fixtures/phase-6b/issuance-retention-contract.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/package.json' has field "type" with value "module"
+packages/storage-node typecheck: tests/phase-6b-differential-exit-red.test.ts(22,47): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6b/issuance-retention-contract.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "../../../tests/fixtures/phase-6b/issuance-retention-contract.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tests/phase-6b-differential-exit-red.test.ts'
+packages/storage-node typecheck:     Imported via "../../../tests/fixtures/phase-6b/issuance-retention-contract.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/package.json' has field "type" with value "module"
+packages/storage-node typecheck: tests/phase-6b-issuance-retention-red.test.ts(1,33): error TS2307: Cannot find module '@ts-drp/canonical' or its corresponding type declarations.
+packages/storage-node typecheck: ../../tests/fixtures/phase-3a0-v3/controlled-anchor-trust.ts(2,33): error TS2307: Cannot find module '@ts-drp/canonical' or its corresponding type declarations.
+packages/storage-node typecheck: ../../tests/fixtures/phase-3a1b-p3/live-fixture.ts(2,45): error TS2307: Cannot find module '@ts-drp/canonical' or its corresponding type declarations.
+packages/storage-node typecheck: ../../tests/fixtures/phase-3a1b-p3/live-fixture.ts(3,47): error TS2307: Cannot find module '@ts-drp/control-plane' or its corresponding type declarations.
+packages/storage-node typecheck: ../../tests/fixtures/phase-3a1b-p3/live-fixture.ts(4,82): error TS2307: Cannot find module '@ts-drp/storage' or its corresponding type declarations.
+packages/storage-node typecheck: ../../tests/fixtures/phase-3a1b-p3/live-fixture.ts(10,46): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/blueprint-catalog/src/index.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/blueprint-catalog/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../../tests/fixtures/phase-3a1b-p3/live-fixture.ts(10,46): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/blueprint-catalog/src/index.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/blueprint-catalog/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-commit-contract.ts(1,33): error TS2307: Cannot find module '@ts-drp/canonical' or its corresponding type declarations.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-commit-contract.ts(2,81): error TS2307: Cannot find module '@ts-drp/storage' or its corresponding type declarations.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-commit-contract.ts(130,37): error TS7031: Binding element 'value' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(1,46): error TS2307: Cannot find module '@ts-drp/blueprint-catalog' or its corresponding type declarations.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(2,62): error TS2307: Cannot find module '@ts-drp/canonical' or its corresponding type declarations.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(8,8): error TS2307: Cannot find module '@ts-drp/compaction' or its corresponding type declarations.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(9,47): error TS2307: Cannot find module '@ts-drp/control-plane' or its corresponding type declarations.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(10,82): error TS2307: Cannot find module '@ts-drp/issuance-store' or its corresponding type declarations.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(11,56): error TS2307: Cannot find module '@ts-drp/issuance-store/maintenance' or its corresponding type declarations.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(13,49): error TS2307: Cannot find module '@ts-drp/keychain/finality' or its corresponding type declarations.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(19,8): error TS2307: Cannot find module '@ts-drp/live-journal' or its corresponding type declarations.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(20,37): error TS2307: Cannot find module '@ts-drp/message-queue' or its corresponding type declarations.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(28,8): error TS2307: Cannot find module '@ts-drp/storage' or its corresponding type declarations.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(34,8): error TS2307: Cannot find module '@ts-drp/storage/snapshot-transfer' or its corresponding type declarations.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(35,71): error TS2307: Cannot find module '@ts-drp/types' or its corresponding type declarations.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(41,55): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption-activate.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(41,55): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption-activate.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(42,53): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption-commit.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "../../../packages/node/src/creator-adoption-commit.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'
+packages/storage-node typecheck:     Imported via "../../../packages/node/src/creator-adoption-commit.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(42,53): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/src/creator-adoption-commit.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "../../../packages/node/src/creator-adoption-commit.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'
+packages/storage-node typecheck:     Imported via "../../../packages/node/src/creator-adoption-commit.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(61,41): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/protocol-v3/src/index.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "../../../packages/protocol-v3/src/index.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'
+packages/storage-node typecheck:     Imported via "../index.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/protocol-v3/src/internal/seal-authority-custody.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/protocol-v3/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(61,41): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/protocol-v3/src/index.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "../../../packages/protocol-v3/src/index.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'
+packages/storage-node typecheck:     Imported via "../index.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/protocol-v3/src/internal/seal-authority-custody.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/protocol-v3/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(62,51): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/src/seal-evidence.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(62,51): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/src/seal-evidence.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(63,47): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/src/seal-vote.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(63,47): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/src/seal-vote.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(64,59): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/src/snapshot-transfer.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(64,59): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/src/snapshot-transfer.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(68,36): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-3a0-v3/controlled-anchor-trust.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "../phase-3a0-v3/controlled-anchor-trust.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'
+packages/storage-node typecheck:     Imported via "../phase-3a0-v3/controlled-anchor-trust.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-3a1b-p3/live-fixture.ts'
+packages/storage-node typecheck:     Imported via "../phase-3a0-v3/controlled-anchor-trust.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(68,36): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-3a0-v3/controlled-anchor-trust.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "../phase-3a0-v3/controlled-anchor-trust.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts'
+packages/storage-node typecheck:     Imported via "../phase-3a0-v3/controlled-anchor-trust.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-3a1b-p3/live-fixture.ts'
+packages/storage-node typecheck:     Imported via "../phase-3a0-v3/controlled-anchor-trust.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(74,8): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-3a1b-p3/live-fixture.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(74,8): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-3a1b-p3/live-fixture.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(595,21): error TS7006: Parameter 'input' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(597,24): error TS7006: Parameter 'input' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(598,23): error TS7006: Parameter 'input' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(599,19): error TS7006: Parameter 'digest' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(607,22): error TS7006: Parameter 'input' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(608,19): error TS7006: Parameter 'input' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(609,30): error TS7006: Parameter 'input' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(639,20): error TS7006: Parameter 'objectId' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(644,35): error TS7006: Parameter 'objectId' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(678,52): error TS7006: Parameter 'ref' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(678,57): error TS7006: Parameter 'index' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(696,14): error TS7006: Parameter 'input' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(707,21): error TS7006: Parameter 'declaration' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(707,34): error TS7006: Parameter 'options' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(712,14): error TS7006: Parameter 'selected' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(713,16): error TS7006: Parameter 'receipt' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(713,25): error TS7006: Parameter 'selected' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(714,22): error TS7006: Parameter 'selected' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(717,14): error TS7006: Parameter 'selected' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(719,11): error TS7006: Parameter 'signal' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(723,21): error TS7006: Parameter 'descriptor' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(733,16): error TS7006: Parameter 'descriptor' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(733,28): error TS7006: Parameter 'bytes' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(740,18): error TS7006: Parameter 'options' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(805,35): error TS7006: Parameter 'input' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(806,22): error TS7006: Parameter 'scope' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(806,29): error TS7006: Parameter 'sequence' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(811,23): error TS7006: Parameter 'scope' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(816,26): error TS7006: Parameter 'input' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(823,19): error TS7006: Parameter 'scope' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(823,26): error TS7006: Parameter 'buildAndSign' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(827,20): error TS7006: Parameter 'input' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(829,24): error TS7006: Parameter 'input' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(830,20): error TS7006: Parameter 'input' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(831,15): error TS7006: Parameter 'input' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(832,20): error TS7006: Parameter 'input' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-adoption-contract.ts(854,45): error TS7006: Parameter 'authorSequence' implicitly has an 'any' type.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts(1,62): error TS2307: Cannot find module '@ts-drp/canonical' or its corresponding type declarations.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts(9,36): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-oracle.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "./creator-successor-oracle.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'
+packages/storage-node typecheck:     Imported via "./creator-successor-oracle.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts(9,36): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-oracle.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "./creator-successor-oracle.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'
+packages/storage-node typecheck:     Imported via "./creator-successor-oracle.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'
+packages/storage-node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/package.json' has field "type" with value "module"
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts(10,44): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/shared/workspace-package-subprocess.mjs' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node'. 'rootDir' is expected to contain all source files.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "../shared/workspace-package-subprocess.mjs" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'
+packages/storage-node typecheck:     Imported via "../shared/workspace-package-subprocess.mjs" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts'
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts(10,44): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/shared/workspace-package-subprocess.mjs' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/storage-node typecheck:   The file is in the program because:
+packages/storage-node typecheck:     Imported via "../shared/workspace-package-subprocess.mjs" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts'
+packages/storage-node typecheck:     Imported via "../shared/workspace-package-subprocess.mjs" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts'
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts(2,45): error TS2307: Cannot find module '@ts-drp/canonical' or its corresponding type declarations.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts(3,50): error TS2307: Cannot find module '@ts-drp/types' or its corresponding type declarations.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts(157,45): error TS18046: 'byte' is of type 'unknown'.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6a-v3/creator-successor-oracle.ts(1,62): error TS2307: Cannot find module '@ts-drp/canonical' or its corresponding type declarations.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6b/ahe-reclamation-contract.ts(9,8): error TS2307: Cannot find module '@ts-drp/storage' or its corresponding type declarations.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6b/differential-exit-contract.ts(9,8): error TS2307: Cannot find module '@ts-drp/storage' or its corresponding type declarations.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6b/issuance-retention-contract.ts(1,33): error TS2307: Cannot find module '@ts-drp/canonical' or its corresponding type declarations.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6b/issuance-retention-contract.ts(7,8): error TS2307: Cannot find module '@ts-drp/issuance-store' or its corresponding type declarations.
+packages/storage-node typecheck: ../../tests/fixtures/phase-6b/issuance-retention-contract.ts(208,51): error TS7006: Parameter 'authorSequence' implicitly has an 'any' type.
+packages/storage-node typecheck: Failed
+packages/node typecheck: tests/browser/fixtures/blueprint-fold.page.ts(2,34): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/src/host.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node'. 'rootDir' is expected to contain all source files.
+packages/node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/package.json' has field "type" with value "module"
+packages/node typecheck: tests/browser/fixtures/blueprint-fold.page.ts(2,34): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/src/host.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/package.json' has field "type" with value "module"
+packages/node typecheck: tests/browser/fixtures/blueprint-fold.worker.ts(2,56): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/src/worker.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node'. 'rootDir' is expected to contain all source files.
+packages/node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/package.json' has field "type" with value "module"
+packages/node typecheck: tests/browser/fixtures/blueprint-fold.worker.ts(2,56): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/src/worker.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/package.json' has field "type" with value "module"
+packages/node typecheck: tests/ephemeral-webrtc-e3-02-red.test.ts(523,12): error TS2339: Property 'emit' does not exist on type 'DRPUnreliableWebRtcRoute'.
+packages/node typecheck: tests/helpers/compact-history-scale-1i-b.ts(152,4): error TS1360: Type '{ history_storage: "full" | "compact"; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' does not satisfy the expected type 'DRPObjectConfig'.
+packages/node typecheck:   Type '{ history_storage: "full" | "compact"; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' is not assignable to type 'DRPObjectConfigBase & { history_storage: "compact"; replica_mode: "observer"; }'.
+packages/node typecheck:     Type '{ history_storage: "full" | "compact"; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' is not assignable to type '{ history_storage: "compact"; replica_mode: "observer"; }'.
+packages/node typecheck:       Types of property 'history_storage' are incompatible.
+packages/node typecheck:         Type '"full" | "compact"' is not assignable to type '"compact"'.
+packages/node typecheck:           Type '"full"' is not assignable to type '"compact"'.
+packages/node typecheck: tests/helpers/compact-history-scale-1i-b.ts(157,3): error TS2322: Type '{ history_storage: "full" | "compact"; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' is not assignable to type 'DRPObjectConfig | undefined'.
+packages/node typecheck:   Type '{ history_storage: "full" | "compact"; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' is not assignable to type '(DRPObjectConfigBase & { history_storage?: "full" | undefined; replica_mode?: ReplicaMode | undefined; }) | (DRPObjectConfigBase & { ...; })'.
+packages/node typecheck:     Type '{ history_storage: "full" | "compact"; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' is not assignable to type 'DRPObjectConfigBase & { history_storage: "compact"; replica_mode: "observer"; }'.
+packages/node typecheck:       Type '{ history_storage: "full" | "compact"; log_config: { level: "silent"; }; replica_mode: "writer" | "observer"; }' is not assignable to type '{ history_storage: "compact"; replica_mode: "observer"; }'.
+packages/node typecheck:         Types of property 'history_storage' are incompatible.
+packages/node typecheck:           Type '"full" | "compact"' is not assignable to type '"compact"'.
+packages/node typecheck:             Type '"full"' is not assignable to type '"compact"'.
+packages/node typecheck: ../worker-host/src/host.ts(1,62): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/src/error.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node'. 'rootDir' is expected to contain all source files.
+packages/node typecheck:   The file is in the program because:
+packages/node typecheck:     Imported via "./error.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/src/host.ts'
+packages/node typecheck:     Imported via "./error.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/src/metrics.ts'
+packages/node typecheck:     Imported via "./error.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/src/wire.ts'
+packages/node typecheck:     Imported via "./error.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/src/worker.ts'
+packages/node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/package.json' has field "type" with value "module"
+packages/node typecheck: ../worker-host/src/host.ts(1,62): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/src/error.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/node typecheck:   The file is in the program because:
+packages/node typecheck:     Imported via "./error.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/src/host.ts'
+packages/node typecheck:     Imported via "./error.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/src/metrics.ts'
+packages/node typecheck:     Imported via "./error.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/src/wire.ts'
+packages/node typecheck:     Imported via "./error.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/src/worker.ts'
+packages/node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/package.json' has field "type" with value "module"
+packages/node typecheck: ../worker-host/src/host.ts(2,35): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/src/metrics.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node'. 'rootDir' is expected to contain all source files.
+packages/node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/package.json' has field "type" with value "module"
+packages/node typecheck: ../worker-host/src/host.ts(2,35): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/src/metrics.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/package.json' has field "type" with value "module"
+packages/node typecheck: ../worker-host/src/host.ts(13,8): error TS6059: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/src/wire.ts' is not under 'rootDir' '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node'. 'rootDir' is expected to contain all source files.
+packages/node typecheck:   The file is in the program because:
+packages/node typecheck:     Imported via "./wire.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/src/host.ts'
+packages/node typecheck:     Imported via "./wire.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/src/host.ts'
+packages/node typecheck:     Imported via "./wire.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/src/host.ts'
+packages/node typecheck:     Imported via "./wire.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/src/worker.ts'
+packages/node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/package.json' has field "type" with value "module"
+packages/node typecheck: ../worker-host/src/host.ts(13,8): error TS6307: File '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/src/wire.ts' is not listed within the file list of project '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node/tsconfig.json'. Projects must list all files or use an 'include' pattern.
+packages/node typecheck:   The file is in the program because:
+packages/node typecheck:     Imported via "./wire.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/src/host.ts'
+packages/node typecheck:     Imported via "./wire.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/src/host.ts'
+packages/node typecheck:     Imported via "./wire.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/src/host.ts'
+packages/node typecheck:     Imported via "./wire.js" from file '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/src/worker.ts'
+packages/node typecheck:   File is ECMAScript module because '/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/worker-host/package.json' has field "type" with value "module"
+packages/node typecheck: Failed
+packages/storage-browser typecheck$ tsc --noEmit
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(16,8): error TS2307: Cannot find module '#phase-6b-ahe-reclamation-maintenance' or its corresponding type declarations.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(106,25): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(195,59): error TS2345: Argument of type 'string' is not assignable to parameter of type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(203,67): error TS2322: Type 'string' is not assignable to type 'GenerationId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [generationIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(203,81): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(206,57): error TS2322: Type 'string' is not assignable to type 'GenerationId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [generationIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(206,71): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(207,53): error TS2322: Type 'string' is not assignable to type 'GenerationId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [generationIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(207,67): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(208,47): error TS2322: Type 'string' is not assignable to type 'GenerationId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [generationIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(208,61): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(209,64): error TS2322: Type 'string' is not assignable to type 'GenerationId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [generationIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(209,78): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(211,73): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(264,51): error TS2345: Argument of type 'string' is not assignable to parameter of type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(272,5): error TS2322: Type 'string' is not assignable to type 'GenerationId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [generationIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(273,5): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(278,50): error TS2322: Type 'string' is not assignable to type 'GenerationId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [generationIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(278,77): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(282,46): error TS2322: Type 'string' is not assignable to type 'GenerationId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [generationIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(282,73): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(286,40): error TS2322: Type 'string' is not assignable to type 'GenerationId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [generationIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(286,67): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(290,50): error TS2322: Type 'string' is not assignable to type 'GenerationId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [generationIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(290,77): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(340,35): error TS7031: Binding element 'deletedGenerationIds' implicitly has an 'any' type.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(462,47): error TS2345: Argument of type 'string' is not assignable to parameter of type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(470,4): error TS2322: Type 'string' is not assignable to type 'GenerationId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [generationIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(471,4): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(475,56): error TS2322: Type 'string' is not assignable to type 'GenerationId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [generationIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(475,74): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(476,52): error TS2322: Type 'string' is not assignable to type 'GenerationId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [generationIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(476,70): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(477,46): error TS2322: Type 'string' is not assignable to type 'GenerationId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [generationIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(477,64): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(479,46): error TS2322: Type 'string' is not assignable to type 'GenerationId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [generationIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(479,64): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(498,52): error TS2345: Argument of type 'string' is not assignable to parameter of type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(694,6): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(695,6): error TS2322: Type 'number' is not assignable to type 'HeadRevision'.
+packages/storage-browser typecheck:   Type 'number' is not assignable to type '{ readonly [headRevisionBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(707,5): error TS2322: Type 'string' is not assignable to type 'GenerationId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [generationIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(824,42): error TS2345: Argument of type 'string' is not assignable to parameter of type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(847,47): error TS2345: Argument of type 'string' is not assignable to parameter of type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(852,4): error TS2322: Type 'string' is not assignable to type 'GenerationId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [generationIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(853,4): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(858,53): error TS2322: Type 'string' is not assignable to type 'GenerationId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [generationIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(858,71): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(861,47): error TS2322: Type 'string' is not assignable to type 'GenerationId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [generationIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(861,65): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(863,46): error TS2322: Type 'string' is not assignable to type 'GenerationId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [generationIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-entry.ts(863,64): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-worker.ts(7,8): error TS2307: Cannot find module '#phase-6b-ahe-reclamation-maintenance' or its corresponding type declarations.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-worker.ts(31,59): error TS2345: Argument of type 'string' is not assignable to parameter of type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-worker.ts(39,67): error TS2322: Type 'string' is not assignable to type 'GenerationId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [generationIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-worker.ts(39,81): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-worker.ts(42,57): error TS2322: Type 'string' is not assignable to type 'GenerationId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [generationIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-worker.ts(42,71): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-worker.ts(43,53): error TS2322: Type 'string' is not assignable to type 'GenerationId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [generationIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-worker.ts(43,67): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-worker.ts(44,47): error TS2322: Type 'string' is not assignable to type 'GenerationId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [generationIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-worker.ts(44,61): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-worker.ts(45,64): error TS2322: Type 'string' is not assignable to type 'GenerationId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [generationIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-worker.ts(45,78): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-ahe-reclamation-worker.ts(47,73): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-differential-exit-entry.ts(66,59): error TS2345: Argument of type 'string' is not assignable to parameter of type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-differential-exit-entry.ts(73,85): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-differential-exit-entry.ts(76,75): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-differential-exit-entry.ts(77,71): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-differential-exit-entry.ts(78,65): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-differential-exit-entry.ts(79,82): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-differential-exit-entry.ts(82,74): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-differential-exit-entry.ts(149,51): error TS2345: Argument of type 'string' is not assignable to parameter of type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-differential-exit-entry.ts(151,52): error TS2322: Type 'string' is not assignable to type 'StorageObjectId'.
+packages/storage-browser typecheck:   Type 'string' is not assignable to type '{ readonly [storageObjectIdBrand]: true; }'.
+packages/storage-browser typecheck: tests/assets/phase-6b-issuance-retention-entry.ts(9,8): error TS2307: Cannot find module '#phase-6b-issuance-maintenance' or its corresponding type declarations.
+packages/storage-browser typecheck: Failed
+examples/v3-room typecheck$ tsc --noEmit
+examples/v3-room typecheck: Done
+ ERR_PNPM_RECURSIVE_FAIL  
+
+
+Summary: 3 fails, 2 passes
+
+/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-node:
+ ERROR  @ts-drp/storage-node@0.11.0 typecheck: `tsc --noEmit`
+Exit status 2
+
+/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/node:
+ ERROR  @ts-drp/node@0.11.0 typecheck: `tsc --noEmit`
+Exit status 2
+
+/private/tmp/d110c-f5b0u-green-75Jm2F/checkout/packages/storage-browser:
+ ERROR  @ts-drp/storage-browser@0.11.0 typecheck: `tsc --noEmit`
+Exit status 2

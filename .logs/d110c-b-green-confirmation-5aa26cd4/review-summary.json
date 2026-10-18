@@ -1,0 +1,41 @@
+{
+	"correctionCommit": "5aa26cd489784b0478d06e9f4a01806972c92ad1",
+	"blockingUnion": {
+		"closed": true,
+		"p0": 0,
+		"p1": 0
+	},
+	"reviewers": [
+		{
+			"name": "Grok 4.6/high",
+			"sessionId": "01a06381-9f72-7542-a61a-82790bbff304",
+			"initialClassification": "NO_VERDICT",
+			"initialStopReason": "cancelled",
+			"resumedExactSession": true,
+			"terminalStopReason": "end_turn",
+			"verdict": "APPROVED",
+			"p0": 0,
+			"p1": 0,
+			"p2": 4
+		},
+		{
+			"name": "Kimi K3 direct/100-step",
+			"sessionId": "session_1fde6564-f522-4077-8fc6-507c808bbf59",
+			"resumedExactSessionForSchema": true,
+			"terminalStopReason": "completed",
+			"verdict": "APPROVED",
+			"p0": 0,
+			"p1": 0,
+			"p2": 4
+		},
+		{
+			"name": "Opus xhigh",
+			"sessionId": "58fb2c64-0b86-4f9a-bf0f-637eedc9ec0a",
+			"terminalStopReason": "end_turn",
+			"verdict": "APPROVED",
+			"p0": 0,
+			"p1": 0,
+			"p2": 4
+		}
+	]
+}

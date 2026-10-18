@@ -1,0 +1,144 @@
+{
+  "base": "29e26b3f93e215f66201bfd5a71e7b2f334c164d",
+  "current": {
+    "targetDiagnostics": [
+      {
+        "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+        "code": 2345,
+        "line": 1199,
+        "message": "Argument of type 'unknown' is not assignable to parameter of type 'object'."
+      },
+      {
+        "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+        "code": 2345,
+        "line": 1199,
+        "message": "Argument of type 'unknown' is not assignable to parameter of type 'object'."
+      },
+      {
+        "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+        "code": 2345,
+        "line": 1258,
+        "message": "Argument of type 'unknown' is not assignable to parameter of type 'object'."
+      }
+    ],
+    "externalDiagnostics": [
+      {
+        "file": "examples/grid/src/v3-zone.ts",
+        "code": 2345,
+        "line": 638,
+        "message": "Argument of type '{ application: V3RoomApplication<ZoneProjection>; author: string; creatorInvite: string | V3RoomCreatorInviteMaterial; ... 11 more ...; signRegisteredVertexDigest: (registeredDigest: Uint8Array<...>) => Promise<...>; }' is not assignable to parameter of type 'CreateV3RoomSessionInput<ZoneProjection>'.\n  Property 'roomHeadAuthority' is missing in type '{ application: V3RoomApplication<ZoneProjection>; author: string; creatorInvite: string | V3RoomCreatorInviteMaterial; ... 11 more ...; signRegisteredVertexDigest: (registeredDigest: Uint8Array<...>) => Promise<...>; }' but required in type 'CreateV3RoomSessionInput<ZoneProjection>'."
+      }
+    ]
+  },
+  "baseline": {
+    "targetDiagnostics": [
+      {
+        "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+        "code": 2345,
+        "line": 1136,
+        "message": "Argument of type 'unknown' is not assignable to parameter of type 'object'."
+      },
+      {
+        "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+        "code": 2345,
+        "line": 1136,
+        "message": "Argument of type 'unknown' is not assignable to parameter of type 'object'."
+      },
+      {
+        "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+        "code": 2345,
+        "line": 1195,
+        "message": "Argument of type 'unknown' is not assignable to parameter of type 'object'."
+      }
+    ],
+    "externalDiagnostics": [
+      {
+        "file": "examples/grid/src/v3-zone.ts",
+        "code": 2345,
+        "line": 638,
+        "message": "Argument of type '{ application: V3RoomApplication<ZoneProjection>; author: string; creatorInvite: string | V3RoomCreatorInviteMaterial; ... 11 more ...; signRegisteredVertexDigest: (registeredDigest: Uint8Array<...>) => Promise<...>; }' is not assignable to parameter of type 'CreateV3RoomSessionInput<ZoneProjection>'.\n  Property 'roomHeadAuthority' is missing in type '{ application: V3RoomApplication<ZoneProjection>; author: string; creatorInvite: string | V3RoomCreatorInviteMaterial; ... 11 more ...; signRegisteredVertexDigest: (registeredDigest: Uint8Array<...>) => Promise<...>; }' but required in type 'CreateV3RoomSessionInput<ZoneProjection>'."
+      }
+    ]
+  },
+  "mappedCurrent": {
+    "targetDiagnostics": [
+      {
+        "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+        "code": 2345,
+        "line": 1136,
+        "message": "Argument of type 'unknown' is not assignable to parameter of type 'object'."
+      },
+      {
+        "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+        "code": 2345,
+        "line": 1136,
+        "message": "Argument of type 'unknown' is not assignable to parameter of type 'object'."
+      },
+      {
+        "file": "tests/phase-3g-v3-room-rebase-red.test.ts",
+        "code": 2345,
+        "line": 1195,
+        "message": "Argument of type 'unknown' is not assignable to parameter of type 'object'."
+      }
+    ],
+    "externalDiagnostics": [
+      {
+        "file": "examples/grid/src/v3-zone.ts",
+        "code": 2345,
+        "line": 638,
+        "message": "Argument of type '{ application: V3RoomApplication<ZoneProjection>; author: string; creatorInvite: string | V3RoomCreatorInviteMaterial; ... 11 more ...; signRegisteredVertexDigest: (registeredDigest: Uint8Array<...>) => Promise<...>; }' is not assignable to parameter of type 'CreateV3RoomSessionInput<ZoneProjection>'.\n  Property 'roomHeadAuthority' is missing in type '{ application: V3RoomApplication<ZoneProjection>; author: string; creatorInvite: string | V3RoomCreatorInviteMaterial; ... 11 more ...; signRegisteredVertexDigest: (registeredDigest: Uint8Array<...>) => Promise<...>; }' but required in type 'CreateV3RoomSessionInput<ZoneProjection>'."
+      }
+    ]
+  },
+  "identical": true,
+  "editedSpanDiagnostics": [],
+  "mappings": [
+    {
+      "currentStartLine": 2,
+      "currentEndLine": 2,
+      "baselineStartLine": 2,
+      "baselineEndLine": 2,
+      "delta": 0
+    },
+    {
+      "currentStartLine": 255,
+      "currentEndLine": 315,
+      "baselineStartLine": 255,
+      "baselineEndLine": 265,
+      "delta": 50
+    },
+    {
+      "currentStartLine": 514,
+      "currentEndLine": 527,
+      "baselineStartLine": 464,
+      "baselineEndLine": 464,
+      "delta": 13
+    }
+  ],
+  "locationEvidence": [
+    {
+      "currentLine": 1199,
+      "baselineLine": 1136,
+      "sourceLine": "\t\t\t\t\t\t\tReflect.get(operation, \"action\") === \"transform-me\" && Reflect.get(operation, \"value\") === 2",
+      "byteIdentical": true
+    },
+    {
+      "currentLine": 1199,
+      "baselineLine": 1136,
+      "sourceLine": "\t\t\t\t\t\t\tReflect.get(operation, \"action\") === \"transform-me\" && Reflect.get(operation, \"value\") === 2",
+      "byteIdentical": true
+    },
+    {
+      "currentLine": 1258,
+      "baselineLine": 1195,
+      "sourceLine": "\t\t\t\tif (input.currentEpochOperations.some(({ operation }) => Reflect.get(operation, \"value\") === 2)) {",
+      "byteIdentical": true
+    }
+  ],
+  "externalSource": {
+    "file": "examples/grid/src/v3-zone.ts",
+    "sha256": "6b655ffa694d06e14440dd6193392ce026db538a4daa0dd51b1207903fa0587a",
+    "byteIdenticalToSignedBase": true
+  },
+  "method": "Same compiler program/options, only test file supplied in memory from signed pre-correction tree; exact three-span newline mapping; no source writes or runtime."
+}

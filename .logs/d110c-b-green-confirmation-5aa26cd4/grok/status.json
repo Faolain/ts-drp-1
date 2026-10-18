@@ -1,0 +1,9 @@
+{
+  "classification": "NO_VERDICT",
+  "duration_seconds": 390.257,
+  "events": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-b-green-confirmation-5aa26cd4/grok/events.jsonl",
+  "exit_code": 1,
+  "public": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-b-green-confirmation-5aa26cd4/grok/public.txt",
+  "stop_reason": "cancelled",
+  "timed_out": false
+}

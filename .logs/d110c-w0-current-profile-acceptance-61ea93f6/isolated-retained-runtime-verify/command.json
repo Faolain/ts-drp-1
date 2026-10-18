@@ -1,0 +1,9 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "node",
+  "args": [
+    ".logs/d110c-w0-current-profile-acceptance-61ea93f6/verify-isolated.mjs",
+    "runtime-retained"
+  ],
+  "start": "2026-09-06T12:13:25.100Z"
+}

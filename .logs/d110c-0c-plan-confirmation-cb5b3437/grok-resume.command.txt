@@ -1,0 +1,1 @@
+grok --resume 01a0642c-d006-7963-871a-6f66b7bd9f39 --permission-mode dontAsk --no-subagents --disable-web-search --reasoning-effort high --max-turns 4 --json-schema <schema.json> -p <reemit-prompt>

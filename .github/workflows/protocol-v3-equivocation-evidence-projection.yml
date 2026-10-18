@@ -1,0 +1,68 @@
+name: Protocol v3 equivocation evidence projection freeze
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  protocol-v3-equivocation-evidence-projection:
+    name: Require immutable protocol-v3 equivocation evidence projection supplement
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@v4
+      - name: Install pinned workspace dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run merge-base-pinned equivocation evidence projection checker
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CHECKER: packages/protocol-v3/supplements/equivocation-evidence-projection-v1/check-freeze.mjs
+          POLICY: packages/protocol-v3/supplements/equivocation-evidence-projection-v1/freeze-policy.json
+          PROFILE: packages/protocol-v3/supplements/equivocation-evidence-projection-v1/profile.json
+          SPECIFICATION: packages/protocol-v3/supplements/equivocation-evidence-projection-v1/spec.md
+          RED_TEST: tests/protocol-v3-equivocation-projection-0o-b1a.test.ts
+          RED_CONTRACT: tests/fixtures/phase-0o-b1a-v3/projection-contract.json
+          CONTROLLED_REFERENCE: tests/fixtures/phase-0o-b1a-v3/controlled-equivocation-projection.ts
+          SOURCE_AUDIT: tests/fixtures/phase-0o-b1a-v3/public-entry-type-audit.ts
+          BUILT_AUDIT: tests/fixtures/phase-0o-b1a-v3/built-package-type-audit.ts
+        run: |
+          if git cat-file -e "$BASE_SHA:$CHECKER"; then
+            git show "$BASE_SHA:$CHECKER" > "$RUNNER_TEMP/check-equivocation-evidence-projection-freeze.mjs"
+            PROTOCOL_V3_EQUIVOCATION_EVIDENCE_PROJECTION_REPOSITORY_ROOT="$GITHUB_WORKSPACE" \
+              node "$RUNNER_TEMP/check-equivocation-evidence-projection-freeze.mjs" "$BASE_SHA"
+          elif ! git cat-file -e "$BASE_SHA:$POLICY" \
+            && ! git cat-file -e "$BASE_SHA:$PROFILE" \
+            && ! git cat-file -e "$BASE_SHA:$SPECIFICATION" \
+            && ! git cat-file -e "$BASE_SHA:$RED_TEST" \
+            && ! git cat-file -e "$BASE_SHA:$RED_CONTRACT" \
+            && ! git cat-file -e "$BASE_SHA:$CONTROLLED_REFERENCE" \
+            && ! git cat-file -e "$BASE_SHA:$SOURCE_AUDIT" \
+            && ! git cat-file -e "$BASE_SHA:$BUILT_AUDIT"; then
+            node "$CHECKER" "$BASE_SHA"
+          else
+            echo "Equivocation evidence projection freeze bootstrap is fail-closed and atomic." >&2
+            exit 1
+          fi
+          node "$CHECKER" "$BASE_SHA"
+      - name: Run controlled reference and repository contract serially
+        run: |
+          PHASE_0O_B1A_IMPLEMENTATION_MODULE=tests/fixtures/phase-0o-b1a-v3/controlled-equivocation-projection.ts \
+            pnpm exec vitest run tests/protocol-v3-equivocation-projection-0o-b1a.test.ts \
+              --no-coverage --maxWorkers=1 --minWorkers=1
+          pnpm exec vitest run tests/protocol-v3-equivocation-projection-0o-b1a.test.ts \
+            --no-coverage --maxWorkers=1 --minWorkers=1
+      - name: Audit source and built package public roots
+        run: |
+          pnpm --filter @ts-drp/protocol-v3 build
+          pnpm exec tsc -p tests/fixtures/phase-0o-b1a-v3/tsconfig.public-entry-audit.json
+          pnpm exec tsc -p tests/fixtures/phase-0o-b1a-v3/tsconfig.built-package-audit.json

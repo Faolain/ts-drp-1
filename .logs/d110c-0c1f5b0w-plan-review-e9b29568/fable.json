@@ -1,0 +1,43 @@
+{
+	"evidence_form": "normalized_summary_from_terminal structured_output",
+	"verdict": "FAIL",
+	"p0_count": 0,
+	"p1_count": 1,
+	"p2_count": 4,
+	"findings": [
+		{
+			"severity": "P1",
+			"title": "GREEN items 2/5, cross-close durability and the GREEN gate need a settlement-profile close that only parent production edits can enable",
+			"evidence": "creator-close.ts still hard-codes creator-trusted-v1 and accepted parent evidence b7751f72 shows settlement-genesis sealEpoch fails CERTIFIED_VALUE_MISMATCH. Parent manualReviewHold and displacedControls call that close before creating the required post-close state. The hold itself is reachable without close through f5b0u openRebasePair over real browser stores.",
+			"required_action": "Keep store law, prompt issue refusal, same-epoch reopen, exact migration behavior, and reaching the unchanged close owner in f5b0w. Move successful close/adopt, cross-close durability and noncreator removal/re-admission to parent f5b after codec/frontier GREEN."
+		},
+		{
+			"severity": "P2",
+			"title": "Retained f5b0c room test pins the hang",
+			"evidence": "The f5b0c room test asserts a held session.issue remains unsettled, which the new prompt refusal intentionally supersedes.",
+			"required_action": "Owner: f5b0w tests-only RED. Replace the hang expectation with the bounded causal sentinel and future exact TypeError, with no issue input or extra plan write."
+		},
+		{
+			"severity": "P2",
+			"title": "A plan-level unfenced precondition is not owned here",
+			"evidence": "The fence is plan-level, and a legitimate plan may retain a prior fence beside a fresh manual-review entry. Encoding a resolution fence precondition here would preempt f5b0x.",
+			"required_action": "Owner: future f5b0x. f5b0w freezes retained entry identity/disposition and existing link/progress state only; it adds no resolution transition."
+		},
+		{
+			"severity": "P2",
+			"title": "Held migration behavior was unspecified",
+			"evidence": "Migration rehearsal and activation await rebasePromise, and the internally redirected target affects source terminal state. The initial plan named no exact call/result contract.",
+			"required_action": "Owner: f5b0w. Freeze exact rehearsal, activation, standalone target and internal redirect behavior before RED."
+		},
+		{
+			"severity": "P2",
+			"title": "Creator-owned and migration-forced holds are indefinite in this slice",
+			"evidence": "A held creator cannot issue ACL changes; fixed-creator cannot be evicted. A changed held policy remains a terminal plan-source-diff refusal.",
+			"required_action": "Record this limitation honestly; f5b0x owns any resolution."
+		}
+	],
+	"red_reachable_before_parent_green": true,
+	"scope_preserved": true,
+	"golden_path_fit": "The slice is the smallest liveness correction. The 64-writer and later long-horizon workloads use transform/rebase and do not rely on manual-review moderation.",
+	"assessment": "No API, authority, wire, schema, crypto, dependency or threshold expansion is required. Correct sequencing and exact migration/store custody are necessary."
+}

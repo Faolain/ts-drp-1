@@ -1,0 +1,20 @@
+{
+  "head": "d1eee8ed48209c6ad3cfc07872984b4f94667cbb",
+  "remote": "d1eee8ed48209c6ad3cfc07872984b4f94667cbb",
+  "signature": "G",
+  "matrixSha256": "2820d4180b093eab0ff6ac24133cf554a9edac44641bc069f67feb2d09087c99",
+  "command": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+    "tests/phase-6b-d110c-0c1f5b0u-room-runtime-red.test.ts",
+    "-t",
+    "D.110c-0c1f5b parent genuine settlement composition|parent f5b P2",
+    "--reporter=json",
+    "--outputFile=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-red-workload-d1eee8ed/focused.json"
+  ],
+  "executionCount": 1,
+  "startedAt": "2026-09-05T16:49:15.784Z"
+}

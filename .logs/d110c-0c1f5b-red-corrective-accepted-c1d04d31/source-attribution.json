@@ -1,0 +1,124 @@
+{
+  "roomOwner": {
+    "file": "examples/v3-room/src/index.ts",
+    "ranges": [
+      {
+        "start": 1379,
+        "lines": [
+          "function migrationCreatorAuthor(material: V3RoomCreatorInviteMaterial): string {",
+          "\tconst decoded = decodeCanonical(material.exactCanonicalLatchedAclBytes, {",
+          "\t\tmaxBytes: 65_536,",
+          "\t\tmaxDepth: 6,",
+          "\t\tmaxItems: 512,",
+          "\t});",
+          "\tconst members = exactDenseArray(",
+          "\t\tdecoded !== null && typeof decoded === \"object\" ? Reflect.get(decoded, \"members\") : undefined",
+          "\t);",
+          "\tconst candidates = (members ?? []).flatMap((value) => {",
+          "\t\tconst member = exactRecord(value, [\"author\", \"finalityKey\", \"groups\"]);",
+          "\t\tconst groups = exactDenseArray(member?.groups);",
+          "\t\treturn member !== undefined &&",
+          "\t\t\ttypeof member.author === \"string\" &&",
+          "\t\t\t/^[0-9a-f]{64}$/u.test(member.author) &&",
+          "\t\t\tmember.finalityKey === member.author &&",
+          "\t\t\tgroups?.includes(\"admin\") === true &&",
+          "\t\t\tgroups.includes(\"finality\") &&",
+          "\t\t\tgroups.includes(\"writer\")",
+          "\t\t\t? [member.author]",
+          "\t\t\t: [];",
+          "\t});",
+          "\tif (candidates.length !== 1) {",
+          "\t\tthrow new TypeError(\"v3 room migration creator application author is invalid\");",
+          "\t}",
+          "\treturn candidates[0] as string;",
+          "}",
+          "",
+          "function migrationInviteAuthority(material: V3RoomCreatorInviteMaterial): Readonly<{",
+          "\treadonly blueprintDigest: string;",
+          "\treadonly creatorAuthor: string;",
+          "\treadonly objectId: string;",
+          "\treadonly signerSetDigest: string;",
+          "}> {",
+          "\tconst preimage = decodeCanonical(material.exactCanonicalGenesisAnchorPreimageBytes, {",
+          "\t\tmaxBytes: 65_536,",
+          "\t\tmaxDepth: 4,",
+          "\t\tmaxItems: 128,",
+          "\t});",
+          "\tconst blueprintDigest =",
+          "\t\tpreimage !== null && typeof preimage === \"object\" ? Reflect.get(preimage, \"blueprintDigest\") : undefined;",
+          "\tconst objectId = preimage !== null && typeof preimage === \"object\" ? Reflect.get(preimage, \"objectId\") : undefined;",
+          "\tconst acl = decodeCanonical(material.exactCanonicalLatchedAclBytes, { maxBytes: 65_536, maxDepth: 6, maxItems: 512 });",
+          "\tconst aclObjectId = acl !== null && typeof acl === \"object\" ? Reflect.get(acl, \"objectId\") : undefined;",
+          "\tif (",
+          "\t\tpreimage === null ||",
+          "\t\ttypeof preimage !== \"object\" ||",
+          "\t\ttypeof blueprintDigest !== \"string\" ||",
+          "\t\t!/^[0-9a-f]{64}$/u.test(blueprintDigest) ||",
+          "\t\ttypeof objectId !== \"string\" ||",
+          "\t\taclObjectId !== objectId",
+          "\t) {",
+          "\t\tthrow new TypeError(\"v3 room migration invite authority is invalid\");",
+          "\t}",
+          "\treturn Object.freeze({",
+          "\t\tblueprintDigest,",
+          "\t\tcreatorAuthor: migrationCreatorAuthor(material),",
+          "\t\tobjectId,",
+          "\t\tsignerSetDigest: digest(\"ts-drp/signer-set/v3\", material.exactCanonicalSignerSetBytes),",
+          "\t});",
+          "}",
+          "",
+          "function migrationTargetObjectId(sourceObjectId: string, rehearsalNonce: Uint8Array): string {"
+        ]
+      },
+      {
+        "start": 1647,
+        "lines": [
+          "\tconst inviteAuthority = migrationInviteAuthority(material);",
+          "\tconst roomInviteAuthority = input.application.migration === undefined ? undefined : inviteAuthority;",
+          "\tif (inviteAuthority.objectId !== input.objectId) {",
+          "\t\tthrow new TypeError(\"v3 room creator invite object is invalid\");"
+        ]
+      }
+    ]
+  },
+  "protocolOwner": {
+    "file": "packages/protocol-v3/src/latched-acl.ts",
+    "ranges": [
+      {
+        "start": 19,
+        "lines": [
+          "const MAX_CANONICAL_BYTES = 8192;",
+          "const MAX_CANONICAL_ITEMS = 2048;",
+          "const SETTLEMENT_MAX_CANONICAL_BYTES = 65_536;",
+          "const SETTLEMENT_MAX_CANONICAL_ITEMS = 8192;",
+          ""
+        ]
+      },
+      {
+        "start": 239,
+        "lines": [
+          "\t\t\treturn Object.freeze({ ok: false, reason: \"malformed-input\" });",
+          "\t\t}",
+          "\t\tconst exactBytes = new Uint8Array(record.exactCanonicalLatchedAclBytes);",
+          "\t\tconst decoded = decodeCanonical(",
+          "\t\t\texactBytes,",
+          "\t\t\tsettlementProfile === \"v1\"",
+          "\t\t\t\t? { maxBytes: SETTLEMENT_MAX_CANONICAL_BYTES, maxDepth: 4, maxItems: SETTLEMENT_MAX_CANONICAL_ITEMS }",
+          "\t\t\t\t: { maxBytes: MAX_CANONICAL_BYTES, maxDepth: 4, maxItems: MAX_CANONICAL_ITEMS }",
+          "\t\t);",
+          "\t\tif (!sameBytes(encodeCanonical(decoded), exactBytes)) {",
+          "\t\t\treturn Object.freeze({ ok: false, reason: \"malformed-input\" });",
+          "\t\t}",
+          "\t\tconst snapshot = copySnapshot(decoded);",
+          "\t\tif (",
+          "\t\t\tsnapshot === undefined ||",
+          "\t\t\t(snapshot.version === 3) !== (settlementProfile === \"v1\") ||",
+          "\t\t\tsnapshot.epoch !== record.expectedEpoch ||"
+        ]
+      }
+    ]
+  },
+  "mutation": "None. Prospectively diagnosed room item-limit failure and successor/P2 paths reproduced on unchanged source/test hashes.",
+  "roomSourceSha256": "e75a9edac9a8d13d4fdb9062003fde84b03d5120d3b18416af8fc9395b39e028",
+  "protocolSourceSha256": "f8c7e85b996f9e9fafd0e23b8509e6cd9a684b625e052afcee158a1cd039efc1"
+}

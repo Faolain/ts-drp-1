@@ -1,0 +1,141 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 11,
+  "passed": 11,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-local-author-red.test.ts",
+      "message": ""
+    }
+  ],
+  "topLevelErrors": [],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "ancestorTitles": [
+        "D.108d1b authenticated peer-local cold issuance RED"
+      ],
+      "fullName": "D.108d1b authenticated peer-local cold issuance RED freezes the exact six-RED/two-GREEN oracle corrective ownership",
+      "status": "passed",
+      "title": "freezes the exact six-RED/two-GREEN oracle corrective ownership",
+      "duration": 2.53937499999995,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.108d1b authenticated peer-local cold issuance RED"
+      ],
+      "fullName": "D.108d1b authenticated peer-local cold issuance RED freezes the exact D.108e2c six-RED/four-GREEN tests-only ownership",
+      "status": "passed",
+      "title": "freezes the exact D.108e2c six-RED/four-GREEN tests-only ownership",
+      "duration": 1.6958329999999933,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.108d1b authenticated peer-local cold issuance RED"
+      ],
+      "fullName": "D.108d1b authenticated peer-local cold issuance RED freezes exact nine-RED/three-GREEN ownership and the closed cold input",
+      "status": "passed",
+      "title": "freezes exact nine-RED/three-GREEN ownership and the closed cold input",
+      "duration": 0.49225000000001273,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.108d1b authenticated peer-local cold issuance RED"
+      ],
+      "fullName": "D.108d1b authenticated peer-local cold issuance RED freezes the exact D.108e2d four-RED/one-GREEN performance ownership",
+      "status": "passed",
+      "title": "freezes the exact D.108e2d four-RED/one-GREEN performance ownership",
+      "duration": 0.4505410000000438,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.108d1b authenticated peer-local cold issuance RED"
+      ],
+      "fullName": "D.108d1b authenticated peer-local cold issuance RED freezes the exact D.108e2e four-RED/one-GREEN skip-budget ownership",
+      "status": "passed",
+      "title": "freezes the exact D.108e2e four-RED/one-GREEN skip-budget ownership",
+      "duration": 0.4142500000000382,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.108d1b authenticated peer-local cold issuance RED"
+      ],
+      "fullName": "D.108d1b authenticated peer-local cold issuance RED freezes the exact D.108e4 thirteen-path tests-only ownership",
+      "status": "passed",
+      "title": "freezes the exact D.108e4 thirteen-path tests-only ownership",
+      "duration": 3.6858330000000024,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.108d1b authenticated peer-local cold issuance RED"
+      ],
+      "fullName": "D.108d1b authenticated peer-local cold issuance RED requires every root canonical consumer to use the D.108e4 export-file boundary",
+      "status": "passed",
+      "title": "requires every root canonical consumer to use the D.108e4 export-file boundary",
+      "duration": 0.4970829999999751,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.108d1b authenticated peer-local cold issuance RED"
+      ],
+      "fullName": "D.108d1b authenticated peer-local cold issuance RED waits for reciprocal raw unreliable links before one measured movement in each direction",
+      "status": "passed",
+      "title": "waits for reciprocal raw unreliable links before one measured movement in each direction",
+      "duration": 1.061458000000016,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.108d1b authenticated peer-local cold issuance RED"
+      ],
+      "fullName": "D.108d1b authenticated peer-local cold issuance RED derives the shipped eight-member chat identities and exact writer split",
+      "status": "passed",
+      "title": "derives the shipped eight-member chat identities and exact writer split",
+      "duration": 35.66274999999996,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.108d1b authenticated peer-local cold issuance RED"
+      ],
+      "fullName": "D.108d1b authenticated peer-local cold issuance RED admits Bob's genuine epoch-zero vertex before the multi-writer successor close",
+      "status": "passed",
+      "title": "admits Bob's genuine epoch-zero vertex before the multi-writer successor close",
+      "duration": 652.543458,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "ancestorTitles": [
+        "D.108d1b authenticated peer-local cold issuance RED"
+      ],
+      "fullName": "D.108d1b authenticated peer-local cold issuance RED pins the complete zero-skip GREEN child inventory to direct execution",
+      "status": "passed",
+      "title": "pins the complete zero-skip GREEN child inventory to direct execution",
+      "duration": 0.3619579999999587,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ]
+}

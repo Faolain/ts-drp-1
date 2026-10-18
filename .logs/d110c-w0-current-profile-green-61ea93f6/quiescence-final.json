@@ -1,0 +1,64 @@
+{
+  "environment": {
+    "profilingNodeOptionsRejected": true,
+    "inheritedProfilingDetected": false,
+    "nodeOptionsPresent": false,
+    "nodeV8CoverageAbsent": true,
+    "diagnosticVariableExplicitlyUnsetForChild": true,
+    "sourceLoggingOptInRemainsUnchanged": true,
+    "ports": [
+      {
+        "port": 4174,
+        "pids": [],
+        "noTcpListener": true
+      },
+      {
+        "port": 4175,
+        "pids": [],
+        "noTcpListener": true
+      },
+      {
+        "port": 51000,
+        "pids": [],
+        "noTcpListener": true
+      },
+      {
+        "port": 51002,
+        "pids": [],
+        "noTcpListener": true
+      }
+    ],
+    "listenerRefinement": "Root approved after unrelated established outbound socket was observed; no process killed; actual bind failures remain gate failures."
+  },
+  "processes": {
+    "numericOnly": true,
+    "noArgvOrComm": true,
+    "candidates": [
+      {
+        "pid": 35021,
+        "status": "35021 34998 S",
+        "taskRelevantCwd": false
+      },
+      {
+        "pid": 35024,
+        "status": "35024 35021 S",
+        "taskRelevantCwd": false
+      },
+      {
+        "pid": 35071,
+        "status": "35071 35024 S",
+        "taskRelevantCwd": false
+      }
+    ],
+    "taskCompetitors": 0,
+    "unrelatedProcessesDoNotBlock": true
+  },
+  "completedRuntimeGroups": [
+    12948,
+    23475,
+    24907,
+    34006
+  ],
+  "allGroupsEmpty": true,
+  "sourceIndexAndParentArtifactsNotMutated": true
+}

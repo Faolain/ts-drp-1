@@ -1,0 +1,103 @@
+{
+  "rawObservationCount": 1,
+  "observations": [
+    {
+      "profileId": "creator-trusted-v1",
+      "composition": "factory",
+      "detail": "D.108e2b application authority was read",
+      "reads": {
+        "application": 1,
+        "signer": 0,
+        "store": 0,
+        "transport": 0
+      },
+      "permitted": false
+    },
+    {
+      "profileId": "creator-trusted-v1",
+      "composition": "rebase",
+      "detail": "D.108e2b application authority was read",
+      "reads": {
+        "application": 1,
+        "signer": 0,
+        "store": 0,
+        "transport": 0
+      },
+      "permitted": false
+    },
+    {
+      "profileId": "creator-trusted-v1",
+      "composition": "signer",
+      "detail": "D.108e2b application authority was read",
+      "reads": {
+        "application": 1,
+        "signer": 0,
+        "store": 0,
+        "transport": 0
+      },
+      "permitted": false
+    },
+    {
+      "profileId": "creator-trusted-v1",
+      "composition": "declaration-only",
+      "detail": "D.108e2b application authority was read",
+      "reads": {
+        "application": 1,
+        "signer": 0,
+        "store": 0,
+        "transport": 0
+      },
+      "permitted": true
+    },
+    {
+      "profileId": "creator-trusted-settlement-v1",
+      "composition": "factory",
+      "detail": "D.108e2b application authority was read",
+      "reads": {
+        "application": 1,
+        "signer": 0,
+        "store": 0,
+        "transport": 0
+      },
+      "permitted": false
+    },
+    {
+      "profileId": "creator-trusted-settlement-v1",
+      "composition": "rebase",
+      "detail": "D.108e2b application authority was read",
+      "reads": {
+        "application": 1,
+        "signer": 0,
+        "store": 0,
+        "transport": 0
+      },
+      "permitted": false
+    },
+    {
+      "profileId": "creator-trusted-settlement-v1",
+      "composition": "signer",
+      "detail": "D.108e2b application authority was read",
+      "reads": {
+        "application": 1,
+        "signer": 0,
+        "store": 0,
+        "transport": 0
+      },
+      "permitted": true
+    },
+    {
+      "profileId": "creator-trusted-settlement-v1",
+      "composition": "declaration-only",
+      "detail": "D.108e2b application authority was read",
+      "reads": {
+        "application": 1,
+        "signer": 0,
+        "store": 0,
+        "transport": 0
+      },
+      "permitted": true
+    }
+  ],
+  "forbiddenViolations": 5,
+  "permittedControls": 3
+}

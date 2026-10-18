@@ -1,0 +1,12 @@
+branch=codex/phase3a1b-p6-golden-path
+green=1063feca39d60d24972ee101ab4051b4c1a23bb9
+green-signature=G
+remote=1063feca39d60d24972ee101ab4051b4c1a23bb9
+stashes=27
+tracked-status:
+changed-paths:
+packages/issuance-store/src/conformance.ts
+packages/issuance-store/src/maintenance.ts
+packages/node/src/v3-live.ts
+packages/storage-browser/src/internal/browser-issuance-store.ts
+packages/storage-node/src/internal/node-issuance-store.ts

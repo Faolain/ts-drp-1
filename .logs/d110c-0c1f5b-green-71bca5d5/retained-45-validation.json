@@ -1,0 +1,91 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 5,
+  "passed": 5,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-45/result.json",
+  "baselineSha256": "d1d125696f422208b21806ecce1d0086c241a985ed33d55802aa92a2d7467735",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-differential-exit-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-differential-exit-red.test.ts",
+      "ancestorTitles": [
+        "D.109f differential and Phase-6b exit RED"
+      ],
+      "fullName": "D.109f differential and Phase-6b exit RED freezes the exact RED and GREEN owner sets",
+      "status": "passed",
+      "title": "freezes the exact RED and GREEN owner sets",
+      "duration": 2.0382920000000695,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-differential-exit-red.test.ts",
+      "ancestorTitles": [
+        "D.109f differential and Phase-6b exit RED"
+      ],
+      "fullName": "D.109f differential and Phase-6b exit RED runs all 128 deterministic archival-versus-compacted planner steps",
+      "status": "passed",
+      "title": "runs all 128 deterministic archival-versus-compacted planner steps",
+      "duration": 203.46224999999993,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-differential-exit-red.test.ts",
+      "ancestorTitles": [
+        "D.109f differential and Phase-6b exit RED"
+      ],
+      "fullName": "D.109f differential and Phase-6b exit RED freezes one sorted duplicate-free proof-kind registry",
+      "status": "passed",
+      "title": "freezes one sorted duplicate-free proof-kind registry",
+      "duration": 0.49679199999991397,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-differential-exit-red.test.ts",
+      "ancestorTitles": [
+        "D.109f differential and Phase-6b exit RED"
+      ],
+      "fullName": "D.109f differential and Phase-6b exit RED deeply freezes the detached pruned-record error scope",
+      "status": "passed",
+      "title": "deeply freezes the detached pruned-record error scope",
+      "duration": 0.30833400000005895,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-differential-exit-red.test.ts",
+      "ancestorTitles": [
+        "D.109f differential and Phase-6b exit RED"
+      ],
+      "fullName": "D.109f differential and Phase-6b exit RED keeps the three GREEN defects confined to their named owners",
+      "status": "passed",
+      "title": "keeps the three GREEN defects confined to their named owners",
+      "duration": 0.9718749999999545,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "7adbd683f21c36c46a389ed6501e2ab2bc37c45f0495a0bb201858fcd0fc7ba0",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

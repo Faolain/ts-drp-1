@@ -1,0 +1,19 @@
+{
+  "attachments": [
+    "d110c-0c-causal-evidence",
+    "d110c-0c-causal-evidence-new-ahe",
+    "d110c-0c-causal-evidence-old-ahe"
+  ],
+  "causalTokenCount": 2,
+  "orderings": [
+    "old-ahe",
+    "new-ahe"
+  ],
+  "playwright": {
+    "files": 1,
+    "tests": 1,
+    "status": "failed-as-diagnostic"
+  },
+  "postCommitDetail": "v3 room successor reopen failed: recovery-rejected: creator predecessor recovery failed: admission-rejected",
+  "valid": true
+}

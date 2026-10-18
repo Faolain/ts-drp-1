@@ -1,0 +1,33 @@
+{
+  "slice": "D.110c-0c1f5b0w",
+  "disposition": "GREEN_WITH_EXACT_RETAINED_BASELINE_DEBT",
+  "anchor": "25ec98628eba5d348086ba18d6481544803e03c9",
+  "acceptedRedTests": "8154c9cb292862b450bf88610dc58d5140f1072b",
+  "acceptedRedEvidence": "ce55db713e6130f936f775a38e68dda198fc4572",
+  "productionCommit": "9c1ec6c40b0af8999c22fa1bc9f1ad971e0e6b2e",
+  "productionSignedPushed": true,
+  "productionPaths": [
+    "examples/v3-room/src/index.ts",
+    "packages/issuance-store/src/contract.ts"
+  ],
+  "testsChanged": false,
+  "publicApiChanged": false,
+  "wireAuthorityDependencyTimeoutOrWorkloadChanged": false,
+  "focused": "219/219 passed, zero skipped or runtime errors; independently identical in the clean-checkout equivalent",
+  "retained": "118/136 passed; exactly 18 baseline failures in obsolete Phase-3g malformed-parameter mock fixtures; clean accepted-anchor and isolated candidate reproduce exact title/status/error matrix",
+  "genuineV1": "1/1 selected passed in both environments; parent settlement integration intentionally unselected",
+  "typechecks": "Room and issuance package typechecks pass; combined source-mapped and browser/node native test diagnostic deltas are exactly 53/78/111 before and after, no added diagnostics",
+  "buildsAndStatic": "Affected 34-package build, final two-package build, isolated fresh 40-package build and candidate build pass; lint, 8-GiB format, diff, exported source-shape and exact candidate identity checks pass",
+  "selfReview": "Clean-refactoring pass leaves one private stable hold flag and guard, no lifetime hold promise or release callback. Existing close owner is unchanged. Shared store validator owns retained identity/progress immutability. Generic non-hold migration failures retain their existing public error; only exact manual-review admission failure bypasses generic wrapping.",
+  "custody": "All 27 stash identities, 86,510 prior untracked paths, protected source controls, and unrelated tracked source hashes are unchanged. Only the two authorized production files and rebuilt issuance contract.js differ from initial consumed-source hashes.",
+  "remainingDebt": [
+    "18 Phase-3g fixture failures need separately owned fixture correction; they are not rebaselined or treated as passing coverage.",
+    "Existing source-mapped/browser/node fixture typecheck diagnostics remain separately owned; production builds and direct changed-package typechecks pass.",
+    "Parent f5b successor codec/frontier, genuine successful settlement close/adopt, cross-close held custody, removal/re-admission and long workloads remain gated and unclaimed.",
+    "Formal trio review follows under root ownership; this implementation agent invoked no additional agents or reviewers."
+  ],
+  "contradictions": [],
+  "isolatedCheckout": "/tmp/d110c-f5b0w-green-m7UvLk/checkout",
+  "isolatedCheckoutRetainedForInspection": true,
+  "manifestPolicy": "SHA-256 of every immediate evidence file, sorted by filename, excluding manifest.sha256 itself; seal after all evidence writes and commit evidence separately"
+}

@@ -1,0 +1,53 @@
+{
+  "head": "79743f98dc0c321a5e7da7b495fec4d761630097",
+  "stashesUnchanged": true,
+  "stashCount": 27,
+  "trackedChanges": [
+    "examples/v3-room/src/index.ts",
+    "packages/node/src/creator-adoption.ts",
+    "packages/node/src/creator-close.ts",
+    "packages/node/src/internal/creator-transition-advance.ts",
+    "packages/node/src/v3-live.ts",
+    "packages/protocol-v3/src/creator-checkpoint.ts",
+    "packages/protocol-v3/src/creator-close.ts"
+  ],
+  "unchangedTrackedCount": 6417,
+  "sourceHashes": {
+    "examples/v3-room/src/index.ts": "58648bbb50ec5a61b3d6516d36f8c506e782dbd1f0dd8e520c7c5dd8f7f36480",
+    "packages/node/src/creator-adoption.ts": "9321bf0da3f2873a6eb51f21b1b5266a7747c18e26fcb4a729360d08e0f1142e",
+    "packages/node/src/creator-close.ts": "834b7877493d5feb3e883cb1e1de81211c64fa8d4d6b2fb6a6fdeb11c5532323",
+    "packages/node/src/internal/creator-transition-advance.ts": "e0164bea9d2b2bb36062cfc8e539673e62dc508207bb68f793610676fba1d2c8",
+    "packages/node/src/v3-live.ts": "d7185162585fdb17699a26ce7ca82095a1d2c1a0f984cd42ab0b3f84a571b4e0",
+    "packages/protocol-v3/src/creator-checkpoint.ts": "f01b247e8adfa0c78cd4930ab6e10060e519cce367bfcdc175e7401d4b8cc5f3",
+    "packages/protocol-v3/src/creator-close.ts": "46fea015c81b17589268e3e98baa8b9295218bb733e68744f48fe5d98c2a2c4c"
+  },
+  "allPriorUntrackedPathsPresent": true,
+  "untrackedCount": 86535,
+  "manifests": [
+    {
+      "dir": ".logs/d110c-0c1f5b0r-design-3a156aca",
+      "sha256": "8618c2643aac865508ebaca31c53212a2ae63dc864f2d244acaa1f2b741e27d0",
+      "valid": true
+    },
+    {
+      "dir": ".logs/d110c-0c1f5b-red-cecde972",
+      "sha256": "356ef503c16b1f500781350a41704bcec514e7505a64a96ca0f3614519094009",
+      "valid": true
+    },
+    {
+      "dir": ".logs/d110c-0c1f5b-red-review-b7751f72",
+      "sha256": "69720f84caefc5f3571c449e11a2ae1da27f94f1668577ddad40eca430fecadb",
+      "valid": true
+    },
+    {
+      "dir": ".logs/d110c-0c1f5b-red-corrective-accepted-c1d04d31",
+      "sha256": "425d45904058d483f6b15339724613a747a77a03fb48bcc3acb1b306ff23a2e5",
+      "valid": true
+    },
+    {
+      "dir": ".logs/d110c-0c1f5b0w-final-review-ad38e6c4",
+      "sha256": "43cd8a3f75654bc7a55612cd7e20323b1fdeed0dea7805c99f3a857d50ee625f",
+      "valid": true
+    }
+  ]
+}

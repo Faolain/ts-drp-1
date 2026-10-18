@@ -1,0 +1,12 @@
+{
+	"anchor": "502198f3c8355f20dc64ab10a9d70595b1998a63",
+	"verdict": "BLOCK",
+	"p0_count": 0,
+	"p1_count": 2,
+	"reviewers": {
+		"grok": "PASS_EXPLICIT_WRAPPER_NO_VERDICT",
+		"kimi": "PASS",
+		"opus": "BLOCK"
+	},
+	"next": "corrective-tests-only-red"
+}

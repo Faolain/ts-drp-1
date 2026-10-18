@@ -1,0 +1,534 @@
+{
+  "count": 48,
+  "nonzero": 0,
+  "statuses": [
+    {
+      "file": "collection/status.json",
+      "sha256": "9d1a408610bfbeee1c6f9ba8d5da8049109ade8992d8cf0becfd62adf4e1a000",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:32:12.900Z",
+        "finish": "2026-09-06T08:32:16.652Z",
+        "pid": 6838
+      }
+    },
+    {
+      "file": "custody-after/status.json",
+      "sha256": "8fca46be7e744a29ff36b739439be031c72c61dae001f9ed85e257b904f07199",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:32:14.065Z",
+        "finish": "2026-09-06T08:32:16.783Z",
+        "pid": 6910
+      }
+    },
+    {
+      "file": "custody-before/status.json",
+      "sha256": "db0ca1e6b211e171393e6a06af890796c4997c9b0392fdf77f080123ac79b537",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:29:48.444Z",
+        "finish": "2026-09-06T08:29:51.508Z",
+        "pid": 3197
+      }
+    },
+    {
+      "file": "custody-final/status.json",
+      "sha256": "d5aa435b86b266d37fc6b57e97da03512c13dcdbe874fcfafb478315797efd7f",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:43:27.566Z",
+        "finish": "2026-09-06T08:43:39.720Z",
+        "pid": 26268
+      }
+    },
+    {
+      "file": "diff/status.json",
+      "sha256": "fdb0513b9d062f95e6590a868140a36f03db8f12fa65b49d9d9ad979878efc92",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:30:13.651Z",
+        "finish": "2026-09-06T08:30:13.683Z",
+        "pid": 3900
+      }
+    },
+    {
+      "file": "equivalence/status.json",
+      "sha256": "107329a5f3c46c5b4c15e587a39b60026c1bb5cde0917dfab1f958720a0bd791",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:31:21.719Z",
+        "finish": "2026-09-06T08:31:22.208Z",
+        "pid": 5344
+      }
+    },
+    {
+      "file": "focused-runtime/status.json",
+      "sha256": "2d7c4224c40a55de485fb5dd45c1ec4bee41f140ca9ecf2f9bab2189f948dcea",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:35:33.681Z",
+        "finish": "2026-09-06T08:35:36.990Z",
+        "pid": 10480
+      }
+    },
+    {
+      "file": "focused/status.json",
+      "sha256": "447b7887bb3528d822d934507643e7b6e052c66021527a55ae527bfc3656bf68",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "quiescent": true,
+        "elapsedMs": 2471,
+        "endedAt": "2026-09-06T08:35:36.985Z"
+      }
+    },
+    {
+      "file": "format/status.json",
+      "sha256": "465044ac69cbfd5f29c2c597cc58df4dcfffe1317b1687b4f5da805150ccdfbf",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:30:11.779Z",
+        "finish": "2026-09-06T08:30:12.321Z",
+        "pid": 3786
+      }
+    },
+    {
+      "file": "freeze-runtime/status.json",
+      "sha256": "771dc0fd4b0ef13c71fa0fdec077c83d2c1ccb0c64729325a5d69d0d0c1b052e",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:35:26.158Z",
+        "finish": "2026-09-06T08:35:27.122Z",
+        "pid": 10163
+      }
+    },
+    {
+      "file": "isolate-temp/status.json",
+      "sha256": "2deb08dfd84ad9862073d80467ff53a123d36aaab854f3abbeb5ec389ec9e571",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:37:10.518Z",
+        "finish": "2026-09-06T08:37:10.533Z",
+        "pid": 12182
+      }
+    },
+    {
+      "file": "isolated/build/status.json",
+      "sha256": "2487404155cd0be9ae31253530ceefad2cfb310a16b3ed53085aec5e41aec681",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:39:35.289Z",
+        "finish": "2026-09-06T08:40:08.117Z",
+        "pid": 16676
+      }
+    },
+    {
+      "file": "isolated/checkout/status.json",
+      "sha256": "5b9bd5e9fccc630fe449dccd29b0dc202cbbc44a1c3a874aca4e5e0eb33bf3a1",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:37:38.913Z",
+        "finish": "2026-09-06T08:37:46.575Z",
+        "pid": 12727
+      }
+    },
+    {
+      "file": "isolated/clone/status.json",
+      "sha256": "096891662bcc8c6fc8a53bccd430dfbf5042206a589b72cb9d420dc1267b2310",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:37:32.280Z",
+        "finish": "2026-09-06T08:37:32.392Z",
+        "pid": 12600
+      }
+    },
+    {
+      "file": "isolated/custody-after/status.json",
+      "sha256": "8bedca12289a7f1a3eb736385f523b5600096cf4159a88c5b05ad4617d2abcaa",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:43:22.885Z",
+        "finish": "2026-09-06T08:43:26.113Z",
+        "pid": 23950
+      }
+    },
+    {
+      "file": "isolated/custody-before/status.json",
+      "sha256": "6ff680f73b799eef97d7cee356fc9a37c5ef22a53101836d0e003b4403c935a0",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:40:49.263Z",
+        "finish": "2026-09-06T08:40:52.890Z",
+        "pid": 19073
+      }
+    },
+    {
+      "file": "isolated/custody-prepared/status.json",
+      "sha256": "2c735bae235d4d24db1e0ca30c8453d2dce9cf86f78efec9e353bf8594a7cd3e",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:39:02.095Z",
+        "finish": "2026-09-06T08:39:05.800Z",
+        "pid": 14005
+      }
+    },
+    {
+      "file": "isolated/diff/status.json",
+      "sha256": "273c6a226e5f5df43378fa8f1b0cee456730b176ba8138d2d107d9b1b15f5cc5",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:41:01.784Z",
+        "finish": "2026-09-06T08:41:01.812Z",
+        "pid": 21543
+      }
+    },
+    {
+      "file": "isolated/equivalence/status.json",
+      "sha256": "25341b7d273d6810a74817ba4a1e1eb90725258d0364c404f465e35736214d69",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:41:01.880Z",
+        "finish": "2026-09-06T08:41:02.529Z",
+        "pid": 21557
+      }
+    },
+    {
+      "file": "isolated/focused-runtime/status.json",
+      "sha256": "1569589b25a10891ee3f78b1894537aef3cd83f7e421c4ceaf66759b325c0425",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:41:48.151Z",
+        "finish": "2026-09-06T08:41:51.609Z",
+        "pid": 22377
+      }
+    },
+    {
+      "file": "isolated/focused/status.json",
+      "sha256": "fff648fcf3e0d3b35090cc3d4b95eb8af3be3147ad86975ab9a4518dd2a61d23",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "quiescent": true,
+        "elapsedMs": 2612,
+        "endedAt": "2026-09-06T08:41:51.604Z"
+      }
+    },
+    {
+      "file": "isolated/format/status.json",
+      "sha256": "1b0dc503c2612921af3809b31b941b71f95fcc093a6bc27fc3a29e23df7eb783",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:40:53.901Z",
+        "finish": "2026-09-06T08:41:02.861Z",
+        "pid": 21417
+      }
+    },
+    {
+      "file": "isolated/freeze-runtime/status.json",
+      "sha256": "f637be5f34b8f4618ac44f201f456f86e63c88cd33b95a8422819291bd2195b8",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:41:40.047Z",
+        "finish": "2026-09-06T08:41:41.015Z",
+        "pid": 22087
+      }
+    },
+    {
+      "file": "isolated/graph-comparison/status.json",
+      "sha256": "3ea5a9c38f06a5458bd90cf0b51483ea04c32cff7d8ecacce22c94651e39d95e",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:41:39.821Z",
+        "finish": "2026-09-06T08:41:39.955Z",
+        "pid": 22049
+      }
+    },
+    {
+      "file": "isolated/install/status.json",
+      "sha256": "22725e53ca76a6e2875e790fe3d1d011476017e28f9a4d4240993047065f463a",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:38:29.866Z",
+        "finish": "2026-09-06T08:38:38.680Z",
+        "pid": 13681
+      }
+    },
+    {
+      "file": "isolated/lint/status.json",
+      "sha256": "a69c4569f3698b40ef83cb16ac8ee4036cea69b4c206bcdc5eaac266e7e5fd44",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:40:58.247Z",
+        "finish": "2026-09-06T08:41:13.917Z",
+        "pid": 21496
+      }
+    },
+    {
+      "file": "isolated/native-addon-import/status.json",
+      "sha256": "1b4748d0007a12a20fa07ec906517f2663d47c94756d696e50b18e6e8dc0d244",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:39:34.074Z",
+        "finish": "2026-09-06T08:39:35.069Z",
+        "pid": 16618
+      }
+    },
+    {
+      "file": "isolated/native-prebuild/status.json",
+      "sha256": "d63c249aee6f463ebe74de58f970b3646ad641fffb67836261a2c55238b31763",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:39:14.705Z",
+        "finish": "2026-09-06T08:39:17.362Z",
+        "pid": 16360
+      }
+    },
+    {
+      "file": "isolated/native-preparation/status.json",
+      "sha256": "5409c8993648afc7138257480c13dff12c21fe30dbc0e3526afc898e25552028",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:39:06.285Z",
+        "finish": "2026-09-06T08:39:17.388Z",
+        "pid": 16350
+      }
+    },
+    {
+      "file": "isolated/node-root-import/status.json",
+      "sha256": "9ad1b6ac632486dd0a20987a6acf88814cb3e7536dce608429e4aea476c48230",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:40:48.142Z",
+        "finish": "2026-09-06T08:40:49.170Z",
+        "pid": 19033
+      }
+    },
+    {
+      "file": "isolated/overlay-check/status.json",
+      "sha256": "8a4c558ebc9b16a6623d84058236a1d741f009f7d75005d78aecfd0e31c53405",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:38:29.542Z",
+        "finish": "2026-09-06T08:38:29.577Z",
+        "pid": 13598
+      }
+    },
+    {
+      "file": "isolated/overlay/status.json",
+      "sha256": "ed06c827e38074be391dbb49cae31621ed31ae137214415ecd9d59cd1f0843c6",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:38:29.718Z",
+        "finish": "2026-09-06T08:38:29.750Z",
+        "pid": 13643
+      }
+    },
+    {
+      "file": "isolated/retained-runtime/status.json",
+      "sha256": "e792f4a92fd47ad3109a614b88cd5363a684b1d64cade56a82ab54f5b8c2e7d6",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:42:20.904Z",
+        "finish": "2026-09-06T08:42:54.575Z",
+        "pid": 22948
+      }
+    },
+    {
+      "file": "isolated/retained/status.json",
+      "sha256": "e516f3f32ebd704e36a5c30115fecb779810c5133a8a215244eb9e2360c1c144",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "quiescent": true,
+        "elapsedMs": 32829,
+        "endedAt": "2026-09-06T08:42:54.569Z"
+      }
+    },
+    {
+      "file": "isolated/typecheck-matrix/status.json",
+      "sha256": "332737f2b8312fa39817e0cdd98e6dbfe1ba87e50023032972c81059213a71b1",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:41:39.594Z",
+        "finish": "2026-09-06T08:41:39.721Z",
+        "pid": 22011
+      }
+    },
+    {
+      "file": "isolated/typecheck/status.json",
+      "sha256": "35ae8f4a2043948ad00cde11efba10f1fae6423af8da848724828c7dcadc547a",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:41:01.887Z",
+        "finish": "2026-09-06T08:41:07.779Z",
+        "pid": 21571
+      }
+    },
+    {
+      "file": "isolated/validate-focused/status.json",
+      "sha256": "28a604fb09af01ac9e27968e18579a79a1c3cee34c7824a5189011302e7a047e",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:42:20.685Z",
+        "finish": "2026-09-06T08:42:20.813Z",
+        "pid": 22910
+      }
+    },
+    {
+      "file": "isolated/validate-retained/status.json",
+      "sha256": "11b534a8365b3da4586410264870ddf8f1294d59637885e65980a13de26f7890",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:43:22.672Z",
+        "finish": "2026-09-06T08:43:22.797Z",
+        "pid": 23912
+      }
+    },
+    {
+      "file": "lint/status.json",
+      "sha256": "5265b774c6b2b30c34495c010dfcc97547f67fe708b6810d624d17c06aea47db",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:30:12.416Z",
+        "finish": "2026-09-06T08:30:30.049Z",
+        "pid": 3831
+      }
+    },
+    {
+      "file": "retained-runtime/status.json",
+      "sha256": "cfbb656da7f71b80a5fde2077a1bf8b0f49a668d417ae36d4f556be2085ee976",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:36:10.566Z",
+        "finish": "2026-09-06T08:36:38.377Z",
+        "pid": 11194
+      }
+    },
+    {
+      "file": "retained/status.json",
+      "sha256": "7643c388ea5eef71dbfe64da19890dbe55dfce0b001396909784d984cb365ce5",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "quiescent": true,
+        "elapsedMs": 26958,
+        "endedAt": "2026-09-06T08:36:38.372Z"
+      }
+    },
+    {
+      "file": "signed-source/status.json",
+      "sha256": "878538e35b93c996a157dc187d6b48d98296b9f832d9d71d904d3cb4226a8a0e",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:35:25.144Z",
+        "finish": "2026-09-06T08:35:26.017Z",
+        "pid": 9958
+      }
+    },
+    {
+      "file": "source-commit/status.json",
+      "sha256": "5992aa82f1a5f232c9af7996492f9467b3689437fecd9da0523b828d5eefcca1",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:34:49.954Z",
+        "finish": "2026-09-06T08:34:50.600Z",
+        "pid": 9322
+      }
+    },
+    {
+      "file": "source-push/status.json",
+      "sha256": "68dec424a8f8a06be54579a0ff36806df4f6507a7308b918c00fdbc74859ec82",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:35:02.998Z",
+        "finish": "2026-09-06T08:35:04.703Z",
+        "pid": 9653
+      }
+    },
+    {
+      "file": "typecheck-matrix/status.json",
+      "sha256": "8e727fabf0eb6f6e1b95a6e2af75b7aaf4eaf6cb25646e57418413969eacd8e5",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:32:12.645Z",
+        "finish": "2026-09-06T08:32:12.769Z",
+        "pid": 6799
+      }
+    },
+    {
+      "file": "typecheck/status.json",
+      "sha256": "bc547258e764c2bb54216bc687a07764e8603103d39fd7cbc40a90fa027a076d",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:30:13.811Z",
+        "finish": "2026-09-06T08:30:18.886Z",
+        "pid": 3938
+      }
+    },
+    {
+      "file": "validate-focused/status.json",
+      "sha256": "24e6c259d5f03d20b68eeedf0b94b000c67e598707d9c40724d14c087c76faaf",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:36:10.332Z",
+        "finish": "2026-09-06T08:36:10.464Z",
+        "pid": 11156
+      }
+    },
+    {
+      "file": "validate-retained/status.json",
+      "sha256": "7a35b759cbd12a92c2cac7a806da8d340d4ee12c6508b08ac01771ea95395275",
+      "status": {
+        "code": 0,
+        "signal": null,
+        "start": "2026-09-06T08:36:54.518Z",
+        "finish": "2026-09-06T08:36:54.665Z",
+        "pid": 11981
+      }
+    }
+  ]
+}

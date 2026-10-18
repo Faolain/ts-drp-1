@@ -1,0 +1,1041 @@
+{
+  "browser": "151.0.7922.34",
+  "result": [
+    {
+      "name": "zero-origin",
+      "setup": [
+        {
+          "ok": true,
+          "errorCode": null
+        }
+      ],
+      "attempt": {
+        "ok": false,
+        "errorCode": "ISSUANCE_INVALID_ARGUMENT"
+      },
+      "before": {
+        "entries": [
+          {
+            "disposition": "rebase",
+            "replacementSequence": null,
+            "sourceDigest": [
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209
+            ],
+            "sourceSequence": 7
+          }
+        ],
+        "fenceSequence": 4,
+        "revision": 0,
+        "scope": {
+          "author": "author:browser-progress",
+          "objectId": "room:browser-progress"
+        }
+      },
+      "beforeLineage": {
+        "exhausted": false,
+        "next": 0
+      },
+      "after": {
+        "entries": [
+          {
+            "disposition": "rebase",
+            "replacementSequence": null,
+            "sourceDigest": [
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209
+            ],
+            "sourceSequence": 7
+          }
+        ],
+        "fenceSequence": 4,
+        "revision": 0,
+        "scope": {
+          "author": "author:browser-progress",
+          "objectId": "room:browser-progress"
+        }
+      },
+      "lineage": {
+        "exhausted": false,
+        "next": 0
+      },
+      "issuedSequences": [],
+      "outboxSequences": [],
+      "reopened": {
+        "entries": [
+          {
+            "disposition": "rebase",
+            "replacementSequence": null,
+            "sourceDigest": [
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209
+            ],
+            "sourceSequence": 7
+          }
+        ],
+        "fenceSequence": 4,
+        "revision": 0,
+        "scope": {
+          "author": "author:browser-progress",
+          "objectId": "room:browser-progress"
+        }
+      }
+    },
+    {
+      "name": "nonempty-origin",
+      "setup": [
+        {
+          "ok": true,
+          "errorCode": null
+        }
+      ],
+      "attempt": {
+        "ok": false,
+        "errorCode": "ISSUANCE_INVALID_ARGUMENT"
+      },
+      "before": {
+        "entries": [
+          {
+            "disposition": "rebase",
+            "replacementSequence": null,
+            "sourceDigest": [
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209
+            ],
+            "sourceSequence": 7
+          }
+        ],
+        "fenceSequence": 4,
+        "revision": 0,
+        "scope": {
+          "author": "author:browser-progress",
+          "objectId": "room:browser-progress"
+        }
+      },
+      "beforeLineage": {
+        "exhausted": false,
+        "next": 0
+      },
+      "after": {
+        "entries": [
+          {
+            "disposition": "rebase",
+            "replacementSequence": null,
+            "sourceDigest": [
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209
+            ],
+            "sourceSequence": 7
+          }
+        ],
+        "fenceSequence": 4,
+        "revision": 0,
+        "scope": {
+          "author": "author:browser-progress",
+          "objectId": "room:browser-progress"
+        }
+      },
+      "lineage": {
+        "exhausted": false,
+        "next": 0
+      },
+      "issuedSequences": [],
+      "outboxSequences": [],
+      "reopened": {
+        "entries": [
+          {
+            "disposition": "rebase",
+            "replacementSequence": null,
+            "sourceDigest": [
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209
+            ],
+            "sourceSequence": 7
+          }
+        ],
+        "fenceSequence": 4,
+        "revision": 0,
+        "scope": {
+          "author": "author:browser-progress",
+          "objectId": "room:browser-progress"
+        }
+      }
+    },
+    {
+      "name": "partial",
+      "setup": [
+        {
+          "ok": true,
+          "errorCode": null
+        },
+        {
+          "ok": false,
+          "errorCode": "ISSUANCE_INVALID_ARGUMENT"
+        }
+      ],
+      "attempt": {
+        "ok": false,
+        "errorCode": "ISSUANCE_COMMIT_INVALID"
+      },
+      "before": {
+        "entries": [
+          {
+            "disposition": "rebase",
+            "replacementSequence": null,
+            "sourceDigest": [
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209
+            ],
+            "sourceSequence": 7
+          }
+        ],
+        "fenceSequence": 4,
+        "revision": 0,
+        "scope": {
+          "author": "author:browser-progress",
+          "objectId": "room:browser-progress"
+        }
+      },
+      "beforeLineage": {
+        "exhausted": false,
+        "next": 0
+      },
+      "after": {
+        "entries": [
+          {
+            "disposition": "rebase",
+            "replacementSequence": null,
+            "sourceDigest": [
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209
+            ],
+            "sourceSequence": 7
+          }
+        ],
+        "fenceSequence": 4,
+        "revision": 0,
+        "scope": {
+          "author": "author:browser-progress",
+          "objectId": "room:browser-progress"
+        }
+      },
+      "lineage": {
+        "exhausted": false,
+        "next": 0
+      },
+      "issuedSequences": [],
+      "outboxSequences": [],
+      "reopened": {
+        "entries": [
+          {
+            "disposition": "rebase",
+            "replacementSequence": null,
+            "sourceDigest": [
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209
+            ],
+            "sourceSequence": 7
+          }
+        ],
+        "fenceSequence": 4,
+        "revision": 0,
+        "scope": {
+          "author": "author:browser-progress",
+          "objectId": "room:browser-progress"
+        }
+      }
+    },
+    {
+      "name": "final",
+      "setup": [
+        {
+          "ok": true,
+          "errorCode": null
+        },
+        {
+          "ok": false,
+          "errorCode": "ISSUANCE_INVALID_ARGUMENT"
+        },
+        {
+          "ok": false,
+          "errorCode": "ISSUANCE_COMMIT_INVALID"
+        }
+      ],
+      "attempt": {
+        "ok": false,
+        "errorCode": "ISSUANCE_COMMIT_INVALID"
+      },
+      "before": {
+        "entries": [
+          {
+            "disposition": "rebase",
+            "replacementSequence": null,
+            "sourceDigest": [
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209
+            ],
+            "sourceSequence": 7
+          }
+        ],
+        "fenceSequence": 4,
+        "revision": 0,
+        "scope": {
+          "author": "author:browser-progress",
+          "objectId": "room:browser-progress"
+        }
+      },
+      "beforeLineage": {
+        "exhausted": false,
+        "next": 0
+      },
+      "after": {
+        "entries": [
+          {
+            "disposition": "rebase",
+            "replacementSequence": null,
+            "sourceDigest": [
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209
+            ],
+            "sourceSequence": 7
+          }
+        ],
+        "fenceSequence": 4,
+        "revision": 0,
+        "scope": {
+          "author": "author:browser-progress",
+          "objectId": "room:browser-progress"
+        }
+      },
+      "lineage": {
+        "exhausted": false,
+        "next": 0
+      },
+      "issuedSequences": [],
+      "outboxSequences": [],
+      "reopened": {
+        "entries": [
+          {
+            "disposition": "rebase",
+            "replacementSequence": null,
+            "sourceDigest": [
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209
+            ],
+            "sourceSequence": 7
+          }
+        ],
+        "fenceSequence": 4,
+        "revision": 0,
+        "scope": {
+          "author": "author:browser-progress",
+          "objectId": "room:browser-progress"
+        }
+      }
+    },
+    {
+      "name": "stale-revision",
+      "setup": [
+        {
+          "ok": true,
+          "errorCode": null
+        },
+        {
+          "ok": true,
+          "errorCode": null
+        }
+      ],
+      "attempt": {
+        "ok": false,
+        "errorCode": "ISSUANCE_RETRY_REQUIRED"
+      },
+      "before": {
+        "entries": [
+          {
+            "disposition": "rebase",
+            "replacementSequence": null,
+            "sourceDigest": [
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209
+            ],
+            "sourceSequence": 7
+          }
+        ],
+        "fenceSequence": 4,
+        "revision": 1,
+        "scope": {
+          "author": "author:browser-progress",
+          "objectId": "room:browser-progress"
+        }
+      },
+      "beforeLineage": {
+        "exhausted": false,
+        "next": 0
+      },
+      "after": {
+        "entries": [
+          {
+            "disposition": "rebase",
+            "replacementSequence": null,
+            "sourceDigest": [
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209
+            ],
+            "sourceSequence": 7
+          }
+        ],
+        "fenceSequence": 4,
+        "revision": 1,
+        "scope": {
+          "author": "author:browser-progress",
+          "objectId": "room:browser-progress"
+        }
+      },
+      "lineage": {
+        "exhausted": false,
+        "next": 0
+      },
+      "issuedSequences": [],
+      "outboxSequences": [],
+      "reopened": {
+        "entries": [
+          {
+            "disposition": "rebase",
+            "replacementSequence": null,
+            "sourceDigest": [
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209
+            ],
+            "sourceSequence": 7
+          }
+        ],
+        "fenceSequence": 4,
+        "revision": 1,
+        "scope": {
+          "author": "author:browser-progress",
+          "objectId": "room:browser-progress"
+        }
+      }
+    },
+    {
+      "name": "inexact-revision",
+      "setup": [
+        {
+          "ok": true,
+          "errorCode": null
+        }
+      ],
+      "attempt": {
+        "ok": false,
+        "errorCode": "ISSUANCE_INVALID_ARGUMENT"
+      },
+      "before": {
+        "entries": [
+          {
+            "disposition": "rebase",
+            "replacementSequence": null,
+            "sourceDigest": [
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209
+            ],
+            "sourceSequence": 7
+          }
+        ],
+        "fenceSequence": 4,
+        "revision": 0,
+        "scope": {
+          "author": "author:browser-progress",
+          "objectId": "room:browser-progress"
+        }
+      },
+      "beforeLineage": {
+        "exhausted": false,
+        "next": 0
+      },
+      "after": {
+        "entries": [
+          {
+            "disposition": "rebase",
+            "replacementSequence": null,
+            "sourceDigest": [
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209
+            ],
+            "sourceSequence": 7
+          }
+        ],
+        "fenceSequence": 4,
+        "revision": 0,
+        "scope": {
+          "author": "author:browser-progress",
+          "objectId": "room:browser-progress"
+        }
+      },
+      "lineage": {
+        "exhausted": false,
+        "next": 0
+      },
+      "issuedSequences": [],
+      "outboxSequences": [],
+      "reopened": {
+        "entries": [
+          {
+            "disposition": "rebase",
+            "replacementSequence": null,
+            "sourceDigest": [
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209,
+              209
+            ],
+            "sourceSequence": 7
+          }
+        ],
+        "fenceSequence": 4,
+        "revision": 0,
+        "scope": {
+          "author": "author:browser-progress",
+          "objectId": "room:browser-progress"
+        }
+      }
+    }
+  ]
+}

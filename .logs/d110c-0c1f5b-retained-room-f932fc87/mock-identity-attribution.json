@@ -1,0 +1,108 @@
+{
+  "method": "Read-only Vite resolveConfig/createResolver SSR identity resolution. No server, module runner, optimizer, fixture execution, build or test run.",
+  "head": "f932fc87cab77e22b2d3994b8af288e9e491547a",
+  "mappings": [
+    {
+      "mock": "@ts-drp/control-plane",
+      "production": "@ts-drp/control-plane",
+      "mockPath": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/packages/control-plane/src/index.ts",
+      "productionPath": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/packages/control-plane/src/index.ts",
+      "sameIdentity": true,
+      "mockSha256": "b70c171e2de3e6e8d51ddcb2ef143bf7dfabc6689bbac5f310477d426ad5e144",
+      "productionSha256": "b70c171e2de3e6e8d51ddcb2ef143bf7dfabc6689bbac5f310477d426ad5e144"
+    },
+    {
+      "mock": "../packages/storage/dist/src/index.js",
+      "production": "@ts-drp/storage",
+      "mockPath": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/packages/storage/dist/src/index.js",
+      "productionPath": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/packages/storage/dist/src/index.js",
+      "sameIdentity": true,
+      "mockSha256": "7e55abb40303846278cb8e097493376185e8f4a787c1026a438a739494cd0eb1",
+      "productionSha256": "7e55abb40303846278cb8e097493376185e8f4a787c1026a438a739494cd0eb1"
+    },
+    {
+      "mock": "../packages/storage-browser/dist/src/index.js",
+      "production": "@ts-drp/storage-browser",
+      "mockPath": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/packages/storage-browser/dist/src/index.js",
+      "productionPath": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/packages/storage-browser/dist/src/index.js",
+      "sameIdentity": true,
+      "mockSha256": "6ab3381e1514b6e8747057df4ed3c58e88edbba0dc6d007c09c88d1218723922",
+      "productionSha256": "6ab3381e1514b6e8747057df4ed3c58e88edbba0dc6d007c09c88d1218723922"
+    },
+    {
+      "mock": "../packages/storage-browser/dist/src/issuance.js",
+      "production": "@ts-drp/storage-browser/issuance",
+      "mockPath": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/packages/storage-browser/dist/src/issuance.js",
+      "productionPath": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/packages/storage-browser/dist/src/issuance.js",
+      "sameIdentity": true,
+      "mockSha256": "0c526d0a56685ae44579a4826e0ac45bf3eb4db41e5c19202a0aa386b1cb2b74",
+      "productionSha256": "0c526d0a56685ae44579a4826e0ac45bf3eb4db41e5c19202a0aa386b1cb2b74"
+    },
+    {
+      "mock": "../packages/storage-browser/dist/src/live-journal.js",
+      "production": "@ts-drp/storage-browser/live-journal",
+      "mockPath": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/packages/storage-browser/dist/src/live-journal.js",
+      "productionPath": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/packages/storage-browser/dist/src/live-journal.js",
+      "sameIdentity": true,
+      "mockSha256": "72911a13f1c04c8d6244ac5b5c512f69e22f46dc328112d528be7ff8c5a5cd17",
+      "productionSha256": "72911a13f1c04c8d6244ac5b5c512f69e22f46dc328112d528be7ff8c5a5cd17"
+    },
+    {
+      "mock": "../packages/protocol-v3/dist/src/public.js",
+      "production": "@ts-drp/protocol-v3",
+      "mockPath": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/packages/protocol-v3/dist/src/public.js",
+      "productionPath": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/packages/protocol-v3/src/public.ts",
+      "sameIdentity": false,
+      "mockSha256": "e03c81e8a730064872bf4246ac97fff427c4d18af5bdc29ca7a323891ff8b572",
+      "productionSha256": "37fde13960dff3a24c9033481103ecbc6ae9dd678ea0750d3831c80927d5f93e"
+    },
+    {
+      "mock": "../packages/node/dist/src/v3-live.js",
+      "production": "@ts-drp/node/v3-live",
+      "mockPath": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/packages/node/dist/src/v3-live.js",
+      "productionPath": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/packages/node/src/v3-live.ts",
+      "sameIdentity": false,
+      "mockSha256": "221334d451a1b4402fa0736cd3511d7e4485c7ca9cc3f7f9ba5fa082324de0b8",
+      "productionSha256": "cf1235b6d7e6944b19b9536d1ca9d911326ae86ce8252632df51c9aa270d462d"
+    }
+  ],
+  "sources": {
+    "vite.config.mts": {
+      "sha256": "6c15cd76cf3197d8f08608f28909731d55b7f07a661fada577aaecbe4b81c610",
+      "matchesSignedHead": true
+    },
+    "tests/phase-3g-v3-room-rebase-red.test.ts": {
+      "sha256": "22e809bf725bebb2c3f85642ae3c9857fcc90c218ed1e9886ffe8cf903276d2f",
+      "matchesSignedHead": true
+    },
+    "examples/v3-room/src/index.ts": {
+      "sha256": "e75a9edac9a8d13d4fdb9062003fde84b03d5120d3b18416af8fc9395b39e028",
+      "matchesSignedHead": true
+    },
+    "packages/node/src/v3-live.ts": {
+      "sha256": "cf1235b6d7e6944b19b9536d1ca9d911326ae86ce8252632df51c9aa270d462d",
+      "matchesSignedHead": true
+    }
+  },
+  "mismatches": [
+    {
+      "mock": "../packages/protocol-v3/dist/src/public.js",
+      "production": "@ts-drp/protocol-v3",
+      "mockPath": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/packages/protocol-v3/dist/src/public.js",
+      "productionPath": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/packages/protocol-v3/src/public.ts",
+      "sameIdentity": false,
+      "mockSha256": "e03c81e8a730064872bf4246ac97fff427c4d18af5bdc29ca7a323891ff8b572",
+      "productionSha256": "37fde13960dff3a24c9033481103ecbc6ae9dd678ea0750d3831c80927d5f93e"
+    },
+    {
+      "mock": "../packages/node/dist/src/v3-live.js",
+      "production": "@ts-drp/node/v3-live",
+      "mockPath": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/packages/node/dist/src/v3-live.js",
+      "productionPath": "/private/tmp/d110c-f5b-retained-room-hsBT3J/checkout/packages/node/src/v3-live.ts",
+      "sameIdentity": false,
+      "mockSha256": "221334d451a1b4402fa0736cd3511d7e4485c7ca9cc3f7f9ba5fa082324de0b8",
+      "productionSha256": "cf1235b6d7e6944b19b9536d1ca9d911326ae86ce8252632df51c9aa270d462d"
+    }
+  ],
+  "diagnosis": "Existing Node and protocol mocks target dist modules, while room bare contracts resolve to src modules. Real Node preparation snapshots the incomplete control-plane mock trust and returns trust-open-failed. Carrier guards are now passed; no scheduling acceptance is claimed."
+}

@@ -1,0 +1,77 @@
+{
+	"schemaVersion": "ahe-formal-variable-signoff-v1",
+	"recordType": "mechanical",
+	"status": "complete",
+	"decision": "phase-n1-formal-variable-set-complete",
+	"recordedAt": "2026-07-26T15:23:57.000Z",
+	"checker": {
+		"algorithm": "exact-registry-field-to-quint-variable-bijection-v1",
+		"contractTest": "Phase -1 formal-model variable-set sign-off",
+		"path": "packages/protocol-v2/tests/formal-model-variable-signoff.test.ts",
+		"sha256": "197cbae2de4c7d000f7dbb8db57dfa1db17a139b76f89a89f2736fc0b4546ab3"
+	},
+	"reviewedArtifacts": [
+		{
+			"path": "packages/protocol-v2/registry/field-registry.json",
+			"sha256": "d073c5b01dc31c121de5fcd0925697a8a3f0839bf9fcf2c7ddde15489b49f724"
+		},
+		{
+			"path": "docs/protocol/amendments-v2.json",
+			"sha256": "a5e60443674e56f003127e80395a92b889270df06b68e43c4418fa0e2ff98725"
+		},
+		{
+			"path": "packages/protocol-v2/formal/ahe-v2-signed-envelope-variables.qnt",
+			"sha256": "000384b27cc1a4dd3f1cf08f02fb916d21c0ceb4a1eb3c173b9c766a64d666b8"
+		},
+		{
+			"path": "packages/protocol-v2/formal/ahe-v2-variable-map.json",
+			"sha256": "3f868400972f871f666df6c8d2d1ba96f67f9752649ffb704bb5b34611eb672b"
+		},
+		{
+			"path": "packages/protocol-v2/tests/formal-model-variable-signoff.test.ts",
+			"sha256": "197cbae2de4c7d000f7dbb8db57dfa1db17a139b76f89a89f2736fc0b4546ab3"
+		}
+	],
+	"reviewedFieldIdentities": [
+		"vertex.kind",
+		"vertex.protocolMajor",
+		"vertex.objectId",
+		"vertex.epoch",
+		"vertex.anchor",
+		"vertex.author",
+		"vertex.logicalTime",
+		"vertex.dependencies",
+		"vertex.operation",
+		"epochAnchor.kind",
+		"epochAnchor.protocolMajor",
+		"epochAnchor.objectId",
+		"epochAnchor.epoch",
+		"epochAnchor.previousAnchor",
+		"epochAnchor.cutDigest",
+		"epochAnchor.stateDigest",
+		"epochAnchor.aclDigest",
+		"epochAnchor.historyRoot",
+		"epochAnchor.historySize",
+		"epochAnchor.archiveIndexRoot",
+		"epochAnchor.blueprintDigest",
+		"epochAnchor.signerSetDigest",
+		"epochAnchor.parametersDigest",
+		"epochAnchor.profileDigest",
+		"epochAnchor.cryptoSuiteId",
+		"sealVote.kind",
+		"sealVote.objectId",
+		"sealVote.epoch",
+		"sealVote.round",
+		"sealVote.phase",
+		"sealVote.proposalDigest",
+		"sealVote.proposalHash",
+		"sealVote.signerId",
+		"roundChange.kind",
+		"roundChange.objectId",
+		"roundChange.epoch",
+		"roundChange.round",
+		"roundChange.phase",
+		"roundChange.highestPrepareQC",
+		"roundChange.signerId"
+	]
+}

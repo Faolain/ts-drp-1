@@ -1,0 +1,8 @@
+{
+  "browserExecutable": "/usr/bin/chromium",
+  "console": [],
+  "error": "Page.goto: net::ERR_BLOCKED_BY_ADMINISTRATOR at http://127.0.0.1:44019/browser/harness.html\nCall log:\n  - navigating to \"http://127.0.0.1:44019/browser/harness.html\", waiting until \"domcontentloaded\"\n",
+  "note": "The managed Chromium policy in this execution environment blocks all navigation; run this same harness in a normal secure browser profile.",
+  "url": "http://127.0.0.1:44019/browser/harness.html",
+  "verdict": "blocked"
+}

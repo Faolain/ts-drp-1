@@ -1,0 +1,83 @@
+{
+  "verdict": "FAIL",
+  "findings": [
+    {
+      "severity": "P1",
+      "file": "packages/protocol-v3/scripts/check-ed25519-profile-freeze.mjs",
+      "line": 41,
+      "title": "Two active workflow owners byte-pin the root policy and all 47 protected-path states; omitted from consumer coverage",
+      "evidence": "check-ed25519-profile-freeze.mjs:38-42 hard-codes frozenTuple {freezePolicySha256: fa2a69d4..., protectedPathCount: 47, protectedPathStatesSha256} and validateFrozenTuple (158-177, called at 202) hashes the live root policy and the state of every root-protected path. check-blueprint-artifact-profile-freeze.mjs:43-46,136-153,204 does the same. The same tuple is embedded in freeze-policy-ed25519-profile-v1.json:7, freeze-policy-blueprint-artifact-profile-v1.json:4-10, docs/protocol/ed25519-acceptance-profile-v3.json:29, docs/protocol/blueprint-artifact-profile-v3.json:57, supplements/ed25519-acceptance-profile-v1/vectors.json:9, tests/fixtures/phase-0g2s/ed25519-acceptance-profile-contract.json:14, tests/fixtures/phase-0j-b-v3/blueprint-runtime-contract.json:72-78 (also pins root checker 0c54c747...), and tests/protocol-v3-blueprint-runtime-0j-b.test.ts:669-706 asserts errors == []. Both are run by active .github/workflows/protocol-v3-ed25519-profile.yml:34-37 and protocol-v3-blueprint-artifact-profile.yml:37-40,55. Neither current-contract-design.md (lines 63-80) nor red-proposal.md (line 59) names them. Because they pin the root policy hash, they cannot be placed in the root roster (circular), and left untouched they stay red after the reset.",
+      "violated_requirement": "Full active consumer coverage; one canonical policy home for the current registry digest (design line 56-57); no recursive custody chain"
+    },
+    {
+      "severity": "P1",
+      "file": "tests/protocol-v3-regenerated-reference-n1prime-d.test.ts",
+      "line": 573,
+      "title": "Four immutable-input historical suites hash the live registry/schema in ordinary CI and are not named for supersession",
+      "evidence": "n1prime-d :571-573 hashes contract.acceptedInputs (regenerated-reference-contract.json:186-191 pins registry 2fd6f512... and schema 6ab6f377...). n1prime-d2 :602-603 hashes contract.immutableArtifacts (blocker-remediation-inputs.json:27 old registry). n1prime-c2 :1187-1195 hashes acceptedInputs (independent-reference-vector-contract.json:28,32). n1prime-b2b :503-505 hashes protectedArtifacts (codec-grammar-decision-contract.json:101 old schema hash; fails once the schema catches up). All run under `pnpm test` (.github/workflows/test.yml:30) and are pinned immutableInputs in freeze-policy-v3.json:41-58. red-proposal.md item 3 lists only e/e2/e3/e4, successor and registry-spec; the design (lines 108-125) does not name these.",
+      "violated_requirement": "Honest historical-test supersession; preserve ordinary test lifecycle; name which immutable inputs move to current custody"
+    },
+    {
+      "severity": "P2",
+      "file": "vite.config.mts",
+      "line": 120,
+      "title": "Root test-lifecycle contract has drifted (`**/.logs/**`); the checker fails on it independently of the registry pin and the design does not re-pin it",
+      "evidence": "vite.config.mts:118-127 has 8 exclusions including `**/.logs/**`; check-protocol-v3-freeze.mjs:37-46 completeTestExclusions has 7 and validateTestLifecycle (509-533) requires deep equality; root-test-lifecycle-contract.json:5-13 also lists 7; e4 test :430-434 records the violation. current-contract-design.md:136-139 says retain the testLifecycle envelope but never states the current 8-entry list is the re-pinned contract, so the RED's causal failure is ambiguous (registry pin vs lifecycle) and current/current acceptance cannot pass without an unspecified change.",
+      "violated_requirement": "Snapshot content resolved before RED; causal RED fails for the stale registry contract, not an unrelated predicate"
+    },
+    {
+      "severity": "P2",
+      "file": ".github/workflows/protocol-v3-author-authorization.yml",
+      "line": 30,
+      "title": "Author-authorization runs the candidate root checker with an implicit base; design keeps it without dispositioning it",
+      "evidence": "Line 30 runs `node packages/protocol-v3/scripts/check-protocol-v3-freeze.mjs` with no base argument and no PROTOCOL_V3_FREEZE_REPOSITORY_ROOT; runCli (checker:974-977) falls back to GITHUB_BASE_SHA / origin/$GITHUB_BASE_REF / HEAD^. The workflow is hash-pinned by author-authorization-v1/freeze-policy via check-freeze.mjs:92-96 and its checker requires the phrase at :157 (analyzer tests/fixtures/phase-3a1b-p6/author-authorization-governance-analyzer.ts:75). current-contract-design.md:79-80 calls it a current root consumer while :32-37 forbids candidate fallback; on the `push` trigger (workflow:5-6) of the amendment commit HEAD^ is the obsolete base and the status goes red.",
+      "violated_requirement": "No candidate-checker authorization; optional integrity operation must be named as integrity only"
+    },
+    {
+      "severity": "P2",
+      "file": "packages/protocol-v3/registry/registry-v1.json",
+      "line": 1709,
+      "title": "Registry's own changeControl.requiredBump was not honored by the W0 field addition; the current acceptance predicate is not stated",
+      "evidence": "registry-v1.json:1707-1710 declares watchedPath packages/protocol-v3/registry/** with requiredBump registryVersion, yet registryVersion stays 1 (line 2) with the eighth field at :57-66; schema $id remains registry-v1.schema.json; historical vectors/sign-off bind registryVersion 1 to seven fields. The design (lines 11-13, 84-89) freezes registryVersion 1 and unchanged bytes but never records the explicit predicate that registryVersion 1 now denotes the optional-field kind by user decision, as production-hardening-tdd-plan-v2.md:104566-104567 requires (explain any intentionally changed current acceptance predicate).",
+      "violated_requirement": "Explain intentionally changed current acceptance predicates; preserve semantic invariants honestly"
+    },
+    {
+      "severity": "P2",
+      "file": "packages/protocol-v3/conformance/freeze-policy-v3.json",
+      "line": 8,
+      "title": "Policy externalPrerequisite will contradict the only way the baseline can land; new checkpoint text must record the amendment",
+      "evidence": "freeze-policy-v3.json:8 and checker:71-72 state branch protection must 'prohibit direct and administrator bypass'. The old checker rejects every old-base PR (registry drift at :97 vs :759-761), so the reset can only land by direct push, bypass or an unprotected branch. current-contract-design.md:39-50 correctly says this is not an old-base PR pass and host config is unverified, but does not require the new policy's checkpoint/externalPrerequisite text to state that the current baseline was established by a reviewed out-of-band amendment with host enforcement unverified. No executable exception exists, so this is an honesty/operational contradiction, not an exploit.",
+      "violated_requirement": "Trust-reset must not hide an operational contradiction; do not relabel host gating as proven"
+    },
+    {
+      "severity": "P3",
+      "file": "packages/protocol-v3/supplements/blueprint-work-budget-v1/check-freeze.mjs",
+      "line": 167,
+      "title": "Dormant blueprint subsystem checkers assert the seven-field parameters kind; disposition as preserved-historical should be explicit",
+      "evidence": "blueprint-work-budget-v1/check-freeze.mjs:154-168 and blueprint-operation-budget-v1/check-freeze.mjs:148-163 fail on the eight-field registry. They are only hashed (freeze-successor-v1/freeze-policy.json:17,25) and never executed by an active workflow, and their workflow phrase lists are already stale (work-budget:190-191). The design (lines 63-69) preserves successor custody byte-identical but does not say these predicates are superseded rather than executed.",
+      "violated_requirement": "Honest supersession of obsolete predicates; preserved subsystem custody"
+    }
+  ],
+  "checked_requirements": [
+    "Prospective-baseline trust reset: old checker rejects any old-base PR at validateTuple (checker:759-761 vs registry pin :97); new checker has no exception branch; CI extraction from merge base; successor profile (freeze-successor-v1/profile.json:14-21, checker:268-302) re-runs the root checker so all five successor-routed workflows are currently red and correctly retargeted",
+    "Anti-self-blessing preserved: candidate policy must equal base policy and checker pin comes from base (checker:852-861); design keeps evaluateProtocolV3Freeze({base,current}) seam (checker:842)",
+    "True causal RED entry: exported evaluateProtocolV3Freeze fails a working-tree current/current fixture on the stale registry pin (also on lifecycle drift, see P2)",
+    "Seal and pacemaker duplicated tuples confirmed (seal check-freeze.mjs:55-65,244-251; pacemaker check-freeze.mjs:271-275 with pacemaker-law-contract.json:33-34) and correctly relinquished by the design",
+    "Independent oracle spec matches frozen grammar: tags/zigzag-varuint (canonical-tag-codec-v1.json:35-67), minimal varuint (:58), encoded-key-byte ordering (:133-138), no codec header, framing DRP\\0/U32BE/U64BE (registry-v1.json:1676-1682), single-part parameters hash (v3-live.ts:1339-1341)",
+    "Node supported profiles unchanged: exactly two digests and default 4 (v3-live.ts:218-222,1334-1349); schema bounds 1/1,000,000 add no runtime profile",
+    "Normative spec/amendments do not enumerate parameter fields (no authorShareMultiplier/maxPendingBytes in docs/protocol), so no spec-vs-registry field-list contradiction",
+    "Existing bijection validator checks the required list (registry-spec-n1prime-b.test.ts:498-501), so an optional-to-required schema mutant is semantically detectable; validateSignoff (:854-865) is the historical-hash conflation the design must supersede",
+    "Historical locks/provenance/vectors/sign-off retain old hashes (reference.lock.json:26, reference-regen.lock.json:26, vectors/registry-v1.json:6-7,21, registry-model-signoff.json:330-334) and the design preserves them as historical statements",
+    "CODEOWNERS v3 block currently satisfies checker ordering (CODEOWNERS:8-31); default `*` owner is the same cohort",
+    "Blueprint-conformance and numeric-determinism workflows do not consume the root contract; equivocation digest-identity/evidence-projection checkers do not pin registry or root policy hashes",
+    "Eight dirty production owners not inspected, per scope"
+  ],
+  "limitations": [
+    "Read-only review; no checker, test or build was executed; red-proposal historical results were not re-run",
+    "The design explicitly defers exact snapshot shape, roster partition (which immutableInputs become current custody, including the schema and registry-spec-n1prime-b test), consumer mapping and command selection to the freeze; the P1 findings add required roster members before that freeze is complete",
+    "The 'current semantic validator' for schema mutants is not named; the only existing bijection validator is test-internal in an immutable-input file",
+    "Whether the explicit v3 CODEOWNERS block should extend to new roster paths is unspecified (not a security gap because the default cohort is identical)",
+    "Host branch protection and whether `main` currently carries the W0 registry bytes were not verified; current branch is codex/phase3a1b-p6-golden-path",
+    "Five successor workflows use pnpm install/--filter which the root workflow validator forbids (checker:663-671); the new per-workflow validation rules are a freeze detail not yet specified"
+  ]
+}

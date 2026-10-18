@@ -1,245 +1,273 @@
-import { DRP_DISCOVERY_TOPIC } from "@ts-drp/types";
+import type { DRPNode } from "@ts-drp/node";
 
-import { gridState } from "./state";
-import { getColorForPeerId, hexToRgba } from "./util/color";
+import type { ZoneSnapshot, ZoneTransientSnapshot } from "./v3-zone";
 
-const formatPeerId = (id: string): string => {
-	return `${id.slice(0, 4)}...${id.slice(-4)}`;
+type GridElements = {
+	readonly blocks: Map<string, { element: HTMLDivElement; kind: string; x: number; y: number }>;
+	readonly positions: Map<string, HTMLDivElement>;
 };
-
-/**
- * Render the info
- */
-export function renderInfo(): void {
-	renderPeerId();
-	renderPeers();
-	renderDiscoveryPeers();
-	renderPeersInDRP();
+// DOM identity belongs to the actual grid element. Replacing a document/grid
+// cannot retain another room's nodes, and no protocol data or authority lives here.
+const grids = new WeakMap<HTMLDivElement, GridElements>();
+function gridElements(grid: HTMLDivElement): GridElements {
+	let state = grids.get(grid);
+	if (state === undefined) {
+		grid.replaceChildren();
+		state = { blocks: new Map(), positions: new Map() };
+		grids.set(grid, state);
+	}
+	return state;
 }
 
-function renderClickablePeerList(
-	peers: string[],
-	isOpen: boolean,
-	elementId: string,
-	callback: () => void,
-	defaultText = "[]"
-): void {
-	const element = <HTMLDivElement>document.getElementById(elementId);
-	const hasPeers = peers.length > 0;
-	if (!hasPeers) {
-		element.innerHTML = defaultText;
-		return;
-	}
-
-	element.innerHTML = `[${peers.map((peer) => `<strong style="color: ${getColorForPeerId(peer)};">${formatPeerId(peer)}</strong>`).join(", ")}]`;
-	element.style.cursor = "pointer";
-
-	const peersList = document.createElement("ul");
-	peersList.style.display = "none";
-	peersList.style.margin = "10px 0";
-	peersList.style.paddingLeft = "20px";
-
-	for (const peer of peers) {
-		const li = document.createElement("li");
-		li.innerHTML = `<strong style="color: ${getColorForPeerId(peer)};">${peer}</strong>`;
-		peersList.appendChild(li);
-	}
-
-	element.appendChild(peersList);
-
-	peersList.style.display = isOpen ? "block" : "none";
-	element.onclick = (): void => {
-		peersList.style.display = peersList.style.display === "none" ? "block" : "none";
-		callback();
+/** One UI owner: full projections render in order; only transient visual frames
+ * may collapse to their latest positions. A full projection/reset cancels the
+ * old pending frame, including close/reopen of the same room identifier. */
+export function createZonePresentation(
+	requestFrame: (callback: FrameRequestCallback) => number = (callback) => requestAnimationFrame(callback),
+	cancelFrame: (handle: number) => void = (handle) => cancelAnimationFrame(handle)
+): Readonly<{ projection(snapshot: ZoneSnapshot): void; transient(snapshot: ZoneTransientSnapshot): void; close(): void }> {
+	let pending: ZoneTransientSnapshot | undefined;
+	let frame: number | undefined;
+	let revision = 0;
+	let current: Readonly<{ ready: boolean; zoneId: string }> | undefined;
+	let closed = false;
+	const cancel = (): void => {
+		revision++;
+		if (frame !== undefined) cancelFrame(frame);
+		frame = undefined;
+		pending = undefined;
 	};
-}
-
-let isDiscoveryPeersOpen = false;
-
-const renderDiscoveryPeers = (): void => {
-	const node = gridState.getNode();
-	gridState.discoveryPeers = node.networkNode.getGroupPeers(DRP_DISCOVERY_TOPIC);
-
-	renderClickablePeerList(gridState.discoveryPeers, isDiscoveryPeersOpen, "discoveryPeers", () => {
-		isDiscoveryPeersOpen = !isDiscoveryPeersOpen;
-	});
-};
-
-let isPeersOpen = false;
-
-const renderPeers = (): void => {
-	const node = gridState.getNode();
-	gridState.peers = node.networkNode.getAllPeers();
-
-	renderClickablePeerList(gridState.peers, isPeersOpen, "peers", () => {
-		isPeersOpen = !isPeersOpen;
-	});
-};
-
-let isPeersInDRPOpen = false;
-
-const renderPeersInDRP = (): void => {
-	if (gridState.drpObject) {
-		const node = gridState.getNode();
-		gridState.objectPeers = node.networkNode.getGroupPeers(gridState.drpObject.id);
-	}
-
-	renderClickablePeerList(
-		gridState.objectPeers,
-		isPeersInDRPOpen,
-		"objectPeers",
-		() => {
-			isPeersInDRPOpen = !isPeersInDRPOpen;
+	return Object.freeze({
+		projection(snapshot: ZoneSnapshot): void {
+			if (closed) return;
+			cancel();
+			current = { ready: snapshot.ready, zoneId: snapshot.zoneId };
+			renderZone(snapshot);
 		},
-		"Your frens in GRID: []"
-	);
-};
+		transient(snapshot: ZoneTransientSnapshot): void {
+			if (closed || !current?.ready || !snapshot.ready || current.zoneId !== snapshot.zoneId) return;
+			pending = snapshot;
+			if (frame !== undefined) return;
+			const selected = revision;
+			frame = requestFrame((): void => {
+				// Cancellation need not suppress an already dispatched callback.
+				if (closed || revision !== selected) return;
+				frame = undefined;
+				const latest = pending;
+				pending = undefined;
+				if (latest !== undefined) renderTransientZone(latest);
+			});
+		},
+		close(): void { closed = true; current = undefined; cancel(); },
+	});
+}
 
-let isPeerIdExpanded = false;
-
-const renderPeerId = (): void => {
-	const element_peerId = <HTMLDivElement>document.getElementById("peerId");
-	const node = gridState.getNode();
-
-	const innerHtml = (): string => `
-	<strong id="peerIdExpanded" 
-			style="color: ${getColorForPeerId(node.networkNode.peerId)};
-				   ${isPeerIdExpanded ? "" : "display: none;"}">
-	  ${node.networkNode.peerId}
-	</strong>
-	<strong id="peerIdCollapsed" 
-			style="color: ${getColorForPeerId(node.networkNode.peerId)};
-				   ${!isPeerIdExpanded ? "" : "display: none;"}">
-	  ${formatPeerId(node.networkNode.peerId)}
-	</strong>`;
-
-	element_peerId.style.cursor = "pointer";
-	element_peerId.innerHTML = innerHtml();
-	element_peerId.onclick = (): void => {
-		isPeerIdExpanded = !isPeerIdExpanded;
-		element_peerId.innerHTML = innerHtml();
-	};
-};
-
-/**
- * Render the grid
- */
-export const render = (): void => {
-	if (gridState.drpObject) {
-		const gridIdTextElement = <HTMLSpanElement>document.getElementById("gridIdText");
-		gridIdTextElement.innerText = `You're in GRID ID:`;
-		const gridIdElement = <HTMLSpanElement>document.getElementById("gridId");
-		gridIdElement.innerText = gridState.drpObject.id;
-		const copyGridIdButton = document.getElementById("copyGridId");
-		if (copyGridIdButton) {
-			copyGridIdButton.style.display = "inline"; // Show the button
-		}
-	} else {
-		const copyGridIdButton = document.getElementById("copyGridId");
-		if (copyGridIdButton) {
-			copyGridIdButton.style.display = "none"; // Hide the button
-		}
-	}
-
-	if (!gridState.drpObject) return;
-	const users = gridState.drpObject.drp?.query_users();
-	const element_grid = <HTMLDivElement>document.getElementById("grid");
-	element_grid.innerHTML = "";
-
-	const gridWidth = element_grid.clientWidth;
-	const gridHeight = element_grid.clientHeight;
-	const centerX = Math.floor(gridWidth / 2);
-	const centerY = Math.floor(gridHeight / 2);
-
-	// Draw grid lines
-	const numLinesX = Math.floor(gridWidth / 50);
-	const numLinesY = Math.floor(gridHeight / 50);
-
-	for (let i = -numLinesX; i <= numLinesX; i++) {
-		const line = document.createElement("div");
-		line.style.position = "absolute";
-		line.style.left = `${centerX + i * 50}px`;
-		line.style.top = "0";
-		line.style.width = "1px";
-		line.style.height = "100%";
-		line.style.backgroundColor = "lightgray";
-		element_grid.appendChild(line);
-	}
-
-	for (let i = -numLinesY; i <= numLinesY; i++) {
-		const line = document.createElement("div");
-		line.style.position = "absolute";
-		line.style.left = "0";
-		line.style.top = `${centerY + i * 50}px`;
-		line.style.width = "100%";
-		line.style.height = "1px";
-		line.style.backgroundColor = "lightgray";
-		element_grid.appendChild(line);
-	}
-
-	if (!users) return;
-	for (const userColorString of users) {
-		const [id, color] = userColorString.split(":");
-		const position = gridState.gridDRP?.query_userPosition(userColorString);
-		const node = gridState.getNode();
-		if (position) {
-			const div = document.createElement("div");
-			div.style.position = "absolute";
-			div.style.left = `${centerX + position.x * 50 + 5}px`; // Center the circle
-			div.style.top = `${centerY - position.y * 50 + 5}px`; // Center the circle
-			if (id === node.networkNode.peerId) {
-				div.style.width = `${34}px`;
-				div.style.height = `${34}px`;
-			} else {
-				div.style.width = `${34 + 6}px`;
-				div.style.height = `${34 + 6}px`;
-			}
-			div.style.backgroundColor = color;
-			div.style.borderRadius = "50%";
-			div.style.transition = "background-color 1s ease-in-out";
-			div.style.animation = `glow-${id} 0.5s infinite alternate`;
-
-			// Add black border for the current user's circle
-			if (id === node.networkNode.peerId) {
-				div.style.border = "3px solid black";
-			}
-
-			div.setAttribute("data-glowing-peer-id", id);
-
-			// Create dynamic keyframes for the glow effect
-			const style = document.createElement("style");
-			style.innerHTML = `
-			@keyframes glow-${id} {
-				0% {
-					background-color: ${hexToRgba(color, 0.5)};
-				}
-				100% {
-					background-color: ${hexToRgba(color, 1)};
-				}
-			}`;
-			document.head.appendChild(style);
-
-			element_grid.appendChild(div);
-		}
-	}
-};
-
-/**
- * Enable the UI controls
- */
+/** Enable the durable-zone controls once the real network node is dialable. */
 export function enableUIControls(): void {
 	const loadingMessage = document.getElementById("loadingMessage");
-	if (loadingMessage) {
-		loadingMessage.style.display = "none";
+	if (loadingMessage !== null) loadingMessage.style.display = "none";
+	for (const id of ["joinGrid", "createGrid", "gridInput", "zoneMemberEnrollment", "copyGridId"]) {
+		const control = document.getElementById(id);
+		if (control instanceof HTMLButtonElement || control instanceof HTMLInputElement) control.disabled = false;
 	}
+}
 
-	const joinButton = <HTMLButtonElement>document.getElementById("joinGrid");
-	const createButton = <HTMLButtonElement>document.getElementById("createGrid");
-	const gridInput = <HTMLInputElement>document.getElementById("gridInput");
-	const copyButton = <HTMLButtonElement>document.getElementById("copyGridId");
+/**
+ * Render current network diagnostics without owning application state.
+ * @param node Active network node.
+ */
+export function renderNetwork(node: DRPNode): void {
+	setText("peerId", node.networkNode.peerId);
+	setText("peers", JSON.stringify(node.networkNode.getAllPeers().sort()));
+	setText("discoveryPeers", JSON.stringify(node.networkNode.getSubscribedTopics().sort()));
+}
 
-	joinButton.disabled = false;
-	createButton.disabled = false;
-	gridInput.disabled = false;
-	copyButton.disabled = false;
+/**
+ * Render the deterministic durable projection and transient overlay.
+ * @param snapshot Current zone projection.
+ */
+export function renderZone(snapshot: ZoneSnapshot): void {
+	setText("gridIdText", snapshot.ready ? "You're in ZONE ID:" : "");
+	setText("gridId", snapshot.zoneId);
+	setText(
+		"objectPeers",
+		snapshot.ready ? `Members: ${JSON.stringify(snapshot.transportPeerAuthors.map(({ peerId }) => peerId))}` : ""
+	);
+	const copy = document.getElementById("copyGridId");
+	if (copy instanceof HTMLButtonElement) copy.style.display = snapshot.ready ? "inline" : "none";
+	renderFabric(snapshot);
+	renderAoiBandwidth(snapshot);
+	renderAoiProjection(snapshot);
+	renderTradeIntent(snapshot);
+	const grid = document.getElementById("grid");
+	if (!(grid instanceof HTMLDivElement)) return;
+	const state = gridElements(grid);
+	const present = new Set<string>();
+	for (const block of snapshot.blocks) {
+		present.add(block.id);
+		let retained = state.blocks.get(block.id);
+		if (retained === undefined) {
+			const element = document.createElement("div");
+			element.dataset.blockId = block.id;
+			element.style.position = "absolute";
+			element.style.padding = "4px 6px";
+			element.style.background = "#444";
+			element.style.color = "white";
+			retained = { element, kind: block.kind, x: block.x, y: block.y };
+			state.blocks.set(block.id, retained);
+		}
+		if (retained.element.textContent === "" || retained.kind !== block.kind || retained.x !== block.x || retained.y !== block.y) {
+			retained.element.textContent = `${block.kind} (${block.x}, ${block.y})`;
+			retained.element.style.left = `calc(50% + ${block.x * 24}px)`;
+			retained.element.style.top = `calc(50% - ${block.y * 24}px)`;
+			retained.kind = block.kind; retained.x = block.x; retained.y = block.y;
+		}
+		grid.appendChild(retained.element);
+	}
+	for (const [id, retained] of state.blocks) if (!present.has(id)) { retained.element.remove(); state.blocks.delete(id); }
+	renderTransientZone(snapshot);
+	// Full projections preserve the original block-before-overlay draw order.
+	for (const element of state.positions.values()) grid.appendChild(element);
+}
+
+/** Update only the already-authorized visual overlay; no durable diagnostics,
+ * block reconstruction, trade verification or protocol operation occurs here. */
+export function renderTransientZone(snapshot: ZoneTransientSnapshot): void {
+	const grid = document.getElementById("grid");
+	if (!(grid instanceof HTMLDivElement)) return;
+	const state = gridElements(grid), present = new Set<string>();
+	for (const [peerId, position] of Object.entries(snapshot.transientPositions)) {
+		present.add(peerId);
+		let element = state.positions.get(peerId);
+		if (element === undefined) {
+			element = document.createElement("div");
+			element.dataset.glowingPeerId = peerId;
+			element.title = peerId;
+			element.style.position = "absolute";
+			element.style.width = "18px";
+			element.style.height = "18px";
+			element.style.borderRadius = "50%";
+			element.style.background = "#2d8cff";
+			state.positions.set(peerId, element);
+			grid.appendChild(element);
+		}
+		element.style.left = `calc(50% + ${position.x * 24}px)`;
+		element.style.top = `calc(50% - ${position.y * 24}px)`;
+	}
+	for (const [peerId, element] of state.positions) if (!present.has(peerId)) { element.remove(); state.positions.delete(peerId); }
+}
+
+function renderTradeIntent(snapshot: ZoneSnapshot): void {
+	const container = document.getElementById("tradeIntentWorkbench");
+	if (!(container instanceof HTMLElement)) return;
+	const heading = document.createElement("h2");
+	heading.textContent = "Co-signed trade intent";
+	const intent = snapshot.tradeIntent;
+	const status = document.createElement("p");
+	status.dataset.tradeIntentStatus = intent.status;
+	status.textContent =
+		intent.status === "absent"
+			? "No trade intent prepared."
+			: `${intent.status}: ${String(intent.approvalCount)} / 2 approvals for ${intent.clientOperationId}`;
+	const context = document.createElement("p");
+	context.textContent =
+		intent.status === "absent"
+			? "Trade intent context is unavailable."
+			: `Intent ${intent.intentDigest}; object ${intent.objectId}; epoch ${String(intent.epoch)}; counterparties ${intent.counterparties.join(
+					", "
+				)}`;
+	container.replaceChildren(heading, status, context);
+}
+
+function renderAoiBandwidth(snapshot: ZoneSnapshot): void {
+	const container = document.getElementById("aoiBandwidthWorkbench");
+	if (!(container instanceof HTMLElement)) return;
+	const heading = document.createElement("h2");
+	heading.textContent = "AOI bandwidth workbench";
+	const description = document.createElement("p");
+	description.textContent =
+		"AOI projection payload throughput is a product diagnostic; browser candidate-pair bytes remain the acceptance authority.";
+	const rows = Object.entries(snapshot.aoiBandwidth).map(([peerId, diagnostic]) => {
+		const row = document.createElement("p");
+		row.dataset.aoiBandwidthPeer = peerId;
+		row.textContent = `${peerId}: ${String(diagnostic.selectedEntityCount)} / ${String(
+			diagnostic.inputEntityCount
+		)} visible, ${(diagnostic.projectionBitsPerSecond / 1_000).toFixed(2)} kbps projection payload, ${String(
+			diagnostic.publicationCount
+		)} publications, ${String(diagnostic.projectionPayloadBytesSent)} bytes, durable delta ${String(
+			diagnostic.durableDelta
+		)}, over-limit ${String(snapshot.rawTransport.overLimit)}`;
+		return row;
+	});
+	const empty = document.createElement("p");
+	empty.textContent = "Waiting for outbound AOI projection data.";
+	container.replaceChildren(heading, description, ...(rows.length === 0 ? [empty] : rows));
+}
+
+function renderAoiProjection(snapshot: ZoneSnapshot): void {
+	const container = document.getElementById("aoiProjectionWorkbench");
+	if (!(container instanceof HTMLElement)) return;
+	const heading = document.createElement("h2");
+	heading.textContent = "Loss-tolerant AOI projection";
+	const rows = Object.entries(snapshot.aoiProjection).map(([peerId, projection]) => {
+		const row = document.createElement("p");
+		row.dataset.aoiProjectionPeer = peerId;
+		row.textContent = `${peerId}: generation ${String(projection.generation ?? "none")}, base ${String(
+			projection.baseKeyframeId ?? "none"
+		)} @ ${String(projection.baseKeyframeSequence ?? "none")}, sequence ${String(
+			projection.lastSequence ?? "none"
+		)}, ${projection.waitingForKeyframe ? "waiting for keyframe" : "current"}`;
+		return row;
+	});
+	const empty = document.createElement("p");
+	empty.textContent = "Waiting for AOI projection data.";
+	container.replaceChildren(heading, ...(rows.length === 0 ? [empty] : rows));
+}
+
+function renderFabric(snapshot: ZoneSnapshot): void {
+	const container = document.getElementById("fabricWorkbench");
+	if (!(container instanceof HTMLElement)) return;
+	const heading = document.createElement("h2");
+	heading.textContent = "Fabric loss and head-of-line evidence";
+	const description = document.createElement("p");
+	description.textContent = "Age of information from receiver-observed raw and reliable WebRTC samples.";
+	const rows = snapshot.fabricTrials.map((trial) => {
+		const row = document.createElement("section");
+		row.setAttribute("data-e3-03-trial", trial.trialId);
+		const title = document.createElement("h3");
+		title.textContent = trial.trialId;
+		row.append(
+			title,
+			fabricMetric("raw-aoi-p50", `Raw p50: ${String(trial.rawAoIP50Ms)} ms`),
+			fabricMetric("raw-aoi-p95", `Raw p95: ${String(trial.rawAoIP95Ms)} ms`),
+			fabricMetric("reliable-aoi-p50", `Reliable p50: ${String(trial.reliableAoIP50Ms)} ms`),
+			fabricMetric("reliable-aoi-p95", `Reliable p95: ${String(trial.reliableAoIP95Ms)} ms`),
+			fabricMetric("max-gap", `Max gap: ${String(trial.maxGap)}`),
+			fabricMetric("raw-delivered", `Raw delivered: ${String(trial.rawDelivered)}`),
+			fabricMetric("raw-dropped", `Raw dropped: ${String(trial.sampleCount - trial.rawDelivered)}`),
+			fabricMetric("reliable-delivered", `Reliable delivered: ${String(trial.reliableDelivered)}`),
+			fabricMetric("reliable-dropped", `Reliable dropped: ${String(trial.sampleCount - trial.reliableDelivered)}`),
+			fabricMetric("fallback-count", `Fallback: ${String(trial.fallbackCount)}`),
+			fabricMetric("durable-delta", `Durable delta: ${String(trial.durableDelta)}`)
+		);
+		return row;
+	});
+	container.replaceChildren(heading, description, ...rows);
+}
+
+function fabricMetric(name: string, text: string): HTMLElement {
+	const separator = text.indexOf(":");
+	const row = document.createElement("p");
+	const label = document.createElement("span");
+	label.textContent = text.slice(0, separator + 1) + " ";
+	const value = document.createElement("span");
+	value.dataset.metric = name;
+	value.textContent = text.slice(separator + 2);
+	row.append(label, value);
+	return row;
+}
+
+function setText(id: string, value: string): void {
+	const element = document.getElementById(id);
+	if (element !== null) element.textContent = value;
 }

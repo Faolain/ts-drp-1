@@ -1,0 +1,61 @@
+{
+  "text": "{\"verdict\":\"APPROVED\",\"summary\":\"Signed RED 466169aa is causal on real close: one file/title, zero pass, sole terminal D110C_0C1F5_FOREIGN_AUTHOR_CLOSE_LIVENESS_REQUIRED after the four foreign abort cases, creator duplicate/regression, no-gap, removal, and current-unauthorized controls. GREEN 52fe3b44 changes only authorIssuanceFrontiersCandidate() classification plus the RED-named contract/wrapper and the shared gossip override. Foreign duplicate/null-prior/regression freeze that successor author at authenticated prior or null; removed writers are omitted; creator duplicate/regression still throw the exact pre-f5a strings; the adjacent-prefix loop and absent-prior re-entry guard are unchanged; no observed-maximum or gap-crossing path exists. Focused GREEN proves exact close-set counts, frozen/absent frontiers, verified adoption, and post-adoption issue/publish. Evidence is honest: focused assertion passed with outer status 1 from the global 70% coverage threshold; retained RED-named control, 195/195, Chromium 2/2, and isolated 52fe3b44 replay passed; the sibling 52fe3b44 root is setup-only. P0/P1 union is empty, so f5a is closable as this narrow close-liveness checkpoint. f5b settlement/re-entry remains blocked.\",\"findings\":[{\"severity\":\"P2\",\"title\":\"Anomaly closes do not assert unaffected successor frontiers\",\"evidence\":\"tests/fixtures/phase-6b-d110c-0c1f5/foreign-author-close-liveness-contract.ts:76-111 and 208-308 check only the anomalous foreign boundary plus closeResult/cutValue/closeOrder counts, then assertAdoption(). The creator frontier is asserted only in the no-gap control at 351-358. packages/node/src/creator-close.ts:528-546 freezes per author via duplicateAuthors.has(author) and issuanceScope.author, so the source does not globally freeze, but a size-based or shared-flag mutant would still satisfy the anomaly assertions.\",\"impact\":\"A mistaken freeze of the creator or a second honest writer would not fail the foreign treatments. Not a demonstrated product defect; residual focused-coverage debt.\",\"required_action\":\"In a later tests-only follow-up, assert the creator (and any other honest successor) frontier still advanced on each foreign-anomaly close. Do not reopen f5a production for this.\"},{\"severity\":\"P2\",\"title\":\"No mixed-anomaly or multi-foreign focused case\",\"evidence\":\"The focused matrix has one foreign writer at a time (null-prior, regression, duplicate, removed-duplicate) and separate creator-only fail-closed cases at 310-331. Plan prose at production-hardening-tdd-plan-v2.md:98278-98281 also listed permutation, simultaneous foreign anomalies, and creator-plus-foreign precedence. Production iteration is successorAuthors then per-author freeze/prefix (creator-close.ts:511-554); collection throws creator duplicates immediately (490-492).\",\"impact\":\"Does not leave an untested authority bypass in the shipped algorithm. Combined anomalies and graph-order permutation remain unexercised in the focused file.\",\"required_action\":\"Optional later fixture covering two foreign anomalies together and creator-duplicate/regression with a concurrent foreign freeze. Treat 64-writer, permissionless writer-set, and remove/re-add hidden history as retained f2/f4 or f5b, not f5a blockers.\"},{\"severity\":\"P2\",\"title\":\"Synthetic gossip classifier restore is sequential-only\",\"evidence\":\"tests/fixtures/phase-6a-v3/creator-adoption-contract.ts:1141-1169 saves gossipTopicFor, overrides through routeV3Ingress plus admission wait, and restores in finally. Overlapping routeRegisteredVertex calls would nest save/restore and could restore the original classifier while a sibling admission is still queued. Current f5a/repeat-close callers await one vertex at a time; retained 195/195 and the isolated two-title boundary include D.109d direct-retained routing.\",\"impact\":\"No demonstrated retained-routing poison on the executed sequential paths. Concurrent helper use could drop the classifier early or restore a stale override.\",\"required_action\":\"If the shared helper is later used concurrently, refcount the override. No f5a production change.\"}],\"red_causal\":true,\"green_closes_red\":true,\"scope_preserved\":true,\"retained_behavior_preserved\":true,\"evidence_sufficient\":true,\"f5a_closable\":true}",
+  "stopReason": "end_turn",
+  "sessionId": "01a0694a-8769-7e92-9c14-10a40505a473",
+  "requestId": "9e81d0f3-9d89-4afa-9c3b-f837261248f4",
+  "thought": "The user wants me to re-emit the same final JSON judgment without markdown fences, without changing any findings, without inspecting files again. This is a schema-only re-emission of the previous APPR...",
+  "usage": {
+    "input_tokens": 168592,
+    "cache_read_input_tokens": 128,
+    "cache_creation_input_tokens": 0,
+    "output_tokens": 1053,
+    "reasoning_tokens": 46,
+    "total_tokens": 169773
+  },
+  "num_turns": 1,
+  "total_cost_usd": 0.05840622,
+  "total_cost_usd_ticks": 584062200,
+  "modelUsage": {
+    "grok-4.6-build": {
+      "inputTokens": 168592,
+      "outputTokens": 1053,
+      "cacheReadInputTokens": 128,
+      "cacheCreationInputTokens": 0,
+      "modelCalls": 1,
+      "costUSD": 0.05840622
+    }
+  },
+  "structuredOutput": {
+    "verdict": "APPROVED",
+    "summary": "Signed RED 466169aa is causal on real close: one file/title, zero pass, sole terminal D110C_0C1F5_FOREIGN_AUTHOR_CLOSE_LIVENESS_REQUIRED after the four foreign abort cases, creator duplicate/regression, no-gap, removal, and current-unauthorized controls. GREEN 52fe3b44 changes only authorIssuanceFrontiersCandidate() classification plus the RED-named contract/wrapper and the shared gossip override. Foreign duplicate/null-prior/regression freeze that successor author at authenticated prior or null; removed writers are omitted; creator duplicate/regression still throw the exact pre-f5a strings; the adjacent-prefix loop and absent-prior re-entry guard are unchanged; no observed-maximum or gap-crossing path exists. Focused GREEN proves exact close-set counts, frozen/absent frontiers, verified adoption, and post-adoption issue/publish. Evidence is honest: focused assertion passed with outer status 1 from the global 70% coverage threshold; retained RED-named control, 195/195, Chromium 2/2, and isolated 52fe3b44 replay passed; the sibling 52fe3b44 root is setup-only. P0/P1 union is empty, so f5a is closable as this narrow close-liveness checkpoint. f5b settlement/re-entry remains blocked.",
+    "findings": [
+      {
+        "severity": "P2",
+        "title": "Anomaly closes do not assert unaffected successor frontiers",
+        "evidence": "tests/fixtures/phase-6b-d110c-0c1f5/foreign-author-close-liveness-contract.ts:76-111 and 208-308 check only the anomalous foreign boundary plus closeResult/cutValue/closeOrder counts, then assertAdoption(). The creator frontier is asserted only in the no-gap control at 351-358. packages/node/src/creator-close.ts:528-546 freezes per author via duplicateAuthors.has(author) and issuanceScope.author, so the source does not globally freeze, but a size-based or shared-flag mutant would still satisfy the anomaly assertions.",
+        "impact": "A mistaken freeze of the creator or a second honest writer would not fail the foreign treatments. Not a demonstrated product defect; residual focused-coverage debt.",
+        "required_action": "In a later tests-only follow-up, assert the creator (and any other honest successor) frontier still advanced on each foreign-anomaly close. Do not reopen f5a production for this."
+      },
+      {
+        "severity": "P2",
+        "title": "No mixed-anomaly or multi-foreign focused case",
+        "evidence": "The focused matrix has one foreign writer at a time (null-prior, regression, duplicate, removed-duplicate) and separate creator-only fail-closed cases at 310-331. Plan prose at production-hardening-tdd-plan-v2.md:98278-98281 also listed permutation, simultaneous foreign anomalies, and creator-plus-foreign precedence. Production iteration is successorAuthors then per-author freeze/prefix (creator-close.ts:511-554); collection throws creator duplicates immediately (490-492).",
+        "impact": "Does not leave an untested authority bypass in the shipped algorithm. Combined anomalies and graph-order permutation remain unexercised in the focused file.",
+        "required_action": "Optional later fixture covering two foreign anomalies together and creator-duplicate/regression with a concurrent foreign freeze. Treat 64-writer, permissionless writer-set, and remove/re-add hidden history as retained f2/f4 or f5b, not f5a blockers."
+      },
+      {
+        "severity": "P2",
+        "title": "Synthetic gossip classifier restore is sequential-only",
+        "evidence": "tests/fixtures/phase-6a-v3/creator-adoption-contract.ts:1141-1169 saves gossipTopicFor, overrides through routeV3Ingress plus admission wait, and restores in finally. Overlapping routeRegisteredVertex calls would nest save/restore and could restore the original classifier while a sibling admission is still queued. Current f5a/repeat-close callers await one vertex at a time; retained 195/195 and the isolated two-title boundary include D.109d direct-retained routing.",
+        "impact": "No demonstrated retained-routing poison on the executed sequential paths. Concurrent helper use could drop the classifier early or restore a stale override.",
+        "required_action": "If the shared helper is later used concurrently, refcount the override. No f5a production change."
+      }
+    ],
+    "red_causal": true,
+    "green_closes_red": true,
+    "scope_preserved": true,
+    "retained_behavior_preserved": true,
+    "evidence_sufficient": true,
+    "f5a_closable": true
+  }
+}

@@ -1,0 +1,18 @@
+FOCUSED_VITEST_INITIAL_STATUS=1
+pnpm exec vitest run tests/phase-6b-ahe-reclamation-red.test.ts packages/storage-node/tests/phase-6b-ahe-reclamation-red.test.ts --coverage.enabled=false --maxWorkers=1 --minWorkers=1 --reporter=json --outputFile=.logs/phase-6b-d109c-red/focused-vitest.json
+
+FOCUSED_VITEST_FINAL_STATUS=1
+pnpm exec vitest run tests/phase-6b-ahe-reclamation-red.test.ts packages/storage-node/tests/phase-6b-ahe-reclamation-red.test.ts --coverage.enabled=false --maxWorkers=1 --minWorkers=1 --reporter=json --outputFile=.logs/phase-6b-d109c-red/focused-vitest-final.json
+
+FOCUSED_BROWSER_STATUS=1
+PLAYWRIGHT_JSON_OUTPUT_NAME="$PWD/.logs/phase-6b-d109c-red/focused-browser.json" pnpm exec playwright test --config packages/storage-browser/playwright.phase-6b-ahe-reclamation.config.ts --reporter=json
+
+RETAINED_FOCUSED_STATUS=0
+pnpm exec vitest run tests/phase-6b-cleanup-eligibility-red.test.ts tests/phase-2l-d-parity-governance-red.test.ts tests/phase-3a1b-p2-outbox-publication-contract.test.ts packages/storage-node/tests/phase-2l-c-node-issuance-registry-red.test.ts packages/storage-node/tests/phase-3a1b-p4-node-live-journal-red.test.ts --coverage.enabled=false --maxWorkers=1 --minWorkers=1 --testNamePattern='^(?!.*$)|keeps issuance factories on exact explicit subpaths and absent from both roots|keeps publication adapter-local and forbids classifier/schema/export sediment|adds only the explicit issuance subpath and shared runtime owner while root stays byte-identical|pins the exact additive package subpath, dependency, filename and unchanged root bytes|D.109a' --reporter=json --outputFile=.logs/phase-6b-d109c-red/retained-focused.json
+
+STATIC_STATUS=0
+pnpm exec eslint tests/fixtures/phase-6b/ahe-reclamation-contract.ts tests/phase-6b-ahe-reclamation-red.test.ts packages/storage-node/tests/fixtures/phase-6b-ahe-reclamation-child.mjs packages/storage-node/tests/phase-6b-ahe-reclamation-red.test.ts packages/storage-browser/playwright.phase-6b-ahe-reclamation.config.ts packages/storage-browser/tests/phase-6b-ahe-reclamation-global-setup.ts packages/storage-browser/tests/assets/phase-6b-ahe-reclamation-entry.ts packages/storage-browser/tests/assets/phase-6b-ahe-reclamation-worker.ts packages/storage-browser/tests/phase-6b-ahe-reclamation-red.pw.ts packages/storage-node/tests/phase-2l-c-node-issuance-registry-red.test.ts packages/storage-node/tests/phase-3a1b-p4-node-live-journal-red.test.ts tests/phase-2l-d-parity-governance-red.test.ts tests/phase-3a1b-p2-outbox-publication-contract.test.ts
+pnpm exec prettier --check tests/fixtures/phase-6b/ahe-reclamation-contract.ts tests/phase-6b-ahe-reclamation-red.test.ts packages/storage-node/tests/fixtures/phase-6b-ahe-reclamation-child.mjs packages/storage-node/tests/phase-6b-ahe-reclamation-red.test.ts packages/storage-browser/playwright.phase-6b-ahe-reclamation.config.ts packages/storage-browser/tests/phase-6b-ahe-reclamation-global-setup.ts packages/storage-browser/tests/assets/phase-6b-ahe-reclamation-entry.ts packages/storage-browser/tests/assets/phase-6b-ahe-reclamation-worker.ts packages/storage-browser/tests/phase-6b-ahe-reclamation-red.pw.ts packages/storage-node/tests/phase-2l-c-node-issuance-registry-red.test.ts packages/storage-node/tests/phase-3a1b-p4-node-live-journal-red.test.ts tests/phase-2l-d-parity-governance-red.test.ts tests/phase-3a1b-p2-outbox-publication-contract.test.ts
+node --check packages/storage-node/tests/fixtures/phase-6b-ahe-reclamation-child.mjs
+git diff --check
+git diff --exit-code -- packages/storage/src packages/storage-node/src packages/storage-browser/src packages/storage/package.json packages/storage-node/package.json packages/storage-browser/package.json pnpm-lock.yaml

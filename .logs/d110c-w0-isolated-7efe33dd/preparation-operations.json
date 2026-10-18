@@ -1,0 +1,90 @@
+{
+  "baseline": "7efe33dd350deab922c3fea7e9fcd1c968f4e474",
+  "isolated": "/private/tmp/d110c-w0-isolated-qA7HqL/checkout",
+  "operations": [
+    {
+      "label": "clone",
+      "cwd": "/private/tmp/d110c-w0-isolated-qA7HqL",
+      "budgetMs": 120000,
+      "command": [
+        "git",
+        "clone",
+        "--shared",
+        "--no-checkout",
+        "/Users/aristotle/Documents/Projects/ts-drp-1",
+        "/private/tmp/d110c-w0-isolated-qA7HqL/checkout"
+      ]
+    },
+    {
+      "label": "checkout",
+      "cwd": "/private/tmp/d110c-w0-isolated-qA7HqL",
+      "budgetMs": 120000,
+      "command": [
+        "git",
+        "-C",
+        "/private/tmp/d110c-w0-isolated-qA7HqL/checkout",
+        "checkout",
+        "--detach",
+        "7efe33dd350deab922c3fea7e9fcd1c968f4e474"
+      ]
+    },
+    {
+      "label": "overlay-check",
+      "cwd": "/private/tmp/d110c-w0-isolated-qA7HqL/checkout",
+      "budgetMs": 30000,
+      "command": [
+        "git",
+        "-C",
+        "/private/tmp/d110c-w0-isolated-qA7HqL/checkout",
+        "apply",
+        "--check",
+        "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-w0-isolated-7efe33dd/source-overlay.patch"
+      ]
+    },
+    {
+      "label": "overlay",
+      "cwd": "/private/tmp/d110c-w0-isolated-qA7HqL/checkout",
+      "budgetMs": 30000,
+      "command": [
+        "git",
+        "-C",
+        "/private/tmp/d110c-w0-isolated-qA7HqL/checkout",
+        "apply",
+        "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-w0-isolated-7efe33dd/source-overlay.patch"
+      ]
+    },
+    {
+      "label": "install",
+      "cwd": "/private/tmp/d110c-w0-isolated-qA7HqL/checkout",
+      "budgetMs": 180000,
+      "command": [
+        "pnpm",
+        "install",
+        "--offline",
+        "--frozen-lockfile",
+        "--ignore-scripts"
+      ]
+    },
+    {
+      "label": "native-preparation",
+      "cwd": "/private/tmp/d110c-w0-isolated-qA7HqL/checkout/node_modules/.pnpm/node-datachannel@0.32.3/node_modules/node-datachannel",
+      "budgetMs": 120000,
+      "command": [
+        "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+        "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-w0-isolated-7efe33dd/native-prepare.mjs"
+      ]
+    },
+    {
+      "label": "build",
+      "cwd": "/private/tmp/d110c-w0-isolated-qA7HqL/checkout",
+      "budgetMs": 300000,
+      "command": [
+        "pnpm",
+        "build:packages"
+      ]
+    }
+  ],
+  "noRetries": true,
+  "sourceEdits": 0,
+  "testsAuthorized": false
+}

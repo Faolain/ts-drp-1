@@ -1,0 +1,1 @@
+NODE_OPTIONS=--max-old-space-size=12288 pnpm exec prettier --check docs/production-hardening/production-hardening-tdd-plan-v2.md .logs/d110c-0c-plan-confirmation-cb5b3437/confirmation-audit.mjs .logs/d110c-0c-plan-confirmation-cb5b3437/confirmation-ledger.md .logs/d110c-0c-plan-confirmation-cb5b3437/state-audit.md

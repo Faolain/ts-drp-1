@@ -1,0 +1,8 @@
+{
+  "cwd": "/tmp/d110c-f5b0v-green-LLxy4p/checkout",
+  "command": "node",
+  "args": [
+    "scripts/ensure-native-deps.mjs"
+  ],
+  "start": "2026-09-05T07:54:47.701Z"
+}

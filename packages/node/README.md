@@ -9,20 +9,39 @@ DRP Node can be used using the CLI or integrated into an existing application.
 
 ### CLI
 
-The CLI provides a simple way to start a DRP Node and connect it to other nodes in the network.
-For more information on what are the commands available, run:
+The CLI starts the explicit configured v3 Canvas receive-only daemon. Importing
+its entry point does not start a host. It does not register the old bare-ID RPC.
+For the executable's arguments, run:
 
 ```bash
 pnpm cli --help
 ```
 
-#### Running a bootstrap node
+#### Trusted local configuration
 
-You can run a bootstrap node using the following command:
+The [configured host](src/cli/v3-canvas.ts) owns the configuration schema.
+The operator selects the packaged application, finite RPC messaging policy,
+local SQLite directory, exact known room/genesis bindings and local author
+identity. Invites authenticate before those bindings can acquire storage;
+neither an invite nor RPC data selects a module, filesystem path or signing key.
 
 ```bash
-pnpm cli -m bootstrap --config configs/bootstrap.json
+pnpm cli --config local-v3-canvas.json
 ```
+
+Creation must be explicitly authorized for a fresh local room. Retained rooms
+use noncreating reopen; a missing file is not permission to recreate it. SQLite
+head custody is mechanical and does not provide independent protection against
+whole-directory rollback. The original runtime owns network configuration and
+public-network acknowledgement. Network-only startup needs no fabricated room
+or author identity: an empty configured room list refuses room acquisition while
+retaining custom/group methods. RPC binds loopback; local completion is not a
+remote delivery receipt. Shutdown joins admitted room work before releasing
+native head custody and stopping the Node's keys and transport.
+
+The [requirement-to-evidence map](../../specs/bounded-storage-lifecycle/requirements-to-evidence.md)
+distinguishes this local configured component from unfinished shipping, obsolete
+plane, distributed transport and device acceptance.
 
 ### Integration
 

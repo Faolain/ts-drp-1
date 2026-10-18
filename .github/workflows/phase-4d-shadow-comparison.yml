@@ -1,0 +1,62 @@
+name: Phase 4d Shadow Comparison
+
+on:
+  pull_request: {}
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      tier:
+        description: Bounded shadow profile
+        options:
+          - pr
+          - nightly
+        required: true
+        type: choice
+
+permissions:
+  contents: read
+
+concurrency:
+  cancel-in-progress: false
+  group: phase-4d-shadow-${{ github.event_name }}
+
+jobs:
+  shadow-comparison:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.24.0
+      - uses: actions/setup-node@v4
+        with:
+          cache: pnpm
+          node-version: "22.x"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @ts-drp/test-utils build
+      - name: Run the bounded shadow tier
+        env:
+          SELECTED_TIER: ${{ github.event_name == 'schedule' && 'nightly' || github.event_name == 'pull_request' && 'pr' || inputs.tier }}
+        run: |-
+          artifact_root="$RUNNER_TEMP/phase-4d-shadow"
+          mkdir -p "$artifact_root"
+          export SHADOW_DATE="$(date -u +%F)"
+          export SHADOW_LEDGER_OUTPUT="$artifact_root/proposed-shadow-soak-ledger.json"
+          export SHADOW_OUTPUT="$artifact_root/shadow-run-report.json"
+          export SHADOW_SHA="$GITHUB_SHA"
+          export SHADOW_TIER="$SELECTED_TIER"
+          pnpm exec vitest run tests/phase-4d-shadow-runner-red.test.ts --exclude '.logs/**' --coverage.enabled=false
+      - name: Upload the reviewed ledger candidate
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: warn
+          name: phase-4d-shadow-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |-
+            ${{ runner.temp }}/phase-4d-shadow/shadow-run-report.json
+            ${{ runner.temp }}/phase-4d-shadow/proposed-shadow-soak-ledger.json
+          retention-days: 30

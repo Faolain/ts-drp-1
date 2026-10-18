@@ -1,0 +1,5 @@
+{
+  ".agents": true,
+  ".claude": true,
+  ".pnpm-store": true
+}

@@ -1,0 +1,52 @@
+{
+  "status": "PASS",
+  "classification": "faulty read-only diagnostic correction; not product RED",
+  "commit": "6394f55101cc4c559df6a3087c7ae4f3c8dfdb2f",
+  "signature": "G",
+  "pushedRefAtValidation": "6394f55101cc4c559df6a3087c7ae4f3c8dfdb2f",
+  "selectedFiles": 1,
+  "selectedTests": 4,
+  "passed": 4,
+  "failed": 0,
+  "filteredSkipped": 7,
+  "completeSelectedNames": [
+    "D.108d2 public return AST oracle accepts private computations and primitive comparisons without confusing operand names with returned authority",
+    "D.108d2 public return AST oracle rejects exact sensitive properties and values on exported returned shapes",
+    "D.108d2 public return AST oracle follows local returned aliases, helpers, methods, export aliases and global product surfaces",
+    "D.108e2b creator successor room lifetime RED keeps node-root and chat authority closed while assigning the room as sole node consumer"
+  ],
+  "commandStatuses": [
+    {
+      "name": "format",
+      "status": 0
+    },
+    {
+      "name": "lint",
+      "status": 0
+    },
+    {
+      "name": "list",
+      "status": 0
+    },
+    {
+      "name": "focused",
+      "status": 0
+    }
+  ],
+  "dirtyCandidateHash": "797511cab746df7ae44de600ae8eb110787b276f96973ef77863665c9cfa2675",
+  "protectedEntries": 81,
+  "stashCount": 27,
+  "unrelatedGovernancePredicatesUnchanged": [
+    "chatHasNoDirectNodeAdoptionConsumer",
+    "chatOwnsOnlyReviewedRoomHeadCapability",
+    "chatInputAllowsOnlyDeclarationWhenProductExists",
+    "noNodeRootWidening",
+    "roomInputAllowsOnlyDeclarationWhenProductExists",
+    "roomIsSoleConsumerWhenProductExists"
+  ],
+  "ownerHashes": {
+    "tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts": "fa2c2dc6d2c195a26ca211cb21a59c7a7497462a84e3ef513066bd87d240b6cc",
+    "tests/phase-6a-creator-successor-product-red.test.ts": "1119e81e6d4e456c2c399d2ed1ef8f69be9396342432e65ba0d5a693a0d68870"
+  },
+  "validatedAt": "2026-09-05T06:43:50.534Z"
+}

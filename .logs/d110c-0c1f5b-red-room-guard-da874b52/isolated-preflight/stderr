@@ -1,0 +1,8 @@
+file:///Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-red-room-guard-da874b52/preflight.mjs:58
+if (targetDiagnostics.length) throw Error('Target type diagnostics');
+                                    ^
+
+Error: Target type diagnostics
+    at file:///Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-red-room-guard-da874b52/preflight.mjs:58:37
+
+Node.js v22.15.0

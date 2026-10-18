@@ -1,0 +1,10 @@
+record=D.110c-0c1f5b0b
+checkpoint=corrective-RED
+commit=de1eed2a6be65ed022f8b502e4cdd6208a234dd1
+parent=42c629d530548c247be93ade52295da1118a2e9a
+signature=G
+remote_ref=origin/codex/phase3a1b-p6-golden-path
+remote_value_at_capture=de1eed2a6be65ed022f8b502e4cdd6208a234dd1
+prior_red=882a3dc1de1a550003b0e105fbbb89444e915b2e
+prior_evidence_commit=42c629d530548c247be93ade52295da1118a2e9a
+

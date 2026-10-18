@@ -1,0 +1,19 @@
+node:internal/modules/esm/resolve:314
+  return new ERR_PACKAGE_PATH_NOT_EXPORTED(
+         ^
+
+Error [ERR_PACKAGE_PATH_NOT_EXPORTED]: Package subpath './v3-live' is not defined by "exports" in /Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json imported from /Users/aristotle/Documents/Projects/ts-drp-1/packages/node/package.json
+    at exportsNotFound (node:internal/modules/esm/resolve:314:10)
+    at packageExportsResolve (node:internal/modules/esm/resolve:604:13)
+    at trySelf (node:internal/modules/cjs/loader:624:34)
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1378:24)
+    at Function.resolve (node:internal/modules/helpers:145:19)
+    at file:///Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0u-green-working-747ce566/custody.mjs:12:145
+    at Array.map (<anonymous>)
+    at file:///Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b0u-green-working-747ce566/custody.mjs:12:106
+    at ModuleJob.run (node:internal/modules/esm/module_job:274:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:644:26) {
+  code: 'ERR_PACKAGE_PATH_NOT_EXPORTED'
+}
+
+Node.js v22.15.0

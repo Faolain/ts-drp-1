@@ -1,0 +1,16 @@
+{
+  "cwd": "/private/tmp/d110c-f5b-green-fixture-exit-dtM3XF/checkout",
+  "command": "git",
+  "args": [
+    "diff",
+    "--check",
+    "8336eb777e775263d4983a76ffea8a699b8faf60^",
+    "8336eb777e775263d4983a76ffea8a699b8faf60",
+    "--",
+    "tests/fixtures/phase-3b-v3/certified-genesis-contract.ts",
+    "tests/phase-3g-v3-room-rebase-red.test.ts",
+    "tests/genesis-profile.test.ts",
+    "tests/phase-5d-pacemaker-red.test.ts"
+  ],
+  "start": "2026-09-06T05:31:05.536Z"
+}

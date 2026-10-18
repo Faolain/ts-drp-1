@@ -1,0 +1,18 @@
+pre-build packages/node/dist/src/v3-live.js
+mtime_epoch=1788496863
+mtime_local=Sep 4 00:41:03 2026
+sha256=170279848e5c5f509a6d23876f779261e1264bdf28e2ddc14519a3bcbb8dd1d6
+
+source packages/node/src/v3-live.ts before production commit
+mtime_epoch=1788518485
+mtime_local=Sep 4 06:41:25 2026
+sha256=bebb6687e0cd61333d96accec75d57b2ce35cf1dae3786111bce7729225df57c
+
+post-build packages/node/dist/src/v3-live.js
+mtime_epoch=1788518777
+mtime_local=Sep 4 06:46:17 2026
+sha256=3ea98b252c64b7df924008a7e35b73d8977957f39242eb7273fd00518fb97e75
+
+Post-build source-shape audit found copySettlementPlan import/use,
+profile-aware isControlOperation, the legacy join/causalJoin intent exceptions,
+and authenticated displaced activationVertexDigest exclusion in built output.

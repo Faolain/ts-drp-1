@@ -1,114 +1,66 @@
+import { acquireBrowserIdentity } from "@ts-drp/example-browser-network";
 import { DRPNode } from "@ts-drp/node";
-import { enableTracing, OpentelemetryMetrics } from "@ts-drp/tracer";
-import { type DRPNodeConfig, type IMetrics } from "@ts-drp/types";
+import { enableTracing } from "@ts-drp/tracer";
 
 import { env } from "./env";
 import { createModularGridNetwork, type ModularGridNetworkSession } from "./modular-network";
 import { isModularNetworkEnv, getNetworkConfigFromEnv as selectNetworkConfigFromEnv } from "./network-config";
-import { Grid } from "./objects/grid";
-import { enableUIControls, render, renderInfo } from "./render";
-import { gridState } from "./state";
-import { getColorForPeerId } from "./util/color";
+import { createZonePresentation, enableUIControls, renderNetwork } from "./render";
+import {
+	createV3ZoneApi,
+	type V3ZoneApi,
+	type V3ZoneRoomHeadAuthorityForOpen,
+	type V3ZoneSettlementSourceApproval,
+} from "./v3-zone";
+
+declare global {
+	interface Window {
+		__TS_DRP_GRID_ROOM_HEAD_AUTHORITY_FOR_OPEN__?: V3ZoneRoomHeadAuthorityForOpen;
+		__TS_DRP_GRID_SETTLEMENT_SOURCE_APPROVAL__?: V3ZoneSettlementSourceApproval;
+	}
+}
+
+interface GridNetworkSession {
+	readonly node: DRPNode;
+	snapshot(): Readonly<{ readonly peerId: string }>;
+	stop(): Promise<void>;
+}
+
+let applicationInterval: ReturnType<typeof setInterval> | undefined;
 
 /**
- * Get the network config from the environment variables
- * @returns The network config
+ * Get the selected network config.
+ * @returns The environment-selected network configuration.
  */
-export function getNetworkConfigFromEnv(): DRPNodeConfig {
+export function getNetworkConfigFromEnv(): ReturnType<typeof selectNetworkConfigFromEnv> {
 	return selectNetworkConfigFromEnv(env, window.location.origin);
 }
 
-function addUser(): void {
-	const node = gridState.getNode();
-	const gridDRP = gridState.getGridDRP();
-	gridDRP.addUser(node.networkNode.peerId, getColorForPeerId(node.networkNode.peerId));
-	render();
-}
-
-function moveUser(direction: string): void {
-	const node = gridState.getNode();
-	const gridDRP = gridState.getGridDRP();
-	gridDRP.moveUser(node.networkNode.peerId, direction);
-	render();
-}
-
-function createConnectHandlers(): void {
-	const node = gridState.getNode();
-	if (gridState.drpObject) {
-		gridState.objectPeers = node.networkNode.getGroupPeers(gridState.drpObject.id);
+function bindControls(zone: V3ZoneApi): void {
+	const createButton = document.getElementById("createGrid");
+	const joinButton = document.getElementById("joinGrid");
+	const gridInput = document.getElementById("gridInput");
+	const enrollmentInput = document.getElementById("zoneMemberEnrollment");
+	const copyButton = document.getElementById("copyGridId");
+	if (
+		!(createButton instanceof HTMLButtonElement) ||
+		!(joinButton instanceof HTMLButtonElement) ||
+		!(gridInput instanceof HTMLInputElement) ||
+		!(enrollmentInput instanceof HTMLInputElement) ||
+		!(copyButton instanceof HTMLButtonElement)
+	) {
+		throw new TypeError("v3 zone controls are unavailable");
 	}
-
-	const objectId = gridState.getObjectId();
-	if (!objectId) return;
-
-	node.messageQueueManager.subscribe(objectId, () => {
-		if (!gridState.drpObject?.id) return;
-		gridState.objectPeers = node.networkNode.getGroupPeers(gridState.drpObject?.id);
-		render();
+	createButton.addEventListener("click", () => {
+		void zone.create(enrollmentInput.value).catch((error: unknown) => console.error("Failed to create v3 zone", error));
 	});
-
-	node.subscribe(objectId, () => {
-		render();
+	joinButton.addEventListener("click", () => {
+		void zone.join(gridInput.value).catch((error: unknown) => console.error("Failed to join v3 zone", error));
 	});
-}
-
-function run(metrics?: IMetrics): void {
-	enableUIControls();
-	renderInfo();
-
-	const button_create = <HTMLButtonElement>document.getElementById("createGrid");
-	const create = async (): Promise<void> => {
-		const node = gridState.getNode();
-
-		gridState.drpObject = await node.createObject({
-			drp: new Grid(),
-			metrics,
-		});
-		gridState.gridDRP = gridState.drpObject.drp;
-		createConnectHandlers();
-
-		// The object creator can sign for finality
-		if (gridState.node?.keychain.blsPublicKey) {
-			gridState.drpObject.acl.setKey(gridState.node?.keychain.blsPublicKey);
-		}
-		addUser();
-		render();
-	};
-
-	button_create.addEventListener("click", () => void create());
-
-	const button_connect = <HTMLButtonElement>document.getElementById("joinGrid");
-	const grid_input = <HTMLInputElement>document.getElementById("gridInput");
-	grid_input.addEventListener("keydown", (event) => {
-		if (event.key === "Enter") {
-			button_connect.click();
-		}
+	gridInput.addEventListener("keydown", (event) => {
+		if (event.key === "Enter") joinButton.click();
 	});
-
-	const connect = async (): Promise<void> => {
-		const drpId = grid_input.value;
-		const node = gridState.getNode();
-
-		try {
-			gridState.drpObject = await node.connectObject({
-				id: drpId,
-				drp: new Grid(),
-				metrics,
-			});
-			gridState.gridDRP = gridState.drpObject.drp;
-			createConnectHandlers();
-			addUser();
-			render();
-			console.log("Succeeded in connecting with DRP", drpId);
-		} catch (e) {
-			console.error("Error while connecting with DRP", drpId, e);
-		}
-	};
-
-	button_connect.addEventListener("click", () => void connect());
-
 	document.addEventListener("keydown", (event) => {
-		// Skip if user is typing in input elements
 		if (
 			event.target instanceof HTMLInputElement ||
 			event.target instanceof HTMLTextAreaElement ||
@@ -116,64 +68,99 @@ function run(metrics?: IMetrics): void {
 		) {
 			return;
 		}
-
-		// Skip if Grid is not initialized
-		if (!gridState.isGridInitialized()) {
-			return;
-		}
-
-		if (event.key === "w") moveUser("U");
-		if (event.key === "a") moveUser("L");
-		if (event.key === "s") moveUser("D");
-		if (event.key === "d") moveUser("R");
+		// move() checks the live room/channel owner. Readiness must not build the
+		// complete diagnostic/ACL/durable-digest snapshot on every input event.
+		if (event.key === "w") zone.move(0, 1);
+		if (event.key === "a") zone.move(-1, 0);
+		if (event.key === "s") zone.move(0, -1);
+		if (event.key === "d") zone.move(1, 0);
 	});
-
-	const copyButton = <HTMLButtonElement>document.getElementById("copyGridId");
 	copyButton.addEventListener("click", () => {
-		const gridIdText = (<HTMLSpanElement>document.getElementById("gridId")).innerText;
-		navigator.clipboard
-			.writeText(gridIdText)
-			.then(() => {
-				console.log("Grid DRP ID copied to clipboard");
-			})
-			.catch((err) => {
-				console.error("Failed to copy: ", err);
-			});
+		void navigator.clipboard.writeText(zone.snapshot().invite);
 	});
 }
 
 async function main(): Promise<void> {
-	let metrics: IMetrics | undefined = undefined;
-	if (env.enableTracing) {
-		enableTracing();
-		metrics = new OpentelemetryMetrics("grid-service-2");
-	}
-
-	let hasRun = false;
-
-	const networkConfig = getNetworkConfigFromEnv();
-	const modularSession = isModularNetworkEnv(env) ? createModularGridNetwork(networkConfig, env) : undefined;
-	const node = modularSession?.node ?? new DRPNode(networkConfig);
-	gridState.node = node;
-	await node.start();
-	// Expose the modular session for observation as soon as the node starts — do NOT gate it on
-	// dialability, which for a browser peer depends on later relay reservation.
-	if (modularSession !== undefined) exposeModularSession(modularSession);
-	await node.networkNode.isDialable(() => {
-		console.log("Started node", import.meta.env);
-		if (hasRun) return;
-		hasRun = true;
-		run(metrics);
+	if (env.enableTracing) await enableTracing();
+	const identity = await acquireBrowserIdentity({
+		lockPrefix: "ts-drp:grid:v3-zone:identity-slot",
+		seedKey: "ts-drp:grid:v3-zone:identity-seed",
 	});
-
-	if (!hasRun) setInterval(renderInfo, import.meta.env.VITE_RENDER_INFO_INTERVAL);
-}
-
-function exposeModularSession(session: ModularGridNetworkSession): void {
-	const target = window as typeof window & { __TS_DRP_GRID_SESSION__?: ModularGridNetworkSession };
-	target.__TS_DRP_GRID_SESSION__ = session;
-	window.addEventListener("beforeunload", () => void session.stop(), { once: true });
-	window.dispatchEvent(new CustomEvent("ts-drp:grid-ready", { detail: session.snapshot() }));
+	const target = window as typeof window & {
+		__TS_DRP_GRID_SESSION__?: GridNetworkSession;
+		__TS_DRP_V3_ZONE__?: V3ZoneApi;
+	};
+	let session: GridNetworkSession | undefined;
+	let unloadHandler: (() => void) | undefined;
+	let zone: V3ZoneApi | undefined;
+	const presentation = createZonePresentation();
+	try {
+		const selected = getNetworkConfigFromEnv();
+		const config: ReturnType<typeof selectNetworkConfigFromEnv> = {
+			...selected,
+			keychain_config: { ...selected.keychain_config, private_key_seed: identity.seed },
+		};
+		const modularSession = isModularNetworkEnv(env) ? createModularGridNetwork(config, env) : undefined;
+		const node = modularSession?.node ?? new DRPNode(config);
+		session = modularSession ?? {
+			node,
+			snapshot: (): Readonly<{ peerId: string }> => Object.freeze({ peerId: node.networkNode.peerId }),
+			stop: (): Promise<void> => node.stop(),
+		};
+		await node.start();
+		zone = createV3ZoneApi(
+			node,
+			presentation.projection,
+			(context) => {
+				const factory = window.__TS_DRP_GRID_ROOM_HEAD_AUTHORITY_FOR_OPEN__;
+				if (typeof factory !== "function") {
+					throw new TypeError(
+						"v3 zone room-head authority is unavailable: the application host must configure its factory"
+					);
+				}
+				return factory(context);
+			},
+			window.__TS_DRP_GRID_SETTLEMENT_SOURCE_APPROVAL__,
+			presentation.transient
+		);
+		target.__TS_DRP_GRID_SESSION__ = session;
+		target.__TS_DRP_V3_ZONE__ = zone;
+		window.dispatchEvent(new CustomEvent("ts-drp:grid-ready", { detail: session.snapshot() }));
+		bindControls(zone);
+		applicationInterval = setInterval(() => renderNetwork(node), env.renderInfoInterval);
+		renderNetwork(node);
+		presentation.projection(zone.snapshot());
+		unloadHandler = (): void => {
+			presentation.close();
+			if (applicationInterval !== undefined) clearInterval(applicationInterval);
+			applicationInterval = undefined;
+			// The document owns the Web Lock until termination. Releasing it here
+			// would let a replacement page reuse this identity while teardown is pending.
+			void (async (): Promise<void> => {
+				// The room joins admitted work before node.stop revokes its signer.
+				await zone?.close().catch((error: unknown) => console.error("Failed to close v3 zone", error));
+				await session?.stop().catch((error: unknown) => console.error("Failed to stop grid session", error));
+			})();
+		};
+		window.addEventListener("beforeunload", unloadHandler, { once: true });
+		await node.networkNode.isDialable(() => {
+			enableUIControls();
+			console.log("Started v3 zone node", import.meta.env);
+		});
+	} catch (error) {
+		presentation.close();
+		delete target.__TS_DRP_GRID_SESSION__;
+		delete target.__TS_DRP_V3_ZONE__;
+		if (unloadHandler !== undefined) window.removeEventListener("beforeunload", unloadHandler);
+		if (applicationInterval !== undefined) clearInterval(applicationInterval);
+		applicationInterval = undefined;
+		await zone?.close().catch(() => undefined);
+		await session?.stop().catch(() => undefined);
+		identity.release();
+		throw error;
+	}
 }
 
 void main();
+
+export type { ModularGridNetworkSession };

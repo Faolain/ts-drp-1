@@ -1,0 +1,134 @@
+{
+	"schemaVersion": "ts-drp-ed25519-acceptance-v1",
+	"profileId": "ts-drp-ed25519-acceptance-v1",
+	"protocolMajor": 3,
+	"suiteId": "ed25519-sha256-v3",
+	"frozenTuple": {
+		"checkpoint": "907fae437e558145f63614cd6b5de925ea4bd8c2",
+		"freezePolicyPath": "packages/protocol-v3/conformance/freeze-policy-v3.json",
+		"freezePolicySha256": "fa2a69d4113f73bbd657d4490189b472a2ae04b5bdc88d35d2de5c87e572ccc3",
+		"protectedPathCount": 47,
+		"protectedPathStatesSha256": "023e7b50c11eff2d5fd4d0d8c5ea6da8d54ad095d73d24b7d3badea2e3769637"
+	},
+	"contractFixturePath": "tests/fixtures/phase-0g2s/ed25519-acceptance-profile-contract.json",
+	"contractFixtureSha256": "42baf0e200234eedf31bd0e16f4e23f55a463b3a50578b13e168c929ce9f29a2",
+	"messageRule": "raw-32-byte-registered-digest",
+	"verificationCall": "ed25519.verify(signature, rawRegisteredDigest, publicKey, { zip215: false })",
+	"liveVectorIds": [
+		"valid",
+		"mixed-order",
+		"small-order-identity",
+		"s-plus-l",
+		"noncanonical-r",
+		"hex-text-message",
+		"json-wrapper-message"
+	],
+	"liveVectors": [
+		{
+			"id": "valid",
+			"messageHex": "8ecc9fd82b696fb267910cd7ef768d33b09a33d6a87f5c2bf1965c695853a967",
+			"publicKeyHex": "03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8",
+			"signatureHex": "9210396b0af0e225e749a96cd08a3307676ee90da380ba6f4afff79fd98fb7949b6becc0c78ad5b01357b9b7d309ef064873759bc0576e68fb1c29d49465180a",
+			"strictAccept": true
+		},
+		{
+			"id": "mixed-order",
+			"messageHex": "8ecc9fd82b696fb267910cd7ef768d33b09a33d6a87f5c2bf1965c695853a967",
+			"publicKeyHex": "d0269f4d6e3acaeb0131ecbe03f232759b74c6cb3d3acc99908c859ab00e1e40",
+			"signatureHex": "6999d5cb5126005c325892f1c6eab824b310708befff12fbaf45dda050cb12f06d111486ed01a501aaf851ff7064f2124d07c1428cc921f5c66e54625c8e040f",
+			"strictAccept": true
+		},
+		{
+			"id": "small-order-identity",
+			"messageHex": "8ecc9fd82b696fb267910cd7ef768d33b09a33d6a87f5c2bf1965c695853a967",
+			"publicKeyHex": "0100000000000000000000000000000000000000000000000000000000000000",
+			"signatureHex": "01000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+			"strictAccept": false
+		},
+		{
+			"id": "s-plus-l",
+			"messageHex": "8ecc9fd82b696fb267910cd7ef768d33b09a33d6a87f5c2bf1965c695853a967",
+			"publicKeyHex": "03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8",
+			"signatureHex": "9210396b0af0e225e749a96cd08a3307676ee90da380ba6f4afff79fd98fb794883fe21de2ede708eaf3b05ab203ce1b4873759bc0576e68fb1c29d49465181a",
+			"strictAccept": false
+		},
+		{
+			"id": "noncanonical-r",
+			"messageHex": "8ecc9fd82b696fb267910cd7ef768d33b09a33d6a87f5c2bf1965c695853a967",
+			"publicKeyHex": "03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8",
+			"signatureHex": "eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f1190539265a559dc62d562560ff09ff57a0c38522d959f9abf702800f946c905",
+			"strictAccept": false
+		},
+		{
+			"id": "hex-text-message",
+			"messageHex": "8ecc9fd82b696fb267910cd7ef768d33b09a33d6a87f5c2bf1965c695853a967",
+			"publicKeyHex": "03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8",
+			"signatureHex": "5a0925fb2a409aaca43b1ff39bd394ea14b7d4a529ed4ed454e1e9808cfb7bbd11ad105f2ecd2e2a5bcd9e75d0e151b31966df664d735dfc65db914e8a33f303",
+			"strictAccept": false
+		},
+		{
+			"id": "json-wrapper-message",
+			"messageHex": "8ecc9fd82b696fb267910cd7ef768d33b09a33d6a87f5c2bf1965c695853a967",
+			"publicKeyHex": "03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8",
+			"signatureHex": "3a9e034f218103ec7a37ba6490102b0253b86fe9a859b09a85d027865cc8089920d64dcc9fb31b80504cdf9b81f5ac39e7c582bfb1f31b33cbabd8b56611160f",
+			"strictAccept": false
+		}
+	],
+	"speccheckProvenance": {
+		"repository": "https://github.com/novifinancial/ed25519-speccheck",
+		"commit": "65519336fda78a3d016e947df6d82848aca0c9da",
+		"casesSha256": "08e47a36d9aead288664930505584f353fff113ab854f2800db1e4f5b3540450"
+	},
+	"speccheckVectorIds": [
+		"case-0-small-a-small-r",
+		"case-3-mixed-a-mixed-r-both-equations",
+		"case-4-mixed-a-mixed-r-cofactored-only",
+		"case-6-s-greater-than-l",
+		"case-8-noncanonical-r",
+		"case-10-noncanonical-a"
+	],
+	"speccheckVectors": [
+		{
+			"id": "case-0-small-a-small-r",
+			"messageHex": "8c93255d71dcab10e8f379c26200f3c7bd5f09d9bc3068d3ef4edeb4853022b6",
+			"publicKeyHex": "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa",
+			"signatureHex": "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a0000000000000000000000000000000000000000000000000000000000000000",
+			"strictAccept": false
+		},
+		{
+			"id": "case-3-mixed-a-mixed-r-both-equations",
+			"messageHex": "9bd9f44f4dcc75bd531b56b2cd280b0bb38fc1cd6d1230e14861d861de092e79",
+			"publicKeyHex": "cdb267ce40c5cd45306fa5d2f29731459387dbf9eb933b7bd5aed9a765b88d4d",
+			"signatureHex": "9046a64750444938de19f227bb80485e92b83fdb4b6506c160484c016cc1852f87909e14428a7a1d62e9f22f3d3ad7802db02eb2e688b6c52fcd6648a98bd009",
+			"strictAccept": true
+		},
+		{
+			"id": "case-4-mixed-a-mixed-r-cofactored-only",
+			"messageHex": "e47d62c63f830dc7a6851a0b1f33ae4bb2f507fb6cffec4011eaccd55b53f56c",
+			"publicKeyHex": "cdb267ce40c5cd45306fa5d2f29731459387dbf9eb933b7bd5aed9a765b88d4d",
+			"signatureHex": "160a1cb0dc9c0258cd0a7d23e94d8fa878bcb1925f2c64246b2dee1796bed5125ec6bc982a269b723e0668e540911a9a6a58921d6925e434ab10aa7940551a09",
+			"strictAccept": true
+		},
+		{
+			"id": "case-6-s-greater-than-l",
+			"messageHex": "85e241a07d148b41e47d62c63f830dc7a6851a0b1f33ae4bb2f507fb6cffec40",
+			"publicKeyHex": "442aad9f089ad9e14647b1ef9099a1ff4798d78589e66f28eca69c11f582a623",
+			"signatureHex": "e96f66be976d82e60150baecff9906684aebb1ef181f67a7189ac78ea23b6c0e547f7690a0e2ddcd04d87dbc3490dc19b3b3052f7ff0538cb68afb369ba3a514",
+			"strictAccept": false
+		},
+		{
+			"id": "case-8-noncanonical-r",
+			"messageHex": "9bedc267423725d473888631ebf45988bad3db83851ee85c85e241a07d148b41",
+			"publicKeyHex": "f7badec5b8abeaf699583992219b7b223f1df3fbbea919844e3f7c554a43dd43",
+			"signatureHex": "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff03be9678ac102edcd92b0210bb34d7428d12ffc5df5f37e359941266a4e35f0f",
+			"strictAccept": false
+		},
+		{
+			"id": "case-10-noncanonical-a",
+			"messageHex": "e96b7021eb39c1a163b6da4e3093dcd3f21387da4cc4572be588fafae23c155b",
+			"publicKeyHex": "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+			"signatureHex": "a9d55260f765261eb9b84e106f665e00b867287a761990d7135963ee0a7d59dca5bb704786be79fc476f91d3f3f89b03984d8068dcf1bb7dfc6637b45450ac04",
+			"strictAccept": false
+		}
+	]
+}

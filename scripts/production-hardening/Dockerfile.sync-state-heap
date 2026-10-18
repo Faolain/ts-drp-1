@@ -1,0 +1,31 @@
+FROM node:22.15.0-bookworm-slim@sha256:557e52a0fcb928ee113df7e1fb5d4f60c1341dbda53f55e3d815ca10807efdce
+
+ARG SOURCE_REVISION
+RUN case "$SOURCE_REVISION" in ???????*) ;; *) exit 1 ;; esac
+LABEL org.opencontainers.image.revision="$SOURCE_REVISION"
+ENV TS_DRP_PROFILE_SOURCE_REVISION="$SOURCE_REVISION"
+
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+
+RUN corepack enable && corepack prepare pnpm@10.24.0 --activate
+
+WORKDIR /ts-drp
+COPY . .
+
+# Install only the root build toolchain and @ts-drp/node's production workspace
+# closure. Lifecycle scripts are intentionally suppressed: the root postinstall
+# builds unrelated workspaces and packages/object's development-only pprof hook
+# requires a native toolchain that is not part of this pinned measurement image.
+# Fail closed if that profiler enters the closure or either required build tool
+# is unusable. The controller performs the fresh measured production build.
+RUN pnpm install --frozen-lockfile --prod --ignore-scripts --filter-prod . --filter-prod '@ts-drp/node...' \
+	&& test -z "$(find node_modules/.pnpm -maxdepth 1 -name 'pprof@*' -print -quit)" \
+	&& pnpm exec esbuild --version \
+	&& pnpm exec tsc --version \
+	&& pnpm --dir node_modules/.pnpm/node-datachannel@0.32.3/node_modules/node-datachannel exec prebuild-install -r napi \
+	&& echo '18ffa3e08a07578c9fea053cd32350a69506f2bfa615c077c6e5ad5843df27a3  node_modules/.pnpm/node-datachannel@0.32.3/node_modules/node-datachannel/build/Release/node_datachannel.node' \
+		| sha256sum --check --strict \
+	&& pnpm --filter-prod '@ts-drp/node^...' run build
+
+ENTRYPOINT ["node", "scripts/production-hardening/sync-state-heap-controller.mjs"]

@@ -4,45 +4,63 @@
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<title>DRP - Chat</title>
-		<link rel="stylesheet" href="styles.css">
+		<link rel="stylesheet" href="styles.css" />
+		<style>
+			#chatInviteRow[hidden] {
+				display: none;
+			}
+			#chatInvite {
+				min-width: 0;
+				width: 100%;
+				resize: vertical;
+				padding: 10px;
+				background-color: var(--input-bg);
+				color: var(--text-color);
+				border: 1px solid var(--border-color);
+				border-radius: 4px;
+			}
+		</style>
 		<script>
-			(function() {
-				const savedTheme = localStorage.getItem('theme');
-				const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)');
-				
-				if (savedTheme === 'dark' || (!savedTheme && prefersDarkScheme.matches)) {
-					document.documentElement.setAttribute('data-theme', 'dark');
+			(function () {
+				const savedTheme = localStorage.getItem("theme");
+				const prefersDarkScheme = window.matchMedia("(prefers-color-scheme: dark)");
+
+				if (savedTheme === "dark" || (!savedTheme && prefersDarkScheme.matches)) {
+					document.documentElement.setAttribute("data-theme", "dark");
 				}
 			})();
 		</script>
 	</head>
 	<body>
 		<h1>DRP - Chat</h1>
-		
-		<button id="themeToggle" class="theme-toggle" aria-label="Toggle dark mode">
-			🌙
-		</button>
-		
+
+		<button id="themeToggle" class="theme-toggle" aria-label="Toggle dark mode">🌙</button>
+
 		<div class="info-row">
 			<div class="info-label">Current peer ID:</div>
 			<div id="peerId" class="info-value"></div>
 		</div>
-		
+
 		<!-- Add a toggle button for mobile -->
 		<button id="infoToggle" class="info-toggle">
 			<span class="toggle-icon">ℹ️</span>
 			<span class="toggle-text">Show Connection Info</span>
 		</button>
-		
+
 		<div class="info-container collapsible">
 			<div class="info-row">
 				<div class="info-label">Connected to:</div>
 				<div id="chatId" class="info-value"></div>
-				<button id="copyButton" class="copy-button" aria-label="Copy room ID">
+				<button id="copyButton" class="copy-button" aria-label="Copy signed chat invite">
 					📋 Copy
 					<span class="tooltip">Copied!</span>
 				</button>
 			</div>
+			<div id="chatInviteRow" class="info-row" hidden>
+				<label class="info-label" for="chatInvite">Signed invite:</label>
+				<textarea id="chatInvite" class="info-value" readonly aria-label="Signed chat invite" rows="2"></textarea>
+			</div>
+			<div id="copyChatStatus" role="status" aria-label="Chat invite copy status"></div>
 			<div class="info-row">
 				<div class="info-label">Peers:</div>
 				<div id="peers" class="info-value"></div>
@@ -58,85 +76,66 @@
 		</div>
 
 		<div class="control-panel">
-			<input id="roomInput" type="text" placeholder="Room ID" />
-			<button id="joinRoom">Connect</button>
-			<button id="createRoom">Create Room</button>
+			<input id="roomInput" type="text" placeholder="Signed chat invite" aria-label="Signed chat invite to join" />
+			<button id="joinRoom" disabled>Connect</button>
+			<button id="createRoom" disabled>Create Room</button>
 		</div>
-
-		<!-- Join room on enter -->
-		<script>
-			var input = document.getElementById("roomInput");
-			input.addEventListener("keypress", function (event) {
-				if (event.key === "Enter") {
-					document.getElementById("joinRoom").click();
-				}
-			});
-		</script>
+		<div id="chatStatus" role="status" aria-label="Chat connection status">Starting configured chat…</div>
 
 		<div id="chat">
 			<!-- Messages will appear here -->
 		</div>
 
 		<div class="message-form">
-			<input id="messageInput" type="text" placeholder="Type your message here..." />
-			<button id="sendMessage">Send</button>
+			<input id="messageInput" type="text" placeholder="Type your message here..." disabled />
+			<button id="sendMessage" disabled>Send</button>
 		</div>
-
-		<!-- Send message on enter -->
-		<script>
-			var input = document.getElementById("messageInput");
-			input.addEventListener("keypress", function (event) {
-				if (event.key === "Enter") {
-					document.getElementById("sendMessage").click();
-				}
-			});
-		</script>
 
 		<!-- Dark mode functionality -->
 		<script>
 			// Theme toggle
-			const themeToggle = document.getElementById('themeToggle');
+			const themeToggle = document.getElementById("themeToggle");
 			const htmlElement = document.documentElement;
-			
+
 			// Check for saved theme preference or use system preference
-			const savedTheme = localStorage.getItem('theme');
-			const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)');
-			
-			if (savedTheme === 'dark') {
-				htmlElement.setAttribute('data-theme', 'dark');
-				themeToggle.innerHTML = '☀️';
-			} else if (savedTheme === 'light') {
-				htmlElement.removeAttribute('data-theme');
-				themeToggle.innerHTML = '🌙';
+			const savedTheme = localStorage.getItem("theme");
+			const prefersDarkScheme = window.matchMedia("(prefers-color-scheme: dark)");
+
+			if (savedTheme === "dark") {
+				htmlElement.setAttribute("data-theme", "dark");
+				themeToggle.innerHTML = "☀️";
+			} else if (savedTheme === "light") {
+				htmlElement.removeAttribute("data-theme");
+				themeToggle.innerHTML = "🌙";
 			} else if (prefersDarkScheme.matches) {
 				// No saved preference, use system preference
-				htmlElement.setAttribute('data-theme', 'dark');
-				themeToggle.innerHTML = '☀️';
+				htmlElement.setAttribute("data-theme", "dark");
+				themeToggle.innerHTML = "☀️";
 			}
-			
+
 			// Toggle theme
-			themeToggle.addEventListener('click', () => {
-				if (htmlElement.getAttribute('data-theme') === 'dark') {
-					htmlElement.removeAttribute('data-theme');
-					localStorage.setItem('theme', 'light');
-					themeToggle.innerHTML = '🌙';
+			themeToggle.addEventListener("click", () => {
+				if (htmlElement.getAttribute("data-theme") === "dark") {
+					htmlElement.removeAttribute("data-theme");
+					localStorage.setItem("theme", "light");
+					themeToggle.innerHTML = "🌙";
 				} else {
-					htmlElement.setAttribute('data-theme', 'dark');
-					localStorage.setItem('theme', 'dark');
-					themeToggle.innerHTML = '☀️';
+					htmlElement.setAttribute("data-theme", "dark");
+					localStorage.setItem("theme", "dark");
+					themeToggle.innerHTML = "☀️";
 				}
 			});
-			
+
 			// Listen for system preference changes
-			prefersDarkScheme.addEventListener('change', (e) => {
+			prefersDarkScheme.addEventListener("change", (e) => {
 				// Only apply if the user hasn't set a preference
-				if (!localStorage.getItem('theme')) {
+				if (!localStorage.getItem("theme")) {
 					if (e.matches) {
-						htmlElement.setAttribute('data-theme', 'dark');
-						themeToggle.innerHTML = '☀️';
+						htmlElement.setAttribute("data-theme", "dark");
+						themeToggle.innerHTML = "☀️";
 					} else {
-						htmlElement.removeAttribute('data-theme');
-						themeToggle.innerHTML = '🌙';
+						htmlElement.removeAttribute("data-theme");
+						themeToggle.innerHTML = "🌙";
 					}
 				}
 			});

@@ -1,0 +1,101 @@
+{
+	"blueprintDigestDomain": "ts-drp/blueprint-admission/v3",
+	"privateKeySeedHex": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+	"vertex": {
+		"anchor": "0101010101010101010101010101010101010101010101010101010101010101",
+		"author": "alice",
+		"authorSequence": 7,
+		"dependencies": ["0202020202020202020202020202020202020202020202020202020202020202"],
+		"epoch": 3,
+		"logicalTime": 9,
+		"objectId": "object:phase-0i-v3"
+	},
+	"package": {
+		"kind": "drp-blueprint-admission-package",
+		"protocolMajor": 3,
+		"schemaVersion": 1,
+		"implementation": {
+			"artifactDigest": "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
+			"artifactId": "@example/chat-blueprint@1.0.0",
+			"runtimeProfile": "ecmascript-2024-sync-v1"
+		},
+		"manifest": {
+			"schemaVersion": 1,
+			"operationDiscriminator": "action",
+			"operations": [
+				{
+					"name": "append",
+					"argumentSchema": {
+						"kind": "closed-record",
+						"fields": [
+							{
+								"name": "nested",
+								"required": false,
+								"type": "canonical-object"
+							},
+							{
+								"name": "requestOrdinal",
+								"required": false,
+								"type": "safe-integer"
+							},
+							{
+								"name": "value",
+								"required": false,
+								"type": "string"
+							}
+						]
+					}
+				},
+				{
+					"name": "set",
+					"argumentSchema": {
+						"kind": "closed-record",
+						"fields": [
+							{
+								"name": "key",
+								"required": true,
+								"type": "string"
+							},
+							{
+								"name": "value",
+								"required": true,
+								"type": "string"
+							}
+						]
+					}
+				},
+				{
+					"name": "set_message",
+					"argumentSchema": {
+						"kind": "closed-record",
+						"fields": [
+							{
+								"name": "key",
+								"required": true,
+								"type": "string"
+							},
+							{
+								"name": "value",
+								"required": true,
+								"type": "string"
+							}
+						]
+					}
+				}
+			]
+		}
+	},
+	"validOperation": {
+		"action": "set_message",
+		"key": "message",
+		"value": "hello"
+	},
+	"legacyLookingValues": [
+		"constructor",
+		"hasOwnProperty",
+		"__proto__",
+		"query_isAdmin",
+		"resolveConflicts",
+		"nonexistent"
+	]
+}

@@ -1,0 +1,31 @@
+allowed_changed_paths_begin
+packages/node/src/creator-close.ts
+packages/node/src/v3-live.ts
+packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts
+tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts
+tests/phase-6a-creator-successor-local-author-red.test.ts
+tests/phase-6b-d110c-a-repeat-close-red.test.ts
+allowed_changed_paths_end
+creator_close_empty_accumulator_count=0
+creator_close_registered_snapshot_count=1
+creator_close_result_epoch_literal_count=0
+creator_close_result_successor_literal_count=0
+v3_live_private_history_owner_count=2
+v3_live_compact_restore_count=1
+v3_live_history_root_count=6
+v3_live_history_size_count=8
+stale_d110cLastPendingRecovery_count=0
+protocol_v3_diff_count=0
+compaction_diff_count=0
+examples_diff_count=0
+dependency_diff_count=0
+source_hashes_begin
+a3366232465e248f3e7d875ec68b687bd7787a26e9dbb92a2b0634c039898d7c  packages/node/src/creator-close.ts
+74a86b57888e48560d2b42832af5726864880edccdc36102b3963af9dd5dbdd9  packages/node/src/v3-live.ts
+d078709a54cd9a22e0f8bad7059a3c29b53532e65395dd39b1e750b14880527b  packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts
+9e4cecce76ad48ed65a74c12d7aaeccd734aeda78eaaeb76b30ccc9bc3599667  tests/fixtures/phase-6b-d110c-a/creator-live-close-result-contract.ts
+094be233c76d0c7fdcb3d41a7f0318d9de09ec031efe7b8a254a06589137ad94  tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts
+237cbe200e5ccc88bd56d4ab47096af00932a38246da7cb9f9513006becf98f1  tests/fixtures/phase-6b-d110c-a/tsconfig.json
+4d8eca966de54fe030d2c704548da1bdd2de730defe6c922e408ed174590c658  tests/phase-6a-creator-successor-local-author-red.test.ts
+1d43e83585fb65f145d674b67208bea3971f9473ce7e3036524cbde21d8a92a0  tests/phase-6b-d110c-a-repeat-close-red.test.ts
+source_hashes_end

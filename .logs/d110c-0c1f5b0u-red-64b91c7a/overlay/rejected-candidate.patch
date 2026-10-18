@@ -1,0 +1,1232 @@
+diff --git a/examples/v3-room/src/index.ts b/examples/v3-room/src/index.ts
+index 939665a0..988b2de9 100644
+--- a/examples/v3-room/src/index.ts
++++ b/examples/v3-room/src/index.ts
+@@ -71,6 +71,12 @@ const CREATOR_INVITE_BYTE_FIELDS = Object.freeze([
+ ] as const);
+ const CREATOR_INVITE_MATERIAL_KEYS = Object.freeze([...CREATOR_INVITE_BYTE_FIELDS, "pinnedGenesisAnchorDigest"]);
+ const UNSUPPORTED_LINEAGE_POLICY = "D110C_LINEAGE_POLICY_UNSUPPORTED";
++const ROOM_SETTLEMENT_REPLACEMENT_MAX_INTENTS = 16;
++const ROOM_SETTLEMENT_REPLACEMENT_DIGEST_LIMITS = Object.freeze({
++	maxBytes: 1_048_640,
++	maxDepth: 9,
++	maxItems: 1_024,
++});
+ // Object framing plus the nine encoded keys and the fixed kind, digest and version values.
+ // The retained exact 65_536/65_537 boundary pair pins this codec-specific arithmetic.
+ const CREATOR_INVITE_FIXED_CANONICAL_BYTE_LENGTH = 346;
+@@ -2831,11 +2837,34 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 	}>;
+ 	type RoomSettlementPlan = NonNullable<Awaited<ReturnType<typeof issuanceStore.readSettlementPlan>>>;
+ 	type RoomSettlementPlanEntry = RoomSettlementPlan["entries"][number];
++	type RoomReplacementEffect = Readonly<{
++		readonly fromIntent: number;
++		readonly intentDigest: Uint8Array;
++		readonly kind: "replacement";
++		readonly sourceSequence: number;
++		readonly throughIntent: number;
++	}>;
++	type RoomSettlementIssueResult =
++		| Awaited<ReturnType<RoomPlaneHandle["issueLocal"]>>
++		| Readonly<{
++				readonly kind: "progress-advanced";
++				readonly lastLogicalTime: number;
++				readonly ok: false;
++				readonly throughIntent: number;
++		  }>
++		| null;
+ 	const settlementScope = Object.freeze({ author: input.author, objectId: input.objectId });
++	const sameReplacementProgress = (left: RoomSettlementPlanEntry, right: RoomSettlementPlanEntry): boolean => {
++		if (left.replacementProgress === undefined || right.replacementProgress === undefined) {
++			return left.replacementProgress === right.replacementProgress;
++		}
++		return sameBytes(encodeCanonical(left.replacementProgress), encodeCanonical(right.replacementProgress));
++	};
+ 	const sameSettlementEntry = (left: RoomSettlementPlanEntry, right: RoomSettlementPlanEntry): boolean =>
+ 		left.sourceSequence === right.sourceSequence &&
+ 		left.disposition === right.disposition &&
+ 		left.replacementSequence === right.replacementSequence &&
++		sameReplacementProgress(left, right) &&
+ 		sameBytes(left.sourceDigest, right.sourceDigest);
+ 	const settlementDisposition = (source: DisplacedSource): RoomSettlementPlanEntry["disposition"] | undefined => {
+ 		if (source.intents.length === 0) return undefined;
+@@ -2877,6 +2906,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 			entries.push(
+ 				Object.freeze({
+ 					disposition,
++					...(prior?.replacementProgress === undefined ? {} : { replacementProgress: prior.replacementProgress }),
+ 					replacementSequence: prior?.replacementSequence ?? null,
+ 					sourceDigest,
+ 					sourceSequence: source.authorSequence,
+@@ -2909,22 +2939,54 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 		return issuanceStore.transactWriteSettlementPlan({ expectedRevision, plan, scope: settlementScope });
+ 	};
+ 	const readSettlementEffect = async (
+-		effect: Readonly<{ readonly kind: "fence" } | { readonly kind: "replacement"; readonly sourceSequence: number }>
++		effect: Readonly<
++			| { readonly kind: "fence" }
++			| { readonly kind: "replacement"; readonly sourceSequence: number }
++			| RoomReplacementEffect
++		>
+ 	): Promise<boolean> => {
+ 		const plan = await issuanceStore.readSettlementPlan(settlementScope);
+ 		if (plan === null) return false;
+ 		if (effect.kind === "fence") return plan.fenceSequence !== null;
+-		return plan.entries.some(
+-			(entry) => entry.sourceSequence === effect.sourceSequence && entry.replacementSequence !== null
++		const entry = plan.entries.find((candidate) => candidate.sourceSequence === effect.sourceSequence);
++		if (!("fromIntent" in effect)) return entry?.replacementSequence !== null;
++		const progress = entry?.replacementProgress;
++		const chunkIndex =
++			progress?.chunks.findIndex((chunk, index) => {
++				const priorThrough = index === 0 ? 0 : progress.chunks[index - 1]?.throughIntent;
++				return priorThrough === effect.fromIntent && chunk.throughIntent === effect.throughIntent;
++			}) ?? -1;
++		const chunk = progress?.chunks[chunkIndex];
++		return (
++			progress !== undefined &&
++			sameBytes(progress.intentDigest, effect.intentDigest) &&
++			chunk?.throughIntent === effect.throughIntent
+ 		);
+ 	};
++	const readSettlementProgressAdvance = async (
++		effect: RoomReplacementEffect
++	): Promise<Readonly<{ readonly lastLogicalTime: number; readonly throughIntent: number }> | undefined> => {
++		const plan = await issuanceStore.readSettlementPlan(settlementScope);
++		const progress = plan?.entries.find((entry) => entry.sourceSequence === effect.sourceSequence)?.replacementProgress;
++		const chunk = progress?.chunks.at(-1);
++		return progress !== undefined &&
++			sameBytes(progress.intentDigest, effect.intentDigest) &&
++			chunk !== undefined &&
++			chunk.throughIntent > effect.fromIntent
++			? Object.freeze({ lastLogicalTime: chunk.lastLogicalTime, throughIntent: chunk.throughIntent })
++			: undefined;
++	};
+ 	const issueSettlement = async (
+ 		operations: readonly Readonly<{
+ 			readonly logicalTime: number;
+ 			readonly operation: Readonly<Record<string, unknown>>;
+ 		}>[],
+-		effect: Readonly<{ readonly kind: "fence" } | { readonly kind: "replacement"; readonly sourceSequence: number }>
+-	): Promise<void> => {
++		effect: Readonly<
++			| { readonly kind: "fence" }
++			| { readonly kind: "replacement"; readonly sourceSequence: number }
++			| RoomReplacementEffect
++		>
++	): Promise<RoomSettlementIssueResult> => {
+ 		if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
+ 		const issued = await activeHandle.issueLocal({
+ 			operations: Object.freeze(operations),
+@@ -2932,14 +2994,69 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 			signRegisteredVertexDigest: input.signRegisteredVertexDigest,
+ 		} as Parameters<RoomPlaneHandle["issueLocal"]>[0]);
+ 		if (!issued.ok) {
++			if (issued.kind === "split-required") return issued;
++			if (issued.kind === "issuance-rejected" && "fromIntent" in effect) {
++				const advance = await readSettlementProgressAdvance(effect);
++				if (advance !== undefined) {
++					await publishAccepted();
++					return Object.freeze({ ...advance, kind: "progress-advanced" as const, ok: false as const });
++				}
++			}
+ 			const linked = await readSettlementEffect(effect);
+-			throw new TypeError(
+-				linked
+-					? `v3 room settlement issue outcome is unknown: ${issued.kind}`
+-					: `v3 room settlement issue failed: ${issued.kind}`
+-			);
++			if (linked) {
++				await publishAccepted();
++				return null;
++			}
++			throw new TypeError(`v3 room settlement issue failed: ${issued.kind}`);
+ 		}
+ 		await publishAccepted();
++		return issued;
++	};
++	const orderedReplacementOperations = (source: DisplacedSource): readonly Readonly<Record<string, unknown>>[] => {
++		const ordered = source.intents.flatMap((intent) => {
++			const operation = detachedRoomOperation(intent.operation);
++			const action = operation === undefined ? undefined : Reflect.get(operation, "action");
++			if (operation === undefined || typeof action !== "string") {
++				throw new TypeError("v3 room displaced operation is invalid");
++			}
++			const policy = input.application.displacementPolicies[action];
++			if (policy === "expire") return [];
++			if (policy !== "rebase" && policy !== "transform") {
++				throw new TypeError("v3 room settlement replacement policy is invalid");
++			}
++			let selected = operation;
++			if (policy === "transform") {
++				const transform = input.application.transformDisplacedOperation;
++				if (transform === undefined) throw new TypeError("v3 room displaced transform is unavailable");
++				const first = detachedRoomOperation(transform(operation));
++				const second = detachedRoomOperation(transform(operation));
++				const identity = input.application.displacedOperationIdentity(operation);
++				if (
++					first === undefined ||
++					second === undefined ||
++					!sameBytes(encodeCanonical(first), encodeCanonical(second)) ||
++					Reflect.get(first, "action") !== action ||
++					input.application.displacedOperationIdentity(first) !== identity
++				) {
++					throw new TypeError("v3 room displaced transform is unstable");
++				}
++				selected = first;
++			}
++			try {
++				decodeCanonical(encodeCanonical(selected, { maxBytes: 65_536, maxDepth: 8, maxItems: 1_024 }), {
++					maxBytes: 65_536,
++					maxDepth: 8,
++					maxItems: 1_024,
++				});
++			} catch {
++				throw new TypeError("v3 room settlement replacement operation exceeds the application batch limit");
++			}
++			return [selected];
++		});
++		if (ordered.length === 0 || ordered.length > ROOM_SETTLEMENT_REPLACEMENT_MAX_INTENTS) {
++			throw new TypeError("v3 room settlement replacement intent count is invalid");
++		}
++		return Object.freeze(ordered);
+ 	};
+ 	const drainSettlementOutbox = async (sources: readonly DisplacedSource[]): Promise<void> => {
+ 		let plan = await writeMergedSettlementPlan(sources);
+@@ -2947,6 +3064,14 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 			await settlementHold;
+ 			return;
+ 		}
++		const sourceBySequence = new Map(sources.map((source) => [source.authorSequence, source] as const));
++		const orderedBySequence = new Map<number, readonly Readonly<Record<string, unknown>>[]>();
++		for (const entry of plan.entries) {
++			if (entry.disposition === "expire" || entry.replacementSequence !== null) continue;
++			const source = sourceBySequence.get(entry.sourceSequence);
++			if (source === undefined) throw new TypeError("v3 room settlement source is unavailable");
++			orderedBySequence.set(entry.sourceSequence, orderedReplacementOperations(source));
++		}
+ 		if (plan.fenceSequence === null) {
+ 			const lineage = await issuanceStore.readLineage(settlementScope);
+ 			if (!Number.isSafeInteger(lineage.next) || lineage.next < 0 || lineage.exhausted) {
+@@ -2969,49 +3094,154 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 			);
+ 			plan = (await issuanceStore.readSettlementPlan(settlementScope)) ?? plan;
+ 		}
+-		const sourceBySequence = new Map(sources.map((source) => [source.authorSequence, source] as const));
+ 		for (const entry of plan.entries) {
+ 			if (entry.disposition === "expire" || entry.replacementSequence !== null) continue;
+-			const source = sourceBySequence.get(entry.sourceSequence);
+-			if (source === undefined) throw new TypeError("v3 room settlement source is unavailable");
+-			const operations = source.intents.flatMap((intent) => {
+-				const operation = detachedRoomOperation(intent.operation);
+-				const action = operation === undefined ? undefined : Reflect.get(operation, "action");
+-				if (operation === undefined || typeof action !== "string") {
+-					throw new TypeError("v3 room displaced operation is invalid");
++			const ordered = orderedBySequence.get(entry.sourceSequence);
++			if (ordered === undefined) throw new TypeError("v3 room settlement replacement is unavailable");
++			const intentDigest = hashDomain(
++				"ts-drp/settlement-replacement-intents/v1",
++				encodeCanonical(ordered, ROOM_SETTLEMENT_REPLACEMENT_DIGEST_LIMITS)
++			);
++			const durableProgress = entry.replacementProgress;
++			if (
++				durableProgress !== undefined &&
++				(durableProgress.intentCount !== ordered.length || !sameBytes(durableProgress.intentDigest, intentDigest))
++			) {
++				throw new TypeError("v3 room settlement replacement intent digest changed");
++			}
++			const consumed = durableProgress?.chunks.at(-1)?.throughIntent ?? 0;
++			const lastLogicalTime = durableProgress?.chunks.at(-1)?.lastLogicalTime;
++			if (lastLogicalTime !== undefined) logicalTime = Math.max(logicalTime, lastLogicalTime + 2);
++			const allocateOperations = (
++				fromIntent: number
++			): readonly Readonly<{ readonly logicalTime: number; readonly operation: Readonly<Record<string, unknown>> }>[] =>
++				Object.freeze(
++					ordered.slice(fromIntent).map((operation) => {
++						const selected = Object.freeze({ logicalTime, operation });
++						logicalTime += 2;
++						return selected;
++					})
++				);
++			let operationBaseIntent = consumed;
++			let operations = allocateOperations(consumed);
++			let initialPrefixLength: number | undefined;
++			if (durableProgress === undefined) {
++				const legacy = await issueSettlement(
++					operations,
++					Object.freeze({ kind: "replacement", sourceSequence: entry.sourceSequence })
++				);
++				if (legacy === null || legacy.ok) continue;
++				if (legacy.kind !== "split-required") throw new TypeError("v3 room settlement split result is invalid");
++				initialPrefixLength = legacy.prefixLength;
++				const current = await issuanceStore.readSettlementPlan(settlementScope);
++				const selected = current?.entries.find((candidate) => candidate.sourceSequence === entry.sourceSequence);
++				if (current === null || selected === undefined || selected.replacementSequence !== null) {
++					throw new TypeError("v3 room settlement split plan changed");
+ 				}
+-				const policy = input.application.displacementPolicies[action];
+-				if (policy === "expire") return [];
+-				if (policy !== "rebase" && policy !== "transform") {
+-					throw new TypeError("v3 room settlement replacement policy is invalid");
++				plan = await issuanceStore.transactWriteSettlementPlan({
++					expectedRevision: current.revision,
++					plan: Object.freeze({
++						...current,
++						entries: Object.freeze(
++							current.entries.map((candidate) =>
++								candidate.sourceSequence === entry.sourceSequence
++									? Object.freeze({
++											...candidate,
++											replacementProgress: Object.freeze({
++												chunks: Object.freeze([]),
++												intentCount: ordered.length,
++												intentDigest,
++												version: 1 as const,
++											}),
++										})
++									: candidate
++							)
++						),
++						revision: current.revision + 1,
++					}),
++					scope: settlementScope,
++				});
++			}
++			let fromIntent = consumed;
++			const refreshProgressPrefix = async (expectedThrough: number): Promise<void> => {
++				const current = await issuanceStore.readSettlementPlan(settlementScope);
++				const selected = current?.entries.find((candidate) => candidate.sourceSequence === entry.sourceSequence);
++				const progress = selected?.replacementProgress;
++				if (
++					current === null ||
++					progress === undefined ||
++					!sameBytes(progress.intentDigest, intentDigest) ||
++					(progress.chunks.at(-1)?.throughIntent ?? 0) !== expectedThrough
++				) {
++					throw new TypeError("v3 room settlement replacement progress did not advance");
+ 				}
+-				let selected = operation;
+-				if (policy === "transform") {
+-					const transform = input.application.transformDisplacedOperation;
+-					if (transform === undefined) throw new TypeError("v3 room displaced transform is unavailable");
+-					const first = detachedRoomOperation(transform(operation));
+-					const second = detachedRoomOperation(transform(operation));
+-					const identity = input.application.displacedOperationIdentity(operation);
++				plan = current;
++			};
++			const adoptProgressAdvance = (
++				advance: Extract<RoomSettlementIssueResult, { kind: "progress-advanced" }>
++			): void => {
++				fromIntent = advance.throughIntent;
++				logicalTime = Math.max(logicalTime, advance.lastLogicalTime + 2);
++				operationBaseIntent = fromIntent;
++				operations = allocateOperations(fromIntent);
++			};
++			while (fromIntent < ordered.length) {
++				const remaining = operations.slice(fromIntent - operationBaseIntent);
++				const effect = (throughIntent: number): RoomReplacementEffect =>
++					Object.freeze({
++						fromIntent,
++						intentDigest,
++						kind: "replacement",
++						sourceSequence: entry.sourceSequence,
++						throughIntent,
++					});
++				if (initialPrefixLength !== undefined) {
+ 					if (
+-						first === undefined ||
+-						second === undefined ||
+-						!sameBytes(encodeCanonical(first), encodeCanonical(second)) ||
+-						Reflect.get(first, "action") !== action ||
+-						input.application.displacedOperationIdentity(first) !== identity
++						!Number.isSafeInteger(initialPrefixLength) ||
++						initialPrefixLength < 1 ||
++						initialPrefixLength >= remaining.length
+ 					) {
+-						throw new TypeError("v3 room displaced transform is unstable");
++						throw new TypeError("v3 room settlement split prefix is invalid");
+ 					}
+-					selected = first;
++					const throughIntent = fromIntent + initialPrefixLength;
++					const issued = await issueSettlement(remaining.slice(0, initialPrefixLength), effect(throughIntent));
++					if (issued?.kind === "progress-advanced") {
++						adoptProgressAdvance(issued);
++						initialPrefixLength = undefined;
++						continue;
++					}
++					await refreshProgressPrefix(throughIntent);
++					fromIntent = throughIntent;
++					initialPrefixLength = undefined;
++					continue;
+ 				}
+-				const selectedLogicalTime = logicalTime;
+-				logicalTime += 2;
+-				return [Object.freeze({ logicalTime: selectedLogicalTime, operation: selected })];
+-			});
+-			if (operations.length === 0) throw new TypeError("v3 room settlement replacement is empty");
+-			await issueSettlement(
+-				Object.freeze(operations),
+-				Object.freeze({ kind: "replacement", sourceSequence: entry.sourceSequence })
+-			);
++				const attempted = await issueSettlement(remaining, effect(ordered.length));
++				if (attempted?.kind === "progress-advanced") {
++					adoptProgressAdvance(attempted);
++					continue;
++				}
++				if (attempted === null || attempted.ok) {
++					await refreshProgressPrefix(ordered.length);
++					fromIntent = ordered.length;
++					continue;
++				}
++				if (
++					attempted.kind !== "split-required" ||
++					!Number.isSafeInteger(attempted.prefixLength) ||
++					attempted.prefixLength < 1 ||
++					attempted.prefixLength >= remaining.length
++				) {
++					throw new TypeError("v3 room settlement split prefix is invalid");
++				}
++				const throughIntent = fromIntent + attempted.prefixLength;
++				const issued = await issueSettlement(remaining.slice(0, attempted.prefixLength), effect(throughIntent));
++				if (issued?.kind === "progress-advanced") {
++					adoptProgressAdvance(issued);
++					continue;
++				}
++				await refreshProgressPrefix(throughIntent);
++				fromIntent = throughIntent;
++			}
+ 		}
+ 	};
+ 	const drainRebaseOutbox = async (): Promise<void> => {
+diff --git a/packages/issuance-store/src/conformance.ts b/packages/issuance-store/src/conformance.ts
+index c04addbb..4466cd81 100644
+--- a/packages/issuance-store/src/conformance.ts
++++ b/packages/issuance-store/src/conformance.ts
+@@ -1,5 +1,6 @@
+ import {
+ 	applySettlementPlanEffect,
++	assertSettlementPlanProgressTransition,
+ 	captureSettlementPlanWriteInput,
+ 	cloneDurableIssueCommit as cloneCommit,
+ 	copyDurableIssueScope as cloneScope,
+@@ -16,6 +17,7 @@ import {
+ 	durablePreimageMatchesScopeAndSequence as preimageMatches,
+ 	durableIssuanceBytesEqual as sameBytes,
+ 	durableIssueScopesEqual as sameScope,
++	settlementReplacementLastLogicalTime,
+ 	assertDurableIssueScope as validateScope,
+ 	isValidDurableAuthorSequence as validOrdinal,
+ 	isValidDurableScopeField as validScopeField,
+@@ -264,6 +266,7 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
+ 		if ((current?.revision ?? null) !== captured.expectedRevision) {
+ 			throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan revision changed");
+ 		}
++		assertSettlementPlanProgressTransition(current ?? null, captured.plan);
+ 		const durable = cloneSettlementPlan(captured.plan);
+ 		this.#plans.set(key, durable);
+ 		return cloneSettlementPlan(durable);
+@@ -331,7 +334,12 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
+ 			}
+ 			const plan = copySettlementPlan(stored, detachedScope);
+ 			if (plan === undefined) throw this.#latchCorruption();
+-			updatedPlan = applySettlementPlanEffect(plan, candidate.planEffect, candidate.authorSequence);
++			updatedPlan = applySettlementPlanEffect(
++				plan,
++				candidate.planEffect,
++				candidate.authorSequence,
++				settlementReplacementLastLogicalTime(candidate)
++			);
+ 		}
+ 		this.#lineages.set(key, {
+ 			exhausted: prior.next === Number.MAX_SAFE_INTEGER,
+diff --git a/packages/issuance-store/src/contract.ts b/packages/issuance-store/src/contract.ts
+index e1050bc8..128cd544 100644
+--- a/packages/issuance-store/src/contract.ts
++++ b/packages/issuance-store/src/contract.ts
+@@ -1,6 +1,6 @@
+ import { decodeCanonical } from "@ts-drp/canonical";
+ 
+-import { MAXIMUM_DURABLE_ISSUANCE_SCOPE_UTF16_UNITS } from "./types.js";
++import { MAXIMUM_DURABLE_ISSUANCE_SCOPE_UTF16_UNITS, SETTLEMENT_REPLACEMENT_MAX_INTENTS } from "./types.js";
+ import type {
+ 	DurableIssuanceError,
+ 	DurableIssuanceErrorCode,
+@@ -11,6 +11,8 @@ import type {
+ 	DurableSignedEnvelope,
+ 	SettlementPlan,
+ 	SettlementPlanEntry,
++	SettlementReplacementChunk,
++	SettlementReplacementProgress,
+ } from "./types.js";
+ 
+ type SettlementPlanEffect = NonNullable<DurableIssueCommit["planEffect"]>;
+@@ -234,6 +236,35 @@ export function durablePreimageMatchesScopeAndSequence(
+ 	}
+ }
+ 
++/**
++ * Derives the final submitted operation logical time from one validated commit.
++ * @param commit - Validated durable issue commit.
++ * @returns The positive final logical time, or undefined for an invalid preimage.
++ */
++export function settlementReplacementLastLogicalTime(commit: DurableIssueCommit): number | undefined {
++	try {
++		const decoded: unknown = decodeCanonical(commit.envelope.canonicalPreimageBytes);
++		if (typeof decoded !== "object" || decoded === null || Array.isArray(decoded)) return undefined;
++		const record = decoded as Record<string, unknown>;
++		let logicalTime = record.logicalTime;
++		const operation = record.operation;
++		if (typeof operation === "object" && operation !== null && !Array.isArray(operation)) {
++			const batch = Reflect.get(operation, "batch");
++			const directEntries = Reflect.get(operation, "entries");
++			const entries =
++				typeof batch === "object" && batch !== null && !Array.isArray(batch)
++					? Reflect.get(batch, "entries")
++					: directEntries;
++			if (Array.isArray(entries) && entries.length > 0) {
++				logicalTime = Reflect.get(entries.at(-1) as object, "logicalTime");
++			}
++		}
++		return Number.isSafeInteger(logicalTime) && (logicalTime as number) > 0 ? (logicalTime as number) : undefined;
++	} catch {
++		return undefined;
++	}
++}
++
+ /**
+  * Deep-copies one validated envelope.
+  * @param envelope - Valid envelope.
+@@ -272,7 +303,15 @@ export function cloneDurableIssueCommit(commit: DurableIssueCommit): DurableIssu
+ 					planEffect:
+ 						commit.planEffect.kind === "fence"
+ 							? { kind: "fence" as const }
+-							: { kind: "replacement" as const, sourceSequence: commit.planEffect.sourceSequence },
++							: "fromIntent" in commit.planEffect
++								? {
++										fromIntent: commit.planEffect.fromIntent,
++										intentDigest: new Uint8Array(commit.planEffect.intentDigest),
++										kind: "replacement" as const,
++										sourceSequence: commit.planEffect.sourceSequence,
++										throughIntent: commit.planEffect.throughIntent,
++									}
++								: { kind: "replacement" as const, sourceSequence: commit.planEffect.sourceSequence },
+ 				}),
+ 	};
+ }
+@@ -284,21 +323,108 @@ export function cloneDurableIssueCommit(commit: DurableIssueCommit): DurableIssu
+  */
+ export function copySettlementPlanEffect(value: unknown): SettlementPlanEffect | undefined {
+ 	if (!isClosedDurableIssuanceRecord(value, ["kind"])) {
++		if (isClosedDurableIssuanceRecord(value, ["kind", "sourceSequence"])) {
++			return value.kind === "replacement" && isValidDurableAuthorSequence(value.sourceSequence)
++				? { kind: "replacement", sourceSequence: value.sourceSequence }
++				: undefined;
++		}
+ 		if (
+-			!isClosedDurableIssuanceRecord(value, ["kind", "sourceSequence"]) ||
++			!isClosedDurableIssuanceRecord(value, [
++				"fromIntent",
++				"intentDigest",
++				"kind",
++				"sourceSequence",
++				"throughIntent",
++			]) ||
+ 			value.kind !== "replacement" ||
+-			!isValidDurableAuthorSequence(value.sourceSequence)
++			!isValidDurableAuthorSequence(value.sourceSequence) ||
++			!isValidDurableAuthorSequence(value.fromIntent) ||
++			!isValidDurableAuthorSequence(value.throughIntent) ||
++			value.fromIntent >= value.throughIntent ||
++			value.throughIntent > SETTLEMENT_REPLACEMENT_MAX_INTENTS
+ 		) {
+ 			return undefined;
+ 		}
+-		return { kind: "replacement", sourceSequence: value.sourceSequence };
++		const intentDigest = copyDurableIssuanceBytes(value.intentDigest);
++		return intentDigest?.byteLength === 32
++			? {
++					fromIntent: value.fromIntent,
++					intentDigest,
++					kind: "replacement",
++					sourceSequence: value.sourceSequence,
++					throughIntent: value.throughIntent,
++				}
++			: undefined;
+ 	}
+ 	return value.kind === "fence" ? { kind: "fence" } : undefined;
+ }
+ 
++function copySettlementReplacementChunk(value: unknown): SettlementReplacementChunk | undefined {
++	if (
++		!isClosedDurableIssuanceRecord(value, ["lastLogicalTime", "replacementSequence", "throughIntent"]) ||
++		!isValidDurableAuthorSequence(value.replacementSequence) ||
++		!Number.isSafeInteger(value.throughIntent) ||
++		(value.throughIntent as number) < 1 ||
++		!Number.isSafeInteger(value.lastLogicalTime) ||
++		(value.lastLogicalTime as number) < 1
++	) {
++		return undefined;
++	}
++	return {
++		lastLogicalTime: value.lastLogicalTime as number,
++		replacementSequence: value.replacementSequence,
++		throughIntent: value.throughIntent as number,
++	};
++}
++
++function copySettlementReplacementProgress(value: unknown): SettlementReplacementProgress | undefined {
++	if (
++		!isClosedDurableIssuanceRecord(value, ["chunks", "intentCount", "intentDigest", "version"]) ||
++		value.version !== 1 ||
++		!Number.isSafeInteger(value.intentCount) ||
++		(value.intentCount as number) < 1 ||
++		(value.intentCount as number) > SETTLEMENT_REPLACEMENT_MAX_INTENTS ||
++		!Array.isArray(value.chunks) ||
++		value.chunks.length > (value.intentCount as number)
++	) {
++		return undefined;
++	}
++	const intentDigest = copyDurableIssuanceBytes(value.intentDigest);
++	if (intentDigest?.byteLength !== 32) return undefined;
++	const chunks: SettlementReplacementChunk[] = [];
++	let priorSequence = -1;
++	let priorThrough = 0;
++	let priorLogicalTime = 0;
++	for (const rawChunk of value.chunks) {
++		const chunk = copySettlementReplacementChunk(rawChunk);
++		if (
++			chunk === undefined ||
++			chunk.replacementSequence <= priorSequence ||
++			chunk.throughIntent <= priorThrough ||
++			chunk.throughIntent > (value.intentCount as number) ||
++			chunk.lastLogicalTime <= priorLogicalTime
++		) {
++			return undefined;
++		}
++		chunks.push(chunk);
++		priorSequence = chunk.replacementSequence;
++		priorThrough = chunk.throughIntent;
++		priorLogicalTime = chunk.lastLogicalTime;
++	}
++	return { chunks, intentCount: value.intentCount as number, intentDigest, version: 1 };
++}
++
+ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefined {
++	const hasProgress =
++		typeof value === "object" && value !== null && Object.prototype.hasOwnProperty.call(value, "replacementProgress");
+ 	if (
+-		!isClosedDurableIssuanceRecord(value, ["disposition", "replacementSequence", "sourceDigest", "sourceSequence"]) ||
++		!isClosedDurableIssuanceRecord(value, [
++			"disposition",
++			...(hasProgress ? ["replacementProgress"] : []),
++			"replacementSequence",
++			"sourceDigest",
++			"sourceSequence",
++		]) ||
+ 		!isValidDurableAuthorSequence(value.sourceSequence) ||
+ 		(value.replacementSequence !== null && !isValidDurableAuthorSequence(value.replacementSequence)) ||
+ 		(value.disposition !== "expire" &&
+@@ -309,9 +435,22 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
+ 		return undefined;
+ 	}
+ 	const sourceDigest = copyDurableIssuanceBytes(value.sourceDigest);
+-	if (sourceDigest === undefined) return undefined;
++	const replacementProgress = hasProgress ? copySettlementReplacementProgress(value.replacementProgress) : undefined;
++	if (
++		sourceDigest === undefined ||
++		(hasProgress && replacementProgress === undefined) ||
++		(replacementProgress !== undefined && (value.disposition === "expire" || value.disposition === "manual-review"))
++	) {
++		return undefined;
++	}
++	if (replacementProgress !== undefined) {
++		const finalChunk = replacementProgress.chunks.at(-1);
++		const complete = finalChunk?.throughIntent === replacementProgress.intentCount;
++		if ((complete ? finalChunk.replacementSequence : null) !== value.replacementSequence) return undefined;
++	}
+ 	return {
+ 		disposition: value.disposition,
++		...(replacementProgress === undefined ? {} : { replacementProgress }),
+ 		replacementSequence: value.replacementSequence,
+ 		sourceDigest,
+ 		sourceSequence: value.sourceSequence,
+@@ -364,6 +503,16 @@ export function cloneSettlementPlan(plan: SettlementPlan): SettlementPlan {
+ 	return {
+ 		entries: plan.entries.map((entry) => ({
+ 			disposition: entry.disposition,
++			...(entry.replacementProgress === undefined
++				? {}
++				: {
++						replacementProgress: {
++							chunks: entry.replacementProgress.chunks.map((chunk) => ({ ...chunk })),
++							intentCount: entry.replacementProgress.intentCount,
++							intentDigest: new Uint8Array(entry.replacementProgress.intentDigest),
++							version: 1 as const,
++						},
++					}),
+ 			replacementSequence: entry.replacementSequence,
+ 			sourceDigest: new Uint8Array(entry.sourceDigest),
+ 			sourceSequence: entry.sourceSequence,
+@@ -374,6 +523,59 @@ export function cloneSettlementPlan(plan: SettlementPlan): SettlementPlan {
+ 	};
+ }
+ 
++/**
++ * Refuses a CAS rewrite that would alter or remove durable replacement progress.
++ * @param current - Current durable plan, if present.
++ * @param next - Proposed next plan revision.
++ */
++export function assertSettlementPlanProgressTransition(current: SettlementPlan | null, next: SettlementPlan): void {
++	if (current === null) return;
++	for (const prior of current.entries) {
++		const candidate = next.entries.find((entry) => entry.sourceSequence === prior.sourceSequence);
++		if (prior.replacementProgress !== undefined && prior.replacementSequence === null) {
++			if (
++				candidate === undefined ||
++				candidate.disposition !== prior.disposition ||
++				candidate.replacementSequence !== prior.replacementSequence ||
++				!durableIssuanceBytesEqual(candidate.sourceDigest, prior.sourceDigest) ||
++				candidate.replacementProgress === undefined ||
++				candidate.replacementProgress.intentCount !== prior.replacementProgress.intentCount ||
++				!durableIssuanceBytesEqual(
++					candidate.replacementProgress.intentDigest,
++					prior.replacementProgress.intentDigest
++				) ||
++				candidate.replacementProgress.chunks.length !== prior.replacementProgress.chunks.length ||
++				candidate.replacementProgress.chunks.some((chunk, index) => {
++					const before = prior.replacementProgress?.chunks[index];
++					return (
++						before === undefined ||
++						chunk.lastLogicalTime !== before.lastLogicalTime ||
++						chunk.replacementSequence !== before.replacementSequence ||
++						chunk.throughIntent !== before.throughIntent
++					);
++				})
++			) {
++				throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement replacement progress changed");
++			}
++		} else if (
++			prior.replacementProgress === undefined &&
++			prior.replacementSequence !== null &&
++			candidate?.replacementProgress !== undefined
++		) {
++			throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "linked settlement replacement cannot be upgraded");
++		} else if (prior.replacementProgress === undefined && candidate?.replacementProgress !== undefined) {
++			if (
++				prior.replacementSequence !== null ||
++				candidate.replacementSequence !== null ||
++				candidate.disposition !== prior.disposition ||
++				!durableIssuanceBytesEqual(candidate.sourceDigest, prior.sourceDigest)
++			) {
++				throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement replacement upgrade changed");
++			}
++		}
++	}
++}
++
+ /**
+  * Validates and detaches one exact settlement-plan CAS write request.
+  * @param value - Untrusted write request.
+@@ -410,12 +612,14 @@ export function captureSettlementPlanWriteInput(value: unknown): Readonly<{
+  * @param plan - Current validated plan.
+  * @param effect - Validated issue effect.
+  * @param authorSequence - Sequence allocated to the issue.
++ * @param lastLogicalTime - Node-derived final operation logical time for a progress chunk.
+  * @returns The detached next plan revision.
+  */
+ export function applySettlementPlanEffect(
+ 	plan: SettlementPlan,
+ 	effect: SettlementPlanEffect,
+-	authorSequence: number
++	authorSequence: number,
++	lastLogicalTime?: number
+ ): SettlementPlan {
+ 	if (plan.revision === Number.MAX_SAFE_INTEGER) {
+ 		throw createDurableIssuanceFailure("ISSUANCE_RECOVERY_CORRUPT", "settlement plan revision is exhausted");
+@@ -432,12 +636,88 @@ export function applySettlementPlanEffect(
+ 		throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement replacement precondition changed");
+ 	}
+ 	const detached = cloneSettlementPlan(plan);
++	if ("fromIntent" in effect) {
++		if (!Number.isSafeInteger(lastLogicalTime) || (lastLogicalTime as number) < 1) {
++			throw createDurableIssuanceFailure("ISSUANCE_COMMIT_INVALID", "settlement chunk logical time is invalid");
++		}
++		const progress = entry.replacementProgress;
++		if (
++			progress === undefined ||
++			!durableIssuanceBytesEqual(progress.intentDigest, effect.intentDigest) ||
++			(progress.chunks.at(-1)?.throughIntent ?? 0) !== effect.fromIntent
++		) {
++			throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement replacement progress changed");
++		}
++		if (effect.throughIntent > progress.intentCount) {
++			throw createDurableIssuanceFailure("ISSUANCE_COMMIT_INVALID", "settlement replacement range is invalid");
++		}
++		const priorChunk = progress.chunks.at(-1);
++		if (
++			(priorChunk !== undefined && authorSequence <= priorChunk.replacementSequence) ||
++			(priorChunk !== undefined && (lastLogicalTime as number) <= priorChunk.lastLogicalTime)
++		) {
++			throw createDurableIssuanceFailure("ISSUANCE_COMMIT_INVALID", "settlement replacement chunk is not monotonic");
++		}
++		const nextProgress: SettlementReplacementProgress = {
++			...progress,
++			chunks: [
++				...progress.chunks,
++				{
++					lastLogicalTime: lastLogicalTime as number,
++					replacementSequence: authorSequence,
++					throughIntent: effect.throughIntent,
++				},
++			],
++		};
++		const entries = detached.entries.map((candidate, candidateIndex) =>
++			candidateIndex === index
++				? {
++						...candidate,
++						replacementProgress: nextProgress,
++						replacementSequence: effect.throughIntent === progress.intentCount ? authorSequence : null,
++					}
++				: candidate
++		);
++		return { ...detached, entries, revision: plan.revision + 1 };
++	}
++	if (entry.replacementProgress !== undefined) {
++		throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement replacement effect form changed");
++	}
+ 	const entries = detached.entries.map((candidate, candidateIndex) =>
+ 		candidateIndex === index ? { ...candidate, replacementSequence: authorSequence } : candidate
+ 	);
+ 	return { ...detached, entries, revision: plan.revision + 1 };
+ }
+ 
++/**
++ * Tests whether durable plan state contains the exact selected issue effect link.
++ * @param plan - Durable plan observed after an ambiguous transaction outcome.
++ * @param effect - Effect carried by the candidate commit.
++ * @param authorSequence - Sequence allocated to the candidate commit.
++ * @returns Whether the exact link is durably present.
++ */
++export function settlementPlanHasExactEffectLink(
++	plan: SettlementPlan | null,
++	effect: SettlementPlanEffect,
++	authorSequence: number
++): boolean {
++	if (effect.kind === "fence") return plan?.fenceSequence === authorSequence;
++	const entry = plan?.entries.find((candidate) => candidate.sourceSequence === effect.sourceSequence);
++	if (!("fromIntent" in effect)) return entry?.replacementSequence === authorSequence;
++	const progress = entry?.replacementProgress;
++	if (progress === undefined || !durableIssuanceBytesEqual(progress.intentDigest, effect.intentDigest)) return false;
++	const index = progress.chunks.findIndex((chunk) => chunk.replacementSequence === authorSequence);
++	const chunk = progress.chunks[index];
++	return (
++		chunk !== undefined &&
++		chunk.throughIntent === effect.throughIntent &&
++		(index === 0 ? 0 : progress.chunks[index - 1]?.throughIntent) === effect.fromIntent &&
++		(effect.throughIntent === progress.intentCount
++			? entry?.replacementSequence === authorSequence
++			: entry?.replacementSequence === null)
++	);
++}
++
+ /**
+  * Closes and detaches a structural commit for the selected scope and ordinal.
+  * @param value - Untrusted commit candidate.
+diff --git a/packages/issuance-store/src/types.ts b/packages/issuance-store/src/types.ts
+index e8ef652b..451422a7 100644
+--- a/packages/issuance-store/src/types.ts
++++ b/packages/issuance-store/src/types.ts
+@@ -47,11 +47,32 @@ export interface DurableIssuanceOutboxEntry {
+ 
+ export type SettlementDisposition = "expire" | "rebase" | "transform" | "manual-review";
+ 
++export const SETTLEMENT_REPLACEMENT_MAX_INTENTS = 16;
++export const SETTLEMENT_REPLACEMENT_DIGEST_LIMITS = Object.freeze({
++	maxBytes: 1_048_640,
++	maxDepth: 9,
++	maxItems: 1_024,
++});
++
++export interface SettlementReplacementChunk {
++	readonly replacementSequence: number;
++	readonly throughIntent: number;
++	readonly lastLogicalTime: number;
++}
++
++export interface SettlementReplacementProgress {
++	readonly version: 1;
++	readonly intentCount: number;
++	readonly intentDigest: Uint8Array;
++	readonly chunks: readonly SettlementReplacementChunk[];
++}
++
+ export interface SettlementPlanEntry {
+ 	readonly sourceSequence: number;
+ 	readonly sourceDigest: Uint8Array;
+ 	readonly disposition: SettlementDisposition;
+ 	readonly replacementSequence: number | null;
++	readonly replacementProgress?: SettlementReplacementProgress;
+ }
+ 
+ export interface SettlementPlan {
+@@ -68,7 +89,14 @@ export interface DurableIssueCommit {
+ 	readonly outboxEntry: DurableIssuanceOutboxEntry;
+ 	readonly planEffect?:
+ 		| Readonly<{ readonly kind: "fence" }>
+-		| Readonly<{ readonly kind: "replacement"; readonly sourceSequence: number }>;
++		| Readonly<{ readonly kind: "replacement"; readonly sourceSequence: number }>
++		| Readonly<{
++				readonly fromIntent: number;
++				readonly intentDigest: Uint8Array;
++				readonly kind: "replacement";
++				readonly sourceSequence: number;
++				readonly throughIntent: number;
++		  }>;
+ }
+ 
+ export type DurableBuildAndSign = (authorSequence: number) => Promise<DurableIssueCommit>;
+diff --git a/packages/node/src/v3-live.ts b/packages/node/src/v3-live.ts
+index 02e7dbc2..94bc4eb0 100644
+--- a/packages/node/src/v3-live.ts
++++ b/packages/node/src/v3-live.ts
+@@ -22,6 +22,7 @@ import {
+ 	type DurableIssueScope,
+ 	type DurableOutboxPageInput,
+ 	type DurableOutboxPublicationTransitionInput,
++	SETTLEMENT_REPLACEMENT_MAX_INTENTS,
+ } from "@ts-drp/issuance-store";
+ import {
+ 	bindDurableIssuancePruningMaintenance,
+@@ -226,6 +227,13 @@ const BLUEPRINT_RETRIEVAL_INPUT_KEYS = ["plane"] as const;
+ const BLUEPRINT_PROJECTION_BASE_INPUT_KEYS = ["plane", "purpose"] as const;
+ const LOCAL_ISSUE_INPUT_KEYS = ["operations", "signRegisteredVertexDigest"] as const;
+ const LOCAL_ISSUE_WITH_PLAN_EFFECT_KEYS = ["operations", "planEffect", "signRegisteredVertexDigest"] as const;
++const PROGRESS_REPLACEMENT_EFFECT_KEYS = [
++	"fromIntent",
++	"intentDigest",
++	"kind",
++	"sourceSequence",
++	"throughIntent",
++] as const;
+ const LOCAL_ISSUE_ENTRY_KEYS = ["logicalTime", "operation"] as const;
+ const CANONICAL_APPLICATION_BATCH_ENTRY_KEYS = ["operation", "logicalTime"] as const;
+ const APPLICATION_BATCH_KEYS = ["batch", "action"] as const;
+@@ -6245,6 +6253,10 @@ function capturedLocalIssueInput(
+ 		const fence = snapshotClosedRecord(input.planEffect, ["kind"]);
+ 		const replacement =
+ 			fence === undefined ? snapshotClosedRecord(input.planEffect, ["kind", "sourceSequence"]) : undefined;
++		const progressReplacement =
++			fence === undefined && replacement === undefined
++				? snapshotClosedRecord(input.planEffect, PROGRESS_REPLACEMENT_EFFECT_KEYS)
++				: undefined;
+ 		if (fence?.kind === "fence") {
+ 			planEffect = ObjectFreeze({ kind: "fence" as const });
+ 		} else if (
+@@ -6253,6 +6265,27 @@ function capturedLocalIssueInput(
+ 			(replacement.sourceSequence as number) >= 0
+ 		) {
+ 			planEffect = ObjectFreeze({ kind: "replacement" as const, sourceSequence: replacement.sourceSequence as number });
++		} else if (
++			progressReplacement?.kind === "replacement" &&
++			NumberIsSafeInteger(progressReplacement.sourceSequence) &&
++			(progressReplacement.sourceSequence as number) >= 0 &&
++			NumberIsSafeInteger(progressReplacement.fromIntent) &&
++			(progressReplacement.fromIntent as number) >= 0 &&
++			NumberIsSafeInteger(progressReplacement.throughIntent) &&
++			(progressReplacement.throughIntent as number) > (progressReplacement.fromIntent as number) &&
++			(progressReplacement.throughIntent as number) <= SETTLEMENT_REPLACEMENT_MAX_INTENTS
++		) {
++			const intentDigest = copyDetachedBytes(progressReplacement.intentDigest);
++			if (intentDigest?.byteLength !== 32) {
++				return localIssueFailure("malformed-input", "v3 local issue plan effect is invalid");
++			}
++			planEffect = ObjectFreeze({
++				fromIntent: progressReplacement.fromIntent as number,
++				intentDigest,
++				kind: "replacement" as const,
++				sourceSequence: progressReplacement.sourceSequence as number,
++				throughIntent: progressReplacement.throughIntent as number,
++			});
+ 		} else {
+ 			return localIssueFailure("malformed-input", "v3 local issue plan effect is invalid");
+ 		}
+@@ -6309,6 +6342,13 @@ function capturedLocalIssueInput(
+ 	if (planEffect !== undefined && settlementProfileFor(payload.trust.trust.profileId) !== "v1") {
+ 		return localIssueFailure("malformed-input", "v3 local issue plan effect is unavailable");
+ 	}
++	if (
++		planEffect?.kind === "replacement" &&
++		"fromIntent" in planEffect &&
++		planEffect.throughIntent - planEffect.fromIntent !== operations.length
++	) {
++		return localIssueFailure("malformed-input", "v3 local issue replacement range does not match its operations");
++	}
+ 	return ObjectFreeze({
+ 		operations: ObjectFreeze(operations),
+ 		...(planEffect === undefined ? {} : { planEffect }),
+@@ -6693,6 +6733,30 @@ async function issueLocal(
+ 	) {
+ 		return localIssueFailure("malformed-input", "v3 local issue plan effect is invalid");
+ 	}
++	if (input.planEffect?.kind === "replacement" && "fromIntent" in input.planEffect) {
++		const effect = input.planEffect;
++		let plan;
++		try {
++			plan = copySettlementPlan(
++				await registration.issuanceStore.readSettlementPlan(registration.issuanceScope),
++				registration.issuanceScope
++			);
++		} catch {
++			registration.operationAdmissionHalted = true;
++			return localIssueFailure("issuance-rejected", "v3 settlement replacement plan read failed");
++		}
++		const entry = plan?.entries.find((candidate) => candidate.sourceSequence === effect.sourceSequence);
++		const progress = entry?.replacementProgress;
++		if (
++			progress === undefined ||
++			entry?.replacementSequence !== null ||
++			!sameBytes(progress.intentDigest, effect.intentDigest) ||
++			(progress.chunks.at(-1)?.throughIntent ?? 0) !== effect.fromIntent ||
++			effect.throughIntent > progress.intentCount
++		) {
++			return localIssueFailure("issuance-rejected", "v3 settlement replacement progress changed");
++		}
++	}
+ 	let applicationOperation = first.operation;
+ 	if (input.operations.length > 1) {
+ 		if (typeof Reflect.get(registration.payload.runtime.reducers, APPLICATION_BATCH_ACTION) !== "function") {
+@@ -6880,7 +6944,8 @@ async function authenticatedOutboxRow(
+ async function readRebaseOutbox(
+ 	registration: V3PlaneRegistration,
+ 	includePublishedSources = false,
+-	settlementFrontier?: SettlementFrontierContext
++	settlementFrontier?: SettlementFrontierContext,
++	openProgressSources?: ReadonlySet<number>
+ ): Promise<V3RebaseOutboxResult> {
+ 	if (!currentRegistration(registration)) {
+ 		return ObjectFreeze({ detail: "v3 plane is not active", kind: "not-active" as const, ok: false as const });
+@@ -6950,7 +7015,12 @@ async function readRebaseOutbox(
+ 					settlementFrontier.admissionEpoch,
+ 					settlementFrontier.terminalThrough
+ 				);
+-				if (ownRowClass === "terminal" || ownRowClass === "old-incarnation") continue;
++				if (
++					(ownRowClass === "terminal" || ownRowClass === "old-incarnation") &&
++					openProgressSources?.has(classified.row.authorSequence) !== true
++				) {
++					continue;
++				}
+ 			}
+ 			const historical = classified.kind === "covered-historical" || classified.kind === "pinned-genesis";
+ 			if (historical && !countHistoricalIssuanceRow(registration.historicalIssuance, classified.row.authorSequence)) {
+@@ -8688,8 +8758,26 @@ async function readSettlementSources(
+ 	registration: V3PlaneRegistration,
+ 	settlementFrontier?: SettlementFrontierContext
+ ): Promise<V3RebaseOutboxResult> {
+-	// Until the checkpoint/room owner supplies its verified frontier, retain every authenticated source candidate.
+-	return readRebaseOutbox(registration, true, settlementFrontier);
++	if (settlementFrontier === undefined) return readRebaseOutbox(registration, true);
++	let plan;
++	try {
++		plan = copySettlementPlan(
++			await registration.issuanceStore.readSettlementPlan(registration.issuanceScope),
++			registration.issuanceScope
++		);
++	} catch {
++		return ObjectFreeze({
++			detail: "v3 settlement plan read failed",
++			kind: "store-failed" as const,
++			ok: false as const,
++		});
++	}
++	const openProgressSources = new Set(
++		plan?.entries
++			.filter((entry) => entry.replacementProgress !== undefined && entry.replacementSequence === null)
++			.map((entry) => entry.sourceSequence) ?? []
++	);
++	return readRebaseOutbox(registration, true, settlementFrontier, openProgressSources);
+ }
+ 
+ export { prepareV3LiveGeneration };
+diff --git a/packages/storage-browser/src/internal/browser-issuance-store.ts b/packages/storage-browser/src/internal/browser-issuance-store.ts
+index 959aa090..4ba9afa7 100644
+--- a/packages/storage-browser/src/internal/browser-issuance-store.ts
++++ b/packages/storage-browser/src/internal/browser-issuance-store.ts
+@@ -1,6 +1,7 @@
+ import {
+ 	applySettlementPlanEffect,
+ 	assertDurableIssueScope,
++	assertSettlementPlanProgressTransition,
+ 	captureSettlementPlanWriteInput,
+ 	classifyDurableIssuanceTerminalSuppression,
+ 	cloneDurableIssueCommit,
+@@ -31,6 +32,9 @@ import {
+ 	isValidDurableScopeField,
+ 	MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT,
+ 	type SettlementPlan,
++	type SettlementPlanEntry,
++	settlementPlanHasExactEffectLink,
++	settlementReplacementLastLogicalTime,
+ } from "@ts-drp/issuance-store";
+ import {
+ 	bindDurableIssuancePruningMaintenance,
+@@ -68,7 +72,9 @@ interface NativeOutboxRecord extends DurableIssueScope {
+ }
+ 
+ interface NativeSettlementPlan extends DurableIssueScope {
+-	readonly entries: SettlementPlan["entries"];
++	readonly entries: readonly (SettlementPlanEntry & {
++		readonly replacementProgress?: SettlementPlanEntry["replacementProgress"];
++	})[];
+ 	readonly fenceSequence: number | null;
+ 	readonly revision: number;
+ }
+@@ -500,6 +506,17 @@ class BrowserIssuanceImplementation {
+ 				reason = createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement plan revision changed");
+ 				transaction.abort();
+ 			} else {
++				try {
++					assertSettlementPlanProgressTransition(current ?? null, captured.plan);
++				} catch (error) {
++					reason =
++						error instanceof Error
++							? error
++							: createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement plan progress changed");
++					transaction.abort();
++				}
++			}
++			if (reason === undefined) {
+ 				const writtenKey = await requestResult(plans.put(nativeSettlementPlan(captured.plan)));
+ 				if (!this.#sameNativePlanKey(writtenKey, captured.scope)) {
+ 					reason = this.#latchCorruption("settlement plan put returned an impossible key");
+@@ -896,7 +913,12 @@ class BrowserIssuanceImplementation {
+ 							transaction.abort();
+ 						} else {
+ 							try {
+-								updatedPlan = applySettlementPlanEffect(plan, candidate.planEffect, candidate.authorSequence);
++								updatedPlan = applySettlementPlanEffect(
++									plan,
++									candidate.planEffect,
++									candidate.authorSequence,
++									settlementReplacementLastLogicalTime(candidate)
++								);
+ 							} catch (error) {
+ 								reason = error instanceof Error ? error : invalid("settlement plan effect failed");
+ 								transaction.abort();
+@@ -971,13 +993,7 @@ class BrowserIssuanceImplementation {
+ 	): void {
+ 		const effect = candidate.planEffect;
+ 		if (effect === undefined) return;
+-		const linked =
+-			effect.kind === "fence"
+-				? plan?.fenceSequence === candidate.authorSequence
+-				: plan?.entries.some(
+-						(entry) =>
+-							entry.sourceSequence === effect.sourceSequence && entry.replacementSequence === candidate.authorSequence
+-					);
++		const linked = settlementPlanHasExactEffectLink(plan, effect, candidate.authorSequence);
+ 		if ((observation.issuedRecord !== null) !== linked) {
+ 			throw this.#latchCorruption("issued row and settlement plan link are inconsistent");
+ 		}
+diff --git a/packages/storage-node/src/internal/node-issuance-store.ts b/packages/storage-node/src/internal/node-issuance-store.ts
+index 815a6117..3ae9991d 100644
+--- a/packages/storage-node/src/internal/node-issuance-store.ts
++++ b/packages/storage-node/src/internal/node-issuance-store.ts
+@@ -1,6 +1,7 @@
+ import {
+ 	applySettlementPlanEffect,
+ 	assertDurableIssueScope,
++	assertSettlementPlanProgressTransition,
+ 	captureSettlementPlanWriteInput,
+ 	classifyDurableIssuanceTerminalSuppression,
+ 	cloneDurableIssueCommit,
+@@ -31,6 +32,8 @@ import {
+ 	isValidDurableScopeField,
+ 	MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT,
+ 	type SettlementPlan,
++	settlementPlanHasExactEffectLink,
++	settlementReplacementLastLogicalTime,
+ } from "@ts-drp/issuance-store";
+ import {
+ 	bindDurableIssuancePruningMaintenance,
+@@ -377,6 +380,16 @@ function settlementPlanEntriesJson(plan: SettlementPlan): string {
+ 	return JSON.stringify(
+ 		plan.entries.map((entry) => ({
+ 			disposition: entry.disposition,
++			...(entry.replacementProgress === undefined
++				? {}
++				: {
++						replacementProgress: {
++							chunks: entry.replacementProgress.chunks.map((chunk) => ({ ...chunk })),
++							intentCount: entry.replacementProgress.intentCount,
++							intentDigest: [...entry.replacementProgress.intentDigest],
++							version: 1,
++						},
++					}),
+ 			replacementSequence: entry.replacementSequence,
+ 			sourceDigest: [...entry.sourceDigest],
+ 			sourceSequence: entry.sourceSequence,
+@@ -407,6 +420,26 @@ function copySettlementPlanRow(value: unknown, scope: DurableIssueScope): Settle
+ 			) {
+ 				return entry;
+ 			}
++			const replacementProgress = Reflect.get(entry, "replacementProgress");
++			if (replacementProgress !== undefined) {
++				if (typeof replacementProgress !== "object" || replacementProgress === null) return entry;
++				const intentDigest = Reflect.get(replacementProgress, "intentDigest");
++				if (
++					!Array.isArray(intentDigest) ||
++					intentDigest.length !== 32 ||
++					intentDigest.some((byte) => !Number.isInteger(byte) || byte < 0 || byte > 255)
++				) {
++					return entry;
++				}
++				return {
++					...entry,
++					replacementProgress: {
++						...replacementProgress,
++						intentDigest: Uint8Array.from(intentDigest as number[]),
++					},
++					sourceDigest: Uint8Array.from(sourceDigest as number[]),
++				};
++			}
+ 			return { ...entry, sourceDigest: Uint8Array.from(sourceDigest as number[]) };
+ 		});
+ 		return copySettlementPlan({ entries, fenceSequence, revision, scope }, scope);
+@@ -611,6 +644,7 @@ class NodeIssuanceImplementation {
+ 			if ((current?.revision ?? null) !== captured.expectedRevision) {
+ 				throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan revision changed");
+ 			}
++			assertSettlementPlanProgressTransition(current, captured.plan);
+ 			const changes =
+ 				current === null
+ 					? statement(
+@@ -944,7 +978,12 @@ class NodeIssuanceImplementation {
+ 				const plan = readSettlementPlanRow(this.#database, scope);
+ 				if (plan === undefined) throw this.#latchCorruption("stored settlement plan is malformed");
+ 				if (plan === null) throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan is absent");
+-				const updated = applySettlementPlanEffect(plan, candidate.planEffect, candidate.authorSequence);
++				const updated = applySettlementPlanEffect(
++					plan,
++					candidate.planEffect,
++					candidate.authorSequence,
++					settlementReplacementLastLogicalTime(candidate)
++				);
+ 				const planChanges = statement(
+ 					this.#database,
+ 					"UPDATE settlement_plans SET revision=?,fence_sequence=?,entries_json=? WHERE object_id=? AND author=? AND revision=?"
+@@ -1053,13 +1092,7 @@ class NodeIssuanceImplementation {
+ 	): void {
+ 		const effect = candidate.planEffect;
+ 		if (effect === undefined) return;
+-		const linked =
+-			effect.kind === "fence"
+-				? plan?.fenceSequence === candidate.authorSequence
+-				: plan?.entries.some(
+-						(entry) =>
+-							entry.sourceSequence === effect.sourceSequence && entry.replacementSequence === candidate.authorSequence
+-					);
++		const linked = settlementPlanHasExactEffectLink(plan, effect, candidate.authorSequence);
+ 		if ((observation.issuedRecord !== null) !== linked) {
+ 			throw this.#latchCorruption("issued row and settlement plan link are inconsistent");
+ 		}

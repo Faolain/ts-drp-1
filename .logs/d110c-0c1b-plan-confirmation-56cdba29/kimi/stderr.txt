@@ -1,0 +1,1391 @@
+Warning: [loop_control] 'max_retries_per_step' is deprecated and no longer used; rename it to 'max_attempts_per_step'. Run /update-config to fix it.
+56cdba29 docs: correct d110c committed issuance plan
+d4ed7024 docs: freeze D110c issuance reconciliation plan
+90a06a1a docs: close D110c issuance retirement prerequisite
+7414fa6b test: close D110c retirement review findings
+d77ee315 feat: authenticate creator issuance retirement
+commit 56cdba29056d493dd95a98a80cb0f5e3c77260c5
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Wed Sep 2 23:47:57 2026 -0400
+
+    docs: correct d110c committed issuance plan
+
+ .logs/d110c-0c1b-plan-review-d4ed7024/commands.md  |   28 +
+ .../grok/command.json                              |   26 +
+ .../grok/events.jsonl                              | 2174 ++++++++++++
+ .../grok/input-packet.md                           | 3486 ++++++++++++++++++++
+ .../grok/public.txt                                |   32 +
+ .../grok/review.diff                               |  317 ++
+ .../grok/status.json                               |    9 +
+ .../grok/verdict.json                              |   30 +
+ .../kimi/status.json                               |    5 +
+ .../kimi/stderr.txt                                |   86 +
+ .../kimi/stream.jsonl                              |   79 +
+ .../kimi/verdict.json                              |   30 +
+ .../manifest.sha256                                |   20 +
+ .../d110c-0c1b-plan-review-d4ed7024/opus/raw.json  |    1 +
+ .../opus/status.json                               |    7 +
+ .../opus/stderr.txt                                |    0
+ .../opus/verdict.json                              |   30 +
+ .logs/d110c-0c1b-plan-review-d4ed7024/prompt.md    |   94 +
+ .../review-summary.md                              |   44 +
+ .logs/d110c-0c1b-plan-review-d4ed7024/schema.json  |   43 +
+ .logs/d110c-0c1b-source-audit-90a06a1a/audit.md    |   60 +-
+ .../manifest.sha256                                |    2 +-
+ .../production-hardening-tdd-plan-v2.md            |   96 +-
+ 23 files changed, 6646 insertions(+), 53 deletions(-)
+.logs/d110c-0c1b-plan-review-d4ed7024/:
+commands.md
+grok
+kimi
+manifest.sha256
+opus
+prompt.md
+review-summary.md
+schema.json
+
+.logs/d110c-0c1b-source-audit-90a06a1a/:
+audit.md
+commands.md
+manifest.sha256
+source-hashes.sha256
+./.logs/d110c-0c-plan-confirmation-cb5b3437/schema.json
+./.logs/d108e4ci-plan-review/schema.json
+./.logs/d108e5-plan-review/schema.json
+./.logs/d108e4bz-plan-review/schema.json
+./.logs/d108e4bn-final-review/schema.json
+./.logs/d110c-0c1a-plan-confirmation-037b8244/schema.json
+./.logs/d108e4bs-plan-review/schema.json
+./.logs/d108e4ck-final-review/schema.json
+./.logs/d108e4cm-freeze-review/schema.json
+./.logs/d108e5-final-review/schema.json
+diff --git a/.logs/d110c-0c1b-source-audit-90a06a1a/audit.md b/.logs/d110c-0c1b-source-audit-90a06a1a/audit.md
+index 074c1151..886094b1 100644
+--- a/.logs/d110c-0c1b-source-audit-90a06a1a/audit.md
++++ b/.logs/d110c-0c1b-source-audit-90a06a1a/audit.md
+@@ -7,11 +7,15 @@ Audit anchor: signed/pushed commit
+ ## Demonstrated defect
+ 
+ `packages/node/src/v3-live.ts::issueOneVertex()` returns from
+-`issuer.issue()` only after `DurableIssuanceStore.transactIssue()` has
+-committed the exact issued record and pending outbox row. All failures from
+-`committedFailure()` therefore occur after durable issuance. The helper sets
++`issuer.issue()` normally returns only after
++`DurableIssuanceStore.transactIssue()` has committed the exact issued record
++and pending outbox row. All failures from `committedFailure()` therefore occur
++after durable issuance. There is also one pre-return ambiguous arm: both real
++issuance stores can commit and then throw exact
++`ISSUANCE_OUTCOME_UNKNOWN` when the bounded terminal readback is unavailable.
++The surrounding catch and `committedFailure()` set
+ `operationAdmissionHalted` only when an optional operation-policy reservation
+-exists. Even when it does set the flag, neither
++exists. Even when they do set the flag, neither
+ `creatorCloseRegistration()` nor the queued `stageClosedBlueprintEpoch()`
+ checks it. A close can consequently fold/capture a graph that omits a durable
+ issued row.
+@@ -46,10 +50,12 @@ operation is necessary for this defect.
+ 
+ This is composition/orchestration, not new product data:
+ 
+-1. Once `issuer.issue()` returned a durable commit, every
+-   `committedFailure()` unconditionally sets the existing
+-   `operationAdmissionHalted` recovery-required flag, including when no
+-   operation admission policy is installed.
++1. Every `committedFailure()` after `issuer.issue()` returned a durable commit
++   unconditionally sets the existing `operationAdmissionHalted`
++   recovery-required flag. The surrounding catch also sets it when the thrown
++   error has exact code `ISSUANCE_OUTCOME_UNKNOWN`, independent of whether an
++   operation admission policy is installed. Definitely pre-transaction
++   signer and capacity failures retain their existing release/retry behavior.
+ 2. `creatorCloseRegistration()` refuses to mint a close registration while
+    that flag is set.
+ 3. `stageClosedBlueprintEpoch()` rechecks the same flag after the registration
+@@ -78,18 +84,23 @@ only after the existing authenticated outbox/journal reconciliation succeeds.
+ 
+ ## Frozen RED witness
+ 
+-A tests-only fixture uses the genuine issue path and real store implementations
+-with a one-use journal adapter that blocks at the target `local-issued` append
+-and then rejects without writing. It binds creator close before releasing the
+-failure, calls close while issue owns the registration queue, then releases the
+-journal rejection. At current code the issue returns the existing
++A tests-only fixture uses the genuine issue path and real store implementations.
++It first admits sequence 0 so the current retirement boundary is non-empty,
++then uses a one-use journal adapter that blocks at sequence 1's target
++`local-issued` append and rejects without writing. It binds creator close
++before releasing the failure, calls close while issue owns the registration
++queue, then releases the journal rejection. At current code the issue returns
++the existing
+ `journal-rejected` class, the exact issued/pending-outbox row survives, the
+ journal and graph omit it, yet the queued creator close advances. After genuine
+ adoption/restart, the next close fails with exact
+ `D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE` because the row retains the old
+-authenticated epoch/anchor. The test expects the earlier close to refuse with
+-`D110C_0C1B_COMMITTED_ISSUANCE_RECOVERY_REQUIRED`, so current code is causal
+-RED. No fixture inserts, mutates, deletes, republishes or reclassifies the row.
++authenticated epoch/anchor. Test case id
++`D110C_0C1B_COMMITTED_ISSUANCE_RECOVERY_REQUIRED` marks unexpected advancement;
++it is not a product error. GREEN must preserve the existing product surfaces:
++bind-after-failure returns `CREATOR_CLOSE_UNAVAILABLE`, while a pre-bound close
++fails through the existing `creator snapshot export failed: not-active` path.
++No fixture inserts, mutates, deletes, republishes or reclassifies the row.
+ 
+ ## Frozen GREEN and retained gates
+ 
+@@ -105,11 +116,18 @@ sequence skip, no hidden pending row, exact carrier boundary and non-null
+ continuation, exact state digest and operation count.
+ 
+ Fault cases cover failure before journal write, journal write then thrown
+-outcome, graph append failure, policy-commit failure, close racing the failure,
+-close binding after the failure, repeated recovery, substituted issued/outbox
+-row, stale epoch/anchor, invalid dependency/ACL, capacity, and terminal
+-classification. Existing fail-closed error classes remain unchanged; the RED
+-token is test-only. Retain D.110c-0c1a, E5-01 admission/recovery, Phase-6a
++outcome, graph append failure, policy-commit failure, a non-terminal
++`ISSUANCE_OUTCOME_UNKNOWN` after durable commit with no operation policy, close
++racing the failure, close binding after the failure, repeated recovery,
++substituted issued/outbox row, stale epoch/anchor, invalid dependency/ACL,
++capacity, and terminal classification. The conservative halt also refuses new
++local and received admissions and a received-path uncertain outcome can refuse
++close; this fail-closed reuse is intentional. On queued-fold refusal,
++creator-close's existing abort path clears `blueprintClosing` while
++`operationAdmissionHalted` remains set; the refused mint consumes no close
++claim, and only deactivate/recover creates a fresh close-capable registration.
++Existing fail-closed error classes remain unchanged; the RED token is test-only.
++Retain D.110c-0c1a, E5-01 admission/recovery, Phase-6a
+ successor recovery/adoption, issuance/outbox/rebase, AHE rollback, snapshot,
+ D.109 reclamation, exact-owner static gates, and the D.110c-a/b hot path. No
+ campaign or D.110a invocation is permitted.
+diff --git a/docs/production-hardening/production-hardening-tdd-plan-v2.md b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+index 9451b1f1..8b3f67b9 100644
+--- a/docs/production-hardening/production-hardening-tdd-plan-v2.md
++++ b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+@@ -96204,9 +96204,9 @@ is under `.logs/d110c-0c1a-review-confirmation-7414fa6b/`; its validating
+ ###### D.110c-0c1b committed-issuance outcome reconciliation prerequisite
+ 
+ **Status: bounded source/architecture audit complete at signed/pushed anchor
+-`90a06a1aae79d408a1c2c6b014dae1a99daf866d`; the exact orchestration repair and
+-causal tests-only RED are frozen below, with plan review next and no production
+-edit yet.** Owner: the
++`90a06a1aae79d408a1c2c6b014dae1a99daf866d`; initial plan review completed with
++the material corrections below applied in one batch, one confirmation is due,
++and no production edit has begun.** Owner: the
+ post-`transactIssue()` outcome window in
+ `packages/node/src/v3-live.ts::issueOneVertex()`, live-journal append, graph
+ admission, restart recovery of pending issuance/outbox rows, and the close-time
+@@ -96218,14 +96218,17 @@ The bounded source/architecture audit inspected `issueOneVertex()`, the
+ registration task queue, blueprint fold/creator-close capture, the complete
+ recovery outbox/journal path, issuance and journal contracts, the retained
+ E5-01 uncertain-outcome test, and the genuine D.110c-a repeat-close fixture.
+-It establishes a narrow composition defect. `issuer.issue()` returns only
+-after `transactIssue()` has durably committed the issued and pending-outbox
+-pair. Every later `committedFailure()` therefore owns a durable row, but it
+-sets `operationAdmissionHalted` only when the optional operation-policy
+-reservation exists. Even when set, neither `creatorCloseRegistration()` nor
+-the queued `stageClosedBlueprintEpoch()` checks the flag. Because snapshot
+-staging queues the fold behind an already running issue, the fold can observe
+-the issue's committed failure and still capture a graph that omits its row.
++It establishes a narrow composition defect. `issuer.issue()` normally returns
++only after `transactIssue()` has durably committed the issued and
++pending-outbox pair. Every later `committedFailure()` therefore owns a durable
++row. Both real issuance stores also have one pre-return ambiguous arm: a commit
++can succeed and the bounded terminal readback can then throw exact
++`ISSUANCE_OUTCOME_UNKNOWN`. The surrounding catch and `committedFailure()` set
++`operationAdmissionHalted` only when the optional operation-policy reservation
++exists. Even when set, neither `creatorCloseRegistration()` nor the queued
++`stageClosedBlueprintEpoch()` checks the flag. Because snapshot staging queues
++the fold behind an already running issue, the fold can observe the issue's
++committed failure and still capture a graph that omits its row.
+ 
+ The existing `recoverV3LiveReplica()` outbox scan is already the exact
+ reconciliation owner. It pages and point-reads the real store, requires exact
+@@ -96236,11 +96239,15 @@ graph/application state once, and commits the recovered reservation before
+ activation. Therefore no durable outcome marker, schema, public API, wire
+ field, dependency, new authority rule, or store operation is required.
+ 
+-GREEN is frozen to three internal checks in `packages/node/src/v3-live.ts`:
++GREEN is frozen to three internal check families in
++`packages/node/src/v3-live.ts`:
+ 
+ 1. after `issuer.issue()` returned, every `committedFailure()` unconditionally
+    sets the existing `operationAdmissionHalted` recovery-required flag, even
+-   when no operation admission policy exists;
++   when no operation admission policy exists; the surrounding catch binds its
++   error and also sets the flag for exact `ISSUANCE_OUTCOME_UNKNOWN`,
++   independent of reservation presence, while definitely pre-transaction
++   signer and capacity failures preserve their current release/retry behavior;
+ 2. `creatorCloseRegistration()` refuses to mint close authority while that
+    flag is set; and
+ 3. `stageClosedBlueprintEpoch()` rechecks the flag after the registration queue
+@@ -96259,29 +96266,36 @@ is under `.logs/d110c-0c1b-source-audit-90a06a1a/`. If implementation discovers
+ that any frozen assumption is false or requires the rejected schema/API/wire/
+ dependency/authority changes, stop and reslice that exact prerequisite.
+ The audit root's validating three-entry self-excluding manifest SHA-256 is
+-`48309c9c5ea98d4bdbd0e44ab1b05ab4fab5a375d8f091548e7adc2a260361fe`.
++`08d278438087bbef20d61e5d058c02f02b89b84c33d02a7ad4f4e6212ca26b7b`.
+ 
+ Tests-only RED must use the real product issue path and real store
+-implementations behind a one-use journal adapter that blocks at the target
+-`local-issued` append and then rejects without writing. Bind creator close
++implementations. First admit sequence 0 so the retirement boundary has a real
++in-graph prefix. Then use a one-use journal adapter that blocks at sequence 1's
++target `local-issued` append and rejects without writing. Bind creator close
+ before releasing the failure and call close while issue owns the registration
+ queue. Current code must prove the issue reports existing `journal-rejected`,
+-the exact issued/pending-outbox row survives, journal and graph omit it, yet the
+-queued genuine close advances; after verified adoption/restart the next genuine
+-close must refuse with exact
++the exact issued/pending-outbox sequence-1 row survives, journal and graph omit
++it, yet the queued genuine close truncates after sequence 0 and advances; after
++verified adoption/restart the next genuine close must refuse with exact
+ `D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE` because that same row carries
+-the old authenticated epoch/anchor. The test's intended expectation is the
+-earlier close refusal token
+-`D110C_0C1B_COMMITTED_ISSUANCE_RECOVERY_REQUIRED`, so the present advance is
+-the sole causal RED. No test may insert, delete, republish, rewrite, or
++the old authenticated epoch/anchor. Test case id
++`D110C_0C1B_COMMITTED_ISSUANCE_RECOVERY_REQUIRED` marks unexpected advancement;
++it is not a product error. GREEN preserves existing product-visible refusals:
++bind-after-failure returns `CREATOR_CLOSE_UNAVAILABLE`, while a pre-bound close
++fails through the existing `creator snapshot export failed: not-active` path.
++No test may insert, delete, republish, rewrite, or
+ privately classify the row to manufacture the failure. Any earlier failure,
+ different row, missing current-close advance, or different next-close token
+ stops and diagnoses RED.
+ 
+ GREEN must prove both orderings: a close handle bound before the committed
+-failure rejects dynamically, and a bind attempted after the failure cannot
+-claim close authority. Neither refusal may change durable head, snapshot,
+-graph, application state, or the surviving row. A second issue must reject
++failure rejects dynamically through the existing snapshot-export error, and a
++bind attempted after the failure returns existing `CREATOR_CLOSE_UNAVAILABLE`
++without claiming close authority. Neither refusal may change durable head,
++snapshot, graph, application state, or the surviving row. Creator-close's
++existing abort path clears `blueprintClosing` after the queued-fold refusal,
++while `operationAdmissionHalted` remains set; another local issue and another
++close bind still refuse until deactivation/recovery. A second issue must reject
+ without another issuance transaction. Deactivate and recover the same epoch;
+ the existing product recovery path must authenticate and admit the exact row
+ once, restore exact application and operation-policy state, and then complete
+@@ -96292,11 +96306,16 @@ carrier boundary and non-null continuation, exact state digest, and exact
+ operation count.
+ 
+ The focused matrix covers failure before journal write, journal write then
+-thrown outcome, graph append failure, operation-policy commit failure, close
+-racing the failure, bind after failure, repeated recovery, substituted
+-issued/outbox row, stale epoch/anchor, invalid dependency/ACL, capacity, and
+-terminal classification. Preserve all existing fail-closed result kinds and
+-details; the D.110c-0c1b token is tests-only. Retain D.110c-0c1a carrier,
++thrown outcome, graph append failure, operation-policy commit failure, exact
++non-terminal `ISSUANCE_OUTCOME_UNKNOWN` after durable commit with no operation
++policy, close racing the failure, bind after failure, repeated recovery,
++substituted issued/outbox row, stale epoch/anchor, invalid dependency/ACL,
++capacity, and terminal classification. Reusing the halt conservatively refuses
++new local and received admission after uncertain local issuance and permits a
++received-path uncertain outcome to refuse close; this broader fail-closed
++effect is intentional. The retained no-failure D.110c-a/b hot path must still
++bind and close. Preserve all existing fail-closed result kinds and details; the
++D.110c-0c1b token is tests-only. Retain D.110c-0c1a carrier,
+ E5-01 admission/recovery, Phase-6a successor recovery/adoption,
+ issuance/outbox/rebase, AHE rollback, snapshot, D.109 reclamation, exact-owner
+ static gates, and the D.110c-a/b hot path. This is a high-risk
+@@ -96304,6 +96323,21 @@ production-lifecycle slice and receives the governing plan review, causal RED
+ custody, signed GREEN, and one final Grok/Kimi/Opus review. No campaign or
+ D.110a invocation runs.
+ 
++The initial plan review at signed/pushed commit
++`d4ed70242c9f21cfb24e1d5c6b1c9c6216096616` produced one material correction
++family: exact `ISSUANCE_OUTCOME_UNKNOWN` after a possible durable commit must
++halt even without a policy reservation, while the D.110c-0c1b token remains a
++test case id and existing creator-close errors remain unchanged. The accepted
++P2 dispositions add a real sequence-0 prefix to the RED, record conservative
++halt reuse, pin creator-close abort/latch behavior, preserve the unconsumed
++refused claim, and retain the no-failure close path. The complete review and
++disposition evidence is under `.logs/d110c-0c1b-plan-review-d4ed7024/`; its
++validating 20-entry self-excluding manifest SHA-256 is
++`7c3592e1edb59992740be65d7565cf3105f80c0e9b188ec51f2f160fa227e88c`.
++Because the P1 correction changes executable fault coverage, the corrected
++signed/pushed plan receives exactly one material Grok/Kimi/Opus confirmation.
++No production edit or RED execution precedes its empty blocking union.
++
+ The complete confirmation evidence is retained under
+ `.logs/d110c-0c-plan-confirmation-cb5b3437/`. Its validating 34-entry
+ self-excluding manifest SHA-256 is
+{
+  "verdict": "CHANGES_REQUIRED",
+  "summary": "The audit of the post-transactIssue live-close omission is correct, recovery already reconciles the exact row, and the three in-memory halt/close/fold checks cover both bind orderings without a new store contract. Frozen RED/GREEN acceptance still names an exact D.110c-0c1b refusal token while forbidding a new product class, which cannot be surfaced by the three v3-live.ts checks.",
+  "findings": [
+    {
+      "severity": "P1",
+      "title": "Exact 0c1b refusal token cannot be produced by frozen GREEN",
+      "evidence": "docs/production-hardening/production-hardening-tdd-plan-v2.md D.110c-0c1b (RED expects earlier close to refuse with exact D110C_0C1B_COMMITTED_ISSUANCE_RECOVERY_REQUIRED, then says the token is tests-only and existing fail-closed kinds/details stay unchanged); packages/node/src/v3-live.ts creatorCloseRegistration()/stageSnapshot() (undefined mint; all fold failures mapped to snapshotExportFailure(\"not-active\", detail)); packages/node/src/creator-close.ts bindCreatorLiveClose()/close() (undefined registration → CREATOR_CLOSE_UNAVAILABLE; snapshot failure → TypeError `creator snapshot export failed: ${snapshot.kind}` and detail is discarded). GREEN is frozen to three internal v3-live.ts checks and must not edit creator-close.ts or add a public result kind.",
+      "impact": "A RED transcribed like the sibling 0c1a `rejects.toThrow(TOKEN)` cannot go green under the frozen repair, so correct halt/close/fold code fails. The two orderings already surface different existing errors, so inventing a product 0c1b string would also breach the no-new-API freeze.",
+      "required_action": "Keep D110C_0C1B_COMMITTED_ISSUANCE_RECOVERY_REQUIRED as the test-owned case id only. Freeze product-visible refusals: bind-after-failure returns existing CREATOR_CLOSE_UNAVAILABLE; pre-bound/in-flight close fails the existing snapshot-export path after the fold recheck. Do not add a new public kind, wire field, or creator-close.ts mapping."
+    },
+    {
+      "severity": "P2",
+      "title": "Defective first close needs a prior in-graph issued prefix",
+      "evidence": "packages/node/src/internal/creator-issuance-retirement-boundary.ts deriveCreatorIssuanceRetirementBoundary(): unadmitted suffix truncates, but admitted === null throws D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE. A sole committed-but-omitted issue is an empty admitted prefix, so the queued close cannot advance.",
+      "impact": "A minimal RED that only fires the one-use journal failure can fail first-close for the 0c1a empty-prefix reason and mis-attribute causality.",
+      "required_action": "Disposition on the RED owner: compose the witness onto a genuine closeable D.110c-a prefix (at least one in-graph issued vertex) so the defective close truncates rather than hitting admitted === null. No executable-scope change."
+    },
+    {
+      "severity": "P2",
+      "title": "Halt reuse newly fail-closes close after received-path halt",
+      "evidence": "packages/node/src/v3-live.ts handleV3Ingress() already sets operationAdmissionHalted on post-durable received journal/graph/policy failures when a reservation exists; creatorCloseRegistration()/stageClosedBlueprintEpoch() currently ignore it. GREEN checks 2–3 would refuse creator close on that existing flag too.",
+      "impact": "Broader live-session close refusal after received uncertain outcomes, not only local committed issuance. Fail-closed and does not drop a local issued row.",
+      "required_action": "Disposition: treat as intended conservative reuse of the existing recovery-required flag; do not carve a received-path exception in this slice."
+    }
+  ],
+  "red_causal": true,
+  "green_closes_red": false,
+  "scope_preserved": true
+}
+{
+  "verdict": "CHANGES_REQUIRED",
+  "summary": "Audit custody and hashes verify exactly; the demonstrated post-commit defect, queue-ordering causality, recovery-owner claim (Q1: correct — recovery reconciles the exact row once, no schema/API/wire/dependency needed), the three-check coverage of both close orderings (Q2), operationAdmissionHalted as owner (Q3: correct for committedFailure paths; terminal ambiguity is separately fail-closed via terminalState), RED causality through the real issue/store/close path with a one-use journal adapter (Q4), and GREEN acceptance of exact-once recovery, policy reconstruction, 0→1→2 continuation and non-null retirement boundary (Q5) all hold. One material failure ordering is missing (Q6): a non-terminal transactIssue throw classified ISSUANCE_OUTCOME_UNKNOWN — a contract-sanctioned possibly-committed outcome — sets no flag when no operation policy is installed, so the same close-omits-durable-row defect survives the frozen GREEN on no-policy planes. The fix is a small extension of the same seam, not a redesign.",
+  "findings": [
+    {
+      "severity": "P1",
+      "title": "Ambiguous transactIssue outcome (ISSUANCE_OUTCOME_UNKNOWN) escapes unconditional halt on no-policy planes",
+      "evidence": "packages/node/src/v3-live.ts:5682-5699 (catch sets operationAdmissionHalted only via `else if (reservation !== undefined)` when signerResolved && !terminalTransactionStarted); packages/issuance-store/src/terminal.ts:111-126 (classifyDurableIssuanceTerminalSuppression throws UnknownOutcomeFailure when the commit may have landed but readback is unreadable, and returns the commit when durable rows prove success at :153-163); packages/storage-browser/src/internal/browser-issuance-store.ts:748-776 (real ambiguous-throw path); packages/storage-node/src/internal/node-issuance-store.ts:801-819 (committing-failure readback path). Plan GREEN item 1 (docs/.../production-hardening-tdd-plan-v2.md:96241-96243) is scoped to 'after issuer.issue() returned' and the fault matrix (:96294-96298) lists only committedFailure positions; 'failure before journal write' denotes post-commit pre-journal committedFailure cases (v3-live.ts:5711-5760), not a pre-return ambiguous transaction throw.",
+      "impact": "On a creator plane without an operation admission policy, a transactIssue throw with ISSUANCE_OUTCOME_UNKNOWN can leave a durable issued/pending-outbox row while the issue reports 'issuance-rejected: v3 local issue transaction failed', no recovery-required flag is set, and neither close check (items 2-3) fires — the queued or later close folds a graph omitting the durable row, reproducing the exact demonstrated defect (omitted orphan row freezes later closes per the D.110c-0c1a derivation) after GREEN passes. Incorrect code therefore passes the frozen acceptance for a supported no-policy configuration.",
+      "required_action": "Amend GREEN item 1 so the existing flag is also set unconditionally when the non-terminal issue transaction outcome is ambiguous: bind the caught error at v3-live.ts:5682 and set registration.operationAdmissionHalted whenever the thrown error carries code ISSUANCE_OUTCOME_UNKNOWN, independent of reservation presence (do not flag the definitely-pre-commit capacityRejected throw, which never reaches the store commit). Add 'issuance transaction outcome unknown (non-terminal, no policy)' to the focused fault matrix with the same close-refusal and recover-exactly-once assertions. No new schema, API, wire field, dependency, or store operation is required; the RED journal-rejection witness remains causal and unchanged."
+    },
+    {
+      "severity": "P2",
+      "title": "Unconditional flag set silently widens halt to ingress and no-policy issue paths",
+      "evidence": "v3-live.ts:3727 (handleV3Ingress rejects new admissions when operationAdmissionHalted) and :5600-5602 (issueOneVertex rejects); GREEN item 1 makes the flag reachable for planes without an operation policy for the first time, so post-commit failures on such planes now halt all subsequent ingress and local issue until deactivate+recovery — a behavioral consequence the plan text does not enumerate (it discusses only close refusal).",
+      "impact": "A retained suite that exercises a post-commit failure without a policy and expects continued ingress/issue could newly fail; conversely the broadening is fail-closed and consistent with the flag's existing meaning, so no incorrect close can pass.",
+      "required_action": "Owner: GREEN implementer. Disposition: no plan-text change required; the frozen retained gates (E5-01 admission/recovery, D.110c-a/b hot path, issuance/outbox suites) are the check — if any retained test depends on post-failure continuation without a policy, that is exactly the plan's stated stop-and-reslice trigger rather than a silent pass."
+    },
+    {
+      "severity": "P2",
+      "title": "Fold-time refusal leaves blueprintClosing latched; acceptance should pin the in-memory wedge",
+      "evidence": "v3-live.ts:6713 sets registration.blueprintClosing = true synchronously before the queued recheck in stageClosedBlueprintEpoch would refuse; the only in-memory clearing is abortSnapshotStage (v3-live.ts:6991-6996), and with the flag set every subsequent creatorCloseRegistration refuses, so the plane remains open-but-unclosable until deactivation plus recovery creates a fresh registration (v3-live.ts:7263-7310 with operationAdmissionHalted: false).",
+      "impact": "Intended fail-closed behavior, and the GREEN text's 'neither refusal may change durable head, snapshot, graph, application state, or the surviving row' is not violated (the latch is in-memory only); but an acceptance test could accidentally assume the refusal unwinds blueprintClosing or consumes the close claim (it does not — claimedCreatorCloseHandles is only marked on a successful mint, v3-live.ts:2590-2591).",
+      "required_action": "Owner: GREEN test author. Disposition: assert explicitly that the refused close leaves durable state untouched, that the close claim is not consumed by a refused mint (post-recovery close on the fresh registration succeeds — already implied by the 0→1 continuation), and that abortSnapshotStage remains the only in-memory abort; no production-code or plan-scope change."
+    }
+  ],
+  "red_causal": true,
+  "green_closes_red": false,
+  "scope_preserved": true
+}
+{
+  "verdict": "CHANGES_REQUIRED",
+  "summary": "The causal attribution, the choice of recoverV3LiveReplica() as the sole reconciliation owner, the no-new-marker/schema/API conclusion, and the choke-point placement of the fold recheck in stageClosedBlueprintEpoch() are all correct and verified against source: only recoverV3LiveReplica() mints a RecoveredV3Live capability (v3-live.ts:5322), so a fresh registration with a clear flag genuinely requires the authenticated outbox/journal scan (v3-live.ts:5155-5199), and stageBlueprintEpoch() sets blueprintClosing synchronously and queues the fold behind the in-flight issue (v3-live.ts:6713-6714), making the fold-time recheck sufficient for both bind orderings on the paths the plan names. One blocking gap remains: the freeze scopes GREEN to committedFailure() only, but issuer.issue() can also *reject* after the durable commit — the genuine node store COMMITs (node-issuance-store.ts:802) and then throws UnknownOutcomeFailure from its readback (terminal.ts:126) — and that arm (v3-live.ts:5682-5699) still marks recovery-required only when an operation-policy reservation exists, which is precisely the no-policy configuration GREEN step 1 exists to fix. An implementation matching the freeze would satisfy the frozen acceptance while the demonstrated defect survives under that ordering, which is also absent from the fault matrix. RED is causal and feasible as written; two P2s are dispositioned to the implementation owner.",
+  "findings": [
+    {
+      "severity": "P1",
+      "title": "Post-commit issuer.issue() rejection is outside the frozen GREEN, so the defect survives with no policy installed",
+      "evidence": "Plan lines 96239-96248 scope step 1 to \"after issuer.issue() returned, every committedFailure()\"; audit.md:9-13 asserts \"All failures from committedFailure() therefore occur after durable issuance\". But packages/node/src/v3-live.ts:5682-5699 is a second post-durable arm: node-issuance-store.ts:802 executes COMMIT, then line 819 calls #classifyAfterTerminalSuppression(); if the readback fails (lines 829-838 -> observation {unreadable:true}) packages/issuance-store/src/terminal.ts:126 throws UnknownOutcomeFailure, so transactIssue() rejects after the issued+outbox rows are durably committed. In that arm v3-live.ts:5685-5687 sets operationAdmissionHalted only when `reservation !== undefined`, and reserveOperation() returns undefined whenever no policy is installed (v3-live.ts:4150). For a non-terminal issue terminalTransactionStarted is false, so line 5698 returns admission-rejected with the flag clear. The frozen fault matrix (plan lines 96294-96298) lists \"journal write then thrown outcome\" but no issuance-transaction-rejects-after-commit ordering.",
+      "impact": "In a deployment with no operation admission policy - exactly the configuration step 1 is written to cover - a durably committed issued/pending-outbox row leaves operationAdmissionHalted false, so neither the bind-time refusal (step 2) nor the queued fold recheck (step 3) fires. creatorCloseRegistration() mints close authority and stageClosedBlueprintEpoch() folds a graph omitting the row, reproducing the demonstrated defect; after adoption that row still carries the old epoch/anchor and freezes later closes with D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE. Because the ordering is not in the acceptance matrix, an incomplete GREEN passes.",
+      "required_action": "Extend GREEN step 1 from \"every committedFailure()\" to \"every failure that is not provably pre-durable\": at v3-live.ts:5685-5687 drop only the `reservation !== undefined` condition, keeping the existing `!signerResolved && !terminalTransactionStarted` release discriminator so the retained E5-01 gate \"releases a definitely pre-issuance failure and permits one clean retry\" (tests/e5-01-v3-operation-admission-red.test.ts:172-204, signer rejects before resolving) stays green. Add one fault case to the RED/GREEN matrix: the issuance transaction rejects with an unknown outcome after its durable commit, with no operation admission policy installed, and the close must still refuse. No schema, API, wire field, or store change is implied."
+    },
+    {
+      "severity": "P2",
+      "title": "Reusing operationAdmissionHalted widens the halt and refusal domain beyond local issuance without acceptance coverage",
+      "evidence": "packages/node/src/v3-live.ts:3727 refuses every non-duplicate received vertex while the flag is set, and the ingress path itself sets the same flag at lines 3803, 3813, 3827, 3834, 3840 and 3853. Unconditional marking therefore newly halts gossip admission in no-policy deployments after a post-commit local-issue failure, and conversely a received-vertex journal/graph failure will now refuse creator close under steps 2 and 3. The frozen acceptance (plan lines 96281-96292) states only that neither refusal may change durable head, snapshot, graph, application state, or the surviving row.",
+      "impact": "A behavior change outside the stated close-refusal scope ships unstated: an ingress-side halt can block a close that would previously have proceeded, and a local post-commit failure now stops received-vertex admission. Both are fail-closed and defensible, but they are untested and could surface as an unexplained retained-gate failure at GREEN.",
+      "required_action": "Owner: D.110c-0c1b implementation. State both consequences explicitly in the acceptance text and pin them with one assertion in the retained D.110c-a/b hot path (a plane with no injected failure still binds and closes). No executable scope change beyond that assertion."
+    },
+    {
+      "severity": "P2",
+      "title": "blueprintClosing stays latched after a step-3 fold refusal and is not covered by the refusal-state assertions",
+      "evidence": "packages/node/src/v3-live.ts:6713 sets registration.blueprintClosing = true synchronously before the fold is queued at 6714; a step-3 recheck failure returns a fold failure and stageSnapshot() maps it to snapshotExportFailure (7029) without resetting the flag. issueLocal() (5842) and authenticateV3Ingress() (3888) then refuse for the life of the registration, and only abortSnapshotStage() (6991-6996) clears it.",
+      "impact": "After a correct refusal the plane is left latched closed in memory. This is harmless under the plan's deactivate-then-recover remedy, but the frozen acceptance does not assert the post-refusal in-memory state, so either behavior (latched or reset) would pass and the eventual choice is unrecorded.",
+      "required_action": "Owner: D.110c-0c1b implementation. Assert the intended post-refusal registration state in GREEN - either the refusal leaves blueprintClosing latched and recovery is the only exit, or step 3 resets it - and record the choice in the plan text. No new product surface."
+    }
+  ],
+  "red_causal": true,
+  "green_closes_red": false,
+  "scope_preserved": true
+}
+2539:	operationAdmissionHalted: boolean;
+3727:	if (!alreadyAccepted && registration.operationAdmissionHalted) {
+3803:		if (reservation !== undefined) registration.operationAdmissionHalted = true;
+3813:		if (reservation !== undefined) registration.operationAdmissionHalted = true;
+3827:		if (reservation !== undefined) registration.operationAdmissionHalted = true;
+3834:			if (reservation !== undefined) registration.operationAdmissionHalted = true;
+3840:		if (reservation !== undefined) registration.operationAdmissionHalted = true;
+3853:		registration.operationAdmissionHalted = true;
+5600:	if (registration.operationAdmissionHalted) {
+5628:	let signerResolved = false;
+5629:	let terminalTransactionStarted = false;
+5637:				signerResolved = true;
+5663:					terminalTransactionStarted = true;
+5683:		if (!signerResolved && !terminalTransactionStarted) {
+5686:			registration.operationAdmissionHalted = true;
+5688:		if (requireTerminalAuthorization && terminalTransactionStarted) {
+5697:			: signerResolved
+5701:	const committedFailure = (
+5705:		if (reservation !== undefined) registration.operationAdmissionHalted = true;
+5711:	if (row === undefined) return committedFailure("issuance-rejected", "v3 local issue record is invalid");
+5722:		return committedFailure("admission-rejected", "v3 local issue authentication failed");
+5731:		return committedFailure("admission-rejected", "v3 local issue record is not authenticated");
+5734:		return committedFailure("admission-rejected", "v3 local issue dependency bound is invalid");
+5752:			return committedFailure("admission-rejected", "v3 terminal issue is not authorized");
+5757:		return committedFailure("authorization-rejected", "v3 local ACL operation is not authorized");
+5760:		return committedFailure("graph-rejected", "v3 local issue graph is at capacity");
+5773:		return committedFailure("journal-rejected", "v3 local issue journal append failed");
+5782:		return committedFailure("journal-rejected", "v3 local issue journal append was rejected");
+5791:		return committedFailure("graph-rejected", "v3 local issue graph is at capacity");
+5795:		if (outcome !== undefined) return committedFailure("graph-rejected", "v3 local issue graph is at capacity");
+5798:		return committedFailure("graph-rejected", "v3 local issue graph append failed");
+5811:		registration.operationAdmissionHalted = true;
+7039:			registration.operationAdmissionHalted = true;
+7290:				operationAdmissionHalted: false,
+			return localIssueFailure("malformed-input", "v3 local issue operation is unknown");
+		}
+		priorLogicalTime = entry.logicalTime as number;
+		operations.push(ObjectFreeze({ logicalTime: priorLogicalTime, operation }));
+	}
+	return ObjectFreeze({
+		operations: ObjectFreeze(operations),
+		signRegisteredVertexDigest: input.signRegisteredVertexDigest as SignRegisteredVertexDigest,
+	});
+}
+
+async function issueOneVertex(
+	registration: V3PlaneRegistration,
+	input: CapturedLocalIssueInput,
+	dependencies: readonly string[],
+	logicalTime: number,
+	operation: Readonly<Record<string, unknown>>,
+	requireTerminalAuthorization = false
+): Promise<InternalLocalIssueResult> {
+	if (!currentRegistration(registration)) return localIssueFailure("not-active", "v3 plane is not active");
+	if (registration.operationAdmissionHalted) {
+		return localIssueFailure("admission-rejected", "v3 operation admission is halted until recovery");
+	}
+	if (registration.index.size >= registration.payload.parameters.maxEpochVertices) {
+		return localIssueFailure("graph-rejected", "v3 local issue graph is at capacity");
+	}
+	if (dependencies.length === 0 || dependencies.length > registration.payload.parameters.maxDependencies) {
+		return localIssueFailure("admission-rejected", "v3 local issue dependency bound is invalid");
+	}
+	const scope = copiedScope(registration.issuanceScope);
+	if (scope === undefined || scope.objectId !== registration.payload.provenance.objectId) {
+		return localIssueFailure("authorization-rejected", "v3 local issue scope is invalid");
+	}
+	const authorized = resolveV3AuthorizedAuthor(registration.authorization, scope.author);
+	if (authorized === undefined) {
+		return localIssueFailure("authorization-rejected", "v3 local issue author is not authorized");
+	}
+	const proposedAcl = aclOperation(scope.author, "0".repeat(64), operation);
+	if (!validateLatchedOperation(registration.authorization, registration.latchedOperations, proposedAcl)) {
+		return localIssueFailure("authorization-rejected", "v3 local ACL operation is not authorized");
+	}
+	const reservation = reserveOperation(registration.operationAdmissionPolicy, operation);
+	if (reservation === null) {
+		return localIssueFailure("admission-rejected", "v3 local operation was rejected before issuance");
+	}
+
+	let commit: unknown;
+	let capacityRejected = false;
+	let signerResolved = false;
+	let terminalTransactionStarted = false;
+	try {
+		const issuer = createAdmissionBoundTransactionalVertexIssuer({
+			author: scope.author,
+			preparedBlueprintAdmission: registration.payload.admission,
+			publicKey: authorized,
+			signRegisteredVertexDigest: async (digest) => {
+				const signature = await input.signRegisteredVertexDigest(digest);
+				signerResolved = true;
+				return signature;
+			},
+			transactIssue: async (selectedScope, buildAndSign) => {
+				const commitOutsideTransaction = async (authorSequence: number): Promise<unknown> => {
+					const candidateCommit = await buildAndSign(authorSequence);
+					const candidateRow = outboxRowSnapshot(
+						ObjectFreeze({ commit: candidateCommit, publishState: "pending" as const }),
+						selectedScope
+					);
+					if (
+						candidateRow !== undefined &&
+						!hasGraphCapacity(registration, candidateRow.canonicalPreimageBytes.byteLength)
+					) {
+						capacityRejected = true;
+						throw new TypeError("v3 local issue graph is at capacity");
+					}
+					return candidateCommit;
+				};
+				if (requireTerminalAuthorization) {
+					const lineage = await registration.issuanceStore.readLineage(selectedScope);
+					if (!NumberIsSafeInteger(lineage.next) || lineage.next < 0 || lineage.exhausted) {
+						throw new TypeError("v3 terminal issuance lineage is unavailable");
+					}
+					const expectedSequence = lineage.next;
+					const candidate = await commitOutsideTransaction(expectedSequence);
+					terminalTransactionStarted = true;
+					return registration.issuanceStore.transactIssue(selectedScope, (authorSequence) => {
+						if (authorSequence !== expectedSequence) {
+							throw new TypeError("v3 terminal issuance lineage changed");
+						}
+						return Promise.resolve(candidate as never);
+					});
+				}
+				return registration.issuanceStore.transactIssue(selectedScope, commitOutsideTransaction as never);
+			},
+		});
+		commit = await issuer.issue({
+			anchor: registration.payload.provenance.anchorDigest,
+			dependencies,
+			epoch: registration.payload.provenance.epoch,
+			logicalTime,
+			objectId: registration.payload.provenance.objectId,
+			operation,
+		});
+	} catch {
+		if (!signerResolved && !terminalTransactionStarted) {
+			releaseOperationReservation(reservation);
+		} else if (reservation !== undefined) {
+			registration.operationAdmissionHalted = true;
+		}
+		if (requireTerminalAuthorization && terminalTransactionStarted) {
+			return internalLocalIssueFailure(
+				"issuance-rejected",
+				"v3 terminal issue transaction outcome is unknown",
+				"outcome-unknown"
+			);
+		}
+		return capacityRejected
+			? localIssueFailure("graph-rejected", "v3 local issue graph is at capacity")
+			: signerResolved
+				? localIssueFailure("admission-rejected", "v3 local issue signature was not admitted")
+				: localIssueFailure("issuance-rejected", "v3 local issue transaction failed");
+	}
+	const committedFailure = (
+		kind: Exclude<Extract<V3LocalIssueResult, { readonly ok: false }>["kind"], "split-required">,
+		detail: string
+	): InternalLocalIssueResult => {
+		if (reservation !== undefined) registration.operationAdmissionHalted = true;
+		return requireTerminalAuthorization
+			? internalLocalIssueFailure(kind, detail, "outcome-unknown")
+			: localIssueFailure(kind, detail);
+	};
+	const row = outboxRowSnapshot(ObjectFreeze({ commit, publishState: "pending" as const }), scope);
+	if (row === undefined) return committedFailure("issuance-rejected", "v3 local issue record is invalid");
+
+	let authenticated: AuthenticatedRecoveryVertex | undefined;
+	try {
+		authenticated = authenticateRecoveryVertex(
+			registration.payload,
+			registration.authorization,
+			row.canonicalPreimageBytes,
+			row.signature
+		);
+	} catch {
+		return committedFailure("admission-rejected", "v3 local issue authentication failed");
+	}
+	if (
+		authenticated === undefined ||
+		authenticated.digest !== lowerHexDigest(row.digest) ||
+		authenticated.author !== scope.author ||
+		authenticated.authorSequence !== row.authorSequence ||
+		registration.index.has(authenticated.digest)
+	) {
+		return committedFailure("admission-rejected", "v3 local issue record is not authenticated");
+	}
+	if (!hasBoundedDependencies(registration.payload, authenticated)) {
+		return committedFailure("admission-rejected", "v3 local issue dependency bound is invalid");
+	}
+	if (requireTerminalAuthorization) {
+		let classification: ReturnType<V3TerminalVertexClassifier> = "reject";
+		try {
+			classification =
+				registration.classifyTerminalVertex?.(
+					ObjectFreeze({
+						author: authenticated.author,
+						exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(row.canonicalPreimageBytes),
+						signature: new Uint8ArrayConstructor(row.signature),
+						vertex: authenticated.admitted,
+					})
+				) ?? "reject";
+		} catch {
+			classification = "reject";
+		}
+		if (classification !== "terminal-authorized") {
+			return committedFailure("admission-rejected", "v3 terminal issue is not authorized");
+		}
+	}
+	const acceptedAcl = aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
+	if (!validateLatchedOperation(registration.authorization, registration.latchedOperations, acceptedAcl)) {
+		return committedFailure("authorization-rejected", "v3 local ACL operation is not authorized");
+	}
+	if (!hasGraphCapacity(registration, authenticated.byteCharge)) {
+		return committedFailure("graph-rejected", "v3 local issue graph is at capacity");
+	}
+
+	let appended;
+	try {
+		appended = await registration.liveJournalStore.appendAccepted({
+			author: scope.author,
+			authorSequence: row.authorSequence,
+			scope: liveJournalScope(registration.payload),
+			sourceKind: "local-issued",
+			vertexDigest: authenticated.digest,
+		});
+	} catch {
+		return committedFailure("journal-rejected", "v3 local issue journal append failed");
+	}
+	if (
+		!appended.ok ||
+		appended.idempotent ||
+		appended.sourceKind !== "local-issued" ||
+		appended.vertexDigest !== authenticated.digest ||
+		!sameLiveJournalScope(appended.scope, liveJournalScope(registration.payload))
+	) {
+		return committedFailure("journal-rejected", "v3 local issue journal append was rejected");
+	}
+
+	const updatedEpochBytes = nextEpochBytes(
+		registration.epochBytes,
+		authenticated.byteCharge,
+		registration.payload.parameters.maxEpochBytes
+	);
+	if (updatedEpochBytes === undefined) {
+		return committedFailure("graph-rejected", "v3 local issue graph is at capacity");
+	}
+	try {
+		const outcome = registration.index.append(authenticated.digest, authenticated.vertex, authenticated.byteCharge);
+		if (outcome !== undefined) return committedFailure("graph-rejected", "v3 local issue graph is at capacity");
+		registration.epochBytes = updatedEpochBytes;
+	} catch {
+		return committedFailure("graph-rejected", "v3 local issue graph append failed");
+	}
+	retainApplicationVertex(
+		registration.applicationVertices,
+		registration.applicationAuthors,
+		authenticated,
+		registration.applicationCharges
+	);
+	registration.graphVersion += 1;
+	if (acceptedAcl !== null && acceptedAcl !== undefined) {
+		registration.latchedOperations.set(acceptedAcl.digest, acceptedAcl);
+	}
+	if (!commitOperationReservation(reservation)) {
+		registration.operationAdmissionHalted = true;
+		return localIssueFailure("admission-rejected", "v3 local operation policy commit failed");
+	}
+	let terminalDisposition: InternalLocalIssueResult["terminalDisposition"];
+	if (currentRegistration(registration)) {
+		try {
+			const disposition = await registration.onAdmittedVertex(
+				ObjectFreeze({
+					vertex: authenticated.admitted,
+					exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(row.canonicalPreimageBytes),
+					signature: new Uint8ArrayConstructor(row.signature),
+					transportSender: registration.networkNode.peerId,
+				})
+			);
+			terminalDisposition = disposition?.kind;
+		} catch {
+			ingressFailureLog("sink-rejected");
+		}
+	}
+	return ObjectFreeze({
+		...localIssueSuccess(row.authorSequence, authenticated.digest),
+		...(terminalDisposition === undefined ? {} : { terminalDisposition }),
+	});
+}
+
+async function issueLocal(
+	registration: V3PlaneRegistration,
+	input: CapturedLocalIssueInput
+): Promise<V3LocalIssueResult> {
+	if (
+		!currentRegistration(registration) ||
+		registration.blueprintClosing ||
+		registration.terminalState !== "active" ||
+		registration.retainedBootstrapHold
+	) {
+		return localIssueFailure("not-active", "v3 plane is not accepting local issues");
+	}
+	const first = input.operations[0];
+	if (first === undefined) return localIssueFailure("malformed-input", "v3 local issue operations are invalid");
+	let applicationOperation = first.operation;
+	if (input.operations.length > 1) {
+		if (typeof Reflect.get(registration.payload.runtime.reducers, APPLICATION_BATCH_ACTION) !== "function") {
+			return localIssueFailure("malformed-input", "v3 local issue application batch reducer is unavailable");
+		}
+		const maximumPrefix = Math.min(input.operations.length, APPLICATION_BATCH_MAX_ENTRIES);
+		let prefixLength = maximumPrefix;
+		for (; prefixLength > 0; prefixLength -= 1) {
+			const candidate = applicationBatchOperation(input.operations.slice(0, prefixLength));
+			if (prefixLength === 1 || applicationBatchFits(candidate)) break;
+		}
+		if (prefixLength < input.operations.length) {
+			return prefixLength > 0
+				? localIssueSplit(prefixLength)
+				: localIssueFailure("malformed-input", "v3 local issue operation exceeds the application batch budget");
+		}
+		applicationOperation = applicationBatchOperation(input.operations);
+		if (!applicationBatchFits(applicationOperation)) {
+			return localIssueFailure("malformed-input", "v3 local issue application batch is invalid");
+		}
+	}
+			}
+		},
+		kind: "staged" as const,
+		ok: true as const,
+		order: staged.order,
+		outputs: staged.outputs,
+		staged: staged.staged,
+	});
+}
+
+function stageBlueprintEpoch(registration: V3PlaneRegistration): Promise<V3BlueprintFoldResult> {
+	if (
+		!currentRegistration(registration) ||
+		registration.blueprintMachine === undefined ||
+		registration.terminalState !== "active"
+	) {
+		return Promise.resolve(blueprintFoldFailure("not-active", "v3 blueprint fold is not active"));
+	}
+	if (registration.blueprintClosing || registration.blueprintFolded) {
+		return Promise.resolve(blueprintFoldFailure("already-folded", "v3 blueprint epoch was already folded"));
+	}
+	// Close application admission synchronously, then wait behind every task that
+	// already owned the registration gate before copying the fixed epoch graph.
+	registration.blueprintClosing = true;
+	return enqueueRegistrationTask(registration, () => () => Promise.resolve(stageClosedBlueprintEpoch(registration)));
+}
+
+interface LiveSnapshotMetadata {
+	readonly anchor: string;
+	readonly archiveIndexRoot: string;
+	readonly epoch: number;
+	readonly objectId: string;
+}
+
+function liveSnapshotMetadata(payload: PreparedV3LivePayload): LiveSnapshotMetadata | undefined {
+	try {
+		const anchor = decodeCanonical(payload.input.exactCanonicalAnchorPreimageBytes);
+		const archiveIndexRoot = ownDataValue(anchor, "archiveIndexRoot");
+		return isDigestHex(archiveIndexRoot)
+			? ObjectFreeze({
+					anchor: payload.provenance.anchorDigest,
+					archiveIndexRoot,
+					epoch: payload.provenance.epoch,
+					objectId: payload.provenance.objectId,
+				})
+			: undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+function snapshotExportFailure(
+	kind: Extract<V3BlueprintSnapshotExportResult, { readonly ok: false }>["kind"],
+	detail: string
+): Extract<V3BlueprintSnapshotExportResult, { readonly ok: false }> {
+	return ObjectFreeze({ detail, kind, ok: false as const });
+}
+
+function exportLiveSnapshotPayload(registration: V3PlaneRegistration): V3BlueprintSnapshotExportResult {
+	if (!currentRegistration(registration)) {
+		return snapshotExportFailure("not-active", "v3 live snapshot export is not active");
+	}
+	if (registration.authorization.kind !== "latched-acl") {
+		return snapshotExportFailure("authorization-rejected", "v3 live snapshot authority is unsupported");
+	}
+	if (!registration.blueprintFolded || registration.blueprintMachine === undefined) {
+		return snapshotExportFailure("not-adopted", "v3 live snapshot epoch is not adopted");
+	}
+	const preview = latchedAclPreview(registration.authorization, registration.latchedOperations);
+	const metadata = liveSnapshotMetadata(registration.payload);
+	if (preview === undefined || metadata === undefined) {
+====
+}
+
+/**
+ * Claims the close-only state of one genuine active v3 registration.
+ * @param registration - Private genuine live registration.
+ * @returns A close registration backed by the private live registry, or undefined.
+ */
+function creatorCloseRegistration(registration: V3PlaneRegistration): V3CreatorCloseRegistration | undefined {
+	if (
+		!currentRegistration(registration) ||
+		registration.mode !== "genesis-active" ||
+		registration.authorization.kind !== "latched-acl" ||
+		registration.terminalState !== "active" ||
+		registration.blueprintHandle === undefined ||
+		registration.payload.input.store.capabilities.durability !== "strict" ||
+		registration.payload.input.store.capabilities.signingEligibility !== "backend-capability-required"
+	)
+		return undefined;
+	const previousHistorySnapshot = creatorClosePreviousHistorySnapshot(registration.payload);
+	if (previousHistorySnapshot === undefined) return undefined;
+	return ObjectFreeze({
+		abortSnapshotStage: (): boolean => {
+			if (!currentRegistration(registration) || registration.blueprintFolded || registration.terminalState !== "active")
+				return false;
+			registration.blueprintClosing = false;
+			return true;
+		},
+		captureCloseGraph: () => {
+			if (!currentRegistration(registration) || !registration.blueprintFolded) return undefined;
+			const vertices = copyApplicationVertices(registration.applicationVertices);
+			const charges = new IntrinsicMap<string, number>(registration.applicationCharges);
+			ReflectApply(MapPrototypeDelete, charges, [registration.payload.provenance.anchorDigest]);
+			if (vertices === undefined || vertices.size !== charges.size + 1 || vertices.size !== registration.index.size) {
+				return undefined;
+			}
+			return ObjectFreeze({
+				charges,
+				frontier: registration.index.tips(),
+				vertices,
+			});
+		},
+		currentTrust: registration.payload.trust.trust,
+		exactCanonicalAnchorPreimageBytes: new Uint8ArrayConstructor(
+			registration.payload.input.exactCanonicalAnchorPreimageBytes
+		),
+		exactCanonicalLatchedAclBytes: encodeCanonical(registration.authorization.value),
+		exactCanonicalParametersBytes: new Uint8ArrayConstructor(
+			registration.payload.input.exactCanonicalParametersCarrierBytes
+		),
+		issuanceScope: ObjectFreeze({ ...registration.issuanceScope }),
+		issuanceStore: registration.issuanceStore,
+		liveJournalStore: registration.liveJournalStore,
+		maxEpochBytes: registration.payload.parameters.maxEpochBytes,
+		maxEpochVertices: registration.payload.parameters.maxEpochVertices,
+		objectId: registration.payload.input.objectId,
+		previousHistorySnapshot,
+		stageSnapshot: async (): Promise<V3BlueprintSnapshotExportResult> => {
+			if (registration.blueprintFolded) return exportLiveSnapshotPayload(registration);
+			const staged = await stageBlueprintEpoch(registration);
+			if (!staged.ok) return snapshotExportFailure("not-active", staged.detail);
+			const adopted = staged.adopt();
+			if (!adopted.ok) return snapshotExportFailure("not-adopted", adopted.detail);
+			return exportLiveSnapshotPayload(registration);
+		},
+		sealDurableReplay: () => sealCreatorDurableReplay(registration),
+		store: registration.payload.input.store,
+		terminalize: (): boolean => {
+			if (!currentRegistration(registration) || !registration.blueprintFolded) return false;
+			registration.blueprintClosing = true;
+			registration.operationAdmissionHalted = true;
+			registration.terminalState = "terminal";
+			return true;
+		},
+	});
+}
+
+function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
+	const ephemeralAuthority = ((): ReturnType<V3PlaneHandle["currentEphemeralAuthority"]> => {
+		if (registration.mode === "snapshot-closed") return undefined;
+		const authorization = registration.authorization;
+		if (authorization.kind !== "latched-acl") return undefined;
+		const snapshot = authorization.value;
+		const aclDigest = lowerHexDigest(hashDomain("ts-drp/latched-acl/v3", encodeCanonical(snapshot)));
+		if (aclDigest === undefined) return undefined;
+		return ObjectFreeze({
+			aclDigest,
+			anchorDigest: registration.payload.provenance.anchorDigest,
+			epoch: registration.payload.provenance.epoch,
+			objectId: registration.payload.provenance.objectId,
+			isCurrentWriter: (author: string): boolean => {
+				if (!currentRegistration(registration)) return false;
+		outbox.authorSequence === issued.authorSequence &&
+		sameScope(outbox.scope, issued.scope) &&
+		bytesEqual(outbox.digest, issued.envelope.digest)
+	);
+}
+
+/**
+ * Classifies one bounded terminal readback under the shared token-free ambiguity policy.
+ * @param input - Private candidate, exact prior lineage and consistent durable observation.
+ * @returns A fresh detached commit when durable rows prove the candidate succeeded.
+ */
+export function classifyDurableIssuanceTerminalSuppression(
+	input: DurableIssuanceTerminalClassificationInput
+): DurableIssueCommit {
+	validateScope(input.scope);
+	const scope = cloneScope(input.scope);
+	const priorLineage = copyExactLineage(input.priorLineage, "caller");
+	if (priorLineage.exhausted) {
+		throw new InvalidArgumentFailure("prior lineage must remain selectable during terminal classification");
+	}
+	let candidate: DurableIssueCommit;
+	try {
+		candidate = copyAndValidateCommit(input.candidate, scope, priorLineage.next);
+	} catch {
+		throw new InvalidArgumentFailure("candidate must close the exact prior-lineage ordinal");
+	}
+	if ("unreadable" in input.observation) throw new UnknownOutcomeFailure(scope);
+	if (!isRecord(input.observation, ["issuedRecord", "lineage", "outboxRecord", "prunedThroughAuthorSequence"])) {
+		throw failure("ISSUANCE_RECOVERY_CORRUPT", "durable observation has an invalid closed shape");
+	}
+	const { issuedRecord, lineage, outboxRecord, prunedThroughAuthorSequence } = input.observation;
+	const observedLineage = copyExactLineage(lineage, "durable-observation");
+	if (
+		prunedThroughAuthorSequence !== null &&
+		(!validOrdinal(prunedThroughAuthorSequence) ||
+			!durableIssuanceLineageConsumed(observedLineage, prunedThroughAuthorSequence))
+	) {
+		throw failure("ISSUANCE_RECOVERY_CORRUPT", "durable observation contains an invalid pruning watermark");
+	}
+	const isConsumed = durableIssuanceLineageConsumed(observedLineage, candidate.authorSequence);
+	const isPruned = durableIssuanceAddressIsPruned(prunedThroughAuthorSequence, candidate.authorSequence);
+	const observedIssued = issuedRecord === null ? null : copyIssuedRecord(issuedRecord);
+	const observedOutbox = outboxRecord === null ? null : copyNativeOutboxRecord(outboxRecord);
+	if (isPruned && (issuedRecord !== null || outboxRecord !== null)) {
+		throw failure("ISSUANCE_RECOVERY_CORRUPT", "pruned durable address still contains issuance rows");
+	}
+	if (
+		(issuedRecord !== null && observedIssued === undefined) ||
+		(outboxRecord !== null && observedOutbox === undefined)
+	) {
+		throw failure("ISSUANCE_RECOVERY_CORRUPT", "terminal readback contains a malformed durable row");
+	}
+
+	if (
+		observedIssued !== null &&
+		observedIssued !== undefined &&
+		observedOutbox !== null &&
+		observedOutbox !== undefined &&
+		isConsumed &&
+		recordMatches(observedIssued, candidate.issuedRecord, true) &&
+		outboxMatchesIssued(observedOutbox, observedIssued)
+	) {
+		return cloneCommit(candidate);
+	}
+	if (issuedRecord === null && outboxRecord === null && isConsumed && isPruned) {
+		throw createDurableIssuanceRecordPrunedError(scope, candidate.authorSequence);
+	}
+	if (issuedRecord === null && outboxRecord === null && durableIssuanceLineagesEqual(observedLineage, priorLineage)) {
+		throw failure("ISSUANCE_SUBSTRATE_FAILURE", "commit was definitively not applied", "transient");
+	}
+	if (
+6649:function stageClosedBlueprintEpoch(registration: V3PlaneRegistration): V3BlueprintFoldResult {
+2577:const claimedCreatorCloseHandles = new WeakSet<V3PlaneHandle>();
+2587:			if (claimedCreatorCloseHandles.has(handle)) return undefined;
+2591:			if (claimed !== undefined) claimedCreatorCloseHandles.add(handle);
+packages/issuance-store/src/conformance.ts:167:		// Backends add ISSUANCE_SUBSTRATE_FAILURE and ISSUANCE_OUTCOME_UNKNOWN;
+packages/issuance-store/src/contract.ts:45:	readonly code = "ISSUANCE_OUTCOME_UNKNOWN" as const;
+packages/issuance-store/src/contract.ts:64:	code: Exclude<DurableIssuanceErrorCode, "ISSUANCE_INVALID_ARGUMENT" | "ISSUANCE_OUTCOME_UNKNOWN">,
+packages/issuance-store/src/types.ts:12:	"ISSUANCE_OUTCOME_UNKNOWN",
+			if (issuedChanges !== 1) throw this.#latchCorruption("issued insert changed an impossible row count");
+			const outboxChanges = statement(
+				this.#database,
+				"INSERT INTO issuance_outbox (object_id,author,author_sequence,digest,publish_state) VALUES(?,?,?,?,?)"
+			).run(scope.objectId, scope.author, candidate.authorSequence, candidate.envelope.digest, "pending").changes;
+			if (outboxChanges !== 1) throw this.#latchCorruption("outbox insert changed an impossible row count");
+			committing = true;
+			this.#database.exec("COMMIT");
+			began = false;
+			committing = false;
+		} catch (error) {
+			if (began || committing) {
+				try {
+					this.#database.exec("ROLLBACK");
+				} catch {
+					// Preserve the mutation failure.
+				}
+			}
+			if (committing) return this.#classifyAfterTerminalSuppression(scope, prior, candidate);
+			if (error === this.#poison) throw error;
+			if (this.#hasCode(error, "ISSUANCE_RETRY_REQUIRED")) throw error;
+			if (this.#isConstraint(error)) throw this.#latchCorruption("issuance child-key collision");
+			throw mapSubstrate(error, "issuance write failed");
+		}
+		return this.#classifyAfterTerminalSuppression(scope, prior, candidate);
+	}
+
+	#classifyAfterTerminalSuppression(
+		scope: DurableIssueScope,
+		prior: NativeLineage,
+		candidate: DurableIssueCommit
+	): DurableIssueCommit {
+		const priorLineage = { exhausted: prior.exhausted, next: prior.next };
+		let observation: TerminalReadback;
+		try {
+			observation = this.#readTerminal(scope, candidate.authorSequence);
+		} catch (error) {
+			if (error === this.#poison) throw error;
+			return classifyDurableIssuanceTerminalSuppression({
+				candidate,
+				observation: { unreadable: true },
+				priorLineage,
+				scope,
+			});
+		}
+		try {
+			return classifyDurableIssuanceTerminalSuppression({
+				candidate,
+				observation,
+				priorLineage,
+				scope,
+====BROWSER
+					...(current.prunedThroughAuthorSequence === null
+						? {}
+						: { prunedThroughAuthorSequence: current.prunedThroughAuthorSequence }),
+				};
+				await requestResult(rawPrior === undefined ? lineages.add(next) : lineages.put(next));
+				await requestResult(issued.add(nativeIssued(candidate)));
+				await requestResult(outbox.add(nativeOutbox(candidate)));
+			}
+			await terminal;
+			if (reason !== undefined) throw reason;
+			const observation = await this.#readTerminal(scope, candidate.authorSequence);
+			return classifyDurableIssuanceTerminalSuppression({ candidate, observation, priorLineage: prior, scope });
+		} catch {
+			await terminal.catch(() => undefined);
+			if (reason !== undefined) throw reason;
+			if (this.#poison !== undefined) throw this.#poison;
+			let observation: TerminalReadback;
+			try {
+				observation = await this.#readTerminal(scope, candidate.authorSequence);
+			} catch {
+				if (this.#closed || this.#poison !== undefined) this.#assertAvailable();
+				return classifyDurableIssuanceTerminalSuppression({
+					candidate,
+					observation: { unreadable: true },
+					priorLineage: prior,
+					scope,
+				});
+			}
+			try {
+				return classifyDurableIssuanceTerminalSuppression({ candidate, observation, priorLineage: prior, scope });
+			} catch (classified) {
+				if (this.#hasCode(classified, "ISSUANCE_RECOVERY_CORRUPT")) {
+					throw this.#latchCorruption("terminal issuance readback is corrupt");
+				}
+				throw classified;
+			}
+		}
+	}
+
+	async #readTerminal(scope: DurableIssueScope, authorSequence: number): Promise<TerminalReadback> {
+		const transaction = this.#startTransaction("readonly");
+		const key = [scope.objectId, scope.author, authorSequence];
+		const [rawLineage, rawIssued, rawOutbox] = await Promise.all([
+			requestResult(transaction.objectStore("lineages").get([scope.objectId, scope.author])),
+			requestResult(transaction.objectStore("issuedRecords").get(key)),
+			requestResult(transaction.objectStore("issuanceOutbox").get(key)),
+		]);
+		await transactionResult(transaction);
+		return this.#terminalFromRaw(scope, rawLineage, rawIssued, rawOutbox);
+	}
+
+	readonly transportSender: string;
+}
+
+const v3PlaneRegistrations = new WeakMap<DRPNetworkNode, Map<string, V3PlaneRegistration>>();
+const v3HandleRegistrations = new WeakMap<V3PlaneHandle, V3PlaneRegistration>();
+const creatorSuccessorTransportHandoffs = new WeakMap<object, V3PlaneRegistration>();
+const aliasedCreatorSuccessorHandles = new WeakSet<V3PlaneHandle>();
+const claimedCreatorCloseHandles = new WeakSet<V3PlaneHandle>();
+const HEX_DIGITS = "0123456789abcdef";
+
+const installCreatorCloseResolver = Reflect.get(bindCreatorLiveClose, "installV3CreatorCloseRegistrationResolver");
+if (
+	typeof installCreatorCloseResolver !== "function" ||
+	ReflectApply(installCreatorCloseResolver, bindCreatorLiveClose, [
+		(plane: unknown): V3CreatorCloseRegistration | undefined => {
+			if (plane === null || typeof plane !== "object") return undefined;
+			const handle = plane as V3PlaneHandle;
+			if (claimedCreatorCloseHandles.has(handle)) return undefined;
+			const registration = v3HandleRegistrations.get(handle);
+			if (registration === undefined) return undefined;
+			const claimed = creatorCloseRegistration(registration);
+			if (claimed !== undefined) claimedCreatorCloseHandles.add(handle);
+			return claimed;
+		},
+	]) !== true
+) {
+	throw new TypeError("v3 creator close registration resolver is unavailable");
+}
+
+const D109D_ISSUANCE_RECEIPT_KEYS = [
+	"closedEpoch",
+====FOLD
+function stageClosedBlueprintEpoch(registration: V3PlaneRegistration): V3BlueprintFoldResult {
+	if (!currentRegistration(registration) || registration.blueprintMachine === undefined) {
+		return blueprintFoldFailure("not-active", "v3 blueprint fold is not active");
+	}
+	if (registration.blueprintFolded) {
+		return blueprintFoldFailure("already-folded", "v3 blueprint epoch was already folded");
+	}
+	const graphVersion = registration.graphVersion;
+	let staged;
+	try {
+		const vertices = copyApplicationVertices(registration.applicationVertices);
+		if (vertices === undefined) return blueprintFoldFailure("fold-rejected", "v3 blueprint graph is unavailable");
+		staged = foldBlueprintEpoch({
+			anchorHash: registration.payload.provenance.anchorDigest,
+			authorize: ({ hash }) => {
+				const author = ReflectApply(MapPrototypeGet, registration.applicationAuthors, [hash]) as string | undefined;
+				return author !== undefined && isV3ApplicationAuthorAuthorized(registration.authorization, author);
+			},
+			machine: registration.blueprintMachine,
+			vertices,
+		});
+	} catch {
+		return blueprintFoldFailure("fold-rejected", "v3 blueprint epoch fold was rejected");
+	}
+	let used = false;
+	return ObjectFreeze({
+		adopt: (): V3BlueprintAdoptResult => {
+			if (used) return blueprintAdoptFailure("already-adopted", "v3 blueprint fold result was already used");
+			used = true;
+			if (!currentRegistration(registration) || registration.blueprintMachine === undefined) {
+				return blueprintAdoptFailure("not-active", "v3 blueprint fold is not active");
+			}
+			if (registration.blueprintFolded || registration.graphVersion !== graphVersion) {
+				return blueprintAdoptFailure("stale-graph", "v3 blueprint fold graph is stale");
+			}
+			try {
+				const snapshot = staged.adopt();
+				registration.blueprintFolded = true;
+				return ObjectFreeze({ kind: "adopted" as const, ok: true as const, snapshot });
+			} catch {
+				return blueprintAdoptFailure("adopt-rejected", "v3 blueprint fold adoption was rejected");
+			}
+====RECOVERY-REG
+					"v3 topic subscription failed",
+					boundNetworkNode,
+					boundQueueManager,
+					topic,
+					queueId,
+					true
+				);
+			}
+			registration = {
+				active: true,
+				applicationAuthors: recovered.applicationAuthors,
+				applicationCharges: recovered.applicationCharges,
+				applicationVertices: recovered.applicationVertices,
+				authorization: recovered.authorization,
+				blueprintClosing: mode === "snapshot-closed",
+				blueprintFolded: mode === "snapshot-closed",
+				blueprintHandle: undefined,
+				blueprintMachine: snapshotMachine,
+				classifyTerminalVertex: recovered.classifyTerminalVertex,
+				displacedIssuanceBoundary: recovered.displacedIssuanceBoundary,
+				displacedSource: recovered.displacedSource,
+				drainingPendingIngress: false,
+				epochBytes: recovered.epochBytes,
+				graphVersion: intrinsicMapSize(recovered.applicationAuthors) ?? -1,
+				handle: undefined as unknown as V3PlaneHandle,
+				hotPredecessor: undefined,
+				index: recovered.index,
+				issuanceScope: selectedScope,
+				issuanceStore: boundIssuanceStore,
+				latchedOperations: recovered.latchedOperations,
+				liveJournalStore: recovered.liveJournalStore,
+				messageQueueManager: boundQueueManager,
+				mode,
+				networkNode: boundNetworkNode,
+				onAdmittedVertex: boundSink,
+				operationAdmissionHalted: false,
+				operationAdmissionPolicy: recovered.operationAdmissionPolicy,
+				payload,
+				pendingIngress: new IntrinsicMap<string, PendingV3Ingress>(),
+				pendingIngressBytes: 0,
+				publicationCursor: undefined,
+				rebaseCursor: undefined,
+				rebaseSnapshot: undefined,
+				retainedBootstrapHold: recovered.retainedBootstrapHold,
+				releaseTerminalBarrier: undefined,
+				runtimeReclamationLatch: undefined,
+				runtimeReclamationResult: undefined,
+				sourceRuntimeHandle: undefined,
+				quarantinedDigests: recovered.quarantinedDigests,
+				queueId: topic,
+				topic,
+				terminalBarrier: undefined,
+				terminalState: recovered.terminal ? "terminal" : "active",
+				gate: undefined,
+			};
+			registration.handle = makeV3PlaneHandle(registration);
+			if (snapshotMachine !== undefined) registration.blueprintHandle = makeV3BlueprintLiveHandle(registration);
+			v3HandleRegistrations.set(registration.handle, registration);
+			registrations ??= new IntrinsicMap<string, V3PlaneRegistration>();
+			if (reusesTransport) {
+				existing.active = false;
+23:	readonly admittedAuthorSequence: number;
+130:	if (admitted === null || lineage.next <= admitted) {
+133:	return Object.freeze({ admittedAuthorSequence: admitted, observedLineage: Object.freeze({ ...lineage }) });
+====TESTS
+e5-01-v3-operation-admission-red.test.ts
+e5-01-zone-prejournal-admission.pw.ts
+outcome-commit-e5-01-policy-red.test.ts
+phase-6b-d110c-0a-authority-red.test.ts
+phase-6b-d110c-0a-browser-custody-red.test.ts
+phase-6b-d110c-0b0-floor-red.test.ts
+phase-6b-d110c-0b0a-staged-handoff-red.test.ts
+phase-6b-d110c-0b1-boundaries.test.ts
+phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts
+phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts
+phase-6b-d110c-a-repeat-close-red.test.ts
+phase-6b-d110c-b-hot-adoption.test.ts
+tests/fixtures/phase-6b-d110c-0c1a/retirement-checkpoint-contract.ts
+====
+====RECOVERY
+				if (nextBytes === undefined || index.size >= payload.parameters.maxEpochVertices) {
+					return recoveryFailure("graph-rejected", "v3 recovery graph is at capacity");
+				}
+				updatedEpochBytes = nextBytes;
+			}
+			const reservation = alreadyRecovered
+				? undefined
+				: reserveOperation(
+						selectedOperationAdmissionPolicy,
+						authenticated.vertex.operation as Readonly<Record<string, unknown>>
+					);
+			if (reservation === null) {
+				return recoveryFailure("admission-rejected", "v3 recovery operation was rejected");
+			}
+			let appended;
+			try {
+				appended = await journal.appendAccepted({
+					author: selectedScope.author,
+					authorSequence: row.authorSequence,
+					scope,
+					sourceKind: "local-issued",
+					vertexDigest: authenticated.digest,
+				});
+			} catch {
+				return recoveryFailure("journal-rejected", "v3 recovery journal append failed");
+			}
+			if (
+				!appended.ok ||
+				appended.vertexDigest !== authenticated.digest ||
+				(alreadyRecovered ? !appended.idempotent : appended.idempotent || appended.sourceKind !== "local-issued")
+			) {
+				return recoveryFailure("journal-rejected", "v3 recovery journal append was rejected");
+			}
+			if (!alreadyRecovered) {
+				try {
+					const outcome = index.append(authenticated.digest, authenticated.vertex, authenticated.byteCharge);
+					if (outcome !== undefined) return recoveryFailure("graph-rejected", "v3 recovery graph is at capacity");
+				} catch {
+					return recoveryFailure("graph-rejected", "v3 recovery graph append failed");
+				}
+				retainApplicationVertex(applicationVertices, applicationAuthors, authenticated, applicationCharges);
+				epochBytes = updatedEpochBytes;
+				recoveredCount += 1;
+				recoveredVertices.push(authenticated.admitted);
+				if (candidate !== null && candidate !== undefined) latchedOperations.set(candidate.digest, candidate);
+				if (!commitOperationReservation(reservation)) {
+					return recoveryFailure("admission-rejected", "v3 recovery policy commit failed");
+				}
+				if (terminalClassification === "terminal-authorized") recoveredTerminal = true;
+			}
+			afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, row.authorSequence] as const);
+====MINT
+		if (
+			successorRecovery === undefined &&
+			!retainedBootstrapHold &&
+			(recoveredCount === 0 || index.size !== preparedVertexCount + recoveredCount)
+		) {
+			return recoveryFailure("issuance-rejected", "v3 recovery requires a complete issued record chain");
+		}
+		const capability = ObjectFreeze({}) as RecoveredV3Live;
+		installRecoveredV3LiveAuthority(
+			capability,
+			ObjectFreeze({
+				applicationAuthors,
+				applicationCharges,
+				applicationVertices,
+				authorization,
+				classifyTerminalVertex:
+1227676aaa25e993ea77abfb83f6dc218e7c87d7cc11156ba105486bf1fbb812  ./audit.md
+da2958f0f6049e598df865be1724260b82451d4e8f233f00241b62b6d04c0b0a  ./commands.md
+56bee1af6ac57ee2cf6a1efa6b96f8e6bcb7ca30ba57f1679bdb51d48ca8e7c2  ./source-hashes.sha256
+====
+# D.110c-0c1b source-audit commands
+
+- `git rev-parse HEAD HEAD^{tree}`
+- `rg -n 'issueOneVertex|committedFailure|operationAdmissionHalted|appendAccepted|recoverV3LiveReplica|stageClosedBlueprintEpoch|stageBlueprintEpoch|creatorCloseRegistration' packages/node/src/v3-live.ts packages/node/src/creator-close.ts tests`
+- bounded `sed`/`nl` inspection of `v3-live.ts` issue, recovery, queue, fold and creator-close owner ranges
+- inspection of `tests/e5-01-v3-operation-admission-red.test.ts` and `tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts`
+- `shasum -a 256` over the six exact inspected owner/contract/test files into `source-hashes.sha256`
+- `shasum -a 256 -c .logs/d110c-0c1b-source-audit-90a06a1a/source-hashes.sha256`
+- `NODE_OPTIONS=--max-old-space-size=8192 pnpm exec prettier --check docs/production-hardening/production-hardening-tdd-plan-v2.md`
+- `git diff --check -- docs/production-hardening/production-hardening-tdd-plan-v2.md`
+
+This checkpoint is read-only architecture evidence plus plan text. It runs no
+test, preflight, campaign, D.110a invocation, or production edit.
+./audit.md: OK
+./commands.md: OK
+./source-hashes.sha256: OK
+packages/issuance-store/src/types.ts: FAILED open or read
+shasum: packages/live-journal/src/types.ts: No such file or directory
+packages/live-journal/src/types.ts: FAILED open or read
+shasum: tests/e5-01-v3-operation-admission-red.test.ts: No such file or directory
+tests/e5-01-v3-operation-admission-red.test.ts: FAILED open or read
+shasum: tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts: No such file or directory
+tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts: FAILED open or read
+shasum: WARNING: 6 listed files could not be read
+# D.110c-0c1b plan review commands
+
+Review target: signed/pushed plan commit
+`d4ed70242c9f21cfb24e1d5c6b1c9c6216096616`, tree
+`b48d37e683b51441de39aeeec57c27a0c19f82f8`.
+
+- Grok 4.6/high: the complete argv is retained in `grok/command.json`; input,
+  streaming events, public output, stderr and runner status are retained under
+  `grok/`.
+- Kimi K3 direct: standard `kimi` CLI with
+  `KIMI_LOOP_MAX_STEPS_PER_TURN=100`, the frozen `prompt.md`, and streamed JSONL
+  captured in `kimi/stream.jsonl`; stderr and normalized terminal verdict are
+  retained beside it.
+- Opus xhigh: direct `claude -p` bridge invocation with the frozen `prompt.md`;
+  the complete CLI result envelope, stderr and normalized terminal verdict are
+  retained under `opus/`.
+- Normalization: `jq` extracted the exact terminal schema payloads into each
+  `verdict.json`; no finding was changed during extraction.
+- Validation: `jq -e` checked all three normalized verdicts against
+  `schema.json`; `shasum -a 256 -c manifest.sha256` validates this self-excluding
+  evidence root after manifest creation.
+
+All review processes exited zero. Grok's wrapper classified the session
+`NO_VERDICT` because its public stream included inspection prose before the
+valid terminal schema, despite `stop_reason=end_turn`; that classification is
+preserved in `grok/status.json`. Its terminal `CHANGES_REQUIRED` findings are
+retained and adopted, but the corrected plan will receive the one permitted
+material confirmation rather than claiming this wrapper result as approval.
+====
+./commands.md: OK
+./grok/command.json: OK
+./grok/events.jsonl: OK
+./grok/input-packet.md: OK
+./grok/public.txt: OK
+./grok/review.diff: OK
+./grok/status.json: OK
+./grok/stderr.log: OK
+./grok/verdict.json: OK
+./kimi/status.json: OK
+./kimi/stderr.txt: OK
+./kimi/stream.jsonl: OK
+./kimi/verdict.json: OK
+./opus/raw.json: OK
+./opus/status.json: OK
+./opus/stderr.txt: OK
+./opus/verdict.json: OK
+./prompt.md: OK
+./review-summary.md: OK
+./schema.json: OK
+packages/node/src/v3-live.ts: OK
+packages/node/src/creator-close.ts: OK
+packages/issuance-store/src/types.ts: OK
+packages/live-journal/src/types.ts: OK
+tests/e5-01-v3-operation-admission-red.test.ts: OK
+tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts: OK
+====
+08d278438087bbef20d61e5d058c02f02b89b84c33d02a7ad4f4e6212ca26b7b  .logs/d110c-0c1b-source-audit-90a06a1a/manifest.sha256
+7c3592e1edb59992740be65d7565cf3105f80c0e9b188ec51f2f160fa227e88c  .logs/d110c-0c1b-plan-review-d4ed7024/manifest.sha256
+ebe75e12c92b197d63ae04bdf80732174fe5e57e
+d4ed70242c9f21cfb24e1d5c6b1c9c6216096616
+G Faolain <Faolain@users.noreply.github.com>
+  origin/codex/phase3a1b-p6-golden-path
+?? .agents/
+?? .claude/
+?? .logs/d108e4-complete-config-a5ac938f/
+?? .logs/d108e4-plan-grok-50fd6fd5/
+?? .logs/d108e4a-green-reviews-3f10ac71/

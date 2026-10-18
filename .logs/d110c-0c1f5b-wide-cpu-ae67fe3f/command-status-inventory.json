@@ -1,0 +1,86 @@
+[
+  {
+    "file": "custody-before/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T07:32:20.573Z",
+    "finish": "2026-09-06T07:32:26.015Z",
+    "pid": 37398
+  },
+  {
+    "file": "custody-final/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T07:36:10.278Z",
+    "finish": "2026-09-06T07:36:12.795Z",
+    "pid": 45034
+  },
+  {
+    "file": "diagnostic-runtime/status.json",
+    "code": 1,
+    "signal": null,
+    "start": "2026-09-06T07:34:06.004Z",
+    "finish": "2026-09-06T07:35:21.792Z",
+    "pid": 40447
+  },
+  {
+    "file": "freeze-runtime/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T07:32:55.287Z",
+    "finish": "2026-09-06T07:32:55.962Z",
+    "pid": 38285
+  },
+  {
+    "file": "profile-inventory/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T07:35:49.163Z",
+    "finish": "2026-09-06T07:35:49.365Z",
+    "pid": 44681
+  },
+  {
+    "file": "validate-runtime/status.json",
+    "code": 0,
+    "signal": null,
+    "start": "2026-09-06T07:35:48.866Z",
+    "finish": "2026-09-06T07:35:49.052Z",
+    "pid": 44643
+  },
+  {
+    "file": "wide-only/status.json",
+    "code": 1,
+    "signal": null,
+    "elapsedMs": 75083.345084,
+    "endedAt": "2026-09-06T07:35:21.785Z",
+    "watchdogActions": [],
+    "ownedProcessGroup": 40665,
+    "quiescent": true,
+    "observedOwnedMembers": [
+      {
+        "pid": 40665,
+        "ppid": 40447,
+        "pgid": 40665,
+        "status": "Ss",
+        "firstSeenMs": 1073.157167,
+        "lastSeenMs": 74210.390667
+      },
+      {
+        "pid": 40676,
+        "ppid": 40665,
+        "pgid": 40665,
+        "status": "S",
+        "firstSeenMs": 1073.167,
+        "lastSeenMs": 74210.394167
+      },
+      {
+        "pid": 40795,
+        "ppid": 40665,
+        "pgid": 40665,
+        "status": "R",
+        "firstSeenMs": 2270.842917,
+        "lastSeenMs": 74210.394459
+      }
+    ]
+  }
+]

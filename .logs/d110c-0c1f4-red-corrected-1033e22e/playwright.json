@@ -1,0 +1,220 @@
+{
+  "config": {
+    "argv": [
+      "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+      "/private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/node_modules/.pnpm/@playwright+test@1.62.1/node_modules/@playwright/test/cli.js",
+      "test",
+      "--config",
+      "packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts",
+      "--project=chromium",
+      "--grep",
+      "D.110c-0c1f4 exact configured bootstrap authority is required on epoch-N cold reopen|D.110c-0c1f2 non-creator writer requires an authenticated historical frontier",
+      "--reporter=json",
+      "--fail-on-flaky-tests"
+    ],
+    "configFile": "/private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts",
+    "rootDir": "/private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/packages/storage-browser/tests",
+    "failOnFlakyTests": true,
+    "forbidOnly": true,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 600000,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-6a-creator-successor-product.pw.ts"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "/private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "/private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-6a-creator-successor-product.pw.ts"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "/private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit",
+        "name": "webkit",
+        "testDir": "/private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-6a-creator-successor-product.pw.ts"
+        ],
+        "timeout": 90000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.62.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "phase-6a-creator-successor-product.pw.ts",
+      "file": "phase-6a-creator-successor-product.pw.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "D.110c-0c1f4 exact configured bootstrap authority is required on epoch-N cold reopen",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 1090,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContainEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\nExpected value: \u001b[32mObjectContaining {\"authorSequence\": 0, \"classification\": \"pinned-genesis\", \"owner\": \"predecessor-validation\", \"payloadEpoch\": 1}\u001b[39m\nReceived array: \u001b[31m[{\"authorSequence\": 0, \"classification\": \"current\", \"digest\": \"9a341ee528419b117894c491be8f52f6dbfa76c54d3575187fe51c6949be5e22\", \"owner\": null, \"payloadEpoch\": 0, \"phase\": null}, {\"classification\": \"activation\", \"displacedIssuanceBoundary\": null, \"owner\": null, \"payloadEpoch\": 0, \"phase\": null}, {\"authorSequence\": 0, \"classification\": \"covered-historical\", \"digest\": \"9a341ee528419b117894c491be8f52f6dbfa76c54d3575187fe51c6949be5e22\", \"owner\": \"predecessor-validation\", \"payloadEpoch\": 1, \"phase\": null}, {\"authorSequence\": 0, \"classification\": \"current\", \"digest\": \"9a341ee528419b117894c491be8f52f6dbfa76c54d3575187fe51c6949be5e22\", \"owner\": \"predecessor-validation\", \"payloadEpoch\": 0, \"phase\": null}, {\"authorSequence\": 0, \"classification\": \"displaced\", \"digest\": \"9a341ee528419b117894c491be8f52f6dbfa76c54d3575187fe51c6949be5e22\", \"owner\": \"successor-recovery\", \"payloadEpoch\": 1, \"phase\": null}, {\"classification\": \"activation\", \"displacedIssuanceBoundary\": 0, \"owner\": null, \"payloadEpoch\": 1, \"phase\": null}]\u001b[39m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContainEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\nExpected value: \u001b[32mObjectContaining {\"authorSequence\": 0, \"classification\": \"pinned-genesis\", \"owner\": \"predecessor-validation\", \"payloadEpoch\": 1}\u001b[39m\nReceived array: \u001b[31m[{\"authorSequence\": 0, \"classification\": \"current\", \"digest\": \"9a341ee528419b117894c491be8f52f6dbfa76c54d3575187fe51c6949be5e22\", \"owner\": null, \"payloadEpoch\": 0, \"phase\": null}, {\"classification\": \"activation\", \"displacedIssuanceBoundary\": null, \"owner\": null, \"payloadEpoch\": 0, \"phase\": null}, {\"authorSequence\": 0, \"classification\": \"covered-historical\", \"digest\": \"9a341ee528419b117894c491be8f52f6dbfa76c54d3575187fe51c6949be5e22\", \"owner\": \"predecessor-validation\", \"payloadEpoch\": 1, \"phase\": null}, {\"authorSequence\": 0, \"classification\": \"current\", \"digest\": \"9a341ee528419b117894c491be8f52f6dbfa76c54d3575187fe51c6949be5e22\", \"owner\": \"predecessor-validation\", \"payloadEpoch\": 0, \"phase\": null}, {\"authorSequence\": 0, \"classification\": \"displaced\", \"digest\": \"9a341ee528419b117894c491be8f52f6dbfa76c54d3575187fe51c6949be5e22\", \"owner\": \"successor-recovery\", \"payloadEpoch\": 1, \"phase\": null}, {\"classification\": \"activation\", \"displacedIssuanceBoundary\": 0, \"owner\": null, \"payloadEpoch\": 1, \"phase\": null}]\u001b[39m\n    at /private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:3177:24",
+                    "location": {
+                      "file": "/private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+                      "column": 24,
+                      "line": 3177
+                    },
+                    "snippet": "  3175 | \t\tconst controlTrace = d110c0cArray(d110c0cRecord(control).trace).map(d110c0cRecord);\n  3176 | \t\tconst treatmentTrace = d110c0cArray(d110c0cRecord(treatment).trace).map(d110c0cRecord);\n> 3177 | \t\texpect(controlTrace).toContainEqual(\n       | \t\t                     ^\n  3178 | \t\t\texpect.objectContaining({\n  3179 | \t\t\t\tauthorSequence: 0,\n  3180 | \t\t\t\tclassification: \"pinned-genesis\","
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+                        "column": 24,
+                        "line": 3177
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoContainEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\nExpected value: \u001b[32mObjectContaining {\"authorSequence\": 0, \"classification\": \"pinned-genesis\", \"owner\": \"predecessor-validation\", \"payloadEpoch\": 1}\u001b[39m\nReceived array: \u001b[31m[{\"authorSequence\": 0, \"classification\": \"current\", \"digest\": \"9a341ee528419b117894c491be8f52f6dbfa76c54d3575187fe51c6949be5e22\", \"owner\": null, \"payloadEpoch\": 0, \"phase\": null}, {\"classification\": \"activation\", \"displacedIssuanceBoundary\": null, \"owner\": null, \"payloadEpoch\": 0, \"phase\": null}, {\"authorSequence\": 0, \"classification\": \"covered-historical\", \"digest\": \"9a341ee528419b117894c491be8f52f6dbfa76c54d3575187fe51c6949be5e22\", \"owner\": \"predecessor-validation\", \"payloadEpoch\": 1, \"phase\": null}, {\"authorSequence\": 0, \"classification\": \"current\", \"digest\": \"9a341ee528419b117894c491be8f52f6dbfa76c54d3575187fe51c6949be5e22\", \"owner\": \"predecessor-validation\", \"payloadEpoch\": 0, \"phase\": null}, {\"authorSequence\": 0, \"classification\": \"displaced\", \"digest\": \"9a341ee528419b117894c491be8f52f6dbfa76c54d3575187fe51c6949be5e22\", \"owner\": \"successor-recovery\", \"payloadEpoch\": 1, \"phase\": null}, {\"classification\": \"activation\", \"displacedIssuanceBoundary\": 0, \"owner\": null, \"payloadEpoch\": 1, \"phase\": null}]\u001b[39m\n\n  3175 | \t\tconst controlTrace = d110c0cArray(d110c0cRecord(control).trace).map(d110c0cRecord);\n  3176 | \t\tconst treatmentTrace = d110c0cArray(d110c0cRecord(treatment).trace).map(d110c0cRecord);\n> 3177 | \t\texpect(controlTrace).toContainEqual(\n       | \t\t                     ^\n  3178 | \t\t\texpect.objectContaining({\n  3179 | \t\t\t\tauthorSequence: 0,\n  3180 | \t\t\t\tclassification: \"pinned-genesis\",\n    at /private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:3177:24"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-03T18:02:13.562Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/packages/storage-browser/test-results/phase-6a-creator-successor-b300d-ired-on-epoch-N-cold-reopen-chromium/error-context.md"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/packages/storage-browser/test-results/phase-6a-creator-successor-b300d-ired-on-epoch-N-cold-reopen-chromium/error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/private/tmp/ts-drp-d110c-0c1f4-red.6CrjQb/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+                    "column": 24,
+                    "line": 3177
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-38a08726d8f148169a3d",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 3036,
+          "column": 1
+        },
+        {
+          "title": "D.110c-0c1f2 non-creator writer requires an authenticated historical frontier",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-03T18:02:15.807Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-0b643455daa45fd96b4e",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 3220,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-03T18:02:12.791Z",
+    "duration": 3027.444,
+    "expected": 0,
+    "skipped": 1,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}

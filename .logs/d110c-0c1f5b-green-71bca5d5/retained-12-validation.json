@@ -1,0 +1,43 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 1,
+  "passed": 1,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-ab98cce6/retained-12/result.json",
+  "baselineSha256": "f1c827516d40d5a9da29010444a3bd29d201fdb18f4afefc9f072388bb097c26",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3h-v3-room-activation-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3h-v3-room-activation-red.test.ts",
+      "ancestorTitles": [
+        "Phase 3h-b creator-signed activation RED"
+      ],
+      "fullName": "Phase 3h-b creator-signed activation RED derives the exact signed decision from record and invite evidence without routing inputs",
+      "status": "passed",
+      "title": "derives the exact signed decision from record and invite evidence without routing inputs",
+      "duration": 5.698542000000003,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "e9b7101874d4f902bbeebda1b65cce8115f034b46295649ffa4df61936378277",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

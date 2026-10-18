@@ -1,0 +1,35 @@
+{
+  "commands": [
+    {
+      "command": "pnpm exec prettier --check tests/phase-6a-creator-successor-product-red.test.ts",
+      "status": 0,
+      "stdout": "All matched files use Prettier code style!"
+    },
+    {
+      "command": "pnpm exec eslint tests/phase-6a-creator-successor-product-red.test.ts",
+      "status": 0
+    },
+    {
+      "command": "git diff --check -- tests/phase-6a-creator-successor-product-red.test.ts",
+      "status": 0
+    }
+  ],
+  "scope": {
+    "syntaxDiagnostics": 0,
+    "allOriginalNonImportBytesIdentical": true,
+    "originalStatements": 5,
+    "appendedStatements": 2
+  },
+  "beforeEditing": {
+    "owners": 8,
+    "retained": 79,
+    "protected": 86522,
+    "stashes": 27,
+    "patch": "245c2b251c5dfc9389c9732319c8e1b474cf2740252dff3d107320121e6564ed",
+    "manifestsVerified": true,
+    "head": "61a793d38a9fa1eafd9639aa41de2335f9891695 G"
+  },
+  "testCommit": "da874b52ab99e7143911f1ce8c018c29f826db3c",
+  "signature": "G",
+  "pushExact": true
+}

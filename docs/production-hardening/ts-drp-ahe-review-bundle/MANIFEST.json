@@ -1,0 +1,238 @@
+{
+  "files": [
+    {
+      "path": "BASELINE.md",
+      "bytes": 513
+    },
+    {
+      "path": "README.md",
+      "bytes": 1712
+    },
+    {
+      "path": "SHA256SUMS.txt",
+      "bytes": 6028
+    },
+    {
+      "path": "evidence/approximate-membership-counterexample.json",
+      "bytes": 626
+    },
+    {
+      "path": "evidence/approximate-membership-counterexample.log",
+      "bytes": 626
+    },
+    {
+      "path": "evidence/browser-surface-audit.json",
+      "bytes": 779
+    },
+    {
+      "path": "evidence/browser-surface-audit.log",
+      "bytes": 779
+    },
+    {
+      "path": "evidence/chromium-browser-validation.json",
+      "bytes": 518
+    },
+    {
+      "path": "evidence/chromium-browser-validation.log",
+      "bytes": 612
+    },
+    {
+      "path": "evidence/epoch-model-validation.json",
+      "bytes": 1008
+    },
+    {
+      "path": "evidence/epoch-model-validation.log",
+      "bytes": 1003
+    },
+    {
+      "path": "evidence/model-all.log",
+      "bytes": 8607
+    },
+    {
+      "path": "evidence/node-benchmark.json",
+      "bytes": 2456
+    },
+    {
+      "path": "evidence/node-benchmark.log",
+      "bytes": 2536
+    },
+    {
+      "path": "evidence/node-coverage.log",
+      "bytes": 7120
+    },
+    {
+      "path": "evidence/node-tests.log",
+      "bytes": 5185
+    },
+    {
+      "path": "evidence/run-status.txt",
+      "bytes": 57
+    },
+    {
+      "path": "evidence/seal-model-validation.json",
+      "bytes": 2106
+    },
+    {
+      "path": "evidence/seal-model-validation.log",
+      "bytes": 2105
+    },
+    {
+      "path": "evidence/storage-scaling.json",
+      "bytes": 3555
+    },
+    {
+      "path": "evidence/storage-scaling.log",
+      "bytes": 3555
+    },
+    {
+      "path": "figures/benchmark-medians.png",
+      "bytes": 109599
+    },
+    {
+      "path": "figures/storage-scaling.png",
+      "bytes": 157532
+    },
+    {
+      "path": "qa/docx-a11y.json",
+      "bytes": 162
+    },
+    {
+      "path": "qa/pdf-inspect.txt",
+      "bytes": 1435
+    },
+    {
+      "path": "qa/pdf-preflight.txt",
+      "bytes": 161
+    },
+    {
+      "path": "qa/visual-diff-summary.json",
+      "bytes": 5495
+    },
+    {
+      "path": "reference-implementation/README.md",
+      "bytes": 5397
+    },
+    {
+      "path": "reference-implementation/browser/browser-tests.js",
+      "bytes": 5587
+    },
+    {
+      "path": "reference-implementation/browser/harness.html",
+      "bytes": 172
+    },
+    {
+      "path": "reference-implementation/browser/run_browser_tests.py",
+      "bytes": 3118
+    },
+    {
+      "path": "reference-implementation/browser/worker.js",
+      "bytes": 2697
+    },
+    {
+      "path": "reference-implementation/docs/attested-hard-epochs-v4.md",
+      "bytes": 40803
+    },
+    {
+      "path": "reference-implementation/model/approximate_membership_counterexample.py",
+      "bytes": 2277
+    },
+    {
+      "path": "reference-implementation/model/browser_surface_audit.py",
+      "bytes": 3389
+    },
+    {
+      "path": "reference-implementation/model/storage_scaling.py",
+      "bytes": 3422
+    },
+    {
+      "path": "reference-implementation/model/validate_epoch_model.py",
+      "bytes": 13763
+    },
+    {
+      "path": "reference-implementation/model/validate_seal.py",
+      "bytes": 5057
+    },
+    {
+      "path": "reference-implementation/package.json",
+      "bytes": 908
+    },
+    {
+      "path": "reference-implementation/src/admission.js",
+      "bytes": 7302
+    },
+    {
+      "path": "reference-implementation/src/archive.js",
+      "bytes": 9131
+    },
+    {
+      "path": "reference-implementation/src/canonical.js",
+      "bytes": 16238
+    },
+    {
+      "path": "reference-implementation/src/ct-merkle.js",
+      "bytes": 8248
+    },
+    {
+      "path": "reference-implementation/src/fold.js",
+      "bytes": 2672
+    },
+    {
+      "path": "reference-implementation/src/hash.js",
+      "bytes": 3059
+    },
+    {
+      "path": "reference-implementation/src/indexeddb-store.js",
+      "bytes": 10752
+    },
+    {
+      "path": "reference-implementation/src/linearize.js",
+      "bytes": 10137
+    },
+    {
+      "path": "reference-implementation/src/protocol.js",
+      "bytes": 11047
+    },
+    {
+      "path": "reference-implementation/src/runtime.js",
+      "bytes": 1687
+    },
+    {
+      "path": "reference-implementation/src/seal.js",
+      "bytes": 11740
+    },
+    {
+      "path": "reference-implementation/src/snapshot.js",
+      "bytes": 5855
+    },
+    {
+      "path": "reference-implementation/src/state.js",
+      "bytes": 3058
+    },
+    {
+      "path": "reference-implementation/test/benchmark.mjs",
+      "bytes": 7926
+    },
+    {
+      "path": "reference-implementation/test/core.test.mjs",
+      "bytes": 26898
+    },
+    {
+      "path": "report/repo-integration-plan.md",
+      "bytes": 4659
+    },
+    {
+      "path": "report/ts-drp-compaction-review.md",
+      "bytes": 53107
+    },
+    {
+      "path": "report/ts-drp-history-at-scale-review.docx",
+      "bytes": 281597
+    },
+    {
+      "path": "report/ts-drp-history-at-scale-review.pdf",
+      "bytes": 684909
+    }
+  ],
+  "file_count": 58,
+  "total_bytes": 1572482
+}

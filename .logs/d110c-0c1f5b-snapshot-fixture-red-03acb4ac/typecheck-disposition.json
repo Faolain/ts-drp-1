@@ -1,0 +1,12 @@
+{
+  "diagnosticCount": 3,
+  "targetCount": 0,
+  "externalCount": 3,
+  "productionDiagnostics": [],
+  "checkedFiles": [
+    "tests/phase-6b-d110c-0c1f5b-snapshot-fixture-contract-red.test.ts"
+  ],
+  "scope": "New focused test source-mapped strict program and imported closure; three unchanged helper diagnostics remain inherited RED",
+  "prior41ComparatorNotUsed": true,
+  "wholeProgramPass": false
+}

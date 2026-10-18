@@ -1,0 +1,283 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 21,
+  "passed": 21,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "attributable": true,
+  "knownFailureFamilyOnly": true,
+  "skipsExact": true,
+  "baselineSource": ".logs/d110c-0c1f5b-green-89f147cc/retained-02/result.json",
+  "baselineSha256": "e05e03bf77a1155cdf44c86da346ab40559da089053681e3e265eaf3625622ac",
+  "numRuntimeErrorTestSuites": null,
+  "numUnhandledErrors": null,
+  "unhandledErrors": [],
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts",
+      "message": "",
+      "testExecError": null
+    }
+  ],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts",
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED freezes the ten migration cases and six genuine process-death boundaries",
+      "status": "passed",
+      "title": "freezes the ten migration cases and six genuine process-death boundaries",
+      "duration": 1.6254580000000374,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts",
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED [RED readiness] requires the Node maintenance owner and v3 settlement schema",
+      "status": "passed",
+      "title": "[RED readiness] requires the Node maintenance owner and v3 settlement schema",
+      "duration": 0.309332999999981,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts",
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED prunes and reopens the same derived authority without changing its facade",
+      "status": "passed",
+      "title": "prunes and reopens the same derived authority without changing its facade",
+      "duration": 93.97241700000001,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts",
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED refuses native mutant canonical-malformed with zero pruning writes",
+      "status": "passed",
+      "title": "refuses native mutant canonical-malformed with zero pruning writes",
+      "duration": 12.33783299999999,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts",
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED refuses native mutant vertex-kind-wrong with zero pruning writes",
+      "status": "passed",
+      "title": "refuses native mutant vertex-kind-wrong with zero pruning writes",
+      "duration": 9.667541999999969,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts",
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED refuses native mutant protocol-major-wrong with zero pruning writes",
+      "status": "passed",
+      "title": "refuses native mutant protocol-major-wrong with zero pruning writes",
+      "duration": 8.54083300000002,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts",
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED refuses native mutant scope-wrong with zero pruning writes",
+      "status": "passed",
+      "title": "refuses native mutant scope-wrong with zero pruning writes",
+      "duration": 10.014707999999985,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts",
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED refuses native mutant ordinal-wrong with zero pruning writes",
+      "status": "passed",
+      "title": "refuses native mutant ordinal-wrong with zero pruning writes",
+      "duration": 10.037125000000003,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts",
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED refuses native mutant epoch-wrong with zero pruning writes",
+      "status": "passed",
+      "title": "refuses native mutant epoch-wrong with zero pruning writes",
+      "duration": 15.173708000000033,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts",
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED refuses native mutant issued-only with zero pruning writes",
+      "status": "passed",
+      "title": "refuses native mutant issued-only with zero pruning writes",
+      "duration": 12.582959000000017,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts",
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED refuses native mutant outbox-only with zero pruning writes",
+      "status": "passed",
+      "title": "refuses native mutant outbox-only with zero pruning writes",
+      "duration": 10.491541999999981,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts",
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED refuses native mutant digest-mismatch with zero pruning writes",
+      "status": "passed",
+      "title": "refuses native mutant digest-mismatch with zero pruning writes",
+      "duration": 9.591250000000002,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts",
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED refuses native mutant sequence-gap with zero pruning writes",
+      "status": "passed",
+      "title": "refuses native mutant sequence-gap with zero pruning writes",
+      "duration": 10.790374999999926,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts",
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED refuses native mutant epoch-regression with zero pruning writes",
+      "status": "passed",
+      "title": "refuses native mutant epoch-regression with zero pruning writes",
+      "duration": 9.77800000000002,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts",
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED rolls back the injected delete-count-mismatch owner-count mutant",
+      "status": "passed",
+      "title": "rolls back the injected delete-count-mismatch owner-count mutant",
+      "duration": 6.110249999999951,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts",
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED rolls back the injected watermark-update-count-mismatch owner-count mutant",
+      "status": "passed",
+      "title": "rolls back the injected watermark-update-count-mismatch owner-count mutant",
+      "duration": 5.947041999999897,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts",
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED serializes two live handles and rejects a genuinely stale watermark extension",
+      "status": "passed",
+      "title": "serializes two live handles and rejects a genuinely stale watermark extension",
+      "duration": 6.931832999999983,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts",
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED migrates the exact v1 authority in place and preserves every issuance row",
+      "status": "passed",
+      "title": "migrates the exact v1 authority in place and preserves every issuance row",
+      "duration": 9.01604199999997,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts",
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED rolls back a failed v1 migration and admits two racing v1 openers exactly once",
+      "status": "passed",
+      "title": "rolls back a failed v1 migration and admits two racing v1 openers exactly once",
+      "duration": 91.27729099999999,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts",
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED rejects unknown versions and catalogs without repairing either authority",
+      "status": "passed",
+      "title": "rejects unknown versions and catalogs without repairing either authority",
+      "duration": 12.600584000000026,
+      "failureMessages": [],
+      "meta": {}
+    },
+    {
+      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts",
+      "ancestorTitles": [
+        "D.109b Node issuance-retention RED"
+      ],
+      "fullName": "D.109b Node issuance-retention RED recovers old XOR complete-new state at every frozen hard-kill edge",
+      "status": "passed",
+      "title": "recovers old XOR complete-new state at every frozen hard-kill edge",
+      "duration": 441.02654200000006,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ],
+  "reporterSha256": "1902a79c5824788f5027bbb77bad8244736c2498e09f9f1de6c56afcadcd9261",
+  "allPass": true,
+  "knownFailuresNotWaived": false
+}

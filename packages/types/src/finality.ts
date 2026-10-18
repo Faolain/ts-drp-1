@@ -4,6 +4,11 @@ import { type AggregatedAttestation, type Attestation } from "./proto/drp/v1/obj
 
 export interface FinalityConfig {
 	/**
+	 * Whether the legacy attestation plane is enabled.
+	 * @default true
+	 */
+	enabled?: boolean;
+	/**
 	 * The threshold for finality.
 	 */
 	finality_threshold?: number;
@@ -40,8 +45,9 @@ export interface IFinalityState {
 	 * @param peerId - The peer id of the signer.
 	 * @param signature - The signature to add.
 	 * @param verify - Whether to verify the signature.
+	 * @returns Whether the signature changed the finality state.
 	 */
-	addSignature(peerId: string, signature: Uint8Array, verify?: boolean): void;
+	addSignature(peerId: string, signature: Uint8Array, verify?: boolean): boolean;
 	/**
 	 * Merges an aggregated attestation into the finality state.
 	 * @param attestation - The aggregated attestation to merge.
@@ -50,6 +56,10 @@ export interface IFinalityState {
 }
 
 export interface IFinalityStore {
+	/**
+	 * Whether the legacy attestation plane is enabled.
+	 */
+	readonly enabled: boolean;
 	/**
 	 * The states of the finality store.
 	 */

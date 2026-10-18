@@ -1,0 +1,15 @@
+{
+	"extends": "../../../tsconfig.json",
+	"compilerOptions": {
+		"composite": false,
+		"noEmit": true,
+		"rootDir": "../../..",
+		"target": "ES2023",
+		"paths": {
+			"@ts-drp/*": ["../../../packages/*/dist/src/index.d.ts", "../../../packages/*"],
+			"@ts-drp/protocol-v3": ["../../../packages/protocol-v3/dist/src/public.d.ts"]
+		}
+	},
+	"files": ["api-contract.ts"],
+	"include": []
+}

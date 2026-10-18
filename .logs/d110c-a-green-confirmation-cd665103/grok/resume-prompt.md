@@ -1,0 +1,1 @@
+Resume this exact confirmation review from the point where the service turn cap stopped it. Complete the remaining read-only inspection and return only the terminal JSON object required by the original prompt. Do not restart the analysis, do not write files, and do not omit the requested verdict/counts/next_slice fields.

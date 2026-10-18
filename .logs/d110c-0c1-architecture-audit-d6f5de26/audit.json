@@ -1,0 +1,13 @@
+{
+  "anchorCommit": "d6f5de263c5d0bcabe4df25532a0a8d3dcf0ccbd",
+  "anchorTree": "17ecf3edf922ca3b27e96a5c8b25ae7888f67146",
+  "currentAuthenticatedBoundarySufficient": false,
+  "decision": "creator-signed-cumulative-issuance-retirement-checkpoint",
+  "implementationAuthorized": false,
+  "newPublicProductApi": false,
+  "newProtocolControlCarrier": true,
+  "newWireOrRegistryContract": true,
+  "requiresHighRiskPrerequisite": true,
+  "selectedStorage": "one replaceable authenticated AHE closure candidate",
+  "storeSchemaChangeRequired": false
+}

@@ -1,0 +1,9 @@
+{
+  "cwd": "/tmp/d110c-f5b0z-green-initial-PcUYzv/checkout",
+  "command": "ps",
+  "args": [
+    "-axo",
+    "pid,ppid,etime,command"
+  ],
+  "start": "2026-09-05T20:01:39.420Z"
+}

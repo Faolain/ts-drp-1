@@ -1,0 +1,21 @@
+{
+  "command": [
+    "pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+    "--config",
+    ".logs/d110c-0c1f5b-green-57834387/segmented-observer-02.config.mts",
+    "-t",
+    "retains checkpoint-terminal open progress",
+    "--reporter=json",
+    "--outputFile=.logs/d110c-0c1f5b-green-57834387/iteration-02-segmented-reporter.json"
+  ],
+  "startedAt": "2026-09-05T17:55:11.653Z",
+  "endedAt": "2026-09-05T17:55:17.465Z",
+  "status": 1,
+  "signal": null,
+  "stdout": "JSON report written to /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1f5b-green-57834387/iteration-02-segmented-reporter.json\n",
+  "stderr": ""
+}

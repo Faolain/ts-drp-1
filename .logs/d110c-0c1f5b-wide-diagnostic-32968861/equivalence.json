@@ -1,0 +1,350 @@
+{
+  "valid": true,
+  "files": [
+    {
+      "file": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts",
+      "beforeSha256": "a1bbf534aa93f5990a442c974035f5aa73c4982569886876a957b6b62da37a0d",
+      "afterSha256": "c63f9cb4c8bfda07a631de56382180147af01e9c062b7099a39a4632d9f16f0e"
+    }
+  ],
+  "callbackOriginalBodySha256": "5772c9807c1d9152f7f89e0f7fe0ad38ede650793c7a571dd63a364862c82ee5",
+  "callbackRestoredBodySha256": "5772c9807c1d9152f7f89e0f7fe0ad38ede650793c7a571dd63a364862c82ee5",
+  "rawInstrumentedBodyNotByteEqual": true,
+  "formatterNormalizedReverseEntireFileByteEqual": true,
+  "restoredFileSha256": "a1bbf534aa93f5990a442c974035f5aa73c4982569886876a957b6b62da37a0d",
+  "originalAwaitExpressions": 289,
+  "originalPromiseAllExpressions": 15,
+  "originalExpectCalls": 271,
+  "allOriginalTokensAssertionsAndControlFlowRestored": true,
+  "removedDiagnosticSpans": [
+    {
+      "kind": "try-open",
+      "start": 61848,
+      "end": 61855,
+      "text": "\ttry {\n"
+    },
+    {
+      "kind": "finally-tail",
+      "start": 82643,
+      "end": 82737,
+      "text": "\t} finally {\n\t\twideDiagnostic(\"callback\", \"settled\", null, null, wideDiagnosticCompleted);\n\t}\n"
+    },
+    {
+      "kind": "writeSync-import",
+      "start": 2419,
+      "end": 2430,
+      "text": ", writeSync"
+    },
+    {
+      "kind": "performance-import",
+      "start": 2449,
+      "end": 2496,
+      "text": "import { performance } from \"node:perf_hooks\";\n"
+    },
+    {
+      "kind": "diagnostic-state",
+      "start": 16307,
+      "end": 16542,
+      "text": "const wideDiagnosticState = {\n\tenabled: process.env.TS_DRP_F5B_WIDE_DIAGNOSTIC === \"1\",\n\trecords: 0,\n\tcompletedOrdinaryIssues: 0,\n\tepoch: null as number | null,\n\tstartNs: 0n,\n\tpreviousUser: 0,\n\tpreviousSystem: 0,\n\twriteFailures: 0,\n};\n"
+    },
+    {
+      "kind": "logger",
+      "start": 16543,
+      "end": 18418,
+      "text": "function wideDiagnostic(\n\tphase: string,\n\tedge: string,\n\tepoch: number | null = null,\n\tpeer: string | null = null,\n\tcompleted: boolean | null = null\n): void {\n\tif (!wideDiagnosticState.enabled || wideDiagnosticState.records >= 4096) return;\n\ttry {\n\t\tconst now = process.hrtime.bigint();\n\t\tconst cpu = process.cpuUsage();\n\t\tconst eventLoop = performance.eventLoopUtilization();\n\t\tif (wideDiagnosticState.records === 0) {\n\t\t\twideDiagnosticState.startNs = now;\n\t\t\twideDiagnosticState.previousUser = cpu.user;\n\t\t\twideDiagnosticState.previousSystem = cpu.system;\n\t\t}\n\t\tif (phase === \"epoch\" && edge === \"begin\") wideDiagnosticState.epoch = epoch;\n\t\tif (phase === \"ordinary-issue\" && edge === \"end\") wideDiagnosticState.completedOrdinaryIssues += 1;\n\t\twideDiagnosticState.records += 1;\n\t\tconst overflow = wideDiagnosticState.records === 4096;\n\t\twriteSync(\n\t\t\t1,\n\t\t\t`${JSON.stringify({\n\t\t\t\tkind: \"F5B_WIDE_DIAGNOSTIC\",\n\t\t\t\tsequence: wideDiagnosticState.records,\n\t\t\t\tphase: overflow ? \"diagnostic-overflow\" : phase,\n\t\t\t\tedge: overflow ? \"limit\" : edge,\n\t\t\t\tepoch: epoch ?? wideDiagnosticState.epoch,\n\t\t\t\tpeer,\n\t\t\t\tcompleted,\n\t\t\t\tcompletedOrdinaryIssues: wideDiagnosticState.completedOrdinaryIssues,\n\t\t\t\telapsedMs: Number(now - wideDiagnosticState.startNs) / 1_000_000,\n\t\t\t\tcpuScope: \"process-aggregate-including-overlapping-work\",\n\t\t\t\tcpuUserMicros: cpu.user,\n\t\t\t\tcpuSystemMicros: cpu.system,\n\t\t\t\teventLoopIdleMs: eventLoop.idle,\n\t\t\t\teventLoopActiveMs: eventLoop.active,\n\t\t\t\teventLoopUtilization: eventLoop.utilization,\n\t\t\t\tdeltaUserMicros: cpu.user - wideDiagnosticState.previousUser,\n\t\t\t\tdeltaSystemMicros: cpu.system - wideDiagnosticState.previousSystem,\n\t\t\t\twriteFailures: wideDiagnosticState.writeFailures,\n\t\t\t})}\\n`\n\t\t);\n\t\twideDiagnosticState.previousUser = cpu.user;\n\t\twideDiagnosticState.previousSystem = cpu.system;\n\t} catch {\n\t\twideDiagnosticState.writeFailures += 1;\n\t}\n}\n"
+    },
+    {
+      "kind": "observation",
+      "start": 31396,
+      "end": 31461,
+      "text": "\t\twideDiagnostic(\"initial-peer-open\", \"begin\", 0, databaseName);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 31510,
+      "end": 31573,
+      "text": "\t\twideDiagnostic(\"initial-peer-open\", \"end\", 0, databaseName);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 31833,
+      "end": 31898,
+      "text": "\t\twideDiagnostic(\"peer-stop\", \"begin\", null, peer.databaseName);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 31955,
+      "end": 32018,
+      "text": "\t\twideDiagnostic(\"peer-stop\", \"end\", null, peer.databaseName);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 32139,
+      "end": 32212,
+      "text": "\t\twideDiagnostic(\"reopen\", \"begin\", closedEpoch + 1, peer.databaseName);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 32287,
+      "end": 32367,
+      "text": "\t\t\twideDiagnostic(\"ahe-transfer\", \"begin\", closedEpoch + 1, peer.databaseName);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 32454,
+      "end": 32532,
+      "text": "\t\t\twideDiagnostic(\"ahe-transfer\", \"end\", closedEpoch + 1, peer.databaseName);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 32532,
+      "end": 32617,
+      "text": "\t\t\twideDiagnostic(\"snapshot-transfer\", \"begin\", closedEpoch + 1, peer.databaseName);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 32763,
+      "end": 32846,
+      "text": "\t\t\twideDiagnostic(\"snapshot-transfer\", \"end\", closedEpoch + 1, peer.databaseName);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 32894,
+      "end": 32981,
+      "text": "\t\twideDiagnostic(\"snapshot-declaration\", \"begin\", closedEpoch + 1, peer.databaseName);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 33062,
+      "end": 33147,
+      "text": "\t\twideDiagnostic(\"snapshot-declaration\", \"end\", closedEpoch + 1, peer.databaseName);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 33211,
+      "end": 33292,
+      "text": "\t\twideDiagnostic(\"reopen-session\", \"begin\", closedEpoch + 1, peer.databaseName);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 33860,
+      "end": 33939,
+      "text": "\t\twideDiagnostic(\"reopen-session\", \"end\", closedEpoch + 1, peer.databaseName);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 34087,
+      "end": 34158,
+      "text": "\t\twideDiagnostic(\"reopen\", \"end\", closedEpoch + 1, peer.databaseName);\n"
+    },
+    {
+      "kind": "diagnostic-state",
+      "start": 61772,
+      "end": 61810,
+      "text": "\tlet wideDiagnosticCompleted = false;\n"
+    },
+    {
+      "kind": "observation",
+      "start": 61810,
+      "end": 61848,
+      "text": "\twideDiagnostic(\"callback\", \"begin\");\n"
+    },
+    {
+      "kind": "observation",
+      "start": 61855,
+      "end": 61901,
+      "text": "\t\twideDiagnostic(\"initial-open\", \"begin\", 0);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 61939,
+      "end": 61983,
+      "text": "\t\twideDiagnostic(\"initial-open\", \"end\", 0);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 65577,
+      "end": 65621,
+      "text": "\t\t\twideDiagnostic(\"epoch\", \"begin\", epoch);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 66006,
+      "end": 66079,
+      "text": "\t\t\t\twideDiagnostic(\"ordinary-issue\", \"begin\", epoch, peer.databaseName);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 66114,
+      "end": 66185,
+      "text": "\t\t\t\twideDiagnostic(\"ordinary-issue\", \"end\", epoch, peer.databaseName);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 66185,
+      "end": 66263,
+      "text": "\t\t\t\twideDiagnostic(\"ordinary-accounting\", \"begin\", epoch, peer.databaseName);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 69654,
+      "end": 69730,
+      "text": "\t\t\t\twideDiagnostic(\"ordinary-accounting\", \"end\", epoch, peer.databaseName);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 70236,
+      "end": 70279,
+      "text": "\t\t\t\twideDiagnostic(\"epoch\", \"end\", epoch);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 70834,
+      "end": 70908,
+      "text": "\t\t\t\twideDiagnostic(\"displaced-issue\", \"begin\", epoch, peer.databaseName);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 71073,
+      "end": 71145,
+      "text": "\t\t\t\twideDiagnostic(\"displaced-issue\", \"end\", epoch, peer.databaseName);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 71539,
+      "end": 71589,
+      "text": "\t\t\twideDiagnostic(\"cohort-stop\", \"begin\", epoch);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 71637,
+      "end": 71685,
+      "text": "\t\t\twideDiagnostic(\"cohort-stop\", \"end\", epoch);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 71846,
+      "end": 71890,
+      "text": "\t\t\twideDiagnostic(\"close\", \"begin\", epoch);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 71916,
+      "end": 71958,
+      "text": "\t\t\twideDiagnostic(\"close\", \"end\", epoch);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 71958,
+      "end": 72014,
+      "text": "\t\t\twideDiagnostic(\"checkpoint-oracle\", \"begin\", epoch);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 76857,
+      "end": 76911,
+      "text": "\t\t\twideDiagnostic(\"checkpoint-oracle\", \"end\", epoch);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 76911,
+      "end": 76955,
+      "text": "\t\t\twideDiagnostic(\"adopt\", \"begin\", epoch);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 77002,
+      "end": 77044,
+      "text": "\t\t\twideDiagnostic(\"adopt\", \"end\", epoch);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 77044,
+      "end": 77102,
+      "text": "\t\t\twideDiagnostic(\"adoption-accounting\", \"begin\", epoch);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 77972,
+      "end": 78028,
+      "text": "\t\t\twideDiagnostic(\"adoption-accounting\", \"end\", epoch);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 78705,
+      "end": 78765,
+      "text": "\t\t\twideDiagnostic(\"peer-reopen-group\", \"begin\", epoch + 1);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 78860,
+      "end": 78918,
+      "text": "\t\t\twideDiagnostic(\"peer-reopen-group\", \"end\", epoch + 1);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 78951,
+      "end": 78993,
+      "text": "\t\t\twideDiagnostic(\"epoch\", \"end\", epoch);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 78997,
+      "end": 79047,
+      "text": "\t\twideDiagnostic(\"final-accounting\", \"begin\", 3);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 81519,
+      "end": 81567,
+      "text": "\t\twideDiagnostic(\"final-accounting\", \"end\", 3);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 81567,
+      "end": 81635,
+      "text": "\t\twideDiagnostic(\"final-reopen\", \"begin\", 3, creator.databaseName);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 82403,
+      "end": 82469,
+      "text": "\t\twideDiagnostic(\"final-reopen\", \"end\", 3, creator.databaseName);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 82469,
+      "end": 82513,
+      "text": "\t\twideDiagnostic(\"final-stop\", \"begin\", 3);\n"
+    },
+    {
+      "kind": "observation",
+      "start": 82567,
+      "end": 82609,
+      "text": "\t\twideDiagnostic(\"final-stop\", \"end\", 3);\n"
+    },
+    {
+      "kind": "completion-flag",
+      "start": 82609,
+      "end": 82643,
+      "text": "\t\twideDiagnosticCompleted = true;\n"
+    },
+    {
+      "kind": "observation",
+      "start": 100891,
+      "end": 100930,
+      "text": "\twideDiagnostic(\"afterEach\", \"begin\");\n"
+    },
+    {
+      "kind": "observation",
+      "start": 101307,
+      "end": 101344,
+      "text": "\twideDiagnostic(\"afterEach\", \"end\");\n"
+    }
+  ],
+  "recordCap": 4096,
+  "plannedSuccessfulRecordsUpperBound": 3800,
+  "recordCountReason": "64 initial peer opens;256 issue/accounting pairs;191 reopen and stop/declaration/session pairs;378 transfer pairs;24 cohort stops+64 final stops;bounded epoch/close/oracle/adopt/group/final/callback/cleanup pairs",
+  "processCpuIsAggregateDuringConcurrentReopens": true,
+  "noRuntimeExecuted": true
+}

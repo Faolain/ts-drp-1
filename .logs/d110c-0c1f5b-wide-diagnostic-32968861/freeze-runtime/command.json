@@ -1,0 +1,9 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "node",
+  "args": [
+    ".logs/d110c-0c1f5b-wide-diagnostic-32968861/runtime.mjs",
+    "freeze"
+  ],
+  "start": "2026-09-06T07:12:26.638Z"
+}

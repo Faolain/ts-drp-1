@@ -1,0 +1,11 @@
+{
+  "code": 1,
+  "signal": null,
+  "timedOut": false,
+  "cleanup": [],
+  "remaining": [],
+  "sourceCustodyExact": true,
+  "start": "2026-09-06T22:46:20.749Z",
+  "finish": "2026-09-06T22:46:22.278Z",
+  "elapsedMs": 1527.183
+}

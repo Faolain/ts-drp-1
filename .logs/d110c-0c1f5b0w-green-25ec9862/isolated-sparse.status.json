@@ -1,0 +1,20 @@
+{
+  "executable": "git",
+  "args": [
+    "-C",
+    "/tmp/d110c-f5b0w-green-m7UvLk/checkout",
+    "sparse-checkout",
+    "set",
+    "packages",
+    "examples",
+    "tests",
+    "scripts",
+    "configs",
+    "patches"
+  ],
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "started": "2026-09-05T14:08:54.541Z",
+  "finished": "2026-09-05T14:08:54.563Z",
+  "status": 0,
+  "signal": null
+}

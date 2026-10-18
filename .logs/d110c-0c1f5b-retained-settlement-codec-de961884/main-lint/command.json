@@ -1,0 +1,10 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "eslint",
+    "tests/d110c-0c1f5b0a-corrective-red.test.ts"
+  ],
+  "start": "2026-09-06T01:13:20.212Z"
+}

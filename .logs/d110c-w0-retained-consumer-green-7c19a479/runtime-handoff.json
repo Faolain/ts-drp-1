@@ -1,0 +1,130 @@
+{
+  "status": "Bounded retained-consumer GREEN repair passed and ready for root independent acceptance; W0 broader gates remain open",
+  "baseline": "7c19a4792eb63eecb85e4ac7a1484df88c77c984",
+  "sourceCommitted": false,
+  "evidenceCommitted": false,
+  "sourcePatch": "green.patch",
+  "sourcePatchSha256": "54baa695c170ae83431fee7b4478e1ced4227dc62fab7043b53fef95c594df8a",
+  "sourceHashes": {
+    "packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs": "3c80b45a20d41a8044406270ffcee5ed954271ce9debfac71b25df778ad120fc",
+    "tests/fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.ts": "67be57e7ad5f72335c8e89b770a031960bf48b636594ec52e3b6c3adbb2db717",
+    "tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts": "2944cdce0fd0ab8a1e1c0318e1bdc49522ac8ff678696a6a0a118f247739e00b"
+  },
+  "runtimeRoster": "runtime-roster.json",
+  "runtimeRosterSha256": "bc6e3512063b245f443e4426374451738206db92c3e46e4b782b5d1f906d58eb",
+  "invocationCount": 2,
+  "totalCaseExecutions": 58,
+  "uniqueConsumerCases": 51,
+  "gates": [
+    {
+      "label": "runtime-checkpoint",
+      "files": 2,
+      "tests": 7,
+      "passed": 7,
+      "failed": 0,
+      "pending": 0,
+      "todo": 0,
+      "skipped": 0,
+      "exactRoster": true,
+      "elapsedMs": 6345
+    },
+    {
+      "label": "runtime-consumers",
+      "files": 14,
+      "tests": 51,
+      "passed": 51,
+      "failed": 0,
+      "pending": 0,
+      "todo": 0,
+      "skipped": 0,
+      "exactRoster": true,
+      "elapsedMs": 113947
+    }
+  ],
+  "consumerClasses": {
+    "inherited": 46,
+    "newClosureControls": 2,
+    "explicitBootstrapSupplements": 3,
+    "noRelabelsOrExclusions": true
+  },
+  "bootstrap": {
+    "epochTwo": "Dynamic same-input pinPresent and pinMatchesOriginal both true; active-new epoch-two handle recovered; post-reopen issue accepted and publication published.",
+    "currentSuccessor": "Existing 0c1b control genuinely recovered an ok:true object handle and accepted issuance with sequence delta1 and one target row; observer remains same-input and no callback API was added."
+  },
+  "boundedClosure": "Existing checkpoint and full unfiltered transition authenticate before exact digest/byteLength auxiliary reference projection; genuine and hostile closure controls pass; durable census 7/6/7 retained and bounded predicate census 5/4 asserted by passing tests.",
+  "publicStoreShape": "Existing genuine child passed ordered eight-key/descriptors, preserved settlement function identities, distinct six overrides, no extra keys/symbols, plus cumulative-skip/materialization/mismatch/reuse/publication/equality assertions.",
+  "child": {
+    "genuineCumulativeSkipChildInvocations": 1,
+    "proofTimingRecords": 1,
+    "wallTimeMs": 73634.20025,
+    "outcome": "proof",
+    "memberCountErrors": [],
+    "originalTimingTelemetryPreserved": true,
+    "diagnosticProfilingEnabled": false
+  },
+  "static": {
+    "lintErrors": 0,
+    "lintWarnings": 0,
+    "formatPass": true,
+    "diffPass": true,
+    "equivalence": "equivalence.json",
+    "greenHunksOnlyAndRedObserversPreserved": true,
+    "typecheck": {
+      "classification": "baseline-equivalent typecheck, not whole-program pass",
+      "retainedDiagnostics": 26,
+      "newDiagnostics": 0,
+      "ownedDiagnostics": 3,
+      "inventory": "typecheck-delta.json",
+      "wholeProgramPass": false,
+      "selectedRoots": 16,
+      "sourceInputs": 909
+    }
+  },
+  "custody": {
+    "result": "custody-after-runtime-consumers.json",
+    "protectedSources": 11,
+    "greenOwners": 3,
+    "builtIdentities": 7,
+    "stashes": 27,
+    "protectedPaths": 86522,
+    "sealedManifestRoots": 42,
+    "sealedEvidenceFiles": 4838,
+    "runtimeInputs": 942,
+    "allPreserved": true
+  },
+  "processGroupsQuiescent": true,
+  "cleanupSignals": 0,
+  "ports": [
+    {
+      "port": 4174,
+      "pids": [],
+      "noTcpListener": true
+    },
+    {
+      "port": 4175,
+      "pids": [],
+      "noTcpListener": true
+    },
+    {
+      "port": 51000,
+      "pids": [],
+      "noTcpListener": true
+    },
+    {
+      "port": 51002,
+      "pids": [],
+      "noTcpListener": true
+    }
+  ],
+  "indexEmpty": true,
+  "retries": 0,
+  "additionalRuntimeReleased": false,
+  "productionEdits": 0,
+  "testAssertionEdits": 0,
+  "reviewerInvocations": 0,
+  "standaloneBuildInvocations": 0,
+  "failedStaticAttemptsPreserved": "static-corrections.json; original and corrected equivalence/freeze scripts, stdout/stderr/status are all included",
+  "previousStaticHandoffAndFreezePreserved": true,
+  "nextOwner": "Root for independent verification and signed checkpoint; original W0 seven cases, retained full roster, browser, fresh-source acceptance and frozen three-model formal review remain outside this bounded handoff.",
+  "manifest": "manifest.sha256"
+}

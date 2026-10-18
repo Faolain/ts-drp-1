@@ -1,0 +1,9 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "node",
+  "args": [
+    ".logs/d110c-w0-browser-7efe33dd/gate.mjs",
+    "freeze"
+  ],
+  "start": "2026-09-06T11:41:18.977Z"
+}

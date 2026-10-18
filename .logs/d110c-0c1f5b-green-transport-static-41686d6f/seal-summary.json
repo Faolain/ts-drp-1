@@ -1,0 +1,39 @@
+{
+  "runtime": {
+    "main": {
+      "total": 24,
+      "passed": 24,
+      "failed": 0,
+      "skipped": 0,
+      "rawSha256": "9187d70a1ddc6276f268dcf1a88e8529a73a7ca72af88bf4671b41a629fa5014"
+    },
+    "isolated": {
+      "total": 24,
+      "passed": 24,
+      "failed": 0,
+      "skipped": 0,
+      "rawSha256": "8f2c957d8fbbd2aeb90fa1fa3e2d0cdea5695ae5526df90a97ace3dd14cbb3f3"
+    }
+  },
+  "commands": 37,
+  "nonzero": [
+    {
+      "file": "custody-before/status.json",
+      "status": -2
+    },
+    {
+      "file": "isolated/native-preparation/status.json",
+      "status": 1
+    },
+    {
+      "file": "lint/status.json",
+      "status": 1
+    }
+  ],
+  "latestCustody": "custody-final.json",
+  "effectiveTestHashCount": 81,
+  "sourceHead": "c5b5f36a3d3201633ae7bab1d9959ab52fa14526",
+  "parentPatchSha256": "6d0fd99cfcb383b82f3becae421b4691bb945639ef9d60b76e9968715df765cb",
+  "noActiveRuntimeRecorder": true,
+  "parentClosed": false
+}

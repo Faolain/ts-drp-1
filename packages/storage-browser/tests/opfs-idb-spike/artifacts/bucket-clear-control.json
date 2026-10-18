@@ -1,0 +1,1 @@
+{"schemaVersion":1,"artifactKind":"bucket-clear-control","method":"whole-bucket-clear","claim":"deletion-not-eviction","notMeasured":["pressure-eviction","lru-ordering","itp-eviction","quota-driven-eviction","eviction-ordering","co-eviction-atomicity"],"payloadsReadableAfterReopen":true,"payloadsAbsentAfterClear":true,"noClearControlSurvived":true,"secondOriginSurvived":true}

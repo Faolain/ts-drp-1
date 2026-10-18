@@ -1,0 +1,16 @@
+{
+	"frozenD37": {
+		"modelSha256": "7971a025959164f609f4509bf4242f94fc4cc0b6974dde903bf462852983f038",
+		"testSha256": "affc5e439220e8ac6353c0795f591da3946a6aeb37d69a71a05763f229f34f6d",
+		"fixtureSha256": "474c83e7a3f130504e8dedc8ceb0843ee3413ca56c27003a354f6088b0f41dcf",
+		"derivationSha256": "e693b3fec5ef0d73299642d49e5ab7fdc969df80214f1d9891a05e188d1b7346"
+	},
+	"profileId": "equivocation-digest-identity-v1",
+	"proofDomain": "ts-drp/equivocation-proof/v1",
+	"slotAdvisory": {
+		"crossSlotAndRetentionOwner": "phase-0o-b",
+		"scope": "per-slot-advisory-signal-only",
+		"slotDurabilityOwner": "injected-transaction-store"
+	},
+	"vertexIdentity": "exact-authenticated-canonical-preimage-digest"
+}

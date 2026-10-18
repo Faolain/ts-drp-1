@@ -1,0 +1,12 @@
+diff --git a/packages/node/src/v3-live.ts b/packages/node/src/v3-live.ts
+index cbd8c9cc..df25dcd5 100644
+--- a/packages/node/src/v3-live.ts
++++ b/packages/node/src/v3-live.ts
+@@ -6438 +6438 @@ async function issueOneVertex(
+-		if (issuanceOutcomeUnknown) {
++		if (issuanceOutcomeUnknown && settlementProfileFor(registration.payload.trust.trust.profileId) === "v1") {
+@@ -6802,3 +6802 @@ function rebaseIntents(
+-			settlementProfileFor(payload.trust.trust.profileId) !== "v1" &&
+-			action !== "causalJoin" &&
+-			action !== "join")
++			settlementProfileFor(payload.trust.trust.profileId) !== "v1")

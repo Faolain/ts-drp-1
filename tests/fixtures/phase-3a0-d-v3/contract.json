@@ -1,0 +1,24 @@
+{
+	"browserReload": "page.reload",
+	"engines": ["chromium", "firefox", "webkit"],
+	"kind": "phase-3a0-d-browser-anchor-trust-parity",
+	"processDeathOwner": "phase-2e6",
+	"requiredClaims": [
+		"byte-identical-trust-record-after-reload",
+		"exact-trust-ref-after-reload",
+		"fresh-capability-authenticates-exact-provenance",
+		"old-xor-exact-new-authority",
+		"strict-indexeddb-fail-closed"
+	],
+	"tier": "nightly",
+	"transactionBoundary": "completed-strict-indexeddb-transaction",
+	"version": 1,
+	"withheldClaims": [
+		"browser-process-death",
+		"physical-debris-absence",
+		"fsync-or-power-loss",
+		"live-state-construction",
+		"trust-advancement",
+		"certified-profile-or-qc"
+	]
+}

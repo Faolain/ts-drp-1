@@ -1,9 +1,14 @@
-import { Command, Option } from "commander";
+import { Command } from "commander";
 
 import { VERSION } from "../version.js";
 
-export const program = new Command();
-program.version(VERSION);
-
-program.addOption(new Option("-c, --config <file>", "config file"));
-program.addOption(new Option("-m, --mode <mode>", "mode to run in").default("node").choices(["node", "bootstrap"]));
+/**
+ * Build a fresh parser; importing the CLI never starts a host or parses process arguments.
+ * @returns Explicit configured v3-only CLI.
+ */
+export function createCliProgram(): Command {
+	return new Command()
+		.name("ts-drp-node")
+		.version(VERSION)
+		.requiredOption("-c, --config <file>", "trusted local v3 Canvas daemon configuration");
+}

@@ -1,0 +1,20 @@
+{
+  "cwd": "/tmp/d110c-f5b-red-room-guard-label-yqm8r2/checkout",
+  "command": "git",
+  "args": [
+    "sparse-checkout",
+    "set",
+    "--no-cone",
+    "/packages/",
+    "/examples/",
+    "/tests/",
+    "/scripts/",
+    "/configs/",
+    "/patches/",
+    "/*",
+    "!/.logs/",
+    "!/docs/",
+    "!/specs/"
+  ],
+  "start": "2026-09-06T02:42:28.881Z"
+}

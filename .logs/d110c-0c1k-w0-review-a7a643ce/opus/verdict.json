@@ -1,0 +1,51 @@
+{
+  "verdict": "PASS",
+  "redCausal": true,
+  "scopePreserved": true,
+  "p0": [],
+  "p1": [],
+  "p2": [
+    {
+      "id": "W0-P2-1",
+      "finding": "The 41-full-shape runtime lifecycle leg is no longer causal for the authority its own name and the plan claim. `rejectedAclLifecycle(41,\"full-shape\")` builds a version-1 ACL carrying `[admin,finality,referee,writer]` (the adoption fixture cannot express `latchedAclVersion`, so version 1 is forced), so after the corrective GREEN that carrier is refused by the version-1 group vocabulary, not by the 8,192-byte ceiling asserted in the test title `rejects 41 full-shape members consistently by legacy byte ceiling`. The authoritative decision itself remains genuinely pinned: `encodedAclBoundary(41,\"full-shape\")` = 8,261 bytes and `stageOpenBoundary(41,\"full-shape\")` drive real `stageLatchedAclOperations`/`openCanonicalLatchedAclSnapshot` at version 2 and reject at the byte gate (latched-acl.ts:492). Only the close/adoption/recovery leg of that one row is now vacuous for its stated cause. This weakness is not introduced by the correction: the same fixture was vocabulary-rejected at the authoritative RED 8860b432, which is exactly why that RED could not distinguish the initial GREEN's v1 widening.",
+      "evidence": "tests/fixtures/phase-6b-d110c-0c1k/w0-runtime-contract.ts:69",
+      "owner": "D.110c-0c1k W0 follow-up, foldable into W1 (which introduces the version-3 full-shape carrier)",
+      "disposition": "Track, non-blocking. Repair requires threading `latchedAclVersion` through `openGenuineCreatorAdoptionFixture`/`createGenuinePreparedV3Fixture` (tests/fixtures/phase-6a-v3/creator-adoption-contract.ts:1124-1127) so the full-shape lifecycle roster is a version-2 carrier and the rejection is byte-caused end to end; the boundary matrix needs no change."
+    },
+    {
+      "id": "W0-P2-2",
+      "finding": "Corrective evidence parity gap: both corrective directories carry a self-excluding `manifest.sha256` over `commands.md` and `results.md` only and omit the machine-readable `result.json` checkpoint summary (record/checkpoint/commit/counts/legacy limits/success) that the authoritative RED and initial GREEN directories of this same record both carry.",
+      "evidence": ".logs/d110c-0c1k-w0-corrective-green-a7a643ce/manifest.sha256:1",
+      "owner": "D.110c-0c1k W0 evidence owner",
+      "disposition": "Add `result.json` to both corrective directories and re-freeze the manifests at record close; no re-run required."
+    },
+    {
+      "id": "W0-P2-3",
+      "finding": "The corrective GREEN results record a broad Node package run (387 passed / 27 failed / 2 skipped), a parent-reproduction comparison, and a Node test-inclusive typecheck, but `commands.md` records no command for the broad run, the parent run, or that typecheck. The recorded command list covers only the focused, direct-ACL and five-file retained selections, builds, protocol-v3 typecheck, lint/format/diff, signature and pushed-ref checks.",
+      "evidence": ".logs/d110c-0c1k-w0-corrective-green-a7a643ce/commands.md:6",
+      "owner": "D.110c-0c1k W0 evidence owner",
+      "disposition": "Record the exact broad-run, parent-run and test-inclusive typecheck invocations in `commands.md` so the 387/27/2 and parent-reproduction claims are reproducible; results themselves are not disputed."
+    },
+    {
+      "id": "W0-P2-4",
+      "finding": "`tests/outcome-commit-e5-02-referee-red.test.ts` is the other direct version-1/version-2 latched-ACL consumer in the repository and appears in no recorded corrective gate (the corrective retained set is the five ACL/settlement/close/adoption files). Read-only inspection shows no regression: its version-1 context substitutes `[\"writer\"]` for the referee member, so the restored v1 vocabulary closure does not reach it.",
+      "evidence": "tests/outcome-commit-e5-02-referee-red.test.ts:65",
+      "owner": "D.110c-0c1k W0 evidence owner",
+      "disposition": "Add this file to the retained selection at record close; verified safe by source inspection in the interim, so it does not block."
+    }
+  ],
+  "notes": [
+    "History confirmed end to end: plan D.110c-0c1k W0 with correction 909f4f5c (docs/production-hardening/production-hardening-tdd-plan-v2.md:97201-97212, byte ceiling explicitly unraised and the 16,384 attempt recorded as correctly aborted) -> superseded RED 7301d5af (one file, four tests) -> authoritative causal RED 8860b432 (two files, 10/10 failed, no fixture/import/export/module-resolution error, boundaries pinned 3,450/7,014/7,122/8,261) -> initial GREEN 0d6e38c2 with evidence commit 9ad3d957 -> shared reviewer P1 -> corrective tests-only RED f511a18b (W0 10/10 retained, direct ACL 6/7 with the sole causal failure being production returning ok:true for the exact version-1 four-group tuple) -> corrective GREEN a7a643ce.",
+    "P1 closed at the source, not at the fixture: `groupsForVersion()` returns GROUPS_V1 for version 1 (packages/protocol-v3/src/latched-acl.ts:120-122) and is the single vocabulary owner for `isGroup` (:124-126), member/group validation in `copySnapshot` (:150, :162, :171-174), operation validation (:302) and `freezeMembers` sorting (:403). No exact-four-group exception and no v1-to-v2 vocabulary path remains anywhere in the file.",
+    "The restoration provably cannot change the canonical bytes of any legitimate version-1 snapshot: GROUPS_V1 and GROUPS_V2 order admin < finality < writer identically, so `freezeMembers`' sort output is byte-identical for every group set version 1 can legally hold. The change is a pure runtime narrowing of the accepted set, with no wire, schema, public-API, dependency or cryptographic effect; `LatchedAclGroup` and every export are unchanged, and the digest domain remains `ts-drp/latched-acl/v3`.",
+    "Boundary matrix and profiles intact: MAX_CANONICAL_BYTES = 8192 (latched-acl.ts:19), MAX_CANONICAL_ITEMS = 2048 (:20) which cannot bind below the 8,192-byte ceiling for any legal shape, member cap `record.version === 3 ? 256 : 64` (:145), settlement 65,536 bytes / maxItems 8,192 / cap 256 (:21-22, :245-246, :491-496), and the version-3 <-> settlement-profile XOR binding (:254). packages/node/src/creator-close.ts:82-83 keeps LEGACY_ACL_MAX_RECORD_BYTES = 8192 and SETTLEMENT_ACL_MAX_RECORD_BYTES = 65,536.",
+    "Case 1 rechecked: 31 and 64 writer-only accept; 65 writer-only is refused by the member cap inside `copySnapshot` and surfaces as `operation-invalid` from staging; 41 full-shape is refused at the 8,192-byte gate (latched-acl.ts:492) on the finality-key stage. Stage/open parity holds in both directions.",
+    "Case 2 rechecked: `SCANNABLE_BYTES` is absent from packages/node/src/creator-close.ts (it survives only in the separately owned packages/control-plane/src/anchor-trust.ts); every recognized kind now throws at creator-close.ts:695-696 with a version-aware ACL ceiling (`latchedAclRecordCeiling`, :667-680), and unrecognized kinds retain their pre-existing drop, which is what the plan's wording requires.",
+    "Case 3 rechecked: the opened-snapshot index is a WeakMap keyed by snapshot identity (latched-acl.ts:87, :198-201) consumed by `authorityInput` (:316-329); v3-live stores the opened snapshot object itself as the authorization value (packages/node/src/v3-live.ts:5011), so per-vertex authorization is O(1) in production, and creator-close `writeAuthorizedAuthors` (:420-428) is O(N) as a consequence rather than the O(N^2) the plan recorded. A non-opened snapshot falls back to full revalidation, which is fail-safe.",
+    "Case 4 rechecked: `authorShareMultiplier` exists in packages/protocol-v3/registry/registry-v1.json:57, is pinned to 4 by both product genesis builders (examples/v3-chat/src/index.ts:29, examples/grid/src/v3-zone.ts:29), and is enforced in `hasGraphCapacity` (v3-live.ts:3776-3788) alongside the retained `maxEpochVertices` ceiling, at four author-charging call sites (:3941 ingress, :6096 transact-issue, :6208 local post-sign, :6334 local pre-sign). Older genesis carriers stay valid through `snapshot.authorShareMultiplier ?? 4` (:1305) and the retained `legacyParametersDigest` (:1301).",
+    "Fail-closed legacy compatibility verified: a referee grant in a version-1 room is refused at ingress and at local issue because `validateLatchedOperation` (v3-live.ts:3533-3544) stages against the real snapshot version; the refusal is not deferred to close, so there is no epoch-liveness break. No production or fixture site other than the one named in W0-P2-1 constructs a referee-bearing version-1 ACL: both product genesis builders emit admin/finality/writer only (examples/v3-chat/src/index.ts:563-584, examples/grid/src/v3-zone.ts:1675-1685), and the E5-02 referee arm is still RED (`createRefereeOutcomeCommitAdmissionOperation` is absent from production), so nothing shipped depends on version 1 holding a referee. The version-1 `submitAcl` referee affordance in the chat example is inert and fails closed, which is the pre-W0 behaviour the correction restores, and is E5-02's to resolve with a version-2 carrier.",
+    "Non-linear history observed and accepted: three unrelated commits (9a9a2226 storage-browser test, b926a606 settlement profile integration, 751b1df5 settlement evidence) landed between the corrective RED f511a18b and the corrective GREEN a7a643ce, so the GREEN is not a direct child of its RED. The attribution still holds on inspection: the deleted exception is absent from latched-acl.ts at HEAD, and the corrective GREEN re-ran the direct ACL control (7/7) and the retained set at a7a643ce itself.",
+    "Method limitation stated plainly: this session had no shell, so commit identity, signature verification, diffs and test execution could not be re-run. Commit-level claims were checked against the working tree at HEAD (a7a643ce) plus the frozen evidence under .logs/d110c-0c1k-w0-*; every behavioural conclusion above is grounded in source read directly, not in the evidence prose.",
+    "Nothing was demanded of W1, W2 or future settlement integration, and no reviewer output was consulted."
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "cwd": "/tmp/d110c-f5b0v-green-LLxy4p/checkout",
+  "command": "git",
+  "args": [
+    "-C",
+    "/tmp/d110c-f5b0v-green-LLxy4p/checkout",
+    "diff",
+    "--check"
+  ],
+  "start": "2026-09-05T07:56:33.938Z"
+}

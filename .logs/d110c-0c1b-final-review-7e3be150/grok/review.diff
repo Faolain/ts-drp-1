@@ -1,0 +1,1001 @@
+commit 7e3be150bdfd75683aa4473c947758f79c1b1fce
+Author:     Faolain <Faolain@users.noreply.github.com>
+AuthorDate: Thu Sep 3 00:45:44 2026 -0400
+Commit:     Faolain <Faolain@users.noreply.github.com>
+CommitDate: Thu Sep 3 00:45:44 2026 -0400
+
+    fix(node): halt close after uncertain issuance
+
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/changed-paths.txt b/.logs/d110c-0c1b-green-0873dfd0/changed-paths.txt
+new file mode 100644
+index 00000000..4a90ab55
+--- /dev/null
++++ b/.logs/d110c-0c1b-green-0873dfd0/changed-paths.txt
+@@ -0,0 +1,8 @@
++docs/production-hardening/production-hardening-tdd-plan-v2.md
++packages/node/src/v3-live.ts
++tests/fixtures/phase-6a-v3/creator-adoption-contract.ts
++tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts
++tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts
++tests/fixtures/phase-6b/runtime-reclamation-contract.ts
++tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts
++tests/phase-6b-d110c-a-repeat-close-red.test.ts
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/commands.md b/.logs/d110c-0c1b-green-0873dfd0/commands.md
+new file mode 100644
+index 00000000..d7ebb238
+--- /dev/null
++++ b/.logs/d110c-0c1b-green-0873dfd0/commands.md
+@@ -0,0 +1,23 @@
++# D.110c-0c1b accepted commands
++
++Focused:
++
++```text
++pnpm exec vitest run tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts --coverage.enabled=false --maxWorkers=1 --minWorkers=1 --reporter=json --outputFile=.logs/d110c-0c1b-green-0873dfd0/focused.json
++```
++
++Retained:
++
++```text
++pnpm exec vitest run tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts tests/e5-01-v3-operation-admission-red.test.ts tests/phase-6a-creator-adoption-commit-red.test.ts tests/phase-6a-creator-successor-activation-red.test.ts tests/phase-6a-creator-successor-epoch-red.test.ts tests/phase-6b-runtime-reclamation-red.test.ts tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts tests/phase-6b-d110c-a-repeat-close-red.test.ts tests/phase-6b-d110c-b-hot-adoption.test.ts --coverage.enabled=false --maxWorkers=1 --minWorkers=1 --reporter=json --outputFile=.logs/d110c-0c1b-green-0873dfd0/retained.json
++```
++
++Static and build:
++
++```text
++pnpm exec eslint packages/node/src/v3-live.ts tests/fixtures/phase-6a-v3/creator-adoption-contract.ts tests/fixtures/phase-6b/runtime-reclamation-contract.ts tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts tests/phase-6b-d110c-a-repeat-close-red.test.ts
++pnpm exec prettier --check packages/node/src/v3-live.ts tests/fixtures/phase-6a-v3/creator-adoption-contract.ts tests/fixtures/phase-6b/runtime-reclamation-contract.ts tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts tests/phase-6b-d110c-a-repeat-close-red.test.ts
++git diff --check
++pnpm --filter @ts-drp/node build
++pnpm exec tsc -p packages/node/tsconfig.build.json --noEmit --pretty false
++```
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/diff-check.status b/.logs/d110c-0c1b-green-0873dfd0/diff-check.status
+new file mode 100644
+index 00000000..573541ac
+--- /dev/null
++++ b/.logs/d110c-0c1b-green-0873dfd0/diff-check.status
+@@ -0,0 +1 @@
++0
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/diff-check.stderr b/.logs/d110c-0c1b-green-0873dfd0/diff-check.stderr
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/diff-check.stdout b/.logs/d110c-0c1b-green-0873dfd0/diff-check.stdout
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/eslint.status b/.logs/d110c-0c1b-green-0873dfd0/eslint.status
+new file mode 100644
+index 00000000..573541ac
+--- /dev/null
++++ b/.logs/d110c-0c1b-green-0873dfd0/eslint.status
+@@ -0,0 +1 @@
++0
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/eslint.stderr b/.logs/d110c-0c1b-green-0873dfd0/eslint.stderr
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/eslint.stdout b/.logs/d110c-0c1b-green-0873dfd0/eslint.stdout
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/focused.json b/.logs/d110c-0c1b-green-0873dfd0/focused.json
+new file mode 100644
+index 00000000..4424c65e
+--- /dev/null
++++ b/.logs/d110c-0c1b-green-0873dfd0/focused.json
+@@ -0,0 +1 @@
++{"numTotalTestSuites":2,"numPassedTestSuites":2,"numFailedTestSuites":0,"numPendingTestSuites":0,"numTotalTests":2,"numPassedTests":2,"numFailedTests":0,"numPendingTests":0,"numTodoTests":0,"snapshot":{"added":0,"failure":false,"filesAdded":0,"filesRemoved":0,"filesRemovedList":[],"filesUnmatched":0,"filesUpdated":0,"matched":0,"total":0,"unchecked":0,"uncheckedKeysByFile":[],"unmatched":0,"updated":0,"didUpdate":false},"startTime":1788410640949,"success":true,"testResults":[{"assertionResults":[{"ancestorTitles":["D.110c-0c1b committed-issuance recovery-required RED"],"fullName":"D.110c-0c1b committed-issuance recovery-required RED refuses a pre-bound close after a durable issue is omitted from live admission","status":"passed","title":"refuses a pre-bound close after a durable issue is omitted from live admission","duration":465.2611250000001,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.110c-0c1b committed-issuance recovery-required RED"],"fullName":"D.110c-0c1b committed-issuance recovery-required RED halts a no-policy plane when the real issuance commit has an unknown return outcome","status":"passed","title":"halts a no-policy plane when the real issuance commit has an unknown return outcome","duration":215.90487499999995,"failureMessages":[],"meta":{}}],"startTime":1788410641930,"endTime":1788410642611.9048,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts"}]}
+\ No newline at end of file
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/focused.status b/.logs/d110c-0c1b-green-0873dfd0/focused.status
+new file mode 100644
+index 00000000..573541ac
+--- /dev/null
++++ b/.logs/d110c-0c1b-green-0873dfd0/focused.status
+@@ -0,0 +1 @@
++0
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/focused.stderr b/.logs/d110c-0c1b-green-0873dfd0/focused.stderr
+new file mode 100644
+index 00000000..e535be5e
+--- /dev/null
++++ b/.logs/d110c-0c1b-green-0873dfd0/focused.stderr
+@@ -0,0 +1,2 @@
++(node:39221) ExperimentalWarning: SQLite is an experimental feature and might change at any time
++(Use `node --trace-warnings ...` to show where the warning was created)
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/focused.stdout b/.logs/d110c-0c1b-green-0873dfd0/focused.stdout
+new file mode 100644
+index 00000000..cf733239
+--- /dev/null
++++ b/.logs/d110c-0c1b-green-0873dfd0/focused.stdout
+@@ -0,0 +1 @@
++JSON report written to /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1b-green-0873dfd0/focused.json
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/focused.timestamps.json b/.logs/d110c-0c1b-green-0873dfd0/focused.timestamps.json
+new file mode 100644
+index 00000000..d5f0874a
+--- /dev/null
++++ b/.logs/d110c-0c1b-green-0873dfd0/focused.timestamps.json
+@@ -0,0 +1 @@
++{"startedAt":"2026-09-03T04:44:00Z","finishedAt":"2026-09-03T04:44:02Z"}
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/green-ledger.md b/.logs/d110c-0c1b-green-0873dfd0/green-ledger.md
+new file mode 100644
+index 00000000..50d70890
+--- /dev/null
++++ b/.logs/d110c-0c1b-green-0873dfd0/green-ledger.md
+@@ -0,0 +1,35 @@
++# D.110c-0c1b GREEN evidence ledger
++
++- Accepted plan confirmation: `4d616285f13daeb74934260b80fe627dd8bdb338`
++- Signed causal RED: `0873dfd0cb202e216041f43562ca31ac4368f889`
++- Scope: halt an active V3 registration after a durable issuance outcome can no longer be reconciled in-process, and refuse both pre-bound and not-yet-bound creator close until authenticated recovery.
++- Excluded: wire/schema/API/dependency/authority/threshold changes, in-process outbox repair, retirement-boundary relaxation, campaigns, and D.110a work.
++
++## Runtime gates
++
++- `focused.json`: one selected file, 2/2 tests passed, zero failed/pending, reporter success true, runner exit 0.
++- The pre-bound ordering commits one real issuance/outbox row, rejects its journal append, refuses the queued close twice, rejects a second issue without a new outbox row, cold-reopens the same genuine epoch-one room, sees the exact target row once, and accepts the immediately following author sequence.
++- The not-yet-bound ordering delegates one real no-policy issuance transaction to durable completion, throws exact `ISSUANCE_OUTCOME_UNKNOWN` only after commit, retains one new pending row, and refuses close binding with existing `CREATOR_CLOSE_UNAVAILABLE`.
++- `retained.json`: 9 selected files, 60/60 tests passed, zero failed/pending, reporter success true, runner exit 0. The roster covers E5-01 authenticated exact-once recovery, Phase-6a adoption/activation/epoch behavior, D.109d runtime reclamation, D.110c-0c1a retirement, D.110c-a repeat close, and D.110c-b hot epoch-two adoption.
++
++## Static gates
++
++- Exact-owner ESLint, Prettier, and `git diff --check` exit 0.
++- `@ts-drp/node` build and its production-source `tsconfig.build.json` no-emit check exit 0.
++- The four source-shape predicates for the unknown-outcome catch, unconditional committed-failure halt, queued fold recheck, and close-registration refusal are all true.
++- Only `packages/node/src/v3-live.ts` changes production source. No root export, public API, package manifest, dependency, wire/schema, threshold, or product configuration changes.
++
++## Retained expectation correction
++
++D.110c-a initially failed only because its closure-byte expectation remained `-318`. A deterministic evidence run reported `before=6833`, `after=6516`, `delta=-317`, with one fewer retained reference and every semantic assertion passing. The exact value changed when completed D.110c-0c1a introduced the authenticated issuance-retirement carrier; this slice corrects only the stale retained expectation to `-317`.
++
++## Development diagnostics
++
++- The first focused GREEN semantic test passed, but its command exited 1 solely because the repository-wide 70% coverage threshold was applied to one file. The accepted focused command disables coverage and exits 0.
++- A proposed exact-owner fixture `tsconfig` expanded inherited fixtures while failing to resolve bare workspace package imports; it was removed and is not an acceptance gate.
++- The first integrated-recovery attempt tried to read close facts after hot activation, when production correctly revokes them. The final tests-only fixture retains the already-authenticated detached cold-reopen inputs before activation; it does not create or mutate epoch state.
++- A draft assertion incorrectly required one `publishPending()` call to drain every historical pending row. The API correctly returned `{ok:true, kind:"empty"}` for ineligible rows. The accepted assertion instead proves the target row remains singular and visible after recovery and that dense author sequencing continues. Publication/rebase behavior remains owned by its retained suites.
++
++## Custody
++
++Protected `.agents`, `.claude`, and `.pnpm-store` paths and all 27 stashes remain present. The evidence manifest is self-excluding. Signed commit and pushed-ref identity are verified after commit in the final review evidence root.
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/manifest-validation.status b/.logs/d110c-0c1b-green-0873dfd0/manifest-validation.status
+new file mode 100644
+index 00000000..573541ac
+--- /dev/null
++++ b/.logs/d110c-0c1b-green-0873dfd0/manifest-validation.status
+@@ -0,0 +1 @@
++0
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/manifest-validation.stdout b/.logs/d110c-0c1b-green-0873dfd0/manifest-validation.stdout
+new file mode 100644
+index 00000000..c5222218
+--- /dev/null
++++ b/.logs/d110c-0c1b-green-0873dfd0/manifest-validation.stdout
+@@ -0,0 +1,35 @@
++.logs/d110c-0c1b-green-0873dfd0/changed-paths.txt: OK
++.logs/d110c-0c1b-green-0873dfd0/commands.md: OK
++.logs/d110c-0c1b-green-0873dfd0/diff-check.status: OK
++.logs/d110c-0c1b-green-0873dfd0/diff-check.stderr: OK
++.logs/d110c-0c1b-green-0873dfd0/diff-check.stdout: OK
++.logs/d110c-0c1b-green-0873dfd0/eslint.status: OK
++.logs/d110c-0c1b-green-0873dfd0/eslint.stderr: OK
++.logs/d110c-0c1b-green-0873dfd0/eslint.stdout: OK
++.logs/d110c-0c1b-green-0873dfd0/focused.json: OK
++.logs/d110c-0c1b-green-0873dfd0/focused.status: OK
++.logs/d110c-0c1b-green-0873dfd0/focused.stderr: OK
++.logs/d110c-0c1b-green-0873dfd0/focused.stdout: OK
++.logs/d110c-0c1b-green-0873dfd0/focused.timestamps.json: OK
++.logs/d110c-0c1b-green-0873dfd0/green-ledger.md: OK
++.logs/d110c-0c1b-green-0873dfd0/node-build.status: OK
++.logs/d110c-0c1b-green-0873dfd0/node-build.stderr: OK
++.logs/d110c-0c1b-green-0873dfd0/node-build.stdout: OK
++.logs/d110c-0c1b-green-0873dfd0/node-source-typecheck.status: OK
++.logs/d110c-0c1b-green-0873dfd0/node-source-typecheck.stderr: OK
++.logs/d110c-0c1b-green-0873dfd0/node-source-typecheck.stdout: OK
++.logs/d110c-0c1b-green-0873dfd0/prettier.status: OK
++.logs/d110c-0c1b-green-0873dfd0/prettier.stderr: OK
++.logs/d110c-0c1b-green-0873dfd0/prettier.stdout: OK
++.logs/d110c-0c1b-green-0873dfd0/protected-paths.json: OK
++.logs/d110c-0c1b-green-0873dfd0/protected-paths.status: OK
++.logs/d110c-0c1b-green-0873dfd0/retained.json: OK
++.logs/d110c-0c1b-green-0873dfd0/retained.status: OK
++.logs/d110c-0c1b-green-0873dfd0/retained.stderr: OK
++.logs/d110c-0c1b-green-0873dfd0/retained.stdout: OK
++.logs/d110c-0c1b-green-0873dfd0/retained.timestamps.json: OK
++.logs/d110c-0c1b-green-0873dfd0/source-hashes.sha256: OK
++.logs/d110c-0c1b-green-0873dfd0/source-shape.json: OK
++.logs/d110c-0c1b-green-0873dfd0/source-shape.status: OK
++.logs/d110c-0c1b-green-0873dfd0/source-shape.stderr: OK
++.logs/d110c-0c1b-green-0873dfd0/stash-count.txt: OK
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/manifest.sha256 b/.logs/d110c-0c1b-green-0873dfd0/manifest.sha256
+new file mode 100644
+index 00000000..243eedb3
+--- /dev/null
++++ b/.logs/d110c-0c1b-green-0873dfd0/manifest.sha256
+@@ -0,0 +1,35 @@
++49834938202056c577c4dec35fe1a92cac6795101748a7db708e13d4c1835cd2  .logs/d110c-0c1b-green-0873dfd0/changed-paths.txt
++f207880611908e477db0cdf49a79677eaaf2b2593b1966748a8e157c61f00685  .logs/d110c-0c1b-green-0873dfd0/commands.md
++9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  .logs/d110c-0c1b-green-0873dfd0/diff-check.status
++e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  .logs/d110c-0c1b-green-0873dfd0/diff-check.stderr
++e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  .logs/d110c-0c1b-green-0873dfd0/diff-check.stdout
++9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  .logs/d110c-0c1b-green-0873dfd0/eslint.status
++e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  .logs/d110c-0c1b-green-0873dfd0/eslint.stderr
++e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  .logs/d110c-0c1b-green-0873dfd0/eslint.stdout
++771d70eae872b55674a1015a568998eb88f2d4cabd9414ad52a550d71e86fe19  .logs/d110c-0c1b-green-0873dfd0/focused.json
++9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  .logs/d110c-0c1b-green-0873dfd0/focused.status
++88b5d184dbb4f80f96b2801dfec49b92f609c9f9f348f2342f19b8f855c4a4ec  .logs/d110c-0c1b-green-0873dfd0/focused.stderr
++d44f45a02dcae773e3baa47a9412781342126b07250722fa5727b1a4d587af7c  .logs/d110c-0c1b-green-0873dfd0/focused.stdout
++624a7acbb7c369a6462e8ab26217d993784336f6512f0110ed88460c6093285d  .logs/d110c-0c1b-green-0873dfd0/focused.timestamps.json
++423081a9f60611cfb2ac91fb8e68c081c6b5664f78fbdaec2b809b1146327391  .logs/d110c-0c1b-green-0873dfd0/green-ledger.md
++9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  .logs/d110c-0c1b-green-0873dfd0/node-build.status
++e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  .logs/d110c-0c1b-green-0873dfd0/node-build.stderr
++30e156c78d21bd83febf9cb5931cd78feb86333ccb0584779a67101280d91d6b  .logs/d110c-0c1b-green-0873dfd0/node-build.stdout
++9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  .logs/d110c-0c1b-green-0873dfd0/node-source-typecheck.status
++e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  .logs/d110c-0c1b-green-0873dfd0/node-source-typecheck.stderr
++e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  .logs/d110c-0c1b-green-0873dfd0/node-source-typecheck.stdout
++9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  .logs/d110c-0c1b-green-0873dfd0/prettier.status
++e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  .logs/d110c-0c1b-green-0873dfd0/prettier.stderr
++17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20  .logs/d110c-0c1b-green-0873dfd0/prettier.stdout
++602eac01f89cf71eb4d7deae37ed7c18874cc7957184cc9913647da9c8efa021  .logs/d110c-0c1b-green-0873dfd0/protected-paths.json
++9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  .logs/d110c-0c1b-green-0873dfd0/protected-paths.status
++12189477b3d011c5ce3b707062d3007b30a70bdfa8c99db5ada5442c0cbcc9a6  .logs/d110c-0c1b-green-0873dfd0/retained.json
++9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  .logs/d110c-0c1b-green-0873dfd0/retained.status
++3d290740262d75b03df686f455535d8c8df3a9d334b4e8dd28599e22f049755d  .logs/d110c-0c1b-green-0873dfd0/retained.stderr
++c09629a12b7cc5027bd4255af94cf75aeb0ca1fe5fe78b84fec5f55581b50a46  .logs/d110c-0c1b-green-0873dfd0/retained.stdout
++d587fc6a83f72a6286014fe5601ca223c43af35c3f6769bacd675273bfe78aea  .logs/d110c-0c1b-green-0873dfd0/retained.timestamps.json
++8362fc176acdae9cf72bfa7ba7efbb7a60feb3a19e51386937e322aef7b11b3d  .logs/d110c-0c1b-green-0873dfd0/source-hashes.sha256
++3b7d1cc4ff098afdfa5867e41d6ab8290d1679c1dbe9be73094937faeb37faaf  .logs/d110c-0c1b-green-0873dfd0/source-shape.json
++9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa  .logs/d110c-0c1b-green-0873dfd0/source-shape.status
++e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  .logs/d110c-0c1b-green-0873dfd0/source-shape.stderr
++932ab0a0e4191d32c0af7b3f565b7b180dbe9869378abc5816f9add54b806e7f  .logs/d110c-0c1b-green-0873dfd0/stash-count.txt
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/node-build.status b/.logs/d110c-0c1b-green-0873dfd0/node-build.status
+new file mode 100644
+index 00000000..573541ac
+--- /dev/null
++++ b/.logs/d110c-0c1b-green-0873dfd0/node-build.status
+@@ -0,0 +1 @@
++0
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/node-build.stderr b/.logs/d110c-0c1b-green-0873dfd0/node-build.stderr
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/node-build.stdout b/.logs/d110c-0c1b-green-0873dfd0/node-build.stdout
+new file mode 100644
+index 00000000..f36afdd9
+--- /dev/null
++++ b/.logs/d110c-0c1b-green-0873dfd0/node-build.stdout
+@@ -0,0 +1,7 @@
++
++> @ts-drp/node@0.11.0 prebuild /Users/aristotle/Documents/Projects/ts-drp-1/packages/node
++> node -p "'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'" > src/version.ts
++
++
++> @ts-drp/node@0.11.0 build /Users/aristotle/Documents/Projects/ts-drp-1/packages/node
++> tsc -b tsconfig.build.json && node build.mjs
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/node-source-typecheck.status b/.logs/d110c-0c1b-green-0873dfd0/node-source-typecheck.status
+new file mode 100644
+index 00000000..573541ac
+--- /dev/null
++++ b/.logs/d110c-0c1b-green-0873dfd0/node-source-typecheck.status
+@@ -0,0 +1 @@
++0
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/node-source-typecheck.stderr b/.logs/d110c-0c1b-green-0873dfd0/node-source-typecheck.stderr
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/node-source-typecheck.stdout b/.logs/d110c-0c1b-green-0873dfd0/node-source-typecheck.stdout
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/prettier.status b/.logs/d110c-0c1b-green-0873dfd0/prettier.status
+new file mode 100644
+index 00000000..573541ac
+--- /dev/null
++++ b/.logs/d110c-0c1b-green-0873dfd0/prettier.status
+@@ -0,0 +1 @@
++0
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/prettier.stderr b/.logs/d110c-0c1b-green-0873dfd0/prettier.stderr
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/prettier.stdout b/.logs/d110c-0c1b-green-0873dfd0/prettier.stdout
+new file mode 100644
+index 00000000..4aa0d16e
+--- /dev/null
++++ b/.logs/d110c-0c1b-green-0873dfd0/prettier.stdout
+@@ -0,0 +1,2 @@
++Checking formatting...
++All matched files use Prettier code style!
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/protected-paths.json b/.logs/d110c-0c1b-green-0873dfd0/protected-paths.json
+new file mode 100644
+index 00000000..3bd15faa
+--- /dev/null
++++ b/.logs/d110c-0c1b-green-0873dfd0/protected-paths.json
+@@ -0,0 +1,5 @@
++{
++  ".agents": true,
++  ".claude": true,
++  ".pnpm-store": true
++}
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/protected-paths.status b/.logs/d110c-0c1b-green-0873dfd0/protected-paths.status
+new file mode 100644
+index 00000000..573541ac
+--- /dev/null
++++ b/.logs/d110c-0c1b-green-0873dfd0/protected-paths.status
+@@ -0,0 +1 @@
++0
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/retained.json b/.logs/d110c-0c1b-green-0873dfd0/retained.json
+new file mode 100644
+index 00000000..374b10b8
+--- /dev/null
++++ b/.logs/d110c-0c1b-green-0873dfd0/retained.json
+@@ -0,0 +1 @@
++{"numTotalTestSuites":18,"numPassedTestSuites":18,"numFailedTestSuites":0,"numPendingTestSuites":0,"numTotalTests":60,"numPassedTests":60,"numFailedTests":0,"numPendingTests":0,"numTodoTests":0,"snapshot":{"added":0,"failure":false,"filesAdded":0,"filesRemoved":0,"filesRemovedList":[],"filesUnmatched":0,"filesUpdated":0,"matched":0,"total":0,"unchecked":0,"uncheckedKeysByFile":[],"unmatched":0,"updated":0,"didUpdate":false},"startTime":1788410643340,"success":true,"testResults":[{"assertionResults":[{"ancestorTitles":[],"fullName":"E5-01 RED keeps the generic admission behavior dormant behind the missing outcome owner","status":"passed","title":"E5-01 RED keeps the generic admission behavior dormant behind the missing outcome owner","duration":0.5422080000000165,"failureMessages":[],"meta":{}},{"ancestorTitles":["E5-01 serialized v3 operation admission"],"fullName":"E5-01 serialized v3 operation admission rebuilds policy from authenticated recovery before activation effects","status":"passed","title":"rebuilds policy from authenticated recovery before activation effects","duration":109.15295800000001,"failureMessages":[],"meta":{}},{"ancestorTitles":["E5-01 serialized v3 operation admission"],"fullName":"E5-01 serialized v3 operation admission reserves before local issuance and commits after journal but before projection","status":"passed","title":"reserves before local issuance and commits after journal but before projection","duration":50.29000000000002,"failureMessages":[],"meta":{}},{"ancestorTitles":["E5-01 serialized v3 operation admission"],"fullName":"E5-01 serialized v3 operation admission returns duplicate and conflict before local issuance, journal or projection","status":"passed","title":"returns duplicate and conflict before local issuance, journal or projection","duration":38.904083000000014,"failureMessages":[],"meta":{}},{"ancestorTitles":["E5-01 serialized v3 operation admission"],"fullName":"E5-01 serialized v3 operation admission releases a definitely pre-issuance failure and permits one clean retry","status":"passed","title":"releases a definitely pre-issuance failure and permits one clean retry","duration":38.257416000000035,"failureMessages":[],"meta":{}},{"ancestorTitles":["E5-01 serialized v3 operation admission"],"fullName":"E5-01 serialized v3 operation admission holds an uncertain post-journal reservation until a fresh recovery rebuilds it exactly once","status":"passed","title":"holds an uncertain post-journal reservation until a fresh recovery rebuilds it exactly once","duration":53.13233300000002,"failureMessages":[],"meta":{}},{"ancestorTitles":["E5-01 serialized v3 operation admission"],"fullName":"E5-01 serialized v3 operation admission rejects remote replay conflicts before journal and effect while accepting one fresh vertex","status":"passed","title":"rejects remote replay conflicts before journal and effect while accepting one fresh vertex","duration":38.08974999999998,"failureMessages":[],"meta":{}},{"ancestorTitles":["E5-01 serialized v3 operation admission"],"fullName":"E5-01 serialized v3 operation admission preserves ordinary local issue when no policy is supplied","status":"passed","title":"preserves ordinary local issue when no policy is supplied","duration":35.870000000000005,"failureMessages":[],"meta":{}}],"startTime":1788410654624,"endTime":1788410654988.87,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/e5-01-v3-operation-admission-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED freezes exactly ten RED and four GREEN owners","status":"passed","title":"freezes exactly ten RED and four GREEN owners","duration":4.073374999999999,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED freezes the closed public contract and finite fault vocabulary","status":"passed","title":"freezes the closed public contract and finite fault vocabulary","duration":0.6673329999999851,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED constructs one sorted generation-2 replacement without a manifest ref","status":"passed","title":"constructs one sorted generation-2 replacement without a manifest ref","duration":1.1316659999999956,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED classifies exact active-new independently of a retrying generation id","status":"passed","title":"classifies exact active-new independently of a retrying generation id","duration":0.9111669999999776,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED keeps root/product/transport/issuance/activation owners outside the GREEN roster","status":"passed","title":"keeps root/product/transport/issuance/activation owners outside the GREEN roster","duration":1.069749999999999,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED [RED readiness] requires all four candidate owners and the non-root package export","status":"passed","title":"[RED readiness] requires all four candidate owners and the non-root package export","duration":0.07304200000004357,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED consumes only a genuine owner-bound intent and commits one exact successor","status":"passed","title":"consumes only a genuine owner-bound intent and commits one exact successor","duration":342.00566699999996,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED accepts a byte-identical second intent without a second head swap","status":"passed","title":"accepts a byte-identical second intent without a second head swap","duration":198.54312500000003,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108c one-CAS creator adoption RED"],"fullName":"D.108c one-CAS creator adoption RED reopens pending-old or exact active-new at every logical request fault","status":"passed","title":"reopens pending-old or exact active-new at every logical request fault","duration":4026.2715,"failureMessages":[],"meta":{}}],"startTime":1788410655289,"endTime":1788410659864.2715,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-commit-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED freezes the D.108e2a activation boundary and its single topic owner","status":"passed","title":"freezes the D.108e2a activation boundary and its single topic owner","duration":228.814209,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED rejects a hostile cold authentication profile before every downstream effect","status":"passed","title":"rejects a hostile cold authentication profile before every downstream effect","duration":7.876709000000005,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED freezes exactly seven RED and eight GREEN owners","status":"passed","title":"freezes exactly seven RED and eight GREEN owners","duration":1.1688749999999573,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED retains the pre-D.108d1b cold input only as a malformed negative beside the authoritative local-author roster","status":"passed","title":"retains the pre-D.108d1b cold input only as a malformed negative beside the authoritative local-author roster","duration":0.34816699999998946,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED derives the exact epoch-one identity and pending epoch-zero lineage independently","status":"passed","title":"derives the exact epoch-one identity and pending epoch-zero lineage independently","duration":258.416292,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED keeps the root and products outside D.108d1","status":"passed","title":"keeps the root and products outside D.108d1","duration":6.166249999999991,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED pins the complete zero-skip GREEN inventory","status":"passed","title":"pins the complete zero-skip GREEN inventory","duration":1.1023749999999382,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED imports the shipped successor activation owner without a source-pattern readiness gate","status":"passed","title":"imports the shipped successor activation owner without a source-pattern readiness gate","duration":0.6475000000000364,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED genuine successor imports its verified snapshot before epoch-one activation","status":"passed","title":"genuine successor imports its verified snapshot before epoch-one activation","duration":223.93995799999993,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED private custody alone selects installEpochAnchor","status":"passed","title":"private custody alone selects installEpochAnchor","duration":1754.2274169999998,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED divergent genesis identity fails before every live effect","status":"passed","title":"divergent genesis identity fails before every live effect","duration":805.5476250000002,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED pending epoch-zero outbox is classified and never published as epoch one","status":"passed","title":"pending epoch-zero outbox is classified and never published as epoch one","duration":188.0681669999999,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED old handle registration author and prepared capability are terminal","status":"passed","title":"old handle registration author and prepared capability are terminal","duration":195.82050000000027,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED hot duplicate returns the same handle before a second source claim","status":"passed","title":"hot duplicate returns the same handle before a second source claim","duration":211.5227079999995,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED conflicting hot duplicate bindings fail closed","status":"passed","title":"conflicting hot duplicate bindings fail closed","duration":215.32795799999985,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED post-adoption activation failure cleans up and fresh reverify performs no second swapHead","status":"passed","title":"post-adoption activation failure cleans up and fresh reverify performs no second swapHead","duration":227.50479200000063,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108d1 creator successor activation RED"],"fullName":"D.108d1 creator successor activation RED TTL expiry performs one bounded full reverify attempt","status":"passed","title":"TTL expiry performs one bounded full reverify attempt","duration":756.4922500000002,"failureMessages":[],"meta":{}}],"startTime":1788410649196,"endTime":1788410654281.4922,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-activation-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.108a successor-epoch live substrate RED"],"fullName":"D.108a successor-epoch live substrate RED freezes exactly five RED and six GREEN owners without a new product API","status":"passed","title":"freezes exactly five RED and six GREEN owners without a new product API","duration":1.720708000000002,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108a successor-epoch live substrate RED"],"fullName":"D.108a successor-epoch live substrate RED constructs one exact canonical non-genesis anchor and epoch-one vertex independently","status":"passed","title":"constructs one exact canonical non-genesis anchor and epoch-one vertex independently","duration":6.917166000000009,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108a successor-epoch live substrate RED"],"fullName":"D.108a successor-epoch live substrate RED preserves installGenesis as a genesis-only operation","status":"passed","title":"preserves installGenesis as a genesis-only operation","duration":20.047334000000006,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108a successor-epoch live substrate RED"],"fullName":"D.108a successor-epoch live substrate RED [RED readiness] requires the six successor representation owners together","status":"passed","title":"[RED readiness] requires the six successor representation owners together","duration":0.108333000000016,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108a successor-epoch live substrate RED"],"fullName":"D.108a successor-epoch live substrate RED keeps epoch-zero and epoch-one rows isolated in one durable store","status":"passed","title":"keeps epoch-zero and epoch-one rows isolated in one durable store","duration":13.658999999999992,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.108a successor-epoch live substrate RED"],"fullName":"D.108a successor-epoch live substrate RED rejects hostile, noncanonical and unsafe successor epoch inputs closed","status":"passed","title":"rejects hostile, noncanonical and unsafe successor epoch inputs closed","duration":13.26679200000001,"failureMessages":[],"meta":{}}],"startTime":1788410660038,"endTime":1788410660094.2668,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-epoch-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.110c-0c1a creator issuance-retirement checkpoint RED"],"fullName":"D.110c-0c1a creator issuance-retirement checkpoint RED requires one authenticated retirement carrier after a genuine dense creator close","status":"passed","title":"requires one authenticated retirement carrier after a genuine dense creator close","duration":299.01837500000005,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.110c-0c1a creator issuance-retirement checkpoint RED"],"fullName":"D.110c-0c1a creator issuance-retirement checkpoint RED replaces the authenticated epoch-one carrier when the admitted boundary does not advance","status":"passed","title":"replaces the authenticated epoch-one carrier when the admitted boundary does not advance","duration":966.736334,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.110c-0c1a creator issuance-retirement checkpoint RED"],"fullName":"D.110c-0c1a creator issuance-retirement checkpoint RED fails closed for every frozen issuance-boundary derivation mutant","status":"passed","title":"fails closed for every frozen issuance-boundary derivation mutant","duration":138.54270900000006,"failureMessages":[],"meta":{}}],"startTime":1788410647218,"endTime":1788410648622.5427,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.110c-0c1b committed-issuance recovery-required RED"],"fullName":"D.110c-0c1b committed-issuance recovery-required RED refuses a pre-bound close after a durable issue is omitted from live admission","status":"passed","title":"refuses a pre-bound close after a durable issue is omitted from live admission","duration":542.7890830000001,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.110c-0c1b committed-issuance recovery-required RED"],"fullName":"D.110c-0c1b committed-issuance recovery-required RED halts a no-policy plane when the real issuance commit has an unknown return outcome","status":"passed","title":"halts a no-policy plane when the real issuance commit has an unknown return outcome","duration":225.9418750000001,"failureMessages":[],"meta":{}}],"startTime":1788410666185,"endTime":1788410666953.942,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.110c-a authenticated repeat-close carrier RED"],"fullName":"D.110c-a authenticated repeat-close carrier RED extends authenticated compact history through one genuine adopted epoch-one close","status":"passed","title":"extends authenticated compact history through one genuine adopted epoch-one close","duration":1839.1888330000002,"failureMessages":[],"meta":{}}],"startTime":1788410660424,"endTime":1788410662263.1887,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-a-repeat-close-red.test.ts"},{"assertionResults":[{"ancestorTitles":["D.110c-b general hot adoption GREEN"],"fullName":"D.110c-b general hot adoption GREEN advances the genuine epoch-one close to one exact epoch-two active owner","status":"passed","title":"advances the genuine epoch-one close to one exact epoch-two active owner","duration":3224.457541,"failureMessages":[],"meta":{}}],"startTime":1788410662597,"endTime":1788410665821.4575,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-b-hot-adoption.test.ts"},{"assertionResults":[{"ancestorTitles":["D.109d receipt-gated installed-v3 runtime reclamation RED"],"fullName":"D.109d receipt-gated installed-v3 runtime reclamation RED freezes the original RED owners and corrected GREEN owner set","status":"passed","title":"freezes the original RED owners and corrected GREEN owner set","duration":1.0573750000000928,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.109d receipt-gated installed-v3 runtime reclamation RED"],"fullName":"D.109d receipt-gated installed-v3 runtime reclamation RED freezes the closed input, result, error and precedence contracts","status":"passed","title":"freezes the closed input, result, error and precedence contracts","duration":0.3246669999999767,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.109d receipt-gated installed-v3 runtime reclamation RED"],"fullName":"D.109d receipt-gated installed-v3 runtime reclamation RED freezes the complete receipt, identity, replay and census matrices","status":"passed","title":"freezes the complete receipt, identity, replay and census matrices","duration":0.9119589999999107,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.109d receipt-gated installed-v3 runtime reclamation RED"],"fullName":"D.109d receipt-gated installed-v3 runtime reclamation RED keeps runtime reclamation internal and the legacy object runtime detached","status":"passed","title":"keeps runtime reclamation internal and the legacy object runtime detached","duration":1.3661670000000186,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.109d receipt-gated installed-v3 runtime reclamation RED"],"fullName":"D.109d receipt-gated installed-v3 runtime reclamation RED [RED readiness] requires the private runtime and creator-close release kernels","status":"passed","title":"[RED readiness] requires the private runtime and creator-close release kernels","duration":0.12904200000002675,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.109d receipt-gated installed-v3 runtime reclamation RED"],"fullName":"D.109d receipt-gated installed-v3 runtime reclamation RED uses genuine close, verify, commit and hot activation identities","status":"passed","title":"uses genuine close, verify, commit and hot activation identities","duration":571.0789169999999,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.109d receipt-gated installed-v3 runtime reclamation RED"],"fullName":"D.109d receipt-gated installed-v3 runtime reclamation RED enforces the exact refusal matrix and precedence with zero writes","status":"passed","title":"enforces the exact refusal matrix and precedence with zero writes","duration":224.5713330000001,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.109d receipt-gated installed-v3 runtime reclamation RED"],"fullName":"D.109d receipt-gated installed-v3 runtime reclamation RED accepts hot and cold real receipts and latches every authority field","status":"passed","title":"accepts hot and cold real receipts and latches every authority field","duration":413.7186250000002,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.109d receipt-gated installed-v3 runtime reclamation RED"],"fullName":"D.109d receipt-gated installed-v3 runtime reclamation RED serializes behind successor and predecessor gates with atomic observation","status":"passed","title":"serializes behind successor and predecessor gates with atomic observation","duration":204.57825000000003,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.109d receipt-gated installed-v3 runtime reclamation RED"],"fullName":"D.109d receipt-gated installed-v3 runtime reclamation RED D.109f preserves owner-observed Discord and MMORPG projections with zero deleted durable reads","status":"passed","title":"D.109f preserves owner-observed Discord and MMORPG projections with zero deleted durable reads","duration":435.2489169999999,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.109d receipt-gated installed-v3 runtime reclamation RED"],"fullName":"D.109d receipt-gated installed-v3 runtime reclamation RED releases every predecessor owner while preserving the live successor","status":"passed","title":"releases every predecessor owner while preserving the live successor","duration":219.23874999999998,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.109d receipt-gated installed-v3 runtime reclamation RED"],"fullName":"D.109d receipt-gated installed-v3 runtime reclamation RED returns frozen replay success and refuses changed authority after release","status":"passed","title":"returns frozen replay success and refuses changed authority after release","duration":207.69412499999999,"failureMessages":[],"meta":{}},{"ancestorTitles":["D.109d receipt-gated installed-v3 runtime reclamation RED"],"fullName":"D.109d receipt-gated installed-v3 runtime reclamation RED keeps precommit construction failure byte-identical and subsequently usable","status":"passed","title":"keeps precommit construction failure byte-identical and subsequently usable","duration":202.07958400000007,"failureMessages":[],"meta":{}}],"startTime":1788410644358,"endTime":1788410646841.0796,"status":"passed","message":"","name":"/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-runtime-reclamation-red.test.ts"}]}
+\ No newline at end of file
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/retained.status b/.logs/d110c-0c1b-green-0873dfd0/retained.status
+new file mode 100644
+index 00000000..573541ac
+--- /dev/null
++++ b/.logs/d110c-0c1b-green-0873dfd0/retained.status
+@@ -0,0 +1 @@
++0
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/retained.stderr b/.logs/d110c-0c1b-green-0873dfd0/retained.stderr
+new file mode 100644
+index 00000000..f151c37b
+--- /dev/null
++++ b/.logs/d110c-0c1b-green-0873dfd0/retained.stderr
+@@ -0,0 +1,18 @@
++(node:39252) ExperimentalWarning: SQLite is an experimental feature and might change at any time
++(Use `node --trace-warnings ...` to show where the warning was created)
++(node:39273) ExperimentalWarning: SQLite is an experimental feature and might change at any time
++(Use `node --trace-warnings ...` to show where the warning was created)
++(node:39291) ExperimentalWarning: SQLite is an experimental feature and might change at any time
++(Use `node --trace-warnings ...` to show where the warning was created)
++(node:39376) ExperimentalWarning: SQLite is an experimental feature and might change at any time
++(Use `node --trace-warnings ...` to show where the warning was created)
++(node:39378) ExperimentalWarning: SQLite is an experimental feature and might change at any time
++(Use `node --trace-warnings ...` to show where the warning was created)
++(node:39431) ExperimentalWarning: SQLite is an experimental feature and might change at any time
++(Use `node --trace-warnings ...` to show where the warning was created)
++(node:39433) ExperimentalWarning: SQLite is an experimental feature and might change at any time
++(Use `node --trace-warnings ...` to show where the warning was created)
++(node:39453) ExperimentalWarning: SQLite is an experimental feature and might change at any time
++(Use `node --trace-warnings ...` to show where the warning was created)
++(node:39490) ExperimentalWarning: SQLite is an experimental feature and might change at any time
++(Use `node --trace-warnings ...` to show where the warning was created)
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/retained.stdout b/.logs/d110c-0c1b-green-0873dfd0/retained.stdout
+new file mode 100644
+index 00000000..8547655d
+--- /dev/null
++++ b/.logs/d110c-0c1b-green-0873dfd0/retained.stdout
+@@ -0,0 +1,2 @@
++D110C_B_HOT_ADOPTION_COMPLETE
++JSON report written to /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-0c1b-green-0873dfd0/retained.json
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/retained.timestamps.json b/.logs/d110c-0c1b-green-0873dfd0/retained.timestamps.json
+new file mode 100644
+index 00000000..4b8398d7
+--- /dev/null
++++ b/.logs/d110c-0c1b-green-0873dfd0/retained.timestamps.json
+@@ -0,0 +1 @@
++{"startedAt":"2026-09-03T04:44:02Z","finishedAt":"2026-09-03T04:44:26Z"}
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/source-hashes.sha256 b/.logs/d110c-0c1b-green-0873dfd0/source-hashes.sha256
+new file mode 100644
+index 00000000..646063a6
+--- /dev/null
++++ b/.logs/d110c-0c1b-green-0873dfd0/source-hashes.sha256
+@@ -0,0 +1,8 @@
++25ad2cd079fe568b56da4b1145cce072d8a51504daeb0e5c43f2d305de1181f0  docs/production-hardening/production-hardening-tdd-plan-v2.md
++60e32fe431936d1c9282c08a21b176ba7347eb8717d57d981b7cb5db66f0bb1c  packages/node/src/v3-live.ts
++0435f89d625e900335538d458ae920263996c2e2026d7fc24a3b44fcaea492a0  tests/fixtures/phase-6a-v3/creator-adoption-contract.ts
++e40e8dddc916380763caa10fe3f4267cf73e5915e786704eef97c7d3bfa72277  tests/fixtures/phase-6b/runtime-reclamation-contract.ts
++7f1e6ad8cbe6d318109c7da1a6e61ce99e4025917e10d5f415fe8ffe5e86e422  tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts
++d1df6c84e23495be0e8520a3d120f9a756894fe79272d91eb3bf314a511bdb19  tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts
++aa3bef042d36003662ac5e1fe10419fdaa09f671ff2306e1a5e71326dc72d64d  tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts
++4049a87f2a556150189e0e10ee80737c4254c40f6d17644da8dc7a87d1b1f883  tests/phase-6b-d110c-a-repeat-close-red.test.ts
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/source-shape.json b/.logs/d110c-0c1b-green-0873dfd0/source-shape.json
+new file mode 100644
+index 00000000..82ec3ffa
+--- /dev/null
++++ b/.logs/d110c-0c1b-green-0873dfd0/source-shape.json
+@@ -0,0 +1,6 @@
++{
++  "unknownOutcome": true,
++  "committedFailure": true,
++  "foldRecheck": true,
++  "bindRefusal": true
++}
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/source-shape.status b/.logs/d110c-0c1b-green-0873dfd0/source-shape.status
+new file mode 100644
+index 00000000..573541ac
+--- /dev/null
++++ b/.logs/d110c-0c1b-green-0873dfd0/source-shape.status
+@@ -0,0 +1 @@
++0
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/source-shape.stderr b/.logs/d110c-0c1b-green-0873dfd0/source-shape.stderr
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/.logs/d110c-0c1b-green-0873dfd0/stash-count.txt b/.logs/d110c-0c1b-green-0873dfd0/stash-count.txt
+new file mode 100644
+index 00000000..f64f5d8d
+--- /dev/null
++++ b/.logs/d110c-0c1b-green-0873dfd0/stash-count.txt
+@@ -0,0 +1 @@
++27
+diff --git a/docs/production-hardening/production-hardening-tdd-plan-v2.md b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+index 84a0618b..7f7a42fc 100644
+--- a/docs/production-hardening/production-hardening-tdd-plan-v2.md
++++ b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+@@ -96203,9 +96203,9 @@ is under `.logs/d110c-0c1a-review-confirmation-7414fa6b/`; its validating
+ 
+ ###### D.110c-0c1b committed-issuance outcome reconciliation prerequisite
+ 
+-**Status: bounded source/architecture audit and the one material plan
+-confirmation are complete with an empty P0/P1 union; the frozen tests-only RED
+-is causal and complete, GREEN is next, and no production edit has begun.** Owner: the
++**Status: bounded source/architecture audit, plan confirmation, and causal RED
++are complete; GREEN is implemented and locally verified, with its signed
++checkpoint and final Grok/Kimi/Opus review next.** Owner: the
+ post-`transactIssue()` outcome window in
+ `packages/node/src/v3-live.ts::issueOneVertex()`, live-journal append, graph
+ admission, restart recovery of pending issuance/outbox rows, and the close-time
+@@ -96379,6 +96379,61 @@ validating 10-entry self-excluding manifest SHA-256 is
+ The causal matrix matches the freeze, so proceed to the three-check GREEN
+ without a separate RED model-review round.
+ 
++GREEN implements only the frozen internal halt and close-refusal checks in
++`packages/node/src/v3-live.ts`. Every failure after a returned durable issuance
++commit now sets `operationAdmissionHalted`; exact
++`ISSUANCE_OUTCOME_UNKNOWN` also sets it when the durable transaction may have
++committed without an operation-policy reservation. Creator-close registration
++refuses while halted, and queued blueprint folding rechecks the halt after its
++barrier. Definitely pre-transaction signer/capacity failure keeps its existing
++reservation release and retry behavior. No public API, root export, package
++manifest, wire/schema, dependency, authority, threshold, or product
++configuration changes.
++
++The accepted focused GREEN selects one file and passes 2/2 tests with zero
++failed/pending tests and runner exit 0. The pre-bound ordering proves one real
++issuance/outbox row commits, its journal admission fails without a write, the
++queued close and its same-handle retry both return exact
++`creator snapshot export failed: not-active`, and a second issue creates no
++new row. It then deactivates and cold-reopens the same genuine epoch-one room
++using detached, already-authenticated close inputs retained before their normal
++post-adoption revocation: the exact target row remains present once and the
++recovered plane accepts the immediately following author sequence. The
++never-bound ordering delegates a real no-policy issuance transaction to
++durable completion, throws the store's exact `ISSUANCE_OUTCOME_UNKNOWN` only
++after that commit, retains one pending row, and refuses later close binding
++with existing `D110C_A_CLOSE_BIND_FAILED:CREATOR_CLOSE_UNAVAILABLE`.
++
++The retained GREEN selects nine files and passes 60/60 tests with zero
++failed/pending tests and runner exit 0. It includes E5-01 authenticated
++exact-once recovery, Phase-6a adoption/activation/epoch behavior, D.109d
++runtime reclamation, D.110c-0c1a retirement, D.110c-a genuine repeat close,
++and D.110c-b hot epoch-two adoption. Its first aggregate run exposed only a
++stale D.110c-a byte expectation: after completed D.110c-0c1a added the
++authenticated issuance-retirement carrier, the deterministic closure census is
++`before=6833`, `after=6516`, `delta=-317`, with one fewer retained reference;
++the old `-318` literal was corrected without a production encoding change.
++All semantic assertions had passed in that diagnostic.
++
++The exact-owner ESLint, Prettier, diff check, Node build, and Node
++production-source no-emit typecheck pass. Four corrected source-shape
++predicates independently locate the unknown-outcome catch, unconditional
++committed-failure halt, queued fold recheck, and creator-close registration
++refusal. A proposed test-fixture-only `tsconfig` was discarded because it
++expanded inherited fixtures while failing bare workspace package resolution;
++it is not treated as a code failure or retained acceptance gate. The initial
++one-case focused command also passed its semantic assertion but exited 1 only
++because a repository-wide 70% coverage threshold was applied to one file; the
++accepted focused command disables coverage and exits 0.
++
++Complete accepted commands, reporter JSON, stdout/stderr, statuses,
++timestamps, source-shape output, changed-path custody, protected-path/stash
++checks, source hashes, and the self-excluding manifest are under
++`.logs/d110c-0c1b-green-0873dfd0/`. No campaign, D.110a invocation, Fable, or
++collaboration subagent ran. Sign and push this GREEN checkpoint, then run the
++single governing Grok/Kimi/Opus plan→RED→GREEN review. Only P0/P1 findings
++block closure.
++
+ The complete confirmation evidence is retained under
+ `.logs/d110c-0c-plan-confirmation-cb5b3437/`. Its validating 34-entry
+ self-excluding manifest SHA-256 is
+diff --git a/packages/node/src/v3-live.ts b/packages/node/src/v3-live.ts
+index b313faee..3564a6fe 100644
+--- a/packages/node/src/v3-live.ts
++++ b/packages/node/src/v3-live.ts
+@@ -5679,10 +5679,12 @@ async function issueOneVertex(
+ 			objectId: registration.payload.provenance.objectId,
+ 			operation,
+ 		});
+-	} catch {
++	} catch (error) {
++		const issuanceOutcomeUnknown =
++			error !== null && typeof error === "object" && Reflect.get(error, "code") === "ISSUANCE_OUTCOME_UNKNOWN";
+ 		if (!signerResolved && !terminalTransactionStarted) {
+ 			releaseOperationReservation(reservation);
+-		} else if (reservation !== undefined) {
++		} else if (reservation !== undefined || issuanceOutcomeUnknown) {
+ 			registration.operationAdmissionHalted = true;
+ 		}
+ 		if (requireTerminalAuthorization && terminalTransactionStarted) {
+@@ -5702,7 +5704,7 @@ async function issueOneVertex(
+ 		kind: Exclude<Extract<V3LocalIssueResult, { readonly ok: false }>["kind"], "split-required">,
+ 		detail: string
+ 	): InternalLocalIssueResult => {
+-		if (reservation !== undefined) registration.operationAdmissionHalted = true;
++		registration.operationAdmissionHalted = true;
+ 		return requireTerminalAuthorization
+ 			? internalLocalIssueFailure(kind, detail, "outcome-unknown")
+ 			: localIssueFailure(kind, detail);
+@@ -6650,6 +6652,9 @@ function stageClosedBlueprintEpoch(registration: V3PlaneRegistration): V3Bluepri
+ 	if (!currentRegistration(registration) || registration.blueprintMachine === undefined) {
+ 		return blueprintFoldFailure("not-active", "v3 blueprint fold is not active");
+ 	}
++	if (registration.operationAdmissionHalted) {
++		return blueprintFoldFailure("not-active", "v3 blueprint fold requires live recovery");
++	}
+ 	if (registration.blueprintFolded) {
+ 		return blueprintFoldFailure("already-folded", "v3 blueprint epoch was already folded");
+ 	}
+@@ -6977,6 +6982,7 @@ function creatorClosePreviousHistorySnapshot(payload: PreparedV3LivePayload): Ac
+ function creatorCloseRegistration(registration: V3PlaneRegistration): V3CreatorCloseRegistration | undefined {
+ 	if (
+ 		!currentRegistration(registration) ||
++		registration.operationAdmissionHalted ||
+ 		registration.mode !== "genesis-active" ||
+ 		registration.authorization.kind !== "latched-acl" ||
+ 		registration.terminalState !== "active" ||
+diff --git a/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts b/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts
+index e248e73e..40fb31f5 100644
+--- a/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts
++++ b/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts
+@@ -402,6 +402,7 @@ export interface GenuineCreatorAdoptionFixtureOptions {
+ 			readonly signRegisteredVertexDigest: V3LocalIssueInput["signRegisteredVertexDigest"];
+ 		}>
+ 	): Promise<Readonly<{ readonly authorSequence: number; readonly digest: string }>>;
++	decorateIssuanceStore?(store: DurableIssuanceStore): DurableIssuanceStore;
+ 	decorateLiveJournalStore?(store: DurableLiveJournalStore): DurableLiveJournalStore;
+ 	readonly establishedPeerPrivateKeySeedHex?: string;
+ 	readonly modules?: GenuineCreatorAdoptionFixtureModules;
+@@ -727,6 +728,7 @@ async function recoverWithDurableStores(
+ 	capability: PreparedV3Live,
+ 	controls: GenuineCreatorAdoptionFixture["controls"],
+ 	modules: GenuineCreatorAdoptionFixtureModules,
++	decorateIssuanceStore?: (store: DurableIssuanceStore) => DurableIssuanceStore,
+ 	decorateLiveJournalStore?: (store: DurableLiveJournalStore) => DurableLiveJournalStore
+ ): Promise<
+ 	Readonly<{
+@@ -744,7 +746,7 @@ async function recoverWithDurableStores(
+ 	const issuanceMaintenance = modules.resolveNodeDurableIssuancePruningMaintenance(rawIssuanceStore);
+ 	if (issuanceMaintenance === undefined) throw new TypeError("D.108b fixture issuance maintenance is unavailable");
+ 	const rawJournal = modules.createNodeDurableLiveJournalStore({ primaryFilename: join(directory, "journal.sqlite") });
+-	const issuanceStore: DurableIssuanceStore = Object.freeze({
++	const baseIssuanceStore: DurableIssuanceStore = Object.freeze({
+ 		close: () => rawIssuanceStore.close(),
+ 		compareAndMarkOutboxPublished: (input) => rawIssuanceStore.compareAndMarkOutboxPublished(input),
+ 		readIssued: async (scope, sequence) => {
+@@ -766,6 +768,7 @@ async function recoverWithDurableStores(
+ 		},
+ 		transactIssue: (scope, buildAndSign) => rawIssuanceStore.transactIssue(scope, buildAndSign),
+ 	});
++	const issuanceStore = decorateIssuanceStore?.(baseIssuanceStore) ?? baseIssuanceStore;
+ 	const baseJournal: DurableLiveJournalStore = Object.freeze({
+ 		appendAccepted: (input) => rawJournal.appendAccepted(input),
+ 		close: () => rawJournal.close(),
+@@ -1082,6 +1085,7 @@ export async function openGenuineCreatorAdoptionFixture(
+ 		fixture.capability,
+ 		controls,
+ 		modules,
++		options.decorateIssuanceStore,
+ 		options.decorateLiveJournalStore
+ 	);
+ 	const messageQueueManager = new MessageQueueManager<Message>({ logConfig: { level: "silent" } });
+diff --git a/tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts b/tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts
+index 7caa62fc..65727a4e 100644
+--- a/tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts
++++ b/tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts
+@@ -1,4 +1,9 @@
+-import type { DurableIssuanceOutboxRecord, DurableIssueScope } from "@ts-drp/issuance-store";
++import {
++	type DurableIssuanceOutboxRecord,
++	type DurableIssuanceStore,
++	DurableIssuanceUnknownOutcomeError,
++	type DurableIssueScope,
++} from "@ts-drp/issuance-store";
+ import type { DurableLiveJournalStore } from "@ts-drp/live-journal";
+ // eslint-disable-next-line import/no-unresolved -- Workspace subpath resolves after the required package build.
+ import { CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE } from "@ts-drp/protocol-v3/creator-issuance-retirement";
+@@ -10,6 +15,7 @@ import {
+ 
+ export const D110C_0C1B_RED_TOKEN = "D110C_0C1B_COMMITTED_ISSUANCE_RECOVERY_REQUIRED" as const;
+ export const D110C_0C1B_PREBOUND_REFUSAL = "creator snapshot export failed: not-active" as const;
++export const D110C_0C1B_UNBOUND_REFUSAL = "D110C_A_CLOSE_BIND_FAILED:CREATOR_CLOSE_UNAVAILABLE" as const;
+ 
+ interface Deferred {
+ 	readonly promise: Promise<void>;
+@@ -29,6 +35,19 @@ export interface D110c0c1bRedEvidence {
+ 	readonly issueKind: "journal-rejected";
+ 	readonly journalWriteDelegated: false;
+ 	readonly pendingRowDelta: 1;
++	readonly recoveredIssueKind: "accepted";
++	readonly recoveredSequenceDelta: 1;
++	readonly recoveredTargetRows: 1;
++	readonly repeatCloseError: typeof D110C_0C1B_PREBOUND_REFUSAL;
++	readonly secondIssueKind: "admission-rejected";
++	readonly secondIssueRowDelta: 0;
++}
++
++export interface D110c0c1bUnknownOutcomeEvidence {
++	readonly bindError: typeof D110C_0C1B_UNBOUND_REFUSAL;
++	readonly issueKind: "admission-rejected";
++	readonly pendingRowDelta: 1;
++	readonly transactDelegated: true;
+ }
+ 
+ function deferred(): Deferred {
+@@ -77,6 +96,12 @@ function assertCommittedFailure(
+ 		issueKind: "journal-rejected" as const,
+ 		journalWriteDelegated: false as const,
+ 		pendingRowDelta: 1 as const,
++		recoveredIssueKind: "accepted" as const,
++		recoveredSequenceDelta: 1 as const,
++		recoveredTargetRows: 1 as const,
++		repeatCloseError: D110C_0C1B_PREBOUND_REFUSAL,
++		secondIssueKind: "admission-rejected" as const,
++		secondIssueRowDelta: 0 as const,
+ 	});
+ }
+ 
+@@ -94,6 +119,12 @@ export async function proveD110c0c1bCommittedIssuanceRecovery(): Promise<D110c0c
+ 	let release = deferred();
+ 	const journalWriteDelegated = false;
+ 	let captured: CapturedCommittedFailure | undefined;
++	let repeatCloseError: string | undefined;
++	let recoveredIssue: Readonly<Record<string, unknown>> | undefined;
++	let recoveredSequenceDelta: number | undefined;
++	let recoveredTargetRows: number | undefined;
++	let secondIssue: Readonly<Record<string, unknown>> | undefined;
++	let secondIssueRowDelta: number | undefined;
+ 	const decorateLiveJournalStore = (store: DurableLiveJournalStore): DurableLiveJournalStore =>
+ 		Object.freeze({
+ 			appendAccepted: async (input) => {
+@@ -113,6 +144,49 @@ export async function proveD110c0c1bCommittedIssuanceRecovery(): Promise<D110c0c
+ 	let fixture: D110cARepeatCloseFixture | undefined;
+ 	try {
+ 		fixture = await openD110cARepeatCloseFixture({
++			afterRepeatCloseFailure: async ({
++				closeHandle,
++				issuanceScope,
++				issuanceStore,
++				plane,
++				recoverCurrentSuccessor,
++				signRegisteredVertexDigest,
++			}) => {
++				try {
++					await closeHandle.close();
++					throw new TypeError("D110C_0C1B_REPEAT_CLOSE_UNEXPECTED_SUCCESS");
++				} catch (error) {
++					repeatCloseError = errorMessage(error);
++				}
++				const before = await issuanceStore.readOutboxPage({ limit: 128, scope: issuanceScope });
++				secondIssue = await plane.issueLocal({
++					operations: Object.freeze([
++						Object.freeze({ logicalTime: 43, operation: Object.freeze({ action: "add", value: 23 }) }),
++					]),
++					signRegisteredVertexDigest,
++				});
++				const after = await issuanceStore.readOutboxPage({ limit: 128, scope: issuanceScope });
++				secondIssueRowDelta = after.length - before.length;
++				const recovered = await recoverCurrentSuccessor();
++				if (recovered.ok !== true || recovered.handle === null || typeof recovered.handle !== "object") {
++					throw new TypeError("D110C_0C1B_RECOVERY_FAILED");
++				}
++				const recoveredPlane = recovered.handle as typeof plane;
++				const target = captured?.after.filter(
++					(row) => !captured?.before.some((beforeRow) => sameOutboxAddress(beforeRow, row))
++				)[0];
++				if (target === undefined) throw new TypeError("D110C_0C1B_RECOVERED_TARGET_UNAVAILABLE");
++				recoveredTargetRows = (await issuanceStore.readOutboxPage({ limit: 128, scope: issuanceScope })).filter((row) =>
++					sameOutboxAddress(target, row)
++				).length;
++				recoveredIssue = await recoveredPlane.issueLocal({
++					operations: Object.freeze([
++						Object.freeze({ logicalTime: 44, operation: Object.freeze({ action: "add", value: 29 }) }),
++					]),
++					signRegisteredVertexDigest,
++				});
++				recoveredSequenceDelta = Number(recoveredIssue.authorSequence) - target.commit.authorSequence;
++			},
+ 			beforeRepeatClose: async ({ issuanceScope, issuanceStore, plane, signRegisteredVertexDigest }) => {
+ 				const before = await issuanceStore.readOutboxPage({ limit: 128, scope: issuanceScope });
+ 				entered = deferred();
+@@ -155,8 +229,89 @@ export async function proveD110c0c1bCommittedIssuanceRecovery(): Promise<D110c0c
+ 	} catch (error) {
+ 		const message = errorMessage(error);
+ 		if (message === D110C_0C1B_RED_TOKEN || message !== D110C_0C1B_PREBOUND_REFUSAL) throw error;
++		if (
++			repeatCloseError !== D110C_0C1B_PREBOUND_REFUSAL ||
++			secondIssue?.ok !== false ||
++			secondIssue.kind !== "admission-rejected" ||
++			secondIssueRowDelta !== 0 ||
++			recoveredIssue?.ok !== true ||
++			recoveredIssue.kind !== "accepted" ||
++			recoveredSequenceDelta !== 1 ||
++			recoveredTargetRows !== 1
++		) {
++			throw new TypeError(
++				`D110C_0C1B_POST_REFUSAL_HALT_INVALID:${JSON.stringify({
++					recoveredIssue,
++					recoveredSequenceDelta,
++					recoveredTargetRows,
++					repeatCloseError,
++					secondIssue,
++					secondIssueRowDelta,
++				})}`
++			);
++		}
+ 		return assertCommittedFailure(captured, journalWriteDelegated);
+ 	} finally {
+ 		await fixture?.close();
+ 	}
+ }
++
++/**
++ * Delegates one genuine no-policy issuance commit, then converts only its
++ * post-commit acknowledgement into the issuance store's exact unknown-outcome
++ * error. The active registration must halt before creator-close is bound.
++ * @returns Exact durable-row and bind-refusal evidence.
++ */
++export async function proveD110c0c1bUnknownIssuanceOutcome(): Promise<D110c0c1bUnknownOutcomeEvidence> {
++	let armed = false;
++	let transactDelegated = false;
++	let issue: Readonly<Record<string, unknown>> | undefined;
++	let pendingRowDelta: number | undefined;
++	const decorateIssuanceStore = (store: DurableIssuanceStore): DurableIssuanceStore =>
++		Object.freeze({
++			close: () => store.close(),
++			compareAndMarkOutboxPublished: (input) => store.compareAndMarkOutboxPublished(input),
++			readIssued: (scope, authorSequence) => store.readIssued(scope, authorSequence),
++			readLineage: (scope) => store.readLineage(scope),
++			readOutboxPage: (input) => store.readOutboxPage(input),
++			transactIssue: async (scope, buildAndSign) => {
++				const commit = await store.transactIssue(scope, buildAndSign);
++				if (!armed) return commit;
++				armed = false;
++				transactDelegated = true;
++				throw new DurableIssuanceUnknownOutcomeError(scope);
++			},
++		});
++
++	try {
++		await openD110cARepeatCloseFixture({
++			beforeRepeatCloseBinding: async ({ issuanceScope, issuanceStore, plane, signRegisteredVertexDigest }) => {
++				const before = await issuanceStore.readOutboxPage({ limit: 128, scope: issuanceScope });
++				armed = true;
++				issue = await plane.issueLocal({
++					operations: Object.freeze([
++						Object.freeze({ logicalTime: 42, operation: Object.freeze({ action: "add", value: 17 }) }),
++					]),
++					signRegisteredVertexDigest,
++				});
++				const after = await issuanceStore.readOutboxPage({ limit: 128, scope: issuanceScope });
++				pendingRowDelta = after.length - before.length;
++			},
++			creator: Object.freeze({ decorateIssuanceStore }),
++			retainedControls: false,
++		});
++		throw new TypeError("D110C_0C1B_UNBOUND_CLOSE_UNEXPECTED_SUCCESS");
++	} catch (error) {
++		const bindError = errorMessage(error);
++		if (bindError !== D110C_0C1B_UNBOUND_REFUSAL) throw error;
++		if (issue?.ok !== false || issue.kind !== "admission-rejected" || pendingRowDelta !== 1 || !transactDelegated) {
++			throw new TypeError("D110C_0C1B_UNKNOWN_OUTCOME_EVIDENCE_INVALID");
++		}
++		return Object.freeze({
++			bindError: D110C_0C1B_UNBOUND_REFUSAL,
++			issueKind: "admission-rejected" as const,
++			pendingRowDelta: 1 as const,
++			transactDelegated: true as const,
++		});
++	}
++}
+diff --git a/tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts b/tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts
+index 79e101dd..4f3ba231 100644
+--- a/tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts
++++ b/tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts
+@@ -110,6 +110,17 @@ export interface D110cARepeatCloseFixture {
+ }
+ 
+ export interface D110cARepeatCloseOptions {
++	afterRepeatCloseFailure?(
++		input: Readonly<{
++			readonly closeHandle: CreatorLiveCloseHandle;
++			readonly error: unknown;
++			readonly issuanceScope: GenuineCreatorAdoptionFixture["evidence"]["issuanceScope"];
++			readonly issuanceStore: GenuineCreatorAdoptionFixture["evidence"]["issuanceStore"];
++			readonly plane: V3PlaneHandle;
++			readonly signRegisteredVertexDigest: GenuineCreatorAdoptionFixture["signRegisteredVertexDigest"];
++			recoverCurrentSuccessor(): Promise<Readonly<Record<string, unknown>>>;
++		}>
++	): Promise<void>;
+ 	beforeRepeatClose?(
+ 		input: Readonly<{
+ 			readonly issuanceScope: GenuineCreatorAdoptionFixture["evidence"]["issuanceScope"];
+@@ -123,6 +134,14 @@ export interface D110cARepeatCloseOptions {
+ 			release(): void;
+ 		}>
+ 	>;
++	beforeRepeatCloseBinding?(
++		input: Readonly<{
++			readonly issuanceScope: GenuineCreatorAdoptionFixture["evidence"]["issuanceScope"];
++			readonly issuanceStore: GenuineCreatorAdoptionFixture["evidence"]["issuanceStore"];
++			readonly plane: V3PlaneHandle;
++			readonly signRegisteredVertexDigest: GenuineCreatorAdoptionFixture["signRegisteredVertexDigest"];
++		}>
++	): Promise<void>;
+ 	readonly creator?: GenuineCreatorAdoptionFixtureOptions;
+ 	readonly objectId?: string;
+ 	readonly retainedControls?: boolean;
+@@ -514,6 +533,49 @@ export async function openD110cARepeatCloseFixture(
+ 		await hot.close();
+ 		await Promise.all([deleteDatabase(primaryDatabaseName), deleteDatabase(snapshotDatabaseName)]);
+ 	};
++	const recoverCurrentSuccessor = async (): Promise<Readonly<Record<string, unknown>>> => {
++		const coldFacts = hot.predecessorColdFacts as unknown as D110c0b1ColdFacts;
++		const genesisTrustCandidate = hot.base.evidence.current.candidates.find((candidate) => {
++			const record = canonicalRecord(candidate.bytes);
++			return record.kind === "drp-anchor-trust-state" && record.currentEpoch === 0;
++		});
++		if (genesisTrustCandidate === undefined) throw new TypeError("D110C_A_CURRENT_GENESIS_TRUST_UNAVAILABLE");
++		const genesisTrustRecord = canonicalRecord(genesisTrustCandidate.bytes);
++		const currentAuthority = copiedRoomHead(hot.successor as V3PlaneHandle);
++		if (
++			currentAuthority === undefined ||
++			!(genesisTrustRecord.detachedCurrentAnchorSignature instanceof Uint8Array) ||
++			!(genesisTrustRecord.exactCanonicalCurrentAnchorPreimageBytes instanceof Uint8Array)
++		) {
++			throw new TypeError("D110C_A_CURRENT_COLD_INPUT_INVALID");
++		}
++		await Promise.resolve(hot.successor.deactivate());
++		const reopened = await reopenCreatorSuccessorAdoption({
++			authenticationProfile: "creator-only",
++			author: hot.base.evidence.issuanceScope.author,
++			catalog: hot.base.catalog,
++			detachedSignature: Uint8Array.from(genesisTrustRecord.detachedCurrentAnchorSignature),
++			exactCanonicalAnchorPreimageBytes: Uint8Array.from(genesisTrustRecord.exactCanonicalCurrentAnchorPreimageBytes),
++			exactCanonicalParametersCarrierBytes: Uint8Array.from(coldFacts.exactCanonicalParametersCarrierBytes),
++			expectedRoomHead: Object.freeze({
++				currentAnchorDigest: currentAuthority.anchorDigest,
++				epoch: currentAuthority.epoch,
++				objectId: currentAuthority.objectId,
++			}),
++			issuanceStore: hot.base.evidence.issuanceStore,
++			liveJournalStore: hot.base.journal,
++			pinnedGenesisAnchorDigest: hot.base.evidence.currentTrust.genesisAnchorDigest,
++			signRegisteredVertexDigest: hot.base.signRegisteredVertexDigest,
++			snapshotDeclaration: coldFacts.snapshotDeclaration,
++			snapshotStore: coldFacts.snapshotStore,
++			store: coldFacts.store,
++			...hot.runtimeBindings,
++		});
++		if (reopened.ok === true && reopened.handle !== null && typeof reopened.handle === "object") {
++			latestSuccessor = reopened.handle as D109dHotFixture["successor"];
++		}
++		return reopened;
++	};
+ 	try {
+ 		const plane = hot.successor as V3PlaneHandle;
+ 		const issued = await hot.successor.issueLocal({
+@@ -526,6 +588,12 @@ export async function openD110cARepeatCloseFixture(
+ 		const published = await hot.successor.publishPending();
+ 		if (published.ok !== true) throw new TypeError(`D110C_A_POST_ADOPTION_PUBLISH_FAILED:${String(published.kind)}`);
+ 		const previousHistory = copiedCompactHistory(hot.base.evidence.exactCanonicalProjectionBytes);
++		await options.beforeRepeatCloseBinding?.({
++			issuanceScope: hot.base.evidence.issuanceScope,
++			issuanceStore: hot.base.evidence.issuanceStore,
++			plane,
++			signRegisteredVertexDigest: hot.base.signRegisteredVertexDigest,
++		});
+ 		const signer = await createRecoverableFinalitySigner({ seed: hexBytes(contract.privateKeySeedHex) });
+ 		const [vote, evidenceStore, snapshotStore] = await Promise.all([
+ 			hot.base.modules.openBrowserSealVoteStore({ databaseName: primaryDatabaseName }),
+@@ -1009,7 +1077,21 @@ export async function openD110cARepeatCloseFixture(
+ 			},
+ 		});
+ 	} catch (error) {
+-		await cleanup();
++		try {
++			if (closeHandle !== undefined && options.afterRepeatCloseFailure !== undefined) {
++				await options.afterRepeatCloseFailure({
++					closeHandle,
++					error,
++					issuanceScope: hot.base.evidence.issuanceScope,
++					issuanceStore: hot.base.evidence.issuanceStore,
++					plane: hot.successor as V3PlaneHandle,
++					recoverCurrentSuccessor,
++					signRegisteredVertexDigest: hot.base.signRegisteredVertexDigest,
++				});
++			}
++		} finally {
++			await cleanup();
++		}
+ 		throw error;
+ 	}
+ }
+diff --git a/tests/fixtures/phase-6b/runtime-reclamation-contract.ts b/tests/fixtures/phase-6b/runtime-reclamation-contract.ts
+index 997d9b42..a9c1b7c0 100644
+--- a/tests/fixtures/phase-6b/runtime-reclamation-contract.ts
++++ b/tests/fixtures/phase-6b/runtime-reclamation-contract.ts
+@@ -18,6 +18,7 @@ import { join, resolve } from "node:path";
+ import { pathToFileURL } from "node:url";
+ 
+ import type { ClosedEpochCleanupPlan } from "../../../packages/node/src/internal/closed-epoch-cleanup.js";
++import { resolveCreatorAdoptionFacts } from "../../../packages/node/src/internal/creator-adoption-intent.js";
+ import {
+ 	bytesForRef,
+ 	commitGenuineCreatorAdoptionFixture,
+@@ -173,6 +174,7 @@ export interface D109dHotFixture {
+ 	readonly committedHead: PresentHead;
+ 	readonly oracle: D108d1Oracle;
+ 	readonly predecessor: object;
++	readonly predecessorColdFacts: Readonly<Record<string, unknown>>;
+ 	readonly runtimeBindings: GenuineCreatorAdoptionFixture["runtimeBindings"];
+ 	readonly successor: Readonly<{
+ 		deactivate(): void | Promise<void>;
+@@ -215,6 +217,8 @@ async function openD109dFixture(mode: "cold" | "hot", options: D109dOpenOptions
+ 	const base = await openGenuineCreatorAdoptionFixture(options.creator);
+ 	let successor: D109dHotFixture["successor"] | undefined;
+ 	try {
++		const predecessorColdFacts = resolveCreatorAdoptionFacts<Readonly<Record<string, unknown>>>(base.handle);
++		if (predecessorColdFacts === undefined) throw new TypeError("D109D_PREDECESSOR_COLD_FACTS_UNAVAILABLE");
+ 		const prepared = await commitGenuineCreatorAdoptionFixture(base);
+ 		const selectedBindings =
+ 			mode === "hot"
+@@ -257,6 +261,7 @@ async function openD109dFixture(mode: "cold" | "hot", options: D109dOpenOptions
+ 			},
+ 			oracle: deriveD108d1Oracle(base),
+ 			predecessor: base.handle,
++			predecessorColdFacts,
+ 			readAdmittedVertices: () => Object.freeze([...admittedVertices]),
+ 			runtimeBindings,
+ 			successor,
+diff --git a/tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts b/tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts
+index defb58b1..9bb67ebf 100644
+--- a/tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts
++++ b/tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts
+@@ -4,7 +4,9 @@ import { describe, expect, it } from "vitest";
+ 
+ import {
+ 	D110C_0C1B_PREBOUND_REFUSAL,
++	D110C_0C1B_UNBOUND_REFUSAL,
+ 	proveD110c0c1bCommittedIssuanceRecovery,
++	proveD110c0c1bUnknownIssuanceOutcome,
+ } from "./fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.js";
+ 
+ describe("D.110c-0c1b committed-issuance recovery-required RED", () => {
+@@ -19,6 +21,21 @@ describe("D.110c-0c1b committed-issuance recovery-required RED", () => {
+ 			issueKind: "journal-rejected",
+ 			journalWriteDelegated: false,
+ 			pendingRowDelta: 1,
++			recoveredIssueKind: "accepted",
++			recoveredSequenceDelta: 1,
++			recoveredTargetRows: 1,
++			repeatCloseError: D110C_0C1B_PREBOUND_REFUSAL,
++			secondIssueKind: "admission-rejected",
++			secondIssueRowDelta: 0,
++		});
++	});
++
++	it("halts a no-policy plane when the real issuance commit has an unknown return outcome", async () => {
++		await expect(proveD110c0c1bUnknownIssuanceOutcome()).resolves.toEqual({
++			bindError: D110C_0C1B_UNBOUND_REFUSAL,
++			issueKind: "admission-rejected",
++			pendingRowDelta: 1,
++			transactDelegated: true,
+ 		});
+ 	});
+ });
+diff --git a/tests/phase-6b-d110c-a-repeat-close-red.test.ts b/tests/phase-6b-d110c-a-repeat-close-red.test.ts
+index a789d012..64dc6de0 100644
+--- a/tests/phase-6b-d110c-a-repeat-close-red.test.ts
++++ b/tests/phase-6b-d110c-a-repeat-close-red.test.ts
+@@ -72,7 +72,7 @@ describe("D.110c-a authenticated repeat-close carrier RED", () => {
+ 			expect(evidence.previousHistoryAfter).toEqual(evidence.independentHistory.previous);
+ 			expect(evidence.previousHistoryAfter).not.toBe(evidence.independentHistory.previous);
+ 			expect(evidence.afterHead.references).toHaveLength(evidence.beforeHead.references.length - 1);
+-			expect(evidence.closureBytes.delta).toBe(-318);
++			expect(evidence.closureBytes.delta).toBe(-317);
+ 			expect(evidence.duplicateCloseErrors).toEqual({
+ 				concurrent: "creator close authority is unavailable",
+ 				sequential: "creator close authority is unavailable",

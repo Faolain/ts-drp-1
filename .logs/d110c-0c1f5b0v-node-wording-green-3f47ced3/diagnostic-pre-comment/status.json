@@ -1,0 +1,6 @@
+{
+  "code": 1,
+  "signal": null,
+  "classification": "identical inherited pre-sink failure at untouched pre-comment commit",
+  "finishTimeWasNotCapturedByTheCommandRunner": true
+}

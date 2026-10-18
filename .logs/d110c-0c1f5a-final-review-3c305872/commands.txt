@@ -1,0 +1,23 @@
+D.110c-0c1f5a final review command/evidence ledger
+
+Review input and local audit were frozen at signed/pushed anchor 3c305872fbee759b1b6386c10a1d1ebbde3dd6e6.
+
+Grok initial bounded review:
+python3 ~/.codex/skills/grok/scripts/run_grok.py --mode review --cwd /Users/aristotle/Documents/Projects/ts-drp-1 --prompt-file .logs/d110c-0c1f5a-final-review-3c305872/prompt.md --schema-file .logs/d110c-0c1f5a-final-review-3c305872/schema.json --output-dir .logs/d110c-0c1f5a-final-review-3c305872/grok --model grok-4.6 --reasoning-effort high --timeout-seconds 1200 --max-turns 128
+
+Grok exact-session structured re-emission:
+grok --cwd /Users/aristotle/Documents/Projects/ts-drp-1 --resume 01a0694a-8769-7e92-9c14-10a40505a473 --model grok-4.6 --reasoning-effort high --disable-web-search --no-subagents --no-plan --max-turns 4 --output-format json --verbatim --prompt-file .logs/d110c-0c1f5a-final-review-3c305872/grok-schema-reemit-prompt.md --permission-mode dontAsk --tools '' --json-schema <schema.json>
+
+Kimi direct review and exact-session presentation-only re-emission are preserved in kimi.stream.jsonl and kimi-reemit.stream.jsonl; both command statuses are zero, and both identify session_96c604b1-fd7b-4149-af66-1c18ca71ab02.
+
+Opus xhigh review:
+CLAUDE_CONFIG_DIR=/Users/aristotle/.claude-phel claude -p --model opus --effort xhigh --permission-mode dontAsk --allowedTools Read,Grep,Glob --disallowedTools Bash,Write,Edit,NotebookEdit,Agent,WebFetch,WebSearch --output-format json --json-schema <schema.json> --name d110c-0c1f5a-final-opus-xhigh < prompt.md
+
+Mechanical closure checks:
+node .logs/d110c-0c1f5a-final-review-3c305872/validate.mjs
+shasum -a 256 -c .logs/d110c-0c1f5a-final-review-3c305872/SHA256SUMS
+NODE_OPTIONS=--max-old-space-size=8192 pnpm exec prettier --check docs/production-hardening/production-hardening-tdd-plan-v2.md .logs/d110c-0c1f5a-final-review-3c305872/review-ledger.md .logs/d110c-0c1f5a-final-review-3c305872/validate.mjs
+git diff --check -- docs/production-hardening/production-hardening-tdd-plan-v2.md
+git status --porcelain=v1
+git stash list
+git verify-commit 3c305872fbee759b1b6386c10a1d1ebbde3dd6e6

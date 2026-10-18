@@ -1,0 +1,60 @@
+{
+  "head": "7eb2a8dfcec8af9a533b3308b6d1f060f52a90b4",
+  "signature": "7eb2a8df G docs: freeze authorized AHE maintenance discovery prerequisite",
+  "coverageFlagSupported": true,
+  "productionPatchUnchanged": true,
+  "stashCount": 27,
+  "commands": [
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "vitest",
+        "--help",
+        "--coverage"
+      ],
+      "nodeOptions": null,
+      "start": "2026-09-05T19:19:35.412Z",
+      "finish": "2026-09-05T19:19:36.031Z",
+      "status": 0,
+      "signal": null,
+      "stdout": "vitest/3.1.1\n\nUsage:\n  $ vitest [...filters]\n\nCommands:\n  run [...filters]      \n  related [...filters]  \n  watch [...filters]    \n  dev [...filters]      \n  bench [...filters]    \n  init <project>        \n  list [...filters]     \n  [...filters]          \n\nFor more info, run any command with the `--help` flag:\n  $ vitest run --help\n  $ vitest related --help\n  $ vitest watch --help\n  $ vitest dev --help\n  $ vitest bench --help\n  $ vitest init --help\n  $ vitest list --help\n  $ vitest --help\n  $ vitest --help --expand-help\n\nOptions:\n  --coverage                                            Enable coverage report. Use '--help --coverage' for more info. \n  --coverage.all                                        Whether to include all files, including the untested ones into report \n  --coverage.provider <name>                            Select the tool for coverage collection, available values are: \"v8\", \"istanbul\" and \"custom\" \n  --coverage.enabled                                    Enables coverage collection. Can be overridden using the --coverage CLI option (default: false) \n  --coverage.include <pattern>                          Files included in coverage as glob patterns. May be specified more than once when using multiple patterns (default: **) \n  --coverage.exclude <pattern>                          Files to be excluded in coverage. May be specified more than once when using multiple extensions (default: Visit https://vitest.dev/config/#coverage-exclude) \n  --coverage.extension <extension>                      Extension to be included in coverage. May be specified more than once when using multiple extensions (default: [\".js\", \".cjs\", \".mjs\", \".ts\", \".mts\", \".tsx\", \".jsx\", \".vue\", \".svelte\"]) \n  --coverage.clean                                      Clean coverage results before running tests (default: true) \n  --coverage.cleanOnRerun                               Clean coverage report on watch rerun (default: true) \n  --coverage.reportsDirectory <path>                    Directory to write coverage report to (default: ./coverage) \n  --coverage.reporter <name>                            Coverage reporters to use. Visit https://vitest.dev/config/#coverage-reporter) for more information (default: [\"text\", \"html\", \"clover\", \"json\"] \n  --coverage.reportOnFailure                            Generate coverage report even when tests fail (default: false) \n  --coverage.allowExternal                              Collect coverage of files outside the project root (default: false) \n  --coverage.skipFull                                   Do not show files with 100% statement, branch, and function coverage (default: false) \n  --coverage.thresholds.100                             Shortcut to set all coverage thresholds to 100 (default: false) \n  --coverage.thresholds.perFile                         Check thresholds per file. See --coverage.thresholds.lines, --coverage.thresholds.functions, --coverage.thresholds.branches and --coverage.thresholds.statements for the actual thresholds (default: false) \n  --coverage.thresholds.autoUpdate                      Update threshold values: \"lines\", \"functions\", \"branches\" and \"statements\" to configuration file when current coverage is above the configured thresholds (default: false) \n  --coverage.thresholds.lines <number>                  Threshold for lines. Visit https://github.com/istanbuljs/nyc#coverage-thresholds for more information. This option is not available for custom providers \n  --coverage.thresholds.functions <number>              Threshold for functions. Visit https://github.com/istanbuljs/nyc#coverage-thresholds for more information. This option is not available for custom providers \n  --coverage.thresholds.branches <number>               Threshold for branches. Visit https://github.com/istanbuljs/nyc#coverage-thresholds for more information. This option is not available for custom providers \n  --coverage.thresholds.statements <number>             Threshold for statements. Visit https://github.com/istanbuljs/nyc#coverage-thresholds for more information. This option is not available for custom providers \n  --coverage.ignoreClassMethods <name>                  Array of class method names to ignore for coverage. Visit https://github.com/istanbuljs/nyc#ignoring-methods) for more information. This option is only available for the istanbul providers (default: [] \n  --coverage.processingConcurrency <number>             Concurrency limit used when processing the coverage results. (default min between 20 and the number of CPUs) \n  --coverage.customProviderModule <path>                Specifies the module name or path for the custom coverage provider module. Visit https://vitest.dev/guide/coverage#custom-coverage-provider for more information. This option is only available for custom providers \n  --coverage.watermarks.statements <watermarks>         High and low watermarks for statements in the format of <high>,<low> \n  --coverage.watermarks.lines <watermarks>              High and low watermarks for lines in the format of <high>,<low> \n  --coverage.watermarks.branches <watermarks>           High and low watermarks for branches in the format of <high>,<low> \n  --coverage.watermarks.functions <watermarks>          High and low watermarks for functions in the format of <high>,<low> \n",
+      "stderr": ""
+    },
+    {
+      "command": "git",
+      "args": [
+        "-C",
+        "/Users/aristotle/Documents/Projects/ts-drp-1",
+        "diff",
+        "--check"
+      ],
+      "nodeOptions": null,
+      "start": "2026-09-05T19:19:36.031Z",
+      "finish": "2026-09-05T19:19:36.138Z",
+      "status": 0,
+      "signal": null,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "prettier",
+        "--check",
+        "docs/production-hardening/production-hardening-tdd-plan-v2.md",
+        ".logs/d110c-0c1f5b0z-plan-correction-7eb2a8df/amendment.md"
+      ],
+      "nodeOptions": "--max-old-space-size=12288",
+      "start": "2026-09-05T19:19:36.138Z",
+      "finish": "2026-09-05T19:19:51.804Z",
+      "status": 0,
+      "signal": null,
+      "stdout": "Checking formatting...\nAll matched files use Prettier code style!\n",
+      "stderr": ""
+    }
+  ],
+  "planHash": "dfa2061ba47837cb76cba0f7f7a78bdcfbd727932ee7c1d5f1cec71872155e18",
+  "newTestRuns": 0
+}

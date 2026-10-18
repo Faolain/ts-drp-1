@@ -1,0 +1,10 @@
+{
+  "cwd": "/tmp/d110c-f5b0u-green-75Jm2F/checkout",
+  "command": "node",
+  "args": [
+    "--input-type=module",
+    "-e",
+    "import fs from \"node:fs\";import assert from \"node:assert/strict\";import{execFileSync}from\"node:child_process\";const dirs=fs.readdirSync(\"packages\").filter(p=>fs.existsSync(`packages/${p}/dist`));assert.deepEqual(dirs,[]);assert(!fs.existsSync(\"node_modules\"));assert.equal(execFileSync(\"git\",[\"status\",\"--porcelain=v1\"],{encoding:\"utf8\"}),\"\");console.log(JSON.stringify({head:execFileSync(\"git\",[\"rev-parse\",\"HEAD\"],{encoding:\"utf8\"}).trim(),workspaceDistDirectories:dirs,nodeModules:false,clean:true}));"
+  ],
+  "start": "2026-09-05T06:46:38.949Z"
+}

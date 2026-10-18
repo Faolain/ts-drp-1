@@ -1,0 +1,89 @@
+
+ RUN  v3.1.1 /Users/aristotle/Documents/Projects/ts-drp-1
+
+stdout | packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts > D.108d1b authenticated peer-local fresh-process issuance RED > fresh Node closes the D.108e4 authenticated oracle and per-reopen budget debt
+D108E4L_TIMING {"arch":"arm64","availableParallelism":10,"members":[{"durationMs":42877.422292,"endOffsetMs":59471.174750000006,"name":"equality","startOffsetMs":16593.752458,"steps":[{"durationMs":204.24212500000067,"endOffsetMs":16797.994583,"name":"context-seed","startOffsetMs":16593.752458},{"durationMs":42642.208083000005,"endOffsetMs":59440.202666000005,"name":"reopen-and-evidence","startOffsetMs":16797.994583},{"durationMs":30.972084000000905,"endOffsetMs":59471.174750000006,"name":"close-context","startOffsetMs":59440.202666000005}],"counts":{"pageCount":8194,"returnedSequenceCount":8193}},{"durationMs":42848.105459,"endOffsetMs":59452.823375,"name":"reuse-0","startOffsetMs":16604.717916,"steps":[{"durationMs":195.17883399999846,"endOffsetMs":16799.89675,"name":"context-seed","startOffsetMs":16604.717916},{"durationMs":42633.513416,"endOffsetMs":59433.410166,"name":"reopen-and-evidence","startOffsetMs":16799.89675},{"durationMs":19.41320899999846,"endOffsetMs":59452.823375,"name":"close-context","startOffsetMs":59433.410166}],"counts":{"capturedIssuedCount":8190,"successorPageFaultCount":1}},{"durationMs":14455.411832999998,"endOffsetMs":73909.254583,"name":"reuse-1","startOffsetMs":59453.84275,"steps":[{"durationMs":85.41475000000355,"endOffsetMs":59539.25750000001,"name":"context-seed","startOffsetMs":59453.84275},{"durationMs":14363.802832999994,"endOffsetMs":73903.060333,"name":"reopen-and-evidence","startOffsetMs":59539.25750000001},{"durationMs":6.194250000000466,"endOffsetMs":73909.254583,"name":"close-context","startOffsetMs":73903.060333}],"counts":{"capturedIssuedCount":8190,"successorPageFaultCount":1}},{"durationMs":42866.462,"endOffsetMs":59478.352333,"name":"over-budget","startOffsetMs":16611.890333,"steps":[{"durationMs":188.81995800000004,"endOffsetMs":16800.710291,"name":"context-seed","startOffsetMs":16611.890333},{"durationMs":42661.130667000005,"endOffsetMs":59461.840958,"name":"reopen-and-evidence","startOffsetMs":16800.710291},{"durationMs":16.511375000001863,"endOffsetMs":59478.352333,"name":"close-context","startOffsetMs":59461.840958}],"counts":{"pageCount":8195,"returnedSequenceCount":8195}},{"durationMs":43166.36170800001,"endOffsetMs":59784.585041000006,"name":"mismatch","startOffsetMs":16618.223332999998,"steps":[{"durationMs":184.15245800000048,"endOffsetMs":16802.375791,"name":"context-seed","startOffsetMs":16618.223332999998},{"durationMs":42955.200084000004,"endOffsetMs":59757.575875,"name":"reopen-and-evidence","startOffsetMs":16802.375791},{"durationMs":27.00916600000346,"endOffsetMs":59784.585041000006,"name":"close-context","startOffsetMs":59757.575875}],"counts":{"pageCount":2,"returnedSequenceCount":2}}],"nodeVersion":"v22.15.0","outcome":"proof","phases":[{"counts":{"storeOpenCount":2},"durationMs":5.163832999999983,"endOffsetMs":5.163832999999983,"maxRssKiB":92528,"name":"preflight-and-store-open","resourceDelta":{"fsRead":0,"fsWrite":0,"involuntaryContextSwitches":1,"systemCPUTime":2083,"userCPUTime":2849},"startOffsetMs":0},{"counts":{"appendCount":1},"durationMs":2.128750000000025,"endOffsetMs":7.292583000000008,"maxRssKiB":92640,"name":"current-row","resourceDelta":{"fsRead":0,"fsWrite":0,"involuntaryContextSwitches":3,"systemCPUTime":336,"userCPUTime":1740},"startOffsetMs":5.163832999999983},{"counts":{"genuineFutureCount":1},"durationMs":281.27479199999993,"endOffsetMs":288.56737499999997,"maxRssKiB":112352,"name":"genuine-future","resourceDelta":{"fsRead":0,"fsWrite":0,"involuntaryContextSwitches":1717,"systemCPUTime":30779,"userCPUTime":339767},"startOffsetMs":7.292583000000008},{"counts":{"appendCount":8191},"durationMs":3790.0202079999995,"endOffsetMs":4078.5875829999995,"maxRssKiB":152096,"name":"authenticated-future-appends","resourceDelta":{"fsRead":0,"fsWrite":0,"involuntaryContextSwitches":13554,"systemCPUTime":543626,"userCPUTime":1988546},"startOffsetMs":288.56737499999997},{"counts":{"maximumPageLimit":128,"probeCount":1},"durationMs":181.76033300000017,"endOffsetMs":4260.347916,"maxRssKiB":191872,"name":"maximum-page-probe","resourceDelta":{"fsRead":0,"fsWrite":0,"involuntaryContextSwitches":2016,"systemCPUTime":33647,"userCPUTime":198686},"startOffsetMs":4078.5875829999995},{"counts":{"facadeCount":2,"materializedRowCount":8193},"durationMs":12159.850042000002,"endOffsetMs":16420.197958,"maxRssKiB":406704,"name":"equality-materialization-and-facades","resourceDelta":{"fsRead":0,"fsWrite":0,"involuntaryContextSwitches":72985,"systemCPUTime":786946,"userCPUTime":13689342},"startOffsetMs":4260.347916},{"counts":{"appendCount":2,"authenticatedSuffixCount":2,"materializedRowCount":8195},"durationMs":170.74224999999933,"endOffsetMs":16590.940208,"maxRssKiB":412896,"name":"over-budget-preparation","resourceDelta":{"fsRead":0,"fsWrite":0,"involuntaryContextSwitches":1368,"systemCPUTime":13382,"userCPUTime":208927},"startOffsetMs":16420.197958},{"counts":{"appendCount":2,"materializedRowCount":2},"durationMs":2.419499999999971,"endOffsetMs":16593.359708,"maxRssKiB":412896,"name":"mismatch-preparation","resourceDelta":{"fsRead":0,"fsWrite":0,"involuntaryContextSwitches":11,"systemCPUTime":515,"userCPUTime":1365},"startOffsetMs":16590.940208},{"counts":{"recoveryCount":5},"durationMs":57316.077833,"endOffsetMs":73909.437541,"maxRssKiB":416576,"name":"concurrent-recoveries","resourceDelta":{"fsRead":0,"fsWrite":0,"involuntaryContextSwitches":172312,"systemCPUTime":1270774,"userCPUTime":49027393},"startOffsetMs":16593.359708},{"counts":{"proofCount":1},"durationMs":2.040291999990586,"endOffsetMs":73911.477833,"maxRssKiB":416576,"name":"proof-assembly","resourceDelta":{"fsRead":0,"fsWrite":0,"involuntaryContextSwitches":14,"systemCPUTime":266,"userCPUTime":2161},"startOffsetMs":73909.437541}],"pid":49041,"platform":"darwin","schema":"d108e4l-v1","wallTimeMs":73911.477833,"memberCountErrors":[]}
+
+ ✓ packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts (5 tests) 79098ms
+   ✓ D.108d1b authenticated peer-local fresh-process issuance RED > fresh Node binds established and fresh chat peers while every ambiguous or unauthenticated cold reopen fails before live effects  4167ms
+   ✓ D.108d1b authenticated peer-local fresh-process issuance RED > fresh Node closes the D.108e4 authenticated oracle and per-reopen budget debt  74913ms
+ ✓ tests/phase-6a-creator-adoption-red.test.ts (13 tests) 1054ms
+   ✓ D.108b read-only creator-successor adoption RED > has one composite readiness gate for the genuine future verifier  467ms
+ ✓ tests/phase-6b-runtime-reclamation-red.test.ts (13 tests) 2837ms
+   ✓ D.109d receipt-gated installed-v3 runtime reclamation RED > uses genuine close, verify, commit and hot activation identities  430ms
+   ✓ D.109d receipt-gated installed-v3 runtime reclamation RED > accepts hot and cold real receipts and latches every authority field  544ms
+   ✓ D.109d receipt-gated installed-v3 runtime reclamation RED > D.109f preserves owner-observed Discord and MMORPG projections with zero deleted durable reads  518ms
+ ✓ tests/phase-6b-d110c-0c1a-retirement-checkpoint-red.test.ts (3 tests) 1713ms
+   ✓ D.110c-0c1a creator issuance-retirement checkpoint RED > replaces the authenticated epoch-one carrier when the admitted boundary does not advance  1261ms
+ ✓ tests/phase-6a-creator-successor-activation-red.test.ts (17 tests) 7760ms
+   ✓ D.108d1 creator successor activation RED > private custody alone selects installEpochAnchor  1945ms
+   ✓ D.108d1 creator successor activation RED > divergent genesis identity fails before every live effect  2799ms
+   ✓ D.108d1 creator successor activation RED > TTL expiry performs one bounded full reverify attempt  913ms
+ ✓ tests/phase-6b-cleanup-eligibility-red.test.ts (11 tests) 428ms
+   ✓ D.109a closed-epoch cleanup eligibility RED > accepts genuine Phase-6a close/adoption material without reopening verification  404ms
+stdout | tests/phase-6a-creator-successor-product-red.test.ts > classifies complete legacy and settlement successor compositions before reading room authorities
+{"kind":"F5B_ROOM_GUARD_OBSERVATIONS","observations":[{"profileId":"creator-trusted-v1","composition":"factory","detail":"v3 room successor authority composition is unsupported","reads":{"application":0,"signer":0,"store":0,"transport":0}},{"profileId":"creator-trusted-v1","composition":"rebase","detail":"v3 room successor authority composition is unsupported","reads":{"application":0,"signer":0,"store":0,"transport":0}},{"profileId":"creator-trusted-v1","composition":"signer","detail":"v3 room successor authority composition is unsupported","reads":{"application":0,"signer":0,"store":0,"transport":0}},{"profileId":"creator-trusted-v1","composition":"declaration-only","detail":"D.108e2b application authority was read","reads":{"application":1,"signer":0,"store":0,"transport":0}},{"profileId":"creator-trusted-settlement-v1","composition":"factory","detail":"v3 room successor authority composition is unsupported","reads":{"application":0,"signer":0,"store":0,"transport":0}},{"profileId":"creator-trusted-settlement-v1","composition":"rebase","detail":"v3 room successor authority composition is unsupported","reads":{"application":0,"signer":0,"store":0,"transport":0}},{"profileId":"creator-trusted-settlement-v1","composition":"signer","detail":"D.108e2b application authority was read","reads":{"application":1,"signer":0,"store":0,"transport":0}},{"profileId":"creator-trusted-settlement-v1","composition":"declaration-only","detail":"D.108e2b application authority was read","reads":{"application":1,"signer":0,"store":0,"transport":0}}]}
+
+ ✓ tests/phase-6a-creator-successor-product-red.test.ts (13 tests) 682ms
+ ✓ packages/storage-node/tests/phase-6b-differential-exit-red.test.ts (6 tests) 7093ms
+   ✓ D.109f Node differential exit RED > executes 128 genuine compacted maintenance steps while the archival owner remains complete  3273ms
+   ✓ D.109f Node differential exit RED > runs the genuine close, adopt, reclaim and next-live golden paths in a fresh process  3238ms
+ ✓ tests/phase-6b-d110c-0a-browser-custody-red.test.ts (1 test) 315ms
+ ✓ tests/phase-6b-d110c-0b1-boundaries.test.ts (4 tests) 1520ms
+ ✓ tests/phase-6a-creator-successor-local-author-red.test.ts (11 tests) 546ms
+   ✓ D.108d1b authenticated peer-local cold issuance RED > admits Bob's genuine epoch-zero vertex before the multi-writer successor close  481ms
+ ✓ tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts (27 tests) 1467ms
+ ✓ tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts (3 tests) 1317ms
+   ✓ D.110c-0b0a staged adoption and pending recovery GREEN > stages without a head swap and publishes through one owner-bound CAS  489ms
+   ✓ D.110c-0b0a staged adoption and pending recovery GREEN > recovers equivalent Complete retries deterministically across both AHE orderings  313ms
+   ✓ D.110c-0b0a staged adoption and pending recovery GREEN > fails closed for absent, incomplete, wrong-head, malformed, and true-fork candidates  513ms
+ ✓ tests/phase-6a-creator-successor-infrastructure-red.test.ts (10 tests) 556ms
+ ✓ tests/phase-6a-creator-adoption-commit-red.test.ts (9 tests) 5874ms
+   ✓ D.108c one-CAS creator adoption RED > consumes only a genuine owner-bound intent and commits one exact successor  377ms
+   ✓ D.108c one-CAS creator adoption RED > reopens pending-old or exact active-new at every logical request fault  5265ms
+ ✓ tests/protocol-v3-creator-author-issuance-frontiers.test.ts (4 tests) 609ms
+   ✓ D.110c-0c1f2 creator author-issuance frontier carrier > round-trips the genuine creator-signed carrier and consumes preparation once  320ms
+ ✓ tests/phase-6a-creator-successor-handle-identity-red.test.ts (3 tests) 440ms
+   ✓ D.108d1a successor handle registration identity RED > returned hot wrapper retains route, admission, targeted replay and deactivation identity  433ms
+ ✓ packages/storage-node/tests/phase-6a-creator-adoption-commit-death-red.test.ts (2 tests) 3836ms
+   ✓ D.108c real SQLite process-death RED > recovers pending-old XOR active-new after genuine SIGKILL at every edge  3828ms
+ ✓ tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts (13 tests) 1890ms
+   ✓ D.110c-0c1f5b0b rejected-GREEN corrective RED > [control] preserves causalJoin ABI refusal on local generation and genuine signed ingress  320ms
+   ✓ D.110c-0c1f5b0b rejected-GREEN corrective RED > [RED] latches terminal state when the terminal transaction outcome is unknown  424ms
+ ✓ tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts (3 tests) 1378ms
+ ✓ tests/phase-6b-d110c-0c1f5b0v-callback-contract.test.ts (2 tests) 1047ms
+   ✓ D.110c-0c1f5b0v replayable callback contract > pins the complete production consumer inventory to no-op and in-memory reconstruction callbacks  917ms
+ ✓ tests/phase-6b-differential-exit-red.test.ts (5 tests) 203ms
+ ✓ packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts (5 tests) 4010ms
+   ✓ D.108d1 fresh-process successor activation RED > fresh Node imports the built non-root successor activation subpath  525ms
+   ✓ D.108d1 fresh-process successor activation RED > cold reopen reconstructs active-new custody with no adoption CAS or displaced-row publication  1179ms
+   ✓ D.108d1 fresh-process successor activation RED > kills declaration-loop telemetry even when it copies the direct-read labels  1208ms
+   ✓ D.108d1 fresh-process successor activation RED > two independent cold wrappers retain identity-keyed publication after awaited release  1093ms
+ ✓ tests/phase-6b-d110c-a-repeat-close-red.test.ts (1 test) 2371ms
+   ✓ D.110c-a authenticated repeat-close carrier RED > extends authenticated compact history through one genuine adopted epoch-one close  2371ms
+ ✓ tests/phase-6b-d110c-0c1k-w0-writer-capacity-red.test.ts (4 tests) 353ms
+D110C_B_HOT_ADOPTION_COMPLETE
+ ✓ tests/phase-6b-d110c-b-hot-adoption.test.ts (1 test) 4259ms
+   ✓ D.110c-b general hot adoption GREEN > advances the genuine epoch-one close to one exact epoch-two active owner  4258ms
+ ✓ tests/phase-6c-retained-heap-red.test.ts (23 tests) 22ms
+ ✓ tests/phase-6c-creator-replay-pagination-red.test.ts (2 tests) 1983ms
+   ✓ D.110a-p creator durable-replay pagination RED > closes a genuine 129-row creator journal across the public page boundary  1980ms
+ ✓ tests/phase-6b-d110c-0b0-floor-red.test.ts (1 test) 4581ms
+   ✓ D.110c-0b0 authenticated room-head floor causal RED > refuses a genuine advanced cold reopen when no independent room-head authority is supplied  4580ms
+ ✓ tests/phase-6b-d110c-0a-authority-red.test.ts (1 test) 334ms
+ ✓ tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts (3 tests) 1110ms
+   ✓ D.110c-0c1b committed-issuance recovery-required RED > refuses a pre-bound close after a durable issue is omitted from live admission  501ms
+   ✓ D.110c-0c1b committed-issuance recovery-required RED > releases a pre-durable byte-capacity reservation and preserves genuine close  369ms
+ ✓ tests/phase-6b-d110c-0c1f5-foreign-author-close-liveness-red.test.ts (1 test) 8593ms
+   ✓ D.110c-0c1f5 foreign-author close liveness > keeps foreign frontier anomalies author-local while creator corruption stays fail closed  8593ms
+ ✓ tests/phase-6b-d110c-0c1f2-multi-author-frontier.test.ts (1 test) 360ms
+   ✓ D.110c-0c1f2 bounded multi-author issuance frontier > authenticates the exact creator-signed frontiers from a genuine two-writer close  358ms
+ ✓ tests/phase-6b-d110c-0c1f2-multi-author-frontier-red.test.ts (1 test) 331ms
+   ✓ D.110c-0c1f2 compact multi-author issuance-frontier RED > requires a bounded authenticated frontier for every admitted successor writer  330ms
+
+ Test Files  34 passed (34)
+      Tests  222 passed (222)
+   Start at  07:34:11
+   Duration  167.17s (transform 2.53s, setup 0ms, collect 11.28s, tests 149.97s, environment 4ms, prepare 1.64s)
+
+JSON report written to /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-w0-regression-readiness-7efe33dd/runtime-retained/result.json

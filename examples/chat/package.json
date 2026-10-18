@@ -1,6 +1,7 @@
 {
 	"name": "ts-drp-example-chat",
 	"version": "0.11.0",
+	"type": "module",
 	"license": "MIT",
 	"scripts": {
 		"build": "vite build",
@@ -10,9 +11,12 @@
 		"start": "vite preview --host --port 5173"
 	},
 	"dependencies": {
+		"@ts-drp/blueprint-catalog": "workspace:*",
+		"@ts-drp/canonical": "0.11.0",
 		"@ts-drp/example-browser-network": "workspace:*",
+		"@ts-drp/example-v3-room": "workspace:*",
 		"@ts-drp/node": "0.11.0",
-		"@ts-drp/object": "0.11.0",
+		"@ts-drp/protocol-v3": "workspace:*",
 		"@ts-drp/types": "0.11.0",
 		"dompurify": "^3.2.4"
 	},

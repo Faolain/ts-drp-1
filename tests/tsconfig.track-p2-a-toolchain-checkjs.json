@@ -1,0 +1,12 @@
+{
+	"extends": "../packages/blueprint-toolchain/tsconfig.json",
+	"compilerOptions": {
+		"checkJs": true,
+		"composite": false,
+		"declaration": false,
+		"declarationMap": false,
+		"noEmit": true
+	},
+	"files": ["../packages/blueprint-toolchain/src/index.js"],
+	"include": []
+}

@@ -1,0 +1,33 @@
+{
+  "status": "Main-workspace browser gate passed; source-built isolation and formal reviews remain open",
+  "baseline": "7efe33dd350deab922c3fea7e9fcd1c968f4e474",
+  "passed": 24,
+  "projects": [
+    "chromium",
+    "firefox",
+    "webkit"
+  ],
+  "exactHistoricalRoster": true,
+  "invocationCount": 1,
+  "failed": 0,
+  "skipped": 0,
+  "flaky": 0,
+  "retries": 0,
+  "elapsedMs": 40335,
+  "globalTimeout": 300000,
+  "externalProcessCeiling": 330000,
+  "inputCount": 1081,
+  "runtimeRosterSha256": "5214a38d6f881921051f7ad486920a903fa91e51728496c98550e89d51be9c66",
+  "sourcePatchSha256": "138cb170776d5f2af780375adc78fee0c9029776656579cd1fb190a8d6fadda4",
+  "custodyExact": true,
+  "shimAbsentBeforeAndAfter": true,
+  "ownedGroupQuiescent": true,
+  "cleanupSignals": 0,
+  "sourceEdits": 0,
+  "packageBuilds": 0,
+  "reviewers": 0,
+  "actualBrowserGate": "Existing Playwright configuration and in-memory test server; not interactive browser substitution",
+  "staticScope": "Collection and input discovery only; no fresh diagnostics requested in this browser gate",
+  "rootVerification": "../d110c-w0-current-profile-acceptance-61ea93f6/browser-result-verify",
+  "manifest": "manifest.sha256"
+}

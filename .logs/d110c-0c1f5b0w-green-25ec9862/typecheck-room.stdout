@@ -1,0 +1,9 @@
+
+> @ts-drp/example-v3-room@0.11.0 typecheck /Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room
+> tsc --noEmit
+
+src/index.ts(4122,8): error TS2358: The left-hand side of an 'instanceof' expression must be of type 'any', an object type or a type parameter.
+src/index.ts(4122,64): error TS2339: Property 'message' does not exist on type 'never'.
+/Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @ts-drp/example-v3-room@0.11.0 typecheck: `tsc --noEmit`
+Exit status 2

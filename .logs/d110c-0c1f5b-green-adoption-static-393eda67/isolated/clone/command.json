@@ -1,0 +1,12 @@
+{
+  "cwd": "/tmp/d110c-f5b-green-adoption-static-Eqj4VS",
+  "command": "git",
+  "args": [
+    "clone",
+    "--shared",
+    "--no-checkout",
+    "/Users/aristotle/Documents/Projects/ts-drp-1",
+    "/tmp/d110c-f5b-green-adoption-static-Eqj4VS/checkout"
+  ],
+  "start": "2026-09-06T03:58:43.885Z"
+}

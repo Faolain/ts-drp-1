@@ -1,0 +1,49 @@
+{
+  "stopped": false,
+  "main": {
+    "total": 49,
+    "passed": 49,
+    "failed": 0,
+    "skipped": 0,
+    "reporterSha256": "f9d42b869d34ea6e70cc3d2bb030e4157d45e1f080a01b3c41cbc30836eeb20f"
+  },
+  "isolated": {
+    "total": 49,
+    "passed": 49,
+    "failed": 0,
+    "skipped": 0,
+    "reporterSha256": "94497028350e0d2f969a7ec59dd8d2bd65b4084b02e4d07e3941c32fde1b1b7b"
+  },
+  "sourceHead": "967da628cc8522cf468c20488a2e071eb84e59ee",
+  "sourceSha256": "6d906b8a31cabab184c9e44a90dc20e369ab5509356ccd3f3f74a87bbef87c71",
+  "parentPatchSha256": "6d0fd99cfcb383b82f3becae421b4691bb945639ef9d60b76e9968715df765cb",
+  "commands": 37,
+  "nonzero": [
+    {
+      "file": "compiler-green/status.json",
+      "status": 1
+    },
+    {
+      "file": "equivalence/status.json",
+      "status": 1
+    },
+    {
+      "file": "freeze-runtime/status.json",
+      "status": 1
+    },
+    {
+      "file": "isolated/compiler-green/status.json",
+      "status": 1
+    }
+  ],
+  "selectedTestDurationsMs": {
+    "main": 10581.41075000001,
+    "isolated": 10236.386167000019
+  },
+  "compiler": "Both exit1 / matrix0, exact unchanged grid-only diagnostic; not a whole-program typecheck pass",
+  "effectiveCustody": "custody-final.json contains the complete effective 85-entry testHashes map",
+  "noRuntimeRetry": true,
+  "noActiveRuntimeRecorder": true,
+  "parentClosed": false,
+  "rootAcceptancePending": true
+}

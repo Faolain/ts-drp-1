@@ -1,0 +1,74 @@
+{
+  "label": "focused",
+  "valid": false,
+  "expectedCases": 7,
+  "actualCases": 7,
+  "passed": 6,
+  "failed": 1,
+  "pending": 0,
+  "exactRoster": true,
+  "quiescent": true,
+  "failures": [
+    {
+      "file": "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+      "name": "D.110c-0c1k W0 real lifecycle and capacity RED charges a settlement-profile offender's own signed fence to its share, refuses its next add, preserves another writer and genuinely closes",
+      "status": "failed",
+      "failureMessages": [
+        "TypeError: D110C_FIXTURE_REGISTERED_VERTEX_ADMISSION_TIMEOUT:5e4ef45713ef2ec7969ffa30fa377b569193b6e78466a5e20f63c61a0c1f868d\n    at Timeout.<anonymous> (/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts:1220:20)\n    at listOnTimeout (node:internal/timers:588:17)\n    at processTimers (node:internal/timers:523:7)"
+      ]
+    }
+  ],
+  "suiteFailures": [
+    {
+      "file": "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+      "message": "",
+      "status": "failed"
+    }
+  ],
+  "actual": [
+    {
+      "file": "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+      "name": "D.110c-0c1k W0 real lifecycle and capacity RED stages, opens, recovers, closes, and adopts a genuine 31-member writer-only ACL",
+      "status": "passed",
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+      "name": "D.110c-0c1k W0 real lifecycle and capacity RED stages, opens, recovers, closes, and adopts a genuine 64-member writer-only ACL",
+      "status": "passed",
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+      "name": "D.110c-0c1k W0 real lifecycle and capacity RED rejects 65 writer-only members consistently by legacy cardinality",
+      "status": "passed",
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+      "name": "D.110c-0c1k W0 real lifecycle and capacity RED rejects 41 full-shape members consistently by legacy byte ceiling",
+      "status": "passed",
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+      "name": "D.110c-0c1k W0 real lifecycle and capacity RED accepts a fitting recognized close record and rejects its oversized kind loudly at runtime",
+      "status": "passed",
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+      "name": "D.110c-0c1k W0 real lifecycle and capacity RED caps one legacy-profile writer, rejects the reserved fence, counts the causal join, preserves another writer and closes below global capacity",
+      "status": "passed",
+      "failureMessages": []
+    },
+    {
+      "file": "tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts",
+      "name": "D.110c-0c1k W0 real lifecycle and capacity RED charges a settlement-profile offender's own signed fence to its share, refuses its next add, preserves another writer and genuinely closes",
+      "status": "failed",
+      "failureMessages": [
+        "TypeError: D110C_FIXTURE_REGISTERED_VERTEX_ADMISSION_TIMEOUT:5e4ef45713ef2ec7969ffa30fa377b569193b6e78466a5e20f63c61a0c1f868d\n    at Timeout.<anonymous> (/Users/aristotle/Documents/Projects/ts-drp-1/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts:1220:20)\n    at listOnTimeout (node:internal/timers:588:17)\n    at processTimers (node:internal/timers:523:7)"
+      ]
+    }
+  ]
+}

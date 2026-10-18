@@ -1,11 +1,8 @@
 import { expect, type Page, test } from "@playwright/test";
 
-// End-to-end proof of the infra-independent discovery path: two real browsers cold-start
-// with NO HTTP registry (VITE_RENDEZVOUS_ENDPOINTS is empty) and NO fixed bootstrap seeds,
-// discover each other purely through the Nostr rendezvous backend (a local `ws` relay
-// fixture standing in for a public relay), connect through a Circuit Relay v2 relay, join
-// the same grid, and converge shared state. Because the only configured rendezvous source
-// is Nostr, mutual discovery is itself the proof the Nostr path carried it.
+// Preservation proof for infra-independent readiness: two real browsers cold-start with
+// NO HTTP registry and NO fixed bootstrap seeds, reserve relays, and observe the Nostr
+// rendezvous source. Room-level dialing and convergence move to T1 with the v3 lifecycle.
 
 interface PublicInfraSnapshot {
 	readonly bootstrapPeers: readonly string[];
@@ -32,7 +29,7 @@ test.afterEach(async ({ request }, testInfo) => {
 	await request.post("http://127.0.0.1:4180/reset").catch(() => undefined);
 });
 
-test("two browsers discover each other over Nostr and converge with no HTTP registry", async ({ browser }) => {
+test("two browsers discover public relay and Nostr readiness with no HTTP registry", async ({ browser }) => {
 	const creatorContext = await browser.newContext();
 	const joinerContext = await browser.newContext();
 	try {
@@ -64,30 +61,8 @@ test("two browsers discover each other over Nostr and converge with no HTTP regi
 		const joinerStart = await readSnapshot(joinerPage);
 		expect(joinerStart.bootstrapPeers).toEqual([]);
 
-		await creatorPage.click("#createGrid");
-		await expect(creatorPage.locator("#gridId")).not.toBeEmpty();
-		const gridId = (await creatorPage.locator("#gridId").textContent())?.trim();
-		if (gridId === undefined || gridId === "") throw new Error("creator did not expose a grid ID");
-		await joinerPage.fill("#gridInput", gridId);
-		await joinerPage.click("#joinGrid");
-
-		// Mutual peer presence: each browser found the other only via Nostr discovery.
-		await expect(creatorPage.locator("#objectPeers")).toContainText(joinerStart.peerId);
-		await expect(joinerPage.locator("#objectPeers")).toContainText(creatorStart.peerId);
-
-		// Shared state converges: the creator's dot is visible on the joiner and moves live.
-		const creatorDot = joinerPage.locator(`[data-glowing-peer-id="${creatorStart.peerId}"]`);
-		await expect(creatorDot).toBeVisible();
-		const beforeMove = await creatorDot.getAttribute("style");
-		await creatorPage.keyboard.press("w");
-		await expect.poll(async () => creatorDot.getAttribute("style")).not.toBe(beforeMove);
-
-		// A live connection exists — direct WebRTC where the network allows, relayed otherwise.
-		const joined = await readSnapshot(joinerPage);
-		const connected = joined.connections.some(
-			(c) => c.transport === "webrtc" || c.transport === "relay" || c.multiaddr.includes("/p2p-circuit")
-		);
-		expect(connected).toBe(true);
+		expect(joinerStart.membershipMode).toBe("invite");
+		expect(joinerStart.relayReservations).toHaveLength(1);
 	} finally {
 		await Promise.allSettled([creatorContext.close(), joinerContext.close()]);
 	}

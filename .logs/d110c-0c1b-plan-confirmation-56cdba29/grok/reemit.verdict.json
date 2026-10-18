@@ -1,0 +1,23 @@
+{
+  "verdict": "APPROVED",
+  "summary": "All six material corrections match the live owners: the 0c1b token is a test case id, existing creator-close errors stay unchanged, exact ISSUANCE_OUTCOME_UNKNOWN after a real-store commit is the missing no-policy arm, seq0-then-seq1 makes RED truncate a non-empty prefix, bind-time plus queued fold-time recheck plus existing abort cover both orderings, halt reuse is fail-closed, and recoverV3LiveReplica remains the sole reconciliation owner. No P0/P1 remains against tests-only RED.",
+  "findings": [
+    {
+      "severity": "P2",
+      "title": "Abort clears closeTask, so the same pre-bound handle can retry close()",
+      "evidence": "packages/node/src/creator-close.ts:609-611 aborts and throws `creator snapshot export failed: ${snapshot.kind}` on fold failure; the outer catch at 804-808 then sets closeTask=undefined and aborts again if stagedSnapshot is still undefined. GREEN item 3 refuses in stageClosedBlueprintEpoch after the queue barrier, and abortSnapshotStage() (v3-live.ts:6991-6995) only clears blueprintClosing.",
+      "impact": "A GREEN that only asserts the first close() and a never-bound CREATOR_CLOSE_UNAVAILABLE could miss a same-handle retry. Under the frozen repair that retry must still fail through the existing snapshot-export path while operationAdmissionHalted remains set; closeTask reset is not recovery.",
+      "required_action": "Owner: D.110c-0c1b GREEN tests. Assert retry close() on the same pre-bound handle still throws `creator snapshot export failed: not-active`, that halt remains, and that only deactivate/recover mints a fresh close-capable registration. No plan or production-scope change."
+    },
+    {
+      "severity": "P2",
+      "title": "No-policy unknown case must throw after a real durable commit, not a pre-transaction mock",
+      "evidence": "packages/issuance-store/src/terminal.ts:126 throws DurableIssuanceUnknownOutcomeError (code ISSUANCE_OUTCOME_UNKNOWN) only on unreadable post-commit readback; node-issuance-store.ts:801-819 and browser-issuance-store.ts:748-776 are the real arms. issueOneVertex() currently uses a bare catch (v3-live.ts:5682-5699) and, because signerResolved is already true, maps that throw to admission-rejected `v3 local issue signature was not admitted` rather than outcome-unknown.",
+      "impact": "A mock that rejects transactIssue with that code before COMMIT would halt under GREEN but leave no issued/pending-outbox row, so recover-exactly-once and the omitted-row close defect would not be proven. Retargeting the existing admission-rejected mapping would also breach the no-new-kind freeze.",
+      "required_action": "Owner: D.110c-0c1b GREEN tests. Drive the real terminal-suppression unreadable arm (or an adapter that throws the real UnknownOutcomeFailure after the real commit), bind error.code, keep the existing local-issue kind/detail, and still refuse close. No new store API."
+    }
+  ],
+  "red_causal": true,
+  "green_closes_red": true,
+  "scope_preserved": true
+}

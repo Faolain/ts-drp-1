@@ -1,0 +1,25 @@
+{
+  "verdict": "APPROVED",
+  "summary": "The eeaaaca8 focused run is honestly diagnostic: one file/title, exit 1, null-prior hit exact D110C_0C1F1_LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED, then ABSENT_PRIOR stopped at creator snapshot export failed: not-active. Source order matches that failure: stageSnapshot/foldBlueprintEpoch authorizes every graph operation against the current latched ACL before authorIssuanceFrontiersCandidate. A successor-only grant cannot authorize a current-epoch application row, so currently authorized writers cannot be absent from the signed prior frontiers through ordinary close/grant/ingress; AUTHOR_REENTRY reachability is correctly moved to f5b. The corrected tests-only RED keeps that authorization refusal, replaces the noncausal case with a current-ACL-authorized duplicate plus successor-only revoke that still dies on the pre-filter duplicate scan, and otherwise pins the five causal current errors/controls plus creator fail-closed and valid removal. Helpers mint real signed vertices, routeV3Ingress, wait on the real admission sink, and read the real durable-head aggregate. No product source changes. GREEN can stay inside close-side issuance-frontier classification: valid authorized anomalous vertices remain close-set/history members, and only the claimed issuance range must not advance. The corrected one-file/one-title RED may execute once.",
+  "findings": [
+    {
+      "severity": "P2",
+      "title": "Parent f5 problem statement still lists absent-prior AUTHOR_REENTRY as a demonstrated close-wide abort",
+      "evidence": "The governing D.110c-0c1f5 paragraph still says an author absent from an otherwise present prior aggregate throws D110C_0C1F1_AUTHOR_REENTRY_PROOF_REQUIRED and aborts close. D.110c-0c1f5a now records that the attempted construction fails at fold under the current latched ACL, and that a currently authorized writer is a previous successor writer and therefore already present in prior frontiers (null or numeric). authorIssuanceFrontiersCandidate emits a frontier for every successor writer, so ordinary grant/re-add cannot produce currently authorized plus priorBoundary === undefined.",
+      "impact": "Readers of the parent f5 text could treat AUTHOR_REENTRY as an f5a RED obligation after this confirmation. That would restore a noncausal treatment.",
+      "required_action": "Leave the parent sentence as an f5b admitted-set/membership question. Do not restore absent-prior as an f5a RED case. D.110c-0c1f5b must decide whether any recovery/admitted-set path can create a currently authorized writer missing from the signed prior frontiers; if none can, keep AUTHOR_REENTRY fail-closed and unreached."
+    },
+    {
+      "severity": "P2",
+      "title": "No-gap RED control asserts frontier values, not a successor open of unchanged aggregate bytes",
+      "evidence": "Plan case 5 says a no-gap two-writer control closes and opens the exact unchanged aggregate. The corrected RED only requires creator and foreign frontiers to equal 1 on the repeat-close durable-head record after a contiguous seq-1 ingress. Byte-for-byte aggregate identity and successor open are already stated as GREEN obligations.",
+      "impact": "A GREEN that preserved those numeric frontiers while changing no-gap aggregate bytes would still satisfy this RED control.",
+      "required_action": "Keep RED as the frontier-value control. D.110c-0c1f5a GREEN remains the owner of no-gap aggregate byte/digest identity and verified transition/adoption."
+    }
+  ],
+  "plan_sufficient": true,
+  "diagnostic_classification_honest": true,
+  "corrected_red_causal": true,
+  "corrected_red_authorized": true,
+  "scope_preserved": true
+}

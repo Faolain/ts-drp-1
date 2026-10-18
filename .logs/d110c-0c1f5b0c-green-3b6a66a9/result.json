@@ -1,0 +1,21 @@
+{
+	"record": "D.110c-0c1f5b0c",
+	"color": "GREEN",
+	"productionCommit": "3b6a66a9b5257c9011611fc2955ac6ee1ab90bfc",
+	"productionSigned": true,
+	"productionRemoteMatched": true,
+	"changedPaths": ["examples/v3-room/src/index.ts"],
+	"focused": { "files": 1, "total": 9, "passed": 9, "failed": 0, "pending": 0 },
+	"retained": { "total": 87, "passed": 87, "failed": 0, "pending": 0 },
+	"legacy": { "total": 26, "passed": 26, "failed": 0, "pending": 0 },
+	"isolatedFocused": { "total": 9, "passed": 9, "failed": 0, "pending": 0 },
+	"isolatedRetained": { "total": 87, "passed": 87, "failed": 0, "pending": 0 },
+	"build": "pass",
+	"typecheck": "pass",
+	"eslint": "pass",
+	"prettier": "pass",
+	"diffCheck": "pass",
+	"designStopRuleTriggered": false,
+	"stashesPreserved": 27,
+	"protectedUntrackedPathsPreserved": true
+}

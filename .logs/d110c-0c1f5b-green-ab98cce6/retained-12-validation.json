@@ -1,0 +1,31 @@
+{
+  "status": 0,
+  "success": true,
+  "total": 1,
+  "passed": 1,
+  "failed": 0,
+  "pending": 0,
+  "exactNames": true,
+  "exactFiles": true,
+  "suiteMessages": [
+    {
+      "name": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3h-v3-room-activation-red.test.ts",
+      "message": ""
+    }
+  ],
+  "topLevelErrors": [],
+  "nonemptyFailureMessages": [],
+  "assertions": [
+    {
+      "ancestorTitles": [
+        "Phase 3h-b creator-signed activation RED"
+      ],
+      "fullName": "Phase 3h-b creator-signed activation RED derives the exact signed decision from record and invite evidence without routing inputs",
+      "status": "passed",
+      "title": "derives the exact signed decision from record and invite evidence without routing inputs",
+      "duration": 4.817542000000003,
+      "failureMessages": [],
+      "meta": {}
+    }
+  ]
+}

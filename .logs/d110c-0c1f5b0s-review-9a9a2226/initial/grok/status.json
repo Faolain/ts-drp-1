@@ -1,0 +1,9 @@
+{
+  "classification": "NO_VERDICT",
+  "duration_seconds": 345.144,
+  "events": "/private/tmp/d110c-f5b0s-grok/events.jsonl",
+  "exit_code": 1,
+  "public": "/private/tmp/d110c-f5b0s-grok/public.txt",
+  "stop_reason": "cancelled",
+  "timed_out": false
+}

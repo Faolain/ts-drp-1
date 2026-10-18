@@ -27,3 +27,8 @@ playwright/.cache/
 
 # Local semantic indexes are disposable analysis caches.
 .tldr/
+
+# Original Topology/DRP author archive (~71 MB of third-party blog PDFs) kept locally as
+# reference material for the production-hardening docs. Not repo content; excluded to keep
+# git history small. Remove this line if it should be versioned.
+docs/production-hardening/Topology-Base-Research/

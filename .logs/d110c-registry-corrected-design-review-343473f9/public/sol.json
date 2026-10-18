@@ -1,0 +1,53 @@
+{
+  "verdict": "FAIL",
+  "findings": [
+    {
+      "severity": "P1",
+      "file": "specs/current-registry-governance/derive-inventory.mjs",
+      "line": 47,
+      "title": "Fixed inventory omits the preserved successor-test fixture closure",
+      "evidence": "The owner map at line 138 explicitly preserves successor-contract.json, successor-contract-type.ts, successor-test-context.ts, temporary-repository-harness.mjs, controlled-freeze-successor.mjs, the historical routing analyzer, and its self-test fixtures. The successor test imports this closure directly, but derivation adds neither that directory nor those files; inventory.json contains no phase-3a1b-freeze-successor-v1 fixture record. Consequently the prospective root manifest would protect the editable successor test while leaving its historical oracle, harness, and analyzer inputs mutable.",
+      "violated_requirement": "Complete fixed inventory; historical-test supersession without suppression; preservation of historical controlled models and evidence"
+    },
+    {
+      "severity": "P2",
+      "file": "specs/current-registry-governance/derive-inventory.mjs",
+      "line": 103,
+      "title": "Inventory collapses current semantic inputs and historical evidence into one role",
+      "evidence": "README.md lines 92-95 require every path to be explicitly classified as an editable current owner, preserved current semantic input, preserved historical evidence, or new RED evidence. Derivation instead emits the single classification preserved-input for both live semantic sources such as CODEOWNERS (inventory.json line 284) and retired historical authorities such as freeze-successor-v1/check-freeze.mjs (line 488), delegating the distinction to prose in the owner map. The frozen inventory therefore cannot itself enforce the promised current-versus-historical role boundary.",
+      "violated_requirement": "Complete role-classified inventory; explicit historical-versus-current authority disposition"
+    },
+    {
+      "severity": "P2",
+      "file": "specs/current-registry-governance/verification.md",
+      "line": 38,
+      "title": "Strict compiler baseline has an impossible RED release ordering",
+      "evidence": "Lines 13-15 and 32 require the compiler baseline after the new RED files exist and before GREEN edits. Lines 38-39 then require any selected-root baseline errors to be dispositioned before RED release. The selected roots include the proposed RED test and helpers, so they cannot exist or be compiled before the RED implementation owner is released. The gate must instead block RED acceptance/hand-off to GREEN, or explicitly run after RED implementation and before GREEN release.",
+      "violated_requirement": "Implementable separate RED/GREEN staging with fresh strict compiler provenance"
+    }
+  ],
+  "checked_requirements": [
+    "Prospective greenfield baseline authority and explicit non-claim of obsolete-policy, old-base PR, or remote-host approval",
+    "One current root transition owner and five integrity-only child CLIs without alternate transition authority",
+    "Missing, obsolete, partial, and malformed base rejection; no recursive historical projection, candidate fallback, or accept-either registry",
+    "Hash-bound source/view validation for both snapshots, fixed 20-source roster, file/path/type/mode custody, required-absent paths, and five closed-tree boundaries",
+    "Root-policy self-hash exclusion and base-controlled checker/policy/inventory custody",
+    "Separation of candidate-only transition mutants from internally consistent invalid-base semantic mutants, including exact semantic attribution and no hardcoded registry-digest shortcut",
+    "All eleven workflow consumers, event/base selection, PR retargeting, permissions, job identities, setup order, subsystem commands, and candidate-install ordering",
+    "runner.sh unique real merge-base selection, base checker extraction, explicit root binding, candidate-fallback resistance, and shared v2/v3 base",
+    "Unchanged real-v2 verification closure and required v2 positive/mutation control",
+    "Historical c2/d/d2/b2b, registry, root-governance, successor, seal, pacemaker, journal, anchor, budget, Ed25519, blueprint, and author-authorization obligations",
+    "Eight lifecycle exclusions including **/.logs/** and prohibition on additional suppression",
+    "Seal and pacemaker readiness execution requirements",
+    "Independent canonical parameter oracle grammar, encoded-key ordering, absent/present-four literals, framing, and production-helper independence",
+    "Blueprint runtime frozenTuple remains exactly five keys with protectedPathCount 47",
+    "Gate-plan whole-file tests, five controlled variants, child integrity commands, syntax/lint/format bounds, fresh isolation, and evidence attribution",
+    "Typecheck diagnostic multiplicity, compiler/options equivalence, selected-root cleanliness, source-resolution recording, and escape detection"
+  ],
+  "limitations": [
+    "Read-only inspection only; no proposal script, test, checker, compiler, build, linter, formatter, Git mutation, browser, network operation, or other model was executed.",
+    "Recorded hashes and Signed HEAD identity were inspected as supplied but not recomputed because the authorized review interface was limited to file reads, listings, and text search.",
+    "Runtime paths, evidence directories, observed test counts, and GREEN behavior do not yet exist and were not treated as implementation failures.",
+    "The eight dirty production owners and remote branch-protection state remained out of scope."
+  ]
+}

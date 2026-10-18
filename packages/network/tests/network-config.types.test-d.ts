@@ -1,4 +1,9 @@
-import type { ControlPlaneConfig, ControlPlaneEvent, DRPNetworkNodeConfig } from "@ts-drp/types";
+import type {
+	ControlPlaneConfig,
+	ControlPlaneEvent,
+	DRPNetworkNodeConfig,
+	DRPPeerSelectionSnapshot,
+} from "@ts-drp/types";
 
 const controlPlane: ControlPlaneConfig = {
 	address_policy: {
@@ -42,6 +47,38 @@ const phaseTwoConfig: DRPNetworkNodeConfig = {
 const defaultConfig: DRPNetworkNodeConfig = {};
 void phaseTwoConfig;
 void defaultConfig;
+
+const t4Snapshot: DRPPeerSelectionSnapshot = {
+	budget: 8,
+	charged: 0,
+	denied: 0,
+	dependencyDialQueue: 0,
+	expectedReplicas: 50,
+	globalDiscovery: false,
+	live: 0,
+	priority: 0,
+	prioritySlots: 1,
+	queued: 0,
+	replacements: 0,
+	selected: 0,
+	upgrade: 0,
+};
+void t4Snapshot;
+
+// @ts-expect-error T4 detached counts are required, not optional compatibility fields.
+const missingT4Snapshot: DRPPeerSelectionSnapshot = {
+	budget: 8,
+	charged: 0,
+	denied: 0,
+	dependencyDialQueue: 0,
+	expectedReplicas: 50,
+	globalDiscovery: false,
+	live: 0,
+	queued: 0,
+	selected: 0,
+	upgrade: 0,
+};
+void missingT4Snapshot;
 
 const removedBootstrap: DRPNetworkNodeConfig = {
 	// @ts-expect-error bootstrap was removed; use seed and relay_service explicitly.

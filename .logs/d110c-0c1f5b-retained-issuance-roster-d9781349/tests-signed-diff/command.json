@@ -1,0 +1,15 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "git",
+  "args": [
+    "show",
+    "--format=fuller",
+    "--stat",
+    "--patch",
+    "--unified=0",
+    "d97813494f06a0c0913ac1a7b2f7760ed67bf2a8",
+    "--",
+    "tests/phase-3a1b-p2-outbox-publication-contract.test.ts"
+  ],
+  "start": "2026-09-06T00:56:25.274Z"
+}

@@ -27,3 +27,4 @@ jobs:
       - shell: bash
         run: |
           pnpm e2e-test
+          pnpm e2e-test:worker-host

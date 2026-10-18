@@ -1,0 +1,10 @@
+{
+  "cwd": "/tmp/d110c-f5b-retained-room-mocks-2C1IwR/checkout",
+  "command": "git",
+  "args": [
+    "checkout",
+    "--detach",
+    "e384a40cc9f30d4cb5f65b459e2be65858ce05e5"
+  ],
+  "start": "2026-09-06T00:33:45.431Z"
+}

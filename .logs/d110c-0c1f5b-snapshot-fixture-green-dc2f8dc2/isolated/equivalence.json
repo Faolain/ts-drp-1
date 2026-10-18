@@ -1,0 +1,31 @@
+{
+  "valid": true,
+  "file": "tests/fixtures/phase-4b-v3/live-snapshot.ts",
+  "beforeSha256": "6765ca20adabc41567024174c079b438134e636108b24738c33c65c59daed759",
+  "afterSha256": "fddfff2be4f1913b7e27a1b20b82efbabee1fc07ea36efe0a0e467c8b1781864",
+  "entireFileReverseByteEqual": true,
+  "otherEmittedJsByteEqual": true,
+  "allowedRuntimeDelta": "New unsupported epoch installer rejects asynchronously without mutation; local plan value is assigned and returned unchanged",
+  "protectedFunctions": {
+    "fakeNetwork": "b767c27fbf09b551b91f7738aaffb85162a393b0330569ef9fe281c22ee6934a",
+    "lowerHex": "320fce9808db4f05c295c2cea17d7607897d8e0540e93c3d6c62d6596276498e",
+    "recoveryCarrier": "1e424c55e5862356cc02830cb41306d814a08a367bbf1d16e6ef8e50fd2e382e",
+    "createRecoveryInput": "eabd9a9e2a9b21846f42cd893e3ecedd25ae5bed63a231c01a9928c65b1bc29d",
+    "recover": "22cb3f9513c404db19b903edb58abe53aa26c590417f05fa8c2abab5acce519b",
+    "recoverLiveSnapshotPeer": "ae892a3ecfd95ab0c7d2b6b698d844cfcf539cdac53084617dff57eab42a7829"
+  },
+  "importsExportsAndModuleInitializationUnchanged": true,
+  "scopeRevisionCasEntryCopiesAndIssuePlanEffectsUnchanged": true,
+  "genesisDispatch": {
+    "file": "packages/node/src/v3-live.ts",
+    "branch": "payload.provenance.epoch === 0 ? journal.installGenesis : journal.installEpochAnchor",
+    "productionSha256": "389f6d9104b25ac58ef3f4b8e3b5fe6e33f4c516ae167926c9edbcc56265e602",
+    "epochZeroDoesNotReadAddedMethod": true
+  },
+  "shadowBoundary": {
+    "unchangedDriver": true,
+    "noRuntimeCredit": true,
+    "noSynthetic100CloseSetup": true
+  },
+  "noNewApiOrAuthority": true
+}

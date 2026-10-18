@@ -17,6 +17,11 @@ export interface GroupPeerChange {
 
 export type GroupPeerChangeHandler = (change: GroupPeerChange) => void;
 
+export type PeerConnectionHandler = (peerId: string) => void;
+
+/** Handler invoked when a remote peer's transport connection closes. */
+export type PeerDisconnectHandler = (peerId: string) => void;
+
 export type ControlPlaneAddressFamily = "ipv4" | "ipv6" | "dns" | "unknown";
 
 export type ControlPlaneAddressScope =
@@ -318,6 +323,39 @@ export interface ControlPlaneConnectionEvidence {
 	readonly transport: ControlPlaneTransport;
 }
 
+export interface DRPConnectionBudgetConfig {
+	readonly max_connections: number;
+	readonly max_parallel_dials: number;
+}
+
+export type DRPConnectionBudgetRole = "browser" | "node" | "relay" | "worker";
+
+export interface DRPConnectionBudget {
+	readonly maxConnections: number;
+	readonly maxParallelDials: number;
+	readonly role: DRPConnectionBudgetRole;
+}
+
+export interface DRPPeerSelectionConfig {
+	readonly expected_replicas: number;
+}
+
+export interface DRPPeerSelectionSnapshot {
+	readonly budget: number;
+	readonly charged: number;
+	readonly denied: number;
+	readonly dependencyDialQueue: number;
+	readonly expectedReplicas: number | undefined;
+	readonly globalDiscovery: boolean;
+	readonly live: number;
+	readonly priority: number;
+	readonly prioritySlots: number;
+	readonly queued: number;
+	readonly replacements: number;
+	readonly selected: number;
+	readonly upgrade: number;
+}
+
 export interface ControlPlaneRelayReservationEvidence {
 	readonly expiresAtMs: number;
 	readonly operatorGroup: string;
@@ -332,6 +370,7 @@ export interface ControlPlaneConfig {
 		sink(event: ControlPlaneEvent): void;
 	};
 	readonly pubsub_scoring?: ControlPlanePubsubScoringConfig;
+	readonly peer_selection?: DRPPeerSelectionConfig;
 	readonly recovery?: ControlPlaneRecoveryConfig;
 	readonly relay_policy?: ControlPlaneRelayPolicyConfig;
 	readonly rendezvous?: ControlPlaneRendezvousConfig;
@@ -360,6 +399,8 @@ export interface DRPNetworkNodeConfig {
 	log_config?: LoggerOptions;
 	/** Independently owned routing, rendezvous, relay-client, admission, and telemetry policy. */
 	control_plane?: ControlPlaneConfig;
+	/** Optional reduction of the hard connection and parallel-dial budget selected for this host role. */
+	connection_budget?: DRPConnectionBudgetConfig;
 	/** Pubsub configuration */
 	pubsub?: {
 		/** Interval in milliseconds between peer discovery attempts */
@@ -378,6 +419,25 @@ export interface DRPNetworkNodeConfig {
 	};
 	/** Whether this node is a forward-only fixed rendezvous seed. */
 	seed?: boolean;
+	/**
+	 * Local ICE configuration shared by libp2p WebRTC and the separate unreliable
+	 * peer connection. Omitted: libp2p retains its installed defaults; the raw
+	 * connection uses Google STUN. Explicit [] disables ICE servers in both.
+	 * STUN is discovery, not a relay guarantee. TURN requires operator-supplied
+	 * servers and credentials; Circuit Relay v2 is not a TURN server.
+	 */
+	webrtc?: {
+		/** At most 8 servers, each with at most 8 STUN/TURN URLs (2048 characters each). */
+		ice_servers?: ReadonlyArray<{
+			readonly urls: string | readonly string[];
+			/** At most 1024 characters. Required with credential for TURN. */
+			readonly username?: string;
+			/** At most 1024 characters; never included in network telemetry. */
+			readonly credential?: string;
+		}>;
+		/** Defaults to all; relay requires an explicitly configured TURN server. */
+		ice_transport_policy?: "all" | "relay";
+	};
 }
 
 /** Minimal structural membership verifier exposed without importing the membership package. */
@@ -530,9 +590,10 @@ export interface DRPNetworkNode {
 	/**
 	 * Gets all peers subscribed to a specific group/topic
 	 * @param group - The group/topic to get peers for
-	 * @returns Array of peer IDs subscribed to the group
+	 * @param view - Optional bounded GossipSub mesh view for implicit durable traffic
+	 * @returns Array of peer IDs subscribed to the group or currently in its mesh
 	 */
-	getGroupPeers(group: string): string[];
+	getGroupPeers(group: string, view?: "mesh"): string[];
 
 	/**
 	 * Broadcasts a message to all peers subscribed to a topic
@@ -542,13 +603,34 @@ export interface DRPNetworkNode {
 	 */
 	broadcastMessage(topic: string, message: Message): Promise<void>;
 
+	/** Publishes through the strict gossip path and reports only local publication completion. */
+	publishMessage(topic: string, message: Message): Promise<true>;
+
+	/** Returns the authenticated gossip topic bound to this exact decoded message identity. */
+	gossipTopicFor(message: Message): string | undefined;
+
+	/** Atomically claims detached transport evidence for this exact decoded message identity. */
+	claimIngressEvidence?(message: Message):
+		| Readonly<{
+				message: Readonly<{
+					data: Uint8Array;
+					objectId: string;
+					sender: string;
+					type: Message["type"];
+				}>;
+				transport:
+					| Readonly<{ kind: "authenticated-stream"; protocol: string; sender: string }>
+					| Readonly<{ kind: "signed-gossip"; sender: string; topic: string }>;
+		  }>
+		| undefined;
+
 	/**
 	 * Sends a message to a specific peer
 	 * @param peerId - The ID of the peer to send to
 	 * @param message - The message to send
 	 * @returns Resolves when the message has been sent
 	 */
-	sendMessage(peerId: string, message: Message): Promise<void>;
+	sendMessage(peerId: string, message: Message, options?: { readonly signal?: AbortSignal }): Promise<void>;
 
 	/**
 	 * Sends a message to a random peer in a group
@@ -571,4 +653,18 @@ export interface DRPNetworkNode {
 	 * @returns A function that removes the handler
 	 */
 	subscribeToGroupPeerChanges(handler: GroupPeerChangeHandler): () => void;
+
+	/**
+	 * Subscribes to genuine authenticated remote transport connections.
+	 * @param handler - Handler invoked with the connected peer ID
+	 * @returns A function that removes the handler
+	 */
+	subscribeToPeerConnections?(handler: PeerConnectionHandler): () => void;
+
+	/**
+	 * Subscribes to genuine remote transport disconnections.
+	 * @param handler - Handler invoked with the disconnected peer ID
+	 * @returns A function that removes the handler
+	 */
+	subscribeToPeerDisconnects?(handler: PeerDisconnectHandler): () => void;
 }

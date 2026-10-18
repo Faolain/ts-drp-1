@@ -1,0 +1,13 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "pnpm",
+  "args": [
+    "exec",
+    "playwright",
+    "test",
+    "--config",
+    "packages/storage-browser/playwright.phase-2l-d-parity.config.ts",
+    "--reporter=json"
+  ],
+  "start": "2026-09-05T06:07:21.338Z"
+}

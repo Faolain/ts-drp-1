@@ -1,0 +1,10 @@
+{
+  "cwd": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "command": "node",
+  "args": [
+    ".logs/d110c-w0-current-profile-acceptance-61ea93f6/verify-exact-seal.mjs",
+    ".logs/d110c-w0-browser-7efe33dd",
+    "97fad32967e5756fa26c4395804d4def75f8a5ec262a3cc70963cb483e533926"
+  ],
+  "start": "2026-09-06T12:11:53.764Z"
+}

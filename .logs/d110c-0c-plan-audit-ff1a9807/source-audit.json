@@ -1,0 +1,19 @@
+{
+	"base": "ff1a9807528b1f29c8d1f381f0c093baf5a5d506",
+	"checks": {
+		"additivePendingClassifierPinned": true,
+		"combinedIssuanceCeilingAbsent": true,
+		"existingPublicRecoveryExport": true,
+		"genesisCarrierEqualityPinned": true,
+		"genesisCurrentOpenerPinned": true,
+		"oldAndNewAheFaultSeams": true,
+		"pendingChainEpochsPinned": true,
+		"pendingProjectionPinned": true,
+		"publicRecoveryInputKeyCount": true,
+		"roomCommitsFloorAfterPendingRecovery": true,
+		"roomUsesExistingRecovery": true,
+		"scanCountersOutsideRead": true,
+		"sharedCheckpointOpenerAvailable": true,
+		"sharedTransitionClassifierAvailable": true
+	}
+}

@@ -1,0 +1,50 @@
+{
+  "initial": [
+    {
+      "chunk_id": "0e5ee1",
+      "wall_time_seconds": 0.586951458,
+      "exit_code": 1,
+      "original_token_count": 42,
+      "output": "Checking formatting...\n[warn] tests/phase-6b-d110c-0c1f5b-integration-red.test.ts\n[warn] Code style issues found in the above file. Run Prettier with --write to fix.\n"
+    },
+    {
+      "chunk_id": "b2832a",
+      "wall_time_seconds": 10.001626792,
+      "session_id": 28083,
+      "original_token_count": 0,
+      "output": ""
+    },
+    {
+      "chunk_id": "df6bb4",
+      "wall_time_seconds": 0.00670175,
+      "exit_code": 0,
+      "original_token_count": 417,
+      "output": " .../phase-6b-d110c-0c1f5b-integration-red.test.ts  | 40 ++++++++--------------\n 1 file changed, 15 insertions(+), 25 deletions(-)\n5fc992bc41dd1d6430f99f887801dbbd7d4c6608 G\n\t\tbase = prior.baseExpectedHead;\n\t}\n\treturn facts;\n}\n\nasync function displacedFixture() {\n\tconst fixture = await openRoom(2);\n\tconst creator = required(fixture.peers[0]);\n\tconst writer = required(fixture.peers[1]);\n\tawait fixture.issue(creator, \"timing-creator\");\n\tawait fixture.issue(writer, \"timing-writer\");\n\tfixture.held.add(writer.databaseName);\n\tawait fixture.issue(writer, \"timing-displaced\");\n\tconst source = required((await durable(writer)).rows.at(-1));\n\texpect(source.publishState, \"F5B_C19_PUBLISHED_SOURCE_REALLY_DURABLE\").toBe(\"published\");\n\tawait fixture.close();\n\tconst checkpoint = fixture.checkpoint();\n\tawait creator.room.adoptCreatorSuccessor();\n\tfixture.held.delete(writer.databaseName);\n\treturn { fixture, creator, writer, source: source.commit, checkpoint };\n}\n\nasync function delayedDependency() {\n\tconst fixture = await openRoom(2);\n\tconst creator = required(fixture.peers[0]);\n\tconst writer = required(fixture.peers[1]);\n\tawait fixture.issue(creator, \"dependency-creator\");\n\tawait fixture.issue(writer, \"dependency-admitted-prefix\");\n\tconst prefix = required(ownCommits(writer).at(-1));\n\tfixture.held.add(writer.databaseName);\n\tawait fixture.issue(writer, \"dependency-n\");\n\tconst delayed = required(ownCommits(writer).at(-1));\n\tawait fixture.issue(writer, \"dependency-n-plus-one\");\n\tconst dependent = required(ownCommits(writer).at(-1));\n\texpect(dependent.authorSequence, \"F5B_C01_TWO_DISTINCT_ADJACENT_AUTHOR_SEQUENCES\").toBe(delayed.authorSequence + 1);\n\texpect(\n"
+    }
+  ],
+  "initialLintCompletion": {
+    "exit_code": 1,
+    "output": "1183:49 prettier/prettier wrapping; 1189:85 prettier/prettier wrapping. Two formatting errors only; corrected by repository Prettier."
+  },
+  "formatFix": {
+    "chunk_id": "33307c",
+    "wall_time_seconds": 0.495713416,
+    "exit_code": 0,
+    "original_token_count": 15,
+    "output": "tests/phase-6b-d110c-0c1f5b-integration-red.test.ts 282ms\n"
+  },
+  "formatPassed": {
+    "chunk_id": "2f14f3",
+    "wall_time_seconds": 0.512034167,
+    "exit_code": 0,
+    "original_token_count": 17,
+    "output": "Checking formatting...\nAll matched files use Prettier code style!\n"
+  },
+  "lintPassed": {
+    "chunk_id": "72e78c",
+    "wall_time_seconds": 3.084438125,
+    "exit_code": 0,
+    "original_token_count": 0,
+    "output": ""
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "record": "D.110c-0c1f5b0a",
+  "checkpoint": "GREEN-corrective",
+  "commit": "b926a60658b7ce244f4ef159d634077e0cba3b49",
+  "agentSourceCommit": "e8cb75a808074940ac7c600a76a95b9e245f2e5f",
+  "focusedFiles": 2,
+  "focusedTests": 14,
+  "focusedPassed": 14,
+  "freshDetachedWorktreePassed": true,
+  "packageBuildsPassed": true,
+  "legacyAuthorizationMaxBytes": 8192,
+  "settlementAuthorizationMaxBytes": 65536,
+  "success": true
+}

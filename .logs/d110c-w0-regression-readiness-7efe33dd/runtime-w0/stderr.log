@@ -1,0 +1,11 @@
+(node:46370) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+stderr | tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts > D.110c-0c1k W0 real lifecycle and capacity RED > caps one legacy-profile writer, rejects the reserved fence, counts the causal join, preserves another writer and closes below global capacity
+::v3-ingress admission-rejected
+
+stderr | tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts > D.110c-0c1k W0 real lifecycle and capacity RED > caps one legacy-profile writer, rejects the reserved fence, counts the causal join, preserves another writer and closes below global capacity
+::v3-ingress graph-rejected
+
+stderr | tests/phase-6b-d110c-0c1k-w0-runtime-red.test.ts > D.110c-0c1k W0 real lifecycle and capacity RED > charges a settlement-profile offender's own signed fence to its share, refuses its next add, preserves another writer and genuinely closes
+::v3-ingress graph-rejected
+

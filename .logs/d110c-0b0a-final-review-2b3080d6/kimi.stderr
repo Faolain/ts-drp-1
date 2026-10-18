@@ -1,0 +1,1039 @@
+Warning: [loop_control] 'max_retries_per_step' is deprecated and no longer used; rename it to 'max_attempts_per_step'. Run /update-config to fix it.
+2b3080d6 feat: close D.110c-0b0a staged adoption GREEN
+c1e443fc test: freeze D.110c-0b0a staged handoff RED
+c47927f5 docs: accept D.110c-0b0a plan
+4f893654 docs: correct D.110c-0b0a staged seam
+7f6d05d3 docs: reslice D.110c-0b0 staged handoff
+2b3080d6562881ecd2a129dc3d896e9e9a86650d
+ .logs/d110c-0b0a-green-c1e443fc/focused.json       |   1 +
+ .logs/d110c-0b0a-green-c1e443fc/green-ledger.md    |  88 ++++++
+ .logs/d110c-0b0a-green-c1e443fc/manifest.sha256    |  16 +
+ .logs/d110c-0b0a-green-c1e443fc/retained.json      |   1 +
+ .../production-hardening-tdd-plan-v2.md            |  37 +++
+ packages/node/package.json                         |   8 +
+ packages/node/src/creator-adoption-commit.ts       | 239 +++++++++++++++
+ packages/node/src/creator-adoption-recover.ts      |  59 ++++
+ packages/node/src/creator-adoption-stage.ts        |  21 ++
+ packages/node/src/creator-adoption.ts              | 332 ++++++++++++++++++++
+ .../node/src/internal/creator-adoption-intent.ts   |  56 ++++
+ .../node/src/internal/creator-adoption-recover.ts  |  70 +++++
+ .../node/src/internal/creator-adoption-stage.ts    |  61 ++++
+ tests/fixtures/phase-3a1b-p3/tsconfig.test.json    |   2 +
+ .../phase-6a-v3/creator-adoption-contract.ts       |  17 +-
+ tests/phase-3a1b-p3-live-transport-red.test.ts     |  16 +
+ .../phase-6b-d110c-0b0a-staged-handoff-red.test.ts | 341 ++++++++++++++++++---
+ 17 files changed, 1325 insertions(+), 40 deletions(-)
+92750:##### D.110c-0b0a staged adoption and pending-recovery prerequisite
+92769:weaken crash acceptance or hide provider I/O in Node. **D.110c-0b0a** owns it,
+92898:D.110c-0b0a does not implement the freshness provider, rewrite the product,
+92903:The first D.110c-0b0a plan review inspected signed/pushed commit
+92922:The blocking union is accepted and corrected in one batch. D.110c-0b0a is
+92965:authority, workload, or a hard acceptance gate. The D.110c-0b0a plan gate is
+92968:The deterministic D.110c-0b0a RED then ran exactly once from accepted plan HEAD
+92970:`tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts`, opened a genuine
+92986:The D.110c-0b0a GREEN implementation now closes that exact causal seam. The
+93018:`.logs/d110c-0b0a-green-c1e443fc/green-ledger.md`. No D.110a identity or long
+diff --git a/packages/node/package.json b/packages/node/package.json
+index ffd598bb..8c2e7fc5 100644
+--- a/packages/node/package.json
++++ b/packages/node/package.json
+@@ -47,6 +47,14 @@
+ 			"types": "./dist/src/creator-adoption-commit.d.ts",
+ 			"import": "./dist/src/creator-adoption-commit.js"
+ 		},
++		"./creator-adoption-stage": {
++			"types": "./dist/src/creator-adoption-stage.d.ts",
++			"import": "./dist/src/creator-adoption-stage.js"
++		},
++		"./creator-adoption-recover": {
++			"types": "./dist/src/creator-adoption-recover.d.ts",
++			"import": "./dist/src/creator-adoption-recover.js"
++		},
+ 		"./creator-adoption-activate": {
+ 			"types": "./dist/src/creator-adoption-activate.d.ts",
+ 			"import": "./dist/src/creator-adoption-activate.js"
+diff --git a/tests/fixtures/phase-3a1b-p3/tsconfig.test.json b/tests/fixtures/phase-3a1b-p3/tsconfig.test.json
+index 6e040860..b24e0e48 100644
+--- a/tests/fixtures/phase-3a1b-p3/tsconfig.test.json
++++ b/tests/fixtures/phase-3a1b-p3/tsconfig.test.json
+@@ -13,6 +13,8 @@
+ 			"@ts-drp/protocol-v3": ["packages/protocol-v3/src/public.ts"],
+ 			"@ts-drp/protocol-v3/registry/registry-v1.json": ["packages/protocol-v3/registry/registry-v1.json"],
+ 			"@ts-drp/storage": ["packages/storage/src/index.ts"],
++			"@ts-drp/storage/maintenance": ["packages/storage/src/maintenance.ts"],
++			"@ts-drp/storage/snapshot-transfer": ["packages/storage/src/snapshot-transfer.ts"],
+ 			"@ts-drp/types": ["packages/types/src/index.ts"]
+ 		},
+ 		"rootDir": "../../.."
+diff --git a/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts b/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts
+index 4f803776..8b07e67b 100644
+--- a/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts
++++ b/tests/fixtures/phase-6a-v3/creator-adoption-contract.ts
+@@ -337,6 +337,7 @@ export interface GenuineCreatorAdoptionFixture {
+ 	readonly catalog: TrustedBlueprintCatalog;
+ 	readonly evidence: Readonly<{
+ 		readonly aheBackend: AheDurableStore;
++		readonly aheStore: AheDurableStore;
+ 		readonly chunks: readonly Uint8Array[];
+ 		readonly closeResult: CreatorLiveCloseResult;
+ 		readonly current: DetachedHeadEvidence;
+@@ -361,6 +362,7 @@ export interface GenuineCreatorAdoptionFixture {
+ 		readonly localIssued: Readonly<{ readonly authorSequence: number; readonly digest: string }>;
+ 		readonly predecessorExactCanonicalLatchedAclBytes: Uint8Array;
+ 		readonly proposed: DetachedHeadEvidence;
++		readonly snapshotStore: SnapshotQuarantineStore<SnapshotVerificationReceipt>;
+ 	}>;
+ 	readonly controls: {
+ 		activeRefMutation?: "digest" | "length";
+@@ -1043,6 +1045,7 @@ export async function openGenuineCreatorAdoptionFixture(
+ 	const primaryDatabaseName = `d108b-seal-${crypto.randomUUID()}`;
+ 	const snapshotDatabaseName = `d108b-snapshot-${crypto.randomUUID()}`;
+ 	let aheBackend: AheDurableStore | undefined;
++	let aheStore: AheDurableStore | undefined;
+ 	let declaration: SnapshotQuarantineDeclaration | undefined;
+ 	const fixture = await createGenuinePreparedV3Fixture({
+ 		applicationBatch: options.applicationBatch === true,
+@@ -1058,10 +1061,12 @@ export async function openGenuineCreatorAdoptionFixture(
+ 		prepareV3LiveGeneration: modules.prepareV3LiveGeneration,
+ 		storeDecorator: (backend) => {
+ 			aheBackend = backend;
+-			return decoratedAheStore(backend, controls);
++			aheStore = decoratedAheStore(backend, controls);
++			return aheStore;
+ 		},
+ 	});
+-	if (aheBackend === undefined) throw new TypeError("D.108b fixture AHE backend capture failed");
++	if (aheBackend === undefined || aheStore === undefined)
++		throw new TypeError("D.108b fixture AHE store capture failed");
+ 	const openedCurrentTrust = await createCurrentAnchorTrustStore({
+ 		objectId: fixture.objectId as Parameters<typeof createCurrentAnchorTrustStore>[0]["objectId"],
+ 		pinnedGenesisAnchorDigest: fixture.anchorDigest,
+@@ -1315,6 +1320,7 @@ export async function openGenuineCreatorAdoptionFixture(
+ 		controls,
+ 		evidence: Object.freeze({
+ 			aheBackend,
++			aheStore,
+ 			chunks: Object.freeze(chunks),
+ 			closeResult,
+ 			current,
+@@ -1336,6 +1342,7 @@ export async function openGenuineCreatorAdoptionFixture(
+ 			}),
+ 			predecessorExactCanonicalLatchedAclBytes: Uint8Array.from(fixture.exactCanonicalLatchedAclBytes as Uint8Array),
+ 			proposed,
++			snapshotStore,
+ 		}),
+ 		handle: bound.handle,
+ 		journal: recovered.journal,
+@@ -1409,11 +1416,15 @@ export function sourceGovernance(): Readonly<{
+ 	const productExists = /adoptCreatorSuccessor\s*\(/u.test(room);
+ 	const roomConsumesVerifier =
+ 		/@ts-drp\/node\/creator-adoption/u.test(room) && /verifyCreatorSuccessorAdoption/u.test(room);
++	const verifierStart = verifier.indexOf("export async function verifyCreatorSuccessorAdoption");
++	const verifierEnd = verifier.indexOf("\nfunction coldFailure", verifierStart);
++	const verifierOwner =
++		verifierStart >= 0 && verifierEnd > verifierStart ? verifier.slice(verifierStart, verifierEnd) : verifier;
+ 	return Object.freeze({
+ 		forbiddenRootExport: /creator-adoption|verifyCreatorSuccessorAdoption/u.test(root),
+ 		noAheMutationInVerifier:
+ 			!/\.(?:beginGeneration|putCachedBlob|promoteReference|completeGeneration|swapHead|discardGeneration)\s*\(/u.test(
+-				verifier
++				verifierOwner
+ 			),
+ 		noDirectChatVerifierConsumer: !/verifyCreatorSuccessorAdoption|CreatorAdoptionIntent|creator-adoption/u.test(chat),
+ 		roomOwnsVerifierWhenProductExists: !productExists || roomConsumesVerifier,
+diff --git a/tests/phase-3a1b-p3-live-transport-red.test.ts b/tests/phase-3a1b-p3-live-transport-red.test.ts
+index a7670472..dab19613 100644
+--- a/tests/phase-3a1b-p3-live-transport-red.test.ts
++++ b/tests/phase-3a1b-p3-live-transport-red.test.ts
+@@ -251,6 +251,14 @@ function nodeBoundaryViolations(manifestText: string, importerText: string): rea
+ 				types: "./dist/src/creator-adoption-commit.d.ts",
+ 				import: "./dist/src/creator-adoption-commit.js",
+ 			},
++			"./creator-adoption-stage": {
++				types: "./dist/src/creator-adoption-stage.d.ts",
++				import: "./dist/src/creator-adoption-stage.js",
++			},
++			"./creator-adoption-recover": {
++				types: "./dist/src/creator-adoption-recover.d.ts",
++				import: "./dist/src/creator-adoption-recover.js",
++			},
+ 			"./creator-adoption-activate": {
+ 				types: "./dist/src/creator-adoption-activate.d.ts",
+ 				import: "./dist/src/creator-adoption-activate.js",
+@@ -2375,6 +2383,14 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
+ 				types: "./dist/src/creator-adoption-commit.d.ts",
+ 				import: "./dist/src/creator-adoption-commit.js",
+ 			},
++			"./creator-adoption-stage": {
++				types: "./dist/src/creator-adoption-stage.d.ts",
++				import: "./dist/src/creator-adoption-stage.js",
++			},
++			"./creator-adoption-recover": {
++				types: "./dist/src/creator-adoption-recover.d.ts",
++				import: "./dist/src/creator-adoption-recover.js",
++			},
+ 			"./creator-adoption-activate": {
+ 				types: "./dist/src/creator-adoption-activate.d.ts",
+ 				import: "./dist/src/creator-adoption-activate.js",
+EXISTS
+ packages/node/src/creator-adoption-commit.ts | 239 +++++++++++++++++++
+ packages/node/src/creator-adoption.ts        | 332 +++++++++++++++++++++++++++
+ 2 files changed, 571 insertions(+)
+diff --git a/packages/node/src/creator-adoption-commit.ts b/packages/node/src/creator-adoption-commit.ts
+index 0a70736d..678edd90 100644
+--- a/packages/node/src/creator-adoption-commit.ts
++++ b/packages/node/src/creator-adoption-commit.ts
+@@ -15,11 +15,15 @@ import {
+ import type { CreatorLiveCloseResult } from "./creator-close.js";
+ import {
+ 	consumeCreatorAdoptionIntent,
++	consumeStagedCreatorSuccessorAdoption,
+ 	createPreparedCreatorSuccessorAdoption,
++	createStagedCreatorSuccessorAdoption,
+ 	type CreatorAdoptionIntentMaterial,
+ 	type PreparedCreatorSuccessorAdoption,
+ 	resolveCreatorAdoptionFacts,
++	type StagedCreatorSuccessorAdoption,
+ } from "./internal/creator-adoption-intent.js";
++import { installCreatorAdoptionPublish, installCreatorAdoptionStage } from "./internal/creator-adoption-stage.js";
+ import { completeCreatorSuccessorLiveMaterial } from "./internal/creator-successor-live.js";
+ 
+ type FailureKind =
+@@ -41,6 +45,14 @@ type CommitSuccess = Readonly<{
+ 	readonly ok: true;
+ 	readonly recovery: "active-new";
+ }>;
++type StageSuccess = Readonly<{
++	readonly capability: StagedCreatorSuccessorAdoption;
++	readonly descriptor: Readonly<Record<string, unknown>>;
++	readonly lifecycle: "successor-staged";
++	readonly ok: true;
++	readonly recovery: "pending-old";
++}>;
++type PublishSuccess = CommitSuccess;
+ 
+ interface SealedAdoptionFacts {
+ 	readonly closeResult: CreatorLiveCloseResult;
+@@ -62,6 +74,11 @@ interface CapturedInput {
+ 	readonly intent: object;
+ }
+ 
++interface CapturedPublishInput {
++	readonly capability: object;
++	readonly handle: object;
++}
++
+ type Candidate = Readonly<{ readonly bytes: Uint8Array; readonly ref: GenerationRef }>;
+ type Terminal =
+ 	| Readonly<{ readonly head: PresentHead; readonly kind: "active-new" }>
+@@ -69,6 +86,12 @@ type Terminal =
+ 	| Readonly<{ readonly kind: "stale-head" }>
+ 	| Readonly<{ readonly kind: "recovery-failed" }>
+ 	| Readonly<{ readonly kind: "chain-invalid" }>;
++type StagedTerminal =
++	| Readonly<{ readonly kind: "staged" }>
++	| Readonly<{ readonly kind: "pending-old" }>
++	| Readonly<{ readonly kind: "stale-head" }>
++	| Readonly<{ readonly kind: "recovery-failed" }>
++	| Readonly<{ readonly kind: "chain-invalid" }>;
+ 
+ function failure(kind: FailureKind, detail: string): CommitFailure {
+ 	return Object.freeze({ detail, kind, ok: false as const });
+@@ -96,6 +119,24 @@ function captureInput(value: unknown): CapturedInput | undefined {
+ 	}
+ }
+ 
++function capturePublishInput(value: unknown): CapturedPublishInput | undefined {
++	try {
++		if (!record(value) || Object.keys(value).sort().join(",") !== "capability,handle") return undefined;
++		const capability = Object.getOwnPropertyDescriptor(value, "capability");
++		const handle = Object.getOwnPropertyDescriptor(value, "handle");
++		return capability !== undefined &&
++			"value" in capability &&
++			record(capability.value) &&
++			handle !== undefined &&
++			"value" in handle &&
++			record(handle.value)
++			? Object.freeze({ capability: capability.value, handle: handle.value })
++			: undefined;
++	} catch {
++		return undefined;
++	}
++}
++
+ function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
+ 	return left.byteLength === right.byteLength && left.every((byte, index) => byte === right[index]);
+ }
+@@ -223,6 +264,47 @@ function validLineage(
+ 	return true;
+ }
+ 
++function validStagedLineage(
++	generations: readonly GenerationRecord[],
++	facts: SealedAdoptionFacts,
++	material: CreatorAdoptionIntentMaterial
++): boolean {
++	const byId = new Map(generations.map((generation) => [generation.generationId, generation]));
++	if (byId.size !== generations.length) return false;
++	const current = byId.get(facts.currentHead.generationId);
++	const pending = byId.get(facts.proposedHead.generationId);
++	const staged = byId.get(material.generationId);
++	if (
++		current === undefined ||
++		pending === undefined ||
++		staged === undefined ||
++		current.state !== "Superseded" ||
++		pending.state !== "Adopted" ||
++		staged.state !== "Complete" ||
++		!sameClosure(current.closure, facts.currentReferences) ||
++		pending.baseExpectedHead.kind !== "present" ||
++		!sameHead(pending.baseExpectedHead, facts.currentHead) ||
++		!sameClosure(pending.closure, facts.proposedReferences) ||
++		staged.baseExpectedHead.kind !== "present" ||
++		!sameHead(staged.baseExpectedHead, material.pendingHead) ||
++		!sameClosure(staged.closure, material.candidateReferences) ||
++		facts.proposedHead.revision !== facts.currentHead.revision + 1
++	) {
++		return false;
++	}
++	for (const generation of generations) {
++		if (new Set(generation.closure.map(({ digest }) => digest)).size !== generation.closure.length) return false;
++		if (
++			generation.baseExpectedHead.kind === "present" &&
++			(generation.baseExpectedHead.generationId === generation.generationId ||
++				!byId.has(generation.baseExpectedHead.generationId))
++		) {
++			return false;
++		}
++	}
++	return true;
++}
++
+ function validProjection(material: CreatorAdoptionIntentMaterial): Readonly<Record<string, unknown>> | undefined {
+ 	const descriptor = canonicalRecord(material.exactCanonicalProjectionBytes);
+ 	if (descriptor?.kind !== "v3-live-generation-2") return undefined;
+@@ -359,6 +441,63 @@ async function authenticatedTerminal(
+ 	}
+ }
+ 
++async function authenticatedStaged(
++	facts: SealedAdoptionFacts,
++	material: CreatorAdoptionIntentMaterial
++): Promise<StagedTerminal> {
++	try {
++		if (
++			!sameHead(material.pendingHead, facts.proposedHead) ||
++			!sameClosure(material.pendingReferences, facts.proposedReferences) ||
++			material.pendingHead.objectId !== facts.objectId
++		) {
++			return Object.freeze({ kind: "chain-invalid" });
++		}
++		const recovered = await facts.store.recoverActiveGeneration(facts.objectId);
++		if (!recovered.ok || recovered.value.kind !== "active") {
++			return Object.freeze({ kind: "recovery-failed" });
++		}
++		const active = recovered.value;
++		if (!sameHead(active.head, material.pendingHead)) return Object.freeze({ kind: "stale-head" });
++		if (
++			active.adoptedGeneration.state !== "Adopted" ||
++			!sameClosure(active.references, material.pendingReferences) ||
++			!sameClosure(active.adoptedGeneration.closure, material.pendingReferences) ||
++			!exactClosureDigest(active.references, active.head.closureDigest)
++		) {
++			return Object.freeze({ kind: "chain-invalid" });
++		}
++		const [generations, currentCandidates, pendingCandidates, stagedCandidates] = await Promise.all([
++			readLineage(facts.store, facts.objectId),
++			loadClosure(facts.store, facts.currentReferences),
++			loadClosure(facts.store, facts.proposedReferences),
++			loadClosure(facts.store, material.candidateReferences),
++		]);
++		const descriptor = validProjection(material);
++		if (
++			generations === undefined ||
++			currentCandidates === undefined ||
++			pendingCandidates === undefined ||
++			stagedCandidates === undefined ||
++			descriptor === undefined ||
++			!validStagedLineage(generations, facts, material) ||
++			!validTrustChain(facts, currentCandidates, pendingCandidates)
++		) {
++			return Object.freeze({ kind: "pending-old" });
++		}
++		const projection = stagedCandidates.filter(({ bytes }) => sameBytes(bytes, material.exactCanonicalProjectionBytes));
++		const predecessor = currentCandidates.filter(
++			({ bytes, ref }) =>
++				sameRef(ref, material.predecessorLiveRef) && canonicalRecord(bytes)?.kind === "v3-live-generation-1"
++		);
++		return projection.length === 1 && predecessor.length === 1
++			? Object.freeze({ kind: "staged" })
++			: Object.freeze({ kind: "chain-invalid" });
++	} catch {
++		return Object.freeze({ kind: "recovery-failed" });
++	}
++}
++
+ function successfulMutation(result: unknown): boolean {
+ 	return record(result) && result.ok === true && Object.hasOwn(result, "value");
+ }
+@@ -411,6 +550,10 @@ async function stageCandidate(facts: SealedAdoptionFacts, material: CreatorAdopt
+ 	if (!successfulMutation(await facts.store.completeGeneration(scope))) {
+ 		throw new TypeError("creator successor completion failed");
+ 	}
++}
++
++async function publishCandidate(facts: SealedAdoptionFacts, material: CreatorAdoptionIntentMaterial): Promise<void> {
++	const scope = Object.freeze({ generationId: material.generationId, objectId: facts.objectId });
+ 	if (
+ 		!successfulMutation(
+ 			await facts.store.swapHead({
+@@ -443,8 +586,87 @@ function success(
+ 	});
+ }
+ 
++function stagedSuccess(
++	handle: object,
++	material: CreatorAdoptionIntentMaterial,
++	descriptor: Readonly<Record<string, unknown>>
++): StageSuccess {
++	return Object.freeze({
++		capability: createStagedCreatorSuccessorAdoption(handle, { descriptor, intent: material }),
++		descriptor,
++		lifecycle: "successor-staged" as const,
++		ok: true as const,
++		recovery: "pending-old" as const,
++	});
++}
++
++async function stageCreatorSuccessorAdoptionKernel(input: unknown): Promise<CommitFailure | StageSuccess> {
++	const captured = captureInput(input);
++	if (captured === undefined) return failure("malformed-input", "creator adoption stage input is invalid");
++	const facts = resolveCreatorAdoptionFacts<SealedAdoptionFacts>(captured.handle);
++	const material = consumeCreatorAdoptionIntent(captured.intent, captured.handle);
++	if (facts === undefined || material === undefined) {
++		return failure("intent-unavailable", "creator adoption intent is unavailable");
++	}
++	const descriptor = validProjection(material);
++	if (descriptor === undefined) return failure("internal-invariant", "creator successor projection is invalid");
++	const terminal = await authenticatedTerminal(facts, material);
++	if (terminal.kind === "active-new") return failure("stale-head", "creator successor is already published");
++	if (terminal.kind === "stale-head") return failure("stale-head", "creator successor head is stale");
++	if (terminal.kind === "recovery-failed") return failure("recovery-failed", "creator successor recovery failed");
++	if (terminal.kind === "chain-invalid") return failure("chain-invalid", "creator successor chain is invalid");
++	try {
++		await stageCandidate(facts, material);
++	} catch {
++		// A fresh authenticated inspection below is the only authority after an ambiguous write.
++	}
++	const staged = await authenticatedStaged(facts, material);
++	if (staged.kind === "staged") return stagedSuccess(captured.handle, material, descriptor);
++	if (staged.kind === "stale-head") return failure("stale-head", "creator successor head is stale");
++	if (staged.kind === "chain-invalid") return failure("chain-invalid", "creator successor chain is invalid");
++	if (staged.kind === "recovery-failed") return failure("recovery-failed", "creator successor recovery failed");
++	return failure("pending-old", "creator successor is not durably complete");
++}
++
++async function publishStagedCreatorSuccessorAdoptionKernel(input: unknown): Promise<CommitFailure | PublishSuccess> {
++	const captured = capturePublishInput(input);
++	if (captured === undefined) return failure("malformed-input", "creator adoption publish input is invalid");
++	const facts = resolveCreatorAdoptionFacts<SealedAdoptionFacts>(captured.handle);
++	const staged = consumeStagedCreatorSuccessorAdoption(captured.capability, captured.handle);
++	if (facts === undefined || staged === undefined) {
++		return failure("intent-unavailable", "creator adoption staged capability is unavailable");
++	}
++	let terminal = await authenticatedTerminal(facts, staged.intent);
++	if (terminal.kind === "active-new") return success(captured.handle, staged.intent, staged.descriptor, terminal.head);
++	if (terminal.kind === "stale-head") return failure("stale-head", "creator successor head is stale");
++	if (terminal.kind === "recovery-failed") return failure("recovery-failed", "creator successor recovery failed");
++	if (terminal.kind === "chain-invalid") return failure("chain-invalid", "creator successor chain is invalid");
++	const authenticated = await authenticatedStaged(facts, staged.intent);
++	if (authenticated.kind !== "staged") {
++		return authenticated.kind === "recovery-failed"
++			? failure("recovery-failed", "creator successor recovery failed")
++			: authenticated.kind === "stale-head"
++				? failure("stale-head", "creator successor head is stale")
++				: failure("chain-invalid", "creator successor staged generation is invalid");
++	}
++	try {
++		await publishCandidate(facts, staged.intent);
++	} catch {
++		// A fresh authenticated reopen below is the only authority after an ambiguous CAS.
++	}
++	terminal = await authenticatedTerminal(facts, staged.intent);
++	if (terminal.kind === "active-new") return success(captured.handle, staged.intent, staged.descriptor, terminal.head);
++	if (terminal.kind === "pending-old") return failure("pending-old", "creator successor remains safely pending");
++	if (terminal.kind === "stale-head") return failure("stale-head", "creator successor head is stale");
++	if (terminal.kind === "chain-invalid") return failure("chain-invalid", "creator successor chain is invalid");
++	if (terminal.kind === "recovery-failed") return failure("recovery-failed", "creator successor recovery failed");
++	return failure("storage-failed", "creator successor storage failed");
++}
++
+ /**
+  * Commits a verified creator successor with one durable head comparison-and-swap.
++ * This retained one-call API does not publish provider freshness and must not
++ * advance a provider-scoped product room.
+  * @param input - Genuine close handle and its owner-bound, one-use intent.
+  * @returns Exact prepared successor or a closed failure.
+  */
+@@ -463,11 +685,21 @@ export async function commitCreatorSuccessorAdoption(input: unknown): Promise<Co
+ 	if (terminal.kind === "stale-head") return failure("stale-head", "creator successor head is stale");
+ 	if (terminal.kind === "recovery-failed") return failure("recovery-failed", "creator successor recovery failed");
+ 	if (terminal.kind === "chain-invalid") return failure("chain-invalid", "creator successor chain is invalid");
++	let stageRequestFailed = false;
+ 	try {
+ 		await stageCandidate(facts, material);
+ 	} catch {
++		stageRequestFailed = true;
+ 		// A fresh authenticated reopen below is the only authority after an ambiguous write.
+ 	}
++	const staged = stageRequestFailed ? undefined : await authenticatedStaged(facts, material);
++	if (staged?.kind === "staged") {
++		try {
++			await publishCandidate(facts, material);
++		} catch {
++			// A fresh authenticated reopen below is the only authority after an ambiguous CAS.
++		}
++	}
+ 	terminal = await authenticatedTerminal(facts, material);
+ 	if (terminal.kind === "active-new") return success(captured.handle, material, descriptor, terminal.head);
+ 	if (terminal.kind === "pending-old") return failure("pending-old", "creator successor remains safely pending");
+@@ -476,3 +708,10 @@ export async function commitCreatorSuccessorAdoption(input: unknown): Promise<Co
+ 	if (terminal.kind === "recovery-failed") return failure("recovery-failed", "creator successor recovery failed");
+ 	return failure("storage-failed", "creator successor storage failed");
+ }
++
++if (!installCreatorAdoptionStage(stageCreatorSuccessorAdoptionKernel)) {
++	throw new TypeError("creator adoption stage owner was already installed");
++}
++if (!installCreatorAdoptionPublish(publishStagedCreatorSuccessorAdoptionKernel)) {
++	throw new TypeError("creator adoption publish owner was already installed");
++}
+diff --git a/tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts b/tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts
+index 3317b9fe..b0c44260 100644
+--- a/tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts
++++ b/tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts
+@@ -1,14 +1,50 @@
+ import "fake-indexeddb/auto";
+ 
+-import type { PresentHead } from "@ts-drp/storage";
+-import { readFileSync } from "node:fs";
+-import { resolve } from "node:path";
+-import { describe, expect, it } from "vitest";
++import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
++import {
++	digestBlob,
++	type GenerationRecord,
++	type GenerationRef,
++	parseGenerationId,
++	type PresentHead,
++} from "@ts-drp/storage";
++import { beforeAll, describe, expect, it } from "vitest";
+ 
+ import {
++	type GenuineCreatorAdoptionFixture,
+ 	openGenuineCreatorAdoptionFixture,
+-	REPOSITORY_ROOT,
+ } from "./fixtures/phase-6a-v3/creator-adoption-contract.js";
++import { activateCreatorSuccessorAdoption } from "../packages/node/src/creator-adoption-activate.js";
++import { commitCreatorSuccessorAdoption } from "../packages/node/src/creator-adoption-commit.js";
++import * as recoverSurface from "../packages/node/src/creator-adoption-recover.js";
++import * as stageSurface from "../packages/node/src/creator-adoption-stage.js";
++
++const { recoverPendingCreatorSuccessorAdoption } = recoverSurface;
++const { publishStagedCreatorSuccessorAdoption, stageCreatorSuccessorAdoption } = stageSurface;
++
++const PARAMETERS = Object.freeze({
++	maxDependencies: 16,
++	maxEpochBytes: 8_388_608,
++	maxEpochVertices: 8192,
++	maxPendingBytes: 16_777_216,
++	maxPendingEntries: 4096,
++	maxSnapshotBytes: 268_435_456,
++	snapshotChunkBytes: 131_072,
++});
++
++beforeAll(() => {
++	Object.defineProperty(navigator, "storage", {
++		configurable: true,
++		value: Object.freeze({ estimate: () => Promise.resolve({ quota: 1_000_000_000_000, usage: 0 }) }),
++	});
++});
++
++function record(value: unknown): Readonly<Record<string, unknown>> {
++	if (value === null || typeof value !== "object" || Array.isArray(value)) {
++		throw new TypeError("D.110c-0b0a canonical record is invalid");
++	}
++	return value as Readonly<Record<string, unknown>>;
++}
+ 
+ function sameHead(left: PresentHead, right: PresentHead): boolean {
+ 	return (
+@@ -19,51 +55,282 @@ function sameHead(left: PresentHead, right: PresentHead): boolean {
+ 	);
+ }
+ 
+-describe("D.110c-0b0a staged adoption and pending recovery causal RED", () => {
+-	it("requires a durable-complete/no-head-swap stage and a non-activating recovery owner", async () => {
+-		Object.defineProperty(navigator, "storage", {
+-			configurable: true,
+-			value: Object.freeze({ estimate: () => Promise.resolve({ quota: 1_000_000_000_000, usage: 0 }) }),
+-		});
++async function verifiedIntent(fixture: GenuineCreatorAdoptionFixture): Promise<unknown> {
++	const verified = await fixture.modules.verifyCreatorSuccessorAdoption({
++		catalog: fixture.catalog,
++		handle: fixture.handle,
++	});
++	if (verified.ok !== true) throw new TypeError(`D.110c-0b0a verification failed: ${String(verified.kind)}`);
++	return verified.intent;
++}
++
++function recoveryInput(fixture: GenuineCreatorAdoptionFixture): Readonly<Record<string, unknown>> {
++	const candidate = fixture.evidence.current.candidates.find(
++		({ ref }) =>
++			ref.byteLength === fixture.evidence.closeResult.currentTrustRef.byteLength &&
++			ref.digest === fixture.evidence.closeResult.currentTrustRef.digest
++	);
++	if (candidate === undefined) throw new TypeError("D.110c-0b0a current trust carrier is unavailable");
++	const trust = record(decodeCanonical(candidate.bytes));
++	if (
++		!(trust.detachedCurrentAnchorSignature instanceof Uint8Array) ||
++		!(trust.exactCanonicalCurrentAnchorPreimageBytes instanceof Uint8Array)
++	) {
++		throw new TypeError("D.110c-0b0a current trust carrier is malformed");
++	}
++	return Object.freeze({
++		authenticationProfile: "creator-only",
++		catalog: fixture.catalog,
++		detachedSignature: Uint8Array.from(trust.detachedCurrentAnchorSignature),
++		exactCanonicalAnchorPreimageBytes: Uint8Array.from(trust.exactCanonicalCurrentAnchorPreimageBytes),
++		exactCanonicalParametersCarrierBytes: encodeCanonical(PARAMETERS),
++		expectedNextRoomHead: Object.freeze({
++			currentAnchorDigest: fixture.evidence.closeResult.successorAnchorDigest,
++			epoch: fixture.evidence.closeResult.successorEpoch,
++			objectId: fixture.evidence.currentTrust.objectId,
++		}),
++		expectedPreviousRoomHead: Object.freeze({
++			currentAnchorDigest: fixture.evidence.currentTrust.currentAnchorDigest,
++			epoch: fixture.evidence.currentTrust.currentEpoch,
++			objectId: fixture.evidence.currentTrust.objectId,
++		}),
++		pinnedGenesisAnchorDigest: fixture.evidence.currentTrust.genesisAnchorDigest,
++		snapshotDeclaration: fixture.evidence.declaration,
++		snapshotStore: fixture.evidence.snapshotStore,
++		store: fixture.evidence.aheStore,
++	});
++}
++
++async function generations(fixture: GenuineCreatorAdoptionFixture): Promise<readonly GenerationRecord[]> {
++	const page = await fixture.evidence.aheBackend.readGenerationPage({
++		limit: 128,
++		objectId: fixture.evidence.proposed.head.objectId,
++	});
++	if (!page.ok || page.value.nextCursor !== null) throw new TypeError("D.110c-0b0a lineage is unavailable");
++	return page.value.generations;
++}
++
++async function installDifferentClosureCandidate(fixture: GenuineCreatorAdoptionFixture): Promise<void> {
++	const complete = (await generations(fixture)).filter(({ state }) => state === "Complete");
++	if (complete.length !== 1) throw new TypeError("D.110c-0b0a fork control requires one complete candidate");
++	const original = complete[0] as GenerationRecord;
++	const originalProjectionDigest = digestBlob(fixture.evidence.exactCanonicalProjectionBytes);
++	if (!originalProjectionDigest.ok) throw new TypeError("D.110c-0b0a projection digest is invalid");
++	const variantBytes = encodeCanonical({
++		...record(decodeCanonical(fixture.evidence.exactCanonicalProjectionBytes)),
++		forkControl: "different-authenticated-closure",
++	});
++	const variantDigest = digestBlob(variantBytes);
++	if (!variantDigest.ok) throw new TypeError("D.110c-0b0a fork projection digest is invalid");
++	const variantRef: GenerationRef = Object.freeze({
++		byteLength: variantBytes.byteLength,
++		digest: variantDigest.value,
++	});
++	const closure = Object.freeze(
++		original.closure
++			.map((ref) => (ref.digest === originalProjectionDigest.value ? variantRef : ref))
++			.sort((left, right) => (left.digest < right.digest ? -1 : left.digest > right.digest ? 1 : 0))
++	);
++	const random = new Uint8Array(32);
++	crypto.getRandomValues(random);
++	const generationId = parseGenerationId(Array.from(random, (byte) => byte.toString(16).padStart(2, "0")).join(""));
++	if (!generationId.ok || original.baseExpectedHead.kind !== "present") {
++		throw new TypeError("D.110c-0b0a fork generation identity is invalid");
++	}
++	const scope = Object.freeze({ generationId: generationId.value, objectId: original.objectId });
++	const begun = await fixture.evidence.aheBackend.beginGeneration({
++		...scope,
++		baseExpectedHead: original.baseExpectedHead,
++		closure,
++	});
++	if (!begun.ok) throw new TypeError(`D.110c-0b0a fork begin failed: ${begun.reason}`);
++	const cached = await fixture.evidence.aheBackend.putCachedBlob({
++		...scope,
++		bytes: variantBytes,
++		digest: variantDigest.value,
++	});
++	if (!cached.ok) throw new TypeError(`D.110c-0b0a fork cache failed: ${cached.reason}`);
++	for (const ref of closure) {
++		const promoted = await fixture.evidence.aheBackend.promoteReference({ ...scope, digest: ref.digest });
++		if (!promoted.ok) throw new TypeError(`D.110c-0b0a fork promotion failed: ${promoted.reason}`);
++	}
++	const completed = await fixture.evidence.aheBackend.completeGeneration(scope);
++	if (!completed.ok) throw new TypeError(`D.110c-0b0a fork completion failed: ${completed.reason}`);
++}
++
++describe("D.110c-0b0a staged adoption and pending recovery GREEN", () => {
++	it("stages without a head swap and publishes through one owner-bound CAS", async () => {
+ 		const fixture = await openGenuineCreatorAdoptionFixture();
++		const foreign = await openGenuineCreatorAdoptionFixture();
+ 		try {
+-			const objectId = fixture.evidence.proposed.head.objectId;
+-			const before = await fixture.evidence.aheBackend.readHead(objectId);
+-			expect(before.ok).toBe(true);
+-			if (!before.ok || before.value.kind !== "present") {
+-				throw new TypeError("D.110c-0b0a genuine predecessor head is unavailable");
++			expect(Object.keys(stageSurface).sort()).toEqual([
++				"publishStagedCreatorSuccessorAdoption",
++				"stageCreatorSuccessorAdoption",
++			]);
++			expect(Object.keys(recoverSurface)).toEqual(["recoverPendingCreatorSuccessorAdoption"]);
++			expect(await stageCreatorSuccessorAdoption({ handle: fixture.handle })).toMatchObject({
++				kind: "malformed-input",
++				ok: false,
++			});
++			const before = await fixture.evidence.aheBackend.readHead(fixture.evidence.proposed.head.objectId);
++			if (!before.ok || before.value.kind !== "present") throw new TypeError("D.110c-0b0a head is unavailable");
++			fixture.controls.aheOperationCounts.clear();
++			const staged = await stageCreatorSuccessorAdoption({
++				handle: fixture.handle,
++				intent: await verifiedIntent(fixture),
++			});
++			expect(Object.keys(staged).sort()).toEqual(["capability", "descriptor", "lifecycle", "ok", "recovery"]);
++			expect(staged).toMatchObject({ lifecycle: "successor-staged", ok: true, recovery: "pending-old" });
++			const afterStage = await fixture.evidence.aheBackend.readHead(fixture.evidence.proposed.head.objectId);
++			if (!afterStage.ok || afterStage.value.kind !== "present") {
++				throw new TypeError("D.110c-0b0a staged head is unavailable");
+ 			}
++			expect(sameHead(before.value, afterStage.value)).toBe(true);
++			expect(fixture.controls.aheOperationCounts.get("swapHead") ?? 0).toBe(0);
++			expect((await generations(fixture)).filter(({ state }) => state === "Complete")).toHaveLength(1);
++
++			expect(await commitCreatorSuccessorAdoption({ handle: fixture.handle, intent: staged.capability })).toMatchObject(
++				{ kind: "intent-unavailable", ok: false }
++			);
++			expect(
++				await activateCreatorSuccessorAdoption({
++					capability: staged.capability,
++					handle: fixture.handle,
++					...fixture.runtimeBindings,
++				})
++			).toMatchObject({ kind: "capability-unavailable", ok: false });
++			expect(
++				await publishStagedCreatorSuccessorAdoption({ capability: staged.capability, handle: foreign.handle })
++			).toMatchObject({ kind: "intent-unavailable", ok: false });
++			expect(
++				await publishStagedCreatorSuccessorAdoption({
++					capability: { ...record(staged.capability) },
++					handle: fixture.handle,
++				})
++			).toMatchObject({ kind: "intent-unavailable", ok: false });
++			expect(
++				await publishStagedCreatorSuccessorAdoption({
++					capability: staged.capability,
++					extra: true,
++					handle: fixture.handle,
++				})
++			).toMatchObject({ kind: "malformed-input", ok: false });
+ 
+-			const verified = await fixture.modules.verifyCreatorSuccessorAdoption({
+-				catalog: fixture.catalog,
++			const published = await publishStagedCreatorSuccessorAdoption({
++				capability: staged.capability,
+ 				handle: fixture.handle,
+ 			});
+-			expect(verified.ok).toBe(true);
+-			if (verified.ok !== true) throw new TypeError(`D.110c-0b0a verification failed: ${String(verified.kind)}`);
++			expect(Object.keys(published).sort()).toEqual([
++				"capability",
++				"descriptor",
++				"head",
++				"lifecycle",
++				"ok",
++				"recovery",
++			]);
++			expect(published).toMatchObject({ lifecycle: "successor-prepared", ok: true, recovery: "active-new" });
++			expect(fixture.controls.aheOperationCounts.get("swapHead")).toBe(1);
++			expect(
++				await publishStagedCreatorSuccessorAdoption({ capability: staged.capability, handle: fixture.handle })
++			).toMatchObject({ kind: "intent-unavailable", ok: false });
++		} finally {
++			await Promise.all([fixture.close(), foreign.close()]);
++		}
++	});
+ 
++	it("recovers equivalent Complete retries deterministically across both AHE orderings", async () => {
++		const fixture = await openGenuineCreatorAdoptionFixture();
++		try {
++			const first = await verifiedIntent(fixture);
++			const second = await verifiedIntent(fixture);
++			expect(await stageCreatorSuccessorAdoption({ handle: fixture.handle, intent: first })).toMatchObject({
++				ok: true,
++			});
++			expect(await stageCreatorSuccessorAdoption({ handle: fixture.handle, intent: second })).toMatchObject({
++				ok: true,
++			});
++			const completeIds = (await generations(fixture))
++				.filter(({ state }) => state === "Complete")
++				.map(({ generationId }) => generationId)
++				.sort();
++			expect(completeIds).toHaveLength(2);
+ 			fixture.controls.aheOperationCounts.clear();
+-			const committed = await fixture.modules.commitCreatorSuccessorAdoption({
+-				handle: fixture.handle,
+-				intent: verified.intent,
++			fixture.controls.aheMutationHook = ({ edge, operation }): void => {
++				if (edge === "after-request" && operation === "swapHead") {
++					throw new TypeError("D.110c-0b0a committed CAS response lost");
++				}
++			};
++			const input = recoveryInput(fixture);
++			const recovered = await recoverPendingCreatorSuccessorAdoption(input);
++			expect(Object.keys(recovered).sort()).toEqual(["head", "lifecycle", "ok", "recovery"]);
++			expect(recovered).toMatchObject({
++				head: input.expectedNextRoomHead,
++				lifecycle: "successor-published",
++				ok: true,
++				recovery: "active-new",
+ 			});
+-			expect(committed).toMatchObject({ ok: true, recovery: "active-new" });
+-			const after = await fixture.evidence.aheBackend.readHead(objectId);
+-			expect(after.ok).toBe(true);
+-			if (!after.ok || after.value.kind !== "present") {
+-				throw new TypeError("D.110c-0b0a committed successor head is unavailable");
+-			}
+-			expect(sameHead(before.value, after.value)).toBe(false);
+ 			expect(fixture.controls.aheOperationCounts.get("swapHead")).toBe(1);
++			const active = await fixture.evidence.aheBackend.readHead(fixture.evidence.proposed.head.objectId);
++			if (!active.ok || active.value.kind !== "present") throw new TypeError("D.110c-0b0a active head is unavailable");
++			expect(active.value.generationId).toBe(completeIds[0]);
+ 
+-			const packageJson = JSON.parse(
+-				readFileSync(resolve(REPOSITORY_ROOT, "packages/node/package.json"), "utf8")
+-			) as Readonly<{ readonly exports?: Readonly<Record<string, unknown>> }>;
+-			expect(packageJson.exports?.["./creator-adoption-stage"]).toBeUndefined();
+-			expect(packageJson.exports?.["./creator-adoption-recover"]).toBeUndefined();
+-
+-			throw new TypeError("D110C_0B0A_STAGED_HANDOFF_SEAM_MISSING");
++			fixture.controls.aheMutationHook = undefined;
++			const swapCount = fixture.controls.aheOperationCounts.get("swapHead");
++			expect(await recoverPendingCreatorSuccessorAdoption(input)).toMatchObject({ ok: true, recovery: "active-new" });
++			expect(fixture.controls.aheOperationCounts.get("swapHead")).toBe(swapCount);
+ 		} finally {
+ 			await fixture.close();
+ 		}
+ 	});
++
++	it("fails closed for absent, incomplete, wrong-head, malformed, and true-fork candidates", async () => {
++		const absent = await openGenuineCreatorAdoptionFixture();
++		const incomplete = await openGenuineCreatorAdoptionFixture();
++		const forked = await openGenuineCreatorAdoptionFixture();
++		try {
++			const absentInput = recoveryInput(absent);
++			expect(await recoverPendingCreatorSuccessorAdoption(absentInput)).toMatchObject({
++				kind: "pending-missing",
++				ok: false,
++			});
++			expect(
++				await recoverPendingCreatorSuccessorAdoption({
++					...absentInput,
++					expectedNextRoomHead: {
++						...(absentInput.expectedNextRoomHead as Readonly<Record<string, unknown>>),
++						currentAnchorDigest: "f".repeat(64),
++					},
++				})
++			).toMatchObject({ ok: false });
++			expect(await recoverPendingCreatorSuccessorAdoption({ ...absentInput, extra: true })).toMatchObject({
++				kind: "malformed-input",
++				ok: false,
++			});
++
++			incomplete.controls.aheMutationHook = ({ edge, operation }): void => {
++				if (edge === "before-request" && operation === "completeGeneration") {
++					throw new TypeError("D.110c-0b0a controlled incomplete candidate");
++				}
++			};
++			expect(
++				await stageCreatorSuccessorAdoption({ handle: incomplete.handle, intent: await verifiedIntent(incomplete) })
++			).toMatchObject({ kind: "pending-old", ok: false });
++			incomplete.controls.aheMutationHook = undefined;
++			expect(await recoverPendingCreatorSuccessorAdoption(recoveryInput(incomplete))).toMatchObject({
++				kind: "pending-missing",
++				ok: false,
++			});
++
++			expect(
++				await stageCreatorSuccessorAdoption({ handle: forked.handle, intent: await verifiedIntent(forked) })
++			).toMatchObject({ ok: true });
++			await installDifferentClosureCandidate(forked);
++			expect(await recoverPendingCreatorSuccessorAdoption(recoveryInput(forked))).toMatchObject({
++				kind: "true-fork",
++				ok: false,
++			});
++		} finally {
++			await Promise.all([absent.close(), incomplete.close(), forked.close()]);
++		}
++	});
+ });
+c685681d3cd8e7f21837000ddb4b886a3048178422f869552d204e7adc45b292  docs/production-hardening/production-hardening-tdd-plan-v2.md
+96dbd687bd163d96cecd70bd4ebdf10a7fa8f2e7f397f50100826e4bb69ed3c6  .logs/d110c-0b0a-green-c1e443fc/green-ledger.md
+dea13e05881f9563d051b9e024ae669f53204a8fe53b4f402e14b6e514243349  .logs/d110c-0b0a-green-c1e443fc/focused.json
+65cba8d8d13b1ded81b9e9506ef419f9313273b7b8d2646efcacd85f42892059  .logs/d110c-0b0a-green-c1e443fc/retained.json
+39af3f8a7a9765d006acdd1b7969a4ba550ee6da9794189980f605bc627510c5  packages/node/package.json
+34c035497e7f052d8331b348aea5fa95287d6db090aed92a132e8855df1ca71f  packages/node/src/creator-adoption-commit.ts
+71d0026c76bcf9c88725757d5c062b27df7515da4d375d96216f28563c708735  packages/node/src/creator-adoption-recover.ts
+26bc75d921d48f41eb49f34dd556d4cac2f9dec1ebb56a8420026369fda2c52e  packages/node/src/creator-adoption-stage.ts
+07e8c680dfd520a1ce45e10081561a4014d4ce0003aa4ffba06c8aade4e5c7db  packages/node/src/creator-adoption.ts
+daedadf8236793dcdb5472b336bb9230bc480b806879113527785d2193019f82  packages/node/src/internal/creator-adoption-intent.ts
+01fb852eab12c8110075694bacbbddf20f8a6bf81321d3413ee7bab19337535e  packages/node/src/internal/creator-adoption-recover.ts
+8e5e6018e555e97bc1211914f76712abad623e442a509b8b23a0a4ffb0e56cd7  packages/node/src/internal/creator-adoption-stage.ts
+423fc5b34f931be24d9af73b60f293279b3febddfbb2b6f44794bd34226d9a93  tests/fixtures/phase-3a1b-p3/tsconfig.test.json
+e1236d4e13ab6c1c04854afe805e7a2d5820f02928c07e8fa223fe138e61ca02  tests/fixtures/phase-6a-v3/creator-adoption-contract.ts
+af39a32b2aa4e1ad372c01e60d33aba8776197e36f63324f8d8c42c8869490b5  tests/phase-3a1b-p3-live-transport-red.test.ts
+c2815d6831837f7845e55479e560b266aa185dd441b3e1e4dfcc05a867cb122a  tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts
+---
+dea13e05881f9563d051b9e024ae669f53204a8fe53b4f402e14b6e514243349  focused.json
+65cba8d8d13b1ded81b9e9506ef419f9313273b7b8d2646efcacd85f42892059  retained.json
+96dbd687bd163d96cecd70bd4ebdf10a7fa8f2e7f397f50100826e4bb69ed3c6  green-ledger.md
+c754e4048fd0cd8369a2649d9b432026f57def2c71a00a64f07b4631c8f299c9  manifest.sha256
+39af3f8a7a9765d006acdd1b7969a4ba550ee6da9794189980f605bc627510c5  packages/node/package.json
+34c035497e7f052d8331b348aea5fa95287d6db090aed92a132e8855df1ca71f  packages/node/src/creator-adoption-commit.ts
+71d0026c76bcf9c88725757d5c062b27df7515da4d375d96216f28563c708735  packages/node/src/creator-adoption-recover.ts
+26bc75d921d48f41eb49f34dd556d4cac2f9dec1ebb56a8420026369fda2c52e  packages/node/src/creator-adoption-stage.ts
+07e8c680dfd520a1ce45e10081561a4014d4ce0003aa4ffba06c8aade4e5c7db  packages/node/src/creator-adoption.ts
+daedadf8236793dcdb5472b336bb9230bc480b806879113527785d2193019f82  packages/node/src/internal/creator-adoption-intent.ts
+01fb852eab12c8110075694bacbbddf20f8a6bf81321d3413ee7bab19337535e  packages/node/src/internal/creator-adoption-recover.ts
+8e5e6018e555e97bc1211914f76712abad623e442a509b8b23a0a4ffb0e56cd7  packages/node/src/internal/creator-adoption-stage.ts
+423fc5b34f931be24d9af73b60f293279b3febddfbb2b6f44794bd34226d9a93  tests/fixtures/phase-3a1b-p3/tsconfig.test.json
+e1236d4e13ab6c1c04854afe805e7a2d5820f02928c07e8fa223fe138e61ca02  tests/fixtures/phase-6a-v3/creator-adoption-contract.ts
+af39a32b2aa4e1ad372c01e60d33aba8776197e36f63324f8d8c42c8869490b5  tests/phase-3a1b-p3-live-transport-red.test.ts
+c2815d6831837f7845e55479e560b266aa185dd441b3e1e4dfcc05a867cb122a  tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts
+focused success: true numTotal: 3 passed: 3 failed: 0 pending: 0
+retained success: true suites: 14 total: 86 passed: 86 failed: 0 pending: 0
+retained files: phase-3a1b-p3-live-transport-red.test.ts,phase-3h-v3-room-rehearsal-red.test.ts,phase-6a-creator-adoption-commit-red.test.ts,phase-6a-creator-adoption-red.test.ts,phase-6a-creator-successor-activation-red.test.ts,phase-6a-creator-successor-handle-identity-red.test.ts,phase-6b-cleanup-eligibility-red.test.ts
+      27
+1
+.logs/d110c-0b0a-green-c1e443fc/focused.json
+.logs/d110c-0b0a-green-c1e443fc/green-ledger.md
+.logs/d110c-0b0a-green-c1e443fc/manifest.sha256
+.logs/d110c-0b0a-green-c1e443fc/retained.json
+docs/production-hardening/production-hardening-tdd-plan-v2.md
+packages/node/package.json
+packages/node/src/creator-adoption-commit.ts
+packages/node/src/creator-adoption-recover.ts
+packages/node/src/creator-adoption-stage.ts
+packages/node/src/creator-adoption.ts
+packages/node/src/internal/creator-adoption-intent.ts
+packages/node/src/internal/creator-adoption-recover.ts
+packages/node/src/internal/creator-adoption-stage.ts
+tests/fixtures/phase-3a1b-p3/tsconfig.test.json
+tests/fixtures/phase-6a-v3/creator-adoption-contract.ts
+tests/phase-3a1b-p3-live-transport-red.test.ts
+tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts
+entries: 7
+/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3a1b-p3-live-transport-red.test.ts 24 passed
+/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-3h-v3-room-rehearsal-red.test.ts 9 passed
+/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-commit-red.test.ts 9 passed
+/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-adoption-red.test.ts 13 passed
+/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-activation-red.test.ts 17 passed
+/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6a-creator-successor-handle-identity-red.test.ts 3 passed
+/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-cleanup-eligibility-red.test.ts 11 passed
+/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts
+ - passed stages without a head swap and publishes through one owner-bound CAS
+ - passed recovers equivalent Complete retries deterministically across both AHE orderings
+ - passed fails closed for absent, incomplete, wrong-head, malformed, and true-fork candidates
+G Faolain <Faolain@users.noreply.github.com> 761B99CEA81C6289
+G Faolain <Faolain@users.noreply.github.com>
+DIFFCHECK_OK
+       0
+import "fake-indexeddb/auto";
+
+import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
+import { digestClosure, type GenerationRef, type PresentHead } from "@ts-drp/storage";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+import { beforeAll, describe, expect, it } from "vitest";
+
+import {
+	classifyD108cTerminal,
+	CREATOR_ADOPTION_COMMIT_EXPORTS,
+	CREATOR_ADOPTION_COMMIT_FAILURE_KINDS,
+	CREATOR_ADOPTION_COMMIT_INPUT_KEYS,
+	CREATOR_ADOPTION_COMMIT_SUCCESS_KEYS,
+	D108C_GREEN_PATHS,
+	D108C_MUTATION_OPERATIONS,
+	D108C_RED_PATHS,
+	D108C_REQUEST_EDGES,
+	type D108cCandidateModule,
+	d108cReadiness,
+	d108cRequestFaultRoster,
+	d108cSourceGovernance,
+	d108cTransactionFaultRoster,
+	deriveD108cCandidateClosure,
+	REPOSITORY_ROOT,
+} from "./fixtures/phase-6a-v3/creator-adoption-commit-contract.js";
+import { openGenuineCreatorAdoptionFixture } from "./fixtures/phase-6a-v3/creator-adoption-contract.js";
+
+const readiness = d108cReadiness();
+       0
+295515e5fc3dc980c0b40291632ff5c39e7d608acb73fec59cb7fa2152820ce9  -
+* (no branch)
++ codex/phase3a1b-p6-golden-path
+  remotes/origin/codex/phase3a1b-p6-golden-path
+2b3080d6 feat: close D.110c-0b0a staged adoption GREEN
+c1e443fc test: freeze D.110c-0b0a staged handoff RED
+c47927f5 docs: accept D.110c-0b0a plan
+d110c-0b0-red
+d110c-0b0a-green-c1e443fc
+d110c-0b0a-plan-confirmation-4f893654
+d110c-0b0a-red-c47927f5
+focused.json
+green-ledger.md
+manifest.sha256
+retained.json
+11:import { decodeSnapshotManifest, snapshotChunkDigest } from "@ts-drp/protocol-v3/snapshot-transfer";
+29:} from "@ts-drp/storage/snapshot-transfer";
+42:	installCreatorSuccessorReopen,
+1114:if (!installCreatorSuccessorReopen(reopenCreatorSuccessorMaterial)) {
+    1116
+command.txt
+manifest.sha256
+red-audit.json
+vitest.json
+node:internal/modules/cjs/loader:1404
+  throw err;
+  ^
+
+Error: Cannot find module './.logs/d110c-0b0a-red-c47927f5/red.json'
+Require stack:
+- /private/tmp/ts-drp-d110c-0b0a-final.N1PX3y/checkout/[eval]
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1401:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1057:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1062:22)
+    at Function._load (node:internal/modules/cjs/loader:1211:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1487:12)
+    at require (node:internal/modules/helpers:135:16)
+    at [eval]:2:9
+    at runScriptInThisContext (node:internal/vm:209:10) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ '/private/tmp/ts-drp-d110c-0b0a-final.N1PX3y/checkout/[eval]' ]
+}
+5fe07796ae0fbc29e0835f01b5287a6c1a6236ab7df742240f885b2849988cb6  .logs/d110c-0b0a-red-c47927f5/command.txt
+c6b5a933d02343fb4961912ef726b042060c5d861faaed1d229bce531863fe9e  .logs/d110c-0b0a-red-c47927f5/manifest.sha256
+9aac93eafb0af7cb9103ea30007a54ffed93cd733a113cb79e21212d5c6c9dc3  .logs/d110c-0b0a-red-c47927f5/red-audit.json
+db4dcd8218055f0d1ab323634faa74511bc977ac244de3c9a4265388db4d9ac9  .logs/d110c-0b0a-red-c47927f5/vitest.json
+success: false total: 1 passed: 0 failed: 1 pending: 0 errors: 0
+failed | TypeError: D110C_0B0A_STAGED_HANDOFF_SEAM_MISSING
+pnpm exec vitest run tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts --reporter=json --outputFile=.logs/d110c-0b0a-red-c47927f5/vitest.json
+c685681d3cd8e7f21837000ddb4b886a3048178422f869552d204e7adc45b292  docs/production-hardening/production-hardening-tdd-plan-v2.md

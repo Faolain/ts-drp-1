@@ -1,0 +1,33 @@
+{
+	"schemaVersion": "ts-drp-compaction-epoch-byte-capacity-freeze-v1",
+	"profile": "compaction-epoch-byte-capacity-v1",
+	"checker": "check-freeze.mjs",
+	"workflow": ".github/workflows/compaction-epoch-byte-capacity.yml",
+	"protectedArtifacts": [
+		"packages/compaction/conformance/epoch-byte-capacity-v1/check-freeze.mjs",
+		"packages/compaction/conformance/epoch-byte-capacity-v1/freeze-policy.json",
+		"packages/compaction/conformance/epoch-byte-capacity-v1/profile.json",
+		"packages/compaction/conformance/epoch-byte-capacity-v1/spec.md",
+		".github/workflows/compaction-epoch-byte-capacity.yml",
+		"tests/compaction-epoch-byte-capacity-0p3.test.ts",
+		"tests/fixtures/phase-0p3-v3/epoch-byte-capacity-contract.json",
+		"tests/fixtures/phase-0p3-v3/controlled-epoch-byte-capacity.ts",
+		"tests/fixtures/phase-0p3-v3/public-entry-type-audit.ts",
+		"tests/fixtures/phase-0p3-v3/built-package-type-audit.ts",
+		"tests/fixtures/phase-0p3-v3/tsconfig.public-entry-audit.json",
+		"tests/fixtures/phase-0p3-v3/tsconfig.built-package-audit.json"
+	],
+	"checkerSha256": "c0f773c6ee4798be09c16fa4067ae03dc19fb2a0089c3dd499db2d530160c188",
+	"artifactSha256": {
+		"packages/compaction/conformance/epoch-byte-capacity-v1/profile.json": "1e381342bb6e249d5788efb38940780adb3d3aaa2f7ad90155bb14b3a662d3a0",
+		"packages/compaction/conformance/epoch-byte-capacity-v1/spec.md": "fba91d3af628a4a73368ba89f996ee0c36e74d4668f639bdb8704a7c7f557125",
+		".github/workflows/compaction-epoch-byte-capacity.yml": "c435297959c8c23a376b749f1ec965d4c554e3aae3ad7def66de1d728123a12f",
+		"tests/compaction-epoch-byte-capacity-0p3.test.ts": "dd8fa7777f1f5fbd7e1beecc4d20d9c65ef7233f2e2b95681256dae48b2aea90",
+		"tests/fixtures/phase-0p3-v3/epoch-byte-capacity-contract.json": "40e9d0042af097b85a20731a4712869808a73b81e18efdefa7cc3fc4eb6ed046",
+		"tests/fixtures/phase-0p3-v3/controlled-epoch-byte-capacity.ts": "65ff8e569209bfb2731f0870f2fcc269a36585eb8cc9eb0c0ac0cf448ce23964",
+		"tests/fixtures/phase-0p3-v3/public-entry-type-audit.ts": "117ce25e428e0dc7ee27d5afc2de6e7c619574fa9b29c6530f4d535beff50074",
+		"tests/fixtures/phase-0p3-v3/built-package-type-audit.ts": "20606a8d4b3618ac37f8a180e8e2938cae0eb21f2256715e610ef326214e8970",
+		"tests/fixtures/phase-0p3-v3/tsconfig.public-entry-audit.json": "eb51b159993e1963bcc115163d83f05d363133a1286f0b621c0fba1a89277e27",
+		"tests/fixtures/phase-0p3-v3/tsconfig.built-package-audit.json": "4533dd639e68e5f816d209c191efbac937cd1ff2a1efa1bc8fca184759137ab4"
+	}
+}
