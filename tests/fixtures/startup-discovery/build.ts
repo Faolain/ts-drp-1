@@ -935,7 +935,11 @@ function observation(directory: string, classificationFault = false, pendingPubl
 						 }
 						 if(path.endsWith("/creator-close.ts")&&ts.isFunctionDeclaration(node)&&node.name?.text==="reconcileCreatorBoundedRecoveryMaintenance"&&node.body){
 						  observeSequentialOwner(node.body,"sealing-maintenance-job","sealing-inclusive");
-						  for(const statement of node.body.statements)if(ts.isForStatement(statement)&&ts.isBlock(statement.statement))
+						  // Joined lifecycle cleanup wraps the same finite loop in try.
+						  // Select its one original body, not nested callback/loop work.
+						  const maintenanceLoops=node.body.statements.flatMap(statement=>ts.isTryStatement(statement)?[...statement.tryBlock.statements]:[statement]).filter(ts.isForStatement);
+						  if(maintenanceLoops.length!==1)throw Error("CRITICAL_MAINTENANCE_LOOP_NOT_UNIQUE");
+						  for(const statement of maintenanceLoops)if(ts.isBlock(statement.statement))
 						   observeSequentialOwner(statement.statement,"sealing-maintenance-pass","sealing-inclusive");
 						 }
 						 if(path.endsWith("/v3-room.ts")&&ts.isIfStatement(node)&&ts.isBlock(node.thenStatement)&&

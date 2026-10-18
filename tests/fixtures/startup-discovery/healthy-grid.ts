@@ -135,6 +135,11 @@ window.addEventListener("message",event=>{
    // Never insert a profiler await into the room's durable implementation.
    if(typeof fullBoundary==="function")await fullBoundary("begin",fullMeta);
    if(typeof fullBoundary==="function")beginFullFunctionWindow(fullMeta);
+   // Detach the existing finite counter table OUTSIDE the product timer. Static
+   // codec rows aggregate a whole realm; only this before/after delta supplies
+   // actual entries/bytes during the selected API, not their first-entry label.
+   const exactCriticalBegin=typeof fullBoundary==="function"
+    ? structuredClone(Reflect.get(globalThis,"__r8CriticalSnapshot")?.()) : undefined;
    const start=begin();
    let fullSnapshot:unknown;
    try{return await action();}
@@ -142,8 +147,11 @@ window.addEventListener("message",event=>{
     const apiEnd=performance.now();
     end(name,start);
     if(typeof fullBoundary==="function"){
+     const exactCriticalEnd=structuredClone(Reflect.get(globalThis,"__r8CriticalSnapshot")?.());
      fullSnapshot=endFullFunctionWindow();
-     try{await fullBoundary("end",{...fullMeta,apiBegin:start.begin,apiEnd},fullSnapshot);}
+     try{await fullBoundary("end",{...fullMeta,apiBegin:start.begin,apiEnd,
+      exactCriticalCounters:{begin:exactCriticalBegin,end:exactCriticalEnd,
+       qualification:"Detached existing bounded counter snapshots outside the original API timer. Subtract matching keys; context fields on static codec rows remain first-entry labels. Counts include actual concurrent work in this realm, not proof of asynchronous causality."}},fullSnapshot);}
      catch(error){Reflect.set(globalThis,"__r8FullFunctionCaptureEndFailure",String(error));
       console.warn(JSON.stringify({kind:"full-function-capture-end-failed",phase:name,error:String(error)}));}
     }

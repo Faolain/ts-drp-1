@@ -4,6 +4,7 @@ import {capturePromotionArray, capturePromotionBytes, capturePromotionRecord, ca
 import {AHE_BOUNDED_READ_LIMITS, digestBlob} from "@ts-drp/storage";
 import ts from "typescript";
 import {describe, expect, it} from "vitest";
+import {createCreatorCanonicalSyntaxReader} from "../src/internal/creator-snapshot-data.js";
 
 const path = new URL("../src/internal/creator-transition-advance.ts", import.meta.url);
 const ast = ts.createSourceFile(path.pathname, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true);
@@ -30,6 +31,7 @@ const equal = (left: unknown, right: unknown) => compareBytes(encodeCanonical(le
  * premises; the genuine native healthy fixture verifies those separate owners. */
 function fixture(cold = false, bounds = AHE_BOUNDED_READ_LIMITS) {
 	const trust = {objectId: "room", currentEpoch: 4, currentAnchorDigest: "h4", genesisAnchorDigest: "h0", profileId: "profile"};
+	const genuineTrusts = new WeakSet<object>([trust]);
 	const pinBytes = encodeCanonical({...trust, currentEpoch: 0, currentAnchorDigest: "h0"});
 	const envelopes = [3, 2, 1, 0].map(epoch => ({objectId: "room", exactCanonicalAnchorPreimageBytes: encodeCanonical({epoch}),
 		detachedAnchorSignature: new Uint8Array(64), exactCanonicalParametersCarrierBytes: encodeCanonical({limit: 64})}));
@@ -65,18 +67,22 @@ function fixture(cold = false, bounds = AHE_BOUNDED_READ_LIMITS) {
 	const classified = materials.map(m => scope(decodeCanonical(m.closure.candidates[1]!.bytes)));
 	const captured: any = {anchorChain: envelopes, nativeRetirementCustody: custody};
 	const bindings: Record<string, unknown> = {
-		compareBytes, encodeCanonical, capturePromotionArray, capturePromotionBytes, capturePromotionRecord, capturePromotionRef, AHE_BOUNDED_READ_LIMITS: bounds, digestBlob,
+		compareBytes, decodeCanonical, encodeCanonical, capturePromotionArray, capturePromotionBytes, capturePromotionRecord, capturePromotionRef, AHE_BOUNDED_READ_LIMITS: bounds, digestBlob,
 		canonicalCreatorDataRecord: decodeCanonical,
 		record: (value: any) => decodeCanonical(value.bytes),
 		uniqueCreatorTransitionCandidate: select, select, syntax: undefined,
-		genuineRecoveryTrust: (value: unknown, bytes: Uint8Array) => value === trust && compareBytes(bytes, pinBytes) === 0,
+		genuineRecoveryTrust: (value: unknown, bytes: Uint8Array) => value !== null && typeof value === "object" &&
+			genuineTrusts.has(value) && compareBytes(bytes, pinBytes) === 0,
+		createCreatorCanonicalSyntaxReader,
 		createCreatorClosedRollbackProofAccounting: () => {
 			const charges: Uint8Array[] = []; proofCharges.push(charges);
 			return {charge: (bytes: Uint8Array) => {charges.push(bytes.slice()); return bytes.byteLength <= AHE_BOUNDED_READ_LIMITS.maxUnionBytes;}};
 		},
 		inspectCreatorHistoricalAnchorChain: ({currentTrust, envelopes: actual}: any) => {
 			chains++;
-			if (currentTrust !== trust || actual.length !== 4 || actual.some((e: any, index: number) =>
+			if (!genuineTrusts.has(currentTrust) || currentTrust.objectId !== "room" || currentTrust.currentEpoch !== 4 ||
+				currentTrust.currentAnchorDigest !== "h4" || currentTrust.genesisAnchorDigest !== "h0" || currentTrust.profileId !== "profile" ||
+				actual.length !== 4 || actual.some((e: any, index: number) =>
 				e.objectId !== "room" || (decodeCanonical(e.exactCanonicalAnchorPreimageBytes) as any).epoch !== 3 - index ||
 				e.detachedAnchorSignature[0] !== 0)) return {ok: false};
 			return {ok: true, identities: [3, 2, 1, 0].map(epoch => ({epoch, anchorDigest: `h${epoch}`, aclDigest: "acl"}))};
@@ -101,7 +107,7 @@ function fixture(cold = false, bounds = AHE_BOUNDED_READ_LIMITS) {
 		},
 		samePromotionValue: equal,
 	};
-	const functions = ["failure", "sameRef", "exactCandidate", "exactCreatorTransitionOccurrence", "capturePromotionClosure",
+	const functions = ["record", "candidateSelection", "uniqueCreatorTransitionCandidate", "failure", "sameRef", "exactCandidate", "exactCreatorTransitionOccurrence", "capturePromotionClosure",
 		"verifyCreatorRecoveryBranch", "createCreatorRecoveryEvidenceOwner", "createCreatorSnapshotRecoveryEvidenceJob",
 		"openCreatorSnapshotRecoverySourceTrust", "openCreatorSnapshotRecoverySourceTrustOwned", "openCreatorSnapshotRecoverySourceTrustFromVerifiedBranch"]
 		.map(name => declaration(name).getText(ast).replace(/^export /, "")).join("\n");
@@ -130,6 +136,7 @@ function fixture(cold = false, bounds = AHE_BOUNDED_READ_LIMITS) {
 		read: input => openCreatorSnapshotRecoveryRoleReadbackOwned(input)});`, bindings);
 	const job = owner.job();
 	return {trust, envelopes, pinBytes, materials, captured, charged, proofCharges, job,
+		newGenuineTrust: (patch: Record<string, unknown> = {}) => {const next = Object.freeze({...trust, ...patch}); genuineTrusts.add(next); return next;},
 		counts: () => ({chains, pins, sources, retired}),
 		open: (patch: any = {}) => owner.open({currentTrust: trust, closure: materials[1]!.closure,
 			anchorChain: envelopes, exactCanonicalPinnedGenesisTrustStateRecordBytes: pinBytes, ...patch}),
@@ -199,6 +206,19 @@ describe("recovery source invocation-local verified branch", () => {
 });
 
 describe("one acquisition owns exact immutable recovery evidence", () => {
+	it("reuses exact signed facts across fresh genuine equal trusts but never accepts a forged copy or changed context", () => {
+		const f = fixture(); expect(f.warmOpen().ok).toBe(true);
+		expect(f.warmOpen({currentTrust: f.newGenuineTrust()}).ok).toBe(true);
+		expect(f.counts()).toEqual({chains: 1, pins: 1, sources: 1, retired: 0});
+		expect(f.warmOpen({currentTrust: {...f.trust}}).ok).toBe(false);
+		expect(f.counts().chains).toBe(1);
+		for (const patch of [{objectId: "foreign"}, {currentEpoch: 5}, {currentAnchorDigest: "other"},
+			{genesisAnchorDigest: "other"}, {profileId: "other"}]) {
+			const changed = fixture(); expect(changed.warmOpen().ok).toBe(true);
+			expect(changed.warmOpen({currentTrust: changed.newGenuineTrust(patch)}).ok).toBe(false);
+			expect(changed.counts().chains).toBe(2);
+		}
+	});
 	it("verifies one branch and each exact source once across source acquisition and final readback, with unchanged complete charges", async () => {
 		const warm = fixture(), cold = fixture();
 		for (let index = 0; index < warm.materials.length; index++) {

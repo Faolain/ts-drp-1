@@ -6425,7 +6425,12 @@ describe("recovery-role readback metadata syntax affected controls", () => {
 		const opened = openCurrentAnchorTrust({exactCanonicalTrustStateRecordBytes: bytes, expectedObjectId: String(genesisMaterial.anchor.objectId), pinnedGenesisAnchorDigest: genesisMaterial.anchorDigest});
 		expect(opened.ok).toBe(true); if (!opened.ok) throw Error("READBACK_GENUINE_PIN_FIXTURE");
 		expect(f.genuine(opened.trust, bytes)).toBe(true); expect(f.genuine({...opened.trust}, bytes)).toBe(false);
-		expect(f.source.indexOf("genuineRecoveryTrust(captured.currentTrust, pinBytes)")).toBeLessThan(f.source.indexOf("const syntax = createCreatorCanonicalSyntaxReader()"));
+		const originalGenuineCheck = f.source.indexOf("genuineRecoveryTrust(captured.currentTrust, pinBytes)");
+		expect(originalGenuineCheck).toBeGreaterThanOrEqual(0);
+		expect(originalGenuineCheck).toBeLessThan(f.source.indexOf("const syntax = evidenceOwner?.syntax ?? createCreatorCanonicalSyntaxReader()"));
+		// A retained private syntax owner may already exist; its first semantic
+		// use still follows the original fresh nominal-trust admission check.
+		expect(originalGenuineCheck).toBeLessThan(f.source.indexOf("const carrier = select("));
 		for (const originalCheck of ["openCreatorCheckpointTrust({", "inspectCreatorClosedCutSuccessorBinding({", "inspectCreatorTransitionAdvance({", "openCreatorSnapshotRecoverySourceTrustFromVerifiedBranch({", "consumeCreatorRecoveryRoleRetiredReadback("]) expect(f.source).toContain(originalCheck);
 		// Only metadata and original admission predicates are executed here. Real
 		// complete role readback, snapshots, signatures and native currency remain

@@ -161,6 +161,7 @@ import {
 	readCreatorOrdinaryFinishingCapacityForSizing,
 	readCreatorOrdinaryPreimageCapacityForSizing,
 	readProspectiveCreatorSnapshotTurnoverForSizing,
+	createCreatorSnapshotRecoveryMaintenanceJob,
 	reconcileCreatorSnapshotRecoveryRoles,
 	resolveCreatorForwardPromotionSource,
 } from "./internal/creator-closed-rollback-data.js";
@@ -2365,16 +2366,32 @@ async function reconcileCreatorBoundedRecoveryMaintenance(registration: V3Creato
 	// Evidence runs once; each subsequent fresh request must remove a group
 	// or generation. One final terminal probe uses the SAME existing bound.
 	const maxMaintenancePasses = 2 + signingEpochs.size + generationCount;
-	for (let pass = 0; pass < maxMaintenancePasses; pass++) {
-		const closeHold = await seal();
-		const checkpoint = await reconcileCreatorSnapshotRecoveryRoles({...input.promotionContext,
-			objectId: registration.objectId, store: registration.store,
-			snapshotStore: input.snapshotStore as CreatorClosedRollbackDataInput["snapshotStore"],
-			liveJournalStore: registration.liveJournalStore}, closeHold, acknowledgeCompletedJournalDrain, requireClosedWorkflowCompletion, currentTrust);
-		if (checkpoint !== "fresh-summary-required") return checkpoint;
-		if (pass === maxMaintenancePasses - 1) throw new TypeError("creator bounded retirement maintenance did not stabilize");
+	// One finite lifecycle owns immutable syntax and authentication facts. Each
+	// pass still supplies its freshly sealed census and performs the original
+	// native currency/planning/effect checks; no paid proof or writer is reused.
+	const maintenance = createCreatorSnapshotRecoveryMaintenanceJob({...input.promotionContext,
+		objectId: registration.objectId, store: registration.store,
+		snapshotStore: input.snapshotStore as CreatorClosedRollbackDataInput["snapshotStore"],
+		liveJournalStore: registration.liveJournalStore}, currentTrust);
+	let primary: unknown, failed = false;
+	try {
+		for (let pass = 0; pass < maxMaintenancePasses; pass++) {
+			const closeHold = await seal();
+			const checkpoint = await maintenance.reconcile(closeHold, acknowledgeCompletedJournalDrain, requireClosedWorkflowCompletion);
+			if (checkpoint !== "fresh-summary-required") return checkpoint;
+			if (pass === maxMaintenancePasses - 1) throw new TypeError("creator bounded retirement maintenance did not stabilize");
+		}
+		throw new TypeError("creator bounded retirement maintenance did not stabilize");
+	} catch (error) {
+		primary = error; failed = true;
+		throw error;
+	} finally {
+		try { await maintenance.release(); }
+		catch (cleanup) {
+			if (failed) throw new AggregateError([primary, cleanup], "creator bounded maintenance and joined release failed", {cause: primary});
+			throw cleanup;
+		}
 	}
-	throw new TypeError("creator bounded retirement maintenance did not stabilize");
 }
 
 /** Prime the original immutable source facts without constructing hypothetical

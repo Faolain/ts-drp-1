@@ -29,6 +29,21 @@ real transition boundary; they are not acceptance runs.
 
 ## Current gameplay diagnosis scope
 
+The receipt's `finiteMaintenanceEvidenceReuse20261018` owns the bounded
+maintenance-lifetime implementation and its affected safety, exact-accounting,
+matched native and unprofiled evidence. Immutable syntax and signed facts may
+outlive one stage; native currency, progress and authority may not. This removes
+measured duplication but does not close multi-second rollover latency, growing
+later-epoch costs, supported64 or endurance requirements. The same receipt entry
+classifies the finite remaining implementation and execution gaps.
+
+The receipt's `causalRolloverDiagnosis20261018` owns the current API-local counter,
+allocation/GC and semantic-stage attribution. First-entry command labels are not
+causal intervals: exact API timestamps supersede the earlier readiness-heavy
+adoption explanation. Native scheduler attempts failed finalization/coverage and
+are not evidence of storage waits or contention. The finite implementation
+handoff remains separate from accepted evidence and original acceptance gates.
+
 The receipt's `ownerSeparatedPathOptimization20261018` owns the parallel
 fork/recovery-evidence/presentation changes and their affected safety, native,
 unprofiled and real-Grid evidence. Reusable immutable facts remain separate from

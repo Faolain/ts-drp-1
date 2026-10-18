@@ -1047,7 +1047,7 @@ function anchorOf(trustRecord: Readonly<Record<string, unknown>>, syntax?: Retur
 	return record(trustRecord.exactCanonicalCurrentAnchorPreimageBytes, syntax);
 }
 
-/** Parsing data for one private read-only acquisition, never authentication or
+/** Parsing data for one private acquisition or its finite maintenance job, never authentication or
  * native currency. Every access uses the original exact-byte comparison and
  * detached outputs. No context/order/role decision is retained. The original
  * reader's entry/byte bounds and overflow behavior apply across assembly awaits.
@@ -1075,6 +1075,11 @@ function createCreatorClosedAcquisitionSyntax() {
 	});
 }
 type CreatorClosedAcquisitionSyntax = ReturnType<typeof createCreatorClosedAcquisitionSyntax>;
+
+interface CreatorRecoveryMaintenanceFacts {
+	readonly input: Captured;
+	readonly parsing: CreatorClosedAcquisitionSyntax;
+}
 
 interface AnchorRequirementFacts {
 	readonly source: DurableLiveJournalStore;
@@ -6549,9 +6554,13 @@ async function acquireClosedData(
 	issuancePreview = false,
 	classificationRead?: SnapshotRecoveryRoleInventory,
 	maintenance = !issuancePreview,
-	borrowedHeaderHold?: NativeReadReservation
+	borrowedHeaderHold?: NativeReadReservation,
+	ownedMaintenance?: CreatorRecoveryMaintenanceFacts
 ): Promise<CreatorClosedRollbackDataResult> {
-	const captured = capture(value);
+	// The maintenance job captured these input bindings before its first pass.
+	// A new observation object still owns every actual read and native lifetime;
+	// no frame, cursor, head, floor or paid accounting crosses a retirement write.
+	const captured = ownedMaintenance === undefined ? capture(value) : Object.freeze({...ownedMaintenance.input});
 	if (captured === undefined) return failure("malformed-input");
 	const input: Captured = classificationRead === undefined ? captured : Object.freeze({...captured, classificationRead});
 	let acquireRoles: AheBoundedRecoveryRoleStore["acquireBoundedRecoveryRoleRead"] | undefined;
@@ -6576,7 +6585,7 @@ async function acquireClosedData(
 	let signingDependencies: CreatorSigningDependencyRead | undefined;
 	let nominationControl: AheRetirementControl | undefined;
 	let headerHold: NativeReadReservation | undefined;
-	const parsing = createCreatorClosedAcquisitionSyntax();
+	const parsing = ownedMaintenance?.parsing ?? createCreatorClosedAcquisitionSyntax();
 	const readRecord = parsing.record;
 	const readAnchor = parsing.anchorOf;
 	const readUnique = parsing.unique;
@@ -7325,7 +7334,7 @@ async function acquireClosedData(
 				}
 				try { await headerHold?.release(); } catch { result ??= failure("release-failed"); }
 			}
-		} finally { parsing.release(); }
+		} finally { if (ownedMaintenance === undefined) parsing.release(); }
 	}
 	if (result !== undefined) return result;
 	if (facts === undefined) return failure("internal-invariant");
@@ -19299,7 +19308,7 @@ async function releaseInheritedObservation(observation: VerifiedCreatorClosedRol
  * The second pass is a fresh SAME-intent postimage check, including cold resume;
  * neither counter zero nor the marker's stored digest is readiness authority. */
 async function reconcileInheritedSnapshotRecoveryRoles(value: CreatorClosedRollbackDataInput,
-	closeHold?: CreatorSnapshotRecoveryCloseHold): Promise<void> {
+	closeHold?: CreatorSnapshotRecoveryCloseHold, ownedMaintenance?: CreatorRecoveryMaintenanceFacts): Promise<void> {
 	const input = capture(value);
 	requireLaw(input !== undefined && closeHold !== undefined, "snapshot-unavailable");
 	for (let pass = 0; pass < 1; pass++) {
@@ -19319,7 +19328,7 @@ async function reconcileInheritedSnapshotRecoveryRoles(value: CreatorClosedRollb
 					pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest}}));
 			const inventory = await snapshotCall(() => input.snapshotStore.captureRecoveryRoleInventory!({objectId: input.objectId}));
 			requireLaw(inventory.owner.migration !== "ready", "floor-stale");
-			const first = await acquireClosedData(value, undefined, undefined, true, undefined, undefined, false, inventory, true, journalHeaderHold);
+			const first = await acquireClosedData(value, undefined, undefined, true, undefined, undefined, false, inventory, true, journalHeaderHold, ownedMaintenance);
 			if (!first.ok) throw new Refusal(first);
 			preliminary = first.observation;
 			const initial = observations.get(preliminary)?.forward;
@@ -19330,7 +19339,7 @@ async function reconcileInheritedSnapshotRecoveryRoles(value: CreatorClosedRollb
 			await releaseInheritedObservation(preliminary);
 			preliminary = undefined;
 			reservations.push(await lifetime.acquireNativeIssuanceReservation());
-			const acquired = await acquireClosedData(value, undefined, undefined, true, closeHold, undefined, false, inventory, true, journalHeaderHold);
+			const acquired = await acquireClosedData(value, undefined, undefined, true, closeHold, undefined, false, inventory, true, journalHeaderHold, ownedMaintenance);
 			if (!acquired.ok) throw new Refusal(acquired);
 			observation = acquired.observation;
 			const facts = observations.get(observation), forward = facts?.forward,
@@ -19494,13 +19503,14 @@ async function reconcileSnapshotRecoveryRoles(
 	closeHold?: CreatorSnapshotRecoveryCloseHold,
 	acknowledgeCompletedJournalDrain = false,
 	requireClosedWorkflowCompletion = false,
-	currentTrust?: CurrentAnchorTrust
+	currentTrust?: CurrentAnchorTrust,
+	ownedMaintenance?: CreatorRecoveryMaintenanceFacts
 ): Promise<boolean> {
 	const sameFloor = (left: CreatorExpectedRoomHead, right: CreatorExpectedRoomHead): boolean =>
 		left.objectId === right.objectId &&
 		left.epoch === right.epoch &&
 		left.currentAnchorDigest === right.currentAnchorDigest;
-	const input = capture(value);
+	const input = ownedMaintenance?.input ?? capture(value);
 	if (input === undefined) throw new Refusal(failure("malformed-input"));
 	checkAbort(input.signal);
 	const inventoryRead = bindMethod<
@@ -19514,7 +19524,7 @@ async function reconcileSnapshotRecoveryRoles(
 		// Inherited classification progress is not terminal completion of the
 		// original cross-store retirement request that halted ordinary admission.
 		requireLaw(!requireClosedWorkflowCompletion, "snapshot-unavailable");
-		await reconcileInheritedSnapshotRecoveryRoles(value, closeHold);
+		await reconcileInheritedSnapshotRecoveryRoles(value, closeHold, ownedMaintenance);
 		return false;
 	}
 	const floor = captureCreatorRoomHeadState(
@@ -19640,7 +19650,7 @@ async function reconcileSnapshotRecoveryRoles(
 		// Consume the categorized runtime census at the existing close checkpoint,
 		// only after ALL original native reservations have actually started. The
 		// whole protected union still grants no all-owner retirement authorization.
-		const closeObserved = await acquireClosedData(value, undefined, undefined, true, closeHold, undefined, false, undefined, true, journalHeaderHold);
+		const closeObserved = await acquireClosedData(value, undefined, undefined, true, closeHold, undefined, false, undefined, true, journalHeaderHold, ownedMaintenance);
 		if (!closeObserved.ok) throw new Refusal(closeObserved);
 		closeUnionMaterial = resolveCreatorForwardPromotionSource(
 			closeObserved.observation,
@@ -20544,20 +20554,77 @@ export async function reconcileCreatorSnapshotRecoveryRoles(
 		return (await reconcileSnapshotRecoveryRoles(value, closeHold, acknowledgeCompletedJournalDrain, requireClosedWorkflowCompletion, currentTrust))
 			? "fresh-summary-required" : "complete";
 	} catch (error) {
-		if (error instanceof Refusal || error instanceof RoleRefusal) {
-			const refusal = new TypeError(
-				`creator snapshot role reconciliation refused: ${error.result.kind}; ${JSON.stringify(error.result)}`,
-				{ cause: error.result }
-			);
-			// Startup can fail before its frame exports local observer events.
-			// Keep the original typed cause, and retain only the local failure
-			// callsite in the normal exception stack; this grants no recovery fact.
-			if (error instanceof Refusal && error.diagnosticStack !== undefined)
-				refusal.stack += `\nOriginal recovery refusal: ${error.diagnosticStack}`;
-			throw refusal;
-		}
-		throw error;
+		throwCreatorSnapshotRecoveryFailure(error);
 	}
+}
+
+function throwCreatorSnapshotRecoveryFailure(error: unknown): never {
+	if (error instanceof Refusal || error instanceof RoleRefusal) {
+		const refusal = new TypeError(
+			`creator snapshot role reconciliation refused: ${error.result.kind}; ${JSON.stringify(error.result)}`,
+			{ cause: error.result }
+		);
+		// Keep the same typed cause and originating callsite for both the public
+		// one-shot request and the finite live maintenance job.
+		if (error instanceof Refusal && error.diagnosticStack !== undefined)
+			refusal.stack += `\nOriginal recovery refusal: ${error.diagnosticStack}`;
+		throw refusal;
+	}
+	throw error;
+}
+
+/** One original finite reconciliation schedule owns immutable syntax and signed
+ * evidence across its separately atomic retirement stages. Capture the exact
+ * input/pin and original method bindings before admitting any work. The five
+ * genuine trust fields, exact signed bytes and closure refs still key evidence;
+ * neither native observations nor authorization survive a stage. Every stage
+ * reopens actual storage and creates/charges its complete original proof book.
+ *
+ * Retention uses the existing syntax/evidence entry and byte bounds, not a new
+ * allowance. No RO/native view is kept across writes. New calls revoke at
+ * release, one admitted call joins, and then all retained facts are discarded.
+ * Reopen starts another job; concurrent stages never share mutable progress.
+ */
+export function createCreatorSnapshotRecoveryMaintenanceJob(
+	value: CreatorClosedRollbackDataInput, currentTrust?: CurrentAnchorTrust
+) {
+	const input = capture(value);
+	if (input === undefined || (currentTrust !== undefined && resolveSealRecoveryTrust(currentTrust) === undefined))
+		throw new TypeError("creator recovery maintenance input is foreign or unavailable");
+	const fixedValue: CreatorClosedRollbackDataInput = Object.freeze({objectId: input.objectId,
+		pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest,
+		exactCanonicalPinnedGenesisTrustStateRecordBytes: input.exactCanonicalPinnedGenesisTrustStateRecordBytes,
+		roomHeadAuthority: input.roomHeadAuthority, catalog: input.catalog, store: input.store,
+		snapshotStore: input.snapshotStore, liveJournalStore: input.liveJournalStore,
+		...(input.signal === undefined ? {} : {signal: input.signal})});
+	const ownedMaintenance = Object.freeze({input, parsing: createCreatorClosedAcquisitionSyntax()});
+	let released = false, pending: Promise<"complete" | "fresh-summary-required"> | undefined,
+		releaseTask: Promise<void> | undefined;
+	return Object.freeze({
+		reconcile(closeHold?: CreatorSnapshotRecoveryCloseHold, acknowledgeCompletedJournalDrain = false,
+			requireClosedWorkflowCompletion = false): Promise<"complete" | "fresh-summary-required"> {
+			if (released || pending !== undefined) return Promise.reject(new TypeError("creator recovery maintenance job is released or busy"));
+			const task = Promise.resolve().then(async (): Promise<"complete" | "fresh-summary-required"> => {
+				try {
+					return (await reconcileSnapshotRecoveryRoles(fixedValue, closeHold, acknowledgeCompletedJournalDrain,
+						requireClosedWorkflowCompletion, currentTrust, ownedMaintenance)) ? "fresh-summary-required" : "complete";
+				} catch (error) { throwCreatorSnapshotRecoveryFailure(error); }
+			});
+			pending = task;
+			void task.then(() => {if (pending === task) pending = undefined;}, () => {if (pending === task) pending = undefined;});
+			return task;
+		},
+		release(): Promise<void> {
+			if (releaseTask !== undefined) return releaseTask;
+			released = true;
+			const admitted = pending;
+			releaseTask = Promise.resolve().then(async () => {
+				await Promise.allSettled(admitted === undefined ? [] : [admitted]);
+				ownedMaintenance.parsing.release();
+			});
+			return releaseTask;
+		},
+	});
 }
 
 type RoleFailure = Extract<CreatorProtectedRecoveryRoleResult, { ok: false }>;

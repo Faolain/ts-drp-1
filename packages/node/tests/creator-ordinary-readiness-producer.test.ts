@@ -1367,8 +1367,11 @@ describe("original joined readiness job metadata ordering", () => {
 			const calls: unknown[] = [], actor = {captureRetirementOwners: () => ({acquireEvidence: async () => ({
 				readExactCanonicalRows: () => [], check: async () => {calls.push("check");}, release: async () => {calls.push("release");},
 			})})};
-			const bindings = {decodeCanonical, reconcileCreatorSnapshotRecoveryRoles: async (_: unknown, _hold: unknown, ack: boolean, strict: boolean, currentTrust?: object) => {
-				calls.push([ack, strict, currentTrust]); const next = outcomes.shift(); if (next === "native-error") throw Error("native verifier refused"); return next;
+			const bindings = {decodeCanonical, createCreatorSnapshotRecoveryMaintenanceJob: (input: {objectId: string}, currentTrust?: object) => {
+				expect(input.objectId).toBe("room"); expect(currentTrust).toBe(trust);
+				return {reconcile: async (_hold: unknown, ack: boolean, strict: boolean) => {
+					calls.push([ack, strict, currentTrust]); const next = outcomes.shift(); if (next === "native-error") throw Error("native verifier refused"); return next;
+				}, release: async () => {calls.push("maintenance-release");}};
 			}};
 			const js = ts.transpileModule(`${fn.getText(close)}\nreturn reconcileCreatorBoundedRecoveryMaintenance;`,
 				{compilerOptions: {target: ts.ScriptTarget.ES2022}}).outputText;
@@ -1378,6 +1381,39 @@ describe("original joined readiness job metadata ordering", () => {
 			if (success) await expect(task).resolves.toBe("complete"); else await expect(task).rejects.toThrow();
 			expect(calls.slice(0, 2)).toEqual(["check", "release"]);
 			expect(calls.filter(Array.isArray).every(args => args[0] === true && args[1] === true && args[2] === trust)).toBe(true);
+			expect(calls.at(-1)).toBe("maintenance-release");
+			expect(calls.filter(call => call === "maintenance-release")).toHaveLength(1);
+		}
+	});
+
+	it("joins its finite maintenance owner on sealing failure and preserves a simultaneous release failure", async () => {
+		const close = ts.createSourceFile("close.ts", readFileSync(new URL("../src/creator-close.ts", import.meta.url), "utf8"), ts.ScriptTarget.Latest, true);
+		const fn = close.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === "reconcileCreatorBoundedRecoveryMaintenance");
+		if (!fn) throw Error("missing original bounded reconciliation");
+		const js = ts.transpileModule(`${fn.getText(close)}\nreturn reconcileCreatorBoundedRecoveryMaintenance;`,
+			{compilerOptions: {target: ts.ScriptTarget.ES2022}}).outputText;
+		for (const failCleanup of [false, true]) {
+			const primary = new Error("fresh seal failed"), cleanup = new Error("maintenance release failed");
+			let joined = false, releaseEntered!: () => void, finishRelease!: () => void;
+			const entered = new Promise<void>(resolve => {releaseEntered = resolve;}), gate = new Promise<void>(resolve => {finishRelease = resolve;});
+			const actor = {captureRetirementOwners: () => ({acquireEvidence: async () => ({
+				readExactCanonicalRows: () => [], check: async () => undefined, release: async () => undefined,
+			})})};
+			const bindings = {decodeCanonical, createCreatorSnapshotRecoveryMaintenanceJob: () => ({
+				reconcile: async () => {throw Error("unreached verifier");},
+				release: async () => {releaseEntered(); await gate; joined = true; if (failCleanup) throw cleanup;},
+			})};
+			const reconcile = new Function("bindings", `const {${Object.keys(bindings).join(",")}}=bindings;${js}`)(bindings);
+			let settled = false;
+			const task = reconcile({objectId: "room"}, {promotionContext: {}}, actor, 0, async () => {throw primary;});
+			const observed = task.then(() => {settled = true; return undefined;}, (error: unknown) => {settled = true; return error;});
+			await entered;
+			expect(joined).toBe(false); expect(settled).toBe(false);
+			finishRelease();
+			const error = await observed;
+			expect(joined).toBe(true);
+			if (failCleanup) {expect(error).toBeInstanceOf(AggregateError); expect((error as AggregateError).errors).toEqual([primary, cleanup]);}
+			else expect(error).toBe(primary);
 		}
 	});
 

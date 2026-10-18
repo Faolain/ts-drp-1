@@ -1,5 +1,5 @@
 import {expect,test as base} from "@playwright/test";
-import {execFile} from "node:child_process";
+import {execFile,spawn} from "node:child_process";
 import {mkdtemp,stat,open} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {isAbsolute,join} from "node:path";
@@ -47,8 +47,22 @@ function selectCriticalTraceCategories(available:readonly string[]):string[]{
  const native=["IndexedDB","indexeddb","disabled-by-default-indexeddb","leveldb","disabled-by-default-leveldb"];
  return ["devtools.timeline","blink.user_timing","disabled-by-default-v8.gc",...native.filter(category=>available.includes(category))];
 }
-function criticalCaptureModes(mode:"full-calls"|"cpu-only"){
- return {v8CpuProfiling:mode==="cpu-only",nativeTracing:mode==="full-calls"};
+function criticalCaptureModes(mode:"full-calls"|"cpu-only"|"trace-only"|"allocation-only"|"system-trace"){
+ return {v8CpuProfiling:mode==="cpu-only",nativeTracing:mode!=="cpu-only"&&mode!=="system-trace",allocationSampling:mode==="allocation-only"};
+}
+function validateCriticalAllocationProfile(profile:any){
+ const failures:string[]=[],nodes=new Set<number>(),ordinals=new Set<number>(),pending=[profile?.head];
+ let nodeSelfSize=0,sampledEstimatedBytes=0;
+ while(pending.length){const node=pending.pop();if(!node||!Number.isSafeInteger(node.id)||nodes.has(node.id)||!Number.isFinite(node.selfSize)||node.selfSize<0){failures.push("invalid/duplicate allocation node");continue;}
+  nodes.add(node.id);nodeSelfSize+=node.selfSize;if(nodes.size>200_000){failures.push("allocation node bound exceeded");break;}
+  if(!node.callFrame||!Array.isArray(node.children)){failures.push("invalid allocation call frame/children");continue;}for(const child of node.children)pending.push(child);
+ }
+ if(!Array.isArray(profile?.samples))failures.push("allocation samples absent");
+ else if(profile.samples.length>2_000_000)failures.push("allocation sample bound exceeded");
+ else for(const sample of profile.samples){if(!nodes.has(sample.nodeId)||!Number.isFinite(sample.size)||sample.size<0||!Number.isSafeInteger(sample.ordinal)||ordinals.has(sample.ordinal))failures.push("invalid/duplicate allocation sample");
+  ordinals.add(sample.ordinal);sampledEstimatedBytes+=sample.size;}
+ return {valid:failures.length===0,failures:[...new Set(failures)],nodes:nodes.size,samples:profile?.samples?.length??0,nodeSelfSize,sampledEstimatedBytes,
+  qualification:"Phase-scoped sampled allocation estimates, including collected objects when both flags are enabled; not allocation call counts, every byte, live memory or a retained/temporary split. Allocation ordinals are not timestamps."};
 }
 // Only this opt-in resource run changes the original launcher's context.
 // Its default incognito context has no on-disk IndexedDB directory to measure.
@@ -94,9 +108,10 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
  const fullFunctionCalls=process.env.STARTUP_HEALTHY_GRID_FULL_CALLS==="1";
  if(fullFunctionCalls&&!criticalProfiling)throw new Error("full function capture requires existing critical instrumentation");
  const profileMode=process.env.STARTUP_HEALTHY_GRID_PROFILE_MODE??"full-calls";
- if(profileMode!=="full-calls"&&profileMode!=="cpu-only")throw new Error("bounded full-calls or cpu-only profile mode required");
+ if(profileMode!=="full-calls"&&profileMode!=="cpu-only"&&profileMode!=="trace-only"&&profileMode!=="allocation-only"&&profileMode!=="system-trace")throw new Error("bounded full-calls, cpu-only, trace-only, allocation-only or system-trace profile mode required");
  const exactFunctionCalls=fullFunctionCalls&&profileMode==="full-calls";
  const captureModes=criticalCaptureModes(profileMode);
+ if((profileMode==="trace-only"||profileMode==="allocation-only"||profileMode==="system-trace")&&!fullFunctionCalls)throw new Error("trace/allocation/system diagnostic requires original bounded E4 API windows");
  if(fullFunctionCalls)await page.context().addInitScript(exact=>{
   Reflect.set(globalThis,"__r8FunctionCaptureEnabled",true);Reflect.set(globalThis,"__r8FullFunctionCalls",exact);
  },exactFunctionCalls);
@@ -250,6 +265,7 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
    sourceMapURL:script.sourceMapURL?.startsWith("data:")?{inline:true,encodedBytes:Buffer.byteLength(script.sourceMapURL),sha256:createHash("sha256").update(script.sourceMapURL).digest("hex")}:script.sourceMapURL,
    executionContextId:script.executionContextId,startLine:script.startLine,startColumn:script.startColumn,endLine:script.endLine,endColumn:script.endColumn});});
   await cdp.send("Runtime.enable");await cdp.send("Debugger.enable");await cdp.send("Profiler.enable");if(captureModes.v8CpuProfiling)await cdp.send("Profiler.setSamplingInterval",{interval:4000});
+  if(captureModes.allocationSampling)await cdp.send("HeapProfiler.enable");
  };
  const realmWindows=async(kind:"begin"|"end",meta:any)=>{
   const result:any[]=[];
@@ -267,6 +283,89 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
   }
   return result;
  };
+ const criticalClockAnchor=async()=>{
+  const hostBegin=performance.now();
+  const before=await bounded(cdp.send("Performance.getMetrics"),"critical clock before");
+  const creator=page.frames().find(frame=>frame.url().split("/").slice(0,3).join("/")===clients[0]?.origin);
+  if(!creator)throw new Error("critical creator clock context unavailable");
+  const renderer=await bounded(creator.evaluate(()=>({timeOrigin:performance.timeOrigin,now:performance.now()})),"critical renderer clock");
+  const after=await bounded(cdp.send("Performance.getMetrics"),"critical clock after");
+  const monotonicSecondsBefore=before.metrics.find(row=>row.name==="Timestamp")?.value,monotonicSecondsAfter=after.metrics.find(row=>row.name==="Timestamp")?.value;
+  if(!Number.isFinite(monotonicSecondsBefore)||!Number.isFinite(monotonicSecondsAfter)||monotonicSecondsAfter!<monotonicSecondsBefore!)throw new Error("critical monotonic clock bracket invalid");
+  return {hostBegin,hostEnd:performance.now(),renderer,monotonicSecondsBefore,monotonicSecondsAfter,
+   qualification:"Sequential CDP monotonic Timestamp brackets renderer performance.now; uncertainty is the full bracket width, not an exact equal-clock assertion. Original blink.user_timing API measure gives exact trace-local begin/end."};
+ };
+ // An opt-in OS capture answers scheduling/thread-state questions, not JS call
+ // counts. The short PID-mapping trace is completely stopped before xctrace or
+ // the original API starts; V8/precise coverage/allocation sampling stay off.
+ let systemTrace:any,systemTraceStop:Promise<void>|undefined;
+ const systemTraceRawSourceHashes=new Set<string>();
+ const systemTraceClock=()=>({utcMilliseconds:Date.now(),hostMonotonicMilliseconds:performance.now(),hostTimeOrigin:performance.timeOrigin});
+ const stopSystemTrace=(reason:string):Promise<void>=>{
+  if(!systemTrace)return Promise.resolve();
+  if(systemTraceStop)return systemTraceStop;
+  const state=systemTrace;
+  systemTraceStop=(async()=>{
+   state.stopRequested={reason,...systemTraceClock()};if(state.monitor)clearInterval(state.monitor);
+   if(state.child?.exitCode===null&&state.child?.signalCode===null)state.child.kill("SIGINT");
+   if(state.listener?.exitCode===null&&state.listener?.signalCode===null)state.listener.kill("SIGTERM");
+   if(state.exited)try{state.exit=await bounded(state.exited,"System Trace stop/save",90_000);}catch(error){state.errors.push({stage:"stop",error:String(error)});state.child?.kill("SIGTERM");
+    try{state.exit=await bounded(state.exited,"System Trace terminate/join",10_000);}catch(joinError){state.errors.push({stage:"terminate-join",error:String(joinError)});state.child?.kill("SIGKILL");state.exit=await bounded(state.exited,"System Trace kill/join",5_000);}}
+   state.stopped=systemTraceClock();
+   const {child,listener,exited,monitor,...metadata}=state;
+   await attachJson("healthy-system-trace-metadata",metadata);
+  })();return systemTraceStop;
+ };
+ const startSystemTrace=async()=>{
+  if(systemTrace)return;
+  const creator=page.frames().find(frame=>frame.url().split("/").slice(0,3).join("/")===clients[0]?.origin);
+  if(!creator)throw new Error("System Trace creator frame unavailable");
+  const frameTree=(await cdp.send("Page.getFrameTree")).frameTree,frames:any[]=[];
+  const visit=(row:any)=>{frames.push(row.frame);for(const child of row.childFrames??[])visit(child);};visit(frameTree);
+  const matching=frames.filter(frame=>frame.url===creator.url());if(matching.length!==1)throw new Error("System Trace creator CDP frame ambiguous");
+  const marker="r8-os-pid-"+process.pid+"-"+Date.now(),chunks:Buffer[]=[];let bytes=0,completed:any;
+  const completion=new Promise<any>(resolve=>{browserCpu.once("Tracing.tracingComplete",resolve);});
+  const mappingBegin=systemTraceClock();
+  await browserCpu.send("Tracing.start",{transferMode:"ReturnAsStream",streamFormat:"json",streamCompression:"none",
+   traceConfig:{recordMode:"recordUntilFull",traceBufferSizeInKb:8192,includedCategories:["devtools.timeline","disabled-by-default-devtools.timeline","blink.user_timing"]}});
+  let creatorClock:any;
+  try{creatorClock=await creator.evaluate(name=>{performance.mark(name);return {timeOrigin:performance.timeOrigin,now:performance.now()};},marker);}
+  finally{await browserCpu.send("Tracing.end");completed=await bounded(completion,"System Trace PID mapping completion");}
+  if(!completed.stream||completed.dataLossOccurred!==false)throw new Error("System Trace PID mapping stream absent or lost");
+  try{for(;;){const chunk=await browserCpu.send("IO.read",{handle:completed.stream,size:1024*1024});const value=Buffer.from(chunk.data,chunk.base64Encoded?"base64":"utf8");bytes+=value.length;
+   if(bytes>8*1024*1024)throw new Error("System Trace PID mapping exceeds 8 MiB");chunks.push(value);if(chunk.eof)break;}}
+  finally{await browserCpu.send("IO.close",{handle:completed.stream});await creator.evaluate(name=>performance.clearMarks(name),marker);}
+  const raw=Buffer.concat(chunks),events=JSON.parse(raw.toString("utf8")).traceEvents;
+  if(!Array.isArray(events))throw new Error("System Trace PID mapping events absent");
+  const marks=events.filter((event:any)=>event.name===marker&&event.cat?.split(",").includes("blink.user_timing"));
+  if(marks.length!==1||!Number.isSafeInteger(marks[0].pid)||!Number.isSafeInteger(marks[0].tid))throw new Error("System Trace creator marker PID ambiguous");
+  const processes=(await browserCpu.send("SystemInfo.getProcessInfo")).processInfo,pid=marks[0].pid;
+  if(!processes.some(row=>row.id===pid&&row.type==="renderer"))throw new Error("System Trace mapped PID is not an owned renderer");
+  const executable=(await promisify(execFile)("/bin/ps",["-p",String(pid),"-ww","-o","comm="])).stdout.trim();
+  const processCommand=(await promisify(execFile)("/bin/ps",["-p",String(pid),"-ww","-o","command="])).stdout.trim();
+  if(!isAbsolute(command.arguments[0])||executable!==command.arguments[0]||!processCommand.includes("--type=renderer"))throw new Error("System Trace renderer binary does not match owned browser");
+  await info.attach("healthy-system-trace-pid-mapping",{body:raw,contentType:"application/json"});
+  const path=info.outputPath("healthy-system-trace.trace"),notification="codex.r8.systemtrace."+process.pid+"."+Date.now();
+  const state:any={path,pid,mainThreadId:marks[0].tid,executable,processCommand,ownedProcesses:processes,frame:matching[0],marker:marks[0],creatorClock,
+   mappingBegin,mappingEnd:systemTraceClock(),mappingBytes:bytes,mappingDataLossOccurred:completed.dataLossOccurred,
+   timeLimitSeconds:30,allocatedOutputLimitBytes:512*1024*1024,allocationSamples:[],phases:[],errors:[],stdout:"",stderr:"",notification:"",
+   qualification:"One exact creator renderer selected by a unique mark executed in its URL/CDP-identified frame, owned-browser process membership and binary path. Mapping trace stops before OS recording/API. System Trace may include kernel/system scheduling metadata; export selects this PID. Browser-process IndexedDB backend is not this target. UTC export precision and clock brackets bound phase alignment; no cycle-exact attribution or backend-lock causality is claimed."};
+  systemTrace=state;
+  const listener=spawn("/usr/bin/notifyutil",["-v","-1",notification],{stdio:["ignore","pipe","pipe"]});state.listener=listener;
+  const ready=new Promise<void>((resolve,reject)=>{listener.on("error",reject);listener.stdout.on("data",chunk=>{state.notification+=chunk.toString();
+    if(state.notification.includes(notification)&&/\[\d+\]/u.test(state.notification)){state.ready=systemTraceClock();resolve();}});
+   listener.on("exit",code=>{if(!state.ready)reject(new Error("System Trace notification did not confirm readiness: "+code+" "+state.notification));});});
+  // Avoid an unhandled rejection if native launch fails before the await below.
+  void ready.catch(()=>{});
+  const args=["xctrace","record","--template","System Trace","--attach",String(pid),"--time-limit","30s","--window","30s","--output",path,"--notify-tracing-started",notification,"--no-prompt"];
+  state.launch={arguments:args,...systemTraceClock()};const child=spawn("/usr/bin/xcrun",args,{stdio:["ignore","pipe","pipe"]});state.child=child;
+  state.recorderPid=child.pid;
+  state.exited=new Promise(resolve=>{child.on("error",error=>resolve({error:String(error),...systemTraceClock()}));child.on("exit",(code,signal)=>resolve({code,signal,...systemTraceClock()}));});
+  for(const channel of ["stdout","stderr"] as const)child[channel].on("data",chunk=>{state[channel]+=chunk.toString();if(Buffer.byteLength(state[channel])>128*1024){state.errors.push({stage:"log-bound",channel});child.kill("SIGINT");}});
+  try{await bounded(ready,"System Trace readiness",15_000);}catch(error){state.errors.push({stage:"readiness",error:String(error)});await stopSystemTrace("readiness-failure");throw error;}
+  state.monitor=setInterval(()=>{void promisify(execFile)("/usr/bin/du",["-sk",path]).then(({stdout})=>{const allocated=Number(stdout.split(/\s+/u)[0])*1024;
+   state.allocationSamples.push({allocated,...systemTraceClock()});if(!Number.isSafeInteger(allocated)||allocated>state.allocatedOutputLimitBytes){state.errors.push({stage:"output-bound",allocated});void stopSystemTrace("output-bound");}},error=>{state.errors.push({stage:"output-stat",error:String(error)});});},1000);
+ };
  const startCriticalWindow=async(meta:any)=>{
   if(activeCapture)throw new Error("overlapping critical capture windows");await initializeCritical();
   const capture:any={index:captureWindows.length,meta,requestedAt:performance.now(),contexts:[...contexts.values()],frames:page.frames().map(frame=>frame.url()),bufferUsage:[],errors:[]};
@@ -274,6 +373,8 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
   capture.contextCoverage={expectedOrigins,observedOrigins,missingOrigins:expectedOrigins.filter(origin=>!observedOrigins.includes(origin)),
    qualification:"Default execution contexts observed on the one profiled renderer session. Missing origins mean incomplete VM coverage, not permission to create duplicate iframe sessions."};
   captureWindows.push(capture);activeCapture=capture;
+  if(profileMode==="system-trace")await startSystemTrace();
+  if(profileMode==="trace-only"||profileMode==="allocation-only")capture.clockBegin=await criticalClockAnchor();
   if(exactFunctionCalls)capture.realmBegin=await realmWindows("begin",meta);
   if(captureModes.nativeTracing)try{
    const available=(await browserCpu.send("Tracing.getCategories")).categories;
@@ -285,6 +386,10 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
    await browserCpu.send("Tracing.recordClockSyncMarker",{syncId:"r8-critical-"+capture.index+"-begin"});
   }catch(error){capture.errors.push({stage:"trace-start",error:String(error)});}
   if(exactFunctionCalls){capture.coverageStart=await cdp.send("Profiler.startPreciseCoverage",{callCount:true,detailed:false,allowTriggeredUpdates:false});capture.coverageStarted=true;capture.coverageReset=await cdp.send("Profiler.takePreciseCoverage");}
+  if(captureModes.allocationSampling){
+   capture.allocationSampling={samplingInterval:32768,stackDepth:128,includeObjectsCollectedByMajorGC:true,includeObjectsCollectedByMinorGC:true};
+   await cdp.send("HeapProfiler.startSampling",capture.allocationSampling);capture.allocationStarted=true;
+  }
   capture.cpuBefore=(await browserCpu.send("SystemInfo.getProcessInfo")).processInfo;
   if(captureModes.v8CpuProfiling){await cdp.send("Profiler.start");capture.profileStarted=true;}capture.readyAt=performance.now();
   return {ok:true,index:capture.index,targetId};
@@ -292,6 +397,21 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
  const stopCriticalWindow=async(reason:string,snapshot?:unknown)=>{
   const capture=activeCapture;if(!capture)return;activeCapture=undefined;capture.reason=reason;capture.stopRequestedAt=performance.now();
   const prefix="healthy-critical-window-"+capture.index;let coverageForPinCheck:any;
+  if(profileMode==="system-trace"){
+   systemTrace?.phases.push({phase:capture.meta.phase,reason,...capture.endMeta,hostStop:systemTraceClock()});
+   if(reason!=="api-return"||capture.meta.phase==="creator-adoption-inclusive")await stopSystemTrace(reason);
+  }
+  // Stop phase allocation collection before any profile/source/trace export or
+  // test GC. Default sampling retains only live objects, so both collected-
+  // object flags above are necessary to attribute short-lived allocation churn.
+  if(capture.allocationStarted)try{
+   const {profile}=await bounded(cdp.send("HeapProfiler.stopSampling"),"allocation sampling stop");capture.allocationStoppedAt=performance.now();
+   capture.allocationValidation=validateCriticalAllocationProfile(profile);
+   const allocationScriptIds=new Set<string>(),pending=capture.allocationValidation.valid?[profile.head]:[];while(pending.length){const node=pending.pop()!;if(node.callFrame.scriptId!=="0")allocationScriptIds.add(node.callFrame.scriptId);for(const child of node.children)pending.push(child);}
+   capture.allocationScripts=[...allocationScriptIds].map(scriptId=>({scriptId,url:scripts.get(scriptId)?.url,parsed:scripts.get(scriptId)}));
+   await attachJson(prefix+"-allocation",profile);
+  }catch(error){capture.errors.push({stage:"allocation-stop",error:String(error)});}
+  if(profileMode==="trace-only"||profileMode==="allocation-only")try{capture.clockEnd=await criticalClockAnchor();}catch(error){capture.errors.push({stage:"clock-end",error:String(error)});}
   if(exactFunctionCalls&&reason!=="api-return"&&snapshot===undefined){
    // A diagnostic checkpoint must not end/revoke an in-flight creator API.
    // Read its current counters directly; partial/open bodies remain explicit.
@@ -333,26 +453,44 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
   finally{if(capture.traceCompleteListener)browserCpu.off("Tracing.tracingComplete",capture.traceCompleteListener);if(capture.traceBufferListener)browserCpu.off("Tracing.bufferUsage",capture.traceBufferListener);}
   // Source retrieval and JSON attachment occur after profilers stop. They are
   // test-only export work, not product API computation or exact invocation work.
+  // Trace-only has no CPU/coverage list. Pin observed scripts directly from the
+  // existing Debugger events; allocation mode can pin only sampled script IDs.
+  // Avoid spending the finite OS window exporting large sources between APIs.
+  const deferSystemSources=profileMode==="system-trace"&&capture.meta.phase==="sealing-inclusive"&&reason==="api-return";
+  const capturedScripts=deferSystemSources?[]:capture.coveredScripts??capture.profileScripts??capture.allocationScripts??[...scripts.values()];
   let capturedSourceBytes=0;
-  for(const script of capture.coveredScripts??capture.profileScripts??[])if(!sourcePins.has(script.scriptId))try{
+  for(const script of capturedScripts)if(!sourcePins.has(script.scriptId))try{
    const {scriptSource}=await cdp.send("Debugger.getScriptSource",{scriptId:script.scriptId});capturedSourceBytes+=Buffer.byteLength(scriptSource);
    if(capturedSourceBytes>128*1024*1024)throw new Error("bounded script source capture exceeds 128 MiB");
-   sourcePins.set(script.scriptId,{...script,utf16Length:scriptSource.length,encodedBytes:Buffer.byteLength(scriptSource),sha256:createHash("sha256").update(scriptSource).digest("hex")});
+   const pin:any={...script,utf16Length:scriptSource.length,encodedBytes:Buffer.byteLength(scriptSource),sha256:createHash("sha256").update(scriptSource).digest("hex")};
+   if(profileMode==="system-trace"&&script.url?.endsWith("/r8-source-binding.mjs")){
+    const expected=JSON.parse(readFileSync(join(directory,"artifacts.json"),"utf8")).entries.find((entry:any)=>entry.name==="r8-source-binding")?.sha256;
+    if(typeof expected!=="string")throw new Error("System Trace expected bundle pin absent");pin.expectedArtifactSha256=expected;pin.exactArtifactMatch=pin.sha256===expected;
+    if(!pin.exactArtifactMatch&&!systemTraceRawSourceHashes.has(pin.sha256)){
+     if(pin.encodedBytes>32*1024*1024||systemTraceRawSourceHashes.size>=1)throw new Error("System Trace mismatched raw source bound exceeded");
+     const name="healthy-system-trace-mismatched-source-"+pin.sha256,path=info.outputPath(name+".js"),file=await open(path,"wx");
+     try{await file.writeFile(scriptSource,"utf8");}finally{await file.close();}await info.attach(name,{path,contentType:"text/javascript"});
+     systemTraceRawSourceHashes.add(pin.sha256);pin.rawSourceAttachment=name;
+    }
+   }
+   sourcePins.set(script.scriptId,pin);
   }catch(error){capture.errors.push({stage:"script-source-pin",scriptId:script.scriptId,error:String(error)});}
   capture.sourcePinValidation={valid:true,failures:[] as any[]};
-  for(const script of capture.coveredScripts??capture.profileScripts??[])if(!sourcePins.has(script.scriptId)){
+  for(const script of capturedScripts)if(!sourcePins.has(script.scriptId)){
    capture.sourcePinValidation.valid=false;capture.sourcePinValidation.failures.push({scriptId:script.scriptId,reason:"covered/profiled script source unpinned"});
   }
+  if(profileMode==="system-trace")for(const pin of sourcePins.values())if(pin.exactArtifactMatch===false){capture.sourcePinValidation.valid=false;capture.sourcePinValidation.failures.push({scriptId:pin.scriptId,reason:"raw runtime bundle differs from exact artifact",sha256:pin.sha256,expectedArtifactSha256:pin.expectedArtifactSha256,rawSourceAttachment:pin.rawSourceAttachment});}
   for(const script of coverageForPinCheck?.result??[])for(const fn of script.functions)for(const range of fn.ranges){
    const pin=sourcePins.get(script.scriptId);if(pin&&range.endOffset>pin.utf16Length){capture.sourcePinValidation.valid=false;
     capture.sourcePinValidation.failures.push({scriptId:script.scriptId,functionName:fn.functionName,startOffset:range.startOffset,endOffset:range.endOffset,sourceUtf16Length:pin.utf16Length});}
   }
   if(exactFunctionCalls){capture.realmEnd=await realmWindows("end",capture.meta);await attachJson(prefix+"-function-snapshots",{creator:snapshot,realms:capture.realmEnd});}
   capture.exportCompletedAt=performance.now();
-  capture.validity={cpuTimeline:captureModes.v8CpuProfiling?capture.cpuValidation?.valid===true:"not-requested-full-calls",sourcePins:capture.sourcePinValidation.valid===true,
-   preciseFunctionCounts:exactFunctionCalls?capture.coverageValidation?.valid===true:"not-requested-cpu-only",
+  capture.validity={cpuTimeline:captureModes.v8CpuProfiling?capture.cpuValidation?.valid===true:"not-requested-"+profileMode,sourcePins:capture.sourcePinValidation.valid===true,
+   allocationProfile:captureModes.allocationSampling?capture.allocationValidation?.valid===true:"not-requested-"+profileMode,
+   preciseFunctionCounts:exactFunctionCalls?capture.coverageValidation?.valid===true:"not-requested-"+profileMode,
    allExpectedRealmContexts:capture.contextCoverage.missingOrigins.length===0,
-   browserTrace:captureModes.nativeTracing?capture.traceEof===true&&capture.traceComplete?.dataLossOccurred===false:"not-requested-cpu-only",
+   browserTrace:captureModes.nativeTracing?capture.traceEof===true&&capture.traceComplete?.dataLossOccurred===false:"not-requested-"+profileMode,
    originalApiBoundary:reason==="api-return"&&Number.isFinite(capture.endMeta?.apiBegin)&&Number.isFinite(capture.endMeta?.apiEnd),errorsAbsent:capture.errors.length===0};
   capture.testOnlyExportMilliseconds=capture.exportCompletedAt-capture.stopRequestedAt;
   // Promises/listener closures are neither evidence nor serializable metadata.
@@ -379,6 +517,7 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
  const saveCriticalCapture=async(reason:string)=>{
   if(!criticalProfiling||criticalTimingsOnly||criticalFinished)return;criticalFinished=true;
   if(activeCapture)await stopCriticalWindow(reason);
+  if(profileMode==="system-trace")await stopSystemTrace(reason);
   await attachJson("healthy-critical-script-source-pins",[...sourcePins.values()]);
   if(fullFunctionCalls&&captureWindows.length!==2)criticalErrors.push({stage:"boundary-completeness",expected:2,actual:captureWindows.length});
   await attachJson("healthy-critical-capture-metadata",{reason,targetId,oneRendererSession:true,fullFunctionCalls,profileMode,exactFunctionCalls,captureModes,elapsedMilliseconds:performance.now()-cpuStarted,
@@ -388,6 +527,7 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
     "One renderer/isolate session; four client realms share it. Only execution contexts observed in that isolate are covered; native builtins/backend functions are not JavaScript call-count evidence.",
     "Precise function coverage includes bundled dependencies, uses callCount:true/detailed:false and resets at window boundaries; it prevents optimized execution. Counts are capture-interval work, not proof every call was caused by the selected API.",
     "CPU samples are validated independently; invalid deltas/IDs/bounds prohibit timeline/flamegraph attribution. Samples are not calls or every compute cycle.",
+    "Allocation-only mode samples at a 32768-byte mean interval with both collected-object flags enabled, without V8 CPU profiling or precise coverage. Allocation estimates include temporary churn but do not identify individual object retention, every allocation, exact bytes or allocation timestamps. No forced GC is added inside a phase.",
     "Only actual full-function snapshot root intervals establish API timing. CDP windows bracket API plus explicit host/other-realm instrumentation; lingering command labels establish no causality.",
     "Browser trace covers selected available categories, automatic GC and instrumented native/backend events, not every native call or kernel wait. Ring data loss and stream completeness remain explicit.",
     "Realm snapshots outside the creator root have broader capture boundaries. Forced test GC, export, assertions, sampling and observer overhead must remain separate. Unknown wall time is not automatically contention."
