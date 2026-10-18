@@ -1,0 +1,44 @@
+Post-checkpoint clarification: what the parallel optimization work improved
+
+This note records follow-up findings after this checkpoint. The three patches
+described below are currently uncommitted working-tree changes; attaching this
+note does not imply that their implementation is contained in this commit.
+
+We removed real duplicated work, but did not fix the main latency problem.
+
+1. State handling: private BlueprintStateMachine fork/adopt no longer needlessly
+   copies, serializes, parses and hashes already-owned validated state. Public
+   snapshots still copy bytes. New operations, reducer execution, authorization
+   and validation remain active; no replay-result cache was introduced.
+2. Recovery verification: unchanged exact immutable evidence is verified fewer
+   times. The matched final seal performed 20 source verifications instead of
+   32. Fresh native storage, authority, protection and currency checks remain,
+   with full proof charges preserved.
+3. Grid rendering: transient movement no longer rebuilds durable-history
+   diagnostics or recreates the entire board. This improves a separate UI path;
+   the native rollover benchmark does not exercise that rendering.
+
+These are implemented, test-backed reductions in duplication, not merely
+cosmetic architectural changes. Verification passed 62 focused tests, source
+and Grid type checks, five healthy native rollovers with settlement/cleanup/
+persisted reopen/continuation, an unprofiled confirmation, and the actual Grid
+movement/rollover browser regression.
+
+However, no meaningful aggregate latency or CPU improvement was demonstrated.
+The profiled owned-browser CPU was 141.81 seconds versus 142.51 previously;
+the unprofiled run used 128.96 seconds versus 124.42 previously. Unprofiled final
+sealing still took 8.67 seconds and creator adoption 2.30 seconds. Host load
+qualifies wall-time comparisons but does not establish an environmental cause
+or excuse the intrinsic computation. Remaining canonical/context processing,
+allocation and native servicing are distributed costs; profiles do not yet
+provide an exact every-cycle explanation or establish one dominant function.
+
+Plain English: we removed some unnecessary trips, but the expensive journey is
+still there. This batch delivered cleaner ownership, specific computational
+reductions and correctness evidence, not the requested gameplay speedup. Do not
+count it as latency, endurance, Phase 6/7 or FPS closure. No new endurance run
+was started and no resource ceiling or safety requirement was weakened.
+
+Detailed evidence and finite remaining work:
+.logs/bounded-storage-lifecycle/phase6-continuation-01/r8-native-main-integration01/receipt.json
+entry: ownerSeparatedPathOptimization20261018
