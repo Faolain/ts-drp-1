@@ -2533,6 +2533,112 @@ export function openCreatorSnapshotRecoverySourceTrust(
 			derivedPredecessorTrustStateRecordBytes: Uint8Array;
 	  }
 > {
+	return openCreatorSnapshotRecoverySourceTrustOwned(input);
+}
+
+type CreatorRecoverySourceResult = ReturnType<typeof openCreatorSnapshotRecoverySourceTrust>;
+type CreatorRecoveryEnvelope = Readonly<{objectId: string; exactCanonicalAnchorPreimageBytes: Uint8Array;
+	detachedAnchorSignature: Uint8Array; exactCanonicalParametersCarrierBytes: Uint8Array}>;
+type CreatorRecoveryVerifiedBranch = Readonly<{
+	currentTrust: CurrentAnchorTrust;
+	envelopes: readonly (CreatorRecoveryEnvelope | undefined)[];
+	chain: Extract<ReturnType<typeof inspectCreatorHistoricalAnchorChain>, {ok: true}>;
+	pin: Extract<ReturnType<typeof openCurrentAnchorTrust>, {ok: true}>;
+	pinRecord: NonNullable<ReturnType<typeof canonicalCreatorDataRecord>>;
+	pinBytes: Uint8Array;
+}>;
+
+function verifyCreatorRecoveryBranch(currentTrust: CurrentAnchorTrust,
+	envelopes: readonly (CreatorRecoveryEnvelope | undefined)[], pinBytes: Uint8Array): CreatorRecoveryVerifiedBranch | undefined {
+	const chain = inspectCreatorHistoricalAnchorChain({currentTrust, envelopes});
+	const pinRecord = canonicalCreatorDataRecord(pinBytes), pin = openCurrentAnchorTrust({
+		exactCanonicalTrustStateRecordBytes: pinBytes, expectedObjectId: currentTrust.objectId,
+		pinnedGenesisAnchorDigest: currentTrust.genesisAnchorDigest,
+	});
+	return chain.ok && pin.ok && pin.trust.currentEpoch === 0 && pinRecord !== undefined &&
+		pin.trust.profileId === currentTrust.profileId ? {currentTrust, envelopes, chain, pin, pinRecord, pinBytes} : undefined;
+}
+
+/** One original acquisition's immutable signed evidence, not native authority.
+ * Inputs reach this owner only AFTER the original bounded defensive capture and
+ * complete proof charges. Exact pin, nominal trust and every signed envelope
+ * byte bind a branch; exact ordered candidate bytes AND refs bind each source.
+ * Changed branches replace the inventory. Overflow is an uncached original
+ * verification, never an admission refusal or proof credit. No native image,
+ * floor, progress, inventory or retirement capability is retained here. */
+function createCreatorRecoveryEvidenceOwner() {
+	let branch: CreatorRecoveryVerifiedBranch | undefined;
+	let context: CurrentAnchorTrust | undefined;
+	let retainedBytes = 0;
+	const sources: {closure: CreatorTransitionClosure; result: Extract<CreatorRecoverySourceResult, {ok: true}>}[] = [];
+	const branchBytes = (value: CreatorRecoveryVerifiedBranch): number => value.pinBytes.byteLength + value.envelopes.reduce(
+		(sum, envelope) => sum + (envelope === undefined ? 0 : envelope.exactCanonicalAnchorPreimageBytes.byteLength +
+			envelope.detachedAnchorSignature.byteLength + envelope.exactCanonicalParametersCarrierBytes.byteLength), 0);
+	const sameBranch = (currentTrust: CurrentAnchorTrust, envelopes: readonly (CreatorRecoveryEnvelope | undefined)[], pinBytes: Uint8Array) =>
+		branch !== undefined && branch.currentTrust === currentTrust && context !== undefined &&
+		context.objectId === currentTrust.objectId && context.currentEpoch === currentTrust.currentEpoch &&
+		context.currentAnchorDigest === currentTrust.currentAnchorDigest && context.genesisAnchorDigest === currentTrust.genesisAnchorDigest &&
+		context.profileId === currentTrust.profileId && compareBytes(branch.pinBytes, pinBytes) === 0 &&
+		branch.envelopes.length === envelopes.length && branch.envelopes.every((old, index) => {
+			const current = envelopes[index];
+			return old !== undefined && current !== undefined && old.objectId === current.objectId &&
+				compareBytes(old.exactCanonicalAnchorPreimageBytes, current.exactCanonicalAnchorPreimageBytes) === 0 &&
+				compareBytes(old.detachedAnchorSignature, current.detachedAnchorSignature) === 0 &&
+				compareBytes(old.exactCanonicalParametersCarrierBytes, current.exactCanonicalParametersCarrierBytes) === 0;
+		});
+	const sameClosure = (a: CreatorTransitionClosure, b: CreatorTransitionClosure): boolean =>
+		a.closure.length === b.closure.length && a.candidates.length === b.candidates.length &&
+		a.closure.every((ref, index) => sameRef(ref, b.closure[index]!)) &&
+		a.candidates.every((candidate, index) => sameRef(candidate.ref, b.candidates[index]!.ref) &&
+			compareBytes(candidate.bytes, b.candidates[index]!.bytes) === 0);
+	const detachedResult = (result: Extract<CreatorRecoverySourceResult, {ok: true}>) => Object.freeze({
+		...result, derivedPredecessorTrustStateRecordBytes: result.derivedPredecessorTrustStateRecordBytes.slice(),
+	});
+	return Object.freeze({
+		branch(currentTrust: CurrentAnchorTrust, envelopes: readonly (CreatorRecoveryEnvelope | undefined)[], pinBytes: Uint8Array) {
+			if (sameBranch(currentTrust, envelopes, pinBytes)) return branch;
+			branch = undefined; context = undefined; sources.length = 0; retainedBytes = 0;
+			const verified = verifyCreatorRecoveryBranch(currentTrust, envelopes, pinBytes);
+			if (verified !== undefined && branchBytes(verified) <= AHE_BOUNDED_READ_LIMITS.maxUnionBytes) {
+				branch = verified; context = Object.freeze({...currentTrust}); retainedBytes = branchBytes(verified);
+			}
+			return verified;
+		},
+		source(verified: CreatorRecoveryVerifiedBranch, closure: CreatorTransitionClosure,
+			charge: (bytes: Uint8Array) => boolean): CreatorRecoverySourceResult {
+			const previous = verified === branch ? sources.find(source => sameClosure(source.closure, closure)) : undefined;
+			if (previous !== undefined) return charge(previous.result.derivedPredecessorTrustStateRecordBytes)
+				? detachedResult(previous.result) : failure("RECOVERY_ROLE_INPUT_INVALID");
+			const result = openCreatorSnapshotRecoverySourceTrustFromVerifiedBranch({...verified, closure}, charge);
+			const bytes = closure.candidates.reduce((sum, candidate) => sum + candidate.bytes.byteLength, 0) +
+				(result.ok ? result.derivedPredecessorTrustStateRecordBytes.byteLength : 0);
+			if (result.ok && verified === branch && sources.length < AHE_BOUNDED_READ_LIMITS.maxObjectGenerations &&
+				bytes <= AHE_BOUNDED_READ_LIMITS.maxUnionBytes - retainedBytes) {
+				sources.push({closure, result: detachedResult(result)}); retainedBytes += bytes;
+			}
+			return result;
+		},
+	});
+}
+type CreatorRecoveryEvidenceOwner = ReturnType<typeof createCreatorRecoveryEvidenceOwner>;
+
+/** Internal acquisition job only; no portable preverified input or authority is
+ * accepted. Public byte openers retain their full defensive paths. Releasing
+ * after the acquisition's original joins discards all immutable facts; deferred
+ * callers then use the original cold implementation. */
+export function createCreatorSnapshotRecoveryEvidenceJob() {
+	let owner: CreatorRecoveryEvidenceOwner | undefined = createCreatorRecoveryEvidenceOwner();
+	return Object.freeze({
+		sourceTrust: (input: unknown): CreatorRecoverySourceResult => openCreatorSnapshotRecoverySourceTrustOwned(input, owner),
+		readback: (input: unknown): ReturnType<typeof openCreatorSnapshotRecoveryRoleReadback> =>
+			openCreatorSnapshotRecoveryRoleReadbackOwned(input, owner),
+		release: (): void => {owner = undefined;},
+	});
+}
+
+function openCreatorSnapshotRecoverySourceTrustOwned(
+	input: unknown, evidence?: CreatorRecoveryEvidenceOwner
+): CreatorRecoverySourceResult {
 	try {
 		const c = capturePromotionRecord(input, [
 			"currentTrust",
@@ -2574,24 +2680,11 @@ export function openCreatorSnapshotRecoverySourceTrust(
 		});
 		if (envelopes.some((value) => value === undefined)) return failure("RECOVERY_ROLE_ANCHOR_INVALID");
 		const currentTrust = c.currentTrust as CurrentAnchorTrust,
-			chain = inspectCreatorHistoricalAnchorChain({ currentTrust, envelopes });
-		const pinRecord = canonicalCreatorDataRecord(pinBytes),
-			pin = openCurrentAnchorTrust({
-				exactCanonicalTrustStateRecordBytes: pinBytes,
-				expectedObjectId: currentTrust.objectId,
-				pinnedGenesisAnchorDigest: currentTrust.genesisAnchorDigest,
-			});
-		if (
-			!chain.ok ||
-			!pin.ok ||
-			pin.trust.currentEpoch !== 0 ||
-			pinRecord === undefined ||
-			pin.trust.profileId !== currentTrust.profileId
-		)
-			return failure("RECOVERY_ROLE_ANCHOR_INVALID");
-		return openCreatorSnapshotRecoverySourceTrustFromVerifiedBranch({
-			closure, currentTrust, envelopes, chain, pin, pinRecord, pinBytes,
-		}, charge);
+			branch = evidence === undefined ? verifyCreatorRecoveryBranch(currentTrust, envelopes, pinBytes)
+				: evidence.branch(currentTrust, envelopes, pinBytes);
+		if (branch === undefined) return failure("RECOVERY_ROLE_ANCHOR_INVALID");
+		return evidence === undefined ? openCreatorSnapshotRecoverySourceTrustFromVerifiedBranch({...branch, closure}, charge)
+			: evidence.source(branch, closure, charge);
 	} catch {
 		return failure("RECOVERY_ROLE_INPUT_INVALID");
 	}
@@ -2720,6 +2813,12 @@ function openCreatorSnapshotRecoverySourceTrustFromVerifiedBranch(
 export function openCreatorSnapshotRecoveryRoleReadback(
 	input: unknown
 ): Readonly<{ ok: false; reason: string } | { ok: true; transfer: VerifiedCreatorSnapshotRecoveryRoleTransfer }> {
+	return openCreatorSnapshotRecoveryRoleReadbackOwned(input);
+}
+
+function openCreatorSnapshotRecoveryRoleReadbackOwned(
+	input: unknown, evidenceOwner?: CreatorRecoveryEvidenceOwner
+): ReturnType<typeof openCreatorSnapshotRecoveryRoleReadback> {
 	try {
 		const keys = [
 			"currentTrust",
@@ -2918,13 +3017,10 @@ export function openCreatorSnapshotRecoveryRoleReadback(
 				: undefined;
 		});
 		if (envelopes.some((e) => e === undefined)) return failure("RECOVERY_ROLE_ANCHOR_INVALID");
-		const branch = inspectCreatorHistoricalAnchorChain({ currentTrust, envelopes });
-		if (!branch.ok) return failure("RECOVERY_ROLE_ANCHOR_INVALID");
-		const pin = openCurrentAnchorTrust({exactCanonicalTrustStateRecordBytes: pinBytes,
-			expectedObjectId: currentTrust.objectId, pinnedGenesisAnchorDigest: currentTrust.genesisAnchorDigest});
-		if (!pin.ok || pin.trust.currentEpoch !== 0 || pin.trust.profileId !== currentTrust.profileId)
-			return failure("RECOVERY_ROLE_ANCHOR_INVALID");
-		const identities = new Map(branch.identities.map((identity) => [identity.epoch, identity]));
+		const verifiedBranch = evidenceOwner === undefined ? verifyCreatorRecoveryBranch(currentTrust, envelopes, pinBytes)
+			: evidenceOwner.branch(currentTrust, envelopes, pinBytes);
+		if (verifiedBranch === undefined) return failure("RECOVERY_ROLE_ANCHOR_INVALID");
+		const identities = new Map(verifiedBranch.chain.identities.map((identity) => [identity.epoch, identity]));
 		const materials = new Map<
 			string,
 			Readonly<{
@@ -2955,9 +3051,9 @@ export function openCreatorSnapshotRecoveryRoleReadback(
 				cRecord?.profileId !== currentTrust.profileId
 			)
 				return failure("RECOVERY_ROLE_SOURCE_INVALID");
-			const trust = openCreatorSnapshotRecoverySourceTrustFromVerifiedBranch({
-				currentTrust, closure, envelopes, chain: branch, pin, pinRecord, pinBytes,
-			}, charge);
+			const trust = evidenceOwner === undefined ? openCreatorSnapshotRecoverySourceTrustFromVerifiedBranch({
+				...verifiedBranch, closure,
+			}, charge) : evidenceOwner.source(verifiedBranch, closure, charge);
 			if (!trust.ok)
 				return failure("RECOVERY_ROLE_SOURCE_INVALID");
 			const evidence = openCreatorTransitionClosedCutEvidence({ closure, floorTrust: trust.trust });

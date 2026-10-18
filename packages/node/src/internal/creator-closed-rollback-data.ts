@@ -220,6 +220,7 @@ import {
 	verifiedCreatorSnapshotCatalog,
 } from "./creator-snapshot-data.js";
 import {
+	createCreatorSnapshotRecoveryEvidenceJob,
 	type CreatorTransitionClosure,
 	exactCreatorTransitionOccurrence,
 	inspectCreatorAdoptionCandidateLineage,
@@ -1054,6 +1055,7 @@ function anchorOf(trustRecord: Readonly<Record<string, unknown>>, syntax?: Retur
  * deferred currency closures then use the original uncached parsing path. */
 function createCreatorClosedAcquisitionSyntax() {
 	let syntax: ReturnType<typeof createCreatorCanonicalSyntaxReader> | undefined = createCreatorCanonicalSyntaxReader();
+	const recoveryEvidence = createCreatorSnapshotRecoveryEvidenceJob();
 	return Object.freeze({
 		record: (bytes: Uint8Array) => record(bytes, syntax),
 		canonicalSelection: (bytes: Uint8Array) => syntax === undefined ? canonicalCreatorDataRecord(bytes) : syntax.canonicalSelection(bytes),
@@ -1067,7 +1069,9 @@ function createCreatorClosedAcquisitionSyntax() {
 		// survives release: later consumers take the original fresh boundary.
 		snapshot: (...args: Parameters<typeof validateCreatorSnapshotData>) => syntax === undefined
 			? validateCreatorSnapshotData(...args) : syntax.snapshot(...args),
-		release: (): void => { syntax = undefined; },
+		recoverySourceTrust: recoveryEvidence.sourceTrust,
+		recoveryReadback: recoveryEvidence.readback,
+		release: (): void => { syntax = undefined; recoveryEvidence.release(); },
 	});
 }
 type CreatorClosedAcquisitionSyntax = ReturnType<typeof createCreatorClosedAcquisitionSyntax>;
@@ -2064,7 +2068,7 @@ async function acquireRecoveryRoleCertificate(
 		for (const scope of scopes) {
 			stage = `source:${scope.epoch}`;
 			const closure = closureAt(scope.epoch + 1);
-			const opened = openCreatorSnapshotRecoverySourceTrust({
+			const opened = (parsing?.recoverySourceTrust ?? openCreatorSnapshotRecoverySourceTrust)({
 				currentTrust,
 				closure,
 				anchorChain: chain,
@@ -2234,7 +2238,7 @@ async function acquireRecoveryRoleCertificate(
 			});
 		let opened: ReturnType<typeof openCreatorSnapshotRecoveryRoleReadback>;
 		try {
-			opened = openCreatorSnapshotRecoveryRoleReadback(readbackInput);
+			opened = (parsing?.recoveryReadback ?? openCreatorSnapshotRecoveryRoleReadback)(readbackInput);
 		} finally {
 			delete frame.retiredReadback;
 		}

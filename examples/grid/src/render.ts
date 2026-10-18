@@ -1,6 +1,66 @@
 import type { DRPNode } from "@ts-drp/node";
 
-import type { ZoneSnapshot } from "./v3-zone";
+import type { ZoneSnapshot, ZoneTransientSnapshot } from "./v3-zone";
+
+type GridElements = {
+	readonly blocks: Map<string, { element: HTMLDivElement; kind: string; x: number; y: number }>;
+	readonly positions: Map<string, HTMLDivElement>;
+};
+// DOM identity belongs to the actual grid element. Replacing a document/grid
+// cannot retain another room's nodes, and no protocol data or authority lives here.
+const grids = new WeakMap<HTMLDivElement, GridElements>();
+function gridElements(grid: HTMLDivElement): GridElements {
+	let state = grids.get(grid);
+	if (state === undefined) {
+		grid.replaceChildren();
+		state = { blocks: new Map(), positions: new Map() };
+		grids.set(grid, state);
+	}
+	return state;
+}
+
+/** One UI owner: full projections render in order; only transient visual frames
+ * may collapse to their latest positions. A full projection/reset cancels the
+ * old pending frame, including close/reopen of the same room identifier. */
+export function createZonePresentation(
+	requestFrame: (callback: FrameRequestCallback) => number = (callback) => requestAnimationFrame(callback),
+	cancelFrame: (handle: number) => void = (handle) => cancelAnimationFrame(handle)
+): Readonly<{ projection(snapshot: ZoneSnapshot): void; transient(snapshot: ZoneTransientSnapshot): void; close(): void }> {
+	let pending: ZoneTransientSnapshot | undefined;
+	let frame: number | undefined;
+	let revision = 0;
+	let current: Readonly<{ ready: boolean; zoneId: string }> | undefined;
+	let closed = false;
+	const cancel = (): void => {
+		revision++;
+		if (frame !== undefined) cancelFrame(frame);
+		frame = undefined;
+		pending = undefined;
+	};
+	return Object.freeze({
+		projection(snapshot: ZoneSnapshot): void {
+			if (closed) return;
+			cancel();
+			current = { ready: snapshot.ready, zoneId: snapshot.zoneId };
+			renderZone(snapshot);
+		},
+		transient(snapshot: ZoneTransientSnapshot): void {
+			if (closed || !current?.ready || !snapshot.ready || current.zoneId !== snapshot.zoneId) return;
+			pending = snapshot;
+			if (frame !== undefined) return;
+			const selected = revision;
+			frame = requestFrame((): void => {
+				// Cancellation need not suppress an already dispatched callback.
+				if (closed || revision !== selected) return;
+				frame = undefined;
+				const latest = pending;
+				pending = undefined;
+				if (latest !== undefined) renderTransientZone(latest);
+			});
+		},
+		close(): void { closed = true; current = undefined; cancel(); },
+	});
+}
 
 /** Enable the durable-zone controls once the real network node is dialable. */
 export function enableUIControls(): void {
@@ -41,32 +101,60 @@ export function renderZone(snapshot: ZoneSnapshot): void {
 	renderTradeIntent(snapshot);
 	const grid = document.getElementById("grid");
 	if (!(grid instanceof HTMLDivElement)) return;
-	grid.replaceChildren();
+	const state = gridElements(grid);
+	const present = new Set<string>();
 	for (const block of snapshot.blocks) {
-		const element = document.createElement("div");
-		element.dataset.blockId = block.id;
-		element.textContent = `${block.kind} (${block.x}, ${block.y})`;
-		element.style.position = "absolute";
-		element.style.left = `calc(50% + ${block.x * 24}px)`;
-		element.style.top = `calc(50% - ${block.y * 24}px)`;
-		element.style.padding = "4px 6px";
-		element.style.background = "#444";
-		element.style.color = "white";
-		grid.appendChild(element);
+		present.add(block.id);
+		let retained = state.blocks.get(block.id);
+		if (retained === undefined) {
+			const element = document.createElement("div");
+			element.dataset.blockId = block.id;
+			element.style.position = "absolute";
+			element.style.padding = "4px 6px";
+			element.style.background = "#444";
+			element.style.color = "white";
+			retained = { element, kind: block.kind, x: block.x, y: block.y };
+			state.blocks.set(block.id, retained);
+		}
+		if (retained.element.textContent === "" || retained.kind !== block.kind || retained.x !== block.x || retained.y !== block.y) {
+			retained.element.textContent = `${block.kind} (${block.x}, ${block.y})`;
+			retained.element.style.left = `calc(50% + ${block.x * 24}px)`;
+			retained.element.style.top = `calc(50% - ${block.y * 24}px)`;
+			retained.kind = block.kind; retained.x = block.x; retained.y = block.y;
+		}
+		grid.appendChild(retained.element);
 	}
+	for (const [id, retained] of state.blocks) if (!present.has(id)) { retained.element.remove(); state.blocks.delete(id); }
+	renderTransientZone(snapshot);
+	// Full projections preserve the original block-before-overlay draw order.
+	for (const element of state.positions.values()) grid.appendChild(element);
+}
+
+/** Update only the already-authorized visual overlay; no durable diagnostics,
+ * block reconstruction, trade verification or protocol operation occurs here. */
+export function renderTransientZone(snapshot: ZoneTransientSnapshot): void {
+	const grid = document.getElementById("grid");
+	if (!(grid instanceof HTMLDivElement)) return;
+	const state = gridElements(grid), present = new Set<string>();
 	for (const [peerId, position] of Object.entries(snapshot.transientPositions)) {
-		const element = document.createElement("div");
-		element.dataset.glowingPeerId = peerId;
-		element.title = peerId;
-		element.style.position = "absolute";
+		present.add(peerId);
+		let element = state.positions.get(peerId);
+		if (element === undefined) {
+			element = document.createElement("div");
+			element.dataset.glowingPeerId = peerId;
+			element.title = peerId;
+			element.style.position = "absolute";
+			element.style.width = "18px";
+			element.style.height = "18px";
+			element.style.borderRadius = "50%";
+			element.style.background = "#2d8cff";
+			state.positions.set(peerId, element);
+			grid.appendChild(element);
+		}
 		element.style.left = `calc(50% + ${position.x * 24}px)`;
 		element.style.top = `calc(50% - ${position.y * 24}px)`;
-		element.style.width = "18px";
-		element.style.height = "18px";
-		element.style.borderRadius = "50%";
-		element.style.background = "#2d8cff";
-		grid.appendChild(element);
 	}
+	for (const [peerId, element] of state.positions) if (!present.has(peerId)) { element.remove(); state.positions.delete(peerId); }
 }
 
 function renderTradeIntent(snapshot: ZoneSnapshot): void {

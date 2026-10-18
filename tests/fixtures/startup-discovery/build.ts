@@ -866,9 +866,12 @@ function observation(directory: string, classificationFault = false, pendingPubl
 						  recoveryEvidenceFailure:"maintenance-signing-evidence-verification",
 						 } : {}),
 						 ...(path.endsWith("/creator-transition-advance.ts") ? {
-						  openCreatorSnapshotRecoverySourceTrust:"maintenance-capture-source-chain-trust",
+						  openCreatorSnapshotRecoverySourceTrust:"maintenance-source-public-boundary",
+						  openCreatorSnapshotRecoverySourceTrustOwned:"maintenance-capture-source-chain-trust",
+						  verifyCreatorRecoveryBranch:"maintenance-source-full-branch-verification",
 						  openCreatorSnapshotRecoverySourceTrustFromVerifiedBranch:"maintenance-source-cut-qc-from-verified-branch",
-						  openCreatorSnapshotRecoveryRoleReadback:"maintenance-semantic-role-readback",
+						  openCreatorSnapshotRecoveryRoleReadback:"maintenance-readback-public-boundary",
+						  openCreatorSnapshotRecoveryRoleReadbackOwned:"maintenance-semantic-role-readback",
 						  openVerifiedCreatorHistoricalIssuance:"historical-issuance-single-author-open",
 						  resolveVerifiedHistoricalSettlementFrontiers:"historical-settlement-many-frontiers",
 						  openCreatorTransitionSettlement:"transition-settlement-control-open",
@@ -905,7 +908,7 @@ function observation(directory: string, classificationFault = false, pendingPubl
 						 if(path.endsWith("/creator-transition-advance.ts")&&ts.isCallExpression(node)&&
 						  node.expression.getText(ast)==="inspectCreatorHistoricalAnchorChain"){
 						  let owner:ts.Node|undefined=node.parent;while(owner&&!ts.isFunctionDeclaration(owner))owner=owner.parent;
-						  if(owner&&ts.isFunctionDeclaration(owner)&&["openCreatorSnapshotRecoverySourceTrust","openCreatorSnapshotRecoveryRoleReadback"].includes(owner.name?.text??""))
+						  if(owner&&ts.isFunctionDeclaration(owner)&&["verifyCreatorRecoveryBranch"].includes(owner.name?.text??""))
 						   observeExpression(node,"recovery-anchor-chain:"+owner.name!.text);
 						 }
 						 if(path.endsWith("/creator-closed-rollback-data.ts")&&ts.isFunctionDeclaration(node)&&node.body&&

@@ -28,7 +28,7 @@ const equal = (left: unknown, right: unknown) => compareBytes(encodeCanonical(le
 /** The real capture and semantic dispatch bodies execute here. Protocol
  * signature/checkpoint results and native retired custody are explicit controlled
  * premises; the genuine native healthy fixture verifies those separate owners. */
-function fixture(cold = false) {
+function fixture(cold = false, bounds = AHE_BOUNDED_READ_LIMITS) {
 	const trust = {objectId: "room", currentEpoch: 4, currentAnchorDigest: "h4", genesisAnchorDigest: "h0", profileId: "profile"};
 	const pinBytes = encodeCanonical({...trust, currentEpoch: 0, currentAnchorDigest: "h0"});
 	const envelopes = [3, 2, 1, 0].map(epoch => ({objectId: "room", exactCanonicalAnchorPreimageBytes: encodeCanonical({epoch}),
@@ -44,6 +44,7 @@ function fixture(cold = false) {
 	const materials = [1, 2, 3].map(epoch => ({closure: closure(epoch), snapshot: null}));
 	let chains = 0, pins = 0, sources = 0, retired = 0;
 	const charged: Uint8Array[] = [];
+	const proofCharges: Uint8Array[][] = [];
 	const charge = (bytes: Uint8Array) => {charged.push(bytes.slice()); return true;};
 	const select = (values: any[], kind: string, epoch?: number, phase?: string) => {
 		const matches = values.filter(value => {const row = decodeCanonical(value.bytes) as any;
@@ -64,12 +65,15 @@ function fixture(cold = false) {
 	const classified = materials.map(m => scope(decodeCanonical(m.closure.candidates[1]!.bytes)));
 	const captured: any = {anchorChain: envelopes, nativeRetirementCustody: custody};
 	const bindings: Record<string, unknown> = {
-		compareBytes, encodeCanonical, capturePromotionArray, capturePromotionBytes, capturePromotionRecord, capturePromotionRef, AHE_BOUNDED_READ_LIMITS, digestBlob,
+		compareBytes, encodeCanonical, capturePromotionArray, capturePromotionBytes, capturePromotionRecord, capturePromotionRef, AHE_BOUNDED_READ_LIMITS: bounds, digestBlob,
 		canonicalCreatorDataRecord: decodeCanonical,
 		record: (value: any) => decodeCanonical(value.bytes),
 		uniqueCreatorTransitionCandidate: select, select, syntax: undefined,
 		genuineRecoveryTrust: (value: unknown, bytes: Uint8Array) => value === trust && compareBytes(bytes, pinBytes) === 0,
-		createCreatorClosedRollbackProofAccounting: () => ({charge: (bytes: Uint8Array) => bytes.byteLength <= AHE_BOUNDED_READ_LIMITS.maxUnionBytes}),
+		createCreatorClosedRollbackProofAccounting: () => {
+			const charges: Uint8Array[] = []; proofCharges.push(charges);
+			return {charge: (bytes: Uint8Array) => {charges.push(bytes.slice()); return bytes.byteLength <= AHE_BOUNDED_READ_LIMITS.maxUnionBytes;}};
+		},
 		inspectCreatorHistoricalAnchorChain: ({currentTrust, envelopes: actual}: any) => {
 			chains++;
 			if (currentTrust !== trust || actual.length !== 4 || actual.some((e: any, index: number) =>
@@ -98,9 +102,10 @@ function fixture(cold = false) {
 		samePromotionValue: equal,
 	};
 	const functions = ["failure", "sameRef", "exactCandidate", "exactCreatorTransitionOccurrence", "capturePromotionClosure",
-		"openCreatorSnapshotRecoverySourceTrust", "openCreatorSnapshotRecoverySourceTrustFromVerifiedBranch"]
+		"verifyCreatorRecoveryBranch", "createCreatorRecoveryEvidenceOwner", "createCreatorSnapshotRecoveryEvidenceJob",
+		"openCreatorSnapshotRecoverySourceTrust", "openCreatorSnapshotRecoverySourceTrustOwned", "openCreatorSnapshotRecoverySourceTrustFromVerifiedBranch"]
 		.map(name => declaration(name).getText(ast).replace(/^export /, "")).join("\n");
-	const readback = declaration("openCreatorSnapshotRecoveryRoleReadback");
+	const readback = declaration("openCreatorSnapshotRecoveryRoleReadbackOwned");
 	const body = readback.body!.statements.find(ts.isTryStatement)!.tryBlock.statements;
 	const start = body.findIndex(s => ts.isVariableStatement(s) && s.declarationList.declarations.some(d => d.name.getText(ast) === "envelopes"));
 	const stop = body.findIndex(s => ts.isForOfStatement(s) && s.expression.getText(ast) === "materialValues");
@@ -108,24 +113,31 @@ function fixture(cold = false) {
 	if (start < 0 || stop <= start || retiredBlock === undefined) throw Error("VERIFIED_BRANCH_ORIGINAL_BLOCK_MISSING");
 	let source = body.slice(start, stop + 1).map(s => s.getText(ast)).join("\n");
 	if (cold) {
-		const call = "openCreatorSnapshotRecoverySourceTrustFromVerifiedBranch({\n\t\t\t\tcurrentTrust, closure, envelopes, chain: branch, pin, pinRecord, pinBytes,\n\t\t\t}, charge)";
+		const call = "evidenceOwner === undefined ? openCreatorSnapshotRecoverySourceTrustFromVerifiedBranch({\n\t\t\t\t...verifiedBranch, closure,\n\t\t\t}, charge) : evidenceOwner.source(verifiedBranch, closure, charge)";
 		if (!source.includes(call)) throw Error("VERIFIED_BRANCH_COLD_COMPARISON_SEAM_CHANGED");
 		source = source.replace(call, "openCreatorSnapshotRecoverySourceTrust({currentTrust, closure, anchorChain: envelopes, exactCanonicalPinnedGenesisTrustStateRecordBytes: pinBytes})");
 		source = source.replace("if (!trust.ok)", "if (!trust.ok || !charge(trust.derivedPredecessorTrustStateRecordBytes))");
 	}
-	const owner = execute<{open(input: unknown): any; read(args: any): any}>(`${functions}\n({open: openCreatorSnapshotRecoverySourceTrust,
-		read: ({captured, materialValues, currentTrust, pinBytes, pinRecord, charge, input, roles}) => {
+	const owner = execute<{open(input: unknown): any; job(): any; read(args: any): any}>(`${functions}
+		function openCreatorSnapshotRecoveryRoleReadbackOwned({captured, materialValues, currentTrust, pinBytes, pinRecord, charge, input, roles}, evidenceOwner) {
 			const chainValues = captured.anchorChain;
 			${source}
 			const protectedKeys = new Set(), allowed = new Set(), cut = {bytes: new Uint8Array()};
 			${retiredBlock.getText(ast)}
 			return {ok: true, materials: [...materials.values()]};
-		}});`, bindings);
-	return {trust, envelopes, pinBytes, materials, captured, charged,
+		}
+		({open: openCreatorSnapshotRecoverySourceTrust, job: createCreatorSnapshotRecoveryEvidenceJob,
+		read: input => openCreatorSnapshotRecoveryRoleReadbackOwned(input)});`, bindings);
+	const job = owner.job();
+	return {trust, envelopes, pinBytes, materials, captured, charged, proofCharges, job,
 		counts: () => ({chains, pins, sources, retired}),
 		open: (patch: any = {}) => owner.open({currentTrust: trust, closure: materials[1]!.closure,
 			anchorChain: envelopes, exactCanonicalPinnedGenesisTrustStateRecordBytes: pinBytes, ...patch}),
+		warmOpen: (patch: any = {}) => job.sourceTrust({currentTrust: trust, closure: materials[1]!.closure,
+			anchorChain: envelopes, exactCanonicalPinnedGenesisTrustStateRecordBytes: pinBytes, ...patch}),
 		read: () => {charge(pinBytes); return owner.read({captured, materialValues: materials, currentTrust: trust, pinBytes,
+			pinRecord: decodeCanonical(pinBytes), charge, input, roles: {classifiedScopes: classified}});},
+		warmRead: () => {charge(pinBytes); return job.readback({captured, materialValues: materials, currentTrust: trust, pinBytes,
 			pinRecord: decodeCanonical(pinBytes), charge, input, roles: {classifiedScopes: classified}});},
 	};
 }
@@ -179,9 +191,68 @@ describe("recovery source invocation-local verified branch", () => {
 	it("does not expose the verified branch as a public capability or add retention past the synchronous owner", () => {
 		expect(declaration("openCreatorSnapshotRecoverySourceTrust").parameters).toHaveLength(1);
 		expect(declaration("openCreatorSnapshotRecoverySourceTrustFromVerifiedBranch").modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword)).not.toBe(true);
-		const source = declaration("openCreatorSnapshotRecoveryRoleReadback").getText(ast);
-		expect(source.match(/inspectCreatorHistoricalAnchorChain\(/g)).toHaveLength(1);
+		const source = declaration("openCreatorSnapshotRecoveryRoleReadbackOwned").getText(ast);
+		expect(declaration("verifyCreatorRecoveryBranch").getText(ast).match(/inspectCreatorHistoricalAnchorChain\(/g)).toHaveLength(1);
 		expect(source).not.toContain("openCreatorSnapshotRecoverySourceTrust({");
 		expect(source).toContain("consumeCreatorRecoveryRoleRetiredReadback(");
+	});
+});
+
+describe("one acquisition owns exact immutable recovery evidence", () => {
+	it("verifies one branch and each exact source once across source acquisition and final readback, with unchanged complete charges", async () => {
+		const warm = fixture(), cold = fixture();
+		for (let index = 0; index < warm.materials.length; index++) {
+			expect(warm.warmOpen({closure: warm.materials[index]!.closure})).toEqual(cold.open({closure: cold.materials[index]!.closure}));
+		}
+		await Promise.resolve();
+		expect(warm.warmRead()).toEqual(cold.read());
+		expect(warm.counts()).toEqual({chains: 1, pins: 1, sources: 3, retired: 1});
+		expect(cold.counts()).toEqual({chains: 4, pins: 4, sources: 6, retired: 1});
+		expect(warm.proofCharges).toEqual(cold.proofCharges);
+		expect(warm.charged).toEqual(cold.charged);
+	});
+	it("captures bytes and detaches returned derived records, rather than retaining mutable caller aliases", async () => {
+		const f = fixture(), first = f.warmOpen(); expect(first.ok).toBe(true);
+		const original = first.derivedPredecessorTrustStateRecordBytes.slice();
+		first.derivedPredecessorTrustStateRecordBytes.fill(255);
+		expect(f.warmOpen().derivedPredecessorTrustStateRecordBytes).toEqual(original);
+		expect(f.counts().sources).toBe(1);
+		await Promise.resolve();
+		f.envelopes[0]!.detachedAnchorSignature[0] = 1;
+		expect(f.warmOpen().ok).toBe(false);
+		f.envelopes[0]!.detachedAnchorSignature[0] = 0;
+		expect(f.warmOpen().ok).toBe(true); expect(f.counts().sources).toBe(2);
+	});
+	it("refuses changed same-epoch source, malformed membership, foreign nominal context and changed pin or branch after warm capture", async () => {
+		for (const change of ["qc", "fork", "duplicate", "missing", "key", "pin", "reorder", "foreign", "context"] as const) {
+			const f = fixture(); expect(f.warmOpen().ok).toBe(true); await Promise.resolve();
+			const c = f.materials[1]!.closure;
+			if (change === "qc") c.candidates[2] = candidate({kind: "drp-seal-qc", epoch: 1, phase: "commit", valid: false});
+			if (change === "fork") c.candidates[0] = candidate({...f.trust, kind: "drp-anchor-trust-state", currentEpoch: 2, currentAnchorDigest: "fork"});
+			if (change === "qc" || change === "fork") c.closure = c.candidates.map(v => v.ref);
+			if (change === "duplicate") c.candidates.push(c.candidates[0]!);
+			if (change === "missing") c.candidates.pop();
+			if (change === "key") f.envelopes[0]!.detachedAnchorSignature[0] = 1;
+			if (change === "pin") f.pinBytes[0] = 255;
+			if (change === "reorder") f.envelopes.reverse();
+			if (change === "context") f.trust.objectId = "foreign";
+			expect(f.warmOpen(change === "foreign" ? {currentTrust: {...f.trust}} : {}).ok, change).toBe(false);
+		}
+	});
+	it("always reconsumes native retirement custody and never substitutes historical verification for current authority", () => {
+		const f = fixture(); expect(f.warmRead().ok).toBe(true); expect(f.warmRead().ok).toBe(true);
+		expect(f.counts()).toEqual({chains: 1, pins: 1, sources: 3, retired: 2});
+		f.captured.nativeRetirementCustody = {};
+		expect(f.warmRead().ok).toBe(false); expect(f.counts().retired).toBe(3);
+	});
+	it("ends reuse on release/reopen and falls back within existing finite byte and entry retention caps", () => {
+		const f = fixture(); expect(f.warmOpen().ok).toBe(true); expect(f.warmOpen().ok).toBe(true);
+		expect(f.counts().sources).toBe(1); f.job.release();
+		expect(f.warmOpen().ok).toBe(true); expect(f.warmOpen().ok).toBe(true);
+		expect(f.counts().sources).toBe(3); expect(f.counts().chains).toBe(3);
+		const reopened = fixture(); expect(reopened.warmOpen().ok).toBe(true); expect(reopened.counts().sources).toBe(1);
+		const overflow = fixture(false, {...AHE_BOUNDED_READ_LIMITS, maxUnionBytes: 1});
+		expect(overflow.warmOpen().ok).toBe(true); expect(overflow.warmOpen().ok).toBe(true);
+		expect(overflow.counts().sources).toBe(2); expect(overflow.counts().chains).toBe(2);
 	});
 });

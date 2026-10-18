@@ -57,6 +57,14 @@ export interface ZoneBlock {
 	readonly y: number;
 }
 
+/** Presentation-only positions from the already admitted ephemeral channel.
+ * This carries no room, signing, migration or cross-epoch authority. */
+export interface ZoneTransientSnapshot {
+	readonly ready: boolean;
+	readonly zoneId: string;
+	readonly transientPositions: ZoneSnapshot["transientPositions"];
+}
+
 export interface V3ZoneRoomHeadOpenContext {
 	readonly author: string;
 	readonly creatorInvite: string | V3RoomCreatorInviteMaterial;
@@ -366,19 +374,23 @@ export interface V3ZoneApi {
  * @param node Authenticated node that owns the room transport and signer.
  * @param onProjection Observer for deterministic durable and transient projections.
  * @param roomHeadAuthorityForOpen Host-owned authority acquisition; initialization belongs to the host.
+ * @param onTransient Optional UI-only position observer; full public snapshots remain fresh.
  * @returns The bounded zone application API.
  */
 export function createV3ZoneApi(
 	node: DRPNode,
 	onProjection: (snapshot: ZoneSnapshot) => void,
 	roomHeadAuthorityForOpen: V3ZoneRoomHeadAuthorityForOpen,
-	approveSettlementSourceSelection?: V3ZoneSettlementSourceApproval
+	approveSettlementSourceSelection?: V3ZoneSettlementSourceApproval,
+	onTransient?: (snapshot: ZoneTransientSnapshot) => void
 ): V3ZoneApi {
 	if (typeof roomHeadAuthorityForOpen !== "function") {
 		throw new TypeError("v3 zone room-head authority factory is required");
 	}
 	if (approveSettlementSourceSelection !== undefined && typeof approveSettlementSourceSelection !== "function")
 		throw new TypeError("v3 zone settlement approval policy is invalid");
+	if (onTransient !== undefined && typeof onTransient !== "function")
+		throw new TypeError("v3 zone transient presentation observer is invalid");
 	const localAuthor = node.keychain.localAuthorId;
 	const localPeerId = node.networkNode.peerId;
 	const enrollment = encodeEnrollment({ author: localAuthor, peerId: localPeerId });
@@ -391,6 +403,13 @@ export function createV3ZoneApi(
 	let room: Awaited<ReturnType<typeof createV3RoomSession<ZoneProjection>>> | undefined;
 	let ephemeral: EphemeralChannel | undefined;
 	let projection = emptyProjection(localAuthor, localPeerId);
+	// Accepted-history identity belongs to the durable projection, not to an
+	// input event or a frame. No parsed authority or native observation is cached.
+	let acceptedOperationDigest = digest("ts-drp/d9346-zone-accepted-operations/v1", encodeCanonical(projection.acceptedDigests));
+	const installProjection = (value: ZoneProjection): void => {
+		projection = value;
+		acceptedOperationDigest = digest("ts-drp/d9346-zone-accepted-operations/v1", encodeCanonical(value.acceptedDigests));
+	};
 	let migrationCreatorAuthor = "";
 	let migrationMembers: readonly Readonly<Enrollment & { readonly order: number }>[] = Object.freeze([]);
 	let invite = "";
@@ -411,7 +430,7 @@ export function createV3ZoneApi(
 		aoiSenders.clear();
 	};
 	const resetZoneState = (): void => {
-		projection = emptyProjection(localAuthor, localPeerId);
+		installProjection(emptyProjection(localAuthor, localPeerId));
 		migrationCreatorAuthor = "";
 		migrationMembers = Object.freeze([]);
 		clearAoiProjection();
@@ -507,10 +526,7 @@ export function createV3ZoneApi(
 					: tradeIntentView(committedPrepared, "accepted", 2)
 				: absentTradeIntent();
 		return Object.freeze({
-			acceptedOperationDigest: digest(
-				"ts-drp/d9346-zone-accepted-operations/v1",
-				encodeCanonical(projection.acceptedDigests)
-			),
+			acceptedOperationDigest,
 			aoiBandwidth: Object.freeze(Object.fromEntries(aoiBandwidthEntries)),
 			aoiPopulations: Object.freeze(Object.fromEntries(aoiEntries)),
 			aoiProjection: Object.freeze(Object.fromEntries(aoiProjectionEntries)),
@@ -554,6 +570,14 @@ export function createV3ZoneApi(
 		});
 	};
 	const emit = (): void => onProjection(snapshot());
+	const emitPositions = (): void => {
+		if (onTransient === undefined) return emit();
+		// Detach the map on every delivery. Positions themselves are frozen at
+		// capture; a subscriber cannot mutate the owner's next visual frame.
+		onTransient(Object.freeze({ ready: room !== undefined, zoneId,
+			transientPositions: Object.freeze(Object.fromEntries(
+				[...transientPositions.entries()].sort(([left], [right]) => compareText(left, right)))) }));
+	};
 	const scheduleAoiExpiry = (channel: EphemeralChannel, sender: string, state: AoiProjectionReceiverState): void => {
 		clearTimeout(state.expiryTimer);
 		const expiresAt = state.receiver.nextExpiryAtMs();
@@ -584,6 +608,9 @@ export function createV3ZoneApi(
 	};
 	const subscribeEphemeral = (channel: EphemeralChannel): void => {
 		channel.subscribe(({ class: deliveryClass, key, payload, sender }) => {
+			// A previously admitted callback must not repaint a reopened room.
+			// Current channel authority is still checked by the original channel.
+			if (room === undefined || ephemeral !== channel) return;
 			const fabricObservation = decodeFabricPayload(payload);
 			if (fabricObservation !== undefined) {
 				const trial = fabricTrials.get(fabricObservation.trialId);
@@ -646,7 +673,7 @@ export function createV3ZoneApi(
 			const position = decodePosition(payload);
 			if (position === undefined) return;
 			transientPositions.set(sender, position);
-			emit();
+			emitPositions();
 		});
 	};
 	const performOpen = async (
@@ -713,7 +740,7 @@ export function createV3ZoneApi(
 					ephemeral = redirectedEphemeral;
 				},
 				onProjection: (value): void => {
-					projection = value;
+					installProjection(value);
 					const latestOutcome = value.outcomes.at(-1);
 					if (latestOutcome !== undefined) {
 						const preparedOutcome = preparedOutcomeCarrier(latestOutcome);
@@ -1166,7 +1193,7 @@ export function createV3ZoneApi(
 				key: localPeerId,
 				payload: encodeEntityDeltaBatch([{ entityId: 0, sequence: localMovementSequence, x: localX, y: localY }]),
 			});
-			emit();
+			emitPositions();
 		},
 		async placeBlock(input: ZoneBlock): Promise<void> {
 			const selected = room;

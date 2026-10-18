@@ -5,7 +5,7 @@ import { enableTracing } from "@ts-drp/tracer";
 import { env } from "./env";
 import { createModularGridNetwork, type ModularGridNetworkSession } from "./modular-network";
 import { isModularNetworkEnv, getNetworkConfigFromEnv as selectNetworkConfigFromEnv } from "./network-config";
-import { enableUIControls, renderNetwork, renderZone } from "./render";
+import { createZonePresentation, enableUIControls, renderNetwork } from "./render";
 import {
 	createV3ZoneApi,
 	type V3ZoneApi,
@@ -93,6 +93,7 @@ async function main(): Promise<void> {
 	let session: GridNetworkSession | undefined;
 	let unloadHandler: (() => void) | undefined;
 	let zone: V3ZoneApi | undefined;
+	const presentation = createZonePresentation();
 	try {
 		const selected = getNetworkConfigFromEnv();
 		const config: ReturnType<typeof selectNetworkConfigFromEnv> = {
@@ -109,7 +110,7 @@ async function main(): Promise<void> {
 		await node.start();
 		zone = createV3ZoneApi(
 			node,
-			renderZone,
+			presentation.projection,
 			(context) => {
 				const factory = window.__TS_DRP_GRID_ROOM_HEAD_AUTHORITY_FOR_OPEN__;
 				if (typeof factory !== "function") {
@@ -119,7 +120,8 @@ async function main(): Promise<void> {
 				}
 				return factory(context);
 			},
-			window.__TS_DRP_GRID_SETTLEMENT_SOURCE_APPROVAL__
+			window.__TS_DRP_GRID_SETTLEMENT_SOURCE_APPROVAL__,
+			presentation.transient
 		);
 		target.__TS_DRP_GRID_SESSION__ = session;
 		target.__TS_DRP_V3_ZONE__ = zone;
@@ -127,8 +129,9 @@ async function main(): Promise<void> {
 		bindControls(zone);
 		applicationInterval = setInterval(() => renderNetwork(node), env.renderInfoInterval);
 		renderNetwork(node);
-		renderZone(zone.snapshot());
+		presentation.projection(zone.snapshot());
 		unloadHandler = (): void => {
+			presentation.close();
 			if (applicationInterval !== undefined) clearInterval(applicationInterval);
 			applicationInterval = undefined;
 			// The document owns the Web Lock until termination. Releasing it here
@@ -145,6 +148,7 @@ async function main(): Promise<void> {
 			console.log("Started v3 zone node", import.meta.env);
 		});
 	} catch (error) {
+		presentation.close();
 		delete target.__TS_DRP_GRID_SESSION__;
 		delete target.__TS_DRP_V3_ZONE__;
 		if (unloadHandler !== undefined) window.removeEventListener("beforeunload", unloadHandler);

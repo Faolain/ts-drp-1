@@ -39,6 +39,20 @@ export interface BlueprintStateMachineInput {
 	readonly preparedBlueprintRuntime: PreparedBlueprintRuntime;
 }
 
+/** Never exported or delivered to a callback. The private brand, rather than
+ * a prototype/shape/symbol property, selects a genuine owner's fork capture. */
+class OwnedBlueprintForkInput implements BlueprintStateMachineInput {
+	readonly #source: BlueprintStateMachine;
+	constructor(source: BlueprintStateMachine, readonly exactCanonicalInitialStateBytes: Uint8Array,
+		readonly expectedBlueprintDigest: string, readonly expectedInitialStateDigest: string,
+		readonly preparedBlueprintRuntime: PreparedBlueprintRuntime, readonly maxApplicationStateBytes: number) {
+		this.#source = source;
+	}
+	static source(input: BlueprintStateMachineInput): BlueprintStateMachine | undefined {
+		return typeof input === "object" && input !== null && #source in input ? input.#source : undefined;
+	}
+}
+
 function hex(bytes: Uint8Array): string {
 	let output = "";
 	for (const byte of bytes) output += byte.toString(16).padStart(2, "0");
@@ -125,6 +139,20 @@ export class BlueprintStateMachine implements IStagedStateMachine<BlueprintState
 	#stateDigest: string;
 
 	constructor(input: BlueprintStateMachineInput) {
+		const owned = OwnedBlueprintForkInput.source(input);
+		if (owned !== undefined) {
+			// Only replacement-only private representations are shared. apply()
+			// passes state through the original runtime's detached input boundary,
+			// then publishes independently validated replacements; snapshot()
+			// always copies bytes. No caller/reducer can mutate these retained facts.
+			this.#applicationLimits = owned.#applicationLimits;
+			this.#expectedBlueprintDigest = owned.#expectedBlueprintDigest;
+			this.#preparedBlueprintRuntime = owned.#preparedBlueprintRuntime;
+			this.#exactCanonicalStateBytes = owned.#exactCanonicalStateBytes;
+			this.#state = owned.#state;
+			this.#stateDigest = owned.#stateDigest;
+			return;
+		}
 		const maxBytes = input.maxApplicationStateBytes ?? APPLICATION_LIMITS.maxBytes;
 		if (!Number.isSafeInteger(maxBytes) || maxBytes < 1)
 			applicationStateFailure("configured application byte ceiling is invalid");
@@ -148,10 +176,11 @@ export class BlueprintStateMachine implements IStagedStateMachine<BlueprintState
 		if (staged.#baseGeneration !== this.#generation) {
 			throw new DRPError("BLUEPRINT_ALREADY_ADOPTED", "staged transition is stale or already adopted");
 		}
-		const nextBytes = copyTrustedBytes(staged.#exactCanonicalStateBytes);
-		const nextState = deepCloneCanonical(staged.#state);
-		this.#exactCanonicalStateBytes = nextBytes;
-		this.#state = nextState;
+		// Both machines own these unexposed immutable representations. Even a
+		// consumed stage may keep applying/forking: those paths detach inputs and
+		// replace fields, so neither machine can mutate the other's state.
+		this.#exactCanonicalStateBytes = staged.#exactCanonicalStateBytes;
+		this.#state = staged.#state;
 		this.#stateDigest = staged.#stateDigest;
 		this.#generation = {};
 		staged.#baseGeneration = undefined;
@@ -179,13 +208,8 @@ export class BlueprintStateMachine implements IStagedStateMachine<BlueprintState
 	}
 
 	fork(): BlueprintStateMachine {
-		const fork = new BlueprintStateMachine({
-			maxApplicationStateBytes: this.#applicationLimits.maxBytes,
-			exactCanonicalInitialStateBytes: this.#exactCanonicalStateBytes,
-			expectedBlueprintDigest: this.#expectedBlueprintDigest,
-			expectedInitialStateDigest: this.#stateDigest,
-			preparedBlueprintRuntime: this.#preparedBlueprintRuntime,
-		});
+		const fork = new BlueprintStateMachine(new OwnedBlueprintForkInput(this, this.#exactCanonicalStateBytes,
+			this.#expectedBlueprintDigest, this.#stateDigest, this.#preparedBlueprintRuntime, this.#applicationLimits.maxBytes));
 		fork.#baseGeneration = this.#generation;
 		fork.#parent = this;
 		return fork;

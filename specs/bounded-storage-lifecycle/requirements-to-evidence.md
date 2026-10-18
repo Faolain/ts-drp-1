@@ -29,6 +29,15 @@ real transition boundary; they are not acceptance runs.
 
 ## Current gameplay diagnosis scope
 
+The receipt's `ownerSeparatedPathOptimization20261018` owns the parallel
+fork/recovery-evidence/presentation changes and their affected safety, native,
+unprofiled and real-Grid evidence. Reusable immutable facts remain separate from
+fresh authority and storage currency; visual coalescing never coalesces durable
+work. The integrated measurements do **not** establish an aggregate latency fix:
+multi-second sealing/adoption, later-epoch growth and the separate supported64
+failure remain open. This complementary work neither reopens accepted slices nor
+creates another acceptance prerequisite.
+
 Canonical reuse supplies immutable syntax facts, never native currency or
 admission/deletion authority. The existing receipt's
 `canonicalOwnerReuseLatency20261016` owns the current capture/snapshot reuse

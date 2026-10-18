@@ -30,6 +30,7 @@ function fixture(){
   evidence:{cut:{ref:{digest:"cut"}},qc:{ref:{digest:"qc"}},representation:"closed"}};
  class Refusal extends Error{constructor(readonly result:{kind:string}){super(result.kind);}}
  const context={createCreatorCanonicalSyntaxReader:()=>{calls.factories++;return {snapshot,record:()=>undefined};},
+  createCreatorSnapshotRecoveryEvidenceJob:()=>({sourceTrust:()=>undefined,readback:()=>undefined,release:()=>{}}),
   record:()=>undefined,anchorOf:()=>undefined,unique:()=>undefined,uniqueCreatorTransitionCandidate:()=>undefined,canonicalCreatorDataRecord:()=>undefined,
   validateCreatorSnapshotData:(...args:unknown[])=>{calls.fresh++;calls.args.push(args);events.push("fresh-syntax");return accept?result:undefined;},
   checkAbort:()=>{},bindMethod:(owner:Record<string,any>,key:string)=>owner[key].bind(owner),

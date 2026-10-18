@@ -3057,6 +3057,7 @@ describe("acquisition-job exact parsing reuse is never current authority", () =>
 			${extract(transitionFile, "exactCreatorTransitionOccurrence")}
 			${["unique", "record", "anchorOf", "createCreatorClosedAcquisitionSyntax"].map(declaration).join("\n")}
 			createCreatorClosedAcquisitionSyntax();`, {
+			createCreatorSnapshotRecoveryEvidenceJob: () => ({sourceTrust: () => undefined, readback: () => undefined, release: () => {}}),
 			AHE_BOUNDED_READ_LIMITS, Object: observedObject, compareBytes: (a: Uint8Array, b: Uint8Array) => Buffer.compare(Buffer.from(a), Buffer.from(b)),
 			decodeCanonical: (bytes: Uint8Array) => {decodes++; return decodeCanonical(bytes);},
 			sameRef: (a: {digest: string; byteLength: number}, b: {digest: string; byteLength: number}) => a.digest === b.digest && a.byteLength === b.byteLength,
@@ -6333,7 +6334,7 @@ describe("recovery-role readback metadata syntax affected controls", () => {
 		const file = ts.createSourceFile(path.pathname, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 		const fn = (name: string) => {const found = file.statements.filter((node): node is ts.FunctionDeclaration => ts.isFunctionDeclaration(node) && node.name?.text === name);
 			if (found.length !== 1) throw Error(`READBACK_METADATA_HELPER:${name}:${found.length}`); return found[0]!;};
-		const readback = fn("openCreatorSnapshotRecoveryRoleReadback"), body = readback.body!.statements.find(ts.isTryStatement)!.tryBlock;
+		const readback = fn("openCreatorSnapshotRecoveryRoleReadbackOwned"), body = readback.body!.statements.find(ts.isTryStatement)!.tryBlock;
 		const statement = (name: string) => {const found = body.statements.filter((node): node is ts.VariableStatement => ts.isVariableStatement(node) && node.declarationList.declarations.some(declaration => ts.isIdentifier(declaration.name) && declaration.name.text === name));
 			if (found.length !== 1) throw Error(`READBACK_METADATA_STATEMENT:${name}:${found.length}`); return found[0]!.getText(file);};
 		const lineage = body.statements.find((node): node is ts.IfStatement => ts.isIfStatement(node) && node.expression.getText(file).startsWith("carrier === undefined"));
