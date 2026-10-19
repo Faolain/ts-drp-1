@@ -7,7 +7,7 @@ import path from "node:path";
 
 import { type AnchorEvidence, expectedAnchorOutcomes } from "../../../tests/fixtures/journal-anchor-read/assertions.js";
 import { type AnchorCase, ANCHOR_CASES, anchorMaterial } from "../../../tests/fixtures/journal-anchor-read/material.js";
-import { decodeCanonical, hashDomain } from "../../canonical/dist/src/index.js";
+import { decodeCanonical, hashDomain } from "@ts-drp/canonical";
 
 // Page globals installed by the bundled journal-anchor browser entry, which
 // lives outside this package's program (see its own declarations).

@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { type Phase4cBrowserServer, startPhase4cBrowserServer } from "./phase-4c-browser-server.js";
-import { encodeCanonical } from "../../canonical/dist/src/index.js";
+import { encodeCanonical } from "@ts-drp/canonical";
 
 import { VOTE_TRANSACTION_STORES } from "../src/internal/seal-vote-store.js";
 
