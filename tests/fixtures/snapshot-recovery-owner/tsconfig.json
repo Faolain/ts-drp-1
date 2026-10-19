@@ -3,6 +3,7 @@
 	"compilerOptions": {
 		"composite": false,
 		"noEmit": true,
+		"allowImportingTsExtensions": true,
 		"rootDir": "../../.."
 	},
 	"files": [

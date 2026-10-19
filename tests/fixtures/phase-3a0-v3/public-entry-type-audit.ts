@@ -47,6 +47,7 @@ type ExpectedView = Readonly<{
 	dependencies: readonly string[];
 	operation: Readonly<Record<string, unknown>>;
 	digest: Uint8Array;
+	settlementSource?: Readonly<Record<string, unknown>>;
 }>;
 type ExpectedExtractResult =
 	| Readonly<{ ok: false; reason: ExpectedFailureReason }>

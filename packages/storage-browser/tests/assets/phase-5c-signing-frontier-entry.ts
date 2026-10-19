@@ -156,7 +156,7 @@ async function run(name: string, scenario: string): Promise<unknown> {
 		txId = 0;
 	const transaction = IDBDatabase.prototype.transaction;
 	IDBDatabase.prototype.transaction = function (stores, mode, options): IDBTransaction {
-		const tx = transaction.call(this, stores, mode, options),
+		const tx = transaction.call(this, stores as string | string[], mode, options),
 			id = ++txId;
 		events.push({
 			ordinal: ++ordinal,

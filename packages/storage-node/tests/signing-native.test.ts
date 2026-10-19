@@ -86,11 +86,12 @@ test("SQLite public signing ports finalize genuine creator proofs and preserve e
 	const first = await openActor("create");
 	const adapter = resolveSealStorePort(first.vote.store);
 	if (adapter === undefined) throw new Error("missing genuine vote port");
+	// Deliberately forged, untrusted intents and enrollment: each genuine port must refuse them at runtime.
 	const raw = Object.freeze({ objectId: "forged", epoch: 0 });
 	expect(await adapter.commitVote(raw)).toEqual({ ok: false, reason: "UNTRUSTED_VOTE_INTENT" });
-	expect(await adapter.commitRoundChange(raw)).toEqual({ ok: false, reason: "UNTRUSTED_ROUND_CHANGE_INTENT" });
-	expect(await adapter.commitQc(raw, raw)).toEqual({ ok: false, reason: "UNTRUSTED_VOTER_ENROLLMENT" });
-	expect(await adapter.retireDetails(raw)).toEqual({ ok: false, reason: "UNTRUSTED_DETAIL_RETIREMENT_INTENT" });
+	expect(await adapter.commitRoundChange!(raw)).toEqual({ ok: false, reason: "UNTRUSTED_ROUND_CHANGE_INTENT" });
+	expect(await adapter.commitQc!(raw as never, raw)).toEqual({ ok: false, reason: "UNTRUSTED_VOTER_ENROLLMENT" });
+	expect(await adapter.retireDetails!(raw)).toEqual({ ok: false, reason: "UNTRUSTED_DETAIL_RETIREMENT_INTENT" });
 	const result = await first.actor.close({ closeInput: prepared.closeInput });
 	expect(result).toMatchObject({ ok: true });
 	if (!result.ok) throw new Error(result.reason);
@@ -253,7 +254,7 @@ test.each(["unchanged", "control", "callback-failure"] as const)(
 				writer.exec("BEGIN IMMEDIATE");
 				try {
 					if (mode === "control") {
-						const objectId = prepared.currentTrust.objectId, key = `signing-retirement:${objectId}`;
+						const objectId = (prepared.currentTrust as CurrentAnchorTrust).objectId, key = `signing-retirement:${objectId}`;
 						const control = {kind: "signing-retirement-control-1", objectId,
 							incarnation: vote.observation.incarnation, revision: 1, sequence: 0, active: null, completed: null};
 						writer.prepare("INSERT INTO signing_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")

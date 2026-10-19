@@ -45,7 +45,7 @@ function fixture() {
 					return {ok: true, value: coordinator};},
 				commitPrepared: async () => {coordinator = completed(); return {ok: true, value: coordinator};},
 				release: async () => {coordinatorReleased++;},
-			} as AheRetirementControlRead;
+			} as unknown as AheRetirementControlRead; // Partial stand-in: only the members sequencing uses.
 		},
 		participants: domains.slice(1).map((commitment, index) => ({commitment,
 			acquire: async () => {

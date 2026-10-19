@@ -22,10 +22,16 @@ it.skipIf(process.env[CLEAN_SNAPSHOT_CHILD] === "1")(
 		const snapshotRoot = path.join(temporaryRoot, "snapshot");
 		fs.mkdirSync(snapshotRoot);
 		try {
-			const archive = execFileSync("git", ["archive", "--format=tar", "HEAD"], {
-				cwd: REPOSITORY_ROOT,
-				maxBuffer: 128 * 1024 * 1024,
-			});
+			// Tracked files without the committed campaign logs (over 1 GB of
+			// .logs evidence would overflow any reasonable buffer).
+			const archive = execFileSync(
+				"git",
+				["archive", "--format=tar", "HEAD", "--", ".", ":(exclude).logs", ":(exclude)**/.logs/**"],
+				{
+					cwd: REPOSITORY_ROOT,
+					maxBuffer: 128 * 1024 * 1024,
+				}
+			);
 			const extracted = spawnSync("tar", ["-xf", "-", "-C", snapshotRoot], {
 				input: archive,
 				encoding: "utf8",

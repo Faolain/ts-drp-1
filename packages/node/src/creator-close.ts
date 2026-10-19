@@ -420,17 +420,30 @@ export interface V3CreatorCloseRegistration {
 		signing: import("@ts-drp/seal/creator").CreatorSigningRecoveryOwner,
 		snapshots: import("@ts-drp/storage/snapshot-transfer").SnapshotRecoveryStore<SnapshotVerificationReceipt>
 	): Promise<Readonly<{hold: CreatorSnapshotRecoveryCloseHold; readRetiredGenerations(): readonly GenerationRecord[]}> | undefined>;
+	/** Explicit queued quiescent recipient boundary: the SAME received gate an
+	 * install enters, reopened only after every admitted hold and release joined.
+	 * `deferrable` reports an unavailable boundary before entry instead of halting. */
+	runReceivedRecoveryMaintenance(
+		signing: import("@ts-drp/seal/creator").CreatorSigningRecoveryOwner,
+		snapshots: import("@ts-drp/storage/snapshot-transfer").SnapshotRecoveryStore<SnapshotVerificationReceipt>,
+		consume: (seal: () => Promise<Readonly<{hold: CreatorSnapshotRecoveryCloseHold;
+			readRetiredGenerations(): readonly GenerationRecord[]}>>) => Promise<"complete">,
+		options?: Readonly<{deferrable?: boolean}>
+	): Promise<"ran" | "deferred">;
 	sealIssuanceMaintenanceDependencies(receivedReceipt?: object): Promise<CreatorSnapshotRecoveryCloseHold | undefined>;
 	/** Prepare bounded idle issuer metadata before the explicit cold readiness capture. */
 	prepareOrdinaryNativeMetadataForReadiness(): Promise<void>;
 	/** Scheduling request only: a recovery halt still requires the original
 	 * authenticated reconciliation before a finishing window can be prepared. */
 	needsOrdinaryReadinessRecovery(): boolean;
+	/** Schedules the original queued drain of retained received work after a
+	 * maintenance job that refused it has joined. Grants no admission. */
+	resumePendingIngress(): void;
 	/** Explicit queued quiescent boundary, never a presign maintenance grant.
 	 * `deferrable` reports an unavailable boundary before entry instead of halting. */
 	runOrdinaryReadinessMaintenance(snapshots: SnapshotRecoveryStore<SnapshotVerificationReceipt>,
 		consume: (seal: () => Promise<CreatorSnapshotRecoveryCloseHold>, requireClosedWorkflowCompletion: boolean) => Promise<"complete">,
-		options?: Readonly<{deferrable?: boolean}>): Promise<"ran" | "deferred">;
+		options?: Readonly<{deferrable?: boolean; after?: () => Promise<void>}>): Promise<"ran" | "deferred">;
 	/** Fresh runtime custody only; source and native admission remain rollback-owned. */
 	sealOrdinaryIssuanceMaintenanceRuntime(receivedReceipt?: object): Promise<CreatorOrdinaryIssuanceRuntimeHold | undefined>;
 	/** Numerical dimensions from the original census field owner; never authority. */
@@ -4773,6 +4786,7 @@ export async function bindCreatorLiveClose(
 								throw cause;
 							} finally {
 								maintenanceJobs.delete(joined); finish();
+								registration.resumePendingIngress();
 							}
 						});
 					},
@@ -4787,6 +4801,7 @@ export async function bindCreatorLiveClose(
 						if (input.promotionContext === undefined || input.archive !== undefined ||
 							input.readOrdinaryApplicationResourceBound === undefined || registration.currentTrust.currentEpoch < 3)
 							return Object.freeze({kind: "deferred", reason: "unsupported"});
+						const resourceBound = input.readOrdinaryApplicationResourceBound;
 						if (!available() || maintenanceJobs.size !== 0 || promotionSource !== undefined || recoverySource !== undefined)
 							return busy;
 						// Observational point reads before any admission: "not-needed" leaves
@@ -4824,7 +4839,24 @@ export async function bindCreatorLiveClose(
 										}, true, requireClosedWorkflowCompletion, registration.currentTrust);
 									if (!available()) throw new TypeError("creator pool maintenance admission was revoked");
 									return checkpoint;
-								}, {deferrable: true});
+								}, {deferrable: true, after: async () => {
+									// Runs in the boundary's queue slot after it released, before
+									// queued arrivals: they cannot change the census mid-capture.
+									const control = await native.readRetirementControl?.(registration.objectId);
+									if (control !== undefined && !control.ok)
+										throw new TypeError("creator pool retirement intent is unavailable", {cause: control});
+									earlyTurnover = control === undefined ? undefined :
+										captureCreatorEarlyTurnoverToken(registration.currentTrust.currentEpoch, control.value);
+									if (!available()) throw new TypeError("creator pool maintenance admission was revoked");
+									// Same cold readiness capture the original boundary uses after maintenance.
+									await registration.prepareOrdinaryNativeMetadataForReadiness();
+									if (!available()) throw new TypeError("creator pool maintenance admission was revoked");
+									const source = await captureCreatorOrdinarySourceWithoutForecast(registration, input, undefined, true);
+									if (!available()) throw new TypeError("creator pool maintenance admission was revoked");
+									ordinaryProofSource = source; detached = false;
+									ordinaryTemplateReady = source !== undefined &&
+										creatorOrdinaryIssuanceSourceReadinessPrepared(source, resourceBound);
+								}});
 							if (outcome === "deferred") {
 								// No hold, freeze or native work occurred: restore the joined hint,
 								// which every ordinary call still checks for fresh currency.
@@ -4833,20 +4865,6 @@ export async function bindCreatorLiveClose(
 									creatorOrdinaryIssuanceSourceReadinessPrepared(priorOrdinarySource, input.readOrdinaryApplicationResourceBound);
 								return busy;
 							}
-							const control = await native.readRetirementControl?.(registration.objectId);
-							if (control !== undefined && !control.ok)
-								throw new TypeError("creator pool retirement intent is unavailable", {cause: control});
-							earlyTurnover = control === undefined ? undefined :
-								captureCreatorEarlyTurnoverToken(registration.currentTrust.currentEpoch, control.value);
-							if (!available()) throw new TypeError("creator pool maintenance admission was revoked");
-							// Same cold readiness capture the original boundary uses after maintenance.
-							await registration.prepareOrdinaryNativeMetadataForReadiness();
-							if (!available()) throw new TypeError("creator pool maintenance admission was revoked");
-							const source = await captureCreatorOrdinarySourceWithoutForecast(registration, input, undefined, true);
-							if (!available()) throw new TypeError("creator pool maintenance admission was revoked");
-							ordinaryProofSource = source; detached = false;
-							ordinaryTemplateReady = source !== undefined &&
-								creatorOrdinaryIssuanceSourceReadinessPrepared(source, input.readOrdinaryApplicationResourceBound);
 							return Object.freeze({kind: "maintained"});
 						} catch (cause) {
 							if (detached) { ordinaryProofSource = undefined; ordinaryTemplateReady = false; }
@@ -4855,6 +4873,9 @@ export async function bindCreatorLiveClose(
 							throw cause;
 						} finally {
 							maintenanceJobs.delete(joined); finish();
+							// Received moves refused while this job held the consumer were
+							// retained, not dropped: admit them now through the full path.
+							registration.resumePendingIngress();
 						}
 					},
 					releaseHeaderCustodyForSuccessorInstall: async (): Promise<void> => {

@@ -603,6 +603,7 @@ function decoratedAheStore(
 	}
 	return Object.freeze<AheDurableStore>({
 		capabilities: backend.capabilities,
+		acquireBoundedActiveRead: (input) => backend.acquireBoundedActiveRead(input),
 		beginGeneration: (input) => mutate("beginGeneration", () => backend.beginGeneration(input)),
 		close: () => backend.close(),
 		completeGeneration: (input) => mutate("completeGeneration", () => backend.completeGeneration(input)),
@@ -848,6 +849,9 @@ async function recoverWithDurableStores(
 		close: () => rawJournal.close(),
 		installEpochAnchor: (input) => rawJournal.installEpochAnchor(input),
 		installGenesis: (input) => rawJournal.installGenesis(input),
+		readAnchorPreimage: (input) => rawJournal.readAnchorPreimage(input),
+		readSignedAnchorEnvelope: (input) => rawJournal.readSignedAnchorEnvelope(input),
+		importHistoricalAnchor: (input) => rawJournal.importHistoricalAnchor(input),
 		readiness: (input) => rawJournal.readiness(input),
 		readPage: async (input) => {
 			const result = await rawJournal.readPage(input);

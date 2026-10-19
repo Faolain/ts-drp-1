@@ -105,6 +105,8 @@ export async function readSigningFrontier(
 
 const stores = SIGNING_PARTICIPANT_SCHEMA_AUTHORITY.stores.map((store) => store.name);
 const signingStores = ["signerState", "sealEvidence", "voteSlots", "voteOutbox"] as const;
+/** Row gets kept in flight ahead of the serial admission that consumes them. */
+const SIGNING_VALUE_WINDOW = 16;
 // The addressed capture spends the existing U entitlement, not an additional
 // signing entitlement. A native poisoned structured clone precedes this check.
 const imageLimits = { maxBytes: LIMITS.maxUnionBytes, maxItems: 65_536, maxDepth: 128 };
@@ -228,59 +230,59 @@ async function image(
 		add("storageMeta", key, value === undefined ? null : value);
 	}
 	for (const name of signingStores) {
-		await new Promise<void>((resolve, reject) => {
-			const native = transaction.objectStore(name);
-			const cursorRequest = native.openKeyCursor(IDBKeyRange.bound([objectId], [objectId, []]));
-			cursorRequest.onerror = (): void => reject(cursorRequest.error);
-			cursorRequest.onsuccess = (): void => {
-				const cursor = cursorRequest.result;
-				if (cursor === null) {
-					resolve();
-					return;
-				}
-				void (async (): Promise<void> => {
-					const key = cursor.key;
-					if (!Array.isArray(key) || key[0] !== objectId || !safe(key[1])) throw new Error("INVALID_SIGNING_ADDRESS");
-					const short = name === "signerState" || name === "sealEvidence";
-					if (
-						key.length !== (short ? 3 : 5) ||
-						typeof key[key.length - 1] !== "string" ||
-						(!short && (!safe(key[2]) || !["prepare", "commit", "round-change"].includes(key[3] as string)))
-					)
-						throw new Error("INVALID_SIGNING_ADDRESS");
-					// Key/count/minimum canonical frame admission precedes the native
-					// value clone. An oversized poisoned row itself remains an IDB
-					// structured-clone substrate limitation, not a JS preallocation proof.
-					if (
-						count >= 65_536 ||
-						logicalBytes + encodeCanonical([name, key, null], imageLimits).byteLength > LIMITS.maxUnionBytes
-					)
-						throw new Error("SIGNING_IMAGE_FULL");
-					const value = (await request(native.get(cursor.primaryKey))) as Record<string, unknown>;
-					if (
-						value === null ||
-						typeof value !== "object" ||
-						value.objectId !== objectId ||
-						value.epoch !== key[1] ||
-						value.signerId !== key[key.length - 1]
-					)
-						throw new Error("INVALID_SIGNING_ADDRESS");
-					if (
-						name === "signerState" &&
-						(!safe(value.revision) ||
-							!safe(value.enteredRound) ||
-							(value.retiredBeforeRound !== undefined &&
-								(!safe(value.retiredBeforeRound) || value.retiredBeforeRound > value.enteredRound)))
-					)
-						throw new Error("INVALID_SIGNING_FRONTIER");
-					if (!short && (value.round !== key[2] || value.phase !== key[3])) throw new Error("INVALID_SIGNING_ADDRESS");
-					add(name, key, value);
-					present = true;
-					if (name === "voteOutbox" && value.dispatched !== true) pendingEpochs.push(key[1]);
-					cursor.continue();
-				})().catch(reject);
-			};
-		});
+		const native = transaction.objectStore(name);
+		// The same ordered primary keys the key cursor walked, in one native read
+		// bounded by the remaining row capacity (+1 so overflow still refuses).
+		const keys = await request(native.getAllKeys(IDBKeyRange.bound([objectId], [objectId, []]), 65_537 - count));
+		const values: Promise<unknown>[] = [];
+		let issued = 0;
+		for (let index = 0; index < keys.length; index++) {
+			const key = keys[index];
+			if (!Array.isArray(key) || key[0] !== objectId || !safe(key[1])) throw new Error("INVALID_SIGNING_ADDRESS");
+			const short = name === "signerState" || name === "sealEvidence";
+			if (
+				key.length !== (short ? 3 : 5) ||
+				typeof key[key.length - 1] !== "string" ||
+				(!short && (!safe(key[2]) || !["prepare", "commit", "round-change"].includes(key[3] as string)))
+			)
+				throw new Error("INVALID_SIGNING_ADDRESS");
+			// Key/count/minimum canonical frame admission precedes this row's
+			// consumption. At most SIGNING_VALUE_WINDOW - 1 later rows are already
+			// in flight. An oversized poisoned row itself remains an IDB
+			// structured-clone substrate limitation, not a JS preallocation proof.
+			if (
+				count >= 65_536 ||
+				logicalBytes + encodeCanonical([name, key, null], imageLimits).byteLength > LIMITS.maxUnionBytes
+			)
+				throw new Error("SIGNING_IMAGE_FULL");
+			while (issued < keys.length && issued < index + SIGNING_VALUE_WINDOW) {
+				const pending = request(native.get(keys[issued]!));
+				// Rows past a refusal are never observed; consumed rows keep their error.
+				void pending.catch(() => undefined);
+				values[issued++] = pending;
+			}
+			const value = (await values[index]) as Record<string, unknown>;
+			if (
+				value === null ||
+				typeof value !== "object" ||
+				value.objectId !== objectId ||
+				value.epoch !== key[1] ||
+				value.signerId !== key[key.length - 1]
+			)
+				throw new Error("INVALID_SIGNING_ADDRESS");
+			if (
+				name === "signerState" &&
+				(!safe(value.revision) ||
+					!safe(value.enteredRound) ||
+					(value.retiredBeforeRound !== undefined &&
+						(!safe(value.retiredBeforeRound) || value.retiredBeforeRound > value.enteredRound)))
+			)
+				throw new Error("INVALID_SIGNING_FRONTIER");
+			if (!short && (value.round !== key[2] || value.phase !== key[3])) throw new Error("INVALID_SIGNING_ADDRESS");
+			add(name, key, value);
+			present = true;
+			if (name === "voteOutbox" && value.dispatched !== true) pendingEpochs.push(key[1]);
+		}
 	}
 	if (!present && !allowAbsent) throw new Error("SIGNING_ADDRESS_ABSENT");
 	const digest = Array.from(hashDomain("ts-drp/signing-native-image/v1", ...frames), (byte) =>

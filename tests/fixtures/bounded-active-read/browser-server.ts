@@ -131,5 +131,7 @@ export async function server(lane: "active" | "role" = "active"): Promise<{ orig
 		close: () => new Promise((ok, fail) => native.close((e) => (e ? fail(e) : ok()))),
 	};
 }
-if (process.argv[2] === "build") await buildAssets();
-if (process.argv[2] === "build-role") await buildAssets("role");
+// Script entry without top-level await: package programs that import this
+// server compile it at their ES6 target. A rejection still exits non-zero.
+if (process.argv[2] === "build") void buildAssets();
+if (process.argv[2] === "build-role") void buildAssets("role");

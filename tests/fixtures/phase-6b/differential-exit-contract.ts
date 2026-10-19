@@ -1,9 +1,12 @@
 import {
 	digestClosure,
+	type BlobDigest,
+	type ClosureDigest,
 	type ExpectedHead,
 	type GenerationId,
 	type GenerationRecord,
 	type GenerationRef,
+	type HeadRevision,
 	type PresentHead,
 	type StorageObjectId,
 } from "@ts-drp/storage";
@@ -205,10 +208,10 @@ export function d109fGenerationId(index: number): GenerationId {
 }
 
 function generationRef(index: number): GenerationRef {
-	return Object.freeze({ byteLength: index + 3, digest: (index + 4096).toString(16).padStart(64, "0") });
+	return Object.freeze({ byteLength: index + 3, digest: (index + 4096).toString(16).padStart(64, "0") as BlobDigest });
 }
 
-function closureDigest(closure: readonly GenerationRef[]): string {
+function closureDigest(closure: readonly GenerationRef[]): ClosureDigest {
 	const result = digestClosure(closure);
 	if (!result.ok) throw new TypeError(`D109F_CLOSURE_DIGEST:${result.reason}`);
 	return result.value;
@@ -221,7 +224,7 @@ function presentHead(index: number): PresentHead {
 		generationId: d109fGenerationId(index),
 		kind: "present" as const,
 		objectId: D109F_OBJECT_ID,
-		revision: index,
+		revision: index as HeadRevision,
 	});
 }
 
@@ -363,7 +366,7 @@ export async function runD109fPlannerDifferential(): Promise<D109fDifferentialRe
 				closedEpoch: step,
 				compactedDeleteCount: compactedPlan.lineageFloor.deleteGenerationIds.length,
 				floorGenerationId: archivalPlan.lineageFloor.generationId,
-				rollbackGenerationIds: Object.freeze([...archivalPlan.rollbackGenerationIds]),
+				rollbackGenerationIds: Object.freeze([...archivalPlan.rollbackGenerationIds] as const),
 			})
 		);
 		compacted = compact(compacted, compactedPlan);

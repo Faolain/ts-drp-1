@@ -169,6 +169,19 @@ function assertWellFormedString(value: string): void {
 }
 
 function encodeVarUint(input: number | bigint): Uint8Array {
+	if (typeof input === "number" && Number.isSafeInteger(input) && input >= 0) {
+		// Exact Number arithmetic for every safe integer: identical bytes, no BigInt.
+		let count = 1;
+		for (let rest = input; rest >= 0x80; rest = Math.floor(rest / 0x80)) count++;
+		const output = new Uint8Array(count);
+		let value = input;
+		for (let index = 0; index < count - 1; index++) {
+			output[index] = (value % 0x80) | 0x80;
+			value = Math.floor(value / 0x80);
+		}
+		output[count - 1] = value;
+		return output;
+	}
 	let value = typeof input === "bigint" ? input : BigInt(input);
 	if (value < BigInt(0)) throw new CanonicalEncodingError("varuint cannot be negative");
 	const output: number[] = [];
@@ -251,7 +264,9 @@ function encodeInternal(
 			if (!Number.isSafeInteger(normalized)) {
 				throw new CanonicalEncodingError("integer must be within JavaScript's safe range");
 			}
-			return encodedParts([Uint8Array.of(TAG.INTEGER), encodeVarUint(zigZagEncode(normalized))]);
+			// Exact in Number arithmetic in the same range as the single-pass writer.
+			const zigZag = normalized >= 0 ? normalized * 2 : normalized >= -0x10000000000000 ? -normalized * 2 - 1 : undefined;
+			return encodedParts([Uint8Array.of(TAG.INTEGER), encodeVarUint(zigZag ?? zigZagEncode(normalized))]);
 		}
 		return encodedParts([Uint8Array.of(TAG.FLOAT64), float64Bytes(normalized)]);
 	}
@@ -575,34 +590,42 @@ function finishSorted(writer: ByteWriter, regionStart: number, tag: number, entr
 			break;
 		}
 	}
-	let order = entries;
+	const count = entries.length;
 	if (!sorted) {
-		order = entries.slice().sort((left, right) =>
-			compareRanges(buffer, left.keyStart, left.keyEnd, right.keyStart, right.keyEnd));
+		// Only the emitted order is needed afterwards; sort the caller's own array.
+		entries.sort((left, right) => compareRanges(buffer, left.keyStart, left.keyEnd, right.keyStart, right.keyEnd));
 		if (duplicate !== undefined) {
-			for (let index = 1; index < order.length; index++) {
-				const previous = order[index - 1]!, current = order[index]!;
+			for (let index = 1; index < count; index++) {
+				const previous = entries[index - 1]!, current = entries[index]!;
 				if (compareRanges(buffer, previous.keyStart, previous.keyEnd, current.keyStart, current.keyEnd) === 0)
 					throw new CanonicalEncodingError(duplicate);
 			}
 		}
 	}
-	const regionEnd = writer.offset;
-	const header = encodeVarUint(entries.length);
-	const headerLength = 1 + header.byteLength;
-	if (sorted) {
-		writer.reserve(headerLength);
-		writer.buffer.copyWithin(regionStart + headerLength, regionStart, regionEnd);
-		writer.buffer[regionStart] = tag;
-		writer.buffer.set(header, regionStart + 1);
-		writer.offset = regionEnd + headerLength;
-		return;
+	const regionEnd = writer.offset, regionLength = regionEnd - regionStart;
+	let headerLength = 2;
+	for (let rest = count; rest >= 0x80; rest = Math.floor(rest / 0x80)) headerLength++;
+	// Unsorted entries are staged past the final output, inside the same buffer.
+	writer.reserve(sorted ? headerLength : headerLength + regionLength);
+	const output = writer.buffer;
+	const scratch = regionEnd + headerLength;
+	if (sorted) output.copyWithin(regionStart + headerLength, regionStart, regionEnd);
+	else output.copyWithin(scratch, regionStart, regionEnd);
+	output[regionStart] = tag;
+	let value = count;
+	for (let index = regionStart + 1; index < regionStart + headerLength - 1; index++) {
+		output[index] = (value % 0x80) | 0x80;
+		value = Math.floor(value / 0x80);
 	}
-	const region = buffer.slice(regionStart, regionEnd);
-	writer.offset = regionStart;
-	writer.byte(tag);
-	writer.bytes(header);
-	for (const entry of order) writer.bytes(region.subarray(entry.keyStart - regionStart, entry.end - regionStart));
+	output[regionStart + headerLength - 1] = value;
+	if (!sorted) {
+		let offset = regionStart + headerLength;
+		for (const entry of entries) {
+			output.copyWithin(offset, scratch + entry.keyStart - regionStart, scratch + entry.end - regionStart);
+			offset += entry.end - entry.keyStart;
+		}
+	}
+	writer.offset = regionEnd + headerLength;
 }
 
 /** The single-pass equivalent of `encodeInternal` without capture: identical

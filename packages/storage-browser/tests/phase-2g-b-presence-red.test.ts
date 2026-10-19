@@ -26,7 +26,12 @@ describe("Phase 2g-b browser metadata capability RED", () => {
 	it("keeps the existing runtime root while giving IDB sole getKey-only presence ownership", () => {
 		expect
 			.soft(Object.keys(browserRoot).sort())
-			.toEqual(["createBrowserAheDurableStore", "createBrowserStorageCapacityPort"]);
+			.toEqual([
+				"NativeReadReservationOwner",
+				"createBrowserAheDurableStore",
+				"createBrowserRoomHeadAuthority",
+				"createBrowserStorageCapacityPort",
+			]);
 		const browserSource = sourceFiles(path.join(WORKSPACE_DIRECTORY, "packages/storage-browser/src"))
 			.map((file) => fs.readFileSync(file, "utf8"))
 			.join("\n");
@@ -92,15 +97,29 @@ export type BlobDigest = string & { readonly [digest]: true };
 export type StoreResult<T> = { readonly ok:true; readonly value:T } | { readonly ok:false; readonly reason:string; readonly cause?:unknown };
 export interface AheDurableStore { readonly marker: "ahe"; close(): Promise<void> }
 export interface BlobExistencePort { probeBlobPresence(digests: readonly BlobDigest[]): Promise<StoreResult<readonly boolean[]>> }
+// Root names the packed browser declarations reference since the room-head
+// and bounded-read phases; only the keys the declarations Pick are shaped.
+export interface NativeReadReservation { release(): Promise<void> }
+export interface AheBoundedRecoveryRoleStore extends AheDurableStore {}
+export interface RoomHeadScope { readonly objectId: string }
+export type RoomHeadInitialization = unknown;
+export interface RoomHeadAuthority {}
+export interface RoomHeadRetirementObservation {
+	readonly scope: RoomHeadScope;
+	readonly state: unknown;
+	readonly control: unknown;
+	readonly imageDigest: string;
+	readonly metadataBytes: number;
+}
 `
 			);
 			fs.writeFileSync(
 				path.join(consumerDirectory, "consumer.ts"),
-				`import type { AheDurableStore, BlobExistencePort } from "@ts-drp/storage";
-import { type BrowserAheDurableStore, createBrowserAheDurableStore } from "@ts-drp/storage-browser";
+				`import type { AheBoundedRecoveryRoleStore, BlobExistencePort } from "@ts-drp/storage";
+import { type BrowserAheDurableStore, createBrowserAheDurableStore, type NativeReadReservationPort } from "@ts-drp/storage-browser";
 type Equal<A,B> = (<T>()=>T extends A?1:2) extends (<T>()=>T extends B?1:2) ? true : false;
 type Expect<T extends true> = T;
-type _Composition = Expect<Equal<BrowserAheDurableStore, AheDurableStore & BlobExistencePort>>;
+type _Composition = Expect<Equal<BrowserAheDurableStore, AheBoundedRecoveryRoleStore & BlobExistencePort & NativeReadReservationPort>>;
 type _Return = Expect<Equal<Awaited<ReturnType<typeof createBrowserAheDurableStore>>, BrowserAheDurableStore>>;
 const factory: (input: { readonly databaseName:string }) => Promise<BrowserAheDurableStore> = createBrowserAheDurableStore;
 void factory;

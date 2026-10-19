@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import * as current from "../src/internal/codec.ts";
-import * as reference from "./reference/codec-v1.ts";
+import * as current from "../src/internal/codec.js";
+import * as reference from "./reference/codec-v1.js";
 
 /** Deterministic PRNG so every failure is reproducible from its seed. */
 function rng(seed: number): () => number {

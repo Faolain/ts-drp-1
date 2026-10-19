@@ -105,7 +105,7 @@
 		"prebuild": "node -p \"'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'\" > src/version.ts",
 		"prepack": "tsc -b",
 		"test": "pnpm --dir ../.. exec vitest run packages/node/tests",
-		"typecheck": "tsc --noEmit && pnpm typecheck:producer-presign-tests",
+		"typecheck": "tsc --noEmit -p tsconfig.typecheck.json && pnpm typecheck:producer-presign-tests",
 		"typecheck:producer-presign-tests": "tsc -p ../../tests/fixtures/producer-presign-retention/tsconfig.json",
 		"watch": "tsc -b -w"
 	},

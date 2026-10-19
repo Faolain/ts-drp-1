@@ -1,5 +1,5 @@
 import {describe, expect, it} from "vitest";
-import {CanonicalEncodingError, createCanonicalEncodingCapture, decodeCanonical, encodeCanonical} from "../src/internal/codec.ts";
+import {CanonicalEncodingError, createCanonicalEncodingCapture, decodeCanonical, encodeCanonical} from "../src/internal/codec.js";
 
 describe("canonical encoder assembly preserves traversal and leaf lifetimes", () => {
 	it("snapshots byte and numeric typed-array leaves before later array getters can mutate them", () => {

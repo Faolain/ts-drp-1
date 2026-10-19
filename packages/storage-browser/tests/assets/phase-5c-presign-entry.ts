@@ -20,6 +20,10 @@ import { resolveSealAuthorityIdentity } from "@ts-drp/protocol-v3/internal/seal-
 import { bindCreatorAnchorSigningRequest } from "@ts-drp/protocol-v3/internal/creator-anchor-signing-request";
 import { mintSealVoterEnrollment, nativeSigningAdmissionFactory } from "../../../seal/src/internal/seal-vote-intent.js";
 
+// The browser store's port is typed through the built seal package; this entry
+// calls the seal source, whose port type carries its own brand.
+type SourceSealStorePort = Parameters<typeof nativeSigningAdmissionFactory>[0];
+
 function barrier(): { task: Promise<void>; resolve(): void } {
 	let resolve!: () => void;
 	const task = new Promise<void>((done) => {
@@ -135,7 +139,7 @@ async function anchorRun(name: string): Promise<unknown> {
 		if (!floor.ok) throw new Error(`GENUINE_ROUND_FLOOR:${floor.reason}`);
 		emit({ kind: "native-round-floor-committed", floor });
 		const nativeFactory = nativeSigningAdmissionFactory(
-			store,
+			store as unknown as SourceSealStorePort,
 			mintSealVoterEnrollment({ ...identity, expectedIncarnation: facade.observation.incarnation })
 		);
 		const authoredScopes: unknown[] = [];

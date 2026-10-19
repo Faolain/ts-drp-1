@@ -4,6 +4,7 @@ import {
 	aheRetirementGenerationIdentity,
 	type AheRetirementPreparation,
 	type BlobDigest,
+	type ClosureDigest,
 	type NativeReadReservation,
 	decodeAheRetirementControl,
 	decodeGenerationRecordV1,
@@ -110,7 +111,7 @@ test("journal invocation capture enforces original whole-image byte ceiling afte
 test("journal held current probe uses exact producer custody and fresh native checks without image recapture", async () => {
 	const directory = await mkdtemp(join(tmpdir(), "ts-drp-journal-held-probe-"));
 	const filename = join(directory, "journal.sqlite");
-	const store = createNodeDurableLiveJournalStore({ primaryFilename: filename });
+	const store = createRetirementStore({ primaryFilename: filename });
 	const raw = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
 	const current = anchorMaterial(0), selector = {objectId: current.scope.objectId};
 	let lease: NativeReadReservation | undefined;
@@ -167,11 +168,11 @@ test("journal held current probe uses exact producer custody and fresh native ch
 
 test("journal held probe refuses copied, rebound and mutated observations while detached recaptures remain exact", async () => {
 	const directory = await mkdtemp(join(tmpdir(), "ts-drp-journal-held-probe-mutation-"));
-	const store = createNodeDurableLiveJournalStore({primaryFilename: join(directory, "journal.sqlite")});
+	const store = createRetirementStore({primaryFilename: join(directory, "journal.sqlite")});
 	const current = anchorMaterial(0), selector = {objectId: current.scope.objectId};
 	let lease: NativeReadReservation | undefined;
 	try {
-		must(await store.installGenesis(current.install));
+		succeed(await store.installGenesis(current.install));
 		const control = must(await store.acquireRetirementControl(selector)); await control.release();
 		const read = store.readRetirementImage;
 		lease = await store.acquireNativeReadReservation(selector);
@@ -201,11 +202,11 @@ test("journal held probe refuses copied, rebound and mutated observations while 
 test("journal held probe release and reopen retain raw-corruption refusal and transparent-wrapper semantics", async () => {
 	const directory = await mkdtemp(join(tmpdir(), "ts-drp-journal-held-probe-reopen-"));
 	const filename = join(directory, "journal.sqlite"), current = anchorMaterial(0), selector = {objectId: current.scope.objectId};
-	const store = createNodeDurableLiveJournalStore({primaryFilename: filename});
+	const store = createRetirementStore({primaryFilename: filename});
 	const raw = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
 	let lease: NativeReadReservation | undefined;
 	try {
-		must(await store.installGenesis(current.install));
+		succeed(await store.installGenesis(current.install));
 		const read = store.readRetirementImage;
 		const wrapper: LiveJournalRetirementImageReader = input => read(input);
 		Object.defineProperty(wrapper, "captureCurrentProbe", {value: function (this: LiveJournalRetirementImageReader, observation: Parameters<NonNullable<LiveJournalRetirementImageReader["captureCurrentProbe"]>>[0]) {
@@ -229,7 +230,7 @@ test("journal held probe release and reopen retain raw-corruption refusal and tr
 		expect(must(await read(selector))).toEqual(captured);
 		await store.close();
 		expect(await probe!.checkCurrent()).toEqual({ok: false, kind: "store-closed"});
-		const reopened = createNodeDurableLiveJournalStore({primaryFilename: filename, initialization: "reopen"});
+		const reopened = createRetirementStore({primaryFilename: filename, initialization: "reopen"});
 		try {
 			expect(must(await reopened.readRetirementImage(selector))).toEqual(captured);
 			expect(reopened.readRetirementImage.captureCurrentProbe?.call(reopened.readRetirementImage, captured)).toBeUndefined();
@@ -242,11 +243,11 @@ test("journal held probe release and reopen retain raw-corruption refusal and tr
 
 test("journal held probe joins admitted native checks but refuses delivery after close", async () => {
 	const directory = await mkdtemp(join(tmpdir(), "ts-drp-journal-held-probe-close-"));
-	const store = createNodeDurableLiveJournalStore({primaryFilename: join(directory, "journal.sqlite")});
+	const store = createRetirementStore({primaryFilename: join(directory, "journal.sqlite")});
 	const current = anchorMaterial(0), selector = {objectId: current.scope.objectId};
 	let lease: NativeReadReservation | undefined;
 	try {
-		must(await store.installGenesis(current.install));
+		succeed(await store.installGenesis(current.install));
 		lease = await store.acquireNativeReadReservation(selector);
 		const read = store.readRetirementImage, captured = must(await read(selector));
 		const probe = read.captureCurrentProbe?.call(read, captured);
@@ -265,9 +266,9 @@ test("journal held probe joins admitted native checks but refuses delivery after
 test("journal held probes retain no released image union in one synchronous-native microtask job", async () => {
 	const directory = await mkdtemp(join(tmpdir(), "ts-drp-journal-held-probe-retention-"));
 	const filename = join(directory, "journal.sqlite"), current = anchorMaterial(0), selector = {objectId: current.scope.objectId};
-	const store = createNodeDurableLiveJournalStore({primaryFilename: filename});
+	const store = createRetirementStore({primaryFilename: filename});
 	try {
-		must(await store.installGenesis(current.install));
+		succeed(await store.installGenesis(current.install));
 		const raw = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
 		try {
 			raw.function("journal_retirement_allows", (_objectId, _epoch, _anchorDigest) => 1);
@@ -369,10 +370,10 @@ test("journal syntax owner releases its private encoded plan even when an ended 
 
 test("journal source-bound append retains independent complete CAS postwrite and readback captures", async () => {
 	const directory = await mkdtemp(join(tmpdir(), "ts-drp-journal-postwrite-capture-"));
-	const store = createNodeDurableLiveJournalStore({primaryFilename: join(directory, "journal.sqlite")});
+	const store = createRetirementStore({primaryFilename: join(directory, "journal.sqlite")});
 	const current = anchorMaterial(0), selector = {objectId: current.scope.objectId};
 	try {
-		must(await store.installGenesis(current.install));
+		succeed(await store.installGenesis(current.install));
 		const before = must(await store.readRetirementImage(selector));
 		const prepare = DatabaseSync.prototype.prepare;
 		let nativeReads = 0;
@@ -397,10 +398,10 @@ test("journal source-bound append retains independent complete CAS postwrite and
 test("journal source-bound append refuses an oversized actual postwrite image before commit and can continue", async () => {
 	const directory = await mkdtemp(join(tmpdir(), "ts-drp-journal-postwrite-budget-"));
 	const filename = join(directory, "journal.sqlite"), old = anchorMaterial(0), current = anchorMaterial(1), selector = {objectId: current.scope.objectId};
-	const store = createNodeDurableLiveJournalStore({primaryFilename: filename});
+	const store = createRetirementStore({primaryFilename: filename});
 	const raw = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
 	try {
-		must(await store.installGenesis(old.install)); must(await store.installEpochAnchor(current.install));
+		succeed(await store.installGenesis(old.install)); succeed(await store.installEpochAnchor(current.install));
 		raw.function("journal_retirement_allows", (_objectId, _epoch, _anchorDigest) => 1);
 		const original = raw.prepare("SELECT * FROM scopes WHERE epoch=0").get()!;
 		const {closed_membership_bytes: _absent, ...normalized} = original;
@@ -436,11 +437,11 @@ test("journal source-bound append refuses an oversized actual postwrite image be
 test("journal source-bound append compares complete postcommit historical rows and recovers exact continuation", async () => {
 	const directory = await mkdtemp(join(tmpdir(), "ts-drp-journal-postwrite-interference-"));
 	const filename = join(directory, "journal.sqlite"), old = anchorMaterial(0), current = anchorMaterial(1), selector = {objectId: current.scope.objectId};
-	let store = createNodeDurableLiveJournalStore({primaryFilename: filename});
+	let store = createRetirementStore({primaryFilename: filename});
 	const raw = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
 	const originalExec = DatabaseSync.prototype.exec;
 	try {
-		must(await store.installGenesis(old.install)); must(await store.installEpochAnchor(current.install));
+		succeed(await store.installGenesis(old.install)); succeed(await store.installEpochAnchor(current.install));
 		raw.function("journal_retirement_allows", (_objectId, _epoch, _anchorDigest) => 1);
 		const before = must(await store.readRetirementImage(selector));
 		const digest = raw.prepare("SELECT parameters_digest FROM scopes WHERE epoch=0").get()!.parameters_digest;
@@ -462,7 +463,7 @@ test("journal source-bound append compares complete postcommit historical rows a
 		expect(refused).toEqual({ok: false, kind: "outcome-unknown"});
 		expect(raw.prepare("SELECT count(*) AS n FROM accepted_entries").get()?.n).toBe(1);
 		raw.prepare("UPDATE scopes SET parameters_digest=? WHERE epoch=0").run(digest as string);
-		await store.close(); store = createNodeDurableLiveJournalStore({primaryFilename: filename, initialization: "reopen"});
+		await store.close(); store = createRetirementStore({primaryFilename: filename, initialization: "reopen"});
 		const recovered = must(await store.readRetirementImage(selector));
 		expect(await store.appendAccepted({...candidate, expectedNativeImage: {imageDigest: recovered.image.imageDigest, controlBytes: null}}))
 			.toMatchObject({ok: true, idempotent: true});
@@ -475,10 +476,10 @@ test("journal source-bound append compares complete postcommit historical rows a
 test("journal source-bound postwrite admission validates malformed historical native values before effects commit", async () => {
 	const directory = await mkdtemp(join(tmpdir(), "ts-drp-journal-postwrite-malformed-"));
 	const filename = join(directory, "journal.sqlite"), old = anchorMaterial(0), current = anchorMaterial(1), selector = {objectId: current.scope.objectId};
-	const store = createNodeDurableLiveJournalStore({primaryFilename: filename});
+	const store = createRetirementStore({primaryFilename: filename});
 	const raw = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
 	try {
-		must(await store.installGenesis(old.install)); must(await store.installEpochAnchor(current.install));
+		succeed(await store.installGenesis(old.install)); succeed(await store.installEpochAnchor(current.install));
 		raw.function("journal_retirement_allows", (_objectId, _epoch, _anchorDigest) => 1);
 		const before = must(await store.readRetirementImage(selector));
 		raw.exec("CREATE TRIGGER postwrite_malformed_test AFTER INSERT ON accepted_entries BEGIN UPDATE scopes SET next_journal_sequence=1e999 WHERE epoch=0; END");
@@ -498,12 +499,25 @@ function must<T>(result: StoreResult<T> | Readonly<{ ok: false }> | Readonly<{ o
 	return result.value;
 }
 
+function succeed(result: Readonly<{ ok: boolean }>): void {
+	if (!result.ok) throw new TypeError("retirement image fixture failed");
+}
+
+/** The node store always installs the retirement surface the shared journal port leaves optional. */
+function createRetirementStore(...args: Parameters<typeof createNodeDurableLiveJournalStore>) {
+	const store = createNodeDurableLiveJournalStore(...args);
+	if (store.readRetirementImage === undefined || store.acquireRetirementControl === undefined) {
+		throw new TypeError("node journal store lacks its retirement surface");
+	}
+	return store as typeof store & Required<Pick<typeof store, "readRetirementImage" | "acquireRetirementControl">>;
+}
+
 // Native encoding conformance for the new received-candidate branch. Real
 // per-author signatures do not make these fixture anchors/ACL portable authority.
 // This is not the integrated128-Writer admission/drainability acceptance test.
 test.each([[64, 0], [128, 0], [128, 2]])("R10 received append capacity widths preserve full native bytes for %i authors with %i local continuations", async (writers, continuationCount) => {
 	const directory = await mkdtemp(join(tmpdir(), "ts-drp-received-capacity-widths-"));
-	const store = createNodeDurableLiveJournalStore({ primaryFilename: join(directory, "journal.sqlite") });
+	const store = createRetirementStore({ primaryFilename: join(directory, "journal.sqlite") });
 	const current = anchorMaterial(0), successor = anchorMaterial(1);
 	const fields = decodeCanonical(Uint8Array.from(Buffer.from(archived.vertexHex, "hex"))) as Record<string, unknown>;
 	const issuer = "f".repeat(64);
@@ -668,7 +682,7 @@ test("R9 complete current journal continuation widths match native append then s
 	};
 	try {
 		for (const count of [61, 125]) {
-			const store = createNodeDurableLiveJournalStore({ primaryFilename: join(directory, `${count}.sqlite`) });
+			const store = createRetirementStore({ primaryFilename: join(directory, `${count}.sqlite`) });
 			try {
 				expect(await store.installGenesis(current.install)).toMatchObject({ ok: true });
 				await must(await store.acquireRetirementControl({ objectId: current.scope.objectId })).release();
@@ -849,7 +863,7 @@ test("R8 SQLite exact existing Complete nomination preserves payload and refuses
 				newBlobs: [],
 				existingCompleteGeneration:
 					variant === "wrong-record"
-						? { ...candidate, baseExpectedHead: { ...head, closureDigest: "f".repeat(64) } }
+						? { ...candidate, baseExpectedHead: { ...head, closureDigest: "f".repeat(64) as ClosureDigest } }
 						: candidate,
 			};
 			const capability = createCreatorAuthenticatedNativeFuture(futureInput);
@@ -938,7 +952,7 @@ test("R8 SQLite exact existing Complete nomination preserves payload and refuses
 test("journal native source image distinguishes byte ceilings from malformed rows", async () => {
 	const directory = await mkdtemp(join(tmpdir(), "ts-drp-journal-retirement-ceiling-"));
 	const filename = join(directory, "journal.sqlite");
-	const store = createNodeDurableLiveJournalStore({ primaryFilename: filename });
+	const store = createRetirementStore({ primaryFilename: filename });
 	const raw = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
 	try {
 		const material = anchorMaterial(0);
@@ -993,7 +1007,7 @@ test("journal native source image distinguishes byte ceilings from malformed row
 test("R8 journal future local and successor widths match native codecs across varuint boundaries", async () => {
 	const directory = await mkdtemp(join(tmpdir(), "ts-drp-journal-future-widths-"));
 	const filename = join(directory, "journal.sqlite");
-	const store = createNodeDurableLiveJournalStore({ primaryFilename: filename });
+	const store = createRetirementStore({ primaryFilename: filename });
 	if (store.readRetirementImage === undefined) throw new Error("native journal image API is unavailable");
 	const readRetirementImage = store.readRetirementImage.bind(store);
 	try {
@@ -1115,7 +1129,7 @@ test("R8 journal future local and successor widths match native codecs across va
 test("journal noncreating retirement image preserves exact source through control birth", async () => {
 	const directory = await mkdtemp(join(tmpdir(), "ts-drp-journal-retirement-source-"));
 	const filename = join(directory, "journal.sqlite");
-	const store = createNodeDurableLiveJournalStore({ primaryFilename: filename });
+	const store = createRetirementStore({ primaryFilename: filename });
 	const raw = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
 	try {
 		const current = anchorMaterial(0);
@@ -1172,7 +1186,7 @@ test("journal noncreating retirement image preserves exact source through contro
 test("journal retirement exposes exact bounded native rows with joined one-use custody", async () => {
 	const directory = await mkdtemp(join(tmpdir(), "ts-drp-journal-retirement-rows-"));
 	const filename = join(directory, "journal.sqlite");
-	const store = createNodeDurableLiveJournalStore({ primaryFilename: filename });
+	const store = createRetirementStore({ primaryFilename: filename });
 	const raw = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
 	try {
 		const current = anchorMaterial(0),
@@ -1252,7 +1266,7 @@ test.each(["local", "received", "mixed"] as const)(
 	async (variant) => {
 		const directory = await mkdtemp(join(tmpdir(), "ts-drp-journal-detail-drain-"));
 		const filename = join(directory, "journal.sqlite");
-		let store = createNodeDurableLiveJournalStore({ primaryFilename: filename });
+		let store = createRetirementStore({ primaryFilename: filename });
 		const raw = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
 		try {
 			const old = anchorMaterial(0),
@@ -1768,7 +1782,7 @@ test.each(["local", "received", "mixed"] as const)(
 			// its complete original inline plan, not synthesize any received metadata.
 			raw.prepare("UPDATE retirement_controls SET record=?").run(encodeJournalRetirementControl(partial.control!));
 			raw.exec("ALTER TABLE retirement_controls DROP COLUMN plan_record; PRAGMA user_version=3");
-			store = createNodeDurableLiveJournalStore({ primaryFilename: filename, initialization: "reopen" });
+			store = createRetirementStore({ primaryFilename: filename, initialization: "reopen" });
 			expect(raw.prepare("PRAGMA user_version").get()?.user_version).toBe(4);
 			expect(must(await store.readRetirementImage(selector))).toEqual(partial);
 			const finish = must(await store.acquireRetirementControl(selector));
@@ -1834,7 +1848,7 @@ test("journal exact current-v2 membership migration preserves rows controls floo
 	const filename = join(directory, "journal.sqlite"),
 		old = anchorMaterial(0),
 		current = anchorMaterial(1);
-	let store = createNodeDurableLiveJournalStore({ primaryFilename: filename });
+	let store = createRetirementStore({ primaryFilename: filename });
 	const raw = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
 	try {
 		expect(await store.installGenesis(old.install)).toMatchObject({ ok: true });
@@ -1874,7 +1888,7 @@ test("journal exact current-v2 membership migration preserves rows controls floo
 		const scopesBefore = raw.prepare("SELECT * FROM scopes ORDER BY epoch,anchor_digest").all();
 		const v2Schema = raw.prepare("SELECT sql FROM sqlite_schema WHERE name='scopes'").get()?.sql as string;
 		expect(v2Schema).not.toContain("closed_membership_bytes");
-		store = createNodeDurableLiveJournalStore({ primaryFilename: filename, initialization: "reopen" });
+		store = createRetirementStore({ primaryFilename: filename, initialization: "reopen" });
 		expect(raw.prepare("PRAGMA user_version").get()?.user_version).toBe(4);
 		expect(raw.prepare("SELECT sql FROM sqlite_schema WHERE name='scopes'").get()?.sql).toBe(
 			v2Schema.replace(
@@ -1913,7 +1927,7 @@ test("journal exact current-v2 membership migration preserves rows controls floo
 		await store.close();
 		// Unsupported catalog drift still refuses and is never "repaired" by migration.
 		raw.exec("ALTER TABLE scopes ADD COLUMN unrelated BLOB");
-		expect(() => createNodeDurableLiveJournalStore({ primaryFilename: filename, initialization: "reopen" })).toThrow(
+		expect(() => createRetirementStore({ primaryFilename: filename, initialization: "reopen" })).toThrow(
 			"unsupported-schema"
 		);
 	} finally {
@@ -2741,7 +2755,7 @@ test("bounded AHE checkpoint refuses stale currency and pending future work then
 test("journal physical eight-header image is complete while role and resource bounds remain distinct", async () => {
 	const directory = await mkdtemp(join(tmpdir(), "ts-drp-journal-eight-headers-"));
 	const filename = join(directory, "journal.sqlite");
-	let store = createNodeDurableLiveJournalStore({ primaryFilename: filename });
+	let store = createRetirementStore({ primaryFilename: filename });
 	const raw = new DatabaseSync(filename + ".drp-live-journal-v1.sqlite");
 	const materials = Array.from({ length: 8 }, (_, epoch) => anchorMaterial(epoch));
 	const first = anchorMaterial(0);
@@ -2936,7 +2950,7 @@ test("journal physical eight-header image is complete while role and resource bo
 				kind: "present",
 			});
 		await store.close();
-		store = createNodeDurableLiveJournalStore({ primaryFilename: filename });
+		store = createRetirementStore({ primaryFilename: filename });
 		expect(must(await read())).toEqual(completed);
 	} finally {
 		raw.close();
@@ -2949,7 +2963,7 @@ test("journal physical eight-header image is complete while role and resource bo
 test("R10 exact empty header drain joins bounded batches and reconstructs original source after reopen", async () => {
 	const directory = await mkdtemp(join(tmpdir(), "ts-drp-journal-header-drain-"));
 	const filename = join(directory, "journal.sqlite");
-	let store = createNodeDurableLiveJournalStore({ primaryFilename: filename });
+	let store = createRetirementStore({ primaryFilename: filename });
 	const materials = Array.from({ length: 20 }, (_, epoch) => anchorMaterial(epoch));
 	const selector = { objectId: materials[0]!.scope.objectId };
 	const raw = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
@@ -3004,7 +3018,7 @@ test("R10 exact empty header drain joins bounded batches and reconstructs origin
 		expect(partial.drainSource).toEqual({ control: source.control, image: source.image, canonicalRows: source.canonicalRows });
 		expect(await store.appendAccepted({ scope: materials[19]!.scope, sourceKind: "local-issued", author: "creator", authorSequence: 1, vertexDigest: "b".repeat(64) })).toMatchObject({ ok: false, kind: "retirement-fenced" });
 		expect(must(await store.readRetirementImage(selector))).toEqual(partial);
-		await store.close(); store = createNodeDurableLiveJournalStore({ primaryFilename: filename, initialization: "reopen" });
+		await store.close(); store = createRetirementStore({ primaryFilename: filename, initialization: "reopen" });
 		expect(must(await store.readRetirementImage(selector))).toEqual(partial);
 		const last = must(await store.acquireRetirementControl(selector)); must(await last.drainBatch()); await last.release();
 		const complete = must(await store.readRetirementImage(selector));
@@ -3023,12 +3037,12 @@ test("R10 exact empty header drain joins bounded batches and reconstructs origin
 
 test("journal fresh native indexes preserve reconstruction and public transition duplicate, key and child refusals", async () => {
 	const directory = await mkdtemp(join(tmpdir(), "ts-drp-journal-reconstruction-index-"));
-	const store = createNodeDurableLiveJournalStore({primaryFilename: join(directory, "journal.sqlite")});
+	const store = createRetirementStore({primaryFilename: join(directory, "journal.sqlite")});
 	const old = anchorMaterial(0), empty = anchorMaterial(1), current = anchorMaterial(2), selector = {objectId: old.scope.objectId};
 	try {
-		must(await store.installGenesis(old.install));
-		for (const material of [empty, current]) must(await store.installEpochAnchor(material.install));
-		for (const scope of [old.scope, current.scope]) must(await store.appendAccepted({scope, sourceKind: "local-issued",
+		succeed(await store.installGenesis(old.install));
+		for (const material of [empty, current]) succeed(await store.installEpochAnchor(material.install));
+		for (const scope of [old.scope, current.scope]) succeed(await store.appendAccepted({scope, sourceKind: "local-issued",
 			author: "creator", authorSequence: 0, vertexDigest: "a".repeat(64)}));
 		const prepare = must(await store.acquireRetirementControl(selector));
 		must(await prepare.prepareFence({throughEpoch: 1, protectedScopes: [], decisionDigest: "b".repeat(64),
@@ -3115,12 +3129,12 @@ test("journal fresh native indexes preserve reconstruction and public transition
 // Native local checkpoint conformance, not protocol membership/deletion authority.
 test("R10 completed journal drain acknowledgement compacts only terminal metadata before the next append", async () => {
 	const directory = await mkdtemp(join(tmpdir(), "ts-drp-journal-drain-ack-")), filename = join(directory, "journal.sqlite");
-	let store = createNodeDurableLiveJournalStore({primaryFilename: filename});
+	let store = createRetirementStore({primaryFilename: filename});
 	const old = anchorMaterial(0), current = anchorMaterial(1), selector = {objectId: old.scope.objectId};
 	const raw = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
 	try {
-		must(await store.installGenesis(old.install)); must(await store.installEpochAnchor(current.install));
-		must(await store.appendAccepted({scope: old.scope, sourceKind: "local-issued", author: "creator",
+		succeed(await store.installGenesis(old.install)); succeed(await store.installEpochAnchor(current.install));
+		succeed(await store.appendAccepted({scope: old.scope, sourceKind: "local-issued", author: "creator",
 			authorSequence: 0, vertexDigest: "a".repeat(64)}));
 		const prepare = must(await store.acquireRetirementControl(selector));
 		must(await prepare.prepareFence({throughEpoch: 1, protectedScopes: [current.scope],
@@ -3144,7 +3158,7 @@ test("R10 completed journal drain acknowledgement compacts only terminal metadat
 		const completed = must(await store.readRetirementImage(selector));
 		expect(completed.control?.drain?.cursor).toBe(1); expect(completed.drainSource).toBeDefined();
 		const headers = raw.prepare("SELECT * FROM scopes ORDER BY epoch,anchor_digest").all();
-		await store.close(); store = createNodeDurableLiveJournalStore({primaryFilename: filename, initialization: "reopen"});
+		await store.close(); store = createRetirementStore({primaryFilename: filename, initialization: "reopen"});
 		expect(must(await store.readRetirementImage(selector))).toEqual(completed);
 		raw.exec("CREATE TRIGGER ack_test_abort BEFORE UPDATE ON retirement_controls WHEN OLD.plan_record IS NOT NULL AND NEW.plan_record IS NULL BEGIN SELECT RAISE(ABORT,'ack-test-abort'); END");
 		const aborted = must(await store.acquireRetirementControl(selector));
@@ -3162,11 +3176,11 @@ test("R10 completed journal drain acknowledgement compacts only terminal metadat
 		expect(compact.drainSource).toBeUndefined(); expect(compact.exactCanonicalControlCarriers).toHaveLength(1);
 		expect(raw.prepare("SELECT plan_record FROM retirement_controls").get()?.plan_record).toBeNull();
 		expect(raw.prepare("SELECT * FROM scopes ORDER BY epoch,anchor_digest").all()).toEqual(headers);
-		await store.close(); store = createNodeDurableLiveJournalStore({primaryFilename: filename, initialization: "reopen"});
+		await store.close(); store = createRetirementStore({primaryFilename: filename, initialization: "reopen"});
 		expect(must(await store.readRetirementImage(selector))).toEqual(compact);
 		expect(await store.appendAccepted({scope: old.scope, sourceKind: "local-issued", author: "creator",
 			authorSequence: 1, vertexDigest: "b".repeat(64)})).toEqual({ok: false, kind: "retirement-fenced"});
-		must(await store.appendAccepted({scope: current.scope, sourceKind: "local-issued", author: "creator",
+		succeed(await store.appendAccepted({scope: current.scope, sourceKind: "local-issued", author: "creator",
 			authorSequence: 1, vertexDigest: "c".repeat(64)}));
 		expect(must(await store.readRetirementImage(selector)).control?.completed).toEqual(source.control.completed);
 	} finally {raw.close(); await store.close(); await rm(directory, {recursive: true, force: true});}
@@ -3174,7 +3188,7 @@ test("R10 completed journal drain acknowledgement compacts only terminal metadat
 
 test("R10 completed journal drain widths match actual mutation and retain protected membership", async () => {
 	const directory = await mkdtemp(join(tmpdir(), "ts-drp-journal-completed-widths-"));
-	const store = createNodeDurableLiveJournalStore({ primaryFilename: join(directory, "journal.sqlite") });
+	const store = createRetirementStore({ primaryFilename: join(directory, "journal.sqlite") });
 	const old = anchorMaterial(0),
 		protectedHeader = anchorMaterial(1),
 		current = anchorMaterial(2),
@@ -3287,25 +3301,27 @@ test("R10 completed journal drain widths match actual mutation and retain protec
 		must(await last.drainBatch());
 		await last.release();
 		const complete = must(await store.readRetirementImage(selector));
-		if (complete.control?.drain == null) throw new Error("original completed drain missing");
-		expect(complete.control.drain.cursor).toBe(17);
+		const control = complete.control;
+		if (control?.drain == null) throw new Error("original completed drain missing");
+		const drain = control.drain;
+		expect(control.drain.cursor).toBe(17);
 		const projected = journalFutureAppendPostimageWidths(complete.canonicalRows, candidate, unsigned, fence, [], {
-			control: complete.control,
+			control,
 		});
 		const conservative = journalFutureAppendPostimageWidths(complete.canonicalRows, candidate, unsigned, fence);
 		expect(conservative.afterLocal.nativeImageBytes).toBeGreaterThan(projected.afterLocal.nativeImageBytes);
 		expect(() =>
 			journalFutureAppendPostimageWidths(complete.canonicalRows, candidate, unsigned, fence, [], {
 				control: {
-					...complete.control,
-					sequence: complete.control.sequence + 1,
-					active: { sequence: complete.control.sequence + 1, preparation: complete.control.completed! },
+					...control,
+					sequence: control.sequence + 1,
+					active: { sequence: control.sequence + 1, preparation: control.completed! },
 				},
 			})
 		).toThrow("retirement-stale");
 		expect(() =>
 			journalFutureAppendPostimageWidths(complete.canonicalRows, candidate, unsigned, fence, [], {
-				control: { ...complete.control, drain: { ...complete.control!.drain!, residualImageDigest: "0".repeat(64) } },
+				control: { ...control, drain: { ...drain, residualImageDigest: "0".repeat(64) } },
 			})
 		).toThrow("retirement-stale");
 		const residualRow = source.canonicalRows.find((bytes) => {
@@ -3327,8 +3343,8 @@ test("R10 completed journal drain widths match actual mutation and retain protec
 		expect(() =>
 			journalFutureAppendPostimageWidths(fabricated, candidate, unsigned, fence, [], {
 				control: {
-					...complete.control,
-					drain: { ...complete.control!.drain!, residualImageDigest: fabricatedImage.imageDigest },
+					...control,
+					drain: { ...drain, residualImageDigest: fabricatedImage.imageDigest },
 				},
 			})
 		).toThrow("retirement-stale");
@@ -3337,7 +3353,7 @@ test("R10 completed journal drain widths match actual mutation and retain protec
 		const appended = must(await store.readRetirementImage(selector));
 		check(projected.afterLocal, appended.canonicalRows);
 		expect(appended.control?.drain).toBeNull();
-		expect(appended.control?.completed).toEqual(complete.control.completed);
+		expect(appended.control?.completed).toEqual(control.completed);
 		const protectedFrame = (frames: readonly Uint8Array[]) =>
 			frames.find((bytes) => {
 				const [table, key] = decodeCanonical(bytes) as [string, unknown[]];
@@ -3446,7 +3462,7 @@ test("R8 journal final successor fence widths match native append and control re
 			[true, 61],
 			[false, 126],
 		] as const) {
-			const store = createNodeDurableLiveJournalStore({
+			const store = createRetirementStore({
 				primaryFilename: join(directory, presentControl ? "present.sqlite" : "absent.sqlite"),
 			});
 			try {

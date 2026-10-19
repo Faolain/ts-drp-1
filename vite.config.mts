@@ -21,7 +21,6 @@ const config = defineConfig({
 	})],
 	resolve: {
 		alias: {
-			"@ts-drp/canonical/encoding-capture": path.resolve(__dirname, "packages/canonical/src/encoding-capture.ts"),
 			"@ts-drp/protocol-v3/internal/owned-signing-request": path.resolve(__dirname, "packages/protocol-v3/src/internal/owned-signing-request.ts"),
 			"@ts-drp/storage/snapshot-transfer": path.resolve(__dirname, "packages/storage/src/snapshot-transfer.ts"),
 			"@ts-drp/network/snapshot-transfer": path.resolve(__dirname, "packages/network/src/snapshot-transfer.ts"),

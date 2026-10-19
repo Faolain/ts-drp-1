@@ -44,7 +44,11 @@ async function createHealthyGridRole(input:{index:number;database:string;identit
   snapshot:Awaited<ReturnType<typeof createBrowserSnapshotQuarantineStore>>|undefined;
  try {
   const finality=index===0?await createRecoverableFinalitySigner({seed:key}):undefined;
-  session=await createV3RoomSession({application:configuredApplication,author,creatorInvite:invite,databaseName:database,issuanceDatabaseName:database,migrationDatabaseNamespace:database,
+  // Opt-in automatic idle trigger (creator only); outcomes are observation only.
+  const autoPool=index===0&&Reflect.get(input,"autoPool")===true?{idleMilliseconds:200,
+   onResult:(outcome:any)=>{const endedAt=performance.now();autoPoolOutcomes.push({kind:outcome.kind,epoch:outcome.epoch,startedAt:endedAt-outcome.milliseconds,endedAt,
+    milliseconds:outcome.milliseconds,...(outcome.kind==="result"?{result:outcome.result}:{error:errorEvidence(outcome.error)})});}}:undefined;
+  session=await createV3RoomSession({application:configuredApplication,author,...(autoPool===undefined?{}:{recoveryPoolAutoMaintenance:autoPool}),creatorInvite:invite,databaseName:database,issuanceDatabaseName:database,migrationDatabaseNamespace:database,
    objectId,publicKeyBytes:ed25519.getPublicKey(key),initialLogicalTime:3,...(finality?{creatorFinalitySigner:finality.signer}:{}),roomHeadAuthority:floor,
    openTransport:peer.open,signRegisteredVertexDigest:async digest=>ed25519.sign(digest,key),onAcceptedVertex:vertex=>{
     const digest=hex(vertex.digest);admitted.add(digest);
@@ -84,7 +88,7 @@ async function createHealthyGridRole(input:{index:number;database:string;identit
    },
    // Capture the existing bounded per-realm timer observations before close
    // reporting removes this frame. Terminal parent-only capture is too late.
-   observer:()=>({timeOrigin:performance.timeOrigin,spans:[...spans],criticalProfiling:Reflect.get(globalThis,"__r8CriticalSnapshot")?.(),eventLoop:Reflect.get(globalThis,"__r8EventLoopCheckpoint")?.(),incrementalNativeControls:{enabled:Reflect.get(globalThis,"__r8IncrementalNativeControls")===true,sourcePin:Reflect.get(globalThis,"__r8IncrementalNativeControlSourcePin"),qualification:"Correctness-only extra quote/readout/UNKNOWN exhaustion and joined proof work; overlapping product metrics cannot be blindly subtracted. Disabled for matched latency and unprofiled runs."},proofEvents:[...proofEvents],proofEventsTruncated,proofObserverMilliseconds,proofOwnerSummaries:[...proofOwnerSummaries.values()],startupTrace:[...trace],publications:peer.publications,transfers:peer.streamBytes,transport:peer.status()}),
+   observer:()=>({timeOrigin:performance.timeOrigin,spans:[...spans],autoPool:[...autoPoolOutcomes],clockMark,longTasks:Reflect.get(globalThis,"__rdLongTasks")?.(),criticalProfiling:Reflect.get(globalThis,"__r8CriticalSnapshot")?.(),eventLoop:Reflect.get(globalThis,"__r8EventLoopCheckpoint")?.(),incrementalNativeControls:{enabled:Reflect.get(globalThis,"__r8IncrementalNativeControls")===true,sourcePin:Reflect.get(globalThis,"__r8IncrementalNativeControlSourcePin"),qualification:"Correctness-only extra quote/readout/UNKNOWN exhaustion and joined proof work; overlapping product metrics cannot be blindly subtracted. Disabled for matched latency and unprofiled runs."},proofEvents:[...proofEvents],proofEventsTruncated,proofObserverMilliseconds,proofOwnerSummaries:[...proofOwnerSummaries.values()],startupTrace:[...trace],publications:peer.publications,transfers:peer.streamBytes,transport:peer.status()}),
    setContext:(role:string,transition:number,command:string)=>{Object.assign(context,{role,transition,command,preparation:false});}
   };
  }catch(error){const joined=await Promise.allSettled([session?.close(),issuance?.close(),snapshot?.close(),floor.close()]);
@@ -93,6 +97,8 @@ async function createHealthyGridRole(input:{index:number;database:string;identit
 // The accepted worker transport is reused unchanged. Only its parentPort is
 // adapted to browser postMessage; this is a fixture route, not native authority.
 let childPeer:ReturnType<typeof workerPeer>|undefined;
+const autoPoolOutcomes:unknown[]=[];
+let clockMark:{name:string;startTime:number}|undefined;
 let childRole:Awaited<ReturnType<typeof createHealthyGridRole>>|undefined;
 let childIndex=-1;
 let childProbeTimer:number|undefined,childProbeTicks=0;
@@ -113,6 +119,8 @@ window.addEventListener("message",event=>{
  const run=async()=>{
   if(command==="init"){
    check(childPeer===undefined,"one original child transport");childIndex=args.index;childPeer=workerPeer(args.id,args.connected);
+   // Trace-clock anchor for this realm (user timing is observation only).
+   const mark=performance.mark("rd-clock-"+args.index+"-"+Date.now());clockMark={name:mark.name,startTime:mark.startTime};
    if(args.suspensionProbe){
     childProbeTimer=window.setInterval(()=>{childProbeTicks++;},20);
     Reflect.set(globalThis,"__r8FrozenClientObservation",()=>({index:childIndex,ticks:childProbeTicks,
@@ -121,6 +129,7 @@ window.addEventListener("message",event=>{
    return true;
   }
   check(childPeer,"original child transport required");
+  if(command==="clock"){const mark=performance.mark("rd-clock-"+childIndex+"-"+Date.now());clockMark={name:mark.name,startTime:mark.startTime};return clockMark;}
   const phase=(name:string)=>{Object.assign(context,{role:childIndex===0?"creator":"recipient-"+childIndex,transition:args.epoch??0,command:name,ordinal:args.ordinal??-1,preparation:false});};
   const product=async<T>(name:string,action:()=>Promise<T>):Promise<T>=>{
    // Label only the three existing issue-command awaits. This notification is
@@ -399,7 +408,8 @@ export async function runHealthyGrid(identity:string,origins:readonly string[],r
   for(let turn=0;turn<2000&&!active.every(role=>ready.has(role.frame.contentWindow!));turn++)await new Promise(resolve=>setTimeout(resolve,10));
   check(active.every(role=>ready.has(role.frame.contentWindow!)),"isolated browser client bundle unavailable");
   for(let index=0;index<4;index++)await rpc(index,"init",{index,id:ids[index],connected:ids.filter((_,other)=>other!==index),suspensionProbe:typeof suspendTransfer==="function"});
-  for(let index=0;index<4;index++)await rpc(index,"open",{index,database:identity+"-role-"+index,identity,objectId,invite,kind});
+  for(let index=0;index<4;index++)await rpc(index,"open",{index,database:identity+"-role-"+index,identity,objectId,invite,kind,
+   autoPool:Reflect.get(globalThis,"__rdPoolMaintenanceAuto")===true});
   await Promise.all(active.map(role=>rpc(role.index,"history")));
  }
  async function close(){
@@ -428,6 +438,25 @@ export async function runHealthyGrid(identity:string,origins:readonly string[],r
   }
   await world();
  }
+ // Real-time hazard probe: moves issued while the creator runs pool maintenance.
+ // Each must be admitted by every peer (bounded wait), never dropped or halted.
+ // Kept out of `ordinary`; ordinals >= 1000 mark them in spans.
+ // With `target` a recipient, the moves come from the creator and another
+ // recipient while that recipient runs its own lull (slots 4-5, rows 4-5).
+ async function concurrentMaintenance(target=0){
+  const started=performance.now(),maintaining=rpc(target,"maintain").then(value=>({value,endedAt:performance.now()-started}));
+  const move=async(index:number,delay:number,slot:number)=>{
+   await new Promise(resolve=>setTimeout(resolve,delay));
+   const ordinal=1000+slot,operation={...gridOperation(index,epoch),id:"integrated-block-"+(slot%8),y:4+(slot%4)},issuedAt=performance.now()-started;
+   const value=await rpc(index,"issue",{operation,ordinal});
+   const peerDelivery=await Promise.all(active.map(role=>rpc(role.index,"admitted",{digest:value.digest,operation,ordinal,waitDeadline:Date.now()+60_000})));
+   return {index,delay,issuedAt,issueMilliseconds:value.issueCompleted-value.issueStarted,digest:value.digest,
+    deliveredAt:peerDelivery.map(row=>row.acceptedCallbackAt+row.timeOrigin-(value.issueStarted+value.timeOrigin))};
+  };
+  const moves=await Promise.all(target===0?[move(1,250,0),move(0,250,1),move(2,1500,2),move(3,2700,3)]:
+   [move(0,150,4),move(target===1?2:1,400,5)]);
+  return {target,maintenance:await maintaining,moves};
+ }
  async function measure(label:string){const values=await Promise.all(active.map(role=>rpc(role.index,"measure")));checkpoints.push({label,epoch,values});
   const memory=Reflect.get(globalThis,"__r8ActiveResourceCheckpoint");if(typeof memory==="function"){const start=begin();try{await memory(label);}finally{end("test-only-active-native-GC-and-memory",start);}}
   return values;}
@@ -436,16 +465,29 @@ export async function runHealthyGrid(identity:string,origins:readonly string[],r
   phase="create-join";await open("create");await measure("created");
   for(let transition=0;transition<rollovers;transition++){
    phase="ordinary-gameplay-"+epoch;await gameplay(8);await measure("before-rollover-"+epoch);
+   // Optional bounded renderer trace window: seal-4 through the next lull.
+   const traceControl=Reflect.get(globalThis,"__rdTraceControl");
+   if(typeof traceControl==="function"&&epoch===4){await traceControl("start");await Promise.all(active.map(role=>rpc(role.index,"clock")));}
    phase="seal-"+epoch;const closed=await rpc(0,"seal");check(closed.ok,"healthy seal refused:"+JSON.stringify(closed));
    const offer=await rpc(0,"export");snapshots.push(await rpc(0,"snapshot",{offer}));
    phase="creator-adoption-"+epoch;await rpc(0,"adopt");
    for(let index=1;index<4;index++){phase="recipient-install-"+epoch+":"+index;await rpc(index,"install",{offer,peers:[ids[0]]});}
    epoch=closed.successorEpoch;phase="settlement-cleanup-"+epoch;
    await Promise.all(active.map(role=>rpc(role.index,"history")));await world();await measure("adopted-"+epoch);
-   // Opt-in idle lull after the measured rollover: creator pool maintenance only.
-   const poolMaintenance=Reflect.get(globalThis,"__rdPoolMaintenanceLull")===true?(phase="pool-maintenance-"+epoch,await rpc(0,"maintain")):undefined;
+   // Opt-in idle lull after the measured rollover: creator, then each recipient, pool maintenance.
+   // A recipient lull prepares the NEXT install, so it is skipped after the last rollover: that
+   // install is outside this bounded run (its original turnover is refused at epoch 8).
+   const lull=Reflect.get(globalThis,"__rdPoolMaintenanceLull")===true,recipientLull=lull&&transition<rollovers-1;
+   const poolMaintenance=!lull?undefined:
+    Reflect.get(globalThis,"__rdPoolMaintenanceConcurrent")===true?(phase="pool-maintenance-concurrent-"+epoch,await concurrentMaintenance()):
+    (phase="pool-maintenance-"+epoch,await rpc(0,"maintain"));
+   const recipientPoolMaintenance:unknown[]=[];
+   const concurrent=Reflect.get(globalThis,"__rdPoolMaintenanceConcurrent")===true;
+   if(recipientLull)for(let index=1;index<4;index++){phase="pool-maintenance-"+epoch+":"+index;
+    recipientPoolMaintenance.push(concurrent&&index===1?await concurrentMaintenance(1):await rpc(index,"maintain"));}
+   if(typeof traceControl==="function"&&epoch===5)await traceControl("stop");
    transitions.push({closedEpoch:closed.epoch,successorEpoch:closed.successorEpoch,sessionRecreations:0,fixtureDatabaseCopies:0,
-    ...(poolMaintenance===undefined?{}:{poolMaintenance})});
+    ...(poolMaintenance===undefined?{}:{poolMaintenance}),...(recipientLull?{recipientPoolMaintenance}:{})});
   }
   const expectedReopenWorld=await world();
   phase="persisted-close";await close();

@@ -9,7 +9,7 @@ import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
 import { copyCanonicalForAdmittedView, verifyReceivedVertex } from "@ts-drp/protocol-v3/internal/received-vertex-authentication";
 import registry from "@ts-drp/protocol-v3/registry/registry-v1.json" with { type: "json" };
 import { snapshotQuarantineContract, snapshotRetirementContract, type SnapshotRecoveryRoleRetirementFact } from "@ts-drp/storage/snapshot-transfer";
-import { AHE_BOUNDED_READ_LIMITS, LOCAL_WORKLOAD_CAPACITY, digestBlob, decodeHeadRecordV1, encodeHeadRecordV1 } from "@ts-drp/storage";
+import { AHE_BOUNDED_READ_LIMITS, type BlobDigest, LOCAL_WORKLOAD_CAPACITY, digestBlob, decodeHeadRecordV1, encodeHeadRecordV1 } from "@ts-drp/storage";
 import {
 	captureLiveJournalSignedAnchorReadInput,
 	encodeJournalRetirementNativeCarriers,
@@ -251,7 +251,7 @@ describe("bounded syntax retention replaces cold parse facts without changing va
 	it("preserves genuine candidate ambiguity, malformed UTF8/BOM and complete decoder/roundtrip refusal outcomes", () => {
 		const before = owner(true), after = owner();
 		const bytes = encodeCanonical({kind: "drp-hard-epoch-cut", epoch: 3});
-		const candidates = [{bytes, ref: {digest: "a".repeat(64), byteLength: bytes.length}}];
+		const candidates = [{bytes, ref: {digest: "a".repeat(64) as BlobDigest, byteLength: bytes.length}}];
 		for (const set of [candidates, [...candidates, candidates[0]!]])
 			expect(uniqueCreatorTransitionCandidate(set, "drp-hard-epoch-cut", 3, undefined, after.reader))
 				.toEqual(uniqueCreatorTransitionCandidate(set, "drp-hard-epoch-cut", 3, undefined, before.reader));
@@ -650,7 +650,7 @@ describe("synchronous maintenance syntax ownership", () => {
 	});
 	it("falls back to full parsing at the finite cache boundary without changing acceptance", () => {
 		const { reader, counts } = countedReader({ ...AHE_BOUNDED_READ_LIMITS,
-			maxObjectGenerations: 1, maxClosureReferences: 1, maxUnionBytes: 32 } as typeof AHE_BOUNDED_READ_LIMITS);
+			maxObjectGenerations: 1, maxClosureReferences: 1, maxUnionBytes: 32 } as unknown as typeof AHE_BOUNDED_READ_LIMITS);
 		const first = encodeCanonical({ kind: "one" });
 		const second = encodeCanonical({ kind: "two" });
 		expect(reader.record(first)).toEqual({ kind: "one" });
@@ -2312,7 +2312,7 @@ describe("snapshot retirement fact fields shared with prospective sizing", () =>
 		const trusts = Array.from({length: 9}, (_, currentEpoch) => ({currentEpoch}));
 		const run = async (rows: unknown[], failure?: string) => {
 			let released = false, checked = false;
-			const bytes = rows.map(encodeCanonical), charged: Uint8Array[] = [];
+			const bytes = rows.map((row) => encodeCanonical(row)), charged: Uint8Array[] = [];
 			const select = execute<(signingTrusts: any[]) => Promise<any[]>>(`${declaration("joinedClosedRetirementRead")}\n` +
 				`(async function(signingTrusts) {${branch.getText(parsed)}\nreturn signingTrusts;});`, {
 				lifetime: {captureClassificationMetadataOwners: () => ({signing: {acquireEvidence: async () => ({
@@ -2327,7 +2327,7 @@ describe("snapshot retirement fact fields shared with prospective sizing", () =>
 		};
 		const rows = [["storageMeta", "incarnation", {}], ["signerState", ["room", 2, "signer"], {}]];
 		const result = await run(rows); expect(result.selected).toEqual([trusts[2], trusts[8]]);
-		expect(result.checked).toBe(true); expect(result.charged).toEqual(rows.map(encodeCanonical));
+		expect(result.checked).toBe(true); expect(result.charged).toEqual(rows.map((row) => encodeCanonical(row)));
 		expect((await run([["storageMeta", "incarnation", {}]])).selected).toEqual([trusts[8]]);
 		await expect(run([["signerState", ["foreign", 2, "signer"], {}]])).rejects.toThrow("chain-invalid");
 		await expect(run(rows, "changed")).rejects.toThrow("changed");
@@ -3211,7 +3211,7 @@ describe("same sizing owner eliminates repeated canonical primitive and evidence
 	it("preserves codec/refusal/node-depth-item rules and uses bounded overflow fallback without byte credit", () => {
 		for (const value of [null, true, false, 0, -0, 127, 128, 1.5, "\ufeff", "a\ufeffb", "😀", new Uint8Array()])
 			expect(widths([value, value]).widths).toEqual(widths([value, value], true).widths);
-		const malformed: unknown[] = [undefined, Symbol("invalid"), NaN, Infinity, 1n, "\ud800", "\udfff"];
+		const malformed: unknown[] = [undefined, Symbol("invalid"), NaN, Infinity, BigInt(1), "\ud800", "\udfff"];
 		let deep: unknown = 1; for (let i = 0; i < 130; i++) deep = {nested: deep};
 		// The original byte ceiling belongs to a COMPLETE carrier sum, not
 		// an isolated encoded leaf width. Keep its enclosing ARRAY charge.
@@ -5175,8 +5175,7 @@ describe("R8 FUTURE snapshot turnover affected controls", () => {
 			// Link the changed production conditional in its original default mode.
 			wholeMaterialProjection: execute(`const input = {}; const ${unique(
 				(node): node is ts.VariableDeclaration => ts.isVariableDeclaration(node) &&
-					ts.isIdentifier(node.name) && node.name.text === "wholeMaterialProjection",
-				"whole material projection conditional"
+					ts.isIdentifier(node.name) && node.name.text === "wholeMaterialProjection"
 			).getText(parsed)}; wholeMaterialProjection;`, {}),
 			freshKnownLeaves: [],
 			freshNativeRefs: undefined,
@@ -5883,12 +5882,14 @@ describe("R8 composer scalar kind census affected controls", () => {
 		expect(fast.stats.scalarReads).toBeGreaterThan(0); expect(old.stats.recordReads).toBeGreaterThan(0);
 		expect(old.stats.fullObjectCopies).toBeGreaterThan(0); expect(fast.stats.decodes).toBe(3);
 		const cut = candidates[1]!;
+		const extraRef: RollbackScalarClosure = {candidates, closure: [...closure.closure, cut.ref]};
+		const missingRef: RollbackScalarClosure = {candidates, closure: closure.closure.filter(ref => ref !== cut.ref)};
 		for (const [refused, kind] of [
 			[rollbackScalarClosure([...candidates, cut]), "drp-hard-epoch-cut"],
 			[rollbackScalarClosure([...candidates, rollbackScalarCandidate({kind: "drp-hard-epoch-cut", epoch: 3})]), "drp-hard-epoch-cut"],
 			[rollbackScalarClosure([...candidates, rollbackScalarCandidate({kind: "drp-seal-qc", epoch: 2, phase: "prepare"})]), "drp-seal-qc"],
-			[{candidates, closure: [...closure.closure, cut.ref]}, "drp-hard-epoch-cut"],
-			[{candidates, closure: closure.closure.filter(ref => ref !== cut.ref)}, "drp-hard-epoch-cut"],
+			[extraRef, "drp-hard-epoch-cut"],
+			[missingRef, "drp-hard-epoch-cut"],
 		] as const) {
 			expect(() => fast.owner.unique(refused, kind, 2)).toThrow("chain-invalid");
 			expect(() => old.owner.unique(refused, kind, 2)).toThrow("chain-invalid");
@@ -5950,7 +5951,7 @@ describe("R8 composer source-priority scalar syntax affected controls", () => {
 		}
 		// BigInt never reaches the original reader's canonical record/Number
 		// branch. Preserve the genuine codec refusal, not a fabricated carrier.
-		expect(() => frame([{id: "bigint", epoch: 2n, live: true}])).toThrow("bigint is outside the canonical domain");
+		expect(() => frame([{id: "bigint", epoch: BigInt(2), live: true}])).toThrow("bigint is outside the canonical domain");
 	});
 	it("keeps default/native callers uncached and threads the reader only through the original composer sort", () => {
 		const f = frame([{id: "a", epoch: 1, live: false}, {id: "b", epoch: 2, live: false}]), native = rollbackScalarSizingFixture();
@@ -6361,7 +6362,7 @@ describe("recovery-role readback metadata syntax affected controls", () => {
 	type Metadata = {ok: boolean; reason?: string; carrier?: Candidate; cut?: Candidate; qc?: Candidate; priorCarrier?: Candidate; priorCut?: Candidate;
 		cutRecord?: Readonly<Record<string, unknown>>; priorRecord?: Readonly<Record<string, unknown>>; pinRecord?: Readonly<Record<string, unknown>>;
 		projectionRecord?: Readonly<Record<string, unknown>>; liveProjections?: number; currentProjections?: number};
-	async function owner(cold = false, retainBytes = AHE_BOUNDED_READ_LIMITS.maxUnionBytes) {
+	async function owner(cold = false, retainBytes: number = AHE_BOUNDED_READ_LIMITS.maxUnionBytes) {
 		const promotion = await import("@ts-drp/protocol-v3/internal/creator-forward-promotion");
 		const {openSealAuthority} = await import("@ts-drp/protocol-v3/seal");
 		const path = new URL("../src/internal/creator-transition-advance.ts", import.meta.url);
@@ -8124,7 +8125,8 @@ describe("ordinary capacity whole-material projection affected controls", () => 
 			chargeSnapshotTarget(bytes: Uint8Array, scope: unknown): boolean}};
 		const raw = new Uint8Array(7).fill(7), native = new Uint8Array(11).fill(11), snapshot = new Uint8Array(13).fill(13), observation = new Uint8Array(17).fill(17);
 		expect(owner.accounting.charge(raw)).toBe(true);
-		expect(owner.material.chargeNativeReader({bytes: native, ref: {digest: digestBlob(native), byteLength: native.byteLength}})).toBe(true);
+		const nativeRef = digestBlob(native); if (!nativeRef.ok) throw Error("FIXTURE_DIGEST");
+		expect(owner.material.chargeNativeReader({bytes: native, ref: {digest: nativeRef.value, byteLength: native.byteLength}})).toBe(true);
 		expect(owner.material.chargeSnapshotTarget(snapshot, snapshotScope75(3))).toBe(true); expect(owner.material.chargeObservation(observation)).toBe(true);
 		for (const width of [19, 19]) expect(owner.accounting.chargeUnknownEncodedLength(width)).toBe(true);
 		const initial = owner.accounting.chargedBytes; expect(initial).toBe(86);
@@ -8643,7 +8645,7 @@ describe("ordinary complete runtime wrapper capacity affected controls", () => {
 			for (const candidateReceived of [false, true]) {
 				const values = f.actual(input, candidateReceived, [], bootstrap, bootstrapVertex);
 				for (const value of [values.currentClose, values.nonActiveCurrent])
-					(value.currentJournal as {rows: object[]}).rows = [...widened, candidateReceived ? values.remote : values.local];
+					((value as Record<string, unknown>).currentJournal as {rows: object[]}).rows = [...widened, candidateReceived ? values.remote : values.local];
 				f.dominates(bound, values);
 				if (candidateReceived) expect(bound.currentClose).toBe(encodeCanonical(values.currentClose).byteLength - 1);
 			}
@@ -8662,7 +8664,7 @@ describe("ordinary complete runtime wrapper capacity affected controls", () => {
 			detachedSignature: new Uint8Array(64), exactCanonicalVertexBytes: vertex});
 		const bound = f.api.capacity(f.input, [row]), values = f.actual(f.input, true);
 		for (const value of [values.currentClose, values.nonActiveCurrent])
-			(value.currentJournal as {rows: object[]}).rows = [{...row, byteCharge: Number.MAX_SAFE_INTEGER}, values.remote];
+			((value as Record<string, unknown>).currentJournal as {rows: object[]}).rows = [{...row, byteCharge: Number.MAX_SAFE_INTEGER}, values.remote];
 		f.dominates(bound, values);
 		expect(bound.currentClose).toBe(encodeCanonical(values.currentClose).byteLength - 1);
 		expect(bound.currentClose).toBeGreaterThan(f.api.capacity(f.input).currentClose);

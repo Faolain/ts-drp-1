@@ -1,9 +1,15 @@
-import { type AheDurableStore, digestBlob, type ExpectedHead, type GenerationRecord } from "@ts-drp/storage";
+import {
+	type AheDurableStore,
+	digestBlob,
+	type ExpectedHead,
+	type GenerationRecord,
+	type StorageObjectId,
+} from "@ts-drp/storage";
 
 import { createBrowserAheDurableStore } from "../../dist/src/index.js";
 import { resolveBrowserAheReclamationMaintenance } from "../../dist/src/maintenance.js";
 
-const OBJECT_ID = `creator:${"f".repeat(32)}`;
+const OBJECT_ID = `creator:${"f".repeat(32)}` as StorageObjectId;
 const POLICY_DIGEST = "53775c5c1ee01e346f588966d6e7acb876df2bd8b2abcbe2b2591f216f7d4d9b";
 const FACADE_KEYS = Object.freeze([
 	"applyWrite",

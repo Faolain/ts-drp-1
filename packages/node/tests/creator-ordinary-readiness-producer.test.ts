@@ -826,6 +826,8 @@ function closeReadinessJob(options: {supported?: boolean; metadata?: () => Promi
 	   store:{readGenerationPage:async()=>{calls.push("generations");return {ok:true,value:{generations:Array(options.generationCount??1).fill({})}};},
 	     readRetirementControl:async()=>{calls.push("retirement");return {ok:true,value:options.activeIntent?{active:{}}:null};}},
 	   needsOrdinaryReadinessRecovery:()=>options.completedRecovery===true||options.recoveryRequired===true,
+	   // Scheduling-only drain of retained received work after the job joins.
+	   resumePendingIngress:()=>{if(maintenanceJobs.size!==0)throw Error("resumed before the readiness job joined");},
 	   runOrdinaryReadinessMaintenance:async(_,consume)=>{calls.push("boundary");
 	     await consume(async()=>{calls.push("seal");return {};},options.completedRecovery??false);calls.push("boundary-joined");},
 	   prepareOrdinaryNativeMetadataForReadiness:async()=>{

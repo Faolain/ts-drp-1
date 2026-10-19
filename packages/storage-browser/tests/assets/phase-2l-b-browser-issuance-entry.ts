@@ -1781,7 +1781,7 @@ async function r8HeldCensusFacts(probeOnly = false): Promise<unknown> {
 		}
 		const maintenance = durableIssuancePruningMaintenanceForStore(store);
 		r8Check(maintenance?.readBoundedRecoveryCensus !== undefined, "original native maintenance census required");
-		const census = (objectId = r8Scope.objectId, limits = ISSUANCE_RETIREMENT_LIMITS) => maintenance.readBoundedRecoveryCensus!({ objectId, limits });
+		const census = (objectId = r8Scope.objectId, limits: Readonly<{ maxRows: number; maxBytes: number }> = ISSUANCE_RETIREMENT_LIMITS) => maintenance.readBoundedRecoveryCensus!({ objectId, limits });
 		stage = "unheld-census-before-first-loan"; take();
 		const unheldBefore = await census();
 		await Promise.all([...seenTransactions].map(id => nativeTerminals.get(id)!)); observations.unheldBeforeWork = take();
@@ -1863,7 +1863,7 @@ async function r8HeldCensusFacts(probeOnly = false): Promise<unknown> {
 				let writerRead = false;
 				foreignWork = requestResult(writer.objectStore("lineages").get([r8Scope.objectId, r8Scope.author])).then(async () => { writerRead = true; await writerTerminal; });
 				void foreignWork.catch(() => undefined);
-				if (mode === "abort") actualHeldTransaction!.abort();
+				if (mode === "abort") (actualHeldTransaction as IDBTransaction | undefined)!.abort();
 				const stop = (mode === "close" ? store.close() : held.release()).then(() => { stopJoined = true; return { code: "RESOLVED" }; }, error => { stopJoined = true; return r8Error(error); });
 				take();
 				const revokedProbe = await currentProbe.checkCurrent().then(current => ({ resolved: true, current }), error => ({ resolved: false, failure: r8Error(error) }));

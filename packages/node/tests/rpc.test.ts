@@ -2,6 +2,7 @@ import * as grpc from "@grpc/grpc-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { V3RpcRoomRegistry } from "../src/rpc/v3-room-registry.js";
+import type { V3RoomProjectionAuthority } from "../src/v3-room.js";
 import { startV3RpcRoomServer, type V3RpcNetworkPort, type V3RpcRoomServer } from "../src/rpc/v3-service.js";
 
 type RpcHandler = (
@@ -56,7 +57,9 @@ async function start(network: TestNetwork, address = "127.0.0.1:7001"): Promise<
 	const server = await startV3RpcRoomServer({
 		// Unit-only lifetime stand-in: these cases never acquire a room or assert
 		// authentication. Genuine registry/native authority is tested separately.
-		registry: { close: vi.fn().mockResolvedValue(undefined) } as unknown as V3RpcRoomRegistry,
+		registry: {
+			close: vi.fn().mockResolvedValue(undefined),
+		} as unknown as V3RpcRoomRegistry<V3RoomProjectionAuthority>,
 		address,
 		credentials: {} as grpc.ServerCredentials,
 		network: { port: network, maxCustomGroups: 8, maxPayloadBytes: 4096, maxNameBytes: 128 },

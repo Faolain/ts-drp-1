@@ -138,7 +138,7 @@ describe("original closed application material continuation", () => {
 		expect(wrapper(Object.assign(() => {}, {action: "join"}), "creator-trusted-settlement-v1")).toBe(true);
 		expect(wrapper(null, "creator-trusted-settlement-v1")).toBe(false);
 		const f = fixture(), pre = record(f.preimage), dependencies = pre.dependencies.slice();
-		const admitted = {...pre, digest: hex(f.captured.vertexDigest)};
+		const admitted: Record<string, any> = {...pre, digest: hex(f.captured.vertexDigest)};
 		const auth = execute<(value: any, charge: number) => any>(`${declaration(liveSource, "authenticatedRecoveryVertex")}\nreturn authenticatedRecoveryVertex;`, {
 			lowerHexDigest: (bytes: Uint8Array) => Buffer.from(bytes).toString("hex"), ObjectFreeze: Object.freeze,
 			creatorAuthenticatedEpochVertexFields: shared.fields, settlementSourceByVertex: new WeakMap()});

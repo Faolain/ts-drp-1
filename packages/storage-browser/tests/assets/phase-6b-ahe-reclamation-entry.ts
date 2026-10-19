@@ -10,11 +10,14 @@ import {
 	encodeGenerationRecordV1,
 	encodeHeadRecordV1,
 	type ExpectedHead,
+	type GenerationId,
 	type GenerationRecord,
+	type HeadRevision,
 	type NativeReadReservation,
 	parseGenerationId,
 	parseHeadRevision,
 	parseStorageObjectId,
+	type StorageObjectId,
 } from "@ts-drp/storage";
 
 import {
@@ -37,8 +40,8 @@ import {
 	PHASE_5E_SCHEMA_VERSION,
 } from "../../src/internal/schema-idb.js";
 
-const OBJECT_ID = `creator:${"a".repeat(32)}`;
-const OTHER_OBJECT_ID = `creator:${"b".repeat(32)}`;
+const OBJECT_ID = `creator:${"a".repeat(32)}` as StorageObjectId;
+const OTHER_OBJECT_ID = `creator:${"b".repeat(32)}` as StorageObjectId;
 const POLICY_DIGEST = "53775c5c1ee01e346f588966d6e7acb876df2bd8b2abcbe2b2591f216f7d4d9b";
 const LINEAGE_MUTANTS = Object.freeze([
 	"head-different",
@@ -107,8 +110,8 @@ type InstalledLockMode = Readonly<{
 	waitUntilRequested(): Promise<void>;
 }>;
 
-function generationId(index: number): string {
-	return index.toString(16).padStart(64, "0");
+function generationId(index: number): GenerationId {
+	return index.toString(16).padStart(64, "0") as GenerationId;
 }
 
 function noHead(objectId = OBJECT_ID): ExpectedHead {
@@ -204,7 +207,7 @@ async function fiveGenerations(
 	let head: ExpectedHead = successful(await store.readHead(OBJECT_ID), "HEAD");
 	const records = [];
 	for (let index = 1; index <= generationCount; index += 1) {
-		const generationId = index.toString(16).padStart(64, "0");
+		const generationId = index.toString(16).padStart(64, "0") as GenerationId;
 		const bytes = bytesForIndex(index);
 		const digest = successful(digestBlob(bytes), "DIGEST");
 		const closure = [{ byteLength: bytes.byteLength, digest }];
@@ -701,7 +704,7 @@ async function applyMutant(
 					generationId: second.generationId,
 					kind: "present",
 					objectId: OBJECT_ID,
-					revision: 2,
+					revision: 2 as HeadRevision,
 				},
 			});
 		} else if (

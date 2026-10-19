@@ -46,6 +46,57 @@ export function runNativeReservedRead<T>(database: IDBDatabase, operation: () =>
 	return owner === undefined ? operation() : owner.runRead(operation);
 }
 
+/** Rows materialized ahead of the per-row charge of a counted-range visit. */
+const COUNTED_RANGE_PAGE = 32;
+
+function countedRangeRequest<T>(request: IDBRequest<T>): Promise<T> {
+	return new Promise((resolve, reject) => {
+		request.addEventListener("success", () => resolve(request.result), { once: true });
+		request.addEventListener("error", () => reject(request.error ?? new Error("IndexedDB request failed")), { once: true });
+	});
+}
+
+/**
+ * Visits an object-store key range in the caller's transaction in primary-key
+ * (cursor) order, in pages: `visit` charges and checks each row of one page
+ * before the next page is requested, so at most one page of uncharged rows is
+ * ever materialized. Reads stop after `limit` rows, as a bounded cursor would.
+ * @param store - Object store (primary keys are unique, so paging is exact).
+ * @param range - Exact key range the cursor walked.
+ * @param limit - Maximum rows read (e.g. a census count + 1 so overflow still refuses).
+ * @param visit - Per-row admission; a throw stops the visit before more rows are read.
+ * @returns The number of rows visited.
+ */
+export async function visitCountedRange(
+	store: IDBObjectStore,
+	range: IDBKeyRange,
+	limit: number,
+	visit: (value: unknown, primaryKey: IDBValidKey) => void
+): Promise<number> {
+	let next = range, visited = 0;
+	for (;;) {
+		const want = Math.min(COUNTED_RANGE_PAGE, limit - visited);
+		if (want <= 0) return visited;
+		const [values, keys] = await Promise.all([
+			countedRangeRequest(store.getAll(next, want)),
+			countedRangeRequest(store.getAllKeys(next, want)),
+		]);
+		if (values.length !== keys.length) throw new Error("IndexedDB counted range read disagrees");
+		for (let index = 0; index < values.length; index++) visit(values[index], keys[index]!);
+		visited += values.length;
+		if (values.length < want) return visited;
+		const last = keys[keys.length - 1]!;
+		try {
+			next = range.upper === undefined
+				? IDBKeyRange.lowerBound(last, true)
+				: IDBKeyRange.bound(last, range.upper, true, range.upperOpen);
+		} catch {
+			// The last row sits at the closed upper bound: nothing lies beyond it.
+			return visited;
+		}
+	}
+}
+
 class HeldReadView {
 	readonly transaction: IDBTransaction;
 	readonly ready: Promise<void>;

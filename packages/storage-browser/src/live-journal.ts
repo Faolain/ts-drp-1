@@ -75,6 +75,7 @@ import {
 	nativeReadReservationTransaction,
 	needsNativeReadReservationTurn,
 	runNativeReservedRead,
+	visitCountedRange,
 } from "./internal/native-read-reservation.js";
 
 type StoredScope = Readonly<{
@@ -483,43 +484,27 @@ async function retirementSnapshot(
 		]);
 		if (!journalRetirementImageCountsFit(scopeCount, rowCount)) throw new Error("retirement-fenced");
 		imageCapture = createJournalRetirementImageCapture();
-		const collect = (store: IDBObjectStore): Promise<{ rows: unknown[]; frames: Uint8Array[] }> =>
-			new Promise((resolve, reject) => {
-				const rows: unknown[] = [],
-					frames: Uint8Array[] = [],
-					request = store.openCursor(range);
-				request.addEventListener("error", () => reject(request.error));
-				request.addEventListener("success", () => {
-					try {
-						const cursor = request.result;
-						if (cursor === null) {
-							resolve({ rows, frames });
-							return;
-						}
-						// Capture this actual IDB row once, charging it before the
-						// next cursor row. The same detached canonical segments own
-						// its optional frame and complete image; no native currency
-						// or authorization is retained/reused across transactions.
-						const row = cursor.value;
-						const frame = imageCapture!.append(store.name as "scopes" | "acceptedEntries", row,
-							captureRows ? cursor.primaryKey : undefined);
-						if (captureRows) {
-							frames.push(frame!);
-						}
-						rows.push(row);
-						cursor.continue();
-					} catch (error) {
-						reject(error);
-						if (!borrowed)
-							try {
-								transaction.abort();
-							} catch {
-								/* The native transaction may already be terminal; preserve primary/readback. */
-							}
-					}
-				});
+		// The counts above already bound both stores. Visit each counted range in
+		// bounded pages inside this SAME transaction instead of one cursor round
+		// trip per row; values and key order are those the cursor walked.
+		const collect = async (store: IDBObjectStore, count: number) => {
+			const rows: unknown[] = [],
+				frames: Uint8Array[] = [];
+			await visitCountedRange(store, range, count + 1, (row, primaryKey) => {
+				// Capture this actual IDB row once, charging it before the next
+				// page is read. The same detached canonical segments own its
+				// optional frame and complete image; no native currency or
+				// authorization is retained/reused across transactions.
+				const frame = imageCapture!.append(store.name as "scopes" | "acceptedEntries", row,
+					captureRows ? primaryKey : undefined);
+				if (captureRows) {
+					frames.push(frame!);
+				}
+				rows.push(row);
 			});
-		const [scopeCapture, rowCapture] = await Promise.all([collect(scopesStore), collect(rowsStore)]);
+			return { rows, frames };
+		};
+		const [scopeCapture, rowCapture] = await Promise.all([collect(scopesStore, scopeCount), collect(rowsStore, rowCount)]);
 		const scopes = scopeCapture.rows,
 			rows = rowCapture.rows;
 		if (scopes.length !== scopeCount || rows.length !== rowCount) throw new CorruptLiveJournalError();

@@ -127,7 +127,7 @@ describe("Node exact-held recovery census producer", () => {
 			const accessor = Object.defineProperty({}, "objectId", {enumerable: true, get() {getters++; return input.objectId;}});
 			expect(capture.call(reader, accessor as typeof input, observation)).toBeUndefined();
 			expect(getters).toBe(0);
-			const wrapper = ((value: typeof input) => reader(value));
+			const wrapper = ((value: Parameters<typeof reader>[0]) => reader(value));
 			expect(capture.call(wrapper, input, observation)).toBeUndefined();
 			expect(capture.call(reader, input, Object.defineProperty({...observation}, "rows", {enumerable: true,
 				get() {getters++; return observation.rows;}}))).toBeUndefined();
@@ -2085,7 +2085,7 @@ describe("R8 native unsigned phase codec widths", () => {
 			capturing = false,
 			entered = 0;
 		const observations: Array<ReturnType<typeof read>> = [];
-		const intents: Array<Parameters<typeof issuanceUnsignedContinuationWidths>[2]> = [];
+		const intents: Array<NonNullable<Parameters<typeof issuanceUnsignedContinuationWidths>[2]>> = [];
 		const sign = async (digest: Uint8Array) => {
 			entered++;
 			const signature = ed25519.sign(digest, currencySeed);

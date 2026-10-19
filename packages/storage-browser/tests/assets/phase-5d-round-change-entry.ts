@@ -35,6 +35,10 @@ import {
 	resolveSealStorePort,
 	type SealDetailRetirementIntentData,
 } from "../../../seal/src/internal/seal-vote-intent.js";
+
+// Browser stores type their port through the built seal package; this entry
+// calls the seal source, whose port type carries its own brand.
+type SourceSealStorePort = Parameters<typeof nativeSigningAdmissionFactory>[0];
 import { createInternalVoteDispatcher } from "../../src/internal/seal-vote-dispatch.js";
 import { openInternalSealVoteStore, VOTE_TRANSACTION_STORES } from "../../src/internal/seal-vote-store.js";
 import { openBrowserSealVoteStore } from "../../src/seal-vote.js";
@@ -209,7 +213,7 @@ async function signFixtureCarrier(
 		signature: Uint8Array | undefined;
 	try {
 		const enrollment = mintSealVoterEnrollment({ ...identity, expectedIncarnation: browser.observation.incarnation });
-		bindSealSigningRequest(request, nativeSigningAdmissionFactory(browser.store, enrollment));
+		bindSealSigningRequest(request, nativeSigningAdmissionFactory(browser.store as unknown as SourceSealStorePort, enrollment));
 		signature = await signSealRegisteredDigest({ request, signer });
 	} catch (cause) {
 		failed = true;
@@ -1511,7 +1515,7 @@ async function runDelayedPhysicalDetailSigning(databaseName: string): Promise<un
 			...identity,
 			expectedIncarnation: opened.browser.observation.incarnation,
 		});
-		const admission = nativeSigningAdmissionFactory(opened.browser.store, enrollment);
+		const admission = nativeSigningAdmissionFactory(opened.browser.store as unknown as SourceSealStorePort, enrollment);
 		const delayed = prepareSealVote({
 			authority: opened.authority as SealAuthority,
 			exactCanonicalCutValueBytes: opened.exactCanonicalCutValueBytes,

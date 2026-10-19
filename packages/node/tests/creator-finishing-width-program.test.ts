@@ -182,7 +182,7 @@ describe("source finishing numerical field program (no proof authority)", () => 
 			currentClose, previousClose, operationalSources: [], classifiedScopes: [older]};
 		const correspondence = {sourceSelection: {selection: "prior-transfer" as const, previousClose: currentClose,
 			installedPromotionSource: null}, currentRoles: roles, currentCutRoles: roles,
-			protectedScopes: [currentClose, previousClose, older], certificates: [{roles, supportGenerations: [], authenticatedSourceGenerations: []}]};
+			protectedScopes: [currentClose, previousClose, older], certificates: [{roles, supportGenerations: [], authenticatedSourceGenerations: [], retiredClassifiedSnapshotScopes: []}]};
 		const value = <T>(result: {ok: true; value: T} | {ok: false}): T => {
 			if (!result.ok) throw Error("SNAPSHOT_RESOURCE_FIXTURE_INVALID"); return result.value;
 		};
@@ -269,7 +269,8 @@ describe("source finishing numerical field program (no proof authority)", () => 
 		const roles = {kind: "creator-snapshot-recovery-roles" as const, version: 1 as const, genesisAnchorDigest: digest,
 			currentClose, previousClose, operationalSources: [], classifiedScopes: [retiring]};
 		const certificate = {roles, supportGenerations: [], authenticatedSourceGenerations: [
-			{scope: retiring, generation: generations[3]!}, {scope: previousClose, generation: generations[4]!}]};
+			{scope: retiring, generation: generations[3]!}, {scope: previousClose, generation: generations[4]!}],
+			retiredClassifiedSnapshotScopes: []};
 		const maintenance = {snapshotScopesAfterCurrentTurnover: [pair(currentClose), pair(previousClose)], snapshotScopesRetiring: [pair(retiring)],
 			generationReplayUnclassified: false, authenticatedExcludedGenerations: [],
 			ordinaryCurrentNativeAdvance: {currentGenerationId: generations[0]!.generationId,
@@ -577,7 +578,7 @@ describe("source finishing numerical field program (no proof authority)", () => 
 		};
 		const merged = (fields: {known: Readonly<Record<string, unknown>>; unknown: Readonly<Record<string, unknown>>}) =>
 			({...fields.known, ...fields.unknown});
-		const summary = (phase: "prepare" | "commit", qc: Uint8Array) => merged(creatorCloseSigningQcSummaryFields({phase,
+		const summary = (phase: "prepare" | "commit", qc: Uint8Array) => merged(creatorCloseSigningQcSummaryFields<unknown>({phase,
 			valueDigest: digest, digest, proposalHash: digest, exactCanonicalQcBytes: qc}));
 		const carrier = (phase: "prepare" | "commit") => merged(creatorCloseSigningStoredCarrierFields({
 			exactCanonicalPreimageBytes: encodeCanonical(merged(creatorCloseSigningVotePreimageFields({scope, phase,
@@ -944,7 +945,7 @@ describe("source finishing numerical field program (no proof authority)", () => 
 			expect(refs.every(reference => reference < index)).toBe(true);
 		}
 		for (const winner of [0, 127, count - 1]) {
-			const parameters = new Map(Array.from({length: count}, (_, index) =>
+			const parameters = new Map<string, number>(Array.from({length: count}, (_, index) =>
 				[`alias.${index}`, index === winner ? 8_334 : 1 + index % 128] as const));
 			parameters.set("constant-alias", maximum);
 			const evaluated = evaluateCreatorFinishingWidthProgramForSizing(program, parameters);

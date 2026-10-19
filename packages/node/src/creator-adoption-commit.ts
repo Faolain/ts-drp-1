@@ -268,8 +268,13 @@ async function loadClosure(
 ): Promise<readonly Candidate[] | undefined> {
 	const candidates: Candidate[] = [];
 	if (accounting !== undefined && !accounting.charge(encodeCanonical(references))) return undefined;
-	for (const ref of references) {
-		const loaded = await store.getBlob(ref.digest);
+	// Independent reads overlap; checks, charges and failures keep the serial per-ref order.
+	const reads = await Promise.allSettled(references.map((ref) => store.getBlob(ref.digest)));
+	for (const [index, ref] of references.entries()) {
+		const read = reads[index];
+		if (read === undefined) return undefined;
+		if (read.status === "rejected") throw read.reason;
+		const loaded = read.value;
 		if (accounting !== undefined && !accounting.charge(encodeCanonical(loaded))) return undefined;
 		if (!loaded.ok || loaded.value === null || loaded.value.byteLength !== ref.byteLength) return undefined;
 		const digest = digestBlob(loaded.value);
@@ -521,13 +526,18 @@ async function authenticatedTerminal(
 		) {
 			return Object.freeze({ kind: "chain-invalid" });
 		}
+		const currentLoad = loadClosure(facts.store, facts.currentReferences, facts.proofAccounting);
+		const activeReferences = pending ? pendingReferences : material.candidateReferences;
 		const [generations, currentCandidates, pendingCandidates, activeCandidates] = await Promise.all([
 			readLineage(facts.store, facts.objectId, facts.origin === "received", facts.proofAccounting),
-			loadClosure(facts.store, facts.currentReferences, facts.proofAccounting),
+			currentLoad,
 			facts.origin === "received"
 				? Promise.resolve(facts.receivedCandidates)
 				: loadClosure(facts.store, facts.proposedReferences, facts.proofAccounting),
-			loadClosure(facts.store, pending ? pendingReferences : material.candidateReferences, facts.proofAccounting),
+			// The same closure is read once when no proof ledger counts each read.
+			activeReferences === facts.currentReferences && facts.proofAccounting === undefined
+				? currentLoad
+				: loadClosure(facts.store, activeReferences, facts.proofAccounting),
 		]);
 		const descriptor = validProjection(material);
 		if (

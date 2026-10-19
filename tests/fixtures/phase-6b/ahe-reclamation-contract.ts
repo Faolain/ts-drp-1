@@ -7,6 +7,7 @@ import {
 	type AheRetirementGenerationSource,
 	type AheRetirementPreparation,
 	type BlobDigest,
+	type ClosureDigest,
 	captureAheRetirementGenerationSource,
 	digestBlob,
 	encodeGenerationRecordV1,
@@ -224,11 +225,20 @@ export function d109cBlobDigest(index: number): BlobDigest {
 }
 
 /**
+ * Creates the head closure digest spelled like {@link d109cBlobDigest}.
+ * @param index - Positive fixture ordinal.
+ * @returns Canonical closure digest.
+ */
+export function d109cClosureDigest(index: number): ClosureDigest {
+	return (index + 32).toString(16).padStart(64, "0") as ClosureDigest;
+}
+
+/**
  * Creates the existing no-head representation.
  * @param objectId - Canonical object identity.
  * @returns Frozen no-head value.
  */
-export function d109cNoHead(objectId = D109C_OBJECT): ExpectedHead {
+export function d109cNoHead(objectId = D109C_OBJECT): Extract<ExpectedHead, { kind: "none" }> {
 	return Object.freeze({ kind: "none" as const, objectId });
 }
 
@@ -242,7 +252,7 @@ export function d109cInput(): D109cReclamationInput {
 	const floor = d109cGenerationId(3);
 	const formerParent = d109cGenerationId(2);
 	const expectedHead = Object.freeze({
-		closureDigest: d109cBlobDigest(5),
+		closureDigest: d109cClosureDigest(5),
 		generationId: activeGenerationId,
 		kind: "present" as const,
 		objectId: D109C_OBJECT,
@@ -256,7 +266,7 @@ export function d109cInput(): D109cReclamationInput {
 		lineageFloor: Object.freeze({
 			deleteGenerationIds: Object.freeze([d109cGenerationId(1), formerParent]),
 			expectedBaseExpectedHead: Object.freeze({
-				closureDigest: d109cBlobDigest(2),
+				closureDigest: d109cClosureDigest(2),
 				generationId: formerParent,
 				kind: "present" as const,
 				objectId: D109C_OBJECT,

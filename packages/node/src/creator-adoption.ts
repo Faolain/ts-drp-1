@@ -125,6 +125,7 @@ import { createV3SnapshotTransferOwner } from "./snapshot-transfer.js";
 import { sealCreatorReceivedRecoveryReplay, type V3PlaneHandle } from "./v3-live.js";
 import { reconcileCreatorSnapshotRecoveryRoles } from "./internal/creator-closed-rollback-data.js";
 import { acquireCreatorPendingClassificationCustody, resolveCreatorSnapshotRecoveryCloseHold } from "./internal/runtime-reclamation.js";
+import type { CreatorRecoveryPoolResult } from "./internal/creator-recovery-pool.js";
 
 export {
 	captureCreatorSuccessorPeers,
@@ -866,6 +867,138 @@ async function recoverCreatorArchiveCloseExport(
 	return exported;
 }
 
+/** Genuine room-native ports; neither an incoming certificate nor a supplied
+ * scope list can grant turnover. No finality signer is required. */
+export type CreatorRecipientRecoveryContext = Pick<CreatorClosedRollbackDataInput,
+	"roomHeadAuthority" | "pinnedGenesisAnchorDigest" | "exactCanonicalPinnedGenesisTrustStateRecordBytes"> &
+	Pick<Parameters<typeof createCreatorSigningRecoveryOwner>[0], "voteStore" | "evidenceStore" | "storageIncarnation">;
+type CreatorRecipientSource = NonNullable<ReturnType<typeof resolveCreatorRecipientRegistration>>;
+type ReceivedRecoverySeal = NonNullable<Awaited<ReturnType<CreatorRecipientSource["sealReceivedRecoveryDependencies"]>>>;
+type ReceivedSigningOwner = Extract<Awaited<ReturnType<typeof createCreatorSigningRecoveryOwner>>, {ok: true}>["owner"];
+
+/** Scheduling only. The received turnover is decided by current state: the pool
+ * is full, or the current Cut still classifies scopes this recipient retains.
+ * Reconcile an authenticated CURRENT classification while this recipient still
+ * owns those alternatives, before the creator retires its copy and a later Cut
+ * legitimately stops spelling them. Full native/source/transfer authentication
+ * remains in the original owner. */
+async function receivedRecoveryTurnoverDue(source: CreatorRecipientSource,
+	snapshotStore: SnapshotRecoveryStore<SnapshotVerificationReceipt>,
+	currentCandidates: Awaited<ReturnType<typeof inspectHead>>["candidates"]): Promise<boolean> {
+	if (source.currentTrust.currentEpoch < 2) return false;
+	const inventory = await snapshotStore.captureRecoveryRoleInventory?.({objectId: source.objectId});
+	const currentCut = uniqueCreatorTransitionCandidate(currentCandidates, "drp-hard-epoch-cut", source.currentTrust.currentEpoch - 1);
+	const currentRoles = currentCut === undefined ? undefined : captureCreatorSnapshotRecoveryRoles(canonicalRecord(currentCut.bytes)?.recoveryRoles);
+	const classifiedPresent = currentRoles?.classifiedScopes.some(scope => inventory?.scopes.some(row =>
+		row.scope.objectId === scope.objectId && row.scope.epoch === scope.epoch && row.scope.anchor === scope.anchor &&
+		row.scope.manifestDigest === scope.manifestDigest)) === true;
+	return inventory !== undefined && inventory.owner.migration === "ready" &&
+		(inventory.owner.recoveryScopes >= inventory.owner.limits.maxRecoveryScopes || classifiedPresent);
+}
+
+/** The original bounded received turnover: one signing census bounds the passes;
+ * each pass seals the received dependencies, reconciles, and joins its hold. */
+async function runReceivedRecoveryTurnoverPasses(input: Readonly<{
+	source: CreatorRecipientSource;
+	snapshotStore: SnapshotRecoveryStore<SnapshotVerificationReceipt>;
+	catalog: TrustedBlueprintCatalog;
+	context: CreatorRecipientRecoveryContext;
+	signing: ReceivedSigningOwner;
+}>, seal: () => Promise<ReceivedRecoverySeal | undefined>): Promise<readonly GenerationRecord[]> {
+	const { source, context } = input;
+	const census = await input.signing.captureRetirementOwners().acquireEvidence();
+	const epochs = new Set<number>();
+	let censusFailed = false, censusPrimary: unknown;
+	try {
+		for (const bytes of census.readExactCanonicalRows()) {
+			const frame = decodeCanonical(bytes) as unknown[];
+			if (frame[0] === "signerState") epochs.add((frame[1] as [string, number, string])[1]);
+		}
+		await census.check();
+	} catch (error) {censusFailed = true; censusPrimary = error; throw error;}
+	finally {await releaseCreatorRecoveryReader(census, censusFailed, censusPrimary, "creator recipient signing census cleanup failed");}
+	const retired: GenerationRecord[] = [];
+	const maxPasses = 2 + epochs.size + AHE_BOUNDED_READ_LIMITS.maxObjectGenerations;
+	for (let pass = 0; pass < maxPasses; pass++) {
+		const sealed = await seal();
+		if (sealed === undefined) throw new TypeError("creator recipient recovery dependencies unavailable");
+		const lifetime = resolveCreatorSnapshotRecoveryCloseHold(sealed.hold,
+			{store: source.store, liveJournalStore: source.liveJournalStore, currentTrust: source.currentTrust});
+		if (lifetime === undefined) throw new TypeError("creator recipient recovery dependency custody differs");
+		let checkpoint: "complete" | "fresh-summary-required";
+		let retirementFailed = false, retirementPrimary: unknown;
+		try {
+			checkpoint = await reconcileCreatorSnapshotRecoveryRoles({
+				roomHeadAuthority: context.roomHeadAuthority, pinnedGenesisAnchorDigest: context.pinnedGenesisAnchorDigest,
+				exactCanonicalPinnedGenesisTrustStateRecordBytes: context.exactCanonicalPinnedGenesisTrustStateRecordBytes,
+				catalog: input.catalog,
+				objectId: source.objectId, store: source.store, snapshotStore: input.snapshotStore,
+				liveJournalStore: source.liveJournalStore}, sealed.hold);
+			retired.push(...sealed.readRetiredGenerations());
+		} catch (error) {retirementFailed = true; retirementPrimary = error; throw error;}
+		finally {await releaseCreatorRecoveryReader(lifetime, retirementFailed, retirementPrimary, "creator recipient retirement dependencies cleanup failed");}
+		if (checkpoint === "complete") break;
+		if (pass === maxPasses - 1) throw new TypeError("creator recipient bounded retirement did not stabilize");
+	}
+	return retired;
+}
+
+/**
+ * Explicit opt-in early recipient turnover at a caller-chosen quiescent lull.
+ * Because the install's predicate is state-based, the SAME original passes run
+ * now make it false at the next install; inline install turnover remains the
+ * backstop. This grants no authority: an unavailable or busy boundary is
+ * reported before entry, never forced. After entry, any failure is recovery work.
+ * @param input - The recipient's genuine live plane, catalog, current room head and native ports.
+ * @returns Whether the boundary maintained the pool, found no pressure, or deferred.
+ */
+export async function maintainCreatorRecipientRecoveryPool(input: Readonly<{
+	plane: V3PlaneHandle;
+	catalog: TrustedBlueprintCatalog;
+	expectedRoomHead: Readonly<{ objectId: string; epoch: number; currentAnchorDigest: string }>;
+	snapshotStore: SnapshotRecoveryStore<SnapshotVerificationReceipt>;
+	recoveryContext: CreatorRecipientRecoveryContext;
+}>): Promise<CreatorRecoveryPoolResult> {
+	const source = resolveCreatorRecipientRegistration(input.plane);
+	if (source === undefined || input.snapshotStore.captureRecoveryRoleInventory === undefined)
+		return Object.freeze({kind: "deferred", reason: "unsupported"});
+	if (!sameCreatorRoomHead(input.expectedRoomHead, source.currentTrust))
+		return Object.freeze({kind: "deferred", reason: "busy"});
+	// Observational point reads before any admission: "not-needed" leaves the
+	// received gate, ordinary issuance and native state untouched.
+	const current = await inspectHead(source.store, source.objectId);
+	if (!(await receivedRecoveryTurnoverDue(source, input.snapshotStore, current.candidates)))
+		return Object.freeze({kind: "not-needed"});
+	const context = input.recoveryContext;
+	const opened = await createCreatorSigningRecoveryOwner({currentTrust: source.currentTrust,
+		voteStore: context.voteStore, evidenceStore: context.evidenceStore, storageIncarnation: context.storageIncarnation});
+	if (!opened.ok) throw new TypeError(`creator recipient signing custody unavailable: ${opened.reason}`);
+	let outcome: "ran" | "deferred";
+	try {
+		outcome = await source.runReceivedRecoveryMaintenance(opened.owner, input.snapshotStore, async (seal) => {
+			// These generations belong to this stable boundary. The next install's
+			// own turnover (if any) classifies from the state it then observes.
+			await runReceivedRecoveryTurnoverPasses({source, snapshotStore: input.snapshotStore, catalog: input.catalog,
+				context, signing: opened.owner}, seal);
+			return "complete";
+		}, {deferrable: true});
+	} finally {
+		await opened.owner.stop();
+	}
+	return Object.freeze(outcome === "deferred" ? {kind: "deferred", reason: "busy"} : {kind: "maintained"});
+}
+
+// Receive-time currency is the native head record alone: its closure digest binds
+// every content-addressed blob that the initial inspection already authenticated.
+async function nativeHeadUnchanged(
+	store: AheDurableStore,
+	objectId: Parameters<AheDurableStore["recoverActiveGeneration"]>[0],
+	expected: PresentHead
+): Promise<boolean> {
+	const recovered = await store.recoverActiveGeneration(objectId);
+	return recovered.ok && recovered.value.kind === "active" && sameHead(recovered.value.head, expected);
+}
+
 /**
  * Received provenance is minted only by verified current custody, signed adjacency and retained destination bytes.
  * Promoted custody owns held native historical readers until the caller joins
@@ -885,11 +1018,7 @@ export async function receiveCreatorSuccessorAdoption(
 		signRegisteredVertexDigest: SignRegisteredVertexDigest;
 		exactCanonicalGenesisAnchorPreimageBytes?: Uint8Array;
 		detachedGenesisSignature?: Uint8Array;
-		/** Genuine room-native ports; neither an incoming certificate nor a
-		 * supplied scope list can grant turnover. No finality signer is required. */
-		recoveryContext?: Pick<CreatorClosedRollbackDataInput,
-			"roomHeadAuthority" | "pinnedGenesisAnchorDigest" | "exactCanonicalPinnedGenesisTrustStateRecordBytes"> &
-			Pick<Parameters<typeof createCreatorSigningRecoveryOwner>[0], "voteStore" | "evidenceStore" | "storageIncarnation">;
+		recoveryContext?: CreatorRecipientRecoveryContext;
 	}>
 ): Promise<ReceivedCreatorSuccessorAdoption> {
 	const source = resolveCreatorRecipientRegistration(input.plane);
@@ -957,7 +1086,7 @@ export async function receiveCreatorSuccessorAdoption(
 	let transfer: ReturnType<typeof createV3SnapshotTransferOwner> | undefined;
 	let scope: Awaited<ReturnType<typeof input.snapshotStore.openScope>> | undefined;
 	let promotionSource: Awaited<ReturnType<typeof acquireCreatorReceivedPromotion>> | undefined;
-	let recoverySigning: Extract<Awaited<ReturnType<typeof createCreatorSigningRecoveryOwner>>, {ok: true}>["owner"] | undefined;
+	let recoverySigning: ReceivedSigningOwner | undefined;
 	const retiredGenerations: GenerationRecord[] = [];
 	let promotionIdentityBeforeTurnover: ReturnType<typeof resolveCreatorForwardPromotion>;
 	const quiesceReceived = (): void => {
@@ -969,68 +1098,23 @@ export async function receiveCreatorSuccessorAdoption(
 		}
 	};
 	const prepareReceivedRecoveryTurnover = async (): Promise<boolean> => {
-		if (source.currentTrust.currentEpoch >= 2) {
-			const inventory = await input.snapshotStore.captureRecoveryRoleInventory?.({objectId: source.objectId});
-			// Scheduling only. Reconcile an authenticated CURRENT classification
-			// while this recipient still owns those alternatives, before the creator
-			// retires its copy and a later Cut legitimately stops spelling them.
-			// Full native/source/transfer authentication remains in the original owner.
-			const currentCut = uniqueCreatorTransitionCandidate(current.candidates, "drp-hard-epoch-cut", source.currentTrust.currentEpoch - 1);
-			const currentRoles = currentCut === undefined ? undefined : captureCreatorSnapshotRecoveryRoles(canonicalRecord(currentCut.bytes)?.recoveryRoles);
-			const classifiedPresent = currentRoles?.classifiedScopes.some(scope => inventory?.scopes.some(row =>
-				row.scope.objectId === scope.objectId && row.scope.epoch === scope.epoch && row.scope.anchor === scope.anchor &&
-				row.scope.manifestDigest === scope.manifestDigest)) === true;
-			if (inventory !== undefined && inventory.owner.migration === "ready" &&
-				(inventory.owner.recoveryScopes >= inventory.owner.limits.maxRecoveryScopes || classifiedPresent)) {
-				const context = input.recoveryContext;
-				if (context === undefined) throw new TypeError("creator recipient turnover native owners are unavailable");
-				const openedCustody = await createCreatorSigningRecoveryOwner({currentTrust: source.currentTrust,
-					voteStore: context.voteStore, evidenceStore: context.evidenceStore, storageIncarnation: context.storageIncarnation});
-				if (!openedCustody.ok) throw new TypeError(`creator recipient signing custody unavailable: ${openedCustody.reason}`);
-				recoverySigning = openedCustody.owner;
-				if (promotionSource !== undefined) {
-					promotionIdentityBeforeTurnover = resolveCreatorForwardPromotion(promotionSource.promotion);
-					if (promotionIdentityBeforeTurnover === undefined) throw new TypeError("creator received promotion identity unavailable before turnover");
-					await promotionSource.release();
-					promotionSource = undefined;
-				}
-				const census = await openedCustody.owner.captureRetirementOwners().acquireEvidence();
-				const epochs = new Set<number>();
-				let censusFailed = false, censusPrimary: unknown;
-				try {
-					for (const bytes of census.readExactCanonicalRows()) {
-						const frame = decodeCanonical(bytes) as unknown[];
-						if (frame[0] === "signerState") epochs.add((frame[1] as [string, number, string])[1]);
-					}
-					await census.check();
-				} catch (error) {censusFailed = true; censusPrimary = error; throw error;}
-				finally {await releaseCreatorRecoveryReader(census, censusFailed, censusPrimary, "creator recipient signing census cleanup failed");}
-				const maxPasses = 2 + epochs.size + AHE_BOUNDED_READ_LIMITS.maxObjectGenerations;
-				for (let pass = 0; pass < maxPasses; pass++) {
-					const sealed = await source.sealReceivedRecoveryDependencies(openedCustody.owner, input.snapshotStore);
-					if (sealed === undefined) throw new TypeError("creator recipient recovery dependencies unavailable");
-					const lifetime = resolveCreatorSnapshotRecoveryCloseHold(sealed.hold,
-						{store: source.store, liveJournalStore: source.liveJournalStore, currentTrust: source.currentTrust});
-					if (lifetime === undefined) throw new TypeError("creator recipient recovery dependency custody differs");
-					let checkpoint: "complete" | "fresh-summary-required";
-					let retirementFailed = false, retirementPrimary: unknown;
-					try {
-						checkpoint = await reconcileCreatorSnapshotRecoveryRoles({
-							roomHeadAuthority: context.roomHeadAuthority, pinnedGenesisAnchorDigest: context.pinnedGenesisAnchorDigest,
-							exactCanonicalPinnedGenesisTrustStateRecordBytes: context.exactCanonicalPinnedGenesisTrustStateRecordBytes,
-							catalog: input.catalog,
-							objectId: source.objectId, store: source.store, snapshotStore: input.snapshotStore,
-							liveJournalStore: source.liveJournalStore}, sealed.hold);
-						retiredGenerations.push(...sealed.readRetiredGenerations());
-					} catch (error) {retirementFailed = true; retirementPrimary = error; throw error;}
-					finally {await releaseCreatorRecoveryReader(lifetime, retirementFailed, retirementPrimary, "creator recipient retirement dependencies cleanup failed");}
-					if (checkpoint === "complete") break;
-					if (pass === maxPasses - 1) throw new TypeError("creator recipient bounded retirement did not stabilize");
-				}
-				return true;
-			}
+		if (!(await receivedRecoveryTurnoverDue(source, input.snapshotStore, current.candidates))) return false;
+		const context = input.recoveryContext;
+		if (context === undefined) throw new TypeError("creator recipient turnover native owners are unavailable");
+		const openedCustody = await createCreatorSigningRecoveryOwner({currentTrust: source.currentTrust,
+			voteStore: context.voteStore, evidenceStore: context.evidenceStore, storageIncarnation: context.storageIncarnation});
+		if (!openedCustody.ok) throw new TypeError(`creator recipient signing custody unavailable: ${openedCustody.reason}`);
+		recoverySigning = openedCustody.owner;
+		if (promotionSource !== undefined) {
+			promotionIdentityBeforeTurnover = resolveCreatorForwardPromotion(promotionSource.promotion);
+			if (promotionIdentityBeforeTurnover === undefined) throw new TypeError("creator received promotion identity unavailable before turnover");
+			await promotionSource.release();
+			promotionSource = undefined;
 		}
-		return false;
+		retiredGenerations.push(...await runReceivedRecoveryTurnoverPasses({source, snapshotStore: input.snapshotStore,
+			catalog: input.catalog, context, signing: openedCustody.owner},
+			() => source.sealReceivedRecoveryDependencies(openedCustody.owner, input.snapshotStore)));
+		return true;
 	};
 	try {
 		transfer = createV3SnapshotTransferOwner({ transport: input.transport });
@@ -1296,7 +1380,7 @@ export async function receiveCreatorSuccessorAdoption(
 		});
 		// Exact certificate equality above authenticates the occupied candidate's
 		// predecessor, offer, companions and replay before retention/adoption effects.
-		if (!sameHead((await inspectHead(source.store, source.objectId)).head, current.head) || !(await replay.verify()))
+		if (!(await nativeHeadUnchanged(source.store, source.objectId, current.head)) || !(await replay.verify()))
 			throw new TypeError("creator recipient current changed before turnover");
 		if (promotionSource !== undefined) await promotionSource.check();
 		if (await prepareReceivedRecoveryTurnover()) {
@@ -1321,7 +1405,7 @@ export async function receiveCreatorSuccessorAdoption(
 			const freshProjection = freshSnapshot === undefined || freshCatalog === undefined ? undefined : projection(facts, chain, freshSnapshot, freshCatalog);
 			if (freshProjection === undefined || !sameBytes(freshProjection.bytes, projected.bytes))
 				throw new TypeError("creator received projection changed during turnover");
-			if (!sameHead((await inspectHead(source.store, source.objectId)).head, current.head) || !(await replay.verify()))
+			if (!(await nativeHeadUnchanged(source.store, source.objectId, current.head)) || !(await replay.verify()))
 				throw new TypeError("creator recipient current changed after turnover");
 		}
 		await scope.retainForRecovery({ exactReceivedCertificateBytes: certificate });
@@ -1332,8 +1416,7 @@ export async function receiveCreatorSuccessorAdoption(
 			!sameBytes(owned.exactReceivedCertificateBytes, certificate)
 		)
 			throw new TypeError("creator received retention custody is unavailable");
-		const readback = await inspectHead(source.store, source.objectId);
-		if (!sameHead(readback.head, current.head) || !(await replay.verify()))
+		if (!(await nativeHeadUnchanged(source.store, source.objectId, current.head)) || !(await replay.verify()))
 			throw new TypeError("creator recipient current changed during receive");
 		if (
 			!installCreatorAdoptionFacts(

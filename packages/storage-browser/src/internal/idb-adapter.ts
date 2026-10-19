@@ -72,6 +72,7 @@ import {
 import {
 	admitBrowserRetirementControl,
 	advanceBrowserRetirementControl,
+	BrowserBoundedReadPrefetch,
 	loadBrowserBoundedReadRequest,
 	readBrowserRetirementControl,
 	writeBrowserRetirementControl,
@@ -847,8 +848,9 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 			const facts = typeof steps === "function" && reserved !== undefined && factObjectId !== undefined
 				? new BoundedReadNativeFacts(this, transaction, factObjectId) : undefined;
 			const driver = typeof steps === "function" ? steps(facts) : steps;
+			const prefetch = new BrowserBoundedReadPrefetch(transaction);
 			let step = driver.next();
-			while (!step.done) step = driver.next(await this.loadBoundedRequest(transaction, step.value));
+			while (!step.done) step = driver.next(await this.loadBoundedRequest(transaction, step.value, prefetch));
 			const outcome = await joinTransactionOutcome(transaction, completion);
 			if (!outcome.ok) return substrateFailure(outcome.cause);
 			if (isBoundedReadCorruption(step.value)) {
@@ -879,8 +881,9 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 		}
 	}
 
-	private async loadBoundedRequest(transaction: IDBTransaction, request: BoundedReadRequest): Promise<unknown> {
-		return loadBrowserBoundedReadRequest(transaction, request);
+	private async loadBoundedRequest(transaction: IDBTransaction, request: BoundedReadRequest,
+		prefetch?: BrowserBoundedReadPrefetch): Promise<unknown> {
+		return loadBrowserBoundedReadRequest(transaction, request, undefined, prefetch);
 	}
 
 	public readGenerationPage(input: {

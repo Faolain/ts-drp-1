@@ -14,9 +14,10 @@ const source = readFileSync(new URL("../src/v3-live.ts", import.meta.url), "utf8
 const tree = ts.createSourceFile("v3-live.ts", source, ts.ScriptTarget.Latest, true);
 const runtimeTree = ts.createSourceFile("runtime-reclamation.ts",
 	readFileSync(new URL("../src/internal/runtime-reclamation.ts", import.meta.url), "utf8"), ts.ScriptTarget.Latest, true);
-const projection = runtimeTree.statements.find((node): node is ts.FunctionDeclaration =>
+const projectionMatch = runtimeTree.statements.find((node): node is ts.FunctionDeclaration =>
 	ts.isFunctionDeclaration(node) && node.name?.text === "creatorAuthenticatedEpochVertexFields");
-if (projection === undefined) throw new Error("missing original authenticated vertex projection");
+if (projectionMatch === undefined) throw new Error("missing original authenticated vertex projection");
+const projection: ts.FunctionDeclaration = projectionMatch;
 function declaration(name: string): string {
 	const node = tree.statements.find((node): node is ts.FunctionDeclaration => ts.isFunctionDeclaration(node) && node.name?.text === name);
 	if (node === undefined) throw new Error(`missing original retained owner: ${name}`);

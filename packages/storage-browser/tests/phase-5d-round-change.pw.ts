@@ -1,20 +1,9 @@
-import { chromium, expect, firefox, type Page, test, webkit } from "@playwright/test";
+import { type BrowserContext, type BrowserType, chromium, expect, firefox, type Page, test, webkit } from "@playwright/test";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { type Phase4cBrowserServer, startPhase4cBrowserServer } from "./phase-4c-browser-server.js";
 import { encodeCanonical } from "../../canonical/dist/src/index.js";
-
-import {
-	killOwnedRecipient,
-	launchOwned,
-	publicProcessRecord,
-} from "/private/tmp/ts-drp-recipient-install-green-high-vh4kHH/.logs/bounded-storage-lifecycle/recipient-install-green-01/ordinary-2f-qualification-01/owned-process-03.js";
-import {
-	checkOriginalChildDeath,
-	closeAndJoinOriginal,
-	retainedError,
-} from "/private/tmp/ts-drp-recipient-install-green-high-vh4kHH/.logs/bounded-storage-lifecycle/recipient-install-green-01/ordinary-2f-qualification-01/owned-crash-process-check-02.js";
 
 import { VOTE_TRANSACTION_STORES } from "../src/internal/seal-vote-store.js";
 
@@ -33,6 +22,52 @@ function browserRuntimeReady(): boolean {
 	const specificAlias = viteSource.indexOf('"@ts-drp/seal/pacemaker"');
 	const bareAlias = viteSource.indexOf('"@ts-drp/seal"');
 	return packageManifest.exports?.["./pacemaker"] !== undefined && specificAlias >= 0 && specificAlias < bareAlias;
+}
+
+// The owned-process SIGKILL harness lives in a campaign directory outside this
+// repository. Only the native signing-detail death tests load it, from
+// RECIPIENT_OWNED_HARNESS_DIRECTORY or the campaign's original location, so
+// every other test here runs without it.
+const OWNED_HARNESS_DIRECTORY =
+	process.env.RECIPIENT_OWNED_HARNESS_DIRECTORY ??
+	"/private/tmp/ts-drp-recipient-install-green-high-vh4kHH/.logs/bounded-storage-lifecycle/recipient-install-green-01/ordinary-2f-qualification-01";
+type OwnedProcessRecord = Readonly<{ pid: number | undefined }>;
+type OwnedLaunch = Readonly<{
+	context: BrowserContext;
+	processRecord: OwnedProcessRecord;
+	profile: string;
+	engine: string;
+	executable: string;
+}>;
+type OwnedJoin = Readonly<{ receipt: unknown } & ({ ok: true } | { ok: false; error: unknown })>;
+type OwnedHarness = Readonly<{
+	launchOwned(
+		type: BrowserType,
+		profile: string,
+		executable: string,
+		receipt: (receipt: unknown) => void
+	): Promise<OwnedLaunch>;
+	killOwnedRecipient(
+		owner: OwnedLaunch,
+		sentinel: OwnedLaunch,
+		event: (kind: string, value: unknown) => void
+	): Promise<Readonly<Record<string, unknown>>>;
+	publicProcessRecord(record: OwnedProcessRecord): unknown;
+	checkOriginalChildDeath(
+		sentinel: unknown,
+		warm: unknown,
+		cold: unknown,
+		death: Readonly<Record<string, unknown>>
+	): void;
+	closeAndJoinOriginal(owner: OwnedLaunch, expected: "killed" | "natural"): Promise<OwnedJoin>;
+	retainedError(error: unknown): unknown;
+}>;
+async function loadOwnedHarness(): Promise<OwnedHarness> {
+	const [owned, check] = await Promise.all([
+		import(`${OWNED_HARNESS_DIRECTORY}/owned-process-03.js`) as Promise<Pick<OwnedHarness, "killOwnedRecipient" | "launchOwned" | "publicProcessRecord">>,
+		import(`${OWNED_HARNESS_DIRECTORY}/owned-crash-process-check-02.js`) as Promise<Pick<OwnedHarness, "checkOriginalChildDeath" | "closeAndJoinOriginal" | "retainedError">>,
+	]);
+	return { ...owned, ...check };
 }
 
 const GREEN_READY = browserRuntimeReady();
@@ -621,18 +656,26 @@ for (const cut of ["first-delete-success", "native-complete-before-delivery"] as
 		const type = { chromium, firefox, webkit }[browserName];
 		const executable = process.env[`RECIPIENT_OWNED_${browserName.toUpperCase()}_EXECUTABLE`];
 		if (!executable) throw new Error("EXACT_ORIGINAL_NATIVE_EXECUTABLE_REQUIRED");
+		const {
+			checkOriginalChildDeath,
+			closeAndJoinOriginal,
+			killOwnedRecipient,
+			launchOwned,
+			publicProcessRecord,
+			retainedError,
+		} = await loadOwnedHarness();
 		const databaseName = `phase6-signing-death-${crypto.randomUUID()}`;
 		const profile = info.outputPath("signing-profile");
 		const raw: unknown[] = [],
 			cleanup: unknown[] = [];
-		let warm: Awaited<ReturnType<typeof launchOwned>> | undefined, sentinel: typeof warm, cold: typeof warm;
+		let warm: OwnedLaunch | undefined, sentinel: typeof warm, cold: typeof warm;
 		let killed = false,
 			primary: unknown;
 		const launchRecord = (
 			owner: NonNullable<typeof warm>
 		): {
 			root: number | undefined;
-			browser: ReturnType<typeof publicProcessRecord>;
+			browser: unknown;
 			profile: string;
 			engine: string;
 			executable: string;

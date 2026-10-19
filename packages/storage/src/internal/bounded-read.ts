@@ -606,6 +606,16 @@ export function* boundedRetirementAdmissionSteps(
 		const preflight = yield { kind: "blob-census-preflight", references: [...references.values()] };
 		if (preflight !== true) return { ok: false, reason: "READ_BUDGET_EXCEEDED" };
 	}
+	if (browser) {
+		// Announce exactly the blob gets this loop issues, in order, so the
+		// native loader can pipeline them inside this same read-only census. The
+		// actual-length preflight and every integrity check stay per blob below.
+		const uncertified = [...references.values()].filter((ref) => facts?.verifiedBlobLength(ref) === undefined);
+		if (uncertified.length !== 0) {
+			const admitted = yield { kind: "blob-preflight", references: uncertified };
+			if (admitted !== true) return { ok: false, reason: "READ_BUDGET_EXCEEDED" };
+		}
+	}
 	let presentBlobs = 0,
 		payloadBytes = 0,
 		browserPreflightBytes = 0;

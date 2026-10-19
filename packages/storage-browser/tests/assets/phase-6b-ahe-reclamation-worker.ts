@@ -1,5 +1,11 @@
 /* eslint-disable import/no-unresolved -- Focused build plugin owns the causal maintenance alias. */
-import { digestBlob, type ExpectedHead, type GenerationRecord } from "@ts-drp/storage";
+import {
+	digestBlob,
+	type ExpectedHead,
+	type GenerationId,
+	type GenerationRecord,
+	type StorageObjectId,
+} from "@ts-drp/storage";
 
 import {
 	D109C_BROWSER_MAINTENANCE_READY,
@@ -16,7 +22,7 @@ const EDGES = Object.freeze([
 	"before-commit",
 	"after-commit",
 ]);
-const OBJECT_ID = `creator:${"a".repeat(32)}`;
+const OBJECT_ID = `creator:${"a".repeat(32)}` as StorageObjectId;
 const POLICY_DIGEST = "53775c5c1ee01e346f588966d6e7acb876df2bd8b2abcbe2b2591f216f7d4d9b";
 
 function successful<T>(result: { ok: false; reason: string } | { ok: true; value: T }, label: string): T {
@@ -31,7 +37,7 @@ async function run(databaseName: string, edge: string): Promise<void> {
 	let head: ExpectedHead = successful(await store.readHead(OBJECT_ID), "HEAD");
 	const records: GenerationRecord[] = [];
 	for (let index = 1; index <= 5; index += 1) {
-		const generationId = index.toString(16).padStart(64, "0");
+		const generationId = index.toString(16).padStart(64, "0") as GenerationId;
 		const bytes = Uint8Array.of(index, index + 1, index + 2);
 		const digest = successful(digestBlob(bytes), "DIGEST");
 		const closure = [{ byteLength: bytes.byteLength, digest }];

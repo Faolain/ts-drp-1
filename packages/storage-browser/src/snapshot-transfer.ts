@@ -33,6 +33,7 @@ import {
 	NativeReadReservationOwner,
 	needsNativeReadReservationTurn,
 	runNativeReservedRead,
+	visitCountedRange,
 } from "./internal/native-read-reservation.js";
 
 export interface BrowserSnapshotQuarantineStoreOptions {
@@ -755,8 +756,10 @@ export async function createBrowserSnapshotQuarantineStore(
 		// Exact bounded observations also cover inherited debt. This read is not
 		// classification authority; all scope mutation admission remains closed.
 		const range = IDBKeyRange.bound([objectId], [objectId + "\0"], false, true);
-		const count = await requestResult(transaction.objectStore("scopes").count(range));
-		const chunkCount = await requestResult(transaction.objectStore("chunks").count(range));
+		const [count, chunkCount] = await Promise.all([
+			requestResult(transaction.objectStore("scopes").count(range)),
+			requestResult(transaction.objectStore("chunks").count(range)),
+		]);
 		if (count > snapshotRetirementContract.maxScopes || chunkCount > snapshotRetirementContract.maxChunks)
 			throw failure("recovery-full", "snapshot retirement capture exceeds native entitlement");
 		let imageDigest = snapshotRetirementContract.imageDigest({ objectId, owner: restoredOwner }),
@@ -782,7 +785,9 @@ export async function createBrowserSnapshotQuarantineStore(
 					}
 				});
 			});
-		await cursor("scopes", (value, key) => {
+		// Scope metadata rows are bounded by the count above: visit the counted
+		// range in bounded pages in this SAME transaction, in cursor order.
+		await visitCountedRange(transaction.objectStore("scopes"), range, count + 1, (value, key) => {
 			const row = fromScopeRow(value),
 				scope = snapshotQuarantineContract.captureRecoveryDependencyScope({
 					objectId: row.objectId,
@@ -1271,58 +1276,46 @@ export async function createBrowserSnapshotQuarantineStore(
 		const rows: ScopeRow[] = [];
 		const legacyScopes: NonNullable<SnapshotRecoveryRoleInventory["legacyScopes"]>[number][] = [];
 		let legacyManifestBytes = 0;
-		await new Promise<void>((resolve, reject) => {
-			let scanned = 0;
-			const request = transaction.objectStore("scopes").openCursor(range);
-			request.addEventListener("error", () => reject(request.error));
-			request.addEventListener("success", () => {
-				try {
-					const cursor = request.result;
-					if (cursor === null) {
-						resolve();
-						return;
-					}
-					if (++scanned > MAX_CHUNKS) throw failure("recovery-full", "snapshot role census exceeds bounded work");
-					const row = fromScopeRow(cursor.value);
-					if (row.objectId !== objectId || JSON.stringify(cursor.primaryKey) !== JSON.stringify(scopeKey(row)))
-						throw failure("poisoned", "snapshot role census key disagrees with its row");
-					if (row.retention === "legacy-unclassified") {
-						legacyManifestBytes += row.exactCanonicalManifestBytes.byteLength;
-						if (
-							!Number.isSafeInteger(legacyManifestBytes) ||
-							legacyManifestBytes > snapshotRetirementContract.maxImageBytes
-						)
-							throw failure("recovery-full", "snapshot inherited manifests exceed bounded work");
-						const scope = snapshotQuarantineContract.captureScope({
-							objectId,
-							epoch: row.epoch,
-							anchor: row.anchor,
-							manifestDigest: row.manifestDigest,
-						});
-						const observation = snapshotQuarantineContract.validateRecoveryManifest(scope, row);
-						legacyScopes.push(
-							Object.freeze({
-								scope,
-								incarnation: row.incarnation,
-								state: observation.state,
-								expiresAt: observation.expiresAt,
-								contentBytes: snapshotQuarantineContract.recoveryContentBytes(
-									row.totalBytes,
-									row.exactCanonicalManifestBytes.byteLength
-								),
-							})
-						);
-					}
-					if (row.retention === "recovery") {
-						if (rows.length === snapshotQuarantineContract.defaultRecoveryLimits.maxRecoveryScopes)
-							throw failure("recovery-full", "snapshot role census exceeds the bounded recovery pool");
-						rows.push(row);
-					}
-					cursor.continue();
-				} catch (error) {
-					reject(error);
-				}
-			});
+		// The same ordered range in bounded pages (one past the work bound so
+		// overflow still refuses at the same row), visited in cursor order.
+		let scanned = 0;
+		await visitCountedRange(transaction.objectStore("scopes"), range, MAX_CHUNKS + 1, (value, key) => {
+			if (++scanned > MAX_CHUNKS) throw failure("recovery-full", "snapshot role census exceeds bounded work");
+			const row = fromScopeRow(value);
+			if (row.objectId !== objectId || JSON.stringify(key) !== JSON.stringify(scopeKey(row)))
+				throw failure("poisoned", "snapshot role census key disagrees with its row");
+			if (row.retention === "legacy-unclassified") {
+				legacyManifestBytes += row.exactCanonicalManifestBytes.byteLength;
+				if (
+					!Number.isSafeInteger(legacyManifestBytes) ||
+					legacyManifestBytes > snapshotRetirementContract.maxImageBytes
+				)
+					throw failure("recovery-full", "snapshot inherited manifests exceed bounded work");
+				const scope = snapshotQuarantineContract.captureScope({
+					objectId,
+					epoch: row.epoch,
+					anchor: row.anchor,
+					manifestDigest: row.manifestDigest,
+				});
+				const observation = snapshotQuarantineContract.validateRecoveryManifest(scope, row);
+				legacyScopes.push(
+					Object.freeze({
+						scope,
+						incarnation: row.incarnation,
+						state: observation.state,
+						expiresAt: observation.expiresAt,
+						contentBytes: snapshotQuarantineContract.recoveryContentBytes(
+							row.totalBytes,
+							row.exactCanonicalManifestBytes.byteLength
+						),
+					})
+				);
+			}
+			if (row.retention === "recovery") {
+				if (rows.length === snapshotQuarantineContract.defaultRecoveryLimits.maxRecoveryScopes)
+					throw failure("recovery-full", "snapshot role census exceeds the bounded recovery pool");
+				rows.push(row);
+			}
 		});
 		const scopes = [];
 		for (const row of rows) {

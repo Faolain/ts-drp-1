@@ -4,6 +4,8 @@ import ts from "typescript";
 
 const TEST_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 export const PACKAGE_DIRECTORY = path.resolve(TEST_DIRECTORY, "../..");
+const SOURCE_DIRECTORY = path.join(PACKAGE_DIRECTORY, "src");
+const INTERNAL_DIRECTORY = path.join(SOURCE_DIRECTORY, "internal");
 const IDB_ADAPTER_OWNER = path.join(PACKAGE_DIRECTORY, "src/internal/idb-adapter.ts");
 const SCHEMA_IDB_OWNER = path.join(PACKAGE_DIRECTORY, "src/internal/schema-idb.ts");
 const ISSUANCE_OWNER = path.join(PACKAGE_DIRECTORY, "src/internal/browser-issuance-store.ts");
@@ -12,7 +14,28 @@ const LIVE_JOURNAL_OWNER = path.join(PACKAGE_DIRECTORY, "src/live-journal.ts");
 const SEAL_VOTE_OWNER = path.join(PACKAGE_DIRECTORY, "src/internal/seal-vote-store.ts");
 const SEAL_VOTE_TEST_CONTROL_OWNER = path.join(PACKAGE_DIRECTORY, "src/internal/seal-vote-test-control.ts");
 const SNAPSHOT_TRANSFER_OWNER = path.join(PACKAGE_DIRECTORY, "src/snapshot-transfer.ts");
-const STRICT_MUTATION_OWNERS = new Set([IDB_ADAPTER_OWNER, SCHEMA_IDB_OWNER, SEAL_VOTE_OWNER]);
+const AHE_RECLAMATION_OWNER = path.join(PACKAGE_DIRECTORY, "src/internal/ahe-reclamation.ts");
+const NATIVE_READ_RESERVATION_OWNER = path.join(PACKAGE_DIRECTORY, "src/internal/native-read-reservation.ts");
+const RETIREMENT_CONTROL_OWNER = path.join(PACKAGE_DIRECTORY, "src/internal/retirement-control.ts");
+const SEAL_EVIDENCE_OWNER = path.join(PACKAGE_DIRECTORY, "src/internal/seal-evidence-store.ts");
+const SIGNING_BACKEND_OWNER = path.join(PACKAGE_DIRECTORY, "src/internal/signing-backend.ts");
+const SIGNING_RETIREMENT_OWNER = path.join(PACKAGE_DIRECTORY, "src/internal/signing-retirement.ts");
+const ROOM_HEAD_OWNER = path.join(PACKAGE_DIRECTORY, "src/room-head.ts");
+const STRICT_MUTATION_OWNERS = new Set([
+	IDB_ADAPTER_OWNER,
+	SCHEMA_IDB_OWNER,
+	SEAL_VOTE_OWNER,
+	AHE_RECLAMATION_OWNER,
+	NATIVE_READ_RESERVATION_OWNER,
+	RETIREMENT_CONTROL_OWNER,
+	SEAL_EVIDENCE_OWNER,
+	SIGNING_BACKEND_OWNER,
+	SIGNING_RETIREMENT_OWNER,
+	ROOM_HEAD_OWNER,
+]);
+// Raw-IDB ownership governs production modules only (test harnesses drive
+// IndexedDB directly and are type-checked, not owner-governed). Each owner may
+// call exactly these methods on receivers whose type names a raw IDB type.
 const DEFAULT_OWNER_METHODS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
 	[
 		IDB_ADAPTER_OWNER,
@@ -29,6 +52,7 @@ const DEFAULT_OWNER_METHODS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
 			"abort",
 			"close",
 			"addEventListener",
+			"deref",
 		]),
 	],
 	[
@@ -45,6 +69,10 @@ const DEFAULT_OWNER_METHODS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
 			"abort",
 			"close",
 			"addEventListener",
+			"getAll",
+			"openCursor",
+			"openKeyCursor",
+			"continue",
 		]),
 	],
 	[
@@ -55,7 +83,9 @@ const DEFAULT_OWNER_METHODS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
 			"transaction",
 			"objectStore",
 			"get",
+			"getKey",
 			"getAll",
+			"count",
 			"openCursor",
 			"continue",
 			"add",
@@ -64,6 +94,11 @@ const DEFAULT_OWNER_METHODS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
 			"abort",
 			"close",
 			"addEventListener",
+			"bound",
+			"lowerBound",
+			"deref",
+			"every",
+			"has",
 		]),
 	],
 	[ISSUANCE_TEST_CONTROL_OWNER, new Set(["open", "transaction", "objectStore", "add", "close", "addEventListener"])],
@@ -75,16 +110,26 @@ const DEFAULT_OWNER_METHODS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
 			"addEventListener",
 			"bound",
 			"close",
+			"cmp",
+			"continue",
+			"count",
 			"createIndex",
 			"createObjectStore",
+			"delete",
+			"deref",
 			"get",
 			"getAll",
 			"getKey",
+			"has",
 			"index",
+			"lowerBound",
 			"objectStore",
 			"open",
+			"openCursor",
 			"put",
+			"set",
 			"transaction",
+			"update",
 		]),
 	],
 	[
@@ -95,9 +140,12 @@ const DEFAULT_OWNER_METHODS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
 			"addEventListener",
 			"bound",
 			"close",
+			"continue",
+			"count",
 			"createIndex",
 			"createObjectStore",
 			"delete",
+			"every",
 			"get",
 			"getAll",
 			"getAllKeys",
@@ -106,8 +154,10 @@ const DEFAULT_OWNER_METHODS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
 			"map",
 			"objectStore",
 			"open",
+			"openCursor",
 			"put",
 			"transaction",
+			"update",
 			"upperBound",
 		]),
 	],
@@ -117,13 +167,19 @@ const DEFAULT_OWNER_METHODS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
 			"abort",
 			"add",
 			"addEventListener",
+			"bound",
 			"close",
 			"continue",
+			"delete",
 			"get",
 			"getAll",
+			"map",
 			"objectStore",
 			"openCursor",
+			"openKeyCursor",
+			"push",
 			"put",
+			"slice",
 			"transaction",
 		]),
 	],
@@ -133,6 +189,7 @@ const DEFAULT_OWNER_METHODS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
 			"abort",
 			"add",
 			"addEventListener",
+			"apply",
 			"close",
 			"count",
 			"createObjectStore",
@@ -142,143 +199,93 @@ const DEFAULT_OWNER_METHODS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
 		]),
 	],
 	[
-		path.join(PACKAGE_DIRECTORY, "tests/opfs-idb-spike/assets/strict-idb-harness.ts"),
+		AHE_RECLAMATION_OWNER,
 		new Set([
-			"open",
-			"createObjectStore",
-			"deleteDatabase",
-			"transaction",
-			"objectStore",
-			"add",
-			"count",
+			"abort",
+			"acquireRecoveryTurn",
+			"addEventListener",
+			"commit",
+			"delete",
+			"finishOperation",
 			"get",
+			"getAll",
+			"getKey",
+			"isClosed",
+			"isPoisoned",
+			"latchPoison",
+			"objectStore",
+			"put",
+			"startOperation",
+			"transaction",
+		]),
+	],
+	[
+		NATIVE_READ_RESERVATION_OWNER,
+		new Set([
+			"abort",
+			"addEventListener",
+			"bound",
+			"get",
+			"getAll",
+			"getAllKeys",
+			"getKey",
+			"has",
+			"lowerBound",
+			"objectStore",
+			"set",
+			"transaction",
+		]),
+	],
+	[
+		RETIREMENT_CONTROL_OWNER,
+		new Set([
+			"add",
+			"addEventListener",
+			"bound",
+			"every",
+			"flatMap",
+			"get",
+			"getAll",
+			"getAllKeys",
+			"getKey",
+			"objectStore",
+			"put",
+		]),
+	],
+	[SEAL_EVIDENCE_OWNER, new Set(["abort", "addEventListener", "get", "getAll", "objectStore", "put", "transaction"])],
+	[SIGNING_BACKEND_OWNER, new Set(["addEventListener", "close", "get", "objectStore", "transaction"])],
+	[
+		SIGNING_RETIREMENT_OWNER,
+		new Set([
+			"abort",
+			"addEventListener",
+			"bound",
+			"close",
+			"delete",
+			"get",
+			"getAllKeys",
+			"objectStore",
+			"put",
+			"transaction",
+		]),
+	],
+	[
+		ROOM_HEAD_OWNER,
+		new Set([
 			"abort",
 			"addEventListener",
 			"close",
-		]),
-	],
-	[
-		path.join(PACKAGE_DIRECTORY, "tests/opfs-idb-spike/assets/substrate-bench-worker.ts"),
-		new Set([
-			"open",
-			"createObjectStore",
-			"deleteDatabase",
-			"transaction",
-			"objectStore",
-			"get",
-			"put",
-			"addEventListener",
-			"close",
-		]),
-	],
-	[
-		path.join(PACKAGE_DIRECTORY, "tests/opfs-idb-spike/assets/bucket-clear-harness.ts"),
-		new Set([
-			"open",
-			"createObjectStore",
-			"deleteDatabase",
-			"databases",
-			"transaction",
-			"objectStore",
-			"put",
-			"get",
-			"addEventListener",
-			"close",
-		]),
-	],
-	[
-		path.join(PACKAGE_DIRECTORY, "tests/assets/schema-lifecycle-entry.ts"),
-		new Set([
-			"open",
-			"deleteDatabase",
-			"databases",
-			"createObjectStore",
-			"createIndex",
-			"transaction",
-			"objectStore",
-			"index",
-			"add",
 			"count",
-			"addEventListener",
-			"close",
-		]),
-	],
-	[
-		path.join(PACKAGE_DIRECTORY, "tests/fixtures/idb-adapter-browser-oracle.ts"),
-		new Set([
-			"open",
-			"databases",
 			"createObjectStore",
-			"deleteDatabase",
-			"transaction",
-			"objectStore",
+			"delete",
 			"get",
-			"getAll",
-			"count",
-			"put",
-			"delete",
-			"call",
-			"addEventListener",
-			"close",
-		]),
-	],
-	[
-		path.join(PACKAGE_DIRECTORY, "tests/assets/phase-2g-b-presence-entry.ts"),
-		new Set(["open", "deleteDatabase", "transaction", "objectStore", "put", "addEventListener", "close"]),
-	],
-	[
-		path.join(PACKAGE_DIRECTORY, "tests/assets/phase-2l-b-browser-issuance-entry.ts"),
-		new Set([
-			"open",
-			"deleteDatabase",
-			"databases",
-			"createObjectStore",
-			"transaction",
-			"objectStore",
-			"add",
-			"map",
-			"addEventListener",
-			"close",
-		]),
-	],
-	[
-		path.join(PACKAGE_DIRECTORY, "tests/assets/phase-5d-round-change-entry.ts"),
-		new Set(["addEventListener", "close", "get", "objectStore", "open", "put", "transaction"]),
-	],
-	[path.join(PACKAGE_DIRECTORY, "tests/phase-5d-round-change.pw.ts"), new Set(["call"])],
-	[
-		path.join(PACKAGE_DIRECTORY, "tests/assets/phase-2l-b-browser-death-worker.ts"),
-		new Set(["addEventListener", "abort"]),
-	],
-	[
-		path.join(PACKAGE_DIRECTORY, "tests/assets/phase-2l-d-browser-parity-entry.ts"),
-		new Set(["open", "deleteDatabase", "transaction", "objectStore", "add", "addEventListener", "close"]),
-	],
-	[
-		path.join(PACKAGE_DIRECTORY, "tests/assets/phase-3a1b-p4-browser-live-journal-entry.ts"),
-		new Set([
-			"addEventListener",
-			"close",
-			"databases",
-			"delete",
-			"deleteDatabase",
-			"getAll",
 			"getAllKeys",
-			"index",
+			"includes",
 			"objectStore",
 			"open",
 			"put",
-			"some",
 			"transaction",
 		]),
-	],
-	[
-		path.join(PACKAGE_DIRECTORY, "tests/assets/phase-3a1b-p4-browser-live-journal-worker.ts"),
-		new Set(["addEventListener", "close", "getAll", "objectStore", "open", "transaction"]),
-	],
-	[
-		path.join(PACKAGE_DIRECTORY, "tests/fixtures/phase-3a1b-p4-browser-observation.ts"),
-		new Set(["apply", "call", "get", "set"]),
 	],
 ]);
 
@@ -304,11 +311,15 @@ function exported(node: ts.Node): boolean {
  * @returns Closed violation descriptions.
  */
 export function auditIdbOwnership(options: IdbOwnershipAuditOptions = {}): readonly string[] {
-	const configPath = path.join(PACKAGE_DIRECTORY, "tsconfig.json");
+	// The package typecheck program: tsconfig.json plus repo-root fixtures and sibling sources.
+	const configPath = path.join(PACKAGE_DIRECTORY, "tsconfig.typecheck.json");
 	const config = ts.readConfigFile(configPath, ts.sys.readFile);
 	if (config.error) return [ts.flattenDiagnosticMessageText(config.error.messageText, "\n")];
 	const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, PACKAGE_DIRECTORY);
 	const governedRootNames = options.rootNames ?? parsed.fileNames;
+	const ownershipRootNames =
+		options.rootNames ??
+		governedRootNames.filter((fileName) => path.resolve(fileName).startsWith(`${SOURCE_DIRECTORY}${path.sep}`));
 	const ownerMethods =
 		options.ownerMethods === undefined
 			? DEFAULT_OWNER_METHODS
@@ -345,8 +356,14 @@ export function auditIdbOwnership(options: IdbOwnershipAuditOptions = {}): reado
 		}
 	}
 	for (const source of program.getSourceFiles()) {
-		if (!governedRootNames.includes(source.fileName)) continue;
+		if (!ownershipRootNames.includes(source.fileName)) continue;
 		const normalized = path.resolve(source.fileName);
+		// Internal owners hand raw IDB handles to sibling owners; only modules
+		// outside src/internal must keep raw IDB types out of exported signatures.
+		const internalOwner =
+			options.ownerMethods === undefined &&
+			ownerMethods.has(normalized) &&
+			normalized.startsWith(`${INTERNAL_DIRECTORY}${path.sep}`);
 		const enforceProductionStrictMutation =
 			options.ownerMethods !== undefined || STRICT_MUTATION_OWNERS.has(normalized);
 		const visit = (node: ts.Node): void => {
@@ -399,7 +416,7 @@ export function auditIdbOwnership(options: IdbOwnershipAuditOptions = {}): reado
 					ts.forEachChild(child, inspectExportSignature);
 				};
 				inspectExportSignature(node);
-				if (rawTypeEscapes) {
+				if (rawTypeEscapes && !internalOwner) {
 					violations.push(`${normalized}: raw IDB type escapes its owner`);
 				}
 			}

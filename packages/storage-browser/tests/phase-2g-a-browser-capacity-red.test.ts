@@ -52,7 +52,12 @@ describe("Phase 2g-a sole no-argument browser capacity binding RED", () => {
 		expect.soft(factory.length).toBe(0);
 		expect
 			.soft(Object.keys(browserModule).sort())
-			.toEqual(["createBrowserAheDurableStore", "createBrowserStorageCapacityPort"]);
+			.toEqual([
+				"NativeReadReservationOwner",
+				"createBrowserAheDurableStore",
+				"createBrowserRoomHeadAuthority",
+				"createBrowserStorageCapacityPort",
+			]);
 		expect.soft(browserModule.createBrowserStorageCapacityPort).toBeTypeOf("function");
 	});
 
@@ -123,6 +128,20 @@ export type StorageCapacityPort = Readonly<{
 	persist?: () => unknown;
 	estimate?: () => unknown;
 }>;
+// Root names the packed browser declarations reference since the room-head
+// and bounded-read phases; only the keys the declarations Pick are shaped.
+export interface NativeReadReservation { release(): Promise<void> }
+export interface AheBoundedRecoveryRoleStore extends AheDurableStore {}
+export interface RoomHeadScope { readonly objectId: string }
+export type RoomHeadInitialization = unknown;
+export interface RoomHeadAuthority {}
+export interface RoomHeadRetirementObservation {
+	readonly scope: RoomHeadScope;
+	readonly state: unknown;
+	readonly control: unknown;
+	readonly imageDigest: string;
+	readonly metadataBytes: number;
+}
 `
 			);
 			fs.writeFileSync(

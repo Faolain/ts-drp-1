@@ -5,6 +5,7 @@ import {describe, expect, it} from "vitest";
 import {CanonicalEncodingError, decodeCanonical, encodeCanonical} from "@ts-drp/canonical";
 import {createJournalRetirementImageCapture, journalRetirementCanonicalRow, journalRetirementImage,
 	journalRetirementImageCountsFit, journalRetirementRowCharge, LIVE_JOURNAL_RETIREMENT_LIMITS} from "@ts-drp/live-journal";
+import {visitCountedRange} from "../src/internal/native-read-reservation.js";
 
 const outcome = (run: () => unknown) => {try {run(); return null;} catch (error) {
 	return error instanceof Error ? [error.constructor.name, error.message] : error;
@@ -28,7 +29,7 @@ function nativeSnapshot(captures: {table: string; row: unknown; key: unknown}[])
 		needsNativeReadReservationTurn: () => false, nativeReadReservationTransaction: () => undefined,
 		isNativeReadReservationTransaction: () => false,
 		strictTransaction: (db: IDBDatabase, names: string[], mode: IDBTransactionMode) => db.transaction(names, mode),
-		signedTransactionTerminal: terminal, JOURNAL_STORES: stores, IDBKeyRange, requestResult,
+		signedTransactionTerminal: terminal, JOURNAL_STORES: stores, IDBKeyRange, requestResult, visitCountedRange,
 		journalRetirementImageCountsFit, CorruptLiveJournalError: class extends Error {}, retirementControl: () => null,
 		createJournalRetirementImageCapture: () => {const owner = createJournalRetirementImageCapture(); return {
 			append: (table: "scopes" | "acceptedEntries", row: unknown, key?: unknown) => {

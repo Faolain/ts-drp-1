@@ -11,7 +11,6 @@
  */
 import {
 	ActionType,
-	type ApplyResult,
 	type IDRP,
 	type IHashGraph,
 	type ResolveConflictsType,
@@ -153,7 +152,8 @@ export interface Replica {
 	obj: {
 		drp?: BoxGame;
 		vertices: Vertex[];
-		applyVertices(vertices: Vertex[]): Promise<ApplyResult>;
+		// Only the fields safeMerge reads; @ts-drp/types no longer exports the legacy ApplyResult.
+		applyVertices(vertices: Vertex[]): Promise<{ applied: boolean; missing: string[] }>;
 	};
 	hashGraph: IHashGraph;
 }

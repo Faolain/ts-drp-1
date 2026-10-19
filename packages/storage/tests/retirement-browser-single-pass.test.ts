@@ -41,6 +41,7 @@ function fixture(count = 16) {
 			else if (request.kind === "generation") response = {objectId, generationId: request.generationId,
 				record: encodeGenerationRecordV1(generations.find(g => g.generationId === request.generationId)!)};
 			else if (request.kind === "promotions") response = promotions;
+			else if (request.kind === "blob-preflight") response = true;
 			else if (request.kind === "blob-census-preflight") {
 				let bytes = 0; response = true;
 				for (const ref of request.references) {

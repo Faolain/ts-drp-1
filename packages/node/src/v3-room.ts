@@ -12,7 +12,9 @@ import {
 	captureCreatorSuccessorPeers,
 	createCreatorSuccessorMaterialServer,
 	CreatorSuccessorExportUnavailable,
+	type CreatorRecipientRecoveryContext,
 	type CreatorSuccessorOffer,
+	maintainCreatorRecipientRecoveryPool,
 	readCreatorSuccessorExport,
 	receiveCreatorSuccessorAdoption,
 	selectRetainedCreatorSuccessorAdoption,
@@ -89,6 +91,11 @@ import type { DRPNetworkNode, Message } from "@ts-drp/types";
 
 import { CREATOR_MAINTENANCE_PROOF_MAX_BYTES, createCreatorClosedRollbackProofAccounting, type CreatorLocalSessionWithdrawal } from "./internal/creator-closed-rollback-data.js";
 import type { CreatorOrdinaryApplicationResourceBoundReader, CreatorOrdinaryFinishingWindowLimits } from "./internal/runtime-reclamation.js";
+import {
+	resolveRecoveryPoolAutoMaintenanceOptions,
+	startRecoveryPoolAutoScheduler,
+	type RecoveryPoolAutoMaintenanceOptions,
+} from "./internal/recovery-pool-auto.js";
 import {
 	captureV3RoomStorageHost,
 	type V3RoomStorageHost,
@@ -519,6 +526,13 @@ export interface CreateV3RoomSessionInput<Projection extends V3RoomProjectionAut
 	readonly rebaseSourceStorage?: Readonly<{ databaseName: string; roomHeadAuthority: V3RoomHeadAuthority }>;
 	readonly roomHeadAuthority: V3RoomHeadAuthority;
 	readonly signRegisteredVertexDigest: SignRegisteredVertexDigest;
+	/**
+	 * Opt-in automatic `maintainRecoveryPool()` at observed idle lulls (creator
+	 * only). Activity resets the idle clock and busy results back off; the next
+	 * seal keeps its inline maintenance as the hard-cap backstop. Moves that
+	 * arrive while it runs wait and are admitted right after it; none are dropped.
+	 */
+	readonly recoveryPoolAutoMaintenance?: RecoveryPoolAutoMaintenanceOptions;
 }
 
 export interface V3RoomSession<Projection extends V3RoomProjectionAuthority = V3RoomProjectionAuthority> {
@@ -550,9 +564,10 @@ export interface V3RoomSession<Projection extends V3RoomProjectionAuthority = V3
 	rehearseMigration(input: V3RoomMigrationRehearsalInput): Promise<V3RoomMigrationRehearsalReceipt>;
 	/**
 	 * Optional early bounded-recovery turnover at a caller-chosen lull (soft
-	 * watermark). New local issues wait for it; it needs a quiescent room (no
-	 * pending or arriving remote ingress) and otherwise reports `deferred`. The
-	 * next seal keeps its original inline maintenance as the hard-cap backstop.
+	 * watermark). It starts only on a quiescent room (no pending remote ingress)
+	 * and otherwise reports `deferred`. Local issues and remote moves arriving
+	 * while it runs wait in order and are admitted right after it with the full
+	 * original checks. The next seal keeps its inline maintenance as backstop.
 	 */
 	maintainRecoveryPool(): Promise<CreatorRecoveryPoolResult>;
 	sealEpoch(): Promise<CreatorLiveCloseResult>;
@@ -2347,6 +2362,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	if (input.openCreatorArchive !== undefined &&
 		(typeof input.openCreatorArchive !== "function" || input.creatorFinalitySigner === undefined))
 		throw new TypeError("v3 creator archive requires the original creator close owner");
+	if (input.recoveryPoolAutoMaintenance !== undefined) resolveRecoveryPoolAutoMaintenanceOptions(input.recoveryPoolAutoMaintenance);
 	if (
 		input.application.snapshotReadPolicy !== undefined &&
 		input.application.snapshotReadPolicy !== "authenticated-public" &&
@@ -4045,6 +4061,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	let migrationAcceptingFollowers = false;
 	let migrationRehearsalReserved = false;
 	let lifetimeTransitionTail: Promise<void> = Promise.resolve();
+	// Admitted lifetime transitions not yet settled; idle detection treats them as busy.
+	let lifetimeTransitionsPending = 0;
+	// Opt-in idle scheduler for early recovery-pool turnover; stopped at close.
+	let autoPoolMaintenance: Readonly<{ stop(): void }> | undefined;
 	// Holds new local issues while an explicit recovery-pool boundary owns the plane.
 	let poolMaintenanceBarrier: Promise<void> | undefined;
 	type LifetimeDispatchResult<Result> = Readonly<{ readonly result: Result | Promise<Result> }>;
@@ -4052,9 +4072,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		const dispatch = (): Promise<Result> => {
 			localOwner?.assertCurrent();
 			const selected = lifetimeTransitionTail.then(() => { localOwner?.assertCurrent(); return transition(); });
+			lifetimeTransitionsPending += 1;
 			lifetimeTransitionTail = selected.then(
-				() => undefined,
-				() => undefined
+				() => { lifetimeTransitionsPending -= 1; },
+				() => { lifetimeTransitionsPending -= 1; }
 			);
 			return selected;
 		};
@@ -6449,6 +6470,84 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		creatorSuccessorAdoptionTask = shared;
 		return shared;
 	};
+	// Genuine room-native turnover ports for this recipient; no finality signer.
+	const recipientRecoveryContext = async (): Promise<CreatorRecipientRecoveryContext> => {
+		const nativeSigning = await ownCreatorSigningStores();
+		return {
+			roomHeadAuthority: input.roomHeadAuthority,
+			pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest,
+			exactCanonicalPinnedGenesisTrustStateRecordBytes: encodeCanonical({
+				kind: "drp-anchor-trust-state",
+				version: 1,
+				objectId: input.objectId,
+				genesisAnchorDigest: material.pinnedGenesisAnchorDigest,
+				currentAnchorDigest: material.pinnedGenesisAnchorDigest,
+				currentEpoch: 0,
+				profileId: Reflect.get(decodeCanonical(material.exactCanonicalProfileBytes) as object, "profileId"),
+				quorum: 1,
+				exactCanonicalCurrentAnchorPreimageBytes: material.exactCanonicalGenesisAnchorPreimageBytes,
+				detachedCurrentAnchorSignature: material.detachedGenesisSignature,
+				exactCanonicalProfileBytes: material.exactCanonicalProfileBytes,
+				exactCanonicalSignerSetBytes: material.exactCanonicalSignerSetBytes,
+			}),
+			voteStore: nativeSigning.vote.store,
+			evidenceStore: nativeSigning.evidence.store,
+			storageIncarnation: nativeSigning.vote.observation.incarnation,
+		};
+	};
+	// Recipient half of the opt-in pool boundary; runs in the lifecycle FIFO.
+	// The next install's turnover predicate is state-based, so early turnover
+	// needs no resume token: once retired, the install finds nothing due.
+	const maintainRecipientRecoveryPool = async (): Promise<CreatorRecoveryPoolResult> => {
+		if (terminalFailure !== undefined || creatorRecipientRecoveryRequired)
+			return Object.freeze({ kind: "deferred", reason: "busy" });
+		await rebasePromise;
+		await migrationCompletionBarrier;
+		await refreshRoomHeadState();
+		if (
+			activeHandle === undefined ||
+			transport === undefined ||
+			openedRoomHeadState === undefined ||
+			openedRoomHeadState.pending !== null
+		)
+			return Object.freeze({ kind: "deferred", reason: "busy" });
+		if (openedRoomHeadState.stable.epoch < 2) return Object.freeze({ kind: "not-needed" });
+		let open!: () => void;
+		const barrier = new Promise<void>((resolve) => { open = resolve; });
+		poolMaintenanceBarrier = barrier;
+		try {
+			await drainPendingIssues();
+			assertSessionOpen();
+			const plane = activeHandle,
+				roomTransport = transport,
+				roomHead = openedRoomHeadState?.stable;
+			if (plane === undefined || roomTransport === undefined || roomHead === undefined)
+				return Object.freeze({ kind: "deferred", reason: "busy" });
+			let result: CreatorRecoveryPoolResult;
+			try {
+				result = await maintainCreatorRecipientRecoveryPool({
+					plane,
+					catalog: input.application.catalog,
+					expectedRoomHead: roomHead,
+					snapshotStore: await ownRecipientSnapshots(),
+					recoveryContext: await recipientRecoveryContext(),
+				});
+			} catch (error) {
+				// Same rule as a failed install: native custody may be uncertain, so the
+				// next install reacquires it through authenticated recovery first.
+				creatorRecipientRecoveryRequired = true;
+				throw error;
+			}
+			// Arrivals queued behind the boundary; any refused at the bounded input
+			// pool are repaired through the same authenticated retained path a reconnect uses.
+			if (result.kind === "maintained" && activeHandle === plane && transport === roomTransport)
+				roomTransport.requestRetainedHistory();
+			return result;
+		} finally {
+			if (poolMaintenanceBarrier === barrier) poolMaintenanceBarrier = undefined;
+			open();
+		}
+	};
 	const installCreatorSuccessor = (
 		request: Readonly<{ offer: CreatorSuccessorOffer; peers: readonly string[] }>
 	): Promise<void> => {
@@ -6476,6 +6575,21 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					openedRoomHeadState === undefined ||
 					openedRoomHeadState.pending !== null ||
 					openedRoomHeadState.stable.epoch === 0
+				)
+					return false;
+				// A repeat carries the installed current trust record, so an offer naming
+				// another epoch/anchor cannot match; skip the whole-export authentication.
+				let offeredTrust: unknown;
+				try {
+					offeredTrust = decodeCanonical(offer.exactCanonicalTrustStateRecordBytes);
+				} catch {
+					offeredTrust = undefined;
+				}
+				if (
+					typeof offeredTrust === "object" &&
+					offeredTrust !== null &&
+					(Reflect.get(offeredTrust, "currentEpoch") !== openedRoomHeadState.stable.epoch ||
+						Reflect.get(offeredTrust, "currentAnchorDigest") !== openedRoomHeadState.stable.currentAnchorDigest)
 				)
 					return false;
 				let exported: Awaited<ReturnType<typeof readSuccessorExport>>;
@@ -6516,7 +6630,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				throw new TypeError("creator recipient current floor is unavailable");
 			let received: Awaited<ReturnType<typeof receiveCreatorSuccessorAdoption>>;
 			try {
-				const nativeSigning = openedRoomHeadState.stable.epoch >= 2 ? await ownCreatorSigningStores() : undefined;
+				const recoveryContext = openedRoomHeadState.stable.epoch >= 2 ? await recipientRecoveryContext() : undefined;
 				received = await receiveCreatorSuccessorAdoption({
 					plane: activeHandle,
 					catalog: input.application.catalog,
@@ -6529,31 +6643,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					signRegisteredVertexDigest: input.signRegisteredVertexDigest,
 					exactCanonicalGenesisAnchorPreimageBytes: material.exactCanonicalGenesisAnchorPreimageBytes,
 					detachedGenesisSignature: material.detachedGenesisSignature,
-					...(nativeSigning === undefined
-						? {}
-						: {
-								recoveryContext: {
-									roomHeadAuthority: input.roomHeadAuthority,
-									pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest,
-									exactCanonicalPinnedGenesisTrustStateRecordBytes: encodeCanonical({
-										kind: "drp-anchor-trust-state",
-										version: 1,
-										objectId: input.objectId,
-										genesisAnchorDigest: material.pinnedGenesisAnchorDigest,
-										currentAnchorDigest: material.pinnedGenesisAnchorDigest,
-										currentEpoch: 0,
-										profileId: Reflect.get(decodeCanonical(material.exactCanonicalProfileBytes) as object, "profileId"),
-										quorum: 1,
-										exactCanonicalCurrentAnchorPreimageBytes: material.exactCanonicalGenesisAnchorPreimageBytes,
-										detachedCurrentAnchorSignature: material.detachedGenesisSignature,
-										exactCanonicalProfileBytes: material.exactCanonicalProfileBytes,
-										exactCanonicalSignerSetBytes: material.exactCanonicalSignerSetBytes,
-									}),
-									voteStore: nativeSigning.vote.store,
-									evidenceStore: nativeSigning.evidence.store,
-									storageIncarnation: nativeSigning.vote.observation.incarnation,
-								},
-							}),
+					...(recoveryContext === undefined ? {} : { recoveryContext }),
 				});
 			} catch (error) {
 				// A failed receive may own native retention despite a lost acknowledgement.
@@ -6640,6 +6730,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	const closeSession = (): Promise<void> => {
 		if (sessionCloseTask !== undefined) return sessionCloseTask;
 		closed = true;
+		autoPoolMaintenance?.stop();
 		revokeTransport();
 		cancelRedirectCreation();
 		const task = (async (): Promise<void> => {
@@ -6962,12 +7053,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		rehearseMigration,
 		promoteCreatorCheckpoint,
 		maintainRecoveryPool(): Promise<CreatorRecoveryPoolResult> {
-			if (input.receiveOnly) return Promise.resolve(Object.freeze({kind: "deferred", reason: "unsupported"}));
 			return enqueueLifetimeTransition(async (): Promise<CreatorRecoveryPoolResult> => {
 				if (redirectPromise !== undefined) await redirectPromise;
 				if (redirectedSession !== undefined) return redirectedSession.maintainRecoveryPool();
 				assertSessionOpen();
-				if (creatorCloseHandle === undefined) return Object.freeze({kind: "deferred", reason: "unsupported"});
+				if (input.receiveOnly || creatorCloseHandle === undefined) return maintainRecipientRecoveryPool();
 				await rebasePromise;
 				await migrationCompletionBarrier;
 				let open!: () => void;
@@ -7089,6 +7179,25 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			}
 		}
 	}
+	if (input.recoveryPoolAutoMaintenance !== undefined && input.receiveOnly !== true)
+		autoPoolMaintenance = startRecoveryPoolAutoScheduler({
+			options: input.recoveryPoolAutoMaintenance,
+			// Identity changes only: a new projection, issued logical time or plane.
+			activity: () => [projection, logicalTime, activeHandle, redirectedSession],
+			busy: () => pendingIssues.length > 0 || drainScheduled || draining || lifetimeTransitionsPending > 0 ||
+				redirectPromise !== undefined || migrationBarrier !== undefined || migrationCompletionBarrier !== undefined,
+			epoch: () => (activeHandle === undefined && redirectedSession === undefined ? undefined : session.authority()?.epoch ?? 0),
+			open: () => !closed && terminalFailure === undefined,
+			maintain: () => session.maintainRecoveryPool(),
+			now: () => performance.now(),
+			setTimer: (callback, milliseconds) => {
+				const handle = setTimeout(callback, milliseconds);
+				// Never keep a host process alive for optional maintenance.
+				(handle as { unref?: () => void }).unref?.();
+				return handle;
+			},
+			clearTimer: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+		});
 	return session;
 }
 

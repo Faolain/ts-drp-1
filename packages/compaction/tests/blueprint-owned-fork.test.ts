@@ -49,7 +49,7 @@ function graph(entries: {hash: string; operation: unknown}[]) {
 	const anchorHash = "0".repeat(64), objectId = "owned-fork", epoch = 1;
 	const vertices = new Map<string, EpochVertex>([[anchorHash, {hash: anchorHash, kind: "drp-epoch-anchor", objectId, epoch, dependencies: []}]]);
 	for (const entry of entries) vertices.set(entry.hash, {hash: entry.hash, kind: "drp-vertex", objectId, epoch,
-		anchor: anchorHash, dependencies: [anchorHash], operation: entry.operation as EpochVertex["operation"]});
+		anchor: anchorHash, dependencies: [anchorHash], operation: entry.operation as NonNullable<EpochVertex["operation"]>});
 	return {anchorHash, vertices};
 }
 

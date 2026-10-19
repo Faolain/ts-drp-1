@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { CanonicalDecodingError, decodeCanonical, encodeCanonical } from "../src/index.ts";
+import { CanonicalDecodingError, decodeCanonical, encodeCanonical } from "../src/index.js";
 
 describe("bounded streaming UTF-8 lifetime", () => {
 	const split = "a".repeat(4095) + "💠" + "b".repeat(4100);

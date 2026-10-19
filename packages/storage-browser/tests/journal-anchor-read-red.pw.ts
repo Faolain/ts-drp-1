@@ -6,8 +6,24 @@ import http from "node:http";
 import path from "node:path";
 
 import { type AnchorEvidence, expectedAnchorOutcomes } from "../../../tests/fixtures/journal-anchor-read/assertions.js";
-import { ANCHOR_CASES, anchorMaterial } from "../../../tests/fixtures/journal-anchor-read/material.js";
+import { type AnchorCase, ANCHOR_CASES, anchorMaterial } from "../../../tests/fixtures/journal-anchor-read/material.js";
 import { decodeCanonical, hashDomain } from "../../canonical/dist/src/index.js";
+
+// Page globals installed by the bundled journal-anchor browser entry, which
+// lives outside this package's program (see its own declarations).
+declare global {
+	interface Window {
+		journalAnchorSetup(name: string, id: AnchorCase): Promise<unknown>;
+		journalAnchorRecover(name: string, id: AnchorCase): Promise<unknown>;
+		journalAnchorControl(name: string, id: AnchorCase): Promise<unknown>;
+		journalAnchorGetKeyControl(name: string): Promise<unknown>;
+		journalRetirementExactRows(name: string): Promise<unknown>;
+		journalRetirementSourceImage(name: string): Promise<unknown>;
+		journalAnchorRemove(name: string): Promise<void>;
+		journalRetirementNoops(name: string): Promise<unknown>;
+		journalPhysicalHeaderBounds(name: string): Promise<unknown>;
+	}
+}
 
 let server: http.Server;
 let url: string;

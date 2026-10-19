@@ -142,6 +142,13 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
   Reflect.set(globalThis,"__r8EventLoopCheckpoint",()=>({timeOrigin:performance.timeOrigin,delays,truncated,limit,
    qualification:"Timer scheduling drift, not a classification of native waits or scheduler contention; captures blocked JS, GC and scheduling together."}));
  });
+ // Main-thread long tasks, observed in every frame realm (each role frame and
+ // the top page). Observation only; role frames report theirs at close.
+ const longTasks=process.env.STARTUP_HEALTHY_GRID_LONGTASKS==="1";
+ if(longTasks)await page.context().addInitScript(()=>{const entries:{startTime:number;duration:number;name:string}[]=[];let truncated=false;
+  try{new PerformanceObserver(list=>{for(const entry of list.getEntries()){if(entries.length<65536)entries.push({startTime:entry.startTime,duration:entry.duration,name:entry.name});else truncated=true;}})
+   .observe({type:"longtask",buffered:true});}catch{}
+  Reflect.set(globalThis,"__rdLongTasks",()=>({timeOrigin:performance.timeOrigin,entries:[...entries],truncated}));});
  const clients:Awaited<ReturnType<typeof server>>[]=[];
  for(let index=0;index<4;index++)clients.push(await server(directory));
  await page.goto(local.origin+"/r8-source-binding");
@@ -648,9 +655,26 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
   })().catch(error=>console.info(JSON.stringify({kind:"healthy-native-partial-completed-checkpoint-unavailable",error:String(error),
    testOnlyCheckpointMilliseconds:performance.now()-checkpointStarted})));
  },300_000);
- if(process.env.STARTUP_HEALTHY_GRID_POOL_LULL==="1")await page.evaluate(()=>Reflect.set(globalThis,"__rdPoolMaintenanceLull",true));
+ const poolLull=process.env.STARTUP_HEALTHY_GRID_POOL_LULL;
+ if(poolLull==="1"||poolLull==="concurrent")await page.evaluate(()=>Reflect.set(globalThis,"__rdPoolMaintenanceLull",true));
+ // Gameplay moves issued while the creator's pool maintenance is running.
+ if(poolLull==="concurrent")await page.evaluate(()=>Reflect.set(globalThis,"__rdPoolMaintenanceConcurrent",true));
+ // Opt-in automatic idle trigger instead of the explicit lull call.
+ if(process.env.STARTUP_HEALTHY_GRID_POOL_AUTO==="1")await page.evaluate(()=>Reflect.set(globalThis,"__rdPoolMaintenanceAuto",true));
+ // Renderer task durations (toplevel RunTask) with user-timing clock marks from
+ // each role frame, written next to the report. Observation only.
+ // "window" traces only seal-4 through the next lull, with V8 CPU samples.
+ const taskTrace=process.env.STARTUP_HEALTHY_GRID_TASK_TRACE==="1",taskTraceWindow=process.env.STARTUP_HEALTHY_GRID_TASK_TRACE==="window";
+ let taskTraceOpen=false;
+ if(taskTrace){await ownedBrowser.startTracing(page,{path:join(process.env.STARTUP_EVIDENCE!,"task-trace.json"),categories:["toplevel","blink.user_timing"]});taskTraceOpen=true;}
+ if(taskTraceWindow)await page.exposeFunction("__rdTraceControl",async(command:string)=>{
+  if(command==="start"&&!taskTraceOpen){await ownedBrowser.startTracing(page,{path:join(process.env.STARTUP_EVIDENCE!,"task-trace.json"),
+   categories:["toplevel","blink.user_timing","disabled-by-default-v8.cpu_profiler"]});taskTraceOpen=true;}
+  else if(command==="stop"&&taskTraceOpen){await ownedBrowser.stopTracing();taskTraceOpen=false;}
+ });
  try{receipt=await page.evaluate(async({origins,rollovers,fixedIdentity,creatorProfile})=>{try{return await Reflect.get(globalThis,"r8HealthyGrid")(fixedIdentity??"r8-integrated-"+Date.now(),origins,rollovers,creatorProfile);}catch(error){return {ok:false,error:String(error),stack:error instanceof Error?error.stack:undefined};}},{origins:clients.map(client=>client.origin),rollovers,fixedIdentity,creatorProfile});}
  finally{
+  if(taskTraceOpen){await ownedBrowser.stopTracing();taskTraceOpen=false;}
   if(criticalCheckpoint)clearTimeout(criticalCheckpoint);
   await saveCriticalCapture("terminal");
   clearTimeout(traceCheckpoint);
@@ -670,6 +694,7 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
   await cdp.detach();
   await Promise.all(clients.map(client=>client.close()));
  }
+ if(longTasks)await info.attach("healthy-native-longtasks",{body:Buffer.from(JSON.stringify(await page.evaluate(()=>Reflect.get(globalThis,"__rdLongTasks")?.()))),contentType:"application/json"});
  await info.attach("healthy-native-integrated-result",{body:Buffer.from(JSON.stringify(receipt)),contentType:"application/json"});
  if(suspendHealthyGrid){
   await info.attach("native-browser-suspension",{body:Buffer.from(JSON.stringify(suspensions)),contentType:"application/json"});

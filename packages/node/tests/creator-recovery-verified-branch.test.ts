@@ -271,7 +271,8 @@ describe("one acquisition owns exact immutable recovery evidence", () => {
 		expect(f.warmOpen().ok).toBe(true); expect(f.warmOpen().ok).toBe(true);
 		expect(f.counts().sources).toBe(3); expect(f.counts().chains).toBe(3);
 		const reopened = fixture(); expect(reopened.warmOpen().ok).toBe(true); expect(reopened.counts().sources).toBe(1);
-		const overflow = fixture(false, {...AHE_BOUNDED_READ_LIMITS, maxUnionBytes: 1});
+		// Deliberately below the fixed bounded-read entitlement.
+		const overflow = fixture(false, {...AHE_BOUNDED_READ_LIMITS, maxUnionBytes: 1} as unknown as typeof AHE_BOUNDED_READ_LIMITS);
 		expect(overflow.warmOpen().ok).toBe(true); expect(overflow.warmOpen().ok).toBe(true);
 		expect(overflow.counts().sources).toBe(2); expect(overflow.counts().chains).toBe(2);
 	});

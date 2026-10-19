@@ -633,7 +633,7 @@ export function resolveCapturedSigningRetirementDataImage(value: unknown, rows: 
 function readSigningRetirementDataImage(rows: readonly Uint8Array[], objectId: string, retain: boolean) {
 	const distinct = new Map<string, { address: Uint8Array; frame: Uint8Array }>();
 	const frames: Readonly<{ bytes: Uint8Array; address?: Uint8Array; addressKey?: string }>[] = [];
-	const selections: Readonly<{ index: number; byteLength: number; store: string; epoch?: number; addressKey?: string }>[] = [];
+	const selections: Readonly<{ index: number; byteLength: number; store: string; epoch?: number | undefined; addressKey?: string }>[] = [];
 	for (const source of rows) {
 		// Only these detached exact bytes back retained commitments. Returned
 		// frames are copies; exclusion uses this capture's scalar row indices.

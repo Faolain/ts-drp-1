@@ -83,7 +83,7 @@ describe("original producer finishing closure geometry",()=>{
 	});
 	it("bounds original advance normalization and both supported adoption layouts without constructing future native records",()=>{
 		for(const profile of ["creator-trusted-v1","creator-trusted-settlement-v1"] as const){
-			const f=proposal(profile), kinds=new Map(f.proposedCandidates.map(item=>[item.ref.digest,decodeCanonical(item.bytes)]));
+			const f=proposal(profile), kinds=new Map(f.proposedCandidates.map(item=>[item.ref.digest,decodeCanonical(item.bytes) as Readonly<Record<string, unknown>>]));
 			const pair={current:undefined,proposed:f.metadata[0]}, aggregate={current:undefined,proposed:f.metadata[1]};
 			const inspect=execute<(input:any)=>any>(`${declaration(advance,"inspectCreatorTransitionAdvanceOwned")}\nreturn inspectCreatorTransitionAdvanceOwned;`,{
 				createCreatorCanonicalSyntaxReader:()=>({}),settlementProfileFor,

@@ -337,8 +337,9 @@ finally {await store.close();}
 		expect(await store.readRetirementImage({ objectId: "r10-process" })).toEqual(before);
 	} finally {
 		if (foreign !== undefined && foreign.exitCode === null && foreign.signalCode === null) {
-			const join = new Promise<void>((resolve) => foreign.once("close", () => resolve()));
-			foreign.kill("SIGKILL");
+			const running = foreign;
+			const join = new Promise<void>((resolve) => running.once("close", () => resolve()));
+			running.kill("SIGKILL");
 			await join;
 		}
 		await held?.release();

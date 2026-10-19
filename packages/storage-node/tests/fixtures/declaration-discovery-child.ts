@@ -7,9 +7,13 @@ const input = JSON.parse(process.argv[2] ?? "null") as { primaryFilename: string
 if (Object.keys(input).sort().join(",") !== "key,primaryFilename")
 	throw new Error("fresh caller boundary contains more than database identity and key");
 const store = createNodeSnapshotQuarantineStore({ primaryFilename: input.primaryFilename });
-try {
-	const result = await reader(store).lookupRecoveryDeclaration(input.key);
-	process.stdout.write(`${stable({ pid: process.pid, result })}\n`);
-} finally {
-	await store.close();
-}
+// An async body rather than top-level await keeps this child valid under the package's ES6 typecheck target;
+// a rejection still ends the process with a non-zero status.
+void (async () => {
+	try {
+		const result = await reader(store).lookupRecoveryDeclaration(input.key);
+		process.stdout.write(`${stable({ pid: process.pid, result })}\n`);
+	} finally {
+		await store.close();
+	}
+})();

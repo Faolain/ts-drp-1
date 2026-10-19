@@ -94,6 +94,7 @@ import {
 	type NativeReadReservationPort,
 	needsNativeReadReservationTurn,
 	runNativeReservedRead,
+	visitCountedRange,
 } from "./native-read-reservation.js";
 
 const DATABASE_SUFFIX = "--drp-issuance-v1";
@@ -525,48 +526,38 @@ async function browserRetirementRows(
 ): Promise<IssuanceRetirementRows> {
 	const names = ["lineages", "issuedRecords", "issuanceOutbox", "settlementPlans"] as const;
 	const range = IDBKeyRange.bound([objectId], [objectId, []]);
-	let count = 0;
-	for (const name of names) count += await requestResult(transaction.objectStore(name).count(range));
+	const counts = await Promise.all(names.map((name) => requestResult(transaction.objectStore(name).count(range))));
+	const count = counts.reduce((total, rows) => total + rows, 0);
 	if (count > limits.maxRows) throw issuanceRetirementRefusal("issuance retirement native census exceeds bound");
 	let bytes = 0;
-	const collect = <T>(name: (typeof names)[number], parse: (raw: unknown) => T | undefined): Promise<T[]> =>
-		new Promise((resolve, reject) => {
-			const output: T[] = [];
-			const request = transaction.objectStore(name).openCursor(range);
-			request.addEventListener("error", () => reject(request.error));
-			request.addEventListener("success", () => {
-				try {
-					const cursor = request.result;
-					if (!cursor) {
-						resolve(output);
-						return;
-					}
-					const row = parse(cursor.value);
-					if (!row) throw issuanceRetirementRefusal("issuance retirement native row unclassified");
-					if (seed !== undefined) {
-						const address = name === "settlementPlans" ? Reflect.get(row as object, "scope") : row;
-						const expected = typeof address === "object" && address !== null ?
-							[Reflect.get(address, "objectId"), Reflect.get(address, "author"),
-								...(name === "issuedRecords" || name === "issuanceOutbox" ? [Reflect.get(address, "authorSequence")] : [])] : [];
-						const key = cursor.primaryKey;
-						if (!Array.isArray(key) || key.length !== expected.length || !key.every((part, index) => part === expected[index]))
-							seed.keysMatch = false;
-					}
-					bytes += encodeCanonical(row, {
-						maxBytes: limits.maxBytes,
-						maxDepth: 16,
-						maxItems: ISSUANCE_RETIREMENT_LIMITS.maxRows * 32,
-					}).length;
-					if (bytes > limits.maxBytes)
-						throw issuanceRetirementRefusal("issuance retirement native image exceeds bound");
-					if (seed !== undefined) seed.encodedRowBytes = bytes;
-					output.push(row);
-					cursor.continue();
-				} catch (error) {
-					reject(error);
-				}
-			});
+	// The counts bound every range. Visit each counted range in bounded pages in
+	// this SAME transaction; rows are classified and charged in the original
+	// store and key order before the next page is read.
+	const collect = async <T>(name: (typeof names)[number], parse: (raw: unknown) => T | undefined): Promise<T[]> => {
+		const output: T[] = [];
+		await visitCountedRange(transaction.objectStore(name), range, counts[names.indexOf(name)]! + 1, (value, key) => {
+			const row = parse(value);
+			if (!row) throw issuanceRetirementRefusal("issuance retirement native row unclassified");
+			if (seed !== undefined) {
+				const address = name === "settlementPlans" ? Reflect.get(row as object, "scope") : row;
+				const expected = typeof address === "object" && address !== null ?
+					[Reflect.get(address, "objectId"), Reflect.get(address, "author"),
+						...(name === "issuedRecords" || name === "issuanceOutbox" ? [Reflect.get(address, "authorSequence")] : [])] : [];
+				if (!Array.isArray(key) || key.length !== expected.length || !key.every((part, index) => part === expected[index]))
+					seed.keysMatch = false;
+			}
+			bytes += encodeCanonical(row, {
+				maxBytes: limits.maxBytes,
+				maxDepth: 16,
+				maxItems: ISSUANCE_RETIREMENT_LIMITS.maxRows * 32,
+			}).length;
+			if (bytes > limits.maxBytes)
+				throw issuanceRetirementRefusal("issuance retirement native image exceeds bound");
+			if (seed !== undefined) seed.encodedRowBytes = bytes;
+			output.push(row);
 		});
+		return output;
+	};
 	return {
 		lineages: await collect("lineages", (raw) => {
 			if (typeof raw !== "object" || raw === null) return undefined;

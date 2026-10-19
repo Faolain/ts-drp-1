@@ -163,7 +163,8 @@ describe("Phase 7 closed-epoch archive byte producer (unit scope)", () => {
 		await expect(deriveClosedEpochArchiveAppend({ ...input, archive: { ...archive1, sourceAnchorDigest: "f".repeat(64) } })).rejects.toThrow(/foreign/);
 		await expect(deriveClosedEpochArchiveAppend({ ...input, archive: { ...archive1, segments: archive1.segments.slice(1) } })).rejects.toThrow(/incomplete|noncontiguous/);
 		await expect(deriveClosedEpochArchiveAppend({ ...input, expectedPreviousRoot: "f".repeat(64) })).rejects.toThrow(/predecessor root/);
-		await expect(deriveClosedEpochArchiveAppend({ ...input, previousLastEntry: undefined })).rejects.toThrow(/frontier/);
+		const { previousLastEntry: _frontier, ...withoutFrontier } = input;
+		await expect(deriveClosedEpochArchiveAppend(withoutFrontier)).rejects.toThrow(/frontier/);
 	});
 	it("preserves every original source byte/signature, history order and exact encoded categories", async () => {
 		const { close, sources, keys } = fixture();

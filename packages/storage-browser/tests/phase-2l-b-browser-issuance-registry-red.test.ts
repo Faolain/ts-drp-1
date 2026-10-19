@@ -25,8 +25,9 @@ describe("Phase 2l-b literal browser issuance authorities", () => {
 		});
 		expect(manifest.dependencies?.["@ts-drp/issuance-store"]).toBe("0.11.0");
 		const rootBytes = fs.readFileSync(path.join(packageDirectory, "src/index.ts"));
+		// Re-pinned after the room-head and native-read-reservation root exports.
 		expect(createHash("sha256").update(rootBytes).digest("hex")).toBe(
-			"30d32c3b4e9f9b4a7036602fe2338315167112bec41ca83a753b4feaba3bf56c"
+			"7cb5878a4b5099864a753cf67be3b1b72d80a6774f3afe2362c15dec1575263f"
 		);
 	});
 

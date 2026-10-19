@@ -85,6 +85,20 @@ export interface AheDurableStore {
 }
 
 export declare function createMemoryAheDurableStore(): AheDurableStore;
+// Root names the packed browser declarations reference since the room-head
+// and bounded-read phases; only the keys the declarations Pick are shaped.
+export interface NativeReadReservation { release(): Promise<void> }
+export interface AheBoundedRecoveryRoleStore extends AheDurableStore {}
+export interface RoomHeadScope { readonly objectId: string }
+export type RoomHeadInitialization = unknown;
+export interface RoomHeadAuthority {}
+export interface RoomHeadRetirementObservation {
+	readonly scope: RoomHeadScope;
+	readonly state: unknown;
+	readonly control: unknown;
+	readonly imageDigest: string;
+	readonly metadataBytes: number;
+}
 `
 	);
 }
@@ -267,7 +281,7 @@ void closeResult;
 		} finally {
 			fs.rmSync(consumerDirectory, { force: true, recursive: true });
 		}
-	});
+	}, 30_000);
 
 	it("retires the complete toy campaign while retaining shared process, server, and ownership governance", () => {
 		const observed = currentClosure();

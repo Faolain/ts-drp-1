@@ -246,7 +246,7 @@ function exactInputs(material = loadMaterial()): {
 	readonly install: Readonly<Record<string, unknown>>;
 	readonly local: Readonly<Record<string, unknown>>;
 	readonly received: Readonly<Record<string, unknown>>;
-	readonly scope: Readonly<Record<string, unknown>>;
+	readonly scope: Readonly<{ anchorDigest: string; epoch: 0; objectId: string }>;
 } {
 	const anchorBytes = Uint8Array.from(Buffer.from(material.anchorHex, "hex"));
 	const parametersBytes = Uint8Array.from(Buffer.from(material.parametersHex, "hex"));
@@ -375,12 +375,12 @@ async function measuredPage(store: JournalStore, input: Readonly<Record<string, 
 		sql.set(value, query);
 		return value;
 	};
-	StatementSync.prototype.all = function (...args: Parameters<StatementSync["all"]>) {
+	StatementSync.prototype.all = function (this: StatementSync, ...args: Parameters<StatementSync["all"]>) {
 		const rows = all.apply(this, args);
 		const query = sql.get(this) ?? "";
 		if (referencesPhase3a1bP4NodeTable(query, "accepted_entries")) materialized.push({ sql: query, rows: rows.length });
 		return rows;
-	};
+	} as StatementSync["all"];
 	try {
 		const result = await store[method](input);
 		return { result, materialized };

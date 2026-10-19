@@ -3185,6 +3185,10 @@ interface V3PlaneRegistration {
 	readonly closeVertices: Map<string, EpochVertex>;
 	readonly authorization: V3LiveAuthorization;
 	blueprintClosing: boolean;
+	/** True only while a deferrable pool boundary (creator readiness or recipient
+	 * lull, never a close or install) owns the closing gate: same epoch, so
+	 * arriving ingress queues behind it. */
+	readinessMaintenanceEntered?: boolean;
 	blueprintFolded: boolean;
 	receivedTransition?: boolean;
 	blueprintMachine?: BlueprintStateMachine;
@@ -8085,7 +8089,12 @@ function enqueueV3Ingress(
 	message: Message,
 	transport: "gossip" | "retained" = "gossip"
 ): Promise<void> {
-	if (!currentRegistration(registration) || registration.blueprintClosing) return Promise.resolve();
+	// A readiness boundary keeps the epoch: queue behind it in FIFO order (the
+	// same bounded input pool) instead of dropping. Authentication and every
+	// admission check run after it releases; a failed boundary leaves the
+	// closing gate set, so authenticateV3Ingress still drops under the halt.
+	if (!currentRegistration(registration) ||
+		registration.blueprintClosing && registration.readinessMaintenanceEntered !== true) return Promise.resolve();
 	const barrier = registration.terminalBarrier;
 	let rawMessage: Message | undefined = message;
 	return enqueueRegistrationTask(
@@ -11262,11 +11271,12 @@ async function prepareCreatorOrdinaryNativeMetadataForReadiness(registration: V3
 async function runCreatorOrdinaryReadinessMaintenance(registration: V3PlaneRegistration, closePlane: V3PlaneHandle,
 	snapshots: SnapshotRecoveryStore<SnapshotVerificationReceipt>,
 	consume: (seal: () => Promise<CreatorSnapshotRecoveryCloseHold>, requireClosedWorkflowCompletion: boolean) => Promise<"complete">,
-	options?: Readonly<{deferrable?: boolean}>): Promise<"ran" | "deferred"> {
+	options?: Readonly<{deferrable?: boolean; after?: () => Promise<void>}>): Promise<"ran" | "deferred"> {
 	// An opt-in pool boundary yields to ordinary work instead of halting it: an
 	// unavailable boundary before entry has minted no hold, frozen no admission
 	// and run no native work, so it is a scheduling miss, not recovery work.
-	const deferrable = options?.deferrable === true;
+	// It also keeps the epoch, so ingress arriving meanwhile queues behind it.
+	const deferrable = options?.deferrable === true, after = options?.after;
 	const payload = registration.payload, authorization = registration.authorization, trust = payload.trust.trust,
 		epoch = trust.currentEpoch, anchor = trust.currentAnchorDigest, profile = trust.profileId,
 		genesis = trust.genesisAnchorDigest, sourceBindings = creatorOrdinaryIssuanceRetainedSourceBindings(registration),
@@ -11324,7 +11334,7 @@ async function runCreatorOrdinaryReadinessMaintenance(registration: V3PlaneRegis
 			if (!runtime.live() || !runtime.sourceBound || runtime.nativeBranchSource !== undefined || runtime.migrationSource !== undefined)
 				throw new TypeError("creator readiness maintenance source is unavailable");
 			enteredGraph = {version: registration.graphVersion, index: registration.index};
-			registration.blueprintClosing = true; entered = true;
+			registration.blueprintClosing = true; entered = true; registration.readinessMaintenanceEntered = deferrable;
 			const boundaryLive = (): boolean => entered && available();
 			const boundary = {available: boundaryLive, completeRetirement: (observation: object): Promise<void> => {
 				if (!accepting || !boundaryLive()) return Promise.reject(new TypeError("creator readiness retirement consumer is unavailable"));
@@ -11375,7 +11385,7 @@ async function runCreatorOrdinaryReadinessMaintenance(registration: V3PlaneRegis
 			// An uncertain native result, stale owner or failed join is recovery
 			// work. Never reopen admission by clearing a halt in a finally block.
 			registration.operationAdmissionHalted = true;
-			finished = true;
+			finished = true; registration.readinessMaintenanceEntered = false;
 			throw failed ? primary : new TypeError("creator readiness maintenance boundary was revoked during release");
 		}
 		// Every original terminal native verification and admitted release has
@@ -11386,7 +11396,11 @@ async function runCreatorOrdinaryReadinessMaintenance(registration: V3PlaneRegis
 			registration.retirementReconstruction = undefined;
 			registration.operationAdmissionHalted = false;
 		}
-		finished = true; registration.blueprintClosing = false; entered = false;
+		finished = true; registration.blueprintClosing = false; entered = false; registration.readinessMaintenanceEntered = false;
+		// Still inside this queue slot: arrivals queued during the boundary keep
+		// waiting, so the caller's post-boundary capture sees a stable census
+		// rather than racing a refused-and-retained arrival. Grants nothing.
+		if (after !== undefined) await after();
 	});
 	return deferred ? "deferred" : "ran";
 }
@@ -19259,6 +19273,144 @@ function prepareCreatorClosedArchive(
 	return task;
 }
 
+async function sealCreatorReceivedRecoveryDependencies(
+	registration: V3PlaneRegistration,
+	closePlane: V3PlaneHandle,
+	signing: CreatorSigningRecoveryOwner,
+	snapshots: SnapshotRecoveryStore<SnapshotVerificationReceipt>
+): ReturnType<V3CreatorCloseRegistration["sealReceivedRecoveryDependencies"]> {
+	const original = resolveCreatorSigningRecoveryOwner(signing, registration.payload.trust.trust);
+	if (original === undefined) throw new TypeError("creator received signing custody is foreign or unavailable");
+	// This is the original received queue gate, not a synthesized fold or
+	// signer. The same closed census refuses pending ingress or unfinished
+	// rebase; the existing protected planner decides every native effect.
+	let retired: readonly GenerationRecord[] = ObjectFreeze([]);
+	const hold = await sealCreatorRecoveryDependencies(registration, true, undefined, closePlane, undefined, {
+		signing: original,
+		completeRetirement: async (observation) => {
+			if (retired.length !== 0) throw new TypeError("creator received retirement already consumed");
+			retired = await consumeCreatorRecoverySourceRetirement(observation, {
+				plane: closePlane,
+				store: registration.payload.input.store,
+				snapshotStore: snapshots,
+				liveJournalStore: registration.liveJournalStore,
+				currentTrust: registration.payload.trust.trust,
+			});
+		},
+	});
+	return hold === undefined
+		? undefined
+		: ObjectFreeze({
+				hold,
+				readRetiredGenerations: () => {
+					if (
+						!currentRegistration(registration) ||
+						registration.receivedTransition !== true ||
+						!registration.blueprintClosing ||
+						registration.terminalState !== "active"
+					)
+						throw new TypeError("creator received retirement owner is unavailable");
+					return retired;
+				},
+			});
+}
+
+/** Explicit quiescent recipient turnover in the ORIGINAL registration queue. It
+ * enters the SAME received gate an install enters (closing plus received
+ * transition), so the original received seal, census and planner run unchanged
+ * and see exactly the state they see inside an install. Unlike an install it
+ * then reopens the gate, only after every admitted hold and release joined.
+ * Ingress arriving meanwhile queues behind this slot and runs full admission
+ * after it; anything refused at the bounded input pool is repaired by the
+ * caller through the authenticated retained path afterwards. */
+async function runCreatorReceivedRecoveryMaintenance(registration: V3PlaneRegistration,
+	seal: () => ReturnType<V3CreatorCloseRegistration["sealReceivedRecoveryDependencies"]>,
+	consume: Parameters<V3CreatorCloseRegistration["runReceivedRecoveryMaintenance"]>[2],
+	options?: Readonly<{deferrable?: boolean}>): Promise<"ran" | "deferred"> {
+	// An unavailable boundary before entry has minted no hold, closed no gate and
+	// run no native work, so a deferrable request reports a scheduling miss.
+	const deferrable = options?.deferrable === true;
+	const payload = registration.payload, authorization = registration.authorization, trust = payload.trust.trust,
+		displacedSource = registration.displacedSource,
+		owners = [payload.input.store, registration.liveJournalStore, registration.issuanceStore] as const;
+	let entered = false, accepting = false, finished = false;
+	let enteredGraph: Readonly<{version: number; index: V3PlaneRegistration["index"]}> | undefined;
+	const available = (): boolean => !finished && currentRegistration(registration) &&
+		registration.mode === "genesis-active" && registration.payload === payload && registration.authorization === authorization &&
+		authorization.kind === "latched-acl" && payload.trust.trust === trust && trust.currentEpoch >= 2 &&
+		registration.payload.input.store === owners[0] && registration.liveJournalStore === owners[1] &&
+		registration.issuanceStore === owners[2] && registration.terminalState === "active" && !registration.operationAdmissionHalted &&
+		registration.blueprintClosing === entered && (registration.receivedTransition === true) === entered &&
+		!registration.blueprintFolded && !registration.terminalTransitionQueued && !registration.terminalPublicationEntered &&
+		registration.terminalBarrier === undefined && !registration.retainedBootstrapHold && !registration.drainingPendingIngress &&
+		registration.displacedSource === displacedSource && registration.currentReplacementCustody === undefined &&
+		!preparedMigrationTargetFloors.has(registration) && registration.pendingIngress.size === 0 && registration.pendingIngressBytes === 0 &&
+		(registration.rebaseSnapshot === undefined || registration.rebaseSnapshot.length === 0) && registration.rebaseCursor === undefined &&
+		(enteredGraph === undefined || registration.graphVersion === enteredGraph.version && registration.index === enteredGraph.index);
+	if (!available()) {
+		if (deferrable) return "deferred";
+		throw new TypeError("creator recipient maintenance boundary is unavailable");
+	}
+	let deferred = false;
+	await enqueueRegistrationTask(registration, () => async () => {
+		if (deferrable && !available()) { finished = true; deferred = true; return; }
+		const lifetimes: CreatorSnapshotRecoveryCloseLifetime[] = [];
+		const pending: Promise<unknown>[] = [];
+		const track = <T>(task: Promise<T>): Promise<T> => {
+			pending.push(task); void task.catch(() => undefined); return task;
+		};
+		let primary: unknown, failed = false;
+		try {
+			if (!available()) throw new TypeError("creator recipient maintenance boundary changed before entry");
+			enteredGraph = {version: registration.graphVersion, index: registration.index};
+			registration.blueprintClosing = true; registration.receivedTransition = true; entered = true;
+			// Same epoch: a deferrable lull queues arriving ingress FIFO behind this
+			// slot (enqueueV3Ingress) instead of dropping it; an install still drops.
+			registration.readinessMaintenanceEntered = deferrable;
+			accepting = true;
+			const boundarySeal = (): ReturnType<Parameters<typeof consume>[0]> => {
+				if (!accepting || !available()) return Promise.reject(new TypeError("creator recipient maintenance boundary was revoked"));
+				return track((async () => {
+					const sealed = await seal();
+					// Resolve this just-minted private hold for joined cleanup even if
+					// an owner changed while sealing; boundary currency is checked BEFORE
+					// any hold is delivered.
+					const lifetime = sealed === undefined ? undefined : resolveRecoveryCloseHold(sealed.hold,
+						{store: registration.payload.input.store, liveJournalStore: registration.liveJournalStore,
+							currentTrust: registration.payload.trust.trust});
+					if (lifetime !== undefined) lifetimes.push(lifetime);
+					if (sealed === undefined || lifetime === undefined || !accepting || !available())
+						throw new TypeError("creator recipient maintenance census is unavailable");
+					return sealed;
+				})());
+			};
+			try {
+				if (await consume(boundarySeal) !== "complete")
+					throw new TypeError("creator recipient maintenance did not complete");
+			} finally { accepting = false; }
+			if (!available()) throw new TypeError("creator recipient maintenance boundary changed");
+		} catch (cause) { failed = true; primary = cause; }
+		// Original reconciliation joins each hold itself. Also join every issued
+		// lifetime on callback failure, before this queue slot can reopen the gate.
+		const work = await Promise.allSettled(pending);
+		const outcomes = await Promise.allSettled(lifetimes.map(lifetime => lifetime.release()));
+		const failures = [...work, ...outcomes].flatMap(outcome => outcome.status === "rejected" ? [outcome.reason] : []);
+		if (failures.length !== 0) { primary = failed ? new AggregateError([primary, ...failures],
+			"creator recipient maintenance and joined release failed", {cause: primary}) :
+			new AggregateError(failures, "creator recipient maintenance release failed"); failed = true; }
+		if (failed || !available()) {
+			// An uncertain native result, stale owner or failed join is recovery
+			// work. Never reopen the received gate in a finally block.
+			registration.operationAdmissionHalted = true;
+			finished = true; registration.readinessMaintenanceEntered = false;
+			throw failed ? primary : new TypeError("creator recipient maintenance boundary was revoked during release");
+		}
+		finished = true; registration.receivedTransition = false; registration.blueprintClosing = false; entered = false;
+		registration.readinessMaintenanceEntered = false;
+	});
+	return deferred ? "deferred" : "ran";
+}
+
 function creatorCloseRegistration(
 	registration: V3PlaneRegistration,
 	purpose: "close" | "recipient" = "close",
@@ -19413,45 +19565,17 @@ function creatorCloseRegistration(
 		// by that exact handle, not the registration's underlying raw handle.
 		sealRecoveryDependencies: (required?: boolean) =>
 			sealCreatorRecoveryDependencies(registration, required, undefined, closePlane),
-		sealReceivedRecoveryDependencies: async (
+		sealReceivedRecoveryDependencies: (
 			signing: CreatorSigningRecoveryOwner,
 			snapshots: SnapshotRecoveryStore<SnapshotVerificationReceipt>
-		) => {
-			const original = resolveCreatorSigningRecoveryOwner(signing, registration.payload.trust.trust);
-			if (original === undefined) throw new TypeError("creator received signing custody is foreign or unavailable");
-			// This is the original received queue gate, not a synthesized fold or
-			// signer. The same closed census refuses pending ingress or unfinished
-			// rebase; the existing protected planner decides every native effect.
-			let retired: readonly GenerationRecord[] = ObjectFreeze([]);
-			const hold = await sealCreatorRecoveryDependencies(registration, true, undefined, closePlane, undefined, {
-				signing: original,
-				completeRetirement: async (observation) => {
-					if (retired.length !== 0) throw new TypeError("creator received retirement already consumed");
-					retired = await consumeCreatorRecoverySourceRetirement(observation, {
-						plane: closePlane,
-						store: registration.payload.input.store,
-						snapshotStore: snapshots,
-						liveJournalStore: registration.liveJournalStore,
-						currentTrust: registration.payload.trust.trust,
-					});
-				},
-			});
-			return hold === undefined
-				? undefined
-				: ObjectFreeze({
-						hold,
-						readRetiredGenerations: () => {
-							if (
-								!currentRegistration(registration) ||
-								registration.receivedTransition !== true ||
-								!registration.blueprintClosing ||
-								registration.terminalState !== "active"
-							)
-								throw new TypeError("creator received retirement owner is unavailable");
-							return retired;
-						},
-					});
-		},
+		) => sealCreatorReceivedRecoveryDependencies(registration, closePlane, signing, snapshots),
+		runReceivedRecoveryMaintenance: (
+			signing: CreatorSigningRecoveryOwner,
+			snapshots: SnapshotRecoveryStore<SnapshotVerificationReceipt>,
+			consume: Parameters<V3CreatorCloseRegistration["runReceivedRecoveryMaintenance"]>[2],
+			options?: Parameters<V3CreatorCloseRegistration["runReceivedRecoveryMaintenance"]>[3]
+		) => runCreatorReceivedRecoveryMaintenance(registration,
+			() => sealCreatorReceivedRecoveryDependencies(registration, closePlane, signing, snapshots), consume, options),
 		sealIssuanceMaintenanceDependencies: (receipt?: object) => {
 			const received = receipt === undefined ? undefined : receivedAppendFacts(registration, receipt);
 			return sealCreatorRecoveryDependencies(registration, true, undefined, closePlane,
@@ -19461,6 +19585,14 @@ function creatorCloseRegistration(
 		needsOrdinaryReadinessRecovery: (): boolean => {
 			if (!currentRegistration(registration)) throw new TypeError("creator ordinary readiness owner is unavailable");
 			return registration.operationAdmissionHalted || creatorRetirementResumeRequested(registration);
+		},
+		resumePendingIngress: (): void => {
+			// Received work refused while a maintenance job held the consumer stays
+			// retained, authenticated and charged. Drain it through the original
+			// queue and full admission path once that job joins; never a grant.
+			if (!currentRegistration(registration) || registration.pendingIngress.size === 0) return;
+			void enqueueRegistrationTask(registration, () => () => drainPendingIngress(registration))
+				.catch(() => ingressFailureLog("admission-rejected"));
 		},
 		runOrdinaryReadinessMaintenance: (
 			snapshots: Parameters<V3CreatorCloseRegistration["runOrdinaryReadinessMaintenance"]>[0],
@@ -19852,6 +19984,17 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 				existing.pendingIngress.clear();
 				existing.pendingIngressBytes = 0;
 				registration.hotPredecessor = new WeakRefConstructor(existing);
+				// Rows at or below the predecessor cursor were authenticated by it and are
+				// published, displaced or historical: a successor epoch publishes none of
+				// them. Resume there instead of re-authenticating the whole outbox.
+				if (
+					existing.publicationCursor !== undefined &&
+					creatorOriginalIssuanceStore(existing) ===
+						creatorOriginalIssuanceStore({ historicalIssuance: recovered.historicalIssuance, issuanceStore: boundIssuanceStore }) &&
+					existing.issuanceScope.objectId === selectedScope.objectId &&
+					existing.issuanceScope.author === selectedScope.author
+				)
+					registration.publicationCursor = existing.publicationCursor;
 			}
 			registrations.set(topic, registration);
 			v3PlaneRegistrations.set(boundNetworkNode, registrations);

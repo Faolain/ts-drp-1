@@ -84,7 +84,7 @@ async function installNativeRoomHeadAuthority(
 	>();
 	const liveContexts = new Set(contexts);
 	let nextId = 0;
-	type Method = Exclude<keyof NodeRoomHeadAuthority, "initialization" | "close">;
+	type Method = Exclude<keyof NodeRoomHeadAuthority, "initialization" | "close" | "inspectDisposableSessions">;
 	type Call = {
 		[Name in Method]: { capability: number; method: Name; input: Parameters<NodeRoomHeadAuthority[Name]>[0] };
 	}[Method];

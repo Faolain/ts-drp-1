@@ -163,7 +163,7 @@ describe("local WebRTC ICE configuration owner", () => {
 		const native = vi.fn(function (_config: RTCConfiguration): void {});
 		vi.stubGlobal("RTCPeerConnection", native);
 		try {
-			expect(node["_node"]?.status).toBe("started");
+			expect((node["_node"] as { status?: string } | undefined)?.status).toBe("started");
 			expect(node["_webRtcConfiguration"]).toBeUndefined();
 			expect(() => node.unreliableWebRtcOwner.close()).not.toThrow();
 			expect(node["_activeUnreliableWebRtcOwner"]).toBeUndefined();
