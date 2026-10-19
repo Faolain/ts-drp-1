@@ -21609,23 +21609,36 @@ async function reconcileSnapshotRecoveryRoles(
  * Reconciles genuinely authenticated roles, preserving the owning typed refusal as cause.
  * @param value - Independent pinned floor and genuine native owners.
  * @param closeHold - Genuine live close's joined native dependency census, when available.
- * @param acknowledgeCompletedJournalDrain - Original completed-drain acknowledgement request.
- * @param requireClosedWorkflowCompletion - Original closed-workflow completion requirement.
- * @param currentTrust - Original current trust, when supplied by the owning close.
- * @param drainSuppressedJournalPrefixes - Request a fresh pass when a generation drain
- * suppressed collectible journal prefixes (scheduling only, never eligibility).
  */
 export async function reconcileCreatorSnapshotRecoveryRoles(
 	value: CreatorClosedRollbackDataInput,
 	closeHold?: CreatorSnapshotRecoveryCloseHold,
 	acknowledgeCompletedJournalDrain = false,
 	requireClosedWorkflowCompletion = false,
-	currentTrust?: CurrentAnchorTrust,
-	drainSuppressedJournalPrefixes = false
+	currentTrust?: CurrentAnchorTrust
 ): Promise<"complete" | "fresh-summary-required"> {
 	try {
-		return (await reconcileSnapshotRecoveryRoles(value, closeHold, acknowledgeCompletedJournalDrain, requireClosedWorkflowCompletion,
-			currentTrust, undefined, drainSuppressedJournalPrefixes))
+		return (await reconcileSnapshotRecoveryRoles(value, closeHold, acknowledgeCompletedJournalDrain, requireClosedWorkflowCompletion, currentTrust))
+			? "fresh-summary-required" : "complete";
+	} catch (error) {
+		throwCreatorSnapshotRecoveryFailure(error);
+	}
+}
+
+/**
+ * The recipient's received-turnover pass: the same reconciliation, except that a
+ * generation drain which suppressed collectible journal prefixes requests one more
+ * fresh pass. A recipient runs no other maintenance inside the journal membership
+ * window, so without it those prefixes are stranded (scheduling only, never eligibility).
+ * @param value - Independent pinned floor and genuine native owners.
+ * @param closeHold - Genuine received seal's joined native dependency census.
+ */
+export async function reconcileCreatorReceivedSnapshotRecoveryRoles(
+	value: CreatorClosedRollbackDataInput,
+	closeHold: CreatorSnapshotRecoveryCloseHold
+): Promise<"complete" | "fresh-summary-required"> {
+	try {
+		return (await reconcileSnapshotRecoveryRoles(value, closeHold, false, false, undefined, undefined, true))
 			? "fresh-summary-required" : "complete";
 	} catch (error) {
 		throwCreatorSnapshotRecoveryFailure(error);

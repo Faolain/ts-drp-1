@@ -123,7 +123,7 @@ import {
 } from "./internal/creator-transition-advance.js";
 import { createV3SnapshotTransferOwner } from "./snapshot-transfer.js";
 import { sealCreatorReceivedRecoveryReplay, type V3PlaneHandle } from "./v3-live.js";
-import { reconcileCreatorSnapshotRecoveryRoles } from "./internal/creator-closed-rollback-data.js";
+import { reconcileCreatorReceivedSnapshotRecoveryRoles, reconcileCreatorSnapshotRecoveryRoles } from "./internal/creator-closed-rollback-data.js";
 import { acquireCreatorPendingClassificationCustody, resolveCreatorSnapshotRecoveryCloseHold } from "./internal/runtime-reclamation.js";
 import type { CreatorRecoveryPoolResult } from "./internal/creator-recovery-pool.js";
 
@@ -928,15 +928,15 @@ async function runReceivedRecoveryTurnoverPasses(input: Readonly<{
 		let checkpoint: "complete" | "fresh-summary-required";
 		let retirementFailed = false, retirementPrimary: unknown;
 		try {
-			checkpoint = await reconcileCreatorSnapshotRecoveryRoles({
+			// A recipient runs no other maintenance inside the journal membership
+			// window, so a generation drain that suppressed this pass's collectible
+			// journal prefixes requests one more fresh pass (still bounded below).
+			checkpoint = await reconcileCreatorReceivedSnapshotRecoveryRoles({
 				roomHeadAuthority: context.roomHeadAuthority, pinnedGenesisAnchorDigest: context.pinnedGenesisAnchorDigest,
 				exactCanonicalPinnedGenesisTrustStateRecordBytes: context.exactCanonicalPinnedGenesisTrustStateRecordBytes,
 				catalog: input.catalog,
 				objectId: source.objectId, store: source.store, snapshotStore: input.snapshotStore,
-				// A recipient runs no other maintenance inside the journal membership
-				// window, so a generation drain that suppressed this pass's collectible
-				// journal prefixes requests one more fresh pass (still bounded below).
-				liveJournalStore: source.liveJournalStore}, sealed.hold, false, false, undefined, true);
+				liveJournalStore: source.liveJournalStore}, sealed.hold);
 			retired.push(...sealed.readRetiredGenerations());
 		} catch (error) {retirementFailed = true; retirementPrimary = error; throw error;}
 		finally {await releaseCreatorRecoveryReader(lifetime, retirementFailed, retirementPrimary, "creator recipient retirement dependencies cleanup failed");}
