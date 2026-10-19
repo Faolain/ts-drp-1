@@ -32,6 +32,18 @@ const DEFAULT_LIMITS: Readonly<CanonicalLimits> = Object.freeze({
 const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
 const intrinsicTextDecoder = TextDecoder;
 const textEncoder = new TextEncoder();
+const SharedArrayBufferConstructor = typeof SharedArrayBuffer === "function" ? SharedArrayBuffer : undefined;
+const MEMO_VIEW_OVERRIDES = ["buffer", "byteLength", "byteOffset", "length"];
+
+/** Only ordinary unshared views: exotic or instrumented carriers keep the original path. */
+function plainMemoView(part: unknown): part is Uint8Array {
+	return part instanceof Uint8Array && Object.getPrototypeOf(part) === Uint8Array.prototype &&
+		!MEMO_VIEW_OVERRIDES.some((name) => Object.hasOwn(part, name)) &&
+		!(SharedArrayBufferConstructor !== undefined && part.buffer instanceof SharedArrayBufferConstructor);
+}
+
+// Body copies use the intrinsic length, as the frozen tree encoder's `new Uint8Array(value)` did.
+const typedArrayByteLength = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Uint8Array.prototype) as object, "byteLength")!.get!;
 const DRP_ERROR_BRAND = Symbol.for("@ts-drp/errors/DRPError");
 
 /** A value cannot be represented by the frozen canonical codec. */
@@ -65,7 +77,18 @@ export class CanonicalDecodingError extends TypeError {
  */
 export function compareBytes(left: Uint8Array, right: Uint8Array): number {
 	const length = Math.min(left.byteLength, right.byteLength);
-	for (let index = 0; index < length; index++) {
+	let start = 0;
+	// Long equal prefixes dominate; skip them a word at a time on ordinary
+	// aligned views. The first differing word is then ordered byte by byte.
+	if (length >= 64 && (left.byteOffset & 3) === 0 && (right.byteOffset & 3) === 0 &&
+		plainMemoView(left) && plainMemoView(right)) {
+		const words = length >>> 2;
+		const a = new Int32Array(left.buffer, left.byteOffset, words);
+		const b = new Int32Array(right.buffer, right.byteOffset, words);
+		while (start < words && a[start] === b[start]) start++;
+		start <<= 2;
+	}
+	for (let index = start; index < length; index++) {
 		const leftByte = left[index] as number;
 		const rightByte = right[index] as number;
 		if (leftByte !== rightByte) return leftByte < rightByte ? -1 : 1;
@@ -143,31 +166,6 @@ function assertWellFormedString(value: string): void {
 			throw new CanonicalEncodingError("string contains an unpaired surrogate");
 		}
 	}
-}
-
-function decodeUtf8String(bytes: Uint8Array): string {
-	const decoder = new intrinsicTextDecoder("utf-8");
-	// Native default decoding strips exactly one initial payload BOM.
-	let matched = bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf ? 3 : 0;
-	const comparePiece = (piece: string): void => {
-		const encoded = textEncoder.encode(piece);
-		if (encoded.byteLength > bytes.byteLength - matched) {
-			throw new CanonicalDecodingError("invalid UTF-8 string");
-		}
-		for (let index = 0; index < encoded.byteLength; index++) {
-			if (encoded[index] !== bytes[matched + index]) {
-				throw new CanonicalDecodingError("invalid UTF-8 string");
-			}
-		}
-		matched += encoded.byteLength;
-	};
-	for (let offset = 0; offset < bytes.byteLength; offset += 4096) {
-		comparePiece(decoder.decode(bytes.subarray(offset, offset + 4096), { stream: true }));
-	}
-	comparePiece(decoder.decode());
-	if (matched !== bytes.byteLength) throw new CanonicalDecodingError("invalid UTF-8 string");
-	// Flush reset the decoder; only now produce the accepted whole string.
-	return decoder.decode(bytes);
 }
 
 function encodeVarUint(input: number | bigint): Uint8Array {
@@ -383,6 +381,374 @@ function encodeInternal(
 	}
 }
 
+/** Growable output of the single-pass encoder. Writers are pooled per
+ * (re)entrant call; encoded bytes are always copied out before release. */
+class ByteWriter {
+	public buffer: Uint8Array;
+	public view: DataView;
+	public offset = 0;
+
+	public constructor(capacity: number) {
+		this.buffer = new Uint8Array(capacity);
+		this.view = new DataView(this.buffer.buffer);
+	}
+
+	public reserve(length: number): void {
+		const needed = this.offset + length;
+		if (needed <= this.buffer.byteLength) return;
+		let capacity = this.buffer.byteLength * 2;
+		while (capacity < needed) capacity *= 2;
+		const next = new Uint8Array(capacity);
+		next.set(this.buffer.subarray(0, this.offset));
+		this.buffer = next;
+		this.view = new DataView(next.buffer);
+	}
+
+	public byte(value: number): void {
+		if (this.offset === this.buffer.byteLength) this.reserve(1);
+		this.buffer[this.offset++] = value;
+	}
+
+	/** Exact for every non-negative integer a double represents exactly. */
+	public varUint(value: number): void {
+		this.reserve(10);
+		const buffer = this.buffer;
+		let offset = this.offset;
+		while (value > 0x7fffffff) {
+			buffer[offset++] = (value % 0x80) | 0x80;
+			value = Math.floor(value / 0x80);
+		}
+		while (value >= 0x80) {
+			buffer[offset++] = (value & 0x7f) | 0x80;
+			value >>>= 7;
+		}
+		buffer[offset++] = value;
+		this.offset = offset;
+	}
+
+	public bytes(value: Uint8Array): void {
+		this.reserve(value.byteLength);
+		this.buffer.set(value, this.offset);
+		this.offset += value.byteLength;
+	}
+
+	/** Copies a caller-owned view without consulting its (possibly own) `byteLength` property. */
+	public foreignBytes(value: Uint8Array): void {
+		const length = Reflect.apply(typedArrayByteLength, value, []) as number;
+		this.reserve(length);
+		this.buffer.set(value, this.offset);
+		this.offset += length;
+	}
+}
+
+const WRITER_POOL: ByteWriter[] = [];
+const POOLED_WRITER_MAX_BYTES = 1 << 20;
+
+/** Encoded object keys are a small schema vocabulary; their exact canonical
+ * STRING bytes (tag, one-byte length, UTF-8) are immutable and reused. */
+const KEY_CACHE = new Map<string, Uint8Array>();
+const KEY_CACHE_LIMIT = 8192;
+
+function writeUtf8(writer: ByteWriter, value: string, byteLength: number, ascii: boolean): void {
+	writer.reserve(byteLength);
+	const buffer = writer.buffer;
+	let offset = writer.offset;
+	if (byteLength > 64) {
+		offset += textEncoder.encodeInto(value, buffer.subarray(offset, offset + byteLength)).written;
+	} else if (ascii) {
+		for (let index = 0; index < value.length; index++) buffer[offset++] = value.charCodeAt(index);
+	} else {
+		for (let index = 0; index < value.length; index++) {
+			const code = value.charCodeAt(index);
+			if (code < 0x80) buffer[offset++] = code;
+			else if (code < 0x800) {
+				buffer[offset++] = 0xc0 | (code >> 6);
+				buffer[offset++] = 0x80 | (code & 0x3f);
+			} else if (code >= 0xd800 && code <= 0xdbff) {
+				const point = ((code - 0xd800) << 10) + (value.charCodeAt(++index) - 0xdc00) + 0x10000;
+				buffer[offset++] = 0xf0 | (point >> 18);
+				buffer[offset++] = 0x80 | ((point >> 12) & 0x3f);
+				buffer[offset++] = 0x80 | ((point >> 6) & 0x3f);
+				buffer[offset++] = 0x80 | (point & 0x3f);
+			} else {
+				buffer[offset++] = 0xe0 | (code >> 12);
+				buffer[offset++] = 0x80 | ((code >> 6) & 0x3f);
+				buffer[offset++] = 0x80 | (code & 0x3f);
+			}
+		}
+	}
+	if (offset !== writer.offset + byteLength) throw new CanonicalEncodingError("string encoding length changed");
+	writer.offset = offset;
+}
+
+/** One scan performs assertWellFormedString's exact validation and measures
+ * the UTF-8 length; the frozen string byte limit is checked afterwards. */
+function writeString(writer: ByteWriter, value: string, limits: Readonly<CanonicalLimits>): void {
+	const length = value.length;
+	let byteLength = length;
+	let ascii = true;
+	for (let index = 0; index < length; index++) {
+		const code = value.charCodeAt(index);
+		if (code < 0x80) continue;
+		ascii = false;
+		if (code < 0x800) byteLength += 1;
+		else if (code >= 0xd800 && code <= 0xdbff) {
+			const next = value.charCodeAt(index + 1);
+			if (!(next >= 0xdc00 && next <= 0xdfff)) throw new CanonicalEncodingError("string contains an unpaired surrogate");
+			index++;
+			byteLength += 2;
+		} else if (code >= 0xdc00 && code <= 0xdfff) {
+			throw new CanonicalEncodingError("string contains an unpaired surrogate");
+		} else byteLength += 2;
+	}
+	if (byteLength > limits.maxBytes) throw new CanonicalEncodingError("string exceeds byte limit");
+	writer.byte(TAG.STRING);
+	writer.varUint(byteLength);
+	writeUtf8(writer, value, byteLength, ascii);
+}
+
+/** Object keys: identical checks and order to encoding the key as a value at
+ * `depth` after the caller's well-formedness check, with exact-byte reuse. */
+function writeKey(writer: ByteWriter, key: string, depth: number, limits: Readonly<CanonicalLimits>): void {
+	const cached = KEY_CACHE.get(key);
+	if (cached !== undefined) {
+		if (depth > limits.maxDepth) throw new CanonicalEncodingError("canonical value exceeds maximum nesting depth");
+		if (cached.byteLength - 2 > limits.maxBytes) throw new CanonicalEncodingError("string exceeds byte limit");
+		writer.bytes(cached);
+		return;
+	}
+	assertWellFormedString(key);
+	if (depth > limits.maxDepth) throw new CanonicalEncodingError("canonical value exceeds maximum nesting depth");
+	const start = writer.offset;
+	writeString(writer, key, limits);
+	// Only one-byte lengths: the cached bytes then carry their UTF-8 length.
+	if (writer.offset - start <= 129 && writer.buffer[start + 1]! < 0x80) {
+		if (KEY_CACHE.size >= KEY_CACHE_LIMIT) KEY_CACHE.clear();
+		KEY_CACHE.set(key, writer.buffer.slice(start, writer.offset));
+	}
+}
+
+function writeInteger(writer: ByteWriter, value: number): void {
+	writer.byte(TAG.INTEGER);
+	if (value >= 0) writer.varUint(value * 2);
+	else if (value >= -0x10000000000000) writer.varUint(-value * 2 - 1);
+	else {
+		let encoded = zigZagEncode(value);
+		writer.reserve(10);
+		do {
+			let byte = Number(encoded & BigInt(0x7f));
+			encoded >>= BigInt(7);
+			if (encoded !== BigInt(0)) byte |= 0x80;
+			writer.buffer[writer.offset++] = byte;
+		} while (encoded !== BigInt(0));
+	}
+}
+
+interface SortedEntry {
+	readonly keyStart: number;
+	readonly keyEnd: number;
+	readonly end: number;
+}
+
+function compareRanges(buffer: Uint8Array, leftStart: number, leftEnd: number, rightStart: number, rightEnd: number): number {
+	const leftLength = leftEnd - leftStart;
+	const rightLength = rightEnd - rightStart;
+	const length = leftLength < rightLength ? leftLength : rightLength;
+	for (let index = 0; index < length; index++) {
+		const leftByte = buffer[leftStart + index]!;
+		const rightByte = buffer[rightStart + index]!;
+		if (leftByte !== rightByte) return leftByte < rightByte ? -1 : 1;
+	}
+	return leftLength === rightLength ? 0 : leftLength < rightLength ? -1 : 1;
+}
+
+/** Entries were written in the ORIGINAL traversal order (so validation and
+ * error precedence are unchanged); emit the header, then canonical order. */
+function finishSorted(writer: ByteWriter, regionStart: number, tag: number, entries: SortedEntry[],
+	duplicate: string | undefined): void {
+	const buffer = writer.buffer;
+	let sorted = true;
+	for (let index = 1; index < entries.length; index++) {
+		const previous = entries[index - 1]!, current = entries[index]!;
+		if (compareRanges(buffer, previous.keyStart, previous.keyEnd, current.keyStart, current.keyEnd) >= 0) {
+			sorted = false;
+			break;
+		}
+	}
+	let order = entries;
+	if (!sorted) {
+		order = entries.slice().sort((left, right) =>
+			compareRanges(buffer, left.keyStart, left.keyEnd, right.keyStart, right.keyEnd));
+		if (duplicate !== undefined) {
+			for (let index = 1; index < order.length; index++) {
+				const previous = order[index - 1]!, current = order[index]!;
+				if (compareRanges(buffer, previous.keyStart, previous.keyEnd, current.keyStart, current.keyEnd) === 0)
+					throw new CanonicalEncodingError(duplicate);
+			}
+		}
+	}
+	const regionEnd = writer.offset;
+	const header = encodeVarUint(entries.length);
+	const headerLength = 1 + header.byteLength;
+	if (sorted) {
+		writer.reserve(headerLength);
+		writer.buffer.copyWithin(regionStart + headerLength, regionStart, regionEnd);
+		writer.buffer[regionStart] = tag;
+		writer.buffer.set(header, regionStart + 1);
+		writer.offset = regionEnd + headerLength;
+		return;
+	}
+	const region = buffer.slice(regionStart, regionEnd);
+	writer.offset = regionStart;
+	writer.byte(tag);
+	writer.bytes(header);
+	for (const entry of order) writer.bytes(region.subarray(entry.keyStart - regionStart, entry.end - regionStart));
+}
+
+/** The single-pass equivalent of `encodeInternal` without capture: identical
+ * bytes, validation, traversal/trap order and error precedence. */
+function writeValue(writer: ByteWriter, value: unknown, active: Set<object>, depth: number,
+	limits: Readonly<CanonicalLimits>): void {
+	if (depth > limits.maxDepth) throw new CanonicalEncodingError("canonical value exceeds maximum nesting depth");
+	if (value === null) return writer.byte(TAG.NULL);
+	if (value === false) return writer.byte(TAG.FALSE);
+	if (value === true) return writer.byte(TAG.TRUE);
+	if (typeof value === "string") return writeString(writer, value, limits);
+	if (typeof value === "number") {
+		if (!Number.isFinite(value)) throw new CanonicalEncodingError("NaN and Infinity are outside the canonical domain");
+		const normalized = value === 0 ? 0 : value;
+		if (Number.isInteger(normalized)) {
+			if (!Number.isSafeInteger(normalized))
+				throw new CanonicalEncodingError("integer must be within JavaScript's safe range");
+			return writeInteger(writer, normalized);
+		}
+		writer.byte(TAG.FLOAT64);
+		writer.reserve(8);
+		writer.view.setFloat64(writer.offset, normalized, false);
+		writer.offset += 8;
+		return;
+	}
+	if (typeof value !== "object") throw new CanonicalEncodingError(`${typeof value} is outside the canonical domain`);
+	if (active.has(value)) throw new CanonicalEncodingError("cyclic values are outside the canonical domain");
+	active.add(value);
+	try {
+		if (value instanceof Uint8Array) {
+			writer.byte(TAG.BYTES);
+			writer.varUint(value.byteLength);
+			writer.foreignBytes(value);
+			return;
+		}
+		if (value instanceof Float32Array) {
+			for (const item of value) {
+				if (!Number.isFinite(item)) throw new CanonicalEncodingError("typed arrays cannot contain NaN or Infinity");
+			}
+			// Read `length` exactly twice (body, then header) like the frozen encoder.
+			const length = value.length, headerLength = value.length;
+			writer.byte(TAG.FLOAT32_ARRAY);
+			writer.varUint(headerLength);
+			writer.reserve(length * 4);
+			for (let index = 0; index < length; index++) {
+				const item = value[index] as number;
+				writer.view.setFloat32(writer.offset, item === 0 ? 0 : item, false);
+				writer.offset += 4;
+			}
+			return;
+		}
+		if (value instanceof Float64Array) {
+			for (const item of value) {
+				if (!Number.isFinite(item)) throw new CanonicalEncodingError("typed arrays cannot contain NaN or Infinity");
+			}
+			const length = value.length, headerLength = value.length;
+			writer.byte(TAG.FLOAT64_ARRAY);
+			writer.varUint(headerLength);
+			writer.reserve(length * 8);
+			for (let index = 0; index < length; index++) {
+				const item = value[index] as number;
+				writer.view.setFloat64(writer.offset, item === 0 ? 0 : item, false);
+				writer.offset += 8;
+			}
+			return;
+		}
+		if (value instanceof Int32Array || value instanceof Uint32Array) {
+			const signed = value instanceof Int32Array;
+			const length = value.length, headerLength = value.length;
+			writer.byte(signed ? TAG.INT32_ARRAY : TAG.UINT32_ARRAY);
+			writer.varUint(headerLength);
+			writer.reserve(length * 4);
+			for (let index = 0; index < length; index++) {
+				if (signed) writer.view.setInt32(writer.offset, value[index] as number, false);
+				else writer.view.setUint32(writer.offset, value[index] as number, false);
+				writer.offset += 4;
+			}
+			return;
+		}
+		if (ArrayBuffer.isView(value) || value instanceof ArrayBuffer || value instanceof Date || value instanceof RegExp) {
+			throw new CanonicalEncodingError("value requires an explicit protocol codec");
+		}
+		if (Array.isArray(value)) {
+			if (value.length > limits.maxItems) throw new CanonicalEncodingError("array exceeds item limit");
+			writer.byte(TAG.ARRAY);
+			writer.varUint(value.length);
+			for (let index = 0; index < value.length; index++) {
+				if (!Object.hasOwn(value, index)) {
+					throw new CanonicalEncodingError("sparse arrays are outside the canonical domain");
+				}
+				writeValue(writer, value[index], active, depth + 1, limits);
+			}
+			return;
+		}
+		if (value instanceof Map) {
+			if (value.size > limits.maxItems) throw new CanonicalEncodingError("map exceeds item limit");
+			const regionStart = writer.offset;
+			const entries: SortedEntry[] = [];
+			for (const [key, item] of value.entries()) {
+				const keyStart = writer.offset;
+				writeValue(writer, key, active, depth + 1, limits);
+				const keyEnd = writer.offset;
+				writeValue(writer, item, active, depth + 1, limits);
+				entries.push({ keyStart, keyEnd, end: writer.offset });
+			}
+			return finishSorted(writer, regionStart, TAG.MAP, entries, "map contains duplicate canonical keys");
+		}
+		if (value instanceof Set) {
+			if (value.size > limits.maxItems) throw new CanonicalEncodingError("set exceeds item limit");
+			const members = [...value];
+			const regionStart = writer.offset;
+			const entries: SortedEntry[] = [];
+			for (const item of members) {
+				const keyStart = writer.offset;
+				writeValue(writer, item, active, depth + 1, limits);
+				entries.push({ keyStart, keyEnd: writer.offset, end: writer.offset });
+			}
+			return finishSorted(writer, regionStart, TAG.SET, entries, "set contains duplicate canonical values");
+		}
+		if (!isPlainObject(value)) {
+			throw new CanonicalEncodingError("class instances require an explicit snapshot codec");
+		}
+		if (Object.getOwnPropertySymbols(value).length !== 0) {
+			throw new CanonicalEncodingError("symbol keys are outside the canonical domain");
+		}
+		const descriptors = Object.getOwnPropertyDescriptors(value) as Record<string, PropertyDescriptor>;
+		const regionStart = writer.offset;
+		const entries: SortedEntry[] = [];
+		for (const key of Object.keys(descriptors)) {
+			const descriptor = descriptors[key]!;
+			if (!descriptor.enumerable) continue;
+			if (!Object.hasOwn(descriptor, "value")) {
+				throw new CanonicalEncodingError(`accessor property ${key} is outside the canonical domain`);
+			}
+			const keyStart = writer.offset;
+			writeKey(writer, key, depth + 1, limits);
+			const keyEnd = writer.offset;
+			writeValue(writer, descriptor.value, active, depth + 1, limits);
+			entries.push({ keyStart, keyEnd, end: writer.offset });
+		}
+		return finishSorted(writer, regionStart, TAG.OBJECT, entries, undefined);
+	} finally {
+		active.delete(value);
+	}
+}
+
 /**
  * Encodes a value with the frozen reference tag codec.
  * @param value - Value in the canonical data domain.
@@ -391,11 +757,17 @@ function encodeInternal(
  */
 export function encodeCanonical(value: unknown, limits: Partial<CanonicalLimits> = {}): Uint8Array {
 	const configured: CanonicalLimits = { ...DEFAULT_LIMITS, ...limits };
-	const bytes = flattenEncoded(encodeInternal(value, new Set<object>(), 0, configured));
-	if (bytes.byteLength > configured.maxBytes) {
-		throw new CanonicalEncodingError("canonical value exceeds byte limit");
+	const writer = WRITER_POOL.pop() ?? new ByteWriter(1024);
+	writer.offset = 0;
+	try {
+		writeValue(writer, value, new Set<object>(), 0, configured);
+		if (writer.offset > configured.maxBytes) {
+			throw new CanonicalEncodingError("canonical value exceeds byte limit");
+		}
+		return writer.buffer.slice(0, writer.offset);
+	} finally {
+		if (writer.buffer.byteLength <= POOLED_WRITER_MAX_BYTES && WRITER_POOL.length < 8) WRITER_POOL.push(writer);
 	}
-	return bytes;
 }
 
 /** An opaque, invocation-owned syntax capture, never wire bytes or authority. */
@@ -561,28 +933,37 @@ export function canonicalRecordResourceForSizing(
 	return checkedCanonicalResourceFootprint({byteLength, items, maxDepth}, configured);
 }
 
+/** Reads an owned copy of the input by offset: no per-node views or result
+ * records. Validation and error precedence match the frozen reader exactly. */
 class Reader {
 	public items = 0;
+	/** Cleared by the only decodable forms the encoder does not reproduce. */
+	public exact = true;
 	public offset = 0;
+	public readonly view: DataView;
 
 	public constructor(
 		public readonly bytes: Uint8Array,
 		public readonly limits: Readonly<CanonicalLimits>,
 		/** Opt-in resource reader only; ordinary decoding retains no stats. */
 		public readonly resourceStats?: {maxDepth: number}
-	) {}
+	) {
+		this.view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+	}
 
-	public take(length: number): Uint8Array {
+	/** Advances past `length` bytes and returns their start offset. */
+	public skip(length: number): number {
 		if (!Number.isSafeInteger(length) || length < 0 || this.offset + length > this.bytes.byteLength) {
 			throw new CanonicalDecodingError("truncated canonical value");
 		}
-		const output = this.bytes.subarray(this.offset, this.offset + length);
+		const start = this.offset;
 		this.offset += length;
-		return output;
+		return start;
 	}
 
 	public byte(): number {
-		return this.take(1)[0] as number;
+		if (this.offset >= this.bytes.byteLength) throw new CanonicalDecodingError("truncated canonical value");
+		return this.bytes[this.offset++]!;
 	}
 
 	public countItems(count = 1): void {
@@ -592,7 +973,26 @@ class Reader {
 		}
 	}
 
-	public varUint(): bigint {
+	/** Up to four bytes (< 2^28) decode exactly as numbers; longer encodings
+	 * replay from their start through the frozen BigInt algorithm. */
+	public varUint(): number | bigint {
+		const bytes = this.bytes;
+		const start = this.offset;
+		let result = 0;
+		for (let count = 1, shift = 0; count <= 4; count++, shift += 7) {
+			if (this.offset >= bytes.byteLength) throw new CanonicalDecodingError("truncated canonical value");
+			const byte = bytes[this.offset++]!;
+			result |= (byte & 0x7f) << shift;
+			if ((byte & 0x80) === 0) {
+				if (count > 1 && (byte & 0x7f) === 0) throw new CanonicalDecodingError("non-minimal varuint");
+				return result;
+			}
+		}
+		this.offset = start;
+		return this.varUintBig();
+	}
+
+	private varUintBig(): bigint {
 		let result = BigInt(0);
 		let shift = BigInt(0);
 		let count = 0;
@@ -615,72 +1015,101 @@ class Reader {
 	}
 }
 
-interface Decoded {
-	bytes: Uint8Array;
-	value: unknown;
+const fatalUtf8Decoder = new intrinsicTextDecoder("utf-8", { fatal: true });
+
+/** Strict UTF-8, stripping exactly one initial BOM like the frozen decoder.
+ * Fatal decoding accepts exactly the inputs whose re-encoding round-trips. */
+function decodeUtf8Range(bytes: Uint8Array, start: number, end: number): string {
+	if (end - start <= 32) {
+		let ascii = true;
+		for (let index = start; index < end; index++) {
+			if (bytes[index]! >= 0x80) {
+				ascii = false;
+				break;
+			}
+		}
+		if (ascii) return String.fromCharCode.apply(null, bytes.subarray(start, end) as unknown as number[]);
+	}
+	try {
+		return fatalUtf8Decoder.decode(bytes.subarray(start, end));
+	} catch {
+		throw new CanonicalDecodingError("invalid UTF-8 string");
+	}
 }
 
 function decodeCollection(reader: Reader, depth: number, tag: number): unknown {
 	const length = Number(reader.varUint());
+	const bytes = reader.bytes;
 	if (tag === TAG.ARRAY) {
 		reader.countItems(length);
 		const values: unknown[] = [];
-		for (let index = 0; index < length; index++) values.push(decodeInternal(reader, depth + 1).value);
+		for (let index = 0; index < length; index++) values.push(decodeInternal(reader, depth + 1));
 		return values;
 	}
 	if (tag === TAG.SET) {
 		reader.countItems(length);
 		const values = new Set<unknown>();
-		let previousBytes: Uint8Array | undefined;
+		let previousStart = -1, previousEnd = -1;
 		for (let index = 0; index < length; index++) {
-			const decoded = decodeInternal(reader, depth + 1);
-			if (previousBytes !== undefined && compareBytes(previousBytes, decoded.bytes) >= 0) {
+			const start = reader.offset;
+			const value = decodeInternal(reader, depth + 1);
+			if (previousStart >= 0 && compareRanges(bytes, previousStart, previousEnd, start, reader.offset) >= 0) {
 				throw new CanonicalDecodingError("set values are not in canonical order or are duplicated");
 			}
-			previousBytes = decoded.bytes;
-			values.add(decoded.value);
+			previousStart = start;
+			previousEnd = reader.offset;
+			values.add(value);
 		}
 		return values;
 	}
 
 	reader.countItems(length * 2);
-	const object = Object.create(null) as Record<string, unknown>;
-	const map = new Map<unknown, unknown>();
-	let previousKeyBytes: Uint8Array | undefined;
+	const object = tag === TAG.OBJECT ? Object.create(null) as Record<string, unknown> : undefined;
+	const map = tag === TAG.OBJECT ? undefined : new Map<unknown, unknown>();
+	let previousStart = -1, previousEnd = -1;
 	for (let index = 0; index < length; index++) {
+		const start = reader.offset;
 		const key = decodeInternal(reader, depth + 1);
-		if (previousKeyBytes !== undefined && compareBytes(previousKeyBytes, key.bytes) >= 0) {
+		if (previousStart >= 0 && compareRanges(bytes, previousStart, previousEnd, start, reader.offset) >= 0) {
 			throw new CanonicalDecodingError("map/object keys are not in canonical order or are duplicated");
 		}
-		previousKeyBytes = key.bytes;
-		const item = decodeInternal(reader, depth + 1).value;
-		if (tag === TAG.OBJECT) {
-			if (typeof key.value !== "string") throw new CanonicalDecodingError("object key must be a string");
-			object[key.value] = item;
+		previousStart = start;
+		previousEnd = reader.offset;
+		const item = decodeInternal(reader, depth + 1);
+		if (object !== undefined) {
+			if (typeof key !== "string") throw new CanonicalDecodingError("object key must be a string");
+			object[key] = item;
 		} else {
-			map.set(key.value, item);
+			map!.set(key, item);
 		}
 	}
-	return tag === TAG.OBJECT ? object : map;
+	return object ?? map;
 }
 
 function decodeTypedArray(reader: Reader, tag: number): Float32Array | Float64Array | Int32Array | Uint32Array {
 	const length = Number(reader.varUint());
 	reader.countItems(length);
 	const width = tag === TAG.FLOAT64_ARRAY ? 8 : 4;
-	const bytes = reader.take(length * width);
-	const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+	const start = reader.skip(length * width);
+	const view = reader.view;
 	let value: Float32Array | Float64Array | Int32Array | Uint32Array;
 	if (tag === TAG.FLOAT32_ARRAY) {
-		value = Float32Array.from({ length }, (_item, index) => view.getFloat32(index * 4, false));
+		value = new Float32Array(length);
+		for (let index = 0; index < length; index++) value[index] = view.getFloat32(start + index * 4, false);
 	} else if (tag === TAG.FLOAT64_ARRAY) {
-		value = Float64Array.from({ length }, (_item, index) => view.getFloat64(index * 8, false));
+		value = new Float64Array(length);
+		for (let index = 0; index < length; index++) value[index] = view.getFloat64(start + index * 8, false);
 	} else if (tag === TAG.INT32_ARRAY) {
-		value = Int32Array.from({ length }, (_item, index) => view.getInt32(index * 4, false));
+		value = new Int32Array(length);
+		for (let index = 0; index < length; index++) value[index] = view.getInt32(start + index * 4, false);
+		return value;
 	} else {
-		value = Uint32Array.from({ length }, (_item, index) => view.getUint32(index * 4, false));
+		value = new Uint32Array(length);
+		for (let index = 0; index < length; index++) value[index] = view.getUint32(start + index * 4, false);
+		return value;
 	}
-	for (const item of value) {
+	for (let index = 0; index < length; index++) {
+		const item = value[index]!;
 		if (!Number.isFinite(item)) throw new CanonicalDecodingError("typed array contains a non-finite number");
 		if (Object.is(item, -0)) {
 			throw new CanonicalDecodingError("typed array contains non-canonical negative zero");
@@ -689,40 +1118,35 @@ function decodeTypedArray(reader: Reader, tag: number): Float32Array | Float64Ar
 	return value;
 }
 
-function decodeInternal(reader: Reader, depth: number): Decoded {
+function decodeInternal(reader: Reader, depth: number): unknown {
 	if (depth > reader.limits.maxDepth) {
 		throw new CanonicalDecodingError("canonical value exceeds maximum nesting depth", "depth");
 	}
 	const resourceStats = reader.resourceStats;
 	if (resourceStats !== undefined && depth > resourceStats.maxDepth) resourceStats.maxDepth = depth;
 	reader.countItems();
-	const start = reader.offset;
 	const tag = reader.byte();
-	let value: unknown;
 
 	switch (tag) {
 		case TAG.NULL:
-			value = null;
-			break;
+			return null;
 		case TAG.FALSE:
-			value = false;
-			break;
+			return false;
 		case TAG.TRUE:
-			value = true;
-			break;
+			return true;
 		case TAG.INTEGER: {
 			const encoded = reader.varUint();
+			if (typeof encoded === "number") return (encoded & 1) === 0 ? encoded >>> 1 : -((encoded >>> 1) + 1);
 			const magnitude = encoded >> BigInt(1);
 			const integer = (encoded & BigInt(1)) === BigInt(0) ? magnitude : -(magnitude + BigInt(1));
 			if (integer < -MAX_SAFE_BIGINT || integer > MAX_SAFE_BIGINT) {
 				throw new CanonicalDecodingError("integer exceeds safe range");
 			}
-			value = Number(integer);
-			break;
+			return Number(integer);
 		}
 		case TAG.FLOAT64: {
-			const bytes = reader.take(8);
-			const number = new DataView(bytes.buffer, bytes.byteOffset, 8).getFloat64(0, false);
+			const start = reader.skip(8);
+			const number = reader.view.getFloat64(start, false);
 			if (!Number.isFinite(number)) {
 				throw new CanonicalDecodingError("non-finite float is outside the canonical domain");
 			}
@@ -730,42 +1154,42 @@ function decodeInternal(reader: Reader, depth: number): Decoded {
 			if (Number.isSafeInteger(number)) {
 				throw new CanonicalDecodingError("integral float must use the integer tag");
 			}
-			value = number;
-			break;
+			// Integral floats beyond the safe range decode, but the encoder refuses them.
+			if (Number.isInteger(number)) reader.exact = false;
+			return number;
 		}
 		case TAG.STRING: {
 			const length = Number(reader.varUint());
-			let bytes: Uint8Array;
+			let start: number;
 			try {
-				bytes = reader.take(length);
+				start = reader.skip(length);
 			} catch (error) {
 				if (error instanceof CanonicalDecodingError) throw new CanonicalDecodingError("invalid UTF-8 string");
 				throw error;
 			}
-			const decodedString = decodeUtf8String(bytes);
-			assertWellFormedString(decodedString);
-			value = decodedString;
-			break;
+			// The native decoder strips one leading BOM, which re-encoding omits.
+			const bytes = reader.bytes;
+			if (reader.offset - start >= 3 && bytes[start] === 0xef && bytes[start + 1] === 0xbb && bytes[start + 2] === 0xbf)
+				reader.exact = false;
+			return decodeUtf8Range(bytes, start, reader.offset);
 		}
-		case TAG.BYTES:
-			value = new Uint8Array(reader.take(Number(reader.varUint())));
-			break;
+		case TAG.BYTES: {
+			const start = reader.skip(Number(reader.varUint()));
+			return reader.bytes.slice(start, reader.offset);
+		}
 		case TAG.ARRAY:
 		case TAG.OBJECT:
 		case TAG.MAP:
 		case TAG.SET:
-			value = decodeCollection(reader, depth, tag);
-			break;
+			return decodeCollection(reader, depth, tag);
 		case TAG.FLOAT32_ARRAY:
 		case TAG.FLOAT64_ARRAY:
 		case TAG.INT32_ARRAY:
 		case TAG.UINT32_ARRAY:
-			value = decodeTypedArray(reader, tag);
-			break;
+			return decodeTypedArray(reader, tag);
 		default:
 			throw new CanonicalDecodingError(`unknown canonical tag 0x${tag.toString(16).padStart(2, "0")}`);
 	}
-	return { value, bytes: reader.bytes.subarray(start, reader.offset) };
 }
 
 /**
@@ -781,11 +1205,46 @@ export function decodeCanonical(input: Uint8Array, limits: Partial<CanonicalLimi
 		throw new CanonicalDecodingError("canonical value exceeds byte limit", "bytes");
 	}
 	const reader = new Reader(bytes, configured);
-	const value = decodeInternal(reader, 0).value;
+	const value = decodeInternal(reader, 0);
 	if (reader.offset !== bytes.byteLength) {
 		throw new CanonicalDecodingError("trailing bytes after canonical value");
 	}
 	return value;
+}
+
+/** Result of {@link decodeCanonicalExactness}. */
+export interface CanonicalExactDecoding {
+	readonly value: unknown;
+	/** True only when `encodeCanonical(value)` with default limits reproduces the input byte for byte. */
+	readonly exact: boolean;
+}
+
+/**
+ * Decodes exactly like {@link decodeCanonical} (same limits, errors and value)
+ * and reports whether re-encoding the untouched value with default limits is
+ * guaranteed to reproduce the input. `false` means unknown: callers keep their
+ * original re-encode-and-compare canonicality check.
+ * @param input - Canonical bytes.
+ * @param limits - Optional resource-limit overrides.
+ * @returns The decoded value and its exactness.
+ */
+export function decodeCanonicalExactness(input: Uint8Array, limits: Partial<CanonicalLimits> = {}): CanonicalExactDecoding {
+	const bytes = new Uint8Array(input);
+	const configured: CanonicalLimits = { ...DEFAULT_LIMITS, ...limits };
+	if (bytes.byteLength > configured.maxBytes) {
+		throw new CanonicalDecodingError("canonical value exceeds byte limit", "bytes");
+	}
+	const stats = { maxDepth: 0 };
+	const reader = new Reader(bytes, configured, stats);
+	const value = decodeInternal(reader, 0);
+	if (reader.offset !== bytes.byteLength) {
+		throw new CanonicalDecodingError("trailing bytes after canonical value");
+	}
+	// The encoder bounds each collection by maxItems; the decoder bounds the
+	// total, so total consumption within the defaults implies encoder success.
+	const exact = reader.exact && bytes.byteLength <= DEFAULT_LIMITS.maxBytes &&
+		reader.items <= DEFAULT_LIMITS.maxItems && stats.maxDepth <= DEFAULT_LIMITS.maxDepth;
+	return Object.freeze({ value, exact });
 }
 
 /** Actual current carrier only. The ORIGINAL decoder validates the supplied
@@ -828,6 +1287,8 @@ export function deepCloneCanonical<T>(value: T): T {
 }
 
 const HASH_MAGIC = Uint8Array.of(0x44, 0x52, 0x50, 0x00);
+/** Exact framed domain prefixes (magic, length, UTF-8 domain), never parts. */
+const DOMAIN_PREFIXES = new Map<string, Uint8Array>();
 
 function u32be(value: number): Uint8Array {
 	if (!Number.isSafeInteger(value) || value < 0 || value > 0xffff_ffff) {
@@ -843,8 +1304,88 @@ function u64be(value: number): Uint8Array {
 		throw new RangeError("u64 value must be a non-negative safe integer");
 	}
 	const bytes = new Uint8Array(8);
-	new DataView(bytes.buffer).setBigUint64(0, BigInt(value), false);
+	const view = new DataView(bytes.buffer);
+	view.setUint32(0, Math.floor(value / 0x1_0000_0000), false);
+	view.setUint32(4, value >>> 0, false);
 	return bytes;
+}
+
+// Exact-input digest memo. A framed SHA-256 is a pure function of the domain and
+// the exact part bytes, and storage currency checks re-hash the same immutable
+// blobs, chunks and images many times per transition. A hit requires full
+// byte-for-byte equality with PRIVATE copies taken at the miss: no identity,
+// length or sample is trusted, and caller mutation after hashing only misses.
+const HASH_MEMO_MIN_BYTES = 64;
+const HASH_MEMO_MAX_ENTRY_BYTES = 4 * 1024 * 1024;
+const HASH_MEMO_MAX_BYTES = 32 * 1024 * 1024;
+const HASH_MEMO_MAX_ENTRIES = 32_768;
+interface HashMemoEntry {
+	readonly parts: readonly Uint8Array[];
+	readonly digest: Uint8Array;
+	readonly bytes: number;
+}
+const hashMemo = new Map<string, HashMemoEntry>();
+let hashMemoBytes = 0;
+
+/** Locates a candidate only; equality is always decided by `sameMemoBytes`.
+ * The fingerprint covers every byte (two 32-bit lanes, word-at-a-time when
+ * aligned): same-layout records differing anywhere must not share a slot. */
+function hashMemoKey(domain: string, parts: readonly Uint8Array[]): string | undefined {
+	let total = 0;
+	let key = domain;
+	let a = 0x811c9dc5;
+	let b = 0x9e3779b1;
+	for (const part of parts) {
+		const length = part.byteLength;
+		total += length;
+		key += `\u0000${length}`;
+		let index = 0;
+		if ((part.byteOffset & 3) === 0) {
+			const words = length >>> 2;
+			const view = new Int32Array(part.buffer, part.byteOffset, words);
+			for (let word = 0; word < words; word++) {
+				const value = view[word]!;
+				a = Math.imul(a ^ value, 0x01000193);
+				b = Math.imul(b ^ value, 0x85ebca6b) ^ (b >>> 13);
+			}
+			index = words << 2;
+		}
+		for (; index < length; index++) {
+			a = Math.imul(a ^ part[index]!, 0x01000193);
+			b = Math.imul(b ^ part[index]!, 0x85ebca6b) ^ (b >>> 13);
+		}
+	}
+	return total < HASH_MEMO_MIN_BYTES || total > HASH_MEMO_MAX_ENTRY_BYTES
+		? undefined : `${key}\u0000${a >>> 0}.${b >>> 0}`;
+}
+
+function sameMemoBytes(left: Uint8Array, right: Uint8Array): boolean {
+	const length = left.byteLength;
+	if (length !== right.byteLength) return false;
+	let index = 0;
+	if ((left.byteOffset & 3) === 0 && (right.byteOffset & 3) === 0) {
+		const words = length >>> 2;
+		const a = new Int32Array(left.buffer, left.byteOffset, words);
+		const b = new Int32Array(right.buffer, right.byteOffset, words);
+		for (let word = 0; word < words; word++) if (a[word] !== b[word]) return false;
+		index = words << 2;
+	}
+	for (; index < length; index++) if (left[index] !== right[index]) return false;
+	return true;
+}
+
+function hashDomainUncached(domain: string, parts: readonly Uint8Array[]): Uint8Array {
+	let prefix = DOMAIN_PREFIXES.get(domain);
+	if (prefix === undefined) {
+		const domainBytes = textEncoder.encode(domain);
+		prefix = concat([HASH_MAGIC, u32be(domainBytes.byteLength), domainBytes]);
+		if (DOMAIN_PREFIXES.size >= 1024) DOMAIN_PREFIXES.clear();
+		DOMAIN_PREFIXES.set(domain, prefix);
+	}
+	// Identical framed bytes, streamed: no whole-message concatenation copy.
+	const hasher = sha256.create().update(prefix);
+	for (const part of parts) hasher.update(u64be(part.byteLength)).update(part);
+	return hasher.digest();
 }
 
 /**
@@ -854,8 +1395,34 @@ function u64be(value: number): Uint8Array {
  * @returns The SHA-256 digest.
  */
 export function hashDomain(domain: string, ...parts: readonly Uint8Array[]): Uint8Array {
-	const domainBytes = textEncoder.encode(domain);
-	const framed: Uint8Array[] = [HASH_MAGIC, u32be(domainBytes.byteLength), domainBytes];
-	for (const part of parts) framed.push(u64be(part.byteLength), part);
-	return sha256(concat(framed));
+	if (typeof domain !== "string" || !parts.every(plainMemoView)) {
+		// Exotic or instrumented carriers keep the frozen framing algorithm verbatim.
+		const domainBytes = textEncoder.encode(domain);
+		const framed: Uint8Array[] = [HASH_MAGIC, u32be(domainBytes.byteLength), domainBytes];
+		for (const part of parts) framed.push(u64be(part.byteLength), part);
+		return sha256(concat(framed));
+	}
+	const key = hashMemoKey(domain, parts);
+	if (key === undefined) return hashDomainUncached(domain, parts);
+	const known = hashMemo.get(key);
+	if (known !== undefined && known.parts.every((part, index) => sameMemoBytes(part, parts[index]!))) {
+		hashMemo.delete(key);
+		hashMemo.set(key, known);
+		return known.digest.slice();
+	}
+	const digest = hashDomainUncached(domain, parts);
+	if (known !== undefined) {
+		hashMemo.delete(key);
+		hashMemoBytes -= known.bytes;
+	}
+	const copies = parts.map((part) => part.slice());
+	const bytes = copies.reduce((sum, part) => sum + part.byteLength, 0);
+	hashMemo.set(key, Object.freeze({ parts: Object.freeze(copies), digest: digest.slice(), bytes }));
+	hashMemoBytes += bytes;
+	for (const [oldest, entry] of hashMemo) {
+		if (hashMemoBytes <= HASH_MEMO_MAX_BYTES && hashMemo.size <= HASH_MEMO_MAX_ENTRIES) break;
+		hashMemo.delete(oldest);
+		hashMemoBytes -= entry.bytes;
+	}
+	return digest;
 }

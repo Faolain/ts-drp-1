@@ -4,6 +4,7 @@ import ts from "typescript";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { aheRetirementGenerationIdentity, decodeAheRetirementControl, digestBlob, encodeGenerationRecordV1,
 	type AheRetirementPreparation, type StoreResult } from "@ts-drp/storage";
+import {BoundedReadBudgetError} from "@ts-drp/storage/adapter";
 import { createBrowserAheDurableStore } from "../src/internal/idb-adapter.js";
 import { PHASE_2D_BLOBS_STORE, PHASE_5C_STORAGE_META_STORE } from "../src/internal/schema-idb.js";
 import * as retirement from "../src/internal/retirement-control.js";
@@ -11,6 +12,16 @@ import * as retirement from "../src/internal/retirement-control.js";
 function must<T>(result: StoreResult<T>): T {
 	if (!result.ok) throw Error(result.reason);
 	return result.value;
+}
+
+async function seedAdopted(store: Awaited<ReturnType<typeof createBrowserAheDurableStore>>, objectId: never): Promise<void> {
+	const generationId = "b".repeat(64) as never, bytes = Uint8Array.of(1), digest = must(digestBlob(bytes));
+	must(await store.beginGeneration({objectId, generationId, baseExpectedHead: {kind: "none", objectId},
+		closure: [{digest, byteLength: bytes.length}]}));
+	must(await store.putCachedBlob({objectId, generationId, digest, bytes}));
+	must(await store.promoteReference({objectId, generationId, digest}));
+	must(await store.completeGeneration({objectId, generationId}));
+	must(await store.swapHead({objectId, generationId, expectedHead: {kind: "none", objectId}}));
 }
 
 afterEach(() => vi.restoreAllMocks());
@@ -31,17 +42,23 @@ describe("same-transaction metadata retirement census", () => {
 			const generation = {objectId, generationId, state: "Adopted" as const, baseExpectedHead: {kind: "none" as const, objectId},
 				closureDigest: head.closureDigest, closure: [{digest, byteLength: bytes.length}]};
 			const recordDigest = must(digestBlob(encodeGenerationRecordV1(generation)));
+			const spy = vi.spyOn(retirement, "admitBrowserRetirementControl");
 			const read = must(await store.acquireRetirementControl!(objectId));
+			// The noncreating observation joins before genuine strict-RW birth.
+			expect(spy.mock.calls.map(([transaction]) => transaction.mode)).toEqual(["readonly", "readwrite"]);
 			const preparation: AheRetirementPreparation = {head, floorEpoch: 2, floorAnchor: "c".repeat(64),
 				decisionDigest: "d".repeat(64), sourceProofDigest: "e".repeat(64), generationRecordDigests: [recordDigest],
 				snapshotScopes: [], protectedIndices: [], retireIndices: [], domains: Array.from({length: 8}, (_, index) =>
 					[2 ** index, new Uint8Array(32), new Uint8Array(32), 0, new Uint8Array(32), new Uint8Array(32), 0] as const)};
-			const spy = vi.spyOn(retirement, "admitBrowserRetirementControl");
+			spy.mockClear();
 			must(await read.prepareBound({preparation, generations: {recordDigests: [recordDigest],
 				identities: [{generationId, identityDigest: aheRetirementGenerationIdentity(generation)}], protectedIndices: [0], retireIndices: []}}));
 			await read.release();
 			expect(spy.mock.calls.map(([transaction]) => transaction.mode)).toEqual(["readwrite", "readonly"]);
-			const commit = must(await store.acquireRetirementControl!(objectId)); spy.mockClear();
+			spy.mockClear();
+			const commit = must(await store.acquireRetirementControl!(objectId));
+			expect(spy.mock.calls.map(([transaction]) => transaction.mode)).toEqual(["readonly"]);
+			spy.mockClear();
 			const completed = must(await commit.commitPrepared({decisionDigest: preparation.decisionDigest,
 				sourceProofDigest: preparation.sourceProofDigest}));
 			await commit.release();
@@ -75,6 +92,81 @@ describe("same-transaction metadata retirement census", () => {
 				expect(decodeAheRetirementControl(actual.record)).toEqual({ok: true, value: completed});
 			} finally { raw.close(); }
 		} finally { await store.close(); }
+	});
+
+	it("observes an existing coordinator through the same genuine held RO, with fresh native qualification after release", async () => {
+		const databaseName = `metadata-held-control-${crypto.randomUUID()}`;
+		const store = await createBrowserAheDurableStore({databaseName});
+		const objectId = `metadata-held-control:${"a".repeat(32)}` as never;
+		try {
+			await seedAdopted(store, objectId);
+			const born = must(await store.acquireRetirementControl!(objectId));
+			const expected = {control: born.control, head: born.head, imageDigest: born.imageDigest, metadataBytes: born.metadataBytes};
+			await born.release();
+			const held = await store.acquireNativeReadReservation({objectId});
+			const spy = vi.spyOn(retirement, "admitBrowserRetirementControl");
+			const first = must(await store.acquireRetirementControl!(objectId));
+			expect({control: first.control, head: first.head, imageDigest: first.imageDigest, metadataBytes: first.metadataBytes}).toEqual(expected);
+			expect(spy.mock.calls.map(([transaction]) => transaction.mode)).toEqual(["readonly"]);
+			const transaction = spy.mock.calls[0]![0];
+			const second = must(await store.acquireRetirementControl!(objectId));
+			expect(second.control).toEqual(expected.control);
+			// Reuse is supplied by the original point owner under this exact real
+			// physical transaction, not by a cached epoch/image or caller object.
+			expect(spy).toHaveBeenCalledTimes(1);
+			await first.release(); await second.release(); await held.check(); await held.release();
+			const after = must(await store.acquireRetirementControl!(objectId));
+			expect(after.control).toEqual(expected.control); await after.release();
+			expect(spy).toHaveBeenCalledTimes(2);
+			expect(spy.mock.calls[1]![0]).not.toBe(transaction);
+		} finally {await store.close();}
+	});
+
+	it("serializes concurrent missing-control births and preserves acquisition poisoning without changing public point reads", async () => {
+		const databaseName = `metadata-control-birth-${crypto.randomUUID()}`;
+		const first = await createBrowserAheDurableStore({databaseName});
+		const second = await createBrowserAheDurableStore({databaseName});
+		const objectId = `metadata-control-birth:${"a".repeat(32)}` as never;
+		const open = indexedDB.open(databaseName);
+		const raw = await new Promise<IDBDatabase>((resolve, reject) => {
+			open.onsuccess = () => resolve(open.result); open.onerror = () => reject(open.error);
+		});
+		try {
+			await seedAdopted(first, objectId);
+			const expectedHead = must(await first.readHead(objectId));
+			const born = (await Promise.all([first.acquireRetirementControl!(objectId), second.acquireRetirementControl!(objectId)])).map(must);
+			expect(born[0]!.control).toEqual(born[1]!.control);
+			expect(born[0]!.imageDigest).toBe(born[1]!.imageDigest);
+			await Promise.all(born.map(read => read.release()));
+			await new Promise<void>((resolve, reject) => {
+				const transaction = raw.transaction(PHASE_5C_STORAGE_META_STORE, "readwrite");
+				transaction.objectStore(PHASE_5C_STORAGE_META_STORE).put({key: `ahe-retirement:${objectId}`, record: Uint8Array.of(255)});
+				transaction.oncomplete = () => resolve(); transaction.onabort = () => reject(transaction.error);
+			});
+			// Point reads retain their existing no-new-poison error contract.
+			expect((await first.readRetirementAdmissionImage!(objectId)).ok).toBe(false);
+			expect(await first.readHead(objectId)).toEqual({ok: true, value: expectedHead});
+			expect(await first.acquireRetirementControl!(objectId)).toEqual({ok: false, reason: "NON_CANONICAL_RECORD"});
+			expect(await first.readHead(objectId)).toEqual({ok: false, reason: "STORE_POISONED"});
+		} finally {raw.close(); await first.close(); await second.close();}
+	});
+
+	it("preserves acquisition-only budget exception translation without poisoning or changing public point reads", async () => {
+		const store = await createBrowserAheDurableStore({databaseName: `metadata-budget-${crypto.randomUUID()}`});
+		const objectId = `metadata-budget:${"a".repeat(32)}` as never;
+		try {
+			await seedAdopted(store, objectId);
+			const born = must(await store.acquireRetirementControl!(objectId)); await born.release();
+			const expectedHead = must(await store.readHead(objectId));
+			const budget = new BoundedReadBudgetError();
+			vi.spyOn(retirement, "admitBrowserRetirementControl").mockImplementation(async () => {throw budget;});
+			expect(await store.acquireRetirementControl!(objectId)).toEqual({ok: false, reason: "READ_BUDGET_EXCEEDED"});
+			expect(await store.readHead(objectId)).toEqual({ok: true, value: expectedHead});
+			const point = await store.readRetirementAdmissionImage!(objectId);
+			expect(point).toEqual({ok: false, reason: "SUBSTRATE_FAILURE", cause: budget});
+			if (!point.ok && "cause" in point) expect(point.cause).toBe(budget);
+			expect(await store.readHead(objectId)).toEqual({ok: true, value: expectedHead});
+		} finally {await store.close();}
 	});
 
 	it("retains the actual second admission call for every physical mutation and propagates its refusal", async () => {

@@ -63,7 +63,7 @@ function fixture() {
 	const sourceFacts = {identity: sourceIdentity, capacity};
 	const api = execute<(proof: object, unsignedBytes: Uint8Array, options: {reader: typeof reader; storageIncarnation: string; actualProducerChunkBytes: 131072}) =>
 		Promise<{knownCarriers: readonly Uint8Array[]; unknownEncodedLengths: readonly number[]; fullFutureProofEnvelopeByteLengths: readonly number[]} | undefined>>(`
-		${["creatorOrdinaryCurrentDimensionStampMatchesForSizing", "deriveCreatorOrdinaryApplicationResourceForSizing",
+		${["resolveCreatorOrdinaryNumericalDimensions", "creatorOrdinaryCurrentDimensionStampMatchesForSizing", "deriveCreatorOrdinaryApplicationResourceForSizing",
 			"reserveCreatorOrdinaryFinishingCapacity"].map(name => declaration(name).getText(tree).replace(/^export /, "")).join("\n")}
 		return reserveCreatorOrdinaryFinishingCapacity;`, {
 		creatorOrdinaryIssuanceProofFacts: (value: object) => value === proof && state.ownerAvailable && frame.alive ? owner : undefined,

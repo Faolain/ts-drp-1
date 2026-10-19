@@ -14,6 +14,7 @@ export async function buildAssets(lane: "active" | "role" = "active"): Promise<v
 	};
 	const alias = { ...loaded.workspaceAliases };
 	// Root imports and explicit lifecycle subpaths must share the same custody owner.
+	alias["@ts-drp/canonical"] = join(root, "packages/canonical/src");
 	alias["@ts-drp/node"] = join(root, "packages/node/src/index.ts");
 	alias["@ts-drp/network/snapshot-transfer"] = join(root, "packages/network/src/snapshot-transfer.ts");
 	alias["@ts-drp/protocol-v3/internal/creator-forward-promotion"] = join(
@@ -49,7 +50,11 @@ export async function buildAssets(lane: "active" | "role" = "active"): Promise<v
 						// Explicit .js imports must not select stale beside-source emit.
 						// Reuse the native launcher rule for product and owned fixture sources.
 						context.onResolve({ filter: /^\..*\.js$/ }, (args) => {
-							const target = resolve(args.resolveDir, args.path.slice(0, -3) + ".ts");
+							const emitted = resolve(args.resolveDir, args.path.slice(0, -3) + ".ts");
+							// Explicit fixture imports of workspace dist/src entries must
+							// select the same current source owner as its relative imports.
+							const target = emitted.startsWith(join(root, "packages") + "/")
+								? emitted.replace(/\/dist\/src\//u, "/src/") : emitted;
 							return (target.startsWith(join(root, "packages") + "/") ||
 								target.startsWith(join(root, "tests/fixtures") + "/")) &&
 								existsSync(target)

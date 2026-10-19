@@ -41,14 +41,20 @@ function validateCriticalCoverage(coverage:any){
  return {valid:failures.length===0,failures:[...new Set(failures)],scripts:coverage?.result?.length??0,functions,calls,timestamp:coverage?.timestamp,
   qualification:"V8 precise per-function call counts for this isolate and capture interval, not CPU samples or cross-client causal attribution. Precise coverage prevents optimized execution; diagnostic timings are not an unprofiled performance result."};
 }
-function selectCriticalTraceCategories(available:readonly string[]):string[]{
+function selectCriticalTraceCategories(available:readonly string[],handoffOnly=false,rendererOnly=false,rendererTasks=false):string[]{
  // Exact names only: substring "file" also matches "cpu_profiler". Enabling
  // that starts another profiler and does not measure filesystem work.
  const native=["IndexedDB","indexeddb","disabled-by-default-indexeddb","leveldb","disabled-by-default-leveldb"];
- return ["devtools.timeline","blink.user_timing","disabled-by-default-v8.gc",...native.filter(category=>available.includes(category))];
+ return ["devtools.timeline","blink.user_timing",...(handoffOnly?[]:["disabled-by-default-v8.gc"]),...(rendererOnly?[]:native.filter(category=>available.includes(category))),
+  ...(rendererTasks?["v8.execute","toplevel"].filter(category=>available.includes(category)):[])];
 }
-function criticalCaptureModes(mode:"full-calls"|"cpu-only"|"trace-only"|"allocation-only"|"system-trace"){
- return {v8CpuProfiling:mode==="cpu-only",nativeTracing:mode!=="cpu-only"&&mode!=="system-trace",allocationSampling:mode==="allocation-only"};
+function criticalCaptureModes(mode:"full-calls"|"cpu-only"|"trace-only"|"allocation-only"|"system-trace"|"self-only"|"self-trace"){
+ return {v8CpuProfiling:mode==="cpu-only",nativeTracing:mode!=="cpu-only"&&mode!=="system-trace"&&mode!=="self-only",allocationSampling:mode==="allocation-only"};
+}
+function verifiedCriticalSourceReuse(reportedHash:unknown,pins:Iterable<any>){
+ if(typeof reportedHash!=="string"||!/^[0-9a-f]{64}$/u.test(reportedHash))return undefined;
+ for(const pin of pins)if(pin.independentlyFetchedSource===true&&pin.sha256===reportedHash)return pin;
+ return undefined;
 }
 function validateCriticalAllocationProfile(profile:any){
  const failures:string[]=[],nodes=new Set<number>(),ordinals=new Set<number>(),pending=[profile?.head];
@@ -108,13 +114,21 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
  const fullFunctionCalls=process.env.STARTUP_HEALTHY_GRID_FULL_CALLS==="1";
  if(fullFunctionCalls&&!criticalProfiling)throw new Error("full function capture requires existing critical instrumentation");
  const profileMode=process.env.STARTUP_HEALTHY_GRID_PROFILE_MODE??"full-calls";
- if(profileMode!=="full-calls"&&profileMode!=="cpu-only"&&profileMode!=="trace-only"&&profileMode!=="allocation-only"&&profileMode!=="system-trace")throw new Error("bounded full-calls, cpu-only, trace-only, allocation-only or system-trace profile mode required");
+ if(profileMode!=="full-calls"&&profileMode!=="cpu-only"&&profileMode!=="trace-only"&&profileMode!=="allocation-only"&&profileMode!=="system-trace"&&profileMode!=="self-only"&&profileMode!=="self-trace")throw new Error("bounded full-calls, cpu-only, trace-only, allocation-only, system-trace, self-only or self-trace profile mode required");
  const exactFunctionCalls=fullFunctionCalls&&profileMode==="full-calls";
+ const selfFunctionCalls=fullFunctionCalls&&(profileMode==="self-only"||profileMode==="self-trace");
+ const handoffOnly=process.env.STARTUP_HEALTHY_GRID_TRACE_DETAIL==="handoff";
+ const rendererTaskTrace=process.env.STARTUP_HEALTHY_GRID_TRACE_DETAIL==="renderer-tasks";
+ const rendererTraceOnly=process.env.STARTUP_HEALTHY_GRID_TRACE_DETAIL==="renderer"||rendererTaskTrace;
+ if(process.env.STARTUP_HEALTHY_GRID_TRACE_DETAIL!==undefined&&!(handoffOnly&&profileMode==="trace-only")&&!(rendererTraceOnly&&(profileMode==="self-trace"||profileMode==="trace-only")))throw Error("NATIVE_HANDOFF_TRACE_SCOPE_INVALID");
+ const bodyFunctionCalls=exactFunctionCalls||selfFunctionCalls;
+ if((profileMode==="self-only"||profileMode==="self-trace")&&(!fullFunctionCalls||process.env.STARTUP_HEALTHY_GRID_OWNER_CLOCK_SCOPE!=="retirement"))throw Error("SELF_ONLY_REQUIRES_RETIREMENT_SCOPE");
  const captureModes=criticalCaptureModes(profileMode);
  if((profileMode==="trace-only"||profileMode==="allocation-only"||profileMode==="system-trace")&&!fullFunctionCalls)throw new Error("trace/allocation/system diagnostic requires original bounded E4 API windows");
  if(fullFunctionCalls)await page.context().addInitScript(exact=>{
   Reflect.set(globalThis,"__r8FunctionCaptureEnabled",true);Reflect.set(globalThis,"__r8FullFunctionCalls",exact);
- },exactFunctionCalls);
+ },bodyFunctionCalls);
+ if(selfFunctionCalls)await page.context().addInitScript(()=>Reflect.set(globalThis,"__r8RequiredFunctionClockScope","retirement"));
  const incrementalNativeControls=process.env.STARTUP_HEALTHY_GRID_INCREMENTAL_CONTROLS==="1";
  if(incrementalNativeControls&&!criticalProfiling)throw new Error("incremental native controls require existing critical build/runtime instrumentation");
  if(incrementalNativeControls)await page.context().addInitScript(()=>Reflect.set(globalThis,"__r8IncrementalNativeControls",true));
@@ -246,7 +260,8 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
  // Never create/poll a CDP session per iframe: that duplicated discovery errors
  // and profile servicing, without adding another independently profiled VM.
  const criticalErrors:any[]=[],captureWindows:any[]=[],contexts=new Map<number,any>(),scripts=new Map<string,any>(),sourcePins=new Map<string,any>();
- let criticalFinished=false,activeCapture:any,criticalReady=false,targetId:string|undefined;
+ let criticalFinished=false,activeCapture:any,criticalReady=false,targetId:string|undefined,criticalTraceFailed=false;
+ const deferredCriticalExports:{capture:any;finish:()=>Promise<any>}[]=[];
  const bounded=async<T>(promise:Promise<T>,label:string,milliseconds=20_000):Promise<T>=>{
   let timeout:ReturnType<typeof setTimeout>|undefined;
   try{return await Promise.race([promise,new Promise<never>((_,reject)=>{timeout=setTimeout(()=>reject(new Error(label+" timed out after "+milliseconds+" ms")),milliseconds);})]);}
@@ -366,6 +381,11 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
   state.monitor=setInterval(()=>{void promisify(execFile)("/usr/bin/du",["-sk",path]).then(({stdout})=>{const allocated=Number(stdout.split(/\s+/u)[0])*1024;
    state.allocationSamples.push({allocated,...systemTraceClock()});if(!Number.isSafeInteger(allocated)||allocated>state.allocatedOutputLimitBytes){state.errors.push({stage:"output-bound",allocated});void stopSystemTrace("output-bound");}},error=>{state.errors.push({stage:"output-stat",error:String(error)});});},1000);
  };
+ const requestCriticalTraceStop=async(capture:any)=>{
+  if(!capture.traceStarted||capture.traceEndAcknowledgedAt!==undefined)return;
+  await browserCpu.send("Tracing.recordClockSyncMarker",{syncId:"r8-critical-"+capture.index+"-end"});capture.traceEndRequestedAt=performance.now();
+  await bounded(browserCpu.send("Tracing.end"),"Tracing.end command");capture.traceEndAcknowledgedAt=performance.now();
+ };
  const startCriticalWindow=async(meta:any)=>{
   if(activeCapture)throw new Error("overlapping critical capture windows");await initializeCritical();
   const capture:any={index:captureWindows.length,meta,requestedAt:performance.now(),contexts:[...contexts.values()],frames:page.frames().map(frame=>frame.url()),bufferUsage:[],errors:[]};
@@ -374,12 +394,15 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
    qualification:"Default execution contexts observed on the one profiled renderer session. Missing origins mean incomplete VM coverage, not permission to create duplicate iframe sessions."};
   captureWindows.push(capture);activeCapture=capture;
   if(profileMode==="system-trace")await startSystemTrace();
-  if(profileMode==="trace-only"||profileMode==="allocation-only")capture.clockBegin=await criticalClockAnchor();
-  if(exactFunctionCalls)capture.realmBegin=await realmWindows("begin",meta);
-  if(captureModes.nativeTracing)try{
+  if(profileMode==="cpu-only"||profileMode==="trace-only"||profileMode==="allocation-only"||profileMode==="self-trace")capture.clockBegin=await criticalClockAnchor();
+  if(bodyFunctionCalls)capture.realmBegin=await realmWindows("begin",meta);
+  if(captureModes.nativeTracing&&profileMode==="self-trace"&&deferredCriticalExports.length){
+   capture.traceSkipped={reason:"Seal trace end was requested; its completion/export is deferred until workflow owners join. No second trace was started."};
+  }else if(captureModes.nativeTracing)try{
+   if(criticalTraceFailed)throw Error("PRIOR_NATIVE_TRACE_DID_NOT_JOIN");
    const available=(await browserCpu.send("Tracing.getCategories")).categories;
-   capture.traceCategories=selectCriticalTraceCategories(available);
-   capture.traceCompletePromise=new Promise(resolve=>{capture.traceCompleteListener=(value:any)=>{capture.traceComplete=value;resolve(value);};browserCpu.once("Tracing.tracingComplete",capture.traceCompleteListener);});
+   capture.traceCategories=selectCriticalTraceCategories(available,handoffOnly,rendererTraceOnly,rendererTaskTrace);
+   capture.traceCompletePromise=new Promise(resolve=>{capture.traceCompleteListener=(value:any)=>{capture.traceComplete=value;capture.traceCompleteReceivedAt=performance.now();resolve(value);};browserCpu.once("Tracing.tracingComplete",capture.traceCompleteListener);});
    capture.traceBufferListener=(value:any)=>{if(capture.bufferUsage.length<180)capture.bufferUsage.push({at:performance.now(),...value});};browserCpu.on("Tracing.bufferUsage",capture.traceBufferListener);
    await browserCpu.send("Tracing.start",{transferMode:"ReturnAsStream",streamFormat:"json",streamCompression:"gzip",bufferUsageReportingInterval:1000,
     traceConfig:{recordMode:"recordContinuously",traceBufferSizeInKb:65536,includedCategories:capture.traceCategories}});capture.traceStarted=true;
@@ -411,8 +434,8 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
    capture.allocationScripts=[...allocationScriptIds].map(scriptId=>({scriptId,url:scripts.get(scriptId)?.url,parsed:scripts.get(scriptId)}));
    await attachJson(prefix+"-allocation",profile);
   }catch(error){capture.errors.push({stage:"allocation-stop",error:String(error)});}
-  if(profileMode==="trace-only"||profileMode==="allocation-only")try{capture.clockEnd=await criticalClockAnchor();}catch(error){capture.errors.push({stage:"clock-end",error:String(error)});}
-  if(exactFunctionCalls&&reason!=="api-return"&&snapshot===undefined){
+  if(profileMode==="cpu-only"||profileMode==="trace-only"||profileMode==="allocation-only"||profileMode==="self-trace")try{capture.clockEnd=await criticalClockAnchor();}catch(error){capture.errors.push({stage:"clock-end",error:String(error)});}
+  if(bodyFunctionCalls&&reason!=="api-return"&&snapshot===undefined){
    // A diagnostic checkpoint must not end/revoke an in-flight creator API.
    // Read its current counters directly; partial/open bodies remain explicit.
    capture.partialCreatorSnapshot=true;
@@ -437,19 +460,30 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
    capture.coveredScripts=coverage.result.map(script=>({scriptId:script.scriptId,url:script.url,parsed:scripts.get(script.scriptId)}));
   }catch(error){capture.errors.push({stage:"coverage-stop",error:String(error)});await cdp.send("Profiler.stopPreciseCoverage").catch(()=>{});}
   capture.cpuAfter=(await browserCpu.send("SystemInfo.getProcessInfo")).processInfo;
+  const sourceScriptsAtBoundary=[...scripts.values()];
+  // End selected body clocks at their original boundaries even if native trace
+  // export is deferred. Other realms must not accidentally clock the rest of
+  // the workflow while the creator continues.
+  if(bodyFunctionCalls){capture.realmEnd=await realmWindows("end",capture.meta);await attachJson(prefix+"-function-snapshots",{creator:snapshot,realms:capture.realmEnd});}
+  const finishExport=async()=>{
+  const activeExportStartedAt=performance.now();capture.activeExportStartedAt=activeExportStartedAt;
   if(capture.traceStarted)try{
-   await browserCpu.send("Tracing.recordClockSyncMarker",{syncId:"r8-critical-"+capture.index+"-end"});capture.traceEndRequestedAt=performance.now();
+   if(capture.traceEndAcknowledgedAt===undefined){
    // Bound the end COMMAND as well as its later completion event. The previous
    // diagnostic bounded only the event after awaiting an unbounded command.
-   await bounded(browserCpu.send("Tracing.end"),"Tracing.end command");capture.traceEndAcknowledgedAt=performance.now();
-   const completed=capture.traceComplete??await bounded(capture.traceCompletePromise,"Tracing.tracingComplete");
+   await requestCriticalTraceStop(capture);
+   }
+   // Independent held-IDB smoke293 completed without data loss after 27.8s
+   // even after its native read had joined. Finalization is outside the product
+   // API timer/deadline; preserve the earlier 20s failures, bound export at45s.
+   const completed=capture.traceComplete??await bounded(capture.traceCompletePromise,"Tracing.tracingComplete",45_000);
    if(!completed.stream)throw new Error("owned trace stream absent");
    capture.tracePath=info.outputPath(prefix+"-trace.json.gz");capture.traceBytes=0;const file=await open(capture.tracePath,"wx");
    try{for(;;){const chunk=await bounded(browserCpu.send("IO.read",{handle:completed.stream,size:1024*1024}),"trace IO.read");const bytes=Buffer.from(chunk.data,chunk.base64Encoded?"base64":"utf8");capture.traceBytes+=bytes.byteLength;
     if(capture.traceBytes>128*1024*1024)throw new Error("bounded trace output exceeds 128 MiB");await file.write(bytes);if(chunk.eof){capture.traceEof=true;break;}}}
    finally{await file.close();await browserCpu.send("IO.close",{handle:completed.stream});}
    await info.attach(prefix+"-browser-trace",{path:capture.tracePath,contentType:"application/gzip"});
-  }catch(error){capture.errors.push({stage:"trace-stop",error:String(error),terminalStage:capture.traceEndAcknowledgedAt===undefined?"end-command":capture.traceComplete===undefined?"completion-event":capture.traceEof?"attachment":"stream-read"});}
+  }catch(error){criticalTraceFailed=true;capture.errors.push({stage:"trace-stop",error:String(error),terminalStage:capture.traceEndAcknowledgedAt===undefined?"end-command":capture.traceComplete===undefined?"completion-event":capture.traceEof?"attachment":"stream-read"});}
   finally{if(capture.traceCompleteListener)browserCpu.off("Tracing.tracingComplete",capture.traceCompleteListener);if(capture.traceBufferListener)browserCpu.off("Tracing.bufferUsage",capture.traceBufferListener);}
   // Source retrieval and JSON attachment occur after profilers stop. They are
   // test-only export work, not product API computation or exact invocation work.
@@ -457,12 +491,25 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
   // existing Debugger events; allocation mode can pin only sampled script IDs.
   // Avoid spending the finite OS window exporting large sources between APIs.
   const deferSystemSources=profileMode==="system-trace"&&capture.meta.phase==="sealing-inclusive"&&reason==="api-return";
-  const capturedScripts=deferSystemSources?[]:capture.coveredScripts??capture.profileScripts??capture.allocationScripts??[...scripts.values()];
+  const capturedScripts=deferSystemSources?[]:capture.coveredScripts??capture.profileScripts??capture.allocationScripts??
+   (selfFunctionCalls||profileMode==="trace-only"||profileMode==="system-trace"?sourceScriptsAtBoundary.filter(script=>script.url?.endsWith("/r8-source-binding.mjs")):sourceScriptsAtBoundary);
+  capture.sourcePinScope=selfFunctionCalls||profileMode==="trace-only"||profileMode==="system-trace"?"Observed application bundles only; other debugger/eval scripts are not claimed pinned":"All scripts selected by the existing profiler/source inventory";
   let capturedSourceBytes=0;
   for(const script of capturedScripts)if(!sourcePins.has(script.scriptId))try{
+   // Debugger reports one source hash per script/realm. Reuse a fetched source
+   // only when that exact reported SHA256 equals our independently computed
+   // hash. Keep every script ID/context and state the different verification
+   // basis; identical URLs or lengths alone never establish equal source.
+   const parsed=scripts.get(script.scriptId),reportedHash=parsed?.hash;
+   const prior=verifiedCriticalSourceReuse(reportedHash,sourcePins.values());
+   if(prior){sourcePins.set(script.scriptId,{...script,utf16Length:prior.utf16Length,encodedBytes:prior.encodedBytes,sha256:prior.sha256,
+    independentlyFetchedSource:false,verificationKind:"Debugger.scriptParsed.hash equals independently fetched exact-source SHA256",
+    reportedSourceHash:reportedHash,independentSourceScriptId:prior.scriptId,
+    ...(prior.expectedArtifactSha256===undefined?{}:{expectedArtifactSha256:prior.expectedArtifactSha256,exactArtifactMatch:prior.exactArtifactMatch})});continue;}
    const {scriptSource}=await cdp.send("Debugger.getScriptSource",{scriptId:script.scriptId});capturedSourceBytes+=Buffer.byteLength(scriptSource);
    if(capturedSourceBytes>128*1024*1024)throw new Error("bounded script source capture exceeds 128 MiB");
-   const pin:any={...script,utf16Length:scriptSource.length,encodedBytes:Buffer.byteLength(scriptSource),sha256:createHash("sha256").update(scriptSource).digest("hex")};
+   const pin:any={...script,utf16Length:scriptSource.length,encodedBytes:Buffer.byteLength(scriptSource),sha256:createHash("sha256").update(scriptSource).digest("hex"),
+    independentlyFetchedSource:true,verificationKind:"Debugger.getScriptSource independently hashed SHA256",reportedSourceHash:reportedHash};
    if(profileMode==="system-trace"&&script.url?.endsWith("/r8-source-binding.mjs")){
     const expected=JSON.parse(readFileSync(join(directory,"artifacts.json"),"utf8")).entries.find((entry:any)=>entry.name==="r8-source-binding")?.sha256;
     if(typeof expected!=="string")throw new Error("System Trace expected bundle pin absent");pin.expectedArtifactSha256=expected;pin.exactArtifactMatch=pin.sha256===expected;
@@ -484,18 +531,29 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
    const pin=sourcePins.get(script.scriptId);if(pin&&range.endOffset>pin.utf16Length){capture.sourcePinValidation.valid=false;
     capture.sourcePinValidation.failures.push({scriptId:script.scriptId,functionName:fn.functionName,startOffset:range.startOffset,endOffset:range.endOffset,sourceUtf16Length:pin.utf16Length});}
   }
-  if(exactFunctionCalls){capture.realmEnd=await realmWindows("end",capture.meta);await attachJson(prefix+"-function-snapshots",{creator:snapshot,realms:capture.realmEnd});}
   capture.exportCompletedAt=performance.now();
   capture.validity={cpuTimeline:captureModes.v8CpuProfiling?capture.cpuValidation?.valid===true:"not-requested-"+profileMode,sourcePins:capture.sourcePinValidation.valid===true,
    allocationProfile:captureModes.allocationSampling?capture.allocationValidation?.valid===true:"not-requested-"+profileMode,
    preciseFunctionCounts:exactFunctionCalls?capture.coverageValidation?.valid===true:"not-requested-"+profileMode,
    allExpectedRealmContexts:capture.contextCoverage.missingOrigins.length===0,
-   browserTrace:captureModes.nativeTracing?capture.traceEof===true&&capture.traceComplete?.dataLossOccurred===false:"not-requested-"+profileMode,
+   browserTrace:capture.traceSkipped?"not-requested-deferred-seal-only":captureModes.nativeTracing?capture.traceEof===true&&capture.traceComplete?.dataLossOccurred===false:"not-requested-"+profileMode,
    originalApiBoundary:reason==="api-return"&&Number.isFinite(capture.endMeta?.apiBegin)&&Number.isFinite(capture.endMeta?.apiEnd),errorsAbsent:capture.errors.length===0};
-  capture.testOnlyExportMilliseconds=capture.exportCompletedAt-capture.stopRequestedAt;
+  capture.testOnlyExportMilliseconds=capture.exportCompletedAt-activeExportStartedAt;
+  capture.deferredBeforeExportMilliseconds=activeExportStartedAt-capture.stopRequestedAt;
+  capture.exportTimingQualification="Export elapsed includes trace finalization/IO waits, not CPU. Deferred-before-export time includes intervening product workflow and must not be labelled test/export overhead; original API interval remains separate.";
   // Promises/listener closures are neither evidence nor serializable metadata.
   delete capture.traceCompletePromise;delete capture.traceCompleteListener;delete capture.traceBufferListener;delete capture.coverageReset;
   return {ok:true,index:capture.index,cpuValid:capture.cpuValidation?.valid,coverageValid:capture.coverageValidation?.valid,traceComplete:capture.traceEof===true};
+  };
+  if(profileMode==="self-trace"&&reason==="api-return"){
+   if(capture.traceStarted)try{
+    await requestCriticalTraceStop(capture);
+   }catch(error){criticalTraceFailed=true;capture.errors.push({stage:"deferred-trace-end",error:String(error)});}
+   capture.exportDeferredUntilWorkflow=true;
+   deferredCriticalExports.push({capture,finish:finishExport});
+   return {ok:true,index:capture.index,exportDeferred:true};
+  }
+  return finishExport();
  };
  if(fullFunctionCalls&&!criticalTimingsOnly)await page.exposeFunction("__r8FunctionCaptureBoundary",async(kind:string,meta:any,snapshot?:unknown)=>{
   if(meta?.role!=="creator"||meta?.transition!==4||!["sealing-inclusive","creator-adoption-inclusive"].includes(meta?.phase))throw new Error("unexpected full-function capture boundary");
@@ -503,12 +561,21 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
    // The fixed predeadline checkpoint closes diagnostic collection only. A
    // later API return/next boundary must not become a synthetic product error
    // or restart profilers after the capture has already been exported.
-   if(kind!=="begin"&&kind!=="end")throw new Error("unexpected postcapture boundary kind");
+   if(kind!=="begin"&&kind!=="end"&&kind!=="trace-stop")throw new Error("unexpected postcapture boundary kind");
    await attachJson("healthy-critical-postcapture-"+meta.rpcToken+"-"+kind,{kind,meta,snapshot,partial:true,
     reason:"diagnostic collection already closed; original product outcome remains independent"});
    return {ok:true,partial:true,captureClosed:true};
   }
   if(kind==="begin")return startCriticalWindow(meta);
+  if(kind==="trace-stop"){
+   if(!activeCapture||activeCapture.meta.rpcToken!==meta.rpcToken||activeCapture.meta.phase!==meta.phase)throw new Error("unpaired tiny trace-stop boundary");
+   activeCapture.traceStopControl={receivedAt:performance.now(),apiBegin:meta.apiBegin,apiEnd:meta.apiEnd,timeOrigin:meta.timeOrigin,
+    qualification:"Tiny metadata-only binding received before bulk exact-counter/body snapshots. API/body clocks already ended; no product owner is released."};
+   try{await requestCriticalTraceStop(activeCapture);}
+   catch(error){criticalTraceFailed=true;activeCapture.errors.push({stage:"tiny-trace-stop",error:String(error)});}
+   finally{activeCapture.traceStopControl.returnedAt=performance.now();}
+   return {ok:true,index:activeCapture.index,traceEndAcknowledged:activeCapture.traceEndAcknowledgedAt!==undefined};
+  }
   if(kind!=="end"||!activeCapture||activeCapture.meta.rpcToken!==meta.rpcToken||activeCapture.meta.phase!==meta.phase)throw new Error("unpaired full-function capture boundary");
   activeCapture.endMeta={...meta};
   return stopCriticalWindow("api-return",snapshot);
@@ -517,6 +584,7 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
  const saveCriticalCapture=async(reason:string)=>{
   if(!criticalProfiling||criticalTimingsOnly||criticalFinished)return;criticalFinished=true;
   if(activeCapture)await stopCriticalWindow(reason);
+  for(const pending of deferredCriticalExports){pending.capture.deferredFinalization={reason,startedAt:performance.now(),qualification:"Original API timer ended and Tracing.end acknowledged at the original boundary. Native stream/source export now runs after the healthy workflow returned; predeadline finalization, if any, is explicitly partial."};await pending.finish();}
   if(profileMode==="system-trace")await stopSystemTrace(reason);
   await attachJson("healthy-critical-script-source-pins",[...sourcePins.values()]);
   if(fullFunctionCalls&&captureWindows.length!==2)criticalErrors.push({stage:"boundary-completeness",expected:2,actual:captureWindows.length});
@@ -580,6 +648,7 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
   })().catch(error=>console.info(JSON.stringify({kind:"healthy-native-partial-completed-checkpoint-unavailable",error:String(error),
    testOnlyCheckpointMilliseconds:performance.now()-checkpointStarted})));
  },300_000);
+ if(process.env.STARTUP_HEALTHY_GRID_POOL_LULL==="1")await page.evaluate(()=>Reflect.set(globalThis,"__rdPoolMaintenanceLull",true));
  try{receipt=await page.evaluate(async({origins,rollovers,fixedIdentity,creatorProfile})=>{try{return await Reflect.get(globalThis,"r8HealthyGrid")(fixedIdentity??"r8-integrated-"+Date.now(),origins,rollovers,creatorProfile);}catch(error){return {ok:false,error:String(error),stack:error instanceof Error?error.stack:undefined};}},{origins:clients.map(client=>client.origin),rollovers,fixedIdentity,creatorProfile});}
  finally{
   if(criticalCheckpoint)clearTimeout(criticalCheckpoint);

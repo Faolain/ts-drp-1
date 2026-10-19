@@ -94,7 +94,7 @@ function fixture(cold = false, bounds = AHE_BOUNDED_READ_LIMITS) {
 		},
 		openCreatorSuccessorTrust: checkpoint, openCreatorCheckpointTrust: checkpoint, openCreatorForwardPromotionCheckpointTrust: checkpoint,
 		capturePromotionSnapshot: () => undefined,
-		openCreatorTransitionClosedCutEvidence: ({closure: c}: any) => ({cut: select(c.candidates, "drp-hard-epoch-cut"),
+		openCreatorTransitionClosedCutEvidenceOwned: ({closure: c}: any) => ({cut: select(c.candidates, "drp-hard-epoch-cut"),
 			qc: select(c.candidates, "drp-seal-qc"), representation: "fixture"}),
 		inspectCreatorClosedCutSuccessorBinding: () => ({ok: true}),
 		inspectCreatorForwardPromotionClosedCutSuccessorBinding: () => ({ok: true}),

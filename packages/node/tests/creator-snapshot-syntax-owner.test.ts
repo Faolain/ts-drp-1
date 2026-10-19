@@ -46,6 +46,31 @@ function fixture(bounds: Readonly<{ maxObjectGenerations: number; maxClosureRefe
 }
 
 describe("same-owner canonical snapshot syntax", () => {
+	it("returns isolated one-field and scalar metadata projections and clears all retained parsing on release", () => {
+		const f = fixture(), reader = f.api.reader();
+		const bytes = encodeCanonical({kind: "drp-anchor-trust-state", objectId: "room", currentEpoch: 3,
+			profileId: f.profile, exactCanonicalCurrentAnchorPreimageBytes: f.payloadBytes, application: f.payload.application});
+		const first = reader.metadata(bytes, true)!.exactCanonicalCurrentAnchorPreimageBytes as Uint8Array;
+		first.fill(255);
+		expect(reader.metadata(bytes.slice(), true)!.exactCanonicalCurrentAnchorPreimageBytes).toEqual(f.payloadBytes);
+		expect(reader.metadata(bytes)).toMatchObject({kind: "drp-anchor-trust-state", objectId: "room", currentEpoch: 3, profileId: f.profile});
+		expect(reader.metadata(bytes)).not.toHaveProperty("application");
+		expect(f.counts.decodes.get(f.key(bytes))).toBe(1);
+		reader.release(); reader.metadata(bytes); reader.metadata(bytes);
+		expect(f.counts.decodes.get(f.key(bytes))).toBe(3);
+		const malformed = Uint8Array.of(255);
+		expect(reader.metadata(malformed)).toBeUndefined();
+		const fresh = f.api.reader(); fresh.metadata(bytes);
+		expect(f.counts.decodes.get(f.key(bytes))).toBe(4);
+		// A borrowed carrier can reenter release through the byte-comparison
+		// surface. The admitted read must not repopulate the cleared inventory.
+		const reentrant = f.api.reader(), carrier = bytes.slice(); reentrant.metadata(carrier);
+		const count = f.counts.decodes.get(f.key(bytes))!;
+		Object.defineProperty(carrier, "byteLength", {get: () => {reentrant.release(); return bytes.byteLength;}});
+		expect(reentrant.metadata(carrier)).toMatchObject({objectId: "room"});
+		expect(reentrant.metadata(carrier)).toMatchObject({objectId: "room"});
+		expect(f.counts.decodes.get(f.key(bytes))).toBe(count + 2);
+	});
 	it("parses each distinct payload/manifest once while preserving all fresh content and ACL bindings", () => {
 		const f = fixture(), reader = f.api.reader();
 		const expected = f.api.fresh(f.payloadBytes, f.manifestBytes, f.cut, f.profile);

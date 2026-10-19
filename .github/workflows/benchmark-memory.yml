@@ -61,7 +61,7 @@ jobs:
           external-data-json-path: ./cache/${{ matrix.id }}-memory/benchmark-data.json
           save-data-file: ${{ github.ref == 'refs/heads/main' }}
           alert-threshold: "130%"
-          fail-on-alert: false
+          fail-on-alert: true
           summary-always: true
 
       - name: Save memory benchmark baseline

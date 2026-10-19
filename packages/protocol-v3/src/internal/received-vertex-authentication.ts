@@ -1,4 +1,4 @@
-import { ed25519 } from "@noble/curves/ed25519.js";
+import { verifyEd25519 } from "./ed25519-verify.js";
 import { decodeCanonical, hashDomain } from "@ts-drp/canonical";
 import type { CurrentAnchorTrust } from "../index.js";
 import { mintCreatorAnchorTrustSourceContext, resolveCreatorAnchorTrustMaterial } from "./seal-authority-custody.js";
@@ -29,7 +29,7 @@ export function verifyCreatorSettlementSourceSelection(
 	const creator = resolveCreatorAnchorTrustMaterial(trust);
 	if (creator === undefined || signature.byteLength !== 64) return false;
 	try {
-		return ed25519.verify(signature, hashDomain("ts-drp/settlement-source-selection/v1", exactCanonicalSelectionBytes), creator.publicKey, { zip215: false });
+		return verifyEd25519(signature, hashDomain("ts-drp/settlement-source-selection/v1", exactCanonicalSelectionBytes), creator.publicKey);
 	} catch {
 		return false;
 	}

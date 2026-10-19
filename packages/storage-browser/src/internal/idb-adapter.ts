@@ -347,11 +347,13 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 	): Promise<StoreResult<Pick<AheRetirementControlRead, "control" | "head" | "imageDigest" | "metadataBytes">>>;
 	private readRetirementImagePoint(
 		objectId: StorageObjectId,
-		allowAbsent: true
+		allowAbsent: true,
+		poisonFailures?: boolean
 	): Promise<StoreResult<AheRetirementAdmissionImage>>;
 	private async readRetirementImagePoint(
 		objectId: StorageObjectId,
-		allowAbsent: boolean
+		allowAbsent: boolean,
+		poisonFailures = false
 	): Promise<StoreResult<AheRetirementAdmissionImage>> {
 		const prepared = prepareStorageAdapterCommand({ kind: "readHead", objectId });
 		if (!prepared.ok) return prepared;
@@ -359,9 +361,9 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 		if (!database) return { ok: false, reason: "STORE_CLOSED" };
 		if (needsNativeReadReservationTurn(database)) {
 			try {
-				return await runNativeReservedRead(database, () =>
-					allowAbsent ? this.readRetirementAdmissionImage(objectId) : this.readRetirementImage(objectId)
-				);
+				return await runNativeReservedRead(database, () => allowAbsent
+					? this.readRetirementImagePoint(objectId, true, poisonFailures)
+					: this.readRetirementImage(objectId));
 			} catch (cause) {
 				return substrateFailure(cause);
 			} finally {
@@ -399,7 +401,10 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 				image = await admitBrowserRetirementControl(tx, objectId, bytes, facts),
 				joined = await joinTransactionOutcome(tx, done);
 			if (!joined.ok) return substrateFailure(joined.cause);
-			if (!image.ok) return image;
+			if (!image.ok) {
+				if (poisonFailures) this.latchControlFailure(image);
+				return image;
+			}
 			if (isNativeReadReservationTransaction(tx)) {
 				if (this.lifecycle.isClosed()) return {ok: false, reason: "STORE_CLOSED"};
 				if (this.lifecycle.isPoisoned()) return {ok: false, reason: "STORE_POISONED"};
@@ -421,17 +426,32 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 		} catch (cause) {
 			if (tx) abortIfActive(tx);
 			if (done && tx) await joinTransactionOutcome(tx, done);
+			if (poisonFailures && cause instanceof BoundedReadBudgetError) return {ok: false, reason: "READ_BUDGET_EXCEEDED"};
+			if (poisonFailures && cause instanceof PersistedStorageError) return this.lifecycle.latchPoison(cause.reason);
 			return substrateFailure(cause);
 		} finally {
 			this.lifecycle.finishOperation();
 		}
 	}
 
-	/* Original mutation path remains below; this point read births no metadata. */
-	public acquireRetirementControl(objectId: StorageObjectId): Promise<StoreResult<AheRetirementControlRead>> {
-		const prepared = prepareStorageAdapterCommand({ kind: "readHead", objectId });
-		if (!prepared.ok) return Promise.resolve(prepared);
-		return this.runControl(objectId);
+	/** Existing metadata is observed by the original complete RO owner. Only
+	 * missing-metadata birth and the returned one-use mutation enter strict RW.
+	 * No RO result grants mutation authority: runControl rechecks exact control,
+	 * head and the full native image in its own fresh RW before every effect. */
+	public async acquireRetirementControl(objectId: StorageObjectId): Promise<StoreResult<AheRetirementControlRead>> {
+		const observed = await this.readRetirementImagePoint(objectId, true, true);
+		if (!observed.ok) return observed;
+		const { control, head, imageDigest } = observed.value;
+		// This RO has completed/joined. The original birth path independently
+		// rereads absence, admits the whole current image and writes strict RW;
+		// concurrent birth is therefore observed, never overwritten from this RO.
+		if (control === null) return this.runControl(objectId);
+		if (this.lifecycle.isClosed()) return {ok: false, reason: "STORE_CLOSED"};
+		if (this.lifecycle.isPoisoned()) return {ok: false, reason: "STORE_POISONED"};
+		const bytes = encodeAheRetirementControl(control);
+		return {ok: true, value: createAheRetirementControlRead(control, head, imageDigest,
+			(next, mutation) => this.runControl(objectId, {bytes, head: headFingerprint(head), imageDigest, next,
+				...(mutation ? {mutation} : {})}), this)};
 	}
 
 	private runControl(objectId: StorageObjectId): Promise<StoreResult<AheRetirementControlRead>>;
@@ -729,9 +749,11 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 	): Promise<StoreResult<AheBoundedRecoveryRoleRead>> {
 		const prepared = prepareBoundedRecoveryRoleRead(input);
 		if (!prepared.ok) return Promise.resolve(prepared);
-		// One reader owns only a weak identity for its ORIGINAL successful native
-		// capture, not cached material or authority. A later/different reservation
-		// must run the complete verifier even when its head/epoch looks identical.
+		// One still-live reader owns only the weak identity of its latest FULLY
+		// verified native basis, not cached material or authority. The first check
+		// in every different reservation must run the complete verifier, even when
+		// head/epoch/bytes look identical; only that successful native terminal may
+		// bind this existing logical reader to the NEW original physical exclusion.
 		let heldCapture: WeakRef<IDBTransaction> | undefined;
 		return this.runBoundedSteps(facts => boundedRecoveryRoleReadSteps(prepared.value, facts), false, undefined,
 			transaction => { heldCapture = new WeakRef(transaction); }, prepared.value.objectId).then((result) =>
@@ -740,7 +762,8 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 				: {
 						ok: true,
 						value: createBoundedRecoveryRoleRead(result.value, (steps, released) =>
-							this.checkBoundedRecoveryRoleCurrency(steps, released, heldCapture)
+							this.checkBoundedRecoveryRoleCurrency(steps, released, heldCapture,
+								transaction => { heldCapture = new WeakRef(transaction); })
 						),
 					}
 		);
@@ -749,7 +772,8 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 	private async checkBoundedRecoveryRoleCurrency(
 		steps: Generator<BoundedReadRequest, StoreResult<Readonly<{kind: "current"}>>, unknown>,
 		released: () => boolean,
-		heldCapture: WeakRef<IDBTransaction> | undefined
+		heldCapture: WeakRef<IDBTransaction> | undefined,
+		captureHeldTransaction: (transaction: IDBTransaction) => void
 	): Promise<StoreResult<Readonly<{kind: "current"}>>> {
 		const database = this.lifecycle.startOperation();
 		if (database === undefined) return {ok: false, reason: "STORE_CLOSED"};
@@ -758,18 +782,18 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 			if (released()) return {ok: false, reason: "READ_RELEASED"};
 			const captured = heldCapture?.deref();
 			if (captured === undefined || nativeReadReservationTransaction(database) !== captured)
-				return await this.runBoundedSteps(steps, false, released);
+				return await this.runBoundedSteps(steps, false, released, captureHeldTransaction);
 			// The exact all-store RO still excludes every native writer. Its complete
 			// captured census/material therefore cannot change. Check the genuine
 			// native transaction freshly, rather than loading/hashing it all again.
 			const current = nativeReadReservationCheck(captured);
-			if (current === undefined) return await this.runBoundedSteps(steps, false, released);
+			if (current === undefined) return await this.runBoundedSteps(steps, false, released, captureHeldTransaction);
 			await current;
 			if (this.lifecycle.isClosed()) return {ok: false, reason: "STORE_CLOSED"};
 			if (this.lifecycle.isPoisoned()) return {ok: false, reason: "STORE_POISONED"};
 			if (released()) return {ok: false, reason: "READ_RELEASED"};
 			if (nativeReadReservationTransaction(database) !== captured)
-				return await this.runBoundedSteps(steps, false, released);
+				return await this.runBoundedSteps(steps, false, released, captureHeldTransaction);
 			// createBoundedRecoveryRoleRead still performs its original final
 			// borrowed-buffer integrity sweep synchronously before public delivery.
 			return {ok: true, value: Object.freeze({kind: "current"})};

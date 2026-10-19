@@ -28,11 +28,12 @@ function visit(node: ts.Node): void {
 if (!expressions.scalar || !expressions.program) throw new Error("missing original scalar/program book input");
 const material = execute<(facts: any, knownCarriers: readonly Uint8Array[]) => readonly number[]>(`
 	${declaration("maintenanceWidthSum")}
-	return (facts, knownCarriers) => {const sum=(...values)=>maintenanceWidthSum(values);
+	return (facts, knownCarriers) => {const input=facts; const sum=(...values)=>maintenanceWidthSum(values);
 	 return [${expressions.scalar},${expressions.program}];};`, {CREATOR_MAINTENANCE_PROOF_MAX_BYTES: 4_194_304});
 function fixture() {
 	const proofMaterialOwners = new WeakMap<object, any>();
-	const create = execute<(initial: any[]) => any>(`${declaration("createCreatorClosedRollbackProofAccounting")}
+	const create = execute<(initial: any[]) => any>(`${declaration("projectCreatorProofMaterialByteLengths")}
+	 ${declaration("createCreatorClosedRollbackProofAccounting")}
 	 return createCreatorClosedRollbackProofAccounting;`, {proofMaterialOwners, compareBytes,
 		closedRetirementEqual: (a: unknown, b: unknown) => compareBytes(encodeCanonical(a), encodeCanonical(b)) === 0,
 		CREATOR_MAINTENANCE_PROOF_MAX_BYTES: 4_194_304, CREATOR_ORDINARY_PROOF_MAX_BYTES: 1_310_720});

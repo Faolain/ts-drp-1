@@ -114,7 +114,7 @@ describe("same original signing role index in full and incremental source captur
 		expect(declaration("captureCreatorOrdinaryIssuanceProofSource")).toContain(
 			"signingTrusts: creatorSigningRoleTrustVector(frame.signingRoleTrusts)");
 		expect(declaration("acquireClosedData")).toContain(
-			"const signingTrusts = creatorSigningRoleTrustVector(capturedTrusts)");
+			"let signingTrusts = creatorSigningRoleTrustVector(capturedTrusts)");
 	});
 });
 const maxBytes = 1_310_720;

@@ -65,16 +65,33 @@ describe("Phase 2e3 durable adapter facade correction RED", () => {
 		expect(Object.keys(manifest.exports ?? {})).toEqual([
 			".",
 			"./contract",
+			"./room-head",
 			"./maintenance",
 			"./adapter",
 			"./snapshot-transfer",
 		]);
 		expect(manifest.exports?.["./internal/transition"]).toBeUndefined();
-		expect(Object.keys(manifest.dependencies ?? {})).toEqual(["@ts-drp/canonical"]);
+		// Bounded snapshot ownership (7d0c2f66) shares protocol-v3's pure snapshot/settlement codecs.
+		expect(Object.keys(manifest.dependencies ?? {})).toEqual(["@ts-drp/canonical", "@ts-drp/protocol-v3"]);
+		// Native backends share the bounded read/retirement step owners through
+		// this subpath (17745861, a116318a, ea4eb158); the surface stays exact.
 		expect(Object.keys(adapter).sort()).toEqual([
+			"AHE_LOCAL_CONTROL_CENSUS_LIMITS",
+			"BoundedReadBudgetError",
+			"BoundedReadNativeFacts",
 			"PersistedStorageError",
+			"boundedActiveReadSteps",
+			"boundedHeadSteps",
+			"boundedRecoveryRoleCurrencySteps",
+			"boundedRecoveryRoleReadSteps",
+			"boundedRetirementAdmissionSteps",
 			"classifyPersistedState",
+			"createBoundedReadAcquisition",
+			"createBoundedRecoveryRoleRead",
 			"evaluateStorageAdapterCommand",
+			"isBoundedReadCorruption",
+			"prepareBoundedRead",
+			"prepareBoundedRecoveryRoleRead",
 			"prepareStorageAdapterCommand",
 			"storageAdapterClosureVerifier",
 		]);
@@ -86,28 +103,64 @@ describe("Phase 2e3 durable adapter facade correction RED", () => {
 			"StorageAdapterLoadRequirement",
 			"StorageAdapterResultValue",
 			"StorageAdapterWrite",
-			"classifyPersistedState",
+			// classifyPersistedState is now re-exported from internal/persisted-state
+			// (still pinned in the runtime surface above), not declared here.
 			"evaluateStorageAdapterCommand",
 			"prepareStorageAdapterCommand",
 			"storageAdapterClosureVerifier",
 		]);
+		// Exact root runtime surface, including the bounded retirement-control,
+		// room-head and capacity owners added by later lifecycle phases.
 		const authorizedRootRuntimeKeys = [
-			"createStageAdmissionController",
+			"AHE_BOUNDED_READ_LIMITS",
+			"AHE_RETIREMENT_CONTROL_LIMITS",
+			"LOCAL_WORKLOAD_CAPACITY",
+			"ROOM_HEAD_IMAGE_LIMITS",
+			"aheRetirementGenerationBindingMatches",
+			"aheRetirementGenerationIdentity",
+			"aheRetirementNativeCommands",
+			"aheRetirementReclamationMatches",
+			"boundCompletedFields",
+			"boundCompletionPayload",
+			"boundPreparedFields",
+			"captureAheRetirementControl",
+			"captureAheRetirementGenerationSource",
+			"captureAheRetirementPreparation",
+			"captureRoomHead",
+			"captureRoomHeadControl",
+			"captureRoomHeadFence",
+			"captureRoomHeadImage",
+			"captureRoomHeadRetirementPlan",
+			"captureRoomHeadScope",
+			"captureRoomHeadState",
+			"createAheRetirementControlRead",
 			"createMemoryAheDurableStore",
+			"createStageAdmissionController",
+			"decodeAheRetirementControl",
 			"decodeGenerationRecordV1",
 			"decodeHeadRecordV1",
 			"digestBlob",
 			"digestClosure",
+			"encodeAheRetirementControl",
 			"encodeGenerationRecordV1",
 			"encodeHeadRecordV1",
 			"inspectStorageCapability",
+			"nominatedFutureControlFields",
 			"parseBlobDigest",
 			"parseCapacityProfile",
 			"parseClosureDigest",
 			"parseGenerationId",
 			"parseHeadRevision",
 			"parseStorageObjectId",
+			"readAheBoundRetirementControlWidthsForSizing",
 			"requestPersistentStorage",
+			"roomHeadDigest",
+			"roomHeadFields",
+			"roomHeadImageDigest",
+			"roomHeadInteger",
+			"roomHeadRetirementChange",
+			"sameRoomHeadValue",
+			"validateRoomHeadRetirementObservation",
 		];
 		const observedRootRuntimeKeys = Object.keys(root).sort();
 		expect(observedRootRuntimeKeys).toEqual(

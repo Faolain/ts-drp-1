@@ -1,7 +1,7 @@
 import {beforeEach, describe, expect, it} from "vitest";
 import {readFileSync} from "node:fs";
 import ts from "typescript";
-import {context, criticalMetrics} from "./critical-observer.js";
+import {context, criticalMetrics, ordinaryIntegrityShape} from "./critical-observer.js";
 
 const begin=(phase:string)=>Reflect.get(globalThis,"__warmMetricBegin")(phase);
 const returned=<T>(token:unknown,value:T):T=>Reflect.get(globalThis,"__warmMetricReturned")(token,value);
@@ -14,6 +14,32 @@ beforeEach(()=>{criticalMetrics.clear();Reflect.set(globalThis,"__r8CriticalProf
  Object.assign(context,{role:"creator",transition:4,command:"observer-regression"});});
 
 describe("existing critical observer returned-promise completion",()=>{
+ it("reports the actual visited byte prerequisite without reading bytes or own getters",()=>{
+  let getterReads=0;const bytes=new Uint8Array(3),bootstrap=new Uint8Array(1);
+  Object.defineProperty(bytes,"byteLength",{get(){getterReads++;throw Error("must not run");},configurable:true});
+  const value={current:{bytes},scope:{},history:null,bootstrap,source:null};
+  expect(ordinaryIntegrityShape(value,false,new Set<object>([value,bytes]))).toMatchObject({supported:false,
+   byteLeaves:1,ownAccessorLengths:1,lastVisitedKind:"bytes",lastByte:{ownByteLength:"accessor",bootstrapReference:false,intrinsicLengthAvailable:true}});
+  expect(getterReads).toBe(0);
+  const dataBytes=new Uint8Array(2);Object.defineProperty(dataBytes,"byteLength",{value:2,configurable:true});
+  const dataValue={...value,bootstrap:dataBytes};
+  expect(ordinaryIntegrityShape(dataValue,false,new Set<object>([dataValue,dataBytes]))).toMatchObject({ownDataLengths:1,ownDataMatchesIntrinsic:1,
+   lastByte:{ownByteLength:"data",ownDataMatchesIntrinsic:true,bootstrapReference:true}});
+  expect(ordinaryIntegrityShape({vertex:true},false,new Set())).toBeUndefined();
+ });
+ it("keeps new image/coordinator detail inside the mature creator scope without increasing retention",()=>{
+  for(const [role,transition] of [["follower",4],["creator",3]] as const){
+   Object.assign(context,{role,transition});
+   expect(begin("native-signing-image-capture")).toBeUndefined();
+   expect(begin("retirement-coordinator-sequential-owner")).toBeUndefined();
+   expect(begin("recovery-preparation-close-hold-sequential-owner")).toBeUndefined();
+  }
+  expect(criticalMetrics.size).toBe(0);
+  Object.assign(context,{role:"creator",transition:4});
+  const token=begin("native-signing-image-capture");expect(token).toBeDefined();
+  Reflect.get(globalThis,"__warmMetricEnd")(token);
+  expect(row()).toMatchObject({entered:1,completed:1});
+ });
  it("shares static attribution with the actual codec row without counting the wrapper twice",()=>{
   const wrap=Reflect.get(globalThis,"__warmMetricBegin")("canonical-decode-callsite:fixed",0,true);
   const codec=Reflect.get(globalThis,"__warmMetricBegin")("canonical-decode",0,true);

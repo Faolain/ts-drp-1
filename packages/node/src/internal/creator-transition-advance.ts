@@ -459,6 +459,10 @@ function candidateSelection(candidate: DetachedClosureCandidate, syntax?: Creato
 	return syntax === undefined ? record(candidate) : syntax.selection(candidate.bytes);
 }
 
+function candidateMetadata(candidate: DetachedClosureCandidate, syntax?: CreatorTransitionSyntax, includeCurrentAnchor = false): Readonly<Record<string, unknown>> | undefined {
+	return syntax === undefined ? record(candidate) : syntax.metadata(candidate.bytes, includeCurrentAnchor);
+}
+
 function compareRef(left: GenerationRef, right: GenerationRef): number {
 	return left.digest < right.digest ? -1 : left.digest > right.digest ? 1 : 0;
 }
@@ -548,12 +552,12 @@ function currentAnchorAclDigest(closure: CreatorTransitionClosure, trust: Curren
 	) {
 		return undefined;
 	}
-	const trustRecord = record(trustCandidate, syntax);
+	const trustRecord = candidateMetadata(trustCandidate, syntax, true);
 	const anchorBytes = trustRecord?.exactCanonicalCurrentAnchorPreimageBytes;
 	if (!(anchorBytes instanceof Uint8Array)) return undefined;
 	let anchor: Readonly<Record<string, unknown>> | undefined;
 	try {
-		const decoded = syntax === undefined ? decodeCanonical(anchorBytes) : syntax.decode(anchorBytes);
+		const decoded = syntax === undefined ? decodeCanonical(anchorBytes) : syntax.metadata(anchorBytes);
 		anchor =
 			decoded !== null && typeof decoded === "object" && !Array.isArray(decoded)
 				? (decoded as Readonly<Record<string, unknown>>)
@@ -584,10 +588,17 @@ function currentAnchorAclDigest(closure: CreatorTransitionClosure, trust: Curren
  * @returns Unique validated evidence, or undefined on ambiguity or refusal.
  */
 export function openCreatorTransitionRetirement(
+	candidate: DetachedClosureCandidate, floorTrust: CurrentAnchorTrust, cut: DetachedClosureCandidate, qc: DetachedClosureCandidate
+): ReturnType<typeof openCreatorTransitionRetirementOwned> {
+	return openCreatorTransitionRetirementOwned(candidate, floorTrust, cut, qc);
+}
+
+function openCreatorTransitionRetirementOwned(
 	candidate: DetachedClosureCandidate,
 	floorTrust: CurrentAnchorTrust,
 	cut: DetachedClosureCandidate,
-	qc: DetachedClosureCandidate
+	qc: DetachedClosureCandidate,
+	syntax?: CreatorTransitionSyntax
 ):
 	| Readonly<{
 			readonly candidate: DetachedClosureCandidate;
@@ -595,7 +606,7 @@ export function openCreatorTransitionRetirement(
 			readonly capability: VerifiedCreatorIssuanceRetirement;
 	  }>
 	| undefined {
-	const decodedCut = record(cut);
+	const decodedCut = candidateMetadata(cut, syntax);
 	if (
 		!exactCandidate(candidate) ||
 		!exactCandidate(cut) ||
@@ -632,6 +643,13 @@ export function openCreatorTransitionRetirement(
  * @returns Unique validated evidence, or undefined on ambiguity or refusal.
  */
 export function openCreatorTransitionAggregate(
+	candidate: DetachedClosureCandidate, floorTrust: CurrentAnchorTrust, cut: DetachedClosureCandidate, qc: DetachedClosureCandidate,
+	currentAuthority: Readonly<{ readonly acl?: DetachedClosureCandidate; readonly trust?: CurrentAnchorTrust }>
+): ReturnType<typeof openCreatorTransitionAggregateOwned> {
+	return openCreatorTransitionAggregateOwned(candidate, floorTrust, cut, qc, currentAuthority);
+}
+
+function openCreatorTransitionAggregateOwned(
 	candidate: DetachedClosureCandidate,
 	floorTrust: CurrentAnchorTrust,
 	cut: DetachedClosureCandidate,
@@ -639,7 +657,8 @@ export function openCreatorTransitionAggregate(
 	currentAuthority: Readonly<{
 		readonly acl?: DetachedClosureCandidate;
 		readonly trust?: CurrentAnchorTrust;
-	}>
+	}>,
+	syntax?: CreatorTransitionSyntax
 ):
 	| Readonly<{
 			readonly candidate: DetachedClosureCandidate;
@@ -647,9 +666,9 @@ export function openCreatorTransitionAggregate(
 			readonly capability: VerifiedCreatorAuthorIssuanceFrontiers;
 	  }>
 	| undefined {
-	const decodedCut = record(cut);
-	const decodedAcl = currentAuthority.acl === undefined ? undefined : record(currentAuthority.acl);
-	const decodedAggregate = record(candidate);
+	const decodedCut = candidateMetadata(cut, syntax);
+	const decodedAcl = currentAuthority.acl === undefined ? undefined : candidateMetadata(currentAuthority.acl, syntax);
+	const decodedAggregate = candidateMetadata(candidate, syntax);
 	if (
 		!exactCandidate(candidate) ||
 		!exactCandidate(cut) ||
@@ -700,11 +719,19 @@ export function openCreatorTransitionAggregate(
  * @returns Unique validated evidence, or undefined on ambiguity or refusal.
  */
 export function openCreatorTransitionSettlement(
+	candidate: DetachedClosureCandidate, floorTrust: CurrentAnchorTrust, cut: DetachedClosureCandidate, qc: DetachedClosureCandidate,
+	expectedCurrentAclDigest: string
+): ReturnType<typeof openCreatorTransitionSettlementOwned> {
+	return openCreatorTransitionSettlementOwned(candidate, floorTrust, cut, qc, expectedCurrentAclDigest);
+}
+
+function openCreatorTransitionSettlementOwned(
 	candidate: DetachedClosureCandidate,
 	floorTrust: CurrentAnchorTrust,
 	cut: DetachedClosureCandidate,
 	qc: DetachedClosureCandidate,
-	expectedCurrentAclDigest: string
+	expectedCurrentAclDigest: string,
+	syntax?: CreatorTransitionSyntax
 ):
 	| Readonly<{
 			readonly candidate: DetachedClosureCandidate;
@@ -712,8 +739,8 @@ export function openCreatorTransitionSettlement(
 			readonly capability: VerifiedCreatorAuthorSettlement;
 	  }>
 	| undefined {
-	const decodedCut = record(cut);
-	const decodedSettlement = record(candidate);
+	const decodedCut = candidateMetadata(cut, syntax);
+	const decodedSettlement = candidateMetadata(candidate, syntax);
 	if (
 		!exactCandidate(candidate) ||
 		!exactCandidate(cut) ||
@@ -977,11 +1004,11 @@ function authenticatedRetirementPair(input: InspectCreatorTransitionAdvanceInput
 		sameRef(candidate.ref, input.proofRefs[1] as GenerationRef)
 	);
 	if (proposedCut === undefined || proposedQc === undefined) return undefined;
-	const openedProposed = openCreatorTransitionRetirement(
+	const openedProposed = openCreatorTransitionRetirementOwned(
 		proposedRetirement,
 		input.successorTrust,
 		proposedCut,
-		proposedQc
+		proposedQc, syntax
 	);
 	if (
 		openedProposed === undefined ||
@@ -1012,7 +1039,7 @@ function authenticatedRetirementPair(input: InspectCreatorTransitionAdvanceInput
 		syntax
 	);
 	if (retiringCut === undefined || retiringQc === undefined) return undefined;
-	const openedCurrent = openCreatorTransitionRetirement(currentCandidate, input.currentTrust, retiringCut, retiringQc);
+	const openedCurrent = openCreatorTransitionRetirementOwned(currentCandidate, input.currentTrust, retiringCut, retiringQc, syntax);
 	return openedCurrent !== undefined &&
 		openedProposed.identity.author === openedCurrent.identity.author &&
 		openedProposed.identity.priorRetirementCandidateDigest === currentCandidate.ref.digest &&
@@ -1034,11 +1061,18 @@ function authenticatedRetirementPair(input: InspectCreatorTransitionAdvanceInput
  * @returns Genuine signed evidence, or undefined on ambiguity/binding failure.
  */
 export function openCreatorTransitionClosedCutEvidence(
+	input: Readonly<{ closure: CreatorTransitionClosure; floorTrust: CurrentAnchorTrust; currentTrust?: CurrentAnchorTrust }>
+): ReturnType<typeof openCreatorTransitionClosedCutEvidenceOwned> {
+	return openCreatorTransitionClosedCutEvidenceOwned(input);
+}
+
+function openCreatorTransitionClosedCutEvidenceOwned(
 	input: Readonly<{
 		closure: CreatorTransitionClosure;
 		floorTrust: CurrentAnchorTrust;
 		currentTrust?: CurrentAnchorTrust;
-	}>
+	}>,
+	sharedSyntax?: CreatorTransitionSyntax
 ):
 	| Readonly<{
 			cut: DetachedClosureCandidate;
@@ -1053,7 +1087,7 @@ export function openCreatorTransitionClosedCutEvidence(
 	// One synchronous opener owns syntax for all of its candidate selectors.
 	// Full authentication below still opens the original exact bytes and trust;
 	// the reader compares mutable input bytes on every repeated syntax access.
-	const syntax = createCreatorCanonicalSyntaxReader();
+	const syntax = sharedSyntax ?? createCreatorCanonicalSyntaxReader();
 	const record = (candidate: DetachedClosureCandidate) => syntax.selection(candidate.bytes);
 	const select = (
 		candidates: readonly DetachedClosureCandidate[], kind: string, epoch?: number, phase?: string
@@ -1089,7 +1123,7 @@ export function openCreatorTransitionClosedCutEvidence(
 			!exactCreatorTransitionOccurrence(input.closure.closure, candidate)
 		)
 			return undefined;
-		const opened = openCreatorTransitionSettlement(candidate, input.floorTrust, cut, qc, digest);
+		const opened = openCreatorTransitionSettlementOwned(candidate, input.floorTrust, cut, qc, digest, syntax);
 		return opened === undefined
 			? undefined
 			: Object.freeze({
@@ -1107,18 +1141,18 @@ export function openCreatorTransitionClosedCutEvidence(
 		!exactCreatorTransitionOccurrence(input.closure.closure, retirementCandidate)
 	)
 		return undefined;
-	const retirement = openCreatorTransitionRetirement(retirementCandidate, input.floorTrust, cut, qc);
+	const retirement = openCreatorTransitionRetirementOwned(retirementCandidate, input.floorTrust, cut, qc, syntax);
 	if (retirement === undefined) return undefined;
 	if (aggregates.length === 0) return Object.freeze({ cut, qc, representation: "retirement-only", retirement });
 	const aggregate = aggregates[0];
 	const acl = select(input.closure.candidates, "drp-v3-latched-acl", epoch);
 	if (aggregate === undefined || !exactCreatorTransitionOccurrence(input.closure.closure, aggregate)) return undefined;
-	const opened = openCreatorTransitionAggregate(
+	const opened = openCreatorTransitionAggregateOwned(
 		aggregate,
 		input.floorTrust,
 		cut,
 		qc,
-		input.currentTrust === undefined ? { acl } : { trust: input.currentTrust }
+		input.currentTrust === undefined ? { acl } : { trust: input.currentTrust }, syntax
 	);
 	return opened === undefined
 		? undefined
@@ -1154,9 +1188,9 @@ function authenticatedAggregatePair(
 		sameRef(candidate.ref, input.proofRefs[1] as GenerationRef)
 	);
 	if (proposedCut === undefined || proposedQc === undefined) return undefined;
-	const openedProposed = openCreatorTransitionAggregate(proposed, input.successorTrust, proposedCut, proposedQc, {
+	const openedProposed = openCreatorTransitionAggregateOwned(proposed, input.successorTrust, proposedCut, proposedQc, {
 		trust: input.currentTrust,
-	});
+	}, syntax);
 	if (
 		openedProposed === undefined ||
 		openedProposed.identity.closedEpoch !== input.currentTrust.currentEpoch ||
@@ -1182,9 +1216,9 @@ function authenticatedAggregatePair(
 	const currentQc = uniqueCreatorTransitionCandidate(input.current.candidates, "drp-seal-qc", closedEpoch, "commit", syntax);
 	const currentAcl = uniqueCreatorTransitionCandidate(input.current.candidates, "drp-v3-latched-acl", closedEpoch, undefined, syntax);
 	if (currentCut === undefined || currentQc === undefined || currentAcl === undefined) return undefined;
-	const openedCurrent = openCreatorTransitionAggregate(current, input.currentTrust, currentCut, currentQc, {
+	const openedCurrent = openCreatorTransitionAggregateOwned(current, input.currentTrust, currentCut, currentQc, {
 		acl: currentAcl,
-	});
+	}, syntax);
 	if (openedCurrent === undefined || openedProposed.identity.priorAggregateCandidateDigest !== current.ref.digest) {
 		return undefined;
 	}
@@ -1206,6 +1240,8 @@ function authenticatedSettlementPair(
 			readonly proposed: DetachedClosureCandidate;
 	  }>
 	| undefined {
+	const open = (...args: Parameters<typeof openCreatorTransitionSettlement>) => openSettlement === openCreatorTransitionSettlement
+		? openCreatorTransitionSettlementOwned(...args, syntax) : openSettlement(...args);
 	if (
 		settlementProfileFor(input.currentTrust.profileId) !== "v1" ||
 		settlementProfileFor(input.successorTrust.profileId) !== "v1" ||
@@ -1235,7 +1271,7 @@ function authenticatedSettlementPair(
 	);
 	const currentAclDigest = currentAnchorAclDigest(input.current, input.currentTrust, syntax);
 	if (proposedCut === undefined || proposedQc === undefined || currentAclDigest === undefined) return undefined;
-	const openedProposed = openSettlement(
+	const openedProposed = open(
 		proposed,
 		input.successorTrust,
 		proposedCut,
@@ -1310,7 +1346,7 @@ function authenticatedSettlementPair(
 	if (currentCut === undefined || currentQc === undefined || currentAcl === undefined || !exactCandidate(currentAcl)) {
 		return undefined;
 	}
-	const openedCurrent = openSettlement(
+	const openedCurrent = open(
 		current,
 		input.currentTrust,
 		currentCut,
@@ -1335,21 +1371,189 @@ function authenticatedSettlementPair(
  * @param input - Current/proposed closure pair, new proof refs, and staging/verification mode.
  * @returns The authenticated proposal (normalized only for in-memory staging) or a rejection.
  */
-export function inspectCreatorTransitionAdvance(
+function inspectCreatorTransitionAdvance(
 	input: InspectCreatorTransitionAdvanceInput
 ): InspectCreatorTransitionAdvanceResult {
 	return inspectCreatorTransitionAdvanceOwned(input);
 }
 
+// Exact-input memo for the exported VERIFY predicate. Every chain verifier
+// re-inspects the same immutable E->E+1 closures many times per transition.
+// Openers consult a trust only through its immutable registered material
+// (resolveCreatorAnchorTrustMaterial), so a genuine trust is keyed by its public
+// fields plus that exact material, never by identity. A hit requires byte-for-
+// byte equality of every candidate, material and ACL byte with PRIVATE copies
+// and the same plain-data shape the original structural checks accept. Only
+// successes are retained; refusals and every other input run the original.
+const TRANSITION_MEMO_MAX_ENTRY_BYTES = 4 * 1024 * 1024;
+const TRANSITION_MEMO_MAX_BYTES = 16 * 1024 * 1024;
+interface TransitionMemoEntry {
+	readonly bytes: readonly Uint8Array[];
+	readonly retained: number;
+	readonly kind: "successor";
+}
+const transitionMemo = new Map<string, TransitionMemoEntry>();
+let transitionMemoBytes = 0;
+
+// Only plain closed records and dense plain arrays are keyed; anything the
+// original structural checks might treat differently keeps the original path.
+function transitionMemoData(value: unknown, keys: readonly string[]): Readonly<Record<string, unknown>> | undefined {
+	if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
+	const prototype = Object.getPrototypeOf(value);
+	if (prototype !== Object.prototype && prototype !== null) return undefined;
+	const own = Reflect.ownKeys(value);
+	if (own.length !== keys.length) return undefined;
+	const result: Record<string, unknown> = {};
+	for (const key of keys) {
+		const descriptor = Reflect.getOwnPropertyDescriptor(value, key);
+		if (descriptor === undefined || descriptor.enumerable !== true || !("value" in descriptor)) return undefined;
+		result[key] = descriptor.value;
+	}
+	return result;
+}
+
+function transitionMemoArray(value: unknown): readonly unknown[] | undefined {
+	if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype ||
+		Reflect.ownKeys(value).length !== value.length + 1) return undefined;
+	const items: unknown[] = [];
+	for (let index = 0; index < value.length; index++) {
+		const descriptor = Reflect.getOwnPropertyDescriptor(value, index);
+		if (descriptor === undefined || !("value" in descriptor)) return undefined;
+		items.push(descriptor.value);
+	}
+	return items;
+}
+
+function transitionMemoInteger(value: unknown): value is number {
+	return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 && !Object.is(value, -0);
+}
+
+const TRANSITION_MEMO_VIEW_OVERRIDES = ["buffer", "byteLength", "byteOffset", "length"];
+
+/** Ordinary unshared views only: instrumented or exotic carriers keep the original path. */
+function transitionMemoBytesOf(value: unknown): Uint8Array | undefined {
+	return value instanceof Uint8Array && Object.getPrototypeOf(value) === Uint8Array.prototype &&
+		!TRANSITION_MEMO_VIEW_OVERRIDES.some((name) => Object.hasOwn(value, name)) && value.buffer instanceof ArrayBuffer
+		? value : undefined;
+}
+
+function transitionMemoKey(input: unknown): Readonly<{ key: string; bytes: readonly Uint8Array[]; proposed: unknown }> | undefined {
+	const fields = ["current", "currentTrust", "mode", "proofRefs", "proposed", "successorTrust"];
+	const hasAcl = typeof input === "object" && input !== null && Reflect.ownKeys(input).includes("settlementAcl");
+	const record = transitionMemoData(input, hasAcl ? [...fields, "settlementAcl"] : fields);
+	if (record === undefined || record.mode !== "verify") return undefined;
+	const bytes: Uint8Array[] = [];
+	const parts: string[] = ["verify"];
+	const ref = (value: unknown): boolean => {
+		const data = transitionMemoData(value, ["digest", "byteLength"]);
+		// Fixed-width hex digests and non-negative safe integers keep the key
+		// injective: no caller-chosen text can imitate the "|"/":" framing.
+		if (data === undefined || typeof data.digest !== "string" || !/^[0-9a-f]{64}$/u.test(data.digest) ||
+			!transitionMemoInteger(data.byteLength)) return false;
+		parts.push(`${data.digest}:${data.byteLength}`);
+		return true;
+	};
+	const trust = (value: unknown): boolean => {
+		const data = transitionMemoData(value, ["currentAnchorDigest", "currentEpoch", "genesisAnchorDigest", "objectId", "profileId"]);
+		if (data === undefined || !transitionMemoInteger(data.currentEpoch) ||
+			![data.currentAnchorDigest, data.genesisAnchorDigest, data.objectId, data.profileId].every((field) => typeof field === "string"))
+			return false;
+		const material = resolveSealRecoveryTrust(value as CurrentAnchorTrust);
+		if (material === undefined) return false;
+		parts.push(`T${JSON.stringify([data.currentAnchorDigest, data.currentEpoch, data.genesisAnchorDigest, data.objectId, data.profileId,
+			material.currentAnchorDigest, material.currentEpoch, material.genesisAnchorDigest, material.objectId, material.quorum])}`);
+		bytes.push(material.publicKey, material.exactCanonicalCurrentAnchorPreimageBytes, material.detachedCurrentAnchorSignature,
+			material.exactCanonicalProfileBytes, material.exactCanonicalSignerSetBytes);
+		return true;
+	};
+	const closure = (value: unknown): boolean => {
+		const data = transitionMemoData(value, ["candidates", "closure"]);
+		const refs = transitionMemoArray(data?.closure), candidates = transitionMemoArray(data?.candidates);
+		if (refs === undefined || candidates === undefined) return false;
+		parts.push(`C${refs.length}`);
+		if (!refs.every(ref)) return false;
+		parts.push(`D${candidates.length}`);
+		for (const candidate of candidates) {
+			const item = transitionMemoData(candidate, ["bytes", "ref"]);
+			const exact = transitionMemoBytesOf(item?.bytes);
+			if (exact === undefined || !ref(item!.ref)) return false;
+			bytes.push(exact);
+		}
+		return true;
+	};
+	const proofRefs = transitionMemoArray(record.proofRefs);
+	if (!trust(record.currentTrust) || !trust(record.successorTrust) || proofRefs === undefined) return undefined;
+	parts.push(`P${proofRefs.length}`);
+	if (!proofRefs.every(ref) || !closure(record.current) || !closure(record.proposed)) return undefined;
+	if (hasAcl) {
+		if (record.settlementAcl === undefined) parts.push("A-");
+		else {
+			const acl = transitionMemoData(record.settlementAcl, ["current", "successor"]);
+			const current = transitionMemoBytesOf(acl?.current), successor = transitionMemoBytesOf(acl?.successor);
+			if (current === undefined || successor === undefined) return undefined;
+			parts.push("A+");
+			bytes.push(current, successor);
+		}
+	}
+	parts.push(`B${bytes.map((item) => item.byteLength).join(",")}`);
+	return Object.freeze({ key: parts.join("|"), bytes, proposed: record.proposed });
+}
+
+function sameTransitionMemoBytes(left: Uint8Array, right: Uint8Array): boolean {
+	return left.byteLength === right.byteLength && compareBytes(left, right) === 0;
+}
+
+/**
+ * The exported transition predicate: exact-input memo over the original owner.
+ * @param input - Current/proposed closure pair, new proof refs, and staging/verification mode.
+ * @returns The original owner's result for these exact inputs.
+ */
+function inspectCreatorTransitionAdvanceExact(
+	input: InspectCreatorTransitionAdvanceInput
+): InspectCreatorTransitionAdvanceResult {
+	let memo: ReturnType<typeof transitionMemoKey>;
+	try {
+		memo = transitionMemoKey(input);
+	} catch {
+		memo = undefined;
+	}
+	if (memo === undefined) return inspectCreatorTransitionAdvance(input);
+	const known = transitionMemo.get(memo.key);
+	if (known !== undefined && known.bytes.length === memo.bytes.length &&
+		known.bytes.every((bytes, index) => sameTransitionMemoBytes(bytes, memo.bytes[index]!))) {
+		transitionMemo.delete(memo.key);
+		transitionMemo.set(memo.key, known);
+		return Object.freeze({ kind: known.kind, ok: true as const, proposed: memo.proposed as CreatorTransitionClosure });
+	}
+	const result = inspectCreatorTransitionAdvance(input);
+	const retained = memo.bytes.reduce((sum, bytes) => sum + bytes.byteLength, 0);
+	if (!result.ok || result.proposed !== memo.proposed || retained > TRANSITION_MEMO_MAX_ENTRY_BYTES) return result;
+	if (known !== undefined) {
+		transitionMemo.delete(memo.key);
+		transitionMemoBytes -= known.retained;
+	}
+	transitionMemo.set(memo.key, Object.freeze({ bytes: Object.freeze(memo.bytes.map((bytes) => bytes.slice())), retained, kind: result.kind }));
+	transitionMemoBytes += retained;
+	for (const [oldest, entry] of transitionMemo) {
+		if (transitionMemoBytes <= TRANSITION_MEMO_MAX_BYTES) break;
+		transitionMemo.delete(oldest);
+		transitionMemoBytes -= entry.retained;
+	}
+	return result;
+}
+
+export { inspectCreatorTransitionAdvanceExact as inspectCreatorTransitionAdvance };
+
 function inspectCreatorTransitionAdvanceOwned(
 	input: InspectCreatorTransitionAdvanceInput,
-	openSettlement: typeof openCreatorTransitionSettlement = openCreatorTransitionSettlement
+	openSettlement: typeof openCreatorTransitionSettlement = openCreatorTransitionSettlement,
+	sharedSyntax?: CreatorTransitionSyntax
 ): InspectCreatorTransitionAdvanceResult {
 	try {
 		// One bounded synchronous owner shares decode-only syntax across the full
 		// current/proposed selection tree. Nothing retains this reader after return;
 		// selected bytes, refs, hashes and every authentication opener remain fresh.
-		const syntax = createCreatorCanonicalSyntaxReader();
+		const syntax = sharedSyntax ?? createCreatorCanonicalSyntaxReader();
 		const withoutControlCandidates = (
 			closure: CreatorTransitionClosure,
 			candidates: readonly (DetachedClosureCandidate | undefined)[]
@@ -2549,9 +2753,10 @@ type CreatorRecoveryVerifiedBranch = Readonly<{
 }>;
 
 function verifyCreatorRecoveryBranch(currentTrust: CurrentAnchorTrust,
-	envelopes: readonly (CreatorRecoveryEnvelope | undefined)[], pinBytes: Uint8Array): CreatorRecoveryVerifiedBranch | undefined {
+	envelopes: readonly (CreatorRecoveryEnvelope | undefined)[], pinBytes: Uint8Array,
+	syntax?: CreatorTransitionSyntax): CreatorRecoveryVerifiedBranch | undefined {
 	const chain = inspectCreatorHistoricalAnchorChain({currentTrust, envelopes});
-	const pinRecord = canonicalCreatorDataRecord(pinBytes), pin = openCurrentAnchorTrust({
+	const pinRecord = syntax === undefined ? canonicalCreatorDataRecord(pinBytes) : syntax.record(pinBytes), pin = openCurrentAnchorTrust({
 		exactCanonicalTrustStateRecordBytes: pinBytes, expectedObjectId: currentTrust.objectId,
 		pinnedGenesisAnchorDigest: currentTrust.genesisAnchorDigest,
 	});
@@ -2600,7 +2805,7 @@ function createCreatorRecoveryEvidenceOwner() {
 		branch(currentTrust: CurrentAnchorTrust, envelopes: readonly (CreatorRecoveryEnvelope | undefined)[], pinBytes: Uint8Array) {
 			if (sameBranch(currentTrust, envelopes, pinBytes)) return branch;
 			branch = undefined; context = undefined; sources.length = 0; retainedBytes = 0;
-			const verified = verifyCreatorRecoveryBranch(currentTrust, envelopes, pinBytes);
+			const verified = verifyCreatorRecoveryBranch(currentTrust, envelopes, pinBytes, syntax);
 			if (verified !== undefined && branchBytes(verified) <= AHE_BOUNDED_READ_LIMITS.maxUnionBytes) {
 				branch = verified; context = Object.freeze({...currentTrust}); retainedBytes = branchBytes(verified);
 			}
@@ -2631,10 +2836,13 @@ type CreatorRecoveryEvidenceOwner = ReturnType<typeof createCreatorRecoveryEvide
 export function createCreatorSnapshotRecoveryEvidenceJob() {
 	let owner: CreatorRecoveryEvidenceOwner | undefined = createCreatorRecoveryEvidenceOwner();
 	return Object.freeze({
+		// The original acquisition borrows this genuine job-owned DATA reader;
+		// no caller can inject parsed records or an alternative syntax provider.
+		get syntax(): CreatorTransitionSyntax | undefined { return owner?.syntax; },
 		sourceTrust: (input: unknown): CreatorRecoverySourceResult => openCreatorSnapshotRecoverySourceTrustOwned(input, owner),
 		readback: (input: unknown): ReturnType<typeof openCreatorSnapshotRecoveryRoleReadback> =>
 			openCreatorSnapshotRecoveryRoleReadbackOwned(input, owner),
-		release: (): void => {owner = undefined;},
+		release: (): void => {owner?.syntax.release(); owner = undefined;},
 	});
 }
 
@@ -2720,7 +2928,8 @@ function openCreatorSnapshotRecoverySourceTrustFromVerifiedBranch(
 			previousIdentity = chain.identities.find((value) => value.epoch === n - 1),
 			predecessorEnvelope = envelopes.find(
 				(value) =>
-					value !== undefined && canonicalCreatorDataRecord(value.exactCanonicalAnchorPreimageBytes)?.epoch === n - 1
+					value !== undefined && (syntax === undefined ? canonicalCreatorDataRecord(value.exactCanonicalAnchorPreimageBytes)
+						: syntax.canonicalSelection(value.exactCanonicalAnchorPreimageBytes))?.epoch === n - 1
 			);
 		const cut = uniqueCreatorTransitionCandidate(closure.candidates, "drp-hard-epoch-cut", n - 1, undefined, syntax),
 			qc = uniqueCreatorTransitionCandidate(closure.candidates, "drp-seal-qc", n - 1, "commit", syntax);
@@ -2889,7 +3098,7 @@ function openCreatorSnapshotRecoveryRoleReadbackOwned(
 			return failure("RECOVERY_ROLE_LINEAGE_INVALID");
 		const cutRecord = record(cut, syntax),
 			priorRecord = record(priorCut, syntax),
-			pinRecord = canonicalCreatorDataRecord(pinBytes);
+			pinRecord = syntax === undefined ? canonicalCreatorDataRecord(pinBytes) : syntax.record(pinBytes);
 		const roles = captureCreatorSnapshotRecoveryRoles(cutRecord?.recoveryRoles);
 		if (
 			cutRecord === undefined ||
@@ -2949,7 +3158,7 @@ function openCreatorSnapshotRecoveryRoleReadbackOwned(
 		const closedAcl = select(live.candidates, "drp-v3-latched-acl", n - 1);
 		if (closedAcl === undefined || compareBytes(closedAcl.bytes, priorData.successorAclBytes) !== 0)
 			return failure("RECOVERY_ROLE_LINEAGE_INVALID:acl");
-		const continuity = inspectCreatorTransitionAdvance({
+		const continuity = inspectCreatorTransitionAdvanceOwned({
 			current: predecessor,
 			proposed: current,
 			currentTrust: priorTrust,
@@ -2957,7 +3166,7 @@ function openCreatorSnapshotRecoveryRoleReadbackOwned(
 			mode: "verify",
 			proofRefs: [cut.ref, qc.ref],
 			settlementAcl: { current: priorData.successorAclBytes, successor: latestData.successorAclBytes },
-		});
+		}, openCreatorTransitionSettlement, syntax);
 		if (!continuity.ok) return failure(`RECOVERY_ROLE_LINEAGE_INVALID:advance:${continuity.reason}`);
 		if (Object.hasOwn(captured, "currentLive")) {
 			const oldProjection = select(current.candidates, "v3-live-generation-2", n - 1),
@@ -3059,7 +3268,7 @@ function openCreatorSnapshotRecoveryRoleReadbackOwned(
 			}, charge) : evidenceOwner.source(verifiedBranch, closure, charge);
 			if (!trust.ok)
 				return failure("RECOVERY_ROLE_SOURCE_INVALID");
-			const evidence = openCreatorTransitionClosedCutEvidence({ closure, floorTrust: trust.trust });
+			const evidence = openCreatorTransitionClosedCutEvidenceOwned({ closure, floorTrust: trust.trust }, syntax);
 			const sourceCut = evidence === undefined ? undefined : record(evidence.cut, syntax);
 			if (evidence === undefined || sourceCut === undefined || sourceCut.previousAnchor !== closedIdentity.anchorDigest)
 				return failure("RECOVERY_ROLE_SOURCE_INVALID");

@@ -1,4 +1,5 @@
 import { compareBytes, encodeCanonical } from "@ts-drp/canonical";
+import { createCanonicalEncodingCapture, type CanonicalEncodingCaptureValue } from "@ts-drp/canonical/encoding-capture";
 
 import {
 	compareSigningSummaryRetirementEntries,
@@ -53,6 +54,42 @@ export function createSigningStorageCodec(
 	const safe = (value: unknown): value is number =>
 		typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 
+	// One synchronous public capture owns only its OWN normalized immutable
+	// outputs. Unknown inputs are never enrolled, even if frozen or aliased.
+	// Opaque child segments retain the original encoder's limits/depth checks
+	// when composed into each original enclosing PRE. Nothing survives return.
+	function withEncoding<T>(action: (scope: EncodingScope) => T): T {
+		const encoding = createCanonicalEncodingCapture();
+		const captured = new WeakMap<object, CanonicalEncodingCaptureValue>();
+		const parts = (value: unknown): unknown => {
+			if (value === null || typeof value !== "object") return value;
+			const prior = captured.get(value);
+			if (prior !== undefined) return prior;
+			if (Array.isArray(value)) return value.map(parts);
+			return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, parts(child)]));
+		};
+		const scope: EncodingScope = {
+			check(value, limits = controlLimits) {
+				// A spent remaining-byte allowance must take the original encoder's
+				// refusal, not the capture API's stricter limit-configuration error.
+				if (!Number.isSafeInteger(limits.maxBytes) || limits.maxBytes < 1)
+					return encodeCanonical(value, limits).byteLength;
+				const result = encoding.capture(parts(value), limits);
+				captured.set(value, result);
+				return result.byteLength;
+			},
+			equal(left, right) {
+				if (!Number.isSafeInteger(controlLimits.maxBytes) || controlLimits.maxBytes < 1) return equal(left, right);
+				return compareBytes(encoding.encode(parts(left), controlLimits), encoding.encode(parts(right), controlLimits)) === 0;
+			},
+		};
+		try { return action(scope); } finally { encoding.release(); }
+	}
+	type EncodingScope = {
+		check(value: object, limits?: typeof controlLimits): number;
+		equal(left: unknown, right: unknown): boolean;
+	};
+
 	function plainRecord(value: unknown): value is Readonly<Record<string, unknown>> {
 		if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
 		const prototype = Object.getPrototypeOf(value) as object | null;
@@ -75,7 +112,7 @@ export function createSigningStorageCodec(
 		return Object.fromEntries(keys.map((key) => [key, descriptors[key].value]));
 	}
 
-	function preparation(value: unknown, objectId?: string, allowSummary = true): SigningRetirementPreparation {
+	function preparation(value: unknown, objectId: string | undefined, allowSummary: boolean, scope: EncodingScope): SigningRetirementPreparation {
 		const hasSummary = plainRecord(value) && Object.hasOwn(value, "summarySource");
 		if (hasSummary && (!allowSummary || objectId === undefined)) throw new TypeError("INVALID_SIGNING_PREPARATION");
 		const row = record(value, [
@@ -111,7 +148,7 @@ export function createSigningStorageCodec(
 			protectedEpochs: Object.freeze(holes),
 			decisionDigest: row.decisionDigest,
 			sourceProofDigest: row.sourceProofDigest,
-			...(hasSummary && objectId !== undefined ? { summarySource: summarySource(row.summarySource, objectId) } : {}),
+			...(hasSummary && objectId !== undefined ? { summarySource: summarySource(row.summarySource, objectId, scope) } : {}),
 		});
 		if (
 			captured.summarySource !== undefined &&
@@ -119,7 +156,7 @@ export function createSigningStorageCodec(
 				!monotone(captured.summarySource.eligibilityFence, captured))
 		)
 			throw new TypeError("INVALID_SIGNING_PREPARATION");
-		encodeCanonical(captured, controlLimits);
+		scope.check(captured);
 		return captured;
 	}
 
@@ -133,7 +170,7 @@ export function createSigningStorageCodec(
 		);
 	}
 
-	function control(value: unknown, objectId: string, incarnation: string, allowDrain = true): SigningRetirementControl {
+	function control(value: unknown, objectId: string, incarnation: string, allowDrain: boolean, scope: EncodingScope): SigningRetirementControl {
 		const hasDrain = plainRecord(value) && Object.hasOwn(value, "drain");
 		const row = record(value, [
 			"kind",
@@ -155,7 +192,7 @@ export function createSigningStorageCodec(
 			row.revision < row.sequence
 		)
 			throw new Error("INVALID_SIGNING_CONTROL");
-		const completed = row.completed === null ? null : preparation(row.completed, objectId);
+		const completed = row.completed === null ? null : preparation(row.completed, objectId, true, scope);
 		if (completed !== null && row.sequence === 0) throw new Error("INVALID_SIGNING_CONTROL");
 		let active: SigningRetirementControl["active"] = null;
 		if (row.active !== null) {
@@ -168,7 +205,7 @@ export function createSigningStorageCodec(
 				!digestPattern.test(pending.sourceImageDigest)
 			)
 				throw new Error("INVALID_SIGNING_CONTROL");
-			const proposed = preparation(pending.preparation, objectId);
+			const proposed = preparation(pending.preparation, objectId, true, scope);
 			if (!monotone(completed, proposed)) throw new Error("INVALID_SIGNING_CONTROL");
 			active = Object.freeze({
 				sequence: pending.sequence,
@@ -182,7 +219,7 @@ export function createSigningStorageCodec(
 			if (row.drain !== null) {
 				if (!allowDrain) throw new Error("INVALID_SIGNING_DRAIN");
 				const state = record(row.drain, ["plan", "cursor", "batches", "remainingDataDigest"]);
-				const plan = retirementDrainPlan(state.plan, objectId, incarnation);
+				const plan = retirementDrainPlan(state.plan, objectId, incarnation, scope);
 				if (
 					!safe(state.cursor) ||
 					state.cursor > plan.entries.length ||
@@ -199,7 +236,7 @@ export function createSigningStorageCodec(
 					(active !== null ||
 						row.sequence !== plan.baseControl.sequence ||
 						row.revision !== plan.baseControl.revision + 1 + state.batches ||
-						!equal(completed, plan.baseControl.completed))
+						!scope.equal(completed, plan.baseControl.completed))
 				)
 					throw new Error("INVALID_SIGNING_DRAIN");
 				drain = Object.freeze({
@@ -220,7 +257,7 @@ export function createSigningStorageCodec(
 			completed,
 			...(drain !== undefined ? { drain } : {}),
 		});
-		encodeCanonical(captured, controlLimits);
+		scope.check(captured);
 		return captured;
 	}
 
@@ -228,9 +265,9 @@ export function createSigningStorageCodec(
 		return compareBytes(encodeCanonical(left, controlLimits), encodeCanonical(right, controlLimits)) === 0;
 	}
 
-	function evidencePlan(value: unknown, objectId: string, incarnation: string): SigningEvidenceRetirementPlan {
+	function evidencePlan(value: unknown, objectId: string, incarnation: string, scope: EncodingScope): SigningEvidenceRetirementPlan {
 		const row = record(value, ["baseControl", "entries", "sourceDataDigest"]);
-		const baseControl = control(row.baseControl, objectId, incarnation, false);
+		const baseControl = control(row.baseControl, objectId, incarnation, false, scope);
 		if (
 			baseControl.active !== null ||
 			baseControl.completed === null ||
@@ -244,7 +281,7 @@ export function createSigningStorageCodec(
 		if (!safe(length) || length === 0 || length > 65_536 || Reflect.ownKeys(descriptors).length !== length + 1)
 			throw new Error("INVALID_SIGNING_DRAIN_PLAN");
 		const entries: SigningEvidenceRetirementEntry[] = [];
-		let bytes = encodeCanonical({ baseControl, sourceDataDigest: row.sourceDataDigest }, controlLimits).byteLength;
+		let bytes = scope.check({ baseControl, sourceDataDigest: row.sourceDataDigest });
 		for (let index = 0; index < length; index++) {
 			const descriptor = descriptors[String(index)];
 			if (descriptor === undefined || !("value" in descriptor) || !descriptor.enumerable)
@@ -278,7 +315,7 @@ export function createSigningStorageCodec(
 				revision: entry.revision,
 				frameDigest: entry.frameDigest,
 			});
-			bytes += encodeCanonical(copied, { ...controlLimits, maxBytes: controlLimits.maxBytes - bytes }).byteLength;
+			bytes += scope.check(copied, { ...controlLimits, maxBytes: controlLimits.maxBytes - bytes });
 			entries.push(copied);
 		}
 		const captured = Object.freeze({
@@ -286,13 +323,13 @@ export function createSigningStorageCodec(
 			entries: Object.freeze(entries),
 			sourceDataDigest: row.sourceDataDigest,
 		});
-		encodeCanonical(captured, controlLimits);
+		scope.check(captured);
 		return captured;
 	}
 
-	function summarySource(value: unknown, objectId: string): SigningSummaryRetirementSource {
+	function summarySource(value: unknown, objectId: string, scope: EncodingScope): SigningSummaryRetirementSource {
 		const row = record(value, ["entries", "sourceDataDigest", "resumeBasisDigest", "eligibilityFence"]);
-		const eligibilityFence = preparation(row.eligibilityFence, objectId, false);
+		const eligibilityFence = preparation(row.eligibilityFence, objectId, false, scope);
 		if (
 			!Array.isArray(row.entries) ||
 			typeof row.sourceDataDigest !== "string" ||
@@ -306,10 +343,7 @@ export function createSigningStorageCodec(
 		if (!safe(length) || length === 0 || length > 65_536 || Reflect.ownKeys(descriptors).length !== length + 1)
 			throw new Error("INVALID_SIGNING_DRAIN_PLAN");
 		const entries: SigningSummaryRetirementEntry[] = [];
-		let charged = encodeCanonical(
-			{ eligibilityFence, sourceDataDigest: row.sourceDataDigest, resumeBasisDigest: row.resumeBasisDigest },
-			controlLimits
-		).byteLength;
+		let charged = scope.check({ eligibilityFence, sourceDataDigest: row.sourceDataDigest, resumeBasisDigest: row.resumeBasisDigest });
 		for (let index = 0; index < length; index++) {
 			const descriptor = descriptors[String(index)];
 			if (descriptor === undefined || !("value" in descriptor) || !descriptor.enumerable)
@@ -354,7 +388,7 @@ export function createSigningStorageCodec(
 			const prior = entries[index - 1];
 			if (prior !== undefined && compareSigningSummaryRetirementEntries(prior, copied) >= 0)
 				throw new Error("INVALID_SIGNING_DRAIN_PLAN");
-			charged += encodeCanonical(copied, { ...controlLimits, maxBytes: controlLimits.maxBytes - charged }).byteLength;
+			charged += scope.check(copied, { ...controlLimits, maxBytes: controlLimits.maxBytes - charged });
 			entries.push(copied);
 		}
 		const captured = Object.freeze({
@@ -363,11 +397,11 @@ export function createSigningStorageCodec(
 			resumeBasisDigest: row.resumeBasisDigest,
 			eligibilityFence,
 		});
-		encodeCanonical(captured, controlLimits);
+		scope.check(captured);
 		return captured;
 	}
 
-	function summaryPlan(value: unknown, objectId: string, incarnation: string): SigningSummaryRetirementPlan {
+	function summaryPlan(value: unknown, objectId: string, incarnation: string, scope: EncodingScope): SigningSummaryRetirementPlan {
 		const row = record(value, [
 			"kind",
 			"baseControl",
@@ -376,7 +410,7 @@ export function createSigningStorageCodec(
 			"resumeBasisDigest",
 			"eligibilityFence",
 		]);
-		const baseControl = control(row.baseControl, objectId, incarnation, false);
+		const baseControl = control(row.baseControl, objectId, incarnation, false, scope);
 		const source = summarySource(
 			{
 				entries: row.entries,
@@ -384,13 +418,13 @@ export function createSigningStorageCodec(
 				resumeBasisDigest: row.resumeBasisDigest,
 				eligibilityFence: row.eligibilityFence,
 			},
-			objectId
+			objectId, scope
 		);
 		if (
 			row.kind !== "signing-summary-retirement-plan-2" ||
 			baseControl.active !== null ||
 			baseControl.completed === null ||
-			!equal(baseControl.completed.summarySource, source) ||
+			!scope.equal(baseControl.completed.summarySource, source) ||
 			!monotone(source.eligibilityFence, baseControl.completed) ||
 			source.entries.some((entry) => !retired(baseControl.completed, entry.key[1]))
 		)
@@ -401,13 +435,14 @@ export function createSigningStorageCodec(
 	function retirementDrainPlan(
 		value: unknown,
 		objectId: string,
-		incarnation: string
+		incarnation: string,
+		scope: EncodingScope
 	): SigningEvidenceRetirementPlan | SigningSummaryRetirementPlan {
 		const kind = plainRecord(value) ? Object.getOwnPropertyDescriptor(value, "kind") : undefined;
 		if (kind !== undefined && !("value" in kind)) throw new TypeError("INVALID_SIGNING_DRAIN_PLAN");
 		return kind?.value === "signing-summary-retirement-plan-2"
-			? summaryPlan(value, objectId, incarnation)
-			: evidencePlan(value, objectId, incarnation);
+			? summaryPlan(value, objectId, incarnation, scope)
+			: evidencePlan(value, objectId, incarnation, scope);
 	}
 
 	function idle(objectId: string, incarnation: string): SigningRetirementControl {
@@ -439,17 +474,17 @@ export function createSigningStorageCodec(
 		);
 	}
 
-	return Object.freeze({
+	return Object.freeze<SigningStorageCodec>({
 		plainRecord,
 		record,
-		preparation,
+		preparation: (value, objectId, allowSummary = true) => withEncoding(scope => preparation(value, objectId, allowSummary, scope)),
 		monotone,
-		control,
+		control: (value, objectId, incarnation, allowDrain = true) => withEncoding(scope => control(value, objectId, incarnation, allowDrain, scope)),
 		equal,
-		evidencePlan,
-		summarySource,
-		summaryPlan,
-		retirementDrainPlan,
+		evidencePlan: (value, objectId, incarnation) => withEncoding(scope => evidencePlan(value, objectId, incarnation, scope)),
+		summarySource: (value, objectId) => withEncoding(scope => summarySource(value, objectId, scope)),
+		summaryPlan: (value, objectId, incarnation) => withEncoding(scope => summaryPlan(value, objectId, incarnation, scope)),
+		retirementDrainPlan: (value, objectId, incarnation) => withEncoding(scope => retirementDrainPlan(value, objectId, incarnation, scope)),
 		idle,
 		retired,
 		summaryMaintenancePending,

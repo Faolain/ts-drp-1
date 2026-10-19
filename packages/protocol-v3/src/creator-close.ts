@@ -1,7 +1,8 @@
-import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { compareBytes, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 
 import { type CurrentAnchorTrust, verifyEd25519RegisteredDigest } from "./index.js";
 import { archiveAppendMatchesCut, captureCreatorArchiveAppendBinding } from "./internal/creator-archive-append.js";
+import { decodeCanonicalWithExactness } from "./internal/canonical-exactness.js";
 export type { CreatorArchiveAppendBinding } from "./internal/creator-archive-append.js";
 import type { CreatorAnchorSigningRequest } from "./internal/creator-anchor-signing-request.js";
 import {
@@ -270,7 +271,7 @@ function safeInteger(value: unknown, minimum = 0): value is number {
 
 function exactCanonicalRecord(bytes: Uint8Array, kind: string): Readonly<Record<string, unknown>> | undefined {
 	try {
-		const decoded = decodeCanonical(bytes);
+		const { value: decoded, exact } = decodeCanonicalWithExactness(bytes);
 		const registered = registry.kinds[kind]?.fields;
 		const fields = registered
 			?.filter((field) => field.required || (plainRecord(decoded) && Object.hasOwn(decoded, field.name)))
@@ -279,7 +280,7 @@ function exactCanonicalRecord(bytes: Uint8Array, kind: string): Readonly<Record<
 			fields === undefined ||
 			!plainRecord(decoded) ||
 			!exactKeys(decoded, fields) ||
-			compareBytes(encodeCanonical(decoded), bytes) !== 0
+			(!exact && compareBytes(encodeCanonical(decoded), bytes) !== 0)
 		) {
 			return undefined;
 		}
@@ -304,8 +305,8 @@ function exactCanonicalRecord(bytes: Uint8Array, kind: string): Readonly<Record<
 }
 
 function decodeCanonicalValue(bytes: Uint8Array): unknown {
-	const value = decodeCanonical(bytes);
-	if (compareBytes(encodeCanonical(value), bytes) !== 0) throw new TypeError("noncanonical carrier");
+	const { value, exact } = decodeCanonicalWithExactness(bytes);
+	if (!exact && compareBytes(encodeCanonical(value), bytes) !== 0) throw new TypeError("noncanonical carrier");
 	return value;
 }
 

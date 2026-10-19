@@ -2,13 +2,14 @@ import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical"
 import { createRecoverableFinalitySigner } from "@ts-drp/keychain/finality";
 import { type CurrentAnchorTrust } from "@ts-drp/protocol-v3";
 import { verifySealQC } from "@ts-drp/protocol-v3/seal";
-import { createCreatorSealActor } from "@ts-drp/seal/creator";
+import { acquireCreatorSigningDependenciesForPreparation, createCreatorSealActor } from "@ts-drp/seal/creator";
 import {
 	type CreatorCloseEvidenceRecord,
+	mintCreatorCloseEvidenceStore,
 	resolveCreatorCloseEvidenceStore,
 } from "@ts-drp/seal/internal/creator-close-intent";
 import { signingRetirementFrameDigest, storedSealQcContainsVote, type SigningRetirementPreparation } from "@ts-drp/seal/internal/storage-port";
-import { resolveSealStorePort } from "@ts-drp/seal/internal/storage-port";
+import { resolveSealStorePort, resolveCapturedSigningRetirementDataImage } from "@ts-drp/seal/internal/storage-port";
 import { AHE_BOUNDED_READ_LIMITS } from "@ts-drp/storage";
 import { spawnSync } from "node:child_process";
 import { mkdtemp, rename, rm, stat } from "node:fs/promises";
@@ -157,6 +158,145 @@ test("SQLite public signing ports finalize genuine creator proofs and preserve e
 	await after.release();
 });
 
+test.each([false, true])("SQLite signing preparation releases native custody, then qualifies fresh control (changed=%s)", async changed => {
+	const file = await filename(), prepared = prepareCreatorActorFixture();
+	const vote = await openNodeSealVoteStore({filename: file, initialization: "create"});
+	const evidence = await openNodeSealEvidenceStore({filename: file, initialization: "reopen"});
+	const adapter = resolveCreatorCloseEvidenceStore(evidence.store);
+	if (adapter?.acquireSigningDependencyObservation === undefined) throw Error("missing actual native signing observer");
+	const acquire = adapter.acquireSigningDependencyObservation;
+	let armed = false, writerProgress = false, writer: DatabaseSync | undefined;
+	const events: string[] = [];
+	const observedEvidence = mintCreatorCloseEvidenceStore({...adapter,
+		acquireSigningDependencyObservation: async input => {
+			const original = await acquire(input);
+			return Object.freeze({control: original.control, imageDigest: original.imageDigest, logicalBytes: original.logicalBytes,
+				readExactCanonicalRows: original.readExactCanonicalRows.bind(original), check: original.check.bind(original),
+				release: async () => {
+					await original.release();
+					if (!armed) return;
+					armed = false;
+					if (writer === undefined) throw Error("missing independent native writer");
+					// This is a real independent connection: BEGIN must succeed before
+					// pure authentication, not after delivery of a dependency capability.
+					writer.exec("BEGIN IMMEDIATE");
+					try {
+						if (changed) {
+							const key = `signing-retirement:${input.objectId}`;
+							const control = {kind: "signing-retirement-control-1", objectId: input.objectId,
+								incarnation: vote.observation.incarnation, revision: 1, sequence: 0, active: null, completed: null};
+							writer.prepare("INSERT INTO signing_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+								.run(key, encodeCanonical({key, value: control}));
+						}
+						writer.exec("COMMIT");
+					} catch (error) {writer.exec("ROLLBACK"); throw error;}
+					writerProgress = true; events.push("writer-committed");
+				},
+			});
+		},
+	});
+	const signer = await createRecoverableFinalitySigner({seed: new Uint8Array(32).fill(0x31)});
+	const opened = await createCreatorSealActor({currentTrust: prepared.currentTrust, evidenceStore: observedEvidence,
+		voteStore: vote.store, signer: signer.signer, storageIncarnation: vote.observation.incarnation, onObservation: () => undefined});
+	if (!opened.ok) {await Promise.all([vote.close(), evidence.close()]); throw Error(opened.reason);}
+	aliasClosers.push(async () => {await opened.actor.stop(); await Promise.all([vote.close(), evidence.close()]);});
+	expect(await opened.actor.close({closeInput: prepared.closeInput})).toMatchObject({ok: true});
+	const protocol = await import("@ts-drp/protocol-v3/seal"), verify = protocol.verifySealQC;
+	const verifying = vi.spyOn(protocol, "verifySealQC").mockImplementation((...args: Parameters<typeof verify>) => {
+		expect(writerProgress).toBe(true); events.push("pure-verification"); return verify(...args);
+	});
+	writer = new DatabaseSync(file);
+	try {
+		writer.exec("PRAGMA busy_timeout=0"); armed = true;
+		const acquisition = opened.actor.acquireRecoveryDependencies([prepared.currentTrust as CurrentAnchorTrust]);
+		if (changed) await expect(acquisition).rejects.toThrow("capture is stale");
+		else {
+			const read = await acquisition;
+			try {expect(() => writer!.exec("BEGIN IMMEDIATE")).toThrow(); await read.checkWhile(async () => undefined);}
+			finally {await read.release();}
+		}
+		expect(writerProgress).toBe(true); expect(verifying.mock.calls.length).toBeGreaterThan(0);
+		expect(events.indexOf("writer-committed")).toBeLessThan(events.indexOf("pure-verification"));
+		// Refusal did not corrupt the owner or strand the original obligations.
+		const continued = await opened.actor.acquireRecoveryDependencies([prepared.currentTrust as CurrentAnchorTrust]);
+		try {expect(continued.readExactCanonicalRows().length).toBeGreaterThan(3);}
+		finally {await continued.release();}
+		writer.exec("BEGIN IMMEDIATE"); writer.exec("ROLLBACK");
+		expect(opened.actor.status()).toMatchObject({phase: "finalized", terminal: false});
+	} finally {verifying.mockRestore(); writer.close();}
+});
+
+test.each(["unchanged", "control", "callback-failure"] as const)(
+	"SQLite detached preparation callback preserves fresh qualification and retry (%s)", async mode => {
+	const file = await filename(), prepared = prepareCreatorActorFixture();
+	const vote = await openNodeSealVoteStore({filename: file, initialization: "create"});
+	const evidence = await openNodeSealEvidenceStore({filename: file, initialization: "reopen"});
+	const signer = await createRecoverableFinalitySigner({seed: new Uint8Array(32).fill(0x31)});
+	const opened = await createCreatorSealActor({currentTrust: prepared.currentTrust, evidenceStore: evidence.store,
+		voteStore: vote.store, signer: signer.signer, storageIncarnation: vote.observation.incarnation, onObservation: () => undefined});
+	if (!opened.ok) {await Promise.all([vote.close(), evidence.close()]); throw Error(opened.reason);}
+	aliasClosers.push(async () => {await opened.actor.stop(); await Promise.all([vote.close(), evidence.close()]);});
+	expect(await opened.actor.close({closeInput: prepared.closeInput})).toMatchObject({ok: true});
+	const writer = new DatabaseSync(file);
+	writer.exec("PRAGMA busy_timeout=0");
+	let calls = 0, pristine: readonly Uint8Array[] = [], continuedExpected: readonly Uint8Array[] = [];
+	try {
+		const acquisition = acquireCreatorSigningDependenciesForPreparation(opened.actor,
+			[prepared.currentTrust as CurrentAnchorTrust], async data => {
+				calls++;
+				expect(Reflect.ownKeys(data)).toEqual(["rows"]);
+				pristine = data.rows.map(bytes => bytes.slice());
+				continuedExpected = pristine;
+				expect(pristine.length).toBeGreaterThan(3);
+				// Native exclusion is genuinely absent during pure quote preparation.
+				// The callback receives detached bytes, not the retained image or ports.
+				writer.exec("BEGIN IMMEDIATE");
+				try {
+					if (mode === "control") {
+						const objectId = prepared.currentTrust.objectId, key = `signing-retirement:${objectId}`;
+						const control = {kind: "signing-retirement-control-1", objectId,
+							incarnation: vote.observation.incarnation, revision: 1, sequence: 0, active: null, completed: null};
+						writer.prepare("INSERT INTO signing_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+							.run(key, encodeCanonical({key, value: control}));
+						// Retry must expose the new exact control, not pretend the
+						// successfully committed metadata change never happened.
+						let replacements = 0;
+						continuedExpected = pristine.map(bytes => {
+							const frame = decodeCanonical(bytes) as unknown[];
+							if (frame[0] !== "storageMeta" || frame[1] !== key) return bytes;
+							replacements++;
+							return encodeCanonical(["storageMeta", key, {key, value: control}]);
+						});
+						expect(replacements).toBe(2); // Original vote and evidence images.
+					}
+					writer.exec("COMMIT");
+				} catch (error) {writer.exec("ROLLBACK"); throw error;}
+				for (const bytes of data.rows) bytes.fill(0xff);
+				if (mode === "callback-failure") throw Error("preparation interrupted");
+			});
+		if (mode === "control") await expect(acquisition).rejects.toThrow("capture is stale");
+		else if (mode === "callback-failure") await expect(acquisition).rejects.toThrow("preparation interrupted");
+		else {
+			const read = await acquisition;
+			try {
+				expect(read.readExactCanonicalRows()).toEqual(pristine);
+				expect(() => writer.exec("BEGIN IMMEDIATE")).toThrow();
+				await read.checkWhile(async () => undefined);
+			} finally {await read.release();}
+		}
+		expect(calls).toBe(1);
+		writer.exec("BEGIN IMMEDIATE"); writer.exec("ROLLBACK");
+		const continued = await opened.actor.acquireRecoveryDependencies([prepared.currentTrust as CurrentAnchorTrust]);
+		try {expect(continued.readExactCanonicalRows()).toEqual(continuedExpected);}
+		finally {await continued.release();}
+		// Copying the nominal owner cannot turn a local callback into authority.
+		await expect(acquireCreatorSigningDependenciesForPreparation({...opened.actor},
+			[prepared.currentTrust as CurrentAnchorTrust], async () => {throw Error("foreign callback executed");}))
+			.rejects.toThrow(/unavailable|foreign/u);
+		expect(opened.actor.status()).toMatchObject({phase: "finalized", terminal: false});
+	} finally {writer.close();}
+});
+
 test("SQLite QC receipt abort rolls back the QC and keeps the exact vote retryable across reopen", async () => {
 	const file = await filename(), prepared = prepareCreatorActorFixture();
 	let faultDatabase: DatabaseSync | undefined, triggerInstalled = false;
@@ -243,6 +383,29 @@ test("SQLite signing content reuse retains fresh custody, changed-byte refusal a
 			expect(again.readExactCanonicalRows()).toEqual(frames!);
 			await again.checkWhile(async () => undefined);
 		} finally {await again.release();}
+		// A freshly authenticated nominal alias and a valid control-only change
+		// do not alter immutable signature facts. They still require a complete
+		// new native image and fresh authority opening, not a revived old view.
+		const alias = prepareCreatorActorFixture().currentTrust as CurrentAnchorTrust;
+		expect(alias).not.toBe(prepared.currentTrust);
+		const controlKey = `signing-retirement:${(prepared.currentTrust as CurrentAnchorTrust).objectId}`;
+		raw.prepare("INSERT INTO signing_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+			.run(controlKey, encodeCanonical({key: controlKey, value: {kind: "signing-retirement-control-1",
+				objectId: (prepared.currentTrust as CurrentAnchorTrust).objectId, incarnation: first.vote.observation.incarnation,
+				revision: 1, sequence: 0, active: null, completed: null}}));
+		verifying.mockClear(); opening.mockClear();
+		const changedControl = await first.actor.acquireRecoveryDependencies([alias]);
+		try {
+			const actual = changedControl.readExactCanonicalRows();
+			const nonMetadata = (rows: readonly Uint8Array[]) => rows.filter(bytes => (decodeCanonical(bytes) as unknown[])[0] !== "storageMeta");
+			expect(actual).not.toEqual(frames!);
+			expect(nonMetadata(actual)).toEqual(nonMetadata(frames!));
+			expect(opening.mock.calls.length).toBeGreaterThan(0);
+			expect(verifying).toHaveBeenCalledTimes(0);
+			expect(() => raw.exec("BEGIN IMMEDIATE")).toThrow();
+			await changedControl.checkWhile(async () => undefined);
+			frames = actual;
+		} finally {await changedControl.release();}
 		const stored = raw.prepare("SELECT row_key,value FROM signing_rows WHERE family='sealEvidence'").get();
 		if (!(stored?.row_key instanceof Uint8Array) || !(stored.value instanceof Uint8Array)) throw Error("native evidence absent");
 		const pristine = stored.value.slice(), key = stored.row_key.slice();
@@ -260,6 +423,13 @@ test("SQLite signing content reuse retains fresh custody, changed-byte refusal a
 		const recovered = await reopened.actor.acquireRecoveryDependencies([prepared.currentTrust as CurrentAnchorTrust]);
 		try {expect(recovered.readExactCanonicalRows()).toEqual(frames!); expect(verifying.mock.calls.length).toBeGreaterThan(0);}
 		finally {await recovered.release();}
+		const retirement = await reopened.actor.captureRetirementOwners().acquireEvidence();
+		try {
+			expect(retirement.readRetirementDataImage).toBeTypeOf("function");
+			expect(retirement.readRetirementDataImage!().frames).toHaveLength(retirement.readExactCanonicalRows().length);
+			await retirement.check();
+		} finally {await retirement.release();}
+		expect(() => retirement.readRetirementDataImage!()).toThrow();
 	} finally {raw.close(); verifying.mockRestore(); opening.mockRestore();}
 });
 
@@ -342,11 +512,21 @@ test("SQLite signing aliases share physical exclusion but independently revoke a
 	const left = await first.retirement.acquireDependency({ objectId: "room" }),
 		right = await second.retirement.acquireDependency({ objectId: "room" });
 	expect(left.readExactCanonicalRows()).toEqual(right.readExactCanonicalRows());
+	const leftData = left.readRetirementDataImage!(), rightData = right.readRetirementDataImage!();
+	const leftRows = left.readExactCanonicalRows();
+	expect(resolveCapturedSigningRetirementDataImage(leftData, leftRows, "room")).toBe(leftData);
+	expect(resolveCapturedSigningRetirementDataImage(rightData, right.readExactCanonicalRows(), "room")).toBe(rightData);
+	expect(() => left.readRetirementDataImage!.call({...left})).toThrow("FOREIGN_SIGNING_OBSERVATION");
+	leftRows[0]!.fill(255);
+	expect(resolveCapturedSigningRetirementDataImage(leftData, leftRows, "room")).toBeUndefined();
+	expect(resolveCapturedSigningRetirementDataImage(leftData, left.readExactCanonicalRows(), "room")).toBe(leftData);
 	const writer = new DatabaseSync(file);
 	try {
 		writer.exec("PRAGMA busy_timeout=0");
 		await left.release();
 		await expect(left.check()).rejects.toThrow("READ_RELEASED");
+		expect(() => left.readRetirementDataImage!()).toThrow("READ_RELEASED");
+		expect(resolveCapturedSigningRetirementDataImage(leftData, right.readExactCanonicalRows(), "room")).toBeUndefined();
 		await right.check();
 		expect(() => writer.exec("BEGIN IMMEDIATE")).toThrow();
 		await first.close();

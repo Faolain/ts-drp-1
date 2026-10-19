@@ -10,6 +10,17 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
 	await served?.close();
 });
+test("native reservation queues real reads before the next keepalive", async ({page}, info) => {
+	const name = "bounded-tail-queue-" + crypto.randomUUID();
+	await page.goto(served.origin + "/role");
+	await page.waitForFunction(() => Reflect.has(globalThis, "boundedHeldTailQueue"));
+	try {
+		await page.evaluate(async name => Reflect.get(globalThis, "boundedRoleSetup")(name, "whole-view"), name);
+		const result = await page.evaluate(async name => Reflect.get(globalThis, "boundedHeldTailQueue")(name), name);
+		await info.attach("native-reservation-tail-queue", {body: JSON.stringify(result), contentType: "application/json"});
+		expect(result).toMatchObject({passed: true, sentinels: 1, writerStarted: true});
+	} finally {await page.evaluate(async name => Reflect.get(globalThis, "boundedRoleDelete")(name), name);}
+});
 for (const selected of ["burst-and-completed-boundary", "release", "abort", "close", "sequential-and-views"] as const)
 	test(`native reservation future point ${selected}`, async ({page}, info) => {
 		const name = "bounded-future-point-" + crypto.randomUUID();
@@ -48,6 +59,14 @@ for (const selected of ["repeat-and-mutation", "replacement-and-corruption", "ab
 				Reflect.get(globalThis, "boundedHeldRoleCurrency")(name, selected), {name, selected});
 			await info.attach("native-exact-held-currency", {body: JSON.stringify(result), contentType: "application/json"});
 			expect(result).toMatchObject({selected, passed: true});
+			if (selected === "replacement-and-corruption") {
+				expect(result.observations).toEqual(expect.arrayContaining([
+					expect.objectContaining({label: "new-hold-original-reader", result: {ok: true, value: {kind: "current"}}}),
+					expect.objectContaining({label: "new-hold-requalified-reader", nativeReads: 0, blobReads: 0}),
+					expect.objectContaining({label: "new-hold-borrowed-mutation", result: {ok: false, reason: "READ_STALE_ROLE_VIEW"}}),
+					expect.objectContaining({label: "no-native-hold-after-requalification", result: {ok: true, value: {kind: "current"}}}),
+				]));
+			}
 		} finally {
 			await page.evaluate(async name => Reflect.get(globalThis, "boundedRoleDelete")(name), name);
 		}

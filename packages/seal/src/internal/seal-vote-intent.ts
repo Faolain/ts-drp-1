@@ -598,29 +598,108 @@ export function signingRetirementFrameDigest(frame: Uint8Array): string {
  * @returns Unique data commitment, refusing contradictory duplicate addresses.
  */
 export function signingRetirementDataDigest(rows: readonly Uint8Array[], objectId: string): string {
+	// Preserve the original synchronous unknown-byte boundary, including its
+	// original borrowed byte inputs. Only retained captures need private copies.
+	return readSigningRetirementDataImage(rows, objectId, false).digest();
+}
+
+/**
+ * One original bounded native-image parser and its operation-local projections.
+ * Every supplied row is decoded before any projection is delivered. This is
+ * mechanical syntax only: a fresh native transaction must create its own image,
+ * and callers still own all currency, context and authentication checks.
+ * @param rows - Original privately owned exact native frames.
+ * @param objectId - Original addressed object, not an authority grant.
+ * @returns Parsed frames and the unchanged canonical-address ordered commitment.
+ */
+export function captureSigningRetirementDataImage(rows: readonly Uint8Array[], objectId: string) {
+	return readSigningRetirementDataImage(rows, objectId, true);
+}
+
+// Nominal membership only: the original capture remains the sole byte owner.
+// No content, authorization or native currency is retained in this registry.
+const signingRetirementDataCaptures = new WeakSet<object>();
+export function releaseCapturedSigningRetirementDataImage(value: unknown): void {
+	if (value !== null && typeof value === "object") signingRetirementDataCaptures.delete(value);
+}
+export function resolveCapturedSigningRetirementDataImage(value: unknown, rows: readonly Uint8Array[], objectId: string):
+	ReturnType<typeof captureSigningRetirementDataImage> | undefined {
+	if (value === null || typeof value !== "object" || !signingRetirementDataCaptures.has(value)) return undefined;
+	const capture = value as ReturnType<typeof captureSigningRetirementDataImage>;
+	try {return capture.matchesExactRows(rows, objectId) && signingRetirementDataCaptures.has(capture) ? capture : undefined;}
+	catch {return undefined;}
+}
+
+function readSigningRetirementDataImage(rows: readonly Uint8Array[], objectId: string, retain: boolean) {
 	const distinct = new Map<string, { address: Uint8Array; frame: Uint8Array }>();
-	for (const bytes of rows) {
+	const frames: Readonly<{ bytes: Uint8Array; address?: Uint8Array; addressKey?: string }>[] = [];
+	const selections: Readonly<{ index: number; byteLength: number; store: string; epoch?: number; addressKey?: string }>[] = [];
+	for (const source of rows) {
+		// Only these detached exact bytes back retained commitments. Returned
+		// frames are copies; exclusion uses this capture's scalar row indices.
+		const bytes = retain ? new Uint8Array(source) : source;
 		const frame = decodeCanonical(bytes, signingFrameLimits);
 		if (!Array.isArray(frame) || frame.length !== 3 || typeof frame[0] !== "string")
 			throw new TypeError("INVALID_SIGNING_DATA_FRAME");
 		if (
 			frame[0] === "storageMeta" &&
 			(frame[1] === `ahe-retirement:${objectId}` || frame[1] === `signing-retirement:${objectId}`)
-		)
+		) {
+			if (retain) {
+				selections.push(Object.freeze({ index: frames.length, byteLength: bytes.byteLength, store: frame[0] }));
+				frames.push({ bytes });
+			}
 			continue;
+		}
 		const address = encodeCanonical(frame.slice(0, 2), signingFrameLimits),
 			key = signingHex(address),
 			prior = distinct.get(key);
 		if (prior !== undefined && compareBytes(prior.frame, bytes) !== 0)
 			throw new TypeError("CONFLICTING_SIGNING_DATA_FRAME");
 		distinct.set(key, { address, frame: bytes });
+		// Immediate unknown-byte digest calls retain only the original distinct
+		// map. Do not add a per-row projection inventory to that hot path.
+		if (retain) {
+			selections.push(Object.freeze({ index: frames.length, byteLength: bytes.byteLength, store: frame[0],
+				epoch: Array.isArray(frame[1]) && typeof frame[1][1] === "number" ? frame[1][1] : undefined,
+				addressKey: Array.from(address).join(",") }));
+			frames.push({ bytes, address, addressKey: key });
+		}
 	}
-	return signingHex(
-		hashDomain(
-			"ts-drp/signing-native-data/v1",
-			...[...distinct.values()].sort((left, right) => compareBytes(left.address, right.address)).map((row) => row.frame)
-		)
-	);
+	const digest = (excluded?: ReadonlySet<number>): string => {
+		// Exclusion selects this capture's original frames only. Rebuild address
+		// multiplicities without parsing/encoding; identical duplicate addresses
+		// remain present if any original occurrence remains in the residual.
+		const remaining = excluded === undefined ? distinct : new Map<string, { address: Uint8Array; frame: Uint8Array }>();
+		if (excluded !== undefined) {
+			for (const [index, row] of frames.entries()) {
+				if (row.address !== undefined && row.addressKey !== undefined && !excluded.has(index))
+					remaining.set(row.addressKey, { address: row.address, frame: row.bytes });
+			}
+		}
+		return signingHex(
+			hashDomain(
+				"ts-drp/signing-native-data/v1",
+				...[...remaining.values()].sort((left, right) => compareBytes(left.address, right.address)).map((row) => row.frame)
+			)
+		);
+	};
+	// Only frozen scalar selectors and detached byte copies escape, not the
+	// private decoder's mutable full trees, canonical addresses or byte inventory.
+	const capture = Object.freeze({ frames: Object.freeze(selections), digest,
+		readExactCanonicalRows: (): readonly Uint8Array[] => Object.freeze(frames.map(row => new Uint8Array(row.bytes))),
+		readCanonicalAddress: (index: number): Uint8Array | undefined => frames[index]?.address?.slice(),
+		matchesExactRows: (rows: readonly Uint8Array[], addressedObjectId: string): boolean => {
+			if (!retain || addressedObjectId !== objectId || !Array.isArray(rows) || rows.length !== frames.length) return false;
+			return frames.every((row, index) => {
+				const field = Object.getOwnPropertyDescriptor(rows, index);
+				return field !== undefined && "value" in field && field.value instanceof Uint8Array &&
+					Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Uint8Array.prototype), "buffer")!.get!.call(field.value) instanceof ArrayBuffer &&
+					compareBytes(field.value, row.bytes) === 0;
+			});
+		} });
+	if (retain) signingRetirementDataCaptures.add(capture);
+	return capture;
 }
 export type SigningRetirementResult = Readonly<
 	{ ok: true; control: SigningRetirementControl } | { ok: false; reason: string }
@@ -631,6 +710,9 @@ export interface SigningDependencyObservation {
 	readonly imageDigest: string;
 	readonly logicalBytes: number;
 	readExactCanonicalRows(): readonly Uint8Array[];
+	/** Original exact-byte syntax capture only; never authentication/currency.
+	 * Absent on external producers, which retain their full unknown-byte path. */
+	readRetirementDataImage?(): ReturnType<typeof captureSigningRetirementDataImage>;
 	check(): Promise<void>;
 	release(): Promise<void>;
 }

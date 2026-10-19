@@ -30,6 +30,10 @@
 		"./encoding-capture": {
 			"types": "./dist/src/encoding-capture.d.ts",
 			"import": "./dist/src/encoding-capture.js"
+		},
+		"./exact": {
+			"types": "./dist/src/exact.d.ts",
+			"import": "./dist/src/exact.js"
 		}
 	},
 	"scripts": {

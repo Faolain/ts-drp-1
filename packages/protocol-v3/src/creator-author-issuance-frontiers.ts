@@ -1,8 +1,9 @@
-import { ed25519 } from "@noble/curves/ed25519.js";
+import { verifyEd25519 } from "./internal/ed25519-verify.js";
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 
 import { creatorRetirementEncodingWidths } from "./creator-issuance-retirement.js";
 import type { CurrentAnchorTrust } from "./index.js";
+import { decodeCanonicalWithExactness } from "./internal/canonical-exactness.js";
 import {
 	type CreatorIssuanceRetirementSigningRequest,
 	mintCreatorIssuanceRetirementSigningRequest,
@@ -407,7 +408,7 @@ export function completeCreatorAuthorIssuanceFrontiers(
 			return failure("SIGNATURE_INVALID");
 		}
 		const signature = Uint8Array.from(input.detachedSignature);
-		if (!ed25519.verify(signature, state.digest, state.publicKey, { zip215: false })) {
+		if (!verifyEd25519(signature, state.digest, state.publicKey)) {
 			return failure("SIGNATURE_INVALID");
 		}
 		const exactCanonicalRecordBytes = encodeCanonical({
@@ -482,7 +483,7 @@ export function openCreatorAuthorIssuanceFrontiers(
 		}
 		const { detachedCreatorSignature: signature, ...preimage } = decoded;
 		const digest = hashDomain(DOMAIN, encodeCanonical(preimage));
-		if (signature.byteLength !== 64 || !ed25519.verify(signature, digest, floor.publicKey, { zip215: false })) {
+		if (signature.byteLength !== 64 || !verifyEd25519(signature, digest, floor.publicKey)) {
 			return failure("SIGNATURE_INVALID");
 		}
 		const capability = Object.freeze({}) as VerifiedCreatorAuthorIssuanceFrontiers;
@@ -874,7 +875,7 @@ export function completeCreatorAuthorSettlement(
 			return failure("SIGNATURE_INVALID");
 		}
 		const signature = Uint8Array.from(input.detachedSignature);
-		if (!ed25519.verify(signature, state.digest, state.publicKey, { zip215: false })) {
+		if (!verifyEd25519(signature, state.digest, state.publicKey)) {
 			return failure("SIGNATURE_INVALID");
 		}
 		const exactCanonicalRecordBytes = encodeCanonical({
@@ -910,7 +911,7 @@ export function openCreatorAuthorSettlement(
 			return failure("MALFORMED_INPUT");
 		}
 		const bytes = Uint8Array.from(input.exactCanonicalRecordBytes);
-		const decoded = decodeCanonical(bytes, {
+		const { value: decoded, exact } = decodeCanonicalWithExactness(bytes, {
 			maxBytes: CREATOR_AUTHOR_SETTLEMENT_MAX_RECORD_BYTES,
 			maxDepth: 4,
 			maxItems: 4096,
@@ -918,7 +919,7 @@ export function openCreatorAuthorSettlement(
 		if (
 			!plainRecord(decoded) ||
 			!exactKeys(decoded, SETTLEMENT_RECORD_KEYS) ||
-			compareBytes(encodeCanonical(decoded), bytes) !== 0 ||
+			(!exact && compareBytes(encodeCanonical(decoded), bytes) !== 0) ||
 			!validSettlementRecordFields(decoded) ||
 			!(decoded.detachedAuthoritySignature instanceof Uint8Array)
 		) {
@@ -947,7 +948,7 @@ export function openCreatorAuthorSettlement(
 		}
 		const { detachedAuthoritySignature: signature, ...preimage } = decoded;
 		const digest = hashDomain(SETTLEMENT_DOMAIN, encodeCanonical(preimage));
-		if (signature.byteLength !== 64 || !ed25519.verify(signature, digest, floor.publicKey, { zip215: false })) {
+		if (signature.byteLength !== 64 || !verifyEd25519(signature, digest, floor.publicKey)) {
 			return failure("SIGNATURE_INVALID");
 		}
 		const capability = Object.freeze({}) as VerifiedCreatorAuthorSettlement;

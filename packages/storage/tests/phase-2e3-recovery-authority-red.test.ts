@@ -69,7 +69,12 @@ describe("Phase 2e3 shared recovery and authority flip RED", () => {
 		expect.soft(types).toContain("recoverActiveGeneration(objectId: StorageObjectId)");
 		expect.soft(types).toContain('kind: "empty"');
 		expect.soft(types).toContain('kind: "active"');
-		expect.soft(types).not.toMatch(/Recovery[^;{]*bytes|Recovery[\s\S]{0,500}Uint8Array/);
+		// The recovery METHOD returns closure facts, never bytes. Later bounded
+		// recovery-role reads borrow blob bytes through their own owner type.
+		expect.soft(types).toContain("recoverActiveGeneration(objectId: StorageObjectId): Promise<StoreResult<ActiveGenerationSnapshot>>");
+		const recoveryResult = /export type ActiveGenerationSnapshot =[\s\S]*?;\n\n/u.exec(types)?.[0];
+		expect.soft(recoveryResult).toBeDefined();
+		expect.soft(recoveryResult).not.toMatch(/bytes|Uint8Array/);
 	});
 
 	it("returns the exact empty result from internal and public memory owners", async () => {

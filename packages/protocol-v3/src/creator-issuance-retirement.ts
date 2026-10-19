@@ -1,4 +1,4 @@
-import { ed25519 } from "@noble/curves/ed25519.js";
+import { verifyEd25519 } from "./internal/ed25519-verify.js";
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 
 import type { CurrentAnchorTrust } from "./index.js";
@@ -398,7 +398,7 @@ export function completeCreatorIssuanceRetirement(
 			return failure("SIGNATURE_INVALID");
 		}
 		const signature = Uint8Array.from(input.detachedSignature);
-		if (!ed25519.verify(signature, state.digest, state.publicKey, { zip215: false })) {
+		if (!verifyEd25519(signature, state.digest, state.publicKey)) {
 			return failure("SIGNATURE_INVALID");
 		}
 		const exactCanonicalRecordBytes = encodeCanonical({
@@ -466,7 +466,7 @@ export function openCreatorIssuanceRetirement(
 		}
 		const { detachedCreatorSignature: signature, ...preimage } = decoded;
 		const digest = hashDomain(DOMAIN, encodeCanonical(preimage));
-		if (signature.byteLength !== 64 || !ed25519.verify(signature, digest, floor.publicKey, { zip215: false })) {
+		if (signature.byteLength !== 64 || !verifyEd25519(signature, digest, floor.publicKey)) {
 			return failure("SIGNATURE_INVALID");
 		}
 		const capability = Object.freeze({}) as VerifiedCreatorIssuanceRetirement;

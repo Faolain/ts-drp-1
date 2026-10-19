@@ -46,7 +46,8 @@ function fixture(operation: unknown = Object.freeze({action: "app", bytes: Uint8
 		currentJournalMaximumAuthorByteLength: 6, effects: Object.freeze([]), completedNative: Object.freeze([])});
 	const geometry = new WeakMap<object, unknown>();
 	const typed = Object.getPrototypeOf(Uint8Array.prototype);
-	const names = ["captureCreatorOrdinaryDimensionIntegrity", "captureCreatorOrdinaryPreparedVertex",
+	const names = ["isInstanceOf", "typedArrayBuffer", "typedArrayByteLength", "copyDetachedBytes",
+		"captureCreatorOrdinaryDimensionIntegrity", "captureCreatorOrdinaryPreparedVertex",
 		"creatorOrdinaryPreparedVertexCurrent", "captureCreatorOrdinaryPreparedAdmission",
 		"creatorOrdinaryPreparedGraphCurrent", "creatorOrdinaryPreparedIssuedEqual",
 		"creatorOrdinaryPreparedNativeCurrent", "advanceCreatorOrdinaryPreparedAdmission",
@@ -58,6 +59,8 @@ function fixture(operation: unknown = Object.freeze({action: "app", bytes: Uint8
 		Uint8ArrayConstructor: Uint8Array, TypedArrayPrototype: typed,
 		TypedArrayByteLengthGetter: Object.getOwnPropertyDescriptor(typed, "byteLength")!.get,
 		TypedArrayBufferGetter: Object.getOwnPropertyDescriptor(typed, "buffer")!.get,
+		FunctionHasInstance: Function.prototype[Symbol.hasInstance], SharedArrayBufferConstructor: SharedArrayBuffer,
+		NumberIsSafeInteger: Number.isSafeInteger,
 		ObjectFreeze: Object.freeze, ObjectIsFrozen: Object.isFrozen, ObjectPrototype: Object.prototype,
 		ObjectDefineProperty: Object.defineProperty,
 		ObjectGetPrototypeOf: Object.getPrototypeOf, ObjectGetOwnPropertyDescriptor: Object.getOwnPropertyDescriptor,
@@ -254,7 +257,11 @@ describe("existing ordinary prepared-capacity DATA owner", () => {
 	});
 	it("keeps native image, source-purpose, accounting and full-view seams explicit", () => {
 		const rollback = readFileSync(new URL("../src/internal/creator-closed-rollback-data.ts", import.meta.url), "utf8");
-		expect(rollback).toContain("!closedRetirementEqual(nativeRows.plans, oldNativeRows.plans)");
+		// The original exact comparison remains the default. Only the separately
+		// tested one-fence postimage may use its current signed-leaf verifier.
+		expect(rollback).toContain("? closedRetirementEqual(nativeRows.plans, oldNativeRows.plans)");
+		expect(rollback).toContain(": creatorOrdinaryMandatoryFencePlansCorrespond(nativeRows, oldNativeRows, currentTrust");
+		expect(rollback).toContain("if (!plansCorrespond ||");
 		expect(rollback).toContain("use.nativeReaderRefs");
 		expect(rollback).toContain("use.snapshotScopes");
 		expect(rollback).toContain("if (preparedCapacityOnly && preparedJournal === undefined) throw unavailable");
@@ -272,6 +279,70 @@ describe("same ordinary integrity owner with mutable plain DATA", () => {
 		expect(f.state.encodes).toBe(before + initialEncodes);
 		return {intact, state: f.state, capturedEncodes: f.state.encodes};
 	}
+	it("reuses original detached bootstrap-byte producer facts without re-encoding the context", () => {
+		// Execute the real private byte producer used by recovery/bootstrap, not
+		// an invented wrapper. This test checks DATA correspondence only.
+		const owner = fixture(), input = Uint8Array.of(1, 2, 3);
+		const bootstrap = owner.functions.copyDetachedBytes(input) as Uint8Array;
+		expect(bootstrap).not.toBe(input);
+		expect(Object.getOwnPropertyDescriptor(bootstrap, "byteLength")).toEqual({
+			value: 3, configurable: true, enumerable: false, writable: false});
+		const f = guard({bootstrap});
+		input.fill(9); // Producer isolation is independent of the integrity owner.
+		for (let index = 0; index < 8; index++) expect(f.intact()).toBe(true);
+		expect(f.state.encodes).toBe(f.capturedEncodes);
+		bootstrap[0] = 9; expect(f.intact()).toBe(false);
+		expect(f.state.encodes).toBe(f.capturedEncodes);
+		bootstrap[0] = 1; expect(f.intact()).toBe(true);
+		expect(f.state.encodes).toBe(f.capturedEncodes);
+	});
+	it("falls back for changed detached-byte metadata and regains only the original descriptor facts", () => {
+		const owner = fixture(), bytes = owner.functions.copyDetachedBytes(Uint8Array.of(1, 2)) as Uint8Array;
+		const original = Object.getOwnPropertyDescriptor(bytes, "byteLength")!, f = guard({bytes});
+		Object.defineProperty(bytes, "byteLength", {...original, value: 1});
+		expect(f.intact()).toBe(false); expect(f.state.encodes).toBe(f.capturedEncodes + 1);
+		Object.defineProperty(bytes, "byteLength", original);
+		expect(f.intact()).toBe(true); expect(f.state.encodes).toBe(f.capturedEncodes + 1);
+		for (const descriptor of [{...original, enumerable: true}, {...original, writable: true}]) {
+			const before = f.state.encodes;
+			Object.defineProperty(bytes, "byteLength", descriptor);
+			expect(f.intact()).toBe(true); expect(f.state.encodes).toBe(before + 1);
+			Object.defineProperty(bytes, "byteLength", original);
+			expect(f.intact()).toBe(true); expect(f.state.encodes).toBe(before + 1);
+		}
+		let reads = 0;
+		Object.defineProperty(bytes, "byteLength", {configurable: true, get() {reads++; return 2;}});
+		const before = f.state.encodes;
+		expect(f.intact()).toBe(true); expect(reads).toBe(1); expect(f.state.encodes).toBe(before + 1);
+		Reflect.deleteProperty(bytes, "byteLength");
+		expect(f.intact()).toBe(true); expect(f.state.encodes).toBe(before + 2);
+		Object.defineProperty(bytes, "byteLength", original);
+		expect(f.intact()).toBe(true); expect(f.state.encodes).toBe(before + 2);
+	});
+	it("keeps original refusal/fallback for invalid, detached or displaced producer byte views", () => {
+		for (const length of [0, 2]) {
+			const owner = fixture(), bytes = owner.functions.copyDetachedBytes(new Uint8Array(length)) as Uint8Array;
+			const f = guard({bytes});
+			expect(f.intact()).toBe(true); expect(f.state.encodes).toBe(f.capturedEncodes);
+			structuredClone(bytes.buffer, {transfer: [bytes.buffer]});
+			// An empty detached view throws in the ORIGINAL intrinsic-buffer
+			// guard; a nonempty pinned length misses and the codec rejects it.
+			expect(f.intact()).toBe(false); expect(f.state.encodes).toBe(f.capturedEncodes + (length === 0 ? 0 : 1));
+		}
+		const owner = fixture(), bytes = owner.functions.copyDetachedBytes(Uint8Array.of(1, 2)) as Uint8Array;
+		Object.defineProperty(bytes, "byteLength", {value: 1, configurable: true});
+		const invalid = guard({bytes}, 1);
+		expect(invalid.intact()).toBe(true); // Preserve the ORIGINAL encoded baseline, even if noncanonical to decode.
+		expect(invalid.state.encodes).toBe(invalid.capturedEncodes + 1);
+		Object.defineProperty(bytes, "byteLength", {value: 2, configurable: true});
+		expect(invalid.intact()).toBe(false); // Never enroll a later corrected length.
+		const normal = owner.functions.copyDetachedBytes(Uint8Array.of(1, 2)) as Uint8Array, f = guard({normal});
+		const parent = Object.getPrototypeOf(normal);
+		Object.setPrototypeOf(normal, Object.create(parent));
+		expect(f.intact()).toBe(true); expect(f.state.encodes).toBe(f.capturedEncodes + 1);
+		Object.setPrototypeOf(normal, parent);
+		expect(f.intact()).toBe(true); expect(f.state.encodes).toBe(f.capturedEncodes + 1);
+	});
 	it("captures mutable records and arrays once and never re-encodes unchanged data", () => {
 		const nested = {count: 1}, value = {action: "batch", entries: [{operation: nested}, {bytes: Uint8Array.of(1, 2)}]};
 		const f = guard(value);

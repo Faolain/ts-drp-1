@@ -1,4 +1,4 @@
-import { ed25519 } from "@noble/curves/ed25519.js";
+import { verifyEd25519 } from "./internal/ed25519-verify.js";
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { captureCreatorSnapshotRecoveryRoles, captureForwardPromotion } from "./internal/creator-forward-promotion.js";
 import { archiveAppendMatchesCut } from "./internal/creator-archive-append.js";
@@ -532,7 +532,7 @@ export function prepareSealVote(
 function voteSignatureFailure(state: SealAuthorityState, signerId: string, bytes: Uint8Array, signature: Uint8Array): string | undefined {
 	const publicKey = state.publicKeys.get(signerId);
 	if (publicKey === undefined) return "unauthorized-signer";
-	return ed25519.verify(signature, hashDomain(registry.kinds.sealVote?.domain ?? "", bytes), publicKey, { zip215: false })
+	return verifyEd25519(signature, hashDomain(registry.kinds.sealVote?.domain ?? "", bytes), publicKey)
 		? undefined : "invalid-signature";
 }
 
@@ -798,7 +798,7 @@ export function verifyRoundChange(
 		const publicKey = state.publicKeys.get(decoded.signerId);
 		if (publicKey === undefined) return failure("unauthorized-signer");
 		const registeredDigest = hashDomain(registry.kinds.roundChange?.domain ?? "", bytes);
-		if (!ed25519.verify(signature, registeredDigest, publicKey, { zip215: false })) {
+		if (!verifyEd25519(signature, registeredDigest, publicKey)) {
 			return failure("invalid-signature");
 		}
 		let highestPrepareQcBytes: Uint8Array | null = null;
@@ -900,7 +900,7 @@ export function verifyProposalBundle(input: Readonly<Record<string, unknown>>): 
 		const voteDigest = hashDomain(registry.kinds.sealVote?.domain ?? "", voteBytes);
 		if (
 			leaderKey === undefined ||
-			!ed25519.verify(copyExactBytes(input.leaderVoteSignature, 64, 64), voteDigest, leaderKey, { zip215: false })
+			!verifyEd25519(copyExactBytes(input.leaderVoteSignature, 64, 64), voteDigest, leaderKey)
 		) {
 			return failure("proposal-authentication-failed");
 		}

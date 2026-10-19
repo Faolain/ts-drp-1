@@ -91,9 +91,11 @@ import {
 } from "@ts-drp/protocol-v3/snapshot-transfer";
 import type { SealStorePort } from "@ts-drp/seal";
 import {
+	acquireCreatorSigningDependenciesForPreparation,
 	createCreatorSealActor,
 	type CreatorCloseSigningFrameWidth,
 	type CreatorSigningDependencyRead,
+	type CreatorSigningDependencyPreparation,
 	type CreatorSigningRetirementOwners,
 	readCreatorCloseSigningFramesForSizing,
 } from "@ts-drp/seal/creator";
@@ -152,6 +154,7 @@ import {
 	type CreatorClosedRollbackDataInput,
 	type CreatorForwardPromotionSourceMaterial,
 	type CreatorIssuanceMaintenanceProof,
+	type CreatorIssuanceMaintenancePreparationData,
 	type CreatorOrdinaryIssuanceMaintenanceProof,
 	type CreatorOrdinaryIssuanceSuffixForSizing,
 	type CreatorOrdinaryIssuanceProofSource,
@@ -194,6 +197,13 @@ import {
 	resolveCreatorSnapshotRecoveryCloseHold,
 } from "./internal/runtime-reclamation.js";
 import type { V3PlaneHandle } from "./v3-live.js";
+import {
+	captureCreatorEarlyTurnoverToken,
+	creatorCloseRetirementResumeRequired,
+	creatorRecoveryPoolPressure,
+	type CreatorEarlyTurnoverToken,
+	type CreatorRecoveryPoolResult,
+} from "./internal/creator-recovery-pool.js";
 import { encodeCreatorCloseMembership } from "./internal/creator-close-membership.js";
 
 const PROFILE: SnapshotTransferProfile = Object.freeze({
@@ -219,10 +229,11 @@ const runtimeReleaseOwners = new WeakMap<
 	V3PlaneHandle,
 	(() => CreatorCloseRuntimeReleasePlan | undefined) & {
 		acceptRecoveryRetirement(observation: object): Promise<void>;
-		borrowSigningDependencies(trusts: readonly CurrentAnchorTrust[]): Promise<CreatorSigningDependencyRead>;
+		borrowSigningDependencies(trusts: readonly CurrentAnchorTrust[], prepareData?: CreatorSigningDependencyPreparation): Promise<CreatorSigningDependencyRead>;
 		captureSigningRetirementOwners(): CreatorSigningRetirementOwners;
 		releaseHeaderCustodyForSuccessorInstall(): Promise<void>;
 		prepareOrdinaryReadiness(): Promise<void>;
+		maintainRecoveryPool(): Promise<CreatorRecoveryPoolResult>;
 	}
 >();
 let creatorCloseRegistrationResolver: ((plane: V3PlaneHandle) => unknown) | undefined;
@@ -234,6 +245,8 @@ type CreatorTrustProjection = Readonly<{
 	signerCount: 1;
 	text: "Creator-certified; one of one; not Byzantine-fault-tolerant.";
 }>;
+
+export type { CreatorRecoveryPoolResult } from "./internal/creator-recovery-pool.js";
 
 export type CreatorLiveCloseStatus = Readonly<{
 	closeAuthority: "available" | "unavailable";
@@ -413,9 +426,11 @@ export interface V3CreatorCloseRegistration {
 	/** Scheduling request only: a recovery halt still requires the original
 	 * authenticated reconciliation before a finishing window can be prepared. */
 	needsOrdinaryReadinessRecovery(): boolean;
-	/** Explicit queued quiescent boundary, never a presign maintenance grant. */
+	/** Explicit queued quiescent boundary, never a presign maintenance grant.
+	 * `deferrable` reports an unavailable boundary before entry instead of halting. */
 	runOrdinaryReadinessMaintenance(snapshots: SnapshotRecoveryStore<SnapshotVerificationReceipt>,
-		consume: (seal: () => Promise<CreatorSnapshotRecoveryCloseHold>, requireClosedWorkflowCompletion: boolean) => Promise<"complete">): Promise<void>;
+		consume: (seal: () => Promise<CreatorSnapshotRecoveryCloseHold>, requireClosedWorkflowCompletion: boolean) => Promise<"complete">,
+		options?: Readonly<{deferrable?: boolean}>): Promise<"ran" | "deferred">;
 	/** Fresh runtime custody only; source and native admission remain rollback-owned. */
 	sealOrdinaryIssuanceMaintenanceRuntime(receivedReceipt?: object): Promise<CreatorOrdinaryIssuanceRuntimeHold | undefined>;
 	/** Numerical dimensions from the original census field owner; never authority. */
@@ -2112,23 +2127,16 @@ async function prepareCreatorIssuanceMaintenanceQuote(
 		throw new TypeError("creator issuance maintenance authority is unavailable");
 	const hold = await registration.sealIssuanceMaintenanceDependencies(receivedReceipt);
 	if (hold === undefined) throw new TypeError("creator issuance maintenance census is unavailable");
-	const proof = await acquireCreatorIssuanceMaintenanceProof(
-		{
-			...input.promotionContext,
-			objectId: registration.objectId,
-			store: registration.store,
-			snapshotStore: input.snapshotStore as CreatorClosedRollbackDataInput["snapshotStore"],
-			liveJournalStore: registration.liveJournalStore,
-		},
-		hold,
-		registration.currentTrust,
-		planEffect?.kind === "fence"
-	);
-	try {
+	// This callback produces sizing DATA only. The source owner must qualify
+	// the complete captured context under NEW native custody before returning a
+	// proof; neither this result nor the callback can authorize an effect.
+	const prepare = async (
+		proof: CreatorIssuanceMaintenanceProof | CreatorIssuanceMaintenancePreparationData
+	): Promise<Omit<CreatorIssuanceMaintenanceQuote, "proof">> => {
 		registration.prepareIssuanceContinuation(hold, unsignedBytes, planEffect, input.prospectiveSettlementPreview);
 		const runtimeCensusOverheadByteLength = registration.readProspectiveRuntimeCensusOverhead(hold, unsignedBytes);
-		// The proof already owns the complete authenticated head under native
-		// readonly custody. Recovery is a writer and cannot run inside that hold.
+		// The source is either the original held proof or isolated preparation
+		// data awaiting full native qualification. Neither path runs recovery here.
 		const head = proof.summary.head;
 		if (head.kind !== "present") throw new TypeError("creator issuance maintenance head is stale");
 		const active = proof.generations.filter(
@@ -2174,16 +2182,24 @@ async function prepareCreatorIssuanceMaintenanceQuote(
 			nativeControl
 		);
 		const needsRecoveryRoles = creatorCloseNeedsRecoveryRoles(registration, current);
-		const recovery = !needsRecoveryRoles
+		const detached = "recovery" in proof;
+		const recovery = !needsRecoveryRoles || detached
 			? undefined
 			: resolveCreatorForwardPromotionSource(
 					proof.observation,
 					registration.store,
 					input.snapshotStore as CreatorClosedRollbackDataInput["snapshotStore"]
 				);
-		if (needsRecoveryRoles && recovery === undefined)
+		if (needsRecoveryRoles && !detached && recovery === undefined)
 			throw new TypeError("creator issuance maintenance recovery role source is unavailable");
-		const material = await prepareProspectiveCreatorCloseMaterial(
+		const material = detached
+			? await prepareProspectiveCreatorCloseMaterialFromPreview(
+				registration, input, current, registration.previewIssuanceClose(unsignedBytes, hold),
+				!needsRecoveryRoles ? undefined : {
+					facts: proof.recovery,
+					survivingScopes: proof.recovery.snapshotTurnover.survivingScopes,
+				})
+			: await prepareProspectiveCreatorCloseMaterial(
 			registration,
 			input,
 			current,
@@ -2242,6 +2258,7 @@ async function prepareCreatorIssuanceMaintenanceQuote(
 		});
 		let archiveCapacity: CreatorIssuanceMaintenanceQuote["archiveCapacity"];
 		if (input.archive !== undefined) {
+			if (detached) throw new TypeError("archive sizing requires its original held source");
 			const archiveLifetime = resolveCreatorSnapshotRecoveryCloseHold(hold, {
 				store: registration.store, liveJournalStore: registration.liveJournalStore,
 				currentTrust: registration.currentTrust,
@@ -2319,7 +2336,6 @@ async function prepareCreatorIssuanceMaintenanceQuote(
 		return Object.freeze({
 			...(archiveCapacity === undefined ? {} : {archiveCapacity}),
 			...(ordinaryFinishingCapacityDimensions === undefined ? {} : {ordinaryFinishingCapacityDimensions}),
-			proof,
 			material,
 			metadata,
 			adoption,
@@ -2331,6 +2347,27 @@ async function prepareCreatorIssuanceMaintenanceQuote(
 			signingFrames: signing.frames,
 			context,
 		});
+	};
+	let prepared: Omit<CreatorIssuanceMaintenanceQuote, "proof"> | undefined;
+	const proof = await acquireCreatorIssuanceMaintenanceProof(
+		{
+			...input.promotionContext,
+			objectId: registration.objectId,
+			store: registration.store,
+			snapshotStore: input.snapshotStore as CreatorClosedRollbackDataInput["snapshotStore"],
+			liveJournalStore: registration.liveJournalStore,
+		},
+		hold,
+		registration.currentTrust,
+		planEffect?.kind === "fence",
+		false,
+		undefined,
+		input.archive === undefined ? async data => { prepared = await prepare(data); } : undefined
+	);
+	try {
+		// An ineligible source keeps the existing held path. A detached source's
+		// prepared data is not returned until its genuine proof has qualified.
+		return Object.freeze({...(prepared ?? await prepare(proof)), proof});
 	} catch (primary) {
 		try {
 			await proof.release();
@@ -3348,6 +3385,8 @@ export async function bindCreatorLiveClose(
 		let capturedGraph: Exclude<ReturnType<V3CreatorCloseRegistration["captureCloseGraph"]>, undefined> | undefined;
 		let persistedSnapshot: Awaited<ReturnType<typeof persistSnapshot>> | undefined;
 		let retirementReconciliationPending = false;
+		// Process-local fact from an explicit early pool turnover at this epoch.
+		let earlyTurnover: CreatorEarlyTurnoverToken | undefined;
 		let derivedCommitment: Awaited<ReturnType<typeof deriveCloseSetHistoryCommitment>> | undefined;
 		let durableReplay: Readonly<{ verify(): Promise<boolean> }> | undefined;
 		let archivePreparation: Awaited<ReturnType<typeof prepareCreatorClosedArchiveAppend>> | undefined;
@@ -3734,12 +3773,15 @@ export async function bindCreatorLiveClose(
 					// This requests original authenticated reconstruction; neither an
 					// epoch nor a completed label grants resume authority. The proof
 					// owner must match the entire source and durable participant map.
-					const resume =
-						retirementReconciliationPending ||
-						registration.retirementReconstruction !== undefined ||
-						(intent?.active !== null && intent?.active !== undefined) ||
-						(intent?.completed?.domains !== undefined &&
-							intent.completed.throughEpoch + 1 === registration.currentTrust.currentEpoch);
+					// A completed control byte-equal to this epoch's early turnover was
+					// already consumed at its explicit boundary; anything else resumes.
+					const resume = creatorCloseRetirementResumeRequired({
+						reconciliationPending: retirementReconciliationPending,
+						reconstructionPresent: registration.retirementReconstruction !== undefined,
+						intent,
+						currentEpoch: registration.currentTrust.currentEpoch,
+						...(earlyTurnover === undefined ? {} : {earlyTurnover}),
+					});
 					if (owner.recoveryScopes >= owner.limits.maxRecoveryScopes || resume || capacityMaintenance) {
 						// Keep this SAME close's unfinished request across lost delivery.
 						// Turnover can reduce the pool before an intent exists; retries
@@ -4650,7 +4692,12 @@ export async function bindCreatorLiveClose(
 								// readiness must not acquire new native prerequisites or effects.
 								if (input.promotionContext !== undefined && input.archive === undefined &&
 									input.readOrdinaryApplicationResourceBound !== undefined) {
-									if (input.ordinaryFinishingWindow !== undefined && registration.currentTrust.currentEpoch >= 3) {
+									// Unfinished recovery (e.g. a durable reopen after an early pool
+									// turnover at this epoch) is discharged here by the ORIGINAL
+									// reconstruction even without a finishing window; otherwise the
+									// halted owner could never prepare readiness again.
+									if ((input.ordinaryFinishingWindow !== undefined || registration.needsOrdinaryReadinessRecovery()) &&
+										registration.currentTrust.currentEpoch >= 3) {
 										if (promotionSource !== undefined || recoverySource !== undefined)
 											throw new TypeError("creator readiness maintenance has retained source readers");
 										const native = registration.store as AheBoundedRecoveryRoleStore;
@@ -4729,6 +4776,87 @@ export async function bindCreatorLiveClose(
 							}
 						});
 					},
+					// Explicit opt-in early turnover (soft watermark). The close keeps its
+					// original inline maintenance as the hard-cap backstop; this only lets a
+					// caller pay for the SAME original reconciliation at a quiescent lull.
+					maintainRecoveryPool: async (): Promise<CreatorRecoveryPoolResult> => {
+						const available = (): boolean => !stopping && !maintenanceClosing && lifecycle === "active" &&
+							!dependenciesReleased && dependencyReleaseTask === undefined && acquisitionTask === undefined &&
+							promotedEpoch === undefined && maintenanceReleaseFailure === undefined && !actor.status().terminal;
+						const busy = Object.freeze({kind: "deferred" as const, reason: "busy" as const});
+						if (input.promotionContext === undefined || input.archive !== undefined ||
+							input.readOrdinaryApplicationResourceBound === undefined || registration.currentTrust.currentEpoch < 3)
+							return Object.freeze({kind: "deferred", reason: "unsupported"});
+						if (!available() || maintenanceJobs.size !== 0 || promotionSource !== undefined || recoverySource !== undefined)
+							return busy;
+						// Observational point reads before any admission: "not-needed" leaves
+						// ordinary issuance, its retained source hint and native state untouched.
+						const native = registration.store as AheBoundedRecoveryRoleStore;
+						const capacity = await native.readGenerationPage({objectId: registration.objectId,
+							limit: AHE_BOUNDED_READ_LIMITS.maxObjectGenerations});
+						if (!capacity.ok) throw new TypeError("creator pool generation capacity is unavailable", {cause: capacity});
+						const owner = await input.snapshotStore.recoveryStatus();
+						if (owner.migration !== "ready" || !creatorRecoveryPoolPressure({recoveryScopes: owner.recoveryScopes,
+							maxRecoveryScopes: owner.limits.maxRecoveryScopes, generations: capacity.value.generations.length,
+							maxObjectGenerations: AHE_BOUNDED_READ_LIMITS.maxObjectGenerations}))
+							return Object.freeze({kind: "not-needed"});
+						if (!available() || maintenanceJobs.size !== 0 || promotionSource !== undefined || recoverySource !== undefined)
+							return busy;
+						// Same admitted-job join as readiness: stop waits for it, and the
+						// original consumer refuses concurrent ordinary quotes meanwhile.
+						let finish!: () => void;
+						const joined = new Promise<void>(resolve => {finish = resolve;});
+						maintenanceJobs.add(joined);
+						const priorOrdinarySource = ordinaryProofSource;
+						let detached = false;
+						try {
+							ordinaryProofSource = undefined; ordinaryTemplateReady = false; detached = true;
+							const outcome = await registration.runOrdinaryReadinessMaintenance(
+								input.snapshotStore as SnapshotRecoveryStore<SnapshotVerificationReceipt>, async (seal, requireClosedWorkflowCompletion) => {
+									if (!available()) throw new TypeError("creator pool maintenance admission was revoked");
+									const generations = await native.readGenerationPage({objectId: registration.objectId,
+										limit: AHE_BOUNDED_READ_LIMITS.maxObjectGenerations});
+									if (!generations.ok) throw new TypeError("creator pool generation capacity is unavailable", {cause: generations});
+									const checkpoint = await reconcileCreatorBoundedRecoveryMaintenance(registration, input, actor,
+										generations.value.generations.length, async () => {
+											if (!available()) throw new TypeError("creator pool maintenance admission was revoked");
+											return seal();
+										}, true, requireClosedWorkflowCompletion, registration.currentTrust);
+									if (!available()) throw new TypeError("creator pool maintenance admission was revoked");
+									return checkpoint;
+								}, {deferrable: true});
+							if (outcome === "deferred") {
+								// No hold, freeze or native work occurred: restore the joined hint,
+								// which every ordinary call still checks for fresh currency.
+								ordinaryProofSource = priorOrdinarySource; detached = false;
+								ordinaryTemplateReady = priorOrdinarySource !== undefined &&
+									creatorOrdinaryIssuanceSourceReadinessPrepared(priorOrdinarySource, input.readOrdinaryApplicationResourceBound);
+								return busy;
+							}
+							const control = await native.readRetirementControl?.(registration.objectId);
+							if (control !== undefined && !control.ok)
+								throw new TypeError("creator pool retirement intent is unavailable", {cause: control});
+							earlyTurnover = control === undefined ? undefined :
+								captureCreatorEarlyTurnoverToken(registration.currentTrust.currentEpoch, control.value);
+							if (!available()) throw new TypeError("creator pool maintenance admission was revoked");
+							// Same cold readiness capture the original boundary uses after maintenance.
+							await registration.prepareOrdinaryNativeMetadataForReadiness();
+							if (!available()) throw new TypeError("creator pool maintenance admission was revoked");
+							const source = await captureCreatorOrdinarySourceWithoutForecast(registration, input, undefined, true);
+							if (!available()) throw new TypeError("creator pool maintenance admission was revoked");
+							ordinaryProofSource = source; detached = false;
+							ordinaryTemplateReady = source !== undefined &&
+								creatorOrdinaryIssuanceSourceReadinessPrepared(source, input.readOrdinaryApplicationResourceBound);
+							return Object.freeze({kind: "maintained"});
+						} catch (cause) {
+							if (detached) { ordinaryProofSource = undefined; ordinaryTemplateReady = false; }
+							earlyTurnover = undefined;
+							if (cause instanceof AggregateError) maintenanceReleaseFailure = cause;
+							throw cause;
+						} finally {
+							maintenanceJobs.delete(joined); finish();
+						}
+					},
 					releaseHeaderCustodyForSuccessorInstall: async (): Promise<void> => {
 						if (lifecycle !== "successor-pending-adoption" && lifecycle !== "successor-adopted")
 							throw new TypeError("creator native successor installation has no completed close");
@@ -4746,11 +4874,13 @@ export async function bindCreatorLiveClose(
 						return actor.captureRetirementOwners();
 					},
 					borrowSigningDependencies: async (
-						trusts: readonly CurrentAnchorTrust[]
+						trusts: readonly CurrentAnchorTrust[],
+						prepareData?: CreatorSigningDependencyPreparation
 					): Promise<CreatorSigningDependencyRead> => {
 						if (stopping || dependenciesReleased || lifecycle === "successor-adopted")
 							throw new TypeError("creator signing dependency consumer is unavailable");
-						return actor.acquireRecoveryDependencies(trusts);
+						return prepareData === undefined ? actor.acquireRecoveryDependencies(trusts) :
+							acquireCreatorSigningDependenciesForPreparation(actor, trusts, prepareData);
 					},
 					acceptRecoveryRetirement: async (observation: object): Promise<void> => {
 						const task = closeTask;
@@ -4827,6 +4957,16 @@ export async function prepareCreatorOrdinaryReadiness(plane: object): Promise<vo
 	await owner.prepareOrdinaryReadiness();
 }
 
+/** Explicit opt-in early recovery-pool turnover at a caller-chosen quiescent lull.
+ * The close's inline maintenance remains the hard-cap backstop; this grants no
+ * authority and an unavailable or busy owner is reported, never forced. */
+export async function maintainCreatorRecoveryPool(plane: object): Promise<CreatorRecoveryPoolResult> {
+	const owner = runtimeReleaseOwners.get(plane as V3PlaneHandle);
+	if (owner === undefined || bindings.get(plane as V3PlaneHandle) === undefined)
+		return Object.freeze({kind: "deferred", reason: "unsupported"});
+	return owner.maintainRecoveryPool();
+}
+
 /** Joins only the original bound close's source custody before successor native
  * installation. This changes no terminal/adoption state and grants no authority. */
 export async function releaseCreatorCloseHeaderCustody(plane: object): Promise<void> {
@@ -4844,10 +4984,11 @@ if (
 					if (owner === undefined) throw new TypeError("creator signing retirement owner is unavailable");
 					return owner.captureSigningRetirementOwners();
 				},
-				borrowSigningDependencies: async (plane: object, trusts: readonly CurrentAnchorTrust[]): Promise<CreatorSigningDependencyRead> => {
+				borrowSigningDependencies: async (plane: object, trusts: readonly CurrentAnchorTrust[],
+					prepareData?: CreatorSigningDependencyPreparation): Promise<CreatorSigningDependencyRead> => {
 					const owner = runtimeReleaseOwners.get(plane as V3PlaneHandle);
 					if (owner === undefined) throw new TypeError("creator signing dependency owner is unavailable");
-					return owner.borrowSigningDependencies(trusts);
+					return owner.borrowSigningDependencies(trusts, prepareData);
 				},
 				acceptRecoveryRetirement: async (plane: object, observation: object): Promise<void> => {
 					const owner = runtimeReleaseOwners.get(plane as V3PlaneHandle);

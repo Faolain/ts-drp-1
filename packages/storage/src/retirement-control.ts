@@ -626,13 +626,12 @@ function digestBytes(value: unknown): Uint8Array {
 		offset = nativeOffset.call(carrier);
 	if (length !== 32 || Object.getPrototypeOf(buffer) !== ArrayBuffer.prototype)
 		throw new TypeError("invalid native domain carrier");
+	// Any extra own key (an accessor overlay, symbol or name) is refused here.
+	// The intrinsic length getter above proved a genuine typed array, whose
+	// indices 0..31 are always own enumerable data properties (they cannot be
+	// redefined), so no per-index descriptor can fail and none is built.
 	const keys = Reflect.ownKeys(carrier);
 	if (keys.length !== 32) throw new TypeError("invalid native domain byte fields");
-	for (let index = 0; index < 32; index++) {
-		const descriptor = Object.getOwnPropertyDescriptor(carrier, String(index));
-		if (descriptor?.enumerable !== true || !("value" in descriptor))
-			throw new TypeError("invalid native domain byte descriptor");
-	}
 	return new Uint8Array(new Uint8Array(buffer, offset, length));
 }
 function domains(value: unknown): readonly AheRetirementDomain[] {

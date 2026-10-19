@@ -1201,7 +1201,7 @@ describe("whole-prefix native nonlocal refusal", () => {
 			},
 		};
 		const code = ["closedNativeJournalScopes", "closedJournalScopeHasNonLocalRows", "closedJournalProtectedReplayScopes", "closedJournalMembershipPrefix",
-			"classifyClosedJournalDetails"].map(declaration).join("\n");
+			"prepareClosedJournalMembershipPrefix", "prepareClosedJournalDetails", "classifyClosedJournalDetails"].map(declaration).join("\n");
 		const result = await execute<Promise<{ collectiblePrefixes: unknown[]; retainedScopes: unknown[] }>>(
 			`${code} classifyClosedJournalDetails(input);`, {
 				input, decodeCanonical, record: (bytes: Uint8Array) => decodeCanonical(bytes),
@@ -1312,7 +1312,7 @@ describe("closed membership synchronous validation and fresh delivery currency",
 		verify = verifyReceivedVertex, open = openCreatorCloseMembership,
 		captureApplicationRows?: (rows: readonly ApplicationRow[]) => void,
 		decode = decodeCanonical): Promise<Prefix | undefined> {
-		return execute(`${declaration("closedJournalMembershipPrefix")}\nclosedJournalMembershipPrefix(input);`, {
+		return execute(`${declaration("prepareClosedJournalMembershipPrefix")}\n${declaration("closedJournalMembershipPrefix")}\nclosedJournalMembershipPrefix(input);`, {
 			input: { scope: f.scope, image: { canonicalRows: f.canonicalRows }, authorities: f.authorities, check,
 				...(captureApplicationRows === undefined ? {} : {captureApplicationRows}) },
 			closedRetirementEqual: (a: unknown, b: unknown) => Buffer.compare(Buffer.from(encodeCanonical(a)), Buffer.from(encodeCanonical(b))) === 0,
@@ -1585,8 +1585,8 @@ describe("closed membership synchronous validation and fresh delivery currency",
 				}},
 			};
 			const run = () => execute<Promise<{collectiblePrefixes: Prefix[]}>>(`${[
-				"closedNativeJournalScopes", "closedJournalProtectedReplayScopes", "closedJournalMembershipPrefix",
-				"classifyClosedJournalDetails"].map(declaration).join("\n")} classifyClosedJournalDetails(input);`, {
+				"closedNativeJournalScopes", "closedJournalProtectedReplayScopes", "closedJournalMembershipPrefix", "prepareClosedJournalMembershipPrefix",
+				"prepareClosedJournalDetails", "classifyClosedJournalDetails"].map(declaration).join("\n")} classifyClosedJournalDetails(input);`, {
 				input, record: decodeCanonical, closedRetirementBytes: encodeCanonical,
 				closedRetirementEqual: (a: unknown, b: unknown) => Buffer.compare(Buffer.from(encodeCanonical(a)), Buffer.from(encodeCanonical(b))) === 0,
 				closedJournalNativeObservationEqual: (a: unknown, b: unknown) => Buffer.compare(Buffer.from(encodeCanonical(a)), Buffer.from(encodeCanonical(b))) === 0,
@@ -1636,6 +1636,7 @@ describe("closed membership synchronous validation and fresh delivery currency",
 			const code = `
 				${declaration("closedNativeJournalScopes")}
 				${declaration("closedJournalMembershipPrefix")}
+				${declaration("prepareClosedJournalMembershipPrefix")}
 				${declaration("collectSourceOwnedClosedJournalMembershipPrefixes")}
 				${declaration("joinSourceReleases")}
 				let aliasRevoked = false, aliasRelease, nominationSource, nominationTask;
@@ -1674,6 +1675,10 @@ describe("closed membership synchronous validation and fresh delivery currency",
 				pendingChecks: Set<Promise<void>>; frame: {alive:boolean}; nominate():void; startNomination():void;
 				removeCapture():void; revokeHeader():void; staleAnchor():void;
 			}>(code, { fixtures, image, counts, floor, state, hooks, authorities: fixtures.flatMap(f => f.authorities),
+				// This owner model controls genuine target custody as a premise;
+				// its check/release moved behind private native lifetime selectors.
+				checkHeldTarget: (target: {check(): Promise<void>}) => target.check(),
+				releaseHeldTarget: (target: {release(): Promise<void>}) => target.release(),
 				record: decodeCanonical, openCreatorCloseMembership: hooks.open ?? openCreatorCloseMembership,
 				openCanonicalLatchedAclSnapshot, authorizeLatchedEnvelopeAuthor, registry, journalRetirementFrameDigest,
 				verifyReceivedVertex: (input: Parameters<typeof verifyReceivedVertex>[0]) => {counts.signatures++; return verifyReceivedVertex(input);},
@@ -1802,7 +1807,7 @@ describe("closed membership synchronous validation and fresh delivery currency",
 			const frame={alive:true,accounting,maintenanceCapture:{journal:image,closeHold:{}},input:{objectId:fixtures[0]!.scope.objectId,store:{},snapshotStore:{},
 				liveJournalStore:{readRetirementImage:async()=>{images++;return {ok:true,value:image};}}}};
 			const facts={forward:{reader,installed:[],certificates:[{journalMembershipAuthorities:fixtures.flatMap(f=>f.authorities),roles:{operationalSources:[]}}]}};
-			const result=await execute<Promise<Prefix[]>>(`${declaration("closedNativeJournalScopes")}\n${declaration("closedJournalMembershipPrefix")}\n${declaration("readProspectiveCreatorMaintenancePrefixesForSizing").replace(/^export /, "")}\nreadProspectiveCreatorMaintenancePrefixesForSizing(input);`,{
+			const result=await execute<Promise<Prefix[]>>(`${declaration("closedNativeJournalScopes")}\n${declaration("closedJournalMembershipPrefix")}\n${declaration("prepareClosedJournalMembershipPrefix")}\n${declaration("readProspectiveCreatorMaintenancePrefixesForSizing").replace(/^export /, "")}\nreadProspectiveCreatorMaintenancePrefixesForSizing(input);`,{
 				input:{proof:{observation,accounting},postAdoptionCensusSizing},observations:new WeakMap([[observation,facts]]),frames:new WeakMap([[reader,frame]]),ledgers:new WeakMap([[accounting,frame]]),
 				resolveCreatorPostAdoptionCensusSizing:()=>postAdoptionCensusSizing,readProspectiveCreatorSnapshotTurnoverForSizing:()=>({ok:true,required:false}),
 				resolveCreatorForwardPromotionSource:()=>({readClosedJournalMembershipPrefixes:async()=>{collections++;return undefined;},checkCurrent:async()=>{checks++;}}),
@@ -3051,13 +3056,14 @@ describe("acquisition-job exact parsing reuse is never current authority", () =>
 			release(): void}>(`
 			${extract(syntaxFile, "canonicalCreatorDataRecord")}
 			${extract(syntaxFile, "createCreatorCanonicalSyntaxReader")}
+			${extract(transitionFile, "createCreatorRecoveryEvidenceOwner")}
+			${extract(transitionFile, "createCreatorSnapshotRecoveryEvidenceJob")}
 			${extract(transitionFile, "record").replace("function record(", "function transitionRecord(")}
 			${extract(transitionFile, "candidateSelection").replace("record(candidate)", "transitionRecord(candidate)")}
 			${selector}
 			${extract(transitionFile, "exactCreatorTransitionOccurrence")}
 			${["unique", "record", "anchorOf", "createCreatorClosedAcquisitionSyntax"].map(declaration).join("\n")}
 			createCreatorClosedAcquisitionSyntax();`, {
-			createCreatorSnapshotRecoveryEvidenceJob: () => ({sourceTrust: () => undefined, readback: () => undefined, release: () => {}}),
 			AHE_BOUNDED_READ_LIMITS, Object: observedObject, compareBytes: (a: Uint8Array, b: Uint8Array) => Buffer.compare(Buffer.from(a), Buffer.from(b)),
 			decodeCanonical: (bytes: Uint8Array) => {decodes++; return decodeCanonical(bytes);},
 			sameRef: (a: {digest: string; byteLength: number}, b: {digest: string; byteLength: number}) => a.digest === b.digest && a.byteLength === b.byteLength,
@@ -6204,8 +6210,8 @@ describe("transition inspect-tree synchronous syntax reuse affected controls", (
 		const reader = syntaxFile.statements.find((node): node is ts.FunctionDeclaration => ts.isFunctionDeclaration(node) && node.name?.text === "createCreatorCanonicalSyntaxReader");
 		if (reader === undefined) throw Error("TRANSITION_INSPECT_READER_MISSING");
 		let inspect = extract("inspectCreatorTransitionAdvanceOwned");
-		if (inspect.split("const syntax = createCreatorCanonicalSyntaxReader();").length !== 2) throw Error("TRANSITION_INSPECT_OWNER_NOT_UNIQUE");
-		if (cold) inspect = inspect.replace("const syntax = createCreatorCanonicalSyntaxReader();", "const syntax = undefined;");
+		if (inspect.split("const syntax = sharedSyntax ?? createCreatorCanonicalSyntaxReader();").length !== 2) throw Error("TRANSITION_INSPECT_OWNER_NOT_UNIQUE");
+		if (cold) inspect = inspect.replace("const syntax = sharedSyntax ?? createCreatorCanonicalSyntaxReader();", "const syntax = undefined;");
 		// Preserve the original catch/refusal while exposing fixture linkage
 		// errors rather than confusing them with a product validation refusal.
 		const caught: string[] = [];
@@ -6214,17 +6220,22 @@ describe("transition inspect-tree synchronous syntax reuse affected controls", (
 		inspect = inspect.replace(originalCatch, '} catch (error) { reportCaught(error);\n\t\treturn failure("TRUST_CLOSURE_INVALID");');
 		const stats = {decodes: 0, owners: 0}, calls: {kind: string; input: unknown}[] = [], identities = new WeakMap<object, Record<string, unknown>>();
 		const state = {afterOpen: undefined as (() => void) | undefined};
-		const owner = execute<{inspect(input: Input): Result; record(candidate: Candidate, syntax?: ReturnType<typeof createCreatorCanonicalSyntaxReader>): Readonly<Record<string, unknown>> | undefined;
+		const owner = execute<{inspect(input: Input): Result; inspectWith(input: Input, syntax: ReturnType<typeof createCreatorCanonicalSyntaxReader>): Result;
+			job(): {readonly syntax: ReturnType<typeof createCreatorCanonicalSyntaxReader> | undefined; release(): void};
+			record(candidate: Candidate, syntax?: ReturnType<typeof createCreatorCanonicalSyntaxReader>): Readonly<Record<string, unknown>> | undefined;
 			select(candidates: Candidate[], kind: string, epoch?: number, phase?: string, syntax?: ReturnType<typeof createCreatorCanonicalSyntaxReader>): Candidate | undefined;
 			reader(): ReturnType<typeof createCreatorCanonicalSyntaxReader>}>(`
 			${reader.getText(syntaxFile).replace(/^export /, "").replace("function createCreatorCanonicalSyntaxReader(", "function originalSyntaxReader(")}
 			const createCreatorCanonicalSyntaxReader = () => { countOwner(); return originalSyntaxReader(); };
-			${["record", "candidateSelection", "sameRef", "compareRef", "exactCandidate", "hex", "failure", "uniqueCreatorTransitionCandidate",
+			${["record", "candidateSelection", "candidateMetadata", "sameRef", "compareRef", "exactCandidate", "hex", "failure", "uniqueCreatorTransitionCandidate",
 				"exactCreatorTransitionOccurrence", "retirementCandidates", "aggregateCandidates", "settlementCandidates", "currentAnchorAclDigest",
-				"openCreatorTransitionSettlement", "authenticatedSettlementPair"].map(extract).join("\n")}
+				"openCreatorTransitionSettlement", "openCreatorTransitionSettlementOwned", "authenticatedSettlementPair"].map(extract).join("\n")}
 			${inspect}
 			${extract("inspectCreatorTransitionAdvance")}
-			({inspect: inspectCreatorTransitionAdvance, record, select: uniqueCreatorTransitionCandidate, reader: createCreatorCanonicalSyntaxReader});`, {
+			${extract("createCreatorRecoveryEvidenceOwner")}
+			${extract("createCreatorSnapshotRecoveryEvidenceJob")}
+			({inspect: inspectCreatorTransitionAdvance, inspectWith: (input, syntax) => inspectCreatorTransitionAdvanceOwned(input, openCreatorTransitionSettlement, syntax),
+			 job: createCreatorSnapshotRecoveryEvidenceJob, record, select: uniqueCreatorTransitionCandidate, reader: createCreatorCanonicalSyntaxReader});`, {
 			...controls, CREATOR_ISSUANCE_RETIREMENT_KIND, AHE_BOUNDED_READ_LIMITS, digestBlob, hashDomain, countOwner: () => {stats.owners++;},
 			reportCaught: (error: unknown) => {caught.push(String(error));},
 			decodeCanonical: (bytes: Uint8Array) => {stats.decodes++; return decodeCanonical(bytes);},
@@ -6260,6 +6271,29 @@ describe("transition inspect-tree synchronous syntax reuse affected controls", (
 		const input: Input = {current, proposed, currentTrust, successorTrust, proofRefs: [c1.ref, q1.ref], mode: "verify", settlementAcl: {current: a1, successor: a2}};
 		return {owner, input, stats, calls, caught, state, trust, c1, q1, s1, file, extract};
 	}
+	it("shares the actual finite job representation across complete transition passes and revokes retained reader aliases", async () => {
+		const fast = await fixture(), cold = await fixture(true), job = fast.owner.job(), syntax = job.syntax!;
+		// The original acquisition already selected these exact candidates before
+		// certificate readback. Pay that whole syntax capture once, not once per
+		// semantic consumer. This supplies no crypto result or native authority.
+		for (const candidate of [...fast.input.current.candidates, ...fast.input.proposed.candidates]) syntax.canonicalSelection(candidate.bytes);
+		const captured = fast.stats.decodes;
+		const first = fast.owner.inspectWith(fast.input, syntax), original = cold.owner.inspect(cold.input);
+		expect(first.ok, JSON.stringify(fast.caught)).toBe(true); expect(first).toEqual(original);
+		const firstPass = fast.stats.decodes - captured;
+		const before = fast.stats.decodes;
+		expect(fast.owner.inspectWith(fast.input, syntax)).toEqual(cold.owner.inspect(cold.input));
+		expect(fast.stats.decodes - before).toBe(0);
+		expect(firstPass).toBe(1); // Only the nested actual anchor was not selected above.
+		expect(fast.stats.owners).toBe(1); expect(fast.calls).toEqual(cold.calls);
+		expect(fast.calls.filter(call => call.kind === "settlement-open")).toHaveLength(4);
+		expect(fast.calls.filter(call => call.kind === "acl-open")).toHaveLength(4);
+		job.release(); expect(job.syntax).toBeUndefined();
+		const released = fast.stats.decodes;
+		expect(fast.owner.inspectWith(fast.input, syntax)).toEqual(cold.owner.inspect(cold.input));
+		expect(fast.stats.decodes).toBeGreaterThan(released);
+		expect(fast.calls).toEqual(cold.calls);
+	});
 	it("matches the actual cold stage/verify tree, order and original opener calls while reusing repeated private parsing", async () => {
 		for (const mode of ["stage", "verify"] as const) {
 			const fast = await fixture(), cold = await fixture(true); fast.input.mode = mode; cold.input.mode = mode;
@@ -6385,7 +6419,7 @@ describe("recovery-role readback metadata syntax affected controls", () => {
 		const read = (o: Awaited<ReturnType<typeof owner>>) => o.read(m.current, m.predecessor, m.live, 4, m.pin);
 		const actual = read(fast); expect(actual.ok).toBe(true); expect(actual).toEqual(read(cold)); expect(actual).toEqual(read(overflow));
 		expect(actual.carrier).toBe(m.trust); expect(actual.cut).toBe(m.cut); expect(actual.liveProjections).toBe(1); expect(actual.currentProjections).toBe(1);
-		const before = fast.decodes(); expect(read(fast)).toEqual(read(cold)); expect(fast.decodes() - before).toBe(1); // Original strict pin remains a fresh canonical read.
+		const before = fast.decodes(); expect(read(fast)).toEqual(read(cold)); expect(fast.decodes() - before).toBe(0); // Exact pin syntax shares its strict whole-record roundtrip, not trust authentication.
 		expect(fast.decodes()).toBeLessThan(cold.decodes()); const misses = overflow.decodes(); read(overflow); expect(overflow.decodes() - misses).toBe(misses);
 		(actual.cutRecord!.nested as {bytes: Uint8Array; members: string[]}).bytes.fill(99); (actual.cutRecord!.nested as {members: string[]}).members.push("tampered");
 		expect(read(fast).cutRecord).toEqual(read(cold).cutRecord); expect(read(fast).cutRecord).toEqual(decodeCanonical(m.cut.bytes));
@@ -6431,7 +6465,7 @@ describe("recovery-role readback metadata syntax affected controls", () => {
 		// A retained private syntax owner may already exist; its first semantic
 		// use still follows the original fresh nominal-trust admission check.
 		expect(originalGenuineCheck).toBeLessThan(f.source.indexOf("const carrier = select("));
-		for (const originalCheck of ["openCreatorCheckpointTrust({", "inspectCreatorClosedCutSuccessorBinding({", "inspectCreatorTransitionAdvance({", "openCreatorSnapshotRecoverySourceTrustFromVerifiedBranch({", "consumeCreatorRecoveryRoleRetiredReadback("]) expect(f.source).toContain(originalCheck);
+		for (const originalCheck of ["openCreatorCheckpointTrust({", "inspectCreatorClosedCutSuccessorBinding({", "inspectCreatorTransitionAdvanceOwned({", "openCreatorSnapshotRecoverySourceTrustFromVerifiedBranch({", "consumeCreatorRecoveryRoleRetiredReadback("]) expect(f.source).toContain(originalCheck);
 		// Only metadata and original admission predicates are executed here. Real
 		// complete role readback, snapshots, signatures and native currency remain
 		// covered by the existing genuine healthy/mature native fixtures.
@@ -6569,16 +6603,16 @@ describe("nominal historical frontier batch affected controls", () => {
 		const owner = execute<{open(author: string): object | undefined; resolve(capability: object): any}>([
 			syntaxOwner[0]!.getText(syntax).replace(/^export /, ""),
 			["record", "candidateSelection", "sameRef", "exactCreatorTransitionOccurrence", "uniqueCreatorTransitionCandidate",
-				"hex", "openCreatorTransitionClosedCutEvidence", "openVerifiedCreatorHistoricalIssuance",
+				"hex", "openCreatorTransitionClosedCutEvidence", "openCreatorTransitionClosedCutEvidenceOwned", "openVerifiedCreatorHistoricalIssuance",
 				"resolveVerifiedCreatorHistoricalIssuance"].map(extract).join("\n"),
 			"({open: author => openVerifiedCreatorHistoricalIssuance({author, closure, floorTrust: target}), resolve: resolveVerifiedCreatorHistoricalIssuance});",
 		].join("\n"), {
 			closure, target, verifiedHistoricalIssuance: registry, AHE_BOUNDED_READ_LIMITS, digestBlob, hashDomain, settlementProfileFor,
 			CREATOR_ISSUANCE_RETIREMENT_KIND: retirementKind, CREATOR_AUTHOR_ISSUANCE_FRONTIERS_KIND: aggregateKind,
 			CREATOR_AUTHOR_SETTLEMENT_KIND: settlementKind,
-			openCreatorTransitionRetirement: () => {calls.retirement++; return {identity: {...identity, author: authors[0], admittedAuthorSequence: 7}};},
-			openCreatorTransitionAggregate: () => {calls.aggregate++; return {identity: {...identity, frontiers: authors.map((author, i) => [author, i])}};},
-			openCreatorTransitionSettlement: () => {calls.settlement++; return options.refused ? undefined :
+			openCreatorTransitionRetirementOwned: () => {calls.retirement++; return {identity: {...identity, author: authors[0], admittedAuthorSequence: 7}};},
+			openCreatorTransitionAggregateOwned: () => {calls.aggregate++; return {identity: {...identity, frontiers: authors.map((author, i) => [author, i])}};},
+			openCreatorTransitionSettlementOwned: () => {calls.settlement++; return options.refused ? undefined :
 				{identity: {...identity, currentAclDigest: aclDigest}, capability: settlement};},
 			frontierFor: (_capability: object, author: string) => rows.find(row => row[0] === author),
 			readCreatorSettlementSourceAnchor: () => {throw Error("UNEXPECTED_SOURCE_ANCHOR_READ");},
@@ -6667,9 +6701,9 @@ describe("same-frame settlement early-late recheck affected controls", () => {
 			${reader.getText(syntaxFile).replace(/^export /, "")}
 			${constants}
 			${["exactSettlementRecord", "exactSettlementArray", "exactSettlementAcl", "exactSettlementFrontierArray", "settlementMembers", "settlementFrontiers",
-				"inspectCreatorAuthorSettlementAdvance", "record", "candidateSelection", "sameRef", "compareRef", "exactCandidate", "hex", "failure",
+				"inspectCreatorAuthorSettlementAdvance", "record", "candidateSelection", "candidateMetadata", "sameRef", "compareRef", "exactCandidate", "hex", "failure",
 				"uniqueCreatorTransitionCandidate", "exactCreatorTransitionOccurrence", "retirementCandidates", "aggregateCandidates", "settlementCandidates",
-				"currentAnchorAclDigest", "openCreatorTransitionSettlement", "authenticatedSettlementPair", "inspectCreatorTransitionAdvanceOwned",
+				"currentAnchorAclDigest", "openCreatorTransitionSettlement", "openCreatorTransitionSettlementOwned", "authenticatedSettlementPair", "inspectCreatorTransitionAdvanceOwned",
 				"inspectCreatorTransitionAdvance", "capturePromotionClosure", "prepareCreatorTransitionAdvanceRecheck"].map(extract).join("\n")}
 			const originalAdvance = inspectCreatorAuthorSettlementAdvance;
 			inspectCreatorAuthorSettlementAdvance = input => { countAdvance(); return originalAdvance(input); };

@@ -15,8 +15,10 @@ function declaration(name: string): ts.FunctionDeclaration {
 }
 interface DeliveryOwner {
 	checkReadEligibility(): Promise<void>;
-	check(): Promise<void>;
+	check(adjacent?: AdjacentTarget): Promise<void>;
 }
+type AdjacentTarget = "pre-callback" | "begin";
+type AdjacentClaim = {consume(target?: AdjacentTarget): boolean};
 type NumericalRead = <T>(owner: DeliveryOwner, read: () => T) => Promise<T>;
 function numericalRead(): NumericalRead {
 	const js = ts.transpileModule(declaration("runCreatorOrdinaryNumericalReadForSizing").getText(tree),
@@ -135,8 +137,8 @@ function guardFixture() {
 		onCurrency: undefined as (() => Promise<void>) | undefined,
 		onHead: undefined as (() => Promise<void>) | undefined,
 		onReadiness: undefined as (() => Promise<void>) | undefined};
-	const capturedFrame = {alive: true, pending: new Set<Promise<unknown>>()};
-	const bytesEqual = (left: Uint8Array, right: Uint8Array): number =>
+	const capturedFrame: {alive: boolean; pending: Set<Promise<unknown>>; adjacentCheck?: AdjacentClaim} = {alive: true, pending: new Set()};
+	const bytesEqual =(left: Uint8Array, right: Uint8Array): number =>
 		left.length === right.length && left.every((value, index) => value === right[index]) ? 0 : 1;
 	const requireLaw = (accepted: boolean, code: string): void => {if (!accepted) throw new Error(code);};
 	const owned = ["issuer", "ahe", "floor", "journal", "snapshot"].map(name => ({check: async () => {
@@ -579,6 +581,50 @@ describe("original ordinary numerical delivery boundaries (no proof authority)",
 		const failure = new Error("original-currency-failure"), facts = {sourceFacts: {capacity: {application: {advanced: true} as object | undefined}}};
 		await expect(delivery({check: async () => {throw failure;}}, facts)).rejects.toBe(failure);
 		expect(facts.sourceFacts.capacity.application).toBeUndefined();
+	});
+});
+
+describe("adjacent ordinary check coalescing (no task, await or own effect in between)", () => {
+	const issue = (target: AdjacentTarget): AdjacentClaim => execute<(target: AdjacentTarget) => AdjacentClaim>(
+		`${declaration("issueCreatorOrdinaryAdjacentCheck").getText(tree)}\nreturn issueCreatorOrdinaryAdjacentCheck;`, {})(target);
+	const wrapped = ["runtime:before", "signing:before", "abort", "source", "signing:after", "runtime:after"];
+
+	it("repeats only the wrapped synchronous eligibility prefix at its one claimed boundary", async () => {
+		for (const target of ["pre-callback", "begin"] as const) {
+			const f = guardFixture(); f.capturedFrame.adjacentCheck = issue(target);
+			for (let turn = 0; turn < 24; turn++) await Promise.resolve(); // Microtask-only path, as in production.
+			await f.guards.check(target);
+			expect(f.events, target).toEqual(wrapped); expect(f.capturedFrame.adjacentCheck, target).toBeUndefined();
+			f.events.length = 0; await f.guards.check(target); // Single use: the next check is complete.
+			expect(f.events, target).toContain("held:issuer"); expect(f.events, target).toContain("snapshot:inventory");
+		}
+	});
+
+	it("stays complete for another boundary, an untargeted check, or once any task has run", async () => {
+		for (const kind of ["other", "untargeted", "task"] as const) {
+			const f = guardFixture(); f.capturedFrame.adjacentCheck = issue("begin");
+			if (kind === "task") await new Promise(resolve => setTimeout(resolve, 0));
+			await f.guards.check(kind === "other" ? "pre-callback" : kind === "untargeted" ? undefined : "begin");
+			for (const event of ["held:snapshot", "ahe:currency", "head:facade", "snapshot:readiness", "snapshot:image",
+				"snapshot:inventory", "floor:current", "journal:current", "issuer:current"]) expect(f.events, kind).toContain(event);
+			expect(f.capturedFrame.adjacentCheck, kind).toBeUndefined();
+		}
+	});
+
+	it("keeps the original wrapper and synchronous refusals, reasons and order when coalesced", async () => {
+		const expected = {runtime: "runtime-closed", "read-phase": "read-phase-revoked", abort: "aborted",
+			release: "chain-invalid", frame: "chain-invalid", source: "chain-invalid"} as const;
+		for (const failure of Object.keys(expected) as (keyof typeof expected)[]) {
+			const f = guardFixture(); f.capturedFrame.adjacentCheck = issue("pre-callback");
+			if (failure === "runtime") f.state.runtimeClosed = true;
+			else if (failure === "read-phase") f.state.readPhaseRevoked = true;
+			else if (failure === "abort") f.state.aborted = true;
+			else if (failure === "release") f.guards.release();
+			else if (failure === "frame") f.capturedFrame.alive = false;
+			else f.state.sourceCurrent = false;
+			await expect(f.guards.check("pre-callback"), failure).rejects.toThrow(expected[failure]);
+			expect(f.events, failure).not.toContain("held:issuer");
+		}
 	});
 });
 

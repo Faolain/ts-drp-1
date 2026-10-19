@@ -1,4 +1,5 @@
 import { ed25519 } from "@noble/curves/ed25519.js";
+import { verifyEd25519 } from "./internal/ed25519-verify.js";
 import {
 	CanonicalDecodingError,
 	compareBytes,
@@ -7,6 +8,7 @@ import {
 	encodeCanonical,
 	hashDomain,
 } from "@ts-drp/canonical";
+import { decodeCanonicalExactness } from "@ts-drp/canonical/exact";
 import { DRPError } from "@ts-drp/errors";
 import { withAuthoredOperationSigningRequest, type OwnedSigningRequest } from "./internal/owned-signing-request.js";
 import { init as initializeModuleLexer, parse as parseModule } from "es-module-lexer";
@@ -723,10 +725,26 @@ function snapshotClosedInput(
 	}
 }
 
+const EXACTNESS_VIEW_OVERRIDES = ["buffer", "byteLength", "byteOffset", "length"] as const;
+
+// One decode may already prove default-limit canonicality; only then is the
+// re-encode comparison skipped. Views whose length or backing could be
+// intercepted keep the original decode-encode-compare path.
+function plainExactnessView(bytes: Uint8Array): boolean {
+	return (
+		bytes instanceof Uint8Array &&
+		Object.getPrototypeOf(bytes) === Uint8Array.prototype &&
+		!EXACTNESS_VIEW_OVERRIDES.some((name) => Object.hasOwn(bytes, name)) &&
+		bytes.buffer instanceof ArrayBuffer
+	);
+}
+
 function decodeExact(bytes: Uint8Array): DecodeResult {
 	try {
-		const value = decodeCanonical(bytes);
-		if (!equalBytes(encodeCanonical(value), bytes)) return { ok: false, reason: "noncanonical" };
+		const { value, exact } = plainExactnessView(bytes)
+			? decodeCanonicalExactness(bytes)
+			: { value: decodeCanonical(bytes), exact: false };
+		if (!exact && !equalBytes(encodeCanonical(value), bytes)) return { ok: false, reason: "noncanonical" };
 		return { ok: true, value };
 	} catch (error) {
 		if (
@@ -875,7 +893,7 @@ function mintAnchorTrust(
 function verifyStrictSignature(signature: Uint8Array, digest: Uint8Array, publicKey: Uint8Array): boolean {
 	if (signature.byteLength !== 64 || publicKey.byteLength !== 32) return false;
 	try {
-		return ed25519.verify(signature, digest, publicKey, { zip215: false });
+		return verifyEd25519(signature, digest, publicKey);
 	} catch {
 		return false;
 	}
@@ -1152,6 +1170,11 @@ export function createAnchorTrustApi(): AnchorTrustApi {
 		CurrentEpochAuthorAuthorizationPrivateState
 	>();
 
+	// Closure scans classify every candidate on each inspection. The verdict is
+	// a pure function of the exact copied bytes, so it is memoized under the
+	// complete byte content itself (a latin1 key, never a digest or identity).
+	const trustRecordVerdicts = new Map<string, boolean>();
+	let trustRecordVerdictChars = 0;
 	const isAnchorTrustStateRecordBytes = (bytes: Uint8Array): boolean => {
 		try {
 			if (
@@ -1161,12 +1184,25 @@ export function createAnchorTrustApi(): AnchorTrustApi {
 				bytes.byteLength > ANCHOR_TRUST_STATE_MAX_RECORD_BYTES
 			)
 				return false;
-			const decoded = decodeExact(new Uint8Array(bytes));
-			return (
+			const copied = new Uint8Array(bytes);
+			let key = "";
+			for (let offset = 0; offset < copied.length; offset += 4096)
+				key += String.fromCharCode.apply(null, copied.subarray(offset, offset + 4096) as unknown as number[]);
+			const known = trustRecordVerdicts.get(key);
+			if (known !== undefined) return known;
+			const decoded = decodeExact(copied);
+			const verdict =
 				decoded.ok &&
 				isClosedDataRecord(decoded.value, TRUST_RECORD_KEYS) &&
-				decoded.value.kind === "drp-anchor-trust-state"
-			);
+				decoded.value.kind === "drp-anchor-trust-state";
+			while (trustRecordVerdicts.size !== 0 && (trustRecordVerdicts.size >= 1024 || trustRecordVerdictChars + key.length > 2_097_152)) {
+				const oldest = trustRecordVerdicts.keys().next().value!;
+				trustRecordVerdicts.delete(oldest);
+				trustRecordVerdictChars -= oldest.length;
+			}
+			trustRecordVerdicts.set(key, verdict);
+			trustRecordVerdictChars += key.length;
+			return verdict;
 		} catch {
 			return false;
 		}
@@ -3350,7 +3386,7 @@ export function verifyEd25519RegisteredDigest(
 	}
 
 	try {
-		return ed25519.verify(signature, rawRegisteredDigest, publicKey, { zip215: false });
+		return verifyEd25519(signature, rawRegisteredDigest, publicKey);
 	} catch {
 		return false;
 	}

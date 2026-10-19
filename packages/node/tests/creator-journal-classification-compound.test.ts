@@ -31,7 +31,8 @@ function property(name: string, sibling: string): string {
 		ts.isObjectLiteralExpression(node.parent) && node.parent.properties.some(item => ts.isPropertyAssignment(item) && item.name.getText(parsed) === sibling)).initializer.getText(parsed);
 }
 const classifierCode = ["closedNativeJournalScopes", "closedJournalFrameAt", "closedJournalScopeHasNonLocalRows",
-	"closedJournalMembershipPrefix", "closedJournalProtectedReplayScopes", "classifyClosedJournalDetails",
+	"closedJournalMembershipPrefix", "prepareClosedJournalMembershipPrefix", "closedJournalProtectedReplayScopes", "classifyClosedJournalDetails",
+	"prepareClosedJournalDetails", "canPrepareClosedJournalDetails",
 	"classifySourceOwnedClosedJournalDetails"].map(declaration).join("\n");
 const privateStart = source.indexOf("const journalClassificationInput:");
 const privateEnd = source.indexOf("const censusFacts = record(census);", privateStart);
@@ -42,6 +43,10 @@ function execute<T>(code: string, context: Record<string, unknown>): T {
 	const imports = { decodeCanonical, encodeCanonical, compareBytes, record: decodeCanonical,
 		closedRetirementBytes: encodeCanonical, closedRetirementEqual: equal,
 		closedJournalNativeObservationEqual: equal, journalRetirementFrameDigest,
+		// Genuine target custody is a controlled premise of this source-owner
+		// model; exercise its original checks/releases after their private move.
+		checkHeldTarget: (target: {check(): Promise<void>}) => target.check(),
+		releaseHeldTarget: (target: {release(): Promise<void>}) => target.release(),
 		closedRetirementHex: (value: string) => Uint8Array.from(value.match(/../gu)!, pair => Number.parseInt(pair, 16)),
 		bindMethod: (owner: Record<string, (...args: any[]) => unknown>, name: string) => owner[name]!.bind(owner),
 		requireLaw: (ok: unknown, reason = "chain-invalid") => { if (!ok) throw Error(reason); },
@@ -152,6 +157,110 @@ function fixture(protectedCount = 0, hooks: Hooks = {}) {
 }
 
 describe("SAME-owner compound closed-journal classification", () => {
+	it("runs the unchanged membership/ACL/signature algorithm on DATA without native ports", async () => {
+		const f = fixture(), original = f.readInput, scope = f.scope;
+		const author = "aa".repeat(32), digest = "03".repeat(32);
+		const preimage = encodeCanonical({objectId: scope.objectId, epoch: scope.epoch, anchor: scope.anchorDigest,
+			author, authorSequence: 1, dependencies: [scope.anchorDigest]});
+		const membership = {scope, exactCanonicalLatchedAclBytes: Uint8Array.of(1),
+			orderedVertexDigests: [new Uint8Array(32).fill(3)],
+			localVertexWitnesses: [{vertexDigest: digest, exactCanonicalPreimageBytes: preimage, detachedSignature: new Uint8Array(64)}]};
+		const carrier = encodeCanonical({...membership, orderedVertexDigests: new Uint8Array(32).fill(3)});
+		const image = {...original.image, canonicalRows: [
+			encodeCanonical(["scopes", [scope.objectId, scope.epoch, scope.anchorDigest],
+				{next_journal_sequence: 1, closed_membership_bytes: carrier}]),
+			encodeCanonical(["accepted_entries", [scope.objectId, scope.epoch, scope.anchorDigest, 0],
+				{vertex_digest: digest, source_kind: "local-issued", local_author: author, local_author_sequence: 1}]),
+		]};
+		const calls: string[] = [], charges: Uint8Array[] = [];
+		const data = {objectId: original.objectId, image, summary: original.summary, floor: original.floor,
+			censusBytes: original.censusBytes, sourceTrust: undefined, unclassifiedReplay: false,
+			protectedRoleScopes: [], authenticatedScopes: [scope], accounting: {charge: (raw: Uint8Array) => {charges.push(raw); return true;}},
+			journalMembershipAuthorities: [{scope, exactCanonicalCutValueBytes: encodeCanonical({parameters: {maxEpochVertices: 4}}),
+				closedAclDigest: "acl", profileId: "profile", suiteId: "suite"}]};
+		const context = {data, calls, membership,
+			registry: {cryptoSuites: {active: [{role: "identityAndVertex", suiteId: "suite"}]}, kinds: {vertex: {domain: "vertex"}}, domains: {vertex: "vertex"}},
+			openCreatorCloseMembership: async () => {calls.push("membership"); return membership;},
+			openCanonicalLatchedAclSnapshot: () => {calls.push("acl"); return {ok: true, snapshot: {}};},
+			authorizeLatchedEnvelopeAuthor: ({author: supplied}: {author: string}) => {calls.push(`authorize:${supplied}`); return {ok: true, authorized: true};},
+			verifyReceivedVertex: (input: any) => {calls.push("signature"); expect(input.resolveAuthorPublicKey(author).bytes).toHaveLength(32);
+				return {accepted: true, digest: new Uint8Array(32).fill(3)};}};
+		expect(execute<boolean>(`${classifierCode} canPrepareClosedJournalDetails(data);`, context)).toBe(true);
+		const result = await execute<Promise<any>>(`${classifierCode} prepareClosedJournalDetails(data);`, context);
+		expect(result.collectiblePrefixes).toHaveLength(1); expect(result.collectiblePrefixes[0].snapshot).toBeNull();
+		expect(calls).toEqual(["membership", "acl", "signature", `authorize:${author}`]);
+		expect(charges).toEqual([encodeCanonical(result)]);
+		for (const port of ["journal", "physical", "check", "checkAvailable", "readWhile"]) expect(data).not.toHaveProperty(port);
+		const missing = {...data, journalMembershipAuthorities: []};
+		expect(execute<boolean>(`${classifierCode} canPrepareClosedJournalDetails(data);`, {...context, data: missing})).toBe(false);
+		const withoutWitness = {...data, image: {...image, canonicalRows: [encodeCanonical(["scopes", [scope.objectId, scope.epoch, scope.anchorDigest],
+			{next_journal_sequence: 1, closed_membership_bytes: encodeCanonical({...membership, orderedVertexDigests: new Uint8Array(32).fill(3), localVertexWitnesses: []})}]), image.canonicalRows[1]]}};
+		expect(execute<boolean>(`${classifierCode} canPrepareClosedJournalDetails(data);`, {...context, data: withoutWitness})).toBe(false);
+	});
+	it("freshly qualifies the complete original runtime census after detached DATA and new native enrollment", async () => {
+		const runtimeText = readFileSync(new URL("../src/v3-live.ts", import.meta.url), "utf8");
+		const runtime = ts.createSourceFile("v3-live.ts", runtimeText, ts.ScriptTarget.Latest, true);
+		const check = select(runtime, (node): node is ts.PropertyAssignment => ts.isPropertyAssignment(node) && node.name.getText(runtime) === "check" &&
+			node.initializer.getText(runtime).includes('throw new TypeError("creator recovery dependency census is stale or unclassified")')).initializer.getText(runtime);
+		const finalQualification = select(parsed, (node): node is ts.IfStatement => ts.isIfStatement(node) &&
+			node.expression.getText(parsed) === "detachedClassification" && node.thenStatement.getText(parsed).includes("await acquireReservations();")).getText(parsed);
+		for (const change of ["unchanged", "activeUnsettled", "pendingIngress", "nativeControl", "context"]) {
+			const original = {currentJournal: {scope: {objectId: "room", epoch: 3, anchorDigest: "head"}},
+				nativeIssuance: {control: {revision: 1}, rows: {issued: [], outbox: []}}};
+			const sealed = encodeCanonical(original), actual = structuredClone(original) as any;
+			if (change === "activeUnsettled") actual.activeUnsettled = [{digest: "new"}];
+			if (change === "pendingIngress") actual.pendingIngress = [{digest: "foreign"}];
+			if (change === "nativeControl") actual.nativeIssuance.control.revision++;
+			const calls: string[] = [];
+			const result = execute<Promise<void>>(`(async()=>{let issuanceRead, journalCurrent, unchangedHeldCensus, mayPrepareUnchanged=false;
+				const sourceLifetime={check:${check}}, detachedClassification=true, input={};
+				const acquireReservations=async()=>{calls.push("NEW-native");};
+				${finalQualification} calls.push("source-delivery");})();`, {
+				sealed, calls, sameBytes: (a: Uint8Array, b: Uint8Array) => compareBytes(a, b) === 0,
+				census: async () => {calls.push("full-actual-census"); return change === "context" ? undefined : encodeCanonical(actual);},
+				checkAbort: () => {},
+			});
+			if (change === "unchanged") {await result; expect(calls).toEqual(["NEW-native", "full-actual-census", "source-delivery"]);}
+			else {await expect(result).rejects.toThrow("creator recovery dependency census is stale or unclassified");
+				expect(calls).toEqual(["NEW-native", "full-actual-census"]);}
+		}
+	});
+	it("reacquires an actual NEW header owner after the detached join, never borrowing the revoked seed", async () => {
+		const reconcile = select(parsed, (node): node is ts.FunctionDeclaration => ts.isFunctionDeclaration(node) && node.name?.text === "reconcileSnapshotRecoveryRoles");
+		const acquire = select(reconcile, (node): node is ts.VariableDeclaration => ts.isVariableDeclaration(node) &&
+			ts.isIdentifier(node.name) && node.name.text === "acquireReservations").getText(parsed);
+		const detached = select(reconcile, (node): node is ts.IfStatement => ts.isIfStatement(node) &&
+			node.expression.getText(parsed) === "detachedClassification" && node.thenStatement.getText(parsed).includes("closed-classification-preparation-detached"));
+		const reset = select(detached, (node): node is ts.ExpressionStatement => ts.isExpressionStatement(node) &&
+			node.expression.getText(parsed).startsWith("nativeReservations.length = 0")).getText(parsed);
+		// Execute all three actual reset statements following length=0, selected
+		// from the joined production branch, not a reconstructed test reset.
+		const statements = (detached.thenStatement as ts.Block).statements;
+		const at = statements.findIndex(statement => statement.getText(parsed) === reset);
+		const clear = statements.slice(at, at + 4).map(statement => statement.getText(parsed)).join("\n");
+		const calls: string[] = [];
+		const result = await execute<Promise<any>>(`(async()=>{
+			${["borrowJournalHeaderHold", "ownJournalHeaderHold", "acquireJournalHeaderHold", "joinSourceReleases"].map(declaration).join("\n")}
+			const journalHeaderHolds=new WeakMap(),nativeReservations=[],input={objectId:"room",liveJournalStore:journal,store:ahe,roomHeadAuthority:floor,pinnedGenesisAnchorDigest:"genesis"};
+			let originalHeaderHold=await acquireJournalHeaderHold(journal,"room"),ownedHeaderHold=originalHeaderHold;
+			const old=originalHeaderHold;let journalHeaderHold=borrowJournalHeaderHold(old,journal);
+			nativeReservations.push(journalHeaderHold);
+			await joinSourceReleases([()=>journalHeaderHold.release(),()=>ownedHeaderHold.release()]);
+			${clear}
+			const acquireNative=owner=>owner.acquireNativeReadReservation.bind(owner),lifetime={acquireNativeIssuanceReservation:()=>issuer.acquireNativeReadReservation()};
+			const ${acquire};await acquireReservations();await journalHeaderHold.check();
+			let oldRefused=false;try{await old.check();}catch{oldRefused=true;}
+			await joinSourceReleases([...nativeReservations.map(read=>()=>read.release()),()=>ownedHeaderHold.release()]);
+			return {oldRefused,newOwner:originalHeaderHold!==old};})();`, {
+			calls, journal: {acquireNativeReadReservation: async () => {calls.push("acquire-journal"); let released=false; return {
+				check: async () => {if(released) throw Error("native-released");}, release: async () => {released=true;calls.push("release-journal");}};}},
+			ahe: {acquireNativeReadReservation: async () => ({check: async () => {}, release: async () => {}})},
+			issuer: {acquireNativeReadReservation: async () => ({check: async () => {}, release: async () => {}})},
+			floor: {acquireNativeReadReservation: async () => ({check: async () => {}, release: async () => {}})},
+		});
+		expect(result).toEqual({oldRefused: true, newOwner: true});
+		expect(calls).toEqual(["acquire-journal", "release-journal", "acquire-journal", "release-journal"]);
+	});
 	it("preserves actual local-prefix classification and every charge, with two full checks independent of protected scopes", async () => {
 		for (const count of [0, 8]) {
 			const old = fixture(count), current = fixture(count);

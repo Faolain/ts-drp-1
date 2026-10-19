@@ -2,10 +2,11 @@ import {
 	CanonicalDecodingError,
 	CanonicalEncodingError,
 	compareBytes,
-	decodeCanonical,
 	encodeCanonical,
 	hashDomain,
 } from "@ts-drp/canonical";
+
+import { decodeCanonicalWithExactness } from "./internal/canonical-exactness.js";
 
 export const SNAPSHOT_MANIFEST_MAX_BYTES = 212_387 as const;
 
@@ -223,14 +224,19 @@ function safeInteger(value: unknown, minimum: number, name: string): number {
 
 function decodeRecord(bytes: Uint8Array): Record<string, unknown> {
 	let value: unknown;
+	let exact: boolean;
 	try {
-		value = decodeCanonical(bytes, { maxBytes: SNAPSHOT_MANIFEST_MAX_BYTES });
+		({ value, exact } = decodeCanonicalWithExactness(bytes, { maxBytes: SNAPSHOT_MANIFEST_MAX_BYTES }));
 	} catch (error) {
 		if (!(error instanceof CanonicalDecodingError) && !(error instanceof CanonicalEncodingError)) throw error;
 		throw new SnapshotManifestError("manifest-noncanonical", "manifest canonical bytes are invalid", {
 			cause: error,
 		});
 	}
+	// An exact decode within this byte ceiling proves the bounded re-encode
+	// succeeds with identical bytes: every encoder byte check measures a part
+	// of that same output, which is no longer than the admitted input.
+	if (exact) return exactRecord(value, MANIFEST_FIELDS, "manifest");
 	let canonical: Uint8Array;
 	try {
 		canonical = encodeCanonical(value, { maxBytes: SNAPSHOT_MANIFEST_MAX_BYTES });

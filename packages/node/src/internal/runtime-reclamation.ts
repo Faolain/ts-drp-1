@@ -4,7 +4,7 @@ import type { EpochVertex } from "@ts-drp/compaction";
 import type { DurableLiveJournalStore, LiveJournalAcceptedRow } from "@ts-drp/live-journal";
 import type { CurrentAnchorTrust } from "@ts-drp/protocol-v3";
 import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
-import type { CreatorSigningDependencyRead, CreatorSigningRetirementOwners } from "@ts-drp/seal/creator";
+import type { CreatorSigningDependencyRead, CreatorSigningRetirementOwners, CreatorSigningDependencyPreparation } from "@ts-drp/seal/creator";
 import type { AheDurableStore, NativeReadReservation } from "@ts-drp/storage";
 import type { AheReclamationReceipt } from "@ts-drp/storage/maintenance";
 
@@ -297,7 +297,7 @@ nativeRows: readonly LiveJournalAcceptedRow[], preparedCapacityOnly?: true): Pro
 	/** Runtime/signing bracket only. The proof owner must still probe genuine
 	 * native facades, complete images, protections and source/target currency. */
 	checkWhile(read: () => Promise<void>, signing?: CreatorSigningDependencyRead): Promise<void>;
-	borrowSigningDependencies(trusts: readonly CurrentAnchorTrust[]): Promise<CreatorSigningDependencyRead>;
+	borrowSigningDependencies(trusts: readonly CurrentAnchorTrust[], prepareData?: CreatorSigningDependencyPreparation): Promise<CreatorSigningDependencyRead>;
 	borrowCurrentNativeReservation?(owner: "ahe" | "journal" | "floor"): Promise<NativeReadReservation | undefined>;
 	acquireNativeIssuanceReservation(): Promise<NativeReadReservation>;
 	/** Revoke observational admissions and join reads, retaining physical
@@ -308,6 +308,9 @@ nativeRows: readonly LiveJournalAcceptedRow[], preparedCapacityOnly?: true): Pro
 type OrdinaryIssuanceRuntimeResolver = (value: unknown, owners: CreatorSnapshotRecoveryCloseOwners) =>
 	CreatorOrdinaryIssuanceRuntimeLifetime | undefined;
 export type CreatorSnapshotRecoveryCloseLifetime = Readonly<{
+	/** Private owner geometry only: this lifetime retains no replacement or
+	 * displaced-source physical custody. It is not currency or authorization. */
+	canDetachNativePreparation?: true;
 	/** Same held, fully charged native observation only. Optional data/currency
 	 * enrollment never supplies authentication, another proof book or authority. */
 	enrollCurrentJournalObservation?(observation: import("@ts-drp/live-journal").LiveJournalRetirementImageObservation): void;
@@ -315,6 +318,9 @@ export type CreatorSnapshotRecoveryCloseLifetime = Readonly<{
 	 * The caller supplies its original fresh ACL resolver; no admitted view,
 	 * source/role decision, native currency or proof credit is returned. */
 	verifyVertex?: typeof import("@ts-drp/protocol-v3/internal/received-vertex-authentication").verifyReceivedVertex;
+	/** Capture only the SAME bounded pure verification kernel. It carries no
+	 * source/lifecycle authority and still resolves the supplied closed ACL anew. */
+	captureVertexVerificationFacts?(): typeof import("@ts-drp/protocol-v3/internal/received-vertex-authentication").verifyReceivedVertex;
 	/** Borrow only the same lexical replacement's already-held current native owners. */
 	borrowCurrentNativeReservation?(owner: "ahe" | "journal" | "floor"): Promise<NativeReadReservation | undefined>;
 	plane?: object;
@@ -322,7 +328,7 @@ export type CreatorSnapshotRecoveryCloseLifetime = Readonly<{
 	sourceTrust: CurrentAnchorTrust | undefined;
 	/** Borrowed from this same runtime owner; detached bytes are observation, never authority. */
 	borrowDependencies(): Promise<CreatorSnapshotRecoveryCloseDependencyRead>;
-	borrowSigningDependencies(trusts: readonly CurrentAnchorTrust[]): Promise<CreatorSigningDependencyRead>;
+	borrowSigningDependencies(trusts: readonly CurrentAnchorTrust[], prepareData?: CreatorSigningDependencyPreparation): Promise<CreatorSigningDependencyRead>;
 	captureSigningRetirementOwners(): CreatorSigningRetirementOwners;
 	captureIssuanceRetirementOwner(): () => Promise<DurableIssuanceRetirementControlRead>;
 	/** Original factory capture for no-deletion authenticated inherited metadata
@@ -388,7 +394,7 @@ type RuntimeReclamationKernel = Readonly<{
 }>;
 type CreatorCloseRuntimeReleaseOwner = ((plane: object) => CreatorCloseRuntimeReleasePlan | undefined) & {
 	acceptRecoveryRetirement?(plane: object, observation: object): Promise<void>;
-	borrowSigningDependencies?(plane: object, trusts: readonly CurrentAnchorTrust[]): Promise<CreatorSigningDependencyRead>;
+	borrowSigningDependencies?(plane: object, trusts: readonly CurrentAnchorTrust[], prepareData?: CreatorSigningDependencyPreparation): Promise<CreatorSigningDependencyRead>;
 	captureSigningRetirementOwners?(plane: object): CreatorSigningRetirementOwners;
 };
 
@@ -604,11 +610,12 @@ export async function acceptCreatorCloseRecoveryRetirement(plane: object, observ
  */
 export async function borrowCreatorCloseSigningDependencies(
 	plane: object,
-	trusts: readonly CurrentAnchorTrust[]
+	trusts: readonly CurrentAnchorTrust[],
+	prepareData?: CreatorSigningDependencyPreparation
 ): Promise<CreatorSigningDependencyRead> {
 	const borrow = creatorCloseReleaseOwner?.borrowSigningDependencies;
 	if (borrow === undefined) throw new TypeError("creator signing dependency owner is unavailable");
-	return borrow(plane, trusts);
+	return borrow(plane, trusts, prepareData);
 }
 
 /** Captures only the already-bound actor's native factories; never eligibility. */

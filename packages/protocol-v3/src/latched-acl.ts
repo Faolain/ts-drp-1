@@ -1,5 +1,6 @@
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 
+import { decodeCanonicalWithExactness } from "./internal/canonical-exactness.js";
 import { settlementProfileFor } from "./settlement-profile.js";
 
 const AUTHOR = /^[0-9a-f]{64}$/u;
@@ -240,13 +241,13 @@ export function openCanonicalLatchedAclSnapshot(
 			return Object.freeze({ ok: false, reason: "malformed-input" });
 		}
 		const exactBytes = new Uint8Array(record.exactCanonicalLatchedAclBytes);
-		const decoded = decodeCanonical(
+		const { value: decoded, exact } = decodeCanonicalWithExactness(
 			exactBytes,
 			settlementProfile === "v1"
 				? { maxBytes: SETTLEMENT_MAX_CANONICAL_BYTES, maxDepth: 4, maxItems: SETTLEMENT_MAX_CANONICAL_ITEMS }
 				: { maxBytes: MAX_CANONICAL_BYTES, maxDepth: 4, maxItems: MAX_CANONICAL_ITEMS }
 		);
-		if (!sameBytes(encodeCanonical(decoded), exactBytes)) {
+		if (!exact && !sameBytes(encodeCanonical(decoded), exactBytes)) {
 			return Object.freeze({ ok: false, reason: "malformed-input" });
 		}
 		const snapshot = copySnapshot(decoded);

@@ -1,5 +1,6 @@
 import type { ResolvedBlueprintBytes, TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog";
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { decodeCanonicalExactness } from "@ts-drp/canonical/exact";
 import type { CloseSetHistoryCommitment } from "@ts-drp/compaction";
 import type { PromotionSource } from "@ts-drp/protocol-v3/internal/creator-forward-promotion";
 import { openCanonicalLatchedAclSnapshot } from "@ts-drp/protocol-v3/latched-acl";
@@ -19,7 +20,7 @@ export interface CreatorSnapshotCatalogIdentity {
  * @returns A canonical whole record or undefined.
  * @param bytes - Exact canonical carrier bytes.
  */
-export function canonicalCreatorDataRecord(bytes: Uint8Array): Readonly<Record<string, unknown>> | undefined {
+function canonicalCreatorDataRecord(bytes: Uint8Array): Readonly<Record<string, unknown>> | undefined {
 	try {
 		const value = decodeCanonical(bytes);
 		return value !== null &&
@@ -32,6 +33,35 @@ export function canonicalCreatorDataRecord(bytes: Uint8Array): Readonly<Record<s
 		return undefined;
 	}
 }
+
+const EXACTNESS_VIEW_OVERRIDES = ["buffer", "byteLength", "byteOffset", "length"] as const;
+
+/**
+ * The same whole-record decoder over ONE decode. When that decode proves
+ * default-limit canonicality the re-encode comparison is skipped; otherwise,
+ * and for any view whose length/backing could be intercepted, the original
+ * decode-encode-compare path runs unchanged.
+ * @returns A canonical whole record or undefined.
+ * @param bytes - Exact canonical carrier bytes.
+ */
+function canonicalCreatorDataRecordByExactness(bytes: Uint8Array): Readonly<Record<string, unknown>> | undefined {
+	if (!(bytes instanceof Uint8Array) || Object.getPrototypeOf(bytes) !== Uint8Array.prototype ||
+		EXACTNESS_VIEW_OVERRIDES.some(name => Object.hasOwn(bytes, name)) || !(bytes.buffer instanceof ArrayBuffer))
+		return canonicalCreatorDataRecord(bytes);
+	try {
+		const { value, exact } = decodeCanonicalExactness(bytes);
+		return value !== null &&
+			typeof value === "object" &&
+			!Array.isArray(value) &&
+			(exact || compareBytes(encodeCanonical(value), bytes) === 0)
+			? (value as Readonly<Record<string, unknown>>)
+			: undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+export { canonicalCreatorDataRecordByExactness as canonicalCreatorDataRecord };
 
 /**
  * Private syntax reuse for one lifecycle inspection/sizing tree or explicitly
@@ -96,15 +126,23 @@ export function createCreatorCanonicalSyntaxReader() {
 		record?: Readonly<Record<string, unknown>>;
 	}>();
 	let retainedBytes = 0;
+	let live = true;
 	const maximumEntries = AHE_BOUNDED_READ_LIMITS.maxObjectGenerations * AHE_BOUNDED_READ_LIMITS.maxClosureReferences;
-	const read = (bytes: Uint8Array) => {
+	const read = (bytes: Uint8Array): NonNullable<ReturnType<typeof entries.get>> => {
+		if (!live) {
+			const captured = new Bytes(bytes);
+			return {bytes: captured, value: decodeCanonical(captured), recordChecked: false,
+				record: undefined as Readonly<Record<string, unknown>> | undefined};
+		}
 		const previous = entries.get(bytes);
 		if (previous !== undefined && compareBytes(previous.bytes, bytes) === 0) {
+			if (!live) return read(bytes);
 			// Recency describes syntax use only, never admission or native currency.
 			entries.delete(bytes);
 			entries.set(bytes, previous);
 			return previous;
 		}
+		if (!live) return read(bytes);
 		if (previous !== undefined) {
 			entries.delete(bytes);
 			retainedBytes -= previous.bytes.byteLength;
@@ -119,6 +157,7 @@ export function createCreatorCanonicalSyntaxReader() {
 			if (matching === undefined && entry.bytes.byteLength === bytes.byteLength && compareBytes(entry.bytes, bytes) === 0)
 				matching = {key, entry};
 		});
+		if (!live) return read(bytes);
 		if (matching !== undefined) {
 			entries.delete(matching.key);
 			entries.set(matching.key, matching.entry!);
@@ -127,7 +166,7 @@ export function createCreatorCanonicalSyntaxReader() {
 		const captured = new Bytes(bytes);
 		const entry = { bytes: captured, value: decodeCanonical(captured), recordChecked: false,
 			record: undefined as Readonly<Record<string, unknown>> | undefined };
-		if (maximumEntries > 0 && captured.byteLength <= AHE_BOUNDED_READ_LIMITS.maxUnionBytes) {
+		if (live && maximumEntries > 0 && captured.byteLength <= AHE_BOUNDED_READ_LIMITS.maxUnionBytes) {
 			// Decode first. A malformed/oversized newcomer must not evict another
 			// successful syntax fact. All data/codec/roundtrip rules remain original;
 			// only cold private parse copies leave this unchanged bounded inventory.
@@ -164,7 +203,26 @@ export function createCreatorCanonicalSyntaxReader() {
 		return entry.record;
 	};
 	return Object.freeze({
+		release: (): void => { live = false; entries.clear(); retainedBytes = 0; },
 		decode: (bytes: Uint8Array): unknown => detach(read(bytes).value),
+		// Scalars and an optional detached anchor carrier come from ONE exact
+		// read. Never combine metadata from one mutable capture with a later
+		// field read, or clone all of its unrelated sibling representations.
+		metadata: (bytes: Uint8Array, includeCurrentAnchor = false): Readonly<Record<string, unknown>> | undefined => {
+			try {
+				const value = read(bytes).value;
+				if (value === null || typeof value !== "object" || isArray(value)) return undefined;
+				const record = value as Readonly<Record<string, unknown>>;
+				const output: Record<string, unknown> = {...selectionFields(record)};
+				for (const key of ["objectId", "previousAnchor", "snapshotManifestDigest", "successorAclDigest", "aclDigest",
+					"currentAnchorDigest", "genesisAnchorDigest", "profileId", "historyRoot"])
+					output[key] = typeof record[key] === "string" ? record[key] : undefined;
+				output.historySize = typeof record.historySize === "number" ? record.historySize : undefined;
+				if (includeCurrentAnchor) output.exactCanonicalCurrentAnchorPreimageBytes =
+					record.exactCanonicalCurrentAnchorPreimageBytes instanceof Bytes ? new Bytes(record.exactCanonicalCurrentAnchorPreimageBytes) : undefined;
+				return Object.freeze(output);
+			} catch { return undefined; }
+		},
 		selection: (bytes: Uint8Array): Readonly<Record<string, unknown>> | undefined => {
 			try {
 				const value = read(bytes).value;

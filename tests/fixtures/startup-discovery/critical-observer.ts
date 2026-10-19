@@ -27,6 +27,11 @@ Object.assign(globalThis, { __warmBegin: begin, __warmEnd: end });
 // active at entry, not proof that an asynchronous remote job was caused by it.
 function metricBegin(phase:string,inputBytes=0,synchronous=false,owner?:StartToken){
  if(Reflect.get(globalThis,"__r8CriticalProfiling")!==true)return undefined;
+ // Focus the added image/coordinator diagnosis on the one mature creator API
+ // window. Do not multiply its rows across all clients/epochs or raise the
+ // existing finite table bound. Outside this scope these owners are unmeasured.
+ if(/^(?:retirement-|native-signing-|native-journal-|native-ahe-control|sealing-source-authenticate|recovery-preparation-|test-only-retirement-row-volume)/u.test(phase)&&
+  (context.role!=="creator"||context.transition!==4))return undefined;
  // Static decode/encode sites aggregate per realm, rather than multiplying retention
  // by command ordinal. Other owners retain role/epoch/command attribution;
  // per-operation waterfall remains in the separately bounded original spans.
@@ -128,18 +133,27 @@ type FullFunctionWindow={meta:FullFunctionMeta;begin:number;end?:number;last:num
  rows:Map<number,FullFunctionRow>;live:Set<FullFunctionFrame>;edges:Map<string,number>;
  waits:{id:number;call:number;kind:string;site?:string;begin:number;end:number;milliseconds:number}[];
  observerMilliseconds:number;selfMilliseconds:number;unownedMilliseconds:number;calls:number;
- invalid:string[];waitsTruncated:boolean;edgesTruncated:boolean;manifestSize:number};
+ invalid:string[];waitsTruncated:boolean;edgesTruncated:boolean;manifestSize:number;
+ lastBoundary?:{kind:string;id?:number};unownedIntervals:{begin:number;end:number;milliseconds:number;previous?:{kind:string;id?:number};next?:{kind:string;id?:number}}[];unownedIntervalsTruncated:boolean};
 let fullFunctionWindow:FullFunctionWindow|undefined, fullFunctionLastSnapshot:unknown;
-function fullFunctionAccount(state:FullFunctionWindow,now:number):void {
+// Diagnostic only: prior selected288 has50,336 top-level body entries plus
+// resumptions. This explicit finite scalar interval budget is not a product
+// capacity or a claim about JavaScript heap bytes. Truncation invalidates full
+// attribution, while cumulative time remains available to report the failure.
+const unownedIntervalLimit=100_000;
+// Expanded async-owner297 actually completed22,900 waits; the old20k table
+// truncated. Same explicit diagnostic-only finite scalar interval budget.
+const functionWaitLimit=100_000;
+function fullFunctionAccount(state:FullFunctionWindow,now:number,next?:{kind:string;id?:number}):void {
  const elapsed=now-state.last;
  if(elapsed<0){if(state.invalid.length<32)state.invalid.push("nonmonotone execution clock");return;}
  if(state.current?.row){state.current.row.selfMilliseconds+=elapsed;state.selfMilliseconds+=elapsed;}
- else state.unownedMilliseconds+=elapsed;
+ else {state.unownedMilliseconds+=elapsed;if(elapsed>0){if(state.unownedIntervals.length<unownedIntervalLimit)state.unownedIntervals.push({begin:state.last,end:now,milliseconds:elapsed,previous:state.lastBoundary,next});else state.unownedIntervalsTruncated=true;}}
  state.last=now;
 }
-function fullFunctionMeasured<T>(state:FullFunctionWindow,action:(now:number)=>T):T {
- const now=performance.now();fullFunctionAccount(state,now);
- try{return action(now);}finally{const end=performance.now();state.observerMilliseconds+=end-now;state.last=end;}
+function fullFunctionMeasured<T>(state:FullFunctionWindow,action:(now:number)=>T,boundary?:{kind:string;id?:number}):T {
+ const now=performance.now();fullFunctionAccount(state,now,boundary);
+ try{return action(now);}finally{const end=performance.now();state.observerMilliseconds+=end-now;state.last=end;state.lastBoundary=boundary;}
 }
 function fullFunctionRow(state:FullFunctionWindow,id:number):FullFunctionRow|undefined {
  if(!Number.isSafeInteger(id)||id<0||id>=state.manifestSize){
@@ -168,14 +182,14 @@ function fullFunctionEnter(id:number,lexicalParent?:FullFunctionFrame,flags=0):F
  return fullFunctionMeasured(state,now=>{
   const frame:FullFunctionFrame={id,flags,lexicalParent:lexicalParent?.call};
   fullFunctionAdopt(state,frame,now,true);return frame;
- });
+ },{kind:"enter",id});
 }
 function fullFunctionCloseWait(state:FullFunctionWindow,frame:FullFunctionFrame,now:number):void {
  const wait=frame.waiting;if(!wait)return;const elapsed=now-wait.begin;
  if(frame.row){if(wait.kind==="yield*")frame.row.delegatedMilliseconds+=elapsed;
   else if(wait.kind==="yield")frame.row.yieldMilliseconds+=elapsed;else frame.row.awaitMilliseconds+=elapsed;
   frame.row.resumptions++;}
- if(state.waits.length<spanLimit)state.waits.push({id:frame.id,call:frame.call!,kind:wait.kind,...(wait.site===undefined?{}:{site:wait.site}),begin:wait.begin,end:now,milliseconds:elapsed});
+ if(state.waits.length<functionWaitLimit)state.waits.push({id:frame.id,call:frame.call!,kind:wait.kind,...(wait.site===undefined?{}:{site:wait.site}),begin:wait.begin,end:now,milliseconds:elapsed});
  else state.waitsTruncated=true;
  frame.waiting=undefined;
 }
@@ -186,7 +200,7 @@ function fullFunctionSuspend<T>(frame:FullFunctionFrame|undefined,value:T,kind="
   if(state.current!==frame){if(state.invalid.length<32)state.invalid.push("suspend execution stack mismatch:"+frame.id);}
   else state.current=frame.parent;
   frame.parent=undefined;frame.waiting={begin:now,kind,...(site===undefined?{}:{site})};if(frame.row)frame.row.suspensions++;
- });return value;
+ },{kind:"suspend",id:frame.id});return value;
 }
 function fullFunctionResume<T>(frame:FullFunctionFrame|undefined,value:T):T {
  const state=fullFunctionWindow;if(!frame||!state)return value;
@@ -194,7 +208,7 @@ function fullFunctionResume<T>(frame:FullFunctionFrame|undefined,value:T):T {
   if(frame.state!==state){fullFunctionAdopt(state,frame,now,false);return;}
   if(!frame.waiting)return;
   fullFunctionCloseWait(state,frame,now);frame.parent=state.current;state.current=frame;
- });return value;
+ },{kind:"resume",id:frame.id});return value;
 }
 function fullFunctionResumeOnError(frame:FullFunctionFrame|undefined):void{fullFunctionResume(frame,undefined);}
 function fullFunctionReturned<T>(frame:FullFunctionFrame|undefined,value:T):T {
@@ -217,7 +231,7 @@ function fullFunctionExit(frame:FullFunctionFrame|undefined):void {
   // sites independently measure task waits. This row measures the body, not a
   // fabricated settlement point for an un-awaited returned task.
   if(!frame.failed&&frame.hasReturn&&frame.row)frame.row.selectedReturns++;
- });
+ },{kind:"exit",id:frame.id});
 }
 function fullFunctionSnapshot(state=fullFunctionWindow):unknown {
  if(!state)return fullFunctionLastSnapshot;
@@ -227,23 +241,28 @@ function fullFunctionSnapshot(state=fullFunctionWindow):unknown {
   elapsedMilliseconds:now-state.begin,manifestSize:state.manifestSize,calls:state.calls,
   rows:[...state.rows.values()].map(row=>({...row})),edges:[...state.edges].map(([edge,calls])=>({edge,calls})),waits:[...state.waits],
   openBodies:[...state.live].map(frame=>({id:frame.id,call:frame.call,waiting:frame.waiting,started:frame.started})),
+  currentExecutingBody:state.current===undefined?null:{id:state.current.id,call:state.current.call},waitLimit:functionWaitLimit,
   selfExecutionWallMilliseconds:state.selfMilliseconds,unownedWallMilliseconds:state.unownedMilliseconds,
   observerMilliseconds:state.observerMilliseconds,partitionMilliseconds:partition,reconciliationResidualMilliseconds:now-state.begin-partition,
+  unownedIntervals:[...state.unownedIntervals],unownedIntervalsTruncated:state.unownedIntervalsTruncated,unownedIntervalLimit,
   invalid:[...state.invalid],waitsTruncated:state.waitsTruncated,edgesTruncated:state.edgesTruncated,
   qualification:"Every instrumented body entry/exit and original await/yield boundary; exact body counts, not CPU samples. Self execution is wall time with nested instrumented calls and suspension removed, NOT CPU; includes native builtins, automatic GC and descheduling inside the segment. Await intervals overlap other work and must not be added to self/partition. yield* and for-await are opaque delegated/iterator computation and suspension, not pure waits. observerMilliseconds measures handlers only, not all inserted-call, JIT/deoptimization or instrumentation overhead. Capture-before-entry continuations are separate. Parameter/default evaluation occurs before body entry. Native/unknown thenable settlement is not assimilated. Observation-runtime functions are excluded explicitly. Open bodies, truncation, unknown IDs, stack mismatches and nonzero reconciliation residual invalidate a claim of complete attribution."};
 }
 export function beginFullFunctionWindow(meta:FullFunctionMeta):void {
  if(Reflect.get(globalThis,"__r8FullFunctionCalls")!==true)return;
+ const required=Reflect.get(globalThis,"__r8RequiredFunctionClockScope");
+ if(required!==undefined&&Reflect.get(globalThis,"__r8FunctionClockScope")!==required)throw Error("FUNCTION_CLOCK_BUILD_SCOPE_MISMATCH");
  if(fullFunctionWindow&&JSON.stringify(fullFunctionWindow.meta)!==JSON.stringify(meta))throw Error("FULL_FUNCTION_CAPTURE_OVERLAP");
  const count=Reflect.get(globalThis,"__r8FunctionManifestSize");
  if(!Number.isSafeInteger(count)||count<=0)throw Error("FULL_FUNCTION_PINNED_MANIFEST_MISSING");
  const now=performance.now();fullFunctionWindow={meta:{...meta},begin:now,last:now,rows:new Map(),live:new Set(),edges:new Map(),waits:[],
-  calls:0,observerMilliseconds:0,selfMilliseconds:0,unownedMilliseconds:0,invalid:[],waitsTruncated:false,edgesTruncated:false,manifestSize:count};
+  calls:0,observerMilliseconds:0,selfMilliseconds:0,unownedMilliseconds:0,invalid:[],waitsTruncated:false,edgesTruncated:false,manifestSize:count,
+  unownedIntervals:[],unownedIntervalsTruncated:false,lastBoundary:{kind:"capture-begin"}};
  Reflect.set(globalThis,"__r8FunctionWindowActive",true);
 }
 export function endFullFunctionWindow():unknown {
  const state=fullFunctionWindow;if(!state)return fullFunctionLastSnapshot;
- const now=performance.now();fullFunctionAccount(state,now);state.end=now;
+ const now=performance.now();fullFunctionAccount(state,now,{kind:"capture-end"});state.end=now;
  fullFunctionLastSnapshot=fullFunctionSnapshot(state);fullFunctionWindow=undefined;
  Reflect.set(globalThis,"__r8FunctionWindowActive",false);return fullFunctionLastSnapshot;
 }
@@ -279,10 +298,45 @@ function proofEvent(event: Readonly<Record<string, unknown>>): void {
   else proofEventsTruncated = true;
   proofObserverMilliseconds += performance.now() - start;
 }
+// Diagnostic-only: inspect the guard's already visited set, not another graph
+// walk. Keep no inputs/references and never read a caller's accessor or bytes.
+export function ordinaryIntegrityShape(value: unknown, supported: boolean, visited: ReadonlySet<object>): Readonly<Record<string, unknown>> | undefined {
+  const descriptor=(object:unknown,key:PropertyKey)=>object!==null&&typeof object==="object"?Object.getOwnPropertyDescriptor(object,key):undefined;
+  const kind=(field:PropertyDescriptor|undefined)=>field===undefined?"absent":"value" in field?"data":"accessor";
+  const fields=["current","scope","history","bootstrap","source"].map(key=>descriptor(value,key));
+  if(!fields.every(field=>field!==undefined&&"value" in field))return undefined;
+  if(visited.size>65_536)return {kind:"dimension-integrity-shape",diagnosticFailure:"original-visited-bound-exceeded"};
+  const bootstrap=fields[3]!.value,source=fields[4]!.value,sourceBootstrap=descriptor(source,"bootstrap");
+  const prototype=Uint8Array.prototype,typedPrototype=Object.getPrototypeOf(prototype);
+  const intrinsic=Object.getOwnPropertyDescriptor(typedPrototype,"byteLength")?.get;
+  let byteLeaves=0,ownDataLengths=0,ownAccessorLengths=0,ownDataMatchesIntrinsic=0,lastVisitedKind="none";
+  let lastByte:Readonly<Record<string,unknown>>|undefined;
+  for(const item of visited){
+    lastVisitedKind="object";
+    if(!(item instanceof Uint8Array))continue;
+    lastVisitedKind="bytes";byteLeaves++;
+    const own=descriptor(item,"byteLength");let intrinsicLength:number|undefined;
+    try {if(intrinsic!==undefined)intrinsicLength=Reflect.apply(intrinsic,item,[]) as number;}catch{/* scalar diagnostic only */}
+    if(own!==undefined&&"value" in own){ownDataLengths++;if(own.value===intrinsicLength)ownDataMatchesIntrinsic++;}
+    else if(own!==undefined)ownAccessorLengths++;
+    lastByte={ownByteLength:kind(own),ownValueType:own!==undefined&&"value" in own?typeof own.value:"none",
+      ownDataMatchesIntrinsic:own!==undefined&&"value" in own&&intrinsicLength!==undefined&&own.value===intrinsicLength,
+      intrinsicLengthAvailable:intrinsicLength!==undefined,prototypeSame:Object.getPrototypeOf(item)===prototype,
+      ownIteratorAbsent:descriptor(item,Symbol.iterator)===undefined,prototypeByteLengthAbsent:descriptor(prototype,"byteLength")===undefined,
+      bootstrapReference:item===bootstrap,sourceBootstrapReference:sourceBootstrap!==undefined&&"value" in sourceBootstrap&&item===sourceBootstrap.value,
+      configurable:own?.configurable??null,enumerable:own?.enumerable??null,writable:own!==undefined&&"value" in own?own.writable??false:null};
+  }
+  return {kind:"dimension-integrity-shape",supported,contextHasBootstrapField:true,sourceBootstrapDescriptor:kind(sourceBootstrap),
+    visitedObjects:visited.size,byteLeaves,ownDataLengths,ownAccessorLengths,ownDataMatchesIntrinsic,lastVisitedKind,lastByte:lastByte??null};
+}
 Object.assign(globalThis, {
   __warmProofOwner: () => ++proofOwner,
   __warmProofEvent: proofEvent,
   __warmBindProofOwner: (owner: object, id: number) => proofOwnerIds.set(owner, id),
   __warmProofIdentity: (owner: object) => proofOwnerIds.get(owner),
+  __warmDimensionIntegrityShape:(value:unknown,supported:boolean,visited:ReadonlySet<object>)=>{
+    if(context.role!=="creator"||context.transition!==4)return;
+    observeMetric("test-only-dimension-integrity-shape",()=>{try{const event=ordinaryIntegrityShape(value,supported,visited);if(event)proofEvent(event);}catch{proofEvent({kind:"dimension-integrity-shape",diagnosticFailure:"shape-inspection-threw"});}});
+  },
 });
 

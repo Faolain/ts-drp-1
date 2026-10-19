@@ -14,14 +14,14 @@ if (declaration === undefined) throw Error("FULL_CALL_ORIGINAL_TRANSFORM_MISSING
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 const instrument = new Function("ts", "TraceMap", "originalPositionFor", "hash", "Buffer",
 	`${ts.transpile(declaration.getText(ast), {target: ts.ScriptTarget.ES2022})};return instrumentFullFunctionBundle;`)
-	(ts, TraceMap, originalPositionFor, hash, Buffer) as (value: string, clockedOwners?: boolean) => {code: string; manifest: any};
+	(ts, TraceMap, originalPositionFor, hash, Buffer) as (value: string, clockedOwners?: boolean, retirementScope?: boolean) => {code: string; manifest: any};
 function source(code: string, path = "tests/product.js") {
 	const map = {version: 3, sources: [path], sourcesContent: [code], names: [],
 		mappings: code.split("\n").map((_, index) => index === 0 ? "AAAA" : "AACA").join(";")};
 	return `${code}\n//# sourceMappingURL=data:application/json;base64,${Buffer.from(JSON.stringify(map)).toString("base64")}`;
 }
 function fixture(code: string, names: string[], bindings: Record<string, unknown> = {}, active = true,
-	clockedOwners = false, path = "tests/product.js") {
+	clockedOwners = false, path = "tests/product.js", retirementScope = false) {
 	const events: any[] = [];
 	const global: any = {__r8FunctionWindowActive: active, __r8FunctionEnter: (id: number, parent: unknown, flags: number) => {
 		const token = {id, parent, flags}; events.push(["enter", token]); return token;
@@ -30,13 +30,40 @@ function fixture(code: string, names: string[], bindings: Record<string, unknown
 		global[`__r8Function${kind}`] = (token: unknown, value: unknown, detail?: unknown) => {events.push([kind, token, value, detail]); return value;};
 	for (const kind of ["ResumeOnError", "Thrown", "Exit"])
 		global[`__r8Function${kind}`] = (...args: unknown[]) => events.push([kind, ...args]);
-	const result = instrument(source(code, path), clockedOwners);
+	const result = instrument(source(code, path), clockedOwners, retirementScope);
 	const compiled = new Function("globalThis", ...Object.keys(bindings), `${result.code}\nreturn {${names.join(",")}};`)
 		(global, ...Object.values(bindings));
 	return {result, compiled, events, global};
 }
 
 describe("full bundle function instrumentation semantics", () => {
+	it("selectively clocks original owners and callbacks inside omitted parents without clocking unrelated helpers", async () => {
+		const f=fixture(`
+function unrelated(v){return v+1;}
+function container(){return async function authenticate(v){const local=()=>unrelated(v);await Promise.resolve();return local();};}
+`,["container","unrelated"],{},true,false,"packages/node/src/internal/creator-closed-rollback-data.ts",true);
+		expect(await f.compiled.container()(6)).toBe(7);expect(f.compiled.unrelated(1)).toBe(2);
+		const selected=f.result.manifest.functions.filter((row:any)=>!row.scopeOmitted&&!row.excluded);
+		expect(selected.map((row:any)=>row.name)).toEqual(["authenticate","local"]);
+		expect(f.result.manifest.scopeOmittedFunctions).toBe(2);
+		expect(f.result.manifest.vmCountOnlyFunctions).toBe(0);
+		expect(f.result.manifest.coverageMode).toBe("selected-retirement-owner-wall-clocks-no-vm-count-claim");
+		expect(f.events.filter(e=>e[0]==="enter").map(e=>e[1].id)).toEqual(selected.map((row:any)=>row.id));
+		expect(f.events.filter(e=>e[0]==="Suspend")).toHaveLength(1);
+		expect(f.global.__r8FunctionClockScope).toBe("retirement");
+	});
+	it("refuses a selected-clock build without an original source-bound root",()=>{
+		expect(()=>instrument(source("function authenticate(){return 1;}","tests/foreign.js"),false,true)).toThrow("RETIREMENT_CLOCK_ROOTS_MISSING");
+	});
+	it("clocks omitted asynchronous recovery and native continuations with their callbacks, not arbitrary codec leaves",async()=>{
+		const source= `async function openSource(){await Promise.resolve();return (()=>7)();} function codecLeaf(){return 2;}`;
+		for(const path of ["packages/node/src/internal/creator-transition-advance.ts","packages/storage-browser/src/internal/idb-adapter.ts"]){
+			const f=fixture(source,["openSource","codecLeaf"],{},true,false,path,true);
+			expect(await f.compiled.openSource()).toBe(7);expect(f.compiled.codecLeaf()).toBe(2);
+			expect(f.result.manifest.functions.filter((r:any)=>!r.excluded&&!r.scopeOmitted).map((r:any)=>r.name)).toHaveLength(2);
+			expect(f.result.manifest.functions.find((r:any)=>r.name==="codecLeaf").scopeOmitted).toBe(true);
+		}
+	});
 	it("keeps every function in VM coverage while explicitly making only syntax-checked hash arithmetic leaves count-only", () => {
 		const code = `
 function rotr(a,b){return a << (32-b) | a >>> b;}

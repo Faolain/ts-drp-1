@@ -28,8 +28,10 @@ import {
 } from "@ts-drp/node/creator-adoption-stage";
 import {
 	bindCreatorLiveClose,
+	maintainCreatorRecoveryPool,
 	prepareCreatorOrdinaryReadiness,
 	type BindCreatorLiveCloseInput,
+	type CreatorRecoveryPoolResult,
 	type CreatorLiveCloseHandle,
 	type CreatorLiveCloseResult,
 	type CreatorLiveCloseStatus,
@@ -546,6 +548,13 @@ export interface V3RoomSession<Projection extends V3RoomProjectionAuthority = V3
 	previewLatchedAcl(): Readonly<Record<string, unknown>>;
 	projection(): Projection;
 	rehearseMigration(input: V3RoomMigrationRehearsalInput): Promise<V3RoomMigrationRehearsalReceipt>;
+	/**
+	 * Optional early bounded-recovery turnover at a caller-chosen lull (soft
+	 * watermark). New local issues wait for it; it needs a quiescent room (no
+	 * pending or arriving remote ingress) and otherwise reports `deferred`. The
+	 * next seal keeps its original inline maintenance as the hard-cap backstop.
+	 */
+	maintainRecoveryPool(): Promise<CreatorRecoveryPoolResult>;
 	sealEpoch(): Promise<CreatorLiveCloseResult>;
 	status(): CreatorLiveCloseStatus;
 }
@@ -4036,6 +4045,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	let migrationAcceptingFollowers = false;
 	let migrationRehearsalReserved = false;
 	let lifetimeTransitionTail: Promise<void> = Promise.resolve();
+	// Holds new local issues while an explicit recovery-pool boundary owns the plane.
+	let poolMaintenanceBarrier: Promise<void> | undefined;
 	type LifetimeDispatchResult<Result> = Readonly<{ readonly result: Result | Promise<Result> }>;
 	const enqueueLifetimeTransition = <Result>(transition: () => Promise<Result>): Promise<Result> => {
 		const dispatch = (): Promise<Result> => {
@@ -6875,6 +6886,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					await rebasePromise;
 					assertSettlementUnheld();
 					await (joinsMigration ? priorMigrationBarrier : priorMigrationCompletion);
+					while (poolMaintenanceBarrier !== undefined) await poolMaintenanceBarrier;
 					if (terminalFailure !== undefined) throw terminalFailure;
 					if (closed) throw new TypeError("v3 room session is closed");
 					if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
@@ -6949,6 +6961,30 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		},
 		rehearseMigration,
 		promoteCreatorCheckpoint,
+		maintainRecoveryPool(): Promise<CreatorRecoveryPoolResult> {
+			if (input.receiveOnly) return Promise.resolve(Object.freeze({kind: "deferred", reason: "unsupported"}));
+			return enqueueLifetimeTransition(async (): Promise<CreatorRecoveryPoolResult> => {
+				if (redirectPromise !== undefined) await redirectPromise;
+				if (redirectedSession !== undefined) return redirectedSession.maintainRecoveryPool();
+				assertSessionOpen();
+				if (creatorCloseHandle === undefined) return Object.freeze({kind: "deferred", reason: "unsupported"});
+				await rebasePromise;
+				await migrationCompletionBarrier;
+				let open!: () => void;
+				const barrier = new Promise<void>((resolve) => { open = resolve; });
+				poolMaintenanceBarrier = barrier;
+				try {
+					await drainPendingIssues();
+					assertSessionOpen();
+					const plane = activeHandle;
+					if (plane === undefined) return Object.freeze({kind: "deferred", reason: "unsupported"});
+					return await maintainCreatorRecoveryPool(plane);
+				} finally {
+					if (poolMaintenanceBarrier === barrier) poolMaintenanceBarrier = undefined;
+					open();
+				}
+			});
+		},
 		sealEpoch(): Promise<CreatorLiveCloseResult> {
 			if (input.receiveOnly) return Promise.reject(new TypeError("v3 room is receive-only"));
 			return enqueueLifetimeTransition(async () => {

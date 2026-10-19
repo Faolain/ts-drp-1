@@ -102,10 +102,15 @@ class HeldReadView {
 		try {
 			const request = this.#store.getKey("");
 			request.addEventListener("success", () => {
-				if (this.#running) this.#pump(); // enqueue while native transaction is active
 				this.#inTurn = true;
 				try { for (const job of this.#queued.splice(0)) job.start(); }
 				finally { this.#inTurn = false; }
+				// Real work admitted on this native turn queues its requests first.
+				// Put the next sentinel behind those requests, not in front of them:
+				// otherwise each real read also services a needless sentinel before
+				// its result can arrive. This is still synchronous in the original
+				// active native handler; no timer or Promise stands in for exclusion.
+				if (this.#running) this.#pump();
 				resolve?.();
 			}, { once: true });
 			request.addEventListener("error", () => {

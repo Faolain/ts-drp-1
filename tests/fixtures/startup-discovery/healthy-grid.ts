@@ -149,7 +149,12 @@ window.addEventListener("message",event=>{
     if(typeof fullBoundary==="function"){
      const exactCriticalEnd=structuredClone(Reflect.get(globalThis,"__r8CriticalSnapshot")?.());
      fullSnapshot=endFullFunctionWindow();
-     try{await fullBoundary("end",{...fullMeta,apiBegin:start.begin,apiEnd,
+     // A tiny control packet stops trace production BEFORE serializing the
+     // large exact counter/wait/gap tables across the exposed-function bridge.
+     // Both original API and body clocks have already ended. Export stays out
+     // of product time; this never releases or mutates a product/native owner.
+     try{await fullBoundary("trace-stop",{...fullMeta,apiBegin:start.begin,apiEnd});
+      await fullBoundary("end",{...fullMeta,apiBegin:start.begin,apiEnd,
       exactCriticalCounters:{begin:exactCriticalBegin,end:exactCriticalEnd,
        qualification:"Detached existing bounded counter snapshots outside the original API timer. Subtract matching keys; context fields on static codec rows remain first-entry labels. Counts include actual concurrent work in this realm, not proof of asynchronous causality."}},fullSnapshot);}
      catch(error){Reflect.set(globalThis,"__r8FullFunctionCaptureEndFailure",String(error));
@@ -269,6 +274,7 @@ window.addEventListener("message",event=>{
     }
     return {...value,databases};
    });
+   case "maintain":return product("pool-maintenance-lull",()=>role.session.maintainRecoveryPool());
    case "seal":return product("sealing-inclusive",()=>role.session.sealEpoch());
    case "export":return product("successor-export",()=>role.session.exportCreatorSuccessor());
    case "snapshot":return product("test-only-exact-snapshot-bytes",()=>role.snapshotBytes(args.offer,args.epoch));
@@ -436,7 +442,10 @@ export async function runHealthyGrid(identity:string,origins:readonly string[],r
    for(let index=1;index<4;index++){phase="recipient-install-"+epoch+":"+index;await rpc(index,"install",{offer,peers:[ids[0]]});}
    epoch=closed.successorEpoch;phase="settlement-cleanup-"+epoch;
    await Promise.all(active.map(role=>rpc(role.index,"history")));await world();await measure("adopted-"+epoch);
-   transitions.push({closedEpoch:closed.epoch,successorEpoch:closed.successorEpoch,sessionRecreations:0,fixtureDatabaseCopies:0});
+   // Opt-in idle lull after the measured rollover: creator pool maintenance only.
+   const poolMaintenance=Reflect.get(globalThis,"__rdPoolMaintenanceLull")===true?(phase="pool-maintenance-"+epoch,await rpc(0,"maintain")):undefined;
+   transitions.push({closedEpoch:closed.epoch,successorEpoch:closed.successorEpoch,sessionRecreations:0,fixtureDatabaseCopies:0,
+    ...(poolMaintenance===undefined?{}:{poolMaintenance})});
   }
   const expectedReopenWorld=await world();
   phase="persisted-close";await close();

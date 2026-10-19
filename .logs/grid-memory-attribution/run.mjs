@@ -24,6 +24,12 @@ sources.push('tests/grid-memory-storage-lineage.test.ts', 'tests/grid-memory-sna
 sources.push('tests/grid-memory-startup-barrier.test.ts', 'tests/grid-memory-boundary-prefix.test.ts', '.logs/grid-memory-attribution/completed100-room-baseline.ts');
 sources.push('tests/grid-memory-async-assertion-retention.test.ts', 'tests/fixtures/grid-expected-publication-failure.ts');
 sources.push('tests/grid-memory-terminal-readiness.test.ts');
+sources.push('tests/grid-memory-allocation-tracking.test.ts', 'tests/grid-memory-allocation-smoke.test.ts', 'tests/fixtures/grid-heap-complement.mts', 'tests/fixtures/grid-heap-complement-control.mts', 'tests/fixtures/grid-heap-allocation-traces.mts', 'specs/grid-memory-attribution/slices/04-residual-provenance.md');
+sources.push('tests/grid-memory-allocation-sampling.test.ts', 'tests/grid-memory-sampling-smoke.test.ts');
+sources.push('tests/grid-memory-growth-horizon.test.ts', 'tests/grid-memory-growth-entry.test.ts', 'specs/grid-memory-attribution/slices/05-growth-horizon.md');
+sources.push('tests/grid-memory-growth-smoke.test.ts');
+sources.push('packages/storage-browser/tests/grid-memory-production.pw.ts', 'packages/storage-browser/tests/fixtures/product-browser-server.ts', 'packages/storage-browser/playwright.grid-memory-production.config.ts', 'packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts', 'packages/storage-browser/tests/assets/phase-4c-b-snapshot-quarantine-entry.ts', 'packages/storage-browser/tests/phase-4c-b-snapshot-quarantine-red.pw.ts', 'packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts', 'specs/grid-memory-production/README.md');
+sources.push('specs/grid-memory-production/lifecycle-audit.md', 'specs/grid-memory-production/review.md');
 sources.push(...args.filter(arg => arg.endsWith('.test.ts') && fs.existsSync(path.join(root, arg))));
 const custody = () => collectGridSourceHashes(root, sources);
 const before = custody();

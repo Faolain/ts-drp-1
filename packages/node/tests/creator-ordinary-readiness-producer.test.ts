@@ -429,6 +429,11 @@ function readinessMaintenanceBoundary() {
 			}) as Promise<void>,
 		runRaw: (consume: (seal: () => Promise<object>, requireClosedWorkflowCompletion: boolean) => Promise<unknown>) =>
 			run(registration, plane, snapshots, consume) as Promise<void>,
+		// Opt-in pool boundary: identical body, but a pre-entry miss yields.
+		runDeferrable: (consume: (seal: () => Promise<object>, requireClosedWorkflowCompletion: boolean) => Promise<void>) =>
+			run(registration, plane, snapshots, async (seal: () => Promise<object>, strict: boolean) => {
+				state.completionModes.push(strict); await consume(seal, strict); return "complete";
+			}, {deferrable: true}) as Promise<"ran" | "deferred">,
 		completedResume: (withSnapshotRequest = false) => {
 			registration.operationAdmissionHalted = true;
 			if (withSnapshotRequest) registration.retirementReconstruction = {head: {...registration.payload.trust.head},
@@ -520,6 +525,51 @@ describe("quiescent readiness maintenance through the original queue", () => {
 			expect(f.registration.operationAdmissionHalted).toBe(true);
 			expect(f.registration.blueprintClosing).toBe(true);
 		}
+	});
+
+	it("lets an opt-in pool boundary yield before entry without enqueuing, freezing or halting", async () => {
+		for (const change of [
+			(f: ReturnType<typeof readinessMaintenanceBoundary>) => {f.state.current = false;},
+			(f: ReturnType<typeof readinessMaintenanceBoundary>) => {f.registration.blueprintClosing = true;},
+			(f: ReturnType<typeof readinessMaintenanceBoundary>) => {f.registration.pendingIngress.set("pending", {});},
+			(f: ReturnType<typeof readinessMaintenanceBoundary>) => {f.registration.rebaseCursor = 0;},
+		]) {
+			const f = readinessMaintenanceBoundary(); change(f);
+			await expect(f.runDeferrable(async () => {throw Error("must not enter");})).resolves.toBe("deferred");
+			expect(f.calls).toEqual([]); expect(f.registration.operationAdmissionHalted).not.toBe(true);
+		}
+	});
+
+	it("defers a queued opt-in boundary changed before entry, while the original boundary still halts", async () => {
+		for (const deferrable of [true, false]) for (const change of [
+			(f: ReturnType<typeof readinessMaintenanceBoundary>) => {f.registration.pendingIngress.set("late", {});},
+			(f: ReturnType<typeof readinessMaintenanceBoundary>) => {f.registration.rebaseCursor = 0;},
+			(f: ReturnType<typeof readinessMaintenanceBoundary>) => {f.trust.currentEpoch = 4;},
+		]) {
+			const f = readinessMaintenanceBoundary(); let enter!: () => void;
+			f.state.predecessor = new Promise<void>(resolve => {enter = resolve;});
+			const consume = async () => {throw Error("must not enter");};
+			const task = deferrable ? f.runDeferrable(consume) : f.run(consume);
+			change(f); enter();
+			if (deferrable) await expect(task).resolves.toBe("deferred");
+			else await expect(task).rejects.toThrow("changed before entry");
+			expect(f.calls).toEqual(["enqueue"]); expect(f.registration.blueprintClosing).toBe(false);
+			expect(f.registration.operationAdmissionHalted === true).toBe(!deferrable);
+			// A deferred boundary is spent: it cannot be revived by restoring state.
+			if (deferrable) expect(f.state.completionModes).toEqual([]);
+		}
+	});
+
+	it("never defers after entry: an opt-in boundary keeps the original revoke, join and halt", async () => {
+		const ran = readinessMaintenanceBoundary();
+		await expect(ran.runDeferrable(async seal => {await seal();})).resolves.toBe("ran");
+		expect(ran.calls).toEqual(["enqueue", "seal", "release"]);
+		expect(ran.registration.blueprintClosing).toBe(false); expect(ran.registration.operationAdmissionHalted).not.toBe(true);
+		const f = readinessMaintenanceBoundary();
+		await expect(f.runDeferrable(async seal => {await seal(); f.registration.pendingIngress.set("late", {}); await seal();}))
+			.rejects.toThrow();
+		expect(f.calls).toEqual(["enqueue", "seal", "release"]);
+		expect(f.registration.operationAdmissionHalted).toBe(true); expect(f.registration.blueprintClosing).toBe(true);
 	});
 
 	it("does not release admission before failed consumer work joins and never clears a failed-join halt", async () => {
@@ -1437,6 +1487,18 @@ describe("original joined readiness job metadata ordering", () => {
 			expect(f.calls).toEqual(["generations", "retirement", "snapshots", "boundary", "generations", "reconcile", "seal", "boundary-joined",
 				"metadata", "metadata-joined", "capture"]);
 			expect(f.ready()).toBe(true); expect(f.jobs.size).toBe(0);
+		}
+	});
+	it("discharges unfinished recovery through original maintenance without a finishing window", async () => {
+		// E.g. a durable reopen after an early pool turnover at this same epoch.
+		const f = closeReadinessJob({epoch: 4, completedRecovery: true}); await f.run();
+		expect(f.calls).toEqual(["generations", "retirement", "snapshots", "boundary", "generations", "reconcile", "seal", "boundary-joined",
+			"metadata", "metadata-joined", "capture"]);
+		expect(f.completionModes).toEqual([true]); expect(f.ready()).toBe(true); expect(f.jobs.size).toBe(0);
+		// Pool pressure alone, or an epoch below the retirement floor, keeps the original no-window path.
+		for (const options of [{epoch: 4, recoveryScopes: 4}, {epoch: 4, generationCount: 6}, {epoch: 2, recoveryRequired: true}]) {
+			const unchanged = closeReadinessJob(options); await unchanged.run();
+			expect(unchanged.calls).toEqual(["metadata", "metadata-joined", "capture"]);
 		}
 	});
 	it("allows native pool pressure only through a complete certified CURRENT-and-finishing window", async () => {

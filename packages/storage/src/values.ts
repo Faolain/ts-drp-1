@@ -27,8 +27,14 @@ function invalid<T>(): ParseResult<T> {
 	return { ok: false, reason: "INVALID_ARGUMENT" };
 }
 
+const HEX_BYTES = Array.from({ length: 256 }, (_, byte) => byte.toString(16).padStart(2, "0"));
+
+// Only fresh hashDomain outputs reach this, so plain indexed reads equal the
+// iterator; a table lookup avoids a closure call and array join per byte.
 function hex(bytes: Uint8Array): string {
-	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+	let text = "";
+	for (let index = 0; index < bytes.length; index++) text += HEX_BYTES[bytes[index]!]!;
+	return text;
 }
 
 /**
@@ -96,7 +102,32 @@ export function digestBlob(bytes: Uint8Array): ParseResult<BlobDigest> {
 export function digestClosure(closure: readonly GenerationRef[]): ParseResult<ClosureDigest> {
 	const copied = copyClosure(closure);
 	if (copied === undefined) return invalid();
-	return ok(hex(hashDomain("ts-drp-storage/closure/v1", encodeCanonical(copied))) as ClosureDigest);
+	const key = closureMemoKey(copied);
+	let digest = key === undefined ? undefined : closureDigests.get(key);
+	if (digest === undefined) {
+		digest = hex(hashDomain("ts-drp-storage/closure/v1", encodeCanonical(copied))) as ClosureDigest;
+		if (key !== undefined) {
+			if (closureDigests.size >= CLOSURE_MEMO_ENTRIES) closureDigests.delete(closureDigests.keys().next().value!);
+			closureDigests.set(key, digest);
+		}
+	}
+	return ok(digest);
+}
+
+const CLOSURE_MEMO_ENTRIES = 4096,
+	CLOSURE_MEMO_REFERENCES = 64;
+const closureDigests = new Map<string, ClosureDigest>();
+
+// A copied closure is sorted {64-hex digest, safe integer} pairs, so this
+// spelling is injective; -0 is left to the original encoder's own outcome.
+function closureMemoKey(closure: readonly GenerationRef[]): string | undefined {
+	if (closure.length > CLOSURE_MEMO_REFERENCES) return undefined;
+	let key = "";
+	for (const ref of closure) {
+		if (Object.is(ref.byteLength, -0)) return undefined;
+		key += `${ref.digest}${ref.byteLength},`;
+	}
+	return key;
 }
 
 /**

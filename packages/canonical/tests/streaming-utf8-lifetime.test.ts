@@ -25,15 +25,17 @@ describe("bounded streaming UTF-8 lifetime", () => {
 	});
 	it("does not share an entered converter with a reentrant decode", () => {
 		const native = TextDecoder.prototype.decode;
+		const nested = "ü".repeat(3000);
 		let entered = false;
+		// Reenter while the outer decode is active, before its native conversion.
 		const hook = vi.spyOn(TextDecoder.prototype, "decode").mockImplementation(function (
 			this: TextDecoder,
 			input,
 			options
 		) {
-			if (!entered && options?.stream && input instanceof Uint8Array && input[0] === 0x9f) {
+			if (!entered && input instanceof Uint8Array && input.byteLength > 4096) {
 				entered = true;
-				expect(decodeCanonical(encodeCanonical("nested"))).toBe("nested");
+				expect(decodeCanonical(encodeCanonical(nested))).toBe(nested);
 			}
 			return Reflect.apply(native, this, [input, options]);
 		});

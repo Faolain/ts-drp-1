@@ -44,6 +44,7 @@ import type {
 	LiveJournalSnapshotToken,
 } from "@ts-drp/live-journal";
 import {
+	captureLiveJournalSignedAnchorReadObservation,
 	advanceJournalRetirementMutationControl,
 	encodeJournalRetirementControl,
 	encodeJournalRetirementNativeCarriers,
@@ -113,6 +114,7 @@ import {
 	type SigningEvidenceRetirementPlan,
 	type SigningRetirementControl,
 	signingRetirementDataDigest,
+	resolveCapturedSigningRetirementDataImage,
 	signingRetirementFrameDigest,
 	signingRetirementMetadataFields,
 	signingRetirementDrainFields,
@@ -862,6 +864,18 @@ interface CapturedSnapshot extends Omit<CreatorClosedRollbackDataInput, "store" 
 	/** Private verification-only context. Public input capture never accepts it;
 	 * it grants neither normal observation resolution nor retirement/delivery. */
 	readonly classificationRead?: SnapshotRecoveryRoleInventory;
+	/** Original maintenance inventory DATA, never native custody. Public capture
+	 * cannot supply this field. The original six-carrier observation owns its
+	 * accounting, including every fresh qualification of the same carrier. */
+	readonly snapshotPreparation?: Readonly<{
+		inventory: SnapshotRecoveryRoleInventory;
+		read: NonNullable<SnapshotRecoveryStore<SnapshotVerificationReceipt>["captureRecoveryRoleInventory"]>;
+		/** Reconciliation retains the complete inventory carrier including any
+		 * explicit legacy vector; issuance keeps its original six-carrier shape. */
+		inventoryCarrier?: "complete";
+		/** References to the SAME serially prepared targets, not copied payloads. */
+		targets?: HeldTarget[];
+	}>;
 	readonly floorRead: CreatorRollbackFloorReader["read"];
 	readonly lookup: CreatorClosedRollbackDataInput["snapshotStore"]["lookupRecoveryDeclaration"];
 	readonly snapshotAcquire: CreatorClosedRollbackDataInput["snapshotStore"]["acquireRecoveryRead"];
@@ -1054,8 +1068,8 @@ function anchorOf(trustRecord: Readonly<Record<string, unknown>>, syntax?: Retur
  * Clear after all acquisition work and failed cleanup joins, before delivery:
  * deferred currency closures then use the original uncached parsing path. */
 function createCreatorClosedAcquisitionSyntax() {
-	let syntax: ReturnType<typeof createCreatorCanonicalSyntaxReader> | undefined = createCreatorCanonicalSyntaxReader();
 	const recoveryEvidence = createCreatorSnapshotRecoveryEvidenceJob();
+	let syntax: ReturnType<typeof createCreatorCanonicalSyntaxReader> | undefined = recoveryEvidence.syntax;
 	return Object.freeze({
 		record: (bytes: Uint8Array) => record(bytes, syntax),
 		canonicalSelection: (bytes: Uint8Array) => syntax === undefined ? canonicalCreatorDataRecord(bytes) : syntax.canonicalSelection(bytes),
@@ -1107,6 +1121,8 @@ interface ImportFrame {
 	/** Original native journal exclusion, retained until every admitted header consumer joins. */
 	headerHold?: NativeReadReservation;
 	headerConsumersRevoked?: boolean;
+	/** One-boundary claim that the complete ordinary check which just ended is still current. */
+	adjacentCheck?: CreatorOrdinaryAdjacentCheck;
 	/** Temporary destination mutation ownership; terminal revocation is separate. */
 	headerMutation?: CapturedImport;
 	/** Original held maintenance facts, never caller-provided future authority. */
@@ -1149,9 +1165,80 @@ interface ImportFrame {
 		scopes: readonly SnapshotQuarantineScopeKey[];
 	}>;
 }
+/** Non-authoritative bookkeeping for exactly one acquisition. No observation,
+ * native source capability or ImportFrame is registered until this complete
+ * DATA result has passed the final original-custody qualification boundary. */
+interface CreatorClosedProofWork {
+	alive: false;
+	readonly headerScopes: Map<string, LiveJournalScope>;
+	headerHold?: NativeReadReservation;
+	readonly input: Captured;
+	readonly reader: SourceReader;
+	readonly accounting: CreatorClosedRollbackProofAccounting;
+	readonly pending: Set<Promise<unknown>>;
+	readonly requirements: Set<ClosedAclAnchorRequirement>;
+	readonly recoveryTrusts: Set<CurrentAnchorTrust>;
+	readonly signingRoleTrusts: Set<CurrentAnchorTrust>;
+	authenticatedExcludedGenerations?: readonly GenerationRecord[];
+	nominationControl?: AheRetirementControl;
+	retiredReadback?: ImportFrame["retiredReadback"];
+}
+/** Method-free proof input. Detached preparation cannot carry a native reader,
+ * a release/check port, a paid book, or an admitted source capability. */
+type CreatorClosedSourceEvidence = Pick<AheBoundedRecoveryRoleRead, "head" | "generations" | "blobs">;
 type SourceReader = (AheBoundedActiveRead | AheBoundedRecoveryRoleRead) & { readonly head: PresentHead };
+
+/** Private provenance from the successful FULL native acquisition below.
+ * A head/shape match cannot enroll an active/subset reader in this route. */
+type CreatorClosedFullRecoverySource = Readonly<{
+	kind: "full-recovery-role-acquisition";
+	owner: Captured["store"];
+	objectId: string;
+	limits: typeof AHE_BOUNDED_READ_LIMITS;
+	reader: AheBoundedRecoveryRoleRead;
+}>;
+type CreatorClosedRecoveryCertificateBorrow = Readonly<{
+	kind: "parent-full-recovery-role-reader";
+	source: CreatorClosedFullRecoverySource;
+	parent: CreatorClosedProofWork;
+}>;
+
 const frames = new WeakMap<SourceReader, ImportFrame>();
 const ledgers = new WeakMap<CreatorClosedRollbackProofLedger, ImportFrame>();
+const proofWorks = new WeakMap<SourceReader, CreatorClosedProofWork>();
+const proofWorkLedgers = new WeakMap<CreatorClosedRollbackProofLedger, CreatorClosedProofWork>();
+function creatorClosedProofWork(reader: SourceReader): ImportFrame | CreatorClosedProofWork | undefined {
+	return frames.get(reader) ?? proofWorks.get(reader);
+}
+function creatorClosedProofLedgerWork(ledger: CreatorClosedRollbackProofLedger): ImportFrame | CreatorClosedProofWork | undefined {
+	return ledgers.get(ledger) ?? proofWorkLedgers.get(ledger);
+}
+function creatorClosedProofWorkAvailable(work: ImportFrame | CreatorClosedProofWork): boolean {
+	return work.alive || proofWorks.get(work.reader) === work && proofWorkLedgers.get(work.accounting) === work;
+}
+/** DATA-stage admission only. Never returned as native currency and never
+ * consulted by a retained check/effect method. Every deferred logical reader
+ * still qualifies through its original actual currency method under NEW holds. */
+function creatorClosedProofPreparingNativeData(accounting: CreatorClosedRollbackProofAccounting): boolean {
+	const work = proofWorkLedgers.get(accounting);
+	return work !== undefined && sourceHeaderSessions.get(work.input)?.image !== undefined;
+}
+function activateCreatorClosedProofWork(reader: SourceReader): ImportFrame {
+	const work = proofWorks.get(reader);
+	requireLaw(work !== undefined && creatorClosedProofWorkAvailable(work) && !frames.has(reader), "internal-invariant");
+	const frame: ImportFrame = { ...work, alive: true };
+	// Requirements were private proof ingredients, not live source grants.
+	// Bind their original exact DATA only to this NEW qualified authority frame.
+	for (const requirement of work.requirements) {
+		const facts = preparedRequirements.get(requirement);
+		requireLaw(facts !== undefined && facts.frame === work, "internal-invariant");
+		requirements.set(requirement, Object.freeze({...facts, frame}));
+		preparedRequirements.delete(requirement);
+	}
+	proofWorks.delete(reader); proofWorkLedgers.delete(work.accounting);
+	frames.set(reader, frame); ledgers.set(frame.accounting, frame);
+	return frame;
+}
 
 // Borrowing is possible only from a hold minted here over the exact original
 // native receiver. A local boolean, a scope list, or copied methods is not custody.
@@ -1159,15 +1246,62 @@ const journalHeaderHolds = new WeakMap<NativeReadReservation, {
 	owner: DurableLiveJournalStore; original: NativeReadReservation; references: number;
 }>();
 const sourceHeaderSessions = new WeakMap<Captured, {
-	hold: NativeReadReservation; scopes: Map<string, LiveJournalScope>;
+	hold?: NativeReadReservation; image?: LiveJournalRetirementImageObservation; scopes: Map<string, LiveJournalScope>;
 	accounting?: CreatorClosedRollbackProofAccounting;
 }>();
+
+/** Pure projection through the SAME signed-envelope validator used by native
+ * readers. No header point-read, native check or reservation is manufactured. */
+function readPreparedSourceEnvelope(image: LiveJournalRetirementImageObservation,
+	request: Parameters<DurableLiveJournalStore["readSignedAnchorEnvelope"]>[0],
+	accounting?: CreatorClosedRollbackProofAccounting): Awaited<ReturnType<DurableLiveJournalStore["readSignedAnchorEnvelope"]>> {
+	const select = (rows: readonly Uint8Array[]): Record<string, unknown>[] => rows.flatMap(bytes => {
+		const frame = decodeCanonical(bytes) as [string, unknown[], Record<string, unknown>];
+		return frame[0] === "scopes" && closedRetirementEqual(frame[1], [request.scope.objectId, request.scope.epoch,
+			request.scope.anchorDigest]) ? [frame[2]] : [];
+	});
+	let candidates = select(image.canonicalRows);
+	if (candidates.length === 0 && image.drainSource !== undefined) {
+		requireLaw(image.control?.drain != null && image.control.drain.residualImageDigest === image.image.imageDigest,
+			"anchor-unavailable");
+		requireLaw(accounting !== undefined, "anchor-unavailable");
+		// Preserve the ORIGINAL missing-header reconstruction observations in
+		// addition to its materialized semantic wrapper; none is paid credit.
+		for (const bytes of [...image.canonicalRows, ...image.exactCanonicalControlCarriers, ...image.drainSource.canonicalRows])
+			requireLaw(accounting.charge(bytes), "proof-budget-exceeded");
+		candidates = select(image.drainSource.canonicalRows);
+	}
+	if (candidates.length === 0) return Object.freeze({ok: true, kind: "missing"});
+	requireLaw(candidates.length === 1, "anchor-unavailable");
+	const row = candidates[0]!, sql = Object.hasOwn(row, "object_id");
+	const captured = captureLiveJournalSignedAnchorReadObservation(request, {
+		scope: {objectId: row[sql ? "object_id" : "objectId"], epoch: row.epoch,
+			anchorDigest: row[sql ? "anchor_digest" : "anchorDigest"]},
+		nextJournalSequence: row[sql ? "next_journal_sequence" : "nextJournalSequence"],
+		parametersDigest: row[sql ? "parameters_digest" : "parametersDigest"],
+		exactCanonicalAnchorPreimageBytes: row[sql ? "exact_anchor_preimage" : "exactCanonicalAnchorPreimageBytes"],
+		detachedAnchorSignature: row[sql ? "detached_anchor_signature" : "detachedAnchorSignature"],
+		exactCanonicalParametersCarrierBytes: row[sql ? "exact_parameters_carrier" : "exactCanonicalParametersCarrierBytes"],
+	});
+	if (!captured.ok) return captured;
+	const stored = captured.value;
+	return Object.freeze({ok: true, kind: "present", scope: stored.scope, parametersDigest: stored.parametersDigest,
+		envelope: Object.freeze({objectId: stored.scope.objectId,
+			exactCanonicalAnchorPreimageBytes: stored.exactCanonicalAnchorPreimageBytes,
+			detachedAnchorSignature: stored.detachedAnchorSignature,
+			exactCanonicalParametersCarrierBytes: stored.exactCanonicalParametersCarrierBytes})});
+}
 
 /** Mechanical reconstruction stays private to the original held source. The
  * existing caller still authenticates every original signature/Cut/chain. */
 async function readHeldSourceEnvelope(input: Captured, request: Parameters<DurableLiveJournalStore["readSignedAnchorEnvelope"]>[0]): Promise<Awaited<ReturnType<DurableLiveJournalStore["readSignedAnchorEnvelope"]>>> {
 	const session = sourceHeaderSessions.get(input);
-	requireLaw(session !== undefined && journalHeaderHolds.has(session.hold), "anchor-unavailable");
+	if (session?.image !== undefined) {
+		const result = readPreparedSourceEnvelope(session.image, request, session.accounting);
+		if (result.ok && result.kind === "present") session.scopes.set(JSON.stringify(request.scope), Object.freeze({...request.scope}));
+		return result;
+	}
+	requireLaw(session !== undefined && session.hold !== undefined && journalHeaderHolds.has(session.hold), "anchor-unavailable");
 	await session.hold.check();
 	let result = await input.liveJournalStore.readSignedAnchorEnvelope(request);
 	if (result.ok && result.kind === "missing") {
@@ -1201,7 +1335,14 @@ async function readHeldSourceEnvelope(input: Captured, request: Parameters<Durab
 
 async function readHeldSourcePreimage(input: Captured, request: Parameters<DurableLiveJournalStore["readAnchorPreimage"]>[0]): Promise<Awaited<ReturnType<DurableLiveJournalStore["readAnchorPreimage"]>>> {
 	const session = sourceHeaderSessions.get(input);
-	requireLaw(session !== undefined && journalHeaderHolds.has(session.hold), "anchor-unavailable");
+	if (session?.image !== undefined) {
+		const result = await readHeldSourceEnvelope(input, {...request, maxBytes: closedSignedAnchorEnvelopeAllowance()});
+		if (!result.ok || result.kind === "missing") return result;
+		requireLaw(result.envelope.exactCanonicalAnchorPreimageBytes.byteLength <= request.maxBytes, "proof-budget-exceeded");
+		return Object.freeze({ok: true, kind: "present", scope: result.scope,
+			exactCanonicalAnchorPreimageBytes: result.envelope.exactCanonicalAnchorPreimageBytes});
+	}
+	requireLaw(session !== undefined && session.hold !== undefined && journalHeaderHolds.has(session.hold), "anchor-unavailable");
 	await session.hold.check();
 	const original = await input.anchorRead(request);
 	if (!original.ok || original.kind !== "missing") {
@@ -1268,15 +1409,17 @@ export function consumeCreatorRecoveryRoleRetiredReadback(
 	trust: CurrentAnchorTrust,
 	certificateDigest: string
 ): readonly SnapshotQuarantineScopeKey[] | undefined {
-	const frame = custody !== null && typeof custody === "object" ? ledgers.get(custody) : undefined;
+	const frame = custody !== null && typeof custody === "object" ? creatorClosedProofLedgerWork(custody) : undefined;
 	const proof = frame?.retiredReadback;
-	if (frame === undefined || !frame.alive || proof === undefined) return undefined;
+	if (frame === undefined || !creatorClosedProofWorkAvailable(frame) || proof === undefined) return undefined;
 	delete frame.retiredReadback;
 	return proof.input === input && proof.trust === trust && proof.certificateDigest === certificateDigest
 		? proof.scopes
 		: undefined;
 }
 const requirements = new WeakMap<ClosedAclAnchorRequirement, AnchorRequirementFacts>();
+const preparedRequirements = new WeakMap<ClosedAclAnchorRequirement,
+	Omit<AnchorRequirementFacts, "frame"> & Readonly<{frame: CreatorClosedProofWork}>>();
 const installedMaterials = new WeakMap<
 	VerifiedInstalledHistoricalAnchor,
 	Readonly<{
@@ -1340,8 +1483,8 @@ function deriveAnchorRequirement(
 		!exactCreatorTransitionOccurrence(closure.closure, retirement.candidate)
 	)
 		return undefined;
-	const frame = frames.get(reader);
-	if (frame === undefined || !frame.alive) return undefined;
+	const frame = creatorClosedProofWork(reader);
+	if (frame === undefined || !creatorClosedProofWorkAvailable(frame)) return undefined;
 	const closedAcl = unique(closure, "drp-v3-latched-acl", identity.closedEpoch);
 	const closedAclDigest = creatorDataDigest("ts-drp/latched-acl/v3", closedAcl.bytes);
 	if (
@@ -1356,9 +1499,7 @@ function deriveAnchorRequirement(
 		return undefined;
 	const requirement = Object.freeze({});
 	frame.requirements.add(requirement);
-	requirements.set(
-		requirement,
-		Object.freeze({
+	const capturedRequirement = Object.freeze({
 			source: input.liveJournalStore,
 			scope: Object.freeze({
 				objectId: input.objectId,
@@ -1384,9 +1525,13 @@ function deriveAnchorRequirement(
 			head: Object.freeze({ ...reader.head }),
 			floor: Object.freeze({ ...floor }),
 			closedAclDigest,
-			frame,
-		})
-	);
+		});
+	if (frame.alive) requirements.set(requirement, Object.freeze({...capturedRequirement, frame}));
+	else {
+		const work = proofWorks.get(reader);
+		requireLaw(work !== undefined && work === frame, "internal-invariant");
+		preparedRequirements.set(requirement, Object.freeze({...capturedRequirement, frame: work}));
+	}
 	return requirement;
 }
 // Native signed-envelope bounds are independent of the cumulative proof ledger.
@@ -1400,7 +1545,7 @@ async function observeAnchor(
 	accounting: CreatorClosedRollbackProofAccounting,
 	successorAnchor: Readonly<Record<string, unknown>>
 ): Promise<Readonly<{ dependency: VerifiedClosedAnchorDependency; aclDigest: string }>> {
-	const facts = requirements.get(requirement);
+	const facts = requirements.get(requirement) ?? preparedRequirements.get(requirement);
 	requireLaw(facts !== undefined && facts.source === input.liveJournalStore, "internal-invariant");
 	checkAbort(input.signal);
 	const allowance = Math.min(8192, accounting.maxBytes - accounting.chargedBytes);
@@ -1491,8 +1636,36 @@ interface HeldTarget {
 	readonly exactCanonicalManifestBytes: Uint8Array;
 	readonly exactCanonicalPayloadBytes: Uint8Array;
 	readonly successorAclBytes: Uint8Array;
-	check(): Promise<void>;
-	release(): Promise<void>;
+}
+// Snapshot proof DATA and native custody have distinct owners. In particular a
+// detached preparation target cannot manufacture a native check/release port.
+const heldTargetLifetimes = new WeakMap<HeldTarget, Readonly<{check(): Promise<void>; release(): Promise<void>}>>();
+const heldTargetReleases = new WeakMap<HeldTarget, Promise<void>>();
+const heldTargetPreparations = new WeakMap<HeldTarget, Readonly<{qualify(): Promise<void>; release(): Promise<void>}>>();
+function checkHeldTarget(target: HeldTarget): Promise<void> {
+	const lifetime = heldTargetLifetimes.get(target);
+	return lifetime === undefined ? Promise.reject(new Refusal(failure("snapshot-unavailable"))) : lifetime.check();
+}
+function releaseHeldTarget(target: HeldTarget): Promise<void> {
+	const entered = heldTargetReleases.get(target);
+	if (entered !== undefined) return entered;
+	// DATA-only preparations own no physical lifetime. Revocation also removes
+	// their final qualifier; releasing a preparation can never revive it later.
+	const preparation = heldTargetPreparations.get(target);
+	heldTargetPreparations.delete(target);
+	if (preparation !== undefined) {
+		const task = preparation.release(); heldTargetReleases.set(target, task); return task;
+	}
+	const lifetime = heldTargetLifetimes.get(target);
+	if (lifetime === undefined) {
+		const task = Promise.resolve(); heldTargetReleases.set(target, task); return task;
+	}
+	// Revoke new native checks immediately; retain only the SAME joined release
+	// task for repeated callers, not an old native-reader closure on live DATA.
+	heldTargetLifetimes.delete(target);
+	const task = Promise.resolve().then(() => lifetime.release());
+	heldTargetReleases.set(target, task);
+	return task;
 }
 interface SnapshotRetirementInventoryState {
 	readonly retired: ReadonlySet<string>;
@@ -1794,20 +1967,38 @@ async function acquireRecoveryRoleCertificate(
 	predecessorTrust: CurrentAnchorTrust,
 	accounting: CreatorClosedRollbackProofAccounting,
 	parsing?: CreatorClosedAcquisitionSyntax,
-	requiredDependencyAnchors: readonly Readonly<{epoch: number; anchorDigest: string}>[] = []
+	requiredDependencyAnchors: readonly Readonly<{epoch: number; anchorDigest: string}>[] = [],
+	borrowedSource?: CreatorClosedRecoveryCertificateBorrow
 ): Promise<RecoveryRoleCertificate> {
 	const selectCandidate = parsing?.candidate ?? uniqueCreatorTransitionCandidate;
 	const readRecord = parsing?.record ?? record;
 	const readUnique = parsing?.unique ?? unique;
 	const readAnchor = parsing?.anchorOf ?? anchorOf;
 
-	const acquire = bindMethod<AheBoundedRecoveryRoleStore["acquireBoundedRecoveryRoleRead"]>(
-		input.store,
-		"acquireBoundedRecoveryRoleRead"
-	);
-	const acquired = await acquire({ objectId: expectedHead.objectId, limits: AHE_BOUNDED_READ_LIMITS });
-	requireLaw(acquired.ok, "ahe-rejected");
-	const reader = acquired.value,
+	const parentPending = borrowedSource?.parent.pending;
+	const borrowedReader = borrowedSource === undefined ? undefined : creatorClosedRecoveryCertificateReader(
+		input, expectedHead, accounting, borrowedSource);
+	// Drop the temporary Work/provenance graph. The certificate retains only the
+	// actual original reader and its existing parent's admitted-task set.
+	borrowedSource = undefined;
+	let reader: AheBoundedRecoveryRoleRead;
+	if (borrowedReader === undefined) {
+		const acquire = bindMethod<AheBoundedRecoveryRoleStore["acquireBoundedRecoveryRoleRead"]>(input.store, "acquireBoundedRecoveryRoleRead");
+		const acquired = await acquire({objectId: expectedHead.objectId, limits: AHE_BOUNDED_READ_LIMITS});
+		requireLaw(acquired.ok, "ahe-rejected");
+		reader = acquired.value;
+	} else reader = borrowedReader;
+	const parentAvailable = borrowedReader === undefined ? undefined : (): boolean => {
+		const parent = creatorClosedProofWork(reader as SourceReader);
+		return parent !== undefined && parent.reader === reader && parent.input === input &&
+			parent.accounting === accounting && parent.pending === parentPending && creatorClosedProofWorkAvailable(parent) &&
+			!("sourceLifetime" in parent && (parent.sourceLifetime?.released || parent.sourceLifetime?.classifiedReleasing));
+	};
+	if (borrowedReader !== undefined) try {
+		const observer = Reflect.get(globalThis, "__warmProofEvent");
+		if (typeof observer === "function") observer({kind: "closed-recovery-reader-borrowed", epoch: currentTrust.currentEpoch});
+	} catch { /* A duplicate capture was avoided, never source qualification. */ }
+	const pendingChecks = new Set<Promise<void>>(),
 		held: HeldTarget[] = [],
 		classifiedHeld: HeldTarget[] = [];
 	let originalPromotion: Awaited<ReturnType<typeof acquireInstalledPromotion>> | undefined;
@@ -1823,7 +2014,7 @@ async function acquireRecoveryRoleCertificate(
 		classifiedReleased = true;
 		const promotion = originalPromotion;
 		classifiedReleaseTask = joinSourceReleases([
-			...classifiedHeld.map((target) => (): Promise<void> => target.release()),
+			...classifiedHeld.map((target) => (): Promise<void> => releaseHeldTarget(target)),
 			...(promotion === undefined ? [] : [(): Promise<void> => promotion.release()]),
 		]);
 		return classifiedReleaseTask;
@@ -1831,11 +2022,14 @@ async function acquireRecoveryRoleCertificate(
 	const release = (): Promise<void> => {
 		if (releaseTask !== undefined) return releaseTask;
 		released = true;
-		releaseTask = joinSourceReleases([
-			releaseClassified,
-			...held.map((target) => (): Promise<void> => target.release()),
-			(): Promise<void> => reader.release(),
-		]);
+		releaseTask = (async () => {
+			await Promise.allSettled([...pendingChecks]);
+			await joinSourceReleases([
+				releaseClassified,
+				...held.map((target) => (): Promise<void> => releaseHeldTarget(target)),
+				...(borrowedReader === undefined ? [(): Promise<void> => reader.release()] : []),
+			]);
+		})();
 		return releaseTask;
 	};
 	try {
@@ -1913,7 +2107,7 @@ async function acquireRecoveryRoleCertificate(
 			requireLaw(reconstructed !== undefined);
 			for (const candidate of reconstructed)
 				requireLaw(accounting.charge(candidate.bytes), "proof-budget-exceeded");
-			requireLaw((await reader.checkCurrency()).ok, "ahe-rejected");
+			if (!creatorClosedProofPreparingNativeData(accounting)) requireLaw((await reader.checkCurrency()).ok, "ahe-rejected");
 			currentDecision = Object.freeze({ candidates: reconstructed, closure: Object.freeze(reconstructed.map(({ ref }) => ref)) });
 		}
 		stage = "roles";
@@ -1973,7 +2167,8 @@ async function acquireRecoveryRoleCertificate(
 					...(truthful ? { truthfulPromotionClose: true as const } : {}),
 				},
 				list,
-				parsing
+				parsing,
+				accounting
 			);
 			const result = list.at(-1);
 			requireLaw(result !== undefined);
@@ -2213,10 +2408,10 @@ async function acquireRecoveryRoleCertificate(
 			exactCanonicalPinnedGenesisTrustStateRecordBytes: input.exactCanonicalPinnedGenesisTrustStateRecordBytes,
 			...(state.retired.size === 0 ? {} : { nativeRetirementCustody: accounting }),
 		};
-		const frame = ledgers.get(accounting);
+		const frame = creatorClosedProofLedgerWork(accounting);
 		requireLaw(
 			frame !== undefined &&
-				frame.alive &&
+				creatorClosedProofWorkAvailable(frame) &&
 				frame.input.store === input.store &&
 				frame.input.snapshotStore === input.snapshotStore &&
 				frame.input.liveJournalStore === input.liveJournalStore,
@@ -2228,8 +2423,11 @@ async function acquireRecoveryRoleCertificate(
 				compareBytes(state.inventoryBytes, beforeReadback.inventoryBytes) === 0,
 				"RECOVERY_CERTIFICATE_INVENTORY_CHANGED"
 			);
-		for (const target of [...held, ...classifiedHeld]) await target.check();
-		requireLaw((await reader.checkCurrency()).ok, "ahe-rejected");
+		// During private DATA preparation these targets have no native authority.
+		// Their full actual qualification is owed at the enclosing final boundary.
+		for (const target of [...held, ...classifiedHeld])
+			if (!heldTargetPreparations.has(target)) await checkHeldTarget(target);
+		if (!creatorClosedProofPreparingNativeData(accounting)) requireLaw((await reader.checkCurrency()).ok, "ahe-rejected");
 		if (state.retired.size !== 0)
 			frame.retiredReadback = Object.freeze({
 				input: readbackInput,
@@ -2336,16 +2534,21 @@ async function acquireRecoveryRoleCertificate(
 				})
 			),
 		]);
-		const check = async (): Promise<void> => {
-			requireLaw(!released, "snapshot-unavailable");
+		const checkAvailable = (): void => {
+			requireLaw(!released && parentAvailable?.() !== false, "snapshot-unavailable");
+		};
+		const checkBody = async (): Promise<void> => {
+			checkAvailable();
 			if (receivedPendingFloor !== undefined) {
 				const floor = captureCreatorRoomHeadState(await input.floorRead({
 					scope: { objectId: input.objectId, pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest },
 				}), input.objectId, input.pinnedGenesisAnchorDigest);
+				checkAvailable();
 				certificateLaw(floor.ok && compareBytes(encodeCanonical(floor.state), encodeCanonical(receivedPendingFloor)) === 0,
 					"RECOVERY_CERTIFICATE_RECEIVED_PENDING_FLOOR_CHANGED");
 			}
 			const actual = await retirementState();
+			checkAvailable();
 			if (state.retired.size !== 0)
 				certificateLaw(
 					state.factCarriers.every(bytes => actual.factCarriers.some(current => compareBytes(bytes, current) === 0)) &&
@@ -2358,11 +2561,23 @@ async function acquireRecoveryRoleCertificate(
 						[...state.retired].every((key) => actual.retired.has(key)),
 					"RECOVERY_CERTIFICATE_RETIREMENT_CHANGED"
 				);
-			for (const target of [...held, ...(classifiedReleased ? [] : classifiedHeld)]) await target.check();
-			if (!classifiedReleased) await originalPromotion?.check();
+			for (const target of [...held, ...(classifiedReleased ? [] : classifiedHeld)]) {
+				await checkHeldTarget(target); checkAvailable();
+			}
+			if (!classifiedReleased) {await originalPromotion?.check(); checkAvailable();}
 			requireLaw((await reader.checkCurrency()).ok, "ahe-rejected");
+			checkAvailable();
 		};
-		await check();
+		const check = (): Promise<void> => {
+			if (released || parentAvailable?.() === false) return Promise.reject(new Refusal(failure("snapshot-unavailable")));
+			const task = Promise.resolve().then(checkBody);
+			pendingChecks.add(task); parentPending?.add(task);
+			const forget = (): void => {pendingChecks.delete(task); parentPending?.delete(task);};
+			void task.then(forget, forget);
+			return task;
+		};
+		if (!creatorClosedProofPreparingNativeData(accounting) &&
+			!input.snapshotPreparation?.targets?.some(target => heldTargetPreparations.has(target))) await check();
 		transferred = true;
 		return Object.freeze({
 			certificateDigest,
@@ -2394,6 +2609,23 @@ async function acquireRecoveryRoleCertificate(
 	} finally {
 		if (!transferred) await release().catch(() => undefined);
 	}
+}
+
+/** Borrowing removes only a duplicate physical capture, not authentication,
+ * currentness, or a charge. Only this acquisition's registered Work can lend
+ * its actual complete reader; its original owning cleanup remains responsible. */
+function creatorClosedRecoveryCertificateReader(
+	input: Captured, expectedHead: PresentHead, accounting: CreatorClosedRollbackProofAccounting,
+	borrow: CreatorClosedRecoveryCertificateBorrow
+): AheBoundedRecoveryRoleRead {
+	const {source, parent} = borrow;
+	requireLaw(borrow.kind === "parent-full-recovery-role-reader" && source.kind === "full-recovery-role-acquisition" &&
+		source.owner === input.store && source.objectId === expectedHead.objectId && source.limits === AHE_BOUNDED_READ_LIMITS &&
+		parent.input === input && parent.accounting === accounting && parent.reader === source.reader &&
+		proofWorks.get(parent.reader) === parent && proofWorkLedgers.get(accounting) === parent &&
+		creatorClosedProofWorkAvailable(parent) && source.reader.head.kind === "present" &&
+		sameRoleHead(source.reader.head, expectedHead), "ahe-rejected");
+	return source.reader;
 }
 
 /**
@@ -2456,8 +2688,10 @@ async function acquireInstalledPromotion(
 	);
 	const capturedSnapshot = Object.freeze({
 		objectId: input.currentTrust.objectId,
-		...(sharedAccounting === undefined || ledgers.get(sharedAccounting)?.input.classificationRead === undefined ? {} :
-			{classificationRead: ledgers.get(sharedAccounting)!.input.classificationRead}),
+		...(sharedAccounting === undefined || creatorClosedProofLedgerWork(sharedAccounting)?.input.classificationRead === undefined ? {} :
+			{classificationRead: creatorClosedProofLedgerWork(sharedAccounting)!.input.classificationRead}),
+		...(sharedAccounting === undefined || creatorClosedProofLedgerWork(sharedAccounting)?.input.snapshotPreparation === undefined ? {} :
+			{snapshotPreparation: creatorClosedProofLedgerWork(sharedAccounting)!.input.snapshotPreparation}),
 		lookup: bindMethod<CapturedSnapshot["lookup"]>(input.snapshotStore, "lookupRecoveryDeclaration"),
 		snapshotAcquire: bindMethod<CapturedSnapshot["snapshotAcquire"]>(input.snapshotStore, "acquireRecoveryRead"),
 		snapshotProtection: snapshotProtectionPort(input.snapshotStore),
@@ -2479,7 +2713,7 @@ async function acquireInstalledPromotion(
 		if (releaseTask !== undefined) return releaseTask;
 		released = true;
 		releaseTask = joinSourceReleases([
-			...held.map((value) => (): Promise<void> => value.release()),
+			...held.map((value) => (): Promise<void> => releaseHeldTarget(value)),
 			(): Promise<void> => reader.release(),
 		]);
 		return releaseTask;
@@ -2616,7 +2850,8 @@ async function acquireInstalledPromotion(
 					...(binding.cut.forwardPromotion === undefined ? {} : { truthfulPromotionClose: true as const }),
 				},
 				held,
-				parsing
+				parsing,
+				accounting
 			);
 		}
 		const currentAclBytes = held[0]?.successorAclBytes;
@@ -2651,7 +2886,8 @@ async function acquireInstalledPromotion(
 				truthfulPromotionClose: true,
 			},
 			held,
-			parsing
+			parsing,
+			accounting
 		);
 		for (const target of held)
 			requireLaw(
@@ -2708,13 +2944,14 @@ async function acquireInstalledPromotion(
 		requireLaw(identity !== undefined && selected !== undefined);
 		const checkSnapshots = async (): Promise<void> => {
 			requireLaw(!released, "snapshot-unavailable");
-			for (const target of held) await target.check();
+			for (const target of held) await checkHeldTarget(target);
 		};
 		const check = async (): Promise<void> => {
 			await checkSnapshots();
 			requireLaw((await reader.checkCurrency()).ok, "ahe-rejected");
 		};
-		await check();
+		if (!creatorClosedProofPreparingNativeData(accounting) &&
+			!capturedSnapshot.snapshotPreparation?.targets?.some(target => heldTargetPreparations.has(target))) await check();
 		const material = Object.freeze({
 			promotion: opened.promotion,
 			reader,
@@ -2816,18 +3053,152 @@ export async function acquireCreatorReceivedPromotion(
 ): ReturnType<typeof acquireInstalledPromotion> {
 	return acquireInstalledPromotion(input, sharedAccounting);
 }
+
+type CreatorClosedSnapshotEvidence = Readonly<{
+	exactCanonicalManifestBytes: Uint8Array;
+	exactCanonicalPayloadBytes: Uint8Array;
+	chunks: ReturnType<typeof decodeSnapshotManifest>["chunks"];
+}>;
+type CreatorClosedPreparedSnapshot = Readonly<{
+	summary: CutSummary;
+	successorAclBytes: Uint8Array;
+	snapshot: NonNullable<CreatorProtectedRecoveryRoleIdentity["snapshot"]>;
+}>;
+
+function creatorClosedPreparedSnapshotInventoryBytes(
+	preparation: NonNullable<CapturedSnapshot["snapshotPreparation"]>, inventory: SnapshotRecoveryRoleInventory
+): Uint8Array {
+	return preparation.inventoryCarrier === "complete" ? creatorClosedSnapshotRoleInventoryBytes(inventory) :
+		closedRetirementBytes({scopes: inventory.scopes, owner: inventory.owner});
+}
+
+/** Bounded raw capture only. Physical snapshot custody is joined before any
+ * payload authentication runs. Callers process/drop this single working
+ * payload before capturing another scope; the same proof book retains only
+ * the original distinct material required by its exact-byte union law. */
+async function captureCreatorClosedSnapshotEvidence(
+	input: Pick<CapturedSnapshot, "signal" | "lookup" | "snapshotAcquire" | "snapshotProtection" | "classificationRead">,
+	scope: SnapshotQuarantineScopeKey,
+	accounting: CreatorClosedRollbackProofAccounting
+): Promise<CreatorClosedSnapshotEvidence> {
+	checkAbort(input.signal);
+	const lookup = await snapshotCall(() => input.lookup(scope, {signal: input.signal}));
+	requireLaw(lookup.kind === "present", "snapshot-unavailable");
+	requireLaw(lookup.state !== "poisoned", "snapshot-invalid");
+	requireLaw(lookup.state === "verified" && snapshotRoleReadable(input, scope, lookup.retention), "snapshot-not-ready");
+	// The manifest supplies bounded native read addresses, not proof facts. Its
+	// pure decoding precedes physical protection and is authenticated again by
+	// the payload/Cut preparation owner after raw native release.
+	let decoded: ReturnType<typeof decodeSnapshotManifest>;
+	try {
+		decoded = decodeSnapshotManifest({exactCanonicalManifestBytes: lookup.declaration.exactCanonicalManifestBytes,
+			expectedManifestDigest: scope.manifestDigest, profile: snapshotQuarantineContract.limits});
+	} catch { throw new Refusal(failure("snapshot-invalid")); }
+	requireLaw(decoded.manifest.totalBytes === lookup.declaration.totalBytes &&
+		decoded.chunks.length === lookup.declaration.chunks.length, "snapshot-invalid");
+	let protection: NativeReadReservation | undefined;
+	let readerRelease: (() => Promise<void>) | undefined;
+	let primary: unknown, evidence: CreatorClosedSnapshotEvidence | undefined;
+	try {
+		if (input.snapshotProtection !== undefined) {
+			const protectedRead = await snapshotCall(() => input.snapshotProtection!(scope));
+			if (protectedRead.kind === "held") protection = protectedRead.protection;
+		}
+		const acquired = await snapshotCall(() => input.snapshotAcquire(lookup.declaration, {signal: input.signal}));
+		requireLaw(acquired.kind === "present", "snapshot-unavailable");
+		readerRelease = bindMethod<typeof acquired.reader.release>(acquired.reader, "release");
+		requireLaw(acquired.state === "verified" && snapshotRoleReadable(input, scope, acquired.retention) &&
+			closedRetirementEqual(acquired.declaration, lookup.declaration), "snapshot-not-ready");
+		const read = bindMethod<typeof acquired.reader.read>(acquired.reader, "read");
+		const payload = new Uint8Array(acquired.declaration.totalBytes);
+		let offset = 0;
+		for (const descriptor of decoded.chunks) {
+			checkAbort(input.signal);
+			const actual = await snapshotCall(() => read(descriptor, {signal: input.signal}));
+			requireLaw(actual !== undefined, "snapshot-unavailable");
+			requireLaw(actual.byteLength === descriptor.byteLength && offset + actual.byteLength <= payload.byteLength,
+				"snapshot-invalid");
+			payload.set(actual, offset); offset += actual.byteLength;
+		}
+		requireLaw(offset === payload.byteLength, "snapshot-invalid");
+		await protection?.check();
+		const manifest = acquired.declaration.exactCanonicalManifestBytes.slice();
+		const material = proofMaterialOwners.get(accounting);
+		requireLaw(material === undefined
+			? accounting.charge(manifest) && accounting.charge(payload)
+			: material.chargeSnapshotTarget(manifest, scope) && material.chargeSnapshotTarget(payload, scope), "proof-budget-exceeded");
+		evidence = Object.freeze({exactCanonicalManifestBytes: manifest, exactCanonicalPayloadBytes: payload,
+			chunks: Object.freeze(decoded.chunks.map(chunk => Object.freeze({...chunk}))) });
+	} catch (error) { primary = error; }
+	let readerFailure: unknown;
+	try { await readerRelease?.(); } catch (error) { readerFailure = error; }
+	try { await protection?.release(); } catch (error) {
+		readerFailure = readerFailure === undefined ? error : new AggregateError([readerFailure, error], "creator raw snapshot join failed", {cause: readerFailure});
+	}
+	if (readerFailure !== undefined) primary = primary === undefined ? readerFailure :
+		new AggregateError([primary, readerFailure], "creator raw snapshot capture and join failed", {cause: primary});
+	if (primary !== undefined) throw primary;
+	checkAbort(input.signal);
+	requireLaw(evidence !== undefined, "internal-invariant");
+	// This pure content check deliberately follows BOTH physical joins. It
+	// validates only the captured bytes; final native currency remains owed.
+	let offset = 0;
+	for (const chunk of evidence.chunks) {
+		requireLaw(offset + chunk.byteLength <= evidence.exactCanonicalPayloadBytes.byteLength &&
+			snapshotChunkDigest(chunk.index, evidence.exactCanonicalPayloadBytes.subarray(offset, offset + chunk.byteLength)) === chunk.digest,
+			"snapshot-invalid");
+		offset += chunk.byteLength;
+	}
+	requireLaw(offset === evidence.exactCanonicalPayloadBytes.byteLength, "snapshot-invalid");
+	return evidence;
+}
+
+/** Pure proof facts from one serially captured payload. No lookup, native
+ * reservation, reader, eligibility decision or source frame is accepted here.
+ * The capture/qualification owner remains responsible for both incarnations
+ * and the complete actual byte comparison under its final native exclusion. */
+function prepareCreatorClosedSnapshotEvidence(
+	input: Pick<CapturedSnapshot, "objectId" | "capturedCatalog">,
+	target: Target,
+	evidence: CreatorClosedSnapshotEvidence,
+	parsing?: CreatorClosedAcquisitionSyntax
+): CreatorClosedPreparedSnapshot {
+	const scope = Object.freeze({ objectId: input.objectId, epoch: Number(target.cut.epoch),
+		anchor: String(target.cut.previousAnchor), manifestDigest: String(target.cut.snapshotManifestDigest) });
+	const payload = evidence.exactCanonicalPayloadBytes;
+	const data = (parsing?.snapshot ?? validateCreatorSnapshotData)(payload,
+		evidence.exactCanonicalManifestBytes, target.cut, target.successorTrust.profileId);
+	requireLaw(data !== undefined, "snapshot-invalid");
+	const catalog = creatorSnapshotCatalogIdentity(target.projection);
+	requireLaw(catalog !== undefined &&
+		verifiedCreatorSnapshotCatalog(input.capturedCatalog, target.cut.blueprintDigest, catalog) !== undefined,
+		"blueprint-invalid");
+	if (!(target.truthfulPromotionClose === true || creatorSnapshotProjectionMatches(target.projection,
+		target.successorAnchor, target.successorTrust.currentAnchorDigest, scope.manifestDigest, data.manifest)))
+		throw new Refusal(failure("chain-invalid", "snapshot", `CLOSED_SNAPSHOT_PROJECTION_MISMATCH:${scope.epoch}`));
+	return Object.freeze({
+		successorAclBytes: data.successorAclBytes,
+		snapshot: Object.freeze({ scope, manifestByteLength: evidence.exactCanonicalManifestBytes.byteLength,
+			payloadDigest: String(data.manifest.payloadDigest), stateDigest: String(target.cut.stateDigest),
+			closedAclDigest: target.closedAclDigest, successorAclDigest: String(target.cut.aclDigest),
+			totalBytes: payload.byteLength, chunks: Object.freeze(evidence.chunks.map(chunk => Object.freeze({ ...chunk }))) }),
+		summary: Object.freeze({ objectId: input.objectId, epoch: scope.epoch, closedAnchorDigest: scope.anchor,
+			successorAnchorDigest: target.successorTrust.currentAnchorDigest, cutRef: Object.freeze({ ...target.evidence.cut.ref }),
+			commitQcRef: Object.freeze({ ...target.evidence.qc.ref }), manifestDigest: scope.manifestDigest,
+			payloadDigest: String(data.manifest.payloadDigest), stateDigest: String(target.cut.stateDigest),
+			closedAclDigest: target.closedAclDigest, successorAclDigest: String(target.cut.aclDigest),
+			payloadByteLength: payload.byteLength, representation: target.evidence.representation }),
+	});
+}
+
 async function readTarget(
-	input: Pick<CapturedSnapshot, "objectId" | "signal" | "lookup" | "snapshotAcquire" | "snapshotProtection" | "capturedCatalog" | "classificationRead">,
+	input: Pick<CapturedSnapshot, "objectId" | "signal" | "lookup" | "snapshotAcquire" | "snapshotProtection" | "capturedCatalog" | "classificationRead" | "snapshotPreparation">,
 	target: Target,
 	held?: HeldTarget[],
-	parsing?: CreatorClosedAcquisitionSyntax
-): Promise<
-	Readonly<{
-		summary: CutSummary;
-		successorAclBytes: Uint8Array;
-		snapshot: NonNullable<CreatorProtectedRecoveryRoleIdentity["snapshot"]>;
-	}>
-> {
+	parsing?: CreatorClosedAcquisitionSyntax,
+	accounting?: CreatorClosedRollbackProofAccounting,
+	qualifiedPreparation?: Readonly<{evidence: CreatorClosedSnapshotEvidence; result: CreatorClosedPreparedSnapshot}>
+): Promise<CreatorClosedPreparedSnapshot> {
 	checkAbort(input.signal);
 	const scope = Object.freeze({
 		objectId: input.objectId,
@@ -2835,6 +3206,54 @@ async function readTarget(
 		anchor: String(target.cut.previousAnchor),
 		manifestDigest: String(target.cut.snapshotManifestDigest),
 	});
+	const preparation = held !== undefined && accounting !== undefined && input.classificationRead === undefined &&
+		input.snapshotProtection !== undefined && input.snapshotPreparation?.inventory.owner.migration === "ready" &&
+		(input.snapshotPreparation.inventory.legacyScopes?.length ?? 0) === 0 ? input.snapshotPreparation : undefined;
+	const phase = (kind: string, reason?: string): void => {
+		try {
+			const observer = Reflect.get(globalThis, "__warmProofEvent");
+			if (typeof observer === "function") observer({kind, epoch: scope.epoch, reason});
+		} catch { /* Diagnostics do not participate in proof authority. */ }
+	};
+	let preparedEvidence: CreatorClosedSnapshotEvidence | undefined = qualifiedPreparation?.evidence;
+	let prepared: CreatorClosedPreparedSnapshot | undefined = qualifiedPreparation?.result;
+	if (preparation !== undefined && qualifiedPreparation === undefined) {
+		requireLaw(preparation.inventory.scopes.some(row => closedRetirementEqual(row.scope, scope)), "snapshot-not-ready");
+		// This is the EXISTING issuance inventory carrier, paid on the original
+		// book before preparation rather than on a second allowance afterwards.
+		requireLaw(chargeProofObservation(accounting!, creatorClosedPreparedSnapshotInventoryBytes(preparation,
+			preparation.inventory)), "proof-budget-exceeded");
+		preparedEvidence = await captureCreatorClosedSnapshotEvidence(input, scope, accounting!);
+		phase("closed-snapshot-preparation-detached");
+		prepared = prepareCreatorClosedSnapshotEvidence(input, target, preparedEvidence, parsing);
+		checkAbort(input.signal);
+		if (preparation.targets !== undefined) {
+			const data: HeldTarget = Object.freeze({target, exactCanonicalManifestBytes: preparedEvidence.exactCanonicalManifestBytes,
+				exactCanonicalPayloadBytes: preparedEvidence.exactCanonicalPayloadBytes, successorAclBytes: prepared.successorAclBytes});
+			const evidence = preparedEvidence, result = prepared;
+			let revoked = false, qualification: Promise<void> | undefined;
+			heldTargetPreparations.set(data, Object.freeze({
+				qualify: (): Promise<void> => qualification ??= (async () => {
+					requireLaw(!revoked, "snapshot-unavailable");
+					const actual: HeldTarget[] = []; let transferred = false;
+					try {
+						await readTarget(input, target, actual, parsing, accounting, {evidence, result});
+						const native = actual[0], lifetime = native === undefined ? undefined : heldTargetLifetimes.get(native);
+						requireLaw(native !== undefined && lifetime !== undefined && !revoked, "snapshot-unavailable");
+						heldTargetLifetimes.delete(native); heldTargetPreparations.delete(data);
+						heldTargetLifetimes.set(data, lifetime); transferred = true;
+					} finally { if (!transferred) for (const native of actual) await releaseHeldTarget(native); }
+				})(),
+				release: async (): Promise<void> => {
+					revoked = true;
+					await Promise.allSettled(qualification === undefined ? [] : [qualification]);
+				},
+			}));
+			held!.push(data); preparation.targets.push(data);
+			return prepared;
+		}
+	} else if (held !== undefined && qualifiedPreparation === undefined) phase("closed-snapshot-preparation-declined",
+		input.snapshotPreparation === undefined ? "original-inventory-carrier-unavailable" : "classification-or-protection-owner");
 	let protection: NativeReadReservation | undefined;
 	let readerRelease: (() => Promise<void>) | undefined;
 	let releaseTask: Promise<void> | undefined;
@@ -2851,13 +3270,7 @@ async function readTarget(
 		return releaseTask;
 	};
 	let primary: unknown;
-	let observed:
-		| Readonly<{
-				summary: CutSummary;
-				successorAclBytes: Uint8Array;
-				snapshot: NonNullable<CreatorProtectedRecoveryRoleIdentity["snapshot"]>;
-		  }>
-		| undefined;
+	let observed: CreatorClosedPreparedSnapshot | undefined;
 	try {
 		// Observational A0 reads remain unpinned. Genuine held material explicitly
 		// protects its exact adapter-bound dependency before its first native read.
@@ -2878,6 +3291,11 @@ async function readTarget(
 		await protection?.check();
 		requireLaw(acquired.state === "verified" && snapshotRoleReadable(input, scope, acquired.retention), "snapshot-not-ready");
 		const declaration = acquired.declaration;
+		if (preparedEvidence !== undefined) requireLaw(
+			closedRetirementEqual(declaration, lookup.declaration) &&
+			compareBytes(declaration.exactCanonicalManifestBytes, preparedEvidence.exactCanonicalManifestBytes) === 0 &&
+			declaration.totalBytes === preparedEvidence.exactCanonicalPayloadBytes.byteLength &&
+			closedRetirementEqual(declaration.chunks, preparedEvidence.chunks), "snapshot-invalid");
 		let decoded: ReturnType<typeof decodeSnapshotManifest>;
 		try {
 			decoded = decodeSnapshotManifest({
@@ -2892,85 +3310,46 @@ async function readTarget(
 			decoded.manifest.totalBytes === declaration.totalBytes && decoded.chunks.length === declaration.chunks.length,
 			"snapshot-invalid"
 		);
-		const payload = new Uint8Array(declaration.totalBytes);
+		// Qualification reads every actual byte, but does not retain a second full
+		// payload or repeat syntax/crypto authentication of the unchanged DATA.
+		const payload = preparedEvidence?.exactCanonicalPayloadBytes ?? new Uint8Array(declaration.totalBytes);
 		let offset = 0;
 		for (const descriptor of decoded.chunks) {
 			checkAbort(input.signal);
 			const actual = await snapshotCall(() => read(descriptor, { signal: input.signal }));
 			if (actual === undefined) throw new Refusal(failure("snapshot-unavailable"));
-			requireLaw(
-				actual.byteLength === descriptor.byteLength &&
-					snapshotChunkDigest(descriptor.index, actual) === descriptor.digest,
-				"snapshot-invalid"
-			);
-			payload.set(actual, offset);
+			requireLaw(actual.byteLength === descriptor.byteLength && (preparedEvidence === undefined
+				? snapshotChunkDigest(descriptor.index, actual) === descriptor.digest
+				: compareBytes(actual, payload.subarray(offset, offset + descriptor.byteLength)) === 0), "snapshot-invalid");
+			if (preparedEvidence === undefined) payload.set(actual, offset);
 			offset += actual.byteLength;
 		}
 		checkAbort(input.signal);
 		requireLaw(offset === payload.byteLength, "snapshot-invalid");
-		const data = (parsing?.snapshot ?? validateCreatorSnapshotData)(
-			payload,
-			declaration.exactCanonicalManifestBytes,
-			target.cut,
-			target.successorTrust.profileId
-		);
-		requireLaw(data !== undefined, "snapshot-invalid");
-		const catalog = creatorSnapshotCatalogIdentity(target.projection);
-		requireLaw(
-			catalog !== undefined &&
-				verifiedCreatorSnapshotCatalog(input.capturedCatalog, target.cut.blueprintDigest, catalog) !== undefined,
-			"blueprint-invalid"
-		);
-		if (
-			!(
-				target.truthfulPromotionClose === true ||
-				creatorSnapshotProjectionMatches(
-					target.projection,
-					target.successorAnchor,
-					target.successorTrust.currentAnchorDigest,
-					scope.manifestDigest,
-					data.manifest
-				)
-			)
-		)
-			throw new Refusal(failure("chain-invalid", "snapshot", `CLOSED_SNAPSHOT_PROJECTION_MISMATCH:${scope.epoch}`));
-		observed = Object.freeze({
-			successorAclBytes: data.successorAclBytes,
-			snapshot: Object.freeze({
-				scope,
-				manifestByteLength: declaration.exactCanonicalManifestBytes.byteLength,
-				payloadDigest: String(data.manifest.payloadDigest),
-				stateDigest: String(target.cut.stateDigest),
-				closedAclDigest: target.closedAclDigest,
-				successorAclDigest: String(target.cut.aclDigest),
-				totalBytes: payload.byteLength,
-				chunks: Object.freeze(decoded.chunks.map((chunk) => Object.freeze({ ...chunk }))),
-			}),
-			summary: Object.freeze({
-				objectId: input.objectId,
-				epoch: scope.epoch,
-				closedAnchorDigest: scope.anchor,
-				successorAnchorDigest: target.successorTrust.currentAnchorDigest,
-				cutRef: Object.freeze({ ...target.evidence.cut.ref }),
-				commitQcRef: Object.freeze({ ...target.evidence.qc.ref }),
-				manifestDigest: scope.manifestDigest,
-				payloadDigest: String(data.manifest.payloadDigest),
-				stateDigest: String(target.cut.stateDigest),
-				closedAclDigest: target.closedAclDigest,
-				successorAclDigest: String(target.cut.aclDigest),
-				payloadByteLength: payload.byteLength,
-				representation: target.evidence.representation,
-			}),
-		});
+		if (preparation !== undefined) {
+			const actualInventory = await snapshotCall(() => preparation.read({objectId: input.objectId}, {signal: input.signal}));
+			requireLaw(chargeProofObservation(accounting!, creatorClosedPreparedSnapshotInventoryBytes(preparation,
+				actualInventory)), "proof-budget-exceeded");
+			requireLaw(closedRetirementEqual(actualInventory.scopes, preparation.inventory.scopes) &&
+				closedRetirementEqual(actualInventory.owner, preparation.inventory.owner) &&
+				(actualInventory.legacyScopes?.length ?? 0) === 0, "snapshot-invalid");
+			await protection?.check();
+			phase("closed-snapshot-preparation-qualified");
+		}
+		observed = prepared ?? prepareCreatorClosedSnapshotEvidence(input, target, {
+			exactCanonicalManifestBytes: declaration.exactCanonicalManifestBytes,
+			exactCanonicalPayloadBytes: payload, chunks: decoded.chunks,
+		}, parsing);
 		if (held !== undefined) {
 			const descriptor = decoded.chunks[0];
 			requireLaw(descriptor !== undefined, "snapshot-invalid");
-			held.push(
-				Object.freeze({
+			const capturedTarget: HeldTarget = Object.freeze({
 					target,
-					exactCanonicalManifestBytes: Uint8Array.from(declaration.exactCanonicalManifestBytes),
+					exactCanonicalManifestBytes: preparedEvidence?.exactCanonicalManifestBytes ?? Uint8Array.from(declaration.exactCanonicalManifestBytes),
 					exactCanonicalPayloadBytes: payload,
-					successorAclBytes: data.successorAclBytes,
+					successorAclBytes: observed.successorAclBytes,
+			});
+			heldTargetLifetimes.set(capturedTarget, Object.freeze({
 					release,
 					check: async (): Promise<void> => {
 						checkAbort(input.signal);
@@ -2984,8 +3363,8 @@ async function readTarget(
 						);
 						await protection?.check();
 					},
-				})
-			);
+			}));
+			held.push(capturedTarget);
 		}
 	} catch (error) {
 		primary = error;
@@ -3017,7 +3396,9 @@ async function authenticate(
 	expectedWholeFloor?: CreatorProtectedRecoveryRoleSummary["floor"],
 	maintenance = false,
 	parsing?: CreatorClosedAcquisitionSyntax,
-	closeHold?: CreatorSnapshotRecoveryCloseHold
+	closeHold?: CreatorSnapshotRecoveryCloseHold,
+	sharedAccounting?: CreatorClosedRollbackProofAccounting,
+	fullRecoverySource?: CreatorClosedFullRecoverySource
 ): Promise<ObservationFacts> {
 	const readUnique = parsing?.unique ?? unique;
 	const readRecord = parsing?.record ?? record;
@@ -3036,9 +3417,9 @@ async function authenticate(
 	let currentTrust: CurrentAnchorTrust = pin;
 	let predecessorTrust = pin;
 	let transitionInput: Parameters<typeof inspectCreatorTransitionAdvance>[0] | undefined;
-	const accounting = createCreatorClosedRollbackProofAccounting([], maintenance);
+	const accounting = sharedAccounting ?? createCreatorClosedRollbackProofAccounting([], maintenance);
 	chargeNativeReaderBlobs(accounting, reader.blobs);
-	const frame: ImportFrame = {
+	const frame: CreatorClosedProofWork = {
 		headerScopes: sourceHeaderSessions.get(input)?.scopes ?? new Map(),
 		input,
 		reader,
@@ -3047,12 +3428,15 @@ async function authenticate(
 		requirements: new Set(),
 		recoveryTrusts: new Set([pin]),
 		signingRoleTrusts: new Set([pin]),
-		alive: true,
+		alive: false,
 	};
-	frames.set(reader, frame);
+	proofWorks.set(reader, frame);
+	if (fullRecoverySource !== undefined)
+		requireLaw(fullRecoverySource.reader === reader && fullRecoverySource.owner === input.store &&
+			fullRecoverySource.objectId === reader.head.objectId && fullRecoverySource.limits === AHE_BOUNDED_READ_LIMITS, "ahe-rejected");
 	const headerSession = sourceHeaderSessions.get(input);
 	if (headerSession !== undefined) { headerSession.accounting = accounting; frame.headerHold = headerSession.hold; }
-	ledgers.set(accounting, frame);
+	proofWorkLedgers.set(accounting, frame);
 	const retainedDependencies: VerifiedClosedAnchorDependency[] = [];
 	const cuts: CutSummary[] = [];
 	if (n === 0) {
@@ -3174,10 +3558,11 @@ async function authenticate(
 				const dependencies = closeHold === undefined ? undefined : resolveCreatorSnapshotRecoveryCloseHold(closeHold,
 					{store: input.store, liveJournalStore: input.liveJournalStore, currentTrust});
 				requireLaw(closeHold === undefined || dependencies !== undefined, "chain-invalid");
-				certificates.push(
-					await acquireRecoveryRoleCertificate(input, reader.head, currentTrust, predecessorTrust, accounting, parsing,
-						dependencies?.dependencyAnchors)
-				);
+				const task = acquireRecoveryRoleCertificate(input, reader.head, currentTrust, predecessorTrust, accounting, parsing,
+					dependencies?.dependencyAnchors, fullRecoverySource === undefined ? undefined :
+						{kind: "parent-full-recovery-role-reader", source: fullRecoverySource, parent: frame});
+				frame.pending.add(task);
+				try {certificates.push(await task);} finally {frame.pending.delete(task);}
 			}
 			const liveProjection = readUnique(live, "v3-live-generation-2", n);
 			const latestClosedAcl = readUnique(live, "drp-v3-latched-acl", n - 1);
@@ -3254,7 +3639,8 @@ async function authenticate(
 							: {}),
 					},
 					held,
-					parsing
+					parsing,
+					accounting
 				);
 				if (held !== undefined) {
 					const material = held[held.length - 1];
@@ -3321,7 +3707,11 @@ async function authenticate(
 		}
 	}
 	checkAbort(input.signal);
-	const currency = await checkCurrent();
+	if (!creatorClosedProofPreparingNativeData(accounting)) {
+		const currency = await checkCurrent();
+		if (!currency.ok) throw new Refusal(failure(currency.reason === "READ_BUDGET_EXCEEDED" ? "proof-budget-exceeded" :
+			"ahe-rejected", "ahe", currency.reason));
+	}
 	frame.recoveryTrusts.add(currentTrust);
 	frame.recoveryTrusts.add(predecessorTrust);
 	frame.signingRoleTrusts.add(currentTrust);
@@ -3337,14 +3727,6 @@ async function authenticate(
 			frame.recoveryTrusts.add(trust);
 			frame.signingRoleTrusts.add(trust);
 		}
-	if (!currency.ok)
-		throw new Refusal(
-			failure(
-				currency.reason === "READ_BUDGET_EXCEEDED" ? "proof-budget-exceeded" : "ahe-rejected",
-				"ahe",
-				currency.reason
-			)
-		);
 	checkAbort(input.signal);
 	let rawFloor: unknown;
 	try {
@@ -3374,8 +3756,10 @@ async function authenticate(
 		);
 	}
 	checkAbort(input.signal);
-	for (const proof of installed) await proof.check();
-	for (const proof of certificates) await proof.check();
+	if (!input.snapshotPreparation?.targets?.some(target => heldTargetPreparations.has(target))) {
+		for (const proof of installed) await proof.check();
+		for (const proof of certificates) await proof.check();
+	}
 	return Object.freeze({
 		summary: Object.freeze({
 			floor: Object.freeze({ ...floor }),
@@ -3482,6 +3866,14 @@ export interface CreatorIssuanceMaintenanceProof {
 	/** Joins physical views after the issuer terminal, before own journal admission. */
 	endWrite(): Promise<void>;
 	release(): Promise<void>;
+}
+
+/** Private quote ingredients only. The SAME accounting lifetime survives final
+ * qualification; no observation, check, release or mutable authority is exposed. */
+export interface CreatorIssuanceMaintenancePreparationData extends Pick<CreatorIssuanceMaintenanceProof,
+	"accounting" | "summary" | "censusBytes" | "signingRows" | "generations" | "blobs" | "currentTrust" |
+	"journal" | "snapshot" | "ahe" | "floor" | "floorImage" | "protectedJournalHeaderScopes"> {
+	readonly recovery: CreatorOrdinaryIssuanceSourceMaterial;
 }
 
 // Terminal withdrawal uses the SAME authenticated proof/census owner. This
@@ -3823,7 +4215,35 @@ interface CreatorOrdinaryIssuanceProofFacts {
 		floorImage: CreatorIssuanceMaintenanceProof["floorImage"];
 		nativeIssuance: CreatorOrdinaryIssuanceSourceFacts["nativeIssuance"]; signingRows: readonly Uint8Array[]}>;
 	checkReadEligibility(): Promise<void>;
-	check(): Promise<void>;
+	/** A named boundary may coalesce only with an adjacent complete check. */
+	check(adjacent?: CreatorOrdinaryAdjacentCheckTarget): Promise<void>;
+	/** Claims the complete check that just ended for ONE next named boundary. */
+	issueAdjacentCheck?(target: CreatorOrdinaryAdjacentCheckTarget): void;
+}
+/** The two ordinary boundaries reached from a complete check without a task,
+ * await or own effect in between: capacity's pre-callback check (after the
+ * acquisition check) and beginWrite (after capacity's post-charge check). */
+type CreatorOrdinaryAdjacentCheckTarget = "pre-callback" | "begin";
+type CreatorOrdinaryAdjacentCheck = Readonly<{consume(target?: CreatorOrdinaryAdjacentCheckTarget): boolean}>;
+/**
+ * Claims that the complete check which just ended is still the latest native
+ * observation for ONE named boundary. The claim lives only while its own
+ * microtask is pending: the event loop cannot start any task (native request
+ * event, timer, message, crypto result) before the microtask queue drains, so
+ * no environment callback can have been delivered in between. Any other check
+ * consumes the claim; a stale, foreign or second use is a complete check.
+ * @param target - The only boundary that may coalesce.
+ * @returns A single-use claim.
+ */
+function issueCreatorOrdinaryAdjacentCheck(target: CreatorOrdinaryAdjacentCheckTarget): CreatorOrdinaryAdjacentCheck {
+	let pending = true, hops = 0;
+	const tick = (): void => { if (pending && ++hops < 256) void Promise.resolve().then(tick); else pending = false; };
+	void Promise.resolve().then(tick);
+	return Object.freeze({consume: (requested?: CreatorOrdinaryAdjacentCheckTarget): boolean => {
+		const adjacent = pending && requested === target;
+		pending = false;
+		return adjacent;
+	}});
 }
 declare const ordinaryIssuanceDimensionReadoutBrand: unique symbol;
 /** Original per-call numerical observation only, never native/source authority. */
@@ -4099,8 +4519,9 @@ export function reserveCreatorOrdinaryFinishingCapacity(
 		exactCanonicalApplicationOperationBytes: options.suffix.exactCanonicalApplicationOperationBytes.slice()});
 	const task = Promise.resolve().then(async () => {
 		// Every configured synchronous application hook gets complete pre-callback
-		// freshness. A revoked/closed owner runs no derivation or callback.
-		await owner.check();
+		// freshness. A revoked/closed owner runs no derivation or callback. Entered
+		// straight from the acquisition's complete check, it may coalesce with it.
+		await owner.check("pre-callback");
 		let refusedBeforeApplication = false;
 		try {
 		const chargedBytes = proof.accounting.chargedBytes;
@@ -4184,6 +4605,10 @@ export function reserveCreatorOrdinaryFinishingCapacity(
 		// effect capture. No hypothetical scenario, new parse or graph fold is
 		// needed there; the original runtime resolver rechecks exact data/context.
 		owner.numerical.current = Object.freeze({unsignedBytes: exactUnsignedBytes, value: facts!.current});
+		// The delivered admission's own beginWrite is the next boundary. It may
+		// coalesce with the complete post-charge check above only if reached with
+		// no task in between; a caller holding the quote owes a complete check.
+		owner.issueAdjacentCheck?.("begin");
 		return derived.capacity;
 		} catch (cause) {
 			owner.numerical.current = undefined;
@@ -5729,36 +6154,87 @@ export async function acquireCreatorOrdinaryIssuanceMaintenanceProof(value: Crea
 			owned.push(acquired.protection);
 		}
 		const objectId = parseStorageObjectId(input.objectId); requireLaw(objectId.ok, "malformed-input");
-		const acquired = currentTrust.currentEpoch >= 2
-			? await bindMethod<AheBoundedRecoveryRoleStore["acquireBoundedRecoveryRoleRead"]>(input.store,
-				"acquireBoundedRecoveryRoleRead")({objectId: objectId.value, limits: AHE_BOUNDED_READ_LIMITS})
-			: await input.acquire({objectId: objectId.value, ancestorCount: currentTrust.currentEpoch === 0 ? 0 : 2, limits: AHE_BOUNDED_READ_LIMITS});
+		// Every source image below is a fresh nonmutating read of a different
+		// owner (AHE, journal, snapshot, floor) inside the custody acquired above,
+		// and was otherwise awaited one after another. Start them together and
+		// join EVERY one; then judge each outcome in the ORIGINAL order, so the
+		// first refusal (and its reason) is the sequential one. The AHE admission
+		// image still follows its own bounded read (it reuses that read's held
+		// native facts) and, as before, is never read unless that read admitted
+		// the exact present source.
+		const sourceRead = <T>(read: () => Promise<T>): Promise<T> => Promise.resolve().then(read);
+		const sameSourceReader = (candidate: SourceReader): boolean => {
+			if (candidate.head.kind !== "present" || !closedRetirementEqual(candidate.head, seed.head) ||
+				!closedRetirementEqual(candidate.generations, seed.generations) || candidate.blobs.length !== seed.blobs.length) return false;
+			// The original predicate (every blob equals SOME prior in canonical ref
+			// AND exact bytes), encoding each ref once rather than both refs per pair.
+			const priors = new Map<string, Uint8Array[]>();
+			for (const prior of seed.blobs) {
+				const key = String.fromCharCode(...closedRetirementBytes(prior.ref)), same = priors.get(key);
+				if (same === undefined) priors.set(key, [prior.bytes]); else same.push(prior.bytes);
+			}
+			return candidate.blobs.every(blob => priors.get(String.fromCharCode(...closedRetirementBytes(blob.ref)))
+				?.some(bytes => compareBytes(blob.bytes, bytes) === 0) === true);
+		};
+		const aheSource = sourceRead(async () => {
+			const acquired = currentTrust.currentEpoch >= 2
+				? await bindMethod<AheBoundedRecoveryRoleStore["acquireBoundedRecoveryRoleRead"]>(input.store,
+					"acquireBoundedRecoveryRoleRead")({objectId: objectId.value, limits: AHE_BOUNDED_READ_LIMITS})
+				: await input.acquire({objectId: objectId.value, ancestorCount: currentTrust.currentEpoch === 0 ? 0 : 2, limits: AHE_BOUNDED_READ_LIMITS});
+			if (!acquired.ok || ("kind" in acquired.value && acquired.value.kind === "empty")) return {acquired};
+			const actual = ("reader" in acquired.value ? acquired.value.reader : acquired.value as AheBoundedRecoveryRoleRead) as SourceReader;
+			// Original custody point: this reader is released with the source on
+			// any later refusal, including a throwing comparison below.
+			reader = actual;
+			if (!sameSourceReader(actual)) return {acquired, actual};
+			const image = await Promise.allSettled([sourceRead(() => bindMethod<NonNullable<AheBoundedRecoveryRoleStore["readRetirementAdmissionImage"]>>(
+				input.store, "readRetirementAdmissionImage")(objectId.value))]);
+			return {acquired, actual, image: image[0]!};
+		});
+		const readJournal = Reflect.get(input.liveJournalStore, "readRetirementImage") as LiveJournalRetirementImageReader;
+		const journalSource = sourceRead(async () => {
+			if (typeof readJournal !== "function") throw new TypeError("missing trusted port: readRetirementImage");
+			return await Reflect.apply(readJournal, input.liveJournalStore, [{objectId: input.objectId}]) as Awaited<ReturnType<LiveJournalRetirementImageReader>>;
+		});
+		const snapshotSource = sourceRead(() => bindMethod<NonNullable<SnapshotRecoveryStore<SnapshotVerificationReceipt>["readRetirementAdmissionImage"]>>(
+			input.snapshotStore, "readRetirementAdmissionImage")({objectId: input.objectId}));
+		const floorScope = {scope: {objectId: input.objectId, pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest}};
+		const floorSource = sourceRead(async () => {
+			const read = bindMethod<(arg: Readonly<{scope: Readonly<{objectId: string; pinnedGenesisAnchorDigest: string}>}>) =>
+				Promise<CreatorIssuanceMaintenanceProof["floorImage"]>>(input.roomHeadAuthority, "readRetirementImage");
+			return {read, image: await read(floorScope)};
+		});
+		const inventorySource = sourceRead(() => snapshotCall(() => bindMethod<NonNullable<SnapshotRecoveryStore<SnapshotVerificationReceipt>["captureRecoveryRoleInventory"]>>(
+			input.snapshotStore, "captureRecoveryRoleInventory")({objectId: input.objectId}, {signal: input.signal})));
+		// The issuer image and signing custody are likewise independent of every
+		// source image above (their own held owners, this runtime's one-shot
+		// enrollments). Both are still JUDGED at their original positions below;
+		// a borrowed signing read is owned (released) as soon as it exists.
+		const nativeIssuanceSource = sourceRead(() => runtime.readNativeIssuance());
+		const signingSource = sourceRead(async () => {
+			const borrowed = await runtime.borrowSigningDependencies(seed.signingTrusts);
+			signing = borrowed; return borrowed;
+		});
+		const [aheOutcome] = await Promise.allSettled([aheSource, journalSource, snapshotSource, floorSource, inventorySource,
+			nativeIssuanceSource, signingSource]);
+		if (aheOutcome.status === "rejected") throw aheOutcome.reason;
+		const {acquired} = aheOutcome.value;
 		requireLaw(acquired.ok, "ahe-rejected");
 		if ("kind" in acquired.value && acquired.value.kind === "empty") throw unavailable;
-		const actual = "reader" in acquired.value ? acquired.value.reader : acquired.value as AheBoundedRecoveryRoleRead;
-		reader = actual as SourceReader;
-		if (reader.head.kind !== "present" || !closedRetirementEqual(reader.head, seed.head) ||
-			!closedRetirementEqual(reader.generations, seed.generations) || reader.blobs.length !== seed.blobs.length ||
-			!reader.blobs.every(blob => seed.blobs.some(prior => closedRetirementEqual(blob.ref, prior.ref) && compareBytes(blob.bytes, prior.bytes) === 0)))
-			throw unavailable;
-		const readJournal = Reflect.get(input.liveJournalStore, "readRetirementImage") as LiveJournalRetirementImageReader;
-		if (typeof readJournal !== "function") throw new TypeError("missing trusted port: readRetirementImage");
-		const journal = await Reflect.apply(readJournal, input.liveJournalStore, [{objectId: input.objectId}]) as Awaited<ReturnType<LiveJournalRetirementImageReader>>;
+		reader = aheOutcome.value.actual!;
+		if (aheOutcome.value.image === undefined) throw unavailable; // Changed head, generations or blobs.
+		const journal = await journalSource;
 		requireLaw(journal.ok, "anchor-unavailable");
-		const snapshot = await bindMethod<NonNullable<SnapshotRecoveryStore<SnapshotVerificationReceipt>["readRetirementAdmissionImage"]>>(
-			input.snapshotStore, "readRetirementAdmissionImage")({objectId: input.objectId});
-		const ahe = await bindMethod<NonNullable<AheBoundedRecoveryRoleStore["readRetirementAdmissionImage"]>>(
-			input.store, "readRetirementAdmissionImage")(objectId.value); requireLaw(ahe.ok, "ahe-rejected");
-		const readFloor = bindMethod<(arg: Readonly<{scope: Readonly<{objectId: string; pinnedGenesisAnchorDigest: string}>}>) =>
-			Promise<CreatorIssuanceMaintenanceProof["floorImage"]>>(input.roomHeadAuthority, "readRetirementImage");
-		const floorScope = {scope: {objectId: input.objectId, pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest}};
-		const floorImage = await readFloor(floorScope);
-		const inventory = await snapshotCall(() => bindMethod<NonNullable<SnapshotRecoveryStore<SnapshotVerificationReceipt>["captureRecoveryRoleInventory"]>>(
-			input.snapshotStore, "captureRecoveryRoleInventory")({objectId: input.objectId}, {signal: input.signal}));
+		const snapshot = await snapshotSource;
+		const aheImage = aheOutcome.value.image;
+		if (aheImage.status === "rejected") throw aheImage.reason;
+		const ahe = aheImage.value; requireLaw(ahe.ok, "ahe-rejected");
+		const {read: readFloor, image: floorImage} = await floorSource;
+		const inventory = await inventorySource;
 		if (!closedRetirementEqual(snapshot, seed.snapshot) || !closedRetirementEqual(ahe.value, seed.ahe) ||
 			!closedRetirementEqual(floorImage, seed.floorImage) ||
 			compareBytes(closedRetirementBytes({scopes: inventory.scopes, owner: inventory.owner}), seed.inventoryBytes) !== 0) throw unavailable;
-		const nativeIssuance = await runtime.readNativeIssuance();
+		const nativeIssuance = await nativeIssuanceSource;
 		issuanceProbe = runtime.captureNativeIssuanceCurrentProbe?.(nativeIssuance);
 		const sameOrdinaryControl = (present: Readonly<{revision: number}> | null | undefined,
 			prior: Readonly<{revision: number}> | null | undefined): boolean => {
@@ -5871,7 +6347,7 @@ export async function acquireCreatorOrdinaryIssuanceMaintenanceProof(value: Crea
 				compareBytes(present.exactCanonicalAnchorPreimageBytes, dependency.bytes) !== 0) throw unavailable;
 			requireLaw(accounting.charge(present.exactCanonicalAnchorPreimageBytes), "proof-budget-exceeded");
 		}
-		signing = await runtime.borrowSigningDependencies(seed.signingTrusts);
+		signing = await signingSource;
 		const signingRows = Object.freeze(signing.readExactCanonicalRows().map(bytes => bytes.slice()));
 		for (const bytes of signingRows) requireLaw(accounting.charge(bytes), "proof-budget-exceeded");
 		for (const bytes of creatorIssuanceMaintenanceObservationCarriers({journal: journal.value, snapshot, ahe: ahe.value,
@@ -5934,11 +6410,25 @@ export async function acquireCreatorOrdinaryIssuanceMaintenanceProof(value: Crea
 			checkAbort(input.signal);
 			requireLaw(!released && capturedFrame.alive && runtime.readSourceIdentity() === seed.identity, "chain-invalid");
 		};
-		const checkPointsAfter = async (): Promise<void> => {
-			requireLaw(closedRetirementEqual(await readFloor(floorScope), floorImage), "floor-stale");
-			journalProbe = await checkCreatorOrdinaryJournalCurrentImage(readJournal, input.liveJournalStore,
-				input.objectId, journal.value, journalProbe);
-			if (issuanceProbe === undefined || !await issuanceProbe.checkCurrent()) {
+		const checkPointsAfter = async (images: readonly (() => Promise<void>)[] = []): Promise<void> => {
+			// The eligibility boundary above admitted ALL of these fresh nonmutating
+			// point reads, which were otherwise awaited one after another. Start them
+			// in the original order, join every one, then judge outcomes in that same
+			// order: the first refusal and its reason are the sequential ones. Probes
+			// change only after every earlier point passed, and the issuer's full
+			// image (which refreshes runtime capture) is still read only when its
+			// probe is absent or stale, after floor and journal points have passed.
+			const point = <T>(read: () => Promise<T>): Promise<T> => Promise.resolve().then(read);
+			const priorJournalProbe = journalProbe, priorIssuanceProbe = issuanceProbe;
+			const imagePoints = images.map(point);
+			const floorPoint = point(async () => requireLaw(closedRetirementEqual(await readFloor(floorScope), floorImage), "floor-stale"));
+			const journalPoint = point(() => checkCreatorOrdinaryJournalCurrentImage(readJournal, input.liveJournalStore,
+				input.objectId, journal.value, priorJournalProbe));
+			const issuancePoint = point(async () => priorIssuanceProbe !== undefined && await priorIssuanceProbe.checkCurrent());
+			const joined = await Promise.allSettled([...imagePoints, floorPoint, journalPoint, issuancePoint]);
+			for (const outcome of joined.slice(0, -2)) if (outcome.status === "rejected") throw outcome.reason;
+			journalProbe = await journalPoint;
+			if (!await issuancePoint) {
 				const fresh = await runtime.readNativeIssuance();
 				requireLaw(closedRetirementEqual(fresh, nativeIssuance), "chain-invalid");
 				issuanceProbe = runtime.captureNativeIssuanceCurrentProbe?.(fresh);
@@ -5948,16 +6438,36 @@ export async function acquireCreatorOrdinaryIssuanceMaintenanceProof(value: Crea
 		const checkReadEligibility = (): Promise<void> => runtime.checkWhile(async () => {
 			await checkPointsBefore(); await checkPointsAfter();
 		}, signing!);
-		const check = (): Promise<void> => runtime.checkWhile(async () => {
-			await checkPointsBefore();
-			requireLaw(closedRetirementEqual(await bindMethod<NonNullable<SnapshotRecoveryStore<SnapshotVerificationReceipt>["readRetirementAdmissionImage"]>>(
-				input.snapshotStore, "readRetirementAdmissionImage")({objectId: input.objectId}), snapshot), "snapshot-not-ready");
-			const freshInventory = await snapshotCall(() => bindMethod<NonNullable<SnapshotRecoveryStore<SnapshotVerificationReceipt>["captureRecoveryRoleInventory"]>>(
-				input.snapshotStore, "captureRecoveryRoleInventory")({objectId: input.objectId}, {signal: input.signal}));
-			requireLaw(compareBytes(closedRetirementBytes({scopes: freshInventory.scopes, owner: freshInventory.owner}), seed.inventoryBytes) === 0, "snapshot-not-ready");
-			await checkPointsAfter();
-		}, signing!);
+		const check = (adjacent?: CreatorOrdinaryAdjacentCheckTarget): Promise<void> => {
+			// A named boundary reached from the complete check that just ended,
+			// with no task, await or own effect since, repeats only its original
+			// synchronous eligibility prefix; the native observation is the same.
+			// Every other check consumes the claim and stays complete.
+			const coalesced = capturedFrame.adjacentCheck?.consume(adjacent) === true;
+			capturedFrame.adjacentCheck = undefined;
+			if (coalesced) return runtime.checkWhile(async () => {
+				checkAbort(input.signal);
+				requireLaw(!released && capturedFrame.alive && runtime.readSourceIdentity() === seed.identity, "chain-invalid");
+			}, signing!);
+			return runtime.checkWhile(async () => {
+				await checkPointsBefore();
+				// Complete delivery adds the snapshot image and whole inventory as the
+				// first (and first-judged) after-points, exactly where they were awaited.
+				await checkPointsAfter([
+					async () => requireLaw(closedRetirementEqual(await bindMethod<NonNullable<SnapshotRecoveryStore<SnapshotVerificationReceipt>["readRetirementAdmissionImage"]>>(
+						input.snapshotStore, "readRetirementAdmissionImage")({objectId: input.objectId}), snapshot), "snapshot-not-ready"),
+					async () => {
+						const freshInventory = await snapshotCall(() => bindMethod<NonNullable<SnapshotRecoveryStore<SnapshotVerificationReceipt>["captureRecoveryRoleInventory"]>>(
+							input.snapshotStore, "captureRecoveryRoleInventory")({objectId: input.objectId}, {signal: input.signal}));
+						requireLaw(compareBytes(closedRetirementBytes({scopes: freshInventory.scopes, owner: freshInventory.owner}), seed.inventoryBytes) === 0, "snapshot-not-ready");
+					},
+				]);
+			}, signing!);
+		};
 		await check();
+		// Prepared capacity is entered next, from this complete check, before any
+		// task can run; its pre-callback boundary may coalesce with it.
+		if (preparedCapacityOnly) capturedFrame.adjacentCheck = issueCreatorOrdinaryAdjacentCheck("pre-callback");
 		if (preparedJournal !== undefined && seed.capacity.readiness === readinessAtCapture)
 			seed.capacity.readiness = Object.freeze({...readinessAtCapture!,
 				geometry: Object.freeze({...readinessAtCapture!.geometry, journal: preparedJournal})});
@@ -5967,7 +6477,7 @@ export async function acquireCreatorOrdinaryIssuanceMaintenanceProof(value: Crea
 				if (received === undefined || compareBytes(received.exactCanonicalPreimageBytes, bytes) !== 0)
 					return Promise.reject(new Refusal(failure("chain-invalid"))); }
 			numerical.current = undefined; capturedFrame.headerConsumersRevoked = true;
-			beginTask = Promise.resolve().then(async () => { await check(); await Promise.allSettled([...capturedFrame.pending]);
+			beginTask = Promise.resolve().then(async () => { await check("begin"); await Promise.allSettled([...capturedFrame.pending]);
 				await runtime.endReadPhase();
 				if (bytes === undefined) await issuer!.release(); else await journalHold!.release();
 				requireLaw(!released && capturedFrame.alive, "snapshot-unavailable"); writeStarted = true; });
@@ -6072,7 +6582,10 @@ export async function acquireCreatorOrdinaryIssuanceMaintenanceProof(value: Crea
 					await joinSourceReleases([() => runtime.release(), ...owned.map(child => () => child.release()),
 						() => signing!.release()]); }); return endTask;
 			}, release});
-		maintenanceTerminalCustody.set(proof, Object.freeze({kind: "ordinary-proof" as const, ...(preparedCapacityOnly ? {preparedCapacityOnly} : {}), source, frame, runtime, numerical, checkReadEligibility, check,
+		maintenanceTerminalCustody.set(proof, Object.freeze({kind: "ordinary-proof" as const, ...(preparedCapacityOnly ? {preparedCapacityOnly,
+			issueAdjacentCheck: (target: CreatorOrdinaryAdjacentCheckTarget): void => {
+				capturedFrame.adjacentCheck = issueCreatorOrdinaryAdjacentCheck(target); }} : {}),
+			source, frame, runtime, numerical, checkReadEligibility, check,
 			capture: Object.freeze({journal: journal.value,
 				get journalFrames() { return journalCorrespondence.nativeFrames; },
 				...(preparedJournal === undefined ? {} : {preparedJournal}),
@@ -6139,7 +6652,8 @@ export async function acquireCreatorIssuanceMaintenanceProof(
 	currentTrust: CurrentAnchorTrust,
 	mandatoryAdoptionFence = false,
 	terminalWithdrawal = false,
-	maintenancePurpose?: "archive-close"
+	maintenancePurpose?: "archive-close",
+	prepareData?: (data: CreatorIssuanceMaintenancePreparationData) => Promise<void>
 ): Promise<CreatorIssuanceMaintenanceProof> {
 	// Purpose selects the existing finite maintenance entitlement, not operation,
 	// fence or retirement authority. Archive close is not an adoption-fence shortcut.
@@ -6159,6 +6673,24 @@ export async function acquireCreatorIssuanceMaintenanceProof(
 	let issuer: NativeReadReservation | undefined;
 	let terminalFloor: NativeReadReservation | undefined;
 	let journalHeaderHold: NativeReadReservation | undefined;
+	const nativeObjectId = parseStorageObjectId(input.objectId);
+	requireLaw(nativeObjectId.ok, "internal-invariant");
+	const captureNativeImages = async () => {
+		const journal = await bindMethod<NonNullable<DurableLiveJournalStore["readRetirementImage"]>>(
+			input.liveJournalStore, "readRetirementImage")({objectId: input.objectId});
+		requireLaw(journal.ok, "anchor-unavailable");
+		const snapshot = await bindMethod<NonNullable<SnapshotRecoveryStore<SnapshotVerificationReceipt>["readRetirementAdmissionImage"]>>(
+			input.snapshotStore, "readRetirementAdmissionImage")({objectId: input.objectId});
+		const ahe = await bindMethod<NonNullable<AheBoundedRecoveryRoleStore["readRetirementAdmissionImage"]>>(
+			input.store, "readRetirementAdmissionImage")(nativeObjectId.value);
+		requireLaw(ahe.ok, "ahe-rejected");
+		const floorImage = await bindMethod<(arg: Readonly<{scope: Readonly<{objectId: string; pinnedGenesisAnchorDigest: string}>}>) =>
+			Promise<ClosedRetirementSource["floorImage"]>>(input.roomHeadAuthority, "readRetirementImage")({
+				scope: {objectId: input.objectId, pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest}});
+		return {journal, snapshot, ahe, floorImage};
+	};
+	let qualifiedNativeImages: Awaited<ReturnType<typeof captureNativeImages>> | undefined;
+	let preparationFailed = false, preparationFailure: unknown;
 	let released = false,
 		writeStarted = false;
 	let releaseTask: Promise<void> | undefined;
@@ -6183,7 +6715,7 @@ export async function acquireCreatorIssuanceMaintenanceProof(
 			await joinSourceReleases([
 				...(frame?.signingDependencies === undefined ? [] : [() => frame!.signingDependencies!.release()]),
 				...(frame?.closeDependencies === undefined ? [] : [() => frame!.closeDependencies!.release()]),
-				...(facts?.forward?.held ?? []).map((target) => () => target.release()),
+				...(facts?.forward?.held ?? []).map((target) => () => releaseHeldTarget(target)),
 				...(facts?.forward?.installed ?? []).map((proof) => () => proof.release()),
 				...(facts?.forward?.certificates ?? []).map((proof) => () => proof.release()),
 				...(frame === undefined ? [] : [() => frame!.reader.release()]),
@@ -6194,7 +6726,7 @@ export async function acquireCreatorIssuanceMaintenanceProof(
 		});
 		return releaseTask;
 	};
-	try {
+	const acquireReservations = async (): Promise<void> => {
 		for (const [role, owner] of [["ahe", input.store], ["journal", input.liveJournalStore]] as const) {
 			const original = (await lifetime.borrowCurrentNativeReservation?.(role)) ??
 				(await bindMethod<(arg: { objectId: string }) => Promise<NativeReadReservation>>(
@@ -6218,6 +6750,101 @@ export async function acquireCreatorIssuanceMaintenanceProof(
 				}));
 		reservations.push(terminalFloor);
 		for (const reservation of reservations) await reservation.check();
+	};
+	try {
+		await acquireReservations();
+		const snapshotInventoryRead = bindMethod<NonNullable<SnapshotRecoveryStore<SnapshotVerificationReceipt>["captureRecoveryRoleInventory"]>>(
+			input.snapshotStore, "captureRecoveryRoleInventory");
+		const snapshotInventory = await snapshotCall(() => snapshotInventoryRead({objectId: input.objectId}, {signal: input.signal}));
+		let nativePreparation: Parameters<typeof acquireClosedData>[12];
+		if (lifetime.canDetachNativePreparation === true && snapshotInventory.owner.migration === "ready" &&
+			(snapshotInventory.legacyScopes?.length ?? 0) === 0) {
+			// This is the ONE original proof lifetime. authenticate consumes this
+			// same book; it must not create/reset a second preparation allowance.
+			const accounting = createCreatorClosedRollbackProofAccounting([],
+				mandatoryAdoptionFence || terminalWithdrawal || maintenancePurpose === "archive-close");
+			let original: Awaited<ReturnType<typeof captureNativeImages>> | undefined = await captureNativeImages();
+			for (const bytes of creatorIssuanceMaintenanceObservationCarriers({journal: original.journal.value,
+				snapshot: original.snapshot, ahe: original.ahe.value, floor: original.floorImage.state, floorImage: original.floorImage,
+				snapshotInventory: {scopes: snapshotInventory.scopes, owner: snapshotInventory.owner}}).map(closedRetirementBytes))
+				requireLaw(chargeProofObservation(accounting, bytes), "proof-budget-exceeded");
+			for (const reservation of reservations) await reservation.check();
+			await joinSourceReleases(reservations.map(reservation => () => reservation.release()));
+			reservations.length = 0; issuer = undefined; terminalFloor = undefined; journalHeaderHold = undefined;
+			try { const observer = Reflect.get(globalThis, "__warmProofEvent");
+				if (typeof observer === "function") observer({kind: "closed-native-preparation-detached", epoch: currentTrust.currentEpoch});
+			} catch { /* Diagnostics never grant custody. */ }
+			nativePreparation = Object.freeze({accounting, journal: original.journal.value,
+				...(prepareData === undefined || maintenancePurpose === "archive-close" ? {} : {prepare: async (
+					prepared: Readonly<{facts: ObservationFacts; work: CreatorClosedProofWork; censusBytes: Uint8Array; signingRows: readonly Uint8Array[]}>
+				) => {
+					const images = original, forward = prepared.facts.forward;
+					requireLaw(images !== undefined && forward !== undefined && forward.wholeFloor !== undefined &&
+						prepared.work.accounting === accounting && creatorClosedProofPreparingNativeData(accounting), "snapshot-unavailable");
+					const headerScopes = prepareClosedJournalHeaderScopes({work: prepared.work, forward,
+						closeAnchors: lifetime.dependencyAnchors, protectedScopes: snapshotInventory.scopes.map(row => row.scope),
+						proofs: [...forward.certificates, ...(forward.pending?.certificates ?? [])]});
+					requireLaw(accounting.charge(closedRetirementBytes(headerScopes)), "proof-budget-exceeded");
+					const roleData = creatorClosedPromotionRoleData(forward);
+					const owner = snapshotInventory.owner;
+					const required = currentCreatorMaintenanceRequiresSnapshotReceiptCapture(forward.reader.generations.length,
+						owner, images.ahe.value.control?.completed, forward.currentTrust.currentEpoch);
+					const authenticated = required ? selectAuthenticatedSnapshotTurnoverInventory({
+						predecessorTrust: forward.predecessorTrust, recoveryRoleTransfer: forward.certificates[0]?.transfer ?? null,
+						recoveryDependencyAnchors: forward.certificates[0]?.dependencyAnchors ?? null,
+						recoveryCertificateDigest: forward.certificates[0]?.certificateDigest ?? null,
+						retirementProtectedScopes: forward.certificates[0]?.protectedScopes ?? null,
+					}, lifetime, snapshotInventory) : undefined;
+					const selection = !required ? {survivingScopes: snapshotInventory.scopes.map(row => row.scope), retiringScopes: []} :
+						authenticated === undefined ? undefined : selectCurrentSnapshotTurnoverInventory(authenticated, snapshotInventory,
+							images.snapshot, forward.wholeFloor.stable);
+					requireLaw(selection !== undefined && !(owner.recoveryScopes >= owner.limits.maxRecoveryScopes &&
+						selection.retiringScopes.length === 0), "snapshot-unavailable");
+					checkAbort(input.signal);
+					requireLaw(creatorClosedProofWorkAvailable(prepared.work) &&
+						creatorClosedProofPreparingNativeData(accounting), "snapshot-unavailable");
+					try { const observer = Reflect.get(globalThis, "__warmProofEvent");
+						if (typeof observer === "function") observer({kind: "closed-quote-preparation-detached", epoch: currentTrust.currentEpoch});
+					} catch { /* This DATA callback has no native authority to grant. */ }
+					try { await prepareData(Object.freeze({accounting, summary: prepared.facts.summary,
+						censusBytes: prepared.censusBytes, signingRows: prepared.signingRows, generations: forward.reader.generations,
+						blobs: forward.reader.blobs, currentTrust: forward.currentTrust, journal: images.journal.value,
+						snapshot: images.snapshot, ahe: images.ahe.value, floor: forward.wholeFloor, floorImage: images.floorImage,
+						protectedJournalHeaderScopes: headerScopes, recovery: Object.freeze({...roleData,
+							snapshotTurnover: Object.freeze({required, ...selection})})}));
+					} catch (error) { preparationFailed = true; preparationFailure = error; throw error; }
+				}}), qualify: async (book: CreatorClosedRollbackProofAccounting) => {
+				checkAbort(input.signal);
+				requireLaw(book === accounting, "internal-invariant");
+				const prepared = original;
+				requireLaw(prepared !== undefined, "snapshot-unavailable");
+				await acquireReservations();
+				const actual = await captureNativeImages();
+				const actualInventory = await snapshotCall(() => snapshotInventoryRead({objectId: input.objectId}, {signal: input.signal}));
+				// All complete actual observations use the ORIGINAL cumulative book.
+				// Identical carriers deduplicate there; changed material is not free.
+				for (const bytes of creatorIssuanceMaintenanceObservationCarriers({
+					journal: actual.journal.value, snapshot: actual.snapshot, ahe: actual.ahe.value,
+					floor: actual.floorImage.state, floorImage: actual.floorImage,
+					snapshotInventory: {scopes: actualInventory.scopes, owner: actualInventory.owner}}).map(closedRetirementBytes))
+					requireLaw(chargeProofObservation(accounting, bytes), "proof-budget-exceeded");
+				requireLaw(closedRetirementEqual(actual.journal.value, prepared.journal.value), "anchor-unavailable");
+				requireLaw(closedRetirementEqual(actual.snapshot, prepared.snapshot), "snapshot-invalid");
+				requireLaw(closedRetirementEqual(actual.ahe.value, prepared.ahe.value), "ahe-rejected");
+				requireLaw(closedRetirementEqual(actual.floorImage, prepared.floorImage), "floor-stale");
+				requireLaw(closedRetirementEqual(actualInventory.scopes, snapshotInventory.scopes) &&
+					closedRetirementEqual(actualInventory.owner, snapshotInventory.owner) &&
+					(actualInventory.legacyScopes?.length ?? 0) === 0, "snapshot-invalid");
+				for (const reservation of reservations) await reservation.check();
+				qualifiedNativeImages = actual;
+				original = undefined;
+				requireLaw(journalHeaderHold !== undefined, "anchor-unavailable");
+				return borrowJournalHeaderHold(journalHeaderHold, input.liveJournalStore);
+			}});
+		} else try { const observer = Reflect.get(globalThis, "__warmProofEvent");
+			if (typeof observer === "function") observer({kind: "closed-native-preparation-declined", epoch: currentTrust.currentEpoch,
+				reason: lifetime.canDetachNativePreparation === true ? "snapshot-classification-owner" : "retained-native-source-custody"});
+		} catch { /* Original supported safe path remains unchanged. */ }
 		const acquired = await acquireClosedData(
 			value,
 			undefined,
@@ -6228,8 +6855,13 @@ export async function acquireCreatorIssuanceMaintenanceProof(
 			true,
 			undefined,
 			mandatoryAdoptionFence || terminalWithdrawal || maintenancePurpose === "archive-close",
-			journalHeaderHold
+			journalHeaderHold,
+			undefined,
+			Object.freeze({inventory: snapshotInventory, read: snapshotInventoryRead, targets: []}),
+			nativePreparation
 		);
+		nativePreparation = undefined;
+		if (preparationFailed) throw preparationFailure;
 		if (!acquired.ok) throw new Refusal(acquired);
 		observation = acquired.observation;
 		facts = observations.get(observation);
@@ -6245,48 +6877,17 @@ export async function acquireCreatorIssuanceMaintenanceProof(
 				sameCreatorRoomHead(forward.wholeFloor.stable, currentTrust),
 			"chain-invalid"
 		);
-		const objectId = parseStorageObjectId(input.objectId);
-		requireLaw(objectId.ok, "internal-invariant");
-		const journal = await bindMethod<NonNullable<DurableLiveJournalStore["readRetirementImage"]>>(
-			input.liveJournalStore,
-			"readRetirementImage"
-		)({ objectId: input.objectId });
-		requireLaw(journal.ok, "anchor-unavailable");
-		const snapshot = await bindMethod<
-			NonNullable<SnapshotRecoveryStore<SnapshotVerificationReceipt>["readRetirementAdmissionImage"]>
-		>(
-			input.snapshotStore,
-			"readRetirementAdmissionImage"
-		)({ objectId: input.objectId });
-		const ahe = await bindMethod<NonNullable<AheBoundedRecoveryRoleStore["readRetirementAdmissionImage"]>>(
-			input.store,
-			"readRetirementAdmissionImage"
-		)(objectId.value);
-		requireLaw(ahe.ok, "ahe-rejected");
-		const floorImage = await bindMethod<
-			(
-				arg: Readonly<{ scope: Readonly<{ objectId: string; pinnedGenesisAnchorDigest: string }> }>
-			) => Promise<ClosedRetirementSource["floorImage"]>
-		>(
-			input.roomHeadAuthority,
-			"readRetirementImage"
-		)({
-			scope: {
-				objectId: input.objectId,
-				pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest,
-			},
-		});
+		const {journal, snapshot, ahe, floorImage} = qualifiedNativeImages ?? await captureNativeImages();
 		requireLaw(
 			compareBytes(closedRetirementBytes(floorImage.state), closedRetirementBytes(forward.wholeFloor)) === 0,
 			"chain-invalid"
 		);
-		const snapshotInventory = await snapshotCall(() =>
-			bindMethod<NonNullable<SnapshotRecoveryStore<SnapshotVerificationReceipt>["captureRecoveryRoleInventory"]>>(
-				input.snapshotStore,
-				"captureRecoveryRoleInventory"
-			)({ objectId: input.objectId }, { signal: input.signal })
-		);
+		const qualifiedSnapshotInventory = await snapshotCall(() => snapshotInventoryRead({objectId: input.objectId}, {signal: input.signal}));
+		requireLaw(chargeProofObservation(frame.accounting, closedRetirementBytes({scopes: qualifiedSnapshotInventory.scopes,
+			owner: qualifiedSnapshotInventory.owner})), "proof-budget-exceeded");
 		requireLaw(
+			closedRetirementEqual(qualifiedSnapshotInventory.scopes, snapshotInventory.scopes) &&
+				closedRetirementEqual(qualifiedSnapshotInventory.owner, snapshotInventory.owner) &&
 			snapshotInventory.scopes.length === snapshot.image.scopes.length &&
 				snapshotInventory.scopes.every((row) =>
 					snapshot.image.scopes.some((pair) =>
@@ -6555,14 +7156,26 @@ async function acquireClosedData(
 	classificationRead?: SnapshotRecoveryRoleInventory,
 	maintenance = !issuancePreview,
 	borrowedHeaderHold?: NativeReadReservation,
-	ownedMaintenance?: CreatorRecoveryMaintenanceFacts
+	ownedMaintenance?: CreatorRecoveryMaintenanceFacts,
+	snapshotPreparation?: CapturedSnapshot["snapshotPreparation"],
+	nativePreparation?: Readonly<{
+		journal: LiveJournalRetirementImageObservation;
+		accounting: CreatorClosedRollbackProofAccounting;
+		prepare?(data: Readonly<{facts: ObservationFacts; work: CreatorClosedProofWork; censusBytes: Uint8Array;
+			signingRows: readonly Uint8Array[]}>): Promise<void>;
+		/** Returns only NEW genuine native custody after complete fresh images
+		 * qualify. It receives the original book, never a live proof/frame. */
+		qualify(accounting: CreatorClosedRollbackProofAccounting): Promise<NativeReadReservation>;
+	}>
 ): Promise<CreatorClosedRollbackDataResult> {
 	// The maintenance job captured these input bindings before its first pass.
 	// A new observation object still owns every actual read and native lifetime;
 	// no frame, cursor, head, floor or paid accounting crosses a retirement write.
 	const captured = ownedMaintenance === undefined ? capture(value) : Object.freeze({...ownedMaintenance.input});
 	if (captured === undefined) return failure("malformed-input");
-	const input: Captured = classificationRead === undefined ? captured : Object.freeze({...captured, classificationRead});
+	const input: Captured = classificationRead === undefined && snapshotPreparation === undefined && nativePreparation === undefined ? captured :
+		Object.freeze({...captured, ...(classificationRead === undefined ? {} : {classificationRead}),
+			...(snapshotPreparation === undefined ? {} : {snapshotPreparation})});
 	let acquireRoles: AheBoundedRecoveryRoleStore["acquireBoundedRecoveryRoleRead"] | undefined;
 	if (protectedUnion || ownedStage !== undefined || ownedNomination !== undefined)
 		try {
@@ -6590,13 +7203,41 @@ async function acquireClosedData(
 	const readAnchor = parsing.anchorOf;
 	const readUnique = parsing.unique;
 	const selectCandidate = parsing.candidate;
+	const qualifyNativePreparation = async (): Promise<void> => {
+		if (nativePreparation === undefined || headerHold !== undefined) return;
+		const work = reader === undefined ? undefined : creatorClosedProofWork(reader);
+		requireLaw(work !== undefined && creatorClosedProofWorkAvailable(work), "snapshot-unavailable");
+		headerHold = await nativePreparation.qualify(work.accounting);
+		await headerHold.check();
+		const session = sourceHeaderSessions.get(input);
+		requireLaw(session !== undefined && session.image === nativePreparation.journal, "internal-invariant");
+		session.hold = headerHold; delete session.image;
+		work.headerHold = headerHold;
+	};
+	const qualifyPreparedSnapshots = async (): Promise<void> => {
+		const targets = input.snapshotPreparation?.targets;
+		if (targets === undefined) return;
+		for (const target of targets) {
+			const qualify = heldTargetPreparations.get(target);
+			if (qualify !== undefined) await qualify.qualify();
+		}
+		// The returned source already owns these exact DATA references. Keep no
+		// preparation queue/custody graph alive after its final qualification.
+		targets.length = 0;
+		const forward = facts?.forward;
+		if (forward === undefined) return;
+		for (const proof of [...forward.installed, ...(forward.pending?.installed ?? [])]) await proof.check();
+		for (const proof of [...forward.certificates, ...(forward.pending?.certificates ?? [])]) await proof.check();
+	};
 	try {
 		checkAbort(input.signal);
-		headerHold = borrowedHeaderHold === undefined
-			? await acquireJournalHeaderHold(input.liveJournalStore, input.objectId)
-			: borrowJournalHeaderHold(borrowedHeaderHold, input.liveJournalStore);
-		await headerHold.check();
-		sourceHeaderSessions.set(input, { hold: headerHold, scopes: new Map() });
+		if (nativePreparation === undefined) {
+			headerHold = borrowedHeaderHold === undefined
+				? await acquireJournalHeaderHold(input.liveJournalStore, input.objectId)
+				: borrowJournalHeaderHold(borrowedHeaderHold, input.liveJournalStore);
+			await headerHold.check();
+			sourceHeaderSessions.set(input, {hold: headerHold, scopes: new Map()});
+		} else sourceHeaderSessions.set(input, {image: nativePreparation.journal, scopes: new Map()});
 		let rawFloor: unknown;
 		try {
 			rawFloor = await input.floorRead({
@@ -6908,9 +7549,11 @@ async function acquireClosedData(
 			certificates,
 			rows,
 			wholeFloor?.ok ? wholeFloor.state : undefined,
-			maintenance, parsing, closeHold
+			maintenance, parsing, closeHold, nativePreparation?.accounting,
+			acquireRoles === undefined ? undefined : {kind: "full-recovery-role-acquisition", owner: input.store,
+				objectId: objectId.value, limits: AHE_BOUNDED_READ_LIMITS, reader: admitted as AheBoundedRecoveryRoleRead}
 		);
-		const heldFrame = frames.get(reader);
+		const heldFrame = creatorClosedProofWork(reader);
 		requireLaw(heldFrame !== undefined, "internal-invariant");
 		heldFrame.headerHold = headerHold;
 		if (nominationControl !== undefined) {
@@ -6919,7 +7562,7 @@ async function acquireClosedData(
 				"readRetirementControl"
 			)(objectId.value);
 			requireLaw(current.ok && closedRetirementEqual(current.value, nominationControl), "ahe-rejected");
-			const frame = frames.get(reader);
+			const frame = creatorClosedProofWork(reader);
 			requireLaw(
 				frame !== undefined && frame.accounting.charge(closedRetirementBytes(nominationControl)),
 				"proof-budget-exceeded"
@@ -6997,8 +7640,8 @@ async function acquireClosedData(
 								baseHead.closureDigest === support.closureDigest,
 							"chain-invalid"
 						);
-						const frame = frames.get(reader);
-						requireLaw(frame !== undefined && frame.alive, "internal-invariant");
+						const frame = creatorClosedProofWork(reader);
+						requireLaw(frame !== undefined && creatorClosedProofWorkAvailable(frame), "internal-invariant");
 						const debt: CreatorProtectedRecoveryRoleDebt = {
 							owner: "ahe",
 							role: "unclassified",
@@ -7062,8 +7705,8 @@ async function acquireClosedData(
 					}
 				}
 			}
-			const originalFrame = frames.get(reader);
-			requireLaw(originalFrame !== undefined && originalFrame.alive, "internal-invariant");
+			const originalFrame = creatorClosedProofWork(reader);
+			requireLaw(originalFrame !== undefined && creatorClosedProofWorkAvailable(originalFrame), "internal-invariant");
 			const extra = reader.generations.filter(
 				(generation) => !required.some((row) => compareBytes(encodeCanonical(row), encodeCanonical(generation)) === 0)
 			);
@@ -7098,8 +7741,9 @@ async function acquireClosedData(
 			requireLaw(lifetime !== undefined, "chain-invalid");
 			closeDependencies = await lifetime.borrowDependencies();
 			const child = closeDependencies;
-			const frame = frames.get(reader);
-			requireLaw(frame !== undefined && frame.alive && frame.closeDependencies === undefined, "snapshot-unavailable");
+			const work = creatorClosedProofWork(reader);
+			requireLaw(work !== undefined && creatorClosedProofWorkAvailable(work) &&
+				(!work.alive || work.closeDependencies === undefined), "snapshot-unavailable");
 			const known = [
 				{epoch: 0, anchorDigest: pin.trust.currentAnchorDigest},
 				{ epoch: forward.currentTrust.currentEpoch, anchorDigest: forward.currentTrust.currentAnchorDigest },
@@ -7136,7 +7780,7 @@ async function acquireClosedData(
 				),
 				"chain-invalid"
 			);
-			requireLaw(chargeProofObservation(frame.accounting, child.readExactCanonicalCensus()), "proof-budget-exceeded");
+			requireLaw(chargeProofObservation(work.accounting, child.readExactCanonicalCensus()), "proof-budget-exceeded");
 			// Compaction may reset a retained L's native base to none. Its original
 			// signed checkpoint remains usable, but that is not a native P/Q role.
 			// Authenticate only the already held cut identities, never epochs drawn
@@ -7163,7 +7807,7 @@ async function acquireClosedData(
 						original.envelope.detachedAnchorSignature,
 						original.envelope.exactCanonicalParametersCarrierBytes,
 					])
-						requireLaw(frame.accounting.charge(bytes), "proof-budget-exceeded");
+						requireLaw(work.accounting.charge(bytes), "proof-budget-exceeded");
 					chain.push(original.envelope);
 					anchorDigest = String(readRecord(original.envelope.exactCanonicalAnchorPreimageBytes).previousAnchor);
 				}
@@ -7195,7 +7839,7 @@ async function acquireClosedData(
 						exactCanonicalPinnedGenesisTrustStateRecordBytes: input.exactCanonicalPinnedGenesisTrustStateRecordBytes,
 					});
 					requireLaw(opened.ok, "chain-invalid");
-					requireLaw(frame.accounting.charge(opened.derivedPredecessorTrustStateRecordBytes), "proof-budget-exceeded");
+					requireLaw(work.accounting.charge(opened.derivedPredecessorTrustStateRecordBytes), "proof-budget-exceeded");
 					const predecessor = readRecord(opened.derivedPredecessorTrustStateRecordBytes);
 					requireLaw(
 						opened.trust.currentEpoch === cut.epoch &&
@@ -7209,17 +7853,17 @@ async function acquireClosedData(
 					proved.push(opened.trust, opened.predecessorTrust);
 				}
 				// All original/derived bytes are charged before publishing any fact.
-				requireLaw(frame.alive, "snapshot-unavailable");
+				requireLaw(creatorClosedProofWorkAvailable(work), "snapshot-unavailable");
 				for (const trust of proved) {
-					frame.recoveryTrusts.add(trust);
-					frame.signingRoleTrusts.add(trust);
+					work.recoveryTrusts.add(trust);
+					work.signingRoleTrusts.add(trust);
 				}
 			}
 			const capturedTrusts = [
 				forward.currentTrust,
 				forward.predecessorTrust,
 				...(forward.pending === undefined ? [] : [forward.pending.trust]),
-				...frame.signingRoleTrusts,
+				...work.signingRoleTrusts,
 			];
 			let signingTrusts = creatorSigningRoleTrustVector(capturedTrusts);
 			if (signingTrusts.length > 7) {
@@ -7233,7 +7877,7 @@ async function acquireClosedData(
 				await joinedClosedRetirementRead(native, async () => {
 					const epochs = new Set<number>([forward.currentTrust.currentEpoch]);
 					for (const bytes of native.readExactCanonicalRows()) {
-						requireLaw(chargeProofObservation(frame.accounting, bytes), "proof-budget-exceeded");
+						requireLaw(chargeProofObservation(work.accounting, bytes), "proof-budget-exceeded");
 						const row = decodeCanonical(bytes);
 						requireLaw(Array.isArray(row) && row.length === 3, "chain-invalid");
 						if (row[0] === "storageMeta") continue;
@@ -7245,10 +7889,21 @@ async function acquireClosedData(
 					signingTrusts = Object.freeze(signingTrusts.filter(trust => epochs.has(trust.currentEpoch)));
 				});
 			}
-			signingDependencies = await lifetime.borrowSigningDependencies(signingTrusts);
+			signingDependencies = await lifetime.borrowSigningDependencies(signingTrusts,
+				nativePreparation?.prepare === undefined ? undefined : async ({rows}: Readonly<{rows: readonly Uint8Array[]}>) => {
+					for (const bytes of rows) requireLaw(chargeProofObservation(work.accounting, bytes), "proof-budget-exceeded");
+					const preparing = proofWorks.get(reader!);
+					requireLaw(preparing !== undefined && preparing === work, "snapshot-unavailable");
+					await nativePreparation.prepare!({facts: facts!, work: preparing, censusBytes: child.readExactCanonicalCensus(), signingRows: rows});
+				});
 			const signing = signingDependencies;
 			for (const bytes of signing.readExactCanonicalRows())
-				requireLaw(chargeProofObservation(frame.accounting, bytes), "proof-budget-exceeded");
+				requireLaw(chargeProofObservation(work.accounting, bytes), "proof-budget-exceeded");
+			await qualifyNativePreparation();
+			await qualifyPreparedSnapshots();
+			// Historical envelopes and exact signing authority selection above are
+			// DATA work, not a live frame. Only the final original native/context
+			// qualification below may create and populate native authority.
 			await child.checkWhile(async () => {
 				requireLaw((await forward.checkCurrent()).ok, "ahe-rejected");
 				requireLaw(wholeFloor !== undefined && wholeFloor.ok, "floor-invalid");
@@ -7267,9 +7922,19 @@ async function acquireClosedData(
 					"floor-stale"
 				);
 			}, signing);
-			requireLaw(frame.alive, "snapshot-unavailable");
+			requireLaw(creatorClosedProofWorkAvailable(work), "snapshot-unavailable");
+			if (nativePreparation !== undefined) try {
+				const observer = Reflect.get(globalThis, "__warmProofEvent");
+				if (typeof observer === "function") observer({kind: "closed-native-preparation-qualified", epoch: forward.currentTrust.currentEpoch});
+			} catch { /* Complete native qualification, never observer authority. */ }
+			const frame = activateCreatorClosedProofWork(reader);
 			frame.closeDependencies = child;
 			frame.signingDependencies = signing;
+		}
+		if (facts.forward !== undefined && !frames.has(reader)) {
+			await qualifyNativePreparation();
+			await qualifyPreparedSnapshots();
+			activateCreatorClosedProofWork(reader);
 		}
 		checkAbort(input.signal);
 	} catch (error) {
@@ -7311,16 +7976,17 @@ async function acquireClosedData(
 				const installedReleased = await Promise.allSettled(installed.map((proof) => proof.release()));
 				if (installedReleased.some((item) => item.status === "rejected")) result ??= failure("release-failed");
 				if (held !== undefined) {
-					const released = await Promise.allSettled(held.map((target) => target.release()));
+					const released = await Promise.allSettled(held.map((target) => releaseHeldTarget(target)));
 					if (released.some((item) => item.status === "rejected")) result ??= failure("release-failed");
 				}
 				if (reader !== undefined) {
-					const frame = frames.get(reader);
+					const frame = creatorClosedProofWork(reader);
 					if (frame !== undefined) {
 						frame.alive = false;
 						ledgers.delete(frame.accounting);
-						for (const requirement of frame.requirements) requirements.delete(requirement);
+						for (const requirement of frame.requirements) { requirements.delete(requirement); preparedRequirements.delete(requirement); }
 						frames.delete(reader);
+						proofWorks.delete(reader); proofWorkLedgers.delete(frame.accounting);
 						await Promise.allSettled([...frame.pending]);
 						headerHold = frame.headerHold ?? headerHold;
 					}
@@ -7421,6 +8087,38 @@ async function joinSourceReleases(releases: readonly (() => Promise<void>)[]): P
 	if (failures.length > 1) throw new AggregateError(failures, "creator source release failed");
 }
 
+/** One pure source spelling for both detached sizing and the final live
+ * promotion-source consumer. It carries no native methods or custody. */
+function creatorClosedPromotionRoleData(forward: NonNullable<ObservationFacts["forward"]>):
+	Omit<CreatorOrdinaryIssuanceSourceMaterial, "snapshotTurnover"> {
+	const input = forward.input;
+	const historicalHeld = forward.pending === undefined ? forward.held : forward.held.slice(0, 2);
+	const installed = forward.installed[0]?.promotion;
+	const promotion = installed === undefined ? undefined : resolveCreatorForwardPromotion(installed);
+	requireLaw(installed === undefined || promotion !== undefined, "chain-invalid");
+	const sources = historicalHeld.map(item => {
+		const {target} = item, evidence = target.evidence;
+		const controls: PromotionControlRef[] = [];
+		for (const [kind, opened] of [["drp-creator-issuance-retirement-state", evidence.retirement],
+			["drp-creator-author-issuance-frontiers-state", evidence.aggregate], ["drp-creator-author-settlement-state", evidence.settlement]] as const)
+			if (opened !== undefined) controls.push(Object.freeze([kind, Object.freeze({...opened.candidate.ref})]));
+		const manifest = record(item.exactCanonicalManifestBytes);
+		return Object.freeze({closedEpoch: Number(target.cut.epoch), closedAnchorDigest: String(target.cut.previousAnchor),
+			successorEpoch: target.successorTrust.currentEpoch, successorAnchorDigest: target.successorTrust.currentAnchorDigest,
+			cutValueDigest: creatorDataDigest("ts-drp/hard-epoch-cut/v3", evidence.cut.bytes), cutRef: Object.freeze({...evidence.cut.ref}),
+			commitQcRef: Object.freeze({...evidence.qc.ref}), manifestRef: Object.freeze({digest: String(target.cut.snapshotManifestDigest),
+				byteLength: item.exactCanonicalManifestBytes.byteLength}), payloadDigest: String(manifest.payloadDigest),
+			stateDigest: String(target.cut.stateDigest), closedAclDigest: target.closedAclDigest, snapshotAclDigest: String(target.cut.aclDigest),
+			checkpointRepresentation: evidence.representation, checkpointRefs: Object.freeze(controls)});
+	});
+	return Object.freeze({currentTrust: forward.currentTrust, sources: Object.freeze(sources),
+		protectedScopes: Object.freeze([...forward.held.map(item => Object.freeze({objectId: input.objectId,
+			epoch: Number(item.target.cut.epoch), anchor: String(item.target.cut.previousAnchor), manifestDigest: String(item.target.cut.snapshotManifestDigest)})),
+			...[...forward.installed, ...(forward.pending?.installed ?? [])].flatMap(proof => proof.protectedScopes),
+			...[...forward.certificates, ...(forward.pending?.certificates ?? [])].flatMap(proof => [...proof.protectedScopes, ...proof.classifiedScopes])]),
+		installedPromotionSource: promotion?.source ?? null, hasRecoveryRoleTransfer: (forward.certificates[0]?.transfer ?? null) !== null});
+}
+
 /**
  * Resolves only this owner's live native acquisition, bound to the actual destination stores.
  * @param capability - Nominal acquisition minted by this owner.
@@ -7455,38 +8153,7 @@ export function resolveCreatorForwardPromotionSource(
 	if (originalFrame.forwardMaterial !== undefined) return originalFrame.forwardMaterial;
 	const latest = held[0];
 	if (latest === undefined) return undefined;
-	const sources = historicalHeld.map((item) => {
-		const { target } = item,
-			evidence = target.evidence;
-		const controls: PromotionControlRef[] = [];
-		for (const [kind, opened] of [
-			["drp-creator-issuance-retirement-state", evidence.retirement],
-			["drp-creator-author-issuance-frontiers-state", evidence.aggregate],
-			["drp-creator-author-settlement-state", evidence.settlement],
-		] as const) {
-			if (opened !== undefined) controls.push(Object.freeze([kind, Object.freeze({ ...opened.candidate.ref })]));
-		}
-		const manifest = record(item.exactCanonicalManifestBytes);
-		return Object.freeze({
-			closedEpoch: Number(target.cut.epoch),
-			closedAnchorDigest: String(target.cut.previousAnchor),
-			successorEpoch: target.successorTrust.currentEpoch,
-			successorAnchorDigest: target.successorTrust.currentAnchorDigest,
-			cutValueDigest: creatorDataDigest("ts-drp/hard-epoch-cut/v3", evidence.cut.bytes),
-			cutRef: Object.freeze({ ...evidence.cut.ref }),
-			commitQcRef: Object.freeze({ ...evidence.qc.ref }),
-			manifestRef: Object.freeze({
-				digest: String(target.cut.snapshotManifestDigest),
-				byteLength: item.exactCanonicalManifestBytes.byteLength,
-			}),
-			payloadDigest: String(manifest.payloadDigest),
-			stateDigest: String(target.cut.stateDigest),
-			closedAclDigest: target.closedAclDigest,
-			snapshotAclDigest: String(target.cut.aclDigest),
-			checkpointRepresentation: evidence.representation,
-			checkpointRefs: Object.freeze(controls),
-		});
-	});
+	const sourceData = creatorClosedPromotionRoleData(forward), sources = sourceData.sources;
 	const sourceFrame = frames.get(reader);
 	if (sourceFrame === undefined) return undefined;
 	// All resolver aliases borrow one frame's lifetime, including admitted checks.
@@ -7516,7 +8183,7 @@ export function resolveCreatorForwardPromotionSource(
 				await joinSourceReleases([
 					...(signingDependencies === undefined ? [] : [(): Promise<void> => signingDependencies.release()]),
 					...(frame?.closeDependencies === undefined ? [] : [(): Promise<void> => frame.closeDependencies!.release()]),
-					...held.map((item) => (): Promise<void> => item.release()),
+					...held.map((item) => (): Promise<void> => releaseHeldTarget(item)),
 					...installedProofs.map((proof) => (): Promise<void> => proof.release()),
 					...certificateProofs.map((proof) => (): Promise<void> => proof.release()),
 					(): Promise<void> => reader.release(),
@@ -7541,7 +8208,7 @@ export function resolveCreatorForwardPromotionSource(
 	};
 	const checkSnapshots = async (): Promise<void> => {
 		requireLaw(!lifetime.released && frames.get(reader)?.alive, "snapshot-unavailable");
-		for (const item of held) await item.check();
+		for (const item of held) await checkHeldTarget(item);
 		for (const proof of installedProofs) await proof.check();
 		for (const proof of certificateProofs) await proof.check();
 	};
@@ -7897,18 +8564,7 @@ export function resolveCreatorForwardPromotionSource(
 		),
 		currentAclBytes: Uint8Array.from(latest.successorAclBytes),
 		sources: Object.freeze(sources),
-		protectedScopes: Object.freeze([
-			...held.map((item) =>
-				Object.freeze({
-					objectId: input.objectId,
-					epoch: Number(item.target.cut.epoch),
-					anchor: String(item.target.cut.previousAnchor),
-					manifestDigest: String(item.target.cut.snapshotManifestDigest),
-				})
-			),
-			...installedProofs.flatMap((proof) => proof.protectedScopes),
-			...certificateProofs.flatMap((proof) => [...proof.protectedScopes, ...proof.classifiedScopes]),
-		]),
+		protectedScopes: sourceData.protectedScopes,
 		historicalSnapshots: Object.freeze(
 			historicalHeld.map((item) =>
 				Object.freeze({
@@ -7978,7 +8634,7 @@ async function authenticateExcludedHistoricalGenerations(
 	reader: AheBoundedRecoveryRoleRead,
 	currentTrust: CurrentAnchorTrust,
 	pin: CurrentAnchorTrust,
-	frame: ImportFrame,
+	frame: ImportFrame | CreatorClosedProofWork,
 	rows: readonly GenerationRecord[],
 	parsing?: CreatorClosedAcquisitionSyntax
 ): Promise<void> {
@@ -8091,7 +8747,7 @@ async function authenticateExcludedHistoricalGenerations(
 		}
 		proved.push(opened.trust, opened.predecessorTrust);
 	}
-	requireLaw(frame.alive && (await reader.checkCurrency()).ok, "ahe-rejected");
+	requireLaw(creatorClosedProofWorkAvailable(frame) && (await reader.checkCurrency()).ok, "ahe-rejected");
 	// The original source and predecessor proofs also authenticate retained
 	// native signing rows. Publishing their verification coverage does not select
 	// a recovery consumer or grant eligibility, writes or a lower safety floor.
@@ -8143,8 +8799,13 @@ function closedGenerationPostRows(
 	);
 }
 
+type ClosedGenerationClassificationData = Readonly<{
+	input: Pick<Captured, "objectId">;
+	reader: Pick<SourceReader, "generations" | "blobs">;
+	authenticatedExcludedGenerations?: readonly GenerationRecord[];
+}>;
 function closedGenerationSourcePriority(
-	frame: ImportFrame, row: GenerationRecord, syntax?: ReturnType<typeof createCreatorCanonicalSyntaxReader>
+	frame: ClosedGenerationClassificationData, row: GenerationRecord, syntax?: ReturnType<typeof createCreatorCanonicalSyntaxReader>
 ): Readonly<{ closing: number; epoch: number }> {
 	const closure = view(frame.reader, frame.reader.generations.findIndex(actual => actual.generationId === row.generationId));
 	const carrier = unique(closure, "drp-anchor-trust-state", undefined, syntax);
@@ -8166,7 +8827,7 @@ function closedGenerationSourcePriority(
 }
 
 function compareClosedGenerationSources(
-	frame: ImportFrame, a: GenerationRecord, b: GenerationRecord, syntax?: ReturnType<typeof createCreatorCanonicalSyntaxReader>
+	frame: ClosedGenerationClassificationData, a: GenerationRecord, b: GenerationRecord, syntax?: ReturnType<typeof createCreatorCanonicalSyntaxReader>
 ): number {
 	const left = closedGenerationSourcePriority(frame, a, syntax), right = closedGenerationSourcePriority(frame, b, syntax);
 	return left.closing - right.closing || left.epoch - right.epoch || a.generationId.localeCompare(b.generationId);
@@ -8349,7 +9010,7 @@ function closedReceivedGenerationConsumersCovered(input: Readonly<{
 }
 
 function classifyClosedGenerationSource(input: {
-	frame: ImportFrame;
+	frame: ClosedGenerationClassificationData;
 	summary: Summary;
 	control: AheRetirementControl | null;
 	unclassified: boolean;
@@ -8410,7 +9071,7 @@ function classifyClosedGenerationSource(input: {
  * @returns Complete original plan and BEFORE/POST bindings without a resume grant.
  */
 function closedGenerationSourceFromSelected(
-	frame: ImportFrame,
+	frame: ClosedGenerationClassificationData,
 	summary: Summary,
 	rows: readonly GenerationRecord[],
 	selected: GenerationRecord
@@ -8536,6 +9197,31 @@ interface ClosedJournalHeaderConsumers {
 function collectClosedJournalHeaderScopes(input: ClosedJournalHeaderConsumers): readonly LiveJournalScope[] {
 	const { frame, forward } = input;
 	requireLaw(frame.alive && frame.headerHold !== undefined && journalHeaderHolds.has(frame.headerHold), "snapshot-unavailable");
+	const scopes = [...frame.requirements].map(requirement => {
+		const facts = requirements.get(requirement);
+		requireLaw(facts !== undefined && facts.frame === frame && facts.source === frame.input.liveJournalStore, "chain-invalid");
+		return facts.scope;
+	});
+	return collectClosedJournalHeaderScopeData({...input, frame, requirementScopes: scopes});
+}
+function prepareClosedJournalHeaderScopes(input: Omit<ClosedJournalHeaderConsumers, "frame"> &
+	Readonly<{work: CreatorClosedProofWork}>): readonly LiveJournalScope[] {
+	const {work} = input;
+	requireLaw(proofWorks.get(work.reader) === work && creatorClosedProofPreparingNativeData(work.accounting), "snapshot-unavailable");
+	const scopes = [...work.requirements].map(requirement => {
+		const facts = preparedRequirements.get(requirement);
+		requireLaw(facts !== undefined && facts.frame === work && facts.source === work.input.liveJournalStore, "chain-invalid");
+		return facts.scope;
+	});
+	return collectClosedJournalHeaderScopeData({...input, frame: work, requirementScopes: scopes});
+}
+/** Pure consumer inventory. Native/effect callers validate their original
+ * frame separately; preparation passes only the same method-free ingredients. */
+function collectClosedJournalHeaderScopeData(input: Omit<ClosedJournalHeaderConsumers, "frame"> & Readonly<{
+	frame: Pick<CreatorClosedProofWork, "input" | "headerScopes" | "recoveryTrusts">;
+	requirementScopes: readonly LiveJournalScope[];
+}>): readonly LiveJournalScope[] {
+	const {frame, forward} = input;
 	const protectedMap = new Map<string, LiveJournalScope>();
 	const retain = (value: Readonly<{ objectId?: string; epoch: number; anchorDigest: string }>): void => {
 		const selected = Object.freeze({ objectId: value.objectId ?? frame.input.objectId, epoch: value.epoch, anchorDigest: value.anchorDigest });
@@ -8555,11 +9241,7 @@ function collectClosedJournalHeaderScopes(input: ClosedJournalHeaderConsumers): 
 	}
 	for (const selected of input.protectedScopes) retain({ objectId: selected.objectId, epoch: selected.epoch, anchorDigest: selected.anchor });
 	for (const selected of input.closeAnchors) retain(selected);
-	for (const requirement of frame.requirements) {
-		const facts = requirements.get(requirement);
-		requireLaw(facts !== undefined && facts.frame === frame && facts.source === frame.input.liveJournalStore, "chain-invalid");
-		retain(facts.scope);
-	}
+	for (const scope of input.requirementScopes) retain(scope);
 	const protectedHeaderScopes = Object.freeze([...protectedMap.values()].sort((a, b) => JSON.stringify([a.objectId, a.epoch, a.anchorDigest]).localeCompare(JSON.stringify([b.objectId, b.epoch, b.anchorDigest]))));
 	requireLaw(protectedHeaderScopes.length <= LIVE_JOURNAL_RETIREMENT_LIMITS.maxRows, "proof-budget-exceeded");
 	return protectedHeaderScopes;
@@ -8568,12 +9250,23 @@ function classifyClosedJournalHeaders(input: ClosedJournalHeaderConsumers & {
 	journal: LiveJournalRetirementImageObservation; floor: CreatorProtectedRecoveryRoleSummary["floor"]; unclassified: boolean;
 }): ClosedRetirementSource["journalHeaders"] {
 	if (input.unclassified || input.floor.pending !== null || input.forward.wholeCensus !== true) return undefined;
-	const { frame } = input;
 	const protectedHeaderScopes = collectClosedJournalHeaderScopes(input);
+	return prepareClosedJournalHeaders({journal: input.journal, protectedHeaderScopes,
+		pinnedGenesisAnchorDigest: input.frame.input.pinnedGenesisAnchorDigest, accounting: input.frame.accounting});
+}
+/** Native header consumers are captured by the held owner before release;
+ * selecting exact empty rows from that private image is pure planning. */
+function prepareClosedJournalHeaders(input: Readonly<{
+	journal: LiveJournalRetirementImageObservation;
+	protectedHeaderScopes: readonly LiveJournalScope[];
+	pinnedGenesisAnchorDigest: string;
+	accounting: CreatorClosedRollbackProofAccounting;
+}>): ClosedRetirementSource["journalHeaders"] {
+	const {protectedHeaderScopes} = input;
 	const protectedMap = new Set(protectedHeaderScopes.map(scope => JSON.stringify([scope.objectId, scope.epoch, scope.anchorDigest])));
 	const decoded = input.journal.canonicalRows.map(bytes => ({ bytes, frame: decodeCanonical(bytes) as [string, unknown[], Record<string, unknown>] }));
 	const selected = decoded.filter(({ frame: [table, key] }) => table === "scopes" &&
-		typeof key[1] === "number" && key[1] !== 0 && key[2] !== frame.input.pinnedGenesisAnchorDigest &&
+		typeof key[1] === "number" && key[1] !== 0 && key[2] !== input.pinnedGenesisAnchorDigest &&
 		!protectedMap.has(JSON.stringify(key)) &&
 		!journalRetirementAllows(input.journal.control, { objectId: String(key[0]), epoch: key[1], anchorDigest: String(key[2]) }) &&
 		!decoded.some(({ frame: [kind, rowKey] }) => kind !== "scopes" && closedRetirementEqual(rowKey.slice(0, 3), key)))
@@ -8582,7 +9275,7 @@ function classifyClosedJournalHeaders(input: ClosedJournalHeaderConsumers & {
 			exactCanonicalNativeFrameBytes: bytes.slice() }));
 	if (selected.length === 0) return undefined;
 	const journalHeaders = Object.freeze({ retiredEmptyHeaders: Object.freeze(selected), protectedHeaderScopes });
-	requireLaw(frame.accounting.charge(closedRetirementBytes(journalHeaders)), "proof-budget-exceeded");
+	requireLaw(input.accounting.charge(closedRetirementBytes(journalHeaders)), "proof-budget-exceeded");
 	return journalHeaders;
 }
 
@@ -8657,6 +9350,16 @@ async function closedJournalMembershipPrefix(input: Readonly<{
 	 * final original source check. The original retirement result stays exact. */
 	captureApplicationRows?(rows: readonly CreatorOrdinaryClosedJournalApplicationRow[]): void;
 }>): Promise<ClosedJournalDetailClassification["collectiblePrefixes"][number] | undefined> {
+	return prepareClosedJournalMembershipPrefix(input, input.check);
+}
+
+/** The same membership/ACL/original-signature algorithm over private DATA.
+ * No result is source currency; the held entry above supplies its real checks,
+ * while detached planning qualifies the complete source at its final owner. */
+async function prepareClosedJournalMembershipPrefix(
+	input: Omit<Parameters<typeof closedJournalMembershipPrefix>[0], "check">,
+	checkSource?: () => Promise<void>
+): Promise<ClosedJournalDetailClassification["collectiblePrefixes"][number] | undefined> {
 	// Own one isolated syntax capture for this bounded prefix invocation. A
 	// canonical row was formerly decoded by the header scan, the entry scan and
 	// then again by validation. Keep the decoder's detached values instead; this
@@ -8683,7 +9386,7 @@ async function closedJournalMembershipPrefix(input: Readonly<{
 	const membership = await openCreatorCloseMembership({ bytes: carrier,
 		exactCanonicalCutValueBytes: authority.exactCanonicalCutValueBytes,
 		maxEpochVertices: parameters.maxEpochVertices });
-	await input.check();
+	await checkSource?.();
 	// The asynchronous membership/native boundary must not let changed caller
 	// carriers reuse this capture. Exact bytes (not a digest, epoch or identity)
 	// bind every row, including unrelated/malformed inventory entries. No parsed
@@ -8772,7 +9475,7 @@ async function closedJournalMembershipPrefix(input: Readonly<{
 	// Join revocation already queued during synchronous validation before that
 	// check captures authority, even when its implementation resolves eagerly.
 	await Promise.resolve();
-	await input.check();
+	await checkSource?.();
 	input.captureApplicationRows?.(Object.freeze(applicationRows));
 	return Object.freeze({ scope: input.scope, snapshot: null, highWatermark: frames.length, rows: Object.freeze(rows) });
 }
@@ -8909,6 +9612,16 @@ async function classifyClosedJournalDetails(input: Readonly<{
 	/** SAME admitted owner's local revocation guard, never native currency or authority. */
 	checkAvailable?(): void;
 }>): Promise<ClosedJournalDetailClassification> {
+	return prepareClosedJournalDetails(input, input);
+}
+
+/** The original classifier over privately captured DATA. Only its held caller
+ * supplies actual native reads/currency. Detached eligibility below proves no
+ * fallback page is required, then the existing installer freshly qualifies. */
+async function prepareClosedJournalDetails(
+	input: Omit<Parameters<typeof classifyClosedJournalDetails>[0], "journal" | "physical" | "check" | "checkAvailable">,
+	held?: Pick<Parameters<typeof classifyClosedJournalDetails>[0], "journal" | "physical" | "check" | "checkAvailable">
+): Promise<ClosedJournalDetailClassification> {
 	const census = record(input.censusBytes);
 	const current = census.currentJournal as Readonly<{ scope: LiveJournalScope }>;
 	requireLaw(current !== undefined && current.scope.objectId === input.objectId, "chain-invalid");
@@ -8993,8 +9706,8 @@ async function classifyClosedJournalDetails(input: Readonly<{
 	let scannedRows = 0;
 	let usedClosedMembership = false;
 	for (const scope of closedNativeJournalScopes(input.objectId, input.image)) {
-		await input.check();
-		input.checkAvailable?.();
+		await held?.check();
+		held?.checkAvailable?.();
 		const retain = (reason: ClosedJournalDetailClassification["retainedScopes"][number]["reason"]): void => {
 			retainedScopes.push(Object.freeze({ scope, reason }));
 		};
@@ -9008,10 +9721,11 @@ async function classifyClosedJournalDetails(input: Readonly<{
 		}
 		const restored = input.resumePlan?.prefixes.filter(prefix =>
 			closedRetirementEqual(prefix.scope, scope)) ?? [];
-		const membershipPrefix = await closedJournalMembershipPrefix({ scope, image: input.image,
-			authorities: input.journalMembershipAuthorities ?? [], check: input.check,
-			...(input.verifyVertex === undefined ? {} : {verifyVertex: input.verifyVertex}) });
-		input.checkAvailable?.();
+		const membershipInput = {scope, image: input.image, authorities: input.journalMembershipAuthorities ?? [],
+			...(input.verifyVertex === undefined ? {} : {verifyVertex: input.verifyVertex})};
+		const membershipPrefix = held === undefined ? await prepareClosedJournalMembershipPrefix(membershipInput) :
+			await closedJournalMembershipPrefix({...membershipInput, check: held.check});
+		held?.checkAvailable?.();
 		if (membershipPrefix !== undefined) {
 			requireLaw(membershipPrefix.rows.length <= input.image.image.rowCount - scannedRows &&
 				(restored.length === 0 || restored.length === 1 &&
@@ -9043,8 +9757,9 @@ async function classifyClosedJournalDetails(input: Readonly<{
 			retain("unclassified-prefix");
 			continue;
 		}
-		const readiness = await input.journal.readiness({ scope });
-		input.checkAvailable?.();
+		requireLaw(held !== undefined, "internal-invariant");
+		const readiness = await held.journal.readiness({ scope });
+		held.checkAvailable?.();
 		requireLaw(input.accounting.charge(closedRetirementBytes(readiness)), "proof-budget-exceeded");
 		if (!readiness.ok || !readiness.ready) {
 			retain("read-refused");
@@ -9069,13 +9784,13 @@ async function classifyClosedJournalDetails(input: Readonly<{
 			afterSequence: number | null = null,
 			count = 0;
 		while (count < readiness.rowCount) {
-			const page = await input.journal.readPage({
+			const page = await held.journal.readPage({
 				scope,
 				snapshot: readiness.snapshot,
 				afterSequence,
 				limit: Math.min(128, readiness.rowCount - count),
 			});
-			input.checkAvailable?.();
+			held.checkAvailable?.();
 			requireLaw(input.accounting.charge(closedRetirementBytes(page)), "proof-budget-exceeded");
 			if (!page.ok) {
 				complete = false;
@@ -9128,16 +9843,17 @@ async function classifyClosedJournalDetails(input: Readonly<{
 			collectiblePrefixes.map(prefix => ({ scope: prefix.scope, highWatermark: prefix.highWatermark,
 				rows: prefix.rows }))), "chain-invalid");
 	}
-	await input.check();
-	input.checkAvailable?.();
-	const after = await bindMethod<NonNullable<DurableLiveJournalStore["readRetirementImage"]>>(
-		input.journal,
-		"readRetirementImage"
-	)({ objectId: input.objectId });
-	input.checkAvailable?.();
-	requireLaw(after.ok && closedJournalNativeObservationEqual(after.value, input.physical), "floor-stale");
-	await input.check();
-	input.checkAvailable?.();
+	if (held !== undefined) {
+		await held.check();
+		held.checkAvailable?.();
+		const after = await bindMethod<NonNullable<DurableLiveJournalStore["readRetirementImage"]>>(
+			held.journal, "readRetirementImage"
+		)({ objectId: input.objectId });
+		held.checkAvailable?.();
+		requireLaw(after.ok && closedJournalNativeObservationEqual(after.value, held.physical), "floor-stale");
+		await held.check();
+		held.checkAvailable?.();
+	}
 	const result: ClosedJournalDetailClassification = Object.freeze({
 		provenance: usedClosedMembership ? "held-closed-cut-membership-and-original-vertices" : "held-closed-role-and-covered-historical-local-issuance",
 		sourceImageDigest: input.image.image.imageDigest,
@@ -9148,6 +9864,55 @@ async function classifyClosedJournalDetails(input: Readonly<{
 	});
 	requireLaw(input.accounting.charge(closedRetirementBytes(result)), "proof-budget-exceeded");
 	return result;
+}
+
+/** Geometry only: decide whether the original algorithm can finish without a
+ * native readiness/page fallback. Syntax never establishes membership, ACL,
+ * signature or deletion eligibility; those all run in the DATA algorithm. */
+function canPrepareClosedJournalDetails(input: Parameters<typeof prepareClosedJournalDetails>[0]): boolean {
+	try {
+		const census = record(input.censusBytes);
+		const current = census.currentJournal as Readonly<{scope: LiveJournalScope}>;
+		if (current?.scope.objectId !== input.objectId) return false;
+		const {replayScopes, protectedRoleScopes, protectedReplayScopes} = closedJournalProtectedReplayScopes({
+			currentScope: current.scope, cuts: input.summary.cuts, sourceTrust: input.sourceTrust,
+			protectedRoleScopes: input.protectedRoleScopes});
+		const incomplete = input.unclassifiedReplay || input.floor.pending !== null ||
+			census.activeUnsettled !== undefined || census.pendingIngress !== undefined ||
+			protectedRoleScopes.some(scope => !replayScopes.some(replay => closedRetirementEqual(replay, scope)));
+		if (incomplete) return true;
+		const captured = input.image.canonicalRows.map(bytes => decodeCanonical(bytes));
+		for (const scope of closedNativeJournalScopes(input.objectId, input.image)) {
+			if (protectedReplayScopes.some(actual => closedRetirementEqual(actual, scope)) ||
+				!input.authenticatedScopes.some(actual => closedRetirementEqual(actual, scope))) continue;
+			const matches = (key: unknown): key is unknown[] => Array.isArray(key) &&
+				closedRetirementEqual(key.slice(0, 3), [scope.objectId, scope.epoch, scope.anchorDigest]);
+			const headers = captured.filter(frame => Array.isArray(frame) && frame[0] === "scopes" && matches(frame[1]));
+			if (headers.length !== 1) return false;
+			const header = (headers[0] as unknown[])[2] as Record<string, unknown>;
+			const carrier = header.closed_membership_bytes ?? header.closedMembershipBytes;
+			const hasAuthority = input.journalMembershipAuthorities?.some(authority => closedRetirementEqual(authority.scope, scope)) === true;
+			if (carrier === undefined || !hasAuthority) {
+				if (input.resumePlan?.prefixes.some(prefix => closedRetirementEqual(prefix.scope, scope)) ||
+					closedJournalScopeHasNonLocalRows(input.image.canonicalRows, scope)) continue;
+				return false;
+			}
+			if (!(carrier instanceof Uint8Array)) return false;
+			const membership = record(carrier);
+			const entries = captured.filter(frame => Array.isArray(frame) &&
+				(frame[0] === "accepted_entries" || frame[0] === "acceptedEntries") && matches(frame[1])) as unknown[][];
+			if (entries.length === 0 || entries.length !== (header.next_journal_sequence ?? header.nextJournalSequence) ||
+				!(membership.orderedVertexDigests instanceof Uint8Array) ||
+				membership.orderedVertexDigests.byteLength !== entries.length * 32 || !Array.isArray(membership.localVertexWitnesses)) return false;
+			for (const frame of entries) {
+				const row = frame[2] as Record<string, unknown>, sql = frame[0] === "accepted_entries";
+				if ((row[sql ? "source_kind" : "sourceKind"]) === "local-issued" &&
+					!membership.localVertexWitnesses.some(witness => witness !== null && typeof witness === "object" &&
+						Reflect.get(witness, "vertexDigest") === row[sql ? "vertex_digest" : "vertexDigest"])) return false;
+			}
+		}
+		return true;
+	} catch { return false; }
 }
 
 /** One finite joined source read. Intermediate scope/prefix results never
@@ -9303,19 +10068,29 @@ function closedSigningAheAddressAbsentForSizing(
 	}
 }
 
-function closedSigningDataRows(rows: readonly Uint8Array[], objectId: string): readonly Uint8Array[] {
-	const distinct = new Map<string, Uint8Array>();
+/** One synchronous native-image projection, not retained syntax or authority.
+ * Validate EVERY row before lookup, including unmatched rows. Exact address
+ * bytes disambiguate the index; caller bytes never escape this stack frame in
+ * a retained fact. Every subsequent native observation builds its own image.
+ */
+function closedSigningDataImage(rows: readonly Uint8Array[], objectId: string) {
+	const distinct = new Map<string, Readonly<{bytes: Uint8Array; address: Uint8Array}>>();
 	for (const bytes of rows) {
 		const frame = decodeCanonical(bytes);
 		requireLaw(Array.isArray(frame) && frame.length === 3 && typeof frame[0] === "string");
 		if (frame[0] === "storageMeta" &&
 			(frame[1] === `ahe-retirement:${objectId}` || frame[1] === `signing-retirement:${objectId}`)) continue;
-		const key = closedRetirementDigest("ts-drp/signing-native-address/v1", closedRetirementBytes(frame.slice(0, 2)));
+		const address = closedRetirementBytes(frame.slice(0, 2));
+		const key = closedRetirementDigest("ts-drp/signing-native-address/v1", address);
 		const prior = distinct.get(key);
-		requireLaw(prior === undefined || compareBytes(prior, bytes) === 0, "chain-invalid");
-		distinct.set(key, bytes);
+		requireLaw(prior === undefined || compareBytes(prior.bytes, bytes) === 0, "chain-invalid");
+		distinct.set(key, {bytes, address});
 	}
-	return [...distinct.values()];
+	return distinct;
+}
+
+function closedSigningDataRows(rows: readonly Uint8Array[], objectId: string): readonly Uint8Array[] {
+	return [...closedSigningDataImage(rows, objectId).values()].map(row => row.bytes);
 }
 
 function closedSigningControl(rows: readonly Uint8Array[], objectId: string): SigningRetirementControl | null {
@@ -9414,6 +10189,11 @@ function selectClosedSigningSummaryEpoch<T extends Pick<SigningSummaryRetirement
 	const epoch = entries.reduce((oldest, entry) => Math.min(oldest, entry.key[1]), Number.POSITIVE_INFINITY);
 	return Object.freeze(entries.filter(entry => entry.key[1] === epoch));
 }
+
+/** Fresh summary sources whose single epoch was the ONLY eligible group when
+ * selected. Process-local identity facts: never persisted, sized or trusted as
+ * eligibility. A decoded or resumed source is absent and keeps the probe pass. */
+const exhaustiveClosedSigningSummarySelections = new WeakSet<object>();
 
 /**
  * Reauthenticate retained safety memory, without inventing a discarded evidence row.
@@ -9700,12 +10480,14 @@ function classifyClosedSigningSummaries(
 		})
 		.sort(compareSigningSummaryRetirementEntries);
 	if (entries.length === 0) return undefined;
+	const selected = selectClosedSigningSummaryEpoch(entries);
 	const result = Object.freeze({
-		entries: selectClosedSigningSummaryEpoch(entries),
+		entries: selected,
 		eligibilityFence: fence,
 		sourceDataDigest: signingRetirementDataDigest(input.rows, input.objectId),
 	});
 	requireLaw(input.accounting.charge(closedRetirementBytes(result)), "proof-budget-exceeded");
+	if (selected.length === entries.length) exhaustiveClosedSigningSummarySelections.add(result);
 	return result;
 }
 
@@ -10204,27 +10986,40 @@ function checkClosedSigningSummaryImage(
 			"floor-stale"
 		);
 	}
-	const data = closedSigningDataRows(input.rows, input.objectId),
-		original = closedSigningDataRows(input.original, input.objectId);
+	// Capture one complete parsed address image for each actual read. Previously
+	// every manifest entry decoded the whole data image again, and computing the
+	// residual parsed both images yet again. Cursor/control and digest checks
+	// above remain fresh; these local indexes grant no deletion permission.
+	const data = closedSigningDataImage(input.rows, input.objectId),
+		original = closedSigningDataImage(input.original, input.objectId);
+	const selected = input.source.entries.map(entry => {
+		const address = closedRetirementBytes([entry.store, entry.key]);
+		return {address, key: closedRetirementDigest("ts-drp/signing-native-address/v1", address)};
+	});
+	const selectedAddresses = new Map<string, Uint8Array[]>();
+	for (const entry of selected) {
+		const addresses = selectedAddresses.get(entry.key);
+		if (addresses === undefined) selectedAddresses.set(entry.key, [entry.address]);
+		else addresses.push(entry.address);
+	}
+	const residual = (image: ReturnType<typeof closedSigningDataImage>): readonly Uint8Array[] =>
+		[...image].filter(([key, row]) => {
+			const addresses = selectedAddresses.get(key);
+			return addresses === undefined || !addresses.some(address => compareBytes(address, row.address) === 0);
+		}).map(([, row]) => row.bytes);
 	requireLaw(
-		closedRetirementEqual(
-			closedSigningSummaryResidualRows(data, input.source.entries),
-			closedSigningSummaryResidualRows(original, input.source.entries)
-		),
+		closedRetirementEqual(residual(data), residual(original)),
 		"floor-stale"
 	);
 	const cursor = same && state != null ? state.cursor : 0;
 	for (const [index, entry] of input.source.entries.entries()) {
-		const matches = data.filter((bytes) => {
-			const frame = decodeCanonical(bytes) as unknown[];
-			return frame[0] === entry.store && closedRetirementEqual(frame[1], entry.key);
-		});
+		const address = selected[index]!;
+		const row = data.get(address.key);
+		const match = row !== undefined && compareBytes(row.address, address.address) === 0 ? row.bytes : undefined;
 		requireLaw(
 			index < cursor
-				? matches.length === 0
-				: matches.length === 1 &&
-						matches[0] !== undefined &&
-						signingRetirementFrameDigest(matches[0]) === entry.frameDigest,
+				? match === undefined
+				: match !== undefined && signingRetirementFrameDigest(match) === entry.frameDigest,
 			"floor-stale"
 		);
 	}
@@ -13118,6 +13913,9 @@ function buildCreatorOrdinaryFinishingResourceProgramForSizing(input: Readonly<{
 		const journalRawSupplement = creatorOrdinaryJournalRawSupplementForSizing(capture.journal, source.knownProtectedMaterial);
 		const rawSourcePhysical = sum(runtimeEnvelope, signingPhysical, journal.canonicalRowByteLengthsTotal,
 			nativeProgress.byteLength, journalPlan.byteLength, snapshotWrapper.byteLength, snapshotWrapper.byteLength,
+			// Each fresh RAW source owns one complete ready inventory, including
+			// detached reconciliation before a retirement as well as no-effect readback.
+			// Equal capture/qualification bytes deduplicate only in that SAME book.
 			futureInventory.byteLength,
 			protectedHeaders.byteLength, journalHeaders.byteLength, floorPoint.byteLength, aheControl.byteLength,
 			classifier, summarySource.byteLength, journalRawSupplement);
@@ -13908,7 +14706,8 @@ function selectSnapshotTurnoverScopeInventory(
  * @returns Conditional surviving and retiring inventories, never authority.
  */
 function selectAuthenticatedSnapshotTurnoverInventory(
-	held: CreatorForwardPromotionSourceMaterial,
+	held: Pick<CreatorForwardPromotionSourceMaterial, "recoveryRoleTransfer" | "recoveryDependencyAnchors" |
+		"retirementProtectedScopes" | "recoveryCertificateDigest" | "predecessorTrust">,
 	lifetime: NonNullable<ReturnType<typeof resolveCreatorSnapshotRecoveryCloseHold>>,
 	inventory: SnapshotRecoveryRoleInventory
 ): Readonly<{ survivingScopes: readonly SnapshotQuarantineScopeKey[]; retiringScopes: readonly SnapshotQuarantineScopeKey[] }> | undefined {
@@ -17117,8 +17916,10 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 							[finalJournalCapacity.canonicalRowByteLengthsTotal]),
 						...journalNativeCarriers.map(maintenanceCanonicalWidth),
 						maintenanceCanonicalWidth({ control: maintenanceParticipants[0], image: sourceSnapshotImage }),
-						// Exact no-effect role readback charges its whole native inventory
-						// in this SAME book. Identical before/after bytes deduplicate only
+						// Detached source capture/qualification and no-effect role readback
+						// charge the same complete ready inventory in this SAME book.
+						// Each fresh serial source needs this term independently of any
+						// previous source lifetime. Identical before/after bytes deduplicate only
 						// after actual observation; every possible future nested fact keeps
 						// its full original encoding bound, without presumed deletion credit.
 						maximumWidth([maintenanceCanonicalWidth({scopes: retainedInventory, owner: retainedOwner}),
@@ -18231,6 +19032,36 @@ function closedIssuanceProtectedRecordsForRetirement(input: Readonly<{
 		}));
 }
 
+/** Installation consumes only the original native image's exact-byte syntax
+ * projections. This grants no freshness or authority: the native observation,
+ * original source/image checks and same-book charges remain independently live.
+ * Unknown/external facts keep the complete original decode path. */
+function closedInstallationSigningData(rows: readonly Uint8Array[], objectId: string, captured?: unknown): Readonly<{
+	dataRows: readonly Uint8Array[];
+	metadata: readonly Readonly<{index: number; frame: unknown[]}>[];
+}> {
+	const image = resolveCapturedSigningRetirementDataImage(captured, rows, objectId);
+	if (image === undefined) return {
+		dataRows: closedSigningDataRows(rows, objectId),
+		metadata: rows.map((bytes, index) => ({index, frame: decodeCanonical(bytes) as unknown[]}))
+			.filter(({frame}) => frame[0] === "storageMeta"),
+	};
+	const distinct = new Map<string, Readonly<{bytes: Uint8Array; address: Uint8Array}>>();
+	const metadata: {index: number; frame: unknown[]}[] = [];
+	for (const selected of image.frames) {
+		const bytes = rows[selected.index]!;
+		if (selected.store === "storageMeta") metadata.push({index: selected.index, frame: decodeCanonical(bytes) as unknown[]});
+		const address = image.readCanonicalAddress(selected.index);
+		// The original parser excludes ONLY these two exact addressed controls;
+		// incarnation and all other native records retain their full original bytes.
+		if (address === undefined) continue;
+		const key = closedRetirementDigest("ts-drp/signing-native-address/v1", address), prior = distinct.get(key);
+		requireLaw(prior === undefined || compareBytes(prior.bytes, bytes) === 0, "chain-invalid");
+		distinct.set(key, {bytes, address});
+	}
+	return {dataRows: [...distinct.values()].map(row => row.bytes), metadata};
+}
+
 /** Original owner composition after its authenticated proof and outer native
  * reservations have joined. Global metadata completion precedes every exact
  * classified local-prefix drain; headers and all other detail stay protected.
@@ -18763,6 +19594,7 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 				"chain-invalid"
 			);
 			const frames = read.readExactCanonicalRows();
+			const parsedFrames = closedInstallationSigningData(frames, input.objectId, read.readRetirementDataImage?.());
 			const state = read.control.drain;
 			const drainP = state?.plan.baseControl.completed;
 			const sameDrain =
@@ -18802,12 +19634,11 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 			}
 			if (
 				summarySource === undefined &&
-				!closedRetirementEqual(closedSigningDataRows(frames, input.objectId), expectedData)
+				!closedRetirementEqual(parsedFrames.dataRows, expectedData)
 			)
 				throw new Refusal(failure("floor-stale", "ahe", "RETIREMENT_SIGNING_DATA_DRIFT"));
-			const aheFrame = frames
-				.map((bytes) => decodeCanonical(bytes) as unknown[])
-				.find((frame) => frame[0] === "storageMeta" && frame[1] === `ahe-retirement:${input.objectId}`);
+			const aheFrame = parsedFrames.metadata.map(row => row.frame)
+				.find((frame) => frame[1] === `ahe-retirement:${input.objectId}`);
 			// Signing and AHE may be distinct native databases. Preserve that
 			// authenticated source absence; a present shared-database row must
 			// instead equal the addressed actual coordinator, never an invented copy.
@@ -18830,9 +19661,9 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 					sequence: read.control.sequence - 1,
 					active: null,
 				};
-				const oldFrames = frames.map((bytes) => {
-					const frame = decodeCanonical(bytes) as unknown[];
-					return frame[0] === "storageMeta" && frame[1] === `signing-retirement:${input.objectId}`
+				const oldFrames = frames.map((bytes, index) => {
+					const frame = parsedFrames.metadata.find(row => row.index === index)?.frame;
+					return frame?.[1] === `signing-retirement:${input.objectId}`
 						? closedRetirementBytes([frame[0], frame[1], { key: frame[1], value: old }])
 						: bytes;
 				});
@@ -18842,9 +19673,9 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 				// metadata boundary; all other frames remain byte-for-byte unchanged.
 				const initialAbsence =
 					old.revision === 0 && old.sequence === 0 && old.completed === null
-						? frames.map((bytes) => {
-								const frame = decodeCanonical(bytes) as unknown[];
-								return frame[0] === "storageMeta" && frame[1] === `signing-retirement:${input.objectId}`
+							? frames.map((bytes, index) => {
+								const frame = parsedFrames.metadata.find(row => row.index === index)?.frame;
+								return frame?.[1] === `signing-retirement:${input.objectId}`
 									? closedRetirementBytes([frame[0], frame[1], null])
 									: bytes;
 							})
@@ -19257,9 +20088,15 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 		});
 		return false;
 	}
+	// When this fresh selection was the only eligible epoch group, journal prefixes
+	// stay suppressed while it is the stored source, so a fresh pass after its
+	// completed drain could only replay this same P. Any other source (another
+	// eligible epoch, resumed or residual drain) keeps the following fresh pass.
+	const summarySelectionComplete = summaries !== undefined && exhaustiveClosedSigningSummarySelections.has(summaries);
 	const needsFreshSummary = generationSource !== undefined
 		? postAheRows.length > AHE_BOUNDED_READ_LIMITS.maxObjectGenerations - 2
-		: evidenceCompleted || summaryProgressed || source.rows.length > AHE_BOUNDED_READ_LIMITS.maxObjectGenerations - 2;
+		: evidenceCompleted || (summaryProgressed && !summarySelectionComplete) ||
+			source.rows.length > AHE_BOUNDED_READ_LIMITS.maxObjectGenerations - 2;
 	if (acknowledgeCompletedJournalDrain && !needsFreshSummary) {
 		// Authenticate the final source under the SAME original bracket. Release
 		// only journal custody for ACK; other owners stay excluded until its exact
@@ -19296,7 +20133,7 @@ async function releaseInheritedObservation(observation: VerifiedCreatorClosedRol
 	await joinSourceReleases([
 		...(frame?.signingDependencies === undefined ? [] : [() => frame.signingDependencies!.release()]),
 		...(frame?.closeDependencies === undefined ? [] : [() => frame.closeDependencies!.release()]),
-		...forward.held.map(row => () => row.release()),
+		...forward.held.map(row => () => releaseHeldTarget(row)),
 		...[...forward.installed, ...(forward.pending?.installed ?? []), ...forward.certificates,
 			...(forward.pending?.certificates ?? [])].map(proof => () => proof.release()),
 		() => forward.reader.release(),
@@ -19397,7 +20234,7 @@ async function reconcileInheritedSnapshotRecoveryRoles(value: CreatorClosedRollb
 			await frame.signingDependencies.checkWhile(() => frame.closeDependencies!.checkWhile(async () => {
 				for (const reservation of reservations) await reservation.check();
 				requireLaw((await forward.checkCurrent()).ok, "ahe-rejected");
-				for (const held of forward.held) await held.check();
+				for (const held of forward.held) await checkHeldTarget(held);
 			}));
 			source = Object.freeze({input, summary: facts.summary, floor: forward.wholeFloor,
 				rows: Object.freeze(forward.reader.generations.map(detachedGeneration)), census: Uint8Array.from(census),
@@ -19607,7 +20444,7 @@ async function reconcileSnapshotRecoveryRoles(
 			owner: object
 		): ((input: Readonly<{ objectId: string }>) => Promise<NativeReadReservation>) =>
 			bindMethod(owner, "acquireNativeReadReservation");
-		try {
+		const acquireReservations = async (): Promise<void> => { try {
 			if (originalHeaderHold === undefined)
 				originalHeaderHold = ownedHeaderHold = await acquireJournalHeaderHold(input.liveJournalStore, input.objectId);
 			nativeReservations.push(await acquireNative(input.store)({ objectId: input.objectId }));
@@ -19634,7 +20471,8 @@ async function reconcileSnapshotRecoveryRoles(
 					`NATIVE_RECOVERY_EXCLUSION:${error instanceof Error ? error.message : "unavailable"}`
 				)
 			);
-		}
+		} };
+		await acquireReservations();
 		await checkNativeReservations();
 		// Recensus only after every native exclusion actually started. Owner reads
 		// route through those held transactions, including queued foreign writers.
@@ -19647,10 +20485,92 @@ async function reconcileSnapshotRecoveryRoles(
 		await lifetime?.check();
 		await held?.checkCurrent();
 		await lifetime?.check();
+		let nativePreparation: Parameters<typeof acquireClosedData>[12];
+		let snapshotPreparation: CapturedSnapshot["snapshotPreparation"];
+		if (currentTrust !== undefined && lifetime.canDetachNativePreparation === true &&
+			inherited.legacyScopes === undefined) {
+			const nativeObject = parseStorageObjectId(input.objectId);
+			requireLaw(nativeObject.ok, "internal-invariant");
+			const readAheControl = bindMethod<NonNullable<AheBoundedRecoveryRoleStore["readRetirementControl"]>>(
+				input.store, "readRetirementControl");
+			const control = await readAheControl(nativeObject.value);
+			requireLaw(control.ok, "ahe-rejected");
+			// A born control carries the actual native incarnation. A pristine
+			// control-less birth retains the original safe held path rather than
+			// replacing incarnation qualification with logical head equality.
+			if (control.value !== null) {
+				const accounting = createCreatorClosedRollbackProofAccounting([], true);
+				const readJournal = bindMethod<NonNullable<DurableLiveJournalStore["readRetirementImage"]>>(
+					input.liveJournalStore, "readRetirementImage");
+				const readSnapshot = bindMethod<NonNullable<SnapshotRecoveryStore<SnapshotVerificationReceipt>["readRetirementImage"]>>(
+					input.snapshotStore, "readRetirementImage");
+				const readFloor = bindMethod<(arg: Readonly<{scope: Readonly<{objectId: string; pinnedGenesisAnchorDigest: string}>}>) =>
+					Promise<ClosedRetirementSource["floorImage"]>>(input.roomHeadAuthority, "readRetirementImage");
+				const floorRequest = {scope: {objectId: input.objectId, pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest}};
+				const captureImages = async () => {
+					const journal = await readJournal({objectId: input.objectId});
+					requireLaw(journal.ok, "anchor-unavailable");
+					const snapshot = await snapshotCall(() => readSnapshot({objectId: input.objectId}));
+					const ahe = await readAheControl(nativeObject.value);
+					requireLaw(ahe.ok, "ahe-rejected");
+					const floorImage = await readFloor(floorRequest);
+					const inventory = await snapshotCall(() => inventoryRead({objectId: input.objectId}, {signal: input.signal}));
+					return {journal: journal.value, snapshot, ahe: ahe.value, floorImage, inventory};
+				};
+				const chargeImages = (images: Awaited<ReturnType<typeof captureImages>>): void => {
+					// Preserve the original RAW reconciliation carriers. The complete
+					// retained inventory is one necessary NEW carrier on this SAME
+					// lifetime, not an issuance semantic wrapper or another allowance.
+					for (const bytes of [...images.journal.canonicalRows, ...closedJournalNativeControlCarriers(images.journal),
+						closedRetirementBytes(images.snapshot), images.ahe === null ? closedRetirementBytes(null) : encodeAheRetirementControl(images.ahe),
+						closedRetirementBytes(images.floorImage), creatorClosedSnapshotRoleInventoryBytes(images.inventory)])
+						requireLaw(accounting.charge(bytes), "proof-budget-exceeded");
+				};
+				let original: Awaited<ReturnType<typeof captureImages>> | undefined = await captureImages();
+				requireLaw(original.ahe !== null && closedRetirementEqual(original.ahe, control.value) &&
+					closedRetirementEqual(original.inventory.scopes, inherited.scopes) &&
+					closedRetirementEqual(original.inventory.owner, inherited.owner) &&
+					original.inventory.legacyScopes === undefined, "floor-stale");
+				chargeImages(original);
+				snapshotPreparation = Object.freeze({inventory: original.inventory, read: inventoryRead,
+					inventoryCarrier: "complete" as const, targets: []});
+				await checkNativeReservations();
+				await joinSourceReleases([...nativeReservations.map(reservation => () => reservation.release()),
+					...(ownedHeaderHold === undefined ? [] : [() => ownedHeaderHold!.release()])]);
+				nativeReservations.length = 0; originalHeaderHold = undefined; ownedHeaderHold = undefined; journalHeaderHold = undefined;
+				try { const observer = Reflect.get(globalThis, "__warmProofEvent");
+					if (typeof observer === "function") observer({kind: "closed-native-preparation-detached", phase: "reconcile", epoch: currentTrust.currentEpoch});
+				} catch { /* Observation cannot grant custody. */ }
+				nativePreparation = Object.freeze({journal: original.journal, accounting, qualify: async (book: CreatorClosedRollbackProofAccounting) => {
+					requireLaw(book === accounting && original !== undefined, "internal-invariant");
+					const prepared = original;
+					await acquireReservations();
+					const actual = await captureImages(); chargeImages(actual);
+					requireLaw(closedRetirementEqual(actual.journal, prepared.journal), "anchor-unavailable");
+					requireLaw(closedRetirementEqual(actual.snapshot, prepared.snapshot), "snapshot-invalid");
+					requireLaw(closedRetirementEqual(actual.ahe, prepared.ahe), "ahe-rejected");
+					requireLaw(closedRetirementEqual(actual.floorImage, prepared.floorImage), "floor-stale");
+					requireLaw(closedRetirementEqual(actual.inventory.scopes, prepared.inventory.scopes) &&
+						closedRetirementEqual(actual.inventory.owner, prepared.inventory.owner) &&
+						actual.inventory.legacyScopes === undefined, "snapshot-invalid");
+					await checkNativeReservations(); original = undefined;
+					requireLaw(journalHeaderHold !== undefined, "anchor-unavailable");
+					return borrowJournalHeaderHold(journalHeaderHold, input.liveJournalStore);
+				}});
+			} else try { const observer = Reflect.get(globalThis, "__warmProofEvent");
+				if (typeof observer === "function") observer({kind: "closed-native-preparation-declined", phase: "reconcile",
+					epoch: currentTrust.currentEpoch, reason: "pristine-ahe-incarnation-carrier"});
+			} catch { /* The original control-less safe path stays supported. */ }
+		} else try { const observer = Reflect.get(globalThis, "__warmProofEvent");
+			if (typeof observer === "function") observer({kind: "closed-native-preparation-declined", phase: "reconcile",
+				epoch: currentTrust?.currentEpoch, reason: "retained-or-discovery-source-custody"});
+		} catch { /* The original discovery/replacement safe path stays supported. */ }
 		// Consume the categorized runtime census at the existing close checkpoint,
 		// only after ALL original native reservations have actually started. The
 		// whole protected union still grants no all-owner retirement authorization.
-		const closeObserved = await acquireClosedData(value, undefined, undefined, true, closeHold, undefined, false, undefined, true, journalHeaderHold, ownedMaintenance);
+		const closeObserved = await acquireClosedData(value, undefined, undefined, true, closeHold, undefined, false, undefined, true,
+			journalHeaderHold, ownedMaintenance, snapshotPreparation, nativePreparation);
+		nativePreparation = undefined;
 		if (!closeObserved.ok) throw new Refusal(closeObserved);
 		closeUnionMaterial = resolveCreatorForwardPromotionSource(
 			closeObserved.observation,
@@ -20355,24 +21275,77 @@ async function reconcileSnapshotRecoveryRoles(
 				}) !== undefined, "snapshot-unavailable");
 		};
 		checkJournalClassificationAvailable();
-		let journalDetails: ClosedJournalDetailClassification | undefined;
-		const journalClassificationTask = Promise.resolve().then(async () => {
-			journalDetails = await classifySourceOwnedClosedJournalDetails({
-				classification: journalClassificationInput, checkAvailable: checkJournalClassificationAvailable,
-				readWhile: read => classificationDependencies.checkWhile(read, sourceFrame.signingDependencies),
-			});
-		});
-		// Both original terminal release and classified-only release must join the
-		// SAME admitted operation. These existing sets are not another queue/owner.
-		sourceFrame.pending.add(journalClassificationTask);
-		classificationLifetime.pendingChecks.add(journalClassificationTask);
-		const forgetJournalClassification = (): void => {
-			sourceFrame.pending.delete(journalClassificationTask);
-			classificationLifetime.pendingChecks.delete(journalClassificationTask);
+		const classificationAccounting = sourceFrame.accounting;
+		const classificationTrusts = Object.freeze([...sourceFrame.recoveryTrusts]);
+		const generationData: ClosedGenerationClassificationData = Object.freeze({
+			input: Object.freeze({objectId: input.objectId}),
+			reader: Object.freeze({generations: forward.reader.generations, blobs: forward.reader.blobs}),
+			...(sourceFrame.authenticatedExcludedGenerations === undefined ? {} : {
+				authenticatedExcludedGenerations: sourceFrame.authenticatedExcludedGenerations})});
+		const pureClassificationInput = {
+			objectId: input.objectId, image: journalProof, summary: closeFacts.summary,
+			...(journalReconstructed ? {resumePlan: journalPlan!} : {}), floor: roles.floor,
+			censusBytes: census, sourceTrust: lifetime.sourceTrust, unclassifiedReplay,
+			protectedRoleScopes: closeUnion.snapshotScopes, authenticatedScopes: journalScopes,
+			journalMembershipAuthorities: roleProofs.flatMap(proof => proof.journalMembershipAuthorities),
+			accounting: classificationAccounting,
 		};
-		void journalClassificationTask.then(forgetJournalClassification, forgetJournalClassification);
-		await journalClassificationTask;
-		checkJournalClassificationAvailable();
+		const detachedClassification = lifetime.canDetachNativePreparation === true &&
+			afterScopes.legacyScopes === undefined && canPrepareClosedJournalDetails(pureClassificationInput);
+		let capturedHeaderScopes: readonly LiveJournalScope[] | undefined;
+		let capturedSigningOwners: CreatorSigningRetirementOwners | undefined;
+		let capturedIssuanceOwner: ClosedRetirementSource["acquireIssuance"] | undefined;
+		let journalDetails: ClosedJournalDetailClassification | undefined;
+		if (detachedClassification) {
+			// Capture DATA and the original future native owner bindings while the
+			// source is still genuinely current. None of these carries old checks.
+			capturedHeaderScopes = !unclassifiedReplay && roles.floor.pending === null && forward.wholeCensus === true
+				? collectClosedJournalHeaderScopes({frame: sourceFrame, forward,
+					closeAnchors: classificationDependencies.dependencyAnchors, protectedScopes: closeUnion.snapshotScopes, proofs: roleProofs})
+				: undefined;
+			capturedSigningOwners = lifetime.captureSigningRetirementOwners();
+			capturedIssuanceOwner = lifetime.captureIssuanceRetirementOwner();
+			const verifyVertex = lifetime.captureVertexVerificationFacts?.() ?? verifyReceivedVertex;
+			await journalClassificationInput.check();
+			checkJournalClassificationAvailable();
+			await joinSourceReleases([
+				...(closeUnionMaterial === undefined ? [] : [() => closeUnionMaterial!.release()]),
+				...(held === undefined || held === closeUnionMaterial ? [] : [() => held!.release()]),
+				...(retiredSourceProof === undefined ? [] : [() => retiredSourceProof!.release()]),
+				...(snapshotExclusion === undefined ? [] : [() => snapshotExclusion!.release()]),
+				...nativeReservations.map(reservation => () => reservation.release()),
+				...(ownedHeaderHold === undefined ? [] : [() => ownedHeaderHold!.release()]),
+			]);
+			nativeReservations.length = 0; originalHeaderHold = undefined; ownedHeaderHold = undefined; journalHeaderHold = undefined;
+			snapshotExclusion = undefined;
+			checkAbort(input.signal);
+			try { const observer = Reflect.get(globalThis, "__warmProofEvent");
+				if (typeof observer === "function") observer({kind: "closed-classification-preparation-detached", epoch: roles.floor.stable.epoch});
+			} catch { /* Planning has no held source/native authority. */ }
+			journalDetails = await prepareClosedJournalDetails({...pureClassificationInput, verifyVertex});
+			checkAbort(input.signal);
+		} else {
+			try { const observer = Reflect.get(globalThis, "__warmProofEvent");
+				if (typeof observer === "function") observer({kind: "closed-classification-preparation-declined", epoch: roles.floor.stable.epoch,
+					reason: lifetime.canDetachNativePreparation !== true ? "retained-source-custody" : "native-page-fallback"});
+			} catch { /* Preserve the original held fallback without authority changes. */ }
+			const journalClassificationTask = Promise.resolve().then(async () => {
+				journalDetails = await classifySourceOwnedClosedJournalDetails({
+					classification: journalClassificationInput, checkAvailable: checkJournalClassificationAvailable,
+					readWhile: read => classificationDependencies.checkWhile(read, sourceFrame.signingDependencies),
+				});
+			});
+			// Both original releases join the SAME admitted held fallback task.
+			sourceFrame.pending.add(journalClassificationTask);
+			classificationLifetime.pendingChecks.add(journalClassificationTask);
+			const forgetJournalClassification = (): void => {
+				sourceFrame.pending.delete(journalClassificationTask);
+				classificationLifetime.pendingChecks.delete(journalClassificationTask);
+			};
+			void journalClassificationTask.then(forgetJournalClassification, forgetJournalClassification);
+			await journalClassificationTask;
+			checkJournalClassificationAvailable();
+		}
 		requireLaw(journalDetails !== undefined, "internal-invariant");
 		const censusFacts = record(census);
 		const unclassifiedSigning =
@@ -20394,8 +21367,8 @@ async function reconcileSnapshotRecoveryRoles(
 			: classifyClosedSigningSummaries({
 					objectId: input.objectId,
 					rows: signingRows,
-					reader: sourceFrame.reader,
-					trusts: [...sourceFrame.recoveryTrusts],
+					reader: generationData.reader,
+					trusts: classificationTrusts,
 					journal: journalDetails,
 					unclassified: unclassifiedSigning,
 					coordinator: aheControl.value,
@@ -20408,8 +21381,8 @@ async function reconcileSnapshotRecoveryRoles(
 				: classifyClosedSigningEvidence({
 						objectId: input.objectId,
 						rows: signingRows,
-						reader: sourceFrame.reader,
-						trusts: [...sourceFrame.recoveryTrusts],
+						reader: generationData.reader,
+						trusts: classificationTrusts,
 						journal: journalDetails,
 						unclassified: unclassifiedSigning,
 						coordinator: aheControl.value,
@@ -20422,13 +21395,16 @@ async function reconcileSnapshotRecoveryRoles(
 		// pass is selected again from OLD and the native correspondence guard
 		// correctly refuses its second deletion. SAME-detail resume still uses OLD.
 		const retirementJournal = signingSummaries === undefined ? journalProof : journal.value;
-		const journalHeaders = sourceFrame.closeDependencies === undefined ? undefined : classifyClosedJournalHeaders({ frame: sourceFrame, forward, journal: retirementJournal,
+		const journalHeaders = detachedClassification ? (capturedHeaderScopes === undefined || unclassifiedSigning ? undefined :
+			prepareClosedJournalHeaders({journal: retirementJournal, protectedHeaderScopes: capturedHeaderScopes,
+				pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest, accounting: classificationAccounting})) :
+			sourceFrame.closeDependencies === undefined ? undefined : classifyClosedJournalHeaders({ frame: sourceFrame, forward, journal: retirementJournal,
 			floor: roles.floor, closeAnchors: sourceFrame.closeDependencies.dependencyAnchors, protectedScopes: closeUnion.snapshotScopes,
 			proofs: roleProofs, unclassified: unclassifiedSigning });
 		const generationSource =
 			continuingGeneration || (signingSummaries === undefined && signingDetails.entries.length === 0)
 				? classifyClosedGenerationSource({
-						frame: sourceFrame,
+						frame: generationData,
 						summary: closeFacts.summary,
 						control: aheControl.value,
 						resumeCompleted: journalReconstructed,
@@ -20450,9 +21426,11 @@ async function reconcileSnapshotRecoveryRoles(
 				summaryEpochs: signingSummaries?.entries.map(entry => entry.key[1]),
 				generationDrain: generationSource !== undefined});
 		} catch { /* Observations cannot grant retirement eligibility or currency. */ }
-		await checkNativeReservations();
-		await sourceUnion.check();
-		await sourceLifetime.check();
+		if (!detachedClassification) {
+			await checkNativeReservations();
+			await sourceUnion.check();
+			await sourceLifetime.check();
+		}
 		let sourceSigningRows: readonly Uint8Array[] = signingDetails.rows;
 		const summaryControl = closedSigningControl(signingRows, input.objectId),
 			summaryDrain = summaryControl?.drain;
@@ -20474,13 +21452,26 @@ async function reconcileSnapshotRecoveryRoles(
 			);
 			for (const bytes of sourceSigningRows) requireLaw(sourceFrame.accounting.charge(bytes), "proof-budget-exceeded");
 		}
+		if (detachedClassification) {
+			// The original logical parent has no physical replacement/displaced
+			// custody in this branch. Its old children were joined, not revived.
+			// NEW real issuance enrollment clears the old native census fast cell;
+			// this first check performs the complete actual census and exact sealed
+			// byte comparison, including runtime/context/pending ingress dependencies.
+			// Keep ALL pure classification/projection above this boundary. The
+			// original finally then joins this fresh custody before the installer's
+			// original complete participant/source/floor qualification and effects.
+			await acquireReservations();
+			await sourceLifetime.check();
+			checkAbort(input.signal);
+		}
 		retirementSource = Object.freeze({
 			...(!unclassifiedSigning && !unclassifiedGenerationReplay ? {issuanceDependenciesClassified: true as const} : {}),
 			...(journalHeaders === undefined ? {} : { journalHeaders }),
 			input,
 			summary: closeFacts.summary,
 			floor: roles.floor,
-			rows: Object.freeze(forward.reader.generations.map(detachedGeneration)),
+			rows: Object.freeze(generationData.reader.generations.map(detachedGeneration)),
 			census: Uint8Array.from(census),
 			signingRows: Object.freeze(sourceSigningRows.map((bytes) => Uint8Array.from(bytes))),
 			signingPhysicalRows: Object.freeze(signingRows.map((bytes) => Uint8Array.from(bytes))),
@@ -20499,8 +21490,8 @@ async function reconcileSnapshotRecoveryRoles(
 			accounting: sourceFrame.accounting,
 			journalScopes,
 			journalDetails,
-			signingOwners: lifetime.captureSigningRetirementOwners(),
-			acquireIssuance: lifetime.captureIssuanceRetirementOwner(),
+			signingOwners: capturedSigningOwners ?? lifetime.captureSigningRetirementOwners(),
+			acquireIssuance: capturedIssuanceOwner ?? lifetime.captureIssuanceRetirementOwner(),
 		});
 	} catch (error) {
 		primary = error;
@@ -20718,7 +21709,7 @@ function strictRoleControls(closure: CreatorTransitionClosure, debt: CreatorProt
 	if ([...counts.values()].some((count) => count > 1)) throw new RoleRefusal(roleFailure("role-ambiguous", debt));
 }
 function selectedRoleRows(
-	reader: AheBoundedRecoveryRoleRead,
+	reader: CreatorClosedSourceEvidence,
 	epoch: number,
 	debt: CreatorProtectedRecoveryRoleDebt,
 	parsing?: CreatorClosedAcquisitionSyntax
@@ -20809,7 +21800,7 @@ interface ProtectedRoleImage {
 }
 /** Pure persisted selection only; all usable/source authentication remains caller-owned. */
 function selectProtectedRoleImage(
-	reader: AheBoundedRecoveryRoleRead,
+	reader: CreatorClosedSourceEvidence,
 	floor: CreatorProtectedRecoveryRoleSummary["floor"],
 	objectId: string,
 	parsing?: CreatorClosedAcquisitionSyntax
@@ -20889,10 +21880,10 @@ async function authenticateHeldPendingRole(
 	const readUnique = parsing?.unique ?? unique;
 
 	requireLaw(reader.head.kind === "present", "ahe-empty");
-	const frame = frames.get(reader as SourceReader);
+	const frame = creatorClosedProofWork(reader as SourceReader);
 	requireLaw(
 		frame !== undefined &&
-			frame.alive &&
+			creatorClosedProofWorkAvailable(frame) &&
 			frame.input === input &&
 			floor.pending !== null &&
 			stable.held.length === (input.classificationRead === undefined ? 2 : Math.min(2, floor.stable.epoch)) &&
@@ -20976,7 +21967,7 @@ async function authenticateHeldPendingRole(
 		}).ok && compareBytes(stableLatest.successorAclBytes, target.closedAclBytes) === 0,
 		"snapshot-invalid"
 	);
-	const data = await readTarget(input, target, held, parsing);
+	const data = await readTarget(input, target, held, parsing, frame.accounting);
 	const actual = held[stable.held.length];
 	requireLaw(
 		actual !== undefined &&
@@ -21064,9 +22055,11 @@ async function authenticateHeldPendingRole(
 		snapshotOwnerReadable(input, await snapshotCall(() => input.readiness({ signal: input.signal }))),
 		"snapshot-not-ready"
 	);
-	for (const item of held) await item.check();
-	for (const proof of installed) await proof.check();
-	for (const proof of certificates) await proof.check();
+	if (!input.snapshotPreparation?.targets?.some(target => heldTargetPreparations.has(target))) {
+		for (const item of held) await checkHeldTarget(item);
+		for (const proof of installed) await proof.check();
+		for (const proof of certificates) await proof.check();
+	}
 	requireLaw((await reader.checkCurrency()).ok, "ahe-rejected");
 	let rawFloor: unknown;
 	try {
@@ -21098,7 +22091,7 @@ async function authenticateHeldPendingRole(
 }
 function authenticateRole(
 	input: CapturedSnapshot,
-	reader: AheBoundedRecoveryRoleRead,
+	reader: CreatorClosedSourceEvidence,
 	rows: readonly GenerationRecord[],
 	roomHead: CreatorExpectedRoomHead,
 	pin: CurrentAnchorTrust,
@@ -21287,7 +22280,7 @@ function authenticateRole(
 			? []
 			: [Object.freeze({ kind, ref: Object.freeze({ ...candidate.ref }) })];
 	});
-	const frame = ledgers.get(accounting);
+	const frame = creatorClosedProofLedgerWork(accounting);
 	if (frame !== undefined) {
 		frame.recoveryTrusts.add(trust);
 		frame.recoveryTrusts.add(predecessorTrust);

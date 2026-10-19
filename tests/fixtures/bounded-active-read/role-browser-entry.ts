@@ -3,6 +3,59 @@ import { check, LIMITS, must, OBJECT, OTHER, payload, ref, stable } from "./cont
 import { createBrowserAheDurableStore } from "../../../packages/storage-browser/dist/src/index.js";
 import type { AheBoundedRecoveryRoleRead } from "../../../packages/storage/dist/src/index.js";
 import { type RoleCase, roleRun, roleSetup } from "./role-contract.js";
+import { NativeReadReservationOwner, runNativeReservedRead } from "../../../packages/storage-browser/src/internal/native-read-reservation.js";
+
+// Request ordering, not an elapsed-time threshold: real queued reads must be
+// ahead of the next native sentinel, while the same original RO transaction
+// continues to exclude an independent native writer until joined release.
+async function heldTailQueue(name: string): Promise<unknown> {
+	const raw = await database(name), foreign = await database(name);
+	const owner = new NativeReadReservationOwner(raw);
+	let held: Awaited<ReturnType<typeof owner.acquire>> | undefined;
+	const descriptor = Object.getOwnPropertyDescriptor(IDBObjectStore.prototype, "getKey")!;
+	const events: string[] = [];
+	let sentinels = 0, recording = false, writerStarted = false;
+	let writerJoined: Promise<void> | undefined;
+	try {
+		held = await owner.acquire({objectId: OBJECT});
+		Object.defineProperty(IDBObjectStore.prototype, "getKey", {...descriptor,
+			value: function(this: IDBObjectStore, ...args: unknown[]): IDBRequest {
+				const native = Reflect.apply(descriptor.value, this, args) as IDBRequest;
+				if (recording) {
+					sentinels++; events.push("issue:sentinel");
+					native.addEventListener("success", () => events.push("success:sentinel"), {once: true});
+				}
+				return native;
+			}});
+		const writer = foreign.transaction("blobs", "readwrite");
+		writerJoined = done(writer); void writerJoined.catch(() => undefined);
+		const write = writer.objectStore("blobs").put({digest: "tail-queue-unrelated", bytes: payload(1)});
+		write.addEventListener("success", () => {writerStarted = true;}, {once: true});
+		recording = true;
+		await runNativeReservedRead(raw, () => new Promise<void>((resolve, reject) => {
+			events.push("issue:real");
+			const real = owner.readTransaction("blobs").objectStore("blobs").get("tail-queue-absent");
+			real.addEventListener("success", () => {events.push("success:real"); resolve();}, {once: true});
+			real.addEventListener("error", () => reject(real.error), {once: true});
+		}));
+		recording = false;
+		check(!writerStarted, "independent native writer remains excluded during real read");
+		check(sentinels === 1, "one tail sentinel, not a redundant sentinel round before the real result");
+		check(events[0] === "issue:real" && events[1] === "issue:sentinel" && events[2] === "success:real",
+			"queued real request precedes the next sentinel in the original native request queue");
+		await held.check();
+		check(!writerStarted, "fresh future-point check preserves original physical exclusion");
+		await held.release(); held = undefined;
+		await writerJoined;
+		check(writerStarted, "independent writer resumes only after joined release");
+		return {passed: true, sentinels, events, writerStarted};
+	} finally {
+		recording = false;
+		Object.defineProperty(IDBObjectStore.prototype, "getKey", descriptor);
+		try {await held?.release(); await owner.close(); await writerJoined;}
+		finally {raw.close(); foreign.close();}
+	}
+}
 
 type HeldCurrencyCase = "repeat-and-mutation" | "replacement-and-corruption" | "abort" | "close";
 
@@ -361,14 +414,43 @@ async function heldRoleCurrency(name: string, selected: HeldCurrencyCase): Promi
 			check(heldTransaction !== originalTransaction, "replacement is a different actual native transaction");
 			const replaced = await currency("new-hold-original-reader");
 			check(replaced.result.ok && replaced.nativeReads > 0 && replaced.blobReads > 0, "different hold requires original full recapture");
+			const blob = captured.blobs[0]!, original = blob.bytes.slice();
+			writer = raw.transaction("blobs", "readwrite"); writerJoined = done(writer);
+			void writerJoined.catch(() => undefined);
+			const write = writer.objectStore("blobs").put({digest: blob.ref.digest, bytes: original});
+			write.addEventListener("success", () => {writerStarted = true;});
+			const repeated = await currency("new-hold-requalified-reader");
+			check(repeated.result.ok && repeated.nativeReads === 0 && repeated.blobReads === 0,
+				"second check uses ONLY freshly fully qualified same native exclusion");
+			check(!writerStarted, "new native hold still physically excludes independent writer");
+			blob.bytes[0] = blob.bytes[0]! ^ 255;
+			const borrowed = await currency("new-hold-borrowed-mutation");
+			check(!borrowed.result.ok && borrowed.result.reason === "READ_STALE_ROLE_VIEW" && borrowed.nativeReads === 0,
+				"requalified native basis still performs every original final borrowed integrity sweep");
+			blob.bytes.set(original);
+			check((await currency("new-hold-borrowed-restored")).result.ok, "restored private bytes remain eligible for same actual native basis");
 			await reservation.release(); reservation = undefined;
-			const blob = captured.blobs[0]!, corrupt = blob.bytes.slice(); corrupt[0] = corrupt[0]! ^ 255;
+			await writerJoined; check(writerStarted, "new held writer commits only after joined new-hold release");
+			const unheld = await currency("no-native-hold-after-requalification");
+			check(unheld.result.ok && unheld.nativeReads > 0 && unheld.blobReads > 0,
+				"no-hold currency cannot borrow the former physical qualification");
+			reservation = await store.acquireNativeReadReservation({objectId: OBJECT});
+			const third = await currency("third-native-hold-first-check");
+			check(third.result.ok && third.nativeReads > 0 && third.blobReads > 0, "every genuinely different native hold starts with full actual verification");
+			const revoked = must(await store.acquireBoundedRecoveryRoleRead({objectId: OBJECT, limits: LIMITS}));
+			await revoked.release(); nativeReads = 0; blobReads = 0;
+			const released = await revoked.checkCurrency();
+			check(!released.ok && released.reason === "READ_RELEASED" && nativeReads === 0,
+				"native rebinding never revives or admits a released logical reader");
+			await reservation.release(); reservation = undefined;
+			const corrupt = blob.bytes.slice(); corrupt[0] = corrupt[0]! ^ 255;
 			const tx = raw.transaction("blobs", "readwrite"), terminal = done(tx);
 			tx.objectStore("blobs").put({digest: blob.ref.digest, bytes: corrupt}); await terminal;
 			reservation = await store.acquireNativeReadReservation({objectId: OBJECT});
 			const changed = await currency("raw-corruption-after-replacement");
 			check(!changed.result.ok && changed.result.reason === "ADOPTED_BLOB_CORRUPT", "raw corruption is detected, not cached as current");
 			check(changed.blobReads > 0, "corrupt replacement actually read native material");
+			check(!(await currency("failed-qualification-remains-refused")).result.ok, "failed full validation cannot bind a successful native basis");
 		} else if (selected === "abort") {
 			originalTransaction.abort();
 			let refused = false;
@@ -406,4 +488,5 @@ Object.assign(globalThis, {
 	boundedHeldRoleCurrency: heldRoleCurrency,
 	boundedHeldCaptureOverlap: heldCaptureOverlap,
 	boundedHeldFuturePoint: heldFuturePoint,
+	boundedHeldTailQueue: heldTailQueue,
 });

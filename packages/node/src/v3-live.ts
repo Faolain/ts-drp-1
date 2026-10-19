@@ -108,6 +108,8 @@ import parameterRegistry from "@ts-drp/protocol-v3/registry/registry-v1.json" wi
 import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
 import {
 	createCreatorSealActor,
+	acquireCreatorSigningDependenciesForPreparation,
+	type CreatorSigningDependencyPreparation,
 	type CreatorSigningDependencyRead,
 	type CreatorSigningRecoveryOwner,
 	type CreatorSigningRetirementOwners,
@@ -3589,7 +3591,7 @@ interface RecoveryCloseHoldFacts {
 	readonly context: CreatorRecoveryCensusContext;
 	readonly registration?: V3PlaneRegistration;
 	readonly closePlane?: V3PlaneHandle;
-	borrowSigning(trusts: readonly CurrentAnchorTrust[]): Promise<CreatorSigningDependencyRead>;
+	borrowSigning(trusts: readonly CurrentAnchorTrust[], prepareData?: CreatorSigningDependencyPreparation): Promise<CreatorSigningDependencyRead>;
 	captureSigning(): CreatorSigningRetirementOwners;
 	readonly dependencyAnchors: readonly Readonly<{ epoch: number; anchorDigest: string }>[];
 	readonly sourceTrust: CurrentAnchorTrust | undefined;
@@ -3652,7 +3654,7 @@ const recoveryCloseHolds = new WeakMap<CreatorSnapshotRecoveryCloseHold,
  * original comparison; no successful check advances these bounded owner facts. */
 function captureCreatorOrdinaryDimensionIntegrity(value: unknown): () => boolean {
 	const exact = encodeCanonical(value);
-	const leaves: {value: Uint8Array; bytes: Uint8Array}[] = [], visited = new Set<object>();
+	const leaves: {value: Uint8Array; bytes: Uint8Array; ownLength: PropertyDescriptor | undefined}[] = [], visited = new Set<object>();
 	const copies = new Map<object, unknown>();
 	const containers: {value: object; parent: object | null; keys: readonly PropertyKey[];
 		fields: readonly {value: unknown; enumerable: boolean; configurable: boolean; writable: boolean}[]}[] = [];
@@ -3661,14 +3663,24 @@ function captureCreatorOrdinaryDimensionIntegrity(value: unknown): () => boolean
 	// Optimization work bounds ONLY. Misses keep the original codec/domain and
 	// original errors/limits; these confer no proof-byte allowance.
 	let remainingFields = 65_536, remainingByteCopies = 4_194_304;
-	const plainBytes = (bytes: Uint8Array): boolean => {
+	const plainBytes = (bytes: Uint8Array, captured?: {ownLength: PropertyDescriptor | undefined}): boolean => {
+		const ownLength = ObjectGetOwnPropertyDescriptor(bytes, "byteLength");
 		if (ObjectGetPrototypeOf(bytes) !== prototype || ObjectGetPrototypeOf(prototype) !== TypedArrayPrototype ||
-			ObjectGetOwnPropertyDescriptor(bytes, "byteLength") !== undefined ||
 			ObjectGetOwnPropertyDescriptor(bytes, Symbol.iterator) !== undefined ||
 			ObjectGetOwnPropertyDescriptor(prototype, "byteLength") !== undefined || prototype[Symbol.iterator] !== iterator ||
 			ObjectGetOwnPropertyDescriptor(TypedArrayPrototype, "byteLength")?.get !== TypedArrayByteLengthGetter) return false;
+		if (TypedArrayByteLengthGetter === undefined) return false;
+		const intrinsicLength = ReflectApply(TypedArrayByteLengthGetter, bytes, []);
+		// The original detached-byte producer pins an own DATA length. The codec
+		// reads that property as well as the actual bytes: both must still agree.
+		// Never invoke an own getter or infer the native width from its declaration.
+		if (ownLength !== undefined && (!("value" in ownLength) || ownLength.value !== intrinsicLength)) return false;
+		if (captured !== undefined && (ownLength === undefined ? captured.ownLength !== undefined :
+			captured.ownLength === undefined || ownLength.value !== captured.ownLength.value ||
+			ownLength.enumerable !== captured.ownLength.enumerable || ownLength.configurable !== captured.ownLength.configurable ||
+			ownLength.writable !== captured.ownLength.writable)) return false;
 		// The original codec rejects detached views, including empty ones.
-		if (bytes.byteLength === 0) {
+		if (intrinsicLength === 0) {
 			if (TypedArrayBufferGetter === undefined) return false;
 			new Uint8ArrayConstructor(ReflectApply(TypedArrayBufferGetter, bytes, []) as ArrayBuffer, 0, 0);
 		}
@@ -3684,7 +3696,7 @@ function captureCreatorOrdinaryDimensionIntegrity(value: unknown): () => boolean
 			if (!plainBytes(current) || current.byteLength > remainingByteCopies) return false;
 			remainingByteCopies -= current.byteLength;
 			const bytes = new Uint8ArrayConstructor(current);
-			leaves.push({value: current, bytes}); copies.set(current, bytes);
+			leaves.push({value: current, bytes, ownLength: ObjectGetOwnPropertyDescriptor(current, "byteLength")}); copies.set(current, bytes);
 			return true;
 		}
 		const parent = ObjectGetPrototypeOf(current), array = ArrayIsArray(current);
@@ -3725,13 +3737,13 @@ function captureCreatorOrdinaryDimensionIntegrity(value: unknown): () => boolean
 		// a later state reached by descriptor/prototype traps during capture.
 		// The detached representation contains only captured data, never getters.
 		if (supported && containers.length !== 0) supported = sameBytes(encodeCanonical(capturedValue(value)), exact);
-		supported &&= containersCurrent() && leaves.every(leaf => plainBytes(leaf.value) && sameBytes(leaf.value, leaf.bytes));
+		supported &&= containersCurrent() && leaves.every(leaf => plainBytes(leaf.value, leaf) && sameBytes(leaf.value, leaf.bytes));
 	} catch { supported = false; }
 	visited.clear(); copies.clear();
 	if (!supported) { leaves.length = 0; containers.length = 0; }
 	return () => {
 		try {
-			if (supported && containersCurrent() && leaves.every(leaf => plainBytes(leaf.value)))
+			if (supported && containersCurrent() && leaves.every(leaf => plainBytes(leaf.value, leaf)))
 				return leaves.every(leaf => sameBytes(leaf.value, leaf.bytes));
 			return sameBytes(encodeCanonical(value), exact);
 		} catch { return false; }
@@ -3891,6 +3903,8 @@ function resolveRecoveryCloseHold(
 		return task;
 	};
 	const lifetime: CreatorSnapshotRecoveryCloseLifetime = ObjectFreeze({
+		...(facts.replacementCustody === undefined && facts.releaseSourceDependencies === undefined
+			? {canDetachNativePreparation: true as const} : {}),
 		enrollCurrentJournalObservation: function (this: CreatorSnapshotRecoveryCloseLifetime,
 			observation: import("@ts-drp/live-journal").LiveJournalRetirementImageObservation): void {
 			if (this !== lifetime || !available()) return;
@@ -3905,6 +3919,13 @@ function resolveRecoveryCloseHold(
 			// native/context checks and joins remain; the prefix supplies its own
 			// ORIGINAL fresh closed-ACL key resolver on every call.
 			return (facts.context.historicalIssuance?.vertexFacts?.verify ?? verifyReceivedVertex)(input);
+		},
+		captureVertexVerificationFacts: function (this: CreatorSnapshotRecoveryCloseLifetime) {
+			if (this !== lifetime || !available()) throw new TypeError("creator recovery close hold is unavailable");
+			// Only exact-byte crypto facts survive. This cannot check a hold, open
+			// native custody or preserve authorization; each invocation supplies
+			// its original fresh closed-ACL key resolver.
+			return facts.context.historicalIssuance?.vertexFacts?.verify ?? verifyReceivedVertex;
 		},
 		captureClassificationMetadataOwners: function (this: CreatorSnapshotRecoveryCloseLifetime) {
 			if (this !== lifetime || !available()) throw new TypeError("creator classification metadata hold is unavailable");
@@ -3934,12 +3955,17 @@ function resolveRecoveryCloseHold(
 		},
 		borrowSigningDependencies: function (
 			this: CreatorSnapshotRecoveryCloseLifetime,
-			trusts: readonly CurrentAnchorTrust[]
+			trusts: readonly CurrentAnchorTrust[],
+			prepareData?: CreatorSigningDependencyPreparation
 		) {
 			if (this !== lifetime) return Promise.reject(new TypeError("creator recovery close hold is foreign"));
 			return admit(async () => {
 				await facts.check();
-				const original = await facts.borrowSigning(trusts);
+				const original = await facts.borrowSigning(trusts, prepareData === undefined ? undefined : async data => {
+					if (!available()) throw new TypeError("creator recovery close hold is unavailable");
+					await prepareData(data);
+					if (!available()) throw new TypeError("creator recovery close hold is unavailable");
+				});
 				if (!available()) {
 					await original.release();
 					throw new TypeError("creator recovery close hold is unavailable");
@@ -9444,7 +9470,8 @@ async function sealCreatorPendingClassificationDependencies(
 			pending: new Set(),
 			retirementAllowed: false,
 			releasing: false,
-			borrowSigning: (trusts) => actor.acquireRecoveryDependencies(trusts),
+			borrowSigning: (trusts, prepareData) => prepareData === undefined ? actor.acquireRecoveryDependencies(trusts) :
+				acquireCreatorSigningDependenciesForPreparation(actor, trusts, prepareData),
 			captureSigning: () => actor.captureRetirementOwners(),
 			check: async () => {
 				const current = await readCreatorRecoveryDependencyCensus(context, observation);
@@ -11234,7 +11261,12 @@ async function prepareCreatorOrdinaryNativeMetadataForReadiness(registration: V3
  * census; presign/received observations retain their original restrictions. */
 async function runCreatorOrdinaryReadinessMaintenance(registration: V3PlaneRegistration, closePlane: V3PlaneHandle,
 	snapshots: SnapshotRecoveryStore<SnapshotVerificationReceipt>,
-	consume: (seal: () => Promise<CreatorSnapshotRecoveryCloseHold>, requireClosedWorkflowCompletion: boolean) => Promise<"complete">): Promise<void> {
+	consume: (seal: () => Promise<CreatorSnapshotRecoveryCloseHold>, requireClosedWorkflowCompletion: boolean) => Promise<"complete">,
+	options?: Readonly<{deferrable?: boolean}>): Promise<"ran" | "deferred"> {
+	// An opt-in pool boundary yields to ordinary work instead of halting it: an
+	// unavailable boundary before entry has minted no hold, frozen no admission
+	// and run no native work, so it is a scheduling miss, not recovery work.
+	const deferrable = options?.deferrable === true;
 	const payload = registration.payload, authorization = registration.authorization, trust = payload.trust.trust,
 		epoch = trust.currentEpoch, anchor = trust.currentAnchorDigest, profile = trust.profileId,
 		genesis = trust.genesisAnchorDigest, sourceBindings = creatorOrdinaryIssuanceRetainedSourceBindings(registration),
@@ -11273,8 +11305,13 @@ async function runCreatorOrdinaryReadinessMaintenance(registration: V3PlaneRegis
 		(registration.rebaseSnapshot === undefined || registration.rebaseSnapshot.length === 0) && registration.rebaseCursor === undefined &&
 		(enteredGraph === undefined || registration.graphVersion === enteredGraph.version && registration.index === enteredGraph.index) &&
 		creatorOrdinaryIssuanceRetainedSourceBindings(registration).every((value, index) => value === sourceBindings[index]);
-	if (!available()) throw new TypeError("creator readiness maintenance boundary is unavailable");
+	if (!available()) {
+		if (deferrable) return "deferred";
+		throw new TypeError("creator readiness maintenance boundary is unavailable");
+	}
+	let deferred = false;
 	await enqueueRegistrationTask(registration, () => async () => {
+		if (deferrable && !available()) { finished = true; deferred = true; return; }
 		const lifetimes: CreatorSnapshotRecoveryCloseLifetime[] = [];
 		const pending: Promise<unknown>[] = [];
 		const track = <T>(task: Promise<T>): Promise<T> => {
@@ -11351,6 +11388,7 @@ async function runCreatorOrdinaryReadinessMaintenance(registration: V3PlaneRegis
 		}
 		finished = true; registration.blueprintClosing = false; entered = false;
 	});
+	return deferred ? "deferred" : "ran";
 }
 
 function sealCreatorOrdinaryIssuanceRuntime(registration: V3PlaneRegistration, closePlane: V3PlaneHandle,
@@ -11667,10 +11705,11 @@ async function sealCreatorRecoveryDependencies(
 			context: registration,
 			registration,
 			closePlane,
-			borrowSigning: (trusts) =>
+			borrowSigning: (trusts, prepareData) =>
 				received === undefined
-					? borrowCreatorCloseSigningDependencies(closePlane, trusts)
-					: received.signing.acquireRecoveryDependencies(trusts),
+					? borrowCreatorCloseSigningDependencies(closePlane, trusts, prepareData)
+					: prepareData === undefined ? received.signing.acquireRecoveryDependencies(trusts) :
+						acquireCreatorSigningDependenciesForPreparation(received.signing, trusts, prepareData),
 			captureSigning: () =>
 				received === undefined
 					? captureCreatorCloseSigningRetirementOwners(closePlane)
@@ -11731,6 +11770,12 @@ async function sealCreatorRecoveryDependencies(
 				const facts = fullRecoveryCloseHoldFacts(capability);
 				if (facts === undefined || facts.releasing || issuanceRead !== undefined || !live())
 					throw new TypeError("creator held issuance census is unavailable");
+				// Releasing an OLD hold permanently revokes its fast cell. A NEW
+				// genuine enrollment may prepare a NEW cell, but only AFTER its first
+				// complete actual census check below succeeds under this new hold.
+				unchangedHeldCensus = undefined;
+				mayPrepareUnchanged = sourceDependencies === undefined && activeSource === undefined &&
+					runtime.nativeBranchSource === undefined && runtime.migrationSource === undefined;
 				let revoked = false;
 				let releaseTask: Promise<void> | undefined;
 				const pending = new Set<Promise<unknown>>();
@@ -19419,9 +19464,10 @@ function creatorCloseRegistration(
 		},
 		runOrdinaryReadinessMaintenance: (
 			snapshots: Parameters<V3CreatorCloseRegistration["runOrdinaryReadinessMaintenance"]>[0],
-			consume: Parameters<V3CreatorCloseRegistration["runOrdinaryReadinessMaintenance"]>[1]
+			consume: Parameters<V3CreatorCloseRegistration["runOrdinaryReadinessMaintenance"]>[1],
+			options?: Parameters<V3CreatorCloseRegistration["runOrdinaryReadinessMaintenance"]>[2]
 		) =>
-			runCreatorOrdinaryReadinessMaintenance(registration, closePlane, snapshots, consume),
+			runCreatorOrdinaryReadinessMaintenance(registration, closePlane, snapshots, consume, options),
 		sealOrdinaryIssuanceMaintenanceRuntime: (receipt?: object): Promise<CreatorOrdinaryIssuanceRuntimeHold | undefined> =>
 			Promise.resolve(sealCreatorOrdinaryIssuanceRuntime(registration, closePlane, receipt)),
 		readOrdinaryRuntimeCapacityWidths: (input: CreatorOrdinaryRuntimeCapacityWidthInput) =>

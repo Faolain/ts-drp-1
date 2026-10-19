@@ -364,7 +364,7 @@ describe("Phase 2g-a public neutral surface RED", () => {
 		};
 		expect
 			.soft(Object.keys(manifest.exports ?? {}))
-			.toEqual([".", "./contract", "./maintenance", "./adapter", "./snapshot-transfer"]);
+			.toEqual([".", "./contract", "./room-head", "./maintenance", "./adapter", "./snapshot-transfer"]);
 		expect.soft(fs.existsSync(path.join(PACKAGE_DIRECTORY, "src/capacity.ts"))).toBe(true);
 		expect.soft(adapter).not.toHaveProperty("inspectStorageCapability");
 		expect.soft(adapter).not.toHaveProperty("requestPersistentStorage");
@@ -481,5 +481,6 @@ void [inspect, request];
 		} finally {
 			fs.rmSync(consumerDirectory, { force: true, recursive: true });
 		}
-	});
+		// A real package build, npm pack and consumer tsc run synchronously here.
+	}, 180_000);
 });

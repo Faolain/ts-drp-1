@@ -1,12 +1,13 @@
-import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import {
 	createSigningStorageCodec,
+	captureSigningRetirementDataImage,
+	releaseCapturedSigningRetirementDataImage,
 	isSigningSummaryRetirementPlan,
 	SIGNING_DETAIL_RETIREMENT_BATCH_ROWS,
 	type SigningDependencyObservation,
 	type SigningEvidenceRetirementPlan,
 	type SigningRetirementControl,
-	signingRetirementDataDigest,
 	signingRetirementDrainFields,
 	signingRetirementFrameDigest,
 	signingRetirementMetadataFields,
@@ -134,16 +135,20 @@ async function nativeControl(
 	transaction: IDBTransaction,
 	objectId: string,
 	incarnation: string
-): Promise<SigningRetirementControl> {
+): Promise<Readonly<{
+	control: SigningRetirementControl;
+	incarnationRow: Record<string, unknown>;
+	controlRow: unknown;
+}>> {
 	assertCurrentBrowserSchema(transaction);
 	if (!incarnationPattern.test(incarnation)) throw new Error("STORAGE_LOSS");
 	const meta = record(await request(transaction.objectStore("storageMeta").get("incarnation")), ["key", "value"]);
 	if (meta.key !== "incarnation" || meta.value !== incarnation) throw new Error("STORAGE_LOSS");
 	const value: unknown = await request(transaction.objectStore("storageMeta").get(keyFor(objectId)));
-	if (value === undefined) return idle(objectId, incarnation);
+	if (value === undefined) return { control: idle(objectId, incarnation), incarnationRow: meta, controlRow: value };
 	const row = record(value, ["key", "value"]);
 	if (row.key !== keyFor(objectId)) throw new Error("INVALID_SIGNING_CONTROL");
-	return control(row.value, objectId, incarnation);
+	return { control: control(row.value, objectId, incarnation), incarnationRow: meta, controlRow: value };
 }
 
 /**
@@ -160,7 +165,7 @@ export async function signingMutationRefusal(
 	epoch: number,
 	incarnation: string
 ): Promise<string | undefined> {
-	const current = await nativeControl(transaction, objectId, incarnation);
+	const { control: current } = await nativeControl(transaction, objectId, incarnation);
 	if (summaryMaintenancePending(current)) return "SIGNING_MAINTENANCE_DEBT";
 	if (current.drain !== undefined && current.drain !== null && current.drain.cursor < current.drain.plan.entries.length)
 		return "SIGNING_MAINTENANCE_DEBT";
@@ -177,6 +182,7 @@ interface Image {
 	readonly controlBytes: number;
 	readonly pendingEpochs: readonly number[];
 	readonly dataDigest: string;
+	readonly data: ReturnType<typeof captureSigningRetirementDataImage>;
 }
 
 /**
@@ -212,7 +218,12 @@ async function image(
 		if (store === "storageMeta" && key === keyFor(objectId)) controlBytes = bytes.byteLength;
 	};
 	for (const key of ["incarnation", `ahe-retirement:${objectId}`, keyFor(objectId)]) {
-		const value: unknown = await request(transaction.objectStore("storageMeta").get(key));
+		// These rows were just captured and validated in this SAME native
+		// transaction. Reuse their exact values, not a previous transaction's
+		// currency or admission decision. Nothing escapes before image creation.
+		const value: unknown = key === "incarnation" ? captured.incarnationRow :
+			key === keyFor(objectId) ? captured.controlRow :
+			await request(transaction.objectStore("storageMeta").get(key));
 		// Absence is committed too, without granting a missing metadata row authority.
 		add("storageMeta", key, value === undefined ? null : value);
 	}
@@ -275,14 +286,22 @@ async function image(
 	const digest = Array.from(hashDomain("ts-drp/signing-native-image/v1", ...frames), (byte) =>
 		byte.toString(16).padStart(2, "0")
 	).join("");
+	// Preserve the original full decoder's byte/item/depth validation once for
+	// this freshly encoded image. Its private parsed rows serve later projections
+	// in this same native transaction, never another transaction's currency.
+	const data = captureSigningRetirementDataImage(frames, objectId);
+	frames.length = 0; // Drop encoded inputs: the parser owns the sole retained inventory.
 	return {
-		control: captured,
+		control: captured.control,
 		digest,
 		logicalBytes,
 		controlBytes,
 		pendingEpochs,
-		frames,
-		dataDigest: signingRetirementDataDigest(frames, objectId),
+		// The parser is the sole retained byte inventory. Encoded inputs above
+		// can now drop; callers receive the original detached mutable byte view.
+		get frames() { return data.readExactCanonicalRows(); },
+		dataDigest: data.digest(),
+		data,
 	};
 }
 
@@ -460,6 +479,10 @@ export class SigningRetirementOwner {
 				if (this !== read) throw new TypeError("FOREIGN_SIGNING_OBSERVATION");
 				return observation.readExactCanonicalRows();
 			},
+			readRetirementDataImage: function () {
+				if (this !== read) throw new TypeError("FOREIGN_SIGNING_OBSERVATION");
+				return observation.readRetirementDataImage!();
+			},
 			check: function () {
 				if (this !== read) return Promise.reject(new TypeError("FOREIGN_SIGNING_OBSERVATION"));
 				return observation.check();
@@ -562,6 +585,11 @@ export class SigningRetirementOwner {
 				if (!live || owner.#closed) throw new Error("READ_RELEASED");
 				return Object.freeze(rows.map(bytes => bytes.slice()));
 			},
+			readRetirementDataImage: function() {
+				if (this !== child) throw new TypeError("FOREIGN_SIGNING_OBSERVATION");
+				if (!live || owner.#closed) throw new Error("READ_RELEASED");
+				return observation!.readRetirementDataImage!();
+			},
 			check: function() {
 				if (this !== child) return Promise.reject(new TypeError("FOREIGN_SIGNING_OBSERVATION"));
 				if (!live || owner.#closed) return Promise.reject(new Error("READ_RELEASED"));
@@ -637,6 +665,7 @@ export class SigningRetirementOwner {
 		let released: Promise<void> | undefined;
 		const release = (): Promise<void> => {
 			live = false;
+			releaseCapturedSigningRetirementDataImage(captured.data);
 			return (released ??= held.release());
 		};
 		const receiver = (self: unknown): void => {
@@ -790,14 +819,14 @@ export class SigningRetirementOwner {
 					const selectedSummary = isSigningSummaryRetirementPlan(plan) ? plan : undefined;
 					if (selectedSummary !== undefined) {
 						const epochs = new Set(selectedSummary.entries.map((entry) => entry.key[1]));
-						for (const bytes of actual.frames) {
-							const frame = decodeCanonical(bytes, imageLimits) as readonly unknown[];
-							if (frame[0] === "storageMeta" || !epochs.has((frame[1] as unknown[])[1] as number)) continue;
+						for (const frame of actual.data.frames) {
+							if (frame.store === "storageMeta" || !epochs.has(frame.epoch as number)) continue;
 							if (
-								frame[0] === "sealEvidence" ||
+								frame.store === "sealEvidence" ||
 								!selectedSummary.entries
 									.slice(cursor)
-									.some((entry) => entry.store === frame[0] && equal(entry.key, frame[1]))
+									.some((entry) => entry.store === frame.store &&
+										Array.from(encodeCanonical([entry.store, entry.key], imageLimits)).join(",") === frame.addressKey)
 							)
 								throw new Error("SUMMARY_SOURCE_CHANGED");
 						}
@@ -834,19 +863,20 @@ export class SigningRetirementOwner {
 						removed.add(Array.from(encodeCanonical([store, entry.key], imageLimits)).join(","));
 					}
 					let removedBytes = 0;
-					const remainingFrames = actual.frames.filter((bytes) => {
-						const frame = decodeCanonical(bytes, imageLimits) as readonly unknown[];
-						const keep = !removed.has(Array.from(encodeCanonical([frame[0], frame[1]], imageLimits)).join(","));
-						if (!keep) removedBytes += bytes.byteLength;
-						return keep;
-					});
+					const excluded = new Set<number>();
+					for (const frame of actual.data.frames) {
+						if (frame.addressKey !== undefined && removed.has(frame.addressKey)) {
+							removedBytes += frame.byteLength;
+							excluded.add(frame.index);
+						}
+					}
 					const next = control(
 						signingRetirementDrainFields(
 							old,
 							plan,
 							nextCursor,
 							kind === "begin" ? 0 : batches + 1,
-							signingRetirementDataDigest(remainingFrames, objectId)
+							actual.data.digest(excluded)
 						),
 						objectId,
 						this.#incarnation
@@ -880,10 +910,15 @@ export class SigningRetirementOwner {
 			return operation;
 		};
 		const observation: SigningRetirementObservation = Object.freeze({
+			readRetirementDataImage: function () {
+				receiver(this);
+				if (!live || used || owner.#closed) throw new Error("READ_RELEASED");
+				return captured.data;
+			},
 			readExactCanonicalRows: function () {
 				receiver(this);
 				if (!live || used || owner.#closed) throw new Error("READ_RELEASED");
-				return Object.freeze(captured.frames.map((bytes) => Uint8Array.from(bytes)));
+				return captured.frames;
 			},
 			control: captured.control,
 			imageDigest: captured.digest,

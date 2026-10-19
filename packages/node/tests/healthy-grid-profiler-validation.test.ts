@@ -3,14 +3,15 @@ import ts from "typescript";
 import {describe,expect,it} from "vitest";
 
 const source=readFileSync(new URL("../../../tests/fixtures/startup-discovery/r8-source-binding.pw.ts",import.meta.url),"utf8");
+const healthySource=readFileSync(new URL("../../../tests/fixtures/startup-discovery/healthy-grid.ts",import.meta.url),"utf8");
 const ast=ts.createSourceFile("r8-source-binding.pw.ts",source,ts.ScriptTarget.Latest,true);
-const names=["validateCriticalCpuProfile","validateCriticalCoverage","selectCriticalTraceCategories","criticalCaptureModes"];
+const names=["validateCriticalCpuProfile","validateCriticalCoverage","selectCriticalTraceCategories","criticalCaptureModes","verifiedCriticalSourceReuse"];
 const declarations=names.map(name=>{
  const declaration=ast.statements.find((node):node is ts.FunctionDeclaration=>ts.isFunctionDeclaration(node)&&node.name?.text===name);
  if(!declaration)throw Error("PROFILE_VALIDATOR_MISSING:"+name);return declaration.getText(ast);
 });
 const code=ts.transpile(declarations.join("\n"),{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None});
-const {validateCriticalCpuProfile:cpu,validateCriticalCoverage:coverage,selectCriticalTraceCategories:categories,criticalCaptureModes:modes}=new Function(code+";return {validateCriticalCpuProfile,validateCriticalCoverage,selectCriticalTraceCategories,criticalCaptureModes};")();
+const {validateCriticalCpuProfile:cpu,validateCriticalCoverage:coverage,selectCriticalTraceCategories:categories,criticalCaptureModes:modes,verifiedCriticalSourceReuse:reuse}=new Function(code+";return {validateCriticalCpuProfile,validateCriticalCoverage,selectCriticalTraceCategories,criticalCaptureModes,verifiedCriticalSourceReuse};")();
 const valid=()=>({nodes:[{id:1,children:[2]},{id:2}],startTime:100,endTime:200,samples:[1,2,2],timeDeltas:[0,30,40]});
 const validCoverage=()=>({timestamp:1.5,result:[{scriptId:"17",url:"http://localhost/bundle.js",functions:[
  {functionName:"",ranges:[{startOffset:0,endOffset:100,count:1}],isBlockCoverage:false},
@@ -18,6 +19,15 @@ const validCoverage=()=>({timestamp:1.5,result:[{scriptId:"17",url:"http://local
 ]}]});
 
 describe("healthy native profiler evidence validation",()=>{
+ it("shares source bytes only through independently verified exact SHA256, never URL, length or an inherited alias",()=>{
+  const hash="a".repeat(64),first={scriptId:"1",sha256:hash,independentlyFetchedSource:true};
+  expect(reuse(hash,[first])).toBe(first);
+  expect(reuse("b".repeat(64),[first])).toBeUndefined();expect(reuse(undefined,[first])).toBeUndefined();
+  expect(reuse(hash,[{...first,independentlyFetchedSource:false}])).toBeUndefined();
+  expect(reuse(hash.toUpperCase(),[first])).toBeUndefined();
+  expect(source).toContain('capture.traceCompleteReceivedAt=performance.now()');
+  expect(source).toContain('bounded(capture.traceCompletePromise,"Tracing.tracingComplete",45_000)');
+ });
  it("accepts complete monotone CPU samples and leaves the original profile unchanged",()=>{
   const profile=valid(),before=JSON.stringify(profile);expect(cpu(profile)).toMatchObject({valid:true,samples:3,sumTimeDeltas:70,negativeDeltas:0});expect(JSON.stringify(profile)).toBe(before);
  });
@@ -73,9 +83,39 @@ describe("healthy native profiler evidence validation",()=>{
   expect(closed).toContain('return {ok:true,partial:true,captureClosed:true}');expect(closed).not.toContain('startCriticalWindow');
  });
  it("never concurrently starts native tracing and the V8 CPU profiler",()=>{
-  expect(modes("full-calls")).toEqual({v8CpuProfiling:false,nativeTracing:true});
-  expect(modes("cpu-only")).toEqual({v8CpuProfiling:true,nativeTracing:false});
+  expect(modes("full-calls")).toEqual({v8CpuProfiling:false,nativeTracing:true,allocationSampling:false});
+  expect(modes("cpu-only")).toEqual({v8CpuProfiling:true,nativeTracing:false,allocationSampling:false});
+  expect(modes("self-only")).toEqual({v8CpuProfiling:false,nativeTracing:false,allocationSampling:false});
+  expect(modes("self-trace")).toEqual({v8CpuProfiling:false,nativeTracing:true,allocationSampling:false});
   expect(source).toContain('if(captureModes.nativeTracing)try{');
   expect(source).toContain('if(captureModes.v8CpuProfiling){await cdp.send("Profiler.start")');
+ });
+ it("bounds a handoff-only trace without verbose background GC or CPU sampling",()=>{
+  expect(categories(["IndexedDB","leveldb","disabled-by-default-v8.gc"],true)).toEqual(["devtools.timeline","blink.user_timing","IndexedDB","leveldb"]);
+  expect(source).toContain('if(criticalTraceFailed)throw Error("PRIOR_NATIVE_TRACE_DID_NOT_JOIN")');
+  expect(source).toContain('Observed application bundles only; other debugger/eval scripts are not claimed pinned');
+ });
+ it("repairs observed native ring overflow by retaining renderer callbacks and GC without verbose IndexedDB/leveldb",()=>{
+  expect(categories(["IndexedDB","indexeddb","leveldb","disabled-by-default-leveldb"],false,true)).toEqual([
+   "devtools.timeline","blink.user_timing","disabled-by-default-v8.gc"]);
+  expect(source).toContain('const sourceScriptsAtBoundary=[...scripts.values()]');
+  expect(source).toContain('capture.deferredBeforeExportMilliseconds=activeExportStartedAt-capture.stopRequestedAt');
+  expect(source).toContain('traceBufferSizeInKb:65536');
+ });
+ it("stops trace production through tiny metadata before serializing the large body/counter snapshots",()=>{
+  const finallyBody=healthySource.slice(healthySource.indexOf('const apiEnd=performance.now()'));
+  expect(finallyBody.indexOf('fullSnapshot=endFullFunctionWindow()')).toBeLessThan(finallyBody.indexOf('fullBoundary("trace-stop"'));
+  expect(finallyBody.indexOf('fullBoundary("trace-stop"')).toBeLessThan(finallyBody.indexOf('fullBoundary("end"'));
+  const control=finallyBody.slice(finallyBody.indexOf('fullBoundary("trace-stop"'),finallyBody.indexOf('fullBoundary("end"'));
+  expect(control).not.toContain('exactCriticalCounters');expect(control).not.toContain('fullSnapshot');
+  expect(source).toContain('if(!capture.traceStarted||capture.traceEndAcknowledgedAt!==undefined)return');
+  expect(source).toContain('activeCapture.traceStopControl.returnedAt=performance.now()');
+ });
+ it("adds only available exact microtask/task categories for the measured remaining gap",()=>{
+  expect(categories(["v8.execute","toplevel","disabled-by-default-cpu_profiler","renderer.scheduler"],false,true,true)).toEqual([
+   "devtools.timeline","blink.user_timing","disabled-by-default-v8.gc","v8.execute","toplevel"]);
+  expect(categories(["toplevel"],false,true,true)).toEqual([
+   "devtools.timeline","blink.user_timing","disabled-by-default-v8.gc","toplevel"]);
+  expect(source).toContain('traceBufferSizeInKb:65536');expect(source).toContain('128*1024*1024');
  });
 });

@@ -24,6 +24,8 @@ const MAX_SCANNABLE_BYTES = 8192;
 const TYPED_ARRAY_PROTOTYPE = Object.getPrototypeOf(Uint8Array.prototype) as object;
 const TYPED_ARRAY_BUFFER_GETTER = Reflect.getOwnPropertyDescriptor(TYPED_ARRAY_PROTOTYPE, "buffer")?.get;
 const TYPED_ARRAY_BYTE_LENGTH_GETTER = Reflect.getOwnPropertyDescriptor(TYPED_ARRAY_PROTOTYPE, "byteLength")?.get;
+const TYPED_ARRAY_BYTE_OFFSET_GETTER = Reflect.getOwnPropertyDescriptor(TYPED_ARRAY_PROTOTYPE, "byteOffset")?.get;
+const TYPED_ARRAY_TAG_GETTER = Reflect.getOwnPropertyDescriptor(TYPED_ARRAY_PROTOTYPE, Symbol.toStringTag)?.get;
 
 export type TrustClosureRejection =
 	| "malformed-input"
@@ -163,6 +165,18 @@ function copyDetachedBytes(value: unknown): Uint8Array | undefined {
 		const byteLength = Reflect.apply(TYPED_ARRAY_BYTE_LENGTH_GETTER, value, []) as number;
 		if (typeof SharedArrayBuffer !== "undefined" && buffer instanceof SharedArrayBuffer) return undefined;
 		if (!Number.isSafeInteger(byteLength) || byteLength < 0) return undefined;
+		// The intrinsic tag getter reads the internal [[TypedArrayName]], which no
+		// prototype swap or own property can fake. A genuine Uint8Array's index
+		// descriptors are its elements, always integers 0..255, so the per-index
+		// loop below would accept every byte: copy them from the backing directly.
+		if (
+			TYPED_ARRAY_TAG_GETTER !== undefined &&
+			TYPED_ARRAY_BYTE_OFFSET_GETTER !== undefined &&
+			Reflect.apply(TYPED_ARRAY_TAG_GETTER, value, []) === "Uint8Array"
+		) {
+			const byteOffset = Reflect.apply(TYPED_ARRAY_BYTE_OFFSET_GETTER, value, []) as number;
+			return new Uint8Array(new Uint8Array(buffer, byteOffset, byteLength));
+		}
 		const copied = new Uint8Array(byteLength);
 		for (let index = 0; index < byteLength; index += 1) {
 			const descriptor = Reflect.getOwnPropertyDescriptor(value, String(index));

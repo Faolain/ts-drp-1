@@ -1,6 +1,8 @@
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import {
 	createSigningStorageCodec,
+	captureSigningRetirementDataImage,
+	releaseCapturedSigningRetirementDataImage,
 	isSigningSummaryRetirementPlan,
 	SIGNING_DETAIL_RETIREMENT_BATCH_ROWS,
 	type SigningDependencyObservation,
@@ -25,6 +27,7 @@ const codec = createSigningStorageCodec(LIMITS);
 const imageLimits = { maxBytes: LIMITS.maxUnionBytes, maxDepth: 128, maxItems: 65_536 };
 const tables: readonly SigningTable[] = ["signerState", "sealEvidence", "voteSlots", "voteOutbox"];
 export interface SqliteSigningImage {
+	readonly data: ReturnType<typeof captureSigningRetirementDataImage>;
 	readonly frames: readonly Uint8Array[];
 	readonly control: SigningRetirementControl;
 	readonly digest: string;
@@ -154,14 +157,18 @@ export function readSqliteSigningImage(
 			if (table === "voteOutbox" && value.dispatched !== true) pendingEpochs.push(key[1]);
 		}
 	if (!present && !allowAbsent) throw new Error("SIGNING_ADDRESS_ABSENT");
+	const digest = Buffer.from(hashDomain("ts-drp/signing-native-image/v1", ...frames)).toString("hex");
+	const data = captureSigningRetirementDataImage(frames, objectId);
+	frames.length = 0;
 	return Object.freeze({
 		control,
-		frames: Object.freeze(frames),
+		get frames() {return data.readExactCanonicalRows();},
 		logicalBytes,
 		controlBytes,
 		pendingEpochs: Object.freeze(pendingEpochs),
-		digest: Buffer.from(hashDomain("ts-drp/signing-native-image/v1", ...frames)).toString("hex"),
-		dataDigest: signingRetirementDataDigest(frames, objectId),
+		digest,
+		dataDigest: data.digest(),
+		data,
 	});
 }
 
@@ -389,6 +396,10 @@ export class SqliteSigningRetirementOwner {
 				if (this !== read) throw new TypeError("FOREIGN_SIGNING_OBSERVATION");
 				return observation.readExactCanonicalRows();
 			},
+			readRetirementDataImage: function () {
+				if (this !== read) throw new TypeError("FOREIGN_SIGNING_OBSERVATION");
+				return observation.readRetirementDataImage!();
+			},
 			check: function () {
 				if (this !== read) return Promise.reject(new TypeError("FOREIGN_SIGNING_OBSERVATION"));
 				return observation.check();
@@ -425,6 +436,7 @@ export class SqliteSigningRetirementOwner {
 		const owner = this;
 		const release = (): Promise<void> => {
 			live = false;
+			releaseCapturedSigningRetirementDataImage(captured.data);
 			return (released ??= held.release().finally(() => this.#imageHolds.delete(held)));
 		};
 		this.#imageHolds.add(held);
@@ -521,11 +533,17 @@ export class SqliteSigningRetirementOwner {
 			control: captured.control,
 			imageDigest: captured.digest,
 			logicalBytes: captured.logicalBytes,
+			readRetirementDataImage: function () {
+				receiver(this);
+				owner.session?.assertCurrent();
+				if (!live || used || owner.#closed) throw new Error("READ_RELEASED");
+				return captured.data;
+			},
 			readExactCanonicalRows: function () {
 				receiver(this);
 				owner.session?.assertCurrent();
 				if (!live || used || owner.#closed) throw new Error("READ_RELEASED");
-				return Object.freeze(captured.frames.map((bytes) => Uint8Array.from(bytes)));
+				return captured.data.readExactCanonicalRows();
 			},
 			check: async function () {
 				receiver(this);

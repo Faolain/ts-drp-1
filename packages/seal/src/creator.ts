@@ -101,7 +101,7 @@ type CreatorSigningImageContentFact = Readonly<{incarnation: string; rows: reado
 	content: readonly CreatorSigningRowContentFact[]}>;
 /** Last successful actor-local PURE verification only. These owned bytes never
  * carry native currency, a held reader, paid credit, or signing authority. */
-type CreatorSigningContentFacts = Readonly<{currentTrust: unknown; trusts: readonly CurrentAnchorTrust[];
+type CreatorSigningContentFacts = Readonly<{
 	exactContextBytes: Uint8Array; images: readonly CreatorSigningImageContentFact[]}>;
 
 interface ActorState {
@@ -675,8 +675,10 @@ export function reconstructCreatorFinalizedEvidence(
 
 async function acquireSigningDependencies(
 	state: ActorState,
-	supplied: readonly CurrentAnchorTrust[]
+	supplied: readonly CurrentAnchorTrust[],
+	prepareData?: CreatorSigningDependencyPreparation
 ): Promise<CreatorSigningDependencyRead> {
+	const contextTrust = state.currentTrust, contextIncarnation = state.storageIncarnation;
 	const previousContent = state.signingContentFacts, contentAttempt = Object.freeze({});
 	// A failed/overlapping acquisition cannot install another attempt's facts.
 	// Never accumulate images as the room ages; only this latest success survives.
@@ -733,8 +735,7 @@ async function acquireSigningDependencies(
 		exactContextBytes = encodeCanonical({current, materials: authenticatedMaterials.map(({material}) => material),
 			storageIncarnation: state.storageIncarnation});
 	} catch { /* Optional reuse cannot impose a new combined-encoding admission limit. */ }
-	const sameContentContext = exactContextBytes !== undefined && previousContent !== undefined && previousContent.currentTrust === state.currentTrust &&
-		previousContent.trusts.length === trusts.length && previousContent.trusts.every((trust, index) => trust === trusts[index]) &&
+	const sameContentContext = exactContextBytes !== undefined && previousContent !== undefined &&
 		compareBytes(previousContent.exactContextBytes, exactContextBytes) === 0;
 	// This acquisition resolved and owns the exact original trust material above.
 	// Every captured native row still gets fresh original role/key resolution.
@@ -778,6 +779,26 @@ async function acquireSigningDependencies(
 	if (acquireVote === undefined || acquireEvidence === undefined)
 		throw new TypeError("native signing dependency observation is unsupported");
 	const held: SigningDependencyObservation[] = [];
+	// These values come only from the original native control/trust producers.
+	// Copy/compare their complete data domain without adding another combined
+	// canonical-encoding limit or retaining any native method in preparation.
+	const copyData = (value: unknown): unknown => {
+		if (value instanceof Uint8Array) return Uint8Array.from(value);
+		if (Array.isArray(value)) return Object.freeze(value.map(copyData));
+		if (value !== null && typeof value === "object") return Object.freeze(Object.fromEntries(
+			Object.keys(value).map(key => [key, copyData((value as Record<string, unknown>)[key])])));
+		return value;
+	};
+	const sameData = (left: unknown, right: unknown): boolean => {
+		if (left instanceof Uint8Array || right instanceof Uint8Array)
+			return left instanceof Uint8Array && right instanceof Uint8Array && compareBytes(left, right) === 0;
+		if (Array.isArray(left) || Array.isArray(right)) return Array.isArray(left) && Array.isArray(right) &&
+			left.length === right.length && left.every((value, index) => sameData(value, right[index]));
+		if (left === null || right === null || typeof left !== "object" || typeof right !== "object") return Object.is(left, right);
+		const keys = Object.keys(left), other = Object.keys(right);
+		return keys.length === other.length && keys.every(key => Object.hasOwn(right, key) &&
+			sameData((left as Record<string, unknown>)[key], (right as Record<string, unknown>)[key]));
+	};
 	let primary: unknown;
 	let failed = false;
 	try {
@@ -791,23 +812,43 @@ async function acquireSigningDependencies(
 			// from bytes a hostile adapter/caller mutated during verification.
 			rows: Object.freeze(observation.readExactCanonicalRows().map(bytes => Uint8Array.from(bytes))),
 			incarnation: observation.control.incarnation,
+			control: copyData(observation.control),
+			imageDigest: observation.imageDigest,
+			logicalBytes: observation.logicalBytes,
 		}));
-		// Both original views/complete row vectors remain native custody and
-		// charged material. Only completed pure content verification is shared:
-		// exact ordered bytes + incarnation, in THIS fixed authenticated context.
-		// A key, shape, epoch or image digest alone cannot select this path.
+		await Promise.all(held.map(observation => observation.check()));
+		const rawJoins = await Promise.allSettled(held.map(observation => observation.release()));
+		const rawJoinFailures = rawJoins.flatMap(outcome => outcome.status === "rejected" ? [outcome.reason] : []);
+		if (rawJoinFailures.length !== 0)
+			throw new AggregateError(rawJoinFailures, "creator signing raw capture joined release failed", {cause: rawJoinFailures[0]});
+		held.length = 0;
+		// No original native view survives into pure row/QC/signature preparation.
+		// The captured complete vectors are DATA only. Final acquisition below
+		// must establish new actual custody and exact full-image correspondence.
+		if (state.stopRequested || state.stopped) throw new TypeError("creator signing dependency owner is unavailable");
+		// Only completed pure content verification is shared. Fresh nominal trust
+		// resolution above binds EVERY material/context byte, rather than requiring
+		// re-derived aliases to be the same capability object. Native metadata is
+		// independently checked and cannot authorize a hit: each reused row must
+		// have its COMPLETE original bytes/signatures and native incarnation.
 		const rows = captured.flatMap((image) => image.rows);
 		const verified: CreatorSigningImageContentFact[] = [];
 		for (const image of captured) {
 			if (verified.some((prior) => prior.incarnation === image.incarnation &&
 				prior.rows.length === image.rows.length &&
 				prior.rows.every((bytes, index) => compareBytes(bytes, image.rows[index]!) === 0))) continue;
-			const previous = sameContentContext ? previousContent!.images.find(prior => prior.incarnation === image.incarnation &&
-				prior.rows.length === image.rows.length && prior.rows.every((bytes, index) => compareBytes(bytes, image.rows[index]!) === 0)) : undefined;
+			const previous = sameContentContext ? previousContent!.images.filter(prior => prior.incarnation === image.incarnation) : [];
 			const content: CreatorSigningRowContentFact[] = [];
 			const incarnation = image.incarnation;
-			for (const [index, bytes] of image.rows.entries()) {
-				const reused = previous?.content[index];
+			for (const bytes of image.rows) {
+				// A control-only change or lawful removal/reordering of another row
+				// does not change this immutable crypto tuple. Search only the SAME
+				// bounded latest-success images; no historical row inventory accrues.
+				let reused: CreatorSigningRowContentFact | undefined;
+				for (const prior of previous) {
+					const at = prior.rows.findIndex(raw => raw.byteLength === bytes.byteLength && compareBytes(raw, bytes) === 0);
+					if (at !== -1) {reused = prior.content[at]; break;}
+				}
 				let carrierFact: CreatorSigningCarrierContentFact | undefined, peerFact: CreatorSigningPeerContentFact | undefined;
 				const frame = decodeCanonical(bytes);
 				if (!Array.isArray(frame) || frame.length !== 3 || typeof frame[0] !== "string")
@@ -939,12 +980,37 @@ async function acquireSigningDependencies(
 				content.push(Object.freeze({...(carrierFact === undefined ? {} : {carrier: carrierFact}),
 					...(peerFact === undefined ? {} : {peer: peerFact})}));
 			}
-			verified.push(Object.freeze({...image, content: Object.freeze(content)}));
+			verified.push(Object.freeze({rows: image.rows, incarnation: image.incarnation, content: Object.freeze(content)}));
 		}
+		// Internal DATA consumer runs inside this SAME capture/authentication
+		// invocation, after BOTH raw native joins and before ANY new custody.
+		// Original captured rows/controls/incarnations stay private and qualify
+		// completely afterwards, including identical bytes in a new incarnation.
+		if (prepareData !== undefined) await prepareData(Object.freeze({rows: Object.freeze(rows.map(bytes => bytes.slice()))}));
+		if (state.stopRequested || state.stopped) throw new TypeError("creator signing dependency owner is unavailable");
+		// Reacquire the ORIGINAL native producers, not a copied reservation or a
+		// revived read. Full controls include incarnation and all progress; row
+		// equality checks every actual byte, not only a head/key/image digest.
+		held.push(await acquireVote({objectId: current.objectId}));
+		held.push(await acquireEvidence({objectId: current.objectId}));
+		for (const [index, observation] of held.entries()) {
+			const original = captured[index]!;
+			const actual = observation.readExactCanonicalRows();
+			if (!sameData(observation.control, original.control) || observation.control.incarnation !== original.incarnation ||
+				observation.imageDigest !== original.imageDigest || observation.logicalBytes !== original.logicalBytes ||
+				actual.length !== original.rows.length || !actual.every((bytes, row) => compareBytes(bytes, original.rows[row]!) === 0))
+				throw new TypeError("creator signing dependency capture is stale");
+		}
+		const contextCurrent = (): boolean => state.currentTrust === contextTrust && state.storageIncarnation === contextIncarnation &&
+			sameData(resolveSealRecoveryTrust(state.currentTrust as CurrentAnchorTrust), current) &&
+			authenticatedMaterials.every(({trust, material}) => sameData(resolveSealRecoveryTrust(trust), material));
+		if (!contextCurrent())
+			throw new TypeError("creator signing dependency authority changed during preparation");
 		await Promise.all(held.map((observation) => observation.check()));
 		if (state.stopRequested || state.stopped) throw new TypeError("creator signing dependency owner is unavailable");
+		if (!contextCurrent()) throw new TypeError("creator signing dependency authority changed during qualification");
 		if (exactContextBytes !== undefined && state.signingContentAttempt === contentAttempt) state.signingContentFacts = Object.freeze({
-			currentTrust: state.currentTrust, trusts: Object.freeze([...trusts]), exactContextBytes, images: Object.freeze(verified)});
+			exactContextBytes, images: Object.freeze(verified)});
 		let live = true;
 		let releaseTask: Promise<void> | undefined;
 		const pending = new Set<Promise<void>>();
@@ -1342,6 +1408,32 @@ export function resolveCreatorSigningRecoveryOwner(
 		value as CreatorSigningRecoveryOwner;
 }
 
+/** Internal bounded proof-DATA consumer; no observation, check/release or
+ * signing/retirement authority crosses the preparation boundary. */
+export type CreatorSigningDependencyPreparation = (data: Readonly<{rows: readonly Uint8Array[]}>) => Promise<void>;
+
+/** Same original actor task lifecycle and native source qualifier as the public
+ * acquisition; this internal subpath adds only a method-free DATA interval. */
+export function acquireCreatorSigningDependenciesForPreparation(
+	owner: CreatorActor | CreatorSigningRecoveryOwner,
+	trusts: readonly CurrentAnchorTrust[],
+	prepareData: CreatorSigningDependencyPreparation
+): Promise<CreatorSigningDependencyRead> {
+	const actor = actorStates.has(owner as CreatorActor) ? owner as CreatorActor : signingRecoveryOwners.get(owner as CreatorSigningRecoveryOwner);
+	const state = actor === undefined ? undefined : actorStates.get(actor);
+	if (state === undefined || state.stopRequested || state.stopped || typeof prepareData !== "function")
+		return Promise.reject(new TypeError("creator signing dependency owner is unavailable"));
+	return enterSigningDependencyTask(state, trusts, prepareData);
+}
+
+function enterSigningDependencyTask(state: ActorState, trusts: readonly CurrentAnchorTrust[],
+	prepareData?: CreatorSigningDependencyPreparation): Promise<CreatorSigningDependencyRead> {
+	const task = acquireSigningDependencies(state, trusts, prepareData);
+	state.dependencyTasks.add(task);
+	void task.then(() => state.dependencyTasks.delete(task), () => state.dependencyTasks.delete(task));
+	return task;
+}
+
 /** One implementation owns native recovery rows for both genuine origins. */
 async function createCreatorNativeActor(
 	input: Readonly<{
@@ -1456,6 +1548,9 @@ async function createCreatorNativeActor(
 							imageDigest: read.imageDigest,
 							logicalBytes: read.logicalBytes,
 							readExactCanonicalRows: read.readExactCanonicalRows.bind(read),
+							...(read.readRetirementDataImage === undefined ? {} : {
+								readRetirementDataImage: read.readRetirementDataImage.bind(read),
+							}),
 							check: read.check.bind(read),
 							checkSigningScope: read.checkSigningScope.bind(read),
 							prepareFence: read.prepareFence.bind(read),
@@ -1486,13 +1581,7 @@ async function createCreatorNativeActor(
 				const owned = actorStates.get(this);
 				if (owned === undefined || owned.stopRequested || owned.stopped)
 					return Promise.reject(new TypeError("creator signing dependency owner is unavailable"));
-				const task = acquireSigningDependencies(owned, trusts);
-				owned.dependencyTasks.add(task);
-				void task.then(
-					() => owned.dependencyTasks.delete(task),
-					() => owned.dependencyTasks.delete(task)
-				);
-				return task;
+				return enterSigningDependencyTask(owned, trusts);
 			},
 			close(this: CreatorActor, closeInput: Readonly<{ closeInput: Readonly<Record<string, unknown>> }>) {
 				const owned = actorStates.get(this);

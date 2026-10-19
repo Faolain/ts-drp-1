@@ -1,4 +1,5 @@
-import { CanonicalDecodingError, decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
+import { CanonicalDecodingError, encodeCanonical } from "@ts-drp/canonical";
+import { decodeCanonicalExactness } from "@ts-drp/canonical/exact";
 
 import {
 	bytesEqual,
@@ -36,8 +37,9 @@ function decodeEnvelope(bytes: Uint8Array, bounded?: "head" | "generation"): Sto
 	}
 	const copied = new Uint8Array(bytes);
 	let decoded: unknown;
+	let exact = false;
 	try {
-		decoded = decodeCanonical(
+		({ value: decoded, exact } = decodeCanonicalExactness(
 			copied,
 			bounded === undefined
 				? undefined
@@ -46,7 +48,7 @@ function decodeEnvelope(bytes: Uint8Array, bounded?: "head" | "generation"): Sto
 						maxDepth: bounded === "head" ? 2 : 4,
 						maxItems: bounded === "head" ? 33 : 127,
 					}
-		);
+		));
 	} catch (cause) {
 		if (bounded !== undefined && cause instanceof CanonicalDecodingError && cause.resourceLimit !== undefined) {
 			return { ok: false, reason: "READ_BUDGET_EXCEEDED" };
@@ -73,12 +75,15 @@ function decodeEnvelope(bytes: Uint8Array, bounded?: "head" | "generation"): Sto
 	) {
 		return { ok: false, reason: "READ_BUDGET_EXCEEDED" };
 	}
-	try {
-		reencoded = encodeCanonical(decoded);
-	} catch {
-		return nonCanonical();
+	// An exact decode guarantees this untouched value re-encodes to `copied`.
+	if (!exact) {
+		try {
+			reencoded = encodeCanonical(decoded);
+		} catch {
+			return nonCanonical();
+		}
+		if (!bytesEqual(copied, reencoded)) return nonCanonical();
 	}
-	if (!bytesEqual(copied, reencoded)) return nonCanonical();
 	return {
 		ok: true,
 		value: {

@@ -254,8 +254,10 @@ describe("cold original-owner capture lifetime and book", () => {
 
 	it("capture and all actual PRE/control charges precede the immutable known-material snapshot and source enrollment", () => {
 		const body = declaration(rollbackSource, "captureCreatorOrdinaryIssuanceProofSource");
-		const capture = body.indexOf("await captureCreatorOrdinaryReadOnlySourceWitnesses("), known = body.indexOf("captureKnownMaterial()"),
-			controls = body.indexOf("for (const control of applicationControls)"), enrollment = body.indexOf("maintenanceTerminalCustody.set(");
+		// The first capture is a provisional projection. Enrollment uses the final
+		// immutable SAME-book union after all application/source observations.
+		const capture = body.indexOf("await captureCreatorOrdinaryReadOnlySourceWitnesses("), known = body.lastIndexOf("captureKnownMaterial()"),
+			controls = body.indexOf("for (const control of applicationControls)"), enrollment = body.lastIndexOf("maintenanceTerminalCustody.set(");
 		expect(capture).toBeGreaterThan(0); expect(controls).toBeGreaterThan(capture); expect(known).toBeGreaterThan(controls);
 		expect(enrollment).toBeGreaterThan(known);
 		const witnesses = declaration(rollbackSource, "captureCreatorOrdinaryReadOnlySourceWitnesses");

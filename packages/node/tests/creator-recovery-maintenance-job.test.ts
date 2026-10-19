@@ -47,7 +47,7 @@ function fixture() {
 		abortedGetter: Object.getOwnPropertyDescriptor(AbortSignal.prototype, "aborted")!.get,
 		resolveSealRecoveryTrust: (current: unknown) => current === trust ? trust : undefined,
 		createCreatorCanonicalSyntaxReader: () => {syntaxFactories++; return createCreatorCanonicalSyntaxReader();},
-		createCreatorSnapshotRecoveryEvidenceJob: () => {evidenceFactories++; return {sourceTrust: () => undefined,
+		createCreatorSnapshotRecoveryEvidenceJob: () => {evidenceFactories++; return {syntax: bindings.createCreatorCanonicalSyntaxReader(), sourceTrust: () => undefined,
 			readback: () => undefined, release: () => {syntaxRelease++; events.push("syntax-release");}};},
 		canonicalCreatorDataRecord, anchorOf: () => undefined, unique: () => undefined,
 		uniqueCreatorTransitionCandidate: () => undefined, validateCreatorSnapshotData: () => undefined,
@@ -132,7 +132,7 @@ describe("finite creator recovery maintenance immutable ownership", () => {
 		expect(declaration("reconcileCreatorSnapshotRecoveryRoles").parameters).toHaveLength(5);
 		const reconcile = declaration("reconcileSnapshotRecoveryRoles").getText(ast);
 		expect(reconcile).toContain("const closeObserved = await acquireClosedData(");
-		expect(reconcile).toContain("journalHeaderHold, ownedMaintenance)");
+  expect(reconcile).toContain("journalHeaderHold, ownedMaintenance, snapshotPreparation, nativePreparation)");
 		const acquisition = declaration("acquireClosedData").getText(ast);
 		expect(acquisition).toContain("if (ownedMaintenance === undefined) parsing.release()");
 		expect(acquisition).toContain("facts = await authenticate(");

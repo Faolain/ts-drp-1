@@ -1,8 +1,9 @@
-import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { compareBytes, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 
 import { openCurrentAnchorTrust } from "./anchor-trust-singleton.js";
 import { openCreatorForwardPromotionSuccessorTrust, openCreatorSuccessorTrust } from "./creator-close.js";
 import { type CurrentAnchorTrust, verifyEd25519RegisteredDigest } from "./index.js";
+import { decodeCanonicalWithExactness } from "./internal/canonical-exactness.js";
 import {
 	mintCreatorAnchorTrustCheckpointPredecessor,
 	resolveCreatorAnchorTrustMaterial,
@@ -122,8 +123,8 @@ function copiedBytes(value: unknown, maximum = 65_536): Uint8Array | undefined {
 
 function exactRecord(bytes: Uint8Array): Readonly<Record<string, unknown>> | undefined {
 	try {
-		const decoded = decodeCanonical(bytes);
-		if (!plainRecord(decoded) || compareBytes(encodeCanonical(decoded), bytes) !== 0) return undefined;
+		const { value: decoded, exact } = decodeCanonicalWithExactness(bytes);
+		if (!plainRecord(decoded) || (!exact && compareBytes(encodeCanonical(decoded), bytes) !== 0)) return undefined;
 		return decoded;
 	} catch {
 		return undefined;

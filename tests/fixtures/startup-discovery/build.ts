@@ -20,6 +20,10 @@ const migrationFault = process.env.STARTUP_MIGRATION_FAULT;
 const criticalProfiling=process.env.STARTUP_HEALTHY_GRID_CRITICAL_PROFILE==="1";
 const fullFunctionCalls = process.env.STARTUP_HEALTHY_GRID_FULL_CALLS === "1";
 const clockedFunctionOwners = process.env.STARTUP_HEALTHY_GRID_CLOCKED_OWNERS === "1";
+const retirementOwnerClocks = process.env.STARTUP_HEALTHY_GRID_OWNER_CLOCK_SCOPE === "retirement";
+if (process.env.STARTUP_HEALTHY_GRID_OWNER_CLOCK_SCOPE !== undefined && !retirementOwnerClocks)
+	throw Error("OWNER_CLOCK_SCOPE_INVALID");
+if (retirementOwnerClocks && (!fullFunctionCalls || clockedFunctionOwners)) throw Error("RETIREMENT_CLOCKS_REQUIRE_EXCLUSIVE_FULL_FUNCTION_BUILD");
 if (clockedFunctionOwners && !fullFunctionCalls) throw Error("CLOCKED_OWNERS_REQUIRE_FULL_FUNCTION_CALLS");
 if (fullFunctionCalls && !criticalProfiling) throw Error("FULL_FUNCTION_CALLS_REQUIRE_CRITICAL_BUILD");
 const incrementalNativeControls=process.env.STARTUP_HEALTHY_GRID_INCREMENTAL_CONTROLS==="1";
@@ -198,7 +202,7 @@ function canonicalCaptureObservationInsertions(ast: ts.SourceFile): ObservationI
 /** Diagnostic-only final-bundle pass. The original source map is evidence, not
  * attached to changed output. Every body is visited, including bundled deps and
  * esbuild helpers; the observer implementation itself is explicitly excluded. */
-function instrumentFullFunctionBundle(raw: string, clockedOwners = false): {code: string; manifest: Record<string, unknown>; sourceMap: unknown} {
+function instrumentFullFunctionBundle(raw: string, clockedOwners = false, retirementScope = false): {code: string; manifest: Record<string, unknown>; sourceMap: unknown} {
 	const mapPrefix = "//# sourceMappingURL=data:application/json;base64,";
 	const mapStart = raw.lastIndexOf(mapPrefix);
 	if (mapStart < 0 || mapStart > 0 && raw.charCodeAt(mapStart - 1) !== 10)
@@ -226,7 +230,7 @@ function instrumentFullFunctionBundle(raw: string, clockedOwners = false): {code
 	type Row = {id: number; key: string; name: string; kind: string; source: string; sourceHash: string;
 		sourceLine: number | null; sourceColumn: number | null; inputBundleLine: number; inputBundleColumn: number;
 		start: number; end: number; token: string; async: boolean; generator: boolean; excluded: boolean;
-		vmCountOnly: boolean; clockCoverage: string;
+		vmCountOnly: boolean; clockCoverage: string; scopeOmitted?: boolean;
 		lexicalParentId?: number; parametersPreBody: {start: number; end: number}[];
 		awaits: string[]; yields: {id: string; delegated: boolean}[]; returns: number; generatedFinalLine?: number; generatedFinalColumn?: number;
 		generatedFunctionStart?: number; generatedFunctionEnd?: number; generatedFunctionLine?: number; generatedFunctionColumn?: number};
@@ -307,6 +311,39 @@ function instrumentFullFunctionBundle(raw: string, clockedOwners = false): {code
 		ts.forEachChild(node, collect);
 	};
 	collect(ast);
+	if (retirementScope) {
+		const roots = new Set(["acquireClosedData", "authenticate", "acquireRecoveryRoleCertificate",
+			"reconcileSnapshotRecoveryRoles", "installClosedRetirementSource", "applyClosedEpochRetirementIntent",
+			"prepareCreatorIssuanceMaintenanceQuote", "chargeCreatorIssuanceMaintenanceQuote",
+			"readProspectiveCreatorMaintenancePrefixesForSizing", "reconcileCreatorSnapshotRecoveryRoles",
+			"reconcileCreatorBoundedRecoveryMaintenance", "deriveCreatorCloseRecoveryRoles", "seal",
+			"readClosedJournalMembershipPrefixes", "collectSourceOwnedClosedJournalMembershipPrefixes",
+			"classifyClosedJournalDetails", "classifySourceOwnedClosedJournalDetails", "joinedClosedRetirementRead",
+			"drainClosedJournalDetails", "acknowledgeClosedJournalDrain", "drainClosedSigningEvidence", "drainClosedSigningSummaries"]);
+		for (const row of functions) {
+			const parent = row.lexicalParentId === undefined ? undefined : byId.get(row.lexicalParentId);
+			const native = row.name === "image" && /\/storage-browser\/(?:dist\/)?src\/internal\/signing-retirement\.(?:ts|js)$/u.test(row.source) ||
+				row.name === "retirementSnapshot" && /\/storage-browser\/(?:dist\/)?src\/live-journal\.(?:ts|js)$/u.test(row.source) ||
+				row.name === "runControl" && /\/storage-browser\/(?:dist\/)?src\/internal\/idb-adapter\.(?:ts|js)$/u.test(row.source) ||
+				row.name === "loadBrowserBoundedReadRequest" && /\/storage-browser\/(?:dist\/)?src\/internal\/retirement-control\.(?:ts|js)$/u.test(row.source) ||
+				["#pump","_HeldReadView_pump"].includes(row.name) && /\/storage-browser\/(?:dist\/)?src\/internal\/native-read-reservation\.(?:ts|js)$/u.test(row.source) ||
+				// Prior valid CPU capture and selected-owner awaits identify these
+				// omitted asynchronous native acquisition/control continuations.
+				row.async && /\/storage-browser\/(?:dist\/)?src\/(?:room-head|live-journal|snapshot-transfer|internal\/(?:retirement-control|idb-adapter|browser-issuance-store|signing-retirement))\.(?:ts|js)$/u.test(row.source) ||
+				row.async && /\/node\/src\/internal\/(?:creator-transition-advance|creator-snapshot-data)\.ts$/u.test(row.source) ||
+				// Timestamped297 gaps identify omitted signing-dependency and
+				// protected-role async continuations. Cover product async owners
+				// coherently, not repeatedly discover one missing continuation.
+				row.async && /(?:^|\/)packages\/(?:node|seal|storage-browser|issuance-store|live-journal|control-plane|keychain|protocol-v3)\//u.test(row.source) ||
+				["sealCreatorRecoveryDependencies","readCreatorRecoveryDependencyCensus","readCreatorClosedArchiveSource"].includes(row.name) && /\/node\/src\/v3-live\.ts$/u.test(row.source);
+			const selected = !row.excluded && (native || roots.has(row.name) &&
+				/\/node\/src\/(?:creator-close|internal\/(?:creator-closed-rollback-data|closed-epoch-cleanup))\.ts$/u.test(row.source) ||
+				parent !== undefined && !parent.excluded && !parent.scopeOmitted);
+			row.scopeOmitted = !selected && !row.excluded;
+			if (row.scopeOmitted) row.clockCoverage = "scope-omitted: unmeasured body; synchronous work belongs to selected caller, asynchronous work may be unowned";
+		}
+		if (!functions.some(row => !row.excluded && !row.scopeOmitted)) throw Error("RETIREMENT_CLOCK_ROOTS_MISSING");
+	}
 	const f = ts.factory;
 	const absent = () => f.createVoidExpression(f.createNumericLiteral(0));
 	const globalCall = (name: string, args: readonly ts.Expression[]) => f.createCallExpression(
@@ -337,7 +374,7 @@ function instrumentFullFunctionBundle(raw: string, clockedOwners = false): {code
 		};
 		const visit: ts.Visitor = node => {
 			const owner = bodyOwner(node);
-			if (owner !== undefined && !owner.excluded && ts.isLabeledStatement(node)) {
+			if (owner !== undefined && !owner.excluded && !owner.scopeOmitted && ts.isLabeledStatement(node)) {
 				const labels: ts.Identifier[] = [];
 				let inner: ts.Statement = node;
 				while (ts.isLabeledStatement(inner)) {labels.push(inner.label); inner = inner.statement;}
@@ -346,6 +383,7 @@ function instrumentFullFunctionBundle(raw: string, clockedOwners = false): {code
 			}
 			if (runnable(node)) {
 				const row = owners.get(node)!;
+				if (row.scopeOmitted) return ts.visitEachChild(node, visit, context);
 				if (row.excluded || row.vmCountOnly) return node;
 				const updated = ts.visitEachChild(node, visit, context) as FunctionNode;
 				const originalBody = updated.body!;
@@ -357,7 +395,7 @@ function instrumentFullFunctionBundle(raw: string, clockedOwners = false): {code
 				const lexical = row.lexicalParentId === undefined ? undefined : byId.get(row.lexicalParentId);
 				const flags = Number(row.async) + 2 * Number(row.generator);
 				const enter = globalCall("Enter", [f.createNumericLiteral(row.id),
-						lexical === undefined || lexical.excluded ? absent() : token(lexical),
+						lexical === undefined || lexical.excluded || lexical.scopeOmitted ? absent() : token(lexical),
 						f.createNumericLiteral(flags)]);
 				const entry = f.createVariableStatement(undefined, f.createVariableDeclarationList([
 					f.createVariableDeclaration(row.token, undefined, undefined, flags !== 0 ? enter :
@@ -382,7 +420,7 @@ function instrumentFullFunctionBundle(raw: string, clockedOwners = false): {code
 				return f.updateSetAccessorDeclaration(updated as ts.SetAccessorDeclaration, updated.modifiers, updated.name, updated.parameters, body);
 			}
 			const updated = ts.visitEachChild(node, visit, context);
-			if (owner === undefined || owner.excluded) {
+			if (owner === undefined || owner.excluded || owner.scopeOmitted) {
 				if (ts.isAwaitExpression(node) || ts.isYieldExpression(node) || ts.isForOfStatement(node) && node.awaitModifier !== undefined) boundaryRanges.push({kind: ts.SyntaxKind[node.kind], ...locate(node),
 					start: node.getStart(ast), end: node.end, qualification: "Module/pre-body execution outside a runnable body; no function token exists."});
 				return updated;
@@ -417,6 +455,7 @@ function instrumentFullFunctionBundle(raw: string, clockedOwners = false): {code
 	const bootstrap = `"use strict";\n// Diagnostic observer bootstrap: module evaluation precedes observer installation.\n` +
 		`const __r8FullCallGlobal = globalThis;\n` +
 		`globalThis.__r8FunctionManifestSize = ${functions.length};\n` +
+		`globalThis.__r8FunctionClockScope = ${JSON.stringify(retirementScope ? "retirement" : "all")};\n` +
 		`globalThis.__r8FunctionEnter ??= function(){return undefined;};\n` +
 		`globalThis.__r8FunctionSuspend ??= function(_token,value){return value;};\n` +
 		`globalThis.__r8FunctionResume ??= function(_token,value){return value;};\n` +
@@ -447,7 +486,7 @@ function instrumentFullFunctionBundle(raw: string, clockedOwners = false): {code
 		if (ts.isCallExpression(node) && node.expression.getText(output) === "__r8FullCallGlobal.__r8FunctionEnter") {
 			const id = node.arguments[0];
 			const row = id !== undefined && ts.isNumericLiteral(id) ? byId.get(Number(id.text)) : undefined;
-			if (row === undefined || row.excluded || row.vmCountOnly || row.generatedFinalLine !== undefined) throw Error("FULL_FUNCTION_CALLS_OUTPUT_ENTRY_NOT_UNIQUE");
+			if (row === undefined || row.excluded || row.vmCountOnly || row.scopeOmitted || row.generatedFinalLine !== undefined) throw Error("FULL_FUNCTION_CALLS_OUTPUT_ENTRY_NOT_UNIQUE");
 			const p = output.getLineAndCharacterOfPosition(node.getStart(output));
 			row.generatedFinalLine = p.line + 1; row.generatedFinalColumn = p.character + 1; entries++;
 			let owner: ts.Node | undefined = node.parent;
@@ -459,13 +498,16 @@ function instrumentFullFunctionBundle(raw: string, clockedOwners = false): {code
 		ts.forEachChild(node, audit);
 	};
 	audit(output);
-	if (entries !== functions.filter(row => !row.excluded && !row.vmCountOnly).length) throw Error("FULL_FUNCTION_CALLS_BODY_COVERAGE_INCOMPLETE");
+	if (entries !== functions.filter(row => !row.excluded && !row.vmCountOnly && !row.scopeOmitted).length) throw Error("FULL_FUNCTION_CALLS_BODY_COVERAGE_INCOMPLETE");
 	if (outputFunctions !== functions.length + 7) throw Error("FULL_FUNCTION_CALLS_FINAL_BODY_CENSUS_DIFFERS");
 	return {code, sourceMap, manifest: {version: 2, inputHash, outputHash: hash(code), eligibleFunctions: entries,
-		coverageMode: clockedOwners ? "vm-all-clocked-owners" : "full-body-clocks", eligibleProductFunctions: functions.filter(row => !row.excluded).length,
+		coverageMode: retirementScope ? "selected-retirement-owner-wall-clocks-no-vm-count-claim" : clockedOwners ? "vm-all-clocked-owners" : "full-body-clocks", eligibleProductFunctions: functions.filter(row => !row.excluded).length,
+		scopeOmittedFunctions: functions.filter(row => row.scopeOmitted).length,
 		vmCountOnlyFunctions: functions.filter(row => row.vmCountOnly).length,
 		excludedObserverFunctions: functions.filter(row => row.excluded).length, excludedBootstrapFunctions: 7, functions, boundaryRanges,
-		qualification: "All final-bundle runnable bodies enumerated for VM precise call counts, including dependencies/generated helpers. Clocked-owner mode explicitly leaves selected syntax-only arithmetic hash leaves VM-count-only; their time belongs to the clocked parent, not a separately clocked leaf. This is not a numeric-type/purity proof. Observer runtime excluded. Parameters execute before body entry. yield* is one opaque delegation interval. Native builtins remain CPU-profile opaque. Original inline map saved separately; output has no stale source map. Source locations/hash identify esbuild's phase-observed inputs; original raw source pins are preserved in the existing archive."}};
+		qualification: retirementScope
+			? "Selected retirement/authentication/fence owners and their lexical callbacks only. Other bodies remain explicitly scope-omitted, not VM-count-only or fully covered. Synchronous unselected callees belong to the selected caller wall interval; asynchronous off-owner work is unowned. No precise coverage or CPU-cycle claim. Original await/return semantics and final-bundle body audit retained; original map saved separately."
+			: "All final-bundle runnable bodies enumerated for VM precise call counts, including dependencies/generated helpers. Clocked-owner mode explicitly leaves selected syntax-only arithmetic hash leaves VM-count-only; their time belongs to the clocked parent, not a separately clocked leaf. This is not a numeric-type/purity proof. Observer runtime excluded. Parameters execute before body entry. yield* is one opaque delegation interval. Native builtins remain CPU-profile opaque. Original inline map saved separately; output has no stale source map. Source locations/hash identify esbuild's phase-observed inputs; original raw source pins are preserved in the existing archive."}};
 }
 function observation(directory: string, classificationFault = false, pendingPublication = false): Plugin {
 	return {
@@ -487,7 +529,8 @@ function observation(directory: string, classificationFault = false, pendingPubl
 					const raw = readFileSync(path, "utf8"),
 						ast = ts.createSourceFile(path, raw, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 					const codecSites = criticalProfiling ? canonicalCallsites(ast, path) : [];
-					if (criticalProfiling && !originalObservationPath.test(path) && !path.endsWith("/packages/seal/src/creator.ts")) {
+					if (criticalProfiling && !originalObservationPath.test(path) && !path.endsWith("/packages/seal/src/creator.ts") &&
+					 !/\/packages\/(?:seal\/(?:dist\/)?src\/internal\/seal-vote-intent|storage-browser\/(?:dist\/)?src\/internal\/signing-retirement)\.(?:ts|js)$/u.test(path)) {
 						const edits: ObservationInsertion[] = [];
 						addCanonicalCallsites(codecSites, edits);
 						if(/\/packages\/storage-browser\/(?:dist\/)?src\/internal\/retirement-control\.(?:ts|js)$/u.test(path)){
@@ -842,6 +885,17 @@ function observation(directory: string, classificationFault = false, pendingPubl
 						 acknowledgeClosedJournalDrain:"maintenance-acknowledge-journal-drain",
 						 drainClosedSigningEvidence:"maintenance-drain-signing-details",
 						 drainClosedSigningSummaries:"maintenance-drain-signing-summaries",
+						 closedSigningDataRows:"retirement-signing-data-row-classification",
+						 closedSigningControl:"retirement-signing-control-extraction",
+						 closedRetirementEqual:"retirement-whole-value-comparison",
+						 signingRetirementDataDigest:"retirement-signing-data-commitment",
+						 signingRetirementFrameDigest:"retirement-signing-frame-commitment",
+						 journalRetirementImage:"retirement-journal-image-commitment",
+						 retirementSnapshot:"native-journal-image-capture",
+						 retirementDrainSource:"native-journal-drain-source-reconstruction",
+						 ...( /\/internal\/signing-retirement\.(?:ts|js)$/u.test(path) ? {
+						  image:"native-signing-image-capture",nativeControl:"native-signing-control-read",
+						 } : {}),
 						 captureJournalRetirementDrainPlan:"journal-retirement-full-plan-capture",
 						 decodeCapturedJournalRetirementNativeCarriers:"journal-retirement-native-progress-decode",
 						 runControl:"native-ahe-retirement-control",
@@ -905,6 +959,19 @@ function observation(directory: string, classificationFault = false, pendingPubl
 						 }
 						};
 						const instrument=(node:ts.Node):void=>{
+						 if(path.endsWith("/v3-live.ts")&&ts.isExpressionStatement(node)&&node.expression.getText(ast)==="supported = capture(value)"){
+						  let owner:ts.Node|undefined=node.parent;while(owner&&!ts.isFunctionDeclaration(owner))owner=owner.parent;
+						  if(owner?.name?.text==="captureCreatorOrdinaryDimensionIntegrity"){
+						   criticalSites["dimension-integrity-shape"]=(criticalSites["dimension-integrity-shape"]??0)+1;
+						   insertions.push({offset:node.end,text:`\n(globalThis as any).__warmDimensionIntegrityShape?.(value,supported,visited);`});
+						  }
+						 }
+						 if(path.endsWith("/creator-transition-advance.ts")&&ts.isCallExpression(node)&&node.expression.getText(ast)==="sameBranch"){
+						  let owner:ts.Node|undefined=node.parent;while(owner&&!ts.isFunctionDeclaration(owner))owner=owner.parent;
+						  if(owner?.name?.text==="createCreatorRecoveryEvidenceOwner"){
+						   insertions.push({offset:node.getStart(ast),text:`(()=>{const __keyHit=`},{offset:node.end,text:`;const __keyScope=(globalThis as any).__warmBegin?.();if(__keyScope?.role==="creator"&&__keyScope.transition===4){((globalThis as any).__warmObserveMetric??((_p:any,action:any)=>action()))("test-only-recovery-evidence-key",()=>{(globalThis as any).__warmProofEvent?.({kind:"recovery-branch-key",hit:__keyHit,currentContext:{...currentTrust},retainedContext:context??null,pinEqual:branch!==undefined&&compareBytes(branch.pinBytes,pinBytes)===0,pinBytes:pinBytes.byteLength,inputChainLength:envelopes.length,retainedChainLength:branch?.envelopes.length??0,chain:envelopes.map((value,index)=>{const old=branch?.envelopes[index];return {index,objectId:value?.objectId??null,objectIdEqual:old?.objectId===value?.objectId,anchorEqual:old!==undefined&&value!==undefined&&compareBytes(old.exactCanonicalAnchorPreimageBytes,value.exactCanonicalAnchorPreimageBytes)===0,signatureEqual:old!==undefined&&value!==undefined&&compareBytes(old.detachedAnchorSignature,value.detachedAnchorSignature)===0,parametersEqual:old!==undefined&&value!==undefined&&compareBytes(old.exactCanonicalParametersCarrierBytes,value.exactCanonicalParametersCarrierBytes)===0};})});});}return __keyHit;})()`});
+						  }
+						 }
 						 if(path.endsWith("/creator-transition-advance.ts")&&ts.isCallExpression(node)&&
 						  node.expression.getText(ast)==="inspectCreatorHistoricalAnchorChain"){
 						  let owner:ts.Node|undefined=node.parent;while(owner&&!ts.isFunctionDeclaration(owner))owner=owner.parent;
@@ -912,11 +979,117 @@ function observation(directory: string, classificationFault = false, pendingPubl
 						   observeExpression(node,"recovery-anchor-chain:"+owner.name!.text);
 						 }
 						 if(path.endsWith("/creator-closed-rollback-data.ts")&&ts.isFunctionDeclaration(node)&&node.body&&
-						  ["acquireClosedData","acquireRecoveryRoleCertificate","readTarget"].includes(node.name?.text??"")){
+						  ["acquireClosedData","acquireRecoveryRoleCertificate","readTarget","authenticate"].includes(node.name?.text??"")){
 						  const owner="sealing-source-"+node.name!.text;
-						  observeSequentialOwner(node.body,owner,"sealing-inclusive");
+						  // Observe the same source owner during adoption too. Context
+						  // labels alone do not establish causality; API bounds and the
+						  // original RPC token select the actual blocking call offline.
+						  observeSequentialOwner(node.body,owner);
 						  node.body.statements.filter(ts.isTryStatement).forEach((statement,index)=>
-						   observeSequentialOwner(statement.tryBlock,owner+"-try"+(index+1),"sealing-inclusive"));
+						   observeSequentialOwner(statement.tryBlock,owner+"-try"+(index+1)));
+						  if(node.name!.text==="authenticate")for(const statement of node.body.statements){
+						   if(ts.isIfStatement(statement)&&statement.expression.getText(ast)==="n === 0"&&statement.elseStatement&&ts.isBlock(statement.elseStatement)){
+						    observeSequentialOwner(statement.elseStatement,owner+"-successor");
+						    statement.elseStatement.statements.filter(ts.isTryStatement).forEach((part,index)=>
+						     observeSequentialOwner(part.tryBlock,owner+"-successor-try"+(index+1)));
+						   }
+						  }
+						  if(node.name!.text==="acquireClosedData"){
+						   const detail=(part:ts.Node):void=>{
+						    if(ts.isIfStatement(part)&&part.expression.getText(ast)==="closeHold !== undefined"&&ts.isBlock(part.thenStatement))
+						     observeSequentialOwner(part.thenStatement,"recovery-preparation-close-hold","sealing-inclusive");
+						    if(ts.isForOfStatement(part)&&part.expression.getText(ast)==="retainedCuts"&&ts.isBlock(part.statement))
+						     observeSequentialOwner(part.statement,"recovery-preparation-retained-cut","sealing-inclusive");
+						    if(ts.isVariableDeclaration(part)&&["qualifyNativePreparation","qualifyPreparedSnapshots"].includes(part.name.getText(ast))&&
+						      part.initializer&&ts.isArrowFunction(part.initializer)&&ts.isBlock(part.initializer.body))
+						     observeSequentialOwner(part.initializer.body,"recovery-preparation-"+part.name.getText(ast),"sealing-inclusive");
+						    ts.forEachChild(part,detail);
+						   };detail(node.body);
+						  }
+						 }
+						 if(path.endsWith("/creator-transition-advance.ts")&&ts.isFunctionDeclaration(node)&&
+						   node.name?.text==="openCreatorSnapshotRecoveryRoleReadbackOwned"&&node.body){
+						  node.body.statements.filter(ts.isTryStatement).forEach((part,index)=>
+						   observeSequentialOwner(part.tryBlock,"recovery-preparation-certificate-readback-try"+(index+1),"sealing-inclusive"));
+						 }
+						 if(path.endsWith("/creator-closed-rollback-data.ts")&&ts.isPropertyAssignment(node)&&
+						   node.name.getText(ast)==="prepare"&&ts.isArrowFunction(node.initializer)&&ts.isBlock(node.initializer.body)){
+						  let owner:ts.Node|undefined=node.parent;while(owner&&!ts.isFunctionDeclaration(owner))owner=owner.parent;
+						  if(owner?.name?.text==="reconcileSnapshotRecoveryRoles")
+						   observeSequentialOwner(node.initializer.body,"recovery-preparation-detached-data","sealing-inclusive");
+						 }
+						 if(/\/internal\/signing-retirement\.(?:ts|js)$/u.test(path)&&ts.isFunctionDeclaration(node)&&node.body){
+						  if(node.name?.text==="image"){
+						   observeSequentialOwner(node.body,"native-signing-image");
+						   for(const statement of node.body.statements)if(ts.isForOfStatement(statement)&&
+						    statement.expression.getText(ast)==="signingStores"&&ts.isBlock(statement.statement))
+						     observeSequentialOwner(statement.statement,"native-signing-store-scan");
+						   const result=node.body.statements.filter(ts.isReturnStatement);
+						   if(result.length!==1||!result[0]!.expression||!ts.isObjectLiteralExpression(result[0]!.expression))throw Error("CRITICAL_SIGNING_IMAGE_RESULT_CHANGED");
+						   // Existing commitments/lengths only: no extra decode, hash,
+						   // native read, retained frame or product return substitution.
+						   const expression=result[0]!.expression;
+						   insertions.push({offset:expression.getStart(ast),text:`((__image:any)=>{const __token=__criticalMetric${node.pos};if(__token?.token.role==="creator"&&__token.token.transition===4)try{(globalThis as any).__warmProofEvent?.({kind:"retirement-native-image-observation",substrate:"signing",begin:__token.token.begin,end:performance.now(),rpcTokenAtEntry:__token.token.rpcToken,commandAtEntry:__token.token.command,objectId,rows:__image.frames.length,logicalBytes:__image.logicalBytes,imageDigest:__image.digest,dataDigest:__image.dataDigest,revision:__image.control?.revision,sequence:__image.control?.sequence});}catch{}return __image;})(`},{offset:expression.end,text:")"});
+						  }
+						  if(node.name?.text==="request"||node.name?.text==="terminal"){
+						   const result=node.body.statements.filter(ts.isReturnStatement);
+						   if(result.length!==1||!result[0]!.expression)throw Error("CRITICAL_SIGNING_NATIVE_REQUEST_RETURN_CHANGED");
+						   // Timing starts after the original request is created. It
+						   // includes callback dispatch, not exclusive backend/lock time.
+						   observeExpression(result[0]!.expression,"native-signing-"+node.name.text+"-service");
+						  }
+						 }
+						 if(/\/storage-browser\/(?:dist\/)?src\/live-journal\.(?:ts|js)$/u.test(path)&&ts.isFunctionDeclaration(node)&&
+						  node.name?.text==="retirementSnapshot"&&node.body){
+						  observeSequentialOwner(node.body,"native-journal-image");
+						  node.body.statements.filter(ts.isTryStatement).forEach((part,index)=>
+						   observeSequentialOwner(part.tryBlock,"native-journal-image-try"+(index+1)));
+						 }
+						 if(/\/storage-browser\/(?:dist\/)?src\/live-journal\.(?:ts|js)$/u.test(path)&&ts.isFunctionDeclaration(node)&&node.body&&
+						  ["requestResult","transactionComplete"].includes(node.name?.text??"")){
+						  for(const result of node.body.statements.filter(ts.isReturnStatement))if(result.expression)
+						   observeExpression(result.expression,"native-journal-"+node.name!.text+"-service");
+						 }
+						 if(/\/storage-browser\/(?:dist\/)?src\/live-journal\.(?:ts|js)$/u.test(path)&&ts.isVariableStatement(node)&&
+						  node.declarationList.declarations.some(part=>part.name.getText(ast)==="observation"&&part.initializer?.getText(ast).startsWith("Object.freeze({"))){
+						  let owner:ts.Node|undefined=node.parent;while(owner&&!ts.isVariableDeclaration(owner))owner=owner.parent;
+						  if(owner&&ts.isVariableDeclaration(owner)&&owner.name.getText(ast)==="readRetirementImage"){
+						   criticalSites["native-journal-image-observation"]=(criticalSites["native-journal-image-observation"]??0)+1;
+						   insertions.push({offset:node.end,text:'\ntry{(globalThis as any).__warmProofEvent?.({kind:"retirement-native-image-observation",substrate:"journal",objectId,rows:observation.canonicalRows.length,rowCount:observation.image.rowCount,scopeCount:observation.image.scopeCount,logicalBytes:observation.image.byteCharge,imageDigest:observation.image.imageDigest,revision:observation.control?.revision,sequence:observation.control?.sequence,reusedHeldNativeImage:transaction!==undefined&&basis!==undefined});}catch{}\n'});
+						  }
+						 }
+						 if(path.endsWith("/closed-epoch-cleanup.ts")&&ts.isFunctionDeclaration(node)&&
+						  node.name?.text==="applyClosedEpochRetirementIntent"&&node.body)
+						   observeSequentialOwner(node.body,"retirement-coordinator");
+						 if(path.endsWith("/closed-epoch-cleanup.ts")&&ts.isCallExpression(node)){
+						  let owner:ts.Node|undefined=node.parent;while(owner&&!ts.isFunctionDeclaration(owner))owner=owner.parent;
+						  if(owner&&ts.isFunctionDeclaration(owner)&&owner.name?.text==="applyClosedEpochRetirementIntent"){
+						   const phases:Record<string,string>={
+						    readCoordinator:"retirement-coordinator-readback",acquireCoordinator:"retirement-coordinator-native-open",
+						    "participant.acquire":"retirement-participant-native-open",transition:"retirement-participant-transition",
+						    inspect:"retirement-participant-inspect",verifyCompleted:"retirement-complete-cross-store-verification",
+						    "read.prepareBound":"retirement-coordinator-prepare-cas","read.commitPrepared":"retirement-coordinator-commit-cas",
+						    "read.prepareFence":"retirement-participant-prepare-cas",
+						   };
+						   const callee=node.expression.getText(ast),phase=phases[callee];if(phase){
+						    observeExpression(node,phase);
+						    const participant=callee.startsWith("participant.")||callee==="transition"||callee==="inspect";
+						    const site=path.slice(root.length+1)+":"+(ast.getLineAndCharacterOfPosition(node.getStart(ast)).line+1);
+						    insertions.push({offset:node.getStart(ast),text:`((globalThis as any).__warmProofEvent?.({kind:"retirement-call-identity",phase:${JSON.stringify(phase)},site:${JSON.stringify(site)},objectId:preparation.head.objectId,sourceHeadGeneration:preparation.head.generationId,sourceHeadRevision:preparation.head.revision,floorEpoch:preparation.floorEpoch,decisionDigest:preparation.decisionDigest,sourceProofDigest:preparation.sourceProofDigest${participant?",participantRoles:participant.commitment[0],controlRevision:coordinator.revision,controlSequence:coordinator.sequence":""}}),`},{offset:node.end,text:")"});
+						   }
+						  }
+						 }
+						 if(/\/internal\/idb-adapter\.(?:ts|js)$/u.test(path)&&ts.isMethodDeclaration(node)&&
+						  node.name.getText(ast)==="runControl"&&node.body){
+						  observeSequentialOwner(node.body,"native-ahe-control");
+						  node.body.statements.filter(ts.isTryStatement).forEach((part,index)=>
+						   observeSequentialOwner(part.tryBlock,"native-ahe-control-try"+(index+1)));
+						 }
+						 if(path.endsWith("/creator-closed-rollback-data.ts")&&ts.isVariableDeclaration(node)&&
+						  node.name.getText(ast)==="verifyCompleted"&&node.initializer&&ts.isArrowFunction(node.initializer)&&ts.isBlock(node.initializer.body)){
+						  observeSequentialOwner(node.initializer.body,"retirement-completed-readback");
+						  node.initializer.body.statements.filter(ts.isTryStatement).forEach((part,index)=>
+						   observeSequentialOwner(part.tryBlock,"retirement-completed-readback-try"+(index+1)));
 						 }
 						 if(path.endsWith("/creator-closed-rollback-data.ts")&&ts.isFunctionDeclaration(node)&&node.body&&
 						  ["reconcileSnapshotRecoveryRoles","installClosedRetirementSource"].includes(node.name?.text??"")){
@@ -1498,6 +1671,25 @@ await ((globalThis as any).__warmObserveMetric??((_phase:any,action:any)=>action
 						  }
 						  insertions.push({offset:node.body.getStart(ast)+1,text:`\nconst ${id}=(globalThis as any).__warmMetricBegin?.(${JSON.stringify(phase)},0,${synchronous});try {\n`},
 						   {offset:node.body.end-1,text:`\n}catch(error){(globalThis as any).__warmMetricFailure?.(${id});throw error;} finally {(globalThis as any).${synchronous?"__warmMetricEnd":"__warmMetricFinish"}?.(${id});}\n`});
+						  if(path.endsWith("/creator-closed-rollback-data.ts")&&ts.isFunctionDeclaration(node)&&
+						   ["authenticate","acquireRecoveryRoleCertificate","installClosedRetirementSource"].includes(node.name?.text??"")){
+						   const name=node.name!.text;
+						   const fields=name==="authenticate"?
+						    'epoch:floor.epoch,anchorDigest:floor.currentAnchorDigest,head:reader.head,generations:reader.generations.map(row=>({generationId:row.generationId,closureDigest:row.closureDigest,state:row.state})),proofBook:(globalThis as any).__warmProofIdentity?.(accounting)':
+						    name==="acquireRecoveryRoleCertificate"?
+						    'epoch:currentTrust.currentEpoch,anchorDigest:currentTrust.currentAnchorDigest,expectedHead,requiredAnchors:requiredDependencyAnchors.map(row=>({...row})),proofBook:(globalThis as any).__warmProofIdentity?.(accounting)':
+						    'epoch:source.floor.stable.epoch,anchorDigest:source.floor.stable.currentAnchorDigest,head:source.summary.head,controlRevision:source.aheControl?.revision,controlSequence:source.aheControl?.sequence,journalImageDigest:source.journal.image.imageDigest,signingRows:source.signingRows.length,signingDetailEntries:source.signingDetails.length,hasSigningSummary:source.signingSummaries!==undefined,hasGenerationDrain:source.generationSource!==undefined,proofBook:(globalThis as any).__warmProofIdentity?.(source.accounting)';
+						   const accountingDeclaration=name!=="authenticate"?undefined:node.body.statements.find(part=>ts.isVariableStatement(part)&&
+						    part.declarationList.declarations.some(declaration=>declaration.name.getText(ast)==="accounting"));
+						   if(name==="authenticate"&&accountingDeclaration===undefined)throw Error("CRITICAL_AUTHENTICATION_ACCOUNTING_MARKER_MISSING");
+						   insertions.push({offset:accountingDeclaration?.end??node.body.getStart(ast)+1,text:`\n{const __pass=(globalThis as any).__warmMetricBegin?.("test-only-pass-identity");try{if(__pass?.token.role==="creator"&&__pass.token.transition===4)(globalThis as any).__warmProofEvent?.({kind:"recovery-pass-identity",owner:${JSON.stringify(name)},${fields}});}catch{}finally{(globalThis as any).__warmMetricEnd?.(__pass);}}\n`});
+						  }
+						  if(ts.isFunctionDeclaration(node)&&["closedSigningDataRows","closedSigningControl","signingRetirementDataDigest"].includes(node.name?.text??"")){
+						   // Summarize the exact original bounded inputs, without
+						   // parsing/copying/hashing them again. Count the diagnostic
+						   // iteration separately; it is not product computation.
+						   insertions.push({offset:node.body.getStart(ast)+1,text:`\nconst __rowDiagnostic=(globalThis as any).__warmMetricBegin?.("test-only-retirement-row-volume",0,true);try{if(__rowDiagnostic?.token.role==="creator"&&__rowDiagnostic.token.transition===4){let __bytes=0;for(const __row of rows)__bytes+=__row.byteLength;(globalThis as any).__warmProofEvent?.({kind:"retirement-row-processing",phase:${JSON.stringify(phase)},source:${JSON.stringify(path.slice(root.length+1))},rows:rows.length,inputBytes:__bytes,commandAtEntry:__rowDiagnostic.token.command,rpcTokenAtEntry:__rowDiagnostic.token.rpcToken});}}finally{(globalThis as any).__warmMetricEnd?.(__rowDiagnostic);}\n`});
+						  }
 						  if(ts.isFunctionDeclaration(node)&&(node.name?.text==="decodeCanonical"||node.name?.text==="canonicalCarrierResourceForSizing")){
 						   const bytes=node.body.statements.find(row=>ts.isVariableStatement(row)&&row.declarationList.declarations.some(d=>ts.isIdentifier(d.name)&&d.name.text==="bytes"));
 						   if(!bytes)throw new Error("CRITICAL_DECODE_BYTES_SEAM_MISSING");
@@ -1573,6 +1765,14 @@ await ((globalThis as any).__warmObserveMetric??((_phase:any,action:any)=>action
 						 (criticalSites["native-ahe-retirement-control"]!==1||!(criticalSites["native-ahe-complete-retirement-admission"]>0)))
 						 throw new Error("CRITICAL_NATIVE_AHE_CONTROL_SEAMS_CHANGED");
 						if(path.endsWith("/creator-close.ts")&&criticalSites.sealing!==1)throw Error("CRITICAL_SEQUENTIAL_SEAL_OWNER_NOT_UNIQUE");
+						if(/\/internal\/signing-retirement\.(?:ts|js)$/u.test(path)&&
+						 ["native-signing-image-capture","native-signing-image","native-signing-store-scan","native-signing-request-service","native-signing-terminal-service"].some(name=>criticalSites[name]!==1))
+						 throw Error("CRITICAL_SIGNING_IMAGE_OWNERS_NOT_UNIQUE");
+						if(/\/internal\/seal-vote-intent\.(?:ts|js)$/u.test(path)&&criticalSites["retirement-signing-data-commitment"]!==1)
+						 throw Error("CRITICAL_SIGNING_DATA_COMMITMENT_NOT_UNIQUE");
+						if(/\/storage-browser\/(?:dist\/)?src\/live-journal\.(?:ts|js)$/u.test(path)&&
+						 ["native-journal-image-capture","native-journal-image","native-journal-image-observation"].some(name=>criticalSites[name]!==1))
+						 throw Error("CRITICAL_JOURNAL_IMAGE_OWNERS_NOT_UNIQUE");
 						 if(path.endsWith("/creator-closed-rollback-data.ts")&&["reconciliation-prefix","retirement-installation",
 						  "maintenance-readiness-fresh-source-baseline"].some(name=>criticalSites[name]!==1))
 						  throw Error("CRITICAL_RECONCILIATION_AND_READINESS_OWNERS_NOT_UNIQUE");
@@ -2286,7 +2486,7 @@ for (const name of selectedEntry === undefined ? ["setup", "recovery", "lifecycl
 	let bytes = requireValue(result.outputFiles[0], "STARTUP_FIXTURE_PRECONDITION").contents;
 	if (fullFunctionCalls) {
 		writeFileSync(join(archive, "entry.before-full-calls.mjs"), bytes, {flag: "wx"});
-		const instrumented = instrumentFullFunctionBundle(Buffer.from(bytes).toString("utf8"), clockedFunctionOwners);
+		const instrumented = instrumentFullFunctionBundle(Buffer.from(bytes).toString("utf8"), clockedFunctionOwners, retirementOwnerClocks);
 		writeFileSync(join(archive, "full-call-manifest.json"), JSON.stringify(instrumented.manifest), {flag: "wx"});
 		writeFileSync(join(archive, "full-call-input-sourcemap.json"), JSON.stringify(instrumented.sourceMap), {flag: "wx"});
 		bytes = Buffer.from(instrumented.code);
