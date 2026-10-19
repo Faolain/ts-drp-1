@@ -51,7 +51,7 @@
 		"test:public-convergence": "RUN_PUBLIC_LIVE=true pnpm exec vitest run packages/network-spike/tests/public-convergence-live.test.ts",
 		"typecheck": "pnpm --parallel typecheck",
 		"watch": "pnpm --parallel --filter '@ts-drp/*' watch",
-		"pretest": "node scripts/ensure-native-deps.mjs"
+		"pretest": "node scripts/ensure-native-deps.mjs && node scripts/check-shadowed-sources.mjs"
 	},
 	"dependencies": {
 		"@esbuild-plugins/node-globals-polyfill": "^0.2.3",

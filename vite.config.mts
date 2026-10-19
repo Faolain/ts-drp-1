@@ -147,6 +147,8 @@ const config = defineConfig({
 		},
 	},
 	test: {
+		// Compiled `.js` beside a `.ts` would run instead of it inside bundled fixtures.
+		globalSetup: ["./scripts/check-shadowed-sources.mjs"],
 		// `docs/` carries vendored review bundles that ship their own `node:test`
 		// suites. Vitest cannot run them, and globbing them turns the repo suite red
 		// for reasons unrelated to `packages/`.
