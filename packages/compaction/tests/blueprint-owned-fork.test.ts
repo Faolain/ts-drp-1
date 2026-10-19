@@ -20,6 +20,8 @@ vi.mock("@ts-drp/protocol-v3/blueprint-application", async importOriginal => {
 	const actual = await importOriginal<typeof import("@ts-drp/protocol-v3/blueprint-application")>();
 	return {...actual, applyPreparedBlueprintOperation: (...args: Parameters<typeof actual.applyPreparedBlueprintOperation>) => {
 		calls.apply++; return actual.applyPreparedBlueprintOperation(...args);
+	}, applyPreparedBlueprintOperationToCanonicalState: (...args: Parameters<typeof actual.applyPreparedBlueprintOperationToCanonicalState>) => {
+		calls.apply++; return actual.applyPreparedBlueprintOperationToCanonicalState(...args);
 	}};
 });
 

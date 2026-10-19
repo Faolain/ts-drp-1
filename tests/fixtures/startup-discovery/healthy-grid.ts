@@ -528,9 +528,12 @@ export async function runHealthyGrid(identity:string,origins:readonly string[],r
   check(!control.publicationFault&&!control.issueAfterSignFault,"healthy run must not inject failures");
   phase="create-join";await open("create");await measure("created");
   for(let transition=0;transition<rollovers;transition++){
-   phase="ordinary-gameplay-"+epoch;await gameplay(8);await measure("before-rollover-"+epoch);
-   // Optional bounded renderer trace window: seal-4 through the next lull.
+   phase="ordinary-gameplay-"+epoch;await gameplay(8);
+   // Optional bounded renderer trace window: seal-4 through the next lull and
+   // the following ordinary gameplay (stopped before its forced-GC measurement).
    const traceControl=Reflect.get(globalThis,"__rdTraceControl");
+   if(typeof traceControl==="function"&&epoch===5)await traceControl("stop");
+   await measure("before-rollover-"+epoch);
    if(typeof traceControl==="function"&&epoch===4){await traceControl("start");await Promise.all(active.map(role=>rpc(role.index,"clock")));}
    phase="seal-"+epoch;const closed=await rpc(0,"seal");check(closed.ok,"healthy seal refused:"+JSON.stringify(closed));
    const offer=await rpc(0,"export");snapshots.push(await rpc(0,"snapshot",{offer}));
@@ -549,7 +552,6 @@ export async function runHealthyGrid(identity:string,origins:readonly string[],r
    const concurrent=Reflect.get(globalThis,"__rdPoolMaintenanceConcurrent")===true;
    if(recipientLull)for(let index=1;index<4;index++){phase="pool-maintenance-"+epoch+":"+index;
     recipientPoolMaintenance.push(concurrent&&index===1?await concurrentMaintenance(1):await rpc(index,"maintain"));}
-   if(typeof traceControl==="function"&&epoch===5)await traceControl("stop");
    transitions.push({closedEpoch:closed.epoch,successorEpoch:closed.successorEpoch,sessionRecreations:0,fixtureDatabaseCopies:0,
     ...(poolMaintenance===undefined?{}:{poolMaintenance}),...(recipientLull?{recipientPoolMaintenance}:{})});
   }

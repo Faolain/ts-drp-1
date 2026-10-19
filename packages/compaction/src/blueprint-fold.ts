@@ -9,6 +9,7 @@ import {
 import { DRPError } from "@ts-drp/errors";
 import {
 	applyPreparedBlueprintOperation,
+	applyPreparedBlueprintOperationToCanonicalState,
 	type BlueprintExecutionContext,
 	type PreparedBlueprintRuntime,
 } from "@ts-drp/protocol-v3/blueprint-application";
@@ -135,8 +136,9 @@ export class BlueprintStateMachine implements IStagedStateMachine<BlueprintState
 	#exactCanonicalStateBytes: Uint8Array;
 	#generation: object = {};
 	#parent: BlueprintStateMachine | undefined;
-	#state: unknown;
-	#stateDigest: string;
+	/** A pure function of the owned immutable bytes, hashed on first read: an
+	 * epoch fold publishes one digest, not one per intermediate state. */
+	#stateDigest: string | undefined;
 
 	constructor(input: BlueprintStateMachineInput) {
 		const owned = OwnedBlueprintForkInput.source(input);
@@ -149,7 +151,6 @@ export class BlueprintStateMachine implements IStagedStateMachine<BlueprintState
 			this.#expectedBlueprintDigest = owned.#expectedBlueprintDigest;
 			this.#preparedBlueprintRuntime = owned.#preparedBlueprintRuntime;
 			this.#exactCanonicalStateBytes = owned.#exactCanonicalStateBytes;
-			this.#state = owned.#state;
 			this.#stateDigest = owned.#stateDigest;
 			return;
 		}
@@ -165,7 +166,6 @@ export class BlueprintStateMachine implements IStagedStateMachine<BlueprintState
 		this.#expectedBlueprintDigest = input.expectedBlueprintDigest;
 		this.#preparedBlueprintRuntime = input.preparedBlueprintRuntime;
 		this.#exactCanonicalStateBytes = initial.bytes;
-		this.#state = initial.value;
 		this.#stateDigest = input.expectedInitialStateDigest;
 	}
 
@@ -180,7 +180,6 @@ export class BlueprintStateMachine implements IStagedStateMachine<BlueprintState
 		// consumed stage may keep applying/forking: those paths detach inputs and
 		// replace fields, so neither machine can mutate the other's state.
 		this.#exactCanonicalStateBytes = staged.#exactCanonicalStateBytes;
-		this.#state = staged.#state;
 		this.#stateDigest = staged.#stateDigest;
 		this.#generation = {};
 		staged.#baseGeneration = undefined;
@@ -189,27 +188,38 @@ export class BlueprintStateMachine implements IStagedStateMachine<BlueprintState
 	}
 
 	apply(operation: unknown, executionContext?: BlueprintExecutionContext): unknown {
-		const result = applyPreparedBlueprintOperation({
+		// The owned bytes are the exact encoding of the validated state, so the
+		// runtime decodes them for the reducer instead of re-encoding that state,
+		// and returns the next state as the bytes its clone would have decoded.
+		const result = applyPreparedBlueprintOperationToCanonicalState({
 			expectedBlueprintDigest: this.#expectedBlueprintDigest,
 			...(executionContext === undefined ? {} : { executionContext }),
+			exactCanonicalStateBytes: this.#exactCanonicalStateBytes,
 			operation,
 			preparedBlueprintRuntime: this.#preparedBlueprintRuntime,
-			state: this.#state,
+			stateLimits: this.#applicationLimits,
 		});
 		// Complete both validations before publishing any machine field. State
 		// and output are independently decoded, even when the reducer aliases them.
-		const nextState = validatedApplicationState(result.state, this.#applicationLimits);
+		// Bytes that decode within the application limits are exactly what
+		// validatedApplicationState(clone) would publish (encoding the decoded
+		// clone reproduces them); otherwise that validation runs for its refusal.
+		const nextState = result.stateWithinLimits ? { bytes: result.exactCanonicalStateBytes } :
+			validatedApplicationState(decodeCanonical(result.exactCanonicalStateBytes), this.#applicationLimits);
 		const output = validatedApplicationState(result.output, this.#applicationLimits);
 		this.#exactCanonicalStateBytes = nextState.bytes;
-		this.#state = nextState.value;
-		this.#stateDigest = stateDigest(nextState.bytes);
+		this.#stateDigest = undefined;
 		this.#generation = {};
 		return output.value;
 	}
 
+	#digest(): string {
+		return this.#stateDigest ??= stateDigest(this.#exactCanonicalStateBytes);
+	}
+
 	fork(): BlueprintStateMachine {
 		const fork = new BlueprintStateMachine(new OwnedBlueprintForkInput(this, this.#exactCanonicalStateBytes,
-			this.#expectedBlueprintDigest, this.#stateDigest, this.#preparedBlueprintRuntime, this.#applicationLimits.maxBytes));
+			this.#expectedBlueprintDigest, this.#digest(), this.#preparedBlueprintRuntime, this.#applicationLimits.maxBytes));
 		fork.#baseGeneration = this.#generation;
 		fork.#parent = this;
 		return fork;
@@ -219,7 +229,7 @@ export class BlueprintStateMachine implements IStagedStateMachine<BlueprintState
 		return Object.freeze({
 			blueprintDigest: this.#expectedBlueprintDigest,
 			exactCanonicalStateBytes: copyTrustedBytes(this.#exactCanonicalStateBytes),
-			stateDigest: this.#stateDigest,
+			stateDigest: this.#digest(),
 		});
 	}
 }

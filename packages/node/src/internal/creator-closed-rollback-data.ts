@@ -11348,22 +11348,19 @@ function maintenanceCanonicalWidth(value: unknown,
 				throw new TypeError("creator maintenance encoded container nesting is invalid");
 			return checked[maintenanceWidthAtom];
 		}
+		// The same widths in the same order and one sum, without staging copies.
 		if (Array.isArray(node)) {
 			decodedItems += node.length;
-			return maintenanceWidthSum([
-				1,
-				maintenanceVarUintWidth(node.length),
-				...node.map((child) => measure(child, depth + 1)),
-			]);
+			const widths = [1, maintenanceVarUintWidth(node.length)];
+			for (const child of node.map((child) => measure(child, depth + 1))) widths.push(child);
+			return maintenanceWidthSum(widths);
 		}
 		if (node !== null && typeof node === "object" && !(node instanceof Uint8Array)) {
 			const pairs = Object.entries(node);
 			decodedItems += pairs.length * 2;
-			return maintenanceWidthSum([
-				1,
-				maintenanceVarUintWidth(pairs.length),
-				...pairs.flatMap(([key, child]) => [measure(key, depth + 1), measure(child, depth + 1)]),
-			]);
+			const widths = [1, maintenanceVarUintWidth(pairs.length)];
+			for (const [key, child] of pairs) widths.push(measure(key, depth + 1), measure(child, depth + 1));
+			return maintenanceWidthSum(widths);
 		}
 		return primitiveWidth(node);
 	};
@@ -11434,7 +11431,34 @@ function createCreatorMaintenanceSizingSyntax() {
 		}
 		return width;
 	};
-	return Object.freeze({ ...syntax, canonicalWidth: (value: unknown) => maintenanceCanonicalWidth(value, primitiveWidth) });
+	// The original source selector and its rank are pure functions of the
+	// frame/summary/row objects, which no sizing schedule mutates (schedules copy
+	// their arrays and replace rows). Every schedule re-plans the SAME first
+	// candidate, so identical objects reuse the complete result; a refusal is
+	// never retained and recomputes. Retention ends with this sizing tree.
+	// The frozen post rows of a retained source are reused too, so the next serial
+	// pass of a later schedule sees the SAME row objects and reuses its source.
+	const sources: { frame: ClosedGenerationClassificationData; summary: Summary; rows: readonly GenerationRecord[];
+		selected: GenerationRecord; value: ReturnType<typeof closedGenerationSourceFromSelected>;
+		post?: readonly GenerationRecord[] }[] = [];
+	const generationSourceFromSelected = (frame: ClosedGenerationClassificationData, summary: Summary,
+		rows: readonly GenerationRecord[], selected: GenerationRecord): ReturnType<typeof closedGenerationSourceFromSelected> => {
+		for (const entry of sources)
+			if (entry.frame === frame && entry.summary === summary && entry.selected === selected &&
+				entry.rows.length === rows.length && entry.rows.every((row, index) => row === rows[index])) return entry.value;
+		const value = closedGenerationSourceFromSelected(frame, summary, rows, selected);
+		if (sources.length < 64) sources.push({ frame, summary, rows: rows.slice(), selected, value });
+		return value;
+	};
+	const generationPostRows = (rows: readonly GenerationRecord[],
+		source: ReturnType<typeof closedGenerationSourceFromSelected>): readonly GenerationRecord[] => {
+		const entry = sources.find(candidate => candidate.value === source && candidate.rows.length === rows.length &&
+			candidate.rows.every((row, index) => row === rows[index]));
+		if (entry === undefined) return closedGenerationPostRows(rows, source);
+		return entry.post ??= closedGenerationPostRows(rows, source);
+	};
+	return Object.freeze({ ...syntax, canonicalWidth: (value: unknown) => maintenanceCanonicalWidth(value, primitiveWidth),
+		generationSourceFromSelected, generationPostRows });
 }
 
 /** Private synchronous compose invocation only: the original owner retains
@@ -11528,9 +11552,27 @@ export function createCreatorNoneResourceProgramCompiler() {
 			throw new TypeError("ORDINARY_NONE_PROGRAM_ARITHMETIC_INVALID");
 		return value;
 	};
+	// Injective over the fixed node shapes above, exactly like their JSON text:
+	// one distinct tag per kind, then its integer fields (or parameter key).
+	const internKey = (node: CreatorNoneResourceNode): string => {
+		switch (node.kind) {
+			case "constant": return `c${node.value}`;
+			case "parameter": return `k${node.key}`;
+			case "sum": return `s${node.children.join(",")}`;
+			case "maximum": return `m${node.children.join(",")}`;
+			case "product": return `x${node.left},${node.right}`;
+			case "subtract": return `d${node.left},${node.right}`;
+			case "floor-quotient": return `f${node.left},${node.right}`;
+			case "ceil-quotient": return `e${node.left},${node.right}`;
+			case "remainder": return `r${node.left},${node.right}`;
+			case "bytes": return `b${node.child}`;
+			case "array-count": return `a${node.child}`;
+			case "positive": return `p${node.child}`;
+		}
+	};
 	const append = (node: CreatorNoneResourceNode, value: number): CreatorNoneResourceNumber => {
 		checked(value);
-		const key = JSON.stringify(node), old = interned.get(key);
+		const key = internKey(node), old = interned.get(key);
 		if (old !== undefined) {
 			if (old.value !== value) throw new TypeError("ORDINARY_NONE_PROGRAM_PARAMETER_DRIFT");
 			return old;
@@ -11603,13 +11645,27 @@ export function createCreatorNoneResourceProgramCompiler() {
 		const primitive = (value: null | boolean | number | string) => {
 			const actual = canonicalPrimitiveResourceForSizing(value, limits); return resource(actual, constantResource(actual), limits);
 		};
+		// A record's primitive key/value resolves to interned constant terms whose
+		// limit() constraints only tighten, so repeating it under the SAME limits
+		// adds no node or constraint. Its private footprint never escapes record().
+		const primitiveTerms = new Map<null | boolean | number | string, CreatorNoneResourceReferences>();
+		let termLimits = [limits.maxBytes, limits.maxItems, limits.maxDepth];
+		const primitiveReferences = (value: null | boolean | number | string) => {
+			if (limits.maxBytes !== termLimits[0] || limits.maxItems !== termLimits[1] || limits.maxDepth !== termLimits[2]) {
+				primitiveTerms.clear(); termLimits = [limits.maxBytes, limits.maxItems, limits.maxDepth];
+			}
+			let refs = primitiveTerms.get(value);
+			if (refs === undefined) primitiveTerms.set(value, refs = references(primitive(value)));
+			return refs;
+		};
 		return Object.freeze({primitive,
 			bytes: (length: number | CreatorNoneResourceNumber) => resource(canonicalBytesResourceForSizing(number(length).value, limits),
 				{byteLength: unary("bytes", length), items: number(1), maxDepth: number(0)}, limits),
 			record: (fields: Readonly<Record<string, unknown>>) => {
 				const actual = canonicalRecordResourceForSizing(fields as Readonly<Record<string, CanonicalResourceFootprint | string | number | boolean | null>>, limits);
-				const entries = Object.entries(fields).map(([key, value]) => ({key: references(primitive(key)),
-					value: references(value !== null && typeof value === "object" ? value as CanonicalResourceFootprint : primitive(value as null | boolean | number | string))}));
+				const entries = Object.entries(fields).map(([key, value]) => ({key: primitiveReferences(key),
+					value: value !== null && typeof value === "object" ? references(value as CanonicalResourceFootprint) :
+						primitiveReferences(value as null | boolean | number | string)}));
 				return resource(actual, {byteLength: combine("sum", [1 + maintenanceVarUintWidth(entries.length),
 					...entries.flatMap(entry => [entry.key.byteLength, entry.value.byteLength])]),
 					items: combine("sum", [1 + 2 * entries.length, ...entries.flatMap(entry => [entry.key.items, entry.value.items])]),
@@ -18281,7 +18337,7 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 						);
 						if (selectedIndex < 0) throw new TypeError("prospective classified original source changed");
 						const currentSource = preclose
-							? closedGenerationSourceFromSelected(
+							? syntax.generationSourceFromSelected(
 									frame,
 									facts.summary,
 									before as readonly GenerationRecord[],
@@ -18291,7 +18347,7 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 						const post =
 							currentSource === undefined
 								? before.filter((_, index) => index !== selectedIndex)
-								: closedGenerationPostRows(before as readonly GenerationRecord[], currentSource);
+								: syntax.generationPostRows(before as readonly GenerationRecord[], currentSource);
 						const selectedRecord = before[selectedIndex];
 						const lineageFloor = before.find(
 							(row) => (row as Readonly<{ generationId: unknown }>).generationId === current.generationId

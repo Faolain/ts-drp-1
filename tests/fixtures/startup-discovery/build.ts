@@ -121,7 +121,7 @@ function canonicalCallsites(ast: ts.SourceFile, path: string): CanonicalCallsite
 	// are never wrapped as callsites; the original definition metrics remain.
 	if (/\/packages\/canonical\/(?:dist\/)?src\/internal\/codec\.(?:ts|js)$/.test(path) &&
 		(sites.length !== 4 || sites.filter(site => site.owner === "deepCloneCanonical").length !== 2 ||
-			sites.filter(site => site.owner === "canonicalPrimitiveResourceForSizing" && site.codec === "encode").length !== 1 ||
+			sites.filter(site => site.owner === "primitiveResourceWidth" && site.codec === "encode").length !== 1 ||
 			sites.filter(site => site.owner === "canonicalValueResourceForSizing" && site.codec === "encode").length !== 1 ||
 			sites.filter(site => site.codec === "decode").length !== 1 || sites.filter(site => site.codec === "encode").length !== 3))
 		throw new Error("CRITICAL_CANONICAL_LOCAL_CLONE_CALLSITE_CHANGED");

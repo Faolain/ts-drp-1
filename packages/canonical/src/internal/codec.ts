@@ -840,27 +840,74 @@ export interface CanonicalResourceFootprint {
 	readonly maxDepth: number;
 }
 
+/** Limits and footprints this module froze after its exact plain-data checks.
+ * Re-validating one is the identity, so internal composition skips only the
+ * repeated descriptor walk; every range check against the CURRENT limits stays. */
+const RESOURCE_LIMITS = new WeakSet<object>();
+const RESOURCE_FOOTPRINTS = new WeakSet<object>();
+const DEFAULT_RESOURCE_LIMITS: Readonly<CanonicalLimits> = Object.freeze({ ...DEFAULT_LIMITS });
+RESOURCE_LIMITS.add(DEFAULT_RESOURCE_LIMITS);
+/** Widths the frozen encoder already produced for an exact primitive. Encoding
+ * a primitive is a pure function of it; a width above the current byte limit
+ * replays the encoder for its exact refusal. Bounded; never authority. */
+const PRIMITIVE_WIDTHS = new Map<null | boolean | number | string, number>();
+const PRIMITIVE_WIDTH_ENTRIES = 4096, PRIMITIVE_WIDTH_MAX_STRING = 256;
+
+/** `encodeVarUint(value).byteLength` for a non-negative safe integer. */
+function varUintWidth(value: number): number {
+	let count = 1;
+	for (let rest = value; rest >= 0x80; rest = Math.floor(rest / 0x80)) count++;
+	return count;
+}
+
+/** `fresh` marks this module's own three-field literal, whose shape holds by construction. */
 function checkedCanonicalResourceFootprint(value: CanonicalResourceFootprint,
-	limits: Partial<CanonicalLimits>): CanonicalResourceFootprint {
+	limits: Partial<CanonicalLimits>, fresh = false): CanonicalResourceFootprint {
 	const configured = canonicalResourceLimits(limits);
-	if (value === null || typeof value !== "object" || !isPlainObject(value) || Object.getOwnPropertySymbols(value).length !== 0)
-		throw new CanonicalEncodingError("canonical resource footprint requires plain scalar fields");
-	const descriptors = Object.getOwnPropertyDescriptors(value), keys = Object.keys(descriptors);
-	if (keys.length !== 3 || ["byteLength", "items", "maxDepth"].some(key =>
-		!Object.hasOwn(descriptors, key) || !Object.hasOwn(descriptors[key]!, "value")))
-		throw new CanonicalEncodingError("canonical resource footprint requires exact data fields");
-	// Capture each scalar once. Accessors cannot alter the tuple between its
-	// validation and return, and no input object is retained in the result.
-	const byteLength = descriptors.byteLength!.value, items = descriptors.items!.value,
+	const trusted = RESOURCE_FOOTPRINTS.has(value);
+	let byteLength: unknown, items: unknown, maxDepth: unknown;
+	if (trusted || fresh) ({ byteLength, items, maxDepth } = value);
+	else {
+		if (value === null || typeof value !== "object" || !isPlainObject(value) || Object.getOwnPropertySymbols(value).length !== 0)
+			throw new CanonicalEncodingError("canonical resource footprint requires plain scalar fields");
+		const descriptors = Object.getOwnPropertyDescriptors(value), keys = Object.keys(descriptors);
+		if (keys.length !== 3 || ["byteLength", "items", "maxDepth"].some(key =>
+			!Object.hasOwn(descriptors, key) || !Object.hasOwn(descriptors[key]!, "value")))
+			throw new CanonicalEncodingError("canonical resource footprint requires exact data fields");
+		// Capture each scalar once. Accessors cannot alter the tuple between its
+		// validation and return, and no input object is retained in the result.
+		byteLength = descriptors.byteLength!.value;
+		items = descriptors.items!.value;
 		maxDepth = descriptors.maxDepth!.value;
+	}
 	if (typeof byteLength !== "number" || !Number.isSafeInteger(byteLength) || byteLength < 1 || byteLength > configured.maxBytes ||
 		typeof items !== "number" || !Number.isSafeInteger(items) || items < 1 || items > configured.maxItems ||
 		typeof maxDepth !== "number" || !Number.isSafeInteger(maxDepth) || maxDepth < 0 || maxDepth > configured.maxDepth)
 		throw new CanonicalEncodingError("canonical resource footprint exceeds original limits");
-	return Object.freeze({byteLength, items, maxDepth});
+	// Every exported result is checked from a fresh literal, so a trusted input
+	// returns only to internal composition and is never aliased to a caller.
+	if (trusted) return value;
+	const result = Object.freeze({ byteLength, items, maxDepth });
+	RESOURCE_FOOTPRINTS.add(result);
+	return result;
+}
+
+/** The frozen encoder's width for one primitive under already-checked limits. */
+function primitiveResourceWidth(value: null | boolean | number | string, configured: Readonly<CanonicalLimits>): number {
+	if (value !== null && typeof value !== "boolean" && typeof value !== "number" && typeof value !== "string")
+		throw new CanonicalEncodingError("resource primitive is outside the canonical domain");
+	const cached = PRIMITIVE_WIDTHS.get(value);
+	if (cached !== undefined && cached <= configured.maxBytes) return cached;
+	const width = encodeCanonical(value, configured).byteLength;
+	if (typeof value !== "string" || value.length <= PRIMITIVE_WIDTH_MAX_STRING) {
+		if (PRIMITIVE_WIDTHS.size >= PRIMITIVE_WIDTH_ENTRIES) PRIMITIVE_WIDTHS.clear();
+		PRIMITIVE_WIDTHS.set(value, width);
+	}
+	return width;
 }
 
 function canonicalResourceLimits(limits: Partial<CanonicalLimits>): Readonly<CanonicalLimits> {
+	if (RESOURCE_LIMITS.has(limits)) return limits as Readonly<CanonicalLimits>;
 	if (!isPlainObject(limits) || Object.getOwnPropertySymbols(limits).length !== 0)
 		throw new CanonicalEncodingError("canonical resource limits require plain data fields");
 	const configured: CanonicalLimits = {...DEFAULT_LIMITS};
@@ -871,52 +918,53 @@ function canonicalResourceLimits(limits: Partial<CanonicalLimits>): Readonly<Can
 			throw new CanonicalEncodingError("canonical resource limit is invalid");
 		configured[key] = descriptor.value as number;
 	}
-	return Object.freeze(configured);
+	const result = Object.freeze(configured);
+	RESOURCE_LIMITS.add(result);
+	return result;
 }
 
-/** Actual primitive validation remains with the frozen encoder. No collection
- * traversal, hypothetical payload or scalar-width interning happens here. */
+/** Actual primitive validation remains with the frozen encoder; only the
+ * widths it already produced are interned. No collection traversal or
+ * hypothetical payload happens here. */
 export function canonicalPrimitiveResourceForSizing(value: null | boolean | number | string,
-	limits: Partial<CanonicalLimits> = {}): CanonicalResourceFootprint {
+	limits: Partial<CanonicalLimits> = DEFAULT_RESOURCE_LIMITS): CanonicalResourceFootprint {
 	const configured = canonicalResourceLimits(limits);
-	if (value !== null && typeof value !== "boolean" && typeof value !== "number" && typeof value !== "string")
-		throw new CanonicalEncodingError("resource primitive is outside the canonical domain");
-	return checkedCanonicalResourceFootprint({byteLength: encodeCanonical(value, configured).byteLength,
-		items: 1, maxDepth: 0}, configured);
+	return checkedCanonicalResourceFootprint({byteLength: primitiveResourceWidth(value, configured),
+		items: 1, maxDepth: 0}, configured, true);
 }
 
 /** BYTES contents are opaque to the original decoder, even when their payload
  * will separately be decoded or charged by another original owner. */
 export function canonicalBytesResourceForSizing(payloadByteLength: number,
-	limits: Partial<CanonicalLimits> = {}): CanonicalResourceFootprint {
+	limits: Partial<CanonicalLimits> = DEFAULT_RESOURCE_LIMITS): CanonicalResourceFootprint {
 	const configured = canonicalResourceLimits(limits);
 	if (!Number.isSafeInteger(payloadByteLength) || payloadByteLength < 0)
 		throw new CanonicalEncodingError("canonical resource byte length is invalid");
-	return checkedCanonicalResourceFootprint({byteLength: 1 + encodeVarUint(payloadByteLength).byteLength + payloadByteLength,
-		items: 1, maxDepth: 0}, configured);
+	return checkedCanonicalResourceFootprint({byteLength: 1 + varUintWidth(payloadByteLength) + payloadByteLength,
+		items: 1, maxDepth: 0}, configured, true);
 }
 
 /** Repeated complete ARRAY children. Every occurrence and collection edge is
  * charged; this never asserts equal-byte identity or removes actual children. */
 export function canonicalArrayResourceForSizing(count: number, child: CanonicalResourceFootprint,
-	limits: Partial<CanonicalLimits> = {}): CanonicalResourceFootprint {
+	limits: Partial<CanonicalLimits> = DEFAULT_RESOURCE_LIMITS): CanonicalResourceFootprint {
 	const configured = canonicalResourceLimits(limits);
 	if (!Number.isSafeInteger(count) || count < 0 || count > Math.floor((configured.maxItems - 1) / 2))
 		throw new CanonicalEncodingError("canonical resource array count is invalid");
 	const checked = checkedCanonicalResourceFootprint(child, configured);
-	return checkedCanonicalResourceFootprint({byteLength: 1 + encodeVarUint(count).byteLength + count * checked.byteLength,
-		items: 1 + count + count * checked.items, maxDepth: count === 0 ? 0 : 1 + checked.maxDepth}, configured);
+	return checkedCanonicalResourceFootprint({byteLength: 1 + varUintWidth(count) + count * checked.byteLength,
+		items: 1 + count + count * checked.items, maxDepth: count === 0 ? 0 : 1 + checked.maxDepth}, configured, true);
 }
 
 /** Heterogeneous original-schema ARRAY slots. This adds complete distinct
  * costs; it does not deduplicate identities or manufacture array values. */
 export function canonicalArrayResourcesForSizing(children: readonly CanonicalResourceFootprint[],
-	limits: Partial<CanonicalLimits> = {}): CanonicalResourceFootprint {
+	limits: Partial<CanonicalLimits> = DEFAULT_RESOURCE_LIMITS): CanonicalResourceFootprint {
 	if (!Array.isArray(children)) throw new CanonicalEncodingError("resource children must be a dense array");
 	const configured = canonicalResourceLimits(limits);
 	if (children.length > Math.floor((configured.maxItems - 1) / 2))
 		throw new CanonicalEncodingError("canonical resource array count exceeds original item limit");
-	let byteLength = 1 + encodeVarUint(children.length).byteLength, items = 1 + children.length, maxDepth = 0;
+	let byteLength = 1 + varUintWidth(children.length), items = 1 + children.length, maxDepth = 0;
 	for (let index = 0; index < children.length; index++) {
 		const descriptor = Object.getOwnPropertyDescriptor(children, String(index));
 		if (descriptor === undefined || !Object.hasOwn(descriptor, "value"))
@@ -926,7 +974,7 @@ export function canonicalArrayResourcesForSizing(children: readonly CanonicalRes
 		items += child.items;
 		maxDepth = Math.max(maxDepth, 1 + child.maxDepth);
 	}
-	return checkedCanonicalResourceFootprint({byteLength, items, maxDepth}, configured);
+	return checkedCanonicalResourceFootprint({byteLength, items, maxDepth}, configured, true);
 }
 
 /** Finite original schema fields only: complete scalar child footprints or
@@ -934,26 +982,33 @@ export function canonicalArrayResourcesForSizing(children: readonly CanonicalRes
  * encoder. Field names/accessors use the SAME frozen encoder's validation. */
 export function canonicalRecordResourceForSizing(
 	fields: Readonly<Record<string, CanonicalResourceFootprint | null | boolean | number | string>>,
-	limits: Partial<CanonicalLimits> = {}): CanonicalResourceFootprint {
+	limits: Partial<CanonicalLimits> = DEFAULT_RESOURCE_LIMITS): CanonicalResourceFootprint {
 	if (!isPlainObject(fields) || Object.getOwnPropertySymbols(fields).length !== 0)
 		throw new CanonicalEncodingError("resource schema requires canonical record fields");
 	const configured = canonicalResourceLimits(limits);
 	const entries = Object.entries(Object.getOwnPropertyDescriptors(fields)).filter(([, descriptor]) => descriptor.enumerable);
 	if (entries.length > Math.floor((configured.maxItems - 1) / 4))
 		throw new CanonicalEncodingError("canonical resource field count exceeds original item limit");
-	let byteLength = 1 + encodeVarUint(entries.length).byteLength, items = 1 + entries.length * 2, maxDepth = 0;
+	let byteLength = 1 + varUintWidth(entries.length), items = 1 + entries.length * 2, maxDepth = 0;
 	for (const [key, descriptor] of entries) {
 		if (!Object.hasOwn(descriptor, "value"))
 			throw new CanonicalEncodingError(`accessor property ${key} is outside the canonical domain`);
-		const keyCost = canonicalPrimitiveResourceForSizing(key, configured), value = descriptor.value;
-		const child = value !== null && typeof value === "object"
-			? checkedCanonicalResourceFootprint(value as CanonicalResourceFootprint, configured)
-			: canonicalPrimitiveResourceForSizing(value as null | boolean | number | string, configured);
-		byteLength += keyCost.byteLength + child.byteLength;
-		items += keyCost.items + child.items;
-		maxDepth = Math.max(maxDepth, 1 + child.maxDepth);
+		// A primitive key or value is exactly its encoded width, one item, depth 0.
+		byteLength += primitiveResourceWidth(key, configured);
+		items += 1;
+		const value: unknown = descriptor.value;
+		if (value !== null && typeof value === "object") {
+			const child = checkedCanonicalResourceFootprint(value as CanonicalResourceFootprint, configured);
+			byteLength += child.byteLength;
+			items += child.items;
+			maxDepth = Math.max(maxDepth, 1 + child.maxDepth);
+		} else {
+			byteLength += primitiveResourceWidth(value as null | boolean | number | string, configured);
+			items += 1;
+			maxDepth = Math.max(maxDepth, 1);
+		}
 	}
-	return checkedCanonicalResourceFootprint({byteLength, items, maxDepth}, configured);
+	return checkedCanonicalResourceFootprint({byteLength, items, maxDepth}, configured, true);
 }
 
 /** Reads an owned copy of the input by offset: no per-node views or result
@@ -1290,7 +1345,7 @@ export function canonicalCarrierResourceForSizing(input: Uint8Array, maximumDept
 	if (reader.offset !== bytes.byteLength)
 		throw new CanonicalDecodingError("trailing bytes after canonical value");
 	return checkedCanonicalResourceFootprint({byteLength: bytes.byteLength, items: reader.items,
-		maxDepth: resourceStats?.maxDepth ?? maximumDepth}, configured);
+		maxDepth: resourceStats?.maxDepth ?? maximumDepth}, configured, true);
 }
 
 /** Encodes only an ACTUAL current value using the original encoder, then uses

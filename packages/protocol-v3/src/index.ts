@@ -3165,10 +3165,32 @@ export interface ApplyPreparedBlueprintOperationInput {
 	readonly state: unknown;
 }
 
+/** The same input with the state given as its canonical encoding. */
+export interface ApplyPreparedBlueprintOperationToCanonicalStateInput {
+	readonly expectedBlueprintDigest: string;
+	readonly executionContext?: BlueprintExecutionContext;
+	readonly exactCanonicalStateBytes: Uint8Array;
+	readonly operation: unknown;
+	readonly preparedBlueprintRuntime: PreparedBlueprintRuntime;
+	/** Decode limits the caller enforces on the next state's bytes. */
+	readonly stateLimits: Readonly<{ maxBytes: number; maxDepth: number; maxItems: number }>;
+}
+
 export interface PreparedBlueprintOperationResult {
 	readonly output: unknown;
 	readonly state: unknown;
 }
+
+/** The next state as the exact bytes the state clone would have decoded. */
+export interface PreparedBlueprintCanonicalStateResult {
+	readonly output: unknown;
+	readonly exactCanonicalStateBytes: Uint8Array;
+	/** Whether those bytes decode within the caller's `stateLimits`. */
+	readonly stateWithinLimits: boolean;
+}
+
+/** The frozen v1 codec's default limits, which every state clone decodes under. */
+const CANONICAL_CLONE_LIMITS = Object.freeze({ maxBytes: 256 * 1024 * 1024, maxDepth: 128, maxItems: 1_000_000 });
 
 function applicationFailure(
 	code:
@@ -3195,6 +3217,31 @@ function applicationFailure(
 export function applyPreparedBlueprintOperation(
 	input: ApplyPreparedBlueprintOperationInput
 ): PreparedBlueprintOperationResult {
+	return applyPreparedBlueprintOperationWith(input, "state") as PreparedBlueprintOperationResult;
+}
+
+/**
+ * Applies one operation exactly as {@link applyPreparedBlueprintOperation} with
+ * `state: decodeCanonical(exactCanonicalStateBytes)`, returning the next state
+ * as `encodeCanonical(state)`: the bytes its state clone would have decoded.
+ * An owner that keeps canonical state bytes therefore neither re-encodes the
+ * state it decoded nor re-encodes the clone it would decode. The clone's
+ * default-limit decode is replaced by the caller's limits whenever those are
+ * no looser; refusals are unchanged (BLUEPRINT_RESULT_INVALID exactly when the
+ * clone's decode would fail).
+ * @param input - Prepared runtime, expected digest, canonical state bytes, operation and state limits.
+ * @returns Detached output, next state bytes, and whether they fit `stateLimits`.
+ */
+export function applyPreparedBlueprintOperationToCanonicalState(
+	input: ApplyPreparedBlueprintOperationToCanonicalStateInput
+): PreparedBlueprintCanonicalStateResult {
+	return applyPreparedBlueprintOperationWith(input, "exactCanonicalStateBytes") as PreparedBlueprintCanonicalStateResult;
+}
+
+function applyPreparedBlueprintOperationWith(
+	input: ApplyPreparedBlueprintOperationInput | ApplyPreparedBlueprintOperationToCanonicalStateInput,
+	stateField: "exactCanonicalStateBytes" | "state"
+): PreparedBlueprintCanonicalStateResult | PreparedBlueprintOperationResult {
 	const contextDescriptor =
 		input !== null && typeof input === "object"
 			? Object.getOwnPropertyDescriptor(input, "executionContext")
@@ -3208,7 +3255,7 @@ export function applyPreparedBlueprintOperation(
 			"expectedBlueprintDigest",
 			"operation",
 			"preparedBlueprintRuntime",
-			"state",
+			...(stateField === "state" ? ["state"] : ["exactCanonicalStateBytes", "stateLimits"]),
 			...(contextDescriptor === undefined ? [] : ["executionContext"]),
 		],
 		"blueprint application input"
@@ -3226,7 +3273,18 @@ export function applyPreparedBlueprintOperation(
 	const expectedBlueprintDigest = ownDataProperty(input, "expectedBlueprintDigest", "blueprint application input");
 	const preparedBlueprintRuntime = ownDataProperty(input, "preparedBlueprintRuntime", "blueprint application input");
 	const operation = ownDataProperty(input, "operation", "blueprint application input");
-	const state = ownDataProperty(input, "state", "blueprint application input");
+	const state = ownDataProperty(input, stateField, "blueprint application input");
+	let stateLimits: Readonly<{ maxBytes: number; maxDepth: number; maxItems: number }> | undefined;
+	if (stateField === "exactCanonicalStateBytes") {
+		const limits: unknown = ownDataProperty(input, "stateLimits", "blueprint application input");
+		assertClosedRecord(limits, ["maxBytes", "maxDepth", "maxItems"], "blueprint state limits");
+		const [maxBytes, maxDepth, maxItems] = (["maxBytes", "maxDepth", "maxItems"] as const)
+			.map(key => ownDataProperty(limits, key, "blueprint state limits"));
+		if (![maxBytes, maxDepth, maxItems].every(Number.isSafeInteger) || (maxBytes as number) < 1 ||
+			(maxDepth as number) < 0 || (maxItems as number) < 1)
+			throw new TypeError("blueprint state limits are invalid");
+		stateLimits = Object.freeze({ maxBytes: maxBytes as number, maxDepth: maxDepth as number, maxItems: maxItems as number });
+	}
 	if (typeof expectedBlueprintDigest !== "string") {
 		return applicationFailure("BLUEPRINT_DIGEST_MISMATCH", "expected blueprint digest is invalid");
 	}
@@ -3272,7 +3330,9 @@ export function applyPreparedBlueprintOperation(
 
 	let detachedState: unknown;
 	try {
-		detachedState = deepCloneCanonical(state);
+		if (stateField === "state") detachedState = deepCloneCanonical(state);
+		else if (state instanceof Uint8Array) detachedState = decodeCanonical(state);
+		else throw new TypeError("canonical application state bytes are required");
 	} catch (error) {
 		return applicationFailure("BLUEPRINT_RESULT_INVALID", "application state is outside the canonical domain", error);
 	}
@@ -3302,10 +3362,27 @@ export function applyPreparedBlueprintOperation(
 
 	try {
 		assertClosedRecord(result, ["state", "output"], "blueprint reducer result");
-		return Object.freeze({
-			output: deepCloneCanonical(ownDataProperty(result, "output", "blueprint reducer result")),
-			state: deepCloneCanonical(ownDataProperty(result, "state", "blueprint reducer result")),
-		});
+		if (stateLimits === undefined) {
+			return Object.freeze({
+				output: deepCloneCanonical(ownDataProperty(result, "output", "blueprint reducer result")),
+				state: deepCloneCanonical(ownDataProperty(result, "state", "blueprint reducer result")),
+			});
+		}
+		const output = deepCloneCanonical(ownDataProperty(result, "output", "blueprint reducer result"));
+		// The state clone's own encode. Its decode under the default limits is
+		// implied by a decode under limits that are nowhere looser; otherwise it
+		// runs as before and refuses exactly as the clone did.
+		const exactCanonicalStateBytes = encodeCanonical(ownDataProperty(result, "state", "blueprint reducer result"));
+		let stateWithinLimits = true;
+		try {
+			decodeCanonical(exactCanonicalStateBytes, stateLimits);
+		} catch {
+			stateWithinLimits = false;
+		}
+		if (!stateWithinLimits || stateLimits.maxBytes > CANONICAL_CLONE_LIMITS.maxBytes ||
+			stateLimits.maxDepth > CANONICAL_CLONE_LIMITS.maxDepth || stateLimits.maxItems > CANONICAL_CLONE_LIMITS.maxItems)
+			decodeCanonical(exactCanonicalStateBytes);
+		return Object.freeze({ output, exactCanonicalStateBytes, stateWithinLimits });
 	} catch (error) {
 		if (error instanceof DRPError) throw error;
 		return applicationFailure("BLUEPRINT_RESULT_INVALID", "blueprint reducer returned an invalid result", error);
