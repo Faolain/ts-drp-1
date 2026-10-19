@@ -16895,6 +16895,75 @@ export function readV3ApplicationProjectionOrder(
 	}
 }
 
+export type V3SpeculativeIngressResult =
+	| Readonly<{ readonly ok: true; readonly vertex: AdmittedReceivedVertexView; readonly vertexDigest: string }>
+	| Readonly<{
+			readonly ok: false;
+			readonly reason: "inactive" | "not-envelope" | "malformed" | "unauthorized" | "admitted" | "not-application";
+	  }>;
+
+/**
+ * Display-only authentication of one live gossip envelope, before and outside
+ * the admission gate. It runs the ingress envelope, signature, scope and
+ * current-Writer checks against the active plane but only reads it: no pending
+ * ingress, index, counter or proof state changes, and the result grants no
+ * admission authority. Durable ingress re-checks the same envelope in full.
+ * @param input - Exact capability-bearing plane and the original live message.
+ * @returns The authenticated application vertex, or why it is not shown.
+ */
+export function speculateV3IngressVertex(
+	input: Readonly<{ readonly plane: V3PlaneHandle; readonly message: Message }>
+): V3SpeculativeIngressResult {
+	const refuse = (reason: Extract<V3SpeculativeIngressResult, { ok: false }>["reason"]): V3SpeculativeIngressResult =>
+		ObjectFreeze({ ok: false as const, reason });
+	try {
+		const registration = v3HandleRegistrations.get(input.plane);
+		// Mirror the ingress drop rule: show only what durable ingress will queue.
+		if (
+			registration === undefined ||
+			!currentRegistration(registration) ||
+			(registration.blueprintClosing && registration.readinessMaintenanceEntered !== true) ||
+			registration.retainedBootstrapHold
+		)
+			return refuse("inactive");
+		const message = input.message;
+		if (
+			message.type !== MessageType.MESSAGE_TYPE_V3_ENVELOPE ||
+			message.objectId !== registration.topic ||
+			registration.networkNode.gossipTopicFor(message) !== registration.topic ||
+			!isInstanceOf(message.data, Uint8ArrayConstructor)
+		)
+			return refuse("not-envelope");
+		const exactWireBytes = copyDetachedBytes(message.data);
+		if (exactWireBytes === undefined || exactWireBytes.byteLength === 0) return refuse("malformed");
+		const decoded = V3Envelope.decode(exactWireBytes);
+		if (!sameBytes(exactWireBytes, V3Envelope.encode(decoded).finish())) return refuse("malformed");
+		const preimage = copyDetachedBytes(decoded.canonicalPreimage);
+		const signature = copyDetachedBytes(decoded.signature);
+		if (preimage === undefined || signature === undefined) return refuse("malformed");
+		const extracted = extractAuthorizedV3Vertex(registration.payload, preimage, signature, (author) =>
+			resolveV3AuthorizedAuthor(registration.authorization, author)
+		);
+		if (extracted === undefined) return refuse("malformed");
+		if (!extracted.ok) return refuse("unauthorized");
+		const vertex = extracted.vertex;
+		const vertexDigest = lowerHexDigest(vertex.digest);
+		if (vertexDigest === undefined) return refuse("malformed");
+		if (registration.index.has(vertexDigest)) return refuse("admitted");
+		const profileId = registration.payload.trust.trust.profileId;
+		if (
+			vertex.settlementSource !== undefined ||
+			isControlOperation(vertex.operation, profileId) ||
+			aclOperation(vertex.author, vertexDigest, vertex.operation) !== null
+		)
+			return refuse("not-application");
+		if (!isV3ApplicationAuthorAuthorized(registration.authorization, vertex.author)) return refuse("unauthorized");
+		return ObjectFreeze({ ok: true as const, vertex, vertexDigest });
+	} catch {
+		return refuse("malformed");
+	}
+}
+
 function stageClosedBlueprintEpoch(
 	registration: V3PlaneRegistration,
 	resumeSource?: AheRetirementControl | CreatorSnapshotRetirementReconstructionRequest

@@ -661,6 +661,9 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
  if(poolLull==="concurrent")await page.evaluate(()=>Reflect.set(globalThis,"__rdPoolMaintenanceConcurrent",true));
  // Opt-in automatic idle trigger instead of the explicit lull call.
  if(process.env.STARTUP_HEALTHY_GRID_POOL_AUTO==="1")await page.evaluate(()=>Reflect.set(globalThis,"__rdPoolMaintenanceAuto",true));
+ // Opt-in speculative presentation: "1" overlay plus ephemeral intents, "overlay" without intents.
+ const presentationMode=process.env.STARTUP_HEALTHY_GRID_PRESENTATION;
+ if(presentationMode==="1"||presentationMode==="overlay")await page.evaluate(mode=>Reflect.set(globalThis,"__rdPresentation",mode),presentationMode);
  // Renderer task durations (toplevel RunTask) with user-timing clock marks from
  // each role frame, written next to the report. Observation only.
  // "window" traces only seal-4 through the next lull, with V8 CPU samples.

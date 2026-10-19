@@ -12,6 +12,7 @@ import { begin, context, end, spans, proofEvents, proofEventsTruncated, proofObs
  beginFullFunctionWindow, endFullFunctionWindow } from "./critical-observer.js";
 import { workerPeer } from "../../../.logs/bounded-storage-lifecycle/r8-warm-capacity-01/worker-transport.ts";
 import { CREATOR_SUCCESSOR_PROTOCOL } from "@ts-drp/network/snapshot-transfer";
+import { createEphemeralChannel } from "../../../packages/ephemeral/src/index.js";
 import { hex, parameters } from "./room.js";
 import { control, trace } from "./observation.js";
 
@@ -44,26 +45,36 @@ async function createHealthyGridRole(input:{index:number;database:string;identit
   snapshot:Awaited<ReturnType<typeof createBrowserSnapshotQuarantineStore>>|undefined;
  try {
   const finality=index===0?await createRecoverableFinalitySigner({seed:key}):undefined;
+  // Opt-in speculative presentation (the base library ignores the absent option).
+  const presentationMode=Reflect.get(input,"presentation");
+  const presentation=presentationMode==="1"||presentationMode==="overlay"?{
+   onSpeculativeProjection:observeVisible,
+   onPresentationEvent:(event:any)=>{const key=event.kind+":"+event.entry.source+(event.kind==="rolled-back"?":"+event.reason:"");presentationCounts[key]=(presentationCounts[key]??0)+1;}}:undefined;
   // Opt-in automatic idle trigger (creator only); outcomes are observation only.
   const autoPool=index===0&&Reflect.get(input,"autoPool")===true?{idleMilliseconds:200,
    onResult:(outcome:any)=>{const endedAt=performance.now();autoPoolOutcomes.push({kind:outcome.kind,epoch:outcome.epoch,startedAt:endedAt-outcome.milliseconds,endedAt,
     milliseconds:outcome.milliseconds,...(outcome.kind==="result"?{result:outcome.result}:{error:errorEvidence(outcome.error)})});}}:undefined;
   session=await createV3RoomSession({application:configuredApplication,author,...(autoPool===undefined?{}:{recoveryPoolAutoMaintenance:autoPool}),creatorInvite:invite,databaseName:database,issuanceDatabaseName:database,migrationDatabaseNamespace:database,
    objectId,publicKeyBytes:ed25519.getPublicKey(key),initialLogicalTime:3,...(finality?{creatorFinalitySigner:finality.signer}:{}),roomHeadAuthority:floor,
-   openTransport:peer.open,signRegisteredVertexDigest:async digest=>ed25519.sign(digest,key),onAcceptedVertex:vertex=>{
+   ...(presentation===undefined?{}:{presentation}),
+   openTransport:()=>({...peer.open(),openEphemeral:openFixtureEphemeral}),signRegisteredVertexDigest:async digest=>ed25519.sign(digest,key),onAcceptedVertex:vertex=>{
     const digest=hex(vertex.digest);admitted.add(digest);
     check(deliveryObservations.size<1024||deliveryObservations.has(digest),"bounded healthy delivery telemetry saturated");
     if(!deliveryObservations.has(digest))deliveryObservations.set(digest,{acceptedCallbackAt:performance.now()});
     if(Reflect.get(globalThis,"__r8CriticalProfiling")===true)performance.mark("drp:accepted-callback:"+index+":"+digest);
     awaitingProjection.add(digest);
-   },onProjection:()=>{const at=performance.now();for(const digest of awaitingProjection){deliveryObservations.get(digest)!.projectionCallbackAt=at;if(Reflect.get(globalThis,"__r8CriticalProfiling")===true)performance.mark("drp:projection-callback:"+index+":"+digest);}awaitingProjection.clear();}});
+   },onProjection:(value:any)=>{const at=performance.now();observeVisible(value);for(const digest of awaitingProjection){deliveryObservations.get(digest)!.projectionCallbackAt=at;if(Reflect.get(globalThis,"__r8CriticalProfiling")===true)performance.mark("drp:projection-callback:"+index+":"+digest);}awaitingProjection.clear();}});
   await waitForV3RoomStartupForDiagnostics(session);
+  // Display-only intents for moves whose signing waits behind maintenance.
+  if(presentationMode==="1")session.bindPresentationIntents(session.openEphemeral({maxMessageBytes:8192,maxSequencedKeys:8,maxSequencedSenders:8}));
   issuance=await createBrowserDurableIssuanceStore({primaryDatabaseName:database});snapshot=await createBrowserSnapshotQuarantineStore({primaryDatabaseName:database});
   const original=session;
   const native=browserIssuancePruningMaintenanceForStore(issuance);check(native,"healthy native census owner unavailable");
   const ownIssuance=issuance,ownSnapshot=snapshot,ownScope={objectId,author};
   return {index,database,application,session:original,floor,issuance,snapshot,admitted,deliveryObservations,native:browserIssuancePruningMaintenanceForStore(issuance),
    issue:(operation:Readonly<Record<string,unknown>>)=>original.issue(structuredClone(operation)),
+   presentation:presentation!==undefined,
+   issueWithReceipt:(operation:Readonly<Record<string,unknown>>)=>original.issueWithReceipt(structuredClone(operation)),
    install:(offer:Awaited<ReturnType<typeof original.exportCreatorSuccessor>>,peers:readonly string[])=>original.installCreatorSuccessor({offer:structuredClone(offer),peers:[...peers]}),
    lineage:()=>ownIssuance.readLineage(ownScope),
    outboxAfter:(next:number)=>ownIssuance.readOutboxPage({scope:ownScope,limit:128,afterKey:next===0?null:[objectId,author,next-1]}),
@@ -97,6 +108,36 @@ async function createHealthyGridRole(input:{index:number;database:string;identit
 // The accepted worker transport is reused unchanged. Only its parentPort is
 // adapted to browser postMessage; this is a fixture route, not native authority.
 let childPeer:ReturnType<typeof workerPeer>|undefined;
+// Opt-in time-to-visible: first time each block placement (id:x:y) appears in
+// what this client displays (the durable projection, or with presentation the
+// speculative view). Same definition on both builds; observation only.
+const visibleAt=new Map<string,number>(),presentationCounts:Record<string,number>={};
+const blockKey=(block:{id:unknown;x:unknown;y:unknown})=>block.id+":"+block.x+":"+block.y;
+function observeVisible(view:any){
+ const at=performance.now();
+ for(const block of view?.blocks??[]){const key=blockKey(block);if(!visibleAt.has(key)&&visibleAt.size<8192)visibleAt.set(key,at);}
+}
+// Fixture ephemeral route: the parent binds each frame to its source frame's
+// peer id, as the worker route does; authority comes from the room provider.
+let childId="",childConnected:string[]=[];
+let ephemeralListener:((ingress:{bytes:Uint8Array;sender:string})=>void)|undefined;
+function openFixtureEphemeral(provider:any,options:any){
+ const writer=(peerId:string)=>{const author=provider.authorForPeer(peerId);return author!==undefined&&provider.isCurrentWriter(author);};
+ const authorizedPeers=()=>provider.currentAuthority()===undefined?[]:childConnected.filter(writer).sort();
+ return createEphemeralChannel({localPeerId:childId,authorizedPeers,isAuthorized:(sender:string)=>provider.currentAuthority()!==undefined&&writer(sender),
+  maxEnvelopeBytes:(deliveryClass:string)=>deliveryClass==="reliable-unordered"?65_536:1_200,
+  onMessage:(listener:(ingress:{bytes:Uint8Array;sender:string})=>void)=>{ephemeralListener=listener;return()=>{if(ephemeralListener===listener)ephemeralListener=undefined;};},
+  send:async(input:{bytes:Uint8Array;recipients:"all"|readonly string[]})=>{
+   const targets=input.recipients==="all"?authorizedPeers():input.recipients;
+   for(const target of targets)window.parent.postMessage({kind:"r8-grid-ephemeral-route",target,bytes:Uint8Array.from(input.bytes)},"*");
+   return targets.length>0;},
+  authorForPeer:(peerId:string)=>provider.authorForPeer(peerId),currentAuthority:()=>provider.currentAuthority(),
+  isCurrentWriter:(author:string)=>provider.isCurrentWriter(author),onPeerDisconnect:()=>()=>undefined} as any,options);
+}
+window.addEventListener("message",event=>{
+ if(event.source!==window.parent||event.data?.kind!=="r8-grid-ephemeral-delivery")return;
+ ephemeralListener?.({bytes:new Uint8Array(event.data.bytes),sender:event.data.source});
+});
 const autoPoolOutcomes:unknown[]=[];
 let clockMark:{name:string;startTime:number}|undefined;
 let childRole:Awaited<ReturnType<typeof createHealthyGridRole>>|undefined;
@@ -119,6 +160,7 @@ window.addEventListener("message",event=>{
  const run=async()=>{
   if(command==="init"){
    check(childPeer===undefined,"one original child transport");childIndex=args.index;childPeer=workerPeer(args.id,args.connected);
+   childId=args.id;childConnected=[...args.connected];
    // Trace-clock anchor for this realm (user timing is observation only).
    const mark=performance.mark("rd-clock-"+args.index+"-"+Date.now());clockMark={name:mark.name,startTime:mark.startTime};
    if(args.suspensionProbe){
@@ -227,7 +269,14 @@ window.addEventListener("message",event=>{
   switch(command){
    case "issue":{
     const before=await product("test-only-issue-preimage",()=>role.lineage());
-    const issueStarted=performance.now();await product("ordinary-issue-and-publication",()=>role.issue(args.operation));const issueCompleted=performance.now();
+    const issueStarted=performance.now();let receiptStages:{visibleAt?:number;durableAt?:number}|undefined;
+    await product("ordinary-issue-and-publication",()=>{
+     if(!role.presentation)return role.issue(args.operation);
+     const receipt=role.issueWithReceipt(args.operation),stages:{visibleAt?:number;durableAt?:number}={};receiptStages=stages;
+     void receipt.visible.then(()=>{stages.visibleAt=performance.now();},()=>undefined);
+     void receipt.durable.then(()=>{stages.durableAt=performance.now();},()=>undefined);
+     return receipt.published;
+    });const issueCompleted=performance.now();
     return product("test-only-native-publication-assertion",async()=>{
      const rows=await role.outboxAfter(before.next);
      const matches=rows.filter(row=>hex(encodeCanonical((decodeCanonical(row.commit.envelope.canonicalPreimageBytes) as any).operation))===hex(encodeCanonical(args.operation)));
@@ -253,6 +302,7 @@ window.addEventListener("message",event=>{
      return {epoch:args.epoch,index:childIndex,ordinal:args.ordinal,operation:args.operation,operationBytes:encodeCanonical(args.operation).byteLength,
       unsignedVertexBytes:row.commit.envelope.canonicalPreimageBytes.byteLength,signedEnvelopeBytes:encodeCanonical(row.commit.envelope).byteLength,
       digest:hex(row.commit.envelope.digest),sequence:row.commit.authorSequence,published:true,issueStarted,issueCompleted,timeOrigin:performance.timeOrigin,
+      visibleAt:visibleAt.get(blockKey(args.operation)),...(receiptStages===undefined?{}:{receiptStages}),
 	  ...(nativeCompletion===undefined?{}:{nativeCompletion})};
     });
    }
@@ -262,9 +312,16 @@ window.addEventListener("message",event=>{
     let assertionPolls=0;
     while(!(role.admitted.has(args.digest)&&projected())&&Date.now()<args.waitDeadline){assertionPolls++;await new Promise(resolve=>setTimeout(resolve,10));}
     check(role.admitted.has(args.digest)&&projected(),"healthy exact digest not live-admitted/projected before seal");
-    return {index:childIndex,timeOrigin:performance.timeOrigin,digest:args.digest,...role.deliveryObservations.get(args.digest),observedProjectionAt:performance.now(),assertionPolls};
+    return {index:childIndex,timeOrigin:performance.timeOrigin,digest:args.digest,...role.deliveryObservations.get(args.digest),observedProjectionAt:performance.now(),assertionPolls,
+     visibleAt:visibleAt.get(blockKey(args.operation))};
    });
-   case "world":return product("test-only-world-projection",async()=>role.session.projection());
+   case "world":return product("test-only-world-projection",async()=>{
+    // With presentation, every settled point must show exactly the durable world.
+    if(role.presentation){const pending=role.session.pendingOperations();
+     check(pending.length===0&&role.session.speculativeProjection()===role.session.projection(),"speculative view did not converge:"+JSON.stringify(pending.map(entry=>[entry.source,entry.id])));}
+    return role.session.projection();
+   });
+   case "presentation":return {index:childIndex,counts:{...presentationCounts},pending:role.presentation?role.session.pendingOperations().length:0};
    case "measure":return product("test-only-native-storage-and-settlement-measurement",async()=>{
     const value=await role.checkpoint(args.epoch),databases=[];
     for(const metadata of await indexedDB.databases()){
@@ -306,7 +363,7 @@ export async function runHealthyGrid(identity:string,origins:readonly string[],r
  const {members,application}=gridCorpus(identity),ids=members.slice(0,4).map(row=>row.peerId);
  const objectId="creator:"+hex(hashDomain("ts-drp/healthy-native-grid/v1",new TextEncoder().encode(identity))).slice(0,32);
  const signers=[{publicKey:members[0]!.author,signerId:"creator"}],startSpan=spans.length;
- const ordinary:any[]=[],snapshots:unknown[]=[],checkpoints:any[]=[],joins:any[]=[],transitions:unknown[]=[],roleObservers:any[]=[];
+ const ordinary:any[]=[],snapshots:unknown[]=[],checkpoints:any[]=[],joins:any[]=[],transitions:unknown[]=[],roleObservers:any[]=[],presentationSummary:unknown[]=[];
  const frames:HTMLIFrameElement[]=[],ready=new Set<Window>();
  const waits=new Map<number,{resolve:(value:any)=>void;reject:(error:unknown)=>void;index:number;command:string;epoch:number;ordinal?:number;
   digest?:string;expectedBlock?:{id:string;x:number;y:number};lastReportedSegment?:string}> ();
@@ -347,6 +404,10 @@ export async function runHealthyGrid(identity:string,origins:readonly string[],r
     pending.lastReportedSegment=packet.segment;
    }
    return;
+  }
+  if(packet?.kind==="r8-grid-ephemeral-route"){
+   const target=ids.indexOf(packet.target);check(target>=0&&target!==index,"fixed connected ephemeral peer");
+   active[target]!.frame.contentWindow!.postMessage({kind:"r8-grid-ephemeral-delivery",source:ids[index],bytes:packet.bytes},active[target]!.origin);return;
   }
   if(packet?.kind==="r8-grid-checkpoint-memory"){
    console.info(JSON.stringify({kind:"healthy-native-admission-memory",value:packet.value}));return;
@@ -409,7 +470,7 @@ export async function runHealthyGrid(identity:string,origins:readonly string[],r
   check(active.every(role=>ready.has(role.frame.contentWindow!)),"isolated browser client bundle unavailable");
   for(let index=0;index<4;index++)await rpc(index,"init",{index,id:ids[index],connected:ids.filter((_,other)=>other!==index),suspensionProbe:typeof suspendTransfer==="function"});
   for(let index=0;index<4;index++)await rpc(index,"open",{index,database:identity+"-role-"+index,identity,objectId,invite,kind,
-   autoPool:Reflect.get(globalThis,"__rdPoolMaintenanceAuto")===true});
+   autoPool:Reflect.get(globalThis,"__rdPoolMaintenanceAuto")===true,presentation:Reflect.get(globalThis,"__rdPresentation")});
   await Promise.all(active.map(role=>rpc(role.index,"history")));
  }
  async function close(){
@@ -450,8 +511,11 @@ export async function runHealthyGrid(identity:string,origins:readonly string[],r
    const ordinal=1000+slot,operation={...gridOperation(index,epoch),id:"integrated-block-"+(slot%8),y:4+(slot%4)},issuedAt=performance.now()-started;
    const value=await rpc(index,"issue",{operation,ordinal});
    const peerDelivery=await Promise.all(active.map(role=>rpc(role.index,"admitted",{digest:value.digest,operation,ordinal,waitDeadline:Date.now()+60_000})));
+   const since=(at:number|undefined,origin:number)=>at===undefined?null:at+origin-(value.issueStarted+value.timeOrigin);
    return {index,delay,issuedAt,issueMilliseconds:value.issueCompleted-value.issueStarted,digest:value.digest,
-    deliveredAt:peerDelivery.map(row=>row.acceptedCallbackAt+row.timeOrigin-(value.issueStarted+value.timeOrigin))};
+    deliveredAt:peerDelivery.map(row=>row.acceptedCallbackAt+row.timeOrigin-(value.issueStarted+value.timeOrigin)),
+    visibleAfter:peerDelivery.map(row=>since(row.visibleAt,row.timeOrigin)),
+    ...(value.receiptStages===undefined?{}:{receiptStages:{visible:since(value.receiptStages.visibleAt,value.timeOrigin),durable:since(value.receiptStages.durableAt,value.timeOrigin)}})};
   };
   const moves=await Promise.all(target===0?[move(1,250,0),move(0,250,1),move(2,1500,2),move(3,2700,3)]:
    [move(0,150,4),move(target===1?2:1,400,5)]);
@@ -490,17 +554,19 @@ export async function runHealthyGrid(identity:string,origins:readonly string[],r
     ...(poolMaintenance===undefined?{}:{poolMaintenance}),...(recipientLull?{recipientPoolMaintenance}:{})});
   }
   const expectedReopenWorld=await world();
+  presentationSummary.push(await Promise.all(active.map(role=>rpc(role.index,"presentation"))));
   phase="persisted-close";await close();
   phase="persisted-reopen";await open("reopen");
   check(await world()===expectedReopenWorld,"persisted reopen lost/changed the authenticated world");await measure("reopened");
   phase="continued-gameplay";await gameplay(4);await measure("continued-gameplay");
+  presentationSummary.push(await Promise.all(active.map(role=>rpc(role.index,"presentation"))));
  }catch(error){failure=error;}
  finally{try{await close();}catch(error){failure=failure===undefined?error:new AggregateError([failure,error],"integrated failure plus joined cleanup failure");}
   window.removeEventListener("message",listener);for(const frame of frames)frame.remove();
   if(probeTimer!==undefined)clearInterval(probeTimer);
   Reflect.deleteProperty(globalThis,"__r8FrozenRouteObservation");}
  return {ok:failure===undefined,phase,epoch,...(failure===undefined?{}:{error:errorEvidence(failure)}),identity,objectId,profileId,activeClients:4,rosterMembers:members.length,requestedRollovers:rollovers,timeOrigin:performance.timeOrigin,
-  ordinary,snapshots,transitions,checkpoints,joins,suspensionEvents,spans:spans.slice(startSpan),roleObservers,proofEventsTruncated:roleObservers.some(row=>row.observer.proofEventsTruncated),
+  ordinary,snapshots,transitions,checkpoints,joins,suspensionEvents,spans:spans.slice(startSpan),roleObservers,presentation:Reflect.get(globalThis,"__rdPresentation")??null,presentationSummary,proofEventsTruncated:roleObservers.some(row=>row.observer.proofEventsTruncated),
   transfers:roleObservers.flatMap(row=>row.observer.transfers),publications:roleObservers.flatMap(row=>row.observer.publications),
   qualification:"Genuine browser IndexedDB and browser writer locks on four independent localhost storage origins; original Grid/room/native/protocol owners in four frame realms. Reuses unchanged accepted warm worker byte-routing transport through a browser parentPort adapter. Local serialized postMessage routing and shared browser renderer/profile are simulator costs, not network/device viability. Healthy rollovers keep original sessions/transports; only explicit persisted-reopen recreates clients on their SAME original origins/databases. No fixture copying/injected failures. "+(profileId==="creator-trusted-settlement-v1"?"Fully settled ordinary contributions exercise genuine settlement/fence/rebase and native cleanup, not fabricated nonempty displacement. ":"The original no-settlement profile has no author fence or settlement plan; its zero-fence adoption and lawful cleanup are not settlement-enabled evidence. ")+"Native read-only scans/assertions, simulator RPC and forced GC overhead are separate; no absolute gameplay latency/physical-memory target defined."};
 }

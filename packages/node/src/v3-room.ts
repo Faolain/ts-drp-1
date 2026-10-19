@@ -54,6 +54,7 @@ import {
 	requestV3RetainedRepair,
 	routeV3Ingress,
 	routeV3RetainedIngress,
+	speculateV3IngressVertex,
 	type V3AdmittedVertexSink,
 	type V3ApplicationProjectionOrder,
 	type V3LiveDescriptor,
@@ -96,6 +97,23 @@ import {
 	startRecoveryPoolAutoScheduler,
 	type RecoveryPoolAutoMaintenanceOptions,
 } from "./internal/recovery-pool-auto.js";
+import {
+	attachPresentationIntents,
+	createPresentationOverlay,
+	type LocalPresentationHooks,
+	type PresentationOverlay,
+	type PresentationRow,
+	type V3RoomPendingOperation,
+	type V3RoomPresentationOptions,
+	type V3RoomPresentationRollbackReason,
+} from "./internal/presentation-overlay.js";
+export type {
+	V3RoomPendingOperation,
+	V3RoomPresentationEvent,
+	V3RoomPresentationOptions,
+	V3RoomPresentationRollbackReason,
+	V3RoomPresentationSource,
+} from "./internal/presentation-overlay.js";
 import {
 	captureV3RoomStorageHost,
 	type V3RoomStorageHost,
@@ -533,6 +551,24 @@ export interface CreateV3RoomSessionInput<Projection extends V3RoomProjectionAut
 	 * arrive while it runs wait and are admitted right after it; none are dropped.
 	 */
 	readonly recoveryPoolAutoMaintenance?: RecoveryPoolAutoMaintenanceOptions;
+	/**
+	 * Opt-in speculative presentation: local moves show at once, remote moves
+	 * show once authenticated (signature + current Writer), both before durable
+	 * admission. Memory-only and display-only; projection() stays authoritative.
+	 */
+	readonly presentation?: V3RoomPresentationOptions<Projection>;
+}
+
+export interface V3RoomIssueReceipt {
+	/**
+	 * Settles when the move is first shown, or with undefined when the move was
+	 * not speculated (outside `speculate`, or overlay full) and issue() completed.
+	 * Rejects if it rolls back first.
+	 */
+	readonly visible: Promise<V3RoomPendingOperation | undefined>;
+	/** Settles atomically with the durable projection that contains it (undefined as for `visible`). */
+	readonly durable: Promise<Readonly<{ vertexDigest: string; authorSequence: number }> | undefined>;
+	readonly published: Promise<void>;
 }
 
 export interface V3RoomSession<Projection extends V3RoomProjectionAuthority = V3RoomProjectionAuthority> {
@@ -558,9 +594,30 @@ export interface V3RoomSession<Projection extends V3RoomProjectionAuthority = V3
 	activateMigration(input: V3RoomMigrationActivationInput): Promise<V3RoomMigrationActivationReceipt>;
 	inspectDurableHead(): ReturnType<CreatorLiveCloseHandle["inspectDurableHead"]>;
 	issue(operation: Readonly<Record<string, unknown>>): Promise<void>;
+	/**
+	 * Opt-in (`presentation`) staged issue: `visible` settles once the move is in
+	 * speculativeProjection(), `durable` once the durable projection contains it,
+	 * `published` exactly when issue() would. A refused move rejects `durable` and
+	 * `published` and rolls back with a reason; the durable path is unchanged.
+	 */
+	issueWithReceipt(operation: Readonly<Record<string, unknown>>): V3RoomIssueReceipt;
 	openEphemeral(options: EphemeralChannelOptions): EphemeralChannel;
+	/**
+	 * Opt-in: sends display-only intents for local pending moves on an authenticated
+	 * ephemeral channel and shows peers' intents as pending. Intents carry no
+	 * signature and can never become vertices; they expire or yield to the signed move.
+	 */
+	bindPresentationIntents(channel: EphemeralChannel, options?: Readonly<{ key?: string }>): () => void;
+	/** Memory-only pending moves in speculative order; empty without `presentation`. */
+	pendingOperations(): readonly V3RoomPendingOperation[];
 	previewLatchedAcl(): Readonly<Record<string, unknown>>;
 	projection(): Projection;
+	/**
+	 * Display-only view: projection() followed by memory-only pending moves.
+	 * It never feeds admission, ACL, ephemeral or seal authority, and it is the
+	 * same object as projection() whenever nothing is pending.
+	 */
+	speculativeProjection(): Projection;
 	rehearseMigration(input: V3RoomMigrationRehearsalInput): Promise<V3RoomMigrationRehearsalReceipt>;
 	/**
 	 * Optional early bounded-recovery turnover at a caller-chosen lull (soft
@@ -1182,6 +1239,7 @@ const PROJECTION_BASE_RESULT_KEYS = Object.freeze([
 	"stateDigest",
 ]);
 const LOWER_HEX_256 = /^[0-9a-f]{64}$/u;
+const PROJECTION_REFUSED_ISSUE = "v3 room issued operation was not accepted by projection";
 
 function roomHeadFailure(code: string): never {
 	throw new TypeError(code);
@@ -2904,6 +2962,17 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	const acceptedVertices = new Map<string, V3RoomAcceptedVertex>();
 	const acceptedOperationRows = new Map<string, readonly V3RoomAcceptedOperation[] | null>();
 	let projection!: Projection;
+	// Opt-in display overlay. It receives copies and notifications only; every
+	// call is isolated so a presentation fault can never fail a durable step.
+	let presentation: PresentationOverlay<Projection> | undefined;
+	const presentationHook = (action: (overlay: PresentationOverlay<Projection>) => void): void => {
+		if (presentation === undefined) return;
+		try {
+			action(presentation);
+		} catch {
+			// Display-only failure; the durable projection is already final.
+		}
+	};
 	let activeHandle: RoomPlaneHandle | undefined;
 	let authenticatedProjectionBase: V3RoomAuthenticatedProjectionBase | undefined;
 	let successorProjectionAuthority: V3RoomSuccessorAuthority | null = null;
@@ -3143,6 +3212,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		authenticatedProjectionBase = base;
 		acceptedVertices.clear();
 		acceptedOperationRows.clear();
+		presentationHook((overlay) => overlay.epochChanged(authority.epoch));
 	};
 	const commit = async (
 		vertices: readonly V3RoomAcceptedVertex[],
@@ -3154,6 +3224,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			logicalTime = Math.max(logicalTime, vertex.logicalTime + 2, latestChild + 2);
 		}
 		const candidate = stage(vertices, recoveryOrder);
+		presentationHook((overlay) =>
+			overlay.durableRefused(
+				vertices.map((vertex) => hex(vertex.digest)).filter((identity) => acceptedOperationRows.get(identity) === null)
+			)
+		);
 		if (candidate.additions.length === 0) return false;
 		for (const { vertex } of candidate.additions) await input.onAcceptedVertex(vertex);
 		input.onProjection(candidate.projection);
@@ -3162,6 +3237,13 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			logicalTime = Math.max(logicalTime, vertex.logicalTime + 2);
 		}
 		projection = candidate.projection;
+		// Confirmation is atomic with the durable projection that now contains the
+		// move: one synchronous step removes the pending copy and re-bases the rest.
+		presentationHook((overlay) =>
+			overlay.durableCommitted(
+				candidate.additions.map(({ identity, vertex }) => Object.freeze({ identity, rows: expand(vertex) ?? [] }))
+			)
+		);
 		return true;
 	};
 	const acceptedOperationSnapshot = (): readonly V3RoomAcceptedOperation[] =>
@@ -3217,6 +3299,84 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			vertex.author === input.author &&
 			acceptedOperationRows.get(hex(vertex.digest)) === null
 	);
+	if (input.presentation !== undefined) {
+		// Durable rows are re-derived only when the durable projection or its
+		// authenticated base changes, never per pending move.
+		let durableRows: readonly PresentationRow[] = Object.freeze([]);
+		let durableRowsKey: readonly [Projection, V3RoomAuthenticatedProjectionBase | undefined] | undefined;
+		presentation = createPresentationOverlay<Projection>({
+			localAuthor: input.author,
+			options: input.presentation,
+			batchableOperationActions: input.application.batchableOperationActions,
+			durable: () =>
+				Object.freeze({
+					projection,
+					epoch: successorProjectionAuthority?.epoch ?? 0,
+					rows: (): readonly PresentationRow[] => {
+						if (durableRowsKey?.[0] !== projection || durableRowsKey[1] !== authenticatedProjectionBase) {
+							durableRows = Object.freeze(
+								orderedProjectionVertices(acceptedVertices).flatMap((vertex) => expand(vertex) ?? [])
+							);
+							durableRowsKey = [projection, authenticatedProjectionBase];
+						}
+						return durableRows;
+					},
+				}),
+			project: (rows) => {
+				const base = authenticatedProjectionBase;
+				return input.application.projectAcceptedOperations(
+					Object.freeze({
+						authenticatedBase:
+							base === undefined
+								? undefined
+								: Object.freeze({
+										blueprintDigest: base.blueprintDigest,
+										epoch: base.epoch,
+										exactCanonicalApplicationStateBytes: new INTRINSIC_UINT8_ARRAY(
+											base.exactCanonicalApplicationStateBytes
+										),
+										objectId: base.objectId,
+										stateDigest: base.stateDigest,
+									}),
+						currentEpochOperations: rows,
+					})
+				);
+			},
+			now: () => performance.now(),
+			setTimer: (callback, milliseconds) => {
+				const handle = setTimeout(callback, milliseconds);
+				(handle as { unref?: () => void }).unref?.();
+				return handle;
+			},
+			clearTimer: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+		});
+	}
+	// Display authentication costs one more signature check, so it runs in its own
+	// task after the durable ingress step is queued and overlaps admission's
+	// storage wait instead of delaying it. A stale plane refuses as inactive.
+	const presentRemoteIngress = (message: Message): void => {
+		const plane = activeHandle;
+		if (plane === undefined || presentation === undefined) return;
+		setTimeout(() => presentSignedIngress(plane, message), 0);
+	};
+	const presentSignedIngress = (plane: V3PlaneHandle, message: Message): void => {
+		presentationHook((overlay) => {
+			const speculated = speculateV3IngressVertex({ plane, message });
+			if (!speculated.ok || overlay.hasRemoteSigned(speculated.vertexDigest)) return;
+			const rows = acceptedOperationsForVertex(input.application, speculated.vertex, currentMigrationRecordAuthority());
+			if (rows === undefined) return;
+			overlay.addRemoteVertex(
+				Object.freeze({
+					author: speculated.vertex.author,
+					epoch: speculated.vertex.epoch,
+					logicalTime: speculated.vertex.logicalTime,
+					vertexDigest: speculated.vertexDigest,
+					rows,
+				})
+			);
+		});
+	};
+	const presentationIntentBindings = new Set<() => void>();
 	const messageQueueManager = new MessageQueueManager<Message>({ logConfig: { level: "silent" } });
 	let recoverStartupPlane: (() => Promise<void>) | undefined;
 	let creatorCloseHandle: CreatorLiveCloseHandle | undefined;
@@ -3373,9 +3533,14 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 		void transportCloseTask.catch(() => undefined);
 	};
+	const closePresentation = (): void => {
+		for (const unbind of [...presentationIntentBindings]) unbind();
+		presentationHook((overlay) => overlay.close());
+	};
 	const shutdown = (): Promise<void> => {
 		if (closePromise !== undefined) return closePromise;
 		closed = true;
+		closePresentation();
 		revokeTransport();
 		cancelRedirectCreation();
 		if (!retainedBootstrapReady) {
@@ -3692,6 +3857,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		startupReplay = undefined;
 		projection = stage(Object.freeze([])).projection;
 		input.onProjection(projection);
+		presentationHook((overlay) => overlay.durableChanged());
 	};
 	const admittedSink = async ({
 		vertex,
@@ -3924,7 +4090,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		openedTransport.setIngressHandler(
 			activeHandle.topic,
 			(message) => {
-				if (!closed) { localOwner?.assertCurrent(); routeV3Ingress(openedTransport.networkNode, message); }
+				if (!closed) {
+					localOwner?.assertCurrent();
+					presentRemoteIngress(message);
+					routeV3Ingress(openedTransport.networkNode, message);
+				}
 			},
 			(message) => {
 				if (!closed && activeHandle !== undefined) { localOwner?.assertCurrent(); routeV3RetainedIngress(activeHandle, message); }
@@ -4067,6 +4237,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	let autoPoolMaintenance: Readonly<{ stop(): void }> | undefined;
 	// Holds new local issues while an explicit recovery-pool boundary owns the plane.
 	let poolMaintenanceBarrier: Promise<void> | undefined;
+	// Receipt continuations handed from issueWithReceipt to the synchronous start of issue().
+	let nextIssueReceiptHooks: LocalPresentationHooks | undefined;
 	type LifetimeDispatchResult<Result> = Readonly<{ readonly result: Result | Promise<Result> }>;
 	const enqueueLifetimeTransition = <Result>(transition: () => Promise<Result>): Promise<Result> => {
 		const dispatch = (): Promise<Result> => {
@@ -4337,7 +4509,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			return;
 		}
 		if (acceptedOperationRows.get(issued.digest) === null) {
-			rejectOwned(owned, new TypeError("v3 room issued operation was not accepted by projection"));
+			rejectOwned(owned, new TypeError(PROJECTION_REFUSED_ISSUE));
 			return;
 		}
 		try {
@@ -6731,6 +6903,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		if (sessionCloseTask !== undefined) return sessionCloseTask;
 		closed = true;
 		autoPoolMaintenance?.stop();
+		closePresentation();
 		revokeTransport();
 		cancelRedirectCreation();
 		const task = (async (): Promise<void> => {
@@ -6907,6 +7080,9 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			return creatorCloseHandle.inspectDurableHead();
 		},
 		async issue(operation: Readonly<Record<string, unknown>>): Promise<void> {
+			// Captured synchronously: only issueWithReceipt sets it, immediately around this call.
+			const receiptHooks = nextIssueReceiptHooks;
+			nextIssueReceiptHooks = undefined;
 			localOwner?.assertCurrent();
 			if (input.receiveOnly) throw new TypeError("v3 room is receive-only");
 			if (redirectPromise === undefined && redirectedSession === undefined) {
@@ -6963,6 +7139,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				) {
 					throw new TypeError("v3 room migration record is invalid");
 				}
+				// Shown before any barrier wait; the durable issue below is unchanged.
+				let presented: string | undefined;
+				presentationHook((overlay) => {
+					presented = overlay.addLocal(captured, logicalTime, receiptHooks);
+				});
 				const priorMigrationBarrier = migrationBarrier;
 				const priorMigrationCompletion = migrationCompletionBarrier;
 				const joinsMigration = priorMigrationBarrier !== undefined && migrationAcceptingFollowers;
@@ -6987,6 +7168,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					}
 					const current = logicalTime;
 					logicalTime += 2;
+					if (presented !== undefined) {
+						const id = presented;
+						presentationHook((overlay) => overlay.bindLocal(id, current));
+					}
 					const promise = new Promise<void>((resolve, reject) => {
 						pendingIssues.push(
 							Object.freeze({
@@ -7003,13 +7188,105 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					scheduleDrain();
 					await promise;
 					settleFollower?.(Object.freeze({ ok: true }));
+					if (presented !== undefined) {
+						const id = presented;
+						presentationHook((overlay) => overlay.settleLocal(id, Object.freeze({ ok: true })));
+					}
 				} catch (error) {
 					settleFollower?.(Object.freeze({ ok: false, reason: error }));
+					if (presented !== undefined) {
+						const id = presented;
+						const reason: "projection-refused" | "refused" =
+							error instanceof TypeError && error.message === PROJECTION_REFUSED_ISSUE ? "projection-refused" : "refused";
+						presentationHook((overlay) => overlay.settleLocal(id, Object.freeze({ ok: false, reason, error })));
+					}
 					throw error;
 				}
 			} finally {
 				if (!transferred) releasePublicInput();
 			}
+		},
+		issueWithReceipt(operation: Readonly<Record<string, unknown>>): V3RoomIssueReceipt {
+			localOwner?.assertCurrent();
+			if (redirectedSession !== undefined) return redirectedSession.issueWithReceipt(operation);
+			if (presentation === undefined) throw new TypeError("v3 room presentation is not enabled");
+			let resolveVisible!: (entry: V3RoomPendingOperation | undefined) => void;
+			let rejectVisible!: (error: unknown) => void;
+			let resolveDurable!: (value: Readonly<{ vertexDigest: string; authorSequence: number }> | undefined) => void;
+			let rejectDurable!: (error: unknown) => void;
+			const visible = new Promise<V3RoomPendingOperation | undefined>((resolve, reject) => {
+				resolveVisible = resolve;
+				rejectVisible = reject;
+			});
+			const durable = new Promise<Readonly<{ vertexDigest: string; authorSequence: number }> | undefined>(
+				(resolve, reject) => {
+					resolveDurable = resolve;
+					rejectDurable = reject;
+				}
+			);
+			// Stage promises a caller ignores must not surface as unhandled.
+			void visible.catch(() => undefined);
+			void durable.catch(() => undefined);
+			const rolledBack = (reason: V3RoomPresentationRollbackReason, error: unknown): void => {
+				const failure = new TypeError(`v3 room presented move rolled back: ${reason}`, { cause: error });
+				rejectVisible(failure);
+				rejectDurable(failure);
+			};
+			nextIssueReceiptHooks = Object.freeze({ visible: resolveVisible, durable: resolveDurable, rolledBack });
+			let published: Promise<void>;
+			try {
+				published = session.issue(operation);
+			} finally {
+				nextIssueReceiptHooks = undefined;
+			}
+			// A move outside the overlay (not speculated, or overlay full) is shown
+			// and durable when the unchanged issue completes.
+			published.then(
+				() => {
+					resolveVisible(undefined);
+					resolveDurable(undefined);
+				},
+				(error: unknown) => {
+					rejectVisible(error);
+					rejectDurable(error);
+				}
+			);
+			return Object.freeze({ visible, durable, published });
+		},
+		bindPresentationIntents(channel: EphemeralChannel, options?: Readonly<{ key?: string }>): () => void {
+			localOwner?.assertCurrent();
+			if (redirectedSession !== undefined) return redirectedSession.bindPresentationIntents(channel, options);
+			assertSessionOpen();
+			if (presentation === undefined) throw new TypeError("v3 room presentation is not enabled");
+			const key = options?.key ?? "drp/presentation-intent/v1";
+			if (typeof key !== "string" || key.length === 0 || key.length > 64)
+				throw new TypeError("v3 room presentation intent key is invalid");
+			const detach = attachPresentationIntents({
+				overlay: presentation,
+				channel,
+				key,
+				localAuthor: input.author,
+				// The same durable roster mapping the ephemeral authority provider uses.
+				authorForPeer: (peerId) => {
+					const matches = projection.transportPeerAuthors.filter((entry) => entry.peerId === peerId);
+					return matches.length === 1 ? matches[0]?.author : undefined;
+				},
+			});
+			const unbind = (): void => {
+				if (!presentationIntentBindings.delete(unbind)) return;
+				detach();
+			};
+			presentationIntentBindings.add(unbind);
+			return unbind;
+		},
+		pendingOperations(): readonly V3RoomPendingOperation[] {
+			if (redirectedSession !== undefined) return redirectedSession.pendingOperations();
+			return presentation?.pending() ?? Object.freeze([]);
+		},
+		speculativeProjection(): Projection {
+			if (redirectedSession !== undefined) return redirectedSession.speculativeProjection();
+			if (terminalFailure !== undefined) throw terminalFailure;
+			return presentation?.projection() ?? projection;
 		},
 		openEphemeral(options: EphemeralChannelOptions): EphemeralChannel {
 			localOwner?.assertCurrent();
