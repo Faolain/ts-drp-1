@@ -19123,7 +19123,8 @@ function closedInstallationSigningData(rows: readonly Uint8Array[], objectId: st
  * classified local-prefix drain; headers and all other detail stay protected.
  * @returns Whether joined evidence work needs a fresh summary acquisition.
  */
-async function installClosedRetirementSource(source: ClosedRetirementSource, acknowledgeCompletedJournalDrain = false): Promise<boolean> {
+async function installClosedRetirementSource(source: ClosedRetirementSource, acknowledgeCompletedJournalDrain = false,
+	drainSuppressedJournalPrefixes = false): Promise<boolean> {
 	const { input, summary, accounting } = source;
 	if (source.inheritedClassification !== undefined) requireLaw(source.generationSource === undefined &&
 		source.signingSummaries === undefined && source.signingDetails.length === 0 &&
@@ -20149,8 +20150,14 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 	// completed drain could only replay this same P. Any other source (another
 	// eligible epoch, resumed or residual drain) keeps the following fresh pass.
 	const summarySelectionComplete = summaries !== undefined && exhaustiveClosedSigningSummarySelections.has(summaries);
+	// A generation drain suppresses this pass's collectible journal prefixes. Their
+	// membership authority lives only in the current role window, so a caller with
+	// no later maintenance in that window (a recipient's received turnover) asks for
+	// one fresh pass, which still pays for its progress by removing generations.
+	const suppressedJournalDrain = drainSuppressedJournalPrefixes && generationSource !== undefined &&
+		source.journalDetails.collectiblePrefixes.length !== 0 && postAheRows.length < source.rows.length;
 	const needsFreshSummary = generationSource !== undefined
-		? postAheRows.length > AHE_BOUNDED_READ_LIMITS.maxObjectGenerations - 2
+		? postAheRows.length > AHE_BOUNDED_READ_LIMITS.maxObjectGenerations - 2 || suppressedJournalDrain
 		: evidenceCompleted || (summaryProgressed && !summarySelectionComplete) ||
 			source.rows.length > AHE_BOUNDED_READ_LIMITS.maxObjectGenerations - 2;
 	if (acknowledgeCompletedJournalDrain && !needsFreshSummary) {
@@ -20397,7 +20404,8 @@ async function reconcileSnapshotRecoveryRoles(
 	acknowledgeCompletedJournalDrain = false,
 	requireClosedWorkflowCompletion = false,
 	currentTrust?: CurrentAnchorTrust,
-	ownedMaintenance?: CreatorRecoveryMaintenanceFacts
+	ownedMaintenance?: CreatorRecoveryMaintenanceFacts,
+	drainSuppressedJournalPrefixes = false
 ): Promise<boolean> {
 	const sameFloor = (left: CreatorExpectedRoomHead, right: CreatorExpectedRoomHead): boolean =>
 		left.objectId === right.objectId &&
@@ -21261,8 +21269,9 @@ async function reconcileSnapshotRecoveryRoles(
 		// every selected/retained support to the authenticated whole AHE census.
 		// This classifies only generation dependencies, not journal/signing replay.
 		let unclassifiedGenerationReplay = closedGenerationReplayIsUnclassified(forward, sourceFrame, sourceUnion.snapshotScopes, roleProofs);
-		// This first supported class does not classify installed or received replay
-		// closures. Their genuine presence requests retention, never eligibility.
+		// This first supported class does not classify installed replay closures.
+		// Their genuine presence requests retention, never eligibility. A received
+		// replay closure is classified only below, by its covered generation consumers.
 		let unclassifiedReplay =
 			forward.installed.length !== 0 ||
 			(forward.pending?.installed.length ?? 0) !== 0 ||
@@ -21281,10 +21290,21 @@ async function reconcileSnapshotRecoveryRoles(
 			);
 			if (received !== null) {
 				requireLaw(sourceFrame.accounting.charge(closedRetirementBytes(received)), "proof-budget-exceeded");
-				unclassifiedReplay = true;
-				unclassifiedGenerationReplay ||= !closedReceivedGenerationConsumersCovered({frame: sourceFrame,
+				// A received certificate's only journal consumer is the replay of its
+				// own scope. When its generation consumers are covered and that scope is
+				// one of the authenticated protected role scopes, the journal classifier
+				// already keeps it as a protectedReplayScope. It then no longer forces
+				// EVERY older recipient scope into permanent retention, which grew the
+				// protected set with room age until the journal refused at epoch 8.
+				// Otherwise it still retains everything, as before.
+				const covered = closedReceivedGenerationConsumersCovered({frame: sourceFrame,
 					scope: row.scope, bytes: received.exactReceivedCertificateBytes,
 					protectedScopes: closeUnion.snapshotScopes, proofs: roleProofs});
+				const replayProtected = closeUnion.snapshotScopes.some(scope => scope.objectId === row.scope.objectId &&
+					scope.epoch === row.scope.epoch && scope.anchor === row.scope.anchor &&
+					scope.manifestDigest === row.scope.manifestDigest);
+				unclassifiedReplay ||= !covered || !replayProtected;
+				unclassifiedGenerationReplay ||= !covered;
 			}
 		}
 		// This input remains lexical to the ORIGINAL reconciliation owner. No new
@@ -21582,23 +21602,30 @@ async function reconcileSnapshotRecoveryRoles(
 		requireLaw(!requireClosedWorkflowCompletion, "snapshot-unavailable");
 		return false;
 	}
-	return installClosedRetirementSource(retirementSource, acknowledgeCompletedJournalDrain);
+	return installClosedRetirementSource(retirementSource, acknowledgeCompletedJournalDrain, drainSuppressedJournalPrefixes);
 }
 
 /**
  * Reconciles genuinely authenticated roles, preserving the owning typed refusal as cause.
  * @param value - Independent pinned floor and genuine native owners.
  * @param closeHold - Genuine live close's joined native dependency census, when available.
+ * @param acknowledgeCompletedJournalDrain - Original completed-drain acknowledgement request.
+ * @param requireClosedWorkflowCompletion - Original closed-workflow completion requirement.
+ * @param currentTrust - Original current trust, when supplied by the owning close.
+ * @param drainSuppressedJournalPrefixes - Request a fresh pass when a generation drain
+ * suppressed collectible journal prefixes (scheduling only, never eligibility).
  */
 export async function reconcileCreatorSnapshotRecoveryRoles(
 	value: CreatorClosedRollbackDataInput,
 	closeHold?: CreatorSnapshotRecoveryCloseHold,
 	acknowledgeCompletedJournalDrain = false,
 	requireClosedWorkflowCompletion = false,
-	currentTrust?: CurrentAnchorTrust
+	currentTrust?: CurrentAnchorTrust,
+	drainSuppressedJournalPrefixes = false
 ): Promise<"complete" | "fresh-summary-required"> {
 	try {
-		return (await reconcileSnapshotRecoveryRoles(value, closeHold, acknowledgeCompletedJournalDrain, requireClosedWorkflowCompletion, currentTrust))
+		return (await reconcileSnapshotRecoveryRoles(value, closeHold, acknowledgeCompletedJournalDrain, requireClosedWorkflowCompletion,
+			currentTrust, undefined, drainSuppressedJournalPrefixes))
 			? "fresh-summary-required" : "complete";
 	} catch (error) {
 		throwCreatorSnapshotRecoveryFailure(error);

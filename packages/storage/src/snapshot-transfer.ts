@@ -1394,6 +1394,20 @@ function retirementObject(input: unknown): string {
 }
 const retirementScopeKey = (value: SnapshotRetirementPreparation["protectedScopes"][number]): string =>
 	JSON.stringify([value.scope.epoch, value.scope.anchor, value.scope.manifestDigest, value.incarnation]);
+const compareRetirementText = (left: string, right: string): number => (left < right ? -1 : left > right ? 1 : 0);
+/** Canonical protected-hole order: numeric epoch, then code-unit text, exactly the
+ * native image order (SQLite `ORDER BY epoch,anchor,manifest_digest`, IndexedDB keys)
+ * from which owners build preparations, and the live journal's numeric scope order.
+ * A decimal-text or locale key would put epoch 10 before 9 and make every honest
+ * preparation straddling a digit boundary read back as a different preparation. */
+const compareRetirementScopes = (
+	left: SnapshotRetirementPreparation["protectedScopes"][number],
+	right: SnapshotRetirementPreparation["protectedScopes"][number]
+): number =>
+	left.scope.epoch - right.scope.epoch ||
+	compareRetirementText(left.scope.anchor, right.scope.anchor) ||
+	compareRetirementText(left.scope.manifestDigest, right.scope.manifestDigest) ||
+	compareRetirementText(left.incarnation, right.incarnation);
 function retirementPreparation(input: unknown, objectId: string): SnapshotRetirementPreparation {
 	const r = retirementFields(input, ["decisionDigest", "sourceProofDigest", "throughEpoch", "protectedScopes"]);
 	const throughEpoch = retirementInteger(r.throughEpoch),
@@ -1422,7 +1436,7 @@ function retirementPreparation(input: unknown, objectId: string): SnapshotRetire
 		)
 			throw failure("malformed-input", "snapshot protected identity is invalid");
 		return Object.freeze({ scope, incarnation: row.incarnation });
-	}).sort((a, b) => retirementScopeKey(a).localeCompare(retirementScopeKey(b)));
+	}).sort(compareRetirementScopes);
 	if (new Set(protectedScopes.map(retirementScopeKey)).size !== protectedScopes.length)
 		throw failure("malformed-input", "snapshot protected holes repeat");
 	return Object.freeze({

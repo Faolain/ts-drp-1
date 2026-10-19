@@ -165,8 +165,10 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
  // the V1 control uses that room's original settlement preview, never a fixture.
  // Eight traverses the existing seven-generation recovery ceiling and its
  // lawful turnover; four/five alone cannot distinguish warm-up from age growth.
+ // Longer bounded runs (up to 32) pass the former epoch-8 recipient journal
+ // ceiling and the 9->10 boundary of the snapshot protected-hole order.
  // Default acceptance workload/deadline and all per-transition assertions stay.
- if(rollovers!==4&&rollovers!==5&&rollovers!==8)throw new Error("bounded native pool-turnover extension required");
+ if(rollovers!==4&&rollovers!==5&&!(Number.isSafeInteger(rollovers)&&rollovers>=8&&rollovers<=32))throw new Error("bounded native pool-turnover extension required");
  if(suspendHealthyGrid&&rollovers!==5)throw new Error("suspension must exercise the original full-pool recipient turnover");
  const executionContexts=new Map<number,{origin:string;defaultContext:boolean}>();
  if(suspendHealthyGrid){

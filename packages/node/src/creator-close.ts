@@ -510,6 +510,10 @@ export interface V3CreatorCloseRegistration {
 		exactCanonicalPreimageBytes: Uint8Array;
 		detachedSignature: Uint8Array;
 	}>[] | undefined>;
+	/** Recipient twin of the close-time membership capture, inside the held received
+	 * gate: records the native carrier only when this recipient's own complete epoch
+	 * graph derives the authenticated Cut's exact close set. Evidence, never authority. */
+	recordReceivedClosedMembership(exactCanonicalCutValueBytes: Uint8Array): Promise<boolean>;
 	/** Exact authenticated whole-source bytes, prepared and joined under this same genuine hold. */
 	prepareClosedEpochArchive(hold: CreatorSnapshotRecoveryCloseHold, limits: ArchiveLimits,
 		sharedAccounting?: import("./internal/creator-closed-rollback-data.js").CreatorClosedRollbackProofAccounting): Promise<ClosedEpochArchive | undefined>;

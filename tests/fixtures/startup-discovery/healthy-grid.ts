@@ -358,7 +358,7 @@ if(window!==window.parent)window.parent.postMessage({kind:"r8-grid-ready"},"*");
 export async function runHealthyGrid(identity:string,origins:readonly string[],rollovers=4,profileId="creator-trusted-settlement-v1") {
  const fixtureWaitDeadline=Date.now()+360_000; // Existing native test cap, not a gameplay latency target.
  check(origins.length===4&&new Set(origins).size===4,"four independent native storage origins required");
- check(rollovers===4||rollovers===5||rollovers===8,"bounded native full-pool extension only");
+ check(rollovers===4||rollovers===5||(Number.isSafeInteger(rollovers)&&rollovers>=8&&rollovers<=32),"bounded native full-pool extension only");
  check(profileId==="creator-trusted-settlement-v1"||profileId==="creator-trusted-v1","existing creator profile required");
  const {members,application}=gridCorpus(identity),ids=members.slice(0,4).map(row=>row.peerId);
  const objectId="creator:"+hex(hashDomain("ts-drp/healthy-native-grid/v1",new TextEncoder().encode(identity))).slice(0,32);
@@ -542,9 +542,9 @@ export async function runHealthyGrid(identity:string,origins:readonly string[],r
    epoch=closed.successorEpoch;phase="settlement-cleanup-"+epoch;
    await Promise.all(active.map(role=>rpc(role.index,"history")));await world();await measure("adopted-"+epoch);
    // Opt-in idle lull after the measured rollover: creator, then each recipient, pool maintenance.
-   // A recipient lull prepares the NEXT install, so it is skipped after the last rollover: that
-   // install is outside this bounded run (its original turnover is refused at epoch 8).
-   const lull=Reflect.get(globalThis,"__rdPoolMaintenanceLull")===true,recipientLull=lull&&transition<rollovers-1;
+   // Every rollover, including the last: recipient journal retention is bounded, so the lull's
+   // turnover no longer meets the former epoch-8 journal ceiling at any room age.
+   const lull=Reflect.get(globalThis,"__rdPoolMaintenanceLull")===true,recipientLull=lull;
    const poolMaintenance=!lull?undefined:
     Reflect.get(globalThis,"__rdPoolMaintenanceConcurrent")===true?(phase="pool-maintenance-concurrent-"+epoch,await concurrentMaintenance()):
     (phase="pool-maintenance-"+epoch,await rpc(0,"maintain"));

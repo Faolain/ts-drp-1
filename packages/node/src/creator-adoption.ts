@@ -933,7 +933,10 @@ async function runReceivedRecoveryTurnoverPasses(input: Readonly<{
 				exactCanonicalPinnedGenesisTrustStateRecordBytes: context.exactCanonicalPinnedGenesisTrustStateRecordBytes,
 				catalog: input.catalog,
 				objectId: source.objectId, store: source.store, snapshotStore: input.snapshotStore,
-				liveJournalStore: source.liveJournalStore}, sealed.hold);
+				// A recipient runs no other maintenance inside the journal membership
+				// window, so a generation drain that suppressed this pass's collectible
+				// journal prefixes requests one more fresh pass (still bounded below).
+				liveJournalStore: source.liveJournalStore}, sealed.hold, false, false, undefined, true);
 			retired.push(...sealed.readRetiredGenerations());
 		} catch (error) {retirementFailed = true; retirementPrimary = error; throw error;}
 		finally {await releaseCreatorRecoveryReader(lifetime, retirementFailed, retirementPrimary, "creator recipient retirement dependencies cleanup failed");}
@@ -1383,6 +1386,12 @@ export async function receiveCreatorSuccessorAdoption(
 		if (!(await nativeHeadUnchanged(source.store, source.objectId, current.head)) || !(await replay.verify()))
 			throw new TypeError("creator recipient current changed before turnover");
 		if (promotionSource !== undefined) await promotionSource.check();
+		// The predecessor scope closes here. While the received gate still freezes
+		// its graph, record the recipient's own closed-membership carrier, as the
+		// creator does at close; without it no closed recipient journal scope can
+		// ever become collectible. Exact Cut agreement only; otherwise nothing is
+		// recorded and the scope keeps its original retention.
+		await source.recordReceivedClosedMembership(offer.exactCanonicalCutValueBytes);
 		if (await prepareReceivedRecoveryTurnover()) {
 			if (promoted) {
 				if (receivedCloseSnapshot === undefined) throw new TypeError("creator received close snapshot unavailable after turnover");

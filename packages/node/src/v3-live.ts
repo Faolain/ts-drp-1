@@ -7,6 +7,7 @@ import {
 	type ClosedEpochArchive,
 	CausalityIndex,
 	CompactMerkleAccumulator,
+	deriveCloseSetHistoryCommitment,
 	type EpochVertex,
 	produceClosedEpochArchive,
 	topologicalOrder,
@@ -170,6 +171,7 @@ import {
 	type V3CreatorCloseRegistration,
 } from "./creator-close.js";
 import { planClosedEpochCleanup, planClosedEpochRoleCleanup } from "./internal/closed-epoch-cleanup.js";
+import { encodeCreatorCloseMembership } from "./internal/creator-close-membership.js";
 import type { CreatorPendingClassificationCustodyInput } from "./internal/creator-adoption-recover.js";
 import type { CreatorClosedRollbackProofAccounting, CreatorSnapshotRetirementReconstructionRequest,
 	CreatorOrdinaryIssuanceSuffixForSizing, CreatorOrdinarySourceCapture } from "./internal/creator-closed-rollback-data.js";
@@ -19251,9 +19253,12 @@ function creatorRetirementResumeRequested(registration: V3PlaneRegistration): bo
 	);
 }
 
-/** The existing closed-fold owner supplies one exact graph; never a caller-selected witness graph. */
-function captureCreatorCloseGraph(registration: V3PlaneRegistration): CreatorCloseGraph | undefined {
-	if (!currentRegistration(registration) || !registration.blueprintFolded ||
+/** The existing closed-fold owner supplies one exact graph; never a caller-selected witness graph.
+ * A recipient has no local fold: only its held received gate freezes the same live graph. */
+function captureCreatorCloseGraph(registration: V3PlaneRegistration, received = false): CreatorCloseGraph | undefined {
+	if (!currentRegistration(registration) ||
+		(received ? registration.blueprintFolded || !registration.blueprintClosing || registration.receivedTransition !== true
+			: !registration.blueprintFolded) ||
 		registration.index.size > registration.payload.parameters.maxEpochVertices) return undefined;
 	const vertices = copyCloseVertices(registration.closeVertices);
 	const authors = copyCloseAuthors(registration.closeAuthors);
@@ -19273,16 +19278,18 @@ function captureCreatorCloseGraph(registration: V3PlaneRegistration): CreatorClo
  * Arrival journalSequence is not an archive ordinal. The existing closed graph/producer
  * owns deterministic history ordering; returned rows confer no portable authority.
  */
-async function readCreatorClosedArchiveSource(registration: V3PlaneRegistration, sharedAccounting?: CreatorClosedRollbackProofAccounting): Promise<
+async function readCreatorClosedArchiveSource(registration: V3PlaneRegistration, sharedAccounting?: CreatorClosedRollbackProofAccounting,
+	received = false): Promise<
 	Readonly<{ graph: CreatorCloseGraph; rows: readonly CreatorReplayRow[] }> | undefined
 > {
-	const graph = captureCreatorCloseGraph(registration);
+	const graph = captureCreatorCloseGraph(registration, received);
 	if (graph === undefined || !registration.blueprintClosing || registration.terminalState !== "active") return undefined;
 	const graphVersion = registration.graphVersion;
 	const index = registration.index;
 	const rows = await readCreatorReplayRows(registration, undefined, sharedAccounting);
 	if (rows === undefined || !currentRegistration(registration) || !registration.blueprintClosing ||
-		!registration.blueprintFolded || registration.terminalState !== "active" ||
+		(received ? registration.blueprintFolded || registration.receivedTransition !== true : !registration.blueprintFolded) ||
+		registration.terminalState !== "active" ||
 		registration.graphVersion !== graphVersion || registration.index !== index ||
 		rows.length !== graph.charges.size || rows.length !== graph.authors.size) return undefined;
 	const identities = new IntrinsicMap<string, Set<number>>();
@@ -19298,6 +19305,81 @@ async function readCreatorClosedArchiveSource(registration: V3PlaneRegistration,
 		sequences.add(identity.authorSequence); identities.set(identity.author, sequences); digests.add(row.digest);
 	}
 	return ObjectFreeze({ graph, rows });
+}
+
+/**
+ * Recipient twin of the creator's close-time membership capture. Inside the held
+ * received gate, the recipient derives the deterministic close-set commitment of its
+ * OWN complete current-epoch graph and records the native carrier only when that
+ * commitment equals the caller's authenticated Cut exactly. The carrier is lifecycle
+ * evidence, never authority: journal retirement still reopens it against a later
+ * independently authenticated Cut/ACL and re-verifies every original signature.
+ * Any disagreement (missing or extra rows, changed graph, refused native write) records
+ * nothing, so the scope keeps its original retention.
+ * @param registration - Genuine recipient registration holding its received gate.
+ * @param exactCanonicalCutValueBytes - The Cut that closes this registration's epoch.
+ * @returns Whether an exact carrier is now recorded for this scope.
+ */
+async function recordCreatorReceivedClosedMembership(
+	registration: V3PlaneRegistration,
+	exactCanonicalCutValueBytes: Uint8Array
+): Promise<boolean> {
+	try {
+		const payload = registration.payload;
+		const authorization = registration.authorization;
+		const journal = registration.liveJournalStore;
+		const available = (): boolean => currentRegistration(registration) && registration.payload === payload &&
+			registration.authorization === authorization && registration.liveJournalStore === journal &&
+			registration.blueprintClosing && registration.receivedTransition === true && !registration.blueprintFolded &&
+			registration.terminalState === "active";
+		if (!available() || authorization.kind !== "latched-acl" || journal.readRetirementImage === undefined ||
+			journal.recordClosedMembership === undefined) return false;
+		const previousHistorySnapshot = creatorClosePreviousHistorySnapshot(payload);
+		const cutBytes = new Uint8ArrayConstructor(exactCanonicalCutValueBytes);
+		const cut = decodeCanonical(cutBytes);
+		const scope = liveJournalScope(payload);
+		if (previousHistorySnapshot === undefined || !isObject(cut) || !sameBytes(encodeCanonical(cut), cutBytes) ||
+			ownDataValue(cut, "kind") !== "drp-hard-epoch-cut" || ownDataValue(cut, "objectId") !== scope.objectId ||
+			ownDataValue(cut, "epoch") !== scope.epoch || ownDataValue(cut, "previousAnchor") !== scope.anchorDigest) return false;
+		const source = await readCreatorClosedArchiveSource(registration, undefined, true);
+		if (source === undefined || !available()) return false;
+		const commitment = await deriveCloseSetHistoryCommitment({
+			authenticatedCanonicalPreimageByteLengths: source.graph.charges,
+			exactCanonicalEpochAnchorPreimageBytes: new Uint8ArrayConstructor(payload.input.exactCanonicalAnchorPreimageBytes),
+			frontier: source.graph.frontier,
+			maxEpochBytes: payload.parameters.maxEpochBytes,
+			maxEpochVertices: payload.parameters.maxEpochVertices,
+			previousHistorySnapshot,
+			vertices: source.graph.vertices,
+		});
+		if (commitment.closeSetRoot !== ownDataValue(cut, "closeSetRoot") ||
+			commitment.closeSetCount !== ownDataValue(cut, "closeSetCount") ||
+			commitment.historyRoot !== ownDataValue(cut, "historyRoot") ||
+			commitment.historySize !== ownDataValue(cut, "historySize") || !available()) return false;
+		const membershipBytes = await encodeCreatorCloseMembership({
+			exactCanonicalCutValueBytes: cutBytes,
+			exactCanonicalLatchedAclBytes: encodeCanonical(authorization.value),
+			commitment,
+			maxEpochVertices: payload.parameters.maxEpochVertices,
+			localVertexWitnesses: source.rows.filter((row) => row.sourceKind === "local-issued").map((row) => ObjectFreeze({
+				vertexDigest: row.digest,
+				exactCanonicalPreimageBytes: new Uint8ArrayConstructor(row.exactCanonicalPreimageBytes),
+				detachedSignature: new Uint8ArrayConstructor(row.detachedSignature),
+			})),
+		});
+		if (!available()) return false;
+		const before = await journal.readRetirementImage({ objectId: scope.objectId });
+		if (!before.ok || !available()) return false;
+		const recorded = await journal.recordClosedMembership({
+			scope,
+			exactCanonicalMembershipBytes: membershipBytes,
+			expectedNativeImage: { imageDigest: before.value.image.imageDigest,
+				controlBytes: before.value.control === null ? null : encodeJournalRetirementControl(before.value.control) },
+		});
+		return recorded.ok;
+	} catch {
+		return false;
+	}
 }
 
 /** Non-durable byte preparation, admitted/joined under the SAME genuine close hold. */
@@ -19630,6 +19712,8 @@ function creatorCloseRegistration(
 					detachedSignature: new Uint8ArrayConstructor(row.detachedSignature),
 				})));
 		},
+		recordReceivedClosedMembership: (exactCanonicalCutValueBytes: Uint8Array) =>
+			recordCreatorReceivedClosedMembership(registration, exactCanonicalCutValueBytes),
 		// The genuine claim may use a successor alias; the close owner is keyed
 		// by that exact handle, not the registration's underlying raw handle.
 		sealRecoveryDependencies: (required?: boolean) =>
