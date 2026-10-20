@@ -1,6 +1,7 @@
 # 14e — Bounds and charges for single-transaction retirement (S5)
 
 Status: contract draft, 2026-10-19, under the [slice 14 parent](14-single-database-watermark-retirement.md).
+Implementation (Track R3): not started. See the [parent status](14-single-database-watermark-retirement.md#status-track-r3-2026-10-19-opt-in-stage-1a-only).
 No review has run. The per-transaction cap below is new policy and needs review
 before acceptance runs (BSL:261-263). RED precedes GREEN.
 Guarantee ids are defined, with their sources, in the

@@ -1,6 +1,8 @@
 # 14f — Native evidence for single-database retirement (S6)
 
 Status: contract draft, 2026-10-19, under the [slice 14 parent](14-single-database-watermark-retirement.md).
+Evidence (Track R3): cases 1–4 pass in Chromium, Firefox and WebKit; case 10 passes on
+Chromium; cases 5–9 and 11 are open. See the [evidence record](#evidence-record-track-r3-2026-10-19).
 No evidence is accepted yet. The default flip in 14 depends on this slice passing.
 Guarantee ids are defined, with their sources, in the
 [golden-path guarantee checklist](../golden-path-guarantees.md).
@@ -91,3 +93,22 @@ Grid. It changes no product code.
 
 If an engine cannot provide strict durability or cross-store atomicity within one
 database, the new path stays opt-in for that engine and the parent records it.
+
+## Evidence record (Track R3, 2026-10-19)
+
+Stage 1a of 14a only: the room retirement session. 14b–14e are not implemented, so
+cases that need their behaviour are OPEN.
+
+| Case                                                    | Command                                                                                                                                                                                  | Source commit | Chromium 151.0.7922.34 | Firefox 153.0 | WebKit 26.5 |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ---------------------- | ------------- | ----------- |
+| 1–4, plus a not-ready database refused before any write | `playwright test --config packages/storage-browser/playwright.room-retirement-session-native.config.ts` (18 tests, exit 0)                                                               | 6c18b0c2      | pass                   | pass          | pass        |
+| 5–8                                                     | —                                                                                                                                                                                        | —             | OPEN                   | OPEN          | OPEN        |
+| 9                                                       | — (no migration)                                                                                                                                                                         | —             | OPEN                   | OPEN          | OPEN        |
+| 10                                                      | healthy native Grid, 8 rollovers, `STARTUP_HEALTHY_GRID_POOL_LULL=1`, `STARTUP_HEALTHY_GRID_ROOM_DATABASE=1` (exit 0; every recipient lull, persisted close, reopen, continued gameplay) | 981bb354      | pass                   | n/a           | n/a         |
+| 11                                                      | — (no bounds assertion yet; see the Track R3 result for a 16-rollover Grid run)                                                                                                          | —             | OPEN                   | n/a           | n/a         |
+
+Case 1 asserts `durability === "strict"` and mode `readwrite` on the session
+transaction. Only the fake-indexeddb RED (`room-retirement-session-red.test.ts`)
+exercises the refusal of a non-strict transaction. Case 3's "a write below a new mark
+is refused" has no stage-1a counterpart, because there are no marks yet; the owners'
+existing write fences are unchanged.

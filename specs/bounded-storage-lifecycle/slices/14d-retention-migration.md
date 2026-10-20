@@ -1,6 +1,9 @@
 # 14d — Migration from six databases to the room database (S4)
 
 Status: contract draft, 2026-10-19, under the [slice 14 parent](14-single-database-watermark-retirement.md).
+Implementation (Track R3): not started. Until it exists, the room database host refuses
+an existing version-6 room with `V3_ROOM_DATABASE_MIGRATION_UNAVAILABLE` before any
+write. See the [parent status](14-single-database-watermark-retirement.md#status-track-r3-2026-10-19-opt-in-stage-1a-only).
 No review has run. RED precedes GREEN; no implementation acceptance is claimed.
 Guarantee ids are defined, with their sources, in the
 [golden-path guarantee checklist](../golden-path-guarantees.md).

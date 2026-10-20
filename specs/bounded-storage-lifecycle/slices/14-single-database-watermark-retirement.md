@@ -117,6 +117,34 @@ this slice.
   show no new per-test failure against the base commit. Otherwise it stays opt-in
   and the reason is recorded here.
 
+### Status (Track R3, 2026-10-19): opt-in, stage 1a only
+
+What landed, opt-in, is stage 1a of 14a:
+
+- the version-7 room database and owner room mode;
+- a room retirement session: one strict read-write transaction at a time over every
+  room store;
+- session facets that run each owner's existing retirement transitions on it;
+- the node's existing closed-retirement install on that session, which commits
+  before each floor effect and before the joint verification.
+
+The host is `createBrowserV3RoomDatabaseStorageHost` in `examples/v3-room` (not
+`browserRoomDatabaseStorageHost`). The node selects the session through an optional
+`openRoomRetirement` host factory, not through a retention port. 14c landed in
+storage only, and 14b, 14d and 14e are not implemented. The host refuses an existing
+six-database room until 14d exists.
+
+The new path stays opt-in because:
+
+1. 14f is incomplete. Cases 1–4 pass in Chromium, Firefox and WebKit, and case 10
+   passes in Chromium. The SIGKILL cases 5–9 and case 11 have not run.
+2. 14b, 14d and 14e are not implemented.
+3. On the healthy native Grid (3 interleaved pairs each with `LULL=1` and with
+   concurrent moves), stage 1a is a few percent faster per lull and does not change
+   seal, creator adoption or the median install. The millisecond range needs 14b's
+   single decision from carried verified facts. The record is in
+   `docs/realtime-latency/tracks/20-track-r2-r3-watermark-retirement/RESULT.md`.
+
 ## Slice graph
 
 | Slice                                         | One question                                                                                                          | Depends on | Decisive artifact                                                                                 |

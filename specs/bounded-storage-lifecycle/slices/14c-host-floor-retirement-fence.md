@@ -1,6 +1,9 @@
 # 14c — Per-owner retirement fence in the host floor (S3)
 
 Status: contract draft, 2026-10-19, under the [slice 14 parent](14-single-database-watermark-retirement.md).
+Implementation (Track R3): storage only, opt-in (`retirementFences: true`). The node does
+not write or check the fence yet; the room path keeps the floor's existing two-phase
+participant. See the [parent status](14-single-database-watermark-retirement.md#status-track-r3-2026-10-19-opt-in-stage-1a-only).
 No review has run. RED precedes GREEN; no implementation acceptance is claimed.
 Guarantee ids are defined, with their sources, in the
 [golden-path guarantee checklist](../golden-path-guarantees.md).
