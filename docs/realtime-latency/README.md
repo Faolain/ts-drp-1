@@ -88,7 +88,7 @@ repository owner made. "Coordinator" marks a recommendation that was then carrie
 | 18 | Track L: fix two bugs on the current path. After a lull and a reopen, recipients admit no moves; and the lull's history repair races a persisted close. | User | Play stops after a restart. Both bugs predate this work. | dcab6d12..88467723. A reopened recipient discharges its completed-retirement halt by re-running the original reconstruction. An orderly close cancels the retained republish it is serving. The Grid runs the final recipient lull again. |
 | 19 | Keep these records in the repository. | User | Decisions and plans should live with the code. | This folder |
 | 20 | Track M: build slice 14b (retirement decided from a ledger of verified facts) and 14e (bounds and charges) on R3's room path. Every decision must match the existing planner, proven by a differential test. | User | Stage 1a kept the per-pass re-proofs that dominate the lull; 14b is the lever for milliseconds. Target: creator lull ≤ 100 ms p50. | In progress |
-| 21 | Track N: stop each recipient's issuance store growing 3 issued and 3 outbox rows per epoch, and make the Grid's proof-event budget scale with rollovers. | User | Unbounded growth with room age violates G1. R3 found it; it predates this work. | In progress |
+| 21 | Track N: stop each recipient's issuance store growing 3 issued and 3 outbox rows per epoch, and make the Grid's proof-event budget scale with rollovers. | User | Unbounded growth with room age violates G1. R3 found it; it predates this work. | 60161b4a..7464f875, merged after verification. A Writer recipient never closes, so its cleanup always stopped at the cold-material guard before the issuance drain. It now drains its own classified, published, settled prefix through the existing authenticated pruner when its completed retirement decisions match, with no generation effect. Recipients stay flat at 13 rows from epoch 5 through 16 on both paths. |
 
 ## Commits
 
@@ -137,6 +137,13 @@ repository owner made. "Coordinator" marks a recommendation that was then carrie
 | cd9d2d88 | docs: record slice 14 status and native evidence (Track R3) |
 | 8955d40d | style: format the Track R2 prototype files with prettier |
 | 68b4168e | docs: record the Track R3 result |
+| 9ae59c2e | docs: record Track R3's merge and queue Tracks M and N |
+| 60161b4a | test: RED for a Writer recipient's local issuance growing with room age |
+| 94cef38a | fix: let a Writer recipient drain its own classified settled issuance |
+| eca9b1c2 | test: a recipient with retired issuance keeps issuing across lulls and reopen |
+| 8d00935d | test(grid): scale the proof-event observer budget with configured rollovers |
+| af83570a | fix: a cold recipient drains only published issuance rows |
+| 7464f875 | docs: record the Track N result |
 
 The commit messages hold the detailed explanation and the measurements for each change.
 
@@ -169,10 +176,9 @@ that track's working documents.
 | [21](tracks/21-track-k-epoch8-retention/README.md) | Track K: epoch-8 recipient refusal | 742a517e–9f606ce8 |
 | [22](tracks/22-track-l-reopen-and-close/README.md) | Track L: reopen admission and close race | dcab6d12..88467723 |
 | 23 | Track M: verified-fact retirement (slices 14b and 14e) | In progress |
-| 24 | Track N: recipient issuance growth | In progress |
+| [24](tracks/24-track-n-recipient-issuance-growth/README.md) | Track N: recipient issuance growth | 60161b4a..7464f875 |
 
-Tracks M and N are in progress. Their folders, `tracks/23-track-m-verified-fact-retirement/` and
-`tracks/24-track-n-recipient-issuance-growth/`, land with their branches.
+Track M is in progress. Its folder, `tracks/23-track-m-verified-fact-retirement/`, lands with its branch.
 
 ## Reading the records
 
@@ -215,10 +221,16 @@ Notes:
 
 - **Track M (in progress):** slice 14b, retirement decided from verified facts carried in memory, plus 14e's bounds
   and charges, on the room path. This is the only path found to millisecond maintenance.
-- **Track N (in progress):** each recipient's issuance store grows by 3 issued records and 3 outbox rows per epoch
-  (26 to 50 rows from epoch 8 to 16), on both paths. The creator and every other store stay flat. Track N also
-  makes the Grid's proof-event budget (50,000 events, about 3.8k per rollover) scale with rollovers, so runs past
-  about 13 rollovers can pass its check.
+- **Left open by Track N** (details in its [RESULT.md](tracks/24-track-n-recipient-issuance-growth/RESULT.md)):
+  - The issuance store's 1,024-row bound limits any Writer, the creator included, to roughly 100 moves per
+    epoch. Raising it is a reviewed-limit decision (G21); nothing was changed.
+  - A recipient that leaked rows before the fix drains its backlog on its next install if it is still below the
+    bound. One already past the bound is untested and may need an authenticated repair.
+  - A creator whose material is cold now drains the same way, under the same restrictions. No test or run covers
+    that case.
+  - The node tests run on the SQLite host; only the Grid covers the room path.
+  - The recipient drain depends on the completed AHE and issuance retirement decisions matching. If Track M's
+    ledger changes how either is recorded, the drain keeps everything and the growth returns on that path.
 - **Before the room database can become the default** (Track R3's [RESULT.md](tracks/20-track-r2-r3-watermark-retirement/RESULT.md) §9–10):
   - 14b and 14e (Track M);
   - wire 14c's per-owner floor fences into the node;
