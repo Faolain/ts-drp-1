@@ -9,10 +9,11 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { StatementSync } from "node:sqlite";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, expect, it } from "vitest";
 
 import { fakeNetwork } from "./fixtures/phase-4b-v3/live-snapshot.js";
 import { ScriptedSnapshotChunkPort } from "./fixtures/phase-4c-v3/snapshot-pull-transport.js";
+import { CANVAS_GENESIS_PROFILE } from "../examples/canvas/src/profile.js";
 import {
 	createV3RoomCreatorInviteMaterial,
 	createV3RoomSession,
@@ -32,13 +33,33 @@ import { nodeIssuancePruningMaintenanceForStore } from "../packages/storage-node
 import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-head.js";
 import { createNodeV3RoomStorageHost } from "../packages/storage-node/src/v3-room-host.js";
 
-// Track P: the shipped Canvas composition (createV3CanvasApplication, signed ACL v1, the
-// creator-trusted-v1 profile, which has no settlement profile) as a long room on genuine
+// Track P: the shipped Canvas composition (createV3CanvasApplication with the shipped
+// genesis profile, examples/canvas/src/profile.ts: creator-trusted-settlement-v1 and the
+// signed ACL version 3 it requires, since Track T) as a long room on genuine
 // SQLite, Ed25519 and room owners with scripted native-byte transport. The creator and one
 // Writer recipient each issue two ordinary moves every epoch, exchange their signed rows,
 // and the recipient installs every successor. Neither peer's local issuance store may grow
 // with room age, and neither peer's per-move issue may do more issuance work as the room
 // ages (Track M findings 12 and 13).
+//
+// CANVAS_LONG_ROOM_PROFILE=creator-trusted-v1 measures the legacy profile instead (signed
+// ACL version 1, no settlement). That profile keeps every row a Writer issues, so the run
+// prints the per-epoch census and asserts no bound on it.
+const LEGACY_MEASUREMENT = process.env.CANVAS_LONG_ROOM_PROFILE === "creator-trusted-v1";
+if (
+	!LEGACY_MEASUREMENT &&
+	process.env.CANVAS_LONG_ROOM_PROFILE !== undefined &&
+	process.env.CANVAS_LONG_ROOM_PROFILE !== CANVAS_GENESIS_PROFILE.profileId
+)
+	throw new TypeError("CANVAS_LONG_ROOM_PROFILE names neither the shipped nor the legacy Canvas profile");
+const PROFILE = LEGACY_MEASUREMENT
+	? Object.freeze({ profileId: "creator-trusted-v1", latchedAclVersion: 1 })
+	: CANVAS_GENESIS_PROFILE;
+// The legacy measurement runs no bound on issuance: it skips the bounded-issuance test.
+beforeEach((context) => {
+	if (LEGACY_MEASUREMENT && context.task.name.startsWith("a Canvas creator and Writer recipient keep bounded issuance"))
+		context.skip();
+});
 const directories = new Set<string>();
 const rooms = new Set<V3RoomSession>();
 const heads = new Set<ReturnType<typeof createNodeRoomHeadAuthority>>();
@@ -135,7 +156,7 @@ async function canvasLongRoomFixture() {
 		exactCanonicalApplicationStateBytes: required(application.migration).canonicalStateBytes(
 			application.projectAcceptedOperations({ authenticatedBase: undefined, currentEpochOperations: [] })
 		),
-		// The shipped Canvas signs ACL version 1 with the creator and its Writers.
+		// The shipped Canvas signs the ACL version its profile requires, with the creator and its Writers.
 		exactCanonicalLatchedAclBytes: encodeCanonical({
 			epoch: 0,
 			kind: "drp-v3-latched-acl",
@@ -148,12 +169,12 @@ async function canvasLongRoomFixture() {
 				.sort((left, right) => left.author.localeCompare(right.author)),
 			objectId,
 			permissionless: false,
-			version: 1,
+			version: PROFILE.latchedAclVersion,
 		}),
 		exactCanonicalParametersCarrierBytes: encodeCanonical(parameters),
 		exactCanonicalProfileBytes: encodeCanonical({
 			cryptoSuiteId: "ed25519-sha256-v3",
-			profileId: "creator-trusted-v1",
+			profileId: PROFILE.profileId,
 			quorum: 1,
 			signers,
 		}),
@@ -540,9 +561,10 @@ it(`a Canvas owner's per-move native outbox reads do not compound across ${EPOCH
 	}
 }, 1_800_000);
 
-// Track M findings 12 and 13. Canvas runs creator-trusted-v1, which has no settlement
-// profile. Neither the creator's nor the Writer recipient's local issuance may grow with
-// room age, and so neither may the issuance work of one move.
+// Track M findings 12 and 13. The shipped Canvas runs creator-trusted-settlement-v1, whose
+// settlement lets the existing retirement drain issued rows (Track T; before it, Canvas ran
+// creator-trusted-v1 and kept every row). Neither the creator's nor the Writer recipient's
+// local issuance may grow with room age, and so neither may the issuance work of one move.
 it(`a Canvas creator and Writer recipient keep bounded issuance and flat per-move work through ${EPOCHS} successors and a reopen`, async () => {
 	expect(EPOCHS).toBeGreaterThanOrEqual(STEADY_EPOCH + 4);
 	const { records, hot, cold } = await canvasLongRoom();
@@ -570,3 +592,19 @@ it(`a Canvas creator and Writer recipient keep bounded issuance and flat per-mov
 				);
 	}
 }, 1_800_000);
+
+// Measurement only (CANVAS_LONG_ROOM_PROFILE=creator-trusted-v1): the legacy profile's census
+// and per-move issuance work per epoch, for the record that it still grows. Nothing here
+// asserts a bound.
+it.runIf(LEGACY_MEASUREMENT)(
+	`legacy creator-trusted-v1 Canvas census through ${EPOCHS} successors and a reopen (measurement only)`,
+	async () => {
+		const { records, hot, cold } = await canvasLongRoom();
+		records.forEach((record, index) => {
+			const work = hot[index] ?? cold;
+			const line = { ...record, work, reopened: index >= hot.length };
+			process.stdout.write(`CANVAS_LONG_ROOM_LEGACY ${JSON.stringify(line)}\n`);
+		});
+	},
+	1_800_000
+);
