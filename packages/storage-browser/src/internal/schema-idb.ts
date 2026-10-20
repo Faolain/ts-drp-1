@@ -920,6 +920,15 @@ export async function openBrowserRoomOwnerConnection(
 }
 
 /**
+ * Closes a room connection opened by {@link openBrowserRoomOwnerConnection} for a
+ * sibling owner that may not close raw connections itself.
+ * @param database - The room connection.
+ */
+export function closeBrowserRoomConnection(database: IDBDatabase): void {
+	database.close();
+}
+
+/**
  * Returns the production-selected substrate evidence binding.
  * @returns The selected and digest-bound substrate authority.
  */
