@@ -232,6 +232,7 @@ export {
 	resolveCreatorSnapshotRecoveryCloseHold,
 } from "./internal/runtime-reclamation.js";
 import { v3RoomRetentionOpener, type V3RoomRetirementSession } from "./internal/room-retirement.js";
+import { createRoomRetentionLedger, type RoomRetentionLedger } from "./internal/room-retention-ledger.js";
 import { deriveV3StableTopic } from "./internal/v3-topic.js";
 import { classifyV3EnvelopeScope } from "./v3-envelope-scope.js";
 import { consumeRecoveredV3LiveAuthority, installRecoveredV3LiveAuthority } from "./v3-live-recovered-authority.js";
@@ -3213,6 +3214,10 @@ interface V3PlaneRegistration {
 	historicalIssuance?: HistoricalIssuanceContext;
 	/** The live session's bounded exact-byte facts, also shared by its historical reads. */
 	readonly vertexFacts: CreatorCensusVertexFacts;
+	/** Slice 14b stage 2 (opted-in room retention host only): the session's ledger of
+	 * verified immutable facts. Created by its first verified boundary, forked only across
+	 * a genuine transport-reusing handoff, released with the plane. */
+	roomRetentionLedger?: RoomRetentionLedger;
 	index: CausalityIndex;
 	readonly issuanceScope: DurableIssueScope;
 	readonly issuanceStore: DurableIssuanceStore;
@@ -3938,6 +3943,20 @@ function resolveRecoveryCloseHold(
 			// native custody or preserve authorization; each invocation supplies
 			// its original fresh closed-ACL key resolver.
 			return facts.context.historicalIssuance?.vertexFacts?.verify ?? verifyReceivedVertex;
+		},
+		captureRoomRetentionLedger: function (this: CreatorSnapshotRecoveryCloseLifetime, create: boolean) {
+			// Slice 14b stage 2: the hold's own live plane, on an opted-in room host only. The
+			// ledger carries immutable verified facts; this hold's census and every currency
+			// check stay with the hold and its acting transaction.
+			const registration = facts.registration;
+			if (this !== lifetime || !available() || registration === undefined || !registration.active ||
+				v3RoomRetentionOpener(registration.payload.input.store) === undefined) return undefined;
+			const current = registration.roomRetentionLedger;
+			if (current !== undefined && !current.released) return current;
+			if (!create) return undefined;
+			const created = createRoomRetentionLedger();
+			registration.roomRetentionLedger = created;
+			return created;
 		},
 		captureClassificationMetadataOwners: function (this: CreatorSnapshotRecoveryCloseLifetime) {
 			if (this !== lifetime || !available()) throw new TypeError("creator classification metadata hold is unavailable");
@@ -7164,6 +7183,7 @@ function aliasCreatorSuccessorHandle(rawHandle: object, wrapper: object): boolea
 function deactivateRegistration(registration: V3PlaneRegistration): boolean {
 	registration.active = false;
 	registration.vertexFacts.release();
+	registration.roomRetentionLedger?.release();
 	// Numerical DATA is no longer selectable once the plane is revoked. Admitted
 	// proof closures retain their own captures through the original pending/native
 	// joins; this drops neither protected storage nor a native reservation.
@@ -20221,6 +20241,8 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 				// immutable-fact retention here even if an old handle stays alive;
 				// admitted native work retains its original independent joins.
 				existing.vertexFacts.release();
+				// Slice 14b stage 2: verified immutable facts cross only this genuine handoff.
+				if (existing.roomRetentionLedger !== undefined) registration.roomRetentionLedger = existing.roomRetentionLedger.fork();
 				existing.pendingIngress.clear();
 				existing.pendingIngressBytes = 0;
 				registration.hotPredecessor = new WeakRefConstructor(existing);

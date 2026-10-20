@@ -273,6 +273,7 @@ import {
 	type CreatorIssuanceRetirementOwner,
 } from "./runtime-reclamation.js";
 import { v3RoomRetentionOpener, v3RoomRetirementOpener, type V3RoomRetirementSession } from "./room-retirement.js";
+import { type RoomRetentionLedger, type RoomRetentionLedgerRecord, roomRetentionLedgerRecordBytes } from "./room-retention-ledger.js";
 import type { CreatorPostAdoptionCensusSizing, CreatorPostAdoptionSettlementSizing, CreatorRoomSettlementPreview } from "../creator-close.js";
 import type { CreatorOrdinaryRuntimeCapacityWidthInput, creatorOrdinaryRuntimeCapacityWidths } from "../v3-live.js";
 import { openCreatorCloseMembership } from "./creator-close-membership.js";
@@ -20549,9 +20550,18 @@ function observeRoomRetention(event: Readonly<Record<string, unknown>>): void {
 	}
 }
 
+/** Per AHE store: the test mode a ledger boundary took and declined on (test hooks only). */
+const roomRetentionModeCarry = new WeakMap<object, Readonly<{ epoch: number; objectId: string;
+	mode: "apply" | "plan-only" | "off" }>>();
+
 /** Test hooks (never authority): a plan-only probe or the existing path per pass, and
  * LOWERED per-transaction bounds. Neither can widen what a decision retires. */
-function roomRetentionTestMode(epoch: number, objectId: string): "apply" | "plan-only" | "off" {
+function roomRetentionTestMode(epoch: number, objectId: string, store?: object): "apply" | "plan-only" | "off" {
+	// Slice 14b stage 2: the answer a ledger boundary already took for this store and epoch
+	// (it declined), so a stateful hook is asked once per boundary.
+	const carried = store === undefined ? undefined : roomRetentionModeCarry.get(store);
+	if (store !== undefined) roomRetentionModeCarry.delete(store);
+	if (carried !== undefined && carried.epoch === epoch && carried.objectId === objectId) return carried.mode;
 	try {
 		const hook = Reflect.get(globalThis, "__roomRetentionMode");
 		if (typeof hook !== "function") return "apply";
@@ -20766,6 +20776,10 @@ interface RoomRetentionPassPlan {
 	readonly basis: RoomRetentionSurvivorBasis;
 	readonly started: number;
 	readonly acquiredMs: number;
+	/** Slice 14b: where the decision's facts came from (stage 1's cold acquisition by default). */
+	readonly acquisition?: "cold" | "ledger";
+	/** Slice 14b stage 2: records the boundary's facts when its decision applies; drops them otherwise. */
+	readonly ledger?: RoomRetentionLedgerCommit;
 }
 
 /**
@@ -20876,9 +20890,13 @@ async function applyRoomRetentionPass(plan: RoomRetentionPassPlan): Promise<bool
 	let exclusion: NativeReadReservation | undefined;
 	let session: V3RoomRetirementSession | undefined;
 	let priorSnapshotControl: SnapshotRetirementImageObservation["control"] | undefined;
+	const acquisition = plan.acquisition ?? "cold";
 	const declined = (reason: string, cause?: unknown): boolean => {
 		roomRetentionFallbacks.set(input.store as object, reason);
-		observeRoomRetention({ kind: "room-retention-pass", epoch: plan.epoch, outcome: "retained", reason,
+		// The refusal drops the plane's ledger as part of this pass, before the pass reports:
+		// the next retention event after a refused pass is the existing path's fallback.
+		plan.ledger?.drop(`retained:${reason}`);
+		observeRoomRetention({ kind: "room-retention-pass", epoch: plan.epoch, outcome: "retained", reason, acquisition,
 			...(cause === undefined ? {} : { cause: cause instanceof Error ? cause.message : String(cause) }),
 			ms: performance.now() - plan.started, acquiredMs: plan.acquiredMs, acquisitionStarted: plan.started, decisions: reports });
 		return true;
@@ -21002,19 +21020,23 @@ async function applyRoomRetentionPass(plan: RoomRetentionPassPlan): Promise<bool
 			await held.release().catch(() => undefined);
 		}
 		if (refusal !== undefined) return declined(`${refusal.code}:${refusal.detail}`, error);
-		observeRoomRetention({ kind: "room-retention-pass", epoch: plan.epoch, outcome: "failed",
+		plan.ledger?.drop("failed");
+		observeRoomRetention({ kind: "room-retention-pass", epoch: plan.epoch, outcome: "failed", acquisition,
 			cause: error instanceof Error ? error.message : String(error), decisions: reports });
 		throw error;
 	} finally {
 		if (exclusion !== undefined) await exclusion.release();
 	}
-	// `acquisitionStarted`: every fact this pass acted on was verified by its own cold
-	// acquisition, which started then (stage 1 carries no fact across passes or opens).
-	observeRoomRetention({ kind: "room-retention-pass", epoch: plan.epoch, outcome: "applied", decisions: reports,
+	// `acquisitionStarted`: every fact this pass acted on was verified by its own acquisition,
+	// which started then: stage 1's cold acquisition, or (stage 2, `acquisition: "ledger"`)
+	// the boundary's fresh reads with the plane's ledger facts verified on these exact bytes.
+	if (plan.shortfall) plan.ledger?.drop("shortfall");
+	observeRoomRetention({ kind: "room-retention-pass", epoch: plan.epoch, outcome: "applied", decisions: reports, acquisition,
 		ms: performance.now() - plan.started, acquiredMs: plan.acquiredMs, acquisitionStarted: plan.started,
 		shortfall: plan.shortfall });
 	// The existing passes would have refused once no authenticated source remained.
 	if (plan.shortfall) throw new Refusal(failure("snapshot-unavailable"));
+	plan.ledger?.commit(plan.decisions);
 	return false;
 }
 
@@ -21051,6 +21073,1259 @@ async function planRoomRetentionBesideExistingPass(plan: RoomRetentionPassPlan):
 		...(planned === undefined ? {} : { planned: planned.decision, writes: planned.writes }),
 		...(refused === undefined ? {} : { refused }),
 		turnover: plan.turnover, shortfall: plan.shortfall, selections: plan.decisions.map(decision => decision.selection) });
+}
+
+/**
+ * Slice 14b: one boundary's decisions, each class selected by its existing rule from one
+ * verified acquisition: stage 1's cold acquisition, or stage 2's ledger planner (the same
+ * classifier inputs, assembled from the ledger's facts and the boundary's fresh reads).
+ * Nothing here reads a store.
+ * @returns The plan, or the reason the boundary keeps the existing path.
+ */
+function buildRoomRetentionPassPlan(source: Readonly<{
+	input: Captured;
+	mode: RoomRetentionPassPlan["mode"];
+	open: RoomRetentionPassPlan["open"];
+	started: number;
+	floor: CreatorProtectedRecoveryRoleSummary["floor"];
+	summary: Summary;
+	reconstructed: boolean;
+	census: Uint8Array;
+	unclassifiedSigning: boolean;
+	unclassifiedGenerationReplay: boolean;
+	journalDetails: ClosedJournalDetailClassification;
+	journal: LiveJournalRetirementImageObservation;
+	retiring: SnapshotRecoveryRoleInventory["scopes"];
+	turnover: RoomRetentionPassPlan["turnover"] | undefined;
+	journalHeaders: ClosedRetirementSource["journalHeaders"];
+	signingEntries: readonly SigningEvidenceRetirementEntry[];
+	signingRows: readonly Uint8Array[];
+	generationData: ClosedGenerationClassificationData;
+	aheControl: AheRetirementControl | null;
+	snapshotImage: SnapshotRetirementImageObservation;
+	classificationTrusts: readonly CurrentAnchorTrust[];
+}>): Readonly<{ plan: RoomRetentionPassPlan } | { declined: string }> {
+	const { input, floor, summary, journal, journalDetails, snapshotImage, signingRows, generationData } = source;
+	const nativeScope = (scope: SnapshotQuarantineScopeKey): SnapshotQuarantineScopeKey =>
+		Object.freeze({ objectId: scope.objectId, epoch: scope.epoch, anchor: scope.anchor, manifestDigest: scope.manifestDigest });
+	const current = floor.stable;
+	const cuts = summary.cuts.filter(cut => cut.objectId === input.objectId &&
+		cut.successorAnchorDigest === current.currentAnchorDigest && cut.epoch + 1 === current.epoch);
+	requireLaw(cuts.length === 1 && floor.pending === null, "chain-invalid");
+	const through = cuts[0]!.epoch;
+	// A resumed existing-path drain owns this boundary.
+	if (source.reconstructed) return Object.freeze({ declined: "reconstructed" });
+	const censusFacts = record(source.census);
+	const nativeIssuance = censusFacts.nativeIssuance as Readonly<{ rows: IssuanceRetirementRows; control?: unknown }> | undefined;
+	requireLaw(nativeIssuance !== undefined && nativeIssuance !== null && nativeIssuance.control !== undefined, "snapshot-unavailable");
+	const issuance = Object.freeze({ protectedRecords: closedIssuanceProtectedRecordsForRetirement({ objectId: input.objectId,
+		throughEpoch: through, rows: nativeIssuance.rows, control: nativeIssuance.control as DurableIssuanceRetirementControl | null,
+		censusRows: censusFacts.rows, protectedReplayScopes: journalDetails.protectedReplayScopes,
+		physicalJournalRows: journal.canonicalRows,
+		dependenciesClassified: !source.unclassifiedSigning && !source.unclassifiedGenerationReplay }) });
+	const snapshot: RoomRetentionSelection["snapshot"] = source.turnover === undefined
+		? Object.freeze({ retire: Object.freeze([]), turnover: null })
+		: Object.freeze({
+			retire: Object.freeze(source.retiring.map(row => Object.freeze({ scope: nativeScope(row.scope), incarnation: row.incarnation }))),
+			turnover: source.turnover.decision,
+		});
+	// The exact header frames this acquisition verified (14b survivors), by scope.
+	const scopeFrames = new Map<string, string>();
+	for (const bytes of journal.canonicalRows) {
+		const frame = decodeCanonical(bytes) as unknown[];
+		if (!Array.isArray(frame) || frame[0] !== "scopes" || !Array.isArray(frame[1])) continue;
+		scopeFrames.set(JSON.stringify(frame[1]), journalRetirementFrameDigest(bytes));
+	}
+	const headerFrameOf = (scope: Readonly<{ objectId: string; epoch: number; anchorDigest: string }>): string => {
+		const digest = scopeFrames.get(JSON.stringify([scope.objectId, scope.epoch, scope.anchorDigest]));
+		requireLaw(digest !== undefined, "chain-invalid");
+		return digest;
+	};
+	const journalSelection: RoomRetentionSelection["journal"] = Object.freeze({
+		prefixes: Object.freeze(journalDetails.collectiblePrefixes.map(prefix => Object.freeze({
+			scope: Object.freeze({ objectId: prefix.scope.objectId, epoch: prefix.scope.epoch, anchorDigest: prefix.scope.anchorDigest }),
+			headerFrameDigest: headerFrameOf(prefix.scope),
+			highWatermark: prefix.highWatermark,
+			rows: Object.freeze(prefix.rows.map(row => Object.freeze({ journalSequence: row.journalSequence,
+				nativeFrameDigest: row.nativeFrameDigest }))),
+		}))),
+		headers: Object.freeze((source.journalHeaders?.retiredEmptyHeaders ?? []).map(header => Object.freeze({
+			scope: Object.freeze({ objectId: header.scope.objectId, epoch: header.scope.epoch, anchorDigest: header.scope.anchorDigest }),
+			nativeFrameDigest: journalRetirementFrameDigest(header.exactCanonicalNativeFrameBytes),
+		}))),
+		genesisAnchorDigest: input.pinnedGenesisAnchorDigest,
+	});
+	const evidence = Object.freeze(source.signingEntries.map(entry => Object.freeze({
+		key: Object.freeze([...entry.key]) as unknown as readonly [string, number, string],
+		revision: entry.revision, frameDigest: entry.frameDigest })));
+	const basis = closedRetirementDigest("ts-drp/room-retention-basis/v1", Uint8Array.from(source.census),
+		closedRetirementBytes({ through, epoch: current.epoch }));
+	let generation: ReturnType<typeof roomRetentionGenerationUnits>;
+	try {
+		generation = roomRetentionGenerationUnits({ frame: generationData, summary,
+			control: source.aheControl, basis,
+			unclassified: source.unclassifiedGenerationReplay || floor.pending !== null ||
+				censusFacts.activeUnsettled !== undefined || censusFacts.pendingIngress !== undefined });
+	} catch (error) {
+		// The existing AHE pass refuses after the other classes' passes applied.
+		if (!(error instanceof Refusal && error.result.kind === "snapshot-unavailable")) throw error;
+		generation = Object.freeze({ units: Object.freeze([]), shortfall: true });
+	}
+	// The survivors as this acquisition verified them: the AHE head, its rollbacks and
+	// every generation; the snapshot image; every closed journal header.
+	let aheImage = generation.units[0]?.sourceImageDigest;
+	if (aheImage === undefined) {
+		try {
+			aheImage = closedAheDataImage(summary.head as PresentHead, generationData.reader.generations);
+		} catch (error) {
+			// A generation outside the closed states: the retention path names no survivors.
+			if (!(error instanceof Refusal)) throw error;
+		}
+	}
+	// Each owner control exactly as this acquisition read it (14b): the owner's canonical
+	// control encoding; the signing owner's exact control frame.
+	const signingControlFrame = signingRows.find(bytes => {
+		const frame = decodeCanonical(bytes) as unknown[];
+		return Array.isArray(frame) && frame[0] === "storageMeta" && frame[1] === `signing-retirement:${input.objectId}`;
+	});
+	const issuanceControl = nativeIssuance.control as DurableIssuanceRetirementControl | null;
+	const controls: RoomRetentionControls | undefined = source.aheControl === null || journal.control === null ||
+		snapshotImage.control === null || signingControlFrame === undefined || issuanceControl === null
+		? undefined
+		: Object.freeze({
+			ahe: roomRetentionControlDigest(encodeAheRetirementControl(source.aheControl)),
+			journal: roomRetentionControlDigest(encodeJournalRetirementControl(journal.control)),
+			snapshot: roomRetentionControlDigest(snapshotRetirementContract.encodeControl(snapshotImage.control)),
+			signing: roomRetentionControlDigest(signingControlFrame),
+			issuance: roomRetentionControlDigest(encodeIssuanceRetirementControl(issuanceControl)),
+		});
+	if (aheImage === undefined) return Object.freeze({ declined: "ahe-image" });
+	if (controls === undefined) return Object.freeze({ declined: "control-birth" });
+	const survivorBasis: RoomRetentionSurvivorBasis = Object.freeze({
+		aheImage,
+		snapshotImage: snapshotImage.image.imageDigest,
+		journalHeaders: Object.freeze([...scopeFrames].flatMap(([key, nativeFrameDigest]) => {
+			const [objectId, epoch, anchorDigest] = JSON.parse(key) as [string, number, string];
+			return epoch <= through ? [Object.freeze({ scope: Object.freeze({ objectId, epoch, anchorDigest }), nativeFrameDigest })] : [];
+		})),
+		controls,
+	});
+	const initial = roomRetentionSurvivorTracker({ basis: survivorBasis,
+		decisions: [{ selection: { journal: journalSelection } }] }).current();
+	const base = { version: 1 as const, objectId: input.objectId, stableEpoch: current.epoch, throughEpoch: through, issuance,
+		survivors: initial.survivors, controls: initial.controls };
+	// One decision per boundary (14b, Track O amendment): each epoch's signing work
+	// (its evidence and the summaries the existing fresh rule selects on the image that
+	// evidence leaves) is one unit, so no committed continuation leaves summary rows in
+	// an epoch the signing control retires.
+	const decisions: RoomRetentionSelection[] = [Object.freeze({ ...base, snapshot, journal: journalSelection,
+		signing: Object.freeze({ evidence, summaries: roomRetentionSummarySelection({ objectId: input.objectId,
+			rows: signingRows, evidence: source.signingEntries, throughEpoch: through, journal: journalDetails,
+			trusts: source.classificationTrusts, unclassified: source.unclassifiedSigning }) }),
+		ahe: Object.freeze({ units: generation.units }) })];
+	return Object.freeze({ plan: Object.freeze({ input, mode: source.mode, open: source.open, epoch: current.epoch,
+		decisions: Object.freeze(decisions.map(selection => Object.freeze({ selection }))),
+		...(source.turnover === undefined ? {} : { turnover: source.turnover }),
+		shortfall: generation.shortfall, basis: survivorBasis, started: source.started,
+		acquiredMs: performance.now() - source.started }) });
+}
+
+// ---------------------------------------------------------------------------------
+// Slice 14b stage 2 (Track M2): the verified-fact ledger on the opted-in room path.
+//
+// - One ledger per live plane chain (V3PlaneRegistration.roomRetentionLedger): created by a
+//   complete stage-1 boundary (the open verification), forked only across a genuine
+//   handoff, released with its plane. A reopen or a non-genuine recovery starts empty.
+// - It holds only immutable signed facts keyed by the exact bytes they were verified from:
+//   the trusts of AHE generations authenticated as historical (keyed by the generation's
+//   exact record without its state), and of retained closed-cut source proofs. Never a
+//   census, a control, a floor, currency, accounting or authorization.
+// - A ledger boundary reads every currency fact once (floor, AHE census, snapshot pool,
+//   journal, controls, the lull hold's sealed census and signing rows), authenticates the
+//   two newest closed epochs and their recovery-role certificate freshly (the same
+//   authenticate), and takes from the ledger only facts whose exact key matches. The same
+//   classifiers and the same plan builder as stage 1 decide; step A and step B are stage
+//   1's, and step B re-checks every control, survivor and deleted row in its transaction.
+// - Anything the ledger cannot vouch for exactly (a missing or evicted fact, a gap in the
+//   chain, a rolled-back identity, a refused read) declines or drops the ledger, and the
+//   boundary runs stage 1, which re-verifies cold and records again.
+// ---------------------------------------------------------------------------------
+
+/** Bounds of one room's ledger (14e). Test hooks may only lower them. */
+const ROOM_RETENTION_LEDGER_LIMITS = Object.freeze({ maxEpochs: 8, maxBytes: 262_144 });
+
+type RoomRetentionLedgerRole = "creator" | "recipient";
+/** A boundary's facts before its decision applied (the record without `retired`). */
+type RoomRetentionLedgerDraft = Omit<RoomRetentionLedgerRecord, "retired">;
+
+/** Per AHE store: a ledger of this room recorded facts. Scheduling hint only, never authority. */
+const roomRetentionLedgerHints = new WeakMap<object, true>();
+/** Shadow mode: the ledger planner's plan for the boundary stage 1 decides next (test evidence). */
+const roomRetentionShadowPlans = new WeakMap<object, Readonly<{ epoch: number; role: RoomRetentionLedgerRole;
+	plan: RoomRetentionPassPlan }>>();
+
+/** Test hook (never authority): "apply" (default), "shadow" (stage 1 decides; the ledger
+ * planner plans beside it and the two are compared), or "off" (stage 1 alone). */
+function roomRetentionLedgerMode(): "apply" | "shadow" | "off" {
+	try {
+		const mode: unknown = Reflect.get(globalThis, "__roomRetentionLedgerMode");
+		return mode === "shadow" || mode === "off" ? mode : "apply";
+	} catch {
+		return "apply";
+	}
+}
+function roomRetentionLedgerLimits(): Readonly<{ maxEpochs: number; maxBytes: number; maxProofBytes: number }> {
+	const defaults = { ...ROOM_RETENTION_LEDGER_LIMITS, maxProofBytes: CREATOR_MAINTENANCE_PROOF_MAX_BYTES };
+	try {
+		const lowered: unknown = Reflect.get(globalThis, "__roomRetentionLedgerLimits");
+		if (lowered !== null && typeof lowered === "object") {
+			const lower = (name: keyof typeof defaults): number => {
+				const value: unknown = Reflect.get(lowered, name);
+				return Number.isSafeInteger(value) && (value as number) >= 0 ? Math.min(value as number, defaults[name]) : defaults[name];
+			};
+			return Object.freeze({ maxEpochs: lower("maxEpochs"), maxBytes: lower("maxBytes"), maxProofBytes: lower("maxProofBytes") });
+		}
+	} catch { /* Default bounds. */ }
+	return Object.freeze(defaults);
+}
+function observeRoomRetentionLedger(ledger: RoomRetentionLedger, event: Readonly<{ action: "recorded" | "declined" | "dropped";
+	epoch: number; role: RoomRetentionLedgerRole; source?: string; reason?: string }>): void {
+	observeRoomRetention({ kind: "room-retention-ledger", ...event, ledger: { id: ledger.id, generation: ledger.generation },
+		facts: ledger.size() });
+}
+
+/** The exact bytes a generation fact is keyed by: its record without its state (currency). */
+function roomRetentionGenerationKey(row: GenerationRecord): string {
+	return closedRetirementDigest("ts-drp/room-retention-ledger-generation/v1", closedRetirementBytes({ objectId: row.objectId,
+		generationId: row.generationId, baseExpectedHead: row.baseExpectedHead, closureDigest: row.closureDigest, closure: row.closure }));
+}
+/** A retained closed cut's source proof: the cut's identity and the generation proving it. */
+function roomRetentionCutKey(cut: Pick<CutSummary, "epoch" | "closedAnchorDigest">, row: GenerationRecord): string {
+	return closedRetirementDigest("ts-drp/room-retention-ledger-cut/v1", closedRetirementBytes({ epoch: cut.epoch,
+		anchor: cut.closedAnchorDigest, generation: roomRetentionGenerationKey(row) }));
+}
+/**
+ * The exact bytes a historical generation's verification depended on. A generation that
+ * carries its own projection (or genesis) is verified from its own bytes; a closed Q is
+ * verified as an advance from the unique predecessor generation, so its key also binds
+ * that predecessor's exact record.
+ * @returns The key, or undefined when no unique predecessor exists (never ledgered).
+ */
+function roomRetentionExcludedKey(source: Pick<AheBoundedActiveRead, "generations" | "blobs">, row: GenerationRecord, n: number,
+	candidate: CreatorClosedAcquisitionSyntax["candidate"]): string | undefined {
+	const own = roomRetentionGenerationKey(row);
+	if (n === 0 || candidate(view(source, source.generations.indexOf(row)).candidates, "v3-live-generation-2", n) !== undefined)
+		return own;
+	const previous = source.generations.filter((_, index) => {
+		const closure = view(source, index);
+		return candidate(closure.candidates, "drp-anchor-trust-state", n - 1) !== undefined &&
+			candidate(closure.candidates, n === 1 ? "v3-live-generation-1" : "v3-live-generation-2", n - 1) !== undefined;
+	});
+	if (previous.length !== 1 || previous[0] === undefined) return undefined;
+	return closedRetirementDigest("ts-drp/room-retention-ledger-advance/v1", closedRetirementBytes({ generation: own,
+		previous: roomRetentionGenerationKey(previous[0]) }));
+}
+/**
+ * The bytes a held trust retains (14e): its identity and the signed anchor material its
+ * genuine registration keeps alive while the ledger holds it.
+ * @returns The bytes, or undefined for a trust without genuine registration (never held).
+ */
+function roomRetentionTrustBytes(trust: CurrentAnchorTrust): number | undefined {
+	const material = resolveSealRecoveryTrust(trust);
+	if (material === undefined) return undefined;
+	return closedRetirementBytes({ objectId: trust.objectId, genesisAnchorDigest: trust.genesisAnchorDigest, profileId: trust.profileId,
+		currentEpoch: trust.currentEpoch, currentAnchorDigest: trust.currentAnchorDigest }).byteLength +
+		material.detachedCurrentAnchorSignature.byteLength + material.exactCanonicalCurrentAnchorPreimageBytes.byteLength +
+		material.exactCanonicalProfileBytes.byteLength + material.exactCanonicalSignerSetBytes.byteLength + material.publicKey.byteLength;
+}
+
+interface RoomRetentionLedgerCollector {
+	generation(epoch: number, key: string, trusts: readonly CurrentAnchorTrust[]): void;
+	cut(epoch: number, key: string, trusts: readonly CurrentAnchorTrust[]): void;
+	finish(identity: Omit<RoomRetentionLedgerDraft, "epochs" | "excluded">): RoomRetentionLedgerDraft;
+}
+/** Collects one boundary's verified facts (fresh or replayed) for its record. */
+function roomRetentionLedgerCollector(): RoomRetentionLedgerCollector {
+	const epochs = new Map<number, { trusts: Map<string, object>; excluded: Set<string>; cuts: Set<string>; bytes: number }>();
+	const excluded: string[] = [];
+	const add = (kind: "excluded" | "cuts", epoch: number, key: string, trusts: readonly CurrentAnchorTrust[]): void => {
+		// The genuine trust objects the verification produced (their registration is their
+		// authority: a copy is foreign), with the bytes they retain.
+		const [trust, predecessor] = trusts;
+		const trustBytes = trust === undefined ? 0 : roomRetentionTrustBytes(trust);
+		const predecessorBytes = predecessor === undefined ? 0 : roomRetentionTrustBytes(predecessor);
+		if (trustBytes === undefined || predecessorBytes === undefined) return;
+		let facts = epochs.get(epoch);
+		if (facts === undefined) epochs.set(epoch, facts = { trusts: new Map(), excluded: new Set(), cuts: new Set(), bytes: 0 });
+		if (facts[kind].has(key)) return;
+		facts[kind].add(key);
+		facts.bytes += key.length + trustBytes + predecessorBytes;
+		if (trust !== undefined) facts.trusts.set(`${key}#trust`, trust);
+		if (predecessor !== undefined) facts.trusts.set(`${key}#predecessor`, predecessor);
+		if (kind === "excluded") excluded.push(key);
+	};
+	return Object.freeze({
+		generation: (epoch: number, key: string, trusts: readonly CurrentAnchorTrust[]) => add("excluded", epoch, key, trusts),
+		cut: (epoch: number, key: string, trusts: readonly CurrentAnchorTrust[]) => add("cuts", epoch, key, trusts),
+		finish: (identity: Omit<RoomRetentionLedgerDraft, "epochs" | "excluded">): RoomRetentionLedgerDraft => Object.freeze({
+			...identity, excluded: Object.freeze([...excluded]),
+			epochs: new Map([...epochs].map(([epoch, facts]) => [epoch, Object.freeze({ trusts: facts.trusts, excluded: facts.excluded,
+				cuts: facts.cuts, bytes: facts.bytes })])),
+		}),
+	});
+}
+
+/** Identities an applied boundary retired. One present again later is a rollback. */
+function roomRetentionRetiredIdentities(decisions: readonly RoomRetentionDecisionPlan[]): readonly string[] {
+	const retired = new Set<string>();
+	for (const { selection } of decisions) {
+		for (const unit of selection.ahe.units as readonly AheRetirementGenerationSource[]) {
+			for (const index of unit.generations.retireIndices) {
+				const identity = unit.generations.identities[index];
+				if (identity !== undefined) retired.add(`ahe:${identity.generationId}`);
+			}
+			for (const generationId of unit.reclamation.lineageFloor.deleteGenerationIds) retired.add(`ahe:${generationId}`);
+		}
+		for (const row of selection.snapshot.retire)
+			retired.add(`snapshot:${JSON.stringify([row.scope.objectId, row.scope.epoch, row.scope.anchor, row.scope.manifestDigest])}`);
+		for (const header of selection.journal.headers)
+			retired.add(`journal:${JSON.stringify([header.scope.objectId, header.scope.epoch, header.scope.anchorDigest])}`);
+	}
+	return Object.freeze([...retired]);
+}
+
+/** What a boundary's applied pass records, or its refusal drops. */
+interface RoomRetentionLedgerCommit {
+	commit(decisions: readonly RoomRetentionDecisionPlan[]): void;
+	drop(reason: string): void;
+}
+function roomRetentionLedgerCommit(context: Readonly<{ ledger: RoomRetentionLedger; store: object; role: RoomRetentionLedgerRole;
+	epoch: number; source: "boundary" | "open-verification"; draft: RoomRetentionLedgerDraft }>): RoomRetentionLedgerCommit {
+	const { ledger, store, role, epoch } = context;
+	return Object.freeze({
+		commit: (decisions: readonly RoomRetentionDecisionPlan[]): void => {
+			const recorded = ledger.record(Object.freeze({ ...context.draft, retired: roomRetentionRetiredIdentities(decisions) }),
+				roomRetentionLedgerLimits());
+			if (recorded.ok) {
+				roomRetentionLedgerHints.set(store, true);
+				observeRoomRetentionLedger(ledger, { action: "recorded", source: context.source, epoch, role });
+			} else {
+				// Over the byte cap the ledger was cleared whole: never trusted in part.
+				roomRetentionLedgerHints.delete(store);
+				observeRoomRetentionLedger(ledger, { action: "dropped", reason: recorded.reason, epoch, role });
+			}
+		},
+		drop: (reason: string): void => {
+			ledger.drop();
+			roomRetentionLedgerHints.delete(store);
+			observeRoomRetentionLedger(ledger, { action: "dropped", reason, epoch, role });
+		},
+	});
+}
+
+/**
+ * Stage 1's open verification seeds (or renews) the ledger: the facts its complete cold
+ * acquisition verified, recorded only if its decision applies. Never changes the decision.
+ * @returns The plan, with the ledger commit attached when this plane has a ledger.
+ */
+function seedRoomRetentionLedger(plan: RoomRetentionPassPlan, source: Readonly<{
+	lifetime: NonNullable<ReturnType<typeof resolveCreatorSnapshotRecoveryCloseHold>>;
+	frame: ImportFrame;
+	reader: Pick<AheBoundedActiveRead, "generations" | "blobs">;
+	summary: Summary;
+	currentTrust: CurrentAnchorTrust;
+	role: RoomRetentionLedgerRole;
+}>): RoomRetentionPassPlan {
+	if (roomRetentionLedgerMode() === "off") return plan;
+	try {
+		const ledger = source.lifetime.captureRoomRetentionLedger?.(true);
+		if (ledger === undefined) return plan;
+		const { frame, currentTrust } = source;
+		const sameIdentity = (trust: CurrentAnchorTrust): boolean => trust.objectId === plan.input.objectId &&
+			trust.genesisAnchorDigest === currentTrust.genesisAnchorDigest && trust.profileId === currentTrust.profileId;
+		const trusts = new Map<string, CurrentAnchorTrust>();
+		for (const trust of frame.recoveryTrusts)
+			if (sameIdentity(trust)) trusts.set(`${trust.currentEpoch}:${trust.currentAnchorDigest}`, trust);
+		const pairOf = (epoch: number, carrier: Readonly<Record<string, unknown>>): readonly CurrentAnchorTrust[] | undefined => {
+			const trust = trusts.get(`${epoch}:${String(carrier.currentAnchorDigest)}`);
+			const predecessor = trusts.get(`${epoch - 1}:${String(anchorOf(carrier).previousAnchor)}`);
+			return trust === undefined || predecessor === undefined ? undefined : [trust, predecessor];
+		};
+		const collector = roomRetentionLedgerCollector();
+		const reader = source.reader;
+		const generations = reader.generations;
+		for (const row of frame.authenticatedExcludedGenerations ?? []) {
+			const index = generations.findIndex(actual => actual.generationId === row.generationId);
+			const actual = generations[index];
+			if (actual === undefined || !closedRetirementEqual(actual, row)) return plan;
+			const carrier = record(unique(view(reader, index), "drp-anchor-trust-state").bytes);
+			const n = Number(carrier.currentEpoch);
+			const key = roomRetentionExcludedKey(reader, actual, n, uniqueCreatorTransitionCandidate);
+			if (key === undefined) continue;
+			if (n === 0) {
+				collector.generation(0, key, []);
+				continue;
+			}
+			const pair = pairOf(n, carrier);
+			if (pair !== undefined) collector.generation(n, key, pair);
+		}
+		for (const cut of source.summary.cuts.filter(cut => cut.epoch > 0)) {
+			const matches = generations.map((row, index) => ({ row, closure: view(reader, index) })).filter(({ closure }) =>
+				uniqueCreatorTransitionCandidate(closure.candidates, "drp-anchor-trust-state", cut.epoch) !== undefined &&
+				uniqueCreatorTransitionCandidate(closure.candidates, "v3-live-generation-2", cut.epoch) !== undefined);
+			const selected = matches[0];
+			if (matches.length !== 1 || selected === undefined) continue;
+			const carrier = record(unique(selected.closure, "drp-anchor-trust-state", cut.epoch).bytes);
+			if (carrier.currentAnchorDigest !== cut.closedAnchorDigest) continue;
+			const pair = pairOf(cut.epoch, carrier);
+			if (pair !== undefined) collector.cut(cut.epoch, roomRetentionCutKey(cut, selected.row), pair);
+		}
+		const draft = collector.finish({ objectId: plan.input.objectId, pinnedGenesisAnchorDigest: plan.input.pinnedGenesisAnchorDigest,
+			boundaryEpoch: plan.epoch, boundaryAnchorDigest: currentTrust.currentAnchorDigest });
+		return Object.freeze({ ...plan, acquisition: "cold" as const, ledger: roomRetentionLedgerCommit({ ledger,
+			store: plan.input.store as object, role: source.role, epoch: plan.epoch,
+			source: ledger.current() === undefined ? "open-verification" as const : "boundary" as const, draft }) });
+	} catch {
+		// Seeding never changes stage 1's decision; without a record the next boundary is cold.
+		return plan;
+	}
+}
+
+/** Shadow evidence: stage 1's plan against the ledger planner's for the same boundary. */
+function compareRoomRetentionShadow(store: object, epoch: number, role: RoomRetentionLedgerRole,
+	stage1: RoomRetentionPassPlan | undefined): void {
+	const shadow = roomRetentionShadowPlans.get(store);
+	if (shadow === undefined) return;
+	roomRetentionShadowPlans.delete(store);
+	const differences: string[] = [];
+	const same = (field: string, left: unknown, right: unknown): void => {
+		try {
+			if (!closedRetirementEqual(left, right)) differences.push(field);
+		} catch {
+			differences.push(`${field}:unencodable`);
+		}
+	};
+	if (shadow.epoch !== epoch) differences.push("epoch");
+	if (stage1 === undefined) differences.push("stage1-declined");
+	else {
+		same("turnover", shadow.plan.turnover ?? null, stage1.turnover ?? null);
+		same("shortfall", shadow.plan.shortfall, stage1.shortfall);
+		same("basis", shadow.plan.basis, stage1.basis);
+		if (shadow.plan.decisions.length !== stage1.decisions.length) differences.push("decisions");
+		for (const [index, decision] of stage1.decisions.entries()) {
+			const left = shadow.plan.decisions[index]?.selection;
+			const right = decision.selection;
+			if (left === undefined) continue;
+			for (const field of ["stableEpoch", "throughEpoch", "snapshot", "journal", "signing", "ahe", "issuance", "survivors",
+				"controls"] as const)
+				same(`decisions[${index}].${field}`, left[field], right[field]);
+		}
+	}
+	observeRoomRetention({ kind: "room-retention-ledger-shadow", epoch, role, equal: differences.length === 0, differences });
+}
+
+/** A ledger boundary that leaves the decision to stage 1. `drop` discards the ledger's
+ * facts (a mismatch, a gap, a rollback); otherwise they are kept (a bound, a shape). */
+class RoomRetentionLedgerDecline {
+	constructor(readonly reason: string, readonly drop: boolean) {}
+}
+function roomRetentionLedgerDeclineOf(error: unknown): Readonly<{ reason: string; drop: boolean }> | undefined {
+	if (error instanceof RoomRetentionLedgerDecline) return Object.freeze({ reason: error.reason, drop: error.drop });
+	// A failed release of something the planner borrowed is not a decline: it propagates.
+	if (error instanceof AggregateError) return undefined;
+	if (error instanceof Refusal) {
+		if (error.result.kind === "aborted") return undefined;
+		if (error.result.kind === "proof-budget-exceeded") return Object.freeze({ reason: "budget", drop: false });
+		return Object.freeze({ reason: `refused:${error.result.kind}${error.result.cause === undefined ? "" :
+			`:${error.result.cause.owner}:${error.result.cause.reason.slice(0, 128)}`}`, drop: true });
+	}
+	if (error instanceof RoleRefusal) return Object.freeze({ reason: `refused:${error.result.kind}`, drop: true });
+	return Object.freeze({ reason: `failed:${error instanceof Error ? error.message.slice(0, 128) : "unknown"}`, drop: true });
+}
+
+/** A room host whose plane may hold ledger facts (cheap point checks before any hold). */
+function roomRetentionLedgerCandidate(captured: Captured): boolean {
+	const store = captured.store as object;
+	return roomRetentionLedgerMode() !== "off" && roomRetentionLedgerHints.has(store) && !roomRetentionFallbacks.has(store) &&
+		v3RoomRetentionOpener(captured.store) !== undefined;
+}
+
+/**
+ * The excluded-generation authentication of the existing acquisition, on the ledger: a
+ * generation whose exact key the ledger holds replays its verified trusts (its census
+ * structure is still checked); any other is authenticated by the same openers. A key the
+ * ledger recorded but no longer holds (evicted) is never re-trusted: the boundary declines.
+ */
+async function authenticateRoomRetentionExcludedGenerations(context: Readonly<{
+	input: Captured;
+	reader: AheBoundedRecoveryRoleRead;
+	currentTrust: CurrentAnchorTrust;
+	pin: CurrentAnchorTrust;
+	frame: ImportFrame | CreatorClosedProofWork;
+	rows: readonly GenerationRecord[];
+	parsing: CreatorClosedAcquisitionSyntax;
+	prior: RoomRetentionLedgerRecord;
+	collector: RoomRetentionLedgerCollector;
+}>): Promise<void> {
+	const { input, reader, currentTrust, pin, frame, parsing, prior, collector } = context;
+	const selected = context.rows.map((row) => {
+		requireLaw(row.objectId === input.objectId && row.state === "Superseded", "chain-invalid");
+		const closure = view(reader, reader.generations.indexOf(row)),
+			carrier = parsing.unique(closure, "drp-anchor-trust-state"),
+			n = Number(parsing.record(carrier.bytes).currentEpoch);
+		requireLaw(Number.isSafeInteger(n) && n >= 0 && n < currentTrust.currentEpoch, "chain-invalid");
+		return { row, closure, n, key: roomRetentionExcludedKey(reader, row, n, parsing.candidate) };
+	});
+	const n = currentTrust.currentEpoch,
+		minimum = Math.min(n, ...selected.filter((item) => item.n > 0).map((item) => Math.max(1, item.n - 1)));
+	requireLaw(n - minimum <= 6, "proof-budget-exceeded");
+	const current = reader.generations
+		.map((_, index) => view(reader, index))
+		.find((closure) => parsing.candidate(closure.candidates, "drp-anchor-trust-state", n) !== undefined &&
+			parsing.candidate(closure.candidates, "v3-live-generation-2", n) !== undefined);
+	requireLaw(current !== undefined, "chain-invalid");
+	// The same original anchor chain (the boundary's captured journal image; it also names
+	// the same header scopes stage 1's acquisition reads).
+	let anchorDigest = String(parsing.anchorOf(parsing.record(parsing.unique(current, "drp-anchor-trust-state", n).bytes)).previousAnchor);
+	const chain: InstallLiveJournalGenesisInput[] = [];
+	for (let epoch = n - 1; epoch >= minimum; epoch--) {
+		checkAbort(input.signal);
+		const original = await readHeldSourceEnvelope(input, {
+			scope: { objectId: input.objectId, epoch, anchorDigest },
+			maxBytes: closedSignedAnchorEnvelopeAllowance(),
+		});
+		requireLaw(original.ok && original.kind === "present", "anchor-unavailable");
+		for (const bytes of [original.envelope.exactCanonicalAnchorPreimageBytes, original.envelope.detachedAnchorSignature,
+			original.envelope.exactCanonicalParametersCarrierBytes])
+			requireLaw(frame.accounting.charge(bytes), "proof-budget-exceeded");
+		chain.push(original.envelope);
+		anchorDigest = String(parsing.record(original.envelope.exactCanonicalAnchorPreimageBytes).previousAnchor);
+	}
+	const proved: CurrentAnchorTrust[] = [];
+	for (const item of selected) {
+		// Without a key (a closed Q with no unique predecessor) the fresh path refuses below.
+		const facts = item.key === undefined ? undefined : prior.epochs.get(item.n);
+		const ledgered = item.key !== undefined && facts?.excluded.has(item.key) === true;
+		if (!ledgered && item.key !== undefined && prior.excluded.includes(item.key))
+			throw new RoomRetentionLedgerDecline("missing", false);
+		if (item.n === 0) {
+			if (!ledgered)
+				authenticateRole(input, reader, [item.row],
+					{ epoch: 0, objectId: input.objectId, currentAnchorDigest: pin.currentAnchorDigest }, pin,
+					parsing.record(input.exactCanonicalPinnedGenesisTrustStateRecordBytes), frame.accounting,
+					{ owner: "ahe", role: "unclassified", objectId: input.objectId, generationId: item.row.generationId }, parsing);
+			if (item.key !== undefined) collector.generation(0, item.key, []);
+			continue;
+		}
+		let trust: CurrentAnchorTrust, predecessor: CurrentAnchorTrust;
+		if (ledgered && facts !== undefined) {
+			const replayed = facts.trusts.get(`${item.key}#trust`), replayedPredecessor = facts.trusts.get(`${item.key}#predecessor`);
+			if (replayed === undefined || replayedPredecessor === undefined) throw new RoomRetentionLedgerDecline("missing", false);
+			trust = replayed as CurrentAnchorTrust;
+			predecessor = replayedPredecessor as CurrentAnchorTrust;
+		} else {
+			const opened = openCreatorSnapshotRecoverySourceTrust({
+				currentTrust,
+				closure: item.closure,
+				anchorChain: chain,
+				exactCanonicalPinnedGenesisTrustStateRecordBytes: input.exactCanonicalPinnedGenesisTrustStateRecordBytes,
+			});
+			requireLaw(opened.ok, "chain-invalid");
+			requireLaw(frame.accounting.charge(opened.derivedPredecessorTrustStateRecordBytes), "proof-budget-exceeded");
+			trust = opened.trust;
+			predecessor = opened.predecessorTrust;
+		}
+		const projection = parsing.candidate(item.closure.candidates, "v3-live-generation-2", item.n);
+		if (projection !== undefined) {
+			requireLaw(creatorSnapshotProjectionAuthorityMatches(parsing.record(projection.bytes),
+				parsing.anchorOf(parsing.record(parsing.unique(item.closure, "drp-anchor-trust-state", item.n).bytes)),
+				trust.currentAnchorDigest), "chain-invalid");
+		} else {
+			// A closed Q: its census structure is checked at every boundary; its full advance
+			// (signatures) only when it was not verified on these exact bytes before.
+			const previous = reader.generations
+				.map((_, index) => view(reader, index))
+				.filter((closure) => parsing.candidate(closure.candidates, "drp-anchor-trust-state", item.n - 1) !== undefined &&
+					parsing.candidate(closure.candidates, item.n === 1 ? "v3-live-generation-1" : "v3-live-generation-2", item.n - 1) !==
+						undefined);
+			requireLaw(previous.length === 1 && previous[0] !== undefined, "chain-invalid");
+			if (!ledgered) {
+				const cut = parsing.unique(item.closure, "drp-hard-epoch-cut", item.n - 1),
+					qc = parsing.unique(item.closure, "drp-seal-qc", item.n - 1);
+				requireLaw(inspectCreatorTransitionAdvance({ current: previous[0], proposed: item.closure, currentTrust: predecessor,
+					successorTrust: trust, mode: "verify", proofRefs: [cut.ref, qc.ref] }).ok, "chain-invalid");
+			}
+		}
+		proved.push(trust, predecessor);
+		if (item.key !== undefined) collector.generation(item.n, item.key, [trust, predecessor]);
+	}
+	// No currency check here: the acting transaction (step B) checks every row it relies on.
+	requireLaw(creatorClosedProofWorkAvailable(frame), "snapshot-unavailable");
+	for (const trust of proved) {
+		frame.recoveryTrusts.add(trust);
+		frame.signingRoleTrusts.add(trust);
+	}
+}
+
+/** The retained-cut source proofs of the existing acquisition, on the ledger (a cut whose
+ * exact proof the ledger holds replays its trusts; the newest cut is always opened). */
+async function authenticateRoomRetentionRetainedCuts(context: Readonly<{
+	input: Captured;
+	reader: AheBoundedRecoveryRoleRead;
+	forward: NonNullable<ObservationFacts["forward"]>;
+	summary: Summary;
+	required: readonly GenerationRecord[];
+	frame: ImportFrame | CreatorClosedProofWork;
+	parsing: CreatorClosedAcquisitionSyntax;
+	prior: RoomRetentionLedgerRecord;
+	collector: RoomRetentionLedgerCollector;
+}>): Promise<void> {
+	const { input, reader, forward, frame: work, parsing, prior, collector } = context;
+	const retainedCuts = context.summary.cuts.filter((cut) => cut.epoch > 0);
+	if (retainedCuts.length === 0) return;
+	const minimumEpoch = Math.min(...retainedCuts.map((cut) => cut.epoch - 1));
+	const n = forward.currentTrust.currentEpoch;
+	requireLaw(n - minimumEpoch <= 6, "proof-budget-exceeded");
+	const chain: InstallLiveJournalGenesisInput[] = [];
+	const currentRow = forward.rows[0];
+	requireLaw(currentRow !== undefined);
+	const current = view(reader, reader.generations.indexOf(currentRow));
+	let anchorDigest = String(parsing.anchorOf(parsing.record(parsing.unique(current, "drp-anchor-trust-state", n).bytes)).previousAnchor);
+	for (let epoch = n - 1; epoch >= minimumEpoch; epoch--) {
+		checkAbort(input.signal);
+		const original = await readHeldSourceEnvelope(input, {
+			scope: { objectId: input.objectId, epoch, anchorDigest },
+			maxBytes: closedSignedAnchorEnvelopeAllowance(),
+		});
+		requireLaw(original.ok && original.kind === "present", "anchor-unavailable");
+		for (const bytes of [original.envelope.exactCanonicalAnchorPreimageBytes, original.envelope.detachedAnchorSignature,
+			original.envelope.exactCanonicalParametersCarrierBytes])
+			requireLaw(work.accounting.charge(bytes), "proof-budget-exceeded");
+		chain.push(original.envelope);
+		anchorDigest = String(parsing.record(original.envelope.exactCanonicalAnchorPreimageBytes).previousAnchor);
+	}
+	const proved: CurrentAnchorTrust[] = [];
+	for (const cut of retainedCuts) {
+		const matches = reader.generations
+			.map((row, index) => ({ row, closure: view(reader, index) }))
+			.filter(({ closure }) => parsing.candidate(closure.candidates, "drp-anchor-trust-state", cut.epoch) !== undefined &&
+				parsing.candidate(closure.candidates, "v3-live-generation-2", cut.epoch) !== undefined);
+		const selected = matches[0];
+		requireLaw(matches.length === 1 && selected !== undefined && selected.row.objectId === input.objectId &&
+			(selected.row.state === "Adopted" || selected.row.state === "Superseded") &&
+			context.required.some((row) => compareBytes(encodeCanonical(row), encodeCanonical(selected.row)) === 0));
+		const carrier = parsing.record(parsing.unique(selected.closure, "drp-anchor-trust-state", cut.epoch).bytes);
+		requireLaw(cut.objectId === input.objectId && carrier.currentAnchorDigest === cut.closedAnchorDigest);
+		const key = roomRetentionCutKey(cut, selected.row);
+		const facts = prior.epochs.get(cut.epoch);
+		const replayed = facts?.cuts.has(key) === true ? facts.trusts.get(`${key}#trust`) : undefined;
+		const replayedPredecessor = facts?.cuts.has(key) === true ? facts.trusts.get(`${key}#predecessor`) : undefined;
+		if (replayed !== undefined && replayedPredecessor !== undefined) {
+			proved.push(replayed as CurrentAnchorTrust, replayedPredecessor as CurrentAnchorTrust);
+			collector.cut(cut.epoch, key, [replayed as CurrentAnchorTrust, replayedPredecessor as CurrentAnchorTrust]);
+			continue;
+		}
+		const opened = openCreatorSnapshotRecoverySourceTrust({
+			currentTrust: forward.currentTrust,
+			closure: selected.closure,
+			anchorChain: chain,
+			exactCanonicalPinnedGenesisTrustStateRecordBytes: input.exactCanonicalPinnedGenesisTrustStateRecordBytes,
+		});
+		requireLaw(opened.ok, "chain-invalid");
+		requireLaw(work.accounting.charge(opened.derivedPredecessorTrustStateRecordBytes), "proof-budget-exceeded");
+		const predecessor = parsing.record(opened.derivedPredecessorTrustStateRecordBytes);
+		requireLaw(
+			opened.trust.currentEpoch === cut.epoch &&
+				opened.trust.currentAnchorDigest === cut.closedAnchorDigest &&
+				opened.predecessorTrust.currentEpoch === cut.epoch - 1 &&
+				opened.predecessorTrust.currentAnchorDigest === predecessor.currentAnchorDigest &&
+				opened.predecessorTrust.objectId === input.objectId &&
+				opened.predecessorTrust.genesisAnchorDigest === forward.currentTrust.genesisAnchorDigest &&
+				opened.predecessorTrust.profileId === forward.currentTrust.profileId
+		);
+		proved.push(opened.trust, opened.predecessorTrust);
+		collector.cut(cut.epoch, key, [opened.trust, opened.predecessorTrust]);
+	}
+	requireLaw(creatorClosedProofWorkAvailable(work), "snapshot-unavailable");
+	for (const trust of proved) {
+		work.recoveryTrusts.add(trust);
+		work.signingRoleTrusts.add(trust);
+	}
+}
+
+/**
+ * Slice 14b stage 2: one boundary's retention plan from the ledger plus ONE read pass of
+ * the boundary's currency, controls and census. The two newest closed epochs and their
+ * recovery-role certificate are authenticated freshly by the original `authenticate`;
+ * the ledger supplies only historical-generation and retained-cut trusts whose exact keys
+ * match. Then exactly stage 1's composites, classifiers and plan builder. Holds no native
+ * reservation: everything it read or borrowed is released before it returns.
+ * @returns The plan and the facts to record when its decision applies.
+ */
+async function planRoomRetentionFromLedger(context: Readonly<{
+	captured: Captured;
+	closeHold: CreatorSnapshotRecoveryCloseHold;
+	lifetime: NonNullable<ReturnType<typeof resolveCreatorSnapshotRecoveryCloseHold>>;
+	prior: RoomRetentionLedgerRecord;
+	open: RoomRetentionPassPlan["open"];
+	started: number;
+	progress: { epoch: number };
+	/** The creator's genuine current trust (a recipient authenticates from the pin alone). */
+	currentTrust?: CurrentAnchorTrust;
+}>): Promise<Readonly<{ plan: RoomRetentionPassPlan; draft: RoomRetentionLedgerDraft }>> {
+	const { closeHold, lifetime, prior } = context;
+	// This planner's own header session owner (the captured image only; no journal hold).
+	const input: Captured = Object.freeze({ ...context.captured });
+	const decline: (reason: string, drop?: boolean) => never = (reason, drop = false) => {
+		throw new RoomRetentionLedgerDecline(reason, drop);
+	};
+	if (prior.objectId !== input.objectId || prior.pinnedGenesisAnchorDigest !== input.pinnedGenesisAnchorDigest)
+		decline("foreign", true);
+	const nativeObject = parseStorageObjectId(input.objectId);
+	requireLaw(nativeObject.ok, "internal-invariant");
+	const floorScope = Object.freeze({ objectId: input.objectId, pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest });
+	const scopeKey = (scope: SnapshotQuarantineScopeKey): string =>
+		JSON.stringify([scope.objectId, scope.epoch, scope.anchor, scope.manifestDigest]);
+	const nativeScope = (scope: SnapshotQuarantineScopeKey): SnapshotQuarantineScopeKey =>
+		Object.freeze({ objectId: scope.objectId, epoch: scope.epoch, anchor: scope.anchor, manifestDigest: scope.manifestDigest });
+	const parsing = createCreatorClosedAcquisitionSyntax();
+	const accounting = createCreatorClosedRollbackProofAccounting([], true);
+	const charge = (bytes: Uint8Array): void => requireLaw(accounting.charge(bytes), "proof-budget-exceeded");
+	const held: HeldTarget[] = [];
+	const installed: Awaited<ReturnType<typeof acquireCreatorInstalledPromotion>>[] = [];
+	const certificates: RecoveryRoleCertificate[] = [];
+	let reader: AheBoundedRecoveryRoleRead | undefined;
+	let closeDependencies: CreatorSnapshotRecoveryCloseDependencyRead | undefined;
+	let signingDependencies: CreatorSigningDependencyRead | undefined;
+	let primary: unknown, failed = false;
+	let result: Readonly<{ plan: RoomRetentionPassPlan; draft: RoomRetentionLedgerDraft }> | undefined;
+	try {
+		checkAbort(input.signal);
+		// One read of each currency fact of this boundary (never ledgered).
+		const inventory = await snapshotCall(() => bindMethod<
+			NonNullable<SnapshotRecoveryStore<SnapshotVerificationReceipt>["captureRecoveryRoleInventory"]>
+		>(input.snapshotStore, "captureRecoveryRoleInventory")({ objectId: input.objectId }, { signal: input.signal }));
+		// Inherited classification and legacy scopes stay with stage 1.
+		if (inventory.owner.migration !== "ready" || inventory.legacyScopes !== undefined) decline("inherited");
+		const floor = captureCreatorRoomHeadState(await input.floorRead({ scope: floorScope }), input.objectId,
+			input.pinnedGenesisAnchorDigest);
+		requireLaw(floor.ok, "floor-invalid");
+		if (floor.state.pending !== null) decline("floor-pending");
+		requireLaw(floor.state.stable.epoch >= 2, "snapshot-unavailable");
+		const epoch = floor.state.stable.epoch;
+		context.progress.epoch = epoch;
+		// Facts of this live session's chain only: its previous boundary, or this one again.
+		if (prior.boundaryEpoch !== epoch && prior.boundaryEpoch + 1 !== epoch) decline("stale", true);
+		// A test mode other than "apply" is stage 1's: it receives this same answer.
+		const mode = roomRetentionTestMode(epoch, input.objectId);
+		if (mode !== "apply") {
+			roomRetentionModeCarry.set(input.store as object, Object.freeze({ epoch, objectId: input.objectId, mode }));
+			decline("mode");
+		}
+		const journal = await bindMethod<NonNullable<DurableLiveJournalStore["readRetirementImage"]>>(
+			input.liveJournalStore, "readRetirementImage")({ objectId: input.objectId });
+		requireLaw(journal.ok, "anchor-unavailable");
+		const snapshotImage = await snapshotCall(() => bindMethod<
+			NonNullable<SnapshotRecoveryStore<SnapshotVerificationReceipt>["readRetirementImage"]>
+		>(input.snapshotStore, "readRetirementImage")({ objectId: input.objectId }));
+		const aheControl = await bindMethod<NonNullable<AheBoundedRecoveryRoleStore["readRetirementControl"]>>(
+			input.store, "readRetirementControl")(nativeObject.value);
+		if (!aheControl.ok) throw new Refusal(failure("ahe-rejected", "ahe", `RETIREMENT_SOURCE_CONTROL:${aheControl.reason}`));
+		const floorImage = await bindMethod<(arg: Readonly<{ scope: typeof floorScope }>) => Promise<ClosedRetirementSource["floorImage"]>>(
+			input.roomHeadAuthority, "readRetirementImage")({ scope: floorScope });
+		for (const bytes of [...journal.value.canonicalRows, ...closedJournalNativeControlCarriers(journal.value),
+			closedRetirementBytes(snapshotImage),
+			aheControl.value === null ? closedRetirementBytes(null) : encodeAheRetirementControl(aheControl.value),
+			closedRetirementBytes(floorImage), creatorClosedSnapshotRoleInventoryBytes(inventory)]) charge(bytes);
+		// The header session reads this boundary's captured journal image only (pure).
+		sourceHeaderSessions.set(input, { image: journal.value, scopes: new Map() });
+		const pin = openCurrentAnchorTrust({
+			exactCanonicalTrustStateRecordBytes: input.exactCanonicalPinnedGenesisTrustStateRecordBytes,
+			expectedObjectId: input.objectId,
+			pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest,
+		});
+		requireLaw(pin.ok && pin.trust.currentEpoch === 0);
+		const acquired = await bindMethod<AheBoundedRecoveryRoleStore["acquireBoundedRecoveryRoleRead"]>(
+			input.store, "acquireBoundedRecoveryRoleRead")({ objectId: nativeObject.value, limits: AHE_BOUNDED_READ_LIMITS });
+		if (!acquired.ok)
+			throw new Refusal(failure(acquired.reason === "READ_BUDGET_EXCEEDED" ? "proof-budget-exceeded" : "ahe-rejected",
+				"ahe", acquired.reason));
+		if ("kind" in acquired.value && acquired.value.kind === "empty") throw new Refusal(failure("ahe-empty"));
+		const admitted = ("reader" in acquired.value ? acquired.value.reader : acquired.value) as AheBoundedRecoveryRoleRead;
+		reader = admitted;
+		requireLaw(admitted.head.kind === "present", "ahe-empty");
+		const source = admitted as SourceReader;
+		// Rollback: an identity a decision of this session retired is present again.
+		const present = new Set([
+			...source.generations.map(row => `ahe:${row.generationId}`),
+			...inventory.scopes.map(row => `snapshot:${scopeKey(row.scope)}`),
+			...closedNativeJournalScopes(input.objectId, journal.value)
+				.map(scope => `journal:${JSON.stringify([scope.objectId, scope.epoch, scope.anchorDigest])}`),
+		]);
+		if (prior.retired.some(identity => present.has(identity))) decline("rollback", true);
+		const protectedImage = selectProtectedRoleImage(admitted, floor.state, input.objectId, parsing);
+		for (const [role, rows] of [["current", protectedImage.currentRows], ["pending-adoption", protectedImage.pendingRows]] as const)
+			for (const row of rows)
+				strictRoleControls(view(source, source.generations.indexOf(row)), {
+					owner: "ahe", role, objectId: input.objectId, generationId: row.generationId,
+				}, parsing);
+		if (protectedImage.pendingRows.length !== 0) decline("pending-role");
+		const rows = protectedImage.currentRows;
+		requireLaw(rows.length === 2 || rows.length === 3, "ahe-rejected");
+		checkAbort(input.signal);
+		// The two newest closed epochs and their recovery-role certificate: fresh.
+		const facts = await authenticate(input, source, bindMethod<AheBoundedActiveRead["checkCurrent"]>(source, "checkCurrency"),
+			floor.state.stable, pin.trust, parsing.record(input.exactCanonicalPinnedGenesisTrustStateRecordBytes), held, installed,
+			certificates, rows, floor.state, true, parsing, closeHold, accounting,
+			{ kind: "full-recovery-role-acquisition", owner: input.store, objectId: nativeObject.value,
+				limits: AHE_BOUNDED_READ_LIMITS, reader: admitted });
+		const forward = facts.forward;
+		requireLaw(forward !== undefined && forward.held.length === 2, "snapshot-unavailable");
+		const work = creatorClosedProofWork(source);
+		requireLaw(work !== undefined && creatorClosedProofWorkAvailable(work), "internal-invariant");
+		// The steady shape this planner decides; any other boundary is stage 1's.
+		if (forward.pending !== undefined || forward.installed.length !== 0 || forward.certificates.length !== 1) decline("shape");
+		const certificate = forward.certificates[0]!;
+		// The creator's genuine trust is the authenticated current trust (stage 1's check).
+		const expected = context.currentTrust;
+		if (expected !== undefined)
+			requireLaw(expected.objectId === forward.currentTrust.objectId &&
+				expected.currentEpoch === forward.currentTrust.currentEpoch &&
+				expected.currentAnchorDigest === forward.currentTrust.currentAnchorDigest &&
+				expected.genesisAnchorDigest === forward.currentTrust.genesisAnchorDigest &&
+				expected.profileId === forward.currentTrust.profileId, "chain-invalid");
+		// Continuity: this boundary's authenticated chain extends the ledger's boundary.
+		if (prior.boundaryEpoch === epoch
+			? prior.boundaryAnchorDigest !== forward.currentTrust.currentAnchorDigest
+			: prior.boundaryAnchorDigest !== forward.predecessorTrust.currentAnchorDigest) decline("discontinuous", true);
+		const required: GenerationRecord[] = [...forward.rows, ...forward.certificates.flatMap((proof) => [
+			...proof.supportGenerations, ...proof.authenticatedSourceGenerations.map((item) => item.generation)])];
+		// A received L can name an ordinary local predecessor P/Q/L (the existing acquisition's
+		// support authentication, unchanged).
+		if (forward.rows.length === 2) {
+			const predecessor = forward.rows[1];
+			if (predecessor?.baseExpectedHead.kind === "present") {
+				const baseHead = predecessor.baseExpectedHead;
+				const support = source.generations.find((row) => row.generationId === baseHead.generationId);
+				if (support !== undefined && !required.some((row) => row.generationId === support.generationId)) {
+					requireLaw(support.state === "Superseded" && support.objectId === input.objectId &&
+						baseHead.objectId === support.objectId && baseHead.generationId === support.generationId &&
+						baseHead.closureDigest === support.closureDigest, "chain-invalid");
+					const debt: CreatorProtectedRecoveryRoleDebt = { owner: "ahe", role: "unclassified", objectId: input.objectId,
+						generationId: support.generationId };
+					if (forward.predecessorTrust.currentEpoch > 1) {
+						const predecessorRows = selectedRoleRows(admitted, forward.predecessorTrust.currentEpoch, debt, parsing);
+						requireLaw(predecessorRows[0] !== undefined &&
+							compareBytes(encodeCanonical(predecessorRows[0]), encodeCanonical(predecessor)) === 0 &&
+							predecessorRows.some((row) => row.generationId === support.generationId), "chain-invalid");
+						const authenticated = authenticateRole(input, admitted, predecessorRows, {
+							epoch: forward.predecessorTrust.currentEpoch, objectId: input.objectId,
+							currentAnchorDigest: forward.predecessorTrust.currentAnchorDigest,
+						}, pin.trust, parsing.record(input.exactCanonicalPinnedGenesisTrustStateRecordBytes), work.accounting, debt, parsing);
+						requireLaw(sameCreatorRoomHead({ objectId: input.objectId, epoch: forward.predecessorTrust.currentEpoch,
+							currentAnchorDigest: forward.predecessorTrust.currentAnchorDigest }, authenticated.trust) &&
+							authenticated.trust.profileId === forward.predecessorTrust.profileId &&
+							authenticated.trust.genesisAnchorDigest === forward.predecessorTrust.genesisAnchorDigest, "chain-invalid");
+						required.push(...predecessorRows);
+					} else {
+						requireLaw(forward.predecessorTrust.currentEpoch === 1 && support.baseExpectedHead.kind === "none");
+						authenticateRole(input, admitted, [support],
+							{ epoch: 0, objectId: input.objectId, currentAnchorDigest: pin.trust.currentAnchorDigest }, pin.trust,
+							parsing.record(input.exactCanonicalPinnedGenesisTrustStateRecordBytes), work.accounting, debt, parsing);
+						required.push(support);
+					}
+				}
+			}
+		}
+		const collector = roomRetentionLedgerCollector();
+		const extra = source.generations.filter((generation) =>
+			!required.some((row) => compareBytes(encodeCanonical(row), encodeCanonical(generation)) === 0));
+		if (extra.length !== 0) {
+			await authenticateRoomRetentionExcludedGenerations({ input, reader: admitted, currentTrust: forward.currentTrust,
+				pin: pin.trust, frame: work, rows: extra, parsing, prior, collector });
+			work.authenticatedExcludedGenerations = Object.freeze(extra.map(detachedGeneration));
+		}
+		for (const row of required)
+			requireLaw(source.generations.some((generation) => compareBytes(encodeCanonical(row), encodeCanonical(generation)) === 0),
+				"chain-invalid");
+		const whole = Object.freeze({ ...forward, wholeCensus: true as const });
+		// The lull hold's lifetime, resolved by the authenticated current trust.
+		requireLaw(resolveCreatorSnapshotRecoveryCloseHold(closeHold, { store: input.store, liveJournalStore: input.liveJournalStore,
+			currentTrust: whole.currentTrust }) === lifetime, "chain-invalid");
+		closeDependencies = await lifetime.borrowDependencies();
+		const child = closeDependencies;
+		const knownAnchors = [
+			{ epoch: 0, anchorDigest: pin.trust.currentAnchorDigest },
+			{ epoch: whole.currentTrust.currentEpoch, anchorDigest: whole.currentTrust.currentAnchorDigest },
+			{ epoch: whole.predecessorTrust.currentEpoch, anchorDigest: whole.predecessorTrust.currentAnchorDigest },
+			...facts.summary.cuts.flatMap((cut) => [
+				{ epoch: cut.epoch, anchorDigest: cut.closedAnchorDigest },
+				{ epoch: cut.epoch + 1, anchorDigest: cut.successorAnchorDigest },
+			]),
+			...whole.certificates.flatMap((proof) => proof.authenticatedSourceGenerations.map((item) =>
+				({ epoch: item.scope.epoch, anchorDigest: item.scope.anchor }))),
+			...whole.certificates.flatMap((proof) => proof.dependencyAnchors),
+		];
+		requireLaw(child.dependencyAnchors.every((dependency) => knownAnchors.some((anchor) =>
+			anchor.epoch === dependency.epoch && anchor.anchorDigest === dependency.anchorDigest)), "chain-invalid");
+		const census = child.readExactCanonicalCensus();
+		requireLaw(chargeProofObservation(accounting, census), "proof-budget-exceeded");
+		await authenticateRoomRetentionRetainedCuts({ input, reader: admitted, forward: whole, summary: facts.summary, required,
+			frame: work, parsing, prior, collector });
+		let borrowedTrusts = creatorSigningRoleTrustVector([whole.currentTrust, whole.predecessorTrust, ...work.signingRoleTrusts]);
+		if (borrowedTrusts.length > 7) {
+			// The existing selection of genuine signing authorities by the actual signing rows.
+			const native = await lifetime.captureClassificationMetadataOwners().signing.acquireEvidence();
+			await joinedClosedRetirementRead(native, async () => {
+				const epochs = new Set<number>([whole.currentTrust.currentEpoch]);
+				for (const bytes of native.readExactCanonicalRows()) {
+					requireLaw(chargeProofObservation(accounting, bytes), "proof-budget-exceeded");
+					const row = decodeCanonical(bytes);
+					requireLaw(Array.isArray(row) && row.length === 3, "chain-invalid");
+					if (row[0] === "storageMeta") continue;
+					requireLaw(["signerState", "voteSlots", "voteOutbox", "sealEvidence"].includes(row[0]) &&
+						Array.isArray(row[1]) && row[1][0] === input.objectId && Number.isSafeInteger(row[1][1]) && row[1][1] >= 0, "chain-invalid");
+					epochs.add(row[1][1]);
+				}
+				await native.check();
+				borrowedTrusts = Object.freeze(borrowedTrusts.filter(trust => epochs.has(trust.currentEpoch)));
+			});
+		}
+		signingDependencies = await lifetime.borrowSigningDependencies(borrowedTrusts);
+		const signingRows = signingDependencies.readExactCanonicalRows();
+		for (const bytes of signingRows) requireLaw(chargeProofObservation(accounting, bytes), "proof-budget-exceeded");
+		// Whole frame (no currency bracket: the acting transaction re-checks what it relies on).
+		const frame = activateCreatorClosedProofWork(source);
+		frame.closeDependencies = child;
+		frame.signingDependencies = signingDependencies;
+		const summary = facts.summary;
+		const roles = Object.freeze({ head: summary.head, floor: floor.state });
+		requireLaw(summary.head.kind === "present" && sameRoleHead(summary.head, admitted.head as PresentHead) &&
+			summary.floor.objectId === floor.state.stable.objectId && summary.floor.epoch === floor.state.stable.epoch &&
+			summary.floor.currentAnchorDigest === floor.state.stable.currentAnchorDigest, "floor-stale");
+		// The protected union of the existing acquisition (its source material's own rules).
+		const references = new Map<string, GenerationRef>();
+		for (const row of source.generations)
+			for (const ref of row.closure) {
+				const seen = references.get(ref.digest);
+				requireLaw(seen === undefined || seen.byteLength === ref.byteLength, "ahe-rejected");
+				requireLaw(source.blobs.some((blob) => blob.ref.digest === ref.digest && blob.ref.byteLength === ref.byteLength &&
+					blob.bytes.byteLength === ref.byteLength), "ahe-rejected");
+				references.set(ref.digest, ref);
+			}
+		const unionScopes = new Map<string, SnapshotQuarantineScopeKey>();
+		for (const scope of [...whole.held.map((item) => Object.freeze({ objectId: input.objectId, epoch: Number(item.target.cut.epoch),
+			anchor: String(item.target.cut.previousAnchor), manifestDigest: String(item.target.cut.snapshotManifestDigest) })),
+		...whole.certificates.flatMap((proof) => proof.protectedScopes)]) {
+			const original = unionScopes.get(scopeKey(scope));
+			requireLaw(original === undefined || compareBytes(encodeCanonical(original), encodeCanonical(scope)) === 0, "snapshot-invalid");
+			unionScopes.set(scopeKey(scope), Object.freeze({ ...scope }));
+		}
+		const snapshotScopes = Object.freeze([...unionScopes.values()]);
+		// The snapshot turnover of the existing reconciliation (same selectors).
+		const transferRoles = resolveCreatorSnapshotRecoveryRoleTransfer(certificate.transfer);
+		if (transferRoles === undefined) decline("transfer");
+		const sourceTrust = lifetime.sourceTrust;
+		requireLaw(sourceTrust === undefined || (sourceTrust.objectId === whole.predecessorTrust.objectId &&
+			sourceTrust.genesisAnchorDigest === whole.predecessorTrust.genesisAnchorDigest &&
+			sourceTrust.profileId === whole.predecessorTrust.profileId &&
+			sourceTrust.currentEpoch === whole.predecessorTrust.currentEpoch &&
+			sourceTrust.currentAnchorDigest === whole.predecessorTrust.currentAnchorDigest), "chain-invalid");
+		requireLaw(lifetime.dependencyAnchors.every((dependency) => certificate.dependencyAnchors.some((anchor) =>
+			anchor.epoch === dependency.epoch && anchor.anchorDigest === dependency.anchorDigest)), "chain-invalid");
+		let protectedScopes = [...new Map(certificate.protectedScopes.map((scope) => [scopeKey(scope), scope])).values()].map(nativeScope);
+		requireLaw(protectedScopes.length >= 2 && protectedScopes.length <= 4, "proof-budget-exceeded");
+		const authenticated = selectAuthenticatedSnapshotTurnoverInventory({ recoveryRoleTransfer: certificate.transfer,
+			recoveryDependencyAnchors: certificate.dependencyAnchors, retirementProtectedScopes: certificate.protectedScopes,
+			recoveryCertificateDigest: certificate.certificateDigest, predecessorTrust: whole.predecessorTrust }, lifetime, inventory);
+		requireLaw(authenticated !== undefined, "chain-invalid");
+		const selection = selectCurrentSnapshotTurnoverInventory(authenticated, inventory, snapshotImage, floor.state.stable);
+		requireLaw(selection !== undefined, "snapshot-unavailable");
+		protectedScopes = selection.survivingScopes.map(nativeScope);
+		requireLaw(protectedScopes.length >= 2 && protectedScopes.length <= 4, "proof-budget-exceeded");
+		if (sourceTrust !== undefined)
+			requireLaw(protectedScopes.some((scope) => scope.objectId === sourceTrust.objectId && scope.epoch === sourceTrust.currentEpoch &&
+				scope.anchor === sourceTrust.currentAnchorDigest && inventory.scopes.some((row) => scopeKey(row.scope) === scopeKey(scope))),
+			"chain-invalid");
+		const protectedKeys = new Set(protectedScopes.map(scopeKey));
+		const retiring = inventory.scopes.filter((row) => !protectedKeys.has(scopeKey(row.scope)));
+		// The existing pre-flight: every owner control in a state the retention path continues from.
+		const censusFacts = record(census);
+		const reason = roomRetentionDeclineReason({ ahe: aheControl.value, journal: journal.value.control, snapshot: snapshotImage.control,
+			signing: closedSigningControl(signingRows, input.objectId),
+			issuance: (censusFacts.nativeIssuance as Readonly<{ control?: unknown }> | undefined)?.control,
+			floor: floorImage, floorEpoch: epoch });
+		if (reason !== undefined) decline(`preflight:${reason}`);
+		const turnover: RoomRetentionPassPlan["turnover"] | undefined = retiring.length === 0 ? undefined : Object.freeze({
+			retiring: Object.freeze(retiring.map((row) => nativeScope(row.scope))),
+			kept: Object.freeze(protectedScopes.map(nativeScope)),
+			decision: Object.freeze({
+				certificateDigest: certificate.certificateDigest,
+				currentHead: Object.freeze({ objectId: floor.state.stable.objectId, epoch: floor.state.stable.epoch,
+					currentAnchorDigest: floor.state.stable.currentAnchorDigest }),
+				survivorScope: nativeScope(transferRoles.currentClose),
+			}),
+		});
+		for (const row of retiring)
+			requireLaw(transferRoles.classifiedScopes.some((scope) => scopeKey(scope) === scopeKey(row.scope)), "snapshot-invalid");
+		requireLaw(completeSnapshotRecoveryInventoryIsPresent(inventory, snapshotImage, roles.floor.stable), "snapshot-invalid");
+		// A resumed journal drain (reconstruction) is the existing path's.
+		const journalPlan = journal.value.control?.drain?.plan;
+		const originalJournalP = journalPlan?.baseControl.completed;
+		const coordinatorP = aheControl.value?.active?.preparation ?? aheControl.value?.completed;
+		if (journal.value.drainSource !== undefined && originalJournalP != null && coordinatorP != null &&
+			originalJournalP.decisionDigest === coordinatorP.decisionDigest &&
+			originalJournalP.sourceProofDigest === coordinatorP.sourceProofDigest &&
+			originalJournalP.throughEpoch === summary.floor.epoch - 1 &&
+			coordinatorP.sourceProofDigest === journal.value.drainSource.control.completed?.sourceProofDigest) decline("reconstructed");
+		const journalScopes = Object.freeze([...frame.recoveryTrusts].map((trust) => Object.freeze({
+			objectId: trust.objectId, epoch: trust.currentEpoch, anchorDigest: trust.currentAnchorDigest })));
+		const roleProofs = [...whole.certificates];
+		let unclassifiedGenerationReplay = closedGenerationReplayIsUnclassified(whole, frame, snapshotScopes, roleProofs);
+		let unclassifiedReplay = roleProofs.some((proof) => proof.roles.operationalSources.length !== 0);
+		const receivedRead = bindMethod<SnapshotRecoveryStore<SnapshotVerificationReceipt>["lookupReceivedRecoveryCertificate"]>(
+			input.snapshotStore, "lookupReceivedRecoveryCertificate");
+		for (const row of inventory.scopes.filter((row) => protectedKeys.has(scopeKey(row.scope)))) {
+			const received = await snapshotCall(() => receivedRead({ objectId: row.scope.objectId, epoch: row.scope.epoch,
+				anchor: row.scope.anchor }));
+			if (received === null) continue;
+			charge(closedRetirementBytes(received));
+			const covered = closedReceivedGenerationConsumersCovered({ frame, scope: row.scope,
+				bytes: received.exactReceivedCertificateBytes, protectedScopes: snapshotScopes, proofs: roleProofs });
+			const replayProtected = snapshotScopes.some((scope) => scopeKey(scope) === scopeKey(row.scope));
+			unclassifiedReplay ||= !covered || !replayProtected;
+			unclassifiedGenerationReplay ||= !covered;
+		}
+		// The journal classifier of the existing reconciliation, in the form stage 1 uses for
+		// this hold: detached (pure over this boundary's captured image) when the hold allows
+		// it, otherwise held (it may read journal pages; step B re-checks every row it deletes).
+		const membershipAuthorities = roleProofs.flatMap((proof) => proof.journalMembershipAuthorities);
+		const pureClassificationInput = { objectId: input.objectId, image: journal.value, summary, floor: roles.floor,
+			censusBytes: census, sourceTrust, unclassifiedReplay, protectedRoleScopes: snapshotScopes,
+			authenticatedScopes: journalScopes, journalMembershipAuthorities: membershipAuthorities, accounting };
+		// The original header consumers (stage 1 collects them before a detached preparation
+		// and after a held classification).
+		const headerScopes = (): readonly LiveJournalScope[] | undefined => !unclassifiedReplay && roles.floor.pending === null
+			? collectClosedJournalHeaderScopeData({ frame, forward: whole, closeAnchors: child.dependencyAnchors,
+				protectedScopes: snapshotScopes, proofs: roleProofs,
+				requirementScopes: [...frame.requirements].map((requirement) => {
+					const requirementFacts = requirements.get(requirement);
+					requireLaw(requirementFacts !== undefined && requirementFacts.frame === frame &&
+						requirementFacts.source === input.liveJournalStore, "chain-invalid");
+					return requirementFacts.scope;
+				}) })
+			: undefined;
+		let capturedHeaderScopes: readonly LiveJournalScope[] | undefined;
+		let journalDetails: ClosedJournalDetailClassification;
+		if (lifetime.canDetachNativePreparation === true && canPrepareClosedJournalDetails(pureClassificationInput)) {
+			capturedHeaderScopes = headerScopes();
+			journalDetails = await prepareClosedJournalDetails({ ...pureClassificationInput,
+				verifyVertex: lifetime.captureVertexVerificationFacts?.() ?? verifyReceivedVertex });
+		} else {
+			const checkAvailable = (): void => {
+				checkAbort(input.signal);
+				requireLaw(frame.alive && frames.get(source) === frame, "snapshot-unavailable");
+			};
+			const verifyVertex = lifetime.verifyVertex;
+			journalDetails = await classifyClosedJournalDetails({ ...pureClassificationInput, journal: input.liveJournalStore,
+				physical: journal.value,
+				...(verifyVertex === undefined ? {} : { verifyVertex: (value: Parameters<typeof verifyReceivedVertex>[0]) =>
+					verifyVertex.call(lifetime, value) }),
+				checkAvailable, check: async (): Promise<void> => checkAvailable() });
+			capturedHeaderScopes = headerScopes();
+		}
+		checkAbort(input.signal);
+		const unclassifiedSigning = unclassifiedReplay || roles.floor.pending !== null ||
+			censusFacts.activeUnsettled !== undefined || censusFacts.pendingIngress !== undefined;
+		const nativeGenerationSource = aheControl.value?.active != null
+			? aheControl.value.active.preparation.generationSource
+			: aheControl.value?.completed?.generationDrain?.source;
+		const continuingGeneration = nativeGenerationSource !== undefined &&
+			nativeGenerationSource.reclamation.closedEpoch + 1 === roles.floor.stable.epoch &&
+			closedRetirementEqual(nativeGenerationSource.reclamation.expectedHead, summary.head) &&
+			(aheControl.value?.active !== null || aheControl.value?.completed?.generationDrain?.phase === "pending");
+		const generationData: ClosedGenerationClassificationData = Object.freeze({
+			input: Object.freeze({ objectId: input.objectId }),
+			reader: Object.freeze({ generations: source.generations, blobs: source.blobs }),
+			...(frame.authenticatedExcludedGenerations === undefined ? {} : {
+				authenticatedExcludedGenerations: frame.authenticatedExcludedGenerations }) });
+		const classificationTrusts = Object.freeze([...frame.recoveryTrusts]);
+		const signingDetails = continuingGeneration
+			? { rows: signingRows, reconstructed: false, entries: Object.freeze([]) as readonly SigningEvidenceRetirementEntry[] }
+			: classifyClosedSigningEvidence({ objectId: input.objectId, rows: signingRows, reader: generationData.reader,
+				trusts: classificationTrusts, journal: journalDetails, unclassified: unclassifiedSigning, coordinator: aheControl.value,
+				summary, accounting });
+		const journalHeaders = capturedHeaderScopes === undefined || unclassifiedSigning ? undefined :
+			prepareClosedJournalHeaders({ journal: journal.value, protectedHeaderScopes: capturedHeaderScopes,
+				pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest, accounting });
+		const built = buildRoomRetentionPassPlan({ input: context.captured, mode: "apply", open: context.open, started: context.started,
+			floor: roles.floor, summary, reconstructed: signingDetails.reconstructed, census, unclassifiedSigning,
+			unclassifiedGenerationReplay, journalDetails, journal: journal.value, retiring, turnover, journalHeaders,
+			signingEntries: signingDetails.entries, signingRows, generationData, aheControl: aheControl.value, snapshotImage,
+			classificationTrusts });
+		if ("declined" in built) decline(`plan:${built.declined}`);
+		// 14e: this decision's charges, refused before its first plan (step B keeps its own book).
+		if (accounting.chargedBytes > roomRetentionLedgerLimits().maxProofBytes) decline("budget");
+		result = Object.freeze({ plan: (built as Readonly<{ plan: RoomRetentionPassPlan }>).plan,
+			draft: collector.finish({ objectId: input.objectId, pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest,
+				boundaryEpoch: epoch, boundaryAnchorDigest: whole.currentTrust.currentAnchorDigest }) });
+	} catch (error) {
+		failed = true;
+		primary = error;
+	}
+	// Release everything this planner read or borrowed before any decision acts.
+	const releases = await Promise.allSettled([
+		...(signingDependencies === undefined ? [] : [signingDependencies.release()]),
+		...(closeDependencies === undefined ? [] : [closeDependencies.release()]),
+		...certificates.map((proof) => proof.release()),
+		...installed.map((proof) => proof.release()),
+		...held.map((target) => releaseHeldTarget(target)),
+	]);
+	const failures = releases.flatMap((outcome) => (outcome.status === "rejected" ? [outcome.reason] : []));
+	if (reader !== undefined) {
+		const work = creatorClosedProofWork(reader as SourceReader);
+		if (work !== undefined) {
+			work.alive = false;
+			ledgers.delete(work.accounting);
+			for (const requirement of work.requirements) {
+				requirements.delete(requirement);
+				preparedRequirements.delete(requirement);
+			}
+			frames.delete(reader as SourceReader);
+			proofWorks.delete(reader as SourceReader);
+			proofWorkLedgers.delete(work.accounting);
+			await Promise.allSettled([...work.pending]);
+		}
+		try {
+			await reader.release();
+		} catch (error) {
+			failures.push(error);
+		}
+	}
+	sourceHeaderSessions.delete(input);
+	parsing.release();
+	if (failures.length !== 0)
+		throw new AggregateError(failed ? [primary, ...failures] : failures, "room retention ledger planner cleanup failed",
+			failed ? { cause: primary } : undefined);
+	if (failed) throw primary;
+	requireLaw(result !== undefined, "internal-invariant");
+	return result;
+}
+
+/**
+ * One ledger boundary of an opted-in room host (either role). Plans from the ledger; in
+ * apply mode releases the hold and applies stage 1's step A and step B with the plan.
+ * @returns "complete" or "fresh-summary-required" when a ledger decision ran (the hold is
+ * then released), or undefined: stage 1 decides this boundary (the hold is untouched).
+ */
+async function reconcileRoomRetentionLedgerBoundary(context: Readonly<{
+	captured: Captured;
+	closeHold: CreatorSnapshotRecoveryCloseHold;
+	lifetime: NonNullable<ReturnType<typeof resolveCreatorSnapshotRecoveryCloseHold>>;
+	role: RoomRetentionLedgerRole;
+	currentTrust?: CurrentAnchorTrust;
+}>): Promise<"complete" | "fresh-summary-required" | undefined> {
+	const { captured, lifetime, role } = context;
+	const store = captured.store as object;
+	const started = performance.now();
+	const mode = roomRetentionLedgerMode();
+	const open = v3RoomRetentionOpener(captured.store);
+	const ledger = lifetime.captureRoomRetentionLedger?.(false);
+	const prior = ledger?.current();
+	if (mode === "off" || open === undefined || ledger === undefined || prior === undefined) {
+		roomRetentionLedgerHints.delete(store);
+		return undefined;
+	}
+	const progress = { epoch: prior.boundaryEpoch + 1 };
+	let planned: Awaited<ReturnType<typeof planRoomRetentionFromLedger>>;
+	try {
+		planned = await planRoomRetentionFromLedger({ captured, closeHold: context.closeHold, lifetime, prior, open, started, progress,
+			...(context.currentTrust === undefined ? {} : { currentTrust: context.currentTrust }) });
+	} catch (error) {
+		const outcome = roomRetentionLedgerDeclineOf(error);
+		if (outcome === undefined) throw error;
+		if (outcome.drop) {
+			ledger.drop();
+			roomRetentionLedgerHints.delete(store);
+		}
+		observeRoomRetentionLedger(ledger, { action: outcome.drop ? "dropped" : "declined", reason: outcome.reason,
+			epoch: progress.epoch, role });
+		return undefined;
+	}
+	// 14e: a record over the ledger's bound is refused before any write; stage 1 decides.
+	const limits = roomRetentionLedgerLimits();
+	if (roomRetentionLedgerRecordBytes(Object.freeze({ ...planned.draft,
+		retired: roomRetentionRetiredIdentities(planned.plan.decisions) }), limits) > limits.maxBytes) {
+		ledger.drop();
+		roomRetentionLedgerHints.delete(store);
+		observeRoomRetentionLedger(ledger, { action: "dropped", reason: "capacity", epoch: planned.plan.epoch, role });
+		return undefined;
+	}
+	const plan: RoomRetentionPassPlan = Object.freeze({ ...planned.plan, acquisition: "ledger" as const,
+		ledger: roomRetentionLedgerCommit({ ledger, store, role, epoch: planned.plan.epoch, source: "boundary", draft: planned.draft }) });
+	if (mode === "shadow") {
+		roomRetentionShadowPlans.set(store, Object.freeze({ epoch: plan.epoch, role, plan }));
+		return undefined;
+	}
+	// As stage 1: the hold is released (its census and lifetime end) before step A and step B.
+	await lifetime.release();
+	return (await applyRoomRetentionPass(plan)) ? "fresh-summary-required" : "complete";
+}
+
+/**
+ * Slice 14b stage 2, the creator's lull: a ledger decision of an opted-in room host,
+ * before (and instead of) the original bounded maintenance when it applies.
+ * @param value - Independent pinned floor and genuine native owners.
+ * @param seal - The lull's original dependency seal.
+ * @param currentTrust - The creator's genuine current trust.
+ * @returns "complete" when a ledger decision completed this boundary; otherwise undefined
+ * and the original maintenance runs (its own seals), exactly as before.
+ */
+export async function reconcileCreatorRoomRetentionFromLedger(
+	value: CreatorClosedRollbackDataInput,
+	seal: () => Promise<CreatorSnapshotRecoveryCloseHold | undefined>,
+	currentTrust: CurrentAnchorTrust
+): Promise<"complete" | undefined> {
+	const captured = capture(value);
+	if (captured === undefined || !roomRetentionLedgerCandidate(captured) || resolveSealRecoveryTrust(currentTrust) === undefined ||
+		currentTrust.genesisAnchorDigest !== captured.pinnedGenesisAnchorDigest) return undefined;
+	try {
+		const hold = await seal();
+		if (hold === undefined) return undefined;
+		const lifetime = resolveCreatorSnapshotRecoveryCloseHold(hold, { store: captured.store,
+			liveJournalStore: captured.liveJournalStore, currentTrust });
+		if (lifetime === undefined) throw new Refusal(failure("malformed-input"));
+		let outcome: Awaited<ReturnType<typeof reconcileRoomRetentionLedgerBoundary>>;
+		try {
+			outcome = await reconcileRoomRetentionLedgerBoundary({ captured, closeHold: hold, lifetime, role: "creator", currentTrust });
+		} finally {
+			await lifetime.release();
+		}
+		// A declined step B leaves the next pass to the original maintenance (the existing path).
+		return outcome === "complete" ? "complete" : undefined;
+	} catch (error) {
+		throwCreatorSnapshotRecoveryFailure(error);
+	}
+}
+
+/** The recipient's received lull: a ledger decision on the SAME sealed hold, or undefined
+ * (the hold untouched) and the original reconciliation decides. */
+async function reconcileCreatorReceivedRoomRetentionFromLedger(
+	value: CreatorClosedRollbackDataInput,
+	closeHold: CreatorSnapshotRecoveryCloseHold
+): Promise<"complete" | "fresh-summary-required" | undefined> {
+	const captured = capture(value);
+	if (captured === undefined || !roomRetentionLedgerCandidate(captured)) return undefined;
+	// Custody selection only: the planner resolves this lifetime again by the authenticated
+	// current trust before relying on it.
+	const floor = captureCreatorRoomHeadState(await captured.floorRead({ scope: { objectId: captured.objectId,
+		pinnedGenesisAnchorDigest: captured.pinnedGenesisAnchorDigest } }), captured.objectId, captured.pinnedGenesisAnchorDigest);
+	if (!floor.ok) return undefined;
+	const lifetime = resolveCreatorSnapshotRecoveryCloseHold(closeHold, { store: captured.store,
+		liveJournalStore: captured.liveJournalStore, currentTrust: Object.freeze({ objectId: floor.state.stable.objectId,
+			currentEpoch: floor.state.stable.epoch, currentAnchorDigest: floor.state.stable.currentAnchorDigest }) as unknown as CurrentAnchorTrust });
+	if (lifetime === undefined) return undefined;
+	return reconcileRoomRetentionLedgerBoundary({ captured, closeHold, lifetime, role: "recipient" });
 }
 
 /**
@@ -21488,7 +22763,7 @@ async function reconcileSnapshotRecoveryRoles(
 		if (retentionOpen !== undefined) {
 			const fallback = roomRetentionFallbacks.get(input.store as object);
 			if (fallback !== undefined) roomRetentionFallbacks.delete(input.store as object);
-			const mode = fallback === undefined ? roomRetentionTestMode(floor.state.stable.epoch, input.objectId) : "off";
+			const mode = fallback === undefined ? roomRetentionTestMode(floor.state.stable.epoch, input.objectId, input.store as object) : "off";
 			if (mode === "off") {
 				observeRoomRetention({ kind: "room-retention-declined", epoch: floor.state.stable.epoch, reason: fallback ?? "mode-off" });
 				retentionOpen = undefined;
@@ -21522,6 +22797,9 @@ async function reconcileSnapshotRecoveryRoles(
 			if (reason !== undefined) {
 				observeRoomRetention({ kind: "room-retention-declined", epoch: floor.state.stable.epoch, reason });
 				retentionOpen = undefined;
+				// Slice 14b stage 2 (shadow evidence): stage 1 declined a boundary the ledger planned.
+				compareRoomRetentionShadow(input.store as object, floor.state.stable.epoch,
+					currentTrust === undefined ? "recipient" : "creator", undefined);
 			} else retentionDeferred = retentionMode === "apply";
 			if (retentionOpen !== undefined && retiring.length !== 0 && authorizedTurnover !== undefined)
 				// The existing turnover's facts; when deferred, its writes move into step B.
@@ -22322,134 +23600,23 @@ async function reconcileSnapshotRecoveryRoles(
 		// A plan-only probe plans only beside the existing boundary's first (fresh) pass.
 		if (retentionOpen !== undefined && (retentionDeferred || (signingSummaries === undefined && !continuingGeneration))) {
 			// Slice 14b stage 1: this boundary's decisions, each class selected by its existing
-			// rule from this one verified acquisition. Nothing below reads a store.
-			const current = roles.floor.stable;
-			const cuts = closeFacts.summary.cuts.filter(cut => cut.objectId === input.objectId &&
-				cut.successorAnchorDigest === current.currentAnchorDigest && cut.epoch + 1 === current.epoch);
-			requireLaw(cuts.length === 1 && roles.floor.pending === null, "chain-invalid");
-			const through = cuts[0]!.epoch;
-			if (journalReconstructed || signingDetails.reconstructed) {
-				// A resumed existing-path drain owns this boundary.
-				observeRoomRetention({ kind: "room-retention-declined", epoch: current.epoch, reason: "reconstructed" });
-				if (retentionDeferred) roomRetentionFallbacks.set(input.store as object, "reconstructed");
-			} else {
-				const nativeIssuance = censusFacts.nativeIssuance as Readonly<{ rows: IssuanceRetirementRows; control?: unknown }> | undefined;
-				requireLaw(nativeIssuance !== undefined && nativeIssuance !== null && nativeIssuance.control !== undefined, "snapshot-unavailable");
-				const issuance = Object.freeze({ protectedRecords: closedIssuanceProtectedRecordsForRetirement({ objectId: input.objectId,
-					throughEpoch: through, rows: nativeIssuance.rows, control: nativeIssuance.control as DurableIssuanceRetirementControl | null,
-					censusRows: censusFacts.rows, protectedReplayScopes: journalDetails.protectedReplayScopes,
-					physicalJournalRows: journal.value.canonicalRows,
-					dependenciesClassified: !unclassifiedSigning && !unclassifiedGenerationReplay }) });
-				const snapshot: RoomRetentionSelection["snapshot"] = retentionTurnover === undefined
-					? Object.freeze({ retire: Object.freeze([]), turnover: null })
-					: Object.freeze({
-						retire: Object.freeze(retiring.map(row => Object.freeze({ scope: nativeScope(row.scope), incarnation: row.incarnation }))),
-						turnover: retentionTurnover.decision,
-					});
-				// The exact header frames this acquisition verified (14b survivors), by scope.
-				const scopeFrames = new Map<string, string>();
-				for (const bytes of journal.value.canonicalRows) {
-					const frame = decodeCanonical(bytes) as unknown[];
-					if (!Array.isArray(frame) || frame[0] !== "scopes" || !Array.isArray(frame[1])) continue;
-					scopeFrames.set(JSON.stringify(frame[1]), journalRetirementFrameDigest(bytes));
-				}
-				const headerFrameOf = (scope: Readonly<{ objectId: string; epoch: number; anchorDigest: string }>): string => {
-					const digest = scopeFrames.get(JSON.stringify([scope.objectId, scope.epoch, scope.anchorDigest]));
-					requireLaw(digest !== undefined, "chain-invalid");
-					return digest;
-				};
-				const journalSelection: RoomRetentionSelection["journal"] = Object.freeze({
-					prefixes: Object.freeze(journalDetails.collectiblePrefixes.map(prefix => Object.freeze({
-						scope: Object.freeze({ objectId: prefix.scope.objectId, epoch: prefix.scope.epoch, anchorDigest: prefix.scope.anchorDigest }),
-						headerFrameDigest: headerFrameOf(prefix.scope),
-						highWatermark: prefix.highWatermark,
-						rows: Object.freeze(prefix.rows.map(row => Object.freeze({ journalSequence: row.journalSequence,
-							nativeFrameDigest: row.nativeFrameDigest }))),
-					}))),
-					headers: Object.freeze((journalHeaders?.retiredEmptyHeaders ?? []).map(header => Object.freeze({
-						scope: Object.freeze({ objectId: header.scope.objectId, epoch: header.scope.epoch, anchorDigest: header.scope.anchorDigest }),
-						nativeFrameDigest: journalRetirementFrameDigest(header.exactCanonicalNativeFrameBytes),
-					}))),
-					genesisAnchorDigest: input.pinnedGenesisAnchorDigest,
-				});
-				const evidence = Object.freeze(signingDetails.entries.map(entry => Object.freeze({
-					key: Object.freeze([...entry.key]) as unknown as readonly [string, number, string],
-					revision: entry.revision, frameDigest: entry.frameDigest })));
-				const basis = closedRetirementDigest("ts-drp/room-retention-basis/v1", Uint8Array.from(census),
-					closedRetirementBytes({ through, epoch: current.epoch }));
-				let generation: ReturnType<typeof roomRetentionGenerationUnits>;
-				try {
-					generation = roomRetentionGenerationUnits({ frame: generationData, summary: closeFacts.summary,
-						control: aheControl.value, basis,
-						unclassified: unclassifiedGenerationReplay || roles.floor.pending !== null ||
-							censusFacts.activeUnsettled !== undefined || censusFacts.pendingIngress !== undefined });
-				} catch (error) {
-					// The existing AHE pass refuses after the other classes' passes applied.
-					if (!(error instanceof Refusal && error.result.kind === "snapshot-unavailable")) throw error;
-					generation = Object.freeze({ units: Object.freeze([]), shortfall: true });
-				}
-				// The survivors as this acquisition verified them: the AHE head, its rollbacks and
-				// every generation; the snapshot image; every closed journal header.
-				let aheImage = generation.units[0]?.sourceImageDigest;
-				if (aheImage === undefined) {
-					try {
-						aheImage = closedAheDataImage(closeFacts.summary.head as PresentHead, generationData.reader.generations);
-					} catch (error) {
-						// A generation outside the closed states: the retention path names no survivors.
-						if (!(error instanceof Refusal)) throw error;
-					}
-				}
-				// Each owner control exactly as this acquisition read it (14b): the owner's canonical
-				// control encoding; the signing owner's exact control frame.
-				const signingControlFrame = signingRows.find(bytes => {
-					const frame = decodeCanonical(bytes) as unknown[];
-					return Array.isArray(frame) && frame[0] === "storageMeta" && frame[1] === `signing-retirement:${input.objectId}`;
-				});
-				const issuanceControl = nativeIssuance.control as DurableIssuanceRetirementControl | null;
-				const controls: RoomRetentionControls | undefined = aheControl.value === null || journal.value.control === null ||
-					snapshotImage.control === null || signingControlFrame === undefined || issuanceControl === null
-					? undefined
-					: Object.freeze({
-						ahe: roomRetentionControlDigest(encodeAheRetirementControl(aheControl.value)),
-						journal: roomRetentionControlDigest(encodeJournalRetirementControl(journal.value.control)),
-						snapshot: roomRetentionControlDigest(snapshotRetirementContract.encodeControl(snapshotImage.control)),
-						signing: roomRetentionControlDigest(signingControlFrame),
-						issuance: roomRetentionControlDigest(encodeIssuanceRetirementControl(issuanceControl)),
-					});
-				if (aheImage === undefined || controls === undefined) {
-					const reason = aheImage === undefined ? "ahe-image" : "control-birth";
-					observeRoomRetention({ kind: "room-retention-declined", epoch: current.epoch, reason });
-					if (retentionDeferred) roomRetentionFallbacks.set(input.store as object, reason);
-				} else {
-					const survivorBasis: RoomRetentionSurvivorBasis = Object.freeze({
-						aheImage,
-						snapshotImage: snapshotImage.image.imageDigest,
-						journalHeaders: Object.freeze([...scopeFrames].flatMap(([key, nativeFrameDigest]) => {
-							const [objectId, epoch, anchorDigest] = JSON.parse(key) as [string, number, string];
-							return epoch <= through ? [Object.freeze({ scope: Object.freeze({ objectId, epoch, anchorDigest }), nativeFrameDigest })] : [];
-						})),
-						controls,
-					});
-					const initial = roomRetentionSurvivorTracker({ basis: survivorBasis,
-						decisions: [{ selection: { journal: journalSelection } }] }).current();
-					const base = { version: 1 as const, objectId: input.objectId, stableEpoch: current.epoch, throughEpoch: through, issuance,
-						survivors: initial.survivors, controls: initial.controls };
-					// One decision per boundary (14b, Track O amendment): each epoch's signing work
-					// (its evidence and the summaries the existing fresh rule selects on the image that
-					// evidence leaves) is one unit, so no committed continuation leaves summary rows in
-					// an epoch the signing control retires.
-					const decisions: RoomRetentionSelection[] = [Object.freeze({ ...base, snapshot, journal: journalSelection,
-						signing: Object.freeze({ evidence, summaries: roomRetentionSummarySelection({ objectId: input.objectId,
-							rows: signingRows, evidence: signingDetails.entries, throughEpoch: through, journal: journalDetails,
-							trusts: classificationTrusts, unclassified: unclassifiedSigning }) }),
-						ahe: Object.freeze({ units: generation.units }) })];
-					retentionPlan = Object.freeze({ input, mode: retentionMode, open: retentionOpen, epoch: current.epoch,
-						decisions: Object.freeze(decisions.map(selection => Object.freeze({ selection }))),
-						...(retentionTurnover === undefined ? {} : { turnover: retentionTurnover }),
-						shortfall: generation.shortfall, basis: survivorBasis, started: retentionStarted,
-						acquiredMs: performance.now() - retentionStarted });
-					}
-			}
+			// rule from this one verified acquisition (buildRoomRetentionPassPlan reads no store).
+			const built = buildRoomRetentionPassPlan({ input, mode: retentionMode, open: retentionOpen, started: retentionStarted,
+				floor: roles.floor, summary: closeFacts.summary, reconstructed: journalReconstructed || signingDetails.reconstructed,
+				census, unclassifiedSigning, unclassifiedGenerationReplay, journalDetails, journal: journal.value, retiring,
+				turnover: retentionTurnover, journalHeaders, signingEntries: signingDetails.entries, signingRows, generationData,
+				aheControl: aheControl.value, snapshotImage, classificationTrusts });
+			const retentionRole = currentTrust === undefined ? "recipient" as const : "creator" as const;
+			if ("declined" in built) {
+				observeRoomRetention({ kind: "room-retention-declined", epoch: roles.floor.stable.epoch, reason: built.declined });
+				if (retentionDeferred) roomRetentionFallbacks.set(input.store as object, built.declined);
+			} else
+				// Slice 14b stage 2: this complete cold acquisition is the open verification; its
+				// facts are recorded in the plane's ledger once its decision applies.
+				retentionPlan = retentionDeferred ? seedRoomRetentionLedger(built.plan, { lifetime, frame: sourceFrame,
+					reader: generationData.reader, summary: closeFacts.summary, currentTrust: forward.currentTrust,
+					role: retentionRole }) : built.plan;
+			if (retentionDeferred) compareRoomRetentionShadow(input.store as object, roles.floor.stable.epoch, retentionRole, retentionPlan);
 		}
 	} catch (error) {
 		primary = error;
@@ -22528,6 +23695,12 @@ export async function reconcileCreatorReceivedSnapshotRecoveryRoles(
 	requireClosedWorkflowCompletion = false
 ): Promise<"complete" | "fresh-summary-required"> {
 	try {
+		// Slice 14b stage 2: an opted-in room host's ledger decision on this same sealed hold;
+		// otherwise (the hold untouched) the original reconciliation below decides.
+		if (!requireClosedWorkflowCompletion) {
+			const ledger = await reconcileCreatorReceivedRoomRetentionFromLedger(value, closeHold);
+			if (ledger !== undefined) return ledger;
+		}
 		return (await reconcileSnapshotRecoveryRoles(value, closeHold, false, requireClosedWorkflowCompletion, undefined, undefined, true))
 			? "fresh-summary-required" : "complete";
 	} catch (error) {

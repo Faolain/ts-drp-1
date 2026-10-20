@@ -9,7 +9,7 @@ import { browserIssuancePruningMaintenanceForStore } from "../../../packages/sto
 import { ISSUANCE_RETIREMENT_LIMITS } from "@ts-drp/issuance-store/maintenance";
 import { gridCorpus, gridOperation, gridSeed } from "../../../.logs/bounded-storage-lifecycle/r8-warm-capacity-01/grid-candidate-01/grid-corpus.ts";
 import { begin, context, end, spans, proofEvents, proofEventsTruncated, proofObserverMilliseconds, proofOwnerSummaries,
- beginFullFunctionWindow, endFullFunctionWindow, proofEventBudget } from "./critical-observer.js";
+ beginFullFunctionWindow, endFullFunctionWindow, proofEventBudget, proofEventsDropped, proofEventKindsRetained } from "./critical-observer.js";
 import { workerPeer } from "../../../.logs/bounded-storage-lifecycle/r8-warm-capacity-01/worker-transport.ts";
 import { CREATOR_SUCCESSOR_PROTOCOL } from "@ts-drp/network/snapshot-transfer";
 import { createEphemeralChannel } from "../../../packages/ephemeral/src/index.js";
@@ -106,7 +106,7 @@ async function createHealthyGridRole(input:{index:number;database:string;identit
    },
    // Capture the existing bounded per-realm timer observations before close
    // reporting removes this frame. Terminal parent-only capture is too late.
-   observer:()=>({timeOrigin:performance.timeOrigin,spans:[...spans],autoPool:[...autoPoolOutcomes],clockMark,longTasks:Reflect.get(globalThis,"__rdLongTasks")?.(),criticalProfiling:Reflect.get(globalThis,"__r8CriticalSnapshot")?.(),eventLoop:Reflect.get(globalThis,"__r8EventLoopCheckpoint")?.(),incrementalNativeControls:{enabled:Reflect.get(globalThis,"__r8IncrementalNativeControls")===true,sourcePin:Reflect.get(globalThis,"__r8IncrementalNativeControlSourcePin"),qualification:"Correctness-only extra quote/readout/UNKNOWN exhaustion and joined proof work; overlapping product metrics cannot be blindly subtracted. Disabled for matched latency and unprofiled runs."},proofEvents:[...proofEvents],proofEventsTruncated,proofEventBudget,proofObserverMilliseconds,proofOwnerSummaries:[...proofOwnerSummaries.values()],startupTrace:[...trace],publications:peer.publications,transfers:peer.streamBytes,transport:peer.status()}),
+   observer:()=>({timeOrigin:performance.timeOrigin,spans:[...spans],autoPool:[...autoPoolOutcomes],clockMark,longTasks:Reflect.get(globalThis,"__rdLongTasks")?.(),criticalProfiling:Reflect.get(globalThis,"__r8CriticalSnapshot")?.(),eventLoop:Reflect.get(globalThis,"__r8EventLoopCheckpoint")?.(),incrementalNativeControls:{enabled:Reflect.get(globalThis,"__r8IncrementalNativeControls")===true,sourcePin:Reflect.get(globalThis,"__r8IncrementalNativeControlSourcePin"),qualification:"Correctness-only extra quote/readout/UNKNOWN exhaustion and joined proof work; overlapping product metrics cannot be blindly subtracted. Disabled for matched latency and unprofiled runs."},proofEvents:[...proofEvents],proofEventsTruncated,proofEventBudget,proofEventsDropped,proofEventKindsRetained,proofObserverMilliseconds,proofOwnerSummaries:[...proofOwnerSummaries.values()],startupTrace:[...trace],publications:peer.publications,transfers:peer.streamBytes,transport:peer.status()}),
    setContext:(role:string,transition:number,command:string)=>{Object.assign(context,{role,transition,command,preparation:false});}
   };
  }catch(error){const joined=await Promise.allSettled([session?.close(),issuance?.close(),snapshot?.close(),floor.close()]);

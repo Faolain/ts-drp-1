@@ -98,7 +98,23 @@ const describe = (error: unknown): Json =>
 let phase = "setup";
 let role: "creator" | "recipient" = "creator";
 const events: Json[] = [];
-const SLIM = ["kind", "epoch", "outcome", "reason", "cause", "ms", "acquiredMs", "decisions", "shortfall"];
+// Measurement only (Track M2): `acquisition` says whether a pass decided from the cold
+// acquisition or the plane's ledger; `action`, `source` and `role` describe ledger events.
+const SLIM = [
+	"kind",
+	"epoch",
+	"outcome",
+	"reason",
+	"cause",
+	"ms",
+	"acquiredMs",
+	"decisions",
+	"shortfall",
+	"acquisition",
+	"action",
+	"source",
+	"role",
+];
 // The node's refusal and decline diagnostics (`requireLaw`, closed-data acquisition,
 // source capture), kept apart from the retention events: a refusal's origin only.
 const laws: Json[] = [];
