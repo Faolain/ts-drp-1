@@ -1,6 +1,6 @@
 # Track R2 / R3: single-database watermark retirement
 
-**Outcome:** R2: prototype (84fd4c8f on worktree-agent-aeb6ebdfc4584ace2 after the Track L rebase), not merged. R3: specs 14 and 14a-14f, and stage 1a of 14a (one room database, one retirement session per install), opt-in and not merged. Track L residuals 1 and 2 are fixed on the shared path. The latency goal is not met (creator lull -3% to -9%, recipient lull -4% to -6%), so the default flip is not in. See [RESULT.md](RESULT.md).
+**Outcome:** R2: prototype (84fd4c8f), kept under storage-browser tests/prototypes. R3: specs 14 and 14a-14f, and stage 1a of 14a (one room database, one retirement session per install), landed opt-in in 84fd4c8f..68b4168e; the default path is unchanged. Track L residuals 1 and 2 are fixed on the shared path. The latency goal is not met (creator lull -3% to -9%, recipient lull -4% to -6%), so the default flip is not in; slice 14b (Track M) is the next lever. See [RESULT.md](RESULT.md).
 
 **Working documents in this folder:** [STEP4.md](STEP4.md), [RESULT.md](RESULT.md)
 
@@ -318,3 +318,160 @@ The G1–G28 checklist is now in the repo: specs/bounded-storage-lifecycle/golde
 - As part of S1, refresh its source line numbers to the current tree. They were taken at 40c0895b; the header says so.
 - Link your slices to it, e.g. `[G15](../golden-path-guarantees.md)` plus the source.
 - Every track's brief, reports and decisions are now in docs/realtime-latency/; yours are under tracks/20-track-r2-r3-watermark-retirement/. When you finish, add your final write-up there as RESULT.md, with local paths written as `<evidence>/...` (that placeholder stands for the scratchpad root). I'll update the README's decision log when I merge.
+
+### Follow-up instruction — Tell R3: Track L landed, rebase (2026-10-20 01:36 UTC)
+
+Track L has landed: rebase onto codex/phase3a1b-p6-golden-path, now at 4bb6bc7d.
+
+What changed:
+- f9828cd0: an orderly close cancels the retained republish it is serving (the v3-room.ts retained publisher callback).
+- 2cb1a9fc and 9379fc48: a reopened recipient discharges its completed-retirement halt.
+  - It runs a new resume block in v3-room.ts, `maintainCreatorRecipientRecoveryPool({resume: true})`, which goes through `runCreatorReceivedRecoveryMaintenance` with `resume` and `creatorCloseRegistration(…, "recipient-resume")`.
+  - It re-runs the original received reconstruction with `requireClosedWorkflowCompletion`, gated by the creator's `completedRequestMatches` predicate.
+- 504e4035: the Grid harness runs the final recipient lull again (no skip). Your acceptance check is now just the normal Grid run with LULL=1.
+- New test: tests/recipient-lull-reopen-close-native.test.ts. It must stay green with your path on.
+- Write-up: docs/realtime-latency/tracks/22-track-l-reopen-and-close/RESULT.md.
+
+L left one open bug in your area. A recipient reopened after only 4 epochs is refused with RECOVERY_CERTIFICATE_UNPROVEN_ABSENCE, because `acquireCreatorSnapshotRetirementReconstructionRequest` passes no `previousCertificate`; 5 and 8 epochs pass.
+- Your design must not have this failure.
+- If the old path keeps it, note it in PROGRESS.md with the root cause.
+- Also make sure an active (unfinished) retirement intent at recipient reopen can be resumed on your path. On the old path it halts the recipient permanently.
+
+### Report returned by the agent (2026-10-20 03:42 UTC)
+
+#### Track R3 handback: single-database watermark retirement
+
+The latency goal is not met, and the default flip is not in. What landed is stage 1a of slice 14a, and it is opt-in. It is correct and it passes the golden path, but on its own it saves only 3–9% on the creator lull and 4–6% on the recipient lull. Reaching the millisecond range needs slice 14b, which is not built. No guarantee was weakened. Both Track L residuals are fixed.
+
+**Where things are**
+- Worktree `<worktree agent-aeb6ebdfc4584ace2>/`, branch `worktree-agent-aeb6ebdfc4584ace2`, base 4bb6bc7d. Nothing pushed.
+- Full record: `docs/realtime-latency/tracks/20-track-r2-r3-watermark-retirement/RESULT.md` (R3 section first, R2 below it), commit 68b4168e.
+- Notes: `<evidence>/track-r3/PROGRESS.md`.
+
+##### Commits (oldest first)
+
+| Commit | What |
+|---|---|
+| 84fd4c8f | R2 prototype |
+| d3cc655d | specs 14 and 14a–14f (S1–S6), on their own |
+| 4f0d5e60 / 0d6258e3 | 14c RED / GREEN |
+| 9080246e, 04f7b009 / b087617b | 14a format: RED, RED fixture fix / GREEN |
+| 166c0d9c / 372e465c | room session RED / GREEN |
+| 2fee9234 / 0c4e0309 | owner facets RED / GREEN |
+| c0729b23 / 59d23366 | named-owner binding RED / GREEN |
+| 2ff759bb / a2a77ebd | residual 1 RED / fix |
+| 4ffb9574 / 6e9a7899 | node room install RED / GREEN |
+| 3bc4edfc | residual 2 fix (its RED is a case in 4ffb9574) |
+| 981bb354 | Grid opt-in |
+| 6c18b0c2 | 14f native cases 1–4 |
+| 0eb4d0a6 / a07e3206 | legacy-room refusal RED / fix |
+| cd9d2d88 | spec statuses, 14f evidence record, requirements-to-evidence row 14 |
+| 8955d40d | prettier on the two R2 prototype files |
+| 68b4168e | RESULT.md and README outcome line |
+
+- 04f7b009 changed a RED I had written, before its GREEN. The fixture used an object id the storage layer rejects; the assertion is unchanged.
+- No pre-existing RED or governance test, frozen artifact, registry or vector was edited.
+- Commit trailer: your brief says "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>", but the harness requires "Claude Opus 5.5 (1M context)". Every commit uses the harness line.
+
+##### Per slice
+- **14a (S1): stage 1a landed, opt-in.**
+  - A version-7 room database holding the five owners in disjoint namespaces, with their formats unchanged.
+  - A room retirement session: one strict read-write transaction over every room store, with checkpoint, commit and abort.
+  - Session facets that run each owner's original transitions inside it.
+  - The node install runs in that session: T1, a checkpoint, the floor in its own database, then T2. `verifyCompleted` and the drains still run after the commit.
+  - Selection: the opt-in host `createBrowserV3RoomDatabaseStorageHost()` in the example, and `STARTUP_HEALTHY_GRID_ROOM_DATABASE=1` for the Grid.
+  - Not landed: "one verified decision, one transaction" with marks as write fences.
+- **14b (S2): not started.** This is the latency lever.
+- **14c (S3):** storage half only (floor version 2 with per-owner fences, opt-in). The node does not write or check the fence yet.
+- **14d (S4): not started.** Instead, the room host refuses an existing six-database room with `V3_ROOM_DATABASE_MIGRATION_UNAVAILABLE` before it writes anything.
+- **14e (S5): not started.**
+- **14f (S6): partial.**
+
+##### Track L residuals (both fixed on the shared path, so the old path no longer has them)
+1. **Four-epoch reopen refused with `UNPROVEN_ABSENCE`.**
+   - Cause: `acquireCreatorSnapshotRetirementReconstructionRequest` checked absence against the current certificate only. After four rollovers the current Cut still classifies a scope this copy retired under its previous certificate.
+   - Fix: the reopen passes the previous Cut (epoch − 1) and the predecessor trust. The law is unchanged.
+   - `tests/recipient-lull-reopen-four-epochs-native.test.ts` passes 3/3.
+2. **An unfinished retirement intent at recipient reopen halted the recipient for good.**
+   - Cause: the resume gate in `runCreatorReceivedRecoveryMaintenance` accepted only `active === null`, so nothing ever discharged the halt.
+   - Fix: it also accepts this copy's own active intent at the same head. The original reconstruction then completes that same intent, with source proof and decision checked equal to the fresh ones, or it refuses.
+   - Evidence: a crash-injection case in `tests/room-database-retirement-native.test.ts`. There is no SQLite crash injection for this.
+
+##### G1–G28
+The full table, with the evidencing test for each id, is in RESULT.md §5. Summary:
+- **Kept, every id except G28.** The session runs the existing transitions, checks and charges unchanged.
+- **G9 is stronger.** Each owner's recheck and its write now share one native transaction.
+- **G25 is kept by refusal.** There is no migration, and existing rooms are refused before anything changes.
+- **G15** is covered for abort and failure, not yet for SIGKILL.
+- **G22:** the proof-accounting test shows the same 20 failures as base, with identical names.
+- **G28 is PARTIAL:** SIGKILL cases 5–9 and the long-room bounds (case 11) were not run.
+
+##### 14f (S6) evidence per engine
+- Playwright config `playwright.room-retirement-session-native.config.ts`: 18 of 18 pass.
+
+| Case | Chromium 151.0.7922.34 | Firefox 153.0 | WebKit 26.5 |
+|---|---|---|---|
+| 1–4, plus not-ready refusal | pass | pass | pass |
+| 5–9 (SIGKILL, migration) | OPEN | OPEN | OPEN |
+| 10 (Grid golden path) | pass | n/a | n/a |
+| 11 (long room with bounds) | OPEN | n/a | n/a |
+
+##### Bench against base
+Healthy native Grid, 8 rollovers, 3 interleaved ABBA pairs per mode. All 12 runs passed, and every room run committed 54 sessions with no aborts. Steady medians in ms:
+
+| Window | LULL=1 base | LULL=1 room | Concurrent base | Concurrent room |
+|---|---|---|---|---|
+| Seal | 292 | 291 | 310 | 313 |
+| Creator adoption | 524 | 520 | 592 | 591 |
+| Recipient install | 349 | 364 | 414 | 422 |
+| Creator lull | 2450 | 2376 (−3%) | 2937 | 2667 (−9%) |
+| Recipient lull | 1350 | 1272 (−6%) | 1503 | 1437 (−4%) |
+
+- **Recipient install tail is wider on the room path:** p90 380→462 and 424→528 ms. Unresolved with only 3 pairs.
+- **Session hold:** p50 106–116 ms, max about 380 ms per install.
+- **Per-move latency during lulls (concurrent):**
+  - creator-lull moves: visible p50 2096→1913 ms;
+  - recipient-lull moves: visible p50 1065→983 ms;
+  - issue time is unchanged;
+  - durable latency was not measured, because this harness mode records no receipt stages.
+- **Longest main-thread task:** no window gets worse (for example, creator lull max 31–34 ms on both).
+- **Why the gain is small:** stage 1a removes only transaction overhead. Re-authentication on every pass (about 45% of a lull), the two-phase commit's steps, the `verifyCompleted` readbacks and the drains all remain.
+- **16 rollovers, one run per path:**
+  - Both paths reach epoch 16 with close, reopen and continued gameplay.
+  - Both then fail the same harness check: the proof-event buffer overflows (`proofEventsTruncated`).
+  - Storage is identical on both paths. The creator is flat.
+  - Every recipient's issuance grows by 3 issued and 3 outbox rows per epoch, on both paths. This was already happening before this work, and it matters for G1 and case 11.
+
+##### Suites against base
+- **node:** 0 new failures (48 failing, the same as Track L's head).
+- **storage and storage-browser:** 625 of 625 pass. Vitest still exits 1 because of an RPC timeout under load.
+- **storage-node retirement set:** 0 new failures.
+- **Root set** (92 filters, which vitest matched to 187 files): 0 new per-test failures. I ran the 70 failing files again with every changed code file swapped back to 4bb6bc7d, then restored and verified the tree.
+  - One test fails at both with a different message at head (envelope purity). Rerun alone, it fails exactly as at base.
+- **Room-path tests:** room test 4/4, Track L's reopen-close 3/3, Track K's long-room retention 2/2, four-epoch 3/3.
+- **Checks:** `pnpm -r typecheck` reports 0 errors, and the shadowed-sources guard is clean.
+
+##### Default flip: not in
+- 14f is incomplete: no SIGKILL cases and no long-room bounds.
+- 14b, 14d and 14e are not built. Without 14d an existing room cannot move to the room database.
+- Flipping it would buy little latency anyway.
+
+##### What remains, in order
+1. **14b:** a ledger of verified facts, verify-on-open, and one decision per epoch. This is the only path to the millisecond range.
+2. **Wire 14c into the node.**
+3. **14d migration**, with its crash matrix.
+4. **14e:** the per-transaction cap and charge-before-delete.
+5. **14f:** SIGKILL cases 5–9, then case 11. Case 11 also needs the recipient issuance growth fixed or bounded, and a proof-event budget that survives 16 rollovers.
+
+##### Risks
+- **Lock hold:** the session holds every room store for about 100–380 ms per install, and the recipient install tail is wider.
+- **Web Locks:** the snapshot owner refuses retirement without them. Node tests must install a lock manager.
+- **One module instance:** room owners and the session registry must load from one module instance. `./maintenance` re-exports every room factory, and a bundle that aliases storage-browser to a file needs a `maintenance` alias.
+- **Filtered issuance facade:** new facades must keep the maintenance-capability link to the genuine store. Otherwise the room path refuses with `RETENTION_FOREIGN_OWNER`, which fails closed.
+- **Shared-path residual fixes** also change the default path.
+
+##### Other notes
+- `installClosedRetirementSource` keeps its name and body, because a source-shape test and the Grid's `build.ts` read it by name. A separate wrapper opens the session.
+- I copied the `node_datachannel.node` binary from the main checkout's `node_modules` into the worktree's `node_modules`. The main checkout was only read.
+- The bench bundle was built before a07e3206. That commit only adds a startup version probe in the example host and does not touch the retirement path.
+- The untracked `.logs/bounded-storage-lifecycle/r8-warm-capacity-01/` stays uncommitted.

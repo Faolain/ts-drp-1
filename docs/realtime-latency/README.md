@@ -53,7 +53,7 @@ loaded machine (load average about 95).
 | Seal, t4–t11 | 260–350 ms |
 | Creator adoption, t4–t11 | 490–590 ms |
 | Recipient install, t4–t11 | 340–590 ms |
-| Creator maintenance in the lull, per epoch | 2.1–2.8 s, off the transition path (Track R3 targets this) |
+| Creator maintenance in the lull, per epoch | 2.1–2.8 s, off the transition path (Track M targets this) |
 | Move visible to the mover / to peers during a lull, presentation on | 1–2 ms / 4–9 ms |
 | Ordinary issue p50 (creator / recipient) | 85 ms / 42 ms |
 | Remote accept p50 | 67 ms |
@@ -84,9 +84,11 @@ repository owner made. "Coordinator" marks a recommendation that was then carrie
 | 14 | Import canonical by package name in two Playwright specs. | User (cleanup approval) | Fixed an order-dependent clean-checkout failure in storage-browser. | 6fc82c6e |
 | 15 | Keep logs, but outside git. | User | Evidence must survive without bloating the repository. | Untracked `.logs` were moved to a local archive. Paths that tracked code imports were restored. |
 | 16 | Track K: fix the epoch-8 recipient refusal. | User | Rooms must live for thousands of epochs (G1). | 742a517e, 86dc4004, 9f606ce8 |
-| 17 | Track R3: write spec slices S1–S6, then build the watermark design for production. The new path becomes the default only after three-engine and SIGKILL evidence. | User | The only path to millisecond maintenance. It changes durable formats, so the spec comes first. | In progress |
+| 17 | Track R3: write spec slices S1–S6, then build the watermark design for production. The new path becomes the default only after three-engine and SIGKILL evidence. | User | The only path to millisecond maintenance. It changes durable formats, so the spec comes first. | 84fd4c8f..68b4168e, merged after verification. Specs 14 and 14a–14f; stage 1a of 14a (one room database, one retirement session per install) is opt-in and the default path is unchanged. It is correct but saves only 3–9%, because every per-pass re-proof remains, so the default was not flipped. It also fixed two of Track L's residuals on the shared path. |
 | 18 | Track L: fix two bugs on the current path. After a lull and a reopen, recipients admit no moves; and the lull's history repair races a persisted close. | User | Play stops after a restart. Both bugs predate this work. | dcab6d12..88467723. A reopened recipient discharges its completed-retirement halt by re-running the original reconstruction. An orderly close cancels the retained republish it is serving. The Grid runs the final recipient lull again. |
 | 19 | Keep these records in the repository. | User | Decisions and plans should live with the code. | This folder |
+| 20 | Track M: build slice 14b (retirement decided from a ledger of verified facts) and 14e (bounds and charges) on R3's room path. Every decision must match the existing planner, proven by a differential test. | User | Stage 1a kept the per-pass re-proofs that dominate the lull; 14b is the lever for milliseconds. Target: creator lull ≤ 100 ms p50. | In progress |
+| 21 | Track N: stop each recipient's issuance store growing 3 issued and 3 outbox rows per epoch, and make the Grid's proof-event budget scale with rollovers. | User | Unbounded growth with room age violates G1. R3 found it; it predates this work. | In progress |
 
 ## Commits
 
@@ -109,6 +111,32 @@ repository owner made. "Coordinator" marks a recommendation that was then carrie
 | 504e4035 | test: run the final recipient lull in the Grid bench again |
 | 9379fc48 | fix: skip the post-resume retained request once the room is closing |
 | 88467723 | docs: record Track L's reopen and close fixes, evidence and guarantee argument |
+| 4bb6bc7d | docs: record Track L's merge in the real-time latency decision log |
+| 84fd4c8f | test: prototype single-database epoch retirement with crash, replay and poison tests |
+| d3cc655d | docs: specify single-database watermark retirement as slices 14a-14f |
+| 4f0d5e60 | test: RED for per-owner retirement fences in the host floor (slice 14c) |
+| 0d6258e3 | feat: add opt-in per-owner retirement fences to the host floor (slice 14c) |
+| 9080246e | test: RED for the room database format and owner room mode (slice 14a) |
+| 04f7b009 | test: use a valid storage object id in the 14a held-view RED |
+| b087617b | feat: add the version-7 room database and owner room mode (slice 14a) |
+| 166c0d9c | test: RED for the room retirement session (slice 14a executor) |
+| 372e465c | feat: add the room retirement session (slice 14a executor) |
+| 2fee9234 | test: RED for owner retirement inside one room session (slice 14a) |
+| 0c4e0309 | feat: run each owner's retirement inside one room session (slice 14a) |
+| c0729b23 | test: RED for room session acquisition bound to a named owner (slice 14a) |
+| 59d23366 | feat: bind room session acquisition to a named owner (slice 14a) |
+| 2ff759bb | test: RED for a recipient reopen after four rollovers (UNPROVEN_ABSENCE) |
+| a2a77ebd | fix: a reopen's retirement request accepts the previous certificate's receipt |
+| 4ffb9574 | test: RED for room-database retirement in the node (slice 14a) |
+| 6e9a7899 | feat: run each node retirement install in one room session (slice 14a) |
+| 3bc4edfc | fix: a recipient reopen resumes its own unfinished retirement intent |
+| 981bb354 | test: opt-in room database for the healthy native Grid |
+| 6c18b0c2 | test: native evidence for the room retirement session (slice 14f cases 1-4) |
+| 0eb4d0a6 | test: RED for the room host refusing an existing six-database room |
+| a07e3206 | fix: the room host refuses an existing six-database room before changing it |
+| cd9d2d88 | docs: record slice 14 status and native evidence (Track R3) |
+| 8955d40d | style: format the Track R2 prototype files with prettier |
+| 68b4168e | docs: record the Track R3 result |
 
 The commit messages hold the detailed explanation and the measurements for each change.
 
@@ -137,11 +165,14 @@ that track's working documents.
 | [17](tracks/17-track-h-long-tasks/README.md) | Track H and the H2 rerun: main-thread long tasks | 75aa8807 |
 | [18](tracks/18-track-r-redesign-guarantees/README.md) | Track R: redesign against the guarantees | G1–G28 and verdicts |
 | [19](tracks/19-typecheck-fixes/README.md) | Repository typecheck fixes | de70325e |
-| [20](tracks/20-track-r2-r3-watermark-retirement/README.md) | Tracks R2 and R3: single-database watermark retirement | Prototype; R3 in progress |
+| [20](tracks/20-track-r2-r3-watermark-retirement/README.md) | Tracks R2 and R3: single-database watermark retirement | 84fd4c8f..68b4168e, opt-in; latency goal not met |
 | [21](tracks/21-track-k-epoch8-retention/README.md) | Track K: epoch-8 recipient refusal | 742a517e–9f606ce8 |
 | [22](tracks/22-track-l-reopen-and-close/README.md) | Track L: reopen admission and close race | dcab6d12..88467723 |
+| 23 | Track M: verified-fact retirement (slices 14b and 14e) | In progress |
+| 24 | Track N: recipient issuance growth | In progress |
 
-The record for an in-progress track (R3) holds only its plan. Its specs, tests and results land with its branch.
+Tracks M and N are in progress. Their folders, `tracks/23-track-m-verified-fact-retirement/` and
+`tracks/24-track-n-recipient-issuance-growth/`, land with their branches.
 
 ## Reading the records
 
@@ -182,14 +213,22 @@ Notes:
 
 ## Open items
 
-- **Track R3:** single-database watermark retirement, spec slices S1–S6 and then production code. This is the only
-  path found to millisecond maintenance.
+- **Track M (in progress):** slice 14b, retirement decided from verified facts carried in memory, plus 14e's bounds
+  and charges, on the room path. This is the only path found to millisecond maintenance.
+- **Track N (in progress):** each recipient's issuance store grows by 3 issued records and 3 outbox rows per epoch
+  (26 to 50 rows from epoch 8 to 16), on both paths. The creator and every other store stay flat. Track N also
+  makes the Grid's proof-event budget (50,000 events, about 3.8k per rollover) scale with rollovers, so runs past
+  about 13 rollovers can pass its check.
+- **Before the room database can become the default** (Track R3's [RESULT.md](tracks/20-track-r2-r3-watermark-retirement/RESULT.md) §9–10):
+  - 14b and 14e (Track M);
+  - wire 14c's per-owner floor fences into the node;
+  - 14d, migration of existing rooms; until then the room host refuses an existing six-database room;
+  - 14f: SIGKILL cases 5–9 and the browser long room (case 11).
+- **Room-path risks:** the retirement session holds one read-write transaction over every room store for about
+  106–116 ms at p50 and up to about 380 ms per install, and the recipient install's p90 is wider on the room path.
 - **Left open by Track L** (details in its [RESULT.md](tracks/22-track-l-reopen-and-close/RESULT.md)):
-  - A recipient reopened after only 4 epochs is refused with `RECOVERY_CERTIFICATE_UNPROVEN_ABSENCE`. It fails
-    closed; 5 and 8 epochs pass. Cause: `acquireCreatorSnapshotRetirementReconstructionRequest` passes no
-    `previousCertificate`. This is in R3's area.
-  - A recipient reopened with an active (unfinished) retirement intent stays halted, as before. A receive-only
-    peer has no way to resume an intent.
+  - Fixed by Track R3 on the shared path: the four-epoch reopen refusal (`RECOVERY_CERTIFICATE_UNPROVEN_ABSENCE`,
+    a2a77ebd) and the permanent halt on an unfinished retirement intent at reopen (3bc4edfc).
   - Moves that arrive during the ~0.5 s reopen discharge are dropped, then re-fetched through retained history,
     so they arrive one round trip late.
   - A close during a reopened room's startup transition is recorded as a terminal failure.
