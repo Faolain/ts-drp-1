@@ -159,6 +159,10 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
  const proofEventRollovers=Number(process.env.STARTUP_HEALTHY_GRID_ROLLOVERS??4);
  const proofEventBudget=Math.max(50_000,(proofEventRollovers>32?6_000:4_000)*(proofEventRollovers+1));
  await page.context().addInitScript(value=>Reflect.set(globalThis,"__r8ProofEventBudget",value),proofEventBudget);
+ // Measurement only (endurance heap): STARTUP_HEALTHY_GRID_PROOF_EVENT_KINDS names the proof-event kinds each realm
+ // retains; others are only counted. Unset by default (every event retained).
+ const proofEventKinds=process.env.STARTUP_HEALTHY_GRID_PROOF_EVENT_KINDS;
+ if(proofEventKinds!==undefined)await page.context().addInitScript(value=>Reflect.set(globalThis,"__r8ProofEventKinds",value),proofEventKinds.split(",").map(kind=>kind.trim()).filter(Boolean));
  // Endurance runs (more than 32 rollovers) scale the per-role delivery telemetry bound the same way.
  const deliveryRollovers=Number(process.env.STARTUP_HEALTHY_GRID_ROLLOVERS??4),deliveryObservationBound=deliveryRollovers>32?32*(deliveryRollovers+1):1024;
  await page.context().addInitScript(value=>Reflect.set(globalThis,"__r8DeliveryObservationBound",value),deliveryObservationBound);

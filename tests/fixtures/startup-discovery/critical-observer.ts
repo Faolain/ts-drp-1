@@ -283,6 +283,15 @@ export const proofEventBudget =
     ? configuredProofEventBudget
     : 50_000;
 export let proofObserverMilliseconds = 0;
+// Measurement only (endurance heap): when a harness names the kinds to retain, every other
+// event is counted here and not retained, so the realm's forced-GC heap leaves out most of
+// the harness's own records. Unset (the default), every event is retained as before.
+const configuredProofEventKinds = Reflect.get(globalThis, "__r8ProofEventKinds");
+const proofEventKinds = Array.isArray(configuredProofEventKinds)
+  ? new Set(configuredProofEventKinds.filter((kind): kind is string => typeof kind === "string"))
+  : undefined;
+export let proofEventsDropped = 0;
+export const proofEventKindsRetained = proofEventKinds === undefined ? undefined : [...proofEventKinds];
 export const proofOwnerSummaries = new Map<number, {owner:number;initialBytes:number;chargedBytes:number;unknownBytes:number;forecastMaximum?:number;forecasts:number;completedCurrentJobPhases?:number;completedCurrentJobJournalComputations?:number}>();
 let proofOwner = 0;
 const proofOwnerIds = new WeakMap<object, number>();
@@ -303,7 +312,8 @@ function proofEvent(event: Readonly<Record<string, unknown>>): void {
         summary.completedCurrentJobJournalComputations=(summary.completedCurrentJobJournalComputations??0)+event.currentJobJournalComputations;
     }
   }
-  if (proofEvents.length < proofEventBudget) proofEvents.push({ ...event, ...context, time: start });
+  if (proofEventKinds !== undefined && !proofEventKinds.has(String(event.kind))) proofEventsDropped++;
+  else if (proofEvents.length < proofEventBudget) proofEvents.push({ ...event, ...context, time: start });
   else proofEventsTruncated = true;
   proofObserverMilliseconds += performance.now() - start;
 }
