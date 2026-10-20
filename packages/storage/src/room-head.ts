@@ -460,3 +460,190 @@ export function captureRoomHeadFence(value: unknown): RoomHeadFenceCommitment {
 		throughEpoch: roomHeadInteger(r.throughEpoch),
 	});
 }
+
+/** Retention owners that keep a per-owner fence entry in the host floor (slice 14c). */
+export const ROOM_RETIREMENT_FENCE_OWNERS = Object.freeze([
+	"ahe",
+	"issuance",
+	"journal",
+	"signing",
+	"snapshot",
+] as const);
+export type RoomRetirementFenceOwner = (typeof ROOM_RETIREMENT_FENCE_OWNERS)[number];
+/** Expected owner control digests around one decision; an expectation, never deletion authority. */
+export interface RoomRetirementFence {
+	readonly base: string;
+	readonly target: string;
+	readonly through: number;
+}
+export type RoomRetirementFenceEntry = readonly [RoomRetirementFenceOwner, RoomRetirementFence];
+export interface RoomHeadRetirementFences {
+	readonly version: 1;
+	readonly scope: RoomHeadScope;
+	readonly revision: number;
+	readonly owners: readonly RoomRetirementFenceEntry[];
+}
+export interface RoomRetirementFenceRequest {
+	readonly scope: RoomHeadScope;
+	readonly owners: readonly RoomRetirementFenceEntry[];
+}
+
+function captureFenceOwner(value: unknown): RoomRetirementFenceOwner {
+	if (typeof value !== "string" || !(ROOM_RETIREMENT_FENCE_OWNERS as readonly string[]).includes(value))
+		throw new TypeError("ROOM_HEAD_INVALID_OWNER");
+	return value as RoomRetirementFenceOwner;
+}
+function captureFence(value: unknown): RoomRetirementFence {
+	const r = roomHeadFields(value, ["base", "target", "through"]);
+	return Object.freeze({
+		base: roomHeadDigest(r.base),
+		target: roomHeadDigest(r.target),
+		through: roomHeadInteger(r.through),
+	});
+}
+function sortedFenceEntries(entries: readonly RoomRetirementFenceEntry[]): readonly RoomRetirementFenceEntry[] {
+	const sorted = [...entries].sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
+	for (let index = 1; index < sorted.length; index++)
+		if (sorted[index - 1]![0] === sorted[index]![0]) throw new TypeError("ROOM_HEAD_INVALID_OWNER");
+	return Object.freeze(sorted);
+}
+
+/**
+ * Captures one host request to record per-owner retirement fences.
+ * @param value - Untrusted `{ scope, owners: [{ owner, through, base, target }] }`.
+ * @returns Detached request with owners sorted by name; mechanical validation only.
+ */
+export function captureRoomRetirementFenceRequest(value: unknown): RoomRetirementFenceRequest {
+	const r = roomHeadFields(value, ["scope", "owners"]);
+	const scope = captureRoomHeadScope(r.scope);
+	if (!Array.isArray(r.owners) || r.owners.length === 0 || r.owners.length > ROOM_RETIREMENT_FENCE_OWNERS.length)
+		throw new TypeError("ROOM_HEAD_INVALID_OWNERS");
+	const entries = (r.owners as unknown[]).map((item): RoomRetirementFenceEntry => {
+		const e = roomHeadFields(item, ["owner", "through", "base", "target"]);
+		return Object.freeze([
+			captureFenceOwner(e.owner),
+			captureFence({ base: e.base, target: e.target, through: e.through }),
+		] as const);
+	});
+	return Object.freeze({ scope, owners: sortedFenceEntries(entries) });
+}
+
+function fenceRecordValue(record: RoomHeadRetirementFences): Readonly<Record<string, unknown>> {
+	return {
+		version: 1,
+		scope: record.scope,
+		revision: record.revision,
+		owners: record.owners.map(([owner, fence]) => [
+			owner,
+			{ base: fence.base, target: fence.target, through: fence.through },
+		]),
+	};
+}
+
+/**
+ * Encodes a fence record as exact canonical bytes under the floor's image limits.
+ * @param record - Complete captured record.
+ * @returns Canonical bytes.
+ */
+export function encodeRoomHeadRetirementFences(record: RoomHeadRetirementFences): Uint8Array {
+	return encodeCanonical(fenceRecordValue(record), ROOM_HEAD_IMAGE_LIMITS);
+}
+
+/**
+ * Decodes one stored fence record. Any malformed, noncanonical or out-of-scope record is corrupt.
+ * @param value - Exact native record bytes.
+ * @param scope - The floor image's scope.
+ * @returns Complete detached record; an expectation only, never deletion authority.
+ */
+export function captureRoomHeadRetirementFences(value: unknown, scope: RoomHeadScope): RoomHeadRetirementFences {
+	try {
+		if (!(value instanceof Uint8Array) || value.byteLength > ROOM_HEAD_IMAGE_LIMITS.maxBytes)
+			throw new TypeError("ROOM_HEAD_INVALID_FENCES");
+		const r = roomHeadFields(decodeCanonical(value, ROOM_HEAD_IMAGE_LIMITS), [
+			"version",
+			"scope",
+			"revision",
+			"owners",
+		]);
+		if (r.version !== 1) throw new TypeError("ROOM_HEAD_INVALID_VERSION");
+		const recordScope = captureRoomHeadScope(r.scope);
+		if (!sameRoomHeadValue(recordScope, scope)) throw new TypeError("ROOM_HEAD_SCOPE_CONFLICT");
+		if (!Array.isArray(r.owners) || r.owners.length === 0 || r.owners.length > ROOM_RETIREMENT_FENCE_OWNERS.length)
+			throw new TypeError("ROOM_HEAD_INVALID_OWNERS");
+		const entries = (r.owners as unknown[]).map((item): RoomRetirementFenceEntry => {
+			if (!Array.isArray(item) || item.length !== 2) throw new TypeError("ROOM_HEAD_INVALID_OWNERS");
+			return Object.freeze([captureFenceOwner(item[0]), captureFence(item[1])] as const);
+		});
+		const owners = sortedFenceEntries(entries);
+		if (owners.some(([owner], index) => owner !== entries[index]![0])) throw new TypeError("ROOM_HEAD_INVALID_OWNERS");
+		const record: RoomHeadRetirementFences = Object.freeze({
+			version: 1,
+			scope: recordScope,
+			revision: roomHeadInteger(r.revision),
+			owners,
+		});
+		const exact = encodeRoomHeadRetirementFences(record);
+		if (value.length !== exact.length || !value.every((byte, index) => byte === exact[index]))
+			throw new TypeError("ROOM_HEAD_NONCANONICAL");
+		return record;
+	} catch {
+		throw new Error("ROOM_HEAD_FENCE_CORRUPT");
+	}
+}
+
+/**
+ * Domain-separated digest of a fence record, for exact readback only.
+ * @param record - Complete captured record.
+ * @returns Lowercase hex digest.
+ */
+export function roomHeadRetirementFencesDigest(record: RoomHeadRetirementFences): string {
+	return Array.from(
+		hashDomain("drp.native-room-head-retirement-fences.v1", encodeRoomHeadRetirementFences(record)),
+		(byte) => byte.toString(16).padStart(2, "0")
+	).join("");
+}
+
+/**
+ * Projects one monotone fence transition without performing a write (slice 14c).
+ * For each requested owner: a first entry is accepted; otherwise the request's
+ * base must be the old target (applied) or the old base (unapplied, replaced),
+ * and `through` never decreases. Every `through` stays below the stable epoch.
+ * Refusal precedence: scope, window, corrupt stored record, fence conflict.
+ * @param stored - Exact stored record bytes from the same transaction, or undefined when none exists.
+ * @param image - Current floor image in the same transaction.
+ * @param request - Captured request.
+ * @returns The next record, or the old record itself when the request changes nothing.
+ */
+export function roomHeadRetirementFenceChange(
+	stored: unknown,
+	image: RoomHeadImage,
+	request: RoomRetirementFenceRequest
+): RoomHeadRetirementFences {
+	if (!sameRoomHeadValue(image.scope, request.scope)) throw new Error("ROOM_HEAD_CONTROL_CONFLICT");
+	for (const [, fence] of request.owners)
+		if (fence.through >= image.state.stable.epoch) throw new Error("ROOM_HEAD_FENCE_WINDOW");
+	const old = stored === undefined ? null : captureRoomHeadRetirementFences(stored, image.scope);
+	const current = new Map<RoomRetirementFenceOwner, RoomRetirementFence>(old?.owners ?? []);
+	let changed = false;
+	for (const [owner, fence] of request.owners) {
+		const previous = current.get(owner);
+		if (previous !== undefined) {
+			if (sameRoomHeadValue(previous, fence)) continue;
+			if ((fence.base !== previous.target && fence.base !== previous.base) || fence.through < previous.through)
+				throw new Error("ROOM_HEAD_FENCE_CONFLICT");
+		}
+		current.set(owner, fence);
+		changed = true;
+	}
+	if (!changed && old !== null) return old;
+	const revision = old === null ? 0 : old.revision;
+	if (revision === Number.MAX_SAFE_INTEGER) throw new Error("ROOM_HEAD_REVISION_EXHAUSTED");
+	return Object.freeze({
+		version: 1,
+		scope: image.scope,
+		revision: revision + 1,
+		owners: sortedFenceEntries(
+			[...current.entries()].map(([owner, fence]): RoomRetirementFenceEntry => Object.freeze([owner, fence] as const))
+		),
+	});
+}

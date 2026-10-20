@@ -22,6 +22,12 @@ import {
 	type RoomHeadState,
 	sameRoomHeadValue,
 } from "@ts-drp/storage";
+import {
+	captureRoomHeadRetirementFences,
+	captureRoomRetirementFenceRequest,
+	encodeRoomHeadRetirementFences,
+	roomHeadRetirementFenceChange,
+} from "@ts-drp/storage/room-head";
 
 import {
 	isNativeReadReservationTransaction,
@@ -32,7 +38,8 @@ import {
 } from "./internal/native-read-reservation.js";
 
 const STORE = "floor",
-	KEY = "record";
+	KEY = "record",
+	FENCES = "retirementFences";
 const hex = (bytes: Uint8Array): string => Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 function request<T>(r: IDBRequest<T>): Promise<T> {
 	return new Promise((resolve, reject) => {
@@ -61,6 +68,11 @@ const conflict = (): RoomHeadResult => Object.freeze({ ok: false, reason: "confl
 export interface BrowserRoomHeadOptions {
 	readonly databaseName: string;
 	readonly initialization: RoomHeadInitialization;
+	/**
+	 * Opt in to the version-2 floor with per-owner retirement fences (slice 14c).
+	 * Without it the floor opens at version 1 exactly as before.
+	 */
+	readonly retirementFences?: true;
 }
 export interface BrowserRoomHeadAuthority extends RoomHeadAuthority {
 	acquireNativeReadReservation(input: Readonly<{ scope: RoomHeadScope }>): Promise<NativeReadReservation>;
@@ -71,14 +83,49 @@ export interface BrowserRoomHeadAuthority extends RoomHeadAuthority {
 	close(): Promise<void>;
 }
 /**
+ * One captured fence record. Declared structurally here so the packed declarations
+ * reference only root `@ts-drp/storage` names; it matches `RoomHeadRetirementFences`.
+ */
+export interface BrowserRoomHeadRetirementFenceRecord {
+	readonly version: 1;
+	readonly scope: RoomHeadScope;
+	readonly revision: number;
+	readonly owners: readonly (readonly [
+		"ahe" | "issuance" | "journal" | "signing" | "snapshot",
+		Readonly<{ base: string; target: string; through: number }>,
+	])[];
+}
+/** Present only on a floor opened with `retirementFences: true`. Fences record expectations, never authority. */
+export interface BrowserRoomHeadRetirementFences {
+	fenceRetirement(
+		input: Readonly<{
+			scope: RoomHeadScope;
+			owners: readonly Readonly<{ owner: string; through: number; base: string; target: string }>[];
+		}>
+	): Promise<BrowserRoomHeadRetirementFenceRecord>;
+	readRetirementFences(input: Readonly<{ scope: RoomHeadScope }>): Promise<BrowserRoomHeadRetirementFenceRecord | null>;
+}
+/**
  * Open a host-selected IndexedDB floor without inventing freshness authority.
  * @param options - Explicit native database and create/migrate/reopen mode.
  * @returns A strict mechanical host-floor participant. Reopen never creates a missing database.
  */
 export async function createBrowserRoomHeadAuthority(
+	options: BrowserRoomHeadOptions & Readonly<{ retirementFences: true }>
+): Promise<BrowserRoomHeadAuthority & BrowserRoomHeadRetirementFences>;
+export async function createBrowserRoomHeadAuthority(
+	options: BrowserRoomHeadOptions
+): Promise<BrowserRoomHeadAuthority>;
+export async function createBrowserRoomHeadAuthority(
 	options: BrowserRoomHeadOptions
 ): Promise<BrowserRoomHeadAuthority> {
-	const o = roomHeadFields(options, ["databaseName", "initialization"]);
+	const optionKeys =
+		options !== null && typeof options === "object" && Reflect.ownKeys(options).includes("retirementFences")
+			? ["databaseName", "initialization", "retirementFences"]
+			: ["databaseName", "initialization"];
+	const o = roomHeadFields(options, optionKeys);
+	if (optionKeys.length === 3 && o.retirementFences !== true) throw new TypeError("ROOM_HEAD_INVALID_OPTIONS");
+	const fenced = optionKeys.length === 3;
 	if (
 		typeof o.databaseName !== "string" ||
 		o.databaseName.length === 0 ||
@@ -107,18 +154,41 @@ export async function createBrowserRoomHeadAuthority(
 		roomHeadFields(o.initialization, ["kind"]);
 		initialization = Object.freeze({ kind: init.kind });
 	}
-	const r = indexedDB.open(o.databaseName, 1);
-	r.addEventListener("upgradeneeded", () => {
-		if (initialization.kind === "reopen") r.transaction?.abort();
-		else r.result.createObjectStore(STORE);
+	const r = indexedDB.open(o.databaseName, fenced ? 2 : 1);
+	r.addEventListener("upgradeneeded", (event) => {
+		const oldVersion = event.oldVersion;
+		if (oldVersion === 0) {
+			if (initialization.kind === "reopen") r.transaction?.abort();
+			else {
+				r.result.createObjectStore(STORE);
+				if (fenced) r.result.createObjectStore(FENCES);
+			}
+		} else if (
+			fenced &&
+			oldVersion === 1 &&
+			r.result.objectStoreNames.length === 1 &&
+			r.result.objectStoreNames.contains(STORE)
+		) {
+			// Version 2 adds only the fence store; the version-1 floor is kept byte for byte.
+			r.result.createObjectStore(FENCES);
+		} else r.transaction?.abort();
 	});
 	const database = await request(r);
-	if (database.objectStoreNames.length !== 1 || !database.objectStoreNames.contains(STORE)) {
+	const stores = fenced ? [STORE, FENCES] : [STORE];
+	if (
+		database.objectStoreNames.length !== stores.length ||
+		stores.some((name) => !database.objectStoreNames.contains(name))
+	) {
 		database.close();
 		throw new Error("ROOM_HEAD_UNSUPPORTED_SCHEMA");
 	}
-	const schema = database.transaction(STORE, "readonly").objectStore(STORE);
-	if (schema.keyPath !== null || schema.autoIncrement || schema.indexNames.length !== 0) {
+	const catalog = database.transaction(stores, "readonly");
+	if (
+		stores.some((name) => {
+			const schema = catalog.objectStore(name);
+			return schema.keyPath !== null || schema.autoIncrement || schema.indexNames.length !== 0;
+		})
+	) {
 		database.close();
 		throw new Error("ROOM_HEAD_UNSUPPORTED_SCHEMA");
 	}
@@ -142,17 +212,29 @@ export async function createBrowserRoomHeadAuthority(
 		if (closed) throw new Error("ROOM_HEAD_CLOSED");
 	};
 	async function transact<T>(mode: IDBTransactionMode, action: (store: IDBObjectStore) => Promise<T>): Promise<T> {
+		return transactOver(mode, [STORE], (tx) => action(tx.objectStore(STORE)));
+	}
+	async function transactOver<T>(
+		mode: IDBTransactionMode,
+		names: string[],
+		action: (tx: IDBTransaction) => Promise<T>
+	): Promise<T> {
 		ensureOpen();
 		const operation = async (): Promise<T> => {
 			const tx =
 				mode === "readonly"
-					? nativeReadonlyTransaction(database, STORE)
-					: database.transaction(STORE, "readwrite", { durability: "strict" });
+					? nativeReadonlyTransaction(database, names)
+					: database.transaction(names, "readwrite", { durability: "strict" });
+			// The fence store is new; its writes refuse unless the engine reports strict durability.
+			if (mode === "readwrite" && names.includes(FENCES) && tx.durability !== "strict") {
+				tx.abort();
+				throw new Error("ROOM_HEAD_DURABILITY_UNAVAILABLE");
+			}
 			const held = isNativeReadReservationTransaction(tx),
 				done = held ? undefined : terminal(tx);
 			void done?.catch(() => undefined);
 			try {
-				const result = await action(tx.objectStore(STORE));
+				const result = await action(tx);
 				if (held) await nativeReadReservationCheck(tx);
 				else await done;
 				ensureOpen();
@@ -342,5 +424,31 @@ export async function createBrowserRoomHeadAuthority(
 		},
 		close,
 	};
-	return Object.freeze(authority);
+	if (!fenced) return Object.freeze(authority);
+	const fences: BrowserRoomHeadRetirementFences = {
+		fenceRetirement: async (input) => {
+			const fenceRequest = captureRoomRetirementFenceRequest(input);
+			return transactOver("readwrite", [STORE, FENCES], async (tx) => {
+				const image = await load(tx.objectStore(STORE));
+				if (image === null) throw new Error("ROOM_HEAD_CONTROL_CONFLICT");
+				const fenceStore = tx.objectStore(FENCES);
+				const stored: unknown = await request(fenceStore.get(fenceRequest.scope.objectId));
+				const next = roomHeadRetirementFenceChange(stored, image, fenceRequest);
+				if (stored !== undefined && next.revision === captureRoomHeadRetirementFences(stored, image.scope).revision)
+					return next;
+				await request(fenceStore.put(encodeRoomHeadRetirementFences(next), fenceRequest.scope.objectId));
+				return next;
+			});
+		},
+		readRetirementFences: async (input) => {
+			const { scope } = inputScope(input, ["scope"]);
+			return transactOver("readonly", [STORE, FENCES], async (tx) => {
+				const image = await load(tx.objectStore(STORE));
+				if (image === null || !sameRoomHeadValue(image.scope, scope)) throw new Error("ROOM_HEAD_CONTROL_CONFLICT");
+				const stored: unknown = await request(tx.objectStore(FENCES).get(scope.objectId));
+				return stored === undefined ? null : captureRoomHeadRetirementFences(stored, image.scope);
+			});
+		},
+	};
+	return Object.freeze({ ...authority, ...fences });
 }
