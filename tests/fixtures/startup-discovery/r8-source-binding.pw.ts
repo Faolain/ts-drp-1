@@ -149,6 +149,13 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
   try{new PerformanceObserver(list=>{for(const entry of list.getEntries()){if(entries.length<65536)entries.push({startTime:entry.startTime,duration:entry.duration,name:entry.name});else truncated=true;}})
    .observe({type:"longtask",buffered:true});}catch{}
   Reflect.set(globalThis,"__rdLongTasks",()=>({timeOrigin:performance.timeOrigin,entries:[...entries],truncated}));});
+ // Measurement-only proof-event buffer, per frame realm. The creator's steady
+ // volume is a constant ~3.7k events per rollover (Track R3's 16-rollover runs),
+ // so the fixed 50,000 cap bounded the run at ~13 rollovers instead of detecting
+ // growth. Scale it with the configured rollovers (4k per rollover plus one for
+ // creation, the floor of 50,000 kept); the truncation checks below still apply.
+ const proofEventBudget=Math.max(50_000,4_000*(Number(process.env.STARTUP_HEALTHY_GRID_ROLLOVERS??4)+1));
+ await page.context().addInitScript(value=>Reflect.set(globalThis,"__r8ProofEventBudget",value),proofEventBudget);
  const clients:Awaited<ReturnType<typeof server>>[]=[];
  for(let index=0;index<4;index++)clients.push(await server(directory));
  await page.goto(local.origin+"/r8-source-binding");
@@ -716,6 +723,8 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
  expect(receipt.joins.every((row:{ok:boolean})=>row.ok)).toBe(true);
  expect(receipt.proofEventsTruncated).toBe(false);
  expect(receipt.roleObservers.every((row:any)=>!row.observer.proofEventsTruncated)).toBe(true);
+ // Every role realm observed with exactly the scaled budget, not a silent default.
+ expect(receipt.roleObservers.every((row:any)=>row.observer.proofEventBudget===proofEventBudget)).toBe(true);
  expect(receipt.roleObservers.reduce((count:number,row:any)=>count+row.observer.proofEvents.length,0)).toBeGreaterThan(0);
  if(finishingWindowFile!==undefined&&!incrementalNativeControls){
   const events=receipt.roleObservers.flatMap((row:any)=>row.observer.proofEvents);

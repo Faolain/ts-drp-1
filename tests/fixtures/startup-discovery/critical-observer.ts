@@ -273,6 +273,15 @@ Object.assign(globalThis,{__r8FunctionEnter:fullFunctionEnter,__r8FunctionSuspen
 
 export const proofEvents: unknown[] = [];
 export let proofEventsTruncated = false;
+// Measurement-only evidence buffer per frame realm. The steady per-rollover volume
+// is constant, so a fixed cap bounds the configured run length rather than any
+// growth. A harness may raise it for longer bounded runs before this realm loads;
+// 50,000 stays the default and the floor.
+const configuredProofEventBudget = Reflect.get(globalThis, "__r8ProofEventBudget");
+export const proofEventBudget =
+  typeof configuredProofEventBudget === "number" && Number.isSafeInteger(configuredProofEventBudget) && configuredProofEventBudget > 50_000
+    ? configuredProofEventBudget
+    : 50_000;
 export let proofObserverMilliseconds = 0;
 export const proofOwnerSummaries = new Map<number, {owner:number;initialBytes:number;chargedBytes:number;unknownBytes:number;forecastMaximum?:number;forecasts:number;completedCurrentJobPhases?:number;completedCurrentJobJournalComputations?:number}>();
 let proofOwner = 0;
@@ -294,7 +303,7 @@ function proofEvent(event: Readonly<Record<string, unknown>>): void {
         summary.completedCurrentJobJournalComputations=(summary.completedCurrentJobJournalComputations??0)+event.currentJobJournalComputations;
     }
   }
-  if (proofEvents.length < 50_000) proofEvents.push({ ...event, ...context, time: start });
+  if (proofEvents.length < proofEventBudget) proofEvents.push({ ...event, ...context, time: start });
   else proofEventsTruncated = true;
   proofObserverMilliseconds += performance.now() - start;
 }
