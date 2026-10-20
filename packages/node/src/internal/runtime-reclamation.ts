@@ -12,6 +12,13 @@ import type { CreatorPostAdoptionCensusSizing, CreatorPostAdoptionSettlementSizi
 import type { CreatorOrdinaryRuntimeCapacityWidthInput, creatorOrdinaryRuntimeCapacityWidths } from "../v3-live.js";
 import type { CreatorPendingClassificationCustodyInput } from "./creator-adoption-recover.js";
 import type { CreatorOrdinarySourceCapture } from "./creator-closed-rollback-data.js";
+import type { V3RoomRetirementSession } from "./room-retirement.js";
+
+/** The original issuance retirement owner of one recovery hold. */
+export type CreatorIssuanceRetirementOwner = (() => Promise<DurableIssuanceRetirementControlRead>) & {
+	/** Slice 14a: the same owner's original read through a room retirement session. */
+	readonly acquireIn?: (session: V3RoomRetirementSession) => Promise<DurableIssuanceRetirementControlRead>;
+};
 
 const INPUT_KEYS = Object.freeze(["aheReceipt", "issuanceReceipt", "successor"] as const);
 
@@ -330,7 +337,7 @@ export type CreatorSnapshotRecoveryCloseLifetime = Readonly<{
 	borrowDependencies(): Promise<CreatorSnapshotRecoveryCloseDependencyRead>;
 	borrowSigningDependencies(trusts: readonly CurrentAnchorTrust[], prepareData?: CreatorSigningDependencyPreparation): Promise<CreatorSigningDependencyRead>;
 	captureSigningRetirementOwners(): CreatorSigningRetirementOwners;
-	captureIssuanceRetirementOwner(): () => Promise<DurableIssuanceRetirementControlRead>;
+	captureIssuanceRetirementOwner(): CreatorIssuanceRetirementOwner;
 	/** Original factory capture for no-deletion authenticated inherited metadata
 	 * composition. Active hold remains read-only for completeRetirement. These
 	 * factories are not narrowed grants: the original planner must select no drains. */

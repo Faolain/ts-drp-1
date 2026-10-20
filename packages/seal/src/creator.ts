@@ -54,10 +54,24 @@ export interface CreatorSigningDependencyRead {
 	release(): Promise<void>;
 }
 
+/**
+ * Slice 14a: a room retirement session's signing acquisition. It receives the actor's
+ * own original facet, which the session accepts only when genuine for its database.
+ */
+export type CreatorSigningSessionAcquire = (
+	store: unknown,
+	input: Readonly<{ objectId: string }>,
+	recovery: boolean
+) => Promise<SigningRetirementObservation>;
+
 /** Original actor-native factories, not proof of retirement eligibility. */
 export interface CreatorSigningRetirementOwners {
 	acquireVote(): Promise<SigningRetirementObservation>;
 	acquireEvidence(): Promise<SigningRetirementObservation>;
+	/** Slice 14a: the same gated, actor-tracked acquisition through a room retirement session. */
+	acquireVoteIn?(session: CreatorSigningSessionAcquire): Promise<SigningRetirementObservation>;
+	/** Slice 14a: the same gated, actor-tracked acquisition through a room retirement session. */
+	acquireEvidenceIn?(session: CreatorSigningSessionAcquire): Promise<SigningRetirementObservation>;
 }
 
 type ActorResult = Readonly<
@@ -112,6 +126,8 @@ interface ActorState {
 	authority: SealAuthority | null;
 	currentTrust: unknown;
 	evidence: CreatorCloseEvidenceAdapter;
+	/** The original minted evidence facet, offered only to a room retirement session. */
+	evidenceStore: unknown;
 	evidenceRecord: CreatorCloseEvidenceRecord | null;
 	onObservation(event: Readonly<Record<string, unknown>>): void;
 	phase: string;
@@ -1481,6 +1497,7 @@ async function createCreatorNativeActor(
 			authority: null,
 			currentTrust: input.currentTrust,
 			evidence,
+			evidenceStore: input.evidenceStore,
 			evidenceRecord: record,
 			onObservation: input.onObservation,
 			phase: record?.phase ?? "empty",
@@ -1572,9 +1589,16 @@ async function createCreatorNativeActor(
 					);
 					return task;
 				};
+				const recovery = owned.signer === undefined;
 				return Object.freeze({
 					acquireVote: () => acquire(voteAcquire),
 					acquireEvidence: () => acquire(evidenceAcquire),
+					// Slice 14a: the same gate, check and actor tracking; only the native
+					// view comes from the caller's room retirement session.
+					acquireVoteIn: (session: CreatorSigningSessionAcquire) =>
+						acquire((input) => session(owned.voteStore, input, recovery)),
+					acquireEvidenceIn: (session: CreatorSigningSessionAcquire) =>
+						acquire((input) => session(owned.evidenceStore, input, recovery)),
 				});
 			},
 			acquireRecoveryDependencies(this: CreatorActor, trusts: readonly CurrentAnchorTrust[]) {

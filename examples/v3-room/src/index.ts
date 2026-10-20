@@ -9,6 +9,18 @@ import type { V3RoomStorageHost } from "@ts-drp/node/v3-room-host";
 import { createBrowserAheDurableStore } from "@ts-drp/storage-browser";
 import { createBrowserDurableIssuanceStore } from "@ts-drp/storage-browser/issuance";
 import { createBrowserDurableLiveJournalStore } from "@ts-drp/storage-browser/live-journal";
+// Every room-mode owner comes from the module that owns the room retirement session.
+import {
+	createBrowserRoomAheDurableStore,
+	createBrowserRoomDurableIssuanceStore,
+	createBrowserRoomLiveJournalStore,
+	createBrowserRoomSnapshotQuarantineStore,
+	openBrowserRoomRetirement,
+	openBrowserRoomSealEvidenceStore,
+	openBrowserRoomSealSigningStore,
+	openBrowserRoomSealVoteStore,
+	prepareBrowserRoomDatabase,
+} from "@ts-drp/storage-browser/maintenance";
 import { createBrowserRoomHeadAuthority } from "@ts-drp/storage-browser/room-head";
 import { openBrowserSealEvidenceStore } from "@ts-drp/storage-browser/seal-evidence";
 import { openBrowserSealVoteStore } from "@ts-drp/storage-browser/seal-vote";
@@ -55,6 +67,36 @@ const browserStorageHost: V3RoomStorageHost = Object.freeze({
 	openRoomHead: (databaseName: string, initialization: V3RoomHeadInitialization) =>
 		createBrowserRoomHeadAuthority({ databaseName, initialization }),
 });
+
+const ROOM_AHE_SUFFIX = "--ahe";
+
+/**
+ * Opt-in (slice 14a): every owner of a room in ONE version-7 IndexedDB database. The
+ * AHE store the room opens under `${name}--ahe` lives in database `name` with the
+ * others; its retirement session then runs each owner's original retirement on one
+ * strict transaction per stage. The host floor (`--room-head`) stays its own database.
+ * The default host is unchanged.
+ * @returns A storage host whose factories prepare the room database before opening.
+ */
+export function createBrowserV3RoomDatabaseStorageHost(): V3RoomStorageHost {
+	const room = async (name: string): Promise<string> => {
+		const databaseName = name.endsWith(ROOM_AHE_SUFFIX) ? name.slice(0, -ROOM_AHE_SUFFIX.length) : name;
+		await prepareBrowserRoomDatabase({ databaseName });
+		return databaseName;
+	};
+	return Object.freeze({
+		openAhe: async (name: string) => createBrowserRoomAheDurableStore({ databaseName: await room(name) }),
+		openIssuance: async (name: string) => createBrowserRoomDurableIssuanceStore({ databaseName: await room(name) }),
+		openJournal: async (name: string) => createBrowserRoomLiveJournalStore({ databaseName: await room(name) }),
+		openSnapshots: async (name: string) => createBrowserRoomSnapshotQuarantineStore({ databaseName: await room(name) }),
+		openSealVote: async (name: string) => openBrowserRoomSealVoteStore({ databaseName: await room(name) }),
+		openSealEvidence: async (name: string) => openBrowserRoomSealEvidenceStore({ databaseName: await room(name) }),
+		openCreatorSigningStores: async (name: string) => openBrowserRoomSealSigningStore({ databaseName: await room(name) }),
+		openRoomRetirement: (name: string) => openBrowserRoomRetirement({ databaseName: name }),
+		openRoomHead: (databaseName: string, initialization: V3RoomHeadInitialization) =>
+			createBrowserRoomHeadAuthority({ databaseName, initialization }),
+	});
+}
 
 export type CreateV3RoomSessionInput<Projection extends V3RoomProjectionAuthority = V3RoomProjectionAuthority> = Omit<
 	HostRoomInput<Projection>,

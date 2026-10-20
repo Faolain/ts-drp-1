@@ -2595,6 +2595,9 @@ class BrowserIssuanceImplementation {
 }
 
 const implementationByStore = new WeakMap<DurableIssuanceStore, BrowserIssuanceImplementation>();
+// The pruning maintenance capability each genuine facade minted (slice 14a): a node may
+// hold only a facade it re-bound to that same capability, never the original facade.
+const implementationByMaintenance = new WeakMap<object, BrowserIssuanceImplementation>();
 
 async function openIssuanceDatabase(name: string): Promise<IDBDatabase> {
 	return new Promise((resolve, reject) => {
@@ -2736,12 +2739,13 @@ export async function createBrowserRoomDurableIssuanceStoreImplementation(
 		const transaction = strictTransaction(admitted, "readwrite");
 		await transactionResult(transaction);
 	});
-	roomIssuanceDatabases.set(store, databaseName);
+	const implementation = implementationByStore.get(store);
+	if (implementation !== undefined) roomIssuanceDatabases.set(implementation, databaseName);
 	return store;
 }
 
-// Genuine room-mode issuance facades, with their room database name.
-const roomIssuanceDatabases = new WeakMap<object, string>();
+// Genuine room-mode issuance owners, with their room database name.
+const roomIssuanceDatabases = new WeakMap<BrowserIssuanceImplementation, string>();
 
 /**
  * Slice 14a: the issuance retirement acquisition of one genuine room-mode issuance
@@ -2758,10 +2762,13 @@ export function acquireBrowserRoomIssuanceStoreRetirement(
 	session: RoomRetirementSession,
 	input: { readonly objectId: string }
 ): Promise<DurableIssuanceRetirementControlRead> {
-	const implementation =
-		typeof store === "object" && store !== null && roomIssuanceDatabases.get(store) === databaseName
-			? implementationByStore.get(store as DurableIssuanceStore)
+	// The owner is named by its genuine facade or by the pruning maintenance capability
+	// that facade minted; either resolves to the one native owner it belongs to.
+	const owner =
+		typeof store === "object" && store !== null
+			? (implementationByStore.get(store as DurableIssuanceStore) ?? implementationByMaintenance.get(store))
 			: undefined;
+	const implementation = owner !== undefined && roomIssuanceDatabases.get(owner) === databaseName ? owner : undefined;
 	if (implementation === undefined) throw new TypeError("RETENTION_FOREIGN_OWNER");
 	return implementation.acquireRetirementControlInSession(session, input);
 }
@@ -2826,6 +2833,7 @@ async function createIssuanceStoreOver(
 		if (!bindDurableIssuancePruningMaintenance(store, maintenance)) {
 			throw new TypeError("browser issuance maintenance was already bound");
 		}
+		implementationByMaintenance.set(maintenance, implementation);
 		return store;
 	} catch (error) {
 		database.onversionchange = null;

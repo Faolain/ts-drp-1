@@ -102,6 +102,7 @@ import {
 	type CreatorCloseSigningFrameWidth,
 	type CreatorSigningDependencyRead,
 	type CreatorSigningRetirementOwners,
+	type CreatorSigningSessionAcquire,
 	readCreatorCloseSigningFramesForSizing,
 	reconstructCreatorFinalizedEvidence,
 	verifyCreatorFinalizedEvidence,
@@ -260,7 +261,9 @@ import {
 	type CreatorOrdinaryApplicationResourceProjection,
 	type CreatorOrdinaryFinishingWindowLimits,
 	type CreatorOrdinaryApplicationControlCapture,
+	type CreatorIssuanceRetirementOwner,
 } from "./runtime-reclamation.js";
+import { v3RoomRetirementOpener, type V3RoomRetirementSession } from "./room-retirement.js";
 import type { CreatorPostAdoptionCensusSizing, CreatorPostAdoptionSettlementSizing, CreatorRoomSettlementPreview } from "../creator-close.js";
 import type { CreatorOrdinaryRuntimeCapacityWidthInput, creatorOrdinaryRuntimeCapacityWidths } from "../v3-live.js";
 import { openCreatorCloseMembership } from "./creator-close-membership.js";
@@ -9180,7 +9183,7 @@ interface ClosedRetirementSource {
 	readonly journalDetails: ClosedJournalDetailClassification;
 	readonly accounting: CreatorClosedRollbackProofAccounting;
 	readonly signingOwners: CreatorSigningRetirementOwners;
-	readonly acquireIssuance: () => Promise<DurableIssuanceRetirementControlRead>;
+	readonly acquireIssuance: CreatorIssuanceRetirementOwner;
 	/** Complete original closed-consumer classification, never source syntax alone. */
 	readonly issuanceDependenciesClassified?: true;
 }
@@ -19138,13 +19141,92 @@ function closedInstallationSigningData(rows: readonly Uint8Array[], objectId: st
 	return {dataRows: [...distinct.values()].map(row => row.bytes), metadata};
 }
 
+/**
+ * Slice 14a: the room retirement session of one install. While `session` is set, every
+ * owner acquisition of the 2PC install is that owner's ORIGINAL read and transitions on
+ * the session's strict room transaction. The session commits before any room-head floor
+ * effect and before the ordinary joint verification; after `leave` every acquisition is
+ * the ordinary one. Every state it commits is one the per-owner path also reaches.
+ */
+interface ClosedRetirementRoom {
+	readonly session: V3RoomRetirementSession | undefined;
+	readonly issuanceIn: NonNullable<CreatorIssuanceRetirementOwner["acquireIn"]>;
+	readonly voteIn: NonNullable<CreatorSigningRetirementOwners["acquireVoteIn"]>;
+	readonly evidenceIn: NonNullable<CreatorSigningRetirementOwners["acquireEvidenceIn"]>;
+	/** Commits the session; later acquisitions are ordinary. */
+	leave(): Promise<void>;
+}
+
+const roomSigning =
+	(session: V3RoomRetirementSession): CreatorSigningSessionAcquire =>
+	(store, request, recovery) =>
+		session.acquireSigning(request, recovery, store);
+
+function observeClosedRetirementRoom(outcome: string, epoch: number, started: number): void {
+	try {
+		const observer = Reflect.get(globalThis, "__warmProofEvent");
+		if (typeof observer === "function")
+			observer({ kind: "closed-retirement-room-session", outcome, epoch, ms: performance.now() - started });
+	} catch {
+		/* Observation grants nothing. */
+	}
+}
+
+/**
+ * Slice 14a: the install of one retirement source. A host that keeps every owner in one
+ * room database selects that room's retirement session; otherwise, and for an inherited
+ * classification, this is exactly the per-owner install.
+ * @returns Whether joined evidence work needs a fresh summary acquisition.
+ */
+async function installClosedRetirementSourceInRoom(source: ClosedRetirementSource, acknowledgeCompletedJournalDrain = false,
+	drainSuppressedJournalPrefixes = false): Promise<boolean> {
+	// Classification (no-deletion metadata composition) stays per-owner.
+	const open = source.inheritedClassification === undefined ? v3RoomRetirementOpener(source.input.store) : undefined;
+	const issuanceIn = source.acquireIssuance.acquireIn,
+		voteIn = source.signingOwners.acquireVoteIn,
+		evidenceIn = source.signingOwners.acquireEvidenceIn;
+	if (open === undefined || issuanceIn === undefined || voteIn === undefined || evidenceIn === undefined)
+		return installClosedRetirementSource(source, acknowledgeCompletedJournalDrain, drainSuppressedJournalPrefixes);
+	const epoch = source.floor.stable.epoch,
+		started = performance.now();
+	let session: V3RoomRetirementSession | undefined = await open();
+	const room: ClosedRetirementRoom = {
+		get session() {
+			return session;
+		},
+		issuanceIn,
+		voteIn,
+		evidenceIn,
+		leave: async (): Promise<void> => {
+			const current = session;
+			if (current === undefined) return;
+			session = undefined;
+			await current.commit();
+			observeClosedRetirementRoom("committed", epoch, started);
+		},
+	};
+	try {
+		return await installClosedRetirementSource(source, acknowledgeCompletedJournalDrain,
+			drainSuppressedJournalPrefixes, room);
+	} catch (primary) {
+		const current = session;
+		session = undefined;
+		if (current !== undefined) {
+			// Nothing since the last checkpoint commits; that prefix is a per-owner state.
+			await current.abort(primary).catch(() => undefined);
+			observeClosedRetirementRoom("aborted", epoch, started);
+		}
+		throw primary;
+	}
+}
+
 /** Original owner composition after its authenticated proof and outer native
  * reservations have joined. Global metadata completion precedes every exact
  * classified local-prefix drain; headers and all other detail stay protected.
  * @returns Whether joined evidence work needs a fresh summary acquisition.
  */
 async function installClosedRetirementSource(source: ClosedRetirementSource, acknowledgeCompletedJournalDrain = false,
-	drainSuppressedJournalPrefixes = false): Promise<boolean> {
+	drainSuppressedJournalPrefixes = false, room?: ClosedRetirementRoom): Promise<boolean> {
 	const { input, summary, accounting } = source;
 	if (source.inheritedClassification !== undefined) requireLaw(source.generationSource === undefined &&
 		source.signingSummaries === undefined && source.signingDetails.length === 0 &&
@@ -19162,10 +19244,14 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 	const parsedObjectId = parseStorageObjectId(input.objectId);
 	requireLaw(parsedObjectId.ok, "malformed-input");
 	const objectId = parsedObjectId.value;
-	const acquireAhe = bindMethod<NonNullable<AheBoundedRecoveryRoleStore["acquireRetirementControl"]>>(
+	const ordinaryAcquireAhe = bindMethod<NonNullable<AheBoundedRecoveryRoleStore["acquireRetirementControl"]>>(
 		input.store,
 		"acquireRetirementControl"
 	);
+	// Slice 14a: inside an open room session every acquisition is the same owner's
+	// original read on the session's strict transaction; otherwise the ordinary one.
+	const acquireAhe: typeof ordinaryAcquireAhe = (id) =>
+		room?.session !== undefined ? room.session.acquireAhe(input.store, id) : ordinaryAcquireAhe(id);
 	const acquireCoordinator = async (): Promise<AheRetirementControlRead> => {
 		const result = await acquireAhe(objectId);
 		if (!result.ok)
@@ -19179,13 +19265,17 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 		}
 		return result.value;
 	};
-	const acquireSnapshot = bindMethod<
+	const ordinaryAcquireSnapshot = bindMethod<
 		NonNullable<SnapshotRecoveryStore<SnapshotVerificationReceipt>["acquireRetirementControl"]>
 	>(input.snapshotStore, "acquireRetirementControl");
-	const acquireJournal = bindMethod<NonNullable<DurableLiveJournalStore["acquireRetirementControl"]>>(
+	const acquireSnapshot: typeof ordinaryAcquireSnapshot = (request) =>
+		room?.session !== undefined ? room.session.acquireSnapshot(input.snapshotStore, request) : ordinaryAcquireSnapshot(request);
+	const ordinaryAcquireJournal = bindMethod<NonNullable<DurableLiveJournalStore["acquireRetirementControl"]>>(
 		input.liveJournalStore,
 		"acquireRetirementControl"
 	);
+	const acquireJournal: typeof ordinaryAcquireJournal = (request) =>
+		room?.session !== undefined ? room.session.acquireJournal(input.liveJournalStore, request) : ordinaryAcquireJournal(request);
 	const journalRead = async (): Promise<LiveJournalRetirementControlRead> => {
 		const result = await acquireJournal({ objectId: input.objectId });
 		requireLaw(result.ok, "anchor-unavailable");
@@ -19482,7 +19572,7 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 	} catch { /* Observation neither unprotects nor prunes any record. */ }
 	const issuancePreparation = Object.freeze({ ...labels, protectedRecords });
 	const issuanceNative = async (): Promise<ClosedEpochRetirementMetadataRead> => {
-		const read = await source.acquireIssuance();
+		const read = await (room?.session !== undefined ? room.issuanceIn(room.session) : source.acquireIssuance());
 		try {
 			checkSourceImage(read.image.imageDigest, issuanceImage.imageDigest);
 			requireLaw(accounting.charge(closedRetirementBytes(read.control)), "proof-budget-exceeded");
@@ -19607,9 +19697,13 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 						commitment: floorDomain,
 						phase,
 						prepareFence: async () => {
+							// The floor is a separate database: commit the room prefix first, so
+							// a floor fence never precedes the coordinator intent it belongs to.
+							await room?.session?.checkpoint();
 							await read.prepareFence(labels);
 						},
 						commitPrepared: async () => {
+							await room?.session?.checkpoint();
 							await read.commitPrepared(labels);
 						},
 						release: read.release.bind(read),
@@ -19660,8 +19754,16 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 	const signingNative = async (coordinator: AheRetirementControl): Promise<ClosedEpochRetirementMetadataRead> => {
 		const reads: SigningRetirementObservation[] = [];
 		try {
-			reads.push(await source.signingOwners.acquireVote());
-			reads.push(await source.signingOwners.acquireEvidence());
+			const session = room?.session;
+			const inRoom = session === undefined ? undefined : roomSigning(session);
+			reads.push(
+				await (room !== undefined && inRoom !== undefined ? room.voteIn(inRoom) : source.signingOwners.acquireVote())
+			);
+			reads.push(
+				await (room !== undefined && inRoom !== undefined
+					? room.evidenceIn(inRoom)
+					: source.signingOwners.acquireEvidence())
+			);
 			const read = reads[0]!;
 			requireLaw(accounting.charge(closedRetirementBytes(read.control)), "proof-budget-exceeded");
 			requireLaw(
@@ -20010,8 +20112,13 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 		generations,
 		participants,
 		acquireCoordinator,
-		verifyCompleted,
+		// The session commits before the ordinary joint custody re-verifies every owner.
+		verifyCompleted: async (coordinator: AheRetirementControl) => {
+			await room?.leave();
+			await verifyCompleted(coordinator);
+		},
 	});
+	await room?.leave();
 	if (generationSource !== undefined && completedCoordinator.completed?.generationDrain?.phase === "pending") {
 		const prior = completedCoordinator,
 			read = await acquireCoordinator();
@@ -21622,7 +21729,7 @@ async function reconcileSnapshotRecoveryRoles(
 		requireLaw(!requireClosedWorkflowCompletion, "snapshot-unavailable");
 		return false;
 	}
-	return installClosedRetirementSource(retirementSource, acknowledgeCompletedJournalDrain, drainSuppressedJournalPrefixes);
+	return installClosedRetirementSourceInRoom(retirementSource, acknowledgeCompletedJournalDrain, drainSuppressedJournalPrefixes);
 }
 
 /**

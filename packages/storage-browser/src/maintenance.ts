@@ -21,6 +21,18 @@ import { acquireBrowserRoomSigningRetirement, browserRoomSigningStore } from "./
 import { acquireBrowserRoomJournalRetirement } from "./live-journal.js";
 import { acquireBrowserRoomSnapshotRetirement } from "./snapshot-transfer.js";
 
+// Slice 14a: every room-mode owner factory from the module that owns the room retirement
+// session, so a host that opens its room owners here shares one set of owner registries
+// with the session, however the subpaths are bundled.
+export { createBrowserRoomDurableIssuanceStore } from "./issuance.js";
+export { createBrowserRoomLiveJournalStore } from "./live-journal.js";
+export {
+	openBrowserRoomSealEvidenceStore,
+	openBrowserRoomSealSigningStore,
+	openBrowserRoomSealVoteStore,
+} from "./seal-signing.js";
+export { createBrowserRoomSnapshotQuarantineStore } from "./snapshot-transfer.js";
+
 /**
  * Resolves reclamation authority only for the exact genuine browser AHE facade.
  * @param store - Candidate ordinary AHE facade.

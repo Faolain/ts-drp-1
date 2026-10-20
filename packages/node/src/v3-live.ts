@@ -231,6 +231,7 @@ export {
 	type CreatorSnapshotRecoveryCloseHold,
 	resolveCreatorSnapshotRecoveryCloseHold,
 } from "./internal/runtime-reclamation.js";
+import type { V3RoomRetirementSession } from "./internal/room-retirement.js";
 import { deriveV3StableTopic } from "./internal/v3-topic.js";
 import { classifyV3EnvelopeScope } from "./v3-envelope-scope.js";
 import { consumeRecoveredV3LiveAuthority, installRecoveredV3LiveAuthority } from "./v3-live-recovered-authority.js";
@@ -3950,7 +3951,11 @@ function resolveRecoveryCloseHold(
 			const scope = ObjectFreeze({ objectId: facts.context.payload.trust.trust.objectId });
 			// Original private maintenance binding captures the real native receiver;
 			// the eventual native view supplies CAS, not caller-selected authority.
-			return () => acquire(scope);
+			// Slice 14a: a room retirement session acts only for the owner of this same
+			// maintenance capability (a filtered facade is re-bound to it, never minted).
+			return ObjectFreeze(Object.assign(() => acquire(scope), {
+				acquireIn: (session: V3RoomRetirementSession) => session.acquireIssuance(scope, native),
+			}));
 		},
 		captureSigningRetirementOwners: function (this: CreatorSnapshotRecoveryCloseLifetime) {
 			if (this !== lifetime || !available() || !facts.retirementAllowed)
