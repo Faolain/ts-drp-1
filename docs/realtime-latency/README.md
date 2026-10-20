@@ -89,8 +89,10 @@ repository owner made. "Coordinator" marks a recommendation that was then carrie
 | 19 | Keep these records in the repository. | User | Decisions and plans should live with the code. | This folder |
 | 20 | Track M: build slice 14b (retirement decided from a ledger of verified facts) and 14e (bounds and charges) on R3's room path. Every decision must match the existing planner, proven by a differential test. | User | Stage 1a kept the per-pass re-proofs that dominate the lull; 14b is the lever for milliseconds. Target: creator lull ≤ 100 ms p50. | Held on its branch (a301cbe0..07849f85), see row 22. Stage 1 cut the creator lull 2441 → 623 ms and the recipient lull 1253 → 466 ms; the target needs stage 2. No decision deleted anything the existing planner keeps. |
 | 21 | Track N: stop each recipient's issuance store growing 3 issued and 3 outbox rows per epoch, and make the Grid's proof-event budget scale with rollovers. | User | Unbounded growth with room age violates G1. R3 found it; it predates this work. | 60161b4a..7464f875, merged after verification. A Writer recipient never closes, so its cleanup always stopped at the cold-material guard before the issuance drain. It now drains its own classified, published, settled prefix through the existing authenticated pruner when its completed retirement decisions match, with no generation effect. Recipients stay flat at 13 rows from epoch 5 through 16 on both paths. |
-| 22 | Hold Track M: fix its crash bug first, then merge. | User | Its 14f case 8 breaks G3 and G14 on the opt-in path on all three engines: a SIGKILL between a creator boundary's two decisions leaves the signing control without a summary source, and maintenance then halts. The main branch must not carry a known guarantee break. | Track M stays on its branch; Track O fixes it there. |
+| 22 | Hold Track M: fix its crash bug first, then merge. | User | Its 14f case 8 breaks G3 and G14 on the opt-in path on all three engines: a SIGKILL between a creator boundary's two decisions leaves the signing control without a summary source, and maintenance then halts. The main branch must not carry a known guarantee break. | Track M stayed on its branch until Track O's fix; both merged in 8c61863e (row 24). |
 | 23 | Start Tracks O, M2, P and Q in parallel. | User | O: the case 8 fix. M2: 14b stage 2, the in-memory ledger that removes the ~282 ms cold acquisition per boundary. P and Q fix two problems Track M found on every path: Canvas issuance grows one row per move with an O(outbox) issue cost (829 ms → 6.7 s per move by epoch 16), and the shipped Canvas and Chat creators never run their lull, so retirement runs inline at seal (about 2.7 s). | In progress |
+| 24 | Accept Track O's 14b/14e amendment, and merge Tracks M and O together. | User | O's fix makes each boundary one decision, with one epoch's signing evidence and summaries as one unit, in a fixed unit order. A crash or refusal between continuations then resumes from a fresh acquisition (G3, G14). Track M's suggested fix left a second split point open. | Merge 8c61863e, after verification on O's head: typecheck 0, 13 room test files passing, the proof-accounting test file identical to the main branch, and 14f case 8 passing with a real SIGKILL. |
+| 25 | Hold Track Q. | Coordinator | Its Canvas and Chat resource bounds work (seal 0.07–0.14x of before), but running the lull exposes a pre-existing bug. A persisted reopen right after the creator's first maintained lull is refused with `floor-stale` (a stored signing-summary resume-basis digest differs on resume, CRD:19350). R3's 4-rollover room test now reaches it and fails. The Grid hits the same bug when reopened at epoch 4. | Not merged until the bug is fixed |
 
 ## Commits
 
@@ -146,6 +148,26 @@ repository owner made. "Coordinator" marks a recommendation that was then carrie
 | 8d00935d | test(grid): scale the proof-event observer budget with configured rollovers |
 | af83570a | fix: a cold recipient drains only published issuance rows |
 | 7464f875 | docs: record the Track N result |
+| 5c6b949d | docs: record Track N's merge in the real-time latency decision log |
+| a301cbe0 | test(track-m): RED for verified retention decisions (14b) and their bounds (14e) |
+| 51d007eb | feat(track-m): verified retention decisions on the opt-in room path (14b stage 1, 14e) |
+| de1d64cc | test(track-m): settlement-room differential, including Track N's cold recipient drain |
+| 9514ff21 | test(grid): allow endurance runs of up to 128 rollovers (measurement only) |
+| 55dbf18a | fix(track-m): keep retention formats off the pinned storage root and the AHE owner's governed IDB calls |
+| 05b5d706 | test(grid): scale delivery and proof-event telemetry for endurance runs (measurement only) |
+| 8fd92c99 | test(track-m): slice 14f native evidence harness for the retention path |
+| da3704ac | test(track-m): Canvas and Chat long-room measurement harness (measurement only) |
+| 8a09ceb8 | fix(track-m): keep the original resume, acquisition and classifier code that existing tests run |
+| 07849f85 | docs(track-m): record the Track M result (14b stage 1 and 14e on the room path) |
+| c6eff8e7 | test(track-o): RED for crash and refusal between the transactions of one retention boundary |
+| 96bc9b3c | docs(14b): one epoch's signing work is one unit; signing before its journal prefix |
+| 31a274fd | fix(track-o): one retention decision per boundary; one epoch's signing work is one unit |
+| a99d8abe | test(track-o): 14f death cases at any continuation, with an optional one-unit cap |
+| bc193d75 | fix(track-o): keep the source-text name census of CRD unchanged (unitEpochs) |
+| a66a0dea | test(track-o): stale and budget refusals at every split point of a boundary |
+| 099db6ce | docs(track-o): record the Track O result (retention crash and refusal resume, 14f case 8) |
+| c67c66b7 | docs: record holding Track M and starting Tracks O, M2, P and Q |
+| 8c61863e | Merge Tracks M and O: verified retention decisions on the opt-in room path |
 
 The commit messages hold the detailed explanation and the measurements for each change.
 
@@ -177,14 +199,14 @@ that track's working documents.
 | [20](tracks/20-track-r2-r3-watermark-retirement/README.md) | Tracks R2 and R3: single-database watermark retirement | 84fd4c8f..68b4168e, opt-in; latency goal not met |
 | [21](tracks/21-track-k-epoch8-retention/README.md) | Track K: epoch-8 recipient refusal | 742a517e–9f606ce8 |
 | [22](tracks/22-track-l-reopen-and-close/README.md) | Track L: reopen admission and close race | dcab6d12..88467723 |
-| 23 | Track M: verified-fact retirement (slices 14b and 14e) | Held until Track O lands |
+| [23](tracks/23-track-m-verified-fact-retirement/README.md) | Track M: verified-fact retirement (slices 14b and 14e) | a301cbe0..07849f85, merged in 8c61863e |
 | [24](tracks/24-track-n-recipient-issuance-growth/README.md) | Track N: recipient issuance growth | 60161b4a..7464f875 |
-| 25 | Track O: crash resume on the retention path (14f case 8) | In progress |
+| [25](tracks/25-track-o-retention-crash-resume/README.md) | Track O: crash resume on the retention path (14f case 8) | c6eff8e7..099db6ce, merged in 8c61863e |
 | 26 | Track P: Canvas issuance growth and O(outbox) issue cost | In progress |
-| 27 | Track Q: Canvas and Chat lull | In progress |
+| 27 | Track Q: Canvas and Chat lull | Held (row 25) |
 | 28 | Track M2: verified-fact ledger (14b stage 2) | In progress |
 
-Folders 23, 25, 26, 27 and 28 land with their branches.
+Folders 26, 27 and 28 land with their branches.
 
 ## Reading the records
 
@@ -225,8 +247,19 @@ Notes:
 
 ## Open items
 
-- **Track M (held):** 14b stage 1 and 14e on the room path cut the creator lull about 4x. It waits for Track O's fix
-  of 14f case 8. The ≤ 100 ms target needs stage 2, Track M2.
+- **Retention path (Tracks M and O, merged opt-in):** the creator lull is about 4x shorter. The ≤ 100 ms target needs
+  stage 2 (Track M2, in progress). Before the room database with retention can become the default:
+  - stage 2;
+  - wire 14c's per-owner floor fences into the node, and build 14d migration;
+  - review the 512-write cap; a committee of more than about 85 signers makes one signing unit exceed it, and that
+    boundary falls back to the existing path;
+  - re-measure recipient-lull issue latency (102 → 122 ms p50 in Track M's pairs) and the heap in a fresh process;
+  - the owners of the node tests that evaluate original CRD and v3-live.ts source text must review them, because a
+    default flip changes that text.
+- **Reopen right after the first maintained lull (blocks Track Q; predates this work):** a persisted reopen after
+  the creator's first maintained lull is refused with `floor-stale`, because the stored signing-summary
+  resume-basis digest differs on resume (CRD:19350-19351, via `installClosedRetirementSourceInRoom`). It fails
+  closed, but the room stops. Reopening after two or more maintained lulls works. Track G recorded the symptom.
 - **Canvas and Chat, on every path (Tracks P and Q):**
   - Canvas issuance gains one row per move and is never retired, because Canvas has no settlement profile. Every
     issue authenticates the whole retained outbox, so per-move issue time grows with room age.
