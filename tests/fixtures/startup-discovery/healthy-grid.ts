@@ -1,10 +1,10 @@
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { createRecoverableFinalitySigner } from "../../../packages/keychain/src/finality.js";
-import { createV3RoomCreatorInviteMaterial, createV3RoomSession, waitForV3RoomStartupForDiagnostics } from "../../../examples/v3-room/src/index.js";
+import { createBrowserV3RoomDatabaseStorageHost, createV3RoomCreatorInviteMaterial, createV3RoomSession, waitForV3RoomStartupForDiagnostics } from "../../../examples/v3-room/src/index.js";
 import { createBrowserRoomHeadAuthority } from "../../../packages/storage-browser/src/room-head.js";
-import { createBrowserDurableIssuanceStore } from "../../../packages/storage-browser/src/issuance.js";
-import { createBrowserSnapshotQuarantineStore } from "../../../packages/storage-browser/src/snapshot-transfer.js";
+import { createBrowserDurableIssuanceStore, createBrowserRoomDurableIssuanceStore } from "../../../packages/storage-browser/src/issuance.js";
+import { createBrowserRoomSnapshotQuarantineStore, createBrowserSnapshotQuarantineStore } from "../../../packages/storage-browser/src/snapshot-transfer.js";
 import { browserIssuancePruningMaintenanceForStore } from "../../../packages/storage-browser/src/internal/browser-issuance-store.js";
 import { ISSUANCE_RETIREMENT_LIMITS } from "@ts-drp/issuance-store/maintenance";
 import { gridCorpus, gridOperation, gridSeed } from "../../../.logs/bounded-storage-lifecycle/r8-warm-capacity-01/grid-candidate-01/grid-corpus.ts";
@@ -54,7 +54,10 @@ async function createHealthyGridRole(input:{index:number;database:string;identit
   const autoPool=index===0&&Reflect.get(input,"autoPool")===true?{idleMilliseconds:200,
    onResult:(outcome:any)=>{const endedAt=performance.now();autoPoolOutcomes.push({kind:outcome.kind,epoch:outcome.epoch,startedAt:endedAt-outcome.milliseconds,endedAt,
     milliseconds:outcome.milliseconds,...(outcome.kind==="result"?{result:outcome.result}:{error:errorEvidence(outcome.error)})});}}:undefined;
-  session=await createV3RoomSession({application:configuredApplication,author,...(autoPool===undefined?{}:{recoveryPoolAutoMaintenance:autoPool}),creatorInvite:invite,databaseName:database,issuanceDatabaseName:database,migrationDatabaseNamespace:database,
+  // Opt-in single room database (slice 14a): every owner in one version-7 database
+  // and each retirement install in one room session. The floor stays separate.
+  const roomDatabase=Reflect.get(input,"roomDatabase")===true;
+  session=await createV3RoomSession({...(roomDatabase?{storageHost:createBrowserV3RoomDatabaseStorageHost()}:{}),application:configuredApplication,author,...(autoPool===undefined?{}:{recoveryPoolAutoMaintenance:autoPool}),creatorInvite:invite,databaseName:database,issuanceDatabaseName:database,migrationDatabaseNamespace:database,
    objectId,publicKeyBytes:ed25519.getPublicKey(key),initialLogicalTime:3,...(finality?{creatorFinalitySigner:finality.signer}:{}),roomHeadAuthority:floor,
    ...(presentation===undefined?{}:{presentation}),
    openTransport:()=>({...peer.open(),openEphemeral:openFixtureEphemeral}),signRegisteredVertexDigest:async digest=>ed25519.sign(digest,key),onAcceptedVertex:vertex=>{
@@ -67,7 +70,8 @@ async function createHealthyGridRole(input:{index:number;database:string;identit
   await waitForV3RoomStartupForDiagnostics(session);
   // Display-only intents for moves whose signing waits behind maintenance.
   if(presentationMode==="1")session.bindPresentationIntents(session.openEphemeral({maxMessageBytes:8192,maxSequencedKeys:8,maxSequencedSenders:8}));
-  issuance=await createBrowserDurableIssuanceStore({primaryDatabaseName:database});snapshot=await createBrowserSnapshotQuarantineStore({primaryDatabaseName:database});
+  issuance=roomDatabase?await createBrowserRoomDurableIssuanceStore({databaseName:database}):await createBrowserDurableIssuanceStore({primaryDatabaseName:database});
+  snapshot=roomDatabase?await createBrowserRoomSnapshotQuarantineStore({databaseName:database}):await createBrowserSnapshotQuarantineStore({primaryDatabaseName:database});
   const original=session;
   const native=browserIssuancePruningMaintenanceForStore(issuance);check(native,"healthy native census owner unavailable");
   const ownIssuance=issuance,ownSnapshot=snapshot,ownScope={objectId,author};
@@ -470,7 +474,8 @@ export async function runHealthyGrid(identity:string,origins:readonly string[],r
   check(active.every(role=>ready.has(role.frame.contentWindow!)),"isolated browser client bundle unavailable");
   for(let index=0;index<4;index++)await rpc(index,"init",{index,id:ids[index],connected:ids.filter((_,other)=>other!==index),suspensionProbe:typeof suspendTransfer==="function"});
   for(let index=0;index<4;index++)await rpc(index,"open",{index,database:identity+"-role-"+index,identity,objectId,invite,kind,
-   autoPool:Reflect.get(globalThis,"__rdPoolMaintenanceAuto")===true,presentation:Reflect.get(globalThis,"__rdPresentation")});
+   autoPool:Reflect.get(globalThis,"__rdPoolMaintenanceAuto")===true,presentation:Reflect.get(globalThis,"__rdPresentation"),
+   roomDatabase:Reflect.get(globalThis,"__rdRoomDatabase")===true});
   await Promise.all(active.map(role=>rpc(role.index,"history")));
  }
  async function close(){
@@ -569,7 +574,7 @@ export async function runHealthyGrid(identity:string,origins:readonly string[],r
   if(probeTimer!==undefined)clearInterval(probeTimer);
   Reflect.deleteProperty(globalThis,"__r8FrozenRouteObservation");}
  return {ok:failure===undefined,phase,epoch,...(failure===undefined?{}:{error:errorEvidence(failure)}),identity,objectId,profileId,activeClients:4,rosterMembers:members.length,requestedRollovers:rollovers,timeOrigin:performance.timeOrigin,
-  ordinary,snapshots,transitions,checkpoints,joins,suspensionEvents,spans:spans.slice(startSpan),roleObservers,presentation:Reflect.get(globalThis,"__rdPresentation")??null,presentationSummary,proofEventsTruncated:roleObservers.some(row=>row.observer.proofEventsTruncated),
+  ordinary,snapshots,transitions,checkpoints,joins,suspensionEvents,spans:spans.slice(startSpan),roleObservers,presentation:Reflect.get(globalThis,"__rdPresentation")??null,roomDatabase:Reflect.get(globalThis,"__rdRoomDatabase")===true,presentationSummary,proofEventsTruncated:roleObservers.some(row=>row.observer.proofEventsTruncated),
   transfers:roleObservers.flatMap(row=>row.observer.transfers),publications:roleObservers.flatMap(row=>row.observer.publications),
   qualification:"Genuine browser IndexedDB and browser writer locks on four independent localhost storage origins; original Grid/room/native/protocol owners in four frame realms. Reuses unchanged accepted warm worker byte-routing transport through a browser parentPort adapter. Local serialized postMessage routing and shared browser renderer/profile are simulator costs, not network/device viability. Healthy rollovers keep original sessions/transports; only explicit persisted-reopen recreates clients on their SAME original origins/databases. No fixture copying/injected failures. "+(profileId==="creator-trusted-settlement-v1"?"Fully settled ordinary contributions exercise genuine settlement/fence/rebase and native cleanup, not fabricated nonempty displacement. ":"The original no-settlement profile has no author fence or settlement plan; its zero-fence adoption and lawful cleanup are not settlement-enabled evidence. ")+"Native read-only scans/assertions, simulator RPC and forced GC overhead are separate; no absolute gameplay latency/physical-memory target defined."};
 }

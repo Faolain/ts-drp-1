@@ -2355,6 +2355,9 @@ if (selectedEntry === "r8-source-binding") {
 		["storage-browser/room-head", "packages/storage-browser/src/room-head.ts"],
 		["storage-browser/snapshot-transfer", "packages/storage-browser/src/snapshot-transfer.ts"],
 		["storage-browser/seal-signing", "packages/storage-browser/src/seal-signing.ts"],
+		// The opt-in room database host (slice 14a) takes every room-mode owner and the
+		// room retirement session from this one module, in the same source graph.
+		["storage-browser/maintenance", "packages/storage-browser/src/maintenance.ts"],
 		["live-journal", "packages/live-journal/src/index.ts"],
 		["issuance-store/maintenance", "packages/issuance-store/src/maintenance.ts"],
 		["example-v3-room", "examples/v3-room/src/index.ts"],

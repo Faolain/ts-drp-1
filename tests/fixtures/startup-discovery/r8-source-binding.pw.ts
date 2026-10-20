@@ -663,6 +663,8 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
  if(poolLull==="concurrent")await page.evaluate(()=>Reflect.set(globalThis,"__rdPoolMaintenanceConcurrent",true));
  // Opt-in automatic idle trigger instead of the explicit lull call.
  if(process.env.STARTUP_HEALTHY_GRID_POOL_AUTO==="1")await page.evaluate(()=>Reflect.set(globalThis,"__rdPoolMaintenanceAuto",true));
+ // Opt-in single room database for every owner (slice 14a); the default host is unchanged.
+ if(process.env.STARTUP_HEALTHY_GRID_ROOM_DATABASE==="1")await page.evaluate(()=>Reflect.set(globalThis,"__rdRoomDatabase",true));
  // Opt-in speculative presentation: "1" overlay plus ephemeral intents, "overlay" without intents.
  const presentationMode=process.env.STARTUP_HEALTHY_GRID_PRESENTATION;
  if(presentationMode==="1"||presentationMode==="overlay")await page.evaluate(mode=>Reflect.set(globalThis,"__rdPresentation",mode),presentationMode);
