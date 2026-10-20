@@ -20691,6 +20691,13 @@ async function activateCreatorSuccessorLive(
 		if (successorPayload === undefined || successorAuthorization === undefined) {
 			return rejected("preparation-rejected", "creator successor issuance authority preparation failed");
 		}
+		// A hot source's store may be its own filtered facade. This successor's filters,
+		// historical owner and displaced source take the original store beneath it (the
+		// native owner), exactly as a persisted reopen does: one facade per successor would
+		// make every recovery read re-page and re-authenticate each retained row once per
+		// epoch lived through. Only the genuine live source handoff names that store.
+		const nativeIssuanceStore =
+			transportHandoff === undefined ? material.issuanceStore : creatorOriginalIssuanceStore(transportHandoff);
 		const openHistoricalIssuance = (): HistoricalIssuanceContext | undefined => {
 			const capability = openVerifiedCreatorHistoricalIssuance({
 				author: material.issuanceScope.author,
@@ -20712,7 +20719,7 @@ async function activateCreatorSuccessorLive(
 				? undefined
 				: {
 						capability,
-						originalIssuanceStore: material.issuanceStore,
+						originalIssuanceStore: nativeIssuanceStore,
 						vertexFacts,
 						count: 0,
 						countedSequences: new IntrinsicSet<number>(),
@@ -20728,7 +20735,7 @@ async function activateCreatorSuccessorLive(
 		const predecessorIssuanceStore = receiveOnly
 			? material.issuanceStore
 			: creatorFilteredIssuanceStore(
-					material.issuanceStore,
+					nativeIssuanceStore,
 					material.issuanceScope,
 					successorPayload,
 					successorAuthorization,
@@ -20812,7 +20819,7 @@ async function activateCreatorSuccessorLive(
 						? undefined
 						: new Uint8ArrayConstructor(material.exactCanonicalPinnedGenesisBootstrapOperationBytes),
 				issuanceScope: material.issuanceScope,
-				issuanceStore: material.issuanceStore,
+				issuanceStore: nativeIssuanceStore,
 				liveJournalStore: material.liveJournalStore,
 				sourceCapability: predecessorSource,
 				predecessorEpoch: material.predecessor.trust.currentEpoch,
@@ -20829,7 +20836,7 @@ async function activateCreatorSuccessorLive(
 				: !filtersOriginalNativeBranch
 					? material.predecessor.trust.currentEpoch > 0
 						? creatorFilteredIssuanceStore(
-								material.issuanceStore,
+								nativeIssuanceStore,
 								material.issuanceScope,
 								successorPayload,
 								successorAuthorization,
@@ -20840,7 +20847,7 @@ async function activateCreatorSuccessorLive(
 							)
 						: material.issuanceStore
 					: creatorFilteredIssuanceStore(
-							material.issuanceStore,
+							nativeIssuanceStore,
 							material.issuanceScope,
 							originalNativeBranch.prepared,
 							originalNativeBranch.authorization,
