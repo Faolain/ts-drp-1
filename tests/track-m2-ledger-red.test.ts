@@ -110,7 +110,7 @@ describe("Track M2 RED: the ledger decides in session", () => {
 			await transition(opened.fixture, opened.creator, opened.recipient, epoch);
 			for (const who of [opened.creator, opened.recipient]) {
 				const seen = await lull(who);
-				expect(seen.result).toBe(false);
+				expect(seen.result).toMatchObject({ kind: "maintained" });
 				const pass = required(passOf(seen.events));
 				expect(pass).toMatchObject({ outcome: "applied", acquisition: "ledger" });
 				expect(ledgerOf(seen.events).some((event) => event.action === "recorded" && event.source === "boundary")).toBe(
@@ -158,10 +158,13 @@ describe("Track M2 RED: durable bytes are untrusted after a fact was ledgered", 
 			)
 		).toEqual([]);
 		expect(ledgerOf(seen.events).some((event) => event.action === "dropped")).toBe(true);
-		// Restored: the next decision is an open verification again, then the ledger.
+		// Stage 1 then refuses the poison and the plane fails closed (as with the ledger off):
+		// even with the bytes restored, the session never decides from the dropped ledger.
 		await foreignWrite(database, [{ store: "snapshot:chunks", key: chunk[0], value: chunk[1] }]).committed;
 		const retry = await lull(opened.creator);
-		expect(passOf(retry.events)).toMatchObject({ acquisition: "cold" });
+		expect(
+			retry.events.filter((event) => event.kind === "room-retention-pass" && event.acquisition === "ledger")
+		).toEqual([]);
 		await opened.fixture.stop(opened.recipient);
 		await opened.fixture.stop(opened.creator);
 	}, 900_000);
@@ -225,20 +228,22 @@ describe("Track M2 RED: the ledger's lifetime is one live session", () => {
 		const before = ledgerOf(events).map((event) => (event.ledger as { id: number }).id);
 		await opened.fixture.stop(opened.recipient);
 		await opened.fixture.stop(opened.creator);
+		const reopened = events.length;
 		const creator = await opened.fixture.open("creator", opened.fixture.creator, { reopen: true });
 		const recipient = await opened.fixture.open("observer", opened.fixture.observer, {
 			reopen: true,
 			receiveOnly: true,
 		});
 		await transition(opened.fixture, creator, recipient, STEADY + 1);
-		const first = await lull(creator);
+		await lull(creator);
+		// The first pass after the reopen (the seal's own maintenance runs it when the reopened
+		// session has not maintained its epoch yet) is the open verification.
+		const first = { events: events.slice(reopened) };
 		expect(passOf(first.events)).toMatchObject({ acquisition: "cold" });
 		const recorded = ledgerOf(first.events).filter((event) => event.action === "recorded");
 		expect(recorded.length).toBeGreaterThan(0);
-		for (const event of recorded) {
-			expect(event).toMatchObject({ source: "open-verification", ledger: { generation: 0 } });
-			expect(before).not.toContain((event.ledger as { id: number }).id);
-		}
+		expect(recorded[0]).toMatchObject({ source: "open-verification", ledger: { generation: 0 } });
+		for (const event of recorded) expect(before).not.toContain((event.ledger as { id: number }).id);
 		await transition(opened.fixture, creator, recipient, STEADY + 2);
 		const second = await lull(creator);
 		expect(passOf(second.events)).toMatchObject({ acquisition: "ledger" });

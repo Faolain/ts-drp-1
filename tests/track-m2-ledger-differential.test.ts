@@ -19,8 +19,10 @@ import { settlementRoom, settlementTransition } from "./fixtures/track-m/settlem
 //    (the same selections, survivors, controls and turnover). Seeded random histories (skipped
 //    lulls, swapped lull order, one persisted reopen) and Track N's settlement room.
 // 2. Applied twins: the same deterministic settlement history with the ledger deciding
-//    (`apply`) and with stage 1 alone (`off`). At every epoch both peers hold exactly the
-//    same owned rows: the ledger never deletes a row stage 1 keeps, nor keeps one it deletes.
+//    (`apply`) and with stage 1 alone (`off`). At every epoch both peers hold the same owned
+//    rows per store: the same count and, for rows keyed by epoch, the same epochs (generation
+//    and issuance identities carry fresh signatures and nonces, so two runs never share them;
+//    the shadow tests above compare the selections themselves on one pre-state).
 // Mechanism evidence only (fake-indexeddb).
 
 type Event = Readonly<Record<string, unknown>>;
@@ -126,7 +128,7 @@ it(`shadow: Track N's settlement room, ${EPOCHS} epochs`, async () => {
 
 const OWNED = /^(ahe:|journal:|snapshot:|issuance:|(sealEvidence|signerState|voteSlots|voteOutbox|storageMeta) )/;
 
-/** One deterministic settlement history; every owned row id of both peers after each epoch. */
+/** One deterministic settlement history; both peers' owned-row census per store after each epoch. */
 async function appliedHistory(mode: "apply" | "off"): Promise<(readonly [ReadonlySet<string>, ReadonlySet<string>])[]> {
 	Reflect.set(globalThis, "__roomRetentionLedgerMode", mode);
 	const fixture = await settlementRoom({ retention: true, name: "m2-twin" });
@@ -135,13 +137,20 @@ async function appliedHistory(mode: "apply" | "off"): Promise<(readonly [Readonl
 	const out: (readonly [ReadonlySet<string>, ReadonlySet<string>])[] = [];
 	const owned = async (peer: number): Promise<ReadonlySet<string>> => {
 		const dump = await dumpDatabase(fixture.database(peer));
-		const ids = new Set<string>();
+		const census = new Map<string, { count: number; epochs: number[] }>();
 		for (const [store, rows] of Object.entries(dump))
 			for (const [key] of rows) {
-				const id = rowId(store, key);
-				if (OWNED.test(id)) ids.add(id);
+				if (!OWNED.test(rowId(store, key))) continue;
+				const entry = census.get(store) ?? { count: 0, epochs: [] };
+				entry.count++;
+				if (Array.isArray(key) && Number.isSafeInteger(key[1])) entry.epochs.push(key[1] as number);
+				census.set(store, entry);
 			}
-		return ids;
+		return new Set(
+			[...census].map(
+				([store, entry]) => `${store} count=${entry.count} epochs=${entry.epochs.sort((a, b) => a - b).join(",")}`
+			)
+		);
 	};
 	for (let epoch = 0; epoch < EPOCHS; epoch++) {
 		await settlementTransition(fixture, peers, delivered, epoch);
@@ -154,7 +163,7 @@ async function appliedHistory(mode: "apply" | "off"): Promise<(readonly [Readonl
 	return out;
 }
 
-it("applied twins: with the ledger deciding, both peers hold exactly stage 1's rows at every epoch", async () => {
+it("applied twins: with the ledger deciding, both peers hold stage 1's rows (count and epochs per store) at every epoch", async () => {
 	const stage1 = await appliedHistory("off");
 	const before = passes.length;
 	const ledger = await appliedHistory("apply");
