@@ -35,6 +35,7 @@ import {
 	PHASE_2D_GENERATIONS_STORE,
 	PHASE_2D_OBJECTS_STORE,
 	PHASE_2D_PROMOTIONS_STORE,
+	roomStoreName,
 } from "./schema-idb.js";
 
 export type BrowserAheReclamationCrashEdge =
@@ -139,7 +140,9 @@ async function loadSnapshot(
 ): Promise<AheReclamationSnapshot> {
 	const parsedObjectId = parseStorageObjectId(objectId);
 	if (!parsedObjectId.ok) throw createAheReclamationError("AHE_RECLAMATION_INVALID_ARGUMENT", "object ID invalid");
-	const objectRow = await requestValue(transaction.objectStore(PHASE_2D_OBJECTS_STORE).get(objectId));
+	const objectRow = await requestValue(
+		transaction.objectStore(roomStoreName(transaction.db, "ahe", PHASE_2D_OBJECTS_STORE)).get(objectId)
+	);
 	let head: ExpectedHead = { kind: "none", objectId: parsedObjectId.value };
 	const headRecord = rowProperty(objectRow, "record");
 	if (objectRow !== undefined && headRecord !== null && headRecord !== undefined) {
@@ -150,7 +153,9 @@ async function loadSnapshot(
 		head = decoded.value;
 	}
 
-	const generationRows = await requestValue(transaction.objectStore(PHASE_2D_GENERATIONS_STORE).getAll());
+	const generationRows = await requestValue(
+		transaction.objectStore(roomStoreName(transaction.db, "ahe", PHASE_2D_GENERATIONS_STORE)).getAll()
+	);
 	const generations: GenerationRecord[] = [];
 	for (const row of generationRows) {
 		const decoded = decodeGenerationRecordV1(bytes(rowProperty(row, "record")));
@@ -178,7 +183,9 @@ async function loadSnapshot(
 			"AHE_RECLAMATION_RETRY_REQUIRED",
 			"addressed native generation census exceeds bound"
 		);
-	const promotionRows = await requestValue(transaction.objectStore(PHASE_2D_PROMOTIONS_STORE).getAll());
+	const promotionRows = await requestValue(
+		transaction.objectStore(roomStoreName(transaction.db, "ahe", PHASE_2D_PROMOTIONS_STORE)).getAll()
+	);
 	const promotions = promotionRows.map(
 		(row) =>
 			({
@@ -188,7 +195,7 @@ async function loadSnapshot(
 			}) as AheReclamationPromotion
 	);
 	const digests = [...new Set(promotions.map(({ digest }) => digest))];
-	const blobStore = transaction.objectStore(PHASE_2D_BLOBS_STORE);
+	const blobStore = transaction.objectStore(roomStoreName(transaction.db, "ahe", PHASE_2D_BLOBS_STORE));
 	const blobs = [];
 	for (const digest of digests) {
 		const row = await requestValue(blobStore.get(digest));
@@ -235,7 +242,7 @@ class BrowserAheReclamationMaintenance implements AheReclamationMaintenance {
 			if (this.lifecycle.isPoisoned()) {
 				throw createAheReclamationError("AHE_RECLAMATION_STORE_POISONED", "store is poisoned");
 			}
-			transaction = database.transaction(browserAheControlStores(), "readwrite", { durability: "strict" });
+			transaction = database.transaction(browserAheControlStores(database), "readwrite", { durability: "strict" });
 			completion = transactionOutcome(transaction);
 			if (transaction.durability !== "strict") {
 				throw createAheReclamationError("AHE_RECLAMATION_SUBSTRATE_FAILURE", "strict durability unavailable");
@@ -329,7 +336,7 @@ export async function applyBrowserBoundedAheReclamation(
 	const observer = crashObserverByStore.get(store);
 	for (const source of decision.independentSourceFloors ?? [])
 		if (source.normalizedThisCall) {
-			const generationStore = transaction.objectStore(PHASE_2D_GENERATIONS_STORE),
+			const generationStore = transaction.objectStore(roomStoreName(transaction.db, "ahe", PHASE_2D_GENERATIONS_STORE)),
 				key = [captured.objectId, source.generation.generationId];
 			await expectKey(store, generationStore, key, "present", "floor rewrite");
 			await requestValue(
@@ -342,7 +349,7 @@ export async function applyBrowserBoundedAheReclamation(
 			await expectKey(store, generationStore, key, "present", "floor rewrite");
 		}
 	if (decision.floor.normalizedThisCall) {
-		const generationStore = transaction.objectStore(PHASE_2D_GENERATIONS_STORE);
+		const generationStore = transaction.objectStore(roomStoreName(transaction.db, "ahe", PHASE_2D_GENERATIONS_STORE));
 		const floorKey = [captured.objectId, captured.lineageFloor.generationId];
 		await expectKey(store, generationStore, floorKey, "present", "floor rewrite");
 		await requestValue(
@@ -355,7 +362,7 @@ export async function applyBrowserBoundedAheReclamation(
 		await expectKey(store, generationStore, floorKey, "present", "floor rewrite");
 		observer?.("after-floor-rewrite", transaction);
 	}
-	const promotionStore = transaction.objectStore(PHASE_2D_PROMOTIONS_STORE);
+	const promotionStore = transaction.objectStore(roomStoreName(transaction.db, "ahe", PHASE_2D_PROMOTIONS_STORE));
 	for (const promotion of decision.deletePromotions) {
 		const key = [promotion.objectId, promotion.generationId, promotion.digest];
 		await expectKey(store, promotionStore, key, "present", "promotion delete");
@@ -363,7 +370,7 @@ export async function applyBrowserBoundedAheReclamation(
 		await expectKey(store, promotionStore, key, "absent", "promotion delete");
 	}
 	if (decision.floor.normalizedThisCall) observer?.("after-promotion-delete", transaction);
-	const generationStore = transaction.objectStore(PHASE_2D_GENERATIONS_STORE);
+	const generationStore = transaction.objectStore(roomStoreName(transaction.db, "ahe", PHASE_2D_GENERATIONS_STORE));
 	for (const generationId of decision.deleteGenerationIds) {
 		const key = [captured.objectId, generationId];
 		await expectKey(store, generationStore, key, "present", "generation delete");
@@ -371,7 +378,7 @@ export async function applyBrowserBoundedAheReclamation(
 		await expectKey(store, generationStore, key, "absent", "generation delete");
 	}
 	if (decision.floor.normalizedThisCall) observer?.("after-generation-delete", transaction);
-	const blobStore = transaction.objectStore(PHASE_2D_BLOBS_STORE);
+	const blobStore = transaction.objectStore(roomStoreName(transaction.db, "ahe", PHASE_2D_BLOBS_STORE));
 	for (const digest of decision.deleteBlobDigests) {
 		await expectKey(store, blobStore, digest, "present", "blob delete");
 		await requestValue(blobStore.delete(digest));

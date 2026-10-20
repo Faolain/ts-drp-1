@@ -1,5 +1,7 @@
 import type { NativeReadReservation } from "@ts-drp/storage";
 
+import { roomOwnerStoreNames } from "./schema-idb.js";
+
 export interface NativeReadReservationPort {
 	acquireNativeReadReservation: (input: { readonly objectId: string }) => Promise<NativeReadReservation>;
 }
@@ -115,9 +117,11 @@ class HeldReadView {
 	readonly #operations = new Set<Promise<unknown>>();
 
 	constructor(database: IDBDatabase) {
-		// All stores: native foreign READWRITE transactions cannot overlap this
-		// view. No schema/control/row is changed, and no JavaScript lock grants it.
-		const stores = Array.from(database.objectStoreNames);
+		// All of this owner's stores: native foreign READWRITE transactions on them
+		// cannot overlap this view. No schema/control/row is changed, and no
+		// JavaScript lock grants it. On a room connection the owner's stores are
+		// its own namespace only, so the view never blocks another owner (14a).
+		const stores = roomOwnerStoreNames(database);
 		if (stores.length === 0) throw new Error("NATIVE_READ_RESERVATION_EMPTY_SCHEMA");
 		this.transaction = database.transaction(stores, "readonly");
 		this.#store = this.transaction.objectStore(this.transaction.objectStoreNames[0]!);

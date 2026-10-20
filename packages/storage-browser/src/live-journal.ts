@@ -77,6 +77,11 @@ import {
 	runNativeReservedRead,
 	visitCountedRange,
 } from "./internal/native-read-reservation.js";
+import {
+	openBrowserRoomOwnerConnection,
+	roomStoreName,
+	roomStoreNames,
+} from "./internal/schema-idb.js";
 
 type StoredScope = Readonly<{
 	readonly scope: LiveJournalScope;
@@ -184,7 +189,10 @@ function transactionComplete(transaction: IDBTransaction): Promise<void> {
 	});
 }
 
-function strictTransaction(database: IDBDatabase, stores: string | string[], mode: IDBTransactionMode): IDBTransaction {
+function strictTransaction(database: IDBDatabase, logical: string | string[], mode: IDBTransactionMode): IDBTransaction {
+	// Logical journal store names; a room connection names them in the journal namespace (14a).
+	const stores =
+		typeof logical === "string" ? roomStoreName(database, "journal", logical) : roomStoreNames(database, "journal", logical);
 	const transaction =
 		mode === "readonly"
 			? nativeReadonlyTransaction(database, stores)
@@ -400,7 +408,7 @@ function advanceRetirementControl(transaction: IDBTransaction, control: LiveJour
 			if (control.drain.cursor < journalRetirementDrainItemCount(control.drain.plan))
 				throw new Error("retirement-fenced");
 			for (const prefix of control.drain.plan.prefixes) {
-				const scopes = transaction.objectStore("scopes"),
+				const scopes = transaction.objectStore(roomStoreName(transaction.db, "journal", "scopes")),
 					request = scopes.get(scopeKey(prefix.scope));
 				request.addEventListener(
 					"success",
@@ -417,7 +425,7 @@ function advanceRetirementControl(transaction: IDBTransaction, control: LiveJour
 			}
 		}
 		const next = advanceJournalRetirementMutationControl(control);
-		transaction.objectStore("retirementControls").put(nativeRetirementRecord(next));
+		transaction.objectStore(roomStoreName(transaction.db, "journal", "retirementControls")).put(nativeRetirementRecord(next));
 	}
 }
 function admitRetirementMutation(control: LiveJournalRetirementControl | null, selected: LiveJournalScope): void {
@@ -425,7 +433,7 @@ function admitRetirementMutation(control: LiveJournalRetirementControl | null, s
 }
 async function checkReplayRetirement(transaction: IDBTransaction, selected: LiveJournalScope,
 	codec: ReturnType<typeof createJournalRetirementControlCodec>): Promise<void> {
-	const raw = await requestResult(transaction.objectStore("retirementControls").get(selected.objectId));
+	const raw = await requestResult(transaction.objectStore(roomStoreName(transaction.db, "journal", "retirementControls")).get(selected.objectId));
 	if (raw === undefined) {codec.clear(); return;}
 	const carriers = retirementNativeCarriers(raw, selected.objectId);
 	const fence = codec.readFence(carriers.record, carriers.planRecord, selected);
@@ -476,8 +484,14 @@ async function retirementSnapshot(
 		imageCapture: ReturnType<typeof createJournalRetirementImageCapture> | undefined;
 	try {
 		const range = IDBKeyRange.bound([objectId], [objectId, []]);
-		const scopesStore = transaction.objectStore("scopes"),
-			rowsStore = transaction.objectStore("acceptedEntries");
+		// Room mode (slice 14a) namespaces the journal stores; the transaction's own
+		// catalog names the physical store, so this body needs no foreign helper.
+		const journalStore = (logical: string): IDBObjectStore =>
+			transaction.objectStore(
+				transaction.objectStoreNames.contains(`journal:${logical}`) ? `journal:${logical}` : logical
+			);
+		const scopesStore = journalStore("scopes"),
+			rowsStore = journalStore("acceptedEntries");
 		const [scopeCount, rowCount] = await Promise.all([
 			requestResult(scopesStore.count(range)),
 			requestResult(rowsStore.count(range)),
@@ -487,7 +501,7 @@ async function retirementSnapshot(
 		// The counts above already bound both stores. Visit each counted range in
 		// bounded pages inside this SAME transaction instead of one cursor round
 		// trip per row; values and key order are those the cursor walked.
-		const collect = async (store: IDBObjectStore, count: number) => {
+		const collect = async (store: IDBObjectStore, count: number, table: "scopes" | "acceptedEntries") => {
 			const rows: unknown[] = [],
 				frames: Uint8Array[] = [];
 			await visitCountedRange(store, range, count + 1, (row, primaryKey) => {
@@ -495,8 +509,7 @@ async function retirementSnapshot(
 				// page is read. The same detached canonical segments own its
 				// optional frame and complete image; no native currency or
 				// authorization is retained/reused across transactions.
-				const frame = imageCapture!.append(store.name as "scopes" | "acceptedEntries", row,
-					captureRows ? primaryKey : undefined);
+				const frame = imageCapture!.append(table, row, captureRows ? primaryKey : undefined);
 				if (captureRows) {
 					frames.push(frame!);
 				}
@@ -504,12 +517,12 @@ async function retirementSnapshot(
 			});
 			return { rows, frames };
 		};
-		const [scopeCapture, rowCapture] = await Promise.all([collect(scopesStore, scopeCount), collect(rowsStore, rowCount)]);
+		const [scopeCapture, rowCapture] = await Promise.all([collect(scopesStore, scopeCount, "scopes"), collect(rowsStore, rowCount, "acceptedEntries")]);
 		const scopes = scopeCapture.rows,
 			rows = rowCapture.rows;
 		if (scopes.length !== scopeCount || rows.length !== rowCount) throw new CorruptLiveJournalError();
 		const image = imageCapture.finish();
-		const controlStore = transaction.objectStore("retirementControls");
+		const controlStore = journalStore("retirementControls");
 		const control = retirementControl(await requestResult(controlStore.get(objectId)), objectId, codec);
 		result = { control, image, frames: [...scopeCapture.frames, ...rowCapture.frames], scopes, rows };
 		if (write !== undefined) {
@@ -835,8 +848,8 @@ async function readSnapshot(database: IDBDatabase, scope: LiveJournalScope): Pro
 	if (needsNativeReadReservationTurn(database))
 		return runNativeReservedRead(database, () => readSnapshot(database, scope));
 	const transaction = strictTransaction(database, ["acceptedEntries", "scopes"], "readonly");
-	const scopeRequest = transaction.objectStore("scopes").get(scopeKey(scope));
-	const rowsRequest = transaction.objectStore("acceptedEntries").getAll(rowRange(scope));
+	const scopeRequest = transaction.objectStore(roomStoreName(transaction.db, "journal", "scopes")).get(scopeKey(scope));
+	const rowsRequest = transaction.objectStore(roomStoreName(transaction.db, "journal", "acceptedEntries")).getAll(rowRange(scope));
 	const [storedScope, rawRows] = await Promise.all([requestResult(scopeRequest), requestResult(rowsRequest)]);
 	await transactionComplete(transaction);
 	if (storedScope === undefined) return null;
@@ -855,10 +868,10 @@ async function readReplaySnapshot(database: IDBDatabase, scope: LiveJournalScope
 		return runNativeReservedRead(database, () => readReplaySnapshot(database, scope, codec));
 	const transaction = strictTransaction(database, JOURNAL_STORES, "readonly");
 	await checkReplayRetirement(transaction, scope, codec);
-	const scopes = transaction.objectStore("scopes");
+	const scopes = transaction.objectStore(roomStoreName(transaction.db, "journal", "scopes"));
 	const scopeRequest = scopes.get(scopeKey(scope));
 	const selectorRequest = scopes.getKey(scopeSelectorRange(scope));
-	const rowsRequest = transaction.objectStore("acceptedEntries").getAll(rowRange(scope));
+	const rowsRequest = transaction.objectStore(roomStoreName(transaction.db, "journal", "acceptedEntries")).getAll(rowRange(scope));
 	const [storedScope, selectedKey, rawRows] = await Promise.all([
 		requestResult(scopeRequest),
 		requestResult(selectorRequest),
@@ -904,7 +917,7 @@ async function readReservedReadiness(
 	)
 		return undefined;
 	// A page can retain a valid older prefix token. It is not complete readiness.
-	const raw = await requestResult(transaction.objectStore("scopes").get(scopeKey(scope)));
+	const raw = await requestResult(transaction.objectStore(roomStoreName(transaction.db, "journal", "scopes")).get(scopeKey(scope)));
 	if (raw === undefined || fromRawScope(raw).nextJournalSequence !== token.highWatermark) return undefined;
 	await transactionComplete(transaction);
 	return Object.freeze({
@@ -941,7 +954,7 @@ async function readReservedPage(
 			? []
 			: await requestResult(
 					transaction
-						.objectStore("acceptedEntries")
+						.objectStore(roomStoreName(transaction.db, "journal", "acceptedEntries"))
 						.getAll(
 							IDBKeyRange.bound(
 								[...scopeKey(token.scope), after + 1],
@@ -1089,10 +1102,10 @@ async function readEmptyClosure(
 	const terminal = signedTransactionTerminal(transaction);
 	let result: EmptyClosureRead | undefined;
 	try {
-		const scopeRequest = transaction.objectStore("scopes").get(scopeKey(input.scope));
+		const scopeRequest = transaction.objectStore(roomStoreName(transaction.db, "journal", "scopes")).get(scopeKey(input.scope));
 		// One complete-prefix lower-bound key probe includes nonnumeric sequence keys.
 		const entryRequest = transaction
-			.objectStore("acceptedEntries")
+			.objectStore(roomStoreName(transaction.db, "journal", "acceptedEntries"))
 			.getKey(IDBKeyRange.lowerBound(scopeKey(input.scope)));
 		const [raw, key] = await Promise.all([requestResult(scopeRequest), requestResult(entryRequest)]);
 		result = captureEmptyClosure(input, raw, key);
@@ -1119,12 +1132,12 @@ async function historicalAnchorWriter(
 	const terminal = signedTransactionTerminal(transaction);
 	let outcome: HistoricalWriterOutcome = { admitted: false, before: null, idempotent: false };
 	try {
-		const scopes = transaction.objectStore("scopes");
+		const scopes = transaction.objectStore(roomStoreName(transaction.db, "journal", "scopes"));
 		const scopeRequest = scopes.get(scopeKey(input.scope));
 		const entryRequest = transaction
-			.objectStore("acceptedEntries")
+			.objectStore(roomStoreName(transaction.db, "journal", "acceptedEntries"))
 			.getKey(IDBKeyRange.lowerBound(scopeKey(input.scope)));
-		const controlRequest = transaction.objectStore("retirementControls").get(input.scope.objectId);
+		const controlRequest = transaction.objectStore(roomStoreName(transaction.db, "journal", "retirementControls")).get(input.scope.objectId);
 		const [raw, key, controlRaw] = await Promise.all([
 			requestResult(scopeRequest),
 			requestResult(entryRequest),
@@ -1180,10 +1193,10 @@ function installWriter(database: IDBDatabase, input: StoredScope): Promise<Write
 			return;
 		}
 		let outcome: WriterOutcome | undefined;
-		const scopes = transaction.objectStore("scopes");
+		const scopes = transaction.objectStore(roomStoreName(transaction.db, "journal", "scopes"));
 		const request = scopes.get(scopeKey(input.scope));
-		const rowsRequest = transaction.objectStore("acceptedEntries").getAll(rowRange(input.scope));
-		const controlRequest = transaction.objectStore("retirementControls").get(input.scope.objectId);
+		const rowsRequest = transaction.objectStore(roomStoreName(transaction.db, "journal", "acceptedEntries")).getAll(rowRange(input.scope));
+		const controlRequest = transaction.objectStore(roomStoreName(transaction.db, "journal", "retirementControls")).get(input.scope.objectId);
 		let controlLoaded = false;
 		controlRequest.addEventListener(
 			"success",
@@ -1286,15 +1299,15 @@ function appendWriter(
 		}
 		let candidate = initial;
 		let outcome: WriterOutcome | undefined;
-		const scopes = transaction.objectStore("scopes");
-		const entries = transaction.objectStore("acceptedEntries");
+		const scopes = transaction.objectStore(roomStoreName(transaction.db, "journal", "scopes"));
+		const entries = transaction.objectStore(roomStoreName(transaction.db, "journal", "acceptedEntries"));
 		const scopeRequest = scopes.get(scopeKey(candidate.scope));
 		const rowsRequest = entries.getAll(rowRange(candidate.scope));
 		const rejectWriter = (kind: LiveJournalFailureKind, before: DurableSnapshot | null): void => {
 			outcome = { before, idempotent: false, rejected: kind };
 			transaction.abort();
 		};
-		const controlRequest = transaction.objectStore("retirementControls").get(candidate.scope.objectId);
+		const controlRequest = transaction.objectStore(roomStoreName(transaction.db, "journal", "retirementControls")).get(candidate.scope.objectId);
 		let controlLoaded = false;
 		controlRequest.addEventListener(
 			"success",
@@ -1520,6 +1533,58 @@ export async function createBrowserDurableLiveJournalStore(
 		database.close();
 		throw error;
 	}
+	return createJournalStoreOver(database);
+}
+
+/**
+ * Creates the strict live-journal capability inside a ready version-7 room database
+ * (slice 14a). Every operation, row format and refusal is the dedicated store's; only
+ * its stores live in the `journal:` namespace and its held read views cover only that
+ * namespace. It never creates or upgrades the room database.
+ * @param options - The room database name.
+ * @returns The strict live-journal capability over its own room connection.
+ */
+export async function createBrowserRoomLiveJournalStore(
+	options: Readonly<{ databaseName: string }>
+): Promise<DurableLiveJournalStore & NativeReadReservationPort> {
+	const databaseName = captureRoomOptions(options);
+	let database: IDBDatabase;
+	try {
+		database = await openBrowserRoomOwnerConnection(databaseName, "journal");
+	} catch {
+		throw failureError("unsupported-schema");
+	}
+	try {
+		// The room connection already checked the exact journal namespace catalog.
+		const transaction = strictTransaction(database, JOURNAL_STORES, "readwrite");
+		await transactionComplete(transaction);
+	} catch (error) {
+		database.close();
+		if (typeof error === "object" && error !== null && Reflect.get(error, "kind") === "durability-unavailable")
+			throw error;
+		throw failureError("unsupported-schema");
+	}
+	return createJournalStoreOver(database);
+}
+
+function captureRoomOptions(value: unknown): string {
+	if (typeof value !== "object" || value === null || Array.isArray(value)) throw new TypeError("malformed-input");
+	const keys = Reflect.ownKeys(value);
+	const descriptor = Object.getOwnPropertyDescriptor(value, "databaseName");
+	if (
+		keys.length !== 1 ||
+		keys[0] !== "databaseName" ||
+		descriptor === undefined ||
+		!("value" in descriptor) ||
+		typeof descriptor.value !== "string" ||
+		descriptor.value.length === 0 ||
+		descriptor.value.includes("\0")
+	)
+		throw new TypeError("malformed-input");
+	return descriptor.value;
+}
+
+function createJournalStoreOver(database: IDBDatabase): DurableLiveJournalStore & NativeReadReservationPort {
 	const readReservations = new NativeReadReservationOwner(database);
 	const retirementCodec = createJournalRetirementControlCodec();
 	const readRetirementSnapshot = (
@@ -1865,7 +1930,7 @@ export async function createBrowserDurableLiveJournalStore(
 		let result: LiveJournalAnchorReadResult;
 		try {
 			const transaction = strictTransaction(database, ["scopes"], "readonly");
-			const request = transaction.objectStore("scopes").get(scopeKey(selected.scope));
+			const request = transaction.objectStore(roomStoreName(transaction.db, "journal", "scopes")).get(scopeKey(selected.scope));
 			const observation = requestResult(request).then((raw: unknown): LiveJournalAnchorReadResult => {
 				if (raw === undefined) return Object.freeze({ kind: "missing", ok: true });
 				// IndexedDB has already cloned the whole row. Inspect only required own fields;
@@ -1913,7 +1978,7 @@ export async function createBrowserDurableLiveJournalStore(
 			const transaction = strictTransaction(database, ["scopes"], "readonly");
 			const terminal = signedTransactionTerminal(transaction);
 			try {
-				const request = transaction.objectStore("scopes").get(scopeKey(captured.value.scope));
+				const request = transaction.objectStore(roomStoreName(transaction.db, "journal", "scopes")).get(scopeKey(captured.value.scope));
 				result = captureSignedRawScope(captured.value, await requestResult(request));
 			} catch {
 				// A failed request must still join its admitted transaction terminal.
@@ -2019,7 +2084,7 @@ export async function createBrowserDurableLiveJournalStore(
 					!sameNullableBytes(beforeBytes, selected.expectedNativeImage.controlBytes)
 				)
 					throw failureError("retirement-stale");
-				const scopes = transaction.objectStore("scopes"),
+				const scopes = transaction.objectStore(roomStoreName(transaction.db, "journal", "scopes")),
 					raw = await requestResult(scopes.get(scopeKey(selected.scope)));
 				if (raw === undefined) throw failureError("not-installed");
 				fromRawScope(raw);

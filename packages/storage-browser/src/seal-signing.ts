@@ -192,7 +192,11 @@ export async function openBrowserSealSigningStore(input: Readonly<{databaseName:
  if (input === null || typeof input !== "object" || Reflect.ownKeys(input).length !== 1 ||
   typeof input.databaseName !== "string" || input.databaseName.length === 0)
   throw new TypeError("browser seal-signing input must contain one databaseName");
- const backend = await openSigningBackend(input);
+ return openSigningFacets(await openSigningBackend(input), input);
+}
+
+async function openSigningFacets(backend: Awaited<ReturnType<typeof openSigningBackend>>,
+ input: Readonly<{databaseName: string}>) {
  try {
   const vote = await buildBrowserSealVoteStore(createInternalSealVoteStore(backend, input, true));
   const evidence = await buildBrowserSealEvidenceStore(createInternalSealEvidenceStore(backend, true));
@@ -205,3 +209,52 @@ export async function openBrowserSealSigningStore(input: Readonly<{databaseName:
  }
 }
 
+function captureRoomSigningInput(input: Readonly<{ databaseName: string }>, label: string): string {
+	if (
+		input === null ||
+		typeof input !== "object" ||
+		Reflect.ownKeys(input).length !== 1 ||
+		typeof input.databaseName !== "string" ||
+		input.databaseName.length === 0
+	)
+		throw new TypeError(`browser ${label} input must contain one databaseName`);
+	return input.databaseName;
+}
+
+/**
+ * Opens the seal-vote facet over the signing stores of a ready version-7 room database
+ * (slice 14a). The stores, rows and refusals are the version-6 signing owner's.
+ * @param input - Exact room database identity.
+ * @returns Bounded observation and opaque-intent accepting storage port.
+ */
+export async function openBrowserRoomSealVoteStore(
+	input: Readonly<{ databaseName: string }>
+): ReturnType<typeof openBrowserSealVoteStore> {
+	const databaseName = captureRoomSigningInput(input, "seal-vote");
+	return buildBrowserSealVoteStore(await openInternalSealVoteStore({ databaseName }, true));
+}
+
+/**
+ * Opens creator-close evidence custody over the signing stores of a ready version-7 room
+ * database (slice 14a).
+ * @param input - Exact room database identity.
+ * @returns Opaque evidence capability, bounded observation and cooperative close seam.
+ */
+export async function openBrowserRoomSealEvidenceStore(
+	input: Readonly<{ databaseName: string }>
+): ReturnType<typeof openBrowserSealEvidenceStore> {
+	const databaseName = captureRoomSigningInput(input, "seal-evidence");
+	return buildBrowserSealEvidenceStore(await openInternalSealEvidenceStore({ databaseName }, true));
+}
+
+/**
+ * Opens both signing facets over ONE room connection and lifetime (slice 14a).
+ * @param input - Exact room database identity.
+ * @returns Both facets and the root close, as the dedicated database's combined store.
+ */
+export async function openBrowserRoomSealSigningStore(
+	input: Readonly<{ databaseName: string }>
+): ReturnType<typeof openBrowserSealSigningStore> {
+	const databaseName = captureRoomSigningInput(input, "seal-signing");
+	return openSigningFacets(await openSigningBackend({ databaseName }, true), { databaseName });
+}

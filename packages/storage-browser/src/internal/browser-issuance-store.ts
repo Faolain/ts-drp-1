@@ -96,6 +96,7 @@ import {
 	runNativeReservedRead,
 	visitCountedRange,
 } from "./native-read-reservation.js";
+import { openBrowserRoomOwnerConnection, roomStoreName, roomStoreNames } from "./schema-idb.js";
 
 const DATABASE_SUFFIX = "--drp-issuance-v1";
 const DATABASE_VERSION = 3;
@@ -160,7 +161,7 @@ function issuanceWriteTurn(transaction: IDBTransaction): {
 	const pump = (): void => {
 		if (!running) return;
 		try {
-			const request = transaction.objectStore("lineages").getKey("");
+			const request = transaction.objectStore(roomStoreName(transaction.db, "issuance", "lineages")).getKey("");
 			request.addEventListener(
 				"success",
 				() => {
@@ -323,7 +324,7 @@ function transactionResult(transaction: IDBTransaction): Promise<void> {
 function strictTransaction(database: IDBDatabase, mode: IDBTransactionMode): IDBTransaction {
 	let transaction: IDBTransaction;
 	try {
-		transaction = database.transaction([...STORE_NAMES], mode, { durability: "strict" });
+		transaction = database.transaction(roomStoreNames(database, "issuance", STORE_NAMES), mode, { durability: "strict" });
 	} catch (error) {
 		throw mapSubstrateError(error, "strict issuance transaction is unavailable");
 	}
@@ -512,7 +513,7 @@ async function browserRetirementControl(
 	transaction: IDBTransaction,
 	objectId: string
 ): Promise<DurableIssuanceRetirementControl | null> {
-	const raw: unknown = await requestResult(transaction.objectStore("retirementControls").get(objectId));
+	const raw: unknown = await requestResult(transaction.objectStore(roomStoreName(transaction.db, "issuance", "retirementControls")).get(objectId));
 	if (raw === undefined) return null;
 	if (!isClosedDurableIssuanceRecord(raw, ["objectId", "record"]) || raw.objectId !== objectId)
 		throw issuanceRetirementRefusal("issuance retirement control unclassified");
@@ -526,7 +527,7 @@ async function browserRetirementRows(
 ): Promise<IssuanceRetirementRows> {
 	const names = ["lineages", "issuedRecords", "issuanceOutbox", "settlementPlans"] as const;
 	const range = IDBKeyRange.bound([objectId], [objectId, []]);
-	const counts = await Promise.all(names.map((name) => requestResult(transaction.objectStore(name).count(range))));
+	const counts = await Promise.all(names.map((name) => requestResult(transaction.objectStore(roomStoreName(transaction.db, "issuance", name)).count(range))));
 	const count = counts.reduce((total, rows) => total + rows, 0);
 	if (count > limits.maxRows) throw issuanceRetirementRefusal("issuance retirement native census exceeds bound");
 	let bytes = 0;
@@ -535,7 +536,7 @@ async function browserRetirementRows(
 	// store and key order before the next page is read.
 	const collect = async <T>(name: (typeof names)[number], parse: (raw: unknown) => T | undefined): Promise<T[]> => {
 		const output: T[] = [];
-		await visitCountedRange(transaction.objectStore(name), range, counts[names.indexOf(name)]! + 1, (value, key) => {
+		await visitCountedRange(transaction.objectStore(roomStoreName(transaction.db, "issuance", name)), range, counts[names.indexOf(name)]! + 1, (value, key) => {
 			const row = parse(value);
 			if (!row) throw issuanceRetirementRefusal("issuance retirement native row unclassified");
 			if (seed !== undefined) {
@@ -621,7 +622,7 @@ async function browserBumpRetirement(transaction: IDBTransaction, objectId: stri
 	if (control)
 		await requestResult(
 			transaction
-				.objectStore("retirementControls")
+				.objectStore(roomStoreName(transaction.db, "issuance", "retirementControls"))
 				.put({ objectId, record: encodeIssuanceRetirementControl(advanceIssuanceRetirementControl(control)) })
 		);
 }
@@ -796,7 +797,7 @@ class BrowserIssuanceImplementation {
 		if (issued === undefined || outbox === undefined || lineages.size !== rows.lineages.length || plans.size !== rows.plans.length ||
 			rows.outbox.some(row => !issued.get(row.author)?.has(row.authorSequence))) return;
 		const counted = await Promise.allSettled(["lineages", "issuedRecords", "issuanceOutbox"].map(name =>
-			requestResult(transaction.objectStore(name).count())));
+			requestResult(transaction.objectStore(roomStoreName(transaction.db, "issuance", name)).count())));
 		const counts: number[] = [];
 		for (const result of counted) {
 			if (result.status === "rejected") throw result.reason;
@@ -837,7 +838,7 @@ class BrowserIssuanceImplementation {
 					await this.#runReservedRead(async () => {
 						const transaction = this.#startTransaction("readonly");
 						const raw = await requestResult(
-							transaction.objectStore("lineages").get([captured.scope.objectId, captured.scope.author])
+							transaction.objectStore(roomStoreName(transaction.db, "issuance", "lineages")).get([captured.scope.objectId, captured.scope.author])
 						);
 						const lineage =
 							raw === undefined
@@ -886,7 +887,7 @@ class BrowserIssuanceImplementation {
 				)
 					throw issuanceRetirementRefusal("issuance retirement birth stale");
 				await requestResult(
-					transaction.objectStore("retirementControls").add({ objectId, record: encodeIssuanceRetirementControl(born) })
+					transaction.objectStore(roomStoreName(transaction.db, "issuance", "retirementControls")).add({ objectId, record: encodeIssuanceRetirementControl(born) })
 				);
 				await terminal;
 			} catch (error) {
@@ -943,7 +944,7 @@ class BrowserIssuanceImplementation {
 				throw issuanceRetirementRefusal("issuance retirement source stale");
 			if (p) assertIssuanceRetirementPreparationRows(current, p, rows);
 			await requestResult(
-				transaction.objectStore("retirementControls").put({ objectId, record: encodeIssuanceRetirementControl(next) })
+				transaction.objectStore(roomStoreName(transaction.db, "issuance", "retirementControls")).put({ objectId, record: encodeIssuanceRetirementControl(next) })
 			);
 			await terminal;
 		} catch (error) {
@@ -1059,10 +1060,10 @@ class BrowserIssuanceImplementation {
 		try {
 			const key = [captured.scope.objectId, captured.scope.author, captured.authorSequence];
 			const rawLineage = await requestResult(
-				transaction.objectStore("lineages").get([captured.scope.objectId, captured.scope.author])
+				transaction.objectStore(roomStoreName(transaction.db, "issuance", "lineages")).get([captured.scope.objectId, captured.scope.author])
 			);
-			const rawIssued = await requestResult(transaction.objectStore("issuedRecords").get(key));
-			const rawOutbox = await requestResult(transaction.objectStore("issuanceOutbox").get(key));
+			const rawIssued = await requestResult(transaction.objectStore(roomStoreName(transaction.db, "issuance", "issuedRecords")).get(key));
+			const rawOutbox = await requestResult(transaction.objectStore(roomStoreName(transaction.db, "issuance", "issuanceOutbox")).get(key));
 			let observation: TerminalReadback;
 			try {
 				observation = this.#terminalFromRaw(captured.scope, rawLineage, rawIssued, rawOutbox);
@@ -1098,7 +1099,7 @@ class BrowserIssuanceImplementation {
 				const row = observation.outboxRecord;
 				if (row === null) throw this.#latchCorruption("publication outbox row disappeared");
 				const writtenKey = await requestResult(
-					transaction.objectStore("issuanceOutbox").put({
+					transaction.objectStore(roomStoreName(transaction.db, "issuance", "issuanceOutbox")).put({
 						author: row.scope.author,
 						authorSequence: row.authorSequence,
 						digest: new Uint8Array(row.digest),
@@ -1139,7 +1140,7 @@ class BrowserIssuanceImplementation {
 				this.#assertAvailable();
 				return lineage === undefined ? {exhausted: false, next: 0} : {exhausted: lineage.exhausted, next: lineage.next};
 			}
-			const raw = await requestResult(transaction.objectStore("lineages").get([detached.objectId, detached.author]));
+			const raw = await requestResult(transaction.objectStore(roomStoreName(transaction.db, "issuance", "lineages")).get([detached.objectId, detached.author]));
 			await transactionResult(transaction);
 			if (raw === undefined) return { exhausted: false, next: 0 };
 			const lineage = copyNativeLineage(raw, detached);
@@ -1167,7 +1168,7 @@ class BrowserIssuanceImplementation {
 				return plan === undefined ? null : cloneSettlementPlan(plan);
 			}
 			const raw = await requestResult(
-				transaction.objectStore("settlementPlans").get([detached.objectId, detached.author])
+				transaction.objectStore(roomStoreName(transaction.db, "issuance", "settlementPlans")).get([detached.objectId, detached.author])
 			);
 			await transactionResult(transaction);
 			if (raw === undefined) return null;
@@ -1187,7 +1188,7 @@ class BrowserIssuanceImplementation {
 		const terminal = transactionResult(transaction);
 		let reason: Error | undefined;
 		try {
-			const plans = transaction.objectStore("settlementPlans");
+			const plans = transaction.objectStore(roomStoreName(transaction.db, "issuance", "settlementPlans"));
 			const key = [captured.scope.objectId, captured.scope.author];
 			const raw = await requestResult(plans.get(key));
 			const current = raw === undefined ? null : copyNativeSettlementPlan(raw, captured.scope);
@@ -1263,9 +1264,9 @@ class BrowserIssuanceImplementation {
 			}
 			const key = [detached.objectId, detached.author, authorSequence];
 			const [rawIssued, rawOutbox, rawLineage] = await Promise.all([
-				requestResult(transaction.objectStore("issuedRecords").get(key)),
-				requestResult(transaction.objectStore("issuanceOutbox").get(key)),
-				requestResult(transaction.objectStore("lineages").get([detached.objectId, detached.author])),
+				requestResult(transaction.objectStore(roomStoreName(transaction.db, "issuance", "issuedRecords")).get(key)),
+				requestResult(transaction.objectStore(roomStoreName(transaction.db, "issuance", "issuanceOutbox")).get(key)),
+				requestResult(transaction.objectStore(roomStoreName(transaction.db, "issuance", "lineages")).get([detached.objectId, detached.author])),
 			]);
 			await transactionResult(transaction);
 			const lineage =
@@ -1365,7 +1366,7 @@ class BrowserIssuanceImplementation {
 	): Promise<readonly DurableIssuanceOutboxRecord[]> {
 		return new Promise((resolve, reject) => {
 			const requests = ["lineages", "issuedRecords", "issuanceOutbox"].map((name) =>
-				transaction.objectStore(name).openCursor()
+				transaction.objectStore(roomStoreName(transaction.db, "issuance", name)).openCursor()
 			);
 			const ready = [false, false, false];
 			const cursors: (IDBCursorWithValue | null)[] = [null, null, null];
@@ -1497,7 +1498,7 @@ class BrowserIssuanceImplementation {
 		} else if (parsed.afterKey !== null) {
 			range = IDBKeyRange.lowerBound([...parsed.afterKey], true);
 		}
-		const rawRows = await requestResult(transaction.objectStore("issuanceOutbox").getAll(range, parsed.limit));
+		const rawRows = await requestResult(transaction.objectStore(roomStoreName(transaction.db, "issuance", "issuanceOutbox")).getAll(range, parsed.limit));
 		const result: DurableIssuanceOutboxRecord[] = [];
 		for (const raw of rawRows) {
 			const row = copyNativeOutbox(raw);
@@ -1528,7 +1529,7 @@ class BrowserIssuanceImplementation {
 		let inheritedEntered = false;
 		try {
 			let rows = await browserRetirementRows(transaction, scope.objectId);
-			const raw = await requestResult(transaction.objectStore("lineages").get([scope.objectId, scope.author]));
+			const raw = await requestResult(transaction.objectStore(roomStoreName(transaction.db, "issuance", "lineages")).get([scope.objectId, scope.author]));
 			const lineage =
 				raw === undefined
 					? { next: 0, exhausted: false, prunedThroughAuthorSequence: null }
@@ -1595,12 +1596,12 @@ class BrowserIssuanceImplementation {
 				if ((await browserRetirementControl(transaction, scope.objectId)) === null)
 					await requestResult(
 						transaction
-							.objectStore("retirementControls")
+							.objectStore(roomStoreName(transaction.db, "issuance", "retirementControls"))
 							.add({ objectId: scope.objectId, record: encodeIssuanceRetirementControl(control) })
 					);
 				await requestResult(
 					// Validation normalizes an absent watermark for arithmetic, not a native rewrite.
-					transaction.objectStore("lineages").put({
+					transaction.objectStore(roomStoreName(transaction.db, "issuance", "lineages")).put({
 						...(raw === undefined ? { ...scope, ...lineage } : raw),
 						pendingUnsigned: pending,
 					})
@@ -1671,10 +1672,10 @@ class BrowserIssuanceImplementation {
 			const observationJoined = observedTerminal;
 			const key = [scope.objectId, scope.author, pending.authorSequence];
 			readback = Promise.all([
-				requestResult(observation.objectStore("lineages").get([scope.objectId, scope.author])),
-				requestResult(observation.objectStore("issuedRecords").get(key)),
-				requestResult(observation.objectStore("issuanceOutbox").get(key)),
-				requestResult(observation.objectStore("settlementPlans").get([scope.objectId, scope.author])),
+				requestResult(observation.objectStore(roomStoreName(observation.db, "issuance", "lineages")).get([scope.objectId, scope.author])),
+				requestResult(observation.objectStore(roomStoreName(observation.db, "issuance", "issuedRecords")).get(key)),
+				requestResult(observation.objectStore(roomStoreName(observation.db, "issuance", "issuanceOutbox")).get(key)),
+				requestResult(observation.objectStore(roomStoreName(observation.db, "issuance", "settlementPlans")).get([scope.objectId, scope.author])),
 			]).then(
 				async (raw) => {
 					await observationJoined;
@@ -1686,7 +1687,7 @@ class BrowserIssuanceImplementation {
 				}
 			);
 			void readback.catch(() => undefined);
-			const raw = await requestResult(marker.objectStore("lineages").get([scope.objectId, scope.author]));
+			const raw = await requestResult(marker.objectStore(roomStoreName(marker.db, "issuance", "lineages")).get([scope.objectId, scope.author]));
 			const lineage = copyNativeLineage(raw, scope);
 			const control = await browserRetirementControl(marker, scope.objectId);
 			inheritedEntered ||=
@@ -1711,7 +1712,7 @@ class BrowserIssuanceImplementation {
 			await browserRetirementRow(marker, scope, pending.authorSequence, pending.canonicalPreimageBytes, pending.digest);
 			this.#assertAvailable();
 			if (pending.phase !== "entered") {
-				await requestResult(marker.objectStore("lineages").put({ ...raw, pendingUnsigned: entered }));
+				await requestResult(marker.objectStore(roomStoreName(marker.db, "issuance", "lineages")).put({ ...raw, pendingUnsigned: entered }));
 				await browserBumpRetirement(marker, scope.objectId);
 			}
 			const currency =
@@ -1808,7 +1809,7 @@ class BrowserIssuanceImplementation {
 			await owned.turn.run(async () => {
 				this.#assertAvailable();
 				const raw = await requestResult(
-					owned.transaction.objectStore("lineages").get([detached.objectId, detached.author])
+					owned.transaction.objectStore(roomStoreName(owned.transaction.db, "issuance", "lineages")).get([detached.objectId, detached.author])
 				);
 				const current = copyNativeLineage(raw, detached);
 				const control = await browserRetirementControl(owned.transaction, detached.objectId);
@@ -1904,7 +1905,7 @@ class BrowserIssuanceImplementation {
 			return this.#runReservedRead(() => this.inspectPruningState(detached));
 		const transaction = this.#startTransaction("readonly");
 		try {
-			const raw = await requestResult(transaction.objectStore("lineages").get([detached.objectId, detached.author]));
+			const raw = await requestResult(transaction.objectStore(roomStoreName(transaction.db, "issuance", "lineages")).get([detached.objectId, detached.author]));
 			await transactionResult(transaction);
 			const lineage =
 				raw === undefined
@@ -1936,10 +1937,10 @@ class BrowserIssuanceImplementation {
 		const transaction = this.#startTransaction("readwrite");
 		const terminal = transactionResult(transaction);
 		try {
-			const lineages = transaction.objectStore("lineages");
-			const issuedRecords = transaction.objectStore("issuedRecords");
-			const issuanceOutbox = transaction.objectStore("issuanceOutbox");
-			const settlementPlans = transaction.objectStore("settlementPlans");
+			const lineages = transaction.objectStore(roomStoreName(transaction.db, "issuance", "lineages"));
+			const issuedRecords = transaction.objectStore(roomStoreName(transaction.db, "issuance", "issuedRecords"));
+			const issuanceOutbox = transaction.objectStore(roomStoreName(transaction.db, "issuance", "issuanceOutbox"));
+			const settlementPlans = transaction.objectStore(roomStoreName(transaction.db, "issuance", "settlementPlans"));
 			const lineageKey = [captured.scope.objectId, captured.scope.author];
 			const rawLineage = await requestResult(lineages.get(lineageKey));
 			const current =
@@ -2115,10 +2116,10 @@ class BrowserIssuanceImplementation {
 		const terminal = job?.terminal ?? transactionResult(transaction);
 		try {
 			const write = async (): Promise<void> => {
-				const lineages = transaction.objectStore("lineages");
-				const issued = transaction.objectStore("issuedRecords");
-				const outbox = transaction.objectStore("issuanceOutbox");
-				const plans = transaction.objectStore("settlementPlans");
+				const lineages = transaction.objectStore(roomStoreName(transaction.db, "issuance", "lineages"));
+				const issued = transaction.objectStore(roomStoreName(transaction.db, "issuance", "issuedRecords"));
+				const outbox = transaction.objectStore(roomStoreName(transaction.db, "issuance", "issuanceOutbox"));
+				const plans = transaction.objectStore(roomStoreName(transaction.db, "issuance", "settlementPlans"));
 				const rawPrior = await requestResult(lineages.get([scope.objectId, scope.author]));
 				const current =
 					rawPrior === undefined
@@ -2320,12 +2321,12 @@ class BrowserIssuanceImplementation {
 		const transaction = this.#startTransaction("readonly");
 		const key = [scope.objectId, scope.author, authorSequence];
 		const [rawLineage, rawIssued, rawOutbox, rawPlan] = await Promise.all([
-			requestResult(transaction.objectStore("lineages").get([scope.objectId, scope.author])),
-			requestResult(transaction.objectStore("issuedRecords").get(key)),
-			requestResult(transaction.objectStore("issuanceOutbox").get(key)),
+			requestResult(transaction.objectStore(roomStoreName(transaction.db, "issuance", "lineages")).get([scope.objectId, scope.author])),
+			requestResult(transaction.objectStore(roomStoreName(transaction.db, "issuance", "issuedRecords")).get(key)),
+			requestResult(transaction.objectStore(roomStoreName(transaction.db, "issuance", "issuanceOutbox")).get(key)),
 			candidate?.planEffect === undefined
 				? Promise.resolve(undefined)
-				: requestResult(transaction.objectStore("settlementPlans").get([scope.objectId, scope.author])),
+				: requestResult(transaction.objectStore(roomStoreName(transaction.db, "issuance", "settlementPlans")).get([scope.objectId, scope.author])),
 		]);
 		await transactionResult(transaction);
 		const observation = this.#terminalFromRaw(scope, rawLineage, rawIssued, rawOutbox);
@@ -2487,7 +2488,7 @@ class BrowserIssuanceImplementation {
 		this.#assertAvailable();
 		const transaction =
 			mode === "readonly"
-				? nativeReadonlyTransaction(this.#database, [...STORE_NAMES])
+				? nativeReadonlyTransaction(this.#database, roomStoreNames(this.#database, "issuance", STORE_NAMES))
 				: strictTransaction(this.#database, mode);
 		if (isNativeReadReservationTransaction(transaction)) return transaction;
 		this.#transactions.add(transaction);
@@ -2687,10 +2688,59 @@ export async function createBrowserDurableIssuanceStoreImplementation(
 ): Promise<DurableIssuanceStore & NativeReadReservationPort> {
 	const primaryDatabaseName = captureOptions(options);
 	const database = await openIssuanceDatabase(`${primaryDatabaseName}${DATABASE_SUFFIX}`);
+	return createIssuanceStoreOver(database, admitDatabase);
+}
+
+/**
+ * Creates the issuance capability inside a ready version-7 room database (slice 14a).
+ * Every operation, row format and refusal is the dedicated store's; only its stores
+ * live in the `issuance:` namespace and its held read views cover only that namespace.
+ * It never creates or upgrades the room database.
+ * @param options - Untrusted exact options naming the room database.
+ * @returns The eight-method shared issuance capability.
+ */
+export async function createBrowserRoomDurableIssuanceStoreImplementation(
+	options: unknown
+): Promise<DurableIssuanceStore & NativeReadReservationPort> {
+	const databaseName = captureRoomOptions(options);
+	let database: IDBDatabase;
+	try {
+		database = await openBrowserRoomOwnerConnection(databaseName, "issuance");
+	} catch {
+		throw createDurableIssuanceFailure("ISSUANCE_UNSUPPORTED_SCHEMA", "issuance room database is unsupported");
+	}
+	// The room connection already checked the exact issuance namespace catalog; admission
+	// keeps only the strict read-write durability check of the dedicated database.
+	return createIssuanceStoreOver(database, async (admitted) => {
+		const transaction = strictTransaction(admitted, "readwrite");
+		await transactionResult(transaction);
+	});
+}
+
+function captureRoomOptions(value: unknown): string {
+	if (typeof value !== "object" || value === null || Array.isArray(value)) throw invalid("options must be a plain record");
+	const keys = Reflect.ownKeys(value);
+	const descriptor = Object.getOwnPropertyDescriptor(value, "databaseName");
+	if (
+		keys.length !== 1 ||
+		keys[0] !== "databaseName" ||
+		descriptor === undefined ||
+		!("value" in descriptor) ||
+		typeof descriptor.value !== "string" ||
+		descriptor.value.length === 0
+	)
+		throw invalid("options must contain only databaseName");
+	return descriptor.value;
+}
+
+async function createIssuanceStoreOver(
+	database: IDBDatabase,
+	admit: (database: IDBDatabase) => Promise<void>
+): Promise<DurableIssuanceStore & NativeReadReservationPort> {
 	const implementation = new BrowserIssuanceImplementation(database);
 	database.onversionchange = (): void => implementation.versionchange();
 	try {
-		await admitDatabase(database);
+		await admit(database);
 		const store = Object.freeze(Object.assign(Object.create(null) as DurableIssuanceStore & NativeReadReservationPort, {
 			acquireNativeReadReservation: (input: { readonly objectId: string }) =>
 				implementation.acquireNativeReadReservation(input),

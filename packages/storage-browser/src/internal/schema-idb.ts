@@ -1,3 +1,5 @@
+import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
+
 const PHASE_2D_DECISION_LINK_SHA256 = "40f0175e5d7a0c4aa9855e61324639b71045ffbcf197c12caf788824c2d8e19c";
 const PHASE_5C_BLOCKED_OPEN_TIMEOUT_MILLISECONDS = 250;
 
@@ -210,13 +212,28 @@ function hasExactSchema(
  * @param transaction
  */
 export function assertCurrentBrowserSchema(transaction: IDBTransaction): void {
+	const room = roomConnections.get(transaction.db);
+	if (room !== undefined) {
+		const exact =
+			transaction.db.version === ROOM_DATABASE_VERSION &&
+			(room === "all"
+				? exactRoomCatalog(transaction.db, transaction)
+				: exactRoomStores(transaction.db, ROOM_NAMESPACE_STORES[room], transaction));
+		if (!exact) throw new BrowserStorageSchemaError();
+		return;
+	}
 	if (!hasExactSchema(transaction.db, SIGNING_PARTICIPANT_SCHEMA_AUTHORITY, transaction)) {
 		throw new BrowserStorageSchemaError();
 	}
 }
 
-/** Store set for one schema-checked AHE local-control transaction, not cross-DB custody. */
-export function browserAheControlStores(): string[] {
+/**
+ * Store set for one schema-checked AHE local-control transaction, not cross-DB custody.
+ * @param database - The AHE connection; a room connection names only the AHE namespace.
+ * @returns The physical store names.
+ */
+export function browserAheControlStores(database?: IDBDatabase): string[] {
+	if (database !== undefined && roomConnections.has(database)) return ROOM_AHE_STORES.map((store) => store.name);
 	return AHE_LOCAL_CONTROL_SCHEMA_AUTHORITY.stores.map((store) => store.name);
 }
 
@@ -461,6 +478,445 @@ export async function openPhase2dInternalDatabase(
 ): Promise<unknown> {
 	requireAcceptedDecision(options.testOnlyDecisionBinding ?? PHASE_2D_STORAGE_DECISION);
 	return openDatabase(options.databaseName, onVersionChange);
+}
+
+// ---------------------------------------------------------------------------
+// Room database (slice 14a): the main database `N` at version 7 hosts every
+// browser retention owner in a disjoint store namespace. Only this module
+// creates or upgrades it; owners open it at exactly version 7 and never upgrade.
+// ---------------------------------------------------------------------------
+
+export const ROOM_DATABASE_VERSION = 7;
+/** Owners that live in the room database. Signing keeps the unprefixed version-6 store names. */
+export type RoomNamespace = "ahe" | "issuance" | "journal" | "signing" | "snapshot";
+type RoomIndexAuthority = Readonly<{ name: string; keyPath: string | readonly string[]; unique: boolean }>;
+type RoomStoreAuthority = Readonly<{
+	name: string;
+	keyPath: string | readonly string[] | null;
+	indexes: readonly RoomIndexAuthority[];
+}>;
+const roomStore = (
+	name: string,
+	keyPath: string | readonly string[] | null,
+	indexes: readonly RoomIndexAuthority[] = []
+): RoomStoreAuthority => Object.freeze({ name, keyPath, indexes: Object.freeze(indexes) });
+const ROOM_AHE_STORES = Object.freeze(
+	AHE_LOCAL_CONTROL_SCHEMA_AUTHORITY.stores
+		.filter((store) =>
+			[
+				PHASE_2D_OBJECTS_STORE,
+				PHASE_2D_GENERATIONS_STORE,
+				PHASE_2D_BLOBS_STORE,
+				PHASE_2D_PROMOTIONS_STORE,
+				PHASE_5C_STORAGE_META_STORE,
+			].includes(store.name as never)
+		)
+		.map((store) => roomStore(`ahe:${store.name}`, store.keyPath))
+);
+const ROOM_NAMESPACE_STORES: Readonly<Record<RoomNamespace, readonly RoomStoreAuthority[]>> = Object.freeze({
+	ahe: ROOM_AHE_STORES,
+	// Signing owns the whole version-6 catalog of `N`, as before; its legacy AHE-named
+	// stores stay empty in room mode. Its transactions keep their version-6 scopes.
+	signing: Object.freeze(
+		SIGNING_PARTICIPANT_SCHEMA_AUTHORITY.stores.map((store) => roomStore(store.name, store.keyPath))
+	),
+	snapshot: Object.freeze([
+		roomStore(
+			"snapshot:scopes",
+			["objectId", "epoch", "anchor", "manifestDigest"],
+			[{ name: "expiryAsc", keyPath: "expiresAt", unique: false }]
+		),
+		roomStore("snapshot:chunks", ["objectId", "epoch", "anchor", "manifestDigest", "index"]),
+		roomStore("snapshot:owner", "id"),
+		roomStore("snapshot:retirementControls", null),
+	]),
+	journal: Object.freeze([
+		roomStore("journal:scopes", ["objectId", "epoch", "anchorDigest"]),
+		roomStore(
+			"journal:acceptedEntries",
+			["objectId", "epoch", "anchorDigest", "journalSequence"],
+			[
+				{ name: "digestUniq", keyPath: ["objectId", "epoch", "anchorDigest", "vertexDigest"], unique: true },
+				{
+					name: "localRefUniq",
+					keyPath: ["objectId", "epoch", "anchorDigest", "localAuthor", "localAuthorSequence"],
+					unique: true,
+				},
+			]
+		),
+		roomStore("journal:retirementControls", "objectId"),
+	]),
+	issuance: Object.freeze([
+		roomStore("issuance:lineages", ["objectId", "author"]),
+		roomStore("issuance:settlementPlans", ["objectId", "author"]),
+		roomStore("issuance:issuedRecords", ["objectId", "author", "authorSequence"]),
+		roomStore("issuance:issuanceOutbox", ["objectId", "author", "authorSequence"]),
+		roomStore("issuance:retirementControls", "objectId"),
+	]),
+});
+const ROOM_LAYOUT_STORE = "room:layout";
+/** Every store of the version-7 room database: version 6 (signing plus the unused legacy AHE stores), the namespaces and the layout. */
+const ROOM_CATALOG: readonly RoomStoreAuthority[] = Object.freeze([
+	...SIGNING_PARTICIPANT_SCHEMA_AUTHORITY.stores.map((store) => roomStore(store.name, store.keyPath)),
+	...ROOM_NAMESPACE_STORES.ahe,
+	...ROOM_NAMESPACE_STORES.snapshot,
+	...ROOM_NAMESPACE_STORES.journal,
+	...ROOM_NAMESPACE_STORES.issuance,
+	roomStore(ROOM_LAYOUT_STORE, null),
+]);
+const ROOM_LAYOUT_KEY = "layout",
+	ROOM_READY_KEY = "ready";
+const ROOM_LAYOUT_LIMITS = Object.freeze({ maxBytes: 65_536, maxItems: 1_024, maxDepth: 8 });
+const roomLayoutBytes = (): Uint8Array =>
+	encodeCanonical({ version: 1, kind: "room-database-layout-1" }, ROOM_LAYOUT_LIMITS);
+/** Ready record. `sources` lists the migrated legacy databases (slice 14d); empty for a room created at version 7. */
+export function roomReadyRecordBytes(
+	sources: readonly Readonly<{ database: string; fencedVersion: number; receiptDigest: string }>[]
+): Uint8Array {
+	return encodeCanonical(
+		{
+			version: 1,
+			kind: "room-database-ready-1",
+			sources: sources.map((source) => ({
+				database: source.database,
+				fencedVersion: source.fencedVersion,
+				receiptDigest: source.receiptDigest,
+			})),
+		},
+		ROOM_LAYOUT_LIMITS
+	);
+}
+
+// Keyed by the connection object; typed `object` so no raw IDB type is a receiver here.
+const roomConnections = new WeakMap<object, RoomNamespace | "all">();
+
+/**
+ * Physical store name of an owner's logical store on this connection.
+ * @param database - The owner's connection (legacy connections are not registered).
+ * @param namespace - The owner's own namespace.
+ * @param logical - The owner's version-6/legacy store name.
+ * @returns The namespaced name on a room connection, else the logical name.
+ */
+export function roomStoreName(database: IDBDatabase, namespace: RoomNamespace, logical: string): string {
+	return roomConnections.has(database) && namespace !== "signing" ? `${namespace}:${logical}` : logical;
+}
+
+/**
+ * Physical names of several of an owner's logical stores on this connection.
+ * @param database - The owner's connection.
+ * @param namespace - The owner's own namespace.
+ * @param logical - The owner's logical store names.
+ * @returns The physical store names, in the same order.
+ */
+export function roomStoreNames(database: IDBDatabase, namespace: RoomNamespace, logical: readonly string[]): string[] {
+	return logical.map((name) => roomStoreName(database, namespace, name));
+}
+
+/**
+ * Logical name of a store seen through an owner's namespace.
+ * @param namespace - The owner's own namespace.
+ * @param physical - The physical store name.
+ * @returns The name without its namespace prefix.
+ */
+export function roomLogicalStoreName(namespace: RoomNamespace, physical: string): string {
+	return physical.startsWith(`${namespace}:`) ? physical.slice(namespace.length + 1) : physical;
+}
+
+/** True when the connection was opened by this module as a room-database connection. */
+export function isRoomConnection(database: IDBDatabase): boolean {
+	return roomConnections.has(database);
+}
+
+/**
+ * Stores a held read view of this connection covers. A room owner's view
+ * covers only its own namespace, so it never blocks another owner's writer.
+ * @param database - Any owner connection.
+ * @returns The store names for a whole-owner readonly view.
+ */
+export function roomOwnerStoreNames(database: IDBDatabase): string[] {
+	const namespace = roomConnections.get(database);
+	if (namespace === undefined || namespace === "all") return Array.from(database.objectStoreNames);
+	return ROOM_NAMESPACE_STORES[namespace].map((store) => store.name);
+}
+
+function exactRoomStores(
+	database: IDBDatabase,
+	stores: readonly RoomStoreAuthority[],
+	transaction: IDBTransaction
+): boolean {
+	try {
+		return stores.every((expected) => {
+			if (!database.objectStoreNames.contains(expected.name)) return false;
+			const actual = transaction.objectStore(expected.name);
+			if (
+				actual.autoIncrement ||
+				!exactKeyPath(actual.keyPath, expected.keyPath) ||
+				actual.indexNames.length !== expected.indexes.length
+			)
+				return false;
+			return expected.indexes.every((index) => {
+				if (!actual.indexNames.contains(index.name)) return false;
+				const native = actual.index(index.name);
+				return exactKeyPath(native.keyPath, index.keyPath) && native.unique === index.unique && !native.multiEntry;
+			});
+		});
+	} catch {
+		return false;
+	}
+}
+
+function exactRoomCatalog(database: IDBDatabase, transaction: IDBTransaction): boolean {
+	return (
+		database.version === ROOM_DATABASE_VERSION &&
+		database.objectStoreNames.length === ROOM_CATALOG.length &&
+		exactRoomStores(database, ROOM_CATALOG, transaction)
+	);
+}
+
+function equalRoomBytes(left: unknown, right: Uint8Array): boolean {
+	return (
+		left instanceof Uint8Array && left.length === right.length && left.every((byte, index) => byte === right[index])
+	);
+}
+
+/** Reads the layout records. Undefined when they are not exact; a corrupt layout is never repaired. */
+function readRoomLayout(transaction: IDBTransaction): Promise<"ready" | "migrating" | undefined> {
+	return new Promise((resolve, reject) => {
+		const listed: unknown[] = [],
+			rows: unknown[] = [];
+		const cursor = transaction.objectStore(ROOM_LAYOUT_STORE).openCursor();
+		cursor.addEventListener("success", () => {
+			const current = cursor.result;
+			// At most two records exist; a third is refused below without reading further.
+			if (current !== null && listed.length < 3) {
+				listed.push(current.key);
+				rows.push(current.value);
+				current.continue();
+				return;
+			}
+			{
+				if (listed.length === 0 || listed[0] !== ROOM_LAYOUT_KEY) {
+					resolve(undefined);
+					return;
+				}
+				if (!equalRoomBytes(rows[0], roomLayoutBytes())) {
+					resolve(undefined);
+					return;
+				}
+				if (listed.length === 1) {
+					resolve("migrating");
+					return;
+				}
+				if (listed.length !== 2 || listed[1] !== ROOM_READY_KEY || !validRoomReadyRecord(rows[1])) {
+					resolve(undefined);
+					return;
+				}
+				resolve("ready");
+			}
+		});
+		cursor.addEventListener("error", () => reject(cursor.error), { once: true });
+	});
+}
+
+function validRoomReadyRecord(value: unknown): boolean {
+	if (!(value instanceof Uint8Array)) return false;
+	try {
+		const decoded = decodeCanonical(value, ROOM_LAYOUT_LIMITS) as Readonly<Record<string, unknown>>;
+		const sources = decoded.sources;
+		if (!Array.isArray(sources)) return false;
+		return equalRoomBytes(value, roomReadyRecordBytes(sources as never));
+	} catch {
+		return false;
+	}
+}
+
+function createRoomStores(database: IDBDatabase, stores: readonly RoomStoreAuthority[]): void {
+	for (const authority of stores) {
+		const store = database.createObjectStore(authority.name, {
+			autoIncrement: false,
+			...(authority.keyPath === null ? {} : { keyPath: copyKeyPath(authority.keyPath) }),
+		});
+		for (const index of authority.indexes)
+			store.createIndex(index.name, copyKeyPath(index.keyPath), { unique: index.unique, multiEntry: false });
+	}
+}
+
+function openRoom(
+	databaseName: string,
+	upgrade: ((event: IDBVersionChangeEvent, request: IDBOpenDBRequest) => void) | undefined,
+	onVersionChange?: () => void
+): Promise<IDBDatabase> {
+	return new Promise((resolve, reject) => {
+		const request = indexedDB.open(databaseName, ROOM_DATABASE_VERSION);
+		let blockedTimer: ReturnType<typeof setTimeout> | undefined;
+		let settled = false;
+		const clearBlockedTimer = (): void => {
+			if (blockedTimer !== undefined) clearTimeout(blockedTimer);
+		};
+		request.addEventListener(
+			"upgradeneeded",
+			(event) => {
+				if (settled || request.transaction === null || upgrade === undefined) {
+					request.transaction?.abort();
+					return;
+				}
+				try {
+					upgrade(event, request);
+				} catch {
+					request.transaction.abort();
+				}
+			},
+			{ once: true }
+		);
+		request.addEventListener(
+			"blocked",
+			() => {
+				blockedTimer ??= setTimeout(() => {
+					if (settled) return;
+					settled = true;
+					reject(new BrowserStorageBlockedError());
+				}, PHASE_5C_BLOCKED_OPEN_TIMEOUT_MILLISECONDS);
+			},
+			{ once: true }
+		);
+		request.addEventListener(
+			"error",
+			() => {
+				if (settled) return;
+				settled = true;
+				clearBlockedTimer();
+				reject(classifyOpenError(request.error));
+			},
+			{ once: true }
+		);
+		request.addEventListener(
+			"success",
+			() => {
+				const database = request.result;
+				if (settled) {
+					database.close();
+					return;
+				}
+				settled = true;
+				clearBlockedTimer();
+				database.addEventListener("versionchange", () => {
+					database.close();
+					onVersionChange?.();
+				});
+				resolve(database);
+			},
+			{ once: true }
+		);
+	});
+}
+
+function roomTransactionDone(transaction: IDBTransaction): Promise<void> {
+	return new Promise((resolve, reject) => {
+		transaction.addEventListener("complete", () => resolve(), { once: true });
+		transaction.addEventListener("abort", () => reject(transaction.error ?? new Error("room transaction aborted")), {
+			once: true,
+		});
+	});
+}
+
+/**
+ * Creates or upgrades the room database to version 7. From version 0 it writes the
+ * version-6 stores, both incarnations and a ready layout; from an exact version 6 it
+ * adds the namespaces and a migrating layout, keeping every version-6 row. Any other
+ * version or catalog refuses with zero changes.
+ * @param input - The room database name.
+ * @param input.databaseName
+ * @returns The layout state; owners open only a ready room database.
+ */
+export async function prepareBrowserRoomDatabase(
+	input: Readonly<{ databaseName: string }>
+): Promise<Readonly<{ state: "ready" | "migrating" }>> {
+	const databaseName = input.databaseName;
+	if (typeof databaseName !== "string" || databaseName.length === 0) throw new TypeError("INVALID_ARGUMENT");
+	const database = await openRoom(databaseName, (event, request) => {
+		const transaction = request.transaction!;
+		const created = request.result;
+		if (event.oldVersion === 0) {
+			if (created.objectStoreNames.length !== 0) throw new BrowserStorageSchemaError();
+			createStores(created, PHASE_5E_SCHEMA_AUTHORITY.stores);
+			transaction.objectStore(PHASE_5C_STORAGE_META_STORE).add({ key: "incarnation", value: randomIncarnation() });
+		} else if (
+			event.oldVersion !== SIGNING_PARTICIPANT_SCHEMA_AUTHORITY.version ||
+			!hasExactSchema(created, SIGNING_PARTICIPANT_SCHEMA_AUTHORITY, transaction, true)
+		)
+			throw new BrowserStorageSchemaError();
+		createRoomStores(created, ROOM_CATALOG.slice(SIGNING_PARTICIPANT_SCHEMA_AUTHORITY.stores.length));
+		const layout = transaction.objectStore(ROOM_LAYOUT_STORE);
+		layout.add(roomLayoutBytes(), ROOM_LAYOUT_KEY);
+		if (event.oldVersion === 0) {
+			// Nothing to migrate: the AHE namespace gets its own incarnation and the room is ready.
+			transaction.objectStore(`ahe:${PHASE_5C_STORAGE_META_STORE}`).add({
+				key: "incarnation",
+				value: randomIncarnation(),
+			});
+			layout.add(roomReadyRecordBytes([]), ROOM_READY_KEY);
+		}
+	});
+	try {
+		const transaction = database.transaction([...database.objectStoreNames], "readonly");
+		const done = roomTransactionDone(transaction);
+		if (!exactRoomCatalog(database, transaction)) {
+			transaction.abort();
+			await done.catch(() => undefined);
+			throw new BrowserStorageSchemaError();
+		}
+		const state = await readRoomLayout(transaction);
+		await done;
+		if (state === undefined) throw new BrowserStorageSchemaError();
+		return Object.freeze({ state });
+	} finally {
+		database.close();
+	}
+}
+
+/**
+ * Opens one owner's own connection to a ready version-7 room database. Never creates or
+ * upgrades it. Checks only the owner's namespace catalog and the ready layout.
+ * @param databaseName - The room database name.
+ * @param namespace - The owner's namespace.
+ * @param onVersionChange - Synchronous owner callback that closes its lifecycle.
+ * @returns The registered owner connection; its held views cover only its namespace.
+ * @internal
+ */
+export async function openBrowserRoomOwnerConnection(
+	databaseName: string,
+	namespace: RoomNamespace | "all",
+	onVersionChange?: () => void
+): Promise<IDBDatabase> {
+	if (typeof databaseName !== "string" || databaseName.length === 0) throw new TypeError("INVALID_ARGUMENT");
+	const database = await openRoom(databaseName, undefined, onVersionChange);
+	try {
+		const stores = namespace === "all" ? ROOM_CATALOG : ROOM_NAMESPACE_STORES[namespace];
+		const transaction = database.transaction(
+			[...stores.map((store) => store.name), ROOM_LAYOUT_STORE].filter(
+				(name, index, names) => names.indexOf(name) === index && database.objectStoreNames.contains(name)
+			),
+			"readonly"
+		);
+		const done = roomTransactionDone(transaction);
+		const exact =
+			database.version === ROOM_DATABASE_VERSION &&
+			database.objectStoreNames.contains(ROOM_LAYOUT_STORE) &&
+			(namespace === "all" ? exactRoomCatalog(database, transaction) : exactRoomStores(database, stores, transaction));
+		if (!exact) {
+			transaction.abort();
+			await done.catch(() => undefined);
+			throw new BrowserStorageSchemaError();
+		}
+		const state = await readRoomLayout(transaction);
+		await done;
+		if (state !== "ready") throw new BrowserStorageSchemaError();
+		roomConnections.set(database, namespace);
+		return database;
+	} catch (error) {
+		database.close();
+		throw error;
+	}
 }
 
 /**

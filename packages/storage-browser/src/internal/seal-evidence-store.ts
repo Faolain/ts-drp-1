@@ -76,9 +76,10 @@ function transactionComplete(transaction: IDBTransaction): Promise<void> {
  * @returns Internal evidence store bound to the durable storage incarnation.
  */
 export async function openInternalSealEvidenceStore(
-	input: Readonly<{ databaseName: string }>
+	input: Readonly<{ databaseName: string }>,
+	room = false
 ): Promise<InternalSealEvidenceStore> {
-	return createInternalSealEvidenceStore(await openSigningBackend(input));
+	return createInternalSealEvidenceStore(await openSigningBackend(input, room));
 }
 
 /** Builds only mechanical storage methods over the original private backend. */

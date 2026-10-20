@@ -24,6 +24,7 @@ import {
 	PHASE_2D_OBJECTS_STORE,
 	PHASE_2D_PROMOTIONS_STORE,
 	PHASE_5C_STORAGE_META_STORE,
+	roomStoreName,
 } from "./schema-idb.js";
 
 function property(value: unknown, key: string): unknown {
@@ -87,7 +88,7 @@ export class BrowserBoundedReadPrefetch {
 			if (typeof key !== "string") continue;
 			const address = JSON.stringify([objectId, key]);
 			if (this.#generations.has(address)) continue;
-			const pending = this.#issue(() => transaction.objectStore(PHASE_2D_GENERATIONS_STORE).get([objectId, key]));
+			const pending = this.#issue(() => transaction.objectStore(roomStoreName(transaction.db, "ahe", PHASE_2D_GENERATIONS_STORE)).get([objectId, key]));
 			if (pending !== undefined) this.#generations.set(address, pending);
 		}
 	}
@@ -107,7 +108,7 @@ export class BrowserBoundedReadPrefetch {
 		if (keys === undefined) {
 			const limit = AHE_LOCAL_CONTROL_CENSUS_LIMITS.maxPromotions + 1;
 			const read = this.#issue(() =>
-				transaction.objectStore(PHASE_2D_PROMOTIONS_STORE).getAllKeys(exactObjectKeyRange(objectId), limit));
+				transaction.objectStore(roomStoreName(transaction.db, "ahe", PHASE_2D_PROMOTIONS_STORE)).getAllKeys(exactObjectKeyRange(objectId), limit));
 			if (read === undefined) return undefined;
 			// Any incomplete or failed read leaves each step to its own exact getKey.
 			keys = read.then((rows) => {
@@ -130,7 +131,7 @@ export class BrowserBoundedReadPrefetch {
 	#fill(): void {
 		while (this.#blobs.size < BLOB_PREFETCH_WINDOW && this.#queued.length !== 0) {
 			const digest = this.#queued.shift()!;
-			const pending = this.#issue(() => this.#transaction.objectStore(PHASE_2D_BLOBS_STORE).get(digest));
+			const pending = this.#issue(() => this.#transaction.objectStore(roomStoreName(this.#transaction.db, "ahe", PHASE_2D_BLOBS_STORE)).get(digest));
 			if (pending === undefined) {
 				this.#queued.length = 0;
 				return;
@@ -181,7 +182,7 @@ export async function loadBrowserBoundedReadRequest(
 				if (total > LIMITS.maxUnionBytes) return false;
 				continue;
 			}
-			const row = await requestValue(transaction.objectStore(PHASE_2D_BLOBS_STORE).get(reference.digest));
+			const row = await requestValue(transaction.objectStore(roomStoreName(transaction.db, "ahe", PHASE_2D_BLOBS_STORE)).get(reference.digest));
 			if (row === undefined) continue;
 			if (!exactRow(row, ["digest", "bytes"]) || property(row, "digest") !== reference.digest)
 				throw new PersistedStorageError("NON_CANONICAL_RECORD");
@@ -197,7 +198,7 @@ export async function loadBrowserBoundedReadRequest(
 	if (request.kind === "promotions") {
 		const rows = await requestValue(
 			transaction
-				.objectStore(PHASE_2D_PROMOTIONS_STORE)
+				.objectStore(roomStoreName(transaction.db, "ahe", PHASE_2D_PROMOTIONS_STORE))
 				.getAll(
 					IDBKeyRange.bound([request.objectId], [request.objectId, []]),
 					AHE_LOCAL_CONTROL_CENSUS_LIMITS.maxPromotions + 1
@@ -214,7 +215,7 @@ export async function loadBrowserBoundedReadRequest(
 		// One bounded native key read returns the same ordered prefix the former
 		// key cursor walked from [objectId] until its first foreign key.
 		const keys = await requestValue(
-			transaction.objectStore(PHASE_2D_GENERATIONS_STORE).getAllKeys(exactObjectKeyRange(request.objectId), limit)
+			transaction.objectStore(roomStoreName(transaction.db, "ahe", PHASE_2D_GENERATIONS_STORE)).getAllKeys(exactObjectKeyRange(request.objectId), limit)
 		);
 		const values: unknown[] = [];
 		for (const key of keys) {
@@ -233,14 +234,14 @@ export async function loadBrowserBoundedReadRequest(
 		return (
 			(await requestValue(
 				transaction
-					.objectStore(PHASE_2D_PROMOTIONS_STORE)
+					.objectStore(roomStoreName(transaction.db, "ahe", PHASE_2D_PROMOTIONS_STORE))
 					.getKey([request.objectId, request.generationId, request.digest])
 			)) !== undefined
 		);
 	}
 	if (request.kind === "blob") {
 		const row = await (prefetch?.takeBlob(transaction, request.digest) ??
-			requestValue(transaction.objectStore(PHASE_2D_BLOBS_STORE).get(request.digest)));
+			requestValue(transaction.objectStore(roomStoreName(transaction.db, "ahe", PHASE_2D_BLOBS_STORE)).get(request.digest)));
 		if (row === undefined) return null;
 		if (!exactRow(row, ["digest", "bytes"]) || property(row, "digest") !== request.digest)
 			throw new PersistedStorageError("NON_CANONICAL_RECORD");
@@ -250,7 +251,7 @@ export async function loadBrowserBoundedReadRequest(
 	const row = await ((head ? undefined : prefetch?.takeGeneration(transaction, request.objectId, request.generationId)) ??
 		requestValue(
 			transaction
-				.objectStore(head ? PHASE_2D_OBJECTS_STORE : PHASE_2D_GENERATIONS_STORE)
+				.objectStore(roomStoreName(transaction.db, "ahe", head ? PHASE_2D_OBJECTS_STORE : PHASE_2D_GENERATIONS_STORE))
 				.get(head ? request.objectId : [request.objectId, request.generationId])
 		));
 	if (row === undefined) return null;
@@ -283,7 +284,7 @@ export async function readBrowserRetirementControl(
 	} catch {
 		throw new PersistedStorageError("UNSUPPORTED_STORAGE_SCHEMA");
 	}
-	const row = await requestValue(transaction.objectStore(PHASE_5C_STORAGE_META_STORE).get(controlKey(objectId)));
+	const row = await requestValue(transaction.objectStore(roomStoreName(transaction.db, "ahe", PHASE_5C_STORAGE_META_STORE)).get(controlKey(objectId)));
 	if (row === undefined) return null;
 	if (!exactRow(row, ["key", "record"]) || property(row, "key") !== controlKey(objectId))
 		throw new PersistedStorageError("NON_CANONICAL_RECORD");
@@ -334,7 +335,7 @@ export async function writeBrowserRetirementControl(
 	birth: boolean
 ): Promise<void> {
 	const row = { key: controlKey(control.objectId), record: encodeAheRetirementControl(control) };
-	const store = transaction.objectStore(PHASE_5C_STORAGE_META_STORE);
+	const store = transaction.objectStore(roomStoreName(transaction.db, "ahe", PHASE_5C_STORAGE_META_STORE));
 	await requestValue(birth ? store.add(row) : store.put(row));
 }
 

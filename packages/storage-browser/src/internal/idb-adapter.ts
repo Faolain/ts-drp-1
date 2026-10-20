@@ -79,11 +79,14 @@ import {
 } from "./retirement-control.js";
 import {
 	browserAheControlStores,
+	openBrowserRoomOwnerConnection,
 	openPhase2dInternalDatabase,
 	PHASE_2D_BLOBS_STORE,
 	PHASE_2D_GENERATIONS_STORE,
 	PHASE_2D_OBJECTS_STORE,
 	PHASE_2D_PROMOTIONS_STORE,
+	roomStoreName,
+	roomStoreNames,
 } from "./schema-idb.js";
 
 export interface BrowserAheDurableStoreOptions {
@@ -295,7 +298,7 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 		let tx: IDBTransaction | undefined, done: Promise<TransactionOutcome> | undefined;
 		try {
 			if (this.lifecycle.isPoisoned()) return { ok: false, reason: "STORE_POISONED" };
-			tx = nativeReadonlyTransaction(database, browserAheControlStores());
+			tx = nativeReadonlyTransaction(database, browserAheControlStores(database));
 			done = transactionOutcome(tx);
 			const value = await readBrowserRetirementControl(tx, objectId),
 				joined = await joinTransactionOutcome(tx, done);
@@ -374,7 +377,7 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 		let tx: IDBTransaction | undefined, done: Promise<TransactionOutcome> | undefined;
 		try {
 			if (this.lifecycle.isPoisoned()) return { ok: false, reason: "STORE_POISONED" };
-			tx = nativeReadonlyTransaction(database, browserAheControlStores());
+			tx = nativeReadonlyTransaction(database, browserAheControlStores(database));
 			done = transactionOutcome(tx);
 			if (isNativeReadReservationTransaction(tx)) {
 				await nativeReadReservationCheck(tx);
@@ -487,7 +490,7 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 		try {
 			if (this.lifecycle.isClosed()) return { ok: false, reason: "STORE_CLOSED" };
 			if (this.lifecycle.isPoisoned()) return { ok: false, reason: "STORE_POISONED" };
-			transaction = database.transaction(browserAheControlStores(), "readwrite", { durability: "strict" });
+			transaction = database.transaction(browserAheControlStores(database), "readwrite", { durability: "strict" });
 			completion = transactionOutcome(transaction);
 			if (transaction.durability !== "strict") throw new StrictDurabilityCapabilityError();
 			const current = await readBrowserRetirementControl(transaction, objectId);
@@ -699,7 +702,7 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 		next: AheRetirementControl,
 		imageDigest: string
 	): Promise<StoreResult<AheRetirementControl>> {
-		const tx = nativeReadonlyTransaction(database, browserAheControlStores()),
+		const tx = nativeReadonlyTransaction(database, browserAheControlStores(database)),
 			done = transactionOutcome(tx);
 		try {
 			const current = await readBrowserRetirementControl(tx, next.objectId),
@@ -843,7 +846,8 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 			if (this.lifecycle.isPoisoned()) return { ok: false, reason: "STORE_POISONED" };
 			if (released?.()) return { ok: false, reason: "READ_RELEASED" };
 			transaction =
-				reserved ?? nativeReadonlyTransaction(database, headOnly ? [PHASE_2D_OBJECTS_STORE] : allAuthorityStores());
+				reserved ??
+				nativeReadonlyTransaction(database, roomStoreNames(database, "ahe", headOnly ? [PHASE_2D_OBJECTS_STORE] : allAuthorityStores()));
 			completion = transactionOutcome(transaction);
 			const facts = typeof steps === "function" && reserved !== undefined && factObjectId !== undefined
 				? new BoundedReadNativeFacts(this, transaction, factObjectId) : undefined;
@@ -918,9 +922,9 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 		let completion: Promise<TransactionOutcome> | undefined;
 		try {
 			if (this.lifecycle.isPoisoned()) return { ok: false, reason: "STORE_POISONED" };
-			transaction = nativeReadonlyTransaction(database, PHASE_2D_BLOBS_STORE);
+			transaction = nativeReadonlyTransaction(database, roomStoreName(database, "ahe", PHASE_2D_BLOBS_STORE));
 			completion = transactionOutcome(transaction);
-			const store = transaction.objectStore(PHASE_2D_BLOBS_STORE);
+			const store = transaction.objectStore(roomStoreName(transaction.db, "ahe", PHASE_2D_BLOBS_STORE));
 			const uniqueDigests: BlobDigest[] = [];
 			const uniqueIndex: Record<string, number> = Object.create(null) as Record<string, number>;
 			for (const digest of copied) {
@@ -1038,10 +1042,10 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 			let headObservation: TransactionHeadObservation | undefined;
 			let control: AheRetirementControl | null = null;
 			transaction = mutation
-				? database.transaction(browserAheControlStores(), "readwrite", {
+				? database.transaction(browserAheControlStores(database), "readwrite", {
 						durability: "strict",
 					})
-				: nativeReadonlyTransaction(database, [...OPERATION_STORES[operation]]);
+				: nativeReadonlyTransaction(database, roomStoreNames(database, "ahe", OPERATION_STORES[operation]));
 			completion = transactionOutcome(transaction);
 			if (mutation && transaction.durability !== "strict") throw new StrictDurabilityCapabilityError();
 			if (mutation) {
@@ -1174,7 +1178,7 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 				case "generation-page": {
 					const rows = await this.request(
 						transaction
-							.objectStore(PHASE_2D_GENERATIONS_STORE)
+							.objectStore(roomStoreName(transaction.db, "ahe", PHASE_2D_GENERATIONS_STORE))
 							.getAll(
 								generationPageRange(requirement.objectId, requirement.afterGenerationId),
 								requirement.limitPlusOne
@@ -1231,7 +1235,7 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 		try {
 			if (this.lifecycle.isClosed()) return { ok: false, reason: "STORE_CLOSED" };
 			if (this.lifecycle.isPoisoned()) return { ok: false, reason: "STORE_POISONED" };
-			transaction = database.transaction(browserAheControlStores(), "readwrite", { durability: "strict" });
+			transaction = database.transaction(browserAheControlStores(database), "readwrite", { durability: "strict" });
 			completion = transactionOutcome(transaction);
 			if (transaction.durability !== "strict") throw new StrictDurabilityCapabilityError();
 			const control = await readBrowserRetirementControl(transaction, objectId);
@@ -1280,7 +1284,7 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 		transaction: IDBTransaction,
 		objectId: StorageObjectId
 	): Promise<TransactionHeadObservationResult> {
-		const row = await this.request(transaction.objectStore(PHASE_2D_OBJECTS_STORE).get(objectId));
+		const row = await this.request(transaction.objectStore(roomStoreName(transaction.db, "ahe", PHASE_2D_OBJECTS_STORE)).get(objectId));
 		const classified = classifyPersistedState({
 			kind: "head",
 			objectId,
@@ -1339,7 +1343,7 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 		let failure: "NON_CANONICAL_RECORD" | "UNSUPPORTED_STORAGE_SCHEMA" | undefined;
 		for (;;) {
 			const rows = await this.request(
-				transaction.objectStore(PHASE_2D_GENERATIONS_STORE).getAll(generationPageRange(objectId, after), 129)
+				transaction.objectStore(roomStoreName(transaction.db, "ahe", PHASE_2D_GENERATIONS_STORE)).getAll(generationPageRange(objectId, after), 129)
 			);
 			for (const row of rows) {
 				const classified = classifyPersistedState({
@@ -1406,7 +1410,7 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 		generationId: GenerationId,
 		facts: StorageAdapterFact[]
 	): Promise<void> {
-		const row = await this.request(transaction.objectStore(PHASE_2D_GENERATIONS_STORE).get([objectId, generationId]));
+		const row = await this.request(transaction.objectStore(roomStoreName(transaction.db, "ahe", PHASE_2D_GENERATIONS_STORE)).get([objectId, generationId]));
 		if (row === undefined) {
 			facts.push({ kind: "generation", objectId, generationId, generationRecord: null });
 			return;
@@ -1462,9 +1466,9 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 				const request =
 					verificationRequest.kind === "promotion"
 						? transaction
-								.objectStore(PHASE_2D_PROMOTIONS_STORE)
+								.objectStore(roomStoreName(transaction.db, "ahe", PHASE_2D_PROMOTIONS_STORE))
 								.get([objectId, generation.generationId, verificationRequest.reference.digest])
-						: transaction.objectStore(PHASE_2D_BLOBS_STORE).get(verificationRequest.reference.digest);
+						: transaction.objectStore(roomStoreName(transaction.db, "ahe", PHASE_2D_BLOBS_STORE)).get(verificationRequest.reference.digest);
 				request.addEventListener(
 					"success",
 					() => {
@@ -1494,7 +1498,7 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 		loaded: Set<BlobDigest>
 	): Promise<void> {
 		if (loaded.has(digest)) return;
-		const row = await this.request(transaction.objectStore(PHASE_2D_BLOBS_STORE).get(digest));
+		const row = await this.request(transaction.objectStore(roomStoreName(transaction.db, "ahe", PHASE_2D_BLOBS_STORE)).get(digest));
 		facts.push({
 			kind: "blob",
 			digest,
@@ -1512,7 +1516,7 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 		const key = promotionKey(scope);
 		if (loaded.has(key)) return;
 		const row = await this.request(
-			transaction.objectStore(PHASE_2D_PROMOTIONS_STORE).get([scope.objectId, scope.generationId, scope.digest])
+			transaction.objectStore(roomStoreName(transaction.db, "ahe", PHASE_2D_PROMOTIONS_STORE)).get([scope.objectId, scope.generationId, scope.digest])
 		);
 		if (row !== undefined) facts.push({ kind: "promotion", ...scope });
 		loaded.add(key);
@@ -1526,7 +1530,7 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 		switch (write.kind) {
 			case "replace-generation":
 				await requestValue(
-					transaction.objectStore(PHASE_2D_GENERATIONS_STORE).put({
+					transaction.objectStore(roomStoreName(transaction.db, "ahe", PHASE_2D_GENERATIONS_STORE)).put({
 						generationId: write.generationId,
 						objectId: write.objectId,
 						record: new Uint8Array(write.record),
@@ -1535,7 +1539,7 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 				return;
 			case "replace-head":
 				await requestValue(
-					transaction.objectStore(PHASE_2D_OBJECTS_STORE).put({
+					transaction.objectStore(roomStoreName(transaction.db, "ahe", PHASE_2D_OBJECTS_STORE)).put({
 						objectId: write.objectId,
 						record: new Uint8Array(write.record),
 					})
@@ -1543,7 +1547,7 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 				return;
 			case "insert-blob":
 				await requestValue(
-					transaction.objectStore(PHASE_2D_BLOBS_STORE).add({
+					transaction.objectStore(roomStoreName(transaction.db, "ahe", PHASE_2D_BLOBS_STORE)).add({
 						bytes: new Uint8Array(write.bytes),
 						digest: write.digest,
 					})
@@ -1551,7 +1555,7 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 				return;
 			case "insert-promotion":
 				await requestValue(
-					transaction.objectStore(PHASE_2D_PROMOTIONS_STORE).add({
+					transaction.objectStore(roomStoreName(transaction.db, "ahe", PHASE_2D_PROMOTIONS_STORE)).add({
 						digest: write.digest,
 						generationId: write.generationId,
 						objectId: write.objectId,
@@ -1743,5 +1747,30 @@ export async function createBrowserAheDurableStore(
 	lifecycle.attach(opaqueDatabase as IDBDatabase);
 	const store = new IdbAheDurableStore(lifecycle);
 	registerBrowserAheReclamationMaintenance(store, lifecycle, options.databaseName);
+	return store;
+}
+
+/**
+ * Creates the AHE durable store inside a ready version-7 room database (slice 14a).
+ * The store keeps every operation, row format and refusal of the dedicated store; only
+ * its stores live in the `ahe:` namespace of the room database and its held read
+ * views cover only that namespace. It never creates or upgrades the room database.
+ * @param options - The room database name.
+ * @returns A strict durable-store adapter over its own room connection.
+ */
+export async function createBrowserRoomAheDurableStore(
+	options: BrowserAheDurableStoreOptions
+): Promise<BrowserAheDurableStore> {
+	if (options === null || typeof options !== "object" || typeof options.databaseName !== "string")
+		throw new TypeError("INVALID_ARGUMENT");
+	const databaseName = options.databaseName;
+	const lifecycle = new IdbAdapterLifecycle();
+	const database = await openBrowserRoomOwnerConnection(databaseName, "ahe", () => {
+		void lifecycle.close().catch(() => undefined);
+	});
+	lifecycle.attach(database);
+	const store = new IdbAheDurableStore(lifecycle);
+	// The dispatch identity of the dedicated `${N}--ahe` database is kept for the room namespace.
+	registerBrowserAheReclamationMaintenance(store, lifecycle, `${databaseName}--ahe`);
 	return store;
 }

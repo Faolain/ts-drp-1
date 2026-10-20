@@ -140,8 +140,8 @@ async function settleAbort(transaction: IDBTransaction): Promise<void> {
  * @param input - Primary database identity and optional causal test observers.
  * @returns Validated internal vote-store capability.
  */
-export async function openInternalSealVoteStore(input: OpenInternalSealVoteStoreInput): Promise<InternalSealVoteStore> {
-	return createInternalSealVoteStore(await openSigningBackend(input), input);
+export async function openInternalSealVoteStore(input: OpenInternalSealVoteStoreInput, room = false): Promise<InternalSealVoteStore> {
+	return createInternalSealVoteStore(await openSigningBackend(input, room), input);
 }
 
 /** Builds only mechanical storage methods over the original private backend. */

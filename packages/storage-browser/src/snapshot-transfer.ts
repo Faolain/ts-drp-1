@@ -35,6 +35,7 @@ import {
 	runNativeReservedRead,
 	visitCountedRange,
 } from "./internal/native-read-reservation.js";
+import { openBrowserRoomOwnerConnection, roomStoreName, roomStoreNames } from "./internal/schema-idb.js";
 
 export interface BrowserSnapshotQuarantineStoreOptions {
 	readonly primaryDatabaseName: string;
@@ -151,7 +152,7 @@ async function validateRecoveryClosure(transaction: IDBTransaction, declaration:
 	);
 	await new Promise<void>((resolve, reject) => {
 		let count = 0;
-		const request = transaction.objectStore("chunks").openCursor(range);
+		const request = transaction.objectStore(roomStoreName(transaction.db, "snapshot", "chunks")).openCursor(range);
 		request.addEventListener("error", () => reject(request.error));
 		request.addEventListener("success", () => {
 			try {
@@ -240,9 +241,15 @@ function transactionComplete(
 	});
 }
 
-function strictTransaction(database: IDBDatabase, stores: readonly string[], mode: IDBTransactionMode): IDBTransaction {
+function strictTransaction(
+	database: IDBDatabase,
+	logical: readonly string[],
+	mode: IDBTransactionMode
+): IDBTransaction {
+	// Logical snapshot store names; a room connection names them in the snapshot namespace (14a).
+	const stores = roomStoreNames(database, "snapshot", logical);
 	return mode === "readonly"
-		? nativeReadonlyTransaction(database, [...stores])
+		? nativeReadonlyTransaction(database, stores)
 		: database.transaction(stores, mode, { durability: "strict" });
 }
 
@@ -498,7 +505,7 @@ async function transact<Result>(
 	throw failure("storage-failed", "browser snapshot quarantine transaction aborted", transaction.error);
 }
 async function ownerStatus(transaction: IDBTransaction): Promise<SnapshotRecoveryOwnerStatus> {
-	const store = transaction.objectStore("owner");
+	const store = transaction.objectStore(roomStoreName(transaction.db, "snapshot", "owner"));
 	const [raw, count] = await Promise.all([requestResult(store.get("owner")), requestResult(store.count())]);
 	if (
 		count !== 1 ||
@@ -537,7 +544,11 @@ async function ownerStatus(transaction: IDBTransaction): Promise<SnapshotRecover
 		? snapshotQuarantineContract.captureClassificationIntent(raw.classificationIntent)
 		: undefined;
 	if (classificationIntent !== undefined) {
-		const bytes = await requestResult(transaction.objectStore("retirementControls").get(classificationIntent.objectId));
+		const bytes = await requestResult(
+			transaction
+				.objectStore(roomStoreName(transaction.db, "snapshot", "retirementControls"))
+				.get(classificationIntent.objectId)
+		);
 		if (bytes === undefined) throw failure("poisoned", "snapshot inherited intent control is absent");
 		const control = snapshotRetirementContract.decodeControl(bytes);
 		if (
@@ -565,16 +576,20 @@ async function ownerStatus(transaction: IDBTransaction): Promise<SnapshotRecover
 }
 
 async function deleteChunks(transaction: IDBTransaction, scope: SnapshotQuarantineScopeKey): Promise<void> {
-	const chunks = transaction.objectStore("chunks");
+	const chunks = transaction.objectStore(roomStoreName(transaction.db, "snapshot", "chunks"));
 	const keys = await requestResult(chunks.getAllKeys(chunkRange(scope)));
 	for (const key of keys) chunks.delete(key);
 }
 
 async function deleteScope(transaction: IDBTransaction, scope: SnapshotQuarantineScopeKey): Promise<void> {
-	const bytes = await requestResult(transaction.objectStore("retirementControls").get(scope.objectId));
+	const bytes = await requestResult(
+		transaction.objectStore(roomStoreName(transaction.db, "snapshot", "retirementControls")).get(scope.objectId)
+	);
 	if (bytes !== undefined) {
 		const control = snapshotRetirementContract.decodeControl(bytes),
-			raw = await requestResult(transaction.objectStore("scopes").get(scopeKey(scope)));
+			raw = await requestResult(
+				transaction.objectStore(roomStoreName(transaction.db, "snapshot", "scopes")).get(scopeKey(scope))
+			);
 		if (control.objectId !== scope.objectId) throw failure("poisoned", "snapshot retirement control key disagrees");
 		if (
 			raw !== undefined &&
@@ -592,7 +607,7 @@ async function deleteScope(transaction: IDBTransaction, scope: SnapshotQuarantin
 			throw failure("recovery-owned", "snapshot native protected hole cannot be deleted");
 	}
 	await deleteChunks(transaction, scope);
-	transaction.objectStore("scopes").delete(scopeKey(scope));
+	transaction.objectStore(roomStoreName(transaction.db, "snapshot", "scopes")).delete(scopeKey(scope));
 }
 
 function fromScopeRow(value: unknown): ScopeRow {
@@ -671,7 +686,79 @@ export async function createBrowserSnapshotQuarantineStore(
 		if (isError(error)) throw error;
 		throw failure("storage-failed", "browser snapshot quarantine admission failed", error);
 	}
-	const database = acquired;
+	return createSnapshotStoreOver(acquired, primaryDatabaseName);
+}
+
+/**
+ * Opens the snapshot owner inside a ready version-7 room database (slice 14a). Every
+ * operation, row format and refusal is the dedicated store's; only its stores live in
+ * the `snapshot:` namespace and its held read views cover only that namespace. It never
+ * creates or upgrades the room database. The owner row is written once, on the first
+ * open of an empty namespace, exactly as the dedicated database's creation writes it.
+ * @param options - The room database name and optional durable policy.
+ * @returns The admitted snapshot quarantine owner.
+ */
+export async function createBrowserRoomSnapshotQuarantineStore(
+	options: Readonly<{ databaseName: string; recoveryLimits?: SnapshotRecoveryLimits }>
+): Promise<SnapshotRecoveryStore<SnapshotVerificationReceipt>> {
+	if (!exactRecord(options, ["databaseName"]) && !exactRecord(options, ["databaseName", "recoveryLimits"]))
+		throw failure("malformed-input", "browser snapshot quarantine options are malformed");
+	const databaseName = options.databaseName;
+	if (typeof databaseName !== "string" || databaseName === "")
+		throw failure("malformed-input", "browser snapshot quarantine options are malformed");
+	const recoveryLimits = Object.prototype.hasOwnProperty.call(options, "recoveryLimits")
+		? snapshotQuarantineContract.captureRecoveryLimits(options.recoveryLimits)
+		: undefined;
+	let acquired: IDBDatabase | undefined;
+	try {
+		try {
+			acquired = await openBrowserRoomOwnerConnection(databaseName, "snapshot");
+		} catch (error) {
+			throw failure("unsupported-schema", "browser snapshot quarantine schema is unsupported", error);
+		}
+		const candidate = acquired;
+		const initialized = await transact(candidate, "readonly", async (transaction) =>
+			requestResult(transaction.objectStore(roomStoreName(transaction.db, "snapshot", "owner")).count())
+		);
+		if (initialized === 0)
+			await transact(
+				candidate,
+				"readwrite",
+				async (transaction) => {
+					const owner = transaction.objectStore(roomStoreName(transaction.db, "snapshot", "owner"));
+					if ((await requestResult(owner.count())) !== 0) return;
+					// An owner row is absent only before the first open of an empty namespace.
+					const scopes = await requestResult(
+						transaction.objectStore(roomStoreName(transaction.db, "snapshot", "scopes")).count()
+					);
+					if (scopes !== 0) throw failure("poisoned", "snapshot owner row is missing");
+					await requestResult(
+						owner.add(initialOwner(recoveryLimits ?? snapshotQuarantineContract.defaultRecoveryLimits))
+					);
+				},
+				{ requireStrictDurability: true }
+			);
+		await transact(candidate, "readonly", async (transaction) => {
+			const persisted = (await ownerStatus(transaction)).limits;
+			if (
+				recoveryLimits !== undefined &&
+				(persisted.maxRecoveryScopes !== recoveryLimits.maxRecoveryScopes ||
+					persisted.maxRecoveryContentBytes !== recoveryLimits.maxRecoveryContentBytes)
+			)
+				throw failure("policy-mismatch", "snapshot recovery policy differs from the durable owner");
+		});
+	} catch (error) {
+		acquired?.close();
+		if (isError(error)) throw error;
+		throw failure("storage-failed", "browser snapshot quarantine admission failed", error);
+	}
+	return createSnapshotStoreOver(acquired, databaseName);
+}
+
+function createSnapshotStoreOver(
+	database: IDBDatabase,
+	primaryDatabaseName: string
+): SnapshotRecoveryStore<SnapshotVerificationReceipt> {
 	const readReservations = new NativeReadReservationOwner(database);
 	let closed = false,
 		terminated = false,
@@ -729,7 +816,9 @@ export async function createBrowserSnapshotQuarantineStore(
 		transaction: IDBTransaction,
 		objectId: string
 	): Promise<SnapshotRetirementControl | null> => {
-		const bytes = await requestResult(transaction.objectStore("retirementControls").get(objectId));
+		const bytes = await requestResult(
+			transaction.objectStore(roomStoreName(transaction.db, "snapshot", "retirementControls")).get(objectId)
+		);
 		if (bytes === undefined) return null;
 		const control = snapshotRetirementContract.decodeControl(bytes);
 		if (control.objectId !== objectId) throw failure("poisoned", "snapshot retirement control key disagrees");
@@ -757,8 +846,8 @@ export async function createBrowserSnapshotQuarantineStore(
 		// classification authority; all scope mutation admission remains closed.
 		const range = IDBKeyRange.bound([objectId], [objectId + "\0"], false, true);
 		const [count, chunkCount] = await Promise.all([
-			requestResult(transaction.objectStore("scopes").count(range)),
-			requestResult(transaction.objectStore("chunks").count(range)),
+			requestResult(transaction.objectStore(roomStoreName(transaction.db, "snapshot", "scopes")).count(range)),
+			requestResult(transaction.objectStore(roomStoreName(transaction.db, "snapshot", "chunks")).count(range)),
 		]);
 		if (count > snapshotRetirementContract.maxScopes || chunkCount > snapshotRetirementContract.maxChunks)
 			throw failure("recovery-full", "snapshot retirement capture exceeds native entitlement");
@@ -769,7 +858,7 @@ export async function createBrowserSnapshotQuarantineStore(
 		const declarations = new Map<string, SnapshotQuarantineDeclaration>();
 		const cursor = async (store: string, visit: (value: unknown, key: IDBValidKey) => void): Promise<void> =>
 			new Promise((resolve, reject) => {
-				const request = transaction.objectStore(store).openCursor(range);
+				const request = transaction.objectStore(roomStoreName(transaction.db, "snapshot", store)).openCursor(range);
 				request.addEventListener("error", () => reject(request.error));
 				request.addEventListener("success", () => {
 					try {
@@ -787,40 +876,45 @@ export async function createBrowserSnapshotQuarantineStore(
 			});
 		// Scope metadata rows are bounded by the count above: visit the counted
 		// range in bounded pages in this SAME transaction, in cursor order.
-		await visitCountedRange(transaction.objectStore("scopes"), range, count + 1, (value, key) => {
-			const row = fromScopeRow(value),
-				scope = snapshotQuarantineContract.captureRecoveryDependencyScope({
-					objectId: row.objectId,
-					epoch: row.epoch,
-					anchor: row.anchor,
-					manifestDigest: row.manifestDigest,
-				});
-			if (row.objectId !== objectId || JSON.stringify(key) !== JSON.stringify(scopeKey(scope)))
-				throw failure("poisoned", "snapshot retirement scope key disagrees");
-			const observation = snapshotQuarantineContract.validateRecoveryManifest(scope, row);
-			const prior = classificationSource
-				? owner.classificationIntent!.promoted.find(
-						(pair) => JSON.stringify(scopeKey(pair.scope)) === JSON.stringify(scopeKey(scope))
-					)
-				: undefined;
-			if (
-				prior !== undefined &&
-				(row.retention !== "recovery" ||
-					row.state !== "verified" ||
-					row.incarnation !== prior.incarnation ||
-					observation.declaration.totalBytes + row.exactCanonicalManifestBytes.byteLength !== prior.contentBytes ||
-					JSON.stringify(row.descriptors) !== JSON.stringify(observation.declaration.chunks))
-			)
-				throw failure("poisoned", "snapshot inherited postimage disagrees with exact source subset");
-			const sourceRow = prior === undefined ? row : { ...row, retention: "legacy-unclassified", descriptors: null };
-			if (prior !== undefined) remaining.delete(JSON.stringify(scopeKey(scope)));
-			metadataBytes += encodeCanonical(sourceRow, { maxDepth: 8, maxItems: 32768 }).byteLength;
-			if (metadataBytes > snapshotRetirementContract.maxImageBytes)
-				throw failure("recovery-full", "snapshot retirement metadata exceeds native entitlement");
-			declarations.set(JSON.stringify(scopeKey(scope)), observation.declaration);
-			scopes.push(Object.freeze({ scope, incarnation: row.incarnation }));
-			imageDigest = snapshotRetirementContract.imageDigest({ prior: imageDigest, row: sourceRow });
-		});
+		await visitCountedRange(
+			transaction.objectStore(roomStoreName(transaction.db, "snapshot", "scopes")),
+			range,
+			count + 1,
+			(value, key) => {
+				const row = fromScopeRow(value),
+					scope = snapshotQuarantineContract.captureRecoveryDependencyScope({
+						objectId: row.objectId,
+						epoch: row.epoch,
+						anchor: row.anchor,
+						manifestDigest: row.manifestDigest,
+					});
+				if (row.objectId !== objectId || JSON.stringify(key) !== JSON.stringify(scopeKey(scope)))
+					throw failure("poisoned", "snapshot retirement scope key disagrees");
+				const observation = snapshotQuarantineContract.validateRecoveryManifest(scope, row);
+				const prior = classificationSource
+					? owner.classificationIntent!.promoted.find(
+							(pair) => JSON.stringify(scopeKey(pair.scope)) === JSON.stringify(scopeKey(scope))
+						)
+					: undefined;
+				if (
+					prior !== undefined &&
+					(row.retention !== "recovery" ||
+						row.state !== "verified" ||
+						row.incarnation !== prior.incarnation ||
+						observation.declaration.totalBytes + row.exactCanonicalManifestBytes.byteLength !== prior.contentBytes ||
+						JSON.stringify(row.descriptors) !== JSON.stringify(observation.declaration.chunks))
+				)
+					throw failure("poisoned", "snapshot inherited postimage disagrees with exact source subset");
+				const sourceRow = prior === undefined ? row : { ...row, retention: "legacy-unclassified", descriptors: null };
+				if (prior !== undefined) remaining.delete(JSON.stringify(scopeKey(scope)));
+				metadataBytes += encodeCanonical(sourceRow, { maxDepth: 8, maxItems: 32768 }).byteLength;
+				if (metadataBytes > snapshotRetirementContract.maxImageBytes)
+					throw failure("recovery-full", "snapshot retirement metadata exceeds native entitlement");
+				declarations.set(JSON.stringify(scopeKey(scope)), observation.declaration);
+				scopes.push(Object.freeze({ scope, incarnation: row.incarnation }));
+				imageDigest = snapshotRetirementContract.imageDigest({ prior: imageDigest, row: sourceRow });
+			}
+		);
 		if (remaining.size !== 0) throw failure("incomplete", "snapshot inherited source subset is missing");
 		await cursor("chunks", (value, key) => {
 			if (
@@ -867,7 +961,7 @@ export async function createBrowserSnapshotQuarantineStore(
 	};
 	const sweep = async (transaction: IDBTransaction, now: number): Promise<number> => {
 		if ((await ownerStatus(transaction)).migration !== "ready") return 0;
-		const scopes = transaction.objectStore("scopes");
+		const scopes = transaction.objectStore(roomStoreName(transaction.db, "snapshot", "scopes"));
 		let deleted = 0;
 		const visit = async (row: ScopeRow): Promise<void> => {
 			if (row.retention === "temporary") {
@@ -911,7 +1005,9 @@ export async function createBrowserSnapshotQuarantineStore(
 		declaration: CapturedDeclaration,
 		incarnation?: string
 	): Promise<ScopeRow | undefined> => {
-		const raw = await requestResult(transaction.objectStore("scopes").get(selectorRange(declaration.scope)));
+		const raw = await requestResult(
+			transaction.objectStore(roomStoreName(transaction.db, "snapshot", "scopes")).get(selectorRange(declaration.scope))
+		);
 		if (raw === undefined) return undefined;
 		const row = fromScopeRow(raw);
 		if (incarnation !== undefined && row.incarnation !== incarnation)
@@ -934,7 +1030,9 @@ export async function createBrowserSnapshotQuarantineStore(
 			throw failure("conflict", "snapshot quarantine declaration conflicts with durable state");
 		if (row.descriptors === null) {
 			await new Promise<void>((resolve, reject) => {
-				const request = transaction.objectStore("chunks").openCursor(chunkRange(declaration.scope));
+				const request = transaction
+					.objectStore(roomStoreName(transaction.db, "snapshot", "chunks"))
+					.openCursor(chunkRange(declaration.scope));
 				request.addEventListener("error", () => reject(request.error));
 				request.addEventListener("success", () => {
 					const cursor = request.result;
@@ -959,7 +1057,11 @@ export async function createBrowserSnapshotQuarantineStore(
 		declaration: CapturedDeclaration,
 		row: ScopeRow
 	): Promise<SnapshotQuarantineStatus> => {
-		const keys = await requestResult(transaction.objectStore("chunks").getAllKeys(chunkRange(declaration.scope)));
+		const keys = await requestResult(
+			transaction
+				.objectStore(roomStoreName(transaction.db, "snapshot", "chunks"))
+				.getAllKeys(chunkRange(declaration.scope))
+		);
 		const occupied = new Set(keys.map((key) => Number((key as IDBValidKey[])[4])));
 		return Object.freeze({
 			expiresAt: row.expiresAt,
@@ -977,7 +1079,7 @@ export async function createBrowserSnapshotQuarantineStore(
 	): Promise<
 		{ observation: Extract<SnapshotRecoveryDeclarationLookup, { kind: "present" }>; incarnation: string } | undefined
 	> => {
-		const scopes = transaction.objectStore("scopes");
+		const scopes = transaction.objectStore(roomStoreName(transaction.db, "snapshot", "scopes"));
 		let raw: unknown = await requestResult(scopes.get(scopeKey(scope)));
 		if (raw === undefined && read?.incarnation !== undefined)
 			raw = await requestResult(scopes.get(recoverySelectorRange(scope)));
@@ -1211,7 +1313,7 @@ export async function createBrowserSnapshotQuarantineStore(
 					"readonly",
 					async (transaction) => {
 						throwIfAborted(signal);
-						const scopes = transaction.objectStore("scopes");
+						const scopes = transaction.objectStore(roomStoreName(transaction.db, "snapshot", "scopes"));
 						const metadata = await readRecoveryMetadata(transaction, scope);
 						if (metadata === undefined) {
 							// Advance the third component, admitting every fourth-key class.
@@ -1234,7 +1336,7 @@ export async function createBrowserSnapshotQuarantineStore(
 					transact(database, "readonly", async (transaction) => {
 						const rows = await requestResult(
 							transaction
-								.objectStore("scopes")
+								.objectStore(roomStoreName(transaction.db, "snapshot", "scopes"))
 								.getAll(recoverySelectorRange({ ...selector, manifestDigest: "0".repeat(64) }), 2)
 						);
 						if (rows.length > 1) throw failure("conflict", "snapshot recovery identity has ambiguous custody");
@@ -1279,44 +1381,49 @@ export async function createBrowserSnapshotQuarantineStore(
 		// The same ordered range in bounded pages (one past the work bound so
 		// overflow still refuses at the same row), visited in cursor order.
 		let scanned = 0;
-		await visitCountedRange(transaction.objectStore("scopes"), range, MAX_CHUNKS + 1, (value, key) => {
-			if (++scanned > MAX_CHUNKS) throw failure("recovery-full", "snapshot role census exceeds bounded work");
-			const row = fromScopeRow(value);
-			if (row.objectId !== objectId || JSON.stringify(key) !== JSON.stringify(scopeKey(row)))
-				throw failure("poisoned", "snapshot role census key disagrees with its row");
-			if (row.retention === "legacy-unclassified") {
-				legacyManifestBytes += row.exactCanonicalManifestBytes.byteLength;
-				if (
-					!Number.isSafeInteger(legacyManifestBytes) ||
-					legacyManifestBytes > snapshotRetirementContract.maxImageBytes
-				)
-					throw failure("recovery-full", "snapshot inherited manifests exceed bounded work");
-				const scope = snapshotQuarantineContract.captureScope({
-					objectId,
-					epoch: row.epoch,
-					anchor: row.anchor,
-					manifestDigest: row.manifestDigest,
-				});
-				const observation = snapshotQuarantineContract.validateRecoveryManifest(scope, row);
-				legacyScopes.push(
-					Object.freeze({
-						scope,
-						incarnation: row.incarnation,
-						state: observation.state,
-						expiresAt: observation.expiresAt,
-						contentBytes: snapshotQuarantineContract.recoveryContentBytes(
-							row.totalBytes,
-							row.exactCanonicalManifestBytes.byteLength
-						),
-					})
-				);
+		await visitCountedRange(
+			transaction.objectStore(roomStoreName(transaction.db, "snapshot", "scopes")),
+			range,
+			MAX_CHUNKS + 1,
+			(value, key) => {
+				if (++scanned > MAX_CHUNKS) throw failure("recovery-full", "snapshot role census exceeds bounded work");
+				const row = fromScopeRow(value);
+				if (row.objectId !== objectId || JSON.stringify(key) !== JSON.stringify(scopeKey(row)))
+					throw failure("poisoned", "snapshot role census key disagrees with its row");
+				if (row.retention === "legacy-unclassified") {
+					legacyManifestBytes += row.exactCanonicalManifestBytes.byteLength;
+					if (
+						!Number.isSafeInteger(legacyManifestBytes) ||
+						legacyManifestBytes > snapshotRetirementContract.maxImageBytes
+					)
+						throw failure("recovery-full", "snapshot inherited manifests exceed bounded work");
+					const scope = snapshotQuarantineContract.captureScope({
+						objectId,
+						epoch: row.epoch,
+						anchor: row.anchor,
+						manifestDigest: row.manifestDigest,
+					});
+					const observation = snapshotQuarantineContract.validateRecoveryManifest(scope, row);
+					legacyScopes.push(
+						Object.freeze({
+							scope,
+							incarnation: row.incarnation,
+							state: observation.state,
+							expiresAt: observation.expiresAt,
+							contentBytes: snapshotQuarantineContract.recoveryContentBytes(
+								row.totalBytes,
+								row.exactCanonicalManifestBytes.byteLength
+							),
+						})
+					);
+				}
+				if (row.retention === "recovery") {
+					if (rows.length === snapshotQuarantineContract.defaultRecoveryLimits.maxRecoveryScopes)
+						throw failure("recovery-full", "snapshot role census exceeds the bounded recovery pool");
+					rows.push(row);
+				}
 			}
-			if (row.retention === "recovery") {
-				if (rows.length === snapshotQuarantineContract.defaultRecoveryLimits.maxRecoveryScopes)
-					throw failure("recovery-full", "snapshot role census exceeds the bounded recovery pool");
-				rows.push(row);
-			}
-		});
+		);
 		const scopes = [];
 		for (const row of rows) {
 			const scope = snapshotQuarantineContract.captureScope({
@@ -1466,7 +1573,11 @@ export async function createBrowserSnapshotQuarantineStore(
 							const selected = roles ?? (await roleInventory(transaction, inventory.objectId));
 							const rows = await Promise.all(
 								[...selected.scopes, ...(selected.legacyScopes ?? [])].map((row) =>
-									requestResult(transaction.objectStore("scopes").get(scopeKey(row.scope)))
+									requestResult(
+										transaction
+											.objectStore(roomStoreName(transaction.db, "snapshot", "scopes"))
+											.get(scopeKey(row.scope))
+									)
 								)
 							);
 							return {
@@ -1517,12 +1628,16 @@ export async function createBrowserSnapshotQuarantineStore(
 										);
 										for (const row of result.promoted) {
 											const raw = fromScopeRow(
-												await requestResult(transaction.objectStore("scopes").get(scopeKey(row.scope)))
+												await requestResult(
+													transaction
+														.objectStore(roomStoreName(transaction.db, "snapshot", "scopes"))
+														.get(scopeKey(row.scope))
+												)
 											);
 											const observation = snapshotQuarantineContract.validateRecoveryManifest(row.scope, raw);
 											await validateRecoveryClosure(transaction, observation.declaration);
 											await requestResult(
-												transaction.objectStore("scopes").put({
+												transaction.objectStore(roomStoreName(transaction.db, "snapshot", "scopes")).put({
 													...raw,
 													retention: "recovery",
 													descriptors: observation.declaration.chunks,
@@ -1530,7 +1645,9 @@ export async function createBrowserSnapshotQuarantineStore(
 											);
 										}
 										await requestResult(
-											transaction.objectStore("owner").put({ ...result.owner, id: "owner" } satisfies OwnerRow)
+											transaction
+												.objectStore(roomStoreName(transaction.db, "snapshot", "owner"))
+												.put({ ...result.owner, id: "owner" } satisfies OwnerRow)
 										);
 										afterImage = await readImage(transaction);
 										await borrowed?.check();
@@ -1590,7 +1707,11 @@ export async function createBrowserSnapshotQuarantineStore(
 												"snapshot retirement survivor or classified scopes are unavailable"
 											);
 										const raw = fromScopeRow(
-											await requestResult(transaction.objectStore("scopes").get(scopeKey(survivor.scope)))
+											await requestResult(
+												transaction
+													.objectStore(roomStoreName(transaction.db, "snapshot", "scopes"))
+													.get(scopeKey(survivor.scope))
+											)
 										);
 										const update = snapshotQuarantineContract.recoveryRetirementCarrier(
 											decision,
@@ -1606,13 +1727,15 @@ export async function createBrowserSnapshotQuarantineStore(
 										)
 											throw failure("recovery-full", "snapshot retirement metadata exceeds the recovery budget");
 										await requestResult(
-											transaction.objectStore("scopes").put({ ...raw, descriptors: update.carrier } satisfies ScopeRow)
+											transaction
+												.objectStore(roomStoreName(transaction.db, "snapshot", "scopes"))
+												.put({ ...raw, descriptors: update.carrier } satisfies ScopeRow)
 										);
 									}
 									if (frontier !== priorFrontier && frontier !== null)
 										await requestResult(
 											transaction
-												.objectStore("retirementControls")
+												.objectStore(roomStoreName(transaction.db, "snapshot", "retirementControls"))
 												.put(snapshotRetirementContract.encodeControl(frontier), inventory.objectId)
 										);
 									throwIfAborted(signal);
@@ -1620,7 +1743,7 @@ export async function createBrowserSnapshotQuarantineStore(
 									for (const row of retired) await deleteScope(transaction, row.scope);
 									await requestResult(
 										transaction
-											.objectStore("owner")
+											.objectStore(roomStoreName(transaction.db, "snapshot", "owner"))
 											.put({ ...current.owner, id: "owner", recoveryScopes, recoveryContentBytes } satisfies OwnerRow)
 									);
 									afterImage = await readImage(transaction);
@@ -1655,9 +1778,16 @@ export async function createBrowserSnapshotQuarantineStore(
 								if (receipt !== undefined)
 									for (const row of retiring) {
 										if (
-											(await requestResult(transaction.objectStore("scopes").getKey(scopeKey(row.scope)))) !==
-												undefined ||
-											(await requestResult(transaction.objectStore("chunks").count(chunkRange(row.scope)))) !== 0
+											(await requestResult(
+												transaction
+													.objectStore(roomStoreName(transaction.db, "snapshot", "scopes"))
+													.getKey(scopeKey(row.scope))
+											)) !== undefined ||
+											(await requestResult(
+												transaction
+													.objectStore(roomStoreName(transaction.db, "snapshot", "chunks"))
+													.count(chunkRange(row.scope))
+											)) !== 0
 										)
 											throw failure("poisoned", "snapshot retirement still has native retired material");
 									}
@@ -1717,7 +1847,9 @@ export async function createBrowserSnapshotQuarantineStore(
 						if (found === undefined) {
 							if (
 								(await requestResult(
-									transaction.objectStore("scopes").getKey(recoverySelectorRange(declaration.scope))
+									transaction
+										.objectStore(roomStoreName(transaction.db, "snapshot", "scopes"))
+										.getKey(recoverySelectorRange(declaration.scope))
 								)) !== undefined
 							)
 								throw failure("conflict", "snapshot identity is occupied by another digest");
@@ -1760,7 +1892,9 @@ export async function createBrowserSnapshotQuarantineStore(
 										}
 										throwIfAborted(readSignal);
 										const raw: unknown = await requestResult(
-											transaction.objectStore("chunks").get(chunkKey(declaration.scope, descriptor.index))
+											transaction
+												.objectStore(roomStoreName(transaction.db, "snapshot", "chunks"))
+												.get(chunkKey(declaration.scope, descriptor.index))
 										);
 										if (raw === undefined) {
 											throwIfAborted(readSignal);
@@ -1864,7 +1998,7 @@ export async function createBrowserSnapshotQuarantineStore(
 						reserved = declaration.totalBytes;
 					snapshotQuarantineContract.assertTemporaryAdmission(scopes, reserved);
 					await new Promise<void>((resolve, reject) => {
-						const scan = transaction.objectStore("scopes").openCursor();
+						const scan = transaction.objectStore(roomStoreName(transaction.db, "snapshot", "scopes")).openCursor();
 						scan.addEventListener("error", () => reject(scan.error));
 						scan.addEventListener("success", () => {
 							const cursor = scan.result;
@@ -1895,7 +2029,7 @@ export async function createBrowserSnapshotQuarantineStore(
 						});
 					});
 					const incarnation = crypto.randomUUID();
-					transaction.objectStore("scopes").add({
+					transaction.objectStore(roomStoreName(transaction.db, "snapshot", "scopes")).add({
 						...declaration.scope,
 						exactReceivedCertificateWrapperBytes: null,
 						chunkCount: declaration.chunks.length,
@@ -1954,7 +2088,9 @@ export async function createBrowserSnapshotQuarantineStore(
 											ensurePort();
 											if ((await recorded(transaction, declaration, incarnation)) === undefined) return undefined;
 											const row = (await requestResult(
-												transaction.objectStore("chunks").get(chunkKey(declaration.scope, descriptor.index))
+												transaction
+													.objectStore(roomStoreName(transaction.db, "snapshot", "chunks"))
+													.get(chunkKey(declaration.scope, descriptor.index))
 											)) as ChunkRow | undefined;
 											if (row === undefined) return undefined;
 											const bytes = exactBytes(row.exactBytes, "persisted snapshot chunk", descriptor.byteLength);
@@ -1984,8 +2120,8 @@ export async function createBrowserSnapshotQuarantineStore(
 												throw failure("poisoned", "snapshot quarantine is poisoned");
 											if (row.state === "verified")
 												throw failure("closed", "verified snapshot quarantine is immutable");
-											const chunks = transaction.objectStore("chunks"),
-												scopes = transaction.objectStore("scopes");
+											const chunks = transaction.objectStore(roomStoreName(transaction.db, "snapshot", "chunks")),
+												scopes = transaction.objectStore(roomStoreName(transaction.db, "snapshot", "scopes"));
 											const existing = (await requestResult(
 												chunks.get(chunkKey(declaration.scope, descriptor.index))
 											)) as ChunkRow | undefined;
@@ -2099,7 +2235,7 @@ export async function createBrowserSnapshotQuarantineStore(
 										)
 											throw failure("recovery-full", "snapshot recovery capacity is full");
 										await requestResult(
-											transaction.objectStore("scopes").put({
+											transaction.objectStore(roomStoreName(transaction.db, "snapshot", "scopes")).put({
 												...row,
 												retention: "recovery",
 												exactReceivedCertificateWrapperBytes: wrapper,
@@ -2107,7 +2243,7 @@ export async function createBrowserSnapshotQuarantineStore(
 										);
 										await requestResult(
 											transaction
-												.objectStore("owner")
+												.objectStore(roomStoreName(transaction.db, "snapshot", "owner"))
 												.put({ ...owner, id: "owner", recoveryScopes, recoveryContentBytes } satisfies OwnerRow)
 										);
 									},
@@ -2155,7 +2291,9 @@ export async function createBrowserSnapshotQuarantineStore(
 										throw failure("poisoned", "snapshot quarantine state is invalid");
 									const status = await statusOf(transaction, declaration, row);
 									const count = await requestResult(
-										transaction.objectStore("chunks").count(chunkRange(declaration.scope))
+										transaction
+											.objectStore(roomStoreName(transaction.db, "snapshot", "chunks"))
+											.count(chunkRange(declaration.scope))
 									);
 									if (status.missingIndices.length !== 0 || count !== declaration.chunks.length)
 										throw failure("incomplete", "snapshot quarantine is incomplete");
@@ -2176,7 +2314,9 @@ export async function createBrowserSnapshotQuarantineStore(
 									)
 										throw failure("receipt-invalid", "snapshot verification completion does not match the scope");
 									if (row.state === "open")
-										transaction.objectStore("scopes").put({ ...row, state: "verified" } satisfies ScopeRow);
+										transaction
+											.objectStore(roomStoreName(transaction.db, "snapshot", "scopes"))
+											.put({ ...row, state: "verified" } satisfies ScopeRow);
 									return Object.freeze({
 										chunkCount: declaration.chunks.length,
 										exactByteLength: declaration.totalBytes,
@@ -2259,7 +2399,7 @@ export async function createBrowserSnapshotQuarantineStore(
 								throw failure("stale-scope", "snapshot control birth image changed");
 							await requestResult(
 								transaction
-									.objectStore("retirementControls")
+									.objectStore(roomStoreName(transaction.db, "snapshot", "retirementControls"))
 									.add(snapshotRetirementContract.encodeControl(born), objectId)
 							);
 						});
@@ -2322,7 +2462,7 @@ export async function createBrowserSnapshotQuarantineStore(
 										throw failure("stale-scope", "snapshot retirement native image changed");
 									await requestResult(
 										transaction
-											.objectStore("retirementControls")
+											.objectStore(roomStoreName(transaction.db, "snapshot", "retirementControls"))
 											.put(snapshotRetirementContract.encodeControl(next), objectId)
 									);
 								});
