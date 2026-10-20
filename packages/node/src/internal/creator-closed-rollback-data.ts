@@ -10361,7 +10361,6 @@ function classifyClosedSigningSummaries(
 			}
 		}
 		if (
-			input.reader.generations.length > AHE_BOUNDED_READ_LIMITS.maxObjectGenerations - 2 &&
 			control.active === null &&
 			input.coordinator?.active === null &&
 			drain != null &&
@@ -10373,6 +10372,10 @@ function classifyClosedSigningSummaries(
 			// A terminal SAME-P summary replay is not new maintenance work. Bind
 			// its exact residual rows before allowing the freshly authenticated
 			// whole source to select capacity reclamation, never a count-only grant.
+			// With or without generation pressure: its stored resume basis binds
+			// every owner's state at its decision, which lawful writes since (this
+			// epoch's moves, before or after a reopen) change, so a replay would be
+			// refused floor-stale. Only an unfinished intent or drain is resumed.
 			checkClosedSigningSummaryImage({
 				rows: input.rows,
 				original: input.rows,
