@@ -20230,6 +20230,7 @@ async function cleanupCreatorSettlementSuccessor(
 	if (ahe === undefined || (frontier !== undefined && issuance === undefined)) return;
 	const native = material.store as AheBoundedRecoveryRoleStore;
 	let coordinatedIssuance: readonly Readonly<{author: string; authorSequence: number; digest: string}>[] | undefined;
+	let coordinatedThroughEpoch: number | undefined;
 	if (native.readRetirementControl !== undefined) {
 		const observed = await native.readRetirementControl(material.successor.head.objectId);
 		if (!observed.ok) throw new TypeError(`creator cleanup retirement control is unavailable: ${observed.reason}`);
@@ -20259,6 +20260,7 @@ async function cleanupCreatorSettlementSuccessor(
 					observed.control.completed.sourceProofDigest !== control.completed.sourceProofDigest ||
 					control.completed.generationDrain?.phase === "pending") return;
 				coordinatedIssuance = observed.control.completed.protectedRecords;
+				coordinatedThroughEpoch = observed.control.completed.throughEpoch;
 			} finally {await observed.release();}
 		}
 	}
@@ -20283,11 +20285,19 @@ async function cleanupCreatorSettlementSuccessor(
 	// Cold material has no producer-private semantic role grant. Keep every
 	// existing source until the next close reacquires its complete native proof;
 	// signed role spelling alone must never authorize reclamation.
-	if (
+	const coldRoles =
 		(Object.hasOwn(cutRecord, "recoveryRoles") || Object.hasOwn(cutRecord, "forwardPromotion")) &&
-		material.certifiedRecoverySourceGenerations === undefined
-	)
-		return;
+		material.certifiedRecoverySourceGenerations === undefined;
+	// A Writer recipient never closes, so its material is always cold. Its own
+	// completed coordinated retirement has still classified every local issued
+	// record through that decision's throughEpoch, and that decision (not role
+	// spelling) lets the existing authenticated pruner drain the classified,
+	// settled prefix outside the decision's holes. Without this drain a recipient
+	// keeps every row it ever issued (G1). The coordinated branch below reclaims
+	// no generation and reads no source role; it is the only branch cold material
+	// reaches.
+	if (coldRoles && coordinatedIssuance === undefined) return;
+	const classifiedThroughEpoch = coldRoles ? coordinatedThroughEpoch : undefined;
 	const retainedSourceRefs = new Map<string, GenerationRef>();
 	const forward = Reflect.get(cutRecord, "forwardPromotion") as
 		| {
@@ -20305,7 +20315,7 @@ async function cleanupCreatorSettlementSuccessor(
 				};
 		  }
 		| undefined;
-	if (forward !== undefined) {
+	if (forward !== undefined && !coldRoles) {
 		// This material is minted only after the complete signed promotion decision
 		// has passed the owning verifier. Retain its actual source/control closures.
 		for (const source of [forward.source, ...(forward.roles?.retainedSources ?? [])]) {
@@ -20318,7 +20328,7 @@ async function cleanupCreatorSettlementSuccessor(
 			}
 		}
 	}
-	if (Object.prototype.hasOwnProperty.call(cutRecord, "recoveryRoles")) {
+	if (Object.prototype.hasOwnProperty.call(cutRecord, "recoveryRoles") && !coldRoles) {
 		// The close owner has verified this exact semantic transfer before signing
 		// and publication. Its predecessor's original promotion support remains a
 		// required native dependency until the later joined turnover decision.
@@ -20483,6 +20493,8 @@ async function cleanupCreatorSettlementSuccessor(
 				if (
 					source === undefined ||
 					source.admitted.epoch > closedEpoch - 2 ||
+					// Cold material drains only what its coordinated decision classified.
+					(classifiedThroughEpoch !== undefined && source.admitted.epoch > classifiedThroughEpoch) ||
 					!(
 						source.admitted.epoch < frontier.admissionEpoch ||
 						(frontier.terminalThrough !== null && row.authorSequence <= frontier.terminalThrough)
