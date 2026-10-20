@@ -672,7 +672,7 @@ describe("14b adversarial: a fact crossing a non-genuine handoff", () => {
 				before = await dumpDatabase(database);
 				try {
 					const planned = (await required(other.planRetention)(owners, selection)) as { decisionDigest: string };
-					const { roomRetentionSourceDigest } = await import("@ts-drp/storage");
+					const { roomRetentionSourceDigest } = await import("@ts-drp/storage/room-head");
 					await required(other.applyRetention)(
 						owners,
 						selection,

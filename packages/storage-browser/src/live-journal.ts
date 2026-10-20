@@ -1,5 +1,4 @@
 import { encodeCanonical } from "@ts-drp/canonical";
-import { roomRetentionControlDigest, RoomRetentionRefusal } from "@ts-drp/storage";
 import {
 	advanceJournalRetirementMutationControl,
 	captureJournalRetirementControl,
@@ -62,6 +61,7 @@ import {
 	type LiveJournalSnapshotToken,
 	reconstructJournalRetirementDrainSource,
 } from "@ts-drp/live-journal";
+import { roomRetentionControlDigest, RoomRetentionRefusal } from "@ts-drp/storage/room-head";
 
 export interface BrowserDurableLiveJournalStoreOptions {
 	readonly primaryDatabaseName: string;

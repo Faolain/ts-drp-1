@@ -15,11 +15,7 @@ import {
 	type ExpectedHead,
 	type GenerationRecord,
 	parseStorageObjectId,
-		roomRetentionControlDigest,
-		RoomRetentionRefusal,
-		type RoomRetentionLabels,
-		type RoomRetentionProofBook,
-	} from "@ts-drp/storage";
+} from "@ts-drp/storage";
 import {
 	AHE_LOCAL_CONTROL_CENSUS_LIMITS,
 	BoundedReadBudgetError,
@@ -38,6 +34,12 @@ import {
 	createAheReclamationError,
 	createAheReclamationReceipt,
 } from "@ts-drp/storage/maintenance";
+import {
+	roomRetentionControlDigest,
+	type RoomRetentionLabels,
+	type RoomRetentionProofBook,
+	RoomRetentionRefusal,
+} from "@ts-drp/storage/room-head";
 
 import { runInternalPrimaryDispatch } from "./primary-dispatch.js";
 import {
@@ -535,15 +537,14 @@ async function loadRetentionState(
 	if (!decodedHead.ok || decodedHead.value.objectId !== objectId) return aheRetentionCorrupt("head");
 	const generations = new Map<string, Readonly<{ record: GenerationRecord; raw: unknown; key: readonly string[] }>>();
 	const foreign: GenerationRecord[] = [];
-	// 14e: every census read is bounded before it is issued (`count`, then `getAll(range,
-	// bound + 1)`). A room database holds one object: another object's rows would widen the
-	// original classifier's view (shared blobs) beyond this bound, so they retain.
-	const objectRange = IDBKeyRange.bound([objectId], [objectId, []]);
+	// 14e: every census read is bounded before it is issued: `getAll(undefined, bound + 1)`
+	// over the whole store. A room database holds one object: another object's rows would
+	// widen the original classifier's view (shared blobs) beyond this bound, so they retain.
 	const generationBound = AHE_BOUNDED_READ_LIMITS.maxObjectGenerations;
 	const generationStore = store(PHASE_2D_GENERATIONS_STORE);
-	const generationRows = await requestValue(generationStore.getAll(objectRange, generationBound + 1));
+	const generationRows = await requestValue(generationStore.getAll(undefined, generationBound + 1));
 	if (generationRows.length > generationBound) throw new RoomRetentionRefusal("RETENTION_CAPACITY", "ahe:generations");
-	if ((await requestValue(generationStore.count())) !== generationRows.length)
+	if (generationRows.some((raw) => rowProperty(raw, "objectId") !== objectId))
 		throw new RoomRetentionRefusal("RETENTION_CAPACITY", "ahe:foreign-generations");
 	for (const raw of generationRows) {
 		const decoded = decodeGenerationRecordV1(bytes(rowProperty(raw, "record")));
@@ -565,9 +566,9 @@ async function loadRetentionState(
 	const promotions = new Map<string, Readonly<{ promotion: AheReclamationPromotion; raw: unknown; key: readonly string[] }>>();
 	const promotionBound = generationBound * AHE_BOUNDED_READ_LIMITS.maxClosureReferences;
 	const promotionStore = store(PHASE_2D_PROMOTIONS_STORE);
-	const promotionRows = await requestValue(promotionStore.getAll(objectRange, promotionBound + 1));
+	const promotionRows = await requestValue(promotionStore.getAll(undefined, promotionBound + 1));
 	if (promotionRows.length > promotionBound) throw new RoomRetentionRefusal("RETENTION_CAPACITY", "ahe:promotions");
-	if ((await requestValue(promotionStore.count())) !== promotionRows.length)
+	if (promotionRows.some((raw) => rowProperty(raw, "objectId") !== objectId))
 		throw new RoomRetentionRefusal("RETENTION_CAPACITY", "ahe:foreign-promotions");
 	for (const raw of promotionRows) {
 		const promotion = {

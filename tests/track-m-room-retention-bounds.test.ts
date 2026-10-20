@@ -1,4 +1,5 @@
-import { decodeGenerationRecordV1, encodeGenerationRecordV1, roomRetentionSourceDigest } from "@ts-drp/storage";
+import { decodeGenerationRecordV1, encodeGenerationRecordV1 } from "@ts-drp/storage";
+import { roomRetentionSourceDigest } from "@ts-drp/storage/room-head";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {

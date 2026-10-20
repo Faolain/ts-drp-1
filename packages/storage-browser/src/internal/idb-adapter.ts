@@ -57,12 +57,7 @@ import {
 	type StorageAdapterWrite,
 } from "@ts-drp/storage/adapter";
 
-import {
-	aheRetentionSection,
-	applyBrowserBoundedAheReclamation,
-	registerBrowserAheReclamationMaintenance,
-} from "./ahe-reclamation.js";
-import type { RoomRetentionSection } from "./room-retention.js";
+import { applyBrowserBoundedAheReclamation, registerBrowserAheReclamationMaintenance } from "./ahe-reclamation.js";
 import {
 	captureNativeReadReservationInput,
 	isNativeReadReservationTransaction,
@@ -1871,14 +1866,12 @@ export function acquireBrowserRoomAheRetirement(
 }
 
 /**
- * Slice 14b: the AHE retention section for a genuine room-mode AHE store of the
- * given room database.
+ * Slice 14b: whether a candidate is a genuine room-mode AHE store of the given room
+ * database (the AHE retention section acts only for such a store). Identity only.
  * @param store - Candidate AHE store.
  * @param databaseName - The session's room database.
- * @returns The section.
+ * @returns Whether the store is that room's genuine AHE store.
  */
-export function browserRoomAheRetentionSection(store: unknown, databaseName: string): RoomRetentionSection {
-	if (!(store instanceof IdbAheDurableStore) || roomAheStores.get(store) !== databaseName)
-		throw new TypeError("RETENTION_FOREIGN_OWNER");
-	return aheRetentionSection;
+export function isBrowserRoomAheStore(store: unknown, databaseName: string): boolean {
+	return store instanceof IdbAheDurableStore && roomAheStores.get(store) === databaseName;
 }

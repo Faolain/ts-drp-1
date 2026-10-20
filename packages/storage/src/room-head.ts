@@ -653,3 +653,44 @@ export function roomHeadRetirementFenceChange(
 		),
 	});
 }
+
+// Slices 14a/14b/14e (Track M): the room-retention formats, on this subpath (the root
+// entry's runtime surface is pinned).
+export {
+	createRoomRetentionProofBook,
+	ROOM_RETENTION_LIMITS,
+	ROOM_RETENTION_OWNERS,
+	RoomRetentionRefusal,
+	roomRetentionControlDigest,
+	roomRetentionDecisionDigest,
+	roomRetentionRefusalOf,
+	roomRetentionRowBytes,
+	roomRetentionRowDigest,
+	roomRetentionSourceDigest,
+	roomRetentionWriteCount,
+} from "./room-retention.js";
+export type {
+	RoomRetentionAheSelection,
+	RoomRetentionApplied,
+	RoomRetentionControls,
+	RoomRetentionDecision,
+	RoomRetentionIssuanceSelection,
+	RoomRetentionJournalScope,
+	RoomRetentionJournalSelection,
+	RoomRetentionKey,
+	RoomRetentionLabels,
+	RoomRetentionPlanned,
+	RoomRetentionSelection,
+	RoomRetentionSigningSelection,
+	RoomRetentionSnapshotScope,
+	RoomRetentionSnapshotSelection,
+	RoomRetentionSurvivors,
+	RoomRetentionTransactionLimits,
+	RoomRetentionOwner,
+	RoomRetentionOwnerDecision,
+	RoomRetentionProofBook,
+	RoomRetentionRefusalCode,
+	RoomRetentionRewriteRef,
+	RoomRetentionRowRef,
+	RoomRetentionTraceEvent,
+} from "./room-retention.js";

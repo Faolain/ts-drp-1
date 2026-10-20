@@ -17,14 +17,14 @@ import {
 	signingRetirementStorageMetaRow,
 	type SigningSummaryRetirementPlan,
 } from "@ts-drp/seal/internal/storage-port";
+import { AHE_BOUNDED_READ_LIMITS as LIMITS } from "@ts-drp/storage";
 import {
-	AHE_BOUNDED_READ_LIMITS as LIMITS,
 	roomRetentionControlDigest,
-	RoomRetentionRefusal,
-	roomRetentionRowDigest,
 	type RoomRetentionLabels,
 	type RoomRetentionProofBook,
-} from "@ts-drp/storage";
+	RoomRetentionRefusal,
+	roomRetentionRowDigest,
+} from "@ts-drp/storage/room-head";
 
 import { NativeReadReservationOwner, type RoomRetirementSession } from "./native-read-reservation.js";
 import {

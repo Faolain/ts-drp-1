@@ -1,16 +1,14 @@
 import type { DurableIssuanceRetirementControlRead } from "@ts-drp/issuance-store/maintenance";
 import type { LiveJournalRetirementControlRead, LiveJournalRetirementResult } from "@ts-drp/live-journal";
 import type { SigningRetirementObservation } from "@ts-drp/seal/internal/storage-port";
-import type {
-	AheRetirementControlRead,
-	RoomRetentionApplied,
-	RoomRetentionLabels,
-	RoomRetentionPlanned,
-	RoomRetentionSelection,
-	RoomRetentionTransactionLimits,
-	StorageObjectId,
-	StoreResult,
-} from "@ts-drp/storage";
+import type { AheRetirementControlRead, StorageObjectId, StoreResult } from "@ts-drp/storage";
+import {
+	type RoomRetentionApplied,
+	type RoomRetentionLabels,
+	type RoomRetentionPlanned,
+	type RoomRetentionSelection,
+	type RoomRetentionTransactionLimits,
+} from "@ts-drp/storage/room-head";
 import type { SnapshotRetirementControlRead } from "@ts-drp/storage/snapshot-transfer";
 
 /** The genuine room owners one retention decision acts for (slice 14b). */

@@ -86,10 +86,10 @@ import {
 } from "@ts-drp/issuance-store/maintenance";
 import {
 	roomRetentionControlDigest,
-	RoomRetentionRefusal,
 	type RoomRetentionLabels,
 	type RoomRetentionProofBook,
-} from "@ts-drp/storage";
+	RoomRetentionRefusal,
+} from "@ts-drp/storage/room-head";
 
 import {
 	captureNativeReadReservationInput,

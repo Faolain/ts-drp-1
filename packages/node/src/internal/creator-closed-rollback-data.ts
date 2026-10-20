@@ -159,15 +159,6 @@ import {
 	parseStorageObjectId,
 	type PresentHead,
 	type StorageRejectionReason,
-	ROOM_RETENTION_LIMITS,
-	roomRetentionControlDigest,
-	roomRetentionRefusalOf,
-	roomRetentionSourceDigest,
-	type RoomRetentionApplied,
-	type RoomRetentionControls,
-	type RoomRetentionPlanned,
-	type RoomRetentionSelection,
-	type RoomRetentionTransactionLimits,
 } from "@ts-drp/storage";
 import {
 	captureRoomHeadRetirementPlan,
@@ -177,6 +168,15 @@ import {
 	roomHeadRetirementControlFields,
 	type RoomHeadRetirementBinding,
 	type RoomHeadRetirementObservation,
+	ROOM_RETENTION_LIMITS,
+	roomRetentionControlDigest,
+	roomRetentionRefusalOf,
+	roomRetentionSourceDigest,
+	type RoomRetentionApplied,
+	type RoomRetentionControls,
+	type RoomRetentionPlanned,
+	type RoomRetentionSelection,
+	type RoomRetentionTransactionLimits,
 } from "@ts-drp/storage/room-head";
 import {
 	AHE_RECLAMATION_LOCAL_ONLY_POLICY_DIGEST,

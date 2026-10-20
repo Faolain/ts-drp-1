@@ -2,23 +2,23 @@ import {
 	createRoomRetentionProofBook,
 	ROOM_RETENTION_LIMITS,
 	ROOM_RETENTION_OWNERS,
-	RoomRetentionRefusal,
-	roomRetentionDecisionDigest,
-	roomRetentionRowBytes,
-	roomRetentionRowDigest,
-	roomRetentionSourceDigest,
-	roomRetentionWriteCount,
 	type RoomRetentionApplied,
 	type RoomRetentionDecision,
+	roomRetentionDecisionDigest,
 	type RoomRetentionKey,
 	type RoomRetentionLabels,
 	type RoomRetentionOwner,
 	type RoomRetentionOwnerDecision,
 	type RoomRetentionPlanned,
 	type RoomRetentionProofBook,
+	RoomRetentionRefusal,
+	roomRetentionRowBytes,
+	roomRetentionRowDigest,
 	type RoomRetentionSelection,
+	roomRetentionSourceDigest,
 	type RoomRetentionTransactionLimits,
-} from "@ts-drp/storage";
+	roomRetentionWriteCount,
+} from "@ts-drp/storage/room-head";
 
 import type { RoomRetirementSession } from "./native-read-reservation.js";
 

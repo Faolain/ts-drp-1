@@ -1,21 +1,18 @@
 import type { DurableIssuanceRetirementControlRead } from "@ts-drp/issuance-store/maintenance";
 import type { LiveJournalRetirementControlRead, LiveJournalRetirementResult } from "@ts-drp/live-journal";
 import type { SigningRetirementObservation } from "@ts-drp/seal/internal/storage-port";
-import type {
-	AheDurableStore,
-	AheRetirementControlRead,
-	RoomRetentionApplied,
-	RoomRetentionLabels,
-	RoomRetentionPlanned,
-	RoomRetentionSelection,
-	RoomRetentionTransactionLimits,
-	StorageObjectId,
-	StoreResult,
-} from "@ts-drp/storage";
+import type { AheDurableStore, AheRetirementControlRead, StorageObjectId, StoreResult } from "@ts-drp/storage";
 import type { AheReclamationMaintenance } from "@ts-drp/storage/maintenance";
+import {
+	type RoomRetentionApplied,
+	type RoomRetentionLabels,
+	type RoomRetentionPlanned,
+	type RoomRetentionSelection,
+	type RoomRetentionTransactionLimits,
+} from "@ts-drp/storage/room-head";
 import type { SnapshotRetirementControlRead } from "@ts-drp/storage/snapshot-transfer";
 
-import { browserAheReclamationMaintenanceForStore } from "./internal/ahe-reclamation.js";
+import { aheRetentionSection, browserAheReclamationMaintenanceForStore } from "./internal/ahe-reclamation.js";
 import {
 	acquireBrowserRoomIssuanceRetirement,
 	acquireBrowserRoomIssuanceStoreRetirement,
@@ -24,8 +21,8 @@ import {
 import {
 	acquireBrowserRoomAheRetirement,
 	type BrowserAheDurableStore,
-	browserRoomAheRetentionSection,
 	createBrowserRoomAheDurableStore as createRoomAheStore,
+	isBrowserRoomAheStore,
 } from "./internal/idb-adapter.js";
 import { openRoomRetirementSession } from "./internal/native-read-reservation.js";
 import { applyRoomRetention, planRoomRetention, type RoomRetentionSections } from "./internal/room-retention.js";
@@ -166,6 +163,18 @@ export interface BrowserRoomRetentionOwners {
 	readonly issuance?: unknown;
 	/** A genuine room signing facet of this database, when the caller holds one. */
 	readonly signing?: unknown;
+}
+
+/**
+ * Slice 14b: the AHE retention section, for a genuine room-mode AHE store of this room
+ * database only (composed here so the package root's declarations do not reach it).
+ * @param store - Candidate AHE store.
+ * @param databaseName - The session's room database.
+ * @returns The section.
+ */
+function browserRoomAheRetentionSection(store: unknown, databaseName: string): RoomRetentionSections["ahe"] {
+	if (!isBrowserRoomAheStore(store, databaseName)) throw new TypeError("RETENTION_FOREIGN_OWNER");
+	return aheRetentionSection;
 }
 
 function retentionSections(

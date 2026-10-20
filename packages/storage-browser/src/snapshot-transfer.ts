@@ -1,6 +1,13 @@
 import { encodeCanonical } from "@ts-drp/canonical";
 import { consumeSnapshotVerificationReceipt } from "@ts-drp/compaction/snapshot-quarantine-receipt";
 import {
+	roomRetentionControlDigest,
+	type RoomRetentionLabels,
+	type RoomRetentionProofBook,
+	RoomRetentionRefusal,
+	type RoomRetentionSelection,
+} from "@ts-drp/storage/room-head";
+import {
 	SNAPSHOT_QUARANTINE_RETENTION_MS,
 	type SnapshotChunkDescriptor,
 	snapshotQuarantineContract,
@@ -26,13 +33,6 @@ import {
 	type SnapshotVerificationReceipt,
 	type VerifiedSnapshotQuarantineReference,
 } from "@ts-drp/storage/snapshot-transfer";
-import {
-	roomRetentionControlDigest,
-	RoomRetentionRefusal,
-	type RoomRetentionLabels,
-	type RoomRetentionProofBook,
-	type RoomRetentionSelection,
-} from "@ts-drp/storage";
 
 import {
 	isNativeReadReservationTransaction,
