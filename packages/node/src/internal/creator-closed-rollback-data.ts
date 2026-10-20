@@ -1812,7 +1812,11 @@ export interface CreatorSnapshotRetirementReconstructionRequest {
  * successor and an addressed native turnover receipt. No transfer, signing,
  * ordinary-admission or deletion permission is returned. The close owner must
  * still authenticate its whole source and durable participant commitments.
- * @param input Original verified successor and addressed snapshot owner.
+ * @param input Original verified successor and addressed snapshot owner. Its
+ * optional `previousCertificate` is the authenticated predecessor generation's own
+ * Cut and trust: the same historical absence evidence the full reconstruction
+ * accepts. It can excuse only a scope the CURRENT Cut classifies, never a missing
+ * protected role, and grants nothing.
  * @returns A reconstruction request only when an actual selected receipt exists.
  */
 export async function acquireCreatorSnapshotRetirementReconstructionRequest(
@@ -1822,6 +1826,7 @@ export async function acquireCreatorSnapshotRetirementReconstructionRequest(
 		head: PresentHead;
 		exactCanonicalCutValueBytes: Uint8Array;
 		accounting: CreatorClosedRollbackProofAccounting;
+		previousCertificate?: Readonly<{ exactCanonicalCutValueBytes: Uint8Array; trust: CurrentAnchorTrust }>;
 	}>
 ): Promise<CreatorSnapshotRetirementReconstructionRequest | undefined> {
 	const cut = record(input.exactCanonicalCutValueBytes);
@@ -1837,6 +1842,19 @@ export async function acquireCreatorSnapshotRetirementReconstructionRequest(
 	const roles = captureCreatorSnapshotRecoveryRoles(cut.recoveryRoles);
 	if (roles === undefined || roles.previousClose === null) return undefined;
 	const certificateDigest = creatorDataDigest("ts-drp/hard-epoch-cut/v3", input.exactCanonicalCutValueBytes);
+	// Same predecessor evidence as the full reconstruction's retirement state: a scope
+	// the current Cut still classifies may already be absent under the previous one.
+	const prior = input.previousCertificate;
+	const priorRoles =
+		prior === undefined ? undefined : captureCreatorSnapshotRecoveryRoles(record(prior.exactCanonicalCutValueBytes).recoveryRoles);
+	const previousCertificate =
+		prior === undefined || priorRoles === undefined
+			? undefined
+			: Object.freeze({
+					roles: priorRoles,
+					trust: prior.trust,
+					digest: creatorDataDigest("ts-drp/hard-epoch-cut/v3", prior.exactCanonicalCutValueBytes),
+				});
 	const inventoryRead = bindMethod<
 		NonNullable<SnapshotRecoveryStore<SnapshotVerificationReceipt>["captureRecoveryRoleInventory"]>
 	>(input.snapshotStore, "captureRecoveryRoleInventory");
@@ -1855,7 +1873,9 @@ export async function acquireCreatorSnapshotRetirementReconstructionRequest(
 			roles,
 			input.currentTrust,
 			certificateDigest,
-			input.accounting
+			input.accounting,
+			undefined,
+			previousCertificate
 		);
 	};
 	const state = await capture();

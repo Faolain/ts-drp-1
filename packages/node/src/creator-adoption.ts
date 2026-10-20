@@ -2939,12 +2939,21 @@ async function reopenCreatorSuccessorMaterial(
 				return coldFailure("chain-invalid", detail);
 			}
 			const issuanceScope = issuance.scope;
+			// The authenticated current generation carries the previous Cut (epoch one
+			// and later); the request then applies the same predecessor absence evidence
+			// as the full reconstruction it asks for.
+			const previousCut = currentEpoch === 0 ? undefined : uniqueCandidateByKind(currentCandidates, "drp-hard-epoch-cut");
+			const previousCertificate =
+				previousCut === undefined || previousCut.record.epoch !== currentEpoch - 1
+					? undefined
+					: Object.freeze({ exactCanonicalCutValueBytes: previousCut.bytes, trust: predecessorTrust });
 			const retirementReconstruction = await acquireCreatorSnapshotRetirementReconstructionRequest({
 				snapshotStore: input.snapshotStore,
 				currentTrust: successorTrust,
 				head: active.head,
 				exactCanonicalCutValueBytes: cutCandidate.bytes,
 				accounting: createCreatorClosedRollbackProofAccounting(reader.blobs),
+				...(previousCertificate === undefined ? {} : { previousCertificate }),
 			});
 			const material: CreatorSuccessorLiveMaterial = Object.freeze({
 				...(input.receiveOnly ? { receiveOnly: true as const } : {}),
