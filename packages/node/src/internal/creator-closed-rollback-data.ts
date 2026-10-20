@@ -20893,10 +20893,12 @@ async function applyRoomRetentionPass(plan: RoomRetentionPassPlan): Promise<bool
 	const acquisition = plan.acquisition ?? "cold";
 	const declined = (reason: string, cause?: unknown): boolean => {
 		roomRetentionFallbacks.set(input.store as object, reason);
+		// The refusal drops the plane's ledger as part of this pass, before the pass reports:
+		// the next retention event after a refused pass is the existing path's fallback.
+		plan.ledger?.drop(`retained:${reason}`);
 		observeRoomRetention({ kind: "room-retention-pass", epoch: plan.epoch, outcome: "retained", reason, acquisition,
 			...(cause === undefined ? {} : { cause: cause instanceof Error ? cause.message : String(cause) }),
 			ms: performance.now() - plan.started, acquiredMs: plan.acquiredMs, acquisitionStarted: plan.started, decisions: reports });
-		plan.ledger?.drop(`retained:${reason}`);
 		return true;
 	};
 	try {
@@ -21018,9 +21020,9 @@ async function applyRoomRetentionPass(plan: RoomRetentionPassPlan): Promise<bool
 			await held.release().catch(() => undefined);
 		}
 		if (refusal !== undefined) return declined(`${refusal.code}:${refusal.detail}`, error);
+		plan.ledger?.drop("failed");
 		observeRoomRetention({ kind: "room-retention-pass", epoch: plan.epoch, outcome: "failed", acquisition,
 			cause: error instanceof Error ? error.message : String(error), decisions: reports });
-		plan.ledger?.drop("failed");
 		throw error;
 	} finally {
 		if (exclusion !== undefined) await exclusion.release();
@@ -21028,14 +21030,12 @@ async function applyRoomRetentionPass(plan: RoomRetentionPassPlan): Promise<bool
 	// `acquisitionStarted`: every fact this pass acted on was verified by its own acquisition,
 	// which started then: stage 1's cold acquisition, or (stage 2, `acquisition: "ledger"`)
 	// the boundary's fresh reads with the plane's ledger facts verified on these exact bytes.
+	if (plan.shortfall) plan.ledger?.drop("shortfall");
 	observeRoomRetention({ kind: "room-retention-pass", epoch: plan.epoch, outcome: "applied", decisions: reports, acquisition,
 		ms: performance.now() - plan.started, acquiredMs: plan.acquiredMs, acquisitionStarted: plan.started,
 		shortfall: plan.shortfall });
 	// The existing passes would have refused once no authenticated source remained.
-	if (plan.shortfall) {
-		plan.ledger?.drop("shortfall");
-		throw new Refusal(failure("snapshot-unavailable"));
-	}
+	if (plan.shortfall) throw new Refusal(failure("snapshot-unavailable"));
 	plan.ledger?.commit(plan.decisions);
 	return false;
 }
