@@ -1,6 +1,6 @@
 # Track R2 / R3: single-database watermark retirement
 
-**Outcome:** R2: prototype (now 7a96411b on worktree-agent-aeb6ebdfc4584ace2), not merged. R3 (spec slices S1-S6, then production): IN PROGRESS.
+**Outcome:** R2: prototype (84fd4c8f on worktree-agent-aeb6ebdfc4584ace2 after the Track L rebase), not merged. R3: specs 14 and 14a-14f, and stage 1a of 14a (one room database, one retirement session per install), opt-in and not merged. Track L residuals 1 and 2 are fixed on the shared path. The latency goal is not met (creator lull -3% to -9%, recipient lull -4% to -6%), so the default flip is not in. See [RESULT.md](RESULT.md).
 
 **Working documents in this folder:** [STEP4.md](STEP4.md), [RESULT.md](RESULT.md)
 
