@@ -63,7 +63,8 @@ Per-transition cost is flat from t4 to t11: the cost no longer grows with room a
 
 ## Decision log
 
-All decisions were taken on 2026-10-19 on branch `codex/phase3a1b-p6-golden-path`. "User" marks a decision the
+Decisions 1–21 were taken on 2026-10-19 and the rest on 2026-10-20, all on branch
+`codex/phase3a1b-p6-golden-path`. "User" marks a decision the
 repository owner made. "Coordinator" marks a recommendation that was then carried out under that approval.
 
 | # | Decision | By | Why | Result |
@@ -90,10 +91,12 @@ repository owner made. "Coordinator" marks a recommendation that was then carrie
 | 20 | Track M: build slice 14b (retirement decided from a ledger of verified facts) and 14e (bounds and charges) on R3's room path. Every decision must match the existing planner, proven by a differential test. | User | Stage 1a kept the per-pass re-proofs that dominate the lull; 14b is the lever for milliseconds. Target: creator lull ≤ 100 ms p50. | Held on its branch (a301cbe0..07849f85), see row 22. Stage 1 cut the creator lull 2441 → 623 ms and the recipient lull 1253 → 466 ms; the target needs stage 2. No decision deleted anything the existing planner keeps. |
 | 21 | Track N: stop each recipient's issuance store growing 3 issued and 3 outbox rows per epoch, and make the Grid's proof-event budget scale with rollovers. | User | Unbounded growth with room age violates G1. R3 found it; it predates this work. | 60161b4a..7464f875, merged after verification. A Writer recipient never closes, so its cleanup always stopped at the cold-material guard before the issuance drain. It now drains its own classified, published, settled prefix through the existing authenticated pruner when its completed retirement decisions match, with no generation effect. Recipients stay flat at 13 rows from epoch 5 through 16 on both paths. |
 | 22 | Hold Track M: fix its crash bug first, then merge. | User | Its 14f case 8 breaks G3 and G14 on the opt-in path on all three engines: a SIGKILL between a creator boundary's two decisions leaves the signing control without a summary source, and maintenance then halts. The main branch must not carry a known guarantee break. | Track M stayed on its branch until Track O's fix; both merged in 8c61863e (row 24). |
-| 23 | Start Tracks O, M2, P and Q in parallel. | User | O: the case 8 fix. M2: 14b stage 2, the in-memory ledger that removes the ~282 ms cold acquisition per boundary. P and Q fix two problems Track M found on every path: Canvas issuance grows one row per move with an O(outbox) issue cost (829 ms → 6.7 s per move by epoch 16), and the shipped Canvas and Chat creators never run their lull, so retirement runs inline at seal (about 2.7 s). | In progress |
+| 23 | Start Tracks O, M2, P and Q in parallel. | User | O: the case 8 fix. M2: 14b stage 2, the in-memory ledger that removes the ~282 ms cold acquisition per boundary. P and Q fix two problems Track M found on every path: Canvas issuance grows one row per move with an O(outbox) issue cost (829 ms → 6.7 s per move by epoch 16), and the shipped Canvas and Chat creators never run their lull, so retirement runs inline at seal (about 2.7 s). | O merged with M (row 24). P merged (row 27). Q held (row 25). M2 in progress. |
 | 24 | Accept Track O's 14b/14e amendment, and merge Tracks M and O together. | User | O's fix makes each boundary one decision, with one epoch's signing evidence and summaries as one unit, in a fixed unit order. A crash or refusal between continuations then resumes from a fresh acquisition (G3, G14). Track M's suggested fix left a second split point open. | Merge 8c61863e, after verification on O's head: typecheck 0, 13 room test files passing, the proof-accounting test file identical to the main branch, and 14f case 8 passing with a real SIGKILL. |
 | 25 | Hold Track Q. | Coordinator | Its Canvas and Chat resource bounds work (seal 0.07–0.14x of before), but running the lull exposes a pre-existing bug. A persisted reopen right after the creator's first maintained lull is refused with `floor-stale` (a stored signing-summary resume-basis digest differs on resume, CRD:19350). R3's 4-rollover room test now reaches it and fails. The Grid hits the same bug when reopened at epoch 4. | Not merged until the bug is fixed |
 | 26 | Track S: fix the reopen right after the first maintained lull, on the shared path; Track Q then rebases onto it. | User | The bug predates this work and also affects the Grid; it blocks Track Q. | In progress |
+| 27 | Merge Track P's per-move fix, and keep its storage assertion red until the user decides how Canvas issuance is retired. | Coordinator | Each hot successor wrapped its source's issuance facade in one more facade, so one recovery read went through s - 1 facades at epoch s. A successor now wraps its source's native store, the same structure a reopen builds. Creator outbox page reads per move went from 54 at epoch 8 and 103 at epoch 15 to a constant 10; the Writer recipient's went to a constant 2. | Merge a3f3f6b0 (8ed37d08..47a936fe), after verification on the merged tree: typecheck 0, Track M and O's room tests passing (38 of 38), and Tracks K, L, N and R3's native tests passing. Track P's per-test suite diff against its base shows no new failures. |
+| 28 | Canvas issuance: give the shipped apps the settlement profile (R-A), for shipped Canvas, the Grid example and the v3-chat demo. Do not write a deletion rule for the legacy profile (R-B). Track T makes the switch. | User | Track P found a spec gap: every issuance deleter requires a settlement profile, so `creator-trusted-v1` keeps every row it issues. At 20 moves per epoch a Canvas creator was refused in epoch 17. The library has no users yet, so changing the shipped profile breaks no one. R-A reuses the reviewed settlement retirement; R-B would need a new spec slice, conformance tests on both native owners and three-engine SIGKILL evidence. The latency bench already runs the settlement profile, so its flat Grid storage did not cover the shipped Grid example. | In progress. Track P's test is the acceptance test; Track T may change only where its profile comes from, not its assertions. The legacy profile keeps its behaviour and is documented as growing. |
 
 ## Commits
 
@@ -169,6 +172,12 @@ repository owner made. "Coordinator" marks a recommendation that was then carrie
 | 099db6ce | docs(track-o): record the Track O result (retention crash and refusal resume, 14f case 8) |
 | c67c66b7 | docs: record holding Track M and starting Tracks O, M2, P and Q |
 | 8c61863e | Merge Tracks M and O: verified retention decisions on the opt-in room path |
+| d7f8c39b | docs: record merging Tracks M and O, and holding Track Q |
+| 7d51b24b | docs: record starting Track S for the first-lull reopen bug |
+| 8ed37d08 | test: a Canvas room's issuance must not grow or compound with room age (RED) |
+| 28e34f80 | fix: a successor filters its source's original issuance store, not its facade |
+| 47a936fe | docs: record the Track P result |
+| a3f3f6b0 | Merge Track P: a successor filters its source's native issuance store |
 
 The commit messages hold the detailed explanation and the measurements for each change.
 
@@ -203,12 +212,13 @@ that track's working documents.
 | [23](tracks/23-track-m-verified-fact-retirement/README.md) | Track M: verified-fact retirement (slices 14b and 14e) | a301cbe0..07849f85, merged in 8c61863e |
 | [24](tracks/24-track-n-recipient-issuance-growth/README.md) | Track N: recipient issuance growth | 60161b4a..7464f875 |
 | [25](tracks/25-track-o-retention-crash-resume/README.md) | Track O: crash resume on the retention path (14f case 8) | c6eff8e7..099db6ce, merged in 8c61863e |
-| 26 | Track P: Canvas issuance growth and O(outbox) issue cost | In progress |
+| [26](tracks/26-track-p-canvas-issuance-growth/README.md) | Track P: Canvas issuance growth and O(outbox) issue cost | 8ed37d08..47a936fe, merged in a3f3f6b0; storage growth left to Track T (row 28) |
 | 27 | Track Q: Canvas and Chat lull | Held (row 25) |
 | 28 | Track M2: verified-fact ledger (14b stage 2) | In progress |
 | 29 | Track S: reopen right after the first maintained lull | In progress |
+| 30 | Track T: the settlement profile for the shipped apps | In progress |
 
-Folders 26 to 29 land with their branches.
+Folders 27 to 30 land with their branches.
 
 ## Reading the records
 
@@ -263,11 +273,13 @@ Notes:
   resume-basis digest differs on resume (CRD:19350-19351, via `installClosedRetirementSourceInRoom`). It fails
   closed, but the room stops. Reopening after two or more maintained lulls works. Track G recorded the symptom.
   Track S is fixing it.
-- **Canvas and Chat, on every path (Tracks P and Q):**
-  - Canvas issuance gains one row per move and is never retired, because Canvas has no settlement profile. Every
-    issue authenticates the whole retained outbox, so per-move issue time grows with room age.
+- **Canvas and Chat, on every path (Tracks P, Q and T):**
+  - Per-move work no longer compounds with room age (Track P). It is still linear in the rows an owner keeps.
+  - The `creator-trusted-v1` profile has no issuance deleter, so an app on it keeps every row it issues. Shipped
+    Canvas, the Grid example and the v3-chat demo all run it today. Track T moves them to
+    `creator-trusted-settlement-v1` (row 28); the legacy profile keeps growing by design.
   - The shipped Canvas and Chat creators supply no `readOrdinaryApplicationResourceBound`, so their lull never
-    runs and retirement stays inline at seal.
+    runs and retirement stays inline at seal (Track Q, held).
   - Chat storage is flat.
 - **Left open by Track N** (details in its [RESULT.md](tracks/24-track-n-recipient-issuance-growth/RESULT.md)):
   - The issuance store's 1,024-row bound limits any Writer, the creator included, to roughly 100 moves per
