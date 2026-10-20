@@ -26,6 +26,7 @@ import {
 	type WireOffer,
 	type WireRow,
 } from "./long-room-driver.js";
+import { CANVAS_GENESIS_PROFILE } from "../../../examples/canvas/src/profile.js";
 import catalogMaterial from "../../../examples/chat/src/chat-catalog-material.json";
 import {
 	createShippingChatGenesisStateBytes,
@@ -353,8 +354,9 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 		].sort((left, right) => left.author.localeCompare(right.author)),
 		objectId,
 		permissionless: false,
-		// The shipped Canvas signs version 1; the shipped Chat signs version 3.
-		version: options.app === "chat" ? 3 : 1,
+		// The shipped Canvas signs the version its profile requires (examples/canvas/src/profile.ts);
+		// the shipped Chat signs version 3.
+		version: options.app === "chat" ? 3 : CANVAS_GENESIS_PROFILE.latchedAclVersion,
 	});
 	const selected = await applicationFor(options.app, exactCanonicalLatchedAclBytes, options.creatorLull);
 	const application = selected.application;
@@ -366,8 +368,9 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 		exactCanonicalParametersCarrierBytes: encodeCanonical(PARAMETERS),
 		exactCanonicalProfileBytes: encodeCanonical({
 			cryptoSuiteId: "ed25519-sha256-v3",
-			// The shipped profiles: Canvas creator-trusted-v1, Chat creator-trusted-settlement-v1.
-			profileId: options.app === "chat" ? "creator-trusted-settlement-v1" : "creator-trusted-v1",
+			// The shipped profiles: Canvas from examples/canvas/src/profile.ts (creator-trusted-v1
+			// before Track T), Chat creator-trusted-settlement-v1.
+			profileId: options.app === "chat" ? "creator-trusted-settlement-v1" : CANVAS_GENESIS_PROFILE.profileId,
 			quorum: 1,
 			signers,
 		}),
