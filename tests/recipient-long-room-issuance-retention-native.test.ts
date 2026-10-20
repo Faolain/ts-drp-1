@@ -118,12 +118,13 @@ async function longRoomFixture() {
 		signGenesisAnchorDigest: (digest) => Promise.resolve(ed25519.sign(digest, creator.seed)),
 	});
 	const host = createNodeV3RoomStorageHost({ directory, initialization: () => "create" });
-	const open = async (index: number) => {
+	// A persisted reopen recreates the owner over the SAME databases and external floor.
+	const open = async (index: number, options: { reopen?: boolean } = {}) => {
 		const identity = required(identities[index]);
 		const name = `peer-${index}`;
 		const floor = createNodeRoomHeadAuthority({
 			filename: join(directory, `${name}-external-floor.sqlite`),
-			initialization: { kind: "create" },
+			initialization: { kind: options.reopen ? "reopen" : "create" },
 		});
 		heads.add(floor);
 		let ingress: ((message: Message) => void) | undefined;
@@ -133,7 +134,7 @@ async function longRoomFixture() {
 		const networkNode = fakeNetwork(required(roster[index]).peerId, false);
 		const input: CreateV3RoomSessionInput<ReturnType<typeof application.projectAcceptedOperations>> = {
 			application,
-			storageHost: host,
+			storageHost: options.reopen ? createNodeV3RoomStorageHost({ directory, initialization: () => "reopen" }) : host,
 			author: identity.author,
 			...(index === 0
 				? { creatorFinalitySigner: (await createRecoverableFinalitySigner({ seed: creator.seed })).signer }
@@ -203,7 +204,13 @@ async function longRoomFixture() {
 				acknowledged.delete(finalDigest);
 			}
 		};
-		return { index, name, room, networkNode, receive };
+		return { index, name, room, floor, networkNode, receive };
+	};
+	const stop = async (opened: Awaited<ReturnType<typeof open>>) => {
+		await opened.room.close();
+		rooms.delete(opened.room);
+		await opened.floor.close();
+		heads.delete(opened.floor);
 	};
 	// Native census only: the issuance owner's own bounded recovery image and pruning
 	// watermark, never a grant.
@@ -246,7 +253,7 @@ async function longRoomFixture() {
 			await store.close();
 		}
 	};
-	return { identities, roster, application, objectId, invite, host, open, issuance, publishedAfter };
+	return { identities, roster, application, objectId, invite, host, open, stop, issuance, publishedAfter };
 }
 
 type Fixture = Awaited<ReturnType<typeof longRoomFixture>>;
@@ -427,6 +434,88 @@ it(`a Writer recipient and the creator keep bounded local issuance through ${EPO
 			`LONG_ROOM_ISSUANCE ${JSON.stringify({ epoch: epoch + 1, recipient: recipientIssuance, creator: creatorIssuance })}`
 		);
 	}
+	expectBoundedIssuance("creator", creatorCensus);
+	expectBoundedIssuance("recipient", recipientCensus);
+}, 1_800_000);
+
+// Grid's LULL=1 order: gameplay, seal, adoption, install, census, then the creator's and
+// the recipient's pool-maintenance lull at the new epoch. The persisted reopen comes after
+// the recipient has retired its own settled issuance prefix, so the reopened owners replay
+// a pruned lineage, and both peers then keep issuing across further successors.
+const REOPEN_EPOCH = Number(process.env.LONG_ROOM_REOPEN_EPOCH ?? 12);
+
+it("a Writer recipient whose settled issuance was retired keeps issuing with lulls across a persisted reopen", async () => {
+	expect(REOPEN_EPOCH).toBeGreaterThanOrEqual(STEADY_EPOCH + 2);
+	const fixture = await longRoomFixture();
+	const peers = [await fixture.open(0), await fixture.open(1)];
+	const delivered: (number | null)[] = [null, null];
+	const flush = async (from: number) => {
+		const rows = await fixture.publishedAfter(from, delivered[from] ?? null);
+		if (rows.length === 0) return;
+		await required(peers[1 - from]).receive(rows, from);
+		delivered[from] = required(rows.at(-1)).commit.authorSequence;
+	};
+	const recipientCensus: { epoch: number; issuance: IssuanceCensus }[] = [];
+	const creatorCensus: { epoch: number; issuance: IssuanceCensus }[] = [];
+	const lulls: { epoch: number; creator: unknown; recipient: unknown }[] = [];
+	const rollover = async (epoch: number) => {
+		for (let ordinal = 0; ordinal < 4; ordinal++) {
+			const index = ordinal % 2;
+			await required(peers[index]).room.issue({
+				action: "placeBlock",
+				id: `block-${index}-${ordinal >> 1}`,
+				kind: "stone",
+				x: epoch,
+				y: index,
+			});
+			await flush(index);
+		}
+		const creator = required(peers[0]);
+		const recipient = required(peers[1]);
+		expect(recipient.room.projection()).toEqual(creator.room.projection());
+		expect(await creator.room.sealEpoch()).toMatchObject({ ok: true, epoch, successorEpoch: epoch + 1 });
+		await creator.room.adoptCreatorSuccessor();
+		const transfer = await successorDelivery(fixture);
+		Reflect.set(recipient.networkNode, "createSnapshotChunkProtocolHost", () => transfer.port);
+		await recipient.room.installCreatorSuccessor({ offer: transfer.offer, peers: transfer.peers });
+		expect(recipient.room.authority()).toMatchObject({ epoch: epoch + 1, objectId: fixture.objectId });
+		expect(recipient.room.projection()).toEqual(creator.room.projection());
+		const recipientIssuance = await fixture.issuance(1);
+		const creatorIssuance = await fixture.issuance(0);
+		recipientCensus.push({ epoch: epoch + 1, issuance: recipientIssuance });
+		creatorCensus.push({ epoch: epoch + 1, issuance: creatorIssuance });
+		const lull = {
+			epoch: epoch + 1,
+			creator: await creator.room.maintainRecoveryPool(),
+			recipient: await recipient.room.maintainRecoveryPool(),
+		};
+		lulls.push(lull);
+		verbose(`LONG_ROOM_ISSUANCE_LULL ${JSON.stringify({ ...lull, recipientIssuance, creatorIssuance })}`);
+	};
+	for (let epoch = 0; epoch < REOPEN_EPOCH; epoch++) await rollover(epoch);
+	// The lulls ran, and the recipient had already retired part of its own lineage.
+	expect(
+		lulls.some((lull) => Reflect.get(lull.recipient as object, "kind") === "maintained"),
+		JSON.stringify(lulls)
+	).toBe(true);
+	const retired = await fixture.issuance(1);
+	expect(retired.prunedThrough, JSON.stringify(retired)).not.toBeNull();
+	const world = required(peers[1]).room.projection();
+	expect(world).toEqual(required(peers[0]).room.projection());
+
+	await fixture.stop(required(peers[1]));
+	await fixture.stop(required(peers[0]));
+	peers[0] = await fixture.open(0, { reopen: true });
+	peers[1] = await fixture.open(1, { reopen: true });
+	expect(required(peers[1]).room.authority()).toMatchObject({ epoch: REOPEN_EPOCH, objectId: fixture.objectId });
+	expect(required(peers[1]).room.projection()).toEqual(world);
+	expect(required(peers[0]).room.projection()).toEqual(world);
+	// Reopen neither resurrects nor drops a kept issuance row.
+	expect(await fixture.issuance(1)).toEqual(retired);
+
+	// Continued gameplay: each reopened Writer's next move reaches the other, and the
+	// room keeps rolling over with lulls while both issuance stores stay bounded.
+	for (let epoch = REOPEN_EPOCH; epoch < REOPEN_EPOCH + 4; epoch++) await rollover(epoch);
 	expectBoundedIssuance("creator", creatorCensus);
 	expectBoundedIssuance("recipient", recipientCensus);
 }, 1_800_000);
