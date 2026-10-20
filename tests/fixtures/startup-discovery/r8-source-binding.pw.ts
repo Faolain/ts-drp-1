@@ -154,8 +154,14 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
  // so the fixed 50,000 cap bounded the run at ~13 rollovers instead of detecting
  // growth. Scale it with the configured rollovers (4k per rollover plus one for
  // creation, the floor of 50,000 kept); the truncation checks below still apply.
- const proofEventBudget=Math.max(50_000,4_000*(Number(process.env.STARTUP_HEALTHY_GRID_ROLLOVERS??4)+1));
+ // Endurance runs (more than 32 rollovers) allow 6k per rollover: the room-retention creator emits
+ // about 4.3k per rollover, and a 100-rollover run saturated 4k per rollover near rollover 94.
+ const proofEventRollovers=Number(process.env.STARTUP_HEALTHY_GRID_ROLLOVERS??4);
+ const proofEventBudget=Math.max(50_000,(proofEventRollovers>32?6_000:4_000)*(proofEventRollovers+1));
  await page.context().addInitScript(value=>Reflect.set(globalThis,"__r8ProofEventBudget",value),proofEventBudget);
+ // Endurance runs (more than 32 rollovers) scale the per-role delivery telemetry bound the same way.
+ const deliveryRollovers=Number(process.env.STARTUP_HEALTHY_GRID_ROLLOVERS??4),deliveryObservationBound=deliveryRollovers>32?32*(deliveryRollovers+1):1024;
+ await page.context().addInitScript(value=>Reflect.set(globalThis,"__r8DeliveryObservationBound",value),deliveryObservationBound);
  const clients:Awaited<ReturnType<typeof server>>[]=[];
  for(let index=0;index<4;index++)clients.push(await server(directory));
  await page.goto(local.origin+"/r8-source-binding");

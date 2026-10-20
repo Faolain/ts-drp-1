@@ -39,6 +39,9 @@ async function createHealthyGridRole(input:{index:number;database:string;identit
  const finishingWindow=Reflect.get(globalThis,"__r8OrdinaryFinishingWindow");
  const configuredApplication=finishingWindow===undefined?application:{...application,ordinaryFinishingWindow:finishingWindow};
  const deliveryObservations=new Map<string,{acceptedCallbackAt:number;projectionCallbackAt?:number}>(),awaitingProjection=new Set<string>();
+ // Measurement-only telemetry bound: 1,024 admitted digests, scaled by endurance runs.
+ const configuredDeliveryBound=Reflect.get(globalThis,"__r8DeliveryObservationBound");
+ const deliveryObservationBound=Number.isSafeInteger(configuredDeliveryBound)&&(configuredDeliveryBound as number)>1024?configuredDeliveryBound as number:1024;
  Reflect.set(globalThis,"__r8HealthyAcceptedDigestPresent",(digest:string)=>admitted.has(digest));
  const floor=await createBrowserRoomHeadAuthority({databaseName:database+"--startup-floor",initialization:{kind}});
  let session:Awaited<ReturnType<typeof createV3RoomSession>>|undefined,issuance:Awaited<ReturnType<typeof createBrowserDurableIssuanceStore>>|undefined,
@@ -62,7 +65,7 @@ async function createHealthyGridRole(input:{index:number;database:string;identit
    ...(presentation===undefined?{}:{presentation}),
    openTransport:()=>({...peer.open(),openEphemeral:openFixtureEphemeral}),signRegisteredVertexDigest:async digest=>ed25519.sign(digest,key),onAcceptedVertex:vertex=>{
     const digest=hex(vertex.digest);admitted.add(digest);
-    check(deliveryObservations.size<1024||deliveryObservations.has(digest),"bounded healthy delivery telemetry saturated");
+    check(deliveryObservations.size<deliveryObservationBound||deliveryObservations.has(digest),"bounded healthy delivery telemetry saturated");
     if(!deliveryObservations.has(digest))deliveryObservations.set(digest,{acceptedCallbackAt:performance.now()});
     if(Reflect.get(globalThis,"__r8CriticalProfiling")===true)performance.mark("drp:accepted-callback:"+index+":"+digest);
     awaitingProjection.add(digest);
