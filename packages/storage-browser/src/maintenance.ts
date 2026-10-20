@@ -6,7 +6,10 @@ import type { AheReclamationMaintenance } from "@ts-drp/storage/maintenance";
 import type { SnapshotRetirementControlRead } from "@ts-drp/storage/snapshot-transfer";
 
 import { browserAheReclamationMaintenanceForStore } from "./internal/ahe-reclamation.js";
-import { acquireBrowserRoomIssuanceRetirement } from "./internal/browser-issuance-store.js";
+import {
+	acquireBrowserRoomIssuanceRetirement,
+	acquireBrowserRoomIssuanceStoreRetirement,
+} from "./internal/browser-issuance-store.js";
 import {
 	acquireBrowserRoomAheRetirement,
 	type BrowserAheDurableStore,
@@ -14,7 +17,7 @@ import {
 } from "./internal/idb-adapter.js";
 import { openRoomRetirementSession } from "./internal/native-read-reservation.js";
 import { prepareBrowserRoomDatabase as prepareRoomDatabase } from "./internal/schema-idb.js";
-import { acquireBrowserRoomSigningRetirement } from "./internal/signing-retirement.js";
+import { acquireBrowserRoomSigningRetirement, browserRoomSigningStore } from "./internal/signing-retirement.js";
 import { acquireBrowserRoomJournalRetirement } from "./live-journal.js";
 import { acquireBrowserRoomSnapshotRetirement } from "./snapshot-transfer.js";
 
@@ -65,14 +68,28 @@ export interface BrowserRoomRetirement {
 		store: unknown,
 		input: Readonly<{ objectId: string }>
 	): Promise<LiveJournalRetirementResult<LiveJournalRetirementControlRead>>;
-	/** The original issuance retirement read over this database's issuance namespace. */
-	acquireIssuance(input: Readonly<{ objectId: string }>): Promise<DurableIssuanceRetirementControlRead>;
+	/**
+	 * The original issuance retirement read over this database's issuance namespace.
+	 * @param input - Exact addressed object.
+	 * @param store - A genuine room-mode issuance store of this database; its lifetime
+	 * and held-view refusals then apply, exactly as on its ordinary path.
+	 */
+	acquireIssuance(
+		input: Readonly<{ objectId: string }>,
+		store?: unknown
+	): Promise<DurableIssuanceRetirementControlRead>;
 	/**
 	 * The original signing retirement observation over this database's signing stores.
 	 * @param input - Exact addressed object.
 	 * @param recovery - Received recovery may own a never-signing address.
+	 * @param store - A genuine room-mode vote or evidence facet of this database; its
+	 * captured incarnation is then required, exactly as on its ordinary path.
 	 */
-	acquireSigning(input: Readonly<{ objectId: string }>, recovery?: boolean): Promise<SigningRetirementObservation>;
+	acquireSigning(
+		input: Readonly<{ objectId: string }>,
+		recovery?: boolean,
+		store?: unknown
+	): Promise<SigningRetirementObservation>;
 	/** Commits the current transaction strictly; a later acquisition opens a new one. */
 	checkpoint(): Promise<void>;
 	/** Commits the current transaction and ends the session. */
@@ -106,10 +123,20 @@ export async function openBrowserRoomRetirement(
 			acquireBrowserRoomSnapshotRetirement(store, databaseName, session, request),
 		acquireJournal: async (store: unknown, request: Readonly<{ objectId: string }>) =>
 			acquireBrowserRoomJournalRetirement(store, databaseName, session, request),
-		acquireIssuance: async (request: Readonly<{ objectId: string }>) =>
-			acquireBrowserRoomIssuanceRetirement(session, request),
-		acquireSigning: async (request: Readonly<{ objectId: string }>, recovery?: boolean) =>
-			acquireBrowserRoomSigningRetirement(session, request, recovery ?? false),
+		acquireIssuance: async (request: Readonly<{ objectId: string }>, store?: unknown) =>
+			store === undefined
+				? acquireBrowserRoomIssuanceRetirement(session, request)
+				: acquireBrowserRoomIssuanceStoreRetirement(store, databaseName, session, request),
+		acquireSigning: async (request: Readonly<{ objectId: string }>, recovery?: boolean, store?: unknown) => {
+			let incarnation: string | undefined;
+			if (store !== undefined) {
+				const owner = browserRoomSigningStore(store);
+				if (owner === undefined || owner.databaseName !== databaseName) throw new TypeError("RETENTION_FOREIGN_OWNER");
+				if (owner.isClosed()) throw new Error("STORE_CLOSED");
+				incarnation = owner.incarnation;
+			}
+			return acquireBrowserRoomSigningRetirement(session, request, recovery ?? false, incarnation);
+		},
 		checkpoint: () => session.checkpoint(),
 		commit: () => session.commit(),
 		abort: (cause?: unknown) => session.abort(cause),
