@@ -154,8 +154,14 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
  // so the fixed 50,000 cap bounded the run at ~13 rollovers instead of detecting
  // growth. Scale it with the configured rollovers (4k per rollover plus one for
  // creation, the floor of 50,000 kept); the truncation checks below still apply.
- const proofEventBudget=Math.max(50_000,4_000*(Number(process.env.STARTUP_HEALTHY_GRID_ROLLOVERS??4)+1));
+ // Endurance runs (more than 32 rollovers) allow 6k per rollover: the room-retention creator emits
+ // about 4.3k per rollover, and a 100-rollover run saturated 4k per rollover near rollover 94.
+ const proofEventRollovers=Number(process.env.STARTUP_HEALTHY_GRID_ROLLOVERS??4);
+ const proofEventBudget=Math.max(50_000,(proofEventRollovers>32?6_000:4_000)*(proofEventRollovers+1));
  await page.context().addInitScript(value=>Reflect.set(globalThis,"__r8ProofEventBudget",value),proofEventBudget);
+ // Endurance runs (more than 32 rollovers) scale the per-role delivery telemetry bound the same way.
+ const deliveryRollovers=Number(process.env.STARTUP_HEALTHY_GRID_ROLLOVERS??4),deliveryObservationBound=deliveryRollovers>32?32*(deliveryRollovers+1):1024;
+ await page.context().addInitScript(value=>Reflect.set(globalThis,"__r8DeliveryObservationBound",value),deliveryObservationBound);
  const clients:Awaited<ReturnType<typeof server>>[]=[];
  for(let index=0;index<4;index++)clients.push(await server(directory));
  await page.goto(local.origin+"/r8-source-binding");
@@ -175,7 +181,11 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
  // Longer bounded runs (up to 32) pass the former epoch-8 recipient journal
  // ceiling and the 9->10 boundary of the snapshot protected-hole order.
  // Default acceptance workload/deadline and all per-transition assertions stay.
- if(rollovers!==4&&rollovers!==5&&!(Number.isSafeInteger(rollovers)&&rollovers>=8&&rollovers<=32))throw new Error("bounded native pool-turnover extension required");
+ // Endurance (measurement only): up to 128 rollovers, with the test deadline and the
+ // diagnostic checkpoint timers scaled by the rollovers; at most 32 is unchanged.
+ if(rollovers!==4&&rollovers!==5&&!(Number.isSafeInteger(rollovers)&&rollovers>=8&&rollovers<=128))throw new Error("bounded native pool-turnover extension required");
+ const enduranceDeadline=rollovers>32?rollovers*30_000:undefined;
+ if(enduranceDeadline!==undefined)test.setTimeout(enduranceDeadline);
  if(suspendHealthyGrid&&rollovers!==5)throw new Error("suspension must exercise the original full-pool recipient turnover");
  const executionContexts=new Map<number,{origin:string;defaultContext:boolean}>();
  if(suspendHealthyGrid){
@@ -639,7 +649,7 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
  // The repeated terminal failure is a pending E4 admitted observation after
  // product calls finish. Re-time this SAME one-shot memory/journal checkpoint
  // so it inspects that wait; do not add queries or extend the test deadline.
- },305_000);
+ },enduranceDeadline===undefined?305_000:enduranceDeadline-55_000);
  // One late, explicitly partial checkpoint is attached before the original
  // deadline can prevent the final receipt. Reuse only completed observations
  // and already collected resource samples: no extra native scan or forced GC.
@@ -663,7 +673,7 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
     ordinaryCount:value?.ordinaryCount,completedTransitions:value?.completedTransitions,testOnlyCheckpointMilliseconds:snapshot.testOnlyCheckpointMilliseconds}));
   })().catch(error=>console.info(JSON.stringify({kind:"healthy-native-partial-completed-checkpoint-unavailable",error:String(error),
    testOnlyCheckpointMilliseconds:performance.now()-checkpointStarted})));
- },300_000);
+ },enduranceDeadline===undefined?300_000:enduranceDeadline-60_000);
  const poolLull=process.env.STARTUP_HEALTHY_GRID_POOL_LULL;
  if(poolLull==="1"||poolLull==="concurrent")await page.evaluate(()=>Reflect.set(globalThis,"__rdPoolMaintenanceLull",true));
  // Gameplay moves issued while the creator's pool maintenance is running.
@@ -672,6 +682,8 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
  if(process.env.STARTUP_HEALTHY_GRID_POOL_AUTO==="1")await page.evaluate(()=>Reflect.set(globalThis,"__rdPoolMaintenanceAuto",true));
  // Opt-in single room database for every owner (slice 14a); the default host is unchanged.
  if(process.env.STARTUP_HEALTHY_GRID_ROOM_DATABASE==="1")await page.evaluate(()=>Reflect.set(globalThis,"__rdRoomDatabase",true));
+ // Opt-in verified retention decisions on the room database (slice 14b); needs ROOM_DATABASE.
+ if(process.env.STARTUP_HEALTHY_GRID_ROOM_RETENTION==="1")await page.evaluate(()=>Reflect.set(globalThis,"__rdRoomRetention",true));
  // Opt-in speculative presentation: "1" overlay plus ephemeral intents, "overlay" without intents.
  const presentationMode=process.env.STARTUP_HEALTHY_GRID_PRESENTATION;
  if(presentationMode==="1"||presentationMode==="overlay")await page.evaluate(mode=>Reflect.set(globalThis,"__rdPresentation",mode),presentationMode);

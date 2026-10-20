@@ -257,7 +257,7 @@ async function installNativeRoomHeadAuthority(
 					_source,
 					request: {
 						handle: number;
-						method: "check" | "release" | "prepareFence" | "abortPrepared" | "commitPrepared";
+						method: "check" | "release" | "prepareFence" | "abortPrepared" | "commitPrepared" | "fenceDecision";
 						input?: RoomHeadFenceCommitment;
 					}
 				) =>
@@ -285,6 +285,11 @@ async function installNativeRoomHeadAuthority(
 								return h.value.abortPrepared(request.input);
 							case "commitPrepared":
 								return h.value.commitPrepared(request.input);
+							case "fenceDecision": {
+								const fence = h.value.fenceDecision;
+								if (fence === undefined) throw new Error("CANVAS_TEST_NATIVE_HANDLE_KIND");
+								return fence.call(h.value, request.input);
+							}
 						}
 					})
 			);
@@ -363,6 +368,12 @@ async function installNativeRoomHeadAuthority(
 										host.__gridTestNativeHandleCall({
 											handle: wire.handle,
 											method: "commitPrepared",
+											input: value,
+										}) as Promise<RoomHeadRetirementObservation["control"]>,
+									fenceDecision: (value) =>
+										host.__gridTestNativeHandleCall({
+											handle: wire.handle,
+											method: "fenceDecision",
 											input: value,
 										}) as Promise<RoomHeadRetirementObservation["control"]>,
 									release: () =>

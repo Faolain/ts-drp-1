@@ -1864,3 +1864,14 @@ export function acquireBrowserRoomAheRetirement(
 		throw new TypeError("RETENTION_FOREIGN_OWNER");
 	return store.acquireRetirementControlInSession(session, objectId as StorageObjectId);
 }
+
+/**
+ * Slice 14b: whether a candidate is a genuine room-mode AHE store of the given room
+ * database (the AHE retention section acts only for such a store). Identity only.
+ * @param store - Candidate AHE store.
+ * @param databaseName - The session's room database.
+ * @returns Whether the store is that room's genuine AHE store.
+ */
+export function isBrowserRoomAheStore(store: unknown, databaseName: string): boolean {
+	return store instanceof IdbAheDurableStore && roomAheStores.get(store) === databaseName;
+}

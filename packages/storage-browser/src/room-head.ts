@@ -393,7 +393,7 @@ export async function createBrowserRoomHeadAuthority(
 				return (join ??= held.release());
 			};
 			async function change(
-				kind: "prepare" | "abort" | "commit",
+				kind: "prepare" | "abort" | "commit" | "fence",
 				value: RoomHeadFenceCommitment
 			): Promise<RoomHeadControl> {
 				if (consumed || released) throw new Error("ROOM_HEAD_OBSERVATION_RELEASED");
@@ -404,7 +404,11 @@ export async function createBrowserRoomHeadAuthority(
 				return transact("readwrite", async (store) => {
 					const now = await load(store);
 					if (now === null || !sameRoomHeadValue(now, original)) throw new Error("ROOM_HEAD_CONTROL_STALE");
-					const next = roomHeadRetirementChange(now, kind, commitment);
+					// Slice 14b step A: prepare then commit one decision's labels in this one transaction.
+					const next =
+						kind === "fence"
+							? roomHeadRetirementChange(roomHeadRetirementChange(now, "prepare", commitment), "commit", commitment)
+							: roomHeadRetirementChange(now, kind, commitment);
 					await save(store, next);
 					return next.control;
 				});
@@ -418,6 +422,7 @@ export async function createBrowserRoomHeadAuthority(
 				prepareFence: (value) => change("prepare", value),
 				abortPrepared: (value) => change("abort", value),
 				commitPrepared: (value) => change("commit", value),
+				fenceDecision: (value) => change("fence", value),
 				release,
 			};
 			return Object.freeze(observation);

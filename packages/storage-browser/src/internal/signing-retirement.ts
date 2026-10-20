@@ -1,4 +1,4 @@
-import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import {
 	createSigningStorageCodec,
 	captureSigningRetirementDataImage,
@@ -18,8 +18,23 @@ import {
 	type SigningSummaryRetirementPlan,
 } from "@ts-drp/seal/internal/storage-port";
 import { AHE_BOUNDED_READ_LIMITS as LIMITS } from "@ts-drp/storage";
+import {
+	roomRetentionControlDigest,
+	type RoomRetentionLabels,
+	type RoomRetentionProofBook,
+	RoomRetentionRefusal,
+	roomRetentionRowDigest,
+} from "@ts-drp/storage/room-head";
 
 import { NativeReadReservationOwner, type RoomRetirementSession } from "./native-read-reservation.js";
+import {
+	type RoomRetentionDraftDelete,
+	type RoomRetentionSection,
+	type RoomRetentionSectionDraft,
+	type RoomRetentionTarget,
+	retentionStale,
+	retentionValueDigest,
+} from "./room-retention.js";
 import { assertCurrentBrowserSchema, SIGNING_PARTICIPANT_SCHEMA_AUTHORITY } from "./schema-idb.js";
 
 const {
@@ -1265,4 +1280,252 @@ export function registerBrowserRoomSigningStore(store: object, owner: RoomSignin
  */
 export function browserRoomSigningStore(store: unknown): RoomSigningOwner | undefined {
 	return typeof store === "object" && store !== null ? roomSigningStores.get(store) : undefined;
+}
+
+function signingRetentionCorrupt(detail: string): never {
+	throw new RoomRetentionRefusal("RETENTION_CORRUPT", `signing:${detail}`);
+}
+
+function signingRetentionImageRefusal(cause: unknown): never {
+	const message = cause instanceof Error ? cause.message : "";
+	if (message === "STORAGE_LOSS") retentionStale("signing:incarnation");
+	if (message === "SIGNING_IMAGE_FULL" || message === "SIGNING_IMAGE_COUNT_FULL")
+		throw new RoomRetentionRefusal("RETENTION_CAPACITY", "signing:image");
+	if (message.startsWith("INVALID_SIGNING") || message === "CONFLICTING_SIGNING_DATA_FRAME")
+		return signingRetentionCorrupt("image");
+	throw cause;
+}
+
+/**
+ * Slices 14a/14b step B: the signing owner's retention section. Inside the acting room
+ * transaction it captures the whole addressed signing image (the owner's existing bounded
+ * census, charged at its exact canonical length) and names every retired row by the digest
+ * of its exact frame. Evidence rows retire whole epochs only (every finalized evidence row
+ * of the epoch, each exactly the verified frame); summaries only for epochs the current
+ * control already retires and whose evidence is already gone, or whose whole evidence this
+ * same section retires (evidence before summaries, kept by atomicity: one epoch's signing
+ * work is one unit, 14b Track O amendment), again whole epochs. The target is the original
+ * prepare and commit of the preparation the
+ * per-owner install composes, refused before any write on the original dispatch-debt and
+ * monotone laws.
+ * @param databaseName - The session's room database.
+ * @param store - A genuine room-mode signing facet of this database, whose captured
+ * incarnation is then required; when absent, the session's own incarnation row is used.
+ * @returns The section.
+ */
+export function browserRoomSigningRetentionSection(databaseName: string, store?: unknown): RoomRetentionSection {
+	let expectedIncarnation: string | undefined;
+	if (store !== undefined) {
+		const owner = browserRoomSigningStore(store);
+		if (owner === undefined || owner.databaseName !== databaseName) throw new TypeError("RETENTION_FOREIGN_OWNER");
+		if (owner.isClosed()) throw new Error("STORE_CLOSED");
+		expectedIncarnation = owner.incarnation;
+	}
+	return Object.freeze<RoomRetentionSection>({
+		owner: "signing" as const,
+		prepare: ({ session, selection, book }) =>
+			session.run(async (transaction) => {
+				const objectId = selection.objectId,
+					through = selection.throughEpoch,
+					chosen = selection.signing;
+				let incarnation = expectedIncarnation;
+				if (incarnation === undefined) {
+					assertCurrentBrowserSchema(transaction);
+					const meta: unknown = await request(transaction.objectStore("storageMeta").get("incarnation"));
+					if (!plainRecord(meta) || meta.key !== "incarnation" || typeof meta.value !== "string")
+						return signingRetentionCorrupt("incarnation");
+					incarnation = meta.value;
+				}
+				const owned = incarnation;
+				let actual: Image;
+				try {
+					actual = await image(transaction, objectId, owned, true);
+				} catch (cause) {
+					return signingRetentionImageRefusal(cause);
+				}
+				try {
+					// The whole addressed image is what this section relies on: charge it exactly.
+					book.charge("signing", actual.logicalBytes);
+					const old = actual.control;
+					if (old.active !== null) retentionStale("signing:active");
+					if (summaryMaintenancePending(old)) retentionStale("signing:summary-debt");
+					if (old.drain != null && old.drain.cursor < old.drain.plan.entries.length) retentionStale("signing:drain");
+					const bytes = actual.data.readExactCanonicalRows();
+					const selections = actual.data.frames;
+					const controlKey = keyFor(objectId);
+					let base: string | undefined;
+					let controlFrame: Uint8Array | undefined;
+					const byAddress = new Map<string, number>();
+					for (const frame of selections) {
+						if (frame.addressKey !== undefined) {
+							byAddress.set(frame.addressKey, frame.index);
+							continue;
+						}
+						const decoded = decodeCanonical(bytes[frame.index]!, imageLimits) as unknown[];
+						if (decoded[1] === controlKey) {
+							base = roomRetentionRowDigest(bytes[frame.index]!);
+							controlFrame = bytes[frame.index]!;
+						}
+					}
+					if (base === undefined || controlFrame === undefined) return signingRetentionCorrupt("control-frame");
+					const address = (store: string, key: readonly (string | number)[]): string =>
+						Array.from(encodeCanonical([store, key], imageLimits)).join(",");
+					const deletes: RoomRetentionDraftDelete[] = [];
+					const named = new Set<string>();
+					const removed = new Set<number>();
+					const verify = (
+						store: string,
+						key: readonly (string | number)[],
+						frameDigest: string
+					): Readonly<Record<string, unknown>> => {
+						const id = address(store, key);
+						if (named.has(id)) retentionStale("signing:duplicate");
+						named.add(id);
+						const index = byAddress.get(id);
+						if (index === undefined) return retentionStale("signing:row-missing");
+						const frame = bytes[index]!;
+						// The exact stored bytes must be the bytes whose eligibility was verified.
+						if (signingRetirementFrameDigest(frame) !== frameDigest) retentionStale("signing:row-changed");
+						const row = (decodeCanonical(frame, imageLimits) as unknown[])[2];
+						if (!plainRecord(row) || row.objectId !== objectId || row.epoch !== key[1])
+							return signingRetentionCorrupt("row");
+						removed.add(index);
+						deletes.push(Object.freeze({ store, key: Object.freeze([...key]), digest: roomRetentionRowDigest(frame) }));
+						return row;
+					};
+					const evidenceEpochs = new Set<number>();
+					for (const entry of chosen.evidence) {
+						const key = entry.key;
+						if (!Array.isArray(key) || key.length !== 3 || key[0] !== objectId || !safe(key[1]) || key[1] > through)
+							retentionStale("signing:evidence-key");
+						const row = verify("sealEvidence", key, entry.frameDigest);
+						if (
+							row.signerId !== key[2] ||
+							row.phase !== "finalized" ||
+							row.peerEvidence !== undefined ||
+							row.storageIncarnation !== owned ||
+							row.revision !== entry.revision
+						)
+							retentionStale("signing:evidence-row");
+						evidenceEpochs.add(key[1]);
+					}
+					const summaryEpochs = new Set<number>();
+					for (const entry of chosen.summaries) {
+						const key = entry.key;
+						const short = entry.store === "signerState";
+						if (
+							!["signerState", "voteSlots", "voteOutbox"].includes(entry.store) ||
+							!Array.isArray(key) ||
+							key.length !== (short ? 3 : 5) ||
+							key[0] !== objectId ||
+							!safe(key[1]) ||
+							key[1] > through ||
+							// Evidence before summaries: the current control already retires the epoch, or
+							// this same section retires the epoch's whole evidence (one epoch's signing work
+							// is one unit, 14b Track O amendment; the census check below then requires every
+							// row of the epoch, its evidence included, to retire here).
+							!(evidenceEpochs.has(key[1]) || retired(old.completed, key[1]))
+						)
+							retentionStale("signing:summary-key");
+						const row = verify(entry.store, key, entry.frameDigest);
+						if (
+							row.signerId !== key[short ? 2 : 4] ||
+							(short && (row.highestPrepareQC == null || row.finalizedCommitQC == null))
+						)
+							retentionStale("signing:summary-row");
+						summaryEpochs.add(key[1] as number);
+					}
+					// Whole epochs only: an unnamed evidence row of a retired evidence epoch, any
+					// evidence row of a summary epoch, or an unnamed summary row refuses.
+					for (const frame of selections) {
+						if (frame.addressKey === undefined || frame.epoch === undefined || frame.store === "storageMeta") continue;
+						if (evidenceEpochs.has(frame.epoch) && frame.store === "sealEvidence" && !removed.has(frame.index))
+							retentionStale("signing:evidence-census");
+						if (summaryEpochs.has(frame.epoch) && !removed.has(frame.index)) retentionStale("signing:summary-census");
+					}
+					const prior = old.completed;
+					const protectedEpochs = [
+						...new Set(
+							selections.flatMap((frame) =>
+								frame.addressKey !== undefined &&
+								frame.store !== "storageMeta" &&
+								frame.epoch !== undefined &&
+								frame.epoch <= through &&
+								!evidenceEpochs.has(frame.epoch) &&
+								(prior === null || frame.epoch > prior.throughEpoch || prior.protectedEpochs.includes(frame.epoch))
+									? [frame.epoch]
+									: []
+							)
+						),
+					].sort((a, b) => a - b);
+					const retires = (epoch: number): boolean => epoch <= through && !protectedEpochs.includes(epoch);
+					if (actual.pendingEpochs.some(retires)) retentionStale("signing:dispatch-debt");
+					let removedBytes = 0;
+					for (const frame of selections) if (removed.has(frame.index)) removedBytes += frame.byteLength;
+					const imageDigest = actual.digest,
+						logicalBytes = actual.logicalBytes,
+						controlBytes = actual.controlBytes;
+					const section: RoomRetentionSectionDraft = Object.freeze({
+						owner: "signing" as const,
+						base,
+						control: roomRetentionControlDigest(controlFrame),
+						through,
+						deletes: Object.freeze(deletes),
+						rewrites: Object.freeze([]),
+						compose: async (labels: RoomRetentionLabels) => {
+							let row: Readonly<{ key: string; value: SigningRetirementControl }>;
+							try {
+								const proposed = preparation(
+									{
+										throughEpoch: through,
+										protectedEpochs,
+										decisionDigest: labels.decisionDigest,
+										sourceProofDigest: labels.sourceProofDigest,
+									},
+									objectId
+								);
+								if (!monotone(old.completed, proposed)) return retentionStale("signing:monotone");
+								if (old.revision >= Number.MAX_SAFE_INTEGER - 1 || old.sequence === Number.MAX_SAFE_INTEGER)
+									return retentionStale("signing:revision");
+								const prepared = control(
+									signingRetirementMetadataFields(old, "prepare", proposed, imageDigest),
+									objectId,
+									owned
+								);
+								const committed = control(
+									signingRetirementMetadataFields(prepared, "commit", undefined, imageDigest),
+									objectId,
+									owned
+								);
+								row = signingRetirementStorageMetaRow(objectId, committed);
+							} catch (cause) {
+								if (cause instanceof RoomRetentionRefusal) throw cause;
+								return retentionStale("signing:transition");
+							}
+							const width = encodeCanonical(["storageMeta", row.key, row], controlLimits).byteLength;
+							if (logicalBytes - controlBytes - removedBytes + width > LIMITS.maxUnionBytes)
+								throw new RoomRetentionRefusal("RETENTION_CAPACITY", "signing:union");
+							return Object.freeze({
+								value: row,
+								digest: retentionValueDigest("storageMeta", row.key, row),
+								// The control frame exactly as the next read's image carries it.
+								control: roomRetentionControlDigest(encodeCanonical(["storageMeta", row.key, row], controlLimits)),
+							});
+						},
+						write: (target: RoomRetentionTarget, writeBook: RoomRetentionProofBook) =>
+							session.run(async (writer) => {
+								for (const row of deletes) {
+									writeBook.write({ kind: "delete", owner: "signing", store: row.store });
+									await request(writer.objectStore(row.store).delete([...(row.key as readonly (string | number)[])]));
+								}
+								writeBook.write({ kind: "control", owner: "signing" });
+								await request(writer.objectStore("storageMeta").put(target.value));
+							}),
+					});
+					return section;
+				} finally {
+					releaseCapturedSigningRetirementDataImage(actual.data);
+				}
+			}),
+	});
 }

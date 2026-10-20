@@ -1,6 +1,13 @@
 import { encodeCanonical } from "@ts-drp/canonical";
 import { consumeSnapshotVerificationReceipt } from "@ts-drp/compaction/snapshot-quarantine-receipt";
 import {
+	roomRetentionControlDigest,
+	type RoomRetentionLabels,
+	type RoomRetentionProofBook,
+	RoomRetentionRefusal,
+	type RoomRetentionSelection,
+} from "@ts-drp/storage/room-head";
+import {
 	SNAPSHOT_QUARANTINE_RETENTION_MS,
 	type SnapshotChunkDescriptor,
 	snapshotQuarantineContract,
@@ -37,6 +44,17 @@ import {
 	runNativeReservedRead,
 	visitCountedRange,
 } from "./internal/native-read-reservation.js";
+import {
+	chargeRetentionRow,
+	type RoomRetentionContext,
+	type RoomRetentionDraftDelete,
+	type RoomRetentionDraftRewrite,
+	type RoomRetentionSection,
+	type RoomRetentionSectionDraft,
+	type RoomRetentionTarget,
+	retentionStale,
+	retentionValueDigest,
+} from "./internal/room-retention.js";
 import { openBrowserRoomOwnerConnection, roomStoreName, roomStoreNames } from "./internal/schema-idb.js";
 
 export interface BrowserSnapshotQuarantineStoreOptions {
@@ -2553,6 +2571,344 @@ function createSnapshotStoreOver(
 				() => Promise.resolve()
 			);
 		});
+	/**
+	 * Slices 14a/14b step B: this owner's retention section. Inside the acting room
+	 * transaction it re-reads the owner row, the control, every scope row of the object
+	 * and the original recovery census, and plans the original role turnover (the
+	 * selection's retired recovery scopes, exactly the census minus the kept roles) and
+	 * the original prepare and commit over the post-turnover image, as the existing
+	 * turnover and install compose them. Every scope row, the owner row and the control
+	 * are charged at their exact canonical length; chunk payloads stay under this owner's
+	 * own bounded accounting and are named by digest only. Deleting needs the original
+	 * creator turnover authority (consumed only when writing) and the retired scopes'
+	 * exclusive dependency guard, borrowed and checked before the first write.
+	 * @param authority - The creator's turnover authority, required when scopes retire.
+	 * @returns The section.
+	 */
+	const retentionSection = (authority?: Readonly<{ capability: object; custody: object }>): RoomRetentionSection =>
+		Object.freeze<RoomRetentionSection>({
+			owner: "snapshot" as const,
+			prepare: ({ session, selection, book, context }) =>
+				session.run(async (transaction) => {
+					if (closed || terminated) throw failure("closed", "snapshot quarantine store is closed");
+					try {
+						return await planSnapshotRetention(transaction, session, selection, book, context, authority);
+					} catch (error) {
+						if (error instanceof RoomRetentionRefusal || !isError(error)) throw error;
+						if (error.code === "poisoned" || error.code === "unsupported-schema" || error.code === "invalid-carrier")
+							throw new RoomRetentionRefusal("RETENTION_CORRUPT", `snapshot:${error.code}`);
+						if (error.code === "recovery-full")
+							throw new RoomRetentionRefusal("RETENTION_CAPACITY", `snapshot:${error.code}`);
+						return retentionStale(`snapshot:${error.code}`);
+					}
+				}),
+		});
+	const planSnapshotRetention = async (
+		transaction: IDBTransaction,
+		session: RoomRetirementSession,
+		selection: RoomRetentionSelection,
+		book: RoomRetentionProofBook,
+		context: RoomRetentionContext,
+		authority: Readonly<{ capability: object; custody: object }> | undefined
+	): Promise<RoomRetentionSectionDraft> => {
+		const objectId = selection.objectId,
+			through = selection.throughEpoch,
+			chosen = selection.snapshot;
+		const objectStore = (logical: string): IDBObjectStore =>
+			transaction.objectStore(roomStoreName(transaction.db, "snapshot", logical));
+		const ownerRaw: unknown = await requestResult(objectStore("owner").get("owner"));
+		const ownerBefore = chargeRetentionRow(book, "snapshot", "owner", "owner", ownerRaw);
+		const owner = await ownerStatus(transaction);
+		if (owner.migration !== "ready" || owner.classificationIntent !== undefined) retentionStale("snapshot:migration");
+		const controlRaw: unknown = await requestResult(objectStore("retirementControls").get(objectId));
+		if (controlRaw === undefined) return retentionStale("snapshot:control-absent");
+		const base = chargeRetentionRow(book, "snapshot", "retirementControls", objectId, controlRaw);
+		const control = snapshotRetirementContract.decodeControl(controlRaw);
+		if (control.objectId !== objectId) throw failure("poisoned", "snapshot retirement control key disagrees");
+		if (control.active !== null) retentionStale("snapshot:active");
+		// Survivors (14b): with a turnover, every recovery scope and chunk (survivors and
+		// retired alike) is exactly the image the verification saw. Accounting unchanged.
+		const survivorImage = selection.survivors.snapshotImage;
+		if (chosen.retire.length !== 0 && survivorImage === null) retentionStale("snapshot:survivors-unnamed");
+		if (survivorImage !== null) {
+			// Any byte that differs from the verified image, including a row this owner's own
+			// reader classifies as poisoned, is a stale decision here (zero writes).
+			let current: string;
+			try {
+				current = (await nativeImage(transaction, objectId)).imageDigest;
+			} catch (error) {
+				if (isError(error) && error.code === "poisoned") return retentionStale("snapshot:survivors");
+				throw error;
+			}
+			if (current !== survivorImage) retentionStale("snapshot:survivors");
+		}
+		const range = IDBKeyRange.bound([objectId], [objectId + "\0"], false, true);
+		const count = await requestResult(objectStore("scopes").count(range));
+		if (count > snapshotRetirementContract.maxScopes)
+			throw new RoomRetentionRefusal("RETENTION_CAPACITY", "snapshot:scopes");
+		const rawRows: unknown[] = await requestResult(objectStore("scopes").getAll(range, count + 1));
+		if (rawRows.length !== count) retentionStale("snapshot:scope-census");
+		const rows = rawRows.map((raw) => {
+			const row = fromScopeRow(raw);
+			const scope = snapshotQuarantineContract.captureRecoveryDependencyScope({
+				objectId: row.objectId,
+				epoch: row.epoch,
+				anchor: row.anchor,
+				manifestDigest: row.manifestDigest,
+			});
+			if (row.objectId !== objectId) throw failure("poisoned", "snapshot retirement scope key disagrees");
+			const key = scopeKey(scope) as (string | number)[];
+			return Object.freeze({
+				raw: raw as ScopeRow,
+				row,
+				scope,
+				key,
+				id: JSON.stringify(key),
+				digest: chargeRetentionRow(book, "snapshot", "scopes", key, raw),
+			});
+		});
+		// The original recovery census (verified recovery rows, closures, accounting).
+		const inventory = await roleInventory(transaction, objectId);
+		const named = new Map<string, string>();
+		for (const pair of chosen.retire) {
+			const id = JSON.stringify(scopeKey(pair.scope));
+			if (named.has(id) || pair.scope.objectId !== objectId) retentionStale("snapshot:retire-scope");
+			named.set(id, pair.incarnation);
+		}
+		const retired = inventory.scopes.filter((row) => named.has(JSON.stringify(scopeKey(row.scope))));
+		if (
+			retired.length !== named.size ||
+			retired.some((row) => named.get(JSON.stringify(scopeKey(row.scope))) !== row.incarnation)
+		)
+			retentionStale("snapshot:retire-census");
+		const kept = inventory.scopes.filter((row) => !named.has(JSON.stringify(scopeKey(row.scope))));
+		// Acting: the caller must hold the retired scopes' exclusive dependency guard.
+		if (
+			authority !== undefined &&
+			retired.length !== 0 &&
+			![...dependencyGuards].some((guard) =>
+				guard.owns(
+					snapshotQuarantineContract.captureRecoveryRetirementScopes({ scopes: retired.map((row) => row.scope) })
+				)
+			)
+		)
+			retentionStale("snapshot:exclusion");
+		const deletes: RoomRetentionDraftDelete[] = [];
+		const rewrites: RoomRetentionDraftRewrite[] = [];
+		let frontier: SnapshotRetirementControl = control;
+		let survivorValue: ScopeRow | undefined;
+		let ownerValue: Record<string, unknown> | undefined;
+		if (retired.length !== 0) {
+			const turnover = chosen.turnover;
+			if (turnover === null) return retentionStale("snapshot:turnover");
+			const survivorScope = snapshotQuarantineContract.captureScope(turnover.survivorScope);
+			let decision: Parameters<typeof snapshotRetirementContract.turnoverFrontier>[1];
+			if (authority === undefined)
+				// Planning: the same fields, never written; the write path consumes the authority.
+				decision = Object.freeze({
+					certificateDigest: turnover.certificateDigest,
+					currentHead: Object.freeze({ ...turnover.currentHead }),
+					survivorScope,
+					priorRetirementControl: control,
+				});
+			else {
+				let consumed: ReturnType<typeof snapshotQuarantineContract.consumeRecoveryRoleRetirementDecision>;
+				try {
+					consumed = snapshotQuarantineContract.consumeRecoveryRoleRetirementDecision(
+						authority.capability,
+						store,
+						authority.custody,
+						kept.map((row) => row.scope)
+					);
+				} catch {
+					// Not the genuine turnover authority this decision was verified with.
+					return retentionStale("snapshot:authority");
+				}
+				if (
+					consumed.classification !== undefined ||
+					consumed.priorRetirementControl === undefined ||
+					consumed.certificateDigest !== turnover.certificateDigest ||
+					JSON.stringify(consumed.currentHead) !== JSON.stringify(turnover.currentHead) ||
+					JSON.stringify(scopeKey(consumed.survivorScope)) !== JSON.stringify(scopeKey(survivorScope))
+				)
+					return retentionStale("snapshot:authority");
+				decision = consumed;
+			}
+			if (
+				decision === undefined ||
+				decision.currentHead.objectId !== objectId ||
+				decision.currentHead.epoch !== survivorScope.epoch + 1
+			)
+				return retentionStale("snapshot:head");
+			const pairs = retired.map((row) => ({ scope: row.scope, incarnation: row.incarnation }));
+			const next = snapshotRetirementContract.turnoverFrontier(control, decision, pairs);
+			if (next === null) return retentionStale("snapshot:frontier");
+			frontier = next;
+			if (
+				kept.some((row) => !snapshotRetirementContract.allows(frontier, row.scope, row.incarnation)) ||
+				retired.some((row) => snapshotRetirementContract.protected(frontier, row.scope, row.incarnation))
+			)
+				retentionStale("snapshot:frontier-roles");
+			const survivor = kept.find(
+				(row) => JSON.stringify(scopeKey(row.scope)) === JSON.stringify(scopeKey(survivorScope))
+			);
+			const survivorRow = rows.find((row) => row.id === JSON.stringify(scopeKey(survivorScope)));
+			if (survivor === undefined || survivorRow === undefined) return retentionStale("snapshot:survivor");
+			const update = snapshotQuarantineContract.recoveryRetirementCarrier(
+				decision,
+				{ scope: survivor.scope, incarnation: survivor.incarnation },
+				pairs,
+				survivorRow.row.descriptors
+			);
+			const recoveryScopes = owner.recoveryScopes - retired.length;
+			const recoveryContentBytes =
+				owner.recoveryContentBytes - retired.reduce((sum, row) => sum + row.contentBytes, 0) + update.contentByteDelta;
+			if (
+				recoveryScopes < 0 ||
+				!Number.isSafeInteger(recoveryContentBytes) ||
+				recoveryContentBytes < 0 ||
+				recoveryContentBytes > owner.limits.maxRecoveryContentBytes
+			)
+				throw new RoomRetentionRefusal("RETENTION_CAPACITY", "snapshot:accounting");
+			survivorValue = { ...survivorRow.raw, descriptors: update.carrier } as ScopeRow;
+			rewrites.push(
+				Object.freeze({
+					store: "scopes",
+					key: survivorRow.key,
+					before: survivorRow.digest,
+					after: retentionValueDigest("scopes", survivorRow.key, survivorValue),
+					value: survivorValue,
+				})
+			);
+			ownerValue = { ...owner, id: "owner", recoveryScopes, recoveryContentBytes };
+			rewrites.push(
+				Object.freeze({
+					store: "owner",
+					key: "owner",
+					before: ownerBefore,
+					after: retentionValueDigest("owner", "owner", ownerValue),
+					value: ownerValue,
+				})
+			);
+			for (const row of retired) {
+				const scopeRow = rows.find((candidate) => candidate.id === JSON.stringify(scopeKey(row.scope)));
+				if (scopeRow === undefined) return retentionStale("snapshot:retired-row");
+				// 14e: bounded before it is issued (the owner's per-scope chunk bound, plus one).
+				const chunkBound = snapshotQuarantineContract.limits.maxChunks;
+				const chunks: unknown[] = await requestResult(objectStore("chunks").getAll(chunkRange(row.scope), chunkBound + 1));
+				if (chunks.length > chunkBound) throw new RoomRetentionRefusal("RETENTION_CAPACITY", "snapshot:chunks");
+				for (const chunk of chunks) {
+					const index = (chunk as Partial<ChunkRow>).index;
+					if (typeof index !== "number") throw failure("poisoned", "snapshot retirement chunk shape is invalid");
+					const key = chunkKey(row.scope, index) as (string | number)[];
+					// Chunk payloads are this owner's own bounded accounting (14e): digested, not charged.
+					deletes.push(
+						Object.freeze({ store: "chunks", key, digest: chargeRetentionRow(book, "snapshot", "chunks", key, chunk, false) })
+					);
+				}
+				deletes.push(Object.freeze({ store: "scopes", key: scopeRow.key, digest: scopeRow.digest }));
+			}
+		} else if (chosen.turnover !== null) retentionStale("snapshot:turnover");
+		const retiredIds = new Set(retired.map((row) => JSON.stringify(scopeKey(row.scope))));
+		const survivors = rows
+			.filter((row) => !retiredIds.has(row.id))
+			.map((row) => Object.freeze({ scope: row.scope, incarnation: row.row.incarnation }));
+		context.snapshotSurvivors = Object.freeze(survivors);
+		// The install's snapshot preparation: every post-turnover scope at or below the frontier.
+		const holes = survivors.filter((row) => row.scope.epoch <= through);
+		if (holes.length > snapshotQuarantineContract.defaultRecoveryLimits.maxRecoveryScopes)
+			throw new RoomRetentionRefusal("RETENTION_CAPACITY", "snapshot:holes");
+		const prior = frontier.completed;
+		const holeKey = (pair: Readonly<{ scope: SnapshotQuarantineScopeKey; incarnation: string }>): string =>
+			JSON.stringify([pair.scope.epoch, pair.scope.anchor, pair.scope.manifestDigest, pair.incarnation]);
+		if (
+			prior !== null &&
+			(through < prior.throughEpoch ||
+				holes.some(
+					(hole) =>
+						hole.scope.epoch <= prior.throughEpoch && !prior.protectedScopes.some((p) => holeKey(p) === holeKey(hole))
+				))
+		)
+			retentionStale("snapshot:advance");
+		if (frontier.revision >= Number.MAX_SAFE_INTEGER - 1 || frontier.sequence === Number.MAX_SAFE_INTEGER)
+			retentionStale("snapshot:revision");
+		const turned = frontier;
+		return Object.freeze<RoomRetentionSectionDraft>({
+			owner: "snapshot" as const,
+			base,
+			control: roomRetentionControlDigest(snapshotRetirementContract.encodeControl(control)),
+			through,
+			deletes: Object.freeze(deletes),
+			rewrites: Object.freeze(rewrites),
+			compose: async (labels: RoomRetentionLabels) => {
+				let bytes: Uint8Array;
+				try {
+					const preparation = snapshotRetirementContract.capturePreparation(
+						{
+							decisionDigest: labels.decisionDigest,
+							sourceProofDigest: labels.sourceProofDigest,
+							throughEpoch: through,
+							protectedScopes: holes,
+						},
+						objectId
+					);
+					const prepared: SnapshotRetirementControl = {
+						...turned,
+						revision: turned.revision + 1,
+						sequence: turned.sequence + 1,
+						active: { sequence: turned.sequence + 1, preparation },
+					};
+					bytes = snapshotRetirementContract.encodeControl({
+						...prepared,
+						revision: prepared.revision + 1,
+						active: null,
+						completed: preparation,
+					});
+				} catch {
+					return retentionStale("snapshot:transition");
+				}
+				return Object.freeze({
+					value: bytes,
+					digest: retentionValueDigest("retirementControls", objectId, bytes),
+					control: roomRetentionControlDigest(bytes),
+				});
+			},
+			write: (target: RoomRetentionTarget, writeBook: RoomRetentionProofBook) =>
+				session.run(async (writer) => {
+					const writeStore = (logical: string): IDBObjectStore =>
+						writer.objectStore(roomStoreName(writer.db, "snapshot", logical));
+					let borrowed: BorrowedExclusion | undefined;
+					if (retired.length !== 0) {
+						const scopes = snapshotQuarantineContract.captureRecoveryRetirementScopes({
+							scopes: retired.map((row) => row.scope),
+						});
+						const guard = [...dependencyGuards].find((candidate) => candidate.owns(scopes));
+						if (guard === undefined) return retentionStale("snapshot:exclusion");
+						borrowed = guard.borrow();
+					}
+					try {
+						await borrowed?.check();
+						if (survivorValue !== undefined) {
+							writeBook.write({ kind: "rewrite", owner: "snapshot", store: "scopes" });
+							await requestResult(writeStore("scopes").put(survivorValue));
+						}
+						for (const row of deletes) {
+							writeBook.write({ kind: "delete", owner: "snapshot", store: row.store });
+							await requestResult(writeStore(row.store).delete(row.key as IDBValidKey));
+						}
+						if (ownerValue !== undefined) {
+							writeBook.write({ kind: "rewrite", owner: "snapshot", store: "owner" });
+							await requestResult(writeStore("owner").put(ownerValue));
+						}
+						writeBook.write({ kind: "control", owner: "snapshot" });
+						await requestResult(writeStore("retirementControls").put(target.value, objectId));
+						await borrowed?.check();
+					} finally {
+						await borrowed?.release();
+					}
+				}),
+		});
+	};
 	const close = (): Promise<void> => {
 		if (closing !== undefined) return closing;
 		closed = true;
@@ -2590,6 +2946,7 @@ function createSnapshotStoreOver(
 		roomSnapshotRetirement.set(store, {
 			databaseName: primaryDatabaseName,
 			acquire: acquireRetirementControlInSession,
+			section: retentionSection,
 		});
 	return store;
 }
@@ -2600,8 +2957,27 @@ const roomSnapshotRetirement = new WeakMap<
 	Readonly<{
 		databaseName: string;
 		acquire(session: RoomRetirementSession, input: unknown): Promise<SnapshotRetirementControlRead>;
+		section(authority?: Readonly<{ capability: object; custody: object }>): RoomRetentionSection;
 	}>
 >();
+
+/**
+ * Slice 14b: the snapshot retention section of a genuine room-mode snapshot owner of
+ * the given room database.
+ * @param store - Candidate snapshot owner.
+ * @param databaseName - The session's room database.
+ * @param authority - The creator's turnover authority, for a decision that retires scopes.
+ * @returns The section.
+ */
+export function browserRoomSnapshotRetentionSection(
+	store: unknown,
+	databaseName: string,
+	authority?: Readonly<{ capability: object; custody: object }>
+): RoomRetentionSection {
+	const entry = typeof store === "object" && store !== null ? roomSnapshotRetirement.get(store) : undefined;
+	if (entry === undefined || entry.databaseName !== databaseName) throw new TypeError("RETENTION_FOREIGN_OWNER");
+	return entry.section(authority);
+}
 
 /**
  * Slice 14a: the snapshot retirement acquisition inside a room retirement session. Only

@@ -39,6 +39,9 @@ async function createHealthyGridRole(input:{index:number;database:string;identit
  const finishingWindow=Reflect.get(globalThis,"__r8OrdinaryFinishingWindow");
  const configuredApplication=finishingWindow===undefined?application:{...application,ordinaryFinishingWindow:finishingWindow};
  const deliveryObservations=new Map<string,{acceptedCallbackAt:number;projectionCallbackAt?:number}>(),awaitingProjection=new Set<string>();
+ // Measurement-only telemetry bound: 1,024 admitted digests, scaled by endurance runs.
+ const configuredDeliveryBound=Reflect.get(globalThis,"__r8DeliveryObservationBound");
+ const deliveryObservationBound=Number.isSafeInteger(configuredDeliveryBound)&&(configuredDeliveryBound as number)>1024?configuredDeliveryBound as number:1024;
  Reflect.set(globalThis,"__r8HealthyAcceptedDigestPresent",(digest:string)=>admitted.has(digest));
  const floor=await createBrowserRoomHeadAuthority({databaseName:database+"--startup-floor",initialization:{kind}});
  let session:Awaited<ReturnType<typeof createV3RoomSession>>|undefined,issuance:Awaited<ReturnType<typeof createBrowserDurableIssuanceStore>>|undefined,
@@ -57,12 +60,12 @@ async function createHealthyGridRole(input:{index:number;database:string;identit
   // Opt-in single room database (slice 14a): every owner in one version-7 database
   // and each retirement install in one room session. The floor stays separate.
   const roomDatabase=Reflect.get(input,"roomDatabase")===true;
-  session=await createV3RoomSession({...(roomDatabase?{storageHost:createBrowserV3RoomDatabaseStorageHost()}:{}),application:configuredApplication,author,...(autoPool===undefined?{}:{recoveryPoolAutoMaintenance:autoPool}),creatorInvite:invite,databaseName:database,issuanceDatabaseName:database,migrationDatabaseNamespace:database,
+  session=await createV3RoomSession({...(roomDatabase?{storageHost:createBrowserV3RoomDatabaseStorageHost(Reflect.get(input,"roomRetention")===true?{roomRetention:true}:{})}:{}),application:configuredApplication,author,...(autoPool===undefined?{}:{recoveryPoolAutoMaintenance:autoPool}),creatorInvite:invite,databaseName:database,issuanceDatabaseName:database,migrationDatabaseNamespace:database,
    objectId,publicKeyBytes:ed25519.getPublicKey(key),initialLogicalTime:3,...(finality?{creatorFinalitySigner:finality.signer}:{}),roomHeadAuthority:floor,
    ...(presentation===undefined?{}:{presentation}),
    openTransport:()=>({...peer.open(),openEphemeral:openFixtureEphemeral}),signRegisteredVertexDigest:async digest=>ed25519.sign(digest,key),onAcceptedVertex:vertex=>{
     const digest=hex(vertex.digest);admitted.add(digest);
-    check(deliveryObservations.size<1024||deliveryObservations.has(digest),"bounded healthy delivery telemetry saturated");
+    check(deliveryObservations.size<deliveryObservationBound||deliveryObservations.has(digest),"bounded healthy delivery telemetry saturated");
     if(!deliveryObservations.has(digest))deliveryObservations.set(digest,{acceptedCallbackAt:performance.now()});
     if(Reflect.get(globalThis,"__r8CriticalProfiling")===true)performance.mark("drp:accepted-callback:"+index+":"+digest);
     awaitingProjection.add(digest);
@@ -360,9 +363,11 @@ if(window!==window.parent)window.parent.postMessage({kind:"r8-grid-ready"},"*");
 
 // Representative healthy path, not an unchanged capacity-test replay.
 export async function runHealthyGrid(identity:string,origins:readonly string[],rollovers=4,profileId="creator-trusted-settlement-v1") {
- const fixtureWaitDeadline=Date.now()+360_000; // Existing native test cap, not a gameplay latency target.
+ // Existing native test cap, not a gameplay latency target; endurance runs (more than 32
+ // rollovers, measurement only) scale it with the rollovers like the test deadline.
+ const fixtureWaitDeadline=Date.now()+(rollovers>32?rollovers*30_000:360_000);
  check(origins.length===4&&new Set(origins).size===4,"four independent native storage origins required");
- check(rollovers===4||rollovers===5||(Number.isSafeInteger(rollovers)&&rollovers>=8&&rollovers<=32),"bounded native full-pool extension only");
+ check(rollovers===4||rollovers===5||(Number.isSafeInteger(rollovers)&&rollovers>=8&&rollovers<=128),"bounded native full-pool extension only");
  check(profileId==="creator-trusted-settlement-v1"||profileId==="creator-trusted-v1","existing creator profile required");
  const {members,application}=gridCorpus(identity),ids=members.slice(0,4).map(row=>row.peerId);
  const objectId="creator:"+hex(hashDomain("ts-drp/healthy-native-grid/v1",new TextEncoder().encode(identity))).slice(0,32);
@@ -475,7 +480,7 @@ export async function runHealthyGrid(identity:string,origins:readonly string[],r
   for(let index=0;index<4;index++)await rpc(index,"init",{index,id:ids[index],connected:ids.filter((_,other)=>other!==index),suspensionProbe:typeof suspendTransfer==="function"});
   for(let index=0;index<4;index++)await rpc(index,"open",{index,database:identity+"-role-"+index,identity,objectId,invite,kind,
    autoPool:Reflect.get(globalThis,"__rdPoolMaintenanceAuto")===true,presentation:Reflect.get(globalThis,"__rdPresentation"),
-   roomDatabase:Reflect.get(globalThis,"__rdRoomDatabase")===true});
+   roomDatabase:Reflect.get(globalThis,"__rdRoomDatabase")===true,roomRetention:Reflect.get(globalThis,"__rdRoomRetention")===true});
   await Promise.all(active.map(role=>rpc(role.index,"history")));
  }
  async function close(){

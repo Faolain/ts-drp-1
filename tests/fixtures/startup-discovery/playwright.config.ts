@@ -7,7 +7,8 @@ if (selectedEntry !== undefined && selectedEntry !== "r8-source-binding") throw 
 export default defineConfig({
 	forbidOnly: true,
 	fullyParallel: false,
-	globalTimeout: 600_000,
+	// Endurance runs (more than 32 rollovers, measurement only) scale the global timeout.
+	globalTimeout: Math.max(600_000, Number(process.env.STARTUP_HEALTHY_GRID_ROLLOVERS ?? 4) * 32_000),
 	outputDir: resolve(evidence, "artifacts"),
 	projects: [
 		{ name: "chromium", use: { browserName: "chromium" } },

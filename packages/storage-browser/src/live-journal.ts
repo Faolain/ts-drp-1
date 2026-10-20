@@ -1,6 +1,7 @@
 import { encodeCanonical } from "@ts-drp/canonical";
 import {
 	advanceJournalRetirementMutationControl,
+	captureJournalRetirementControl,
 	type AppendAcceptedVertexInput,
 	type AppendAcceptedVertexResult,
 	captureJournalRetirementObject,
@@ -60,6 +61,7 @@ import {
 	type LiveJournalSnapshotToken,
 	reconstructJournalRetirementDrainSource,
 } from "@ts-drp/live-journal";
+import { roomRetentionControlDigest, RoomRetentionRefusal } from "@ts-drp/storage/room-head";
 
 export interface BrowserDurableLiveJournalStoreOptions {
 	readonly primaryDatabaseName: string;
@@ -78,6 +80,15 @@ import {
 	runNativeReservedRead,
 	visitCountedRange,
 } from "./internal/native-read-reservation.js";
+import {
+	chargeRetentionRow,
+	type RoomRetentionDraftDelete,
+	type RoomRetentionDraftRewrite,
+	type RoomRetentionSection,
+	type RoomRetentionSectionDraft,
+	retentionStale,
+	retentionValueDigest,
+} from "./internal/room-retention.js";
 import {
 	openBrowserRoomOwnerConnection,
 	roomStoreName,
@@ -2620,4 +2631,291 @@ export function acquireBrowserRoomJournalRetirement(
 	const entry = typeof store === "object" && store !== null ? roomJournalRetirement.get(store) : undefined;
 	if (entry === undefined || entry.databaseName !== databaseName) throw new TypeError("RETENTION_FOREIGN_OWNER");
 	return entry.acquire(session, input);
+}
+
+function sameJournalScope(left: LiveJournalScope, right: LiveJournalScope): boolean {
+	return left.objectId === right.objectId && left.epoch === right.epoch && left.anchorDigest === right.anchorDigest;
+}
+
+function journalRetentionCorrupt(detail: string): never {
+	throw new RoomRetentionRefusal("RETENTION_CORRUPT", `journal:${detail}`);
+}
+
+/**
+ * Slices 14a/14b step B: the journal owner's retention section. Inside the acting room
+ * transaction it re-reads the control and every header of the object, the complete row
+ * range of each collectible prefix (bounded by its high watermark plus one) and each
+ * retired header, and names every row by the digest of its exact bytes. A prefix row
+ * retires only when its exact frame hashes to the verified native frame digest the
+ * planner carried; a header only when it is empty, outside the genesis anchor, and
+ * already fenced by the current control. The target control is the original prepare and
+ * commit of the same preparation the per-owner install composes (journal rows before
+ * their header: a prefix header stays, its membership carrier stripped exactly as the
+ * existing completed-drain acknowledgement strips it).
+ */
+const journalRetentionSection: RoomRetentionSection = Object.freeze<RoomRetentionSection>({
+	owner: "journal" as const,
+	prepare: ({ session, selection, book }) =>
+		session.run(async (transaction) => {
+			const objectId = selection.objectId,
+				through = selection.throughEpoch,
+				chosen = selection.journal;
+			const store = (logical: string): IDBObjectStore =>
+				transaction.objectStore(roomStoreName(transaction.db, "journal", logical));
+			const rawControl: unknown = await requestResult(store("retirementControls").get(objectId));
+			if (rawControl === undefined) retentionStale("journal:control-absent");
+			chargeRetentionRow(book, "journal", "retirementControls", objectId, rawControl);
+			let control: LiveJournalRetirementControl;
+			try {
+				const decoded = retirementControl(rawControl, objectId);
+				if (decoded === null) return journalRetentionCorrupt("control");
+				control = decoded;
+			} catch {
+				return journalRetentionCorrupt("control");
+			}
+			if (control.active !== null) retentionStale("journal:active");
+			const drain = control.drain ?? null;
+			if (drain !== null && drain.cursor !== journalRetirementDrainItemCount(drain.plan))
+				retentionStale("journal:drain");
+			// Every ordinary journal mutation advances the revision and clears a completed
+			// drain (LJ advanceJournalRetirementMutationControl); the base is the rest.
+			const { revision: _revision, drain: _drain, ...state } = control as LiveJournalRetirementControl & {
+				drain?: unknown;
+			};
+			const base = retentionValueDigest("retirementControls", objectId, state);
+			const range = IDBKeyRange.bound([objectId], [objectId, []]);
+			const scopeCount = await requestResult(store("scopes").count(range));
+			if (!journalRetirementImageCountsFit(scopeCount, 0))
+				throw new RoomRetentionRefusal("RETENTION_CAPACITY", "journal:scopes");
+			const headerRows: unknown[] = await requestResult(store("scopes").getAll(range, scopeCount + 1));
+			if (headerRows.length !== scopeCount) retentionStale("journal:scope-census");
+			const headers = headerRows.map((raw) => {
+				let stored: StoredScope;
+				try {
+					stored = fromRawScope(raw);
+				} catch {
+					return journalRetentionCorrupt("header");
+				}
+				if (stored.scope.objectId !== objectId) journalRetentionCorrupt("header-object");
+				const key = scopeKey(stored.scope);
+				return Object.freeze({
+					raw: raw as Readonly<Record<string, unknown>>,
+					scope: stored.scope,
+					key,
+					next: stored.nextJournalSequence,
+					digest: chargeRetentionRow(book, "journal", "scopes", key, raw),
+				});
+			});
+			// Survivors (14b): every closed header is exactly the verified one, a header this
+			// boundary's prefixes rewrite, or a header this decision deletes; nothing else.
+			const frameOf = (header: (typeof headers)[number]): string =>
+				journalRetirementFrameDigest(journalRetirementCanonicalRow("scopes", header.key, header.raw));
+			const expected = new Map(
+				selection.survivors.journalHeaders.map((row) => [JSON.stringify(scopeKey(row.scope)), row.nativeFrameDigest])
+			);
+			const rewritten = new Set(selection.survivors.journalRewritten.map((scope) => JSON.stringify(scopeKey(scope))));
+			const retiring = new Set(chosen.headers.map((row) => JSON.stringify(scopeKey(row.scope))));
+			for (const header of headers) {
+				if (header.scope.epoch > through) continue;
+				const id = JSON.stringify(header.key);
+				const digest = expected.get(id);
+				if (digest !== undefined ? frameOf(header) !== digest : !rewritten.has(id) && !retiring.has(id))
+					retentionStale("journal:survivor");
+			}
+			for (const id of expected.keys())
+				if (!headers.some((header) => JSON.stringify(header.key) === id)) retentionStale("journal:survivor-missing");
+			const deletes: RoomRetentionDraftDelete[] = [],
+				rewrites: RoomRetentionDraftRewrite[] = [];
+			const named = new Set<string>(),
+				deletedHeaders = new Set<string>(),
+				stripped = new Set<string>();
+			const strip = (header: (typeof headers)[number]): void => {
+				const id = JSON.stringify(header.key);
+				if (deletedHeaders.has(id) || stripped.has(id) || !Object.hasOwn(header.raw, "closedMembershipBytes")) return;
+				stripped.add(id);
+				const value: Record<string, unknown> = { ...header.raw };
+				delete value.closedMembershipBytes;
+				rewrites.push(
+					Object.freeze({
+						store: "scopes",
+						key: header.key,
+						before: header.digest,
+						after: retentionValueDigest("scopes", header.key, value),
+						value: Object.freeze(value),
+					})
+				);
+			};
+			for (const retired of chosen.headers) {
+				const scope = retired.scope,
+					id = JSON.stringify(scopeKey(scope));
+				if (
+					scope.objectId !== objectId ||
+					scope.epoch === 0 ||
+					scope.anchorDigest === chosen.genesisAnchorDigest ||
+					scope.epoch > through ||
+					named.has(id)
+				)
+					retentionStale("journal:header-scope");
+				named.add(id);
+				const found = headers.filter((header) => sameJournalScope(header.scope, scope));
+				const header = found[0];
+				if (found.length !== 1 || header === undefined) retentionStale("journal:header-missing");
+				if (journalRetirementFrameDigest(journalRetirementCanonicalRow("scopes", header.key, header.raw)) !== retired.nativeFrameDigest)
+					retentionStale("journal:header-changed");
+				if ((await requestResult(store("acceptedEntries").count(IDBKeyRange.bound(header.key, [...header.key, []])))) !== 0)
+					retentionStale("journal:header-rows");
+				// Only a header the current control already fences: its rows retired earlier.
+				if (journalRetirementAllows(control, scope)) retentionStale("journal:header-unfenced");
+				deletedHeaders.add(id);
+				deletes.push(Object.freeze({ store: "scopes", key: header.key, digest: header.digest }));
+			}
+			for (const prefix of chosen.prefixes) {
+				const scope = prefix.scope,
+					id = JSON.stringify(scopeKey(scope));
+				if (scope.objectId !== objectId || scope.epoch > through || named.has(id)) retentionStale("journal:prefix-scope");
+				named.add(id);
+				const found = headers.filter((header) => sameJournalScope(header.scope, scope));
+				const header = found[0];
+				if (
+					found.length !== 1 ||
+					header === undefined ||
+					header.next !== prefix.highWatermark ||
+					prefix.highWatermark === 0 ||
+					prefix.rows.length !== prefix.highWatermark
+				)
+					retentionStale("journal:prefix-header");
+				// The header the decision rewrites is exactly the verified one.
+				if (frameOf(header) !== prefix.headerFrameDigest) retentionStale("journal:prefix-header-changed");
+				// The complete row range, one past the named count: an unnamed row refuses.
+				const rows: unknown[] = await requestResult(
+					store("acceptedEntries").getAll(IDBKeyRange.bound(header.key, [...header.key, []]), prefix.highWatermark + 1)
+				);
+				if (rows.length !== prefix.highWatermark) retentionStale("journal:prefix-census");
+				for (const [index, raw] of rows.entries()) {
+					const selected = prefix.rows[index];
+					let row: StoredRow;
+					try {
+						row = fromRawRow(raw);
+					} catch {
+						return journalRetentionCorrupt("row");
+					}
+					if (selected === undefined || row.journalSequence !== selected.journalSequence || !sameJournalScope(row.scope, scope))
+						retentionStale("journal:prefix-row-key");
+					const key = [...header.key, row.journalSequence];
+					// The exact stored bytes must be the bytes whose membership was verified.
+					if (journalRetirementFrameDigest(journalRetirementCanonicalRow("acceptedEntries", key, raw)) !== selected.nativeFrameDigest)
+						retentionStale("journal:prefix-row-changed");
+					deletes.push(
+						Object.freeze({
+							store: "acceptedEntries",
+							key,
+							digest: chargeRetentionRow(book, "journal", "acceptedEntries", key, raw),
+						})
+					);
+				}
+				strip(header);
+			}
+			// A completed original drain's prefix headers keep their carrier until the next
+			// ordinary mutation strips it (LJ advanceRetirementControl). This write is such a
+			// mutation, so it performs that acknowledgement too; it is not part of the
+			// decision (an ordinary append between planning and acting performs it instead).
+			const acknowledged = (drain?.plan.prefixes ?? []).flatMap((prefix) =>
+				headers.filter(
+					(header) =>
+						sameJournalScope(header.scope, prefix.scope) &&
+						!deletedHeaders.has(JSON.stringify(header.key)) &&
+						!stripped.has(JSON.stringify(header.key)) &&
+						Object.hasOwn(header.raw, "closedMembershipBytes")
+				)
+			);
+			const prior = control.completed;
+			const protectedScopes = headers
+				.map((header) => header.scope)
+				.filter(
+					(scope) =>
+						scope.epoch <= through &&
+						!chosen.prefixes.some((prefix) => sameJournalScope(prefix.scope, scope)) &&
+						(prior === null ||
+							scope.epoch > prior.throughEpoch ||
+							prior.protectedScopes.some((hole) => sameJournalScope(hole, scope)))
+				)
+				.map((scope) => Object.freeze({ objectId: scope.objectId, epoch: scope.epoch, anchorDigest: scope.anchorDigest }));
+			if (protectedScopes.length > LIVE_JOURNAL_RETIREMENT_LIMITS.maxScopes)
+				throw new RoomRetentionRefusal("RETENTION_CAPACITY", "journal:protected-scopes");
+			return Object.freeze<RoomRetentionSectionDraft>({
+				owner: "journal" as const,
+				base,
+				control: roomRetentionControlDigest(encodeJournalRetirementControl(control)),
+				through,
+				deletes: Object.freeze(deletes),
+				rewrites: Object.freeze(rewrites),
+				compose: async (labels: Readonly<{ throughEpoch: number; decisionDigest: string; sourceProofDigest: string }>) => {
+					const preparation = {
+						decisionDigest: labels.decisionDigest,
+						sourceProofDigest: labels.sourceProofDigest,
+						throughEpoch: through,
+						protectedScopes,
+					};
+					let committed: LiveJournalRetirementControl;
+					try {
+						// The original prepare (monotone frontier, revision and sequence) then commit.
+						const idle = control.kind === "v3-live-journal-retirement-control-2" ? { ...control, drain: null } : control;
+						const prepared = captureJournalRetirementControl({
+							...idle,
+							revision: control.revision + 1,
+							sequence: control.sequence + 1,
+							active: { sequence: control.sequence + 1, preparation },
+						});
+						committed = captureJournalRetirementControl({
+							...prepared,
+							revision: control.revision + 2,
+							active: null,
+							completed: prepared.active!.preparation,
+						});
+					} catch {
+						return retentionStale("journal:transition");
+					}
+					const value = nativeRetirementRecord(committed);
+					return Object.freeze({
+						value,
+						digest: retentionValueDigest("retirementControls", objectId, value),
+						control: roomRetentionControlDigest(encodeJournalRetirementControl(committed)),
+					});
+				},
+				write: (target, writeBook) =>
+					session.run(async (writer) => {
+						const writeStore = (logical: string): IDBObjectStore =>
+							writer.objectStore(roomStoreName(writer.db, "journal", logical));
+						for (const row of deletes) {
+							writeBook.write({ kind: "delete", owner: "journal", store: row.store });
+							await requestResult(writeStore(row.store).delete(row.key as IDBValidKey));
+						}
+						for (const row of rewrites) {
+							writeBook.write({ kind: "rewrite", owner: "journal", store: row.store });
+							await requestResult(writeStore(row.store).put(row.value));
+						}
+						for (const header of acknowledged) {
+							const value: Record<string, unknown> = { ...header.raw };
+							delete value.closedMembershipBytes;
+							writeBook.write({ kind: "rewrite", owner: "journal", store: "scopes" });
+							await requestResult(writeStore("scopes").put(value));
+						}
+						writeBook.write({ kind: "control", owner: "journal" });
+						await requestResult(writeStore("retirementControls").put(target.value));
+					}),
+			});
+		}),
+});
+
+/**
+ * Slice 14b: the journal retention section of a genuine room-mode journal of the given
+ * room database.
+ * @param store - Candidate journal facade.
+ * @param databaseName - The session's room database.
+ * @returns The section.
+ */
+export function browserRoomJournalRetentionSection(store: unknown, databaseName: string): RoomRetentionSection {
+	const entry = typeof store === "object" && store !== null ? roomJournalRetirement.get(store) : undefined;
+	if (entry === undefined || entry.databaseName !== databaseName) throw new TypeError("RETENTION_FOREIGN_OWNER");
+	return journalRetentionSection;
 }

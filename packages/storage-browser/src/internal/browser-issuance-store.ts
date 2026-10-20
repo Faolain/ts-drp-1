@@ -51,6 +51,7 @@ import {
 	captureIssuanceNativeSignInput,
 	captureIssuancePendingUnsignedIntent,
 	captureIssuanceRetirementObject,
+	captureIssuanceRetirementPreparation,
 	createDurableIssuancePruningReceipt,
 	createDurableIssuancePruningState,
 	createDurableIssuanceRecordPrunedError,
@@ -83,6 +84,12 @@ import {
 	joinIssuanceNativeSign,
 	settlementPlanPermitsAuthenticatedPruning,
 } from "@ts-drp/issuance-store/maintenance";
+import {
+	roomRetentionControlDigest,
+	type RoomRetentionLabels,
+	type RoomRetentionProofBook,
+	RoomRetentionRefusal,
+} from "@ts-drp/storage/room-head";
 
 import {
 	captureNativeReadReservationInput,
@@ -97,6 +104,14 @@ import {
 	runNativeReservedRead,
 	visitCountedRange,
 } from "./native-read-reservation.js";
+import {
+	chargeRetentionRow,
+	type RoomRetentionSection,
+	type RoomRetentionSectionDraft,
+	type RoomRetentionTarget,
+	retentionStale,
+	retentionValueDigest,
+} from "./room-retention.js";
 import { openBrowserRoomOwnerConnection, roomStoreName, roomStoreNames } from "./schema-idb.js";
 
 const DATABASE_SUFFIX = "--drp-issuance-v1";
@@ -2771,6 +2786,122 @@ export function acquireBrowserRoomIssuanceStoreRetirement(
 	const implementation = owner !== undefined && roomIssuanceDatabases.get(owner) === databaseName ? owner : undefined;
 	if (implementation === undefined) throw new TypeError("RETENTION_FOREIGN_OWNER");
 	return implementation.acquireRetirementControlInSession(session, input);
+}
+
+/**
+ * Slices 14a/14b step B: the issuance owner's retention section (role 16: nothing is
+ * deleted). Inside the acting room transaction it reads the control and the original
+ * bounded row census of the object, charges both, and rechecks the original preparation
+ * row law for the planner's protected records. Ordinary issuance mutations advance the
+ * control's revision by one and nothing else, so the decision's base is the control
+ * without that counter; the target is composed in the acting transaction from the
+ * control actually read, through the original prepare and commit transitions.
+ * @param databaseName - The session's room database.
+ * @param store - A genuine room-mode issuance store (or its maintenance capability) of
+ * this database, when the caller holds one.
+ * @returns The section.
+ */
+export function browserRoomIssuanceRetentionSection(databaseName: string, store?: unknown): RoomRetentionSection {
+	if (store !== undefined) {
+		const owner =
+			typeof store === "object" && store !== null
+				? (implementationByStore.get(store as DurableIssuanceStore) ?? implementationByMaintenance.get(store))
+				: undefined;
+		if (owner === undefined || roomIssuanceDatabases.get(owner) !== databaseName)
+			throw new TypeError("RETENTION_FOREIGN_OWNER");
+	}
+	return Object.freeze<RoomRetentionSection>({
+		owner: "issuance" as const,
+		prepare: ({ session, selection, book }) =>
+			session.run(async (transaction) => {
+				const objectId = selection.objectId,
+					through = selection.throughEpoch,
+					chosen = selection.issuance;
+				const raw: unknown = await requestResult(
+					transaction.objectStore(roomStoreName(transaction.db, "issuance", "retirementControls")).get(objectId)
+				);
+				if (raw === undefined) return retentionStale("issuance:control-absent");
+				chargeRetentionRow(book, "issuance", "retirementControls", objectId, raw);
+				let control: DurableIssuanceRetirementControl | null;
+				let rows: IssuanceRetirementRows;
+				let image: ReturnType<typeof issuanceRetirementImage>;
+				try {
+					control = await browserRetirementControl(transaction, objectId);
+					rows = await browserRetirementRows(transaction, objectId);
+					image = issuanceRetirementImage(rows, objectId);
+				} catch (cause) {
+					const message = cause instanceof Error ? cause.message : "";
+					if (message.includes("exceeds bound"))
+						throw new RoomRetentionRefusal("RETENTION_CAPACITY", "issuance:census");
+					throw new RoomRetentionRefusal("RETENTION_CORRUPT", "issuance:census");
+				}
+				if (control === null) return retentionStale("issuance:control-absent");
+				if (control.active !== null) retentionStale("issuance:active");
+				for (const row of [...rows.lineages, ...rows.issued, ...rows.outbox, ...rows.plans])
+					book.charge(
+						"issuance",
+						encodeCanonical(row, {
+							maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes,
+							maxDepth: 16,
+							maxItems: ISSUANCE_RETIREMENT_LIMITS.maxRows * 32,
+						}).byteLength
+					);
+				const protectedRecords = chosen.protectedRecords.map((record) => ({ ...record }));
+				const preparation = (labels: Readonly<{ decisionDigest: string; sourceProofDigest: string }>) =>
+					captureIssuanceRetirementPreparation({
+						decisionDigest: labels.decisionDigest,
+						sourceProofDigest: labels.sourceProofDigest,
+						throughEpoch: through,
+						protectedRecords,
+					});
+				const current = control;
+				// The original preparation row law, label-independent, before anything is written.
+				try {
+					const probe = preparation({ decisionDigest: "0".repeat(64), sourceProofDigest: "0".repeat(64) });
+					if (current.completed !== null && probe.throughEpoch < current.completed.throughEpoch)
+						return retentionStale("issuance:advance");
+					assertIssuanceRetirementPreparationRows(current, probe, rows);
+				} catch (cause) {
+					if (cause instanceof RoomRetentionRefusal) throw cause;
+					return retentionStale(`issuance:rows:${cause instanceof Error ? cause.message : ""}`);
+				}
+				const { revision: _revision, ...state } = current;
+				const section: RoomRetentionSectionDraft = Object.freeze({
+					owner: "issuance" as const,
+					// Ordinary mutations advance only the revision counter: the base is the rest.
+					base: retentionValueDigest("retirementControls", objectId, state),
+					control: roomRetentionControlDigest(encodeIssuanceRetirementControl(current)),
+					through,
+					deletes: Object.freeze([]),
+					rewrites: Object.freeze([]),
+					compose: async (labels: RoomRetentionLabels) => {
+						let committed: DurableIssuanceRetirementControl;
+						try {
+							const prepared = await createIssuanceRetirementControlRead(current, image, async (next) => next).prepareFence(
+								preparation(labels)
+							);
+							committed = await createIssuanceRetirementControlRead(prepared, image, async (next) => next).commitPrepared();
+						} catch {
+							return retentionStale("issuance:transition");
+						}
+						const value = { objectId, record: encodeIssuanceRetirementControl(committed) };
+						return Object.freeze({
+							value,
+							digest: retentionValueDigest("retirementControls", objectId, value),
+							control: roomRetentionControlDigest(value.record),
+						});
+					},
+					write: (target: RoomRetentionTarget, writeBook: RoomRetentionProofBook) =>
+						session.run(async (writer) => {
+							writeBook.write({ kind: "control", owner: "issuance" });
+							await requestResult(
+								writer.objectStore(roomStoreName(writer.db, "issuance", "retirementControls")).put(target.value)
+							);
+						}),
+				});
+				return section;
+			}),
+	});
 }
 
 function captureRoomOptions(value: unknown): string {
