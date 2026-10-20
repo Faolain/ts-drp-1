@@ -20493,8 +20493,10 @@ async function cleanupCreatorSettlementSuccessor(
 				if (
 					source === undefined ||
 					source.admitted.epoch > closedEpoch - 2 ||
-					// Cold material drains only what its coordinated decision classified.
-					(classifiedThroughEpoch !== undefined && source.admitted.epoch > classifiedThroughEpoch) ||
+					// Cold material drains only what its coordinated decision classified,
+					// and only published rows (G19), whatever that classification said.
+					(classifiedThroughEpoch !== undefined &&
+						(source.admitted.epoch > classifiedThroughEpoch || row.publishState !== "published")) ||
 					!(
 						source.admitted.epoch < frontier.admissionEpoch ||
 						(frontier.terminalThrough !== null && row.authorSequence <= frontier.terminalThrough)
