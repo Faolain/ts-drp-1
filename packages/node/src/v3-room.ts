@@ -6777,7 +6777,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					});
 					// Ingress refused while admission was halted is repaired through the
 					// same authenticated retained path a reconnect uses.
-					if (result.kind === "maintained" && activeHandle === plane && transport === roomTransport)
+					if (result.kind === "maintained" && !closed && activeHandle === plane && transport === roomTransport)
 						roomTransport.requestRetainedHistory();
 				} catch (error) {
 					terminalFailure = error;
