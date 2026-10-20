@@ -5116,9 +5116,11 @@ const claimedCreatorCloseHandles = new WeakSet<V3PlaneHandle>();
 const HEX_DIGITS = "0123456789abcdef";
 
 if (
-	!installCreatorRecipientResolver((plane) => {
+	!installCreatorRecipientResolver((plane, resume) => {
 		const registration = v3HandleRegistrations.get(plane as V3PlaneHandle);
-		return registration === undefined ? undefined : creatorCloseRegistration(registration, "recipient");
+		return registration === undefined
+			? undefined
+			: creatorCloseRegistration(registration, resume === true ? "recipient-resume" : "recipient");
 	})
 )
 	throw new TypeError("v3 creator recipient registration resolver is unavailable");
@@ -19477,20 +19479,36 @@ async function sealCreatorReceivedRecoveryDependencies(
 async function runCreatorReceivedRecoveryMaintenance(registration: V3PlaneRegistration,
 	seal: () => ReturnType<V3CreatorCloseRegistration["sealReceivedRecoveryDependencies"]>,
 	consume: Parameters<V3CreatorCloseRegistration["runReceivedRecoveryMaintenance"]>[2],
-	options?: Readonly<{deferrable?: boolean}>): Promise<"ran" | "deferred"> {
+	options?: Readonly<{deferrable?: boolean; resume?: boolean}>): Promise<"ran" | "deferred"> {
 	// An unavailable boundary before entry has minted no hold, closed no gate and
 	// run no native work, so a deferrable request reports a scheduling miss.
-	const deferrable = options?.deferrable === true;
+	const resume = options?.resume === true, deferrable = options?.deferrable === true && !resume;
 	const payload = registration.payload, authorization = registration.authorization, trust = payload.trust.trust,
 		displacedSource = registration.displacedSource,
 		owners = [payload.input.store, registration.liveJournalStore, registration.issuanceStore] as const;
+	// Recipient twin of the creator's completed-resume discharge: a durable reopen
+	// after this copy completed its retirement at this epoch halts admission. That
+	// stored decision only requests the ORIGINAL received reconstruction; it grants
+	// no admission, and cannot discharge an active intent or a different halt.
+	const resumeControl = registration.retirementResumeControl, reconstruction = registration.retirementReconstruction;
+	const completedRequestMatches = (): boolean => resumeControl?.active === null &&
+		resumeControl.objectId === payload.provenance.objectId && resumeControl.completed?.domains !== undefined &&
+		resumeControl.completed.throughEpoch + 1 === trust.currentEpoch &&
+		(reconstruction === undefined || sameHead(reconstruction.head, payload.trust.head) &&
+			sameCreatorRoomHead(reconstruction.roomHead, trust)) && creatorRetirementResumeRequested(registration);
+	const completedResume = resume && registration.operationAdmissionHalted && completedRequestMatches() ? resumeControl : undefined;
+	if (resume && completedResume === undefined) return "deferred";
+	const admissionStateCurrent = (): boolean => completedResume === undefined
+		? !registration.operationAdmissionHalted
+		: registration.retirementResumeControl === resumeControl && registration.retirementReconstruction === reconstruction &&
+			registration.operationAdmissionHalted && completedRequestMatches();
 	let entered = false, accepting = false, finished = false;
 	let enteredGraph: Readonly<{version: number; index: V3PlaneRegistration["index"]}> | undefined;
 	const available = (): boolean => !finished && currentRegistration(registration) &&
 		registration.mode === "genesis-active" && registration.payload === payload && registration.authorization === authorization &&
 		authorization.kind === "latched-acl" && payload.trust.trust === trust && trust.currentEpoch >= 2 &&
 		registration.payload.input.store === owners[0] && registration.liveJournalStore === owners[1] &&
-		registration.issuanceStore === owners[2] && registration.terminalState === "active" && !registration.operationAdmissionHalted &&
+		registration.issuanceStore === owners[2] && registration.terminalState === "active" && admissionStateCurrent() &&
 		registration.blueprintClosing === entered && (registration.receivedTransition === true) === entered &&
 		!registration.blueprintFolded && !registration.terminalTransitionQueued && !registration.terminalPublicationEntered &&
 		registration.terminalBarrier === undefined && !registration.retainedBootstrapHold && !registration.drainingPendingIngress &&
@@ -19536,7 +19554,10 @@ async function runCreatorReceivedRecoveryMaintenance(registration: V3PlaneRegist
 				})());
 			};
 			try {
-				if (await consume(boundarySeal) !== "complete")
+				// A resume must reach the original terminal reconciliation through at
+				// least one sealed census; a no-op never discharges the halt.
+				if (await consume(boundarySeal, completedResume !== undefined) !== "complete" ||
+					completedResume !== undefined && lifetimes.length === 0)
 					throw new TypeError("creator recipient maintenance did not complete");
 			} finally { accepting = false; }
 			if (!available()) throw new TypeError("creator recipient maintenance boundary changed");
@@ -19556,6 +19577,13 @@ async function runCreatorReceivedRecoveryMaintenance(registration: V3PlaneRegist
 			finished = true; registration.readinessMaintenanceEntered = false;
 			throw failed ? primary : new TypeError("creator recipient maintenance boundary was revoked during release");
 		}
+		// Every original terminal verification and admitted release succeeded while
+		// this SAME private request still owns the halt; no await separates them.
+		if (completedResume !== undefined) {
+			registration.retirementResumeControl = undefined;
+			registration.retirementReconstruction = undefined;
+			registration.operationAdmissionHalted = false;
+		}
 		finished = true; registration.receivedTransition = false; registration.blueprintClosing = false; entered = false;
 		registration.readinessMaintenanceEntered = false;
 	});
@@ -19564,14 +19592,16 @@ async function runCreatorReceivedRecoveryMaintenance(registration: V3PlaneRegist
 
 function creatorCloseRegistration(
 	registration: V3PlaneRegistration,
-	purpose: "close" | "recipient" = "close",
+	purpose: "close" | "recipient" | "recipient-resume" = "close",
 	closePlane: V3PlaneHandle = registration.handle
 ): V3CreatorCloseRegistration | undefined {
+	// A halted recipient resolves only for the resume that runs its ORIGINAL
+	// reconstruction; installs and lulls still find it unavailable.
 	if (
 		!currentRegistration(registration) ||
 		(purpose === "close" && registration.receiveOnly) ||
 		(registration.operationAdmissionHalted &&
-			!(purpose === "close" && creatorRetirementResumeRequested(registration))) ||
+			!(purpose !== "recipient" && creatorRetirementResumeRequested(registration))) ||
 		registration.mode !== "genesis-active" ||
 		registration.authorization.kind !== "latched-acl" ||
 		registration.terminalState !== "active" ||

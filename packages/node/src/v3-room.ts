@@ -12,6 +12,7 @@ import {
 	captureCreatorSuccessorPeers,
 	createCreatorSuccessorMaterialServer,
 	CreatorSuccessorExportUnavailable,
+	creatorRecipientRetirementResumeRequested,
 	type CreatorRecipientRecoveryContext,
 	type CreatorSuccessorOffer,
 	maintainCreatorRecipientRecoveryPool,
@@ -6734,6 +6735,70 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			open();
 		}
 	};
+	// A durable reopen right after this recipient completed a retirement at its
+	// current epoch (a lull's early turnover) halts its admission until the ORIGINAL
+	// received reconciliation runs again, as a creator's readiness boundary does for
+	// a creator. Discharge it once, in the lifecycle FIFO before startup reports
+	// ready, holding local issues meanwhile. A failure after entry is terminal; a
+	// plane without that request is left exactly as it was.
+	let recipientRetirementResume: Promise<void> = Promise.resolve();
+	if (
+		input.creatorFinalitySigner === undefined &&
+		activeHandle !== undefined &&
+		creatorRecipientRetirementResumeRequested(activeHandle)
+	) {
+		let open!: () => void;
+		const barrier = new Promise<void>((resolve) => { open = resolve; });
+		poolMaintenanceBarrier = barrier;
+		const release = (): void => {
+			if (poolMaintenanceBarrier === barrier) poolMaintenanceBarrier = undefined;
+			open();
+		};
+		try {
+			recipientRetirementResume = enqueueLifetimeTransition(async () => {
+				try {
+					await rebasePromise;
+					await migrationCompletionBarrier;
+					await refreshRoomHeadState();
+					await drainPendingIssues();
+					assertSessionOpen();
+					const plane = activeHandle,
+						roomTransport = transport,
+						roomHead = openedRoomHeadState?.stable;
+					if (plane === undefined || roomTransport === undefined || roomHead === undefined || openedRoomHeadState?.pending !== null)
+						throw new TypeError("v3 room recipient retirement resume owner is unavailable");
+					const result = await maintainCreatorRecipientRecoveryPool({
+						plane,
+						catalog: input.application.catalog,
+						expectedRoomHead: roomHead,
+						snapshotStore: await ownRecipientSnapshots(),
+						recoveryContext: await recipientRecoveryContext(),
+						resume: true,
+					});
+					// Ingress refused while admission was halted is repaired through the
+					// same authenticated retained path a reconnect uses.
+					if (result.kind === "maintained" && activeHandle === plane && transport === roomTransport)
+						roomTransport.requestRetainedHistory();
+				} catch (error) {
+					terminalFailure = error;
+					try {
+						await shutdown();
+					} catch (cleanup) {
+						throw combineFailures(error, cleanup);
+					}
+					throw error;
+				} finally {
+					release();
+				}
+			});
+		} catch (error) {
+			recipientRetirementResume = Promise.reject(error);
+		}
+		void recipientRetirementResume.then(release, (error: unknown) => {
+			release();
+			terminalFailure = error;
+		});
+	}
 	const installCreatorSuccessor = (
 		request: Readonly<{ offer: CreatorSuccessorOffer; peers: readonly string[] }>
 	): Promise<void> => {
@@ -7398,6 +7463,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		if (terminalFailure !== undefined) throw terminalFailure;
 		if (closed) throw new TypeError("v3 room session is closed");
 		await rebasePromise;
+		await recipientRetirementResume;
 		if (terminalFailure !== undefined) throw terminalFailure;
 		if (closed) throw new TypeError("v3 room session is closed");
 	});

@@ -422,13 +422,16 @@ export interface V3CreatorCloseRegistration {
 	): Promise<Readonly<{hold: CreatorSnapshotRecoveryCloseHold; readRetiredGenerations(): readonly GenerationRecord[]}> | undefined>;
 	/** Explicit queued quiescent recipient boundary: the SAME received gate an
 	 * install enters, reopened only after every admitted hold and release joined.
-	 * `deferrable` reports an unavailable boundary before entry instead of halting. */
+	 * `deferrable` reports an unavailable boundary before entry instead of halting.
+	 * `resume` runs it only to discharge a durable reopen's completed-retirement
+	 * halt, by the ORIGINAL reconstruction; it reports "deferred" when no such
+	 * request matches. */
 	runReceivedRecoveryMaintenance(
 		signing: import("@ts-drp/seal/creator").CreatorSigningRecoveryOwner,
 		snapshots: import("@ts-drp/storage/snapshot-transfer").SnapshotRecoveryStore<SnapshotVerificationReceipt>,
 		consume: (seal: () => Promise<Readonly<{hold: CreatorSnapshotRecoveryCloseHold;
-			readRetiredGenerations(): readonly GenerationRecord[]}>>) => Promise<"complete">,
-		options?: Readonly<{deferrable?: boolean}>
+			readRetiredGenerations(): readonly GenerationRecord[]}>>, requireClosedWorkflowCompletion: boolean) => Promise<"complete">,
+		options?: Readonly<{deferrable?: boolean; resume?: boolean}>
 	): Promise<"ran" | "deferred">;
 	sealIssuanceMaintenanceDependencies(receivedReceipt?: object): Promise<CreatorSnapshotRecoveryCloseHold | undefined>;
 	/** Prepare bounded idle issuer metadata before the explicit cold readiness capture. */

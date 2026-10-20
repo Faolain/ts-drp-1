@@ -904,6 +904,7 @@ async function runReceivedRecoveryTurnoverPasses(input: Readonly<{
 	catalog: TrustedBlueprintCatalog;
 	context: CreatorRecipientRecoveryContext;
 	signing: ReceivedSigningOwner;
+	requireClosedWorkflowCompletion?: boolean;
 }>, seal: () => Promise<ReceivedRecoverySeal | undefined>): Promise<readonly GenerationRecord[]> {
 	const { source, context } = input;
 	const census = await input.signing.captureRetirementOwners().acquireEvidence();
@@ -936,7 +937,7 @@ async function runReceivedRecoveryTurnoverPasses(input: Readonly<{
 				exactCanonicalPinnedGenesisTrustStateRecordBytes: context.exactCanonicalPinnedGenesisTrustStateRecordBytes,
 				catalog: input.catalog,
 				objectId: source.objectId, store: source.store, snapshotStore: input.snapshotStore,
-				liveJournalStore: source.liveJournalStore}, sealed.hold);
+				liveJournalStore: source.liveJournalStore}, sealed.hold, input.requireClosedWorkflowCompletion === true);
 			retired.push(...sealed.readRetiredGenerations());
 		} catch (error) {retirementFailed = true; retirementPrimary = error; throw error;}
 		finally {await releaseCreatorRecoveryReader(lifetime, retirementFailed, retirementPrimary, "creator recipient retirement dependencies cleanup failed");}
@@ -947,11 +948,26 @@ async function runReceivedRecoveryTurnoverPasses(input: Readonly<{
 }
 
 /**
+ * Whether a durable reopen left this recipient's plane halted on its own completed
+ * retirement at the current epoch. Observation only: it grants no admission.
+ * @param plane - The recipient's genuine live plane.
+ * @returns Whether the original received reconstruction is still owed.
+ */
+export function creatorRecipientRetirementResumeRequested(plane: V3PlaneHandle): boolean {
+	return resolveCreatorRecipientRegistration(plane, true)?.needsOrdinaryReadinessRecovery() === true;
+}
+
+/**
  * Explicit opt-in early recipient turnover at a caller-chosen quiescent lull.
  * Because the install's predicate is state-based, the SAME original passes run
  * now make it false at the next install; inline install turnover remains the
  * backstop. This grants no authority: an unavailable or busy boundary is
  * reported before entry, never forced. After entry, any failure is recovery work.
+ * With `resume`, the SAME passes instead discharge a durable reopen's halt on a
+ * retirement this copy completed at its current epoch (a creator's readiness
+ * boundary does this for the creator): they must reach the original terminal
+ * reconciliation before the halt clears. A plane without that request reports
+ * "not-needed" or "deferred" and is left untouched.
  * @param input - The recipient's genuine live plane, catalog, current room head and native ports.
  * @returns Whether the boundary maintained the pool, found no pressure, or deferred.
  */
@@ -961,16 +977,19 @@ export async function maintainCreatorRecipientRecoveryPool(input: Readonly<{
 	expectedRoomHead: Readonly<{ objectId: string; epoch: number; currentAnchorDigest: string }>;
 	snapshotStore: SnapshotRecoveryStore<SnapshotVerificationReceipt>;
 	recoveryContext: CreatorRecipientRecoveryContext;
+	resume?: true;
 }>): Promise<CreatorRecoveryPoolResult> {
-	const source = resolveCreatorRecipientRegistration(input.plane);
+	const resume = input.resume === true;
+	const source = resolveCreatorRecipientRegistration(input.plane, resume);
 	if (source === undefined || input.snapshotStore.captureRecoveryRoleInventory === undefined)
 		return Object.freeze({kind: "deferred", reason: "unsupported"});
 	if (!sameCreatorRoomHead(input.expectedRoomHead, source.currentTrust))
 		return Object.freeze({kind: "deferred", reason: "busy"});
 	// Observational point reads before any admission: "not-needed" leaves the
-	// received gate, ordinary issuance and native state untouched.
-	const current = await inspectHead(source.store, source.objectId);
-	if (!(await receivedRecoveryTurnoverDue(source, input.snapshotStore, current.candidates)))
+	// received gate, ordinary issuance and native state untouched. A resume is
+	// requested by the plane's own halt, not by pool pressure.
+	if (resume ? !source.needsOrdinaryReadinessRecovery() :
+		!(await receivedRecoveryTurnoverDue(source, input.snapshotStore, (await inspectHead(source.store, source.objectId)).candidates)))
 		return Object.freeze({kind: "not-needed"});
 	const context = input.recoveryContext;
 	const opened = await createCreatorSigningRecoveryOwner({currentTrust: source.currentTrust,
@@ -978,13 +997,13 @@ export async function maintainCreatorRecipientRecoveryPool(input: Readonly<{
 	if (!opened.ok) throw new TypeError(`creator recipient signing custody unavailable: ${opened.reason}`);
 	let outcome: "ran" | "deferred";
 	try {
-		outcome = await source.runReceivedRecoveryMaintenance(opened.owner, input.snapshotStore, async (seal) => {
+		outcome = await source.runReceivedRecoveryMaintenance(opened.owner, input.snapshotStore, async (seal, requireClosedWorkflowCompletion) => {
 			// These generations belong to this stable boundary. The next install's
 			// own turnover (if any) classifies from the state it then observes.
 			await runReceivedRecoveryTurnoverPasses({source, snapshotStore: input.snapshotStore, catalog: input.catalog,
-				context, signing: opened.owner}, seal);
+				context, signing: opened.owner, requireClosedWorkflowCompletion}, seal);
 			return "complete";
-		}, {deferrable: true});
+		}, resume ? {resume: true} : {deferrable: true});
 	} finally {
 		await opened.owner.stop();
 	}

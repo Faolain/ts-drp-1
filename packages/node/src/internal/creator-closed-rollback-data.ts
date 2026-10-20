@@ -21632,13 +21632,16 @@ export async function reconcileCreatorSnapshotRecoveryRoles(
  * window, so without it those prefixes are stranded (scheduling only, never eligibility).
  * @param value - Independent pinned floor and genuine native owners.
  * @param closeHold - Genuine received seal's joined native dependency census.
+ * @param requireClosedWorkflowCompletion - A durable-reopen resume must reach the
+ * original terminal retirement result, exactly as the creator's resume does.
  */
 export async function reconcileCreatorReceivedSnapshotRecoveryRoles(
 	value: CreatorClosedRollbackDataInput,
-	closeHold: CreatorSnapshotRecoveryCloseHold
+	closeHold: CreatorSnapshotRecoveryCloseHold,
+	requireClosedWorkflowCompletion = false
 ): Promise<"complete" | "fresh-summary-required"> {
 	try {
-		return (await reconcileSnapshotRecoveryRoles(value, closeHold, false, false, undefined, undefined, true))
+		return (await reconcileSnapshotRecoveryRoles(value, closeHold, false, requireClosedWorkflowCompletion, undefined, undefined, true))
 			? "fresh-summary-required" : "complete";
 	} catch (error) {
 		throwCreatorSnapshotRecoveryFailure(error);
