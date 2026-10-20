@@ -231,7 +231,7 @@ export {
 	type CreatorSnapshotRecoveryCloseHold,
 	resolveCreatorSnapshotRecoveryCloseHold,
 } from "./internal/runtime-reclamation.js";
-import type { V3RoomRetirementSession } from "./internal/room-retirement.js";
+import { type V3RoomRetirementSession, v3RoomRetentionOpener } from "./internal/room-retirement.js";
 import { deriveV3StableTopic } from "./internal/v3-topic.js";
 import { classifyV3EnvelopeScope } from "./v3-envelope-scope.js";
 import { consumeRecoveredV3LiveAuthority, installRecoveredV3LiveAuthority } from "./v3-live-recovered-authority.js";
@@ -11297,8 +11297,9 @@ async function runCreatorOrdinaryReadinessMaintenance(registration: V3PlaneRegis
 	// recovery halt. The trusted close owner below must reach a terminal native
 	// reconciliation result; its admitted holds/releases must then join.
 	const completedRequestMatches = (): boolean => resumeControl?.active === null &&
-		resumeControl.objectId === payload.provenance.objectId && resumeControl.completed?.domains !== undefined &&
-		resumeControl.completed.throughEpoch + 1 === epoch &&
+		resumeControl.objectId === payload.provenance.objectId &&
+		completedRetirementRecorded(registration, resumeControl, reconstruction) &&
+		resumeControl.completed!.throughEpoch + 1 === epoch &&
 		(reconstruction === undefined || sameHead(reconstruction.head, payload.trust.head) &&
 			sameCreatorRoomHead(reconstruction.roomHead, trust)) && creatorRetirementResumeRequested(registration);
 	const completedResume = registration.operationAdmissionHalted && completedRequestMatches() ? resumeControl : undefined;
@@ -19241,6 +19242,28 @@ function creatorClosePreviousHistorySnapshot(payload: PreparedV3LivePayload): Ac
  * @param closePlane - Exact genuine handle bound to the creator-close owner.
  * @returns A close registration backed by the private live registry, or undefined.
  */
+/**
+ * Whether a durable completed AHE retirement control records a completed boundary.
+ * The original two-phase completion carries its participant domains. Slice 14b, on a
+ * room host that opted into verified retention only: one retention transaction wrote
+ * every owner at once and so has no participant domains; together with the addressed
+ * turnover receipt that this reopen found, it is the same completed-boundary request,
+ * discharged by the same original reconstruction. Other hosts keep the original rule.
+ * Observation only; it grants nothing.
+ * @param registration - Private genuine live registration (selects the host opt-in).
+ * @param control - The durable completed control.
+ * @param receipt - The addressed turnover receipt this reopen reconstructed, if any.
+ * @returns Whether the control records a completed boundary.
+ */
+function completedRetirementRecorded(registration: V3PlaneRegistration, control: AheRetirementControl,
+	receipt: CreatorSnapshotRetirementReconstructionRequest | undefined): boolean {
+	const completed = control.completed;
+	if (completed === null) return false;
+	if (completed.domains !== undefined) return true;
+	return receipt !== undefined && control.kind === "ahe-retirement-control-3" && completed.generationDrain === undefined &&
+		v3RoomRetentionOpener(registration.payload.input.store) !== undefined;
+}
+
 /** A private request for original authenticated reconstruction, never a grant
  * to issue, admit, retire or replace the addressed durable decision. */
 function creatorRetirementResumeRequested(registration: V3PlaneRegistration): boolean {
@@ -19255,8 +19278,8 @@ function creatorRetirementResumeRequested(registration: V3PlaneRegistration): bo
 			(control.active !== null
 				? control.active.preparation.head.kind === "present" &&
 					sameHead(control.active.preparation.head, registration.payload.trust.head)
-				: control.completed?.domains !== undefined &&
-					control.completed.throughEpoch + 1 === registration.payload.trust.trust.currentEpoch))
+				: completedRetirementRecorded(registration, control, receipt) &&
+					control.completed!.throughEpoch + 1 === registration.payload.trust.trust.currentEpoch))
 	);
 }
 
@@ -19497,8 +19520,9 @@ async function runCreatorReceivedRecoveryMaintenance(registration: V3PlaneRegist
 	// no admission, and cannot discharge a different halt.
 	const resumeControl = registration.retirementResumeControl, reconstruction = registration.retirementReconstruction;
 	const completedRequestMatches = (): boolean => resumeControl?.active === null &&
-		resumeControl.objectId === payload.provenance.objectId && resumeControl.completed?.domains !== undefined &&
-		resumeControl.completed.throughEpoch + 1 === trust.currentEpoch &&
+		resumeControl.objectId === payload.provenance.objectId &&
+		completedRetirementRecorded(registration, resumeControl, reconstruction) &&
+		resumeControl.completed!.throughEpoch + 1 === trust.currentEpoch &&
 		(reconstruction === undefined || sameHead(reconstruction.head, payload.trust.head) &&
 			sameCreatorRoomHead(reconstruction.roomHead, trust)) && creatorRetirementResumeRequested(registration);
 	// An unfinished intent this copy prepared at this same head (a crash or failure
@@ -20972,8 +20996,9 @@ async function activateCreatorSuccessorLive(
 			// mature retirement transfer to resume. Active and reconstructed debt
 			// still halt independently; completed retirement begins at epoch two.
 			(material.successor.trust.currentEpoch >= 2 &&
-				retirementControl?.completed?.domains !== undefined &&
-				retirementControl.completed.throughEpoch + 1 === material.successor.trust.currentEpoch);
+				retirementControl !== null && retirementControl !== undefined &&
+				completedRetirementRecorded(activatedRegistration, retirementControl, receipt) &&
+				retirementControl.completed!.throughEpoch + 1 === material.successor.trust.currentEpoch);
 		if (retirementControl !== null && resumeCheckpoint) {
 			activatedRegistration.operationAdmissionHalted = true;
 			activatedRegistration.retirementResumeControl = retirementControl;

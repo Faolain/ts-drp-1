@@ -56,6 +56,12 @@ export interface V3RoomStorageHost {
 	 * presence selects the room retirement path; without it the current path runs.
 	 */
 	openRoomRetirement?(name: string): Promise<V3RoomRetirementSession>;
+	/**
+	 * Optional (slice 14b): with `openRoomRetirement`, retire each closed epoch by one
+	 * verified retention decision per room transaction instead of the per-pass install.
+	 * Selection only; it grants no authority.
+	 */
+	readonly roomRetention?: true;
 	openRoomHead(
 		name: string,
 		initialization: RoomHeadInitialization
@@ -109,6 +115,8 @@ export function captureV3RoomStorageHost(value: V3RoomStorageHost): V3RoomStorag
 	if (retirement !== undefined && typeof retirement !== "function")
 		throw new TypeError("v3 room storage host retirement factory is unavailable");
 	const openRetirement = retirement?.bind(value);
+	const retention = value.roomRetention;
+	if (retention !== undefined && retention !== true) throw new TypeError("v3 room storage host retention option is invalid");
 	for (const name of FACTORIES) {
 		const factory = value[name];
 		if (typeof factory !== "function") throw new TypeError("v3 room storage host factory is unavailable");
@@ -117,7 +125,7 @@ export function captureV3RoomStorageHost(value: V3RoomStorageHost): V3RoomStorag
 			enumerable: true,
 			value:
 				name === "openAhe" && openRetirement !== undefined
-					? roomAheFactory(bound as V3RoomStorageHost["openAhe"], openRetirement)
+					? roomAheFactory(bound as V3RoomStorageHost["openAhe"], openRetirement, retention === true)
 					: bound,
 		});
 	}
@@ -128,6 +136,8 @@ export function captureV3RoomStorageHost(value: V3RoomStorageHost): V3RoomStorag
 	}
 	if (openRetirement !== undefined)
 		Object.defineProperty(captured, "openRoomRetirement", { enumerable: true, value: openRetirement });
+	if (openRetirement !== undefined && retention === true)
+		Object.defineProperty(captured, "roomRetention", { enumerable: true, value: true });
 	return Object.freeze(captured);
 }
 
@@ -138,17 +148,19 @@ const AHE_SUFFIX = "--ahe";
  * that host's session over `name`. The session verifies every owner it acts for.
  * @param openAhe - The captured AHE factory.
  * @param openRetirement - The captured room retirement factory.
+ * @param retention - Whether the host opted into slice 14b retention.
  * @returns The AHE factory, unchanged in behaviour and result.
  */
 function roomAheFactory(
 	openAhe: V3RoomStorageHost["openAhe"],
-	openRetirement: NonNullable<V3RoomStorageHost["openRoomRetirement"]>
+	openRetirement: NonNullable<V3RoomStorageHost["openRoomRetirement"]>,
+	retention: boolean
 ): V3RoomStorageHost["openAhe"] {
 	return async (name: string) => {
 		const store = await openAhe(name);
 		if (name.endsWith(AHE_SUFFIX)) {
 			const room = name.slice(0, -AHE_SUFFIX.length);
-			registerV3RoomRetirementOpener(store, () => openRetirement(room));
+			registerV3RoomRetirementOpener(store, () => openRetirement(room), { retention });
 		}
 		return store;
 	};

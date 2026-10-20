@@ -388,7 +388,7 @@ export function createNodeRoomHeadAuthority(options: NodeRoomHeadOptions, sessio
 				return (join ??= held.release());
 			};
 			async function change(
-				kind: "prepare" | "abort" | "commit",
+				kind: "prepare" | "abort" | "commit" | "fence",
 				value: RoomHeadFenceCommitment
 			): Promise<RoomHeadControl> {
 				if (released || consumed) throw new Error("ROOM_HEAD_OBSERVATION_RELEASED");
@@ -398,7 +398,11 @@ export function createNodeRoomHeadAuthority(options: NodeRoomHeadOptions, sessio
 				return transact(true, () => {
 					const now = load(scope);
 					if (now === null || !sameRoomHeadValue(now, original)) throw new Error("ROOM_HEAD_CONTROL_STALE");
-					const next = roomHeadRetirementChange(now, kind, commitment);
+					// Slice 14b step A: prepare then commit one decision's labels in this one transaction.
+					const next =
+						kind === "fence"
+							? roomHeadRetirementChange(roomHeadRetirementChange(now, "prepare", commitment), "commit", commitment)
+							: roomHeadRetirementChange(now, kind, commitment);
 					save(next);
 					return next.control;
 				});
@@ -412,6 +416,7 @@ export function createNodeRoomHeadAuthority(options: NodeRoomHeadOptions, sessio
 				prepareFence: (value: RoomHeadFenceCommitment) => change("prepare", value),
 				abortPrepared: (value: RoomHeadFenceCommitment) => change("abort", value),
 				commitPrepared: (value: RoomHeadFenceCommitment) => change("commit", value),
+				fenceDecision: (value: RoomHeadFenceCommitment) => change("fence", value),
 				release,
 			});
 		},

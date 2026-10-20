@@ -104,9 +104,14 @@ function existingDatabaseVersion(databaseName: string): Promise<number | undefin
  * others; its retirement session then runs each owner's original retirement on one
  * strict transaction per stage. The host floor (`--room-head`) stays its own database.
  * The default host is unchanged.
+ * @param options - `roomRetention` (slice 14b, opt-in on top of the room database):
+ * recovery-pool maintenance retires each closed-epoch boundary by verified retention
+ * decisions, one room transaction each, instead of the existing per-class passes.
  * @returns A storage host whose factories prepare the room database before opening.
  */
-export function createBrowserV3RoomDatabaseStorageHost(): V3RoomStorageHost {
+export function createBrowserV3RoomDatabaseStorageHost(
+	options: Readonly<{ roomRetention?: true }> = {}
+): V3RoomStorageHost {
 	// Until a migration exists (slice 14d), only a new room or an existing room database
 	// is served. A room in the six-database layout is refused before its main database
 	// changes, so the default host can still open it.
@@ -140,6 +145,7 @@ export function createBrowserV3RoomDatabaseStorageHost(): V3RoomStorageHost {
 		openRoomRetirement: (name: string) => openBrowserRoomRetirement({ databaseName: name }),
 		openRoomHead: (databaseName: string, initialization: V3RoomHeadInitialization) =>
 			createBrowserRoomHeadAuthority({ databaseName, initialization }),
+		...(options.roomRetention === true ? { roomRetention: true as const } : {}),
 	});
 }
 

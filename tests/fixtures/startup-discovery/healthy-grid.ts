@@ -57,7 +57,7 @@ async function createHealthyGridRole(input:{index:number;database:string;identit
   // Opt-in single room database (slice 14a): every owner in one version-7 database
   // and each retirement install in one room session. The floor stays separate.
   const roomDatabase=Reflect.get(input,"roomDatabase")===true;
-  session=await createV3RoomSession({...(roomDatabase?{storageHost:createBrowserV3RoomDatabaseStorageHost()}:{}),application:configuredApplication,author,...(autoPool===undefined?{}:{recoveryPoolAutoMaintenance:autoPool}),creatorInvite:invite,databaseName:database,issuanceDatabaseName:database,migrationDatabaseNamespace:database,
+  session=await createV3RoomSession({...(roomDatabase?{storageHost:createBrowserV3RoomDatabaseStorageHost(Reflect.get(input,"roomRetention")===true?{roomRetention:true}:{})}:{}),application:configuredApplication,author,...(autoPool===undefined?{}:{recoveryPoolAutoMaintenance:autoPool}),creatorInvite:invite,databaseName:database,issuanceDatabaseName:database,migrationDatabaseNamespace:database,
    objectId,publicKeyBytes:ed25519.getPublicKey(key),initialLogicalTime:3,...(finality?{creatorFinalitySigner:finality.signer}:{}),roomHeadAuthority:floor,
    ...(presentation===undefined?{}:{presentation}),
    openTransport:()=>({...peer.open(),openEphemeral:openFixtureEphemeral}),signRegisteredVertexDigest:async digest=>ed25519.sign(digest,key),onAcceptedVertex:vertex=>{
@@ -475,7 +475,7 @@ export async function runHealthyGrid(identity:string,origins:readonly string[],r
   for(let index=0;index<4;index++)await rpc(index,"init",{index,id:ids[index],connected:ids.filter((_,other)=>other!==index),suspensionProbe:typeof suspendTransfer==="function"});
   for(let index=0;index<4;index++)await rpc(index,"open",{index,database:identity+"-role-"+index,identity,objectId,invite,kind,
    autoPool:Reflect.get(globalThis,"__rdPoolMaintenanceAuto")===true,presentation:Reflect.get(globalThis,"__rdPresentation"),
-   roomDatabase:Reflect.get(globalThis,"__rdRoomDatabase")===true});
+   roomDatabase:Reflect.get(globalThis,"__rdRoomDatabase")===true,roomRetention:Reflect.get(globalThis,"__rdRoomRetention")===true});
   await Promise.all(active.map(role=>rpc(role.index,"history")));
  }
  async function close(){

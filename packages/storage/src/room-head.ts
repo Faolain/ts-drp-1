@@ -57,6 +57,12 @@ export interface RoomHeadRetirementObservation {
 	prepareFence(input: RoomHeadFenceCommitment): Promise<RoomHeadControl>;
 	abortPrepared(input: RoomHeadFenceCommitment): Promise<RoomHeadControl>;
 	commitPrepared(input: RoomHeadFenceCommitment): Promise<RoomHeadControl>;
+	/**
+	 * Optional (slice 14b step A): the same prepare then commit of one decision's labels,
+	 * in ONE native transaction, so no crash leaves the floor's control active. The
+	 * result is exactly the state `prepareFence` then `commitPrepared` reach.
+	 */
+	fenceDecision?(input: RoomHeadFenceCommitment): Promise<RoomHeadControl>;
 	release(): Promise<void>;
 }
 
