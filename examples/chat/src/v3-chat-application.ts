@@ -1,5 +1,6 @@
 import type { TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog/bytes";
 import { decodeCanonical } from "@ts-drp/canonical";
+import type { CanonicalResourceFootprint } from "@ts-drp/canonical/resource";
 import type { V3OperationAdmissionPolicyFactory } from "@ts-drp/node/v3-live";
 import type { V3RoomApplication, V3RoomProjectionInput } from "@ts-drp/node/v3-room";
 import { prepareBlueprintAdmission, prepareBlueprintRuntime } from "@ts-drp/protocol-v3";
@@ -9,6 +10,7 @@ import {
 	createShippingChatCapacityAdmissionPolicy,
 	createShippingChatGenesisStateBytes,
 	restoreShippingChatCapacityState,
+	SHIPPING_CHAT_CAPACITY_STATE_LIMITS,
 	type ShippingChatCapacity,
 	shippingChatCapacityStateBytes,
 } from "./v3-chat-capacity.js";
@@ -35,6 +37,92 @@ export type ShippingChatApplication = V3RoomApplication<ShippingChatProjection> 
 	Readonly<{
 		createOperationAdmissionPolicy: V3OperationAdmissionPolicyFactory;
 	}>;
+
+type ResourceBoundReader = NonNullable<V3RoomApplication["readOrdinaryApplicationResourceBound"]>;
+type ResourceCatalog = Parameters<ResourceBoundReader>[0]["catalog"];
+const RESOURCE_IDENTITY_KEYS = [
+	"blueprintDigest",
+	"artifactId",
+	"artifactDigest",
+	"catalogDigest",
+	"runtimeProfile",
+] as const;
+const RESOURCE_CARRIER_KEYS = ["exactArtifactBytes", "canonicalBlueprintPackageBytes"] as const;
+const RESOURCE_MATERIAL_KEYS = [
+	"exactCanonicalBaseStateBytes",
+	"currentOperations",
+	"protectedOperations",
+	"recoveryOperations",
+	"candidateOperation",
+] as const;
+
+/**
+ * Own data properties of a record with exactly `keys`; no accessor runs.
+ * @param value - The untrusted value.
+ * @param keys - Its exact own keys.
+ * @returns The values by key, or undefined for any other shape.
+ */
+function resourceDataRecord(value: unknown, keys: readonly string[]): Readonly<Record<string, unknown>> | undefined {
+	if (
+		value === null ||
+		typeof value !== "object" ||
+		Array.isArray(value) ||
+		Reflect.ownKeys(value).length !== keys.length
+	)
+		return undefined;
+	const descriptors = Object.getOwnPropertyDescriptors(value);
+	const out: Record<string, unknown> = {};
+	for (const key of keys) {
+		const descriptor = descriptors[key];
+		if (descriptor === undefined || !("value" in descriptor)) return undefined;
+		out[key] = descriptor.value;
+	}
+	return out;
+}
+
+/**
+ * The base states of a resource bound input that names exactly this composition's catalog
+ * entry, in the shape the room supplies (packages/node/src/internal/runtime-reclamation.ts
+ * `CreatorOrdinaryApplicationResourceBoundInput`), as the Grid's reader checks it
+ * (examples/grid/src/v3-zone.ts `captureResourceMaterial`); undefined for anything else.
+ * The same check as packages/node/src/applications/canvas.ts `resourceBoundBases`.
+ * @param input - The room's resource bound input.
+ * @param expected - The composition's own resolved catalog entry, copied at composition.
+ * @returns The non-empty dense list of base state byte strings, unvalidated.
+ */
+function resourceBoundBases(input: unknown, expected: ResourceCatalog): readonly Uint8Array[] | undefined {
+	const outer = resourceDataRecord(input, ["catalog", "material"]);
+	const entry = resourceDataRecord(outer?.catalog, [...RESOURCE_IDENTITY_KEYS, ...RESOURCE_CARRIER_KEYS]);
+	if (outer === undefined || entry === undefined || RESOURCE_IDENTITY_KEYS.some((key) => entry[key] !== expected[key]))
+		return undefined;
+	for (const key of RESOURCE_CARRIER_KEYS) {
+		const value = entry[key];
+		if (
+			!(value instanceof Uint8Array) ||
+			value.byteLength !== expected[key].byteLength ||
+			value.some((byte, index) => byte !== expected[key][index])
+		)
+			return undefined;
+	}
+	const material = resourceDataRecord(outer.material, RESOURCE_MATERIAL_KEYS);
+	if (
+		material === undefined ||
+		!Array.isArray(material.currentOperations) ||
+		!Array.isArray(material.protectedOperations) ||
+		!Array.isArray(material.recoveryOperations)
+	)
+		return undefined;
+	const bases: unknown = material.exactCanonicalBaseStateBytes;
+	if (!Array.isArray(bases) || bases.length === 0) return undefined;
+	const out: Uint8Array[] = [];
+	for (let index = 0; index < bases.length; index++) {
+		const descriptor = Object.getOwnPropertyDescriptor(bases, index);
+		if (descriptor === undefined || !("value" in descriptor) || !(descriptor.value instanceof Uint8Array))
+			return undefined;
+		out.push(descriptor.value);
+	}
+	return out;
+}
 
 /**
  * One genuine compiled application kernel; the native policy owns exact byte entitlements.
@@ -65,6 +153,42 @@ export async function createShippingV3ChatApplication(
 		expectedBlueprintDigest: blueprintDigest,
 		exactArtifactBytes: resolved.exactArtifactBytes,
 	});
+	// Ordinary resource bound (Track Q, docs/realtime-latency/tracks/27-track-q-canvas-chat-lull).
+	// One rule for every application that states its bound this way (Canvas, shipping Chat):
+	// a canonical footprint that dominates every state the application's own capture admits,
+	// derived only from limits that capture enforces, never from observed sizes. Every
+	// shipping Chat state passes `captureShippingChatCapacityState`, which encodes it under
+	// SHIPPING_CHAT_CAPACITY_STATE_LIMITS (the reviewed 32 KiB retained-state bound, 16,384
+	// items, depth 16): the projection and migration below re-capture every state, and this
+	// composition's admission policy (`createOperationAdmissionPolicy`, which the room must
+	// install with it) captures the complete joined state of every reservation, every
+	// inherited state and every capacity allocation before admitting it. So that ceiling is
+	// the bound, for any material; it reads no operation. Planning only: it grants no
+	// validity, admission, authority or credit, and the room re-checks every base under it.
+	const resourceCatalog: ResourceCatalog = Object.freeze({
+		blueprintDigest: resolved.blueprintDigest,
+		artifactId: resolved.artifactId,
+		artifactDigest: resolved.artifactDigest,
+		catalogDigest: resolved.evidence.catalogDigest,
+		runtimeProfile: resolved.runtimeProfile,
+		exactArtifactBytes: resolved.exactArtifactBytes.slice(),
+		canonicalBlueprintPackageBytes: resolved.canonicalBlueprintPackageBytes.slice(),
+	});
+	const readOrdinaryApplicationResourceBound: ResourceBoundReader = (input): CanonicalResourceFootprint | undefined => {
+		try {
+			const bases = resourceBoundBases(input, resourceCatalog);
+			if (bases === undefined) return undefined;
+			// Only authenticated shipping Chat states: captured, canonical, within the ceiling.
+			for (const base of bases) restoreShippingChatCapacityState(base);
+			return Object.freeze({
+				byteLength: SHIPPING_CHAT_CAPACITY_STATE_LIMITS.maxBytes,
+				items: SHIPPING_CHAT_CAPACITY_STATE_LIMITS.maxItems,
+				maxDepth: SHIPPING_CHAT_CAPACITY_STATE_LIMITS.maxDepth,
+			});
+		} catch {
+			return undefined;
+		}
+	};
 	const project = (projection: V3RoomProjectionInput): ShippingChatProjection => {
 		let state: unknown =
 			projection.authenticatedBase === undefined
@@ -90,6 +214,7 @@ export async function createShippingV3ChatApplication(
 	};
 	return Object.freeze({
 		catalog,
+		readOrdinaryApplicationResourceBound,
 		createGenesisApplicationStateBytes(
 			context: Readonly<{ objectId: string; exactCanonicalLatchedAclBytes: Uint8Array }>
 		): Uint8Array {

@@ -22,6 +22,8 @@ export interface ShippingChatState {
 }
 
 const LIMITS = Object.freeze({ maxBytes: SHIPPING_CHAT_RETAINED_BYTES, maxDepth: 16, maxItems: 16_384 });
+/** The canonical limits `captureShippingChatCapacityState` enforces on every Chat state. */
+export const SHIPPING_CHAT_CAPACITY_STATE_LIMITS = LIMITS;
 const AUTHOR = /^[0-9a-f]{64}$/u;
 function objectId(value: unknown): string {
 	if (typeof value !== "string" || value.length === 0 || value.length > 1024)
