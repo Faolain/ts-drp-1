@@ -69,6 +69,34 @@ const browserStorageHost: V3RoomStorageHost = Object.freeze({
 });
 
 const ROOM_AHE_SUFFIX = "--ahe";
+const ROOM_DATABASE_VERSION = 7;
+
+/**
+ * The version of an existing database, or undefined when none exists. It never creates
+ * a database: the creating upgrade of a missing one is aborted.
+ * @param databaseName - Database to inspect.
+ * @returns Its version, or undefined.
+ */
+function existingDatabaseVersion(databaseName: string): Promise<number | undefined> {
+	return new Promise((resolve, reject) => {
+		const request = indexedDB.open(databaseName);
+		let absent = false;
+		request.onupgradeneeded = (event): void => {
+			if (event.oldVersion !== 0) return;
+			absent = true;
+			request.transaction?.abort();
+		};
+		request.onsuccess = (): void => {
+			const version = request.result.version;
+			request.result.close();
+			resolve(version);
+		};
+		request.onerror = (): void => {
+			if (absent) resolve(undefined);
+			else reject(request.error ?? new Error("V3_ROOM_DATABASE_UNAVAILABLE"));
+		};
+	});
+}
 
 /**
  * Opt-in (slice 14a): every owner of a room in ONE version-7 IndexedDB database. The
@@ -79,9 +107,26 @@ const ROOM_AHE_SUFFIX = "--ahe";
  * @returns A storage host whose factories prepare the room database before opening.
  */
 export function createBrowserV3RoomDatabaseStorageHost(): V3RoomStorageHost {
+	// Until a migration exists (slice 14d), only a new room or an existing room database
+	// is served. A room in the six-database layout is refused before its main database
+	// changes, so the default host can still open it.
+	const prepared = new Map<string, Promise<void>>();
+	const prepare = async (databaseName: string): Promise<void> => {
+		const version = await existingDatabaseVersion(databaseName);
+		if (version !== undefined && version !== ROOM_DATABASE_VERSION)
+			throw new Error("V3_ROOM_DATABASE_MIGRATION_UNAVAILABLE");
+		await prepareBrowserRoomDatabase({ databaseName });
+	};
 	const room = async (name: string): Promise<string> => {
 		const databaseName = name.endsWith(ROOM_AHE_SUFFIX) ? name.slice(0, -ROOM_AHE_SUFFIX.length) : name;
-		await prepareBrowserRoomDatabase({ databaseName });
+		let ready = prepared.get(databaseName);
+		if (ready === undefined) {
+			ready = prepare(databaseName);
+			prepared.set(databaseName, ready);
+			// A refusal is not remembered: a later open checks again.
+			ready.catch(() => prepared.delete(databaseName));
+		}
+		await ready;
 		return databaseName;
 	};
 	return Object.freeze({
