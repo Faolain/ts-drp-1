@@ -118,11 +118,22 @@ export type OwnerOutcome =
 	| { readonly kind: "blocked"; readonly reason: "pending" | "malformed" | "capacity" };
 
 export type RetirementRefusal =
-	| "HEAD_CHANGED" | "CORRUPT" | "STALE" | "FLOOR_BEHIND" | "BUDGET" | "DURABILITY" | "INVALID_DECISION";
+	| "HEAD_CHANGED"
+	| "CORRUPT"
+	| "STALE"
+	| "FLOOR_BEHIND"
+	| "BUDGET"
+	| "DURABILITY"
+	| "INVALID_DECISION";
 
 export type RetirementOutcome =
-	| { readonly kind: "retired"; readonly floor: FloorFences; readonly owners: Readonly<Record<string, OwnerOutcome>>;
-		readonly blobsDeleted: number; readonly chargedBytes: number }
+	| {
+			readonly kind: "retired";
+			readonly floor: FloorFences;
+			readonly owners: Readonly<Record<string, OwnerOutcome>>;
+			readonly blobsDeleted: number;
+			readonly chargedBytes: number;
+	  }
 	| { readonly kind: "refused"; readonly reason: RetirementRefusal; readonly detail: string };
 
 export interface OpenVerification {
@@ -138,22 +149,52 @@ export interface OpenVerification {
 }
 
 export type OpenOutcome =
-	| { readonly kind: "verified"; readonly floor: FloorFences; readonly rows: number; readonly blobs: number;
-		/** Rows at or below a fence awaiting a verified decision (hidden, never deleted on the mark's word). */
-		readonly retiredPending: number; readonly fencesRaised: readonly string[] }
-	| { readonly kind: "refused"; readonly reason: "HEAD_MISMATCH" | "CORRUPT" | "POISONED" | "CAPACITY"; readonly detail: string };
+	| {
+			readonly kind: "verified";
+			readonly floor: FloorFences;
+			readonly rows: number;
+			readonly blobs: number;
+			/** Rows at or below a fence awaiting a verified decision (hidden, never deleted on the mark's word). */
+			readonly retiredPending: number;
+			readonly fencesRaised: readonly string[];
+	  }
+	| {
+			readonly kind: "refused";
+			readonly reason: "HEAD_MISMATCH" | "CORRUPT" | "POISONED" | "CAPACITY";
+			readonly detail: string;
+	  };
 
 export class EpochRetirementError extends Error {
-	constructor(readonly code: string, detail: string) {
+	constructor(
+		readonly code: string,
+		detail: string
+	) {
 		super(`${code}: ${detail}`);
 		this.name = "EpochRetirementError";
 	}
 }
 
-interface MarkRecord { readonly fence: number; readonly drained: number; readonly revision: number; readonly decision: Uint8Array | null }
-interface HeadRecord { readonly bytes: Uint8Array; readonly revision: number }
-interface BlobRecord { readonly scope: string; readonly lastRef: number; readonly bytes: Uint8Array }
-interface ReceiptRecord { readonly legacyName: string; readonly legacyVersion: number; readonly rows: number; readonly digest: Uint8Array }
+interface MarkRecord {
+	readonly fence: number;
+	readonly drained: number;
+	readonly revision: number;
+	readonly decision: Uint8Array | null;
+}
+interface HeadRecord {
+	readonly bytes: Uint8Array;
+	readonly revision: number;
+}
+interface BlobRecord {
+	readonly scope: string;
+	readonly lastRef: number;
+	readonly bytes: Uint8Array;
+}
+interface ReceiptRecord {
+	readonly legacyName: string;
+	readonly legacyVersion: number;
+	readonly rows: number;
+	readonly digest: Uint8Array;
+}
 
 export interface EpochRetirementStoreOptions {
 	readonly databaseName: string;
@@ -187,19 +228,32 @@ function isEpoch(value: unknown): value is number {
 function isMark(value: unknown): value is MarkRecord {
 	if (typeof value !== "object" || value === null) return false;
 	const mark = value as Record<string, unknown>;
-	return (mark.fence === NONE || isEpoch(mark.fence)) && (mark.drained === NONE || isEpoch(mark.drained)) &&
-		isEpoch(mark.revision) && (mark.decision === null || mark.decision instanceof Uint8Array) &&
-		(mark.drained as number) <= (mark.fence as number);
+	return (
+		(mark.fence === NONE || isEpoch(mark.fence)) &&
+		(mark.drained === NONE || isEpoch(mark.drained)) &&
+		isEpoch(mark.revision) &&
+		(mark.decision === null || mark.decision instanceof Uint8Array) &&
+		(mark.drained as number) <= (mark.fence as number)
+	);
 }
 
 function isHead(value: unknown): value is HeadRecord {
-	return typeof value === "object" && value !== null && (value as HeadRecord).bytes instanceof Uint8Array &&
-		isEpoch((value as HeadRecord).revision);
+	return (
+		typeof value === "object" &&
+		value !== null &&
+		(value as HeadRecord).bytes instanceof Uint8Array &&
+		isEpoch((value as HeadRecord).revision)
+	);
 }
 
 function isBlob(value: unknown): value is BlobRecord {
-	return typeof value === "object" && value !== null && (value as BlobRecord).bytes instanceof Uint8Array &&
-		typeof (value as BlobRecord).scope === "string" && isEpoch((value as BlobRecord).lastRef);
+	return (
+		typeof value === "object" &&
+		value !== null &&
+		(value as BlobRecord).bytes instanceof Uint8Array &&
+		typeof (value as BlobRecord).scope === "string" &&
+		isEpoch((value as BlobRecord).lastRef)
+	);
 }
 
 function isBlobKey(value: unknown, scope: string): value is readonly [string, string] {
@@ -207,8 +261,15 @@ function isBlobKey(value: unknown, scope: string): value is readonly [string, st
 }
 
 function isRowKey(value: unknown): value is RetainedRowKey {
-	return Array.isArray(value) && value.length === 5 && typeof value[0] === "string" && typeof value[1] === "string" &&
-		isEpoch(value[2]) && typeof value[3] === "string" && typeof value[4] === "string";
+	return (
+		Array.isArray(value) &&
+		value.length === 5 &&
+		typeof value[0] === "string" &&
+		typeof value[1] === "string" &&
+		isEpoch(value[2]) &&
+		typeof value[3] === "string" &&
+		typeof value[4] === "string"
+	);
 }
 
 const NO_MARK: MarkRecord = Object.freeze({ fence: NONE, drained: NONE, revision: 0, decision: null });
@@ -239,22 +300,37 @@ function ownerAll(owner: string, scope: string): IDBKeyRange {
 function strictWrite(database: IDBDatabase, stores: readonly string[]): IDBTransaction {
 	const transaction = database.transaction(stores as string[], "readwrite", { durability: "strict" });
 	if (transaction.durability !== "strict") {
-		try { transaction.abort(); } catch { /* already finished */ }
+		try {
+			transaction.abort();
+		} catch {
+			/* already finished */
+		}
 		throw new EpochRetirementError("DURABILITY", "strict durability unavailable");
 	}
 	return transaction;
 }
 
 class Refusal {
-	constructor(readonly reason: RetirementRefusal, readonly detail: string) {}
+	constructor(
+		readonly reason: RetirementRefusal,
+		readonly detail: string
+	) {}
 }
 
-function openDatabase(name: string, version: number, upgrade?: (database: IDBDatabase, transaction: IDBTransaction) => void): Promise<IDBDatabase> {
+function openDatabase(
+	name: string,
+	version: number,
+	upgrade?: (database: IDBDatabase, transaction: IDBTransaction) => void
+): Promise<IDBDatabase> {
 	return new Promise((resolve, reject) => {
 		const open = indexedDB.open(name, version);
 		open.onupgradeneeded = () => {
-			try { upgrade?.(open.result, open.transaction!); }
-			catch (cause) { open.transaction?.abort(); reject(cause); }
+			try {
+				upgrade?.(open.result, open.transaction!);
+			} catch (cause) {
+				open.transaction?.abort();
+				reject(cause);
+			}
 		};
 		open.onsuccess = () => resolve(open.result);
 		open.onerror = () => reject(open.error ?? new Error("IndexedDB open failed"));
@@ -266,16 +342,24 @@ function openDatabase(name: string, version: number, upgrade?: (database: IDBDat
  * host floor (spec slice S3). It lives in its own database, as the room-head
  * floor does. Keys are [scope, owner]; values are epochs.
  */
-export async function openEpochRetirementFloor(databaseName: string): Promise<EpochRetirementFloorPort & { close(): void }> {
-	const database = await openDatabase(databaseName, 1, (db) => { db.createObjectStore("retiredThrough"); });
+export async function openEpochRetirementFloor(
+	databaseName: string
+): Promise<EpochRetirementFloorPort & { close(): void }> {
+	const database = await openDatabase(databaseName, 1, (db) => {
+		db.createObjectStore("retiredThrough");
+	});
 	database.onversionchange = () => database.close();
 	const scopeRange = (scope: string): IDBKeyRange => IDBKeyRange.bound([scope, ""], [scope, []]);
 	const collect = async (store: IDBObjectStore, scope: string): Promise<Record<string, number>> => {
-		const [keys, values] = await Promise.all([request(store.getAllKeys(scopeRange(scope))), request(store.getAll(scopeRange(scope)))]);
+		const [keys, values] = await Promise.all([
+			request(store.getAllKeys(scopeRange(scope))),
+			request(store.getAll(scopeRange(scope))),
+		]);
 		const out: Record<string, number> = {};
 		keys.forEach((key, index) => {
 			const value: unknown = values[index];
-			if (!Array.isArray(key) || typeof key[1] !== "string" || !isEpoch(value)) throw new EpochRetirementError("CORRUPT", "floor fence is malformed");
+			if (!Array.isArray(key) || typeof key[1] !== "string" || !isEpoch(value))
+				throw new EpochRetirementError("CORRUPT", "floor fence is malformed");
 			out[key[1]] = value;
 		});
 		return out;
@@ -292,12 +376,20 @@ export async function openEpochRetirementFloor(databaseName: string): Promise<Ep
 			const done = settled(transaction);
 			const store = transaction.objectStore("retiredThrough");
 			let current: Record<string, number>;
-			try { current = await collect(store, scope); }
-			catch (cause) { transaction.abort(); await done; throw cause; }
-			for (const [owner, value] of Object.entries(through)) {
-				if (value > (current[owner] ?? NONE)) { store.put(value, [scope, owner]); current[owner] = value; }
+			try {
+				current = await collect(store, scope);
+			} catch (cause) {
+				transaction.abort();
+				await done;
+				throw cause;
 			}
-			if (await done !== "complete") throw new EpochRetirementError("ABORTED", "floor fence transaction aborted");
+			for (const [owner, value] of Object.entries(through)) {
+				if (value > (current[owner] ?? NONE)) {
+					store.put(value, [scope, owner]);
+					current[owner] = value;
+				}
+			}
+			if ((await done) !== "complete") throw new EpochRetirementError("ABORTED", "floor fence transaction aborted");
 			return current;
 		},
 	};
@@ -321,7 +413,10 @@ export class EpochRetirementStore {
 		this.#options = options;
 		// A newer schema (or a migration fence) closes this connection: a stale
 		// writer can never keep writing under an older format.
-		database.onversionchange = () => { this.#closed = true; database.close(); };
+		database.onversionchange = () => {
+			this.#closed = true;
+			database.close();
+		};
 	}
 
 	static async open(options: EpochRetirementStoreOptions): Promise<EpochRetirementStore> {
@@ -341,19 +436,29 @@ export class EpochRetirementStore {
 		return new EpochRetirementStore(database, options);
 	}
 
-	get closed(): boolean { return this.#closed; }
+	get closed(): boolean {
+		return this.#closed;
+	}
 
-	close(): void { this.#closed = true; this.#database.close(); }
+	close(): void {
+		this.#closed = true;
+		this.#database.close();
+	}
 
-	#assertOpen(): void { if (this.#closed) throw new EpochRetirementError("STORE_CLOSED", "connection closed"); }
+	#assertOpen(): void {
+		if (this.#closed) throw new EpochRetirementError("STORE_CLOSED", "connection closed");
+	}
 
 	/** G5: nothing is read, written or retired for a scope until this connection re-verified it. */
 	#assertVerified(scope: string): void {
 		this.#assertOpen();
-		if (!this.#verified.has(scope)) throw new EpochRetirementError("UNVERIFIED", `scope ${scope} not verified on this open`);
+		if (!this.#verified.has(scope))
+			throw new EpochRetirementError("UNVERIFIED", `scope ${scope} not verified on this open`);
 	}
 
-	#observe(step: RetirementStep | MigrationStep): void { this.#options.observe?.(step); }
+	#observe(step: RetirementStep | MigrationStep): void {
+		this.#options.observe?.(step);
+	}
 
 	#fenceFor(scope: string, owner: string, mark: MarkRecord): number {
 		return Math.max(mark.fence, this.#floorSeen.get(JSON.stringify([scope, owner])) ?? NONE);
@@ -361,19 +466,21 @@ export class EpochRetirementStore {
 
 	/** Compare-and-set of the exact head bytes (null expected means absent). */
 	async putHead(scope: string, expected: Uint8Array | null, next: Uint8Array): Promise<void> {
-		if (expected === null) this.#assertOpen(); else this.#assertVerified(scope);
+		if (expected === null) this.#assertOpen();
+		else this.#assertVerified(scope);
 		const transaction = strictWrite(this.#database, [HEADS]);
 		const done = settled(transaction);
 		const store = transaction.objectStore(HEADS);
 		const current: unknown = await request(store.get(scope));
 		const matches = expected === null ? current === undefined : isHead(current) && bytesEqual(current.bytes, expected);
 		if (!matches) {
-			transaction.abort(); await done;
+			transaction.abort();
+			await done;
 			throw new EpochRetirementError("HEAD_CHANGED", "head compare-and-set refused");
 		}
 		const revision = isHead(current) ? current.revision + 1 : 0;
 		store.put({ bytes: next.slice(), revision } satisfies HeadRecord, scope);
-		if (await done !== "complete") throw new EpochRetirementError("ABORTED", "head transaction aborted");
+		if ((await done) !== "complete") throw new EpochRetirementError("ABORTED", "head transaction aborted");
 	}
 
 	/**
@@ -383,14 +490,19 @@ export class EpochRetirementStore {
 	 * whole append has zero writes. Rows are immutable exact bytes per key.
 	 */
 	async append(rows: readonly RetainedRowInput[], blobs: readonly RetainedBlobInput[] = []): Promise<void> {
-		for (const scope of new Set([...rows.map((row) => row.scope), ...blobs.map((blob) => blob.scope)])) this.#assertVerified(scope);
+		for (const scope of new Set([...rows.map((row) => row.scope), ...blobs.map((blob) => blob.scope)]))
+			this.#assertVerified(scope);
 		for (const row of rows) {
 			if (!isRowKey([row.owner, row.scope, row.epoch, row.kind, row.id]) || !(row.bytes instanceof Uint8Array))
 				throw new EpochRetirementError("INVALID_ARGUMENT", "row");
 		}
 		for (const blob of blobs) {
 			// Verify on arrival: the content address is recomputed, never trusted.
-			if (!isEpoch(blob.epoch) || !(blob.bytes instanceof Uint8Array) || hex(this.#options.digest(blob.bytes)) !== blob.digest)
+			if (
+				!isEpoch(blob.epoch) ||
+				!(blob.bytes instanceof Uint8Array) ||
+				hex(this.#options.digest(blob.bytes)) !== blob.digest
+			)
 				throw new EpochRetirementError("POISONED", `blob ${blob.digest} does not match its digest`);
 		}
 		const transaction = strictWrite(this.#database, [ROWS, BLOBS, MARKS]);
@@ -405,7 +517,8 @@ export class EpochRetirementStore {
 			for (const row of rows) {
 				const text = rowKeyText([row.owner, row.scope, row.epoch, row.kind, row.id]);
 				const twin = batch.get(text);
-				if (twin !== undefined && !bytesEqual(twin, row.bytes)) throw new EpochRetirementError("CONFLICT", `row ${text} appears twice with different bytes`);
+				if (twin !== undefined && !bytesEqual(twin, row.bytes))
+					throw new EpochRetirementError("CONFLICT", `row ${text} appears twice with different bytes`);
 				batch.set(text, row.bytes);
 				const markKey = JSON.stringify([row.scope, row.owner]);
 				let fence = fences.get(markKey);
@@ -415,7 +528,8 @@ export class EpochRetirementStore {
 					fence = this.#fenceFor(row.scope, row.owner, mark ?? NO_MARK);
 					fences.set(markKey, fence);
 				}
-				if (row.epoch <= fence) throw new EpochRetirementError("RETIRED", `${row.owner} epoch ${row.epoch} <= fence ${fence}`);
+				if (row.epoch <= fence)
+					throw new EpochRetirementError("RETIRED", `${row.owner} epoch ${row.epoch} <= fence ${fence}`);
 				const key = [row.owner, row.scope, row.epoch, row.kind, row.id];
 				const existing: unknown = await request(rowStore.get(key));
 				if (existing !== undefined && !(existing instanceof Uint8Array && bytesEqual(existing, row.bytes)))
@@ -431,9 +545,10 @@ export class EpochRetirementStore {
 					fence = (mark ?? NO_MARK).fence;
 					blobFences.set(blob.scope, fence);
 				}
-				if (blob.epoch <= fence) throw new EpochRetirementError("RETIRED", `blob reference epoch ${blob.epoch} <= fence ${fence}`);
+				if (blob.epoch <= fence)
+					throw new EpochRetirementError("RETIRED", `blob reference epoch ${blob.epoch} <= fence ${fence}`);
 				const id = JSON.stringify([blob.scope, blob.digest]);
-				const existing: unknown = lastRefs.get(id) ?? await request(blobStore.get([blob.scope, blob.digest]));
+				const existing: unknown = lastRefs.get(id) ?? (await request(blobStore.get([blob.scope, blob.digest])));
 				const lastRef = isBlob(existing) ? Math.max(existing.lastRef, blob.epoch) : blob.epoch;
 				// Verified bytes replace whatever bytes sat under this content address.
 				lastRefs.set(id, { scope: blob.scope, digest: blob.digest, lastRef, bytes: blob.bytes });
@@ -443,7 +558,11 @@ export class EpochRetirementStore {
 				blobStore.put({ scope, lastRef, bytes: bytes.slice() } satisfies BlobRecord, [scope, digest]);
 		} catch (cause) {
 			refusal = cause instanceof EpochRetirementError ? cause : new EpochRetirementError("FAILED", String(cause));
-			try { transaction.abort(); } catch { /* already finished */ }
+			try {
+				transaction.abort();
+			} catch {
+				/* already finished */
+			}
 		}
 		const outcome = await done;
 		if (refusal !== undefined) throw refusal;
@@ -461,7 +580,8 @@ export class EpochRetirementStore {
 			const mark: unknown = await request(transaction.objectStore(MARKS).get([key[1], key[0]]));
 			if (mark !== undefined && !isMark(mark)) throw new EpochRetirementError("CORRUPT", "malformed mark");
 			const fence = this.#fenceFor(key[1], key[0], mark ?? NO_MARK);
-			if (key[2] <= fence) throw new EpochRetirementError("RECORD_PRUNED", `${key[0]} epoch ${key[2]} <= fence ${fence}`);
+			if (key[2] <= fence)
+				throw new EpochRetirementError("RECORD_PRUNED", `${key[0]} epoch ${key[2]} <= fence ${fence}`);
 			const rows = transaction.objectStore(ROWS);
 			const current: unknown = await request(rows.get(key as unknown as IDBValidKey));
 			if (!(current instanceof Uint8Array) || !bytesEqual(current, expected))
@@ -469,7 +589,11 @@ export class EpochRetirementStore {
 			rows.put(next.slice(), key as unknown as IDBValidKey);
 		} catch (cause) {
 			refusal = cause instanceof EpochRetirementError ? cause : new EpochRetirementError("FAILED", String(cause));
-			try { transaction.abort(); } catch { /* already finished */ }
+			try {
+				transaction.abort();
+			} catch {
+				/* already finished */
+			}
 		}
 		const outcome = await done;
 		if (refusal !== undefined) throw refusal;
@@ -491,14 +615,19 @@ export class EpochRetirementStore {
 
 	async readBlob(scope: string, digest: string): Promise<Uint8Array | undefined> {
 		this.#assertVerified(scope);
-		const value: unknown = await request(this.#database.transaction(BLOBS, "readonly").objectStore(BLOBS).get([scope, digest]));
+		const value: unknown = await request(
+			this.#database.transaction(BLOBS, "readonly").objectStore(BLOBS).get([scope, digest])
+		);
 		if (value === undefined) return undefined;
-		if (!isBlob(value) || hex(this.#options.digest(value.bytes)) !== digest) throw new EpochRetirementError("POISONED", `blob ${digest}`);
+		if (!isBlob(value) || hex(this.#options.digest(value.bytes)) !== digest)
+			throw new EpochRetirementError("POISONED", `blob ${digest}`);
 		return value.bytes;
 	}
 
 	async mark(scope: string, owner: string): Promise<{ fence: number; drained: number; revision: number }> {
-		const value: unknown = await request(this.#database.transaction(MARKS, "readonly").objectStore(MARKS).get([scope, owner]));
+		const value: unknown = await request(
+			this.#database.transaction(MARKS, "readonly").objectStore(MARKS).get([scope, owner])
+		);
 		if (value !== undefined && !isMark(value)) throw new EpochRetirementError("CORRUPT", "malformed mark");
 		const mark = value ?? NO_MARK;
 		return { fence: mark.fence, drained: mark.drained, revision: mark.revision };
@@ -507,7 +636,10 @@ export class EpochRetirementStore {
 	/** Raw counts for tests and measurement (no trust implied). */
 	async counts(): Promise<{ rows: number; blobs: number }> {
 		const transaction = this.#database.transaction([ROWS, BLOBS], "readonly");
-		const [rows, blobs] = await Promise.all([request(transaction.objectStore(ROWS).count()), request(transaction.objectStore(BLOBS).count())]);
+		const [rows, blobs] = await Promise.all([
+			request(transaction.objectStore(ROWS).count()),
+			request(transaction.objectStore(BLOBS).count()),
+		]);
 		return { rows, blobs };
 	}
 
@@ -528,15 +660,21 @@ export class EpochRetirementStore {
 		const floor = await this.#options.floor.fence(decision.scope, wanted);
 		for (const owner of decision.owners) {
 			if (floorOf(floor, owner.owner) < owner.through)
-				return { kind: "refused", reason: "FLOOR_BEHIND", detail: `${owner.owner} floor ${floorOf(floor, owner.owner)} < ${owner.through}` };
+				return {
+					kind: "refused",
+					reason: "FLOOR_BEHIND",
+					detail: `${owner.owner} floor ${floorOf(floor, owner.owner)} < ${owner.through}`,
+				};
 		}
 		this.#noteFloor(decision.scope, floor);
 		this.#observe("after-floor");
 		// Step B.
 		let transaction: IDBTransaction;
-		try { transaction = strictWrite(this.#database, [ROWS, BLOBS, HEADS, MARKS]); }
-		catch (cause) {
-			if (cause instanceof EpochRetirementError && cause.code === "DURABILITY") return { kind: "refused", reason: "DURABILITY", detail: cause.message };
+		try {
+			transaction = strictWrite(this.#database, [ROWS, BLOBS, HEADS, MARKS]);
+		} catch (cause) {
+			if (cause instanceof EpochRetirementError && cause.code === "DURABILITY")
+				return { kind: "refused", reason: "DURABILITY", detail: cause.message };
 			throw cause;
 		}
 		const done = settled(transaction);
@@ -547,10 +685,17 @@ export class EpochRetirementStore {
 			result = await this.#retireInside(transaction, decision, floor);
 		} catch (cause) {
 			if (cause instanceof Refusal) result = { kind: "refused", reason: cause.reason, detail: cause.detail };
-			else { crash = cause; crashed = true; }
+			else {
+				crash = cause;
+				crashed = true;
+			}
 		}
 		if (crashed || result?.kind === "refused") {
-			try { transaction.abort(); } catch { /* already finished */ }
+			try {
+				transaction.abort();
+			} catch {
+				/* already finished */
+			}
 		}
 		const outcome = await done;
 		if (crashed) throw crash;
@@ -568,7 +713,11 @@ export class EpochRetirementStore {
 		}
 	}
 
-	async #retireInside(transaction: IDBTransaction, decision: RetirementDecision, floor: FloorFences): Promise<RetirementOutcome> {
+	async #retireInside(
+		transaction: IDBTransaction,
+		decision: RetirementDecision,
+		floor: FloorFences
+	): Promise<RetirementOutcome> {
 		const rows = transaction.objectStore(ROWS);
 		const blobs = transaction.objectStore(BLOBS);
 		const marks = transaction.objectStore(MARKS);
@@ -580,7 +729,8 @@ export class EpochRetirementStore {
 		// 1. Exact head: any adoption, rollback, restore or foreign write since the
 		// caller verified its facts refuses with zero writes.
 		const head: unknown = await request(transaction.objectStore(HEADS).get(decision.scope));
-		if (!isHead(head) || !bytesEqual(head.bytes, decision.head)) throw new Refusal("HEAD_CHANGED", "head bytes differ from the verified head");
+		if (!isHead(head) || !bytesEqual(head.bytes, decision.head))
+			throw new Refusal("HEAD_CHANGED", "head bytes differ from the verified head");
 		charge(head.bytes.byteLength);
 		// 2. Marks: currency read in this transaction; anything contradicting the
 		// verified facts or the floor fails closed.
@@ -591,9 +741,17 @@ export class EpochRetirementStore {
 			if (value !== undefined && !isMark(value)) throw new Refusal("CORRUPT", `malformed mark for ${owner.owner}`);
 			const mark = value ?? NO_MARK;
 			charge(64);
-			if (mark.fence >= decision.protectedFrom) throw new Refusal("CORRUPT", `${owner.owner} fence ${mark.fence} reaches protected ${decision.protectedFrom}`);
-			if (mark.fence > floorOf(floor, owner.owner)) throw new Refusal("STALE", `${owner.owner} fence ${mark.fence} above observed floor ${floorOf(floor, owner.owner)}`);
-			if (mark.drained >= owner.through) { outcomes[owner.owner] = { kind: "current", drained: mark.drained }; continue; }
+			if (mark.fence >= decision.protectedFrom)
+				throw new Refusal("CORRUPT", `${owner.owner} fence ${mark.fence} reaches protected ${decision.protectedFrom}`);
+			if (mark.fence > floorOf(floor, owner.owner))
+				throw new Refusal(
+					"STALE",
+					`${owner.owner} fence ${mark.fence} above observed floor ${floorOf(floor, owner.owner)}`
+				);
+			if (mark.drained >= owner.through) {
+				outcomes[owner.owner] = { kind: "current", drained: mark.drained };
+				continue;
+			}
 			plans.push({ owner, mark });
 		}
 		// 3. Bounded candidate census and classification per owner.
@@ -605,21 +763,38 @@ export class EpochRetirementStore {
 				request(rows.getAllKeys(range, owner.cap + 1)),
 			]);
 			if (values.length !== keys.length) throw new Refusal("CORRUPT", "candidate census disagrees");
-			if (values.length > owner.cap) { outcomes[owner.owner] = { kind: "blocked", reason: "capacity" }; continue; }
+			if (values.length > owner.cap) {
+				outcomes[owner.owner] = { kind: "blocked", reason: "capacity" };
+				continue;
+			}
 			let blocked: "pending" | "malformed" | undefined;
 			for (let index = 0; index < values.length; index++) {
 				const key: unknown = keys[index];
 				const value: unknown = values[index];
-				if (!isRowKey(key)) { blocked ??= "malformed"; continue; }
-				if (decision.protectedRows.has(rowKeyText(key))) throw new Refusal("CORRUPT", `protected row ${rowKeyText(key)} inside retired range`);
-				if (!(value instanceof Uint8Array)) { blocked ??= "malformed"; continue; }
+				if (!isRowKey(key)) {
+					blocked ??= "malformed";
+					continue;
+				}
+				if (decision.protectedRows.has(rowKeyText(key)))
+					throw new Refusal("CORRUPT", `protected row ${rowKeyText(key)} inside retired range`);
+				if (!(value instanceof Uint8Array)) {
+					blocked ??= "malformed";
+					continue;
+				}
 				charge(value.byteLength + rowKeyText(key).length);
 				let verdict: RowClass;
-				try { verdict = owner.classify(value, key); } catch { verdict = "malformed"; }
+				try {
+					verdict = owner.classify(value, key);
+				} catch {
+					verdict = "malformed";
+				}
 				if (verdict === "block") blocked ??= "pending";
 				else if (verdict === "malformed") blocked = "malformed";
 			}
-			if (blocked !== undefined) { outcomes[owner.owner] = { kind: "blocked", reason: blocked }; continue; }
+			if (blocked !== undefined) {
+				outcomes[owner.owner] = { kind: "blocked", reason: blocked };
+				continue;
+			}
 			advancing.push({ owner, mark, count: values.length });
 		}
 		// 4. Rewrites are exact-compared before any write.
@@ -627,7 +802,8 @@ export class EpochRetirementStore {
 			if (rewrite.key[1] !== decision.scope || rewrite.key[2] < decision.protectedFrom)
 				throw new Refusal("INVALID_DECISION", "rewrite outside the protected set");
 			const current: unknown = await request(rows.get(rewrite.key as unknown as IDBValidKey));
-			if (!(current instanceof Uint8Array) || !bytesEqual(current, rewrite.expected)) throw new Refusal("CORRUPT", `rewrite source ${rowKeyText(rewrite.key)} changed`);
+			if (!(current instanceof Uint8Array) || !bytesEqual(current, rewrite.expected))
+				throw new Refusal("CORRUPT", `rewrite source ${rowKeyText(rewrite.key)} changed`);
 			charge(current.byteLength);
 		}
 		// 5. Shared blobs: lastRef only SELECTS; the verified protected set decides.
@@ -650,25 +826,32 @@ export class EpochRetirementStore {
 		this.#observe("after-reads");
 		// 6. Effects: deletes, rewrites, then the marks, all in this transaction.
 		for (const { owner } of advancing) rows.delete(ownerRange(owner.owner, decision.scope, owner.through));
-		for (const rewrite of decision.rewrites ?? []) rows.put(rewrite.next.slice(), rewrite.key as unknown as IDBValidKey);
+		for (const rewrite of decision.rewrites ?? [])
+			rows.put(rewrite.next.slice(), rewrite.key as unknown as IDBValidKey);
 		for (const key of doomedBlobs) blobs.delete(key);
 		this.#observe("after-deletes");
 		for (const { owner, mark, count } of advancing) {
-			marks.put({
-				fence: Math.max(mark.fence, owner.through),
-				drained: owner.through,
-				revision: mark.revision + 1,
-				decision: decision.decisionDigest.slice(),
-			} satisfies MarkRecord, [decision.scope, owner.owner]);
+			marks.put(
+				{
+					fence: Math.max(mark.fence, owner.through),
+					drained: owner.through,
+					revision: mark.revision + 1,
+					decision: decision.decisionDigest.slice(),
+				} satisfies MarkRecord,
+				[decision.scope, owner.owner]
+			);
 			outcomes[owner.owner] = { kind: "advanced", from: mark.drained, to: owner.through, deleted: count };
 		}
 		if (blobsDrained) {
-			marks.put({
-				fence: Math.max(blobMark.fence, decision.blobThrough),
-				drained: decision.blobThrough,
-				revision: blobMark.revision + 1,
-				decision: decision.decisionDigest.slice(),
-			} satisfies MarkRecord, [decision.scope, BLOB_MARK_OWNER]);
+			marks.put(
+				{
+					fence: Math.max(blobMark.fence, decision.blobThrough),
+					drained: decision.blobThrough,
+					revision: blobMark.revision + 1,
+					decision: decision.decisionDigest.slice(),
+				} satisfies MarkRecord,
+				[decision.scope, BLOB_MARK_OWNER]
+			);
 		}
 		return { kind: "retired", floor, owners: outcomes, blobsDeleted: doomedBlobs.length, chargedBytes: charged };
 	}
@@ -687,7 +870,8 @@ export class EpochRetirementStore {
 		const marks = new Map<string, MarkRecord>();
 		for (const owner of verification.owners) {
 			const value: unknown = await request(transaction.objectStore(MARKS).get([scope, owner]));
-			if (value !== undefined && !isMark(value)) return { kind: "refused", reason: "CORRUPT", detail: `malformed mark for ${owner}` };
+			if (value !== undefined && !isMark(value))
+				return { kind: "refused", reason: "CORRUPT", detail: `malformed mark for ${owner}` };
 			marks.set(owner, value ?? NO_MARK);
 		}
 		const rowsByOwner = new Map<string, { values: unknown[]; keys: IDBValidKey[] }>();
@@ -697,7 +881,8 @@ export class EpochRetirementStore {
 				request(transaction.objectStore(ROWS).getAll(range, verification.cap + 1)),
 				request(transaction.objectStore(ROWS).getAllKeys(range, verification.cap + 1)),
 			]);
-			if (values.length > verification.cap) return { kind: "refused", reason: "CAPACITY", detail: `${owner} exceeds ${verification.cap}` };
+			if (values.length > verification.cap)
+				return { kind: "refused", reason: "CAPACITY", detail: `${owner} exceeds ${verification.cap}` };
 			rowsByOwner.set(owner, { values, keys });
 		}
 		const blobIndex = transaction.objectStore(BLOBS).index(BLOBS_BY_LAST_REF);
@@ -708,14 +893,22 @@ export class EpochRetirementStore {
 		]);
 		if (blobValues.length > verification.blobCap) return { kind: "refused", reason: "CAPACITY", detail: "blobs" };
 		const floor = await this.#options.floor.read(scope);
-		if (!isHead(head) || !bytesEqual(head.bytes, verification.head)) return { kind: "refused", reason: "HEAD_MISMATCH", detail: "head differs from the verified head" };
-		let retiredPending = 0, verified = 0;
+		if (!isHead(head) || !bytesEqual(head.bytes, verification.head))
+			return { kind: "refused", reason: "HEAD_MISMATCH", detail: "head differs from the verified head" };
+		let retiredPending = 0,
+			verified = 0;
 		const raise: string[] = [];
 		for (const owner of verification.owners) {
 			const mark = marks.get(owner)!;
 			const ownerFloor = floorOf(floor, owner);
-			if (mark.fence > ownerFloor) return { kind: "refused", reason: "CORRUPT", detail: `${owner} fence ${mark.fence} above host floor ${ownerFloor}` };
-			if (mark.fence >= verification.protectedFrom) return { kind: "refused", reason: "CORRUPT", detail: `${owner} fence reaches the protected set` };
+			if (mark.fence > ownerFloor)
+				return {
+					kind: "refused",
+					reason: "CORRUPT",
+					detail: `${owner} fence ${mark.fence} above host floor ${ownerFloor}`,
+				};
+			if (mark.fence >= verification.protectedFrom)
+				return { kind: "refused", reason: "CORRUPT", detail: `${owner} fence reaches the protected set` };
 			const fence = Math.max(mark.fence, ownerFloor);
 			if (ownerFloor > mark.fence) raise.push(owner);
 			const { values, keys } = rowsByOwner.get(owner)!;
@@ -723,7 +916,10 @@ export class EpochRetirementStore {
 				const key: unknown = keys[index];
 				const value: unknown = values[index];
 				if (!isRowKey(key)) return { kind: "refused", reason: "POISONED", detail: "mis-shaped row key" };
-				if (key[2] <= fence) { retiredPending++; continue; }
+				if (key[2] <= fence) {
+					retiredPending++;
+					continue;
+				}
 				if (!(value instanceof Uint8Array) || !verification.verifyRow(value, key))
 					return { kind: "refused", reason: "POISONED", detail: `row ${rowKeyText(key)} failed re-verification` };
 				verified++;
@@ -743,13 +939,21 @@ export class EpochRetirementStore {
 			let lost = false;
 			for (const owner of raise) {
 				const current: unknown = await request(store.get([scope, owner]));
-				if (current !== undefined && !isMark(current)) { lost = true; break; }
+				if (current !== undefined && !isMark(current)) {
+					lost = true;
+					break;
+				}
 				const mark = current ?? NO_MARK;
 				const ownerFloor = floorOf(floor, owner);
-				if (mark.fence < ownerFloor) store.put({ ...mark, fence: ownerFloor, revision: mark.revision + 1 } satisfies MarkRecord, [scope, owner]);
+				if (mark.fence < ownerFloor)
+					store.put({ ...mark, fence: ownerFloor, revision: mark.revision + 1 } satisfies MarkRecord, [scope, owner]);
 			}
-			if (lost) { write.abort(); await done; return { kind: "refused", reason: "CORRUPT", detail: "mark changed while raising fences" }; }
-			if (await done !== "complete") throw new EpochRetirementError("ABORTED", "fence transaction aborted");
+			if (lost) {
+				write.abort();
+				await done;
+				return { kind: "refused", reason: "CORRUPT", detail: "mark changed while raising fences" };
+			}
+			if ((await done) !== "complete") throw new EpochRetirementError("ABORTED", "fence transaction aborted");
 		}
 		this.#noteFloor(scope, floor);
 		this.#verified.add(scope);
@@ -771,20 +975,30 @@ export class EpochRetirementStore {
 		this.#assertOpen();
 		const reports: MigrationReport[] = [];
 		for (const source of sources) {
-			const receipt: unknown = await request(this.#database.transaction(RECEIPTS, "readonly").objectStore(RECEIPTS).get(source.databaseName));
+			const receipt: unknown = await request(
+				this.#database.transaction(RECEIPTS, "readonly").objectStore(RECEIPTS).get(source.databaseName)
+			);
 			const exists = (await indexedDB.databases()).find((info) => info.name === source.databaseName);
 			if (receipt !== undefined) {
 				if (exists !== undefined) await deleteDatabase(source.databaseName);
-				reports.push({ databaseName: source.databaseName, kind: exists === undefined ? "already-migrated" : "deleted-after-receipt" });
+				reports.push({
+					databaseName: source.databaseName,
+					kind: exists === undefined ? "already-migrated" : "deleted-after-receipt",
+				});
 				continue;
 			}
-			if (exists === undefined) { reports.push({ databaseName: source.databaseName, kind: "absent" }); continue; }
+			if (exists === undefined) {
+				reports.push({ databaseName: source.databaseName, kind: "absent" });
+				continue;
+			}
 			const legacy = await fenceLegacy(source.databaseName, exists.version ?? 1);
 			let carried: { rows: RetainedRowInput[]; marks: Record<string, number>; digest: Uint8Array };
 			try {
 				this.#observe("after-fence");
 				carried = await this.#authenticate(legacy.database, source);
-			} finally { legacy.database.close(); }
+			} finally {
+				legacy.database.close();
+			}
 			// Floor first (step A), as for a retirement: a crash before the copy
 			// leaves the floor ahead, which only raises fences at the next open.
 			const floorThrough = new Map<string, Record<string, number>>();
@@ -797,7 +1011,8 @@ export class EpochRetirementStore {
 			for (const [scope, fences] of floorThrough) {
 				const after = await this.#options.floor.fence(scope, fences);
 				for (const [owner, value] of Object.entries(fences))
-					if (floorOf(after, owner) < value) throw new EpochRetirementError("FLOOR_BEHIND", `floor for ${scope}/${owner}`);
+					if (floorOf(after, owner) < value)
+						throw new EpochRetirementError("FLOOR_BEHIND", `floor for ${scope}/${owner}`);
 			}
 			const transaction = strictWrite(this.#database, [ROWS, MARKS, RECEIPTS]);
 			const done = settled(transaction);
@@ -809,7 +1024,10 @@ export class EpochRetirementStore {
 						const key = [row.owner, row.scope, row.epoch, row.kind, row.id];
 						const existing: unknown = await request(transaction.objectStore(ROWS).get(key));
 						if (existing !== undefined && !(existing instanceof Uint8Array && bytesEqual(existing, row.bytes)))
-							throw new EpochRetirementError("CONFLICT", `migrated row ${rowKeyText(key as unknown as RetainedRowKey)} differs`);
+							throw new EpochRetirementError(
+								"CONFLICT",
+								`migrated row ${rowKeyText(key as unknown as RetainedRowKey)} differs`
+							);
 						transaction.objectStore(ROWS).put(row.bytes.slice(), key);
 					}
 					for (const [markKey, value] of Object.entries(carried.marks)) {
@@ -820,15 +1038,27 @@ export class EpochRetirementStore {
 						// A legacy completion installs a write FENCE only. Carried rows at or
 						// below it stay hidden until a verified decision deletes them.
 						if (value > mark.fence)
-							transaction.objectStore(MARKS).put({ ...mark, fence: value, revision: mark.revision + 1 } satisfies MarkRecord, [scope, owner]);
+							transaction
+								.objectStore(MARKS)
+								.put({ ...mark, fence: value, revision: mark.revision + 1 } satisfies MarkRecord, [scope, owner]);
 					}
-					transaction.objectStore(RECEIPTS).put({
-						legacyName: source.databaseName, legacyVersion: legacy.version, rows: carried.rows.length, digest: carried.digest,
-					} satisfies ReceiptRecord, source.databaseName);
+					transaction.objectStore(RECEIPTS).put(
+						{
+							legacyName: source.databaseName,
+							legacyVersion: legacy.version,
+							rows: carried.rows.length,
+							digest: carried.digest,
+						} satisfies ReceiptRecord,
+						source.databaseName
+					);
 				}
 			} catch (cause) {
 				refusal = cause instanceof EpochRetirementError ? cause : new EpochRetirementError("FAILED", String(cause));
-				try { transaction.abort(); } catch { /* already finished */ }
+				try {
+					transaction.abort();
+				} catch {
+					/* already finished */
+				}
 			}
 			const outcome = await done;
 			if (refusal !== undefined) throw refusal;
@@ -842,11 +1072,18 @@ export class EpochRetirementStore {
 	}
 
 	async receipt(legacyName: string): Promise<{ rows: number; digest: Uint8Array; legacyVersion: number } | undefined> {
-		const value = await request(this.#database.transaction(RECEIPTS, "readonly").objectStore(RECEIPTS).get(legacyName)) as ReceiptRecord | undefined;
-		return value === undefined ? undefined : { rows: value.rows, digest: value.digest, legacyVersion: value.legacyVersion };
+		const value = (await request(
+			this.#database.transaction(RECEIPTS, "readonly").objectStore(RECEIPTS).get(legacyName)
+		)) as ReceiptRecord | undefined;
+		return value === undefined
+			? undefined
+			: { rows: value.rows, digest: value.digest, legacyVersion: value.legacyVersion };
 	}
 
-	async #authenticate(database: IDBDatabase, source: LegacyRetentionSource): Promise<{ rows: RetainedRowInput[]; marks: Record<string, number>; digest: Uint8Array }> {
+	async #authenticate(
+		database: IDBDatabase,
+		source: LegacyRetentionSource
+	): Promise<{ rows: RetainedRowInput[]; marks: Record<string, number>; digest: Uint8Array }> {
 		const transaction = database.transaction(source.stores as string[], "readonly");
 		const image = new Map<string, Array<readonly [IDBValidKey, unknown]>>();
 		for (const store of source.stores) {
@@ -855,15 +1092,22 @@ export class EpochRetirementStore {
 				request(objectStore.getAll(null, source.cap + 1)),
 				request(objectStore.getAllKeys(null, source.cap + 1)),
 			]);
-			if (keys.length > source.cap) throw new EpochRetirementError("CAPACITY", `${source.databaseName}/${store} exceeds ${source.cap}`);
-			image.set(store, keys.map((key, index) => [key, values[index]] as const));
+			if (keys.length > source.cap)
+				throw new EpochRetirementError("CAPACITY", `${source.databaseName}/${store} exceeds ${source.cap}`);
+			image.set(
+				store,
+				keys.map((key, index) => [key, values[index]] as const)
+			);
 		}
 		const rows: RetainedRowInput[] = [];
 		for (const store of source.stores) {
 			for (const [key, value] of image.get(store)!) {
 				const carried = source.carry(store, key, value);
 				if (carried === undefined) continue;
-				if (!isRowKey([carried.owner, carried.scope, carried.epoch, carried.kind, carried.id]) || !(carried.bytes instanceof Uint8Array))
+				if (
+					!isRowKey([carried.owner, carried.scope, carried.epoch, carried.kind, carried.id]) ||
+					!(carried.bytes instanceof Uint8Array)
+				)
 					throw new EpochRetirementError("POISONED", `legacy row ${String(key)} maps to an invalid row`);
 				rows.push(carried);
 			}
@@ -897,7 +1141,9 @@ export interface LegacyRetentionSource {
 	 */
 	readonly carry: (store: string, key: IDBValidKey, value: unknown) => RetainedRowInput | undefined;
 	/** Completed legacy retirement per JSON [scope, owner]; absent means -1 (retain everything). */
-	readonly marks: (image: ReadonlyMap<string, ReadonlyArray<readonly [IDBValidKey, unknown]>>) => Readonly<Record<string, number>>;
+	readonly marks: (
+		image: ReadonlyMap<string, ReadonlyArray<readonly [IDBValidKey, unknown]>>
+	) => Readonly<Record<string, number>>;
 }
 
 export type MigrationReport =
@@ -919,7 +1165,10 @@ function lengthPrefix(length: number): Uint8Array {
 function concat(parts: readonly Uint8Array[]): Uint8Array {
 	const out = new Uint8Array(parts.reduce((total, part) => total + part.byteLength, 0));
 	let offset = 0;
-	for (const part of parts) { out.set(part, offset); offset += part.byteLength; }
+	for (const part of parts) {
+		out.set(part, offset);
+		offset += part.byteLength;
+	}
 	return out;
 }
 
@@ -954,12 +1203,23 @@ function validateDecision(decision: RetirementDecision): string | undefined {
 	if (decision.owners.length === 0) return "owners";
 	const seen = new Set<string>();
 	for (const owner of decision.owners) {
-		if (typeof owner.owner !== "string" || owner.owner.length === 0 || owner.owner.startsWith("#") || seen.has(owner.owner)) return "owner";
+		if (
+			typeof owner.owner !== "string" ||
+			owner.owner.length === 0 ||
+			owner.owner.startsWith("#") ||
+			seen.has(owner.owner)
+		)
+			return "owner";
 		seen.add(owner.owner);
-		if ((owner.through !== NONE && !isEpoch(owner.through)) || owner.through >= decision.protectedFrom) return `through for ${owner.owner}`;
+		if ((owner.through !== NONE && !isEpoch(owner.through)) || owner.through >= decision.protectedFrom)
+			return `through for ${owner.owner}`;
 		if (!Number.isSafeInteger(owner.cap) || owner.cap < 0) return "cap";
 	}
-	if (!(decision.blobThrough === NONE || isEpoch(decision.blobThrough)) || decision.blobThrough >= decision.protectedFrom) return "blobThrough";
+	if (
+		!(decision.blobThrough === NONE || isEpoch(decision.blobThrough)) ||
+		decision.blobThrough >= decision.protectedFrom
+	)
+		return "blobThrough";
 	if (!Number.isSafeInteger(decision.blobCap) || decision.blobCap < 0) return "blobCap";
 	if (!Number.isSafeInteger(decision.proofBytes) || decision.proofBytes <= 0) return "proofBytes";
 	if (!(decision.decisionDigest instanceof Uint8Array)) return "decisionDigest";
