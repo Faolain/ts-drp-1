@@ -25,6 +25,7 @@ import { Keychain } from "../packages/keychain/src/keychain.js";
 import { type CanvasProjection, createV3CanvasApplication } from "../packages/node/src/applications/canvas.js";
 import { readCreatorSuccessorExport } from "../packages/node/src/creator-adoption.js";
 import { parseStorageObjectId } from "../packages/storage/src/index.js";
+import { openPhase2dBrowserDatabase } from "../packages/storage-browser/src/internal/schema-idb.js";
 import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-head.js";
 
 // Track R3, slice 14a in the node: the same genuine rollover, lull, persisted close and
@@ -565,3 +566,29 @@ it("an active intent left by a crash between the session's transactions resumes 
 	await deliverEpoch(fixture, recipient, epochs + 1);
 	expect(recipient.room.projection().state).toEqual(creator.room.projection().state);
 }, 900_000);
+
+// Until a migration exists (slice 14d), the room database host serves only new rooms.
+// An existing six-database room is refused before anything changes its main database,
+// so the default host can still open it.
+it("refuses an existing six-database room without changing its main database", async () => {
+	const name = `legacy-room-${Date.now()}`;
+	const legacy = await openPhase2dBrowserDatabase({ databaseName: name });
+	legacy.close();
+	const host = createBrowserV3RoomDatabaseStorageHost();
+	await expect(host.openSealVote(name)).rejects.toThrow("V3_ROOM_DATABASE_MIGRATION_UNAVAILABLE");
+	await expect(host.openAhe(`${name}--ahe`)).rejects.toThrow("V3_ROOM_DATABASE_MIGRATION_UNAVAILABLE");
+	const version = await new Promise<number>((resolve, reject) => {
+		const request = indexedDB.open(name);
+		request.onsuccess = () => {
+			const value = request.result.version;
+			request.result.close();
+			resolve(value);
+		};
+		request.onerror = () => reject(request.error);
+	});
+	expect(version).toBe(6);
+	// A new room is still created and opened.
+	const fresh = `new-room-${Date.now()}`;
+	const vote = await host.openSealVote(fresh);
+	expect(vote).toBeDefined();
+});
