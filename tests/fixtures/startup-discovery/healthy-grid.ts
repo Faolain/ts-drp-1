@@ -360,9 +360,11 @@ if(window!==window.parent)window.parent.postMessage({kind:"r8-grid-ready"},"*");
 
 // Representative healthy path, not an unchanged capacity-test replay.
 export async function runHealthyGrid(identity:string,origins:readonly string[],rollovers=4,profileId="creator-trusted-settlement-v1") {
- const fixtureWaitDeadline=Date.now()+360_000; // Existing native test cap, not a gameplay latency target.
+ // Existing native test cap, not a gameplay latency target; endurance runs (more than 32
+ // rollovers, measurement only) scale it with the rollovers like the test deadline.
+ const fixtureWaitDeadline=Date.now()+(rollovers>32?rollovers*30_000:360_000);
  check(origins.length===4&&new Set(origins).size===4,"four independent native storage origins required");
- check(rollovers===4||rollovers===5||(Number.isSafeInteger(rollovers)&&rollovers>=8&&rollovers<=32),"bounded native full-pool extension only");
+ check(rollovers===4||rollovers===5||(Number.isSafeInteger(rollovers)&&rollovers>=8&&rollovers<=128),"bounded native full-pool extension only");
  check(profileId==="creator-trusted-settlement-v1"||profileId==="creator-trusted-v1","existing creator profile required");
  const {members,application}=gridCorpus(identity),ids=members.slice(0,4).map(row=>row.peerId);
  const objectId="creator:"+hex(hashDomain("ts-drp/healthy-native-grid/v1",new TextEncoder().encode(identity))).slice(0,32);

@@ -175,7 +175,11 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
  // Longer bounded runs (up to 32) pass the former epoch-8 recipient journal
  // ceiling and the 9->10 boundary of the snapshot protected-hole order.
  // Default acceptance workload/deadline and all per-transition assertions stay.
- if(rollovers!==4&&rollovers!==5&&!(Number.isSafeInteger(rollovers)&&rollovers>=8&&rollovers<=32))throw new Error("bounded native pool-turnover extension required");
+ // Endurance (measurement only): up to 128 rollovers, with the test deadline and the
+ // diagnostic checkpoint timers scaled by the rollovers; at most 32 is unchanged.
+ if(rollovers!==4&&rollovers!==5&&!(Number.isSafeInteger(rollovers)&&rollovers>=8&&rollovers<=128))throw new Error("bounded native pool-turnover extension required");
+ const enduranceDeadline=rollovers>32?rollovers*30_000:undefined;
+ if(enduranceDeadline!==undefined)test.setTimeout(enduranceDeadline);
  if(suspendHealthyGrid&&rollovers!==5)throw new Error("suspension must exercise the original full-pool recipient turnover");
  const executionContexts=new Map<number,{origin:string;defaultContext:boolean}>();
  if(suspendHealthyGrid){
@@ -639,7 +643,7 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
  // The repeated terminal failure is a pending E4 admitted observation after
  // product calls finish. Re-time this SAME one-shot memory/journal checkpoint
  // so it inspects that wait; do not add queries or extend the test deadline.
- },305_000);
+ },enduranceDeadline===undefined?305_000:enduranceDeadline-55_000);
  // One late, explicitly partial checkpoint is attached before the original
  // deadline can prevent the final receipt. Reuse only completed observations
  // and already collected resource samples: no extra native scan or forced GC.
@@ -663,7 +667,7 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
     ordinaryCount:value?.ordinaryCount,completedTransitions:value?.completedTransitions,testOnlyCheckpointMilliseconds:snapshot.testOnlyCheckpointMilliseconds}));
   })().catch(error=>console.info(JSON.stringify({kind:"healthy-native-partial-completed-checkpoint-unavailable",error:String(error),
    testOnlyCheckpointMilliseconds:performance.now()-checkpointStarted})));
- },300_000);
+ },enduranceDeadline===undefined?300_000:enduranceDeadline-60_000);
  const poolLull=process.env.STARTUP_HEALTHY_GRID_POOL_LULL;
  if(poolLull==="1"||poolLull==="concurrent")await page.evaluate(()=>Reflect.set(globalThis,"__rdPoolMaintenanceLull",true));
  // Gameplay moves issued while the creator's pool maintenance is running.
