@@ -328,6 +328,10 @@ export type CreatorSnapshotRecoveryCloseLifetime = Readonly<{
 	/** Capture only the SAME bounded pure verification kernel. It carries no
 	 * source/lifecycle authority and still resolves the supplied closed ACL anew. */
 	captureVertexVerificationFacts?(): typeof import("@ts-drp/protocol-v3/internal/received-vertex-authentication").verifyReceivedVertex;
+	/** Slice 14b stage 2: this live plane's ledger of verified immutable facts (an opted-in
+	 * room host's retention path only). `create` starts an empty one for a plane without
+	 * one. It holds no currency, control, census, accounting or authorization. */
+	captureRoomRetentionLedger?(create: boolean): import("./room-retention-ledger.js").RoomRetentionLedger | undefined;
 	/** Borrow only the same lexical replacement's already-held current native owners. */
 	borrowCurrentNativeReservation?(owner: "ahe" | "journal" | "floor"): Promise<NativeReadReservation | undefined>;
 	plane?: object;

@@ -165,6 +165,7 @@ import {
 	readCreatorOrdinaryPreimageCapacityForSizing,
 	readProspectiveCreatorSnapshotTurnoverForSizing,
 	createCreatorSnapshotRecoveryMaintenanceJob,
+	reconcileCreatorRoomRetentionFromLedger,
 	reconcileCreatorSnapshotRecoveryRoles,
 	resolveCreatorForwardPromotionSource,
 } from "./internal/creator-closed-rollback-data.js";
@@ -4836,6 +4837,19 @@ export async function bindCreatorLiveClose(
 							const outcome = await registration.runOrdinaryReadinessMaintenance(
 								input.snapshotStore as SnapshotRecoveryStore<SnapshotVerificationReceipt>, async (seal, requireClosedWorkflowCompletion) => {
 									if (!available()) throw new TypeError("creator pool maintenance admission was revoked");
+									// Slice 14b stage 2: an opted-in room host decides this boundary from its
+									// plane's verified-fact ledger when it can; otherwise the original below.
+									if (!requireClosedWorkflowCompletion && input.promotionContext !== undefined) {
+										const ledger = await reconcileCreatorRoomRetentionFromLedger({...input.promotionContext,
+											objectId: registration.objectId, store: registration.store,
+											snapshotStore: input.snapshotStore as CreatorClosedRollbackDataInput["snapshotStore"],
+											liveJournalStore: registration.liveJournalStore}, async () => {
+											if (!available()) throw new TypeError("creator pool maintenance admission was revoked");
+											return seal();
+										}, registration.currentTrust);
+										if (!available()) throw new TypeError("creator pool maintenance admission was revoked");
+										if (ledger === "complete") return ledger;
+									}
 									const generations = await native.readGenerationPage({objectId: registration.objectId,
 										limit: AHE_BOUNDED_READ_LIMITS.maxObjectGenerations});
 									if (!generations.ok) throw new TypeError("creator pool generation capacity is unavailable", {cause: generations});
