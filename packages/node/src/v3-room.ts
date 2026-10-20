@@ -301,6 +301,13 @@ export interface V3RoomCreatorInviteMaterialInput {
 	readonly exactCanonicalApplicationStateBytes: Uint8Array;
 	readonly exactCanonicalLatchedAclBytes: Uint8Array;
 	readonly exactCanonicalParametersCarrierBytes: Uint8Array;
+	/**
+	 * The signed trust profile, latched for the room's life. Use `creator-trusted-settlement-v1`
+	 * (with a version-3 latched ACL): its settlement lets retirement drain old issued rows. The
+	 * legacy `creator-trusted-v1` has no settlement and keeps every issued row, so a Writer's
+	 * issuance store, seal time and per-move work grow with room age, and at high move rates a
+	 * creator's move is eventually refused when its issuance maintenance proof reserve runs out.
+	 */
 	readonly exactCanonicalProfileBytes: Uint8Array;
 	readonly exactCanonicalSignerSetBytes: Uint8Array;
 	readonly objectId: string;
