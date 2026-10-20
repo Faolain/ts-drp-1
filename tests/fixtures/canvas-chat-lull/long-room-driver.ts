@@ -41,6 +41,8 @@ export interface WindowEvents {
 	readonly retirementSelections: number;
 	readonly boundaryReadiness: number;
 	readonly total: number;
+	/** Every event kind in the window, with its count. */
+	readonly kinds: Readonly<Record<string, number>>;
 }
 
 export interface LullIngress {
@@ -211,6 +213,10 @@ function windowEvents(events: readonly ObservedEvent[]): WindowEvents {
 		retirementSelections: events.filter((event) => event.kind === RETIREMENT_SELECTION).length,
 		boundaryReadiness: events.filter((event) => event.kind === "ordinary-boundary-readiness").length,
 		total: events.length,
+		kinds: events.reduce<Record<string, number>>((out, event) => {
+			out[event.kind] = (out[event.kind] ?? 0) + 1;
+			return out;
+		}, {}),
 	};
 }
 
