@@ -310,3 +310,11 @@ The G1–G28 checklist exists only in the session scratchpad (track-r/GUARANTEES
 or (b) commit the checklist with its source column into specs/bounded-storage-lifecycle/ as part of S1, and link it from each slice.
 
 Prefer (b), and keep the source citations there current with your rebased line numbers.
+
+### Follow-up instruction — Tell R3 guarantees file is now in the repo (2026-10-19 23:36 UTC)
+
+The G1–G28 checklist is now in the repo: specs/bounded-storage-lifecycle/golden-path-guarantees.md (commit 1c6a8259 on codex/phase3a1b-p6-golden-path). Rebase onto it, and edit that file rather than creating your own copy.
+
+- As part of S1, refresh its source line numbers to the current tree. They were taken at 40c0895b; the header says so.
+- Link your slices to it, e.g. `[G15](../golden-path-guarantees.md)` plus the source.
+- Every track's brief, reports and decisions are now in docs/realtime-latency/; yours are under tracks/20-track-r2-r3-watermark-retirement/. When you finish, add your final write-up there as RESULT.md, with local paths written as `<evidence>/...` (that placeholder stands for the scratchpad root). I'll update the README's decision log when I merge.

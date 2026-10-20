@@ -85,7 +85,7 @@ repository owner made. "Coordinator" marks a recommendation that was then carrie
 | 15 | Keep logs, but outside git. | User | Evidence must survive without bloating the repository. | Untracked `.logs` were moved to a local archive. Paths that tracked code imports were restored. |
 | 16 | Track K: fix the epoch-8 recipient refusal. | User | Rooms must live for thousands of epochs (G1). | 742a517e, 86dc4004, 9f606ce8 |
 | 17 | Track R3: write spec slices S1–S6, then build the watermark design for production. The new path becomes the default only after three-engine and SIGKILL evidence. | User | The only path to millisecond maintenance. It changes durable formats, so the spec comes first. | In progress |
-| 18 | Track L: fix two bugs on the current path. After a lull and a reopen, recipients admit no moves; and the lull's history repair races a persisted close. | User | Play stops after a restart. Both bugs predate this work. | In progress |
+| 18 | Track L: fix two bugs on the current path. After a lull and a reopen, recipients admit no moves; and the lull's history repair races a persisted close. | User | Play stops after a restart. Both bugs predate this work. | dcab6d12..88467723. A reopened recipient discharges its completed-retirement halt by re-running the original reconstruction. An orderly close cancels the retained republish it is serving. The Grid runs the final recipient lull again. |
 | 19 | Keep these records in the repository. | User | Decisions and plans should live with the code. | This folder |
 
 ## Commits
@@ -101,6 +101,14 @@ repository owner made. "Coordinator" marks a recommendation that was then carrie
 | 742a517e | fix: bound recipient journal retention and snapshot hole order past epoch 8 |
 | 86dc4004 | test: keep the final recipient lull skipped in the Grid bench, with the real reason |
 | 9f606ce8 | refactor: keep the public role-reconciliation wrapper signature unchanged |
+| 1c6a8259 | docs: record the real-time latency tracks, their plans and decisions |
+| dcab6d12 | test: RED recipient lull reopen admission and orderly-close repair |
+| dd70af0c | test: RED orderly close refusing a retained send through its revoked transport |
+| f9828cd0 | fix: an orderly close cancels the retained publication it is serving |
+| 2cb1a9fc | fix: a reopened recipient discharges its completed-retirement halt |
+| 504e4035 | test: run the final recipient lull in the Grid bench again |
+| 9379fc48 | fix: skip the post-resume retained request once the room is closing |
+| 88467723 | docs: record Track L's reopen and close fixes, evidence and guarantee argument |
 
 The commit messages hold the detailed explanation and the measurements for each change.
 
@@ -131,9 +139,9 @@ that track's working documents.
 | [19](tracks/19-typecheck-fixes/README.md) | Repository typecheck fixes | de70325e |
 | [20](tracks/20-track-r2-r3-watermark-retirement/README.md) | Tracks R2 and R3: single-database watermark retirement | Prototype; R3 in progress |
 | [21](tracks/21-track-k-epoch8-retention/README.md) | Track K: epoch-8 recipient refusal | 742a517e–9f606ce8 |
-| [22](tracks/22-track-l-reopen-and-close/README.md) | Track L: reopen admission and close race | In progress |
+| [22](tracks/22-track-l-reopen-and-close/README.md) | Track L: reopen admission and close race | dcab6d12..88467723 |
 
-The records for in-progress tracks hold only their plan. Their specs, tests and results land with their branches.
+The record for an in-progress track (R3) holds only its plan. Its specs, tests and results land with its branch.
 
 ## Reading the records
 
@@ -176,11 +184,15 @@ Notes:
 
 - **Track R3:** single-database watermark retirement, spec slices S1–S6 and then production code. This is the only
   path found to millisecond maintenance.
-- **Track L:**
-  - after a recipient lull and a persisted reopen, recipients admit no live moves;
-  - the final lull's unawaited history repair races the persisted close.
-
-  The Grid harness still skips the final recipient lull because of these.
+- **Left open by Track L** (details in its [RESULT.md](tracks/22-track-l-reopen-and-close/RESULT.md)):
+  - A recipient reopened after only 4 epochs is refused with `RECOVERY_CERTIFICATE_UNPROVEN_ABSENCE`. It fails
+    closed; 5 and 8 epochs pass. Cause: `acquireCreatorSnapshotRetirementReconstructionRequest` passes no
+    `previousCertificate`. This is in R3's area.
+  - A recipient reopened with an active (unfinished) retirement intent stays halted, as before. A receive-only
+    peer has no way to resume an intent.
+  - Moves that arrive during the ~0.5 s reopen discharge are dropped, then re-fetched through retained history,
+    so they arrive one round trip late.
+  - A close during a reopened room's startup transition is recorded as a terminal failure.
 - **Recipient install total:** +42 ms mean in Track H's pairs, within noise. Re-measure if it persists.
 - **Not repaired:** rooms that already leaked journal scopes before Track K stay fail-closed until an explicit
   migration.
