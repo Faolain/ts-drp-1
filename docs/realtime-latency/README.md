@@ -93,6 +93,7 @@ repository owner made. "Coordinator" marks a recommendation that was then carrie
 | 23 | Start Tracks O, M2, P and Q in parallel. | User | O: the case 8 fix. M2: 14b stage 2, the in-memory ledger that removes the ~282 ms cold acquisition per boundary. P and Q fix two problems Track M found on every path: Canvas issuance grows one row per move with an O(outbox) issue cost (829 ms → 6.7 s per move by epoch 16), and the shipped Canvas and Chat creators never run their lull, so retirement runs inline at seal (about 2.7 s). | In progress |
 | 24 | Accept Track O's 14b/14e amendment, and merge Tracks M and O together. | User | O's fix makes each boundary one decision, with one epoch's signing evidence and summaries as one unit, in a fixed unit order. A crash or refusal between continuations then resumes from a fresh acquisition (G3, G14). Track M's suggested fix left a second split point open. | Merge 8c61863e, after verification on O's head: typecheck 0, 13 room test files passing, the proof-accounting test file identical to the main branch, and 14f case 8 passing with a real SIGKILL. |
 | 25 | Hold Track Q. | Coordinator | Its Canvas and Chat resource bounds work (seal 0.07–0.14x of before), but running the lull exposes a pre-existing bug. A persisted reopen right after the creator's first maintained lull is refused with `floor-stale` (a stored signing-summary resume-basis digest differs on resume, CRD:19350). R3's 4-rollover room test now reaches it and fails. The Grid hits the same bug when reopened at epoch 4. | Not merged until the bug is fixed |
+| 26 | Track S: fix the reopen right after the first maintained lull, on the shared path; Track Q then rebases onto it. | User | The bug predates this work and also affects the Grid; it blocks Track Q. | In progress |
 
 ## Commits
 
@@ -205,8 +206,9 @@ that track's working documents.
 | 26 | Track P: Canvas issuance growth and O(outbox) issue cost | In progress |
 | 27 | Track Q: Canvas and Chat lull | Held (row 25) |
 | 28 | Track M2: verified-fact ledger (14b stage 2) | In progress |
+| 29 | Track S: reopen right after the first maintained lull | In progress |
 
-Folders 26, 27 and 28 land with their branches.
+Folders 26 to 29 land with their branches.
 
 ## Reading the records
 
@@ -260,6 +262,7 @@ Notes:
   the creator's first maintained lull is refused with `floor-stale`, because the stored signing-summary
   resume-basis digest differs on resume (CRD:19350-19351, via `installClosedRetirementSourceInRoom`). It fails
   closed, but the room stops. Reopening after two or more maintained lulls works. Track G recorded the symptom.
+  Track S is fixing it.
 - **Canvas and Chat, on every path (Tracks P and Q):**
   - Canvas issuance gains one row per move and is never retired, because Canvas has no settlement profile. Every
     issue authenticates the whole retained outbox, so per-move issue time grows with room age.
