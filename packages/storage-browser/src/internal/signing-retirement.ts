@@ -1302,8 +1302,10 @@ function signingRetentionImageRefusal(cause: unknown): never {
  * census, charged at its exact canonical length) and names every retired row by the digest
  * of its exact frame. Evidence rows retire whole epochs only (every finalized evidence row
  * of the epoch, each exactly the verified frame); summaries only for epochs the current
- * control already retires and whose evidence is already gone (evidence before summaries),
- * again whole epochs. The target is the original prepare and commit of the preparation the
+ * control already retires and whose evidence is already gone, or whose whole evidence this
+ * same section retires (evidence before summaries, kept by atomicity: one epoch's signing
+ * work is one unit, 14b Track O amendment), again whole epochs. The target is the original
+ * prepare and commit of the preparation the
  * per-owner install composes, refused before any write on the original dispatch-debt and
  * monotone laws.
  * @param databaseName - The session's room database.
@@ -1418,9 +1420,11 @@ export function browserRoomSigningRetentionSection(databaseName: string, store?:
 							key[0] !== objectId ||
 							!safe(key[1]) ||
 							key[1] > through ||
-							evidenceEpochs.has(key[1]) ||
-							// Evidence before summaries: the current control already retires the epoch.
-							!retired(old.completed, key[1])
+							// Evidence before summaries: the current control already retires the epoch, or
+							// this same section retires the epoch's whole evidence (one epoch's signing work
+							// is one unit, 14b Track O amendment; the census check below then requires every
+							// row of the epoch, its evidence included, to retire here).
+							!(evidenceEpochs.has(key[1]) || retired(old.completed, key[1]))
 						)
 							retentionStale("signing:summary-key");
 						const row = verify(entry.store, key, entry.frameDigest);

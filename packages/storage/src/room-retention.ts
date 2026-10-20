@@ -243,7 +243,10 @@ export interface RoomRetentionJournalSelection {
 	readonly genesisAnchorDigest: string;
 }
 
-/** The signing part: whole-epoch evidence rows, and summaries of epochs whose evidence already retired. */
+/**
+ * The signing part: whole-epoch evidence rows, and summaries of epochs whose evidence
+ * already retired or retires in the same unit (one epoch's signing work, 14b).
+ */
 export interface RoomRetentionSigningSelection {
 	readonly evidence: readonly Readonly<{
 		key: readonly [string, number, string];

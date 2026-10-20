@@ -46,7 +46,7 @@ const OCCURRENCES = [1, 2] as const;
 export function splitSuite(role: Role, seed: string): void {
 	let observed: ReturnType<typeof observeEvents> | undefined;
 	let reference: Recovery | undefined;
-	let composition: readonly string[] | undefined;
+	let composition: InterruptionReport["committed"] | undefined;
 	beforeEach(() => {
 		observed = observeEvents();
 	});
@@ -56,8 +56,11 @@ export function splitSuite(role: Role, seed: string): void {
 		expect(await closeFixtures()).toEqual([]);
 	});
 	const events = (): Event[] => required(observed).events;
-	const present = (kind: UnitKind, occurrence: number): boolean =>
-		required(composition).filter((label) => label === kind).length >= occurrence;
+	// A transaction carries `kind` when its unit has rows of it (one epoch's signing unit
+	// carries both signing-evidence and signing-summary).
+	const positionsOf = (kind: UnitKind): number[] =>
+		required(composition).flatMap((units, index) => (units[kind] > 0 ? [index] : []));
+	const present = (kind: UnitKind, occurrence: number): boolean => positionsOf(kind).length >= occurrence;
 	const resumeAfter = async (report: InterruptionReport, rooms: Rooms): Promise<void> => {
 		await closeBoth(rooms);
 		if (report.killed) await expectUnchangedSinceKill(rooms, role, report);
@@ -72,8 +75,8 @@ export function splitSuite(role: Role, seed: string): void {
 		it("reference: the crash-free one-unit boundary, a reopen and three more rollovers", async () => {
 			const rooms = await steadyRooms(seed);
 			const { lull, report } = await boundary(rooms, { role, oneUnit: true });
-			composition = report.committed.map(kindsOf);
-			console.info(`track-o ${role} one-unit transactions: ${JSON.stringify(composition)}`);
+			composition = report.committed;
+			console.info(`track-o ${role} one-unit transactions: ${JSON.stringify(composition.map(kindsOf))}`);
 			expect(lull).toMatchObject({ kind: "maintained" });
 			// Every committed transaction carries exactly one unit.
 			for (const units of report.committed) expect(units.total).toBe(1);
@@ -112,8 +115,7 @@ export function splitSuite(role: Role, seed: string): void {
 					console.info(
 						`track-o ${role} refused after ${kind} #${occurrence}: ${JSON.stringify({ committed: report.committed.map(kindsOf), at: report.committedAtRefusal, refused: report.refusedUnits === undefined ? undefined : kindsOf(report.refusedUnits) })}`
 					);
-					const positions = required(composition).flatMap((label, index) => (label === kind ? [index] : []));
-					const last = positions[occurrence - 1] === required(composition).length - 1;
+					const last = positionsOf(kind)[occurrence - 1] === required(composition).length - 1;
 					if (report.refused) expect(report.refusal).toMatchObject({ code: "RETENTION_CAPACITY" });
 					// After the boundary's last transaction there is none to refuse.
 					else expect(last).toBe(true);

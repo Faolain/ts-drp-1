@@ -20681,10 +20681,12 @@ function roomRetentionGenerationUnits(input: Readonly<{
 
 /**
  * The existing fresh summary rule (classifyClosedSigningSummaries) for the epochs whose
- * evidence the boundary's first decision retires: evaluated on the state that decision
- * leaves (its evidence gone, its completed fence), with its verified evidence entries
- * as the evidence plan. Every eligible epoch is selected (the existing pass loop retires
- * the remaining ones through its residual continuation within the same boundary).
+ * evidence the boundary's decision retires: evaluated on the state that evidence
+ * retirement leaves (its evidence gone, its completed fence), with its verified evidence
+ * entries as the evidence plan. Every eligible epoch is selected (the existing pass loop
+ * retires the remaining ones through its residual continuation within the same
+ * boundary). Each selected epoch's summaries retire in the same unit as its evidence
+ * (14b, Track O amendment).
  */
 function roomRetentionSummarySelection(input: Readonly<{
 	objectId: string;
@@ -20766,7 +20768,16 @@ interface RoomRetentionPassPlan {
 	readonly acquiredMs: number;
 }
 
-/** The ordered continuation items of one selection (14e): each a whole unit. */
+/**
+ * The ordered continuation items of one selection (14e): each a whole unit, in the 14b
+ * order (Track O amendment): snapshot turnover, journal headers, each epoch's signing work
+ * (its evidence and its summaries together), journal prefixes, AHE units. Every prefix of
+ * these items is a state the next acquisition's classifiers reselect the rest from: the
+ * evidence classifier admits an epoch only while its journal prefix is collectible, and
+ * an epoch's summaries retire with its evidence, before any AHE unit.
+ * @param selection - The boundary's decision.
+ * @returns The units, in order.
+ */
 function roomRetentionItems(selection: RoomRetentionSelection): readonly RoomRetentionSelection[] {
 	const empty = (): Omit<RoomRetentionSelection, "snapshot" | "journal" | "signing" | "ahe"> & {
 		snapshot: RoomRetentionSelection["snapshot"]; journal: RoomRetentionSelection["journal"];
@@ -20780,12 +20791,13 @@ function roomRetentionItems(selection: RoomRetentionSelection): readonly RoomRet
 	if (selection.snapshot.retire.length !== 0) items.push({ ...empty(), snapshot: selection.snapshot });
 	for (const header of selection.journal.headers)
 		items.push({ ...empty(), journal: { prefixes: [], headers: [header], genesisAnchorDigest: selection.journal.genesisAnchorDigest } });
+	const signingEpochs = [...new Set([...selection.signing.evidence.map(entry => entry.key[1]),
+		...selection.signing.summaries.map(entry => entry.key[1] as number)])].sort((a, b) => a - b);
+	for (const epoch of signingEpochs)
+		items.push({ ...empty(), signing: { evidence: selection.signing.evidence.filter(entry => entry.key[1] === epoch),
+			summaries: selection.signing.summaries.filter(entry => entry.key[1] === epoch) } });
 	for (const prefix of selection.journal.prefixes)
 		items.push({ ...empty(), journal: { prefixes: [prefix], headers: [], genesisAnchorDigest: selection.journal.genesisAnchorDigest } });
-	for (const epoch of [...new Set(selection.signing.evidence.map(entry => entry.key[1]))])
-		items.push({ ...empty(), signing: { evidence: selection.signing.evidence.filter(entry => entry.key[1] === epoch), summaries: [] } });
-	for (const epoch of [...new Set(selection.signing.summaries.map(entry => entry.key[1]))])
-		items.push({ ...empty(), signing: { evidence: [], summaries: selection.signing.summaries.filter(entry => entry.key[1] === epoch) } });
 	for (const unit of selection.ahe.units) items.push({ ...empty(), ahe: { units: [unit] } });
 	return items;
 }
@@ -22422,19 +22434,15 @@ async function reconcileSnapshotRecoveryRoles(
 						decisions: [{ selection: { journal: journalSelection } }] }).current();
 					const base = { version: 1 as const, objectId: input.objectId, stableEpoch: current.epoch, throughEpoch: through, issuance,
 						survivors: initial.survivors, controls: initial.controls };
-					const none = Object.freeze({ retire: Object.freeze([]), turnover: null });
-					const decisions: RoomRetentionSelection[] = evidence.length === 0
-						? [Object.freeze({ ...base, snapshot, journal: journalSelection,
-							signing: Object.freeze({ evidence, summaries: Object.freeze([]) }), ahe: Object.freeze({ units: generation.units }) })]
-						: [Object.freeze({ ...base, snapshot, journal: journalSelection,
-							signing: Object.freeze({ evidence, summaries: Object.freeze([]) }), ahe: Object.freeze({ units: Object.freeze([]) }) }),
-							// The existing summary pass and AHE passes, after the evidence decision.
-							Object.freeze({ ...base, snapshot: none,
-								journal: Object.freeze({ prefixes: Object.freeze([]), headers: Object.freeze([]), genesisAnchorDigest: input.pinnedGenesisAnchorDigest }),
-								signing: Object.freeze({ evidence: Object.freeze([]), summaries: roomRetentionSummarySelection({ objectId: input.objectId,
-									rows: signingRows, evidence: signingDetails.entries, throughEpoch: through, journal: journalDetails,
-									trusts: classificationTrusts, unclassified: unclassifiedSigning }) }),
-								ahe: Object.freeze({ units: generation.units }) })];
+					// One decision per boundary (14b, Track O amendment): each epoch's signing work
+					// (its evidence and the summaries the existing fresh rule selects on the image that
+					// evidence leaves) is one unit, so no committed continuation leaves summary rows in
+					// an epoch the signing control retires.
+					const decisions: RoomRetentionSelection[] = [Object.freeze({ ...base, snapshot, journal: journalSelection,
+						signing: Object.freeze({ evidence, summaries: roomRetentionSummarySelection({ objectId: input.objectId,
+							rows: signingRows, evidence: signingDetails.entries, throughEpoch: through, journal: journalDetails,
+							trusts: classificationTrusts, unclassified: unclassifiedSigning }) }),
+						ahe: Object.freeze({ units: generation.units }) })];
 					retentionPlan = Object.freeze({ input, mode: retentionMode, open: retentionOpen, epoch: current.epoch,
 						decisions: Object.freeze(decisions.map(selection => Object.freeze({ selection }))),
 						...(retentionTurnover === undefined ? {} : { turnover: retentionTurnover }),
