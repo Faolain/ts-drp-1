@@ -122,6 +122,11 @@ async function lullFixture() {
 		let topic: string | undefined;
 		let publisher: ((targetPeerId?: string) => Promise<void>) | undefined;
 		let retainedRequests = 0;
+		let transportRevoked = false;
+		let revoked!: () => void;
+		const revocation = new Promise<void>((resolve) => {
+			revoked = resolve;
+		});
 		const accepted = new Set<string>();
 		const acknowledged = new Map<string, () => void>();
 		const peer = identity === creator ? "canvas-creator" : "canvas-observer";
@@ -151,7 +156,10 @@ async function lullFixture() {
 				Reflect.set(networkNode, "gossipTopicFor", (message: Message) => message.objectId);
 				return {
 					networkNode,
-					close: () => undefined,
+					close: () => {
+						transportRevoked = true;
+						revoked();
+					},
 					openEphemeral: () => {
 						throw new TypeError("LULL_REOPEN_EPHEMERAL_UNUSED");
 					},
@@ -204,6 +212,8 @@ async function lullFixture() {
 			receive,
 			publisher: () => required(publisher),
 			retainedRequests: () => retainedRequests,
+			transportRevoked: () => transportRevoked,
+			revocation,
 		};
 	};
 	const issued = async () => {
@@ -461,4 +471,59 @@ it("an orderly close cancels the retained repair it is serving after a recipient
 		"transport operation failures"
 	).toEqual([]);
 	expect(outcomes).toHaveLength(2);
+}, 900_000);
+
+it("an orderly close cancels a retained send that its own transport revocation refused", async () => {
+	const fixture = await lullFixture();
+	const creator = await fixture.open("creator", fixture.creator);
+	const recipient = await fixture.open("observer", fixture.observer, { receiveOnly: true });
+	const lulls: Awaited<ReturnType<typeof rollover>>[] = [];
+	for (let epoch = 0; epoch < EPOCHS; epoch++) lulls.push(await rollover(fixture, creator, recipient, epoch));
+	expect(required(lulls.at(-1)).repairRequested).toBe(true);
+	await creator.room.issue(paint("served-c", [6, 6, 6]));
+	await deliverEpoch(fixture, recipient, EPOCHS);
+
+	// Like the integrated transport, this one refuses sends once its owner has closed it.
+	// The close revokes the transport first and retires the plane later; a send the plane
+	// makes in between is refused by the revocation while the plane is still current.
+	const network = creator.networkNode;
+	Reflect.set(network, "getAllPeers", () => ["canvas-observer"]);
+	const send = network.sendMessage.bind(network);
+	let retired = false;
+	const unsubscribe = network.unsubscribe.bind(network);
+	Reflect.set(network, "unsubscribe", (topic: string) => {
+		retired = true;
+		return unsubscribe(topic);
+	});
+	let entered!: () => void;
+	const sending = new Promise<void>((resolve) => {
+		entered = resolve;
+	});
+	let release!: () => void;
+	const released = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	let retiredAtRefusal: boolean | undefined;
+	Reflect.set(network, "sendMessage", async (...args: Parameters<typeof send>) => {
+		entered();
+		await released;
+		if (creator.transportRevoked()) {
+			retiredAtRefusal = retired;
+			throw new TypeError("LULL_REOPEN_TRANSPORT_REVOKED");
+		}
+		return send(...args);
+	});
+	const served = creator
+		.publisher()("canvas-observer")
+		.then(
+			() => undefined,
+			(reason: unknown) => reason
+		);
+	await sending;
+	const closing = fixture.stop(creator);
+	await creator.revocation;
+	release();
+	await closing;
+	expect(retiredAtRefusal, "the revocation refused the send while the plane was current").toBe(false);
+	expect(await served, "transport operation failure").toBeUndefined();
 }, 900_000);
