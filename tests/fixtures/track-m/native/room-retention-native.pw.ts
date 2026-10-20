@@ -38,6 +38,11 @@ const SOURCE = JSON.parse(process.env.TRACK_M_14F_SOURCE ?? "{}") as Json;
 const CHILD_TIMEOUT = Number(process.env.TRACK_M_14F_CHILD_TIMEOUT ?? 1_500_000);
 // Boundaries after a recovery's reopen, each compared with the crash-free reference's.
 const RECOVERY_ROLLOVERS = Number(process.env.TRACK_M_14F_RECOVERY_ROLLOVERS ?? 2);
+// Track O: the death cases' target continuation, and a one-unit cap on the creator's
+// sessions (the node's own planner then splits the boundary into one-unit continuations),
+// so cases 5-8 can land between any two units. Defaults: continuation 0, default caps.
+const CONTINUATION = Number(process.env.TRACK_O_14F_CONTINUATION ?? 0);
+const ONE_UNIT = process.env.TRACK_O_14F_ONE_UNIT === "1";
 const childAsset = (): string => path.join(ASSETS, "tm14f-child.mjs");
 
 // Two loopback origins: the creator's room and the recipient's room each run in their own
@@ -261,7 +266,15 @@ async function deathRun(engine: Engine, name: string, edge: Edge | "none") {
 		mode: "mutate",
 		profile,
 		edge,
-		url: server.url({ mode: "mutate", prefix: names.prefix, seed: names.seed, steady: STEADY, edge, continuation: 0 }),
+		url: server.url({
+			mode: "mutate",
+			prefix: names.prefix,
+			seed: names.seed,
+			steady: STEADY,
+			edge,
+			continuation: CONTINUATION,
+			...(ONE_UNIT ? { oneUnit: true } : {}),
+		}),
 		peerUrl: peerUrl(names),
 		log: names.log,
 		timeoutMs: CHILD_TIMEOUT,
@@ -320,9 +333,13 @@ for (const [number, edge] of EDGES)
 		const messages = mutate.messages;
 		const checkpoint = one(messages, "checkpoint") as Message & { writes: Write[]; deletesIssued?: number };
 		const pre = (one(messages, "pre") as { observed: ObservedAll }).observed;
-		const plan = (messages.find((message) => message.kind === "plan" && message.index === 0) as { plan: Json }).plan;
+		const k = CONTINUATION;
+		const planned = messages.find((message) => message.kind === "plan" && message.index === k) as {
+			plan: Json;
+			units?: number;
+		};
+		const plan = planned.plan;
 		const recovered = (one(recovery.messages, "recovered") as { observed: ObservedAll }).observed;
-		const k = 0;
 		const writes = checkpoint.writes;
 		const roomName = pre.room.dump!.database;
 		const floorName = pre.floor.dump!.database;
@@ -439,6 +456,7 @@ for (const [number, edge] of EDGES)
 			ms: mutate.ms + recovery.ms,
 			log: names.log,
 			profile,
+			continuation: { target: k, oneUnit: ONE_UNIT, units: planned.units ?? null },
 			kill: mutate.kill,
 			signal: mutate.signal,
 			checkpoint: {
@@ -479,7 +497,9 @@ for (const [number, edge] of EDGES)
 		// The floor fence never lags the room database.
 		expect(s3.lagging).toEqual([]);
 		expect(s3.throughAhead).toEqual([]);
-		if (floor.fate === "new") expect(s3.floorShape).toEqual({ active: null, revisionDelta: 2, completedIsPlan: true });
+		// Each continuation's step A is one floor transaction (prepare and commit).
+		if (floor.fate === "new")
+			expect(s3.floorShape).toEqual({ active: null, revisionDelta: 2 * (k + 1), completedIsPlan: true });
 		// Replay: both rooms reopen, admit, seal, adopt, install and run both lulls.
 		expect(recoveryResult.reopen).toEqual({ ok: true });
 		expect(recoveryResult.rollover).toMatchObject({ ok: true });

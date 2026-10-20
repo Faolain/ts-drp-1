@@ -12,6 +12,11 @@ export interface RetentionHooks {
 	beforeFirstPlan?(
 		input: Readonly<{ database: string; selection: Readonly<Record<string, unknown>> }>
 	): Promise<void> | void;
+	/**
+	 * Before each planRetention (Track O). It may only throw a refusal the session itself
+	 * could give (a lowered per-transaction cap); the node's own planner then splits.
+	 */
+	beforePlan?(input: Readonly<{ database: string; selection: Readonly<Record<string, unknown>> }>): void;
 	/** After each planRetention; `index` is the continuation it plans (applies so far). */
 	afterPlan?(
 		input: Readonly<{
@@ -67,6 +72,7 @@ export function trapRetention(fixture: LullFixture, hooks: RetentionHooks) {
 					counts.sessions++;
 					await hooks.beforeFirstPlan?.({ database, selection });
 				}
+				hooks.beforePlan?.({ database, selection });
 				counts.plans++;
 				const planned = (await call("planRetention")(...args)) as Readonly<Record<string, unknown>>;
 				await hooks.afterPlan?.({ database, index: applied, planned, selection });

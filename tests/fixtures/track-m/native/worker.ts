@@ -64,6 +64,8 @@ interface Input {
 	readonly steady: number;
 	readonly edge?: Edge;
 	readonly continuation?: number;
+	/** Track O: the creator's sessions refuse any plan of more than one unit (a one-unit cap). */
+	readonly oneUnit?: boolean;
 	readonly variant?: string;
 	readonly epochs?: number;
 	/** Recovery: boundaries to run after the reopen (each compared with the reference). */
@@ -768,6 +770,27 @@ async function case3Existing(input: Input): Promise<Json> {
 	return { lull: jsonable(lull), stale };
 }
 
+/**
+ * Track O: the units a selection carries (the snapshot turnover, each journal header and
+ * prefix, each epoch's signing work, each AHE unit), as the node's planner splits them.
+ * @param value - A retention selection.
+ * @returns How many units it carries.
+ */
+function unitCount(value: Readonly<Record<string, unknown>>): number {
+	const selection = value as unknown as RoomRetentionSelection;
+	const epochs = new Set<unknown>([
+		...selection.signing.evidence.map((entry) => entry.key[1]),
+		...selection.signing.summaries.map((entry) => entry.key[1]),
+	]);
+	return (
+		(selection.snapshot.retire.length === 0 ? 0 : 1) +
+		selection.journal.headers.length +
+		selection.journal.prefixes.length +
+		epochs.size +
+		selection.ahe.units.length
+	);
+}
+
 /** One SIGKILL edge of the creator lull's retention decision `continuation`. */
 async function mutate(input: Input): Promise<Json> {
 	const edge = required(input.edge);
@@ -814,12 +837,24 @@ async function mutate(input: Input): Promise<Json> {
 			model = modelOf(required(observed.room.raw));
 			post({ kind: "pre", observed: wireAll(observed) });
 		},
+		// Track O: a one-unit cap, so the target continuation can be any unit of the boundary.
+		...(input.oneUnit === true
+			? {
+					beforePlan: ({
+						database,
+						selection,
+					}: Readonly<{ database: string; selection: Readonly<Record<string, unknown>> }>) => {
+						if (database === names.room && unitCount(selection) > 1)
+							throw new RoomRetentionRefusal("RETENTION_CAPACITY", "track-o:one-unit");
+					},
+				}
+			: {}),
 		afterPlan: ({ database, index, planned, selection }) => {
 			if (database !== names.room) return;
 			const wire = planWire(planned, selection as unknown as RoomRetentionSelection, model);
 			plans.set(index, wire);
 			fencing = index;
-			post({ kind: "plan", index, plan: wire });
+			post({ kind: "plan", index, plan: wire, units: unitCount(selection) });
 			if (index !== target) return;
 			if (edge === "inside-a") fenceArmed = true;
 		},
