@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/require-await -- Every RoleEndpoint method is async so the browser proxy and the in-process endpoint share one contract. */
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { openTrustedBlueprintCatalogBytes } from "@ts-drp/blueprint-catalog/bytes";
-import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import type { SnapshotChunkProtocolPort } from "@ts-drp/network/snapshot-transfer";
 import { createBrowserAheDurableStore } from "@ts-drp/storage-browser";
 import { createBrowserDurableIssuanceStore } from "@ts-drp/storage-browser/issuance";
@@ -68,6 +68,8 @@ export interface RoleEnvironment {
 	readonly track: Readonly<{ rooms: Set<Closable>; heads: Set<Closable>; ports: Set<SnapshotChunkProtocolPort> }>;
 	/** This role's observer events. */
 	readonly events?: Readonly<Record<string, unknown>>[];
+	/** Calls `listener` synchronously with each of this role's observer events until unsubscribed. */
+	subscribe?(listener: (event: Readonly<Record<string, unknown>>) => void): () => void;
 	/** Recipient: carries one material request to the creator's `dispatch`. */
 	relay?(request: string): Promise<string[]>;
 }
@@ -307,6 +309,21 @@ function loopbackNetwork(peerId: string): DRPNetworkNode {
 	} as unknown as DRPNetworkNode;
 }
 
+/** The operation action and dependency digests a signed preimage carries (observation only; the room authenticates). */
+function preimageFacts(preimage: Uint8Array): Readonly<{ action: string; dependencies: string[] }> {
+	try {
+		const vertex = decodeCanonical(preimage) as Readonly<Record<string, unknown>>;
+		const operation = vertex.operation as Readonly<Record<string, unknown>> | null | undefined;
+		const dependencies = Array.isArray(vertex.dependencies) ? (vertex.dependencies as unknown[]) : [];
+		return {
+			action: typeof operation?.action === "string" ? operation.action : "unknown",
+			dependencies: dependencies.map((value) => (value instanceof Uint8Array ? hex(value) : String(value))),
+		};
+	} catch {
+		return { action: "undecodable", dependencies: [] };
+	}
+}
+
 // ---------------------------------------------------------------------------------------
 // One role.
 
@@ -461,6 +478,49 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 	};
 	let scripted: ScriptedSnapshotChunkPort | undefined;
 	let drained = 0;
+	// Hands the other peer's authenticated signed rows to this room's ingress synchronously, in
+	// order; the returned promise joins the application acceptance of the last row.
+	const deliver = (rows: readonly WireRow[]): Promise<number> => {
+		const finalDigest = required(rows.at(-1)).digest;
+		const started = performance.now();
+		if (accepted.has(finalDigest)) return Promise.resolve(performance.now() - started);
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		const joined = new Promise<void>((resolve, reject) => {
+			acknowledged.set(finalDigest, resolve);
+			timer = setTimeout(() => reject(new TypeError("CANVAS_CHAT_LULL_REMOTE_ADMISSION_TIMEOUT")), 300_000);
+		});
+		const cleanup = () => {
+			if (timer !== undefined) clearTimeout(timer);
+			acknowledged.delete(finalDigest);
+		};
+		try {
+			for (const row of rows)
+				required(ingress)(
+					Message.create({
+						objectId: required(topic),
+						sender: peers[1 - index],
+						type: MessageType.MESSAGE_TYPE_V3_ENVELOPE,
+						data: V3Envelope.encode({
+							canonicalPreimage: fromBase64(row.preimage),
+							signature: fromBase64(row.signature),
+						}).finish(),
+					})
+				);
+		} catch (error) {
+			cleanup();
+			return Promise.reject(error);
+		}
+		return joined.then(
+			() => {
+				cleanup();
+				return performance.now() - started;
+			},
+			(error: unknown) => {
+				cleanup();
+				throw error;
+			}
+		);
+	};
 	const kindOf = (result: unknown) => {
 		const value = result as { kind: string; reason?: string };
 		return value.reason === undefined ? value.kind : `${value.kind}:${value.reason}`;
@@ -490,6 +550,7 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 							signature: toBase64(row.commit.envelope.signature),
 							digest: hex(row.commit.envelope.digest),
 							authorSequence: row.commit.authorSequence,
+							...preimageFacts(row.commit.envelope.canonicalPreimageBytes),
 						});
 					const last = rows.at(-1);
 					if (rows.length < 128 || last === undefined) return out;
@@ -501,35 +562,7 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 		},
 		// Delivers authenticated signed rows of the other peer in issue order; the final row is
 		// an ordinary move whose application acceptance joins the delivery.
-		receive: async (rows: readonly WireRow[]) => {
-			const finalDigest = required(rows.at(-1)).digest;
-			const started = performance.now();
-			if (accepted.has(finalDigest)) return performance.now() - started;
-			let timer: ReturnType<typeof setTimeout> | undefined;
-			const joined = new Promise<void>((resolve, reject) => {
-				acknowledged.set(finalDigest, resolve);
-				timer = setTimeout(() => reject(new TypeError("CANVAS_CHAT_LULL_REMOTE_ADMISSION_TIMEOUT")), 300_000);
-			});
-			try {
-				for (const row of rows)
-					required(ingress)(
-						Message.create({
-							objectId: required(topic),
-							sender: peers[1 - index],
-							type: MessageType.MESSAGE_TYPE_V3_ENVELOPE,
-							data: V3Envelope.encode({
-								canonicalPreimage: fromBase64(row.preimage),
-								signature: fromBase64(row.signature),
-							}).finish(),
-						})
-					);
-				await joined;
-				return performance.now() - started;
-			} finally {
-				if (timer !== undefined) clearTimeout(timer);
-				acknowledged.delete(finalDigest);
-			}
-		},
+		receive: (rows: readonly WireRow[]) => deliver(rows),
 		state: async () => hex(required(application.migration).canonicalStateBytes(room.projection() as never)),
 		seal: async (epoch: number) => {
 			const started = performance.now();
@@ -614,6 +647,56 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 			const started = performance.now();
 			const result = await room.maintainRecoveryPool();
 			return { ms: performance.now() - started, kind: kindOf(result) };
+		},
+		// The creator's lull with moves arriving while it runs (G23). Once the lull's own
+		// retirement selection is observed (so its boundary has entered and admission is
+		// frozen), the other peer's rows go to this room's ingress and one local move is
+		// issued; both are joined. Without a selection (a lull with nothing to retire) they
+		// arrive when the lull settles.
+		lullWithIngress: async (rows: readonly WireRow[], epoch: number, ordinal: number) => {
+			const mark = acceptedOrder.length;
+			let settledAt: number | undefined;
+			let unsubscribe = (): void => undefined;
+			const entered = new Promise<boolean>((resolve) => {
+				unsubscribe =
+					env.subscribe?.((event) => {
+						if (event.kind === "closed-retirement-selection") resolve(true);
+					}) ?? unsubscribe;
+			});
+			const started = performance.now();
+			const lull = room.maintainRecoveryPool().then((result) => {
+				settledAt = performance.now();
+				return result;
+			});
+			const selected = await Promise.race([entered, lull.then(() => false)]);
+			unsubscribe();
+			const pendingAtDelivery = settledAt === undefined;
+			const deliveredAt = performance.now();
+			const remote =
+				rows.length === 0
+					? undefined
+					: deliver(rows).then((ms) => ({
+							ms,
+							settledAfterLull: settledAt === undefined ? false : performance.now() >= settledAt,
+						}));
+			const localIssuedDuringLull = settledAt === undefined;
+			const localStarted = performance.now();
+			const local = room
+				.issue(operationFor(options.app, index, epoch, ordinal))
+				.then(() => ({ ms: performance.now() - localStarted, settledAt: performance.now() }));
+			const [result, remoteResult, localResult] = await Promise.all([lull, remote, local]);
+			const lullEnd = settledAt ?? performance.now();
+			return {
+				ms: lullEnd - started,
+				kind: kindOf(result),
+				selected,
+				pendingAtDelivery,
+				deliveredAfterMs: deliveredAt - started,
+				localIssuedDuringLull,
+				remote: remoteResult ?? null,
+				local: { ms: localResult.ms, settledAfterLull: localResult.settledAt >= lullEnd },
+				accepted: acceptedOrder.slice(mark),
+			};
 		},
 		accepted: async (from: number) => acceptedOrder.slice(from),
 		census: () => host.census(name),

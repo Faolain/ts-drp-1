@@ -252,7 +252,6 @@ function nodeHostFor(kind: HostKind, directory: string, reopen: boolean): LongRo
 export interface RunHooks {
 	/** Macrotask yield before each seal (default 300 ms, Track M finding 5). */
 	readonly settleMs?: number;
-	readonly lullIngressDelayMs?: number;
 	/** JSONL output directory (one file per run) and the tree label. */
 	readonly out?: string;
 	readonly tree?: string;
@@ -273,10 +272,22 @@ export async function runLongRoom(
 	const directory = mkdtempSync(join(tmpdir(), "canvas-chat-lull-"));
 	directories.add(directory);
 	const events: Record<Role, Readonly<Record<string, unknown>>[]> = { creator: [], recipient: [] };
+	// Synchronous per-role listeners (the creator's lull-ingress trigger, long-room-core.ts).
+	const listeners: Record<Role, Set<(event: Readonly<Record<string, unknown>>) => void>> = {
+		creator: new Set(),
+		recipient: new Set(),
+	};
+	const subscribe = (role: Role) => (listener: (event: Readonly<Record<string, unknown>>) => void) => {
+		listeners[role].add(listener);
+		return () => void listeners[role].delete(listener);
+	};
 	let unattributed = 0;
 	const restore = await installEnvironment(options.host, (role, event) => {
 		if (role === undefined) unattributed++;
-		else events[role].push(event);
+		else {
+			events[role].push(event);
+			for (const listener of listeners[role]) listener(event);
+		}
 	});
 	const out = hooks.out;
 	const tree = hooks.tree ?? "unknown";
@@ -301,7 +312,14 @@ export async function runLongRoom(
 		const creator = inRole(
 			"creator",
 			await roleContext.run("creator", () =>
-				openRole(options, 0, { host, unique: directory, openFloor, track, events: creatorEvents })
+				openRole(options, 0, {
+					host,
+					unique: directory,
+					openFloor,
+					track,
+					events: creatorEvents,
+					subscribe: subscribe("creator"),
+				})
 			)
 		);
 		const recipient = inRole(
@@ -313,6 +331,7 @@ export async function runLongRoom(
 					openFloor,
 					track,
 					events: recipientEvents,
+					subscribe: subscribe("recipient"),
 					relay: (request) => creator.dispatch(request),
 				})
 			)
@@ -324,7 +343,6 @@ export async function runLongRoom(
 		return {
 			...(await driveLongRoom(options, endpoints, {
 				settleMs: hooks.settleMs ?? 300,
-				...(hooks.lullIngressDelayMs === undefined ? {} : { lullIngressDelayMs: hooks.lullIngressDelayMs }),
 				reopen: async () => {
 					await endpoints[1].close();
 					await endpoints[0].close();

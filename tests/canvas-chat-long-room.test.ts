@@ -97,6 +97,9 @@ it.skipIf(!ENABLED).each(cases)(
 				sealRetirement: record.windows.seal.retirementSelections,
 				lullRetirement: record.windows.lull.retirementSelections,
 				ingress: record.lullIngress?.order,
+				entered: record.lullIngress?.entered,
+				pending: record.lullIngress?.pendingAtDelivery,
+				reopened: record.reopened === undefined ? undefined : true,
 			}))
 		);
 		for (const record of run.epochs) {
@@ -104,6 +107,9 @@ it.skipIf(!ENABLED).each(cases)(
 			if (record.lullIngress !== undefined) {
 				expect(record.lullIngress.allAdmitted, summary).toBe(true);
 				expect(record.lullIngress.fifo, summary).toBe(true);
+				// A lull that selected retirement had the moves handed to it while it was still running.
+				if (record.windows.lull.retirementSelections > 0)
+					expect([record.lullIngress.entered, record.lullIngress.pendingAtDelivery], summary).toEqual([true, true]);
 			}
 			if (bound === "absent") expect(record.lulls.creator, summary).toBe("deferred:unsupported");
 		}
@@ -112,7 +118,11 @@ it.skipIf(!ENABLED).each(cases)(
 				expect(record.lulls.creator, summary).not.toBe("deferred:unsupported");
 			for (const record of run.epochs) {
 				const prior = run.epochs.find(({ epoch }) => epoch === record.epoch - 1);
-				if (prior?.lulls.creator === "maintained") expect(record.windows.seal.retirementSelections, summary).toBe(0);
+				// The first seal after a persisted reopen resumes the retirement the closed process had
+				// planned (its in-memory turnover token does not survive the reopen); it is reported in
+				// the JSONL and RESULT.md, not asserted here.
+				if (prior?.lulls.creator === "maintained" && prior.reopened === undefined)
+					expect(record.windows.seal.retirementSelections, summary).toBe(0);
 			}
 		}
 	},

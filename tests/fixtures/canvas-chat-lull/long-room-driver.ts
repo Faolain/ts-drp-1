@@ -44,22 +44,41 @@ export interface WindowEvents {
 }
 
 export interface LullIngress {
-	/** Recipient rows delivered to the creator while its lull was pending. */
+	/** Recipient rows delivered to the creator during its lull. */
 	readonly delivered: number;
+	/** The operation action of each delivered row, in delivery order. */
+	readonly deliveredActions: readonly string[];
+	/** The lull's own retirement selection was observed before the delivery (its boundary had entered). */
+	readonly entered: boolean;
 	/** The lull had not settled when the rows were handed to the creator's ingress. */
 	readonly pendingAtDelivery: boolean;
+	/** Milliseconds from the lull's start to the delivery. */
+	readonly deliveredAfterMs: number;
 	/** The creator's local move was issued while the lull was pending. */
 	readonly localIssuedDuringLull: boolean;
-	/** Every delivered row and the local move were accepted by the creator. */
+	/** Delivered rows the creator reported through `onAcceptedVertex`. */
+	readonly reported: number;
+	/** Delivered protocol controls (not reported through `onAcceptedVertex`) that a reported
+	 * delivered row depends on, directly or through other delivered rows: admitted before it. */
+	readonly controlsCovered: number;
+	/** Every delivered row was admitted (reported, or a protocol control a reported row depends
+	 * on) and so was the creator's local move. Nothing was dropped. */
 	readonly allAdmitted: boolean;
-	/** The delivered rows were accepted in delivery order. */
+	/** The reported delivered rows were accepted in delivery order. */
 	readonly fifo: boolean;
-	/** Delivered rows (and the local move) whose acceptance settled after the lull. */
-	readonly settledAfterLull: number;
+	/** The last delivered row's acceptance, and the local move's, settled after the lull. */
+	readonly remoteSettledAfterLull: boolean | null;
+	readonly localSettledAfterLull: boolean;
 	/** Creator acceptance order of this step: "r<i>" = i-th delivered row, "l" = local move. */
 	readonly order: readonly string[];
+	/** The Writer recipient's issue time of each delivered row (before the lull started). */
+	readonly remoteIssueMs: readonly number[];
+	/** The creator's wall time to accept the last delivered row (from delivery). */
 	readonly remoteAdmitMs: number | null;
+	/** The creator's wall time of its own move issued during the lull. */
 	readonly localIssueMs: number;
+	/** The recipient's wall time to accept the creator's lull move, after both lulls. */
+	readonly localDeliveryMs: number | null;
 }
 
 export interface EpochRecord {
@@ -83,6 +102,8 @@ export interface EpochRecord {
 	readonly lullIngress?: LullIngress;
 	/** Both roles were closed and reopened from their persisted stores after this epoch. */
 	readonly reopened?: Readonly<{ ms: number; state: boolean; authority: number | null }>;
+	/** Whatever the platform's `sample` hook returned after this epoch (e.g. long tasks). */
+	readonly sample?: Readonly<Record<string, unknown>>;
 }
 
 export interface LongRoomRun {
@@ -96,6 +117,10 @@ export interface WireRow {
 	readonly signature: string;
 	readonly digest: string;
 	readonly authorSequence: number;
+	/** The operation action of the signed preimage (observation only). */
+	readonly action?: string;
+	/** Hex digests of the vertex's declared dependencies (observation only). */
+	readonly dependencies?: readonly string[];
 }
 
 /** The creator successor offer (base64 of its four exact canonical byte strings). */
@@ -103,6 +128,20 @@ export type WireOffer = Readonly<Record<string, string>>;
 
 export interface ObservedEvent {
 	readonly kind: string;
+}
+
+export interface LullWithIngressResult {
+	readonly ms: number;
+	readonly kind: string;
+	/** The lull's retirement selection was observed before the delivery. */
+	readonly selected: boolean;
+	readonly pendingAtDelivery: boolean;
+	readonly deliveredAfterMs: number;
+	readonly localIssuedDuringLull: boolean;
+	readonly remote: Readonly<{ ms: number; settledAfterLull: boolean }> | null;
+	readonly local: Readonly<{ ms: number; settledAfterLull: boolean }>;
+	/** Hex digests this role accepted during the step, in acceptance order. */
+	readonly accepted: readonly string[];
 }
 
 export interface RoleEndpoint {
@@ -127,6 +166,9 @@ export interface RoleEndpoint {
 	authorityEpoch(): Promise<number | null>;
 	/** `maintainRecoveryPool()`: wall time and result kind. */
 	lull(): Promise<Readonly<{ ms: number; kind: string }>>;
+	/** Creator: `maintainRecoveryPool()` with `rows` delivered and one local move (`ordinal`)
+	 * issued while it runs, both joined; see long-room-core.ts. */
+	lullWithIngress(rows: readonly WireRow[], epoch: number, ordinal: number): Promise<LullWithIngressResult>;
 	/** Hex digests of every vertex this role accepted, in acceptance order, from index `from`. */
 	accepted(from: number): Promise<string[]>;
 	census(): Promise<StoreCensus>;
@@ -138,10 +180,10 @@ export interface RoleEndpoint {
 export interface DriveHooks {
 	/** Macrotask yield before each seal (Track M finding 5: NATIVE_READ_RESERVATION_BUSY). */
 	readonly settleMs?: number;
-	/** Delay between starting the creator's lull and delivering the moves that arrive during it. */
-	readonly lullIngressDelayMs?: number;
 	/** Closes both roles and reopens them from their persisted stores. */
 	reopen?(): Promise<readonly [creator: RoleEndpoint, recipient: RoleEndpoint]>;
+	/** Platform observations after each epoch's census (e.g. long tasks per page). */
+	sample?(): Promise<Readonly<Record<string, unknown>>>;
 	write?(record: EpochRecord): void;
 	log?(line: string): void;
 	now?(): number;
@@ -178,7 +220,7 @@ const sleep = (ms: number): Promise<unknown> => new Promise((resolve) => setTime
  * Drives one long room.
  * @param options - The room.
  * @param initial - The creator and the recipient.
- * @param hooks - Output, the pre-seal yield, the lull-ingress delay and the reopen.
+ * @param hooks - Output, the pre-seal yield, the per-epoch sample and the reopen.
  * @returns Every epoch's record.
  */
 export async function driveLongRoom(
@@ -246,64 +288,75 @@ export async function driveLongRoom(
 			if (options.lullMoves === 0) creatorLull = await creator.lull();
 			else {
 				// Moves that arrive while the creator's lull runs (G23): the Writer recipient's
-				// moves are issued first and handed to the creator's ingress after the lull
-				// started; the creator's own move is issued while it runs.
+				// moves are issued first, then handed to the creator's ingress once its lull has
+				// entered its boundary, together with one local creator move.
 				const remote = writerRecipient ? options.lullMoves : 0;
+				const remoteIssueMs: number[] = [];
 				for (let index = 0; index < remote; index++)
-					recipientIssue.push(await recipient.issue(epoch, options.moves + index));
+					remoteIssueMs.push(await recipient.issue(epoch, options.moves + index));
 				const rows = remote === 0 ? [] : await recipient.published(delivered[1] ?? null);
-				const mark = (await creator.accepted(0)).length;
-				let lullSettledAt: number | undefined;
-				const lull = creator.lull().then((result) => {
-					lullSettledAt = now();
-					return result;
-				});
-				await sleep(hooks.lullIngressDelayMs ?? 50);
-				const pendingAtDelivery = lullSettledAt === undefined;
-				const received = rows.length === 0 ? undefined : creator.receive(rows).then((ms) => ({ ms, settledAt: now() }));
-				const localIssuedDuringLull = lullSettledAt === undefined;
-				const local = creator.issue(epoch, options.moves + remote).then((ms) => ({ ms, settledAt: now() }));
-				const [lullResult, remoteResult, localResult] = await Promise.all([lull, received, local]);
-				creatorLull = lullResult;
-				const lullEnd = lullSettledAt ?? now();
+				const step = await creator.lullWithIngress(rows, epoch, options.moves + remote);
+				creatorLull = { ms: step.ms, kind: step.kind };
 				const last = rows.at(-1);
 				if (last !== undefined) delivered[1] = last.authorSequence;
 				const own = await creator.published(delivered[0] ?? null);
 				const localDigest = own.at(-1)?.digest;
-				const acceptedNow = (await creator.accepted(mark)).slice();
-				const position = new Map(acceptedNow.map((digest, index) => [digest, index]));
+				const position = new Map(step.accepted.map((digest, index) => [digest, index]));
 				const remotePositions = rows.map((row) => position.get(row.digest));
-				const order = acceptedNow.flatMap((digest) => {
-					const index = rows.findIndex((row) => row.digest === digest);
-					if (index >= 0) return [`r${index}`];
-					return digest === localDigest ? ["l"] : [];
-				});
+				// A protocol control (for example the settlement author fence) is admitted without an
+				// application notification. It counts as admitted when a reported delivered row
+				// depends on it, directly or through other delivered rows (no vertex is admitted
+				// before its dependencies).
+				const covered = new Set(rows.filter((row) => position.has(row.digest)).map((row) => row.digest));
+				for (let changed = true; changed; ) {
+					changed = false;
+					for (const row of rows)
+						if (covered.has(row.digest))
+							for (const dependency of row.dependencies ?? [])
+								if (!covered.has(dependency) && rows.some((other) => other.digest === dependency)) {
+									covered.add(dependency);
+									changed = true;
+								}
+				}
+				const reportedRows = remotePositions.filter((value): value is number => value !== undefined);
 				lullIngress = {
 					delivered: rows.length,
-					pendingAtDelivery,
-					localIssuedDuringLull,
+					deliveredActions: rows.map((row) => row.action ?? "unknown"),
+					entered: step.selected,
+					pendingAtDelivery: step.pendingAtDelivery,
+					deliveredAfterMs: step.deliveredAfterMs,
+					localIssuedDuringLull: step.localIssuedDuringLull,
+					reported: reportedRows.length,
+					controlsCovered: rows.filter((row) => !position.has(row.digest) && covered.has(row.digest)).length,
 					allAdmitted:
-						remotePositions.every((value) => value !== undefined) &&
+						rows.every(
+							(row) => position.has(row.digest) || (row.action?.startsWith("$drp.") === true && covered.has(row.digest))
+						) &&
 						localDigest !== undefined &&
 						position.has(localDigest),
-					fifo: remotePositions.every(
-						(value, index) => value !== undefined && (index === 0 || value > (remotePositions[index - 1] ?? -1))
-					),
-					settledAfterLull:
-						(remoteResult !== undefined && remoteResult.settledAt >= lullEnd ? rows.length : 0) +
-						(localResult.settledAt >= lullEnd ? 1 : 0),
-					order,
-					remoteAdmitMs: remoteResult?.ms ?? null,
-					localIssueMs: localResult.ms,
+					fifo: reportedRows.every((value, index) => index === 0 || value > (reportedRows[index - 1] ?? -1)),
+					remoteSettledAfterLull: step.remote?.settledAfterLull ?? null,
+					localSettledAfterLull: step.local.settledAfterLull,
+					order: step.accepted.flatMap((digest) => {
+						const index = rows.findIndex((row) => row.digest === digest);
+						if (index >= 0) return [`r${index}`];
+						return digest === localDigest ? ["l"] : [];
+					}),
+					remoteIssueMs,
+					remoteAdmitMs: step.remote?.ms ?? null,
+					localIssueMs: step.local.ms,
+					localDeliveryMs: null,
 				};
-				creatorIssue.push(localResult.ms);
-				if (remoteResult !== undefined) creatorAdmitsRemote.push(remoteResult.ms);
 			}
 			const lullEvents = await creator.drainEvents();
 			stage = "recipient-lull";
 			const recipientLull = await recipient.lull();
 			// The local lull move reaches the recipient before the census and the next epoch.
-			if (options.lullMoves !== 0) await flush(0, recipientAdmitsRemote);
+			if (lullIngress !== undefined) {
+				const deliveries: number[] = [];
+				await flush(0, deliveries);
+				lullIngress = { ...lullIngress, localDeliveryMs: deliveries[0] ?? null };
+			}
 			const state = await sameState();
 			other.push(...(await creator.drainEvents()));
 			stage = "census";
@@ -322,6 +375,7 @@ export async function driveLongRoom(
 				reopened = { ms, state: true, authority: authorityAfter };
 				await creator.drainEvents();
 			}
+			const sample = hooks.sample === undefined ? undefined : await hooks.sample();
 			const record: EpochRecord = {
 				epoch: epoch + 1,
 				lulled,
@@ -346,11 +400,12 @@ export async function driveLongRoom(
 				},
 				...(lullIngress === undefined ? {} : { lullIngress }),
 				...(reopened === undefined ? {} : { reopened }),
+				...(sample === undefined ? {} : { sample }),
 			};
 			epochs.push(record);
 			hooks.write?.(record);
 			hooks.log?.(
-				`CANVAS_CHAT_LULL ${label} epoch=${epoch + 1} lulls=${record.lulls.creator}/${record.lulls.recipient} seal=${seal.toFixed(0)} (retire ${record.windows.seal.retirementSelections}) adopt=${adopt.toFixed(0)} install=${install.toFixed(0)} lull=${creatorLull.ms.toFixed(0)} (retire ${record.windows.lull.retirementSelections})/${recipientLull.ms.toFixed(0)}${lullIngress === undefined ? "" : ` ingress=${lullIngress.order.join(",")} fifo=${String(lullIngress.fifo)}`}${reopened === undefined ? "" : ` reopen=${reopened.ms.toFixed(0)}`}`
+				`CANVAS_CHAT_LULL ${label} epoch=${epoch + 1} lulls=${record.lulls.creator}/${record.lulls.recipient} seal=${seal.toFixed(0)} (retire ${record.windows.seal.retirementSelections}) adopt=${adopt.toFixed(0)} install=${install.toFixed(0)} lull=${creatorLull.ms.toFixed(0)} (retire ${record.windows.lull.retirementSelections})/${recipientLull.ms.toFixed(0)}${lullIngress === undefined ? "" : ` ingress=${lullIngress.order.join(",")} actions=${lullIngress.deliveredActions.join(",")} entered=${String(lullIngress.entered)} pending=${String(lullIngress.pendingAtDelivery)} afterLull=${String(lullIngress.remoteSettledAfterLull)}/${String(lullIngress.localSettledAfterLull)} fifo=${String(lullIngress.fifo)} admitted=${String(lullIngress.allAdmitted)}`}${reopened === undefined ? "" : ` reopen=${reopened.ms.toFixed(0)}`}`
 			);
 		}
 	} catch (error) {
