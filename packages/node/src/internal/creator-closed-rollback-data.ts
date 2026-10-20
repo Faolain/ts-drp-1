@@ -20649,20 +20649,31 @@ function roomRetentionGenerationUnits(input: Readonly<{
 		resumeCompleted: false, unclassified: input.unclassified });
 	if (first === undefined) return Object.freeze({ units: Object.freeze([]), shortfall: false });
 	units.push(capture(first));
-	const sorted = (input.frame.authenticatedExcludedGenerations ?? []).slice()
-		.sort((a, b) => compareClosedGenerationSources(input.frame, a, b));
-	const retired = new Set<string>(first.reclamation.lineageFloor.deleteGenerationIds);
+	// Each later unit is the existing classifier's own selection on the exact post-image of
+	// the previous unit: the rows and blobs that unit leaves, and the authenticated excluded
+	// sources still present in them. Its pass after that unit has no pending generation
+	// drain of this cut, so no prior control applies.
+	const authenticated = new Set((input.frame.authenticatedExcludedGenerations ?? []).map(row => row.generationId));
 	let rows = closedGenerationPostRows(input.frame.reader.generations, first);
 	let shortfall = false;
 	while (rows.length > limit) {
-		const next = sorted.find(row => !retired.has(row.generationId) && rows.some(actual => actual.generationId === row.generationId));
-		if (next === undefined) { shortfall = true; break; }
-		const selected = rows.find(row => row.generationId === next.generationId)!;
-		const referenced = new Set(rows.flatMap(row => row.closure.map(ref => ref.digest)));
-		const plan = closedGenerationSourceFromSelected({ ...input.frame, reader: Object.freeze({ generations: rows,
-			blobs: input.frame.reader.blobs.filter(blob => referenced.has(blob.ref.digest)) }) }, input.summary, rows, selected);
+		const present = rows;
+		const referenced = new Set(present.flatMap(row => row.closure.map(ref => ref.digest)));
+		let plan: ReturnType<typeof classifyClosedGenerationSource>;
+		try {
+			plan = classifyClosedGenerationSource({
+				frame: Object.freeze({ ...input.frame,
+					reader: Object.freeze({ generations: present, blobs: input.frame.reader.blobs.filter(blob => referenced.has(blob.ref.digest)) }),
+					authenticatedExcludedGenerations: Object.freeze(present.filter(row => authenticated.has(row.generationId))) }),
+				summary: input.summary, control: null, unclassified: input.unclassified, resumeCompleted: false });
+		} catch (error) {
+			// The existing pass refuses here: no eligible authenticated source remains.
+			if (!(error instanceof Refusal && error.result.kind === "snapshot-unavailable")) throw error;
+			shortfall = true;
+			break;
+		}
+		requireLaw(plan !== undefined, "internal-invariant");
 		units.push(capture(plan));
-		for (const id of plan.reclamation.lineageFloor.deleteGenerationIds) retired.add(id);
 		rows = closedGenerationPostRows(rows, plan);
 	}
 	return Object.freeze({ units: Object.freeze(units), shortfall });
@@ -21077,21 +21088,10 @@ async function reconcileSnapshotRecoveryRoles(
 	if (floor.state.pending !== null) throw new Refusal(failure("floor-pending"));
 	requireLaw(floor.state.stable.epoch >= 2, "snapshot-unavailable");
 	// Slice 14b stage 1: a room host that opted in retires this boundary by verified
-	// retention decisions after this same complete acquisition. A durable resume, legacy
-	// scopes and a pass after a retention refusal keep the existing path. A plan-only
-	// probe (test hook) keeps the existing path unchanged and only plans alongside it.
-	let retentionOpen = requireClosedWorkflowCompletion || inherited.legacyScopes !== undefined
-		? undefined : v3RoomRetentionOpener(input.store);
+	// retention decisions after this same complete acquisition (selected below, after the
+	// acquisition; nothing here reads a store or changes the existing prefix).
+	let retentionOpen: RoomRetentionPassPlan["open"] | undefined;
 	let retentionMode: "apply" | "plan-only" = "apply";
-	if (retentionOpen !== undefined) {
-		const fallback = roomRetentionFallbacks.get(input.store as object);
-		if (fallback !== undefined) roomRetentionFallbacks.delete(input.store as object);
-		const mode = fallback === undefined ? roomRetentionTestMode(floor.state.stable.epoch, input.objectId) : "off";
-		if (mode === "off") {
-			observeRoomRetention({ kind: "room-retention-declined", epoch: floor.state.stable.epoch, reason: fallback ?? "mode-off" });
-			retentionOpen = undefined;
-		} else retentionMode = mode;
-	}
 	const retentionStarted = performance.now();
 	// Set once the pre-flight accepted this boundary in apply mode: the existing turnover,
 	// summary and generation classes then move into the retention decisions.
@@ -21468,6 +21468,20 @@ async function reconcileSnapshotRecoveryRoles(
 					JSON.stringify([row.scope.objectId, row.scope.epoch, row.scope.anchor, row.scope.manifestDigest])
 				)
 		);
+		// Slice 14b stage 1: only a room host that opted in. A durable resume, legacy scopes
+		// and a pass after a retention refusal keep the existing path. A plan-only probe
+		// (test hook) keeps the existing path unchanged and only plans alongside it.
+		retentionOpen = requireClosedWorkflowCompletion || inherited.legacyScopes !== undefined
+			? undefined : v3RoomRetentionOpener(input.store);
+		if (retentionOpen !== undefined) {
+			const fallback = roomRetentionFallbacks.get(input.store as object);
+			if (fallback !== undefined) roomRetentionFallbacks.delete(input.store as object);
+			const mode = fallback === undefined ? roomRetentionTestMode(floor.state.stable.epoch, input.objectId) : "off";
+			if (mode === "off") {
+				observeRoomRetention({ kind: "room-retention-declined", epoch: floor.state.stable.epoch, reason: fallback ?? "mode-off" });
+				retentionOpen = undefined;
+			} else retentionMode = mode;
+		}
 		if (retentionOpen !== undefined) {
 			// Slice 14b: continue only from owner states the retention path reaches itself.
 			// Every read here is a point observation under the held exclusions; no grant.
@@ -21762,13 +21776,23 @@ async function reconcileSnapshotRecoveryRoles(
 		const unchangedSnapshotReadback = retiring.length === 0 && snapshotExclusion === undefined &&
 			retirementDecision === undefined && nativeReceipt === undefined && transactionFailure === undefined
 			? unchangedSnapshotCandidate : undefined;
-		try {
+		// Slice 14b: the retention path attempted no native transaction in this acquisition
+		// (its effects are re-planned and verified inside step B), so it keeps the same
+		// brackets without the post-effect observer.
+		if (retentionDeferred) try {
 			await checkNativeReservations();
 			await lifetime?.check();
 			await checkHeldCurrent();
 			await closeUnion.check();
-			// The retention path attempted no native transaction in this acquisition.
-			if (unchangedSnapshotReadback === undefined && !retentionDeferred) {
+		} catch (error) {
+			readbackFailure = error;
+		}
+		else try {
+			await checkNativeReservations();
+			await lifetime?.check();
+			await checkHeldCurrent();
+			await closeUnion.check();
+			if (unchangedSnapshotReadback === undefined) {
 				const readback = await observeCreatorProtectedRecoveryRoles(roleInput);
 				if (!readback.ok) throw new RoleRefusal(readback);
 				const current = resolveCreatorProtectedRecoveryRoleObservation(readback.observation);
