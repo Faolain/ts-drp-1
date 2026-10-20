@@ -19494,19 +19494,31 @@ async function runCreatorReceivedRecoveryMaintenance(registration: V3PlaneRegist
 	// Recipient twin of the creator's completed-resume discharge: a durable reopen
 	// after this copy completed its retirement at this epoch halts admission. That
 	// stored decision only requests the ORIGINAL received reconstruction; it grants
-	// no admission, and cannot discharge an active intent or a different halt.
+	// no admission, and cannot discharge a different halt.
 	const resumeControl = registration.retirementResumeControl, reconstruction = registration.retirementReconstruction;
 	const completedRequestMatches = (): boolean => resumeControl?.active === null &&
 		resumeControl.objectId === payload.provenance.objectId && resumeControl.completed?.domains !== undefined &&
 		resumeControl.completed.throughEpoch + 1 === trust.currentEpoch &&
 		(reconstruction === undefined || sameHead(reconstruction.head, payload.trust.head) &&
 			sameCreatorRoomHead(reconstruction.roomHead, trust)) && creatorRetirementResumeRequested(registration);
-	const completedResume = resume && registration.operationAdmissionHalted && completedRequestMatches() ? resumeControl : undefined;
+	// An unfinished intent this copy prepared at this same head (a crash or failure
+	// between its stages) is the same kind of request. The original received
+	// reconstruction then either completes that SAME intent (its install requires the
+	// stored preparation's source proof and decision to equal the freshly authenticated
+	// ones) or refuses; it never prepares a different one over it.
+	const activeRequestMatches = (): boolean => resumeControl?.active != null &&
+		resumeControl.objectId === payload.provenance.objectId &&
+		resumeControl.active.preparation.head.kind === "present" &&
+		sameHead(resumeControl.active.preparation.head, payload.trust.head) &&
+		(reconstruction === undefined || sameHead(reconstruction.head, payload.trust.head) &&
+			sameCreatorRoomHead(reconstruction.roomHead, trust)) && creatorRetirementResumeRequested(registration);
+	const requestMatches = (): boolean => completedRequestMatches() || activeRequestMatches();
+	const completedResume = resume && registration.operationAdmissionHalted && requestMatches() ? resumeControl : undefined;
 	if (resume && completedResume === undefined) return "deferred";
 	const admissionStateCurrent = (): boolean => completedResume === undefined
 		? !registration.operationAdmissionHalted
 		: registration.retirementResumeControl === resumeControl && registration.retirementReconstruction === reconstruction &&
-			registration.operationAdmissionHalted && completedRequestMatches();
+			registration.operationAdmissionHalted && requestMatches();
 	let entered = false, accepting = false, finished = false;
 	let enteredGraph: Readonly<{version: number; index: V3PlaneRegistration["index"]}> | undefined;
 	const available = (): boolean => !finished && currentRegistration(registration) &&
