@@ -87,8 +87,10 @@ repository owner made. "Coordinator" marks a recommendation that was then carrie
 | 17 | Track R3: write spec slices S1–S6, then build the watermark design for production. The new path becomes the default only after three-engine and SIGKILL evidence. | User | The only path to millisecond maintenance. It changes durable formats, so the spec comes first. | 84fd4c8f..68b4168e, merged after verification. Specs 14 and 14a–14f; stage 1a of 14a (one room database, one retirement session per install) is opt-in and the default path is unchanged. It is correct but saves only 3–9%, because every per-pass re-proof remains, so the default was not flipped. It also fixed two of Track L's residuals on the shared path. |
 | 18 | Track L: fix two bugs on the current path. After a lull and a reopen, recipients admit no moves; and the lull's history repair races a persisted close. | User | Play stops after a restart. Both bugs predate this work. | dcab6d12..88467723. A reopened recipient discharges its completed-retirement halt by re-running the original reconstruction. An orderly close cancels the retained republish it is serving. The Grid runs the final recipient lull again. |
 | 19 | Keep these records in the repository. | User | Decisions and plans should live with the code. | This folder |
-| 20 | Track M: build slice 14b (retirement decided from a ledger of verified facts) and 14e (bounds and charges) on R3's room path. Every decision must match the existing planner, proven by a differential test. | User | Stage 1a kept the per-pass re-proofs that dominate the lull; 14b is the lever for milliseconds. Target: creator lull ≤ 100 ms p50. | In progress |
+| 20 | Track M: build slice 14b (retirement decided from a ledger of verified facts) and 14e (bounds and charges) on R3's room path. Every decision must match the existing planner, proven by a differential test. | User | Stage 1a kept the per-pass re-proofs that dominate the lull; 14b is the lever for milliseconds. Target: creator lull ≤ 100 ms p50. | Held on its branch (a301cbe0..07849f85), see row 22. Stage 1 cut the creator lull 2441 → 623 ms and the recipient lull 1253 → 466 ms; the target needs stage 2. No decision deleted anything the existing planner keeps. |
 | 21 | Track N: stop each recipient's issuance store growing 3 issued and 3 outbox rows per epoch, and make the Grid's proof-event budget scale with rollovers. | User | Unbounded growth with room age violates G1. R3 found it; it predates this work. | 60161b4a..7464f875, merged after verification. A Writer recipient never closes, so its cleanup always stopped at the cold-material guard before the issuance drain. It now drains its own classified, published, settled prefix through the existing authenticated pruner when its completed retirement decisions match, with no generation effect. Recipients stay flat at 13 rows from epoch 5 through 16 on both paths. |
+| 22 | Hold Track M: fix its crash bug first, then merge. | User | Its 14f case 8 breaks G3 and G14 on the opt-in path on all three engines: a SIGKILL between a creator boundary's two decisions leaves the signing control without a summary source, and maintenance then halts. The main branch must not carry a known guarantee break. | Track M stays on its branch; Track O fixes it there. |
+| 23 | Start Tracks O, M2, P and Q in parallel. | User | O: the case 8 fix. M2: 14b stage 2, the in-memory ledger that removes the ~282 ms cold acquisition per boundary. P and Q fix two problems Track M found on every path: Canvas issuance grows one row per move with an O(outbox) issue cost (829 ms → 6.7 s per move by epoch 16), and the shipped Canvas and Chat creators never run their lull, so retirement runs inline at seal (about 2.7 s). | In progress |
 
 ## Commits
 
@@ -175,10 +177,14 @@ that track's working documents.
 | [20](tracks/20-track-r2-r3-watermark-retirement/README.md) | Tracks R2 and R3: single-database watermark retirement | 84fd4c8f..68b4168e, opt-in; latency goal not met |
 | [21](tracks/21-track-k-epoch8-retention/README.md) | Track K: epoch-8 recipient refusal | 742a517e–9f606ce8 |
 | [22](tracks/22-track-l-reopen-and-close/README.md) | Track L: reopen admission and close race | dcab6d12..88467723 |
-| 23 | Track M: verified-fact retirement (slices 14b and 14e) | In progress |
+| 23 | Track M: verified-fact retirement (slices 14b and 14e) | Held until Track O lands |
 | [24](tracks/24-track-n-recipient-issuance-growth/README.md) | Track N: recipient issuance growth | 60161b4a..7464f875 |
+| 25 | Track O: crash resume on the retention path (14f case 8) | In progress |
+| 26 | Track P: Canvas issuance growth and O(outbox) issue cost | In progress |
+| 27 | Track Q: Canvas and Chat lull | In progress |
+| 28 | Track M2: verified-fact ledger (14b stage 2) | In progress |
 
-Track M is in progress. Its folder, `tracks/23-track-m-verified-fact-retirement/`, lands with its branch.
+Folders 23, 25, 26, 27 and 28 land with their branches.
 
 ## Reading the records
 
@@ -219,8 +225,14 @@ Notes:
 
 ## Open items
 
-- **Track M (in progress):** slice 14b, retirement decided from verified facts carried in memory, plus 14e's bounds
-  and charges, on the room path. This is the only path found to millisecond maintenance.
+- **Track M (held):** 14b stage 1 and 14e on the room path cut the creator lull about 4x. It waits for Track O's fix
+  of 14f case 8. The ≤ 100 ms target needs stage 2, Track M2.
+- **Canvas and Chat, on every path (Tracks P and Q):**
+  - Canvas issuance gains one row per move and is never retired, because Canvas has no settlement profile. Every
+    issue authenticates the whole retained outbox, so per-move issue time grows with room age.
+  - The shipped Canvas and Chat creators supply no `readOrdinaryApplicationResourceBound`, so their lull never
+    runs and retirement stays inline at seal.
+  - Chat storage is flat.
 - **Left open by Track N** (details in its [RESULT.md](tracks/24-track-n-recipient-issuance-growth/RESULT.md)):
   - The issuance store's 1,024-row bound limits any Writer, the creator included, to roughly 100 moves per
     epoch. Raising it is a reviewed-limit decision (G21); nothing was changed.
