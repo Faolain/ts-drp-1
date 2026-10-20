@@ -1,3 +1,4 @@
+import { roomRetentionRefusalOf } from "@ts-drp/storage/room-head";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -29,19 +30,25 @@ import { closeFixtures, required } from "../track-m/room-retention-fixture.js";
 // - kill after the n-th unit of each kind: the process dies right after that transaction
 //   commits; both rooms reopen from the same databases and run RECOVERY_ROLLOVERS more
 //   rollovers (default caps);
-// - refusal (capacity) of the transaction after the n-th unit of each kind: the lull goes
-//   on from a fresh acquisition, then the rooms reopen and run the same rollovers.
+// - refusal (capacity, stale or budget) of the transaction after the n-th unit of each
+//   kind: the lull goes on from a fresh acquisition, then the rooms reopen and run the same
+//   rollovers.
 //
 // Each must reach the crash-free durable end state of the same one-unit boundary, with no
 // refused acquisition. A split point this room's boundary does not have is skipped (the
 // reference prints the boundary's transactions).
 
 const OCCURRENCES = [1, 2] as const;
+const REFUSALS = [
+	["capacity", "RETENTION_CAPACITY"],
+	["stale", "RETENTION_STALE"],
+	["budget", "RETENTION_BUDGET"],
+] as const;
 
 /**
  * Registers the split-point suite of `role`'s boundary.
- * @param role
- * @param seed
+ * @param role - The role whose boundary is split (creator or observer).
+ * @param seed - The room seed.
  */
 export function splitSuite(role: Role, seed: string): void {
 	let observed: ReturnType<typeof observeEvents> | undefined;
@@ -101,27 +108,28 @@ export function splitSuite(role: Role, seed: string): void {
 					await resumeAfter(report, rooms);
 				}, 900_000);
 
-		for (const kind of UNIT_KINDS)
-			for (const occurrence of OCCURRENCES)
-				it(`the transaction after ${kind} #${occurrence} refused (capacity): the lull resumes`, async (context) => {
-					if (!present(kind, occurrence)) return context.skip();
-					const rooms = await steadyRooms(seed);
-					const from = events().length;
-					const { lull, report } = await boundary(rooms, {
-						role,
-						oneUnit: true,
-						refuse: { after: kind, kind: "capacity", occurrence },
-					});
-					console.info(
-						`track-o ${role} refused after ${kind} #${occurrence}: ${JSON.stringify({ committed: report.committed.map(kindsOf), at: report.committedAtRefusal, refused: report.refusedUnits === undefined ? undefined : kindsOf(report.refusedUnits) })}`
-					);
-					const last = positionsOf(kind)[occurrence - 1] === required(composition).length - 1;
-					if (report.refused) expect(report.refusal).toMatchObject({ code: "RETENTION_CAPACITY" });
-					// After the boundary's last transaction there is none to refuse.
-					else expect(last).toBe(true);
-					expect(lull).toMatchObject({ kind: "maintained" });
-					expectNoRefusedAcquisition(events(), from);
-					await resumeAfter(report, rooms);
-				}, 900_000);
+		for (const [refusal, code] of REFUSALS)
+			for (const kind of UNIT_KINDS)
+				for (const occurrence of OCCURRENCES)
+					it(`the transaction after ${kind} #${occurrence} refused (${refusal}): the lull resumes`, async (context) => {
+						if (!present(kind, occurrence)) return context.skip();
+						const rooms = await steadyRooms(seed);
+						const from = events().length;
+						const { lull, report } = await boundary(rooms, {
+							role,
+							oneUnit: true,
+							refuse: { after: kind, kind: refusal, occurrence },
+						});
+						console.info(
+							`track-o ${role} refused after ${kind} #${occurrence}: ${JSON.stringify({ committed: report.committed.map(kindsOf), at: report.committedAtRefusal, refused: report.refusedUnits === undefined ? undefined : kindsOf(report.refusedUnits) })}`
+						);
+						const last = positionsOf(kind)[occurrence - 1] === required(composition).length - 1;
+						if (report.refused) expect(roomRetentionRefusalOf(report.refusal)?.code).toBe(code);
+						// After the boundary's last transaction there is none to refuse.
+						else expect(last).toBe(true);
+						expect(lull).toMatchObject({ kind: "maintained" });
+						expectNoRefusedAcquisition(events(), from);
+						await resumeAfter(report, rooms);
+					}, 900_000);
 	});
 }
