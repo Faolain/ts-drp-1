@@ -189,7 +189,7 @@ describe("14a owners in room mode", () => {
 		const ahe = (await factory(aheModule, "createBrowserRoomAheDurableStore")({ databaseName: name })) as Closeable & {
 			acquireNativeReadReservation(input: Readonly<{ objectId: string }>): Promise<{ release(): Promise<void> }>;
 		};
-		const reservation = await ahe.acquireNativeReadReservation({ objectId: "isolation-object" });
+		const reservation = await ahe.acquireNativeReadReservation({ objectId: `isolation:${"a".repeat(32)}` });
 		const other = await request(indexedDB.open(name));
 		try {
 			const settle = async (stores: string[], put: (tx: IDBTransaction) => void): Promise<"committed" | "waiting"> => {
