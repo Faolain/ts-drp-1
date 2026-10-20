@@ -19,7 +19,7 @@ import {
 } from "@ts-drp/seal/internal/storage-port";
 import { AHE_BOUNDED_READ_LIMITS as LIMITS } from "@ts-drp/storage";
 
-import { NativeReadReservationOwner } from "./native-read-reservation.js";
+import { NativeReadReservationOwner, type RoomRetirementSession } from "./native-read-reservation.js";
 import { assertCurrentBrowserSchema, SIGNING_PARTICIPANT_SCHEMA_AUTHORITY } from "./schema-idb.js";
 
 const {
@@ -310,6 +310,251 @@ async function image(
 // The original native writer reuses this exact bounded census/parser for its
 // whole-image CAS; no second authority or collector owns row eligibility.
 export { image as readSigningNativeImage, terminal as signingNativeTransactionComplete };
+
+/**
+ * Original mechanical admission of a signing control transition, before any native work.
+ * @param current - The captured control.
+ * @param objectId - Exact addressed object.
+ * @param kind - The transition.
+ * @param value - The proposed preparation, for prepare.
+ * @returns The original refusal, or the parsed preparation.
+ */
+function signingTransitionAdmission(
+	current: SigningRetirementControl,
+	objectId: string,
+	kind: "prepare" | "abort" | "commit",
+	value: SigningRetirementPreparation | undefined
+): Readonly<{ ok: false; reason: string }> | Readonly<{ ok: true; proposed: SigningRetirementPreparation | undefined }> {
+	if ((kind === "prepare") === (current.active !== null))
+		return { ok: false, reason: "ILLEGAL_TRANSITION" };
+	const drain = current.drain;
+	if (kind === "prepare" && summaryMaintenancePending(current))
+		return { ok: false, reason: "SIGNING_MAINTENANCE_DEBT" };
+	if (kind === "prepare" && drain !== undefined && drain !== null && drain.cursor < drain.plan.entries.length)
+		return { ok: false, reason: "SIGNING_MAINTENANCE_DEBT" };
+	let proposed: SigningRetirementPreparation | undefined;
+	if (kind === "prepare") {
+		try {
+			proposed = preparation(value, objectId);
+		} catch {
+			return { ok: false, reason: "MALFORMED_INPUT" };
+		}
+		if (!monotone(current.completed, proposed))
+			return { ok: false, reason: "RETIRED_HOLE_REINTRODUCED" };
+	}
+	return { ok: true, proposed };
+}
+
+/**
+ * Original signing control transition inside the caller's strict writer: the whole
+ * native image must equal the captured one, then the next control is written.
+ * Every refusal is returned before any write; the caller owns the terminal.
+ * @param transaction - Strict read-write transaction over the signing stores.
+ * @param objectId - Exact addressed object.
+ * @param incarnation - Expected original native incarnation.
+ * @param allowAbsent - Received recovery may own a never-signing address.
+ * @param capturedDigest - The captured native image commitment.
+ * @param kind - The transition.
+ * @param proposed - The admitted preparation, for prepare.
+ * @returns The original result.
+ */
+async function signingTransitionBody(
+	transaction: IDBTransaction,
+	objectId: string,
+	incarnation: string,
+	allowAbsent: boolean,
+	capturedDigest: string,
+	kind: "prepare" | "abort" | "commit",
+	proposed: SigningRetirementPreparation | undefined
+): Promise<SigningRetirementResult> {
+	const actual = await image(transaction, objectId, incarnation, allowAbsent);
+	if (actual.digest !== capturedDigest) {
+		return { ok: false, reason: "NATIVE_IMAGE_CHANGED" };
+	}
+	const old = actual.control;
+	if (
+		old.revision === Number.MAX_SAFE_INTEGER ||
+		(kind === "prepare" && old.sequence === Number.MAX_SAFE_INTEGER)
+	)
+		throw new Error("SIGNING_REVISION_EXHAUSTED");
+	if (kind === "prepare" && actual.pendingEpochs.some((epoch) => retired(proposed ?? null, epoch))) {
+		return { ok: false, reason: "SIGNING_DISPATCH_DEBT" };
+	}
+	const next = control(
+		signingRetirementMetadataFields(old, kind, proposed, actual.digest),
+		objectId,
+		incarnation
+	);
+	const row = signingRetirementStorageMetaRow(objectId, next);
+	const bytes = encodeCanonical(["storageMeta", row.key, row], controlLimits);
+	if (actual.logicalBytes - actual.controlBytes + bytes.byteLength > LIMITS.maxUnionBytes)
+		throw new Error("SIGNING_IMAGE_BYTES_FULL");
+	await request(transaction.objectStore("storageMeta").put(row));
+	return Object.freeze({ ok: true, control: next });
+}
+
+/**
+ * Original mechanical admission of a signing drain transition, before any native work.
+ * @param current - The captured control.
+ * @param objectId - Exact addressed object.
+ * @param incarnation - Original native incarnation.
+ * @param kind - Begin or one batch.
+ * @param value - The proposed plan, for begin.
+ * @returns The original refusal, or the parsed plan.
+ */
+function signingDrainAdmission(
+	current: SigningRetirementControl,
+	objectId: string,
+	incarnation: string,
+	kind: "begin" | "batch",
+	value: SigningEvidenceRetirementPlan | SigningSummaryRetirementPlan | undefined
+):
+	| Readonly<{ ok: false; reason: string }>
+	| Readonly<{ ok: true; plan: SigningEvidenceRetirementPlan | SigningSummaryRetirementPlan }> {
+	let plan: SigningEvidenceRetirementPlan | SigningSummaryRetirementPlan;
+	try {
+		plan =
+			kind === "begin"
+				? retirementDrainPlan(value, objectId, incarnation)
+				: retirementDrainPlan(current.drain?.plan, objectId, incarnation);
+	} catch {
+		return { ok: false, reason: "MALFORMED_INPUT" };
+	}
+	if (
+		current.active !== null ||
+		current.completed === null ||
+		(current.completed.summarySource !== undefined && !isSigningSummaryRetirementPlan(plan)) ||
+		(kind === "begin" && current.drain != null)
+	)
+		return { ok: false, reason: "ILLEGAL_TRANSITION" };
+	return { ok: true, plan };
+}
+
+/**
+ * Original signing drain transition inside the caller's strict writer: exact image,
+ * plan and source checks, every remaining descriptor checked before any delete, then
+ * the bounded batch delete and the next control. Refusals are returned before any write.
+ * @param transaction - Strict read-write transaction over the signing stores.
+ * @param objectId - Exact addressed object.
+ * @param incarnation - Expected original native incarnation.
+ * @param capturedDigest - The captured native image commitment.
+ * @param kind - Begin or one batch.
+ * @param plan - The admitted plan.
+ * @returns The original result.
+ */
+async function signingDrainBody(
+	transaction: IDBTransaction,
+	objectId: string,
+	incarnation: string,
+	capturedDigest: string,
+	kind: "begin" | "batch",
+	plan: SigningEvidenceRetirementPlan | SigningSummaryRetirementPlan
+): Promise<SigningRetirementResult> {
+	const actual = await image(transaction, objectId, incarnation),
+		old = actual.control;
+	if (actual.digest !== capturedDigest) {
+		return { ok: false, reason: "NATIVE_IMAGE_CHANGED" };
+	}
+	const state = old.drain;
+	if (kind === "begin") {
+		if (!equal(old, plan.baseControl) || actual.dataDigest !== plan.sourceDataDigest) {
+			return { ok: false, reason: "EVIDENCE_SOURCE_CHANGED" };
+		}
+	} else if (
+		state == null ||
+		!equal(state.plan, plan) ||
+		old.active !== null ||
+		!equal(old.completed, plan.baseControl.completed) ||
+		old.sequence !== plan.baseControl.sequence ||
+		old.revision !== plan.baseControl.revision + 1 + state.batches ||
+		actual.dataDigest !== state.remainingDataDigest
+	) {
+		return { ok: false, reason: "EVIDENCE_SOURCE_CHANGED" };
+	}
+	if (actual.pendingEpochs.some((epoch) => retired(old.completed, epoch))) {
+		return { ok: false, reason: "SIGNING_DISPATCH_DEBT" };
+	}
+	const cursor = state?.cursor ?? 0,
+		batches = state?.batches ?? 0;
+	if (kind === "batch" && cursor === plan.entries.length) {
+		return Object.freeze({ ok: true, control: old });
+	}
+	if (old.revision === Number.MAX_SAFE_INTEGER || (kind === "batch" && batches === Number.MAX_SAFE_INTEGER))
+		throw new Error("SIGNING_REVISION_EXHAUSTED");
+	const summary = isSigningSummaryRetirementPlan(plan);
+	const removed = new Set<string>();
+	const selectedSummary = isSigningSummaryRetirementPlan(plan) ? plan : undefined;
+	if (selectedSummary !== undefined) {
+		const epochs = new Set(selectedSummary.entries.map((entry) => entry.key[1]));
+		for (const frame of actual.data.frames) {
+			if (frame.store === "storageMeta" || !epochs.has(frame.epoch as number)) continue;
+			if (
+				frame.store === "sealEvidence" ||
+				!selectedSummary.entries
+					.slice(cursor)
+					.some((entry) => entry.store === frame.store &&
+						Array.from(encodeCanonical([entry.store, entry.key], imageLimits)).join(",") === frame.addressKey)
+			)
+				throw new Error("SUMMARY_SOURCE_CHANGED");
+		}
+	}
+	// Every remaining descriptor is mechanically checked before any DELETE;
+	// the original private caller must have authenticated eligibility.
+	for (const [index, entry] of plan.entries.entries()) {
+		const store = "store" in entry ? entry.store : "sealEvidence";
+		const row: unknown = await request(transaction.objectStore(store).get([...entry.key]));
+		if (index < cursor) {
+			if (row !== undefined) throw new Error("EVIDENCE_SOURCE_CHANGED");
+			continue;
+		}
+		if (
+			!retired(old.completed, entry.key[1]) ||
+			!plainRecord(row) ||
+			(!summary && (row.phase !== "finalized" || row.peerEvidence !== undefined)) ||
+			(summary && store === "signerState" && (row.highestPrepareQC == null || row.finalizedCommitQC == null)) ||
+			row.objectId !== objectId ||
+			row.epoch !== entry.key[1] ||
+			row.signerId !== entry.key[store === "voteSlots" || store === "voteOutbox" ? 4 : 2] ||
+			(!summary && row.storageIncarnation !== incarnation) ||
+			("revision" in entry && row.revision !== entry.revision) ||
+			signingRetirementFrameDigest(encodeCanonical([store, entry.key, row], imageLimits)) !== entry.frameDigest
+		)
+			throw new Error("EVIDENCE_SOURCE_CHANGED");
+	}
+	const nextCursor =
+		kind === "begin" ? 0 : Math.min(cursor + SIGNING_DETAIL_RETIREMENT_BATCH_ROWS, plan.entries.length);
+	for (let index = cursor; index < nextCursor; index++) {
+		const entry = plan.entries[index];
+		const store = "store" in entry ? entry.store : "sealEvidence";
+		await request(transaction.objectStore(store).delete([...entry.key]));
+		removed.add(Array.from(encodeCanonical([store, entry.key], imageLimits)).join(","));
+	}
+	let removedBytes = 0;
+	const excluded = new Set<number>();
+	for (const frame of actual.data.frames) {
+		if (frame.addressKey !== undefined && removed.has(frame.addressKey)) {
+			removedBytes += frame.byteLength;
+			excluded.add(frame.index);
+		}
+	}
+	const next = control(
+		signingRetirementDrainFields(
+			old,
+			plan,
+			nextCursor,
+			kind === "begin" ? 0 : batches + 1,
+			actual.data.digest(excluded)
+		),
+		objectId,
+		incarnation
+	);
+	const row = signingRetirementStorageMetaRow(objectId, next),
+		bytes = encodeCanonical(["storageMeta", row.key, row], controlLimits);
+	if (actual.logicalBytes - actual.controlBytes - removedBytes + bytes.byteLength > LIMITS.maxUnionBytes)
+		throw new Error("SIGNING_IMAGE_BYTES_FULL");
+	await request(transaction.objectStore("storageMeta").put(row));
+	return Object.freeze({ ok: true, control: next });
+}
 
 /** Child custody of the original signing/evidence connection, not another authority owner. */
 interface SharedSigningGroup {
@@ -678,23 +923,9 @@ export class SigningRetirementOwner {
 			value?: SigningRetirementPreparation
 		): Promise<SigningRetirementResult> => {
 			if (!live || used || this.#closed) return Promise.resolve({ ok: false, reason: "READ_RELEASED" });
-			if ((kind === "prepare") === (captured.control.active !== null))
-				return Promise.resolve({ ok: false, reason: "ILLEGAL_TRANSITION" });
-			const drain = captured.control.drain;
-			if (kind === "prepare" && summaryMaintenancePending(captured.control))
-				return Promise.resolve({ ok: false, reason: "SIGNING_MAINTENANCE_DEBT" });
-			if (kind === "prepare" && drain !== undefined && drain !== null && drain.cursor < drain.plan.entries.length)
-				return Promise.resolve({ ok: false, reason: "SIGNING_MAINTENANCE_DEBT" });
-			let proposed: SigningRetirementPreparation | undefined;
-			if (kind === "prepare") {
-				try {
-					proposed = preparation(value, objectId);
-				} catch {
-					return Promise.resolve({ ok: false, reason: "MALFORMED_INPUT" });
-				}
-				if (!monotone(captured.control.completed, proposed))
-					return Promise.resolve({ ok: false, reason: "RETIRED_HOLE_REINTRODUCED" });
-			}
+			const admission = signingTransitionAdmission(captured.control, objectId, kind, value);
+			if (!admission.ok) return Promise.resolve(admission);
+			const proposed = admission.proposed;
 			used = true;
 			const operation = (async (): Promise<SigningRetirementResult> => {
 				await release(); // Revoke and join the physical RO before entering RW.
@@ -703,33 +934,17 @@ export class SigningRetirementOwner {
 				const completion = terminal(transaction);
 				try {
 					if (transaction.durability !== "strict") throw new Error("STRICT_DURABILITY_UNAVAILABLE");
-					const actual = await image(transaction, objectId, this.#incarnation, allowAbsent);
-					if (actual.digest !== captured.digest) {
-						await completion;
-						return { ok: false, reason: "NATIVE_IMAGE_CHANGED" };
-					}
-					const old = actual.control;
-					if (
-						old.revision === Number.MAX_SAFE_INTEGER ||
-						(kind === "prepare" && old.sequence === Number.MAX_SAFE_INTEGER)
-					)
-						throw new Error("SIGNING_REVISION_EXHAUSTED");
-					if (kind === "prepare" && actual.pendingEpochs.some((epoch) => retired(proposed ?? null, epoch))) {
-						await completion;
-						return { ok: false, reason: "SIGNING_DISPATCH_DEBT" };
-					}
-					const next = control(
-						signingRetirementMetadataFields(old, kind, proposed, actual.digest),
+					const result = await signingTransitionBody(
+						transaction,
 						objectId,
-						this.#incarnation
+						this.#incarnation,
+						allowAbsent,
+						captured.digest,
+						kind,
+						proposed
 					);
-					const row = signingRetirementStorageMetaRow(objectId, next);
-					const bytes = encodeCanonical(["storageMeta", row.key, row], controlLimits);
-					if (actual.logicalBytes - actual.controlBytes + bytes.byteLength > LIMITS.maxUnionBytes)
-						throw new Error("SIGNING_IMAGE_BYTES_FULL");
-					await request(transaction.objectStore("storageMeta").put(row));
 					await completion;
-					return Object.freeze({ ok: true, control: next });
+					return result;
 				} catch (primary) {
 					try {
 						transaction.abort();
@@ -756,22 +971,9 @@ export class SigningRetirementOwner {
 			value?: SigningEvidenceRetirementPlan | SigningSummaryRetirementPlan
 		): Promise<SigningRetirementResult> => {
 			if (!live || used || this.#closed) return Promise.resolve({ ok: false, reason: "READ_RELEASED" });
-			let plan: SigningEvidenceRetirementPlan | SigningSummaryRetirementPlan;
-			try {
-				plan =
-					kind === "begin"
-						? retirementDrainPlan(value, objectId, this.#incarnation)
-						: retirementDrainPlan(captured.control.drain?.plan, objectId, this.#incarnation);
-			} catch {
-				return Promise.resolve({ ok: false, reason: "MALFORMED_INPUT" });
-			}
-			if (
-				captured.control.active !== null ||
-				captured.control.completed === null ||
-				(captured.control.completed.summarySource !== undefined && !isSigningSummaryRetirementPlan(plan)) ||
-				(kind === "begin" && captured.control.drain != null)
-			)
-				return Promise.resolve({ ok: false, reason: "ILLEGAL_TRANSITION" });
+			const admission = signingDrainAdmission(captured.control, objectId, this.#incarnation, kind, value);
+			if (!admission.ok) return Promise.resolve(admission);
+			const plan = admission.plan;
 			used = true;
 			const operation = (async (): Promise<SigningRetirementResult> => {
 				await release();
@@ -780,116 +982,16 @@ export class SigningRetirementOwner {
 				const completion = terminal(transaction);
 				try {
 					if (transaction.durability !== "strict") throw new Error("STRICT_DURABILITY_UNAVAILABLE");
-					const actual = await image(transaction, objectId, this.#incarnation),
-						old = actual.control;
-					if (actual.digest !== captured.digest) {
-						await completion;
-						return { ok: false, reason: "NATIVE_IMAGE_CHANGED" };
-					}
-					const state = old.drain;
-					if (kind === "begin") {
-						if (!equal(old, plan.baseControl) || actual.dataDigest !== plan.sourceDataDigest) {
-							await completion;
-							return { ok: false, reason: "EVIDENCE_SOURCE_CHANGED" };
-						}
-					} else if (
-						state == null ||
-						!equal(state.plan, plan) ||
-						old.active !== null ||
-						!equal(old.completed, plan.baseControl.completed) ||
-						old.sequence !== plan.baseControl.sequence ||
-						old.revision !== plan.baseControl.revision + 1 + state.batches ||
-						actual.dataDigest !== state.remainingDataDigest
-					) {
-						await completion;
-						return { ok: false, reason: "EVIDENCE_SOURCE_CHANGED" };
-					}
-					if (actual.pendingEpochs.some((epoch) => retired(old.completed, epoch))) {
-						await completion;
-						return { ok: false, reason: "SIGNING_DISPATCH_DEBT" };
-					}
-					const cursor = state?.cursor ?? 0,
-						batches = state?.batches ?? 0;
-					if (kind === "batch" && cursor === plan.entries.length) {
-						await completion;
-						return Object.freeze({ ok: true, control: old });
-					}
-					if (old.revision === Number.MAX_SAFE_INTEGER || (kind === "batch" && batches === Number.MAX_SAFE_INTEGER))
-						throw new Error("SIGNING_REVISION_EXHAUSTED");
-					const summary = isSigningSummaryRetirementPlan(plan);
-					const removed = new Set<string>();
-					const selectedSummary = isSigningSummaryRetirementPlan(plan) ? plan : undefined;
-					if (selectedSummary !== undefined) {
-						const epochs = new Set(selectedSummary.entries.map((entry) => entry.key[1]));
-						for (const frame of actual.data.frames) {
-							if (frame.store === "storageMeta" || !epochs.has(frame.epoch as number)) continue;
-							if (
-								frame.store === "sealEvidence" ||
-								!selectedSummary.entries
-									.slice(cursor)
-									.some((entry) => entry.store === frame.store &&
-										Array.from(encodeCanonical([entry.store, entry.key], imageLimits)).join(",") === frame.addressKey)
-							)
-								throw new Error("SUMMARY_SOURCE_CHANGED");
-						}
-					}
-					// Every remaining descriptor is mechanically checked before any DELETE;
-					// the original private caller must have authenticated eligibility.
-					for (const [index, entry] of plan.entries.entries()) {
-						const store = "store" in entry ? entry.store : "sealEvidence";
-						const row: unknown = await request(transaction.objectStore(store).get([...entry.key]));
-						if (index < cursor) {
-							if (row !== undefined) throw new Error("EVIDENCE_SOURCE_CHANGED");
-							continue;
-						}
-						if (
-							!retired(old.completed, entry.key[1]) ||
-							!plainRecord(row) ||
-							(!summary && (row.phase !== "finalized" || row.peerEvidence !== undefined)) ||
-							(summary && store === "signerState" && (row.highestPrepareQC == null || row.finalizedCommitQC == null)) ||
-							row.objectId !== objectId ||
-							row.epoch !== entry.key[1] ||
-							row.signerId !== entry.key[store === "voteSlots" || store === "voteOutbox" ? 4 : 2] ||
-							(!summary && row.storageIncarnation !== this.#incarnation) ||
-							("revision" in entry && row.revision !== entry.revision) ||
-							signingRetirementFrameDigest(encodeCanonical([store, entry.key, row], imageLimits)) !== entry.frameDigest
-						)
-							throw new Error("EVIDENCE_SOURCE_CHANGED");
-					}
-					const nextCursor =
-						kind === "begin" ? 0 : Math.min(cursor + SIGNING_DETAIL_RETIREMENT_BATCH_ROWS, plan.entries.length);
-					for (let index = cursor; index < nextCursor; index++) {
-						const entry = plan.entries[index];
-						const store = "store" in entry ? entry.store : "sealEvidence";
-						await request(transaction.objectStore(store).delete([...entry.key]));
-						removed.add(Array.from(encodeCanonical([store, entry.key], imageLimits)).join(","));
-					}
-					let removedBytes = 0;
-					const excluded = new Set<number>();
-					for (const frame of actual.data.frames) {
-						if (frame.addressKey !== undefined && removed.has(frame.addressKey)) {
-							removedBytes += frame.byteLength;
-							excluded.add(frame.index);
-						}
-					}
-					const next = control(
-						signingRetirementDrainFields(
-							old,
-							plan,
-							nextCursor,
-							kind === "begin" ? 0 : batches + 1,
-							actual.data.digest(excluded)
-						),
+					const result = await signingDrainBody(
+						transaction,
 						objectId,
-						this.#incarnation
+						this.#incarnation,
+						captured.digest,
+						kind,
+						plan
 					);
-					const row = signingRetirementStorageMetaRow(objectId, next),
-						bytes = encodeCanonical(["storageMeta", row.key, row], controlLimits);
-					if (actual.logicalBytes - actual.controlBytes - removedBytes + bytes.byteLength > LIMITS.maxUnionBytes)
-						throw new Error("SIGNING_IMAGE_BYTES_FULL");
-					await request(transaction.objectStore("storageMeta").put(row));
 					await completion;
-					return Object.freeze({ ok: true, control: next });
+					return result;
 				} catch (primary) {
 					try {
 						transaction.abort();
@@ -989,4 +1091,178 @@ export class SigningRetirementOwner {
 			if (causes.length > 1) throw new AggregateError(causes, "signing owner close failed", { cause: causes[0] });
 		})());
 	}
+}
+
+/**
+ * Slice 14a: the original signing retirement observation inside a room retirement
+ * session. Capture, the original mechanical admissions and every transition body run
+ * on the session's strict transaction, with the original incarnation, whole-image and
+ * source checks; nothing is read back, because the session commits whole or not at
+ * all. The session's writer excludes every other writer, so no held read view is taken.
+ * A thrown refusal fails the session; a returned refusal has written nothing.
+ * @param session - The open room retirement session.
+ * @param input - Exact addressed object.
+ * @param recovery - Received recovery may own a never-signing address.
+ * @param expectedIncarnation - The signing owner's captured incarnation; when absent,
+ * the incarnation row read in the session's own transaction is used.
+ * @returns The original observation shape, its transitions bound to the session.
+ */
+export async function acquireBrowserRoomSigningRetirement(
+	session: RoomRetirementSession,
+	input: Readonly<{ objectId: string }>,
+	recovery = false,
+	expectedIncarnation?: string
+): Promise<SigningRetirementObservation> {
+	const copied = record(input, ["objectId"]);
+	if (typeof copied.objectId !== "string" || copied.objectId.length === 0 || copied.objectId.includes("\0"))
+		throw new TypeError("INVALID_SIGNING_ADDRESS");
+	const objectId = copied.objectId;
+	encodeCanonical(objectId, controlLimits);
+	const { incarnation, captured } = await session.run(async (transaction) => {
+		let incarnation = expectedIncarnation;
+		if (incarnation === undefined) {
+			assertCurrentBrowserSchema(transaction);
+			const meta = record(await request(transaction.objectStore("storageMeta").get("incarnation")), ["key", "value"]);
+			if (meta.key !== "incarnation" || typeof meta.value !== "string") throw new Error("STORAGE_LOSS");
+			incarnation = meta.value;
+		}
+		return { incarnation, captured: await image(transaction, objectId, incarnation, recovery) };
+	});
+	let live = true,
+		used = false;
+	const release = (): Promise<void> => {
+		live = false;
+		releaseCapturedSigningRetirementDataImage(captured.data);
+		return Promise.resolve();
+	};
+	const receiver = (self: unknown): void => {
+		if (self !== observation) throw new TypeError("FOREIGN_SIGNING_OBSERVATION");
+	};
+	const transition = async (
+		kind: "prepare" | "abort" | "commit",
+		value?: SigningRetirementPreparation
+	): Promise<SigningRetirementResult> => {
+		if (!live || used) return { ok: false, reason: "READ_RELEASED" };
+		const admission = signingTransitionAdmission(captured.control, objectId, kind, value);
+		if (!admission.ok) return admission;
+		used = true;
+		await release();
+		return session.run((transaction) =>
+			signingTransitionBody(transaction, objectId, incarnation, recovery, captured.digest, kind, admission.proposed)
+		);
+	};
+	const drainTransition = async (
+		kind: "begin" | "batch",
+		value?: SigningEvidenceRetirementPlan | SigningSummaryRetirementPlan
+	): Promise<SigningRetirementResult> => {
+		if (!live || used) return { ok: false, reason: "READ_RELEASED" };
+		const admission = signingDrainAdmission(captured.control, objectId, incarnation, kind, value);
+		if (!admission.ok) return admission;
+		used = true;
+		await release();
+		return session.run((transaction) =>
+			signingDrainBody(transaction, objectId, incarnation, captured.digest, kind, admission.plan)
+		);
+	};
+	const observation: SigningRetirementObservation = Object.freeze({
+		readRetirementDataImage: function () {
+			receiver(this);
+			if (!live || used) throw new Error("READ_RELEASED");
+			return captured.data;
+		},
+		readExactCanonicalRows: function () {
+			receiver(this);
+			if (!live || used) throw new Error("READ_RELEASED");
+			return captured.frames;
+		},
+		control: captured.control,
+		imageDigest: captured.digest,
+		logicalBytes: captured.logicalBytes,
+		check: async function () {
+			receiver(this);
+			if (!live || used) throw new Error("READ_RELEASED");
+		},
+		checkSigningScope: async function (
+			this: SigningRetirementObservation,
+			input: Readonly<{ epoch: number; round: number; signerId: string }>
+		): Promise<Readonly<{ ok: true } | { ok: false; reason: string }>> {
+			receiver(this);
+			if (!live || used) return Object.freeze({ ok: false as const, reason: "READ_RELEASED" });
+			const scope = record(input, ["epoch", "round", "signerId"]);
+			if (
+				!safe(scope.epoch) ||
+				!safe(scope.round) ||
+				typeof scope.signerId !== "string" ||
+				!scope.signerId ||
+				scope.signerId.includes("\0")
+			)
+				throw new TypeError("INVALID_SIGNING_SCOPE");
+			encodeCanonical(scope, controlLimits);
+			return Object.freeze(
+				await session.run(async (transaction) => {
+					const refusal = await signingMutationRefusal(transaction, objectId, scope.epoch as number, incarnation);
+					if (refusal !== undefined) return { ok: false as const, reason: refusal };
+					const floor = await readSigningFrontier(
+						transaction,
+						{ objectId, epoch: scope.epoch as number, signerId: scope.signerId as string },
+						incarnation
+					);
+					return (scope.round as number) < floor
+						? { ok: false as const, reason: "SIGNING_RETIRED" }
+						: { ok: true as const };
+				})
+			);
+		},
+		release: function () {
+			receiver(this);
+			return release();
+		},
+		prepareFence: function (value: SigningRetirementPreparation) {
+			receiver(this);
+			return transition("prepare", value);
+		},
+		abortPrepared: function () {
+			receiver(this);
+			return transition("abort");
+		},
+		commitPrepared: function () {
+			receiver(this);
+			return transition("commit");
+		},
+		beginEvidenceDrain: function (value: SigningEvidenceRetirementPlan) {
+			receiver(this);
+			return drainTransition("begin", value);
+		},
+		beginSummaryDrain: function (value: SigningSummaryRetirementPlan) {
+			receiver(this);
+			return drainTransition("begin", value);
+		},
+		drainEvidenceBatch: function () {
+			receiver(this);
+			return drainTransition("batch");
+		},
+	});
+	return observation;
+}
+
+type RoomSigningOwner = Readonly<{ databaseName: string; incarnation: string; isClosed(): boolean }>;
+// Genuine room-mode signing facets (vote and evidence), keyed by the minted facet.
+const roomSigningStores = new WeakMap<object, RoomSigningOwner>();
+
+/**
+ * Registers one genuine room-mode signing facet (slice 14a).
+ * @param store - The minted facet.
+ * @param owner - Its room database, captured incarnation and lifetime.
+ */
+export function registerBrowserRoomSigningStore(store: object, owner: RoomSigningOwner): void {
+	roomSigningStores.set(store, owner);
+}
+
+/**
+ * Resolves a genuine room-mode signing facet.
+ * @param store - Candidate facet.
+ * @returns Its room database, captured incarnation and lifetime, when genuine.
+ */
+export function browserRoomSigningStore(store: unknown): RoomSigningOwner | undefined {
+	return typeof store === "object" && store !== null ? roomSigningStores.get(store) : undefined;
 }

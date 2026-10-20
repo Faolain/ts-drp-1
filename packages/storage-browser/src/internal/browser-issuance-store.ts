@@ -93,6 +93,7 @@ import {
 	NativeReadReservationOwner,
 	type NativeReadReservationPort,
 	needsNativeReadReservationTurn,
+	type RoomRetirementSession,
 	runNativeReservedRead,
 	visitCountedRange,
 } from "./native-read-reservation.js";
@@ -858,6 +859,26 @@ class BrowserIssuanceImplementation {
 	}
 	acquireRetirementControl(input: { readonly objectId: string }): Promise<DurableIssuanceRetirementControlRead> {
 		return this.#trackRetirement(this.#acquireRetirementControl(input));
+	}
+	/**
+	 * Slice 14a: the original acquisition inside a room retirement session, with this
+	 * store's lifetime and held-view refusals checked before every session operation.
+	 * @param session - The open room retirement session of this store's database.
+	 * @param input - Exact addressed object.
+	 * @returns The original retirement read, its transitions bound to the session.
+	 */
+	acquireRetirementControlInSession(
+		session: RoomRetirementSession,
+		input: { readonly objectId: string }
+	): Promise<DurableIssuanceRetirementControlRead> {
+		const guard = (): void => {
+			this.#assertAvailable();
+			if (this.#readReservations.view())
+				throw issuanceRetirementRefusal("join issuance native readonly reservation before retirement");
+		};
+		return this.#trackRetirement(
+			Promise.resolve().then(() => acquireBrowserRoomIssuanceRetirement(session, input, guard))
+		);
 	}
 	async #acquireRetirementControl(input: { readonly objectId: string }): Promise<DurableIssuanceRetirementControlRead> {
 		this.#assertAvailable();
@@ -2711,10 +2732,38 @@ export async function createBrowserRoomDurableIssuanceStoreImplementation(
 	}
 	// The room connection already checked the exact issuance namespace catalog; admission
 	// keeps only the strict read-write durability check of the dedicated database.
-	return createIssuanceStoreOver(database, async (admitted) => {
+	const store = await createIssuanceStoreOver(database, async (admitted) => {
 		const transaction = strictTransaction(admitted, "readwrite");
 		await transactionResult(transaction);
 	});
+	roomIssuanceDatabases.set(store, databaseName);
+	return store;
+}
+
+// Genuine room-mode issuance facades, with their room database name.
+const roomIssuanceDatabases = new WeakMap<object, string>();
+
+/**
+ * Slice 14a: the issuance retirement acquisition of one genuine room-mode issuance
+ * store inside a room retirement session of its own database.
+ * @param store - Candidate issuance facade.
+ * @param databaseName - The session's room database.
+ * @param session - The open room retirement session.
+ * @param input - Exact addressed object.
+ * @returns The original retirement read, its transitions bound to the session.
+ */
+export function acquireBrowserRoomIssuanceStoreRetirement(
+	store: unknown,
+	databaseName: string,
+	session: RoomRetirementSession,
+	input: { readonly objectId: string }
+): Promise<DurableIssuanceRetirementControlRead> {
+	const implementation =
+		typeof store === "object" && store !== null && roomIssuanceDatabases.get(store) === databaseName
+			? implementationByStore.get(store as DurableIssuanceStore)
+			: undefined;
+	if (implementation === undefined) throw new TypeError("RETENTION_FOREIGN_OWNER");
+	return implementation.acquireRetirementControlInSession(session, input);
 }
 
 function captureRoomOptions(value: unknown): string {
@@ -2818,5 +2867,70 @@ export function browserIssuancePruningMaintenanceForStore(store: DurableIssuance
 		inspectPruningState: (scope: DurableIssueScope) => implementation.inspectPruningState(scope),
 		pruneAuthenticatedSettledPrefix: (input: unknown) => implementation.pruneAuthenticatedSettledPrefix(input),
 		prunePublishedPrefix: (input: unknown) => implementation.prunePublishedPrefix(input),
+	});
+}
+
+/**
+ * Slice 14a: the original issuance retirement acquisition inside a room retirement
+ * session. Capture, birth and every transition run the original row census, image
+ * digest, control CAS and preparation-row checks on the session's strict transaction;
+ * nothing is read back, because the session commits whole or not at all. A refused
+ * transition fails the session.
+ * @param session - The open room retirement session.
+ * @param input - The exact object address.
+ * @returns The original retirement read, its transitions bound to the session.
+ */
+export async function acquireBrowserRoomIssuanceRetirement(
+	session: RoomRetirementSession,
+	input: { readonly objectId: string },
+	guard: () => void = () => undefined
+): Promise<DurableIssuanceRetirementControlRead> {
+	const objectId = captureIssuanceRetirementObject(input);
+	guard();
+	const snapshot = await session.run(async (transaction) => {
+		const rows = await browserRetirementRows(transaction, objectId),
+			control = await browserRetirementControl(transaction, objectId),
+			image = issuanceRetirementImage(rows, objectId);
+		if (control !== null) return { control, image };
+		const born: DurableIssuanceRetirementControl = {
+			kind: "v3-issuance-retirement-control-1",
+			objectId,
+			incarnation: issuanceRetirementHex(globalThis.crypto.getRandomValues(new Uint8Array(32))),
+			revision: 0,
+			sequence: 0,
+			active: null,
+			completed: null,
+		};
+		await requestResult(
+			transaction
+				.objectStore(roomStoreName(transaction.db, "issuance", "retirementControls"))
+				.add({ objectId, record: encodeIssuanceRetirementControl(born) })
+		);
+		return { control: born, image };
+	});
+	const control = snapshot.control,
+		image = snapshot.image;
+	return createIssuanceRetirementControlRead(control, image, async (next, p) => {
+		guard();
+		await session.run(async (transaction) => {
+			const current = await browserRetirementControl(transaction, objectId),
+				rows = await browserRetirementRows(transaction, objectId);
+			if (
+				!current ||
+				!issuanceRetirementBytesEqual(
+					encodeIssuanceRetirementControl(current),
+					encodeIssuanceRetirementControl(control)
+				) ||
+				issuanceRetirementImage(rows, objectId).imageDigest !== image.imageDigest
+			)
+				throw issuanceRetirementRefusal("issuance retirement source stale");
+			if (p) assertIssuanceRetirementPreparationRows(current, p, rows);
+			await requestResult(
+				transaction
+					.objectStore(roomStoreName(transaction.db, "issuance", "retirementControls"))
+					.put({ objectId, record: encodeIssuanceRetirementControl(next) })
+			);
+		});
+		return next;
 	});
 }

@@ -7,6 +7,7 @@ import {CURRENT_BROWSER_SCHEMA_VERSION} from "./internal/schema-idb.js";
 import {openInternalSealVoteStore, createInternalSealVoteStore, type InternalSealVoteStore} from "./internal/seal-vote-store.js";
 import {openInternalSealEvidenceStore, createInternalSealEvidenceStore, type InternalSealEvidenceStore, type PeerSealEvidence} from "./internal/seal-evidence-store.js";
 import {openSigningBackend} from "./internal/signing-backend.js";
+import {registerBrowserRoomSigningStore} from "./internal/signing-retirement.js";
 
 export type {PeerSealEvidence} from "./internal/seal-evidence-store.js";
 
@@ -231,7 +232,9 @@ export async function openBrowserRoomSealVoteStore(
 	input: Readonly<{ databaseName: string }>
 ): ReturnType<typeof openBrowserSealVoteStore> {
 	const databaseName = captureRoomSigningInput(input, "seal-vote");
-	return buildBrowserSealVoteStore(await openInternalSealVoteStore({ databaseName }, true));
+	const opened = await buildBrowserSealVoteStore(await openInternalSealVoteStore({ databaseName }, true));
+	const closed = registerRoomSigningStores(databaseName, opened.observation.incarnation, [opened.store]);
+	return Object.freeze({ ...opened, close: () => (closed(), opened.close()) });
 }
 
 /**
@@ -244,7 +247,9 @@ export async function openBrowserRoomSealEvidenceStore(
 	input: Readonly<{ databaseName: string }>
 ): ReturnType<typeof openBrowserSealEvidenceStore> {
 	const databaseName = captureRoomSigningInput(input, "seal-evidence");
-	return buildBrowserSealEvidenceStore(await openInternalSealEvidenceStore({ databaseName }, true));
+	const opened = await buildBrowserSealEvidenceStore(await openInternalSealEvidenceStore({ databaseName }, true));
+	const closed = registerRoomSigningStores(databaseName, opened.observation.incarnation, [opened.store]);
+	return Object.freeze({ ...opened, close: () => (closed(), opened.close()) });
 }
 
 /**
@@ -256,5 +261,26 @@ export async function openBrowserRoomSealSigningStore(
 	input: Readonly<{ databaseName: string }>
 ): ReturnType<typeof openBrowserSealSigningStore> {
 	const databaseName = captureRoomSigningInput(input, "seal-signing");
-	return openSigningFacets(await openSigningBackend({ databaseName }, true), { databaseName });
+	const opened = await openSigningFacets(await openSigningBackend({ databaseName }, true), { databaseName });
+	const closed = registerRoomSigningStores(databaseName, opened.vote.observation.incarnation, [
+		opened.vote.store,
+		opened.evidence.store,
+	]);
+	return Object.freeze({ ...opened, close: () => (closed(), opened.close()) });
+}
+
+/**
+ * Registers genuine room-mode signing facets for the room retirement session (slice 14a).
+ * @param databaseName - The room database.
+ * @param incarnation - The signing owner's captured native incarnation.
+ * @param stores - The minted facets of one lifetime.
+ * @returns Marks the lifetime closed; a closed facet is refused by the session.
+ */
+function registerRoomSigningStores(databaseName: string, incarnation: string, stores: readonly object[]): () => void {
+	let closed = false;
+	for (const store of stores)
+		registerBrowserRoomSigningStore(store, Object.freeze({ databaseName, incarnation, isClosed: () => closed }));
+	return () => {
+		closed = true;
+	};
 }

@@ -1,7 +1,22 @@
-import type { AheDurableStore } from "@ts-drp/storage";
+import type { DurableIssuanceRetirementControlRead } from "@ts-drp/issuance-store/maintenance";
+import type { LiveJournalRetirementControlRead, LiveJournalRetirementResult } from "@ts-drp/live-journal";
+import type { SigningRetirementObservation } from "@ts-drp/seal/internal/storage-port";
+import type { AheDurableStore, AheRetirementControlRead, StorageObjectId, StoreResult } from "@ts-drp/storage";
 import type { AheReclamationMaintenance } from "@ts-drp/storage/maintenance";
+import type { SnapshotRetirementControlRead } from "@ts-drp/storage/snapshot-transfer";
 
 import { browserAheReclamationMaintenanceForStore } from "./internal/ahe-reclamation.js";
+import { acquireBrowserRoomIssuanceRetirement } from "./internal/browser-issuance-store.js";
+import {
+	acquireBrowserRoomAheRetirement,
+	type BrowserAheDurableStore,
+	createBrowserRoomAheDurableStore as createRoomAheStore,
+} from "./internal/idb-adapter.js";
+import { openRoomRetirementSession } from "./internal/native-read-reservation.js";
+import { prepareBrowserRoomDatabase as prepareRoomDatabase } from "./internal/schema-idb.js";
+import { acquireBrowserRoomSigningRetirement } from "./internal/signing-retirement.js";
+import { acquireBrowserRoomJournalRetirement } from "./live-journal.js";
+import { acquireBrowserRoomSnapshotRetirement } from "./snapshot-transfer.js";
 
 /**
  * Resolves reclamation authority only for the exact genuine browser AHE facade.
@@ -10,4 +25,93 @@ import { browserAheReclamationMaintenanceForStore } from "./internal/ahe-reclama
  */
 export function resolveBrowserAheReclamationMaintenance(store: AheDurableStore): AheReclamationMaintenance | undefined {
 	return browserAheReclamationMaintenanceForStore(store);
+}
+
+/**
+ * Slice 14a: creates or upgrades one room database to the version-7 layout. Owners
+ * open only a ready room database; a migrating layout is refused by every owner.
+ * @param input - The room database name.
+ * @param input.databaseName - The room database name.
+ * @returns The layout state.
+ */
+export function prepareBrowserRoomDatabase(input: Readonly<{ databaseName: string }>): Promise<unknown> {
+	return prepareRoomDatabase(input);
+}
+
+/**
+ * Slice 14a: the AHE durable store inside a ready room database (`ahe:` namespace).
+ * @param options - The room database name.
+ * @param options.databaseName - The room database name.
+ * @returns The strict AHE durable-store adapter over its own room connection.
+ */
+export function createBrowserRoomAheDurableStore(
+	options: Readonly<{ databaseName: string }>
+): Promise<BrowserAheDurableStore> {
+	return createRoomAheStore(options);
+}
+
+/**
+ * Slice 14a: one room retirement session. Each owner's original retirement read and
+ * transitions run on the session's strict transaction over the whole room database;
+ * the session commits at a checkpoint or at the end, whole or not at all.
+ */
+export interface BrowserRoomRetirement {
+	/** The original AHE retirement read of a genuine room-mode AHE store of this database. */
+	acquireAhe(store: AheDurableStore, objectId: StorageObjectId): Promise<StoreResult<AheRetirementControlRead>>;
+	/** The original snapshot retirement read of a genuine room-mode snapshot owner of this database. */
+	acquireSnapshot(store: unknown, input: Readonly<{ objectId: string }>): Promise<SnapshotRetirementControlRead>;
+	/** The original journal retirement result of a genuine room-mode journal of this database. */
+	acquireJournal(
+		store: unknown,
+		input: Readonly<{ objectId: string }>
+	): Promise<LiveJournalRetirementResult<LiveJournalRetirementControlRead>>;
+	/** The original issuance retirement read over this database's issuance namespace. */
+	acquireIssuance(input: Readonly<{ objectId: string }>): Promise<DurableIssuanceRetirementControlRead>;
+	/**
+	 * The original signing retirement observation over this database's signing stores.
+	 * @param input - Exact addressed object.
+	 * @param recovery - Received recovery may own a never-signing address.
+	 */
+	acquireSigning(input: Readonly<{ objectId: string }>, recovery?: boolean): Promise<SigningRetirementObservation>;
+	/** Commits the current transaction strictly; a later acquisition opens a new one. */
+	checkpoint(): Promise<void>;
+	/** Commits the current transaction and ends the session. */
+	commit(): Promise<void>;
+	/** Discards every write since the last checkpoint and ends the session. */
+	abort(cause?: unknown): Promise<void>;
+}
+
+/**
+ * Slice 14a: opens one retirement session on a ready room database.
+ * @param input - The room database name.
+ * @param input.databaseName - The room database name.
+ * @returns The session; it refuses a missing, migrating or foreign database.
+ */
+export async function openBrowserRoomRetirement(
+	input: Readonly<{ databaseName: string }>
+): Promise<BrowserRoomRetirement> {
+	if (input === null || typeof input !== "object" || typeof input.databaseName !== "string")
+		throw new TypeError("INVALID_ARGUMENT");
+	const databaseName = input.databaseName;
+	const session = await openRoomRetirementSession({ databaseName });
+	return Object.freeze({
+		acquireAhe: async (store: AheDurableStore, objectId: StorageObjectId) =>
+			(await acquireBrowserRoomAheRetirement(
+				store,
+				databaseName,
+				session,
+				objectId
+			)) as StoreResult<AheRetirementControlRead>,
+		acquireSnapshot: async (store: unknown, request: Readonly<{ objectId: string }>) =>
+			acquireBrowserRoomSnapshotRetirement(store, databaseName, session, request),
+		acquireJournal: async (store: unknown, request: Readonly<{ objectId: string }>) =>
+			acquireBrowserRoomJournalRetirement(store, databaseName, session, request),
+		acquireIssuance: async (request: Readonly<{ objectId: string }>) =>
+			acquireBrowserRoomIssuanceRetirement(session, request),
+		acquireSigning: async (request: Readonly<{ objectId: string }>, recovery?: boolean) =>
+			acquireBrowserRoomSigningRetirement(session, request, recovery ?? false),
+		checkpoint: () => session.checkpoint(),
+		commit: () => session.commit(),
+		abort: (cause?: unknown) => session.abort(cause),
+	});
 }

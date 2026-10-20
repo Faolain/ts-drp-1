@@ -74,6 +74,7 @@ import {
 	type NativeReadReservationPort,
 	nativeReadReservationTransaction,
 	needsNativeReadReservationTurn,
+	type RoomRetirementSession,
 	runNativeReservedRead,
 	visitCountedRange,
 } from "./internal/native-read-reservation.js";
@@ -1564,7 +1565,7 @@ export async function createBrowserRoomLiveJournalStore(
 			throw error;
 		throw failureError("unsupported-schema");
 	}
-	return createJournalStoreOver(database);
+	return createJournalStoreOver(database, databaseName);
 }
 
 function captureRoomOptions(value: unknown): string {
@@ -1584,7 +1585,10 @@ function captureRoomOptions(value: unknown): string {
 	return descriptor.value;
 }
 
-function createJournalStoreOver(database: IDBDatabase): DurableLiveJournalStore & NativeReadReservationPort {
+function createJournalStoreOver(
+	database: IDBDatabase,
+	roomDatabaseName?: string
+): DurableLiveJournalStore & NativeReadReservationPort {
 	const readReservations = new NativeReadReservationOwner(database);
 	const retirementCodec = createJournalRetirementControlCodec();
 	const readRetirementSnapshot = (
@@ -2427,6 +2431,113 @@ function createJournalStoreOver(database: IDBDatabase): DurableLiveJournalStore 
 				),
 			};
 		});
+	// Slice 14a: the original acquisition and transitions inside one room retirement
+	// session. Capture, birth and every one-use transition run the same retirementSnapshot
+	// body on the session's strict transaction (its in-transaction currency checks are the
+	// authority); nothing is read back, because the session commits whole or not at all.
+	// Any thrown refusal fails the session, so no partial transition can commit.
+	const acquireRetirementControlInSession = (
+		session: RoomRetirementSession,
+		input: Readonly<{ objectId: string }>
+	): Promise<LiveJournalRetirementResult<LiveJournalRetirementControlRead>> =>
+		trackRetirement(async () => {
+			const blocked = unavailable();
+			if (blocked !== undefined) return blocked;
+			let objectId: string;
+			try {
+				objectId = captureJournalRetirementObject(input);
+			} catch {
+				return failed("malformed-input");
+			}
+			resetSnapshotValidation();
+			let captured: RetirementSnapshot;
+			try {
+				// A held view of this owner would block the session's writer.
+				if (nativeReadReservationTransaction(database) !== undefined) throw new Error("retirement-transition");
+				captured = await session.run(async (transaction) => {
+					const snapshot = await readRetirementSnapshot(objectId, undefined, true, transaction);
+					if (snapshot.image.scopeCount === 0 || snapshot.control !== null) return snapshot;
+					const bytes = new Uint8Array(32);
+					crypto.getRandomValues(bytes);
+					const born: LiveJournalRetirementControl = {
+						kind: "v3-live-journal-retirement-control-1",
+						objectId,
+						incarnation: Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join(""),
+						revision: 0,
+						sequence: 0,
+						active: null,
+						completed: null,
+					};
+					await readRetirementSnapshot(
+						objectId,
+						{ expected: null, imageDigest: snapshot.image.imageDigest, next: born },
+						false,
+						transaction
+					);
+					return { ...snapshot, control: born };
+				});
+				if (captured.image.scopeCount === 0) return failed("not-installed");
+			} catch (error) {
+				return failed(
+					error instanceof Error &&
+						(error.message === "retirement-fenced" ||
+							error.message === "retirement-transition" ||
+							error.message === "retirement-stale")
+						? error.message
+						: "substrate-failure"
+				);
+			}
+			const current = captured.control;
+			if (current === null) return failed("internal-invariant");
+			const afterCapture = unavailable();
+			if (afterCapture !== undefined) return afterCapture;
+			const expectedCarriers = retirementCodec.encode(current);
+			let drainSource: LiveJournalRetirementDrainSource | undefined;
+			try {
+				drainSource = retirementDrainSource(captured);
+			} catch {
+				return failed("retirement-stale");
+			}
+			return {
+				ok: true,
+				value: retirementCodec.createRead(
+					current,
+					captured.image,
+					(next, deletions, nextCarriers) =>
+						trackRetirement(async () => {
+							const blocked = unavailable();
+							if (blocked !== undefined) return blocked;
+							try {
+								await session.run((transaction) =>
+									readRetirementSnapshot(
+										objectId,
+										{
+											expected: current,
+											expectedCarriers,
+											imageDigest: captured.image.imageDigest,
+											next,
+											nextCarriers,
+											...(deletions === undefined ? {} : { deletions }),
+										},
+										false,
+										transaction
+									)
+								);
+							} catch (error) {
+								return failed(
+									error instanceof Error &&
+										(error.message === "retirement-stale" || error.message === "retirement-transition")
+										? error.message
+										: "substrate-failure"
+								);
+							}
+							return { ok: true, value: next };
+						}),
+					captured.frames,
+					drainSource
+				),
+			};
+		});
 	const close = (): Promise<void> => {
 		if (closePromise !== undefined) return closePromise;
 		closed = true;
@@ -2444,7 +2555,7 @@ function createJournalStoreOver(database: IDBDatabase): DurableLiveJournalStore 
 		return closePromise;
 	};
 
-	return Object.freeze({
+	const facade = Object.freeze({
 		recordClosedMembership,
 		readRetirementImage,
 		acquireRetirementControl,
@@ -2474,4 +2585,39 @@ function createJournalStoreOver(database: IDBDatabase): DurableLiveJournalStore 
 		readiness,
 		readPage,
 	});
+	if (roomDatabaseName !== undefined)
+		roomJournalRetirement.set(facade, { databaseName: roomDatabaseName, acquire: acquireRetirementControlInSession });
+	return facade;
+}
+
+// Genuine room-mode journal facades, with their room database and session acquisition.
+const roomJournalRetirement = new WeakMap<
+	object,
+	Readonly<{
+		databaseName: string;
+		acquire(
+			session: RoomRetirementSession,
+			input: Readonly<{ objectId: string }>
+		): Promise<LiveJournalRetirementResult<LiveJournalRetirementControlRead>>;
+	}>
+>();
+
+/**
+ * Slice 14a: the journal retirement acquisition inside a room retirement session. Only
+ * the exact genuine room-mode journal of the session's own database is accepted.
+ * @param store - Candidate journal facade.
+ * @param databaseName - The session's room database.
+ * @param session - The open room retirement session.
+ * @param input - The exact object address.
+ * @returns The original retirement result, its transitions bound to the session.
+ */
+export function acquireBrowserRoomJournalRetirement(
+	store: unknown,
+	databaseName: string,
+	session: RoomRetirementSession,
+	input: Readonly<{ objectId: string }>
+): Promise<LiveJournalRetirementResult<LiveJournalRetirementControlRead>> {
+	const entry = typeof store === "object" && store !== null ? roomJournalRetirement.get(store) : undefined;
+	if (entry === undefined || entry.databaseName !== databaseName) throw new TypeError("RETENTION_FOREIGN_OWNER");
+	return entry.acquire(session, input);
 }

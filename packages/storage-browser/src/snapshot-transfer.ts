@@ -20,6 +20,7 @@ import {
 	type SnapshotRecoveryStore,
 	snapshotRetirementContract,
 	type SnapshotRetirementControl,
+	type SnapshotRetirementControlRead,
 	type SnapshotRetirementImage,
 	type SnapshotVerificationQuarantine,
 	type SnapshotVerificationReceipt,
@@ -32,6 +33,7 @@ import {
 	nativeReadReservationCheck,
 	NativeReadReservationOwner,
 	needsNativeReadReservationTurn,
+	type RoomRetirementSession,
 	runNativeReservedRead,
 	visitCountedRange,
 } from "./internal/native-read-reservation.js";
@@ -752,12 +754,13 @@ export async function createBrowserRoomSnapshotQuarantineStore(
 		if (isError(error)) throw error;
 		throw failure("storage-failed", "browser snapshot quarantine admission failed", error);
 	}
-	return createSnapshotStoreOver(acquired, databaseName);
+	return createSnapshotStoreOver(acquired, databaseName, true);
 }
 
 function createSnapshotStoreOver(
 	database: IDBDatabase,
-	primaryDatabaseName: string
+	primaryDatabaseName: string,
+	room = false
 ): SnapshotRecoveryStore<SnapshotVerificationReceipt> {
 	const readReservations = new NativeReadReservationOwner(database);
 	let closed = false,
@@ -2489,6 +2492,67 @@ function createSnapshotStoreOver(
 				);
 			});
 		});
+	// Slice 14a: the original acquisition and transitions inside one room retirement
+	// session. The session's strict transaction excludes every other writer for its
+	// whole life, so no held read view is taken (it would wait behind the session);
+	// birth and every transition recheck exact control and the whole native image in
+	// that same transaction, and nothing is read back, because the session commits
+	// whole or not at all. A refused transition fails the session.
+	const acquireRetirementControlInSession = (
+		session: RoomRetirementSession,
+		input: unknown
+	): Promise<SnapshotRetirementControlRead> =>
+		promiseCapture(async () => {
+			const objectId = snapshotRetirementContract.captureObject(input);
+			if (closed || terminated) throw failure("closed", "snapshot quarantine store is closed");
+			const captured = await session.run(async (transaction) => {
+				const control = await readControl(transaction, objectId),
+					image = await nativeImage(transaction, objectId);
+				if (control !== null || image.scopeCount === 0) return { control, image };
+				const born: SnapshotRetirementControl = {
+					kind: "snapshot-retirement-control-1",
+					objectId,
+					incarnation: crypto.randomUUID().replaceAll("-", "") + crypto.randomUUID().replaceAll("-", ""),
+					revision: 0,
+					sequence: 0,
+					active: null,
+					completed: null,
+				};
+				await requestResult(
+					transaction
+						.objectStore(roomStoreName(transaction.db, "snapshot", "retirementControls"))
+						.add(snapshotRetirementContract.encodeControl(born), objectId)
+				);
+				return { control: born, image };
+			});
+			if (captured.control === null) throw failure("incomplete", "snapshot retirement object is not installed");
+			const control = captured.control,
+				expected = snapshotRetirementContract.encodeControl(control),
+				image = captured.image;
+			return snapshotRetirementContract.createRead(
+				control,
+				image,
+				async (next) => {
+					if (closed || terminated) throw failure("closed", "snapshot quarantine store is closed");
+					await session.run(async (transaction) => {
+						const actual = await readControl(transaction, objectId);
+						if (
+							actual === null ||
+							!sameBytes(snapshotRetirementContract.encodeControl(actual), expected) ||
+							(await nativeImage(transaction, objectId)).imageDigest !== image.imageDigest
+						)
+							throw failure("stale-scope", "snapshot retirement native image changed");
+						await requestResult(
+							transaction
+								.objectStore(roomStoreName(transaction.db, "snapshot", "retirementControls"))
+								.put(snapshotRetirementContract.encodeControl(next), objectId)
+						);
+					});
+					return next;
+				},
+				() => Promise.resolve()
+			);
+		});
 	const close = (): Promise<void> => {
 		if (closing !== undefined) return closing;
 		closed = true;
@@ -2522,5 +2586,39 @@ function createSnapshotStoreOver(
 		openScope,
 		sweepExpired,
 	});
+	if (room)
+		roomSnapshotRetirement.set(store, {
+			databaseName: primaryDatabaseName,
+			acquire: acquireRetirementControlInSession,
+		});
 	return store;
+}
+
+// Genuine room-mode snapshot owners, with their room database and session acquisition.
+const roomSnapshotRetirement = new WeakMap<
+	object,
+	Readonly<{
+		databaseName: string;
+		acquire(session: RoomRetirementSession, input: unknown): Promise<SnapshotRetirementControlRead>;
+	}>
+>();
+
+/**
+ * Slice 14a: the snapshot retirement acquisition inside a room retirement session. Only
+ * the exact genuine room-mode snapshot owner of the session's own database is accepted.
+ * @param store - Candidate snapshot owner.
+ * @param databaseName - The session's room database.
+ * @param session - The open room retirement session.
+ * @param input - The exact object address.
+ * @returns The original retirement read, its transitions bound to the session.
+ */
+export function acquireBrowserRoomSnapshotRetirement(
+	store: unknown,
+	databaseName: string,
+	session: RoomRetirementSession,
+	input: unknown
+): Promise<SnapshotRetirementControlRead> {
+	const entry = typeof store === "object" && store !== null ? roomSnapshotRetirement.get(store) : undefined;
+	if (entry === undefined || entry.databaseName !== databaseName) throw new TypeError("RETENTION_FOREIGN_OWNER");
+	return entry.acquire(session, input);
 }

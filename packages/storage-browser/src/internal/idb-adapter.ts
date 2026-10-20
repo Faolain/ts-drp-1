@@ -64,6 +64,7 @@ import {
 	nativeReadonlyTransaction,
 	nativeReadReservationCheck,
 	NativeReadReservationOwner,
+	type RoomRetirementSession,
 	type NativeReadReservationPort,
 	nativeReadReservationTransaction,
 	needsNativeReadReservationTurn,
@@ -98,6 +99,14 @@ export type BrowserAheDurableStore = AheBoundedRecoveryRoleStore & BlobExistence
 type Phase2dMutationOperation = Exclude<StorageAdapterCommand["kind"], "getBlob" | "readGenerationPage" | "readHead">;
 
 type TransactionOutcome = Readonly<{ ok: true }> | Readonly<{ cause: unknown; ok: false }>;
+type AheRetirementControlCompare = Readonly<{
+	bytes: Uint8Array;
+	head: string;
+	imageDigest: string;
+	next: AheRetirementControl;
+	mutation?: AheRetirementNativeMutation;
+}>;
+type AheRetirementControlState = { postimage?: string; nextControl?: AheRetirementControl };
 
 type HeldAheRetirementAdmissionImage = Readonly<{transaction: IDBTransaction; objectId: StorageObjectId;
 	controlBytes: Uint8Array | null; head: ExpectedHead; imageDigest: string; metadataBytes: number}>;
@@ -461,23 +470,11 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 	private runControl(objectId: StorageObjectId): Promise<StoreResult<AheRetirementControlRead>>;
 	private runControl(
 		objectId: StorageObjectId,
-		compare: Readonly<{
-			bytes: Uint8Array;
-			head: string;
-			imageDigest: string;
-			next: AheRetirementControl;
-			mutation?: AheRetirementNativeMutation;
-		}>
+		compare: AheRetirementControlCompare
 	): Promise<StoreResult<AheRetirementControl>>;
 	private async runControl(
 		objectId: StorageObjectId,
-		compare?: Readonly<{
-			bytes: Uint8Array;
-			head: string;
-			imageDigest: string;
-			next: AheRetirementControl;
-			mutation?: AheRetirementNativeMutation;
-		}>
+		compare?: AheRetirementControlCompare
 	): Promise<StoreResult<AheRetirementControlRead | AheRetirementControl>> {
 		const database = this.lifecycle.startOperation();
 		if (database === undefined) return { ok: false, reason: "STORE_CLOSED" };
@@ -485,180 +482,23 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 		const releaseTurn = typeof turn === "function" ? turn : await turn;
 		let transaction: IDBTransaction | undefined;
 		let completion: Promise<TransactionOutcome> | undefined;
-		let postimage: string | undefined;
-		let nextControl: AheRetirementControl | undefined;
+		const state: AheRetirementControlState = {};
 		try {
 			if (this.lifecycle.isClosed()) return { ok: false, reason: "STORE_CLOSED" };
 			if (this.lifecycle.isPoisoned()) return { ok: false, reason: "STORE_POISONED" };
 			transaction = database.transaction(browserAheControlStores(database), "readwrite", { durability: "strict" });
 			completion = transactionOutcome(transaction);
 			if (transaction.durability !== "strict") throw new StrictDurabilityCapabilityError();
-			const current = await readBrowserRetirementControl(transaction, objectId);
-			const observed = await this.requiredHeadObservation(transaction, objectId);
-			if (
-				compare !== undefined &&
-				(current === null ||
-					!equalBytes(encodeAheRetirementControl(current), compare.bytes) ||
-					headFingerprint(observed.head) !== compare.head)
-			) {
+			const body = await this.controlBody(transaction, objectId, compare, state);
+			if (!body.ok) {
 				abortIfActive(transaction);
 				await joinTransactionOutcome(transaction, completion);
-				return { ok: false, reason: "READ_STALE_ROLE_VIEW" };
+				if (body.latch) this.latchControlFailure(body.refusal);
+				return body.refusal;
 			}
-			const control = compare?.next ??
-				current ?? {
-					kind: "ahe-retirement-control-2" as const,
-					objectId,
-					incarnation: controlIncarnation(),
-					revision: 0,
-					sequence: 0,
-					active: null,
-					completed: null,
-				};
-			const bytes = encodeAheRetirementControl(control);
-			const admitted = await admitBrowserRetirementControl(transaction, objectId, bytes);
-			if (!admitted.ok) {
-				abortIfActive(transaction);
-				await joinTransactionOutcome(transaction, completion);
-				this.latchControlFailure(admitted);
-				return admitted;
-			}
-			if (compare !== undefined && admitted.value.imageDigest !== compare.imageDigest) {
-				abortIfActive(transaction);
-				await joinTransactionOutcome(transaction, completion);
-				return { ok: false, reason: "READ_STALE_ROLE_VIEW" };
-			}
-			if (compare !== undefined) {
-				const mutationBefore = compare.mutation;
-				const records = admitted.value.generations.map((g) => g.recordDigest);
-				if (
-					!current ||
-					!aheRetirementGenerationBindingMatches(current, admitted.value.generations) ||
-					(mutationBefore?.kind !== "reclaim" &&
-						!aheRetirementGenerationBindingMatches(control, admitted.value.generations))
-				) {
-					abortIfActive(transaction);
-					await joinTransactionOutcome(transaction, completion);
-					return { ok: false, reason: "READ_STALE_ROLE_VIEW" };
-				}
-				const mutation = compare.mutation;
-				if (mutation?.kind === "reclaim") {
-					if (
-						!aheRetirementReclamationMatches(
-							current,
-							control,
-							mutation.source,
-							admitted.value.imageDigest,
-							admitted.value.generations
-						)
-					) {
-						abortIfActive(transaction);
-						await joinTransactionOutcome(transaction, completion);
-						return { ok: false, reason: "READ_STALE_ROLE_VIEW" };
-					}
-					await applyBrowserBoundedAheReclamation(transaction, this, mutation.source.reclamation, true);
-				} else if (mutation) {
-					const candidate = admitted.value.generations.find((g) => g.generationId === mutation.material.generationId);
-					const resuming = mutation.kind === "stage" && current.nominee != null;
-					const existingDigest = mutation.material.existingGenerationRecordDigest;
-					const nominatingExisting = mutation.kind === "stage" && !resuming && existingDigest !== undefined;
-					if (
-						(mutation.kind === "stage" && !resuming && !nominatingExisting && (candidate !== undefined || records.length >= 7)) ||
-						(nominatingExisting && (candidate?.recordDigest !== existingDigest || control.nominee?.recordDigest !== existingDigest ||
-							mutation.material.blobs.length !== 0)) ||
-						(resuming &&
-							(candidate?.recordDigest !== current.nominee?.recordDigest ||
-								!equalBytes(encodeCanonical(current.nominee), encodeCanonical(control.nominee)))) ||
-						(mutation.kind === "publish" && candidate?.recordDigest !== current.nominee?.recordDigest)
-					) {
-						abortIfActive(transaction);
-						await joinTransactionOutcome(transaction, completion);
-						return { ok: false, reason: "RETIREMENT_FENCED" };
-					}
-					if (nominatingExisting) {
-						const prepared = prepareStorageAdapterCommand({kind: "completeGeneration", objectId,
-							generationId: mutation.material.generationId});
-						if (!prepared.ok) throw new TypeError("existing native future command is invalid");
-						const authorized = await this.verifyCandidate(transaction, objectId, mutation.material.generationId,
-							await this.loadFacts(transaction, prepared.value));
-						if (!authorized?.ok) {
-							abortIfActive(transaction);
-							await joinTransactionOutcome(transaction, completion);
-							return authorized ?? {ok: false, reason: "INVALID_ARGUMENT"};
-						}
-					}
-					for (const command of resuming || nominatingExisting ? [] : aheRetirementNativeCommands(mutation)) {
-						const prepared = prepareStorageAdapterCommand(command);
-						if (!prepared.ok) {
-							abortIfActive(transaction);
-							await joinTransactionOutcome(transaction, completion);
-							return prepared;
-						}
-						const facts = await this.loadFacts(transaction, prepared.value);
-						let evaluation = evaluateStorageAdapterCommand(prepared.value, facts);
-						if (prepared.value.command.kind === "completeGeneration" || prepared.value.command.kind === "swapHead") {
-							const authorized = await this.verifyCandidate(
-								transaction,
-								objectId,
-								mutation.material.generationId,
-								facts
-							);
-							if (!authorized?.ok) {
-								abortIfActive(transaction);
-								await joinTransactionOutcome(transaction, completion);
-								return authorized ?? { ok: false, reason: "INVALID_ARGUMENT" };
-							}
-							evaluation = evaluateStorageAdapterCommand(prepared.value, facts, authorized.value);
-						}
-						if (!evaluation.result.ok) {
-							abortIfActive(transaction);
-							await joinTransactionOutcome(transaction, completion);
-							return evaluation.result;
-						}
-						await this.applyWrites(transaction, evaluation);
-					}
-				}
-				// A metadata-only prepare/commit has changed no generation, blob,
-				// promotion or head in this SAME strict native RW transaction. The
-				// first census already admitted these exact next-control bytes. Do
-				// not reconstruct that identical whole image a second time. Actual
-				// stage/publish/reclaim commands still require their fresh postimage
-				// census; every branch retains independent native readback below.
-				const after = mutation === undefined ? admitted :
-					await admitBrowserRetirementControl(transaction, objectId, bytes);
-				if (!after.ok) {
-					abortIfActive(transaction);
-					await joinTransactionOutcome(transaction, completion);
-					this.latchControlFailure(after);
-					return after;
-				}
-				if (!aheRetirementGenerationBindingMatches({ ...control, binding: null }, after.value.generations)) {
-					abortIfActive(transaction);
-					await joinTransactionOutcome(transaction, completion);
-					return { ok: false, reason: "READ_STALE_ROLE_VIEW" };
-				}
-				if (
-					mutation?.kind === "stage" &&
-					after.value.generations.find((g) => g.generationId === mutation.material.generationId)?.recordDigest !==
-						control.nominee?.recordDigest
-				) {
-					abortIfActive(transaction);
-					await joinTransactionOutcome(transaction, completion);
-					return { ok: false, reason: "NON_CANONICAL_RECORD" };
-				}
-				if (mutation?.kind === "reclaim" && after.value.imageDigest !== mutation.source.postImageDigest) {
-					abortIfActive(transaction);
-					await joinTransactionOutcome(transaction, completion);
-					return { ok: false, reason: "READ_STALE_ROLE_VIEW" };
-				}
-				postimage = after.value.imageDigest;
-				nextControl = control;
-			}
-			if (compare !== undefined || current === null)
-				await writeBrowserRetirementControl(transaction, control, current === null);
 			const outcome = await joinTransactionOutcome(transaction, completion);
-			if (compare !== undefined && postimage !== undefined) {
-				const readback = await this.readControlPostimage(database, control, postimage);
+			if (compare !== undefined && state.postimage !== undefined) {
+				const readback = await this.readControlPostimage(database, body.control, state.postimage);
 				if (readback.ok) return readback;
 				if (!outcome.ok) return substrateFailure(outcome.cause);
 				return readback;
@@ -667,14 +507,14 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 			return {
 				ok: true,
 				value: createAheRetirementControlRead(
-					control,
-					observed.head,
-					admitted.value.imageDigest,
+					body.control,
+					body.head,
+					body.imageDigest,
 					(next, mutation) =>
 						this.runControl(objectId, {
-							bytes,
-							head: headFingerprint(observed.head),
-							imageDigest: admitted.value.imageDigest,
+							bytes: body.bytes,
+							head: headFingerprint(body.head),
+							imageDigest: body.imageDigest,
 							next,
 							...(mutation ? { mutation } : {}),
 						}),
@@ -684,8 +524,8 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 		} catch (cause) {
 			if (transaction !== undefined) abortIfActive(transaction);
 			if (completion !== undefined) await joinTransactionOutcome(transaction, completion);
-			if (nextControl && postimage !== undefined) {
-				const readback = await this.readControlPostimage(database, nextControl, postimage);
+			if (state.nextControl && state.postimage !== undefined) {
+				const readback = await this.readControlPostimage(database, state.nextControl, state.postimage);
 				if (readback.ok) return readback;
 			}
 			if (cause instanceof BoundedReadBudgetError) return { ok: false, reason: "READ_BUDGET_EXCEEDED" };
@@ -695,6 +535,231 @@ class IdbAheDurableStore implements BrowserAheDurableStore {
 			releaseTurn();
 			this.lifecycle.finishOperation();
 		}
+	}
+
+	/**
+	 * The original retirement-control CAS body, run inside the caller's strict
+	 * read-write transaction: exact control, head and whole-image currency, the
+	 * optional native mutation with its postimage census, and the control write.
+	 * A refusal is returned before the caller aborts its transaction.
+	 * @param transaction - The caller's strict read-write transaction.
+	 * @param objectId - Exact object address.
+	 * @param compare - The one-use mutation, absent for observation and birth.
+	 * @param state - Postimage evidence for the caller's ambiguous-outcome readback.
+	 * @returns The written or observed control, or the original refusal.
+	 */
+	private async controlBody(
+		transaction: IDBTransaction,
+		objectId: StorageObjectId,
+		compare: AheRetirementControlCompare | undefined,
+		state: AheRetirementControlState
+	): Promise<
+		| Readonly<{ ok: false; refusal: StoreResult<never>; latch: boolean }>
+		| Readonly<{
+				ok: true;
+				control: AheRetirementControl;
+				bytes: Uint8Array;
+				head: ExpectedHead;
+				imageDigest: string;
+		  }>
+	> {
+		const current = await readBrowserRetirementControl(transaction, objectId);
+		const observed = await this.requiredHeadObservation(transaction, objectId);
+		if (
+			compare !== undefined &&
+			(current === null ||
+				!equalBytes(encodeAheRetirementControl(current), compare.bytes) ||
+				headFingerprint(observed.head) !== compare.head)
+		) {
+			return { ok: false, refusal: { ok: false, reason: "READ_STALE_ROLE_VIEW" }, latch: false };
+		}
+		const control = compare?.next ??
+			current ?? {
+				kind: "ahe-retirement-control-2" as const,
+				objectId,
+				incarnation: controlIncarnation(),
+				revision: 0,
+				sequence: 0,
+				active: null,
+				completed: null,
+			};
+		const bytes = encodeAheRetirementControl(control);
+		const admitted = await admitBrowserRetirementControl(transaction, objectId, bytes);
+		if (!admitted.ok) {
+			return { ok: false, refusal: admitted, latch: true };
+		}
+		if (compare !== undefined && admitted.value.imageDigest !== compare.imageDigest) {
+			return { ok: false, refusal: { ok: false, reason: "READ_STALE_ROLE_VIEW" }, latch: false };
+		}
+		if (compare !== undefined) {
+			const mutationBefore = compare.mutation;
+			const records = admitted.value.generations.map((g) => g.recordDigest);
+			if (
+				!current ||
+				!aheRetirementGenerationBindingMatches(current, admitted.value.generations) ||
+				(mutationBefore?.kind !== "reclaim" &&
+					!aheRetirementGenerationBindingMatches(control, admitted.value.generations))
+			) {
+				return { ok: false, refusal: { ok: false, reason: "READ_STALE_ROLE_VIEW" }, latch: false };
+			}
+			const mutation = compare.mutation;
+			if (mutation?.kind === "reclaim") {
+				if (
+					!aheRetirementReclamationMatches(
+						current,
+						control,
+						mutation.source,
+						admitted.value.imageDigest,
+						admitted.value.generations
+					)
+				) {
+					return { ok: false, refusal: { ok: false, reason: "READ_STALE_ROLE_VIEW" }, latch: false };
+				}
+				await applyBrowserBoundedAheReclamation(transaction, this, mutation.source.reclamation, true);
+			} else if (mutation) {
+				const candidate = admitted.value.generations.find((g) => g.generationId === mutation.material.generationId);
+				const resuming = mutation.kind === "stage" && current.nominee != null;
+				const existingDigest = mutation.material.existingGenerationRecordDigest;
+				const nominatingExisting = mutation.kind === "stage" && !resuming && existingDigest !== undefined;
+				if (
+					(mutation.kind === "stage" && !resuming && !nominatingExisting && (candidate !== undefined || records.length >= 7)) ||
+					(nominatingExisting && (candidate?.recordDigest !== existingDigest || control.nominee?.recordDigest !== existingDigest ||
+						mutation.material.blobs.length !== 0)) ||
+					(resuming &&
+						(candidate?.recordDigest !== current.nominee?.recordDigest ||
+							!equalBytes(encodeCanonical(current.nominee), encodeCanonical(control.nominee)))) ||
+					(mutation.kind === "publish" && candidate?.recordDigest !== current.nominee?.recordDigest)
+				) {
+					return { ok: false, refusal: { ok: false, reason: "RETIREMENT_FENCED" }, latch: false };
+				}
+				if (nominatingExisting) {
+					const prepared = prepareStorageAdapterCommand({kind: "completeGeneration", objectId,
+						generationId: mutation.material.generationId});
+					if (!prepared.ok) throw new TypeError("existing native future command is invalid");
+					const authorized = await this.verifyCandidate(transaction, objectId, mutation.material.generationId,
+						await this.loadFacts(transaction, prepared.value));
+					if (!authorized?.ok) {
+						return { ok: false, refusal: authorized ?? {ok: false, reason: "INVALID_ARGUMENT"}, latch: false };
+					}
+				}
+				for (const command of resuming || nominatingExisting ? [] : aheRetirementNativeCommands(mutation)) {
+					const prepared = prepareStorageAdapterCommand(command);
+					if (!prepared.ok) {
+						return { ok: false, refusal: prepared, latch: false };
+					}
+					const facts = await this.loadFacts(transaction, prepared.value);
+					let evaluation = evaluateStorageAdapterCommand(prepared.value, facts);
+					if (prepared.value.command.kind === "completeGeneration" || prepared.value.command.kind === "swapHead") {
+						const authorized = await this.verifyCandidate(
+							transaction,
+							objectId,
+							mutation.material.generationId,
+							facts
+						);
+						if (!authorized?.ok) {
+							return { ok: false, refusal: authorized ?? { ok: false, reason: "INVALID_ARGUMENT" }, latch: false };
+						}
+						evaluation = evaluateStorageAdapterCommand(prepared.value, facts, authorized.value);
+					}
+					if (!evaluation.result.ok) {
+						return { ok: false, refusal: evaluation.result, latch: false };
+					}
+					await this.applyWrites(transaction, evaluation);
+				}
+			}
+			// A metadata-only prepare/commit has changed no generation, blob,
+			// promotion or head in this SAME strict native RW transaction. The
+			// first census already admitted these exact next-control bytes. Do
+			// not reconstruct that identical whole image a second time. Actual
+			// stage/publish/reclaim commands still require their fresh postimage
+			// census; every branch retains independent native readback below.
+			const after = mutation === undefined ? admitted :
+				await admitBrowserRetirementControl(transaction, objectId, bytes);
+			if (!after.ok) {
+				return { ok: false, refusal: after, latch: true };
+			}
+			if (!aheRetirementGenerationBindingMatches({ ...control, binding: null }, after.value.generations)) {
+				return { ok: false, refusal: { ok: false, reason: "READ_STALE_ROLE_VIEW" }, latch: false };
+			}
+			if (
+				mutation?.kind === "stage" &&
+				after.value.generations.find((g) => g.generationId === mutation.material.generationId)?.recordDigest !==
+					control.nominee?.recordDigest
+			) {
+				return { ok: false, refusal: { ok: false, reason: "NON_CANONICAL_RECORD" }, latch: false };
+			}
+			if (mutation?.kind === "reclaim" && after.value.imageDigest !== mutation.source.postImageDigest) {
+				return { ok: false, refusal: { ok: false, reason: "READ_STALE_ROLE_VIEW" }, latch: false };
+			}
+			state.postimage = after.value.imageDigest;
+			state.nextControl = control;
+		}
+		if (compare !== undefined || current === null)
+			await writeBrowserRetirementControl(transaction, control, current === null);
+		return { ok: true, control, bytes, head: observed.head, imageDigest: admitted.value.imageDigest };
+	}
+
+	/**
+	 * Slice 14a: the original retirement-control acquisition inside a room
+	 * retirement session. Observation, birth and every one-use mutation run the
+	 * same CAS body on the session's strict transaction; nothing is read back,
+	 * because the session commits whole or not at all.
+	 * @param session - The room retirement session of this store's database.
+	 * @param objectId - Exact object address.
+	 * @returns The original retirement read, bound to the session.
+	 */
+	async acquireRetirementControlInSession(
+		session: RoomRetirementSession,
+		objectId: StorageObjectId
+	): Promise<StoreResult<AheRetirementControlRead>> {
+		const prepared = prepareStorageAdapterCommand({ kind: "readHead", objectId });
+		if (!prepared.ok) return prepared;
+		type Body = Extract<Awaited<ReturnType<IdbAheDurableStore["controlBody"]>>, { ok: true }>;
+		const run = async <T,>(
+			compare: AheRetirementControlCompare | undefined,
+			value: (body: Body) => T
+		): Promise<StoreResult<T>> => {
+			// No recovery turn: an ordinary operation holding it may be waiting on a
+			// native transaction that the session itself blocks. Exactness comes
+			// from the in-transaction CAS, as in every ordinary path.
+			if (this.lifecycle.startOperation() === undefined) return { ok: false, reason: "STORE_CLOSED" };
+			try {
+				if (this.lifecycle.isPoisoned()) return { ok: false, reason: "STORE_POISONED" };
+				const body = await session.run((transaction) => this.controlBody(transaction, objectId, compare, {}));
+				if (!body.ok) {
+					if (body.latch) this.latchControlFailure(body.refusal);
+					// A refused owner body is never committed with the session.
+					await session.abort(new Error("AHE_RETIREMENT_REFUSED"));
+					return body.refusal;
+				}
+				return { ok: true, value: value(body) };
+			} catch (cause) {
+				if (cause instanceof BoundedReadBudgetError) return { ok: false, reason: "READ_BUDGET_EXCEEDED" };
+				if (cause instanceof PersistedStorageError) return this.lifecycle.latchPoison(cause.reason);
+				return substrateFailure(cause);
+			} finally {
+				this.lifecycle.finishOperation();
+			}
+		};
+		const bind = (body: Body): AheRetirementControlRead =>
+			createAheRetirementControlRead(
+				body.control,
+				body.head,
+				body.imageDigest,
+				(next, mutation) =>
+					run(
+						{
+							bytes: body.bytes,
+							head: headFingerprint(body.head),
+							imageDigest: body.imageDigest,
+							next,
+							...(mutation ? { mutation } : {}),
+						},
+						() => next
+					),
+				this
+			);
+		return run(undefined, bind);
 	}
 
 	private async readControlPostimage(
@@ -1772,5 +1837,30 @@ export async function createBrowserRoomAheDurableStore(
 	const store = new IdbAheDurableStore(lifecycle);
 	// The dispatch identity of the dedicated `${N}--ahe` database is kept for the room namespace.
 	registerBrowserAheReclamationMaintenance(store, lifecycle, `${databaseName}--ahe`);
+	roomAheStores.set(store, databaseName);
 	return store;
+}
+
+// Genuine room-mode AHE stores, keyed by store, with their room database name.
+const roomAheStores = new WeakMap<object, string>();
+
+/**
+ * Slice 14a: the AHE retirement acquisition inside a room retirement session. Only
+ * the exact genuine room-mode store of the session's own database is accepted.
+ * @param store - Candidate AHE store.
+ * @param databaseName - The session's room database.
+ * @param session - The open room retirement session.
+ * @param objectId - Exact object address; its command preparation validates it.
+ * @returns The original retirement read bound to the session. The packed root
+ * declarations stay free of retirement names; the maintenance entry types it.
+ */
+export function acquireBrowserRoomAheRetirement(
+	store: unknown,
+	databaseName: string,
+	session: RoomRetirementSession,
+	objectId: string
+): Promise<unknown> {
+	if (!(store instanceof IdbAheDurableStore) || roomAheStores.get(store) !== databaseName)
+		throw new TypeError("RETENTION_FOREIGN_OWNER");
+	return store.acquireRetirementControlInSession(session, objectId as StorageObjectId);
 }
