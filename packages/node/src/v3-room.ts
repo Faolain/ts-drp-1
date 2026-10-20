@@ -4108,7 +4108,21 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				targetPeerId === undefined
 					? await activeHandle.republishRetained()
 					: await republishV3RetainedTo(activeHandle, targetPeerId);
-			if (!result.ok) throw new TypeError(`v3 room retained publication failed: ${result.kind}`);
+			if (result.ok) return;
+			// An orderly close cancels a retained publication still in flight: it revokes
+			// this transport synchronously, then retires the plane. A send that revocation
+			// refused, or a plane retired before or around the send, is that cancellation,
+			// not a publication fault. Storage and record faults, and every failure outside
+			// an orderly close or after a terminal failure, still reject.
+			if (
+				sessionCloseTask !== undefined &&
+				terminalFailure === undefined &&
+				(result.kind === "not-active" ||
+					result.kind === "publication-state-unknown" ||
+					result.kind === "publish-failed")
+			)
+				return;
+			throw new TypeError(`v3 room retained publication failed: ${result.kind}`);
 		});
 		if (input.creatorFinalitySigner !== undefined) {
 			const creatorFinalitySigner = input.creatorFinalitySigner;
