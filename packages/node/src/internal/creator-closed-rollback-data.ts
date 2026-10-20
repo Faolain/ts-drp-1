@@ -20791,9 +20791,9 @@ function roomRetentionItems(selection: RoomRetentionSelection): readonly RoomRet
 	if (selection.snapshot.retire.length !== 0) items.push({ ...empty(), snapshot: selection.snapshot });
 	for (const header of selection.journal.headers)
 		items.push({ ...empty(), journal: { prefixes: [], headers: [header], genesisAnchorDigest: selection.journal.genesisAnchorDigest } });
-	const signingEpochs = [...new Set([...selection.signing.evidence.map(entry => entry.key[1]),
+	const unitEpochs = [...new Set([...selection.signing.evidence.map(entry => entry.key[1]),
 		...selection.signing.summaries.map(entry => entry.key[1] as number)])].sort((a, b) => a - b);
-	for (const epoch of signingEpochs)
+	for (const epoch of unitEpochs)
 		items.push({ ...empty(), signing: { evidence: selection.signing.evidence.filter(entry => entry.key[1] === epoch),
 			summaries: selection.signing.summaries.filter(entry => entry.key[1] === epoch) } });
 	for (const prefix of selection.journal.prefixes)
