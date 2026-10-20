@@ -93,7 +93,7 @@ and the fresh census:
 | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Snapshot | role turnover to the signed Cut's `recoveryRoles`; only `classifiedScopes` retire; survivor fact; live close hold covers dependency anchors; a displaced source's scope survives (CRD:20401-21019, CRD:20700-20800)                                                                                                                                   |
 | Journal  | `closedJournalProtectedReplayScopes` (CRD:9521) are kept; collectible prefixes by membership or local issuance coverage (`prepareClosedJournalDetails`, CRD:9621; `prepareClosedJournalMembershipPrefix`, CRD:9359); empty headers outside `protectedHeaderScopes` (CRD:9222-9247); Track K's received-certificate replay narrowing (CRD:21290-21308) |
-| Signing  | evidence only when rebuildable byte for byte (CRD:10110-10179), all or nothing per epoch; summaries only for epochs whose evidence retirement completed earlier; dispatch debt and replay-protected epochs excluded                                                                                                                                   |
+| Signing  | evidence only when rebuildable byte for byte (CRD:10110-10179), all or nothing per epoch; summaries only for epochs whose evidence retirement completed earlier or retires in the same unit (amended by Track O, below); dispatch debt and replay-protected epochs excluded                                                                           |
 | AHE      | head plus two `baseExpectedHead` rollbacks and source generations kept; only authenticated historical generations retire, Q before P; lineage-floor rewrite (packages/storage/src/maintenance.ts:576-828)                                                                                                                                             |
 | Issuance | `closedIssuanceProtectedRecordsForRetirement` (CRD:19043-19089): epoch at most `throughEpoch - 2`, one covered classification, one published outbox pair, scope not replay-protected, no journal row for the scope                                                                                                                                    |
 
@@ -103,6 +103,10 @@ everything (CRD:21427-21431, CRD:21275-21308). The real ordering dependencies
 are kept, evaluated on the pre-state of the transaction:
 
 - signing evidence before its summaries (summary rebuild needs signer state);
+  both retire in one unit (below);
+- signing evidence for an epoch before, or with, the journal prefix of that
+  epoch: the evidence classifier admits an epoch only while its prefix is
+  collectible (CRD:10588 at Track M's head 07849f85);
 - signing work for an epoch before the AHE generation whose closure rebuilds it;
 - Q before P among AHE generations;
 - journal rows before their header, never in one decision (LJ:393-397 in
@@ -117,6 +121,51 @@ each pass had one decision policy and one two-phase commit
 Track K's extra fresh pass after a generation drain (CRD:20153-20160) is not
 needed: prefixes are no longer suppressed. Its effect, scope k-3 becoming
 collectible at floor k, must still hold (acceptance 6).
+
+### Units and resume (amendment, Track O, 2026-10-20)
+
+The decision is made of units that are never split: the snapshot turnover, one
+journal header, one journal prefix, one epoch's signing work, and one AHE
+generation unit. One epoch's signing work is its whole evidence and its whole
+summaries. The summaries are selected by the existing fresh summary rule
+(CRD:10269-10524), evaluated on the image that the same unit's evidence
+retirement leaves: the same signers, the same finalized QCs, and the same
+exclusions as the existing summary pass that follows an evidence pass. The rule
+"evidence before summaries" is kept by atomicity. No committed state holds an
+epoch's evidence without its signer state. A split between continuations never
+leaves summary rows, in an epoch the signing control retires, that the
+crash-free boundary would have retired. The existing rule can decline an
+epoch's summaries while its evidence retires: a signer with signer state but no
+finalized evidence. That case is the same on the existing path and in the
+crash-free boundary, and is not created by a split.
+
+Units commit in this order: snapshot turnover, journal headers, signing work by
+epoch, journal prefixes, AHE units. The issuance section keeps its place after
+the AHE section in every continuation. Continuations
+([14e](14e-retention-bounds-and-charges.md)) split only between units. Every
+committed prefix of a boundary's continuations is therefore a state from which
+the next cold acquisition's classifiers select exactly the remaining units. A
+crash, or a refusal, between two continuations is then a resume
+([G3](../golden-path-guarantees.md), [G14](../golden-path-guarantees.md)), with
+no durable resume record. This is why the boundary is one decision, not one
+decision per class.
+
+Why this amends the stage-1 text: Track M (docs/realtime-latency/tracks/23-track-m-verified-fact-retirement/RESULT.md,
+finding 1) evaluated "evidence before summaries" on the pre-state of each
+transaction, so it retired a boundary in two decisions. The first retired epoch
+e's evidence and completed the signing control past e. The second retired e's
+summaries. A crash or refusal between them leaves e's summaries in an epoch the
+control retires:
+
+- no later pass selects them, because the fresh summary rule requires the
+  evidence drain of the same floor (CRD:10395);
+- a later AHE unit then retires the generation that supplies e's trust;
+- the next acquisition halts with `UNCLASSIFIED_SIGNING_DEPENDENCY:e`.
+
+Track M ordered journal prefixes before signing evidence. A crash, or a refusal,
+between those two continuations strands e's evidence the same way. Track O's RED
+tests (tests/track-o-room-retention-resume.test.ts and
+tests/track-o-room-retention-split.test.ts) reproduce both.
 
 The decision then becomes:
 

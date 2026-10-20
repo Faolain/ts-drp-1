@@ -48,6 +48,15 @@ partial transaction and no cursor: each continuation commits whole or not at
 all. The number of continuations per epoch is bounded by the owner bounds above
 divided by the cap.
 
+Continuations split only between the units of
+[14b](14b-retention-trust.md#units-and-resume-amendment-track-o-2026-10-20).
+One epoch's signing work, its evidence and its summaries together, is one
+unit. Every committed prefix of continuations is a state from which the next
+acquisition selects the remaining units, so a crash or refusal between two
+continuations resumes without a cursor (amendment, Track O, 2026-10-20). A unit
+whose own plan exceeds the cap is not split. The boundary keeps the existing
+path, as before.
+
 Every read in step B is bounded before it is issued: point reads by key, and
 census reads with `getAll(range, bound + 1)` or `count(range)` so that an
 over-bound range refuses instead of loading more
