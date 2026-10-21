@@ -113,6 +113,7 @@ repository owner made. "Coordinator" marks a recommendation that was then carrie
 | 38 | Approve Track Q's ordinary resource bounds, and merge Track Q. | User (bounds), Coordinator (merge) | Canvas: the exact encoded size of its widest reachable state (2,944 bytes, 817 items, depth 3 at 10×10). Chat: its existing 32 KiB retained-state limits, unchanged. Both come from limits the apps already enforce (G21) and cover every reachable state (G22). With them, the creator lull runs, and seal falls to 0.09–0.12× of base in Chromium (about 0.2 s); adoption is 190–255 ms slower; seal plus adoption is 0.32–0.42× of base. | Merge 46eb7821 (ff22665c..30937f29), after verification on main: typecheck 0; Track Q's bound and lull tests, the 4-rollover room test, Tracks P, S, N, L, K, M2 and O's tests, and the 6-epoch Canvas/Chat long rooms with a reopen all passing. |
 | 39 | Keep shipped Canvas on the settlement profile on main and fix forward, although it stalls with real networking. | User | Track X's first step: with real networking in Chromium, shipped Canvas and shipped Chat on main each stall at epoch 5 on the creator's first move, with Track V's signature. Canvas on the legacy profile (b2c3d8f1) passes 16/16 twice. Chat has signed the settlement profile since before this work, so it stays exposed either way. Neither page rolls a room over by itself. Switching Canvas back would bring back its storage growth and turn Track P's and Track Q's Canvas tests red. | Known G3 break on main for settlement rooms that roll over with real networking, until Track X's fix lands. Track X also checks whether Chat's stall predates this work (3c5bb123) and bisects if not. |
 | 40 | Merge Track U (measurement only). | Coordinator | Seal and adoption are not slower with the ledger: over 21 LULL=1 pairs the median ratios are 0.98 for seal and 1.03 for adoption, and main-thread CPU is 0.99 for both. Idle gaps of 500 ms and 2 s before seal change nothing, so M2's overlap hypothesis is rejected. The residual 0.36 MB per epoch is the harness's records (0.16), the canonical hash memo filling to its ceiling (about 0.1), and a steady 0.08 that heap snapshots attribute to bounded library caches still filling (transition memo, trust-record verdicts, ed25519 and closure-digest memos), V8 optimized code and the harness. Every library grower has a constant ceiling, so G1 holds. | Merge d60a08af (6f1db125..0711a8fb), after verification on main: typecheck 0, the harness-reading tests as on main, and 4-rollover Grid runs passing with the room database and retention in LULL=1 and concurrent modes. The concurrent case, which failed at persisted reopen before Track S, now passes. |
+| 41 | Track Y: measure how much of each library cache a steady game uses, drop transition-memo entries for epochs the room has left, propose the other caches' ceilings with their latency cost, and show memory levelling off past 128 rollovers. | User | At their ceilings the caches hold about 56 MB per client (row 40). Old-epoch transition entries are probably dead weight, so dropping them is approved once measurement confirms it. Lower ceilings for the hash memo, trust-record verdicts, ed25519 memo and closure digests trade memory against latency, so they come back to the owner as proposals. The owner approved a run beyond the Grid harness's 128-rollover limit through a new opt-in that leaves the existing check unchanged. | In progress |
 
 ## Commits
 
@@ -280,8 +281,9 @@ that track's working documents.
 | [32](tracks/32-track-v-settlement-for-grid-and-chat/README.md) | Track V: the settlement profile for the Grid example and the v3-chat demo | Stopped: Grid switch held (row 36); harness and RESULT.md on main |
 | 33 | Track W: a rolling window and a local archive for shipped Chat | In progress |
 | 34 | Track X: the settlement fence delivery stall | In progress |
+| 35 | Track Y: trim the library caches and size their ceilings | In progress |
 
-Folders 33 and 34 land with their branches.
+Folders 33 to 35 land with their branches.
 
 ## Reading the records
 
@@ -339,7 +341,8 @@ Notes:
   at those ceilings a client carries about 37 MB of canonical hash memo, 17 MB of transition memo (full around
   epoch 190) and 2 MB of trust-record keys. Old-epoch transition entries are probably dead weight. Pruning the
   transition memo by epoch, or lowering the hash-memo or trust-verdict ceilings, is a memory-budget decision. The
-  plateau is projected, not observed, because the harness allows at most 128 rollovers.
+  plateau is projected, not observed, because the harness allows at most 128 rollovers. Track Y is measuring
+  and trimming (row 41).
 - **Left open by Track S** (details in its [RESULT.md](tracks/29-track-s-first-lull-reopen/RESULT.md)): the first
   maintained boundary now writes one classification-only decision instead of a no-op replay (+35 to +63 ms in that
   lull in single runs). No SIGKILL case covers a crash inside that install, and the Grid reopen runs were Chromium
