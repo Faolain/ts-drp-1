@@ -1,6 +1,13 @@
-import { expect, type Page, test } from "@playwright/test";
+import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 
 import { installGridRoomHeadAuthority } from "./fixtures/phase-3a1b/grid-room-head-authority";
+import {
+	installPhaseProbe,
+	pageNow,
+	type PhaseWindow,
+	summarizePhases,
+	takePhases,
+} from "./fixtures/track-z/phase-probe";
 
 // Track V: the shipped Grid page (examples/grid, served by its own dev server with real
 // browser networking, as phase-3a1b-d9346-v3-zone.pw.ts serves it) as a long zone in
@@ -25,6 +32,61 @@ const POST_INSTALL_PAUSE_MS = Number(process.env.TRACK_V_GRID_POST_INSTALL_PAUSE
 const PROBE = process.env.TRACK_V_GRID_PROBE === "1";
 // Diagnostics: TRACK_V_GRID_CENSUS=0 skips the IndexedDB census, to rule out any effect of its reads.
 const CENSUS = process.env.TRACK_V_GRID_CENSUS !== "0";
+// Track Z (measurement only, opt-in): TRACK_Z_PHASES=1 installs tests/fixtures/track-z/phase-probe.ts in
+// both pages and prints, per epoch, a TRACK_Z_PHASES line that attributes each window (play, seal, export,
+// adoption, install, convergence, lulls) to the proof events, spans, IndexedDB transactions and long tasks it
+// held. TRACK_Z_LULL=explicit calls maintainRecoveryPool() on the creator's and then the Writer's room after
+// each install, as the latency bench's lull mode does. The shipped zone API has no such call, so the harness
+// adds one to the served /src/v3-zone.ts that delegates to the zone's current room exactly as its
+// sealEpoch() does; nothing else in the page changes. TRACK_Z_PAGE_GLOBALS (JSON) sets page globals for a
+// scratch measurement build (see the probe).
+const PHASES = process.env.TRACK_Z_PHASES === "1";
+const LULL = process.env.TRACK_Z_LULL ?? "off";
+if (LULL !== "off" && LULL !== "explicit") throw new Error("TRACK_Z_LULL must be off or explicit");
+
+interface LullResult {
+	readonly kind: string;
+	readonly reason: string | null;
+	readonly ms: number;
+	readonly start: number;
+	readonly end: number;
+}
+
+async function exposeZoneLull(context: BrowserContext): Promise<void> {
+	await context.route(
+		(url) => url.port === "4174" && url.pathname === "/src/v3-zone.ts",
+		async (route) => {
+			const response = await route.fetch();
+			const body = await response.text();
+			const anchor = /\n([ \t]*)sealEpoch\(\) \{\n/gu;
+			const found = [...body.matchAll(anchor)];
+			if (found.length !== 1) throw new Error("TRACK_Z_ZONE_SEAL_ANCHOR_ABSENT");
+			const indent = found[0]?.[1] ?? "";
+			const method =
+				`\n${indent}maintainRecoveryPool() {\n${indent}  const selected = room;\n` +
+				`${indent}  if (selected === undefined || closeRequested) return Promise.reject(new TypeError("v3 zone is not open"));\n` +
+				`${indent}  return selected.maintainRecoveryPool();\n${indent}},`;
+			const headers = { ...response.headers() };
+			delete headers["content-length"];
+			await route.fulfill({
+				status: response.status(),
+				headers,
+				body: body.replace(anchor, (match) => method + match),
+			});
+		}
+	);
+}
+
+const runLull = (page: Page): Promise<LullResult> =>
+	page.evaluate(async () => {
+		const api = Reflect.get(window, "__TS_DRP_V3_ZONE__") as {
+			maintainRecoveryPool(): Promise<{ kind: string; reason?: string }>;
+		};
+		const start = performance.timeOrigin + performance.now();
+		const result = await api.maintainRecoveryPool();
+		const end = performance.timeOrigin + performance.now();
+		return { kind: result.kind, reason: result.reason ?? null, ms: end - start, start, end };
+	});
 
 interface Census {
 	readonly databases: Readonly<Record<string, Readonly<Record<string, number>>>>;
@@ -153,6 +215,9 @@ test(`the shipped Grid page runs ${EPOCHS} creator successors with an enrolled W
 	// Independent Writers own independent account floors, as the d9346 rollover test does.
 	await installGridRoomHeadAuthority([creatorContext]);
 	await installGridRoomHeadAuthority([receiverContext], "__TS_DRP_GRID_ROOM_HEAD_AUTHORITY_FOR_OPEN__", "create");
+	if (PHASES || process.env.TRACK_Z_PAGE_GLOBALS !== undefined)
+		await Promise.all([installPhaseProbe(creatorContext), installPhaseProbe(receiverContext)]);
+	if (LULL === "explicit") await Promise.all([exposeZoneLull(creatorContext), exposeZoneLull(receiverContext)]);
 	const creator = await creatorContext.newPage();
 	const receiver = await receiverContext.newPage();
 	const records: unknown[] = [];
@@ -191,6 +256,26 @@ test(`the shipped Grid page runs ${EPOCHS} creator successors with an enrolled W
 		await receiver.click("#joinGrid");
 		await expect.poll(async () => (await zone(receiver)).durableVertexCount).toBe(2);
 		await expect.poll(async () => (await zone(creator)).durableVertexCount).toBe(2);
+		// Track Z: everything before the first epoch (open, create, join) is one window.
+		let phaseFrom = 0;
+		if (PHASES) {
+			const openedAt = (await pageNow(creator)) + 1;
+			const windows: PhaseWindow[] = [{ name: "open", start: 0, end: openedAt }];
+			const [creatorRaw, recipientRaw] = await Promise.all([takePhases(creator), takePhases(receiver)]);
+			process.stdout.write(
+				`TRACK_Z_PHASES ${JSON.stringify({
+					app: "grid",
+					epoch: 0,
+					creator: summarizePhases(creatorRaw, windows),
+					recipient: summarizePhases(recipientRaw, windows),
+					databases: {
+						creator: Object.keys((await census(creator)).databases),
+						recipient: Object.keys((await census(receiver)).databases),
+					},
+				})}\n`
+			);
+			phaseFrom = openedAt;
+		}
 		for (let epoch = 0; epoch < EPOCHS; epoch++) {
 			const issueMs: { creator: number[]; recipient: number[] } = { creator: [], recipient: [] };
 			for (let ordinal = 0; ordinal < MOVES * 2; ordinal++) {
@@ -223,19 +308,29 @@ test(`the shipped Grid page runs ${EPOCHS} creator successors with an enrolled W
 					exportCreatorSuccessor(): Promise<Record<string, Uint8Array>>;
 					adoptCreatorSuccessor(): Promise<unknown>;
 				};
+				// Absolute page times of the step boundaries (Track Z's windows).
+				const marks: number[] = [];
+				const mark = (): void => {
+					marks.push(performance.timeOrigin + performance.now());
+				};
 				let started = performance.now();
+				mark();
 				const close = await api.sealEpoch();
 				const seal = performance.now() - started;
+				mark();
 				if (!close.ok) throw new Error("TRACK_V_HEALTHY_CLOSE_REFUSED");
 				started = performance.now();
 				const offer = await api.exportCreatorSuccessor();
 				const exported = performance.now() - started;
+				mark();
 				started = performance.now();
 				await api.adoptCreatorSuccessor();
 				const adoption = performance.now() - started;
+				mark();
 				return {
 					close: { ok: close.ok, epoch: close.epoch, successorEpoch: close.successorEpoch },
 					ms: { seal, export: exported, adoption },
+					marks,
 					offer: Object.fromEntries(
 						[
 							"exactCanonicalCutValueBytes",
@@ -247,29 +342,77 @@ test(`the shipped Grid page runs ${EPOCHS} creator successors with an enrolled W
 				};
 			});
 			expect(rollover.close).toEqual({ ok: true, epoch, successorEpoch: epoch + 1 });
-			const install = await receiver.evaluate(
+			const installed = await receiver.evaluate(
 				async ({ offer, peer }) => {
 					const api = Reflect.get(window, "__TS_DRP_V3_ZONE__") as {
 						installCreatorSuccessor(input: unknown): Promise<unknown>;
 					};
 					const started = performance.now();
+					const start = performance.timeOrigin + started;
 					await api.installCreatorSuccessor({
 						peers: [peer],
 						offer: Object.fromEntries(Object.entries(offer).map(([key, value]) => [key, new Uint8Array(value)])),
 					});
-					return performance.now() - started;
+					const ended = performance.now();
+					return { ms: ended - started, start, end: performance.timeOrigin + ended };
 				},
 				{ offer: rollover.offer, peer: creatorEnrollment.localPeerId }
 			);
+			const install = installed.ms;
 			await expect.poll(async () => (await zone(receiver)).blocks).toEqual((await zone(creator)).blocks);
 			if (POST_INSTALL_PAUSE_MS > 0) await new Promise((resolve) => setTimeout(resolve, POST_INSTALL_PAUSE_MS));
+			// Track Z: the explicit lull, creator first and then the Writer, as the bench orders it.
+			const convergedAt = await pageNow(creator);
+			const lull =
+				LULL === "explicit" ? { creator: await runLull(creator), recipient: await runLull(receiver) } : undefined;
 			const skipped: Census = { databases: {}, usage: null };
+			const censusAt = await pageNow(creator);
 			const [creatorCensus, recipientCensus] = CENSUS
 				? await Promise.all([census(creator), census(receiver)])
 				: [skipped, skipped];
+			if (PHASES) {
+				const takenAt = await pageNow(creator);
+				const [sealAt, exportAt, adoptAt, adoptedAt] = rollover.marks as [number, number, number, number];
+				const windows: PhaseWindow[] = [
+					{ name: "play", start: phaseFrom, end: sealAt },
+					{ name: "seal", start: sealAt, end: exportAt },
+					{ name: "export", start: exportAt, end: adoptAt },
+					{ name: "adopt", start: adoptAt, end: adoptedAt },
+					{ name: "handoff", start: adoptedAt, end: installed.start },
+					{ name: "install", start: installed.start, end: installed.end },
+					{ name: "converge", start: installed.end, end: lull?.creator.start ?? convergedAt },
+					...(lull === undefined
+						? []
+						: [
+								{ name: "lull-creator", start: lull.creator.start, end: lull.creator.end },
+								{ name: "lull-recipient", start: lull.recipient.start, end: lull.recipient.end },
+							]),
+					{ name: "census", start: censusAt, end: takenAt + 1 },
+				];
+				const [creatorRaw, recipientRaw] = await Promise.all([takePhases(creator), takePhases(receiver)]);
+				process.stdout.write(
+					`TRACK_Z_PHASES ${JSON.stringify({
+						app: "grid",
+						epoch: epoch + 1,
+						creator: summarizePhases(creatorRaw, windows),
+						recipient: summarizePhases(recipientRaw, windows),
+						auto: { creator: creatorRaw.auto, recipient: recipientRaw.auto },
+						dropped: { creator: creatorRaw.dropped, recipient: recipientRaw.dropped },
+					})}\n`
+				);
+				phaseFrom = takenAt + 1;
+			}
 			const record = {
 				epoch: epoch + 1,
 				ms: { ...rollover.ms, install },
+				...(lull === undefined
+					? {}
+					: {
+							lull: {
+								creator: { kind: lull.creator.kind, reason: lull.creator.reason, ms: lull.creator.ms },
+								recipient: { kind: lull.recipient.kind, reason: lull.recipient.reason, ms: lull.recipient.ms },
+							},
+						}),
 				issueMs,
 				creator: { rows: total(creatorCensus), issuance: issuance(creatorCensus), usage: creatorCensus.usage },
 				recipient: { rows: total(recipientCensus), issuance: issuance(recipientCensus), usage: recipientCensus.usage },
