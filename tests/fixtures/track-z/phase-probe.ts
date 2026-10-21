@@ -222,9 +222,14 @@ export function summarizePhases(raw: RawPhases, windows: readonly PhaseWindow[])
 		summaries[name] ??= fresh(0);
 		return summaries[name];
 	};
-	for (const [time, kind, ms] of raw.proof) {
+	for (const [time, kind, ms, detail] of raw.proof) {
 		const summary = at(time);
 		summary.proof[kind] = (summary.proof[kind] ?? 0) + 1;
+		// Retention and retirement events also count per outcome or reason (for example a decline's reason).
+		if (detail !== null && (kind.startsWith("room-retention") || kind.startsWith("closed-retirement"))) {
+			const keyed = `${kind}:${detail.slice(0, 60)}`;
+			summary.proof[keyed] = (summary.proof[keyed] ?? 0) + 1;
+		}
 		if (ms !== null) summary.proofMs[kind] = Math.round((summary.proofMs[kind] ?? 0) + ms);
 	}
 	for (const [name, start, end] of raw.spans) {
