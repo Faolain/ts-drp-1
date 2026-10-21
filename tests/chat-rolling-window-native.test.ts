@@ -30,7 +30,15 @@ import { SHIPPING_CHAT_ARCHIVE_DEFAULT_BOUND } from "../examples/chat/src/v3-cha
 // CHAT_WINDOW_EPOCHS (default 300), CHAT_WINDOW_OUT=<dir> (one JSONL line per epoch),
 // CHAT_WINDOW_VERBOSE=1. CHAT_WINDOW_PAD=<n> appends n characters to every text, which only
 // shortens the run before the window is full (development; the default is 0).
+//
+// The window is 64 KiB (65,536 bytes; owner review 2026-10-21). The assertions need every
+// member's share full, 50 steady epochs after that, and more than twice the window's bytes
+// sent, so a run too short for them is refused before any epoch runs, with the length it needs
+// (231 epochs at the default text length: the Writers' shares are full at epoch 154 and twice
+// the window's bytes are sent by epoch 231; 91 epochs with CHAT_WINDOW_PAD=400).
 const EPOCHS = Number(process.env.CHAT_WINDOW_EPOCHS ?? 300);
+const WINDOW_BYTES = 65_536;
+const STEADY_EPOCHS = 50;
 const PAD = Number(process.env.CHAT_WINDOW_PAD ?? 0);
 const REOPEN_AT = Math.floor(EPOCHS / 2);
 const CRASH_AT = REOPEN_AT + 5;
@@ -89,6 +97,40 @@ class WindowModel {
 			this.evictions.set(message.author, (this.evictions.get(message.author) ?? 0) + 1);
 		}
 	}
+}
+
+/**
+ * The shortest run this test's assertions hold for, from the genesis shares and the messages the
+ * run sends (the same model, without a room): every member has pushed out an older message,
+ * STEADY_EPOCHS more epochs ran, and more than twice the window's bytes were sent.
+ * @param ceilings - Each author's genesis share.
+ * @param authors - The authors, by peer index.
+ * @returns The fewest epochs, and the epoch every share is full.
+ */
+function shortestRun(
+	ceilings: ReadonlyMap<string, number>,
+	authors: readonly string[]
+): Readonly<{ epochs: number; steady: number }> {
+	const model = new WindowModel(ceilings);
+	let steady = Number.POSITIVE_INFINITY;
+	let sent = 0;
+	for (let epoch = 0; epoch < 100_000; epoch++) {
+		for (let ordinal = 0; ordinal < SENDERS.length; ordinal++) {
+			const sender = required(SENDERS[ordinal]);
+			const operation = operationFor(sender, epoch, ordinal);
+			const message = {
+				author: required(authors[sender]),
+				clientOperationId: operation.clientOperationId,
+				displayTimeMs: operation.displayTimeMs,
+				text: operation.text,
+			};
+			model.apply(message);
+			sent += recordBytes(message);
+		}
+		if (authors.every((author) => (model.evictions.get(author) ?? 0) > 0)) steady = Math.min(steady, epoch + 1);
+		if (epoch + 1 >= steady + STEADY_EPOCHS && sent > 2 * WINDOW_BYTES) return { epochs: epoch + 1, steady };
+	}
+	throw new TypeError("CHAT_WINDOW_SHORTEST_RUN");
 }
 
 interface EpochRecord {
@@ -156,6 +198,16 @@ async function runChatWindowRoom(): Promise<LongRoomRun> {
 	};
 	const ceilingByAuthor = new Map(genesis.capacity.allocations.map(([author, ceiling]) => [author, ceiling]));
 	const ceilings = room.identities.map(({ author }) => required(ceilingByAuthor.get(author)));
+	const shortest = shortestRun(
+		ceilingByAuthor,
+		room.identities.map(({ author }) => author)
+	);
+	if (EPOCHS < shortest.epochs)
+		throw new RangeError(
+			`CHAT_WINDOW_EPOCHS=${EPOCHS} is too short for this test's assertions: every member's share is full at epoch ` +
+				`${shortest.steady}, and they need ${STEADY_EPOCHS} steady epochs after it and more than ` +
+				`${2 * WINDOW_BYTES} bytes sent. Run at least ${shortest.epochs} epochs (CHAT_WINDOW_PAD=<n> fills the window sooner).`
+		);
 	const model = new WindowModel(ceilingByAuthor);
 	const opened: ChatWindowPeer[] = [];
 	for (let index = 0; index < WRITERS; index++) opened.push(await room.open(index));
@@ -366,8 +418,8 @@ it(
 		expect(run.issued).toHaveLength(EPOCHS * SENDERS.length);
 		for (const { epoch, digests, model } of run.agreement)
 			expect(digests, `state digests at epoch ${epoch}`).toEqual(Array.from({ length: WRITERS }, () => model));
-		// The run outlives a lifetime ledger: far more bytes were sent than the whole state holds.
-		expect(run.issued.reduce((sum, message) => sum + recordBytes(message), 0)).toBeGreaterThan(4 * 32_768);
+		// The run outlives a lifetime ledger: more than twice the bytes the whole window holds were sent.
+		expect(run.issued.reduce((sum, message) => sum + recordBytes(message), 0)).toBeGreaterThan(2 * WINDOW_BYTES);
 	},
 	TIMEOUT
 );
@@ -379,7 +431,7 @@ it(
 		// The agreement test compares every peer's bytes with the model's window every epoch;
 		// here the window's shape: per member, a suffix of what they sent, within their share,
 		// and their next older message would not have fitted.
-		expect(run.steadyEpoch, "every member's share filled within the run").toBeLessThanOrEqual(EPOCHS - 50);
+		expect(run.steadyEpoch, "every member's share filled within the run").toBeLessThanOrEqual(EPOCHS - STEADY_EPOCHS);
 		const finalState = decodeCanonical(Buffer.from(required(run.exported.at(-1)).exported, "hex")) as {
 			version: number;
 			messages: ChatMessage[];
@@ -412,13 +464,15 @@ it(
 	async () => {
 		const run = await chatWindowRoom();
 		const steady = run.records.filter((record) => record.epoch >= run.steadyEpoch);
-		expect(steady.length).toBeGreaterThanOrEqual(50);
+		expect(steady.length).toBeGreaterThanOrEqual(STEADY_EPOCHS);
 		// Each member's charge stays within one message of their share, so the whole state stays in
-		// a band one largest message per member wide, under the 32 KiB ceiling.
+		// a band one largest message per member wide, under the 64 KiB window, and a full window
+		// fills it to within that band.
 		const largest = Math.max(...run.issued.map(recordBytes));
 		const full = Math.max(...steady.map((record) => record.stateBytes));
+		expect(full, "a full window").toBeGreaterThan(WINDOW_BYTES - (WRITERS + 1) * largest);
 		for (const record of steady) {
-			expect(record.stateBytes, `state bytes at epoch ${record.epoch}`).toBeLessThanOrEqual(32_768);
+			expect(record.stateBytes, `state bytes at epoch ${record.epoch}`).toBeLessThanOrEqual(WINDOW_BYTES);
 			expect(record.stateBytes, `state bytes at epoch ${record.epoch}`).toBeGreaterThan(full - WRITERS * largest);
 		}
 		for (let index = 0; index < WRITERS; index++) {
