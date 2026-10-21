@@ -441,6 +441,65 @@ describe("Track W: Chat's new-room window format", () => {
 			)
 		).toMatchObject({ kind: "rejected" });
 	});
+
+	it("states Track Q's ordinary resource bound for its own catalog entry and window states only", async () => {
+		const application = await windowApplication();
+		const read = required(application.readOrdinaryApplicationResourceBound);
+		const entry = (catalog: (typeof catalogs)["window"]) => {
+			const resolved = catalog.catalog.resolve(catalog.blueprintDigest);
+			return {
+				blueprintDigest: resolved.blueprintDigest,
+				artifactId: resolved.artifactId,
+				artifactDigest: resolved.artifactDigest,
+				catalogDigest: resolved.evidence.catalogDigest,
+				runtimeProfile: resolved.runtimeProfile,
+				exactArtifactBytes: resolved.exactArtifactBytes.slice(),
+				canonicalBlueprintPackageBytes: resolved.canonicalBlueprintPackageBytes.slice(),
+			};
+		};
+		const material = (bases: readonly Uint8Array[]) => ({
+			exactCanonicalBaseStateBytes: [...bases],
+			currentOperations: [],
+			protectedOperations: [],
+			recoveryOperations: [],
+			candidateOperation: null,
+		});
+		// A full window: every member at (or just under) the ceiling.
+		const genesis = createShippingChatWindowGenesisStateBytes({ exactCanonicalLatchedAclBytes: aclBytes(0) });
+		const ceilings = (decodeCanonical(genesis) as { capacity: { allocations: [string, number, number][] } }).capacity
+			.allocations;
+		const full: ShippingChatMessage[] = [];
+		for (const [author, ceiling] of ceilings) {
+			let used = 0;
+			for (let index = 0; ; index++) {
+				const next = message(author, `full-${index}`, "x".repeat(200));
+				if (used + size(next) > ceiling) break;
+				used += size(next);
+				full.push(next);
+			}
+		}
+		const fullState = shippingChatWindowStateBytes({
+			version: 4,
+			messages: full,
+			capacity: (decodeCanonical(genesis) as { capacity: unknown }).capacity,
+		});
+		const input = (catalog = entry(catalogs.window), bases: readonly Uint8Array[] = [genesis, fullState]) =>
+			({ catalog, material: material(bases) }) as unknown as Parameters<typeof read>[0];
+		// The same value as the lifetime format (approved 2026-10-20), and every window state fits it.
+		expect(read(input())).toEqual({ byteLength: 32_768, items: 16_384, maxDepth: 16 });
+		expect(fullState.byteLength).toBeLessThanOrEqual(32_768);
+		// The lifetime catalog entry, a lifetime state, or a tampered window state: no bound.
+		expect(read(input(entry(catalogs.lifetime)))).toBeUndefined();
+		expect(
+			read(
+				input(entry(catalogs.window), [
+					createShippingChatGenesisStateBytes({ exactCanonicalLatchedAclBytes: aclBytes(0) }),
+				])
+			)
+		).toBeUndefined();
+		expect(read(input(entry(catalogs.window), [Uint8Array.of(...fullState, 0)]))).toBeUndefined();
+		expect(read(input(entry(catalogs.window), []))).toBeUndefined();
+	});
 });
 
 function required<Value>(value: Value | undefined): Value {

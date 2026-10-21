@@ -1,11 +1,12 @@
 import type { TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog/bytes";
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import type { CanonicalResourceFootprint } from "@ts-drp/canonical/resource";
 import type {
 	V3OperationAdmissionPolicy,
 	V3OperationAdmissionPolicyFactory,
 	V3OperationAdmissionReservation,
 } from "@ts-drp/node/v3-live";
-import type { V3RoomProjectionInput } from "@ts-drp/node/v3-room";
+import type { V3RoomApplication, V3RoomProjectionInput } from "@ts-drp/node/v3-room";
 import { prepareBlueprintAdmission, prepareBlueprintRuntime } from "@ts-drp/protocol-v3";
 import { applyPreparedBlueprintOperation } from "@ts-drp/protocol-v3/blueprint-application";
 
@@ -14,6 +15,7 @@ import {
 	createShippingChatGenesisStateBytes,
 	reallocateShippingChatCapacity,
 	restoreShippingChatCapacityState,
+	SHIPPING_CHAT_CAPACITY_STATE_LIMITS,
 	SHIPPING_CHAT_RETAINED_BYTES,
 	type ShippingChatAllocation,
 	type ShippingChatCapacity,
@@ -42,7 +44,16 @@ export interface ShippingChatWindowState {
 	readonly capacity: ShippingChatCapacity;
 }
 
-const LIMITS = Object.freeze({ maxBytes: SHIPPING_CHAT_RETAINED_BYTES, maxDepth: 16, maxItems: 16_384 });
+// The same state limits as the lifetime format (32,768 bytes, 16,384 items, depth 16): Track Q's
+// approved ordinary resource bound rests on every Chat state passing a capture under them.
+const LIMITS = SHIPPING_CHAT_CAPACITY_STATE_LIMITS;
+type ResourceBoundReader = NonNullable<V3RoomApplication["readOrdinaryApplicationResourceBound"]>;
+type ResourceCatalog = Parameters<ResourceBoundReader>[0]["catalog"];
+/** Track Q's exact-entry check (v3-chat-application.ts `resourceBoundBases`), passed in by the caller. */
+export type ShippingChatResourceBoundBases = (
+	input: unknown,
+	expected: ResourceCatalog
+) => readonly Uint8Array[] | undefined;
 const OPERATION_LIMITS = Object.freeze({ maxBytes: 65_536, maxDepth: 16, maxItems: 16_384 });
 const AUTHOR = /^[0-9a-f]{64}$/u;
 const hex = (bytes: Uint8Array): string => Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -433,6 +444,11 @@ export function createShippingChatWindowAdmissionPolicy(
 				}
 				encodeCanonical(ordered, LIMITS);
 				const ceiling = capacity.allocations.find((row) => row[0] === author)?.[1];
+				// The joined window (committed work plus this reservation) passes the state check under
+				// LIMITS before anything is admitted, as the lifetime policy captures its joined state.
+				const joined = [...window];
+				for (const message of ordered) applyMessage(joined, capacity, message);
+				captureShippingChatWindowState({ version: 4, capacity, messages: joined });
 				// This epoch's charge: every distinct identity of this author reserved in the epoch
 				// (pending or committed), exact retries of window messages included, plus the new ones.
 				let charge = 0;
@@ -475,6 +491,8 @@ export function createShippingChatWindowAdmissionPolicy(
  * The window-format application: one genuine compiled kernel (`v3-shipping-chat.v4`); the native
  * policy owns per-epoch byte admission.
  * @param input - The window catalog, its digest and the exact genesis ACL.
+ * @param readResourceBases - Track Q's exact catalog-entry and material check for the ordinary
+ * resource bound reader (v3-chat-application.ts `resourceBoundBases`).
  * @returns The room application.
  */
 export async function createShippingChatWindowApplication(
@@ -482,7 +500,8 @@ export async function createShippingChatWindowApplication(
 		catalog: TrustedBlueprintCatalog;
 		blueprintDigest: string;
 		exactCanonicalGenesisLatchedAclBytes: Uint8Array;
-	}>
+	}>,
+	readResourceBases: ShippingChatResourceBoundBases
 ): Promise<ShippingChatApplication> {
 	const catalog = input.catalog,
 		blueprintDigest = input.blueprintDigest;
@@ -503,6 +522,34 @@ export async function createShippingChatWindowApplication(
 		expectedBlueprintDigest: blueprintDigest,
 		exactArtifactBytes: resolved.exactArtifactBytes,
 	});
+	// Ordinary resource bound: Track Q's rule and value (approved 2026-10-20), unchanged by the
+	// window. Every window state passes `captureShippingChatWindowState`, which encodes it under
+	// SHIPPING_CHAT_CAPACITY_STATE_LIMITS: the reducer keeps each member's window charge within the
+	// member's ceiling and the ceilings within 32,768 bytes; the projection and migration re-capture
+	// every state; and the admission policy captures the joined window of every message reservation,
+	// every inherited state and every capacity allocation before admitting it. So that ceiling
+	// dominates every state, for any material; it reads no operation. Planning only: it grants no
+	// validity, admission, authority or credit, and the room re-checks every base under it.
+	const resourceCatalog: ResourceCatalog = Object.freeze({
+		blueprintDigest: resolved.blueprintDigest,
+		artifactId: resolved.artifactId,
+		artifactDigest: resolved.artifactDigest,
+		catalogDigest: resolved.evidence.catalogDigest,
+		runtimeProfile: resolved.runtimeProfile,
+		exactArtifactBytes: resolved.exactArtifactBytes.slice(),
+		canonicalBlueprintPackageBytes: resolved.canonicalBlueprintPackageBytes.slice(),
+	});
+	const readOrdinaryApplicationResourceBound: ResourceBoundReader = (value): CanonicalResourceFootprint | undefined => {
+		try {
+			const bases = readResourceBases(value, resourceCatalog);
+			if (bases === undefined) return undefined;
+			// Only authenticated window states: captured, canonical, within the ceiling.
+			for (const base of bases) restoreShippingChatWindowState(base);
+			return Object.freeze({ byteLength: LIMITS.maxBytes, items: LIMITS.maxItems, maxDepth: LIMITS.maxDepth });
+		} catch {
+			return undefined;
+		}
+	};
 	const project = (projection: V3RoomProjectionInput): ShippingChatProjection => {
 		let state: unknown =
 			projection.authenticatedBase === undefined
@@ -529,6 +576,7 @@ export async function createShippingChatWindowApplication(
 	};
 	return Object.freeze({
 		catalog,
+		readOrdinaryApplicationResourceBound,
 		createGenesisApplicationStateBytes(
 			context: Readonly<{ objectId: string; exactCanonicalLatchedAclBytes: Uint8Array }>
 		): Uint8Array {

@@ -141,7 +141,7 @@ export async function createShippingV3ChatApplication(
 ): Promise<ShippingChatApplication> {
 	// A room's format is the artifact its signed genesis names: new rooms sign the window format.
 	if (input.catalog.resolve(input.blueprintDigest).artifactId === SHIPPING_CHAT_WINDOW_ARTIFACT_ID)
-		return createShippingChatWindowApplication(input);
+		return createShippingChatWindowApplication(input, resourceBoundBases);
 	const catalog = input.catalog,
 		blueprintDigest = input.blueprintDigest;
 	const genesisBytes = createShippingChatGenesisStateBytes({
