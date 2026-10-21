@@ -38,11 +38,43 @@ const track = Object.freeze({
 });
 let endpoint: RoleEndpoint | undefined;
 
+// Measurement only (Track Y): `__cacheProbe` exists only in a TRACK_M_APPS_CACHE_PROBE=1 bundle. Each call runs
+// inside a probe phase named after its method; the role's epoch is its authority epoch (the creator's advances
+// when its adoption returns, the recipient's when its install returns); every drain of observer events (once per
+// epoch, after both lulls) and the close flush the events to the spec's `__cacheProbeSink`.
+const cacheProbe = Reflect.get(globalThis, "__cacheProbe") as
+	| undefined
+	| Readonly<{
+			setContext(provider: () => { epoch: number; role: string }): void;
+			enter(phase: string): void;
+			exit(phase: string): void;
+			flush(label: string): Promise<unknown>;
+	  }>;
+const probed = { epoch: 0, role: "unset" };
+cacheProbe?.setContext(() => probed);
+async function probedCall(method: Method, run: () => Promise<unknown>): Promise<unknown> {
+	if (cacheProbe === undefined) return run();
+	if (method === "close") await cacheProbe.flush(`e${probed.epoch}-before-close`);
+	cacheProbe.enter(method);
+	let result: unknown;
+	try {
+		result = await run();
+	} finally {
+		cacheProbe.exit(method);
+	}
+	if (method === "adopt" || method === "install") probed.epoch++;
+	if (method === "drainEvents") await cacheProbe.flush(`e${probed.epoch}`);
+	if (method === "close") await cacheProbe.flush("close");
+	return result;
+}
+
 window.trackMAppsRole = Object.freeze({
 	open: async (options: LongRoomOptions, index: 0 | 1, unique: string) => {
 		if (options.host === "node") throw new TypeError("TRACK_M_APPS_BROWSER_HOST_REQUIRED");
 		if (endpoint !== undefined) throw new TypeError("TRACK_M_APPS_ROLE_ALREADY_OPEN");
 		const floorPrefix = `tma-floor-${hex(crypto.getRandomValues(new Uint8Array(8)))}`;
+		probed.role = index === 0 ? "creator" : "recipient";
+		cacheProbe?.enter("open");
 		endpoint = await openRole(options, index, {
 			host: browserHostFor(options.host, unique),
 			unique,
@@ -60,11 +92,12 @@ window.trackMAppsRole = Object.freeze({
 					}
 				: {}),
 		});
+		cacheProbe?.exit("open");
 	},
 	call: (method: Method, args: readonly unknown[]): Promise<unknown> => {
 		if (endpoint === undefined) return Promise.reject(new TypeError("TRACK_M_APPS_ROLE_NOT_OPEN"));
 		const selected = endpoint[method] as (...values: unknown[]) => Promise<unknown>;
-		return selected(...args);
+		return cacheProbe === undefined ? selected(...args) : probedCall(method, () => selected(...args));
 	},
 	shutdown: async () => {
 		await Promise.allSettled([...track.rooms].map((room) => room.close()));

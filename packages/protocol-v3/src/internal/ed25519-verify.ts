@@ -4,7 +4,7 @@ import { ed25519 } from "@noble/curves/ed25519.js";
  * Authentication layers re-verify the same immutable signed records many times
  * per transition; this bounded exact-byte memo returns the identical boolean.
  * It carries no authority: callers still bind every byte they verify. */
-const MEMO_LIMIT = 4096;
+const MEMO_LIMIT = 2048;
 const MEMO_MAX_MESSAGE_BYTES = 256;
 const memo = new Map<string, boolean>();
 

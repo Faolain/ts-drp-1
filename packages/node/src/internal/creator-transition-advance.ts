@@ -1387,10 +1387,18 @@ function inspectCreatorTransitionAdvance(
 // successes are retained; refusals and every other input run the original.
 const TRANSITION_MEMO_MAX_ENTRY_BYTES = 4 * 1024 * 1024;
 const TRANSITION_MEMO_MAX_BYTES = 16 * 1024 * 1024;
+// Epoch window. A room's readers re-inspect only its newest two E->E+1 checks
+// (adoption and install the current one; lull, export and reopen the previous
+// one as well), so storing a check drops the same lineage's (genesis anchor and
+// object) entries for older current epochs. Dropping an entry only makes a later
+// identical check run the original again.
+const TRANSITION_MEMO_EPOCHS = 2;
 interface TransitionMemoEntry {
 	readonly bytes: readonly Uint8Array[];
 	readonly retained: number;
 	readonly kind: "successor";
+	readonly lineage: string;
+	readonly epoch: number;
 }
 const transitionMemo = new Map<string, TransitionMemoEntry>();
 let transitionMemoBytes = 0;
@@ -1437,13 +1445,15 @@ function transitionMemoBytesOf(value: unknown): Uint8Array | undefined {
 		? value : undefined;
 }
 
-function transitionMemoKey(input: unknown): Readonly<{ key: string; bytes: readonly Uint8Array[]; proposed: unknown }> | undefined {
+function transitionMemoKey(input: unknown): Readonly<{ key: string; bytes: readonly Uint8Array[]; proposed: unknown; lineage: string; epoch: number }> | undefined {
 	const fields = ["current", "currentTrust", "mode", "proofRefs", "proposed", "successorTrust"];
 	const hasAcl = typeof input === "object" && input !== null && Reflect.ownKeys(input).includes("settlementAcl");
 	const record = transitionMemoData(input, hasAcl ? [...fields, "settlementAcl"] : fields);
 	if (record === undefined || record.mode !== "verify") return undefined;
 	const bytes: Uint8Array[] = [];
 	const parts: string[] = ["verify"];
+	let lineage: string | undefined;
+	let epoch = 0;
 	const ref = (value: unknown): boolean => {
 		const data = transitionMemoData(value, ["digest", "byteLength"]);
 		// Fixed-width hex digests and non-negative safe integers keep the key
@@ -1462,6 +1472,10 @@ function transitionMemoKey(input: unknown): Readonly<{ key: string; bytes: reado
 		if (material === undefined) return false;
 		parts.push(`T${JSON.stringify([data.currentAnchorDigest, data.currentEpoch, data.genesisAnchorDigest, data.objectId, data.profileId,
 			material.currentAnchorDigest, material.currentEpoch, material.genesisAnchorDigest, material.objectId, material.quorum])}`);
+		if (lineage === undefined) {
+			lineage = JSON.stringify([data.genesisAnchorDigest, data.objectId]);
+			epoch = data.currentEpoch;
+		}
 		bytes.push(material.publicKey, material.exactCanonicalCurrentAnchorPreimageBytes, material.detachedCurrentAnchorSignature,
 			material.exactCanonicalProfileBytes, material.exactCanonicalSignerSetBytes);
 		return true;
@@ -1496,7 +1510,8 @@ function transitionMemoKey(input: unknown): Readonly<{ key: string; bytes: reado
 		}
 	}
 	parts.push(`B${bytes.map((item) => item.byteLength).join(",")}`);
-	return Object.freeze({ key: parts.join("|"), bytes, proposed: record.proposed });
+	if (lineage === undefined) return undefined;
+	return Object.freeze({ key: parts.join("|"), bytes, proposed: record.proposed, lineage, epoch });
 }
 
 function sameTransitionMemoBytes(left: Uint8Array, right: Uint8Array): boolean {
@@ -1532,8 +1547,16 @@ function inspectCreatorTransitionAdvanceExact(
 		transitionMemo.delete(memo.key);
 		transitionMemoBytes -= known.retained;
 	}
-	transitionMemo.set(memo.key, Object.freeze({ bytes: Object.freeze(memo.bytes.map((bytes) => bytes.slice())), retained, kind: result.kind }));
+	transitionMemo.set(memo.key, Object.freeze({ bytes: Object.freeze(memo.bytes.map((bytes) => bytes.slice())), retained, kind: result.kind,
+		lineage: memo.lineage, epoch: memo.epoch }));
 	transitionMemoBytes += retained;
+	let newest = memo.epoch;
+	for (const entry of transitionMemo.values()) if (entry.lineage === memo.lineage && entry.epoch > newest) newest = entry.epoch;
+	for (const [key, entry] of transitionMemo)
+		if (entry.lineage === memo.lineage && entry.epoch <= newest - TRANSITION_MEMO_EPOCHS) {
+			transitionMemo.delete(key);
+			transitionMemoBytes -= entry.retained;
+		}
 	for (const [oldest, entry] of transitionMemo) {
 		if (transitionMemoBytes <= TRANSITION_MEMO_MAX_BYTES) break;
 		transitionMemo.delete(oldest);

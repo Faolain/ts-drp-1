@@ -9,14 +9,20 @@ import { browserIssuancePruningMaintenanceForStore } from "../../../packages/sto
 import { ISSUANCE_RETIREMENT_LIMITS } from "@ts-drp/issuance-store/maintenance";
 import { gridCorpus, gridOperation, gridSeed } from "../../../.logs/bounded-storage-lifecycle/r8-warm-capacity-01/grid-candidate-01/grid-corpus.ts";
 import { begin, context, end, spans, proofEvents, proofEventsTruncated, proofObserverMilliseconds, proofOwnerSummaries,
- beginFullFunctionWindow, endFullFunctionWindow, proofEventBudget, proofEventsDropped, proofEventKindsRetained } from "./critical-observer.js";
+ beginFullFunctionWindow, endFullFunctionWindow, proofEventBudget, proofEventsDropped, proofEventKindsRetained,
+ harnessRecordsCounted, spansCounted, proofOwnerEventsCounted } from "./critical-observer.js";
 import { workerPeer } from "../../../.logs/bounded-storage-lifecycle/r8-warm-capacity-01/worker-transport.ts";
 import { CREATOR_SUCCESSOR_PROTOCOL } from "@ts-drp/network/snapshot-transfer";
 import { createEphemeralChannel } from "../../../packages/ephemeral/src/index.js";
 import { hex, parameters } from "./room.js";
-import { control, trace } from "./observation.js";
+import { control, trace, traceCount } from "./observation.js";
 
 function check(value:unknown,reason:string):asserts value {if(!value)throw new Error(reason);}
+// Measurement only (Track Y): the cache probe exists only in bundles built with STARTUP_CACHE_PROBE=1
+// (tests/fixtures/cache-probe). Otherwise this is undefined and every use below is skipped.
+const cacheProbe=Reflect.get(globalThis,"__cacheProbe") as undefined|{setContext(provider:()=>{epoch:number;role:string}):void;
+ enter(phase:string):void;exit(phase:string):void;flush(label:string):Promise<unknown>};
+cacheProbe?.setContext(()=>({epoch:context.transition,role:context.role}));
 function errorEvidence(error:unknown):unknown {
  if(error===null||typeof error!=="object")return error;
  if(typeof Reflect.get(error,"message")!=="string")return structuredClone(error);
@@ -65,6 +71,9 @@ async function createHealthyGridRole(input:{index:number;database:string;identit
    ...(presentation===undefined?{}:{presentation}),
    openTransport:()=>({...peer.open(),openEphemeral:openFixtureEphemeral}),signRegisteredVertexDigest:async digest=>ed25519.sign(digest,key),onAcceptedVertex:vertex=>{
     const digest=hex(vertex.digest);admitted.add(digest);
+    // Measurement only (counted harness records): keep the newest 1,024 digests instead of every one.
+    if(harnessRecordsCounted){if(admitted.size>1024)admitted.delete(admitted.values().next().value!);
+     if(deliveryObservations.size>=1024&&!deliveryObservations.has(digest))deliveryObservations.delete(deliveryObservations.keys().next().value!);}
     check(deliveryObservations.size<deliveryObservationBound||deliveryObservations.has(digest),"bounded healthy delivery telemetry saturated");
     if(!deliveryObservations.has(digest))deliveryObservations.set(digest,{acceptedCallbackAt:performance.now()});
     if(Reflect.get(globalThis,"__r8CriticalProfiling")===true)performance.mark("drp:accepted-callback:"+index+":"+digest);
@@ -78,6 +87,10 @@ async function createHealthyGridRole(input:{index:number;database:string;identit
   const original=session;
   const native=browserIssuancePruningMaintenanceForStore(issuance);check(native,"healthy native census owner unavailable");
   const ownIssuance=issuance,ownSnapshot=snapshot,ownScope={objectId,author};
+  // Measurement only (counted harness records): the transport fixture's per-message records are counted and
+  // drained at each checkpoint instead of kept for the whole room.
+  const drainTransportRecords=()=>{for(const name of ["publications","streamBytes","historyEvents","retainedEvents"] as const){
+   const list=Reflect.get(peer,name) as unknown[]|undefined;if(Array.isArray(list))transportRecordCounts[name]=(transportRecordCounts[name]??0)+list.splice(0).length;}};
   return {index,database,application,session:original,floor,issuance,snapshot,admitted,deliveryObservations,native:browserIssuancePruningMaintenanceForStore(issuance),
    issue:(operation:Readonly<Record<string,unknown>>)=>original.issue(structuredClone(operation)),
    presentation:presentation!==undefined,
@@ -106,8 +119,10 @@ async function createHealthyGridRole(input:{index:number;database:string;identit
    },
    // Capture the existing bounded per-realm timer observations before close
    // reporting removes this frame. Terminal parent-only capture is too late.
-   observer:()=>({timeOrigin:performance.timeOrigin,spans:[...spans],autoPool:[...autoPoolOutcomes],clockMark,longTasks:Reflect.get(globalThis,"__rdLongTasks")?.(),criticalProfiling:Reflect.get(globalThis,"__r8CriticalSnapshot")?.(),eventLoop:Reflect.get(globalThis,"__r8EventLoopCheckpoint")?.(),incrementalNativeControls:{enabled:Reflect.get(globalThis,"__r8IncrementalNativeControls")===true,sourcePin:Reflect.get(globalThis,"__r8IncrementalNativeControlSourcePin"),qualification:"Correctness-only extra quote/readout/UNKNOWN exhaustion and joined proof work; overlapping product metrics cannot be blindly subtracted. Disabled for matched latency and unprofiled runs."},proofEvents:[...proofEvents],proofEventsTruncated,proofEventBudget,proofEventsDropped,proofEventKindsRetained,proofObserverMilliseconds,proofOwnerSummaries:[...proofOwnerSummaries.values()],startupTrace:[...trace],publications:peer.publications,transfers:peer.streamBytes,transport:peer.status()}),
-   setContext:(role:string,transition:number,command:string)=>{Object.assign(context,{role,transition,command,preparation:false});}
+   observer:()=>({timeOrigin:performance.timeOrigin,spans:[...spans],autoPool:[...autoPoolOutcomes],clockMark,longTasks:Reflect.get(globalThis,"__rdLongTasks")?.(),criticalProfiling:Reflect.get(globalThis,"__r8CriticalSnapshot")?.(),eventLoop:Reflect.get(globalThis,"__r8EventLoopCheckpoint")?.(),incrementalNativeControls:{enabled:Reflect.get(globalThis,"__r8IncrementalNativeControls")===true,sourcePin:Reflect.get(globalThis,"__r8IncrementalNativeControlSourcePin"),qualification:"Correctness-only extra quote/readout/UNKNOWN exhaustion and joined proof work; overlapping product metrics cannot be blindly subtracted. Disabled for matched latency and unprofiled runs."},proofEvents:[...proofEvents],proofEventsTruncated,proofEventBudget,proofEventsDropped,proofEventKindsRetained,proofObserverMilliseconds,proofOwnerSummaries:[...proofOwnerSummaries.values()],startupTrace:[...trace],publications:peer.publications,transfers:peer.streamBytes,transport:peer.status(),
+    ...(harnessRecordsCounted?{harnessRecordsCounted:{spans:spansCounted,proofOwnerEvents:proofOwnerEventsCounted,startupTrace:traceCount.counted,...transportRecordCounts}}:{})}),
+   setContext:(role:string,transition:number,command:string)=>{Object.assign(context,{role,transition,command,preparation:false});},
+   drainTransportRecords
   };
  }catch(error){const joined=await Promise.allSettled([session?.close(),issuance?.close(),snapshot?.close(),floor.close()]);
   const faults=joined.flatMap(row=>row.status==="rejected"?[row.reason]:[]);if(faults.length)throw new AggregateError([error,...faults],"healthy role create failed with cleanup failures");throw error;}
@@ -146,6 +161,7 @@ window.addEventListener("message",event=>{
  ephemeralListener?.({bytes:new Uint8Array(event.data.bytes),sender:event.data.source});
 });
 const autoPoolOutcomes:unknown[]=[];
+const transportRecordCounts:Record<string,number>={};
 let clockMark:{name:string;startTime:number}|undefined;
 let childRole:Awaited<ReturnType<typeof createHealthyGridRole>>|undefined;
 let childIndex=-1;
@@ -198,12 +214,14 @@ window.addEventListener("message",event=>{
    // actual entries/bytes during the selected API, not their first-entry label.
    const exactCriticalBegin=typeof fullBoundary==="function"
     ? structuredClone(Reflect.get(globalThis,"__r8CriticalSnapshot")?.()) : undefined;
+   cacheProbe?.enter(name);
    const start=begin();
    let fullSnapshot:unknown;
    try{return await action();}
    finally{
     const apiEnd=performance.now();
     end(name,start);
+    cacheProbe?.exit(name);
     if(typeof fullBoundary==="function"){
      const exactCriticalEnd=structuredClone(Reflect.get(globalThis,"__r8CriticalSnapshot")?.());
      fullSnapshot=endFullFunctionWindow();
@@ -238,6 +256,7 @@ window.addEventListener("message",event=>{
    try{await childPeer.join();joins.push({index:childIndex,owner:"transport",ok:true});}catch(error){joins.push({index:childIndex,owner:"transport",ok:false,error:errorEvidence(error)});faults.push(error);}
    if(childProbeTimer!==undefined){clearInterval(childProbeTimer);childProbeTimer=undefined;}
    const observer=role?.observer();childRole=undefined;
+   if(cacheProbe!==undefined)await cacheProbe.flush("close");
    return {index:childIndex,epoch:args.epoch,joins,...(observer===undefined?{nativeRole:"absent"}:{observer}),ok:faults.length===0,errors:faults.map(errorEvidence)};
   }
   const role=childRole;check(role,"original native role required");
@@ -345,6 +364,8 @@ window.addEventListener("message",event=>{
       await done;databases.push({name:metadata.name,version:metadata.version,stores});
      }finally{db.close();}
     }
+    if(harnessRecordsCounted)role.drainTransportRecords();
+    if(cacheProbe!==undefined)await cacheProbe.flush(String(args.label??"measure"));
     return {...value,databases};
    });
    case "maintain":return product("pool-maintenance-lull",()=>role.session.maintainRecoveryPool());
@@ -367,12 +388,21 @@ export async function runHealthyGrid(identity:string,origins:readonly string[],r
  // rollovers, measurement only) scale it with the rollovers like the test deadline.
  const fixtureWaitDeadline=Date.now()+(rollovers>32?rollovers*30_000:360_000);
  check(origins.length===4&&new Set(origins).size===4,"four independent native storage origins required");
- check(rollovers===4||rollovers===5||(Number.isSafeInteger(rollovers)&&rollovers>=8&&rollovers<=128),"bounded native full-pool extension only");
+ // Past 128 rollovers (measurement only) only with the spec's explicit STARTUP_HEALTHY_GRID_ENDURANCE_MAX opt-in,
+ // handed to this realm as __r8EnduranceMax (129 to 1024). Unset, the check is unchanged for every value.
+ const enduranceMax=Reflect.get(globalThis,"__r8EnduranceMax");
+ const enduranceExtended=typeof enduranceMax==="number"&&Number.isSafeInteger(enduranceMax)&&enduranceMax>128&&enduranceMax<=1024&&
+  Number.isSafeInteger(rollovers)&&rollovers>128&&rollovers<=enduranceMax;
+ check(enduranceExtended||rollovers===4||rollovers===5||(Number.isSafeInteger(rollovers)&&rollovers>=8&&rollovers<=128),"bounded native full-pool extension only");
  check(profileId==="creator-trusted-settlement-v1"||profileId==="creator-trusted-v1","existing creator profile required");
  const {members,application}=gridCorpus(identity),ids=members.slice(0,4).map(row=>row.peerId);
  const objectId="creator:"+hex(hashDomain("ts-drp/healthy-native-grid/v1",new TextEncoder().encode(identity))).slice(0,32);
  const signers=[{publicKey:members[0]!.author,signerId:"creator"}],startSpan=spans.length;
  const ordinary:any[]=[],snapshots:unknown[]=[],checkpoints:any[]=[],joins:any[]=[],transitions:unknown[]=[],roleObservers:any[]=[],presentationSummary:unknown[]=[];
+ // Measurement only (endurance heap): with the harness's per-epoch records counted, these lists stay empty and
+ // only their counts are kept. Unset (the default), every record is kept as before.
+ const harnessRecordCounts:Record<string,number>={};
+ const keep=<T>(list:T[],kind:string,value:T)=>{harnessRecordCounts[kind]=(harnessRecordCounts[kind]??0)+1;if(!harnessRecordsCounted)list.push(value);};
  const frames:HTMLIFrameElement[]=[],ready=new Set<Window>();
  const waits=new Map<number,{resolve:(value:any)=>void;reject:(error:unknown)=>void;index:number;command:string;epoch:number;ordinal?:number;
   digest?:string;expectedBlock?:{id:string;x:number;y:number};lastReportedSegment?:string}> ();
@@ -504,7 +534,7 @@ export async function runHealthyGrid(identity:string,origins:readonly string[],r
  async function gameplay(count:number){
   for(let ordinal=0;ordinal<count;ordinal++){
    const index=ordinal%4,operation={...gridOperation(index,epoch),id:"integrated-block-"+(ordinal%8)};
-   const value=await rpc(index,"issue",{operation,ordinal});ordinary.push(value);
+   const value=await rpc(index,"issue",{operation,ordinal});keep(ordinary,"ordinary",value);
    value.peerDelivery=await Promise.all(active.map(role=>rpc(role.index,"admitted",{digest:value.digest,operation,ordinal,waitDeadline:fixtureWaitDeadline})));
   }
   await world();
@@ -531,7 +561,7 @@ export async function runHealthyGrid(identity:string,origins:readonly string[],r
    [move(0,150,4),move(target===1?2:1,400,5)]);
   return {target,maintenance:await maintaining,moves};
  }
- async function measure(label:string){const values=await Promise.all(active.map(role=>rpc(role.index,"measure")));checkpoints.push({label,epoch,values});
+ async function measure(label:string){const values=await Promise.all(active.map(role=>rpc(role.index,"measure",cacheProbe===undefined?{}:{label})));keep(checkpoints,"checkpoints",{label,epoch,values});
   const memory=Reflect.get(globalThis,"__r8ActiveResourceCheckpoint");if(typeof memory==="function"){const start=begin();try{await memory(label);}finally{end("test-only-active-native-GC-and-memory",start);}}
   return values;}
  try{
@@ -545,8 +575,12 @@ export async function runHealthyGrid(identity:string,origins:readonly string[],r
    if(typeof traceControl==="function"&&epoch===5)await traceControl("stop");
    await measure("before-rollover-"+epoch);
    if(typeof traceControl==="function"&&epoch===4){await traceControl("start");await Promise.all(active.map(role=>rpc(role.index,"clock")));}
+   // Measurement only: a fixed idle gap before each seal (unset, none), to separate earlier background work
+   // (the lull's IndexedDB cleanup) from the seal and adoption that follow.
+   const sealIdleGap=Reflect.get(globalThis,"__rdSealIdleGapMilliseconds");
+   if(typeof sealIdleGap==="number"&&sealIdleGap>0){const start=begin();await new Promise(resolve=>setTimeout(resolve,sealIdleGap));end("test-only-seal-idle-gap",start);}
    phase="seal-"+epoch;const closed=await rpc(0,"seal");check(closed.ok,"healthy seal refused:"+JSON.stringify(closed));
-   const offer=await rpc(0,"export");snapshots.push(await rpc(0,"snapshot",{offer}));
+   const offer=await rpc(0,"export");keep(snapshots,"snapshots",await rpc(0,"snapshot",{offer}));
    phase="creator-adoption-"+epoch;await rpc(0,"adopt");
    for(let index=1;index<4;index++){phase="recipient-install-"+epoch+":"+index;await rpc(index,"install",{offer,peers:[ids[0]]});}
    epoch=closed.successorEpoch;phase="settlement-cleanup-"+epoch;
@@ -563,7 +597,7 @@ export async function runHealthyGrid(identity:string,origins:readonly string[],r
    const concurrent=Reflect.get(globalThis,"__rdPoolMaintenanceConcurrent")===true;
    if(recipientLull)for(let index=1;index<4;index++){phase="pool-maintenance-"+epoch+":"+index;
     recipientPoolMaintenance.push(concurrent&&index===1?await concurrentMaintenance(1):await rpc(index,"maintain"));}
-   transitions.push({closedEpoch:closed.epoch,successorEpoch:closed.successorEpoch,sessionRecreations:0,fixtureDatabaseCopies:0,
+   keep(transitions,"transitions",{closedEpoch:closed.epoch,successorEpoch:closed.successorEpoch,sessionRecreations:0,fixtureDatabaseCopies:0,
     ...(poolMaintenance===undefined?{}:{poolMaintenance}),...(recipientLull?{recipientPoolMaintenance}:{})});
   }
   const expectedReopenWorld=await world();
@@ -579,7 +613,8 @@ export async function runHealthyGrid(identity:string,origins:readonly string[],r
   if(probeTimer!==undefined)clearInterval(probeTimer);
   Reflect.deleteProperty(globalThis,"__r8FrozenRouteObservation");}
  return {ok:failure===undefined,phase,epoch,...(failure===undefined?{}:{error:errorEvidence(failure)}),identity,objectId,profileId,activeClients:4,rosterMembers:members.length,requestedRollovers:rollovers,timeOrigin:performance.timeOrigin,
-  ordinary,snapshots,transitions,checkpoints,joins,suspensionEvents,spans:spans.slice(startSpan),roleObservers,presentation:Reflect.get(globalThis,"__rdPresentation")??null,roomDatabase:Reflect.get(globalThis,"__rdRoomDatabase")===true,presentationSummary,proofEventsTruncated:roleObservers.some(row=>row.observer.proofEventsTruncated),
+  ordinary,snapshots,transitions,checkpoints,joins,suspensionEvents,spans:spans.slice(startSpan),roleObservers,
+  ...(harnessRecordsCounted?{harnessRecordCounts:{...harnessRecordCounts,parentSpans:spansCounted,parentStartupTrace:traceCount.counted}}:{}),presentation:Reflect.get(globalThis,"__rdPresentation")??null,roomDatabase:Reflect.get(globalThis,"__rdRoomDatabase")===true,presentationSummary,proofEventsTruncated:roleObservers.some(row=>row.observer.proofEventsTruncated),
   transfers:roleObservers.flatMap(row=>row.observer.transfers),publications:roleObservers.flatMap(row=>row.observer.publications),
   qualification:"Genuine browser IndexedDB and browser writer locks on four independent localhost storage origins; original Grid/room/native/protocol owners in four frame realms. Reuses unchanged accepted warm worker byte-routing transport through a browser parentPort adapter. Local serialized postMessage routing and shared browser renderer/profile are simulator costs, not network/device viability. Healthy rollovers keep original sessions/transports; only explicit persisted-reopen recreates clients on their SAME original origins/databases. No fixture copying/injected failures. "+(profileId==="creator-trusted-settlement-v1"?"Fully settled ordinary contributions exercise genuine settlement/fence/rebase and native cleanup, not fabricated nonempty displacement. ":"The original no-settlement profile has no author fence or settlement plan; its zero-fence adoption and lawful cleanup are not settlement-enabled evidence. ")+"Native read-only scans/assertions, simulator RPC and forced GC overhead are separate; no absolute gameplay latency/physical-memory target defined."};
 }
