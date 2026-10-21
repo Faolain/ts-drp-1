@@ -50,10 +50,14 @@ const phaseIds = new Map<string, number>();
 const domainIds = new Map<string, number>();
 const instance = Math.random().toString(36).slice(2, 10);
 let flushes = 0;
+// Residency-only bundles (cacheProbePlugin({ residencyOnly: true })) record no events and keep no key table, so
+// the probe's own memory stays bounded by the caches' entries in endurance runs; flushes carry residency only.
+let residencyOnly = false;
 
 let events = new Int32Array(1 << 16);
 let used = 0;
 function emit(map: number, op: number, key: number, a: number, b: number): void {
+	if (residencyOnly) return;
 	if (used + 4 > events.length) {
 		const grown = new Int32Array(events.length * 2);
 		grown.set(events);
@@ -127,6 +131,7 @@ class ProbedMap extends Map<string, unknown> {
 	}
 
 	#id(key: string): number {
+		if (residencyOnly) return 0;
 		let id = this.#keys.get(key);
 		if (id === undefined) {
 			id = this.#keys.size;
@@ -222,10 +227,16 @@ class ProbedMap extends Map<string, unknown> {
  * Called by the bundle-only rewrite of each cache's declaration.
  * @param name - Which cache.
  * @param original - The cache's own new, empty Map (replaced by the probed one).
+ * @param mode - "residency" in residency-only bundles: no events, no key table.
  * @returns A Map with the same behaviour that records the cache's events.
  */
-export function probeCache<Key, Value>(name: CacheName, original: Map<Key, Value>): Map<Key, Value> {
+export function probeCache<Key, Value>(
+	name: CacheName,
+	original: Map<Key, Value>,
+	mode?: "residency"
+): Map<Key, Value> {
 	if (original.size !== 0 || !NAMES.has(name) || maps.length >= 255) throw new TypeError("CACHE_PROBE_SITE_INVALID");
+	if (mode === "residency") residencyOnly = true;
 	const map = new ProbedMap(name, maps.length);
 	maps.push({ name, ordinal: maps.filter((row) => row.name === name).length, map });
 	return map as unknown as Map<Key, Value>;
@@ -268,6 +279,7 @@ const probe: CacheProbe = Object.freeze({
 		const payload = events.subarray(0, used);
 		const line = JSON.stringify({
 			kind: "cache-probe",
+			...(residencyOnly ? { mode: "residency" } : {}),
 			instance,
 			flush: flushes++,
 			label,

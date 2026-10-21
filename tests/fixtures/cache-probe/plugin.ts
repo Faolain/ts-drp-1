@@ -38,9 +38,12 @@ const SITES: readonly { readonly file: RegExp; readonly variable: string; readon
 
 /**
  * The cache-probe plugin. Put it first in the plugin list: it loads the five cache-owning modules itself.
+ * @param options - `residencyOnly`: the probe records no events and keeps no key table (endurance runs).
+ * @param options.residencyOnly - Whether the bundle's probe only reports each cache's resident entries and size.
  * @returns The plugin; the build fails if any cache declaration is not found exactly once.
  */
-export function cacheProbePlugin(): Plugin {
+export function cacheProbePlugin(options: { readonly residencyOnly?: boolean } = {}): Plugin {
+	const mode = options.residencyOnly === true ? ', "residency"' : "";
 	return {
 		name: "track-y-cache-probe",
 		setup(build): void {
@@ -59,7 +62,7 @@ export function cacheProbePlugin(): Plugin {
 					raw.replace(
 						declaration,
 						(_, types: string | undefined) =>
-							`const ${site.variable} = __trackYProbeCache(${JSON.stringify(site.name)}, new Map${types ?? ""}());`
+							`const ${site.variable} = __trackYProbeCache(${JSON.stringify(site.name)}, new Map${types ?? ""}()${mode});`
 					);
 				wrapped.add(site.name);
 				return { contents, loader: path.endsWith(".ts") ? "ts" : "js", resolveDir: dirname(path) };

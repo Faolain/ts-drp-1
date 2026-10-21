@@ -248,8 +248,9 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
   if(heapSnapshotLabels.has(label))await takeHeapSnapshot(label);
  });
  // Measurement only (Track Y): with a bundle built with STARTUP_CACHE_PROBE=1, STARTUP_CACHE_PROBE=1 here appends each
- // realm's cache-probe flushes to STARTUP_EVIDENCE/cache-probe.jsonl. Unset by default (no binding).
- if(process.env.STARTUP_CACHE_PROBE==="1"){
+ // realm's cache-probe flushes to STARTUP_EVIDENCE/cache-probe.jsonl (also for =residency, the residency-only probe).
+ // Unset by default (no binding).
+ if(process.env.STARTUP_CACHE_PROBE==="1"||process.env.STARTUP_CACHE_PROBE==="residency"){
   if(process.env.STARTUP_EVIDENCE===undefined)throw new Error("cache probe requires STARTUP_EVIDENCE");
   const probeFile=join(process.env.STARTUP_EVIDENCE,"cache-probe.jsonl");
   await page.exposeFunction("__cacheProbeSink",async(line:string)=>{await appendFile(probeFile,line+"\n");});

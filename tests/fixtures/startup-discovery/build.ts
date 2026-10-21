@@ -35,7 +35,11 @@ if (finishingEnvelopeShadow && (selectedEntry !== "r8-source-binding" || migrati
 if(criticalProfiling && (selectedEntry!=="r8-source-binding" || migrationFault!==undefined))throw new Error("CRITICAL_PROFILING_REQUIRES_HEALTHY_CURRENT_SOURCE");
 // Measurement only (Track Y): STARTUP_CACHE_PROBE=1 wraps the library's five in-memory caches with the probe in
 // tests/fixtures/cache-probe, in this bundle only (the sources are unchanged). Unset by default: no probe.
-const cacheProbe = process.env.STARTUP_CACHE_PROBE === "1";
+// STARTUP_CACHE_PROBE=residency builds the residency-only probe (no events, no key table) for endurance runs.
+const cacheProbeMode = process.env.STARTUP_CACHE_PROBE;
+if (cacheProbeMode !== undefined && cacheProbeMode !== "1" && cacheProbeMode !== "residency")
+	throw new Error("CACHE_PROBE_MODE_MUST_BE_1_OR_RESIDENCY");
+const cacheProbe = cacheProbeMode !== undefined;
 if (cacheProbe && (selectedEntry !== "r8-source-binding" || migrationFault !== undefined || criticalProfiling || finishingEnvelopeShadow))
 	throw new Error("CACHE_PROBE_REQUIRES_UNPROFILED_CURRENT_SOURCE");
 if (
@@ -2400,7 +2404,7 @@ for (const name of selectedEntry === undefined ? ["setup", "recovery", "lifecycl
 		metafile: true,
 		sourcemap:criticalProfiling?"inline":false,
 		plugins: [
-			...(cacheProbe ? [cacheProbePlugin()] : []),
+			...(cacheProbe ? [cacheProbePlugin({ residencyOnly: cacheProbeMode === "residency" })] : []),
 			{
 				name: "current-chat-catalog-entry",
 				setup(context): void {
