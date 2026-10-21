@@ -20,6 +20,16 @@ import { installGridRoomHeadAuthority } from "./fixtures/phase-3a1b/grid-room-he
 // convergence and successful transitions, and bounds nothing. On non-convergence it prints
 // TRACK_X_STUCK with the recent console lines (and, with TRACK_X_PROBE=1, whether a later
 // creator move converges).
+//
+// Hang diagnostics (measurement only, all opt-in): TRACK_X_ROLLOVER_TIMEOUT_MS bounds the
+// creator's seal/export/adopt evaluate and the recipient's install evaluate; when one does
+// not return in time the harness prints TRACK_X_ROLLOVER_HUNG with the step the creator's
+// rollover reached, both pages' recent console lines and, with TRACK_X_NET_PROBE=1, every
+// network call of each page still in flight. TRACK_X_NET_PROBE=1 also appends
+// `globalThis.__TRACK_X_NODE__ = () => node;` to the page's entry module and wraps the page's
+// own network node's send and publish methods to time them (observation only: each wrapper
+// calls the original with the same arguments and returns its result). TRACK_X_CONSOLE_ALL=1
+// keeps every console line of both pages (not only warnings and errors) for those prints.
 const EPOCHS = Number(process.env.TRACK_X_EPOCHS ?? 16);
 const MOVES = Number(process.env.TRACK_X_MOVES ?? 2);
 const SETTLE_MS = 300;
@@ -27,7 +37,11 @@ const CONVERGE_MS = Number(process.env.TRACK_X_CONVERGE_MS ?? 60_000);
 const POST_INSTALL_PAUSE_MS = Number(process.env.TRACK_X_POST_INSTALL_PAUSE_MS ?? 0);
 const PROBE = process.env.TRACK_X_PROBE === "1";
 const CENSUS = process.env.TRACK_X_CENSUS !== "0";
-const ACCESSOR = "\n;globalThis.__TRACK_X_ROOM__ = () => room;\n";
+const ROLLOVER_TIMEOUT_MS = Number(process.env.TRACK_X_ROLLOVER_TIMEOUT_MS ?? 0);
+const NET_PROBE = process.env.TRACK_X_NET_PROBE === "1";
+const CONSOLE_ALL = process.env.TRACK_X_CONSOLE_ALL === "1";
+const ACCESSOR =
+	"\n;globalThis.__TRACK_X_ROOM__ = () => room;\n" + (NET_PROBE ? ";globalThis.__TRACK_X_NODE__ = () => node;\n" : "");
 
 interface Census {
 	readonly databases: Readonly<Record<string, Readonly<Record<string, number>>>>;
@@ -238,6 +252,114 @@ const connectedPeers = (page: Page): Promise<readonly string[]> =>
 			)()?.connectedPeers() ?? []
 	);
 
+// Observation only: times the page's own network node's send and publish calls.
+async function installNetProbe(page: Page): Promise<void> {
+	await page.evaluate(() => {
+		const node = (
+			Reflect.get(globalThis, "__TRACK_X_NODE__") as (() => { networkNode: object } | undefined) | undefined
+		)?.();
+		if (node === undefined) throw new Error("TRACK_X_NODE_ABSENT");
+		const network = node.networkNode as Record<string, unknown>;
+		const state = {
+			sequence: 0,
+			inflight: new Map<number, Readonly<Record<string, unknown>>>(),
+			slow: [] as Readonly<Record<string, unknown>>[],
+			counts: {} as Record<string, number>,
+		};
+		Reflect.set(globalThis, "__TRACK_X_NET__", state);
+		for (const name of [
+			"sendMessage",
+			"publishMessage",
+			"sendSyncMessage",
+			"sendSyncResponseMessage",
+			"broadcastMessage",
+		]) {
+			const original = network[name];
+			if (typeof original !== "function") continue;
+			network[name] = function (this: unknown, ...args: unknown[]): unknown {
+				const id = ++state.sequence;
+				const started = performance.now();
+				const target = typeof args[0] === "string" ? args[0].slice(-12) : typeof args[0];
+				const type = (args[1] as { type?: unknown } | undefined)?.type;
+				state.inflight.set(id, { name, target, type, started: Math.round(started) });
+				state.counts[name] = (state.counts[name] ?? 0) + 1;
+				const settle = (): void => {
+					const ms = performance.now() - started;
+					state.inflight.delete(id);
+					if (ms > 1_000) {
+						state.slow.push({ name, target, type, started: Math.round(started), ms: Math.round(ms) });
+						if (state.slow.length > 60) state.slow.shift();
+					}
+				};
+				let result: unknown;
+				try {
+					result = Reflect.apply(original as (...values: unknown[]) => unknown, this, args);
+				} catch (error) {
+					settle();
+					throw error;
+				}
+				if (result instanceof Promise) void result.then(settle, settle);
+				else settle();
+				return result;
+			};
+		}
+	});
+}
+
+async function readNetProbe(page: Page): Promise<unknown> {
+	return page.evaluate(() => {
+		const state = Reflect.get(globalThis, "__TRACK_X_NET__") as
+			| { inflight: Map<number, unknown>; slow: unknown[]; counts: unknown }
+			| undefined;
+		return {
+			now: Math.round(performance.now()),
+			step: Reflect.get(globalThis, "__TRACK_X_STEP__") ?? null,
+			inflight: state === undefined ? null : [...state.inflight.values()],
+			slow: state?.slow ?? null,
+			counts: state?.counts ?? null,
+		};
+	});
+}
+
+// Per-epoch summary of the probe: calls in flight now, and the slow calls since the last one.
+async function takeNetProbe(page: Page): Promise<unknown> {
+	return page.evaluate(() => {
+		const state = Reflect.get(globalThis, "__TRACK_X_NET__") as
+			| { inflight: Map<number, { started: number }>; slow: unknown[]; counts: Record<string, number> }
+			| undefined;
+		if (state === undefined) return null;
+		const now = performance.now();
+		const slow = state.slow.splice(0);
+		return {
+			inflight: state.inflight.size,
+			oldestInflightMs: Math.round(Math.max(0, ...[...state.inflight.values()].map(({ started }) => now - started))),
+			slow,
+			counts: { ...state.counts },
+		};
+	});
+}
+
+/**
+ * Resolves with the evaluation, or with undefined once `ms` passes (0: no bound).
+ * @param evaluation - The pending page evaluation.
+ * @param ms - The bound.
+ * @returns The result, or undefined on timeout.
+ */
+async function bounded<Value>(evaluation: Promise<Value>, ms: number): Promise<Readonly<{ value: Value }> | undefined> {
+	if (ms <= 0) return { value: await evaluation };
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	try {
+		return await Promise.race([
+			evaluation.then((value) => ({ value })),
+			new Promise<undefined>((resolve) => {
+				timer = setTimeout(() => resolve(undefined), ms);
+			}),
+		]);
+	} finally {
+		if (timer !== undefined) clearTimeout(timer);
+	}
+}
+
 async function waitShown(app: ShippedApp, page: Page, key: unknown, timeout: number): Promise<boolean> {
 	try {
 		await expect.poll(() => app.shows(page, key), { timeout }).toBe(true);
@@ -270,6 +392,7 @@ for (const app of [canvas, chat])
 		// keyed by their first two words, and a tail of the recent lines with test-time ms.
 		const consoleCounts = { creator: new Map<string, number>(), recipient: new Map<string, number>() };
 		const consoleTail: string[] = [];
+		const consoleAll: string[] = [];
 		const ingress: string[] = [];
 		for (const [label, page] of [
 			["creator", creator],
@@ -277,6 +400,10 @@ for (const app of [canvas, chat])
 		] as const) {
 			page.on("pageerror", (error) => consoleTail.push(`${label} ${Date.now() - started} pageerror ${error.message}`));
 			page.on("console", (message) => {
+				if (CONSOLE_ALL) {
+					consoleAll.push(`${label} ${Date.now() - started} ${message.type()} ${message.text().slice(0, 240)}`);
+					if (consoleAll.length > 400) consoleAll.shift();
+				}
 				if (message.type() !== "warning" && message.type() !== "error") return;
 				const key = `${message.type()} ${message.text().split(/\s+/u).slice(0, 2).join(" ").slice(0, 80)}`;
 				consoleCounts[label].set(key, (consoleCounts[label].get(key) ?? 0) + 1);
@@ -295,8 +422,25 @@ for (const app of [canvas, chat])
 			consoleCounts.recipient.clear();
 			return taken;
 		};
+		const hung = async (phase: string, epoch: number): Promise<never> => {
+			const probe = async (page: Page): Promise<unknown> =>
+				(await bounded(NET_PROBE ? readNetProbe(page) : pageMs(page), 10_000))?.value ?? "unresponsive";
+			const report = {
+				app: app.name,
+				phase,
+				epoch,
+				testMs: Date.now() - started,
+				creator: await probe(creator),
+				recipient: await probe(receiver),
+				console: consoleTail.slice(-120),
+				consoleAll: consoleAll.slice(-300),
+			};
+			process.stdout.write(`TRACK_X_ROLLOVER_HUNG ${JSON.stringify(report)}\n`);
+			throw new Error(`TRACK_X_ROLLOVER_HUNG ${app.name} epoch ${epoch} ${phase}`);
+		};
 		try {
 			await Promise.all([openApp(creator, app), openApp(receiver, app)]);
+			if (NET_PROBE) await Promise.all([installNetProbe(creator), installNetProbe(receiver)]);
 			const invite = await app.create(creator);
 			await app.join(receiver, invite);
 			const creatorPeer = await peerIdOf(creator, app);
@@ -337,30 +481,42 @@ for (const app of [canvas, chat])
 					deliveryMs.push(Date.now() - sent);
 				}
 				await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
-				const rollover = await creator.evaluate(async () => {
+				const rolloverEvaluation = creator.evaluate(async () => {
+					const step = (name: string): void => {
+						Reflect.set(globalThis, "__TRACK_X_STEP__", { name, at: Math.round(performance.now()) });
+					};
 					const room = (Reflect.get(globalThis, "__TRACK_X_ROOM__") as () => unknown)() as {
 						sealEpoch(): Promise<{ ok: boolean; epoch: number; successorEpoch: number }>;
 						exportCreatorSuccessor(): Promise<Record<string, Uint8Array>>;
 						adoptCreatorSuccessor(): Promise<unknown>;
 					};
 					let begun = performance.now();
+					step("seal");
 					const close = await room.sealEpoch();
 					const seal = performance.now() - begun;
 					if (!close.ok) throw new Error("TRACK_X_HEALTHY_CLOSE_REFUSED");
 					begun = performance.now();
+					step("export");
 					const offer = await room.exportCreatorSuccessor();
 					const exported = performance.now() - begun;
 					begun = performance.now();
+					step("adopt");
 					await room.adoptCreatorSuccessor();
 					const adoption = performance.now() - begun;
+					step("done");
 					return {
 						close: { ok: close.ok, epoch: close.epoch, successorEpoch: close.successorEpoch },
 						ms: { seal, export: exported, adoption },
 						offer: Object.fromEntries(Object.entries(offer).map(([key, value]) => [key, Array.from(value)])),
 					};
 				});
+				// A timed-out evaluation is abandoned; its later rejection (the page closing) is not unhandled.
+				void rolloverEvaluation.catch(() => undefined);
+				const rolloverResult = await bounded(rolloverEvaluation, ROLLOVER_TIMEOUT_MS);
+				if (rolloverResult === undefined) await hung("creator rollover", epoch + 1);
+				const rollover = (rolloverResult as NonNullable<typeof rolloverResult>).value;
 				expect(rollover.close).toEqual({ ok: true, epoch, successorEpoch: epoch + 1 });
-				const install = await receiver.evaluate(
+				const installEvaluation = receiver.evaluate(
 					async ({ offer, peer }) => {
 						const room = (Reflect.get(globalThis, "__TRACK_X_ROOM__") as () => unknown)() as {
 							installCreatorSuccessor(input: unknown): Promise<unknown>;
@@ -374,6 +530,10 @@ for (const app of [canvas, chat])
 					},
 					{ offer: rollover.offer, peer: creatorPeer }
 				);
+				void installEvaluation.catch(() => undefined);
+				const installResult = await bounded(installEvaluation, ROLLOVER_TIMEOUT_MS);
+				if (installResult === undefined) await hung("recipient install", epoch + 1);
+				const install = (installResult as NonNullable<typeof installResult>).value;
 				await expect.poll(() => app.view(receiver), { timeout: CONVERGE_MS }).toEqual(await app.view(creator));
 				if (POST_INSTALL_PAUSE_MS > 0) await new Promise((resolve) => setTimeout(resolve, POST_INSTALL_PAUSE_MS));
 				const skipped: Census = { databases: {}, usage: null };
@@ -395,6 +555,9 @@ for (const app of [canvas, chat])
 						usage: recipientCensus.usage,
 					},
 					console: takeConsole(),
+					...(NET_PROBE
+						? { net: { creator: await takeNetProbe(creator), recipient: await takeNetProbe(receiver) } }
+						: {}),
 				};
 				records.push(record);
 				process.stdout.write(`TRACK_X_CHROMIUM ${JSON.stringify(record)}\n`);
