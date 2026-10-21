@@ -107,6 +107,7 @@ repository owner made. "Coordinator" marks a recommendation that was then carrie
 | 32 | Merge Track T: shipped Canvas signs `creator-trusted-settlement-v1`, with the version-3 ACL that profile requires. | Coordinator | Canvas issuance is flat at 13 rows per peer from epoch 6 through 17 and a reopen (legacy grew 4 rows per epoch), and every store is flat from epoch 8 to 100 in Chromium. At 20 moves per epoch, where the legacy profile was refused in epoch 17, it ran 30 epochs without a refusal. Seal no longer grows with room age (legacy +60–69 ms per epoch). Adoption is a flat 150–280 ms slower, because settled issuance is pruned there. No library code changed. | Merge 2e272eb0 (ac17c698..dacb9870), after verification on main: typecheck 0, the Canvas, ledger and genesis-roots tests passing. |
 | 33 | Merge Track S, and unhold Track Q. | Coordinator | The creator's first maintained lull replayed its finished signing summary, whose stored resume basis then went stale as the epoch's lawful moves landed, so a persisted reopen was refused `floor-stale`. One removed condition in `classifyClosedSigningSummaries`: a finished summary is never replayed, and the same pass makes a fresh decision. The `floor-stale` check is unchanged. | Merge 19caa468 (5a7491f8..40d50ea3), after verification of main + Tracks T and S together: typecheck 0, Track S's six tests and every room, ledger and long-room test passing, the pinned source test failing exactly as at base. Track Q is rebasing onto it. |
 | 34 | Track V: amend the tests that pin the Grid example's and the v3-chat demo's genesis bytes, changing only the profile name and the ACL version in a separate commit, then switch both apps to the settlement profile. | User | Completes row 28 for all shipped apps. The pins describe the products' current genesis, not a guarantee. If the contract needs more than those two values, Track V stops and reports. | In progress |
+| 35 | Track W: shipped Chat keeps a rolling window of recent messages in its shared state, and each device keeps a local archive of what it has seen. Late joiners see only the window. | User | Shipped Chat keeps every message in its replicated state against a lifetime 32 KiB budget, so it refuses new messages near epoch 57 at 4 messages per epoch. Raising the cap would make every transition heavier with room age (G1) and still hit a wall. A window keeps the state and transitions flat; the archive keeps each player's history. The window and archive sizes are reviewed limits (G21) for the owner. | In progress |
 
 ## Commits
 
@@ -250,8 +251,9 @@ that track's working documents.
 | [30](tracks/30-track-t-settlement-for-shipped-apps/README.md) | Track T: the settlement profile for the shipped apps | ac17c698..dacb9870, merged in 2e272eb0; Canvas only |
 | 31 | Track U: lull-mode seal and adoption, and the residual heap slope | In progress |
 | 32 | Track V: the settlement profile for the Grid example and the v3-chat demo | In progress |
+| 33 | Track W: a rolling window and a local archive for shipped Chat | In progress |
 
-Folders 27, 31 and 32 land with their branches.
+Folders 27 and 31 to 33 land with their branches.
 
 ## Reading the records
 
@@ -322,8 +324,8 @@ Notes:
   - The shipped Canvas and Chat creators supply no `readOrdinaryApplicationResourceBound`, so their lull never
     runs and retirement stays inline at seal, about 2.7 s in Chromium (Track Q, rebasing).
   - Chat storage is flat, but shipped Chat's own 32 KiB retained-state cap (`SHIPPING_CHAT_RETAINED_BYTES`)
-    rejects new messages near epoch 57 at 4 messages per epoch, by design and the same at base. A long-lived Chat
-    room needs that cap revisited.
+    rejects new messages near epoch 57 at 4 messages per epoch, by design and the same at base. Track W replaces
+    it with a rolling window plus a local archive (row 35).
   - The RED fixture `startupShippedCanvas` (tests/fixtures/startup-discovery/shipped.ts) still builds a legacy
     invite labelled "shipped"; it passes, but the label is stale.
 - **Left open by Track N** (details in its [RESULT.md](tracks/24-track-n-recipient-issuance-growth/RESULT.md)):
