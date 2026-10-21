@@ -40,9 +40,40 @@ const CENSUS = process.env.TRACK_V_GRID_CENSUS !== "0";
 // adds one to the served /src/v3-zone.ts that delegates to the zone's current room exactly as its
 // sealEpoch() does; nothing else in the page changes. TRACK_Z_PAGE_GLOBALS (JSON) sets page globals for a
 // scratch measurement build (see the probe).
+// TRACK_Z_ROLLOVER_TIMEOUT_MS bounds the creator's seal/export/adopt evaluate, the Writer's install evaluate
+// and the final zone closes, as Track X's TRACK_X_ROLLOVER_TIMEOUT_MS does for Canvas and Chat: a rollover
+// that does not return in time prints TRACK_Z_ROLLOVER_HUNG with the step the creator reached and the
+// recent console lines, and fails the test instead of holding the shared ports until the test timeout.
 const PHASES = process.env.TRACK_Z_PHASES === "1";
 const LULL = process.env.TRACK_Z_LULL ?? "off";
 if (LULL !== "off" && LULL !== "explicit") throw new Error("TRACK_Z_LULL must be off or explicit");
+const ROLLOVER_TIMEOUT_MS = Number(process.env.TRACK_Z_ROLLOVER_TIMEOUT_MS ?? 0);
+
+async function bounded<Value>(evaluation: Promise<Value>, ms: number): Promise<Readonly<{ value: Value }> | undefined> {
+	if (ms <= 0) return { value: await evaluation };
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	try {
+		return await Promise.race([
+			evaluation.then((value) => ({ value })),
+			new Promise<undefined>((resolve) => {
+				timer = setTimeout(() => resolve(undefined), ms);
+			}),
+		]);
+	} finally {
+		if (timer !== undefined) clearTimeout(timer);
+	}
+}
+
+const readStep = async (page: Page): Promise<unknown> =>
+	(
+		await bounded(
+			page.evaluate(() => ({
+				now: Math.round(performance.now()),
+				step: Reflect.get(globalThis, "__TRACK_Z_STEP__") ?? null,
+			})),
+			10_000
+		)
+	)?.value ?? "unresponsive";
 
 interface LullResult {
 	readonly kind: string;
@@ -302,7 +333,20 @@ test(`the shipped Grid page runs ${EPOCHS} creator successors with an enrolled W
 				}
 			}
 			await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
-			const rollover = await creator.evaluate(async () => {
+			const hung = async (phase: string): Promise<never> => {
+				process.stdout.write(
+					`TRACK_Z_ROLLOVER_HUNG ${JSON.stringify({
+						app: "grid",
+						phase,
+						epoch: epoch + 1,
+						creator: await readStep(creator),
+						recipient: await readStep(receiver),
+						console: consoleTail.slice(-60),
+					})}\n`
+				);
+				throw new Error(`TRACK_Z_ROLLOVER_HUNG ${phase} epoch ${epoch + 1}`);
+			};
+			const rolloverEvaluation = creator.evaluate(async () => {
 				const api = Reflect.get(window, "__TS_DRP_V3_ZONE__") as {
 					sealEpoch(): Promise<{ ok: boolean; epoch: number; successorEpoch: number }>;
 					exportCreatorSuccessor(): Promise<Record<string, Uint8Array>>;
@@ -313,20 +357,27 @@ test(`the shipped Grid page runs ${EPOCHS} creator successors with an enrolled W
 				const mark = (): void => {
 					marks.push(performance.timeOrigin + performance.now());
 				};
+				const step = (name: string): void => {
+					Reflect.set(globalThis, "__TRACK_Z_STEP__", { name, at: Math.round(performance.now()) });
+				};
 				let started = performance.now();
 				mark();
+				step("seal");
 				const close = await api.sealEpoch();
 				const seal = performance.now() - started;
 				mark();
 				if (!close.ok) throw new Error("TRACK_V_HEALTHY_CLOSE_REFUSED");
 				started = performance.now();
+				step("export");
 				const offer = await api.exportCreatorSuccessor();
 				const exported = performance.now() - started;
 				mark();
 				started = performance.now();
+				step("adopt");
 				await api.adoptCreatorSuccessor();
 				const adoption = performance.now() - started;
 				mark();
+				step("done");
 				return {
 					close: { ok: close.ok, epoch: close.epoch, successorEpoch: close.successorEpoch },
 					ms: { seal, export: exported, adoption },
@@ -341,8 +392,13 @@ test(`the shipped Grid page runs ${EPOCHS} creator successors with an enrolled W
 					),
 				};
 			});
+			// A timed-out evaluation is abandoned; its later rejection (the page closing) is not unhandled.
+			void rolloverEvaluation.catch(() => undefined);
+			const rolloverResult = await bounded(rolloverEvaluation, ROLLOVER_TIMEOUT_MS);
+			if (rolloverResult === undefined) await hung("creator rollover");
+			const rollover = (rolloverResult as NonNullable<typeof rolloverResult>).value;
 			expect(rollover.close).toEqual({ ok: true, epoch, successorEpoch: epoch + 1 });
-			const installed = await receiver.evaluate(
+			const installEvaluation = receiver.evaluate(
 				async ({ offer, peer }) => {
 					const api = Reflect.get(window, "__TS_DRP_V3_ZONE__") as {
 						installCreatorSuccessor(input: unknown): Promise<unknown>;
@@ -358,6 +414,10 @@ test(`the shipped Grid page runs ${EPOCHS} creator successors with an enrolled W
 				},
 				{ offer: rollover.offer, peer: creatorEnrollment.localPeerId }
 			);
+			void installEvaluation.catch(() => undefined);
+			const installResult = await bounded(installEvaluation, ROLLOVER_TIMEOUT_MS);
+			if (installResult === undefined) await hung("recipient install");
+			const installed = (installResult as NonNullable<typeof installResult>).value;
 			const install = installed.ms;
 			await expect.poll(async () => (await zone(receiver)).blocks).toEqual((await zone(creator)).blocks);
 			if (POST_INSTALL_PAUSE_MS > 0) await new Promise((resolve) => setTimeout(resolve, POST_INSTALL_PAUSE_MS));
@@ -427,14 +487,14 @@ test(`the shipped Grid page runs ${EPOCHS} creator successors with an enrolled W
 			contentType: "application/json",
 		});
 	} finally {
-		await Promise.allSettled([
-			creator.evaluate(() =>
+		// With TRACK_Z_ROLLOVER_TIMEOUT_MS, a zone close that joins a hung rollover is abandoned after the same bound.
+		const closes = [creator, receiver].map((page) =>
+			page.evaluate(() =>
 				(Reflect.get(window, "__TS_DRP_V3_ZONE__") as { close(): Promise<void> } | undefined)?.close()
-			),
-			receiver.evaluate(() =>
-				(Reflect.get(window, "__TS_DRP_V3_ZONE__") as { close(): Promise<void> } | undefined)?.close()
-			),
-		]);
+			)
+		);
+		for (const close of closes) void close.catch(() => undefined);
+		await bounded(Promise.allSettled(closes), ROLLOVER_TIMEOUT_MS);
 		await Promise.allSettled([creator.close(), receiver.close(), ...contexts.map((context) => context.close())]);
 	}
 });
