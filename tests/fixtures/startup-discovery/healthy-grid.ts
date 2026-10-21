@@ -545,6 +545,10 @@ export async function runHealthyGrid(identity:string,origins:readonly string[],r
    if(typeof traceControl==="function"&&epoch===5)await traceControl("stop");
    await measure("before-rollover-"+epoch);
    if(typeof traceControl==="function"&&epoch===4){await traceControl("start");await Promise.all(active.map(role=>rpc(role.index,"clock")));}
+   // Measurement only: a fixed idle gap before each seal (unset, none), to separate earlier background work
+   // (the lull's IndexedDB cleanup) from the seal and adoption that follow.
+   const sealIdleGap=Reflect.get(globalThis,"__rdSealIdleGapMilliseconds");
+   if(typeof sealIdleGap==="number"&&sealIdleGap>0){const start=begin();await new Promise(resolve=>setTimeout(resolve,sealIdleGap));end("test-only-seal-idle-gap",start);}
    phase="seal-"+epoch;const closed=await rpc(0,"seal");check(closed.ok,"healthy seal refused:"+JSON.stringify(closed));
    const offer=await rpc(0,"export");snapshots.push(await rpc(0,"snapshot",{offer}));
    phase="creator-adoption-"+epoch;await rpc(0,"adopt");
