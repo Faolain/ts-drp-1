@@ -97,12 +97,16 @@ repository owner made. "Coordinator" marks a recommendation that was then carrie
 | 22 | Hold Track M: fix its crash bug first, then merge. | User | Its 14f case 8 breaks G3 and G14 on the opt-in path on all three engines: a SIGKILL between a creator boundary's two decisions leaves the signing control without a summary source, and maintenance then halts. The main branch must not carry a known guarantee break. | Track M stayed on its branch until Track O's fix; both merged in 8c61863e (row 24). |
 | 23 | Start Tracks O, M2, P and Q in parallel. | User | O: the case 8 fix. M2: 14b stage 2, the in-memory ledger that removes the ~282 ms cold acquisition per boundary. P and Q fix two problems Track M found on every path: Canvas issuance grows one row per move with an O(outbox) issue cost (829 ms → 6.7 s per move by epoch 16), and the shipped Canvas and Chat creators never run their lull, so retirement runs inline at seal (about 2.7 s). | O merged with M (row 24). P merged (row 27). Q held (row 25). M2 merged (row 29). |
 | 24 | Accept Track O's 14b/14e amendment, and merge Tracks M and O together. | User | O's fix makes each boundary one decision, with one epoch's signing evidence and summaries as one unit, in a fixed unit order. A crash or refusal between continuations then resumes from a fresh acquisition (G3, G14). Track M's suggested fix left a second split point open. | Merge 8c61863e, after verification on O's head: typecheck 0, 13 room test files passing, the proof-accounting test file identical to the main branch, and 14f case 8 passing with a real SIGKILL. |
-| 25 | Hold Track Q. | Coordinator | Its Canvas and Chat resource bounds work (seal 0.07–0.14x of before), but running the lull exposes a pre-existing bug. A persisted reopen right after the creator's first maintained lull is refused with `floor-stale` (a stored signing-summary resume-basis digest differs on resume, CRD:19350). R3's 4-rollover room test now reaches it and fails. The Grid hits the same bug when reopened at epoch 4. | Not merged until the bug is fixed |
-| 26 | Track S: fix the reopen right after the first maintained lull, on the shared path; Track Q then rebases onto it. | User | The bug predates this work and also affects the Grid; it blocks Track Q. | In progress |
+| 25 | Hold Track Q. | Coordinator | Its Canvas and Chat resource bounds work (seal 0.07–0.14x of before), but running the lull exposes a pre-existing bug. A persisted reopen right after the creator's first maintained lull is refused with `floor-stale` (a stored signing-summary resume-basis digest differs on resume, CRD:19350). R3's 4-rollover room test now reaches it and fails. The Grid hits the same bug when reopened at epoch 4. | Unheld after Track S merged (row 33); rebasing onto 19caa468. |
+| 26 | Track S: fix the reopen right after the first maintained lull, on the shared path; Track Q then rebases onto it. | User | The bug predates this work and also affects the Grid; it blocks Track Q. | Merged in 19caa468 (row 33). |
 | 27 | Merge Track P's per-move fix, and keep its storage assertion red until the user decides how Canvas issuance is retired. | Coordinator | Each hot successor wrapped its source's issuance facade in one more facade, so one recovery read went through s - 1 facades at epoch s. A successor now wraps its source's native store, the same structure a reopen builds. Creator outbox page reads per move went from 54 at epoch 8 and 103 at epoch 15 to a constant 10; the Writer recipient's went to a constant 2. | Merge a3f3f6b0 (8ed37d08..47a936fe), after verification on the merged tree: typecheck 0, Track M and O's room tests passing (38 of 38), and Tracks K, L, N and R3's native tests passing. Track P's per-test suite diff against its base shows no new failures. |
-| 28 | Canvas issuance: give the shipped apps the settlement profile (R-A), for shipped Canvas, the Grid example and the v3-chat demo. Do not write a deletion rule for the legacy profile (R-B). Track T makes the switch. | User | Track P found a spec gap: every issuance deleter requires a settlement profile, so `creator-trusted-v1` keeps every row it issues. At 20 moves per epoch a Canvas creator was refused in epoch 17. The library has no users yet, so changing the shipped profile breaks no one. R-A reuses the reviewed settlement retirement; R-B would need a new spec slice, conformance tests on both native owners and three-engine SIGKILL evidence. The latency bench already runs the settlement profile, so its flat Grid storage did not cover the shipped Grid example. | In progress. Track P's test is the acceptance test; Track T may change only where its profile comes from, not its assertions. The legacy profile keeps its behaviour and is documented as growing. |
+| 28 | Canvas issuance: give the shipped apps the settlement profile (R-A), for shipped Canvas, the Grid example and the v3-chat demo. Do not write a deletion rule for the legacy profile (R-B). Track T makes the switch. | User | Track P found a spec gap: every issuance deleter requires a settlement profile, so `creator-trusted-v1` keeps every row it issues. At 20 moves per epoch a Canvas creator was refused in epoch 17. The library has no users yet, so changing the shipped profile breaks no one. R-A reuses the reviewed settlement retirement; R-B would need a new spec slice, conformance tests on both native owners and three-engine SIGKILL evidence. The latency bench already runs the settlement profile, so its flat Grid storage did not cover the shipped Grid example. | Canvas switched by Track T (row 32). The Grid example and the v3-chat demo are pinned by existing tests and move in Track V (row 34). Track P's test is the acceptance test; Track T changed only where its profile comes from. The legacy profile keeps its behaviour and is documented as growing. |
 | 29 | Merge Track M2, the verified-fact ledger (14b stage 2), on the opt-in room path. | Coordinator | Steady lull against Track O's head (3 interleaved pairs per mode): creator 632.5 → 441.6 ms, recipient 490.6 → 251.9 ms. Its decisions equal stage 1's in every shadow and applied-twin comparison, and the 14f native cases pass on three engines with ledger-decided boundaries killed. Nothing changes on the default path. | Merge e0494c5a (111889d6..262f5fa5), after verification on the merged tree: typecheck 0, the ledger, Track M, Track O and Tracks K, L, N and R3's tests passing, Track P's storage assertion still red by design, and the pinned source test failing exactly as at base. The ≤ 100 ms target is not met; readiness capture (~160 ms) needs its own slice. |
 | 30 | Track U: settle Track M2's two open measurement questions. Are seal and adoption slower with the ledger in LULL=1 mode? What is the residual heap growth in 100-rollover runs? | User | With the ledger, LULL=1 seal (×1.04–1.54) and adoption (×1.03–1.14) were slower in all three pairs, though neither path runs ledger code. Concurrent mode showed no direction. The heap still grows 0.36 MB per epoch on both stage 1 and the ledger once the harness drops most of its proof events; nobody knows what grows. Both must be answered before the room path can become the default. | In progress |
+| 31 | Count the settlement author fence in Track P's issuance check: under the settlement profile each Writer's issue counter rises by its moves plus one fence per successor. | User | Track P's check assumed one row per move, which holds only for the legacy profile. The check stays an exact equality, and the fence count is derived from the profile, so the legacy measurement still expects the moves alone. No other assertion, bound or epoch count changed. | ff0a8b66. Track P's storage test passes on shipped Canvas. |
+| 32 | Merge Track T: shipped Canvas signs `creator-trusted-settlement-v1`, with the version-3 ACL that profile requires. | Coordinator | Canvas issuance is flat at 13 rows per peer from epoch 6 through 17 and a reopen (legacy grew 4 rows per epoch), and every store is flat from epoch 8 to 100 in Chromium. At 20 moves per epoch, where the legacy profile was refused in epoch 17, it ran 30 epochs without a refusal. Seal no longer grows with room age (legacy +60–69 ms per epoch). Adoption is a flat 150–280 ms slower, because settled issuance is pruned there. No library code changed. | Merge 2e272eb0 (ac17c698..dacb9870), after verification on main: typecheck 0, the Canvas, ledger and genesis-roots tests passing. |
+| 33 | Merge Track S, and unhold Track Q. | Coordinator | The creator's first maintained lull replayed its finished signing summary, whose stored resume basis then went stale as the epoch's lawful moves landed, so a persisted reopen was refused `floor-stale`. One removed condition in `classifyClosedSigningSummaries`: a finished summary is never replayed, and the same pass makes a fresh decision. The `floor-stale` check is unchanged. | Merge 19caa468 (5a7491f8..40d50ea3), after verification of main + Tracks T and S together: typecheck 0, Track S's six tests and every room, ledger and long-room test passing, the pinned source test failing exactly as at base. Track Q is rebasing onto it. |
+| 34 | Track V: amend the tests that pin the Grid example's and the v3-chat demo's genesis bytes, changing only the profile name and the ACL version in a separate commit, then switch both apps to the settlement profile. | User | Completes row 28 for all shipped apps. The pins describe the products' current genesis, not a guarantee. If the contract needs more than those two values, Track V stops and reports. | In progress |
 
 ## Commits
 
@@ -194,6 +198,17 @@ repository owner made. "Coordinator" marks a recommendation that was then carrie
 | 2908fc79 | test(grid): retain only named proof-event kinds for endurance heap (measurement only) |
 | 262f5fa5 | docs(track-m2): result of the verified-fact ledger (slice 14b stage 2) |
 | e0494c5a | Merge Track M2: the verified-fact ledger on the opt-in room retention path |
+| b2c3d8f1 | docs: record merging Track M2 and starting Track U |
+| ac17c698 | Canvas: sign creator-trusted-settlement-v1 into new rooms |
+| b9dada54 | Track P's Canvas long-room test follows the shipped profile |
+| ea34d5a6 | docs: the legacy creator-trusted-v1 profile keeps every issued row |
+| dacb9870 | docs: record the Track T result |
+| 2e272eb0 | Merge Track T: shipped Canvas signs the settlement profile into new rooms |
+| ff0a8b66 | test: count the settlement author fence in Track P's issuance check |
+| 5a7491f8 | test(track-s): RED for a reopen right after the creator's first maintained lull |
+| ef57d107 | fix(track-s): never replay a terminal SAME-P signing summary, so a reopen after the first maintained lull plays on |
+| 40d50ea3 | docs(track-s): record the Track S result (reopen right after the first maintained lull) |
+| 19caa468 | Merge Track S: a reopen right after the first maintained lull plays on |
 
 The commit messages hold the detailed explanation and the measurements for each change.
 
@@ -229,13 +244,14 @@ that track's working documents.
 | [24](tracks/24-track-n-recipient-issuance-growth/README.md) | Track N: recipient issuance growth | 60161b4a..7464f875 |
 | [25](tracks/25-track-o-retention-crash-resume/README.md) | Track O: crash resume on the retention path (14f case 8) | c6eff8e7..099db6ce, merged in 8c61863e |
 | [26](tracks/26-track-p-canvas-issuance-growth/README.md) | Track P: Canvas issuance growth and O(outbox) issue cost | 8ed37d08..47a936fe, merged in a3f3f6b0; storage growth left to Track T (row 28) |
-| 27 | Track Q: Canvas and Chat lull | Held (row 25) |
+| 27 | Track Q: Canvas and Chat lull | Rebasing onto 19caa468 (rows 25, 33) |
 | [28](tracks/28-track-m2-verified-fact-ledger/README.md) | Track M2: verified-fact ledger (14b stage 2) | 111889d6..262f5fa5, merged in e0494c5a |
-| 29 | Track S: reopen right after the first maintained lull | In progress |
-| 30 | Track T: the settlement profile for the shipped apps | In progress |
+| [29](tracks/29-track-s-first-lull-reopen/README.md) | Track S: reopen right after the first maintained lull | 5a7491f8..40d50ea3, merged in 19caa468 |
+| [30](tracks/30-track-t-settlement-for-shipped-apps/README.md) | Track T: the settlement profile for the shipped apps | ac17c698..dacb9870, merged in 2e272eb0; Canvas only |
 | 31 | Track U: lull-mode seal and adoption, and the residual heap slope | In progress |
+| 32 | Track V: the settlement profile for the Grid example and the v3-chat demo | In progress |
 
-Folders 27, 29, 30 and 31 land with their branches.
+Folders 27, 31 and 32 land with their branches.
 
 ## Reading the records
 
@@ -291,19 +307,25 @@ Notes:
   - re-measure recipient-lull issue latency (102 → 122 ms p50 in Track M's pairs) and the heap in a fresh process;
   - the owners of the node tests that evaluate original CRD and v3-live.ts source text must review them, because a
     default flip changes that text.
-- **Reopen right after the first maintained lull (blocks Track Q; predates this work):** a persisted reopen after
-  the creator's first maintained lull is refused with `floor-stale`, because the stored signing-summary
-  resume-basis digest differs on resume (CRD:19350-19351, via `installClosedRetirementSourceInRoom`). It fails
-  closed, but the room stops. Reopening after two or more maintained lulls works. Track G recorded the symptom.
-  Track S is fixing it.
+- **Left open by Track S** (details in its [RESULT.md](tracks/29-track-s-first-lull-reopen/RESULT.md)): the first
+  maintained boundary now writes one classification-only decision instead of a no-op replay (+35 to +63 ms in that
+  lull in single runs). No SIGKILL case covers a crash inside that install, and the Grid reopen runs were Chromium
+  only.
 - **Canvas and Chat, on every path (Tracks P, Q and T):**
   - Per-move work no longer compounds with room age (Track P). It is still linear in the rows an owner keeps.
-  - The `creator-trusted-v1` profile has no issuance deleter, so an app on it keeps every row it issues. Shipped
-    Canvas, the Grid example and the v3-chat demo all run it today. Track T moves them to
-    `creator-trusted-settlement-v1` (row 28); the legacy profile keeps growing by design.
+  - The `creator-trusted-v1` profile has no issuance deleter, so an app on it keeps every row it issues; it is
+    documented as such. Shipped Canvas now signs `creator-trusted-settlement-v1` (Track T). The Grid example and
+    the v3-chat demo still run the legacy profile until Track V lands.
+  - Existing Canvas rooms keep the profile their genesis signed; there is no migration (G25).
+  - On the settlement profile, Canvas adoption is a flat 150–280 ms slower, because settled issuance is pruned
+    there.
   - The shipped Canvas and Chat creators supply no `readOrdinaryApplicationResourceBound`, so their lull never
-    runs and retirement stays inline at seal (Track Q, held).
-  - Chat storage is flat.
+    runs and retirement stays inline at seal, about 2.7 s in Chromium (Track Q, rebasing).
+  - Chat storage is flat, but shipped Chat's own 32 KiB retained-state cap (`SHIPPING_CHAT_RETAINED_BYTES`)
+    rejects new messages near epoch 57 at 4 messages per epoch, by design and the same at base. A long-lived Chat
+    room needs that cap revisited.
+  - The RED fixture `startupShippedCanvas` (tests/fixtures/startup-discovery/shipped.ts) still builds a legacy
+    invite labelled "shipped"; it passes, but the label is stale.
 - **Left open by Track N** (details in its [RESULT.md](tracks/24-track-n-recipient-issuance-growth/RESULT.md)):
   - The issuance store's 1,024-row bound limits any Writer, the creator included, to roughly 100 moves per
     epoch. Raising it is a reviewed-limit decision (G21); nothing was changed.
