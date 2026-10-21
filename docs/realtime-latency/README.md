@@ -61,6 +61,10 @@ loaded machine (load average about 95).
 
 Per-transition cost is flat from t4 to t11: the cost no longer grows with room age.
 
+On the opt-in room path with retention (Tracks M, O and M2; 8-rollover Grid pairs, load 13–48), the steady lull
+is 442 ms on the creator and 252 ms on each recipient. During it, a peer's move is admitted by the creator in 214 ms
+p50, and a recipient's own move takes 78 ms p50 to issue.
+
 ## Decision log
 
 Decisions 1–21 were taken on 2026-10-19 and the rest on 2026-10-20, all on branch
@@ -91,12 +95,14 @@ repository owner made. "Coordinator" marks a recommendation that was then carrie
 | 20 | Track M: build slice 14b (retirement decided from a ledger of verified facts) and 14e (bounds and charges) on R3's room path. Every decision must match the existing planner, proven by a differential test. | User | Stage 1a kept the per-pass re-proofs that dominate the lull; 14b is the lever for milliseconds. Target: creator lull ≤ 100 ms p50. | Held on its branch (a301cbe0..07849f85), see row 22. Stage 1 cut the creator lull 2441 → 623 ms and the recipient lull 1253 → 466 ms; the target needs stage 2. No decision deleted anything the existing planner keeps. |
 | 21 | Track N: stop each recipient's issuance store growing 3 issued and 3 outbox rows per epoch, and make the Grid's proof-event budget scale with rollovers. | User | Unbounded growth with room age violates G1. R3 found it; it predates this work. | 60161b4a..7464f875, merged after verification. A Writer recipient never closes, so its cleanup always stopped at the cold-material guard before the issuance drain. It now drains its own classified, published, settled prefix through the existing authenticated pruner when its completed retirement decisions match, with no generation effect. Recipients stay flat at 13 rows from epoch 5 through 16 on both paths. |
 | 22 | Hold Track M: fix its crash bug first, then merge. | User | Its 14f case 8 breaks G3 and G14 on the opt-in path on all three engines: a SIGKILL between a creator boundary's two decisions leaves the signing control without a summary source, and maintenance then halts. The main branch must not carry a known guarantee break. | Track M stayed on its branch until Track O's fix; both merged in 8c61863e (row 24). |
-| 23 | Start Tracks O, M2, P and Q in parallel. | User | O: the case 8 fix. M2: 14b stage 2, the in-memory ledger that removes the ~282 ms cold acquisition per boundary. P and Q fix two problems Track M found on every path: Canvas issuance grows one row per move with an O(outbox) issue cost (829 ms → 6.7 s per move by epoch 16), and the shipped Canvas and Chat creators never run their lull, so retirement runs inline at seal (about 2.7 s). | O merged with M (row 24). P merged (row 27). Q held (row 25). M2 in progress. |
+| 23 | Start Tracks O, M2, P and Q in parallel. | User | O: the case 8 fix. M2: 14b stage 2, the in-memory ledger that removes the ~282 ms cold acquisition per boundary. P and Q fix two problems Track M found on every path: Canvas issuance grows one row per move with an O(outbox) issue cost (829 ms → 6.7 s per move by epoch 16), and the shipped Canvas and Chat creators never run their lull, so retirement runs inline at seal (about 2.7 s). | O merged with M (row 24). P merged (row 27). Q held (row 25). M2 merged (row 29). |
 | 24 | Accept Track O's 14b/14e amendment, and merge Tracks M and O together. | User | O's fix makes each boundary one decision, with one epoch's signing evidence and summaries as one unit, in a fixed unit order. A crash or refusal between continuations then resumes from a fresh acquisition (G3, G14). Track M's suggested fix left a second split point open. | Merge 8c61863e, after verification on O's head: typecheck 0, 13 room test files passing, the proof-accounting test file identical to the main branch, and 14f case 8 passing with a real SIGKILL. |
 | 25 | Hold Track Q. | Coordinator | Its Canvas and Chat resource bounds work (seal 0.07–0.14x of before), but running the lull exposes a pre-existing bug. A persisted reopen right after the creator's first maintained lull is refused with `floor-stale` (a stored signing-summary resume-basis digest differs on resume, CRD:19350). R3's 4-rollover room test now reaches it and fails. The Grid hits the same bug when reopened at epoch 4. | Not merged until the bug is fixed |
 | 26 | Track S: fix the reopen right after the first maintained lull, on the shared path; Track Q then rebases onto it. | User | The bug predates this work and also affects the Grid; it blocks Track Q. | In progress |
 | 27 | Merge Track P's per-move fix, and keep its storage assertion red until the user decides how Canvas issuance is retired. | Coordinator | Each hot successor wrapped its source's issuance facade in one more facade, so one recovery read went through s - 1 facades at epoch s. A successor now wraps its source's native store, the same structure a reopen builds. Creator outbox page reads per move went from 54 at epoch 8 and 103 at epoch 15 to a constant 10; the Writer recipient's went to a constant 2. | Merge a3f3f6b0 (8ed37d08..47a936fe), after verification on the merged tree: typecheck 0, Track M and O's room tests passing (38 of 38), and Tracks K, L, N and R3's native tests passing. Track P's per-test suite diff against its base shows no new failures. |
 | 28 | Canvas issuance: give the shipped apps the settlement profile (R-A), for shipped Canvas, the Grid example and the v3-chat demo. Do not write a deletion rule for the legacy profile (R-B). Track T makes the switch. | User | Track P found a spec gap: every issuance deleter requires a settlement profile, so `creator-trusted-v1` keeps every row it issues. At 20 moves per epoch a Canvas creator was refused in epoch 17. The library has no users yet, so changing the shipped profile breaks no one. R-A reuses the reviewed settlement retirement; R-B would need a new spec slice, conformance tests on both native owners and three-engine SIGKILL evidence. The latency bench already runs the settlement profile, so its flat Grid storage did not cover the shipped Grid example. | In progress. Track P's test is the acceptance test; Track T may change only where its profile comes from, not its assertions. The legacy profile keeps its behaviour and is documented as growing. |
+| 29 | Merge Track M2, the verified-fact ledger (14b stage 2), on the opt-in room path. | Coordinator | Steady lull against Track O's head (3 interleaved pairs per mode): creator 632.5 → 441.6 ms, recipient 490.6 → 251.9 ms. Its decisions equal stage 1's in every shadow and applied-twin comparison, and the 14f native cases pass on three engines with ledger-decided boundaries killed. Nothing changes on the default path. | Merge e0494c5a (111889d6..262f5fa5), after verification on the merged tree: typecheck 0, the ledger, Track M, Track O and Tracks K, L, N and R3's tests passing, Track P's storage assertion still red by design, and the pinned source test failing exactly as at base. The ≤ 100 ms target is not met; readiness capture (~160 ms) needs its own slice. |
+| 30 | Track U: settle Track M2's two open measurement questions. Are seal and adoption slower with the ledger in LULL=1 mode? What is the residual heap growth in 100-rollover runs? | User | With the ledger, LULL=1 seal (×1.04–1.54) and adoption (×1.03–1.14) were slower in all three pairs, though neither path runs ledger code. Concurrent mode showed no direction. The heap still grows 0.36 MB per epoch on both stage 1 and the ledger once the harness drops most of its proof events; nobody knows what grows. Both must be answered before the room path can become the default. | In progress |
 
 ## Commits
 
@@ -178,6 +184,16 @@ repository owner made. "Coordinator" marks a recommendation that was then carrie
 | 28e34f80 | fix: a successor filters its source's original issuance store, not its facade |
 | 47a936fe | docs: record the Track P result |
 | a3f3f6b0 | Merge Track P: a successor filters its source's native issuance store |
+| 093a367f | docs: record merging Track P and starting Track T for the shipped apps' profile |
+| 111889d6 | test(track-m2): RED for the 14b stage-2 verified-fact ledger on the room retention path |
+| 3794be41 | feat(track-m2): 14b stage 2, the verified-fact ledger on the room retention path |
+| 42f21f29 | test(track-m2): correct three RED premises and the applied-twins oracle |
+| 1582ef8c | test(track-m2): the ledger on Track O's split points, and on Canvas |
+| 84f50751 | fix(track-m2): drop the ledger before a refused pass reports (14f case 2) |
+| f30bad5a | test(track-m): keep the decision's source in the 14f evidence (measurement only) |
+| 2908fc79 | test(grid): retain only named proof-event kinds for endurance heap (measurement only) |
+| 262f5fa5 | docs(track-m2): result of the verified-fact ledger (slice 14b stage 2) |
+| e0494c5a | Merge Track M2: the verified-fact ledger on the opt-in room retention path |
 
 The commit messages hold the detailed explanation and the measurements for each change.
 
@@ -214,11 +230,12 @@ that track's working documents.
 | [25](tracks/25-track-o-retention-crash-resume/README.md) | Track O: crash resume on the retention path (14f case 8) | c6eff8e7..099db6ce, merged in 8c61863e |
 | [26](tracks/26-track-p-canvas-issuance-growth/README.md) | Track P: Canvas issuance growth and O(outbox) issue cost | 8ed37d08..47a936fe, merged in a3f3f6b0; storage growth left to Track T (row 28) |
 | 27 | Track Q: Canvas and Chat lull | Held (row 25) |
-| 28 | Track M2: verified-fact ledger (14b stage 2) | In progress |
+| [28](tracks/28-track-m2-verified-fact-ledger/README.md) | Track M2: verified-fact ledger (14b stage 2) | 111889d6..262f5fa5, merged in e0494c5a |
 | 29 | Track S: reopen right after the first maintained lull | In progress |
 | 30 | Track T: the settlement profile for the shipped apps | In progress |
+| 31 | Track U: lull-mode seal and adoption, and the residual heap slope | In progress |
 
-Folders 27 to 30 land with their branches.
+Folders 27, 29, 30 and 31 land with their branches.
 
 ## Reading the records
 
@@ -259,9 +276,15 @@ Notes:
 
 ## Open items
 
-- **Retention path (Tracks M and O, merged opt-in):** the creator lull is about 4x shorter. The ≤ 100 ms target needs
-  stage 2 (Track M2, in progress). Before the room database with retention can become the default:
-  - stage 2;
+- **Retention path (Tracks M, O and M2, merged opt-in):** the steady creator lull is 442 ms and the recipient's
+  252 ms, against 2,441 ms and 1,253 ms without retention in Track M's pairs. The ≤ 100 ms target is not met. The creator lull
+  is now mostly readiness capture (~160 ms) and the planner's read pass (~125 ms); readiness capture needs its own
+  slice, and cutting the read pass (facts recorded at arrival, or one read shared with step B) is a new design
+  decision. Before the room database with retention can become the default:
+  - Track U's answers: LULL=1 seal and adoption were slower with the ledger in all three pairs, and the heap grows
+    0.36 MB per epoch on both stage 1 and the ledger for reasons not yet attributed;
+  - seal-time retention still runs stage 1, so creators without an ordinary resource bound (shipped Canvas and
+    Chat until Track Q lands) get no gain at seal;
   - wire 14c's per-owner floor fences into the node, and build 14d migration;
   - review the 512-write cap; a committee of more than about 85 signers makes one signing unit exceed it, and that
     boundary falls back to the existing path;
