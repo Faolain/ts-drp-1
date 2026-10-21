@@ -119,6 +119,7 @@ repository owner made. "Coordinator" marks a recommendation that was then carrie
 | 44 | Track Y's ceilings: keep the canonical hash memo at 32 MiB and 32,768 entries; lower the trust-record verdicts to 128 entries and 262,144 characters, the ed25519 verify memo to 2,048 entries and the closure digests to 512 entries. | User | Each cache is a pure speed-up: its key is the exact input bytes, and an eviction only makes the work run again (Track Y's map, with shadow-mode checks finding 0 mismatches). None of the three lowered caches lost a hit in any measured run. Keeping the hash memo full avoids any re-hashing cost, including on Node hosts serving several rooms. With the transition-memo trim (row 41), a client's caches at their ceilings go from about 64.5 MB to about 42 MB. | In progress (Track Y) |
 | 45 | Track X continues: on the settlement profile, the creator's startup readiness preparation must not wait for a subscriber, so the first placement after a join takes the warm path. Then Track V's held Grid switch merges with d9346 unchanged. | User | Track X found that the startup barrier publishes accepted rows before it prepares readiness, and publishing waits for a subscriber, so the first placement after a join waits up to about 1.5 s. Amending the d9346 assertion would have accepted that wait. | In progress (Track X) |
 | 46 | Track Z: new rooms use the room database with retention, and the lull where the app supports it, by default. Existing rooms keep the host they were created on, with no migration. First attribute the shipped pages' seal, adoption and install, and show what the flip buys, before building it. | User | With real networking, the shipped pages' creator seal takes 3–9 s (Track X), and the bench's default mode seals in about 3.4 s against about 0.26 s on the opt-in path. The shipped examples never opt in. No migration follows row 28 (R-A): the library has no users yet. | After Track X merges |
+| 47 | Merge Track Y: the transition memo keeps a room's newest two epochs, and the owner's three lowered ceilings (row 44). | Coordinator | Every cache is a pure speed-up: the key is the exact input bytes, a hit compares every byte, and eviction only makes the work run again; shadow-mode checks found 0 mismatches over about 4.2M hits. Transition-memo hits are only ever on the current or previous epoch, so keeping two loses none. A client's caches at their ceilings drop from about 64.5 MB to about 41.7 MB. Over 256 Grid rollovers all memory grows 0.013 MB per epoch late (base 0.202), and at e250 each client holds about 18.7 MB less. Paired latency is unchanged within the same-build control. The three RED tests that count signature checks give the same counts. | Merge 6d0b15ce (6bbd0aac..2ed095ac), after verification on main: typecheck 0, the new RED and the canonical, storage, room and Canvas/Chat tests passing, the three signature-count RED tests failing exactly as at base, Grid runs passing in LULL=1, concurrent (room database and retention) and default modes, Track M's browser long room and the Canvas/Chat e2e passing. |
 
 ## Commits
 
@@ -243,6 +244,21 @@ repository owner made. "Coordinator" marks a recommendation that was then carrie
 | 470392f2 | test(track-m-apps): per-epoch heap and heap snapshots in the browser long room (measurement only) |
 | 0711a8fb | docs(track-u): result of the lull seal/adoption and endurance heap questions |
 | d60a08af | Merge Track U: lull-mode seal and adoption, and the residual heap slope |
+| 97fff267 | docs: record merging Track U |
+| 760607d9 | docs: record starting Track Y for the library cache memory budget |
+| af342318 | docs: record the owner's decisions on Chat's window, cache ceilings, startup order and the default path |
+| 6bbd0aac | test(track-y): cache probe for the library's five in-memory caches (measurement only) |
+| 333a7744 | test(track-y): RED, the transition memo keeps a constant number of epochs per room |
+| b74b7807 | test(track-y): RED collector check takes its weak references in a synchronous frame |
+| a3891f11 | perf(node): the transition memo keeps only a room's newest two epochs |
+| 5c49dd8e | perf(protocol-v3): trust-record verdict memo holds 128 records / 262,144 key characters |
+| 8f77597e | perf(protocol-v3): ed25519 verify memo holds 2,048 entries |
+| 0702f6c5 | perf(storage): closure digest memo holds 512 entries |
+| 88b29074 | test(track-y): explicit STARTUP_HEALTHY_GRID_ENDURANCE_MAX opt-in for Grid endurance runs past 128 rollovers |
+| 00efcc53 | test(track-y): residency-only cache probe for endurance runs (measurement only) |
+| 864cc983 | test(track-y): Node long-room probe runner records the heap after a forced GC (measurement only) |
+| 2ed095ac | docs(track-y): result of trimming the library caches and sizing their ceilings |
+| 6d0b15ce | Merge Track Y: trim the transition memo and lower three cache ceilings |
 
 The commit messages hold the detailed explanation and the measurements for each change.
 
@@ -286,10 +302,10 @@ that track's working documents.
 | [32](tracks/32-track-v-settlement-for-grid-and-chat/README.md) | Track V: the settlement profile for the Grid example and the v3-chat demo | Stopped: Grid switch held (row 36); harness and RESULT.md on main |
 | 33 | Track W: a rolling window and a local archive for shipped Chat | In progress |
 | 34 | Track X: the settlement fence delivery stall | In progress |
-| 35 | Track Y: trim the library caches and size their ceilings | In progress |
+| [35](tracks/35-track-y-cache-memory/README.md) | Track Y: trim the library caches and size their ceilings | 6bbd0aac..2ed095ac, merged in 6d0b15ce |
 | 36 | Track Z: the room database by default for new rooms | Not started (after Track X) |
 
-Folders 33 to 36 land with their branches.
+Folders 33, 34 and 36 land with their branches.
 
 ## Reading the records
 
@@ -343,12 +359,10 @@ Notes:
   - re-measure recipient-lull issue latency (102 → 122 ms p50 in Track M's pairs) and the heap in a fresh process;
   - the owners of the node tests that evaluate original CRD and v3-live.ts source text must review them, because a
     default flip changes that text.
-- **Library cache memory (Track U):** the caches that still fill late in a long room all have constant ceilings, but
-  at those ceilings a client carries about 37 MB of canonical hash memo, 17 MB of transition memo (full around
-  epoch 190) and 2 MB of trust-record keys. Old-epoch transition entries are probably dead weight. Pruning the
-  transition memo by epoch, or lowering the hash-memo or trust-verdict ceilings, is a memory-budget decision. The
-  plateau is projected, not observed, because the harness allows at most 128 rollovers. Track Y is measuring
-  and trimming (row 41).
+- **Library cache memory (Tracks U and Y):** settled by Track Y (rows 44 and 47). At their ceilings a client's caches
+  hold about 41.7 MB, most of it the canonical hash memo the owner kept at 32 MiB (about 40.6 MB); 8 MiB would save
+  about 30 MB for a few ms per 256 epochs, if a memory budget ever needs it. Node hosts share one set of caches per
+  process across rooms, which is unmeasured with many active rooms. Chat's browser plateau needs Track W's window.
 - **Left open by Track S** (details in its [RESULT.md](tracks/29-track-s-first-lull-reopen/RESULT.md)): the first
   maintained boundary now writes one classification-only decision instead of a no-op replay (+35 to +63 ms in that
   lull in single runs). No SIGKILL case covers a crash inside that install, and the Grid reopen runs were Chromium
