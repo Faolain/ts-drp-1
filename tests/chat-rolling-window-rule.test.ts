@@ -1,5 +1,4 @@
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
-import { canonicalCarrierResourceForSizing } from "@ts-drp/canonical/resource";
 import { describe, expect, it } from "vitest";
 
 import { openShippingChatCatalogs } from "../examples/chat/src/chat-catalogs.js";
@@ -56,24 +55,6 @@ const operationOf = (value: ShippingChatMessage) => ({
 	displayTimeMs: value.displayTimeMs,
 	text: value.text,
 });
-
-interface GenesisState {
-	readonly version: number;
-	readonly messages: readonly unknown[];
-	readonly capacity: { readonly version: 1; readonly basisObjectId: string; allocations: [string, number, number][] };
-}
-/** The empty state with every row at the budget's width, two bytes of count framing, and the shares. */
-const splitTotal = (state: GenesisState, budget: number): number =>
-	encodeCanonical({
-		...state,
-		messages: [],
-		capacity: {
-			...state.capacity,
-			allocations: state.capacity.allocations.map(([author, , epoch]) => [author, budget, epoch]),
-		},
-	}).byteLength +
-	2 +
-	state.capacity.allocations.reduce((sum, [, ceiling]) => sum + ceiling, 0);
 
 /** A version-4 state with explicit ceilings (rows sorted by author). */
 function windowState(ceilings: readonly (readonly [string, number])[], messages: readonly ShippingChatMessage[] = []) {
@@ -165,25 +146,12 @@ describe("Track W: Chat's new-room window format", () => {
 		// Rooms whose genesis signed v3 keep it, byte for byte.
 		expect(catalogs.lifetime.blueprintDigest).toBe("61ab694a75cab170e0f2202a9f0f712a683d5f166334e59f8fdf0d4e43df065f");
 		expect(catalogs.lifetime.catalog.resolve(catalogs.lifetime.blueprintDigest).artifactId).toBe("v3-shipping-chat.v3");
-		// The window's own budget (65,536 bytes, owner review 2026-10-21) split equally among the
-		// genesis roster, by the rule the lifetime format splits its unchanged 32,768: the empty
-		// state with maximum-width rows, two bytes of count framing and the shares make exactly
-		// the budget, and the shares differ by at most one byte.
-		const v3 = decodeCanonical(
-			createShippingChatGenesisStateBytes({ exactCanonicalLatchedAclBytes: aclBytes(0) })
-		) as GenesisState;
+		// Same equal split of the same budget, now as a window share.
+		const v3 = decodeCanonical(createShippingChatGenesisStateBytes({ exactCanonicalLatchedAclBytes: aclBytes(0) }));
 		const v4 = decodeCanonical(
 			createShippingChatWindowGenesisStateBytes({ exactCanonicalLatchedAclBytes: aclBytes(0) })
-		) as GenesisState;
-		expect(v4).toMatchObject({ version: 4, messages: [], capacity: { version: 1, basisObjectId: OBJECT } });
-		expect(v3.capacity.allocations.map(([, ceiling]) => ceiling)).toEqual([10_814, 10_813, 10_813]);
-		expect(v4.capacity.allocations).toEqual([
-			[A, 21_736, 0],
-			[B, 21_736, 0],
-			[C, 21_736, 0],
-		]);
-		expect(splitTotal(v3, 32_768)).toBe(32_768);
-		expect(splitTotal(v4, 65_536)).toBe(65_536);
+		);
+		expect(v4).toEqual({ ...(v3 as object), version: 4 });
 		const lifetime = await createShippingV3ChatApplication({
 			catalog: catalogs.lifetime.catalog,
 			blueprintDigest: catalogs.lifetime.blueprintDigest,
@@ -444,12 +412,8 @@ describe("Track W: Chat's new-room window format", () => {
 	it("the window state refuses what the format forbids, and a window room inherits no lifetime state", async () => {
 		const one = message(A, "one", "first");
 		expect(() => windowState([[A, size(one) - 1]], [one])).toThrow();
-		expect(() => windowState([[A, 65_536]])).toThrow();
+		expect(() => windowState([[A, 32_768]])).toThrow();
 		expect(() => windowState([[A, 1_000]], [one, one])).toThrow();
-		// A share may exceed the lifetime format's whole 32 KiB budget, and the reducer keeps what it holds.
-		const big = [message(A, "big-1", "x".repeat(20_000)), message(A, "big-2", "y".repeat(20_000))];
-		const large = windowState([[A, size(required(big[0])) + size(required(big[1]))]]);
-		expect(windowIdentities(await windowApplication(), large, big)).toEqual(big.map(identity));
 		expect(() =>
 			restoreShippingChatWindowState(
 				createShippingChatGenesisStateBytes({ exactCanonicalLatchedAclBytes: aclBytes(0) })
@@ -521,11 +485,9 @@ describe("Track W: Chat's new-room window format", () => {
 		});
 		const input = (catalog = entry(catalogs.window), bases: readonly Uint8Array[] = [genesis, fullState]) =>
 			({ catalog, material: material(bases) }) as unknown as Parameters<typeof read>[0];
-		// The window's own value (for owner review; the lifetime format keeps Track Q's approved
-		// {32768, 16384, 16}): the widest state the window's capture admits, per dimension (the
-		// next test shows each is reached and none exceeded). Every window state fits it.
-		expect(read(input())).toEqual({ byteLength: 65_535, items: 9_503, maxDepth: 4 });
-		expect(fullState.byteLength).toBeLessThanOrEqual(65_535);
+		// The same value as the lifetime format (approved 2026-10-20), and every window state fits it.
+		expect(read(input())).toEqual({ byteLength: 32_768, items: 16_384, maxDepth: 16 });
+		expect(fullState.byteLength).toBeLessThanOrEqual(32_768);
 		// The lifetime catalog entry, a lifetime state, or a tampered window state: no bound.
 		expect(read(input(entry(catalogs.lifetime)))).toBeUndefined();
 		expect(
@@ -538,151 +500,7 @@ describe("Track W: Chat's new-room window format", () => {
 		expect(read(input(entry(catalogs.window), [Uint8Array.of(...fullState, 0)]))).toBeUndefined();
 		expect(read(input(entry(catalogs.window), []))).toBeUndefined();
 	});
-
-	it("the window's bound is exact: a witness reaches each dimension, and no state its capture admits exceeds one", () => {
-		const footprint = (bytes: Uint8Array): ReturnType<typeof canonicalCarrierResourceForSizing> =>
-			canonicalCarrierResourceForSizing(bytes, 16, { maxBytes: 65_536, maxItems: 16_384, maxDepth: 16 }, "exact");
-		// Bytes: the genesis shares, each filled exactly by its member, with at least 128 messages
-		// (the messages count takes its second byte): one byte under the 65,536-byte budget.
-		const genesis = decodeCanonical(
-			createShippingChatWindowGenesisStateBytes({ exactCanonicalLatchedAclBytes: aclBytes(0) })
-		) as GenesisState;
-		const filled = genesis.capacity.allocations.flatMap(([author, ceiling]) => fillExactly(author, ceiling));
-		expect(filled.length).toBeGreaterThanOrEqual(128);
-		const widest = shippingChatWindowStateBytes({ version: 4, messages: filled, capacity: genesis.capacity });
-		expect(widest.byteLength).toBe(65_535);
-		// Depth: state, capacity, allocations, row.
-		expect(footprint(widest).maxDepth).toBe(4);
-		// Items: an exhaustive search over the capture's rules finds the most items any admitted
-		// state can have, and the window's capture admits the state it finds.
-		const search = widestByItems(65_536);
-		expect(search.items).toBe(9_503);
-		const witness = itemsWitness(search.messagesPerMember);
-		const bytes = shippingChatWindowStateBytes(witness);
-		expect(footprint(bytes)).toEqual({ byteLength: bytes.byteLength, items: 9_503, maxDepth: 4 });
-		// One more smallest message is refused: over its member's share, or, with the share raised
-		// to hold it, over the budget.
-		const first = required(witness.capacity.allocations[0]);
-		const extra = smallestMessage(first[0], required(search.messagesPerMember[0]));
-		const messages = [...witness.messages, extra];
-		expect(() => shippingChatWindowStateBytes({ ...witness, messages })).toThrow();
-		const raised = [[first[0], first[1] + size(extra), first[2]], ...witness.capacity.allocations.slice(1)];
-		expect(() =>
-			shippingChatWindowStateBytes({ ...witness, messages, capacity: { ...witness.capacity, allocations: raised } })
-		).toThrow();
-	});
 });
-
-// The capture's identity alphabet (`[A-Za-z0-9._:-]`): 66 one-character identities per member.
-const IDENTITY_CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._:-";
-const memberAuthor = (index: number): string => index.toString(16).padStart(64, "0");
-/** A member's `index`th smallest message: shortest new identity, one-character text, display time 0. */
-function smallestMessage(author: string, index: number): ShippingChatMessage {
-	const n = IDENTITY_CHARACTERS.length;
-	const id =
-		index < n
-			? required(IDENTITY_CHARACTERS[index])
-			: required(IDENTITY_CHARACTERS[Math.floor((index - n) / n)]) + required(IDENTITY_CHARACTERS[(index - n) % n]);
-	return message(author, id, "x", 0);
-}
-/** Messages of `author` whose records sum to exactly `ceiling` bytes (200, then two of 150-250). */
-function fillExactly(author: string, ceiling: number): ShippingChatMessage[] {
-	const make = (index: number, bytes: number): ShippingChatMessage => {
-		const id = `f-${String(index).padStart(4, "0")}`;
-		// Text of up to 127 characters: its length takes one byte, so each character is one byte.
-		const base = size(message(author, id, "x")) - 2;
-		return message(author, id, "x".repeat(bytes - base - 1));
-	};
-	const rows: ShippingChatMessage[] = [];
-	let left = ceiling;
-	for (; left > 500; left -= 200) rows.push(make(rows.length, 200));
-	const half = Math.floor(left / 2);
-	rows.push(make(rows.length, half), make(rows.length + 1, left - half));
-	expect(rows.reduce((sum, row) => sum + size(row), 0)).toBe(ceiling);
-	return rows;
-}
-interface WitnessState {
-	readonly version: 4;
-	readonly messages: ShippingChatMessage[];
-	readonly capacity: { readonly version: 1; readonly basisObjectId: string; allocations: [string, number, number][] };
-}
-const emptyState = (allocations: readonly (readonly [string, number, number])[]): WitnessState => ({
-	version: 4,
-	messages: [],
-	capacity: {
-		version: 1 as const,
-		basisObjectId: "x",
-		allocations: allocations.map(([author, ceiling, epoch]): [string, number, number] => [author, ceiling, epoch]),
-	},
-});
-const itemsOf = (value: unknown): number =>
-	canonicalCarrierResourceForSizing(encodeCanonical(value), 16, { maxBytes: 65_536, maxItems: 16_384, maxDepth: 16 })
-		.items;
-/** The smallest charge of a member holding `count` messages (its `count` smallest). */
-function smallestCharge(count: number): number {
-	let charge = 0;
-	for (let index = 0; index < count; index++) charge += size(smallestMessage(memberAuthor(1), index));
-	return charge;
-}
-/**
- * The most decoder items of any state the window's capture admits within `budget`, by an
- * exhaustive search over the capture's rules, independent of the product: every member is a
- * distinct author with one row; a member's messages have distinct identities and charge at most
- * the member's ceiling; the empty state (shortest basis), two bytes of count framing and every
- * ceiling fit the budget. A member holding k messages costs its row plus its k smallest records
- * (ceiling = charge), and is worth its row's and messages' items; the search is an unbounded
- * knapsack over members.
- */
-function widestByItems(budget: number): Readonly<{ items: number; messagesPerMember: readonly number[] }> {
-	const empty = emptyState([]);
-	const room = budget - 2 - encodeCanonical(empty).byteLength;
-	const rowItems = itemsOf(emptyState([[memberAuthor(1), 0, 0]])) - itemsOf(empty);
-	const messageItems =
-		itemsOf({ ...emptyState([[memberAuthor(1), 1_000, 0]]), messages: [smallestMessage(memberAuthor(1), 0)] }) -
-		itemsOf(emptyState([[memberAuthor(1), 1_000, 0]]));
-	const options: { count: number; cost: number; value: number }[] = [];
-	for (let count = 0; ; count++) {
-		const charge = smallestCharge(count);
-		const cost = encodeCanonical([memberAuthor(1), charge, 0]).byteLength + charge;
-		if (cost > room) break;
-		options.push({ count, cost, value: rowItems + count * messageItems });
-	}
-	const best = new Int32Array(room + 1);
-	const pick = new Int32Array(room + 1).fill(-1);
-	for (let bytes = 1; bytes <= room; bytes++) {
-		best[bytes] = required(best[bytes - 1]);
-		for (let index = 0; index < options.length; index++) {
-			const option = required(options[index]);
-			if (option.cost > bytes) break;
-			const value = required(best[bytes - option.cost]) + option.value;
-			if (value > required(best[bytes])) {
-				best[bytes] = value;
-				pick[bytes] = index;
-			}
-		}
-	}
-	const messagesPerMember: number[] = [];
-	for (let bytes = room; bytes > 0; ) {
-		const index = required(pick[bytes]);
-		if (index < 0) bytes -= 1;
-		else {
-			const option = required(options[index]);
-			messagesPerMember.push(option.count);
-			bytes -= option.cost;
-		}
-	}
-	return { items: itemsOf(empty) + required(best[room]), messagesPerMember };
-}
-/** The state the search found: member i holds its `perMember[i]` smallest messages at ceiling = charge. */
-function itemsWitness(perMember: readonly number[]): WitnessState {
-	const state = emptyState(perMember.map((count, index) => [memberAuthor(index + 1), smallestCharge(count), 0]));
-	return {
-		...state,
-		messages: perMember.flatMap((count, index) =>
-			Array.from({ length: count }, (_, ordinal) => smallestMessage(memberAuthor(index + 1), ordinal))
-		),
-	};
-}
 
 function required<Value>(value: Value | undefined): Value {
 	if (value === undefined) throw new TypeError("CHAT_WINDOW_RULE_REQUIRED");

@@ -105,7 +105,7 @@ function captureCapacity(value) {
 			typeof row[1] !== "number" ||
 			row[1] % 1 !== 0 ||
 			row[1] < 0 ||
-			row[1] > 65536 ||
+			row[1] > 32768 ||
 			typeof row[2] !== "number" ||
 			row[2] % 1 !== 0 ||
 			row[2] < 0 ||
