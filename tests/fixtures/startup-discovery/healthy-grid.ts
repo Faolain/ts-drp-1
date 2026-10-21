@@ -388,7 +388,12 @@ export async function runHealthyGrid(identity:string,origins:readonly string[],r
  // rollovers, measurement only) scale it with the rollovers like the test deadline.
  const fixtureWaitDeadline=Date.now()+(rollovers>32?rollovers*30_000:360_000);
  check(origins.length===4&&new Set(origins).size===4,"four independent native storage origins required");
- check(rollovers===4||rollovers===5||(Number.isSafeInteger(rollovers)&&rollovers>=8&&rollovers<=128),"bounded native full-pool extension only");
+ // Past 128 rollovers (measurement only) only with the spec's explicit STARTUP_HEALTHY_GRID_ENDURANCE_MAX opt-in,
+ // handed to this realm as __r8EnduranceMax (129 to 1024). Unset, the check is unchanged for every value.
+ const enduranceMax=Reflect.get(globalThis,"__r8EnduranceMax");
+ const enduranceExtended=typeof enduranceMax==="number"&&Number.isSafeInteger(enduranceMax)&&enduranceMax>128&&enduranceMax<=1024&&
+  Number.isSafeInteger(rollovers)&&rollovers>128&&rollovers<=enduranceMax;
+ check(enduranceExtended||rollovers===4||rollovers===5||(Number.isSafeInteger(rollovers)&&rollovers>=8&&rollovers<=128),"bounded native full-pool extension only");
  check(profileId==="creator-trusted-settlement-v1"||profileId==="creator-trusted-v1","existing creator profile required");
  const {members,application}=gridCorpus(identity),ids=members.slice(0,4).map(row=>row.peerId);
  const objectId="creator:"+hex(hashDomain("ts-drp/healthy-native-grid/v1",new TextEncoder().encode(identity))).slice(0,32);

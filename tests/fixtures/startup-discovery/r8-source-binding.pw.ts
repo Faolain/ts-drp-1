@@ -172,6 +172,13 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
  // Endurance runs (more than 32 rollovers) scale the per-role delivery telemetry bound the same way.
  const deliveryRollovers=Number(process.env.STARTUP_HEALTHY_GRID_ROLLOVERS??4),deliveryObservationBound=deliveryRollovers>32?32*(deliveryRollovers+1):1024;
  await page.context().addInitScript(value=>Reflect.set(globalThis,"__r8DeliveryObservationBound",value),deliveryObservationBound);
+ // Measurement only (Track Y): STARTUP_HEALTHY_GRID_ENDURANCE_MAX is a separately named, explicit opt-in for endurance
+ // runs past 128 rollovers: an integer from 129 to 1024, and the run's rollovers must not exceed it. Unset by default;
+ // unset, the rollover checks below and in healthy-grid.ts are unchanged for every value.
+ const enduranceMaxText=process.env.STARTUP_HEALTHY_GRID_ENDURANCE_MAX;
+ const enduranceMax=enduranceMaxText===undefined?undefined:Number(enduranceMaxText);
+ if(enduranceMax!==undefined&&!(Number.isSafeInteger(enduranceMax)&&enduranceMax>128&&enduranceMax<=1024))throw new Error("endurance max must be an explicit integer from 129 to 1024");
+ if(enduranceMax!==undefined)await page.context().addInitScript(value=>Reflect.set(globalThis,"__r8EnduranceMax",value),enduranceMax);
  const clients:Awaited<ReturnType<typeof server>>[]=[];
  for(let index=0;index<4;index++)clients.push(await server(directory));
  await page.goto(local.origin+"/r8-source-binding");
@@ -193,7 +200,9 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
  // Default acceptance workload/deadline and all per-transition assertions stay.
  // Endurance (measurement only): up to 128 rollovers, with the test deadline and the
  // diagnostic checkpoint timers scaled by the rollovers; at most 32 is unchanged.
- if(rollovers!==4&&rollovers!==5&&!(Number.isSafeInteger(rollovers)&&rollovers>=8&&rollovers<=128))throw new Error("bounded native pool-turnover extension required");
+ // Past 128 only with the explicit STARTUP_HEALTHY_GRID_ENDURANCE_MAX opt-in above.
+ const enduranceExtended=enduranceMax!==undefined&&Number.isSafeInteger(rollovers)&&rollovers>128&&rollovers<=enduranceMax;
+ if(!enduranceExtended&&rollovers!==4&&rollovers!==5&&!(Number.isSafeInteger(rollovers)&&rollovers>=8&&rollovers<=128))throw new Error("bounded native pool-turnover extension required");
  const enduranceDeadline=rollovers>32?rollovers*30_000:undefined;
  if(enduranceDeadline!==undefined)test.setTimeout(enduranceDeadline);
  if(suspendHealthyGrid&&rollovers!==5)throw new Error("suspension must exercise the original full-pool recipient turnover");
