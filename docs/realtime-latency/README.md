@@ -120,6 +120,8 @@ repository owner made. "Coordinator" marks a recommendation that was then carrie
 | 45 | Track X continues: on the settlement profile, the creator's startup readiness preparation must not wait for a subscriber, so the first placement after a join takes the warm path. Then Track V's held Grid switch merges with d9346 unchanged. | User | Track X found that the startup barrier publishes accepted rows before it prepares readiness, and publishing waits for a subscriber, so the first placement after a join waits up to about 1.5 s. Amending the d9346 assertion would have accepted that wait. | In progress (Track X) |
 | 46 | Track Z: new rooms use the room database with retention, and the lull where the app supports it, by default. Existing rooms keep the host they were created on, with no migration. First attribute the shipped pages' seal, adoption and install, and show what the flip buys, before building it. | User | With real networking, the shipped pages' creator seal takes 3–9 s (Track X), and the bench's default mode seals in about 3.4 s against about 0.26 s on the opt-in path. The shipped examples never opt in. No migration follows row 28 (R-A): the library has no users yet. | After Track X merges |
 | 47 | Merge Track Y: the transition memo keeps a room's newest two epochs, and the owner's three lowered ceilings (row 44). | Coordinator | Every cache is a pure speed-up: the key is the exact input bytes, a hit compares every byte, and eviction only makes the work run again; shadow-mode checks found 0 mismatches over about 4.2M hits. Transition-memo hits are only ever on the current or previous epoch, so keeping two loses none. A client's caches at their ceilings drop from about 64.5 MB to about 41.7 MB. Over 256 Grid rollovers all memory grows 0.013 MB per epoch late (base 0.202), and at e250 each client holds about 18.7 MB less. Paired latency is unchanged within the same-build control. The three RED tests that count signature checks give the same counts. | Merge 6d0b15ce (6bbd0aac..2ed095ac), after verification on main: typecheck 0, the new RED and the canonical, storage, room and Canvas/Chat tests passing, the three signature-count RED tests failing exactly as at base, Grid runs passing in LULL=1, concurrent (room database and retention) and default modes, Track M's browser long room and the Canvas/Chat e2e passing. |
+| 48 | Merge Track X's fix: a recipient that holds an authenticated vertex with a missing dependency asks the creator for retained history (at most once a second per room, and once after each install); the issuance census accepts a migrated Writer's inherited plan; a direct send that never completes cannot hold a room (10 s deadline). Track X's startup-readiness RED stays on its branch with that work. | Coordinator | Root cause: the creator's settlement fence is gossiped at adoption, reaches a recipient before its install and is dropped, and nothing asked for it again; only the retained-request ticks scheduled at open repaired it, so the stall followed the tick count and always hit epoch 5. Shipped Canvas and Chat on main stalled there, and Chat already did at 3c5bb123. The census refused the plan the room itself writes for a migrated Writer, so the joiner could never open its zone (d9346 line 908). With the fix, the creator's first move of each epoch reaches the recipient in 6–203 ms (before: 1.9–3.9 s, then never). | Merge cf6d306f (f2d301d5 merged, then 65505659..cf6d306f picked: the fixture half of 9b6b5f3f and 270c7068..e26cd812), after verification on main with Track Y: typecheck 0; Track X's four RED files passing, the fence RED 3 more times; every room and Canvas/Chat test passing; Grid bench in LULL=1 and concurrent; Chat and Canvas over real networking 16/16; Canvas/Chat e2e 9/9; Grid with Track V's switch 16/16 in the earlier check. A Canvas run in that earlier check hung at the creator's epoch-3 seal. That is a seal deadlock on IndexedDB that predates the fix (base 2 of 30 under a request storm); Track X is fixing it next (row 49). |
+| 49 | Track X fixes the seal deadlock by staging the snapshot before `close()` takes its promotion or recovery source, aborting the stage if the source cannot be taken. If that breaks a proof or a pinned order, it stops and reports, with releasing and retaking the source as the fallback. | Coordinator | `close()` takes the source first, which holds the live journal's native read reservation (a readonly IndexedDB transaction that blocks every writer), then stages the snapshot, which waits for earlier tasks in the live plane's queue. An ingress task already dequeued appends to the journal, and that write waits for the readonly view: stage, queue, append and view wait on each other, with no timeout. Any creator ingress append in that window closes the cycle: a peer's retained rows, or a Writer's move. Staging first drains the queue while no view is held, and later ingress returns early. | In progress (Track X) |
 
 ## Commits
 
@@ -259,6 +261,22 @@ repository owner made. "Coordinator" marks a recommendation that was then carrie
 | 864cc983 | test(track-y): Node long-room probe runner records the heap after a forced GC (measurement only) |
 | 2ed095ac | docs(track-y): result of trimming the library caches and sizing their ceilings |
 | 6d0b15ce | Merge Track Y: trim the transition memo and lower three cache ceilings |
+| 369420d0 | docs: record merging Track Y |
+| 4122ab83 | test: measure the shipped Canvas and Chat pages as long rooms in Chromium |
+| 7cbbcaef | test: RED for the settlement fence that reaches a recipient before its install |
+| d48b57cd | test: RED for a lost creator move that the creator's next move needs |
+| 24699ced | fix: a recipient asks the creator again for a dependency it is missing |
+| 3e806aff | test: RED for a migrated Writer's settlement plan the census refuses |
+| f4c3c5c2 | fix: the issuance census classifies a migrated Writer's inherited plan |
+| f2d301d5 | docs: record the Track X result |
+| e94f9d5b | Merge Track X: a recipient re-requests a missing dependency; the census accepts a migrated Writer's inherited plan |
+| 65505659 | test: the Track X fixture can gossip through the genuine network publication |
+| eeddd65a | test: RED for a direct send that never completes |
+| 38625ca8 | test: hang diagnostics for the Track X shipped-app harness |
+| f4548274 | fix: a direct send that never completes cannot hold a room |
+| e58e9c9a | test: IndexedDB/lock probe and a history-request storm for the Track X harness |
+| 3371c81e | docs: record the Canvas harness hang |
+| cf6d306f | test: let pending history requests finish before the lost-move RED loses its move |
 
 The commit messages hold the detailed explanation and the measurements for each change.
 
@@ -301,11 +319,11 @@ that track's working documents.
 | [31](tracks/31-track-u-lull-seal-and-heap/README.md) | Track U: lull-mode seal and adoption, and the residual heap slope | 6f1db125..0711a8fb, merged in d60a08af |
 | [32](tracks/32-track-v-settlement-for-grid-and-chat/README.md) | Track V: the settlement profile for the Grid example and the v3-chat demo | Stopped: Grid switch held (row 36); harness and RESULT.md on main |
 | 33 | Track W: a rolling window and a local archive for shipped Chat | In progress |
-| 34 | Track X: the settlement fence delivery stall | In progress |
+| [34](tracks/34-track-x-settlement-fence-delivery/README.md) | Track X: the settlement fence delivery stall | 4122ab83..e26cd812 merged in cf6d306f; the seal deadlock and the startup order continue |
 | [35](tracks/35-track-y-cache-memory/README.md) | Track Y: trim the library caches and size their ceilings | 6bbd0aac..2ed095ac, merged in 6d0b15ce |
-| 36 | Track Z: the room database by default for new rooms | Not started (after Track X) |
+| 36 | Track Z: the room database by default for new rooms | In progress |
 
-Folders 33, 34 and 36 land with their branches.
+Folders 33 and 36 land with their branches.
 
 ## Reading the records
 
@@ -386,18 +404,24 @@ Notes:
     it with a rolling window plus a local archive (row 35).
   - The RED fixture `startupShippedCanvas` (tests/fixtures/startup-discovery/shipped.ts) still builds a legacy
     invite labelled "shipped"; it passes, but the label is stale.
-- **Settlement profile with real networking (Track V; Track X fixing; known break on main, row 39):** in Chromium
-  with the shipped page's network, the creator's settlement fence reaches a peer before install and is dropped
-  (`authenticateV3Ingress` drops a not-authenticated vertex instead of holding it). The fixed retained-request
-  schedule recovers it for a few epochs; from epoch 5 the creator's moves stay pending at the peer (G3). Shipped
-  Canvas and shipped Chat on main both stall at epoch 5; the Grid switch is held until the fix.
+- **Settlement profile with real networking (Tracks V and X):** fixed by Track X (row 48); shipped Canvas and Chat
+  and the Grid with Track V's switch run 16/16 in Chromium with real networking. Left open, with Track X:
+  - a seal deadlock on IndexedDB that predates the fix: the creator's `close()` holds the journal's read
+    reservation while it waits for the live plane's queue, and a queued journal append waits for that read. It hung
+    2 of 30 base runs under a history-request storm, and once in a normal Canvas run. Track X is fixing it (row 49);
+  - the startup order (row 45), then Track V's Grid switch;
+  - recipients re-request only from the creator, and there is no periodic retry: if an answer is lost and the creator
+    sends nothing new, a held move waits for the creator's next move or the next install;
+  - the private-WeakMap count in phase-3a1-ac-live-persistence-red (already failing) rose from 18 to 19
+    (`v3MissingDependencyRequests`, which must outlive a session's successor planes).
 - **Left open by Track V** (details in its [RESULT.md](tracks/32-track-v-settlement-for-grid-and-chat/RESULT.md)):
   - v3-chat needs an owner decision: its contract oracle `isD110cBSuccessorAuthority` also checks a legacy direct
     room in the same test, so switching it means parameterising the oracle, switching those rooms, or accepting
     either profile.
   - With the Grid switch, tests/phase-3a1b-d9346-v3-zone.pw.ts fails: an ordinary placement now builds a finishing
     resource program (perhaps a lawful settlement cost, needing owner approval), and a migrated joiner throws
-    "issuance retirement plan has no lineage". Track X looks at both.
+    "issuance retirement plan has no lineage". Track X fixed the second (a library defect, f4c3c5c2); the first is
+    the startup order (row 45).
   - Pre-existing: on the legacy profile the shipped Grid creator cannot reopen after any rollover, because `join()`
     (examples/grid/src/v3-zone.ts:1160-1166) gives it the bootstrap roster instead of the genesis roster.
   - Pre-existing, both profiles: a Node-host Writer reopen right after epoch 2 fails with "unable to open database
