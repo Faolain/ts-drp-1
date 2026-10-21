@@ -7,12 +7,17 @@ const synchronousMetrics:{phase:string;value:any}[]=[];
 const scalarCounters:Record<string,number>={};
 const scalarByEpoch=new Map<number,Record<string,number>>();
 export const context = { role: "initialization", transition: -1, preparation:false, command:"initialization", ordinal:-1,rpcToken:-1 };
+// Measurement only (endurance heap): with the harness's per-epoch records counted, a realm keeps no span and
+// no per-owner proof summary, only these counts. Unset (the default), every span and summary is kept as before.
+export const harnessRecordsCounted=Reflect.get(globalThis,"__r8HarnessRecordsCounted")===true;
+export let spansCounted=0,proofOwnerEventsCounted=0;
 export type StartToken=Readonly<{begin:number;role:string;transition:number;preparation:boolean;command:string;ordinal:number;timeOrigin:number;id:number;rpcToken:number}>;
 export function begin(): StartToken { return Object.freeze({begin:performance.now(),role:context.role,transition:context.transition,preparation:context.preparation,command:context.command,ordinal:context.ordinal,timeOrigin:performance.timeOrigin,id:++nextSpan,rpcToken:context.rpcToken}); }
 export function end(phase: string, start: StartToken): void {
   const stop = performance.now();
   const label=start.preparation?"test-preparation:"+phase:phase;
-  if(spans.length<spanLimit)spans.push({ phase:label, role:start.role,transition:start.transition,command:start.command,ordinal:start.ordinal,timeOrigin:start.timeOrigin, begin: start.begin, end: stop, milliseconds: stop - start.begin,id:start.id,rpcToken:start.rpcToken });else spansTruncated=true;
+  if(harnessRecordsCounted)spansCounted++;
+  else if(spans.length<spanLimit)spans.push({ phase:label, role:start.role,transition:start.transition,command:start.command,ordinal:start.ordinal,timeOrigin:start.timeOrigin, begin: start.begin, end: stop, milliseconds: stop - start.begin,id:start.id,rpcToken:start.rpcToken });else spansTruncated=true;
   if(Reflect.get(globalThis,"__r8CriticalProfiling")===true){
     const observed=performance.now();
     if(markCount++<markLimit)performance.measure(`drp:${label}:${start.role}:e${start.transition}:${start.command}:o${start.ordinal}:rpc${start.rpcToken}:s${start.id}`,{start:start.begin,end:stop});else timingMarksTruncated=true;
@@ -297,7 +302,8 @@ let proofOwner = 0;
 const proofOwnerIds = new WeakMap<object, number>();
 function proofEvent(event: Readonly<Record<string, unknown>>): void {
   const start = performance.now();
-  if (typeof event.owner === "number") {
+  if (typeof event.owner === "number" && harnessRecordsCounted) proofOwnerEventsCounted++;
+  else if (typeof event.owner === "number") {
     let summary=proofOwnerSummaries.get(event.owner);
     if(!summary){summary={owner:event.owner,initialBytes:typeof event.chargedBytes==="number"?event.chargedBytes:0,chargedBytes:0,unknownBytes:0,forecasts:0};proofOwnerSummaries.set(event.owner,summary);}
     if(typeof event.chargedBytes==="number")summary.chargedBytes=Math.max(summary.chargedBytes,event.chargedBytes);

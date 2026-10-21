@@ -163,6 +163,12 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
  // retains; others are only counted. Unset by default (every event retained).
  const proofEventKinds=process.env.STARTUP_HEALTHY_GRID_PROOF_EVENT_KINDS;
  if(proofEventKinds!==undefined)await page.context().addInitScript(value=>Reflect.set(globalThis,"__r8ProofEventKinds",value),proofEventKinds.split(",").map(kind=>kind.trim()).filter(Boolean));
+ // Measurement only (endurance heap): STARTUP_HEALTHY_GRID_HARNESS_RECORDS=counted also stops retaining the harness's other
+ // per-epoch records (spans, per-owner proof summaries, startup trace events, the parent's per-move, per-checkpoint and
+ // per-transition records, the transport fixture's per-message records); every realm counts them instead. Unset by default.
+ const harnessRecords=process.env.STARTUP_HEALTHY_GRID_HARNESS_RECORDS;
+ if(harnessRecords!==undefined&&harnessRecords!=="counted")throw new Error("harness records mode must be counted");
+ if(harnessRecords==="counted")await page.context().addInitScript(()=>Reflect.set(globalThis,"__r8HarnessRecordsCounted",true));
  // Endurance runs (more than 32 rollovers) scale the per-role delivery telemetry bound the same way.
  const deliveryRollovers=Number(process.env.STARTUP_HEALTHY_GRID_ROLLOVERS??4),deliveryObservationBound=deliveryRollovers>32?32*(deliveryRollovers+1):1024;
  await page.context().addInitScript(value=>Reflect.set(globalThis,"__r8DeliveryObservationBound",value),deliveryObservationBound);
@@ -211,10 +217,26 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
  await cdp.send("Performance.enable");await sample();
  let pending=Promise.resolve();const timer=setInterval(()=>{pending=pending.then(sample).catch(error=>{samplingErrors.push(error);});},200);
  const activeMemory:unknown[]=[];
+ // Measurement only: STARTUP_HEALTHY_GRID_HEAP_SNAPSHOTS names checkpoint labels (for example adopted-50,adopted-90); after
+ // that checkpoint's forced GC a V8 heap snapshot of the renderer (every frame realm) is written to STARTUP_EVIDENCE as
+ // heap-<label>.heapsnapshot. Unset by default (no snapshot).
+ const heapSnapshotLabels=new Set((process.env.STARTUP_HEALTHY_GRID_HEAP_SNAPSHOTS??"").split(",").map(label=>label.trim()).filter(Boolean));
+ if(heapSnapshotLabels.size&&process.env.STARTUP_EVIDENCE===undefined)throw new Error("heap snapshots require STARTUP_EVIDENCE");
+ const heapSnapshots:unknown[]=[];
+ const takeHeapSnapshot=async(label:string)=>{
+  const path=join(process.env.STARTUP_EVIDENCE!,"heap-"+label.replace(/[^a-z0-9-]/giu,"_")+".heapsnapshot"),file=await open(path,"w");
+  let bytes=0,writes=Promise.resolve();
+  const chunk=({chunk}:{chunk:string})=>{bytes+=chunk.length;writes=writes.then(()=>file.write(chunk)).then(()=>undefined);};
+  const started=performance.now();
+  cdp.on("HeapProfiler.addHeapSnapshotChunk",chunk);
+  try{await cdp.send("HeapProfiler.takeHeapSnapshot",{reportProgress:false});}finally{cdp.off("HeapProfiler.addHeapSnapshotChunk",chunk);await writes;await file.close();}
+  heapSnapshots.push({label,path,characters:bytes,testOnlyMilliseconds:performance.now()-started});
+ };
  await page.exposeFunction("__r8ActiveResourceCheckpoint",async(label:string)=>{
   await pending;await sample();const before=samples.at(-1),start=performance.now();
   await cdp.send("HeapProfiler.collectGarbage");const gcMilliseconds=performance.now()-start;await sample();
   activeMemory.push({label,before,after:samples.at(-1),testOnlyGcMilliseconds:gcMilliseconds});
+  if(heapSnapshotLabels.has(label))await takeHeapSnapshot(label);
  });
  const suspensions:unknown[]=[];
  if(suspendHealthyGrid)await page.exposeFunction("__r8SuspendTransfer",async(metadata:any)=>{
@@ -688,6 +710,10 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
  if(process.env.STARTUP_HEALTHY_GRID_ROOM_DATABASE==="1")await page.evaluate(()=>Reflect.set(globalThis,"__rdRoomDatabase",true));
  // Opt-in verified retention decisions on the room database (slice 14b); needs ROOM_DATABASE.
  if(process.env.STARTUP_HEALTHY_GRID_ROOM_RETENTION==="1")await page.evaluate(()=>Reflect.set(globalThis,"__rdRoomRetention",true));
+ // Measurement only: STARTUP_HEALTHY_GRID_SEAL_IDLE_GAP_MS waits that many milliseconds before each seal. Unset, none.
+ const sealIdleGap=process.env.STARTUP_HEALTHY_GRID_SEAL_IDLE_GAP_MS;
+ if(sealIdleGap!==undefined){const value=Number(sealIdleGap);if(!Number.isSafeInteger(value)||value<1||value>60_000)throw new Error("bounded seal idle gap required");
+  await page.evaluate(gap=>Reflect.set(globalThis,"__rdSealIdleGapMilliseconds",gap),value);}
  // Opt-in speculative presentation: "1" overlay plus ephemeral intents, "overlay" without intents.
  const presentationMode=process.env.STARTUP_HEALTHY_GRID_PRESENTATION;
  if(presentationMode==="1"||presentationMode==="overlay")await page.evaluate(mode=>Reflect.set(globalThis,"__rdPresentation",mode),presentationMode);
@@ -696,7 +722,10 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
  // "window" traces only seal-4 through the next lull, with V8 CPU samples.
  const taskTrace=process.env.STARTUP_HEALTHY_GRID_TASK_TRACE==="1",taskTraceWindow=process.env.STARTUP_HEALTHY_GRID_TASK_TRACE==="window";
  let taskTraceOpen=false;
- if(taskTrace){await ownedBrowser.startTracing(page,{path:join(process.env.STARTUP_EVIDENCE!,"task-trace.json"),categories:["toplevel","blink.user_timing"]});taskTraceOpen=true;}
+ // Measurement only: STARTUP_HEALTHY_GRID_TASK_TRACE_CATEGORIES (comma list, for example IndexedDB) adds trace categories to
+ // the whole-run task trace. Unset by default (toplevel and blink.user_timing only).
+ const extraTraceCategories=(process.env.STARTUP_HEALTHY_GRID_TASK_TRACE_CATEGORIES??"").split(",").map(category=>category.trim()).filter(Boolean);
+ if(taskTrace){await ownedBrowser.startTracing(page,{path:join(process.env.STARTUP_EVIDENCE!,"task-trace.json"),categories:["toplevel","blink.user_timing",...extraTraceCategories]});taskTraceOpen=true;}
  if(taskTraceWindow)await page.exposeFunction("__rdTraceControl",async(command:string)=>{
   if(command==="start"&&!taskTraceOpen){await ownedBrowser.startTracing(page,{path:join(process.env.STARTUP_EVIDENCE!,"task-trace.json"),
    categories:["toplevel","blink.user_timing","disabled-by-default-v8.cpu_profiler"]});taskTraceOpen=true;}
@@ -724,6 +753,7 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
   await cdp.detach();
   await Promise.all(clients.map(client=>client.close()));
  }
+ if(heapSnapshots.length)await info.attach("healthy-native-heap-snapshots",{body:Buffer.from(JSON.stringify(heapSnapshots)),contentType:"application/json"});
  if(longTasks)await info.attach("healthy-native-longtasks",{body:Buffer.from(JSON.stringify(await page.evaluate(()=>Reflect.get(globalThis,"__rdLongTasks")?.()))),contentType:"application/json"});
  await info.attach("healthy-native-integrated-result",{body:Buffer.from(JSON.stringify(receipt)),contentType:"application/json"});
  if(suspendHealthyGrid){
@@ -733,8 +763,15 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
  expect(receipt.ok,JSON.stringify({phase:receipt.phase,error:receipt.error})).toBe(true);
  expect(receipt.profileId).toBe(creatorProfile);
  expect(samplingErrors.map(String)).toEqual([]);
+ // Measurement only: with the harness's records counted, the lists are empty and their counts carry the same checks.
+ const countedRecords=harnessRecords==="counted"?receipt.harnessRecordCounts:undefined;
+ if(countedRecords!==undefined){
+  expect(countedRecords.transitions).toBe(rollovers);expect(receipt.epoch).toBe(rollovers);expect(receipt.phase).toBe("continued-gameplay");
+  expect(countedRecords.ordinary).toBe(rollovers*8+4);expect(countedRecords.snapshots).toBe(rollovers);
+ }else{
  expect(receipt.transitions).toHaveLength(rollovers);expect(receipt.epoch).toBe(rollovers);expect(receipt.phase).toBe("continued-gameplay");
  expect(receipt.ordinary).toHaveLength(rollovers*8+4);expect(receipt.snapshots).toHaveLength(rollovers);
+ }
  expect(activeMemory.length).toBeGreaterThan(0);
  expect(receipt.joins.every((row:{ok:boolean})=>row.ok)).toBe(true);
  expect(receipt.proofEventsTruncated).toBe(false);
@@ -784,7 +821,8 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
   }
   expect(charges.every((event:any)=>event.ok&&event.noFutureConstructors&&event.chargedAfter===event.chargedBefore+event.knownChargedBytes+event.unknownChargedBytes)).toBe(true);
  }
- expect(receipt.transfers.length).toBeGreaterThan(0);
+ if(countedRecords!==undefined)expect(receipt.transfers.length+receipt.roleObservers.reduce((count:number,row:any)=>count+(row.observer.harnessRecordsCounted?.streamBytes??0),0)).toBeGreaterThan(0);
+ else expect(receipt.transfers.length).toBeGreaterThan(0);
  expect(Math.max(...samples.map(row=>row.indexedDbAllocatedBytes))).toBeGreaterThan(0);
 });
 test("public room pending bytes refuse before stalled native work drains and join every admitted caller",async({page},info)=>{
