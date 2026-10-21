@@ -1202,7 +1202,9 @@ export function createAnchorTrustApi(): AnchorTrustApi {
 				decoded.ok &&
 				isClosedDataRecord(decoded.value, TRUST_RECORD_KEYS) &&
 				decoded.value.kind === "drp-anchor-trust-state";
-			while (trustRecordVerdicts.size !== 0 && (trustRecordVerdicts.size >= 1024 || trustRecordVerdictChars + key.length > 2_097_152)) {
+			// At most 128 records / 262,144 key characters: a steady room re-reads at most
+			// about 50 distinct records per client.
+			while (trustRecordVerdicts.size !== 0 && (trustRecordVerdicts.size >= 128 || trustRecordVerdictChars + key.length > 262_144)) {
 				const oldest = trustRecordVerdicts.keys().next().value!;
 				trustRecordVerdicts.delete(oldest);
 				trustRecordVerdictChars -= oldest.length;

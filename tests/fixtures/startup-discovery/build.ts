@@ -9,6 +9,7 @@ import ts from "typescript";
 import {originalPositionFor, TraceMap} from "@jridgewell/trace-mapping";
 
 import { requireValue } from "./assert.js";
+import { cacheProbePlugin } from "../cache-probe/plugin.js";
 import { pendingNativeTransform } from "../pending-discovery/native-transform.js";
 
 const root = resolve(import.meta.dirname, "../../.."),
@@ -32,6 +33,15 @@ const finishingEnvelopeShadow = process.env.STARTUP_FINISHING_ENVELOPE_SHADOW ==
 if (finishingEnvelopeShadow && (selectedEntry !== "r8-source-binding" || migrationFault !== undefined || criticalProfiling))
 	throw new Error("FINISHING_ENVELOPE_SHADOW_REQUIRES_UNPROFILED_CURRENT_SOURCE");
 if(criticalProfiling && (selectedEntry!=="r8-source-binding" || migrationFault!==undefined))throw new Error("CRITICAL_PROFILING_REQUIRES_HEALTHY_CURRENT_SOURCE");
+// Measurement only (Track Y): STARTUP_CACHE_PROBE=1 wraps the library's five in-memory caches with the probe in
+// tests/fixtures/cache-probe, in this bundle only (the sources are unchanged). Unset by default: no probe.
+// STARTUP_CACHE_PROBE=residency builds the residency-only probe (no events, no key table) for endurance runs.
+const cacheProbeMode = process.env.STARTUP_CACHE_PROBE;
+if (cacheProbeMode !== undefined && cacheProbeMode !== "1" && cacheProbeMode !== "residency")
+	throw new Error("CACHE_PROBE_MODE_MUST_BE_1_OR_RESIDENCY");
+const cacheProbe = cacheProbeMode !== undefined;
+if (cacheProbe && (selectedEntry !== "r8-source-binding" || migrationFault !== undefined || criticalProfiling || finishingEnvelopeShadow))
+	throw new Error("CACHE_PROBE_REQUIRES_UNPROFILED_CURRENT_SOURCE");
 if (
 	migrationFault !== undefined &&
 	(selectedEntry !== "r8-source-binding" || !["after-apply", "pending-publication"].includes(migrationFault))
@@ -2394,6 +2404,7 @@ for (const name of selectedEntry === undefined ? ["setup", "recovery", "lifecycl
 		metafile: true,
 		sourcemap:criticalProfiling?"inline":false,
 		plugins: [
+			...(cacheProbe ? [cacheProbePlugin({ residencyOnly: cacheProbeMode === "residency" })] : []),
 			{
 				name: "current-chat-catalog-entry",
 				setup(context): void {

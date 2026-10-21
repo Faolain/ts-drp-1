@@ -18,6 +18,11 @@ import { hex, parameters } from "./room.js";
 import { control, trace, traceCount } from "./observation.js";
 
 function check(value:unknown,reason:string):asserts value {if(!value)throw new Error(reason);}
+// Measurement only (Track Y): the cache probe exists only in bundles built with STARTUP_CACHE_PROBE=1
+// (tests/fixtures/cache-probe). Otherwise this is undefined and every use below is skipped.
+const cacheProbe=Reflect.get(globalThis,"__cacheProbe") as undefined|{setContext(provider:()=>{epoch:number;role:string}):void;
+ enter(phase:string):void;exit(phase:string):void;flush(label:string):Promise<unknown>};
+cacheProbe?.setContext(()=>({epoch:context.transition,role:context.role}));
 function errorEvidence(error:unknown):unknown {
  if(error===null||typeof error!=="object")return error;
  if(typeof Reflect.get(error,"message")!=="string")return structuredClone(error);
@@ -209,12 +214,14 @@ window.addEventListener("message",event=>{
    // actual entries/bytes during the selected API, not their first-entry label.
    const exactCriticalBegin=typeof fullBoundary==="function"
     ? structuredClone(Reflect.get(globalThis,"__r8CriticalSnapshot")?.()) : undefined;
+   cacheProbe?.enter(name);
    const start=begin();
    let fullSnapshot:unknown;
    try{return await action();}
    finally{
     const apiEnd=performance.now();
     end(name,start);
+    cacheProbe?.exit(name);
     if(typeof fullBoundary==="function"){
      const exactCriticalEnd=structuredClone(Reflect.get(globalThis,"__r8CriticalSnapshot")?.());
      fullSnapshot=endFullFunctionWindow();
@@ -249,6 +256,7 @@ window.addEventListener("message",event=>{
    try{await childPeer.join();joins.push({index:childIndex,owner:"transport",ok:true});}catch(error){joins.push({index:childIndex,owner:"transport",ok:false,error:errorEvidence(error)});faults.push(error);}
    if(childProbeTimer!==undefined){clearInterval(childProbeTimer);childProbeTimer=undefined;}
    const observer=role?.observer();childRole=undefined;
+   if(cacheProbe!==undefined)await cacheProbe.flush("close");
    return {index:childIndex,epoch:args.epoch,joins,...(observer===undefined?{nativeRole:"absent"}:{observer}),ok:faults.length===0,errors:faults.map(errorEvidence)};
   }
   const role=childRole;check(role,"original native role required");
@@ -357,6 +365,7 @@ window.addEventListener("message",event=>{
      }finally{db.close();}
     }
     if(harnessRecordsCounted)role.drainTransportRecords();
+    if(cacheProbe!==undefined)await cacheProbe.flush(String(args.label??"measure"));
     return {...value,databases};
    });
    case "maintain":return product("pool-maintenance-lull",()=>role.session.maintainRecoveryPool());
@@ -379,7 +388,12 @@ export async function runHealthyGrid(identity:string,origins:readonly string[],r
  // rollovers, measurement only) scale it with the rollovers like the test deadline.
  const fixtureWaitDeadline=Date.now()+(rollovers>32?rollovers*30_000:360_000);
  check(origins.length===4&&new Set(origins).size===4,"four independent native storage origins required");
- check(rollovers===4||rollovers===5||(Number.isSafeInteger(rollovers)&&rollovers>=8&&rollovers<=128),"bounded native full-pool extension only");
+ // Past 128 rollovers (measurement only) only with the spec's explicit STARTUP_HEALTHY_GRID_ENDURANCE_MAX opt-in,
+ // handed to this realm as __r8EnduranceMax (129 to 1024). Unset, the check is unchanged for every value.
+ const enduranceMax=Reflect.get(globalThis,"__r8EnduranceMax");
+ const enduranceExtended=typeof enduranceMax==="number"&&Number.isSafeInteger(enduranceMax)&&enduranceMax>128&&enduranceMax<=1024&&
+  Number.isSafeInteger(rollovers)&&rollovers>128&&rollovers<=enduranceMax;
+ check(enduranceExtended||rollovers===4||rollovers===5||(Number.isSafeInteger(rollovers)&&rollovers>=8&&rollovers<=128),"bounded native full-pool extension only");
  check(profileId==="creator-trusted-settlement-v1"||profileId==="creator-trusted-v1","existing creator profile required");
  const {members,application}=gridCorpus(identity),ids=members.slice(0,4).map(row=>row.peerId);
  const objectId="creator:"+hex(hashDomain("ts-drp/healthy-native-grid/v1",new TextEncoder().encode(identity))).slice(0,32);
@@ -547,7 +561,7 @@ export async function runHealthyGrid(identity:string,origins:readonly string[],r
    [move(0,150,4),move(target===1?2:1,400,5)]);
   return {target,maintenance:await maintaining,moves};
  }
- async function measure(label:string){const values=await Promise.all(active.map(role=>rpc(role.index,"measure")));keep(checkpoints,"checkpoints",{label,epoch,values});
+ async function measure(label:string){const values=await Promise.all(active.map(role=>rpc(role.index,"measure",cacheProbe===undefined?{}:{label})));keep(checkpoints,"checkpoints",{label,epoch,values});
   const memory=Reflect.get(globalThis,"__r8ActiveResourceCheckpoint");if(typeof memory==="function"){const start=begin();try{await memory(label);}finally{end("test-only-active-native-GC-and-memory",start);}}
   return values;}
  try{

@@ -2,6 +2,8 @@ import { build, type Metafile, type Plugin } from "esbuild";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
+import { cacheProbePlugin } from "../../cache-probe/plugin.js";
+
 // Track M measurement (Canvas and Chat in a browser): bundles tests/fixtures/track-m-apps/
 // browser/entry.ts from the WORKING-TREE SOURCES of the tree it sits in. Every `@ts-drp/*`
 // specifier resolves to the package's `src/*.ts` (the module its `exports` names under
@@ -85,7 +87,12 @@ export async function buildTrackMAppsAssets(
 		metafile: true,
 		logLevel: "warning",
 		nodePaths: [join(root, "packages/storage-browser/node_modules"), join(root, "node_modules")],
-		plugins: [sourcePlugin(aliases, distResolved)],
+		// Measurement only (Track Y): TRACK_M_APPS_CACHE_PROBE=1 wraps the library's five in-memory caches with the
+		// probe in tests/fixtures/cache-probe, in this bundle only (the sources are unchanged). Unset by default.
+		plugins: [
+			...(process.env.TRACK_M_APPS_CACHE_PROBE === "1" ? [cacheProbePlugin()] : []),
+			sourcePlugin(aliases, distResolved),
+		],
 	});
 	writeFileSync(
 		join(outDir, "tma.html"),
