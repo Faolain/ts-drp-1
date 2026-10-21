@@ -97,7 +97,7 @@ repository owner made. "Coordinator" marks a recommendation that was then carrie
 | 22 | Hold Track M: fix its crash bug first, then merge. | User | Its 14f case 8 breaks G3 and G14 on the opt-in path on all three engines: a SIGKILL between a creator boundary's two decisions leaves the signing control without a summary source, and maintenance then halts. The main branch must not carry a known guarantee break. | Track M stayed on its branch until Track O's fix; both merged in 8c61863e (row 24). |
 | 23 | Start Tracks O, M2, P and Q in parallel. | User | O: the case 8 fix. M2: 14b stage 2, the in-memory ledger that removes the ~282 ms cold acquisition per boundary. P and Q fix two problems Track M found on every path: Canvas issuance grows one row per move with an O(outbox) issue cost (829 ms → 6.7 s per move by epoch 16), and the shipped Canvas and Chat creators never run their lull, so retirement runs inline at seal (about 2.7 s). | O merged with M (row 24). P merged (row 27). Q held (row 25). M2 merged (row 29). |
 | 24 | Accept Track O's 14b/14e amendment, and merge Tracks M and O together. | User | O's fix makes each boundary one decision, with one epoch's signing evidence and summaries as one unit, in a fixed unit order. A crash or refusal between continuations then resumes from a fresh acquisition (G3, G14). Track M's suggested fix left a second split point open. | Merge 8c61863e, after verification on O's head: typecheck 0, 13 room test files passing, the proof-accounting test file identical to the main branch, and 14f case 8 passing with a real SIGKILL. |
-| 25 | Hold Track Q. | Coordinator | Its Canvas and Chat resource bounds work (seal 0.07–0.14x of before), but running the lull exposes a pre-existing bug. A persisted reopen right after the creator's first maintained lull is refused with `floor-stale` (a stored signing-summary resume-basis digest differs on resume, CRD:19350). R3's 4-rollover room test now reaches it and fails. The Grid hits the same bug when reopened at epoch 4. | Unheld after Track S merged (row 33); rebasing onto 19caa468. |
+| 25 | Hold Track Q. | Coordinator | Its Canvas and Chat resource bounds work (seal 0.07–0.14x of before), but running the lull exposes a pre-existing bug. A persisted reopen right after the creator's first maintained lull is refused with `floor-stale` (a stored signing-summary resume-basis digest differs on resume, CRD:19350). R3's 4-rollover room test now reaches it and fails. The Grid hits the same bug when reopened at epoch 4. | Unheld after Track S merged (row 33); merged in 46eb7821 (row 38). |
 | 26 | Track S: fix the reopen right after the first maintained lull, on the shared path; Track Q then rebases onto it. | User | The bug predates this work and also affects the Grid; it blocks Track Q. | Merged in 19caa468 (row 33). |
 | 27 | Merge Track P's per-move fix, and keep its storage assertion red until the user decides how Canvas issuance is retired. | Coordinator | Each hot successor wrapped its source's issuance facade in one more facade, so one recovery read went through s - 1 facades at epoch s. A successor now wraps its source's native store, the same structure a reopen builds. Creator outbox page reads per move went from 54 at epoch 8 and 103 at epoch 15 to a constant 10; the Writer recipient's went to a constant 2. | Merge a3f3f6b0 (8ed37d08..47a936fe), after verification on the merged tree: typecheck 0, Track M and O's room tests passing (38 of 38), and Tracks K, L, N and R3's native tests passing. Track P's per-test suite diff against its base shows no new failures. |
 | 28 | Canvas issuance: give the shipped apps the settlement profile (R-A), for shipped Canvas, the Grid example and the v3-chat demo. Do not write a deletion rule for the legacy profile (R-B). Track T makes the switch. | User | Track P found a spec gap: every issuance deleter requires a settlement profile, so `creator-trusted-v1` keeps every row it issues. At 20 moves per epoch a Canvas creator was refused in epoch 17. The library has no users yet, so changing the shipped profile breaks no one. R-A reuses the reviewed settlement retirement; R-B would need a new spec slice, conformance tests on both native owners and three-engine SIGKILL evidence. The latency bench already runs the settlement profile, so its flat Grid storage did not cover the shipped Grid example. | Canvas switched by Track T (row 32). The Grid example and the v3-chat demo are pinned by existing tests and move in Track V (row 34). Track P's test is the acceptance test; Track T changed only where its profile comes from. The legacy profile keeps its behaviour and is documented as growing. |
@@ -106,8 +106,11 @@ repository owner made. "Coordinator" marks a recommendation that was then carrie
 | 31 | Count the settlement author fence in Track P's issuance check: under the settlement profile each Writer's issue counter rises by its moves plus one fence per successor. | User | Track P's check assumed one row per move, which holds only for the legacy profile. The check stays an exact equality, and the fence count is derived from the profile, so the legacy measurement still expects the moves alone. No other assertion, bound or epoch count changed. | ff0a8b66. Track P's storage test passes on shipped Canvas. |
 | 32 | Merge Track T: shipped Canvas signs `creator-trusted-settlement-v1`, with the version-3 ACL that profile requires. | Coordinator | Canvas issuance is flat at 13 rows per peer from epoch 6 through 17 and a reopen (legacy grew 4 rows per epoch), and every store is flat from epoch 8 to 100 in Chromium. At 20 moves per epoch, where the legacy profile was refused in epoch 17, it ran 30 epochs without a refusal. Seal no longer grows with room age (legacy +60–69 ms per epoch). Adoption is a flat 150–280 ms slower, because settled issuance is pruned there. No library code changed. | Merge 2e272eb0 (ac17c698..dacb9870), after verification on main: typecheck 0, the Canvas, ledger and genesis-roots tests passing. |
 | 33 | Merge Track S, and unhold Track Q. | Coordinator | The creator's first maintained lull replayed its finished signing summary, whose stored resume basis then went stale as the epoch's lawful moves landed, so a persisted reopen was refused `floor-stale`. One removed condition in `classifyClosedSigningSummaries`: a finished summary is never replayed, and the same pass makes a fresh decision. The `floor-stale` check is unchanged. | Merge 19caa468 (5a7491f8..40d50ea3), after verification of main + Tracks T and S together: typecheck 0, Track S's six tests and every room, ledger and long-room test passing, the pinned source test failing exactly as at base. Track Q is rebasing onto it. |
-| 34 | Track V: amend the tests that pin the Grid example's and the v3-chat demo's genesis bytes, changing only the profile name and the ACL version in a separate commit, then switch both apps to the settlement profile. | User | Completes row 28 for all shipped apps. The pins describe the products' current genesis, not a guarantee. If the contract needs more than those two values, Track V stops and reports. | In progress |
+| 34 | Track V: amend the tests that pin the Grid example's and the v3-chat demo's genesis bytes, changing only the profile name and the ACL version in a separate commit, then switch both apps to the settlement profile. | User | Completes row 28 for all shipped apps. The pins describe the products' current genesis, not a guarantee. If the contract needs more than those two values, Track V stops and reports. | Stopped; see row 36. |
 | 35 | Track W: shipped Chat keeps a rolling window of recent messages in its shared state, and each device keeps a local archive of what it has seen. Late joiners see only the window. | User | Shipped Chat keeps every message in its replicated state against a lifetime 32 KiB budget, so it refuses new messages near epoch 57 at 4 messages per epoch. Raising the cap would make every transition heavier with room age (G1) and still hit a wall. A window keeps the state and transitions flat; the archive keeps each player's history. The window and archive sizes are reviewed limits (G21) for the owner. | In progress |
+| 36 | Hold Track V's Grid switch on its branch, and put its Chromium reproduction and RESULT.md on main. | Coordinator | On Node the switch keeps the shipped Grid's issuance flat (13 rows per peer through 16 epochs and a reopen; legacy reached 33). In Chromium with real networking, the creator's settlement fence reaches the Writer before install and is rejected; after a few successors (epoch 4-5, 33-41 s in) the creator's moves never reach the Writer again, in every run. Legacy passes 16/16. That breaks G3. v3-chat was not switched: its contract oracle is applied to the v3-chat product and to a legacy direct room in the same test, and every way around that is outside the approval. | Held on branch `worktree-agent-a84dc20beddb97044` (d5a0015f..27fe2688). On main: cedcc628 (harness), 5ed93b67 (RESULT.md). |
+| 37 | Track X: find and fix the settlement fence delivery stall in the library. First check whether shipped Canvas and Chat, which already sign the settlement profile, stall the same way on main with real networking. | Coordinator | Track T's and Track Q's Chromium evidence used a harness without the shipped page's networking, so main may carry the same G3 break for Canvas and Chat. Fix first, then merge Track V's switch. | In progress |
+| 38 | Approve Track Q's ordinary resource bounds, and merge Track Q. | User (bounds), Coordinator (merge) | Canvas: the exact encoded size of its widest reachable state (2,944 bytes, 817 items, depth 3 at 10×10). Chat: its existing 32 KiB retained-state limits, unchanged. Both come from limits the apps already enforce (G21) and cover every reachable state (G22). With them, the creator lull runs, and seal falls to 0.09–0.12× of base in Chromium (about 0.2 s); adoption is 190–255 ms slower; seal plus adoption is 0.32–0.42× of base. | Merge 46eb7821 (ff22665c..30937f29), after verification on main: typecheck 0; Track Q's bound and lull tests, the 4-rollover room test, Tracks P, S, N, L, K, M2 and O's tests, and the 6-epoch Canvas/Chat long rooms with a reopen all passing. |
 
 ## Commits
 
@@ -210,6 +213,19 @@ repository owner made. "Coordinator" marks a recommendation that was then carrie
 | ef57d107 | fix(track-s): never replay a terminal SAME-P signing summary, so a reopen after the first maintained lull plays on |
 | 40d50ea3 | docs(track-s): record the Track S result (reopen right after the first maintained lull) |
 | 19caa468 | Merge Track S: a reopen right after the first maintained lull plays on |
+| 6066c539 | docs: record merging Tracks T and S, and starting Track V |
+| dccb8cd4 | docs: record starting Track W for long-running Chat rooms |
+| cedcc628 | test: measure the shipped Grid page as a long zone in Chromium (Track V) |
+| 5ed93b67 | docs: record the Track V result (Grid stopped at the browser proof) |
+| ff22665c | test(track-q): RED for the Canvas and Chat creator lull |
+| 17eb3afa | feat(track-q): Canvas and Chat supply their ordinary resource bound |
+| 494a1454 | test(track-q): deliver lull-time moves inside the creator lull; browser harness |
+| 08e416e6 | test(track-q): record every proof-event kind per long-room window |
+| fafa66c4 | docs(track-q): record the Canvas and Chat creator lull result |
+| 74801275 | test(track-q): Canvas long rooms use the shipped settlement profile; reopen on every host |
+| f4919f12 | test(track-q): browser long room can alternate prebuilt bundles |
+| 30937f29 | docs(track-q): RESULT.md for the branch rebased onto 19caa468 |
+| 46eb7821 | Merge Track Q: Canvas and Chat run their creator lull |
 
 The commit messages hold the detailed explanation and the measurements for each change.
 
@@ -245,15 +261,16 @@ that track's working documents.
 | [24](tracks/24-track-n-recipient-issuance-growth/README.md) | Track N: recipient issuance growth | 60161b4a..7464f875 |
 | [25](tracks/25-track-o-retention-crash-resume/README.md) | Track O: crash resume on the retention path (14f case 8) | c6eff8e7..099db6ce, merged in 8c61863e |
 | [26](tracks/26-track-p-canvas-issuance-growth/README.md) | Track P: Canvas issuance growth and O(outbox) issue cost | 8ed37d08..47a936fe, merged in a3f3f6b0; storage growth left to Track T (row 28) |
-| 27 | Track Q: Canvas and Chat lull | Rebasing onto 19caa468 (rows 25, 33) |
+| [27](tracks/27-track-q-canvas-chat-lull/README.md) | Track Q: Canvas and Chat lull | ff22665c..30937f29, merged in 46eb7821 |
 | [28](tracks/28-track-m2-verified-fact-ledger/README.md) | Track M2: verified-fact ledger (14b stage 2) | 111889d6..262f5fa5, merged in e0494c5a |
 | [29](tracks/29-track-s-first-lull-reopen/README.md) | Track S: reopen right after the first maintained lull | 5a7491f8..40d50ea3, merged in 19caa468 |
 | [30](tracks/30-track-t-settlement-for-shipped-apps/README.md) | Track T: the settlement profile for the shipped apps | ac17c698..dacb9870, merged in 2e272eb0; Canvas only |
 | 31 | Track U: lull-mode seal and adoption, and the residual heap slope | In progress |
-| 32 | Track V: the settlement profile for the Grid example and the v3-chat demo | In progress |
+| [32](tracks/32-track-v-settlement-for-grid-and-chat/README.md) | Track V: the settlement profile for the Grid example and the v3-chat demo | Stopped: Grid switch held (row 36); harness and RESULT.md on main |
 | 33 | Track W: a rolling window and a local archive for shipped Chat | In progress |
+| 34 | Track X: the settlement fence delivery stall | In progress |
 
-Folders 27 and 31 to 33 land with their branches.
+Folders 31, 33 and 34 land with their branches.
 
 ## Reading the records
 
@@ -321,13 +338,35 @@ Notes:
   - Existing Canvas rooms keep the profile their genesis signed; there is no migration (G25).
   - On the settlement profile, Canvas adoption is a flat 150–280 ms slower, because settled issuance is pruned
     there.
-  - The shipped Canvas and Chat creators supply no `readOrdinaryApplicationResourceBound`, so their lull never
-    runs and retirement stays inline at seal, about 2.7 s in Chromium (Track Q, rebasing).
+  - With Track Q, the shipped Canvas and Chat creators run their lull. Adoption is 190–255 ms slower in Chromium,
+    because the cold ordinary-source capture moved there; removing that would change shared room code
+    (`prepareOrdinaryReadiness`). The first seal after a persisted reopen still runs one retirement selection,
+    because the lull's early-turnover token is kept in memory only (the Grid too).
+  - Track M's application harness (`TRACK_M_APPS=1`) fails Chat on the room and room-retention hosts at epoch 3's
+    seal ("creator recovery role transfer source failed: internal-invariant"), on base too. Not yet investigated.
   - Chat storage is flat, but shipped Chat's own 32 KiB retained-state cap (`SHIPPING_CHAT_RETAINED_BYTES`)
     rejects new messages near epoch 57 at 4 messages per epoch, by design and the same at base. Track W replaces
     it with a rolling window plus a local archive (row 35).
   - The RED fixture `startupShippedCanvas` (tests/fixtures/startup-discovery/shipped.ts) still builds a legacy
     invite labelled "shipped"; it passes, but the label is stale.
+- **Settlement profile with real networking (Track V, Track X fixing):** in Chromium with the shipped page's
+  network, the creator's settlement fence reaches a Writer before install and is rejected. After a few successors
+  the creator's moves never reach that Writer again (G3). The Grid switch is held until the fix. Shipped Canvas and
+  Chat already sign the settlement profile and may be affected on main; Track X checks that first.
+- **Left open by Track V** (details in its [RESULT.md](tracks/32-track-v-settlement-for-grid-and-chat/RESULT.md)):
+  - v3-chat needs an owner decision: its contract oracle `isD110cBSuccessorAuthority` also checks a legacy direct
+    room in the same test, so switching it means parameterising the oracle, switching those rooms, or accepting
+    either profile.
+  - With the Grid switch, tests/phase-3a1b-d9346-v3-zone.pw.ts fails: an ordinary placement now builds a finishing
+    resource program (perhaps a lawful settlement cost, needing owner approval), and a migrated joiner throws
+    "issuance retirement plan has no lineage". Track X looks at both.
+  - Pre-existing: on the legacy profile the shipped Grid creator cannot reopen after any rollover, because `join()`
+    (examples/grid/src/v3-zone.ts:1160-1166) gives it the bootstrap roster instead of the genesis roster.
+  - Pre-existing, both profiles: a Node-host Writer reopen right after epoch 2 fails with "unable to open database
+    file" in `openNodeSealVoteStore`.
+  - The latency bench is not the shipped Grid: it lacks `authorShareMultiplier: 4` and the outcome-commit admission
+    policy, uses a 64-member roster, runs lulls and does not open the ephemeral plane. Its Chromium numbers describe
+    the bench composition only.
 - **Left open by Track N** (details in its [RESULT.md](tracks/24-track-n-recipient-issuance-growth/RESULT.md)):
   - The issuance store's 1,024-row bound limits any Writer, the creator included, to roughly 100 moves per
     epoch. Raising it is a reviewed-limit decision (G21); nothing was changed.
