@@ -114,7 +114,7 @@ export function digestClosure(closure: readonly GenerationRef[]): ParseResult<Cl
 	return ok(digest);
 }
 
-const CLOSURE_MEMO_ENTRIES = 4096,
+const CLOSURE_MEMO_ENTRIES = 512,
 	CLOSURE_MEMO_REFERENCES = 64;
 const closureDigests = new Map<string, ClosureDigest>();
 
