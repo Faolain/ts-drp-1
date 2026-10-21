@@ -78,6 +78,7 @@ it.each([
 		expect(applied.length, JSON.stringify(kinds(room.events.creator, "room-retention"))).toBeGreaterThan(0);
 
 		const summary = lullSummary(room);
+		if (process.env.TRACK_Z_VERBOSE === "1") process.stdout.write(`TRACK_Z_LULLS ${app} ${summary}\n`);
 		for (const role of ["creator", "recipient"] as const) {
 			const byEpoch = lullsByEpoch(room.events[role]);
 			expect(
