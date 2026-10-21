@@ -91,6 +91,7 @@ const METHODS = [
 	"lull",
 	"census",
 	"archive",
+	"storageUsage",
 	"drainEvents",
 	"close",
 ] as const satisfies readonly (keyof RoleEndpoint)[];

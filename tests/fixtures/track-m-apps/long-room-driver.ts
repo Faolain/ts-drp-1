@@ -52,6 +52,11 @@ export interface EpochRecord {
 	readonly eventKinds: Readonly<Record<string, number>>;
 	/** Chat window format with a device archive (Track W): each role's archive after the epoch. */
 	readonly archive?: Readonly<{ creator: ArchiveObservation | null; recipient: ArchiveObservation | null }>;
+	/**
+	 * Track W: each role's origin storage usage (`navigator.storage.estimate()`) after the epoch,
+	 * for every app and format, where the platform has it. Observation only.
+	 */
+	readonly originUsage?: Readonly<{ creator: number | null; recipient: number | null }>;
 }
 
 /**
@@ -123,6 +128,8 @@ export interface RoleEndpoint {
 	census(): Promise<StoreCensus>;
 	/** Track W: the Chat device archive after its pending write, or null without one. */
 	archive(): Promise<ArchiveObservation | null>;
+	/** Track W: the origin's storage usage, or null where the platform has none (Node). */
+	storageUsage?(): Promise<number | null>;
 	/** Observer events since the previous drain. */
 	drainEvents(): Promise<ObservedEvent[]>;
 	close(): Promise<void>;
@@ -231,6 +238,10 @@ export async function driveLongRoom(
 			const lulled = await census();
 			stage = "archive";
 			const archive = { creator: await creator.archive(), recipient: await recipient.archive() };
+			const originUsage = {
+				creator: (await creator.storageUsage?.()) ?? null,
+				recipient: (await recipient.storageUsage?.()) ?? null,
+			};
 			const window = [...(await creator.drainEvents()), ...(await recipient.drainEvents())];
 			const eventKinds: Record<string, number> = {};
 			for (const event of window) eventKinds[event.kind] = (eventKinds[event.kind] ?? 0) + 1;
@@ -260,6 +271,7 @@ export async function driveLongRoom(
 					.map((event) => String(event.reason)),
 				eventKinds,
 				...(archive.creator === null && archive.recipient === null ? {} : { archive }),
+				...(originUsage.creator === null && originUsage.recipient === null ? {} : { originUsage }),
 			};
 			epochs.push(record);
 			hooks.write?.(record);

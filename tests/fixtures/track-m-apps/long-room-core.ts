@@ -664,6 +664,10 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 				...(estimate?.usage === undefined ? {} : { originUsage: estimate.usage }),
 			};
 		},
+		storageUsage: async (): Promise<number | null> => {
+			if (typeof navigator === "undefined" || typeof navigator.storage?.estimate !== "function") return null;
+			return (await navigator.storage.estimate()).usage ?? null;
+		},
 		drainEvents: async () => {
 			const events = env.events ?? [];
 			const out: ObservedEvent[] = events.slice(drained).map((event) => ({
