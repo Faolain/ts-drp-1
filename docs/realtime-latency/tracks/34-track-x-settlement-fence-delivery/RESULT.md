@@ -47,6 +47,11 @@ at Track V's two d9346 failures.
   Canvas, Chat and Grid run 16/16. The fix also removes Track M's `NATIVE_READ_RESERVATION_BUSY` seal race (base 13 of
   16 fail with no settle before the seal, fix 0). It departs from row 49 in one point: after a source failure the
   epoch stays folded and the close stays retryable, because `abortSnapshotStage` cannot undo a fold (10.2).
+- **The startup order** (section 11, row 45): options only, nothing implemented. A scratch prototype (readiness
+  before publication on settlement) makes the startup RED and d9346 pass (9/9 runs with the seal fix), but it changes
+  the order pinned in `creator-ordinary-readiness-producer.test.ts`, and it exposes an intermittent
+  `NATIVE_READ_RESERVATION_BUSY`: a received append that meets the readiness job's held read view is dropped, not
+  retained. Every option that prepares readiness earlier needs that fixed too.
 
 ## 1. Step 1: shipped Canvas and Chat on main
 
@@ -627,6 +632,112 @@ module-load race in the test worker); alone it passes (logs/rerun-mseal-d110c.lo
 existing ones of section 7 (the same counts as at 2a65f450 before the merge; the merge adds Track Y's four passing
 node tests). `pnpm -r typecheck`: 0 errors, 46 of 47 projects. `node scripts/check-shadowed-sources.mjs`: clean.
 
+## 11. The startup order (row 45): options, not implemented
+
+The coordinator asked for options and no implementation. The startup RED of 9b6b5f3f stays red on this branch. The
+prototype lives only on the scratch branch track-x-startup-seal (ef37befb, first written as 3e95ac40).
+
+### 11.1 Where readiness waits
+
+The settlement creator's startup barrier (`rebasePromise`, v3-room.ts:5705-5726) runs `waitForRetainedBootstrap`,
+`publishAccepted`, `drainRebaseOutbox` and then `prepareCurrentCreatorOrdinaryReadiness`. Each publication is a plane
+FIFO task: `publishPending` (v3-live.ts:16156) awaits `networkNode.publishMessage` (16248), and
+`DRPNetworkNode.waitForPeersAndPublish` first waits for a subscriber (`waitForSubscriber`,
+packages/network/src/node.ts:2929; at most 1000 ms in 25 ms polls, then it publishes to no one, which
+`allowPublishToZeroTopicPeers` at 2334 permits). The drain's `issueSettlement` publishes after each issue as well.
+`room.issue` awaits the same barrier (v3-room.ts:7278) after it presents the move locally.
+
+The order is pinned. `packages/node/tests/creator-ordinary-readiness-producer.test.ts:1578-1627` ("room explicit
+readiness boundary wiring") takes the source text of `prepareCurrentCreatorOrdinaryReadiness` and `rebasePromise`,
+runs it with stubs, and requires `["enqueue", "bootstrap", "publish", "drain", "prepare"]` on v1. Its title is "joins
+preparation after startup publication/rebase and before the existing barrier resolves". Any new identifier in the
+barrier text also breaks it, because the stubs define only the names it uses today.
+
+### 11.2 The prototype
+
+On v1 only: the drain issues its fence and replacements without publishing them; readiness is prepared on the local
+postimage; then `publishAccepted` publishes every accepted row in author-sequence order, and only then does the
+barrier resolve. The creator's own gossip republication of retained history (no target peer) is held until the
+barrier settles, at most one held; direct replies are not held. Successor adoption drains still publish each issue at
+once.
+
+| Check                                                                       | Result                                                         |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Startup RED (9b6b5f3f)                                                      | passes (logs/startup-red-proto1-r1.log)                        |
+| Wiring test (pinned order)                                                  | fails: v1 order becomes enqueue, bootstrap, drain, prepare (1) |
+| d9346, seal fix, no prototype (md9-base-1)                                  | line 474 fails, migration passes                               |
+| d9346, prototype and seal fix (md9-proto-busy-1..3, md9-proto-seal-mp-1..6) | 9 of 9 runs pass both tests                                    |
+| d9346, prototype on main's `creator-close.ts` (presl, mq, mp runs)          | 10 of 12 pass; 1 BUSY; 1 transfer failure (2)                  |
+| d9346, prototype at 9b6b5f3f (d9346-startup-r1, older base)                 | both tests fail with BUSY                                      |
+
+(1) The other six failures in that run (logs/wiring-proto1.log) are five timeouts under load and one that fails at
+base too. (2) md9-proto-presl-mp-2 failed at the rollover with "snapshot peer has no open unlimited authenticated
+connection" (connection-unavailable), with no BUSY; I have not seen it elsewhere.
+
+### 11.3 The NATIVE_READ_RESERVATION_BUSY
+
+A probe in the built storage-browser dist (bin/patch-busy-probe.py, never in src) logged both stacks
+(data/md9-proto-presl-3-trace). Two refusals came on the creator's `--ahe` database at 4217 and 4300 ms page time:
+
+- **Holder**: `acquireCreatorIssuanceMaintenanceProof` (creator-closed-rollback-data.ts:6682), holding the view
+  since 3606 ms, before the Writer had even connected (about 3960 ms). The zone was at epoch 0 with one durable vertex
+  before and after, so no close was running. Local issues, the drain's fence among them, run their maintenance job
+  inside a plane FIFO task (`enqueueLocalIssue`, v3-live.ts:15149-15158), so they cannot overlap ingress. The one
+  holder outside the FIFO at that point is the readiness job: `prepareOrdinaryReadiness` (creator-close.ts:4677, an
+  owner maintenance job started from the room barrier) → `captureCreatorOrdinarySourceWithoutForecast` (2460) → the
+  proof (2473). A second probe that names the caller (bin/patch-maintenance-probe.py) never fired, because 14 further
+  runs had no BUSY. The holder is therefore identified by elimination, not by a stack.
+- **Refused**: the Writer's first append. A creator bound for maintenance takes local replacement custody before it
+  consults the maintenance consumer (`handleV3Ingress`, v3-live.ts:7556-7569). The browser reservation refuses at once
+  (storage-browser native-read-reservation.ts:279); the node reservation waits under `busy_timeout`. The catch logs
+  `admission-rejected received-maintenance-custody` and returns false **without retaining the append**. When the
+  consumer itself refuses for the same reason (a maintenance job in flight, creator-close.ts:3438-3450), the append is
+  kept as pending ingress (v3-live.ts:7730-7737), as the pending-ingress drain says it must ("Retain exact unadmitted
+  work until durable delivery succeeds", 7471). The creator then logged `graph-rejected`, left the room topics, and
+  `zone()` threw "creator held issuance census is unavailable".
+
+So the BUSY is not caused by the reorder. It is an existing asymmetry, and the reorder lines the readiness job up with
+the first joiner's append. The same path exists without the prototype: startup and successor-install readiness
+(v3-room.ts:5716, 6667) both run outside the FIFO. I have not seen it without the prototype. The seal fix only changes
+`close()`; 9 of 9 against 10 of 12 does not show that it matters here.
+
+### 11.4 Options
+
+Each of A, B and C prepares readiness before the first join, so each also needs one of these BUSY fixes:
+
+- **(i) Retain on a custody refusal.** In `handleV3Ingress`, keep the append as pending ingress when custody cannot
+  be taken, as the consumer-refusal path already does. That is bounded by `maxPendingEntries` and `maxPendingBytes`
+  and counted in the census (G21). Pending ingress is retried today only after the next successful ingress (7974), so
+  the end of the maintenance job should also trigger the retry. That trigger is event-driven, not a timer. This also
+  covers installs. It is the smallest change.
+- **(ii) Serialize readiness with ingress.** Run the readiness job as a plane FIFO task. Ingress then waits behind
+  the cold capture (hundreds of ms on this machine), and the job would move into the plane, which is a bigger change.
+
+The orders:
+
+- **A. Reorder on v1 (the prototype).** Readiness is prepared before publication, and the barrier still resolves only
+  after every accepted row is published, so "started up" still implies "published". The publications still wait for
+  a subscriber. Evidence: the RED passes, and d9346 passes 9 of 9 with the seal fix. Cost: the owner must amend the
+  pinned wiring test to the v1 order `enqueue, bootstrap, drain, prepare, publish` (I did not edit it). One cost
+  remains: a placement made while the creator is still alone still waits for the barrier's last publications (at
+  most 1 s per pending row), but it builds nothing.
+- **B. Keep the barrier text, stop the barrier from waiting on publication.** On v1 at startup, `publishAccepted` and
+  the drain's publication would hand the pending rows to one bounded background publisher, which waits for a
+  subscriber outside the plane FIFO and then publishes in order. The pinned test passes by its letter, but its title
+  ("after startup publication") stops being true, and "started up" no longer implies "published". This needs a no-wait
+  subscriber check on the plane's network port (`getGroupPeers`, node.ts:2793), a "deferred" egress result, and the
+  publisher's bound. G19 holds the issuance retention owner while rows stay pending. Not prototyped.
+- **C. Do not wait when the topic has no subscriber at all.** In `waitForSubscriber`, return at once when
+  `getSubscribers(topic)` is empty. This is the smallest diff, but it changes every app and both profiles. A joiner
+  whose subscription is still in flight loses the gossip copy and must repair it. The startup RED's second assertion
+  (the startup publications reach the Writer by gossip) would fail, and existing REDs are not edited to pass. Not
+  prototyped.
+
+Without a fix, row 45's placement stays cold: section 6.1, options 1 and 3, which row 45 rules out.
+
+My preference, for the owner to decide: A with (i). A keeps the publication semantics and the delivery wait, and
+touches only the room's barrier and the drain's publication mode. (i) closes a drop that can happen without A.
+
 ## Commits
 
 | Commit   | What                                                                              |
@@ -648,7 +759,8 @@ node tests). `pnpm -r typecheck`: 0 errors, 46 of 47 projects. `node scripts/che
 | e1f471bb | test: RED for a creator seal that waits on its own live journal                   |
 | 2a65f450 | fix: the creator seal stages before it takes a journal source                     |
 | b8ad1f50 | merge: main 24d4ca61 into the seal deadlock work                                  |
-| (this)   | docs: record the seal deadlock fix                                                |
+| 75a16b81 | docs: record the seal deadlock fix                                                |
+| (this)   | docs: record the startup-order options                                            |
 
 Main (24d4ca61) carries f2d301d5, the fixture half of 9b6b5f3f (65505659) and 270c7068..e26cd812 as picked
 commits (eeddd65a..cf6d306f). The startup RED file of 9b6b5f3f stays on this branch.
