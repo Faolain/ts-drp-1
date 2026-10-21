@@ -44,8 +44,8 @@ export { RETIREMENT_SELECTION } from "./long-room-driver.js";
 // Hosts: "node" = the default Node SQLite host (createNodeV3RoomStorageHost); "browser" = the
 // default six-database browser host on fake-indexeddb; "room" = the browser room-database
 // host on fake-indexeddb. fake-indexeddb is mechanism evidence only (no engine timing). The
-// external floor is SQLite on every host here. A persisted reopen is supported on the node
-// host only.
+// external floor is SQLite on every host here. A persisted reopen reopens the same files or
+// databases on every host.
 
 const directories = new Set<string>();
 const track = Object.freeze({
@@ -235,10 +235,11 @@ function sqliteCensus(directory: string, name: string): StoreCensus {
 }
 
 function nodeHostFor(kind: HostKind, directory: string, reopen: boolean): LongRoomHost {
-	if (kind !== "node") {
-		if (reopen) throw new TypeError("CANVAS_CHAT_LULL_REOPEN_NODE_ONLY");
-		return browserHostFor(kind, directory);
-	}
+	// A browser host's database names derive from `directory` alone, so a reopen opens the
+	// same fake-indexeddb databases (they persist in-process), as R3's
+	// room-database-retirement-native reopen does; the room learns it is reopening from its
+	// persisted stores and from the external floor's "reopen" initialization (`openFloor`).
+	if (kind !== "node") return browserHostFor(kind, directory);
 	const storageHost = createNodeV3RoomStorageHost({ directory, initialization: () => (reopen ? "reopen" : "create") });
 	// Separate observation handles over the same files (never the room's own owners).
 	const observe = createNodeV3RoomStorageHost({ directory, initialization: () => "reopen" });

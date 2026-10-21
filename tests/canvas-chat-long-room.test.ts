@@ -10,7 +10,8 @@ import {
 } from "./fixtures/canvas-chat-lull/node-long-room.js";
 
 // Track Q evidence (Canvas and Chat creator lull): long rooms of the shipped Canvas
-// (creator-trusted-v1, 10x10) and Chat (creator-trusted-settlement-v1) compositions through
+// (its shipped profile from examples/canvas/src/profile.ts, 10x10) and Chat
+// (creator-trusted-settlement-v1) compositions through
 // genuine seal, adoption, install and both roles' lulls, with moves arriving while the
 // creator's lull runs and an optional persisted reopen. Each run is the product composition
 // ("shipped") or the same composition without its resource bound reader ("absent", the
@@ -20,7 +21,7 @@ import {
 // CANVAS_CHAT_LULL_APPS=canvas,chat  CANVAS_CHAT_LULL_HOSTS=node,room,browser
 // CANVAS_CHAT_LULL_RECIPIENTS=receive-only,writer  CANVAS_CHAT_LULL_BOUNDS=shipped,absent
 // CANVAS_CHAT_LULL_EPOCHS=16  CANVAS_CHAT_LULL_MOVES=2  CANVAS_CHAT_LULL_LULL_MOVES=2
-// CANVAS_CHAT_LULL_REOPEN_AFTER=<epoch> (node host only)  CANVAS_CHAT_LULL_REPEAT=<n>
+// CANVAS_CHAT_LULL_REOPEN_AFTER=<epoch> (every host)  CANVAS_CHAT_LULL_REPEAT=<n>
 // (pairs; odd repeats reverse the bound order)  CANVAS_CHAT_LULL_OUT=<dir> (JSONL)
 // CANVAS_CHAT_LULL_TREE=<label>  CANVAS_CHAT_LULL_VERBOSE=1  CANVAS_CHAT_LULL_SETTLE_MS=300
 
@@ -80,7 +81,7 @@ it.skipIf(!ENABLED).each(cases)(
 				epochs: EPOCHS,
 				moves: MOVES,
 				lullMoves: LULL_MOVES,
-				...(REOPEN_AFTER === undefined || host !== "node" ? {} : { reopenAfter: REOPEN_AFTER }),
+				...(REOPEN_AFTER === undefined ? {} : { reopenAfter: REOPEN_AFTER }),
 			},
 			{
 				settleMs: Number(process.env.CANVAS_CHAT_LULL_SETTLE_MS ?? 300),
