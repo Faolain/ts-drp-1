@@ -254,6 +254,7 @@ function expectProductInput(
 		readonly acl: Uint8Array;
 		readonly blueprintDigest: string;
 		readonly objectId: string;
+		readonly profileId: string;
 		readonly signerAuthor: string;
 		readonly stateBytes: Uint8Array;
 	}>
@@ -271,7 +272,7 @@ function expectProductInput(
 	expect(input.exactCanonicalProfileBytes).toEqual(
 		encodeCanonical({
 			cryptoSuiteId: "ed25519-sha256-v3",
-			profileId: "creator-trusted-v1",
+			profileId: expected.profileId,
 			quorum: 1,
 			signers: [{ publicKey: expected.signerAuthor, signerId: "creator" }],
 		})
@@ -608,6 +609,7 @@ describe.skipIf(!canonicalStateInputReady)("D.93.56 shared genesis-root builder 
 			acl: await expectedChatAcl(chatObjectId),
 			blueprintDigest: chatBlueprintDigest,
 			objectId: chatObjectId,
+			profileId: "creator-trusted-v1",
 			signerAuthor: creatorFinality.localAuthorId,
 			stateBytes: chatStateBytes,
 		});
@@ -641,10 +643,11 @@ describe.skipIf(!canonicalStateInputReady)("D.93.56 shared genesis-root builder 
 				].sort((left, right) => (left.author < right.author ? -1 : left.author > right.author ? 1 : 0)),
 				objectId: zoneInput.objectId,
 				permissionless: false,
-				version: 1,
+				version: 3,
 			}),
 			blueprintDigest: zoneBlueprintDigest,
 			objectId: zoneInput.objectId,
+			profileId: "creator-trusted-settlement-v1",
 			signerAuthor: zoneCreatorAuthor,
 			stateBytes: zoneStateBytes,
 		});
