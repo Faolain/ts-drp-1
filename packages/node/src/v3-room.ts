@@ -3538,6 +3538,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	const selectionApprovalControllers = new Set<AbortController>();
 	let transportCloseTask: Promise<void> | undefined;
 	let unbindMissingDependencyRequest: (() => void) | undefined;
+	// Track X (decision row 51): a gossip republication of retained history waits for
+	// a subscriber inside the plane's FIFO. On a settlement creator it runs after the startup
+	// barrier, so the barrier's local drain and readiness never queue behind it. A reply to a
+	// requesting peer (a direct stream, no subscriber wait) is not held.
+	let startupGossipRepublicationBarrier: Promise<void> | undefined;
+	let heldStartupGossipRepublication: Promise<void> | undefined;
 	// Ask the creator for retained history now (Track X). The transport bounds it; a refusal
 	// is not a room failure: the next vertex that waits for a missing dependency asks again.
 	const requestMissingRetainedHistory = (): void => {
@@ -4137,7 +4143,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				activeHandle.topic,
 				requestMissingRetainedHistory
 			);
-		openedTransport.setRetainedPublisher(async (targetPeerId) => {
+		const republishRetainedHistory = async (targetPeerId: string | undefined): Promise<void> => {
 			assertSessionOpen();
 			if (terminalFailure !== undefined) throw terminalFailure;
 			if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
@@ -4160,6 +4166,17 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			)
 				return;
 			throw new TypeError(`v3 room retained publication failed: ${result.kind}`);
+		};
+		openedTransport.setRetainedPublisher((targetPeerId) => {
+			const held = startupGossipRepublicationBarrier;
+			if (targetPeerId !== undefined || held === undefined) return republishRetainedHistory(targetPeerId);
+			// One gossip republication after the settlement creator's startup barrier answers every
+			// one asked for before it: at most one is held (G21).
+			heldStartupGossipRepublication ??= held.then(() => {
+				heldStartupGossipRepublication = undefined;
+				return republishRetainedHistory(undefined);
+			});
+			return heldStartupGossipRepublication;
 		});
 		if (input.creatorFinalitySigner !== undefined) {
 			const creatorFinalitySigner = input.creatorFinalitySigner;
@@ -5060,6 +5077,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 		throw new TypeError("v3 room replacement recovery source is unbounded");
 	};
+	// Track X (decision row 51): the settlement creator's startup drain issues its
+	// fence and replacements locally and the startup barrier publishes them after readiness
+	// (rebasePromise). Every other drain (successor adoption) publishes each issue at once.
+	let settlementDrainPublication: "immediate" | "after-readiness" = "immediate";
 	const issueSettlement = async (
 		operations: readonly Readonly<{
 			readonly logicalTime: number;
@@ -5107,7 +5128,9 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			}
 			await recoverSettlementOwner();
 			if (linked) {
-				await publishAccepted();
+				if (settlementDrainPublication === "immediate") {
+					await publishAccepted();
+				}
 				return null;
 			}
 			let recoveredSource = source;
@@ -5144,7 +5167,9 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				throw new TypeError("v3 committed settlement fence clock is invalid");
 			logicalTime = Math.max(logicalTime, (Reflect.get(preimage, "logicalTime") as number) + 2);
 		}
-		await publishAccepted();
+		if (settlementDrainPublication === "immediate") {
+			await publishAccepted();
+		}
 		return issued;
 	};
 	const drainSettlementOutbox = async (sources: readonly DisplacedSource[]): Promise<void> => {
@@ -5490,7 +5515,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			}
 		}
 	};
-	const drainRebaseOutbox = async (): Promise<void> => {
+	const drainRebaseOutbox = async (publication: "immediate" | "after-readiness" = "immediate"): Promise<void> => {
 		if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
 		const sources: DisplacedSource[] = [];
 		for (;;) {
@@ -5520,9 +5545,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			}
 		}
 		if (settlementProfile === "v1") {
+			settlementDrainPublication = publication;
 			try {
 				await drainSettlementOutbox(sources);
 			} finally {
+				settlementDrainPublication = "immediate";
 				// These nominal sources authorize only this joined drain. Do not
 				// retain old registrations as a long-lived capability cache.
 				recoveredSettlementSources = undefined;
@@ -5710,10 +5737,19 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 						if (!(settlementProfile === "none" && sourceMaterial === undefined && selectRoomStartup() !== "successor")) {
 							await waitForRetainedBootstrap();
 							if (terminalFailure !== undefined) throw terminalFailure;
-							await publishAccepted();
-							await drainRebaseOutbox();
+							if (settlementProfile !== "v1") {
+								await publishAccepted();
+							}
+							await drainRebaseOutbox(settlementProfile === "v1" ? "after-readiness" : "immediate");
 						}
 						await prepareCurrentCreatorOrdinaryReadiness();
+						// Settlement (decision row 51): every publication waits for a subscriber
+						// on the topic inside the plane's FIFO (network node.ts waitForSubscriber), so
+						// readiness is prepared on the local drain's postimage first. Then every accepted
+						// row is published in author-sequence order before the barrier resolves.
+						if (settlementProfile === "v1") {
+							await publishAccepted();
+						}
 					} catch (error) {
 						terminalFailure = error;
 						try {
@@ -5727,6 +5763,16 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	void rebasePromise.catch((error: unknown) => {
 		terminalFailure = error;
 	});
+	if (settlementProfile === "v1" && creatorCloseHandle !== undefined) {
+		const startupSettled = rebasePromise.then(
+			() => undefined,
+			() => undefined
+		);
+		startupGossipRepublicationBarrier = startupSettled;
+		void startupSettled.then(() => {
+			if (startupGossipRepublicationBarrier === startupSettled) startupGossipRepublicationBarrier = undefined;
+		});
+	}
 	if (recoveredActivation !== undefined) {
 		try {
 			await publishAccepted();
