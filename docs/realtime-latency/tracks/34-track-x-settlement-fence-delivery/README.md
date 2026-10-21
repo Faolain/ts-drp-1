@@ -1,6 +1,6 @@
 # Track X: the settlement fence delivery stall
 
-**Outcome:** Fix merged in cf6d306f (4122ab83..e26cd812, without the startup-readiness RED). A recipient now asks the creator again for a missing dependency, so the settlement fence that arrives before install is no longer lost; shipped Canvas and Chat and the Grid with Track V's switch run 16/16 with real networking. IN PROGRESS: the IndexedDB seal deadlock (row 49) and the startup order (row 45). See [RESULT.md](RESULT.md).
+**Outcome:** Fix merged in cf6d306f (4122ab83..e26cd812, without the startup-readiness RED). A recipient now asks the creator again for a missing dependency, so the settlement fence that arrives before install is no longer lost; shipped Canvas and Chat and the Grid with Track V's switch run 16/16 with real networking. The IndexedDB seal deadlock fix is picked as 04f7fd0b..9b28e327 (row 53): the seal stages its snapshot before it takes a journal source. IN PROGRESS: the startup order (rows 45 and 51). See [RESULT.md](RESULT.md).
 
 **Working documents in this folder:** [BRIEF.md](BRIEF.md), [RESULT.md](RESULT.md)
 
@@ -370,3 +370,237 @@ export PATH="<fnm>/node-versions/v22.15.0/installation/bin:$PATH"
 That directory has node v22.15.0 and pnpm 10.24.0, the repo's packageManager. Don't change the fnm default or install anything globally.
 
 Check any run since 14:07 for "pnpm: command not found" or for node 22.23.4. Rerun those, and never pair a run on 22.23.4 with one on 22.15.0.
+
+### Follow-up instruction — Your fix is merged; main is 24d4ca61 (2026-10-21 18:56 UTC)
+
+Coordinator here. Your work is merged into main (codex/phase3a1b-p6-golden-path), now 24d4ca61. That's f2d301d5 merged, then the fixture half of 9b6b5f3f as 65505659, then 270c7068..e26cd812 picked as eeddd65a..cf6d306f.
+
+What I checked with Node 22.15.0 pinned and Track Y underneath:
+- typecheck 0 and the shadow guard clean;
+- your four RED files passing, with the fence RED three more times;
+- every room and Canvas/Chat test passing;
+- the Grid bench in LULL=1 and concurrent modes;
+- Chat and Canvas with real networking 16/16;
+- the Canvas/Chat e2e 9/9.
+
+Decision rows 48 and 49 and your track folder are recorded on main.
+
+For your next commits (the seal deadlock, then the startup order), rebase onto 24d4ca61 or merge it in. The startup RED (9b6b5f3f) and its fixture are still only on your branch, as agreed, and the fixture's changes are already on main as 65505659.
+
+Track Z has started, from 24d4ca61. It's working on making the room database the default for new rooms. It won't edit creator-close.ts, and it will report before touching v3-room.ts. Your deadlock fix has to cover the room-database host as well as the default host.
+
+### Report returned by the agent (2026-10-21 20:32 UTC)
+
+Track X step 2 (seal deadlock, Option 1) is done and proven; moving on to step 3 (startup order options).
+Branch worktree-agent-a9ab847b594d95e7f: e1f471bb RED, 2a65f450 fix, b8ad1f50 merge of main 24d4ca61 (no rewrite), 75a16b81 docs (RESULT.md section 10).
+- Fix: in close(), the stageSnapshot block and `lifecycle = "sealed"` move ahead of the promotion and recovery sources. No other change, and no test pins that order.
+- One departure from row 49: I do not call abortSnapshotStage when a source fails. Once the stage has folded, it returns false and changes nothing (v3-live 19774-19779). So a source failure leaves the close "sealed" and retryable, which is what any failure after the stage already did at base. If you want the old "back to active" outcome, the alternative is to split the stage: drain first, take the sources, then fold. That needs a new close-registration step in v3-live.ts and a check that nothing admitted meanwhile writes the journal (RESULT 10.2).
+- RED, base vs fix: hangs 4/4 at main's code (both hosts, both sources); passes 4/4 at the merged head. The control passes 4/4.
+- Storm harness at the merged head: 31/31 counted runs pass with 0 hangs (base 2/30). One run is not counted: my own node suite's firewall.test.ts rebuilt packages/node/dist under Vite and reloaded the page.
+- Real networking at the merged head: Canvas 16/16, Chat 16/16. Grid with Track V's 4 commits, on scratch branch track-x-grid-seal: 3 runs, all 16/16.
+- Bonus: the fix also removes Track M's NATIVE_READ_RESERVATION_BUSY seal race. With no settle before a seal, base fails 13 of 16 runs ("recovery role transfer source failed: internal-invariant") and the fix fails 0 of 16. A probe shows the cause: an admitted ingress task holds the journal view (acquireLocalReplacementCustody, then resumeJournalReads) when the source is taken. So the 300 ms settles could go.
+- Bench, 8 ABBA pairs at 8 rollovers, base vs fix: seal 3392 vs 3481 ms, adopt 687 vs 704, install 2065 vs 2091, issue 53.7 vs 55.0, delivery 121.5 vs 124.1. Recipient install, which this code doesn't touch, moves the same way, so I read it as load noise (load 160-350).
+- Suites, per test, base vs fix: no new failures. Root has one each way, both explained: a vite SSR import race that passes alone, and a timeout on the base side. pnpm -r typecheck: 0 errors. Shadow guard: clean.
+Note for anyone running Chromium proofs next to suites: packages/node/tests/firewall.test.ts and sync-state-heap-recharacterization-1o-f-ii-red.test.ts rebuild packages/node/dist from the worktree's src.
+
+### Follow-up instruction — Accept X's seal fix departure; verifying now (2026-10-21 20:34 UTC)
+
+I accept the seal-fix departure from row 49 (a source failure leaves the close sealed and retryable, and abortSnapshotStage is not called once the stage has folded). I'm verifying e1f471bb, 2a65f450 and 75a16b81 by cherry-picking them onto main 24d4ca61. Your merge commit b8ad1f50 would bring tests/track-x-settlement-startup-readiness-red.test.ts onto main, and that RED stays on your branch until step 3 fixes it. I'll merge once my checks pass. Carry on with step 3 and hand back the startup-order options without implementing a choice the owner hasn't made. Leave Track M's 300 ms settles alone for now; I'll raise removing them separately.
+
+### Report returned by the agent (2026-10-21 21:26 UTC)
+
+Track X step 3 (startup order, row 45) is done as options only. Nothing is implemented. On my branch the head is now b9335db0 "docs: record the startup-order options" (RESULT.md section 11, a summary bullet and a commits row; prettier clean). The startup RED from 9b6b5f3f stays red here. I did not edit creator-ordinary-readiness-producer.test.ts. Track M's 300 ms settles are untouched.
+
+**What makes readiness wait**
+- The barrier is `rebasePromise` (v3-room.ts:5705-5726). It runs bootstrap, then `publishAccepted`, then the drain, then prepare.
+- Every publication is a plane FIFO task: `publishPending` (v3-live.ts:16156) awaits `publishMessage` at 16248.
+- `waitForSubscriber` (network node.ts:2929) then waits up to 1 s for a subscriber, and after that publishes to no one.
+- `room.issue` awaits the same barrier (v3-room.ts:7278).
+- The wiring test pins this order: v1 must call `[enqueue, bootstrap, publish, drain, prepare]` (lines 1578-1627). Any new identifier in the barrier text also breaks it.
+
+**The prototype** (scratch branch track-x-startup-seal, ef37befb)
+- On v1 the drain issues locally, readiness is prepared, then every accepted row is published, and only then does the barrier resolve. The creator's own gossip republication of its history is held until the barrier settles (at most one).
+- The startup RED passes.
+- The wiring test fails only on the pinned order.
+- Shipped Grid (d9346), prototype plus the seal fix: 9 of 9 runs pass both tests. Without the prototype, line 474 still fails.
+- Prototype on main's creator-close.ts: 10 of 12 pass, 1 BUSY, and 1 rollover transfer failure ("snapshot peer has no open unlimited authenticated connection", no BUSY, not seen elsewhere).
+
+**The NATIVE_READ_RESERVATION_BUSY**
+I caught both stacks with a probe patched into the built storage-browser code (run md9-proto-presl-3).
+- **Holder:** `acquireCreatorIssuanceMaintenanceProof`. It held the creator's `--ahe` read view from 3606 ms, before the Writer connected. The zone was at epoch 0, so no close was running.
+  - Local issues run their maintenance inside the plane FIFO (`enqueueLocalIssue`, v3-live.ts:15149-15158), so they cannot overlap ingress.
+  - That leaves the readiness job as the holder: `prepareOrdinaryReadiness` (creator-close.ts:4677, outside the FIFO) → `captureCreatorOrdinarySourceWithoutForecast` (2460/2473).
+  - This is by elimination. A second probe that would name the caller never fired: 14 more runs had no BUSY.
+- **Refused:** the Writer's first append. `handleV3Ingress` (v3-live.ts:7556-7569) takes custody before it asks the maintenance consumer. On the browser the reservation refuses at once, and the catch returns false without keeping the append.
+- **The asymmetry:** when the consumer refuses for the same reason, the append is kept as pending ingress (7730-7737), as the comment at 7471 says it must be. So this is a drop that already exists in the code; the reorder only lines it up with the first join. The same path exists at startup and at successor installs (v3-room.ts:5716, 6667), though I never saw it without the prototype.
+- The seal fix changes only close(), so it shouldn't matter here. 9/9 against 10/12 is not evidence that it does.
+
+**Options for the owner** (each of A, B and C needs one BUSY fix)
+- **BUSY fix (i), smallest:** keep the append as pending ingress when custody is refused, as the consumer path does. It is bounded by maxPendingEntries/Bytes and counted in the census (G21). Also retry when the maintenance job ends; today pending ingress is retried only after the next successful ingress (7974).
+- **BUSY fix (ii):** run the readiness job as a plane FIFO task. Bigger, and ingress waits behind the cold capture.
+- **A. Reorder on v1 (the prototype).** "Started up" still means "published", and publications still wait for a subscriber. The owner has to amend the pinned wiring order to `enqueue, bootstrap, drain, prepare, publish`. One cost remains: a placement made while the creator is still alone still waits for the last publications, but it builds nothing.
+- **B. Background publisher.** The barrier text stays, so the pinned test passes by its letter, but its "after startup publication" meaning stops being true. It needs a no-wait subscriber check, a "deferred" egress result and a bound. G19 holds issuance retention while rows stay pending. Not prototyped.
+- **C. No subscriber wait when the topic has none.** Smallest diff, but it changes every app and both profiles. The startup RED's assertion that the startup publications reach the Writer by gossip would fail. Not prototyped.
+- **My preference, for the owner to decide:** A with (i).
+
+**Worktree state**
+- Back on worktree-agent-a9ab847b594d95e7f at b9335db0, tree clean.
+- Dists are rebuilt from the branch: no probes, no prototype, and the stage-first fix is present.
+- Rebuilding normally after touching the files did not remove the dist probes, because `tsc -b` compares content. I used `tsc -b tsconfig.build.json --force` for storage-browser and node, which did. This is recorded in PROGRESS.md.
+- Scratch branches are kept: track-x-startup-seal and track-x-grid-seal.
+- No processes of mine are left.
+- One port collision on 4175 at launch; that log was renamed `*-porttaken` and excluded.
+
+Files are in <evidence>/track-x/:
+- PROGRESS.md
+- logs/md9-proto-*.log
+- data/md9-proto-presl-3-trace/console.txt
+- bin/: patch-busy-probe.py, patch-maintenance-probe.py, busy-console.py, trace-snapshots.py, d9loop.sh
+
+The full write-up is <worktree agent-a9ab847b594d95e7f>/docs/realtime-latency/tracks/34-track-x-settlement-fence-delivery/RESULT.md, section 11.
+
+### Follow-up instruction — Owner chose startup option A with BUSY fix (i); implement (2026-10-21 21:30 UTC)
+
+The owner chose startup option A (prepare readiness before publishing, on v1) with BUSY fix (i) (keep the append as pending ingress on a custody refusal, and retry when the maintenance job ends). Implement both on your branch (it already has the stage-first fix, which I'm verifying for main now).
+
+Pinned-test amendment the owner approved: in packages/node/tests/creator-ordinary-readiness-producer.test.ts (1578-1627), only the v1 expected order becomes ["enqueue", "bootstrap", "drain", "prepare", "publish"], and the test title's wording may change if it no longer describes the order. Make it its own commit, with a message naming the owner's approval (decision row 51). Keep the barrier text to the identifiers the stubs already define, as your prototype did. If any other change to that test, or to any other RED, governance or frozen file, turns out to be needed, stop and report before making it.
+
+Order of work:
+1. RED for (i), committed before the fix. A custody refusal on a creator bound for maintenance (handleV3Ingress, v3-live.ts:7556-7569) loses the append today. The RED should show the append kept as pending ingress and admitted once the maintenance job ends, without waiting for another ingress. Use the node host if you can reproduce it there; if you can't, use whatever fixture shows it, and say which.
+2. Implement A (the prototype's shape) and (i). Keep pending ingress bounded by maxPendingEntries/maxPendingBytes and counted in the census (G21). Make the retry event-driven, not a timer. Keep edits to v3-room.ts minimal and list every function you touch: Track Z may later touch host selection there.
+3. Proof:
+   - the startup RED (9b6b5f3f) and the new (i) RED green, the amended wiring test green, and your seal RED still green;
+   - shipped Grid (d9346) with Track V's 4 commits (d5a0015f, 15bf2ed1, 5b55b6e9, 27fe2688) on a scratch branch: at least 6 runs, both tests;
+   - shipped Canvas and Chat with real networking, 16/16 over 2 runs each;
+   - the bench at 8 rollovers in default mode and in room database + LULL=1, paired against base;
+   - per-test suite comparison against base (node; root room and native tests including Tracks K-X; storage, storage-browser and storage-node; the Canvas/Chat e2e);
+   - pnpm -r typecheck 0 errors, and the shadow guard.
+   Also confirm that V's 4 commits apply cleanly on your head.
+4. Add RESULT.md section 12 and a commits row, then hand back with the commit list.
+
+Leave Track M's 300 ms settles alone. Keep the Node PATH pin, the port checks, and `tsc -b --force` after removing probes.
+
+### Report returned by the agent (2026-10-21 21:32 UTC)
+
+Track X: the approved wiring-test amendment can't pass as worded, so I need one more change approved.
+
+packages/node/tests/creator-ordinary-readiness-producer.test.ts:1602-1612 checks `room.calls` at the moment prepare is entered (line 1609, `await enteredPromise`). The prepare stub is still gated at that point, and the test only calls `release()` afterwards. Under option A, publish runs after prepare, so at line 1609 the calls are ["enqueue", "bootstrap", "drain", "prepare"]. The approved 5-element list can't hold at that line.
+
+Smallest change that keeps the test's intent (preparation joins before the barrier resolves, and now before publication):
+1. Line 1609, v1: ["enqueue", "bootstrap", "drain", "prepare"].
+2. After `await room.done;` on line 1611, add `expect(room.calls).toEqual(["enqueue", "bootstrap", "drain", "prepare", "publish"]);`.
+3. Title: "joins preparation after the startup rebase, before startup publication and before the existing barrier resolves".
+
+The NONE and receive-only test and the swap test stay unchanged; both pass with A's barrier text.
+
+Is this approved? Until I hear back I'm doing the (i) RED and the implementation, and I won't touch the test.
+
+### Follow-up instruction — Owner approved the refined wiring-test amendment (2026-10-21 21:34 UTC)
+
+The owner approved your refined amendment to packages/node/tests/creator-ordinary-readiness-producer.test.ts, exactly as you wrote it:
+- line 1609 (v1) becomes ["enqueue", "bootstrap", "drain", "prepare"];
+- after `await room.done;` (line 1611), add `expect(room.calls).toEqual(["enqueue", "bootstrap", "drain", "prepare", "publish"]);`;
+- the title becomes "joins preparation after the startup rebase, before startup publication and before the existing barrier resolves".
+The NONE/receive-only test and the swap test stay unchanged. Commit it on its own, with a message naming the owner's approval (decision row 51). Anything further on that test, or on any other pinned file, comes back to me first.
+
+### Report returned by the agent (2026-10-21 21:43 UTC)
+
+Track X: fix (i) as approved turns the lost append into a terminal creator, so I've stopped on (i) and need a decision. Option A is unaffected and I'm continuing with it.
+
+The RED, uncommitted for now: tests/track-x-custody-refusal-red.test.ts with tests/fixtures/track-x/custody-refusal-room.ts. It runs on the node SQLite host, which reproduces this: the storage-node owner also throws BUSY at once when it already holds a reservation (storage-node native-read-reservation.ts:61).
+- The creator reopens. Its startup readiness job (captureCreatorOrdinarySourceWithoutForecast → acquireCreatorIssuanceMaintenanceProof) already holds the AHE, journal and issuer views and is about to reserve the floor. At that moment the Writer's move reaches the creator's ingress.
+- The move's custody is refused before it reaches the floor (BUSY on the AHE view).
+- **At base:** the move is never admitted within 15 s of the job's end (logs custody-red-base-r3). The RED fails for the right reason.
+- **With (i)** (keep the append as pending ingress when custody is refused): the RED fails with "creator held issuance census is unavailable" (custody-red-scratch-i-r1).
+  - The readiness job holds an issuance census that requires pending ingress to stay unchanged (`live()` → `pendingCurrent()`, v3-live.ts:11007/11041).
+  - Keeping the append changes pending ingress, so the job's next reservation check fails (creator-closed-rollback-data.ts:6785).
+  - The startup barrier then fails, and the creator becomes terminal.
+- At base, a Writer row with a missing dependency is also kept as pending (7966), and it kills readiness the same way. That is exactly Chromium md9-proto-presl-3: BUSY, BUSY, graph-rejected, then "creator held issuance census is unavailable", then the creator leaves the room.
+- The retry half of (i) already exists: the readiness and pool jobs call `registration.resumePendingIngress()` when they end (creator-close.ts:4804 and 4906; v3-live.ts:19906).
+
+So no ingress may touch the plane while the readiness job holds its census. Options:
+- **(a) Recommended. Run the readiness capture in a plane FIFO slot,** as `runCreatorOrdinaryReadinessMaintenance` already does for readiness maintenance and pool lulls (v3-live.ts:19660-19674).
+  - That slot sets the closing gate with `readinessMaintenanceEntered`, so arriving ingress queues FIFO behind it (enqueueV3Ingress, 8184-8189). Nothing is dropped and nothing is refused: this is G23's existing pattern.
+  - The changes are in creator-close.ts `prepareOrdinaryReadiness` plus a v3-live registration entry point. The RED's setup would change: the move would wait in the FIFO instead of reaching custody. The test would still require the move to be admitted after the job and the creator to stay live.
+  - Risk: the capture must not enqueue plane tasks itself, or it deadlocks the way the seal did. sealCreatorRecoveryDependencies does not, and readiness maintenance already seals inside such a slot. I'd prove the rest.
+- **(b) (i) plus one bounded readiness retry** when its census is invalidated by ingress. This changes startup failure semantics, and a steady stream of appends could still fail it.
+- **(c) (i) as specified.** Counterexample above: the creator becomes terminal.
+
+I'd keep (i)'s retain as well under (a), for other holders that can still refuse custody (for example retained reads in withCurrentRetainedRead), but only together with (a).
+
+Which do you want? Meanwhile I'm committing the approved wiring-test amendment and implementing A. No proof runs until this is settled.
+
+### Follow-up instruction — Owner chose (a): readiness capture in a plane FIFO slot (2026-10-21 21:44 UTC)
+
+The owner chose (a): run the readiness capture in a plane FIFO slot, as runCreatorOrdinaryReadinessMaintenance already does, so ingress that arrives meanwhile queues FIFO behind it and nothing is dropped or refused. Keep (i)'s retain-on-custody-refusal as well, for other holders, but only together with (a). The fix (b) retry is not wanted. This replaces (i)-alone in decision row 51.
+
+Conditions:
+- Commit the RED before the fix. It may change its setup so the move waits in the FIFO, but it must still require that the move is admitted after the job and that the creator stays live. Keep the node-host custody-refusal case as a separate test of (i)'s retain under (a), if it can still be reached through another holder; if it can't, say so.
+- Prove the capture enqueues no plane task of its own on any path, at startup and at successor install (v3-room.ts:5716, 6667), so it cannot deadlock the way the seal did. Add a test for it if it can be checked.
+- Measure what the slot costs real-time play. Give the wait an ingress move sees behind the readiness slot, as p50/p90/max, at startup and after each successor install. Also give move delivery and the creator's first-move latency per epoch, paired against base, with the bench at 8 rollovers in default mode and in room database + LULL=1, and with shipped Grid/Canvas/Chat over real networking. If the slot adds a per-epoch wait that real-time play would notice (say tens of ms at p50 after installs on a warm room, beyond the load noise), stop and report before going further.
+- Everything else in my previous message stands: the d9346 runs with V's commits, the per-test suite comparison, typecheck, the shadow guard, RESULT section 12, and the hand-back.
+
+### Report returned by the agent (2026-10-21 22:00 UTC)
+
+Track X: (a) as written leaves a hole that makes the creator terminal, and implementing it would change two pinned source texts. I propose a refinement below and need a yes or no before I implement it. Meanwhile I'm implementing A and writing the RED, which doesn't depend on the choice.
+
+1) The hole. A readiness job captures first, and when that source isn't certified, or recovery is required, it then runs `registration.runOrdinaryReadinessMaintenance` (creator-close.ts 4724-4760). The ingress queued behind the capture slot runs before the maintenance slot does (it is a single FIFO). The consumer refuses it while the readiness job is in flight (creator-close.ts 3438), so v3-live.ts 7733 keeps it as pending ingress. The non-deferrable maintenance boundary requires `pendingIngress.size === 0` (v3-live.ts 11400, rechecked at entry in 11417). It throws, readiness fails, and the startup or install barrier makes the creator terminal. So under (a) an append that arrives during the first capture becomes a terminal creator whenever maintenance follows.
+   - Base has the same chain in a narrower window (an arrival between the capture and the maintenance, or before the maintenance on the required path).
+   - Separately, the readiness maintenance is non-deferrable, so `enqueueV3Ingress` (8186) drops new arrivals while it runs.
+
+2) Pinned texts. Two tests run these functions from source against stubs:
+   - packages/node/tests/creator-ordinary-readiness-producer.test.ts (closeReadinessJob, 803-860) runs the actual `prepareOrdinaryReadiness` text against a stub registration. Any new call in that text, such as a `registration.runOrdinaryReadinessCapture(...)` wrapper, needs one stub line added to that pinned test.
+   - creator-recovery-pool-gameplay.test.ts and producer test line 420 run `runCreatorOrdinaryReadinessMaintenance`, so it can't take new identifiers either. A whole-job slot would deadlock on its nested enqueue anyway.
+
+3) Proposed refinement (same intent: arrivals queue behind readiness, nothing dropped or refused, event-driven, bounded). Neither pinned text changes:
+   - `prepareCreatorOrdinaryReadiness(plane)` (creator-close.ts 5002, not pinned) takes a readiness ingress hold before it starts the job. The hold is a new creatorCloseRegistration method in v3-live. It sets a per-registration hold promise, then enqueues one empty FIFO task and awaits it as a flush, so every earlier queued ingress finishes before the job starts. It resolves the hold in a finally once the job has joined. This is the job that already calls `resumePendingIngress`.
+   - `enqueueV3Ingress` waits on that hold through its existing barrier option (`inputAdmission.barrier`, which already serves `terminalBarrier`, with `captureBeforeBarrier`). An arrival is captured and charged to the input pool (32 jobs, maxPendingBytes, G21), waits outside the FIFO and outside pendingIngress, then enters the FIFO in arrival order when the job ends. While the hold is set, the closing-gate drop at 8186 queues instead, so the readiness maintenance phase drops nothing either. That boundary keeps the epoch, as the pool's does. A failed boundary still drops at authentication under the halt, as for the pool today.
+   - Effect: pendingIngress and the graph stay fixed for the whole job. The capture census and the maintenance boundary can't be invalidated by ingress, and no ingress reaches custody during readiness. (i)'s retain stays for other holders.
+   - Deadlock: the job waits only for the flush and its own maintenance slot. No FIFO task waits on the hold. My static pass over packages/node/src (call graph from refresh, the cold capture and metadata) reaches no FIFO enqueue. The pool's `after` already runs the same cold capture inside a FIFO slot.
+   - Measurement: I'd report the wait an ingress sees behind the hold (p50/p90/max, at startup and after each install), plus the other numbers you asked for.
+
+4) What it doesn't cover. Other FIFO work, such as retained-history reads (`withCurrentRetainedRead` holds all four reservations), can still overlap the capture and BUSY it. That hazard already exists. Adding a capture slot on top would close it but needs the stub line in (2). Optional.
+
+5) (i)'s separate test. After the hold, the readiness job is no longer a holder. The production holders left outside the FIFO are:
+   - v3-room.ts 5383, the split replacement's floor view during the drain, which a readiness job always follows, so its end resumes;
+   - the migration target floor;
+   - the seal, whose closing gate drops ingress.
+   None can be driven on the node host without a split replacement or a migration. So I'd test (i) with the test itself holding the creator floor's native reservation, standing in for 5383. The retained append is then admitted at the next drain trigger: the creator's next move, an admitted ingress, or a job end.
+
+Can I go ahead with 3 (and 4 or not)?
+
+### Follow-up instruction — Approve the readiness hold (3); not the capture slot (4) (2026-10-21 22:00 UTC)
+
+Yes to (3), the readiness ingress hold. It meets the owner's intent for row 51: arrivals wait behind readiness, nothing is dropped or refused, and no pinned text changes. I'll record it as how row 51 is implemented.
+
+No to (4) for now. The hazard predates this work, and it would need a pinned-test stub line, which is the owner's call. Record it in RESULT.md as an open item: retained reads can BUSY the capture, and the fix is a capture slot plus one stub line in creator-ordinary-readiness-producer.test.ts.
+
+For (3), cover these with tests, where the node host can reach them:
+- The hole from your point 1: an append arrives during the capture of a readiness job whose source then needs maintenance. It must be admitted after the job, and the creator must stay live. This should fail at base or with (a) as first written.
+- close() is called while the hold is set. Close still waits for the job, and the held arrivals then meet the closed gate exactly as they would today. No hang, and no arrival admitted after the stage.
+- The input pool fills while the hold is set (32 jobs or maxPendingBytes). Say what happens to the next arrival, and show that it is the existing refusal behaviour, not a new drop path.
+- The hold is released on every path: job success, failure, terminal failure, and a throw in the flush.
+- The seal's closing gate still drops while no hold is set. Only readiness maintenance under the hold queues instead.
+Also state the argument that no FIFO task can await the hold. If it can be asserted cheaply (for example, a debug check that the hold is never awaited from inside a FIFO task in tests), add it.
+
+(i)'s separate test with the test holding the creator floor's native reservation is fine. Name it as a stand-in for v3-room.ts 5383.
+
+Measurements as before: the wait behind the hold (p50/p90/max) at startup and after each install, the bench pairs, and shipped Grid/Canvas/Chat. Stop and report if the per-install wait is noticeable for real-time play.
+
+### Report returned by the agent
+
+Track X: (i) breaks the creator's local issues, so I need a decision on it. The hold is unaffected and I'm continuing with it.
+
+Finding. With (i), a custody-refused append is kept as a pending-ingress entry whose parents are all present. The creator census refuses such an entry unless it is the entered received append (v3-live.ts ~10240, readCreatorRecoveryDependencyCensus: `if (missingParents.length === 0 && active.enteredReceivedDigest === undefined) return undefined;`).
+- The creator's next local issue therefore fails: "issuance-rejected ... creator recovery dependency hold unavailable:replay". The census is reached through prepareCreatorIssuanceMaintenanceQuote (creator-close.ts:2154).
+- A failed issue drains nothing, so the creator can't play until a received append succeeds or a maintenance job ends.
+- Node-host test standing in for v3-room.ts 5383 (the test holds the creator's floor reservation): at base the move is lost (logs/retain-red-base-r2.log); with (i) the creator's own next move is refused (logs/xreds-head-r1.log).
+
+For the real 5383 holder it's worse. The split replacement acquires its floor view outside the FIFO, then runs source.withDependencies in a FIFO read-control slot while still holding the floor. That slot seals an active census (sealCreatorRecoveryDependencies with activeSource). Ingress queued ahead of the slot gets custody-refused. Under (i) it is kept, the census then refuses, and the split replacement fails. At base the append is dropped and the replacement goes on. So for that holder, (i) turns a lost append into a failed replacement.
+
+Options:
+1. Recommended: ship the hold without (i). Custody refusal by a non-FIFO holder drops the append, as at base. RESULT records the 5383 loss as an open item.
+2. (i) plus a drain before each local issue. In issueLocal, a maintenance-bound creator with pending ingress drains it before issuing. A probe passes the stand-in test (logs/retain-alpha-r1.log). It does not help 5383: the floor is still held during that census, so the replacement still fails.
+3. The 5383 replacement takes the ingress hold around its floor view, so arrivals wait instead of being refused, and (i) isn't needed there. This needs an edit to v3-room's replacement loop (Track Z's caution) and a hold exposed on the rebase source. It's a new decision.
+
+Until you answer, I'm keeping (i) out of the fix commit; it's saved as a separate patch. I'm continuing with: the hold REDs (both fail at base and pass with the hold: logs/hold-red-base-r1.log, logs/xreds-head-r1.log), the hold fix, the hold property tests and the measurements. I'll add (i) in its own commit only if you choose 2 or ask for it.
