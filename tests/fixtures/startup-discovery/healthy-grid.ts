@@ -82,8 +82,11 @@ async function createHealthyGridRole(input:{index:number;database:string;identit
   await waitForV3RoomStartupForDiagnostics(session);
   // Display-only intents for moves whose signing waits behind maintenance.
   if(presentationMode==="1")session.bindPresentationIntents(session.openEphemeral({maxMessageBytes:8192,maxSequencedKeys:8,maxSequencedSenders:8}));
-  issuance=roomDatabase?await createBrowserRoomDurableIssuanceStore({databaseName:database}):await createBrowserDurableIssuanceStore({primaryDatabaseName:database});
-  snapshot=roomDatabase?await createBrowserRoomSnapshotQuarantineStore({databaseName:database}):await createBrowserSnapshotQuarantineStore({primaryDatabaseName:database});
+  // The census observers follow the layout the room was opened in: without a flag the
+  // default host routes the room (a new room: the room database; an existing one: its own).
+  const roomLayout=roomDatabase||(await indexedDB.databases()).some(entry=>entry.name===database&&entry.version===7);
+  issuance=roomLayout?await createBrowserRoomDurableIssuanceStore({databaseName:database}):await createBrowserDurableIssuanceStore({primaryDatabaseName:database});
+  snapshot=roomLayout?await createBrowserRoomSnapshotQuarantineStore({databaseName:database}):await createBrowserSnapshotQuarantineStore({primaryDatabaseName:database});
   const original=session;
   const native=browserIssuancePruningMaintenanceForStore(issuance);check(native,"healthy native census owner unavailable");
   const ownIssuance=issuance,ownSnapshot=snapshot,ownScope={objectId,author};

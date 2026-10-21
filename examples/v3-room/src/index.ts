@@ -155,14 +155,89 @@ export type CreateV3RoomSessionInput<Projection extends V3RoomProjectionAuthorit
 > &
 	Readonly<{ storageHost?: V3RoomStorageHost }>;
 
+// The six-database layout's per-room databases besides `name` itself (the issuance
+// database is named by the issuance primary name).
+const SIX_DATABASE_SUFFIXES = [ROOM_AHE_SUFFIX, "--drp-live-journal-v1", "--drp-snapshot-quarantine-v1"] as const;
+const SIX_DATABASE_ISSUANCE_SUFFIX = "--drp-issuance-v1";
+
+/** The layout an existing room was created in, or "new" when none of its databases exists. */
+type ExistingRoomLayout = "room" | "six-database" | "new";
+
+/**
+ * Which existing databases of `names` exist, with their versions. It never creates a
+ * database: it lists them when the engine can, and otherwise probes each one with an
+ * aborted creating upgrade. Without IndexedDB nothing exists.
+ * @param names - Candidate database names.
+ * @returns The existing ones with their versions.
+ */
+async function existingDatabases(names: readonly string[]): Promise<ReadonlyMap<string, number>> {
+	const existing = new Map<string, number>();
+	const factory = Reflect.get(globalThis, "indexedDB") as IDBFactory | undefined;
+	if (factory === undefined) return existing;
+	if (typeof factory.databases === "function") {
+		for (const { name, version } of await factory.databases())
+			if (name !== undefined && names.includes(name)) existing.set(name, version ?? 0);
+		return existing;
+	}
+	for (const name of names) {
+		const version = await existingDatabaseVersion(name);
+		if (version !== undefined) existing.set(name, version);
+	}
+	return existing;
+}
+
+/**
+ * The layout a room was created in, read from its database names alone (a rebase source
+ * counts as part of the room: the session opens its journal through the same host).
+ * - its main database at the room database's version: the room database;
+ * - any six-database name (the main database at another version, or `--ahe`, a journal,
+ *   snapshot or issuance database; a recipient may have no main database yet): six databases;
+ * - none of its databases: a new room.
+ * Local mechanics only: a wrong answer can only fail to open (the room host refuses a
+ * six-database main database; the six-database owners refuse version 7). It grants nothing.
+ * @param input - The room's database names.
+ * @returns The layout.
+ */
+async function existingRoomLayout(
+	input: Pick<CreateV3RoomSessionInput, "databaseName" | "issuanceDatabaseName" | "rebaseSourceStorage">
+): Promise<ExistingRoomLayout> {
+	const own = input.databaseName;
+	const source = input.rebaseSourceStorage?.databaseName;
+	const sixDatabaseNames = (name: string): string[] => SIX_DATABASE_SUFFIXES.map((suffix) => `${name}${suffix}`);
+	const issuance = `${(input.issuanceDatabaseName as string | undefined) ?? own}${SIX_DATABASE_ISSUANCE_SUFFIX}`;
+	const legacy = [issuance, ...sixDatabaseNames(own), ...(source === undefined ? [] : sixDatabaseNames(source))];
+	const existing = await existingDatabases([own, ...(source === undefined ? [] : [source]), ...legacy]);
+	const main = existing.get(own);
+	if (main === ROOM_DATABASE_VERSION) return "room";
+	if (main !== undefined || legacy.some((name) => existing.has(name))) return "six-database";
+	if (source !== undefined && existing.has(source))
+		return existing.get(source) === ROOM_DATABASE_VERSION ? "room" : "six-database";
+	return "new";
+}
+
+// The layout a NEW room is created in when the application passes no storage host.
+const NEW_ROOM_LAYOUT: Exclude<ExistingRoomLayout, "new"> = "six-database";
+
 /**
  * Selects native IndexedDB mechanics for the browser application boundary.
  * External head freshness, application catalog and signer selection stay explicit.
+ * Without an explicit `storageHost`, a room opens on the host it was created on: one in
+ * the room database on the room database with retention (and the scheduled lull, unless
+ * the application passes `recoveryPoolScheduledLull: false`), one in six databases on the
+ * six-database host, unchanged. Nothing is migrated.
  * @param input - Existing application and host-acquired room authority.
  * @returns The shared SDK room lifecycle, with no browser-only protocol owner.
  */
 export async function createV3RoomSession<Projection extends V3RoomProjectionAuthority>(
 	input: CreateV3RoomSessionInput<Projection>
 ): Promise<V3RoomSession<Projection>> {
-	return openHostRoom({ ...input, storageHost: input.storageHost ?? browserStorageHost });
+	if (input.storageHost !== undefined) return openHostRoom({ ...input, storageHost: input.storageHost });
+	const existing = await existingRoomLayout(input);
+	const layout = existing === "new" ? NEW_ROOM_LAYOUT : existing;
+	if (layout === "six-database") return openHostRoom({ ...input, storageHost: browserStorageHost });
+	return openHostRoom({
+		...input,
+		storageHost: createBrowserV3RoomDatabaseStorageHost({ roomRetention: true }),
+		recoveryPoolScheduledLull: input.recoveryPoolScheduledLull ?? true,
+	});
 }
