@@ -30,6 +30,17 @@ import { installGridRoomHeadAuthority } from "./fixtures/phase-3a1b/grid-room-he
 // own network node's send and publish methods to time them (observation only: each wrapper
 // calls the original with the same arguments and returns its result). TRACK_X_CONSOLE_ALL=1
 // keeps every console line of both pages (not only warnings and errors) for those prints.
+// TRACK_X_IDB_PROBE=1 adds an init script to both pages that records every IndexedDB
+// transaction (database, stores, mode and the stack that created it) until it completes or
+// aborts, and every Web Locks request until its callback settles (observation only: the
+// wrappers return the original transaction and call the original request); the hang print then
+// lists the ones still open. With TRACK_X_ROLLOVER_TIMEOUT_MS the final room closes are
+// abandoned after the same bound, so a hung run ends instead of waiting for the test timeout.
+//
+// Stress, not measurement (opt-in): TRACK_X_HISTORY_STORM_MS (with TRACK_X_NET_PROBE=1) makes
+// the recipient page send the creator a direct retained-history request on the room's history
+// control topic every TRACK_X_HISTORY_STORM_MS ms, so the creator answers with targeted
+// retained republications all the time. It reproduces the creator seal hang far more often.
 const EPOCHS = Number(process.env.TRACK_X_EPOCHS ?? 16);
 const MOVES = Number(process.env.TRACK_X_MOVES ?? 2);
 const SETTLE_MS = 300;
@@ -40,6 +51,8 @@ const CENSUS = process.env.TRACK_X_CENSUS !== "0";
 const ROLLOVER_TIMEOUT_MS = Number(process.env.TRACK_X_ROLLOVER_TIMEOUT_MS ?? 0);
 const NET_PROBE = process.env.TRACK_X_NET_PROBE === "1";
 const CONSOLE_ALL = process.env.TRACK_X_CONSOLE_ALL === "1";
+const IDB_PROBE = process.env.TRACK_X_IDB_PROBE === "1";
+const HISTORY_STORM_MS = Number(process.env.TRACK_X_HISTORY_STORM_MS ?? 0);
 const ACCESSOR =
 	"\n;globalThis.__TRACK_X_ROOM__ = () => room;\n" + (NET_PROBE ? ";globalThis.__TRACK_X_NODE__ = () => node;\n" : "");
 
@@ -252,6 +265,82 @@ const connectedPeers = (page: Page): Promise<readonly string[]> =>
 			)()?.connectedPeers() ?? []
 	);
 
+// Observation only: open IndexedDB transactions and Web Locks requests of the page.
+function idbProbeInitScript(): void {
+	const open = new Map<number, Readonly<Record<string, unknown>>>();
+	let sequence = 0;
+	const stack = (): string =>
+		(new Error().stack ?? "")
+			.split("\n")
+			.slice(2, 14)
+			.map((line) => line.trim().replace(/https?:\/\/127\.0\.0\.1:\d+\/@fs\/\S*?\/(packages|examples)\//u, "$1/"))
+			.join(" | ");
+	const transaction = IDBDatabase.prototype.transaction;
+	IDBDatabase.prototype.transaction = function (
+		this: IDBDatabase,
+		...args: Parameters<IDBDatabase["transaction"]>
+	): IDBTransaction {
+		const created = Reflect.apply(transaction, this, args) as IDBTransaction;
+		const id = ++sequence;
+		const stores = args[0];
+		open.set(id, {
+			kind: "idb",
+			db: this.name,
+			stores: (Array.isArray(stores) ? stores : [stores]).join(","),
+			mode: args[1] ?? "readonly",
+			at: Math.round(performance.now()),
+			stack: stack(),
+		});
+		const done = (): void => {
+			open.delete(id);
+		};
+		created.addEventListener("complete", done);
+		created.addEventListener("abort", done);
+		return created;
+	};
+	const locks = (navigator as Navigator & { locks?: LockManager }).locks;
+	if (locks !== undefined) {
+		const request = locks.request;
+		locks.request = function (this: LockManager, ...args: unknown[]): Promise<unknown> {
+			const id = ++sequence;
+			const options = typeof args[1] === "object" && args[1] !== null ? (args[1] as LockOptions) : undefined;
+			open.set(id, {
+				kind: "lock",
+				name: args[0],
+				mode: options?.mode ?? "exclusive",
+				ifAvailable: options?.ifAvailable === true,
+				at: Math.round(performance.now()),
+				stack: stack(),
+			});
+			const result = Reflect.apply(request, this, args) as Promise<unknown>;
+			void result.then(
+				() => open.delete(id),
+				() => open.delete(id)
+			);
+			return result;
+		} as LockManager["request"];
+	}
+	Reflect.set(globalThis, "__TRACK_X_IDB__", { open, count: (): number => sequence });
+}
+
+async function readIdbProbe(page: Page): Promise<unknown> {
+	return page.evaluate(() => {
+		const state = Reflect.get(globalThis, "__TRACK_X_IDB__") as
+			| { open: Map<number, Readonly<Record<string, unknown>>>; count(): number }
+			| undefined;
+		if (state === undefined) return null;
+		const now = Math.round(performance.now());
+		return {
+			now,
+			created: state.count(),
+			open: [...state.open.values()]
+				.map((entry) => ({ ...entry, ageMs: now - (entry.at as number) }))
+				.sort((left, right) => right.ageMs - left.ageMs)
+				.slice(0, 40),
+		};
+	});
+}
+
 // Observation only: times the page's own network node's send and publish calls.
 async function installNetProbe(page: Page): Promise<void> {
 	await page.evaluate(() => {
@@ -384,6 +473,11 @@ for (const app of [canvas, chat])
 		await installGridRoomHeadAuthority([receiverContext], app.headFactory, "create");
 		await exposeRoom(creatorContext, app);
 		await exposeRoom(receiverContext, app);
+		if (IDB_PROBE)
+			await Promise.all([
+				creatorContext.addInitScript(idbProbeInitScript),
+				receiverContext.addInitScript(idbProbeInitScript),
+			]);
 		const creator = await creatorContext.newPage();
 		const receiver = await receiverContext.newPage();
 		const records: unknown[] = [];
@@ -432,6 +526,14 @@ for (const app of [canvas, chat])
 				testMs: Date.now() - started,
 				creator: await probe(creator),
 				recipient: await probe(receiver),
+				...(IDB_PROBE
+					? {
+							idb: {
+								creator: (await bounded(readIdbProbe(creator), 10_000))?.value ?? "unresponsive",
+								recipient: (await bounded(readIdbProbe(receiver), 10_000))?.value ?? "unresponsive",
+							},
+						}
+					: {}),
 				console: consoleTail.slice(-120),
 				consoleAll: consoleAll.slice(-300),
 			};
@@ -450,6 +552,35 @@ for (const app of [canvas, chat])
 			process.stdout.write(
 				`TRACK_X_OPENED ${JSON.stringify({ app: app.name, ms: Date.now() - started, creatorPeer, receiverPeer })}\n`
 			);
+			if (HISTORY_STORM_MS > 0) {
+				const storm = await receiver.evaluate(
+					({ creator: target, ms }) => {
+						const node = (Reflect.get(globalThis, "__TRACK_X_NODE__") as () => { networkNode: unknown })();
+						const network = node.networkNode as {
+							peerId: string;
+							getSubscribedTopics(): string[];
+							sendMessage(peer: string, message: unknown): Promise<void>;
+						};
+						const controlId = network
+							.getSubscribedTopics()
+							.find((topic) => topic.startsWith("/ts-drp/room-history/1/"));
+						if (controlId === undefined) throw new Error("TRACK_X_HISTORY_CONTROL_TOPIC_ABSENT");
+						const data = new TextEncoder().encode("ts-drp-room-history-request-v1");
+						Reflect.set(
+							globalThis,
+							"__TRACK_X_STORM__",
+							setInterval(() => {
+								void network
+									.sendMessage(target, { data: data.slice(), objectId: controlId, sender: network.peerId, type: 8 })
+									.catch(() => undefined);
+							}, ms)
+						);
+						return controlId;
+					},
+					{ creator: creatorPeer, ms: HISTORY_STORM_MS }
+				);
+				process.stdout.write(`TRACK_X_HISTORY_STORM ${JSON.stringify({ ms: HISTORY_STORM_MS, controlId: storm })}\n`);
+			}
 			for (let epoch = 0; epoch < EPOCHS; epoch++) {
 				const issueMs: number[] = [];
 				const deliveryMs: number[] = [];
@@ -568,14 +699,15 @@ for (const app of [canvas, chat])
 			});
 		} finally {
 			process.stdout.write(`TRACK_X_INGRESS ${JSON.stringify({ app: app.name, ingress })}\n`);
-			await Promise.allSettled([
-				creator.evaluate(() =>
+			// With TRACK_X_ROLLOVER_TIMEOUT_MS, a room close that joins a hung rollover is abandoned
+			// after the same bound, so a hung run ends instead of waiting for the test timeout.
+			const closes = [creator, receiver].map((page) =>
+				page.evaluate(() =>
 					(Reflect.get(globalThis, "__TRACK_X_ROOM__") as () => { close(): Promise<void> } | undefined)()?.close()
-				),
-				receiver.evaluate(() =>
-					(Reflect.get(globalThis, "__TRACK_X_ROOM__") as () => { close(): Promise<void> } | undefined)()?.close()
-				),
-			]);
+				)
+			);
+			for (const close of closes) void close.catch(() => undefined);
+			await bounded(Promise.allSettled(closes), ROLLOVER_TIMEOUT_MS);
 			await Promise.allSettled([creator.close(), receiver.close(), ...contexts.map((context) => context.close())]);
 		}
 	});
