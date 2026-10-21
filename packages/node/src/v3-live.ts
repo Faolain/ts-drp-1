@@ -8192,8 +8192,8 @@ function enqueueV3Ingress(
 	// and charged to the bounded input pool first, outside the FIFO.
 	const hold = registration.readinessIngressHold;
 	if (!currentRegistration(registration) ||
-		registration.blueprintClosing && registration.readinessMaintenanceEntered !== true && hold === undefined)
-		return Promise.resolve();
+		hold === undefined &&
+		registration.blueprintClosing && registration.readinessMaintenanceEntered !== true) return Promise.resolve();
 	const terminal = registration.terminalBarrier;
 	const barrier = hold === undefined ? terminal :
 		terminal === undefined ? hold : Promise.all([terminal, hold]).then(() => undefined);
