@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type -- Transparent fixture inference preserves the existing native capability signatures. */
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
-import { DRP_MESSAGE_PROTOCOL } from "@ts-drp/network";
+import { DRP_MESSAGE_PROTOCOL, DRPNetworkNode as GenuineNetworkNode } from "@ts-drp/network";
 import { type DRPNetworkNode, Message, MessageType, V3Envelope } from "@ts-drp/types";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -55,6 +55,30 @@ const parameters = Object.freeze({
 
 export type RecipientRole = "writer" | "observer";
 
+export interface MemoryNetworkOptions {
+	/**
+	 * Gossip through the GENUINE `DRPNetworkNode.publishMessage` (packages/network/src/node.ts)
+	 * over this network: it waits for a subscriber on the topic (`waitForSubscriber`, at most
+	 * 1000 ms per publication by default) and then publishes to the peers subscribed to the
+	 * topic only; with none, the publication succeeds and reaches no one
+	 * (`allowPublishToZeroTopicPeers`). `subscriberWaitMs` replaces the 1000 ms bound, to
+	 * model a first subscriber that arrives later than one bound.
+	 * Without this option a publication reaches every peer at once (the original fixture).
+	 */
+	readonly genuinePublication?: Readonly<{ subscriberWaitMs?: number }>;
+}
+
+/** One completed genuine gossip publication (`genuinePublication` only). */
+export interface Publication {
+	readonly from: string;
+	readonly started: number;
+	readonly completed: number;
+	/** The peers subscribed to the topic when the publication completed. */
+	readonly recipients: readonly string[];
+	readonly sequence: unknown;
+	readonly action: unknown;
+}
+
 export interface Delivery {
 	readonly kind: "gossip" | "direct";
 	readonly from: string;
@@ -69,15 +93,17 @@ type Evidence = Readonly<{
 
 /**
  * A two-peer in-memory network under the genuine room transport.
+ * @param options - How a publication reaches the other peers.
  * @returns The network: `node` registers one peer, `idle` joins every delivery in flight.
  */
-export function memoryNetwork() {
+export function memoryNetwork(options: MemoryNetworkOptions = {}) {
 	const nodes = new Map<string, Readonly<{ network: DRPNetworkNode; adapter: NodeRoomNetworkAdapter }>>();
 	const gossip = new WeakSet<Message>();
 	const evidence = new WeakMap<Message, Evidence>();
 	const inFlight = new Set<Promise<void>>();
 	const observers = new Set<(delivery: Delivery) => void>();
 	const losses = new Set<(delivery: Delivery) => boolean>();
+	const publications: Publication[] = [];
 	let tail = Promise.resolve();
 	const deliver = (kind: Delivery["kind"], from: string, to: string, message: Message) => {
 		const target = nodes.get(to);
@@ -107,14 +133,63 @@ export function memoryNetwork() {
 		inFlight.add(job);
 		void job.finally(() => inFlight.delete(job));
 	};
+	const genuinePublisher = (peerId: string, publication: NonNullable<MemoryNetworkOptions["genuinePublication"]>) => {
+		const genuine = new GenuineNetworkNode({
+			bootstrap_peers: [],
+			listen_addresses: [],
+			log_config: { level: "silent" },
+		});
+		const subscribers = (topic: string) =>
+			[...nodes.entries()]
+				.filter(([id, peer]) => id !== peerId && peer.network.getSubscribedTopics().includes(topic))
+				.map(([id]) => id);
+		Reflect.set(genuine, "_pubsub", {
+			getSubscribers: (topic: string) => subscribers(topic).map((id) => ({ toString: () => id })),
+			streamsOutbound: { has: (id: string) => nodes.has(id) },
+			publish: (topic: string, bytes: Uint8Array) => {
+				const message = Message.decode(bytes);
+				for (const id of subscribers(topic)) deliver("gossip", peerId, id, message);
+				return Promise.resolve({ recipients: [] });
+			},
+		});
+		const bound = publication.subscriberWaitMs;
+		if (bound !== undefined) {
+			const waitForSubscriber = Reflect.get(GenuineNetworkNode.prototype, "waitForSubscriber") as (
+				topic: string,
+				timeout: number
+			) => Promise<void>;
+			Reflect.set(genuine, "waitForSubscriber", (topic: string) =>
+				Reflect.apply(waitForSubscriber, genuine, [topic, bound])
+			);
+		}
+		return async (topic: string, message: Message) => {
+			const started = performance.now();
+			const result = await genuine.publishMessage(topic, message);
+			const vertex = deliveredVertex(message);
+			publications.push(
+				Object.freeze({
+					from: peerId,
+					started,
+					completed: performance.now(),
+					recipients: Object.freeze(subscribers(topic)),
+					sequence: vertex?.authorSequence,
+					action: (vertex?.operation as Readonly<Record<string, unknown>> | undefined)?.action,
+				})
+			);
+			return result;
+		};
+	};
 	const node = (peerId: string) => {
 		const network = fakeNetwork(peerId, false);
 		Object.assign(network, {
 			getAllPeers: () => [...nodes.keys()].filter((id) => id !== peerId),
-			publishMessage: (_topic: string, message: Message) => {
-				for (const id of nodes.keys()) if (id !== peerId) deliver("gossip", peerId, id, message);
-				return Promise.resolve(true);
-			},
+			publishMessage:
+				options.genuinePublication === undefined
+					? (_topic: string, message: Message) => {
+							for (const id of nodes.keys()) if (id !== peerId) deliver("gossip", peerId, id, message);
+							return Promise.resolve(true);
+						}
+					: genuinePublisher(peerId, options.genuinePublication),
 			sendMessage: (target: string, message: Message) => {
 				if (!nodes.has(target) || target === peerId) return Promise.reject(new Error("TRACK_X_PEER_UNREACHABLE"));
 				deliver("direct", peerId, target, message);
@@ -146,6 +221,8 @@ export function memoryNetwork() {
 			losses.add(predicate);
 			return () => losses.delete(predicate);
 		},
+		/** Every completed genuine gossip publication, in completion order. */
+		publications: publications as readonly Publication[],
 		idle: async () => {
 			while (inFlight.size > 0) await Promise.allSettled([...inFlight]);
 		},
@@ -171,9 +248,10 @@ export function deliveredVertex(message: Message): Readonly<Record<string, unkno
  * Track S's settlement room on the node SQLite host, with the genuine room transport.
  * Structurally the settlement room that Track M's `settlementDelivery` reads.
  * @param role - The recipient's role.
+ * @param networkOptions - How a publication reaches the other peers (memoryNetwork).
  * @returns The room fixture.
  */
-export async function fenceDeliveryRoom(role: RecipientRole) {
+export async function fenceDeliveryRoom(role: RecipientRole, networkOptions: MemoryNetworkOptions = {}) {
 	const directory = mkdtempSync(join(tmpdir(), "track-x-fence-delivery-"));
 	directories.add(directory);
 	const identities = [0x71, 0x72].map((byte) => {
@@ -215,8 +293,8 @@ export async function fenceDeliveryRoom(role: RecipientRole) {
 		signGenesisAnchorDigest: (digest) => Promise.resolve(ed25519.sign(digest, creator.seed)),
 	});
 	const storageHost = createNodeV3RoomStorageHost({ directory, initialization: () => "create" });
-	const network = memoryNetwork();
-	const open = async (index: number) => {
+	const network = memoryNetwork(networkOptions);
+	const open = async (index: number, { awaitStartup = true }: Readonly<{ awaitStartup?: boolean }> = {}) => {
 		const identity = required(identities[index]);
 		const name = `peer-${index}`;
 		const peerId = required(roster[index]).peerId;
@@ -258,7 +336,7 @@ export async function fenceDeliveryRoom(role: RecipientRole) {
 		};
 		const room = await createV3RoomSession(input);
 		rooms.add(room);
-		await waitForV3RoomStartupForDiagnostics(room);
+		if (awaitStartup) await waitForV3RoomStartupForDiagnostics(room);
 		return { index, name, room, floor, networkNode };
 	};
 	return {
