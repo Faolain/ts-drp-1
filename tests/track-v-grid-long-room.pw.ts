@@ -2,6 +2,7 @@ import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 
 import { installGridRoomHeadAuthority } from "./fixtures/phase-3a1b/grid-room-head-authority";
 import {
+	hangTail,
 	installPhaseProbe,
 	pageNow,
 	type PhaseWindow,
@@ -341,6 +342,7 @@ test(`the shipped Grid page runs ${EPOCHS} creator successors with an enrolled W
 						epoch: epoch + 1,
 						creator: await readStep(creator),
 						recipient: await readStep(receiver),
+						...(PHASES ? { tail: { creator: await hangTail(creator), recipient: await hangTail(receiver) } } : {}),
 						console: consoleTail.slice(-60),
 					})}\n`
 				);

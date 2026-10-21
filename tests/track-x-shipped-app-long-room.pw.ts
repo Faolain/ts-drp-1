@@ -2,6 +2,7 @@ import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 
 import { installGridRoomHeadAuthority } from "./fixtures/phase-3a1b/grid-room-head-authority";
 import {
+	hangTail,
 	installPhaseProbe,
 	pageNow,
 	type PhaseWindow,
@@ -578,6 +579,14 @@ for (const app of [canvas, chat])
 					: {}),
 				console: consoleTail.slice(-120),
 				consoleAll: consoleAll.slice(-300),
+				// Track Z: the step the creator's rollover reached, and with TRACK_Z_PHASES the spans it completed.
+				step: (
+					await bounded(
+						creator.evaluate(() => Reflect.get(globalThis, "__TRACK_X_STEP__") ?? null),
+						10_000
+					)
+				)?.value,
+				...(PHASES ? { tail: { creator: await hangTail(creator), recipient: await hangTail(receiver) } } : {}),
 			};
 			process.stdout.write(`TRACK_X_ROLLOVER_HUNG ${JSON.stringify(report)}\n`);
 			throw new Error(`TRACK_X_ROLLOVER_HUNG ${app.name} epoch ${epoch} ${phase}`);

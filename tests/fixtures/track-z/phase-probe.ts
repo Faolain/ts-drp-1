@@ -169,6 +169,33 @@ export function takePhases(page: Page): Promise<RawPhases> {
 	});
 }
 
+/**
+ * For a hung rollover: the page's most recent completed spans and proof events, as [name, ms, ago] and
+ * [kind, ago], and the IndexedDB transactions still open. The last completed seal span names the step that
+ * did not finish.
+ * @param page - A page whose context has the probe.
+ * @returns The tail, or "unresponsive" after 10 s.
+ */
+export async function hangTail(page: Page): Promise<unknown> {
+	const read = Promise.all([takePhases(page), pageNow(page)]).then(([raw, now]) => ({
+		spans: raw.spans.slice(-16).map(([name, start, end]) => [name, Math.round(end - start), Math.round(now - end)]),
+		proof: raw.proof.slice(-8).map(([at, kind]) => [kind, Math.round(now - at)]),
+		openTransactions: raw.openTransactions,
+	}));
+	void read.catch(() => undefined);
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	try {
+		return await Promise.race([
+			read,
+			new Promise<string>((resolve) => {
+				timer = setTimeout(() => resolve("unresponsive"), 10_000);
+			}),
+		]);
+	} finally {
+		if (timer !== undefined) clearTimeout(timer);
+	}
+}
+
 const shortDatabase = (name: string): string => name.replace(/[0-9a-f]{16,}/gu, "*").slice(0, 80);
 
 /**
