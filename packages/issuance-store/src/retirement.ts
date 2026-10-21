@@ -1474,6 +1474,9 @@ export function issuanceRetirementImage(
 	}
 	for (const p of rows.plans) {
 		const lineage = rows.lineages.find((l) => l.author === p.scope.author);
+		// Before its first target fence, a migrated author has a plan and no lineage here. Its
+		// entries then name only sources outside this object: an external source, or an
+		// inherited source whose operation the target creator imported into this object.
 		if (
 			!lineage &&
 			!(
@@ -1481,10 +1484,13 @@ export function issuanceRetirementImage(
 				p.entries.length > 0 &&
 				p.entries.every(
 					(entry) =>
-						entry.sourceObjectId !== undefined &&
-						entry.sourceObjectId !== objectId &&
 						entry.replacementSequence === null &&
-						(entry.replacementProgress === undefined || entry.replacementProgress.chunks.length === 0)
+						(entry.replacementProgress === undefined || entry.replacementProgress.chunks.length === 0) &&
+						((entry.sourceObjectId !== undefined && entry.sourceObjectId !== objectId) ||
+							(entry.disposition === "inherited" &&
+								entry.inheritance !== undefined &&
+								entry.inheritance.targetObjectId === objectId &&
+								entry.inheritance.sourceObjectId !== objectId))
 				)
 			)
 		)
