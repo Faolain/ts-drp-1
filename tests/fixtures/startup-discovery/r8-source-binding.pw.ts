@@ -722,7 +722,10 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
  // "window" traces only seal-4 through the next lull, with V8 CPU samples.
  const taskTrace=process.env.STARTUP_HEALTHY_GRID_TASK_TRACE==="1",taskTraceWindow=process.env.STARTUP_HEALTHY_GRID_TASK_TRACE==="window";
  let taskTraceOpen=false;
- if(taskTrace){await ownedBrowser.startTracing(page,{path:join(process.env.STARTUP_EVIDENCE!,"task-trace.json"),categories:["toplevel","blink.user_timing"]});taskTraceOpen=true;}
+ // Measurement only: STARTUP_HEALTHY_GRID_TASK_TRACE_CATEGORIES (comma list, for example IndexedDB) adds trace categories to
+ // the whole-run task trace. Unset by default (toplevel and blink.user_timing only).
+ const extraTraceCategories=(process.env.STARTUP_HEALTHY_GRID_TASK_TRACE_CATEGORIES??"").split(",").map(category=>category.trim()).filter(Boolean);
+ if(taskTrace){await ownedBrowser.startTracing(page,{path:join(process.env.STARTUP_EVIDENCE!,"task-trace.json"),categories:["toplevel","blink.user_timing",...extraTraceCategories]});taskTraceOpen=true;}
  if(taskTraceWindow)await page.exposeFunction("__rdTraceControl",async(command:string)=>{
   if(command==="start"&&!taskTraceOpen){await ownedBrowser.startTracing(page,{path:join(process.env.STARTUP_EVIDENCE!,"task-trace.json"),
    categories:["toplevel","blink.user_timing","disabled-by-default-v8.cpu_profiler"]});taskTraceOpen=true;}
