@@ -97,7 +97,15 @@ interface EpochRecord {
 	readonly windowMessages: number;
 	readonly charges: readonly number[];
 	readonly census: readonly StoreCensus[];
-	readonly archive: readonly Readonly<{ messages: number; bytes: number; fileBytes: number }>[];
+	readonly archive: readonly Readonly<{
+		messages: number;
+		bytes: number;
+		fileBytes: number;
+		/** Measurement only: cumulative since the archive opened (append cost). */
+		appended: number;
+		transactions: number;
+		transactionMs: number;
+	}>[];
 	readonly latency: Readonly<{
 		issue: readonly number[];
 		seal: number;
@@ -251,6 +259,9 @@ async function runChatWindowRoom(): Promise<LongRoomRun> {
 				messages: peer.archive.records().length,
 				bytes: peer.archive.stats().bytes,
 				fileBytes: room.archiveFileBytes(index),
+				appended: peer.archive.stats().appended,
+				transactions: peer.archive.stats().transactions,
+				transactionMs: peer.archive.stats().transactionMs,
 			})),
 			latency: { issue: issueMs, seal: seal.ms, adopt: adopt.ms, install, lull },
 			lullKinds,

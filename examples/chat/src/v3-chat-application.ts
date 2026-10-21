@@ -15,8 +15,10 @@ import {
 	shippingChatCapacityStateBytes,
 } from "./v3-chat-capacity.js";
 import { type ShippingChatMessage } from "./v3-chat-message.js";
+import { createShippingChatWindowApplication, SHIPPING_CHAT_WINDOW_ARTIFACT_ID } from "./v3-chat-window.js";
 
 export { createShippingChatGenesisStateBytes } from "./v3-chat-capacity.js";
+export { createShippingChatWindowGenesisStateBytes, SHIPPING_CHAT_WINDOW_ARTIFACT_ID } from "./v3-chat-window.js";
 export {
 	captureShippingChatOperation,
 	SHIPPING_CHAT_OPERATION_LIMITS,
@@ -31,6 +33,8 @@ export interface ShippingChatProjection {
 	readonly capacity: ShippingChatCapacity;
 	readonly transportPeerAuthors: readonly Readonly<{ author: string; peerId: string }>[];
 	readonly writerAuthors: readonly string[];
+	/** Window format only: the epoch this projection's authenticated base opened (display data). */
+	readonly epoch?: number;
 }
 
 export type ShippingChatApplication = V3RoomApplication<ShippingChatProjection> &
@@ -135,6 +139,9 @@ export async function createShippingV3ChatApplication(
 		exactCanonicalGenesisLatchedAclBytes: Uint8Array;
 	}>
 ): Promise<ShippingChatApplication> {
+	// A room's format is the artifact its signed genesis names: new rooms sign the window format.
+	if (input.catalog.resolve(input.blueprintDigest).artifactId === SHIPPING_CHAT_WINDOW_ARTIFACT_ID)
+		return createShippingChatWindowApplication(input);
 	const catalog = input.catalog,
 		blueprintDigest = input.blueprintDigest;
 	const genesisBytes = createShippingChatGenesisStateBytes({

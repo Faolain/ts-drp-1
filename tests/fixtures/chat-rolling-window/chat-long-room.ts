@@ -389,8 +389,14 @@ export async function chatWindowRoomFixture(options: ChatWindowRoomOptions) {
 	/** The application state a joiner installs from the creator's current successor export. */
 	const exportedApplicationStateBytes = async () => {
 		const exported = await readExport();
-		const payload = Reflect.get(exported.material, "exactCanonicalSnapshotPayloadBytes") as unknown;
-		if (!(payload instanceof Uint8Array)) throw new TypeError("CHAT_WINDOW_EXPORT_PAYLOAD_MISSING");
+		// The snapshot payload is the declared chunks in order (as tests/phase-6b-grid-successor-state-red).
+		const payload = new Uint8Array(exported.chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0));
+		let offset = 0;
+		for (const chunk of exported.chunks) {
+			payload.set(chunk, offset);
+			offset += chunk.byteLength;
+		}
+		if (payload.byteLength === 0) throw new TypeError("CHAT_WINDOW_EXPORT_PAYLOAD_MISSING");
 		const snapshot = decodeCanonical(payload) as Record<string, unknown>;
 		return encodeCanonical(snapshot.application);
 	};

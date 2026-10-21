@@ -1,4 +1,3 @@
-import { openTrustedBlueprintCatalogBytes } from "@ts-drp/blueprint-catalog/bytes";
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import {
 	acquireBrowserIdentity,
@@ -19,17 +18,24 @@ import { DRPNode } from "@ts-drp/node";
 import { authenticateV3RoomCreatorInvite } from "@ts-drp/node/v3-room";
 import { DRP_DISCOVERY_TOPIC } from "@ts-drp/types";
 
-import catalogMaterial from "./chat-catalog-material.json" with { type: "json" };
+import { openShippingChatCatalogs, type ShippingChatCatalog } from "./chat-catalogs";
 import { setupCopyButton } from "./util/clipboard";
 import { createPeerNameElement, formatPeerItem, shortenId, styleMessageElement } from "./util/peerIdentity";
 import { initializeToastContainer, showToast, ToastType } from "./util/toast";
 import {
 	captureShippingChatOperation,
-	createShippingChatGenesisStateBytes,
+	createShippingChatWindowGenesisStateBytes,
 	createShippingV3ChatApplication,
 	type ShippingChatMessageOperation,
 	type ShippingChatProjection,
 } from "./v3-chat-application";
+import {
+	openBrowserShippingChatArchiveStore,
+	openShippingChatLocalArchive,
+	shippingChatArchiveDatabaseName,
+	shippingChatHistory,
+	type ShippingChatLocalArchive,
+} from "./v3-chat-archive";
 
 type ChatHeadFactory = (
 	context: Readonly<{
@@ -55,22 +61,14 @@ function bytes(value: string): Uint8Array {
 	if (!/^(?:[0-9a-f]{2})+$/u.test(value)) throw new TypeError("Chat bytes are invalid");
 	return Uint8Array.from(value.match(/../gu) as string[], (byte) => Number.parseInt(byte, 16));
 }
-const catalog = openTrustedBlueprintCatalogBytes({
-	catalogBytes: Uint8Array.from(atob(catalogMaterial.catalogBytes), (byte) => byte.charCodeAt(0)),
-	assets: Object.fromEntries(
-		Object.entries(catalogMaterial.assets).map(([name, value]) => [
-			name,
-			Uint8Array.from(atob(value), (byte) => byte.charCodeAt(0)),
-		])
-	),
-});
-const blueprintDigest = catalog.blueprintDigests[0];
-if (blueprintDigest === undefined || catalog.blueprintDigests.length !== 1)
-	throw new TypeError("Chat requires its exact shipping catalog");
+// New rooms sign the rolling-window format; rooms whose genesis signed the lifetime format keep it.
+const catalogs = openShippingChatCatalogs();
 
 let node: DRPNode | undefined;
 let room: V3RoomSession<ShippingChatProjection> | undefined;
 let projection: ShippingChatProjection | undefined;
+// This device's history of the open room (outside room storage; display only).
+let archive: ShippingChatLocalArchive | undefined;
 let openTask: Promise<void> | undefined;
 let issueTask: Promise<void> | undefined;
 let closing = false;
@@ -157,21 +155,22 @@ function render(): void {
 	}
 	const chat = document.getElementById("chat") as HTMLElement;
 	chat.replaceChildren();
-	if (projection === undefined || projection.messages.length === 0) {
+	// The shared window plus the messages only this device still keeps (each once).
+	const messages = projection === undefined ? [] : shippingChatHistory(projection.messages, archive?.records() ?? []);
+	if (messages.length === 0) {
 		const empty = document.createElement("div");
 		empty.className = "no-messages";
 		empty.textContent = room === undefined ? "Create or join a chat room to begin." : "No messages yet";
 		chat.appendChild(empty);
 	} else {
-		const messages = [...projection.messages].sort(
-			(a, b) =>
-				a.displayTimeMs - b.displayTimeMs ||
-				a.author.localeCompare(b.author) ||
-				a.clientOperationId.localeCompare(b.clientOperationId)
-		);
 		for (const message of messages) {
 			const row = document.createElement("div");
-			row.className = "message" + (message.author === node?.keychain.localAuthorId ? " self" : "");
+			row.className =
+				"message" +
+				(message.author === node?.keychain.localAuthorId ? " self" : "") +
+				(message.inWindow ? "" : " archived");
+			// Older messages kept on this device only: no longer in the room's shared window.
+			if (!message.inWindow) row.title = "Kept on this device; no longer in the room's shared history.";
 			row.dataset.author = message.author;
 			row.dataset.clientOperationId = message.clientOperationId;
 			row.dataset.displayTimeMs = String(message.displayTimeMs);
@@ -202,12 +201,17 @@ async function openChat(operation: "create" | "join"): Promise<void> {
 	if (selectedNode === undefined || closing || room !== undefined) return;
 	status(operation === "create" ? "Creating chat…" : "Joining chat…", "joining");
 	let opened: V3RoomSession<ShippingChatProjection> | undefined;
+	let openedArchive: ShippingChatLocalArchive | undefined;
 	try {
 		const author = selectedNode.keychain.localAuthorId;
 		let objectId: string;
 		let invite: string | V3RoomCreatorInviteMaterial;
 		let exactCanonicalLatchedAclBytes: Uint8Array;
+		// The room's format: new rooms sign the window catalog; a joined room is whichever catalog its
+		// signed genesis names.
+		let format: ShippingChatCatalog;
 		if (operation === "create") {
+			format = catalogs.window;
 			objectId = selectedNode.networkNode.peerId + ":" + hex(crypto.getRandomValues(new Uint8Array(16)));
 			exactCanonicalLatchedAclBytes = encodeCanonical({
 				epoch: 0,
@@ -220,8 +224,10 @@ async function openChat(operation: "create" | "join"): Promise<void> {
 			const signers = [{ publicKey: author, signerId: "creator" }];
 			invite = await createV3RoomCreatorInviteMaterial({
 				objectId,
-				blueprintDigest,
-				exactCanonicalApplicationStateBytes: createShippingChatGenesisStateBytes({ exactCanonicalLatchedAclBytes }),
+				blueprintDigest: format.blueprintDigest,
+				exactCanonicalApplicationStateBytes: createShippingChatWindowGenesisStateBytes({
+					exactCanonicalLatchedAclBytes,
+				}),
 				exactCanonicalLatchedAclBytes,
 				exactCanonicalParametersCarrierBytes: encodeCanonical({
 					maxDependencies: 16,
@@ -242,14 +248,36 @@ async function openChat(operation: "create" | "join"): Promise<void> {
 				signGenesisAnchorDigest: (digest) => selectedNode.keychain.signWithLocalAuthor(digest),
 			});
 		} else {
-			invite = roomInput.value.trim();
-			const identity = authenticateV3RoomCreatorInvite({
-				creatorInvite: invite,
-				application: {
-					catalog,
-					canonicalBlueprintPackageBytes: catalog.resolve(blueprintDigest).canonicalBlueprintPackageBytes,
-				},
-			});
+			const creatorInvite = roomInput.value.trim();
+			invite = creatorInvite;
+			const authenticate = (
+				candidate: ShippingChatCatalog
+			): ReturnType<typeof authenticateV3RoomCreatorInvite> | undefined => {
+				try {
+					return authenticateV3RoomCreatorInvite({
+						creatorInvite,
+						application: {
+							catalog: candidate.catalog,
+							canonicalBlueprintPackageBytes: candidate.catalog.resolve(candidate.blueprintDigest)
+								.canonicalBlueprintPackageBytes,
+						},
+					});
+				} catch {
+					return undefined;
+				}
+			};
+			const windowIdentity = authenticate(catalogs.window);
+			const identity =
+				windowIdentity ??
+				authenticateV3RoomCreatorInvite({
+					creatorInvite,
+					application: {
+						catalog: catalogs.lifetime.catalog,
+						canonicalBlueprintPackageBytes: catalogs.lifetime.catalog.resolve(catalogs.lifetime.blueprintDigest)
+							.canonicalBlueprintPackageBytes,
+					},
+				});
+			format = windowIdentity === undefined ? catalogs.lifetime : catalogs.window;
 			objectId = identity.objectId;
 			const material = decodeCanonical(bytes(invite)) as Record<string, unknown>;
 			if (!(material.exactCanonicalLatchedAclBytes instanceof Uint8Array))
@@ -257,10 +285,20 @@ async function openChat(operation: "create" | "join"): Promise<void> {
 			exactCanonicalLatchedAclBytes = material.exactCanonicalLatchedAclBytes;
 		}
 		const application = await createShippingV3ChatApplication({
-			catalog,
-			blueprintDigest,
+			catalog: format.catalog,
+			blueprintDigest: format.blueprintDigest,
 			exactCanonicalGenesisLatchedAclBytes: exactCanonicalLatchedAclBytes,
 		});
+		// The device archive opens first, in its own database, so it sees the first projection.
+		// Chat works without it (a browser that refuses the database just shows the window).
+		try {
+			openedArchive = await openShippingChatLocalArchive({
+				store: await openBrowserShippingChatArchiveStore(shippingChatArchiveDatabaseName(objectId, author)),
+			});
+		} catch (error) {
+			console.warn("Chat device archive is unavailable; showing the room's shared window only", error);
+		}
+		const deviceArchive = openedArchive;
 		const factory = window.__TS_DRP_CHAT_ROOM_HEAD_AUTHORITY_FOR_OPEN__;
 		if (typeof factory !== "function")
 			throw new TypeError("Chat room-head authority is unavailable: the application host must configure its factory");
@@ -297,13 +335,17 @@ async function openChat(operation: "create" | "join"): Promise<void> {
 			onAcceptedVertex: () => undefined,
 			onProjection: (value) => {
 				projection = value;
+				// O(1): the archive writes in a later task, off this callback.
+				deviceArchive?.observe(value);
 				render();
 			},
 		});
 		if (closing) throw new TypeError("Chat closed during open");
 		room = opened;
+		archive = deviceArchive;
 		observer = !enrolledWriter;
 		projection = opened.projection();
+		deviceArchive?.observe(projection);
 		status(
 			observer
 				? "Connected as an observer; this chat is read-only."
@@ -313,6 +355,8 @@ async function openChat(operation: "create" | "join"): Promise<void> {
 		render();
 	} catch (error) {
 		await opened?.close();
+		await openedArchive?.close();
+		archive = undefined;
 		projection = undefined;
 		status(
 			error instanceof Error ? error.message : "Could not open chat. Check the signed invite and configured host.",
@@ -410,6 +454,7 @@ async function main(): Promise<void> {
 					await openTask;
 					await issueTask;
 					await room?.close();
+					await archive?.close();
 					await (modular?.stop() ?? node?.stop());
 					identity.release();
 				})().catch((error: unknown) =>

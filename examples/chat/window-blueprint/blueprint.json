@@ -1,0 +1,326 @@
+{
+	"schemaVersion": 2,
+	"kind": "ts-drp-blueprint-authoring-source",
+	"artifactId": "v3-shipping-chat.v4",
+	"runtimeProfile": "ecmascript-2024-sync-v1",
+	"operationDiscriminator": "action",
+	"workBudgetProfile": "blueprint-work-budget-v1",
+	"operations": [
+		{
+			"name": "acl",
+			"reducerBinding": "aclReducer",
+			"maxCanonicalOperationBytes": 65536,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [
+					{
+						"name": "group",
+						"required": true,
+						"type": "string"
+					},
+					{
+						"name": "kind",
+						"required": true,
+						"type": "string"
+					},
+					{
+						"name": "target",
+						"required": true,
+						"type": "string"
+					}
+				]
+			}
+		},
+		{
+			"name": "applicationBatch",
+			"reducerBinding": "applicationBatchReducer",
+			"maxCanonicalOperationBytes": 65536,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [
+					{
+						"name": "batch",
+						"required": true,
+						"type": "canonical-object"
+					}
+				]
+			}
+		},
+		{
+			"name": "capacityAllocation",
+			"reducerBinding": "capacityAllocationReducer",
+			"maxCanonicalOperationBytes": 65536,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [
+					{
+						"name": "aclDigest",
+						"required": true,
+						"type": "string"
+					},
+					{
+						"name": "capacity",
+						"required": true,
+						"type": "canonical-object"
+					},
+					{
+						"name": "epoch",
+						"required": true,
+						"type": "safe-integer"
+					}
+				]
+			}
+		},
+		{
+			"name": "causalJoin",
+			"reducerBinding": "causalJoinReducer",
+			"maxCanonicalOperationBytes": 65536,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [
+					{
+						"name": "capacity",
+						"required": false,
+						"type": "canonical-object"
+					}
+				]
+			}
+		},
+		{
+			"name": "message",
+			"reducerBinding": "messageReducer",
+			"maxCanonicalOperationBytes": 65536,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [
+					{
+						"name": "clientOperationId",
+						"required": true,
+						"type": "string"
+					},
+					{
+						"name": "displayTimeMs",
+						"required": true,
+						"type": "safe-integer"
+					},
+					{
+						"name": "text",
+						"required": true,
+						"type": "string"
+					}
+				]
+			}
+		},
+		{
+			"name": "migrationActivation",
+			"reducerBinding": "migrationActivationReducer",
+			"maxCanonicalOperationBytes": 65536,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [
+					{
+						"name": "decision",
+						"required": true,
+						"type": "canonical-object"
+					}
+				]
+			}
+		},
+		{
+			"name": "migrationRecord",
+			"reducerBinding": "migrationRecordReducer",
+			"maxCanonicalOperationBytes": 65536,
+			"argumentSchema": {
+				"kind": "closed-record",
+				"fields": [
+					{
+						"name": "record",
+						"required": true,
+						"type": "canonical-object"
+					}
+				]
+			}
+		}
+	],
+	"conformance": {
+		"corpusVersion": "shipping-chat-window-v4",
+		"seed": "shipping-chat-window-v4-2026-10-20",
+		"initialState": {
+			"version": 4,
+			"messages": [],
+			"capacity": {
+				"version": 1,
+				"basisObjectId": "creator:capacity-conformance",
+				"allocations": [
+					["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 16000, 0],
+					["bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", 16000, 0]
+				]
+			}
+		},
+		"prCases": [
+			{
+				"id": "authenticated-state-inheritance",
+				"action": "migrationRecord",
+				"arguments": {
+					"record": {
+						"version": 2,
+						"kind": "ts-drp-v3-room-migration-record",
+						"archivePolicy": "retain-source",
+						"authorityKind": "creator-ed25519-registered-vertex-v1",
+						"sourceCreatorAuthor": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"targetCreatorAuthor": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"targetEpoch": 0,
+						"applicationState": {
+							"version": 4,
+							"messages": [],
+							"capacity": {
+								"version": 1,
+								"basisObjectId": "creator:capacity-conformance",
+								"allocations": [
+									["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 16000, 0],
+									["bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", 16000, 0]
+								]
+							}
+						}
+					}
+				},
+				"executionContext": {
+					"author": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+				}
+			},
+			{
+				"id": "causal-join",
+				"action": "causalJoin",
+				"arguments": {}
+			},
+			{
+				"id": "acl",
+				"action": "acl",
+				"arguments": {
+					"group": "writer",
+					"kind": "grant",
+					"target": "reader"
+				}
+			},
+			{
+				"id": "message",
+				"action": "message",
+				"arguments": {
+					"clientOperationId": "first",
+					"displayTimeMs": 1791662400000,
+					"text": "hello"
+				},
+				"executionContext": {
+					"author": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+				}
+			},
+			{
+				"id": "exact-retry",
+				"action": "message",
+				"arguments": {
+					"clientOperationId": "first",
+					"displayTimeMs": 1791662400000,
+					"text": "hello"
+				},
+				"executionContext": {
+					"author": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+				}
+			},
+			{
+				"id": "batch",
+				"action": "applicationBatch",
+				"arguments": {
+					"batch": {
+						"version": 1,
+						"entries": [
+							{
+								"logicalTime": -0,
+								"operation": {
+									"action": "message",
+									"clientOperationId": "batch-0",
+									"displayTimeMs": 0,
+									"text": "first"
+								}
+							},
+							{
+								"logicalTime": 1,
+								"operation": {
+									"action": "message",
+									"clientOperationId": "batch-1",
+									"displayTimeMs": 1,
+									"text": "second"
+								}
+							}
+						]
+					}
+				},
+				"executionContext": {
+					"author": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+				}
+			},
+			{
+				"id": "capacity-allocation",
+				"action": "capacityAllocation",
+				"arguments": {
+					"epoch": 1,
+					"aclDigest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+					"capacity": {
+						"version": 1,
+						"basisObjectId": "creator:capacity-conformance",
+						"allocations": [
+							["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 16000, 0],
+							["bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", 16000, 0]
+						]
+					}
+				}
+			},
+			{
+				"id": "migration-activation",
+				"action": "migrationActivation",
+				"arguments": {
+					"decision": {
+						"targetObjectId": "creator:conformance"
+					}
+				}
+			}
+		],
+		"nightlyAdditionalCases": [
+			{
+				"id": "unicode",
+				"action": "message",
+				"arguments": {
+					"clientOperationId": "unicode",
+					"displayTimeMs": 9007199254740991,
+					"text": "棋 ♟ café"
+				},
+				"executionContext": {
+					"author": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+				}
+			},
+			{
+				"id": "same-id-other-author",
+				"action": "message",
+				"arguments": {
+					"clientOperationId": "first",
+					"displayTimeMs": 1791662400000,
+					"text": "hello"
+				},
+				"executionContext": {
+					"author": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+				}
+			},
+			{
+				"id": "astral",
+				"action": "message",
+				"arguments": {
+					"clientOperationId": "astral",
+					"displayTimeMs": 64,
+					"text": "𝄞 😀 x"
+				},
+				"executionContext": {
+					"author": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+				}
+			}
+		]
+	}
+}

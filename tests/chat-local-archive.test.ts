@@ -109,7 +109,8 @@ describe("Track W: Chat's device archive", () => {
 			store: openNodeShippingChatArchiveStore(join(temporary(), "count.sqlite")),
 			bound: { maxMessages: 5, maxBytes: 1_048_576 },
 		});
-		for (const row of rows) byCount.observe({ messages: [row], epoch: 1 });
+		// A growing window observed many times before one write (only the latest projection is kept).
+		for (let index = 1; index <= rows.length; index++) byCount.observe({ messages: rows.slice(0, index), epoch: 1 });
 		await byCount.flush();
 		expect(byCount.records().map(identity)).toEqual(rows.slice(3).map(identity));
 		await byCount.close();
@@ -170,6 +171,52 @@ describe("Track W: Chat's device archive", () => {
 		await reopened.flush();
 		expect(reopened.records().map(identity)).toEqual([identity(message(A, "kept")), identity(message(A, "admitted"))]);
 		await reopened.close();
+	});
+
+	it("archives a new message even when an exact retry moved an archived message after it before the write", async () => {
+		const archive = await openShippingChatLocalArchive({
+			store: openNodeShippingChatArchiveStore(join(temporary(), "archive.sqlite")),
+			schedule: () => undefined,
+		});
+		const [one, two, fresh] = [message(A, "one"), message(B, "two"), message(B, "fresh")];
+		archive.observe({ messages: [one, two], epoch: 1 });
+		await archive.flush();
+		// `fresh` is admitted, then `one` is retried exactly and becomes the window's newest message.
+		archive.observe({ messages: [two, fresh, one], epoch: 2 });
+		await archive.flush();
+		expect(archive.records().map((row) => [identity(row), row.epoch])).toEqual([
+			[identity(one), 1],
+			[identity(two), 1],
+			[identity(fresh), 2],
+		]);
+		await archive.close();
+	});
+
+	it("never archives again a message its bound dropped while the message is still in the window, across a reopen", async () => {
+		const file = join(temporary(), "archive.sqlite");
+		const bound = { maxMessages: 2, maxBytes: 1_048_576 };
+		const [m1, m2, m3, m4] = [message(A, "m1"), message(A, "m2"), message(A, "m3"), message(A, "m4")];
+		const first = await openShippingChatLocalArchive({ store: openNodeShippingChatArchiveStore(file), bound });
+		first.observe({ messages: [m1, m2, m3], epoch: 1 });
+		await first.close();
+		const second = await openShippingChatLocalArchive({ store: openNodeShippingChatArchiveStore(file), bound });
+		expect(second.records().map(identity)).toEqual([m2, m3].map(identity));
+		// m1 is still in the window: the bound dropped it, and it does not come back.
+		second.observe({ messages: [m1, m2, m3], epoch: 2 });
+		await second.flush();
+		expect(second.records().map(identity)).toEqual([m2, m3].map(identity));
+		// m1 leaves the window and m4 arrives: m2 is dropped, m1's marker goes.
+		second.observe({ messages: [m2, m3, m4], epoch: 3 });
+		await second.close();
+		const check = new DatabaseSync(file, { readOnly: true });
+		try {
+			const rows = check.prepare("SELECT key, length(record) AS size FROM messages ORDER BY seq").all();
+			const live = rows.filter((row) => Number(row.size) > 0).map((row) => String(row.key).split("/")[1]);
+			const markers = rows.filter((row) => Number(row.size) === 0).map((row) => String(row.key).split("/")[1]);
+			expect({ live, markers }).toEqual({ live: ["m3", "m4"], markers: ["m2"] });
+		} finally {
+			check.close();
+		}
 	});
 
 	it("treats stored bytes as untrusted: a tampered or malformed row is dropped on load, never shown", async () => {
