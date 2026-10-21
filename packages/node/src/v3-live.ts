@@ -7988,6 +7988,12 @@ const MAX_ADMITTED_PENDING_PUBLICATION_JOBS = 32;
 // The same local control ceiling applies to distinct retained/completion cuts.
 // Joining an existing cut creates no additional retained native job.
 const MAX_ADMITTED_EGRESS_CONTROL_JOBS = 32;
+// A direct reply to one requesting peer (targeted retained republication) runs inside the
+// plane's FIFO, ahead of the plane's later moves, seal and close. Each of its sends carries
+// this deadline: a send that has not completed by then is aborted (the genuine node aborts its
+// stream) and ends the reply, and the peer asks again. Without it a stream that never drains
+// (libp2p's stream close has no bound of its own) would hold the plane forever.
+const RETAINED_DIRECT_SEND_DEADLINE_MS = 10_000;
 
 class InputCaptureCapacityError extends Error {
 	constructor(readonly capacity: "byte" | "entry") {
@@ -16471,7 +16477,9 @@ async function republishRetained(registration: V3PlaneRegistration, targetPeerId
 			if (targetPeerId === undefined) {
 				published = await registration.networkNode.publishMessage(registration.topic, message);
 			} else {
-				await registration.networkNode.sendMessage(targetPeerId, message);
+				await registration.networkNode.sendMessage(targetPeerId, message, {
+					signal: AbortSignal.timeout(RETAINED_DIRECT_SEND_DEADLINE_MS),
+				});
 				published = true;
 			}
 		} catch {
