@@ -111,6 +111,7 @@ repository owner made. "Coordinator" marks a recommendation that was then carrie
 | 36 | Hold Track V's Grid switch on its branch, and put its Chromium reproduction and RESULT.md on main. | Coordinator | On Node the switch keeps the shipped Grid's issuance flat (13 rows per peer through 16 epochs and a reopen; legacy reached 33). In Chromium with real networking, the creator's settlement fence reaches the Writer before install and is rejected; after a few successors (epoch 4-5, 33-41 s in) the creator's moves never reach the Writer again, in every run. Legacy passes 16/16. That breaks G3. v3-chat was not switched: its contract oracle is applied to the v3-chat product and to a legacy direct room in the same test, and every way around that is outside the approval. | Held on branch `worktree-agent-a84dc20beddb97044` (d5a0015f..27fe2688). On main: cedcc628 (harness), 5ed93b67 (RESULT.md). |
 | 37 | Track X: find and fix the settlement fence delivery stall in the library. First check whether shipped Canvas and Chat, which already sign the settlement profile, stall the same way on main with real networking. | Coordinator | Track T's and Track Q's Chromium evidence used a harness without the shipped page's networking, so main may carry the same G3 break for Canvas and Chat. Fix first, then merge Track V's switch. | In progress |
 | 38 | Approve Track Q's ordinary resource bounds, and merge Track Q. | User (bounds), Coordinator (merge) | Canvas: the exact encoded size of its widest reachable state (2,944 bytes, 817 items, depth 3 at 10×10). Chat: its existing 32 KiB retained-state limits, unchanged. Both come from limits the apps already enforce (G21) and cover every reachable state (G22). With them, the creator lull runs, and seal falls to 0.09–0.12× of base in Chromium (about 0.2 s); adoption is 190–255 ms slower; seal plus adoption is 0.32–0.42× of base. | Merge 46eb7821 (ff22665c..30937f29), after verification on main: typecheck 0; Track Q's bound and lull tests, the 4-rollover room test, Tracks P, S, N, L, K, M2 and O's tests, and the 6-epoch Canvas/Chat long rooms with a reopen all passing. |
+| 39 | Keep shipped Canvas on the settlement profile on main and fix forward, although it stalls with real networking. | User | Track X's first step: with real networking in Chromium, shipped Canvas and shipped Chat on main each stall at epoch 5 on the creator's first move, with Track V's signature. Canvas on the legacy profile (b2c3d8f1) passes 16/16 twice. Chat has signed the settlement profile since before this work, so it stays exposed either way. Neither page rolls a room over by itself. Switching Canvas back would bring back its storage growth and turn Track P's and Track Q's Canvas tests red. | Known G3 break on main for settlement rooms that roll over with real networking, until Track X's fix lands. Track X also checks whether Chat's stall predates this work (3c5bb123) and bisects if not. |
 
 ## Commits
 
@@ -349,10 +350,11 @@ Notes:
     it with a rolling window plus a local archive (row 35).
   - The RED fixture `startupShippedCanvas` (tests/fixtures/startup-discovery/shipped.ts) still builds a legacy
     invite labelled "shipped"; it passes, but the label is stale.
-- **Settlement profile with real networking (Track V, Track X fixing):** in Chromium with the shipped page's
-  network, the creator's settlement fence reaches a Writer before install and is rejected. After a few successors
-  the creator's moves never reach that Writer again (G3). The Grid switch is held until the fix. Shipped Canvas and
-  Chat already sign the settlement profile and may be affected on main; Track X checks that first.
+- **Settlement profile with real networking (Track V; Track X fixing; known break on main, row 39):** in Chromium
+  with the shipped page's network, the creator's settlement fence reaches a peer before install and is dropped
+  (`authenticateV3Ingress` drops a not-authenticated vertex instead of holding it). The fixed retained-request
+  schedule recovers it for a few epochs; from epoch 5 the creator's moves stay pending at the peer (G3). Shipped
+  Canvas and shipped Chat on main both stall at epoch 5; the Grid switch is held until the fix.
 - **Left open by Track V** (details in its [RESULT.md](tracks/32-track-v-settlement-for-grid-and-chat/RESULT.md)):
   - v3-chat needs an owner decision: its contract oracle `isD110cBSuccessorAuthority` also checks a legacy direct
     room in the same test, so switching it means parameterising the oracle, switching those rooms, or accepting
