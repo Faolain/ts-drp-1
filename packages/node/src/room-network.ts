@@ -18,6 +18,10 @@ const RETAINED_REQUEST_DELAYS = [0, 500, 1_500, 3_000, 6_000, 10_000, 15_000] as
 // creator at once. Further asks within this interval collapse into one trailing ask, so a
 // room has at most one such timer and one request in flight (`#request` coalesces).
 const MISSING_HISTORY_REQUEST_INTERVAL_MS = 1_000;
+// One request attempt runs at a time and every later request joins it (`#request`). Its
+// direct send carries this deadline, so a send that never completes cannot leave the
+// recipient unable to ask again.
+const HISTORY_REQUEST_SEND_DEADLINE_MS = 10_000;
 
 /**
  * Read a creator routing hint without granting room or genesis authority.
@@ -793,7 +797,9 @@ export class NodeRoomNetworkAdapter {
 		}
 		await Promise.allSettled([
 			registration.publisher(creatorPeerId),
-			this.#networkNode.sendMessage(creatorPeerId, message),
+			this.#networkNode.sendMessage(creatorPeerId, message, {
+				signal: AbortSignal.timeout(HISTORY_REQUEST_SEND_DEADLINE_MS),
+			}),
 		]);
 	}
 }
