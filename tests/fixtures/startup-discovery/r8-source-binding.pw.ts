@@ -163,6 +163,12 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
  // retains; others are only counted. Unset by default (every event retained).
  const proofEventKinds=process.env.STARTUP_HEALTHY_GRID_PROOF_EVENT_KINDS;
  if(proofEventKinds!==undefined)await page.context().addInitScript(value=>Reflect.set(globalThis,"__r8ProofEventKinds",value),proofEventKinds.split(",").map(kind=>kind.trim()).filter(Boolean));
+ // Measurement only (endurance heap): STARTUP_HEALTHY_GRID_HARNESS_RECORDS=counted also stops retaining the harness's other
+ // per-epoch records (spans, per-owner proof summaries, startup trace events, the parent's per-move, per-checkpoint and
+ // per-transition records, the transport fixture's per-message records); every realm counts them instead. Unset by default.
+ const harnessRecords=process.env.STARTUP_HEALTHY_GRID_HARNESS_RECORDS;
+ if(harnessRecords!==undefined&&harnessRecords!=="counted")throw new Error("harness records mode must be counted");
+ if(harnessRecords==="counted")await page.context().addInitScript(()=>Reflect.set(globalThis,"__r8HarnessRecordsCounted",true));
  // Endurance runs (more than 32 rollovers) scale the per-role delivery telemetry bound the same way.
  const deliveryRollovers=Number(process.env.STARTUP_HEALTHY_GRID_ROLLOVERS??4),deliveryObservationBound=deliveryRollovers>32?32*(deliveryRollovers+1):1024;
  await page.context().addInitScript(value=>Reflect.set(globalThis,"__r8DeliveryObservationBound",value),deliveryObservationBound);
@@ -737,8 +743,15 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
  expect(receipt.ok,JSON.stringify({phase:receipt.phase,error:receipt.error})).toBe(true);
  expect(receipt.profileId).toBe(creatorProfile);
  expect(samplingErrors.map(String)).toEqual([]);
+ // Measurement only: with the harness's records counted, the lists are empty and their counts carry the same checks.
+ const countedRecords=harnessRecords==="counted"?receipt.harnessRecordCounts:undefined;
+ if(countedRecords!==undefined){
+  expect(countedRecords.transitions).toBe(rollovers);expect(receipt.epoch).toBe(rollovers);expect(receipt.phase).toBe("continued-gameplay");
+  expect(countedRecords.ordinary).toBe(rollovers*8+4);expect(countedRecords.snapshots).toBe(rollovers);
+ }else{
  expect(receipt.transitions).toHaveLength(rollovers);expect(receipt.epoch).toBe(rollovers);expect(receipt.phase).toBe("continued-gameplay");
  expect(receipt.ordinary).toHaveLength(rollovers*8+4);expect(receipt.snapshots).toHaveLength(rollovers);
+ }
  expect(activeMemory.length).toBeGreaterThan(0);
  expect(receipt.joins.every((row:{ok:boolean})=>row.ok)).toBe(true);
  expect(receipt.proofEventsTruncated).toBe(false);
@@ -788,7 +801,8 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
   }
   expect(charges.every((event:any)=>event.ok&&event.noFutureConstructors&&event.chargedAfter===event.chargedBefore+event.knownChargedBytes+event.unknownChargedBytes)).toBe(true);
  }
- expect(receipt.transfers.length).toBeGreaterThan(0);
+ if(countedRecords!==undefined)expect(receipt.transfers.length+receipt.roleObservers.reduce((count:number,row:any)=>count+(row.observer.harnessRecordsCounted?.streamBytes??0),0)).toBeGreaterThan(0);
+ else expect(receipt.transfers.length).toBeGreaterThan(0);
  expect(Math.max(...samples.map(row=>row.indexedDbAllocatedBytes))).toBeGreaterThan(0);
 });
 test("public room pending bytes refuse before stalled native work drains and join every admitted caller",async({page},info)=>{
