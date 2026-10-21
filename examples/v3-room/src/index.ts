@@ -68,6 +68,18 @@ const browserStorageHost: V3RoomStorageHost = Object.freeze({
 		createBrowserRoomHeadAuthority({ databaseName, initialization }),
 });
 
+/**
+ * The six-database host: each room owner in its own IndexedDB database (the room's
+ * signing, seal vote and evidence database `name`, `name--ahe`, its live journal,
+ * snapshot quarantine and issuance databases). Rooms created in six databases reopen on
+ * it when the application passes no storage host; an application passes it explicitly to
+ * create a new room in six databases.
+ * @returns The six-database storage host.
+ */
+export function createBrowserV3SixDatabaseStorageHost(): V3RoomStorageHost {
+	return browserStorageHost;
+}
+
 const ROOM_AHE_SUFFIX = "--ahe";
 const ROOM_DATABASE_VERSION = 7;
 
@@ -234,7 +246,8 @@ export async function createV3RoomSession<Projection extends V3RoomProjectionAut
 	if (input.storageHost !== undefined) return openHostRoom({ ...input, storageHost: input.storageHost });
 	const existing = await existingRoomLayout(input);
 	const layout = existing === "new" ? NEW_ROOM_LAYOUT : existing;
-	if (layout === "six-database") return openHostRoom({ ...input, storageHost: browserStorageHost });
+	if (layout === "six-database")
+		return openHostRoom({ ...input, storageHost: createBrowserV3SixDatabaseStorageHost() });
 	return openHostRoom({
 		...input,
 		storageHost: createBrowserV3RoomDatabaseStorageHost({ roomRetention: true }),
