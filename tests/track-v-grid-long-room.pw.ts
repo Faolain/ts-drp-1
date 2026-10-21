@@ -4,6 +4,7 @@ import { installGridRoomHeadAuthority } from "./fixtures/phase-3a1b/grid-room-he
 import {
 	hangTail,
 	installPhaseProbe,
+	lullWindows,
 	pageNow,
 	type PhaseWindow,
 	summarizePhases,
@@ -310,17 +311,38 @@ test(`the shipped Grid page runs ${EPOCHS} creator successors with an enrolled W
 		}
 		for (let epoch = 0; epoch < EPOCHS; epoch++) {
 			const issueMs: { creator: number[]; recipient: number[] } = { creator: [], recipient: [] };
+			// Track Z: [ordinal (even: creator, odd: Writer), issue start, issue ms, first seen by the other page]
+			// in absolute page time.
+			const moveTimes: [number, number, number, number][] = [];
 			for (let ordinal = 0; ordinal < MOVES * 2; ordinal++) {
 				const index = ordinal % 2;
 				const [page, other] = index === 0 ? [creator, receiver] : [receiver, creator];
 				const block = { id: `block-${index}-${ordinal >> 1}`, kind: "stone", x: epoch, y: index };
-				const ms = await page.evaluate(async (value) => {
+				const [ms, at] = await page.evaluate(async (value) => {
 					const api = Reflect.get(window, "__TS_DRP_V3_ZONE__") as { placeBlock(input: unknown): Promise<void> };
 					const started = performance.now();
 					await api.placeBlock(value);
-					return performance.now() - started;
+					return [performance.now() - started, performance.timeOrigin + started] as const;
 				}, block);
 				issueMs[index === 0 ? "creator" : "recipient"].push(ms);
+				if (PHASES) {
+					// Polls inside the other page every 5 ms until its zone holds the block.
+					const seen = await other.evaluate(
+						async ({ id, bound }) => {
+							const api = Reflect.get(window, "__TS_DRP_V3_ZONE__") as {
+								snapshot(): { blocks: readonly { id: string }[] };
+							};
+							const started = performance.now();
+							while (!api.snapshot().blocks.some((entry) => entry.id === id)) {
+								if (performance.now() - started > bound) return null;
+								await new Promise((resolve) => setTimeout(resolve, 5));
+							}
+							return performance.timeOrigin + performance.now();
+						},
+						{ id: block.id, bound: 60_000 }
+					);
+					if (seen !== null) moveTimes.push([ordinal, Math.round(at), Math.round(ms), Math.round(seen)]);
+				}
 				try {
 					await expect
 						.poll(async () => (await zone(other)).blocks, { timeout: PROBE ? 20_000 : 60_000 })
@@ -458,6 +480,8 @@ test(`the shipped Grid page runs ${EPOCHS} creator successors with an enrolled W
 						epoch: epoch + 1,
 						creator: summarizePhases(creatorRaw, windows),
 						recipient: summarizePhases(recipientRaw, windows),
+						lulls: { creator: lullWindows(creatorRaw), recipient: lullWindows(recipientRaw) },
+						moves: moveTimes,
 						auto: { creator: creatorRaw.auto, recipient: recipientRaw.auto },
 						dropped: { creator: creatorRaw.dropped, recipient: recipientRaw.dropped },
 					})}\n`

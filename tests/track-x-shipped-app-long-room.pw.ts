@@ -4,6 +4,7 @@ import { installGridRoomHeadAuthority } from "./fixtures/phase-3a1b/grid-room-he
 import {
 	hangTail,
 	installPhaseProbe,
+	lullWindows,
 	pageNow,
 	type PhaseWindow,
 	summarizePhases,
@@ -89,8 +90,8 @@ interface ShippedApp {
 	create(page: Page): Promise<string>;
 	/** Joins with the invite through the UI. */
 	join(page: Page, invite: string): Promise<void>;
-	/** Makes one creator move through the UI; returns its key and the in-page ms until the creator shows it. */
-	move(page: Page, epoch: number, ordinal: number): Promise<Readonly<{ key: unknown; ms: number }>>;
+	/** Makes one creator move through the UI; returns its key, the in-page ms until the creator shows it and its absolute page start time. */
+	move(page: Page, epoch: number, ordinal: number): Promise<Readonly<{ key: unknown; ms: number; at: number }>>;
 	/** Whether the page shows the move. */
 	shows(page: Page, key: unknown): Promise<boolean>;
 	/** The page's comparable view of the room's state. */
@@ -127,7 +128,11 @@ const canvas: ShippedApp = {
 				if (performance.now() - started > 60_000) throw new Error("TRACK_X_CANVAS_PAINT_NOT_SHOWN");
 				await new Promise((resolve) => setTimeout(resolve, 5));
 			}
-			return { key: { id: pixelId, color: pixel.style.backgroundColor }, ms: performance.now() - started };
+			return {
+				key: { id: pixelId, color: pixel.style.backgroundColor },
+				ms: performance.now() - started,
+				at: performance.timeOrigin + started,
+			};
 		}, id);
 	},
 	async shows(page, key) {
@@ -179,7 +184,7 @@ const chat: ShippedApp = {
 				if (performance.now() - started > 60_000) throw new Error("TRACK_X_CHAT_MESSAGE_NOT_SHOWN");
 				await new Promise((resolve) => setTimeout(resolve, 5));
 			}
-			return { key: value, ms: performance.now() - started };
+			return { key: value, ms: performance.now() - started, at: performance.timeOrigin + started };
 		}, text);
 	},
 	async shows(page, key) {
@@ -499,6 +504,37 @@ async function waitShown(app: ShippedApp, page: Page, key: unknown, timeout: num
 	}
 }
 
+/**
+ * Track Z (TRACK_Z_PHASES): waits inside the page, polling every 5 ms, until it shows the move.
+ * @param app - The shipped app.
+ * @param page - The receiving page.
+ * @param key - The move's key.
+ * @param timeout - Bound in ms.
+ * @returns The absolute page time it was first seen, or null on timeout.
+ */
+function seenInPage(app: ShippedApp, page: Page, key: unknown, timeout: number): Promise<number | null> {
+	return page.evaluate(
+		async ({ name, value, bound }) => {
+			const shown = (): boolean => {
+				if (name === "canvas") {
+					const { id, color } = value as { id: string; color: string };
+					return document.getElementById(id)?.style.backgroundColor === color;
+				}
+				return Array.from(document.querySelectorAll(".message-content")).some(
+					(element) => element.textContent === value
+				);
+			};
+			const started = performance.now();
+			while (!shown()) {
+				if (performance.now() - started > bound) return null;
+				await new Promise((resolve) => setTimeout(resolve, 5));
+			}
+			return performance.timeOrigin + performance.now();
+		},
+		{ name: app.name, value: key, bound: timeout }
+	);
+}
+
 for (const app of [canvas, chat])
 	test(`the shipped ${app.name} page runs ${EPOCHS} creator successors with a joined recipient (measurement)`, async ({
 		browser,
@@ -655,11 +691,16 @@ for (const app of [canvas, chat])
 			for (let epoch = 0; epoch < EPOCHS; epoch++) {
 				const issueMs: number[] = [];
 				const deliveryMs: number[] = [];
+				// Track Z: [ordinal, issue start, issue ms, first seen by the recipient] in absolute page time.
+				const moveTimes: [number, number, number, number][] = [];
 				for (let ordinal = 0; ordinal < MOVES; ordinal++) {
 					const moved = await app.move(creator, epoch, ordinal);
 					issueMs.push(Math.round(moved.ms));
 					const sent = Date.now();
-					if (!(await waitShown(app, receiver, moved.key, CONVERGE_MS))) {
+					const seen = PHASES ? await seenInPage(app, receiver, moved.key, CONVERGE_MS) : undefined;
+					if (seen !== undefined && seen !== null)
+						moveTimes.push([ordinal, Math.round(moved.at), Math.round(moved.ms), Math.round(seen)]);
+					if (seen === null || (seen === undefined && !(await waitShown(app, receiver, moved.key, CONVERGE_MS)))) {
 						const stuck = {
 							app: app.name,
 							epoch: epoch + 1,
@@ -786,6 +827,8 @@ for (const app of [canvas, chat])
 							epoch: epoch + 1,
 							creator: summarizePhases(creatorRaw, windows),
 							recipient: summarizePhases(recipientRaw, windows),
+							lulls: { creator: lullWindows(creatorRaw), recipient: lullWindows(recipientRaw) },
+							moves: moveTimes,
 							auto: { creator: creatorRaw.auto, recipient: recipientRaw.auto },
 							dropped: { creator: creatorRaw.dropped, recipient: recipientRaw.dropped },
 						})}\n`

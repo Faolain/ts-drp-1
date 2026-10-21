@@ -85,7 +85,11 @@ function phaseProbeInitScript(globals: Readonly<Record<string, unknown>>): void 
 			if (event !== null && typeof event === "object" && room()) {
 				const record = event as Record<string, unknown>;
 				const ms = typeof record.ms === "number" ? record.ms : null;
-				const detail = record.outcome ?? record.reason ?? record.refusal ?? null;
+				// A lull reports its trigger and result (the library's scheduled lull, Track Z).
+				const detail =
+					record.kind === "recovery-pool-lull"
+						? `${String(record.trigger)}:${String(record.result)}`
+						: (record.outcome ?? record.reason ?? record.refusal ?? null);
 				state.proof.push([now(), String(record.kind), ms, detail === null ? null : String(detail).slice(0, 60)]);
 			}
 		} catch {
@@ -226,7 +230,10 @@ export function summarizePhases(raw: RawPhases, windows: readonly PhaseWindow[])
 		const summary = at(time);
 		summary.proof[kind] = (summary.proof[kind] ?? 0) + 1;
 		// Retention and retirement events also count per outcome or reason (for example a decline's reason).
-		if (detail !== null && (kind.startsWith("room-retention") || kind.startsWith("closed-retirement"))) {
+		if (
+			detail !== null &&
+			(kind.startsWith("room-retention") || kind.startsWith("closed-retirement") || kind === "recovery-pool-lull")
+		) {
 			const keyed = `${kind}:${detail.slice(0, 60)}`;
 			summary.proof[keyed] = (summary.proof[keyed] ?? 0) + 1;
 		}
@@ -268,4 +275,16 @@ export function summarizePhases(raw: RawPhases, windows: readonly PhaseWindow[])
 		summary.tasks.total = Math.round(summary.tasks.total + duration);
 	}
 	return summaries;
+}
+
+/**
+ * The lulls one page ran in these records, as absolute page-time windows: each
+ * `recovery-pool-lull` proof event is reported when its lull ends and carries its length.
+ * @param raw - One page's records (from `takePhases`).
+ * @returns `[start, end, "trigger:result"]` per lull, in end order.
+ */
+export function lullWindows(raw: RawPhases): [number, number, string][] {
+	return raw.proof
+		.filter(([, kind, ms]) => kind === "recovery-pool-lull" && ms !== null)
+		.map(([end, , ms, detail]) => [Math.round(end - (ms ?? 0)), Math.round(end), detail ?? "unknown"]);
 }
