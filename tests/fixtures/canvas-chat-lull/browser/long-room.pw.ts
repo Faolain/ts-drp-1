@@ -25,7 +25,8 @@ import {
 // CANVAS_CHAT_LULL_CANVAS_RECIPIENTS=receive-only  CANVAS_CHAT_LULL_CHAT_RECIPIENTS=writer
 // CANVAS_CHAT_LULL_BOUNDS=shipped,absent  CANVAS_CHAT_LULL_REPEAT=3  CANVAS_CHAT_LULL_MOVES=2
 // CANVAS_CHAT_LULL_LULL_MOVES=2  CANVAS_CHAT_LULL_SETTLE_MS=300  CANVAS_CHAT_LULL_OUT=<dir>
-// CANVAS_CHAT_LULL_TREE=<label>
+// CANVAS_CHAT_LULL_TREE=<label>  CANVAS_CHAT_LULL_REPEAT_FROM=<n>
+// CANVAS_CHAT_LULL_PREBUILT_ASSETS=<dir> (a bundle build.ts already made, global-setup.ts)
 
 type Host = "browser" | "room";
 function selection<Value extends string>(name: string, allowed: readonly Value[], fallback: readonly Value[]): Value[] {
@@ -39,6 +40,8 @@ function selection<Value extends string>(name: string, allowed: readonly Value[]
 
 const EPOCHS = Number(process.env.CANVAS_CHAT_LULL_EPOCHS ?? 8);
 const REPEAT = Number(process.env.CANVAS_CHAT_LULL_REPEAT ?? 3);
+// The first repeat's index (measurement only: runs split across invocations keep distinct indices).
+const REPEAT_FROM = Number(process.env.CANVAS_CHAT_LULL_REPEAT_FROM ?? 0);
 const MOVES = Number(process.env.CANVAS_CHAT_LULL_MOVES ?? 2);
 const LULL_MOVES = Number(process.env.CANVAS_CHAT_LULL_LULL_MOVES ?? 2);
 const APPS = selection("CANVAS_CHAT_LULL_APPS", ["canvas", "chat"], ["canvas", "chat"]);
@@ -71,7 +74,7 @@ const METHODS = [
 ] as const satisfies readonly (keyof RoleEndpoint)[];
 
 const cases: { options: LongRoomOptions; repeat: number }[] = [];
-for (let repeat = 0; repeat < REPEAT; repeat++)
+for (let repeat = REPEAT_FROM; repeat < REPEAT_FROM + REPEAT; repeat++)
 	for (const app of APPS)
 		for (const host of HOSTS)
 			for (const recipient of RECIPIENTS[app])
