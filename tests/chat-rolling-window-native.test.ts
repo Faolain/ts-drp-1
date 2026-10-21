@@ -31,14 +31,18 @@ import { SHIPPING_CHAT_ARCHIVE_DEFAULT_BOUND } from "../examples/chat/src/v3-cha
 // CHAT_WINDOW_VERBOSE=1. CHAT_WINDOW_PAD=<n> appends n characters to every text, which only
 // shortens the run before the window is full (development; the default is 0).
 //
-// The window is 32 KiB (32,768 bytes). The assertions need every member's share full, 50
-// steady epochs after that, and more than four times the window's bytes sent, so a run too
-// short for them is refused before any epoch runs, with the length it needs (231 epochs at
-// the default text length: every share is full at epoch 77 and four times the window's
-// bytes are sent by epoch 231; 70 epochs with CHAT_WINDOW_PAD=400).
+// The window is 32 KiB (32,768 bytes). The assertions need every member's share full,
+// STEADY_EPOCHS steady epochs after that, and more than four times the window's bytes sent, so
+// a run too short for them is refused before any epoch runs, with the length it needs (231
+// epochs at the default text length: every share is full at epoch 77 and four times the
+// window's bytes are sent by epoch 231; 120 epochs with CHAT_WINDOW_PAD=400).
 const EPOCHS = Number(process.env.CHAT_WINDOW_EPOCHS ?? 300);
 const WINDOW_BYTES = 32_768;
-const STEADY_EPOCHS = 50;
+// The stores' byte slope over the steady epochs needs 100 of them: the library's stores keep
+// bounded oscillations (earlier snapshot generations catching up with a full window, counters
+// widening), which tilt a shorter series. Over 50 steady epochs they measured 22-24 bytes per
+// epoch at both text lengths, above the assertion's 16; over 100 or more, at most 2.8.
+const STEADY_EPOCHS = 100;
 const PAD = Number(process.env.CHAT_WINDOW_PAD ?? 0);
 const REOPEN_AT = Math.floor(EPOCHS / 2);
 const CRASH_AT = REOPEN_AT + 5;
