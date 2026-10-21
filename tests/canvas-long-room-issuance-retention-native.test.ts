@@ -14,6 +14,7 @@ import { afterAll, beforeAll, beforeEach, expect, it } from "vitest";
 import { fakeNetwork } from "./fixtures/phase-4b-v3/live-snapshot.js";
 import { ScriptedSnapshotChunkPort } from "./fixtures/phase-4c-v3/snapshot-pull-transport.js";
 import { CANVAS_GENESIS_PROFILE } from "../examples/canvas/src/profile.js";
+import { settlementProfileFor } from "../packages/protocol-v3/src/settlement-profile.js";
 import {
 	createV3RoomCreatorInviteMaterial,
 	createV3RoomSession,
@@ -55,6 +56,8 @@ if (
 const PROFILE = LEGACY_MEASUREMENT
 	? Object.freeze({ profileId: "creator-trusted-v1", latchedAclVersion: 1 })
 	: CANVAS_GENESIS_PROFILE;
+// Under the settlement profile each Writer also issues one author fence per successor.
+const FENCES_PER_SUCCESSOR = settlementProfileFor(PROFILE.profileId) === "v1" ? 1 : 0;
 // The legacy measurement runs no bound on issuance: it skips the bounded-issuance test.
 beforeEach((context) => {
 	if (LEGACY_MEASUREMENT && context.task.name.startsWith("a Canvas creator and Writer recipient keep bounded issuance"))
@@ -576,7 +579,7 @@ it(`a Canvas creator and Writer recipient keep bounded issuance and flat per-mov
 			const issuance = record[peer];
 			// The author keeps issuing every epoch, so the bound is not vacuous.
 			expect(issuance.next, `${at}: the author keeps issuing`).toBe(
-				first[peer].next + (record.epoch - first.epoch) * MOVES
+				first[peer].next + (record.epoch - first.epoch) * (MOVES + FENCES_PER_SUCCESSOR)
 			);
 			expect(issuance.pending, at).toBe(0);
 			expect(issuance.issuedCount, at).toBe(first[peer].issuedCount);
