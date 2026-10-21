@@ -35,6 +35,8 @@ const SETTLE_MS = Number(process.env.TRACK_X_RED_SETTLE_MS ?? 16_000);
 const ROLLOVERS = Number(process.env.TRACK_X_RED_ROLLOVERS ?? 4);
 const DELIVERY_MS = Number(process.env.TRACK_X_RED_DELIVERY_MS ?? 10_000);
 const FENCE_ACTION = "$drp.author-fence.v1";
+// A little over one missing-dependency request interval (room-network.ts, 1 s).
+const REQUEST_QUIET_MS = 1_500;
 
 afterEach(async () => {
 	expect(await closeFixtures(), "native admitted work and owners join").toEqual([]);
@@ -132,6 +134,16 @@ for (const role of ["writer", "observer"] as const satisfies readonly RecipientR
 		const creatorPeer = required(fixture.roster[0]).peerId;
 		const recipientPeer = required(fixture.roster[1]).peerId;
 		let lost = 0;
+		// The recipient's history requests, its pushes to the creator and the creator's replies
+		// (every retained row, the lost move included once it is issued) are direct deliveries.
+		let lastDirect = Date.now();
+		fixture.network.observe(({ kind, from, to }) => {
+			if (
+				kind === "direct" &&
+				((from === recipientPeer && to === creatorPeer) || (from === creatorPeer && to === recipientPeer))
+			)
+				lastDirect = Date.now();
+		});
 		const converged = async (label: string): Promise<void> => {
 			const deadline = Date.now() + DELIVERY_MS;
 			while (JSON.stringify(recipient.room.projection()) !== JSON.stringify(creator.room.projection())) {
@@ -140,7 +152,21 @@ for (const role of ["writer", "observer"] as const satisfies readonly RecipientR
 				await sleep(25);
 			}
 		};
+		// A request still pending when the move is lost (the trailing missing-dependency request of
+		// the convergence just before) would bring the move back before the check below. Such a
+		// request repeats at most once per interval (room-network.ts
+		// MISSING_HISTORY_REQUEST_INTERVAL_MS, 1 s), so a quiet period a little longer than that
+		// interval means none is pending.
+		const requestsQuiet = async (): Promise<void> => {
+			const deadline = Date.now() + DELIVERY_MS;
+			for (;;) {
+				await fixture.network.idle();
+				if (Date.now() - lastDirect >= REQUEST_QUIET_MS || Date.now() > deadline) return;
+				await sleep(100);
+			}
+		};
 		const loseOneMove = async (epoch: number): Promise<void> => {
+			await requestsQuiet();
 			const id = `lost-${epoch}`;
 			const restore = fixture.network.lose(({ kind, from, to, message }) => {
 				const operation = deliveredVertex(message)?.operation as Readonly<Record<string, unknown>> | undefined;
