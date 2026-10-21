@@ -35,8 +35,9 @@ import type { SettlementRoom } from "../track-m/settlement-room.js";
 // - `sendMessage` is a direct authenticated stream: the copy carries one-use
 //   `authenticated-stream` evidence (`claimIngressEvidence`) and no gossip topic.
 // Delivery is asynchronous and in order. Nothing is dropped, reordered or replayed by the
-// network itself, and no peer-connection events are emitted after setup (the shipped
-// browser pages see none after their first connections either).
+// network itself unless a test names a delivery to lose (`lose`), and no peer-connection
+// events are emitted after setup (the shipped browser pages see none after their first
+// connections either).
 //
 // The recipient is either a Writer (in the latched ACL, as Grid's players under Track V's
 // switch) or a receive-only observer (outside the ACL, as every joiner of the shipped Canvas
@@ -76,6 +77,7 @@ export function memoryNetwork() {
 	const evidence = new WeakMap<Message, Evidence>();
 	const inFlight = new Set<Promise<void>>();
 	const observers = new Set<(delivery: Delivery) => void>();
+	const losses = new Set<(delivery: Delivery) => boolean>();
 	let tail = Promise.resolve();
 	const deliver = (kind: Delivery["kind"], from: string, to: string, message: Message) => {
 		const target = nodes.get(to);
@@ -92,7 +94,9 @@ export function memoryNetwork() {
 				new Promise<void>((resolve) =>
 					setTimeout(() => {
 						try {
-							for (const observe of observers) observe({ kind, from, to, message: received });
+							const delivery = { kind, from, to, message: received };
+							for (const observe of observers) observe(delivery);
+							if ([...losses].some((lost) => lost(delivery))) return;
 							if (!target.adapter.route(received)) routeV3Ingress(target.network, received);
 						} finally {
 							resolve();
@@ -132,6 +136,15 @@ export function memoryNetwork() {
 		observe: (observer: (delivery: Delivery) => void) => {
 			observers.add(observer);
 			return () => observers.delete(observer);
+		},
+		/**
+		 * Lose every delivery the predicate selects (observers still see it) until removed.
+		 * @param predicate - Selects the deliveries to lose.
+		 * @returns Remove the loss.
+		 */
+		lose: (predicate: (delivery: Delivery) => boolean) => {
+			losses.add(predicate);
+			return () => losses.delete(predicate);
 		},
 		idle: async () => {
 			while (inFlight.size > 0) await Promise.allSettled([...inFlight]);

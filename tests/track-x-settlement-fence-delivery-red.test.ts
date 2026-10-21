@@ -118,3 +118,61 @@ for (const role of ["writer", "observer"] as const satisfies readonly RecipientR
 		await converged(`epoch ${ROLLOVERS} creator move`);
 		expect(fences.size).toBe(ROLLOVERS);
 	}, 180_000);
+
+// The same repair, for any creator vertex the recipient lost (here one live move, lost in
+// transit), at the genesis epoch and again at a successor: the creator's next move depends
+// on the lost one, arrives, and is held for it. The recipient must ask for the missing
+// dependency then, and keep asking at later dependents; it must never stay deaf to the
+// creator because a schedule ran out.
+for (const role of ["writer", "observer"] as const satisfies readonly RecipientRole[])
+	it(`a ${role} recipient recovers a lost creator move when the creator's next move needs it`, async () => {
+		const fixture = await fenceDeliveryRoom(role);
+		const creator = await fixture.open(0);
+		const recipient = await fixture.open(1);
+		const creatorPeer = required(fixture.roster[0]).peerId;
+		const recipientPeer = required(fixture.roster[1]).peerId;
+		let lost = 0;
+		const converged = async (label: string): Promise<void> => {
+			const deadline = Date.now() + DELIVERY_MS;
+			while (JSON.stringify(recipient.room.projection()) !== JSON.stringify(creator.room.projection())) {
+				if (Date.now() > deadline)
+					throw new TypeError(`TRACK_X_RED ${label}: not admitted by the ${role} recipient within ${DELIVERY_MS} ms`);
+				await sleep(25);
+			}
+		};
+		const loseOneMove = async (epoch: number): Promise<void> => {
+			const id = `lost-${epoch}`;
+			const restore = fixture.network.lose(({ kind, from, to, message }) => {
+				const operation = deliveredVertex(message)?.operation as Readonly<Record<string, unknown>> | undefined;
+				const selected = kind === "gossip" && from === creatorPeer && to === recipientPeer && operation?.id === id;
+				if (selected) lost++;
+				return selected;
+			});
+			try {
+				await creator.room.issue({ action: "placeBlock", id, kind: "stone", x: epoch, y: 5 });
+				await fixture.network.idle();
+			} finally {
+				restore();
+			}
+			await sleep(500);
+			expect(JSON.stringify(recipient.room.projection())).not.toBe(JSON.stringify(creator.room.projection()));
+			await creator.room.issue({ action: "placeBlock", id: `after-${epoch}`, kind: "stone", x: epoch, y: 6 });
+			await converged(`epoch ${epoch}: the lost move and the move after it`);
+		};
+		await sleep(SETTLE_MS);
+		await creator.room.issue({ action: "placeBlock", id: "first", kind: "stone", x: 0, y: 0 });
+		await converged("epoch 0 first move");
+		await loseOneMove(0);
+		await sleep(300);
+		const sealed = await creator.room.sealEpoch();
+		expect((sealed as { ok?: boolean }).ok, JSON.stringify(sealed)).toBe(true);
+		await creator.room.adoptCreatorSuccessor();
+		await fixture.network.idle();
+		const transfer = await settlementDelivery(asSettlementRoom(fixture));
+		Reflect.set(recipient.networkNode, "createSnapshotChunkProtocolHost", () => transfer.port);
+		await recipient.room.installCreatorSuccessor({ offer: transfer.offer, peers: transfer.peers });
+		await creator.room.issue({ action: "placeBlock", id: "successor-first", kind: "stone", x: 1, y: 0 });
+		await converged("epoch 1 first move");
+		await loseOneMove(1);
+		expect(lost).toBe(2);
+	}, 180_000);
