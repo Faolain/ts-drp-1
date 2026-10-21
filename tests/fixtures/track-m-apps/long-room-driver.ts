@@ -8,6 +8,8 @@
 export type HostKind = "node" | "browser" | "room" | "room-retention";
 export type AppKind = "canvas" | "chat";
 export type RecipientMode = "receive-only" | "writer";
+/** Chat only (Track W): "window" = the shipped rolling-window format (v4), "lifetime" = version 3. */
+export type ChatFormat = "window" | "lifetime";
 
 export interface LongRoomOptions {
 	readonly app: AppKind;
@@ -18,12 +20,16 @@ export interface LongRoomOptions {
 	readonly epochs: number;
 	/** Ordinary moves per Writer per epoch. */
 	readonly moves: number;
+	/** Chat only: the format the creator signs into genesis (default "window", what Chat ships). */
+	readonly chatFormat?: ChatFormat;
 }
 
 export type StoreCensus = Readonly<Record<string, readonly [rows: number, bytes: number]>>;
 
 export interface EpochRecord {
 	readonly epoch: number;
+	/** Bytes of the canonical application state both roles hold after the install. */
+	readonly stateBytes?: number;
 	readonly installed: Readonly<{ creator: StoreCensus; recipient: StoreCensus }>;
 	readonly lulled: Readonly<{ creator: StoreCensus; recipient: StoreCensus }>;
 	readonly latency: Readonly<{
@@ -44,6 +50,30 @@ export interface EpochRecord {
 	/** Reasons of this epoch's `room-retention-declined` events (the existing passes ran instead). */
 	readonly retentionDeclines: readonly string[];
 	readonly eventKinds: Readonly<Record<string, number>>;
+	/** Chat window format with a device archive (Track W): each role's archive after the epoch. */
+	readonly archive?: Readonly<{ creator: ArchiveObservation | null; recipient: ArchiveObservation | null }>;
+}
+
+/**
+ * Track W: one role's Chat device archive (application data in its own database, outside the
+ * room's stores and census). Counters are cumulative since the role opened. Observation only.
+ */
+export interface ArchiveObservation {
+	readonly messages: number;
+	readonly bytes: number;
+	readonly appended: number;
+	readonly evicted: number;
+	/** Store transactions and the wall time spent in them (the append cost). */
+	readonly transactions: number;
+	readonly transactionMs: number;
+	/** Calls of `observe()` on the projection callback and the wall time spent in them. */
+	readonly observes: number;
+	readonly observeMs: number;
+	readonly failures: number;
+	/** The archive database's own rows and payload bytes. */
+	readonly database: StoreCensus;
+	/** `navigator.storage.estimate()` usage of this role's origin, where the platform has it. */
+	readonly originUsage?: number;
 }
 
 export interface LongRoomRun {
@@ -91,6 +121,8 @@ export interface RoleEndpoint {
 	/** `maintainRecoveryPool()`: wall time and result kind. */
 	lull(): Promise<Readonly<{ ms: number; kind: string }>>;
 	census(): Promise<StoreCensus>;
+	/** Track W: the Chat device archive after its pending write, or null without one. */
+	archive(): Promise<ArchiveObservation | null>;
 	/** Observer events since the previous drain. */
 	drainEvents(): Promise<ObservedEvent[]>;
 	close(): Promise<void>;
@@ -115,7 +147,8 @@ export function fromBase64(text: string): Uint8Array {
 }
 
 export function labelOf(options: LongRoomOptions): string {
-	return `${options.app}-${options.recipient}-${options.creatorLull ? "reader" : "product"}-${options.host}`;
+	const format = options.app === "chat" && options.chatFormat === "lifetime" ? "-lifetime" : "";
+	return `${options.app}-${options.recipient}-${options.creatorLull ? "reader" : "product"}-${options.host}${format}`;
 }
 
 /**
@@ -143,9 +176,10 @@ export async function driveLongRoom(
 		admits.push(await (from === 0 ? recipient : creator).receive(rows));
 		delivered[from] = last.authorSequence;
 	};
-	const sameState = async (): Promise<void> => {
+	const sameState = async (): Promise<number> => {
 		const [left, right] = await Promise.all([creator.state(), recipient.state()]);
 		if (left !== right) throw new TypeError(`TRACK_M_APPS_PROJECTIONS_DIFFER ${label}`);
+		return left.length / 2;
 	};
 	const census = async (): Promise<{ creator: StoreCensus; recipient: StoreCensus }> => ({
 		creator: await creator.census(),
@@ -186,7 +220,7 @@ export async function driveLongRoom(
 			const install = await recipient.install(exported.offer);
 			const authority = await recipient.authorityEpoch();
 			if (authority !== epoch + 1) throw new TypeError(`TRACK_M_APPS_INSTALL_EPOCH ${String(authority)}`);
-			await sameState();
+			const stateBytes = await sameState();
 			stage = "census";
 			const installed = await census();
 			stage = "creator-lull";
@@ -195,11 +229,14 @@ export async function driveLongRoom(
 			const recipientLull = await recipient.lull();
 			stage = "census";
 			const lulled = await census();
+			stage = "archive";
+			const archive = { creator: await creator.archive(), recipient: await recipient.archive() };
 			const window = [...(await creator.drainEvents()), ...(await recipient.drainEvents())];
 			const eventKinds: Record<string, number> = {};
 			for (const event of window) eventKinds[event.kind] = (eventKinds[event.kind] ?? 0) + 1;
 			const record: EpochRecord = {
 				epoch: epoch + 1,
+				stateBytes,
 				installed,
 				lulled,
 				latency: {
@@ -222,6 +259,7 @@ export async function driveLongRoom(
 					.filter((event) => event.kind === "room-retention-declined")
 					.map((event) => String(event.reason)),
 				eventKinds,
+				...(archive.creator === null && archive.recipient === null ? {} : { archive }),
 			};
 			epochs.push(record);
 			hooks.write?.(record);

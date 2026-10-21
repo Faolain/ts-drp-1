@@ -25,6 +25,8 @@ import {
 // TRACK_M_APPS_CANVAS_RECIPIENTS=receive-only  TRACK_M_APPS_CHAT_RECIPIENTS=writer
 // TRACK_M_APPS_LULLS=product  TRACK_M_APPS_REPEAT=1  TRACK_M_APPS_MOVES=2  TRACK_M_APPS_SETTLE_MS=<ms>
 // TRACK_M_APPS_OUT=<dir> (JSONL per case)  TRACK_M_APPS_TREE=<label>
+// TRACK_M_APPS_CHAT_FORMAT=window,lifetime (Track W; default window, the shipped format; a tree
+// without the window format ignores it)
 //
 // Measurement only, off by default: TRACK_M_APPS_HEAP=1 adds each page's used JS heap after a
 // forced collection (HeapProfiler.collectGarbage, then Runtime.getHeapUsage) to every epoch's
@@ -52,6 +54,7 @@ const RECIPIENTS = {
 	chat: selection("TRACK_M_APPS_CHAT_RECIPIENTS", ["receive-only", "writer"], ["writer"]),
 };
 const LULLS = selection("TRACK_M_APPS_LULLS", ["product", "reader"], ["product"]);
+const CHAT_FORMATS = selection("TRACK_M_APPS_CHAT_FORMAT", ["window", "lifetime"], ["window"]);
 const SETTLE = process.env.TRACK_M_APPS_SETTLE_MS;
 const OUT = process.env.TRACK_M_APPS_OUT;
 const TREE = process.env.TRACK_M_APPS_TREE ?? "unknown";
@@ -87,6 +90,7 @@ const METHODS = [
 	"authorityEpoch",
 	"lull",
 	"census",
+	"archive",
 	"drainEvents",
 	"close",
 ] as const satisfies readonly (keyof RoleEndpoint)[];
@@ -96,11 +100,20 @@ for (let repeat = 0; repeat < REPEAT; repeat++)
 	for (const app of APPS)
 		for (const recipient of RECIPIENTS[app])
 			for (const lull of LULLS)
-				for (const host of repeat % 2 === 0 ? HOSTS : [...HOSTS].reverse())
-					cases.push({
-						options: { app, host, recipient, creatorLull: lull === "reader", epochs: EPOCHS, moves: MOVES },
-						repeat,
-					});
+				for (const chatFormat of app === "chat" ? CHAT_FORMATS : (["window"] as const))
+					for (const host of repeat % 2 === 0 ? HOSTS : [...HOSTS].reverse())
+						cases.push({
+							options: {
+								app,
+								host,
+								recipient,
+								creatorLull: lull === "reader",
+								epochs: EPOCHS,
+								moves: MOVES,
+								...(app === "chat" && chatFormat === "lifetime" ? { chatFormat } : {}),
+							},
+							repeat,
+						});
 
 // Two static servers over the same bundle: two origins.
 const servers: Server[] = [];
