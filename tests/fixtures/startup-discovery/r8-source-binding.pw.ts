@@ -217,10 +217,26 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
  await cdp.send("Performance.enable");await sample();
  let pending=Promise.resolve();const timer=setInterval(()=>{pending=pending.then(sample).catch(error=>{samplingErrors.push(error);});},200);
  const activeMemory:unknown[]=[];
+ // Measurement only: STARTUP_HEALTHY_GRID_HEAP_SNAPSHOTS names checkpoint labels (for example adopted-50,adopted-90); after
+ // that checkpoint's forced GC a V8 heap snapshot of the renderer (every frame realm) is written to STARTUP_EVIDENCE as
+ // heap-<label>.heapsnapshot. Unset by default (no snapshot).
+ const heapSnapshotLabels=new Set((process.env.STARTUP_HEALTHY_GRID_HEAP_SNAPSHOTS??"").split(",").map(label=>label.trim()).filter(Boolean));
+ if(heapSnapshotLabels.size&&process.env.STARTUP_EVIDENCE===undefined)throw new Error("heap snapshots require STARTUP_EVIDENCE");
+ const heapSnapshots:unknown[]=[];
+ const takeHeapSnapshot=async(label:string)=>{
+  const path=join(process.env.STARTUP_EVIDENCE!,"heap-"+label.replace(/[^a-z0-9-]/giu,"_")+".heapsnapshot"),file=await open(path,"w");
+  let bytes=0,writes=Promise.resolve();
+  const chunk=({chunk}:{chunk:string})=>{bytes+=chunk.length;writes=writes.then(()=>file.write(chunk)).then(()=>undefined);};
+  const started=performance.now();
+  cdp.on("HeapProfiler.addHeapSnapshotChunk",chunk);
+  try{await cdp.send("HeapProfiler.takeHeapSnapshot",{reportProgress:false});}finally{cdp.off("HeapProfiler.addHeapSnapshotChunk",chunk);await writes;await file.close();}
+  heapSnapshots.push({label,path,characters:bytes,testOnlyMilliseconds:performance.now()-started});
+ };
  await page.exposeFunction("__r8ActiveResourceCheckpoint",async(label:string)=>{
   await pending;await sample();const before=samples.at(-1),start=performance.now();
   await cdp.send("HeapProfiler.collectGarbage");const gcMilliseconds=performance.now()-start;await sample();
   activeMemory.push({label,before,after:samples.at(-1),testOnlyGcMilliseconds:gcMilliseconds});
+  if(heapSnapshotLabels.has(label))await takeHeapSnapshot(label);
  });
  const suspensions:unknown[]=[];
  if(suspendHealthyGrid)await page.exposeFunction("__r8SuspendTransfer",async(metadata:any)=>{
@@ -734,6 +750,7 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
   await cdp.detach();
   await Promise.all(clients.map(client=>client.close()));
  }
+ if(heapSnapshots.length)await info.attach("healthy-native-heap-snapshots",{body:Buffer.from(JSON.stringify(heapSnapshots)),contentType:"application/json"});
  if(longTasks)await info.attach("healthy-native-longtasks",{body:Buffer.from(JSON.stringify(await page.evaluate(()=>Reflect.get(globalThis,"__rdLongTasks")?.()))),contentType:"application/json"});
  await info.attach("healthy-native-integrated-result",{body:Buffer.from(JSON.stringify(receipt)),contentType:"application/json"});
  if(suspendHealthyGrid){
