@@ -10,7 +10,8 @@ import { cacheProbePlugin } from "./plugin.js";
 // source). Third-party packages and Node built-ins are bundled or left to Node as esbuild decides for
 // `platform: "node"`.
 //
-// usage: node --experimental-strip-types tests/fixtures/cache-probe/build-node.ts <out.mjs>
+// usage: node --experimental-strip-types tests/fixtures/cache-probe/build-node.ts <out.mjs> [residency]
+// ("residency" builds the residency-only probe: no events and no key table, for endurance runs)
 
 const root = resolve(import.meta.dirname, "../../..");
 
@@ -55,8 +56,9 @@ function sourcePlugin(): Plugin {
 	};
 }
 
-const outfile = process.argv[2];
-if (outfile === undefined) throw new Error("usage: build-node.ts <out.mjs>");
+const [outfile, mode] = process.argv.slice(2);
+if (outfile === undefined || (mode !== undefined && mode !== "residency"))
+	throw new Error("usage: build-node.ts <out.mjs> [residency]");
 await build({
 	bundle: true,
 	entryPoints: [join(import.meta.dirname, "node-long-room.ts")],
@@ -69,6 +71,6 @@ await build({
 	banner: {
 		js: 'import { createRequire as __cacheProbeRequire } from "node:module"; const require = __cacheProbeRequire(import.meta.url);',
 	},
-	plugins: [cacheProbePlugin(), sourcePlugin()],
+	plugins: [cacheProbePlugin({ residencyOnly: mode === "residency" }), sourcePlugin()],
 });
 process.stdout.write(`${resolve(outfile)}\n`);

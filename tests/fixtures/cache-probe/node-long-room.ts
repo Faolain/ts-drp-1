@@ -9,7 +9,8 @@ import type { AppKind, HostKind } from "../track-m-apps/long-room-driver.js";
 // of the process) share one set: the probe sees the process's caches. Each endpoint call runs inside a
 // probe phase named after its method; the epoch is the room's (the driver's seal epoch until the
 // recipient's install returns, then the next one); the creator's event drain (once per epoch, after both
-// lulls) and the end of the run flush the probe to <out.jsonl>.
+// lulls) and the end of the run flush the probe to <out.jsonl>. Run with `node --expose-gc`, each of those flushes
+// is followed by a forced GC and a {kind: "heap"} line with the process's memory after it.
 //
 // usage: node <bundle.mjs> <canvas|chat> <node|room|room-retention> <epochs> <out.jsonl> [reader|product]
 
@@ -43,6 +44,15 @@ Reflect.set(globalThis, "__cacheProbeSink", (line: string) => {
 const context = { epoch: 0, role: "node-process" };
 probe.setContext(() => context);
 
+const gc = Reflect.get(globalThis, "gc") as (() => void) | undefined;
+function heapAfterGc(label: string): void {
+	if (typeof gc !== "function" || out === undefined) return;
+	gc();
+	const { heapUsed, heapTotal, external, arrayBuffers, rss } = process.memoryUsage();
+	const line = { kind: "heap", label, epoch: context.epoch, heapUsed, heapTotal, external, arrayBuffers, rss };
+	appendFileSync(out, `${JSON.stringify(line)}\n`);
+}
+
 function probed(endpoint: RoleEndpoint, role: "creator" | "recipient"): RoleEndpoint {
 	const wrapped: Record<string, (...args: unknown[]) => Promise<unknown>> = {};
 	for (const [method, call] of Object.entries(endpoint) as [string, (...args: unknown[]) => Promise<unknown>][])
@@ -56,7 +66,10 @@ function probed(endpoint: RoleEndpoint, role: "creator" | "recipient"): RoleEndp
 				probe.exit(method);
 			}
 			if (role === "recipient" && method === "install") context.epoch++;
-			if (role === "creator" && method === "drainEvents") await probe.flush(`e${context.epoch}`);
+			if (role === "creator" && method === "drainEvents") {
+				await probe.flush(`e${context.epoch}`);
+				heapAfterGc(`e${context.epoch}`);
+			}
 			return result;
 		};
 	return wrapped as unknown as RoleEndpoint;
