@@ -1,7 +1,7 @@
 # Track X: the settlement fence that reaches a recipient before its install
 
 Worktree: <worktree agent-a9ab847b594d95e7f>/
-Branch: worktree-agent-a9ab847b594d95e7f (rebased onto main 725f291b)
+Branch: worktree-agent-a9ab847b594d95e7f (rebased onto main 725f291b; main 24d4ca61 merged in at b8ad1f50)
 Evidence: <evidence>/track-x/ (PROGRESS.md, logs/, tests/, bench/, bin/, data/, trash/).
 
 On the `creator-trusted-settlement-v1` profile, with real networking in Chromium, the creator's moves stopped reaching
@@ -38,6 +38,15 @@ at Track V's two d9346 failures.
 - **Suites, typecheck** (section 7). Per test, base against fix: no new failure in any set; the 8 Track X tests are
   the only change (failing at base, passing with the fixes). Canvas and Chat e2e pass 9/9 on both sides. The workspace
   typecheck has 0 errors, and the shadowed-sources check is clean.
+- **The Canvas harness hang** (section 9, merge verification): a seal deadlocked on its own live journal. The
+  close took a journal source (a held IndexedDB read view) before staging the snapshot, and the stage waited for an
+  admitted ingress append that waited for the view. The bug predates Track X's fix.
+- **The seal deadlock fix** (section 10, commit 2a65f450, RED e1f471bb; coordinator decision, row 49): `close()`
+  stages the snapshot before it takes the promotion or recovery source. The RED hangs 4 of 4 at base, on the default
+  and the room-database host, and passes with the fix. The storm harness has 0 hangs in 31 runs (base: 2 of 30).
+  Canvas, Chat and Grid run 16/16. The fix also removes Track M's `NATIVE_READ_RESERVATION_BUSY` seal race (base 13 of
+  16 fail with no settle before the seal, fix 0). It departs from row 49 in one point: after a source failure the
+  epoch stays folded and the close stays retryable, because `abortSnapshotStage` cannot undo a fold (10.2).
 
 ## 1. Step 1: shipped Canvas and Chat on main
 
@@ -424,7 +433,9 @@ recipient could never ask again. Both sends now carry a 10 s deadline (`RETAINED
 peer asks again while it still misses something. This is hardening: no observed hang had a send in flight. Each
 deadline is one `AbortSignal.timeout` per send; nothing new is held.
 
-### 9.4 Options for the seal deadlock (not implemented)
+### 9.4 Options for the seal deadlock
+
+The coordinator chose option 1 (decision row 49); section 10 records the fix and where it differs from the text below.
 
 1. Stage first: in `close()`, run `stageSnapshot` before taking the promotion or recovery source (3730, 3740-3746). The
    stage closes admission and drains the FIFO while no view is held; later ingress returns early because
@@ -456,20 +467,188 @@ changed them without a decision.
   console lines, IndexedDB and Web Locks probe, bounded final closes) and the history-request storm. The storm is
   stress, not measurement.
 
+## 10. The seal deadlock fix: stage before source (coordinator decision, Option 1)
+
+### 10.1 RED (e1f471bb)
+
+tests/track-x-seal-source-deadlock-red.test.ts, with the fixture tests/fixtures/track-x/seal-source-room.ts: a
+settlement creator (creator-trusted-settlement-v1, the Grid zone application) alone on a browser storage host over
+fake-indexeddb, with the genuine room session. The test watches `IDBDatabase.prototype.transaction` (observation only)
+and, each time `close()` takes a journal source (a held journal view created under creator-close.ts `acquireSource`,
+not under the promotion checkpoint taken before `close()`), delivers a copy of the creator's latest published vertex
+back to the creator from the other peer, as a recipient's retained-history push does. Four cases:
+
+| Host                                                       | Close                                                                                               |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| default six-database (no `storageHost`)                    | the epoch-2 seal (recovery source, creator-close.ts 3746)                                           |
+| default six-database                                       | a promotion close (`promoteCreatorCheckpoint({closedEpoch: 0})` at epoch 1: promotion source, 3730) |
+| room database (`createBrowserV3RoomDatabaseStorageHost()`) | the epoch-2 seal                                                                                    |
+| room database                                              | a promotion close                                                                                   |
+
+The room-database host deadlocks the same way: its live journal's held view covers the journal namespace of the room
+database (`roomOwnerStoreNames`), and an ingress append writes that namespace.
+
+At e26cd812 (node 22.15.0) all four cases hang past the 30 s bound; with `TRACK_X_RED_ECHO=0` (no copy delivered)
+all four pass in 1-4 s, so the hang needs the ingress append and nothing else.
+
+### 10.2 The fix (2a65f450)
+
+In `close()` (packages/node/src/creator-close.ts), the `stageSnapshot` block and `lifecycle = "sealed"` move from
+after the source block to right after the maintenance join, before the promotion source (3730) and the epoch-2
+recovery source (3740-3746). Nothing else changes. The stage closes admission (`blueprintClosing`), waits for the
+plane's admitted tasks while no journal view is held, so an admitted ingress append completes; ingress that arrives
+later returns at `enqueueV3Ingress` (or at `authenticateV3Ingress` if it was queued earlier) without writing.
+
+A source that fails after the stage now leaves the close `sealed` and retryable (the next `close()` skips the stage,
+`stagedSnapshot` is kept, and takes the sources again). `abortSnapshotStage` cannot reopen a folded epoch: it returns
+false once `blueprintFolded` is set (v3-live.ts 19774-19779), so calling it after a source failure would do nothing;
+the close's existing catch already calls it only while nothing is staged. This is the state every failure after the
+stage already left at base: the reconciliation's reacquire (3844), the archive and membership reacquires (3907-3916,
+4074-4080), `persistSnapshot`. Before, a source failure left the epoch unfolded and the room `active`. For a promotion close
+that was already partial: `acquirePromotionCheckpoint` had set `promotedEpoch` (4559), which keeps ordinary
+issuance maintenance and readiness unavailable (3446, 4680). For an epoch-2 seal the room went back to ordinary play
+in the same epoch.
+
+This departs from decision row 49 ("aborting the stage if the source cannot be taken"): the fix does not call
+`abortSnapshotStage` on a source failure, because after the fold that call returns false and changes nothing. If the
+old outcome matters, the alternative keeps the order and splits the stage: close admission and drain the plane's
+admitted tasks first, take the sources, then fold. A source failure could then be aborted (nothing folded yet). It
+needs a new step in the close registration (v3-live.ts), and a proof that no task admitted while the sources are held
+writes the journal (the closed gate stops ingress; local issue, publication and maintenance paths would each need
+checking). So I did not make it without a decision.
+
+### 10.3 What the old order protected, and why the new order keeps it
+
+The source-before-stage order dates from the phase 6 checkpoint (ea4eb158); no comment, spec or test states a reason.
+What it gave: a source failure did not fold the epoch (10.2). Nothing reads under the source's view during the stage:
+`stageClosedBlueprintEpoch` folds the in-memory graph and `exportLiveSnapshotPayload` encodes in-memory state; neither
+reads a store. The close already takes the recovery source after the stage when reconciliation released it (3838-3844),
+and Track V's fence map (docs/realtime-latency/tracks/02-phase0-adoption-fence-map) counts up to three such
+acquisitions per close.
+
+- **Native read reservation (G11, G12).** The source takes the same held view, and holds it over the same later steps
+  (graph capture, persistence, durable replay, cut, adoption facts) until the same releases. Foreign writers are still
+  excluded natively for its whole life. The only change is that the view no longer spans the stage's wait for the
+  plane, where exclusion was the bug: the plane's own admitted writer waited on it. No fact is carried across the view:
+  the stage reads nothing durable, and every reuse of currency stays inside the view that read it.
+- **Closed-rollback proofs (CRD, creator-closed-rollback-data.ts).** `acquireCreatorForwardPromotionSource` reads the
+  same closed epoch (`epoch - 1`, or `promotedEpoch`) from the same stores and authenticates it afresh; the promotion
+  identity check against the checkpoint (`promotionSourceIdentity`) and `checkCurrent` are unchanged. The stage writes
+  none of the stores the proof reads. The proof's journal header is now taken after the plane's admitted tasks
+  finished, so it sees the epoch's final journal instead of a journal that could not be written while it was held.
+- **G3 (golden path).** The closed epoch is still exactly what the plane admitted before the stage task ran. The boundary
+  moves earlier by the duration of the source acquisition: a move that arrives during it is no longer admitted into the
+  closing epoch (in the browser it used to hang the seal; on the node host, by reading the code and not exercised here,
+  its append meets the reservation's `BEGIN IMMEDIATE` and fails after the 1 s busy timeout, and a failed append of a
+  new move halts admission). It reaches the successor through the retained-history requests and
+  writer rebase, as any move arriving after the stage does. The durable close order (snapshot, durable replay, cut,
+  head swap, adoption) is unchanged, so crash recovery sees the same states; the fold is in memory and a reopen
+  rebuilds the plane unfolded from durable state.
+- **G4 (no resurrection of terminal sessions).** No callback, timer or retry is added. A folded epoch cannot be
+  reopened (`abortSnapshotStage` refuses), and late or replayed ingress meets the closed gate.
+- **G14 (one bounded resumable retirement intent).** The retirement reconciliation (3799-3833) runs after the stage and
+  the sources, unchanged. The stage's resume source is the registration's own `retirementResumeControl` or
+  `retirementReconstruction`, not a close source. On a retry the stage is skipped and a pending reconciliation releases
+  and reacquires the promotion source as before.
+- **G17 (permanent fences, no late writers).** Admission closes earlier, so fewer late writes reach the closing epoch;
+  the fences are written by the unchanged durable close and adoption.
+- **G23 (lull ingress queues, nothing dropped).** A seal is not a lull. During a deferrable lull,
+  `readinessMaintenanceEntered` still queues ingress at `enqueueV3Ingress`. At a seal, ingress after the stage was
+  already dropped at base; the drop now starts at the stage instead of after the sources.
+- **G22 (reservation before irreversible effects).** The fold is not a durable effect. Every durable effect still comes
+  after the sources and their charges.
+
+### 10.4 Proof
+
+All runs on Node 22.15.0 and pnpm 10.24.0. "Merged head" is b8ad1f50: main 24d4ca61 (with Track Y) merged into
+2a65f450. "Base" is the same tree with main's creator-close.ts put back (uncommitted, the file equal to
+24d4ca61's). The machine's load average was 50-340 throughout.
+
+| Check                                                                                                                                       | Base                                                                                                                                                                                        | Fix                                                                                                                                                                                 |
+| ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RED, 4 cases (30 s bound)                                                                                                                   | e26cd812: 4 of 4 hang; main code at the merged head: 4 of 4 hang                                                                                                                            | 2a65f450: 4 of 4 pass, then 6 of 6 runs; merged head: 4 of 4 pass                                                                                                                   |
+| RED control (`TRACK_X_RED_ECHO=0`)                                                                                                          | 4 of 4 pass in 1-4 s                                                                                                                                                                        | —                                                                                                                                                                                   |
+| Storm harness (`TRACK_X_HISTORY_STORM_MS=250`, `TRACK_X_IDB_PROBE=1`, 4 epochs)                                                             | 2 of 30 hang (section 9.2)                                                                                                                                                                  | 2a65f450: 30 of 30 pass, 0 hangs; merged head: 31 of 31 counted runs pass, 0 hangs                                                                                                  |
+| Canvas, real networking, 16 epochs                                                                                                          | —                                                                                                                                                                                           | 2a65f450: 16/16; merged head: 16/16                                                                                                                                                 |
+| Chat, real networking, 16 epochs                                                                                                            | —                                                                                                                                                                                           | 2a65f450: 16/16; merged head: 16/16                                                                                                                                                 |
+| Grid (Track V's harness) with Track V's four commits                                                                                        | —                                                                                                                                                                                           | merged head + d5a0015f, 15bf2ed1, 5b55b6e9, 27fe2688 (scratch branch track-x-grid-seal): 3 runs, 16/16 each; rows flat from epoch 7 (creator 169 rows / 13 issued, Writer 148 / 13) |
+| Track M's seal-after-a-received-move race (no settle before the seal; Canvas and Chat, room and browser hosts, Writer, 4 epochs, 4 repeats) | 3 of 16 pass; 13 fail at the epoch-3 seal with "creator recovery role transfer source failed: internal-invariant" (the recovery source, creator-close.ts 3746), on both hosts and both apps | 16 of 16 pass                                                                                                                                                                       |
+
+**The fix also removes Track M's seal race** (Track M RESULT, "A pre-existing race,
+`NATIVE_READ_RESERVATION_BUSY`", the reason the settlement fixture and the Canvas and Chat runs wait 300 ms before
+each seal). It is the other order of the same window. A scratch probe at main's code (observation only, the IndexedDB
+`transaction` wrapper of the RED; <evidence>/track-x/trash/settle0-probe/, logs/settle0-probe-mpresl-2.log) shows
+that when the recovery source fails, an admitted ingress task holds the live journal's view:
+`authenticateV3Ingress` → `handleV3Ingress` → `acquireLocalReplacementCustody` (v3-live.ts 13969), then
+`handleV3IngressWithSource` → `resumeJournalReads` (14064). The browser owner refuses a second view at once
+(`NATIVE_READ_RESERVATION_BUSY`, native-read-reservation.ts 279), and `acquireClosedData` reports
+`internal-invariant`. If the source is first, the task's append waits on the source instead: the deadlock of 10.1.
+Staging first lets the task finish, with its view released, before any source is taken.
+
+One storm run at the merged head (mstorm-1) is not counted: the page reloaded at 15:00:15 because
+packages/node/tests/firewall.test.ts, in the node suite running alongside, runs `pnpm --filter @ts-drp/node build`
+and rewrote packages/node/dist under the Vite server (the trace shows `src/index.ts?t=…`). The test failed with
+"Execution context was destroyed".
+
+**Latency bench** (healthy native Grid, 8 rollovers, default mode, 8 interleaved pairs in ABBA order, bundles built
+at the merged head from main's creator-close.ts and from the fix; pooled medians of transitions 3 and later;
+<evidence>/track-x/bench/runs/run-m\*, bin/bench_sum.py):
+
+| Median (ms)       | Base   | Fix    |
+| ----------------- | ------ | ------ |
+| Seal              | 3392.2 | 3481.0 |
+| Creator adoption  | 687.4  | 704.1  |
+| Recipient install | 2065.1 | 2091.2 |
+| Per-move issue    | 53.7   | 55.0   |
+| Remote delivery   | 121.5  | 124.1  |
+
+The fix is within 3% everywhere. Per pair, the seal is higher at the fix in 6 of 8 pairs (differences -174 to +450
+ms), but so is the recipient install in 7 of 8, and the recipient does not run this code; with load averages of
+160-350, these runs cannot resolve a difference of that size. The bench seals after its gameplay and a forced-GC checkpoint
+(healthy-grid.ts), so the plane should hold no admitted task; the close then does the same work in a different
+order. All 16 runs passed.
+
+**Suites**, per test, base against fix at the merged head (<evidence>/track-x/tests/mpresl-_.json and mseal-_.json,
+bin/vcompare.py):
+
+| Set                                    | Base (pass / fail)      | Fix (pass / fail)       | Differences         |
+| -------------------------------------- | ----------------------- | ----------------------- | ------------------- |
+| packages/node                          | 1027 / 48               | 1027 / 48               | none                |
+| storage-node retirement and room head  | 163 / 61 (2 pending)    | 163 / 61 (2 pending)    | none                |
+| root room and native tests (246 files) | 828 / 350 (110 pending) | 828 / 350 (110 pending) | one each way, below |
+| native Canvas and Chat                 | 35 / 15                 | 35 / 15                 | none                |
+| startup-discovery observation          | 23 / 0                  | 23 / 0                  | none                |
+| Grid and AOI                           | 65 / 0                  | 65 / 0                  | none                |
+
+In the root set, the fix run failed d110c "puts ACL membership, genesis admission, adjacency, and monotonicity in the
+bounded advance predicate" with `ReferenceError: Cannot access '__vite_ssr_import_8__' before initialization` (a
+module-load race in the test worker); alone it passes (logs/rerun-mseal-d110c.log). The base run timed out phase-4c
+"proves peak verifier ownership on 64 MiB", which passed at the fix. The failures common to both sides are the
+existing ones of section 7 (the same counts as at 2a65f450 before the merge; the merge adds Track Y's four passing
+node tests). `pnpm -r typecheck`: 0 errors, 46 of 47 projects. `node scripts/check-shadowed-sources.mjs`: clean.
+
 ## Commits
 
-| Commit   | What                                                                           |
-| -------- | ------------------------------------------------------------------------------ |
-| 4122ab83 | test: measure the shipped Canvas and Chat pages as long rooms in Chromium      |
-| 7cbbcaef | test: RED for the settlement fence that reaches a recipient before its install |
-| d48b57cd | test: RED for a lost creator move that the creator's next move needs           |
-| 24699ced | fix: a recipient asks the creator again for a dependency it is missing         |
-| 3e806aff | test: RED for a migrated Writer's settlement plan the census refuses           |
-| f4c3c5c2 | fix: the issuance census classifies a migrated Writer's inherited plan         |
-| f2d301d5 | docs: record the Track X result                                                |
-| 9b6b5f3f | test: RED for a settlement creator whose readiness waits for a subscriber      |
-| 270c7068 | test: RED for a direct send that never completes                               |
-| 76ea48f2 | test: hang diagnostics for the Track X shipped-app harness                     |
-| 4787390d | fix: a direct send that never completes cannot hold a room                     |
-| d46c3e74 | test: IndexedDB/lock probe and a history-request storm for the harness         |
-| (this)   | docs: record the Canvas harness hang                                           |
+| Commit   | What                                                                              |
+| -------- | --------------------------------------------------------------------------------- |
+| 4122ab83 | test: measure the shipped Canvas and Chat pages as long rooms in Chromium         |
+| 7cbbcaef | test: RED for the settlement fence that reaches a recipient before its install    |
+| d48b57cd | test: RED for a lost creator move that the creator's next move needs              |
+| 24699ced | fix: a recipient asks the creator again for a dependency it is missing            |
+| 3e806aff | test: RED for a migrated Writer's settlement plan the census refuses              |
+| f4c3c5c2 | fix: the issuance census classifies a migrated Writer's inherited plan            |
+| f2d301d5 | docs: record the Track X result                                                   |
+| 9b6b5f3f | test: RED for a settlement creator whose readiness waits for a subscriber         |
+| 270c7068 | test: RED for a direct send that never completes                                  |
+| 76ea48f2 | test: hang diagnostics for the Track X shipped-app harness                        |
+| 4787390d | fix: a direct send that never completes cannot hold a room                        |
+| d46c3e74 | test: IndexedDB/lock probe and a history-request storm for the harness            |
+| a2ef638b | docs: record the Canvas harness hang                                              |
+| e26cd812 | test: let pending history requests finish before the lost-move RED loses its move |
+| e1f471bb | test: RED for a creator seal that waits on its own live journal                   |
+| 2a65f450 | fix: the creator seal stages before it takes a journal source                     |
+| b8ad1f50 | merge: main 24d4ca61 into the seal deadlock work                                  |
+| (this)   | docs: record the seal deadlock fix                                                |
+
+Main (24d4ca61) carries f2d301d5, the fixture half of 9b6b5f3f (65505659) and 270c7068..e26cd812 as picked
+commits (eeddd65a..cf6d306f). The startup RED file of 9b6b5f3f stays on this branch.
