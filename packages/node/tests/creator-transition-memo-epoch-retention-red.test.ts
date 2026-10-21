@@ -230,14 +230,19 @@ describe("Track Y: the transition memo keeps a constant number of epochs per roo
 
 	it("releases the entries of epochs the room has left to the garbage collector", async () => {
 		const memo = loadMemo();
-		const held = new WeakMap<object, string>();
-		const room = lineage(memo, "a", 32 * 1024);
-		const early: WeakRef<object>[] = [];
-		for (let epoch = 0; epoch < 200; epoch++) {
-			const before = new Set(memo.memo.values());
-			check(memo, held, `a/${epoch}`, room(epoch));
-			if (epoch < 10) for (const entry of memo.memo.values()) if (!before.has(entry)) early.push(new WeakRef(entry));
-		}
+		// Synchronous helper: a suspended async frame keeps its stale registers (here the loop's last entry)
+		// alive across the await, which would hold one early entry no matter what the memo does.
+		const early = ((): WeakRef<object>[] => {
+			const held = new WeakMap<object, string>();
+			const room = lineage(memo, "a", 32 * 1024);
+			const refs: WeakRef<object>[] = [];
+			for (let epoch = 0; epoch < 200; epoch++) {
+				const before = new Set(memo.memo.values());
+				check(memo, held, `a/${epoch}`, room(epoch));
+				if (epoch < 10) for (const entry of memo.memo.values()) if (!before.has(entry)) refs.push(new WeakRef(entry));
+			}
+			return refs;
+		})();
 		expect(early).toHaveLength(10);
 		await collectGarbage();
 		expect(early.filter((ref) => ref.deref() !== undefined)).toHaveLength(0);
