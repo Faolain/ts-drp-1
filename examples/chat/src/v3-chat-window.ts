@@ -12,11 +12,6 @@ import { applyPreparedBlueprintOperation } from "@ts-drp/protocol-v3/blueprint-a
 
 import type { ShippingChatApplication, ShippingChatProjection } from "./v3-chat-application.js";
 import {
-	createShippingChatGenesisStateBytes,
-	reallocateShippingChatCapacity,
-	restoreShippingChatCapacityState,
-	SHIPPING_CHAT_CAPACITY_STATE_LIMITS,
-	SHIPPING_CHAT_RETAINED_BYTES,
 	type ShippingChatAllocation,
 	type ShippingChatCapacity,
 	shippingChatMessageCharges,
@@ -27,15 +22,30 @@ import { captureShippingChatOperation, type ShippingChatMessage } from "./v3-cha
 
 // Track W: the shipped Chat's new-room format (state version 4, artifact `v3-shipping-chat.v4`,
 // examples/chat/window-blueprint). The replicated state is a rolling window: each member's
-// allocation ceiling (the unchanged equal split of SHIPPING_CHAT_RETAINED_BYTES) bounds the
-// exact canonical bytes of that member's messages in the window, and a member's new message
-// pushes out that member's own oldest messages. The compiled reducer owns that rule; this
-// module owns the state's validation, the genesis, the native admission policy (which caps what
-// a member adds in one epoch at the member's ceiling, so nothing admitted in an epoch leaves the
-// window before the epoch is sealed) and the application wiring. Rooms whose genesis signed the
-// version-3 (lifetime) format keep examples/chat/src/v3-chat-capacity.ts unchanged.
+// allocation ceiling (an equal split of the window's own budget, SHIPPING_CHAT_WINDOW_BYTES)
+// bounds the exact canonical bytes of that member's messages in the window, and a member's new
+// message pushes out that member's own oldest messages. The compiled reducer owns that rule; this
+// module owns the state's validation, the genesis split, the reallocation, the native admission
+// policy (which caps what a member adds in one epoch at the member's ceiling, so nothing admitted
+// in an epoch leaves the window before the epoch is sealed) and the application wiring. Rooms
+// whose genesis signed the version-3 (lifetime) format keep examples/chat/src/v3-chat-capacity.ts
+// unchanged, with its 32,768-byte budget and limits.
 
 export const SHIPPING_CHAT_WINDOW_ARTIFACT_ID = "v3-shipping-chat.v4" as const;
+/** The window's budget per room (owner review 2026-10-21). The lifetime format keeps 32,768. */
+export const SHIPPING_CHAT_WINDOW_BYTES = 65_536;
+/**
+ * The window's canonical limits: the widest state the window's capture admits, per dimension, so
+ * every window state is captured under them and they are also its ordinary resource bound (for
+ * owner review; derived in docs/realtime-latency/tracks/33-track-w-chat-rolling-window/RESULT.md,
+ * checked by tests/chat-rolling-window-rule.test.ts).
+ * - Bytes, 65,535: the empty state, two bytes of messages-count framing and every ceiling fit the
+ *   budget, and a full window's count takes two of those bytes (fewer than 16,384 messages).
+ * - Items, 9,503: the most any admitted state has, eight members holding their smallest records
+ *   (124 bytes: one-character identity and text, display time 0) under a one-character basis.
+ * - Depth, 4: state, capacity, allocations, row.
+ */
+export const SHIPPING_CHAT_WINDOW_STATE_LIMITS = Object.freeze({ maxBytes: 65_535, maxItems: 9_503, maxDepth: 4 });
 
 export interface ShippingChatWindowState {
 	readonly version: 4;
@@ -44,9 +54,7 @@ export interface ShippingChatWindowState {
 	readonly capacity: ShippingChatCapacity;
 }
 
-// The same state limits as the lifetime format (32,768 bytes, 16,384 items, depth 16): Track Q's
-// approved ordinary resource bound rests on every Chat state passing a capture under them.
-const LIMITS = SHIPPING_CHAT_CAPACITY_STATE_LIMITS;
+const LIMITS = SHIPPING_CHAT_WINDOW_STATE_LIMITS;
 type ResourceBoundReader = NonNullable<V3RoomApplication["readOrdinaryApplicationResourceBound"]>;
 type ResourceCatalog = Parameters<ResourceBoundReader>[0]["catalog"];
 /** Track Q's exact-entry check (v3-chat-application.ts `resourceBoundBases`), passed in by the caller. */
@@ -99,6 +107,16 @@ function objectId(value: unknown): string {
 }
 const identityOf = (message: Readonly<{ author: string; clientOperationId: string }>): string =>
 	`${message.author}\u0000${message.clientOperationId}`;
+/**
+ * The whole-budget check's overhead.
+ * @param basisObjectId - The capacity basis.
+ * @param allocations - The allocation rows.
+ * @returns The canonical bytes of the empty window over them.
+ */
+function emptyStateBytes(basisObjectId: string, allocations: readonly (readonly [string, number, number])[]): number {
+	return encodeCanonical({ version: 4, messages: [], capacity: { version: 1, basisObjectId, allocations } }, LIMITS)
+		.byteLength;
+}
 
 /**
  * Exact canonical bytes of one retained message record: the unit every share is charged in.
@@ -163,10 +181,10 @@ export function captureShippingChatWindowState(value: unknown): ShippingChatWind
 	const ceilingByAuthor = new Map(allocations.map(([author, ceiling]) => [author, ceiling]));
 	for (const [author, charge] of shippingChatMessageCharges(messages))
 		if (charge > (ceilingByAuthor.get(author) ?? -1)) throw new TypeError("Chat window share is exceeded");
-	// The same whole-budget check as the lifetime format: the empty state, the largest
-	// messages-array count framing (two bytes) and every ceiling fit the retained budget.
-	const emptyBytes = encodeCanonical({ ...result, messages: [] }, LIMITS).byteLength;
-	if (emptyBytes + 2 + allocations.reduce((sum, row) => sum + row[1], 0) > SHIPPING_CHAT_RETAINED_BYTES)
+	// The lifetime format's whole-budget check over the window's budget: the empty state, the
+	// largest messages-array count framing (two bytes) and every ceiling fit it.
+	const emptyBytes = emptyStateBytes(result.capacity.basisObjectId, allocations);
+	if (emptyBytes + 2 + allocations.reduce((sum, row) => sum + row[1], 0) > SHIPPING_CHAT_WINDOW_BYTES)
 		throw new TypeError("Chat window shares are overbooked");
 	encodeCanonical(result, LIMITS);
 	return result;
@@ -190,16 +208,40 @@ export function restoreShippingChatWindowState(bytes: Uint8Array): ShippingChatW
 }
 
 /**
- * Sole NEW-genesis owner of the window format: the lifetime format's equal split of the same
- * budget among the genesis roster, as window shares. It grants no portable authentication.
+ * Sole NEW-genesis owner of the window format: the lifetime format's equal-split rule applied to
+ * the window's budget among the exact genesis roster (every enrolled member, a receive-only
+ * genesis included), as window shares. Overhead is charged at the budget's integer width for
+ * every row. It grants no portable authentication.
  * @param input - The exact canonical genesis ACL.
  * @returns The exact canonical version-4 genesis state.
  */
 export function createShippingChatWindowGenesisStateBytes(
 	input: Readonly<{ exactCanonicalLatchedAclBytes: Uint8Array }>
 ): Uint8Array {
-	const lifetime = restoreShippingChatCapacityState(createShippingChatGenesisStateBytes(input));
-	return shippingChatWindowStateBytes({ version: 4, messages: [], capacity: lifetime.capacity });
+	const acl = decodeCanonical(input.exactCanonicalLatchedAclBytes) as Readonly<Record<string, unknown>>;
+	if (acl.epoch !== 0) throw new TypeError("Chat window genesis requires epoch zero");
+	shippingChatWriters(input.exactCanonicalLatchedAclBytes);
+	const members = dense(acl.members).map((value) => (value as Readonly<{ author: string }>).author);
+	const basisObjectId = objectId(acl.objectId);
+	const available =
+		SHIPPING_CHAT_WINDOW_BYTES -
+		emptyStateBytes(
+			basisObjectId,
+			members.map((author) => [author, SHIPPING_CHAT_WINDOW_BYTES, 0] as const)
+		) -
+		2;
+	if (available < 0) throw new TypeError("Chat window metadata exceeds its budget");
+	const quotient = members.length === 0 ? 0 : Math.floor(available / members.length);
+	const remainder = members.length === 0 ? 0 : available % members.length;
+	return shippingChatWindowStateBytes({
+		version: 4,
+		messages: [],
+		capacity: {
+			version: 1,
+			basisObjectId,
+			allocations: members.map((author, index) => [author, quotient + (index < remainder ? 1 : 0), 0]),
+		},
+	});
 }
 
 /**
@@ -233,8 +275,12 @@ function applyMessage(
 }
 
 /**
- * The lifetime format's reviewed reallocation formula over a window: released incarnations keep
- * a ceiling equal to their current window charge, later Writers share what is free.
+ * The lifetime format's reviewed reallocation formula (v3-chat-capacity.ts
+ * `reallocateShippingChatCapacity`) over a window and the window's budget: a published new
+ * admission incarnation releases the older one, which keeps a ceiling equal to its current window
+ * charge; Writers without a row get one at zero; what is free is split equally among the current
+ * Writers. Missing evidence keeps the full ceiling. The window owns its copy so its allocation can
+ * change without touching version-3 rooms.
  * @param input - The current window state, the native-selected ACL and settlement frontiers.
  * @returns The reallocated capacity record.
  */
@@ -246,17 +292,59 @@ export function reallocateShippingChatWindowCapacity(
 	}>
 ): ShippingChatCapacity {
 	const state = captureShippingChatWindowState(input.state);
-	const capacity = reallocateShippingChatCapacity({
-		// The same capacity and charges, presented as the lifetime format's identity-sorted view.
-		state: {
-			version: 3,
-			messages: [...state.messages].sort((left, right) =>
-				identityOf(left) < identityOf(right) ? -1 : identityOf(left) > identityOf(right) ? 1 : 0
-			),
-			capacity: state.capacity,
-		},
-		exactCanonicalLatchedAclBytes: input.exactCanonicalLatchedAclBytes,
-		authenticatedSettlementFrontiers: input.authenticatedSettlementFrontiers,
+	const acl = decodeCanonical(input.exactCanonicalLatchedAclBytes) as Readonly<Record<string, unknown>>;
+	if (state.capacity.basisObjectId !== objectId(acl.objectId))
+		throw new TypeError("Chat window release requires its authenticated source basis");
+	const epoch = integer(acl.epoch),
+		writers = shippingChatWriters(input.exactCanonicalLatchedAclBytes);
+	const used = shippingChatMessageCharges(state.messages);
+	const frontiers = new Map<string, ShippingChatSettlementFrontier>();
+	let previous = "";
+	for (const value of input.authenticatedSettlementFrontiers) {
+		if (
+			value.length !== 3 ||
+			!AUTHOR.test(value[0]) ||
+			value[0] <= previous ||
+			integer(value[1]) > epoch ||
+			(value[2] !== null && integer(value[2]) !== value[2])
+		)
+			throw new TypeError("Chat settlement frontier is invalid");
+		previous = value[0];
+		frontiers.set(value[0], value);
+	}
+	const carried = new Map<string, ShippingChatAllocation>();
+	for (const [author, ceiling, allocationEpoch] of state.capacity.allocations) {
+		const frontier = frontiers.get(author);
+		const released = frontier !== undefined && frontier[1] > allocationEpoch;
+		carried.set(
+			author,
+			Object.freeze([author, released ? (used.get(author) ?? 0) : ceiling, released ? frontier[1] : allocationEpoch])
+		);
+	}
+	for (const author of writers) if (!carried.has(author)) carried.set(author, Object.freeze([author, 0, epoch]));
+	const rows = [...carried.values()].sort((left, right) => left[0].localeCompare(right[0]));
+	// Every proposed ceiling is charged at the budget's integer width: finite metadata
+	// conservatism, not a dropped charge.
+	const available =
+		SHIPPING_CHAT_WINDOW_BYTES -
+		emptyStateBytes(
+			state.capacity.basisObjectId,
+			rows.map(([author, , allocationEpoch]) => [author, SHIPPING_CHAT_WINDOW_BYTES, allocationEpoch] as const)
+		) -
+		2 -
+		rows.reduce((sum, row) => sum + row[1], 0);
+	if (available < 0) throw new TypeError("Chat window capacity has no allocation metadata headroom");
+	const quotient = writers.length === 0 ? 0 : Math.floor(available / writers.length),
+		remainder = writers.length === 0 ? 0 : available % writers.length;
+	const grants = new Map(writers.map((author, index) => [author, quotient + (index < remainder ? 1 : 0)]));
+	const capacity: ShippingChatCapacity = Object.freeze({
+		version: 1,
+		basisObjectId: state.capacity.basisObjectId,
+		allocations: Object.freeze(
+			rows.map(([author, ceiling, allocationEpoch]) =>
+				Object.freeze([author, ceiling + (grants.get(author) ?? 0), allocationEpoch] as const)
+			)
+		),
 	});
 	captureShippingChatWindowState({ ...state, capacity });
 	return capacity;
@@ -522,14 +610,18 @@ export async function createShippingChatWindowApplication(
 		expectedBlueprintDigest: blueprintDigest,
 		exactArtifactBytes: resolved.exactArtifactBytes,
 	});
-	// Ordinary resource bound: Track Q's rule and value (approved 2026-10-20), unchanged by the
-	// window. Every window state passes `captureShippingChatWindowState`, which encodes it under
-	// SHIPPING_CHAT_CAPACITY_STATE_LIMITS: the reducer keeps each member's window charge within the
-	// member's ceiling and the ceilings within 32,768 bytes; the projection and migration re-capture
-	// every state; and the admission policy captures the joined window of every message reservation,
-	// every inherited state and every capacity allocation before admitting it. So that ceiling
-	// dominates every state, for any material; it reads no operation. Planning only: it grants no
-	// validity, admission, authority or credit, and the room re-checks every base under it.
+	// Ordinary resource bound: Track Q's rule (one footprint that dominates every state the
+	// application's own capture admits, from limits that capture enforces) with the window's own
+	// value, SHIPPING_CHAT_WINDOW_STATE_LIMITS (for owner review; the lifetime format keeps Track Q's
+	// approved {32768, 16384, 16}). Every window state passes `captureShippingChatWindowState`,
+	// which encodes it under exactly those limits: the reducer keeps each member's window charge
+	// within the member's ceiling and the ceilings within the 65,536-byte budget; the projection and
+	// migration re-capture every state; and the admission policy captures the joined window of
+	// every message reservation, every inherited state and every capacity allocation before
+	// admitting it. The limits are the widest state that capture admits, so they never refuse a
+	// state the budget allows. So the value dominates every state, for any material; it reads no
+	// operation. Planning only: it grants no validity, admission, authority or credit, and the room
+	// re-checks every base under it.
 	const resourceCatalog: ResourceCatalog = Object.freeze({
 		blueprintDigest: resolved.blueprintDigest,
 		artifactId: resolved.artifactId,
