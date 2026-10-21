@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type -- Measurement fixture: transparent inference keeps the native capability signatures. */
 /* eslint-disable @typescript-eslint/require-await -- Every RoleEndpoint method is async so the browser proxy and the in-process endpoint share one contract. */
 import { ed25519 } from "@noble/curves/ed25519.js";
-import { openTrustedBlueprintCatalogBytes } from "@ts-drp/blueprint-catalog/bytes";
 import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import type { SnapshotChunkProtocolPort } from "@ts-drp/network/snapshot-transfer";
 import { createBrowserAheDurableStore } from "@ts-drp/storage-browser";
@@ -16,6 +15,8 @@ import { type DRPNetworkNode, Message, MessageType, V3Envelope } from "@ts-drp/t
 
 import {
 	type AppKind,
+	type ArchiveObservation,
+	type ChatFormat,
 	fromBase64,
 	type HostKind,
 	type LongRoomOptions,
@@ -27,11 +28,17 @@ import {
 	type WireRow,
 } from "./long-room-driver.js";
 import { CANVAS_GENESIS_PROFILE } from "../../../examples/canvas/src/profile.js";
-import catalogMaterial from "../../../examples/chat/src/chat-catalog-material.json";
+import { openShippingChatCatalogs } from "../../../examples/chat/src/chat-catalogs.js";
 import {
 	createShippingChatGenesisStateBytes,
+	createShippingChatWindowGenesisStateBytes,
 	createShippingV3ChatApplication,
+	type ShippingChatProjection,
 } from "../../../examples/chat/src/v3-chat-application.js";
+import {
+	openShippingChatLocalArchive,
+	type ShippingChatArchiveStore,
+} from "../../../examples/chat/src/v3-chat-archive.js";
 import {
 	createBrowserV3RoomDatabaseStorageHost,
 	createV3RoomCreatorInviteMaterial,
@@ -71,6 +78,11 @@ export interface RoleEnvironment {
 	readonly events?: Readonly<Record<string, unknown>>[];
 	/** Recipient: carries one material request to the creator's `dispatch`. */
 	relay?(request: string): Promise<string[]>;
+	/**
+	 * Track W (Chat window format): opens this role's device archive store in its own database
+	 * (never a room database) and its census. Without it the role keeps no archive.
+	 */
+	openArchive?(name: string): Promise<Readonly<{ store: ShippingChatArchiveStore; census(): Promise<StoreCensus> }>>;
 }
 
 export interface LongRoomHost {
@@ -220,22 +232,17 @@ const PARAMETERS = Object.freeze({
 });
 const CANVAS_SIDE = 10;
 
-function chatCatalog() {
-	const bytes = (value: string) => Uint8Array.from(atob(value), (byte) => byte.charCodeAt(0));
-	return openTrustedBlueprintCatalogBytes({
-		catalogBytes: bytes(catalogMaterial.catalogBytes),
-		assets: Object.fromEntries(
-			Object.entries(catalogMaterial.assets as Record<string, string>).map(([file, value]) => [file, bytes(value)])
-		),
-	});
-}
-
 // A measurement-only true upper bound (both applications' whole retained state is far below
 // it), so the creator's explicit lull is supported as on the Grid; neither shipped
 // application supplies a reader, so without it the creator's lull reports `unsupported`.
 const resourceBound = Object.assign(() => Object.freeze({ byteLength: 65_536, items: 16_384, maxDepth: 16 }), {});
 
-async function applicationFor(app: AppKind, exactCanonicalLatchedAclBytes: Uint8Array, creatorLull: boolean) {
+async function applicationFor(
+	app: AppKind,
+	exactCanonicalLatchedAclBytes: Uint8Array,
+	creatorLull: boolean,
+	chatFormat: ChatFormat
+) {
 	if (app === "canvas") {
 		const canvas = createV3CanvasApplication(CANVAS_SIDE, CANVAS_SIDE);
 		const application = creatorLull
@@ -246,8 +253,10 @@ async function applicationFor(app: AppKind, exactCanonicalLatchedAclBytes: Uint8
 		);
 		return { application, genesis, admission: undefined, catalog: canvas.catalog };
 	}
-	const catalog = chatCatalog();
-	const blueprintDigest = required(catalog.blueprintDigests[0]);
+	// Track W: the shipped Chat signs the rolling-window format (v4) into new rooms; "lifetime"
+	// measures the version-3 format rooms created before it keep.
+	const catalogs = openShippingChatCatalogs();
+	const { catalog, blueprintDigest } = chatFormat === "lifetime" ? catalogs.lifetime : catalogs.window;
 	const chat = await createShippingV3ChatApplication({
 		catalog,
 		blueprintDigest,
@@ -258,7 +267,10 @@ async function applicationFor(app: AppKind, exactCanonicalLatchedAclBytes: Uint8
 		: chat;
 	return {
 		application,
-		genesis: createShippingChatGenesisStateBytes({ exactCanonicalLatchedAclBytes }),
+		genesis:
+			chatFormat === "lifetime"
+				? createShippingChatGenesisStateBytes({ exactCanonicalLatchedAclBytes })
+				: createShippingChatWindowGenesisStateBytes({ exactCanonicalLatchedAclBytes }),
 		admission: chat.createOperationAdmissionPolicy,
 		catalog,
 	};
@@ -358,8 +370,25 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 		// the shipped Chat signs version 3.
 		version: options.app === "chat" ? 3 : CANVAS_GENESIS_PROFILE.latchedAclVersion,
 	});
-	const selected = await applicationFor(options.app, exactCanonicalLatchedAclBytes, options.creatorLull);
+	const chatFormat = options.chatFormat ?? "window";
+	const selected = await applicationFor(options.app, exactCanonicalLatchedAclBytes, options.creatorLull, chatFormat);
 	const application = selected.application;
+	// Track W: the shipped Chat (window format) keeps a device archive fed by the projection
+	// callback, as examples/chat does; observation reads its stats after each epoch.
+	const archiveHandle =
+		options.app === "chat" && chatFormat === "window" && env.openArchive !== undefined
+			? await env.openArchive(name)
+			: undefined;
+	const archive =
+		archiveHandle === undefined ? undefined : await openShippingChatLocalArchive({ store: archiveHandle.store });
+	const observed = { calls: 0, ms: 0 };
+	const observe = (projection: unknown): void => {
+		if (archive === undefined) return;
+		const started = performance.now();
+		archive.observe(projection as ShippingChatProjection);
+		observed.ms += performance.now() - started;
+		observed.calls++;
+	};
 	const signers = [{ publicKey: creator.author, signerId: "creator" }];
 	const invite = await createV3RoomCreatorInviteMaterial({
 		blueprintDigest: required(application.catalog.blueprintDigests[0]),
@@ -405,7 +434,7 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 		publicKeyBytes: ed25519.getPublicKey(identity.seed),
 		roomHeadAuthority: floor,
 		signRegisteredVertexDigest: (digest: Uint8Array) => Promise.resolve(ed25519.sign(digest, identity.seed)),
-		onProjection: () => undefined,
+		onProjection: observe,
 		onAcceptedVertex: (vertex: Readonly<{ digest: Uint8Array }>) => {
 			const digest = hex(vertex.digest);
 			accepted.add(digest);
@@ -431,6 +460,7 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 	const room = await createV3RoomSession(input as unknown as Parameters<typeof createV3RoomSession>[0]);
 	track.rooms.add(room);
 	await waitForV3RoomStartupForDiagnostics(room);
+	observe(room.projection());
 
 	// The creator's genuine successor export over scripted native bytes; it grants nothing.
 	const exported = async () => {
@@ -612,6 +642,32 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 			return { ms: performance.now() - started, kind: kindOf(result) };
 		},
 		census: () => host.census(name),
+		archive: async (): Promise<ArchiveObservation | null> => {
+			if (archive === undefined || archiveHandle === undefined) return null;
+			await archive.flush();
+			const stats = archive.stats();
+			const estimate =
+				typeof navigator === "undefined" || typeof navigator.storage?.estimate !== "function"
+					? undefined
+					: await navigator.storage.estimate();
+			return {
+				messages: stats.messages,
+				bytes: stats.bytes,
+				appended: stats.appended,
+				evicted: stats.evicted,
+				transactions: stats.transactions,
+				transactionMs: stats.transactionMs,
+				observes: observed.calls,
+				observeMs: observed.ms,
+				failures: stats.failures,
+				database: await archiveHandle.census(),
+				...(estimate?.usage === undefined ? {} : { originUsage: estimate.usage }),
+			};
+		},
+		storageUsage: async (): Promise<number | null> => {
+			if (typeof navigator === "undefined" || typeof navigator.storage?.estimate !== "function") return null;
+			return (await navigator.storage.estimate()).usage ?? null;
+		},
 		drainEvents: async () => {
 			const events = env.events ?? [];
 			const out: ObservedEvent[] = events.slice(drained).map((event) => ({
@@ -626,6 +682,7 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 			await room.close();
 			track.rooms.delete(room);
 			await floor.close();
+			await archive?.close();
 			track.heads.delete(floor);
 		},
 	} satisfies RoleEndpoint);

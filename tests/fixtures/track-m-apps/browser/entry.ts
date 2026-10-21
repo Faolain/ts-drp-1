@@ -1,7 +1,8 @@
 import type { SnapshotChunkProtocolPort } from "@ts-drp/network/snapshot-transfer";
 import { createBrowserRoomHeadAuthority } from "@ts-drp/storage-browser/room-head";
 
-import { browserHostFor, hex, openRole } from "../long-room-core.js";
+import { openBrowserShippingChatArchiveStore } from "../../../../examples/chat/src/v3-chat-archive.js";
+import { browserHostFor, databaseCensus, hex, openRole } from "../long-room-core.js";
 import type { LongRoomOptions, RoleEndpoint } from "../long-room-driver.js";
 
 // Track M measurement, browser entry: ONE role (creator or recipient) of the Canvas / Chat
@@ -82,6 +83,14 @@ window.trackMAppsRole = Object.freeze({
 				createBrowserRoomHeadAuthority({ databaseName: `${floorPrefix}-${name}`, initialization: { kind: "create" } }),
 			track,
 			events,
+			// Track W: the shipped Chat's device archive, in its own database of this origin.
+			openArchive: async (name: string) => {
+				const databaseName = `${floorPrefix}-chat-archive-${name}`;
+				return {
+					store: await openBrowserShippingChatArchiveStore(databaseName),
+					census: (): ReturnType<typeof databaseCensus> => databaseCensus(databaseName),
+				};
+			},
 			...(index === 1
 				? {
 						relay: (request: string): Promise<string[]> => {
