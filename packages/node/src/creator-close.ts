@@ -3721,6 +3721,22 @@ export async function bindCreatorLiveClose(
 			closeTask = (async (): Promise<CreatorLiveCloseResult> => {
 				await Promise.all([...maintenanceJobs]);
 				if (maintenanceReleaseFailure !== undefined) throw maintenanceReleaseFailure;
+				// Stage before any promotion or recovery source. A source holds the live
+				// journal's native read reservation, which excludes every journal writer;
+				// the stage closes admission and then waits for the plane's admitted tasks,
+				// and an admitted ingress task still appends to that journal. Staged first,
+				// those tasks finish before a source exists, and later ingress meets the
+				// closed gate. The stage folds the in-memory graph and reads no durable
+				// state, so every source below authenticates the same closed facts.
+				if (stagedSnapshot === undefined) {
+					const snapshot = await registration.stageSnapshot();
+					if (!snapshot.ok) {
+						registration.abortSnapshotStage();
+						throw new TypeError(`creator snapshot export failed: ${snapshot.kind}: ${snapshot.detail}`);
+					}
+					stagedSnapshot = snapshot;
+				}
+				lifecycle = "sealed";
 				if (retirementReconciliationPending && promotionSource !== undefined) {
 					// The prior failed close has joined its maintenance finally blocks.
 					// Its point census may reflect OLD while durable work reached NEW.
@@ -3744,15 +3760,6 @@ export async function bindCreatorLiveClose(
 					(priorCutRecord?.forwardPromotion !== undefined || (epoch === 2 && input.promotionContext !== undefined))
 				)
 					await acquireRecoverySource();
-				if (stagedSnapshot === undefined) {
-					const snapshot = await registration.stageSnapshot();
-					if (!snapshot.ok) {
-						registration.abortSnapshotStage();
-						throw new TypeError(`creator snapshot export failed: ${snapshot.kind}: ${snapshot.detail}`);
-					}
-					stagedSnapshot = snapshot;
-				}
-				lifecycle = "sealed";
 				capturedGraph ??= registration.captureCloseGraph();
 				if (capturedGraph === undefined) throw new TypeError("creator close graph capture failed");
 				let snapshot = stagedSnapshot;
