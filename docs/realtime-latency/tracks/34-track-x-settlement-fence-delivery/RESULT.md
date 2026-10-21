@@ -356,6 +356,106 @@ sides. Reports: <evidence>/track-x/tests/{base,fix}-<set>.json; comparison: `pyt
 - **d9346 line 474** needs the owner's decision (section 6.1).
 - **Track V's switch is not merged.** These Grid proofs use it on a scratch branch only.
 
+## 9. The Canvas harness hang (merge verification, 2026-10-21)
+
+The coordinator's merge check ran the Canvas harness once and the creator's epoch-3 rollover never returned (30 minute
+test timeout; <evidence>/verify-x/). It is not caused by the Track X fix. It is a deadlock in the creator seal that
+base 725f291b has too.
+
+### 9.1 The deadlock
+
+`close()` in packages/node/src/creator-close.ts takes the promotion or recovery source (3730, and 3740-3746 when
+`epoch >= 2`) before it stages the snapshot (3748). Taking the source reaches `acquireClosedData` in
+packages/node/src/internal/creator-closed-rollback-data.ts (7268-7271: `acquireJournalHeaderHold`), which holds the
+live journal's native read reservation: a readonly IndexedDB transaction on acceptedEntries, retirementControls and
+scopes that stays open (`HeldReadView`, packages/storage-browser/src/internal/native-read-reservation.ts) and, by
+design, excludes every native writer (live-journal.ts 961-962, 1662). It also takes two shared
+snapshot-recovery-dependency locks. All of this happens outside the live plane's FIFO. Then `stageSnapshot` reaches
+`stageBlueprintEpoch` in v3-live.ts, which sets `blueprintClosing` and waits for the FIFO's earlier tasks
+(`enqueueRegistrationTask`), still holding the view.
+
+An ingress task that started before `blueprintClosing` was set is one of those earlier tasks. Ingress of a vertex the
+creator already has still calls `liveJournalStore.appendAccepted` and expects an idempotent result
+(`handleV3IngressWithSource`). That append opens a readwrite transaction on the same stores, and IndexedDB starts it
+only after the earlier readonly view ends. The view ends only when the seal releases its source, after the stage. So
+the stage waits for the FIFO, the FIFO waits for the append, the append waits for the view, and the view waits for the
+stage. Nothing in the chain has a timeout. Any ingress append that starts in that window closes the cycle: the
+recipient's push of its own retained rows to the creator (`#performRequest` in room-network.ts sends them with every
+history request), or a Writer's new move.
+
+Evidence, with the harness's IndexedDB and Web Locks probe (`TRACK_X_IDB_PROBE=1`): in every hang the creator's step
+is `seal`, no network call is in flight, and the creator page has a readonly `HeldReadView` transaction on
+drp-live-journal-v1 created at the seal's start, the two shared snapshot-recovery-dependency locks from the same
+moment, and a readwrite `appendWriter` transaction on the same stores created 15 to 80 ms later, all still open after
+90 to 180 s. Every hang is at harness epoch 3, the first seal with `epoch >= 2`. Every hang starts within about 40 ms
+of a recipient history request from the schedule the room network starts when the recipient opens (+6 s four times,
++10 s once; RETAINED_REQUEST_DELAYS). The coordinator's run matches too: the recipient joined at trace 12.25 s and the
+seal started at 18.32 s.
+
+### 9.2 Base and head
+
+Fast Canvas runs, 4 epochs, `TRACK_X_HISTORY_STORM_MS=250` (the recipient sends the creator a direct history request
+every 250 ms, which makes the hang far more frequent):
+
+| Library                                  | Runs | Hangs | Where                                             |
+| ---------------------------------------- | ---- | ----- | ------------------------------------------------- |
+| base 725f291b                            | 30   | 2     | epoch-3 seal, same IndexedDB pattern              |
+| 9b6b5f3f (Track X fix, before 4787390d)  | 6    | 2     | epoch-3 seal, same IndexedDB pattern (one probed) |
+| 4787390d (with the direct-send deadline) | 18   | 1     | epoch-3 seal, same IndexedDB pattern              |
+
+Without the storm: base 12 fast runs (48 rollovers), no hang. 9b6b5f3f: 6 runs of 4 epochs, 6 of 16 epochs (one ended
+at epoch 15 when the dev server and relays dropped under load 235, one could not start its web server), no hang; most
+of these were slow (open after 30-77 s), so the open-time schedule was over before the first seal. The coordinator's
+hang was a fast run: its epoch-3 seal came 6 s after the recipient joined.
+
+The Track X fix adds history requests (after each install, and at most one a second while a vertex waits for a
+dependency), and each one pushes the recipient's rows to the creator. That can add triggers, but the rates above do
+not separate base from head. The fix for the deadlock belongs in the seal (section 9.4), not in the request path.
+
+### 9.3 A direct send with no bound (fixed: 270c7068 RED, 4787390d fix)
+
+Before the IndexedDB probe pointed at the seal, I suspected the creator's answer to a history request. It is a FIFO
+task too: `republishRetained` awaited `networkNode.sendMessage(target, row)` with no signal, and the genuine send has
+no bound without one (libp2p's stream close waits for idle or drain with no timeout). The node-level RED
+(tests/track-x-stalled-direct-send-red.test.ts) shows that one stalled reply holds the creator's moves, seal and close.
+The recipient's own history request send had the same shape, and while it hung every later request joined it, so the
+recipient could never ask again. Both sends now carry a 10 s deadline (`RETAINED_DIRECT_SEND_DEADLINE_MS` in v3-live.ts,
+`HISTORY_REQUEST_SEND_DEADLINE_MS` in room-network.ts); a reply send past it is aborted and ends that reply, and the
+peer asks again while it still misses something. This is hardening: no observed hang had a send in flight. Each
+deadline is one `AbortSignal.timeout` per send; nothing new is held.
+
+### 9.4 Options for the seal deadlock (not implemented)
+
+1. Stage first: in `close()`, run `stageSnapshot` before taking the promotion or recovery source (3730, 3740-3746). The
+   stage closes admission and drains the FIFO while no view is held; later ingress returns early because
+   `blueprintClosing` is set. A source that then fails to acquire calls `abortSnapshotStage`, as a failed stage does
+   now.
+2. Release the source before `stageSnapshot` and reacquire it after, comparing identity, as `close()` already does
+   around the archive work (3851-3916).
+3. Narrower: skip the journal append for a vertex the creator already has. That removes the duplicate trigger only; a
+   Writer's new move in the same window still deadlocks.
+
+Option 1 or 2 needs a RED on the browser storage host (fake-indexeddb), with an ingress task held in the FIFO when
+the seal takes its source. The native read reservation and the closed-rollback proofs carry G-guarantees, so I have not
+changed them without a decision.
+
+### 9.5 Notes
+
+- **Private WeakMap count.** tests/phase-3a1-ac-live-persistence-red.test.ts already fails at base. Its count of
+  top-level private WeakMaps in v3-live.ts goes from 18 to 19 with `v3MissingDependencyRequests` (24699ced). That map
+  binds the room transport's request to a network node and the room's live topic, and it must outlive every successor
+  plane of the session. The only existing per-node structure, `v3PlaneRegistrations`, holds plane registrations, and
+  successor planes are activated with a closed input key set (`ACTIVATION_INPUT_KEYS`), so I kept the WeakMap. The
+  direct-send deadline adds no WeakMap and no call the test forbids.
+- **A flaky precondition in my own RED.** In d48b57cd's Writer case, a recipient's trailing missing-dependency request
+  can bring the "lost" move back before the test checks that it is missing (seen twice under load 170-240, on head and
+  base of 4787390d alike). The test does not assert anything wrong; the precondition races the repair it tests. I left
+  it unchanged under the hard rules. Waiting a little over one request interval before losing the move would remove the
+  race.
+- **Harness.** 76ea48f2 and d46c3e74 add opt-in hang diagnostics (rollover timeout, step marker, network probe, all
+  console lines, IndexedDB and Web Locks probe, bounded final closes) and the history-request storm. The storm is
+  stress, not measurement.
+
 ## Commits
 
 | Commit   | What                                                                           |
@@ -366,4 +466,10 @@ sides. Reports: <evidence>/track-x/tests/{base,fix}-<set>.json; comparison: `pyt
 | 24699ced | fix: a recipient asks the creator again for a dependency it is missing         |
 | 3e806aff | test: RED for a migrated Writer's settlement plan the census refuses           |
 | f4c3c5c2 | fix: the issuance census classifies a migrated Writer's inherited plan         |
-| (this)   | docs: record the Track X result                                                |
+| f2d301d5 | docs: record the Track X result                                                |
+| 9b6b5f3f | test: RED for a settlement creator whose readiness waits for a subscriber      |
+| 270c7068 | test: RED for a direct send that never completes                               |
+| 76ea48f2 | test: hang diagnostics for the Track X shipped-app harness                     |
+| 4787390d | fix: a direct send that never completes cannot hold a room                     |
+| d46c3e74 | test: IndexedDB/lock probe and a history-request storm for the harness         |
+| (this)   | docs: record the Canvas harness hang                                           |
