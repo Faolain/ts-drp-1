@@ -27,6 +27,7 @@ import {
 	verifyOutcomeCommitOperation,
 } from "@ts-drp/outcome-commit";
 
+import { GRID_GENESIS_PROFILE } from "./profile.js";
 import catalogMaterial from "./zone-catalog-material.json" with { type: "json" };
 import predecessorCatalogMaterial from "./zone-catalog-predecessor-material.json" with {type:"json"};
 import { createZoneStateKernel, emptyZoneState, type ZonePlacementGrowthMaterial, type ZoneState, type ZoneStateKernel } from "./zone-state.js";
@@ -1876,13 +1877,13 @@ async function createCreatorInviteMaterial(
 			.sort((left, right) => compareText(left.author, right.author)),
 		objectId,
 		permissionless: false,
-		version: 1,
+		version: GRID_GENESIS_PROFILE.latchedAclVersion,
 	});
 	const signerSet = Object.freeze([Object.freeze({ publicKey: node.keychain.localAuthorId, signerId: "creator" })]);
 	const exactCanonicalSignerSetBytes = encodeCanonical(signerSet);
 	const exactCanonicalProfileBytes = encodeCanonical({
 		cryptoSuiteId: "ed25519-sha256-v3",
-		profileId: "creator-trusted-v1",
+		profileId: GRID_GENESIS_PROFILE.profileId,
 		quorum: 1,
 		signers: signerSet,
 	});
