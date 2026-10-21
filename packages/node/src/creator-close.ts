@@ -234,6 +234,7 @@ const runtimeReleaseOwners = new WeakMap<
 		captureSigningRetirementOwners(): CreatorSigningRetirementOwners;
 		releaseHeaderCustodyForSuccessorInstall(): Promise<void>;
 		prepareOrdinaryReadiness(): Promise<void>;
+		holdIngressForReadiness(): Promise<() => void>;
 		maintainRecoveryPool(): Promise<CreatorRecoveryPoolResult>;
 	}
 >();
@@ -443,6 +444,10 @@ export interface V3CreatorCloseRegistration {
 	/** Schedules the original queued drain of retained received work after a
 	 * maintenance job that refused it has joined. Grants no admission. */
 	resumePendingIngress(): void;
+	/** Holds every arrival behind an ordinary readiness preparation (decision row
+	 * 51), after the tasks already queued have finished. Resolves to the release,
+	 * which the caller runs on every path. Grants no admission. */
+	holdIngressForReadiness(): Promise<() => void>;
 	/** Explicit queued quiescent boundary, never a presign maintenance grant.
 	 * `deferrable` reports an unavailable boundary before entry instead of halting. */
 	runOrdinaryReadinessMaintenance(snapshots: SnapshotRecoveryStore<SnapshotVerificationReceipt>,
@@ -4805,6 +4810,7 @@ export async function bindCreatorLiveClose(
 							}
 						});
 					},
+					holdIngressForReadiness: (): Promise<() => void> => registration.holdIngressForReadiness(),
 					// Explicit opt-in early turnover (soft watermark). The close keeps its
 					// original inline maintenance as the hard-cap backstop; this only lets a
 					// caller pay for the SAME original reconciliation at a quiescent lull.
@@ -5003,7 +5009,16 @@ export async function prepareCreatorOrdinaryReadiness(plane: object): Promise<vo
 	const owner = runtimeReleaseOwners.get(plane as V3PlaneHandle);
 	if (owner === undefined || bindings.get(plane as V3PlaneHandle) === undefined)
 		throw new TypeError("creator ordinary readiness binding is unavailable");
-	await owner.prepareOrdinaryReadiness();
+	// Decision row 51: arrivals wait behind the whole preparation (its captures
+	// and any maintenance boundary), so no received append meets the job's native
+	// reservations or its consumer refusal, and none changes the pending ingress
+	// its census and boundary require. Released on every path.
+	const release = await owner.holdIngressForReadiness();
+	try {
+		await owner.prepareOrdinaryReadiness();
+	} finally {
+		release();
+	}
 }
 
 /** Explicit opt-in early recovery-pool turnover at a caller-chosen quiescent lull.

@@ -3193,6 +3193,10 @@ interface V3PlaneRegistration {
 	 * lull, never a close or install) owns the closing gate: same epoch, so
 	 * arriving ingress queues behind it. */
 	readinessMaintenanceEntered?: boolean;
+	/** Set only while a creator's ordinary readiness preparation runs
+	 * (holdV3IngressForReadiness): every arrival waits behind the whole
+	 * preparation, outside this FIFO and outside pending ingress. */
+	readinessIngressHold?: Promise<void>;
 	blueprintFolded: boolean;
 	receivedTransition?: boolean;
 	blueprintMachine?: BlueprintStateMachine;
@@ -8182,9 +8186,17 @@ function enqueueV3Ingress(
 	// same bounded input pool) instead of dropping. Authentication and every
 	// admission check run after it releases; a failed boundary leaves the
 	// closing gate set, so authenticateV3Ingress still drops under the halt.
+	// A creator readiness hold (decision row 51) keeps the epoch for the whole
+	// preparation, its own maintenance boundary included: every arrival waits
+	// behind it through the same barrier as a terminal transition, captured
+	// and charged to the bounded input pool first, outside the FIFO.
+	const hold = registration.readinessIngressHold;
 	if (!currentRegistration(registration) ||
-		registration.blueprintClosing && registration.readinessMaintenanceEntered !== true) return Promise.resolve();
-	const barrier = registration.terminalBarrier;
+		registration.blueprintClosing && registration.readinessMaintenanceEntered !== true && hold === undefined)
+		return Promise.resolve();
+	const terminal = registration.terminalBarrier;
+	const barrier = hold === undefined ? terminal :
+		terminal === undefined ? hold : Promise.all([terminal, hold]).then(() => undefined);
 	let rawMessage: Message | undefined = message;
 	return enqueueRegistrationTask(
 		registration,
@@ -8212,6 +8224,40 @@ function enqueueV3Ingress(
 			...(barrier === undefined ? {} : { barrier }),
 		}
 	);
+}
+
+/** Decision row 51: a creator's ordinary readiness preparation holds its plane's
+ * ingress for the whole preparation. Arrivals wait behind the hold in
+ * enqueueV3Ingress (the barrier option), captured and charged to the bounded
+ * input pool, never in this FIFO and never as pending ingress, so pending
+ * ingress, the graph and every native reservation stay the preparation's own
+ * until it ends; then they enter the FIFO in arrival order through the full
+ * admission path. The flush makes every task queued before the hold finish
+ * first. Only enqueueV3Ingress reads the hold, and it waits on it before it
+ * takes a FIFO reservation, so no FIFO task awaits it. The release is
+ * idempotent; the caller releases on every path. */
+async function holdV3IngressForReadiness(registration: V3PlaneRegistration): Promise<() => void> {
+	if (!currentRegistration(registration) || registration.readinessIngressHold !== undefined)
+		throw new TypeError("creator readiness ingress hold is unavailable");
+	let resolveHold!: () => void;
+	const hold = new Promise<void>((resolve) => {
+		resolveHold = resolve;
+	});
+	registration.readinessIngressHold = hold;
+	let released = false;
+	const release = (): void => {
+		if (released) return;
+		released = true;
+		if (registration.readinessIngressHold === hold) registration.readinessIngressHold = undefined;
+		resolveHold();
+	};
+	try {
+		await enqueueRegistrationTask(registration, () => () => Promise.resolve());
+	} catch (error) {
+		release();
+		throw error;
+	}
+	return release;
 }
 
 interface SnapshottedOutboxRow {
@@ -19911,6 +19957,7 @@ function creatorCloseRegistration(
 			void enqueueRegistrationTask(registration, () => () => drainPendingIngress(registration))
 				.catch(() => ingressFailureLog("admission-rejected"));
 		},
+		holdIngressForReadiness: (): Promise<() => void> => holdV3IngressForReadiness(registration),
 		runOrdinaryReadinessMaintenance: (
 			snapshots: Parameters<V3CreatorCloseRegistration["runOrdinaryReadinessMaintenance"]>[0],
 			consume: Parameters<V3CreatorCloseRegistration["runOrdinaryReadinessMaintenance"]>[1],
