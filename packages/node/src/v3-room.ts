@@ -45,6 +45,7 @@ import {
 	activateV3LivePlane,
 	authorizeV3NewLocalOperation,
 	bindV3BlueprintLivePlane,
+	bindV3MissingDependencyRequest,
 	deactivateV3LivePlaneJoined,
 	prepareV3LiveGeneration,
 	prepareV3TerminalMigrationSource,
@@ -419,6 +420,12 @@ export interface V3RoomTransport {
 	close(): void | Promise<void>;
 	openEphemeral(provider: V3RoomEphemeralAuthorizationProvider, options: EphemeralChannelOptions): EphemeralChannel;
 	requestRetainedHistory(): void;
+	/**
+	 * Optional: ask the creator for its retained history now, rate limited by the transport.
+	 * The room asks when a received vertex waits for a missing dependency and after it
+	 * installs a successor. A no-op on the creator and after close; it must not throw.
+	 */
+	requestMissingRetainedHistory?(): void;
 	setIngressHandler(
 		ingressId: string,
 		liveHandler: (message: Message) => void,
@@ -3530,8 +3537,23 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	};
 	const selectionApprovalControllers = new Set<AbortController>();
 	let transportCloseTask: Promise<void> | undefined;
+	let unbindMissingDependencyRequest: (() => void) | undefined;
+	// Ask the creator for retained history now (Track X). The transport bounds it; a refusal
+	// is not a room failure: the next vertex that waits for a missing dependency asks again.
+	const requestMissingRetainedHistory = (): void => {
+		if (closed || transportCloseTask !== undefined) return;
+		const request = transport?.requestMissingRetainedHistory;
+		if (typeof request !== "function") return;
+		try {
+			Reflect.apply(request, transport, []);
+		} catch {
+			// Bounded transport refusal; nothing was admitted or released.
+		}
+	};
 	const revokeTransport = (): void => {
 		for (const controller of selectionApprovalControllers) controller.abort();
+		unbindMissingDependencyRequest?.();
+		unbindMissingDependencyRequest = undefined;
 		if (transportCloseTask !== undefined) return;
 		try {
 			// close revokes/cancels synchronously; its promise joins admitted work.
@@ -4108,6 +4130,13 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				if (!closed && activeHandle !== undefined) { localOwner?.assertCurrent(); routeV3RetainedIngress(activeHandle, message); }
 			}
 		);
+		// The live topic is stable across successors, so one binding serves every epoch.
+		if (typeof openedTransport.requestMissingRetainedHistory === "function")
+			unbindMissingDependencyRequest = bindV3MissingDependencyRequest(
+				openedTransport.networkNode,
+				activeHandle.topic,
+				requestMissingRetainedHistory
+			);
 		openedTransport.setRetainedPublisher(async (targetPeerId) => {
 			assertSessionOpen();
 			if (terminalFailure !== undefined) throw terminalFailure;
@@ -6934,6 +6963,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				}
 				throw error;
 			}
+			// The creator published its settlement fence at adoption, before this install, and
+			// this peer could not authenticate it then; live copies that arrived during the
+			// install met the closing plane. Ask the creator for the successor's retained
+			// history once, now that the successor plane admits it.
+			requestMissingRetainedHistory();
 		});
 		const shared = attempt.finally(() => {
 			if (creatorSuccessorAdoptionTask === shared) creatorSuccessorAdoptionTask = undefined;

@@ -3296,6 +3296,9 @@ interface VerifiedV3IngressEvidence {
 }
 
 const v3PlaneRegistrations = new WeakMap<DRPNetworkNode, Map<string, V3PlaneRegistration>>();
+// The room transport's bounded retained-history request, per network node and stable
+// room topic (the topic outlives every successor plane of one room session).
+const v3MissingDependencyRequests = new WeakMap<DRPNetworkNode, Map<string, () => void>>();
 const v3HandleRegistrations = new WeakMap<V3PlaneHandle, V3PlaneRegistration>();
 const preparedMigrationTargetFloors = new WeakMap<V3PlaneRegistration, Readonly<{ read(): Promise<Uint8Array> }>>();
 
@@ -7380,6 +7383,48 @@ function hasGraphCapacity(
 	);
 }
 
+/**
+ * Bind the room transport's bounded retained-history request to one live room topic.
+ * A vertex held for a missing dependency calls it. The request grants nothing: whatever
+ * it brings back re-enters the ordinary authenticated ingress path. The transport owns
+ * its bounds (one request in flight, rate limited).
+ * @param networkNode - The room's network node.
+ * @param topic - The room's stable live topic.
+ * @param request - The transport's request; it must not throw into ingress.
+ * @returns Unbind; a later binding for the same topic is left in place.
+ */
+export function bindV3MissingDependencyRequest(
+	networkNode: DRPNetworkNode,
+	topic: string,
+	request: () => void
+): () => void {
+	if (typeof topic !== "string" || topic.length === 0 || typeof request !== "function")
+		throw new TypeError("v3 missing dependency request binding is invalid");
+	let byTopic = v3MissingDependencyRequests.get(networkNode);
+	if (byTopic === undefined) {
+		byTopic = new IntrinsicMap<string, () => void>();
+		v3MissingDependencyRequests.set(networkNode, byTopic);
+	}
+	const bound = byTopic;
+	ReflectApply(MapPrototypeSet, bound, [topic, request]);
+	return (): void => {
+		if (ReflectApply(MapPrototypeGet, bound, [topic]) === request) ReflectApply(MapPrototypeDelete, bound, [topic]);
+	};
+}
+
+function requestMissingDependencies(registration: V3PlaneRegistration): void {
+	if (!currentRegistration(registration)) return;
+	const byTopic = v3MissingDependencyRequests.get(registration.networkNode);
+	if (byTopic === undefined) return;
+	const request = ReflectApply(MapPrototypeGet, byTopic, [registration.topic]) as (() => void) | undefined;
+	if (request === undefined) return;
+	try {
+		request();
+	} catch {
+		// A refused request leaves the vertex held; the next dependent vertex asks again.
+	}
+}
+
 function releasePendingIngress(registration: V3PlaneRegistration, digest: string): void {
 	const pending = registration.pendingIngress.get(digest);
 	if (pending === undefined) return;
@@ -7920,6 +7965,10 @@ async function authenticateV3Ingress(registration: V3PlaneRegistration, captured
 		});
 		if (!registration.index.has(authenticated.digest) && !hasInstalledDependencies(registration.index, authenticated)) {
 			retainPendingIngress(registration, evidence, exactWireBytes.byteLength);
+			// A dependency is missing (for example a settlement fence that arrived before this
+			// plane was installed and failed authentication there). Ask for it again now, not
+			// on a schedule that can run out; the answer re-enters this same path.
+			requestMissingDependencies(registration);
 			return ingressFailureLog("graph-rejected");
 		}
 		if (await handleV3Ingress(registration, evidence, retained.value)) await drainPendingIngress(registration);

@@ -14,6 +14,10 @@ const HISTORY_REQUEST = new TextEncoder().encode("ts-drp-room-history-request-v1
 // admission must remain finite until timers and entered retry work have joined.
 const MAX_RETAINED_REQUEST_SCHEDULES = 32;
 const RETAINED_REQUEST_DELAYS = [0, 500, 1_500, 3_000, 6_000, 10_000, 15_000] as const;
+// A recipient that is missing a dependency (or has just installed a successor) asks the
+// creator at once. Further asks within this interval collapse into one trailing ask, so a
+// room has at most one such timer and one request in flight (`#request` coalesces).
+const MISSING_HISTORY_REQUEST_INTERVAL_MS = 1_000;
 
 /**
  * Read a creator routing hint without granting room or genesis authority.
@@ -94,6 +98,8 @@ interface RoomRegistration {
 	readonly creatorPeerId: string | undefined;
 	ingress(message: Message): void;
 	ingressId: string | undefined;
+	missingRequestDue: boolean;
+	missingRequestTimer: ReturnType<typeof setTimeout> | undefined;
 	publisher(targetPeerId?: string): Promise<void>;
 	requestAttempt: Promise<void> | undefined;
 	requestPending: boolean;
@@ -113,6 +119,11 @@ export interface NodeRoomNetworkPort {
 	close(): Promise<void>;
 	openEphemeral(provider: EphemeralAuthorizationProvider, options: EphemeralChannelOptions): EphemeralChannel;
 	requestRetainedHistory(): void;
+	/**
+	 * Ask the creator for its retained history now, rate limited; a no-op on the creator and
+	 * after close. For a dependency that is missing, never on a schedule that can run out.
+	 */
+	requestMissingRetainedHistory(): void;
 	setIngressHandler(
 		ingressId: string,
 		liveHandler: (message: Message) => void,
@@ -241,6 +252,8 @@ export class NodeRoomNetworkAdapter {
 		for (const timer of registration.timers) clearTimeout(timer);
 		registration.timers.clear();
 		registration.retainedRequestSchedules = 0;
+		registration.missingRequestTimer = undefined;
+		registration.missingRequestDue = false;
 		this.#byControlId.delete(registration.controlId);
 		if (registration.ingressId !== undefined) this.#byIngressId.delete(registration.ingressId);
 		let failure: unknown;
@@ -294,6 +307,8 @@ export class NodeRoomNetworkAdapter {
 			creatorPeerId,
 			ingress: () => undefined,
 			ingressId: undefined,
+			missingRequestDue: false,
+			missingRequestTimer: undefined,
 			publisher: () => Promise.resolve(),
 			requestAttempt: undefined,
 			requestPending: false,
@@ -330,6 +345,7 @@ export class NodeRoomNetworkAdapter {
 				return this.#ephemeral.openAuthorized(objectId, provider, options);
 			},
 			requestRetainedHistory: (): void => this.#scheduleRequests(registration),
+			requestMissingRetainedHistory: (): void => this.#requestMissing(registration),
 			setIngressHandler: (
 				ingressId: string,
 				_liveHandler: (message: Message) => void,
@@ -719,6 +735,27 @@ export class NodeRoomNetworkAdapter {
 			}, delay);
 			registration.timers.add(timer);
 		}
+	}
+
+	#requestMissing(registration: RoomRegistration): void {
+		if (registration.closed) return;
+		const creatorPeerId = registration.creatorPeerId;
+		// The creator's journal is the retained authority for its epoch; it has no one to ask.
+		if (creatorPeerId === undefined || creatorPeerId === this.#networkNode.peerId) return;
+		if (registration.missingRequestTimer !== undefined) {
+			registration.missingRequestDue = true;
+			return;
+		}
+		void this.#request(registration).catch(() => undefined);
+		const timer = setTimeout(() => {
+			registration.timers.delete(timer);
+			registration.missingRequestTimer = undefined;
+			if (!registration.missingRequestDue || registration.closed) return;
+			registration.missingRequestDue = false;
+			this.#requestMissing(registration);
+		}, MISSING_HISTORY_REQUEST_INTERVAL_MS);
+		registration.timers.add(timer);
+		registration.missingRequestTimer = timer;
 	}
 
 	#request(registration: RoomRegistration): Promise<void> {
