@@ -68,6 +68,11 @@ const HEAP_SNAPSHOTS = new Set(
 );
 if (HEAP_SNAPSHOTS.size !== 0 && OUT === undefined) throw new TypeError("TRACK_M_APPS_HEAP_SNAPSHOTS_REQUIRE_OUT");
 const HEAP = process.env.TRACK_M_APPS_HEAP === "1" || HEAP_SNAPSHOTS.size !== 0;
+// Measurement only (Track Y), off by default: TRACK_M_APPS_CACHE_PROBE=1 (requires TRACK_M_APPS_OUT) builds the
+// pages with the cache probe (tests/fixtures/cache-probe; see browser/build.ts) and appends both pages' probe
+// flushes to <OUT>/<label>-<tree>-<browser>-cache-probe.jsonl.
+const CACHE_PROBE = process.env.TRACK_M_APPS_CACHE_PROBE === "1";
+if (CACHE_PROBE && OUT === undefined) throw new TypeError("TRACK_M_APPS_CACHE_PROBE_REQUIRES_OUT");
 const LULL_KINDS = ["maintained", "not-needed", "deferred:unsupported", "deferred:busy"];
 const METHODS = [
 	"issue",
@@ -157,6 +162,11 @@ for (const { options, repeat } of cases) {
 		if (OUT !== undefined) mkdirSync(OUT, { recursive: true });
 		const pages = [page, await context.newPage()] as const;
 		const unique = `${label}/${repeat}/${Date.now()}/${Math.random()}`;
+		if (CACHE_PROBE && file !== undefined) {
+			const probeFile = file.replace(/\.jsonl$/, "-cache-probe.jsonl");
+			for (const selected of pages)
+				await selected.exposeFunction("__cacheProbeSink", (line: string) => appendFileSync(probeFile, `${line}\n`));
+		}
 		for (const [index, selected] of pages.entries()) {
 			selected.on("pageerror", (error) =>
 				process.stdout.write(`TRACK_M_APPS_PAGE_ERROR ${label} role=${index} ${String(error)}\n`)

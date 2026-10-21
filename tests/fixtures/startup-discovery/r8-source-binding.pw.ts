@@ -1,6 +1,6 @@
 import {expect,test as base} from "@playwright/test";
 import {execFile,spawn} from "node:child_process";
-import {mkdtemp,stat,open} from "node:fs/promises";
+import {mkdtemp,stat,open,appendFile} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {isAbsolute,join} from "node:path";
 import {promisify} from "node:util";
@@ -238,6 +238,13 @@ test(suspendHealthyGrid?"native Grid resumes renderer suspension during admitted
   activeMemory.push({label,before,after:samples.at(-1),testOnlyGcMilliseconds:gcMilliseconds});
   if(heapSnapshotLabels.has(label))await takeHeapSnapshot(label);
  });
+ // Measurement only (Track Y): with a bundle built with STARTUP_CACHE_PROBE=1, STARTUP_CACHE_PROBE=1 here appends each
+ // realm's cache-probe flushes to STARTUP_EVIDENCE/cache-probe.jsonl. Unset by default (no binding).
+ if(process.env.STARTUP_CACHE_PROBE==="1"){
+  if(process.env.STARTUP_EVIDENCE===undefined)throw new Error("cache probe requires STARTUP_EVIDENCE");
+  const probeFile=join(process.env.STARTUP_EVIDENCE,"cache-probe.jsonl");
+  await page.exposeFunction("__cacheProbeSink",async(line:string)=>{await appendFile(probeFile,line+"\n");});
+ }
  const suspensions:unknown[]=[];
  if(suspendHealthyGrid)await page.exposeFunction("__r8SuspendTransfer",async(metadata:any)=>{
   const origins=[local.origin,...clients.map(client=>client.origin)];
