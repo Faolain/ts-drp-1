@@ -8,12 +8,13 @@ import {
 	selection,
 } from "./fixtures/track-m-apps/app-long-room.js";
 
-// Track M measurement: the shipped Canvas composition (creator-trusted-v1, signed ACL v1,
-// 10x10) as a long room of genuine seal, adoption, install and both roles' lulls on the
-// default Node SQLite host and on the room-database host with and without verified
-// retention. It records per-store rows and bytes per role and epoch, and per-transition
-// latency (TRACK_M_APPS_OUT=<dir> writes JSONL; TRACK_M_APPS_VERBOSE=1 prints a line per
-// epoch). It asserts only the room's own progress, never a bound: the numbers are the point.
+// Track M measurement: the shipped Canvas composition (the profile and signed ACL version of
+// examples/canvas/src/profile.ts, 10x10) as a long room of genuine seal, adoption, install
+// and both roles' lulls on the default Node SQLite host and on the room-database host with
+// and without verified retention. It records per-store rows and bytes per role and epoch,
+// and per-transition latency (TRACK_M_APPS_OUT=<dir> writes JSONL; TRACK_M_APPS_VERBOSE=1
+// prints a line per epoch). It asserts only the room's own progress, never a bound: the
+// numbers are the point.
 //
 // TRACK_M_APPS_HOSTS=node,browser,room,room-retention  TRACK_M_APPS_EPOCHS=16
 // TRACK_M_APPS_CANVAS_RECIPIENTS=receive-only,writer  TRACK_M_APPS_LULLS=product,reader

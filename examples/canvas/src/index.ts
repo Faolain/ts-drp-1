@@ -19,6 +19,8 @@ import { DRPNode } from "@ts-drp/node";
 import { type CanvasProjection, createV3CanvasApplication } from "@ts-drp/node/applications/canvas";
 import { DRP_DISCOVERY_TOPIC } from "@ts-drp/types";
 
+import { CANVAS_GENESIS_PROFILE } from "./profile";
+
 type CanvasHeadFactory = (
 	context: Readonly<{
 		author: string;
@@ -146,7 +148,7 @@ async function creatorInvite(selectedNode: DRPNode, objectId: string): Promise<V
 			members: [{ author, finalityKey: author, groups: ["admin", "finality", "writer"] }],
 			objectId,
 			permissionless: false,
-			version: 1,
+			version: CANVAS_GENESIS_PROFILE.latchedAclVersion,
 		}),
 		exactCanonicalParametersCarrierBytes: encodeCanonical({
 			maxDependencies: 16,
@@ -159,7 +161,7 @@ async function creatorInvite(selectedNode: DRPNode, objectId: string): Promise<V
 		}),
 		exactCanonicalProfileBytes: encodeCanonical({
 			cryptoSuiteId: "ed25519-sha256-v3",
-			profileId: "creator-trusted-v1",
+			profileId: CANVAS_GENESIS_PROFILE.profileId,
 			quorum: 1,
 			signers,
 		}),

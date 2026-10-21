@@ -29,6 +29,13 @@ export type SettlementProfile = "none" | "v1";
 
 /**
  * Selects the author-settlement contract latched by a genesis profile.
+ *
+ * Only `creator-trusted-settlement-v1` settles issuance. Under the legacy `creator-trusted-v1`
+ * profile nothing settles or retires an author's issued rows, so each Writer's issuance store
+ * keeps every row it ever issued and grows with room age, and so do seal time and the work of
+ * each move; at high move rates a creator's move is eventually refused when its issuance
+ * maintenance proof reserve runs out. New rooms should sign `creator-trusted-settlement-v1`,
+ * which requires a version-3 latched ACL. A room keeps the profile its genesis signed.
  * @param profileId - The authenticated profile identifier.
  * @returns The selected settlement contract, or `none` for legacy profiles.
  */
