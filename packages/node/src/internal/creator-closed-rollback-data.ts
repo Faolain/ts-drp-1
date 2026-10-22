@@ -9411,6 +9411,11 @@ async function closedJournalMembershipPrefix(input: Readonly<{
  * of the same author, at a higher sequence, is a member of a later scope's signed Cut: a local
  * witness of that Cut's membership, opened as above, that the reader confirms is the issued fence
  * at that digest. A later fence that missed its own Cut is no evidence.
+ * R5-chain (owner's C1): a replacement that missed its own Cut too is followed. It must be a
+ * local-issued row of a later scope of this image whose closed membership (opened as above) omits
+ * it, read through the same reader (its own plan entry and derivation), and its replacements must
+ * meet the same rule, the last link being a member of a later signed Cut. A chain of more links
+ * than the journal's protected-scope limit retains the scope.
  * @returns Each outside row's original source bytes by vertex digest, or undefined to retain.
  */
 async function closedJournalReplacedOutsideRows(input: Readonly<{
@@ -9457,6 +9462,35 @@ async function closedJournalReplacedOutsideRows(input: Readonly<{
 			key[1] > input.scope.epoch && typeof key[2] === "string")
 			laterScopes.push(Object.freeze({ objectId: input.scope.objectId, epoch: key[1], anchorDigest: key[2] }));
 	}
+	// R5-chain: whether a replacement is a member of a later signed Cut, or a replaced local row
+	// outside its own later scope's Cut whose replacements are (`links` counts the chain so far).
+	const linked = async (replacement: string, links: number): Promise<boolean> => {
+		for (const scope of laterScopes) {
+			if ((await laterMembers(scope))?.has(replacement) === true) return true;
+		}
+		if (links >= LIVE_JOURNAL_RETIREMENT_LIMITS.maxScopes) return false;
+		const entries = input.captured.filter(({ frame }) => {
+			if (!Array.isArray(frame) || (frame[0] !== "accepted_entries" && frame[0] !== "acceptedEntries") ||
+				!Array.isArray(frame[1]) || frame[1].length !== 4) return false;
+			const row = frame[2] as Record<string, unknown>;
+			return (row.vertex_digest ?? row.vertexDigest) === replacement;
+		});
+		if (entries.length !== 1) return false;
+		const frame = entries[0]!.frame as unknown[], key = frame[1] as unknown[];
+		const sql = frame[0] === "accepted_entries", row = frame[2] as Record<string, unknown>;
+		const scope = laterScopes.find(value =>
+			closedRetirementEqual([value.objectId, value.epoch, value.anchorDigest], key.slice(0, 3)));
+		const author = row[sql ? "local_author" : "localAuthor"];
+		const authorSequence = row[sql ? "local_author_sequence" : "localAuthorSequence"];
+		const members = scope === undefined ? null : await laterMembers(scope);
+		if (members === null || members.has(replacement) || row[sql ? "source_kind" : "sourceKind"] !== "local-issued" ||
+			typeof author !== "string" || !Number.isSafeInteger(authorSequence)) return false;
+		const read = await input.read(Object.freeze({ author, authorSequence: Number(authorSequence), vertexDigest: replacement }))
+			.catch(() => undefined);
+		if (read === undefined || read.authorFence === true || read.replacementVertexDigests.length === 0) return false;
+		for (const next of read.replacementVertexDigests) if (!(await linked(next, links + 1))) return false;
+		return true;
+	};
 	// R7: whether bytes are this author's own settlement fence at this sequence.
 	const authorFence = (bytes: unknown, author: string, authorSequence: number): boolean => {
 		if (!(bytes instanceof Uint8Array)) return false;
@@ -9514,13 +9548,7 @@ async function closedJournalReplacedOutsideRows(input: Readonly<{
 			continue;
 		}
 		if (read === undefined || read.replacementVertexDigests.length === 0) return undefined;
-		for (const replacement of read.replacementVertexDigests) {
-			let found = false;
-			for (const scope of laterScopes) {
-				if ((await laterMembers(scope))?.has(replacement) === true) { found = true; break; }
-			}
-			if (!found) return undefined;
-		}
+		for (const replacement of read.replacementVertexDigests) if (!(await linked(replacement, 1))) return undefined;
 		outside.set(digest, read);
 	}
 	return outside.size === input.frames.length ? outside : undefined;

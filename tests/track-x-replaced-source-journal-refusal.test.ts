@@ -19,10 +19,14 @@ import {
 // signed Cut becomes collectible only when every outside row is this author's own replaced source
 // whose replacement is a member of a later signed Cut and equals the source's derivation by the
 // immutable policy. Otherwise the scope, with the outside row, is retained:
-// (a) its replacement missed the next Cut (and was itself replaced): the scope stays retained.
-//     Under that rule the replacement's own scope is collected meanwhile, and the Writer's plan
-//     still names the retired replacement: its 6th install after the miss is refused (RESULT
-//     section 13, "R5-chain"), so this case stops at the 5th;
+// (a) R5-chain (owner's C1) changed this case: a replacement that missed its own Cut is followed
+//     to its own replacement, so the scope is retained while no link of the chain is in a signed
+//     Cut yet. Here the move's replacement, and each replacement of it, misses three Cuts in a
+//     row, and the scope is kept through its classification (the install of epoch 4, the only one
+//     at which this Writer holds the scope's own Cut authority) and after it. This case checks
+//     the rule within that window only: a chain that resolves after the window is kept for good
+//     today, which the owner's W1 (keep a retained scope's signed Cut authorities until it is
+//     collected) addresses (RESULT section 13, "The classification window");
 // (b) its durable plan entry names a replacement whose operations are not the derivation: the
 //     source is never accepted as replaced, so nothing of the scope is deleted;
 // (c) R5b (owner's B2) changed this case: a received row outside the Cut (another Writer's move
@@ -33,45 +37,56 @@ afterEach(async () => {
 	expect(await closeFixtures(), "native admitted work and owners join").toEqual([]);
 });
 
-it("(a) a scope whose outside move's replacement missed the next signed Cut stays retained", async () => {
+it("(a, C1) a scope whose outside move's replacements miss their Cuts stays retained while no link is in a signed Cut", async () => {
 	const room = await open();
 	const creator = required(room.peers[0]);
 	const history: string[] = [];
 	const MISSED = 1;
+	// The replacements issued by the installs after these seals miss the next Cut.
+	const CHAIN = new Set([MISSED, MISSED + 1, MISSED + 2]);
+	// The last link, issued by the install after the last chain seal, is in cut(LAST); this Writer
+	// knows that Cut from its install after seal LAST.
+	const LAST = MISSED + 4;
+	// Through the install of epoch LAST (the evidence run for the window sets more: its install of
+	// epoch 8 refuses, "settlement plan references retired or absent issued work").
+	const EPOCHS = Number(process.env.TRACK_X_R5_REFUSAL_A_EPOCHS ?? LAST);
 	let source: DurableIssuanceOutboxRecord | undefined;
-	const EPOCHS = 6;
+	let late: DurableIssuanceOutboxRecord[] = [];
 	for (let epoch = 0; epoch < EPOCHS; epoch++) {
-		// The Writer does not move in the epoch after the missed one: its moves would depend on
-		// the withheld replacement, which the creator never admits.
-		await play(room, `epoch-${epoch}`, epoch === MISSED + 1 ? [0] : [0, 1]);
-		await seal(room, epoch, [1]);
+		// The Writer does not move while its replacement is withheld: its moves would depend on it.
+		await play(room, `epoch-${epoch}`, CHAIN.has(epoch - 1) ? [0] : [0, 1]);
+		await seal(room, epoch, epoch === MISSED ? [1] : []);
+		// The withheld replacement reaches the creator after its seal, which drops it.
+		if (late.length > 0) creator.inject(late, 1);
+		late = [];
 		if (epoch === MISSED)
 			source = (await room.fixture.publishedAfter(1, null)).find(
 				(row) => row.commit.authorSequence === room.delivered[1]
 			);
 		await creator.room.adoptCreatorSuccessor();
 		const installed = await install(room, 1);
-		history.push(`epoch ${epoch + 1}: ${installed}; protected [${(await protectedEpochs(room, 1)).join(",")}]`);
+		const kept = await protectedEpochs(room, 1);
+		history.push(`epoch ${epoch + 1}: ${installed}; protected [${kept.join(",")}]`);
 		expect(installed, history.join("\n")).toBe("ok");
-		// The missed epoch's replacement reaches the creator only during its next seal, which drops
-		// it (the Writer's settlement fence arrives in time); its next install replaces it in turn.
-		if (epoch === MISSED) {
-			const fence = required((await room.fixture.publishedAfter(1, room.delivered[1]))[0]);
-			expect(isControl(fence)).toBe(true);
-			// No admission report exists for a control row; the seal's settle covers its admission (had
-			// it missed the Cut too, the next install would refuse: RESULT section 13, "R6").
-			creator.inject([fence], 1);
-			room.delivered[1] = fence.commit.authorSequence;
+		if (epoch >= MISSED + 2 && epoch < LAST) {
+			// The installs of epochs 4 and 5: no link is in a signed Cut this Writer knows (the
+			// scope's classification at the first found none), so the scope stays, past replay.
+			expect(kept, history.join("\n")).toContain(MISSED);
+			expect(await journalHolds(room, 1, required(source).commit.envelope.digest)).toBe(true);
+		}
+		if (CHAIN.has(epoch)) {
+			// The install's fence reaches the creator in time (no admission report exists for a
+			// control row; the seal's settle covers it), and its replacement only after the next seal.
+			const rows = await room.fixture.publishedAfter(1, room.delivered[1]);
+			expect(rows.map(isControl)).toEqual([true, false]);
+			creator.inject([required(rows[0])], 1);
+			late = [required(rows[1])];
+			room.delivered[1] = required(rows[1]).commit.authorSequence;
 		} else await deliver(room, 1);
 	}
 	console.log(`TRACK_X_R5_REFUSAL_A ${JSON.stringify(history)}`);
-	// The move converged through the replacement of its replacement.
+	// The move converged through the fourth link.
 	expect(blockIds(creator)).toContain(`seal-${MISSED}-1`);
-	const kept = await protectedEpochs(room, 1);
-	expect(kept, history.join("\n")).toContain(MISSED);
-	expect(await journalHolds(room, 1, required(source).commit.envelope.digest)).toBe(true);
-	// The other epochs' scopes, whose replacements made the next Cut, were collected.
-	expect(kept.filter((epoch) => epoch !== MISSED && epoch < EPOCHS - 3)).toEqual([]);
 }, 900_000);
 
 it("(c) a scope holding another Writer's move outside the Cut is kept across a crash after the install, then collected", async () => {

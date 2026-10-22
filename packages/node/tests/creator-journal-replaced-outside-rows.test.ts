@@ -125,6 +125,11 @@ interface Case {
 	installedThroughEpoch?: number;
 	members?: readonly string[];
 	laterWitnesses?: readonly Record<string, unknown>[];
+	/** In place of the one later scope's header: later scopes' headers and rows. */
+	laterRows?: readonly Uint8Array[];
+	/** The later scopes with a held, authenticated Cut (default: the one later scope). */
+	laterAuthorities?: readonly (typeof scope)[];
+	maxScopes?: number;
 }
 
 async function classify(input: Case = {}) {
@@ -135,7 +140,9 @@ async function classify(input: Case = {}) {
 			received,
 			member,
 			input.outsideRow ?? outsideLocal,
-			header(later, 1, carrier(later, input.laterMembers ?? [digests.replacement], input.laterWitnesses ?? [])),
+			...(input.laterRows ?? [
+				header(later, 1, carrier(later, input.laterMembers ?? [digests.replacement], input.laterWitnesses ?? [])),
+			]),
 		],
 	};
 	const read =
@@ -156,6 +163,7 @@ async function classify(input: Case = {}) {
 		closedRetirementEqual: equal,
 		closedRetirementHex: hexBytes,
 		journalRetirementFrameDigest,
+		LIVE_JOURNAL_RETIREMENT_LIMITS: { maxScopes: input.maxScopes ?? 7 },
 		requireLaw: (ok: unknown, reason = "chain-invalid") => {
 			if (!ok) throw Error(reason);
 		},
@@ -179,7 +187,10 @@ async function classify(input: Case = {}) {
 		data: {
 			scope,
 			image,
-			authorities: [authority(scope), ...(input.laterAuthority === false ? [] : [authority(later)])],
+			authorities: [
+				authority(scope),
+				...(input.laterAuthority === false ? [] : (input.laterAuthorities ?? [later]).map(authority)),
+			],
 			check: async () => {
 				calls.push("check");
 			},
@@ -224,7 +235,9 @@ describe("R5: a journal scope with this author's replaced moves outside its sign
 		]);
 	});
 
-	it("(a) stays retained while the replacement is not a member of a later signed Cut", async () => {
+	// R5-chain (owner's C1) changed this case: a replacement outside its own Cut is followed (see
+	// the R5-chain block); with no link of the chain in a signed Cut, the scope is retained.
+	it("(a, C1) stays retained while no link of the chain is a member of a later signed Cut", async () => {
 		expect((await classify({ laterMembers: ["05".repeat(32)] })).prefix).toBeUndefined();
 		// A later scope's carrier without its held, authenticated Cut is no evidence either.
 		expect((await classify({ laterAuthority: false })).prefix).toBeUndefined();
@@ -298,6 +311,104 @@ describe("R5: a journal scope with this author's replaced moves outside its sign
 		const { prefix, calls } = await classify({ capture: true });
 		expect(prefix).toBeUndefined();
 		expect(calls.some((call) => call.startsWith("read:"))).toBe(false);
+	});
+});
+
+// R5-chain (owner's C1): an outside row is collectible when its replacement is in a later signed
+// Cut, or is itself a replaced local row outside a later scope's Cut that meets the same rule (each
+// link read through the held reader: its own plan entry and the immutable policy's derivation), the
+// last link a member of a signed Cut, the walk bounded by the journal's protected-scope limit.
+const later2 = { objectId, epoch: 3, anchorDigest: "a3".repeat(32) };
+const later3 = { objectId, epoch: 4, anchorDigest: "a4".repeat(32) };
+const links = { first: "11".repeat(32), second: "12".repeat(32), third: "13".repeat(32) };
+const link = (at: typeof scope, digest: string, sequence: number, kind = "local-issued") =>
+	encodeCanonical([
+		"accepted_entries",
+		[objectId, at.epoch, at.anchorDigest, 0],
+		{
+			vertex_digest: digest,
+			source_kind: kind,
+			// A received link names this author's sequence too: only its kind refuses it.
+			local_author: writer,
+			local_author_sequence: sequence,
+			...(kind === "received" ? { received_preimage: outsidePreimage, received_signature: signature } : {}),
+		},
+	]);
+/** The held reader: each source's replacements by sequence (5 -> first link, 7 -> second, 9 -> third). */
+const chainReader =
+	(
+		reads: string[],
+		replacements: ReadonlyMap<number, readonly string[]> = new Map([
+			[5, [links.first]],
+			[7, [links.second]],
+			[9, [links.third]],
+		])
+	) =>
+	async (request: Record<string, unknown>) => {
+		reads.push(`read:${String(request.authorSequence)}`);
+		const named = replacements.get(Number(request.authorSequence));
+		return named === undefined
+			? undefined
+			: { exactCanonicalPreimageBytes: outsidePreimage, detachedSignature: signature, replacementVertexDigests: named };
+	};
+/** The first link outside cut(2); the second in cut(3) unless `second` says otherwise; a third in cut(4). */
+const chain = (input: { second?: "member" | "outside" | "absent"; firstKind?: string; third?: boolean } = {}) => ({
+	laterRows: [
+		header(later, 1, carrier(later, [], [])),
+		link(later, links.first, 7, input.firstKind),
+		header(
+			later2,
+			1,
+			carrier(later2, input.second === undefined || input.second === "member" ? [links.second] : [], [])
+		),
+		...(input.second === "outside" ? [link(later2, links.second, 9)] : []),
+		...(input.third === true ? [header(later3, 0, carrier(later3, [links.third], []))] : []),
+	],
+	laterAuthorities: [later, later2, ...(input.third === true ? [later3] : [])],
+});
+
+describe("R5-chain: a replaced move whose replacement missed its own Cut too", () => {
+	it("is collectible once a later link of the chain is a member of a later signed Cut", async () => {
+		const reads: string[] = [];
+		const { prefix } = await classify({ read: chainReader(reads), ...chain() });
+		expect(prefix?.rows.map((row) => [row.journalSequence, row.vertexDigest, row.authorSequence])).toEqual([
+			[0, digests.creator, 0],
+			[1, digests.member, 4],
+			[2, digests.outside, 5],
+		]);
+		// The source and the first link are read; the second link is found in cut(3).
+		expect(reads).toEqual(["read:5", "read:7"]);
+		// Three links, the last in cut(4).
+		expect(
+			(await classify({ read: chainReader([]), ...chain({ second: "outside", third: true }) })).prefix
+		).toBeDefined();
+	});
+
+	it("(a, C1) stays retained while no link of the chain is in a signed Cut", async () => {
+		// The second link is in no Cut and no later scope.
+		expect((await classify({ read: chainReader([]), ...chain({ second: "absent" }) })).prefix).toBeUndefined();
+		// The second link missed cut(3) too, and its replacement is in no later scope.
+		expect((await classify({ read: chainReader([]), ...chain({ second: "outside" }) })).prefix).toBeUndefined();
+		// cut(3) is not held and authenticated.
+		expect((await classify({ read: chainReader([]), ...chain(), laterAuthorities: [later] })).prefix).toBeUndefined();
+	});
+
+	it("stays retained when a link's derivation does not match, or it is not this author's replaced local row", async () => {
+		// The held reader returns nothing for the first link: its own plan entry does not name a
+		// completed replacement equal to its derivation by the immutable policy.
+		const reads: string[] = [];
+		expect(
+			(await classify({ read: chainReader(reads, new Map([[5, [links.first]]])), ...chain() })).prefix
+		).toBeUndefined();
+		expect(reads).toEqual(["read:5", "read:7"]);
+		// The first link is a received row.
+		expect((await classify({ read: chainReader([]), ...chain({ firstKind: "received" }) })).prefix).toBeUndefined();
+	});
+
+	it("stays retained when the chain is longer than the journal's protected-scope limit", async () => {
+		const three = chain({ second: "outside", third: true });
+		expect((await classify({ read: chainReader([]), ...three, maxScopes: 3 })).prefix).toBeDefined();
+		expect((await classify({ read: chainReader([]), ...three, maxScopes: 2 })).prefix).toBeUndefined();
 	});
 });
 
