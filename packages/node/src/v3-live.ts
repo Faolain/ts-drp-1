@@ -3270,8 +3270,12 @@ interface V3PlaneRegistration {
 	/** Native gossip retained ahead of the runtime handler, through object fanout join. */
 	admittedGossipQueueJobs: number;
 	admittedGossipQueueBytes: number;
-	/** Track AA: a refusal or a busy repair probe asks for one capacity signal at low water. */
-	deliveryRepairWake: boolean;
+	/**
+	 * Track AA: the plane's delivery repair state. Absent until the plane routes ingress or
+	 * reports a gap while the room transport is bound to its topic
+	 * (`bindV3MissingDependencyRequest`).
+	 */
+	deliveryRepair?: V3PlaneDeliveryRepair;
 	pendingIngressBytes: number;
 	publicationCursor: number | undefined;
 	/** Replayable egress joins only equal selectors at the same queued gate cut.
@@ -5179,7 +5183,7 @@ export function readV3RuntimeOwnerCensus(plane: V3PlaneHandle): Readonly<Record<
 		admittedEgressControlJobs: registration.admittedEgressControlJobs,
 		admittedGossipQueueJobs: registration.admittedGossipQueueJobs,
 		admittedGossipQueueBytes: registration.admittedGossipQueueBytes,
-		deliveryRepairWake: Number(registration.deliveryRepairWake),
+		deliveryRepairWake: Number(registration.deliveryRepair?.wake === true),
 	});
 }
 
@@ -7226,8 +7230,8 @@ function aliasCreatorSuccessorHandle(rawHandle: object, wrapper: object): boolea
 
 function deactivateRegistration(registration: V3PlaneRegistration): boolean {
 	registration.active = false;
-	// Track AA: a plane that reported a delivery gap tells its transport that it is gone.
-	if (deliveryRepairProbes.has(registration)) reportDeliveryGap(registration, "retired");
+	// Track AA: a plane with delivery repair state tells its transport that it is gone.
+	if (registration.deliveryRepair !== undefined) reportDeliveryGap(registration, "retired");
 	registration.vertexFacts.release();
 	registration.roomRetentionLedger?.release();
 	// Numerical DATA is no longer selectable once the plane is revoked. Admitted
@@ -7484,26 +7488,46 @@ function requestMissingDependencies(registration: V3PlaneRegistration, peerId: s
 	reportDeliveryGap(registration, "missing", peerId);
 }
 
-// Track AA: each plane's capacity probe, created at its first report. It holds the plane
-// weakly, so a transport that keeps it does not keep a retired plane.
-const deliveryRepairProbes = new WeakMap<V3PlaneRegistration, () => V3DeliveryRepairCapacity>();
+/** Track AA: one plane's delivery repair state (see `V3PlaneRegistration.deliveryRepair`). */
+interface V3PlaneDeliveryRepair {
+	/** A refusal or a busy probe asks for one capacity signal once both owners are at low water. */
+	wake: boolean;
+	/**
+	 * The probe handed to the transport. It holds the plane weakly, so a transport that keeps
+	 * it does not keep a retired plane.
+	 */
+	capacity(): V3DeliveryRepairCapacity;
+}
 
-function reportDeliveryGap(registration: V3PlaneRegistration, kind: V3DeliveryGap["kind"], peerId?: string): void {
+function deliveryRepairRequest(registration: V3PlaneRegistration): ((gap?: V3DeliveryGap) => void) | undefined {
 	const byTopic = v3MissingDependencyRequests.get(registration.networkNode);
-	if (byTopic === undefined) return;
-	const request = ReflectApply(MapPrototypeGet, byTopic, [registration.topic]) as
-		| ((gap?: V3DeliveryGap) => void)
-		| undefined;
-	if (request === undefined) return;
-	let capacity = deliveryRepairProbes.get(registration);
-	if (capacity === undefined) {
-		const plane = new WeakRefConstructor(registration);
-		capacity = (): V3DeliveryRepairCapacity => {
+	if (byTopic === undefined) return undefined;
+	return ReflectApply(MapPrototypeGet, byTopic, [registration.topic]) as ((gap?: V3DeliveryGap) => void) | undefined;
+}
+
+// Track AA: a plane gets its delivery repair state the first time it routes ingress or reports
+// a gap while the room transport is bound to its topic. Ingress owners that run inside the
+// plane's admission (the input pool's release and refusal) only read it.
+function attachDeliveryRepair(registration: V3PlaneRegistration): V3PlaneDeliveryRepair | undefined {
+	if (registration.deliveryRepair !== undefined) return registration.deliveryRepair;
+	if (deliveryRepairRequest(registration) === undefined) return undefined;
+	const plane = new WeakRefConstructor(registration);
+	const state: V3PlaneDeliveryRepair = {
+		wake: false,
+		capacity: (): V3DeliveryRepairCapacity => {
 			const current = plane.deref();
 			return current === undefined ? "retired" : deliveryRepairCapacity(current);
-		};
-		deliveryRepairProbes.set(registration, capacity);
-	}
+		},
+	};
+	registration.deliveryRepair = state;
+	return state;
+}
+
+function reportDeliveryGap(registration: V3PlaneRegistration, kind: V3DeliveryGap["kind"], peerId?: string): void {
+	const state = attachDeliveryRepair(registration);
+	const request = deliveryRepairRequest(registration);
+	if (state === undefined || request === undefined) return;
+	const capacity = state.capacity;
 	try {
 		request(ObjectFreeze(peerId === undefined ? { kind, capacity } : { kind, peerId, capacity }));
 	} catch {
@@ -7521,11 +7545,13 @@ function deliveryRepairLowWater(registration: V3PlaneRegistration): boolean {
 	);
 }
 
+// A closing plane (a seal or a close) is busy: a republication would only meet its closing
+// gate. Once it is open again or retired, the probe says so.
 function deliveryRepairCapacity(registration: V3PlaneRegistration): V3DeliveryRepairCapacity {
 	if (!currentRegistration(registration)) return "retired";
-	const closing = registration.blueprintClosing && registration.readinessIngressHold === undefined;
-	if (!closing && deliveryRepairLowWater(registration)) return "ready";
-	registration.deliveryRepairWake = true;
+	if (!registration.blueprintClosing && deliveryRepairLowWater(registration)) return "ready";
+	const state = registration.deliveryRepair;
+	if (state !== undefined) state.wake = true;
 	return "busy";
 }
 
@@ -7534,13 +7560,16 @@ function deliveryRepairCapacity(registration: V3PlaneRegistration): V3DeliveryRe
 // owners are already at low water (one copy larger than a byte bound) needs no signal:
 // the transport's probe already reports room, and no release would clear the request.
 function noteDeliveryRefusal(registration: V3PlaneRegistration, peerId: string | undefined): void {
-	if (!deliveryRepairLowWater(registration)) registration.deliveryRepairWake = true;
+	const state = attachDeliveryRepair(registration);
+	if (state === undefined) return;
+	if (!deliveryRepairLowWater(registration)) state.wake = true;
 	if (typeof peerId === "string") reportDeliveryGap(registration, "refused", peerId);
 }
 
 function noteDeliveryCapacity(registration: V3PlaneRegistration): void {
-	if (!registration.deliveryRepairWake || !deliveryRepairLowWater(registration)) return;
-	registration.deliveryRepairWake = false;
+	const state = registration.deliveryRepair;
+	if (state === undefined || !state.wake || !deliveryRepairLowWater(registration)) return;
+	state.wake = false;
 	if (currentRegistration(registration)) reportDeliveryGap(registration, "capacity");
 }
 
@@ -8215,7 +8244,8 @@ function enqueueRegistrationTask<Result>(
 			inputReservationReleased = true;
 			registration[counter]--;
 			registration.admittedInputBytes -= capturedBytes;
-			if (counter === "admittedInputJobs") noteDeliveryCapacity(registration);
+			if (counter === "admittedInputJobs" && registration.deliveryRepair?.wake === true)
+				noteDeliveryCapacity(registration);
 		};
 		const custody: InputCaptureCustody | undefined =
 			inputAdmission?.refuseCapture === undefined
@@ -8341,7 +8371,8 @@ function enqueueV3Ingress(
 		sender = undefined;
 	}
 	const refuse = (): void => {
-		noteDeliveryRefusal(registration, sender);
+		// The route attached the state if the room transport is bound to this plane's topic.
+		if (registration.deliveryRepair !== undefined) noteDeliveryRefusal(registration, sender);
 		ingressFailureLog("admission-rejected");
 	};
 	return enqueueRegistrationTask(
@@ -20866,7 +20897,6 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 				admittedEgressControlJobs: 0,
 				admittedGossipQueueJobs: 0,
 				admittedGossipQueueBytes: 0,
-				deliveryRepairWake: false,
 			};
 			registration.handle = makeV3PlaneHandle(registration);
 			if (snapshotMachine !== undefined) registration.blueprintHandle = makeV3BlueprintLiveHandle(registration);
@@ -20875,7 +20905,7 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 			if (reusesTransport) {
 				existing.active = false;
 				// Track AA: the predecessor's delivery repair state ends with it.
-				if (deliveryRepairProbes.has(existing)) reportDeliveryGap(existing, "retired");
+				if (existing.deliveryRepair !== undefined) reportDeliveryGap(existing, "retired");
 				// This hot handoff deliberately keeps the transport subscription,
 				// so normal deactivateRegistration is not called. End optional
 				// immutable-fact retention here even if an old handle stays alive;
@@ -21801,6 +21831,8 @@ export function routeV3Ingress(networkNode: DRPNetworkNode, message: Message): b
 		const bytes =
 			byteLength * 2 +
 			encodeCanonical({ sender: message.sender, objectId: message.objectId, type: message.type }).byteLength;
+		// Track AA: so the input pool can name this copy's sender if it refuses it.
+		attachDeliveryRepair(registration);
 		if (
 			registration.admittedGossipQueueJobs >= MAX_ADMITTED_INPUT_JOBS ||
 			bytes > registration.payload.parameters.maxPendingBytes - registration.admittedGossipQueueBytes
@@ -21850,6 +21882,8 @@ export function routeV3RetainedIngress(handle: V3PlaneHandle, message: Message):
 		return false;
 	}
 	if (indexedV3Copy(registration, message)) return true;
+	// Track AA: so the input pool can name this copy's sender if it refuses it.
+	attachDeliveryRepair(registration);
 	void enqueueV3Ingress(registration, message, "retained");
 	return true;
 }
