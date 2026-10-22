@@ -24,9 +24,10 @@ import { directories, heads, hex, required, rooms } from "../track-m/room-retent
 // Track X (decision row 51): Track S's settlement room on the node SQLite host (Grid zone
 // application, creator-trusted-settlement-v1, the creator and one Writer, manual delivery of
 // signed rows, persisted close and reopen over the same databases and external floor), with
-// one observation point: each peer's external floor (the room head authority, which is also
-// the creator's settlement whole-floor) can be observed when it is read or reserved. The
-// hooks observe and may delay; they never change an argument or a result. Rows can be
+// two observation points: each peer's external floor (the room head authority, which is also
+// the creator's settlement whole-floor) can be observed when it is read or reserved, and each
+// projection the room reports can be observed (row 60). The hooks observe and may delay or
+// deliver rows; they never change an argument or a result. Rows can be
 // delivered as gossip (through the plane's message queue) or as retained history (straight
 // to the plane's input pool), as the genuine room transport delivers them.
 
@@ -127,7 +128,15 @@ export async function readinessHoldRoom(
 		signGenesisAnchorDigest: (digest) => Promise.resolve(ed25519.sign(digest, creator.seed)),
 	});
 	const storageHost = createNodeV3RoomStorageHost({ directory, initialization: () => "create" });
-	const open = async (index: number, openOptions: Readonly<{ reopen?: boolean; floor?: FloorHooks }> = {}) => {
+	const open = async (
+		index: number,
+		openOptions: Readonly<{
+			reopen?: boolean;
+			floor?: FloorHooks;
+			/** Observes each projection the room reports (it may deliver rows; it changes nothing). */
+			onProjection?: (peer: HookPeer) => void;
+		}> = {}
+	) => {
 		const identity = required(identities[index]);
 		const name = `peer-${index}`;
 		const original = createNodeRoomHeadAuthority({
@@ -184,7 +193,7 @@ export async function readinessHoldRoom(
 			publicKeyBytes: ed25519.getPublicKey(identity.seed),
 			roomHeadAuthority: floor,
 			signRegisteredVertexDigest: (digest) => Promise.resolve(ed25519.sign(digest, identity.seed)),
-			onProjection: () => undefined,
+			onProjection: () => openOptions.onProjection?.(hookPeer),
 			onAcceptedVertex: (vertex) => {
 				const digest = hex(vertex.digest);
 				if (!accepted.has(digest)) accepted.set(digest, performance.now());
