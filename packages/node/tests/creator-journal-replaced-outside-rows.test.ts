@@ -124,6 +124,7 @@ interface Case {
 	capture?: boolean;
 	installedThroughEpoch?: number;
 	members?: readonly string[];
+	laterWitnesses?: readonly Record<string, unknown>[];
 }
 
 async function classify(input: Case = {}) {
@@ -134,7 +135,7 @@ async function classify(input: Case = {}) {
 			received,
 			member,
 			input.outsideRow ?? outsideLocal,
-			header(later, 1, carrier(later, input.laterMembers ?? [digests.replacement], [])),
+			header(later, 1, carrier(later, input.laterMembers ?? [digests.replacement], input.laterWitnesses ?? [])),
 		],
 	};
 	const read =
@@ -184,7 +185,9 @@ async function classify(input: Case = {}) {
 			},
 			...(input.reader === false ? {} : { readReplacedLocalSource: read }),
 			...(input.capture === true ? { captureApplicationRows: () => calls.push("capture") } : {}),
-			...(input.installedThroughEpoch === undefined ? {} : { installedThroughEpoch: () => input.installedThroughEpoch }),
+			...(input.installedThroughEpoch === undefined
+				? {}
+				: { installedThroughEpoch: () => input.installedThroughEpoch }),
 		},
 	};
 	const js = ts.transpileModule(`${classifierCode} closedJournalMembershipPrefix(data);`, {
@@ -295,5 +298,180 @@ describe("R5: a journal scope with this author's replaced moves outside its sign
 		const { prefix, calls } = await classify({ capture: true });
 		expect(prefix).toBeUndefined();
 		expect(calls.some((call) => call.startsWith("read:"))).toBe(false);
+	});
+});
+
+// R7 (owner's rule): an outside own settlement fence is collectible once a later own fence by the
+// same Writer is a member of a signed Cut this Writer knows.
+const fencePreimage = (author: string, authorSequence: number, at = scope): Uint8Array =>
+	encodeCanonical({
+		objectId,
+		epoch: at.epoch,
+		anchor: at.anchorDigest,
+		author,
+		authorSequence,
+		dependencies: [at.anchorDigest],
+		operation: { action: "$drp.author-fence.v1", fenceSequence: authorSequence, version: 1 },
+	});
+const otherWriter = "dd".repeat(32);
+const fences = {
+	outside: { digest: "06".repeat(32), bytes: fencePreimage(writer, 5) },
+	later: { digest: "07".repeat(32), bytes: fencePreimage(writer, 7, later) },
+	otherLater: { digest: "08".repeat(32), bytes: fencePreimage(otherWriter, 7, later) },
+	received: { digest: "09".repeat(32), bytes: fencePreimage(otherWriter, 3) },
+	lowerLater: { digest: "0a".repeat(32), bytes: fencePreimage(writer, 4, later) },
+	laterMove: { digest: "0b".repeat(32), bytes: preimage(writer, 7, [later.anchorDigest], later) },
+};
+for (const fence of Object.values(fences)) digestOf.set(Buffer.from(fence.bytes).toString("hex"), fence.digest);
+const outsideFence = entry(2, {
+	vertex_digest: fences.outside.digest,
+	source_kind: "local-issued",
+	local_author: writer,
+	local_author_sequence: 5,
+});
+const receivedFence = entry(2, {
+	vertex_digest: fences.received.digest,
+	source_kind: "received",
+	received_preimage: fences.received.bytes,
+	received_signature: signature,
+});
+const witness = (fence: { digest: string; bytes: Uint8Array }) => ({
+	vertexDigest: fence.digest,
+	exactCanonicalPreimageBytes: fence.bytes,
+	detachedSignature: signature,
+});
+/** The held reader: this author's issued fences by sequence, marked as fences. */
+const fenceReader =
+	(
+		reads: string[],
+		issued: ReadonlyMap<number, Uint8Array> = new Map([
+			[5, fences.outside.bytes],
+			[7, fences.later.bytes],
+		])
+	) =>
+	async (request: Record<string, unknown>) => {
+		reads.push(`read:${String(request.authorSequence)}`);
+		const bytes = issued.get(Number(request.authorSequence));
+		return bytes === undefined
+			? undefined
+			: {
+					exactCanonicalPreimageBytes: bytes,
+					detachedSignature: signature,
+					replacementVertexDigests: [],
+					authorFence: true,
+				};
+	};
+const laterFenceInCut = { laterMembers: [fences.later.digest], laterWitnesses: [witness(fences.later)] };
+
+describe("R7: a journal scope with this author's own settlement fence outside its signed Cut", () => {
+	it("is collectible, whole, once a later own fence is a member of a later signed Cut", async () => {
+		const reads: string[] = [];
+		const { prefix, calls } = await classify({
+			outsideRow: outsideFence,
+			read: fenceReader(reads),
+			...laterFenceInCut,
+		});
+		expect(prefix?.highWatermark).toBe(3);
+		expect(prefix?.rows.map((row) => [row.journalSequence, row.vertexDigest, row.authorSequence])).toEqual([
+			[0, digests.creator, 0],
+			[1, digests.member, 4],
+			[2, fences.outside.digest, 5],
+		]);
+		// The outside fence and the later fence are both read from the held owner; the outside
+		// fence's original bytes are verified against this scope's closed ACL like every member.
+		expect(reads).toEqual(["read:5", "read:7"]);
+		expect(calls).toContain("signature:06");
+	});
+
+	it("stays retained while no later own fence is a member of a signed Cut", async () => {
+		const retained = async (input: Case) => (await classify({ outsideRow: outsideFence, ...input })).prefix;
+		const reads: string[] = [];
+		// No later fence at all.
+		expect(await retained({ read: fenceReader(reads) })).toBeUndefined();
+		// The later fence missed its own Cut too: it is not a member, even with a witness for it.
+		expect(
+			await retained({
+				read: fenceReader(reads),
+				laterMembers: [digests.replacement],
+				laterWitnesses: [witness(fences.later)],
+			})
+		).toBeUndefined();
+		// A later scope's carrier without its held, authenticated Cut is no evidence.
+		expect(await retained({ read: fenceReader(reads), ...laterFenceInCut, laterAuthority: false })).toBeUndefined();
+		// The held reader does not confirm the later fence as this author's issued fence.
+		expect(
+			await retained({ read: fenceReader(reads, new Map([[5, fences.outside.bytes]])), ...laterFenceInCut })
+		).toBeUndefined();
+		// A later own member at a lower sequence, or one that is a move rather than a fence.
+		for (const other of [fences.lowerLater, fences.laterMove])
+			expect(
+				await retained({
+					read: fenceReader(
+						reads,
+						new Map([
+							[5, fences.outside.bytes],
+							[4, fences.lowerLater.bytes],
+							[7, other.bytes],
+						])
+					),
+					laterMembers: [other.digest],
+					laterWitnesses: [witness(other)],
+				})
+			).toBeUndefined();
+		// The outside row's own facts are not exactly a fence at its sequence, or name a replacement.
+		const notFence = async () => ({
+			exactCanonicalPreimageBytes: outsidePreimage,
+			detachedSignature: signature,
+			replacementVertexDigests: [],
+			authorFence: true,
+		});
+		expect(await retained({ read: notFence, ...laterFenceInCut })).toBeUndefined();
+		const named = async (request: Record<string, unknown>) => ({
+			...(await fenceReader([])(request)),
+			replacementVertexDigests: [fences.later.digest],
+		});
+		expect(await retained({ read: named, ...laterFenceInCut })).toBeUndefined();
+		// No held reader.
+		expect(await retained({ reader: false, ...laterFenceInCut })).toBeUndefined();
+	});
+
+	it("never collects another author's fence by this rule", async () => {
+		const reads: string[] = [];
+		// The only later fence in a signed Cut is another author's.
+		expect(
+			(
+				await classify({
+					outsideRow: outsideFence,
+					read: fenceReader(
+						reads,
+						new Map([
+							[5, fences.outside.bytes],
+							[7, fences.otherLater.bytes],
+						])
+					),
+					laterMembers: [fences.otherLater.digest],
+					laterWitnesses: [witness(fences.otherLater)],
+				})
+			).prefix
+		).toBeUndefined();
+		// Another author's fence outside the Cut is a received row: a later own fence in a signed Cut
+		// does not collect it, and the reader is never consulted. Only R5b's rule (this peer's
+		// successor install durable) does.
+		const receivedReads: string[] = [];
+		expect(
+			(await classify({ outsideRow: receivedFence, read: fenceReader(receivedReads), ...laterFenceInCut })).prefix
+		).toBeUndefined();
+		const { prefix } = await classify({
+			outsideRow: receivedFence,
+			read: fenceReader(receivedReads),
+			...laterFenceInCut,
+			installedThroughEpoch: 2,
+		});
+		expect(prefix?.rows.map((row) => row.vertexDigest)).toEqual([
+			digests.creator,
+			digests.member,
+			fences.received.digest,
+		]);
+		expect(receivedReads).toEqual([]);
 	});
 });

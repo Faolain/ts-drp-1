@@ -15410,6 +15410,9 @@ function replacedSourceOperations(
  * admission refusal, the source's own operations under that derivation's proposal digest).
  * Data, not authority: the journal classifier authenticates the source against its closed
  * ACL and requires every returned replacement digest in a later signed Cut.
+ * R7: a row that is this author's own settlement fence (version 1, fenceSequence equal to its own
+ * sequence) has no plan entry and no replacement; it is returned with its original bytes, marked
+ * as a fence, and the classifier requires a later own fence in a later signed Cut.
  * @returns The source bytes and replacement digests, or undefined when not exactly that.
  */
 async function replacedLocalSourceFacts(
@@ -15442,10 +15445,27 @@ async function replacedLocalSourceFacts(
 		)
 			return undefined;
 		const sourceVertex = decodeCanonical(sourceRow.canonicalPreimageBytes);
+		const sourceOperation = isObject(sourceVertex) ? Reflect.get(sourceVertex, "operation") : undefined;
+		if (isObject(sourceVertex) && isObject(sourceOperation) && isAuthorFenceOperation(sourceOperation)) {
+			// The decoded operation is a null-prototype record: exactly the three fence fields.
+			if (
+				ReflectOwnKeys(sourceOperation).length !== 3 ||
+				Reflect.get(sourceOperation, "version") !== 1 ||
+				Reflect.get(sourceOperation, "fenceSequence") !== source.authorSequence ||
+				Reflect.get(sourceVertex, "author") !== scope.author ||
+				Reflect.get(sourceVertex, "authorSequence") !== source.authorSequence ||
+				Reflect.get(sourceVertex, "objectId") !== scope.objectId
+			)
+				return undefined;
+			return ObjectFreeze({
+				exactCanonicalPreimageBytes: new Uint8ArrayConstructor(sourceRow.canonicalPreimageBytes),
+				detachedSignature: new Uint8ArrayConstructor(sourceRow.signature),
+				replacementVertexDigests: ObjectFreeze([]),
+				authorFence: true as const,
+			});
+		}
 		const sourceEpoch = isObject(sourceVertex) ? Reflect.get(sourceVertex, "epoch") : undefined;
-		const sourceOperations = isObject(sourceVertex)
-			? replacedSourceOperations(payload, Reflect.get(sourceVertex, "operation"))
-			: undefined;
+		const sourceOperations = isObject(sourceVertex) ? replacedSourceOperations(payload, sourceOperation) : undefined;
 		if (!NumberIsSafeInteger(sourceEpoch) || sourceOperations === undefined || sourceOperations.length === 0)
 			return undefined;
 		const plan = await store.readSettlementPlan(scope);

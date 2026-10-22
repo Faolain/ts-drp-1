@@ -324,6 +324,10 @@ export type CreatorReplacedLocalSourceRead = Readonly<{
 	exactCanonicalPreimageBytes: Uint8Array;
 	detachedSignature: Uint8Array;
 	replacementVertexDigests: readonly string[];
+	/** Decision row 60 (R7): the row is this author's own settlement fence (fenceSequence equal to
+	 * its sequence), which has no plan entry and no replacement; replacementVertexDigests is empty.
+	 * The classifier requires a later own fence in a later signed Cut before any deletion. */
+	authorFence?: true;
 }>;
 export type CreatorSnapshotRecoveryCloseLifetime = Readonly<{
 	/** Decision row 60 (R5): this hold's own registration reads a local source it replaced.

@@ -9406,6 +9406,11 @@ async function closedJournalMembershipPrefix(input: Readonly<{
  * Each replacement digest must be in the closed membership of a later scope of this same image,
  * opened against that scope's held authenticated Cut. The caller still authenticates every
  * returned source against this scope's closed ACL. Missing or unreadable facts retain the scope.
+ * R7 (owner's rule): an outside row that is this author's own settlement fence (the reader returns
+ * its original bytes, marked as a fence, with no replacement) is collectible once a later own fence
+ * of the same author, at a higher sequence, is a member of a later scope's signed Cut: a local
+ * witness of that Cut's membership, opened as above, that the reader confirms is the issued fence
+ * at that digest. A later fence that missed its own Cut is no evidence.
  * @returns Each outside row's original source bytes by vertex digest, or undefined to retain.
  */
 async function closedJournalReplacedOutsideRows(input: Readonly<{
@@ -9418,6 +9423,7 @@ async function closedJournalReplacedOutsideRows(input: Readonly<{
 }>): Promise<ReadonlyMap<string, CreatorReplacedLocalSourceRead> | undefined> {
 	const outside = new Map<string, CreatorReplacedLocalSourceRead>();
 	const later = new Map<string, ReadonlySet<string> | null>();
+	const laterWitnesses = new Map<string, readonly unknown[]>();
 	const laterMembers = async (scope: LiveJournalScope): Promise<ReadonlySet<string> | null> => {
 		const key = JSON.stringify([scope.objectId, scope.epoch, scope.anchorDigest]);
 		const known = later.get(key);
@@ -9438,6 +9444,7 @@ async function closedJournalReplacedOutsideRows(input: Readonly<{
 			const members = new Set(membership.orderedVertexDigests.map(bytes =>
 				[...bytes].map(byte => byte.toString(16).padStart(2, "0")).join("")));
 			later.set(key, members);
+			laterWitnesses.set(key, Array.isArray(membership.localVertexWitnesses) ? membership.localVertexWitnesses : []);
 			return members;
 		} catch {
 			return null;
@@ -9450,6 +9457,45 @@ async function closedJournalReplacedOutsideRows(input: Readonly<{
 			key[1] > input.scope.epoch && typeof key[2] === "string")
 			laterScopes.push(Object.freeze({ objectId: input.scope.objectId, epoch: key[1], anchorDigest: key[2] }));
 	}
+	// R7: whether bytes are this author's own settlement fence at this sequence.
+	const authorFence = (bytes: unknown, author: string, authorSequence: number): boolean => {
+		if (!(bytes instanceof Uint8Array)) return false;
+		try {
+			const vertex = record(bytes), operation = vertex.operation as Readonly<Record<string, unknown>> | null;
+			return vertex.author === author && vertex.authorSequence === authorSequence && typeof operation === "object" &&
+				operation !== null && operation.action === "$drp.author-fence.v1" && operation.version === 1 &&
+				operation.fenceSequence === authorSequence;
+		} catch {
+			return false;
+		}
+	};
+	// R7: whether a later own fence of this author, at a higher sequence, is a member of a later
+	// scope's signed Cut (a local witness of its opened membership that the reader confirms).
+	const laterOwnFence = async (author: string, authorSequence: number): Promise<boolean> => {
+		for (const scope of laterScopes) {
+			const members = await laterMembers(scope);
+			const witnesses = laterWitnesses.get(JSON.stringify([scope.objectId, scope.epoch, scope.anchorDigest]));
+			if (members === null || witnesses === undefined) continue;
+			for (const witness of witnesses) {
+				const value = typeof witness === "object" && witness !== null ? witness as Readonly<Record<string, unknown>> : {};
+				const digest = value.vertexDigest, bytes = value.exactCanonicalPreimageBytes;
+				if (typeof digest !== "string" || !members.has(digest) || !(bytes instanceof Uint8Array)) continue;
+				let sequence: unknown;
+				try {
+					sequence = record(bytes).authorSequence;
+				} catch {
+					continue;
+				}
+				if (!Number.isSafeInteger(sequence) || Number(sequence) <= authorSequence ||
+					!authorFence(bytes, author, Number(sequence))) continue;
+				const read = await input.read(Object.freeze({ author, authorSequence: Number(sequence), vertexDigest: digest }))
+					.catch(() => undefined);
+				if (read?.authorFence === true && read.replacementVertexDigests.length === 0 &&
+					authorFence(read.exactCanonicalPreimageBytes, author, Number(sequence))) return true;
+			}
+		}
+		return false;
+	};
 	for (const { frame } of input.frames) {
 		const row = (frame as unknown[])[2] as Record<string, unknown>;
 		const sql = (frame as unknown[])[0] === "accepted_entries";
@@ -9460,6 +9506,13 @@ async function closedJournalReplacedOutsideRows(input: Readonly<{
 			!Number.isSafeInteger(authorSequence) || outside.has(digest)) return undefined;
 		const read = await input.read(Object.freeze({ author, authorSequence: Number(authorSequence), vertexDigest: digest }))
 			.catch(() => undefined);
+		if (read?.authorFence === true) {
+			if (read.replacementVertexDigests.length !== 0 ||
+				!authorFence(read.exactCanonicalPreimageBytes, author, Number(authorSequence)) ||
+				!(await laterOwnFence(author, Number(authorSequence)))) return undefined;
+			outside.set(digest, read);
+			continue;
+		}
 		if (read === undefined || read.replacementVertexDigests.length === 0) return undefined;
 		for (const replacement of read.replacementVertexDigests) {
 			let found = false;
@@ -9533,8 +9586,9 @@ async function prepareClosedJournalMembershipPrefix(
 	// Missing detail is not permission, even when a valid Cut names membership.
 	if (frames.length !== watermark || frames.length === 0) return undefined;
 	// Decision row 60: rows outside the Cut only as this author's replaced local sources (R5,
-	// option A), or as received rows once this peer has durably installed the successor that the
-	// Cut closes into (R5b, B2). Any other row outside the Cut retains the scope.
+	// option A) or own settlement fences superseded by a later own fence in a signed Cut (R7), or
+	// as received rows once this peer has durably installed the successor that the Cut closes into
+	// (R5b, B2). Any other row outside the Cut retains the scope.
 	let outside: ReadonlyMap<string, CreatorReplacedLocalSourceRead> | undefined;
 	const receivedOutside = new Set<string>();
 	if (frames.length !== members.size) {
