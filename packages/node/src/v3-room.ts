@@ -4871,7 +4871,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	const mergedSettlementPlan = (
 		sources: readonly Pick<DisplacedSource, "authorSequence" | "intents" | "vertexDigest">[],
 		current: RoomSettlementPlan | null,
-		inheritances: ReadonlyMap<number, NonNullable<RoomSettlementPlanEntry["inheritance"]>> = new Map()
+		inheritances: ReadonlyMap<number, NonNullable<RoomSettlementPlanEntry["inheritance"]>> = new Map(),
+		prunedSources: ReadonlySet<number> = new Set()
 	): ((priorFenceEpoch: unknown, activeEpoch: number | undefined) => RoomSettlementPlan) => {
 		const priorEntries = new Map(current?.entries.map((entry) => [entry.sourceSequence, entry] as const));
 		const entries: RoomSettlementPlanEntry[] = [];
@@ -4911,7 +4912,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		// A new operational anchor can terminalize a source that was already
 		// replaced. Absence from the current rebase scan does not erase its durable
 		// intent/source/replacement link; authenticated pruning owns that removal.
+		// Decision row 60 (R5): once that pruning has removed a completed entry's own source
+		// (completedSettlementSourcesPruned), the link has no consumer left: no rebase scan or
+		// recovery census can meet the source again. Carrying it would name retired work, which
+		// the store refuses on every later plan write.
 		for (const prior of current?.entries ?? []) {
+			if (prunedSources.has(prior.sourceSequence)) continue;
 			if (!entries.some((entry) => entry.sourceSequence === prior.sourceSequence)) entries.push(prior);
 		}
 		entries.sort((left, right) => left.sourceSequence - right.sourceSequence);
@@ -4942,9 +4948,44 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			return plan;
 		};
 	};
+	/**
+	 * Decision row 60 (R5): the completed local entries whose own source row authenticated
+	 * pruning has removed (the store reads it as pruned). Only an entry that is not in the
+	 * current rebase scan, names a local source and has its replacement issued (or expired);
+	 * an incomplete, manual-review, inherited or migrated entry is always kept.
+	 * @param current - The durable plan before this merge.
+	 * @param sources - The current rebase scan.
+	 * @returns The source sequences whose entries the merge drops.
+	 */
+	const completedSettlementSourcesPruned = async (
+		current: RoomSettlementPlan | null,
+		sources: readonly DisplacedSource[]
+	): Promise<ReadonlySet<number>> => {
+		const pruned = new Set<number>();
+		for (const entry of current?.entries ?? []) {
+			if (
+				entry.sourceObjectId !== undefined ||
+				entry.inheritance !== undefined ||
+				sources.some((source) => source.authorSequence === entry.sourceSequence) ||
+				(entry.disposition !== "expire" &&
+					(entry.disposition === "manual-review" ||
+						entry.disposition === "inherited" ||
+						entry.replacementSequence === null))
+			)
+				continue;
+			if ((await issuanceStore.readIssued(settlementScope, entry.sourceSequence)) === null)
+				pruned.add(entry.sourceSequence);
+		}
+		return pruned;
+	};
 	const writeMergedSettlementPlan = async (sources: readonly DisplacedSource[]): Promise<RoomSettlementPlan> => {
 		const current = await issuanceStore.readSettlementPlan(settlementScope);
-		const completePlan = mergedSettlementPlan(sources, current, await authenticatedSettlementInheritance(sources));
+		const completePlan = mergedSettlementPlan(
+			sources,
+			current,
+			await authenticatedSettlementInheritance(sources),
+			await completedSettlementSourcesPruned(current, sources)
+		);
 		const priorFence =
 			current?.fenceSequence == null
 				? undefined

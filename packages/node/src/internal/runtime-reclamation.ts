@@ -314,7 +314,21 @@ nativeRows: readonly LiveJournalAcceptedRow[], preparedCapacityOnly?: true): Pro
 }>;
 type OrdinaryIssuanceRuntimeResolver = (value: unknown, owners: CreatorSnapshotRecoveryCloseOwners) =>
 	CreatorOrdinaryIssuanceRuntimeLifetime | undefined;
+/** Decision row 60 (R5): one local-issued journal row outside its scope's signed Cut. */
+export type CreatorReplacedLocalSource = Readonly<{ author: string; authorSequence: number; vertexDigest: string }>;
+/** Its original issued bytes and the exact replacement rows its own plan entry names, each of
+ * whose operations equal the source's derivation by the original immutable settlement policy.
+ * Data only: the journal classifier authenticates the source against its closed ACL and
+ * requires every replacement digest in a later signed Cut before any deletion. */
+export type CreatorReplacedLocalSourceRead = Readonly<{
+	exactCanonicalPreimageBytes: Uint8Array;
+	detachedSignature: Uint8Array;
+	replacementVertexDigests: readonly string[];
+}>;
 export type CreatorSnapshotRecoveryCloseLifetime = Readonly<{
+	/** Decision row 60 (R5): this hold's own registration reads a local source it replaced.
+	 * Undefined unless the source, its plan entry and every replacement row are exactly that. */
+	readReplacedLocalSource?(source: CreatorReplacedLocalSource): Promise<CreatorReplacedLocalSourceRead | undefined>;
 	/** Private owner geometry only: this lifetime retains no replacement or
 	 * displaced-source physical custody. It is not currency or authorization. */
 	canDetachNativePreparation?: true;
