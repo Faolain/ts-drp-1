@@ -16,6 +16,10 @@ import { installGridRoomHeadAuthority } from "./fixtures/phase-3a1b/grid-room-he
 // recent console lines (TRACK_V_GRID_STUCK). Track V found that on the settlement profile
 // the creator's blocks stop reaching the Writer after four successors (see
 // docs/realtime-latency/tracks/32-track-v-settlement-for-grid-and-chat/RESULT.md).
+// Each epoch also records every move's delivery time (deliveryMs) and the time both pages take
+// to converge after the install (ms.converge). By default play pauses during rollovers;
+// TRACK_V_PLAY_THROUGH_ROLLOVER=1 (Track X, decision row 60) keeps the Writer playing through
+// them, see below.
 const EPOCHS = Number(process.env.TRACK_V_GRID_EPOCHS ?? 16);
 const MOVES = 2;
 const SETTLE_MS = 300;
@@ -25,6 +29,85 @@ const POST_INSTALL_PAUSE_MS = Number(process.env.TRACK_V_GRID_POST_INSTALL_PAUSE
 const PROBE = process.env.TRACK_V_GRID_PROBE === "1";
 // Diagnostics: TRACK_V_GRID_CENSUS=0 skips the IndexedDB census, to rule out any effect of its reads.
 const CENSUS = process.env.TRACK_V_GRID_CENSUS !== "0";
+// Track X (decision row 60), opt-in: TRACK_V_PLAY_THROUGH_ROLLOVER=1 keeps the Writer playing through
+// every rollover, as a real game does. It places a block every TRACK_V_PLAY_THROUGH_MS (default 75)
+// while the creator seals, exports and adopts and while the Writer installs. A placement the Writer's
+// own install refuses is counted, not failed. Each epoch then asserts that the creator holds every
+// block the Writer placed (its last placement of each id; a move outside the sealed cut arrives as
+// its replacement). Without it, play pauses during rollovers as before.
+const PLAY_THROUGH = process.env.TRACK_V_PLAY_THROUGH_ROLLOVER === "1";
+const PLAY_THROUGH_MS = Number(process.env.TRACK_V_PLAY_THROUGH_MS ?? 75);
+// Convergence polls every 25 ms, so each move's delivery time (placement to the other page) is recorded.
+const POLL = { intervals: [25] };
+
+interface Block {
+	readonly id: string;
+	readonly kind: string;
+	readonly x: number;
+	readonly y: number;
+}
+
+interface PlayThrough {
+	phase: "rollover" | "install";
+	stop(): Promise<{
+		readonly placed: number;
+		readonly refused: Readonly<Record<"rollover" | "install", number>>;
+		readonly firstRefusal: string | null;
+		readonly placeMs: readonly number[];
+		readonly last: readonly Block[];
+	}>;
+}
+
+// The Writer's play during one rollover: a placement every PLAY_THROUGH_MS until stopped. Ids
+// repeat, so the zone state stays the same size.
+function playThrough(page: Page, epoch: number): PlayThrough {
+	let running = true;
+	const refused = { rollover: 0, install: 0 };
+	let firstRefusal: string | null = null;
+	const placeMs: number[] = [];
+	const last = new Map<string, Block>();
+	const state: PlayThrough = {
+		phase: "rollover",
+		stop: async () => {
+			running = false;
+			await loop;
+			return { placed: placeMs.length, refused, firstRefusal, placeMs, last: [...last.values()] };
+		},
+	};
+	const loop = (async (): Promise<void> => {
+		for (let sequence = 0; running; sequence++) {
+			await new Promise((resolve) => setTimeout(resolve, PLAY_THROUGH_MS));
+			if (!running) break;
+			const block = { id: `play-${sequence % 4}`, kind: "glass", x: 20 + (sequence % 40), y: 9 + (epoch % 4) };
+			const phase = state.phase;
+			try {
+				placeMs.push(
+					await page.evaluate(async (value) => {
+						const api = Reflect.get(window, "__TS_DRP_V3_ZONE__") as { placeBlock(input: unknown): Promise<void> };
+						const started = performance.now();
+						await api.placeBlock(value);
+						return performance.now() - started;
+					}, block)
+				);
+				last.set(block.id, block);
+			} catch (error) {
+				refused[phase]++;
+				firstRefusal ??= `${phase}: ${String(error).slice(0, 300)}`;
+			}
+		}
+	})();
+	return state;
+}
+
+const quantiles = (values: readonly number[]): Readonly<{ count: number; p50: number; max: number }> | null => {
+	if (values.length === 0) return null;
+	const sorted = [...values].sort((left, right) => left - right);
+	return {
+		count: sorted.length,
+		p50: Math.round(sorted[Math.floor((sorted.length - 1) / 2)] ?? 0),
+		max: Math.round(sorted.at(-1) ?? 0),
+	};
+};
 
 interface Census {
 	readonly databases: Readonly<Record<string, Readonly<Record<string, number>>>>;
@@ -193,6 +276,8 @@ test(`the shipped Grid page runs ${EPOCHS} creator successors with an enrolled W
 		await expect.poll(async () => (await zone(creator)).durableVertexCount).toBe(2);
 		for (let epoch = 0; epoch < EPOCHS; epoch++) {
 			const issueMs: { creator: number[]; recipient: number[] } = { creator: [], recipient: [] };
+			// Placement to the first poll that sees the block on the other page.
+			const deliveryMs: { creator: number[]; recipient: number[] } = { creator: [], recipient: [] };
 			for (let ordinal = 0; ordinal < MOVES * 2; ordinal++) {
 				const index = ordinal % 2;
 				const [page, other] = index === 0 ? [creator, receiver] : [receiver, creator];
@@ -204,10 +289,12 @@ test(`the shipped Grid page runs ${EPOCHS} creator successors with an enrolled W
 					return performance.now() - started;
 				}, block);
 				issueMs[index === 0 ? "creator" : "recipient"].push(ms);
+				const placed = Date.now();
 				try {
 					await expect
-						.poll(async () => (await zone(other)).blocks, { timeout: PROBE ? 20_000 : 60_000 })
+						.poll(async () => (await zone(other)).blocks, { timeout: PROBE ? 20_000 : 60_000, ...POLL })
 						.toContainEqual(block);
+					deliveryMs[index === 0 ? "creator" : "recipient"].push(Date.now() - placed);
 				} catch (error) {
 					process.stdout.write(
 						`TRACK_V_GRID_STUCK ${JSON.stringify({ epoch: epoch + 1, ordinal, block, console: consoleTail })}\n`
@@ -217,51 +304,97 @@ test(`the shipped Grid page runs ${EPOCHS} creator successors with an enrolled W
 				}
 			}
 			await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
-			const rollover = await creator.evaluate(async () => {
-				const api = Reflect.get(window, "__TS_DRP_V3_ZONE__") as {
-					sealEpoch(): Promise<{ ok: boolean; epoch: number; successorEpoch: number }>;
-					exportCreatorSuccessor(): Promise<Record<string, Uint8Array>>;
-					adoptCreatorSuccessor(): Promise<unknown>;
-				};
-				let started = performance.now();
-				const close = await api.sealEpoch();
-				const seal = performance.now() - started;
-				if (!close.ok) throw new Error("TRACK_V_HEALTHY_CLOSE_REFUSED");
-				started = performance.now();
-				const offer = await api.exportCreatorSuccessor();
-				const exported = performance.now() - started;
-				started = performance.now();
-				await api.adoptCreatorSuccessor();
-				const adoption = performance.now() - started;
-				return {
-					close: { ok: close.ok, epoch: close.epoch, successorEpoch: close.successorEpoch },
-					ms: { seal, export: exported, adoption },
-					offer: Object.fromEntries(
-						[
-							"exactCanonicalCutValueBytes",
-							"exactCanonicalCommitQcBytes",
-							"exactCanonicalTrustStateRecordBytes",
-							"exactCanonicalSnapshotManifestBytes",
-						].map((key) => [key, Array.from(offer[key] ?? [])])
-					),
-				};
-			});
-			expect(rollover.close).toEqual({ ok: true, epoch, successorEpoch: epoch + 1 });
-			const install = await receiver.evaluate(
-				async ({ offer, peer }) => {
+			const play = PLAY_THROUGH ? playThrough(receiver, epoch) : undefined;
+			const transition = async () => {
+				const rollover = await creator.evaluate(async () => {
 					const api = Reflect.get(window, "__TS_DRP_V3_ZONE__") as {
-						installCreatorSuccessor(input: unknown): Promise<unknown>;
+						sealEpoch(): Promise<{ ok: boolean; epoch: number; successorEpoch: number }>;
+						exportCreatorSuccessor(): Promise<Record<string, Uint8Array>>;
+						adoptCreatorSuccessor(): Promise<unknown>;
 					};
-					const started = performance.now();
-					await api.installCreatorSuccessor({
-						peers: [peer],
-						offer: Object.fromEntries(Object.entries(offer).map(([key, value]) => [key, new Uint8Array(value)])),
-					});
-					return performance.now() - started;
-				},
-				{ offer: rollover.offer, peer: creatorEnrollment.localPeerId }
-			);
-			await expect.poll(async () => (await zone(receiver)).blocks).toEqual((await zone(creator)).blocks);
+					let started = performance.now();
+					const close = await api.sealEpoch();
+					const seal = performance.now() - started;
+					if (!close.ok) throw new Error("TRACK_V_HEALTHY_CLOSE_REFUSED");
+					started = performance.now();
+					const offer = await api.exportCreatorSuccessor();
+					const exported = performance.now() - started;
+					started = performance.now();
+					await api.adoptCreatorSuccessor();
+					const adoption = performance.now() - started;
+					return {
+						close: { ok: close.ok, epoch: close.epoch, successorEpoch: close.successorEpoch },
+						ms: { seal, export: exported, adoption },
+						offer: Object.fromEntries(
+							[
+								"exactCanonicalCutValueBytes",
+								"exactCanonicalCommitQcBytes",
+								"exactCanonicalTrustStateRecordBytes",
+								"exactCanonicalSnapshotManifestBytes",
+							].map((key) => [key, Array.from(offer[key] ?? [])])
+						),
+					};
+				});
+				expect(rollover.close).toEqual({ ok: true, epoch, successorEpoch: epoch + 1 });
+				if (play !== undefined) play.phase = "install";
+				const install = await receiver.evaluate(
+					async ({ offer, peer }) => {
+						const api = Reflect.get(window, "__TS_DRP_V3_ZONE__") as {
+							installCreatorSuccessor(input: unknown): Promise<unknown>;
+						};
+						const started = performance.now();
+						await api.installCreatorSuccessor({
+							peers: [peer],
+							offer: Object.fromEntries(Object.entries(offer).map(([key, value]) => [key, new Uint8Array(value)])),
+						});
+						return performance.now() - started;
+					},
+					{ offer: rollover.offer, peer: creatorEnrollment.localPeerId }
+				);
+				return { rollover, install };
+			};
+			const { rollover, install } = await transition().catch(async (error: unknown) => {
+				if (play !== undefined) {
+					const partial = await play.stop();
+					process.stdout.write(
+						`TRACK_V_PLAY_THROUGH_FAILED ${JSON.stringify({
+							epoch: epoch + 1,
+							error: String(error).slice(0, 800),
+							play: { ...partial, placeMs: quantiles(partial.placeMs) },
+							console: consoleTail.slice(-40),
+						})}\n`
+					);
+				}
+				throw error;
+			});
+			const played = await play?.stop();
+			// Both pages converge, and the creator holds every block the Writer placed during the
+			// rollover (none when play pauses).
+			const same = (left: Block, right: Block): boolean =>
+				left.id === right.id && left.kind === right.kind && left.x === right.x && left.y === right.y;
+			const installed = Date.now();
+			try {
+				await expect
+					.poll(
+						async () => {
+							const [mine, theirs] = await Promise.all([zone(creator), zone(receiver)]);
+							const held = mine.blocks as readonly Block[];
+							return {
+								equal: JSON.stringify(mine.blocks) === JSON.stringify(theirs.blocks),
+								missing: (played?.last ?? []).filter((block) => !held.some((value) => same(value, block))),
+							};
+						},
+						// Paused play keeps the config's 20 s; play through allows for the rebased moves.
+						{ ...(PLAY_THROUGH ? { timeout: 60_000 } : {}), ...POLL }
+					)
+					.toEqual({ equal: true, missing: [] });
+			} catch (error) {
+				process.stdout.write(
+					`TRACK_V_PLAY_THROUGH_STUCK ${JSON.stringify({ epoch: epoch + 1, last: played?.last, console: consoleTail.slice(-60) })}\n`
+				);
+				throw error;
+			}
+			const convergeMs = Date.now() - installed;
 			if (POST_INSTALL_PAUSE_MS > 0) await new Promise((resolve) => setTimeout(resolve, POST_INSTALL_PAUSE_MS));
 			const skipped: Census = { databases: {}, usage: null };
 			const [creatorCensus, recipientCensus] = CENSUS
@@ -269,8 +402,20 @@ test(`the shipped Grid page runs ${EPOCHS} creator successors with an enrolled W
 				: [skipped, skipped];
 			const record = {
 				epoch: epoch + 1,
-				ms: { ...rollover.ms, install },
+				ms: { ...rollover.ms, install, converge: convergeMs },
 				issueMs,
+				deliveryMs,
+				...(played === undefined
+					? {}
+					: {
+							play: {
+								everyMs: PLAY_THROUGH_MS,
+								placed: played.placed,
+								refused: played.refused,
+								firstRefusal: played.firstRefusal,
+								placeMs: quantiles(played.placeMs),
+							},
+						}),
 				creator: { rows: total(creatorCensus), issuance: issuance(creatorCensus), usage: creatorCensus.usage },
 				recipient: { rows: total(recipientCensus), issuance: issuance(recipientCensus), usage: recipientCensus.usage },
 				stores: { creator: creatorCensus.databases, recipient: recipientCensus.databases },
