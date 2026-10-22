@@ -574,7 +574,8 @@ export interface CreateV3RoomSessionInput<Projection extends V3RoomProjectionAut
 	 * epoch whose lull settled gets that result without a second lull, and the idle
 	 * scheduler skips that epoch. The browser binding enables it for new rooms on the
 	 * room database with retention. The next seal keeps its inline maintenance as the
-	 * hard-cap backstop.
+	 * hard-cap backstop. Moves that arrive while it runs wait and are admitted right
+	 * after it; none are dropped.
 	 */
 	readonly recoveryPoolScheduledLull?: boolean;
 	/**
