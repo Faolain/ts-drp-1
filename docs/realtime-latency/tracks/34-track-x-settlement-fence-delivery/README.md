@@ -1,6 +1,6 @@
 # Track X: the settlement fence delivery stall
 
-**Outcome:** Fix merged in cf6d306f (4122ab83..e26cd812, without the startup-readiness RED). A recipient now asks the creator again for a missing dependency, so the settlement fence that arrives before install is no longer lost; shipped Canvas and Chat and the Grid with Track V's switch run 16/16 with real networking. The IndexedDB seal deadlock fix is picked as 04f7fd0b..9b28e327 (row 53): the seal stages its snapshot before it takes a journal source. IN PROGRESS: the startup order (rows 45 and 51). See [RESULT.md](RESULT.md).
+**Outcome:** Fix merged in cf6d306f (4122ab83..e26cd812, without the startup-readiness RED). A recipient now asks the creator again for a missing dependency, so the settlement fence that arrives before install is no longer lost; shipped Canvas and Chat and the Grid with Track V's switch run 16/16 with real networking. The IndexedDB seal deadlock fix is picked as 04f7fd0b..9b28e327 (row 53): the seal stages its snapshot before it takes a journal source. The startup order (option A) and the readiness ingress hold merged in 8595826c (rows 51, 55 and 59). IN PROGRESS: play during a rollover, and d9346's migration failure (row 60). See [RESULT.md](RESULT.md).
 
 **Working documents in this folder:** [BRIEF.md](BRIEF.md), [RESULT.md](RESULT.md)
 
@@ -604,3 +604,166 @@ Options:
 3. The 5383 replacement takes the ingress hold around its floor view, so arrivals wait instead of being refused, and (i) isn't needed there. This needs an edit to v3-room's replacement loop (Track Z's caution) and a hold exposed on the rebase source. It's a new decision.
 
 Until you answer, I'm keeping (i) out of the fix commit; it's saved as a separate patch. I'm continuing with: the hold REDs (both fail at base and pass with the hold: logs/hold-red-base-r1.log, logs/xreds-head-r1.log), the hold fix, the hold property tests and the measurements. I'll add (i) in its own commit only if you choose 2 or ask for it.
+
+### Report returned by the agent
+
+Track X: the hold's wait numbers are in, I fixed one pin regression, and I found an adoption failure that predates row 51. Continuing with the proofs unless you say otherwise.
+
+1. Pin regression, fixed in 0e7c068e (source only, no test edited). In the node suite, creator-recipient-recovery-pool.test.ts failed. It pins a regex on the closing-gate line in enqueueV3Ingress, and 04135190 had folded "&& hold === undefined" into that line. The hold check now sits on its own line before it, the pinned line is byte-identical to the one in A, and behaviour is unchanged. After the fix, the pin, the hold unit tests and pool gameplay (33/33) pass, and so do the hold REDs, close/seal, the startup RED and the seal RED (9/9). Node suite against base: that was the only new failure.
+
+2. Wait behind the hold:
+- Chromium bench at 8 rollovers, 4 runs, default and room-DB modes:
+  - 0 moves arrived during a hold in 64 installs.
+  - Hold window after installs: p50 64-66 ms, p90 77-82, max 96-105.
+  - Hold window at create: p50 90-102. At reopen: p50 296 (default), 876 (room DB).
+  - Delivery and the creator's first move per epoch are within noise of base (delivery 100.7 vs 99.5 default, 93.5 vs 93.8 room DB).
+- Node host, worst case (a Writer move injected at the very start of the creator's readiness capture, 2 paired runs × 8 epochs):
+  - Head: the move waits behind the hold p50 54 / p90 61 / max 66 ms, and is admitted p50 131 ms after arrival.
+  - A without the hold: the same arrival makes the creator terminal at epoch 1 in 2 of 2 runs ("creator ordinary runtime custody is stale or revoked"), so there is no base wait to compare.
+- Node host, Writer streaming moves from the start of the capture: every move arrives after the hold ends, because the Writer's issue takes 40-70 ms. 8/8 epochs complete.
+- Moves streamed after adoption: head and A-only match (first move p50 129 vs 134 ms).
+
+My reading: real-time play doesn't notice the slot. Only a move that lands in the ~60 ms window waits for it, and at base that same move loses the creator.
+
+3. New finding, present at base (b8ad1f50 node source too, not caused by row 51). On the node host, if the Writer installs the successor and starts playing straight away while the creator adopts, the creator's adoption fails at epoch 1.
+- Failure path: performCreatorSuccessorAdoption (v3-room 6711) → drainRebaseOutbox → drainSettlementOutbox → issueSettlement, which fails with "prospective runtime census has unresolved ingress or rebase dependencies" (v3-live prospectiveCreatorRuntimeCensusOverhead).
+- That census refuses a non-received local issue whenever pendingIngress is not empty.
+- A probe showed one pending Writer row, with one dependency missing from the creator's new plane, sitting there while the creator drains its own settlement row. The creator then goes terminal.
+- Reproduction: TRACK_X_STREAM_FROM=install in <evidence>/track-x scratch test tests/track-x-scratch-hold-stream.test.ts.
+- I haven't fixed it. It needs a design call (the census rule versus the drain order), and I don't know whether the shipped apps' adoption order can reach it. I'll list it as an open item in RESULT 12.
+
+(i) is still waiting on your choice between options 1, 2 and 3. Next I'm running the stor and rootx base suites, paired Canvas/Chat runs (base vs head), and then the Grid scratch branch with V's 4 commits (d9346 ≥6 runs, plus the long room paired).
+
+### Follow-up instruction — Owner chose option 1: ship hold without (i) (2026-10-21 23:36 UTC)
+
+The owner chose option 1: ship the hold without (i). A custody refusal by a holder outside the FIFO drops the append, as at base. Keep the (i) patch out of every commit (store it under <evidence>/track-x). In RESULT 12, record as open items the 5383 loss (with your option 3, holding ingress around the split replacement's floor view, as the candidate fix) and why (i) failed (the census refuses an entry with all parents present, so the creator's next local issue fails).
+
+Main has moved to ebf4254f: Track W's Chat window plus your seal fix, picked as 04f7fd0b..9b28e327 (your e1f471bb, 2a65f450, 75a16b81 and b9335db0) with docs. Before your proofs, rebase or merge your branch onto it, so the grid scratch branch and the suite comparisons are against current main. The picks are identical to your commits, so the merge should be clean.
+
+Your wait numbers look fine (p50 64-66 ms after installs, with no moves arriving in that window in 64 installs). Carry on with the proofs.
+
+On the adoption failure you found at base (a Writer playing straight after its install while the creator adopts leaves a pending Writer row, the census refuses the creator's settlement drain, and the creator goes terminal at epoch 1): don't fix it in this track. After the proofs, and before your hand-back, spend a bounded effort (about an hour) on whether shipped Grid, Canvas or Chat over real networking can reach it. For example, run the shipped harness with the Writer moving right after install, and check d9346. Then give the design options (the census rule versus the drain order) in RESULT 12 with a recommendation. If it is reachable on a shipped page, say so at the top of your hand-back. It would then become its own track.
+
+### Report returned by the agent (2026-10-22 00:14 UTC)
+
+Track X heads-up on the adoption-drain finding: in the shipped order, one Writer move during the creator's seal is enough to fail the creator's next adoption, and main's node source does the same.
+
+The shipped order here is: the creator seals, exports and adopts, and only then does the Writer install. I ran it on the node host with a scratch test (tests/track-x-scratch-drain-race.test.ts, untracked; logs in <evidence>/track-x/logs/race-*):
+- The Writer makes one move 50 ms into the creator's seal (TRACK_X_CAP=1). At epoch 1 the creator's adopt then fails.
+- Failure path: drainRebaseOutbox, then drainSettlementOutbox (v3-room 5348, the settlement replacement), then issueSettlement, which fails with "authorization-rejected: active replacement source custody refused: portable source protected dependency is unavailable" (v3-live 6782, in the portable replacement's dependency walk).
+- The same happens when the Writer moves only during the seal, only during the adopt, or across both. It fails 3 of 3 at head and also at main's node source (ebf4254f), so it predates row 51.
+- The reverse case is clean: the creator playing while the Writer installs completes 6 of 6, at head and at main.
+- This is a different refusal from the one I sent earlier (the post-install case, which only happens in the fixture's install-before-adopt order).
+
+Shipped Canvas and Chat cannot reach it, because their joiners are receive-only observers that never move.
+
+Grid can only be tested on the scratch branch with V's commits. Once the suites finish, I'll try a scratch copy of Track V's Grid harness in which the Writer places a block every 100 ms during the creator's seal, export and adopt.
+
+Every shipped harness so far pauses moves during rollovers, which is why none of them has hit this.
+
+### Follow-up instruction — Ack drain-race finding; plan it as X's next step (2026-10-22 00:15 UTC)
+
+Thanks, this is important. For real-time games, play during the creator's seal and adoption is the normal case, so it can't stay an open item. Plan:
+
+1. Finish the startup work and its proofs as planned, and include the Grid check with a Writer placing every 100 ms through seal, export and adopt.
+2. Make the drain race the next step of this track, after I've verified and merged the startup fix. Don't start the fix before then, so the startup branch stays clean.
+   - Commit the scratch test as a proper RED first, with both orders and both refusals: the seal-time move ("portable source protected dependency is unavailable") and the install-before-adopt move ("prospective runtime census has unresolved ingress or rebase dependencies").
+   - Root-cause both, and give options in RESULT section 13. If the fix needs a guarantee-level or pinned-text choice, stop there; otherwise go straight to the smallest fix.
+3. In your hand-back for the startup work, add a short section on this finding: the exact repro, which shipped pages can reach it (Grid result included), and your first read on the cause.
+
+Also, record in RESULT 12 that every shipped harness pauses moves during rollovers, so the latency figures to date assume that pause. The proof for the drain-race fix should include runs with continuous play through rollovers.
+
+### Report returned by the agent (2026-10-22 00:16 UTC)
+
+Track X correction to my heads-up: the seal-time refusal happens in the Writer's install, not the creator's adoption. The creator survives; the Writer is the one that ends up terminal.
+
+I dumped both peers' settlement plans after the failure (logs/race-wds-cap1-plan-r1.log, main's node source):
+- Creator: fence 4, no entries.
+- Writer: fence 5, plus one entry {sourceSequence 4, disposition "rebase", replacement pending}. That entry is the move the Writer made during the creator's seal, which is not in the cut.
+
+How the Writer fails:
+- Its install runs performCreatorSuccessorAdoption(received), the same function as the creator's adopt, which is why I misread the stack.
+- That goes through drainRebaseOutbox to drainSettlementOutbox (v3-room 5348, the replacement), which must rebase that move into the new epoch.
+- The portable replacement's dependency walk (v3-live 6782) cannot find a protected dependency of the move, so the install throws.
+- The received-adoption catch then sets terminalFailure, so the Writer is terminal (deaf). That breaks the "recipient never deaf" guarantee.
+
+The install-before-adopt census refusal is unchanged: it is on the creator's adoption (the probe showed creatorMaintenanceBound).
+
+Your plan is understood. I'll finish the startup proofs, including the Grid race run. I won't start the drain-race RED or fix until you have merged the startup fix. The hand-back will include the repro, the shipped pages that reach it and my first read on the cause, and RESULT 12 will note the rollover pause.
+
+### Report returned by the agent (2026-10-22 03:07 UTC)
+
+#### Track X: row 51 (A and the readiness hold) is done; the drain race can be reached on the shipped Grid page
+
+**Top finding: play during a rollover makes a Writer terminal on the shipped Grid page, and main has the same bug.**
+- I used a scratch copy of Track V's Grid long-room harness, with the Writer placing a block every 100 ms through the creator's seal, export and adopt.
+- The Writer's install fails at epoch 1 in all three runs: 2/2 at head and 1/1 at main's node source. The error is: "v3 room settlement issue failed: authorization-rejected: active replacement source custody refused: portable source protected dependency is unavailable".
+- Logs: `<evidence>/track-x/logs/hg-race-head-1.log`, `-2.log` and `hg-race-mseal-1.log`.
+- The section on it is at the end of this report. As you asked, I have not started its RED or fix.
+
+##### Commits on worktree-agent-a9ab847b594d95e7f
+All end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Nothing is pushed.
+
+| Commit | What |
+| --- | --- |
+| 7256d607 | The owner-approved wiring amendment (row 51), committed on its own |
+| f86f8a0a | fix: A, a settlement creator prepares readiness before its startup publication |
+| 83176da6 | The hold REDs and a node-host fixture |
+| 04135190 | fix: the readiness ingress hold |
+| 9f143f3b | 15 unit tests pinning the hold |
+| 0e7c068e | fix: keeps `enqueueV3Ingress`'s pinned closing-gate line unchanged (the pinned test was not edited) |
+| 4f5fc446 | Clean merge of main ebf4254f; node source now differs from main's by A and the hold only |
+| 23a569ac | docs: RESULT.md sections 12.1–12.10 and the commit rows |
+
+(i) is in no commit. Its patch is `<evidence>/track-x/data/hold-fix-v1.patch` and its test is `data/track-x-custody-refusal-retain-red.test.ts`. RESULT 12.9 records the 5383 loss, why (i) failed, and option 3 as the candidate fix.
+
+##### Proof
+- **REDs:** at head, the startup RED (9b6b5f3f), the hold REDs, the close and seal tests, the amended wiring test, the seal RED and the 15 hold unit tests all pass.
+- **Suites, per test, head vs main's node source:** 0 regressions in every set.
+  - node: 1042/48 vs 1027/63. The 15 fixed tests are new-code tests.
+  - Every other set is identical: storage-node 163/61, native6 35/15, observers 23/23, grid 65/65, Chat window 21/21, storage 1000/304.
+  - root room and native tests (Tracks K–X): 1 new failure, a d110c load-order flake that passes alone. 7 fixed.
+- **Typecheck and guard:** `pnpm -r typecheck` has 0 errors and the shadow guard passes, after `tsc -b --force` and a node dist rebuild.
+- **Track V's 4 commits** cherry-pick cleanly onto 4f5fc446 (scratch branch track-x-hold-grid).
+- **Shipped pages, real networking, paired base/head:**
+  - Canvas 16/16 ×4 and Chat 16/16 ×4. Delivery p50: Canvas 112.5 / 110.5 ms, Chat 7.5 / 9.0 ms.
+  - Grid long room 16/16 ×4. One head run was slow in every phase (seal 5–8 s); the other head run was the fastest of the four.
+  - All of these harnesses pause play during rollovers. RESULT 12.7 records that every latency figure so far assumes that pause.
+- **d9346, both tests, 36 runs with Track V's switch:**
+
+| Build | Runs | Migration test fails at line 915 | Placement test fails |
+| --- | --- | --- | --- |
+| Main's node source | 8 | 1 | 4 (all at 534, Track V's known issue) |
+| A only | 4 | 2 | 1 (at 419) |
+| Head | 14 | 8 | 2 (at 534) |
+| Head with a labelling probe | 10 | 0 | 0 |
+
+  - **The migration failure is not caused by the hold.** It also fails at A only and at main's node source, and it depends on load. Head failed it 6 times in 10 at load 75–196 and 2 times in 14 at load 17–55. Main's node source was never run at high load, so its 1 in 8 is not a matched comparison.
+  - What fails: after the migration, the rejoined joiner's "target-suffix" block never reaches the creator.
+  - The probe only adds labels to admission refusals. In the labelled runs, bursts of 9–40 arrivals hit the existing 32-job input-pool refusal when a retained republication lands. My unproven reading: the block is refused there and is never asked for again, because nothing depends on it. It is not root-caused, and it is listed as an open item that should be settled before Track V's switch merges.
+  - The A-only failure at line 419 is the hole that the hold closes, seen on a shipped page: custody refusals at startup, then the creator is terminal. It did not happen in 24 head runs.
+- **Bench and hold-wait figures:** as reported before. Wait after installs p50 64–66 ms, with no arrivals during a hold.
+
+##### Play during a rollover (for the next step, RESULT 12.10)
+- **Exact repro, node host, creator-trusted-settlement-v1:**
+  1. A Writer makes one move while the creator is sealing epoch N. One move 50 ms into the seal is enough. A move during the creator's adopt also triggers it.
+  2. The creator seals, exports and adopts.
+  3. The Writer installs N+1. Its settlement plan holds that move as a "rebase" entry.
+  4. The install drain fails at drainSettlementOutbox, in the replacement step (v3-room ~5348), with the portable-source error above. The refusal comes from v3-live 6778, in `preparePortableSettlementSource`.
+  5. The install throws, the received-adoption catch sets the terminal failure, and the Writer is terminal (deaf).
+- **Reproductions:**
+  - Fails 3/3 with continuous play, at head and at main.
+  - The creator playing while the Writer installs is fine (6/6).
+  - The scratch test is `<evidence>/track-x/data/track-x-scratch-drain-race.test.ts`, which will become the RED.
+- **Which shipped pages reach it:**
+  - Grid: yes (above).
+  - Canvas and Chat: no. Their joiners only observe and never issue.
+- **Second order, fixture only:** if the Writer installs and plays before the creator adopts, the creator's fence fails with "prospective runtime census has unresolved ingress or rebase dependencies" and the creator is terminal. No shipped harness installs before the creator adopts.
+- **First read on the cause, to verify in section 13:** the dependency walk accepts only the source anchor or carriers in the census. The rebased move's parents were settled into the cut, so they are neither. The fix is either to stop the walk at vertices the successor already holds as settled, or to carry those vertices in the census. For the second order, the choice is the census rule versus the drain order.
+
+##### State
+- **Worktree:** on my branch at 23a569ac, clean apart from the untracked bench inputs (`.logs/…r8-warm-capacity-01`, never committed). The node dist is rebuilt at head.
+- **Scratch branch track-x-hold-grid** (4f5fc446 plus V's 4 commits) is kept.
+- **Moved to `<evidence>/track-x/data/`:** the scratch tests (hold-wait, hold-stream, drain-race), the probe patches, and the scratch Grid race harness (in `scratch-grid/`).
+- **Processes:** none of mine are left running. The ports are currently held by Track Z's runs.
+- **PROGRESS.md** (`<evidence>/track-x/PROGRESS.md`) is current.
