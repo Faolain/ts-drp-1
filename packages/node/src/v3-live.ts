@@ -15261,6 +15261,23 @@ async function authenticatedCompletedNativeReplacementSource(
 		const candidate = classifyRebaseRow(registration, row, undefined, vertexFacts);
 		if (candidate === undefined || !validRebaseRow(registration, candidate)) return false;
 		const proof = candidate.authenticated.admitted.settlementSource;
+		if (proof === undefined) {
+			const nonportableThrough = completedNonportableReplacementChunk(
+				registration,
+				selected,
+				entry,
+				chunk,
+				candidate,
+				throughIntent
+			);
+			if (
+				nonportableThrough === undefined ||
+				!(await verifyNestedNativeSource(registration, row, vertexFacts, sharedAccounting))
+			)
+				return false;
+			throughIntent = nonportableThrough;
+			continue;
+		}
 		const record =
 			proof === undefined ? undefined : snapshotClosedRecord({ ...proof }, PORTABLE_SETTLEMENT_SOURCE_KEYS);
 		if (
@@ -15290,6 +15307,65 @@ async function authenticatedCompletedNativeReplacementSource(
 		throughIntent = record.throughIntent as number;
 	}
 	return entry.replacementProgress === undefined || throughIntent === entry.replacementProgress.intentCount;
+}
+
+/** Decision row 60: a non-creator author that the target still authorizes, with no creator
+ * selection, issues its replacement nonportable (issueReplacement): the replacement carries no
+ * settlementSource record. The original native plan entry names it, and its exact operations
+ * must be the source's permitted replacement operations for this chunk, derived again by the
+ * original policy (deriveOwnedReplacement), with the plan's disposition and refusal. Native
+ * completion for local recovery only; no recipient ever sees a portable exception for it.
+ * @returns The chunk's end intent, or undefined when it is not that exact replacement. */
+function completedNonportableReplacementChunk(
+	registration: V3PlaneRegistration,
+	selected: ClassifiedRebaseRow,
+	entry: SettlementPlan["entries"][number],
+	chunk: Readonly<{ replacementSequence: number; throughIntent?: number }>,
+	candidate: ClassifiedRebaseRow,
+	fromIntent: number
+): number | undefined {
+	const author = selected.row.scope.author;
+	const operation = candidate.authenticated.vertex.operation;
+	if (
+		resolveCreatorSettlementAuthor(registration.payload.trust.trust) === author ||
+		!isV3ApplicationAuthorAuthorized(registration.authorization, author) ||
+		candidate.authenticated.author !== author ||
+		candidate.authenticated.authorSequence !== chunk.replacementSequence ||
+		operation === undefined
+	)
+		return undefined;
+	const operations = applicationBatchEntries(registration.payload, operation) ?? [
+		{
+			operation: operation as Readonly<Record<string, unknown>>,
+			logicalTime: candidate.authenticated.admitted.logicalTime,
+		},
+	];
+	const progress = entry.replacementProgress;
+	const planEffect =
+		progress === undefined
+			? { kind: "replacement" as const, sourceSequence: selected.row.authorSequence }
+			: {
+					kind: "replacement" as const,
+					sourceSequence: selected.row.authorSequence,
+					fromIntent,
+					throughIntent: chunk.throughIntent ?? progress.intentCount,
+					intentDigest: progress.intentDigest,
+				};
+	let derived: NativeReplacementPreparation;
+	try {
+		derived = deriveOwnedReplacement(registration, selected, { operations, planEffect });
+	} catch {
+		return undefined;
+	}
+	if (
+		derived.disposition !== entry.disposition ||
+		!sameBytes(
+			encodeCanonical(entry.transformRefusal?.proposedIntentDigest ?? null),
+			encodeCanonical(derived.transformRefusal?.proposedIntentDigest ?? null)
+		)
+	)
+		return undefined;
+	return fromIntent + operations.length;
 }
 
 /** Bounded original native linked-source custody; never portable wire authority. */
