@@ -7530,9 +7530,11 @@ function deliveryRepairCapacity(registration: V3PlaneRegistration): V3DeliveryRe
 }
 
 // A capacity refusal names the copy's sender to the room transport and asks for one
-// capacity signal once both owners have drained to low water.
+// capacity signal once both owners have drained to low water. A copy refused while both
+// owners are already at low water (one copy larger than a byte bound) needs no signal:
+// the transport's probe already reports room, and no release would clear the request.
 function noteDeliveryRefusal(registration: V3PlaneRegistration, peerId: string | undefined): void {
-	registration.deliveryRepairWake = true;
+	if (!deliveryRepairLowWater(registration)) registration.deliveryRepairWake = true;
 	if (typeof peerId === "string") reportDeliveryGap(registration, "refused", peerId);
 }
 
@@ -20872,6 +20874,8 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 			registrations ??= new IntrinsicMap<string, V3PlaneRegistration>();
 			if (reusesTransport) {
 				existing.active = false;
+				// Track AA: the predecessor's delivery repair state ends with it.
+				if (deliveryRepairProbes.has(existing)) reportDeliveryGap(existing, "retired");
 				// This hot handoff deliberately keeps the transport subscription,
 				// so normal deactivateRegistration is not called. End optional
 				// immutable-fact retention here even if an old handle stays alive;
