@@ -3424,6 +3424,43 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		void task.then(() => creatorArchiveRecoveryTasks.delete(task), () => creatorArchiveRecoveryTasks.delete(task));
 		return task;
 	};
+	// Decision row 61, gate serving: this room's successor server answers only once the creator has
+	// adopted the successor it serves, the adoption tail (publication, settlement drain, readiness)
+	// and the startup readiness included. A Writer's install does not retry a refused material
+	// fetch, so an early material request is held, not refused: the material server first
+	// authenticates it and admits its requester under its own session ceiling, and only its
+	// response write waits here, one per peer (a newer request from the same peer supersedes),
+	// within the server's own response deadline (its write signal). Manifest and chunk requests
+	// need an admitted requester, and none is reported before the adoption.
+	let startupServingReady = false;
+	const successorServingHolds = new Map<string, (recheck: boolean) => void>();
+	const releaseSuccessorServingHolds = (): void => {
+		for (const release of [...successorServingHolds.values()]) release(true);
+	};
+	const successorAdopted = (closedEpoch: number): boolean =>
+		startupServingReady &&
+		creatorSuccessorAdoptionTask === undefined &&
+		successorProjectionAuthority !== null &&
+		successorProjectionAuthority.epoch > closedEpoch;
+	const holdUntilSuccessorAdopted = async (closedEpoch: number, peerId: string, signal: AbortSignal): Promise<void> => {
+		for (;;) {
+			signal.throwIfAborted();
+			if (closed || terminalFailure !== undefined) throw new TypeError("creator successor serving is closed");
+			if (successorAdopted(closedEpoch)) return;
+			successorServingHolds.get(peerId)?.(false);
+			const recheck = await new Promise<boolean>((resolve) => {
+				const release = (again: boolean): void => {
+					signal.removeEventListener("abort", aborted);
+					if (successorServingHolds.get(peerId) === release) successorServingHolds.delete(peerId);
+					resolve(again);
+				};
+				const aborted = (): void => release(true);
+				signal.addEventListener("abort", aborted, { once: true });
+				successorServingHolds.set(peerId, release);
+			});
+			if (!recheck) throw new TypeError("creator successor request was superseded");
+		}
+	};
 	const serveSuccessor = async (): Promise<CreatorSuccessorOffer> => {
 		if (transport === undefined || activeHandle === undefined)
 			throw new TypeError("creator successor transport is unavailable");
@@ -3448,8 +3485,29 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			connectedPeers: () => port.connectedPeers(),
 		});
 		successorServing = createV3SnapshotTransferOwner({ transport: port });
+		const closedEpoch = exported.declaration.scope.epoch;
 		successorServing.serve({
-			...server,
+			authorization: Object.freeze({
+				authorForPeer: (peer: string): string | undefined =>
+					successorAdopted(closedEpoch) ? server.authorization.authorForPeer(peer) : undefined,
+				isAuthorizedAuthor: (author: string): boolean => server.authorization.isAuthorizedAuthor(author),
+			}),
+			control: (stream, bytes) =>
+				server.control(
+					Object.freeze({
+						peerId: stream.peerId,
+						...(stream.connection === undefined ? {} : { connection: stream.connection }),
+						abort: (reason?: Error): void => stream.abort(reason),
+						close: (): Promise<void> => stream.close(),
+						read: (maxBytes: number, options: Readonly<{ readonly signal: AbortSignal }>): Promise<Uint8Array> =>
+							stream.read(maxBytes, options),
+						write: async (bytes: Uint8Array, options: Readonly<{ readonly signal: AbortSignal }>): Promise<void> => {
+							await holdUntilSuccessorAdopted(closedEpoch, stream.peerId, options.signal);
+							return stream.write(bytes, options);
+						},
+					}),
+					bytes
+				),
 			descriptors: exported.declaration.chunks,
 			exactCanonicalManifestBytes: exported.offer.exactCanonicalSnapshotManifestBytes,
 			quarantine: successorServingScope,
@@ -5804,6 +5862,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	void rebasePromise.catch((error: unknown) => {
 		terminalFailure = error;
 	});
+	// The startup readiness above ends the startup hold on successor serving (decision row 61).
+	const openStartupSuccessorServing = (): void => {
+		startupServingReady = true;
+		releaseSuccessorServingHolds();
+	};
+	void rebasePromise.then(openStartupSuccessorServing, openStartupSuccessorServing);
 	if (settlementProfile === "v1" && creatorCloseHandle !== undefined) {
 		const startupSettled = rebasePromise.then(
 			() => undefined,
@@ -6778,6 +6842,9 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			if (creatorSuccessorAdoptionTask === shared) creatorSuccessorAdoptionTask = undefined;
 		});
 		creatorSuccessorAdoptionTask = shared;
+		// Held successor requests re-check once the adoption, its tail included, has settled as its
+		// callers see it (decision row 61).
+		void shared.then(releaseSuccessorServingHolds, releaseSuccessorServingHolds);
 		return shared;
 	};
 	// Genuine room-native turnover ports for this recipient; no finality signer.
