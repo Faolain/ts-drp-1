@@ -7,7 +7,9 @@ import { describe, expect, it } from "vitest";
 // Track X, decision row 60 (R5, owner's option A): a journal scope whose rows are exactly its
 // signed Cut's membership plus local-issued rows outside the Cut is collectible only when each
 // outside row is a source this author replaced (the held lifetime's reader returns its facts),
-// and every replacement digest is a member of a later scope's signed Cut. This executes the
+// and every replacement digest is a member of a later scope's signed Cut. R5b (owner's B2): a
+// received row outside the Cut is collectible once this peer's durable room-head floor, with
+// nothing pending, is past the scope's epoch (it has durably installed the Cut's successor). This executes the
 // private production membership classifier on DATA with controlled premises, as
 // creator-journal-classification-compound.test.ts does: Cut, membership-carrier, ACL and
 // signature openers are premises here; the reader's own checks (plan entry, derivation) are
@@ -120,13 +122,15 @@ interface Case {
 	read?: (request: Record<string, unknown>) => Promise<unknown>;
 	reader?: false;
 	capture?: boolean;
+	installedThroughEpoch?: number;
+	members?: readonly string[];
 }
 
 async function classify(input: Case = {}) {
 	const calls: string[] = [];
 	const image = {
 		canonicalRows: [
-			header(scope, 3, carrier(scope, [digests.creator, digests.member], [memberWitness])),
+			header(scope, 3, carrier(scope, input.members ?? [digests.creator, digests.member], [memberWitness])),
 			received,
 			member,
 			input.outsideRow ?? outsideLocal,
@@ -180,6 +184,7 @@ async function classify(input: Case = {}) {
 			},
 			...(input.reader === false ? {} : { readReplacedLocalSource: read }),
 			...(input.capture === true ? { captureApplicationRows: () => calls.push("capture") } : {}),
+			...(input.installedThroughEpoch === undefined ? {} : { installedThroughEpoch: () => input.installedThroughEpoch }),
 		},
 	};
 	const js = ts.transpileModule(`${classifierCode} closedJournalMembershipPrefix(data);`, {
@@ -236,17 +241,53 @@ describe("R5: a journal scope with this author's replaced moves outside its sign
 		expect(refused.prefix).toBeUndefined();
 	});
 
-	it("(c) stays retained when the outside row is not local-issued", async () => {
+	// R5b (owner's B2) changed this case. Under option A a received row outside the Cut always
+	// retained its scope; now it does until this peer's successor install is durable.
+	it("(c, B2) keeps a received row outside the Cut until this peer has durably installed the successor", async () => {
 		const reads: unknown[] = [];
-		const { prefix } = await classify({
-			outsideRow: outsideReceived,
-			read: async (request) => {
-				reads.push(request);
-				return undefined;
-			},
-		});
-		expect(prefix).toBeUndefined();
+		const read = async (request: Record<string, unknown>) => {
+			reads.push(request);
+			return undefined;
+		};
+		// (a) No durable floor past the scope (none supplied, the scope's own epoch, or pending,
+		// which the caller supplies as none): retained.
+		expect((await classify({ outsideRow: outsideReceived, read })).prefix).toBeUndefined();
+		expect((await classify({ outsideRow: outsideReceived, read, installedThroughEpoch: 1 })).prefix).toBeUndefined();
+		const { prefix, calls } = await classify({ outsideRow: outsideReceived, read, installedThroughEpoch: 2 });
+		expect(prefix?.highWatermark).toBe(3);
+		expect(prefix?.rows.map((row) => [row.journalSequence, row.vertexDigest, row.authorSequence])).toEqual([
+			[0, digests.creator, 0],
+			[1, digests.member, 4],
+			[2, digests.outside, 5],
+		]);
+		// No replaced-source read: its own received bytes are authenticated like every member's.
 		expect(reads).toEqual([]);
+		expect(calls).toEqual(["membership:1", "check", "signature:01", "signature:02", "signature:03", "check"]);
+		// An application-row capture keeps the original exact classifier.
+		expect(
+			(await classify({ outsideRow: outsideReceived, read, installedThroughEpoch: 2, capture: true })).prefix
+		).toBeUndefined();
+	});
+
+	it("(b, B2) treats a received row that the Cut contains as a member, never as outside", async () => {
+		const members = [digests.creator, digests.member, digests.outside];
+		// A member: collectible with no durable install, and a member of the Cut may not depend on a
+		// row outside it.
+		const { prefix } = await classify({ outsideRow: outsideReceived, members });
+		expect(prefix?.rows.map((row) => row.vertexDigest)).toEqual([digests.creator, digests.member, digests.outside]);
+		// A Cut that holds the received row but not the local row it depends on: that local row is
+		// a replaced source outside the Cut, and the received member depending on it is refused.
+		await expect(
+			classify({
+				outsideRow: outsideReceived,
+				members: [digests.creator, digests.outside],
+				read: async () => ({
+					exactCanonicalPreimageBytes: memberPreimage,
+					detachedSignature: signature,
+					replacementVertexDigests: [digests.replacement],
+				}),
+			})
+		).rejects.toThrow("chain-invalid");
 	});
 
 	it("keeps the original classifier exact without a held reader or for an application-row capture", async () => {

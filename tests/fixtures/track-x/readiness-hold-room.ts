@@ -3,7 +3,8 @@ import { ed25519 } from "@noble/curves/ed25519.js";
 import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import type { DurableIssuanceOutboxRecord } from "@ts-drp/issuance-store";
 import { Message, MessageType, V3Envelope } from "@ts-drp/types";
-import { mkdtempSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -179,8 +180,23 @@ export async function readinessHoldRoom(
 		const networkNode = fakeNetwork(required(roster[index]).peerId, false);
 		const input: CreateV3RoomSessionInput<ReturnType<typeof application.projectAcceptedOperations>> = {
 			application,
+			// A reopened peer reopens its existing stores; a store a later install creates (a new
+			// plane's database) is created, as on the first open (the host's own filename scheme).
 			storageHost: openOptions.reopen
-				? createNodeV3RoomStorageHost({ directory, initialization: () => "reopen" })
+				? createNodeV3RoomStorageHost({
+						directory,
+						initialization: ({ name, family }) =>
+							existsSync(
+								join(
+									directory,
+									`${createHash("sha256")
+										.update(JSON.stringify([family, name]))
+										.digest("hex")}.sqlite`
+								)
+							)
+								? "reopen"
+								: "create",
+					})
 				: storageHost,
 			author: identity.author,
 			...(index === 0

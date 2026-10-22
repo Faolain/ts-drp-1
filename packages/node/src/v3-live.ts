@@ -83,6 +83,7 @@ import {
 	resolveCurrentEpochAuthorizedAuthor,
 } from "@ts-drp/protocol-v3/author-authorization";
 import {
+	CREATOR_AUTHOR_SETTLEMENT_KIND,
 	openCreatorAuthorSettlement,
 	resolveCreatorAuthorSettlement,
 } from "@ts-drp/protocol-v3/creator-author-issuance-frontiers";
@@ -19769,7 +19770,74 @@ function creatorReceivedCutCandidate(
 	}
 	if (outside < 1 || local.length < outside) return undefined;
 	local.sort((left, right) => right.sequence - left.sequence);
-	const excluded = new Set(local.slice(0, outside).map((row) => row.digest));
+	return creatorReceivedCutWithout(registration, graph, new Set(local.slice(0, outside).map((row) => row.digest)));
+}
+
+/**
+ * Decision row 60 (R5b, owner's B2): another Writer's move made during the creator's seal can
+ * reach this recipient, still in the sealed epoch, and so its graph, but not the Cut. The
+ * successor's creator-signed settlement record names, per author of the successor ACL, the
+ * last author sequence of the closed epoch's contiguous run (terminalThrough); every row of a
+ * named author beyond it is outside the Cut. The candidate is the graph without those rows,
+ * only when no remaining vertex depends on one of them. The record is a hint here, never
+ * membership: the caller records the candidate only when its close-set commitment equals the
+ * signed Cut's exactly. An author the record does not name keeps all its rows, so an outside
+ * row of such an author leaves the commitment unequal and the scope retained.
+ * @returns The candidate frontier, byte charges and members, or undefined.
+ */
+function creatorReceivedFrontierCandidate(
+	registration: V3PlaneRegistration,
+	graph: CreatorCloseGraph,
+	terminalThrough: ReadonlyMap<string, number | null>
+): Readonly<{ frontier: string[]; charges: Map<string, number>; members: ReadonlySet<string> }> | undefined {
+	const excluded = new Set<string>();
+	for (const [digest, identity] of graph.authors) {
+		if (!terminalThrough.has(identity.author)) continue;
+		const through = terminalThrough.get(identity.author);
+		if (through === null || through === undefined || identity.authorSequence > through) excluded.add(digest);
+	}
+	return excluded.size === 0 ? undefined : creatorReceivedCutWithout(registration, graph, excluded);
+}
+
+/**
+ * Decision row 60 (R5b): the per-author terminalThrough of the successor's creator-signed
+ * settlement record that closes this scope, read as DATA for creatorReceivedFrontierCandidate.
+ * The installer has already opened and authenticated these exact bytes; this reader confers
+ * nothing and any shape it does not recognize yields no hint.
+ * @returns The authors' terminalThrough, or undefined.
+ */
+function creatorReceivedSettlementTerminalThrough(
+	exactCanonicalSettlementBytes: Uint8Array | null | undefined,
+	scope: LiveJournalScope
+): ReadonlyMap<string, number | null> | undefined {
+	if (!(exactCanonicalSettlementBytes instanceof Uint8ArrayConstructor)) return undefined;
+	try {
+		const settlement = decodeCanonical(exactCanonicalSettlementBytes);
+		if (!isObject(settlement) || ownDataValue(settlement, "kind") !== CREATOR_AUTHOR_SETTLEMENT_KIND ||
+			ownDataValue(settlement, "objectId") !== scope.objectId || ownDataValue(settlement, "closedEpoch") !== scope.epoch ||
+			ownDataValue(settlement, "closedAnchorDigest") !== scope.anchorDigest) return undefined;
+		const frontiers = ownDataValue(settlement, "frontiers");
+		if (!ArrayIsArray(frontiers)) return undefined;
+		const terminalThrough = new IntrinsicMap<string, number | null>();
+		for (const entry of frontiers as unknown[]) {
+			if (!ArrayIsArray(entry) || entry.length !== 3) return undefined;
+			const [author, , through] = entry as unknown[];
+			if (typeof author !== "string" || terminalThrough.has(author) ||
+				(through !== null && (!NumberIsSafeInteger(through) || (through as number) < 0))) return undefined;
+			terminalThrough.set(author, through as number | null);
+		}
+		return terminalThrough;
+	} catch {
+		return undefined;
+	}
+}
+
+/** The graph without `excluded`, only when no remaining vertex depends on an excluded one. */
+function creatorReceivedCutWithout(
+	registration: V3PlaneRegistration,
+	graph: CreatorCloseGraph,
+	excluded: ReadonlySet<string>
+): Readonly<{ frontier: string[]; charges: Map<string, number>; members: ReadonlySet<string> }> | undefined {
 	const members = new Set<string>();
 	const dependedOn = new Set<string>();
 	const charges = new IntrinsicMap<string, number>();
@@ -19799,18 +19867,22 @@ function creatorReceivedCutCandidate(
  * commitment equals the caller's authenticated Cut exactly. The carrier is lifecycle
  * evidence, never authority: journal retirement still reopens it against a later
  * independently authenticated Cut/ACL and re-verifies every original signature.
- * Decision row 60 (R5): when the whole graph differs, the graph without this author's own
- * moves outside the Cut (creatorReceivedCutCandidate) is tried once, under the same exact
- * Cut equality; the carrier then holds the Cut's membership and witnesses only.
+ * Decision row 60 (R5, R5b): when the whole graph differs, the graph without every author's
+ * rows beyond the successor's creator-signed terminalThrough (creatorReceivedFrontierCandidate)
+ * and then the graph without this author's own moves outside the Cut
+ * (creatorReceivedCutCandidate) are tried, each under the same exact Cut equality; the carrier
+ * then holds the Cut's membership and witnesses only.
  * Any other disagreement (missing or extra rows, changed graph, refused native write) records
  * nothing, so the scope keeps its original retention.
  * @param registration - Genuine recipient registration holding its received gate.
  * @param exactCanonicalCutValueBytes - The Cut that closes this registration's epoch.
+ * @param exactCanonicalSettlementBytes - The successor's authenticated settlement record, if any.
  * @returns Whether an exact carrier is now recorded for this scope.
  */
 async function recordCreatorReceivedClosedMembership(
 	registration: V3PlaneRegistration,
-	exactCanonicalCutValueBytes: Uint8Array
+	exactCanonicalCutValueBytes: Uint8Array,
+	exactCanonicalSettlementBytes?: Uint8Array | null
 ): Promise<boolean> {
 	try {
 		const payload = registration.payload;
@@ -19846,15 +19918,25 @@ async function recordCreatorReceivedClosedMembership(
 			value.historyRoot === ownDataValue(cut, "historyRoot") &&
 			value.historySize === ownDataValue(cut, "historySize");
 		let commitment = await derive(source.graph.frontier, source.graph.charges);
-		// Decision row 60 (R5): this recipient's own moves after the creator's seal are in its
-		// graph but not in the Cut. Only the signed Cut's exact commitment admits the candidate.
+		// Decision row 60 (R5, R5b): moves made after the creator's seal, this recipient's own or
+		// another Writer's that it admitted, are in its graph but not in the Cut. Only the signed
+		// Cut's exact commitment admits a candidate.
 		let members: ReadonlySet<string> | undefined;
 		if (!cutEquals(commitment)) {
-			const candidate = creatorReceivedCutCandidate(registration, source, ownDataValue(cut, "closeSetCount"));
-			if (candidate === undefined || !available()) return false;
-			commitment = await derive(candidate.frontier, candidate.charges);
-			if (!cutEquals(commitment)) return false;
-			members = candidate.members;
+			const terminalThrough = creatorReceivedSettlementTerminalThrough(exactCanonicalSettlementBytes, scope);
+			const candidates = [
+				...(terminalThrough === undefined ? [] : [creatorReceivedFrontierCandidate(registration, source.graph, terminalThrough)]),
+				creatorReceivedCutCandidate(registration, source, ownDataValue(cut, "closeSetCount")),
+			];
+			for (const candidate of candidates) {
+				if (candidate === undefined || !available()) continue;
+				const derived = await derive(candidate.frontier, candidate.charges);
+				if (!cutEquals(derived)) continue;
+				commitment = derived;
+				members = candidate.members;
+				break;
+			}
+			if (members === undefined || !available()) return false;
 		}
 		if (!available()) return false;
 		const membershipBytes = await encodeCreatorCloseMembership({
@@ -20256,8 +20338,8 @@ function creatorCloseRegistration(
 					detachedSignature: new Uint8ArrayConstructor(row.detachedSignature),
 				})));
 		},
-		recordReceivedClosedMembership: (exactCanonicalCutValueBytes: Uint8Array) =>
-			recordCreatorReceivedClosedMembership(registration, exactCanonicalCutValueBytes),
+		recordReceivedClosedMembership: (exactCanonicalCutValueBytes: Uint8Array, exactCanonicalSettlementBytes?: Uint8Array | null) =>
+			recordCreatorReceivedClosedMembership(registration, exactCanonicalCutValueBytes, exactCanonicalSettlementBytes),
 		// The genuine claim may use a successor alias; the close owner is keyed
 		// by that exact handle, not the registration's underlying raw handle.
 		sealRecoveryDependencies: (required?: boolean) =>

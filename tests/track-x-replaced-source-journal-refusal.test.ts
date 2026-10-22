@@ -25,8 +25,9 @@ import {
 //     section 13, "R5-chain"), so this case stops at the 5th;
 // (b) its durable plan entry names a replacement whose operations are not the derivation: the
 //     source is never accepted as replaced, so nothing of the scope is deleted;
-// (c) the outside row is another Writer's move, received: the scope stays retained (with two
-//     Writers playing through every seal this repeats each epoch; see RESULT section 13, R5b).
+// (c) R5b (owner's B2) changed this case: a received row outside the Cut (another Writer's move
+//     made during the seal) used to retain its scope for good; it is now kept until this peer has
+//     durably installed the Cut's successor, and across a crash after that install, then collected.
 
 afterEach(async () => {
 	expect(await closeFixtures(), "native admitted work and owners join").toEqual([]);
@@ -73,7 +74,7 @@ it("(a) a scope whose outside move's replacement missed the next signed Cut stay
 	expect(kept.filter((epoch) => epoch !== MISSED && epoch < EPOCHS - 3)).toEqual([]);
 }, 900_000);
 
-it("(c) a scope holding another Writer's move outside the Cut stays retained", async () => {
+it("(c) a scope holding another Writer's move outside the Cut is kept across a crash after the install, then collected", async () => {
 	const room = await open(2);
 	const creator = required(room.peers[0]);
 	const history: string[] = [];
@@ -93,11 +94,21 @@ it("(c) a scope holding another Writer's move outside the Cut stays retained", a
 			`epoch ${epoch + 1}: ${installed.join(",")}; writer-1 protected [${(await protectedEpochs(room, 1)).join(",")}]`
 		);
 		expect(installed, history.join("\n")).toEqual(["ok", "ok"]);
+		if (epoch === OUTSIDE) {
+			// Writer 1's install of the successor is durable; it crashes before any later retirement.
+			const digest = required(received).commit.envelope.digest;
+			expect(await journalHolds(room, 1, digest)).toBe(true);
+			await room.fixture.stop(required(room.peers[1]));
+			room.peers[1] = await room.fixture.open(1, { reopen: true });
+			expect(required(room.peers[1]).room.authority()?.epoch).toBe(OUTSIDE + 1);
+			expect(await journalHolds(room, 1, digest), "kept across the crash").toBe(true);
+		}
 		await deliver(room, 1);
 		await deliver(room, 2);
 	}
 	console.log(`TRACK_X_R5_REFUSAL_C ${JSON.stringify(history)}`);
 	expect(blockIds(creator)).toContain(`seal-${OUTSIDE}-2`);
-	expect(await protectedEpochs(room, 1), history.join("\n")).toContain(OUTSIDE);
-	expect(await journalHolds(room, 1, required(received).commit.envelope.digest)).toBe(true);
+	expect(await protectedEpochs(room, 1), history.join("\n")).not.toContain(OUTSIDE);
+	expect(await journalHolds(room, 1, required(received).commit.envelope.digest), "collected").toBe(false);
+	expect(required(room.peers[1]).room.projection()).toEqual(creator.room.projection());
 }, 900_000);

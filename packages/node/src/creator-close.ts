@@ -521,8 +521,13 @@ export interface V3CreatorCloseRegistration {
 	}>[] | undefined>;
 	/** Recipient twin of the close-time membership capture, inside the held received
 	 * gate: records the native carrier only when this recipient's own complete epoch
-	 * graph derives the authenticated Cut's exact close set. Evidence, never authority. */
-	recordReceivedClosedMembership(exactCanonicalCutValueBytes: Uint8Array): Promise<boolean>;
+	 * graph derives the authenticated Cut's exact close set. Evidence, never authority.
+	 * Decision row 60 (R5b): the successor's authenticated settlement record, when present,
+	 * names each author's last row in the Cut; a hint for the candidate, never membership. */
+	recordReceivedClosedMembership(
+		exactCanonicalCutValueBytes: Uint8Array,
+		exactCanonicalSettlementBytes?: Uint8Array | null
+	): Promise<boolean>;
 	/** Exact authenticated whole-source bytes, prepared and joined under this same genuine hold. */
 	prepareClosedEpochArchive(hold: CreatorSnapshotRecoveryCloseHold, limits: ArchiveLimits,
 		sharedAccounting?: import("./internal/creator-closed-rollback-data.js").CreatorClosedRollbackProofAccounting): Promise<ClosedEpochArchive | undefined>;

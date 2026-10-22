@@ -1410,7 +1410,7 @@ export async function receiveCreatorSuccessorAdoption(
 		// creator does at close; without it no closed recipient journal scope can
 		// ever become collectible. Exact Cut agreement only; otherwise nothing is
 		// recorded and the scope keeps its original retention.
-		await source.recordReceivedClosedMembership(offer.exactCanonicalCutValueBytes);
+		await source.recordReceivedClosedMembership(offer.exactCanonicalCutValueBytes, auxiliary.exactCanonicalSettlementBytes);
 		if (await prepareReceivedRecoveryTurnover()) {
 			if (promoted) {
 				if (receivedCloseSnapshot === undefined) throw new TypeError("creator received close snapshot unavailable after turnover");
