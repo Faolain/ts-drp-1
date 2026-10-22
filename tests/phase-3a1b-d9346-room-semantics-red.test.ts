@@ -58,6 +58,7 @@ interface ExpectedInput {
 	readonly publicKeyBytes: Uint8Array;
 	readonly roomHeadAuthority: never;
 	signRegisteredVertexDigest(): Promise<Uint8Array>;
+	readonly storageHost: typeof sixDatabaseStorageHost;
 }
 
 interface ExpectedSession {
@@ -310,6 +311,7 @@ vi.mock("../packages/storage-browser/dist/src/live-journal.js", async (importOri
 }));
 
 const roomModule = import("../examples/v3-room/src/index.js");
+const sixDatabaseStorageHost = (await roomModule).createBrowserV3SixDatabaseStorageHost();
 
 function accepted(
 	digestBytes: number | Uint8Array,
@@ -448,6 +450,7 @@ function input(application: ExpectedApplication, onProjection: (projection: Proj
 		publicKeyBytes: Uint8Array.of(1),
 		roomHeadAuthority: undefined as never,
 		signRegisteredVertexDigest: () => Promise.resolve(new Uint8Array(64)),
+		storageHost: sixDatabaseStorageHost,
 	};
 }
 

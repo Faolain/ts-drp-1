@@ -141,6 +141,7 @@ describe("D.93.46a shared v3-room extraction", () => {
 		);
 		expect(roomBytesInOutput, "V3_CHAT_SHARED_ROOM_OWNER_TREE_SHAKEN").toBeGreaterThan(0);
 		expect(roomExports, "V3_ROOM_RUNTIME_EXPORTS_DIFFER").toEqual([
+			"createBrowserV3SixDatabaseStorageHost",
 			"createV3RoomCreatorInviteMaterial",
 			"createV3RoomSession",
 		]);

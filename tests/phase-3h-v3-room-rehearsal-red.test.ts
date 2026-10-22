@@ -422,7 +422,7 @@ async function openRoom(
 		signer?(digest: Uint8Array): Promise<Uint8Array>;
 	}>
 ): Promise<MigrationSession> {
-	const { createV3RoomSession } = await roomModule;
+	const { createBrowserV3SixDatabaseStorageHost, createV3RoomSession } = await roomModule;
 	const author = input.author ?? input.material.author;
 	const stable = {
 		currentAnchorDigest: input.material.invite.pinnedGenesisAnchorDigest,
@@ -440,6 +440,7 @@ async function openRoom(
 	});
 	return (await createV3RoomSession({
 		application: input.application,
+		storageHost: createBrowserV3SixDatabaseStorageHost(),
 		author,
 		creatorInvite: input.material.invite,
 		databaseName: input.databaseName,

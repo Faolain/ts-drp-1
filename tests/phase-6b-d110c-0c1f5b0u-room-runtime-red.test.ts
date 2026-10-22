@@ -16,6 +16,7 @@ import { fakeNetwork } from "./fixtures/phase-4b-v3/live-snapshot.js";
 import { microtaskTurns, observeResult } from "./fixtures/phase-6b-d110c-0c1f5b0w/manual-review-probe.js";
 import { createV3ChatApplication } from "../examples/v3-chat/src/index.js";
 import {
+	createBrowserV3SixDatabaseStorageHost,
 	createV3RoomCreatorInviteMaterial,
 	createV3RoomSession,
 	type CreateV3RoomSessionInput,
@@ -341,6 +342,7 @@ async function openRebasePair(
 	};
 	const input = (target: boolean): CreateV3RoomSessionInput => ({
 		application,
+		storageHost: createBrowserV3SixDatabaseStorageHost(),
 		author,
 		creatorInvite: target ? targetInvite : sourceInvite,
 		databaseName: `${name}-${target ? "target" : "source"}`,

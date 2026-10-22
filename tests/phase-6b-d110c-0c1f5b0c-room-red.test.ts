@@ -414,6 +414,7 @@ vi.mock("@ts-drp/node/v3-live", async (importOriginal) => {
 });
 
 const roomModule = import("../examples/v3-room/src/index.js");
+const sixDatabaseStorageHost = (await roomModule).createBrowserV3SixDatabaseStorageHost();
 
 function invite(anchor: string): V3RoomCreatorInviteMaterial {
 	return Object.freeze({
@@ -494,6 +495,7 @@ function application(
 function roomInput(selectedApplication = application()): Readonly<Record<string, unknown>> {
 	return Object.freeze({
 		application: selectedApplication,
+		storageHost: sixDatabaseStorageHost,
 		author: AUTHOR,
 		creatorInvite: invite("b".repeat(64)),
 		databaseName: "settlement-target-plane",

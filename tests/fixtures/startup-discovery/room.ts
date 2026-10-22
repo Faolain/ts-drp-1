@@ -6,6 +6,7 @@ import { event } from "./observation.js";
 import type { Bootstrap } from "./types.js";
 import { createV3ChatApplication } from "../../../examples/v3-chat/src/index.js";
 import {
+	createBrowserV3SixDatabaseStorageHost,
 	createV3RoomCreatorInviteMaterial,
 	createV3RoomSession,
 	type CreateV3RoomSessionInput,
@@ -183,6 +184,7 @@ export async function roomInput(
 	});
 	return {
 		application,
+		storageHost: createBrowserV3SixDatabaseStorageHost(),
 		author,
 		...(signer
 			? { creatorFinalitySigner: finality.signer as unknown as CreateV3RoomSessionInput["creatorFinalitySigner"] }

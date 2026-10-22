@@ -75,7 +75,7 @@ export async function startProductBrowserServer(
 import { censusGridStorage } from ${JSON.stringify(resolve(REPOSITORY_ROOT, "tests/fixtures/grid-memory-storage-census.ts"))};
 import { createV3ChatApplication } from ${JSON.stringify(resolve(REPOSITORY_ROOT, "examples/v3-chat/src/index.ts"))};
 import { createV3ZoneApplication } from ${JSON.stringify(resolve(REPOSITORY_ROOT, "examples/grid/src/v3-zone.ts"))};
-import { createV3RoomCreatorInviteMaterial, createV3RoomSession } from ${JSON.stringify(resolve(REPOSITORY_ROOT, "examples/v3-room/src/index.ts"))};
+import { createBrowserV3SixDatabaseStorageHost, createV3RoomCreatorInviteMaterial, createV3RoomSession } from ${JSON.stringify(resolve(REPOSITORY_ROOT, "examples/v3-room/src/index.ts"))};
 import { bindV3BlueprintLivePlane } from ${JSON.stringify(resolve(REPOSITORY_ROOT, "packages/node/src/v3-live.ts"))};
 import { Keychain } from ${JSON.stringify(resolve(REPOSITORY_ROOT, "packages/keychain/src/index.ts"))};
 import { createRecoverableFinalitySigner } from ${JSON.stringify(resolve(REPOSITORY_ROOT, "packages/keychain/src/finality.ts"))};
@@ -88,6 +88,7 @@ Object.defineProperty(globalThis, "__d108e3DirectRoomDependencies", {
     createRecoverableFinalitySigner,
     createV3ChatApplication,
     createV3ZoneApplication,
+    createBrowserV3SixDatabaseStorageHost,
     createV3RoomCreatorInviteMaterial,
     createV3RoomSession,
     Keychain,
