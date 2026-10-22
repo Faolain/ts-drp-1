@@ -738,29 +738,415 @@ Without a fix, row 45's placement stays cold: section 6.1, options 1 and 3, whic
 My preference, for the owner to decide: A with (i). A keeps the publication semantics and the delivery wait, and
 touches only the room's barrier and the drain's publication mode. (i) closes a drop that can happen without A.
 
+## 12. Decision row 51: A, and the readiness ingress hold
+
+The owner chose startup option A, together with a fix for the NATIVE_READ_RESERVATION_BUSY. The first choice of BUSY
+fix was (i), retain on a custody refusal. The owner then replaced it with (a): run the readiness capture in a plane
+FIFO slot, and keep (i) only together with (a). Written literally, (a) leaves a hole (12.2), so the coordinator
+approved the readiness ingress hold as the way row 51 is implemented. The owner then chose to ship the hold without
+(i), because (i) breaks the creator's own moves (12.5). An append refused custody by a holder outside the FIFO is
+dropped, as at base.
+
+Log, script and patch paths in this section are under <evidence>/track-x/ unless they name a repository file.
+
+### 12.1 A (f86f8a0a) and the wiring amendment (7256d607)
+
+These match the prototype of 11.2, with its comments renamed to row 51. On v1 the startup barrier now runs:
+
+- enqueue and bootstrap;
+- drain, with the publication deferred (`settlementDrainPublication: "after-readiness"`);
+- prepare readiness;
+- `publishAccepted`, before the barrier resolves.
+  The owner-approved amendment to `creator-ordinary-readiness-producer.test.ts` makes three changes:
+- line 1609 expects `enqueue, bootstrap, drain, prepare` while the barrier is held;
+- after `room.done` the test requires `enqueue, bootstrap, drain, prepare, publish`;
+- the title says preparation is joined "after the startup rebase, before startup publication".
+  The startup RED of 9b6b5f3f passes.
+
+### 12.2 Why (a) as written leaves a hole
+
+A slot like `runCreatorOrdinaryReadinessMaintenance`'s would cover the capture only. The readiness job is longer:
+
+- On the window and recovery path it captures (a warm refresh or a cold capture).
+- Then, when the capture is not certified, it runs `runOrdinaryReadinessMaintenance`, its own FIFO slot.
+- Then it captures cold again (creator-close.ts, `prepareOrdinaryReadiness`).
+
+An append that arrives during the first capture queues behind that capture's slot. It then runs before the
+maintenance slot, while `maintenanceJobs` is not empty, so the consumer refuses it and keeps it as pending ingress
+(v3-live.ts `retainPendingIngress`). The readiness boundary is not deferrable. Its runtime census requires no pending
+ingress (`captureCreatorRecoveryRuntime`, `live()`: `pendingIngress.size === 0` when the observation is not active),
+so the boundary fails and the startup or install barrier makes the creator terminal. Closing this inside (a) would
+need the slot to span the whole job, or the pinned `prepareOrdinaryReadiness` text to change. The hold spans the whole
+job and changes no pinned text.
+
+### 12.3 The hold (04135190)
+
+- `prepareCreatorOrdinaryReadiness` (creator-close.ts) takes the hold from its plane before the job and releases it
+  in a `finally`. That covers success, failure, a terminal failure and a synchronous throw.
+- `holdV3IngressForReadiness` (v3-live.ts) sets `registration.readinessIngressHold` to an unresolved promise. It then
+  flushes the FIFO with an empty task, so every task queued before the hold finishes before the job starts. If the
+  flush throws, the hold is released and the error is rethrown. A second hold on the same plane is refused. Release
+  is idempotent.
+- `enqueueV3Ingress` reads the hold and passes it as its input-admission barrier, alone or joined with a terminal
+  barrier. The arrival is first captured and charged to the bounded input pool (`captureBeforeBarrier`: 32 jobs,
+  `maxPendingBytes`), with no FIFO reservation and no pending-ingress entry. When the hold is released, it enters the
+  FIFO in arrival order and runs the full admission path.
+- While a hold is set, the closing-gate drop at enqueue is skipped, so the arrival queues instead.
+  `authenticateV3Ingress` still drops it if the gate is still closed when it runs, which is the case after a failed
+  readiness boundary or a close.
+
+Every function touched:
+
+- v3-live.ts: the `V3PlaneRegistration.readinessIngressHold` field, `enqueueV3Ingress`, the new
+  `holdV3IngressForReadiness`, and the `holdIngressForReadiness` property of `creatorCloseRegistration`.
+- creator-close.ts: `V3CreatorCloseRegistration.holdIngressForReadiness`, the `runtimeReleaseOwners` value type, the
+  owner's `holdIngressForReadiness` in `bindCreatorLiveClose`, and `prepareCreatorOrdinaryReadiness`.
+- v3-room.ts: no edit beyond A.
+
+G1-G28:
+
+- Nothing is admitted without the full path: a held arrival runs `authenticateV3Ingress` and every admission check
+  after release.
+- What is held is bounded and counted by the same input pool, joined work and gossip pool as today (G21, G22).
+- Nothing is re-requested on a schedule.
+- No recipient is deaf: the hold is released on every path, and held arrivals then proceed.
+
+### 12.4 Why the hold cannot deadlock
+
+- Only `enqueueV3Ingress` reads the hold. It waits on it through `inputAdmission.barrier`, and
+  `enqueueRegistrationTask` takes the FIFO reservation only after the barrier resolves (`barrier.then(enqueue)`). So
+  a held arrival holds no FIFO slot and no native reservation; its capture copies wire bytes only.
+- Promises that wait on held arrivals are awaited in three places, none of them a FIFO task:
+  - the gossip queue subscription in `activateV3LivePlane`, whose message-queue fanout awaits the handler;
+  - `routeV3RetainedIngress`, which uses `void`;
+  - `deactivateV3LivePlaneJoined` through `joinedWork`. The room calls that from `shutdown` only after
+    `creatorCloseHandle.stop()`, which waits for the readiness job.
+- The readiness job awaits:
+  - the flush;
+  - its native captures;
+  - `prepareOrdinaryNativeMetadataForReadiness`;
+  - its own maintenance FIFO slot, which runs behind FIFO tasks only, and those never wait on held arrivals.
+    None of these waits on the hold, and the hold is released when the job settles.
+- The unit test pins this. It checks that only `enqueueV3Ingress` reads `readinessIngressHold`, and that it passes
+  the hold as its barrier with `captureBeforeBarrier: true`. It checks that only the readiness preparation takes the
+  hold, and where `enqueueV3Ingress` and `joinedWork` are used. It also runs a FIFO task queued after held arrivals,
+  and that task completes while they wait.
+
+### 12.5 (i): retaining an append whose custody was refused
+
+I wrote (i): `handleV3Ingress` keeps the append as pending ingress when `acquireLocalReplacementCustody` throws. Its
+node-host test (<evidence>/track-x/data/track-x-custody-refusal-retain-red.test.ts, uncommitted) stands in for the
+holder at v3-room.ts 5383: the test itself holds the creator's floor reservation while the Writer's move arrives,
+releases it, and the creator then plays.
+
+- At f86f8a0a the move is refused custody and lost (logs/retain-red-base-r2.log).
+- With (i), the creator's own next move is refused: `issuance-rejected ... creator recovery dependency hold
+unavailable:replay` (logs/xreds-head-r1.log).
+
+The reason is the census. `readCreatorRecoveryDependencyCensus` refuses any pending-ingress entry whose parents are
+all present, unless it is the received append being admitted (v3-live.ts, `missingParents.length === 0 &&
+active.enteredReceivedDigest === undefined`). A local issue on a maintenance-bound creator reaches that census
+through `prepareCreatorIssuanceMaintenanceQuote` (creator-close.ts:2154; probe logs/retain-probe-r2.log). So a kept,
+ready append blocks the creator's moves until another append is admitted or a maintenance job ends.
+
+For the real 5383 holder it is worse. The split replacement holds its floor view outside the FIFO, then calls
+`source.withDependencies`, a FIFO read-control task that seals an active census, while it still holds that view. An
+append queued ahead of that task is refused custody. If it is kept, the census refuses and the replacement fails; at
+base it is dropped and the replacement goes on.
+
+A drain before each local issue (a probe in `issueLocal`) makes the stand-in pass (logs/retain-alpha-r1.log). It
+cannot help 5383, though, because the floor view is still held while that census runs. I reported this to the
+coordinator with three options:
+
+1. Ship the hold without (i).
+2. (i) plus a drain before each issue.
+3. Have the 5383 replacement take the ingress hold around its floor view.
+
+The owner chose option 1. (i) is in no commit. It is kept in <evidence>/track-x/data/hold-fix-v1.patch, which holds
+both the hold and (i), and its test in <evidence>/track-x/data/track-x-custody-refusal-retain-red.test.ts. The 5383
+loss stays open (12.9).
+
+### 12.6 Tests
+
+The RED (83176da6, committed before the fix) uses a new node-host fixture, tests/fixtures/track-x/readiness-hold-room.ts.
+It runs a creator and a Writer on the SQLite host, with hooks on the creator's floor reservations, so a test can
+deliver a Writer move at an exact point inside the creator's readiness job.
+
+| Test                                                                  | What it requires                                                                                                                                                                              | f86f8a0a (A only)                                                               | Head  |
+| --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ----- |
+| track-x-readiness-hold-red: startup                                   | A Writer move that reaches the creator during its startup readiness is admitted after the job; the creator stays live and plays.                                                              | fail: the move is refused custody and lost                                      | pass  |
+| track-x-readiness-hold-red: maintenance                               | The hole of 12.2: an append arrives during the capture of a readiness job whose source then needs maintenance (epoch-3 adoption, uncertified window). Admitted after; the creator stays live. | fail: adoption terminal, "creator ordinary runtime custody is stale or revoked" | pass  |
+| track-x-readiness-hold-close: close while held                        | close() while the hold is set. Close waits for the job; the held move then meets the closed plane; nothing hangs; nothing is admitted after the stage; native owners join.                    | -                                                                               | pass  |
+| track-x-readiness-hold-close: seal while held                         | A seal staged while the hold is set. Nothing is admitted after the stage; the held move is not in the cut and is replaced into epoch 2; both projections are equal.                           | -                                                                               | pass  |
+| packages/node/tests/track-x-readiness-ingress-hold.test.ts (15 tests) | Runs the real source of the hold, `enqueueV3Ingress`, `enqueueRegistrationTask`, `authenticateV3Ingress` and `prepareCreatorOrdinaryReadiness` against a small plane.                         | -                                                                               | 15/15 |
+
+The unit file covers the coordinator's list:
+
+- Held arrivals take no FIFO reservation. A FIFO task queued after them runs while they wait, and they are admitted in
+  arrival order after release. The flush runs every task queued before the hold first. A terminal barrier and the
+  hold are both waited for.
+- The closing gate. With no hold, a seal's or a close's closing gate still drops at enqueue, and only an entered
+  readiness boundary queues. Under a hold, an arrival during a closing gate queues and then meets the gate in
+  `authenticateV3Ingress`. Arrivals held on a plane that was deactivated meanwhile are dropped.
+- The pool. With the hold set, the 33rd arrival (32 jobs) and the arrival past `maxPendingBytes` get the existing
+  input-pool refusal (`admission-rejected`). The logs, counters and decodes are identical to the same arrivals behind
+  a busy FIFO task, so there is no new drop path. A refused arrival is handled as today: the next move that depends
+  on it is retained as pending ingress and asks for it again (24699ced).
+- Release on every path: a second hold is refused without disturbing the first; a throwing flush releases the hold
+  and every arrival behind it; `prepareCreatorOrdinaryReadiness` releases after success, failure, a terminal failure
+  (`AggregateError`) and a synchronous throw; when the hold cannot be taken, the job never runs.
+- No FIFO task can await the hold (12.4): the static checks, and the runtime check that a FIFO task queued after held
+  arrivals completes.
+
+The coordinator also asked for (i)'s retain under the hold, tested with the test holding the creator floor's native
+reservation as a stand-in for v3-room.ts 5383. That test exists (tests/track-x-custody-refusal-retain-red.test.ts,
+uncommitted, kept in <evidence>/track-x/data). (i) is not in this branch, for the reason in 12.5.
+
+The hold flushes the FIFO with one empty task of its own, so it must never run inside a FIFO task. Its two callers,
+`prepareCurrentCreatorOrdinaryReadiness` at startup (inside `enqueueLifetimeTransition`) and after an install
+(`performCreatorSuccessorAdoption`), run in lifetime transitions, not in plane FIFO tasks. The
+readiness job's own FIFO work is its existing maintenance slot. Every hold in the runs of 12.7 completed its flush.
+
+### 12.7 Cost to real-time play
+
+Three builds were measured:
+
+- base: b8ad1f50 node source, before A;
+- A only: f86f8a0a;
+- head: A and the hold, with a probe that reports each hold (data/hold-probe.patch, not committed).
+
+Each bench mode ran 4 rounds of base, A only and head, interleaved, at 8 rollovers. Every run passed. The figures pool
+those runs.
+
+Every shipped harness stops play during a rollover: this bench, the Track X Canvas and Chat harness, Track V's Grid
+harness, d9346 and Track M's long-room driver. The creator seals, exports and adopts, and the Writer installs, with no
+moves in between. So every latency figure to date, these included, assumes that pause. With play through the rollover,
+a Writer can be lost (12.10). The proof of that fix must include runs with continuous play through rollovers.
+
+**Hold windows, in Chromium (head with the probe).** The window runs from the hold to its release.
+
+| Mode                       | Create              | Reopen              | After installs (n=32)      | Moves that arrived during a hold |
+| -------------------------- | ------------------- | ------------------- | -------------------------- | -------------------------------- |
+| default                    | p50 90, max 118 ms  | p50 296, max 400 ms | p50 64, p90 82, max 105 ms | 0 in 40 holds                    |
+| room database and `LULL=1` | p50 102, max 105 ms | p50 876, max 912 ms | p50 66, p90 77, max 96 ms  | 0 in 40 holds                    |
+
+No move arrived during a hold, so in the bench the wait behind the hold was zero at every percentile. The bench plays
+its moves after each transition.
+
+**Move delivery and the creator's first move, base / A only / head.** These are pooled medians over transitions 3 and
+later. "Installs" pools the moves after all 8 installs (n=32 per side).
+
+| Mode          | Adoption ms     | Delivery ms          | Creator's 1st move after installs (p50) | 1st recipient move to creator (p50) | Creator's 1st move after create (p50) |
+| ------------- | --------------- | -------------------- | --------------------------------------- | ----------------------------------- | ------------------------------------- |
+| default       | 531 / 551 / 543 | 99.5 / 102.2 / 100.7 | 92.1 / 90.2 / 93.6                      | 102.8 / 93.0 / 94.9                 | 81.2 / 99.0 / 97.1                    |
+| room database | 590 / 563 / 576 | 93.8 / 90.8 / 93.5   | 115.5 / 112.7 / 116.3                   | 92.0 / 87.6 / 89.8                  | 81.9 / 126.5 / 113.5                  |
+
+After installs, all three builds are within the run-to-run spread. Between rounds, the same build's delivery median
+moves by up to about 30 ms (default: base 87 to 115, head 91 to 125). The one cost is A's at create, described in 12.9.
+
+**The worst case, on the node host.** This used a scratch test, <evidence>/track-x/data/track-x-scratch-hold-wait.test.ts.
+At each of 8 installs, the Writer's move reaches the creator the moment the creator's readiness capture takes its first
+floor reservation. The test ran 2 paired rounds per build.
+
+- Head: the move waits behind the hold for p50 54, p90 61, max 66 ms (n=16). It is admitted p50 131, p90 146, max 149
+  ms after it arrives. One move at a time, outside readiness, the Writer's moves are admitted in p50 40 ms.
+- A only: the creator is terminal at epoch 1 in both rounds ("creator ordinary runtime custody is stale or revoked").
+  That is the hole of 12.2.
+
+So the hold delays only a move that lands inside its window of about 60 ms. At base, that same move is lost, or the
+creator is lost.
+
+**Streaming, on the node host.** In <evidence>/track-x/data/track-x-scratch-hold-stream.test.ts, the Writer plays one
+move after another:
+
+- Started when the creator's capture starts, every move arrives after the hold, because the Writer's issue takes 40 to
+  70 ms. The wait is p50 79.5, max 94 ms, and 8/8 epochs complete.
+- Started after the adoption, the first move per epoch waits p50 129 ms at head against 134 with A only. Later moves
+  wait 156 against 163.
+
+**Shipped pages, real networking, paired against main's node source.** These ran on the Grid scratch branch of 12.8
+(head plus Track V's 4 commits), with the node dist rebuilt for each side, alternating base and head (logs/ccpair-hc.log,
+gridpair-hg.log, grid-pair-sum.txt).
+
+| Page and harness                   | Runs             | Creator's 1st move issue p50 (ms) | 1st move delivery p50 | Adoption p50         | Install p50             |
+| ---------------------------------- | ---------------- | --------------------------------- | --------------------- | -------------------- | ----------------------- |
+| Canvas, Track X harness, 16 epochs | 2 + 2, all 16/16 | 415 / 402.5                       | 112.5 / 110.5         | 1192 / 912           | 1996 / 1735             |
+| Chat, Track X harness, 16 epochs   | 2 + 2, all 16/16 | 408.5 / 405.5                     | 7.5 / 9.0             | 978 / 1177           | 1872 / 1789             |
+| Grid, Track V long room, 16 epochs | 2 + 2, all 16/16 | 265, 210 / 190, 479               | -                     | 857, 954 / 641, 1020 | 2407, 1997 / 1997, 2393 |
+
+Figures are base / head. For Grid they are per run (epochs 2 and later): the second head run was slow in every phase
+(seal 5 to 8 s against 3 to 4 s in the other three runs, load 60 to 114), so the runs are shown apart. The first head
+run is the fastest of the four. The hold does not gate the creator's own issue, only remote ingress. These harnesses
+play only after each transition completes, and these runs carried no hold probe, so they bound the cost to play
+between rollovers, not the wait behind a hold.
+
+### 12.8 Proof
+
+The branch was merged with main at ebf4254f before these runs (4f5fc446, clean). Its node source then differs from
+main's by A and the hold only.
+
+**REDs.** At head:
+
+- the startup RED of 9b6b5f3f passes;
+- the hold REDs and the close/seal tests of 83176da6 pass;
+- the amended wiring test passes;
+- the seal RED passes;
+- the 15 unit tests of the hold pass.
+
+**Suites, per test, head (4f5fc446) against main's node source.** Both sides ran in the same worktree, with only
+packages/node/src swapped.
+
+| Set                                                        | Main's node source | Head               | New failures            | Fixed                                                 |
+| ---------------------------------------------------------- | ------------------ | ------------------ | ----------------------- | ----------------------------------------------------- |
+| packages/node                                              | 1027 pass, 63 fail | 1042 pass, 48 fail | 0                       | 15: the hold's unit tests and the amended wiring test |
+| storage-node retention and native set                      | 163 / 61           | 163 / 61           | 0                       | 0                                                     |
+| Canvas/Chat native set (6 files)                           | 35 / 15            | 35 / 15            | 0                       | 0                                                     |
+| startup-discovery observers                                | 23 / 0             | 23 / 0             | 0                       | 0                                                     |
+| Grid (examples/grid/src and the e4-01, e4-03 REDs)         | 65 / 0             | 65 / 0             | 0                       | 0                                                     |
+| Chat window (chat-local-archive, chat-rolling-window-rule) | 21 / 0             | 21 / 0             | 0                       | 0                                                     |
+| storage, storage-browser, storage-node                     | 1000 / 304         | 1000 / 304         | 0                       | 0                                                     |
+| root room and native tests, Tracks K to X (277 files)      | 1393 / 361         | 1399 / 355         | 1, a load flake (below) | 7                                                     |
+
+- The one new root failure is d110c "puts ACL membership ...", a vite SSR ReferenceError from module load order. Run
+  alone at head, it passes (logs/d110c-mh-r1.log). The only d110c failure left alone is "centralizes the settlement
+  profile predicate", which also fails at main.
+- The 7 fixed root tests are the Track X startup and hold REDs and their close/seal tests, which test new code, and
+  grid-memory-terminal-readiness plus two phase-6b-grid-successor-state tests, which fail at main's node source and
+  pass with A and the hold.
+
+**Track V's 4 commits** (d5a0015f, 15bf2ed1, 5b55b6e9, 27fe2688) cherry-pick cleanly onto 4f5fc446 (scratch branch
+track-x-hold-grid: 5f03a254, bc1ba50e, 372a03f9, 65898f68). The shipped-page runs below are on that branch.
+
+**Shipped Grid, d9346 (both tests), with Track V's switch.** 36 runs. The node dist was rebuilt for each side. Runs
+marked "probe" carry data/admission-probe.patch, which only labels each unlabelled admission refusal. Indexes:
+logs/gridpair-hg.log, d9pair-hd.log, d9pair-hm.log, d9pair-hn.log, d9probe-hp.log and d9probe-hq.log.
+
+| Build              | Runs | Placement test fails                                       | Migration test fails at 915 |
+| ------------------ | ---- | ---------------------------------------------------------- | --------------------------- |
+| Main's node source | 8    | 4, all at 534 (Track V's known "future resource programs") | 1                           |
+| A only (f86f8a0a)  | 4    | 1, at 419: the creator is terminal at startup (below)      | 2                           |
+| Head               | 14   | 2, at 534                                                  | 8                           |
+| Head, probe        | 10   | 0                                                          | 0                           |
+
+- The migration test fails the same way at every build. After the migration, the rejoined joiner's "target-suffix"
+  block never reaches the creator. The creator logs bursts of `admission-rejected` about 5 s apart. With the probe, the
+  only labels in the passing runs are `refuse-pool`, the input pool's existing 32-job refusal, in bursts of 9 to 40 when
+  a retained republication lands, and the retained-bootstrap gossip drop. My reading, not yet proven: the block arrives
+  while the creator's pool is full, is refused, and nothing asks for it again because nothing depends on it.
+- It depends on load. At load 75 to 196, head failed it 6 times in 10 and A only 2 in 4. At load 17 to 55, head failed
+  it 2 times in 14. Main's node source ran at load 27 to 71 and failed it 1 time in 8; it did not run at high load.
+- The placement failure at 419 with A only is the hole of 12.2 on a shipped page. The creator logs
+  `received-maintenance-custody` refusals at startup, then every snapshot throws "Refusal". It did not happen at head
+  in 24 runs.
+
+**Typecheck and guard.** With the node dist rebuilt (`tsc -b tsconfig.build.json --force`, then build) at 4f5fc446:
+`pnpm -r typecheck` has 0 errors, and `node scripts/check-shadowed-sources.mjs` passes.
+
+### 12.9 Open items
+
+- **The 5383 loss.** An append that meets a custody refusal while the split replacement at v3-room.ts 5383 holds the
+  creator floor's view (outside the FIFO) is dropped, as at base. It comes back only if a later move depends on it and
+  the recipient asks for it again (24699ced).
+  - Why (i) did not fix it: `readCreatorRecoveryDependencyCensus` refuses a pending entry whose parents are all
+    present unless it is the received append being admitted. So a retained, ready append makes the creator's next
+    local issue fail ("creator recovery dependency hold unavailable:replay"). At 5383 itself, the census runs while
+    the floor view is still held, so the replacement would fail too.
+  - Candidate fix (option 3): the split replacement takes the readiness ingress hold around its floor view. Arrivals
+    would then wait outside the FIFO, as they do during readiness, so none meets the refusal.
+- **Retained reads can BUSY the readiness capture.** This predates row 51. The hold stops ingress only. A
+  retained-history read is a FIFO task with a native read reservation, so it can overlap the capture, which then meets
+  `NATIVE_READ_RESERVATION_BUSY`. The fix is a capture slot plus one stub line in the pinned
+  creator-ordinary-readiness-producer.test.ts, which is the owner's call (coordinator, row 51).
+- **Play during a rollover can lose a peer (12.10).** This predates row 51, and it is the next step of this track.
+- **d9346's migration test loses a block with Track V's switch (12.8).** It fails at main's node source too, more
+  often under load. In the labelled runs, a retained republication overflows the receiver's 32-job input pool, with
+  9 to 40 refusals at a time. A block refused there comes back only if a later move depends on it. Not root-caused;
+  it should be settled before Track V's switch merges.
+- **A's cost at startup.** The creator's first move after create is about 16 ms slower in default mode (98 to 100 ms
+  against 82, n=4) and about 35 to 45 ms slower with the room database (115 to 128 against 82), because publication
+  now waits for readiness. Moves after installs are unchanged (12.7).
+- **A pre-existing failure.** creator-ordinary-readiness-producer.test.ts, "readiness-owned recovery source
+  acquisition > uses the genuine same-head pair ...", fails at f86f8a0a and at head alike (logs/pinned-base-r1.log).
+- **An unlabelled function in the bench bundle.** tests/fixtures/startup-discovery/build.ts maps function names to
+  phase labels, and the new `holdV3IngressForReadiness` has no label there. The bundle builds and runs. That file is
+  Track U's, so it is left alone.
+
+### 12.10 Play during a rollover can lose a Writer
+
+This predates row 51. It fails the same way at main's node source and at head, and it is the next step of this track
+(section 13). The rows below were found with a node-host scratch test, track-x-scratch-drain-race.test.ts (kept
+in <evidence>/track-x/data, not committed), and a scratch copy of Track V's Grid harness.
+
+**The repro.** On creator-trusted-settlement-v1, with a creator and one Writer:
+
+1. The Writer makes one move while the creator seals epoch N (or while it adopts epoch N+1). The move is outside the
+   sealed cut.
+2. The creator seals, exports and adopts.
+3. The Writer installs epoch N+1. Its settlement plan has one entry for that move, disposition "rebase". Its install
+   drain (`performCreatorSuccessorAdoption`, received, then `drainRebaseOutbox`, then `drainSettlementOutbox`) issues
+   the replacement, which fails: "authorization-rejected: active replacement source custody refused: portable source
+   protected dependency is unavailable".
+4. The install throws, the received-adoption catch sets the terminal failure, and the Writer is terminal. It no longer
+   receives or plays.
+
+A single move 50 ms into the seal is enough (logs/race-wds-cap1-main-r1.log at main's node source,
+race-wds-cap1-head-r1.log at head). Continuous play through the rollover fails at epoch 1 in 3/3 (race-wdr-_), and so
+does play only during the adopt (race-wda-head-r1). The creator playing while the Writer installs is fine (6/6,
+race-cdi-_).
+
+**Shipped pages.**
+
+- Grid can reach it. In the scratch Grid harness the Writer places a block every 100 ms through the creator's seal,
+  export and adopt. The Writer's install fails at epoch 1 with the message above, at head in 2/2 runs and at main's
+  node source in 1/1 (logs/hg-race-head-1, -2 and hg-race-mseal-1, on the Grid scratch branch).
+- Canvas and Chat cannot reach it as shipped: their joiners only observe and never issue, so a joiner has no move to
+  rebase.
+- Every shipped harness pauses moves through rollovers (12.7), which is why none of them has shown it.
+
+**A second order, fixture only.** If the Writer installs and plays before the creator adopts, the Writer's row is
+pending at the creator with a dependency the creator does not have yet. The creator's settlement fence then fails
+("prospective runtime census has unresolved ingress or rebase dependencies"), and the creator is terminal at epoch 1.
+No shipped harness installs before the creator adopts.
+
+**First read on the cause (to be checked in section 13).** `preparePortableSettlementSource` walks the replaced move's
+dependencies back to the source anchor. Each vertex on the way must be the anchor or a carrier in the census bytes. The
+move's parents are rows that were settled into the cut, so they are neither, and the walk throws. Either the walk
+should stop at vertices the successor already holds as settled, or the census should carry them. For the second order,
+the census rule (`prospectiveCreatorRuntimeCensusOverhead` requires empty pending ingress for a local issue) and the
+drain order (the fence is issued before pending Writer rows are resolved) are the two places a fix could go.
+
 ## Commits
 
-| Commit   | What                                                                              |
-| -------- | --------------------------------------------------------------------------------- |
-| 4122ab83 | test: measure the shipped Canvas and Chat pages as long rooms in Chromium         |
-| 7cbbcaef | test: RED for the settlement fence that reaches a recipient before its install    |
-| d48b57cd | test: RED for a lost creator move that the creator's next move needs              |
-| 24699ced | fix: a recipient asks the creator again for a dependency it is missing            |
-| 3e806aff | test: RED for a migrated Writer's settlement plan the census refuses              |
-| f4c3c5c2 | fix: the issuance census classifies a migrated Writer's inherited plan            |
-| f2d301d5 | docs: record the Track X result                                                   |
-| 9b6b5f3f | test: RED for a settlement creator whose readiness waits for a subscriber         |
-| 270c7068 | test: RED for a direct send that never completes                                  |
-| 76ea48f2 | test: hang diagnostics for the Track X shipped-app harness                        |
-| 4787390d | fix: a direct send that never completes cannot hold a room                        |
-| d46c3e74 | test: IndexedDB/lock probe and a history-request storm for the harness            |
-| a2ef638b | docs: record the Canvas harness hang                                              |
-| e26cd812 | test: let pending history requests finish before the lost-move RED loses its move |
-| e1f471bb | test: RED for a creator seal that waits on its own live journal                   |
-| 2a65f450 | fix: the creator seal stages before it takes a journal source                     |
-| b8ad1f50 | merge: main 24d4ca61 into the seal deadlock work                                  |
-| 75a16b81 | docs: record the seal deadlock fix                                                |
-| (this)   | docs: record the startup-order options                                            |
+| Commit   | What                                                                               |
+| -------- | ---------------------------------------------------------------------------------- |
+| 4122ab83 | test: measure the shipped Canvas and Chat pages as long rooms in Chromium          |
+| 7cbbcaef | test: RED for the settlement fence that reaches a recipient before its install     |
+| d48b57cd | test: RED for a lost creator move that the creator's next move needs               |
+| 24699ced | fix: a recipient asks the creator again for a dependency it is missing             |
+| 3e806aff | test: RED for a migrated Writer's settlement plan the census refuses               |
+| f4c3c5c2 | fix: the issuance census classifies a migrated Writer's inherited plan             |
+| f2d301d5 | docs: record the Track X result                                                    |
+| 9b6b5f3f | test: RED for a settlement creator whose readiness waits for a subscriber          |
+| 270c7068 | test: RED for a direct send that never completes                                   |
+| 76ea48f2 | test: hang diagnostics for the Track X shipped-app harness                         |
+| 4787390d | fix: a direct send that never completes cannot hold a room                         |
+| d46c3e74 | test: IndexedDB/lock probe and a history-request storm for the harness             |
+| a2ef638b | docs: record the Canvas harness hang                                               |
+| e26cd812 | test: let pending history requests finish before the lost-move RED loses its move  |
+| e1f471bb | test: RED for a creator seal that waits on its own live journal                    |
+| 2a65f450 | fix: the creator seal stages before it takes a journal source                      |
+| b8ad1f50 | merge: main 24d4ca61 into the seal deadlock work                                   |
+| 75a16b81 | docs: record the seal deadlock fix                                                 |
+| b9335db0 | docs: record the startup-order options                                             |
+| 7256d607 | test: pin the v1 startup order with preparation before publication                 |
+| f86f8a0a | fix: a settlement creator prepares readiness before its startup publication        |
+| 83176da6 | test: red for a Writer's append that meets a creator's readiness preparation       |
+| 04135190 | fix: a creator's readiness preparation holds arrivals until it ends                |
+| 9f143f3b | test: pin the readiness ingress hold's gates, pool bounds, release paths and close |
+| 0e7c068e | fix: keep enqueueV3Ingress's pinned closing-gate line under the readiness hold     |
+| 4f5fc446 | merge: main ebf4254f into the row 51 work                                          |
+| (this)   | docs: record decision row 51's implementation and proof                            |
 
 Main (24d4ca61) carries f2d301d5, the fixture half of 9b6b5f3f (65505659) and 270c7068..e26cd812 as picked
-commits (eeddd65a..cf6d306f). The startup RED file of 9b6b5f3f stays on this branch.
+commits (eeddd65a..cf6d306f). The startup RED file of 9b6b5f3f stays on this branch. Main (ebf4254f) also carries
+e1f471bb, 2a65f450, 75a16b81 and b9335db0 as picked commits (04f7fd0b..9b28e327).
