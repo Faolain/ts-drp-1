@@ -59,12 +59,13 @@ export interface ShippingChatSharesState {
 	readonly messages: readonly ShippingChatMessage[];
 	readonly capacity: ShippingChatShares;
 }
-export interface ShippingChatShareUpdate {
-	readonly action: "capacityAllocation";
-	readonly capacity: ShippingChatShares;
-	readonly epoch: number;
-	readonly aclDigest: string;
-}
+// A type alias (not an interface), so an update passes as a room operation record as it is.
+export type ShippingChatShareUpdate = Readonly<{
+	action: "capacityAllocation";
+	capacity: ShippingChatShares;
+	epoch: number;
+	aclDigest: string;
+}>;
 
 // The same state limits as the v3 and v4 formats (32,768 bytes, 16,384 items, depth 16): Track
 // Q's approved ordinary resource bound rests on every Chat state passing a capture under them.
@@ -170,7 +171,12 @@ export function shippingChatSharesAllowanceBytes(basisObjectId: string): number 
 		shippingChatSharesWindowBytes(basisObjectId, SHIPPING_CHAT_SHARE_HOLDERS) / SHIPPING_CHAT_SHARE_HOLDERS
 	);
 }
-/** The equal split of the budget for these rows (author, sinceEpoch), already sorted by author. */
+/**
+ * The equal split of the budget for these rows, already sorted by author.
+ * @param basisObjectId - The room's object id.
+ * @param rows - The rows' authors and first checkpoints.
+ * @returns The share record.
+ */
 function split(
 	basisObjectId: string,
 	rows: readonly (readonly [author: string, sinceEpoch: number])[]
