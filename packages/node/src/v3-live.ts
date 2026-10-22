@@ -15976,64 +15976,84 @@ async function readRebaseOutbox(
 						registration.currentReplacementCustody = custody;
 						// The existing dependency read is fully joined before entering write custody.
 						let settlementAuthorization: Readonly<Record<string, unknown>> | undefined;
-						await withActiveRebaseDependencies(
-							registration,
-							heldSource,
-							(read) =>
-								read.checkWhile(() => {
-									settlementAuthorization = preparePortableSettlementSource(
-										registration,
-										heldSource,
-										owned,
-										read.readExactCanonicalCensus()
-									);
-									return Promise.resolve();
-								}),
-							custody
-						);
-						if (settlementAuthorization === undefined)
-							throw new TypeError("portable replacement source preparation is unavailable");
-						const selectionBytes = creatorSettlementSelectionBytes(settlementAuthorization);
-						const selectionDigest = hashDomain("ts-drp/settlement-source-selection/v1", selectionBytes);
 						const creator = resolveCreatorSettlementAuthor(registration.payload.trust.trust);
-						let selectionSignature =
-							creatorSelection !== undefined && sameBytes(creatorSelection.digest, selectionDigest)
-								? creatorSelection.signature
-								: undefined;
-						if (selectionSignature === undefined && creator === registration.issuanceScope.author) {
-							await withActiveRebaseDependencies(registration, heldSource, read => read.checkWhile(async () => {
-								const exact = preparePortableSettlementSource(registration, heldSource, owned, read.readExactCanonicalCensus());
-								if (!sameBytes(creatorSettlementSelectionBytes(exact), selectionBytes)) throw new TypeError("creator selection native source changed");
-								const target = creatorSelectionProposalTarget(registration, selectionBytes);
-								const valid = (): boolean => currentRegistration(registration) && verifyPortableSettlementSource(registration, target, registration.closeVertices, false, new Set(), true);
-								selectionSignature = await withOwnedCreatorSelectionRequest(registration, custody!, read, selectionBytes, valid,
-									request => owned.signRegisteredVertexDigest(new Uint8ArrayConstructor(selectionDigest), request));
-							}), custody, [selectionBytes, new Uint8ArrayConstructor(64)]);
-						}
-						if (
-							selectionSignature !== undefined &&
-							!verifyCreatorSettlementSourceSelection(
-								registration.payload.trust.trust,
-								selectionBytes,
-								selectionSignature
+						// With no creator selection, a non-creator author that the target still
+						// authorizes issues its replacement nonportable, exactly as the portable
+						// path below ends for it ("Null is explicitly nonportable"). No recipient
+						// ever sees a portable record, so neither the record nor the dependency
+						// read that only it consumes is prepared: the record's closure can reach
+						// other authors' rows of the sealed epoch, which this author's census
+						// never holds, and the read cannot classify a source this drain already
+						// replaced nonportably. The exact native source, plan effect, floor and
+						// write custody of issueLocal are unchanged.
+						const nonportable =
+							creatorSelection === undefined &&
+							creator !== registration.issuanceScope.author &&
+							isV3ApplicationAuthorAuthorized(registration.authorization, registration.issuanceScope.author);
+						if (nonportable) {
+							outcome = await issueLocal(
+								registration,
+								ObjectFreeze({ ...owned, settlementCustody: custody, settlementAuthorization: undefined })
+							);
+						} else {
+							await withActiveRebaseDependencies(
+								registration,
+								heldSource,
+								(read) =>
+									read.checkWhile(() => {
+										settlementAuthorization = preparePortableSettlementSource(
+											registration,
+											heldSource,
+											owned,
+											read.readExactCanonicalCensus()
+										);
+										return Promise.resolve();
+									}),
+								custody
+							);
+							if (settlementAuthorization === undefined)
+								throw new TypeError("portable replacement source preparation is unavailable");
+							const selectionBytes = creatorSettlementSelectionBytes(settlementAuthorization);
+							const selectionDigest = hashDomain("ts-drp/settlement-source-selection/v1", selectionBytes);
+							let selectionSignature =
+								creatorSelection !== undefined && sameBytes(creatorSelection.digest, selectionDigest)
+									? creatorSelection.signature
+									: undefined;
+							if (selectionSignature === undefined && creator === registration.issuanceScope.author) {
+								await withActiveRebaseDependencies(registration, heldSource, read => read.checkWhile(async () => {
+									const exact = preparePortableSettlementSource(registration, heldSource, owned, read.readExactCanonicalCensus());
+									if (!sameBytes(creatorSettlementSelectionBytes(exact), selectionBytes)) throw new TypeError("creator selection native source changed");
+									const target = creatorSelectionProposalTarget(registration, selectionBytes);
+									const valid = (): boolean => currentRegistration(registration) && verifyPortableSettlementSource(registration, target, registration.closeVertices, false, new Set(), true);
+									selectionSignature = await withOwnedCreatorSelectionRequest(registration, custody!, read, selectionBytes, valid,
+										request => owned.signRegisteredVertexDigest(new Uint8ArrayConstructor(selectionDigest), request));
+								}), custody, [selectionBytes, new Uint8ArrayConstructor(64)]);
+							}
+							if (
+								selectionSignature !== undefined &&
+								!verifyCreatorSettlementSourceSelection(
+									registration.payload.trust.trust,
+									selectionBytes,
+									selectionSignature
+								)
 							)
-						)
-							throw new TypeError("explicit creator selection differs from exact source/target");
-						// Null is explicitly nonportable. Exact native source/plan ownership still
-						// permits original local recovery, but never a foreign-recipient exception.
-						settlementAuthorization =
-							selectionSignature === undefined &&
-							isV3ApplicationAuthorAuthorized(registration.authorization, registration.issuanceScope.author)
-								? undefined
-								: ObjectFreeze({
-										...settlementAuthorization,
-										creatorSelectionSignature:
-											selectionSignature === undefined ? null : new Uint8ArrayConstructor(selectionSignature),
-									});
-						outcome = await issueLocal(
-							registration,
-							ObjectFreeze({ ...owned, settlementCustody: custody, settlementAuthorization })
-						);
+								throw new TypeError("explicit creator selection differs from exact source/target");
+							// Null is explicitly nonportable. Exact native source/plan ownership still
+							// permits original local recovery, but never a foreign-recipient exception.
+							settlementAuthorization =
+								selectionSignature === undefined &&
+								isV3ApplicationAuthorAuthorized(registration.authorization, registration.issuanceScope.author)
+									? undefined
+									: ObjectFreeze({
+											...settlementAuthorization,
+											creatorSelectionSignature:
+												selectionSignature === undefined ? null : new Uint8ArrayConstructor(selectionSignature),
+										});
+							outcome = await issueLocal(
+								registration,
+								ObjectFreeze({ ...owned, settlementCustody: custody, settlementAuthorization })
+							);
+						}
 					} catch (error) {
 						outcome = localIssueFailure(
 							"authorization-rejected",
