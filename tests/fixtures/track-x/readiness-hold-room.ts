@@ -2,7 +2,7 @@
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import type { DurableIssuanceOutboxRecord } from "@ts-drp/issuance-store";
-import { Message, MessageType, V3Envelope } from "@ts-drp/types";
+import { type DRPNetworkNode, Message, MessageType, V3Envelope } from "@ts-drp/types";
 import { createHash } from "node:crypto";
 import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -143,6 +143,11 @@ export async function readinessHoldRoom(
 			 * replacing the application's for the given actions.
 			 */
 			policies?: Partial<V3RoomApplication["displacementPolicies"]>;
+			/**
+			 * Sees this peer's network node before its room session opens (for example, to bind a
+			 * reopened creator to an existing successor link before its startup serving begins).
+			 */
+			onNetwork?: (networkNode: DRPNetworkNode) => void;
 		}> = {}
 	) => {
 		const identity = required(identities[index]);
@@ -183,6 +188,7 @@ export async function readinessHoldRoom(
 		const accepted = new Map<string, number>();
 		const acknowledged = new Map<string, () => void>();
 		const networkNode = fakeNetwork(required(roster[index]).peerId, false);
+		openOptions.onNetwork?.(networkNode);
 		const input: CreateV3RoomSessionInput<ReturnType<typeof application.projectAcceptedOperations>> = {
 			application:
 				openOptions.policies === undefined

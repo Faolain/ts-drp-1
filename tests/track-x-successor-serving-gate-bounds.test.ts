@@ -1,7 +1,9 @@
 import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
 import type { DurableIssuanceOutboxRecord } from "@ts-drp/issuance-store";
+import { decodeSnapshotManifest } from "@ts-drp/protocol-v3/snapshot-transfer";
 import { afterEach, expect, it } from "vitest";
 
+import { SNAPSHOT_PULL_INACTIVITY_MS } from "../packages/node/src/snapshot-transfer.js";
 import { closeFixtures, required } from "./fixtures/track-m/room-retention-fixture.js";
 import { type ReadinessHoldPeer, readinessHoldRoom } from "./fixtures/track-x/readiness-hold-room.js";
 import { linkSuccessorProtocol, type SuccessorLink } from "./fixtures/track-x/successor-link.js";
@@ -13,15 +15,22 @@ import { linkSuccessorProtocol, type SuccessorLink } from "./fixtures/track-x/su
 //   or chunk request needs a requester the server has admitted, and before the adoption the gate
 //   reports none, so such a request is refused, not held.
 // - A held material request lasts at most the server's own response deadline
-//   (SNAPSHOT_PULL_INACTIVITY_MS, 10 s), the same as the Writer's own material deadline. If the
-//   creator has not adopted by then, the Writer's install fails, but nothing is lost: once the
-//   creator adopts, the Writer's retry installs, and both play on.
+//   (SNAPSHOT_PULL_INACTIVITY_MS, 10 s), the same as the Writer's own material deadline. Each
+//   attempt ends there; the Writer's one install retries the material request within itself
+//   (option E, decided after astra consult 3) and completes once the creator adopts, and both play
+//   on. (Before option E, proof 2 expected that first install to fail and an explicit retry.)
 
 afterEach(async () => {
 	expect(await closeFixtures(), "native admitted work and owners join").toEqual([]);
 });
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+// The node snapshot transfer's manifest profile (packages/node/src/snapshot-transfer.ts PROFILE).
+const SNAPSHOT_PROFILE = Object.freeze({
+	maxManifestBytes: 212_387,
+	maxSnapshotBytes: 268_435_456,
+	snapshotChunkBytes: 131_072,
+});
 
 const settled = <T>(promise: Promise<T>): Promise<string> =>
 	promise.then(
@@ -91,9 +100,49 @@ async function requestManifest(link: SuccessorLink, manifestDigest: string): Pro
 	}
 }
 
-it("a manifest request before the creator adopts is refused, not held; after the adoption and the install it is served", async () => {
+/**
+ * Sends one snapshot chunk request on a raw link stream.
+ * @param link - The link.
+ * @param manifestDigest - The successor's manifest digest.
+ * @param chunk - The chunk to request.
+ * @returns The first response frame's kind, or the refusal.
+ */
+async function requestChunk(
+	link: SuccessorLink,
+	manifestDigest: string,
+	chunk: Readonly<{ index: number; digest: string }>
+): Promise<string> {
+	const stream = await link.open();
+	const signal = AbortSignal.timeout(10_000);
+	try {
+		await stream.write(
+			encodeCanonical({
+				descriptors: [{ digest: chunk.digest, index: chunk.index }],
+				kind: "snapshot-chunk-request",
+				manifestDigest,
+				version: 1,
+			}),
+			{ signal }
+		);
+		const response = decodeCanonical(await stream.read(1_048_576, { signal })) as { kind?: unknown };
+		return String(response.kind);
+	} catch (error) {
+		return `refused: ${error instanceof Error ? error.message : String(error)}`;
+	} finally {
+		await stream.close();
+	}
+}
+
+it("a manifest or chunk request before the creator adopts is refused, not held; after the adoption and the install it is served", async () => {
 	const room = await sealedRoom();
 	const cut = decodeCanonical(room.offer.exactCanonicalCutValueBytes) as { snapshotManifestDigest: string };
+	const chunk = required(
+		decodeSnapshotManifest({
+			exactCanonicalManifestBytes: room.offer.exactCanonicalSnapshotManifestBytes,
+			expectedManifestDigest: cut.snapshotManifestDigest,
+			profile: SNAPSHOT_PROFILE,
+		}).chunks[0]
+	);
 	// The Writer's install sends its authenticated material request first. Without the gate the
 	// server answers it and admits this peer, and the manifest request below is then served.
 	const installed = settled(
@@ -107,31 +156,49 @@ it("a manifest request before the creator adopts is refused, not held; after the
 	const before = await requestManifest(room.link, cut.snapshotManifestDigest);
 	expect(before, "refused before the adoption").toMatch(/^refused: /u);
 	expect(performance.now() - early, "refused at once, not held").toBeLessThan(5_000);
+	const earlyChunk = performance.now();
+	expect(await requestChunk(room.link, cut.snapshotManifestDigest, chunk), "chunk refused before the adoption").toMatch(
+		/^refused: /u
+	);
+	expect(performance.now() - earlyChunk, "chunk refused at once, not held").toBeLessThan(5_000);
 
 	await room.creator.room.adoptCreatorSuccessor();
 	expect(await installed, "the Writer's install").toBe("ok");
 	expect(await requestManifest(room.link, cut.snapshotManifestDigest), "served after the adoption").toBe(
 		"snapshot-manifest-response"
 	);
+	expect(await requestChunk(room.link, cut.snapshotManifestDigest, chunk), "chunk served after the adoption").toBe(
+		"snapshot-chunk-response"
+	);
 	await expectLive(room, "after");
 }, 240_000);
 
-it("a held material request ends at the server's response deadline; the Writer's retry after the adoption installs", async () => {
+it("each held attempt ends at the server's response deadline; the one install continues and completes after the adoption", async () => {
 	const room = await sealedRoom();
-	const first = settled(
+	let installEnded: string | undefined;
+	const installed = settled(
 		room.writer.room.installCreatorSuccessor({ offer: room.offer, peers: [room.creator.networkNode.peerId] })
+	).then((outcome) => {
+		installEnded = outcome;
+		return outcome;
+	});
+	const deadline = performance.now() + 120_000;
+	while (room.link.requests.length < 2 && installEnded === undefined && performance.now() < deadline) await sleep(50);
+	const [first = 0, second = 0] = room.link.requests;
+	console.log(
+		`TRACK_X_GATE_BOUND ${JSON.stringify({ installEnded, requests: room.link.requests.length, heldMs: Math.round(second - first) })}`
 	);
-	const firstOutcome = await first;
-	console.log(`TRACK_X_GATE_BOUND ${JSON.stringify({ firstOutcome, requests: room.link.requests.length })}`);
+	expect(installEnded, "the install continues past the first attempt's deadline").toBeUndefined();
+	expect(room.link.requests.length, "a second attempt within the same install").toBeGreaterThanOrEqual(2);
+	expect(second - first, "the first attempt was held to the response deadline").toBeGreaterThanOrEqual(
+		SNAPSHOT_PULL_INACTIVITY_MS - 1_000
+	);
 	expect(room.link.responses, "nothing served while the creator has not adopted").toEqual([]);
-	expect(firstOutcome, "the first install ends at the material deadline").toMatch(/^failed: /u);
 	expect(room.writer.room.authority()?.epoch ?? 0).toBe(0);
 
 	await room.creator.room.adoptCreatorSuccessor();
-	const retried = await settled(
-		room.writer.room.installCreatorSuccessor({ offer: room.offer, peers: [room.creator.networkNode.peerId] })
-	);
-	expect(retried, "the Writer's retry after the adoption").toBe("ok");
+	expect(await installed, "the one install, after the adoption").toBe("ok");
+	expect(room.link.responses).toHaveLength(1);
 	expect(room.writer.room.authority()?.epoch).toBe(1);
 	await expectLive(room, "after");
 }, 240_000);

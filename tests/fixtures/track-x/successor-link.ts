@@ -89,37 +89,95 @@ function pipeStream(
 	};
 }
 
+export interface SuccessorLinkFrame {
+	/** Which side wrote the frame. */
+	readonly from: "writer" | "creator";
+	/** The frame's canonical `kind`, or "raw" for a frame that is not a canonical record (chunk bytes). */
+	readonly kind: string;
+	/** When it was written. */
+	readonly at: number;
+}
+
+export interface SuccessorLinkOptions {
+	/**
+	 * Close the creator's port as the production port does (network node.ts
+	 * createSnapshotChunkProtocolHost): abort its open inbound streams, then wait for every inbound
+	 * handler to finish. Without it, close only removes the handler.
+	 */
+	readonly joinHandlersOnClose?: boolean;
+}
+
 export interface SuccessorLink {
 	/** When the Writer sent each material request. */
 	readonly requests: number[];
 	/** When the creator wrote each material response. */
 	readonly responses: number[];
+	/** Every frame either side wrote on the link, in order. */
+	readonly frames: SuccessorLinkFrame[];
+	/** @returns How many of the creator's inbound handlers are still running. */
+	activeHandlers(): number;
 	/**
-	 * Opens one raw Writer-to-creator stream on the link (for frames the Writer's install never sends).
-	 * @returns The Writer's end of the stream.
+	 * Binds a reopened creator's network node to this link (the same peer), so its successor
+	 * serving answers the streams this link's Writer port opens.
+	 * @param networkNode - The reopened creator's network node.
 	 */
-	open(): Promise<SnapshotChunkProtocolStream>;
+	rebindCreator(networkNode: object): void;
+	/**
+	 * Binds a reopened Writer's network node to this link (the same peer).
+	 * @param networkNode - The reopened Writer's network node.
+	 */
+	rebindWriter(networkNode: object): void;
+	/**
+	 * Sets the peers the creator's port reports as connected (default: the Writer).
+	 * @param peers - The connected peers, or undefined for the default.
+	 */
+	setConnected(peers: readonly string[] | undefined): void;
+	/**
+	 * Opens one raw stream to the creator on the link (for frames the Writer's install never sends).
+	 * @param peerId - The peer the creator sees on the stream (default: the Writer).
+	 * @returns The requester's end of the stream.
+	 */
+	open(peerId?: string): Promise<SnapshotChunkProtocolStream>;
 }
+
+const frameKind = (bytes: Uint8Array): string => {
+	try {
+		const value = decodeCanonical(bytes) as { kind?: unknown } | null;
+		return typeof value?.kind === "string" ? value.kind : "raw";
+	} catch {
+		return "raw";
+	}
+};
 
 /**
  * Connects the Writer's creator-successor protocol port to the creator's.
  * @param creator - The creator peer.
  * @param writer - The Writer peer.
+ * @param options - How the creator's port closes.
  * @returns The link's observations and a raw opener.
  */
-export function linkSuccessorProtocol(creator: ReadinessHoldPeer, writer: ReadinessHoldPeer): SuccessorLink {
+export function linkSuccessorProtocol(
+	creator: ReadinessHoldPeer,
+	writer: ReadinessHoldPeer,
+	options: SuccessorLinkOptions = {}
+): SuccessorLink {
 	const creatorPeer = creator.networkNode.peerId;
 	const writerPeer = writer.networkNode.peerId;
 	const requests: number[] = [];
 	const responses: number[] = [];
+	const frames: SuccessorLinkFrame[] = [];
+	const inbound = new Map<SnapshotChunkProtocolStream, Promise<void>>();
 	let handler: ((stream: SnapshotChunkProtocolStream) => Promise<void>) | undefined;
+	let connected: readonly string[] | undefined;
 	const creatorPort: SnapshotChunkProtocolPort = {
 		localPeerId: creatorPeer,
 		close: () => {
 			handler = undefined;
-			return Promise.resolve();
+			if (options.joinHandlersOnClose !== true) return Promise.resolve();
+			for (const stream of [...inbound.keys()]) stream.abort(new Error("TRACK_X_LINK_PORT_CLOSED"));
+			return Promise.allSettled([...inbound.values()]).then(() => undefined);
 		},
-		connectedPeers: () => [writerPeer],
+		connectedPeers: () => [...(connected ?? [writerPeer])],
 		open: () => Promise.reject(new TypeError("TRACK_X_LINK_CREATOR_DOES_NOT_DIAL")),
 		serve: (next) => {
 			handler = next;
@@ -128,34 +186,55 @@ export function linkSuccessorProtocol(creator: ReadinessHoldPeer, writer: Readin
 			};
 		},
 	};
-	const open = (peer: string, signal: AbortSignal): Promise<SnapshotChunkProtocolStream> => {
+	const open = (peer: string, signal: AbortSignal, from = writerPeer): Promise<SnapshotChunkProtocolStream> => {
 		signal.throwIfAborted();
 		const serve = handler;
 		if (peer !== creatorPeer || serve === undefined) return Promise.reject(new TypeError("TRACK_X_LINK_NO_SERVER"));
 		const toCreator = new FramePipe();
 		const toWriter = new FramePipe();
 		let material = false;
-		const inbound = pipeStream(writerPeer, toCreator, toWriter, () => {
+		const served = pipeStream(from, toCreator, toWriter, (bytes) => {
+			frames.push({ from: "creator", kind: frameKind(bytes), at: performance.now() });
 			if (material) responses.push(performance.now());
 		});
 		const outbound = pipeStream(creatorPeer, toWriter, toCreator, (bytes) => {
-			const request = decodeCanonical(bytes) as { kind?: unknown };
-			if (request?.kind === "creator-successor-material-request") {
+			const kind = frameKind(bytes);
+			frames.push({ from: "writer", kind, at: performance.now() });
+			if (kind === "creator-successor-material-request") {
 				material = true;
 				requests.push(performance.now());
 			}
 		});
-		void serve(inbound);
+		const task = serve(served).finally(() => inbound.delete(served));
+		inbound.set(served, task);
+		void task.catch(() => undefined);
 		return Promise.resolve(outbound);
 	};
 	const writerPort: SnapshotChunkProtocolPort = {
 		localPeerId: writerPeer,
 		close: () => Promise.resolve(),
 		connectedPeers: () => [creatorPeer],
-		open: (peer, options) => open(peer, options.signal),
+		open: (peer, openOptions) => open(peer, openOptions.signal),
 		serve: () => () => undefined,
 	};
-	Reflect.set(creator.networkNode, "createSnapshotChunkProtocolHost", () => creatorPort);
-	Reflect.set(writer.networkNode, "createSnapshotChunkProtocolHost", () => writerPort);
-	return { requests, responses, open: () => open(creatorPeer, new AbortController().signal) };
+	const rebindCreator = (networkNode: object): void => {
+		Reflect.set(networkNode, "createSnapshotChunkProtocolHost", () => creatorPort);
+	};
+	const rebindWriter = (networkNode: object): void => {
+		Reflect.set(networkNode, "createSnapshotChunkProtocolHost", () => writerPort);
+	};
+	rebindCreator(creator.networkNode);
+	rebindWriter(writer.networkNode);
+	return {
+		requests,
+		responses,
+		frames,
+		activeHandlers: () => inbound.size,
+		rebindCreator,
+		rebindWriter,
+		setConnected: (peers) => {
+			connected = peers === undefined ? undefined : [...peers];
+		},
+		open: (peerId) => open(creatorPeer, new AbortController().signal, peerId ?? writerPeer),
+	};
 }
