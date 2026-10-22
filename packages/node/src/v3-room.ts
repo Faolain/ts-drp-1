@@ -100,6 +100,7 @@ import {
 	type RecoveryPoolAutoMaintenanceOptions,
 } from "./internal/recovery-pool-auto.js";
 import { createScheduledRecoveryPoolLull } from "./internal/recovery-pool-scheduled.js";
+import { retainedPublicationCancelled } from "./internal/retained-publication.js";
 import {
 	attachPresentationIntents,
 	createPresentationOverlay,
@@ -4161,22 +4162,25 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			assertSessionOpen();
 			if (terminalFailure !== undefined) throw terminalFailure;
 			if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
+			const plane = activeHandle;
 			const result =
 				targetPeerId === undefined
-					? await activeHandle.republishRetained()
-					: await republishV3RetainedTo(activeHandle, targetPeerId);
+					? await plane.republishRetained()
+					: await republishV3RetainedTo(plane, targetPeerId);
 			if (result.ok) return;
 			// An orderly close cancels a retained publication still in flight: it revokes
 			// this transport synchronously, then retires the plane. A send that revocation
 			// refused, or a plane retired before or around the send, is that cancellation,
-			// not a publication fault. Storage and record faults, and every failure outside
-			// an orderly close or after a terminal failure, still reject.
+			// not a publication fault. This session's own successor (an adoption or an
+			// install) cancels it the same way: it retires the plane this publication read,
+			// and the successor serves the next request. Storage and record faults, and every
+			// other failure or any after a terminal failure, still reject.
 			if (
-				sessionCloseTask !== undefined &&
-				terminalFailure === undefined &&
-				(result.kind === "not-active" ||
-					result.kind === "publication-state-unknown" ||
-					result.kind === "publish-failed")
+				retainedPublicationCancelled(result.kind, {
+					terminal: terminalFailure !== undefined,
+					closing: sessionCloseTask !== undefined,
+					superseded: activeHandle !== plane || creatorSuccessorAdoptionTask !== undefined,
+				})
 			)
 				return;
 			throw new TypeError(`v3 room retained publication failed: ${result.kind}`);
