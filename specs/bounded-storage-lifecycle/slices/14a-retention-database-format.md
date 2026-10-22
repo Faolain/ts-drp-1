@@ -5,6 +5,10 @@ Implementation (Track R3): stage 1a only, opt-in. The version-7 room database, t
 room factories, the room retirement session and the node install in one session per
 install have landed; one retirement per epoch in one transaction needs 14b. See the
 [parent status](14-single-database-watermark-retirement.md#status-track-r3-2026-10-19-opt-in-stage-1a-only).
+Default (Track Z, 2026-10-21): no longer opt-in for new browser rooms. With no
+`storageHost`, a new room is created in the room database with retention; a room
+created in six databases reopens on the six-database host, unchanged. See the
+[Track Z status](14-single-database-watermark-retirement.md#status-track-z-2026-10-21-the-browser-default-for-new-rooms).
 No review has run. RED precedes GREEN; no implementation acceptance is claimed.
 Guarantee ids (G1–G28) are defined, with their sources, in the
 [golden-path guarantee checklist](../golden-path-guarantees.md). Line numbers are at commit 1c6a8259.

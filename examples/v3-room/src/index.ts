@@ -111,11 +111,12 @@ function existingDatabaseVersion(databaseName: string): Promise<number | undefin
 }
 
 /**
- * Opt-in (slice 14a): every owner of a room in ONE version-7 IndexedDB database. The
+ * Slice 14a: every owner of a room in ONE version-7 IndexedDB database. The
  * AHE store the room opens under `${name}--ahe` lives in database `name` with the
  * others; its retirement session then runs each owner's original retirement on one
  * strict transaction per stage. The host floor (`--room-head`) stays its own database.
- * The default host is unchanged.
+ * `createV3RoomSession` uses it, with retention, for every new room when the application
+ * passes no storage host (Track Z); rooms created in six databases keep that host.
  * @param options - `roomRetention` (slice 14b, opt-in on top of the room database):
  * recovery-pool maintenance retires each closed-epoch boundary by verified retention
  * decisions, one room transaction each, instead of the existing per-class passes.
@@ -227,8 +228,9 @@ async function existingRoomLayout(
 	return "new";
 }
 
-// The layout a NEW room is created in when the application passes no storage host.
-const NEW_ROOM_LAYOUT: Exclude<ExistingRoomLayout, "new"> = "six-database";
+// The layout a NEW room is created in when the application passes no storage host: the
+// room database with retention and the scheduled lull (the owner's choice, 2026-10-21).
+const NEW_ROOM_LAYOUT: Exclude<ExistingRoomLayout, "new"> = "room";
 
 /**
  * Selects native IndexedDB mechanics for the browser application boundary.

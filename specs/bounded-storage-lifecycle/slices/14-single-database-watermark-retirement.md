@@ -145,6 +145,45 @@ The new path stays opt-in because:
    single decision from carried verified facts. The record is in
    `docs/realtime-latency/tracks/20-track-r2-r3-watermark-retirement/RESULT.md`.
 
+### Status (Track Z, 2026-10-21): the browser default for new rooms
+
+The owner chose to make the room database with retention the default for new
+browser rooms, with no migration. When the application passes no `storageHost`,
+`createV3RoomSession` in `examples/v3-room`:
+
+- opens a room on the host it was created on, read from its database names alone
+  (nothing is created to probe): a room database (main database at version 7) on
+  `createBrowserV3RoomDatabaseStorageHost({ roomRetention: true })`, and a
+  six-database room (any of its six-database names exists, a rebase source
+  included) on the six-database host, unchanged;
+- creates a new room in the room database with retention;
+- turns on the scheduled lull (`recoveryPoolScheduledLull`, packages/node): one
+  `maintainRecoveryPool()` per epoch, queued in the lifecycle FIFO after the
+  creator's adoption and after every recipient's install (Writer and
+  receive-only), with no idle trigger. Six-database, explicit and Node SQLite
+  hosts get no scheduling.
+
+An application keeps any host by passing it, for example
+`createBrowserV3SixDatabaseStorageHost()`, exported for this. Nothing is migrated:
+14d is not implemented and the default does not need it. The room host still
+refuses a six-database room, and the routing never sends one to it.
+
+Not part of the flip:
+
+- 14c is deferred by the owner. The existing per-class path writes no per-owner
+  fence, so 14c's open check as written fails closed on every room after its first
+  retirement round, and no floor in use offers `fenceRetirement`. Rooms keep
+  Track M's step A (`fenceDecision`) and trust RED 4. 14c stays open, to revisit
+  if an IndexedDB floor ships.
+- The one-off first retirement round of every room (the per-class path, about
+  2.1-2.8 s once) and creator adoption are later tracks.
+
+The class (ii) tests that relied on the six-database default pass the explicit
+six-database host (owner-approved). The evidence (14f on Chromium, Firefox and
+WebKit, the per-test suite comparison against the base, the shipped pages and the
+bench) is in
+`docs/realtime-latency/tracks/36-track-z-room-database-default/RESULT.md`.
+
 ## Slice graph
 
 | Slice                                         | One question                                                                                                          | Depends on | Decisive artifact                                                                                 |
