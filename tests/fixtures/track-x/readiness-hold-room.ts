@@ -2,6 +2,7 @@
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import type { DurableIssuanceOutboxRecord } from "@ts-drp/issuance-store";
+import type { V3RoomStorageHost } from "@ts-drp/node/v3-room-host";
 import { type DRPNetworkNode, Message, MessageType, V3Envelope } from "@ts-drp/types";
 import { createHash } from "node:crypto";
 import { existsSync, mkdtempSync } from "node:fs";
@@ -100,36 +101,43 @@ export async function readinessHoldRoom(
 	const parameters = Object.freeze({ ...defaultParameters, ...options.parameters });
 	const objectId = `creator:${hex(hashDomain("track-x-readiness-hold-object/v1", new TextEncoder().encode(directory))).slice(0, 32)}`;
 	const signers = [{ publicKey: creator.author, signerId: "creator" }];
-	const invite = await createV3RoomCreatorInviteMaterial({
-		blueprintDigest: required(application.catalog.blueprintDigests[0]),
-		exactCanonicalApplicationStateBytes: required(application.migration).canonicalStateBytes(
-			application.projectAcceptedOperations({ authenticatedBase: undefined, currentEpochOperations: [] })
-		),
-		exactCanonicalLatchedAclBytes: encodeCanonical({
-			epoch: 0,
-			kind: "drp-v3-latched-acl",
-			members: identities
-				.map(({ author }, index) => ({
-					author,
-					finalityKey: index === 0 ? author : null,
-					groups: index === 0 ? ["admin", "finality", "writer"] : ["writer"],
-				}))
-				.sort((left, right) => left.author.localeCompare(right.author)),
-			objectId,
-			permissionless: false,
-			version: 3,
-		}),
-		exactCanonicalParametersCarrierBytes: encodeCanonical(parameters),
-		exactCanonicalProfileBytes: encodeCanonical({
-			cryptoSuiteId: "ed25519-sha256-v3",
-			profileId: "creator-trusted-settlement-v1",
-			quorum: 1,
-			signers,
-		}),
-		exactCanonicalSignerSetBytes: encodeCanonical(signers),
-		objectId,
-		signGenesisAnchorDigest: (digest) => Promise.resolve(ed25519.sign(digest, creator.seed)),
-	});
+	/**
+	 * The creator's invite material for an object of this room (its own, or a migration target's).
+	 * @param inviteObjectId - The object id.
+	 * @returns The signed invite material.
+	 */
+	const material = (inviteObjectId: string) =>
+		createV3RoomCreatorInviteMaterial({
+			blueprintDigest: required(application.catalog.blueprintDigests[0]),
+			exactCanonicalApplicationStateBytes: required(application.migration).canonicalStateBytes(
+				application.projectAcceptedOperations({ authenticatedBase: undefined, currentEpochOperations: [] })
+			),
+			exactCanonicalLatchedAclBytes: encodeCanonical({
+				epoch: 0,
+				kind: "drp-v3-latched-acl",
+				members: identities
+					.map(({ author }, index) => ({
+						author,
+						finalityKey: index === 0 ? author : null,
+						groups: index === 0 ? ["admin", "finality", "writer"] : ["writer"],
+					}))
+					.sort((left, right) => left.author.localeCompare(right.author)),
+				objectId: inviteObjectId,
+				permissionless: false,
+				version: 3,
+			}),
+			exactCanonicalParametersCarrierBytes: encodeCanonical(parameters),
+			exactCanonicalProfileBytes: encodeCanonical({
+				cryptoSuiteId: "ed25519-sha256-v3",
+				profileId: "creator-trusted-settlement-v1",
+				quorum: 1,
+				signers,
+			}),
+			exactCanonicalSignerSetBytes: encodeCanonical(signers),
+			objectId: inviteObjectId,
+			signGenesisAnchorDigest: (digest) => Promise.resolve(ed25519.sign(digest, creator.seed)),
+		});
+	const invite = await material(objectId);
 	const storageHost = createNodeV3RoomStorageHost({ directory, initialization: () => "create" });
 	const open = async (
 		index: number,
@@ -148,6 +156,13 @@ export async function readinessHoldRoom(
 			 * reopened creator to an existing successor link before its startup serving begins).
 			 */
 			onNetwork?: (networkNode: DRPNetworkNode) => void;
+			/** Opens this peer on another object of the room (for example, a migration target). */
+			room?: Readonly<{ invite: typeof invite; objectId: string }>;
+			/**
+			 * The test's own wrapper of this peer's storage host (for example, to inject a storage
+			 * fault); unlike the hooks above, it may change results.
+			 */
+			host?: (host: V3RoomStorageHost) => V3RoomStorageHost;
 		}> = {}
 	) => {
 		const identity = required(identities[index]);
@@ -183,12 +198,31 @@ export async function readinessHoldRoom(
 					});
 		let ingress: ((message: Message) => void) | undefined;
 		let retainedIngress: ((message: Message) => void) | undefined;
+		let retainedPublisher: ((targetPeerId?: string) => Promise<void>) | undefined;
 		let topic: string | undefined;
 		const retainedMessages = new WeakSet<Message>();
 		const accepted = new Map<string, number>();
 		const acknowledged = new Map<string, () => void>();
 		const networkNode = fakeNetwork(required(roster[index]).peerId, false);
 		openOptions.onNetwork?.(networkNode);
+		// A reopened peer reopens its existing stores; a store a later install creates (a new
+		// plane's database) is created, as on the first open (the host's own filename scheme).
+		const peerHost = openOptions.reopen
+			? createNodeV3RoomStorageHost({
+					directory,
+					initialization: ({ name, family }) =>
+						existsSync(
+							join(
+								directory,
+								`${createHash("sha256")
+									.update(JSON.stringify([family, name]))
+									.digest("hex")}.sqlite`
+							)
+						)
+							? "reopen"
+							: "create",
+				})
+			: storageHost;
 		const input: CreateV3RoomSessionInput<ReturnType<typeof application.projectAcceptedOperations>> = {
 			application:
 				openOptions.policies === undefined
@@ -200,34 +234,17 @@ export async function readinessHoldRoom(
 								...openOptions.policies,
 							}) as typeof application.displacementPolicies,
 						},
-			// A reopened peer reopens its existing stores; a store a later install creates (a new
-			// plane's database) is created, as on the first open (the host's own filename scheme).
-			storageHost: openOptions.reopen
-				? createNodeV3RoomStorageHost({
-						directory,
-						initialization: ({ name, family }) =>
-							existsSync(
-								join(
-									directory,
-									`${createHash("sha256")
-										.update(JSON.stringify([family, name]))
-										.digest("hex")}.sqlite`
-								)
-							)
-								? "reopen"
-								: "create",
-					})
-				: storageHost,
+			storageHost: openOptions.host === undefined ? peerHost : openOptions.host(peerHost),
 			author: identity.author,
 			...(index === 0
 				? { creatorFinalitySigner: (await createRecoverableFinalitySigner({ seed: creator.seed })).signer }
 				: {}),
-			creatorInvite: invite,
+			creatorInvite: openOptions.room?.invite ?? invite,
 			databaseName: name,
 			issuanceDatabaseName: name,
 			migrationDatabaseNamespace: name,
 			initialLogicalTime: 3,
-			objectId,
+			objectId: openOptions.room?.objectId ?? objectId,
 			publicKeyBytes: ed25519.getPublicKey(identity.seed),
 			roomHeadAuthority: floor,
 			signRegisteredVertexDigest: (digest) => Promise.resolve(ed25519.sign(digest, identity.seed)),
@@ -248,7 +265,9 @@ export async function readinessHoldRoom(
 						throw new TypeError("TRACK_X_HOLD_EPHEMERAL_UNUSED");
 					},
 					requestRetainedHistory: () => undefined,
-					setRetainedPublisher: () => undefined,
+					setRetainedPublisher: (publisher) => {
+						retainedPublisher = publisher;
+					},
 					setIngressHandler: (selectedTopic, live, retained) => {
 						topic = selectedTopic;
 						ingress = live;
@@ -314,7 +333,39 @@ export async function readinessHoldRoom(
 				acknowledged.delete(finalDigest);
 			}
 		};
-		return { index, name, room, floor: original, networkNode, accepted, inject, injectRetained, receive };
+		/**
+		 * Hands a message another peer's room sent (for example, a retained republication caught at
+		 * that peer's network node) to this peer's ingress, as the genuine transport would.
+		 * @param message - The message.
+		 * @param retained - Whether it arrives as retained history rather than gossip.
+		 */
+		const deliver = (message: Message, retained = false): void => {
+			if (!retained) {
+				required(ingress)(message);
+				return;
+			}
+			retainedMessages.add(message);
+			required(retainedIngress)(message);
+		};
+		/**
+		 * Runs this peer's room's retained-history republication (what a history request triggers).
+		 * @param targetPeerId - The requesting peer, or none for a gossip republication.
+		 * @returns When the republication has been sent.
+		 */
+		const republish = (targetPeerId?: string): Promise<void> => required(retainedPublisher)(targetPeerId);
+		return {
+			index,
+			name,
+			room,
+			floor: original,
+			networkNode,
+			accepted,
+			inject,
+			injectRetained,
+			receive,
+			deliver,
+			republish,
+		};
 	};
 	const stop = async (opened: Awaited<ReturnType<typeof open>>) => {
 		await opened.room.close();
@@ -322,20 +373,31 @@ export async function readinessHoldRoom(
 		await opened.floor.close();
 		heads.delete(opened.floor);
 	};
-	const publishedAfter = async (index: number, after: number | null) => {
+	const publishedAfter = async (index: number, after: number | null, scopeObjectId = objectId) => {
 		const store = await storageHost.openIssuance(`peer-${index}`);
 		try {
 			const author = required(identities[index]).author;
 			return await store.readOutboxPage({
-				scope: { objectId, author },
-				afterKey: after === null ? null : [objectId, author, after],
+				scope: { objectId: scopeObjectId, author },
+				afterKey: after === null ? null : [scopeObjectId, author, after],
 				limit: 128,
 			});
 		} finally {
 			await store.close();
 		}
 	};
-	return { identities, roster, application, objectId, invite, host: { storageHost }, open, stop, publishedAfter };
+	return {
+		identities,
+		roster,
+		application,
+		objectId,
+		invite,
+		material,
+		host: { storageHost },
+		open,
+		stop,
+		publishedAfter,
+	};
 }
 
 export type ReadinessHoldRoom = Awaited<ReturnType<typeof readinessHoldRoom>>;
