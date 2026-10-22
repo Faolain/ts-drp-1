@@ -436,6 +436,11 @@ export interface V3CreatorCloseRegistration {
 		options?: Readonly<{deferrable?: boolean; resume?: boolean}>
 	): Promise<"ran" | "deferred">;
 	sealIssuanceMaintenanceDependencies(receivedReceipt?: object): Promise<CreatorSnapshotRecoveryCloseHold | undefined>;
+	/** @internal Private live scheduling hint, read at each call: whether this registration now
+	 * retains a cross-object migration source, whose census the ordinary warm source capture
+	 * declines by design. Negative only: it may skip an OPTIONAL ordinary prime, and grants no
+	 * admission, proof, credit or authority. A missing or failing hint keeps the original route. */
+	hasMigrationSourceForOrdinaryPrime?(): boolean;
 	/** Prepare bounded idle issuer metadata before the explicit cold readiness capture. */
 	prepareOrdinaryNativeMetadataForReadiness(): Promise<void>;
 	/** Scheduling request only: a recovery halt still requires the original
@@ -2475,6 +2480,22 @@ async function captureCreatorOrdinarySourceWithoutForecast(
 ): Promise<CreatorOrdinaryIssuanceProofSource | undefined> {
 	if (input.promotionContext === undefined || input.archive !== undefined ||
 		input.readOrdinaryApplicationResourceBound === undefined) return undefined;
+	// While the registration retains a cross-object migration source, this OPTIONAL lifetime
+	// can only end in the data owner's "native-or-cross-context-source" decline: skip it. Nothing
+	// is sealed, acquired or charged, so nothing is transferred, and the caller's mandatory cold
+	// quote keeps every check. Readiness is never skipped; a missing or failing hint keeps the
+	// original route.
+	let migrationSource = false;
+	if (!readiness) try { migrationSource = registration.hasMigrationSourceForOrdinaryPrime?.() === true; }
+	catch { /* The original route below. */ }
+	if (migrationSource) {
+		try {
+			const observer = Reflect.get(globalThis, "__warmProofEvent");
+			if (typeof observer === "function") observer({kind: "ordinary-incremental-source-prime-skipped",
+				epoch: registration.currentTrust.currentEpoch, reason: "migration-source"});
+		} catch { /* Diagnostics never alter the original owner outcome. */ }
+		return undefined;
+	}
 	const hold = await registration.sealIssuanceMaintenanceDependencies(receivedReceipt);
 	if (hold === undefined) return undefined;
 	// The existing proof acquisition owns failure cleanup of this original hold.

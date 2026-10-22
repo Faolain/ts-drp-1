@@ -11055,6 +11055,18 @@ function nativeBranchDisplacedSource(registration: V3PlaneRegistration): V3Displ
 		: undefined;
 }
 
+/** The retained displaced source when it is a cross-object migration source (an activated source
+ * of another object): exactly captureCreatorRecoveryRuntime's `migrationSource` selection, which
+ * puts that source in the recovery census, where the ordinary warm source capture declines it by
+ * design. Read only as creator close's private, negative prime hint; it grants nothing. */
+function migrationDisplacedSource(registration: V3PlaneRegistration): V3DisplacedSourceAuthority | undefined {
+	const source = registration.displacedSource;
+	return source?.activationVertexDigest !== undefined &&
+		source.prepared.trust.trust.objectId !== registration.payload.trust.trust.objectId
+		? source
+		: undefined;
+}
+
 /** One runtime tuple/predicate for complete census and runtime-only custody. */
 function captureCreatorRecoveryRuntime(registration: V3PlaneRegistration, activeObservation: boolean,
 	drainingReceived: boolean, terminalIssuanceObservation: boolean, quiescentBoundary?: () => boolean) {
@@ -20464,6 +20476,9 @@ function creatorCloseRegistration(
 			options?: Parameters<V3CreatorCloseRegistration["runReceivedRecoveryMaintenance"]>[3]
 		) => runCreatorReceivedRecoveryMaintenance(registration,
 			() => sealCreatorReceivedRecoveryDependencies(registration, closePlane, signing, snapshots), consume, options),
+		// Private, negative scheduling hint read at each call, so a reopen, rollover or replaced
+		// source is reflected at once (decision row 73).
+		hasMigrationSourceForOrdinaryPrime: (): boolean => migrationDisplacedSource(registration) !== undefined,
 		sealIssuanceMaintenanceDependencies: (receipt?: object) => {
 			const received = receipt === undefined ? undefined : receivedAppendFacts(registration, receipt);
 			return sealCreatorRecoveryDependencies(registration, true, undefined, closePlane,
