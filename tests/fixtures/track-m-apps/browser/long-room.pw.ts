@@ -54,7 +54,7 @@ const RECIPIENTS = {
 	chat: selection("TRACK_M_APPS_CHAT_RECIPIENTS", ["receive-only", "writer"], ["writer"]),
 };
 const LULLS = selection("TRACK_M_APPS_LULLS", ["product", "reader"], ["product"]);
-const CHAT_FORMATS = selection("TRACK_M_APPS_CHAT_FORMAT", ["window", "lifetime"], ["window"]);
+const CHAT_FORMATS = selection("TRACK_M_APPS_CHAT_FORMAT", ["window", "lifetime", "shares"], ["window"]);
 const SETTLE = process.env.TRACK_M_APPS_SETTLE_MS;
 const OUT = process.env.TRACK_M_APPS_OUT;
 const TREE = process.env.TRACK_M_APPS_TREE ?? "unknown";
@@ -111,7 +111,7 @@ for (let repeat = 0; repeat < REPEAT; repeat++)
 								creatorLull: lull === "reader",
 								epochs: EPOCHS,
 								moves: MOVES,
-								...(app === "chat" && chatFormat === "lifetime" ? { chatFormat } : {}),
+								...(app === "chat" && chatFormat !== "window" ? { chatFormat } : {}),
 							},
 							repeat,
 						});

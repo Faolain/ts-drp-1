@@ -1,6 +1,6 @@
 # Track X: the settlement fence delivery stall
 
-**Outcome:** Fix merged in cf6d306f (4122ab83..e26cd812, without the startup-readiness RED). A recipient now asks the creator again for a missing dependency, so the settlement fence that arrives before install is no longer lost; shipped Canvas and Chat and the Grid with Track V's switch run 16/16 with real networking. The IndexedDB seal deadlock fix is picked as 04f7fd0b..9b28e327 (row 53): the seal stages its snapshot before it takes a journal source. The startup order (option A) and the readiness ingress hold merged in 8595826c (rows 51, 55 and 59). IN PROGRESS: play during a rollover, and d9346's migration failure (row 60). See [RESULT.md](RESULT.md).
+**Outcome:** Fix merged in cf6d306f (4122ab83..e26cd812, without the startup-readiness RED). A recipient now asks the creator again for a missing dependency, so the settlement fence that arrives before install is no longer lost; shipped Canvas and Chat and the Grid with Track V's switch run 16/16 with real networking. The IndexedDB seal deadlock fix is picked as 04f7fd0b..9b28e327 (row 53): the seal stages its snapshot before it takes a journal source. The startup order (option A) and the readiness ingress hold merged in 8595826c (rows 51, 55 and 59). IN PROGRESS: play during a rollover, and d9346's migration failure (row 60), with the owner's successor-serving gate (row 61) and the R5 journal fix (row 62). See [RESULT.md](RESULT.md).
 
 **Working documents in this folder:** [BRIEF.md](BRIEF.md), [RESULT.md](RESULT.md)
 
@@ -767,3 +767,195 @@ All end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Nothing 
 - **Moved to `<evidence>/track-x/data/`:** the scratch tests (hold-wait, hold-stream, drain-race), the probe patches, and the scratch Grid race harness (in `scratch-grid/`).
 - **Processes:** none of mine are left running. The ports are currently held by Track Z's runs.
 - **PROGRESS.md** (`<evidence>/track-x/PROGRESS.md`) is current.
+
+### Follow-up instruction — Startup fix merged; start drain race (section 13) (2026-10-22 03:29 UTC)
+
+Your startup order and readiness hold are merged: main is 8595826c (merge) plus docs at 30cb474e, decision rows 59-60. My verification on 44e14408 found no new per-test failures, and the REDs, bench, e2e and shipped Chat/Canvas/Grid all passed.
+
+Next, decision row 60, in this order:
+
+13. PLAY DURING A ROLLOVER. A Writer that moves during the creator's seal or adoption becomes terminal at its next install.
+   - Base: start from main 30cb474e on your branch (`git merge` it, or `git switch -C` a new branch from it).
+   - First commit the RED: the seal-time move and the adopt-time move, plus the fixture-only install-before-adopt order (the creator's census refusal), and a continuous-play case.
+   - Root-cause both refusals and write RESULT section 13.
+   - If the fix needs a guarantee-level or pinned-text choice, stop and bring options. Otherwise implement the smallest fix.
+   - Proof:
+     - the REDs green;
+     - the node host with continuous play through 16+ rollovers (Writer moves every ~50-100 ms through seal, export, adopt and install);
+     - your scratch Grid race harness over real networking, at least 3 runs at head, 16/16, with the creator and Writer live;
+     - shipped Canvas/Chat/Grid as before;
+     - the bench pairs;
+     - the per-test suites against base, typecheck and the shadow guard.
+   - Turn the scratch Grid race harness into a committed opt-in mode of Track V's harness (for example TRACK_V_PLAY_THROUGH_ROLLOVER=1), so continuous play can be measured from now on. Report seal/adopt/install and move delivery with play through rollovers against the paused figures.
+14. D9346's MIGRATION FAILURE (line 915). Root-cause the lost target-suffix block (the 32-job input-pool refusal during a retained republication burst is your lead), with a RED if you can make it deterministic. Fix it, or bring options if it is a limit or guarantee choice. Track V's Grid switch merges after 13 and 14, so check d9346 with V's 4 commits at the end (at least 10 runs, some under load).
+
+Parallel work:
+- Track Z is wiring a scheduled lull into v3-room.ts: tail calls at the end of adoptCreatorSuccessor and installCreatorSuccessor, a runRecoveryPoolMaintenance refactor of session.maintainRecoveryPool, and a settled hook in the auto scheduler and recovery-pool-auto.ts. Avoid those spots, or tell me before you edit them.
+- Track W2 is in examples/chat only.
+
+The usual rules apply: the Node pin, per-port checks, never edit pinned or RED tests without approval, and commit only on your branch. Hand back after 14, or earlier if you need a decision.
+
+### Report returned by the agent (2026-10-22 04:03 UTC)
+
+Track X, row 60: I need your decision on the creator's census refusal (R3, RED case 4, fixture-only order). The Writer-side fix is green. I am carrying on with its proofs and with step 14 while you decide.
+
+State:
+- RED committed: 2863424c. All 4 cases fail at base.
+- Base is main 30cb474e.
+
+R1 (seal-time and adopt-time moves; RED cases 1 and 2), fixed:
+- The Writer's install drain still prepares the portable settlement source (the walk back to the source anchor), even when the replacement is nonportable and the record is thrown away. A non-creator Writer the target authorizes has no creator selection, so its settlementAuthorization ends up undefined anyway.
+- The walk needs other authors' rows of the sealed epoch. The Writer's census never holds them, so the walk throws, the install fails, and the Writer goes terminal.
+
+R2 (found once R1 was fixed; continuous case), fixed:
+- When a drain has 2 or more rebased rows, the second replacement's dependency census refuses the source the first replacement already replaced. authenticatedCompletedNativeReplacementSource needs a signed settlementSource record, and a nonportable replacement never has one. This was latent at base for any Writer with 2 or more rebase entries.
+
+The fix for both (uncommitted):
+- Only the nonportable branch of issueReplacement in v3-live changes.
+- It now issues the nonportable replacement directly and skips withActiveRebaseDependencies plus preparePortableSettlementSource, whose only consumer is the portable record.
+- It is behaviour-preserving whenever those steps would have succeeded. No guarantee or pinned text changes.
+
+Results with the fix:
+- RED cases 1 and 2 are green.
+- The continuous case is green over 3 rollovers: 85 moves, all reach the creator. The one move per epoch that fails is the Writer's own move during its install ("not-active"), which is existing behaviour.
+
+Harness note: the 32-job gossip queue (routeV3Ingress, MAX_ADMITTED_INPUT_JOBS) silently refused 19 of a 51-row synchronous burst. Nothing re-requests a refused tail row until a later row depends on it. That matches step 14's lead. My RED now delivers in flow-controlled batches of 16 and sends only the new epoch's rows. I'll report this in step 14.
+
+R3 (RED case 4, install-before-adopt):
+- The Writer's new-epoch row reaches the creator's new plane after activation and before its adoption drain issues its fence. The row becomes pending ingress because its dependency, the Writer's fence, was dropped by the sealed plane.
+- The creator's drain issues run before readiness is prepared, so their sizing (prospectiveCreatorRuntimeCensusOverhead) requires pendingIngress.size === 0. The fence is refused and the creator goes terminal.
+- Only an export before adoption can produce this. No shipped flow exports before adoption, and Writers get the successor only from that export.
+- The row-51 hold begins only at readiness. Taking it at rebind in v3-room still leaves the window from activation to rebind open, so a complete fix needs the hold from activation.
+
+Options for R3:
+- (A) Ingress hold from activation. Set the readiness hold atomically when the creator's successor registration replaces its predecessor in v3PlaneRegistrations (v3-live). The room's adoption tail adopts it through publishAccepted, the drain and readiness, and releases it in a finally on every path (creator-close and v3-room).
+  - Complete, no guarantee change.
+  - New hold state in activation, and a G28 liveness risk if any path forgets the release.
+  - Touches the adoption tail next to Track Z's spot.
+- (B) Hold from rebind only (v3-room and creator-close). Greens the RED, but leaves the window from activation to rebind open, so it is partial. I don't recommend it.
+- (C) Record it as a fixture-only limit (unreachable in shipped flows) and leave the code alone. RED case 4 would need your approval to be marked as a documented known limit.
+- (D) Refuse, with a count, other authors' new-epoch rows at a creator successor plane until its own fence exists. A later dependent re-requests them. This changes ingress semantics.
+- (E) Let the drain-time sizing count pending roots. This is a guarantee-level change to the recovery census.
+
+I recommend C now, or A if you want R3 closed in this track.
+
+### Follow-up instruction — Owner chose C for R3: documented known limit (2026-10-22 04:24 UTC)
+
+The owner chose C for R3: record it as a documented known limit and leave the code alone.
+
+What to do:
+- RED case 4 is your own new test, so you may mark it as a documented known limit. Use `it.skip` (or equivalent) with a comment giving:
+  - the order (export before the creator's adoption, then a Writer's new-epoch row before the creator's adoption drain);
+  - why no shipped flow reaches it;
+  - option A as the fix: the ingress hold from activation through the adoption tail.
+- Keep cases 1-3 and the continuous case live and green.
+- Record the limit in RESULT section 13. Answer one question there: can an app reach "export before adoption" through the public library API (V3RoomSession or the room package), or only through the fixture's internal path? If public API code can reach it, say so at the top of your hand-back.
+
+Your R1/R2 fix (the nonportable branch of issueReplacement skips the portable source preparation) is fine to commit as described.
+
+On the harness note: a burst refused by the 32-job gossip queue, with nothing re-requesting the refused tail rows, is a real-time-play issue in itself. Treat it as the core of step 14, not only as a harness concern. Then continue with the proofs and step 14 as planned.
+
+### Follow-up instruction — Owner: evaluate an export-before-adoption API guard (2026-10-22 05:04 UTC)
+
+I relayed your finding to the owner: an app can export before adoption through the public API (sealEpoch / serveAvailableSuccessor, exportCreatorSuccessor with no adoption precondition). They want an API guard evaluated before deciding. Without building it yet, check whether the library can refuse, or wait, to serve or export a creator's successor until the creator has adopted it, which is the order shipped flows already use. Report:
+(a) every path that serves or exports successor material before adoption, and whether any legitimate flow needs it;
+(b) every test, fixture, RED, frozen artifact or spec that relies on export before adoption, classified (i)/(ii)/(iii);
+(c) the latency cost, if any: how long a Writer would wait for the successor in the shipped flows (it should be about zero if they already wait);
+(d) the smallest guard (refuse with a typed error, or wait for adoption) and its G28 liveness argument.
+Send this as a short message when you have it. Meanwhile, keep case 4 skipped as agreed and carry on with R4, the proofs and step 14.
+
+Separately, your install-latency finding (each rebased entry pays a full dependency census in prepareReplacement, 0.4-3.5 s, so an install costs N times that) is a real-time-play problem in its own right. Measure it in the play-through proofs: install time against the number of rebased moves. Don't optimise it in this track; it will get its own track after yours merges. Do include your best read of where the per-entry cost goes.
+
+### Follow-up instruction — Include P1 in this track if provably safe (2026-10-22 05:14 UTC)
+
+Change of plan on P1. Installs of 64-343 s under continuous play make the play-through proof meaningless without it, so include P1 (prepareReplacement skips the dependency census for a nonportable replacement) in this track, on one condition: argue it is safe. Show that the census you skip only feeds the portable record, or is redundant for a nonportable replacement, and that every check a nonportable replacement needs (authorization, plan entry, deriveOwnedReplacement equality, G21 accounting) still runs. Write that argument in RESULT 13, list the guarantees it touches, and add a test that a nonportable replacement with a bad dependency or plan entry is still refused after P1. Commit it on its own, after the R4 fix.
+
+If the argument doesn't hold, don't commit P1. Report why, and it goes to the follow-up track.
+
+The remaining cost (issueOneVertex → transactIssue → nativeSignAdmission → issuanceRetirementImage encoding the whole issuance image on each issue) is the follow-up track, so don't optimise it here. Do record your profile of it in RESULT 13, including install time against the number of rebased moves with P1.
+
+The export-before-adopt guard evaluation (a)-(d) still comes first as a short message.
+
+### Report returned by the agent
+
+Track X: export-before-adopt guard evaluation (a)-(d). Nothing has been built.
+
+(a) Paths that serve or export a successor before adoption:
+1. V3RoomSession.sealEpoch → serveAvailableSuccessor (v3-room ~7537). It serves straight after the close, whenever the node has a snapshot protocol host.
+2. exportCreatorSuccessor (~7177) → serveSuccessor (~3427). It returns the offer and serves, with no adoption check.
+3. A reopened room whose head is still pending (sealed, not yet adopted) serves at startup (~7618).
+4. The storage-level subpath exports readCreatorSuccessorExport and createCreatorSuccessorMaterialServer ("@ts-drp/node/creator-adoption"). They take no session and check nothing about adoption.
+Serving on its own is inert: a Writer needs the offer, and only path 2 (or 4) hands it out.
+No legitimate flow needs a Writer to receive successor material before adoption. Every shipped page and harness uses the offer only after adoptCreatorSuccessor resolves. Four of them do call export before adopt (create, then adopt, then hand over): healthy-grid (and so r8), d9346, the Track V Grid harness and the Track X shipped-app harness. Two r9 tests (chat-role-network, creator-selection) fetch from the server that sealEpoch started, but only after adoption.
+
+(b) What relies on export before adoption:
+- (i) The four harnesses above: they create the offer before adopting but use it after. The row-51 proof track-x-readiness-hold-close.test.ts genuinely installs before adoption, but only through the fixture's settlementDelivery, which calls the storage-level functions directly.
+- (ii) d9346 asserts the exact stage order seal, export, adopt (phase-3a1b-d9346-v3-zone.pw.ts:489-491; not a RED, but pinned). track-x-readiness-hold-red.test.ts (maintenance case) installs before adoption through settlementDelivery. My skipped case 4 does too. tests/fixtures/phase-6b-d110c-b/source-shape.mjs:38-42 pins substrings of the adoption section of v3-room.ts.
+- (iii) Docs that say "seals, exports and adopts": Track V RESULT, my RESULT/README, Track K RESULT, the 06 DESIGN, and requirements-to-evidence.md:5420 ("issue/seal/export/adopt/install" seams). No spec, registry or frozen vector requires export before adoption.
+
+(c) Latency: about zero in every shipped flow, since the Writer already gets the offer only after adoption. If export had to move after adopt, the total from seal to offer would be unchanged; the export time just moves.
+
+(d) Guard options:
+- Refuse in exportCreatorSuccessor with a typed error. This breaks the four harnesses, and reordering d9346 changes a pinned stage order (needs approval). sealEpoch's serve would also have to move to the adoption tail, where Track Z is adding its tail calls.
+- Wait in exportCreatorSuccessor. This deadlocks every sequential caller: export is awaited before adopt, and both run in the same lifetime FIFO. Rejected.
+- Smallest guard (recommended): gate serving, not exporting. The successor material server answers a chunk request only once the creator has adopted that successor (the adoption tail, readiness included, is complete). Before that it refuses with a typed retryable error, or holds the request, bounded by the transfer's existing per-port request limits. Effects:
+  - The offer can still be created early, so no harness, pin or Track Z spot changes.
+  - Nothing new is held unbounded (G21, G22).
+  - A Writer can no longer finish an install before the creator's adoption tail, which closes R3 for the session API.
+- Liveness: adoption is one bounded lifetime operation. Once it completes, every request is served. If it fails, the session is terminal, and the Writer's install fails the same way it would today. So the guard never leaves a Writer permanently deaf.
+- Still to check: whether the Writer's install retries a refused fetch or fails, which decides between refuse and hold.
+- Limits: the storage-level exports (path 4) stay unguarded unless the gate goes into createCreatorSuccessorMaterialServer. Doing that would remove the row-51 proof scenario (readiness-hold-close/red).
+- Note: in the spec, G28 is "native requirements need native evidence". The liveness argument above falls under G2/G3 and the brief's "never permanently deaf".
+
+Separately, a new finding I'm characterising now (R5, likely a guarantee-level choice). With paced play-through (one Writer move per seal), the Writer's 9th install fails "journal retirement refused: malformed-input", and the Writer goes terminal.
+- Cause: each epoch's Writer journal scope that holds a move outside the cut (later replaced nonportably) is never collectible. The closed-membership prefix needs every row in the cut, and the local-issued path needs every row covered-historical.
+- So the protected scopes grow by one per epoch (0..7). At 8 they exceed maxScopes (7), and prepareFence refuses.
+- This is also unbounded growth with room age (G1).
+I'll send options shortly. P1 is next after that.
+
+### Report returned by the agent
+
+Track X R5 needs a decision: a Writer that moves during 8 seals goes terminal.
+
+What I see: with one Writer move during each seal (node host, paced play, R1/R2/R4 fixes in), the Writer's install of epoch 9 fails with "journal retirement refused: malformed-input". The Writer is then dead.
+
+Root cause (probe evidence: logs r60-r5-probe-r1..r3):
+- A Writer's journal for epoch e can be collected only as a closed-membership prefix. creator-closed-rollback-data.ts prepareClosedJournalMembershipPrefix requires the scope's rows to equal the signed cut's membership exactly (`frames.length !== members.size` → undefined).
+- The local-issued fallback refuses any scope that also holds received rows (closedJournalScopeHasNonLocalRows → "unclassified-prefix").
+- A move the Writer made after the creator's cut sits in the epoch-e journal, outside the cut, and is replaced in e+1. So that whole scope is retained forever. Once protected, it stays protected in every later intent.
+- Writer protected scopes by epoch: [0,1,2] → [0..3] → … → [0..7]. At 8 they exceed LIVE_JOURNAL_RETIREMENT_LIMITS.maxScopes (7), and the live-journal prepareFence refuses (captureJournalRetirementPreparation).
+- So a Writer that ever moves during 8 seals, over the room's whole life, dies at its next install. It is also unbounded growth with room age (G1).
+- The creator is unaffected: it drains normally.
+- The cause is the membership rule, not the profile, so I expect it on any profile where a Writer's row falls outside a cut. Not yet checked on shipped Canvas/Chat, whose long-room harnesses pause during rollovers.
+
+Options:
+- A (my recommendation): one more collectible class.
+  - An epoch-e scope whose rows are exactly cut(e)'s membership, plus local-issued rows outside the cut.
+  - Each outside row must be a source this author replaced, and the replacement must be a member of a later signed cut.
+  - Binding: deriveOwnedReplacement(source vertex, immutable policy) equals the replacement's operations, as R4's completedNonportableReplacementChunk already checks.
+  - Deletion proof is then signed facts only: the two cuts, both signed vertices and the policy. Plan labels and counts are not proof (G7, G8, G10).
+  - Touches G7, G8, G10, G15 and G19, and needs your approval.
+  - Cost: one bounded check per outside row, in the existing pass.
+- B: the same as A, but the replacement only needs to be durably issued and published, not yet in a signed cut.
+  - Collects one epoch sooner, but rests on local evidence. I don't recommend it (G5, G8).
+- C: no code change. Document it as a limit: a Writer must not move during more than 7 seals.
+  - Real-time play makes that unavoidable, so it isn't acceptable for the Grid.
+- D: raise maxScopes.
+  - Only moves the wall, and still breaks G1. Rejected.
+
+Until you decide, I'm continuing with P1 (with the safety argument and its refusal test) and step 14. The 16-rollover play-through proofs can't pass before R5 is fixed: both the node host and the Grid will die at the 9th install.
+
+### Follow-up instruction — Owner decisions: gate serving, R5 option A (2026-10-22 05:32 UTC)
+
+Owner decisions on the guard and R5 (the owner chose both directly, 2026-10-22).
+
+1. Guard: gate serving, not exporting (your recommended option). The offer can still be created before adoption. The successor material server answers chunk requests only after the creator's adoption tail, readiness included, has completed. Pick hold or typed retryable refusal by what the Writer's install does with a refused fetch: if it doesn't retry, hold, bounded by the existing per-port request limits. The rule is that the gate must never be the reason a Writer's install fails. Leave the storage-level subpath exports (createCreatorSuccessorMaterialServer, readCreatorSuccessorExport) unguarded, so the row-51 proof scenario stays, and record them as a known limit. RED first: a Writer that fetches before adoption is not served until adoption completes, then installs. Un-skip your case 4 only if it now passes as written; otherwise leave it skipped and say why.
+
+2. R5: option A, prove by signed cut. The new collectible class is an epoch-e scope whose rows are exactly cut(e)'s membership plus local-issued rows outside the cut. Each outside row must be a source this author replaced, the replacement must be a member of a later signed cut, and deriveOwnedReplacement(source vertex, immutable policy) must equal the replacement's operations. Deletion rests on signed facts only. RED first, plus refusal tests showing the scope is still retained when:
+   (a) the replacement is not yet in a signed cut;
+   (b) the replacement's operations don't match the derivation;
+   (c) the outside row isn't local-issued;
+   (d) the outside row isn't a replaced source.
+   Show that the Writer's protected scopes stay bounded over at least 16 rollovers of paced play (node host). In RESULT, state per guarantee (G7, G8, G10, G15, G19) why it still holds. Also check whether R5 is reachable on shipped Chat now that Track W2 adds late Writers, and say so either way.
+
+Order: R5 (it blocks every play-through proof), then the gate, then P1 under its existing condition, then step 14 and the proofs.

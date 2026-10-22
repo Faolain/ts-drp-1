@@ -6,8 +6,17 @@
 		<title>DRP - Chat</title>
 		<link rel="stylesheet" href="styles.css" />
 		<style>
-			#chatInviteRow[hidden] {
+			#chatInviteRow[hidden],
+			#membershipPanel[hidden] {
 				display: none;
+			}
+			#authorId {
+				word-break: break-all;
+			}
+			#sendHint {
+				min-height: 1.2em;
+				font-size: 0.9em;
+				opacity: 0.8;
 			}
 			#chatInvite {
 				min-width: 0;
@@ -39,6 +48,10 @@
 		<div class="info-row">
 			<div class="info-label">Current peer ID:</div>
 			<div id="peerId" class="info-value"></div>
+		</div>
+		<div class="info-row">
+			<div class="info-label">Your author ID:</div>
+			<div id="authorId" class="info-value" aria-label="Your author ID"></div>
 		</div>
 
 		<!-- Add a toggle button for mobile -->
@@ -81,6 +94,16 @@
 			<button id="createRoom" disabled>Create Room</button>
 		</div>
 		<div id="chatStatus" role="status" aria-label="Chat connection status">Starting configured chat…</div>
+		<div id="membershipPanel" class="control-panel" hidden>
+			<input
+				id="memberInput"
+				type="text"
+				placeholder="Member's author ID"
+				aria-label="Member's author ID to make or unmake a Writer"
+			/>
+			<button id="grantWriter" disabled>Make Writer</button>
+			<button id="revokeWriter" disabled>Revoke Writer</button>
+		</div>
 
 		<div id="chat">
 			<!-- Messages will appear here -->
@@ -90,6 +113,7 @@
 			<input id="messageInput" type="text" placeholder="Type your message here..." disabled />
 			<button id="sendMessage" disabled>Send</button>
 		</div>
+		<div id="sendHint" aria-label="Why sending is closed"></div>
 
 		<!-- Dark mode functionality -->
 		<script>

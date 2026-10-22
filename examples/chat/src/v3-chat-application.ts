@@ -15,10 +15,22 @@ import {
 	shippingChatCapacityStateBytes,
 } from "./v3-chat-capacity.js";
 import { type ShippingChatMessage } from "./v3-chat-message.js";
+import {
+	createShippingChatSharesApplication,
+	SHIPPING_CHAT_SHARES_ARTIFACT_ID,
+	type ShippingChatShares,
+} from "./v3-chat-shares.js";
 import { createShippingChatWindowApplication, SHIPPING_CHAT_WINDOW_ARTIFACT_ID } from "./v3-chat-window.js";
 
 export { createShippingChatGenesisStateBytes } from "./v3-chat-capacity.js";
 export { createShippingChatWindowGenesisStateBytes, SHIPPING_CHAT_WINDOW_ARTIFACT_ID } from "./v3-chat-window.js";
+export {
+	createShippingChatSharesGenesisStateBytes,
+	SHIPPING_CHAT_SHARE_HOLDERS,
+	SHIPPING_CHAT_SHARES_ARTIFACT_ID,
+	type ShippingChatShares,
+	shippingChatShareUpdate,
+} from "./v3-chat-shares.js";
 export {
 	captureShippingChatOperation,
 	SHIPPING_CHAT_OPERATION_LIMITS,
@@ -30,10 +42,11 @@ export {
 export const SHIPPING_CHAT_ARTIFACT_ID = "v3-shipping-chat.v3" as const;
 export interface ShippingChatProjection {
 	readonly messages: readonly ShippingChatMessage[];
-	readonly capacity: ShippingChatCapacity;
+	/** The v3 and v4 formats' allocations, or the v5 format's share rows. */
+	readonly capacity: ShippingChatCapacity | ShippingChatShares;
 	readonly transportPeerAuthors: readonly Readonly<{ author: string; peerId: string }>[];
 	readonly writerAuthors: readonly string[];
-	/** Window format only: the epoch this projection's authenticated base opened (display data). */
+	/** Window and shares formats only: the epoch this projection's authenticated base opened (display data). */
 	readonly epoch?: number;
 }
 
@@ -139,8 +152,11 @@ export async function createShippingV3ChatApplication(
 		exactCanonicalGenesisLatchedAclBytes: Uint8Array;
 	}>
 ): Promise<ShippingChatApplication> {
-	// A room's format is the artifact its signed genesis names: new rooms sign the window format.
-	if (input.catalog.resolve(input.blueprintDigest).artifactId === SHIPPING_CHAT_WINDOW_ARTIFACT_ID)
+	// A room's format is the artifact its signed genesis names: new rooms sign the shares format.
+	const artifactId = input.catalog.resolve(input.blueprintDigest).artifactId;
+	if (artifactId === SHIPPING_CHAT_SHARES_ARTIFACT_ID)
+		return createShippingChatSharesApplication(input, resourceBoundBases);
+	if (artifactId === SHIPPING_CHAT_WINDOW_ARTIFACT_ID)
 		return createShippingChatWindowApplication(input, resourceBoundBases);
 	const catalog = input.catalog,
 		blueprintDigest = input.blueprintDigest;
