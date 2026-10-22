@@ -24,12 +24,14 @@ import {
 // before the creator adopts it. Its first rows reach the creator's sealed plane and are dropped;
 // its next move reaches the creator's new plane during the adoption, before the creator's
 // settlement fence, with a dependency the creator does not hold yet. The creator must stay live
-// and admit the Writer's rows once it holds them.
+// and admit the Writer's rows once it holds them. It is skipped as a documented known limit
+// (decision row 60, option C); see the comment on the case.
 
 const SETTLE_MS = 300;
 const RETRY_MS = 50;
 const STREAM_CAP = 40;
 const DELIVERY_BATCH = 16;
+const SEAL_PLAY_EPOCHS = 5;
 // Opt-in scale for the proof runs: more rollovers, and an optional pause between the Writer's
 // moves (0, the default, plays back to back).
 const STREAM_EPOCHS = Number(process.env.TRACK_X_PLAY_THROUGH_EPOCHS ?? 3);
@@ -173,6 +175,30 @@ it("a Writer move made during the creator's seal is replaced at the Writer's ins
 	await expectLive(room, "epoch-1");
 }, 240_000);
 
+// A source the Writer's install replaced (nonportably) stays in its outbox. The received
+// recovery turnover at a later install (once the Writer's recovery scopes reach their bound)
+// censuses it before any later signed cut covers it, and must still recognize it as settled.
+it(`a Writer that moves during every seal stays live through ${SEAL_PLAY_EPOCHS} rollovers`, async () => {
+	const room = await openRoom();
+	for (let epoch = 0; epoch < SEAL_PLAY_EPOCHS; epoch++) {
+		await play(room, `epoch-${epoch}`);
+		await sleep(SETTLE_MS);
+		const sealing = room.creator.room.sealEpoch();
+		await room.writer.room.issue({ action: "placeBlock", id: `seal-${epoch}`, kind: "gold", x: 9, y: epoch });
+		const sealed = await sealing;
+		expect((sealed as { ok?: boolean }).ok, JSON.stringify(sealed)).toBe(true);
+		room.creator.inject(await room.fixture.publishedAfter(1, room.delivered[1]), 1);
+		await room.creator.room.adoptCreatorSuccessor();
+		expect(room.creator.room.authority()?.epoch).toBe(epoch + 1);
+		expect(await install(room), `install of epoch ${epoch + 1}`).toBe("ok");
+		expect(room.writer.room.authority()?.epoch).toBe(epoch + 1);
+		await deliver(room, 1);
+		expect(blockIds(room.creator)).toContain(`seal-${epoch}`);
+	}
+	expect(room.writer.room.projection()).toEqual(room.creator.room.projection());
+	await expectLive(room, "after-seals");
+}, 600_000);
+
 it("a Writer move made during the creator's adoption is replaced at the Writer's install; the Writer stays live", async () => {
 	const room = await openRoom();
 	await play(room, "epoch-0");
@@ -270,7 +296,21 @@ it(
 	Math.max(600_000, STREAM_EPOCHS * 120_000)
 );
 
-it("fixture-only order: a Writer that installs and plays before the creator adopts leaves the creator live", async () => {
+// KNOWN LIMIT (decision row 60, option C; the owner chose to leave the code alone). Order: the
+// creator seals and its successor is exported before the creator adopts it; a Writer installs it
+// and plays, and the Writer's new-epoch row reaches the creator's new plane after activation and
+// before the adoption drain issues the creator's settlement fence. Its dependency (the Writer's
+// fence) was dropped by the sealed plane, so it waits as pending ingress, and the drain's issue
+// sizing (v3-live prospectiveCreatorRuntimeCensusOverhead, used before readiness is prepared)
+// requires no pending ingress: the creator's fence is refused and the creator goes terminal.
+// No shipped flow reaches it: the shipped pages and harnesses hand the offer to Writers only after
+// adoptCreatorSuccessor resolves, and a Writer has no other way to obtain the offer. The public
+// session API does not prevent it, though: sealEpoch already serves the successor material and
+// exportCreatorSuccessor returns the offer with no adoption precondition (RESULT section 13).
+// The fix, if wanted: option A, the readiness ingress hold taken atomically when the creator's
+// successor registration activates and held through the adoption tail (publication, settlement
+// drain, readiness), released on every path.
+it.skip("fixture-only order: a Writer that installs and plays before the creator adopts leaves the creator live", async () => {
 	const state: { armed: boolean; rows: Rows; delivered: boolean } = { armed: false, rows: [], delivered: false };
 	// Once armed, the creator's first projection (its adoption's successor projection, before its
 	// settlement drain) delivers the Writer's rows as gossip.
