@@ -1041,6 +1041,11 @@ export async function receiveCreatorSuccessorAdoption(
 		exactCanonicalGenesisAnchorPreimageBytes?: Uint8Array;
 		detachedGenesisSignature?: Uint8Array;
 		recoveryContext?: CreatorRecipientRecoveryContext;
+		/**
+		 * The caller's lifetime (decision row 61, option E): the material fetch retries transient
+		 * unavailability, inside this one admitted receive, until it aborts.
+		 */
+		retryUntil?: AbortSignal;
 	}>
 ): Promise<ReceivedCreatorSuccessorAdoption> {
 	const source = resolveCreatorRecipientRegistration(input.plane);
@@ -1144,6 +1149,7 @@ export async function receiveCreatorSuccessorAdoption(
 			transport: input.transport,
 			peers: input.peers,
 			manifestDigest: manifest.manifestDigest,
+			...(input.retryUntil === undefined ? {} : { retryUntil: input.retryUntil }),
 			identity: {
 				author: input.author,
 				sign: input.signRegisteredVertexDigest,

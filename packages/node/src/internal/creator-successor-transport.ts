@@ -242,7 +242,179 @@ export function createCreatorSuccessorMaterialServer(
 }
 
 /**
+ * Reviewed pacing of a Writer's retries of transient creator-successor material unavailability
+ * (decision row 61, option E). After a round in which every connected candidate failed
+ * transiently, or none was connected, the next round waits this long, doubling per round up to
+ * the maximum. One attempt is in flight at a time and each keeps its own
+ * SNAPSHOT_PULL_INACTIVITY_MS deadline, so a fetch makes at most one attempt per listed peer
+ * (at most SNAPSHOT_PULL_MAX_ATTEMPTS) per round. There is no total deadline: a creator holds an
+ * early request until it has adopted the successor it serves, and any finite total would only move
+ * that cliff. The fetch ends when the material arrives, when every listed peer has failed
+ * terminally, or when its caller's lifetime (`retryUntil`) ends.
+ */
+export const CREATOR_SUCCESSOR_MATERIAL_RETRY_INITIAL_MS = 250 as const;
+/** The longest pause between two rounds of material attempts (see CREATOR_SUCCESSOR_MATERIAL_RETRY_INITIAL_MS). */
+export const CREATOR_SUCCESSOR_MATERIAL_RETRY_MAX_MS = 5_000 as const;
+
+type ReceivedCreatorSuccessorMaterial = CreatorSuccessorAuxiliaryMaterial &
+	Readonly<{ authorization: SnapshotPeerAuthorization; peers: readonly string[] }>;
+
+/**
+ * One material attempt's outcome. Transient: the attempt's own deadline or the caller's lifetime
+ * ended it, or opening, writing or reading the stream failed (a reset, an ended stream, no
+ * connection). Terminal: signing failed, or the response itself is unacceptable (malformed frame,
+ * wrong kind, version, manifest, peers or nonce, unauthorized author, bad signature, invalid
+ * bounds). Uncertain cleanup: the stream's release could not be confirmed.
+ */
+type MaterialAttempt =
+	| Readonly<{ kind: "received"; value: ReceivedCreatorSuccessorMaterial }>
+	| Readonly<{ kind: "transient" | "terminal" | "uncertain-cleanup"; failure: unknown }>;
+
+async function attemptCreatorSuccessorMaterial(
+	input: Readonly<{
+		transport: SnapshotChunkProtocolPort;
+		identity: SigningIdentity;
+		manifestDigest: string;
+	}>,
+	peer: string,
+	lifetime: AbortSignal | undefined
+): Promise<MaterialAttempt> {
+	const nonce = crypto.getRandomValues(new Uint8Array(32));
+	const request = {
+		kind: "creator-successor-material-request",
+		version: 1,
+		nonce,
+		manifestDigest: input.manifestDigest,
+		requesterPeer: input.transport.localPeerId,
+		sourcePeer: peer,
+		author: input.identity.author,
+	};
+	const controller = new AbortController();
+	const timer = setTimeout(
+		() => controller.abort(new Error("creator material request timed out")),
+		SNAPSHOT_PULL_INACTIVITY_MS
+	);
+	const lifetimeEnded = (): void => controller.abort(lifetime?.reason);
+	lifetime?.addEventListener("abort", lifetimeEnded, { once: true });
+	if (lifetime?.aborted === true) lifetimeEnded();
+	let stream: SnapshotChunkProtocolStream | undefined;
+	let received: ReceivedCreatorSuccessorMaterial | undefined;
+	let phase: "stream" | "signing" | "response" = "stream";
+	let failed = false;
+	let cleanupFailed = false;
+	let primary: unknown;
+	const cleanupFailure = (error: unknown): void => {
+		cleanupFailed = true;
+		primary = failed
+			? new AggregateError([primary, error], "creator material attempt and cleanup failed", { cause: primary })
+			: error;
+		failed = true;
+	};
+	try {
+		stream = await input.transport.open(peer, { signal: controller.signal });
+		phase = "signing";
+		const signature = await signTransportFrame(input.identity, request, controller.signal);
+		phase = "stream";
+		await stream.write(encodeCanonical({ ...request, signature }, FRAME_LIMITS), { signal: controller.signal });
+		const bytes = await stream.read(MAX_BYTES, { signal: controller.signal });
+		phase = "response";
+		const response = decode(bytes, [
+			"kind",
+			"version",
+			"nonce",
+			"manifestDigest",
+			"requesterPeer",
+			"sourcePeer",
+			"author",
+			"signature",
+			"exactCanonicalSettlementBytes",
+			"exactCanonicalHistoryBytes",
+		]);
+		const { signature: responseSignature, ...proof } = response;
+		if (
+			response.kind !== "creator-successor-material-response" ||
+			response.version !== 1 ||
+			response.manifestDigest !== input.manifestDigest ||
+			response.requesterPeer !== input.transport.localPeerId ||
+			response.sourcePeer !== peer ||
+			!(response.nonce instanceof Uint8Array) ||
+			compareBytes(response.nonce, nonce) !== 0 ||
+			typeof response.author !== "string" ||
+			!input.identity.isAuthorizedAuthor(response.author) ||
+			!(await verify(response.author, responseSignature, proof))
+		)
+			throw new TypeError("creator material source is unauthorized");
+		const author = response.author;
+		received = Object.freeze({
+			...auxiliary(response),
+			peers: Object.freeze([peer]),
+			authorization: Object.freeze({
+				authorForPeer: (candidate: string) => (candidate === peer ? author : undefined),
+				isAuthorizedAuthor: input.identity.isAuthorizedAuthor,
+			}),
+		});
+	} catch (error) {
+		failed = true;
+		primary = error;
+	}
+	clearTimeout(timer);
+	lifetime?.removeEventListener("abort", lifetimeEnded);
+	if (failed) {
+		try {
+			stream?.abort(primary instanceof Error ? primary : undefined);
+		} catch (error) {
+			cleanupFailure(error);
+		}
+	}
+	try {
+		await stream?.close();
+	} catch (error) {
+		cleanupFailure(error);
+		try {
+			stream?.abort(error instanceof Error ? error : undefined);
+		} catch (abortError) {
+			cleanupFailure(abortError);
+		}
+	}
+	if (cleanupFailed) return { kind: "uncertain-cleanup", failure: primary };
+	if (!failed && received !== undefined) return { kind: "received", value: received };
+	// A response is judged on its content, whatever the deadline; a signing refusal is not the
+	// network's. Everything else (no stream, a failed write or read, a deadline) is transient.
+	const terminal = phase === "response" || (phase === "signing" && !controller.signal.aborted);
+	return { kind: terminal ? "terminal" : "transient", failure: primary };
+}
+
+/**
+ * Waits between two rounds of material attempts.
+ * @param ms The pause.
+ * @param lifetime The caller's lifetime.
+ * @returns Whether the pause completed (false when the lifetime ended first).
+ */
+function pauseMaterialRetry(ms: number, lifetime: AbortSignal): Promise<boolean> {
+	return new Promise((resolve) => {
+		if (lifetime.aborted) {
+			resolve(false);
+			return;
+		}
+		const done = (completed: boolean): void => {
+			clearTimeout(timer);
+			lifetime.removeEventListener("abort", ended);
+			resolve(completed);
+		};
+		const ended = (): void => done(false);
+		const timer = setTimeout(() => done(true), ms);
+		lifetime.addEventListener("abort", ended, { once: true });
+	});
+}
+
+/**
  * Fetches bounded operation-private native materials over existing unlimited authenticated streams.
+ * Without `retryUntil`, one pass over the connected listed peers. With it (decision row 61, option
+ * E), transient unavailability is retried with a fresh nonce, rotating over the listed peers that
+ * are connected at each round, one attempt in flight, paced by CREATOR_SUCCESSOR_MATERIAL_RETRY_*,
+ * until the material arrives, every listed peer has failed terminally, or `retryUntil` aborts.
+ * Uncertain stream cleanup ends the fetch at once in both modes. The failure kept for the
+ * diagnostic is one per listed peer, in first-failure order.
  * @param input The actual recipient transport, application identity and expected native manifest.
  * @returns Detached verified material and its operation-private source authorization.
  */
@@ -252,117 +424,36 @@ export async function receiveCreatorSuccessorMaterial(
 		identity: SigningIdentity;
 		peers: readonly string[];
 		manifestDigest: string;
+		/** The caller's lifetime; when present, transient unavailability is retried until it aborts. */
+		retryUntil?: AbortSignal;
 	}>
-): Promise<
-	CreatorSuccessorAuxiliaryMaterial & Readonly<{ authorization: SnapshotPeerAuthorization; peers: readonly string[] }>
-> {
+): Promise<ReceivedCreatorSuccessorMaterial> {
 	const peers = captureCreatorSuccessorPeers(input.peers);
-	const connected = new Set(input.transport.connectedPeers());
-	const candidates = peers.filter((peer) => connected.has(peer));
-	const failures: unknown[] = [];
-	for (let attempt = 0; attempt < Math.min(candidates.length, SNAPSHOT_PULL_MAX_ATTEMPTS); attempt += 1) {
-		const peer = candidates[attempt] as string;
-		const nonce = crypto.getRandomValues(new Uint8Array(32));
-		const request = {
-			kind: "creator-successor-material-request",
-			version: 1,
-			nonce,
-			manifestDigest: input.manifestDigest,
-			requesterPeer: input.transport.localPeerId,
-			sourcePeer: peer,
-			author: input.identity.author,
-		};
-		const controller = new AbortController();
-		const timer = setTimeout(
-			() => controller.abort(new Error("creator material request timed out")),
-			SNAPSHOT_PULL_INACTIVITY_MS
-		);
-		let stream: SnapshotChunkProtocolStream | undefined;
-		let received:
-			| (CreatorSuccessorAuxiliaryMaterial &
-					Readonly<{ authorization: SnapshotPeerAuthorization; peers: readonly string[] }>)
-			| undefined;
-		let failed = false;
-		let cleanupFailed = false;
-		let primary: unknown;
-		const cleanupFailure = (error: unknown): void => {
-			cleanupFailed = true;
-			primary = failed
-				? new AggregateError([primary, error], "creator material attempt and cleanup failed", { cause: primary })
-				: error;
-			failed = true;
-		};
-		try {
-			stream = await input.transport.open(peer, { signal: controller.signal });
-			await stream.write(
-				encodeCanonical({ ...request, signature: await signTransportFrame(input.identity, request, controller.signal) }, FRAME_LIMITS),
-				{ signal: controller.signal }
-			);
-			const response = decode(await stream.read(MAX_BYTES, { signal: controller.signal }), [
-				"kind",
-				"version",
-				"nonce",
-				"manifestDigest",
-				"requesterPeer",
-				"sourcePeer",
-				"author",
-				"signature",
-				"exactCanonicalSettlementBytes",
-				"exactCanonicalHistoryBytes",
-			]);
-			const { signature, ...proof } = response;
-			if (
-				response.kind !== "creator-successor-material-response" ||
-				response.version !== 1 ||
-				response.manifestDigest !== input.manifestDigest ||
-				response.requesterPeer !== input.transport.localPeerId ||
-				response.sourcePeer !== peer ||
-				!(response.nonce instanceof Uint8Array) ||
-				compareBytes(response.nonce, nonce) !== 0 ||
-				typeof response.author !== "string" ||
-				!input.identity.isAuthorizedAuthor(response.author) ||
-				!(await verify(response.author, signature, proof))
-			)
-				throw new TypeError("creator material source is unauthorized");
-			const author = response.author;
-			received = Object.freeze({
-				...auxiliary(response),
-				peers: Object.freeze([peer]),
-				authorization: Object.freeze({
-					authorForPeer: (candidate: string) => (candidate === peer ? author : undefined),
-					isAuthorizedAuthor: input.identity.isAuthorizedAuthor,
-				}),
-			});
-		} catch (error) {
-			failed = true;
-			primary = error;
-		}
-		clearTimeout(timer);
-		if (failed) {
-			try {
-				stream?.abort(primary instanceof Error ? primary : undefined);
-			} catch (error) {
-				cleanupFailure(error);
-			}
-		}
-		try {
-			await stream?.close();
-		} catch (error) {
-			cleanupFailure(error);
-			try {
-				stream?.abort(error instanceof Error ? error : undefined);
-			} catch (abortError) {
-				cleanupFailure(abortError);
-			}
-		}
-		if (failed) {
-			failures.push(primary);
+	const lifetime = input.retryUntil;
+	const failures = new Map<string, unknown>();
+	const terminal = new Set<string>();
+	let pause: number = CREATOR_SUCCESSOR_MATERIAL_RETRY_INITIAL_MS;
+	const failure = (): AggregateError => {
+		const errors = [...failures.values()];
+		const cause = errors[0] ?? lifetime?.reason;
+		return new AggregateError(errors, "creator successor material transport failed", {
+			cause: cause instanceof AggregateError ? (cause.cause ?? cause) : cause,
+		});
+	};
+	for (;;) {
+		const connected = new Set(input.transport.connectedPeers());
+		for (const peer of peers) {
+			if (lifetime?.aborted === true) throw failure();
+			if (terminal.has(peer) || !connected.has(peer)) continue;
+			const attempt = await attemptCreatorSuccessorMaterial(input, peer, lifetime);
+			if (attempt.kind === "received") return attempt.value;
+			failures.set(peer, attempt.failure);
 			// A later peer must not hide uncertain native stream cleanup.
-			if (cleanupFailed) break;
-		} else if (received !== undefined) return received;
+			if (attempt.kind === "uncertain-cleanup") throw failure();
+			if (attempt.kind === "terminal") terminal.add(peer);
+		}
+		if (lifetime === undefined || peers.every((peer) => terminal.has(peer))) throw failure();
+		if (!(await pauseMaterialRetry(pause, lifetime))) throw failure();
+		pause = Math.min(pause * 2, CREATOR_SUCCESSOR_MATERIAL_RETRY_MAX_MS);
 	}
-	const cause = failures[0];
-	throw new AggregateError(failures, "creator successor material transport failed", {
-		cause: cause instanceof AggregateError ? (cause.cause ?? cause) : cause,
-	});
 }
