@@ -50,6 +50,10 @@ const PHASES = process.env.TRACK_Z_PHASES === "1";
 const LULL = process.env.TRACK_Z_LULL ?? "off";
 if (LULL !== "off" && LULL !== "explicit") throw new Error("TRACK_Z_LULL must be off or explicit");
 const ROLLOVER_TIMEOUT_MS = Number(process.env.TRACK_Z_ROLLOVER_TIMEOUT_MS ?? 0);
+// TRACK_Z_WRITER_FIRST=1: each epoch's moves start with the Writer's (ordinals 1, 0, 3, 2), so its first move is
+// issued right after its install, while its own lull and the creator's may still run (addition 3's Writer issue and
+// creator admission during a lull). Ordinals keep their issuer: even the creator, odd the Writer.
+const WRITER_FIRST = process.env.TRACK_Z_WRITER_FIRST === "1";
 
 async function bounded<Value>(evaluation: Promise<Value>, ms: number): Promise<Readonly<{ value: Value }> | undefined> {
 	if (ms <= 0) return { value: await evaluation };
@@ -314,7 +318,8 @@ test(`the shipped Grid page runs ${EPOCHS} creator successors with an enrolled W
 			// Track Z: [ordinal (even: creator, odd: Writer), issue start, issue ms, first seen by the other page]
 			// in absolute page time.
 			const moveTimes: [number, number, number, number][] = [];
-			for (let ordinal = 0; ordinal < MOVES * 2; ordinal++) {
+			for (let step = 0; step < MOVES * 2; step++) {
+				const ordinal = WRITER_FIRST ? step ^ 1 : step;
 				const index = ordinal % 2;
 				const [page, other] = index === 0 ? [creator, receiver] : [receiver, creator];
 				const block = { id: `block-${index}-${ordinal >> 1}`, kind: "stone", x: epoch, y: index };
