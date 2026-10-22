@@ -1,3 +1,4 @@
+import { decodeCanonical } from "@ts-drp/canonical";
 import type { DurableIssuanceOutboxRecord } from "@ts-drp/issuance-store";
 import { afterEach, expect, it } from "vitest";
 
@@ -28,6 +29,7 @@ import {
 const SETTLE_MS = 300;
 const RETRY_MS = 50;
 const STREAM_CAP = 40;
+const DELIVERY_BATCH = 16;
 // Opt-in scale for the proof runs: more rollovers, and an optional pause between the Writer's
 // moves (0, the default, plays back to back).
 const STREAM_EPOCHS = Number(process.env.TRACK_X_PLAY_THROUGH_EPOCHS ?? 3);
@@ -92,15 +94,36 @@ async function play(room: Room, label: string): Promise<void> {
 
 /**
  * Delivers every row a peer published since the last delivery to the other peer as gossip, and
- * waits until the last one is admitted.
+ * waits until the last one is admitted. Rows go in batches of at most DELIVERY_BATCH, each
+ * admitted before the next, as a network with flow control would deliver them: the recipient's
+ * bounded gossip queue (32 jobs) refuses a larger synchronous burst, and this fixture has no
+ * retained-history responder to re-fetch a refused row.
  * @param room - The room.
  * @param index - The sending peer.
  */
 async function deliver(room: Room, index: 0 | 1): Promise<void> {
 	const rows = await room.fixture.publishedAfter(index, room.delivered[index]);
-	if (rows.length === 0) return;
-	await (index === 0 ? room.writer : room.creator).receive(rows, index);
-	room.delivered[index] = required(rows.at(-1)).commit.authorSequence;
+	for (let start = 0; start < rows.length; start += DELIVERY_BATCH)
+		await (index === 0 ? room.writer : room.creator).receive(rows.slice(start, start + DELIVERY_BATCH), index);
+	if (rows.length !== 0) room.delivered[index] = required(rows.at(-1)).commit.authorSequence;
+}
+
+/**
+ * Delivers the Writer's rows of one epoch published since the last delivery (its fence, the
+ * replacements and any later move) to the creator, in flow-controlled batches as deliver() does.
+ * The stream already gossiped the Writer's rows of the earlier epoch, and the ones outside the cut
+ * are replaced in this epoch.
+ * @param room - The room.
+ * @param epoch - The epoch whose rows are delivered.
+ */
+async function deliverWriterEpoch(room: Room, epoch: number): Promise<void> {
+	const rows = await room.fixture.publishedAfter(1, room.delivered[1]);
+	const current = rows.filter(
+		(row) => (decodeCanonical(row.commit.envelope.canonicalPreimageBytes) as { epoch?: unknown }).epoch === epoch
+	);
+	for (let start = 0; start < current.length; start += DELIVERY_BATCH)
+		await room.creator.receive(current.slice(start, start + DELIVERY_BATCH), 1);
+	if (rows.length !== 0) room.delivered[1] = required(rows.at(-1)).commit.authorSequence;
 }
 
 /**
@@ -233,7 +256,7 @@ it(
 			expect(room.writer.room.authority()?.epoch).toBe(epoch + 1);
 			// The Writer's rows of the new epoch (its fence, the replacements, its moves) reach the
 			// creator, then both play on.
-			await deliver(room, 1);
+			await deliverWriterEpoch(room, epoch + 1);
 		}
 		await expectLive(room, "after-stream");
 		console.log(`TRACK_X_PLAY_THROUGH ${JSON.stringify({ placed: placed.length, failures: failures.slice(0, 5) })}`);
