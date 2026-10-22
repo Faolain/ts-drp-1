@@ -6833,7 +6833,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			}
 			// Arrivals queued behind the boundary; any refused at the bounded input
 			// pool are repaired through the same authenticated retained path a reconnect uses.
-			if (result.kind === "maintained" && activeHandle === plane && transport === roomTransport)
+			// Not after close: close revoked the transport and the next open asks again.
+			if (result.kind === "maintained" && !closed && activeHandle === plane && transport === roomTransport)
 				roomTransport.requestRetainedHistory();
 			return result;
 		} finally {
