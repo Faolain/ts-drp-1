@@ -138,6 +138,11 @@ export async function readinessHoldRoom(
 			floor?: FloorHooks;
 			/** Observes each projection the room reports (it may deliver rows; it changes nothing). */
 			onProjection?: (peer: HookPeer) => void;
+			/**
+			 * This peer's own displacement policies (the trusted local room policy, not signed),
+			 * replacing the application's for the given actions.
+			 */
+			policies?: Partial<V3RoomApplication["displacementPolicies"]>;
 		}> = {}
 	) => {
 		const identity = required(identities[index]);
@@ -179,7 +184,16 @@ export async function readinessHoldRoom(
 		const acknowledged = new Map<string, () => void>();
 		const networkNode = fakeNetwork(required(roster[index]).peerId, false);
 		const input: CreateV3RoomSessionInput<ReturnType<typeof application.projectAcceptedOperations>> = {
-			application,
+			application:
+				openOptions.policies === undefined
+					? application
+					: {
+							...application,
+							displacementPolicies: Object.freeze({
+								...application.displacementPolicies,
+								...openOptions.policies,
+							}) as typeof application.displacementPolicies,
+						},
 			// A reopened peer reopens its existing stores; a store a later install creates (a new
 			// plane's database) is created, as on the first open (the host's own filename scheme).
 			storageHost: openOptions.reopen
