@@ -15371,7 +15371,17 @@ function completedNonportableReplacementChunk(
 	try {
 		derived = deriveOwnedReplacement(registration, selected, { operations, planEffect });
 	} catch {
-		return undefined;
+		// R6-A: a source older than the immediately closed epoch, whose ACL no longer resolves.
+		return olderSourcePolicyReplacementChunk(
+			registration,
+			selected,
+			entry,
+			operations,
+			fromIntent,
+			"throughIntent" in planEffect ? planEffect.throughIntent : undefined
+		)
+			? fromIntent + operations.length
+			: undefined;
 	}
 	if (
 		derived.disposition !== entry.disposition ||
@@ -15382,6 +15392,85 @@ function completedNonportableReplacementChunk(
 	)
 		return undefined;
 	return fromIntent + operations.length;
+}
+
+/** Decision row 60 (R6, owner's R6-A): completion of a nonportable replacement chunk whose source
+ * is older than the immediately closed epoch. deriveOwnedReplacement needs the source epoch's ACL
+ * (resolveVerifiedHistoricalSourceAcl), which resolves only for the immediately closed epoch, so
+ * it refuses every older source, and a Writer whose replacement missed the next Cut was refused
+ * at every later install. The source stays authenticated by the census's own classification (a
+ * displaced row of this registration's author); the caller still requires a current non-creator
+ * Writer, the original plan entry naming each replacement row, and each row's own authentication.
+ * The chunk's operations must equal this slice of the original immutable policy's derivation from
+ * the source's operations (derivePolicyReplacement) or, for the plan's recorded admission refusal,
+ * of the source's own operations under that derivation's proposal digest, with the plan's
+ * disposition. Native completion for local recovery only, as completedNonportableReplacementChunk.
+ * @returns Whether the chunk is exactly that replacement. */
+function olderSourcePolicyReplacementChunk(
+	registration: V3PlaneRegistration,
+	selected: ClassifiedRebaseRow,
+	entry: SettlementPlan["entries"][number],
+	operations: readonly Readonly<{ operation: Readonly<Record<string, unknown>> }>[],
+	fromIntent: number,
+	throughIntent: number | undefined
+): boolean {
+	try {
+		const payload = registration.payload;
+		const policy = payload.input.settlementPolicy;
+		const sourceEpoch = selected.authenticated.admitted.epoch;
+		const sourceOperation = selected.authenticated.vertex.operation;
+		if (
+			!currentRegistration(registration) ||
+			policy === undefined ||
+			policy.blueprintDigest !== payload.provenance.blueprintDigest ||
+			selected.kind !== "displaced" ||
+			selected.authenticated.author !== registration.issuanceScope.author ||
+			!NumberIsSafeInteger(sourceEpoch) ||
+			sourceEpoch >= payload.provenance.epoch - 1 ||
+			sourceOperation === undefined ||
+			isControlOperation(sourceOperation, payload.trust.trust.profileId) ||
+			Reflect.get(sourceOperation, "action") === "acl"
+		)
+			return false;
+		const intents = rebaseIntents(payload, selected.authenticated);
+		const sourceOperations = intents?.map((intent) => detachedCanonicalOperation(intent.operation));
+		if (
+			sourceOperations === undefined ||
+			sourceOperations.length === 0 ||
+			sourceOperations.some((operation) => operation === undefined)
+		)
+			return false;
+		const original = sourceOperations as readonly Readonly<Record<string, unknown>>[];
+		const derived = derivePolicyReplacement(policy, original);
+		if (!sameBytes(encodeCanonical(derived), encodeCanonical(derivePolicyReplacement(policy, original)))) return false;
+		const refusal = entry.transformRefusal;
+		if (
+			refusal !== undefined &&
+			(derived.disposition !== "transform" ||
+				!sameBytes(
+					refusal.proposedIntentDigest,
+					hashDomain(
+						"ts-drp/settlement-transform-proposal/v1",
+						encodeCanonical(derived.operations, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS)
+					)
+				))
+		)
+			return false;
+		if (derived.disposition !== entry.disposition) return false;
+		const expected = refusal === undefined ? derived.operations : original;
+		const end = throughIntent ?? expected.length;
+		return (
+			fromIntent >= 0 &&
+			end <= expected.length &&
+			end - fromIntent === operations.length &&
+			sameBytes(
+				encodeCanonical(operations.map((value) => value.operation)),
+				encodeCanonical(expected.slice(fromIntent, end))
+			)
+		);
+	} catch {
+		return false;
+	}
 }
 
 /** Decision row 60 (R5): the application operations one vertex operation carries, as
