@@ -31,6 +31,7 @@ import { CANVAS_GENESIS_PROFILE } from "../../../examples/canvas/src/profile.js"
 import { openShippingChatCatalogs } from "../../../examples/chat/src/chat-catalogs.js";
 import {
 	createShippingChatGenesisStateBytes,
+	createShippingChatSharesGenesisStateBytes,
 	createShippingChatWindowGenesisStateBytes,
 	createShippingV3ChatApplication,
 	type ShippingChatProjection,
@@ -253,10 +254,12 @@ async function applicationFor(
 		);
 		return { application, genesis, admission: undefined, catalog: canvas.catalog };
 	}
-	// Track W: the shipped Chat signs the rolling-window format (v4) into new rooms; "lifetime"
-	// measures the version-3 format rooms created before it keep.
+	// Track W: "window" measures the rolling-window format (v4); "lifetime" the version-3 format
+	// rooms created before it keep. Track W2: "shares" measures the membership-aware format (v5)
+	// the shipped Chat now signs into new rooms.
 	const catalogs = openShippingChatCatalogs();
-	const { catalog, blueprintDigest } = chatFormat === "lifetime" ? catalogs.lifetime : catalogs.window;
+	const { catalog, blueprintDigest } =
+		chatFormat === "lifetime" ? catalogs.lifetime : chatFormat === "shares" ? catalogs.shares : catalogs.window;
 	const chat = await createShippingV3ChatApplication({
 		catalog,
 		blueprintDigest,
@@ -270,7 +273,9 @@ async function applicationFor(
 		genesis:
 			chatFormat === "lifetime"
 				? createShippingChatGenesisStateBytes({ exactCanonicalLatchedAclBytes })
-				: createShippingChatWindowGenesisStateBytes({ exactCanonicalLatchedAclBytes }),
+				: chatFormat === "shares"
+					? createShippingChatSharesGenesisStateBytes({ exactCanonicalLatchedAclBytes })
+					: createShippingChatWindowGenesisStateBytes({ exactCanonicalLatchedAclBytes }),
 		admission: chat.createOperationAdmissionPolicy,
 		catalog,
 	};
@@ -373,10 +378,10 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 	const chatFormat = options.chatFormat ?? "window";
 	const selected = await applicationFor(options.app, exactCanonicalLatchedAclBytes, options.creatorLull, chatFormat);
 	const application = selected.application;
-	// Track W: the shipped Chat (window format) keeps a device archive fed by the projection
-	// callback, as examples/chat does; observation reads its stats after each epoch.
+	// Track W: the shipped Chat (window and shares formats) keeps a device archive fed by the
+	// projection callback, as examples/chat does; observation reads its stats after each epoch.
 	const archiveHandle =
-		options.app === "chat" && chatFormat === "window" && env.openArchive !== undefined
+		options.app === "chat" && chatFormat !== "lifetime" && env.openArchive !== undefined
 			? await env.openArchive(name)
 			: undefined;
 	const archive =

@@ -8,8 +8,11 @@
 export type HostKind = "node" | "browser" | "room" | "room-retention";
 export type AppKind = "canvas" | "chat";
 export type RecipientMode = "receive-only" | "writer";
-/** Chat only (Track W): "window" = the shipped rolling-window format (v4), "lifetime" = version 3. */
-export type ChatFormat = "window" | "lifetime";
+/**
+ * Chat only. Track W: "window" = the rolling-window format (v4), "lifetime" = version 3. Track W2:
+ * "shares" = the membership-aware format (v5) the shipped Chat signs into new rooms.
+ */
+export type ChatFormat = "window" | "lifetime" | "shares";
 
 export interface LongRoomOptions {
 	readonly app: AppKind;
@@ -154,7 +157,10 @@ export function fromBase64(text: string): Uint8Array {
 }
 
 export function labelOf(options: LongRoomOptions): string {
-	const format = options.app === "chat" && options.chatFormat === "lifetime" ? "-lifetime" : "";
+	const format =
+		options.app === "chat" && options.chatFormat !== undefined && options.chatFormat !== "window"
+			? `-${options.chatFormat}`
+			: "";
 	return `${options.app}-${options.recipient}-${options.creatorLull ? "reader" : "product"}-${options.host}${format}`;
 }
 
