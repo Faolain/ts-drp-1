@@ -123,22 +123,27 @@ function sharesState(
 function message(author: string, clientOperationId: string, text: string, displayTimeMs = T): ShippingChatMessage {
 	return { author, clientOperationId, displayTimeMs, text };
 }
-/** A message whose canonical record is exactly `bytes` long (bytes >= 130). */
+/**
+ * A message whose canonical record is exactly `bytes` long (bytes >= 140), with non-empty text.
+ * A size the text alone cannot reach (where its length prefix grows a byte) uses a one-character
+ * longer id.
+ */
 function sized(author: string, clientOperationId: string, bytes: number): ShippingChatMessage {
-	const probe = message(author, clientOperationId, "x");
-	let text = "x".repeat(Math.max(1, bytes - size(probe) + 1));
-	while (size(message(author, clientOperationId, text)) > bytes) text = text.slice(1);
-	while (size(message(author, clientOperationId, text)) < bytes) text += "x";
-	const value = message(author, clientOperationId, text);
-	if (size(value) !== bytes) throw new TypeError("CHAT_SHARES_RULE_SIZE");
-	return value;
+	for (const id of [clientOperationId, `${clientOperationId}z`]) {
+		const fixed = size(message(author, id, ""));
+		for (let length = Math.max(1, bytes - fixed - 3); length <= bytes - fixed; length++) {
+			const value = message(author, id, "x".repeat(length));
+			if (size(value) === bytes) return value;
+		}
+	}
+	throw new TypeError("CHAT_SHARES_RULE_SIZE");
 }
-/** Messages of `author` whose records total exactly `bytes`, each between 130 and 1,500 bytes. */
+/** Messages of `author` whose records total exactly `bytes`, each between 140 and 1,500 bytes. */
 function padding(author: string, prefix: string, bytes: number): ShippingChatMessage[] {
 	const out: ShippingChatMessage[] = [];
 	let rest = bytes;
 	while (rest > 0) {
-		const next = rest > 1_630 ? 1_500 : rest > 1_500 ? rest - 130 : rest;
+		const next = rest > 1_640 ? 1_500 : rest > 1_500 ? rest - 140 : rest;
 		out.push(sized(author, `${prefix}-${out.length}`, next));
 		rest -= next;
 	}
@@ -805,7 +810,7 @@ describe("Track W2: Chat's membership-aware format (v5)", () => {
 							? [author, operationOf(own[Math.floor(next() * own.length)]!)]
 							: [
 									author,
-									operationOf(sized(author, `m-${round}-${index}`, 130 + Math.floor(next() * (ALLOWANCE - 130)))),
+									operationOf(sized(author, `m-${round}-${index}`, 140 + Math.floor(next() * (ALLOWANCE - 140)))),
 								];
 				}
 				operations.push(operation);

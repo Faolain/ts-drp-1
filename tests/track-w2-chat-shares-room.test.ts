@@ -112,7 +112,7 @@ describe("Track W2: membership changes in a v5 Chat room", () => {
 			genesisStateBytes: createShippingChatSharesGenesisStateBytes,
 		});
 		const creator = await f.open(0);
-		// The shipped page opens a joiner outside the ACL receive-only.
+		// The shipped page opens a joiner outside the ACL receive-only, and it follows the room live.
 		let joiner = await f.open(1, { receiveOnly: true });
 		const author = required(f.identities[1]).author;
 		await creator.room.issue(message("w2-hello", "welcome"));
@@ -123,26 +123,41 @@ describe("Track W2: membership changes in a v5 Chat room", () => {
 		await rollover(creator, 0);
 		await f.install(joiner);
 		expect(isWriter(joiner.room.previewLatchedAcl().current, author)).toBe(true);
-		// The page reopens the joiner's replica as a Writer, over the same databases.
-		await f.stop(joiner);
-		joiner = await f.open(1, { reopen: true });
-		expect(joiner.room.authority()).toMatchObject({ epoch: 1, lifecycle: "active" });
-		// Checkpoint 1: no share yet, so a message is refused (the page keeps its text).
-		await expect(joiner.room.issue(message("w2-early", "too early"))).rejects.toThrow();
+		// Checkpoint 1: the joiner is a Writer without a share, so its page stays receive-only.
 		// The creator's page issues the share update once checkpoint 1 is installed.
 		const update = required(updateFor(creator));
 		expect(update.capacity.allocations.find((row) => row[0] === author)).toEqual([author, expect.any(Number), 2]);
 		await creator.room.issue(update);
 		expect(updateFor(creator)).toBeUndefined();
+		expect(await joiner.receive(await f.issuedAfter(0, null), 0)).toBe(true);
+		expect(shares(joiner).allocations.find((row) => row[0] === author)?.[2]).toBe(2);
 		await rollover(creator, 1);
 		await f.install(joiner);
 		expect(joiner.room.authority()).toMatchObject({ epoch: 2, lifecycle: "active" });
-		// Checkpoint 2: the joiner speaks, and the creator admits it.
-		const before = lastSequence(await f.issuedAfter(1, null));
+		// Checkpoint 2: its share is in force. On Send, the page reopens the joiner's replica as a
+		// Writer over the same databases and issues at once.
+		await f.stop(joiner);
+		joiner = await f.open(1, { promote: true });
+		expect(joiner.room.authority()).toMatchObject({ epoch: 2, lifecycle: "active" });
 		await joiner.room.issue(message("w2-joiner", "hello from the joiner"));
-		expect(await creator.receive(await f.issuedAfter(1, before), 1)).toBe(true);
+		const spoken = await f.issuedAfter(1, null);
+		expect(await creator.receive(spoken, 1)).toBe(true);
 		expect(ids(creator)).toEqual(["w2-hello", "w2-joiner"]);
 		expect(ids(joiner)).toEqual(["w2-hello", "w2-joiner"]);
+		// It stays a Writer: through a checkpoint in which it says nothing, and a restart.
+		await rollover(creator, 2);
+		await f.install(joiner);
+		await rollover(creator, 3);
+		await f.install(joiner);
+		await f.stop(joiner);
+		joiner = await f.open(1, { reopen: true });
+		expect(joiner.room.authority()).toMatchObject({ epoch: 4, lifecycle: "active" });
+		await joiner.room.issue(message("w2-joiner-again", "still here"));
+		expect(await creator.receive(await f.issuedAfter(1, lastSequence(spoken)), 1)).toBe(true);
+		expect(ids(creator)).toEqual(["w2-hello", "w2-joiner", "w2-joiner-again"]);
+		await rollover(creator, 4);
+		await f.install(joiner);
+		expect(Buffer.from(joiner.stateBytes()).equals(Buffer.from(creator.stateBytes()))).toBe(true);
 	}, 240_000);
 
 	it("a revoked member's messages stay until the window needs their space, then leave first, oldest first", async () => {

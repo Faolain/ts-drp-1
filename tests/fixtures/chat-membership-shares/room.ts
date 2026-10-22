@@ -4,7 +4,8 @@ import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical"
 import type { DurableIssuanceOutboxRecord } from "@ts-drp/issuance-store";
 import type { SnapshotChunkProtocolPort, SnapshotChunkProtocolStream } from "@ts-drp/network/snapshot-transfer";
 import { Message, MessageType, V3Envelope } from "@ts-drp/types";
-import { mkdtempSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -177,17 +178,34 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 	});
 	const host = createNodeV3RoomStorageHost({ directory, initialization: () => "create" });
 
+	// Whether the native host already holds a store (packages/storage-node/src/v3-room-host.ts names
+	// each store's files after sha256(JSON.stringify([family, name]))).
+	const storeExists = (name: string, family: string): boolean => {
+		const key = createHash("sha256")
+			.update(JSON.stringify([family, name]))
+			.digest("hex");
+		return readdirSync(directory).some((file) => file.startsWith(key));
+	};
+
 	/**
 	 * Opens one peer. `receiveOnly` opens it as an observer (the shipped page's joiner);
 	 * `reopen` recreates the owners over the SAME databases, floor and archive file.
+	 * `promote` reopens a replica that was receive-only until now as a Writer: its stores reopen,
+	 * and a store only a Writer uses (seal votes and evidence) is created the first time, as the
+	 * browser's IndexedDB host creates a missing store when it opens it.
 	 * `name` lets one identity open a second, independent replica.
 	 * @param index
 	 * @param openOptions
 	 * @param openOptions.reopen
+	 * @param openOptions.promote
 	 * @param openOptions.receiveOnly
 	 * @param openOptions.name
 	 */
-	const open = async (index: number, openOptions: { reopen?: boolean; receiveOnly?: boolean; name?: string } = {}) => {
+	const open = async (
+		index: number,
+		openOptions: { reopen?: boolean; promote?: boolean; receiveOnly?: boolean; name?: string } = {}
+	) => {
+		const reopening = openOptions.reopen === true || openOptions.promote === true;
 		const identity = required(identities[index]);
 		const name = openOptions.name ?? `peer-${index}`;
 		let archive: ShippingChatLocalArchive | undefined;
@@ -199,7 +217,7 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 		}
 		const floor = createNodeRoomHeadAuthority({
 			filename: join(directory, `${name}-external-floor.sqlite`),
-			initialization: { kind: openOptions.reopen ? "reopen" : "create" },
+			initialization: { kind: reopening ? "reopen" : "create" },
 		});
 		track.heads.add(floor);
 		let ingress: ((message: Message) => void) | undefined;
@@ -209,9 +227,14 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 		const networkNode = fakeNetwork(required(peers[index]), false);
 		const input: CreateV3RoomSessionInput<ShippingChatProjection> = {
 			application,
-			storageHost: openOptions.reopen
-				? createNodeV3RoomStorageHost({ directory, initialization: () => "reopen" })
-				: host,
+			storageHost: openOptions.promote
+				? createNodeV3RoomStorageHost({
+						directory,
+						initialization: (store) => (storeExists(store.name, store.family) ? "reopen" : "create"),
+					})
+				: openOptions.reopen
+					? createNodeV3RoomStorageHost({ directory, initialization: () => "reopen" })
+					: host,
 			author: identity.author,
 			...(index === 0
 				? { creatorFinalitySigner: (await createRecoverableFinalitySigner({ seed: creator.seed })).signer }
