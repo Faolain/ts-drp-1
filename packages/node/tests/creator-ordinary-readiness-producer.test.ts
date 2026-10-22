@@ -1599,16 +1599,18 @@ function roomBoundary(options: {profile?: string; receiveOnly?: boolean; prepare
 }
 
 describe("room explicit readiness boundary wiring", () => {
-	it("joins preparation after startup publication/rebase and before the existing barrier resolves", async () => {
+	it("joins preparation after the startup rebase, before startup publication and before the existing barrier resolves", async () => {
 		let release!: () => void, entered!: () => void;
 		const enteredPromise = new Promise<void>(resolve => {entered = resolve;}), gate = new Promise<void>(resolve => {release = resolve;});
 		const observed: object[] = [];
 		const room = roomBoundary({prepare: async plane => {observed.push(plane); entered(); await gate;}});
 		let ready = false; void room.done.then(() => {ready = true;});
 		await enteredPromise;
-		expect(room.calls).toEqual(["enqueue", "bootstrap", "publish", "drain", "prepare"]);
+		expect(room.calls).toEqual(["enqueue", "bootstrap", "drain", "prepare"]);
 		expect(observed).toEqual([room.plane]); expect(ready).toBe(false);
-		release(); await room.done; expect(ready).toBe(true);
+		release(); await room.done;
+		expect(room.calls).toEqual(["enqueue", "bootstrap", "drain", "prepare", "publish"]);
+		expect(ready).toBe(true);
 	});
 
 	it("prepares no-drain NONE startup explicitly without adding work to receive-only startup", async () => {
