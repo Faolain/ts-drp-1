@@ -22,6 +22,36 @@ const MISSING_HISTORY_REQUEST_INTERVAL_MS = 1_000;
 // direct send carries this deadline, so a send that never completes cannot leave the
 // recipient unable to ask again.
 const HISTORY_REQUEST_SEND_DEADLINE_MS = 10_000;
+// Track AA (decision row 73): the creator's delivery repair. When the creator's live plane
+// refuses a first copy at one of its capacity bounds, or holds an authenticated row for a
+// missing dependency, it names the peer that sent the copy. Once the plane has room again
+// the creator asks that peer, with the existing HISTORY_REQUEST sent to it directly, to
+// republish its retained history. The peer id is a routing hint only: the request grants
+// nothing, and every row that comes back re-enters the plane's ordinary authenticated
+// admission and pays its own charges there. Proposed limits, for the owner's review
+// (docs/realtime-latency/tracks/39-track-aa-creator-delivery-repair/RESULT.md):
+// - at most MAX_DELIVERY_REPAIR_PEERS remembered peers per room. A peer id is at most
+//   MAX_DELIVERY_REPAIR_PEER_ID_BYTES UTF-8 bytes, belongs to a connected peer, and is
+//   charged DELIVERY_REPAIR_ENTRY_BYTES plus its id bytes. A full set refuses a new peer;
+//   a peer named by an authenticated row may replace one named only by a refused copy;
+// - at most MAX_DELIVERY_REPAIR_SENDS requests in flight per room, one per peer, each
+//   charged DELIVERY_REPAIR_SEND_BYTES, with its own HISTORY_REQUEST_SEND_DEADLINE_MS timer;
+//   one scheduling timer per room;
+// - requests at least DELIVERY_REPAIR_SPACING_MS apart per room, and at least
+//   DELIVERY_REPAIR_PEER_INTERVAL_MS apart per peer, doubling after each failed send up to
+//   DELIVERY_REPAIR_MAX_BACKOFF_MS. Due peers are asked in round robin, peers named by
+//   authenticated rows first;
+// - a request goes out only while the plane reports room for a republication burst; while
+//   it is busy the room re-probes at most once per DELIVERY_REPAIR_PEER_INTERVAL_MS.
+const MAX_DELIVERY_REPAIR_PEERS = 64;
+const MAX_DELIVERY_REPAIR_PEER_ID_BYTES = 128;
+const DELIVERY_REPAIR_ENTRY_BYTES = 64;
+const MAX_DELIVERY_REPAIR_SENDS = 4;
+const DELIVERY_REPAIR_SEND_BYTES = 256;
+const DELIVERY_REPAIR_SPACING_MS = 250;
+const DELIVERY_REPAIR_PEER_INTERVAL_MS = 1_000;
+const DELIVERY_REPAIR_MAX_BACKOFF_MS = 32_000;
+const TEXT_ENCODER = new TextEncoder();
 
 /**
  * Read a creator routing hint without granting room or genesis authority.
@@ -83,6 +113,78 @@ export interface NodeRoomControlPlaneObservation {
 /** Trusted local room composition supplies this observation from its verified current owners. */
 export type NodeRoomControlPlaneObservationProvider = () => NodeRoomControlPlaneObservation | undefined;
 
+/** Track AA: whether the reporting live plane has room for a republication burst. */
+export type NodeRoomDeliveryRepairCapacity = "ready" | "busy" | "retired";
+
+/**
+ * Track AA: a delivery gap the room's live plane reports (v3-live `V3DeliveryGap`). `peerId`
+ * is the authenticated transport identity of the copy concerned: a routing hint, never
+ * authority. `capacity` belongs to the reporting plane; another function is another plane.
+ */
+export interface NodeRoomDeliveryGap {
+	readonly kind: "missing" | "refused" | "capacity" | "retired";
+	readonly peerId?: string;
+	capacity(): NodeRoomDeliveryRepairCapacity;
+}
+
+/** Track AA: detached scalars of one room's delivery repair (tests and diagnostics only). */
+export interface NodeRoomDeliveryRepairCensus {
+	/** Remembered peers, due or cooling down, and their charged bytes. */
+	readonly peers: number;
+	readonly peerBytes: number;
+	readonly duePeers: number;
+	/** Requests in flight and their charged bytes. */
+	readonly sends: number;
+	readonly sendBytes: number;
+	/** Scheduling timer (0 or 1) and send deadline timers. */
+	readonly timers: number;
+	readonly waitingForCapacity: number;
+	readonly planeBound: number;
+	/** Monotonic counters since the room opened. */
+	readonly signals: number;
+	readonly requestsSent: number;
+	readonly sendFailures: number;
+	readonly busyProbes: number;
+	readonly refusedPeers: number;
+	readonly evictedPeers: number;
+	readonly unreachablePeers: number;
+	readonly clears: number;
+}
+
+interface DeliveryRepairPeer {
+	due: boolean;
+	authenticated: boolean;
+	sending: boolean;
+	askedAt: number | undefined;
+	failures: number;
+	readonly bytes: number;
+}
+
+interface DeliveryRepairSend {
+	readonly controller: AbortController;
+	readonly deadline: ReturnType<typeof setTimeout>;
+	cancelled: boolean;
+}
+
+interface DeliveryRepair {
+	probe: (() => NodeRoomDeliveryRepairCapacity) | undefined;
+	readonly peers: Map<string, DeliveryRepairPeer>;
+	peerBytes: number;
+	waiting: boolean;
+	timer: ReturnType<typeof setTimeout> | undefined;
+	nextAt: number;
+	readonly sends: Set<DeliveryRepairSend>;
+	readonly jobs: Set<Promise<void>>;
+	signals: number;
+	requestsSent: number;
+	sendFailures: number;
+	busyProbes: number;
+	refusedPeers: number;
+	evictedPeers: number;
+	unreachablePeers: number;
+	clears: number;
+}
+
 interface PendingSelectionRequest {
 	readonly registration: RoomRegistration;
 	readonly digest: Uint8Array;
@@ -105,6 +207,7 @@ interface RoomRegistration {
 	missingRequestDue: boolean;
 	missingRequestTimer: ReturnType<typeof setTimeout> | undefined;
 	publisher(targetPeerId?: string): Promise<void>;
+	readonly repair: DeliveryRepair;
 	requestAttempt: Promise<void> | undefined;
 	requestPending: boolean;
 	retainedRequestSchedules: number;
@@ -128,6 +231,12 @@ export interface NodeRoomNetworkPort {
 	 * after close. For a dependency that is missing, never on a schedule that can run out.
 	 */
 	requestMissingRetainedHistory(): void;
+	/**
+	 * Track AA: report a delivery gap of the room's live plane. On the creator, a refused or
+	 * missing copy marks its sender for a bounded, capacity-gated HISTORY_REQUEST. A no-op on
+	 * every other peer and after close; it never throws.
+	 */
+	requestDeliveryRepair(gap: NodeRoomDeliveryGap): void;
 	setIngressHandler(
 		ingressId: string,
 		liveHandler: (message: Message) => void,
@@ -193,6 +302,37 @@ export class NodeRoomNetworkAdapter {
 	}
 
 	/**
+	 * Read one room's delivery repair census (Track AA) without retaining any owner.
+	 * @param objectId Room identity.
+	 * @returns Detached scalars, or undefined when the room is not registered.
+	 */
+	readDeliveryRepairCensus(objectId: string): NodeRoomDeliveryRepairCensus | undefined {
+		const registration = this.#byObjectId.get(objectId);
+		if (registration === undefined) return undefined;
+		const repair = registration.repair;
+		let duePeers = 0;
+		for (const entry of repair.peers.values()) if (entry.due) duePeers++;
+		return Object.freeze({
+			peers: repair.peers.size,
+			peerBytes: repair.peerBytes,
+			duePeers,
+			sends: repair.sends.size,
+			sendBytes: repair.sends.size * DELIVERY_REPAIR_SEND_BYTES,
+			timers: Number(repair.timer !== undefined) + repair.sends.size,
+			waitingForCapacity: Number(repair.waiting),
+			planeBound: Number(repair.probe !== undefined),
+			signals: repair.signals,
+			requestsSent: repair.requestsSent,
+			sendFailures: repair.sendFailures,
+			busyProbes: repair.busyProbes,
+			refusedPeers: repair.refusedPeers,
+			evictedPeers: repair.evictedPeers,
+			unreachablePeers: repair.unreachablePeers,
+			clears: repair.clears,
+		});
+	}
+
+	/**
 	 * Read detached current room observations; transport presence is not authority.
 	 * @returns Valid observations from live registered room owners only.
 	 */
@@ -253,6 +393,7 @@ export class NodeRoomNetworkAdapter {
 		registration.controlPlaneObservationProvider = undefined;
 		for (const controller of registration.selectionControllers) controller.abort(new Error("room network is closed"));
 		registration.unsubscribePeerConnections();
+		this.#clearRepair(registration);
 		for (const timer of registration.timers) clearTimeout(timer);
 		registration.timers.clear();
 		registration.retainedRequestSchedules = 0;
@@ -276,7 +417,7 @@ export class NodeRoomNetworkAdapter {
 		} catch (error) {
 			failure ??= error;
 		}
-		void Promise.allSettled([...registration.selectionJobs]).then(() => {
+		void Promise.allSettled([...registration.selectionJobs, ...registration.repair.jobs]).then(() => {
 			if (this.#byObjectId.get(objectId) === registration) this.#byObjectId.delete(objectId);
 			if (failure !== undefined) rejectClose(failure);
 			else resolveClose();
@@ -314,6 +455,24 @@ export class NodeRoomNetworkAdapter {
 			missingRequestDue: false,
 			missingRequestTimer: undefined,
 			publisher: () => Promise.resolve(),
+			repair: {
+				probe: undefined,
+				peers: new Map(),
+				peerBytes: 0,
+				waiting: false,
+				timer: undefined,
+				nextAt: 0,
+				sends: new Set(),
+				jobs: new Set(),
+				signals: 0,
+				requestsSent: 0,
+				sendFailures: 0,
+				busyProbes: 0,
+				refusedPeers: 0,
+				evictedPeers: 0,
+				unreachablePeers: 0,
+				clears: 0,
+			},
 			requestAttempt: undefined,
 			requestPending: false,
 			retainedRequestSchedules: 0,
@@ -350,6 +509,7 @@ export class NodeRoomNetworkAdapter {
 			},
 			requestRetainedHistory: (): void => this.#scheduleRequests(registration),
 			requestMissingRetainedHistory: (): void => this.#requestMissing(registration),
+			requestDeliveryRepair: (gap: NodeRoomDeliveryGap): void => this.#requestDeliveryRepair(registration, gap),
 			setIngressHandler: (
 				ingressId: string,
 				_liveHandler: (message: Message) => void,
@@ -718,6 +878,271 @@ export class NodeRoomNetworkAdapter {
 		}
 	}
 
+	#requestDeliveryRepair(registration: RoomRegistration, gap: NodeRoomDeliveryGap): void {
+		try {
+			if (registration.closed) return;
+			const creatorPeerId = registration.creatorPeerId;
+			// Only the creator repairs; every other peer asks the creator (`#requestMissing`).
+			if (creatorPeerId === undefined || creatorPeerId !== this.#networkNode.peerId) return;
+			if (gap === null || typeof gap !== "object") return;
+			const kind: unknown = gap.kind;
+			const capacity: unknown = gap.capacity;
+			const peerId: unknown = gap.peerId;
+			if (
+				typeof capacity !== "function" ||
+				(kind !== "missing" && kind !== "refused" && kind !== "capacity" && kind !== "retired")
+			)
+				return;
+			const repair = registration.repair;
+			if (capacity !== repair.probe) {
+				// A plane this room no longer tracks, or a successor plane. Hints named for the
+				// replaced plane concern rows of its epoch, so they end with it.
+				if (kind === "retired") return;
+				this.#clearRepair(registration);
+				repair.probe = capacity as () => NodeRoomDeliveryRepairCapacity;
+			}
+			repair.signals++;
+			if (kind === "retired") {
+				this.#clearRepair(registration);
+				return;
+			}
+			if (kind === "capacity") repair.waiting = false;
+			else this.#markRepairPeer(registration, peerId, kind === "missing");
+			this.#pumpRepair(registration);
+		} catch {
+			// Repair is advisory: a failure here changes no admission and no plane state.
+		}
+	}
+
+	#markRepairPeer(registration: RoomRegistration, peerId: unknown, authenticated: boolean): void {
+		const repair = registration.repair;
+		if (
+			typeof peerId !== "string" ||
+			peerId.length === 0 ||
+			peerId.length > MAX_DELIVERY_REPAIR_PEER_ID_BYTES ||
+			peerId === this.#networkNode.peerId
+		) {
+			repair.refusedPeers++;
+			return;
+		}
+		const existing = repair.peers.get(peerId);
+		if (existing !== undefined) {
+			existing.due = true;
+			if (authenticated) existing.authenticated = true;
+			return;
+		}
+		const idBytes = TEXT_ENCODER.encode(peerId).byteLength;
+		if (idBytes > MAX_DELIVERY_REPAIR_PEER_ID_BYTES) {
+			repair.refusedPeers++;
+			return;
+		}
+		if (repair.peers.size >= MAX_DELIVERY_REPAIR_PEERS) {
+			const now = Date.now();
+			for (const [id, entry] of repair.peers)
+				if (!entry.due && !entry.sending && repairReadyAt(entry, now) <= now) this.#dropRepairPeer(repair, id, entry);
+		}
+		// A full set refuses a peer named only by a refused copy before any connection lookup.
+		if (repair.peers.size >= MAX_DELIVERY_REPAIR_PEERS && !authenticated) {
+			repair.refusedPeers++;
+			return;
+		}
+		if (!this.#connected(peerId)) {
+			repair.unreachablePeers++;
+			return;
+		}
+		if (repair.peers.size >= MAX_DELIVERY_REPAIR_PEERS) {
+			// A peer named by an authenticated row replaces the oldest peer named only by a
+			// refused copy (and not being asked right now).
+			for (const [id, entry] of repair.peers) {
+				if (entry.authenticated || entry.sending) continue;
+				this.#dropRepairPeer(repair, id, entry);
+				repair.evictedPeers++;
+				break;
+			}
+			if (repair.peers.size >= MAX_DELIVERY_REPAIR_PEERS) {
+				repair.refusedPeers++;
+				return;
+			}
+		}
+		const bytes = DELIVERY_REPAIR_ENTRY_BYTES + idBytes;
+		repair.peers.set(peerId, { due: true, authenticated, sending: false, askedAt: undefined, failures: 0, bytes });
+		repair.peerBytes += bytes;
+	}
+
+	#pumpRepair(registration: RoomRegistration): void {
+		const repair = registration.repair;
+		if (registration.closed || repair.probe === undefined || repair.waiting) return;
+		this.#clearRepairTimer(repair);
+		const now = Date.now();
+		for (let guard = 0; guard <= MAX_DELIVERY_REPAIR_PEERS; guard++) {
+			// A settling send pumps again.
+			if (repair.sends.size >= MAX_DELIVERY_REPAIR_SENDS) return;
+			let chosen: [string, DeliveryRepairPeer] | undefined;
+			let wakeAt = Number.POSITIVE_INFINITY;
+			for (const [peerId, entry] of repair.peers) {
+				const readyAt = repairReadyAt(entry, now);
+				if (!entry.due) {
+					// Asked and cooled down: nothing left to remember.
+					if (!entry.sending && readyAt <= now) this.#dropRepairPeer(repair, peerId, entry);
+					continue;
+				}
+				if (entry.sending) continue;
+				if (readyAt > now) {
+					wakeAt = Math.min(wakeAt, readyAt);
+					continue;
+				}
+				if (chosen === undefined || (entry.authenticated && !chosen[1].authenticated)) chosen = [peerId, entry];
+				if (entry.authenticated) break;
+			}
+			if (chosen === undefined) {
+				if (wakeAt !== Number.POSITIVE_INFINITY) this.#armRepair(registration, wakeAt - now);
+				return;
+			}
+			if (now < repair.nextAt) {
+				this.#armRepair(registration, repair.nextAt - now);
+				return;
+			}
+			let capacity: NodeRoomDeliveryRepairCapacity;
+			try {
+				capacity = repair.probe();
+			} catch {
+				capacity = "retired";
+			}
+			if (capacity === "retired") {
+				this.#clearRepair(registration);
+				return;
+			}
+			if (capacity !== "ready") {
+				// The plane signals capacity once it drains to low water. Until then the room
+				// re-probes at most once per interval, in case that signal never comes.
+				repair.busyProbes++;
+				repair.waiting = true;
+				this.#armRepair(registration, DELIVERY_REPAIR_PEER_INTERVAL_MS);
+				return;
+			}
+			const [peerId, entry] = chosen;
+			if (!this.#connected(peerId)) {
+				this.#dropRepairPeer(repair, peerId, entry);
+				repair.unreachablePeers++;
+				continue;
+			}
+			this.#sendRepair(registration, peerId, entry, now);
+		}
+	}
+
+	#sendRepair(registration: RoomRegistration, peerId: string, entry: DeliveryRepairPeer, now: number): void {
+		const repair = registration.repair;
+		// Round robin: the peer just asked goes to the back.
+		repair.peers.delete(peerId);
+		repair.peers.set(peerId, entry);
+		entry.due = false;
+		entry.sending = true;
+		entry.askedAt = now;
+		repair.nextAt = now + DELIVERY_REPAIR_SPACING_MS;
+		repair.requestsSent++;
+		const controller = new AbortController();
+		const deadline = setTimeout(
+			() => controller.abort(new Error("room delivery repair send deadline elapsed")),
+			HISTORY_REQUEST_SEND_DEADLINE_MS
+		);
+		const send = { controller, deadline, cancelled: false };
+		repair.sends.add(send);
+		const aborted = new Promise<false>((resolve) => {
+			controller.signal.addEventListener("abort", () => resolve(false), { once: true });
+		});
+		let attempt: Promise<boolean>;
+		try {
+			attempt = this.#networkNode
+				.sendMessage(
+					peerId,
+					Message.create({
+						data: HISTORY_REQUEST.slice(),
+						objectId: registration.controlId,
+						sender: this.#networkNode.peerId,
+						type: MessageType.MESSAGE_TYPE_CUSTOM,
+					}),
+					{ signal: controller.signal }
+				)
+				.then(
+					() => true,
+					() => false
+				);
+		} catch {
+			attempt = Promise.resolve(false);
+		}
+		const job: Promise<void> = Promise.race([attempt, aborted])
+			.then((delivered) => {
+				clearTimeout(deadline);
+				repair.sends.delete(send);
+				entry.sending = false;
+				if (send.cancelled) return;
+				if (delivered) entry.failures = 0;
+				else {
+					// The gap is not repaired: the peer stays due, asked again after a longer pause.
+					repair.sendFailures++;
+					entry.failures = Math.min(entry.failures + 1, 16);
+					if (repair.peers.get(peerId) === entry) entry.due = true;
+				}
+				this.#pumpRepair(registration);
+			})
+			.finally(() => {
+				repair.jobs.delete(job);
+			});
+		repair.jobs.add(job);
+	}
+
+	#armRepair(registration: RoomRegistration, delayMs: number): void {
+		const repair = registration.repair;
+		this.#clearRepairTimer(repair);
+		const timer = setTimeout(
+			() => {
+				if (repair.timer !== timer) return;
+				repair.timer = undefined;
+				repair.waiting = false;
+				this.#pumpRepair(registration);
+			},
+			Math.max(0, delayMs)
+		);
+		repair.timer = timer;
+	}
+
+	#clearRepairTimer(repair: DeliveryRepair): void {
+		if (repair.timer === undefined) return;
+		clearTimeout(repair.timer);
+		repair.timer = undefined;
+	}
+
+	#dropRepairPeer(repair: DeliveryRepair, peerId: string, entry: DeliveryRepairPeer): void {
+		if (repair.peers.get(peerId) !== entry) return;
+		repair.peers.delete(peerId);
+		repair.peerBytes -= entry.bytes;
+	}
+
+	#clearRepair(registration: RoomRegistration): void {
+		const repair = registration.repair;
+		if (repair.probe !== undefined || repair.peers.size > 0 || repair.sends.size > 0) repair.clears++;
+		repair.probe = undefined;
+		repair.peers.clear();
+		repair.peerBytes = 0;
+		repair.waiting = false;
+		repair.nextAt = 0;
+		this.#clearRepairTimer(repair);
+		for (const send of repair.sends) {
+			send.cancelled = true;
+			clearTimeout(send.deadline);
+			send.controller.abort(new Error("room delivery repair was cancelled"));
+		}
+		repair.sends.clear();
+	}
+
+	#connected(peerId: string): boolean {
+		try {
+			return this.#networkNode.getAllPeers().includes(peerId);
+		} catch {
+			return false;
+		}
+	}
+
 	#scheduleRequests(registration: RoomRegistration): void {
 		if (registration.closed) throw new Error("room network is closed");
 		if (registration.retainedRequestSchedules >= MAX_RETAINED_REQUEST_SCHEDULES)
@@ -802,6 +1227,13 @@ export class NodeRoomNetworkAdapter {
 			}),
 		]);
 	}
+}
+
+function repairReadyAt(entry: DeliveryRepairPeer, now: number): number {
+	if (entry.askedAt === undefined) return now;
+	return (
+		entry.askedAt + Math.min(DELIVERY_REPAIR_PEER_INTERVAL_MS * 2 ** entry.failures, DELIVERY_REPAIR_MAX_BACKOFF_MS)
+	);
 }
 
 function historyControlId(objectId: string): string {

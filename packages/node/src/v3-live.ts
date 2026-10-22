@@ -3270,6 +3270,8 @@ interface V3PlaneRegistration {
 	/** Native gossip retained ahead of the runtime handler, through object fanout join. */
 	admittedGossipQueueJobs: number;
 	admittedGossipQueueBytes: number;
+	/** Track AA: a refusal or a busy repair probe asks for one capacity signal at low water. */
+	deliveryRepairWake: boolean;
 	pendingIngressBytes: number;
 	publicationCursor: number | undefined;
 	/** Replayable egress joins only equal selectors at the same queued gate cut.
@@ -3308,7 +3310,7 @@ interface VerifiedV3IngressEvidence {
 const v3PlaneRegistrations = new WeakMap<DRPNetworkNode, Map<string, V3PlaneRegistration>>();
 // The room transport's bounded retained-history request, per network node and stable
 // room topic (the topic outlives every successor plane of one room session).
-const v3MissingDependencyRequests = new WeakMap<DRPNetworkNode, Map<string, () => void>>();
+const v3MissingDependencyRequests = new WeakMap<DRPNetworkNode, Map<string, (gap?: V3DeliveryGap) => void>>();
 const v3HandleRegistrations = new WeakMap<V3PlaneHandle, V3PlaneRegistration>();
 const preparedMigrationTargetFloors = new WeakMap<V3PlaneRegistration, Readonly<{ read(): Promise<Uint8Array> }>>();
 
@@ -5177,6 +5179,7 @@ export function readV3RuntimeOwnerCensus(plane: V3PlaneHandle): Readonly<Record<
 		admittedEgressControlJobs: registration.admittedEgressControlJobs,
 		admittedGossipQueueJobs: registration.admittedGossipQueueJobs,
 		admittedGossipQueueBytes: registration.admittedGossipQueueBytes,
+		deliveryRepairWake: Number(registration.deliveryRepairWake),
 	});
 }
 
@@ -7223,6 +7226,8 @@ function aliasCreatorSuccessorHandle(rawHandle: object, wrapper: object): boolea
 
 function deactivateRegistration(registration: V3PlaneRegistration): boolean {
 	registration.active = false;
+	// Track AA: a plane that reported a delivery gap tells its transport that it is gone.
+	if (deliveryRepairProbes.has(registration)) reportDeliveryGap(registration, "retired");
 	registration.vertexFacts.release();
 	registration.roomRetentionLedger?.release();
 	// Numerical DATA is no longer selectable once the plane is revoked. Admitted
@@ -7421,11 +7426,34 @@ function hasGraphCapacity(
 	);
 }
 
+/** Track AA: whether a plane has room for a republication burst (see {@link V3DeliveryGap}). */
+export type V3DeliveryRepairCapacity = "ready" | "busy" | "retired";
+
+/**
+ * Track AA (decision row 73): a delivery gap one live plane reports to its room transport.
+ * - `missing`: an authenticated row waits for a dependency; `peerId` sent it.
+ * - `refused`: a copy `peerId` sent was refused at the gossip queue or the input pool.
+ * - `capacity`: after a refusal or a busy probe, both owners are at most half full again.
+ * - `retired`: the plane is no longer current.
+ * `peerId` is the authenticated transport identity of the copy (the gossip publisher the
+ * network verified, or the peer of an authenticated direct stream). It is a routing hint
+ * only: it grants no admission, acknowledgement, retirement or proof credit. `capacity`
+ * belongs to the reporting plane (another plane reports another function) and holds it
+ * weakly; it reports "busy" until both owners are at most half full, then "ready".
+ */
+export interface V3DeliveryGap {
+	readonly kind: "missing" | "refused" | "capacity" | "retired";
+	readonly peerId?: string;
+	capacity(): V3DeliveryRepairCapacity;
+}
+
 /**
  * Bind the room transport's bounded retained-history request to one live room topic.
  * A vertex held for a missing dependency calls it. The request grants nothing: whatever
  * it brings back re-enters the ordinary authenticated ingress path. The transport owns
- * its bounds (one request in flight, rate limited).
+ * its bounds (one request in flight, rate limited). Track AA: the call carries the
+ * delivery gap; a transport that ignores its argument keeps the earlier behaviour for a
+ * missing dependency, and receives the other gap kinds as well.
  * @param networkNode - The room's network node.
  * @param topic - The room's stable live topic.
  * @param request - The transport's request; it must not throw into ingress.
@@ -7434,13 +7462,13 @@ function hasGraphCapacity(
 export function bindV3MissingDependencyRequest(
 	networkNode: DRPNetworkNode,
 	topic: string,
-	request: () => void
+	request: (gap?: V3DeliveryGap) => void
 ): () => void {
 	if (typeof topic !== "string" || topic.length === 0 || typeof request !== "function")
 		throw new TypeError("v3 missing dependency request binding is invalid");
 	let byTopic = v3MissingDependencyRequests.get(networkNode);
 	if (byTopic === undefined) {
-		byTopic = new IntrinsicMap<string, () => void>();
+		byTopic = new IntrinsicMap<string, (gap?: V3DeliveryGap) => void>();
 		v3MissingDependencyRequests.set(networkNode, byTopic);
 	}
 	const bound = byTopic;
@@ -7450,16 +7478,85 @@ export function bindV3MissingDependencyRequest(
 	};
 }
 
-function requestMissingDependencies(registration: V3PlaneRegistration): void {
+function requestMissingDependencies(registration: V3PlaneRegistration, peerId: string): void {
 	if (!currentRegistration(registration)) return;
+	// A refused request leaves the vertex held; the next dependent vertex asks again.
+	reportDeliveryGap(registration, "missing", peerId);
+}
+
+// Track AA: each plane's capacity probe, created at its first report. It holds the plane
+// weakly, so a transport that keeps it does not keep a retired plane.
+const deliveryRepairProbes = new WeakMap<V3PlaneRegistration, () => V3DeliveryRepairCapacity>();
+
+function reportDeliveryGap(registration: V3PlaneRegistration, kind: V3DeliveryGap["kind"], peerId?: string): void {
 	const byTopic = v3MissingDependencyRequests.get(registration.networkNode);
 	if (byTopic === undefined) return;
-	const request = ReflectApply(MapPrototypeGet, byTopic, [registration.topic]) as (() => void) | undefined;
+	const request = ReflectApply(MapPrototypeGet, byTopic, [registration.topic]) as
+		| ((gap?: V3DeliveryGap) => void)
+		| undefined;
 	if (request === undefined) return;
+	let capacity = deliveryRepairProbes.get(registration);
+	if (capacity === undefined) {
+		const plane = new WeakRefConstructor(registration);
+		capacity = (): V3DeliveryRepairCapacity => {
+			const current = plane.deref();
+			return current === undefined ? "retired" : deliveryRepairCapacity(current);
+		};
+		deliveryRepairProbes.set(registration, capacity);
+	}
 	try {
-		request();
+		request(ObjectFreeze(peerId === undefined ? { kind, capacity } : { kind, peerId, capacity }));
 	} catch {
-		// A refused request leaves the vertex held; the next dependent vertex asks again.
+		// The transport's repair is advisory; a failure there changes no admission.
+	}
+}
+
+function deliveryRepairLowWater(registration: V3PlaneRegistration): boolean {
+	const half = registration.payload.parameters.maxPendingBytes / 2;
+	return (
+		registration.admittedInputJobs <= MAX_ADMITTED_INPUT_JOBS / 2 &&
+		registration.admittedGossipQueueJobs <= MAX_ADMITTED_INPUT_JOBS / 2 &&
+		registration.admittedInputBytes <= half &&
+		registration.admittedGossipQueueBytes <= half
+	);
+}
+
+function deliveryRepairCapacity(registration: V3PlaneRegistration): V3DeliveryRepairCapacity {
+	if (!currentRegistration(registration)) return "retired";
+	const closing = registration.blueprintClosing && registration.readinessIngressHold === undefined;
+	if (!closing && deliveryRepairLowWater(registration)) return "ready";
+	registration.deliveryRepairWake = true;
+	return "busy";
+}
+
+// A capacity refusal names the copy's sender to the room transport and asks for one
+// capacity signal once both owners have drained to low water.
+function noteDeliveryRefusal(registration: V3PlaneRegistration, peerId: string | undefined): void {
+	registration.deliveryRepairWake = true;
+	if (typeof peerId === "string") reportDeliveryGap(registration, "refused", peerId);
+}
+
+function noteDeliveryCapacity(registration: V3PlaneRegistration): void {
+	if (!registration.deliveryRepairWake || !deliveryRepairLowWater(registration)) return;
+	registration.deliveryRepairWake = false;
+	if (currentRegistration(registration)) reportDeliveryGap(registration, "capacity");
+}
+
+// Track AA: a direct copy of a row this plane has already admitted (its digest is in the
+// plane's causality index, which holds only admitted rows of this plane) is dropped before
+// it reserves an input-pool slot. It would only re-append idempotently. A full retained
+// republication then spends the pool on the rows still missing, not on its duplicate prefix.
+// Nothing is admitted here, and a copy that is pending, queued or unknown is not touched.
+function indexedV3Copy(registration: V3PlaneRegistration, message: Message): boolean {
+	try {
+		const data = message.data;
+		if (!isInstanceOf(data, Uint8ArrayConstructor)) return false;
+		const preimage = V3Envelope.decode(data).canonicalPreimage;
+		if (!isInstanceOf(preimage, Uint8ArrayConstructor) || typedArrayByteLength(preimage) === 0) return false;
+		const digest = lowerHexDigest(hashDomain(V3_VERTEX_DOMAIN, preimage));
+		return digest !== undefined && registration.index.has(digest);
+	} catch {
+		return false;
 	}
 }
 
@@ -8005,8 +8102,9 @@ async function authenticateV3Ingress(registration: V3PlaneRegistration, captured
 			retainPendingIngress(registration, evidence, exactWireBytes.byteLength);
 			// A dependency is missing (for example a settlement fence that arrived before this
 			// plane was installed and failed authentication there). Ask for it again now, not
-			// on a schedule that can run out; the answer re-enters this same path.
-			requestMissingDependencies(registration);
+			// on a schedule that can run out; the answer re-enters this same path. Track AA:
+			// the authenticated sender of this row is the peer to ask.
+			requestMissingDependencies(registration, captured.sender);
 			return ingressFailureLog("graph-rejected");
 		}
 		if (await handleV3Ingress(registration, evidence, retained.value)) await drainPendingIngress(registration);
@@ -8115,6 +8213,7 @@ function enqueueRegistrationTask<Result>(
 			inputReservationReleased = true;
 			registration[counter]--;
 			registration.admittedInputBytes -= capturedBytes;
+			if (counter === "admittedInputJobs") noteDeliveryCapacity(registration);
 		};
 		const custody: InputCaptureCustody | undefined =
 			inputAdmission?.refuseCapture === undefined
@@ -8232,6 +8331,17 @@ function enqueueV3Ingress(
 	const barrier = hold === undefined ? terminal :
 		terminal === undefined ? hold : Promise.all([terminal, hold]).then(() => undefined);
 	let rawMessage: Message | undefined = message;
+	// Track AA: the transport identity a capacity refusal reports (a routing hint only).
+	let sender: string | undefined;
+	try {
+		sender = typeof message.sender === "string" ? message.sender : undefined;
+	} catch {
+		sender = undefined;
+	}
+	const refuse = (): void => {
+		noteDeliveryRefusal(registration, sender);
+		ingressFailureLog("admission-rejected");
+	};
 	return enqueueRegistrationTask(
 		registration,
 		(custody): (() => Promise<void>) | Readonly<{ join: Promise<void> }> => {
@@ -8252,8 +8362,8 @@ function enqueueV3Ingress(
 				: (): Promise<void> => authenticateV3Ingress(registration, captured);
 		},
 		{
-			refuse: () => ingressFailureLog("admission-rejected"),
-			refuseCapture: () => ingressFailureLog("admission-rejected"),
+			refuse,
+			refuseCapture: refuse,
 			captureBeforeBarrier: true,
 			...(barrier === undefined ? {} : { barrier }),
 		}
@@ -20754,6 +20864,7 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 				admittedEgressControlJobs: 0,
 				admittedGossipQueueJobs: 0,
 				admittedGossipQueueBytes: 0,
+				deliveryRepairWake: false,
 			};
 			registration.handle = makeV3PlaneHandle(registration);
 			if (snapshotMachine !== undefined) registration.blueprintHandle = makeV3BlueprintLiveHandle(registration);
@@ -21690,6 +21801,7 @@ export function routeV3Ingress(networkNode: DRPNetworkNode, message: Message): b
 			registration.admittedGossipQueueJobs >= MAX_ADMITTED_INPUT_JOBS ||
 			bytes > registration.payload.parameters.maxPendingBytes - registration.admittedGossipQueueBytes
 		) {
+			noteDeliveryRefusal(registration, message.sender);
 			ingressFailureLog("admission-rejected");
 			return true;
 		}
@@ -21698,6 +21810,7 @@ export function routeV3Ingress(networkNode: DRPNetworkNode, message: Message): b
 		const release = (): void => {
 			registration.admittedGossipQueueJobs--;
 			registration.admittedGossipQueueBytes -= bytes;
+			noteDeliveryCapacity(registration);
 		};
 		// Buffered completion is insufficient: an entered handler may still be
 		// waiting behind publication, a terminal barrier or native storage work.
@@ -21732,6 +21845,7 @@ export function routeV3RetainedIngress(handle: V3PlaneHandle, message: Message):
 	) {
 		return false;
 	}
+	if (indexedV3Copy(registration, message)) return true;
 	void enqueueV3Ingress(registration, message, "retained");
 	return true;
 }

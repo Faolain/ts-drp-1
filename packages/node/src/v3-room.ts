@@ -59,6 +59,7 @@ import {
 	speculateV3IngressVertex,
 	type V3AdmittedVertexSink,
 	type V3ApplicationProjectionOrder,
+	type V3DeliveryGap,
 	type V3LiveDescriptor,
 	type V3LocalSettlementFloor,
 	type V3LocalSettlementPolicy,
@@ -428,6 +429,12 @@ export interface V3RoomTransport {
 	 * installs a successor. A no-op on the creator and after close; it must not throw.
 	 */
 	requestMissingRetainedHistory?(): void;
+	/**
+	 * Optional (Track AA): a delivery gap the room's live plane reports (a refused or missing
+	 * copy and the peer that sent it, the plane's capacity, its retirement). A bounded,
+	 * advisory repair request; it grants nothing and must not throw.
+	 */
+	requestDeliveryRepair?(gap: V3DeliveryGap): void;
 	setIngressHandler(
 		ingressId: string,
 		liveHandler: (message: Message) => void,
@@ -3655,14 +3662,23 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	let heldStartupGossipRepublication: Promise<void> | undefined;
 	// Ask the creator for retained history now (Track X). The transport bounds it; a refusal
 	// is not a room failure: the next vertex that waits for a missing dependency asks again.
-	const requestMissingRetainedHistory = (): void => {
+	// Track AA: the plane's delivery gaps also reach the transport's bounded repair. A
+	// missing dependency still asks the creator exactly as before.
+	const requestMissingRetainedHistory = (gap?: V3DeliveryGap): void => {
 		if (closed || transportCloseTask !== undefined) return;
-		const request = transport?.requestMissingRetainedHistory;
-		if (typeof request !== "function") return;
-		try {
-			Reflect.apply(request, transport, []);
-		} catch {
-			// Bounded transport refusal; nothing was admitted or released.
+		const request = gap === undefined || gap.kind === "missing" ? transport?.requestMissingRetainedHistory : undefined;
+		const repair = gap === undefined ? undefined : transport?.requestDeliveryRepair;
+		const calls: (readonly [unknown, readonly unknown[]])[] = [
+			[request, []],
+			[repair, [gap]],
+		];
+		for (const [call, args] of calls) {
+			if (typeof call !== "function") continue;
+			try {
+				Reflect.apply(call, transport, args);
+			} catch {
+				// Bounded transport refusal; nothing was admitted or released.
+			}
 		}
 	};
 	const revokeTransport = (): void => {
@@ -4247,7 +4263,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			}
 		);
 		// The live topic is stable across successors, so one binding serves every epoch.
-		if (typeof openedTransport.requestMissingRetainedHistory === "function")
+		if (
+			typeof openedTransport.requestMissingRetainedHistory === "function" ||
+			typeof openedTransport.requestDeliveryRepair === "function"
+		)
 			unbindMissingDependencyRequest = bindV3MissingDependencyRequest(
 				openedTransport.networkNode,
 				activeHandle.topic,
