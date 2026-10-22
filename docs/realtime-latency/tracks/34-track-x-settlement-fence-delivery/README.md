@@ -1,6 +1,6 @@
 # Track X: the settlement fence delivery stall
 
-**Outcome:** Fix merged in cf6d306f (4122ab83..e26cd812, without the startup-readiness RED). A recipient now asks the creator again for a missing dependency, so the settlement fence that arrives before install is no longer lost; shipped Canvas and Chat and the Grid with Track V's switch run 16/16 with real networking. The IndexedDB seal deadlock fix is picked as 04f7fd0b..9b28e327 (row 53): the seal stages its snapshot before it takes a journal source. The startup order (option A) and the readiness ingress hold merged in 8595826c (rows 51, 55 and 59). IN PROGRESS: play during a rollover, and d9346's migration failure (row 60), with the owner's successor-serving gate (row 61) and the R5 journal fix (row 62). See [RESULT.md](RESULT.md).
+**Outcome:** Fix merged in cf6d306f (4122ab83..e26cd812, without the startup-readiness RED). A recipient now asks the creator again for a missing dependency, so the settlement fence that arrives before install is no longer lost; shipped Canvas and Chat and the Grid with Track V's switch run 16/16 with real networking. The IndexedDB seal deadlock fix is picked as 04f7fd0b..9b28e327 (row 53): the seal stages its snapshot before it takes a journal source. The startup order (option A) and the readiness ingress hold merged in 8595826c (rows 51, 55 and 59). IN PROGRESS: play during a rollover, and d9346's migration failure (row 60). On its branch: the late-arrival cleanup rules (rows 62 and 64-68), the successor-serving gate (row 61), and one completion and dependency contract that would replace the per-case rules, modelled by Track J and reviewed by astra, awaiting the owner (row 71); then the gate's install retry (row 72) and step 14 (row 73). See [RESULT.md](RESULT.md).
 
 **Working documents in this folder:** [BRIEF.md](BRIEF.md), [RESULT.md](RESULT.md)
 
@@ -959,3 +959,844 @@ Owner decisions on the guard and R5 (the owner chose both directly, 2026-10-22).
    Show that the Writer's protected scopes stay bounded over at least 16 rollovers of paced play (node host). In RESULT, state per guarantee (G7, G8, G10, G15, G19) why it still holds. Also check whether R5 is reachable on shipped Chat now that Track W2 adds late Writers, and say so either way.
 
 Order: R5 (it blocks every play-through proof), then the gate, then P1 under its existing condition, then step 14 and the proofs.
+
+### Follow-up instruction — Heads-up: Track Z edits republishRetainedHistory (2026-10-22 05:45 UTC)
+
+Overlap heads-up from Track Z, no action needed unless it collides with you. Track Z is adding a narrow exception in v3-room.ts republishRetainedHistory (about lines 4160-4180). A retained-history republish that gets not-active or publication-state-unknown returns instead of throwing when the session has moved past the captured plane, or an adoption or install is in flight. It doesn't touch your setRetainedPublisher wrapper or startupGossipRepublicationBarrier (4181-4192), rebasePromise, readiness or enqueueV3Ingress. Keep your gate and R5 edits out of republishRetainedHistory. If you need to change it, tell me first.
+
+### Follow-up instruction — Main moved to 0171994d with Track W2 (2026-10-22 06:22 UTC)
+
+FYI: main is now 0171994d, with Track W2 merged (examples/chat, tests and docs only, no library change). Rebase when convenient. Decision rows 61 (the serving gate) and 62 (R5 option A) are recorded in docs/realtime-latency/README.md. When you check whether R5 is reachable on shipped Chat, use the v5 page: an admin can now make a joiner a Writer (tests/track-w2-shipped-chat-membership.pw.ts shows the flow).
+
+### Report returned by the agent (2026-10-22 06:26 UTC)
+
+Track X R5 status: option A works for a Writer's own moves, but a twin case (R5b) needs an owner decision.
+
+DONE (not yet committed, waiting on the suites):
+- The R5 RED is green through 12 rollovers. The Writer keeps 2 protected scopes ([n-2, n-1]) instead of one more per epoch. Log: r60-r5-fix-r2.
+- Option A needed two more pieces I hadn't foreseen:
+  (1) A Writer never recorded the closed-membership carrier for a scope that held an outside move. Its whole-graph commitment (9 rows) never matched the Cut (8). The fix: try the graph without this author's last (count - cut) own rows, and record it only when the signed Cut's commitment matches exactly.
+  (2) Once the scopes drain, the issuance retirement prunes the replaced source rows. The room's merged settlement plan kept every completed entry forever, so every later plan write refused with "settlement plan references retired or absent issued work". The fix, in v3-room (mergedSettlementPlan / writeMergedSettlementPlan, not Track Z's spots): drop a completed local entry once the store reads its source as pruned.
+
+R5b (residual, by code; a 3-peer probe to confirm is next):
+- The case: Writer B moves during the seal and Writer A admits that move in epoch e. Under option A, A's scope e stays retained, because the outside row is received, not local (your refusal case c). A also records no carrier, because its graph has B's extra row.
+- Why it matters: with 2 or more Writers playing through rollovers this happens almost every epoch. A's protected scopes then grow by one per epoch, and A's install should refuse at about the 9th epoch ("journal retirement refused: malformed-input"). That is the same failure as before, now limited to multi-Writer rooms such as shipped Chat with W2's Writers.
+- Shipped Chat, Grid and Canvas all use "rebase" for every action, so there are no expire or manual-review sources.
+
+Options for R5b:
+- A2: a received outside row b by author B is collectible when a later signed Cut contains a B-authored row whose operations equal derive(b) under the immutable policy. A has no plan linkage for B, so the match is by derivation only.
+- B2 (my recommendation): a received row outside cut(e) is collectible once A has installed cut(e)'s successor. The signed facts are that cut(e) excludes b and that A's post-install state comes only from the signed snapshot plus the new epoch. B keeps its own copy and replaces it; A's copy has no consumer left. This needs a carrier that subtracts other authors' outside rows, using the creator-signed per-author issuance frontiers.
+- C2: record it as a known limit. Multi-Writer rooms that play through seals would fail after about 8 epochs.
+
+Next, while you decide: I commit R5 (local case), write refusal tests a-d (c also documents R5b), merge main 0171994d, then move on to the gate.
+
+### Follow-up instruction — Owner chose B2 for R5b; conditions (2026-10-22 06:30 UTC)
+
+The owner chose B2 for R5b (2026-10-22). A received row outside cut(e) becomes collectible once this peer has durably installed cut(e)'s successor. The carrier subtracts other authors' outside rows using the creator-signed per-author issuance frontiers.
+
+Conditions:
+1. RED first, using your 3-peer probe as the case: Writer B moves during the seal, and A admits it. It must fail at base and at your R5 commit, and pass after.
+2. Refusal tests:
+   (a) before A's successor install is durable, the scope is kept, including across a crash between the install and the collection;
+   (b) a received row that cut(e) does contain is not treated as outside;
+   (c) a row beyond the signed frontier of an author the frontiers don't cover is kept.
+   Your earlier refusal case (c) (received, not local) changes meaning under B2. Rewrite it in your own RED to state the new rule, and list that change in RESULT.
+3. In RESULT, argue per guarantee (G1, G5, G7, G8, G10, G15, G19) why deletion stays safe. Cover: nothing on A, including retained-history republication to a peer that asks, needs A's copy after the install; B's own copy is untouched; and a creator with outside rows is unaffected.
+4. Piece (2) of your R5 fix (dropping a completed local entry from the merged settlement plan once its source reads as pruned) also needs a test: an incomplete entry, or one whose source is not pruned, stays.
+5. Proof: 3 peers with 2 Writers playing through at least 16 rollovers (node host), each Writer's protected scopes bounded. Run shipped Chat with W2's Writers if it reaches the case.
+
+Commit order: R5 local case, then R5b, then the gate.
+
+### Report returned by the agent (2026-10-22 07:07 UTC)
+
+Track X: the R5 local fix is ready to commit, but two new findings need your decision (R5-chain and R6). I'm committing R5 now and starting R5b (B2) meanwhile.
+
+R5 local:
+- The R5 RED is green through 12 rollovers (the Writer's protected scopes stay at [n-3, n-2]).
+- 27 focused suites, fix against base: the same failures in both, except that the RED fails at base and passes with the fix.
+- New unit tests: the classifier's refusal cases (a)-(d), and the plan merge. The merge keeps an entry that is incomplete, whose source is not pruned, that is manual-review, inherited or migrated, or that the current scan still meets.
+- Harness note: the room never reports control rows to onAcceptedVertex. A lone settlement fence (an install with nothing to replace) therefore times out a receive that waits for it. This was the cause of the earlier "cap 0 → TRACK_X_HOLD_ADMISSION_TIMEOUT" note, and it is a harness problem, not a library one.
+
+FINDING R5-chain (a decision on the owner's refusal rule (a)). Taken literally, rule (a) makes a Writer terminal:
+- The Writer's seal move s_e is replaced by r in e+1. The Writer's settlement fence makes cut(e+1), but r reaches the creator only after the next seal has begun. r is then replaced by r', which is in cut(e+2).
+- Under option A, scope e is retained for good, because r is in no signed cut. Scope e+1, holding r outside its Cut with r' in a cut, is collected.
+- The issuance retirement then retires r logically (epoch ≤ throughEpoch, not a protected hole). s_e stays protected, so the store's physical prune watermark stays below r and readIssued(r) is still non-null.
+- The room's plan keeps [s_e → r], and every later plan write is refused: "settlement plan references retired or absent issued work". On the node host, the 6th install after the miss fails.
+Options:
+- C1 (recommended): follow the chain. An outside row is collectible when its replacement is in a later signed cut, or is itself a replaced outside row of a later scope that meets the same rule. Each link is checked by derivation equality, and the last link must be a member of a signed cut. Scopes e and e+1 then become collectible in the same retirement, and refusal (a) becomes "no link of the chain is in a signed cut yet". Deletion still rests only on signed facts and derivations.
+- C2: keep r's scope and its issuance row while a retained source's entry names r. This avoids the terminal install, but two scopes are retained for good per missed replacement, so the Writer still goes terminal after about 3-4 misses.
+- C3: a known limit.
+
+FINDING R6 (pre-existing: the census code is unchanged by R5; is it in this track?):
+- Scenario: a Writer's whole install output for e+1 (its settlement fence and replacements) misses cut(e+1).
+- Its next install fails in the recovery census with "creator recovery dependency hold unavailable: outbox-classification:<s_e>:displaced:published". Every retry fails the same way, so the Writer is terminal.
+- Cause: s_e's plan entry is complete (replacement r), but r is in no cut. The creator's terminal frontier stops below s_e, because the fence missed the cut. completedNonportableReplacementChunk calls deriveOwnedReplacement, which needs s_e's epoch ACL, and that resolves only for the immediately closed epoch (e+1).
+- Reachable whenever a Writer's install rows arrive after the creator has begun its next seal, for example with slow installs and automatic rollovers.
+- On the node host it fails at the 2nd install after the miss. The probe shows tt=6, and the plan has [7, rebase, 9] with 9 itself an open source.
+Options:
+- R6-A: when the source's epoch is older than the closed epoch, recognize completion with the immutable-policy derivation (the R5 reader's derivePolicyReplacement). The source stays authenticated by the census's own classification, and the plan entry and replacement rows are checked as in R4.
+- R6-B: a known limit.
+
+Unless you tell me otherwise, R5 refusal case (a) runs 6 rollovers and asserts retention. Its comment points to the 7th-install failure and RESULT 13.
+
+### Follow-up instruction — Owner: R5-chain C1, R6-A in this track (2026-10-22 07:09 UTC)
+
+The owner decided both (2026-10-22): R5-chain option C1, follow the chain; R6 option R6-A, fixed in this track.
+
+R5-chain (C1):
+- An outside row is collectible when its replacement is in a later signed cut, or is itself a replaced outside row of a later scope that meets the same rule. Check each link by derivation equality under the immutable policy. The last link must be a member of a signed cut.
+- Bound the walk by the journal's maxScopes, and refuse (keep) beyond it.
+- Refusal (a) becomes "no link of the chain is in a signed cut yet". State that in your RED, and list the change in RESULT.
+- Add refusal tests for: a chain whose last link is in no cut; a link whose derivation doesn't match; and a chain longer than the bound.
+- Run the double-miss case as a RED first. It must fail at your R5 commit and pass after.
+
+R6 (R6-A):
+- When the source's epoch is older than the closed epoch, recognise completion with the immutable-policy derivation (derivePolicyReplacement). The source stays authenticated by the census's own classification, and the plan entry and replacement rows are checked as in R4.
+- RED first, from your probe: the Writer's whole install output misses cut(e+1). It must fail at base and pass after.
+- Add refusal tests: a mismatched derivation, and a plan entry whose replacement rows are absent, still fail closed.
+- In RESULT, say per guarantee why the census stays sound.
+
+Order: R5b (B2), then R5-chain, then R6, then the gate, P1 and step 14. Each fix is its own commit after its RED. The 16-rollover play-through proofs should cover all of them, including at least one run with slow installs and automatic rollovers, where R6 is reachable. Until C1 lands, your interim 6-rollover form of refusal case (a) is fine.
+
+### Follow-up instruction — Track J's suspected gaps for R6 (unconfirmed) (2026-10-22 07:33 UTC)
+
+Heads-up from Track J, the new Quint modelling track. It is modelling rows 61-66 in parallel. These are suspected gaps from reading your code, NOT yet confirmed by its model or a run. Check them while you build the R6 RED, since they sit on R6's own schedule.
+
+1. Outside fence. Suppose a Writer's install fence ($drp.author-fence.v1) misses cut(e+1). It has no plan entry, because settlementDisposition gives none without intents, and replacedLocalSourceFacts refuses control operations. No class from rows 62-66 covers it, so that scope may stay protected for good. In your R6 RED (whole install output misses cut(e+1)), assert that the scope holding the fence becomes collectible, and that the protected scope count stays bounded over the following rollovers, not just that the next install succeeds.
+
+2. The plan wedge. Piece (2) of your R5 fix drops a completed entry only when its source reads as physically pruned. But the prune watermark is contiguous (prunedThroughAuthorSequence), while the store refuses as soon as a named row is logically retired (issuanceRetirementAllows). If one row stays stuck below, such as the fence in item 1, every later completed entry above it is never dropped, and every plan write is refused. Check whether the drop should key on logical retirement rather than the physical watermark, and whether your R5-chain or R6 runs can reach this.
+
+3. Crash window (lower priority). A later scope's carrier is opened only with a held Cut authority (current, predecessor, operational sources). A crash between install and cleanup, followed by more rollovers, might outlive that window and leave a scope protected. Add one native case: crash after the install, then 3+ rollovers before reopening, then check that collection still happens.
+
+If item 1 or 2 is real and needs a rule beyond rows 62-66, stop and send me the options. It is the owner's decision. If it falls inside R6-A as decided, fix it there and list it in RESULT.
+
+### Follow-up instruction — R7 fence counterexample confirmed; owner rule (2026-10-22 07:47 UTC)
+
+Track J's model CONFIRMED the outside-fence gap, and the owner has decided the rule (2026-10-22). Call it R7.
+
+The counterexample, on your head 13793d94: Writer A's install fence f and a move m both miss cut(1). Then r (the replacement of m) and the next fence land in cut(2). Scope 1 is kept for good, because f has no plan entry (settlementDisposition gives none for 0 intents, v3-room.ts:4836) and replacedLocalSourceFacts refuses control operations. Next, f becomes a protected hole that holds the contiguous watermark (prunedThroughAuthorSequence) at -1, and r is retired logically. Entry (m→r) is never dropped, because completedSettlementSourcesPruned needs readIssued===null. Install e+7 then refuses "settlement plan references retired or absent issued work". In a second form with no moves, each fence miss permanently keeps one scope, so the 6th miss passes maxScopes 7 (malformed-input).
+
+The owner's rule (R7): an outside own fence is collectible once a later own fence by the same Writer is a member of a signed cut this Writer knows. It is approved on two conditions: Track J's model passes it, which it is checking now, and your safety argument holds. If either fails, stop and send me options.
+
+Work, after R5b and before or alongside R6, since it shares R6's schedule:
+- REDs first, each failing at your current head:
+  (i) the Writer installs e+1, its fence is withheld until after the creator seals e+1, and it makes a move during that seal. Expect bounded protected scopes and a live Writer through e+8.
+  (ii) the fence is withheld at 6 or more seals, with no moves. Expect bounded protected scopes.
+  (iii) your R6 RED, run about 6 rollovers past the miss.
+- Refusal tests: an outside fence is kept while no later own fence is in a signed cut, including when the later fence also missed its cut. Another author's fence is never collected by this rule.
+- In RESULT, per guarantee (G1, G5, G7, G8, G10, G15, G19): why a later own fence in a signed cut makes the old one unneeded, both by the creator's settlement and recovery census and by retained-history republication.
+- Track J is also checking whether piece (2) (dropping a plan entry only once its source is physically pruned) can still wedge through any other protected hole. If it finds one, I'll forward it. Don't change piece (2) unless that comes back.
+Order: finish R5b, then R7 and R6 (same schedule; your call which first), then R5-chain, the gate, P1 and step 14.
+
+### Report returned by the agent (2026-10-22 08:16 UTC)
+
+Track X: R7 (the outside own fence) is committed. Its REDs pass, and the per-test suites show no new failures against base.
+
+Commits:
+- 77ffef9a: R5-chain RED (double miss). It fails at epoch 7 ("settlement plan references retired or absent issued work") both at the R5 commit and at the R5b head. The C1 fix is prepared but not applied.
+- 128b066e: REDs (i), (ii) and (iii), all failing at the head before R7.
+  - (i) The fence and the seal-time move both miss cut(1). The install of epoch 7 refuses.
+  - (ii) No moves; the fence misses every other Cut, 6 misses in total. Protected scopes grow to [1,3,5,6,7].
+  - (iii) This is the R6 RED. It refuses at the epoch 3 census.
+- b8268291: the R7 fix.
+  - replacedLocalSourceFacts now returns this author's own fence as authorFence: exactly the three fields, version 1, fenceSequence equal to its own sequence, and no replacement.
+  - closedJournalReplacedOutsideRows collects an outside own fence only when a later own fence is a member of a later scope's signed Cut. That fence must be the same author's, at a higher sequence, and a local witness of the membership opened against the held, authenticated Cut. The reader must also confirm it is the issued fence at that digest.
+  - The outside fence's own bytes are still authenticated against the scope's closed ACL.
+
+Results:
+- REDs (i) and (ii): green through 10 and 14 rollovers, with protected scopes staying at [n-3,n-2].
+- Unit tests: 3 new R7 cases, 9 of 9 pass.
+  - They cover: kept when no later fence exists; kept when the later fence missed its own Cut; kept without the held authority; kept when the reader doesn't confirm the later fence; kept for a lower sequence or a non-fence later row; kept when the outside row's facts aren't a fence or name a replacement; never collected via another author's later fence. A received fence from another author is collected only by R5b's rule, and the reader is never consulted for it.
+  - Mutation check: forcing laterOwnFence to return true fails all 3.
+- Suites: 33 focused files. With the fix 34 tests fail, at base 38. The set failing with the fix is a subset of the base set, so there are no new failures.
+
+One limit to flag:
+- If a Writer's fences miss every Cut in a row, R7 can never fire, because no later own fence ever lands in a signed Cut.
+- Each consecutive miss keeps one more scope until the journal's maxScopes (7). That is about 6 consecutive misses.
+- This can happen if every install ends after the creator's next seal has begun (slow installs with fast automatic rollovers).
+- Under R7, alternating misses are bounded; consecutive ones are not.
+- I'll measure whether the slow-install automatic-rollover proof reaches it.
+
+Next: R6-A. Its unit refusal tests are written. Then the R5-chain fix (C1), the gate, P1 and step 14. The R6 RED (iii) also needs C1, since m→r misses cut(2) and r' lands in cut(3), so it will pass fully only after C1.
+
+### Follow-up instruction — R7 acknowledged; proceed with R6-A (2026-10-22 08:16 UTC)
+
+Good. R7 is acknowledged, and the refusal coverage and the mutation check are what I wanted. Proceed: R6-A, then C1, then the gate, P1 and step 14.
+On the consecutive-miss limit: I've asked Track J to confirm it in the model and to model candidate remedies (creator-side pacing, frontier-based fence collection, or better). Keep measuring whether your slow-install automatic-rollover proof reaches it. If it does, record the epoch and the scopes, and don't design a fix. Any remedy is a new rule for the owner, and I'll bring it once Track J has results.
+
+### Report returned by the agent (2026-10-22 08:24 UTC)
+
+Track X needs an owner decision. Every row-60 rule (R5, R5b, R7, C1) can only see proof that exists one install after a scope leaves replay. A proof that arrives later leaves the scope kept for good and wedges the plan, which confirms Track J items 2 and 3.
+
+R6-A and C1 themselves work:
+- R6-A is committed as 4cbef3d7 (census fallback plus 4 unit tests).
+- C1 is applied but not committed. With R7 and R6-A, the double-miss RED and the R6 RED both pass through 10 rollovers, with protected scopes staying at [n-3,n-2].
+
+The problem shows up when I rewrite refusal (a) under C1:
+- The move's replacement misses 3 Cuts in a row.
+- Install 8 refuses "settlement plan references retired or absent issued work".
+- Protected scopes are [1,2,4,5] at install 7: scope 3 was collected, while scopes 1 and 2 stay kept.
+
+Root cause, from a probe:
+- prepareClosedJournalDetails classifies a scope only while it has a recovery trust. authenticatedScopes comes from frame.recoveryTrusts; any other scope is retained as "source-coverage-incomplete".
+- Scope e is therefore classified at exactly one install, e+3, when the latest Cut it knows is cut(e+2).
+- Scope 1 was classified once, at install 4, when scope 4 had no Cut yet. The chain stopped there and was never evaluated again, although the last link reached cut(5).
+- Scope 3's own chain resolved inside its window, so it was collected. That retired a link that the plan entries of the kept scopes still name. Piece (2) drops an entry only when its source is physically pruned, so the plan wedges. This is Track J item 2.
+
+Consequences:
+- An outside row must be resolved by cut(e+2), which means at most 2 misses in a row. This holds for every class: a chain, a fence (R7), and a received row (R5b is always in time).
+- 3 misses in a row keep that scope for good. This is the earlier "consecutive-miss limit", but it is worse than I said: it is reached at 3 misses, not about 6.
+- Each such event then either wedges the plan (if a later collected scope retires a row the plan names) or adds a permanent protected scope until maxScopes (7) refuses.
+- Track J item 3 (a crash or offline period spanning the window) is the same mechanism. I haven't run it yet. A Writer that skips an install may be unable to rejoin at all, and I'll check that.
+
+Options (owner's decision):
+- W1: Keep the classification evidence of a retained scope until it is collected.
+  - When a scope with unresolved outside rows leaves its window, keep the signed Cut authorities it needs (its own and later ones) as data. Re-verify each one against the creator's immutable trust on every use (G5, G10: signed facts may outlive a stage).
+  - It is bounded by maxScopes. It touches G18's protected set and the trust retention.
+  - This is a real design change, and it is the general fix.
+- W2: Keep recovery trusts longer for scopes with unresolved outside rows, as G18's "bounded pending work".
+  - The effect is the same as W1, through the existing trust machinery, bounded by maxScopes.
+  - It is also a guarantee-level choice about how many trusts are retained.
+- W3: Accept the window as a documented limit.
+  - Two misses in a row resolve; three keep the scope.
+  - To keep a kept scope from ever wedging plan writes, change piece (2) to drop a completed entry once its replacement or its source is logically retired, not physically pruned (Track J item 2). The census then covers the source through the creator's terminal frontier, as it does at install 7 here.
+  - Kept scopes still count toward maxScopes, so a Writer with about 5 such events in its lifetime ends in malformed-input. The failure is bounded and loud.
+- W4: Pace the creator so that Writers' outputs land in time, which is Track J's candidate.
+  - It cannot be unconditional without hurting liveness.
+  - It could reduce how often misses happen, but cannot remove them.
+
+My recommendation: W3's piece (2) change now, since it is needed for liveness under any option, plus W1 or W2 as the fix for boundedness.
+
+What I'll do unless you say otherwise:
+- Remove the probes.
+- Commit C1 as decided, with the unit refusal tests: last link in no Cut, link derivation mismatch, chain longer than the bound.
+- Make refusal (a) assert only the rule: the scope is retained while no link is in a signed Cut, checked at installs 4 and 5. It will stop before the window limit.
+- Keep the triple-miss run as evidence for the decision.
+- Then the gate, P1 and step 14.
+
+Logs:
+- <evidence>/track-x/logs/r60-c1-probe-r1.log
+- <evidence>/track-x/logs/r60-c1-refusal-a-r1.log
+
+### Follow-up instruction — Owner chose W1; plan-drop after model check (2026-10-22 08:25 UTC)
+
+The owner decided (2026-10-22):
+1. W1: keep the classification evidence of a retained scope until it is collected. When a scope with unresolved outside rows leaves its window, keep the signed Cut authorities it needs (its own and later ones) as data. Re-verify each against the creator's immutable trust on every use. Bounded by maxScopes. Classification may then run at any later install while they exist.
+2. The piece (2) change (drop a completed entry once its replacement or its source is logically retired) is approved ONLY after Track J's model shows the census never misclassifies a still-present source whose entry was dropped. I've asked Track J to model W1 and this change first. Don't build either until I forward its result.
+
+Meanwhile, go ahead as you proposed:
+- remove the probes;
+- commit C1 with its refusal tests;
+- narrow refusal (a) to the rule inside the window (installs 4 and 5);
+- keep the triple-miss run as evidence;
+- then the gate, P1 and step 14.
+Also run the Writer that skips an install (offline across the window). Record whether it can rejoin at all, as evidence for W1. Don't fix it yet.
+
+When you build W1:
+- RED first: the triple-miss case and the offline-across-the-window case. Each must fail at your C1 commit and pass after.
+- Refusal tests: a kept authority that fails re-verification is never used; the kept authorities are dropped when their scope is collected; the bound holds.
+- In RESULT, argue per guarantee G1, G5, G10 and G18.
+
+### Follow-up instruction — Model cleared W1 and (B); build them, with conditions (2026-10-22 08:44 UTC)
+
+Track J's model has cleared both owner conditions, so build W1 and the plan-drop change (B). The simulator ran 5000x30 steps on 1 Writer and 3000x30 on 2 Writers with a leave, seed 7. Apalache is still running; if it finds a violation I'll stop you.
+
+What the model found:
+- Today's window fails as you saw: triple miss (wedge, at install 7 in the model), offline across the window (kept for good), and a crash at the classification install e+3 (kept for good).
+- W1 passes every invariant: safety, g1Count, g1NoLeak, planSound, noPlanRefusal, noCensusRefusal, withinMaxScopes, noProtectedHole. Covered: triple miss, offline 2+ seals then caught up, crash then cleanup, fence double miss, fence miss with a move chain, whole install output miss, two Writers late.
+- Kept-authority bound: at most MAX_MISS + 1 Cuts (the scope's own plus the next MAX_MISS); a bound of one less fails. W1 needs misses <= maxScopes, so natively keep at most maxScopes + 1 = 8 Cuts. Beyond maxScopes consecutive misses, the install refuses ("scopes"), a loud and bounded failure.
+- (B) never misclassifies, with or without W1. A retired replacement implies its scope was collected, which implies the chain landed and the signed terminal frontier passed the source. So a dropped entry's source is always at or below the frontier, and the census reads it as terminal. (B) alone doesn't fix leaks; W1 does.
+
+Native checks before you rely on the model:
+1. The model ASSUMES the creator-signed terminal frontier is cumulative: the max own sequence over the signed cuts, never falling back. Check this in the code and state it in RESULT with file:line. If the native frontier is per-cut and can fall back, STOP and report; (B)'s argument then needs revisiting.
+2. A crash at the classification install e+3: does a clean scope (no outside rows) also leak? Add it as a RED case.
+3. A Writer back from offline that moves before catching up adds one miss per seal it is behind. Record what happens natively when that exceeds maxScopes. Don't design a fix; it goes into the decision record.
+
+Build, each fix its own commit after its RED:
+- REDs: the triple miss; offline across the window (2-3 seals); the crash at e+3. Each must fail at your C1 commit.
+- W1: keep the needed signed Cut authorities as data, at most maxScopes + 1, re-verified against the creator's immutable trust on every use and dropped when the scope is collected. Refusal tests: one that fails re-verification is never used; they are dropped at collection; the bound holds, and a refusal beyond it is loud.
+- (B): drop a completed entry once its source or its replacement is logically retired. Refusal tests: an incomplete entry stays, and an entry whose source is above the terminal frontier stays.
+- RESULT: per guarantee G1, G5, G10 and G18, and the frontier's cumulativeness with file:line.
+Then the gate, P1 and step 14, as before.
+
+### Report returned by the agent (2026-10-22 08:50 UTC)
+
+Track X native checks before building W1 and (B). Two of the three REDs you asked for don't reproduce natively, so only the triple miss is a W1 RED here. C1 is committed as 6f37faae, and the suite pair against b8268291 shows no new failures.
+
+1. The terminal frontier is cumulative, with one exception.
+   - Each author's boundary starts from the previous signed settlement record's frontier: deriveAuthorSettlement, creator-close.ts:1387-1394 (boundary: previousFrontier?.[2]).
+   - deriveCreatorAuthorSettlementFrontier (creator-close.ts:1401-1422) only raises it. A fence counts only when fence > boundary; contiguous slots extend it; a regressed slot never lowers it, and for the issuance author it throws (1407-1410).
+   - The exception: an author that is not in the current ACL gets [author, epoch+1, null] (creator-close.ts:1383-1385). So a Writer removed and then re-admitted has its frontier reset to null.
+   - For (B) I'll check whether the census still reads logically retired rows. If it doesn't, the reset can't matter. If it does, I'll stop and report before relying on it.
+
+2. Offline across the window: such a Writer cannot rejoin at all, so W1 can't fix it. This is a pre-existing rejoin limit, not the classification window.
+   - Probe: tests/track-x-offline-window-probe.test.ts. 1 offline Writer, 3 normal installs, then the creator rolls on while the Writer misses installs, then the Writer installs the current successor.
+   - Skip 1: it catches up and stays bounded through 6 more rollovers, protected [n-3,n-2]. This holds with or without moves made while behind; those moves are one miss, replaced at catch-up.
+   - Skip 2, skip 3, and skip 2 with a stop and reopen: the catch-up install refuses "creator recipient signed adjacency is invalid". A successor install needs the adjacent epoch, and the creator serves only its current successor.
+   - Because of this, your item 3 can't happen natively. A Writer that moves while behind can be at most 1 seal behind and still rejoin, so it adds at most 1 miss.
+   - Logs: <evidence>/track-x/logs/r60-offline-skip{1,2,3}-*.
+
+3. A crash at the classification install doesn't leak natively.
+   - The classification runs inside the install's received recovery turnover (creator-adoption.ts:1413-1414), before the install commits.
+   - Natively, scope e is replay-protected through install e+3 and classified at install e+4, which knows cut(e+3). The model's "e+3" is this install.
+   - Case: tests/track-x-classification-window-red.test.ts, clean scope 2, with a stop and reopen right after install 5 and again right after install 6. It passes at C1: scope 2 is collected at install 6, and protected stays [n-3,n-2] through epoch 9.
+   - A kill inside the turnover leaves the install uncommitted, so the Writer must install that epoch again. If the creator rolled over in the meantime, that becomes the adjacency limit from point 2.
+
+So, natively:
+- The window is lost only by proof that arrives after install e+4. For a move chain that means the seal move plus 3 consecutive replacement misses (the triple-miss RED). For fences it means 4 consecutive fence misses, since a later fence only has to land in cut(e+3).
+- The triple-miss RED fails at C1 (wedge at install 8). It is in the same file. I'll add a 4-fence-miss case, commit both as the W1 RED, and build W1 and then (B).
+- I'm keeping the offline probe as evidence. I won't commit it as a W1 RED, since it can't pass after W1.
+
+### Follow-up instruction — Proceed: W1 RED = triple miss + 4 fence misses (2026-10-22 08:51 UTC)
+
+Agreed on all three points. Proceed:
+- The W1 RED is the triple miss plus the 4-consecutive-fence-miss case, committed together. Then W1, then (B), each after its RED. Keep the e+3/e+4 crash case as a passing guard in the same file, since it documents that the native classification install is e+4.
+- Frontier: check whether the census reads logically retired rows. If it does, and a removed then re-admitted Writer's frontier reset to null can make the census misclassify a dropped entry's source, stop and report before (B). Add a test either way: a removed then re-admitted Writer with a dropped entry.
+- Offline skip of 2+ installs ("creator recipient signed adjacency is invalid"): don't fix it in this track. Keep the probe and logs as evidence, and add a short section to RESULT: what fails, where (creator-adoption.ts:1063), skip 1 against skip 2+, and that W1 can't help it. I'm treating it as a separate product limit: a player who drops for two epochs can't rejoin. I'll decide separately whether it gets its own track.
+Then the gate, P1 and step 14.
+
+### Report returned by the agent (2026-10-22 09:04 UTC)
+
+Track X: the W1 RED is committed (402c76a4); W1 itself needs a storage decision before I build it.
+
+RED at C1: the triple miss wedges at install 8. Four fence misses keep scopes 1 and 2 for good, though they stay within the protected bound of 4. The e+3/e+4 crash guard passes.
+
+The blocker: W1 must keep cut(e) for a scope that has left its window, and nothing durable holds it today. A Writer's durable stores keep a signed scope's anchor (its journal header) and its membership carrier (bound only to the cut's digest). The cut bytes, the commit QC and the successor's signed anchor live only in snapshot and AHE closures, and those are retired when the window moves on.
+
+Re-verification is the easy part. openCreatorCheckpointTrust (@ts-drp/protocol-v3/creator-checkpoint) takes the pinned genesis anchor and signature, anchor(e), anchor(e+1), cut(e) and the QC. From those it checks both signatures against the genesis signer set, the lineage, and the cut/QC equation. That is a full check against the creator's immutable trust, with no protocol-v3 edit.
+
+Where the kept authorities live is a durable-format and G21 accounting choice, so I'm bringing it to you:
+
+- S1 (durable, my recommendation if you accept the cost). Extend the Writer's received closed-membership carrier (the journal scope header) to also carry cut(e), the signed successor anchor and the QC.
+  - It is written in the install, like the carrier today, so it is crash-safe and matches the model's "crash then cleanup" case.
+  - It is dropped with the carrier when the scope is collected.
+  - It is bounded at one per journal scope (at most maxScopes = 7, within your 8).
+  - Cost: about +2.5-3 KB on every Writer scope, not only retained ones.
+  - The two received-path capacity width programs must count it: the append-time template (creator-closed-rollback-data ~15724) and post-adoption maintenance (~16860). At append time the future cut is not known yet, so they need a worst-case cut/anchor/QC width.
+  - Pinned numbers in the finishing-capacity and width tests may shift, so those tests would need edits.
+- S2. A new bounded sidecar store (node SQLite plus browser IndexedDB) holding at most 8 kept authorities. It is written when a scope leaves its window retained, and deleted at collection.
+  - Capacity sizing stays unchanged and it gets its own fixed bound.
+  - Cost: a new storage API on both hosts. It is a second transaction next to the install, so a crash between the two loses the keep, and the scope falls back to being retained.
+- S3 (smallest). Keep the same data in memory (bounded at 8, re-verified on every use).
+  - No format or sizing change, and both REDs pass.
+  - Cost: a restart while a scope waits loses the keep, and the scope is kept for good (today's behaviour, ending in the loud maxScopes refusal). That does not match the model's crash case.
+
+S3's verification and classification code is a strict subset of S1's and S2's. So I can build S3 now, with refusal tests for a failed re-verification, the drop at collection and the bound, and add durable storage on top once you decide.
+
+Meanwhile I'm starting on (B): whether the census reads logically retired rows, and the test for a removed then re-admitted Writer.
+
+### Follow-up instruction — Build S3 now; evaluate hybrid S1' while I consult (2026-10-22 09:05 UTC)
+
+Build S3 now, the in-memory core with re-verification through openCreatorCheckpointTrust, at most 8 kept authorities, dropped at collection. Include its refusal tests: a failed re-verification is never used, the drop at collection, and the bound with a loud refusal beyond it. Commit it after the W1 RED. I'm deciding the durable layer (S1 or S2) under the owner's delegation, after an astra consult.
+
+One more option, please evaluate it before I decide. Call it S1'. Write the kept authorities into the scope's journal header ONLY when the classifying install (e+4) leaves that scope retained with unresolved outside rows, in that same install transaction, never for clean scopes. Answer with file:line:
+1. At the e+4 install's received recovery turnover, are cut(e), the signed successor anchor(e+1) and the QC still readable from the snapshot and AHE closures, before that install retires them?
+2. Can that turnover's write rewrite an existing scope header in place, or append a record to it, within the same transaction?
+3. Which capacity programs must count it? Only the post-adoption maintenance program (~16860), or also the append-time template (~15724)? Would any pinned number in the finishing-capacity or width tests change? List each pinned test and the value that would move. If none moves, say so.
+4. Its crash behaviour: a kill inside that turnover leaves the install uncommitted, so the scope is reclassified on the re-install. Confirm.
+Send me the answers as a short message. Keep going on (B) meanwhile.
+
+### Report returned by the agent (2026-10-22 09:07 UTC)
+
+Track X, S1' evaluation (all paths are under packages/). Short version: S1' needs storage changes on both hosts, and the sizing is conditional work in two programs.
+
+1. Readable: yes.
+   - At install e+4, scope e is still in the authenticated journal scopes (node/src/internal/creator-closed-rollback-data.ts:23500-23508).
+   - Its closure(e+1) is read when the recovery certificate is built, before the turnover retires anything. The authority loop reads the trust-state carrier, which is the signed anchor(e+1) (:2509), and cut(e) (:2511-2512). The QC can be read the same way, with readUnique(closure, "drp-seal-qc", e) (as at :2838).
+   - Classification consumes these in-memory copies (:23577, :23618).
+   - Gap: ClosedJournalMembershipAuthority (:1918-1924) keeps only the cut, the ACL digest, the profile and the suite. S1' would add the trust-state record bytes and the QC at :2527.
+2. Rewrite or append: no.
+   - closed_membership_bytes is written only when empty. Equal bytes are idempotent; different bytes are refused as "evidence-conflict" (storage-node/src/live-journal.ts:1887-1897; the UPDATE at :1915-1917 requires "closed_membership_bytes IS NULL"). The browser does the same (storage-browser/src/live-journal.ts:2107-2125).
+   - The turnover's journal API is prepareFence, commitPrepared, beginDrain, drainBatch and acknowledgeCompletedDrain (live-journal/src/types.ts:320-343). It only deletes rows and headers, or clears membership (storage-node/src/live-journal.ts:1017-1028).
+   - S1' therefore needs a new write-if-absent header field (a new scopes column, or a carrier upgrade under the same check) in storage-node, storage-browser and live-journal: the image frames at retirement.ts:841-844, the byte charge at :1121 and :1619, and clearing at drain.
+   - "The same transaction" can only mean the journal store's own transaction. The stores are separate SQLite files (journal: storage-node/src/live-journal.ts:1006; snapshot: storage-node/src/snapshot-transfer.ts:554).
+3. Capacity: both programs.
+   - The append-time template's future context (creator-closed-rollback-data.ts:15724-15744, maxClosedMembershipByteLength for "future"; it runs for received-append, :15690) and the post-adoption maintenance (:16860-16883, non-preclose) both predict the image after the next install, which is where S1' writes.
+   - The term can be exact and conditional: zero unless the scope leaving its window at the next install has rows outside its Cut, which the program can read from the actual image (row count against membership).
+   - Pinned values I found:
+     - creator-ordinary-settlement-capacity.test.ts:578-613 (request dimensions 1/512/32_768);
+     - :627-642 (the frozen E3 program fixture, evaluated as recorded: 2117228, 4076517, 664607, 35251, 99209);
+     - :898-937 (call inputs 10000/2048/80000/300/512/64);
+     - :1035 (delta 200);
+     - creator-finishing-width-program.test.ts:171 (17_882), :222-235 (225/277/251), and :418, which pins the carrier schema "creator-close-membership-1" (S1' leaves the carrier untouched).
+   - None of these is a received future-context journal width, so a conditional term moves none of them. I would confirm that by running the capacity suites. An unconditional worst-case term would change every received prediction; I can't rule out a moved value without running it.
+4. Crash: partly.
+   - The install is not one transaction. A kill before the journal's beginDrain commits leaves the journal unchanged, and the re-install reclassifies.
+   - A kill after it resumes the persisted drain (the reconstructed path, creator-closed-rollback-data.ts:23440-23450; restored prefixes must equal the plan, :9978-9987). That path re-evaluates only the scopes outside the plan, and a retained scope is outside it, so a retained scope is still reclassified and the write redone.
+   - Crash safety doesn't depend on atomicity. The record is signed data, re-verified on every use and cleared with the scope, so being written early or left over after a kill is harmless under G10. A missed write is redone at the re-install, because the window is unchanged.
+
+I'm building S3 now, then (B).
+
+### Follow-up instruction — Pivot: one completion contract (astra A1-A3) (2026-10-22 09:24 UTC)
+
+Change of direction, decided under the owner's overnight delegation after an independent astra (Codex gpt-6-astra) review whose proofs were checked: 45 of 49 claims VERIFIED, none WRONG. Report: <evidence>/astra-review/astra-report.md, checks in verification.md. Its findings on your work:
+- A1 (blocker for G1/G3): a Writer that misses ONE ordinary creator row per epoch still installs, and its projection matches the creator's. But its journal scopes never retire (the closed-membership prefix needs every cut member). Install 9 refuses "journal retirement refused: malformed-input". This happens at base 0171994d and at your 4cbef3d7 and 402c76a4, with no play during rollovers at all. Probe: tests/astra-partial-cut.test.ts on branch astra-review (5c7a2e45).
+- A2 (high): with the library's `expire` policy, install 4 refuses "creator recovery dependency hold unavailable:outbox-classification:9:displaced:published", at base and at your head. The probe is on astra-review. The cause isn't established: your census accepts expire at v3-live.ts:10583 on one path.
+- A3 (high): journal retention (creator-closed-rollback-data.ts:19309), issuance retirement / the plan (v3-room.ts:4976-4977) and the live-journal retirement (retirement.ts:1652-1653) use three inconsistent completion checks. Each R-fix patched one of them.
+Astra's recommendation, which I'm adopting: stop adding per-case cleanup rules. Specify one authenticated completion and dependency contract shared by the census and every retirement, prove it with the model and native tests, and only then change deletion rules.
+
+Do now:
+1. Stop at a clean point. If S3 is complete with its tests, commit it. Otherwise save it on a backup branch (git branch track-x-s3-wip) and leave your branch at 402c76a4 plus anything finished. Don't start (B).
+2. Take astra's probes as REDs. Copy tests/astra-partial-cut.test.ts and the expire probe from astra-review (`git show astra-review:<path>`; list them with `git diff --stat 0171994d astra-review -- tests`) into your branch as one RED commit. Keep the astra names, and note the source commit in the message. They must fail at your head.
+3. Write <evidence>/track-x/CONTRACT.md:
+   - Work classes: local or received; move, fence or control; rebase, expire or manual-review; in the cut, outside it, or partially received; on time, late, very late, offline, crashed; one Writer or several; removed and re-admitted.
+   - For each class: when it is complete, which signed facts prove that, which store may delete what, when, and under which bound.
+   - Map each current check (the three above, plus the census, completedNonportableReplacementChunk and your R5-R7/C1 classes) onto the contract, and list every disagreement.
+   - Say whether an authenticated membership or completion format change would remove the dependence on complete pre-install delivery and long replacement chains, and what it costs. That's astra's owner question 4; give a recommendation.
+   - Cover the rejoin limit (2 or more missed installs refuse with signed adjacency invalid). Propose the maximum lag or disconnection that must recover automatically, and the backpressure beyond it (astra owner question 2).
+   - Put W1's storage question (S1/S2/S3/S1') into the contract. An astra consult on it is running, and I'll forward its answer.
+4. Send me a short message when CONTRACT.md is ready, then hand back. Track J models the contract before anything is built, and the gate, P1 and step 14 are then done against it.
+
+### Follow-up instruction — Astra storage consult: S1 recommended; fold into contract (2026-10-22 09:25 UTC)
+
+The astra storage consult is done. It ran in its own worktree at your 402c76a4, with probes. Answer: <evidence>/astra-consult-1/answer.md, evidence in <evidence>/astra-consult-1/evidence/.
+Ranking: S1 > S1' > S2 > S3. Key points for CONTRACT.md:
+- S1 as a received-only, versioned extension INSIDE the existing opaque membership carrier. Both native stores already accept opaque canonical membership bytes, so no SQL column or IDB store is needed. Capture it at the received close, where the offer supplies the Cut, the QC and the successor trust (the seam is creator-adoption.ts:1413). Don't mutate the header late.
+- A recording failure must stop the install. Today v3-live.ts:20072-20075 catches the error and returns false, and creator-adoption.ts:1413 ignores the result.
+- Measured bundles are 3,038-4,139 bytes; eight would be 24-33 KB per replica (examples, not a worst-case bound). Both received projections (D:15724, D:16860) must budget it. Audit the ordinary finishing paths too (D:13793, 12849, 13167, 13419). Astra infers the existing pins can stay as legacy cases, with new extended-case tests.
+- S1' fails as specified: both hosts refuse different occupied membership bytes and open their own transactions (L:1285 rejects membership replacement). S2 and S3 lose W1's evidence on a crash.
+- Astra notes that no option yet has implementation-level crash proof.
+Use S1 as the storage design in the contract. It is a durable format change of the membership carrier, which astra lists as an owner decision (question 4), so it gets built only after the contract is modelled and the format change is approved. Your stop point and CONTRACT.md steps are unchanged.
+
+### Report returned by the agent (2026-10-22 10:02 UTC)
+
+Track X: CONTRACT.md is ready at <evidence>/track-x/CONTRACT.md. I'm handing back now.
+
+- S3 is not on my branch. a8bfbe64 broke 7 of 10 tests in the pinned packages/node/tests/creator-journal-classification-compound.test.ts ("keptJournal is not defined"; 2 tests hang to the timeout). That test runs the private callsite text from "const journalClassificationInput:" to "const censusFacts = record(census);" with only the names it already has, and S3 adds new names inside it. Every other per-test result matched base (r60-w1-pair: fix 41 failures, base 36; the only base-only failures are the two window REDs). I saved S3 on track-x-s3-wip (a8bfbe64) and moved my branch back to 402c76a4.
+- The astra REDs are committed as 9e20b737 (copied from astra-review 5c7a2e45, names kept). Both fail at the head's sources: the partial-cut case refuses install 9 with "malformed-input", protected [0..6]; the expire case refuses install 4 with "outbox-classification:9:displaced:published". Both controls pass.
+- A2 root cause, found with a temporary probe that I have removed: at the install of e+2, the census runs before the new successor's settlement record is adopted. It sees terminalThrough 8, and the expired row is 9. The record being installed would cover row 9, because fence 10 is in cut(3). On the ordinary path the census recognises expire only through that frontier check: the completion helper accepts rebase/transform only, and the plan-entry branch that accepts expire runs only for an epoch-0 native branch. Rebase passes because the R4 derivation check recognises it without the frontier.
+- The contract:
+  - A peer may delete a row of its own that missed its Cut once two things hold. The creator has signed that the row is final (its cumulative per-author frontier passes it, which happens when the Writer's next own fence lands in a Cut). And the Writer's own plan entry is settled locally (expired, or its replacement is durably issued and matches the derivation). Rows in the Cut, and other Writers' rows that missed it, are deletable once the peer has durably installed the next epoch.
+  - This removes the C1 chain walk, makes R7 a special case, and gives expire a completion rule. It changes decided rows 62/65, so it needs the owner.
+  - It also gives one deletion order, and plan entries are dropped when either end is logically retired. The section lists 9 places where today's checks disagree (D1-D9).
+- Recommendations for the owner:
+  - Format question 4: approve F1 (the successor offer carries the closed epoch's ordered close-set digests, which can be checked against the Cut's root; this fixes A1) and F2 (= S1, the received-only carrier extension).
+  - Lag question 2: today a Writer cannot rejoin after missing 2 or more installs. I propose that a lag of up to K = 7 installs recovers automatically, through a chain of retained successor certificates. Beyond K, the Writer gets a typed "rejoin-required" refusal and rejoins as a new incarnation.
+  - Consecutive missed fences and pending manual reviews: a typed backpressure refusal one scope before maxScopes, instead of "malformed-input" at it.
+- Still open:
+  - the re-admission census check (D8), and its test, which is not built;
+  - whether the IndexedDB issuance store reads logically retired rows.
+
+### Report returned by the agent
+
+Track X has stopped as you asked: the astra REDs are committed, CONTRACT.md is written, and the W1 in-memory core (S3) is not on my branch because it breaks a pinned test. I sent you a short message when CONTRACT.md was ready.
+
+Standing finding, still to put at the top of any write-up: an app can export a creator's successor before adoption through the public API (`sealEpoch` / `serveAvailableSuccessor`, and `exportCreatorSuccessor`, which has no adoption precondition).
+
+**Branch.** `worktree-agent-a9ab847b594d95e7f` is at 402c76a4 plus 9e20b737. Nothing is pushed.
+
+**What happened, in order**
+1. **S3 is saved on `track-x-s3-wip` (a8bfbe64), not on my branch.**
+   - I committed it first, then the focused suites showed it breaks 7 of 10 tests in `packages/node/tests/creator-journal-classification-compound.test.ts` ("keptJournal is not defined"; 2 tests hang until they time out).
+   - That pinned test runs the private code from `const journalClassificationInput:` to `const censusFacts = record(census);` in `creator-closed-rollback-data.ts`, and only the names already used there are defined. S3 adds new names inside it.
+   - Everything else matched base: 41 failures with the fix, 36 at base. The only base-only failures are the two window REDs.
+   - So I moved the branch back to 402c76a4, undid S3's comment change in `tests/track-x-replaced-source-journal-refusal.test.ts`, and moved S3's untracked files into `<evidence>/track-x/trash/s3-wip/`.
+   - Any W1 build, S1 included, must enter that code through names it already reads, as R5 did with `lifetime.readReplacedLocalSource`, or get approval to change the test.
+2. **Astra REDs committed as 9e20b737**, copied from astra-review 5c7a2e45 with the names kept and prettier applied:
+   - `tests/astra-partial-cut.test.ts`
+   - `tests/astra-expired-outside.test.ts`
+   - `tests/fixtures/astra/outside-rows-room.ts`, `readiness-hold-room.ts`, `settlement-room.ts`
+
+   At this head (log `r60-astra-reds-head-r1`):
+   - partial cut: install 9 refuses "journal retirement refused: malformed-input", protected [0..6];
+   - expire: install 4 refuses "creator recovery dependency hold unavailable:outbox-classification:9:displaced:published";
+   - both controls pass.
+3. **A2's root cause is now known.** A temporary probe (removed; source is clean; log `r60-a2-probe-r1`) showed:
+   - The census runs during the Writer's install of epoch 4, before the new successor's settlement record is adopted. The frontier it reads gives `terminalThrough` = 8.
+   - Row 9 is the move made during seal 2, and its plan entry is `expire`.
+   - The record being installed would cover row 9, since fence 10 is in cut(3), but the census doesn't read it yet.
+   - On the ordinary path that frontier check is the only one that accepts expire. The completion helper takes rebase/transform only (v3-live.ts:15261-15262), and the plan-entry branch that does take expire runs only for an epoch-0 native branch (v3-live.ts:10573-10583, 11039-11056).
+   - Rebase passes because the R4 derivation check recognises it without the frontier.
+   - So an expired source goes unrecognised at exactly one install, the install of e+2.
+
+**CONTRACT.md** (`<evidence>/track-x/CONTRACT.md`). Facts carry file:line at 402c76a4; proposals and open points are labelled.
+- **Work classes:** 16 classes covering every dimension you listed. Each gives when it is complete today, the signed facts used, who deletes it and when, the proposed rule, and its bound.
+- **The rule:**
+  - A row in the Cut, or another Writer's row that missed it, is done once this peer has durably installed the next epoch.
+  - A Writer's own row that missed its Cut is done when two things hold:
+    - **T** (signed): the creator's cumulative per-author frontier passes it. It is cumulative at creator-close.ts:1387-1422, and an admitted fence F moves it to F-1 (1411-1417). A re-admitted Writer's old rows count through the old-incarnation clause.
+    - **Settled** (local): the row is a fence, or its plan entry is expire by policy, or its replacement chunks are durably issued and match the derivation. Manual review is never settled automatically.
+  - The replacement does not have to land in a Cut. This removes the C1 chain walk and makes R7 a special case, but it changes decided rows 62/65, so it needs the owner.
+  - The census needs a third class, "settled, waiting for T", which is the A2 fix.
+- **Rest of the contract:**
+  - a list of what keeps each row (census, plan, replay window, journal, republication, crash);
+  - one deletion order, with plan entries dropped when either end is logically retired;
+  - invariants I1-I5 for Track J.
+- **Mapping and disagreements:** every current check is mapped, including the three astra named, the census, `completedNonportableReplacementChunk` and R5-R7/C1. There are 9 disagreements (D1-D9); A1, A2 and A3 are three of them.
+- **Recommendations for the owner:**
+  - **Question 4 (format change):** approve two changes.
+    - **F1:** the successor offer carries the closed epoch's ordered close-set digests. These can be checked against the Cut's root with the existing Merkle rebuild, which fixes A1. It costs 32 B per member per offer.
+    - **F2 = S1:** the received-only carrier extension, recorded at creator-adoption.ts:1413, with a recording failure stopping the install. Under the new rule only the scope's own Cut authority is needed.
+    - The alternatives, delivering every member before install or recording the carrier later, are listed with their costs.
+  - **Question 2 (lag):** today a lag of 1 recovers and 2 or more fails with "creator recipient signed adjacency is invalid" (creator-adoption.ts:1058-1063). I propose K = 7: the creator keeps a chain of successor certificates (about 4 KB each). Beyond K, a typed "rejoin-required" refusal, and the Writer rejoins as a new incarnation.
+  - **Missed fences:** a typed backpressure refusal one scope before maxScopes, instead of `malformed-input` at it.
+- **W1 storage** uses astra's ranking, S1 > S1' > S2 > S3, and records why S3 is off the branch.
+
+**Still open**
+- Re-admission (D8): the census frontier check fails a re-admitted Writer's row, whose frontier resets to null, while two other checks accept such rows as old-incarnation. The test you asked for, a removed then re-admitted Writer with a dropped entry, is not built because (B) is on hold.
+- Whether the IndexedDB issuance store reads logically retired rows. The node SQLite store does: `readOutboxPage` filters only on the physical watermark.
+
+**Uncommitted, left in the tree:**
+- `tests/track-x-play-through-rollover-red.test.ts` (knob edits)
+- `tests/track-x-nonportable-prepare-refusal.test.ts` (the P1 refusal test)
+- `tests/track-x-offline-window-probe.test.ts` (offline evidence probe)
+- `.logs/bounded-storage-lifecycle/r8-warm-capacity-01/` (bench inputs, never to be committed)
+
+None of my processes is still running. To stop my suite run I killed my own script; its base half kept running on its own and finished normally. The vitest processes still running belong to worktree agent-aacbd4e4ceff4b065. PROGRESS.md is up to date.
+
+Files are in `<evidence>/track-x/` (`<evidence>/track-x/`):
+- CONTRACT.md
+- PROGRESS.md
+- logs/r60-astra-reds-head-r1.log
+- logs/r60-a2-probe-r1.log
+- logs/r60-w1-pair-fix.log
+- logs/r60-w1-pair-base.log
+- logs/r60-w1-compound-head-r1.log
+- bin/a2probe.py
+
+### Follow-up instruction — Resume Track X on non-deletion work (2026-10-22 10:06 UTC)
+
+Track X: please resume on work that deletes nothing, while the contract is checked.
+
+Status: CONTRACT.md is with Track J (modelling it as contractA: simulator, then a safety-only inductive Apalache proof, then progress) and with astra (gpt-6-astra, high) for an adversarial review in its own worktree at your head 9e20b737. Don't build the contract, F1, F2 or any change to the deletion rules until both report and the decision is recorded. I'll forward their results. The owner is asleep and has delegated decisions to me after an astra consult; a format change and any edit of the pinned compound test still wait for the owner.
+
+In this order:
+1. Settle the contract's two OPEN facts, with proof (file:line plus a quote, or a probe test and its output):
+   (a) whether the IndexedDB issuance store (storage-browser) reads logically retired rows, on every path the census, the plan check and republication use;
+   (b) the D8 re-admission census check: what a re-admitted Writer's census does with its old incarnation's rows and frontier today.
+   Write both into CONTRACT.md's FACT section and send me a short message when done.
+2. The successor-serving gate (decision row 61, "Gate serving"): the creator's successor material server answers only after the creator has adopted that successor, readiness included. RED first, then the fix, as before.
+3. Step 14: the 32-job burst refusal (d9346 line 915).
+
+Rules unchanged: new RED tests only; don't edit existing RED or governance tests, frozen artifacts or the pinned packages/node/tests/creator-journal-classification-compound.test.ts. Commit on your branch only; never push. Node v22.15.0 pinned. Check each Chromium port separately before a browser run. Main has not moved since 0171994d; I'll tell you when Track Z merges.
+
+### Follow-up instruction — Forward Track J's contract bound finding (2026-10-22 10:13 UTC)
+
+Track X, for information (no build yet): Track J's first result on the contract (contractA). Safety, planSound, noPlanRefusal and noProtectedHole hold in simulation with 1 Writer, with 2 Writers and a leave, with expiry, and with a derivation mismatch (3000x30, seed 7). Apalache is next.
+
+One finding touches the backpressure and pacing design: counting consecutive missed fences with M = maxScopes is not enough. A move misses cut(e) (its fence lands in cut(e)), then the fences miss cuts e+1, e+2 and e+3. At FENCE_PACE 3 = maxScopes 3, the install at e+4 holds scopes e..e+3 and refuses "scopes". The bound must count the cut the outside row missed: some own row has to land within maxScopes cuts of that cut. In consecutive fence misses that is M <= maxScopes - 1, so 6 natively. Please put this into CONTRACT.md's liveness section and the placement of the typed backpressure refusal when you next touch it. It doesn't change your current order: open facts, then the gate, then step 14.
+
+Track J is also checking a suspect: under the "either" drop, a replacement y can be retired before its source x when a pending review blocks x's scope; the entry [x->y] is dropped and Settled(x) may never become true again. Not confirmed; I'll forward the result.
+
+### Report returned by the agent (2026-10-22 10:17 UTC)
+
+Track X: both OPEN facts are now in CONTRACT.md section 1.4, with Track J's liveness bound added in 6.3. Moving on to the gate.
+
+(a) IndexedDB store: logically retired rows are still read on every path until they are physically pruned. This is the same as the node store.
+- `readIssued` (BIS:1282-1345) and all three `readOutboxPage` paths (BIS:1347-1400) check only lineage consumption and the pruning watermark.
+- The retirement control is read only on writes (BIS:624-634) and plan writes (BIS:1251, 2252).
+- So the census sees every present row. Republication picks rows from the current journal scope and reads their bytes with `readIssued` (V:21948), which does not filter them either.
+- The plan check is split: the room drops a completed entry only after physical pruning (R:4960-4980), but the store refuses a plan that names logically retired work (IS:1635-1655). The contract's order closes that gap.
+
+(b) D8: nothing reaches the old-incarnation branch today. Probe: tests/track-x-readmission-census-probe.test.ts, commit 82d1a5cf, log <evidence>/track-x/logs/r61-d8-probe-r2.log, on shipped Chat.
+- The removed Writer's own replica is stuck:
+  - its install is refused: "creator historical issuance authority preparation failed";
+  - a receive-only reopen gives "issuance-rejected";
+  - after the refused install, every reopen gives "chain-invalid".
+- The only way back is a fresh replica. It installs epochs 3-8 and the room converges.
+- Its author sequences restart at 0, so (author, sequence) is not unique across incarnations. Today's checks also match the digest, so this breaks nothing now, but the model should know it.
+- D8 would only bite in a design that lets the old replica rejoin on its own databases.
+- Side finding for W2 and the owner: a removed member's page can't keep watching the room from its own databases.
+
+Next: the successor-serving gate (RED first), then step 14.
+
+### Follow-up instruction — Forward J's confirmed either-drop leak to X (2026-10-22 10:23 UTC)
+
+Track X: Track J confirmed the "either"-drop suspect: a leak (G1), not a safety failure. Please write it into CONTRACT.md as a proposed amendment (document only; no build yet; adoption is decided after astra's review). Keep going on the gate meanwhile.
+
+The trace (one Writer, manual review; model contract-either-drop-review.qnt, test eitherDropLeaksTest): the Writer's rows 1 and 2 miss cut(1) and get pending review entries. Row 1 is resolved by replacement 4, which lands in cut(2). Scope 1 stays held because review 2 is pending, while scope 2 collects (collection is not a prefix). Install 6 logically retires 4, and install 7's merge drops [1->4] because its replacement is retired. When review 2 later expires, Settled(1) needs a complete entry with a durable replacement, and both are gone, so scope 1 is never collected. Natively it is also reachable through an open entry left by a crash between the plan write and the replacement issue.
+
+Candidate fixes Track J tested:
+(a) drop only when the source is retired: fails, because the store refuses a plan naming retired work (the D3 wedge, sourceDropWedgesTest);
+(b) "eitherGuarded": in section 3.4 step 2, I retires an own row y only if no live plan entry names y as a replacement, unless that entry's source is retired in the same step. The either-drop stays. Passes: guardedDropCollectsTest, and simulation 3000x30 seed 7 with safety, g1NoLeak, planSound, noPlanRefusal, noCensusRefusal and I5;
+(c) prefix-only collection: untested, but one pending review would then hold every later scope.
+Track J recommends (b). Please add it with the trace, and note what it costs natively: which issuance-retirement read must check live plan entries, and whether that read fits inside the pinned compound test's slice or lives elsewhere.
+
+### Report returned by the agent (2026-10-22 10:25 UTC)
+
+Track X: amendment A-1 ("eitherGuarded") is now CONTRACT.md 3.6, with Track J's trace, fixes (a)-(c) and its native cost. The gate RED is committed (e032dd1e) and I'm on the fix.
+
+Native cost of (b):
+- It needs no new store read. The only issuance-retirement decision is the hole selection `closedIssuanceProtectedRecordsForRetirement` (D:19299-19341).
+- That function already receives `rows.plans`, the complete native image's plans (IS:60-76, captured by `issuanceRetirementImage`). So (b) is one extra pass over those plans' entries, bounded by maxEpochVertices per author plan.
+- It is called at D:19792 and D:21344. Both, and the function itself, lie outside the pinned compound test's slice (D:23564-23678). The test is not affected.
+
+Found while checking:
+- The store already enforces a coarser form of (b). `assertIssuanceRetirementPreparationRows` (IS:1584-1595) refuses any preparation that would retire a source, fence, replacement or chunk named by a plan that does not permit authenticated pruning. That is any plan with a pending review, an open entry, or no fence.
+- So natively, step 4 of the trace is a refused preparation, not a silent leak: the hole selection ignores plans and proposes retiring 4, and the store refuses.
+- OPEN: whether the caller treats that refusal as a decline (bounded retention) or as an install refusal.
+- (b) in the hole selection would make the node agree with the store, and keep fewer rows.
+
+RED e032dd1e: the creator's own room server sends the successor material about 4 s into the test, before adoption (log r61-gate-red-head-r1).
+
+### Follow-up instruction — Ask X to settle the store-refusal handling (2026-10-22 10:25 UTC)
+
+Track X: thanks, recorded. After the gate fix and before step 14, please settle the OPEN point with a probe: when assertIssuanceRetirementPreparationRows (IS:1584-1595) refuses a preparation because a plan without authenticated pruning names the row, does the caller decline and keep the rows (bounded retention), or refuse the install? Take the install path and the lull/maintenance path separately (D:19792 and D:21344), and give the line that handles the refusal plus the probe's output. If either path refuses the install, that is a terminal state reachable today with a late review or a crash between the plan write and the replacement issue: say so plainly, and add it to CONTRACT.md as a fact for A-1. Probe only; no fix until the contract is decided.
+
+### Follow-up instruction — Send astra's contract review to Track X (2026-10-22 10:36 UTC)
+
+Track X: astra's review of CONTRACT.md is in: <evidence>/astra-consult-2/answer.md (probes in <evidence>/astra-consult-2/evidence/; the probe files are untracked in scratchpad/astra-consult-1/wt). Verdict "adopt with changes". Its H1 is Track J's either-drop hole, with the same fix, so your A-1 stands.
+
+Decision (coordinator, under the owner's delegation): the contract plus A-1 is the working design. Nothing that changes deletion rules or formats is built yet; rows 62/65 stay until the owner approves replacing them in the morning. Track J is modelling H2, H5 and H3 next.
+
+When you reach a natural pause in the gate fix, please fold astra's corrections into CONTRACT.md (document only), each marked with its H-number:
+- H2: the membership carrier/F2 must live until both J's and I's consumers have discharged it (or an authenticated handoff is persisted first). Today's cleanup NULLs closed_membership_bytes (storage-node live-journal.ts:1022; storage-browser live-journal.ts:431).
+- Need must be owner-specific obligations (an I copy needed by the census does not make the J copy needed).
+- H5: logical retirement and its plan change must be atomic in their owner, or a resumable intent with safe intermediate states. Keep the existing paired/published gates (D:19334) and G19.
+- H3: I5 holds only for authors present in the installed ACL. Old-incarnation does not imply Settled. The readmission policy for unresolved old work is an owner choice. Note the conflict with tests/phase-6b-d110c-0c1f5b-integration-red.test.ts:1059-1060 and 1175-1181. Astra says those tests fail earlier, on F5B_TRANSFER_EXISTING_SUPPORTED_DATABASE (schema version 3 expected, 6 received). Please check whether that also fails at base 0171994d, and say so.
+- H4: a rejoin bundle must include each epoch's F1 membership list. Its size is up to about 1.8 MB for K=7 at maxEpochVertices 8192, not 7 x 4 KB. Define the distance L and the latest-snapshot jump; CA:1069-1073 needs a deliberate path, not a bypass.
+- H6: backpressure becomes a finishing reservation across scopes, rows (V:10369 caps at maxEpochVertices*3), bytes, plans and proofs, not "one scope before maxScopes". Track J's bound (fence misses <= maxScopes-1) is one input to it.
+- Implementation seam: astra's probe packages/node/tests/astra-contract-pinned-seam-probe.test.ts shows that F2 can reach the pinned slice as an optional property of the already-bound lifetime (`readClosedJournalAuthority`), with the pinned assertions unchanged (10/10). So no pinned-test edit is needed for the plumbing.
+- The carrier recorder's Boolean is ignored at CA:1413 (V:20072-20075). Record it as a fact; the fix belongs to the F2 build.
+Then continue: the gate, the store-refusal probe, step 14.
+
+### Follow-up instruction — Forward J's H2/H5/H3 model results to X (2026-10-22 11:11 UTC)
+
+Track X: Track J has modelled astra's H2, H5 and H3. Please add these to CONTRACT.md along with astra's corrections (document only):
+- H2: the drafted carrier lifetime ("cleared with its scope", 3.4 step 4) fails even without a crash. An own cut member with no plan entry: J collects the scope and clears the proof, then I, which works from the pre-drain image one pass behind, has T but not Settled and never retires the row. Fix "consumers" (the baseline): keep the membership proof (F1 carrier + F2 authority) until every own non-fence member of the scope is logically retired. The alternative "handoff" persists a per-row membership fact in J's commit. Both pass with a crash and a reopen. I re-derives Done(x) when it retires: for a member, proof and installed > e; otherwise T and Settled.
+- H5: logical retirement and its plan change must be one commit ("atomic"). retireFirst + a crash makes the store refuse on reopen; planFirst + a crash loses Settled for good. This requires the install merge to drop only pruned sources (today's piece 2), not "either" entries. The replacement issue (plan + row) stays one commit.
+- H3: with no readmission policy, intent is lost. Both (i) expire on authenticated incarnation replacement (matches F5B_C11) and (ii) preserve-and-expose keep every invariant; (ii) needs the app to resolve within FENCE_PACE seals, with the creator holding seals until then. The old-incarnation clause is inert on the fresh-replica path, which is the only native one today. Row identity must include the digest or incarnation: (author, seq) alone is unsafe.
+- A-1 is a fixpoint, not one pass. A one-pass guard leaks on a chain 1->4->6 with both links reviewed. Natively, either decide x's hole before y's in sequence order, or iterate the selection until nothing changes. Please write that into 3.6.
+- Need per owner: J's copy, I's copy and the proof each have their own condition. I's copy needed by the census does not keep J's copy.
+Model files are on Track J's branch track-j-late-arrival-model (contract-proof-handoff.qnt, contract-cross-store-crash.qnt, contract-readmit-*.qnt, contract-guard-one-pass.qnt). Continue the gate and the rest afterwards.
+
+### Report returned by the agent (2026-10-22 11:18 UTC)
+
+Track X: CONTRACT.md now has astra's corrections and Track J's H2/H5/H3 results (document only; nothing built).
+- Where: new section 3.7 (H1-H6, the pinned-test seam, the silent carrier recording), with [Hn] notes in 1.2, 2, 3.1, 3.3, 3.4, 3.5, 3.6, D6, D9, 6.1, 6.2, 6.3 and 7.
+- Need is per owner (3.3). Need_C is Track J's baseline: the proof is kept until every own non-fence member of the scope is logically retired.
+- 3.4 step 2: I re-derives Done when it retires a row.
+- 3.4 step 3: the plan change goes inside the retirement's own commit. The merge drops only pruned sources.
+- 3.6: A-1 is a fixpoint. Deciding holes in ascending author sequence reaches it in one pass. That order is topological because V:15274 rejects a replacement sequence <= its source and V:15608-15610 requires a later epoch.
+- 3.7 H3: options (i) and (ii). I labelled one point as my own reading: under (ii), one slow application holds the creator's seals.
+- Two citation fixes: the membership opener is creator-close-membership.ts:242-302, and D9/CA:1413 is re-checked at head.
+- Still open: whether the two phase-6b re-admission tests fail on F5B_TRANSFER_EXISTING_SUPPORTED_DATABASE at base 0171994d too. I'll run them at head and with packages/node/src flipped to 0171994d (the only package that differs) once the gate suite pair finishes. That pair is in its base half now. Then I commit the gate, then the store-refusal probe, then step 14.
+
+### Report returned by the agent (2026-10-22 11:31 UTC)
+
+Track X: the row-61 gate is committed as 5bd36214 on my branch, and the H3 base check is answered.
+
+1. Gate commit 5bd36214 (RED e032dd1e).
+- What it does: serveSuccessor holds the authenticated material response until the creator has adopted that successor, readiness included. There is one hold per peer, ending at the server's own 10 s response deadline. Manifest and chunk requests are refused at once until the adoption.
+- Functions touched in v3-room.ts:
+  - serveSuccessor;
+  - the adoptCreatorSuccessor wrapper: one `void shared.then(release, release)` right after `creatorSuccessorAdoptionTask = shared`. The adoption tail is not touched. Please tell Track Z.
+  - the startup rebasePromise area (serving opens once startup readiness has settled);
+  - new helpers successorAdopted, holdUntilSuccessorAdopted, releaseSuccessorServingHolds and openStartupSuccessorServing.
+- Proofs:
+  - the RED passes;
+  - new tests/track-x-successor-serving-gate-bounds.test.ts (fixture tests/fixtures/track-x/successor-link.ts): (a) a manifest request is refused at once while the Writer's material request is held; (b) a held request ends at the deadline, and the Writer's retry after the adoption installs;
+  - all 3 tests fail at base and pass with the fix (logs r61-gate-bounds-fix-r3, r61-gate-bounds-base-r1);
+  - suite pair over 38 serving and settlement files (r61-gate-pair-fix/base): no new failures; the only changes are the gate tests going from failed to passed.
+- Known limits:
+  - If the creator takes more than 10 s to adopt after a Writer's fetch, that install fails at its material deadline and a retry after the adoption succeeds. No shipped flow fetches before adopting. This brushes against the rule "the gate must never be the reason a Writer's install fails", so I am flagging it.
+  - The storage-level exports remain unguarded, as decided.
+  - Case 4 stays skipped: it serves through those storage-level exports.
+
+2. H3 base check: yes, it fails at base 0171994d too.
+- Both phase-6b re-admission tests ("cases 6-9", "case 11 retains") fail identically at base and at my head 5bd36214.
+- The failure is F5B_TRANSFER_EXISTING_SUPPORTED_DATABASE in grid-room-workload.ts:518: database d110c-f5b-parent-1-peer-0--ahe expects version 3 and gets 6.
+- The base run flipped packages/node/src to 0171994d, the only package that differs (logs r61-h3-phase6b-base / -head).
+- So this is pre-existing on main. It is now recorded in CONTRACT 3.7 H3.
+
+3. Running now: the store-refusal probe for IS:1584-1595, install path and lull path. Step 14 comes after it.
+
+### Follow-up instruction — Gate accepted; settle the 10 s hold limit (2026-10-22 11:32 UTC)
+
+Track X: the gate (5bd36214) and the H3 base check are received and recorded, thanks. I'll carry the adoptCreatorSuccessor wrapper change into the Track Z merge notes; Track Z is finished and is being verified for merging, so a rebase may meet it in v3-room.ts.
+
+On the 10 s known limit: the rule is that the gate must never be the reason a Writer's install fails. After the store-refusal probe, please settle it with a short probe. If the creator adopts more than 10 s after the Writer's fetch, does the Writer's install path retry by itself, with nothing user-visible and nothing counted toward a retry or terminal budget, and install after the adoption? If yes, it is latency only: record it in RESULT as a limit and move on. If it surfaces an error, counts toward a budget, or needs the app to act, make the held request end with a typed "successor not adopted yet" answer, which the Writer treats as retry-later (no failure, no budget), and add that case to the bounds test. Then step 14.
+
+### Report returned by the agent (2026-10-22 11:44 UTC)
+
+Track X: the store-refusal probe is done (commit 6558a699, tests/track-x-plan-dependency-retirement-probe.test.ts, log <evidence>/track-x/logs/r61-a1-probe-r2.log). Answer: with a late review, IS:1584-1595 is never reached. The census refuses first, on both paths, and the Writer is stuck for good. That is a terminal state reachable today.
+
+Setup:
+- [m1->y1] is complete. The Writer reopens with a local manual-review policy, and m2 is made during seal 2.
+- After install 3 the plan is {fenceSequence: null, entries: [[3,rebase,5],[7,manual-review,null]]}. The drain held settlement and issued no fence (R:5233-5235).
+
+Install path:
+- Install 4, and its retry, fail with "creator recovery dependency hold unavailable:outbox-classification:7:displaced:published".
+- Where: the received-turnover census (CA:1136-1138). Row 7 has no completion class:
+  - the completion helper needs a replacement (V:15258-15265);
+  - the plan-entry branch excludes manual-review and runs only for native-branch sources (V:10581);
+  - with no Writer fence, the frontier fallback has 7 > terminalThrough (V:10714-10721) and returns undefined.
+- It is thrown at V:11722. The room sets creatorRecipientRecoveryRequired and rethrows (R:7089-7093).
+- The Writer stays at epoch 3.
+
+Lull path:
+- The lull after install 3 fails with "creator recipient maintenance and joined release failed", caused by the same census refusal.
+- V:20277-20282 sets operationAdmissionHalted = true, and R:~6915 rethrows.
+- The creator's next move is never admitted by the Writer. Installs 4 and 4-retry then fail as above.
+
+Control, manual-review from the start (no reopen): installs 1-3 pass, then install 4 and its retry fail the same way, on row 3.
+
+The store message never appears in any case.
+
+Crash case (an open entry between the plan write and the replacement issue): not probed, because there is no deterministic crash point in the fixture. By static reading the census passes it as open, the hole selection proposes retiring a reference of the non-prunable plan, and the install-path participant has no catch (D:19816 `await read.prepareFence(issuancePreparation)`). So the store refusal would fail the install. That is reading only.
+
+Recorded in CONTRACT 3.6 as the FACT for A-1, and as new disagreement D10: the census has no class for a pending manual-review source. Under the contract it is class 6: open, counted against backpressure, never refused. No shipped app uses manual-review (Grid, Canvas and Chat rebase or expire), so no shipped flow reaches it.
+
+Next, the 10 s gate limit. By code and by bounds proof 2, the install fails with "creator successor material transport failed". The room sets creatorRecipientRecoveryRequired (R:7092), so the next install runs a recovery pass first, and the app must call install again. Nothing retries by itself, so it fails your test.
+
+I'll build the typed answer:
+- The material server gains an optional ready(peer, signal) hook. When the gate's hold (about half the 10 s window) ends before the adoption, it writes a "creator-successor-material-not-ready" frame echoing the nonce, manifestDigest, requesterPeer and sourcePeer.
+- receiveCreatorSuccessorMaterial treats that frame as retry-later. It does not count it as a failed attempt, and retries the same peer after a short delay.
+- A session-close signal is threaded through receiveCreatorSuccessorAdoption, so the wait ends on close.
+- The frame is unsigned: the owned-signing whitelist in protocol-v3 (owned-signing-request.ts:104) only admits request and response kinds, and I won't touch protocol-v3. The frame carries no material and only causes a retry, so the cost is that a hostile source peer could delay a Writer's install, as it can by not answering today. A wire-level addition on the creator-successor protocol; old Writers treat it as a failed attempt, as today.
+- Tell me if you want it signed (needs the protocol-v3 whitelist) or bounded differently. Otherwise I'll build it as described: RED case in the bounds test first.
+
+### Follow-up instruction — Hold the not-ready frame; do step 14 first (2026-10-22 11:44 UTC)
+
+Track X: thanks, the manual-review terminal state is recorded as an open item (no shipped app reaches it; contract class 6 covers it).
+
+Please hold the typed "not-ready" frame. It is a wire-level addition, so under the owner's delegation I'm consulting astra first: (A) your unsigned frame; (B) no wire change, the Writer retrying a material transport failure by itself within a bound; (C) record it as a limit if no shipped flow can fetch before the adoption; (D) a signed frame through the protocol-v3 whitelist. Astra is working at your head 6558a699 in its own worktree. Meanwhile, go to step 14 (the 32-job burst refusal). I'll send the decision when astra reports.
+
+One fact would help it: in the RED e032dd1e, which flow made the Writer fetch about 4 s in, before the adoption? Is that a shipped flow (Grid, Canvas or Chat with automatic rollovers), or one the fixture forced? Reply briefly when you can; no need to stop step 14 for it.
+
+### Report returned by the agent (2026-10-22 11:48 UTC)
+
+Track X: the RED e032dd1e's fetch before the adoption is one the fixture forces. No shipped flow does it.
+
+The test does it all itself, in tests/track-x-successor-serving-gate-red.test.ts:203-217. It calls sealEpoch, then exportCreatorSuccessor, then the Writer's installCreatorSuccessor at once, and only then adoptCreatorSuccessor. The Writer's request goes out within milliseconds of that install call; no timer or automatic flow is involved. If you saw about 4 s somewhere, that is probably the seal's duration, not a separate flow.
+
+Shipped flows all hand the offer to the Writer only after adoptCreatorSuccessor resolves:
+- No app code calls exportCreatorSuccessor or installCreatorSuccessor. examples/chat and canvas.ts have no rollover code. examples/grid/src/v3-zone.ts:1011-1029 only passes the calls through. examples/v3-chat calls only sealEpoch and adoptCreatorSuccessor.
+- packages/node and examples have no automatic rollover or scheduler that seals or installs. A grep for auto rollover finds nothing.
+- Every harness that drives the shipped pages seals, exports and adopts inside one creator evaluate and returns the offer only after the adoption is awaited. The receiver installs after that. This covers:
+  - d9346 (tests/phase-3a1b-d9346-v3-zone.pw.ts:559-592);
+  - track-v-grid-long-room.pw.ts:316-346;
+  - track-x-shipped-app-long-room.pw.ts:626-656;
+  - track-w2-shipped-chat-membership.pw.ts:174-199;
+  - startup-discovery healthy-grid.ts:582-585.
+- tests/fixtures/track-m-apps/long-room-core.ts and canvas-chat-lull/long-room-core.ts adopt before they export.
+- A Writer has no other way to get the offer: it is never gossiped.
+
+So for option C: no shipped flow can fetch before the adoption today. Only the public session API allows it.
+
+I'm holding the not-ready frame as you asked:
+- Nothing is committed for it.
+- The only change is in tests/fixtures/track-x/successor-link.ts, which now has a `notReady` list. It is uncommitted and changes nothing while no such frame exists.
+
+Starting step 14 now.
+
+### Follow-up instruction — Gate limit decided: option E, no wire change (2026-10-22 12:12 UTC)
+
+Track X: decision on the gate's 10 s limit, made under the owner's delegation after astra consult 3. Astra's answer: <evidence>/astra-consult-3/answer.md. Its probes: <evidence>/astra-consult-1/wt/tests/astra-consult-3-gate.probe.test.ts. Drop the not-ready frame and revert the fixture's `notReady` list.
+
+Option E: no wire change. Inside the same install, the Writer retries transient material acquisition until it succeeds or the session closes. There is no finite total deadline, because any deadline only moves the cliff. Specifically:
+1. Retry inside the original admitted material-acquisition turn (around creator-adoption.ts:1143, receiveCreatorSuccessorMaterial), before the snapshot and retention stages. Do NOT repeat the whole receive: beginReceived (CA:1102) and quiesceReceived/terminalizeReceived (CA:1470, 1117) make that different.
+2. Retry only transient unavailability: a timeout, a reset, a reconnect after cleanup has completed. Keep terminal: an invalid signature, a foreign author, a wrong peer, manifest or nonce, a malformed frame, a profile mismatch, and uncertain cleanup (creator-successor-transport.ts:360-361). Keep the hostile-response pins exact, including the request counts in r9-chat-shipping-room-native.test.ts:714-724 and r9-grid-outcome-transfer-native.test.ts:3738-3744. Use a fresh nonce on each attempt, and refresh the connected candidates.
+3. One attempt in flight at a time. Rotate fairly between candidates, so a blackholing peer can't starve a serving one. Use a reviewed backoff, and keep streams, timers, listeners and diagnostics bounded. Don't raise SNAPSHOT_PULL_INACTIVITY_MS, and don't reuse the snapshot's 3-attempt constant (G21: reviewed limits, not post-hoc constants).
+4. Cancel on session close before closeSession awaits the install (v3-room.ts:7187).
+Also fix the two gate defects astra proved:
+5. Close and serving replacement must cancel held responses before the port joins its handlers. Today close waits for the 10 s timer (PROBE_PRODUCTION_PORT). Also release the holds of disconnected peers (PROBE_CUSTOM_PORT).
+6. A late `await predecessorClose?.stop()` failure (v3-room.ts:6829, outside the readiness catch) releases serving with no terminal failure (PROBE_LATE_FAILURE). Either terminalize the final-stop failure before releasing, or release serving only on an explicit successful-adoption state.
+Tests: astra's section 5. That means one-install-outwaits-gate (readiness delayed past 10 s, several attempts, one public install succeeds), retry-only-transient-material, fair-and-bounded-wait, close-cancels-before-join, failed-adoption-never-opens (including a final-stop failure), restart-pending-gate and mixed-version-no-wire. Amend your own bounds test's "install must fail" expectation to "each attempt ends, one install continues". It's your unmerged test, so that's yours to change. Keep the gate RED, and add chunk coverage.
+Separately, astra's restart probe reopened the creator with "v3 room trust installation failed: trust-rejected" on your in-memory link fixture. Find out whether that is the fixture or a real defect before restart-pending-gate relies on it.
+Order: finish step 14 first, then this. RED first, as always.
+
+### Report returned by the agent (2026-10-22 12:14 UTC)
+
+Track X, step 14 (d9346 line 915): "target-suffix" is not lost. The creator admits it, but late, so the test's 20 s poll runs out under load. Root cause below, then two decisions I need. I'm starting the gate's option E now (RED first) while you decide.
+
+**Evidence.** I ran a timestamped ingress and maintenance probe on scratch (HEAD + V's 4 commits). The probe is data/step14-probe.patch and is not committed. Runs:
+- 10 runs with Track V's switch (s14p-1..6, s14w-1..4), load 40-90;
+- 3 legacy runs without the switch (s14l-1..3).
+All passed at these loads. Tools: bin/s14-sum.py, bin/txq-timeline.py.
+
+**What happens.**
+1. After the migration, the creator's warm maintenance path is declined for every Writer row it receives on the target (the new zone). The warm event is `ordinary-source-capture-refused` with reason `native-or-cross-context-source`, at creator-closed-rollback-data.ts:5465. The cause is that the target plane's census carries `migrationSource` (v3-live.ts:11133) for as long as the migration's displaced source is held, which is the target's whole epoch 0.
+2. So each received row:
+   - first runs the optional source prime, a full proof acquisition of 1.3-2.7 s that then declines;
+   - then runs the cold quote, 1.1-2.9 s;
+   - then runs beginWrite, 0.2-0.6 s.
+   That is 3-6 s per row at load 55-90. Before the migration the same rows take the incremental warm path in 89-409 ms.
+3. Rows are serialized in the plane's FIFO, and the gossip queue waits behind it too.
+4. On settlement, the Writer's target fence arrives just before the suffix, so the suffix waits for two cold rows. It is admitted 6.7-9.9 s after placement.
+5. Legacy has only the suffix to process, about 1.6-2.5 s at low load.
+6. Track V's earlier failures were at load 75-196, about 2.5 times slower, which puts it past 20 s.
+
+**The `admission-rejected` bursts are duplicates.** They are copies from the Writer's retained republications (7 rows each at 0, 0.5, 1.5, 3, 6, 10 and 15 s) that pile up in the creator's 32-job pool during the backlog. The first copy of every row is already queued, so nothing is lost. The `received-maintenance-capture` refusal at close (+20 s) in the old failing traces is the suffix's capture, still running.
+
+**Decision 1: d9346 line 915.** Part of this is a defect (wasted work) and part is a design limit.
+- **A. Narrow fix (my recommendation).** Skip the optional prime when the plane's census has a cross-context (migration) source. The prime would decline for that reason anyway, so every admission outcome stays the same and G1-G28 are unaffected.
+  - It roughly halves the cost per row.
+  - It touches v3-live and creator-close.ts only.
+  - The RED would be deterministic: on a migrated plane, a second received row does not re-prime. It would be built on the r9-grid-outcome-transfer-native migration tooling.
+- **B. Design.** Let the ordinary warm source support migration-sourced planes. Rows would then cost about 0.1-0.4 s again. This is a design decision for the owner.
+- **C. Accept the cost.** This means relaxing d9346's 915 poll, which needs owner approval. A and C can be combined.
+- With A alone, line 915 should pass at most loads, but a cold row of a few seconds per Writer move remains on migrated zones until the first rollover.
+
+**Decision 2: the gap in your framing, which is real but not what d9346 hits.** If a Writer outpaces a slow creator, the first copy of a row can be refused, at the gossip queue (routeV3Ingress) or at the input pool. On the creator, nothing ever asks for it again:
+- room-network #requestMissing returns early on the creator (room-network.ts:744-748);
+- the Writer's republication schedule ends after 15 s;
+- so even a later dependent move leaves the creator deaf to that Writer until the Writer reopens.
+
+A migrated zone at 3-6 s per row would reach this after about 32 fast moves.
+- Proposed fix: on a capacity refusal, remember the sender (a bounded set, counted for G21 and G22). When the pool drains, send that peer one HISTORY_REQUEST, which makes it republish to us. Also give the creator's missing-dependency request a peer to ask.
+- This needs a peer-aware request path, so it is a design change.
+- A node RED is feasible with a transport that records requests.
+
+Do you want it built, and in which order relative to A?
+
+**State.**
+- The not-ready fixture change is reverted.
+- The probe is still applied on scratch branch track-x-step14-legacy. I'm reversing it and switching back to my branch before the gate work.
+- d9346 ≥10 runs will follow whichever fix you choose.
+
+### Follow-up instruction — Step 14 decisions go to astra; continue E (2026-10-22 12:15 UTC)
+
+Track X: thanks, that's a clear root cause. Both decisions are going to astra first, under the owner's delegation. It is working at your step-14 scratch head 62a72432 in its own worktree, using your probe patch, tools and s14 logs (read only). Carry on with the gate's option E in the meantime. I'll send both decisions when astra reports. Don't build A or the peer-aware request yet, and leave d9346's poll alone. Please make sure the step-14 probe is reversed on track-x-step14-legacy before you switch away, as you planned. Its patch stays in data/ as evidence.
+
+### Report returned by the agent (2026-10-22 12:38 UTC)
+
+Track X heads-up before I edit code near Track Z's areas (option E, nothing committed yet).
+
+1) Planned v3-room edits, all small:
+- (a) Make the final `await predecessorClose?.stop()` at the end of performCreatorSuccessorAdoption (R:6829) terminal: try/catch, set terminalFailure, rethrow. successorAdopted also requires !closed && terminalFailure === undefined.
+- (b) Add a session lifetime AbortController, aborted in shutdown() and closeSession() right after closed=true. It is passed as `retryUntil` into receiveCreatorSuccessorAdoption at R:7075, inside installCreatorSuccessor, not its tail.
+- (c) Gate: add a serving generation, and cancel holds on close, shutdown and serveSuccessor replacement. Also release held requests of disconnected peers when another request is admitted.
+
+None of these touch the requestMissingRetainedHistory tail call, runRecoveryPoolMaintenance or the auto scheduler hook. Edit (a) is in the adoption tail, though, so tell me if it collides with Track Z.
+
+2) Restart question answered. It is not the fixture and not the gate; it is a real product gap. Reopening the creator after sealEpoch and before adoptCreatorSuccessor fails "v3 room trust installation failed: trust-rejected" (cause trust-state-inconsistent). It fails the same way with no export and no Writer install at all.
+- Reopen after seal+adopt works, and so does reopen without a seal.
+- Cause: room startup's trust install (R:7818-7835: createCurrentAnchorTrustStore.install, then openAtHead, then openCurrentAnchorTrust) reads the epoch-0 AHE head. After the seal that head holds the successor's trust record, which the generic opener refuses by design (tests/phase-5e-creator-close-red.test.ts:338-361, "leaving successor opening to creator-close").
+- So a creator that crashes between seal and adoption cannot reopen at all.
+- Evidence: probe tests/track-x-creator-reopen-pending-probe.test.ts (untracked), log <evidence>/track-x/logs/e-reopen-probe.log.
+- Consequence: "creator restarts while a request is held" is unreachable. I am writing restart-pending-gate as: the creator seals and adopts, then restarts with its startup readiness delayed past 10 s. A Writer install started while the creator was down must outwait it and be served only after startup readiness. A Writer-restart case is added too.
+- The seal-to-adoption reopen gap itself is out of my scope unless you say otherwise.
+
+3) RED so far (head 6558a699): the transport-level tests tests/track-x-successor-material-retry.test.ts fail on every transient-retry case. The terminal cases each send one request, at base and by design. The final-stop extraction test tests/track-x-successor-serving-gate-late-failure.test.ts fails: the held response is served. The native file tests/track-x-successor-material-wait.test.ts and the amended bounds test are running now.
+
+### Follow-up instruction — No collision with Z; reopen gap recorded (2026-10-22 12:38 UTC)
+
+Track X: go ahead with (a), (b) and (c). I checked Track Z's diff of v3-room.ts (0171994d..worktree-agent-a869e104e72e01ff1). It doesn't touch the end of performCreatorSuccessorAdoption, closeSession's body, shutdown() or serveSuccessor. Its changes nearby:
+- In the adoptCreatorSuccessor wrapper, `return performCreatorSuccessorAdoption();` becomes `await performCreatorSuccessorAdoption(); scheduledLulls?.schedule();`. That is just above your `void shared.then(release, release)` line, so expect a small textual conflict when you rebase onto main after Z merges. Keep both. With (a), a final-stop failure rejects before schedule(), which is what we want.
+- `scheduledLulls?.schedule()` after the install's requestMissingRetainedHistory() and at the end of promotion.
+- In the pool-maintenance path, `!closed &&` is added before roomTransport.requestRetainedHistory().
+- maintainRecoveryPool claims scheduled lulls synchronously.
+Please make sure your session AbortController in (b) also aborts the waits that Z's scheduled lull could start, if any of them reach receiveCreatorSuccessorAdoption. Probably none do, but please check.
+
+The seal-to-adoption reopen gap: agreed, it's out of your scope. I'm recording it as an open item, a candidate for its own track. Two small things when convenient: commit tests/track-x-creator-reopen-pending-probe.test.ts as a probe (not a RED), and say whether it fails the same way at base 0171994d. Your restart-pending-gate design (seal + adopt, then restart with delayed startup readiness, plus a Writer-restart case) is right.
+
+### Follow-up instruction — Step 14 decided: A after E, keep the poll (2026-10-22 12:50 UTC)
+
+Track X: the step 14 decisions, made under the owner's delegation after astra consult 4. The answer is at <evidence>/astra-consult-4/answer.md. Astra's prototype is <evidence>/astra-consult-4/evidence/verified-a.patch (close.ts + v3-live.ts), and its probe is tests/astra-consult-4-probe.test.ts in scratchpad/astra-consult-1/wt.
+
+1. Build A, in its own commit, after E is committed. Astra verified your mechanism, with two corrections:
+   - the census inserts migrationSource at v3-live.ts:11841, not 11133;
+   - A is not strictly outcome-preserving. It skips an optional proof lifetime, so that lifetime's acquisition and release failures no longer surface there. Its probe shows this, and the existing tests at creator-closed-rollback-proof-accounting.test.ts:9290 and :9478 pin those failures for the lifetimes that are actually entered.
+   State the claim narrowly: healthy outcomes are unchanged; failures in the skipped optional lifetime are no longer raised; every check in the mandatory cold quote stays.
+   Requirements:
+   - Use a private migration-source hint. A missing hint keeps the old route.
+   - Never skip readiness priming (close:4727, 4893 pass true).
+   - Never transfer the skipped lifetime's charges or credit.
+   - Never disable later supported warm capture.
+   Tests: astra's section "Tests required", A bullet. That covers migration epoch 0, local and received rows, initial and refreshed prime; non-migration warm hits unchanged; readiness still entered; invalidation of the hint on reopen, rollover and source replacement; corruption or stale floors injected into the cold path are still refused; accounting and joined cleanup. Then d9346 with the poll unchanged, at least 10 runs, with load recorded.
+2. Keep d9346's 20 s poll (no C).
+3. B is deferred to a follow-up design track. Astra found that the cold fallback can persist after the rollover for a different reason (all-local "fixedJournalShape", data:15332); record it in your RESULT.
+4. Correction for your RESULT: in your traces, the capacity refusals after the suffix are all on the joiner (context 1), not the creator.
+5. The lost-first-copy gap is reproduced natively. Astra used 39 rows and saw 7 first copies refused; a later dependent row calls the creator's missing hook, which sends nothing. It goes to a separate new track, not to you. Keep a pointer to it in CONTRACT/RESULT.
+Your order: finish E, then A, then the d9346 runs.
