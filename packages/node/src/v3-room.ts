@@ -2851,6 +2851,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			issuanceStore: stores.issuance,
 			liveJournalStore: stores.journal,
 			author: input.author,
+			roomHeadAuthority,
 			...(archive === undefined ? {} : { archiveRecovery: { store: archive.store,
 				accounting: createCreatorClosedRollbackProofAccounting([], true), roomHeadAuthority } }),
 		});

@@ -81,13 +81,15 @@ export const stackHere = (): string => {
  */
 export async function readinessHoldRoom(
 	options: Readonly<{
+		/** Parent-owned directory for native process-death/reopen tests. */
+		directory?: string;
 		window?: V3RoomApplication["ordinaryFinishingWindow"];
 		parameters?: Partial<typeof defaultParameters>;
 		/** Non-creator Writers (default 1; row 60 R5 refusal case c uses 2). */
 		writers?: number;
 	}> = {}
 ) {
-	const directory = mkdtempSync(join(tmpdir(), "track-x-readiness-hold-"));
+	const directory = options.directory ?? mkdtempSync(join(tmpdir(), "track-x-readiness-hold-"));
 	directories.add(directory);
 	const identities = Array.from({ length: 1 + (options.writers ?? 1) }, (_, index) => 0x91 + index).map((byte) => {
 		const seed = new Uint8Array(32).fill(byte);

@@ -386,7 +386,7 @@ interface ArchiveCloseExportFacts {
 	readonly nativeBlobs: AheBoundedRecoveryRoleRead["blobs"];
 }
 
-interface ColdArchiveCloseEvidence {
+interface LocalClosedAdoptionEvidence {
 	readonly head: PresentHead;
 	readonly generation: GenerationRecord;
 	readonly currentHead: PresentHead;
@@ -411,7 +411,7 @@ async function readCreatorSuccessorExportMaterial(
 		capture(facts: ArchiveCloseExportFacts): void;
 	}>,
 	recovery?: Readonly<{ accounting: import("./internal/creator-closed-rollback-data.js").CreatorClosedRollbackProofAccounting;
-		checkFloor(): Promise<void>; captureClosed?(facts: ColdArchiveCloseEvidence): void }>
+		checkFloor(): Promise<void>; captureClosed?(facts: LocalClosedAdoptionEvidence): void }>
 ): Promise<CreatorSuccessorExport> {
 	const exportAccounting = selection?.accounting ?? recovery?.accounting;
 	const checkExportFloor = selection?.checkFloor ?? recovery?.checkFloor;
@@ -670,7 +670,7 @@ async function readCreatorSuccessorExportMaterial(
 				!exportAccounting.charge(snapshot.exactCanonicalPayloadBytes))
 				throw new TypeError("archive Complete export full snapshot proof charge is exhausted");
 		}
-		if (recovery?.captureClosed !== undefined && generation.state === "Adopted" && Object.hasOwn(cut.record, "archiveAppend") &&
+		if (recovery?.captureClosed !== undefined && generation.state === "Adopted" &&
 			generation.baseExpectedHead.kind === "present" && predecessorGeneration !== undefined &&
 			generation.baseExpectedHead.generationId === predecessorGeneration.generationId &&
 			uniqueCandidateByKind(current.candidates, chain.currentProjectionKind)?.record.epoch === chain.currentEpoch) {
@@ -3709,17 +3709,18 @@ function pendingRecoveryFailure(kind: string, detail: string): CreatorAdoptionPe
  * publishes a head or grants a floor. Complete candidates take precedence.
  */
 /** Restores the original local Q's private adoption facts before any live reconstruction. */
-async function restoreLocalArchiveClosedAdoption(
+async function restoreLocalClosedAdoption(
 	input: Parameters<typeof selectRetainedCreatorSuccessorAdoption>[0]
 ): ReturnType<typeof selectRetainedCreatorSuccessorAdoption> {
 	const archive = input.archiveRecovery;
-	if (archive === undefined) return null;
-	const accounting = archive.accounting;
+	const floor = input.roomHeadAuthority ?? archive?.roomHeadAuthority;
+	if (floor === undefined) return null;
+	const accounting = archive?.accounting ?? createCreatorClosedRollbackProofAccounting([], true);
 	const parsed = parseStorageObjectId(input.expectedPreviousRoomHead.objectId);
 	if (!parsed.ok) throw new TypeError("archive local close startup scope is invalid");
 	const objectId = parsed.value;
 	const floorScope = Object.freeze({ objectId, pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest });
-	const floorRead = archive.roomHeadAuthority.read.bind(archive.roomHeadAuthority);
+	const floorRead = floor.read.bind(floor);
 	const initial = captureCreatorRoomHeadState(await floorRead({ scope: floorScope }), objectId, input.pinnedGenesisAnchorDigest);
 	if (!initial.ok || !sameRoomHead(initial.state.stable, input.expectedPreviousRoomHead) ||
 		!accounting.charge(encodeCanonical(initial))) throw new TypeError("archive local close startup floor differs");
@@ -3736,8 +3737,8 @@ async function restoreLocalArchiveClosedAdoption(
 		objectId, pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest,
 		exactCanonicalGenesisAnchorPreimageBytes: input.exactCanonicalAnchorPreimageBytes,
 		detachedGenesisSignature: input.detachedSignature, catalog: input.catalog });
-	const captureQ = async (): Promise<ColdArchiveCloseEvidence | undefined> => {
-		let result: ColdArchiveCloseEvidence | undefined;
+	const captureQ = async (): Promise<LocalClosedAdoptionEvidence | undefined> => {
+		let result: LocalClosedAdoptionEvidence | undefined;
 		try {
 			await readCreatorSuccessorExportMaterial(exportInput, undefined,
 				{ accounting, checkFloor, captureClosed: facts => { result = facts; } });
@@ -3788,15 +3789,19 @@ async function restoreLocalArchiveClosedAdoption(
 			(read.value?.completed != null && read.value.completed.throughEpoch >= next.epoch))
 			throw new TypeError("archive local Q native floor or unresolved intent refuses continuation");
 	};
-	await completeCreatorCertifiedArchiveAppend({ archiveStore: archive.store, accounting, currentTrust: predecessorTrust,
-		exactCanonicalCutValueBytes: cut.bytes, exactCanonicalCommitQcBytes: qc.bytes,
-		exactCanonicalTrustStateRecordBytes: trust.bytes, checkCurrent: async (): Promise<void> => {
-			await checkNativeArchiveSource();
-			const fresh = await captureQ();
-			if (fresh === undefined || !sameHead(fresh.head, closed.head) ||
-				compareBytes(encodeCanonical(fresh.generation), encodeCanonical(closed.generation)) !== 0)
-				throw new TypeError("archive local Q changed before its exact native archive readback");
-		} });
+	await checkNativeArchiveSource();
+	if (Object.hasOwn(cut.record, "archiveAppend")) {
+		if (archive === undefined) throw new TypeError("local close startup certified archive owner is unavailable");
+		await completeCreatorCertifiedArchiveAppend({ archiveStore: archive.store, accounting, currentTrust: predecessorTrust,
+			exactCanonicalCutValueBytes: cut.bytes, exactCanonicalCommitQcBytes: qc.bytes,
+			exactCanonicalTrustStateRecordBytes: trust.bytes, checkCurrent: async (): Promise<void> => {
+				await checkNativeArchiveSource();
+				const fresh = await captureQ();
+				if (fresh === undefined || !sameHead(fresh.head, closed.head) ||
+					compareBytes(encodeCanonical(fresh.generation), encodeCanonical(closed.generation)) !== 0)
+					throw new TypeError("archive local Q changed before its exact native archive readback");
+			} });
+	}
 	let oldAcl = Uint8Array.from(input.exactCanonicalGenesisLatchedAclBytes);
 	if (closed.chain.currentEpoch > 0) {
 		const priorCut = uniqueCandidateByKind(closed.closure.currentCandidates, "drp-hard-epoch-cut");
@@ -3887,6 +3892,8 @@ export async function selectRetainedCreatorSuccessorAdoption(
 		issuanceStore: DurableIssuanceStore;
 		liveJournalStore: DurableLiveJournalStore;
 		author: string;
+		/** Original room floor, also required to recover a local seal without archive storage. */
+		roomHeadAuthority?: CreatorClosedRollbackDataInput["roomHeadAuthority"];
 		archiveRecovery?: CreatorSuccessorExportInput["archiveRecovery"];
 	}>
 ): Promise<Readonly<{
@@ -3982,7 +3989,7 @@ export async function selectRetainedCreatorSuccessorAdoption(
 			const present = reader.head.kind === "present";
 			await reader.release();
 			readerReleased = true;
-			return present ? restoreLocalArchiveClosedAdoption(input) : null;
+			return present ? restoreLocalClosedAdoption(input) : null;
 		}
 		const { retained, certificate } = custody;
 		const decodedHead = decodeHeadRecordV1(certificate.exactCanonicalOldHeadBytes, "head");
