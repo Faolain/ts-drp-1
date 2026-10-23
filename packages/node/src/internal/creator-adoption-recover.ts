@@ -42,6 +42,7 @@ export interface CreatorAdoptionRoomHead {
 }
 
 export interface CreatorAdoptionPendingRecoveryInput {
+	readonly exactCanonicalGenesisLatchedAclBytes?: Uint8Array;
 	/** Existing room maintenance book, not authority or a separate archive allowance. */
 	readonly proofAccounting?: import("./creator-closed-rollback-data.js").CreatorClosedRollbackProofAccounting;
 	readonly authenticationProfile: "creator-only";

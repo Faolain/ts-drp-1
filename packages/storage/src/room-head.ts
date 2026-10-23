@@ -433,7 +433,7 @@ export function sameRoomHeadValue(a: unknown, b: unknown): boolean {
 	return x.length === y.length && x.every((v, i) => v === y[i]);
 }
 /**
- * Capture stable/pending state with exact predecessor and adjacent successor.
+ * Capture stable/pending state with exact predecessor and a strictly later successor.
  * @param value - Untrusted state input.
  * @param scope - Original object and genesis pin.
  * @returns Immutable mechanically valid state, not an authenticated recovery decision.
@@ -447,7 +447,7 @@ export function captureRoomHeadState(value: unknown, scope: RoomHeadScope): Room
 		next = captureRoomHead(p.next, scope);
 	if (
 		!sameRoomHeadValue(previous, stable) ||
-		next.epoch !== stable.epoch + 1 ||
+		next.epoch <= stable.epoch ||
 		next.currentAnchorDigest === stable.currentAnchorDigest
 	)
 		throw new TypeError("ROOM_HEAD_INVALID_ADJACENCY");

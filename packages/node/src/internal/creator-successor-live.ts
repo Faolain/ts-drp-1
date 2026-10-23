@@ -19,6 +19,7 @@ import type {
 } from "../v3-live.js";
 import type { CreatorSnapshotRetirementReconstructionRequest } from "./creator-closed-rollback-data.js";
 import type { CreatorExpectedRoomHead } from "./creator-room-head.js";
+import type { VerifiedCreatorCheckpointAttachment } from "./creator-transition-advance.js";
 
 export interface CreatorSuccessorGenerationMaterial {
 	readonly candidates: readonly Readonly<{ readonly bytes: Uint8Array; readonly ref: GenerationRef }>[];
@@ -32,6 +33,7 @@ export interface CreatorSuccessorGenerationMaterial {
 }
 
 export interface CreatorSuccessorLiveMaterial {
+	readonly checkpoint?: VerifiedCreatorCheckpointAttachment;
 	/** Local authoring restriction inherited from genuine custody, never a wire authority. */
 	readonly receiveOnly?: true;
 	/** Trusted local application input, never obtained from the received proof. */
@@ -60,6 +62,7 @@ export interface CreatorSuccessorLiveMaterial {
 	readonly classifiedRecoverySourceGenerations?: readonly GenerationRecord[];
 	readonly predecessor: CreatorSuccessorGenerationMaterial;
 	readonly predecessorExactCanonicalLatchedAclBytes: Uint8Array;
+	readonly predecessorExactCanonicalParametersBytes?: Uint8Array;
 	readonly snapshotPayloadDigest: string;
 	readonly sourceRuntimeHandle?: WeakRef<object>;
 	readonly stateDigest: string;
@@ -110,6 +113,7 @@ let kernel: CreatorSuccessorLiveKernel | undefined;
 let handleAliasKernel: CreatorSuccessorHandleAliasKernel | undefined;
 
 export interface CreatorSuccessorReopenInput {
+	readonly exactCanonicalGenesisLatchedAclBytes?: Uint8Array;
 	readonly receiveOnly?: true;
 	readonly settlementPolicy?: V3LocalSettlementPolicy;
 	readonly settlementFloor?: V3LocalSettlementFloor;

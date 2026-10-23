@@ -810,7 +810,7 @@ export function applySettlementPlanEffect(
 		throw createDurableIssuanceFailure("ISSUANCE_RECOVERY_CORRUPT", "settlement plan revision is exhausted");
 	}
 	if (effect.kind === "fence") {
-		if (plan.fenceSequence !== null || plan.entries.some((entry) => entry.disposition === "manual-review")) {
+		if (plan.fenceSequence !== null || plan.entries.some((entry) => entry.disposition === "manual-review" && entry.sourceContextDigest === undefined)) {
 			throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement fence precondition changed");
 		}
 		return { ...cloneSettlementPlan(plan), fenceSequence: authorSequence, revision: plan.revision + 1 };
@@ -820,6 +820,7 @@ export function applySettlementPlanEffect(
 	if (
 		entry === undefined ||
 		entry.replacementSequence !== null ||
+		entry.sourceContextDigest !== undefined ||
 		entry.disposition === "manual-review" ||
 		entry.disposition === "inherited"
 	) {

@@ -4,6 +4,7 @@ import {
 	type PreparedCreatorSuccessorAdoptionMaterial,
 } from "./internal/creator-adoption-intent.js";
 import { captureCreatorExpectedRoomHead, sameCreatorRoomHead } from "./internal/creator-room-head.js";
+import { resolveCreatorCheckpointAttachment } from "./internal/creator-transition-advance.js";
 import {
 	consumeCreatorSuccessorHandleAlias,
 	consumeCreatorSuccessorLive,
@@ -40,7 +41,6 @@ const COLD_KEYS = Object.freeze([
 	"snapshotStore",
 	"store",
 ]);
-const COLD_BOOTSTRAP_POLICY_KEYS = Object.freeze([...COLD_KEYS, "exactCanonicalPinnedGenesisBootstrapOperationBytes"]);
 
 type PlainRecord = Record<string, unknown>;
 type Failure = Readonly<{
@@ -201,7 +201,10 @@ function transitionHeads(
 		predecessor.objectId === successor.objectId &&
 		predecessor.genesisAnchorDigest === successor.genesisAnchorDigest &&
 		predecessor.genesisAnchorDigest === material.pinnedGenesisAnchorDigest &&
-		successor.epoch === predecessor.epoch + 1 &&
+		(successor.epoch === predecessor.epoch + 1 || (() => {
+			const point = material.checkpoint === undefined ? undefined : resolveCreatorCheckpointAttachment(material.checkpoint);
+			return point !== undefined && point.localBase.trust === material.predecessor.trust && point.target.trust === material.successor.trust;
+		})()) &&
 		material.predecessor.head.objectId === predecessor.objectId &&
 		material.successor.head.objectId === successor.objectId
 		? Object.freeze({ predecessor, successor })
@@ -597,15 +600,9 @@ export async function reopenCreatorSuccessorAdoption(input: unknown): Promise<Re
 			"creator successor reopen requires an authenticated room-head floor"
 		);
 	}
-	const captured =
-		captureRuntimeInput(input, COLD_KEYS) ??
-		captureRuntimeInput(input, COLD_BOOTSTRAP_POLICY_KEYS) ??
-		captureRuntimeInput(input, [...COLD_KEYS, "settlementPolicy"]) ??
-		captureRuntimeInput(input, [...COLD_BOOTSTRAP_POLICY_KEYS, "settlementPolicy"]) ??
-		captureRuntimeInput(input, [...COLD_KEYS, "settlementFloor"]) ??
-		captureRuntimeInput(input, [...COLD_BOOTSTRAP_POLICY_KEYS, "settlementFloor"]) ??
-		captureRuntimeInput(input, [...COLD_KEYS, "settlementPolicy", "settlementFloor"]) ??
-		captureRuntimeInput(input, [...COLD_BOOTSTRAP_POLICY_KEYS, "settlementPolicy", "settlementFloor"]);
+	const optional = ["exactCanonicalPinnedGenesisBootstrapOperationBytes", "exactCanonicalGenesisLatchedAclBytes",
+		"settlementPolicy", "settlementFloor"].filter(key => input !== null && typeof input === "object" && Object.hasOwn(input, key));
+	const captured = captureRuntimeInput(input, [...COLD_KEYS, ...optional]);
 	if (captured === undefined) return failure("malformed-input", "creator successor reopen input is invalid");
 	if (captured.receiveOnly !== undefined && captured.receiveOnly !== true)
 		return failure("malformed-input", "creator successor receive-only restriction is invalid");

@@ -40,6 +40,7 @@ import {
 	type CreatorLiveCloseStatus,
 } from "@ts-drp/node/creator-close";
 import { consumeCreatorAdoptionPendingRecovery } from "@ts-drp/node/internal/creator-adoption-recover";
+import { permitsStagedCreatorCheckpointFloorAdvance } from "./internal/creator-adoption-intent.js";
 import { createV3SnapshotTransferOwner } from "@ts-drp/node/snapshot-transfer";
 import {
 	activateV3LivePlane,
@@ -50,6 +51,8 @@ import {
 	prepareV3LiveGeneration,
 	prepareV3TerminalMigrationSource,
 	queryV3RetainedHashes,
+	inspectV3UnresolvedAcceptedWork,
+	type V3UnresolvedAcceptedWork,
 	readV3ApplicationProjectionOrder,
 	recoverV3LiveReplica,
 	republishV3RetainedTo,
@@ -645,6 +648,8 @@ export interface V3RoomSession<Projection extends V3RoomProjectionAuthority = V3
 	bindPresentationIntents(channel: EphemeralChannel, options?: Readonly<{ key?: string }>): () => void;
 	/** Memory-only pending moves in speculative order; empty without `presentation`. */
 	pendingOperations(): readonly V3RoomPendingOperation[];
+	/** Durable accepted work whose commitment is unknown after reattachment. */
+	unresolvedAcceptedWork(): Promise<readonly V3UnresolvedAcceptedWork[]>;
 	previewLatchedAcl(): Readonly<Record<string, unknown>>;
 	projection(): Projection;
 	/**
@@ -1325,7 +1330,7 @@ function captureRoomHeadState(value: unknown, scope: V3RoomHeadScope): V3RoomHea
 		next !== undefined &&
 		sameRoomHead(previous, stable) &&
 		next.objectId === scope.objectId &&
-		next.epoch === stable.epoch + 1 &&
+		next.epoch > stable.epoch &&
 		next.currentAnchorDigest !== stable.currentAnchorDigest
 		? Object.freeze({ pending: Object.freeze({ next, previous }), stable })
 		: undefined;
@@ -1414,12 +1419,14 @@ async function beginRoomHeadAdvance(
 	authority: V3RoomHeadAuthority,
 	scope: V3RoomHeadScope,
 	current: V3RoomHead,
-	next: V3RoomHead
+	next: V3RoomHead,
+	stagedCheckpoint?: Readonly<{ capability: unknown; owner: unknown }>
 ): Promise<V3RoomHeadState> {
 	if (
 		current.objectId !== scope.objectId ||
 		next.objectId !== scope.objectId ||
-		next.epoch !== current.epoch + 1 ||
+		(next.epoch !== current.epoch + 1 && (stagedCheckpoint === undefined ||
+			!permitsStagedCreatorCheckpointFloorAdvance(stagedCheckpoint.capability, stagedCheckpoint.owner, current, next))) ||
 		next.currentAnchorDigest === current.currentAnchorDigest
 	) {
 		return roomHeadFailure("D110C_FLOOR_REGRESSION");
@@ -2888,7 +2895,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					if (roomHeadAuthority === undefined || openedRoomHeadState === undefined)
 						return roomHeadFailure("D110C_FLOOR_MIGRATION_REQUIRED");
 					if (openedRoomHeadState.pending === null) openedRoomHeadState = await beginRoomHeadAdvance(
-						roomHeadAuthority, roomHeadScope, openedRoomHeadState.stable, selected.head);
+						roomHeadAuthority, roomHeadScope, openedRoomHeadState.stable, selected.head,
+						{capability: staged.capability, owner: received.handle});
 					if (received.releasePromotionDependencies !== undefined) {
 						retainedPromotionDependencies.push({ releasePromotionDependencies: received.releasePromotionDependencies });
 						transferred = true;
@@ -4158,6 +4166,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 								detachedSignature: material.detachedGenesisSignature,
 								exactCanonicalAnchorPreimageBytes: material.exactCanonicalGenesisAnchorPreimageBytes,
 								exactCanonicalParametersCarrierBytes: material.exactCanonicalParametersCarrierBytes,
+								exactCanonicalGenesisLatchedAclBytes: material.exactCanonicalLatchedAclBytes,
 								expectedNextRoomHead: selectedPending.next,
 								expectedPreviousRoomHead: selectedPending.previous,
 								issuanceStore,
@@ -4198,6 +4207,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 							detachedSignature: material.detachedGenesisSignature,
 							exactCanonicalAnchorPreimageBytes: material.exactCanonicalGenesisAnchorPreimageBytes,
 							exactCanonicalParametersCarrierBytes: material.exactCanonicalParametersCarrierBytes,
+							exactCanonicalGenesisLatchedAclBytes: material.exactCanonicalLatchedAclBytes,
 							exactCanonicalPinnedGenesisBootstrapOperationBytes,
 							expectedRoomHead,
 							issuanceStore,
@@ -4997,7 +5007,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		for (const source of [...sources].sort((left, right) => left.authorSequence - right.authorSequence)) {
 			const prior = priorEntries.get(source.authorSequence);
 			const inheritance = inheritances.get(source.authorSequence) ?? prior?.inheritance;
-			const disposition = inheritance === undefined ? settlementDisposition(source) : "inherited";
+			const disposition = prior?.sourceContextDigest !== undefined ? prior.disposition :
+				inheritance === undefined ? settlementDisposition(source) : "inherited";
 			if (disposition === undefined) continue;
 			const sourceDigest = bytes(source.vertexDigest);
 			const sourceObjectId =
@@ -5351,10 +5362,14 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				return;
 		}
 		let plan = await writeMergedSettlementPlan(sources);
-		if (plan.entries.some((entry) => entry.disposition === "manual-review")) {
-			settlementHeld = true;
-			return;
-		}
+		settlementHeld = plan.entries.some(entry => entry.disposition === "manual-review" && entry.sourceContextDigest === undefined);
+		if (settlementHeld) return;
+		// A retained source context preserves unknown work, including pre-existing
+		// policy/progress metadata. Its presence grants no replacement decision.
+		const eligible = (entry: RoomSettlementPlan["entries"][number]): boolean => entry.sourceContextDigest === undefined &&
+			entry.disposition !== "expire" && entry.disposition !== "inherited" && entry.disposition !== "manual-review" &&
+			entry.replacementSequence === null;
+		if (plan.entries.some(entry => entry.sourceContextDigest !== undefined) && !plan.entries.some(eligible)) return;
 		const sourceBySequence = new Map(sources.map((source) => [source.authorSequence, source] as const));
 		let sourceOwner = activeHandle;
 		const refreshSourceOwner = async (): Promise<void> => {
@@ -5366,7 +5381,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			const current = await issuanceStore.readSettlementPlan(settlementScope);
 			if (current === null) throw new TypeError("v3 room replacement recovery plan is unavailable");
 			for (const entry of current.entries) {
-				if (entry.disposition === "expire" || entry.disposition === "inherited" || entry.replacementSequence !== null)
+				if (!eligible(entry))
 					continue;
 				const selected = recoveredSources.get(entry.sourceSequence);
 				const original = sourceBySequence.get(entry.sourceSequence);
@@ -5392,7 +5407,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		};
 		const orderedBySequence = new Map<number, readonly Readonly<Record<string, unknown>>[]>();
 		for (const entry of plan.entries) {
-			if (entry.disposition === "expire" || entry.disposition === "inherited" || entry.replacementSequence !== null)
+			if (!eligible(entry))
 				continue;
 			const source = sourceBySequence.get(entry.sourceSequence);
 			if (source === undefined) throw new TypeError("v3 room settlement source is unavailable");
@@ -5472,7 +5487,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			plan = (await issuanceStore.readSettlementPlan(settlementScope)) ?? plan;
 		}
 		for (const entry of plan.entries) {
-			if (entry.disposition === "expire" || entry.disposition === "inherited" || entry.replacementSequence !== null)
+			if (!eligible(entry))
 				continue;
 			await refreshSourceOwner();
 			const ordered = orderedBySequence.get(entry.sourceSequence);
@@ -6756,7 +6771,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			roomHeadAuthority,
 			roomHeadScope,
 			openedRoomHeadState.stable,
-			nextRoomHead
+			nextRoomHead,
+			{ capability: staged.capability, owner: adoptionOwner }
 		);
 		openedRoomHeadState = pendingRoomHead;
 		assertSessionOpen();
@@ -7633,6 +7649,13 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		pendingOperations(): readonly V3RoomPendingOperation[] {
 			if (redirectedSession !== undefined) return redirectedSession.pendingOperations();
 			return presentation?.pending() ?? Object.freeze([]);
+		},
+		async unresolvedAcceptedWork(): Promise<readonly V3UnresolvedAcceptedWork[]> {
+			if (redirectedSession !== undefined) return redirectedSession.unresolvedAcceptedWork();
+			assertSessionOpen();
+			await rebasePromise;
+			if (activeHandle === undefined) throw new TypeError("v3 room source custody owner is unavailable");
+			return inspectV3UnresolvedAcceptedWork(activeHandle);
 		},
 		speculativeProjection(): Projection {
 			if (redirectedSession !== undefined) return redirectedSession.speculativeProjection();

@@ -1,3 +1,4 @@
+import { creatorSourceCustodyGeometryForSizing } from "./creator-source-custody.js";
 import type { TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog";
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { canonicalRecordResourceForSizing,
@@ -71,6 +72,7 @@ import {
 import { type CurrentAnchorTrust, openCurrentAnchorTrust } from "@ts-drp/protocol-v3";
 import { resolveSealRecoveryTrust } from "@ts-drp/protocol-v3/seal";
 import {
+	decodeCreatorReattachmentCheckpoint,
 	openCreatorCheckpointTrust,
 	openCreatorForwardPromotionCheckpointTrust,
 } from "@ts-drp/protocol-v3/creator-checkpoint";
@@ -96,6 +98,7 @@ import {
 import { authorizeLatchedEnvelopeAuthor, openCanonicalLatchedAclSnapshot } from "@ts-drp/protocol-v3/latched-acl";
 import {
 	readCreatorSettlementSourceAnchor,
+	openCreatorSettlementSourceTrust,
 	resolveCreatorSettlementAuthor,
 	openAuthorFenceOperation,
 	verifyReceivedVertex,
@@ -242,14 +245,26 @@ import {
 	exactCreatorTransitionOccurrence,
 	inspectCreatorAdoptionCandidateLineage,
 	inspectCreatorTransitionAdvance,
+	inspectCreatorCheckpointTransition,
+	openCreatorCheckpointAttachment,
+	openCreatorCheckpointPoint,
+	resolveCreatorCheckpointPoint,
+	reconstructCreatorReattachmentCheckpoint,
+	type VerifiedCreatorCheckpointPoint,
+	resolveCreatorCheckpointAttachment,
+	type VerifiedCreatorCheckpointAttachment,
 	prepareCreatorTransitionAdvanceRecheck,
 	openCreatorForwardPromotion,
 	openCreatorSnapshotRecoveryRoleReadback,
 	openCreatorSnapshotRecoverySourceTrust,
+	openCreatorOrdinaryHistoricalSnapshotSource,
 	openCreatorTransitionClosedCutEvidence,
 	openCreatorTransitionSettlement,
 	resolveCreatorForwardPromotion,
 	resolveCreatorSnapshotRecoveryRoleTransfer,
+	resolveCreatorNativeCheckpointRecoveryTransfer,
+	type CreatorNativeCheckpointRecoveryRoles,
+	type CreatorNativeCheckpointAbsenceBasis,
 	uniqueCreatorTransitionCandidate,
 	type VerifiedCreatorForwardPromotion,
 	type VerifiedCreatorSnapshotRecoveryRoleTransfer,
@@ -716,6 +731,8 @@ interface ObservationFacts {
 	readonly dependencies: readonly VerifiedClosedAnchorDependency[];
 	readonly forward?: Readonly<{
 		readonly wholeCensus?: true;
+		readonly checkpoint?: VerifiedCreatorCheckpointAttachment;
+		readonly nativePublication?: true;
 		readonly wholeFloor?: CreatorProtectedRecoveryRoleSummary["floor"];
 		readonly pending?: Readonly<{
 			rows: readonly GenerationRecord[];
@@ -1688,6 +1705,13 @@ function releaseHeldTarget(target: HeldTarget): Promise<void> {
 	heldTargetReleases.set(target, task);
 	return task;
 }
+type CreatorOwnedRecoveryRoles = CreatorSnapshotRecoveryRoles | CreatorNativeCheckpointRecoveryRoles;
+
+/** Same original capability owner; the native variant never resolves as a signed remote list. */
+function resolveOwnedRecoveryRoles(transfer: VerifiedCreatorSnapshotRecoveryRoleTransfer): CreatorOwnedRecoveryRoles | undefined {
+	return resolveCreatorSnapshotRecoveryRoleTransfer(transfer) ?? resolveCreatorNativeCheckpointRecoveryTransfer(transfer)?.roles;
+}
+
 interface SnapshotRetirementInventoryState {
 	readonly retired: ReadonlySet<string>;
 	readonly inventoryBytes: Uint8Array;
@@ -1707,15 +1731,17 @@ interface SnapshotRetirementInventoryState {
  */
 function captureSnapshotRetirementInventoryState(
 	inventory: SnapshotRecoveryRoleInventory,
-	roles: CreatorSnapshotRecoveryRoles,
+	roles: CreatorOwnedRecoveryRoles,
 	currentTrust: CurrentAnchorTrust,
 	certificateDigest: string,
 	accounting: CreatorClosedRollbackProofAccounting,
 	classificationRead?: SnapshotRecoveryRoleInventory,
-	previousCertificate?: Readonly<{roles: CreatorSnapshotRecoveryRoles; trust: CurrentAnchorTrust; digest: string}>
+	previousCertificate?: Readonly<{roles: CreatorSnapshotRecoveryRoles; trust: CurrentAnchorTrust; digest: string}>,
+	nativeAbsenceBases: readonly CreatorNativeCheckpointAbsenceBasis[] = [],
+	currentSignedCertificateDigest?: string
 ): SnapshotRetirementInventoryState {
 	const previousClose = roles.previousClose;
-	requireLaw(previousClose !== null, "chain-invalid");
+	requireLaw(previousClose !== null || roles.kind === "creator-native-checkpoint-recovery-roles", "chain-invalid");
 	const sameScope = (a: SnapshotQuarantineScopeKey, b: SnapshotQuarantineScopeKey): boolean =>
 		a.objectId === b.objectId && a.epoch === b.epoch && a.anchor === b.anchor && a.manifestDigest === b.manifestDigest;
 	const certificateLaw = (condition: unknown, reason: string): void => {
@@ -1745,7 +1771,8 @@ function captureSnapshotRetirementInventoryState(
 	if (fact !== undefined) {
 		requireLaw(accounting.charge(encodeCanonical(fact)), "proof-budget-exceeded");
 		certificateLaw(
-			fact.certificateDigest === certificateDigest &&
+			(fact.certificateDigest === certificateDigest || (roles.kind === "creator-native-checkpoint-recovery-roles" &&
+					currentSignedCertificateDigest !== undefined && fact.certificateDigest === currentSignedCertificateDigest)) &&
 				fact.currentHead.objectId === currentTrust.objectId &&
 				fact.currentHead.epoch === currentTrust.currentEpoch &&
 				fact.currentHead.currentAnchorDigest === currentTrust.currentAnchorDigest &&
@@ -1755,7 +1782,8 @@ function captureSnapshotRetirementInventoryState(
 		);
 		for (const row of fact.retired) {
 			certificateLaw(
-				roles.classifiedScopes.some((scope) => sameScope(scope, row.scope)),
+				roles.classifiedScopes.some((scope) => sameScope(scope, row.scope)) ||
+					(roles.kind === "creator-native-checkpoint-recovery-roles" && !physicalScopes.some(scope => sameScope(scope.scope, row.scope))),
 				"RECOVERY_CERTIFICATE_RETIREMENT_CLASSIFICATION"
 			);
 			if (!physicalScopes.some((scope) => sameScope(scope.scope, row.scope)))
@@ -1793,10 +1821,31 @@ function captureSnapshotRetirementInventoryState(
 			}
 		}
 	}
+	for (const basis of nativeAbsenceBases) {
+		requireLaw(roles.kind === "creator-native-checkpoint-recovery-roles", "chain-invalid");
+		const previousSurvivor = inventory.scopes.find(row => sameScope(row.scope, basis.survivorScope));
+		const receipt = previousSurvivor?.retirement;
+		if (receipt === undefined) continue;
+		const bytes = encodeCanonical(receipt); requireLaw(accounting.charge(bytes), "proof-budget-exceeded");
+		certificateLaw((receipt.certificateDigest === basis.certificateDigest ||
+			(basis.signedCertificateDigest !== undefined && receipt.certificateDigest === basis.signedCertificateDigest)) &&
+			closedRetirementEqual(receipt.currentHead, basis.currentHead) &&
+			receipt.survivor.incarnation === previousSurvivor?.incarnation && sameScope(receipt.survivor.scope, basis.survivorScope),
+			"RECOVERY_CERTIFICATE_NATIVE_PRIOR_BINDING");
+		factBytes ??= bytes; factCarriers.push(bytes);
+		for (const row of receipt.retired) {
+			// A historical receipt can establish absence only. If the identity is
+			// physically present now, its CURRENT classification must authenticate it.
+			if (physicalScopes.some(actual => sameScope(actual.scope, row.scope))) continue;
+			certificateLaw(!basis.protectedScopes.some(scope => sameScope(scope, row.scope)),
+				"RECOVERY_CERTIFICATE_NATIVE_PRIOR_PROTECTED");
+			if (roles.classifiedScopes.some(scope => sameScope(scope, row.scope))) retired.add(scopeKey(row.scope));
+		}
+	}
 	for (const scope of [
 		roles.currentClose,
-		previousClose,
-		...roles.operationalSources.map((source) => ({
+		...(previousClose === null ? [] : [previousClose]),
+		...(roles.kind === "creator-native-checkpoint-recovery-roles" ? roles.additionalRollbackSources : roles.operationalSources).map((source) => ({
 			objectId: currentTrust.objectId,
 			epoch: source.closedEpoch,
 			anchor: source.closedAnchorDigest,
@@ -1848,6 +1897,8 @@ export async function acquireCreatorSnapshotRetirementReconstructionRequest(
 		exactCanonicalCutValueBytes: Uint8Array;
 		accounting: CreatorClosedRollbackProofAccounting;
 		previousCertificate?: Readonly<{ exactCanonicalCutValueBytes: Uint8Array; trust: CurrentAnchorTrust }>;
+		/** Requests original native reconstruction for an already verified received head. */
+		nativePublication?: true;
 	}>
 ): Promise<CreatorSnapshotRetirementReconstructionRequest | undefined> {
 	const cut = record(input.exactCanonicalCutValueBytes);
@@ -1889,6 +1940,24 @@ export async function acquireCreatorSnapshotRetirementReconstructionRequest(
 				scope.manifestDigest === roles.currentClose.manifestDigest
 		);
 		if (selected?.retirement === undefined) return undefined;
+		if (input.nativePublication === true) {
+			// This is only a request to enter the ORIGINAL native reconstruction.
+			// The remote signed role list cannot classify this recipient's actual
+			// predecessors. Full current roles, absence and native currency must all
+			// be verified by that owner before it can release the activation gate.
+			const fact = selected.retirement;
+			const nativeDigest = creatorDataDigest("ts-drp/native-checkpoint-recovery-roles/v1", encodeCanonical({
+				genesisAnchorDigest: input.currentTrust.genesisAnchorDigest,
+				currentAnchorDigest: input.currentTrust.currentAnchorDigest, nativeHead: input.head}));
+			requireLaw((fact.certificateDigest === nativeDigest || fact.certificateDigest === certificateDigest) &&
+				fact.currentHead.objectId === input.currentTrust.objectId && fact.currentHead.epoch === input.currentTrust.currentEpoch &&
+				fact.currentHead.currentAnchorDigest === input.currentTrust.currentAnchorDigest &&
+				fact.survivor.incarnation === selected.incarnation && closedRetirementEqual(fact.survivor.scope, selected.scope), "chain-invalid");
+			const factBytes = encodeCanonical(fact), inventoryBytes = encodeCanonical(inventory);
+			requireLaw(input.accounting.charge(factBytes) && input.accounting.charge(inventoryBytes), "proof-budget-exceeded");
+			return Object.freeze({retired: new Set(fact.retired.map(row => JSON.stringify(row.scope))),
+				factBytes, inventoryBytes, factCarriers: Object.freeze([factBytes])});
+		}
 		return captureSnapshotRetirementInventoryState(
 			inventory,
 			roles,
@@ -1987,7 +2056,7 @@ interface RecoveryRoleCertificate {
 	readonly certificateDigest: string;
 	readonly dependencyAnchors: readonly Readonly<{ epoch: number; anchorDigest: string }>[];
 	readonly transfer: VerifiedCreatorSnapshotRecoveryRoleTransfer;
-	readonly roles: CreatorSnapshotRecoveryRoles;
+	readonly roles: CreatorOwnedRecoveryRoles;
 	readonly protectedScopes: readonly SnapshotQuarantineScopeKey[];
 	readonly classifiedScopes: readonly SnapshotQuarantineScopeKey[];
 	/** Exact classified alternatives already retired under this certificate's
@@ -1996,6 +2065,16 @@ interface RecoveryRoleCertificate {
 	check(): Promise<void>;
 	releaseClassified(): Promise<void>;
 	release(): Promise<void>;
+}
+/** The original native point certificate can release a historical source
+ * generation only after its own bound absence receipt has discharged the
+ * snapshot. Full source authentication and the joined native retirement proof
+ * still run below; this merely stops treating that ended consumer as required. */
+function recoveryCertificateRequiredGenerations(proof: RecoveryRoleCertificate): readonly GenerationRecord[] {
+	const native = resolveCreatorNativeCheckpointRecoveryTransfer(proof.transfer);
+	return [...proof.supportGenerations, ...proof.authenticatedSourceGenerations.filter(binding => native === undefined ||
+		proof.protectedScopes.some(scope => closedRetirementEqual(scope, binding.scope)) ||
+		!proof.retiredClassifiedSnapshotScopes.some(scope => closedRetirementEqual(scope, binding.scope))).map(binding => binding.generation)];
 }
 /** Detached resource spelling from the SAME authenticated certificate owner. */
 type CreatorConditionalGenerationResourceCertificate = Pick<RecoveryRoleCertificate,
@@ -2009,7 +2088,8 @@ async function acquireRecoveryRoleCertificate(
 	accounting: CreatorClosedRollbackProofAccounting,
 	parsing?: CreatorClosedAcquisitionSyntax,
 	requiredDependencyAnchors: readonly Readonly<{epoch: number; anchorDigest: string}>[] = [],
-	borrowedSource?: CreatorClosedRecoveryCertificateBorrow
+	borrowedSource?: CreatorClosedRecoveryCertificateBorrow,
+	checkpoint?: VerifiedCreatorCheckpointAttachment
 ): Promise<RecoveryRoleCertificate> {
 	const selectCandidate = parsing?.candidate ?? uniqueCreatorTransitionCandidate;
 	const readRecord = parsing?.record ?? record;
@@ -2079,6 +2159,139 @@ async function acquireRecoveryRoleCertificate(
 			if (!condition) throw new Refusal(failure("chain-invalid", "snapshot", reason));
 		};
 		chargeNativeReaderBlobs(accounting, reader.blobs);
+		const currentGeneration = reader.generations.find(row => row.generationId === expectedHead.generationId);
+		const currentBase = currentGeneration?.baseExpectedHead;
+		const nativeParent = currentBase?.kind === "present" ? reader.generations.find(row =>
+			row.generationId === currentBase.generationId && row.objectId === currentBase.objectId && row.closureDigest === currentBase.closureDigest) : undefined;
+		const parentCarrier = nativeParent === undefined ? undefined : selectCandidate(view(reader, reader.generations.indexOf(nativeParent)).candidates,
+			"drp-anchor-trust-state");
+		const receivedAdjacent = checkpoint === undefined && settlementProfileFor(currentTrust.profileId) === "v1" && parentCarrier !== undefined &&
+			Number(readRecord(parentCarrier.bytes).currentEpoch) + 1 === currentTrust.currentEpoch;
+		if (checkpoint !== undefined || receivedAdjacent) {
+			// Exact native publication edges and the current floor own this local
+			// partition. A gap additionally requires the original nominal attachment;
+			// an adjacent received head is verified by its original signed edge below.
+			if (checkpoint !== undefined) {
+				const attachment = resolveCreatorCheckpointAttachment(checkpoint);
+				requireLaw(attachment !== undefined && attachment.target.trust === currentTrust &&
+					attachment.localBase.trust === predecessorTrust, "chain-invalid");
+			}
+			const floorState = captureCreatorRoomHeadState(await input.floorRead({scope: {
+				objectId: input.objectId, pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest,
+			}}), input.objectId, input.pinnedGenesisAnchorDigest);
+			requireLaw(floorState.ok && floorState.state.pending === null &&
+				sameCreatorRoomHead(floorState.state.stable, currentTrust), "floor-stale");
+			const inventoryRead = bindMethod<NonNullable<SnapshotRecoveryStore<SnapshotVerificationReceipt>["captureRecoveryRoleInventory"]>>(
+				input.snapshotStore, "captureRecoveryRoleInventory");
+			const initialInventory = await snapshotCall(() => inventoryRead({objectId: input.objectId}, {signal: input.signal}));
+			const selected = selectedRoleRows(reader, currentTrust.currentEpoch,
+				{owner: "ahe", role: "current", objectId: input.objectId}, parsing);
+			const pinRecord = readRecord(input.exactCanonicalPinnedGenesisTrustStateRecordBytes);
+			const pin = openCurrentAnchorTrust({expectedObjectId: input.objectId,
+				pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest,
+				exactCanonicalTrustStateRecordBytes: input.exactCanonicalPinnedGenesisTrustStateRecordBytes});
+			requireLaw(pin.ok, "chain-invalid");
+			const sources: {exactCanonicalGenerationBytes: Uint8Array; closure: CreatorTransitionClosure;
+				snapshot: null | {exactCanonicalManifestBytes: Uint8Array; exactCanonicalPayloadBytes: Uint8Array}}[] = [];
+			const authenticatedSourceGenerations: {scope: SnapshotQuarantineScopeKey; generation: GenerationRecord}[] = [];
+			const sourceTrusts = new Set<CurrentAnchorTrust>([pin.trust, currentTrust, predecessorTrust]);
+			for (const generation of reader.generations) {
+				const closure = view(reader, reader.generations.indexOf(generation));
+				const carrier = readUnique(closure, "drp-anchor-trust-state"), carrierRecord = readRecord(carrier.bytes);
+				const epoch = Number(carrierRecord.currentEpoch);
+				let snapshot: typeof sources[number]["snapshot"] = null;
+				if (epoch > 0) {
+					stage = `native-source:${epoch}`;
+					const point = reconstructCreatorReattachmentCheckpoint(closure) !== undefined;
+					const historicalOnly = !point && (generation.baseExpectedHead.kind === "none" || !reader.generations.some(row =>
+						generation.baseExpectedHead.kind === "present" && row.generationId === generation.baseExpectedHead.generationId));
+					const ordinaryRows = point ? undefined : historicalOnly ? [generation] : selectedRoleRows(reader, epoch,
+						{owner: "ahe", role: "unclassified", objectId: input.objectId}, parsing);
+					const previousGeneration = ordinaryRows?.[1];
+					const predecessorClosure = previousGeneration === undefined ? undefined : view(reader, reader.generations.indexOf(previousGeneration));
+					const historical = historicalOnly ? openCreatorOrdinaryHistoricalSnapshotSource({creatorTrust: currentTrust, closure,
+						exactCanonicalPinnedGenesisTrustStateRecordBytes: input.exactCanonicalPinnedGenesisTrustStateRecordBytes}) : undefined;
+					const opened = historicalOnly ? undefined : openCreatorSnapshotRecoverySourceTrust({currentTrust, closure,
+						...(point ? {anchorChain: []} : {predecessorClosure}),
+						exactCanonicalPinnedGenesisTrustStateRecordBytes: input.exactCanonicalPinnedGenesisTrustStateRecordBytes});
+					if (opened?.ok === false) throw new Refusal(failure("chain-invalid", "snapshot", `RECOVERY_NATIVE_SOURCE:${epoch}:${opened.reason}`));
+					const sourceTrust = historical?.trust ?? (opened?.ok === true ? opened.trust : undefined);
+					requireLaw(sourceTrust !== undefined && sourceTrust.currentEpoch === epoch && epoch <= currentTrust.currentEpoch);
+					sourceTrusts.add(sourceTrust);
+					if (opened?.ok === true) requireLaw(accounting.charge(opened.derivedPredecessorTrustStateRecordBytes), "proof-budget-exceeded");
+					const cut = readRecord(readUnique(closure, "drp-hard-epoch-cut", epoch - 1).bytes);
+					const scope = Object.freeze({objectId: input.objectId, epoch: epoch - 1,
+						anchor: String(cut.previousAnchor), manifestDigest: String(cut.snapshotManifestDigest)});
+					authenticatedSourceGenerations.push({scope, generation});
+					if (initialInventory.scopes.some(row => closedRetirementEqual(row.scope, scope))) {
+						stage = `native-source-snapshot:${epoch}`;
+						const original = await authenticateRole(input, reader, ordinaryRows ?? [generation],
+							{objectId: input.objectId, epoch, currentAnchorDigest: String(carrierRecord.currentAnchorDigest)},
+							pin.trust, pinRecord, accounting, {owner: "ahe", role: "unclassified", objectId: input.objectId}, parsing, currentTrust);
+						requireLaw(original.target !== undefined, "chain-invalid");
+						const targets = selected.includes(generation) ? held : classifiedHeld;
+						await readTarget(input, original.target, targets, parsing, accounting);
+						const value = targets.at(-1); requireLaw(value !== undefined, "internal-invariant");
+						requireLaw(chargeSnapshotTarget(accounting, value), "proof-budget-exceeded");
+						snapshot = {exactCanonicalManifestBytes: value.exactCanonicalManifestBytes,
+							exactCanonicalPayloadBytes: value.exactCanonicalPayloadBytes};
+					}
+				}
+				sources.push({exactCanonicalGenerationBytes: encodeGenerationRecordV1(generation), closure, snapshot});
+			}
+			const opened = openCreatorSnapshotRecoveryRoleReadback({kind: checkpoint === undefined ? "native-local-recovery" : "native-checkpoint-recovery",
+				checkpoint: checkpoint ?? null, currentTrust,
+				exactCanonicalNativeHeadBytes: encodeHeadRecordV1(expectedHead), sourceMaterials: sources,
+				exactCanonicalPinnedGenesisTrustStateRecordBytes: input.exactCanonicalPinnedGenesisTrustStateRecordBytes});
+			if (!opened.ok) throw new Refusal(failure("chain-invalid", "snapshot", opened.reason));
+			const identity = resolveCreatorNativeCheckpointRecoveryTransfer(opened.transfer);
+			requireLaw(identity !== undefined && sameRoleHead(identity.nativeHead, expectedHead), "chain-invalid");
+			const {roles, certificateDigest} = identity;
+			const retirementState = async (): Promise<SnapshotRetirementInventoryState> =>
+				captureSnapshotRetirementInventoryState(await snapshotCall(() => inventoryRead({objectId: input.objectId}, {signal: input.signal})),
+					roles, currentTrust, certificateDigest, accounting, input.classificationRead, undefined, identity.historicalAbsenceBases,
+					identity.signedCertificateDigest);
+			const state = await retirementState();
+			const dependencyAnchors = Object.freeze([...sourceTrusts].map(trust => Object.freeze({
+				epoch: trust.currentEpoch, anchorDigest: trust.currentAnchorDigest})));
+			requireLaw(requiredDependencyAnchors.every(required => dependencyAnchors.some(actual =>
+				actual.epoch === required.epoch && actual.anchorDigest === required.anchorDigest)), "chain-invalid");
+			const protectedScopes = Object.freeze([roles.currentClose, ...(roles.previousClose === null ? [] : [roles.previousClose]),
+				...roles.additionalRollbackSources.map(source => Object.freeze({objectId: input.objectId, epoch: source.closedEpoch,
+					anchor: source.closedAnchorDigest, manifestDigest: source.manifestRef.digest}))]);
+			const available = (): void => requireLaw(!released && parentAvailable?.() !== false, "snapshot-unavailable");
+			const checkBody = async (): Promise<void> => {
+				available();
+				const floor = captureCreatorRoomHeadState(await input.floorRead({scope: {
+					objectId: input.objectId, pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest,
+				}}), input.objectId, input.pinnedGenesisAnchorDigest);
+				available(); requireLaw(floor.ok && closedRetirementEqual(floor.state, floorState.state), "floor-stale");
+				const actual = await retirementState(); available();
+				requireLaw(state.factCarriers.every(bytes => actual.factCarriers.some(current => compareBytes(bytes, current) === 0)) &&
+					[...state.retired].every(key => actual.retired.has(key)), "chain-invalid");
+				for (const target of [...held, ...(classifiedReleased ? [] : classifiedHeld)]) {
+					await checkHeldTarget(target); available();
+				}
+				requireLaw((await reader.checkCurrency()).ok, "ahe-rejected"); available();
+			};
+			const check = (): Promise<void> => {
+				if (released || parentAvailable?.() === false) return Promise.reject(new Refusal(failure("snapshot-unavailable")));
+				const task = Promise.resolve().then(checkBody); pendingChecks.add(task); parentPending?.add(task);
+				const forget = (): void => {pendingChecks.delete(task); parentPending?.delete(task);};
+				void task.then(forget, forget); return task;
+			};
+			if (!creatorClosedProofPreparingNativeData(accounting) &&
+				!input.snapshotPreparation?.targets?.some(target => heldTargetPreparations.has(target))) await check();
+			transferred = true;
+			return Object.freeze({reader, certificateDigest, transfer: opened.transfer, roles, protectedScopes,
+				classifiedScopes: roles.classifiedScopes, supportGenerations: Object.freeze([]),
+				authenticatedSourceGenerations: Object.freeze(authenticatedSourceGenerations),
+				authenticatedSourceTrusts: creatorSigningRoleTrustVector(sourceTrusts), journalMembershipAuthorities: Object.freeze([]),
+				dependencyAnchors, verifiedSnapshotMaterials: Object.freeze([...held, ...classifiedHeld].map(target => Object.freeze({
+					exactCanonicalManifestBytes: target.exactCanonicalManifestBytes.slice(), exactCanonicalPayloadBytes: target.exactCanonicalPayloadBytes.slice()}))),
+				retiredClassifiedSnapshotScopes: Object.freeze(roles.classifiedScopes.filter(scope => state.retired.has(
+					JSON.stringify([scope.objectId, scope.epoch, scope.anchor, scope.manifestDigest])))), check, releaseClassified, release});
+		}
 		const closureAt = (epoch: number): CreatorTransitionClosure => {
 			const matches = reader.generations
 				.map((_, index) => view(reader, index))
@@ -3458,6 +3671,8 @@ async function authenticate(
 	let currentTrust: CurrentAnchorTrust = pin;
 	let predecessorTrust = pin;
 	let transitionInput: Parameters<typeof inspectCreatorTransitionAdvance>[0] | undefined;
+	let checkpoint: VerifiedCreatorCheckpointAttachment | undefined;
+	let nativePublication = false;
 	const accounting = sharedAccounting ?? createCreatorClosedRollbackProofAccounting([], maintenance);
 	chargeNativeReaderBlobs(accounting, reader.blobs);
 	const frame: CreatorClosedProofWork = {
@@ -3495,6 +3710,49 @@ async function authenticate(
 			"blueprint-invalid"
 		);
 	} else {
+		const rawBase = roleView(1), baseCarrier = selectCandidate(rawBase.candidates, "drp-anchor-trust-state");
+		const baseEpoch = baseCarrier === undefined ? undefined : readRecord(baseCarrier.bytes).currentEpoch;
+		if (settlementProfileFor(pin.profileId) === "v1" && typeof baseEpoch === "number" && Number.isSafeInteger(baseEpoch) && baseEpoch >= 0 && baseEpoch < n &&
+			readRecord(readUnique(live, "drp-hard-epoch-cut", n - 1).bytes).forwardPromotion === undefined) {
+			rows = selectedRoleRows(reader, n, {owner: "ahe", role: "current", objectId: input.objectId}, parsing);
+			const role = await authenticateRole(input, reader, rows.slice(0, 2), floor, pin, pinRecord, accounting,
+				{owner: "ahe", role: "current", objectId: input.objectId, generationId: rows[0]!.generationId}, parsing);
+			const point = role.checkpoint === undefined ? undefined : resolveCreatorCheckpointAttachment(role.checkpoint);
+			const originalPredecessor = point?.localBase.trust ?? role.transition?.currentTrust;
+			requireLaw(originalPredecessor !== undefined && role.target !== undefined && (baseEpoch === n - 1 || point !== undefined));
+			currentTrust = role.trust; predecessorTrust = originalPredecessor; checkpoint = role.checkpoint; predecessorIndex = 1;
+			nativePublication = true;
+			const current = await readTarget(input, role.target, held, parsing, accounting);
+			if (role.transition !== undefined) requireLaw(inspectCreatorTransitionAdvance({...role.transition,
+				settlementAcl: {current: role.target.closedAclBytes, successor: current.successorAclBytes}}).ok);
+			cuts.push(current.summary);
+			if (held !== undefined) requireLaw(chargeSnapshotTarget(accounting, held[held.length - 1]!), "proof-budget-exceeded");
+			for (const rollback of rows.slice(1)) {
+				const closure = view(reader, reader.generations.indexOf(rollback));
+				const carrier = readUnique(closure, "drp-anchor-trust-state"), record = readRecord(carrier.bytes);
+				const epoch = Number(record.currentEpoch);
+				const rollbackIndex = rows.indexOf(rollback);
+					const priorRows = epoch === 0 || rollbackIndex === 2 ? [rollback] : reconstructCreatorReattachmentCheckpoint(closure) !== undefined
+					? (rollbackIndex === 1 && rows[2] !== undefined ? [rollback, rows[2]!] : [rollback])
+					: selectedRoleRows(reader, epoch, {owner: "ahe", role: "unclassified", objectId: input.objectId}, parsing);
+				requireLaw(priorRows[0]?.generationId === rollback.generationId);
+				const prior = await authenticateRole(input, reader, priorRows,
+					{objectId: input.objectId, epoch, currentAnchorDigest: String(record.currentAnchorDigest)},
+						pin, pinRecord, accounting, {owner: "ahe", role: "unclassified", objectId: input.objectId}, parsing, currentTrust);
+				if (epoch === 0) continue;
+				requireLaw(prior.target !== undefined);
+				cuts.push((await readTarget(input, prior.target, held, parsing, accounting)).summary);
+				if (held !== undefined) requireLaw(chargeSnapshotTarget(accounting, held[held.length - 1]!), "proof-budget-exceeded");
+			}
+			const dependencies = closeHold === undefined ? undefined : resolveCreatorSnapshotRecoveryCloseHold(closeHold,
+				{store: input.store, liveJournalStore: input.liveJournalStore, currentTrust});
+			requireLaw(closeHold === undefined || dependencies !== undefined, "chain-invalid");
+			const task = acquireRecoveryRoleCertificate(input, reader.head, currentTrust, predecessorTrust, accounting, parsing,
+				dependencies?.dependencyAnchors, fullRecoverySource === undefined ? undefined :
+					{kind: "parent-full-recovery-role-reader", source: fullRecoverySource, parent: frame}, checkpoint);
+			frame.pending.add(task);
+			try {certificates.push(await task);} finally {frame.pending.delete(task);}
+		} else {
 		let transitionRecheck: ReturnType<typeof prepareCreatorTransitionAdvanceRecheck> | undefined;
 		try {
 			const rawBase = roleView(1);
@@ -3746,6 +4004,7 @@ async function authenticate(
 			// returned observation or its later native/current-floor checks.
 			transitionRecheck?.release();
 		}
+		}
 	}
 	checkAbort(input.signal);
 	if (!creatorClosedProofPreparingNativeData(accounting)) {
@@ -3825,6 +4084,8 @@ async function authenticate(
 						rows,
 						...(expectedWholeFloor === undefined ? {} : { wholeFloor: expectedWholeFloor }),
 						predecessorIndex,
+						...(checkpoint === undefined ? {} : {checkpoint}),
+						...(nativePublication ? {nativePublication: true as const} : {}),
 						checkCurrent,
 						currentTrust,
 						predecessorTrust,
@@ -4002,7 +4263,7 @@ interface CreatorOrdinaryMaintenanceResourceFacts {
 	 * own required-scope correspondence before using the shared numerical filter. */
 	readonly ordinaryRoleResourceCorrespondence?: Readonly<{
 		sourceSelection: NonNullable<ReturnType<typeof creatorCloseRecoveryRoleSourceRelation>>;
-		currentRoles?: CreatorSnapshotRecoveryRoles;
+		currentRoles?: CreatorOwnedRecoveryRoles;
 		currentCutRoles?: CreatorSnapshotRecoveryRoles;
 		protectedScopes: readonly SnapshotQuarantineScopeKey[];
 		certificates: readonly CreatorConditionalGenerationResourceCertificate[];
@@ -5521,7 +5782,7 @@ export async function captureCreatorOrdinaryIssuanceProofSource(proof: CreatorIs
 			!snapshotMaterials.some(row => closedRetirementEqual(row.scope, scope)))
 		.map(scope => Object.freeze({...scope})));
 	const currentRoles = originalMaterial?.recoveryRoleTransfer == null ? undefined :
-		resolveCreatorSnapshotRecoveryRoleTransfer(originalMaterial.recoveryRoleTransfer);
+		resolveOwnedRecoveryRoles(originalMaterial.recoveryRoleTransfer);
 	const advance = creatorOrdinaryNativeAdvanceResourceFacts(forward, frame);
 	const sourceScope = (row: PromotionSource): SnapshotQuarantineScopeKey => ({objectId: frame.input.objectId,
 		epoch: row.closedEpoch, anchor: row.closedAnchorDigest, manifestDigest: row.manifestRef.digest});
@@ -7641,7 +7902,9 @@ async function acquireClosedData(
 			const forward = facts.forward;
 			requireLaw(
 				forward !== undefined && forward.held.length ===
-					(classificationRead === undefined ? 2 : Math.min(2, floor.stable.epoch)) + (forward.pending === undefined ? 0 : 1),
+					(forward.nativePublication === true ? forward.rows.filter(row => uniqueCreatorTransitionCandidate(
+						view(reader!, reader!.generations.indexOf(row)).candidates, "v3-live-generation-2") !== undefined).length :
+						classificationRead === undefined ? 2 : Math.min(2, floor.stable.epoch)) + (forward.pending === undefined ? 0 : 1),
 				"snapshot-unavailable"
 			);
 			required = [
@@ -7651,18 +7914,12 @@ async function acquireClosedData(
 					...proof.supportGenerations,
 					...proof.authenticatedSourceGenerations.map((source) => source.generation),
 				]),
-				...(forward.pending?.certificates ?? []).flatMap((proof) => [
-					...proof.supportGenerations,
-					...proof.authenticatedSourceGenerations.map((source) => source.generation),
-				]),
+				...(forward.pending?.certificates ?? []).flatMap(recoveryCertificateRequiredGenerations),
 				...forward.installed.flatMap((proof) => [
 					...proof.supportGenerations,
 					...proof.authenticatedSourceGenerations.map((source) => source.generation),
 				]),
-				...forward.certificates.flatMap((proof) => [
-					...proof.supportGenerations,
-					...proof.authenticatedSourceGenerations.map((source) => source.generation),
-				]),
+				...forward.certificates.flatMap(recoveryCertificateRequiredGenerations),
 			];
 			// A received L can name an ordinary local predecessor P/Q/L, not only
 			// the first received pair's genesis base. Authenticate that predecessor's
@@ -7701,7 +7958,7 @@ async function acquireClosedData(
 									predecessorRows.some((row) => row.generationId === support.generationId),
 								"chain-invalid"
 							);
-							const authenticated = authenticateRole(
+							const authenticated = await authenticateRole(
 								input,
 								reader as AheBoundedRecoveryRoleRead,
 								predecessorRows,
@@ -7731,7 +7988,7 @@ async function acquireClosedData(
 							required.push(...predecessorRows);
 						} else {
 							requireLaw(forward.predecessorTrust.currentEpoch === 1 && support.baseExpectedHead.kind === "none");
-							authenticateRole(
+							await authenticateRole(
 								input,
 								reader as AheBoundedRecoveryRoleRead,
 								[support],
@@ -7758,7 +8015,7 @@ async function acquireClosedData(
 					forward.currentTrust,
 					pin.trust,
 					originalFrame,
-					extra, parsing
+					extra, parsing, forward.nativePublication
 				);
 				originalFrame.authenticatedExcludedGenerations = Object.freeze(extra.map(detachedGeneration));
 			}
@@ -7826,7 +8083,16 @@ async function acquireClosedData(
 			// signed checkpoint remains usable, but that is not a native P/Q role.
 			// Authenticate only the already held cut identities, never epochs drawn
 			// from signing rows. The same source opener proves both adjacent trusts.
-			const retainedCuts = facts.summary.cuts.filter((cut) => cut.epoch > 0);
+			// Checkpoint cuts name remote proof epochs. Their actual native
+			// current/two rollback roles were fully opened above on this SAME
+			// frame; remote predecessors are not invented journal/signing roles.
+			if (forward.nativePublication === true) for (const row of forward.rows) {
+				const carrier = readRecord(readUnique(view(reader, reader.generations.indexOf(row)), "drp-anchor-trust-state").bytes);
+				requireLaw([...work.recoveryTrusts].some(trust => trust.objectId === input.objectId &&
+					trust.currentEpoch === carrier.currentEpoch && trust.currentAnchorDigest === carrier.currentAnchorDigest &&
+					trust.profileId === forward.currentTrust.profileId && trust.genesisAnchorDigest === input.pinnedGenesisAnchorDigest), "chain-invalid");
+			}
+			const retainedCuts = forward.nativePublication !== true ? facts.summary.cuts.filter((cut) => cut.epoch > 0) : [];
 			if (retainedCuts.length !== 0) {
 				const minimumEpoch = Math.min(...retainedCuts.map((cut) => cut.epoch - 1));
 				const n = forward.currentTrust.currentEpoch;
@@ -7986,6 +8252,7 @@ async function acquireClosedData(
 			const observer = Reflect.get(globalThis, "__warmProofEvent");
 			if (typeof observer === "function") observer({kind: "closed-data-acquisition-refused",
 				refusal: error instanceof Refusal ? error.result.kind : "internal-invariant",
+				...(error instanceof RoleRefusal ? {roleFailure: error.result} : {}),
 				...(error instanceof Error ? {type: error.name, message: error.message.slice(0, 512), stack: error.stack?.slice(0, 4096)} : {})});
 		} catch { /* Diagnostic observers cannot change refusal or joined release. */ }
 		result =
@@ -8133,7 +8400,7 @@ async function joinSourceReleases(releases: readonly (() => Promise<void>)[]): P
 function creatorClosedPromotionRoleData(forward: NonNullable<ObservationFacts["forward"]>):
 	Omit<CreatorOrdinaryIssuanceSourceMaterial, "snapshotTurnover"> {
 	const input = forward.input;
-	const historicalHeld = forward.pending === undefined ? forward.held : forward.held.slice(0, 2);
+	const historicalHeld = forward.pending === undefined ? forward.held : forward.held.slice(0, -1);
 	const installed = forward.installed[0]?.promotion;
 	const promotion = installed === undefined ? undefined : resolveCreatorForwardPromotion(installed);
 	requireLaw(installed === undefined || promotion !== undefined, "chain-invalid");
@@ -8184,7 +8451,7 @@ export function resolveCreatorForwardPromotionSource(
 	)
 		return undefined;
 	const { input, reader, held } = forward;
-	const historicalHeld = forward.pending === undefined ? held : held.slice(0, 2);
+	const historicalHeld = forward.pending === undefined ? held : held.slice(0, -1);
 	const installedProofs = [...forward.installed, ...(forward.pending?.installed ?? [])];
 	const certificateProofs = [...forward.certificates, ...(forward.pending?.certificates ?? [])];
 	const originalFrame = frames.get(reader);
@@ -8373,8 +8640,9 @@ export function resolveCreatorForwardPromotionSource(
 			const roots = forward.rows.map(detachedGeneration);
 			requireLaw(
 				(roots.length === 2 || roots.length === 3) &&
-					historicalHeld.length === 2 &&
-					held.length === (forward.pending === undefined ? 2 : 3) &&
+					(forward.nativePublication !== true ? historicalHeld.length === 2 :
+						historicalHeld.length === forward.rows.filter(row => uniqueCreatorTransitionCandidate(view(reader, reader.generations.indexOf(row)).candidates, "drp-hard-epoch-cut") !== undefined).length) &&
+					held.length === historicalHeld.length + (forward.pending === undefined ? 0 : 1) &&
 					forward.wholeFloor !== undefined,
 				"snapshot-unavailable"
 			);
@@ -8677,7 +8945,8 @@ async function authenticateExcludedHistoricalGenerations(
 	pin: CurrentAnchorTrust,
 	frame: ImportFrame | CreatorClosedProofWork,
 	rows: readonly GenerationRecord[],
-	parsing?: CreatorClosedAcquisitionSyntax
+	parsing?: CreatorClosedAcquisitionSyntax,
+	nativePublication?: true
 ): Promise<void> {
 	const readUnique = parsing?.unique ?? unique;
 	const readRecord = parsing?.record ?? record;
@@ -8690,13 +8959,17 @@ async function authenticateExcludedHistoricalGenerations(
 			carrier = readUnique(closure, "drp-anchor-trust-state"),
 			n = Number(readRecord(carrier.bytes).currentEpoch);
 		requireLaw(Number.isSafeInteger(n) && n >= 0 && n < currentTrust.currentEpoch, "chain-invalid");
-		return { row, closure, n };
+		const historical = nativePublication === true && n > 0 && reconstructCreatorReattachmentCheckpoint(closure) === undefined &&
+			selectCandidate(closure.candidates, "v3-live-generation-2", n) !== undefined ?
+			openCreatorOrdinaryHistoricalSnapshotSource({creatorTrust: currentTrust, closure,
+				exactCanonicalPinnedGenesisTrustStateRecordBytes: input.exactCanonicalPinnedGenesisTrustStateRecordBytes}) : undefined;
+		return { row, closure, n, historical };
 	});
 	// Genesis is independently authenticated by the original pin. A positive
 	// source still needs its exact signed identity on the current branch, but
 	// epoch one's predecessor does not require a redundant genesis envelope.
 	const n = currentTrust.currentEpoch,
-		minimum = Math.min(n, ...selected.filter((item) => item.n > 0).map((item) => Math.max(1, item.n - 1)));
+		minimum = Math.min(n, ...selected.filter((item) => item.n > 0 && item.historical === undefined && reconstructCreatorReattachmentCheckpoint(item.closure) === undefined).map((item) => Math.max(1, item.n - 1)));
 	requireLaw(n - minimum <= 6, "proof-budget-exceeded");
 	const current = reader.generations
 		.map((_, index) => view(reader, index))
@@ -8726,8 +8999,15 @@ async function authenticateExcludedHistoricalGenerations(
 	}
 	const proved: CurrentAnchorTrust[] = [];
 	for (const item of selected) {
+		if (item.n === 0 && item.closure.candidates.length === 1 &&
+			compareBytes(item.closure.candidates[0]!.bytes, input.exactCanonicalPinnedGenesisTrustStateRecordBytes) === 0) {
+			// The initial trust-only native publication is not a usable live
+			// projection. Its complete single-reference closure is the genuine pin.
+			requireLaw(frame.accounting.charge(item.closure.candidates[0]!.bytes), "proof-budget-exceeded");
+			continue;
+		}
 		if (item.n === 0) {
-			authenticateRole(
+			await authenticateRole(
 				input,
 				reader,
 				[item.row],
@@ -8737,6 +9017,13 @@ async function authenticateExcludedHistoricalGenerations(
 				frame.accounting,
 				{ owner: "ahe", role: "unclassified", objectId: input.objectId, generationId: item.row.generationId }, parsing
 			);
+			continue;
+		}
+		if (item.historical !== undefined) {
+			// The current native partition independently classified this exact row.
+			// Its original signed settlement authenticates historical DATA after its
+			// snapshot/older ancestry has retired; it grants no role or eligibility.
+			proved.push(item.historical.trust);
 			continue;
 		}
 		const opened = openCreatorSnapshotRecoverySourceTrust({
@@ -8786,7 +9073,8 @@ async function authenticateExcludedHistoricalGenerations(
 				"chain-invalid"
 			);
 		}
-		proved.push(opened.trust, opened.predecessorTrust);
+		proved.push(opened.trust);
+		if (reconstructCreatorReattachmentCheckpoint(item.closure) === undefined) proved.push(opened.predecessorTrust);
 	}
 	requireLaw(creatorClosedProofWorkAvailable(frame) && (await reader.checkCurrency()).ok, "ahe-rejected");
 	// The original source and predecessor proofs also authenticate retained
@@ -8983,17 +9271,24 @@ function closedGenerationCertificateCoverage(
 		proof.roles === undefined || proof.protectedScopes === undefined || proof.authenticatedSourceGenerations === undefined ||
 		proof.supportGenerations === undefined || proof.reader.head.kind !== "present" || frame.reader.head.kind !== "present" ||
 		!sameRoleHead(proof.reader.head,frame.reader.head)) return false;
-	const roles = resolveCreatorSnapshotRecoveryRoleTransfer(proof.transfer);
+	const roles = resolveOwnedRecoveryRoles(proof.transfer);
 	if (roles === undefined || !closedRetirementEqual(roles,proof.roles) || roles.previousClose === null) return false;
 	const head = frame.reader.head;
 	if (head.kind !== "present") return false;
 	const current = frame.reader.generations.find(row => row.generationId === head.generationId);
 	if (current === undefined) return false;
-	const cut = uniqueCreatorTransitionCandidate(view(frame.reader,frame.reader.generations.indexOf(current)).candidates,
-		"drp-hard-epoch-cut",roles.currentClose.epoch);
-	if (cut === undefined || proof.certificateDigest !== creatorDataDigest("ts-drp/hard-epoch-cut/v3",cut.bytes) ||
-		!closedRetirementEqual(record(cut.bytes).recoveryRoles,roles)) return false;
-	const required = [roles.currentClose,roles.previousClose,...roles.operationalSources.map(source => ({
+	const native = resolveCreatorNativeCheckpointRecoveryTransfer(proof.transfer);
+	if (native !== undefined) {
+		if (!sameRoleHead(native.nativeHead, head) || proof.certificateDigest !== native.certificateDigest ||
+			native.protectedHeads.some(protectedHead => !frame.reader.generations.some(row => row.generationId === protectedHead.generationId &&
+				row.objectId === protectedHead.objectId && row.closureDigest === protectedHead.closureDigest))) return false;
+	} else {
+		const cut = uniqueCreatorTransitionCandidate(view(frame.reader,frame.reader.generations.indexOf(current)).candidates,
+			"drp-hard-epoch-cut",roles.currentClose.epoch);
+		if (cut === undefined || proof.certificateDigest !== creatorDataDigest("ts-drp/hard-epoch-cut/v3",cut.bytes) ||
+			!closedRetirementEqual(record(cut.bytes).recoveryRoles,roles)) return false;
+	}
+	const required = [roles.currentClose,roles.previousClose,...(roles.kind === "creator-native-checkpoint-recovery-roles" ? roles.additionalRollbackSources : roles.operationalSources).map(source => ({
 		objectId:frame.input.objectId,epoch:source.closedEpoch,anchor:source.closedAnchorDigest,manifestDigest:source.manifestRef.digest
 	}))];
 	return required.every(scope => proof.protectedScopes!.some(actual => closedRetirementEqual(actual,scope)) &&
@@ -9022,6 +9317,25 @@ function closedReceivedGenerationConsumersCovered(input: Readonly<{
 		const binding = proof?.authenticatedSourceGenerations.find(row => closedRetirementEqual(row.scope, scope));
 		if (binding === undefined || binding.generation.generationId !== certificate.candidateGenerationId ||
 			binding.generation.closureDigest !== certificate.candidateClosureDigest) return false;
+		const current = view(frame.reader, frame.reader.generations.findIndex(row => row.generationId === binding.generation.generationId));
+		const projection = uniqueCreatorTransitionCandidate(current.candidates, "v3-live-generation-2", scope.epoch + 1);
+		if (projection === undefined) return false;
+		const native = proof === undefined ? undefined : resolveCreatorNativeCheckpointRecoveryTransfer(proof.transfer);
+		const historicalPoint = native?.protectedHeads.length === 3 &&
+			native.protectedHeads[2]?.generationId === binding.generation.generationId;
+		if (historicalPoint) {
+			// The oldest usable rollback is an independently verified point. Its
+			// original birth receipt does not keep a fourth native head alive.
+			const pointBytes = reconstructCreatorReattachmentCheckpoint(current);
+			if (pointBytes === undefined) {
+				const sourceTrust = [...frame.recoveryTrusts].find(trust => trust.currentEpoch === scope.epoch + 1 &&
+					trust.objectId === scope.objectId && trust.currentAnchorDigest === record(certificate.exactCanonicalTrustStateRecordBytes).currentAnchorDigest);
+				if (certificate.exactCanonicalReattachmentCheckpointBytes !== undefined || sourceTrust === undefined ||
+					openCreatorOrdinaryHistoricalSnapshotSource({creatorTrust: sourceTrust, closure: current,
+						exactCanonicalPinnedGenesisTrustStateRecordBytes: frame.input.exactCanonicalPinnedGenesisTrustStateRecordBytes}) === undefined) return false;
+			} else if (certificate.exactCanonicalReattachmentCheckpointBytes === undefined ||
+				compareBytes(pointBytes, certificate.exactCanonicalReattachmentCheckpointBytes) !== 0) return false;
+		} else {
 		const old = decodeHeadRecordV1(certificate.exactCanonicalOldHeadBytes, "head");
 		if (!old.ok || old.value.kind !== "present" || old.value.objectId !== frame.input.objectId) return false;
 		const oldHead = old.value;
@@ -9030,11 +9344,16 @@ function closedReceivedGenerationConsumersCovered(input: Readonly<{
 			row.objectId === oldHead.objectId && row.closureDigest === oldHead.closureDigest);
 		if (predecessor === undefined || (frame.authenticatedExcludedGenerations ?? []).some(row =>
 			row.generationId === predecessor.generationId || row.generationId === binding.generation.generationId)) return false;
-		const current = view(frame.reader, frame.reader.generations.findIndex(row => row.generationId === binding.generation.generationId));
 		const previous = view(frame.reader, frame.reader.generations.indexOf(predecessor));
-		const oldTrust = uniqueCreatorTransitionCandidate(previous.candidates, "drp-anchor-trust-state", scope.epoch);
-		const projection = uniqueCreatorTransitionCandidate(current.candidates, "v3-live-generation-2", scope.epoch + 1);
-		if (oldTrust === undefined || projection === undefined || !closedRetirementEqual(oldTrust.ref, certificate.currentTrustRef)) return false;
+		const oldTrust = uniqueCreatorTransitionCandidate(previous.candidates, "drp-anchor-trust-state");
+		if (oldTrust === undefined || !closedRetirementEqual(oldTrust.ref, certificate.currentTrustRef)) return false;
+		// Scope belongs to the remote close; the birth record binds the actual
+		// native local base. The independent protected-source proof above owns
+		// checkpoint authentication. This coverage check grants no replay power.
+		const oldEpoch = record(oldTrust.bytes).currentEpoch;
+		if (typeof oldEpoch !== "number" || !Number.isSafeInteger(oldEpoch) || oldEpoch < 0 || oldEpoch > scope.epoch ||
+			(oldEpoch < scope.epoch && certificate.exactCanonicalReattachmentCheckpointBytes === undefined)) return false;
+		}
 		for (const bytes of [certificate.exactCanonicalCutValueBytes, certificate.exactCanonicalCommitQcBytes,
 			certificate.exactCanonicalTrustStateRecordBytes, certificate.exactCanonicalSettlementBytes,
 			certificate.exactCanonicalRetirementBytes, certificate.exactCanonicalAggregateBytes]) {
@@ -12598,7 +12917,8 @@ function creatorOrdinaryResourceNativeCapacityForSizing(facts: CreatorOrdinaryRe
 		// create a new LOCAL issued/outbox row. Existing foreign/local native debt
 		// stays complete. The explicit future suffix here is genuinely all-local.
 		maxAdditionalCurrentIssued: future?.additionalCurrentRows ?? (runtime.kind === "received-append" ? 0 : 1),
-		maxCanonicalPreimageByteLength: preimage, successorFenceCount: current.successorFenceCount});
+		maxCanonicalPreimageByteLength: preimage, successorFenceCount: current.successorFenceCount,
+		sourceCustody: creatorSourceCustodyGeometryForSizing(facts.sourceFacts.currentTrust, runtime.exactCanonicalLatchedAclBytes)});
 	return {receivedPreimages: Object.freeze(receivedPreimages), preimage, fencePreimage, runtimeWidths, issuance};
 }
 function creatorOrdinaryResourceCurrentFactsEligible(facts: CreatorOrdinaryResourceDimensionFacts,
@@ -12777,7 +13097,7 @@ function deriveCreatorOrdinarySourceResourceProgramForSizing(profile: CreatorOrd
 			basis.authorMaximum, ...(current.currentJournalMaximumAuthorByteLength === 0 ? [] : [{
 				byteLength: current.currentJournalMaximumAuthorByteLength, items: 1, maxDepth: 0}])];
 		setResource("author.maximum", Object.freeze({byteLength: Math.max(...authorResources.map(value => value.byteLength)), items: Math.max(...authorResources.map(value => value.items)), maxDepth: Math.max(...authorResources.map(value => value.maxDepth))}));
-		setResource("issuance.planRewrite", issuanceRetirementPlanRewriteResourceForSizing(rows.plans) ?? actual(null));
+		setResource("issuance.planRewrite", issuance.planRewriteResource ?? actual(null));
 		let oldSigning: ReturnType<typeof closedSigningControl>, signingEpochCount: number, evidenceCount: number, summaryCount: number;
 		if (signingUnchanged) {
 			oldSigning = preparedSigning!.control as ReturnType<typeof closedSigningControl>;
@@ -13075,7 +13395,8 @@ function prepareCreatorOrdinaryFinishingWindowForSizing(input: Readonly<{
 			const issuance = issuanceOrdinaryFinishingCapacityWidths({rows, scope: runtime.issuanceScope, control: capture.nativeIssuance.control ?? null,
 				maxAdditionalCurrentIssued: branch.localCount, maxAdditionalCurrentPreimageBytes: localPreimageRaw,
 				maxCanonicalPreimageByteLength: preimage, maxOrdinaryPreimageByteLength: limits.maxCanonicalPreimageByteLength,
-				successorFenceCount: fence});
+				successorFenceCount: fence,
+				sourceCustody: creatorSourceCustodyGeometryForSizing(source.currentTrust, runtime.exactCanonicalLatchedAclBytes)});
 			const journal = journalSeed.projection.quote({maxAdditionalCurrentRows: count, canonicalPreimageByteLength: limits.maxCanonicalPreimageByteLength,
 				canonicalAuthorByteLength: canonicalPrimitiveResourceForSizing(runtime.issuanceScope.author).byteLength,
 				successorAnchorByteLength: output(first, "artifacts.anchor.bytes"), parametersByteLength: journalSeed.parametersBytes.byteLength,
@@ -13832,7 +14153,7 @@ function buildCreatorOrdinaryFinishingResourceProgramForSizing(input: Readonly<{
 		const summaryPrep = record({...labels, protectedEpochs: array(signingEpochCountTerm, integer), summarySource});
 		const participantPreps = [record({...labels, protectedScopes: array(protectedSnapshotCountTerm, pair)}), record({...labels, protectedScopes: protectedHeaders}),
 			record({...labels, protectedRecords, planRewrite: inputResource("issuance.planRewrite",
-				issuanceRetirementPlanRewriteResourceForSizing(rows.plans) ?? nil)}), maximum(signingPrep, summaryPrep)];
+				issuance.planRewriteResource ?? nil)}), maximum(signingPrep, summaryPrep)];
 		const preparation = record({head, floorEpoch: integer, floorAnchor: digest, decisionDigest: digest, sourceProofDigest: digest,
 			generationRecordDigests: recordDigests, snapshotScopes: snapshotHoles, protectedIndices: array(snapshotCountTerm, integer),
 			retireIndices: array(snapshotCountTerm, integer), domains});
@@ -14882,7 +15203,7 @@ export function creatorOrdinaryPreimageResourceGeometryForSizing(input: Readonly
  * @returns Exact conditional complement, never native deletion authority.
  */
 function selectSnapshotTurnoverScopeInventory(
-	roles: CreatorSnapshotRecoveryRoles,
+	roles: CreatorOwnedRecoveryRoles,
 	protectedScopes: readonly SnapshotQuarantineScopeKey[],
 	inventoryScopes: readonly SnapshotQuarantineScopeKey[],
 	source: Pick<CurrentAnchorTrust, "objectId" | "currentEpoch" | "currentAnchorDigest"> | undefined
@@ -14939,7 +15260,7 @@ function selectAuthenticatedSnapshotTurnoverInventory(
 	lifetime: NonNullable<ReturnType<typeof resolveCreatorSnapshotRecoveryCloseHold>>,
 	inventory: SnapshotRecoveryRoleInventory
 ): Readonly<{ survivingScopes: readonly SnapshotQuarantineScopeKey[]; retiringScopes: readonly SnapshotQuarantineScopeKey[] }> | undefined {
-	const roles = held.recoveryRoleTransfer === null ? undefined : resolveCreatorSnapshotRecoveryRoleTransfer(held.recoveryRoleTransfer);
+	const roles = held.recoveryRoleTransfer === null ? undefined : resolveOwnedRecoveryRoles(held.recoveryRoleTransfer);
 	const dependencies = held.recoveryDependencyAnchors;
 	const protectedScopes = held.retirementProtectedScopes;
 	const source = lifetime.sourceTrust;
@@ -15570,6 +15891,7 @@ export function evaluateCreatorOrdinaryFinishingCapacityTemplate(
 			parameters.set(key, value);
 		};
 		const issuer = issuanceOrdinaryFinishingCapacityWidths({rows: native.rows, scope, control: native.control ?? null,
+			sourceCustody: creatorSourceCustodyGeometryForSizing(seed.currentTrust, input.exactCanonicalCurrentLatchedAclBytes),
 			successorFenceCount: dimensions.successorFenceCount,
 			maxAdditionalCurrentIssued: received === undefined ? 1 : 0,
 			maxCanonicalPreimageByteLength: Math.max(dimensions.canonicalPreimageByteLength,
@@ -15582,7 +15904,7 @@ export function evaluateCreatorOrdinaryFinishingCapacityTemplate(
 		set("native.image", issuer.nativeImageByteLength);
 		set("native.image.items", issuer.nativeImageShape.items);
 		set("native.image.depth", issuer.nativeImageShape.maxDepth);
-		const planRewriteResource = issuanceRetirementPlanRewriteResourceForSizing(native.rows.plans) ??
+		const planRewriteResource = issuer.planRewriteResource ??
 			{byteLength: 1, items: 1, maxDepth: 0};
 		set("native.planRewrite", planRewriteResource.byteLength);
 		set("native.planRewrite.items", planRewriteResource.items);
@@ -16645,7 +16967,7 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 							exactCanonicalPlanBytes: encodeCanonical(issuancePlan),
 						}),
 			},
-			native.control
+			native.control, creatorSourceCustodyGeometryForSizing(trust, input.exactCanonicalCurrentLatchedAclBytes)
 		) : undefined;
 		if (issuancePhases === undefined ? input.issuancePhases !== undefined :
 			!closedRetirementEqual(issuancePhases, input.issuancePhases))
@@ -16658,6 +16980,7 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 		// checked, and no row/control is manufactured from a capacity dimension.
 		const issuanceCapacity = capacityDimensions === undefined ? undefined : issuanceOrdinaryFinishingCapacityWidths({
 			rows: native.rows, scope: issuanceScope, control: native.control,
+			sourceCustody: creatorSourceCustodyGeometryForSizing(trust, input.exactCanonicalCurrentLatchedAclBytes),
 			successorFenceCount: capacityDimensions.successorFenceCount,
 			maxAdditionalCurrentIssued: received === undefined ? 1 : 0,
 			maxCanonicalPreimageByteLength: Math.max(capacityDimensions.canonicalPreimageByteLength,
@@ -16704,7 +17027,7 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 		if (native.rows.plans.some(plan => plan.entries.length !== 0) && exactPlanRewriteResource === undefined)
 			return Object.freeze({ok: false, reason: "MAINTENANCE_PLAN_REWRITE_WIDTH_UNAVAILABLE"});
 		const capacityPlanRewriteResource = capacityDimensions === undefined ? undefined :
-			issuanceRetirementPlanRewriteResourceForSizing(native.rows.plans) ?? {byteLength: 1, items: 1, maxDepth: 0};
+			issuanceCapacity?.planRewriteResource ?? {byteLength: 1, items: 1, maxDepth: 0};
 		if (capacityPlanRewriteResource !== undefined && exactPlanRewriteResource !== undefined &&
 			(capacityPlanRewriteResource.byteLength < exactPlanRewriteResource.byteLength ||
 			 capacityPlanRewriteResource.items < exactPlanRewriteResource.items || capacityPlanRewriteResource.maxDepth < exactPlanRewriteResource.maxDepth))
@@ -16904,7 +17227,7 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 		const turnoverRoles =
 			turnoverSource?.recoveryRoleTransfer === null || turnoverSource?.recoveryRoleTransfer === undefined
 				? undefined
-				: resolveCreatorSnapshotRecoveryRoleTransfer(turnoverSource.recoveryRoleTransfer);
+				: resolveOwnedRecoveryRoles(turnoverSource.recoveryRoleTransfer);
 		const retiredPairs = capture.snapshot.image.scopes.filter((pair) =>
 			turnover.retiringScopes.some((scope) => closedRetirementEqual(scope, pair.scope))
 		);
@@ -21798,7 +22121,7 @@ async function authenticateRoomRetentionExcludedGenerations(context: Readonly<{
 			throw new RoomRetentionLedgerDecline("missing", false);
 		if (item.n === 0) {
 			if (!ledgered)
-				authenticateRole(input, reader, [item.row],
+				await authenticateRole(input, reader, [item.row],
 					{ epoch: 0, objectId: input.objectId, currentAnchorDigest: pin.currentAnchorDigest }, pin,
 					parsing.record(input.exactCanonicalPinnedGenesisTrustStateRecordBytes), frame.accounting,
 					{ owner: "ahe", role: "unclassified", objectId: input.objectId, generationId: item.row.generationId }, parsing);
@@ -22086,8 +22409,7 @@ async function planRoomRetentionFromLedger(context: Readonly<{
 		if (prior.boundaryEpoch === epoch
 			? prior.boundaryAnchorDigest !== forward.currentTrust.currentAnchorDigest
 			: prior.boundaryAnchorDigest !== forward.predecessorTrust.currentAnchorDigest) decline("discontinuous", true);
-		const required: GenerationRecord[] = [...forward.rows, ...forward.certificates.flatMap((proof) => [
-			...proof.supportGenerations, ...proof.authenticatedSourceGenerations.map((item) => item.generation)])];
+		const required: GenerationRecord[] = [...forward.rows, ...forward.certificates.flatMap(recoveryCertificateRequiredGenerations)];
 		// A received L can name an ordinary local predecessor P/Q/L (the existing acquisition's
 		// support authentication, unchanged).
 		if (forward.rows.length === 2) {
@@ -22106,7 +22428,7 @@ async function planRoomRetentionFromLedger(context: Readonly<{
 						requireLaw(predecessorRows[0] !== undefined &&
 							compareBytes(encodeCanonical(predecessorRows[0]), encodeCanonical(predecessor)) === 0 &&
 							predecessorRows.some((row) => row.generationId === support.generationId), "chain-invalid");
-						const authenticated = authenticateRole(input, admitted, predecessorRows, {
+						const authenticated = await authenticateRole(input, admitted, predecessorRows, {
 							epoch: forward.predecessorTrust.currentEpoch, objectId: input.objectId,
 							currentAnchorDigest: forward.predecessorTrust.currentAnchorDigest,
 						}, pin.trust, parsing.record(input.exactCanonicalPinnedGenesisTrustStateRecordBytes), work.accounting, debt, parsing);
@@ -22117,7 +22439,7 @@ async function planRoomRetentionFromLedger(context: Readonly<{
 						required.push(...predecessorRows);
 					} else {
 						requireLaw(forward.predecessorTrust.currentEpoch === 1 && support.baseExpectedHead.kind === "none");
-						authenticateRole(input, admitted, [support],
+						await authenticateRole(input, admitted, [support],
 							{ epoch: 0, objectId: input.objectId, currentAnchorDigest: pin.trust.currentAnchorDigest }, pin.trust,
 							parsing.record(input.exactCanonicalPinnedGenesisTrustStateRecordBytes), work.accounting, debt, parsing);
 						required.push(support);
@@ -22211,7 +22533,7 @@ async function planRoomRetentionFromLedger(context: Readonly<{
 		}
 		const snapshotScopes = Object.freeze([...unionScopes.values()]);
 		// The snapshot turnover of the existing reconciliation (same selectors).
-		const transferRoles = resolveCreatorSnapshotRecoveryRoleTransfer(certificate.transfer);
+		const transferRoles = resolveOwnedRecoveryRoles(certificate.transfer);
 		if (transferRoles === undefined) decline("transfer");
 		const sourceTrust = lifetime.sourceTrust;
 		requireLaw(sourceTrust === undefined || (sourceTrust.objectId === whole.predecessorTrust.objectId &&
@@ -22827,7 +23149,7 @@ async function reconcileSnapshotRecoveryRoles(
 		const transferRoles =
 			held.recoveryRoleTransfer === null
 				? undefined
-				: resolveCreatorSnapshotRecoveryRoleTransfer(held.recoveryRoleTransfer);
+				: resolveOwnedRecoveryRoles(held.recoveryRoleTransfer);
 		if (lifetime !== undefined && transferRoles !== undefined) {
 			// Discovery custody may legitimately select a shorter snapshot chain.
 			// The reserved complete source above has authenticated the ACTUAL held
@@ -22887,7 +23209,8 @@ async function reconcileSnapshotRecoveryRoles(
 				])
 			).values(),
 		].map(nativeScope);
-		requireLaw(protectedScopes.length >= 2 && protectedScopes.length <= 4, "proof-budget-exceeded");
+		requireLaw(protectedScopes.length >= (observations.get(acquired.observation)?.forward?.nativePublication === true &&
+			held.predecessorTrust.currentEpoch === 0 ? 1 : 2) && protectedScopes.length <= 4, "proof-budget-exceeded");
 		const inventory = await snapshotCall(() => inventoryRead({ objectId: input.objectId }, { signal: input.signal }));
 		let unchangedSnapshotCandidate: Readonly<{snapshotBytes: Uint8Array; inventoryBytes: Uint8Array}> | undefined;
 		if (authorizedTurnover !== undefined) {
@@ -22898,7 +23221,7 @@ async function reconcileSnapshotRecoveryRoles(
 			requireLaw(closeUnionMaterial.recoveryCertificateDigest === held.recoveryCertificateDigest &&
 				closedRetirementEqual(closeUnionMaterial.retirementProtectedScopes, held.retirementProtectedScopes) &&
 				closeUnionMaterial.recoveryRoleTransfer !== null &&
-				closedRetirementEqual(resolveCreatorSnapshotRecoveryRoleTransfer(closeUnionMaterial.recoveryRoleTransfer), transferRoles), "chain-invalid");
+				closedRetirementEqual(resolveOwnedRecoveryRoles(closeUnionMaterial.recoveryRoleTransfer), transferRoles), "chain-invalid");
 			const authenticated = selectAuthenticatedSnapshotTurnoverInventory(closeUnionMaterial, authorizedTurnover.lifetime, inventory);
 			requireLaw(authenticated !== undefined, "chain-invalid");
 			const snapshot = await snapshotCall(() => bindMethod<NonNullable<SnapshotRecoveryStore<SnapshotVerificationReceipt>["readRetirementImage"]>>(
@@ -24052,6 +24375,8 @@ interface AuthenticatedRole {
 	readonly support: readonly GenerationRecord[];
 	readonly target?: Target;
 	readonly transition?: Parameters<typeof inspectCreatorTransitionAdvance>[0];
+	readonly checkpoint?: VerifiedCreatorCheckpointAttachment;
+	readonly point?: VerifiedCreatorCheckpointPoint;
 }
 function strictRoleControls(closure: CreatorTransitionClosure, debt: CreatorProtectedRecoveryRoleDebt,
 	parsing?: CreatorClosedAcquisitionSyntax): void {
@@ -24114,17 +24439,36 @@ function selectedRoleRows(
 	// A received L names the authentic previous live P directly. Its logical
 	// companion is reconstructed by the original authenticator; no native Q is
 	// invented or charged as a generation. Labels select only, never authenticate.
-	if (
-		has(q, "drp-anchor-trust-state", epoch - 1) &&
-		has(q, epoch === 1 ? "v3-live-generation-1" : "v3-live-generation-2", epoch - 1)
-	) {
+	const baseCarrier = (parsing?.candidate ?? uniqueCreatorTransitionCandidate)(
+		view(reader, reader.generations.indexOf(q)).candidates, "drp-anchor-trust-state");
+	const baseEpoch = baseCarrier === undefined ? undefined : canonicalRecord(baseCarrier.bytes)?.currentEpoch;
+	if (typeof baseEpoch === "number" && Number.isSafeInteger(baseEpoch) && baseEpoch >= 0 && baseEpoch < epoch &&
+		has(q, baseEpoch === 0 ? "v3-live-generation-1" : "v3-live-generation-2", baseEpoch)) {
 		requireLaw(
 			live.objectId === q.objectId &&
 				live.generationId !== q.generationId &&
-				sameRoleHead(live.baseExpectedHead, roleHead(q)) &&
+				live.baseExpectedHead.objectId === q.objectId && live.baseExpectedHead.closureDigest === q.closureDigest &&
+				(q.baseExpectedHead.kind === "none" || sameRoleHead(live.baseExpectedHead, roleHead(q))) &&
 				((live.state === "Complete" && q.state === "Adopted") ||
 					(["Adopted", "Superseded"].includes(live.state) && q.state === "Superseded"))
 		);
+		if (baseCarrier !== undefined && (parsing?.record ?? record)(baseCarrier.bytes).profileId === "creator-trusted-settlement-v1" &&
+			q.baseExpectedHead.kind === "present") {
+			const second = reader.generations.find(row => q.baseExpectedHead.kind === "present" &&
+				row.generationId === q.baseExpectedHead.generationId);
+			if (second !== undefined) {
+				const secondCarrier = (parsing?.candidate ?? uniqueCreatorTransitionCandidate)(
+					view(reader, reader.generations.indexOf(second)).candidates, "drp-anchor-trust-state");
+				const secondEpoch = secondCarrier === undefined ? undefined : canonicalRecord(secondCarrier.bytes)?.currentEpoch;
+				if (typeof secondEpoch === "number" && secondEpoch >= 0 && secondEpoch < baseEpoch &&
+					has(second, secondEpoch === 0 ? "v3-live-generation-1" : "v3-live-generation-2", secondEpoch)) {
+					requireLaw(second.state === "Superseded" && q.baseExpectedHead.objectId === second.objectId &&
+						q.baseExpectedHead.closureDigest === second.closureDigest &&
+						(second.baseExpectedHead.kind === "none" || sameRoleHead(q.baseExpectedHead, roleHead(second))));
+					return [live, q, second];
+				}
+			}
+		}
 		return [live, q];
 	}
 	requireLaw(q.baseExpectedHead.kind === "present");
@@ -24256,7 +24600,7 @@ async function authenticateHeldPendingRole(
 	);
 	const installedStart = installed.length,
 		certificatesStart = certificates.length;
-	const role = authenticateRole(
+	const role = await authenticateRole(
 		input,
 		reader,
 		image.pendingRows,
@@ -24447,7 +24791,7 @@ async function authenticateHeldPendingRole(
 		certificates: Object.freeze(certificates.slice(certificatesStart)),
 	});
 }
-function authenticateRole(
+async function authenticateRole(
 	input: CapturedSnapshot,
 	reader: CreatorClosedSourceEvidence,
 	rows: readonly GenerationRecord[],
@@ -24456,8 +24800,9 @@ function authenticateRole(
 	pinRecord: Readonly<Record<string, unknown>>,
 	accounting: CreatorClosedRollbackProofAccounting,
 	debt: CreatorProtectedRecoveryRoleDebt,
-	parsing?: CreatorClosedAcquisitionSyntax
-): AuthenticatedRole {
+	parsing?: CreatorClosedAcquisitionSyntax,
+	historicalFloorTrust: CurrentAnchorTrust = pin
+): Promise<AuthenticatedRole> {
 	const readUnique = parsing?.unique ?? unique;
 	const readRecord = parsing?.record ?? record;
 	const selectCandidate = parsing?.candidate ?? uniqueCreatorTransitionCandidate;
@@ -24479,13 +24824,155 @@ function authenticateRole(
 	let predecessorTrust = pin;
 	let target: Target | undefined;
 	let transition: Parameters<typeof inspectCreatorTransitionAdvance>[0] | undefined;
+	let checkpoint: VerifiedCreatorCheckpointAttachment | undefined;
+	let point: VerifiedCreatorCheckpointPoint | undefined;
 	if (n === 0)
 		requireLaw(
 			compareBytes(carrier.bytes, input.exactCanonicalPinnedGenesisTrustStateRecordBytes) === 0 &&
 				sameCreatorRoomHead(roomHead, pin)
 		);
-	else {
+	else if (debt.role === "unclassified" && rows.length === 1 &&
+		reconstructCreatorReattachmentCheckpoint(live) === undefined) {
+		const historical = openCreatorOrdinaryHistoricalSnapshotSource({creatorTrust: historicalFloorTrust, closure: live,
+			exactCanonicalPinnedGenesisTrustStateRecordBytes: input.exactCanonicalPinnedGenesisTrustStateRecordBytes});
+		law(historical !== undefined && sameCreatorRoomHead(roomHead, historical.trust), "HISTORICAL_SNAPSHOT_SOURCE");
+		requireLaw(historical !== undefined);
+		trust = historical.trust; predecessorTrust = trust;
+		target = {cut: historical.binding.cut, successorAnchor: historical.binding.successorAnchor, successorTrust: trust,
+			evidence: historical.evidence, closedAclBytes: historical.closedAclBytes, closedAclDigest: historical.closedAclDigest, projection};
+	}
+	else if (debt.role === "unclassified" && rows.length === 1 && reconstructCreatorReattachmentCheckpoint(live) !== undefined) {
+		const checkpointBytes = reconstructCreatorReattachmentCheckpoint(live)!;
+		const remote = decodeCreatorReattachmentCheckpoint(checkpointBytes);
+		const cut = readUnique(live, "drp-hard-epoch-cut", n - 1), qc = readUnique(live, "drp-seal-qc", n - 1),
+			settlement = readUnique(live, "drp-creator-author-settlement-state"), closedAcl = readUnique(live, "drp-v3-latched-acl", n - 1);
+		requireLaw(remote !== undefined);
+		const source = openCreatorCheckpointTrust({detachedGenesisSignature: pinRecord.detachedCurrentAnchorSignature,
+			exactCanonicalGenesisAnchorPreimageBytes: pinRecord.exactCanonicalCurrentAnchorPreimageBytes,
+			exactCanonicalCommitQcBytes: qc.bytes, exactCanonicalCutValueBytes: cut.bytes,
+			exactCanonicalCurrentTrustStateRecordBytes: carrier.bytes,
+			exactCanonicalPredecessorTrustStateRecordBytes: remote.exactCanonicalPredecessorTrustStateRecordBytes,
+			expectedCurrentHead: roomHead, expectedObjectId: input.objectId, pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest});
+		law(source.ok, "RETAINED_POINT_SIGNED_AUTHORITY"); requireLaw(source.ok);
+		const original = openCreatorSnapshotRecoverySourceTrust({currentTrust: source.currentTrust, closure: live, anchorChain: [],
+			exactCanonicalPinnedGenesisTrustStateRecordBytes: input.exactCanonicalPinnedGenesisTrustStateRecordBytes});
+		law(original.ok, "RETAINED_POINT_NATIVE_CLOSURE"); requireLaw(original.ok);
+		const cutRecord = readRecord(cut.bytes), scope = {objectId: input.objectId, epoch: n - 1,
+			anchor: String(cutRecord.previousAnchor), manifestDigest: String(cutRecord.snapshotManifestDigest)};
+		const snapshot = await captureCreatorClosedSnapshotEvidence(input, scope, accounting);
+		const opened = openCreatorCheckpointPoint({expectedObjectId: input.objectId, pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest,
+			exactCanonicalGenesisAnchorPreimageBytes: pinRecord.exactCanonicalCurrentAnchorPreimageBytes,
+			detachedGenesisSignature: pinRecord.detachedCurrentAnchorSignature,
+			exactCanonicalReattachmentCheckpointBytes: checkpointBytes, exactCanonicalCutValueBytes: cut.bytes,
+			exactCanonicalCommitQcBytes: qc.bytes, exactCanonicalTrustStateRecordBytes: carrier.bytes,
+			exactCanonicalSettlementBytes: settlement.bytes, exactCanonicalSnapshotManifestBytes: snapshot.exactCanonicalManifestBytes,
+			exactCanonicalSnapshotPayloadBytes: snapshot.exactCanonicalPayloadBytes});
+		const identity = opened.ok ? resolveCreatorCheckpointPoint(opened.capability) : undefined;
+		law(opened.ok && identity !== undefined, "RETAINED_POINT_SNAPSHOT_AUTHORITY");
+		requireLaw(opened.ok && identity !== undefined);
+		const expected = [...identity.proofCandidates, projectionCarrier, closedAcl];
+		law(expected.length === live.candidates.length && expected.every(candidate => live.candidates.some(actual =>
+			closedRetirementEqual(candidate.ref, actual.ref) && compareBytes(candidate.bytes, actual.bytes) === 0)), "EXACT_RETAINED_POINT_CLOSURE");
+		trust = identity.target.trust; predecessorTrust = trust; point = opened.capability;
+		const evidence = openCreatorTransitionClosedCutEvidence({closure: live, floorTrust: trust,
+			currentTrust: identity.remoteCheckpoint.predecessorTrust});
+		const binding = inspectCreatorClosedCutSuccessorBinding({successorTrust: trust, exactCanonicalCutValueBytes: cut.bytes});
+		requireLaw(evidence !== undefined && binding.ok);
+		target = {cut: binding.cut, successorAnchor: binding.successorAnchor, successorTrust: trust, evidence,
+			closedAclBytes: closedAcl.bytes, closedAclDigest: String(readAnchor(readRecord(remote.exactCanonicalPredecessorTrustStateRecordBytes)).aclDigest), projection};
+	} else {
 		const rawBase = closures[1] as CreatorTransitionClosure;
+		const baseCarrier = selectCandidate(rawBase.candidates, "drp-anchor-trust-state");
+		const baseEpoch = baseCarrier === undefined ? undefined : readRecord(baseCarrier.bytes).currentEpoch;
+		if (typeof baseEpoch === "number" && Number.isSafeInteger(baseEpoch) && baseEpoch >= 0 && baseEpoch < n - 1) {
+			const base = rows[1];
+			law((rows.length === 2 || rows.length === 3) && base !== undefined && generation.baseExpectedHead.kind === "present" &&
+				generation.baseExpectedHead.objectId === base.objectId && generation.baseExpectedHead.generationId === base.generationId &&
+				generation.baseExpectedHead.closureDigest === base.closureDigest &&
+				(base.baseExpectedHead.kind === "none" || sameRoleHead(generation.baseExpectedHead, roleHead(base))) &&
+				((["Adopted", "Superseded"].includes(generation.state) && base.state === "Superseded") ||
+					(debt.role === "pending-adoption" && generation.state === "Complete" && base.state === "Adopted")),
+				"EXACT_RECEIVED_CHECKPOINT_ROLE_LINEAGE");
+			requireLaw(base !== undefined && generation.baseExpectedHead.kind === "present" && baseCarrier !== undefined);
+			const cut = readUnique(live, "drp-hard-epoch-cut", n - 1), qc = readUnique(live, "drp-seal-qc", n - 1);
+			const cutRecord = readRecord(cut.bytes), closedAcl = readUnique(live, "drp-v3-latched-acl", n - 1);
+			const scope = {objectId: input.objectId, epoch: n - 1, anchor: String(cutRecord.previousAnchor),
+				manifestDigest: String(cutRecord.snapshotManifestDigest)};
+			const lookup = bindMethod<SnapshotRecoveryStore<SnapshotVerificationReceipt>["lookupReceivedRecoveryCertificate"]>(
+				input.snapshotStore, "lookupReceivedRecoveryCertificate");
+			const receipt = await snapshotCall(() => lookup({objectId: scope.objectId, epoch: scope.epoch, anchor: scope.anchor}));
+			law(receipt !== null && closedRetirementEqual(receipt.scope, scope), "RECEIVED_CHECKPOINT_ROLE_CUSTODY");
+			requireLaw(receipt !== null);
+			requireLaw(accounting.charge(encodeCanonical(receipt)), "proof-budget-exceeded");
+			const certificate = openReceivedCertificate(receipt.exactReceivedCertificateBytes);
+			const point = certificate.exactCanonicalReattachmentCheckpointBytes === undefined ? undefined :
+				decodeCreatorReattachmentCheckpoint(certificate.exactCanonicalReattachmentCheckpointBytes);
+			law(point !== undefined && certificate.pinnedGenesisAnchorDigest === input.pinnedGenesisAnchorDigest &&
+				certificate.candidateGenerationId === generation.generationId && certificate.candidateClosureDigest === generation.closureDigest &&
+				compareBytes(certificate.exactCanonicalOldHeadBytes, encodeHeadRecordV1(generation.baseExpectedHead)) === 0 &&
+				closedRetirementEqual(certificate.currentTrustRef, baseCarrier.ref) &&
+				compareBytes(certificate.exactCanonicalCutValueBytes, cut.bytes) === 0 &&
+				compareBytes(certificate.exactCanonicalCommitQcBytes, qc.bytes) === 0 &&
+				compareBytes(certificate.exactCanonicalTrustStateRecordBytes, carrier.bytes) === 0 &&
+				certificate.exactCanonicalSettlementBytes !== null &&
+				compareBytes(certificate.exactCanonicalSettlementBytes, readUnique(live, "drp-creator-author-settlement-state").bytes) === 0,
+				"EXACT_RECEIVED_CHECKPOINT_ROLE_BIRTH");
+			requireLaw(point !== undefined && certificate.exactCanonicalSettlementBytes !== null);
+			const opened = openCreatorCheckpointTrust({detachedGenesisSignature: pinRecord.detachedCurrentAnchorSignature,
+				exactCanonicalGenesisAnchorPreimageBytes: pinRecord.exactCanonicalCurrentAnchorPreimageBytes,
+				exactCanonicalCommitQcBytes: qc.bytes, exactCanonicalCutValueBytes: cut.bytes,
+				exactCanonicalCurrentTrustStateRecordBytes: carrier.bytes,
+				exactCanonicalPredecessorTrustStateRecordBytes: point.exactCanonicalPredecessorTrustStateRecordBytes,
+				expectedCurrentHead: roomHead, expectedObjectId: input.objectId, pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest});
+			law(opened.ok, "SIGNED_CURRENT_CHECKPOINT_ADJACENCY"); requireLaw(opened.ok);
+			const sourceRecord = readRecord(baseCarrier.bytes), sourceAnchor = sourceRecord.exactCanonicalCurrentAnchorPreimageBytes,
+				sourceSignature = sourceRecord.detachedCurrentAnchorSignature;
+			requireLaw(sourceAnchor instanceof Uint8Array && sourceSignature instanceof Uint8Array);
+			const localTrust = openCreatorSettlementSourceTrust(opened.currentTrust, sourceAnchor, sourceSignature,
+				input.objectId, input.pinnedGenesisAnchorDigest);
+			law(localTrust !== undefined && localTrust.currentEpoch === baseEpoch && compareBytes(baseCarrier.bytes,
+				encodeCanonical({...readRecord(carrier.bytes), currentEpoch: localTrust.currentEpoch,
+					currentAnchorDigest: localTrust.currentAnchorDigest, exactCanonicalCurrentAnchorPreimageBytes: sourceAnchor,
+					detachedCurrentAnchorSignature: sourceSignature})) === 0, "CHECKPOINT_LOCAL_BASE_TRUST");
+			requireLaw(localTrust !== undefined);
+			const previousProjection = readUnique(rawBase, baseEpoch === 0 ? "v3-live-generation-1" : "v3-live-generation-2", baseEpoch);
+			law(creatorSnapshotProjectionAuthorityMatches(readRecord(previousProjection.bytes), readRecord(sourceAnchor),
+				localTrust.currentAnchorDigest), "PREVIOUS_PROJECTION_AUTHORITY");
+			const snapshot = await captureCreatorClosedSnapshotEvidence(input, scope, accounting);
+			const attachment = openCreatorCheckpointAttachment({localBaseHead: generation.baseExpectedHead, localTrust,
+				exactCanonicalGenesisAnchorPreimageBytes: pinRecord.exactCanonicalCurrentAnchorPreimageBytes,
+				detachedGenesisSignature: pinRecord.detachedCurrentAnchorSignature,
+				exactCanonicalReattachmentCheckpointBytes: certificate.exactCanonicalReattachmentCheckpointBytes,
+				exactCanonicalCutValueBytes: cut.bytes, exactCanonicalCommitQcBytes: qc.bytes,
+				exactCanonicalTrustStateRecordBytes: carrier.bytes, exactCanonicalSettlementBytes: certificate.exactCanonicalSettlementBytes,
+				exactCanonicalSnapshotManifestBytes: snapshot.exactCanonicalManifestBytes,
+				exactCanonicalSnapshotPayloadBytes: snapshot.exactCanonicalPayloadBytes});
+			const identity = attachment.ok ? resolveCreatorCheckpointAttachment(attachment.capability) : undefined;
+			law(attachment.ok && identity !== undefined, "CURRENT_ROLE_CHECKPOINT_ATTACHMENT");
+			requireLaw(attachment.ok && identity !== undefined);
+			const history = {bytes: certificate.exactCanonicalHistoryBytes, ref: {digest: digestBlob(certificate.exactCanonicalHistoryBytes),
+				byteLength: certificate.exactCanonicalHistoryBytes.byteLength}};
+			requireLaw(history.ref.digest.ok);
+			const candidates = [...identity.proofCandidates, previousProjection, {bytes: history.bytes,
+				ref: {digest: history.ref.digest.value, byteLength: history.ref.byteLength}}];
+			const proposed = {candidates, closure: candidates.map(({ref}) => ref)};
+			law(inspectCreatorCheckpointTransition({checkpoint: attachment.capability, localHead: generation.baseExpectedHead,
+				currentTrust: localTrust, current: rawBase, proposed}) &&
+				compareBytes(closedAcl.bytes, identity.remoteCheckpoint.exactCanonicalPredecessorAclBytes) === 0 &&
+				matchesCreatorAdoptionReferences({pendingReferences: proposed.closure, predecessorLiveRef: previousProjection.ref,
+					exactCanonicalProjectionBytes: projectionCarrier.bytes, exactCanonicalCutValueBytes: cut.bytes,
+					predecessorExactCanonicalLatchedAclBytes: closedAcl.bytes}, live.closure), "EXACT_CURRENT_CHECKPOINT_ROLE_CLOSURE");
+			trust = identity.target.trust; predecessorTrust = localTrust; checkpoint = attachment.capability;
+			const evidence = openCreatorTransitionClosedCutEvidence({closure: live, floorTrust: trust,
+				currentTrust: identity.remoteCheckpoint.predecessorTrust});
+			const binding = inspectCreatorClosedCutSuccessorBinding({successorTrust: trust, exactCanonicalCutValueBytes: cut.bytes});
+			requireLaw(evidence !== undefined && binding.ok);
+			target = {cut: binding.cut, successorAnchor: binding.successorAnchor, successorTrust: trust, evidence,
+				closedAclBytes: closedAcl.bytes, closedAclDigest: String(readAnchor(readRecord(point.exactCanonicalPredecessorTrustStateRecordBytes)).aclDigest),
+				projection};
+			const fresh = await snapshotCall(() => lookup({objectId: scope.objectId, epoch: scope.epoch, anchor: scope.anchor}));
+			law(closedRetirementEqual(fresh, receipt), "RECEIVED_CHECKPOINT_ROLE_CUSTODY_CHANGED");
+		} else {
 		const received = selectCandidate(rawBase.candidates, "drp-anchor-trust-state", n - 1) !== undefined &&
 			selectCandidate(rawBase.candidates, n === 1 ? "v3-live-generation-1" : "v3-live-generation-2", n - 1) !== undefined;
 		const predecessor = closures[received ? 1 : 2] as CreatorTransitionClosure;
@@ -24497,7 +24984,9 @@ function authenticateRole(
 			law(base !== undefined && generation.baseExpectedHead.kind === "present" &&
 				((["Adopted", "Superseded"].includes(generation.state) && base.state === "Superseded") ||
 					(debt.role === "pending-adoption" && generation.state === "Complete" && base.state === "Adopted")) &&
-				sameRoleHead(generation.baseExpectedHead, roleHead(base)) && reconstructed !== undefined,
+				generation.baseExpectedHead.objectId === base.objectId && generation.baseExpectedHead.generationId === base.generationId &&
+				generation.baseExpectedHead.closureDigest === base.closureDigest &&
+				(base.baseExpectedHead.kind === "none" || sameRoleHead(generation.baseExpectedHead, roleHead(base))) && reconstructed !== undefined,
 				"EXACT_RECEIVED_ROLE_LINEAGE");
 			requireLaw(reconstructed !== undefined);
 			// Charge the recovered companion even though it has no native Q row.
@@ -24512,6 +25001,25 @@ function authenticateRole(
 			qc = readUnique(proposed, "drp-seal-qc", n - 1);
 		const predecessorCarrier = readUnique(predecessor, "drp-anchor-trust-state", n - 1);
 		requireLaw(compareBytes(readUnique(proposed, "drp-anchor-trust-state", n).bytes, carrier.bytes) === 0);
+		if (received && rows[1]?.baseExpectedHead.kind === "none") {
+			// Base normalization erases the arithmetic needed to rederive its old
+			// head revision. The original received birth record still binds the
+			// exact persisted tuple and every signed transition control.
+			const closed = readRecord(cut.bytes);
+			const receipt = await snapshotCall(() => input.snapshotStore.lookupReceivedRecoveryCertificate({
+				objectId: input.objectId, epoch: n - 1, anchor: String(closed.previousAnchor)}));
+			law(receipt !== null, "NORMALIZED_RECEIVED_BASE_CUSTODY"); requireLaw(receipt !== null);
+			requireLaw(accounting.charge(encodeCanonical(receipt)), "proof-budget-exceeded");
+			const birth = openReceivedCertificate(receipt.exactReceivedCertificateBytes);
+			law(birth.pinnedGenesisAnchorDigest === input.pinnedGenesisAnchorDigest &&
+				birth.candidateGenerationId === generation.generationId && birth.candidateClosureDigest === generation.closureDigest &&
+				compareBytes(birth.exactCanonicalOldHeadBytes, encodeHeadRecordV1(generation.baseExpectedHead)) === 0 &&
+				closedRetirementEqual(birth.currentTrustRef, predecessorCarrier.ref) &&
+				compareBytes(birth.exactCanonicalCutValueBytes, cut.bytes) === 0 &&
+				compareBytes(birth.exactCanonicalCommitQcBytes, qc.bytes) === 0 &&
+				compareBytes(birth.exactCanonicalTrustStateRecordBytes, carrier.bytes) === 0,
+				"EXACT_NORMALIZED_RECEIVED_BASE_BIRTH");
+		}
 		if (n === 1) {
 			requireLaw(compareBytes(predecessorCarrier.bytes, input.exactCanonicalPinnedGenesisTrustStateRecordBytes) === 0);
 			const opened = openCreatorSuccessorTrust({
@@ -24615,6 +25123,7 @@ function authenticateRole(
 			closedAclDigest: aclDigest,
 			projection,
 		};
+		}
 	}
 	const anchor = readAnchor(readRecord(carrier.bytes));
 	law(
@@ -24656,6 +25165,8 @@ function authenticateRole(
 		trust,
 		support: rows.slice(1),
 		...(target === undefined ? {} : { target, transition }),
+		...(checkpoint === undefined ? {} : {checkpoint}),
+		...(point === undefined ? {} : {point}),
 	};
 }
 /**
@@ -24735,7 +25246,7 @@ export async function observeCreatorProtectedRecoveryRoles(
 				);
 		const pinRecord = record(captured.exactCanonicalPinnedGenesisTrustStateRecordBytes);
 		debt = { owner: "ahe", role: "current", objectId: captured.objectId, generationId: currentGeneration.generationId };
-		let current = authenticateRole(
+		let current = await authenticateRole(
 			captured,
 			reader,
 			currentRows,
@@ -24753,7 +25264,7 @@ export async function observeCreatorProtectedRecoveryRoles(
 				objectId: captured.objectId,
 				generationId: pendingRows[0]?.generationId,
 			};
-			pending = authenticateRole(
+			pending = await authenticateRole(
 				captured,
 				reader,
 				pendingRows,
@@ -24827,7 +25338,10 @@ export async function observeCreatorProtectedRecoveryRoles(
 				requireLaw(compareBytes(successorAcl, target.closedAclBytes) === 0, "snapshot-invalid");
 			const data = await readTarget(captured, target);
 			if (!accounting.charge(data.successorAclBytes)) throw new Refusal(failure("proof-budget-exceeded"));
-			if (settlementProfileFor(role.trust.profileId) === "v1") {
+			if (role.checkpoint !== undefined) {
+				const point = resolveCreatorCheckpointAttachment(role.checkpoint);
+				requireLaw(point !== undefined && compareBytes(point.target.exactCanonicalLatchedAclBytes, data.successorAclBytes) === 0);
+			} else if (settlementProfileFor(role.trust.profileId) === "v1") {
 				requireLaw(
 					role.transition !== undefined &&
 						inspectCreatorTransitionAdvance({

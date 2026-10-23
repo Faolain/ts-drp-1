@@ -1,3 +1,4 @@
+import { creatorSourceCustodyGeometryForSizing } from "./internal/creator-source-custody.js";
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { type AccumulatorSnapshot, type ArchiveLimits, type ClosedEpochArchive,
 	deriveClosedEpochArchiveAppend, deriveCloseSetHistoryCommitment, measureArchiveAppendCapacityForSizing, type EpochVertex } from "@ts-drp/compaction";
@@ -520,6 +521,8 @@ export interface V3CreatorCloseRegistration {
 		  }>
 		| undefined
 	>;
+	/** Retains exact authenticated source work before a gap or removal publication. */
+	retainAcceptedSourceCustody(targetTrust: CurrentAnchorTrust, exactCanonicalTargetAclBytes: Uint8Array): Promise<Readonly<{ verify(): Promise<boolean> }>>;
 	/** Fresh original local replay carriers, retained before historical issuance pruning.
 	 * This supplies bytes to the closed-member witness, never independent authority. */
 	captureClosedMembershipLocalWitnesses(): Promise<readonly Readonly<{
@@ -2220,7 +2223,7 @@ async function prepareCreatorIssuanceMaintenanceQuote(
 				digest: hashDomain("ts-drp/vertex/v3", unsignedBytes),
 				...(planEffect === undefined ? {} : { planEffect, exactCanonicalPlanBytes: encodeCanonical(plan) }),
 			},
-			nativeControl
+			nativeControl, creatorSourceCustodyGeometryForSizing(registration.currentTrust, registration.exactCanonicalLatchedAclBytes)
 		);
 		const needsRecoveryRoles = creatorCloseNeedsRecoveryRoles(registration, current);
 		const detached = "recovery" in proof;
@@ -2787,7 +2790,8 @@ async function prepareCreatorOrdinaryIssuanceMaintenanceQuote(
 		if (!plainRecord(unsigned) || typeof unsigned.authorSequence !== "number") throw new TypeError("creator ordinary unsigned identity is malformed");
 		const issuancePhases = received === undefined ? issuanceUnsignedPostimageWidths(nativeRows, registration.issuanceScope,
 			{kind: "v3-issuance-pending-unsigned-1", authorSequence: unsigned.authorSequence, canonicalPreimageBytes: unsignedBytes,
-				digest: hashDomain("ts-drp/vertex/v3", unsignedBytes)}, nativeControl) : undefined;
+				digest: hashDomain("ts-drp/vertex/v3", unsignedBytes)}, nativeControl,
+			creatorSourceCustodyGeometryForSizing(registration.currentTrust, registration.exactCanonicalLatchedAclBytes)) : undefined;
 		stage = "signing-widths";
 		const signing = readCreatorCloseSigningFramesForSizing({currentTrust: registration.currentTrust,
 			genuinePreparedClose: material.prepared.close, exactCanonicalCutValueBytes: material.prepared.exactCanonicalCutValueBytes,

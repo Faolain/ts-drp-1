@@ -2,16 +2,19 @@ import type { ResolvedBlueprintBytes, TrustedBlueprintCatalog } from "@ts-drp/bl
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { type CloseSetHistoryCommitment, CompactMerkleAccumulator } from "@ts-drp/compaction";
 import { verifySnapshotStreamWithReceipt } from "@ts-drp/compaction/snapshot-quarantine-receipt";
-import type { DurableIssuanceStore, DurableIssueScope } from "@ts-drp/issuance-store";
+import { copySettlementPlan, type DurableIssuanceStore, type DurableIssueScope } from "@ts-drp/issuance-store";
 import type { DurableLiveJournalStore } from "@ts-drp/live-journal";
 import type { SnapshotChunkProtocolPort } from "@ts-drp/network/snapshot-transfer";
 import { type CurrentAnchorTrust, openCurrentAnchorTrust, type SignRegisteredVertexDigest } from "@ts-drp/protocol-v3";
 import type { OwnedIdentityChallengeAdmission, OwnedSigningRequest } from "@ts-drp/protocol-v3/internal/owned-signing-request";
+import { openCreatorSettlementSourceTrust, readCreatorSettlementSourceAnchor } from "@ts-drp/protocol-v3/internal/received-vertex-authentication";
 import { createCreatorSigningRecoveryOwner } from "@ts-drp/seal/creator";
 import { CREATOR_AUTHOR_SETTLEMENT_MAX_RECORD_BYTES } from "@ts-drp/protocol-v3/creator-author-issuance-frontiers";
 import { CREATOR_AUTHOR_ISSUANCE_FRONTIERS_MAX_RECORD_BYTES } from "@ts-drp/protocol-v3/creator-author-issuance-frontiers";
 import { CREATOR_ISSUANCE_RETIREMENT_MAX_RECORD_BYTES } from "@ts-drp/protocol-v3/creator-issuance-retirement";
 import {
+	CREATOR_REATTACHMENT_CHECKPOINT_MAX_BYTES,
+	decodeCreatorReattachmentCheckpoint,
 	encodeCreatorReattachmentCheckpoint,
 	openCreatorCheckpointTrust,
 	openCreatorForwardPromotionCheckpointTrust,
@@ -26,7 +29,7 @@ import {
 	captureCreatorSnapshotRecoveryRoles,
 	type PromotionSource,
 } from "@ts-drp/protocol-v3/internal/creator-forward-promotion";
-import { openCanonicalLatchedAclSnapshot } from "@ts-drp/protocol-v3/latched-acl";
+import { authorizeLatchedApplicationWrite, openCanonicalLatchedAclSnapshot } from "@ts-drp/protocol-v3/latched-acl";
 import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
 import { decodeSnapshotManifest, snapshotChunkDigest } from "@ts-drp/protocol-v3/snapshot-transfer";
 import {
@@ -99,6 +102,7 @@ import {
 } from "./internal/creator-closed-rollback-data.js";
 import { resolveCreatorRecipientRegistration } from "./internal/creator-recipient-provenance.js";
 import { captureCreatorRoomHeadState, sameCreatorRoomHead } from "./internal/creator-room-head.js";
+import { openCreatorSourceCustody, resolveCreatorSourceCustody } from "./internal/creator-source-custody.js";
 import {
 	canonicalCreatorDataRecord as canonicalRecord,
 	creatorPromotedSnapshotProjectionMatches,
@@ -122,10 +126,14 @@ import {
 import {
 	type CreatorTransitionClosure,
 	inspectCreatorAdoptionCandidateLineage,
+	inspectCreatorCheckpointTransition,
 	inspectCreatorTransitionAdvance,
+	openCreatorCheckpointAttachment,
+	resolveCreatorCheckpointAttachment,
 	resolveCreatorForwardPromotion,
 	uniqueCreatorTransitionCandidate,
 	type VerifiedCreatorForwardPromotion,
+	type VerifiedCreatorCheckpointAttachment,
 } from "./internal/creator-transition-advance.js";
 import { createV3SnapshotTransferOwner } from "./snapshot-transfer.js";
 import { sealCreatorReceivedRecoveryReplay, type V3PlaneHandle } from "./v3-live.js";
@@ -157,7 +165,7 @@ export interface CreatorSuccessorOffer {
 export class CreatorSuccessorExportUnavailable extends TypeError {}
 
 interface ReceivedCertificate {
-	readonly kind: "creator-received-recovery-certificate-1";
+	readonly kind: "creator-received-recovery-certificate-1" | "creator-received-checkpoint-certificate-1";
 	readonly pinnedGenesisAnchorDigest: string;
 	readonly exactCanonicalOldHeadBytes: Uint8Array;
 	readonly currentTrustRef: GenerationRef;
@@ -168,6 +176,7 @@ interface ReceivedCertificate {
 	readonly exactCanonicalHistoryBytes: Uint8Array;
 	readonly exactCanonicalRetirementBytes?: Uint8Array;
 	readonly exactCanonicalAggregateBytes?: Uint8Array;
+	readonly exactCanonicalReattachmentCheckpointBytes?: Uint8Array;
 	readonly sealedReplayDigest: string;
 	readonly sealedReplayRowCount: number;
 	readonly sealedReplayByteCharge: number;
@@ -196,12 +205,14 @@ const RECEIVED_CERTIFICATE_KEYS = Object.freeze([
 const RECEIVED_CERTIFICATE_MAX_ITEMS = 1 + 4 * (RECEIVED_CERTIFICATE_KEYS.length + 2);
 const NONE_RECEIVED_CERTIFICATE_KEYS=Object.freeze([...RECEIVED_CERTIFICATE_KEYS,"exactCanonicalRetirementBytes","exactCanonicalAggregateBytes"]);
 const NONE_RECEIVED_CERTIFICATE_MAX_ITEMS=1+4*(NONE_RECEIVED_CERTIFICATE_KEYS.length+2);
+const CHECKPOINT_RECEIVED_CERTIFICATE_KEYS=Object.freeze([...RECEIVED_CERTIFICATE_KEYS,"exactCanonicalReattachmentCheckpointBytes"]);
 
 function encodeReceivedCertificate(value: ReceivedCertificate): Uint8Array {
 	return encodeCanonical(value, {
 		maxBytes: SNAPSHOT_RECEIVED_CERTIFICATE_MAX_BYTES,
 		maxDepth: 2,
-		maxItems: value.exactCanonicalSettlementBytes===null ? NONE_RECEIVED_CERTIFICATE_MAX_ITEMS : RECEIVED_CERTIFICATE_MAX_ITEMS,
+		maxItems: value.exactCanonicalSettlementBytes === null || value.kind === "creator-received-checkpoint-certificate-1"
+			? NONE_RECEIVED_CERTIFICATE_MAX_ITEMS : RECEIVED_CERTIFICATE_MAX_ITEMS,
 	});
 }
 
@@ -212,8 +223,12 @@ export function openReceivedCertificate(bytes: Uint8Array): ReceivedCertificate 
 			maxDepth: 2,
 			maxItems: NONE_RECEIVED_CERTIFICATE_MAX_ITEMS,
 		});
-	const value=capturePromotionRecord(decoded,RECEIVED_CERTIFICATE_KEYS) ?? capturePromotionRecord(decoded,NONE_RECEIVED_CERTIFICATE_KEYS);
-	if (value === undefined || value.kind !== "creator-received-recovery-certificate-1")
+	const value=capturePromotionRecord(decoded,RECEIVED_CERTIFICATE_KEYS) ?? capturePromotionRecord(decoded,NONE_RECEIVED_CERTIFICATE_KEYS) ??
+		capturePromotionRecord(decoded,CHECKPOINT_RECEIVED_CERTIFICATE_KEYS);
+	const checkpoint = value?.kind === "creator-received-checkpoint-certificate-1";
+	if (value === undefined || (value.kind !== "creator-received-recovery-certificate-1" && !checkpoint) ||
+		checkpoint !== Object.hasOwn(value, "exactCanonicalReattachmentCheckpointBytes") ||
+		(checkpoint && value.exactCanonicalSettlementBytes === null))
 		throw new TypeError("creator received certificate schema is invalid");
 	for (const key of ["pinnedGenesisAnchorDigest", "sealedReplayDigest", "candidateClosureDigest"] as const)
 		if (typeof value[key] !== "string" || !ED25519_PUBLIC_KEY_HEX.test(value[key]))
@@ -237,6 +252,12 @@ export function openReceivedCertificate(bytes: Uint8Array): ReceivedCertificate 
 	)
 		throw new TypeError("creator received certificate native identity is invalid");
 	const carriers: Record<string, Uint8Array | null> = {};
+	if (checkpoint) {
+		const bytes = capturePromotionBytes(value.exactCanonicalReattachmentCheckpointBytes, CREATOR_REATTACHMENT_CHECKPOINT_MAX_BYTES);
+		if (bytes === undefined || decodeCreatorReattachmentCheckpoint(bytes) === undefined)
+			throw new TypeError("creator received checkpoint carrier is invalid");
+		carriers.exactCanonicalReattachmentCheckpointBytes = bytes;
+	}
 	for (const [key, maximum] of [
 		["exactCanonicalOldHeadBytes", AHE_BOUNDED_READ_LIMITS.maxHeadBytes],
 		["exactCanonicalCutValueBytes", AHE_BOUNDED_READ_LIMITS.maxBlobBytes],
@@ -506,6 +527,12 @@ async function readCreatorSuccessorExportMaterial(
 			trust.record.currentEpoch !== Number(cut.record.epoch) + 1
 		)
 			throw new TypeError("creator successor native material is invalid");
+		if (recovery?.captureClosed !== undefined && successorProjection?.record.epoch === trust.record.currentEpoch) {
+			// This discovery asks only for an unfinished local close. A live
+			// projection has no such intent; its independent cold opener below
+			// authenticates the full received checkpoint and native currency.
+			throw new CreatorSuccessorExportUnavailable("creator active live projection is not a local closed candidate");
+		}
 		const lineage = reader.generations;
 		let predecessorGeneration = lineage.find(({ generationId }) => generationId === current.head.generationId);
 		let predecessor: RecoveredClosure["currentCandidates"] | undefined;
@@ -1113,16 +1140,18 @@ export async function receiveCreatorSuccessorAdoption(
 	const offer = captureCreatorSuccessorOffer(input.offer);
 	const cut = canonicalRecord(offer.exactCanonicalCutValueBytes);
 	const promoted = cut !== undefined && Object.hasOwn(cut, "forwardPromotion");
-	const opened = (promoted ? openCreatorForwardPromotionSuccessorTrust : openCreatorSuccessorTrust)({
+	const offeredEpoch = canonicalRecord(offer.exactCanonicalTrustStateRecordBytes)?.currentEpoch;
+	const checkpointRequested = Number.isSafeInteger(offeredEpoch) && Number(offeredEpoch) > source.currentTrust.currentEpoch + 1;
+	let opened = checkpointRequested ? undefined : (promoted ? openCreatorForwardPromotionSuccessorTrust : openCreatorSuccessorTrust)({
 		currentTrust: source.currentTrust,
 		exactCanonicalCutValueBytes: offer.exactCanonicalCutValueBytes,
 		exactCanonicalCommitQcBytes: offer.exactCanonicalCommitQcBytes,
 		exactCanonicalTrustStateRecordBytes: offer.exactCanonicalTrustStateRecordBytes,
 	});
 	if (
-		!opened.ok ||
+		(!checkpointRequested && (!opened?.ok || opened.trust.currentEpoch !== source.currentTrust.currentEpoch + 1)) ||
 		cut === undefined ||
-		opened.trust.currentEpoch !== source.currentTrust.currentEpoch + 1
+		(checkpointRequested && promoted)
 	)
 		throw new TypeError("creator recipient signed adjacency is invalid");
 	const manifest = decodeSnapshotManifest({
@@ -1132,8 +1161,8 @@ export async function receiveCreatorSuccessorAdoption(
 	});
 	if (
 		manifest.manifest.objectId !== source.objectId ||
-		manifest.manifest.epoch !== source.currentTrust.currentEpoch ||
-		manifest.manifest.anchor !== source.currentTrust.currentAnchorDigest
+		manifest.manifest.epoch !== (checkpointRequested ? cut.epoch : source.currentTrust.currentEpoch) ||
+		manifest.manifest.anchor !== (checkpointRequested ? cut.previousAnchor : source.currentTrust.currentAnchorDigest)
 	)
 		throw new TypeError("creator recipient manifest predecessor scope is invalid");
 	const current = await inspectHead(source.store, source.objectId);
@@ -1208,6 +1237,7 @@ export async function receiveCreatorSuccessorAdoption(
 			transport: input.transport,
 			peers: input.peers,
 			manifestDigest: manifest.manifestDigest,
+			...(checkpointRequested ? {materialKind: "checkpoint" as const} : {}),
 			...(input.retryUntil === undefined ? {} : { retryUntil: input.retryUntil }),
 			identity: {
 				author: input.author,
@@ -1224,7 +1254,29 @@ export async function receiveCreatorSuccessorAdoption(
 				},
 			},
 		});
-		assertSettlementCompanionProfile(auxiliary.exactCanonicalSettlementBytes,opened.trust.profileId);
+		const point = checkpointRequested ? decodeCreatorReattachmentCheckpoint(auxiliary.exactCanonicalReattachmentCheckpointBytes) : undefined;
+		if (checkpointRequested) {
+			if (point === undefined || input.exactCanonicalGenesisAnchorPreimageBytes === undefined || input.detachedGenesisSignature === undefined)
+				throw new TypeError("creator checkpoint recovery carriers are unavailable");
+			const currentPoint = openCreatorCheckpointTrust({
+				exactCanonicalGenesisAnchorPreimageBytes: input.exactCanonicalGenesisAnchorPreimageBytes,
+				detachedGenesisSignature: input.detachedGenesisSignature,
+				exactCanonicalPredecessorTrustStateRecordBytes: point.exactCanonicalPredecessorTrustStateRecordBytes,
+				exactCanonicalCurrentTrustStateRecordBytes: offer.exactCanonicalTrustStateRecordBytes,
+				exactCanonicalCutValueBytes: offer.exactCanonicalCutValueBytes,
+				exactCanonicalCommitQcBytes: offer.exactCanonicalCommitQcBytes,
+				expectedCurrentHead: {objectId: source.objectId, epoch: Number(offeredEpoch),
+					currentAnchorDigest: String(canonicalRecord(offer.exactCanonicalTrustStateRecordBytes)?.currentAnchorDigest)},
+				expectedObjectId: source.objectId, pinnedGenesisAnchorDigest: source.currentTrust.genesisAnchorDigest,
+			});
+			if (!currentPoint.ok || currentPoint.predecessorTrust.currentEpoch !== manifest.manifest.epoch ||
+				currentPoint.predecessorTrust.currentAnchorDigest !== manifest.manifest.anchor)
+				throw new TypeError("creator checkpoint current authority is invalid");
+			opened = {ok: true, trust: currentPoint.currentTrust};
+		}
+		if (!opened?.ok) throw new TypeError("creator successor authority is invalid");
+		const receivedTrust = opened.trust;
+		assertSettlementCompanionProfile(auxiliary.exactCanonicalSettlementBytes,receivedTrust.profileId);
 		const receivedHistory = openCreatorCloseHistory({
 			bytes: auxiliary.exactCanonicalHistoryBytes,
 			exactCanonicalCutValueBytes: offer.exactCanonicalCutValueBytes,
@@ -1259,8 +1311,10 @@ export async function receiveCreatorSuccessorAdoption(
 		let proposedCandidates = [
 			...current.candidates.filter(
 				({ ref, bytes }) =>
+					(checkpointRequested ? canonicalRecord(bytes)?.kind === currentProjectionKind(source.currentTrust.currentEpoch) :
 					ref.digest !== current.trustRef.digest &&
 					!new Set(["drp-creator-author-settlement-state","drp-creator-issuance-retirement-state","drp-creator-author-issuance-frontiers-state"]).has(String(canonicalRecord(bytes)?.kind))
+					)
 			),
 			...candidates,
 		].sort((a, b) => a.ref.digest.localeCompare(b.ref.digest));
@@ -1271,8 +1325,8 @@ export async function receiveCreatorSuccessorAdoption(
 			totalBytes: Number(manifest.manifest.totalBytes),
 			scope: Object.freeze({
 				objectId: source.objectId,
-				epoch: source.currentTrust.currentEpoch,
-				anchor: source.currentTrust.currentAnchorDigest,
+				epoch: Number(manifest.manifest.epoch),
+				anchor: String(manifest.manifest.anchor),
 				manifestDigest: manifest.manifestDigest,
 			}),
 		});
@@ -1290,12 +1344,34 @@ export async function receiveCreatorSuccessorAdoption(
 			expectedManifestDigest: manifest.manifestDigest,
 			quarantine: scope,
 		});
+		let checkpoint: VerifiedCreatorCheckpointAttachment | undefined;
+		if (checkpointRequested) {
+			const snapshot = await verifySnapshot({snapshotDeclaration: declaration, snapshotStore: input.snapshotStore},
+				{cut, successorTrust: receivedTrust});
+			if (snapshot === undefined) throw new TypeError("creator checkpoint snapshot is invalid");
+			const verified = openCreatorCheckpointAttachment({localBaseHead: current.head, localTrust: source.currentTrust,
+				exactCanonicalGenesisAnchorPreimageBytes: input.exactCanonicalGenesisAnchorPreimageBytes,
+				detachedGenesisSignature: input.detachedGenesisSignature,
+				exactCanonicalReattachmentCheckpointBytes: auxiliary.exactCanonicalReattachmentCheckpointBytes,
+				...offer, exactCanonicalSnapshotPayloadBytes: snapshot.exactCanonicalPayloadBytes,
+				exactCanonicalSettlementBytes: auxiliary.exactCanonicalSettlementBytes});
+			if (!verified.ok) throw new TypeError(`creator checkpoint attachment is invalid: ${verified.reason}`);
+			checkpoint = verified.capability;
+			const bound = resolveCreatorCheckpointAttachment(checkpoint);
+			if (bound === undefined) throw new TypeError("creator checkpoint attachment is unavailable");
+			proposedCandidates = [...bound.proofCandidates, ...proposedCandidates.filter(candidate => {
+				const kind = canonicalRecord(candidate.bytes)?.kind;
+				return kind === currentProjectionKind(source.currentTrust.currentEpoch) || kind === "creator-close-history-1";
+			})].sort((a, b) => a.ref.digest.localeCompare(b.ref.digest));
+			proposed = {candidates: proposedCandidates, closure: proposedCandidates.map(({ref}) => ref)};
+		}
 		const replay = await source.sealDurableReplay();
 		if (replay === undefined || replay.commitment === undefined)
 			throw new TypeError("creator recipient native replay is invalid");
 		const owner = Object.freeze({});
 		receivedOwner = owner;
 		let facts: SealedAdoptionFacts = Object.freeze({
+			...(checkpoint === undefined ? {} : {checkpoint}),
 			...(source.receiveOnly ? { receiveOnly: true as const } : {}),
 			origin: "received",
 			receivedCandidates: Object.freeze([...proposedCandidates]),
@@ -1305,8 +1381,8 @@ export async function receiveCreatorSuccessorAdoption(
 				successorTrustRef: trustCandidate.ref,
 				currentTrustRef: current.trustRef,
 				epoch: source.currentTrust.currentEpoch,
-				successorEpoch: opened.trust.currentEpoch,
-				successorAnchorDigest: opened.trust.currentAnchorDigest,
+				successorEpoch: receivedTrust.currentEpoch,
+				successorAnchorDigest: receivedTrust.currentAnchorDigest,
 			}),
 			currentHead: current.head,
 			currentReferences: current.references,
@@ -1354,7 +1430,7 @@ export async function receiveCreatorSuccessorAdoption(
 				catalog: input.catalog,
 				expectedHead: current.head,
 				currentTrust: source.currentTrust,
-				successorTrust: opened.trust,
+				successorTrust: receivedTrust,
 				currentGenerationId: current.head.generationId,
 				exactCanonicalGenesisAnchorPreimageBytes: input.exactCanonicalGenesisAnchorPreimageBytes,
 				detachedGenesisSignature: input.detachedGenesisSignature,
@@ -1375,7 +1451,7 @@ export async function receiveCreatorSuccessorAdoption(
 				mode: "stage",
 				proofRefs: [facts.transition.cutValueRef, facts.transition.commitQcRef],
 				proposed,
-				successorTrust: opened.trust,
+				successorTrust: receivedTrust,
 				settlementAcl: {
 					current: source.exactCanonicalLatchedAclBytes,
 					successor: encodeCanonical(snapshot.payload.acl),
@@ -1407,18 +1483,20 @@ export async function receiveCreatorSuccessorAdoption(
 			snapshot === undefined || resolved === undefined ? undefined : projection(facts, chain, snapshot, resolved);
 		if (snapshot === undefined || resolved === undefined || projected === undefined)
 			throw new TypeError("creator received snapshot projection is invalid");
-		const advance = inspectCreatorTransitionAdvance({
+		const advance = checkpoint === undefined ? inspectCreatorTransitionAdvance({
 			current: { candidates: current.candidates, closure: current.references },
 			currentTrust: source.currentTrust,
 			mode: "stage",
 			proofRefs: [facts.transition.cutValueRef, facts.transition.commitQcRef],
 			proposed,
-			successorTrust: opened.trust,
+			successorTrust: receivedTrust,
 			settlementAcl: {
 				current: source.exactCanonicalLatchedAclBytes,
 				successor: snapshot.authorizedAclBytes ?? encodeCanonical(snapshot.payload.acl),
 			},
-		});
+		}) : inspectCreatorCheckpointTransition({checkpoint, localHead: current.head, currentTrust: source.currentTrust,
+			current: {candidates: current.candidates, closure: current.references}, proposed})
+			? {ok: true as const, proposed} : {ok: false as const, reason: "CHECKPOINT_CLOSURE_INVALID"};
 		if (!advance.ok) throw new TypeError(`creator received settlement transition is invalid: ${advance.reason}`);
 		facts = Object.freeze({
 			...facts,
@@ -1447,7 +1525,8 @@ export async function receiveCreatorSuccessorAdoption(
 			throw new TypeError("creator received candidate closure is invalid");
 		const certificate = encodeReceivedCertificate(
 			Object.freeze({
-				kind: "creator-received-recovery-certificate-1",
+				kind: checkpoint === undefined ? "creator-received-recovery-certificate-1" : "creator-received-checkpoint-certificate-1",
+				...(checkpoint === undefined ? {} : {exactCanonicalReattachmentCheckpointBytes: auxiliary.exactCanonicalReattachmentCheckpointBytes!}),
 				pinnedGenesisAnchorDigest: source.currentTrust.genesisAnchorDigest,
 				exactCanonicalOldHeadBytes: encodeHeadRecordV1(current.head),
 				currentTrustRef: current.trustRef,
@@ -1483,7 +1562,7 @@ export async function receiveCreatorSuccessorAdoption(
 		// creator does at close; without it no closed recipient journal scope can
 		// ever become collectible. Exact Cut agreement only; otherwise nothing is
 		// recorded and the scope keeps its original retention.
-		const membershipRecorded = await source.recordReceivedClosedMembership(offer.exactCanonicalCutValueBytes,
+		const membershipRecorded = checkpoint === undefined && await source.recordReceivedClosedMembership(offer.exactCanonicalCutValueBytes,
 			auxiliary.exactCanonicalSettlementBytes, auxiliary.exactCanonicalCloseMembershipBytes, {
 				exactCanonicalCommitQcBytes: offer.exactCanonicalCommitQcBytes,
 				exactCanonicalSuccessorTrustStateRecordBytes: offer.exactCanonicalTrustStateRecordBytes,
@@ -1515,6 +1594,13 @@ export async function receiveCreatorSuccessorAdoption(
 			if (!(await nativeHeadUnchanged(source.store, source.objectId, current.head)) || !(await replay.verify()))
 				throw new TypeError("creator recipient current changed after turnover");
 		}
+		// Every durable received intent must already own the accepted source
+		// contexts that cold verification will need. This read/write stays under
+		// the original receive gate and precedes receipt publication.
+		const sourceCustody = await source.retainAcceptedSourceCustody(receivedTrust,
+			snapshot.authorizedAclBytes ?? encodeCanonical(snapshot.payload.acl));
+		if (!(await replay.verify()) || !(await sourceCustody.verify()))
+			throw new TypeError("creator recipient source changed before retention");
 		await scope.retainForRecovery({ exactReceivedCertificateBytes: certificate });
 		const owned = await input.snapshotStore.lookupReceivedRecoveryCertificate(selector);
 		if (
@@ -1525,6 +1611,8 @@ export async function receiveCreatorSuccessorAdoption(
 			throw new TypeError("creator received retention custody is unavailable");
 		if (!(await nativeHeadUnchanged(source.store, source.objectId, current.head)) || !(await replay.verify()))
 			throw new TypeError("creator recipient current changed during receive");
+		facts = Object.freeze({...facts, durableReplay: Object.freeze({...replay,
+			verify: async () => await replay.verify() && await sourceCustody.verify()})});
 		if (
 			!installCreatorAdoptionFacts(
 				owner,
@@ -1595,6 +1683,7 @@ type ReceivedCreatorSuccessorAdoption = Readonly<{
 }>;
 
 interface SealedAdoptionFacts {
+	readonly checkpoint?: VerifiedCreatorCheckpointAttachment;
 	/** Same original full recovery-call ledger; bookkeeping only, not source or native authority. */
 	readonly proofAccounting?: import("./internal/creator-closed-rollback-data.js").CreatorClosedRollbackProofAccounting;
 	readonly certifiedRecoverySourceGenerations?: CreatorSuccessorLiveSeed["certifiedRecoverySourceGenerations"];
@@ -1646,6 +1735,7 @@ interface RecoveredClosure {
 }
 
 interface VerifiedChain {
+	readonly checkpointPredecessorAnchor?: Readonly<Record<string, unknown>>;
 	readonly currentCatalog: Readonly<{
 		readonly artifactDigest: string;
 		readonly artifactId: string;
@@ -1980,7 +2070,8 @@ function verifyChain(
 	facts: Pick<
 		SealedAdoptionFacts,
 		"transition" | "promotion" | "currentTrust" | "currentReferences" | "proposedReferences"
-	>,
+		| "checkpoint"
+	> & {readonly currentHead?: PresentHead},
 	closure: RecoveredClosure,
 	inspectAdvance = true
 ): VerifiedChain | undefined {
@@ -2002,6 +2093,11 @@ function verifyChain(
 	const promotion =
 		facts.promotion === undefined ? undefined : resolveCreatorForwardPromotion(facts.promotion.verified);
 	const promotedCut = Object.hasOwn(canonicalRecord(cutBytes) ?? {}, "forwardPromotion");
+	const checkpoint = facts.checkpoint === undefined ? undefined : resolveCreatorCheckpointAttachment(facts.checkpoint);
+	if (facts.checkpoint !== undefined && (checkpoint === undefined || promotedCut || facts.promotion !== undefined || facts.currentHead === undefined ||
+		!inspectCreatorCheckpointTransition({checkpoint: facts.checkpoint, localHead: facts.currentHead,
+			currentTrust: facts.currentTrust, current: {candidates: closure.currentCandidates, closure: facts.currentReferences},
+			proposed: {candidates: closure.proposedCandidates, closure: facts.proposedReferences}}))) return undefined;
 	// Received pure preflight may open signed adjacency before acquiring native
 	// historical custody. Complete verification never accepts that alone.
 	if (promotedCut && promotion === undefined && inspectAdvance) return undefined;
@@ -2012,12 +2108,12 @@ function verifyChain(
 			promotion.successorAnchorDigest !== transition.successorAnchorDigest)
 	)
 		return undefined;
-	const opened = (promotedCut ? openCreatorForwardPromotionSuccessorTrust : openCreatorSuccessorTrust)({
+	const opened = checkpoint === undefined ? (promotedCut ? openCreatorForwardPromotionSuccessorTrust : openCreatorSuccessorTrust)({
 		currentTrust: facts.currentTrust,
 		exactCanonicalCommitQcBytes: commitBytes,
 		exactCanonicalCutValueBytes: cutBytes,
 		exactCanonicalTrustStateRecordBytes: successorTrustBytes,
-	});
+	}) : {ok: true as const, trust: checkpoint.target.trust};
 	if (
 		!opened.ok ||
 		opened.trust.currentAnchorDigest !== transition.successorAnchorDigest ||
@@ -2033,7 +2129,7 @@ function verifyChain(
 		proposed: { candidates: closure.proposedCandidates, closure: facts.proposedReferences },
 		successorTrust: opened.trust,
 	});
-	if (inspectAdvance && !advance.ok) return undefined;
+	if (checkpoint === undefined && inspectAdvance && !advance.ok) return undefined;
 	const cut = canonicalRecord(cutBytes);
 	const currentTrustRecord = canonicalRecord(currentTrustBytes);
 	const successorTrustRecord = canonicalRecord(successorTrustBytes);
@@ -2055,14 +2151,14 @@ function verifyChain(
 		!Number.isSafeInteger(currentEpoch) ||
 		currentEpoch < 0 ||
 		!Number.isSafeInteger(successorEpoch) ||
-		successorEpoch !== currentEpoch + 1 ||
+		(checkpoint === undefined ? successorEpoch !== currentEpoch + 1 : successorEpoch <= currentEpoch + 1) ||
 		facts.transition.epoch !== currentEpoch ||
 		facts.transition.successorEpoch !== successorEpoch ||
 		currentTrustRecord.currentEpoch !== currentEpoch ||
 		successorTrustRecord.currentEpoch !== successorEpoch ||
 		currentAnchor?.epoch !== currentEpoch ||
 		successorAnchor?.epoch !== successorEpoch ||
-		successorAnchor?.previousAnchor !== facts.currentTrust.currentAnchorDigest
+		successorAnchor?.previousAnchor !== (checkpoint?.remoteCheckpoint.predecessorTrust.currentAnchorDigest ?? facts.currentTrust.currentAnchorDigest)
 	) {
 		return undefined;
 	}
@@ -2087,6 +2183,8 @@ function verifyChain(
 		return undefined;
 	}
 	return Object.freeze({
+		...(checkpoint === undefined ? {} : {checkpointPredecessorAnchor: canonicalRecord(
+			readCreatorSettlementSourceAnchor(checkpoint.remoteCheckpoint.predecessorTrust)!.anchorPreimage)!}),
 		currentAnchor,
 		currentEpoch,
 		currentProjectionKind: expectedCurrentProjectionKind,
@@ -2224,17 +2322,18 @@ function projection(
 ): Readonly<{ readonly bytes: Uint8Array; readonly descriptor: Readonly<Record<string, unknown>> }> | undefined {
 	try {
 		const parameters = record(chain.cut.parameters) ? chain.cut.parameters : undefined;
+		const closedAnchor = chain.checkpointPredecessorAnchor ?? chain.currentAnchor;
 		if (
 			parameters === undefined ||
-			chain.cut.previousHistoryRoot !== chain.currentAnchor.historyRoot ||
-			chain.cut.previousHistorySize !== chain.currentAnchor.historySize ||
+			chain.cut.previousHistoryRoot !== closedAnchor.historyRoot ||
+			chain.cut.previousHistorySize !== closedAnchor.historySize ||
 			chain.cut.historyRoot !== facts.history.historyRoot ||
 			chain.cut.historySize !== facts.history.historySize
 		) {
 			return undefined;
 		}
 		const bytes = encodeCreatorSuccessorProjection({
-			currentAnchor: chain.currentAnchor,
+			currentAnchor: closedAnchor,
 			successorAnchor: chain.successorAnchor,
 			successorAnchorBytes: chain.successorAnchorBytes,
 			successorAnchorDigest: facts.transition.successorAnchorDigest,
@@ -2279,7 +2378,8 @@ function successorCommitMaterial(
 			predecessorLiveRef,
 			exactCanonicalProjectionBytes,
 			exactCanonicalCutValueBytes: cut.bytes,
-			predecessorExactCanonicalLatchedAclBytes: facts.exactCanonicalLatchedAclBytes,
+			predecessorExactCanonicalLatchedAclBytes: facts.checkpoint === undefined ? facts.exactCanonicalLatchedAclBytes :
+				resolveCreatorCheckpointAttachment(facts.checkpoint)!.remoteCheckpoint.exactCanonicalPredecessorAclBytes,
 		};
 		let candidateReferences = deriveCreatorAdoptionReferences(referenceInput);
 		if (candidateReferences === undefined) return undefined;
@@ -2334,23 +2434,26 @@ function creatorSuccessorLiveSeed(
 			return undefined;
 		}
 		const projectionDigest = digestBlob(projected.bytes);
-		const predecessorAclDigest = digestBlob(facts.exactCanonicalLatchedAclBytes);
+		const closedAclBytes = facts.checkpoint === undefined ? facts.exactCanonicalLatchedAclBytes :
+			resolveCreatorCheckpointAttachment(facts.checkpoint)!.remoteCheckpoint.exactCanonicalPredecessorAclBytes;
+		const predecessorAclDigest = digestBlob(closedAclBytes);
 		if (!projectionDigest.ok || !predecessorAclDigest.ok) return undefined;
 		const projectionRef = Object.freeze({ byteLength: projected.bytes.byteLength, digest: projectionDigest.value });
 		const predecessorAclRef = Object.freeze({
-			byteLength: facts.exactCanonicalLatchedAclBytes.byteLength,
+			byteLength: closedAclBytes.byteLength,
 			digest: predecessorAclDigest.value,
 		});
 		const successorCandidates = commitMaterial.candidateReferences.map((ref) => {
 			if (sameRef(ref, projectionRef)) return Object.freeze({ bytes: Uint8Array.from(projected.bytes), ref });
 			if (sameRef(ref, predecessorAclRef)) {
-				return Object.freeze({ bytes: Uint8Array.from(facts.exactCanonicalLatchedAclBytes), ref });
+				return Object.freeze({ bytes: Uint8Array.from(closedAclBytes), ref });
 			}
 			const candidate = closure.proposedCandidates.find((entry) => sameRef(entry.ref, ref));
 			if (candidate === undefined) throw new TypeError("creator successor candidate is unavailable");
 			return Object.freeze({ bytes: Uint8Array.from(candidate.bytes), ref: Object.freeze({ ...ref }) });
 		});
 		return Object.freeze({
+			...(facts.checkpoint === undefined ? {} : {checkpoint: facts.checkpoint}),
 			catalog: factsForCatalog(resolved),
 			...(facts.receiveOnly ? { receiveOnly: true as const } : {}),
 			...(facts.origin === "received" && facts.promotion !== undefined
@@ -2364,7 +2467,7 @@ function creatorSuccessorLiveSeed(
 				: { classifiedRecoverySourceGenerations: facts.classifiedRecoverySourceGenerations }),
 			origin: facts.origin,
 			exactCanonicalLatchedAclBytes: Uint8Array.from(exactCanonicalLatchedAclBytes),
-			exactCanonicalParametersCarrierBytes: Uint8Array.from(facts.exactCanonicalParametersCarrierBytes),
+			exactCanonicalParametersCarrierBytes: encodeCanonical(chain.cut.parameters),
 			exactCanonicalPinnedGenesisBootstrapOperationBytes:
 				facts.exactCanonicalPinnedGenesisBootstrapOperationBytes === undefined
 					? undefined
@@ -2388,6 +2491,7 @@ function creatorSuccessorLiveSeed(
 				trustRef: Object.freeze({ ...facts.transition.currentTrustRef }),
 			}),
 			predecessorExactCanonicalLatchedAclBytes: Uint8Array.from(facts.exactCanonicalLatchedAclBytes),
+			predecessorExactCanonicalParametersBytes: Uint8Array.from(facts.exactCanonicalParametersCarrierBytes),
 			snapshotPayloadDigest: snapshot.manifest.payloadDigest,
 			sourceRuntimeHandle: facts.sourceRuntimeHandle,
 			stateDigest: snapshot.manifest.stateDigest,
@@ -2445,6 +2549,7 @@ export async function verifyCreatorSuccessorAdoption(input: unknown): Promise<Ad
 		snapshot = await selectedPromotionSnapshot(facts, chain, snapshot);
 		if (snapshot === undefined) return failure("snapshot-invalid", "creator promoted snapshot is invalid");
 		if (
+			facts.checkpoint === undefined &&
 			settlementProfileFor(chain.successorTrust.profileId) === "v1" &&
 			!inspectCreatorTransitionAdvance({
 				current: { candidates: closure.currentCandidates, closure: facts.currentReferences },
@@ -2537,7 +2642,8 @@ async function authenticatedSuccessorIssuanceScope(
 	expectedEpoch: number,
 	exactCanonicalLatchedAclBytes: Uint8Array,
 	expectedProfileId: string,
-	checkNativeCurrency: () => Promise<void>
+	checkNativeCurrency: () => Promise<void>,
+	currentTrust: CurrentAnchorTrust
 ): Promise<AuthenticatedSuccessorIssuanceScopeResult> {
 	let lineageAuthors: readonly string[];
 	try {
@@ -2554,8 +2660,24 @@ async function authenticatedSuccessorIssuanceScope(
 		);
 		// Enrolled settlement members may recover their exact native old-source
 		// custody. This is not current application or portable replacement authority.
-		const localCustodian = settlementProfileFor(expectedProfileId) === "v1" &&
+		let localCustodian = settlementProfileFor(expectedProfileId) === "v1" &&
 			opened.snapshot.members.some(({author}) => author === input.author);
+		if (!localCustodian && !input.receiveOnly && settlementProfileFor(expectedProfileId) === "v1") {
+			const scope = {objectId, author: input.author};
+			const plan = copySettlementPlan(await input.issuanceStore.readSettlementPlan(scope), scope);
+			for (const entry of plan?.entries ?? []) {
+				if (entry.sourceContextDigest === undefined || entry.replacementSequence !== null ||
+					entry.disposition === "expire" || entry.disposition === "inherited") continue;
+				const context = plan?.sourceContexts?.find(value => sameBytes(value.digest, entry.sourceContextDigest!));
+				const capability = context === undefined ? undefined : openCreatorSourceCustody({currentTrust, context});
+				const source = capability === undefined ? undefined : resolveCreatorSourceCustody(capability);
+				const authorized = source === undefined ? undefined : authorizeLatchedApplicationWrite({author: input.author, snapshot: source.acl});
+				if (source === undefined || source.trust.currentEpoch >= expectedEpoch || authorized?.ok !== true || !authorized.authorized)
+					return Object.freeze({ok: false as const, reason: "authority" as const});
+				localCustodian = true;
+			}
+			await checkNativeCurrency();
+		}
 		if (
 			(writers.length === 0 && !localCustodian) ||
 			new Set(writers).size !== writers.length ||
@@ -2694,6 +2816,55 @@ async function reopenCreatorSuccessorMaterial(
 			const base = presentBase(active.adoptedGeneration);
 			const baseGeneration = lineage?.find((generation) => generation.generationId === base?.generationId);
 			const baseCandidates = baseGeneration === undefined ? undefined : await readClosure(baseGeneration.closure);
+			const baseTrust = baseCandidates === undefined ? undefined : uniqueCandidateByKind(baseCandidates, "drp-anchor-trust-state");
+			if (baseTrust !== undefined && typeof baseTrust.record.currentEpoch === "number" &&
+				baseTrust.record.currentEpoch < input.expectedRoomHead.epoch - 1) {
+				const previous = exactRoomHead({objectId, epoch: baseTrust.record.currentEpoch,
+					currentAnchorDigest: baseTrust.record.currentAnchorDigest});
+				if (previous === undefined) return coldFailure("chain-invalid", "creator checkpoint native base is invalid");
+				const recoveryInput = {...input, expectedPreviousRoomHead: previous, expectedNextRoomHead: input.expectedRoomHead};
+				const opened = await authenticatePendingCandidate(recoveryInput, lineage, active.adoptedGeneration, previous,
+					input.expectedRoomHead, objectId, readClosure);
+				const context = opened?.receivedContext;
+				if (opened === undefined || context?.checkpoint === undefined || context.receivedCustody === undefined ||
+					!sameHead(opened.head, active.head)) return coldFailure("chain-invalid", "creator checkpoint cold proof is invalid");
+				await authenticateReceivedCandidateCustody(recoveryInput, context.receivedCustody, context, active.head);
+				const {chain, predecessorTrust, snapshot} = context;
+				const activeCandidates = await readClosure(active.references);
+				const oldProjection = uniqueCandidateByKind(context.currentCandidates, chain.currentProjectionKind);
+				const oldTrust = uniqueCandidateByKind(context.currentCandidates, "drp-anchor-trust-state");
+				const newProjection = activeCandidates === undefined ? undefined : uniqueCandidateByKind(activeCandidates, "v3-live-generation-2");
+				const newTrust = activeCandidates === undefined ? undefined : uniqueCandidateByKind(activeCandidates, "drp-anchor-trust-state");
+				const resolved = verifiedCatalog(input.catalog, snapshot.payload.blueprintDigest, chain.currentCatalog);
+				if (activeCandidates === undefined || oldProjection === undefined || oldTrust === undefined || newProjection === undefined ||
+					newTrust === undefined || resolved === undefined) return coldFailure("chain-invalid", "creator checkpoint cold projection is invalid");
+				const exactCanonicalLatchedAclBytes = encodeCanonical(snapshot.payload.acl);
+				const issuance = await authenticatedSuccessorIssuanceScope(input, objectId, String(chain.successorAnchor.aclDigest),
+					chain.successorEpoch, exactCanonicalLatchedAclBytes, chain.successorTrust.profileId, async () => {
+						if (!(await capturedReader.checkCurrency()).ok) throw new TypeError("creator checkpoint cold native census changed");
+					}, chain.successorTrust);
+				if (!issuance.ok) return coldFailure("chain-invalid", `creator checkpoint issuance ${issuance.reason} is invalid`);
+				const material: CreatorSuccessorLiveMaterial = Object.freeze({checkpoint: context.checkpoint,
+					...(input.receiveOnly ? {receiveOnly: true as const} : {}), origin: "durable-reopen", catalog: factsForCatalog(resolved),
+					exactCanonicalLatchedAclBytes, exactCanonicalParametersCarrierBytes: encodeCanonical(chain.cut.parameters),
+					exactCanonicalPinnedGenesisBootstrapOperationBytes, exactCanonicalSnapshotPayloadBytes: snapshot.exactCanonicalPayloadBytes,
+					issuanceScope: issuance.scope, issuanceStore: input.issuanceStore, liveJournalStore: input.liveJournalStore,
+					snapshotStore: input.snapshotStore, pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest, store: input.store,
+					predecessor: {candidates: context.currentCandidates, head: context.currentHead, references: context.currentGeneration.closure,
+						trust: predecessorTrust, trustRef: oldTrust.ref, exactCanonicalProjectionBytes: oldProjection.bytes,
+						exactCanonicalAnchorPreimageBytes: chain.currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes as Uint8Array,
+						detachedAnchorSignature: chain.currentTrustRecord.detachedCurrentAnchorSignature as Uint8Array},
+					predecessorExactCanonicalLatchedAclBytes: context.predecessorAclBytes,
+					predecessorExactCanonicalParametersBytes: context.predecessorParametersBytes,
+					successor: {candidates: activeCandidates, head: active.head, references: active.references,
+						trust: chain.successorTrust, trustRef: newTrust.ref, exactCanonicalProjectionBytes: newProjection.bytes,
+						exactCanonicalAnchorPreimageBytes: chain.successorAnchorBytes,
+						detachedAnchorSignature: chain.successorTrustRecord.detachedCurrentAnchorSignature as Uint8Array},
+					snapshotPayloadDigest: String(snapshot.manifest.payloadDigest), stateDigest: String(snapshot.manifest.stateDigest),
+					terminalizeSource: async () => true});
+				if (!(await reader.checkCurrency()).ok) return coldFailure("storage-failed", "creator checkpoint cold native census changed");
+				return Object.freeze({ok: true as const, material});
+			}
 			const direct =
 				baseCandidates !== undefined &&
 				uniqueCandidateByKind(baseCandidates, "drp-anchor-trust-state")?.record.currentEpoch ===
@@ -3006,7 +3177,8 @@ async function reopenCreatorSuccessorMaterial(
 				successorTrust.profileId,
 				async () => {
 					if (!(await possessionReader.checkCurrency()).ok) throw new TypeError("creator possession native recovery census changed");
-				}
+				},
+				successorTrust
 			);
 			if (!issuance.ok) {
 				const detail =
@@ -3032,6 +3204,7 @@ async function reopenCreatorSuccessorMaterial(
 				head: active.head,
 				exactCanonicalCutValueBytes: cutCandidate.bytes,
 				accounting: createCreatorClosedRollbackProofAccounting(reader.blobs),
+				...(direct && settlementProfileFor(successorTrust.profileId) === "v1" && cutCandidate.record.forwardPromotion === undefined ? {nativePublication: true as const} : {}),
 				...(previousCertificate === undefined ? {} : { previousCertificate }),
 			});
 			const material: CreatorSuccessorLiveMaterial = Object.freeze({
@@ -3119,6 +3292,9 @@ interface AuthenticatedPendingCandidate {
 }
 
 interface ReceivedCandidateContext {
+	readonly checkpoint?: VerifiedCreatorCheckpointAttachment;
+	readonly receivedCustody?: ReceivedCustody;
+	readonly predecessorParametersBytes?: Uint8Array;
 	readonly currentGeneration: GenerationRecord;
 	readonly currentHead: PresentHead;
 	readonly currentCandidates: RecoveredClosure["currentCandidates"];
@@ -3164,6 +3340,27 @@ async function readReceivedCustody(
 	return Object.freeze({ retained, certificate });
 }
 
+/** The bounded native inventory discovers receipt-only intents by their exact
+ * local base. Epoch ordering never selects a successor or grants authority. */
+async function readReceivedCustodyForNativeHead(
+	input: Pick<CreatorAdoptionPendingRecoveryInput, "snapshotStore" | "pinnedGenesisAnchorDigest" | "proofAccounting">,
+	head: PresentHead
+): Promise<ReceivedCustody | null> {
+	const inventory = await input.snapshotStore.captureRecoveryRoleInventory?.({objectId: head.objectId});
+	if (inventory === undefined || (input.proofAccounting !== undefined && !input.proofAccounting.charge(encodeCanonical(inventory))))
+		throw new TypeError("creator received recovery inventory is unavailable or exhausted");
+	let selected: ReceivedCustody | null = null;
+	const exactHead = encodeHeadRecordV1(head);
+	for (const {scope} of inventory.scopes) {
+		const custody = await readReceivedCustody(input, {objectId: scope.objectId, epoch: scope.epoch, currentAnchorDigest: scope.anchor});
+		if (custody === null || !sameBytes(custody.certificate.exactCanonicalOldHeadBytes, exactHead)) continue;
+		if (selected !== null && !sameBytes(selected.retained.exactReceivedCertificateBytes, custody.retained.exactReceivedCertificateBytes))
+			throw new TypeError("creator received recovery intents conflict for the native head");
+		selected = custody;
+	}
+	return selected;
+}
+
 /**
  * A Complete/Adopted row is not permission to ignore an occupied birth certificate.
  * Reuses its existing authenticated snapshot/chain context and the pure native
@@ -3178,7 +3375,8 @@ async function authenticateReceivedCandidateCustody(
 	custody: ReceivedCustody | null,
 	context: ReceivedCandidateContext,
 	nativeHead: PresentHead
-): Promise<void> {
+): Promise<Awaited<ReturnType<typeof sealCreatorReceivedRecoveryReplay>>> {
+	custody = context.receivedCustody ?? custody;
 	if (custody === null) return;
 	const { certificate, retained } = custody;
 	const {
@@ -3242,11 +3440,12 @@ async function authenticateReceivedCandidateCustody(
 	});
 	if (history === undefined) throw new TypeError("creator received occupied custody history is invalid");
 	const accumulator = CompactMerkleAccumulator.fromSnapshot(history);
-	const rawCandidates = [
+	const rawCandidates = context.checkpoint !== undefined ? proposedCandidates : [
 		...currentCandidates.filter(
 			({ ref, bytes }) =>
-				!sameRef(ref, oldTrust.ref) &&
+				(context.checkpoint === undefined ? !sameRef(ref, oldTrust.ref) &&
 				!new Set(["drp-creator-author-settlement-state","drp-creator-issuance-retirement-state","drp-creator-author-issuance-frontiers-state"]).has(String(canonicalRecord(bytes)?.kind))
+				: sameRef(ref, oldProjection.ref))
 		),
 		...proof,
 	].sort((a, b) => a.ref.digest.localeCompare(b.ref.digest));
@@ -3259,7 +3458,7 @@ async function authenticateReceivedCandidateCustody(
 		successorEpoch: chain.successorEpoch,
 		successorAnchorDigest: chain.successorTrust.currentAnchorDigest,
 	});
-	const advance = inspectCreatorTransitionAdvance({
+	const advance = context.checkpoint === undefined ? inspectCreatorTransitionAdvance({
 		current: { candidates: currentCandidates, closure: currentGeneration.closure },
 		currentTrust: predecessorTrust,
 		mode: "stage",
@@ -3270,7 +3469,10 @@ async function authenticateReceivedCandidateCustody(
 			current: predecessorAclBytes,
 			successor: snapshot.authorizedAclBytes ?? encodeCanonical(snapshot.payload.acl),
 		},
-	});
+	}) : {ok: inspectCreatorCheckpointTransition({checkpoint: context.checkpoint, localHead: currentHead,
+		currentTrust: predecessorTrust, current: {candidates: currentCandidates, closure: currentGeneration.closure},
+		proposed: {candidates: rawCandidates, closure: rawCandidates.map(({ref}) => ref)}}),
+		proposed: {candidates: rawCandidates, closure: rawCandidates.map(({ref}) => ref)}};
 	const resolved = verifiedCatalog(input.catalog, snapshot.payload.blueprintDigest, chain.currentCatalog);
 	const projected =
 		resolved === undefined
@@ -3297,7 +3499,8 @@ async function authenticateReceivedCandidateCustody(
 				predecessorLiveRef: oldProjection.ref,
 				exactCanonicalProjectionBytes: projected.bytes,
 				exactCanonicalCutValueBytes: certificate.exactCanonicalCutValueBytes,
-				predecessorExactCanonicalLatchedAclBytes: predecessorAclBytes,
+				predecessorExactCanonicalLatchedAclBytes: context.checkpoint === undefined ? predecessorAclBytes :
+					resolveCreatorCheckpointAttachment(context.checkpoint)!.remoteCheckpoint.exactCanonicalPredecessorAclBytes,
 			},
 			candidate.closure
 		)
@@ -3317,7 +3520,7 @@ async function authenticateReceivedCandidateCustody(
 		},
 		expectedNativeHead: nativeHead,
 		catalog: input.catalog,
-		exactCanonicalParametersCarrierBytes: input.exactCanonicalParametersCarrierBytes,
+		exactCanonicalParametersCarrierBytes: context.predecessorParametersBytes ?? input.exactCanonicalParametersCarrierBytes,
 		pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest,
 		store: input.store,
 		exactCanonicalLatchedAclBytes: predecessorAclBytes,
@@ -3348,6 +3551,7 @@ async function authenticateReceivedCandidateCustody(
 		!sameBytes(after.exactReceivedCertificateBytes, retained.exactReceivedCertificateBytes)
 	)
 		throw new TypeError("creator received occupied custody incarnation changed");
+	return replay;
 }
 
 function exactRoomHead(value: unknown): CreatorAdoptionRoomHead | undefined {
@@ -3405,6 +3609,123 @@ function roomHeadFromTrust(trust: CurrentAnchorTrust): CreatorAdoptionRoomHead {
 	});
 }
 
+/** Reopens the same received point proof for cold activation and interrupted
+ * publication. Its local predecessor is always the actual native base. */
+async function authenticateReceivedCheckpointCandidate(
+	input: CreatorAdoptionPendingRecoveryInput,
+	structure: NonNullable<ReturnType<typeof inspectCreatorAdoptionCandidateLineage>>,
+	currentCandidates: RecoveredClosure["currentCandidates"],
+	candidateCandidates: RecoveredClosure["currentCandidates"],
+	expectedPrevious: CreatorAdoptionRoomHead,
+	expectedNext: CreatorAdoptionRoomHead
+): Promise<AuthenticatedPendingCandidate | undefined> {
+	const {currentGeneration, currentHead, candidateGeneration: candidate, candidateHead} = structure;
+	const currentCarrier = uniqueCandidateByKind(currentCandidates, "drp-anchor-trust-state");
+	const targetCarrier = uniqueCandidateByKind(candidateCandidates, "drp-anchor-trust-state");
+	const sourceProjection = uniqueCandidateByKind(currentCandidates, currentProjectionKind(expectedPrevious.epoch));
+	const targetProjection = uniqueCandidateByKind(candidateCandidates, "v3-live-generation-2");
+	const cut = uniqueCandidateByKind(candidateCandidates, "drp-hard-epoch-cut");
+	const qc = uniqueCandidateByKind(candidateCandidates, "drp-seal-qc");
+	const settlement = uniqueCandidateByKind(candidateCandidates, "drp-creator-author-settlement-state");
+	if (currentCarrier === undefined || targetCarrier === undefined || sourceProjection === undefined || targetProjection === undefined ||
+		cut === undefined || qc === undefined || settlement === undefined || expectedNext.epoch <= expectedPrevious.epoch + 1 ||
+		cut.record.epoch !== expectedNext.epoch - 1 || cut.record.objectId !== expectedNext.objectId ||
+		typeof cut.record.previousAnchor !== "string") return undefined;
+	const custody = await readReceivedCustody(input, {objectId: expectedNext.objectId, epoch: Number(cut.record.epoch),
+		currentAnchorDigest: cut.record.previousAnchor});
+	const certificate = custody?.certificate;
+	const point = certificate?.exactCanonicalReattachmentCheckpointBytes === undefined ? undefined :
+		decodeCreatorReattachmentCheckpoint(certificate.exactCanonicalReattachmentCheckpointBytes);
+	if (custody === null || certificate === undefined || point === undefined ||
+		!sameBytes(certificate.exactCanonicalCutValueBytes, cut.bytes) || !sameBytes(certificate.exactCanonicalCommitQcBytes, qc.bytes) ||
+		!sameBytes(certificate.exactCanonicalTrustStateRecordBytes, targetCarrier.bytes) ||
+		certificate.exactCanonicalSettlementBytes === null || !sameBytes(certificate.exactCanonicalSettlementBytes, settlement.bytes)) return undefined;
+	const opened = openCreatorCheckpointTrust({detachedGenesisSignature: input.detachedSignature,
+		exactCanonicalGenesisAnchorPreimageBytes: input.exactCanonicalAnchorPreimageBytes,
+		exactCanonicalCommitQcBytes: qc.bytes, exactCanonicalCurrentTrustStateRecordBytes: targetCarrier.bytes,
+		exactCanonicalCutValueBytes: cut.bytes, exactCanonicalPredecessorTrustStateRecordBytes: point.exactCanonicalPredecessorTrustStateRecordBytes,
+		expectedCurrentHead: expectedNext, expectedObjectId: expectedNext.objectId, pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest});
+	if (!opened.ok) return undefined;
+	const sourceBytes = currentCarrier.record.exactCanonicalCurrentAnchorPreimageBytes,
+		sourceSignature = currentCarrier.record.detachedCurrentAnchorSignature;
+	if (!(sourceBytes instanceof Uint8Array) || !(sourceSignature instanceof Uint8Array)) return undefined;
+	const predecessorTrust = openCreatorSettlementSourceTrust(opened.currentTrust, sourceBytes, sourceSignature,
+		expectedPrevious.objectId, input.pinnedGenesisAnchorDigest);
+	if (predecessorTrust === undefined || !sameRoomHead(roomHeadFromTrust(predecessorTrust), expectedPrevious) ||
+		!sameBytes(currentCarrier.bytes, encodeCanonical({...targetCarrier.record,
+			currentEpoch: predecessorTrust.currentEpoch, currentAnchorDigest: predecessorTrust.currentAnchorDigest,
+			exactCanonicalCurrentAnchorPreimageBytes: sourceBytes, detachedCurrentAnchorSignature: sourceSignature}))) return undefined;
+	const currentAnchor = canonicalRecord(sourceBytes);
+	const targetAnchorBytes = targetCarrier.record.exactCanonicalCurrentAnchorPreimageBytes;
+	const successorAnchor = targetAnchorBytes instanceof Uint8Array ? canonicalRecord(targetAnchorBytes) : undefined;
+	if (currentAnchor === undefined || successorAnchor === undefined || sourceProjection.record.epoch !== expectedPrevious.epoch ||
+		sourceProjection.record.objectId !== expectedPrevious.objectId || sourceProjection.record.blueprintDigest !== currentAnchor.blueprintDigest)
+		return undefined;
+	let predecessorAclBytes: Uint8Array | undefined, predecessorParametersBytes: Uint8Array | undefined;
+	if (expectedPrevious.epoch === 0) {
+		predecessorAclBytes = input.exactCanonicalGenesisLatchedAclBytes;
+		predecessorParametersBytes = input.exactCanonicalParametersCarrierBytes;
+	} else {
+		const priorCut = uniqueCandidateByKind(currentCandidates, "drp-hard-epoch-cut");
+		if (priorCut === undefined || priorCut.record.epoch !== expectedPrevious.epoch - 1) return undefined;
+		const priorDeclaration = await input.snapshotStore.lookupRecoveryDeclaration({objectId: expectedPrevious.objectId,
+			epoch: Number(priorCut.record.epoch), anchor: String(priorCut.record.previousAnchor), manifestDigest: String(priorCut.record.snapshotManifestDigest)});
+		if (input.proofAccounting !== undefined && !input.proofAccounting.charge(encodeCanonical(priorDeclaration))) return undefined;
+		if (priorDeclaration.kind !== "present" || priorDeclaration.state === "poisoned") return undefined;
+		const priorSnapshot = await verifySnapshot({snapshotDeclaration: priorDeclaration.declaration, snapshotStore: input.snapshotStore},
+			{cut: priorCut.record, successorTrust: predecessorTrust}, input.proofAccounting);
+		if (priorSnapshot === undefined) return undefined;
+		predecessorAclBytes = encodeCanonical(priorSnapshot.payload.acl);
+		predecessorParametersBytes = encodeCanonical(priorCut.record.parameters);
+	}
+	if (predecessorAclBytes === undefined || predecessorParametersBytes === undefined ||
+		hex(hashDomain("ts-drp/parameters/v3", predecessorParametersBytes)) !== currentAnchor.parametersDigest ||
+		!openCanonicalLatchedAclSnapshot({exactCanonicalLatchedAclBytes: predecessorAclBytes, expectedAclDigest: String(currentAnchor.aclDigest),
+			expectedEpoch: expectedPrevious.epoch, expectedObjectId: expectedPrevious.objectId, expectedProfileId: predecessorTrust.profileId}).ok) return undefined;
+	const observation = await input.snapshotStore.lookupRecoveryDeclaration(custody.retained.scope);
+	if (input.proofAccounting !== undefined && !input.proofAccounting.charge(encodeCanonical(observation))) return undefined;
+	if (observation.kind !== "present" || observation.state === "poisoned") return undefined;
+	const snapshot = await verifySnapshot({snapshotDeclaration: observation.declaration, snapshotStore: input.snapshotStore},
+		{cut: cut.record, successorTrust: opened.currentTrust}, input.proofAccounting);
+	if (snapshot === undefined) return undefined;
+	const attachment = openCreatorCheckpointAttachment({localBaseHead: currentHead, localTrust: predecessorTrust,
+		exactCanonicalGenesisAnchorPreimageBytes: input.exactCanonicalAnchorPreimageBytes, detachedGenesisSignature: input.detachedSignature,
+		exactCanonicalReattachmentCheckpointBytes: certificate.exactCanonicalReattachmentCheckpointBytes,
+		exactCanonicalCutValueBytes: cut.bytes, exactCanonicalCommitQcBytes: qc.bytes, exactCanonicalTrustStateRecordBytes: targetCarrier.bytes,
+		exactCanonicalSnapshotManifestBytes: observation.declaration.exactCanonicalManifestBytes,
+		exactCanonicalSnapshotPayloadBytes: snapshot.exactCanonicalPayloadBytes, exactCanonicalSettlementBytes: settlement.bytes});
+	const attachmentIdentity = attachment.ok ? resolveCreatorCheckpointAttachment(attachment.capability) : undefined;
+	if (!attachment.ok || attachmentIdentity === undefined) return undefined;
+	const historyDigest = digestBlob(certificate.exactCanonicalHistoryBytes);
+	if (!historyDigest.ok) return undefined;
+	const proposedCandidates = [...attachmentIdentity.proofCandidates, sourceProjection,
+		{bytes: certificate.exactCanonicalHistoryBytes, ref: {digest: historyDigest.value, byteLength: certificate.exactCanonicalHistoryBytes.byteLength}}]
+		.sort((a, b) => a.ref.digest.localeCompare(b.ref.digest));
+	if (!inspectCreatorCheckpointTransition({checkpoint: attachment.capability, localHead: currentHead, currentTrust: predecessorTrust,
+		current: {candidates: currentCandidates, closure: currentGeneration.closure},
+		proposed: {candidates: proposedCandidates, closure: proposedCandidates.map(({ref}) => ref)}})) return undefined;
+	const chain: VerifiedChain = Object.freeze({currentAnchor, currentEpoch: expectedPrevious.epoch,
+		checkpointPredecessorAnchor: canonicalRecord(readCreatorSettlementSourceAnchor(attachmentIdentity.remoteCheckpoint.predecessorTrust)!.anchorPreimage)!,
+		currentCatalog: {artifactDigest: String(sourceProjection.record.artifactDigest), artifactId: String(sourceProjection.record.artifactId),
+			blueprintDigest: String(sourceProjection.record.blueprintDigest), catalogDigest: String(sourceProjection.record.catalogDigest),
+			runtimeProfile: String(sourceProjection.record.runtimeProfile)}, currentProjectionKind: currentProjectionKind(expectedPrevious.epoch),
+		currentTrustRecord: currentCarrier.record, cut: cut.record, successorAnchor,
+		successorAnchorBytes: targetAnchorBytes as Uint8Array, successorEpoch: expectedNext.epoch,
+		successorTrust: attachmentIdentity.target.trust, successorTrustRecord: targetCarrier.record});
+	if (verifiedCatalog(input.catalog, snapshot.payload.blueprintDigest, chain.currentCatalog) === undefined ||
+		!creatorSnapshotProjectionMatches(targetProjection.record, successorAnchor, chain.successorTrust.currentAnchorDigest,
+			observation.declaration.scope.manifestDigest, snapshot.manifest) ||
+		hex(hashDomain("ts-drp/parameters/v3", encodeCanonical(cut.record.parameters))) !== successorAnchor.parametersDigest ||
+		!matchesCreatorAdoptionReferences({pendingReferences: proposedCandidates.map(({ref}) => ref), predecessorLiveRef: sourceProjection.ref,
+			exactCanonicalProjectionBytes: targetProjection.bytes, exactCanonicalCutValueBytes: cut.bytes,
+			predecessorExactCanonicalLatchedAclBytes: attachmentIdentity.remoteCheckpoint.exactCanonicalPredecessorAclBytes}, candidate.closure))
+		return undefined;
+	return Object.freeze({closureDigest: candidateHead.closureDigest, generation: candidate, head: candidateHead,
+		receivedContext: Object.freeze({checkpoint: attachment.capability, receivedCustody: custody, predecessorParametersBytes,
+			currentGeneration, currentHead, currentCandidates, proposedCandidates, candidate, candidateHead, chain, predecessorTrust,
+			predecessorAclBytes, snapshot})});
+}
+
 
 async function authenticatePendingCandidate(
 	input: CreatorAdoptionPendingRecoveryInput,
@@ -3440,6 +3761,10 @@ async function authenticatePendingCandidate(
 				candidateCandidates === undefined
 			) {
 				return undefined;
+			}
+			if (expectedNext.epoch > expectedPrevious.epoch + 1) {
+				return direct ? authenticateReceivedCheckpointCandidate(input, structure, currentCandidates, candidateCandidates,
+					expectedPrevious, expectedNext) : undefined;
 			}
 			const proposedCandidates = direct
 				? receivedTransitionClosure(currentCandidates, candidateCandidates, expectedPrevious.epoch)
@@ -3955,16 +4280,17 @@ export async function selectRetainedCreatorSuccessorAdoption(
 			references: readonly GenerationRef[]
 		): Promise<RecoveredClosure["currentCandidates"] | undefined> =>
 			Promise.resolve(recoveryCensusClosure(reader, references));
-		const custody = await readReceivedCustody({ ...input, ...(proofAccounting === undefined ? {} : { proofAccounting }) }, previous);
+		const custodyInput = { ...input, ...(proofAccounting === undefined ? {} : { proofAccounting }) };
+		const custody = reader.head.kind === "present" ? await readReceivedCustodyForNativeHead(custodyInput, reader.head) : null;
 		const complete: Readonly<{ candidate: AuthenticatedPendingCandidate; next: CreatorAdoptionRoomHead }>[] = [];
 		for (const generation of reader.generations) {
 			if (generation.state !== "Complete") continue;
 			const closure = await readClosure(generation.closure);
 			const trust = closure === undefined ? undefined : uniqueCandidateByKind(closure, "drp-anchor-trust-state");
-			if (trust?.record.currentEpoch !== previous.epoch + 1) continue;
+			if (typeof trust?.record.currentEpoch !== "number" || trust.record.currentEpoch <= previous.epoch) continue;
 			const next = exactRoomHead({
 				objectId: previous.objectId,
-				epoch: previous.epoch + 1,
+				epoch: trust.record.currentEpoch,
 				currentAnchorDigest: trust.record.currentAnchorDigest,
 			});
 			if (next === undefined) continue;
@@ -4005,6 +4331,45 @@ export async function selectRetainedCreatorSuccessorAdoption(
 			throw new TypeError("creator retained recovery complete successors conflict");
 		if (complete.length > 0) {
 			if (!(await reader.checkCurrency()).ok) throw new TypeError("creator retained recovery native census changed");
+			const selected = complete[0]!, context = selected.candidate.receivedContext;
+			if (context.checkpoint !== undefined) {
+				if (reader.head.kind !== "present" || context.receivedCustody === undefined)
+					throw new TypeError("creator retained checkpoint custody is unavailable");
+				const recoveryInput = {...input, expectedNextRoomHead: selected.next, ...(proofAccounting === undefined ? {} : {proofAccounting})};
+				const replay = await authenticateReceivedCandidateCustody(recoveryInput, context.receivedCustody, context, reader.head);
+				const certificate = context.receivedCustody.certificate;
+				const observation = await input.snapshotStore.lookupRecoveryDeclaration(context.receivedCustody.retained.scope);
+				const history = openCreatorCloseHistory({bytes: certificate.exactCanonicalHistoryBytes,
+					exactCanonicalCutValueBytes: certificate.exactCanonicalCutValueBytes,
+					historyRoot: context.chain.cut.historyRoot, historySize: context.chain.cut.historySize});
+				if (replay === undefined || history === undefined || observation.kind !== "present" || observation.state !== "verified" ||
+					observation.retention !== "recovery") throw new TypeError("creator retained checkpoint proof is unavailable");
+				const proof = context.proposedCandidates;
+				const cut = uniqueCandidateByKind(proof, "drp-hard-epoch-cut")!, qc = uniqueCandidateByKind(proof, "drp-seal-qc")!,
+					trust = uniqueCandidateByKind(proof, "drp-anchor-trust-state")!;
+				const owner = Object.freeze({});
+				const facts: SealedAdoptionFacts = Object.freeze({checkpoint: context.checkpoint, origin: "received",
+					receivedCandidates: proof, receivedCandidateGenerationId: certificate.candidateGenerationId,
+					receivedCandidateClosureDigest: certificate.candidateClosureDigest, ...(proofAccounting === undefined ? {} : {proofAccounting}),
+					transition: {cutValueRef: cut.ref, commitQcRef: qc.ref, successorTrustRef: trust.ref, currentTrustRef: certificate.currentTrustRef,
+						epoch: previous.epoch, successorEpoch: selected.next.epoch, successorAnchorDigest: selected.next.currentAnchorDigest},
+					currentHead: context.currentHead, currentReferences: context.currentGeneration.closure, currentTrust: context.predecessorTrust,
+					durableReplay: replay, exactCanonicalLatchedAclBytes: context.predecessorAclBytes,
+					exactCanonicalParametersCarrierBytes: context.predecessorParametersBytes ?? input.exactCanonicalParametersCarrierBytes,
+					exactCanonicalPinnedGenesisBootstrapOperationBytes: input.exactCanonicalPinnedGenesisBootstrapOperationBytes,
+					history: {historyRoot: String(context.chain.cut.historyRoot), historySize: Number(context.chain.cut.historySize), historySnapshot: history},
+					issuanceScope: {objectId: parsed.value, author: input.author}, issuanceStore: input.issuanceStore, liveJournalStore: input.liveJournalStore,
+					objectId: parsed.value, proposedHead: context.currentHead, proposedReferences: proof.map(({ref}) => ref),
+					snapshotDeclaration: observation.declaration, snapshotStore: input.snapshotStore, store: input.store,
+					terminalizeSource: async () => {revokeCreatorAdoptionFacts(owner); return true;}});
+				if (!installCreatorAdoptionFacts(owner, facts)) throw new TypeError("creator retained checkpoint provenance conflicts");
+				const verified = await verifyCreatorSuccessorAdoption({handle: owner, catalog: input.catalog});
+				if (!verified.ok || !(await reader.checkCurrency()).ok || !(await replay.verify())) {
+					revokeCreatorAdoptionFacts(owner); throw new TypeError("creator retained checkpoint adoption authentication failed");
+				}
+				return Object.freeze({head: selected.next, received: Object.freeze({handle: owner, verified,
+					releasePromotionDependencies: async () => {revokeCreatorAdoptionFacts(owner);}})});
+			}
 			return Object.freeze({ head: (complete[0] as (typeof complete)[number]).next });
 		}
 		if (custody === null) {
@@ -4044,9 +4409,13 @@ export async function selectRetainedCreatorSuccessorAdoption(
 		if (cut === undefined || successorRecord === undefined)
 			throw new TypeError("creator retained recovery proof is invalid");
 		const promoted = Object.hasOwn(cut, "forwardPromotion");
+		const remotePoint = certificate.exactCanonicalReattachmentCheckpointBytes === undefined ? undefined :
+			decodeCreatorReattachmentCheckpoint(certificate.exactCanonicalReattachmentCheckpointBytes);
+		if (certificate.exactCanonicalReattachmentCheckpointBytes !== undefined && (remotePoint === undefined || promoted))
+			throw new TypeError("creator retained recovery checkpoint proof is invalid");
 		const next = exactRoomHead({
 			objectId: previous.objectId,
-			epoch: previous.epoch + 1,
+			epoch: remotePoint === undefined ? previous.epoch + 1 : successorRecord.currentEpoch,
 			currentAnchorDigest: successorRecord.currentAnchorDigest,
 		});
 		if (next === undefined) throw new TypeError("creator retained recovery successor scope is invalid");
@@ -4066,8 +4435,19 @@ export async function selectRetainedCreatorSuccessorAdoption(
 					exactCanonicalTrustStateRecordBytes: certificate.exactCanonicalTrustStateRecordBytes,
 				})
 			: undefined;
-		const checkpoint =
-			previous.epoch === 0
+		const remoteTrust = remotePoint === undefined ? undefined : openCreatorCheckpointTrust({
+			detachedGenesisSignature: input.detachedSignature, exactCanonicalGenesisAnchorPreimageBytes: input.exactCanonicalAnchorPreimageBytes,
+			exactCanonicalCommitQcBytes: certificate.exactCanonicalCommitQcBytes, exactCanonicalCutValueBytes: certificate.exactCanonicalCutValueBytes,
+			exactCanonicalCurrentTrustStateRecordBytes: certificate.exactCanonicalTrustStateRecordBytes,
+			exactCanonicalPredecessorTrustStateRecordBytes: remotePoint.exactCanonicalPredecessorTrustStateRecordBytes,
+			expectedCurrentHead: next, expectedObjectId: parsed.value, pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest});
+		const localTrust = remoteTrust?.ok ? openCreatorSettlementSourceTrust(remoteTrust.currentTrust,
+			oldTrust.record.exactCanonicalCurrentAnchorPreimageBytes as Uint8Array,
+			oldTrust.record.detachedCurrentAnchorSignature as Uint8Array, parsed.value, input.pinnedGenesisAnchorDigest) : undefined;
+		const checkpoint = remotePoint !== undefined
+			? remoteTrust?.ok && localTrust !== undefined && next.epoch > previous.epoch + 1 ?
+				{ok: true as const, predecessorTrust: localTrust, currentTrust: remoteTrust.currentTrust} : {ok: false as const}
+			: previous.epoch === 0
 				? genesis?.ok && adjacent?.ok
 					? { ok: true as const, predecessorTrust: genesis.trust, currentTrust: adjacent.trust }
 					: { ok: false as const }
@@ -4103,13 +4483,29 @@ export async function selectRetainedCreatorSuccessorAdoption(
 			observation.state !== "verified" ||
 			observation.retention !== "recovery" ||
 			cut.snapshotManifestDigest !== retained.scope.manifestDigest ||
-			cut.epoch !== previous.epoch ||
-			cut.previousAnchor !== previous.currentAnchorDigest
+			cut.epoch !== retained.scope.epoch ||
+			cut.previousAnchor !== retained.scope.anchor
 		)
 			throw new TypeError("creator retained recovery snapshot ownership differs");
+		const receivedSnapshot = remotePoint === undefined ? undefined : await verifySnapshot(
+			{snapshotDeclaration: observation.declaration, snapshotStore: input.snapshotStore},
+			{cut, successorTrust: checkpoint.currentTrust}, proofAccounting);
+		const attachment = remotePoint === undefined ? undefined : receivedSnapshot === undefined ? undefined : openCreatorCheckpointAttachment({
+			localBaseHead: nativeHead, localTrust: checkpoint.predecessorTrust,
+			exactCanonicalGenesisAnchorPreimageBytes: input.exactCanonicalAnchorPreimageBytes, detachedGenesisSignature: input.detachedSignature,
+			exactCanonicalReattachmentCheckpointBytes: certificate.exactCanonicalReattachmentCheckpointBytes,
+			exactCanonicalCutValueBytes: certificate.exactCanonicalCutValueBytes, exactCanonicalCommitQcBytes: certificate.exactCanonicalCommitQcBytes,
+			exactCanonicalTrustStateRecordBytes: certificate.exactCanonicalTrustStateRecordBytes,
+			exactCanonicalSnapshotManifestBytes: observation.declaration.exactCanonicalManifestBytes,
+			exactCanonicalSnapshotPayloadBytes: receivedSnapshot.exactCanonicalPayloadBytes,
+			exactCanonicalSettlementBytes: certificate.exactCanonicalSettlementBytes});
+		const attachmentIdentity = attachment?.ok ? resolveCreatorCheckpointAttachment(attachment.capability) : undefined;
+		if (remotePoint !== undefined && (attachment?.ok !== true || attachmentIdentity === undefined))
+			throw new TypeError("creator retained recovery checkpoint attachment is invalid");
 		const oldAnchor = canonicalRecord(oldTrust.record.exactCanonicalCurrentAnchorPreimageBytes as Uint8Array);
 		if (oldAnchor === undefined) throw new TypeError("creator retained recovery old anchor is invalid");
 		let oldAcl = input.exactCanonicalGenesisLatchedAclBytes;
+		let oldParameters = input.exactCanonicalParametersCarrierBytes;
 		if (previous.epoch > 0) {
 			const oldCut = uniqueCandidateByKind(current, "drp-hard-epoch-cut");
 			if (oldCut === undefined)
@@ -4134,8 +4530,10 @@ export async function selectRetainedCreatorSuccessorAdoption(
 			);
 			if (oldSnapshot === undefined) throw new TypeError("creator retained recovery predecessor snapshot is invalid");
 			oldAcl = encodeCanonical(oldSnapshot.payload.acl);
+			oldParameters = encodeCanonical(oldCut.record.parameters);
 		}
-		if (hex(hashDomain("ts-drp/latched-acl/v3", oldAcl)) !== oldAnchor.aclDigest)
+		if (hex(hashDomain("ts-drp/latched-acl/v3", oldAcl)) !== oldAnchor.aclDigest ||
+			hex(hashDomain("ts-drp/parameters/v3", oldParameters)) !== oldAnchor.parametersDigest)
 			throw new TypeError("creator retained recovery predecessor ACL differs");
 		const replay = await sealCreatorReceivedRecoveryReplay({
 			generation: {
@@ -4149,7 +4547,7 @@ export async function selectRetainedCreatorSuccessorAdoption(
 				exactCanonicalProjectionBytes: oldProjection.bytes,
 			},
 			catalog: input.catalog,
-			exactCanonicalParametersCarrierBytes: input.exactCanonicalParametersCarrierBytes,
+			exactCanonicalParametersCarrierBytes: oldParameters,
 			pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest,
 			store: input.store,
 			exactCanonicalLatchedAclBytes: oldAcl,
@@ -4184,15 +4582,17 @@ export async function selectRetainedCreatorSuccessorAdoption(
 			if (!digest.ok) throw new TypeError("creator retained recovery proof digest is invalid");
 			return Object.freeze({ bytes, ref: Object.freeze({ digest: digest.value, byteLength: bytes.byteLength }) });
 		});
-		const proposedCandidates = [
+		const proposedCandidates = (attachmentIdentity === undefined ? [
 			...current.filter(
 				({ ref, bytes }) =>
 					!sameRef(ref, oldTrust.ref) && !new Set(["drp-creator-author-settlement-state","drp-creator-issuance-retirement-state","drp-creator-author-issuance-frontiers-state"]).has(String(canonicalRecord(bytes)?.kind))
 			),
 			...proof,
-		].sort((a, b) => a.ref.digest.localeCompare(b.ref.digest));
+		] : [...attachmentIdentity.proofCandidates, oldProjection, proof.find(candidate =>
+			sameBytes(candidate.bytes, certificate.exactCanonicalHistoryBytes))!]).sort((a, b) => a.ref.digest.localeCompare(b.ref.digest));
 		const owner = Object.freeze({});
 		let facts: SealedAdoptionFacts = Object.freeze({
+			...(attachment?.ok === true ? {checkpoint: attachment.capability} : {}),
 			origin: "received",
 			receivedCandidates: Object.freeze(proposedCandidates),
 			...(proofAccounting === undefined ? {} : { proofAccounting }),
@@ -4212,7 +4612,7 @@ export async function selectRetainedCreatorSuccessorAdoption(
 			currentTrust: checkpoint.predecessorTrust,
 			durableReplay: replay,
 			exactCanonicalLatchedAclBytes: oldAcl,
-			exactCanonicalParametersCarrierBytes: input.exactCanonicalParametersCarrierBytes,
+			exactCanonicalParametersCarrierBytes: oldParameters,
 			exactCanonicalPinnedGenesisBootstrapOperationBytes: input.exactCanonicalPinnedGenesisBootstrapOperationBytes,
 			history: {
 				historyRoot: hex(accumulator.root()),
@@ -4261,9 +4661,9 @@ export async function selectRetainedCreatorSuccessorAdoption(
 			throw new TypeError("creator retained recovery authenticated adoption failed");
 		}
 		const finalCustody = await input.snapshotStore.lookupReceivedRecoveryCertificate({
-			objectId: previous.objectId,
-			epoch: previous.epoch,
-			anchor: previous.currentAnchorDigest,
+			objectId: retained.scope.objectId,
+			epoch: retained.scope.epoch,
+			anchor: retained.scope.anchor,
 		});
 		if (proofAccounting !== undefined && !proofAccounting.charge(encodeCanonical(finalCustody)))
 			throw new TypeError("creator retained recovery certificate readback proof capacity refused");
@@ -4361,7 +4761,7 @@ async function recoverPendingCreatorSuccessorMaterial(
 			!parsedObjectId.ok ||
 			expectedPrevious.objectId !== parsedObjectId.value ||
 			expectedNext.objectId !== parsedObjectId.value ||
-			expectedNext.epoch !== expectedPrevious.epoch + 1
+			expectedNext.epoch <= expectedPrevious.epoch
 		) {
 			return pendingRecoveryFailure("chain-invalid", "creator pending room-head input is invalid");
 		}
@@ -4383,7 +4783,7 @@ async function recoverPendingCreatorSuccessorMaterial(
 			references: readonly GenerationRef[]
 		): Promise<RecoveredClosure["currentCandidates"] | undefined> =>
 			Promise.resolve(recoveryCensusClosure(capturedReader, references));
-		const custody = await readReceivedCustody(input, expectedPrevious);
+		let custody = await readReceivedCustody(input, expectedPrevious);
 		const candidates: AuthenticatedPendingCandidate[] = [];
 		for (const generation of lineage) {
 			const candidate = await authenticatePendingCandidate(
@@ -4405,6 +4805,8 @@ async function recoverPendingCreatorSuccessorMaterial(
 		if (candidates.length === 0) {
 			return pendingRecoveryFailure("pending-missing", "creator pending successor is unavailable");
 		}
+		const checkpointCustody = candidates.find(candidate => candidate.receivedContext.checkpoint !== undefined)?.receivedContext.receivedCustody;
+		if (checkpointCustody !== undefined) custody = checkpointCustody;
 		const closureDigests = new Set(candidates.map(({ closureDigest }) => closureDigest));
 		if (closureDigests.size !== 1) {
 			return pendingRecoveryFailure("true-fork", "creator pending successors disagree");

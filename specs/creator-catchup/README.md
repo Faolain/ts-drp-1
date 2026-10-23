@@ -2,24 +2,23 @@
 
 An accepted local operation must remain either committed, durably pending, or explicitly disposed of by its policy when a replica misses checkpoints or loses its Writer role. Membership removal changes authority; it does not prove completion. Re-admission changes current authority; it does not revive an old runtime or erase old intent.
 
-## Next agent prompt
+## Implementation and remaining verification
 
-Updated 2026-10-23. Continue from the native RED tests in `tests/creator-rejoin-readmission-native.test.ts`. Both reach the real product boundary: a gap fails signed adjacency, and removal fails historical issuance preparation. The bounded verification and transport seam passes native checkpoint and tamper controls in `tests/creator-reattachment-checkpoint-native.test.ts`; it does not yet authorize native adoption. Three fresh independent read-only design drafts have been synthesized below. Independent code review found and closed a sealed-export regression, with native sealed-successor reopen checks passing.
+Updated 2026-10-23. The public native room path now installs a bounded checkpoint after missed epochs and retains visible accepted work through removal, re-admission and cold reopen. The repeated-gap gate reaches epoch 16 through eight two-epoch jumps, preserving eight independently accepted unknown sources and allowing fresh current issue. This is a finite admitted workload; unresolved sources remain bounded by the original plan and issuance quota.
 
-Implement the authenticated checkpoint re-attachment seam first. Keep actual local AHE ancestry separate from the remote final checkpoint's predecessor. Review the precise storage reservation and retention design before changing native layouts. Update this handoff after each verified pass; these tests are a completion gate, not evidence that fail-closed behavior fulfils rejoin.
+The native role and custody slice has completed independent review; its two reported regressions have focused corrections. Native role and absence tampering, receipt-only recovery before a complete candidate, and mixed adjacent/checkpoint histories have focused regressions. Remaining gates are all owner bounds, both usable rollback forward promotions, genuine SQLite process death, browser verification, and explicit source expiry. A further concrete completion case remains open: after full removal of an author who has both a signed-close committed source and an omitted source, same-key re-admission stalls on an obsolete ordinary rebase entry. No duplicate APP was observed. Its correction must preserve exact signed completion evidence through the last consumer. Fault exceptions around floor writes are not process-death evidence. Proof-level parameter and blueprint substitution controls do not replace the outstanding application-level historical-ABI test.
 
-- [x] [Authenticated checkpoint and transition model](slices/01-authenticated-chain.md)
-- [ ] [Bounded native attachment receipt](slices/02-successor-evidence.md)
-- [ ] [Received catch-up publication and reopen](slices/03-catchup-publication.md)
-- [ ] [Dormant custody and re-admission](slices/04-dormant-custody.md)
-- [ ] [Durable policy resolution and independent current issuance](slices/05-policy-resolution.md)
-- [ ] Native SQLite, all three browser engines, real process death and independent review.
+- [Authenticated checkpoint and transition model](slices/01-authenticated-chain.md)
+- [Bounded native attachment receipt](slices/02-successor-evidence.md)
+- [Received catch-up publication and reopen](slices/03-catchup-publication.md)
+- [Dormant custody and re-admission](slices/04-dormant-custody.md)
+- [Durable policy resolution and independent current issuance](slices/05-policy-resolution.md)
 
 ## Independent design synthesis
 
 All three drafts identify the same existing conflation: `predecessor` means both actual local ancestry and the remote checkpoint predecessor, while historical issuance requires a latest per-author frontier. Use one discriminated adjacent/checkpoint transition in the original adoption owner. Its material names `localBase`, `remoteCheckpoint` and `target` explicitly. Adjacent transitions retain their stronger classification. The original historical source owner authenticates custody independently of current Writer permission and optional commitment evidence; a removed writer does not become the existing empty-issuance observer mode.
 
-All three drafts also reject permanent retention of one AHE generation per pending source epoch. Transfer minimal immutable source proof into existing snapshot recovery custody before its old generation retires, charge that proof before acceptance, and retain it until the last source or rollback consumer releases it. The candidate checkpoint carrier exceeds one AHE blob's 65,536-byte ceiling. It belongs in bounded transport/recovery metadata, subject to complete envelope, wrapper, journal and operation-proof sizing. Use separately requested adjacent-membership and checkpoint response variants so a gap never fetches irrelevant final-close membership as if it classified local work; existing response ceilings remain unchanged.
+All three drafts also reject permanent retention of one AHE generation per pending source epoch. Transfer minimal immutable source proof into the existing settlement plan before its old generation retires, charge its complete native representation before acceptance, and retain it until the last source consumer releases it. The full transport checkpoint exceeds one AHE blob's ceiling. Its compact native point proof stores only remote predecessor trust and predecessor settlement; the final closure already owns the exact predecessor ACL. This keeps seven references, one current-trust record and the existing per-record and union limits. Use separately requested adjacent-membership and checkpoint response variants so a gap never fetches irrelevant final-close membership as if it classified local work; existing response ceilings remain unchanged.
 
 Native publication continues through the original intent, stage/CAS and floor owners. The mechanical floor codec may represent a monotone gap only after Node authenticates the exact attachment. Reopen reconstructs original signed proof and native currency, not stored labels. G18 is judged against the original contract and current adjacent recovery behavior: actual local rollback payloads remain protected, and a higher floor never permits an old writable session. Verify usable recovery, not just generation counts.
 
@@ -35,6 +34,10 @@ The native base head is the replica's actual installed generation. The final Cut
 
 Original signed source identity includes object, author, sequence, digest and epoch. A current ACL can forbid new writes while the recovery owner retains and exposes old sources. Only authenticated commitment or an explicit application policy resolution can settle them. Terminal runtime handles remain terminal after a new session obtains authority.
 
+The original recovery owner derives usable local roles from exact native publication edges for received adjacent heads and checkpoint jumps. Adjacent heads retain their original signed edge and full snapshot checks; jumps additionally require the nominal checkpoint attachment. It authenticates current and first-rollback birth receipts, then opens the oldest rollback as an independent signed point. A historical signature authenticates DATA; it cannot choose a current native partition, revive a session, or authorize deletion. The exported semantic readback alone supplies no native read custody. The original Node acquisition joins it to the exact current bounded reader, floor, full census, held snapshots and currentness checks before the existing retirement coordinator may act.
+
+A native absence receipt identifies an immutable publication: fixed genesis, exact native head tuple and current anchor. Its identity excludes predecessor pointers that authorized cleanup may normalize. A historical receipt can establish absence for an independently classified old point; it cannot classify a currently present scope or excuse a missing protected payload. Current deletion still requires fresh current role proof, exact native image and intent binding, and joined last-consumer release.
+
 ## Bound and refusal
 
 Re-attachment must work after arbitrarily many missed epochs using bounded current checkpoint evidence. The earlier seven-certificate proposal is rejected: seven was provisional, a missing certificate could strand old intent, and full membership plus signed carriers exceeds the existing journal image bound at capacity. Do not add a new certificate ring or require an age-sized chain.
@@ -47,6 +50,6 @@ The existing journal image has a 2 MiB ceiling and the AHE closure has seven ref
 
 The public native regression is the runnable review surface. The focused Quint model covers transition sequencing, retained intent, exact old/new floor recovery and stale runtime fencing. It does not model Ed25519, native transaction exclusion, or prove the full settlement contract. Native evidence remains mandatory for those boundaries.
 
-The focused model's six deterministic tests and 3,000 randomized runs of 40 steps pass. Its finite `stepSmall` projection exhaustively checked 598,740 generated / 143,522 distinct states, with no states left on the queue and graph depth 27. This projection limits the model to three epochs, two accepted identities and five runtime incarnations; these are verification bounds, not product lifetime limits. Deliberate intent-loss and old-session-revival transitions each produce a shortest counterexample. The native recovery tests remain RED.
+The focused model's six deterministic tests and 3,000 randomized runs of 40 steps pass. Its finite `stepSmall` projection exhaustively checked 598,740 generated / 143,522 distinct states, with no states left on the queue and graph depth 27. This projection limits the model to three epochs, two accepted identities and five runtime incarnations; these are verification bounds, not product lifetime limits. Deliberate intent-loss and old-session-revival transitions each produce a shortest counterexample. The public gap path now has native positive evidence; the remaining verification list above limits the completion claim.
 
 Keep G1–G28, particularly bounded overhead and reserve-before-acceptance (G1/G2/G21/G22), original proof custody and untrusted native bytes (G5–G12), rollback/floor/crash behavior (G14–G18/G24/G28), and terminal session fencing (G4/G17).

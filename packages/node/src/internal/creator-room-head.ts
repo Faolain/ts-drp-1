@@ -131,7 +131,7 @@ export function captureCreatorRoomHeadState(
 				!valid(next) ||
 				previous.epoch !== stable.epoch ||
 				previous.currentAnchorDigest !== stable.currentAnchorDigest ||
-				next.epoch !== stable.epoch + 1 ||
+				next.epoch <= stable.epoch ||
 				next.currentAnchorDigest === stable.currentAnchorDigest
 			)
 				return failure("floor-invalid");

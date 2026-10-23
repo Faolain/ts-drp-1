@@ -1,3 +1,4 @@
+import { CANONICAL_SETTLEMENT_PLAN_STORAGE_KIND, issuanceLegacySettlementPlanEntriesJson } from "@ts-drp/issuance-store/maintenance";
 import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
 import {
 	applySettlementPlanEffect,
@@ -513,37 +514,10 @@ function copyOutboxRow(value: unknown): NativeOutboxRow | undefined {
 }
 
 function settlementPlanEntriesJson(plan: SettlementPlan): string {
-	if (plan.sourceContexts !== undefined) return JSON.stringify({kind: "canonical-settlement-plan-1",
+	if (plan.sourceContexts !== undefined) return JSON.stringify({kind: CANONICAL_SETTLEMENT_PLAN_STORAGE_KIND,
 		bytes: Buffer.from(encodeCanonical(plan, {maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes, maxDepth: 12,
 			maxItems: ISSUANCE_RETIREMENT_LIMITS.maxRows * 32})).toString("base64")});
-	return JSON.stringify(
-		plan.entries.map((entry) => ({
-			disposition: entry.disposition,
-			...(entry.sourceObjectId === undefined ? {} : { sourceObjectId: entry.sourceObjectId }),
-			...(entry.transformRefusal===undefined?{}:{transformRefusal:{...entry.transformRefusal,proposedIntentDigest:[...entry.transformRefusal.proposedIntentDigest]}}),
-			...(entry.inheritance === undefined
-				? {}
-				: {
-						inheritance: {
-							...entry.inheritance,
-							targetVertexDigest: [...entry.inheritance.targetVertexDigest],
-						},
-					}),
-			...(entry.replacementProgress === undefined
-				? {}
-				: {
-						replacementProgress: {
-							chunks: entry.replacementProgress.chunks.map((chunk) => ({ ...chunk })),
-							intentCount: entry.replacementProgress.intentCount,
-							intentDigest: [...entry.replacementProgress.intentDigest],
-							version: 1,
-						},
-					}),
-			replacementSequence: entry.replacementSequence,
-			sourceDigest: [...entry.sourceDigest],
-			sourceSequence: entry.sourceSequence,
-		}))
-	);
+	return issuanceLegacySettlementPlanEntriesJson(plan);
 }
 
 function copySettlementPlanRow(value: unknown, scope: DurableIssueScope): SettlementPlan | undefined {
@@ -556,7 +530,7 @@ function copySettlementPlanRow(value: unknown, scope: DurableIssueScope): Settle
 	if (objectId !== scope.objectId || author !== scope.author || typeof entriesJson !== "string") return undefined;
 	try {
 		const decoded: unknown = JSON.parse(entriesJson);
-		if (isClosedDurableIssuanceRecord(decoded, ["kind", "bytes"]) && decoded.kind === "canonical-settlement-plan-1") {
+		if (isClosedDurableIssuanceRecord(decoded, ["kind", "bytes"]) && decoded.kind === CANONICAL_SETTLEMENT_PLAN_STORAGE_KIND) {
 			if (typeof decoded.bytes !== "string" || decoded.bytes.length > Math.ceil(ISSUANCE_RETIREMENT_LIMITS.maxBytes / 3) * 4)
 				return undefined;
 			const bytes = Buffer.from(decoded.bytes, "base64");

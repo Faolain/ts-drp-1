@@ -35,7 +35,10 @@ import type { CreatorClosedRollbackProofAccounting, CreatorForwardPromotionSourc
 import { completeCreatorSuccessorLiveMaterial } from "./internal/creator-successor-live.js";
 import {
 	inspectCreatorTransitionAdvance,
+	inspectCreatorCheckpointTransition,
+	resolveCreatorCheckpointAttachment,
 	resolveCreatorForwardPromotion,
+	type VerifiedCreatorCheckpointAttachment,
 	type VerifiedCreatorForwardPromotion,
 } from "./internal/creator-transition-advance.js";
 
@@ -68,6 +71,7 @@ type StageSuccess = Readonly<{
 type PublishSuccess = CommitSuccess;
 
 interface SealedAdoptionFacts {
+	readonly checkpoint?: VerifiedCreatorCheckpointAttachment;
 	/** Original complete close/recovery ledger; grants no adoption or native authority. */
 	readonly proofAccounting?: CreatorClosedRollbackProofAccounting;
 	readonly origin: "local-close" | "received";
@@ -138,10 +142,15 @@ function predecessorProjectionKind(
 ): "v3-live-generation-1" | "v3-live-generation-2" | undefined {
 	const currentEpoch = material.activation.predecessor.trust.currentEpoch;
 	const successorEpoch = material.activation.successor.trust.currentEpoch;
+	const point = material.activation.checkpoint === undefined ? undefined : resolveCreatorCheckpointAttachment(material.activation.checkpoint);
+	if (material.activation.checkpoint !== undefined && (point === undefined ||
+		point.localBase.trust !== material.activation.predecessor.trust ||
+		point.target.trust !== material.activation.successor.trust ||
+		!sameHead(point.localBase.head, material.activation.predecessor.head))) return undefined;
 	return Number.isSafeInteger(currentEpoch) &&
 		currentEpoch >= 0 &&
 		Number.isSafeInteger(successorEpoch) &&
-		successorEpoch === currentEpoch + 1
+		(point === undefined ? successorEpoch === currentEpoch + 1 : successorEpoch > currentEpoch + 1)
 		? currentEpoch === 0
 			? "v3-live-generation-1"
 			: "v3-live-generation-2"
@@ -428,7 +437,7 @@ function validProjection(material: CreatorAdoptionIntentMaterial): Readonly<Reco
 			predecessorLiveRef: material.predecessorLiveRef,
 			exactCanonicalProjectionBytes: material.exactCanonicalProjectionBytes,
 			exactCanonicalCutValueBytes: cut.bytes,
-			predecessorExactCanonicalLatchedAclBytes: material.activation.predecessorExactCanonicalLatchedAclBytes,
+			predecessorExactCanonicalLatchedAclBytes: closedAclBytes(material),
 		},
 		material.candidateReferences
 	);
@@ -442,6 +451,10 @@ function validTrustChain(
 	currentCandidates: readonly Candidate[],
 	pendingCandidates: readonly Candidate[]
 ): boolean {
+	if (facts.checkpoint !== undefined) return inspectCreatorCheckpointTransition({checkpoint: facts.checkpoint,
+		localHead: facts.currentHead, currentTrust: facts.currentTrust,
+		current: {candidates: currentCandidates, closure: facts.currentReferences},
+		proposed: {candidates: pendingCandidates, closure: facts.proposedReferences}});
 	const cutBytes = candidateBytes(pendingCandidates, facts.transition.cutValueRef);
 	const commitBytes = candidateBytes(pendingCandidates, facts.transition.commitQcRef);
 	const successorTrustBytes = candidateBytes(pendingCandidates, facts.transition.successorTrustRef);
@@ -484,6 +497,13 @@ function validTrustChain(
 		proposed: { candidates: pendingCandidates, closure: facts.proposedReferences },
 		successorTrust: opened.trust,
 	}).ok;
+}
+
+function closedAclBytes(material: CreatorAdoptionIntentMaterial): Uint8Array {
+	if (material.activation.checkpoint === undefined) return material.activation.predecessorExactCanonicalLatchedAclBytes;
+	const point = resolveCreatorCheckpointAttachment(material.activation.checkpoint);
+	if (point === undefined) throw new TypeError("creator checkpoint closed ACL is unavailable");
+	return point.remoteCheckpoint.exactCanonicalPredecessorAclBytes;
 }
 
 async function authenticatedTerminal(
@@ -651,7 +671,7 @@ async function stageCandidate(
 	await facts.promotion?.source.checkSnapshots();
 	if (facts.proofAccounting !== undefined) {
 		for (const bytes of [material.exactCanonicalProjectionBytes, encodeCanonical(material.candidateReferences),
-			material.activation.predecessorExactCanonicalLatchedAclBytes,
+			closedAclBytes(material),
 			...(facts.origin === "received" ? material.activation.successor.candidates.map(({ bytes }) => bytes) : [])])
 			if (!facts.proofAccounting.charge(bytes)) throw new TypeError("creator successor full proof charge is exhausted before stage");
 	}
@@ -700,7 +720,7 @@ async function stageCandidate(
 		throw new TypeError("creator successor projection cache failed");
 	}
 	for (const bytes of [
-		material.activation.predecessorExactCanonicalLatchedAclBytes,
+		closedAclBytes(material),
 		...(facts.origin === "received" ? material.activation.successor.candidates.map(({ bytes }) => bytes) : []),
 	]) {
 		const digest = digestBlob(bytes);
