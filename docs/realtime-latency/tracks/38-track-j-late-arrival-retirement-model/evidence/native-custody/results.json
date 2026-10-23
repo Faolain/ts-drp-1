@@ -1,0 +1,930 @@
+{
+  "kind": "track-j-native-custody-evidence-1",
+  "sourceHashes": {
+    "packages/protocol-v3/formal/native-retirement-custody.qnt": "355130aa24f9af7318a1100744cef6dea1d1ba8dc60e2ff11cf2276d8808880b",
+    "packages/protocol-v3/formal/room-repair-custody.qnt": "806c83b3f7ac6955e44ef075401e978dfbd52902af53e97f369ededa1c5f7d3c",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-fence-proof.qnt": "0a1361ba5d2e95c96fe8a9afdb166b6234740f718a1efb3649f49ca98b5f7caf",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d",
+    "packages/protocol-v3/formal/settlement-replacement-retirement.qnt": "de30525dcd061ec795b2c10ed2cfab09b8a39950269b092e70322e9b9a9dc07b",
+    "packages/protocol-v3/formal/check-native-custody.mjs": "f7c198bc32f85020a6f485326c2efd5caeb0ce3337cdb25b99e209711da3f924",
+    "package.json": "a3057992395a57ec7bd8f2718e57dc5a1c682a98e259ec1edebf2d1dc85891c7",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-proofs.qnt": "374cd077fe0d0e2149c8cbf0160d4671046d2a18a19ce8eac0fd6a6944a20b04",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-exhaustive.qnt": "75dc47740cb3b66082bad82fa7bc9ea60535dfd76b53276ccd50ca048ffb6bcc",
+    "packages/protocol-v3/formal/received-certificate-retry.qnt": "ae271ef9da5154d7086cc59282fb899a596f5215257d70679acaf7d011abcaf2"
+  },
+  "sourceSetSha256": "27cdcb77e4c2aa99dd66927dceec2399e978a42c8cd469f8b579852e9a10d2f5",
+  "sourceSetEncoding": "sorted relative path + NUL + lowercase sha256 + LF",
+  "bounds": {
+    "nativeSmall": {
+      "epochs": [
+        0,
+        3
+      ],
+      "rows": 3,
+      "replacementEdges": 2
+    },
+    "native300": {
+      "epochs": [
+        0,
+        299
+      ],
+      "rows": 3,
+      "replacementEdges": 2
+    },
+    "repairSmall": {
+      "peers": 3,
+      "nativeSends": 2,
+      "rememberedHints": 2
+    },
+    "repairBoundarySchedule": {
+      "peers": 65,
+      "nativeSends": 2,
+      "rememberedHints": 64
+    },
+    "contractA5": {
+      "writers": 1,
+      "epochs": [
+        0,
+        5
+      ],
+      "sequences": [
+        0,
+        8
+      ],
+      "movesPerEpoch": 2
+    },
+    "contractFence": {
+      "writers": 1,
+      "epochs": [
+        0,
+        3
+      ],
+      "sequences": [
+        0,
+        4
+      ],
+      "movesPerEpoch": 1
+    }
+  },
+  "claims": {
+    "fullContractInduction": "OPEN: original move/seal candidate-hypothesis counterexamples retained",
+    "unboundedEpochProof": false,
+    "nativeRefinementProof": false,
+    "repairLiveness": "conditional on stable connected roster, capacity, weak sweep/native-settlement fairness and strong valid-answer fairness",
+    "timingNote": "Some batch wall times include a coordinator pause; checker logs are authoritative for solver durations."
+  },
+  "sections": {
+    "adjuncts": {
+      "sourceUnchanged": true,
+      "results": [
+        {
+          "name": "native-typecheck",
+          "command": "typecheck",
+          "args": [
+            "packages/protocol-v3/formal/native-retirement-custody.qnt"
+          ],
+          "expected": "typecheck",
+          "code": 0,
+          "got": "typecheck",
+          "seconds": 1,
+          "log": {
+            "path": "adjuncts-native-typecheck.log.gz",
+            "sha256": "f1b651238a58fe290baec6c5e32f3bdb1943dd2bd582f02569231f7a757c7837",
+            "uncompressedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "states": null
+        },
+        {
+          "name": "repair-typecheck",
+          "command": "typecheck",
+          "args": [
+            "packages/protocol-v3/formal/room-repair-custody.qnt"
+          ],
+          "expected": "typecheck",
+          "code": 0,
+          "got": "typecheck",
+          "seconds": 1,
+          "log": {
+            "path": "adjuncts-repair-typecheck.log.gz",
+            "sha256": "f1b651238a58fe290baec6c5e32f3bdb1943dd2bd582f02569231f7a757c7837",
+            "uncompressedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "states": null
+        },
+        {
+          "name": "native-small",
+          "command": "test",
+          "args": [
+            "packages/protocol-v3/formal/native-retirement-custody.qnt",
+            "--main",
+            "nativeRetirementCustodySmall"
+          ],
+          "expected": "tests",
+          "count": 9,
+          "code": 0,
+          "got": "tests",
+          "seconds": 1,
+          "log": {
+            "path": "adjuncts-native-small.log.gz",
+            "sha256": "41c08b1c603e4772f47c9b8405b5b683612c0f07a35defd457514c5c7459fe88",
+            "uncompressedSha256": "2d06427ccdc26c1b68e9d9c73454ec304c5b42083301cfc09f6ced7f912956cc"
+          },
+          "states": null
+        },
+        {
+          "name": "native-300",
+          "command": "test",
+          "args": [
+            "packages/protocol-v3/formal/native-retirement-custody.qnt",
+            "--main",
+            "nativeRetirementCustody300"
+          ],
+          "expected": "tests",
+          "count": 10,
+          "code": 0,
+          "got": "tests",
+          "seconds": 1,
+          "log": {
+            "path": "adjuncts-native-300.log.gz",
+            "sha256": "7cd163cb64c90fd72f56dcee5e449fbd13e7346b6271727527373cd623ba6687",
+            "uncompressedSha256": "48d600ecd44170a24b4e0427abb46743767df8191e1c30fcc9c7284e5d25a0b6"
+          },
+          "states": null
+        },
+        {
+          "name": "repair-small",
+          "command": "test",
+          "args": [
+            "packages/protocol-v3/formal/room-repair-custody.qnt",
+            "--main",
+            "roomRepairCustodySmall"
+          ],
+          "expected": "tests",
+          "count": 6,
+          "code": 0,
+          "got": "tests",
+          "seconds": 1,
+          "log": {
+            "path": "adjuncts-repair-small.log.gz",
+            "sha256": "460eadc4dc805d12607d6f5c1270998158de8952b59ce85b5360e5d88d66d8b1",
+            "uncompressedSha256": "8b413cc763649b78cf66fad1072696cb2ca750f8d1a636d62612262e8a5e2be3"
+          },
+          "states": null
+        },
+        {
+          "name": "repair-65",
+          "command": "test",
+          "args": [
+            "packages/protocol-v3/formal/room-repair-custody.qnt",
+            "--main",
+            "roomRepairCustody65"
+          ],
+          "expected": "tests",
+          "count": 6,
+          "code": 0,
+          "got": "tests",
+          "seconds": 1,
+          "log": {
+            "path": "adjuncts-repair-65.log.gz",
+            "sha256": "7b46aa97363d1ede8619c9b40524f8a345b9e9a8515364ada363fb6e85fc3f81",
+            "uncompressedSha256": "36a71f0e2fd00169cab53637bda14e35dd6653fe5c1d56c778879fc8859c4639"
+          },
+          "states": null
+        },
+        {
+          "name": "native-tlc",
+          "command": "verify",
+          "expected": "ok",
+          "args": [
+            "packages/protocol-v3/formal/native-retirement-custody.qnt",
+            "--main",
+            "nativeRetirementCustodySmall",
+            "--backend",
+            "tlc",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8844",
+            "--step",
+            "step",
+            "--init",
+            "init",
+            "--invariants",
+            "safety",
+            "--verbosity=3",
+            "--tlc-config",
+            "/private/tmp/ts-drp-native-custody-reviewed/tlc.json"
+          ],
+          "code": 0,
+          "got": "ok",
+          "seconds": 7,
+          "log": {
+            "path": "adjuncts-native-tlc.log.gz",
+            "sha256": "322e629d6c90d081beb110532d4b0452c66a3ecf70d5b60ccc101b868662794d",
+            "uncompressedSha256": "ab3c5910d6d7515b347baddd4983a9ff5107d544c254e19e86c760c9bb713147"
+          },
+          "states": {
+            "generated": 1413,
+            "distinct": 316,
+            "queued": 0,
+            "depth": 19
+          }
+        },
+        {
+          "name": "repair-tlc",
+          "command": "verify",
+          "expected": "ok",
+          "args": [
+            "packages/protocol-v3/formal/room-repair-custody.qnt",
+            "--main",
+            "roomRepairCustodySmall",
+            "--backend",
+            "tlc",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8844",
+            "--step",
+            "step",
+            "--init",
+            "init",
+            "--invariants",
+            "safety",
+            "--verbosity=3",
+            "--tlc-config",
+            "/private/tmp/ts-drp-native-custody-reviewed/tlc.json"
+          ],
+          "code": 0,
+          "got": "ok",
+          "seconds": 6,
+          "log": {
+            "path": "adjuncts-repair-tlc.log.gz",
+            "sha256": "fa7d48b7576ff1f11afe8da6fb44724f46296a28a211117b87dc95860002a4f2",
+            "uncompressedSha256": "7244ad4d38b9adb75c500eb00300c1c9005f9a434885f9ef2140661e9678fd18"
+          },
+          "states": {
+            "generated": 32797,
+            "distinct": 4371,
+            "queued": 0,
+            "depth": 20
+          }
+        },
+        {
+          "name": "native-mutation",
+          "command": "verify",
+          "expected": "violation",
+          "args": [
+            "packages/protocol-v3/formal/native-retirement-custody.qnt",
+            "--main",
+            "nativeRetirementCustodySmall",
+            "--backend",
+            "tlc",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8844",
+            "--step",
+            "unsafeStep",
+            "--init",
+            "init",
+            "--invariants",
+            "safety",
+            "--verbosity=3",
+            "--tlc-config",
+            "/private/tmp/ts-drp-native-custody-reviewed/tlc.json"
+          ],
+          "code": 1,
+          "got": "violation",
+          "seconds": 6,
+          "log": {
+            "path": "adjuncts-native-mutation.log.gz",
+            "sha256": "4ab96fc58af1ddab53da6206f12a1b0a5c60712fc251618ace9c3180738763fb",
+            "uncompressedSha256": "829ceb9eda1007038dfcdb110f0d0b530c906dabfc72252956c555a65414ffe3"
+          },
+          "states": {
+            "generated": 21,
+            "distinct": 9,
+            "queued": 6,
+            "depth": 3
+          }
+        },
+        {
+          "name": "repair-mutation",
+          "command": "verify",
+          "expected": "violation",
+          "args": [
+            "packages/protocol-v3/formal/room-repair-custody.qnt",
+            "--main",
+            "roomRepairCustodySmall",
+            "--backend",
+            "tlc",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8844",
+            "--step",
+            "unsafeStep",
+            "--init",
+            "init",
+            "--invariants",
+            "safety",
+            "--verbosity=3",
+            "--tlc-config",
+            "/private/tmp/ts-drp-native-custody-reviewed/tlc.json"
+          ],
+          "code": 1,
+          "got": "violation",
+          "seconds": 6,
+          "log": {
+            "path": "adjuncts-repair-mutation.log.gz",
+            "sha256": "12a17f5c187e2d864135a44e290cd8be693c6b7b6433bcca266cad40ef7e7c91",
+            "uncompressedSha256": "fb184ae044e1e5268c383bc84649ef5574afd98caf1f2ef2b9bf8f4db3958853"
+          },
+          "states": {
+            "generated": 12,
+            "distinct": 10,
+            "queued": 7,
+            "depth": 3
+          }
+        },
+        {
+          "name": "native-nonvacuity",
+          "command": "verify",
+          "expected": "violation",
+          "args": [
+            "packages/protocol-v3/formal/native-retirement-custody.qnt",
+            "--main",
+            "nativeRetirementCustodySmall",
+            "--backend",
+            "tlc",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8844",
+            "--step",
+            "step",
+            "--init",
+            "init",
+            "--invariants",
+            "neverRewrite",
+            "--verbosity=3",
+            "--tlc-config",
+            "/private/tmp/ts-drp-native-custody-reviewed/tlc.json"
+          ],
+          "code": 1,
+          "got": "violation",
+          "seconds": 7,
+          "log": {
+            "path": "adjuncts-native-nonvacuity.log.gz",
+            "sha256": "0b11be6d3a122dbf6e0501dac900103b964b7e281b74793eab396290bfd9822a",
+            "uncompressedSha256": "53b26537dad9ca77c9c44e35e214d2bdc56228b01d34ac633da250bc2e9f3e71"
+          },
+          "states": {
+            "generated": 19,
+            "distinct": 8,
+            "queued": 5,
+            "depth": 3
+          }
+        },
+        {
+          "name": "repair-nonvacuity",
+          "command": "verify",
+          "expected": "violation",
+          "args": [
+            "packages/protocol-v3/formal/room-repair-custody.qnt",
+            "--main",
+            "roomRepairCustodySmall",
+            "--backend",
+            "tlc",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8844",
+            "--step",
+            "step",
+            "--init",
+            "init",
+            "--invariants",
+            "neverUnrememberedPeer",
+            "--verbosity=3",
+            "--tlc-config",
+            "/private/tmp/ts-drp-native-custody-reviewed/tlc.json"
+          ],
+          "code": 1,
+          "got": "violation",
+          "seconds": 6,
+          "log": {
+            "path": "adjuncts-repair-nonvacuity.log.gz",
+            "sha256": "25c808fe87676203e7efbe02ff32a292e815ebde7498953a5a2498998c8d3716",
+            "uncompressedSha256": "2d7173b4b52bb76f2679df5f9f6028eb754417b2a9f71dc723d333d1d015de9f"
+          },
+          "states": {
+            "generated": 55,
+            "distinct": 27,
+            "queued": 15,
+            "depth": 5
+          }
+        },
+        {
+          "name": "repair-temporal",
+          "command": "verify",
+          "expected": "ok",
+          "args": [
+            "packages/protocol-v3/formal/room-repair-custody.qnt",
+            "--main",
+            "roomRepairCustodySmall",
+            "--backend",
+            "tlc",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8844",
+            "--step",
+            "liveStep",
+            "--init",
+            "init",
+            "--temporal",
+            "fairRepair",
+            "--verbosity=3",
+            "--tlc-config",
+            "/private/tmp/ts-drp-native-custody-reviewed/tlc.json"
+          ],
+          "code": 0,
+          "got": "ok",
+          "seconds": 7,
+          "log": {
+            "path": "adjuncts-repair-temporal.log.gz",
+            "sha256": "f2604610b8bbbfa78b2d861c2450ffdc85d5665d13b2d5dd501ef5b13bda80c3",
+            "uncompressedSha256": "5ce5e21d0fc5c9d0465ecc72a65f7e021948712cb538f8b1052f388caba57d36"
+          },
+          "states": {
+            "generated": 21801,
+            "distinct": 2971,
+            "queued": 0,
+            "depth": 18
+          }
+        },
+        {
+          "name": "repair-temporal-mutation",
+          "command": "verify",
+          "expected": "violation",
+          "args": [
+            "packages/protocol-v3/formal/room-repair-custody.qnt",
+            "--main",
+            "roomRepairCustodySmall",
+            "--backend",
+            "tlc",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8844",
+            "--step",
+            "unsafeHintLiveStep",
+            "--init",
+            "init",
+            "--temporal",
+            "fairHintRepair",
+            "--verbosity=3",
+            "--tlc-config",
+            "/private/tmp/ts-drp-native-custody-reviewed/tlc.json"
+          ],
+          "code": 1,
+          "got": "violation",
+          "seconds": 6,
+          "log": {
+            "path": "adjuncts-repair-temporal-mutation.log.gz",
+            "sha256": "06a5fb97979abc0a6c44e11b0d0d2c562aa649e54baf27a7f7f690d52a388255",
+            "uncompressedSha256": "2c1ea611f355a45ca60f928f34b8ec99aacf521569b78730b016fc33a0a4fcc8"
+          },
+          "states": {
+            "generated": 708,
+            "distinct": 145,
+            "queued": 0,
+            "depth": null
+          }
+        },
+        {
+          "name": "native-apalache-base",
+          "command": "verify",
+          "expected": "ok",
+          "args": [
+            "packages/protocol-v3/formal/native-retirement-custody.qnt",
+            "--main",
+            "nativeRetirementCustody300",
+            "--backend",
+            "apalache",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8844",
+            "--step",
+            "step",
+            "--init",
+            "init",
+            "--invariants",
+            "safety",
+            "--verbosity=3",
+            "--apalache-config",
+            "/private/tmp/ts-drp-native-custody-reviewed/apalache.json",
+            "--max-steps=0"
+          ],
+          "code": 0,
+          "got": "ok",
+          "seconds": 8,
+          "log": {
+            "path": "adjuncts-native-apalache-base.log.gz",
+            "sha256": "ba62973ce3b04cab9b82b412071dc2297f7a55661184edb3f2269e53e97cdd50",
+            "uncompressedSha256": "f2312c6967e8493864c7595d17a67a4011de76475bbc7beb2fbf32633a90fcff"
+          },
+          "states": null
+        },
+        {
+          "name": "native-apalache-step",
+          "command": "verify",
+          "expected": "ok",
+          "args": [
+            "packages/protocol-v3/formal/native-retirement-custody.qnt",
+            "--main",
+            "nativeRetirementCustody300",
+            "--backend",
+            "apalache",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8844",
+            "--step",
+            "step",
+            "--init",
+            "indInit",
+            "--invariants",
+            "safety",
+            "--verbosity=3",
+            "--apalache-config",
+            "/private/tmp/ts-drp-native-custody-reviewed/apalache.json",
+            "--max-steps=1"
+          ],
+          "code": 0,
+          "got": "ok",
+          "seconds": 9,
+          "log": {
+            "path": "adjuncts-native-apalache-step.log.gz",
+            "sha256": "b83a29b6a80ce87304520ea6c6b143ce203bb785a2c57e5cae12ba330a39ca73",
+            "uncompressedSha256": "37c0e1bad4af080bfb13c67660355ca0e706c01e88945e0ce1827484e05284fa"
+          },
+          "states": null
+        }
+      ],
+      "expectedCaseCount": 16,
+      "allExpectedResults": true
+    },
+    "fence": {
+      "sourceUnchanged": true,
+      "results": [
+        {
+          "name": "fence-typecheck",
+          "command": "typecheck",
+          "args": [
+            "packages/protocol-v3/formal/settlement-replacement-retirement-fence-proof.qnt"
+          ],
+          "expected": "typecheck",
+          "code": 0,
+          "got": "typecheck",
+          "seconds": 6,
+          "log": {
+            "path": "fence-fence-typecheck.log.gz",
+            "sha256": "f1b651238a58fe290baec6c5e32f3bdb1943dd2bd582f02569231f7a757c7837",
+            "uncompressedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "states": null
+        },
+        {
+          "name": "fence-tests",
+          "command": "test",
+          "args": [
+            "packages/protocol-v3/formal/settlement-replacement-retirement-fence-proof.qnt",
+            "--main",
+            "proofContractCurrentFence"
+          ],
+          "expected": "tests",
+          "count": 2,
+          "code": 0,
+          "got": "tests",
+          "seconds": 7,
+          "log": {
+            "path": "fence-fence-tests.log.gz",
+            "sha256": "a706b26ab781ecabe01a9d8864706c822b44650b1f47da6cb8e38a8699f9fffd",
+            "uncompressedSha256": "2e1b3abf848c2fbca596041d0dc88044c2cdc7af2996f243cd7fcc9fad40994e"
+          },
+          "states": null
+        },
+        {
+          "name": "fence-base",
+          "command": "verify",
+          "expected": "ok",
+          "args": [
+            "packages/protocol-v3/formal/settlement-replacement-retirement-fence-proof.qnt",
+            "--main",
+            "proofContractCurrentFence",
+            "--backend",
+            "apalache",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8846",
+            "--step",
+            "step",
+            "--init",
+            "init",
+            "--invariants",
+            "currentFence",
+            "--verbosity=3",
+            "--apalache-config",
+            "/private/tmp/ts-drp-current-fence-reviewed/apalache.json",
+            "--max-steps=0"
+          ],
+          "code": 0,
+          "got": "ok",
+          "seconds": 94,
+          "log": {
+            "path": "fence-fence-base.log.gz",
+            "sha256": "c0730150ea443bc9fcb686f2686ac4f9a413239ab11a89a0cfa86ed6faa12904",
+            "uncompressedSha256": "cbbe6bcee708845012f22f2369e2befbe0db271162b1f7c2d3ac3d41c8eb9b6b"
+          },
+          "states": null
+        },
+        {
+          "name": "fence-preservation",
+          "command": "verify",
+          "expected": "ok",
+          "args": [
+            "packages/protocol-v3/formal/settlement-replacement-retirement-fence-proof.qnt",
+            "--main",
+            "proofContractCurrentFence",
+            "--backend",
+            "apalache",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8846",
+            "--step",
+            "step",
+            "--init",
+            "indInitFence",
+            "--invariants",
+            "currentFence",
+            "--verbosity=3",
+            "--apalache-config",
+            "/private/tmp/ts-drp-current-fence-reviewed/apalache.json",
+            "--max-steps=1"
+          ],
+          "code": 124,
+          "got": "timeout",
+          "seconds": 300,
+          "log": {
+            "path": "fence-fence-preservation.log.gz",
+            "sha256": "19cd43232ed5a8d602d6ae111677449e97266128a13b0dd66cb4feacad743e92",
+            "uncompressedSha256": "c9b71e09de6263871f416938b3c7aeb759f5ae0f0194a152825eb8cb141e721e"
+          },
+          "states": null
+        },
+        {
+          "name": "fenced-move",
+          "command": "verify",
+          "expected": "ok",
+          "args": [
+            "packages/protocol-v3/formal/settlement-replacement-retirement-fence-proof.qnt",
+            "--main",
+            "proofContractCurrentFence",
+            "--backend",
+            "apalache",
+            "--apalache-version",
+            "0.56.1",
+            "--server-endpoint",
+            "localhost:8846",
+            "--step",
+            "stepMove",
+            "--init",
+            "indInitContractFenced",
+            "--invariants",
+            "indContractFenced",
+            "--verbosity=3",
+            "--apalache-config",
+            "/private/tmp/ts-drp-current-fence-reviewed/apalache.json",
+            "--max-steps=1"
+          ],
+          "code": 0,
+          "got": "ok",
+          "seconds": 79,
+          "log": {
+            "path": "fence-fenced-move.log.gz",
+            "sha256": "10dc28d142b9c3edf0d0c6b0f0353210041e6efcb6cfd10d0b46cf253a4ddead",
+            "uncompressedSha256": "dd4d775760e068fff099aa1bf1d1121567cdf0febf69b30ce1d3fd6ae1887de0"
+          },
+          "states": null
+        }
+      ],
+      "expectedCaseCount": 5,
+      "allExpectedResults": false
+    },
+    "trackJApalache": {
+      "results": [
+        {
+          "name": "contract-base",
+          "main": "proofContractSafetyReducedA",
+          "init": "init",
+          "step": "step",
+          "depth": 0,
+          "invariant": "indContract",
+          "expected": "ok",
+          "got": "ok",
+          "code": 0,
+          "seconds": 100,
+          "log": {
+            "path": "trackJApalache-contract-base.log.gz",
+            "sha256": "64a626f8da1cf6dbe32d7452e5c3f454eb200f7848df506e5238756c622d69d9",
+            "uncompressedSha256": "eb560c734a664e75f1158bb677757948461877ace8b7382340c85d0e77b83009"
+          },
+          "states": null
+        },
+        {
+          "name": "decided-base",
+          "main": "proofSmallA",
+          "init": "init",
+          "step": "step",
+          "depth": 0,
+          "invariant": "indInv",
+          "expected": "ok",
+          "got": "ok",
+          "code": 0,
+          "seconds": 100,
+          "log": {
+            "path": "trackJApalache-decided-base.log.gz",
+            "sha256": "512003496372af555f1fcaf1ba2eeaf8ce4b8b80a7ea50ab11507eb6a6833c76",
+            "uncompressedSha256": "1283be56d11d7ad4acc39df02db632f2d3cbeef1043effbf6a6efeebf6591e82"
+          },
+          "states": null
+        },
+        {
+          "name": "decided-step",
+          "main": "proofSmallA",
+          "init": "indInit",
+          "step": "step",
+          "depth": 1,
+          "invariant": "indInv",
+          "expected": "ok",
+          "got": "ok",
+          "code": 0,
+          "seconds": 798,
+          "log": {
+            "path": "trackJApalache-decided-step.log.gz",
+            "sha256": "45c88de112ee366df5d0f43da80afb30ba746f3ff7f87fdccf4c01f5e36312fa",
+            "uncompressedSha256": "cab208125cb6ec58238c2d9f731467ec3f724a4aace8943342d6f00125dfcde3"
+          },
+          "states": null
+        },
+        {
+          "name": "contract-move",
+          "main": "proofContractSafetyReducedA",
+          "init": "indInitContract",
+          "step": "stepMove",
+          "depth": 1,
+          "invariant": "indContract",
+          "expected": "ok",
+          "got": "violation",
+          "code": 1,
+          "seconds": 106,
+          "log": {
+            "path": "trackJApalache-contract-move.log.gz",
+            "sha256": "159f533ca4334fec6597874fad4edb7d19126efdb040c3bfb1b99c6cde125d9b",
+            "uncompressedSha256": "aadf70c6f455816d8802bcef4530ef937eaed516ae7ee3ed75409bbf6666f388"
+          },
+          "states": null
+        },
+        {
+          "name": "contract-seal",
+          "main": "proofContractSafetyReducedA",
+          "init": "indInitContract",
+          "step": "stepSeal",
+          "depth": 1,
+          "invariant": "indContract",
+          "expected": "ok",
+          "got": "violation",
+          "code": 1,
+          "seconds": 375,
+          "log": {
+            "path": "trackJApalache-contract-seal.log.gz",
+            "sha256": "763323a4bd28fc82bbf425906075762b122d6527a22833d799e20f93bbf2b1ff",
+            "uncompressedSha256": "62c8270510dc37ffa6bb862126c271d74ff077132aecba9010842918d9e2ab6e"
+          },
+          "states": null
+        },
+        {
+          "name": "contract-nonvacuity",
+          "main": "proofContractSafetyReducedA",
+          "init": "indInitContract",
+          "step": "step",
+          "depth": 0,
+          "invariant": "indRichStateAbsent3",
+          "expected": "violation",
+          "got": "violation",
+          "code": 1,
+          "seconds": 120,
+          "log": {
+            "path": "trackJApalache-contract-nonvacuity.log.gz",
+            "sha256": "a4026fb9a7516c001d2fcb9ce84f4c261ab829c5ef0edba75386f2d5e822af9d",
+            "uncompressedSha256": "c1b6f106fe2456f54c1bcab57b6906d7b815acc195ce4d015f1b2808b5d79495"
+          },
+          "states": null
+        }
+      ],
+      "runner": {
+        "path": "trackJApalache-run.mjs.gz",
+        "sha256": "9f319a6ff3527822f0f816e1ba89d49cf10d11f0a16f46e8d2023e2e7e07471f",
+        "uncompressedSha256": "51f732c44d8f0d3df93b50d35c07ab475ee6be0ed6cdba66197cf87bbfa031f4"
+      }
+    },
+    "largerBounds": {
+      "results": [
+        {
+          "main": "exhContractSafetyA5",
+          "code": 0,
+          "got": "ok",
+          "seconds": 815,
+          "log": {
+            "path": "largerBounds-exhContractSafetyA5.log.gz",
+            "sha256": "7525c4773cb2d00e09b715b04fe6049b3b41d7ff65f82d4d4c8d66b71c6ac4f5",
+            "uncompressedSha256": "3cca8f5bf8d5546fbd7ab65812e7961bf219cb37ef697b006c404a1c3c75a769"
+          },
+          "states": {
+            "generated": 8200311,
+            "distinct": 2491897,
+            "queued": 0,
+            "depth": 17
+          }
+        }
+      ],
+      "runner": {
+        "path": "largerBounds-run.mjs.gz",
+        "sha256": "867ee6d8ef614d47ce8b9b5ab661110e5af6ed0c799051e87871376692dbf62e",
+        "uncompressedSha256": "dd09614e370cbaf5407391b1a976e970080ad2b61a8257ddf52f71ef3badf0b7"
+      },
+      "incomplete": {
+        "main": "exhContractProgressA5",
+        "status": "running-at-artifact-snapshot",
+        "log": {
+          "path": "largerBounds-progress-snapshot.log.gz",
+          "sha256": "4b274a966fb33e1add94ecaa3fe659a9bba4fb9780ed2f5bf7a676d8a7cbfb71",
+          "uncompressedSha256": "a73bb39992a815446289928722448e7d4638871e1bb050680dba8170ee8630ed"
+        },
+        "liveLog": "/private/tmp/ts-drp-track-j-a5-final/exhContractProgressA5.log",
+        "watchdogSeconds": 900,
+        "sessionId": 52013
+      }
+    },
+    "review": {
+      "path": "review-findings.txt",
+      "sha256": "f65269025e2f590d024ca29e8342ce8b6895e3307389692c2f6e1aca96826c9a",
+      "status": "one-confirmed-finding-fixed"
+    },
+    "receivedCertificateRetry": {
+      "verdict": "18 passing",
+      "log": {
+        "path": "received-certificate-retry.log.gz",
+        "sha256": "973f0616ad2619e8dc97423568a066d270d59ae32a76bb8ace16ac2c6b7b4fba",
+        "uncompressedSha256": "74de89e8077c1b3051f335ff644c406ca04b20bf6750ad7583274b13639703bd"
+      }
+    },
+    "fenceReachable": {
+      "backend": "tlc",
+      "main": "proofContractCurrentFence",
+      "invariant": "currentFence",
+      "verdict": "ok",
+      "log": {
+        "path": "fence-reachable.log.gz",
+        "sha256": "0e5e8f3ebdf7824d3b0e27816ed1e2a6003a4503c2c267683a7dd95f0e44ba3a",
+        "uncompressedSha256": "9b596c8168adb3b03ab5cfed97b97cd3e7880b2c931d71919e213f34af9432e9"
+      },
+      "states": {
+        "generated": 22893,
+        "distinct": 6788,
+        "queued": 0,
+        "depth": 11
+      },
+      "command": [
+        "quint",
+        "verify",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-fence-proof.qnt",
+        "--main",
+        "proofContractCurrentFence",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--invariants",
+        "currentFence",
+        "--tlc-config",
+        "{\"workers\":1,\"maxHeap\":\"-Xmx2G\"}"
+      ]
+    }
+  }
+}

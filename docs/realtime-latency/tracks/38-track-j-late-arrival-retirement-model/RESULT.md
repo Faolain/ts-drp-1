@@ -162,3 +162,8 @@ a passing default result. The slow families and the large graph remain in the ex
 Final validation results and hashes are recorded in [final-results.json](evidence/final-results.json).
 Model changes require rerunning the affected properties and negative controls. Native implementation changes
 need their own correspondence review and browser/persistence gates; model success cannot substitute for them.
+
+The [native custody and repair adjuncts](NATIVE-CUSTODY.md) add whole-source recovery,
+portable dependency closure, native send ownership and conditional repair liveness.
+Their evidence also records the later final-source Apalache checks and larger A5
+run, including the still-open contract induction counterexamples.
