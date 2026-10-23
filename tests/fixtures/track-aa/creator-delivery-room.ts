@@ -140,6 +140,8 @@ export function admissionGate() {
 
 export interface RoomOptions {
 	readonly profile?: Profile;
+	/** Existing native directory for process-death recovery probes. */
+	readonly directory?: string;
 	/** Writers besides the creator. */
 	readonly writers?: number;
 	/** Optional genuine network boundary for native transport composition checks. */
@@ -156,7 +158,7 @@ export interface RoomOptions {
 export async function creatorDeliveryRoom(options: RoomOptions = {}) {
 	const profile = options.profile ?? "shipped";
 	const writerCount = options.writers ?? 1;
-	const directory = mkdtempSync(join(tmpdir(), "track-aa-creator-delivery-"));
+	const directory = options.directory ?? mkdtempSync(join(tmpdir(), "track-aa-creator-delivery-"));
 	directories.add(directory);
 	const identities = Array.from({ length: writerCount + 1 }, (_, index) => {
 		const seed = new Uint8Array(32).fill(0x31 + index);

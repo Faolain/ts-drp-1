@@ -585,9 +585,11 @@ describe("quiescent readiness maintenance through the original queue", () => {
 		expect(f.registration.operationAdmissionHalted).toBe(true); expect(f.registration.blueprintClosing).toBe(true);
 	});
 
-	it("keeps the captured completed-recovery halt until terminal reconstruction and every admitted hold have joined", async () => {
-		for (const withSnapshotRequest of [false, true]) {
+	it("keeps the captured active or completed recovery halt until terminal reconstruction and every admitted hold have joined", async () => {
+		for (const active of [false, true]) for (const withSnapshotRequest of [false, true]) {
 		const f = readinessMaintenanceBoundary(), original = f.completedResume(withSnapshotRequest), receipt = f.registration.retirementReconstruction;
+		if (active) f.registration.retirementResumeControl.active = {preparation: {
+			...original.completed, floorEpoch: 2, head: {...f.registration.payload.trust.head}}};
 		let release!: () => void, entered!: () => void;
 		const wait = new Promise<void>(resolve => {release = resolve;}), ready = new Promise<void>(resolve => {entered = resolve;});
 		f.state.release = async () => {entered(); await wait;};
@@ -610,7 +612,7 @@ describe("quiescent readiness maintenance through the original queue", () => {
 		}
 	});
 
-	it("never treats an unrelated halt, active intent, foreign checkpoint or separate reconstruction as completed readiness recovery", async () => {
+	it("never treats an unrelated halt, malformed active intent, foreign checkpoint or separate reconstruction as readiness recovery", async () => {
 		for (const change of [
 			(f: ReturnType<typeof readinessMaintenanceBoundary>) => {f.registration.retirementResumeControl = undefined;},
 			(f: ReturnType<typeof readinessMaintenanceBoundary>) => {f.registration.retirementResumeControl.objectId = "foreign";},
@@ -629,9 +631,25 @@ describe("quiescent readiness maintenance through the original queue", () => {
 		}
 	});
 
+	it("rejects active recovery with a foreign head, frontier, missing domains or unresolved nominee before entry", async () => {
+		for (const change of [
+			(control: any) => {control.active.preparation.head.generationId = "foreign";},
+			(control: any) => {control.active.preparation.floorEpoch = 1;},
+			(control: any) => {control.active.preparation.domains = undefined;},
+			(control: any) => {control.nominee = {};},
+		]) {
+			const f = readinessMaintenanceBoundary(), control = f.completedResume();
+			f.registration.retirementResumeControl.active = {preparation: {...control.completed, floorEpoch: 2, head: {...f.registration.payload.trust.head}}};
+			change(control);
+			await expect(f.run(async () => {throw Error("must not enter");})).rejects.toThrow("boundary is unavailable");
+			expect(f.registration.operationAdmissionHalted).toBe(true); expect(f.calls).toEqual([]);
+		}
+	});
+
 	it("retains completed recovery on incomplete handoff, empty reconstruction, stale request, consumer failure or failed join", async () => {
-		for (const failure of ["undefined", "fresh", "empty", "request", "receipt", "consumer", "join"] as const) {
+		for (const active of [false, true]) for (const failure of ["undefined", "fresh", "empty", "request", "receipt", "consumer", "join"] as const) {
 			const f = readinessMaintenanceBoundary(), original = f.completedResume(true), receipt = f.registration.retirementReconstruction;
+			if (active) f.registration.retirementResumeControl.active = {preparation: {...original.completed, floorEpoch: 2, head: {...f.registration.payload.trust.head}}};
 			if (failure === "join") f.state.release = async () => {throw Error("native join failed");};
 			await expect(f.runRaw(async seal => {
 				if (failure !== "empty") await seal();

@@ -1,6 +1,6 @@
 import {readFileSync} from "node:fs";
 import {encodeCanonical} from "@ts-drp/canonical";
-import {parseStorageObjectId} from "@ts-drp/storage";
+import {AHE_BOUNDED_READ_LIMITS, parseStorageObjectId} from "@ts-drp/storage";
 import {snapshotQuarantineContract} from "@ts-drp/storage/snapshot-transfer";
 import ts from "typescript";
 import {describe, expect, it} from "vitest";
@@ -90,10 +90,34 @@ describe("finite creator recovery maintenance immutable ownership", () => {
 		expect(f.calls.map(args => [args[0].objectId, args[1], args[2], args[3], args[4]])).toEqual([
 			[objectId, hold1, true, true, f.trust], [objectId, hold2, false, false, f.trust], [objectId, hold3, false, false, f.trust]]);
 		expect(f.calls.every(args => args[5] === f.calls[0]![5])).toBe(true);
+		expect(f.calls.every(args => args[6] === true)).toBe(true);
 		expect(f.calls[0]![0].exactCanonicalPinnedGenesisTrustStateRecordBytes).toEqual(encodeCanonical({kind: "pin", value: 1}));
 		expect(f.events.filter(event => event === "fresh-native-image")).toHaveLength(3);
 		expect(f.events.filter(event => event === "fresh-floor")).toHaveLength(3);
 		await job.release(); expect(f.counts().syntaxRelease).toBe(1);
+	});
+	it("requests a fresh pass when generation reclamation suppressed an eligible journal prefix", () => {
+		const owner = declaration("installClosedRetirementSource");
+		const selected = ["summarySelectionComplete", "suppressedJournalDrain", "needsFreshSummary"].map(name => {
+			const statement = owner.body!.statements.find(statement => ts.isVariableStatement(statement) &&
+				statement.declarationList.declarations.some(value => ts.isIdentifier(value.name) && value.name.text === name));
+			if (!statement) throw Error(`missing original completion condition:${name}`);
+			return statement.getText(ast);
+		}).join("\n");
+		const parameters = ["source", "generationSource", "postAheRows", "drainSuppressedJournalPrefixes",
+			"summaries", "exhaustiveClosedSigningSummarySelections", "evidenceCompleted", "summaryProgressed", "AHE_BOUNDED_READ_LIMITS"];
+		const js = ts.transpile(`${selected}\nneedsFreshSummary;`, {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None});
+		const evaluate = new Function(...parameters, `return eval(${JSON.stringify(js)});`);
+		const remaining = AHE_BOUNDED_READ_LIMITS.maxObjectGenerations - 2;
+		const source = {rows: Array.from({length: remaining + 1}), journalDetails: {collectiblePrefixes: [{scope: "original-authenticated-prefix"}]}};
+		const read = (request: boolean, state = source, post = Array.from({length: remaining})) =>
+			evaluate(state, {}, post, request, undefined, new WeakSet(), false, false, AHE_BOUNDED_READ_LIMITS);
+		expect(read(false)).toBe(false); // Prior creator scheduling prematurely stopped here.
+		expect(read(true)).toBe(true);
+		expect(read(true, {...source, journalDetails: {collectiblePrefixes: []}})).toBe(false);
+		expect(read(true, {...source, rows: Array.from({length: remaining})})).toBe(false);
+		// This result schedules a fresh original verifier; it is not membership,
+		// deletion authority, a reusable native read, or a transferred proof charge.
 	});
 	it("revokes new admissions immediately and clears evidence only after the admitted native workflow joins", async () => {
 		const f = fixture(), job = f.create(), gates = f.block();

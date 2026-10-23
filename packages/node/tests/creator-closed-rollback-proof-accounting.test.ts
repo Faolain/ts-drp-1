@@ -81,13 +81,15 @@ describe("private issuance hole selection", () => {
 	it("requires covered published work, physical absence and complete replay exclusion; preserves SAME-intent and permanent holes", () => {
 		const select = execute<(input: any) => readonly unknown[]>(`${declaration("closedIssuanceProtectedRecordsForRetirement")}\nclosedIssuanceProtectedRecordsForRetirement;`, {
 			record: decodeCanonical, requireLaw: (value: unknown) => {if (!value) throw Error("chain-invalid");},
+			closeIssuanceRetirementProtectedRecords: (input: {protectedRecords: readonly unknown[]}) => input.protectedRecords,
 		});
 		const digest = new Uint8Array(32).fill(3), scope = {objectId: "room", author: "author"};
 		const row = {...scope, authorSequence: 2, digest,
 			canonicalPreimageBytes: encodeCanonical({...scope, authorSequence: 2, epoch: 0, anchor: "anchor", operation: {action: "$drp.author-fence.v1"}})};
 		const hole = {author: "author", authorSequence: 2, digest: "03".repeat(32)};
 		const proof = {scope, authorSequence: 2, digest, classification: "covered-historical", dependencyKind: "signed-settled-issuance"};
-		const base = {objectId: "room", throughEpoch: 3, rows: {issued: [row], outbox: [{...row, publishState: "published"}]},
+		const intent = {decisionDigest: "01".repeat(32), sourceProofDigest: "02".repeat(32)};
+		const base = {objectId: "room", throughEpoch: 3, intent, rows: {issued: [row], outbox: [{...row, publishState: "published"}]},
 			control: null, censusRows: [proof], protectedReplayScopes: [], physicalJournalRows: [], dependenciesClassified: true};
 		expect(select(base)).toEqual([]);
 		expect(select({...base, censusRows: [{...proof, classification: "filtered-settlement-source"}]})).toEqual([]);
@@ -101,9 +103,19 @@ describe("private issuance hole selection", () => {
 			{...base, protectedReplayScopes: [{objectId: "room", epoch: 0, anchorDigest: "anchor"}]},
 			{...base, physicalJournalRows: [encodeCanonical(["acceptedEntries", ["room", 0, "anchor", 0], {}])]},
 			{...base, throughEpoch: 1}]) expect(select(changed)).toEqual([hole]);
-		const original = {throughEpoch: 3, protectedRecords: [hole]};
+		const original = {...intent, throughEpoch: 3, protectedRecords: [hole]};
 		expect(select({...base, control: {active: null, completed: original}})).toEqual([hole]);
 		expect(select({...base, control: {active: {preparation: original}, completed: null}})).toEqual([hole]);
+		for (const fresh of [{...intent, decisionDigest: "04".repeat(32)}, {...intent, sourceProofDigest: "05".repeat(32)}, undefined]) {
+			// Completed intent plus a new authenticated source at the SAME cut may
+			// release its last-consumer holes; reopening preserves this distinction.
+			const reopened = decodeCanonical(encodeCanonical({active: null, completed: original}));
+			expect(select({...base, intent: fresh, control: reopened})).toEqual([]);
+			expect(select({...base, intent: fresh, control: reopened, physicalJournalRows:
+				[encodeCanonical(["acceptedEntries", ["room", 0, "anchor", 0], {}])]})).toEqual([hole]);
+			expect(() => select({...base, intent: fresh, control: {active: {preparation: original}, completed: null}}))
+				.toThrow("chain-invalid");
+		}
 		expect(select({...base, control: {active: null, completed: {...original, throughEpoch: 2}}})).toEqual([]);
 		expect(select({...base, censusRows: [], control: {active: null, completed: {...original, protectedRecords: []}}})).toEqual([]);
 		expect(() => select({...base, rows: {...base.rows, issued: [{...row, objectId: "foreign"}]}})).toThrow("chain-invalid");
@@ -1816,6 +1828,7 @@ describe("closed membership synchronous validation and fresh delivery currency",
 				record:decodeCanonical,openCreatorCloseMembership,openCanonicalLatchedAclSnapshot,authorizeLatchedEnvelopeAuthor,verifyReceivedVertex,registry,journalRetirementFrameDigest,
 				closedRetirementHex:(value:string)=>Uint8Array.from(value.match(/../gu)!,pair=>Number.parseInt(pair,16)),
 				closedRetirementEqual:(a:unknown,b:unknown)=>Buffer.compare(Buffer.from(encodeCanonical(a)),Buffer.from(encodeCanonical(b)))===0,
+				closedJournalNativeObservationEqual:(a:unknown,b:unknown)=>Buffer.compare(Buffer.from(encodeCanonical(a)),Buffer.from(encodeCanonical(b)))===0,
 				requireLaw:(ok:boolean,reason="chain-invalid")=>{if(!ok)throw Error(reason);},
 			});
 			expect(result).toEqual(await Promise.all(fixtures.map(f=>runPrefix(f,async()=>{}))));
@@ -5808,7 +5821,7 @@ describe("conservative CURRENT to FUTURE capacity envelope", () => {
 		const exactTotal=known.reduce((sum,row)=>sum+row.length,0)+carrier.length+3+9+5+7+7;
 		for(const capacity of [exactTotal-1,exactTotal,exactTotal+1,exactTotal+8]) {
 			const materials=new WeakMap(),book=execute<ReturnType<typeof createCreatorClosedRollbackProofAccounting>>(
-				`${declaration("createCreatorClosedRollbackProofAccounting").replace(/^export /,"")}\ncreateCreatorClosedRollbackProofAccounting([]);`,
+				`${declaration("projectCreatorProofMaterialByteLengths")}\n${declaration("createCreatorClosedRollbackProofAccounting").replace(/^export /,"")}\ncreateCreatorClosedRollbackProofAccounting([]);`,
 				{AHE_BOUNDED_READ_LIMITS,CREATOR_ORDINARY_PROOF_MAX_BYTES:capacity,proofMaterialOwners:materials});
 			expect(book.charge(known[0]!)).toBe(true);expect(book.chargeUnknownEncodedLength(3)).toBe(true);
 			const reader={},observation={},postAdoptionCensusSizing={},image={},frame={alive:true,accounting:book,
@@ -5827,7 +5840,7 @@ describe("conservative CURRENT to FUTURE capacity envelope", () => {
 				quote,unsigned:bytes(12),observations:new WeakMap([[observation,facts]]),frames:new WeakMap([[reader,frame]]),ledgers:new WeakMap([[book,frame]]),
 				proofMaterialOwners:materials,resolveCreatorPostAdoptionCensusSizing:()=>postAdoptionCensusSizing,
 				readProspectiveCreatorSnapshotTurnoverForSizing:()=>({ok:true,required:false}),resolveCreatorForwardPromotionSource:()=>undefined,
-				closedRetirementEqual:(a:unknown,b:unknown)=>a===b,isAuthenticatedInitialAdoptionDrain:()=>false,
+				closedRetirementEqual:(a:unknown,b:unknown)=>a===b,closedJournalNativeObservationEqual:(a:unknown,b:unknown)=>a===b,isAuthenticatedInitialAdoptionDrain:()=>false,
 				createCreatorMaintenanceSizingSyntax:()=>createCreatorCanonicalSyntaxReader(),
 				requireLaw:(ok:boolean,reason:string)=>{if(!ok)throw Error(reason);},
 				composeProspectiveCreatorMaintenancePrefixesForSizing:(input:any,...args:unknown[])=>{

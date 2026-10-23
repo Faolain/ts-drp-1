@@ -11720,21 +11720,28 @@ async function runCreatorOrdinaryReadinessMaintenance(registration: V3PlaneRegis
 		scope = ObjectFreeze({...registration.issuanceScope}), owners = [payload.input.store, registration.liveJournalStore,
 			registration.issuanceStore, payload.input.settlementFloor] as const;
 	const resumeControl = registration.retirementResumeControl, reconstruction = registration.retirementReconstruction;
-	// This stored decision is only a request to run the ORIGINAL reconstruction.
-	// It grants no admission and cannot discharge an active intent or a different
-	// recovery halt. The trusted close owner below must reach a terminal native
-	// reconciliation result; its admitted holds/releases must then join.
-	const completedRequestMatches = (): boolean => resumeControl?.active === null &&
-		resumeControl.objectId === payload.provenance.objectId && resumeControl.completed !== null &&
-		(resumeControl.completed.domains !== undefined || registration.roomRetentionResumeControl === resumeControl) &&
-		resumeControl.completed.throughEpoch + 1 === epoch &&
+	// This same private request enters only the ORIGINAL reconstruction. An
+	// active intent must finish its exact native P before ordinary readiness;
+	// the request itself discharges no halt and authorizes no new selection.
+	// The trusted close owner below must reach terminal native verification,
+	// and every admitted hold/release must join before the gate can reopen.
+	const recoveryRequestMatches = (): boolean => resumeControl !== undefined &&
+		resumeControl.objectId === payload.provenance.objectId &&
+		(resumeControl.active !== null
+			? resumeControl.active.preparation?.head.kind === "present" &&
+				sameHead(resumeControl.active.preparation.head, payload.trust.head) &&
+				resumeControl.active.preparation.domains !== undefined &&
+				resumeControl.active.preparation.floorEpoch + 1 === epoch && resumeControl.nominee == null
+			: resumeControl.completed !== null &&
+				(resumeControl.completed.domains !== undefined || registration.roomRetentionResumeControl === resumeControl) &&
+				resumeControl.completed.throughEpoch + 1 === epoch) &&
 		(reconstruction === undefined || sameHead(reconstruction.head, payload.trust.head) &&
 			sameCreatorRoomHead(reconstruction.roomHead, trust)) && creatorRetirementResumeRequested(registration);
-	const completedResume = registration.operationAdmissionHalted && completedRequestMatches() ? resumeControl : undefined;
+	const recoveryResume = registration.operationAdmissionHalted && recoveryRequestMatches() ? resumeControl : undefined;
 	const admissionStateCurrent = (): boolean => registration.retirementResumeControl === resumeControl &&
-		registration.retirementReconstruction === reconstruction && (completedResume === undefined
+		registration.retirementReconstruction === reconstruction && (recoveryResume === undefined
 			? !registration.operationAdmissionHalted
-			: registration.operationAdmissionHalted && completedRequestMatches());
+			: registration.operationAdmissionHalted && recoveryRequestMatches());
 	let entered = false, accepting = false, finished = false;
 	let enteredGraph: Readonly<{version: number; index: V3PlaneRegistration["index"]}> | undefined;
 	const available = (): boolean => !finished && currentRegistration(registration) && !registration.receiveOnly &&
@@ -11806,7 +11813,7 @@ async function runCreatorOrdinaryReadinessMaintenance(registration: V3PlaneRegis
 			try {
 				// Internal execution handoff from the existing close/reconciliation
 				// owner, not a persisted status flag or caller-supplied wire receipt.
-				if (await consume(seal, completedResume !== undefined) !== "complete" || completedResume !== undefined && lifetimes.length === 0)
+				if (await consume(seal, recoveryResume !== undefined) !== "complete" || recoveryResume !== undefined && lifetimes.length === 0)
 					throw new TypeError("creator readiness maintenance did not complete reconstruction");
 			} finally { accepting = false; }
 			if (!available()) throw new TypeError("creator readiness maintenance boundary changed");
@@ -11829,7 +11836,7 @@ async function runCreatorOrdinaryReadinessMaintenance(registration: V3PlaneRegis
 		// Every original terminal native verification and admitted release has
 		// succeeded while this SAME private request still owns the halt. No await
 		// or public exposure separates its consumption from reopening this gate.
-		if (completedResume !== undefined) {
+		if (recoveryResume !== undefined) {
 			registration.retirementResumeControl = undefined;
 			registration.roomRetentionResumeControl = undefined;
 			registration.retirementReconstruction = undefined;
@@ -20976,6 +20983,9 @@ function creatorCloseRegistration(
 				: new Uint8ArrayConstructor(registration.exactCanonicalPinnedGenesisBootstrapOperationBytes),
 		issuanceScope: ObjectFreeze({ ...registration.issuanceScope }),
 		issuanceStore: registration.issuanceStore,
+		readOrdinarySignMaterialByteLength: (...args: Parameters<NonNullable<V3CreatorCloseRegistration["readOrdinarySignMaterialByteLength"]>>) =>
+			durableIssuancePruningMaintenanceForStore(creatorOriginalIssuanceStore(registration))
+				?.readOrdinarySignMaterialByteLength?.(...args),
 		liveJournalStore: registration.liveJournalStore,
 		beginRetainedReplayClose: () => beginRetainedReplayClose(registration),
 		maxEpochBytes: registration.payload.parameters.maxEpochBytes,

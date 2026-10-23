@@ -6869,7 +6869,7 @@ export async function acquireCreatorIssuanceMaintenanceProof(
 					floor: actual.floorImage.state, floorImage: actual.floorImage,
 					snapshotInventory: {scopes: actualInventory.scopes, owner: actualInventory.owner}}).map(closedRetirementBytes))
 					requireLaw(chargeProofObservation(accounting, bytes), "proof-budget-exceeded");
-				requireLaw(closedRetirementEqual(actual.journal.value, prepared.journal.value), "anchor-unavailable");
+				requireLaw(closedJournalNativeObservationEqual(actual.journal.value, prepared.journal.value), "anchor-unavailable");
 				requireLaw(closedRetirementEqual(actual.snapshot, prepared.snapshot), "snapshot-invalid");
 				requireLaw(closedRetirementEqual(actual.ahe.value, prepared.ahe.value), "ahe-rejected");
 				requireLaw(closedRetirementEqual(actual.floorImage, prepared.floorImage), "floor-stale");
@@ -15160,7 +15160,7 @@ export async function readProspectiveCreatorMaintenancePrefixesForSizing(
 			if (prefix !== undefined) memberships.push(prefix);
 		}
 		const actual = await frame.input.liveJournalStore.readRetirementImage!({ objectId: frame.input.objectId });
-		requireLaw(actual.ok && closedRetirementEqual(actual.value, capture.journal), "floor-stale");
+		requireLaw(actual.ok && closedJournalNativeObservationEqual(actual.value, capture.journal), "floor-stale");
 	}
 	const adoptionDrain = isAuthenticatedInitialAdoptionDrain(input);
 	// The field-add algebra covers the original single current-context source.
@@ -19295,6 +19295,7 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
  * ordinary admission authority is returned. */
 function closedIssuanceProtectedRecordsForRetirement(input: Readonly<{
 	objectId: string; throughEpoch: number; rows: IssuanceRetirementRows;
+	intent: Readonly<{decisionDigest: string; sourceProofDigest: string}> | undefined;
 	control: DurableIssuanceRetirementControl | null; censusRows: unknown;
 	protectedReplayScopes: readonly LiveJournalScope[]; physicalJournalRows: readonly Uint8Array[];
 	dependenciesClassified: boolean;
@@ -19306,8 +19307,14 @@ function closedIssuanceProtectedRecordsForRetirement(input: Readonly<{
 		return [JSON.stringify(frame[1].slice(0, 3))];
 	}));
 	const classified = Array.isArray(input.censusRows) ? input.censusRows : [];
-	const same = input.control?.active?.preparation.throughEpoch === input.throughEpoch
-		? input.control.active.preparation : input.control?.completed?.throughEpoch === input.throughEpoch ? input.control.completed : undefined;
+	const prior = input.control?.active?.preparation ?? input.control?.completed;
+	const same = prior != null && prior.throughEpoch === input.throughEpoch && input.intent !== undefined &&
+		prior.decisionDigest === input.intent.decisionDigest && prior.sourceProofDigest === input.intent.sourceProofDigest
+		? prior : undefined;
+	// The cut is only a monotone frontier, not intent identity. A fresh fully
+	// authenticated source after the last journal consumer disappears can release
+	// old holes at that same cut. An incomplete intent must still resume exactly.
+	requireLaw(input.control?.active == null || same === input.control.active.preparation, "chain-invalid");
 	const selected = Object.freeze(input.rows.issued.filter(row => {
 		const value = record(row.canonicalPreimageBytes), epoch = value.epoch;
 		requireLaw(typeof epoch === "number" && Number.isSafeInteger(epoch) && epoch >= 0, "chain-invalid");
@@ -19808,7 +19815,7 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 		}
 	};
 	const protectedRecords = closedIssuanceProtectedRecordsForRetirement({objectId: input.objectId, throughEpoch: cut.epoch,
-		rows: issuanceRows, control: issuanceControl,
+		rows: issuanceRows, control: issuanceControl, intent: labels,
 		censusRows: census.rows, protectedReplayScopes: source.journalDetails.protectedReplayScopes,
 		physicalJournalRows: source.journalPhysical.canonicalRows,
 		dependenciesClassified: source.issuanceDependenciesClassified === true && source.inheritedClassification === undefined});
@@ -21365,6 +21372,7 @@ function buildRoomRetentionPassPlan(source: Readonly<{
 	requireLaw(nativeIssuance !== undefined && nativeIssuance !== null && nativeIssuance.control !== undefined, "snapshot-unavailable");
 	const issuance = Object.freeze({ protectedRecords: closedIssuanceProtectedRecordsForRetirement({ objectId: input.objectId,
 		throughEpoch: through, rows: nativeIssuance.rows, control: nativeIssuance.control as DurableIssuanceRetirementControl | null,
+		intent: (nativeIssuance.control as DurableIssuanceRetirementControl | null)?.active?.preparation,
 		censusRows: censusFacts.rows, protectedReplayScopes: journalDetails.protectedReplayScopes,
 		physicalJournalRows: journal.canonicalRows,
 		dependenciesClassified: !source.unclassifiedSigning && !source.unclassifiedGenerationReplay }) });
@@ -22808,7 +22816,7 @@ async function reconcileSnapshotRecoveryRoles(
 					const prepared = original;
 					await acquireReservations();
 					const actual = await captureImages(); chargeImages(actual);
-					requireLaw(closedRetirementEqual(actual.journal, prepared.journal), "anchor-unavailable");
+					requireLaw(closedJournalNativeObservationEqual(actual.journal, prepared.journal), "anchor-unavailable");
 					requireLaw(closedRetirementEqual(actual.snapshot, prepared.snapshot), "snapshot-invalid");
 					requireLaw(closedRetirementEqual(actual.ahe, prepared.ahe), "ahe-rejected");
 					requireLaw(closedRetirementEqual(actual.floorImage, prepared.floorImage), "floor-stale");
@@ -24012,8 +24020,11 @@ export function createCreatorSnapshotRecoveryMaintenanceJob(
 			if (released || pending !== undefined) return Promise.reject(new TypeError("creator recovery maintenance job is released or busy"));
 			const task = Promise.resolve().then(async (): Promise<"complete" | "fresh-summary-required"> => {
 				try {
+					// A generation-only pass can suppress an independently eligible
+					// journal prefix. Complete that existing workflow while its source
+					// remains available; the fresh pass retains all original checks.
 					return (await reconcileSnapshotRecoveryRoles(fixedValue, closeHold, acknowledgeCompletedJournalDrain,
-						requireClosedWorkflowCompletion, currentTrust, ownedMaintenance)) ? "fresh-summary-required" : "complete";
+						requireClosedWorkflowCompletion, currentTrust, ownedMaintenance, true)) ? "fresh-summary-required" : "complete";
 				} catch (error) { throwCreatorSnapshotRecoveryFailure(error); }
 			});
 			pending = task;

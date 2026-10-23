@@ -496,6 +496,8 @@ export interface V3CreatorCloseRegistration {
 	readonly exactCanonicalPinnedGenesisBootstrapOperationBytes?: Uint8Array;
 	readonly issuanceScope: DurableIssueScope;
 	readonly issuanceStore: DurableIssuanceStore;
+	/** Original native strategy's pure numerical obligation; no native capture. */
+	readOrdinarySignMaterialByteLength?: typeof import("@ts-drp/issuance-store/maintenance").issuanceUnsignedOwnMaterialByteLength;
 	readonly liveJournalStore: DurableLiveJournalStore;
 	readonly maxEpochBytes: number;
 	readonly maxEpochVertices: number;
@@ -2044,6 +2046,7 @@ type CreatorIssuanceMaintenanceQuote = Readonly<{
 	metadata: Awaited<ReturnType<typeof prospectiveCreatorMetadataWidths>>["frames"];
 	adoption: ReturnType<typeof prospectiveCreatorAdoptionBytes>;
 	issuancePhases: ReturnType<typeof issuanceUnsignedPostimageWidths> | undefined;
+	ordinarySignMaterialByteLength?: number;
 	receivedSignature?: Uint8Array;
 	runtimeCensusOverheadByteLength: number;
 	postAdoptionCensusSizing: readonly CreatorPostAdoptionCensusSizing[];
@@ -2233,6 +2236,15 @@ async function prepareCreatorIssuanceMaintenanceQuote(
 			},
 			nativeControl
 		);
+		const ordinarySignMaterialByteLength = receivedReceipt === undefined && planEffect === undefined &&
+			registration.currentTrust.profileId === "creator-trusted-v1" && nativeRows.plans.length === 0
+			? registration.readOrdinarySignMaterialByteLength?.(nativeRows, registration.issuanceScope, {
+				kind: "v3-issuance-pending-unsigned-1", authorSequence: unsigned.authorSequence,
+				canonicalPreimageBytes: unsignedBytes, digest: hashDomain("ts-drp/vertex/v3", unsignedBytes),
+			}, nativeControl) : undefined;
+		if (ordinarySignMaterialByteLength !== undefined &&
+			(!Number.isSafeInteger(ordinarySignMaterialByteLength) || ordinarySignMaterialByteLength < 0))
+			throw new TypeError("creator ordinary native material bound is malformed");
 		const needsRecoveryRoles = creatorCloseNeedsRecoveryRoles(registration, current);
 		const detached = "recovery" in proof;
 		const recovery = !needsRecoveryRoles || detached
@@ -2392,6 +2404,7 @@ async function prepareCreatorIssuanceMaintenanceQuote(
 			metadata,
 			adoption,
 			issuancePhases,
+			...(ordinarySignMaterialByteLength === undefined ? {} : {ordinarySignMaterialByteLength}),
 			...(receivedReceipt === undefined ? {} : {receivedSignature: registration.readReceivedAppendCandidate(receivedReceipt).signature}),
 			runtimeCensusOverheadByteLength,
 			postAdoptionCensusSizing,
@@ -2857,11 +2870,11 @@ function creatorIssuanceMaintenanceQuoteSizing(
 	const receivedSignature = quote.receivedSignature === undefined ? [] : [quote.receivedSignature];
 	const unknownBasis = [
 		...(quote.archiveCapacity === undefined ? [] : [quote.archiveCapacity.status.maxControlByteLength]),
-		issuancePhases === undefined ? 0 : Math.max(
+		quote.ordinarySignMaterialByteLength ?? (issuancePhases === undefined ? 0 : Math.max(
 			issuancePhases.reserved.nativeCensusBytes,
 			issuancePhases.entered.nativeCensusBytes,
 			issuancePhases.final.nativeCensusBytes
-		),
+		)),
 		quote.runtimeCensusOverheadByteLength,
 	];
 	const fields = {
