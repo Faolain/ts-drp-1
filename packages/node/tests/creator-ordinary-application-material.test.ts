@@ -4,6 +4,8 @@ import {settlementProfileFor} from "@ts-drp/protocol-v3/settlement-profile";
 import * as ts from "typescript";
 import {describe, expect, it} from "vitest";
 
+import { createWorkCheckpoint } from "../src/internal/cooperative-work.js";
+
 // Actual private numerical/cold-capture bodies with controlled original owners.
 // These do not mint native, membership, signature or admission capabilities.
 // The existing real-crypto closed-prefix tests establish the capture boundary;
@@ -19,6 +21,7 @@ function declaration(source: string, name: string): string {
 }
 function execute<T>(body: string, bindings: Record<string, unknown>): T {
 	const js = ts.transpileModule(body, {compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None}}).outputText;
+	bindings = {createWorkCheckpoint, ...bindings};
 	return new Function("bindings", `const {${Object.keys(bindings).join(",")}}=bindings;\n${js}`)(bindings) as T;
 }
 const shared = execute<{

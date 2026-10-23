@@ -1,6 +1,7 @@
 export {
 	captureLiveJournalAnchorReadObservation,
 	captureLiveJournalInput,
+	validateLiveJournalSnapshot,
 	captureSourceBoundJournalAppendInput,
 	captureLiveJournalHistoricalAnchorImportInput,
 	captureLiveJournalSignedAnchorReadInput,

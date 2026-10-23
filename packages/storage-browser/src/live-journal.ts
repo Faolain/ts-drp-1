@@ -13,6 +13,7 @@ import {
 	captureLiveJournalAnchorReadObservation,
 	captureLiveJournalHistoricalAnchorImportInput,
 	captureLiveJournalInput,
+	validateLiveJournalSnapshot,
 	captureSourceBoundJournalAppendInput,
 	captureLiveJournalSignedAnchorReadInput,
 	captureLiveJournalSignedAnchorReadObservation,
@@ -1008,9 +1009,11 @@ function failed(kind: LiveJournalFailureKind): Readonly<{ readonly kind: LiveJou
 function captureAddressedClosure(snapshot: DurableSnapshot,
 	validation?: ReturnType<typeof createLiveJournalSnapshotValidation>): DurableSnapshot | undefined {
 	try {
-		const captured = deriveLiveJournalSnapshot({ durable: snapshot, validation } as never);
+		const captured = validateLiveJournalSnapshot({ durable: snapshot, validation } as never);
 		if (captured.ok !== true) return undefined;
-		return { rows: captured.rows, scope: snapshot.scope };
+		// Only this adapter's fresh private native row/header captures reach
+		// this function. Shared validation returns no borrowed rows or token.
+		return snapshot;
 	} catch {
 		return undefined;
 	}

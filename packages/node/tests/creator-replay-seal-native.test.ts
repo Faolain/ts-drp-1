@@ -1,3 +1,4 @@
+import { createWorkCheckpoint } from "../src/internal/cooperative-work.js";
 import "fake-indexeddb/auto";
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { readFileSync } from "node:fs";
@@ -636,7 +637,7 @@ function hiddenNativeOutboxFixture(kind: "pinned" | "covered" | "settled" = "pin
 	const frontier = {}, settlement = vi.fn(() => frontier);
 	const fields = vi.fn((...args: unknown[]) => args);
 	const rows: unknown[] = [], scopes = new Map();
-	const bindings = {registration, nativeRows, currentTrust: {genesisAnchorDigest: "genesis"},
+	const bindings = {checkpoint: createWorkCheckpoint(), live: () => true, registration, nativeRows, currentTrust: {genesisAnchorDigest: "genesis"},
 		observation: {replay}, creatorReplayReads: new WeakMap([[replay, {vertexFacts}]]),
 		visibleNative: new Map(), rows, scopes,
 		resolveVerifiedCreatorHistoricalIssuance: resolve, countHistoricalIssuanceRow: count,
@@ -647,16 +648,16 @@ function hiddenNativeOutboxFixture(kind: "pinned" | "covered" | "settled" = "pin
 	const code = ts.transpileModule(`${capture.getText(tree)}\n${loop[0]!.getText(tree)}\nreturn {rows, scopes};`, {
 		compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None},
 	}).outputText;
-	const run = () => new Function(...Object.keys(bindings), code)(...Object.values(bindings));
+	const run = () => new Function(...Object.keys(bindings), `return (async () => {${code}})();`)(...Object.values(bindings));
 	return {run, vertexFacts, registration, historical, native, nativeRows, current, pinned, covered, settled,
 		resolve, count, settlement, frontier, fields, rows};
 }
 
 describe("hidden native outbox census verification facts", () => {
-	it("passes the replay's exact owner to all three original authentication seams", () => {
+	it("passes the replay's exact owner to all three original authentication seams", async () => {
 		for (const kind of ["pinned", "covered", "settled"] as const) {
 			const f = hiddenNativeOutboxFixture(kind);
-			expect(f.run().rows).toHaveLength(1);
+			expect((await f.run()).rows).toHaveLength(1);
 			expect(f.resolve).toHaveBeenCalledExactlyOnceWith(f.historical.capability);
 			expect(f.count).toHaveBeenCalledExactlyOnceWith(f.historical, f.native.authorSequence);
 			for (const authenticate of [f.pinned, f.covered, f.settled]) {
@@ -669,32 +670,32 @@ describe("hidden native outbox census verification facts", () => {
 				: kind === "covered" ? "covered-historical" : "filtered-settlement-source");
 		}
 	});
-	it("refuses unavailable or foreign current historical identity before authentication", () => {
+	it("refuses unavailable or foreign current historical identity before authentication", async () => {
 		for (const identity of [undefined, {author: "foreign", objectId: "object"}, {author: "alice", objectId: "foreign"}]) {
 			const f = hiddenNativeOutboxFixture(); f.current.identity = identity;
-			expect(f.run()).toBeUndefined();
+			expect(await f.run()).toBeUndefined();
 			expect(f.resolve).toHaveBeenCalledExactlyOnceWith(f.historical.capability);
 			for (const authenticate of [f.pinned, f.covered, f.settled]) expect(authenticate).not.toHaveBeenCalled();
 			expect(f.count).not.toHaveBeenCalled(); expect(f.rows).toHaveLength(0);
 		}
 		const foreignFacade = hiddenNativeOutboxFixture(); foreignFacade.registration.issuanceStore = {};
-		expect(foreignFacade.run()).toBeUndefined(); expect(foreignFacade.resolve).not.toHaveBeenCalled();
+		expect(await foreignFacade.run()).toBeUndefined(); expect(foreignFacade.resolve).not.toHaveBeenCalled();
 		for (const authenticate of [foreignFacade.pinned, foreignFacade.covered, foreignFacade.settled])
 			expect(authenticate).not.toHaveBeenCalled();
 	});
-	it("still freshly enforces native completeness, publication, and the historical count guard", () => {
+	it("still freshly enforces native completeness, publication, and the historical count guard", async () => {
 		for (const missing of ["issued", "publication"] as const) {
 			const f = hiddenNativeOutboxFixture();
 			if (missing === "issued") f.nativeRows.issued.length = 0;
 			else f.native.publishState = "pending";
-			expect(f.run()).toBeUndefined(); expect(f.resolve).toHaveBeenCalledTimes(1);
+			expect(await f.run()).toBeUndefined(); expect(f.resolve).toHaveBeenCalledTimes(1);
 			for (const authenticate of [f.pinned, f.covered, f.settled]) expect(authenticate).not.toHaveBeenCalled();
 			expect(f.count).not.toHaveBeenCalled();
 		}
 		const f = hiddenNativeOutboxFixture(); f.count.mockReturnValueOnce(false);
-		expect(f.run()).toBeUndefined(); expect(f.rows).toHaveLength(0);
+		expect(await f.run()).toBeUndefined(); expect(f.rows).toHaveLength(0);
 		expect(f.count).toHaveBeenCalledExactlyOnceWith(f.historical, f.native.authorSequence);
-		expect(f.run().rows).toHaveLength(1); expect(f.resolve).toHaveBeenCalledTimes(2); expect(f.count).toHaveBeenCalledTimes(2);
+		expect((await f.run()).rows).toHaveLength(1); expect(f.resolve).toHaveBeenCalledTimes(2); expect(f.count).toHaveBeenCalledTimes(2);
 	});
 });
 

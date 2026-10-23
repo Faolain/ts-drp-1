@@ -181,6 +181,7 @@ import {
 } from "./creator-close.js";
 import { planClosedEpochCleanup, planClosedEpochRoleCleanup } from "./internal/closed-epoch-cleanup.js";
 import { inspectCreatorClosedCutSuccessorBinding } from "@ts-drp/protocol-v3/creator-close";
+import { createWorkCheckpoint, yieldToHost } from "./internal/cooperative-work.js";
 import { encodeCreatorCloseMembership, openCreatorCloseMembership,
 	rewriteCreatorCloseMembershipWitnesses } from "./internal/creator-close-membership.js";
 import { encodeReceivedCloseMembership, openReceivedCloseMembership, verifyReceivedClosedJournalAuthority,
@@ -7791,6 +7792,7 @@ function retainPendingIngress(
 async function drainPendingIngress(registration: V3PlaneRegistration): Promise<void> {
 	if (registration.drainingPendingIngress || !currentRegistration(registration)) return;
 	registration.drainingPendingIngress = true;
+	const checkpoint = createWorkCheckpoint();
 	try {
 		for (;;) {
 			const ready = [...registration.pendingIngress.entries()]
@@ -7800,6 +7802,7 @@ async function drainPendingIngress(registration: V3PlaneRegistration): Promise<v
 				.sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
 			if (ready.length === 0) return;
 			for (const [digest, pending] of ready) {
+				await checkpoint();
 				if (!currentRegistration(registration)) return;
 				// Retain exact unadmitted work until durable delivery succeeds. A
 				// local capacity refusal must not erase it or spin a retry loop.
@@ -8241,6 +8244,9 @@ function captureV3Ingress(
 
 async function authenticateV3Ingress(registration: V3PlaneRegistration, captured: CapturedV3Ingress): Promise<void> {
 	try {
+		// The existing FIFO owns only captured input here. Start the native and
+		// admission work in a host turn, then recheck the original live owner.
+		await yieldToHost();
 		if (!currentRegistration(registration) || registration.blueprintClosing) return;
 		if (registration.retainedBootstrapHold && captured.transport === "gossip") {
 			ingressFailureLog("admission-rejected");
@@ -10755,6 +10761,9 @@ async function readCreatorRecoveryDependencyCensus(
 	| undefined
 > {
 	const vertexFacts = creatorReplayReads.get(observation.replay)?.vertexFacts;
+	// This read walk retains its original native reservations and live
+	// predicate. A checkpoint neither releases custody nor caches permission.
+	const checkpoint = createWorkCheckpoint();
 	const { graphVersion, currentTrust, sourceTrust, sourceBound, live, replay, active } = observation;
 	const branchSource =
 		observation.liveRegistration === undefined ? undefined : nativeBranchDisplacedSource(observation.liveRegistration);
@@ -10781,6 +10790,8 @@ async function readCreatorRecoveryDependencyCensus(
 		const index = active.index;
 		if (pendingIngress.length > registration.payload.parameters.maxPendingEntries) return undefined;
 		for (const [digest, pending] of pendingIngress) {
+			await checkpoint();
+			if (!live()) return undefined;
 			const evidence = pending.evidence;
 			const authenticated = authenticateRecoveryVertex(
 				registration.payload,
@@ -10911,6 +10922,8 @@ async function readCreatorRecoveryDependencyCensus(
 	let afterKey: DurableOutboxPageInput["afterKey"] = null;
 	let scanned = 0;
 	for (;;) {
+		await checkpoint();
+		if (!live()) return undefined;
 		observation.stage = "outbox-page";
 		const page = await registration.issuanceStore.readOutboxPage({ afterKey, limit: 64 });
 		if (capturedInputs !== undefined && !capturedInputs.overCapacity) try {
@@ -10925,6 +10938,8 @@ async function readCreatorRecoveryDependencyCensus(
 		}
 		if (page.length > 64) return undefined;
 		for (const raw of page) {
+			await checkpoint();
+			if (!live()) return undefined;
 			if (++scanned > registration.payload.parameters.maxEpochVertices * 3) return undefined;
 			const scope = raw.commit.issuedRecord.scope;
 			const row = outboxRowSnapshot(raw, scope);
@@ -11266,6 +11281,8 @@ async function readCreatorRecoveryDependencyCensus(
 		if (page.length < 64) break;
 	}
 	for (const native of nativeRows.outbox) {
+		await checkpoint();
+		if (!live()) return undefined;
 		if (visibleNative.get(native.author)?.has(native.authorSequence)) continue;
 		// Only the original verified facade may hide already-covered rows. Its
 		// ordinary page path above retains the original historical-count bound.
@@ -11344,6 +11361,8 @@ async function readCreatorRecoveryDependencyCensus(
 		);
 	}
 	for (const lineage of nativeRows.lineages) {
+		await checkpoint();
+		if (!live()) return undefined;
 		if (!scopes.has(lineage.author) && lineage.author !== registration.issuanceScope.author) {
 			// A retained, fully-pruned known author is not an absent source. Its
 			// native watermark still needs the original authenticated closed frontier.
@@ -11370,6 +11389,8 @@ async function readCreatorRecoveryDependencyCensus(
 	scopes.set(registration.issuanceScope.author, registration.issuanceScope);
 	const debt: unknown[] = [];
 	for (const scope of [...scopes.values()].sort((a, b) => (a.author < b.author ? -1 : a.author > b.author ? 1 : 0))) {
+		await checkpoint();
+		if (!live()) return undefined;
 		observation.stage = `settlement:${scope.author}`;
 		const lineage = await registration.issuanceStore.readLineage(scope);
 		const rawPlan = await registration.issuanceStore.readSettlementPlan(scope);
@@ -11406,6 +11427,8 @@ async function readCreatorRecoveryDependencyCensus(
 		if (canReadUnsettled && plan !== null) {
 			if (plan.entries.length > registration.payload.parameters.maxEpochVertices) return undefined;
 			for (const entry of plan.entries) {
+				await checkpoint();
+				if (!live()) return undefined;
 				if (entry.disposition === "expire" || entry.disposition === "inherited" || entry.replacementSequence !== null)
 					continue;
 				const source = unsettled.get(scope.author)?.get(entry.sourceSequence);
@@ -11416,6 +11439,8 @@ async function readCreatorRecoveryDependencyCensus(
 				)
 					return undefined;
 				for (const chunk of entry.replacementProgress?.chunks ?? []) {
+					await checkpoint();
+					if (!live()) return undefined;
 					const issued = await registration.issuanceStore.readIssued(scope, chunk.replacementSequence);
 					const rows = await registration.issuanceStore.readOutboxPage({
 						scope,
@@ -11479,6 +11504,8 @@ async function readCreatorRecoveryDependencyCensus(
 		observation.liveRegistration === undefined
 			? undefined
 			: preparedMigrationTargetFloors.get(observation.liveRegistration);
+	await checkpoint();
+	if (!live()) return undefined;
 	const preparedTargetFloorFrame = await preparedTargetFloor?.read();
 	const exactCanonicalCensusBytes =
 		live() && (await replay.verify())
@@ -15779,7 +15806,12 @@ function enqueueLocalIssue(
 			const captured = capturedLocalIssueInput(registration.payload, rawInput, custody);
 			return "ok" in captured
 				? (): Promise<V3LocalIssueResult> => Promise.resolve(captured)
-				: (): Promise<V3LocalIssueResult> => issueLocal(registration, captured);
+				: async (): Promise<V3LocalIssueResult> => {
+						// Keep this admitted input charged and in its original FIFO while
+						// timers run. issueLocal performs all current-owner/native checks.
+						await yieldToHost();
+						return issueLocal(registration, captured);
+					};
 		},
 		{
 			refuse: () =>
@@ -16527,6 +16559,7 @@ async function readRebaseOutbox(
 	settlementFrontier?: SettlementFrontierContext,
 	openProgressSources?: ReadonlySet<number>
 ): Promise<V3RebaseOutboxResult> {
+	const checkpoint = createWorkCheckpoint();
 	if (!currentRegistration(registration)) {
 		return ObjectFreeze({ detail: "v3 plane is not active", kind: "not-active" as const, ok: false as const });
 	}
@@ -16549,6 +16582,9 @@ async function readRebaseOutbox(
 		const sourceHistory = crossSource?.historicalIssuance ?? registration.historicalIssuance;
 		beginHistoricalIssuanceScan(sourceHistory);
 		for (;;) {
+			await checkpoint();
+			if (!currentRegistration(registration))
+				return ObjectFreeze({ detail: "v3 plane is not active", kind: "not-active" as const, ok: false as const });
 			let rawPage: unknown;
 			try {
 				rawPage = await selectedStore.readOutboxPage(
@@ -16571,6 +16607,9 @@ async function readRebaseOutbox(
 			}
 			if (page.length === 0) break;
 			for (let pageIndex = 0; pageIndex < page.length; pageIndex++) {
+				await checkpoint();
+				if (!currentRegistration(registration))
+					return ObjectFreeze({ detail: "v3 plane is not active", kind: "not-active" as const, ok: false as const });
 				const raw = page.read(pageIndex);
 				if (raw === undefined) {
 					return ObjectFreeze({

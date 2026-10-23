@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import * as ts from "typescript";
 import { describe, expect, it } from "vitest";
 
+import { yieldToHost } from "../src/internal/cooperative-work.js";
+
 // Track X, decision row 51: the readiness ingress hold. These run the actual bodies of
 // trackRegistrationJoinedWork, enqueueRegistrationTask, enqueueV3Ingress,
 // holdV3IngressForReadiness and authenticateV3Ingress (v3-live.ts) and
@@ -30,6 +32,7 @@ function load(tree: ts.SourceFile, names: string[], bindings: Record<string, unk
 			compilerOptions: { target: ts.ScriptTarget.ES2022 },
 		}
 	).outputText;
+	bindings = {yieldToHost, ...bindings};
 	return new Function("__bindings", `const {${Object.keys(bindings).join(",")}}=__bindings;${js}`)(bindings) as Record<
 		string,
 		unknown
