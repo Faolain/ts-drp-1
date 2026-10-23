@@ -1,14 +1,21 @@
-# Track X: the settlement fence that reaches a recipient before its install
+# Track X: successor delivery and durable settlement completion
 
-Worktree: <worktree agent-a9ab847b594d95e7f>/
-Branch: worktree-agent-a9ab847b594d95e7f (rebased onto main 725f291b; main 24d4ca61 merged in at b8ad1f50)
+Original investigation: <worktree agent-a9ab847b594d95e7f>/, branch worktree-agent-a9ab847b594d95e7f.
+Continuation integrated on codex/phase3a1b-p6-golden-path: F1 177f4355, native point read 9b41a0e4, F2/Done fd342d90, sealed recovery 7c94ec35.
 Evidence: <evidence>/track-x/ (PROGRESS.md, logs/, tests/, bench/, bin/, data/, trash/).
 
 On the `creator-trusted-settlement-v1` profile, with real networking in Chromium, the creator's moves stopped reaching
 the other peer after the fourth successor (Track V, Grid). Track X found the cause, fixed it in the library, and looked
 at Track V's two d9346 failures.
 
-## Summary
+## Current delivery status
+
+The delivery, serving-gate and migration-prime fixes below are integrated. The final continuation also implements
+transferred Cut membership (F1), durable received authority (F2), and one local settlement-completion rule. Section 18
+records that result and its evidence. Earlier sections preserve the original measurements and their source revisions;
+their historical open-item lists do not describe the final continuation.
+
+## Initial delivery result
 
 - **Step 1: shipped Canvas and shipped Chat on main stall the same way** (section 1). Both stop at epoch 5 in every
   run, with Track V's signature. Legacy Canvas passes 16/16. The stall also happens with Track Q merged.
@@ -1115,6 +1122,385 @@ should stop at vertices the successor already holds as settled, or the census sh
 the census rule (`prospectiveCreatorRuntimeCensusOverhead` requires empty pending ingress for a local issue) and the
 drain order (the fence is issued before pending Writer rows are resolved) are the two places a fix could go.
 
+## 13. Play during a rollover (row 60)
+
+Row 60 asked for 12.10 first. The work found one defect after another, each owned by the owner's rows 62-68, and
+the coordinator then stopped the per-case rules in favour of one contract (row 71, 13.4). Every fix below has its
+own RED commit first, and each failed at the commit before its fix.
+
+### 13.1 What was found and fixed
+
+| Item | What failed | Fix (RED) |
+| ---- | ----------- | --------- |
+| R1 | A Writer's move made during the creator's seal or adoption: the next install's replacement prepared the portable source (`preparePortableSettlementSource`) although a non-creator Writer's replacement is nonportable and the result was thrown away; the walk needs other authors' rows the Writer's census never holds. | bb357ac1 (2863424c, 0a3cce4f) |
+| R2 | The second replacement in one install drain refused in the census: the already-replaced source looked open. | bb357ac1 (same RED, continuous case) |
+| R4 | The next install's received turnover census refused a source replaced nonportably in the epoch before (completion was recognised only through a signed settlement source). | e47f6b8b (fc4bd2af) |
+| R5 | A Writer's journal scope holding its own move made outside the cut was never collectible; protected scopes grew one per epoch and the 9th install failed ("journal retirement refused: malformed-input"). Row 62. | daf61067 (357ddea2) |
+| R5b | The same for a received row outside the cut (another Writer's move during the seal). Row 64 (B2). | 986e1d05 (13793d94) |
+| R7 | A Writer's own fence outside the next cut kept its scope for good (Track J's counterexample). Row 67. | b8268291 (128b066e) |
+| R6 | When a Writer's whole install output missed the next cut, the following install failed the census on every retry: the derivation needs the source epoch's ACL. Row 66 (R6-A). | 4cbef3d7 (128b066e) |
+| C1 | A replacement that itself missed the next cut wedged every later plan write. Row 65. | 6f37faae (77ffef9a) |
+
+The play-through RED (tests/track-x-play-through-rollover-red.test.ts) passes its cases 1 to 3 and the R4 case.
+Each fix's suite pair had no new per-test failure against its base (logs r60-r5-suites-r1, r60-r5b-suites-r1,
+r60-r7-suites-r1, r60-r6c1-suites-r1). The 16-rollover play-through proofs that row 60 asked for were not finished:
+the direction changed first.
+
+### 13.2 Limits at the original Track X checkpoint
+
+- **Case 4, install before adopt (R3):** the owner chose a known limit (option C). The case is `it.skip` with its
+  reason. No shipped flow installs before the creator adopts, but the public API can export before adoption
+  (`sealEpoch` serves, and `exportCreatorSuccessor` has no adoption precondition); row 61 then guarded serving.
+- **W1 (row 68), RED 402c76a4:** a scope is classified at exactly one install, so an outside proof that arrives 3 or
+  more installs later was never re-evaluated (triple miss, fence misses). Durable F2 and the shared Done rule now pass
+  these cases, including an out-of-window restart (section 18). The original in-memory build (S3) passed the REDs but
+  broke the pinned packages/node/tests/creator-journal-classification-compound.test.ts ("keptJournal is not
+  defined"), so it was saved on branch track-x-s3-wip and is not on this branch. The owner chose storage S1.
+- **Astra's A1 and A2 REDs (9e20b737)** originally failed: a partial Cut with a missing row and an expired source
+  unrecognised at a later install. F1 resolves the missing membership; the shared settlement-completion owner
+  recognizes genuine expiry without a replacement. Both native cases now pass (section 18).
+- **P1** (skip the dependency census for a nonportable replacement) was measured, not committed: epoch-3 installs
+  111/82/57 s against 6.1/12.9/13.2 s (logs/p1pair-pp1.log, load 44-63). Its refusal test
+  (tests/track-x-nonportable-prepare-refusal.test.ts) is uncommitted. Without P1 an install costs about 0.4 to 3.5 s
+  per rebased entry under load.
+
+### 13.3 The completion contract (row 71) and its probes
+
+<evidence>/track-x/CONTRACT.md defines when a late-arriving row is done, what still needs it, the deletion order and
+the checks, with astra's review folded in (H1-H6) and amendment A-1. This was the working design at the original
+checkpoint. Section 18 records the implemented F1/F2/Done portion; issuance-plan lifetime work remains a separate
+joined owner. Two probes established the original failures:
+
+- **D8, a removed then re-admitted Writer** (82d1a5cf, logs/r61-d8-probe-r2): the removed replica wedges (its install
+  is refused, "creator historical issuance authority preparation failed"; every later reopen fails "chain-invalid"),
+  while a fresh replica works and restarts its sequences at 0.
+- **A-1, a pending manual review** (6558a699, logs/r61-a1-probe-r2): the census refuses the pending source
+  ("creator recovery dependency hold unavailable:outbox-classification:7:displaced:published") at the 4th install and
+  on every retry, and the lull refused the same way. The final continuation now keeps this source open and permits
+  unrelated installs and collection, including after reopen (section 18).
+
+## 14. Serve a sealed successor only after the creator adopts it (row 61)
+
+**RED e032dd1e, fix 5bd36214.** The creator's successor material server answered a Writer's request as soon as the
+creator had sealed and exported, before the creator itself had adopted. The fix, in v3-room.ts `serveSuccessor`, wraps
+the material server: a peer is authorised only once the creator has adopted that successor (readiness included), and
+the response to a request that arrives earlier is held per peer inside the server's own response deadline, then
+released when `adoptCreatorSuccessor` settles. Exporting stays possible before adoption, and the storage-level exports
+(`createCreatorSuccessorMaterialServer`, `readCreatorSuccessorExport`) stay unguarded (owner's choice, a known limit).
+
+Proof: the RED and tests/track-x-successor-serving-gate-bounds.test.ts (bounded holds; chunks refused before
+adoption) pass (logs/r61-gate-bounds-fix-r3) and fail at base (r61-gate-bounds-base-r1). Suite pair: no new
+per-test failure (fix 49 failed, base 51; the two are the gate tests).
+
+The gate had a limit: a request held past the Writer's 10 s window failed the whole install. Section 15 removes it.
+
+## 15. The Writer's one install outwaits the gate (row 72, option E)
+
+**RED 6604dff8, fix 2e813db5.** No wire change. Astra's consult 3 (<evidence>/astra-consult-3/answer.md) chose
+it over an unsigned not-ready frame (forgeable by a hostile source to starve honest ones), a signed one (needs the
+protocol-v3 whitelist) and a finite retry budget (only moves the cliff).
+
+### 15.1 What changed
+
+- **packages/node/src/internal/creator-successor-transport.ts.** `receiveCreatorSuccessorMaterial` takes an optional
+  `retryUntil` signal. Without it, the fetch is one pass over the connected listed peers, as before. With it, each
+  round re-reads the connected peers and tries each listed, connected, not-yet-terminal peer once, one attempt in
+  flight, each attempt with a fresh nonce and its own `SNAPSHOT_PULL_INACTIVITY_MS` deadline (not raised). Between
+  rounds it pauses 250 ms, doubling to 5 s (`CREATOR_SUCCESSOR_MATERIAL_RETRY_INITIAL_MS` / `_MAX_MS`, new; the
+  snapshot 3-attempt constant is not reused). It ends when the material arrives, when every listed peer failed
+  terminally, or when `retryUntil` aborts. There is no total deadline.
+  - Each attempt (`attemptCreatorSuccessorMaterial`) is classified by where it failed. Opening, writing or reading
+    the stream, its own deadline and the lifetime are transient. A signing failure not caused by an abort, and
+    everything about the response (frame, kind, version, manifest, peers, nonce, author, signature, bounds), are
+    terminal: that peer is not asked again. Uncertain stream cleanup ends the fetch at once, as before.
+  - The diagnostic keeps one failure per listed peer (first-failure order), so its size is bounded by the peer list.
+  - A server-side refusal is a stream abort, which the Writer cannot tell from a reset, so it is transient. A source
+    that refuses for good, or holds every request, keeps the install waiting until the session closes. That is the
+    accepted cost of no total deadline (row 72: the owner decides whether an install may stay pending until close).
+- **packages/node/src/creator-adoption.ts.** `receiveCreatorSuccessorAdoption` passes `retryUntil` through.
+- **packages/node/src/v3-room.ts.**
+  - A session lifetime (`sessionLifetime`, `endSessionWaits`): `shutdown` and `closeSession` abort it right after
+    marking the session closed, before `closeSession` awaits the install, and the install's receive passes it as
+    `retryUntil`. So a close ends a waiting install promptly. Track Z's scheduled lull never reaches the receive
+    (its lull runs `maintainRecipientRecoveryPool` / `maintainCreatorRecoveryPool` only), so nothing else needs it.
+  - The gate (row 61) gets a serving generation. `cancelSuccessorServingHolds` bumps it and releases every hold; a
+    held request of an older generation fails "creator successor serving is closed". Close and a serving replacement
+    (`serveSuccessor`) cancel the holds before the port joins its handlers. Each response write first releases the
+    holds of peers that are no longer connected (`releaseDisconnectedSuccessorServingHolds`). `successorAdopted` also
+    requires an open session with no terminal failure.
+  - A failure of the adoption tail's final `predecessorClose.stop()` now sets the terminal failure before serving can
+    open (it was released before).
+
+### 15.2 Tests and proof
+
+The RED (6604dff8) has three new files and an amended bounds proof:
+
+- tests/track-x-successor-material-retry.test.ts (20 tests, transport level): reset, ended stream, open failure and
+  the attempt's own deadline are retried with fresh nonces; a peer not yet connected is waited for; nine terminal
+  responses each make exactly one request; uncertain cleanup ends at once; fair rotation (a, b, a, b) with one stream
+  in flight; a disconnected peer is skipped until it reconnects; the lifetime ends both the wait and an attempt in
+  flight; listeners and diagnostics stay bounded.
+- tests/track-x-successor-material-wait.test.ts (10 tests, native rooms): the one install outwaits a 22 s adoption
+  delay (requests at 0, 10.3 and 20.8 s, one response after the adoption at 22.2 s); a request after adoption is
+  served at once; Writer close, creator close (handlers joined) and serving replacement each end held work in 4 to
+  6 ms; a failed adoption never opens serving; a creator restarted after adoption with a 12 s startup delay is
+  outwaited; Writer restart; a disconnected peer's hold is released in 1 ms; same-peer supersession; no new frame
+  kind on the wire.
+- tests/track-x-successor-serving-gate-late-failure.test.ts: the final-stop failure is terminal and the held request
+  fails.
+- tests/track-x-successor-serving-gate-bounds.test.ts proof 2 now reads: each held attempt ends at the server's
+  response deadline, and the one install continues and completes after the adoption. Proof 1 adds chunk requests.
+
+RED: 10 unit and 9 native tests fail at 6604dff8's source (logs e-red-unit-r1, e-red-native-r1); three native tests
+pass there on purpose (served at once, Writer restart, supersession). With the fix: 22/22 unit, 13/13 native including
+the gate RED e032dd1e (e-fix-unit-r1, e-fix-native-r1). The hostile-response pin r9-grid-outcome-transfer-native
+(3738-3744) passes unchanged (30 passed, 4 skipped; e-fix-pins-r1). The other pin, r9-chat-shipping-room-native
+(714-724), fails before it reaches the pin at base and fix alike ("truncated canonical value" building the shipped
+Chat genesis state), so it cannot run here; the transport tests cover the same refusals with one request each.
+
+Why r9-chat-shipping-room-native fails here (so that the failure is not mistaken for a product failure later):
+
+- **What it reads.** It reads no `.logs` input. Its only outside input is the catalog named by
+  `SHIPPING_CHAT_CATALOG_DIR`. These runs point it at Track M's materialised catalog,
+  <evidence>/track-m/sub-cc/chat-catalog. That catalog was written on 2026-10-20 at 05:10 and holds one blueprint,
+  digest 61ab694a…, in the capacity format.
+- **The failure.** The fixture calls `createShippingV3ChatApplication({ catalog, blueprintDigest })` with no
+  `exactCanonicalGenesisLatchedAclBytes`. For a capacity-format artifact, examples/chat/src/v3-chat-application.ts:163
+  then decodes an empty `Uint8Array` as the genesis ACL. The throw is at examples/chat/src/v3-chat-capacity.ts:189
+  (logs r9-chat-shipping-catalog-r1).
+- **What that makes it.** The test is out of step with Chat's current application input. It is not the room's
+  behaviour.
+- **Without the variable.** Every test fails at once with "SHIPPING_CHAT_CATALOG_DIR must name genuine nightly
+  output" (r61 pair logs).
+
+The completed E pair covers 44 files on both sides: 49 failed / 229 passed / 14 skipped with E, versus
+67 failed / 211 passed / 14 skipped without it. Comparing the raw named failure headings finds no new named failure
+and 18 resolved failures. The fixed run also reports a Vitest worker `onTaskUpdate` timeout, so neither side is a
+clean full-suite pass. Logs: `e-pair-fix.log`, `e-pair-base.log`; the file manifest is `data/e-pair-all.txt`.
+The earlier console-summary parser omits some fast tests, so its differing inventory counts are not a complete
+per-test result set.
+
+## 16. Recover a creator restarted between seal and adoption
+
+The original restart probe met "v3 room trust installation failed: trust-rejected" when reopening the creator. The probe
+tests/track-x-creator-reopen-pending-probe.test.ts (a831bdfa, a probe, not a RED) reopens the creator at each step:
+
+| Creator stopped after               | Reopen                                                  |
+| ----------------------------------- | ------------------------------------------------------- |
+| seal                                | fails, trust-rejected (cause: trust-state-inconsistent) |
+| seal, export                        | fails, the same                                         |
+| seal, export, a Writer install open | fails, the same                                         |
+| seal, adoption                      | succeeds, epoch 1                                       |
+| (no seal)                           | succeeds                                                |
+
+It is not the fixture and not the gate. Room startup installs trust from the epoch-0 store, whose head now holds the
+sealed successor's trust record, and the generic opener refuses that record by design ("leaving successor opening to
+creator-close", tests/phase-5e-creator-close-red.test.ts:338-361). So a creator that crashes between seal and
+adoption could not reopen its room. That was the original checkpoint's open item; it is resolved by 7c94ec35.
+
+Startup now reconstructs the original local close through the existing adoption owner before opening a live plane.
+The room's durable floor, original Cut/QC/trust, predecessor snapshot and journal replay must agree. The generic
+trust opener remains strict. Certified archive appends still require the archive owner; ordinary local seals no
+longer require an archive merely to restore their original adoption facts.
+
+The native acceptance tests run four consecutive seal/stop/reopen cycles with and without a recipient already
+waiting. Separate worker processes are killed with SIGKILL immediately after seals at epochs 0 and 2 while native
+owners remain open; both reopen, preserve the durable projection, issue new work and roll over again. Native altered
+Cut, stale read-view and fenced-source controls all refuse before head publication, and healthy reopen remains
+possible afterward. Independent review found no actionable regression; node build/typecheck pass. The obsolete
+historical adoption fixture fails before its authorization assertions because it lacks the current native membership
+port, so that suite is not counted as passing. See the `creator-sealed-successor-*` native tests.
+
+## 17. A migrated target skips the prime that can only decline (row 73, step 14 A)
+
+**RED 8dd890ea, fix 73f780ff.** Astra's consult 4 (<evidence>/astra-consult-4/answer.md) verified the mechanism.
+Its prototype is <evidence>/astra-consult-4/evidence/verified-a.patch, which was reverted.
+
+### 17.1 The cost
+
+After a migration, the creator's target runs epoch 0 with the migration source retained. Every ordinary admission
+on it, local or received, first runs an OPTIONAL prime: creator-close.ts `captureCreatorOrdinarySourceWithoutForecast`,
+called at close:3500 for the initial prime and at close:3514 for the joined-source refresh. That prime is one
+complete cold read lifetime: seal dependencies, acquire a proof, capture, release.
+
+On this target the capture always declines. The census carries `migrationSource`: the selection is at
+v3-live.ts:11075-11076 and the insertion at 11841 (not 11133, as the step-14 note said). The data owner then refuses
+any census with a migration source as "native-or-cross-context-source" (creator-closed-rollback-data.ts:5465-5466).
+So each admission pays a lifetime that learns nothing, and then pays the mandatory cold quote. In Track V's
+switched d9346 runs, maintenance start to prime result took 1.3 to 2.6 s per post-migration creator row, at load
+40 to 91. The FIFO maintenance queue then serialises these rows.
+
+### 17.2 What changed
+
+- **packages/node/src/creator-close.ts.**
+  - `V3CreatorCloseRegistration` gains an optional member, `hasMigrationSourceForOrdinaryPrime?(): boolean`, marked
+    `@internal`. The root tsconfig strips internal members (`stripInternal`, which packages/node extends), so the
+    published declarations do not carry it. The unit test emits the declaration in memory, with and without
+    stripping, to prove that.
+  - `captureCreatorOrdinarySourceWithoutForecast` reads the hint after its domain check, and only for a
+    non-readiness call. When the hint is true, it reports `ordinary-incremental-source-prime-skipped`
+    (`reason: "migration-source"`) and returns `undefined`. Nothing is sealed, acquired, captured, charged or
+    released, so no credit is transferred.
+  - A missing, false or throwing hint keeps the original route. Readiness priming (close:4727 and 4893 pass `true`)
+    never reads the hint.
+- **packages/node/src/v3-live.ts.**
+  - `migrationDisplacedSource(registration)` is exactly `captureCreatorRecoveryRuntime`'s `migrationSource`
+    selection. The unit test runs both sources over five cases and compares them.
+  - The creator close registration answers the hint by calling it each time, so a reopen, a rollover or a replaced
+    source shows at once.
+  - `captureCreatorRecoveryRuntime` itself is untouched. Existing tests extract it into a sandbox with fixed
+    bindings, and a new free identifier there would break them.
+
+The hint can only skip a prime that would have declined. The census sets `migrationSource` whenever the runtime has
+a migration source, and the hint is true only then, so a true hint always means a decline. No supported warm capture
+is lost. Later warm capture is unchanged: the cold path's capture at close:3556-3558 still runs.
+
+The claim is narrow on purpose. Healthy outcomes are unchanged, and every check of the mandatory cold quote stays.
+Failures that only the skipped lifetime could raise (acquire, capture or release faults of that lifetime) are no
+longer raised. The unit test pins this: the same faults still raise when the hint is false, and in readiness.
+
+### 17.3 Tests and proof
+
+**Unit test: tests/track-x-ordinary-prime-migration-skip.test.ts.** It runs the exact helper and the exact live
+predicate, taken from source into a sandbox. Its eight tests check:
+
+- the member is private (the in-memory declaration emit drops it when stripInternal is set and keeps it when not);
+- a migration source skips the prime, for a received and an unreceived receipt alike: no seal, proof, capture or
+  release, and the skip event is reported;
+- readiness is never skipped;
+- a missing, false or throwing hint keeps the original route;
+- the hint is read at each call;
+- outside the domain, the hint is not read;
+- the narrowed claim: faults in acquire, capture, release, and capture-and-release raise nothing when skipped, but
+  still raise when the hint is false and in readiness;
+- `migrationDisplacedSource` equals the census's `migrationSource` selection over five cases.
+
+**Native test: tests/track-x-ordinary-prime-migration-native.test.ts** (node SQLite room). The Writer joins the
+migrated target the way d9346's joiner does: from the target's invite, with the creator's retained republication. It
+checks:
+
+- on the migrated epoch 0, every local and received row's prime is preceded by the skip event, none runs a declined
+  lifetime, and all rows are admitted;
+- readiness priming is still entered, and still declined by the data owner;
+- a reopen at epoch 0 still skips; the rollover and a reopen at epoch 1 never do;
+- with no migration, nothing is skipped and warm hits are unchanged;
+- a corrupted census read inside the mandatory cold quote is refused, with the projection unchanged, and the same
+  operation then succeeds.
+
+The fixture gains a target's invite material, `open({ room, host })`, `deliver` and `republish`.
+
+**Results.** These ran in a scratch copy, because the worktree was busy with option E's suite pair. The copy is a
+copy of the worktree without .git and .logs, and its source was verified equal to HEAD.
+
+| Run | Source | Result | Log |
+| --- | --- | --- | --- |
+| RED | 2e813db5 | 7 fail, 6 pass | a-red-copy-r2 |
+| With A | 73f780ff | 13/13 pass | a-green-copy-r1 |
+| Fixture users with the trimmed fixture | 73f780ff | 15/15 pass | a-green-copy-r2 |
+| Node typecheck | 73f780ff | 0 errors | a-typecheck-node-copy |
+
+**Suite pair.** A was run against 8dd890ea's source, 120 files at a 120 s timeout. No test failed with A that
+passed without it among the named results captured by the comparison: 210 failed with A and 218 without
+(`data/a-pair-compare.txt`). The raw totals differ by eight failures. The parser omits fast test lines and reports
+different inventories, so it does not establish an eight-test one-to-one attribution; the dedicated RED/green run
+above supplies that evidence.
+
+The 120 files are A's surface pins, at the coordinator's request:
+
+- d9346-v3-room-extraction-red's export pin. It shows the same pre-existing diff in both halves, and A adds no
+  export.
+- Every test that names `V3CreatorCloseRegistration`, or reads creator-close.ts or v3-live.ts as text, directly or
+  through a fixture it imports. This includes the sandbox extractions in creator-closed-rollback-proof-accounting
+  and creator-ordinary-readiness-producer, and the pinned creator-journal-classification-compound.
+- The migration suites (phase-3h, r9 canvas/chat/grid) and the Track X room suites.
+
+No pinned test needed an edit. packages/node/tests/authenticated-commit-packaging-1o-g-corrective-red is excluded
+by the root vitest config, and A changes no package.json or export map.
+
+### 17.4 Corrections and what A does not fix
+
+- **Capacity refusals.** After the suffix is placed in the step-14 traces, every capacity refusal is on the joiner
+  (context 1), not on the creator (context 0). s14p-1 has 16 joiner refusals, starting after +15 s, while the
+  creator's suffix admission ended at about +9.9 s.
+- **Cold fallback after the rollover.** It can persist for a different reason. On the creator's epoch 1 (all local
+  rows), the native probe reports `ordinary-incremental-fallback` with `"failed":["fixedJournalShape"]`
+  (creator-closed-rollback-data.ts:15332: "An all-local branch needs its own compiler"). A does not change this.
+- **B is deferred** to its own design track: warm capture with a migration source. It needs authenticated
+  cross-object source facts and fresh custody of both native contexts, and it touches G5, G10-G12, G21-G22 and G25.
+- **The lost first copy is a separate new track.** Astra reproduced it natively: 39 rows, 7 first copies refused,
+  and the missing hook sends nothing. A delivery repair that is peer-aware, bounded and progress-controlled belongs
+  there. The pointer is kept in CONTRACT and here.
+- **The 20 s poll stays** (no C).
+
+### 17.5 d9346 with A
+
+The uninstrumented loops `d9a-a.log` and `d9a-noa.log` each completed ten runs with both d9346 tests passing:
+20/20 tests with A and 20/20 without A. These runs establish compatibility, not that A is necessary for success.
+
+The later instrumented, interleaved ten-pair loop (`d9ab-probe.log`) passed 16/20 tests with A and 15/20 without A.
+Both sides passed the first six pairs; later pairs encountered migration-delivery or first-test failures under very
+high host load. That does not establish a reliable browser speedup or a statistically meaningful reliability change.
+
+The first five instrumented pairs (`data/d9ab-probe-summary.txt`) do confirm the mechanism: all ten migrated-target
+rows with A skip the declining prime, and none of the ten without A do. The measured median start-to-capture time
+is 2.539 s with A versus 4.061 s without it, while the mandatory cold quote varies substantially with load. The
+supported claim is the removal of the redundant native lifetime; the mandatory cold quote and delivery limitations
+remain independently observable.
+
+## 18. Durable received authority and one completion rule
+
+F1 carries the creator's exact Cut membership to a recipient that never received every included row. The recipient
+verifies it and adds only its own authenticated witnesses before persisting it. A missing committed local native row
+still refuses; an absent remote row is not fabricated. This is why a partially received Cut can now leave the replay
+window without accumulating permanent journal scopes.
+
+F2 keeps the Cut, commit QC and successor trust beside that membership in the existing native journal carrier.
+Those bytes are data. When the ordinary recovery window no longer supplies authority, the genuine held owner
+reopens them against the immutable genesis and the original signed scope header. No in-memory authority registry
+survives a lifetime. The existing recovery-window DATA path remains available, and the complete native image bound
+charges the retained envelope. The owner is
+[`creator-received-close-membership.ts`](../../../../packages/node/src/internal/creator-received-close-membership.ts).
+
+The journal and recovery census use the same local completion owner in
+[`v3-live.ts`](../../../../packages/node/src/v3-live.ts). An own row outside the Cut needs signed terminal coverage
+and completed local settlement. A fence is intrinsically settled; expiry needs the exact source digest and the
+immutable policy's expiry result; replacement work needs every durable chunk and the same policy-derived operations.
+Manual review stays open. Replacement inclusion in a later Cut is not an extra completion condition. The journal
+still authenticates the original row against its closed ACL and checks the original dependency rules.
+
+An interrupted old-build installation can have persisted the unwrapped membership. The native upgrade permits only
+an additive received envelope containing those exact old bytes. It retains native image currency, mutation fencing
+and the whole-image ceiling, and refuses rewrites or downgrades. Both hosts use the same mechanical preservation
+predicate in [`live-journal`](../../../../packages/live-journal/src/retirement.ts); protocol authority remains with
+the held verifier.
+
+The final native evidence covers delayed replacements through twelve epochs, fences that miss four Cuts and restart
+after their authority leaves the recovery window, clean-scope crash boundaries, and expiry/rebase trajectories.
+Resolved scopes return to the two replay scopes. A manual-review source survives ten epochs and a persisted reopen
+while unrelated scopes collect. Genuine stored F2 records pass; altered Cut, QC, trust, scope, header or genesis
+material is refused. The adversarial cases live with the native Track X tests rather than a second documented matrix.
+
+The independent review found the interrupted legacy-record retry defect. Its new native reproduction passes after
+the shared extension fix, along with SQLite and Chromium stale/changed/oversize/reopen controls. The compound lifetime
+and accounting suite remains green, and all package builds and the proper node typecheck pass. The follow-up review
+found no actionable regressions. Two unrelated ordinary-settlement-capacity test failures reproduce unchanged on the pre-F2 integration
+baseline; a broad historical suite is not claimed green.
+
+This result does not yet prove arbitrary repeated portable replacement chains have a bounded footprint. Their
+remaining native source/plan consumers and atomic retirement are being joined by H5. The browser gameplay
+continuation has a separate evidence owner; creator seal-to-adoption crash recovery is resolved in section 16. An offline recipient missing
+at least two installs, and the same removed/re-admitted replica preserving an unresolved source, still need strong
+acceptance assertions; the D8 observation probe is not a passing recovery proof. These conclusions must be added
+before claiming the entire continuation complete.
+
+Track J's [formal result](../38-track-j-late-arrival-retirement-model/RESULT.md) is integrated as 01d05d84. Its complete
+finite graphs and mutation witnesses support the stated bounded model; they are not an unbounded eventual-delivery
+theorem or a substitute for the remaining native rejoin and portable-chain gates.
+
+Continuation logs are under `<evidence>/track-x/logs/`: `f2-window.log`, `f2-expire.log`,
+`f2-outwindow-reopen.log`, `f2-upgrade-{unit,sqlite,browser}.log`, `f2-final-{build,typecheck}.log`,
+`f2-review-final.log`, and `recovery-{seal-green1,sigkill1,refusal-native,review,final-typecheck}.log`.
+
 ## Commits
 
 | Commit   | What                                                                               |
@@ -1145,7 +1531,38 @@ drain order (the fence is issued before pending Writer rows are resolved) are th
 | 9f143f3b | test: pin the readiness ingress hold's gates, pool bounds, release paths and close |
 | 0e7c068e | fix: keep enqueueV3Ingress's pinned closing-gate line under the readiness hold     |
 | 4f5fc446 | merge: main ebf4254f into the row 51 work                                          |
-| (this)   | docs: record decision row 51's implementation and proof                            |
+| 23a569ac | docs: record decision row 51's implementation and proof                            |
+| 2863424c | test: RED for a Writer that plays during the creator's seal or adoption            |
+| 0a3cce4f | test: deliver the play-through RED's rows in flow-controlled batches               |
+| bb357ac1 | fix: issue a Writer's nonportable settlement replacement without the portable prep |
+| fc4bd2af | test: RED for a nonportably replaced source at the Writer's recovery turnover      |
+| e47f6b8b | fix: recognize a completed nonportable settlement replacement in the census        |
+| 04a59a33 | test: an opt-in play-through-rollover mode for Track V's Grid harness              |
+| 357ddea2 | test: RED for a Writer whose journal scopes with a replaced move stay protected    |
+| daf61067 | fix: collect a Writer's journal scope whose outside moves it replaced              |
+| 0699bcf3 | merge: main 0171994d into the row 60 work                                          |
+| 13793d94 | test: RED for journal scopes that keep another Writer's move made during the seal  |
+| 986e1d05 | fix: collect a received move outside the Cut once the successor install is durable |
+| 77ffef9a | test: RED for a replacement of a move made during the seal that missed the Cut too |
+| 128b066e | test: RED for a settlement fence, or whole install output, that missed the Cut     |
+| b8268291 | fix: collect a Writer's settlement fence outside the Cut after a later own fence   |
+| 4cbef3d7 | fix: recognize a completed replacement of a source older than the closed epoch     |
+| 6f37faae | fix: follow a replaced move's replacement that missed its own Cut too              |
+| 402c76a4 | test: RED for outside rows that resolve after the classification window (W1)       |
+| 9e20b737 | test: RED for astra A1 (partial Cut) and A2 (expire policy)                        |
+| 82d1a5cf | test: probe a removed then re-admitted Writer (CONTRACT D8)                        |
+| e032dd1e | test: RED for serving the successor only after the creator adopts it (row 61)      |
+| 5bd36214 | fix: serve a sealed successor only after the creator has adopted it (row 61)       |
+| 6558a699 | test: probe a pending manual review's effect on installs and the lull (A-1)        |
+| 6604dff8 | test: RED for option E, the one install outwaits the serving gate (row 61)         |
+| 2e813db5 | fix: a Writer's install retries its material fetch until the session closes (E)    |
+| a831bdfa | test: probe a creator reopen while its sealed successor is pending (probe)         |
+| 8dd890ea | test: RED for skipping the declining prime on a migrated target (row 73, A)       |
+| 73f780ff | fix: a migrated target skips the optional prime that can only decline (A)         |
+| 19ce52a2 | fix: terminally reject framing-bound violations while retrying transient resets |
+| fd342d90 | fix: persist received authority and share the local settlement-completion rule |
+| 7c94ec35 | fix: reconstruct sealed local adoption before room startup |
+| (this)   | docs: preserve original E/A evidence and record the verified continuation |
 
 Main (24d4ca61) carries f2d301d5, the fixture half of 9b6b5f3f (65505659) and 270c7068..e26cd812 as picked
 commits (eeddd65a..cf6d306f). The startup RED file of 9b6b5f3f stays on this branch. Main (ebf4254f) also carries
