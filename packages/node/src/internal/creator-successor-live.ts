@@ -99,6 +99,35 @@ export type CreatorSuccessorLiveResult =
 	| Readonly<{ readonly handle: object; readonly ok: true }>
 	| Readonly<{ readonly cause?: unknown; readonly detail: string; readonly kind: string; readonly ok: false }>;
 
+export interface CreatorSuccessorRetainedReadPause {
+	finish(outcome: "restored" | "unavailable"): void;
+}
+
+let retainedReadPauseOwner: ((plane: object) => Promise<CreatorSuccessorRetainedReadPause>) | undefined;
+
+/**
+ * Installs the original registration owner for joined replay quiescence.
+ * @param owner - Private registration resolver; grants no native authority.
+ * @returns Whether this call installed the sole resolver.
+ */
+export function installCreatorSuccessorRetainedReadPause(
+	owner: (plane: object) => Promise<CreatorSuccessorRetainedReadPause>
+): boolean {
+	if (retainedReadPauseOwner !== undefined) return false;
+	retainedReadPauseOwner = owner;
+	return true;
+}
+
+/**
+ * Pauses future replay reads while an original successor operation owns native work.
+ * @param plane - Genuine active plane or its registered alias.
+ * @returns Original phase finisher, invoked only after native work and release join.
+ */
+export function pauseCreatorSuccessorRetainedReads(plane: object): Promise<CreatorSuccessorRetainedReadPause> {
+	if (retainedReadPauseOwner === undefined) return Promise.reject(new TypeError("creator replay owner is unavailable"));
+	return retainedReadPauseOwner(plane);
+}
+
 type CreatorSuccessorLiveKernel = (
 	material: CreatorSuccessorLiveMaterial,
 	bindings: CreatorSuccessorRuntimeBindings

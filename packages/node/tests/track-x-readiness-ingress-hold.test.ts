@@ -57,6 +57,7 @@ interface Registration {
 	readinessMaintenanceEntered?: boolean;
 	terminalBarrier?: Promise<void>;
 	readinessIngressHold?: Promise<void>;
+	retainedReplayReadPhase?: Readonly<{ kind: string }>;
 	retainedBootstrapHold: boolean;
 }
 
@@ -65,7 +66,7 @@ interface Message {
 	bytes: number;
 }
 
-type Hold = (registration: Registration) => Promise<() => void>;
+type Hold = (registration: Registration) => Promise<(successful: boolean) => void>;
 type Enqueue = (registration: Registration, message: Message, transport?: "gossip" | "retained") => Promise<void>;
 type Task = <Result>(
 	registration: Registration,
@@ -117,6 +118,9 @@ function plane(maxPendingBytes = 1_048_576): {
 			"authenticateV3Ingress",
 			"enqueueV3Ingress",
 			"holdV3IngressForReadiness",
+			"beginRetainedReplayTransition",
+			"retireRetainedReplay",
+			"releaseRetainedReplayPrefix",
 		],
 		{
 			ReflectApply: Reflect.apply,
@@ -180,7 +184,7 @@ describe("readiness ingress hold: arrivals wait outside the FIFO", () => {
 		});
 		expect(order).toEqual(["fifo-task"]);
 		expect(f.decoded).toEqual([]);
-		release();
+		release(true);
 		await Promise.all(arrivals);
 		expect(f.decoded).toEqual([1, 2, 3]);
 		expect(f.logs).toEqual(["envelope-rejected", "envelope-rejected", "envelope-rejected"]);
@@ -188,6 +192,7 @@ describe("readiness ingress hold: arrivals wait outside the FIFO", () => {
 		expect(f.registration.admittedInputBytes).toBe(0);
 		expect(f.registration.joinedWork.size).toBe(0);
 		expect(f.registration.readinessIngressHold).toBeUndefined();
+		expect(f.registration.retainedReplayReadPhase).toBeUndefined();
 		// After release, an arrival goes straight to the FIFO.
 		await f.enqueue(f.registration, { id: 4, bytes: 10 });
 		expect(f.decoded).toEqual([1, 2, 3, 4]);
@@ -217,7 +222,7 @@ describe("readiness ingress hold: arrivals wait outside the FIFO", () => {
 		const release = await holding;
 		expect(order).toEqual(["earlier-task", "held"]);
 		expect(f.decoded).toEqual([]);
-		release();
+		release(true);
 		await arrival;
 		expect(f.decoded).toEqual([7]);
 	});
@@ -228,7 +233,7 @@ describe("readiness ingress hold: arrivals wait outside the FIFO", () => {
 		f.registration.terminalBarrier = terminal.promise;
 		const release = await f.hold(f.registration);
 		const arrival = f.enqueue(f.registration, { id: 9, bytes: 10 });
-		release();
+		release(true);
 		await settle();
 		expect(f.decoded).toEqual([]);
 		terminal.resolve();
@@ -271,7 +276,7 @@ describe("readiness ingress hold: the closing gate", () => {
 		const arrival = kept.enqueue(kept.registration, { id: 3, bytes: 10 });
 		await settle();
 		expect(kept.registration.admittedInputJobs).toBe(1);
-		releaseKept();
+		releaseKept(false);
 		await arrival;
 		expect(kept.decoded, "dropped by authenticateV3Ingress's own gate, as today").toEqual([]);
 		expect(kept.logs).toEqual([]);
@@ -282,7 +287,7 @@ describe("readiness ingress hold: the closing gate", () => {
 		cleared.registration.blueprintClosing = true;
 		const later = cleared.enqueue(cleared.registration, { id: 4, bytes: 10 });
 		cleared.registration.blueprintClosing = false;
-		releaseCleared();
+		releaseCleared(true);
 		await later;
 		expect(cleared.decoded).toEqual([4]);
 	});
@@ -293,7 +298,7 @@ describe("readiness ingress hold: the closing gate", () => {
 		const arrival = f.enqueue(f.registration, { id: 5, bytes: 10 });
 		await settle();
 		f.state.current = false;
-		release();
+		release(true);
 		await arrival;
 		expect(f.decoded).toEqual([]);
 		expect(f.registration.admittedInputJobs).toBe(0);
@@ -312,7 +317,7 @@ describe("readiness ingress hold: the bounded input pool", () => {
 	async function fill(block: "hold" | "busy-fifo", maxPendingBytes: number, count: number) {
 		const f = plane(maxPendingBytes);
 		const busy = deferred();
-		let release = (): void => busy.resolve();
+		let release = (_successful: boolean): void => busy.resolve();
 		let busyTask: Promise<void> | undefined;
 		if (block === "hold") release = await f.hold(f.registration);
 		else busyTask = f.task(f.registration, () => () => busy.promise);
@@ -323,7 +328,7 @@ describe("readiness ingress hold: the bounded input pool", () => {
 			jobs: f.registration.admittedInputJobs,
 			bytes: f.registration.admittedInputBytes,
 		};
-		release();
+		release(true);
 		await Promise.all(arrivals);
 		await busyTask;
 		return { full, decoded: f.decoded.length, after: f.registration.admittedInputJobs };
@@ -358,8 +363,8 @@ describe("readiness ingress hold: release on every path", () => {
 		const first = f.registration.readinessIngressHold;
 		await expect(f.hold(f.registration)).rejects.toThrow("creator readiness ingress hold is unavailable");
 		expect(f.registration.readinessIngressHold).toBe(first);
-		release();
-		release();
+		release(true);
+		release(true);
 		expect(f.registration.readinessIngressHold).toBeUndefined();
 		f.state.current = false;
 		await expect(f.hold(f.registration)).rejects.toThrow("creator readiness ingress hold is unavailable");
@@ -376,6 +381,7 @@ describe("readiness ingress hold: release on every path", () => {
 		const arrival = f.enqueue(f.registration, { id: 6, bytes: 10 });
 		gate.resolve();
 		await expect(holding).rejects.toThrow("flush failed");
+		expect(f.registration.retainedReplayReadPhase).toEqual({ kind: "unavailable" });
 		expect(f.registration.readinessIngressHold).toBeUndefined();
 		await arrival;
 		expect(f.decoded).toEqual([6]);
@@ -397,7 +403,7 @@ describe("readiness ingress hold: release on every path", () => {
 			const owner = {
 				holdIngressForReadiness: async () => {
 					calls.push("hold");
-					return () => calls.push("release");
+					return (successful: boolean): number => calls.push(`release:${successful}`);
 				},
 				prepareOrdinaryReadiness: async () => {
 					calls.push("prepare");
@@ -416,10 +422,10 @@ describe("readiness ingress hold: release on every path", () => {
 			);
 			if (name === "success") {
 				await expect(result).resolves.toBe("resolved");
-				expect(calls).toEqual(["hold", "prepare", "prepared", "release"]);
+				expect(calls).toEqual(["hold", "prepare", "prepared", "release:true"]);
 			} else {
 				await expect(result).resolves.not.toBe("resolved");
-				expect(calls, name).toEqual(["hold", "prepare", "release"]);
+				expect(calls, name).toEqual(["hold", "prepare", "release:false"]);
 			}
 		}
 	});

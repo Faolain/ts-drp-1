@@ -8085,6 +8085,8 @@ export interface CreatorForwardPromotionSourceMaterial {
 		originalAnchorEnvelope: null;
 	}>[];
 	checkCurrent(): Promise<void>;
+	/** Borrows native custody only; the consumer must authenticate its own current head and floor. */
+	borrowJournalHeaderReservation(): Promise<NativeReadReservation>;
 	/** One original admitted source turn; no caller-selected image or authority. */
 	readClosedJournalMembershipPrefixes(): Promise<ClosedJournalDetailClassification["collectiblePrefixes"] | undefined>;
 	checkSnapshots(): Promise<void>;
@@ -8359,6 +8361,61 @@ export function resolveCreatorForwardPromotionSource(
 				})
 			: null;
 	const material: CreatorForwardPromotionSourceMaterial = Object.freeze({
+		borrowJournalHeaderReservation: async function (
+			this: CreatorForwardPromotionSourceMaterial
+		): Promise<NativeReadReservation> {
+			requireLaw(this === material && !aliasRevoked && nominationTask === undefined, "snapshot-unavailable");
+			if (nominationSource !== undefined) return nominationSource.borrowJournalHeaderReservation();
+			let borrowed: NativeReadReservation | undefined;
+			const checkParent = (): void =>
+				requireLaw(
+					!aliasRevoked &&
+						nominationTask === undefined &&
+						!lifetime.released &&
+						!lifetime.classifiedReleasing &&
+						frames.get(reader)?.alive === true &&
+						!sourceFrame.headerConsumersRevoked &&
+						sourceFrame.headerMutation === undefined,
+					"snapshot-unavailable"
+				);
+			try {
+				await withSourceRead(async () => {
+					checkParent();
+					requireLaw(sourceFrame.headerHold !== undefined, "snapshot-unavailable");
+					borrowed = borrowJournalHeaderHold(sourceFrame.headerHold, input.liveJournalStore);
+					await borrowed.check();
+				});
+				checkParent();
+				requireLaw(borrowed !== undefined, "anchor-unavailable");
+				const original = borrowed;
+				let finish!: () => void,
+					released = false,
+					releaseTask: Promise<void> | undefined;
+				const joined = new Promise<void>((resolve) => {
+					finish = resolve;
+				});
+				pendingChecks.add(joined);
+				return Object.freeze({
+					check: async (): Promise<void> => {
+						requireLaw(!released, "anchor-unavailable");
+						checkParent();
+						await original.check();
+						checkParent();
+					},
+					release: (): Promise<void> => {
+						if (releaseTask !== undefined) return releaseTask;
+						released = true;
+						return (releaseTask = original.release().finally(() => {
+							pendingChecks.delete(joined);
+							finish();
+						}));
+					},
+				});
+			} catch (error) {
+				await borrowed?.release();
+				throw error;
+			}
+		},
 		acquireProtectedUnion: async function (
 			this: CreatorForwardPromotionSourceMaterial
 		): Promise<CreatorHeldProtectedRecoveryUnion> {

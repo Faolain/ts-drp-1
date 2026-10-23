@@ -116,6 +116,7 @@ import {
 	type GenerationId,
 	type GenerationRecord,
 	type GenerationRef,
+	type NativeReadReservation,
 	parseGenerationId,
 	type PresentHead,
 } from "@ts-drp/storage";
@@ -234,7 +235,7 @@ const runtimeReleaseOwners = new WeakMap<
 		captureSigningRetirementOwners(): CreatorSigningRetirementOwners;
 		releaseHeaderCustodyForSuccessorInstall(): Promise<void>;
 		prepareOrdinaryReadiness(): Promise<void>;
-		holdIngressForReadiness(): Promise<() => void>;
+		holdIngressForReadiness(): Promise<(successful: boolean) => void>;
 		maintainRecoveryPool(): Promise<CreatorRecoveryPoolResult>;
 	}
 >();
@@ -455,7 +456,7 @@ export interface V3CreatorCloseRegistration {
 	/** Holds every arrival behind an ordinary readiness preparation (decision row
 	 * 51), after the tasks already queued have finished. Resolves to the release,
 	 * which the caller runs on every path. Grants no admission. */
-	holdIngressForReadiness(): Promise<() => void>;
+	holdIngressForReadiness(): Promise<(successful: boolean) => void>;
 	/** Explicit queued quiescent boundary, never a presign maintenance grant.
 	 * `deferrable` reports an unavailable boundary before entry instead of halting. */
 	runOrdinaryReadinessMaintenance(snapshots: SnapshotRecoveryStore<SnapshotVerificationReceipt>,
@@ -545,7 +546,17 @@ export interface V3CreatorCloseRegistration {
 	 * not confer target signing authority and never emits future preimages. */
 	readArchiveCloseContinuationPreimageByteLengths?(hold: CreatorSnapshotRecoveryCloseHold,
 		sharedAccounting: import("./internal/creator-closed-rollback-data.js").CreatorClosedRollbackProofAccounting): Promise<readonly number[]>;
-	terminalize(): boolean;
+	beginRetainedReplayClose(): (successful: boolean) => void;
+	terminalize(
+		sealed: Readonly<{
+			predecessorHead: PresentHead;
+			head: PresentHead;
+			cutValueRef: GenerationRef;
+			commitQcRef: GenerationRef;
+			successorTrustRef: GenerationRef;
+			borrowJournalHeaderCustody(): Promise<NativeReadReservation | undefined>;
+		}>
+	): boolean;
 }
 
 function archiveCapacityPromiseCovers(promise: ArchiveCapacityPromise,needed: ArchiveCapacityDeclaration): boolean {
@@ -3752,6 +3763,7 @@ export async function bindCreatorLiveClose(
 			) {
 				return Promise.reject(new TypeError("creator close authority is unavailable"));
 			}
+			const finishRetainedReplayClose = registration.beginRetainedReplayClose();
 			maintenanceClosing = true;
 			ordinaryProofSource = undefined; ordinaryTemplateReady = false;
 			closeTask = (async (): Promise<CreatorLiveCloseResult> => {
@@ -4471,7 +4483,21 @@ export async function bindCreatorLiveClose(
 						...retiredSourceGenerations,
 					]);
 				}
-				if (!registration.terminalize()) throw new TypeError("creator close terminalization failed");
+				if (
+					!registration.terminalize({
+						predecessorHead: current.head,
+						head: proposedHead,
+						cutValueRef,
+						commitQcRef,
+						successorTrustRef,
+						borrowJournalHeaderCustody: async (): Promise<NativeReadReservation | undefined> => {
+							if (stopping || dependenciesReleased || lifecycle !== "successor-pending-adoption")
+								throw new TypeError("creator sealed journal custody is unavailable");
+							return (recoverySource ?? promotionSource)?.borrowJournalHeaderReservation();
+						},
+					})
+				)
+					throw new TypeError("creator close terminalization failed");
 				lifecycle = "successor-pending-adoption";
 				const result = Object.freeze({
 					closedVertexCount: commitment.closeSetCount,
@@ -4537,12 +4563,14 @@ export async function bindCreatorLiveClose(
 				) {
 					throw new TypeError("creator adoption facts already exist");
 				}
+				finishRetainedReplayClose(true);
 				return result;
 			})().catch((error) => {
 				closeTask = undefined;
 				if (stagedSnapshot === undefined && registration.abortSnapshotStage()) lifecycle = "active";
 				else lifecycle = "sealed";
 				maintenanceClosing = lifecycle !== "active";
+				finishRetainedReplayClose(false);
 				throw error;
 			});
 			return closeTask;
@@ -4841,7 +4869,7 @@ export async function bindCreatorLiveClose(
 							}
 						});
 					},
-					holdIngressForReadiness: (): Promise<() => void> => registration.holdIngressForReadiness(),
+					holdIngressForReadiness: (): Promise<(successful: boolean) => void> => registration.holdIngressForReadiness(),
 					// Explicit opt-in early turnover (soft watermark). The close keeps its
 					// original inline maintenance as the hard-cap backstop; this only lets a
 					// caller pay for the SAME original reconciliation at a quiescent lull.
@@ -5045,10 +5073,12 @@ export async function prepareCreatorOrdinaryReadiness(plane: object): Promise<vo
 	// reservations or its consumer refusal, and none changes the pending ingress
 	// its census and boundary require. Released on every path.
 	const release = await owner.holdIngressForReadiness();
+	let successful = false;
 	try {
 		await owner.prepareOrdinaryReadiness();
+		successful = true;
 	} finally {
-		release();
+		release(successful);
 	}
 }
 

@@ -729,8 +729,18 @@ describe("same adoption verification facts through original close custody", () =
 		const predecessorValidation = {vertexFacts: next.facts}, successorRuntime = {vertexFacts: next.facts};
 		const registration = (historicalIssuance: {vertexFacts: unknown}) => ({active: true, historicalIssuance, vertexFacts: historicalIssuance.vertexFacts, pendingIngress: new Map(),
 			pendingIngressBytes: 0, networkNode: {unsubscribe() {}}, messageQueueManager: {close() {}}, queueId: "q", topic: "topic"});
-		const deactivate = (value: unknown) => executeLiveOwner<boolean>(["deactivateRegistration"], "deactivateRegistration(registration)", {
+		const deactivate = (value: unknown): boolean =>
+			executeLiveOwner<boolean>(
+				[
+					"deactivateRegistration",
+					"releaseIdleEgressAdmissionOwner",
+					"retireRetainedReplay",
+					"releaseRetainedReplayPrefix",
+				],
+				"deactivateRegistration(registration)",
+				{
 			registration: value, ordinaryRuntimeCapacityGeometry: new WeakMap(), v3PlaneRegistrations: new WeakMap(),
+					v3EgressAdmissionOwners: new WeakMap(),
 			topicMembership: () => false, hasQueueGuarded: () => false});
 		deactivate(registration({vertexFacts: old.facts}));
 		expect(predecessorValidation.vertexFacts).toBe(successorRuntime.vertexFacts);
@@ -772,7 +782,18 @@ describe("same adoption verification facts through original close custody", () =
 		const code = ts.transpileModule(replacements[0]!.getText(parsed), {
 			compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None},
 		}).outputText;
-		new Function("existing", "registration", "reusesTransport", "WeakRefConstructor", code)(existing, registration, true, WeakRef);
+		const retire = executeLiveOwner<(registration: unknown) => void>(
+			["retireRetainedReplay", "releaseRetainedReplayPrefix"],
+			"retireRetainedReplay",
+			{}
+		);
+		new Function("existing", "registration", "reusesTransport", "WeakRefConstructor", "retireRetainedReplay", code)(
+			existing,
+			registration,
+			true,
+			WeakRef,
+			retire
+		);
 		expect(existing.active).toBe(false);
 		expect(existing.pendingIngress.size).toBe(0); expect(existing.pendingIngressBytes).toBe(0);
 		expect(registration.hotPredecessor!.deref()).toBe(existing);

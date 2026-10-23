@@ -1,0 +1,115 @@
+
+ RUN  v3.1.1 /private/tmp/ts-drp-replay-performance
+
+(node:41299) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ packages/node/tests/creator-replay-seal-native.test.ts (40 tests | 3 failed | 37 skipped) 240237ms
+   ↓ held census exact syntax and crypto facts > shares only the live owner's bounded byte facts with replay seals while still reading every native tuple freshly
+   ↓ held census exact syntax and crypto facts > reuses unchanged owned bytes but returns detached nested admission values
+   ↓ held census exact syntax and crypto facts > does not cross signature, key, suite, anchor, domain or ABI boundaries
+   ↓ held census exact syntax and crypto facts > derives only pure verification from successful extraction and detaches digest bytes
+   ↓ held census exact syntax and crypto facts > forks only detached signature facts, never admission or the old owner's lifetime
+   ↓ held census exact syntax and crypto facts > resolves keys freshly after fork and misses altered bytes, context, signature and revoked admission
+   ↓ held census exact syntax and crypto facts > does not carry failed results, unverified syntax, saturated or released facts
+   ↓ held census exact syntax and crypto facts > does not reuse a fact if key resolution mutates the requested bytes
+   ↓ held census exact syntax and crypto facts > does not multiply identical signature facts from different ABIs across nested handoffs
+   ↓ held census exact syntax and crypto facts > records the original admission's pure tuple without retaining or re-encoding its admitted graph
+   ↓ held census exact syntax and crypto facts > never derives extraction from verification or admits through another prepared ABI
+   ↓ held census exact syntax and crypto facts > does not treat failed extraction as a signature fact
+   ↓ held census exact syntax and crypto facts > runs the fresh resolver and refuses fact reuse for missing authorization, changed key or exact bytes
+   ↓ held census exact syntax and crypto facts > permanently disables retention without disabling original verification or extraction
+   ↓ held census exact syntax and crypto facts > detaches returned syntax and validates normally after private retention saturates
+   ↓ held census exact syntax and crypto facts > preserves null prototypes and own __proto__ keys without inheriting ambient record properties
+   ↓ same-owner explicit readiness refresh custody > reopens a new complete proof for the exact hint and joins it before delivering a replacement
+   ↓ same-owner explicit readiness refresh custody > treats only unsupported correspondence as a miss and still joins the actual admitted owner
+   ↓ same-owner explicit readiness refresh custody > preserves authentication, stale-storage, accounting and cleanup failures instead of silently falling back
+   × ordinary runtime candidate-free readiness producer > uses only its own admitted native capture and refuses commit after context change, interruption or release 228ms
+     → expected "spy" to be called once with arguments: [ { check: [Function check] }, …(5) ]
+
+Received:
+
+  1st spy call:
+
+@@ -3,8 +3,8 @@
+      "check": [Function check],
+    },
+    {},
+    {},
+    {},
+-   null,
++   undefined,
+    {},
+  ]
+
+
+Number of calls: 1
+
+   ↓ mandatory fence immutable source handoff > captures exact local-fence DATA before UNKNOWN charging without feeding it to the ordinary compiler
+   ↓ same-held census immutable input reuse > keeps the real browser issuance facade immutable like the SQLite facade
+   ↓ same-held census immutable input reuse > reads complete native inputs and replay freshly on every call, owning isolated page bytes
+   ↓ same-held census immutable input reuse > uses an original held-native probe without recopying rows, but checks replay, context and revocation freshly
+   ↓ same-held census immutable input reuse > reuses only a verified same-held journal image, preserving fresh graph, charge, key and mutable-leaf checks
+   ↓ same-held census immutable input reuse > keeps journal currency unarmed until full verification, and refuses to reuse released or changed native owners
+   ↓ same-held census immutable input reuse > refuses changed complete PRE, signatures, controls or replay even with unchanged image metadata
+   ↓ same-held census immutable input reuse > requests original validation for changed context, history counters, foreign view or prepared floor
+   ↓ same-held census immutable input reuse > joins a delayed native read without delivering reusable facts after revocation
+   ↓ same-held census immutable input reuse > treats optional context/view encoding failures as misses but preserves native and replay errors
+   ↓ same-held census immutable input reuse > keeps callback-bearing and over-capacity work on the complete original path
+   ↓ hidden native outbox census verification facts > passes the replay's exact owner to all three original authentication seams
+   ↓ hidden native outbox census verification facts > refuses unavailable or foreign current historical identity before authentication
+   ↓ hidden native outbox census verification facts > still freshly enforces native completeness, publication, and the historical count guard
+   ↓ same adoption verification facts through original close custody > rejects foreign/revoked lifetime calls immediately and joins admitted reads without clearing another child
+   ↓ same adoption verification facts through original close custody > old predecessor deactivation cannot clear the new successor's shared historical facts
+   ↓ same adoption verification facts through original close custody > clears failed activation's facts rather than retaining abandoned one-use handoffs
+   ↓ same adoption verification facts through original close custody > healthy transport replacement releases predecessor facts even when its inactive handle remains retained
+   × creator replay seal exact native readback > refuses post-seal signature changes and permits exact continuation 120003ms
+     → Test timed out in 120000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+   × creator replay seal exact native readback > refuses post-seal provenance changes and permits exact continuation 120005ms
+     → Test timed out in 120000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/node/tests/creator-replay-seal-native.test.ts > ordinary runtime candidate-free readiness producer > uses only its own admitted native capture and refuses commit after context change, interruption or release
+AssertionError: expected "spy" to be called once with arguments: [ { check: [Function check] }, …(5) ]
+
+Received:
+
+  1st spy call:
+
+@@ -3,8 +3,8 @@
+      "check": [Function check],
+    },
+    {},
+    {},
+    {},
+-   null,
++   undefined,
+    {},
+  ]
+
+
+Number of calls: 1
+
+ ❯ packages/node/tests/creator-replay-seal-native.test.ts:371:21
+    369|   const f = make(), accounting = {}, staged = await f.method.call(f.li…
+    370|   expect(staged.preparation).toBe(f.preparation);
+    371|   expect(f.capture).toHaveBeenCalledExactlyOnceWith(f.facts, f.registr…
+       |                     ^
+    372|   expect(staged.commit()).toBe(true);
+    373|   f.state.identity = {}; expect(staged.commit()).toBe(false);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  packages/node/tests/creator-replay-seal-native.test.ts > creator replay seal exact native readback > refuses post-seal signature changes and permits exact continuation
+ FAIL  packages/node/tests/creator-replay-seal-native.test.ts > creator replay seal exact native readback > refuses post-seal provenance changes and permits exact continuation
+Error: Test timed out in 120000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 37 skipped (40)
+   Start at  06:37:24
+   Duration  241.52s (transform 3.70s, setup 0ms, collect 1.05s, tests 240.24s, environment 0ms, prepare 41ms)

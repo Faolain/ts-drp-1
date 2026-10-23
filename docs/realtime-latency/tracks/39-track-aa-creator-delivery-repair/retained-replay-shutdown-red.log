@@ -1,0 +1,47 @@
+
+ RUN  v3.1.1 /private/tmp/ts-drp-replay-performance
+
+(node:28342) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ tests/track-z-retained-publication-successor.test.ts (13 tests | 1 failed | 12 skipped) 6386ms
+   ↓ the creator's send in flight when its own adoption retires the plane does not reject
+   ↓ creator close drains replay reads before acquiring its native sources
+   ↓ successor native preparation joins concurrent creator replay reads
+   ↓ successor native preparation joins concurrent recipient replay reads
+   ↓ a malformed successor offer leaves ordinary retained publication available
+   ↓ physical retained sends share one egress bound across multiple hot handoffs
+   × current room close joins physical retained sends from a retired predecessor 6385ms
+     → current room close must join the predecessor's actual native send: expected true to be false // Object.is equality
+   ↓ retained publication recovers through the original close retry after native acquisition fails
+   ↓ retirement wakes replay waiting outside the FIFO and a late close completion cannot revive it
+   ↓ sealed replay children preserve native journal exclusion and join parent revocation
+   ↓ a recipient (Writer) asked for retained history inside its own install's activation does not reject
+   ↓ guard: a send that fails while the serving plane is still current still rejects
+   ↓ guard: a target that is unavailable with no successor in flight still rejects
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/track-z-retained-publication-successor.test.ts > current room close joins physical retained sends from a retired predecessor
+AssertionError: current room close must join the predecessor's actual native send: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ tests/track-z-retained-publication-successor.test.ts:420:87
+    418|   close = room.close().then((errors) => { closed = true; return errors…
+    419|   await new Promise(resolve => setTimeout(resolve, 100));
+    420|   expect(closed, "current room close must join the predecessor's actua…
+       |                                                                                       ^
+    421|   expect(readV3RuntimeOwnerCensus(predecessor)).toMatchObject({
+    422|    active: 0, retainedReplayPrefixRows: 0, retainedReplayNativeSends: …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 12 skipped (13)
+   Start at  06:23:39
+   Duration  9.14s (transform 1.90s, setup 0ms, collect 2.55s, tests 6.39s, environment 0ms, prepare 39ms)

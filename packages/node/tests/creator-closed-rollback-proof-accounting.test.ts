@@ -5394,38 +5394,94 @@ describe("joined plane deactivation preserves the original successor alias lease
 	// Controlled nominal registry/jobs only. The actual helper is extracted;
 	// these controls are not browser WebLock or native-storage acceptance.
 	function owner(aliasCleanupFailure?: unknown) {
-		const path = new URL("../src/v3-live.ts", import.meta.url), source = readFileSync(path, "utf8"),
+		const path = new URL("../src/v3-live.ts", import.meta.url),
+			source = readFileSync(path, "utf8"),
 			file = ts.createSourceFile(path.pathname, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-		const declarations = file.statements.filter((node): node is ts.FunctionDeclaration =>
-			ts.isFunctionDeclaration(node) && node.name?.text === "deactivateV3LivePlaneJoined");
-		if (declarations.length !== 1) throw new Error("JOINED_PLANE_DEACTIVATION_HELPER_NOT_UNIQUE");
-		const events: string[] = [], registry = new WeakMap<object, object>();
-		let revokeCalls = 0, rawDeactivations = 0, aliasDeactivations = 0;
-		const raw = {deactivate: async () => {rawDeactivations++; events.push("raw-extra-deactivate");}},
-			registration = {active: true, handle: raw, joinedWork: new Set<Promise<void>>()};
-		const alias = {deactivate: async () => {
-			aliasDeactivations++; events.push("alias-own-lease-release");
-			expect(registration.active).toBe(false);
-			if (aliasCleanupFailure !== undefined) throw aliasCleanupFailure;
-		}};
-		registry.set(raw, registration); registry.set(alias, registration);
-		const join = execute<(handle: object) => Promise<void>>(
-			`${declarations[0]!.getText(file).replace(/^export /, "")}\ndeactivateV3LivePlaneJoined;`, {
-				v3HandleRegistrations: registry, ReflectApply: Reflect.apply, SetPrototypeValues: Set.prototype.values,
-				SetIteratorNext: Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Reflect.apply(Set.prototype.values, new Set(), [])), "next")!.value,
-				deactivateRegistration: (actual: typeof registration) => {
-					expect(actual).toBe(registration); revokeCalls++; events.push("revoke-admission"); actual.active = false; return true;
+		const declarations = file.statements.filter(
+			(node): node is ts.FunctionDeclaration =>
+				ts.isFunctionDeclaration(node) &&
+				["deactivateV3LivePlaneJoined", "joinEgressAdmissionOwner"].includes(node.name?.text ?? "")
+		);
+		if (declarations.length !== 2) throw new Error("JOINED_PLANE_DEACTIVATION_HELPER_NOT_UNIQUE");
+		const events: string[] = [],
+			registry = new WeakMap<object, object>();
+		let revokeCalls = 0,
+			rawDeactivations = 0,
+			aliasDeactivations = 0;
+		const raw = {
+				// eslint-disable-next-line @typescript-eslint/require-await -- Controlled promise-returning cleanup.
+				deactivate: async (): Promise<void> => {
+					rawDeactivations++;
+					events.push("raw-extra-deactivate");
 				},
-			});
+			},
+			registration = {
+				active: true,
+				handle: raw,
+				joinedWork: new Set<Promise<void>>(),
+				networkNode: {},
+				topic: "room",
+			};
+		const alias = {
+			// eslint-disable-next-line @typescript-eslint/require-await -- Controlled promise-returning cleanup.
+			deactivate: async (): Promise<void> => {
+				aliasDeactivations++;
+				events.push("alias-own-lease-release");
+				expect(registration.active).toBe(false);
+				if (aliasCleanupFailure !== undefined) throw aliasCleanupFailure;
+			},
+		};
+		registry.set(raw, registration);
+		registry.set(alias, registration);
+		const join = execute<(handle: object) => Promise<void>>(
+			`${declarations.map((declaration) => declaration.getText(file).replace(/^export /, "")).join("\n")}\ndeactivateV3LivePlaneJoined;`,
+			{
+				v3HandleRegistrations: registry,
+				v3PlaneRegistrations: new WeakMap(),
+				v3EgressAdmissionOwners: new WeakMap(),
+				ReflectApply: Reflect.apply,
+				SetPrototypeValues: Set.prototype.values,
+				SetIteratorNext: Object.getOwnPropertyDescriptor(
+					Object.getPrototypeOf(Reflect.apply(Set.prototype.values, new Set(), [])),
+					"next"
+				)?.value,
+				deactivateRegistration: (actual: typeof registration) => {
+					expect(actual).toBe(registration);
+					revokeCalls++;
+					events.push("revoke-admission");
+					actual.active = false;
+					return true;
+				},
+			}
+		);
 		const deferred = (name: string) => {
 			let resolve!: () => void, reject!: (reason: unknown) => void;
-			const pending = new Promise<void>((done, fail) => {resolve = done; reject = fail;});
-			const task = pending.then(() => {events.push("joined:" + name);}, error => {events.push("failed:" + name); throw error;});
+			const pending = new Promise<void>((done, fail) => {
+				resolve = done;
+				reject = fail;
+			});
+			const task = pending.then(
+				() => {
+					events.push("joined:" + name);
+				},
+				(error) => {
+					events.push("failed:" + name);
+					throw error;
+				}
+			);
 			registration.joinedWork.add(task);
-			return {resolve, reject, task};
+			return { resolve, reject, task };
 		};
-		return {join, alias, raw, registration, events, deferred, admits: () => registration.active,
-			counts: () => ({revokeCalls, rawDeactivations, aliasDeactivations})};
+		return {
+			join,
+			alias,
+			raw,
+			registration,
+			events,
+			deferred,
+			admits: (): boolean => registration.active,
+			counts: (): Readonly<Record<string, number>> => ({ revokeCalls, rawDeactivations, aliasDeactivations }),
+		};
 	}
 
 	for (const failed of [false, true]) it(`revokes synchronously and releases the alias only after both jobs join (${failed ? "one job fails" : "both succeed"})`, async () => {

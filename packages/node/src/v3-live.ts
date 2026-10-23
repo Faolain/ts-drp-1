@@ -62,6 +62,7 @@ import {
 	LIVE_JOURNAL_RETIREMENT_LIMITS,
 	type LiveJournalAcceptedRow,
 	type LiveJournalScope,
+	type LiveJournalSnapshotToken,
 } from "@ts-drp/live-journal";
 import type { MessageQueueManager } from "@ts-drp/message-queue";
 import {
@@ -88,7 +89,11 @@ import {
 	openCreatorAuthorSettlement,
 	resolveCreatorAuthorSettlement,
 } from "@ts-drp/protocol-v3/creator-author-issuance-frontiers";
-import { readPreparedCreatorSuccessorAnchorForSizing } from "@ts-drp/protocol-v3/creator-close";
+import {
+	openCreatorForwardPromotionSuccessorTrust,
+	openCreatorSuccessorTrust,
+	readPreparedCreatorSuccessorAnchorForSizing,
+} from "@ts-drp/protocol-v3/creator-close";
 import {
 	copyCanonicalForAdmittedView,
 	openCreatorSettlementSourceTrust,
@@ -197,6 +202,7 @@ import {
 	type CreatorSuccessorRuntimeBindings,
 	installCreatorSuccessorHandleAlias,
 	installCreatorSuccessorLive,
+	installCreatorSuccessorRetainedReadPause,
 } from "./internal/creator-successor-live.js";
 import {
 	openVerifiedCreatorHistoricalIssuance,
@@ -3180,7 +3186,44 @@ interface V3ReplayableEgressDemand {
 	readonly gate: Promise<void> | undefined;
 	readonly result: Promise<V3EgressResult>;
 	readonly controller: AbortController | undefined;
+	readonly broadcast?: { current: V3RetainedReplayRound; pending?: V3RetainedReplayRound; accepting: boolean };
 }
+
+interface V3RetainedReplayRound {
+	readonly result: Promise<V3EgressResult>;
+	resolve(result: V3EgressResult): void;
+}
+
+function retainedReplayRound(): V3RetainedReplayRound {
+	let resolve!: (result: V3EgressResult) => void;
+	const result = new Promise<V3EgressResult>((done) => {
+		resolve = done;
+	});
+	return { result, resolve };
+}
+
+interface V3RetainedReplayTelemetry {
+	bufferedRows: number;
+	bufferedBytes: number;
+	nativeSends: number;
+	readJobs: number;
+	peakBufferedRows: number;
+	peakBufferedBytes: number;
+	peakNativeSends: number;
+	peakReadJobs: number;
+	readTurns: number;
+	maxReadTurnMs: number;
+}
+
+type V3RetainedReplayReadPhase =
+	| Readonly<{ kind: "unavailable" | "retired" }>
+	| Readonly<{ kind: "sealed"; source: Parameters<V3CreatorCloseRegistration["terminalize"]>[0] }>
+	| {
+			kind: "closing";
+			ready: Promise<void>;
+			resume(): void;
+			source?: Parameters<V3CreatorCloseRegistration["terminalize"]>[0];
+	  };
 
 interface V3PlaneRegistration {
 	readonly receiveOnly: boolean;
@@ -3288,6 +3331,12 @@ interface V3PlaneRegistration {
 	/** The native egress pool bounds distinct selectors. Targeted retained replies
 	 * share an entered replay; completion/broadcast callers share only a queued cut. */
 	replayableEgress?: Map<string, V3ReplayableEgressDemand>;
+	retainedReplayTelemetry?: V3RetainedReplayTelemetry;
+	/** One immutable row DATA prefix shared by every active replay, never native authority. */
+	retainedReplayPrefix?: RetainedReplayPrefix;
+	// The original close orders native reads, carries the sealed source, and
+	// revokes waiting turns on every retirement path.
+	retainedReplayReadPhase?: V3RetainedReplayReadPhase;
 	rebaseCursor: number | undefined;
 	rebaseSnapshot: readonly ClassifiedRebaseRow[] | undefined;
 	retainedBootstrapHold: boolean;
@@ -3315,6 +3364,74 @@ interface VerifiedV3IngressEvidence {
 }
 
 const v3PlaneRegistrations = new WeakMap<DRPNetworkNode, Map<string, V3PlaneRegistration>>();
+interface V3EgressAdmissionOwner {
+	jobs: number;
+	bufferedBytes: number;
+	idle?: Promise<void>;
+	resolveIdle?(): void;
+}
+// A native send outlives the epoch that started it. Replacements on the same
+// network and stable room topic inherit its outstanding numerical reservations.
+const v3EgressAdmissionOwners = new WeakMap<DRPNetworkNode, Map<string, V3EgressAdmissionOwner>>();
+
+function egressAdmissionOwner(registration: V3PlaneRegistration): V3EgressAdmissionOwner {
+	let owners = v3EgressAdmissionOwners.get(registration.networkNode);
+	if (owners === undefined) {
+		owners = new Map();
+		v3EgressAdmissionOwners.set(registration.networkNode, owners);
+	}
+	let owner = owners.get(registration.topic);
+	if (owner === undefined) {
+		owner = { jobs: 0, bufferedBytes: 0 };
+		owners.set(registration.topic, owner);
+	}
+	return owner;
+}
+
+function reserveEgressAdmission(owner: V3EgressAdmissionOwner): void {
+	if (owner.jobs === 0)
+		owner.idle = new Promise<void>((resolve) => {
+			owner.resolveIdle = resolve;
+		});
+	owner.jobs++;
+}
+
+function releaseEgressAdmission(registration: V3PlaneRegistration, owner: V3EgressAdmissionOwner): void {
+	owner.jobs--;
+	if (owner.jobs !== 0) return;
+	const resolve = owner.resolveIdle;
+	owner.idle = undefined;
+	owner.resolveIdle = undefined;
+	releaseIdleEgressAdmissionOwner(registration, owner);
+	resolve?.();
+}
+
+async function joinEgressAdmissionOwner(registration: V3PlaneRegistration): Promise<void> {
+	for (;;) {
+		const owner = v3EgressAdmissionOwners.get(registration.networkNode)?.get(registration.topic);
+		if (owner === undefined || owner.jobs === 0) return;
+		if (owner.idle === undefined) throw new TypeError("v3 native egress join is unavailable");
+		await owner.idle;
+		// Zero-to-nonzero admission creates a new promise. A prior idle wake may
+		// never discharge newer work, including a replacement on this same topic.
+	}
+}
+
+function releaseIdleEgressAdmissionOwner(registration: V3PlaneRegistration, owner?: V3EgressAdmissionOwner): void {
+	const owners = v3EgressAdmissionOwners.get(registration.networkNode);
+	const current = owners?.get(registration.topic);
+	if (
+		current === undefined ||
+		(owner !== undefined && current !== owner) ||
+		current.jobs !== 0 ||
+		current.bufferedBytes !== 0
+	)
+		return;
+	if (v3PlaneRegistrations.get(registration.networkNode)?.get(registration.topic)?.active === true) return;
+	owners?.delete(registration.topic);
+	if (owners?.size === 0) v3EgressAdmissionOwners.delete(registration.networkNode);
+}
+
 // The room transport's bounded retained-history request, per network node and stable
 // room topic (the topic outlives every successor plane of one room session).
 const v3MissingDependencyRequests = new WeakMap<DRPNetworkNode, Map<string, (gap?: V3DeliveryGap) => void>>();
@@ -5172,6 +5289,7 @@ export function readV3RuntimeOwnerCensus(plane: V3PlaneHandle): Readonly<Record<
 		quarantinedDigests: registration.quarantinedDigests.size,
 		rebaseSnapshotRows: registration.rebaseSnapshot?.length ?? 0,
 		causalityIndex: registration.index.size,
+		epochBytes: registration.epochBytes,
 		gatePresent: Number(registration.gate !== undefined),
 		drainingPendingIngress: Number(registration.drainingPendingIngress),
 		terminalBarrierPresent: Number(registration.terminalBarrier !== undefined),
@@ -5184,7 +5302,23 @@ export function readV3RuntimeOwnerCensus(plane: V3PlaneHandle): Readonly<Record<
 		admittedReadControlJobs: registration.admittedReadControlJobs,
 		admittedPendingPublicationJobs: registration.admittedPendingPublicationJobs,
 		admittedEgressControlJobs: registration.admittedEgressControlJobs,
+		sharedEgressControlJobs: v3EgressAdmissionOwners.get(registration.networkNode)?.get(registration.topic)?.jobs ?? 0,
+		sharedRetainedReplayBufferedBytes:
+			v3EgressAdmissionOwners.get(registration.networkNode)?.get(registration.topic)?.bufferedBytes ?? 0,
 		replayableEgressKeys: registration.replayableEgress?.size ?? 0,
+		retainedReplayPrefixRows: registration.retainedReplayPrefix?.rows.length ?? 0,
+		retainedReplayPrefixBytes: registration.retainedReplayPrefix?.bytes ?? 0,
+		retainedReplayBufferedRows: registration.retainedReplayTelemetry?.bufferedRows ?? 0,
+		retainedReplayBufferedBytes: registration.retainedReplayTelemetry?.bufferedBytes ?? 0,
+		retainedReplayNativeSends: registration.retainedReplayTelemetry?.nativeSends ?? 0,
+		retainedReplayReadJobs: registration.retainedReplayTelemetry?.readJobs ?? 0,
+		retainedReplayPeakBufferedRows: registration.retainedReplayTelemetry?.peakBufferedRows ?? 0,
+		retainedReplayPeakBufferedBytes: registration.retainedReplayTelemetry?.peakBufferedBytes ?? 0,
+		retainedReplayPeakNativeSends: registration.retainedReplayTelemetry?.peakNativeSends ?? 0,
+		retainedReplayPeakReadJobs: registration.retainedReplayTelemetry?.peakReadJobs ?? 0,
+		retainedReplayReadTurns: registration.retainedReplayTelemetry?.readTurns ?? 0,
+		retainedReplayReadRetired: Number(registration.retainedReplayReadPhase?.kind === "retired"),
+		retainedReplayMaxReadTurnMs: registration.retainedReplayTelemetry?.maxReadTurnMs ?? 0,
 		admittedGossipQueueJobs: registration.admittedGossipQueueJobs,
 		admittedGossipQueueBytes: registration.admittedGossipQueueBytes,
 		deliveryRepairWake: Number(registration.deliveryRepair?.wake === true),
@@ -7248,13 +7382,14 @@ function deactivateRegistration(registration: V3PlaneRegistration): boolean {
 	registration.pendingIngressBytes = 0;
 	const registrations = v3PlaneRegistrations.get(registration.networkNode);
 	if (registrations?.get(registration.topic) === registration) registrations.delete(registration.topic);
+	releaseIdleEgressAdmissionOwner(registration);
 	try {
 		registration.networkNode.unsubscribe(registration.topic);
 	} catch {
 		// Continue to queue cleanup and both observable postconditions.
 	}
 	if (registration.deliveryRepair !== undefined) reportDeliveryGap(registration, "retired");
-	for (const demand of registration.replayableEgress?.values() ?? []) demand.controller?.abort();
+	retireRetainedReplay(registration);
 	try {
 		registration.messageQueueManager.close(registration.queueId);
 	} catch {
@@ -8181,11 +8316,9 @@ const MAX_ADMITTED_PENDING_PUBLICATION_JOBS = 32;
 // Joining an existing cut creates no additional retained native job.
 const MAX_ADMITTED_EGRESS_CONTROL_JOBS = 32;
 const MAX_TARGETED_REPLAY_PEER_ID_CHARS = 128;
-// A direct reply to one requesting peer (targeted retained republication) runs inside the
-// plane's FIFO, ahead of the plane's later moves, seal and close. Each of its sends carries
-// this deadline: a send that has not completed by then is aborted (the genuine node aborts its
-// stream) and ends the reply, and the peer asks again. Without it a stream that never drains
-// (libp2p's stream close has no bound of its own) would hold the plane forever.
+// Cancellation requests a transport abort; it never releases admission or native
+// join ownership. Targeted replay sends run outside the durable FIFO, one row per
+// target, so a slow stream does not stop local issue or another peer's repair.
 const RETAINED_DIRECT_SEND_DEADLINE_MS = 10_000;
 
 class InputCaptureCapacityError extends Error {
@@ -8251,8 +8384,9 @@ function enqueueRegistrationTask<Result>(
 				: inputAdmission?.pool === "pending-publication"
 					? MAX_ADMITTED_PENDING_PUBLICATION_JOBS
 					: MAX_ADMITTED_INPUT_JOBS;
+	const egressOwner = inputAdmission?.pool === "egress-control" ? egressAdmissionOwner(registration) : undefined;
 	if (inputAdmission !== undefined) {
-		if (registration[counter] >= limit) {
+		if ((egressOwner?.jobs ?? registration[counter]) >= limit) {
 			try {
 				return Promise.resolve(inputAdmission.refuse());
 			} catch (error) {
@@ -8261,6 +8395,7 @@ function enqueueRegistrationTask<Result>(
 		}
 		// Reserve before capture or a terminal-barrier wait, including re-entry.
 		registration[counter]++;
+		if (egressOwner !== undefined) reserveEgressAdmission(egressOwner);
 	}
 	return trackRegistrationJoinedWork(registration, (releaseJoined) => {
 		let capturedBytes = 0;
@@ -8269,6 +8404,7 @@ function enqueueRegistrationTask<Result>(
 			if (inputAdmission === undefined || inputReservationReleased) return;
 			inputReservationReleased = true;
 			registration[counter]--;
+			if (egressOwner !== undefined) releaseEgressAdmission(registration, egressOwner);
 			registration.admittedInputBytes -= capturedBytes;
 			if (counter === "admittedInputJobs" && registration.deliveryRepair?.wake === true)
 				noteDeliveryCapacity(registration);
@@ -8446,25 +8582,30 @@ function enqueueV3Ingress(
  * first. Only enqueueV3Ingress reads the hold, and it waits on it before it
  * takes a FIFO reservation, so no FIFO task awaits it. The release is
  * idempotent; the caller releases on every path. */
-async function holdV3IngressForReadiness(registration: V3PlaneRegistration): Promise<() => void> {
+async function holdV3IngressForReadiness(registration: V3PlaneRegistration): Promise<(successful: boolean) => void> {
 	if (!currentRegistration(registration) || registration.readinessIngressHold !== undefined)
 		throw new TypeError("creator readiness ingress hold is unavailable");
+	// An adoption may already own the same negative read phase. Its nested
+	// readiness job cannot restore or finish that parent transition.
+	const finishReads =
+		registration.retainedReplayReadPhase?.kind === "closing" ? undefined : beginRetainedReplayTransition(registration);
 	let resolveHold!: () => void;
 	const hold = new Promise<void>((resolve) => {
 		resolveHold = resolve;
 	});
 	registration.readinessIngressHold = hold;
 	let released = false;
-	const release = (): void => {
+	const release = (successful: boolean): void => {
 		if (released) return;
 		released = true;
 		if (registration.readinessIngressHold === hold) registration.readinessIngressHold = undefined;
+		finishReads?.(successful ? "restore" : "unavailable");
 		resolveHold();
 	};
 	try {
 		await enqueueRegistrationTask(registration, () => () => Promise.resolve());
 	} catch (error) {
-		release();
+		release(false);
 		throw error;
 	}
 	return release;
@@ -8820,7 +8961,8 @@ function sameLiveJournalScope(value: unknown, expected: LiveJournalScope): boole
 function journalRowSnapshot(
 	value: unknown,
 	expectedScope: LiveJournalScope,
-	expectedSequence: number
+	expectedSequence: number,
+	maximumRetainedBytes?: number
 ): SnapshottedJournalRow | undefined {
 	try {
 		if (!isObject(value)) return undefined;
@@ -8843,6 +8985,16 @@ function journalRowSnapshot(
 			return undefined;
 		}
 		if (row.sourceKind === "received") {
+			if (maximumRetainedBytes !== undefined) {
+				const preimageBytes = typedArrayByteLength(row.exactCanonicalPreimageBytes);
+				const signatureBytes = typedArrayByteLength(row.detachedSignature);
+				if (
+					preimageBytes === undefined ||
+					signatureBytes === undefined ||
+					32 + row.vertexDigest.length * 2 + preimageBytes + signatureBytes > maximumRetainedBytes
+				)
+					return undefined;
+			}
 			const exactCanonicalPreimageBytes = copyDetachedBytes(row.exactCanonicalPreimageBytes);
 			const detachedSignature = copyDetachedBytes(row.detachedSignature);
 			return exactCanonicalPreimageBytes === undefined || detachedSignature?.byteLength !== 64
@@ -8856,6 +9008,8 @@ function journalRowSnapshot(
 					});
 		}
 		return typeof row.author !== "string" ||
+			(maximumRetainedBytes !== undefined &&
+				32 + row.vertexDigest.length * 2 + row.author.length * 2 > maximumRetainedBytes) ||
 			row.author.length === 0 ||
 			!NumberIsSafeInteger(row.authorSequence) ||
 			(row.authorSequence as number) < 0
@@ -16858,11 +17012,87 @@ function enqueuePendingPublication(registration: V3PlaneRegistration): Promise<V
 	return enqueueRegistrationTask(registration, () => () => publishPending(registration), admission);
 }
 
-async function republishRetained(
-	registration: V3PlaneRegistration,
-	targetPeerId?: string,
-	signal?: AbortSignal
-): Promise<V3EgressResult> {
+interface RetainedReplayPrefix {
+	readonly scope: LiveJournalScope;
+	snapshot: LiveJournalSnapshotToken;
+	readonly rows: SnapshottedJournalRow[];
+	bytes: number;
+}
+
+interface RetainedReplayCursor {
+	readonly prefix: RetainedReplayPrefix;
+	readonly rowCount: number;
+}
+
+function releaseRetainedReplayPrefix(registration: V3PlaneRegistration): void {
+	const prefix = registration.retainedReplayPrefix;
+	if (prefix === undefined) return;
+	prefix.rows.length = 0;
+	prefix.bytes = 0;
+	registration.retainedReplayPrefix = undefined;
+}
+
+function retireRetainedReplay(registration: V3PlaneRegistration): void {
+	const previous = registration.retainedReplayReadPhase;
+	registration.retainedReplayReadPhase = { kind: "retired" };
+	if (previous?.kind === "closing") previous.resume();
+	for (const demand of registration.replayableEgress?.values() ?? []) demand.controller?.abort();
+	releaseRetainedReplayPrefix(registration);
+}
+
+function beginRetainedReplayTransition(
+	registration: V3PlaneRegistration
+): (outcome: "sealed" | "restore" | "unavailable") => void {
+	if (
+		!currentRegistration(registration) ||
+		registration.retainedReplayReadPhase?.kind === "closing" ||
+		registration.retainedReplayReadPhase?.kind === "retired"
+	)
+		throw new TypeError("v3 retained close is unavailable");
+	const previous = registration.retainedReplayReadPhase;
+	let resume!: () => void;
+	const ready = new Promise<void>((resolve) => {
+		resume = resolve;
+	});
+	const phase: Extract<V3RetainedReplayReadPhase, { kind: "closing" }> = { kind: "closing", ready, resume };
+	registration.retainedReplayReadPhase = phase;
+	return (outcome): void => {
+		// This exact close owns the transition. Retirement or a newer owner cannot
+		// be overwritten by a late completion. Failure never restores read authority.
+		if (registration.retainedReplayReadPhase === phase) {
+			if (!currentRegistration(registration)) retireRetainedReplay(registration);
+			else
+				registration.retainedReplayReadPhase =
+					outcome === "restore"
+						? previous
+						: outcome === "sealed" && phase.source !== undefined
+							? { kind: "sealed", source: phase.source }
+							: { kind: "unavailable" };
+		}
+		resume();
+	};
+}
+
+function beginRetainedReplayClose(registration: V3PlaneRegistration): (successful: boolean) => void {
+	const finish = beginRetainedReplayTransition(registration);
+	return (successful: boolean): void => finish(successful ? "sealed" : "unavailable");
+}
+
+function retainedReplayRowBytes(row: SnapshottedJournalRow): number {
+	// UTF-16 string storage plus detached bytes and scalar fields. Object/array
+	// cardinality is independently bounded by the existing journal/epoch limits.
+	return (
+		32 +
+		row.vertexDigest.length * 2 +
+		(row.sourceKind === "received"
+			? row.exactCanonicalPreimageBytes.byteLength + row.detachedSignature.byteLength
+			: row.author.length * 2)
+	);
+}
+
+async function prepareRetainedReplay(
+	registration: V3PlaneRegistration
+): Promise<Readonly<{ ok: true; cursor: RetainedReplayCursor }> | V3EgressResult> {
 	if (!currentRegistration(registration)) return egressFailure("not-active", "v3 plane is not active");
 	const scope = liveJournalScope(registration.payload);
 	let readiness;
@@ -16882,78 +17112,241 @@ async function republishRetained(
 	) {
 		return egressFailure("record-rejected", "v3 retained journal readiness is invalid");
 	}
-	if (readiness.rowCount === 0) {
-		let emptyPage;
-		try {
-			emptyPage = await registration.liveJournalStore.readPage({
-				afterSequence: null,
-				limit: 1,
-				scope,
-				snapshot: readiness.snapshot,
-			});
-		} catch {
-			return egressFailure("store-failed", "v3 retained journal page read failed");
-		}
-		return emptyPage.ok && emptyPage.rows.length === 0 && emptyPage.nextSequence === null
-			? egressSuccess("empty")
-			: egressFailure("record-rejected", "v3 retained journal is inconsistent");
-	}
-
-	let afterSequence: number | null = null;
-	for (let expectedSequence = 0; expectedSequence < readiness.rowCount; expectedSequence += 1) {
-		let page;
-		try {
-			page = await registration.liveJournalStore.readPage({
-				afterSequence,
-				limit: 1,
-				scope,
-				snapshot: readiness.snapshot,
-			});
-		} catch {
-			return egressFailure("store-failed", "v3 retained journal page read failed");
-		}
-		if (!currentRegistration(registration)) return egressFailure("not-active", "v3 plane is not active");
-		if (!page.ok || page.rows.length !== 1) {
-			return egressFailure("record-rejected", "v3 retained journal page is incomplete");
-		}
-		const row = journalRowSnapshot(page.rows[0], scope, expectedSequence);
-		const expectedNext = expectedSequence + 1 < readiness.rowCount ? expectedSequence : null;
-		if (row === undefined || page.nextSequence !== expectedNext) {
-			return egressFailure("record-rejected", "v3 retained journal row is invalid");
-		}
-
-		let authenticated;
-		try {
-			authenticated = await authenticateRetainedJournalRow(registration, row);
-		} catch {
-			return egressFailure("store-failed", "v3 retained issued record read failed");
-		}
-		if (authenticated === undefined) {
-			return egressFailure("record-rejected", "v3 retained vertex is not authenticated");
-		}
-		const { canonicalPreimageBytes, signature } = authenticated;
-		if (ReflectApply(SetPrototypeHas, registration.quarantinedDigests, [authenticated.digest]) === true) {
-			afterSequence = expectedSequence;
-			continue;
-		}
-		const message = Message.create({
-			data: V3Envelope.encode({
-				canonicalPreimage: new Uint8ArrayConstructor(canonicalPreimageBytes),
-				signature: new Uint8ArrayConstructor(signature),
-			}).finish(),
-			objectId: registration.topic,
-			sender: registration.networkNode.peerId,
-			type: MessageType.MESSAGE_TYPE_V3_ENVELOPE,
+	let prefix = registration.retainedReplayPrefix;
+	if (prefix !== undefined && readiness.rowCount < prefix.rows.length)
+		return egressFailure("record-rejected", "v3 retained journal prefix regressed");
+	if (
+		prefix !== undefined &&
+		prefix.snapshot.snapshotDigest === readiness.snapshot.snapshotDigest &&
+		prefix.rows.length === readiness.rowCount
+	)
+		return { ok: true, cursor: { prefix, rowCount: readiness.rowCount } };
+	if (prefix !== undefined) {
+		// A new demand may extend the DATA array only after the native store
+		// validates the old exact prefix against its current physical journal.
+		const checked = await registration.liveJournalStore.readPage({
+			afterSequence: null,
+			limit: 1,
+			scope,
+			snapshot: prefix.snapshot,
 		});
+		if (!checked.ok || checked.snapshot.snapshotDigest !== prefix.snapshot.snapshotDigest)
+			return egressFailure("record-rejected", "v3 retained journal prefix changed");
+	} else {
+		prefix = { scope, snapshot: readiness.snapshot, rows: [], bytes: 0 };
+		registration.retainedReplayPrefix = prefix;
+	}
+	// There is one generation. A suffix extends the shared array, while every
+	// entered target retains its original row-count boundary. No target pins a
+	// second full-prefix copy. The byte ceiling accounts for UTF-16 strings and
+	// scalar overhead on top of the existing bounded native journal image.
+	const maxRows = Math.min(registration.payload.parameters.maxEpochVertices, LIVE_JOURNAL_RETIREMENT_LIMITS.maxRows);
+	const maxBytes = 2 * LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes + 32 * maxRows;
+	if (readiness.rowCount > maxRows)
+		return egressFailure("record-rejected", "v3 retained journal row capacity exceeded");
+	const originalRows = prefix.rows.length,
+		originalBytes = prefix.bytes;
+	let complete = false;
+	try {
+		let sequence = originalRows;
+		do {
+			const page = await registration.liveJournalStore.readPage({
+				afterSequence: sequence === 0 ? null : sequence - 1,
+				limit: 1,
+				scope,
+				snapshot: readiness.snapshot,
+			});
+			if (!currentRegistration(registration)) return egressFailure("not-active", "v3 plane is not active");
+			const remaining = readiness.rowCount - sequence;
+			if (
+				!page.ok ||
+				!sameLiveJournalScope(page.scope, scope) ||
+				page.snapshot.snapshotDigest !== readiness.snapshot.snapshotDigest ||
+				page.rows.length !== Math.min(1, remaining) ||
+				page.nextSequence !== (remaining > 1 ? sequence : null)
+			)
+				return egressFailure("record-rejected", "v3 retained journal page is incomplete");
+			if (remaining === 0) break;
+			const row = journalRowSnapshot(page.rows[0], scope, sequence, maxBytes - prefix.bytes);
+			if (row === undefined) return egressFailure("record-rejected", "v3 retained journal row is invalid");
+			const bytes = retainedReplayRowBytes(row);
+			if (bytes > maxBytes - prefix.bytes)
+				return egressFailure("record-rejected", "v3 retained journal byte capacity exceeded");
+			prefix.rows.push(row);
+			prefix.bytes += bytes;
+			sequence++;
+		} while (sequence < readiness.rowCount);
+		prefix.snapshot = readiness.snapshot;
+		complete = true;
+		return { ok: true, cursor: { prefix, rowCount: readiness.rowCount } };
+	} finally {
+		if (!complete) {
+			// Only residency is released: operation-local proof charges are never
+			// refunded. Existing streams keep their exact prior prefix. Revocation
+			// may already have cleared it, so rollback must never restore its rows.
+			prefix.rows.length = Math.min(prefix.rows.length, originalRows);
+			prefix.bytes = prefix.rows.length === originalRows ? originalBytes : 0;
+		}
+	}
+}
+
+async function readRetainedReplayMessage(
+	registration: V3PlaneRegistration,
+	cursor: RetainedReplayCursor,
+	expectedSequence: number
+): Promise<
+	| Readonly<{
+			ok: true;
+			vertex: Readonly<{ canonicalPreimageBytes: Uint8Array; signature: Uint8Array }> | undefined;
+			digest: string;
+	  }>
+	| V3EgressResult
+> {
+	if (!currentRegistration(registration)) return egressFailure("not-active", "v3 plane is not active");
+	// This is exact captured DATA. Signature/ACL and local-issued correspondence
+	// are fresh below; the surrounding read turn reacquires native head/floor
+	// custody. No native reservation or positive currentness crosses a send.
+	const row = cursor.prefix.rows[expectedSequence];
+	if (row === undefined || row.journalSequence !== expectedSequence)
+		return egressFailure("record-rejected", "v3 retained journal prefix is unavailable");
+
+	let authenticated;
+	try {
+		authenticated = await authenticateRetainedJournalRow(registration, row);
+	} catch {
+		return egressFailure("store-failed", "v3 retained issued record read failed");
+	}
+	if (!currentRegistration(registration)) return egressFailure("not-active", "v3 plane is not active");
+	if (authenticated === undefined) {
+		return egressFailure("record-rejected", "v3 retained vertex is not authenticated");
+	}
+	if (ReflectApply(SetPrototypeHas, registration.quarantinedDigests, [authenticated.digest]) === true)
+		return { ok: true, vertex: undefined, digest: authenticated.digest };
+	return { ok: true, vertex: authenticated, digest: authenticated.digest };
+}
+
+function encodeRetainedReplayMessage(
+	registration: V3PlaneRegistration,
+	vertex: Readonly<{ canonicalPreimageBytes: Uint8Array; signature: Uint8Array }>,
+	bufferedBytes: number
+): Message | undefined {
+	// Each protobuf byte field has at most one tag and five length bytes. Native
+	// callbacks see only the encoded copy, never bytes retained in the prefix.
+	const { canonicalPreimageBytes, signature } = vertex;
+	const encodedBound = canonicalPreimageBytes.byteLength + signature.byteLength + 12;
+	if (encodedBound > registration.payload.parameters.maxPendingBytes - bufferedBytes) return undefined;
+	return Message.create({
+		data: V3Envelope.encode({ canonicalPreimage: canonicalPreimageBytes, signature }).finish(),
+		objectId: registration.topic,
+		sender: registration.networkNode.peerId,
+		type: MessageType.MESSAGE_TYPE_V3_ENVELOPE,
+	});
+}
+
+async function republishRetained(
+	registration: V3PlaneRegistration,
+	targetPeerId: string | undefined,
+	signal: AbortSignal
+): Promise<V3EgressResult> {
+	const egressOwner = egressAdmissionOwner(registration);
+	const telemetry = (registration.retainedReplayTelemetry ??= {
+		bufferedRows: 0,
+		bufferedBytes: 0,
+		nativeSends: 0,
+		readJobs: 0,
+		peakBufferedRows: 0,
+		peakBufferedBytes: 0,
+		peakNativeSends: 0,
+		peakReadJobs: 0,
+		readTurns: 0,
+		maxReadTurnMs: 0,
+	});
+	const read = async <T>(task: () => Promise<T>): Promise<T> => {
+		telemetry.readJobs++;
+		telemetry.peakReadJobs = Math.max(telemetry.peakReadJobs, telemetry.readJobs);
+		try {
+			for (;;) {
+				if (!currentRegistration(registration)) throw new TypeError("v3 retained replay owner is stale");
+				const phase = registration.retainedReplayReadPhase;
+				if (phase?.kind === "unavailable" || phase?.kind === "retired")
+					throw new TypeError("v3 retained replay read phase is unavailable");
+				if (phase?.kind === "closing") {
+					await phase.ready;
+					continue;
+				}
+				const turn = await enqueueRegistrationTask(
+					registration,
+					() =>
+						async (): Promise<
+							Readonly<{ kind: "paused"; ready: Promise<void> }> | Readonly<{ kind: "read"; value: T }>
+						> => {
+							const entered = registration.retainedReplayReadPhase;
+							// Close sets its phase synchronously before draining the FIFO. A
+							// queued turn must yield without taking custody or waiting in it.
+							if (entered?.kind === "closing") return { kind: "paused" as const, ready: entered.ready };
+							if (entered?.kind === "unavailable" || entered?.kind === "retired")
+								throw new TypeError("v3 retained replay read phase is unavailable");
+							const started = performance.now();
+							try {
+								const value =
+									registration.payload.input.settlementFloor === undefined
+										? await task()
+										: await withCurrentRetainedRead(registration, async ({ check }) => {
+												const result = await task();
+												await check();
+												return result;
+											});
+								return { kind: "read" as const, value };
+							} finally {
+								telemetry.readTurns++;
+								telemetry.maxReadTurnMs = Math.max(telemetry.maxReadTurnMs, performance.now() - started);
+							}
+						}
+				);
+				if (turn.kind === "read") return turn.value;
+				await turn.ready;
+			}
+		} finally {
+			telemetry.readJobs--;
+		}
+	};
+	const prepared = await read(() => prepareRetainedReplay(registration));
+	if (!("cursor" in prepared)) return prepared;
+	// Only one shared immutable row DATA prefix survives a turn. Each stream
+	// authenticates its next row under fresh custody, then releases the FIFO and
+	// all native reservations before awaiting its physical network send.
+	const cursor = prepared.cursor;
+	for (let sequence = 0; sequence < cursor.rowCount; sequence++) {
+		let captured: Awaited<ReturnType<typeof readRetainedReplayMessage>> | undefined = await read(() =>
+			readRetainedReplayMessage(registration, cursor, sequence)
+		);
+		if (!("vertex" in captured)) return captured;
+		if (captured.vertex === undefined) continue;
+		if (!currentRegistration(registration) || signal?.aborted === true)
+			return egressFailure("not-active", "v3 plane is not active");
+		if (ReflectApply(SetPrototypeHas, registration.quarantinedDigests, [captured.digest]) === true) continue;
+		// Admit encoded output against one aggregate pending-byte ceiling. The
+		// helper's input tuple is discarded before the native wait, leaving only
+		// the detached message when revocation clears the shared prefix in place.
+		const message = encodeRetainedReplayMessage(registration, captured.vertex, egressOwner.bufferedBytes);
+		captured = undefined;
+		if (message === undefined)
+			return egressFailure("admission-rejected", "v3 retained publication byte capacity exhausted");
+		const encodedByteCharge = message.data.byteLength;
+		telemetry.bufferedRows++;
+		telemetry.bufferedBytes += encodedByteCharge;
+		egressOwner.bufferedBytes += encodedByteCharge;
+		telemetry.nativeSends++;
+		telemetry.peakBufferedRows = Math.max(telemetry.peakBufferedRows, telemetry.bufferedRows);
+		telemetry.peakBufferedBytes = Math.max(telemetry.peakBufferedBytes, telemetry.bufferedBytes);
+		telemetry.peakNativeSends = Math.max(telemetry.peakNativeSends, telemetry.nativeSends);
 		let published: unknown;
 		try {
 			if (targetPeerId === undefined) {
 				published = await registration.networkNode.publishMessage(registration.topic, message);
 			} else {
 				await registration.networkNode.sendMessage(targetPeerId, message, {
-					signal: signal === undefined
-						? AbortSignal.timeout(RETAINED_DIRECT_SEND_DEADLINE_MS)
-						: AbortSignal.any([signal, AbortSignal.timeout(RETAINED_DIRECT_SEND_DEADLINE_MS)]),
+					signal: AbortSignal.any([signal, AbortSignal.timeout(RETAINED_DIRECT_SEND_DEADLINE_MS)]),
 				});
 				published = true;
 			}
@@ -16961,29 +17354,37 @@ async function republishRetained(
 			return currentRegistration(registration)
 				? egressFailure("publish-failed", "v3 retained publication failed")
 				: egressFailure("publication-state-unknown", "v3 retained publication state is unknown");
+		} finally {
+			telemetry.bufferedRows--;
+			telemetry.bufferedBytes -= encodedByteCharge;
+			egressOwner.bufferedBytes -= encodedByteCharge;
+			telemetry.nativeSends--;
 		}
 		if (!currentRegistration(registration)) {
 			return egressFailure("publication-state-unknown", "v3 retained publication state is unknown");
 		}
 		if (published !== true) return egressFailure("publish-failed", "v3 retained publication failed");
-		afterSequence = expectedSequence;
 	}
-	return egressSuccess("published");
+	// The final send can outlive foreign head/floor advancement too. Finish this
+	// caller's full prefix after a fresh final turn, independently of later demand.
+	return read(() =>
+		Promise.resolve(
+			currentRegistration(registration)
+				? egressSuccess(prepared.cursor.rowCount === 0 ? "empty" : "published")
+				: egressFailure("not-active", "v3 plane is not active")
+		)
+	);
 }
 
 function enqueueReplayableEgress(
 	registration: V3PlaneRegistration,
-	capture: () =>
-		| Readonly<{ selector: string; shareRunning?: boolean; run(signal?: AbortSignal): Promise<V3EgressResult> }>
-		| Readonly<{ refusal: V3EgressResult }>
+	capture: () => Readonly<{ selector: string; run(): Promise<V3EgressResult> }> | Readonly<{ refusal: V3EgressResult }>
 ): Promise<V3EgressResult> {
 	const predecessor = registration.gate;
 	let entered = false;
 	let joined = false;
 	let ownsTail = false;
-	let shareRunning = false;
 	let selector: string | undefined;
-	let controller: AbortController | undefined;
 	let joinedResult: Promise<V3EgressResult> | undefined;
 	let demand: V3ReplayableEgressDemand | undefined;
 	const forget = (): void => {
@@ -17001,18 +17402,16 @@ function enqueueReplayableEgress(
 				return { join: Promise.resolve(request.refusal) };
 			}
 			selector = request.selector;
-			shareRunning = request.shareRunning === true;
 			const existing = registration.replayableEgress?.get(selector);
-			if (existing !== undefined && (shareRunning || (ownsTail && existing.gate === predecessor))) {
+			if (existing !== undefined && ownsTail && existing.gate === predecessor) {
 				joined = true;
 				joinedResult = existing.result;
 				return { join: existing.result };
 			}
-			if (shareRunning) controller = new AbortController();
 			return (): Promise<V3EgressResult> => {
 				entered = true;
-				if (!shareRunning) forget();
-				return request.run(controller?.signal);
+				forget();
+				return request.run();
 			};
 		},
 		{
@@ -17024,22 +17423,13 @@ function enqueueReplayableEgress(
 				),
 		}
 	);
-	if (!joined && (shareRunning || (!entered && ownsTail)) && selector !== undefined) {
-		demand = ObjectFreeze({ gate: registration.gate, result, controller });
+	if (!joined && !entered && ownsTail && selector !== undefined) {
+		demand = ObjectFreeze({ gate: registration.gate, result, controller: undefined });
 		registration.replayableEgress ??= new IntrinsicMap<string, V3ReplayableEgressDemand>();
 		registration.replayableEgress.set(selector, demand);
-		// One record per native admitted selector; a duplicate owns no new snapshot,
-		// gate or cancellation. Retirement aborts, but native settlement releases it.
 		void result.then(forget, forget);
 	}
 	return joinedResult ?? result;
-}
-
-function enqueueRetainedPublication(registration: V3PlaneRegistration): Promise<V3EgressResult> {
-	return enqueueReplayableEgress(registration, () => ({
-		selector: "retained",
-		run: () => republishRetained(registration),
-	}));
 }
 
 function enqueueRebaseCompletion(
@@ -17072,15 +17462,88 @@ function enqueueRebaseCompletion(
 	});
 }
 
-function enqueueTargetedRetainedPublication(
-	registration: V3PlaneRegistration,
-	targetPeerId: string
-): Promise<V3EgressResult> {
-	return enqueueReplayableEgress(registration, () => ({
-		selector: `retained:${targetPeerId}`,
-		shareRunning: true,
-		run: (signal) => republishRetained(registration, targetPeerId, signal),
-	}));
+function enqueueRetainedPublication(registration: V3PlaneRegistration, targetPeerId?: string): Promise<V3EgressResult> {
+	const selector = targetPeerId === undefined ? "retained" : `retained:${targetPeerId}`;
+	const existing = registration.replayableEgress?.get(selector);
+	if (existing !== undefined && existing.broadcast?.accepting !== false) {
+		if (existing.broadcast === undefined) return existing.result;
+		if (!currentRegistration(registration))
+			return Promise.resolve(egressFailure("not-active", "v3 plane is not active"));
+		// A request can come from a newly connected peer that missed this round's
+		// first rows. One pending full round coalesces all such requests, with its
+		// own promise. Later demand cannot extend an earlier caller's completion.
+		return (existing.broadcast.pending ??= retainedReplayRound()).result;
+	}
+	if (!currentRegistration(registration)) return Promise.resolve(egressFailure("not-active", "v3 plane is not active"));
+	const egressOwner = egressAdmissionOwner(registration);
+	if (egressOwner.jobs >= MAX_ADMITTED_EGRESS_CONTROL_JOBS)
+		return Promise.resolve(
+			egressFailure("admission-rejected", "v3 retained/completion admission is full; retry after admitted work joins")
+		);
+	registration.admittedEgressControlJobs++;
+	reserveEgressAdmission(egressOwner);
+	const controller = new AbortController();
+	const broadcast =
+		targetPeerId === undefined
+			? { current: retainedReplayRound(), pending: undefined as V3RetainedReplayRound | undefined, accepting: true }
+			: undefined;
+	const firstRound = broadcast?.current;
+	let resolve!: (result: V3EgressResult) => void;
+	const result = trackRegistrationJoinedWork(
+		registration,
+		() =>
+			new Promise<V3EgressResult>((done) => {
+				resolve = done;
+			})
+	).finally(() => {
+		registration.admittedEgressControlJobs--;
+		releaseEgressAdmission(registration, egressOwner);
+		if (registration.replayableEgress?.get(selector)?.result === result) registration.replayableEgress.delete(selector);
+		if (![...(registration.replayableEgress?.values() ?? [])].some((demand) => demand.controller !== undefined))
+			releaseRetainedReplayPrefix(registration);
+	});
+	registration.replayableEgress ??= new IntrinsicMap<string, V3ReplayableEgressDemand>();
+	registration.replayableEgress.set(selector, ObjectFreeze({ gate: undefined, result, controller, broadcast }));
+	const fail = (): V3EgressResult =>
+		currentRegistration(registration)
+			? egressFailure("store-failed", "v3 retained publication native read failed")
+			: egressFailure("not-active", "v3 plane is not active");
+	const run = async (): Promise<V3EgressResult> => {
+		for (;;) {
+			let outcome: V3EgressResult;
+			try {
+				outcome = await republishRetained(registration, targetPeerId, controller.signal);
+			} catch {
+				outcome = fail();
+			}
+			if (broadcast === undefined) return outcome;
+			const completed = broadcast.current,
+				pending = broadcast.pending;
+			broadcast.pending = undefined;
+			if (!outcome.ok || pending === undefined || !currentRegistration(registration) || controller.signal.aborted) {
+				broadcast.accepting = false;
+				completed.resolve(outcome);
+				pending?.resolve(outcome.ok ? fail() : outcome);
+				return outcome;
+			}
+			broadcast.current = pending;
+			completed.resolve(outcome);
+			// One shared prefix, one native stream and one pending promise remain
+			// bounded even if every send prompts another broadcast request.
+		}
+	};
+	// Install the native owner before starting any read. Cancellation keeps this
+	// owner charged until the physical send joins, including across full rounds.
+	void run().then(resolve, () => {
+		const outcome = fail();
+		if (broadcast !== undefined) {
+			broadcast.accepting = false;
+			broadcast.current.resolve(outcome);
+			broadcast.pending?.resolve(outcome);
+		}
+		resolve(outcome);
+	});
+	return firstRound?.result ?? result;
 }
 
 function terminalFailure(
@@ -20419,6 +20882,7 @@ function creatorCloseRegistration(
 				registration.terminalState !== "active"
 			)
 				return Promise.resolve(false);
+			beginRetainedReplayTransition(registration);
 			registration.blueprintClosing = true;
 			return enqueueRegistrationTask(registration, () => () => {
 				const current = currentRegistration(registration);
@@ -20428,6 +20892,7 @@ function creatorCloseRegistration(
 		},
 		terminalizeReceived: (): boolean => {
 			if (registration.receivedTransition !== true || registration.terminalState !== "active") return false;
+			retireRetainedReplay(registration);
 			registration.receivedTransition = false;
 			// The replacement may already be registered; the captured predecessor still owns its gate.
 			registration.blueprintClosing = true;
@@ -20512,6 +20977,7 @@ function creatorCloseRegistration(
 		issuanceScope: ObjectFreeze({ ...registration.issuanceScope }),
 		issuanceStore: registration.issuanceStore,
 		liveJournalStore: registration.liveJournalStore,
+		beginRetainedReplayClose: () => beginRetainedReplayClose(registration),
 		maxEpochBytes: registration.payload.parameters.maxEpochBytes,
 		maxEpochVertices: registration.payload.parameters.maxEpochVertices,
 		objectId: registration.payload.input.objectId,
@@ -20580,7 +21046,7 @@ function creatorCloseRegistration(
 			void enqueueRegistrationTask(registration, () => () => drainPendingIngress(registration))
 				.catch(() => ingressFailureLog("admission-rejected"));
 		},
-		holdIngressForReadiness: (): Promise<() => void> => holdV3IngressForReadiness(registration),
+		holdIngressForReadiness: (): Promise<(successful: boolean) => void> => holdV3IngressForReadiness(registration),
 		runOrdinaryReadinessMaintenance: (
 			snapshots: Parameters<V3CreatorCloseRegistration["runOrdinaryReadinessMaintenance"]>[0],
 			consume: Parameters<V3CreatorCloseRegistration["runOrdinaryReadinessMaintenance"]>[1],
@@ -20635,8 +21101,18 @@ function creatorCloseRegistration(
 		bindSnapshotReadinessOwner: (store: SnapshotQuarantineStore<SnapshotVerificationReceipt>): boolean =>
 			bindSnapshotReadinessOwner(registration, store),
 		store: registration.payload.input.store,
-		terminalize: (): boolean => {
+		terminalize: (sealed: Parameters<V3CreatorCloseRegistration["terminalize"]>[0]): boolean => {
 			if (!currentRegistration(registration) || !registration.blueprintFolded) return false;
+			const phase = registration.retainedReplayReadPhase;
+			if (phase?.kind !== "closing") return false;
+			phase.source = ObjectFreeze({
+				predecessorHead: ObjectFreeze({ ...sealed.predecessorHead }),
+				head: ObjectFreeze({ ...sealed.head }),
+				cutValueRef: ObjectFreeze({ ...sealed.cutValueRef }),
+				commitQcRef: ObjectFreeze({ ...sealed.commitQcRef }),
+				successorTrustRef: ObjectFreeze({ ...sealed.successorTrustRef }),
+				borrowJournalHeaderCustody: sealed.borrowJournalHeaderCustody,
+			});
 			registration.blueprintClosing = true;
 			registration.operationAdmissionHalted = true;
 			registration.terminalState = "terminal";
@@ -20964,6 +21440,7 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 			registrations ??= new IntrinsicMap<string, V3PlaneRegistration>();
 			if (reusesTransport) {
 				existing.active = false;
+				retireRetainedReplay(existing);
 				// Track AA: the predecessor's delivery repair state ends with it.
 				if (existing.deliveryRepair !== undefined) reportDeliveryGap(existing, "retired");
 				// This hot handoff deliberately keeps the transport subscription,
@@ -21847,6 +22324,24 @@ if (!installCreatorSuccessorLive(activateCreatorSuccessorLive)) {
 }
 
 if (
+	!installCreatorSuccessorRetainedReadPause(async (plane) => {
+		const registration = v3HandleRegistrations.get(plane as V3PlaneHandle);
+		if (registration === undefined) throw new TypeError("creator replay registration is unavailable");
+		const finish = beginRetainedReplayTransition(registration);
+		try {
+			await registration.gate;
+		} catch (error) {
+			finish("unavailable");
+			throw error;
+		}
+		return ObjectFreeze({
+			finish: (outcome: "restored" | "unavailable"): void => finish(outcome === "restored" ? "restore" : "unavailable"),
+		});
+	})
+)
+	throw new TypeError("creator successor retained read owner was already installed");
+
+if (
 	!installV3RuntimeReclamationKernel(
 		Object.assign(reclaimV3RuntimeKernel, {
 			resolveRecoveryCloseHold,
@@ -21968,7 +22463,7 @@ export function republishV3RetainedTo(handle: V3PlaneHandle, targetPeerId: strin
 	) {
 		return Promise.resolve(egressFailure("not-active", "v3 retained target is unavailable"));
 	}
-	return enqueueTargetedRetainedPublication(registration, targetPeerId);
+	return enqueueRetainedPublication(registration, targetPeerId);
 }
 
 /** Position metadata, not portable authorization or a native reservation. */
@@ -22070,10 +22565,77 @@ async function authenticateRetainedJournalRow(
 	return { canonicalPreimageBytes, signature, digest: authenticated.digest };
 }
 
+function authenticateSealedRetainedAncestry(
+	registration: V3PlaneRegistration,
+	reader: AheBoundedActiveRead,
+	sealed: Parameters<V3CreatorCloseRegistration["terminalize"]>[0]
+): PresentHead {
+	if (registration.terminalState !== "terminal" || !sameHead(reader.head, sealed.head))
+		throw new TypeError("v3 sealed retained head differs");
+	const active = reader.generations.find((generation) => generation.generationId === reader.head.generationId);
+	const predecessor = reader.generations.find(
+		(generation) => generation.generationId === sealed.predecessorHead.generationId
+	);
+	if (
+		active?.state !== "Adopted" ||
+		predecessor?.state !== "Superseded" ||
+		active.objectId !== reader.head.objectId ||
+		predecessor.objectId !== reader.head.objectId ||
+		active.closureDigest !== reader.head.closureDigest ||
+		predecessor.closureDigest !== sealed.predecessorHead.closureDigest ||
+		active.baseExpectedHead.kind !== "present" ||
+		!sameHead(active.baseExpectedHead, sealed.predecessorHead) ||
+		reader.head.revision !== sealed.predecessorHead.revision + 1 ||
+		!predecessor.closure.some(
+			(ref) =>
+				ref.digest === registration.payload.trust.trustRef.digest &&
+				ref.byteLength === registration.payload.trust.trustRef.byteLength
+		)
+	)
+		throw new TypeError("v3 sealed retained ancestry differs");
+	const bytesFor = (selected: GenerationRef): Uint8Array => {
+		if (!active.closure.some((ref) => ref.digest === selected.digest && ref.byteLength === selected.byteLength))
+			throw new TypeError("v3 sealed retained signed record is outside the current closure");
+		const blob = reader.blobs.find(
+			({ ref }) => ref.digest === selected.digest && ref.byteLength === selected.byteLength
+		);
+		const digest = blob === undefined ? undefined : digestBlob(blob.bytes);
+		if (
+			blob === undefined ||
+			blob.bytes.byteLength !== selected.byteLength ||
+			!digest?.ok ||
+			digest.value !== selected.digest
+		)
+			throw new TypeError("v3 sealed retained signed record differs");
+		return blob.bytes;
+	};
+	const cut = bytesFor(sealed.cutValueRef),
+		qc = bytesFor(sealed.commitQcRef),
+		trust = bytesFor(sealed.successorTrustRef);
+	const cutValue = decodeCanonical(cut);
+	const open =
+		isObject(cutValue) && Object.hasOwn(cutValue, "forwardPromotion")
+			? openCreatorForwardPromotionSuccessorTrust
+			: openCreatorSuccessorTrust;
+	const successor = open({
+		currentTrust: registration.payload.trust.trust,
+		exactCanonicalCutValueBytes: cut,
+		exactCanonicalCommitQcBytes: qc,
+		exactCanonicalTrustStateRecordBytes: trust,
+	});
+	if (!successor.ok || successor.trust.currentEpoch !== registration.payload.provenance.epoch + 1)
+		throw new TypeError("v3 sealed retained successor trust is invalid");
+	return reader.head;
+}
+
 async function withCurrentRetainedRead<T>(
 	registration: V3PlaneRegistration,
 	consume: (context: Readonly<{ scope: LiveJournalScope; graphVersion: number; check(): Promise<void> }>) => Promise<T>
 ): Promise<T> {
+	const phase = registration.retainedReplayReadPhase;
+	if (phase?.kind === "closing" || phase?.kind === "unavailable" || phase?.kind === "retired")
+		throw new TypeError("v3 retained query read phase is unavailable");
+	const sealed = phase?.kind === "sealed" ? phase.source : undefined;
 	const scope = liveJournalScope(registration.payload),
 		floor = registration.payload.input.settlementFloor;
 	const parsed = parseStorageObjectId(scope.objectId);
@@ -22087,11 +22649,36 @@ async function withCurrentRetainedRead<T>(
 	try {
 		for (const owner of [registration.payload.input.store, registration.liveJournalStore, registration.issuanceStore]) {
 			if (!currentRegistration(registration)) throw new TypeError("v3 retained query owner is stale");
+			if (owner === registration.liveJournalStore && sealed !== undefined) {
+				const borrowed = await sealed.borrowJournalHeaderCustody();
+				if (borrowed !== undefined) {
+					reservations.push(borrowed);
+					continue;
+				}
+			}
 			const acquire: unknown = Reflect.get(owner, "acquireNativeReadReservation");
 			if (typeof acquire !== "function") throw new TypeError("v3 retained query native custody is unsupported");
 			reservations.push((await ReflectApply(acquire, owner, [{ objectId: scope.objectId }])) as NativeReadReservation);
 		}
 		reservations.push(await floor.acquireNativeReadReservation({ scope: floorScope }));
+		let expectedHead = registration.payload.trust.head;
+		if (sealed !== undefined) {
+			const acquired = await registration.payload.input.store.acquireBoundedActiveRead({
+				objectId: parsed.value,
+				ancestorCount: 2,
+				limits: AHE_BOUNDED_READ_LIMITS,
+			});
+			if (!acquired.ok || acquired.value.kind !== "present")
+				throw new TypeError("v3 sealed retained native ancestry is unavailable");
+			const reader = acquired.value.reader;
+			reservations.push({
+				check: async (): Promise<void> => {
+					if (!(await reader.checkCurrent()).ok) throw new TypeError("v3 sealed retained native ancestry is stale");
+				},
+				release: () => reader.release(),
+			});
+			expectedHead = authenticateSealedRetainedAncestry(registration, reader, sealed);
+		}
 		const graphVersion = registration.graphVersion;
 		let expectedFloorBytes: Uint8Array | undefined;
 		const check = async (): Promise<void> => {
@@ -22103,7 +22690,7 @@ async function withCurrentRetainedRead<T>(
 				registration.graphVersion !== graphVersion ||
 				!head.ok ||
 				head.value.kind !== "present" ||
-				!sameHead(head.value, registration.payload.trust.head) ||
+				!sameHead(head.value, expectedHead) ||
 				image.state.pending !== null ||
 				!sameCreatorRoomHead(image.state.stable, registration.payload.trust.trust)
 			)
@@ -22250,7 +22837,9 @@ export function requestV3RetainedRepair(
 			if (
 				typeof request !== "function" ||
 				(targetPeerId !== undefined &&
-					(typeof targetPeerId !== "string" || targetPeerId.length === 0 || targetPeerId.length > 4096))
+					(typeof targetPeerId !== "string" ||
+						targetPeerId.length === 0 ||
+						targetPeerId.length > MAX_TARGETED_REPLAY_PEER_ID_CHARS))
 			)
 				throw new TypeError("v3 retained repair target is invalid");
 			return () =>
@@ -22263,10 +22852,6 @@ export function requestV3RetainedRepair(
 						throw new TypeError("v3 retained repair target is unavailable");
 					await check();
 					request();
-					if (targetPeerId !== undefined) {
-						const result = await republishRetained(registration, targetPeerId);
-						if (!result.ok) throw new TypeError(`v3 retained repair publication failed: ${result.kind}`);
-					}
 					await check();
 					return ObjectFreeze({ kind: "scheduled" as const });
 				});
@@ -22277,7 +22862,15 @@ export function requestV3RetainedRepair(
 				throw new TypeError("v3 read control task capacity exhausted; retry after admitted work joins");
 			},
 		}
-	);
+	).then(async (scheduled) => {
+		// Native inspection custody ends before the streamed network lifetime.
+		// The common targeted owner rechecks the live plane and every signed row.
+		if (targetPeerId !== undefined) {
+			const result = await enqueueRetainedPublication(registration, targetPeerId);
+			if (!result.ok) throw new TypeError(`v3 retained repair publication failed: ${result.kind}`);
+		}
+		return scheduled;
+	});
 }
 
 /**
@@ -22290,7 +22883,10 @@ export async function deactivateV3LivePlaneJoined(handle: V3PlaneHandle): Promis
 	const registration = v3HandleRegistrations.get(handle);
 	if (registration === undefined) throw new TypeError("v3 plane deactivation owner is unavailable");
 	const revoked = !registration.active || deactivateRegistration(registration);
-	const joined: Promise<void>[] = [];
+	// Room shutdown joins retained/completion sends from every retired epoch on
+	// this stable topic before its host may discard the network and native stores.
+	const replacement = v3PlaneRegistrations.get(registration.networkNode)?.get(registration.topic);
+	const joined: Promise<void>[] = replacement === undefined ? [joinEgressAdmissionOwner(registration)] : [];
 	const iterator = ReflectApply(SetPrototypeValues, registration.joinedWork, []);
 	for (;;) {
 		const next = ReflectApply(SetIteratorNext, iterator, []) as IteratorResult<Promise<void>>;
