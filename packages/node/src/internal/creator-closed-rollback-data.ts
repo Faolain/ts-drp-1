@@ -3653,7 +3653,7 @@ async function authenticate(
 	closeHold?: CreatorSnapshotRecoveryCloseHold,
 	sharedAccounting?: CreatorClosedRollbackProofAccounting,
 	fullRecoverySource?: CreatorClosedFullRecoverySource,
-	checkpoint?: () => Promise<void> | undefined
+	cooperativeCheckpoint?: () => Promise<void> | undefined
 ): Promise<ObservationFacts> {
 	const readUnique = parsing?.unique ?? unique;
 	const readRecord = parsing?.record ?? record;
@@ -3873,14 +3873,14 @@ async function authenticate(
 				exactCanonicalCutValueBytes: cut.bytes,
 				predecessorExactCanonicalLatchedAclBytes: latestClosedAcl.bytes,
 			}, live.closure));
-			await checkpoint?.();
+			await cooperativeCheckpoint?.();
 			checkAbort(input.signal);
 			const ready = await snapshotCall(() => input.readiness({ signal: input.signal }));
 			requireLaw(snapshotOwnerReadable(input, ready), "snapshot-not-ready");
 			let newestAcl: Uint8Array | undefined;
 			let newestSuccessorAcl: Uint8Array | undefined;
 			for (const k of n === 1 ? [0] : [n - 1, n - 2]) {
-				await checkpoint?.();
+				await cooperativeCheckpoint?.();
 				checkAbort(input.signal);
 				const latest = k === n - 1;
 				const closure = latest ? proposed : predecessor;
@@ -3981,7 +3981,7 @@ async function authenticate(
 				);
 			}
 			for (const target of cuts) {
-				await checkpoint?.();
+				await cooperativeCheckpoint?.();
 				checkAbort(input.signal);
 				const lookup = await snapshotCall(() =>
 					input.lookup(
@@ -3999,7 +3999,7 @@ async function authenticate(
 					{objectId: input.objectId, epoch: target.epoch, anchor: target.closedAnchorDigest, manifestDigest: target.manifestDigest},
 					lookup.retention), "snapshot-not-ready");
 			}
-			await checkpoint?.();
+			await cooperativeCheckpoint?.();
 			checkAbort(input.signal);
 			requireLaw(
 				snapshotOwnerReadable(input, await snapshotCall(() => input.readiness({ signal: input.signal }))),
@@ -4012,7 +4012,7 @@ async function authenticate(
 		}
 		}
 	}
-	await checkpoint?.();
+	await cooperativeCheckpoint?.();
 	checkAbort(input.signal);
 	if (!creatorClosedProofPreparingNativeData(accounting)) {
 		const currency = await checkCurrent();
@@ -4034,7 +4034,7 @@ async function authenticate(
 			frame.recoveryTrusts.add(trust);
 			frame.signingRoleTrusts.add(trust);
 		}
-	await checkpoint?.();
+	await cooperativeCheckpoint?.();
 	checkAbort(input.signal);
 	let rawFloor: unknown;
 	try {
@@ -4063,7 +4063,7 @@ async function authenticate(
 			"floor-stale"
 		);
 	}
-	await checkpoint?.();
+	await cooperativeCheckpoint?.();
 	checkAbort(input.signal);
 	if (!input.snapshotPreparation?.targets?.some(target => heldTargetPreparations.has(target))) {
 		for (const proof of installed) await proof.check();
