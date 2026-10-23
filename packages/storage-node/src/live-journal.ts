@@ -4,6 +4,9 @@ import {
 	type AppendAcceptedVertexResult,
 	captureJournalRetirementObject,
 	captureJournalClosedMembershipInput,
+	captureJournalClosedMembershipReadInput,
+	captureJournalClosedMembershipObservation,
+	type LiveJournalClosedMembershipReadResult,
 	captureLiveJournalAnchorReadObservation,
 	captureLiveJournalHistoricalAnchorImportInput,
 	captureLiveJournalInput,
@@ -1772,6 +1775,43 @@ export function createNodeDurableLiveJournalStore(
 		});
 	};
 
+	// SQLite point reads complete synchronously inside the admitted native owner.
+	const readClosedMembership: NonNullable<DurableLiveJournalStore["readClosedMembership"]> = async input => {
+		const blocked = unavailable();
+		if (blocked !== undefined) return blocked;
+		let selected: ReturnType<typeof captureJournalClosedMembershipReadInput>;
+		try { selected = captureJournalClosedMembershipReadInput(input); }
+		catch { return failed("malformed-input"); }
+		const afterCapture = unavailable();
+		if (afterCapture !== undefined) return afterCapture;
+		let result: LiveJournalClosedMembershipReadResult;
+		try {
+			database.exec("BEGIN");
+			// CASE prevents SQLite from copying an oversized BLOB into JavaScript.
+			const row = statement(database, `SELECT CASE
+				WHEN closed_membership_bytes IS NULL THEN 'missing'
+				WHEN typeof(closed_membership_bytes)!='blob' OR length(closed_membership_bytes)=0
+					OR length(closed_membership_bytes)>? THEN 'store-poisoned'
+				WHEN length(closed_membership_bytes)>? THEN 'read-budget-exceeded'
+				ELSE 'present' END AS kind,
+				CASE WHEN typeof(closed_membership_bytes)='blob' AND length(closed_membership_bytes)>0
+					AND length(closed_membership_bytes)<=? THEN closed_membership_bytes ELSE NULL END AS bytes
+				FROM scopes WHERE object_id=? AND epoch=? AND anchor_digest=?`).get(
+				LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes, selected.maxBytes, selected.maxBytes, ...scopeParameters(selected.scope));
+			if (row === undefined || row.kind === "missing") result = Object.freeze({ok: true, kind: "missing"});
+			else if (row.kind === "store-poisoned") result = failed("store-poisoned");
+			else if (row.kind === "read-budget-exceeded") result = Object.freeze({ok: false, kind: "read-budget-exceeded"});
+			else if (row.kind === "present") result = captureJournalClosedMembershipObservation(selected, selected.scope, row.bytes);
+			else result = failed("internal-invariant");
+			database.exec("COMMIT");
+		} catch {
+			try { database.exec("ROLLBACK"); } catch { /* Preserve the original failure. */ }
+			return failed("substrate-failure");
+		}
+		if (!result.ok && result.kind === "store-poisoned") poison();
+		return result;
+	};
+
 	const importHistoricalAnchor = async (
 		input: LiveJournalHistoricalAnchorImportInput
 		// eslint-disable-next-line @typescript-eslint/require-await -- SQLite work is synchronous behind the async port.
@@ -2326,6 +2366,7 @@ export function createNodeDurableLiveJournalStore(
 	};
 
 	const store = Object.freeze({
+		readClosedMembership,
 		recordClosedMembership,
 		readRetirementImage,
 		acquireRetirementControl,

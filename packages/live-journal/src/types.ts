@@ -194,6 +194,8 @@ export type LiveJournalPageResult =
 	| Failure;
 
 export interface DurableLiveJournalStore {
+	/** Noncreating, bounded point read of opaque evidence; the caller authenticates the Cut. */
+	readClosedMembership?(input: LiveJournalClosedMembershipReadInput): Promise<LiveJournalClosedMembershipReadResult>;
 	/** Opaque exact close-owner evidence; native CAS/custody, never protocol authorization. */
 	recordClosedMembership?(
 		input: Readonly<{
@@ -228,6 +230,17 @@ export interface DurableLiveJournalStore {
 	readPage(input: LiveJournalPageInput): Promise<LiveJournalPageResult>;
 	close(): Promise<void>;
 }
+
+export interface LiveJournalClosedMembershipReadInput {
+	readonly scope: LiveJournalScope;
+	readonly maxBytes: number;
+}
+
+export type LiveJournalClosedMembershipReadResult =
+	| Readonly<{ readonly ok: true; readonly kind: "missing" }>
+	| Readonly<{ readonly ok: true; readonly kind: "present"; readonly scope: LiveJournalScope;
+		readonly exactCanonicalMembershipBytes: Uint8Array }>
+	| Readonly<{ readonly ok: false; readonly kind: LiveJournalAnchorReadFailureKind }>;
 
 /** One bounded object checkpoint. No field grants application or deletion authority. */
 export interface LiveJournalRetirementPreparation {

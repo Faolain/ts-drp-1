@@ -6,6 +6,9 @@ import {
 	type AppendAcceptedVertexResult,
 	captureJournalRetirementObject,
 	captureJournalClosedMembershipInput,
+	captureJournalClosedMembershipReadInput,
+	captureJournalClosedMembershipObservation,
+	type LiveJournalClosedMembershipReadResult,
 	captureLiveJournalAnchorReadObservation,
 	captureLiveJournalHistoricalAnchorImportInput,
 	captureLiveJournalInput,
@@ -2023,6 +2026,44 @@ function createJournalStoreOver(
 		});
 	};
 
+	const readClosedMembership: NonNullable<DurableLiveJournalStore["readClosedMembership"]> = async input => {
+		const blocked = unavailable();
+		if (blocked !== undefined) return blocked;
+		let selected: ReturnType<typeof captureJournalClosedMembershipReadInput>;
+		try { selected = captureJournalClosedMembershipReadInput(input); }
+		catch { return failed("malformed-input"); }
+		if (needsNativeReadReservationTurn(database)) {
+			try { return await runNativeReservedRead(database, () => readClosedMembership(selected)); }
+			catch { return unavailable() ?? failed("substrate-failure"); }
+		}
+		const afterCapture = unavailable();
+		if (afterCapture !== undefined) return afterCapture;
+		let result: LiveJournalClosedMembershipReadResult | undefined;
+		try {
+			const transaction = strictTransaction(database, ["scopes"], "readonly");
+			const terminal = signedTransactionTerminal(transaction);
+			try {
+				const raw: unknown = await requestResult(transaction.objectStore(roomStoreName(transaction.db, "journal", "scopes")).get(scopeKey(selected.scope)));
+				if (raw === undefined) result = Object.freeze({ok: true, kind: "missing"});
+				else if (raw === null || typeof raw !== "object" || Array.isArray(raw)) result = failed("store-poisoned");
+				else {
+					const fields: Record<string, unknown> = {};
+					for (const key of ["objectId", "epoch", "anchorDigest", "closedMembershipBytes"]) {
+						const d = Object.getOwnPropertyDescriptor(raw, key);
+						if (d !== undefined && (!("value" in d) || !d.enumerable)) throw new TypeError("invalid native field");
+						fields[key] = d?.value;
+					}
+					result = captureJournalClosedMembershipObservation(selected,
+						{objectId: fields.objectId, epoch: fields.epoch, anchorDigest: fields.anchorDigest}, fields.closedMembershipBytes);
+				}
+			} catch { /* Join the admitted transaction even when its request fails. */ }
+			if (!(await terminal) || result === undefined) return failed("substrate-failure");
+			await nativeReadReservationCheck(transaction);
+		} catch { return failed("substrate-failure"); }
+		if (!result.ok && result.kind === "store-poisoned") poison();
+		return result;
+	};
+
 	const importHistoricalAnchor = async (
 		input: LiveJournalHistoricalAnchorImportInput
 	): Promise<LiveJournalHistoricalAnchorImportResult> => {
@@ -2567,6 +2608,7 @@ function createJournalStoreOver(
 	};
 
 	const facade = Object.freeze({
+		readClosedMembership,
 		recordClosedMembership,
 		readRetirementImage,
 		acquireRetirementControl,

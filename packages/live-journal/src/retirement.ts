@@ -14,6 +14,8 @@ import {createCanonicalEncodingCapture, type CanonicalEncodingCaptureValue} from
 import { captureLiveJournalInput, captureLiveJournalUnsignedSuccessorInput } from "./contract.js";
 import type {
 	LiveJournalFailureKind,
+	LiveJournalClosedMembershipReadInput,
+	LiveJournalClosedMembershipReadResult,
 	LiveJournalRetirementControl,
 	LiveJournalRetirementControlRead,
 	LiveJournalRetirementDrainPlan,
@@ -50,7 +52,7 @@ export function journalRetirementImageCountsFit(scopeCount: number, rowCount: nu
 	);
 }
 const hex = /^[0-9a-f]{64}$/u;
-const fail = (kind: LiveJournalFailureKind): LiveJournalRetirementResult<never> => ({ ok: false, kind });
+const fail = (kind: LiveJournalFailureKind): Extract<LiveJournalRetirementResult<never>, {ok: false}> => ({ ok: false, kind });
 function record(value: unknown, keys: readonly string[]): Record<string, unknown> {
 	if (value === null || typeof value !== "object" || Array.isArray(value)) throw new TypeError("malformed-input");
 	const proto = Object.getPrototypeOf(value);
@@ -87,6 +89,38 @@ function scope(value: unknown, objectId: string): LiveJournalScope {
 	const r = record(value, ["objectId", "epoch", "anchorDigest"]);
 	if (r.objectId !== objectId) throw new TypeError("malformed-input");
 	return Object.freeze({ objectId, epoch: integer(r.epoch), anchorDigest: digest(r.anchorDigest) });
+}
+/** Capture a bounded point selector without invoking caller accessors. */
+export function captureJournalClosedMembershipReadInput(input: unknown): LiveJournalClosedMembershipReadInput {
+	const r = record(input, ["scope", "maxBytes"]);
+	const selected = record(r.scope, ["objectId", "epoch", "anchorDigest"]);
+	const objectId = captureJournalRetirementObject({ objectId: selected.objectId });
+	const maxBytes = integer(r.maxBytes);
+	if (maxBytes > LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes) throw new TypeError("malformed-input");
+	return Object.freeze({scope: scope(r.scope, objectId), maxBytes});
+}
+
+/** Detach native evidence only after its physical byte bound passes. No protocol authority is inferred. */
+export function captureJournalClosedMembershipObservation(
+	input: LiveJournalClosedMembershipReadInput, observedScope: unknown, bytes: unknown
+): LiveJournalClosedMembershipReadResult {
+	try {
+		const observed = scope(observedScope, input.scope.objectId);
+		if (observed.epoch !== input.scope.epoch || observed.anchorDigest !== input.scope.anchorDigest)
+			return fail("store-poisoned");
+		if (bytes === undefined || bytes === null) return Object.freeze({ok: true, kind: "missing"});
+		const typed = Object.getPrototypeOf(Uint8Array.prototype) as object;
+		if (Object.getOwnPropertyDescriptor(typed, Symbol.toStringTag)?.get?.call(bytes) !== "Uint8Array")
+			return fail("store-poisoned");
+		const size = Object.getOwnPropertyDescriptor(typed, "byteLength")!.get!.call(bytes) as number;
+		if (size === 0 || size > LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes) return fail("store-poisoned");
+		if (size > input.maxBytes) return Object.freeze({ok: false, kind: "read-budget-exceeded"});
+		const buffer = Object.getOwnPropertyDescriptor(typed, "buffer")!.get!.call(bytes) as ArrayBuffer;
+		const offset = Object.getOwnPropertyDescriptor(typed, "byteOffset")!.get!.call(bytes) as number;
+		Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, "byteLength")!.get!.call(buffer);
+		return Object.freeze({ok: true, kind: "present", scope: observed,
+			exactCanonicalMembershipBytes: new Uint8Array(new Uint8Array(buffer, offset, size))});
+	} catch { return fail("store-poisoned"); }
 }
 /** Captures bounded opaque canonical evidence and mandatory exact native currency.
  * Neither canonical encoding nor this capture authenticates a close certificate. */

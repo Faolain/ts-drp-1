@@ -309,27 +309,23 @@ export async function readCreatorSuccessorExport(
 	input: CreatorSuccessorExportInput
 ): Promise<CreatorSuccessorExport> {
 	const exported = await readCreatorSuccessorExportWithoutMembership(input);
-	if (input.journalStore === undefined) return exported;
-	const image = await input.journalStore.readRetirementImage?.({ objectId: input.objectId });
-	if (image?.ok !== true) throw new TypeError("creator successor membership image is unavailable");
-	const accounting = input.archiveRecovery?.accounting;
-	if (accounting !== undefined && image.value.canonicalRows.some(bytes => !accounting.charge(bytes)))
-		throw new TypeError("creator successor membership proof charge is exhausted");
+	if (input.journalStore?.readClosedMembership === undefined) return exported;
 	const cut = canonicalRecord(exported.offer.exactCanonicalCutValueBytes);
 	const parameters = cut?.parameters as Readonly<{ maxEpochVertices: number }> | undefined;
-	if (cut === undefined || parameters === undefined) throw new TypeError("creator successor membership Cut is invalid");
-	const headers = image.value.canonicalRows.map(bytes => decodeCanonical(bytes)).filter(frame =>
-		Array.isArray(frame) && frame[0] === "scopes" && Array.isArray(frame[1]) && frame[1].length === 3 &&
-		frame[1][0] === input.objectId && frame[1][1] === cut.epoch && frame[1][2] === cut.previousAnchor);
-	if (headers.length === 0) return exported;
-	if (headers.length !== 1) throw new TypeError("creator successor membership scope is ambiguous");
-	const header = (headers[0] as unknown[])[2] as Record<string, unknown>;
-	const membership = header.closedMembershipBytes ?? header.closed_membership_bytes;
+	if (cut === undefined || parameters === undefined || typeof cut.epoch !== "number" || typeof cut.previousAnchor !== "string")
+		throw new TypeError("creator successor membership Cut is invalid");
+	const observed = await input.journalStore.readClosedMembership({
+		scope: {objectId: input.objectId, epoch: cut.epoch, anchorDigest: cut.previousAnchor},
+		maxBytes: CREATOR_CLOSE_MEMBERSHIP_MAX_BYTES,
+	});
+	if (!observed.ok) throw new TypeError(`creator successor membership read refused: ${observed.kind}`);
 	// Prior valid installs can lack this optional evidence when their graph was
 	// sparse. Keep their original export usable; absence grants no collection.
-	if (membership === undefined || membership === null) return exported;
-	if (!(membership instanceof Uint8Array) || membership.byteLength > CREATOR_CLOSE_MEMBERSHIP_MAX_BYTES)
-		throw new TypeError("creator successor membership carrier is unavailable");
+	if (observed.kind === "missing") return exported;
+	const membership = observed.exactCanonicalMembershipBytes;
+	const accounting = input.archiveRecovery?.accounting;
+	if (accounting !== undefined && !accounting.charge(membership))
+		throw new TypeError("creator successor membership proof charge is exhausted");
 	const bytes = await rewriteCreatorCloseMembershipWitnesses({
 		bytes: membership, exactCanonicalCutValueBytes: exported.offer.exactCanonicalCutValueBytes,
 		maxEpochVertices: parameters.maxEpochVertices, localVertexWitnesses: [],
