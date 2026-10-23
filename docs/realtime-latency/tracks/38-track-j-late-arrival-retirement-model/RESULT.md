@@ -8,6 +8,10 @@ arbitrarily many epochs correct. Native browser, persistence, and long-room evid
 custody, cross-handoff egress, broadcast-round, and exact-intent selection laws. Their current-fence
 projection and finite transition bridge do not close the full-contract induction gap described here.
 
+The [completion-proof drain adjunct](SOURCE-PROOF-DRAIN.md) separates terminal proof custody from physical
+pruning eligibility. Its bounded source-pair model checks that cold recovery retains classification through
+independent prefix blockage and plan progress, then releases shared proof only after actual native absence.
+
 The user authorized challenging earlier assumptions on 2026-10-23. The completion contract may therefore
 replace the earlier “replacement must land in a later cut” rule when implementation checks preserve accepted
 intent. A durable replacement can carry that intent before it lands, provided the old source is signed
