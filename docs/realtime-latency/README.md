@@ -1,5 +1,8 @@
 # Real-time latency work (October 2026)
 
+The current continuation and completion gates are in [PROGRESS.md](PROGRESS.md).
+This document retains the earlier decision log and track evidence.
+
 This folder records the work to bring ts-drp's transition and per-move latency from seconds into the range a
 real-time game needs. It holds:
 
