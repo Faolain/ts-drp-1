@@ -81,6 +81,10 @@ const METHODS = [
 	"issue",
 	"published",
 	"receive",
+	"inject",
+	"projectionAudit",
+	"acceptance",
+	"settlementAudit",
 	"state",
 	"seal",
 	"adopt",
@@ -220,7 +224,7 @@ for (const { options, repeat } of cases) {
 		const driven: RoleEndpoint = HEAP
 			? {
 					...creator,
-					drainEvents: async () => {
+					drainEvents: async (): ReturnType<RoleEndpoint["drainEvents"]> => {
 						await measureHeap();
 						return creator.drainEvents();
 					},

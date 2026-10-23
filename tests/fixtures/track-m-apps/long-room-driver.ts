@@ -6,7 +6,7 @@
 // latency is measured inside the role that does the work.
 
 export type HostKind = "node" | "browser" | "room" | "room-retention";
-export type AppKind = "canvas" | "chat";
+export type AppKind = "canvas" | "chat" | "grid";
 export type RecipientMode = "receive-only" | "writer";
 /**
  * Chat only. Track W: "window" = the rolling-window format (v4), "lifetime" = version 3. Track W2:
@@ -113,6 +113,34 @@ export interface RoleEndpoint {
 	published(after: number | null): Promise<WireRow[]>;
 	/** Delivers the other role's rows; returns the wall time until the last one is accepted. */
 	receive(rows: readonly WireRow[]): Promise<number>;
+	/** Delivers without joining application acceptance (old-epoch and control rows). */
+	inject(rows: readonly WireRow[]): Promise<void>;
+	/** Observation of the actual published projection input, never a candidate preview. */
+	projectionAudit(): Promise<
+		Readonly<{
+			base: Readonly<{ epoch: number; state: string }> | null;
+			operations: readonly Readonly<{ author: string; operation: Readonly<Record<string, unknown>> }>[];
+			acceptedCount: number;
+			lastAcceptedAt: number | null;
+			remoteAcceptedCount: number;
+			lastRemoteAcceptedAt: number | null;
+		}>
+	>;
+	acceptance(digests: readonly string[]): Promise<readonly boolean[]>;
+	/** Every live plan reference is still backed by its paired original issuance row. */
+	settlementAudit(): Promise<
+		Readonly<{
+			entries: number;
+			missing: readonly number[];
+			dispositions: Readonly<Record<string, number>>;
+			replacements: readonly Readonly<{
+				sourceDigest: string;
+				sourceSequence: number;
+				disposition: string;
+				replacementDigests: readonly string[];
+			}>[];
+		}>
+	>;
 	/** Hex of the canonical application state of the current projection. */
 	state(): Promise<string>;
 	/** Creator: seals `epoch` (throws on refusal); returns its wall time. */

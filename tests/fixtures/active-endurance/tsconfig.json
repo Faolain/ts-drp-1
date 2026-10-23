@@ -1,0 +1,19 @@
+{
+	"extends": "../../../tsconfig.json",
+	"compilerOptions": {
+		"composite": false,
+		"declaration": false,
+		"declarationMap": false,
+		"noEmit": true,
+		"target": "ES2023",
+		"module": "ESNext",
+		"moduleResolution": "Bundler",
+		"paths": {
+			"@ts-drp/network/snapshot-transfer": ["../../../packages/network/src/snapshot-transfer.ts"],
+			"@ts-drp/storage": ["../../../packages/storage/src/index.ts"],
+			"@ts-drp/storage/*": ["../../../packages/storage/src/*.ts"]
+		}
+	},
+	"include": ["./*.ts", "../../active-app-endurance-native.test.ts", "../../active-app-endurance-failures.test.ts"],
+	"exclude": ["../../../.claude", "../../../.logs", "../../../node_modules"]
+}

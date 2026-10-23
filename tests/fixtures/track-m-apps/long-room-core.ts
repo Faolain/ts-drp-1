@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type -- Measurement fixture: transparent inference keeps the native capability signatures. */
 /* eslint-disable @typescript-eslint/require-await -- Every RoleEndpoint method is async so the browser proxy and the in-process endpoint share one contract. */
 import { ed25519 } from "@noble/curves/ed25519.js";
-import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import type { SnapshotChunkProtocolPort } from "@ts-drp/network/snapshot-transfer";
 import { createBrowserAheDurableStore } from "@ts-drp/storage-browser";
 import { createBrowserDurableIssuanceStore } from "@ts-drp/storage-browser/issuance";
@@ -40,10 +40,12 @@ import {
 	openShippingChatLocalArchive,
 	type ShippingChatArchiveStore,
 } from "../../../examples/chat/src/v3-chat-archive.js";
+import { createV3ZoneApplication } from "../../../examples/grid/src/v3-zone.js";
 import {
 	createBrowserV3RoomDatabaseStorageHost,
 	createV3RoomCreatorInviteMaterial,
 	createV3RoomSession,
+	type V3RoomProjectionInput,
 	waitForV3RoomStartupForDiagnostics,
 } from "../../../examples/v3-room/src/index.js";
 import { toCanvasWireOperation } from "../../../packages/blueprints/src/v3-canvas.js";
@@ -92,6 +94,7 @@ export interface LongRoomHost {
 	readonly observe: Readonly<{
 		openIssuance(name: string): ReturnType<typeof createBrowserDurableIssuanceStore>;
 		openAhe(name: string): ReturnType<typeof createBrowserAheDurableStore>;
+		openJournal(name: string): ReturnType<typeof createBrowserDurableLiveJournalStore>;
 		openSnapshots(name: string): ReturnType<typeof createBrowserSnapshotQuarantineStore>;
 	}>;
 	census(name: string): Promise<StoreCensus>;
@@ -244,6 +247,25 @@ async function applicationFor(
 	creatorLull: boolean,
 	chatFormat: ChatFormat
 ) {
+	if (app === "grid") {
+		const acl = decodeCanonical(exactCanonicalLatchedAclBytes) as {
+			members: { author: string; finalityKey: string | null }[];
+		};
+		const creator = required(acl.members.find((member) => member.finalityKey !== null)).author;
+		const members = [...acl.members].sort(
+			(left, right) => Number(right.author === creator) - Number(left.author === creator)
+		);
+		const roster = members.map(({ author }, order) => ({
+			author,
+			order,
+			peerId: order === 0 ? "grid-creator" : "grid-recipient",
+		}));
+		const application = createV3ZoneApplication(roster, "grid-creator", creator);
+		const genesis = required(application.migration).canonicalStateBytes(
+			application.projectAcceptedOperations({ authenticatedBase: undefined, currentEpochOperations: [] })
+		);
+		return { application, genesis, admission: undefined, catalog: application.catalog };
+	}
 	if (app === "canvas") {
 		const canvas = createV3CanvasApplication(CANVAS_SIDE, CANVAS_SIDE);
 		const application = creatorLull
@@ -282,9 +304,10 @@ async function applicationFor(
 }
 
 function operationFor(app: AppKind, role: number, epoch: number, ordinal: number): Readonly<Record<string, unknown>> {
+	if (app === "grid") return { action: "placeBlock", id: `block-${role}-${ordinal}`, kind: "stone", x: epoch, y: role };
 	if (app === "canvas")
 		return toCanvasWireOperation(
-			{ action: "paint", offset: [(epoch + ordinal) % CANVAS_SIDE, role], rgb: [1 + role, 2 + ordinal, 3] },
+			{ action: "paint", offset: [(epoch + ordinal) % CANVAS_SIDE, role], rgb: [1 + role, 2 + (ordinal % 250), 3] },
 			`paint-${role}-${epoch}-${ordinal}`
 		);
 	return Object.freeze({
@@ -373,11 +396,20 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 		permissionless: false,
 		// The shipped Canvas signs the version its profile requires (examples/canvas/src/profile.ts);
 		// the shipped Chat signs version 3.
-		version: options.app === "chat" ? 3 : CANVAS_GENESIS_PROFILE.latchedAclVersion,
+		version: options.app !== "canvas" ? 3 : CANVAS_GENESIS_PROFILE.latchedAclVersion,
 	});
 	const chatFormat = options.chatFormat ?? "window";
 	const selected = await applicationFor(options.app, exactCanonicalLatchedAclBytes, options.creatorLull, chatFormat);
-	const application = selected.application;
+	const projectionInputs = new WeakMap<object, V3RoomProjectionInput>();
+	const originalApplication = selected.application;
+	const application = {
+		...originalApplication,
+		projectAcceptedOperations: (value: V3RoomProjectionInput) => {
+			const result = originalApplication.projectAcceptedOperations(value);
+			projectionInputs.set(result, value);
+			return result;
+		},
+	};
 	// Track W: the shipped Chat (window and shares formats) keeps a device archive fed by the
 	// projection callback, as examples/chat does; observation reads its stats after each epoch.
 	const archiveHandle =
@@ -404,7 +436,7 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 			cryptoSuiteId: "ed25519-sha256-v3",
 			// The shipped profiles: Canvas from examples/canvas/src/profile.ts (creator-trusted-v1
 			// before Track T), Chat creator-trusted-settlement-v1.
-			profileId: options.app === "chat" ? "creator-trusted-settlement-v1" : CANVAS_GENESIS_PROFILE.profileId,
+			profileId: options.app !== "canvas" ? "creator-trusted-settlement-v1" : CANVAS_GENESIS_PROFILE.profileId,
 			quorum: 1,
 			signers,
 		}),
@@ -418,6 +450,10 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 	let ingress: ((message: Message) => void) | undefined;
 	let topic: string | undefined;
 	const accepted = new Set<string>();
+	let acceptedCount = 0;
+	let lastAcceptedAt: number | null = null;
+	let remoteAcceptedCount = 0;
+	let lastRemoteAcceptedAt: number | null = null;
 	const acknowledged = new Map<string, () => void>();
 	const networkNode = loopbackNetwork(peers[index]);
 	const receiveOnly = index === 1 && !writerRecipient;
@@ -440,8 +476,16 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 		roomHeadAuthority: floor,
 		signRegisteredVertexDigest: (digest: Uint8Array) => Promise.resolve(ed25519.sign(digest, identity.seed)),
 		onProjection: observe,
-		onAcceptedVertex: (vertex: Readonly<{ digest: Uint8Array }>) => {
+		onAcceptedVertex: (vertex: Readonly<{ digest: Uint8Array; author: string }>) => {
 			const digest = hex(vertex.digest);
+			if (!accepted.has(digest)) {
+				acceptedCount++;
+				lastAcceptedAt = performance.timeOrigin + performance.now();
+				if (vertex.author !== identity.author) {
+					remoteAcceptedCount++;
+					lastRemoteAcceptedAt = lastAcceptedAt;
+				}
+			}
 			accepted.add(digest);
 			acknowledged.get(digest)?.();
 		},
@@ -473,9 +517,11 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 		if (!object.ok) throw new TypeError("TRACK_M_APPS_INVALID_OBJECT");
 		const store = await host.observe.openAhe("creator--ahe");
 		const snapshotStore = await host.observe.openSnapshots("creator");
+		const journalStore = await host.observe.openJournal("creator");
 		try {
 			const value = await readCreatorSuccessorExport({
 				store,
+				journalStore,
 				snapshotStore,
 				catalog: application.catalog,
 				objectId: object.value,
@@ -494,6 +540,7 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 			}
 			return { ...value, chunks };
 		} finally {
+			await journalStore.close();
 			await snapshotStore.close();
 			await store.close();
 		}
@@ -504,8 +551,80 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 		const value = result as { kind: string; reason?: string };
 		return value.reason === undefined ? value.kind : `${value.kind}:${value.reason}`;
 	};
+	const inject = async (rows: readonly WireRow[]): Promise<void> => {
+		for (const row of rows)
+			required(ingress)(
+				Message.create({
+					objectId: required(topic),
+					sender: peers[1 - index],
+					type: MessageType.MESSAGE_TYPE_V3_ENVELOPE,
+					data: V3Envelope.encode({
+						canonicalPreimage: fromBase64(row.preimage),
+						signature: fromBase64(row.signature),
+					}).finish(),
+				})
+			);
+	};
 
 	return Object.freeze({
+		inject,
+		acceptance: async (digests: readonly string[]) => digests.map((digest) => accepted.has(digest)),
+		projectionAudit: async () => {
+			const value = required(projectionInputs.get(room.projection()));
+			return {
+				base:
+					value.authenticatedBase === undefined
+						? null
+						: {
+								epoch: value.authenticatedBase.epoch,
+								state: hex(value.authenticatedBase.exactCanonicalApplicationStateBytes),
+							},
+				operations: value.currentEpochOperations.map(({ author, operation }) => ({ author, operation })),
+				acceptedCount,
+				lastAcceptedAt,
+				remoteAcceptedCount,
+				lastRemoteAcceptedAt,
+			};
+		},
+		settlementAudit: async () => {
+			const store = await host.observe.openIssuance(name);
+			try {
+				const scope = { objectId, author: identity.author };
+				const plan = await store.readSettlementPlan(scope);
+				const missing: number[] = [];
+				const dispositions: Record<string, number> = {};
+				const replacements: {
+					sourceDigest: string;
+					sourceSequence: number;
+					disposition: string;
+					replacementDigests: string[];
+				}[] = [];
+				for (const entry of plan?.entries ?? []) {
+					dispositions[entry.disposition] = (dispositions[entry.disposition] ?? 0) + 1;
+					const sourceScope = entry.sourceObjectId === undefined ? scope : { ...scope, objectId: entry.sourceObjectId };
+					if ((await store.readIssued(sourceScope, entry.sourceSequence)) === null) missing.push(entry.sourceSequence);
+					const replacementDigests: string[] = [];
+					for (const sequence of new Set([
+						entry.replacementSequence,
+						...(entry.replacementProgress?.chunks.map((chunk) => chunk.replacementSequence) ?? []),
+					])) {
+						if (sequence === null) continue;
+						const row = await store.readIssued(scope, sequence);
+						if (row === null) missing.push(sequence);
+						else replacementDigests.push(hex(row.envelope.digest));
+					}
+					replacements.push({
+						sourceDigest: hex(entry.sourceDigest),
+						sourceSequence: entry.sourceSequence,
+						disposition: entry.disposition,
+						replacementDigests,
+					});
+				}
+				return { entries: plan?.entries.length ?? 0, missing, dispositions, replacements };
+			} finally {
+				await store.close();
+			}
+		},
 		issue: async (epoch: number, ordinal: number) => {
 			const started = performance.now();
 			await room.issue(operationFor(options.app, index, epoch, ordinal));
@@ -542,18 +661,7 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 				timer = setTimeout(() => reject(new TypeError("TRACK_M_APPS_REMOTE_ADMISSION_TIMEOUT")), 120_000);
 			});
 			try {
-				for (const row of rows)
-					required(ingress)(
-						Message.create({
-							objectId: required(topic),
-							sender: peers[1 - index],
-							type: MessageType.MESSAGE_TYPE_V3_ENVELOPE,
-							data: V3Envelope.encode({
-								canonicalPreimage: fromBase64(row.preimage),
-								signature: fromBase64(row.signature),
-							}).finish(),
-						})
-					);
+				await inject(rows);
 				await joined;
 				return performance.now() - started;
 			} finally {

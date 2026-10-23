@@ -1,0 +1,41 @@
+{
+  "kind": "configuration",
+  "app": "grid",
+  "sourceHead": "6f414a258998a9da913e638b22a3891241e88829",
+  "dirtyTracked": true,
+  "sourceDiffSha256": "25f03f5aad064464da5416fac6e2e337b830f7cae11f1768e6c7be66e3187449",
+  "epochs": 300,
+  "moves": 2,
+  "streamLimit": 4,
+  "reopenAt": 150,
+  "host": "SQLite",
+  "transport": "scripted signed-byte first-copy loss/delay and explicit durable replay",
+  "successorMembership": "v2 native journal point read",
+  "cpu": "Apple M1 Max",
+  "cores": 10,
+  "load": [
+    7.95458984375,
+    11.2958984375,
+    13.298828125
+  ],
+  "directory": "/private/tmp/active-endurance-preperf-300-02/grid-sqlite-w0172j",
+  "completed": 300,
+  "accepted": 3000,
+  "elapsedMs": 1699993.927666,
+  "issueMs": {
+    "p50": 38.163832999998704,
+    "p95": 235.41808299999684,
+    "p99": 306.3865419999929,
+    "max": 778.3717079999624
+  },
+  "receiveMs": {
+    "p50": 50.51862500002608,
+    "p95": 2021.221750000026,
+    "max": 5072.909624999971
+  },
+  "transitionMs": {
+    "p50": 1787.452583999955,
+    "p95": 2581.12737500004,
+    "max": 4249.895250000001
+  }
+}

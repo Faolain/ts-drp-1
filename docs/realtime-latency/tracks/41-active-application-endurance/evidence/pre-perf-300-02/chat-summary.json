@@ -1,0 +1,41 @@
+{
+  "kind": "configuration",
+  "app": "chat",
+  "sourceHead": "6f414a258998a9da913e638b22a3891241e88829",
+  "dirtyTracked": true,
+  "sourceDiffSha256": "25f03f5aad064464da5416fac6e2e337b830f7cae11f1768e6c7be66e3187449",
+  "epochs": 300,
+  "moves": 2,
+  "streamLimit": 4,
+  "reopenAt": 150,
+  "host": "SQLite",
+  "transport": "scripted signed-byte first-copy loss/delay and explicit durable replay",
+  "successorMembership": "v2 native journal point read",
+  "cpu": "Apple M1 Max",
+  "cores": 10,
+  "load": [
+    7.95458984375,
+    11.2958984375,
+    13.298828125
+  ],
+  "directory": "/private/tmp/active-endurance-preperf-300-02/chat-sqlite-v77hcj",
+  "completed": 300,
+  "accepted": 3000,
+  "elapsedMs": 2638933.844333,
+  "issueMs": {
+    "p50": 69.85070800012909,
+    "p95": 1129.2717089999933,
+    "p99": 1403.3193750001956,
+    "max": 3341.3611669999664
+  },
+  "receiveMs": {
+    "p50": 421.81300000008196,
+    "p95": 1590.5283749999944,
+    "max": 3961.471459000022
+  },
+  "transitionMs": {
+    "p50": 2197.673582999967,
+    "p95": 3116.796083000023,
+    "max": 4937.852666000137
+  }
+}

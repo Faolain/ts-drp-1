@@ -185,6 +185,38 @@ const sqliteFile = (directory: string, family: (typeof SQLITE_FAMILIES)[number],
 	);
 const quote = (value: string) => `"${value.replaceAll('"', '""')}"`;
 
+/**
+ * Counts every user table in one actual native database using a read-only handle.
+ * @param filename - Existing SQLite database.
+ * @returns Table rows and BLOB/TEXT payload bytes.
+ */
+export function sqliteFileCensus(filename: string): StoreCensus {
+	const out: Record<string, readonly [number, number]> = {};
+	const database = new DatabaseSync(filename, { readOnly: true });
+	try {
+		const tables = database
+			.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+			.all()
+			.map((row) => String(row.name));
+		for (const table of tables) {
+			const columns = database
+				.prepare(`PRAGMA table_info(${quote(table)})`)
+				.all()
+				.map((column) => quote(String(column.name)));
+			const payload = columns
+				.map((column) => `CASE WHEN typeof(${column}) IN ('blob','text') THEN length(${column}) ELSE 0 END`)
+				.join(" + ");
+			const row = database
+				.prepare(`SELECT COUNT(*) AS rows, COALESCE(SUM(${payload || "0"}), 0) AS bytes FROM ${quote(table)}`)
+				.get() as { rows: number; bytes: number };
+			out[table] = [Number(row.rows), Number(row.bytes)];
+		}
+	} finally {
+		database.close();
+	}
+	return Object.freeze(out);
+}
+
 /** Rows and BLOB/TEXT payload bytes of every table of one role's SQLite owners. */
 function sqliteCensus(directory: string, name: string): StoreCensus {
 	const out: Record<string, readonly [number, number]> = {};
@@ -194,37 +226,23 @@ function sqliteCensus(directory: string, name: string): StoreCensus {
 			out[`${family}:#missing`] = [1, 0];
 			continue;
 		}
-		const database = new DatabaseSync(filename, { readOnly: true });
-		try {
-			const tables = database
-				.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
-				.all()
-				.map((row) => String(row.name));
-			for (const table of tables) {
-				const columns = database
-					.prepare(`PRAGMA table_info(${quote(table)})`)
-					.all()
-					.map((column) => quote(String(column.name)));
-				const payload = columns
-					.map((column) => `CASE WHEN typeof(${column}) IN ('blob','text') THEN length(${column}) ELSE 0 END`)
-					.join(" + ");
-				const row = database
-					.prepare(`SELECT COUNT(*) AS rows, COALESCE(SUM(${payload || "0"}), 0) AS bytes FROM ${quote(table)}`)
-					.get() as { rows: number; bytes: number };
-				out[`${family}:${table}`] = [Number(row.rows), Number(row.bytes)];
-			}
-		} finally {
-			database.close();
+		for (const [table, census] of Object.entries(sqliteFileCensus(filename))) out[`${family}:${table}`] = census;
+		out[`${family}:#primary`] = [1, statSync(filename).size];
+		for (const suffix of ["wal", "shm"]) {
+			const sidecar = `${filename}-${suffix}`;
+			out[`${family}:#${suffix}`] = existsSync(sidecar) ? [1, statSync(sidecar).size] : [0, 0];
 		}
-		const wal = `${filename}-wal`;
-		out[`${family}:#file`] = [1, statSync(filename).size + (existsSync(wal) ? statSync(wal).size : 0)];
 	}
 	return Object.freeze(out);
 }
 
-function nodeHostFor(kind: HostKind, directory: string): LongRoomHost {
+export function nodeHostFor(kind: HostKind, directory: string, reopen = false): LongRoomHost {
 	if (kind !== "node") return browserHostFor(kind, directory);
-	const storageHost = createNodeV3RoomStorageHost({ directory, initialization: () => "create" });
+	const storageHost = createNodeV3RoomStorageHost({
+		directory,
+		initialization: ({ family, name }) =>
+			reopen && existsSync(sqliteFile(directory, family, name)) ? "reopen" : "create",
+	});
 	// Separate observation handles over the same files (never the room's own owners).
 	const observe = createNodeV3RoomStorageHost({ directory, initialization: () => "reopen" });
 	return Object.freeze({
