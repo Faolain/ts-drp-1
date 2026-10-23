@@ -191,6 +191,18 @@ preserves the earlier baseline and first reviewed cooperative-work candidate; it
 observed maximum timer gap improves from 2,146 to 174 ms. This is neither a
 CPU-efficiency result nor completion of the smooth-game-loop goal.
 
+The reviewed recovery/outbox scheduling slice is integrated at `5abfb079`, with
+seven held native-boundary controls. Its [quiet candidate receipt](../../../../.logs/recovery-retention/transition-responsiveness-15/manifest.json)
+preserves source `329b08cc` plus patch `e93b8e0b…0f9`: four epochs, 57 accepted
+operations, exact 32-slot state and reopen at epoch 2. Timer p95/p99/max are
+15.248/62.023/146.050 ms; each receiver observes 4,731 ephemeral deliveries.
+Within-baseline receive-gap maxima are about 19.77 ms. The raw maxima are about
+875 ms and include authority mismatch and reopen intervals. This run uses the
+original observation harness, before the later starvation gate; its production
+composition and interleaving also differ from pair 12. It is descriptive evidence,
+with no paired speedup, CPU-efficiency or smooth-play completion claim. Guarded
+maintenance callbacks and the final rejoin composition still need their own gates.
+
 The [current coarse gate and controls](evidence/coarse-starvation-gate/manifest.json)
 keep raw phase callbacks, deliveries, CPU and task spans. They use a 1,000 ms
 starvation alarm and separate receiver baselines after completed convergence;

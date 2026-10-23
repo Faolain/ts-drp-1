@@ -10,11 +10,13 @@ not native storage or network behavior.
 
 ## Next agent prompt
 
-Root native production includes the composed `a847900d` checkpoint, the first reviewed
-responsiveness slice, and the separate pending-floor model. Genuine recipient SIGKILL
-evidence is integrated at `cc4a9908`. The full `613ab647` to recovery composition review,
-full-removal completion/local-author expiry work, and finer responsiveness slice remain
-separate open gates. Do not describe the whole rejoin composition as fully reviewed.
+Root native production now includes `5abfb079`: the reviewed recovery/outbox scheduling
+checkpoints and seven held native-boundary controls, following the composed rejoin source,
+first responsiveness slice and separate pending-floor model. Genuine recipient SIGKILL
+evidence is integrated at `cc4a9908`; the coarse starvation harness is at `e20cd61d`.
+The full `613ab647` to recovery composition review, historical pending egress after journal
+retirement, full-removal completion/local-author expiry, and guarded maintenance callbacks
+remain separate open gates. Do not describe the whole rejoin composition as fully reviewed.
 
 Finish those gates and their affected composed checks before starting the final campaign.
 The continued-play harness uses a 1,000 ms coarse starvation alarm with per-receiver
@@ -26,6 +28,14 @@ the original Claude worktrees: several contain deliberately reversed source file
 before/after comparisons. Their committed heads and scratchpad progress reports identify
 the candidate fixes. Use isolated checkouts, retain failed runs, and compare the actual
 tests rather than aggregate pass counts. Update this file at each integration checkpoint.
+
+Before launch, run the final changed completion/expiry/maintenance cases together with
+the small native owner/close, mixed-history and real receipt/floor SIGKILL core. Preserve
+one final-source campaign rather than repeating long runs before production is ready.
+Planning allowance from existing receipts is 25–45 minutes for Grid and 80–110 minutes
+for sequential Canvas/Chat, plus builds and roughly 2–5 minutes for the affected preflight.
+Those estimates use different source scopes and are not bounds. Keep our heavy jobs idle
+during Grid timing; continue recording external shared-host load.
 
 ## Completion contract
 
@@ -55,7 +65,7 @@ tests rather than aggregate pass counts. Update this file at each integration ch
 | [Recovery and long-room proof](tracks/41-active-application-endurance/RESULT.md) | PRE-PERF300-02 completed 300 epochs and 3,000 accepted operations in each of Canvas, Grid and Chat, with both peers reopening at epoch 150. This source predates the replay fix and remaining capacity/rejoin changes. The final integrated campaign is pending. |
 | Arbitrary-gap rejoin and same-key readmission | **Open completion/review gates.** The native gap/custody checkpoint is composed into root. [Real recipient process-death evidence](tracks/42-native-continued-play/evidence/rejoin-process-death/RESULT.md) passes receipt-commit and floor-commit recovery of captured A despite newer B, preserving unknown signed work through another install/reopen. The complete `613ab647` to recovery review, durable full-removal completion and local-author expiry remain open. The separate physical census retains the distinction between an extra source-floor header and the oldest usable recovery base. |
 | [Larger work per epoch](../../specs/bounded-storage-lifecycle/capacity-finishability.md) | Common currency, exact-intent and startup-recovery fixes are integrated, together with authenticated pending-bootstrap retention. Isolated shipped-profile campaigns finished 412 serial records across four cycles and 4,208 batched edits across six cycles. Common integration passes 22 focused controls and both real SQLite SIGKILL/recovery edges; final rejoin/performance composition remains open. Historical 357/489-record legacy creator-trusted/NONE failures are not shipped-app G2 regressions. |
-| [Native continued play](tracks/42-native-continued-play/RESULT.md) | **Performance completion remains open.** The first reviewed cooperative-work slice is integrated; its matched native pair reduces the observed maximum timer gap from 2,146 to 174 ms without a CPU-efficiency claim. The current bounded harness preserves raw phase observations and checks a separately labeled coarse starvation alarm plus each receiver after convergence. Its integrated short smoke and behavioral negatives are distinct from the pending final 300-epoch campaign and finer responsiveness work. |
+| [Native continued play](tracks/42-native-continued-play/RESULT.md) | **Performance completion remains open.** The first reviewed cooperative-work slice is integrated; its matched native pair reduces the observed maximum timer gap from 2,146 to 174 ms without a CPU-efficiency claim. The subsequent recovery/outbox checkpoint slice is integrated at `5abfb079`; its separate four-epoch candidate records a 146 ms maximum timer gap and does not run the later starvation harness. Guarded maintenance callbacks and final production composition remain pending. The current bounded harness preserves raw phase observations and checks a separately labeled coarse starvation alarm plus each receiver after convergence. Its integrated short smoke and behavioral negatives are distinct from the pending final 300-epoch campaign and finer responsiveness work. |
 | Browser parity | Actual three-engine browser launch remains **blocked** on macOS permission. Native libp2p plus controlled raw datagrams supplies no real browser WebRTC or rendering/FPS result. |
 
 The new application harness uses the shipped compositions, two concurrent durable
