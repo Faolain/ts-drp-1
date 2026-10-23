@@ -1,0 +1,53 @@
+{
+  "run": "active-continued-play-profile-05",
+  "configuration": {
+    "kind": "configuration",
+    "sourceHead": "37bb60809f7a008dd54f3aaff63b4c82695f6d91",
+    "sourceDiffSha256": "325919d7df493b00e5e056a9c3308cd0e7bb83117b82ef20cc98018788293528",
+    "load": [
+      114.17724609375,
+      119.435546875,
+      122.35546875
+    ],
+    "durable": "real localhost WebSocket/libp2p, 20ms delayed genuine ingress",
+    "ephemeral": "controlled raw datagrams; production room authority, codec, queue and sequence filter; not real WebRTC or FPS",
+    "tickIntervalMs": 10,
+    "successor": "signed native export over scripted chunk/material transport",
+    "epochs": 3,
+    "cpuProfiles": true
+  },
+  "terminalExitCode": 0,
+  "testPassed": true,
+  "sourcePatchSha256": "325919d7df493b00e5e056a9c3308cd0e7bb83117b82ef20cc98018788293528",
+  "scope": "Two Grid peers in one process; actual localhost WebSocket/libp2p durable traffic; controlled raw ephemeral datagrams; scripted authenticated successor material",
+  "responsiveness": "RED: own CPU and zero timer callbacks during seal/adopt, no ephemeral receipts throughout rollover",
+  "limits": [
+    "shared loaded host, not isolated latency",
+    "no browser, real WebRTC or render/FPS evidence",
+    "Inspector profile startup/stop overhead affects total transition/timer gaps; use no-inspector03 for responsiveness and profiled-step deltas for attribution"
+  ],
+  "filesSha256": {
+    "adopt-1.cpuprofile.gz": "2576f17d081220657c1fc6ff541dda2eb5814f88133ad0b75b23383fc78f0d74",
+    "adopt-2.cpuprofile.gz": "306be0fb8e630569c0c9dc00f434f410be573e436a00fa5cc0bf917fc89eaf30",
+    "adopt-3.cpuprofile.gz": "6be3673ebebe68d59e96b27666e0bd73c4d229f7fd9adf6d185911f1646ed35e",
+    "continued-play.jsonl.gz": "0ed0695182a7b45f6bd77818157491700c1f1f6930a339e664a1636062f16156",
+    "install-1.cpuprofile.gz": "faedd1a3a9a516c7d22a178a918436743b379c593229a7dc386618edb6aaa493",
+    "install-2.cpuprofile.gz": "89384957c42ca59cddef81c7a5a6338d52becb7c87db0eebcd604fa415afa656",
+    "install-3.cpuprofile.gz": "b64488a28d5b02bb9fa2b8a4894ce5da2478d03c4fd77e0adcf51ce9e5c395f1",
+    "profile-attribution.json": "8d30e7c5c727c429b177b5377b4798a18cb7c1130599c5b710d1e687907396b6",
+    "samples.json.gz": "0dbd64344bbec2126981f767e9f5d64eca5ff5a860fb135a82335f79ce089438",
+    "seal-1.cpuprofile.gz": "af9884cf83c66d16ff293dac1e8bb7ebc75a9012f15964233aa50a25106f969d",
+    "seal-2.cpuprofile.gz": "e210f83444475e7758b9b5d29e700695728afabf751e0dd271b2af3b06c8221b",
+    "seal-3.cpuprofile.gz": "a81abbb8ec18bfea6357d043311dc481791ff4965fe4f575639eb5eb3ea030c4",
+    "source.diff.gz": "3cc8fd6e11f33cb9cc6b070031928ba8078b680962252f8f53bfb25cfed5f13a",
+    "summary.json": "fd1ea12da2bff740136dd1ba0cf96865da2036ce8f10dbffdcdd27d297b5a1f7",
+    "test.log.gz": "0ede35872e786a7135979b0477bb599dff0665d137a7a8f626742bf84e2560b4"
+  },
+  "hardware": {
+    "cpu": "Apple M1 Max",
+    "cores": 10,
+    "node": "v22.23.4",
+    "platform": "darwin",
+    "arch": "arm64"
+  }
+}

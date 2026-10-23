@@ -1,0 +1,223 @@
+{
+	"candidate": "shared bounded immutable retained prefix; measurements precede later sealed-custody, close/adoption lifecycle and full broadcast-round correctness fixes",
+	"baseline": "exact combined predecessor 6cd4c567; original AA replay stall preserved in RESULT.md",
+	"runtime": {
+		"node": "22.23.4",
+		"pnpm": "10.24.0",
+		"hostHardware": "Apple M1 Max, 10 CPU cores; RAM not captured",
+		"quietWindow": "other integration/model agents held heavy work; host not claimed globally idle",
+		"hostHardwareProvenance": "Earlier parent endurance/probe observation on this host; no new optional hardware query",
+		"transport": "SQLite room sessions with production NodeRoomNetworkAdapter over an asynchronous ordered in-memory network"
+	},
+	"test": "tests/track-aa-retained-replay-owner.test.ts",
+	"commands": [
+		"pnpm exec vitest run tests/track-aa-retained-replay-owner.test.ts --coverage.enabled=false --maxWorkers=1 --minWorkers=1",
+		"TRACK_AA_MEASURE_REPLAY_STALL=1 TRACK_AA_MEASURE_REPLAY_SCALE=1 TRACK_AA_MEASURE_REPLAY_APPEND=1 pnpm exec vitest run tests/track-aa-retained-replay-owner.test.ts -t 'single slow replay|quiet 128-row|every send overlaps' --coverage.enabled=false --maxWorkers=1 --minWorkers=1"
+	],
+	"nativeControls": {
+		"passed": 22,
+		"optInMeasurementsSkipped": 4,
+		"includes": [
+			"same-target native join",
+			"held targeted/requested send permits durable issue and native recipient admission",
+			"healthy target independent of slow target",
+			"native slot remains charged after abort until actual send joins",
+			"32 held targets and immediate shared-prefix release",
+			"one active and one pending full broadcast round, independent caller completion",
+			"native callback mutation leaves shared received bytes intact",
+			"physical foreign journal corruption leaves captured bytes intact and rejects new demand",
+			"floor advance at first and last native send refuses stale continuation/success",
+			"partial suffix capture rollback",
+			"encoded buffer charge survives callback replacement",
+			"sealed predecessor publication authenticates exact native signed successor ancestry",
+			"sealed native blob/ancestry/head/floor mutation refuses continuation",
+			"sealed replay abort remains joined to physical sends"
+		]
+	},
+	"slowReplay": {
+		"seedUserRows": 80,
+		"replayRows": 82,
+		"successfulSendDelayMs": 100,
+		"duplicateRequests": 81,
+		"replayWallMs": 9248,
+		"firstDurableIssueMs": 76.420583,
+		"issueSamples": 20,
+		"durableIssueMs": {
+			"p50": 79.22,
+			"p95": 87.44,
+			"p99": 88.09
+		},
+		"recipientObservedMs": {
+			"p50": 92.92,
+			"p95": 103.79,
+			"p99": 326.64
+		},
+		"rawDurableIssueMs": [
+			76.420583, 73.835, 81.383833, 73.63875, 73.708875, 75.966834, 78.982625, 77.880208, 79.972542, 77.696792,
+			78.808959, 79.537833, 79.216667, 79.99025, 83.207125, 82.165625, 83.505, 84.714084, 88.09225, 87.437792
+		],
+		"rawRecipientObservedMs": [
+			89.112958, 95.578083, 94.674167, 82.910917, 87.137667, 86.586625, 92.922459, 87.692166, 93.932209, 326.641333,
+			92.165375, 90.30275, 93.747667, 90.174625, 99.231084, 92.81725, 99.604583, 99.346625, 99.330208, 103.788625
+		],
+		"peakNativeSendsIncludingAutomaticRepair": 2,
+		"peakEncodedBufferBytes": 1211,
+		"maxReadTurnMsIncludingPopulation": 37.610667
+	},
+	"quietReplay": {
+		"seedUserRows": 128,
+		"replayRows": 129,
+		"populationMs": 9603.719458,
+		"replayMs": 153.237791,
+		"fullScans": 0,
+		"fullScanRows": 0,
+		"pageReads": 129,
+		"pageRows": 257,
+		"peakNativeSends": 1,
+		"peakEncodedBufferBytes": 707,
+		"maxReadTurnMsIncludingPopulation": 15.18975
+	},
+	"continuousAppend": {
+		"seedUserRows": 64,
+		"capturedRows": 65,
+		"appendedUserRows": 64,
+		"combinedReplayAndIssueMs": 5447.529292,
+		"fullScans": 0,
+		"fullScanRows": 0,
+		"maxReadTurnMsIncludingPopulation": 7.903875,
+		"rejectedIntermediateDesign": {
+			"fullScans": 64,
+			"fullScanRows": 6240,
+			"combinedMs": 6038.55
+		}
+	},
+	"capacityBaseline": {
+		"requestedUserRows": 512,
+		"completedUserIssues": 357,
+		"acceptedRows": 358,
+		"refusal": "creator issuance maintenance proof reserve is exhausted",
+		"populationMs": 165699.239667,
+		"seal": {
+			"ok": true,
+			"closedRows": 358,
+			"successorEpoch": 1,
+			"ms": 548.296917
+		},
+		"postSeal": "adopt-or-next issue failed; original run did not distinguish phase",
+		"rawLog": "retained-replay-capacity-baseline.log",
+		"sourceTree": "6cd4c567, historical pre-H5; not a claim about later integrated finishing changes"
+	},
+	"limits": [
+		"No browser or WebRTC timing evidence for this change",
+		"No FPS or bandwidth readiness claim",
+		"No completed 512-row replay",
+		"Read-turn maxima include automatic replay during fixture population",
+		"Proof/native/prefix authority is rechecked as described in RESULT.md",
+		"Quiet-window timings were not rerun after the sealed-custody, close/adoption lifecycle and full broadcast-round correctness fixes",
+		"Foreign write exclusion for the new borrow path has fake-indexeddb mechanism evidence; Chromium/Firefox/WebKit parity is outstanding"
+	],
+	"sealedCustodyMechanism": {
+		"test": "tests/track-z-retained-publication-successor.test.ts",
+		"scope": "fake-indexeddb with real browser storage implementation; not native engine parity",
+		"controls": [
+			"aged sealed predecessor publication across own adoption",
+			"borrowed child retains original native read transaction",
+			"foreign readwrite transaction remains excluded after child release",
+			"parent revocation rejects children and joins their releases",
+			"replay read turns pause outside FIFO throughout original creator close",
+			"transient native close-acquisition failure -> original close retry -> successful retained publication",
+			"retirement wakes paused replay and a late close completion cannot restore read availability",
+			"hot adoption clears prefix while the held native send remains charged",
+			"creator and recipient successor native preparation overlapping continuous replay",
+			"malformed successor offer preserves retained publication before source custody",
+			"two held predecessor sends plus 30 current sends saturate the original 32-slot pool",
+			"stable-room encoded bytes equal current plus held predecessor bytes until native join"
+		]
+	},
+	"slowReplayBaseline": {
+		"sourceTree": "6cd4c567",
+		"replayRows": 82,
+		"successfulSendDelayMs": 100,
+		"replayWallMs": 8401,
+		"firstDurableIssueMs": 8389.37,
+		"durableIssueMs": {
+			"p50": 77.32,
+			"p95": 85.25,
+			"p99": 8389.37
+		},
+		"recipientObservedMs": {
+			"p50": 87.84,
+			"p95": 95.86,
+			"p99": 8509.97
+		},
+		"rawLog": "retained-replay-slow-baseline.log",
+		"rawIndividualSamples": "not printed by the original baseline probe"
+	},
+	"stableRoomConservation": {
+		"redLog": "retained-replay-egress-red.log",
+		"greenLog": "retained-replay-successor-egress-green.log",
+		"scope": "One network instance and stable topic; hot predecessors remain charged and current-room close joins their actual native sends. Host must await room close or last-plane joined deactivation before discarding the network.",
+		"shutdownRedLog": "retained-replay-shutdown-red.log",
+		"finalGreenLog": "retained-replay-lifecycle-final.log"
+	},
+	"validation": {
+		"broaderCandidate": "72 passed; replay owner, lifecycle, lost-answer, scheduler, overload/fairness controls before final shutdown join",
+		"finalShutdownDelta": "50 passed (22 replay owner + 13 lifecycle + 15 readiness extraction), 4 opt-in measurements skipped; 4 historical lifecycle extraction controls passed separately",
+		"typecheck": "node typecheck and producer-presign typecheck passed",
+		"changedSourceLint": "All changed production and fixture hunks clean; git diff --check passes",
+		"independentReview": "Sixth independent review found only the joined-deactivation extraction harness missing the actual shared-owner helper. That finding and the matching ordinary prepared-capacity harness were fixed; all 18 affected controls pass. No production changes followed the review.",
+		"fixtureFailureScope": "9/15 readiness extraction controls failed with missing helper binding, distinct from passing native readiness/lifecycle controls",
+		"finalExtractionInventory": "Actual helper closures updated in readiness hold, historical replay lifecycle, joined-deactivation alias lease, and ordinary prepared-capacity harnesses; other matches use whole modules, static AST checks, or whole-source instrumentation.",
+		"finalExtractionControls": "18 passed across joined-deactivation alias lease and ordinary prepared-capacity DATA controls, after repairing all inventoried helper closures",
+		"finalQuietMeasurement": "Not run on this isolated final candidate. Parent delegated the quiet measurement to endurance after integration because the shared host remains busy."
+	},
+	"baselineFailureClassification": {
+		"sourceTree": "6cd4c5677f019c2c7c25a1e32f70b26eb38469e7",
+		"worktree": "/private/tmp/ts-drp-replay-baseline-classification",
+		"baselineClean": true,
+		"command": "pnpm exec vitest run packages/node/tests/creator-replay-seal-native.test.ts -t 'uses only its own admitted native capture|refuses post-seal (signature|provenance)' --coverage.enabled=false --maxWorkers=1 --minWorkers=1",
+		"sameSelectedTestBodies": true,
+		"selectedTestBodySha256": "bfa27c967d3e872d2ccfb869f3bc60f48f909faccc70b0b0a18f2fe14cb2a339",
+		"results": {
+			"baseline": {
+				"failed": 3,
+				"skipped": 37,
+				"seconds": 241.45,
+				"log": "retained-replay-readback-baseline.log"
+			},
+			"candidate": {
+				"failed": 3,
+				"skipped": 37,
+				"seconds": 241.52,
+				"log": "retained-replay-readback-candidate.log"
+			}
+		},
+		"cases": [
+			{
+				"name": "ordinary runtime candidate-free readiness producer > uses only its own admitted native capture and refuses commit after context change, interruption or release",
+				"baseline": "same expected-arguments assertion failure",
+				"candidate": "same expected-arguments assertion failure"
+			},
+			{
+				"name": "creator replay seal exact native readback > refuses post-seal signature changes and permits exact continuation",
+				"baseline": "120000 ms timeout",
+				"candidate": "120000 ms timeout"
+			},
+			{
+				"name": "creator replay seal exact native readback > refuses post-seal provenance changes and permits exact continuation",
+				"baseline": "120000 ms timeout",
+				"candidate": "120000 ms timeout"
+			}
+		],
+		"sourceResolution": "creator-adoption-contract.ts defaultCreatorAdoptionFixtureModules() uses absolute file URLs rooted in each worktree, directly importing node/src/v3-live.ts, creator-close.ts and creator-adoption*.ts. live-fixture.ts also directly imports node/src/v3-live.ts. No node/runtime dist entry is used. Unchanged storage-node/dist is identical.",
+		"sha256": {
+			"storageNodeDistIndexBoth": "10b7012f5cf17cae527241cd53ada5ff7cdfe442031c6465752c5bbeb85999e8",
+			"baselineV3Live": "0f945f18731046be73a3e1d6658f4bd0496690f9e4338884f55d0b268dd4512e",
+			"candidateV3Live": "340e6ad00b28811137b0f1e022f64e35e42bcd7288c65bb46ce3908d1f7b0585",
+			"baselineCreatorClose": "1ae4a661463df4384f5018112f7eca7505107512c728e2e494e3d2138486709d",
+			"candidateCreatorClose": "0f641747080cf3228b77ed604a1b25324caad39e56ec71d2695851039a98b072"
+		},
+		"classification": "Baseline failures; no claim that these whole historical suites pass."
+	},
+	"terminalLogFormat": "Captured terminal output with trailing whitespace and trailing blank lines normalized; original terminal logs remain in /private/tmp."
+}

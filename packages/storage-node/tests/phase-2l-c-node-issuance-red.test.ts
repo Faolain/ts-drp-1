@@ -2421,6 +2421,17 @@ describe("R8 native unsigned phase codec widths", () => {
 				expect(widths.reserved).toEqual(actual(reserved));
 				expect(widths.entered).toEqual(actual(marked));
 				expect(widths.final).toEqual(actual(final));
+				const ownBound = maintenance.readOrdinarySignMaterialByteLength?.(before.rows, currencyScope, intent, before.control ?? null);
+				if (settlement) expect(ownBound).toBeUndefined();
+				else {
+					const actualOwnRows = [...[reserved, marked, final].map(phase =>
+						phase.rows.lineages.find(row => row.author === currencyScope.author)!),
+						...final.rows.issued.filter(row => row.author === currencyScope.author && row.authorSequence === committed.authorSequence),
+						...final.rows.outbox.filter(row => row.author === currencyScope.author && row.authorSequence === committed.authorSequence)];
+					const acquired = actualOwnRows.reduce((sum, row) => sum + encodeCanonical(row).byteLength, 0) +
+						[reserved, marked, final].reduce((sum, phase) => sum + encodeIssuanceRetirementControl(phase.control!).byteLength, 0);
+					expect(ownBound).toBe(acquired + 10 * encodeCanonical(Number.MAX_SAFE_INTEGER).byteLength);
+				}
 				const inherited = issuanceUnsignedPostimageWidths(marked.rows, currencyScope, intent, marked.control ?? null);
 				expect(inherited.reserved).toEqual(actual(marked));
 				expect(inherited.entered).toEqual(actual(marked));
@@ -2640,4 +2651,89 @@ describe("R8 successor fence transient native widths", () => {
 			}
 		}
 	});
+});
+
+describe("ordinary sign delta native currency", () => {
+	it("reads the complete quoted entry image once and acquires no historical PRE after reserve", async () => {
+		const filename = primary("ordinary-delta-reads"), {createNodeDurableIssuanceStore} = await loadPhase2lCNodeModule();
+		const store = createNodeDurableIssuanceStore({primaryFilename: filename});
+		const originalExec = DatabaseSync.prototype.exec, originalPrepare = DatabaseSync.prototype.prepare;
+		let writer: DatabaseSync | undefined, committed = false, before = 0, after = 0;
+		try {
+			for (let index = 0; index < 3; index++)
+				await currencyIssuer(store, undefined, digest => Promise.resolve(ed25519.sign(digest, currencySeed))).issue(currencyInput);
+			const context = await currencyContext(store);
+			DatabaseSync.prototype.exec = function (sql: string): void {
+				originalExec.call(this, sql);
+				if (sql === "BEGIN IMMEDIATE" && writer === undefined) writer = this;
+				if (this === writer && sql === "COMMIT") committed = true;
+			};
+			DatabaseSync.prototype.prepare = function (sql: string): StatementSync {
+				if (this === writer && /^SELECT \* FROM issued_records\b/u.test(sql)) {
+					if (committed) after++; else before++;
+				}
+				return originalPrepare.call(this, sql);
+			};
+			await expect(currencyIssuer(store, context, digest => Promise.resolve(ed25519.sign(digest, currencySeed))).issue(currencyInput))
+				.resolves.toMatchObject({authorSequence: 3});
+			expect(before).toBe(1);
+			expect(after).toBe(0);
+		} finally {DatabaseSync.prototype.exec = originalExec; DatabaseSync.prototype.prepare = originalPrepare; await store.close();}
+	});
+
+	for (const connection of ["foreign", "same-writer"] as const) {
+		for (const mutation of ["same-size-preimage", "outbox", "plan", "control"] as const) {
+			for (const gap of [1, 2] as const) {
+				it(`refuses ${connection} ${mutation} after native phase ${gap} before entering crypto`, async () => {
+					const filename = primary(`ordinary-delta-${connection}-${mutation}-${gap}`);
+					const {createNodeDurableIssuanceStore} = await loadPhase2lCNodeModule();
+					const store = createNodeDurableIssuanceStore({primaryFilename: filename});
+					const originalExec = DatabaseSync.prototype.exec;
+					let writer: DatabaseSync | undefined, commits = 0, changed = false, entered = 0;
+					let foreign: DatabaseSync | undefined;
+					try {
+						await currencyIssuer(store, undefined, digest => Promise.resolve(ed25519.sign(digest, currencySeed))).issue(currencyInput);
+						const context = await currencyContext(store);
+						if (connection === "foreign") {
+							foreign = new DatabaseSync(derivedFilename(filename));
+							foreign.function("issuance_retirement_connection", {varargs: true}, () => 1);
+							foreign.function("issuance_retirement_record", {varargs: true}, () => 1);
+						}
+						DatabaseSync.prototype.exec = function (sql: string): void {
+							originalExec.call(this, sql);
+							if (sql === "BEGIN IMMEDIATE" && writer === undefined) writer = this;
+							if (this !== writer || sql !== "COMMIT" || ++commits !== gap || changed) return;
+							changed = true;
+							const target = foreign ?? this;
+							if (mutation === "same-size-preimage") {
+								const old = target.prepare("SELECT canonical_preimage FROM issued_records WHERE author_sequence=0").get()?.canonical_preimage as Uint8Array;
+								const fields = decodeCanonical(old) as Record<string, unknown>;
+								const next = encodeCanonical({...fields, logicalTime: Number(fields.logicalTime) + 1});
+								expect(next.byteLength).toBe(old.byteLength);
+								target.prepare("UPDATE issued_records SET canonical_preimage=?,digest=? WHERE author_sequence=0")
+									.run(next, hashDomain("ts-drp/vertex/v3", next));
+							} else if (mutation === "outbox") {
+								target.prepare("UPDATE issuance_outbox SET publish_state='published' WHERE author_sequence=0").run();
+							} else if (mutation === "plan") {
+								target.prepare("INSERT INTO settlement_plans(object_id,author,revision,fence_sequence,entries_json) VALUES(?,?,0,NULL,'[]')")
+									.run(currencyScope.objectId, currencyScope.author);
+							} else {
+								const old = target.prepare("SELECT record FROM retirement_controls WHERE object_id=?").get(currencyScope.objectId)?.record as Uint8Array;
+								const control = decodeIssuanceRetirementControl(old);
+								target.prepare("UPDATE retirement_controls SET record=? WHERE object_id=?")
+									.run(encodeIssuanceRetirementControl({...control, revision: control.revision + 1}), currencyScope.objectId);
+							}
+						};
+						await expect(currencyIssuer(store, context, digest => {entered++; return Promise.resolve(ed25519.sign(digest, currencySeed));})
+							.issue(currencyInput)).rejects.toMatchObject({code: gap === 1 ? "ISSUANCE_RETRY_REQUIRED" : "ISSUANCE_OUTCOME_UNKNOWN"});
+						expect(changed).toBe(true);
+						expect(entered).toBe(0);
+						const raw = new DatabaseSync(derivedFilename(filename), {readOnly: true});
+						try {expect(raw.prepare("SELECT count(*) AS n FROM issued_records").get()?.n).toBe(1);}
+						finally {raw.close();}
+					} finally {DatabaseSync.prototype.exec = originalExec; foreign?.close(); await store.close();}
+				});
+			}
+		}
+	}
 });

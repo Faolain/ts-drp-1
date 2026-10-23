@@ -97,6 +97,7 @@ import type {
 import type { DRPNetworkNode, Message } from "@ts-drp/types";
 
 import { CREATOR_MAINTENANCE_PROOF_MAX_BYTES, createCreatorClosedRollbackProofAccounting, type CreatorLocalSessionWithdrawal } from "./internal/creator-closed-rollback-data.js";
+import { pauseCreatorSuccessorRetainedReads } from "./internal/creator-successor-live.js";
 import type { CreatorOrdinaryApplicationResourceBoundReader, CreatorOrdinaryFinishingWindowLimits } from "./internal/runtime-reclamation.js";
 import {
 	resolveRecoveryPoolAutoMaintenanceOptions,
@@ -6745,174 +6746,192 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		if (received === undefined && closeStatus?.lifecycle !== "successor-pending-adoption") {
 			throw new TypeError("D110C_B_ACTIVATION_STALLED");
 		}
-		const predecessorClose = creatorCloseHandle;
-		const adoptionOwner = received?.handle ?? predecessorClose;
-		const verified =
-			received?.verified ??
-			(await verifyCreatorSuccessorAdoption({
-				catalog: input.application.catalog,
+		const retainedReadPause =
+			received === undefined ? await pauseCreatorSuccessorRetainedReads(activeHandle) : undefined;
+		let restoreRetainedReads = true;
+		let successorReadPause: Awaited<ReturnType<typeof pauseCreatorSuccessorRetainedReads>> | undefined;
+		let successorReady = false;
+		try {
+			const predecessorClose = creatorCloseHandle;
+			const adoptionOwner = received?.handle ?? predecessorClose;
+			const verified =
+				received?.verified ??
+				(await verifyCreatorSuccessorAdoption({
+					catalog: input.application.catalog,
+					handle: adoptionOwner,
+				}));
+			if (!verified.ok) throw new TypeError(`v3 room successor verification failed: ${verified.kind}`);
+			if (roomHeadAuthority === undefined || openedRoomHeadState === undefined) {
+				return roomHeadFailure("D110C_FLOOR_MIGRATION_REQUIRED");
+			}
+			assertSessionOpen();
+			restoreRetainedReads = false;
+			const staged = await stageCreatorSuccessorAdoption({
 				handle: adoptionOwner,
-			}));
-		if (!verified.ok) throw new TypeError(`v3 room successor verification failed: ${verified.kind}`);
-		if (roomHeadAuthority === undefined || openedRoomHeadState === undefined) {
-			return roomHeadFailure("D110C_FLOOR_MIGRATION_REQUIRED");
-		}
-		assertSessionOpen();
-		const staged = await stageCreatorSuccessorAdoption({
-			handle: adoptionOwner,
-			intent: verified.intent,
-		});
-		if (!staged.ok)
-			throw new TypeError(`v3 room successor stage failed: ${String(staged.kind)}`, {
-				cause: staged.cause === undefined ? staged : staged.cause,
+				intent: verified.intent,
 			});
-		const nextRoomHead = expectedRoomHeadFromDescriptor(staged.descriptor as Readonly<Record<string, unknown>>);
-		const pendingRoomHead = await beginRoomHeadAdvance(
-			roomHeadAuthority,
-			roomHeadScope,
-			openedRoomHeadState.stable,
-			nextRoomHead,
-			{ capability: staged.capability, owner: adoptionOwner }
-		);
-		openedRoomHeadState = pendingRoomHead;
-		assertSessionOpen();
-		const published = await publishStagedCreatorSuccessorAdoption({
-			capability: staged.capability,
-			handle: adoptionOwner,
-		});
-		if (!published.ok) throw new TypeError(`v3 room successor publication failed: ${String(published.kind)}`);
-		openedRoomHeadState = await commitRoomHeadAdvance(roomHeadAuthority, roomHeadScope, pendingRoomHead);
-		if (openedRoomHeadState.pending !== null || !sameRoomHead(openedRoomHeadState.stable, nextRoomHead)) {
-			return roomHeadFailure("D110C_FLOOR_MISMATCH");
-		}
-		assertSessionOpen();
-		startupReplay = [];
-		const activated = await activateCreatorSuccessorAdoption({
-			createOperationAdmissionPolicy: successorAdmissionFactory,
-			...(classifyTerminalVertex === undefined ? {} : { classifyTerminalVertex }),
-			capability: published.capability,
-			expectedRoomHead: openedRoomHeadState.stable,
-			handle: adoptionOwner,
-			messageQueueManager,
-			networkNode: transport.networkNode,
-			onAdmittedVertex: admittedSink as unknown as V3AdmittedVertexSink,
-		});
-		if (activated.ok !== true) {
-			startupReplay = undefined;
-			const failure = new TypeError(
-				`D110C_B_ACTIVATION_STALLED: ${activated.kind}: ${activated.detail}${
-					activated.cause instanceof Error ? `: ${activated.cause.message}` : ""
-				}`,
-				{
-					cause: activated.cause === undefined ? activated : activated.cause,
-				}
+			if (!staged.ok)
+				throw new TypeError(`v3 room successor stage failed: ${String(staged.kind)}`, {
+					cause: staged.cause === undefined ? staged : staged.cause,
+				});
+			const nextRoomHead = expectedRoomHeadFromDescriptor(staged.descriptor as Readonly<Record<string, unknown>>);
+			const pendingRoomHead = await beginRoomHeadAdvance(
+				roomHeadAuthority,
+				roomHeadScope,
+				openedRoomHeadState.stable,
+				nextRoomHead,
+				{ capability: staged.capability, owner: adoptionOwner }
 			);
-			terminalFailure = failure;
-			creatorCloseHandle = undefined;
-			creatorCloseUnavailableContinuity = "stalled";
-			const stale = activeHandle;
-			activeHandle = undefined;
-			return throwAfterJoinedCleanup(failure, [
-				async (): Promise<void> => {
-					await predecessorClose?.stop();
-				},
-				(): void | Promise<void> => stale.deactivate(),
-			]);
-		}
-		const replacement = activated.handle as RoomPlaneHandle;
-		let replacementOwned = true;
-		const releaseReplacement = async (): Promise<void> => {
-			if (!replacementOwned) return;
-			await Promise.resolve(replacement.deactivate());
-			replacementOwned = false;
-		};
-		const throwAfterReplacementCleanup = async (primary: unknown): Promise<never> => {
-			startupReplay = undefined;
-			return throwAfterJoinedCleanup(primary, [
-				releaseReplacement,
-				async (): Promise<void> => {
-					await predecessorClose?.stop();
-				},
-			]);
-		};
-		if (closed) {
-			return throwAfterReplacementCleanup(new TypeError("v3 room session is closed"));
-		}
-		let authority: V3RoomSuccessorAuthority;
-		try {
-			authority = successorAuthority(activated.trust, replacement);
-		} catch (error) {
-			return throwAfterReplacementCleanup(error);
-		}
-		const predecessor = activeHandle;
-		try {
-			await Promise.resolve(predecessor.deactivate());
-		} catch (error) {
-			return throwAfterReplacementCleanup(error);
-		}
-		if (closed) {
-			activeHandle = undefined;
-			return throwAfterReplacementCleanup(new TypeError("v3 room session is closed"));
-		}
-		const failCloseRebind = async (): Promise<never> => {
-			startupReplay = undefined;
+			openedRoomHeadState = pendingRoomHead;
+			assertSessionOpen();
+			const published = await publishStagedCreatorSuccessorAdoption({
+				capability: staged.capability,
+				handle: adoptionOwner,
+			});
+			if (!published.ok) throw new TypeError(`v3 room successor publication failed: ${String(published.kind)}`);
+			openedRoomHeadState = await commitRoomHeadAdvance(roomHeadAuthority, roomHeadScope, pendingRoomHead);
+			if (openedRoomHeadState.pending !== null || !sameRoomHead(openedRoomHeadState.stable, nextRoomHead)) {
+				return roomHeadFailure("D110C_FLOOR_MISMATCH");
+			}
+			assertSessionOpen();
+			startupReplay = [];
+			const activated = await activateCreatorSuccessorAdoption({
+				createOperationAdmissionPolicy: successorAdmissionFactory,
+				...(classifyTerminalVertex === undefined ? {} : { classifyTerminalVertex }),
+				capability: published.capability,
+				expectedRoomHead: openedRoomHeadState.stable,
+				handle: adoptionOwner,
+				messageQueueManager,
+				networkNode: transport.networkNode,
+				onAdmittedVertex: admittedSink as unknown as V3AdmittedVertexSink,
+			});
+			if (activated.ok !== true) {
+				startupReplay = undefined;
+				const failure = new TypeError(
+					`D110C_B_ACTIVATION_STALLED: ${activated.kind}: ${activated.detail}${
+						activated.cause instanceof Error ? `: ${activated.cause.message}` : ""
+					}`,
+					{
+						cause: activated.cause === undefined ? activated : activated.cause,
+					}
+				);
+				terminalFailure = failure;
+				creatorCloseHandle = undefined;
+				creatorCloseUnavailableContinuity = "stalled";
+				const stale = activeHandle;
+				activeHandle = undefined;
+				return await throwAfterJoinedCleanup(failure, [
+					async (): Promise<void> => {
+						await predecessorClose?.stop();
+					},
+					(): void | Promise<void> => stale.deactivate(),
+				]);
+			}
+			const replacement = activated.handle as RoomPlaneHandle;
+			let replacementOwned = true;
+			const releaseReplacement = async (): Promise<void> => {
+				if (!replacementOwned) return;
+				await Promise.resolve(replacement.deactivate());
+				replacementOwned = false;
+			};
+			const throwAfterReplacementCleanup = async (primary: unknown): Promise<never> => {
+				startupReplay = undefined;
+				return throwAfterJoinedCleanup(primary, [
+					releaseReplacement,
+					async (): Promise<void> => {
+						await predecessorClose?.stop();
+					},
+				]);
+			};
+			try {
+				successorReadPause = await pauseCreatorSuccessorRetainedReads(replacement);
+			} catch (error) {
+				return await throwAfterReplacementCleanup(error);
+			}
+			if (closed) {
+				return await throwAfterReplacementCleanup(new TypeError("v3 room session is closed"));
+			}
+			let authority: V3RoomSuccessorAuthority;
+			try {
+				authority = successorAuthority(activated.trust, replacement);
+			} catch (error) {
+				return await throwAfterReplacementCleanup(error);
+			}
+			const predecessor = activeHandle;
+			try {
+				await Promise.resolve(predecessor.deactivate());
+			} catch (error) {
+				return await throwAfterReplacementCleanup(error);
+			}
+			if (closed) {
+				activeHandle = undefined;
+				return await throwAfterReplacementCleanup(new TypeError("v3 room session is closed"));
+			}
+			const failCloseRebind = async (): Promise<never> => {
+				startupReplay = undefined;
+				activeHandle = replacement;
+				replacementOwned = false;
+				successorProjectionAuthority = authority;
+				creatorCloseHandle = undefined;
+				creatorCloseUnavailableContinuity = "stalled";
+				creatorCloseRebindFailure = new TypeError("D110C_B_CLOSE_REBIND_FAILED");
+				terminalFailure = creatorCloseRebindFailure;
+				return throwAfterJoinedCleanup(terminalFailure, [
+					async (): Promise<void> => {
+						await predecessorClose?.stop();
+					},
+				]);
+			};
+			if (input.creatorFinalitySigner !== undefined && bindCurrentCreatorClose === undefined)
+				return await failCloseRebind();
+			const rebound = await bindCurrentCreatorClose?.(replacement);
+			if (closed) {
+				activeHandle = undefined;
+				return await throwAfterJoinedCleanup(new TypeError("v3 room session is closed"), [
+					releaseReplacement,
+					async (): Promise<void> => {
+						await predecessorClose?.stop();
+					},
+					...(rebound?.ok ? [(): Promise<void> => rebound.handle.stop()] : []),
+				]);
+			}
+			if (rebound !== undefined && !rebound.ok) return await failCloseRebind();
 			activeHandle = replacement;
 			replacementOwned = false;
 			successorProjectionAuthority = authority;
-			creatorCloseHandle = undefined;
-			creatorCloseUnavailableContinuity = "stalled";
-			creatorCloseRebindFailure = new TypeError("D110C_B_CLOSE_REBIND_FAILED");
-			terminalFailure = creatorCloseRebindFailure;
-			return throwAfterJoinedCleanup(terminalFailure, [
-				async (): Promise<void> => {
-					await predecessorClose?.stop();
-				},
-			]);
-		};
-		if (input.creatorFinalitySigner !== undefined && bindCurrentCreatorClose === undefined) return failCloseRebind();
-		const rebound = await bindCurrentCreatorClose?.(replacement);
-		if (closed) {
-			activeHandle = undefined;
-			return throwAfterJoinedCleanup(new TypeError("v3 room session is closed"), [
-				releaseReplacement,
-				async (): Promise<void> => {
-					await predecessorClose?.stop();
-				},
-				...(rebound?.ok ? [(): Promise<void> => rebound.handle.stop()] : []),
-			]);
-		}
-		if (rebound !== undefined && !rebound.ok) return failCloseRebind();
-		activeHandle = replacement;
-		replacementOwned = false;
-		successorProjectionAuthority = authority;
-		creatorCloseHandle = rebound?.ok ? rebound.handle : undefined;
-		creatorCloseUnavailableContinuity = "continuous";
-		try {
-			installSuccessorProjectionBase(replacement, authority);
-			await commitSuccessorProjection();
-			if (!input.receiveOnly && settlementProfile === "v1") {
-				await publishAccepted();
-				await drainRebaseOutbox();
+			creatorCloseHandle = rebound?.ok ? rebound.handle : undefined;
+			creatorCloseUnavailableContinuity = "continuous";
+			try {
+				installSuccessorProjectionBase(replacement, authority);
+				await commitSuccessorProjection();
+				if (!input.receiveOnly && settlementProfile === "v1") {
+					await publishAccepted();
+					await drainRebaseOutbox();
+				}
+				await prepareCurrentCreatorOrdinaryReadiness();
+			} catch (error) {
+				startupReplay = undefined;
+				terminalFailure = error;
+				return await throwAfterJoinedCleanup(error, [
+					shutdown,
+					async (): Promise<void> => {
+						await predecessorClose?.stop();
+					},
+				]);
 			}
-			await prepareCurrentCreatorOrdinaryReadiness();
-		} catch (error) {
-			startupReplay = undefined;
-			terminalFailure = error;
-			return throwAfterJoinedCleanup(error, [
-				shutdown,
-				async (): Promise<void> => {
-					await predecessorClose?.stop();
-				},
-			]);
-		}
-		// The replacement authority and its readiness are installed; a failure of this last stop is
-		// the room's terminal failure, so nothing waiting on the adoption (successor serving
-		// included, decision row 61) treats the adoption as complete.
-		try {
-			await predecessorClose?.stop();
-		} catch (error) {
-			terminalFailure = error;
-			throw error;
+			// The replacement authority and its readiness are installed; a failure of this last stop is
+			// the room's terminal failure, so nothing waiting on the adoption (successor serving
+			// included, decision row 61) treats the adoption as complete.
+			try {
+				await predecessorClose?.stop();
+			} catch (error) {
+				terminalFailure = error;
+				throw error;
+			}
+			successorReady = true;
+		} finally {
+			successorReadPause?.finish(successorReady ? "restored" : "unavailable");
+			retainedReadPause?.finish(restoreRetainedReads ? "restored" : "unavailable");
 		}
 	};
 	const adoptCreatorSuccessor = (): Promise<void> => {

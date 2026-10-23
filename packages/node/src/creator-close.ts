@@ -117,6 +117,7 @@ import {
 	type GenerationId,
 	type GenerationRecord,
 	type GenerationRef,
+	type NativeReadReservation,
 	parseGenerationId,
 	type PresentHead,
 } from "@ts-drp/storage";
@@ -235,7 +236,7 @@ const runtimeReleaseOwners = new WeakMap<
 		captureSigningRetirementOwners(): CreatorSigningRetirementOwners;
 		releaseHeaderCustodyForSuccessorInstall(): Promise<void>;
 		prepareOrdinaryReadiness(): Promise<void>;
-		holdIngressForReadiness(): Promise<() => void>;
+		holdIngressForReadiness(): Promise<(successful: boolean) => void>;
 		maintainRecoveryPool(): Promise<CreatorRecoveryPoolResult>;
 	}
 >();
@@ -456,7 +457,7 @@ export interface V3CreatorCloseRegistration {
 	/** Holds every arrival behind an ordinary readiness preparation (decision row
 	 * 51), after the tasks already queued have finished. Resolves to the release,
 	 * which the caller runs on every path. Grants no admission. */
-	holdIngressForReadiness(): Promise<() => void>;
+	holdIngressForReadiness(): Promise<(successful: boolean) => void>;
 	/** Explicit queued quiescent boundary, never a presign maintenance grant.
 	 * `deferrable` reports an unavailable boundary before entry instead of halting. */
 	runOrdinaryReadinessMaintenance(snapshots: SnapshotRecoveryStore<SnapshotVerificationReceipt>,
@@ -496,6 +497,8 @@ export interface V3CreatorCloseRegistration {
 	readonly exactCanonicalPinnedGenesisBootstrapOperationBytes?: Uint8Array;
 	readonly issuanceScope: DurableIssueScope;
 	readonly issuanceStore: DurableIssuanceStore;
+	/** Original native strategy's pure numerical obligation; no native capture. */
+	readOrdinarySignMaterialByteLength?: typeof import("@ts-drp/issuance-store/maintenance").issuanceUnsignedOwnMaterialByteLength;
 	readonly liveJournalStore: DurableLiveJournalStore;
 	readonly maxEpochBytes: number;
 	readonly maxEpochVertices: number;
@@ -548,7 +551,17 @@ export interface V3CreatorCloseRegistration {
 	 * not confer target signing authority and never emits future preimages. */
 	readArchiveCloseContinuationPreimageByteLengths?(hold: CreatorSnapshotRecoveryCloseHold,
 		sharedAccounting: import("./internal/creator-closed-rollback-data.js").CreatorClosedRollbackProofAccounting): Promise<readonly number[]>;
-	terminalize(): boolean;
+	beginRetainedReplayClose(): (successful: boolean) => void;
+	terminalize(
+		sealed: Readonly<{
+			predecessorHead: PresentHead;
+			head: PresentHead;
+			cutValueRef: GenerationRef;
+			commitQcRef: GenerationRef;
+			successorTrustRef: GenerationRef;
+			borrowJournalHeaderCustody(): Promise<NativeReadReservation | undefined>;
+		}>
+	): boolean;
 }
 
 function archiveCapacityPromiseCovers(promise: ArchiveCapacityPromise,needed: ArchiveCapacityDeclaration): boolean {
@@ -2036,6 +2049,7 @@ type CreatorIssuanceMaintenanceQuote = Readonly<{
 	metadata: Awaited<ReturnType<typeof prospectiveCreatorMetadataWidths>>["frames"];
 	adoption: ReturnType<typeof prospectiveCreatorAdoptionBytes>;
 	issuancePhases: ReturnType<typeof issuanceUnsignedPostimageWidths> | undefined;
+	ordinarySignMaterialByteLength?: number;
 	receivedSignature?: Uint8Array;
 	runtimeCensusOverheadByteLength: number;
 	postAdoptionCensusSizing: readonly CreatorPostAdoptionCensusSizing[];
@@ -2225,6 +2239,15 @@ async function prepareCreatorIssuanceMaintenanceQuote(
 			},
 			nativeControl, creatorSourceCustodyGeometryForSizing(registration.currentTrust, registration.exactCanonicalLatchedAclBytes)
 		);
+		const ordinarySignMaterialByteLength = receivedReceipt === undefined && planEffect === undefined &&
+			registration.currentTrust.profileId === "creator-trusted-v1" && nativeRows.plans.length === 0
+			? registration.readOrdinarySignMaterialByteLength?.(nativeRows, registration.issuanceScope, {
+				kind: "v3-issuance-pending-unsigned-1", authorSequence: unsigned.authorSequence,
+				canonicalPreimageBytes: unsignedBytes, digest: hashDomain("ts-drp/vertex/v3", unsignedBytes),
+			}, nativeControl) : undefined;
+		if (ordinarySignMaterialByteLength !== undefined &&
+			(!Number.isSafeInteger(ordinarySignMaterialByteLength) || ordinarySignMaterialByteLength < 0))
+			throw new TypeError("creator ordinary native material bound is malformed");
 		const needsRecoveryRoles = creatorCloseNeedsRecoveryRoles(registration, current);
 		const detached = "recovery" in proof;
 		const recovery = !needsRecoveryRoles || detached
@@ -2384,6 +2407,7 @@ async function prepareCreatorIssuanceMaintenanceQuote(
 			metadata,
 			adoption,
 			issuancePhases,
+			...(ordinarySignMaterialByteLength === undefined ? {} : {ordinarySignMaterialByteLength}),
 			...(receivedReceipt === undefined ? {} : {receivedSignature: registration.readReceivedAppendCandidate(receivedReceipt).signature}),
 			runtimeCensusOverheadByteLength,
 			postAdoptionCensusSizing,
@@ -2850,11 +2874,11 @@ function creatorIssuanceMaintenanceQuoteSizing(
 	const receivedSignature = quote.receivedSignature === undefined ? [] : [quote.receivedSignature];
 	const unknownBasis = [
 		...(quote.archiveCapacity === undefined ? [] : [quote.archiveCapacity.status.maxControlByteLength]),
-		issuancePhases === undefined ? 0 : Math.max(
+		quote.ordinarySignMaterialByteLength ?? (issuancePhases === undefined ? 0 : Math.max(
 			issuancePhases.reserved.nativeCensusBytes,
 			issuancePhases.entered.nativeCensusBytes,
 			issuancePhases.final.nativeCensusBytes
-		),
+		)),
 		quote.runtimeCensusOverheadByteLength,
 	];
 	const fields = {
@@ -3756,6 +3780,7 @@ export async function bindCreatorLiveClose(
 			) {
 				return Promise.reject(new TypeError("creator close authority is unavailable"));
 			}
+			const finishRetainedReplayClose = registration.beginRetainedReplayClose();
 			maintenanceClosing = true;
 			ordinaryProofSource = undefined; ordinaryTemplateReady = false;
 			closeTask = (async (): Promise<CreatorLiveCloseResult> => {
@@ -4475,7 +4500,21 @@ export async function bindCreatorLiveClose(
 						...retiredSourceGenerations,
 					]);
 				}
-				if (!registration.terminalize()) throw new TypeError("creator close terminalization failed");
+				if (
+					!registration.terminalize({
+						predecessorHead: current.head,
+						head: proposedHead,
+						cutValueRef,
+						commitQcRef,
+						successorTrustRef,
+						borrowJournalHeaderCustody: async (): Promise<NativeReadReservation | undefined> => {
+							if (stopping || dependenciesReleased || lifecycle !== "successor-pending-adoption")
+								throw new TypeError("creator sealed journal custody is unavailable");
+							return (recoverySource ?? promotionSource)?.borrowJournalHeaderReservation();
+						},
+					})
+				)
+					throw new TypeError("creator close terminalization failed");
 				lifecycle = "successor-pending-adoption";
 				const result = Object.freeze({
 					closedVertexCount: commitment.closeSetCount,
@@ -4541,12 +4580,14 @@ export async function bindCreatorLiveClose(
 				) {
 					throw new TypeError("creator adoption facts already exist");
 				}
+				finishRetainedReplayClose(true);
 				return result;
 			})().catch((error) => {
 				closeTask = undefined;
 				if (stagedSnapshot === undefined && registration.abortSnapshotStage()) lifecycle = "active";
 				else lifecycle = "sealed";
 				maintenanceClosing = lifecycle !== "active";
+				finishRetainedReplayClose(false);
 				throw error;
 			});
 			return closeTask;
@@ -4845,7 +4886,7 @@ export async function bindCreatorLiveClose(
 							}
 						});
 					},
-					holdIngressForReadiness: (): Promise<() => void> => registration.holdIngressForReadiness(),
+					holdIngressForReadiness: (): Promise<(successful: boolean) => void> => registration.holdIngressForReadiness(),
 					// Explicit opt-in early turnover (soft watermark). The close keeps its
 					// original inline maintenance as the hard-cap backstop; this only lets a
 					// caller pay for the SAME original reconciliation at a quiescent lull.
@@ -5049,10 +5090,12 @@ export async function prepareCreatorOrdinaryReadiness(plane: object): Promise<vo
 	// reservations or its consumer refusal, and none changes the pending ingress
 	// its census and boundary require. Released on every path.
 	const release = await owner.holdIngressForReadiness();
+	let successful = false;
 	try {
 		await owner.prepareOrdinaryReadiness();
+		successful = true;
 	} finally {
-		release();
+		release(successful);
 	}
 }
 

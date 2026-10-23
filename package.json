@@ -51,6 +51,7 @@
 		"test:public-convergence": "RUN_PUBLIC_LIVE=true pnpm exec vitest run packages/network-spike/tests/public-convergence-live.test.ts",
 		"track-j:formal": "bash packages/protocol-v3/formal/settlement-replacement-retirement-mutations/track-j.sh formal",
 		"track-j:verify": "bash packages/protocol-v3/formal/settlement-replacement-retirement-mutations/track-j.sh verify",
+		"track-j:custody": "node packages/protocol-v3/formal/check-native-custody.mjs",
 		"typecheck": "pnpm --parallel typecheck",
 		"watch": "pnpm --parallel --filter '@ts-drp/*' watch",
 		"pretest": "node scripts/ensure-native-deps.mjs && node scripts/check-shadowed-sources.mjs"

@@ -1,0 +1,41 @@
+{
+  "kind": "configuration",
+  "app": "canvas",
+  "sourceHead": "6f414a258998a9da913e638b22a3891241e88829",
+  "dirtyTracked": true,
+  "sourceDiffSha256": "25f03f5aad064464da5416fac6e2e337b830f7cae11f1768e6c7be66e3187449",
+  "epochs": 300,
+  "moves": 2,
+  "streamLimit": 4,
+  "reopenAt": 150,
+  "host": "SQLite",
+  "transport": "scripted signed-byte first-copy loss/delay and explicit durable replay",
+  "successorMembership": "v2 native journal point read",
+  "cpu": "Apple M1 Max",
+  "cores": 10,
+  "load": [
+    7.95458984375,
+    11.2958984375,
+    13.298828125
+  ],
+  "directory": "/private/tmp/active-endurance-preperf-300-02/canvas-sqlite-Gxglye",
+  "completed": 300,
+  "accepted": 3000,
+  "elapsedMs": 2365684.651667,
+  "issueMs": {
+    "p50": 37.24120799999946,
+    "p95": 1027.9786669999594,
+    "p99": 1301.2651659999974,
+    "max": 2554.400957999984
+  },
+  "receiveMs": {
+    "p50": 371.842209000024,
+    "p95": 1511.4329169999692,
+    "max": 4009.0473749999655
+  },
+  "transitionMs": {
+    "p50": 1882.9737909999676,
+    "p95": 2722.5529589999933,
+    "max": 4457.156457999954
+  }
+}

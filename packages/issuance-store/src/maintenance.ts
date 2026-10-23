@@ -48,6 +48,9 @@ export interface DurableIssuancePruningReceipt {
 export interface DurableIssuancePruningMaintenance {
 	/** Noncreating mechanical native census; no signing or retirement authority. */
 	readonly readBoundedRecoveryCensus?: DurableIssuanceRecoveryCensusReader;
+	/** Pure resource bound for this original backend's ordinary sign strategy.
+	 * Does not capture native state or replace its full entry currency check. */
+	readonly readOrdinarySignMaterialByteLength?: typeof import("./retirement.js").issuanceUnsignedOwnMaterialByteLength;
 	withNativeSignAdmission?(
 		input: Readonly<{ scope: DurableIssueScope; exactCanonicalUnsignedVertexBytes: Uint8Array }>,
 		sign: () => Promise<Uint8Array>

@@ -620,6 +620,35 @@ export function issuanceUnsignedPostimageWidths(
 	return Object.freeze({ reserved: make("reserved"), entered: make("entered"), final: make("final") });
 }
 
+/** Complete new material for the SQLite ordinary sign path after its charged
+ * full entry image. That owner checks fresh same-connection currency at every
+ * writer boundary and never reacquires/materializes whole history postimages.
+ * The generic native census widths remain unchanged for other owners and for
+ * future maintenance. This is a numerical bound, never native authorization. */
+export function issuanceUnsignedOwnMaterialByteLength(
+	rows: IssuanceRetirementRows, scope: DurableIssueScope, input: IssuanceUnsignedProspectiveIntent,
+	control: DurableIssuanceRetirementControl | null
+): number | undefined {
+	if (input.planEffect !== undefined || rows.plans.length !== 0) return undefined;
+	const phases = issuanceUnsignedPostimageWidths(rows, scope, input, control);
+	const existing = rows.lineages.findIndex(row => row.objectId === scope.objectId && row.author === scope.author);
+	const lineageCount = rows.lineages.length + Number(existing < 0);
+	const lineageIndex = existing < 0 ? rows.lineages.length : existing;
+	const issuedIndex = lineageCount + rows.issued.length;
+	const outboxIndex = lineageCount + rows.issued.length + 1 + rows.outbox.length;
+	const widths = [phases.reserved.canonicalRowBytes[lineageIndex], phases.entered.canonicalRowBytes[lineageIndex],
+		phases.final.canonicalRowBytes[lineageIndex], phases.final.canonicalRowBytes[issuedIndex],
+		phases.final.canonicalRowBytes[outboxIndex], phases.reserved.encodedControlBytes,
+		phases.entered.encodedControlBytes, phases.final.encodedControlBytes,
+		// Entry, reserve-postimage, reserved-check, entered-postimage and
+		// entered-check each acquire data_version and total_changes. Their ten
+		// primitive values are neither predicted nor global monotone tokens.
+		10 * encodeCanonical(Number.MAX_SAFE_INTEGER).byteLength];
+	if (widths.some(width => width === undefined || !Number.isSafeInteger(width) || width < 0)) return undefined;
+	const total = (widths as number[]).reduce((sum, width) => sum + width, 0);
+	return Number.isSafeInteger(total) ? total : undefined;
+}
+
 /**
  * Positive scalar capacity for a finite ordinary-work rectangle in this SAME
  * codec. This does not prepare an unsigned intent, merge a plan, authenticate a

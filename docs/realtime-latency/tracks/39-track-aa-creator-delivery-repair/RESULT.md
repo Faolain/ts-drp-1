@@ -45,17 +45,89 @@ browser proof verifies eventual recovery of an 80-block burst after the creator
 pauses; its loaded-host timing is not a game-rate result. Exact observed results
 and their scope are recorded in [evidence.json](evidence.json).
 
-**A single full-journal replay still holds the durable plane FIFO across network
-sends. This is a confirmed performance blocker.** With 80 rows and a successful 100 ms delay per send, one replay occupied
-that gate for 8,292 ms and delayed a durable issue for 8,268 ms. Eighty duplicate
-requests shared that one replay. Coalescing prevents redundant queued snapshots;
-it does not make a slow full replay suitable for interactive durable issue. The
-ephemeral path was not measured in this proof.
+The original full-journal replay held the durable FIFO across network sends:
+80 rows with 100 ms successful sends occupied the gate for 8,292 ms and delayed
+issue for 8,268 ms. The follow-up moves physical sends outside that FIFO. All
+active target and broadcast streams share one bounded immutable journal DATA
+prefix; each target retains only its captured row-count boundary. Broadcast demand
+joins one pending full round, so a peer joining midway receives the earlier rows.
+Each round has its own completion promise; continuous later demand cannot keep an
+earlier caller pending. New rows extend the shared prefix only after native
+validation of the old prefix; failed capture discards the incomplete suffix.
 
-The 512-row no-loss bandwidth probe did not produce a completed sample during the
-loaded pre-coalescing run. It is an explicitly enabled measurement in
-[the cost probe](../../../../tests/track-aa-periodic-cost.test.ts), with separate
-issue, publication-drain and remote-admission phase telemetry for a serialized
-combined-tree run. No steady-state bandwidth or FPS-readiness claim follows from
-this change. Streaming work outside the durable FIFO and reducing unchanged
-full-journal traffic remain separate performance work.
+Every row still acquires fresh native head/floor custody, authenticates its
+signature and ACL, and rereads local-issued correspondence before sending. Native
+reservations end before the send. A completed close authenticates its exact signed
+successor references and native ancestry on each turn. If that close still owns
+the journal transaction, replay borrows a joined child of the original custody;
+parent revocation rejects that child and child cancellation preserves the parent.
+This mechanism has fake-indexeddb coverage; native browser-engine parity remains
+unverified. The close owner pauses future replay reads before draining the FIFO;
+waiting readers hold no native custody and never block the close inside that FIFO.
+Adoption pauses its predecessor and replacement through native verification, source
+release and successor readiness. Standalone readiness uses the same phase; malformed
+offers rejected before source custody leave replay available. Only the original
+transition owner can restore its prior phase after joined completion. The completed
+close resumes sealed reads. A failed or ambiguous close leaves
+reads unavailable until the same close owner successfully retries. Retirement
+wakes waiting readers and clears the prefix on both ordinary deactivation and
+hot successor handoff, without discharging physical sends. Already captured signed
+row DATA is reusable
+across unrelated appends or later physical journal corruption; it is not current
+admission or native authority. A new demand validates the current journal again.
+This avoids the measured quadratic alternative: rereading a page after each of
+64 appends caused 64 complete scans containing 6,240 rows.
+
+The registration owns one prefix, bounded by existing journal image/row limits;
+UTF-16 strings and scalar data are charged as well as detached bytes. Encoded
+messages share the existing pending-byte ceiling, and the original 32-slot egress
+pool bounds streams, one queued read and one native send per stream. Both numerical
+reservations belong to the network and stable room topic across epoch handoffs.
+Two held predecessor sends leave only 30 current-epoch slots; releasing an epoch
+does not replenish native credit. The regression failed before this shared owner
+and passes with it, including exact byte conservation and reuse after native join. Callback
+mutation cannot reach prefix bytes. Retirement clears the prefix in place while
+actual sends and their charges remain joined. No promise timeout discharges a
+running native send. Current-room shutdown awaits this same pool's idle completion,
+including sends started by retired predecessors. Every zero-to-nonzero admission
+starts a fresh idle generation; shutdown rechecks after each wake. The bound is
+per network instance and stable room topic. Hosts must await room shutdown (or
+joined deactivation of the last plane) before discarding that network; it does not
+bound arbitrarily many separately created network instances.
+
+The exact combined baseline replayed 82 rows in 8,401 ms and delayed the first
+durable issue by 8,389 ms. The shared-prefix native probe replayed 82 rows in
+9,248 ms with the same
+100 ms per-send delay. Twenty concurrent durable issues had p50/p95/p99
+79.22/87.44/88.09 ms; the first took 76.42 ms. Recipient observation had
+92.92/103.79/326.64 ms, including one tail outlier. A separate 129-row replay took
+153.24 ms. A replay of 65 captured rows overlapping 64 new durable issues
+completed with **zero full-journal scans**. These use SQLite room sessions and the production room transport over an ordered
+in-memory network during a quiet test window, not browser, WebRTC, bandwidth or
+FPS measurements.
+These measurements precede the subsequent sealed-custody, close/adoption lifecycle and broadcast-round
+correctness fixes; timing has not been repeated on that final candidate. Read-turn
+maxima also include fixture population/automatic repair; they are not a
+separate cold-capture latency distribution. Exact samples and limits are in
+[retained-replay-performance.json](retained-replay-performance.json).
+
+The requested 512-row baseline on the historical pre-H5 combined tree
+(`6cd4c567`) remains a failed capacity probe: after 357 user
+issues, 358 rows were accepted and further issue refused because the creator
+maintenance proof reserve was exhausted. Seal closed all 358 rows and prepared
+epoch 1; the subsequent adoption-or-next-issue block failed with the same reserve
+error. That original run did not distinguish those phases. The opt-in regression
+now logs adoption, next issue, normal maintenance and retry separately. No
+capacity limit or load was changed to conceal the refusal. Capacity finishing,
+three-browser replay currency, and larger steady-state performance remain separate
+acceptance work. This historical refusal is not a claim about the later integrated
+H5 finishing changes.
+
+The affected replay, lifecycle, scheduler and fairness controls pass. Independent
+review findings about extracted private helper dependencies were repaired without
+weakening their behavioral assertions. Three older readiness/native-readback
+controls fail identically on unchanged `6cd4c567` and this candidate: one argument
+assertion and two 120-second timeouts. The comparison uses identical test bodies
+and direct worktree-local node sources; its exact results and source hashes are
+recorded in the performance evidence. Those historical whole suites are not
+claimed green.

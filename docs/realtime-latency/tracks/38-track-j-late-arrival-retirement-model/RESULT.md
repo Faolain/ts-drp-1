@@ -4,6 +4,10 @@ The model supports the completion/dependency design for bounded retirement, with
 also reproduces the failures of the previous per-case rules. It does **not** prove the production library or
 arbitrarily many epochs correct. Native browser, persistence, and long-room evidence remain separate gates.
 
+[Replay lifetime and retirement-intent adjuncts](REPLAY-CUSTODY.md) cover the later read-phase, borrowed
+custody, cross-handoff egress, broadcast-round, and exact-intent selection laws. Their current-fence
+projection and finite transition bridge do not close the full-contract induction gap described here.
+
 The user authorized challenging earlier assumptions on 2026-10-23. The completion contract may therefore
 replace the earlier “replacement must land in a later cut” rule when implementation checks preserve accepted
 intent. A durable replacement can carry that intent before it lands, provided the old source is signed
@@ -162,3 +166,10 @@ a passing default result. The slow families and the large graph remain in the ex
 Final validation results and hashes are recorded in [final-results.json](evidence/final-results.json).
 Model changes require rerunning the affected properties and negative controls. Native implementation changes
 need their own correspondence review and browser/persistence gates; model success cannot substitute for them.
+
+The [native custody and repair adjuncts](NATIVE-CUSTODY.md) add whole-source recovery,
+portable dependency closure, native send ownership and conditional repair liveness.
+Their evidence also records the later final-source Apalache checks and larger A5
+run, including the still-open contract induction counterexamples.
+
+The [rejoin contract adjunct](REJOIN-CONTRACT.md) separately checks arbitrary-gap attachment, actual local recovery roles, durable unknown-source custody, and current pruning authority. Its signed-expiry law remains an explicit implementation requirement until a producer is mapped; it does not extend the older adjacent-install bridge or close full-contract induction.

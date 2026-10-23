@@ -1,0 +1,2119 @@
+{
+  "sourceHashes": {
+    "packages/protocol-v3/formal/rejoin-head-roles.qnt": "cbf93becae62eabdef822584b3ccc72eb744d0674291c8d52efd47972979eb05",
+    "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+    "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d",
+    "packages/protocol-v3/formal/check-rejoin-contract.mjs": "0820723b805d061e54c8e6b86929bffd7e1106098e6c7e327c9a666ac8b074b6",
+    "packages/node/src/v3-live.ts": "85db2432f5c904f9ff702728443c2718f683053252bcfaa877b2a63b6ea4e214",
+    "packages/node/src/creator-close.ts": "a34ecaa7f1670688121d7756aa4df21f214e25076364e23be6d28fdd8a01ff10",
+    "packages/node/src/internal/creator-closed-rollback-data.ts": "1c772b0b66e96ba53167905c2202f6cf754b89b1dafbc5528925744bae5f525e",
+    "packages/storage-node/src/internal/node-issuance-store.ts": "46a07737fdcddae311c0a679a788614862b67b2848256c4a367b2db1a85a1566",
+    "packages/issuance-store/src/retirement.ts": "d04b09a28fb2ff5520e3aa4f9949fbfc1d4481a14ccffc3050ddf00b179c74de"
+  },
+  "unchanged": true,
+  "results": [
+    {
+      "name": "rejoin-head-roles.qnt-typecheck",
+      "command": "typecheck",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt"
+      ],
+      "expected": "typecheck",
+      "code": 0,
+      "got": "typecheck",
+      "seconds": 1,
+      "log": "v3-rejoin-head-roles.qnt-typecheck.log.gz",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzipSha256": "2c94583799b249a7367148555fbb157344d99d5d1b1181b1d1e7dfb9ec9c39af",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "cbf93becae62eabdef822584b3ccc72eb744d0674291c8d52efd47972979eb05",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      }
+    },
+    {
+      "name": "rejoin-unknown-custody.qnt-typecheck",
+      "command": "typecheck",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt"
+      ],
+      "expected": "typecheck",
+      "code": 0,
+      "got": "typecheck",
+      "seconds": 1,
+      "log": "v3-rejoin-unknown-custody.qnt-typecheck.log.gz",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzipSha256": "4c97d8de77688af684316f1328ea747d2e98f9680dd7b834dda24e32eab2130e",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      }
+    },
+    {
+      "name": "rejoin-pruning-currency.qnt-typecheck",
+      "command": "typecheck",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt"
+      ],
+      "expected": "typecheck",
+      "code": 0,
+      "got": "typecheck",
+      "seconds": 1,
+      "log": "v3-rejoin-pruning-currency.qnt-typecheck.log.gz",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gzipSha256": "9a297fe16f02b967f2a031fdf1daf10eb9fe09a28d58f6887fb0c5ecddd8fa25",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      }
+    },
+    {
+      "name": "head-tests",
+      "command": "test",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt",
+        "--main",
+        "rejoinHeadFloor"
+      ],
+      "expected": "tests",
+      "count": 10,
+      "code": 0,
+      "got": "tests",
+      "seconds": 1,
+      "log": "v3-head-tests.log.gz",
+      "logSha256": "f38936c8bc9bd27122879c2814f9e59e001f7571ce1186f5d8b0eb49e997b4ba",
+      "gzipSha256": "2d42170ddd5e31f5ed448aeac180ce909a47cb08f7fb335e01362dfe2a823a5c",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "cbf93becae62eabdef822584b3ccc72eb744d0674291c8d52efd47972979eb05",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      }
+    },
+    {
+      "name": "roles-tests",
+      "command": "test",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt",
+        "--main",
+        "rejoinActualHeadRoles"
+      ],
+      "expected": "tests",
+      "count": 10,
+      "code": 0,
+      "got": "tests",
+      "seconds": 2,
+      "log": "v3-roles-tests.log.gz",
+      "logSha256": "4da463679fb3f3d654d077ef30de6e65206abc0a84de85895625305cfa2eb426",
+      "gzipSha256": "42d947d54c44b1e762eafc457dfad9bdf0a672bb739f1f6fc2b05d91a5c12026",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "cbf93becae62eabdef822584b3ccc72eb744d0674291c8d52efd47972979eb05",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      }
+    },
+    {
+      "name": "custody-tests",
+      "command": "test",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt",
+        "--main",
+        "rejoinUnknownCustody"
+      ],
+      "expected": "tests",
+      "count": 19,
+      "code": 0,
+      "got": "tests",
+      "seconds": 2,
+      "log": "v3-custody-tests.log.gz",
+      "logSha256": "f623584397cae59e5b2b421e71d025708c864ef22e20ab8a3bc6fa9a99874153",
+      "gzipSha256": "d8c6ae629cd029fd5525a70e2fa4facda3b52d65d829743745b297c85703c7c8",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      }
+    },
+    {
+      "name": "pruning-tests",
+      "command": "test",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt",
+        "--main",
+        "rejoinPruningCurrency"
+      ],
+      "expected": "tests",
+      "count": 13,
+      "code": 0,
+      "got": "tests",
+      "seconds": 1,
+      "log": "v3-pruning-tests.log.gz",
+      "logSha256": "0866a48fabc73565ecf70ea4844fc359b7f5640d05af3e18c66690868b63d050",
+      "gzipSha256": "aee04c5f2507ce5499c8da278512e050380ef778cbbb8137961c5c6152f880c0",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      }
+    },
+    {
+      "name": "head-tlc",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt",
+        "--main",
+        "rejoinHeadFloor",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 6,
+      "log": "v3-head-tlc.log.gz",
+      "logSha256": "6c4d7c3705fe6ffb7ce60bd77ac995d5bbcb5dbb2c4992b30d57311c6b84ae15",
+      "gzipSha256": "f4d1d82b45b0c4ef233d73421dfc17e5afc2ceddf2f3daa7fa38ae0b567735bc",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "cbf93becae62eabdef822584b3ccc72eb744d0674291c8d52efd47972979eb05",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 2947,
+        "distinct": 1654,
+        "queue": 0
+      }
+    },
+    {
+      "name": "head-staleStep",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt",
+        "--main",
+        "rejoinHeadFloor",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "staleStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 6,
+      "log": "v3-head-staleStep.log.gz",
+      "logSha256": "0806141225e7b50460fc31a285d45a7924787290baa56b4a013dc56ba24eb2ac",
+      "gzipSha256": "fb9105f7e5703f71286ff4555c113366afb4a4e4c7a012e8cf1707a2cfc3c5bb",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "cbf93becae62eabdef822584b3ccc72eb744d0674291c8d52efd47972979eb05",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 57,
+        "distinct": 37,
+        "queue": 23
+      }
+    },
+    {
+      "name": "head-lowerStep",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt",
+        "--main",
+        "rejoinHeadFloor",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "lowerStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 8,
+      "log": "v3-head-lowerStep.log.gz",
+      "logSha256": "0dd654429702e508784bf761f4929c79ba24fb77a546b7586eed353c455be01b",
+      "gzipSha256": "89b41b62f1f6b6fb51c6e3b4fb805b470bd3c22598efb7b43d49655e81f80a42",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "cbf93becae62eabdef822584b3ccc72eb744d0674291c8d52efd47972979eb05",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 356,
+        "distinct": 241,
+        "queue": 71
+      }
+    },
+    {
+      "name": "head-reviveStep",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt",
+        "--main",
+        "rejoinHeadFloor",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "reviveStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 7,
+      "log": "v3-head-reviveStep.log.gz",
+      "logSha256": "ab5c282625db34986b4d77ce9d751dab1aa987772d0a75b379e39f8cb2cf4d63",
+      "gzipSha256": "fe10d8c0922837427a0c1a98e14608b5284da03f9dac0dbb7e8644c83a565ee2",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "cbf93becae62eabdef822584b3ccc72eb744d0674291c8d52efd47972979eb05",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 266,
+        "distinct": 171,
+        "queue": 61
+      }
+    },
+    {
+      "name": "head-signatureStep",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt",
+        "--main",
+        "rejoinHeadFloor",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "signatureStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 7,
+      "log": "v3-head-signatureStep.log.gz",
+      "logSha256": "97508e24352b976e5bee97337042ab1aa710f5dd35c34324a3a5f44bcfc922f7",
+      "gzipSha256": "1c50c0a5c7a8dd69ed5858ddf293ef1172ce530e11914dae9cad8ee78b99c16b",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "cbf93becae62eabdef822584b3ccc72eb744d0674291c8d52efd47972979eb05",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 266,
+        "distinct": 171,
+        "queue": 61
+      }
+    },
+    {
+      "name": "head-receiptOnlyStep",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt",
+        "--main",
+        "rejoinHeadFloor",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "receiptOnlyStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 6,
+      "log": "v3-head-receiptOnlyStep.log.gz",
+      "logSha256": "e2cedba67062602315f511fe8d6ca3364b5886aa8175a19f99bd9daa6636afb7",
+      "gzipSha256": "7776f6fd49e9fc1f7988d4cd5b686e6111857ee1479fbfc04a254faf597ad5ec",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "cbf93becae62eabdef822584b3ccc72eb744d0674291c8d52efd47972979eb05",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 124,
+        "distinct": 72,
+        "queue": 33
+      }
+    },
+    {
+      "name": "head-receiptAdmissionStep",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt",
+        "--main",
+        "rejoinHeadFloor",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "receiptAdmissionStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 6,
+      "log": "v3-head-receiptAdmissionStep.log.gz",
+      "logSha256": "21316e86f85beaf5ed0925bf26350e0f93b85f4541687e2fe0ab614884ef13c0",
+      "gzipSha256": "5834ecf2098118fe407dbc892c8c5c1be968e341586145114b8ea32281e8228a",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "cbf93becae62eabdef822584b3ccc72eb744d0674291c8d52efd47972979eb05",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 71,
+        "distinct": 39,
+        "queue": 23
+      }
+    },
+    {
+      "name": "head-neverGap",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt",
+        "--main",
+        "rejoinHeadFloor",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "neverGap",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 7,
+      "log": "v3-head-neverGap.log.gz",
+      "logSha256": "2f19fc2d547d633ebf474b5980b1c1e0a365f9cc520ae10786268777f5f0747e",
+      "gzipSha256": "98c09111e92d3d00d259f538472f1ea25599e5c6eb90638419568abf680eb765",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "cbf93becae62eabdef822584b3ccc72eb744d0674291c8d52efd47972979eb05",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 214,
+        "distinct": 125,
+        "queue": 43
+      }
+    },
+    {
+      "name": "head-neverReceiptOnlyRecovery",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt",
+        "--main",
+        "rejoinHeadFloor",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "neverReceiptOnlyRecovery",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 7,
+      "log": "v3-head-neverReceiptOnlyRecovery.log.gz",
+      "logSha256": "aebd67ab53280d08ee70154982c34025f7c7e423d4eb1c5680ce0535101a3266",
+      "gzipSha256": "c033019b393bd37d4a5a48969b17d1775e6f8c112ca8e94f5cd00c673eee5956",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "cbf93becae62eabdef822584b3ccc72eb744d0674291c8d52efd47972979eb05",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 123,
+        "distinct": 71,
+        "queue": 32
+      }
+    },
+    {
+      "name": "roles-tlc",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt",
+        "--main",
+        "rejoinActualHeadRoles",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 118,
+      "log": "v3-roles-tlc.log.gz",
+      "logSha256": "6ee978e82d00356a0e6381fb8022117499f6bf3b750dfea4273f2171eeff9dd6",
+      "gzipSha256": "633dffe77c8f8237c092082b189cb0d5f6f070bfd5306549dccf8e773a4c497f",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "cbf93becae62eabdef822584b3ccc72eb744d0674291c8d52efd47972979eb05",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 9396272,
+        "distinct": 2335818,
+        "queue": 0
+      }
+    },
+    {
+      "name": "roles-remoteStep",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt",
+        "--main",
+        "rejoinActualHeadRoles",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "remoteStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 7,
+      "log": "v3-roles-remoteStep.log.gz",
+      "logSha256": "a3959ccb136085f72ae72f231bb5b723054c9cca6de93e69b1c53ca2e10d8f95",
+      "gzipSha256": "5354c782a6b48f9af95d62538cfb18a9e2727ae8449ea7889c51f6c9dc2c5612",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "cbf93becae62eabdef822584b3ccc72eb744d0674291c8d52efd47972979eb05",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 28,
+        "distinct": 26,
+        "queue": 21
+      }
+    },
+    {
+      "name": "roles-protectedStep",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt",
+        "--main",
+        "rejoinActualHeadRoles",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "protectedStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 6,
+      "log": "v3-roles-protectedStep.log.gz",
+      "logSha256": "e4c49b284c2e616d924faf019eab1814c20e89f4d1b7516c98235864c0675cbb",
+      "gzipSha256": "7412197b04a59c444debde6607761b1860b4b36cb8dd8829b1f8f3bfcce0cca7",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "cbf93becae62eabdef822584b3ccc72eb744d0674291c8d52efd47972979eb05",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 63,
+        "distinct": 60,
+        "queue": 47
+      }
+    },
+    {
+      "name": "roles-obsoleteStep",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt",
+        "--main",
+        "rejoinActualHeadRoles",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "obsoleteStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 7,
+      "log": "v3-roles-obsoleteStep.log.gz",
+      "logSha256": "562b04cacf10763bb5febb119fa75906ba0383163be2cfd43bb9613934552bef",
+      "gzipSha256": "87f6fac3bfe6bda4d666532642517f72303a23fb14f4004e5b8959f96577a56e",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "cbf93becae62eabdef822584b3ccc72eb744d0674291c8d52efd47972979eb05",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 216,
+        "distinct": 205,
+        "queue": 156
+      }
+    },
+    {
+      "name": "roles-mixedStep",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt",
+        "--main",
+        "rejoinActualHeadRoles",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "mixedStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 7,
+      "log": "v3-roles-mixedStep.log.gz",
+      "logSha256": "f1cc29c49834c08ff94e00de7a156e68ca272aa75195d7f5d31941cdf2bb3c00",
+      "gzipSha256": "860a65384b4ee3a968b9677d4d7f26ff1eedb7fafb40aab3aece75dc45563771",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "cbf93becae62eabdef822584b3ccc72eb744d0674291c8d52efd47972979eb05",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 50,
+        "distinct": 47,
+        "queue": 35
+      }
+    },
+    {
+      "name": "roles-neverNormalized",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt",
+        "--main",
+        "rejoinActualHeadRoles",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "neverNormalized",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 6,
+      "log": "v3-roles-neverNormalized.log.gz",
+      "logSha256": "37542ef6c8f8b9ccca3aa86e68e3302de65c585092c02ea1d444ca6fc4391ce3",
+      "gzipSha256": "6fb680579843389ae24e693b1ba739d24da80f216e8698416342993e211df32b",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "cbf93becae62eabdef822584b3ccc72eb744d0674291c8d52efd47972979eb05",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 198,
+        "distinct": 187,
+        "queue": 138
+      }
+    },
+    {
+      "name": "custody-tlc",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt",
+        "--main",
+        "rejoinUnknownCustody",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 10,
+      "log": "v3-custody-tlc.log.gz",
+      "logSha256": "48501c8ec2850875895182378869f046d651328fa12a37a983d85dac8375c14b",
+      "gzipSha256": "15fd94d4a7e28e16b93bf9208d426004f1a179e19c8314ae3a9f0ce2dc25b6ad",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 548019,
+        "distinct": 108832,
+        "queue": 0
+      }
+    },
+    {
+      "name": "custody-replayStep",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt",
+        "--main",
+        "rejoinUnknownCustody",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "replayStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 8,
+      "log": "v3-custody-replayStep.log.gz",
+      "logSha256": "ec02422df22d0d333c1dca2d22326ee04723eb4eca6a6ac98813ac484ac1be71",
+      "gzipSha256": "1d26946c8ee2b0e64a3c55a206ff8cd0ec0b3636da775cbb8ad5192d36f69b65",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 69,
+        "distinct": 44,
+        "queue": 32
+      }
+    },
+    {
+      "name": "custody-autoExpiryStep",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt",
+        "--main",
+        "rejoinUnknownCustody",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "autoExpiryStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 7,
+      "log": "v3-custody-autoExpiryStep.log.gz",
+      "logSha256": "d3de10e24b2c4c611642a9e14eb2c0559c43d6c667bae7926c397fb2f749f5bb",
+      "gzipSha256": "9398d53ef4f22e83f83e19ea7300e283ff8e7070edbaadfc8b742ee058568e89",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 69,
+        "distinct": 44,
+        "queue": 32
+      }
+    },
+    {
+      "name": "custody-unknownStep",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt",
+        "--main",
+        "rejoinUnknownCustody",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "unknownStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 7,
+      "log": "v3-custody-unknownStep.log.gz",
+      "logSha256": "90c88a06354b7ecf1c2f031c672a0ab6a7fa952be15e7dfbda1f8cb83f40a7b1",
+      "gzipSha256": "d61e7fb4625b5d81ddcaf00bd0ae91b1e28b7b17e9394c34d030ce0ba5dc9809",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 69,
+        "distinct": 44,
+        "queue": 32
+      }
+    },
+    {
+      "name": "custody-consumerStep",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt",
+        "--main",
+        "rejoinUnknownCustody",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "consumerStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 7,
+      "log": "v3-custody-consumerStep.log.gz",
+      "logSha256": "4f04cb700c922a064b0d99d3483a491836eb4fbc5d3566dfe7e3eb5a1b98a014",
+      "gzipSha256": "67b836cbd4e7cc651a2e3e15fae24a9198f0d825e076781ddc4c086e5eb2f898",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 1705,
+        "distinct": 850,
+        "queue": 521
+      }
+    },
+    {
+      "name": "custody-reserveStep",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt",
+        "--main",
+        "rejoinUnknownCustody",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "reserveStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 7,
+      "log": "v3-custody-reserveStep.log.gz",
+      "logSha256": "5040fbc62d80c785b9b7bf9537bb36274209d1a992175d511335e38e9eaa59cf",
+      "gzipSha256": "e751efd40be52e0f77a5fb10a0d1cf436793068d79af6f785bf16a906dbb234b",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 15,
+        "distinct": 15,
+        "queue": 13
+      }
+    },
+    {
+      "name": "custody-undoStep",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt",
+        "--main",
+        "rejoinUnknownCustody",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "undoStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 7,
+      "log": "v3-custody-undoStep.log.gz",
+      "logSha256": "2bed7efe9ebf9ee1b7da56b8ba2652b90bebcc23b97c42095e8ff408f29f79f7",
+      "gzipSha256": "f397e2894d34c6f620e4a15c9bdb14457d9f5d1fdf9b6501cfccf365e7173c09",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 1705,
+        "distinct": 850,
+        "queue": 521
+      }
+    },
+    {
+      "name": "custody-foreignStep",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt",
+        "--main",
+        "rejoinUnknownCustody",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "foreignStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 8,
+      "log": "v3-custody-foreignStep.log.gz",
+      "logSha256": "00678bba6ec80e42f95abb07f1f05e675d6e135bd6f2d80e0bfae4fb7cc53778",
+      "gzipSha256": "f6f4a968d2f045f666411a2fc6171ecba9a8782b8540af245a456c04f92ea299",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 69,
+        "distinct": 44,
+        "queue": 32
+      }
+    },
+    {
+      "name": "custody-gapCustodyStep",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt",
+        "--main",
+        "rejoinUnknownCustody",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "gapCustodyStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 7,
+      "log": "v3-custody-gapCustodyStep.log.gz",
+      "logSha256": "b6b4ffaa3d33277a3ad3269e61f8a332c121d49c5adf87d1dcbbd17fe56cb7a7",
+      "gzipSha256": "1ab5c158532a679560909d0a4e1858c939214ff085fa355068caac9da3688324",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 69,
+        "distinct": 44,
+        "queue": 32
+      }
+    },
+    {
+      "name": "custody-staleExpiryStep",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt",
+        "--main",
+        "rejoinUnknownCustody",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "staleExpiryStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 7,
+      "log": "v3-custody-staleExpiryStep.log.gz",
+      "logSha256": "f18a9557ccede21b581307505220d8336f5a0b4cceeec619bc112ed7145b04bc",
+      "gzipSha256": "c162acdcc52b591e042bb6e7b182fb40b41de8453ee87bdc246e74b568818c23",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 1714,
+        "distinct": 850,
+        "queue": 520
+      }
+    },
+    {
+      "name": "custody-projectionCommitStep",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt",
+        "--main",
+        "rejoinUnknownCustody",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "projectionCommitStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 7,
+      "log": "v3-custody-projectionCommitStep.log.gz",
+      "logSha256": "9fe0fa01ebe69c5606d7ae5fb2a9a154b2d633b46545d3476300022b31730832",
+      "gzipSha256": "22d10b7a42f2f5de7de767b0791639994458dd4aa2a3c56e64fd07403845a59d",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 69,
+        "distinct": 44,
+        "queue": 32
+      }
+    },
+    {
+      "name": "custody-wrongSourceStep",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt",
+        "--main",
+        "rejoinUnknownCustody",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "wrongSourceStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 7,
+      "log": "v3-custody-wrongSourceStep.log.gz",
+      "logSha256": "10e9ba40cba77e4ee87cecea00bdcffc7fcb3c965833af9bf66deed4663772fe",
+      "gzipSha256": "69a91bfdfbceac3f4bace316d0abc3a91070aa2424c19aafb9d775e614596b86",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 638,
+        "distinct": 352,
+        "queue": 227
+      }
+    },
+    {
+      "name": "custody-neverExpired",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt",
+        "--main",
+        "rejoinUnknownCustody",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "neverExpired",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 7,
+      "log": "v3-custody-neverExpired.log.gz",
+      "logSha256": "973a60f128f8bf806d6ea7a6310b5f340ceb599205d955d2f64ee336b3f22c4f",
+      "gzipSha256": "49a974a5d9e5e9c5c99bdfebb23a919fd8cccce4cbb28ce4affaf8b154ccb6e4",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 603,
+        "distinct": 328,
+        "queue": 208
+      }
+    },
+    {
+      "name": "custody-neverUnknownAfterGap",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt",
+        "--main",
+        "rejoinUnknownCustody",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "neverUnknownAfterGap",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 7,
+      "log": "v3-custody-neverUnknownAfterGap.log.gz",
+      "logSha256": "fcbf0b2ee85e2c999e6ee5f86206d57a679317ffff4519d55f4ffc2e2a9949d7",
+      "gzipSha256": "0830e2aef48a14c405b242c0d1c2d023f124a5608e9f0342243decd97ad14044",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 30,
+        "distinct": 17,
+        "queue": 12
+      }
+    },
+    {
+      "name": "pruning-tlc",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt",
+        "--main",
+        "rejoinPruningCurrency",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 6,
+      "log": "v3-pruning-tlc.log.gz",
+      "logSha256": "b0b22859466f6b86322f67e005e90474b61c5a4d83b0b8bd6fb779653ef8f18e",
+      "gzipSha256": "e95ef155c9da0b433ae20f1ff508eb1d088f96911484af73dd807a739591641b",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 14208,
+        "distinct": 3702,
+        "queue": 0
+      }
+    },
+    {
+      "name": "pruning-forgedStep",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt",
+        "--main",
+        "rejoinPruningCurrency",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "forgedStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 6,
+      "log": "v3-pruning-forgedStep.log.gz",
+      "logSha256": "a9cbb3cc6aea9cd9f8e40cdf70ba41d22d318fee5c5d2cdc92cb7d124d219587",
+      "gzipSha256": "b71493647c0fbab6814b0a772d105c9a8dfb595c6ea76289d8639804091625d0",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 15,
+        "distinct": 14,
+        "queue": 11
+      }
+    },
+    {
+      "name": "pruning-staleStep",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt",
+        "--main",
+        "rejoinPruningCurrency",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "staleStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 6,
+      "log": "v3-pruning-staleStep.log.gz",
+      "logSha256": "8b4ee5b9a06f769ad59cf387d72b77debcabc1ce9a3df56b0f21a7304dfa3a55",
+      "gzipSha256": "38b8e18717138165e73ff78916ea8f1807b881c48c8e405b9b4e9bbe15849dd4",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 3264,
+        "distinct": 1158,
+        "queue": 560
+      }
+    },
+    {
+      "name": "pruning-receiptProtectedStep",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt",
+        "--main",
+        "rejoinPruningCurrency",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "receiptProtectedStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 6,
+      "log": "v3-pruning-receiptProtectedStep.log.gz",
+      "logSha256": "84e73f639857e6ff7535f89e29b143703d6b2d5b36eea90c0ecb2caf87b1c5ef",
+      "gzipSha256": "8e311ccc3d463ed770dd51b607b3866346cf7248e4f89a9535c3978979de9c97",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 15,
+        "distinct": 14,
+        "queue": 11
+      }
+    },
+    {
+      "name": "pruning-receiptForeignStep",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt",
+        "--main",
+        "rejoinPruningCurrency",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "receiptForeignStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 6,
+      "log": "v3-pruning-receiptForeignStep.log.gz",
+      "logSha256": "02fda16cf2bfad61a2ba40586daa3c888a3a7430d4f4312cd2a4d9646136cde0",
+      "gzipSha256": "a888b570bb402cc9e0dd5c8b72a86727900ff315b01e661d0f82ec6b1ee0271f",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 15,
+        "distinct": 14,
+        "queue": 11
+      }
+    },
+    {
+      "name": "pruning-consumerStep",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt",
+        "--main",
+        "rejoinPruningCurrency",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "consumerStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 6,
+      "log": "v3-pruning-consumerStep.log.gz",
+      "logSha256": "77190cc3659b93712ee8f879a34db01b15d9843dee5284dd7d17e2353c5c5db2",
+      "gzipSha256": "59f7c0c9a7a93b32138f756bc78fbc38b24cd8c950029c87c50164561de3e155",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 15,
+        "distinct": 14,
+        "queue": 11
+      }
+    },
+    {
+      "name": "pruning-censusStep",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt",
+        "--main",
+        "rejoinPruningCurrency",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "censusStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 6,
+      "log": "v3-pruning-censusStep.log.gz",
+      "logSha256": "cffe118cea636a16d26aadf6d84c9d639a271855fd3a06f31ddbadb4b2a18735",
+      "gzipSha256": "a3134088b6cd4ee858d8e2a85577ac27089d5113cd44abd8c60e312badb6108b",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 15,
+        "distinct": 14,
+        "queue": 11
+      }
+    },
+    {
+      "name": "pruning-neverDeleted",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt",
+        "--main",
+        "rejoinPruningCurrency",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "neverDeleted",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 6,
+      "log": "v3-pruning-neverDeleted.log.gz",
+      "logSha256": "9d87a452b05c506be765edf3b6c091126ba74ad259cb6d8bb495a6b670a0f7da",
+      "gzipSha256": "7888f7965f5b3fa7cce28f25af49e9b4c87e305ae6c3eee205749e91a6b5466e",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 184,
+        "distinct": 97,
+        "queue": 67
+      }
+    },
+    {
+      "name": "pruning-neverNormalizedCertificate",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt",
+        "--main",
+        "rejoinPruningCurrency",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "neverNormalizedCertificate",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 6,
+      "log": "v3-pruning-neverNormalizedCertificate.log.gz",
+      "logSha256": "6b999ec0bf079dbc5f9df40901052154b5ee7c9562e52c996580e74157751e47",
+      "gzipSha256": "c797c2db677af2e72f125a2f924328b761c81a96f4623c5c8a4d2fba5fd96d6b",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 13,
+        "distinct": 13,
+        "queue": 10
+      }
+    },
+    {
+      "name": "role-projection-tlc",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt",
+        "--main",
+        "rejoinRoleProjection",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 6,
+      "log": "v3-role-projection-tlc.log.gz",
+      "logSha256": "e653e6792657f1c0e9e41950a1a906189ce78b435af8aa651a876aaeec50c4ce",
+      "gzipSha256": "a601067109d28013c74f71808e2b80c4d5b0edc3671ba7b79c4e1088fdb46e91",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "cbf93becae62eabdef822584b3ccc72eb744d0674291c8d52efd47972979eb05",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 1765,
+        "distinct": 372,
+        "queue": 0
+      }
+    },
+    {
+      "name": "custody-projection-tlc",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt",
+        "--main",
+        "rejoinCustodyProjection",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 7,
+      "log": "v3-custody-projection-tlc.log.gz",
+      "logSha256": "3607ebca1d5c8098cd9c3d9805713027f26aaa52d1addaee830b195d68268696",
+      "gzipSha256": "d0fe946bb645223fb94db19a7f1c3c287910b09286cff12d2001822958106660",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 102,
+        "distinct": 24,
+        "queue": 0
+      }
+    },
+    {
+      "name": "absence-projection-tlc",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt",
+        "--main",
+        "rejoinAbsenceProjection",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/tlc.json"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 6,
+      "log": "v3-absence-projection-tlc.log.gz",
+      "logSha256": "42e51ec8dad35fd451db33d7b89e12b19b5ac2c55647c7095124a234835b314f",
+      "gzipSha256": "ed591fc6f377c896dbce705b686fee790d8707e8bea1ad816ec55de9e7350981",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "tlcStates": {
+        "generated": 23,
+        "distinct": 10,
+        "queue": 0
+      }
+    },
+    {
+      "name": "role-projection-base",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt",
+        "--main",
+        "rejoinRoleProjection",
+        "--backend",
+        "apalache",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--apalache-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/apalache.json",
+        "--max-steps=0"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 7,
+      "log": "v3-role-projection-base.log.gz",
+      "logSha256": "83e1e536599eef067e07a9d731928009d8b3a6c1786024f91f6b2f984a02c8f7",
+      "gzipSha256": "a6576a9b81028a38c5e9e6a66a5529327886d6c1ddb7adf504064918abc2c7fa",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "cbf93becae62eabdef822584b3ccc72eb744d0674291c8d52efd47972979eb05",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      }
+    },
+    {
+      "name": "role-projection-step",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt",
+        "--main",
+        "rejoinRoleProjection",
+        "--backend",
+        "apalache",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "step",
+        "--init",
+        "indInit",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--apalache-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/apalache.json",
+        "--max-steps=1"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 7,
+      "log": "v3-role-projection-step.log.gz",
+      "logSha256": "3f1b8885bdef27710d5306d85e4cb9b6fdbdfa5a80a91d91ea90086f3879ece8",
+      "gzipSha256": "dcbbf1423d1fc9818d5e0ecf2485e0680527bc522bc1b7fde575048fbc31e912",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "cbf93becae62eabdef822584b3ccc72eb744d0674291c8d52efd47972979eb05",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      }
+    },
+    {
+      "name": "role-projection-mutation",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt",
+        "--main",
+        "rejoinRoleProjection",
+        "--backend",
+        "apalache",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "unsafeStep",
+        "--init",
+        "indInit",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--apalache-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/apalache.json",
+        "--max-steps=1"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 8,
+      "log": "v3-role-projection-mutation.log.gz",
+      "logSha256": "06036f17a9430b5dc770ce4a4476df01cb81080348cdf851aa0dd7b0046a125f",
+      "gzipSha256": "3c3baee2ca10b1afa5b8d96787f29296c7b32ccdf3bd5cbcdcddcc45f7692a06",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "cbf93becae62eabdef822584b3ccc72eb744d0674291c8d52efd47972979eb05",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      }
+    },
+    {
+      "name": "custody-projection-base",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt",
+        "--main",
+        "rejoinCustodyProjection",
+        "--backend",
+        "apalache",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--apalache-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/apalache.json",
+        "--max-steps=0"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 9,
+      "log": "v3-custody-projection-base.log.gz",
+      "logSha256": "37a4957dfc1243008be951316ecb8871ea48035e6bdd3f932b0d1632ff6bb526",
+      "gzipSha256": "5b37bd931b6470c4601bdcd586874e4d0bad9eb5d422ecb25b05de49127e7043",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      }
+    },
+    {
+      "name": "custody-projection-step",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt",
+        "--main",
+        "rejoinCustodyProjection",
+        "--backend",
+        "apalache",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "step",
+        "--init",
+        "indInit",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--apalache-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/apalache.json",
+        "--max-steps=1"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 8,
+      "log": "v3-custody-projection-step.log.gz",
+      "logSha256": "e2c745e1c78ba00a89484a37e90e34209171f0d1de7a02f4fb9d43539f935c81",
+      "gzipSha256": "dd34c27ec4a041f1f33145ca9516ba9ced506bd75f754aea47726e9db879fcc6",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      }
+    },
+    {
+      "name": "custody-projection-mutation",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt",
+        "--main",
+        "rejoinCustodyProjection",
+        "--backend",
+        "apalache",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "unsafeStep",
+        "--init",
+        "indInit",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--apalache-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/apalache.json",
+        "--max-steps=1"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 8,
+      "log": "v3-custody-projection-mutation.log.gz",
+      "logSha256": "58e46fa4457b8b59795467ac6c1129821f709437625875a452a57af7695e80bc",
+      "gzipSha256": "35f667633b69110d56fbe6416ec439a4394bb9b6a138a33536562b4ec145b5b2",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      }
+    },
+    {
+      "name": "absence-projection-base",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt",
+        "--main",
+        "rejoinAbsenceProjection",
+        "--backend",
+        "apalache",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--apalache-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/apalache.json",
+        "--max-steps=0"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 7,
+      "log": "v3-absence-projection-base.log.gz",
+      "logSha256": "a19fc158c966f1c20b9e55dd236414a6f7fae56f1524eb38d832081dfdb57181",
+      "gzipSha256": "cec019baed062e5061e5f1423aae41c3706fc3919e312f81c28f9f221f6cd15b",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      }
+    },
+    {
+      "name": "absence-projection-step",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt",
+        "--main",
+        "rejoinAbsenceProjection",
+        "--backend",
+        "apalache",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "step",
+        "--init",
+        "indInit",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--apalache-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/apalache.json",
+        "--max-steps=1"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 7,
+      "log": "v3-absence-projection-step.log.gz",
+      "logSha256": "a3aabb480973a01568febbe33e41ac13e482af1330eb05c6fb828f6191e5f8fd",
+      "gzipSha256": "abb4daa562a121047a9204d60e69fe2bdb3215facb77cc4f71f8fbf0075fd71a",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      }
+    },
+    {
+      "name": "absence-projection-mutation",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt",
+        "--main",
+        "rejoinAbsenceProjection",
+        "--backend",
+        "apalache",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8910",
+        "--step",
+        "unsafeStep",
+        "--init",
+        "indInit",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--apalache-config",
+        "/private/tmp/ts-drp-rejoin-formal-v3/apalache.json",
+        "--max-steps=1"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 7,
+      "log": "v3-absence-projection-mutation.log.gz",
+      "logSha256": "8aebd7dc34ad88503e45240458a5c12219f39e30bee1edecf3278cfb18b1a92e",
+      "gzipSha256": "dada43cf7b356ea584c7668e49ad2f78a0b7df744f5ba8bfd1894c383e218832",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      }
+    }
+  ]
+}

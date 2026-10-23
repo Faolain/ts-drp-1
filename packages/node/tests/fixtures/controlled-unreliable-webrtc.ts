@@ -73,6 +73,8 @@ export class ControlledRawRoute implements DRPUnreliableWebRtcRoute {
 
 	reconcile(peers: readonly string[]): Promise<void> {
 		this.reconciledPeers.push([...peers]);
+		if (this.reconciledPeers.length > this.#bus.historyLimit)
+			this.reconciledPeers.splice(0, this.reconciledPeers.length - this.#bus.historyLimit);
 		return Promise.resolve();
 	}
 
@@ -120,6 +122,14 @@ export class ControlledRawBus {
 	readonly sends: ControlledRawSend[] = [];
 	readonly #connected = new Set<string>();
 	readonly #routes = new Map<string, ControlledRawRoute>();
+	readonly historyLimit: number;
+	sent = 0;
+
+	constructor(historyLimit = Number.POSITIVE_INFINITY) {
+		if (historyLimit !== Number.POSITIVE_INFINITY && (!Number.isSafeInteger(historyLimit) || historyLimit < 1))
+			throw new Error("CONTROLLED_RAW_HISTORY_LIMIT");
+		this.historyLimit = historyLimit;
+	}
 
 	connect(left: string, right: string): void {
 		this.#connected.add(this.#pair(left, right));
@@ -138,6 +148,8 @@ export class ControlledRawBus {
 	}
 
 	register(peerId: string, routeId: string, route: ControlledRawRoute): void {
+		if (this.historyLimit !== Number.POSITIVE_INFINITY)
+			for (const [key, existing] of this.#routes) if (existing.closed) this.#routes.delete(key);
 		this.#routes.set(`${peerId}\0${routeId}`, route);
 	}
 
@@ -157,8 +169,18 @@ export class ControlledRawBus {
 			return false;
 		}
 		this.sends.push(Object.freeze({ bytes: bytes.slice(), peers: Object.freeze([...peers]), routeId, sender }));
+		this.sent++;
+		if (this.sends.length > this.historyLimit) this.sends.splice(0, this.sends.length - this.historyLimit);
 		for (const { route } of targets) route?.emit(bytes, sender);
 		return true;
+	}
+
+	history(): Readonly<{ sends: number; routes: number; reconciliations: number }> {
+		return {
+			sends: this.sends.length,
+			routes: this.#routes.size,
+			reconciliations: [...this.#routes.values()].reduce((sum, route) => sum + route.reconciledPeers.length, 0),
+		};
 	}
 
 	#pair(left: string, right: string): string {

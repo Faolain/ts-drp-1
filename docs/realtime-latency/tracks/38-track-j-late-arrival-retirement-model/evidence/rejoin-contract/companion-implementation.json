@@ -1,0 +1,33 @@
+{
+  "capturedAt": "2026-10-23T13:19:49.925819+00:00",
+  "baseCommit": "34b08cd727afc3f91ed0384619becde478334d50",
+  "status": "UNCOMMITTED WORKING SNAPSHOT; independent review fixes and expiry still pending",
+  "sourceHashes": {
+    "packages/node/src/internal/creator-transition-advance.ts": "a3121227faf21faa1f73c2b440bbac84bc97faa05286e2d289c00f466d86679b",
+    "packages/node/src/internal/creator-closed-rollback-data.ts": "c0f05ab3fae4d78e142b0ade530fdf0cda542d9355f5c9ed98b35f6ee48b365c",
+    "packages/node/src/creator-adoption.ts": "6af4068bf186f00773a8b0c88d3d4e8f756f2934307197b0a881eef5a89dbd2a",
+    "packages/node/src/creator-adoption-commit.ts": "02a4f22ff46623197e1c9679a29b64d855df95c94cb19ecc080ce69710c8db60",
+    "packages/node/src/creator-adoption-activate.ts": "8ee919f5a2d0d4f06bd6a4e94474e6b5cdfdfbea7acf2ad1ed19c9d9a2f5f88a",
+    "packages/node/src/internal/creator-source-custody.ts": "e4fc8d9535c5b3bd0f70f2d39046f35d68743265e5e925c086c15a3da42add0f",
+    "packages/node/src/v3-live.ts": "3e5100b4fcda2056f237b41e3eb18cc127c57a584a79211798e19f50bafa9bfa",
+    "packages/node/src/internal/creator-room-head.ts": "2c91aa188afab37bbb87a60218e4cc214648b30d3451b4e2ab939ffc5eb07097",
+    "packages/storage/src/room-head.ts": "3a6909c616cc21eabf72d29154a6807bf9768a02fa63f5a11b7bbda6aa077237",
+    "packages/issuance-store/src/retirement.ts": "8f71fc3372d984a0e71e0bfae995c4b6df62c3120b299a56df3bf4d8aa160b93",
+    "packages/issuance-store/src/contract.ts": "24283465265d4247f84960da5c5bc50ff8e2021ef19662064860870047d19a34"
+  },
+  "patch": {
+    "file": "companion-source.diff.gz",
+    "sha256": "d0bb8d9f07222a44ea1a21e91010b33422e7865b9965632c82849798eb67d4f6",
+    "gzipSha256": "fa91dd8fcce89cc698e19feec13e766941b891f990ec7afc4b2f2f680db1b71f"
+  },
+  "claim": "Inspected ownership correspondence only. Native reported counts are not replayed by this formal runner. Explicit expiry remains a proposed contract; none of these hashes establishes an implementing expiry producer.",
+  "mapping": {
+    "pointAttachment": "packages/node/src/internal/creator-transition-advance.ts",
+    "currentPartitionAndAbsence": "packages/node/src/internal/creator-closed-rollback-data.ts",
+    "durableReceiptAndPublication": "packages/node/src/creator-adoption.ts",
+    "sourceCustody": "packages/node/src/internal/creator-source-custody.ts",
+    "sourcePlanCapture": "packages/node/src/v3-live.ts",
+    "ordinaryAdmissionReserve": "packages/issuance-store/src/retirement.ts"
+  },
+  "nativeWitnessLimit": "Reported roles12/10/8 before nextfloor and14/12/10 after pending successor recovery; exact normalized generation was not identified at this capture."
+}

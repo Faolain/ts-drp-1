@@ -140,8 +140,14 @@ export function admissionGate() {
 
 export interface RoomOptions {
 	readonly profile?: Profile;
+	/** Existing native directory for process-death recovery probes. */
+	readonly directory?: string;
 	/** Writers besides the creator. */
 	readonly writers?: number;
+	/** Optional genuine network boundary for native transport composition checks. */
+	readonly network?: ReturnType<typeof memoryNetwork>;
+	readonly peerIds?: readonly string[];
+	onAccepted?(index: number, digest: string, author: string): void;
 }
 
 /**
@@ -152,14 +158,20 @@ export interface RoomOptions {
 export async function creatorDeliveryRoom(options: RoomOptions = {}) {
 	const profile = options.profile ?? "shipped";
 	const writerCount = options.writers ?? 1;
-	const directory = mkdtempSync(join(tmpdir(), "track-aa-creator-delivery-"));
+	const directory = options.directory ?? mkdtempSync(join(tmpdir(), "track-aa-creator-delivery-"));
 	directories.add(directory);
 	const identities = Array.from({ length: writerCount + 1 }, (_, index) => {
 		const seed = new Uint8Array(32).fill(0x31 + index);
 		return { seed, author: hex(ed25519.getPublicKey(seed)) };
 	});
 	const creator = required(identities[0]);
-	const roster = identities.map(({ author }, order) => ({ author, order, peerId: `track-aa-peer-${order}` }));
+	if (options.peerIds !== undefined && options.peerIds.length !== identities.length)
+		throw new TypeError("TRACK_AA_PEER_COUNT_DIFFERS");
+	const roster = identities.map(({ author }, order) => ({
+		author,
+		order,
+		peerId: options.peerIds?.[order] ?? `track-aa-peer-${order}`,
+	}));
 	const application = createV3ZoneApplication(roster, required(roster[0]).peerId, creator.author);
 	const objectId = `creator:${hex(hashDomain("track-aa-creator-delivery-object/v1", new TextEncoder().encode(directory))).slice(0, 32)}`;
 	const signers = [{ publicKey: creator.author, signerId: "creator" }];
@@ -193,7 +205,7 @@ export async function creatorDeliveryRoom(options: RoomOptions = {}) {
 		signGenesisAnchorDigest: (digest) => Promise.resolve(ed25519.sign(digest, creator.seed)),
 	});
 	const storageHost = createNodeV3RoomStorageHost({ directory, initialization: () => "create" });
-	const network = memoryNetwork();
+	const network = options.network ?? memoryNetwork();
 	const creatorGate = admissionGate();
 	const accepted = new Map<number, Set<string>>();
 	const nodes = new Map<string, DRPNetworkNode>();
@@ -207,13 +219,13 @@ export async function creatorDeliveryRoom(options: RoomOptions = {}) {
 		if (byDigest === undefined) sent.set(from, (byDigest = new Map()));
 		if (!byDigest.has(digest)) byDigest.set(digest, message);
 	});
-	const open = async (index: number, options: Readonly<{ reopen?: true }> = {}) => {
+	const open = async (index: number, openOptions: Readonly<{ reopen?: true }> = {}) => {
 		const identity = required(identities[index]);
 		const name = `peer-${index}`;
 		const peerId = required(roster[index]).peerId;
 		const floor = createNodeRoomHeadAuthority({
 			filename: join(directory, `${name}-external-floor.sqlite`),
-			initialization: { kind: options.reopen ? "reopen" : "create" },
+			initialization: { kind: openOptions.reopen ? "reopen" : "create" },
 		});
 		heads.add(floor);
 		const { network: networkNode, adapter } = network.node(peerId);
@@ -222,7 +234,7 @@ export async function creatorDeliveryRoom(options: RoomOptions = {}) {
 		accepted.set(index, seen);
 		const input: CreateV3RoomSessionInput<ReturnType<typeof application.projectAcceptedOperations>> = {
 			application,
-			storageHost: options.reopen
+			storageHost: openOptions.reopen
 				? createNodeV3RoomStorageHost({ directory, initialization: () => "reopen" })
 				: storageHost,
 			author: identity.author,
@@ -241,6 +253,7 @@ export async function creatorDeliveryRoom(options: RoomOptions = {}) {
 			onProjection: () => undefined,
 			onAcceptedVertex: async (vertex) => {
 				seen.add(hex(vertex.digest));
+				options.onAccepted?.(index, hex(vertex.digest), vertex.author);
 				if (index === 0) await creatorGate.pass();
 			},
 			// The genuine room transport, as `DRPNode.openRoomNetwork` opens it (the creator
@@ -281,6 +294,8 @@ export async function creatorDeliveryRoom(options: RoomOptions = {}) {
 			.filter(([, message]) => author === undefined || envelopeVertex(message)?.author === author)
 			.map(([digest, message]) => Object.freeze({ digest, message }));
 	return {
+		directory,
+		host: { storageHost },
 		profile,
 		identities,
 		roster,
@@ -295,6 +310,10 @@ export async function creatorDeliveryRoom(options: RoomOptions = {}) {
 		open,
 		bare,
 		sentBy,
+		clearObservations: () => {
+			sent.clear();
+			for (const seen of accepted.values()) seen.clear();
+		},
 	};
 }
 

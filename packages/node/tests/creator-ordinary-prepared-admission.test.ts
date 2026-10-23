@@ -93,8 +93,17 @@ describe("existing ordinary prepared-capacity DATA owner", () => {
 		const geometry = new WeakMap<object, unknown>([[registration, heldCapture]]);
 		const registrations = new Map([[registration.topic, registration]]);
 		const deactivate = execute<(value: typeof registration) => boolean>(
-			declaration("deactivateRegistration").getText(tree) + "\nreturn deactivateRegistration;", {
+			[
+				"deactivateRegistration",
+				"releaseIdleEgressAdmissionOwner",
+				"retireRetainedReplay",
+				"releaseRetainedReplayPrefix",
+			]
+				.map((name) => declaration(name).getText(tree))
+				.join("\n") + "\nreturn deactivateRegistration;",
+			{
 				ordinaryRuntimeCapacityGeometry: geometry,
+				v3EgressAdmissionOwners: new WeakMap(),
 				v3PlaneRegistrations: new WeakMap([[registration.networkNode, registrations]]),
 				topicMembership: () => false, hasQueueGuarded: () => false,
 			});

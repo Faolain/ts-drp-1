@@ -79,6 +79,8 @@ import {
 	issuanceRetirementRefusal,
 	issuanceRetirementTransitionRows,
 	issuanceUnsignedPostimageCharge,
+	issuanceUnsignedPostimageWidths,
+	issuanceUnsignedOwnMaterialByteLength,
 	joinIssuanceNativeSign,
 	type IssuanceRetirementRows,
 	settlementPlanPermitsAuthenticatedPruning,
@@ -789,7 +791,8 @@ function reserveUnsignedIntent(
 	database: DatabaseSync,
 	scope: DurableIssueScope,
 	captured: ReturnType<typeof captureIssuanceNativeSignInput>,
-	context: Parameters<NonNullable<Parameters<DurableBuildAndSign>[1]>>[2]
+	context: Parameters<NonNullable<Parameters<DurableBuildAndSign>[1]>>[2],
+	ordinaryRows?: IssuanceRetirementRows
 ): NativeLineage {
 	const current = readNativeLineage(database, scope, "writer");
 	if (!current || current.exhausted || current.next !== captured.sequence)
@@ -834,7 +837,7 @@ function reserveUnsignedIntent(
 	)
 		throw issuanceRetirementRefusal("native unsigned identity or context is unresolved");
 	const pending = old ?? requested;
-	const priorRows = retirementRows(database, scope.objectId);
+	const priorRows = ordinaryRows ?? retirementRows(database, scope.objectId);
 	const normalized = {
 		...scope,
 		next: current.next,
@@ -848,8 +851,20 @@ function reserveUnsignedIntent(
 			? priorRows.lineages.map((row) => (row.author === scope.author ? normalized : row))
 			: [...priorRows.lineages, normalized],
 	};
-	issuanceRetirementImage(rows, scope.objectId); // reserved postimage, including exact unknown debt bytes
-	issuanceUnsignedPostimageCharge(rows, scope, pending); // eventual pair + exact prospective plan
+	if (ordinaryRows === undefined) {
+		issuanceRetirementImage(rows, scope.objectId); // reserved postimage, including exact unknown debt bytes
+		issuanceUnsignedPostimageCharge(rows, scope, pending); // eventual pair + exact prospective plan
+	} else {
+		// The exact initial native image is still held by this writer. NONE's
+		// own pending phase changes only this lineage/control. Size the original
+		// complete postimages without constructing/hash-reading new full images.
+		if (planEffect !== undefined || ordinaryRows.plans.length !== 0)
+			throw issuanceRetirementRefusal("ordinary unsigned source has settlement work");
+		issuanceUnsignedPostimageWidths(ordinaryRows, scope, {
+			kind: "v3-issuance-pending-unsigned-1", authorSequence: captured.sequence,
+			canonicalPreimageBytes: captured.bytes, digest: captured.digest,
+		}, priorControl);
+	}
 	assertRetirementRow(database, scope, captured.sequence, captured.bytes, captured.digest);
 	if (priorControl === null)
 		statement(database, "INSERT INTO retirement_controls (object_id,record) VALUES(?,?)").run(
@@ -1698,11 +1713,29 @@ class NodeIssuanceImplementation {
 								imageDigest: capturedContext.expectedIssuanceImageDigest,
 								controlBytes: capturedContext.expectedIssuanceControlBytes ?? null,
 							};
+				let ordinaryRows: IssuanceRetirementRows | undefined;
+				let ordinaryDataVersion: number | undefined;
+				let ordinaryTotalChanges: number | undefined;
+				const dataVersion = (): number => {
+					const row = statement(database as DatabaseSync, "PRAGMA main.data_version").get();
+					if (typeof row?.data_version !== "number" || !Number.isSafeInteger(row.data_version) || row.data_version < 0)
+						throw issuanceRetirementRefusal("native issuance data version is unavailable");
+					return row.data_version;
+				};
+				const totalChanges = (): number => {
+					const row = statement(database as DatabaseSync, "SELECT total_changes() AS changes").get();
+					if (typeof row?.changes !== "number" || !Number.isSafeInteger(row.changes) || row.changes < 0)
+						throw issuanceRetirementRefusal("native issuance change count is unavailable");
+					return row.changes;
+				};
 				const readQuoteCurrency = (): NonNullable<typeof quoteCurrency> => {
-					const image = issuanceRetirementImage(
-						retirementRows(database as DatabaseSync, detached.objectId),
-						detached.objectId
-					);
+					const rows = retirementRows(database as DatabaseSync, detached.objectId);
+					const image = issuanceRetirementImage(rows, detached.objectId);
+					if (capturedContext?.planEffect === undefined && rows.plans.length === 0) {
+						ordinaryRows = rows;
+						ordinaryDataVersion = dataVersion();
+						ordinaryTotalChanges = totalChanges();
+					}
 					const control = readRetirementControl(database as DatabaseSync, detached.objectId);
 					return {
 						imageDigest: image.imageDigest,
@@ -1711,6 +1744,20 @@ class NodeIssuanceImplementation {
 				};
 				const checkQuoteCurrency = (): void => {
 					if (quoteCurrency === undefined) return;
+					// Compare only this writer connection's values. SQLite changes
+					// data_version for commits by ANY other connection, not for this
+					// connection's own commits. Each point is under BEGIN IMMEDIATE;
+					// no callback can mutate this private connection between phases.
+					if (ordinaryDataVersion !== undefined) {
+						if (dataVersion() !== ordinaryDataVersion || totalChanges() !== ordinaryTotalChanges)
+							throw issuanceRetirementRefusal("native issuance quote currency changed");
+						const control = readRetirementControl(database as DatabaseSync, detached.objectId);
+						const bytes = control === null ? null : encodeIssuanceRetirementControl(control);
+						if (bytes === null ? quoteCurrency.controlBytes !== null : quoteCurrency.controlBytes === null ||
+							!issuanceRetirementBytesEqual(bytes, quoteCurrency.controlBytes))
+							throw issuanceRetirementRefusal("native issuance quote control changed");
+						return;
+					}
 					const actual = readQuoteCurrency();
 					if (
 						actual.imageDigest !== quoteCurrency.imageDigest ||
@@ -1721,20 +1768,32 @@ class NodeIssuanceImplementation {
 					)
 						throw issuanceRetirementRefusal("native issuance quote currency changed");
 				};
+				const retainOwnQuotePostimage = (ownChanges: number): void => {
+					if (quoteCurrency === undefined) return;
+					if (ordinaryDataVersion === undefined) { quoteCurrency = readQuoteCurrency(); return; }
+					if (dataVersion() !== ordinaryDataVersion || ordinaryTotalChanges === undefined ||
+						!Number.isSafeInteger(ordinaryTotalChanges + ownChanges) || totalChanges() !== ordinaryTotalChanges + ownChanges)
+						throw issuanceRetirementRefusal("native issuance quote currency changed");
+					ordinaryTotalChanges += ownChanges;
+					const control = readRetirementControl(database as DatabaseSync, detached.objectId);
+					quoteCurrency = {...quoteCurrency, controlBytes: control === null ? null : encodeIssuanceRetirementControl(control)};
+				};
 				checkQuoteCurrency();
 				if (!current || !sameLineage(current, prior) || current.exhausted)
 					throw issuanceRetirementRefusal("native sign lineage changed");
 				// Quote currency is checked above, not persisted as unsigned identity.
+				const reservedChanges = Number(quoteCurrency?.controlBytes === null) + (current.pendingUnsigned === undefined ? 2 : 0);
 				prior = reserveUnsignedIntent(
 					database,
 					detached,
 					captured,
-					capturedContext?.planEffect === undefined ? undefined : { planEffect: capturedContext.planEffect }
+					capturedContext?.planEffect === undefined ? undefined : { planEffect: capturedContext.planEffect },
+					ordinaryRows
 				);
 				ownedPending = prior.pendingUnsigned;
 				// Carry only this writer's exact own postimage across each COMMIT/BEGIN
 				// gap. A foreign author/control change cannot inherit the old quote.
-				if (quoteCurrency !== undefined) quoteCurrency = readQuoteCurrency();
+				retainOwnQuotePostimage(reservedChanges);
 				// A provisional ordinal is durable before any crypto. No signature or
 				// eligibility is inferred from this mechanical native intent.
 				database.exec("COMMIT");
@@ -1755,6 +1814,7 @@ class NodeIssuanceImplementation {
 					!issuanceRetirementBytesEqual(encodeCanonical(reserved.pendingUnsigned), encodeCanonical(ownedPending))
 				)
 					throw issuanceRetirementRefusal("native unsigned reservation changed");
+				const enteringChanges = ownedPending.phase !== "entered" ? 2 : 0;
 				if (ownedPending.phase !== "entered") {
 					ownedPending = { ...ownedPending, phase: "entered" };
 					statement(database, "UPDATE lineages SET pending_unsigned=? WHERE object_id=? AND author=?").run(
@@ -1764,7 +1824,7 @@ class NodeIssuanceImplementation {
 					);
 					bumpRetirement(database, detached.objectId);
 				}
-				if (quoteCurrency !== undefined) quoteCurrency = readQuoteCurrency();
+				retainOwnQuotePostimage(enteringChanges);
 				database.exec("COMMIT"); // entered marker survives an escaped signature
 				database.exec("BEGIN IMMEDIATE");
 				checkQuoteCurrency();
@@ -1775,7 +1835,11 @@ class NodeIssuanceImplementation {
 					readRetirementControl(database, detached.objectId)?.incarnation !== ownedPending.incarnation
 				)
 					throw issuanceRetirementRefusal("native unsigned entered source changed");
-				issuanceUnsignedPostimageCharge(retirementRows(database, detached.objectId), detached, ownedPending);
+				if (ordinaryRows === undefined)
+					issuanceUnsignedPostimageCharge(retirementRows(database, detached.objectId), detached, ownedPending);
+				// The ordinary bound was proved from the complete entry image before
+				// reserve. Fresh version/control and exact own-lineage checks above
+				// establish that only the already-sized phases have occurred.
 				assertRetirementRow(database, detached, captured.sequence, captured.bytes, captured.digest);
 				// Keep this exact writer connection until builder, commit and original
 				// terminal observation join; do not roll back merely when crypto returns.
@@ -2546,6 +2610,7 @@ export function createNodeDurableIssuanceStoreImplementation(
 		Object.freeze(readBoundedRecoveryCensus);
 		const maintenance = Object.freeze({
 			readBoundedRecoveryCensus,
+			readOrdinarySignMaterialByteLength: issuanceUnsignedOwnMaterialByteLength,
 			withNativeSignAdmission: (input: unknown, sign: () => Promise<Uint8Array>) =>
 				implementation.withNativeSignAdmission(input, sign),
 			acquireRetirementControl: (input: { readonly objectId: string }) =>
