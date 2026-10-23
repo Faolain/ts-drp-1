@@ -9,7 +9,7 @@ import {
 	resolveCreatorAnchorTrustMaterial,
 } from "./internal/seal-authority-custody.js";
 import { settlementProfileFor } from "./settlement-profile.js";
-import { CREATOR_AUTHOR_SETTLEMENT_MAX_RECORD_BYTES } from "./creator-author-issuance-frontiers.js";
+import { CREATOR_AUTHOR_SETTLEMENT_MAX_RECORD_BYTES } from "./internal/creator-settlement-limits.js";
 
 const DIGEST_HEX = /^[0-9a-f]{64}$/u;
 const INPUT_KEYS = Object.freeze([
