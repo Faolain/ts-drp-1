@@ -39,7 +39,7 @@ function openRoom(
 	options: {
 		local?: string;
 		peers?: Iterable<string>;
-		send?(peer: string): Promise<void> | undefined;
+		send?(peer: string, signal?: AbortSignal): Promise<void> | undefined;
 	} = {}
 ) {
 	const local = options.local ?? "creator";
@@ -50,7 +50,7 @@ function openRoom(
 		getAllPeers: () => [...connected],
 		sendMessage: (peer: string, message: Message, sendOptions?: { signal?: AbortSignal }) => {
 			sent.push({ peer, message, signal: sendOptions?.signal });
-			return options.send?.(peer) ?? Promise.resolve();
+			return options.send?.(peer, sendOptions?.signal) ?? Promise.resolve();
 		},
 	});
 	const adapter = new NodeRoomNetworkAdapter(network, new NodeEphemeralAdapter(network, null));
@@ -90,6 +90,13 @@ function plane(initial: NodeRoomDeliveryRepairCapacity = "ready") {
 }
 
 const peersOf = (sent: readonly Sent[]) => sent.map((entry) => entry.peer);
+
+function untilAborted(signal?: AbortSignal): Promise<void> {
+	return new Promise((_resolve, reject) => {
+		if (signal?.aborted) reject(signal.reason);
+		else signal?.addEventListener("abort", () => reject(signal.reason), { once: true });
+	});
+}
 
 describe("Track AA: the creator's delivery repair scheduler", () => {
 	it("is a no-op on every peer but the creator", async () => {
@@ -242,7 +249,7 @@ describe("Track AA: the creator's delivery repair scheduler", () => {
 		const stalled = ["stall-1", "stall-2", "stall-3", "stall-4", "stall-5"];
 		const { port, sent, census } = openRoom({
 			peers: [...stalled, "writer-1"],
-			send: (peer) => (peer.startsWith("stall-") ? new Promise<void>(() => undefined) : undefined),
+			send: (peer, signal) => (peer.startsWith("stall-") ? untilAborted(signal) : undefined),
 		});
 		const p = plane("busy");
 		for (const peerId of [...stalled, "writer-1"]) port.requestDeliveryRepair(p.refused(peerId));
@@ -274,7 +281,7 @@ describe("Track AA: the creator's delivery repair scheduler", () => {
 	it("close cancels its timer and in-flight requests, and joins them", async () => {
 		vi.useFakeTimers();
 		const { port, sent, census } = openRoom({
-			send: (peer) => (peer === "writer-1" ? new Promise<void>(() => undefined) : undefined),
+			send: (peer, signal) => (peer === "writer-1" ? untilAborted(signal) : undefined),
 		});
 		const p = plane("ready");
 		port.requestDeliveryRepair(p.refused("writer-1"));
@@ -282,7 +289,7 @@ describe("Track AA: the creator's delivery repair scheduler", () => {
 		expect(census()).toMatchObject({ sends: 1, timers: 2 });
 		const closing = port.close();
 		expect(required(sent[0]).signal?.aborted).toBe(true);
-		expect(census()).toMatchObject({ peers: 0, sends: 0, timers: 0, planeBound: 0 });
+		expect(census()).toMatchObject({ peers: 0, sends: 1, timers: 0, planeBound: 0 });
 		expect(vi.getTimerCount()).toBe(0);
 		await closing;
 		port.requestDeliveryRepair(p.refused("writer-3"));
@@ -294,7 +301,7 @@ describe("Track AA: the creator's delivery repair scheduler", () => {
 	it("a successor plane replaces the replaced plane's hints; retirement ends them", async () => {
 		vi.useFakeTimers();
 		const { port, sent, census } = openRoom({
-			send: (peer) => (peer === "writer-2" ? new Promise<void>(() => undefined) : undefined),
+			send: (peer, signal) => (peer === "writer-2" ? untilAborted(signal) : undefined),
 		});
 		const first = plane("busy");
 		port.requestDeliveryRepair(first.refused("writer-1"));
@@ -309,6 +316,7 @@ describe("Track AA: the creator's delivery repair scheduler", () => {
 		expect(census()).toMatchObject({ peers: 1, sends: 1, planeBound: 1 });
 		port.requestDeliveryRepair(second.retired());
 		expect(required(sent[0]).signal?.aborted).toBe(true);
+		await vi.advanceTimersByTimeAsync(0);
 		expect(census()).toMatchObject({ peers: 0, sends: 0, timers: 0, planeBound: 0, clears: 2 });
 		// A probe that reports retirement (or throws) ends the hints the same way.
 		const third = plane("retired");
@@ -340,5 +348,162 @@ describe("Track AA: the creator's delivery repair scheduler", () => {
 		expect(sent).toEqual([]);
 		expect(census()).toMatchObject({ peers: 0, sends: 0, timers: 0, signals: 0 });
 		await port.close();
+	});
+
+	it("keeps admitted-row targets due through lost replies and clears them only at admission", async () => {
+		vi.useFakeTimers();
+		const { port, sent, census } = openRoom({ peers: ["writer-1"] });
+		const p = plane();
+		const admitted = new Set<string>();
+		const digest = "a".repeat(64);
+		const tracking = { maxEntries: 2, maxBytes: 384, isAdmitted: (value: string) => admitted.has(value) };
+		port.requestDeliveryRepair({ ...p.missing("writer-1"), vertexDigest: digest, tracking });
+		await vi.advanceTimersByTimeAsync(65_000);
+		expect(sent.length).toBeGreaterThan(5);
+		expect(census()).toMatchObject({ targets: 1, targetBytes: 192, targetLimit: 2, duePeers: 1 });
+		const before = sent.length;
+		admitted.add(digest);
+		await vi.advanceTimersByTimeAsync(32_000);
+		expect(sent.length - before).toBeLessThanOrEqual(7);
+		expect(census()).toMatchObject({ targets: 0, targetBytes: 0, duePeers: 0, timers: 1, sweepActive: 1 });
+		await port.close();
+	});
+
+	it("keeps a raw refused hint dirty beyond a minute without decoding or claiming admission", async () => {
+		vi.useFakeTimers();
+		const { port, sent, census } = openRoom();
+		const p = plane();
+		const probe = vi.fn(() => false);
+		port.requestDeliveryRepair({
+			...p.refused("writer-1"),
+			tracking: { maxEntries: 2, maxBytes: 384, isAdmitted: probe },
+		});
+		await vi.advanceTimersByTimeAsync(130_000);
+		expect(sent.length).toBeGreaterThan(7);
+		expect(peersOf(sent).filter((peer) => peer === "writer-1").length).toBeLessThanOrEqual(11);
+		expect(probe).not.toHaveBeenCalled();
+		expect(census()).toMatchObject({ peers: 1, unconfirmedPeers: 1, targets: 0, duePeers: 1, timers: 1 });
+		await port.close();
+		expect(vi.getTimerCount()).toBe(0);
+	});
+
+	it("reserves ordinary turns beside peers that continuously return unresolved authenticated work", async () => {
+		vi.useFakeTimers();
+		const p = plane("busy");
+		const peers = ["bad-1", "bad-2", "bad-3", "bad-4", "writer-1"];
+		const { port, sent } = openRoom({
+			peers,
+			send: (peer) => {
+				if (peer !== "writer-1") queueMicrotask(() => port.requestDeliveryRepair(p.missing(peer)));
+				return undefined;
+			},
+		});
+		port.requestDeliveryRepair(p.refused("writer-1"));
+		for (const peer of peers.slice(0, 4)) port.requestDeliveryRepair(p.missing(peer));
+		p.set("ready");
+		port.requestDeliveryRepair(p.ready());
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(peersOf(sent)).toContain("writer-1");
+		await port.close();
+	});
+
+	it("sweeps the connected roster when a full peer set cannot remember a final refused copy", async () => {
+		vi.useFakeTimers();
+		const peers = Array.from({ length: 65 }, (_, index) => `peer-${String(index).padStart(3, "0")}`);
+		const { port, sent, census } = openRoom({ peers });
+		const p = plane("busy");
+		const tracking = { maxEntries: 64, maxBytes: 64 * 192, isAdmitted: () => false };
+		for (const [index, peer] of peers.slice(0, 64).entries())
+			port.requestDeliveryRepair({ ...p.missing(peer), vertexDigest: index.toString(16).padStart(64, "0"), tracking });
+		port.requestDeliveryRepair({ ...p.refused(required(peers[64])), tracking });
+		expect(census()).toMatchObject({ peers: 64, targets: 64, sweepActive: 1, refusedPeers: 1 });
+		p.set("ready");
+		port.requestDeliveryRepair(p.ready());
+		await vi.advanceTimersByTimeAsync(330_000);
+		expect(peersOf(sent)).toContain(required(peers[64]));
+		expect(census().peers).toBeLessThanOrEqual(64);
+		expect(census().targets).toBeLessThanOrEqual(64);
+		expect(census().sweepCursorBytes).toBeLessThanOrEqual(128);
+		expect(sent.length).toBeLessThanOrEqual(1321);
+		await port.close();
+		expect(vi.getTimerCount()).toBe(0);
+	});
+
+	it("preserves a sweep-only peer's cooldown when a refusal follows immediately", async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(0);
+		const { port, sent, census } = openRoom({ peers: ["writer-1"] });
+		const p = plane();
+		const tracking = { maxEntries: 64, maxBytes: 64 * 192, isAdmitted: () => false };
+		port.requestDeliveryRepair({ ...p.ready(), tracking });
+		await vi.advanceTimersByTimeAsync(5_100);
+		expect(sent).toHaveLength(1);
+		port.requestDeliveryRepair({ ...p.refused("writer-1"), tracking });
+		await vi.advanceTimersByTimeAsync(899);
+		expect(sent).toHaveLength(1);
+		await vi.advanceTimersByTimeAsync(1);
+		expect(sent).toHaveLength(2);
+		expect(census().peers).toBe(1);
+		await port.close();
+	});
+
+	for (const local of ["creator", "writer-1"])
+		it(`periodically repairs a quiet ${local} plane without a hint and replaces its timer with the epoch`, async () => {
+			vi.useFakeTimers();
+			const { port, sent, connected, census } = openRoom({ local, peers: [] });
+			const tracking = { maxEntries: 64, maxBytes: 64 * 192, isAdmitted: () => false };
+			const first = plane();
+			port.requestDeliveryRepair({ ...first.ready(), tracking });
+			await vi.advanceTimersByTimeAsync(15_000);
+			expect(sent).toEqual([]);
+			expect(census()).toMatchObject({ peers: 0, planeBound: 1, sweepActive: 1, timers: 1 });
+			connected.add("creator");
+			connected.add("writer-1");
+			connected.add("writer-2");
+			await vi.advanceTimersByTimeAsync(10_000);
+			expect(peersOf(sent)).toEqual(local === "creator" ? ["writer-1", "writer-2"] : ["creator", "creator"]);
+			expect(census()).toMatchObject({ peers: 0, sends: 0, timers: 1 });
+			const second = plane();
+			port.requestDeliveryRepair({ ...second.ready(), tracking });
+			port.requestDeliveryRepair(first.retired());
+			expect(census()).toMatchObject({ clears: 1, planeBound: 1, timers: 1 });
+			await vi.advanceTimersByTimeAsync(5_000);
+			expect(sent).toHaveLength(3);
+			port.requestDeliveryRepair(second.retired());
+			expect(census()).toMatchObject({ peers: 0, planeBound: 0, sweepActive: 0, timers: 0 });
+			await vi.advanceTimersByTimeAsync(30_000);
+			expect(sent).toHaveLength(3);
+			await port.close();
+			expect(vi.getTimerCount()).toBe(0);
+		});
+
+	it("keeps noncooperative native sends charged across cancellation, replacement and close", async () => {
+		vi.useFakeTimers();
+		const releases: (() => void)[] = [];
+		const { port, sent, census } = openRoom({
+			peers: ["writer-1", "writer-2", "writer-3", "writer-4", "writer-5"],
+			send: () => new Promise<void>((resolve) => releases.push(resolve)),
+		});
+		const p = plane("busy");
+		for (let i = 1; i <= 5; i++) port.requestDeliveryRepair(p.refused(`writer-${i}`));
+		p.set("ready");
+		port.requestDeliveryRepair(p.ready());
+		await vi.advanceTimersByTimeAsync(60_000);
+		expect(sent).toHaveLength(4);
+		expect(census()).toMatchObject({ sends: 4, timers: 0 });
+		const next = plane();
+		port.requestDeliveryRepair(next.refused("writer-1"));
+		expect(census().sends).toBe(4);
+		let closed = false;
+		const closing = port.close().then(() => {
+			closed = true;
+		});
+		await vi.advanceTimersByTimeAsync(1_000);
+		expect(closed).toBe(false);
+		expect(census().sends).toBe(4);
+		for (const release of releases) release();
+		await closing;
+		expect(sent).toHaveLength(4);
+		expect(vi.getTimerCount()).toBe(0);
 	});
 });

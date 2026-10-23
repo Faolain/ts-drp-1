@@ -14,7 +14,7 @@ it("keeps the direct-message abort signal attached while dialing", async () => {
 	vi.spyOn(node, "safeDial").mockImplementation((_peer, _host, signal) => {
 		receivedSignal = signal;
 		return new Promise((_resolve, reject) => {
-			release = () => reject(failure);
+			release = (): void => reject(failure);
 			signal?.addEventListener("abort", release, { once: true });
 		});
 	});

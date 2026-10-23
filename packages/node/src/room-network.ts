@@ -28,8 +28,9 @@ const HISTORY_REQUEST_SEND_DEADLINE_MS = 10_000;
 // the creator asks that peer, with the existing HISTORY_REQUEST sent to it directly, to
 // republish its retained history. The peer id is a routing hint only: the request grants
 // nothing, and every row that comes back re-enters the plane's ordinary authenticated
-// admission and pays its own charges there. Proposed limits, for the owner's review
-// (docs/realtime-latency/tracks/39-track-aa-creator-delivery-repair/RESULT.md):
+// admission and pays its own charges there. Silent first/final losses also require a
+// periodic request: recipients ask the creator, which rotates connected routing peers.
+// The same bounded send owner services both periodic and observed-gap work:
 // - at most MAX_DELIVERY_REPAIR_PEERS remembered peers per room. A peer id is at most
 //   MAX_DELIVERY_REPAIR_PEER_ID_BYTES UTF-8 bytes, belongs to a connected peer, and is
 //   charged DELIVERY_REPAIR_ENTRY_BYTES plus its id bytes. A full set refuses a new peer;
@@ -39,8 +40,8 @@ const HISTORY_REQUEST_SEND_DEADLINE_MS = 10_000;
 //   one scheduling timer per room;
 // - requests at least DELIVERY_REPAIR_SPACING_MS apart per room, and at least
 //   DELIVERY_REPAIR_PEER_INTERVAL_MS apart per peer, doubling after each failed send up to
-//   DELIVERY_REPAIR_MAX_BACKOFF_MS. Due peers are asked in round robin, peers named by
-//   authenticated rows first;
+//   DELIVERY_REPAIR_MAX_BACKOFF_MS. Authenticated-priority turns alternate with
+//   ordinary round robin so untrusted held-row traffic cannot starve refusal hints;
 // - a request goes out only while the plane reports room for a republication burst; while
 //   it is busy the room re-probes at most once per DELIVERY_REPAIR_PEER_INTERVAL_MS.
 const MAX_DELIVERY_REPAIR_PEERS = 64;
@@ -51,6 +52,12 @@ const DELIVERY_REPAIR_SEND_BYTES = 256;
 const DELIVERY_REPAIR_SPACING_MS = 250;
 const DELIVERY_REPAIR_PEER_INTERVAL_MS = 1_000;
 const DELIVERY_REPAIR_MAX_BACKOFF_MS = 32_000;
+// A silent lost first/final copy produces no gap. Every active plane therefore
+// rotates one connected routing peer per interval, using the same send owner.
+const DELIVERY_REPAIR_SWEEP_INTERVAL_MS = 5_000;
+// Digests are routing work, never accepted bytes. Their independent owner uses the
+// plane's signed pending-entry/byte limits and charges a fixed record plus the hex id.
+const DELIVERY_REPAIR_TARGET_BYTES = 192;
 const TEXT_ENCODER = new TextEncoder();
 
 /**
@@ -116,6 +123,13 @@ export type NodeRoomControlPlaneObservationProvider = () => NodeRoomControlPlane
 /** Track AA: whether the reporting live plane has room for a republication burst. */
 export type NodeRoomDeliveryRepairCapacity = "ready" | "busy" | "retired";
 
+/** Weak, current-plane lookup; successful transport sends never establish admission. */
+export interface NodeRoomDeliveryRepairTracking {
+	readonly maxEntries: number;
+	readonly maxBytes: number;
+	isAdmitted(digest: string): boolean;
+}
+
 /**
  * Track AA: a delivery gap the room's live plane reports (v3-live `V3DeliveryGap`). `peerId`
  * is the authenticated transport identity of the copy concerned: a routing hint, never
@@ -124,6 +138,8 @@ export type NodeRoomDeliveryRepairCapacity = "ready" | "busy" | "retired";
 export interface NodeRoomDeliveryGap {
 	readonly kind: "missing" | "refused" | "capacity" | "retired";
 	readonly peerId?: string;
+	readonly vertexDigest?: string;
+	readonly tracking?: NodeRoomDeliveryRepairTracking;
 	capacity(): NodeRoomDeliveryRepairCapacity;
 }
 
@@ -133,6 +149,13 @@ export interface NodeRoomDeliveryRepairCensus {
 	readonly peers: number;
 	readonly peerBytes: number;
 	readonly duePeers: number;
+	readonly targets: number;
+	readonly targetBytes: number;
+	readonly targetLimit: number;
+	readonly refusedTargets: number;
+	readonly unconfirmedPeers: number;
+	readonly sweepActive: number;
+	readonly sweepCursorBytes: number;
 	/** Requests in flight and their charged bytes. */
 	readonly sends: number;
 	readonly sendBytes: number;
@@ -157,17 +180,29 @@ interface DeliveryRepairPeer {
 	sending: boolean;
 	askedAt: number | undefined;
 	failures: number;
+	unanswered: number;
+	unconfirmed: boolean;
+	readonly targets: Set<string>;
 	readonly bytes: number;
 }
 
 interface DeliveryRepairSend {
+	readonly peerId: string;
 	readonly controller: AbortController;
-	readonly deadline: ReturnType<typeof setTimeout>;
+	deadline: ReturnType<typeof setTimeout> | undefined;
 	cancelled: boolean;
 }
 
 interface DeliveryRepair {
 	probe: (() => NodeRoomDeliveryRepairCapacity) | undefined;
+	tracking: NodeRoomDeliveryRepairTracking | undefined;
+	targetLimit: number;
+	targets: number;
+	refusedTargets: number;
+	preferAuthenticated: boolean;
+	sweepEnabled: boolean;
+	sweepCursor: string | undefined;
+	sweepAt: number;
 	readonly peers: Map<string, DeliveryRepairPeer>;
 	peerBytes: number;
 	waiting: boolean;
@@ -311,14 +346,25 @@ export class NodeRoomNetworkAdapter {
 		if (registration === undefined) return undefined;
 		const repair = registration.repair;
 		let duePeers = 0;
+		let unconfirmedPeers = 0;
 		for (const entry of repair.peers.values()) if (entry.due) duePeers++;
+		for (const entry of repair.peers.values()) if (entry.unconfirmed) unconfirmedPeers++;
+		let deadlineTimers = 0;
+		for (const send of repair.sends) if (send.deadline !== undefined) deadlineTimers++;
 		return Object.freeze({
 			peers: repair.peers.size,
 			peerBytes: repair.peerBytes,
 			duePeers,
+			targets: repair.targets,
+			targetBytes: repair.targets * DELIVERY_REPAIR_TARGET_BYTES,
+			targetLimit: repair.targetLimit,
+			refusedTargets: repair.refusedTargets,
+			unconfirmedPeers,
+			sweepActive: Number(repair.sweepEnabled),
+			sweepCursorBytes: repair.sweepCursor === undefined ? 0 : TEXT_ENCODER.encode(repair.sweepCursor).byteLength,
 			sends: repair.sends.size,
 			sendBytes: repair.sends.size * DELIVERY_REPAIR_SEND_BYTES,
-			timers: Number(repair.timer !== undefined) + repair.sends.size,
+			timers: Number(repair.timer !== undefined) + deadlineTimers,
 			waitingForCapacity: Number(repair.waiting),
 			planeBound: Number(repair.probe !== undefined),
 			signals: repair.signals,
@@ -457,6 +503,14 @@ export class NodeRoomNetworkAdapter {
 			publisher: () => Promise.resolve(),
 			repair: {
 				probe: undefined,
+				tracking: undefined,
+				targetLimit: 0,
+				targets: 0,
+				refusedTargets: 0,
+				preferAuthenticated: true,
+				sweepEnabled: false,
+				sweepCursor: undefined,
+				sweepAt: 0,
 				peers: new Map(),
 				peerBytes: 0,
 				waiting: false,
@@ -882,8 +936,10 @@ export class NodeRoomNetworkAdapter {
 		try {
 			if (registration.closed) return;
 			const creatorPeerId = registration.creatorPeerId;
-			// Only the creator repairs; every other peer asks the creator (`#requestMissing`).
-			if (creatorPeerId === undefined || creatorPeerId !== this.#networkNode.peerId) return;
+			// Recipients periodically ask their creator; creators rotate connected peers.
+			if (creatorPeerId === undefined) return;
+			const localCreator = creatorPeerId === this.#networkNode.peerId;
+			if (!localCreator && gap?.tracking === undefined && registration.repair.tracking === undefined) return;
 			if (gap === null || typeof gap !== "object") return;
 			const kind: unknown = gap.kind;
 			const capacity: unknown = gap.capacity;
@@ -901,20 +957,39 @@ export class NodeRoomNetworkAdapter {
 				this.#clearRepair(registration);
 				repair.probe = capacity as () => NodeRoomDeliveryRepairCapacity;
 			}
+			if (repair.tracking === undefined && gap.tracking !== undefined) {
+				const tracking = gap.tracking;
+				if (
+					typeof tracking.isAdmitted === "function" &&
+					Number.isSafeInteger(tracking.maxEntries) &&
+					tracking.maxEntries > 0 &&
+					Number.isSafeInteger(tracking.maxBytes) &&
+					tracking.maxBytes > 0
+				) {
+					repair.tracking = tracking;
+					repair.sweepEnabled = true;
+					repair.sweepAt = Date.now() + DELIVERY_REPAIR_SWEEP_INTERVAL_MS;
+					repair.targetLimit = Math.min(
+						tracking.maxEntries,
+						Math.floor(tracking.maxBytes / DELIVERY_REPAIR_TARGET_BYTES)
+					);
+				}
+			}
 			repair.signals++;
 			if (kind === "retired") {
 				this.#clearRepair(registration);
 				return;
 			}
 			if (kind === "capacity") repair.waiting = false;
-			else this.#markRepairPeer(registration, peerId, kind === "missing");
+			else
+				this.#markRepairPeer(registration, localCreator ? peerId : creatorPeerId, kind === "missing", gap.vertexDigest);
 			this.#pumpRepair(registration);
 		} catch {
 			// Repair is advisory: a failure here changes no admission and no plane state.
 		}
 	}
 
-	#markRepairPeer(registration: RoomRegistration, peerId: unknown, authenticated: boolean): void {
+	#markRepairPeer(registration: RoomRegistration, peerId: unknown, authenticated: boolean, digest?: string): void {
 		const repair = registration.repair;
 		if (
 			typeof peerId !== "string" ||
@@ -928,7 +1003,10 @@ export class NodeRoomNetworkAdapter {
 		const existing = repair.peers.get(peerId);
 		if (existing !== undefined) {
 			existing.due = true;
+			existing.unanswered = 0;
 			if (authenticated) existing.authenticated = true;
+			else if (repair.tracking !== undefined) existing.unconfirmed = true;
+			this.#markRepairTarget(repair, existing, digest, authenticated);
 			return;
 		}
 		const idBytes = TEXT_ENCODER.encode(peerId).byteLength;
@@ -965,8 +1043,57 @@ export class NodeRoomNetworkAdapter {
 			}
 		}
 		const bytes = DELIVERY_REPAIR_ENTRY_BYTES + idBytes;
-		repair.peers.set(peerId, { due: true, authenticated, sending: false, askedAt: undefined, failures: 0, bytes });
+		const entry: DeliveryRepairPeer = {
+			due: true,
+			authenticated,
+			sending: false,
+			// A sweep keeps only its latest cursor/time. It is the only sweep that
+			// can still be inside the peer interval, so no second peer map is needed.
+			askedAt: repair.sweepCursor === peerId ? repair.sweepAt - DELIVERY_REPAIR_SWEEP_INTERVAL_MS : undefined,
+			failures: 0,
+			unanswered: 0,
+			unconfirmed: !authenticated && repair.tracking !== undefined,
+			targets: new Set(),
+			bytes,
+		};
+		repair.peers.set(peerId, entry);
 		repair.peerBytes += bytes;
+		this.#markRepairTarget(repair, entry, digest, authenticated);
+	}
+
+	#markRepairTarget(
+		repair: DeliveryRepair,
+		entry: DeliveryRepairPeer,
+		digest: string | undefined,
+		authenticated: boolean
+	): void {
+		if (
+			!authenticated ||
+			repair.tracking === undefined ||
+			typeof digest !== "string" ||
+			!/^[0-9a-f]{64}$/u.test(digest)
+		)
+			return;
+		if (entry.targets.has(digest)) return;
+		if (repair.tracking.isAdmitted(digest)) return;
+		if (repair.targets >= repair.targetLimit) {
+			for (const peer of repair.peers.values()) this.#pruneRepairTargets(repair, peer);
+		}
+		if (repair.targets >= repair.targetLimit) {
+			repair.refusedTargets++;
+			entry.unconfirmed = true;
+			return;
+		}
+		entry.targets.add(digest);
+		repair.targets++;
+	}
+
+	#pruneRepairTargets(repair: DeliveryRepair, entry: DeliveryRepairPeer): void {
+		for (const digest of entry.targets) {
+			if (repair.tracking?.isAdmitted(digest) !== true) continue;
+			entry.targets.delete(digest);
+			repair.targets--;
+		}
 	}
 
 	#pumpRepair(registration: RoomRegistration): void {
@@ -978,21 +1105,53 @@ export class NodeRoomNetworkAdapter {
 			// A settling send pumps again.
 			if (repair.sends.size >= MAX_DELIVERY_REPAIR_SENDS) return;
 			let chosen: [string, DeliveryRepairPeer] | undefined;
+			let priority: [string, DeliveryRepairPeer] | undefined;
+			let swept = false;
 			let wakeAt = Number.POSITIVE_INFINITY;
 			for (const [peerId, entry] of repair.peers) {
+				const tracked = entry.targets.size > 0;
+				this.#pruneRepairTargets(repair, entry);
+				if (tracked && entry.targets.size === 0 && !entry.unconfirmed) entry.due = false;
 				const readyAt = repairReadyAt(entry, now);
 				if (!entry.due) {
 					// Asked and cooled down: nothing left to remember.
 					if (!entry.sending && readyAt <= now) this.#dropRepairPeer(repair, peerId, entry);
 					continue;
 				}
-				if (entry.sending) continue;
+				if (entry.sending || [...repair.sends].some((send) => send.peerId === peerId)) continue;
 				if (readyAt > now) {
 					wakeAt = Math.min(wakeAt, readyAt);
 					continue;
 				}
-				if (chosen === undefined || (entry.authenticated && !chosen[1].authenticated)) chosen = [peerId, entry];
-				if (entry.authenticated) break;
+				chosen ??= [peerId, entry];
+				if (entry.authenticated) priority ??= [peerId, entry];
+			}
+			// A priority turn alternates with ordinary round robin, so repeated held
+			// rows cannot starve a first copy that only reached the capacity boundary.
+			if (repair.preferAuthenticated && priority !== undefined) chosen = priority;
+			if (repair.sweepEnabled) {
+				if (now < repair.sweepAt) wakeAt = Math.min(wakeAt, repair.sweepAt);
+				else {
+					const peerId = this.#nextRepairSweepPeer(registration, now);
+					if (peerId === undefined) wakeAt = Math.min(wakeAt, now + DELIVERY_REPAIR_SWEEP_INTERVAL_MS);
+					else {
+						chosen = [
+							peerId,
+							repair.peers.get(peerId) ?? {
+								due: true,
+								authenticated: false,
+								sending: false,
+								askedAt: undefined,
+								failures: 0,
+								unanswered: 0,
+								unconfirmed: false,
+								targets: new Set(),
+								bytes: 0,
+							},
+						];
+						swept = true;
+					}
+				}
 			}
 			if (chosen === undefined) {
 				if (wakeAt !== Number.POSITIVE_INFINITY) this.#armRepair(registration, wakeAt - now);
@@ -1026,30 +1185,65 @@ export class NodeRoomNetworkAdapter {
 				repair.unreachablePeers++;
 				continue;
 			}
-			this.#sendRepair(registration, peerId, entry, now);
+			repair.preferAuthenticated = !repair.preferAuthenticated;
+			if (swept) {
+				repair.sweepCursor = peerId;
+				repair.sweepAt = now + DELIVERY_REPAIR_SWEEP_INTERVAL_MS;
+			}
+			this.#sendRepair(registration, peerId, entry, now, repair.peers.get(peerId) === entry);
 		}
 	}
 
-	#sendRepair(registration: RoomRegistration, peerId: string, entry: DeliveryRepairPeer, now: number): void {
+	#nextRepairSweepPeer(registration: RoomRegistration, now: number): string | undefined {
+		const repair = registration.repair;
+		let first: string | undefined;
+		let next: string | undefined;
+		// The connection owner already bounds this roster. Keep one cursor, not a
+		// second peer list: even a 65th refused sender gets recurring repair turns.
+		for (const peerId of this.#networkNode.getAllPeers()) {
+			if (
+				peerId === this.#networkNode.peerId ||
+				(registration.creatorPeerId !== this.#networkNode.peerId && peerId !== registration.creatorPeerId) ||
+				peerId.length === 0 ||
+				peerId.length > MAX_DELIVERY_REPAIR_PEER_ID_BYTES ||
+				TEXT_ENCODER.encode(peerId).byteLength > MAX_DELIVERY_REPAIR_PEER_ID_BYTES ||
+				[...repair.sends].some((send) => send.peerId === peerId)
+			)
+				continue;
+			const entry = repair.peers.get(peerId);
+			if (entry !== undefined && repairReadyAt(entry, now) > now) continue;
+			if (first === undefined || peerId < first) first = peerId;
+			if ((repair.sweepCursor === undefined || peerId > repair.sweepCursor) && (next === undefined || peerId < next))
+				next = peerId;
+		}
+		return next ?? first;
+	}
+
+	#sendRepair(
+		registration: RoomRegistration,
+		peerId: string,
+		entry: DeliveryRepairPeer,
+		now: number,
+		remembered: boolean
+	): void {
 		const repair = registration.repair;
 		// Round robin: the peer just asked goes to the back.
-		repair.peers.delete(peerId);
-		repair.peers.set(peerId, entry);
+		if (remembered) {
+			repair.peers.delete(peerId);
+			repair.peers.set(peerId, entry);
+		}
 		entry.due = false;
 		entry.sending = true;
 		entry.askedAt = now;
 		repair.nextAt = now + DELIVERY_REPAIR_SPACING_MS;
 		repair.requestsSent++;
 		const controller = new AbortController();
-		const deadline = setTimeout(
-			() => controller.abort(new Error("room delivery repair send deadline elapsed")),
-			HISTORY_REQUEST_SEND_DEADLINE_MS
-		);
-		const send = { controller, deadline, cancelled: false };
+		const deadline = setTimeout(() => {
+			send.deadline = undefined;
+			controller.abort(new Error("room delivery repair send deadline elapsed"));
+		}, HISTORY_REQUEST_SEND_DEADLINE_MS);
+		const send: DeliveryRepairSend = { peerId, controller, deadline, cancelled: false };
 		repair.sends.add(send);
-		const aborted = new Promise<false>((resolve) => {
-			controller.signal.addEventListener("abort", () => resolve(false), { once: true });
-		});
 		let attempt: Promise<boolean>;
 		try {
 			attempt = this.#networkNode
@@ -1070,14 +1264,22 @@ export class NodeRoomNetworkAdapter {
 		} catch {
 			attempt = Promise.resolve(false);
 		}
-		const job: Promise<void> = Promise.race([attempt, aborted])
+		// Cancellation asks the native operation to stop; it does not release its
+		// slot or its close join until the native promise has actually settled.
+		const job: Promise<void> = attempt
 			.then((delivered) => {
 				clearTimeout(deadline);
+				send.deadline = undefined;
 				repair.sends.delete(send);
 				entry.sending = false;
-				if (send.cancelled) return;
-				if (delivered) entry.failures = 0;
-				else {
+				if (!send.cancelled && delivered) {
+					entry.failures = 0;
+					this.#pruneRepairTargets(repair, entry);
+					if ((entry.targets.size > 0 || entry.unconfirmed) && !entry.due) {
+						entry.due = true;
+						entry.unanswered = Math.min(entry.unanswered + 1, 6);
+					}
+				} else if (!send.cancelled) {
 					// The gap is not repaired: the peer stays due, asked again after a longer pause.
 					repair.sendFailures++;
 					entry.failures = Math.min(entry.failures + 1, 16);
@@ -1116,12 +1318,22 @@ export class NodeRoomNetworkAdapter {
 		if (repair.peers.get(peerId) !== entry) return;
 		repair.peers.delete(peerId);
 		repair.peerBytes -= entry.bytes;
+		repair.targets -= entry.targets.size;
+		entry.targets.clear();
 	}
 
 	#clearRepair(registration: RoomRegistration): void {
 		const repair = registration.repair;
 		if (repair.probe !== undefined || repair.peers.size > 0 || repair.sends.size > 0) repair.clears++;
 		repair.probe = undefined;
+		repair.tracking = undefined;
+		repair.targetLimit = 0;
+		repair.targets = 0;
+		repair.preferAuthenticated = true;
+		repair.sweepEnabled = false;
+		repair.sweepCursor = undefined;
+		repair.sweepAt = 0;
+		for (const entry of repair.peers.values()) entry.targets.clear();
 		repair.peers.clear();
 		repair.peerBytes = 0;
 		repair.waiting = false;
@@ -1130,9 +1342,9 @@ export class NodeRoomNetworkAdapter {
 		for (const send of repair.sends) {
 			send.cancelled = true;
 			clearTimeout(send.deadline);
+			send.deadline = undefined;
 			send.controller.abort(new Error("room delivery repair was cancelled"));
 		}
-		repair.sends.clear();
 	}
 
 	#connected(peerId: string): boolean {
@@ -1232,7 +1444,11 @@ export class NodeRoomNetworkAdapter {
 function repairReadyAt(entry: DeliveryRepairPeer, now: number): number {
 	if (entry.askedAt === undefined) return now;
 	return (
-		entry.askedAt + Math.min(DELIVERY_REPAIR_PEER_INTERVAL_MS * 2 ** entry.failures, DELIVERY_REPAIR_MAX_BACKOFF_MS)
+		entry.askedAt +
+		Math.min(
+			DELIVERY_REPAIR_PEER_INTERVAL_MS * 2 ** Math.max(entry.failures, entry.unanswered - 1),
+			DELIVERY_REPAIR_MAX_BACKOFF_MS
+		)
 	);
 }
 

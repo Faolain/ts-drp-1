@@ -2955,7 +2955,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		};
 		try {
 			options.signal?.throwIfAborted();
-			const connection = await this.safeDial([multiaddr(`/p2p/${peerId}`)]);
+			const connection = await this.safeDial([multiaddr(`/p2p/${peerId}`)], this._node, options.signal);
 			options.signal?.throwIfAborted();
 			stream = <Stream>await connection?.newStream(DRP_MESSAGE_PROTOCOL, { signal: options.signal });
 			options.signal?.addEventListener("abort", abort, { once: true });

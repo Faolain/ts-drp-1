@@ -22,7 +22,7 @@ import {
 	placedRows,
 } from "./fixtures/track-aa/scenario.js";
 import { closeFixtures, required } from "./fixtures/track-m/room-retention-fixture.js";
-import { readV3RuntimeOwnerCensus } from "../packages/node/src/v3-live.js";
+import { readV3RuntimeOwnerCensus, routeV3RetainedIngress } from "../packages/node/src/v3-live.js";
 
 // The plane's ingress warnings (v3-live.ts `ingressFailureLog`) go to the console captured at
 // module load. vi.hoisted runs before every import, so the recorder sees them.
@@ -108,13 +108,20 @@ async function settled(fixture: CreatorDeliveryRoom, creator: OpenedPeer): Promi
 		const repair = repairCensus(fixture, creator);
 		return (
 			Object.entries(SETTLED).every(([field, value]) => plane[field] === value) &&
-			repair.duePeers === 0 &&
 			repair.sends === 0 &&
 			repair.waitingForCapacity === 0
 		);
 	}, 10_000);
 	expect(planeCensus(creator)).toMatchObject(SETTLED);
-	expect(repairCensus(fixture, creator)).toMatchObject({ duePeers: 0, sends: 0, waitingForCapacity: 0 });
+	// Request-send success is not delivery acknowledgement. Unconfirmed refusal
+	// hints keep bounded, backed-off repair alive until this epoch ends, even after
+	// this test has independently observed all of its signed rows admitted.
+	const repair = repairCensus(fixture, creator);
+	expect(repair).toMatchObject({ sends: 0, waitingForCapacity: 0 });
+	expect(repair.peers).toBeLessThanOrEqual(64);
+	expect(repair.targets).toBeLessThanOrEqual(ROOM_PARAMETERS.maxPendingEntries);
+	expect(repair.targetBytes).toBeLessThanOrEqual(ROOM_PARAMETERS.maxPendingBytes);
+	expect(repair.timers).toBeLessThanOrEqual(5);
 	expect(quiet).toBe(true);
 }
 
@@ -145,7 +152,7 @@ async function oversizedGossip(sender: DRPNetworkNode, topic: string): Promise<v
 
 describe("Track AA proof: the admitted-copy filter (v3-live routeV3RetainedIngress)", () => {
 	it(
-		"a forged or genuine copy of an admitted row takes no input slot and gains nothing; an unknown copy still does",
+		"a forged or genuine copy retains no input slot, gains nothing and cannot bypass full-pool or byte admission",
 		async () => {
 			const fixture = await creatorDeliveryRoom({ profile: "shipped" });
 			const [creator, writer] = await openAll(fixture);
@@ -185,7 +192,7 @@ describe("Track AA proof: the admitted-copy filter (v3-live routeV3RetainedIngre
 			const during = planeCensus(required(creator));
 			expect(during.admittedInputJobs, "600 copies of admitted digests: no input slot").toBe(before.admittedInputJobs);
 			expect(during.admittedInputBytes).toBe(before.admittedInputBytes);
-			expect(warnings.length - mark, "no copy reached capture or authentication").toBe(0);
+			expect(warnings.length - mark, "bounded duplicate captures released without authentication").toBe(0);
 			// Control: copies of an unknown row take input slots.
 			const topic = required(rows[0]).message.objectId;
 			for (let copy = 0; copy < 10; copy++)
@@ -195,11 +202,34 @@ describe("Track AA proof: the admitted-copy filter (v3-live routeV3RetainedIngre
 				);
 			await fixture.network.idle();
 			expect(planeCensus(required(creator)).admittedInputJobs).toBe(before.admittedInputJobs + 10);
+			const handle = required(planes.get(creatorPeer)) as V3LiveModule.V3PlaneHandle;
+			while (planeCensus(required(creator)).admittedInputJobs < 32)
+				routeV3RetainedIngress(handle, envelopeMessage(topic, new Uint8Array(64).fill(1), hostile.peerId));
+			const fullPoolDecode = vi.spyOn(V3Envelope, "decode");
+			try {
+				routeV3RetainedIngress(handle, required(rows[0]).message);
+				expect(fullPoolDecode, "a full pool refuses before duplicate decoding or hashing").not.toHaveBeenCalled();
+				expect(planeCensus(required(creator)).admittedInputJobs).toBe(32);
+			} finally {
+				fullPoolDecode.mockRestore();
+			}
 			fixture.creatorGate.release();
 			await fixture.network.idle();
 			await settled(fixture, required(creator));
 			// The busy row was counted when it entered the gate; no copy admitted anything more.
 			expect(required(creator).accepted.size, "no copy was admitted").toBe(acceptedBefore);
+			const oversized = envelopeMessage(topic, new Uint8Array(ROOM_PARAMETERS.maxPendingBytes + 1), hostile.peerId);
+			const byteBoundDecode = vi.spyOn(V3Envelope, "decode");
+			try {
+				routeV3RetainedIngress(handle, oversized);
+				expect(
+					byteBoundDecode,
+					"an oversized payload is refused before duplicate decoding or hashing"
+				).not.toHaveBeenCalled();
+				expect(planeCensus(required(creator)).admittedInputJobs).toBe(0);
+			} finally {
+				byteBoundDecode.mockRestore();
+			}
 		},
 		TEST_TIMEOUT
 	);
@@ -282,7 +312,7 @@ describe("Track AA proof: the admitted-copy filter (v3-live routeV3RetainedIngre
 			expect(creator.room.authority()?.epoch).toBe(1);
 			const adopted = repairCensus(fixture, creator);
 			expect(adopted.clears, "the retired plane's repair state was cleared").toBeGreaterThanOrEqual(1);
-			expect(adopted).toMatchObject({ peers: 0, sends: 0, planeBound: 0, timers: 0 });
+			expect(adopted).toMatchObject({ peers: 0, sends: 0, planeBound: 1, timers: 1, sweepActive: 1 });
 			mark = warnings.length;
 			await hostile.sendMessage(creator.peerId, envelopeMessage(topic, epoch0.data, hostile.peerId));
 			await fixture.network.idle();

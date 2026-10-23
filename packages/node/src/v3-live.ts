@@ -240,6 +240,7 @@ export {
 import { v3RoomRetentionOpener, type V3RoomRetirementSession } from "./internal/room-retirement.js";
 import { createRoomRetentionLedger, type RoomRetentionLedger } from "./internal/room-retention-ledger.js";
 import { deriveV3StableTopic } from "./internal/v3-topic.js";
+import type { NodeRoomDeliveryRepairTracking } from "./room-network.js";
 import { classifyV3EnvelopeScope } from "./v3-envelope-scope.js";
 import { consumeRecoveredV3LiveAuthority, installRecoveredV3LiveAuthority } from "./v3-live-recovered-authority.js";
 
@@ -3174,6 +3175,12 @@ async function prepareV3LiveGeneration(input: PrepareV3LiveGenerationInput): Pro
 	return failure("internal-invariant", "creator preparation exhausted unexpectedly");
 }
 
+interface V3ReplayableEgressDemand {
+	readonly gate: Promise<void> | undefined;
+	readonly result: Promise<V3EgressResult>;
+	readonly controller: AbortController | undefined;
+}
+
 interface V3PlaneRegistration {
 	readonly receiveOnly: boolean;
 	snapshotReadiness?: Readonly<{
@@ -3271,20 +3278,15 @@ interface V3PlaneRegistration {
 	admittedGossipQueueJobs: number;
 	admittedGossipQueueBytes: number;
 	/**
-	 * Track AA: the plane's delivery repair state. Absent until the plane routes ingress or
-	 * reports a gap while the room transport is bound to its topic
-	 * (`bindV3MissingDependencyRequest`).
+	 * Track AA: one weak delivery probe bound when both the plane and room transport
+	 * exist (`bindV3MissingDependencyRequest`), including before the first live row.
 	 */
 	deliveryRepair?: V3PlaneDeliveryRepair;
 	pendingIngressBytes: number;
 	publicationCursor: number | undefined;
-	/** Replayable egress joins only equal selectors at the same queued gate cut.
-	 * Entered work or intervening work requires a fresh authenticated attempt. */
-	queuedReplayableEgress?: Readonly<{
-		gate: Promise<void> | undefined;
-		result: Promise<V3EgressResult>;
-		selector: string;
-	}>;
+	/** The native egress pool bounds distinct selectors. Targeted retained replies
+	 * share an entered replay; completion/broadcast callers share only a queued cut. */
+	replayableEgress?: Map<string, V3ReplayableEgressDemand>;
 	rebaseCursor: number | undefined;
 	rebaseSnapshot: readonly ClassifiedRebaseRow[] | undefined;
 	retainedBootstrapHold: boolean;
@@ -5181,6 +5183,7 @@ export function readV3RuntimeOwnerCensus(plane: V3PlaneHandle): Readonly<Record<
 		admittedReadControlJobs: registration.admittedReadControlJobs,
 		admittedPendingPublicationJobs: registration.admittedPendingPublicationJobs,
 		admittedEgressControlJobs: registration.admittedEgressControlJobs,
+		replayableEgressKeys: registration.replayableEgress?.size ?? 0,
 		admittedGossipQueueJobs: registration.admittedGossipQueueJobs,
 		admittedGossipQueueBytes: registration.admittedGossipQueueBytes,
 		deliveryRepairWake: Number(registration.deliveryRepair?.wake === true),
@@ -7230,8 +7233,6 @@ function aliasCreatorSuccessorHandle(rawHandle: object, wrapper: object): boolea
 
 function deactivateRegistration(registration: V3PlaneRegistration): boolean {
 	registration.active = false;
-	// Track AA: a plane with delivery repair state tells its transport that it is gone.
-	if (registration.deliveryRepair !== undefined) reportDeliveryGap(registration, "retired");
 	registration.vertexFacts.release();
 	registration.roomRetentionLedger?.release();
 	// Numerical DATA is no longer selectable once the plane is revoked. Admitted
@@ -7251,6 +7252,8 @@ function deactivateRegistration(registration: V3PlaneRegistration): boolean {
 	} catch {
 		// Continue to queue cleanup and both observable postconditions.
 	}
+	if (registration.deliveryRepair !== undefined) reportDeliveryGap(registration, "retired");
+	for (const demand of registration.replayableEgress?.values() ?? []) demand.controller?.abort();
 	try {
 		registration.messageQueueManager.close(registration.queueId);
 	} catch {
@@ -7448,6 +7451,8 @@ export type V3DeliveryRepairCapacity = "ready" | "busy" | "retired";
 export interface V3DeliveryGap {
 	readonly kind: "missing" | "refused" | "capacity" | "retired";
 	readonly peerId?: string;
+	readonly vertexDigest?: string;
+	readonly tracking?: NodeRoomDeliveryRepairTracking;
 	capacity(): V3DeliveryRepairCapacity;
 }
 
@@ -7477,21 +7482,24 @@ export function bindV3MissingDependencyRequest(
 	}
 	const bound = byTopic;
 	ReflectApply(MapPrototypeSet, bound, [topic, request]);
+	const registration = v3PlaneRegistrations.get(networkNode)?.get(topic);
+	if (registration !== undefined) reportDeliveryGap(registration, "capacity");
 	return (): void => {
 		if (ReflectApply(MapPrototypeGet, bound, [topic]) === request) ReflectApply(MapPrototypeDelete, bound, [topic]);
 	};
 }
 
-function requestMissingDependencies(registration: V3PlaneRegistration, peerId: string): void {
+function requestMissingDependencies(registration: V3PlaneRegistration, peerId: string, digest: string): void {
 	if (!currentRegistration(registration)) return;
-	// A refused request leaves the vertex held; the next dependent vertex asks again.
-	reportDeliveryGap(registration, "missing", peerId);
+	// The held row remains a target until admission; send success cannot clear it.
+	reportDeliveryGap(registration, "missing", peerId, digest);
 }
 
 /** Track AA: one plane's delivery repair state (see `V3PlaneRegistration.deliveryRepair`). */
 interface V3PlaneDeliveryRepair {
 	/** A refusal or a busy probe asks for one capacity signal once both owners are at low water. */
 	wake: boolean;
+	readonly tracking: NodeRoomDeliveryRepairTracking;
 	/**
 	 * The probe handed to the transport. It holds the plane weakly, so a transport that keeps
 	 * it does not keep a retired plane.
@@ -7505,15 +7513,22 @@ function deliveryRepairRequest(registration: V3PlaneRegistration): ((gap?: V3Del
 	return ReflectApply(MapPrototypeGet, byTopic, [registration.topic]) as ((gap?: V3DeliveryGap) => void) | undefined;
 }
 
-// Track AA: a plane gets its delivery repair state the first time it routes ingress or reports
-// a gap while the room transport is bound to its topic. Ingress owners that run inside the
-// plane's admission (the input pool's release and refusal) only read it.
+// Each active plane binds one weak repair probe as soon as its room transport exists.
+// Admission owners (input release and refusal) reuse it; successor planes replace it.
 function attachDeliveryRepair(registration: V3PlaneRegistration): V3PlaneDeliveryRepair | undefined {
 	if (registration.deliveryRepair !== undefined) return registration.deliveryRepair;
 	if (deliveryRepairRequest(registration) === undefined) return undefined;
 	const plane = new WeakRefConstructor(registration);
 	const state: V3PlaneDeliveryRepair = {
 		wake: false,
+		tracking: ObjectFreeze({
+			maxEntries: registration.payload.parameters.maxPendingEntries,
+			maxBytes: registration.payload.parameters.maxPendingBytes,
+			isAdmitted: (digest: string): boolean => {
+				const current = plane.deref();
+				return current === undefined || !currentRegistration(current) || current.index.has(digest);
+			},
+		}),
 		capacity: (): V3DeliveryRepairCapacity => {
 			const current = plane.deref();
 			return current === undefined ? "retired" : deliveryRepairCapacity(current);
@@ -7523,13 +7538,26 @@ function attachDeliveryRepair(registration: V3PlaneRegistration): V3PlaneDeliver
 	return state;
 }
 
-function reportDeliveryGap(registration: V3PlaneRegistration, kind: V3DeliveryGap["kind"], peerId?: string): void {
+function reportDeliveryGap(
+	registration: V3PlaneRegistration,
+	kind: V3DeliveryGap["kind"],
+	peerId?: string,
+	vertexDigest?: string
+): void {
 	const state = attachDeliveryRepair(registration);
 	const request = deliveryRepairRequest(registration);
 	if (state === undefined || request === undefined) return;
 	const capacity = state.capacity;
 	try {
-		request(ObjectFreeze(peerId === undefined ? { kind, capacity } : { kind, peerId, capacity }));
+		request(
+			ObjectFreeze({
+				kind,
+				capacity,
+				tracking: state.tracking,
+				...(peerId === undefined ? {} : { peerId }),
+				...(vertexDigest === undefined ? {} : { vertexDigest }),
+			})
+		);
 	} catch {
 		// The transport's repair is advisory; a failure there changes no admission.
 	}
@@ -7573,16 +7601,12 @@ function noteDeliveryCapacity(registration: V3PlaneRegistration): void {
 	if (currentRegistration(registration)) reportDeliveryGap(registration, "capacity");
 }
 
-// Track AA: a direct copy of a row this plane has already admitted (its digest is in the
-// plane's causality index, which holds only admitted rows of this plane) is dropped before
-// it reserves an input-pool slot. It would only re-append idempotently. A full retained
-// republication then spends the pool on the rows still missing, not on its duplicate prefix.
-// Nothing is admitted here, and a copy that is pending, queued or unknown is not touched.
-function indexedV3Copy(registration: V3PlaneRegistration, message: Message): boolean {
+// A direct copy is inspected only after bounded byte/entry capture. An admitted digest
+// then releases that temporary input slot immediately, before waiting on the FIFO, so
+// replayed prefixes do not consume every slot needed for the missing tail.
+function indexedV3Copy(registration: V3PlaneRegistration, captured: CapturedV3Ingress): boolean {
 	try {
-		const data = message.data;
-		if (!isInstanceOf(data, Uint8ArrayConstructor)) return false;
-		const preimage = V3Envelope.decode(data).canonicalPreimage;
+		const preimage = V3Envelope.decode(captured.exactWireBytes).canonicalPreimage;
 		if (!isInstanceOf(preimage, Uint8ArrayConstructor) || typedArrayByteLength(preimage) === 0) return false;
 		const digest = lowerHexDigest(hashDomain(V3_VERTEX_DOMAIN, preimage));
 		return digest !== undefined && registration.index.has(digest);
@@ -8135,7 +8159,7 @@ async function authenticateV3Ingress(registration: V3PlaneRegistration, captured
 			// plane was installed and failed authentication there). Ask for it again now, not
 			// on a schedule that can run out; the answer re-enters this same path. Track AA:
 			// the authenticated sender of this row is the peer to ask.
-			requestMissingDependencies(registration, captured.sender);
+			requestMissingDependencies(registration, captured.sender, authenticated.digest);
 			return ingressFailureLog("graph-rejected");
 		}
 		if (await handleV3Ingress(registration, evidence, retained.value)) await drainPendingIngress(registration);
@@ -8155,6 +8179,7 @@ const MAX_ADMITTED_PENDING_PUBLICATION_JOBS = 32;
 // The same local control ceiling applies to distinct retained/completion cuts.
 // Joining an existing cut creates no additional retained native job.
 const MAX_ADMITTED_EGRESS_CONTROL_JOBS = 32;
+const MAX_TARGETED_REPLAY_PEER_ID_CHARS = 128;
 // A direct reply to one requesting peer (targeted retained republication) runs inside the
 // plane's FIFO, ahead of the plane's later moves, seal and close. Each of its sends carries
 // this deadline: a send that has not completed by then is aborted (the genuine node aborts its
@@ -8390,6 +8415,13 @@ function enqueueV3Ingress(
 			} finally {
 				rawMessage = undefined;
 			}
+			if (
+				captured !== undefined &&
+				transport === "retained" &&
+				registration.deliveryRepair !== undefined &&
+				indexedV3Copy(registration, captured)
+			)
+				return { join: Promise.resolve() };
 			return captured === undefined
 				? { join: Promise.resolve() }
 				: (): Promise<void> => authenticateV3Ingress(registration, captured);
@@ -16825,7 +16857,11 @@ function enqueuePendingPublication(registration: V3PlaneRegistration): Promise<V
 	return enqueueRegistrationTask(registration, () => () => publishPending(registration), admission);
 }
 
-async function republishRetained(registration: V3PlaneRegistration, targetPeerId?: string): Promise<V3EgressResult> {
+async function republishRetained(
+	registration: V3PlaneRegistration,
+	targetPeerId?: string,
+	signal?: AbortSignal
+): Promise<V3EgressResult> {
 	if (!currentRegistration(registration)) return egressFailure("not-active", "v3 plane is not active");
 	const scope = liveJournalScope(registration.payload);
 	let readiness;
@@ -16914,7 +16950,9 @@ async function republishRetained(registration: V3PlaneRegistration, targetPeerId
 				published = await registration.networkNode.publishMessage(registration.topic, message);
 			} else {
 				await registration.networkNode.sendMessage(targetPeerId, message, {
-					signal: AbortSignal.timeout(RETAINED_DIRECT_SEND_DEADLINE_MS),
+					signal: signal === undefined
+						? AbortSignal.timeout(RETAINED_DIRECT_SEND_DEADLINE_MS)
+						: AbortSignal.any([signal, AbortSignal.timeout(RETAINED_DIRECT_SEND_DEADLINE_MS)]),
 				});
 				published = true;
 			}
@@ -16934,16 +16972,23 @@ async function republishRetained(registration: V3PlaneRegistration, targetPeerId
 
 function enqueueReplayableEgress(
 	registration: V3PlaneRegistration,
-	capture: () => Readonly<{ selector: string; run(): Promise<V3EgressResult> }> | Readonly<{ refusal: V3EgressResult }>
+	capture: () =>
+		| Readonly<{ selector: string; shareRunning?: boolean; run(signal?: AbortSignal): Promise<V3EgressResult> }>
+		| Readonly<{ refusal: V3EgressResult }>
 ): Promise<V3EgressResult> {
-	const queued = registration.queuedReplayableEgress;
 	const predecessor = registration.gate;
 	let entered = false;
 	let joined = false;
 	let ownsTail = false;
+	let shareRunning = false;
 	let selector: string | undefined;
+	let controller: AbortController | undefined;
 	let joinedResult: Promise<V3EgressResult> | undefined;
-	let demand: V3PlaneRegistration["queuedReplayableEgress"];
+	let demand: V3ReplayableEgressDemand | undefined;
+	const forget = (): void => {
+		if (selector !== undefined && registration.replayableEgress?.get(selector) === demand)
+			registration.replayableEgress?.delete(selector);
+	};
 	const result = enqueueRegistrationTask<V3EgressResult>(
 		registration,
 		() => {
@@ -16955,17 +17000,18 @@ function enqueueReplayableEgress(
 				return { join: Promise.resolve(request.refusal) };
 			}
 			selector = request.selector;
-			if (ownsTail && queued !== undefined && queued.gate === predecessor && queued.selector === selector) {
+			shareRunning = request.shareRunning === true;
+			const existing = registration.replayableEgress?.get(selector);
+			if (existing !== undefined && (shareRunning || (ownsTail && existing.gate === predecessor))) {
 				joined = true;
-				joinedResult = queued.result;
-				return { join: queued.result };
+				joinedResult = existing.result;
+				return { join: existing.result };
 			}
+			if (shareRunning) controller = new AbortController();
 			return (): Promise<V3EgressResult> => {
 				entered = true;
-				if (demand !== undefined && registration.queuedReplayableEgress === demand) {
-					registration.queuedReplayableEgress = undefined;
-				}
-				return request.run();
+				if (!shareRunning) forget();
+				return request.run(controller?.signal);
 			};
 		},
 		{
@@ -16977,9 +17023,13 @@ function enqueueReplayableEgress(
 				),
 		}
 	);
-	if (!entered && !joined && ownsTail && selector !== undefined) {
-		demand = ObjectFreeze({ gate: registration.gate, result, selector });
-		registration.queuedReplayableEgress = demand;
+	if (!joined && (shareRunning || (!entered && ownsTail)) && selector !== undefined) {
+		demand = ObjectFreeze({ gate: registration.gate, result, controller });
+		registration.replayableEgress ??= new IntrinsicMap<string, V3ReplayableEgressDemand>();
+		registration.replayableEgress.set(selector, demand);
+		// One record per native admitted selector; a duplicate owns no new snapshot,
+		// gate or cancellation. Retirement aborts, but native settlement releases it.
+		void result.then(forget, forget);
 	}
 	return joinedResult ?? result;
 }
@@ -17025,11 +17075,11 @@ function enqueueTargetedRetainedPublication(
 	registration: V3PlaneRegistration,
 	targetPeerId: string
 ): Promise<V3EgressResult> {
-	return enqueueRegistrationTask(registration, () => () => republishRetained(registration, targetPeerId), {
-		pool: "egress-control",
-		refuse: () =>
-			egressFailure("admission-rejected", "v3 retained/completion admission is full; retry after admitted work joins"),
-	});
+	return enqueueReplayableEgress(registration, () => ({
+		selector: `retained:${targetPeerId}`,
+		shareRunning: true,
+		run: (signal) => republishRetained(registration, targetPeerId, signal),
+	}));
 }
 
 function terminalFailure(
@@ -20587,6 +20637,7 @@ function creatorCloseRegistration(
 }
 
 function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
+	attachDeliveryRepair(registration);
 	const ephemeralAuthority = ((): ReturnType<V3PlaneHandle["currentEphemeralAuthority"]> => {
 		if (registration.mode === "snapshot-closed") return undefined;
 		const authorization = registration.authorization;
@@ -20930,6 +20981,7 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 			}
 			registrations.set(topic, registration);
 			v3PlaneRegistrations.set(boundNetworkNode, registrations);
+			if (registration.deliveryRepair !== undefined) reportDeliveryGap(registration, "capacity");
 			return ObjectFreeze({ handle: registration.handle, ok: true as const });
 		} catch {
 			return activationFailureAfterCleanup(
@@ -21881,7 +21933,6 @@ export function routeV3RetainedIngress(handle: V3PlaneHandle, message: Message):
 	) {
 		return false;
 	}
-	if (indexedV3Copy(registration, message)) return true;
 	// Track AA: so the input pool can name this copy's sender if it refuses it.
 	attachDeliveryRepair(registration);
 	void enqueueV3Ingress(registration, message, "retained");
@@ -21902,6 +21953,7 @@ export function republishV3RetainedTo(handle: V3PlaneHandle, targetPeerId: strin
 		registration.mode === "snapshot-closed" ||
 		typeof targetPeerId !== "string" ||
 		targetPeerId.length === 0 ||
+		targetPeerId.length > MAX_TARGETED_REPLAY_PEER_ID_CHARS ||
 		targetPeerId === registration.networkNode.peerId ||
 		!registration.networkNode.getAllPeers().includes(targetPeerId)
 	) {

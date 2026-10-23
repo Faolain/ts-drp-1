@@ -13,6 +13,49 @@ const PROFILES: readonly Profile[] = ["shipped", "settlement"];
 const HISTORY_REQUEST = new TextEncoder().encode("ts-drp-room-history-request-v1");
 
 describe.each(PROFILES)("Track AA lost repair answer, %s", (profile) => {
+	for (const direction of ["writer-to-creator", "creator-to-writer"] as const)
+		it(`recovers a silently lost first and final copy ${direction} without a refusal or later move`, async () => {
+			const fixture = await creatorDeliveryRoom({ profile });
+			const peers = await openAll(fixture);
+			const sender = required(peers[direction === "writer-to-creator" ? 1 : 0]);
+			const receiver = required(peers[direction === "writer-to-creator" ? 0 : 1]);
+			await fixture.network.idle();
+			let lost = 0;
+			let requests = 0;
+			fixture.network.observe(({ from, to, message }) => {
+				if (
+					from === receiver.peerId &&
+					to === sender.peerId &&
+					message.type === MessageType.MESSAGE_TYPE_CUSTOM &&
+					message.data.length === HISTORY_REQUEST.length &&
+					message.data.every((byte, index) => byte === HISTORY_REQUEST[index])
+				)
+					requests++;
+			});
+			fixture.network.lose(({ kind, from, to, message }) => {
+				const operation = envelopeVertex(message)?.operation as { id?: string } | undefined;
+				if (kind !== "gossip" || from !== sender.peerId || to !== receiver.peerId || operation?.id !== "silent-final-0")
+					return false;
+				lost++;
+				return true;
+			});
+			const started = performance.now();
+			const ids = await place(sender, "silent-final", 1);
+			await fixture.network.idle();
+			const rows = placedRows(fixture, sender, ids);
+			const result = await admitted(
+				receiver,
+				rows.map(({ digest }) => digest),
+				12_000
+			);
+			expect(lost).toBeGreaterThan(0);
+			expect(requests, "periodic repair needs no observed gap").toBeGreaterThan(0);
+			expect(result).toMatchObject({ complete: true });
+			console.info(
+				`TRACK_AA_SILENT ${JSON.stringify({ profile, direction, ms: Math.round(performance.now() - started), requests })}`
+			);
+		}, 90_000);
+
 	for (const gap of ["refused", "missing"] as const)
 		it(`retries a lost final answer for a ${gap} row without later traffic`, async () => {
 			const fixture = await creatorDeliveryRoom({ profile });
