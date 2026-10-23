@@ -378,9 +378,18 @@ async function attemptCreatorSuccessorMaterial(
 	}
 	if (cleanupFailed) return { kind: "uncertain-cleanup", failure: primary };
 	if (!failed && received !== undefined) return { kind: "received", value: received };
-	// A response is judged on its content, whatever the deadline; a signing refusal is not the
-	// network's. Everything else (no stream, a failed write or read, a deadline) is transient.
-	const terminal = phase === "response" || (phase === "signing" && !controller.signal.aborted);
+	// The network port wraps both framing violations and ordinary resets in protocol-violation.
+	// Only the length decoder's definite violations are terminal before a response is available.
+	let framingViolation = false;
+	let cause = primary;
+	for (let depth = 0; depth < 8 && cause instanceof Error; depth++) {
+		if (cause.name === "InvalidDataLengthError" || cause.name === "InvalidDataLengthLengthError") {
+			framingViolation = true;
+			break;
+		}
+		cause = cause.cause;
+	}
+	const terminal = framingViolation || phase === "response" || (phase === "signing" && !controller.signal.aborted);
 	return { kind: terminal ? "terminal" : "transient", failure: primary };
 }
 

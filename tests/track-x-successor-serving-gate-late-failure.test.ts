@@ -50,7 +50,7 @@ const predecessorClose = { stop };
 const shutdown = async () => { closed = true; }, throwAfterJoinedCleanup = async (error) => { throw error; };
 const publishAccepted = async () => {}, drainRebaseOutbox = async () => {};
 const enqueueLifetimeTransition = (task) => Promise.resolve().then(task), assertSessionOpen = () => {};
-let redirectPromise, redirectedSession;
+let redirectPromise, redirectedSession, scheduledLulls;
 const performCreatorSuccessorAdoption = async () => {
 ${source.slice(tailStart, wrapperStart)}
 ${source.slice(wrapperStart, wrapperEnd)}

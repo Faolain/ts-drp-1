@@ -83,6 +83,7 @@ function response(
 type Reply =
 	| Readonly<{ kind: "serve"; bytes?: (request: Request) => Uint8Array }>
 	| Readonly<{ kind: "reset" }>
+	| Readonly<{ kind: "invalid-length"; name: "InvalidDataLengthError" | "InvalidDataLengthLengthError" }>
 	| Readonly<{ kind: "end" }>
 	| Readonly<{ kind: "blackhole" }>
 	| Readonly<{ kind: "open-fails" }>
@@ -168,8 +169,12 @@ function fakePort(
 						if (request === undefined) throw new Error("TRACK_X_NO_REQUEST");
 						return (behavior.bytes ?? ((value: Request) => response(value)))(request);
 					}
-					if (behavior.kind === "reset" || behavior.kind === "uncertain-cleanup")
-						throw new Error("snapshot frame violates its byte bound");
+					if (behavior.kind === "reset" || behavior.kind === "uncertain-cleanup" || behavior.kind === "invalid-length")
+						throw Object.assign(new Error("snapshot frame violates its byte bound", {
+							cause: Object.assign(new Error("stream read failed"), {
+								name: behavior.kind === "invalid-length" ? behavior.name : "StreamResetError",
+							}),
+						}), { code: "protocol-violation" });
 					if (behavior.kind === "end") throw new Error("TRACK_X_STREAM_ENDED");
 					await new Promise<void>((resolve) => {
 						options.signal.addEventListener("abort", () => resolve(), { once: true });
@@ -304,6 +309,24 @@ const terminal: readonly (readonly [string, (request: Request) => Uint8Array])[]
 	["a malformed frame", (request) => response(request, {}, { afterSigning: { unexpected: 1 } })],
 	["invalid material bounds", (request) => response(request, { exactCanonicalHistoryBytes: new Uint8Array() })],
 ];
+
+for (const name of ["InvalidDataLengthError", "InvalidDataLengthLengthError"] as const) {
+	it(`${name} in the network port is terminal before the response is decoded`, async () => {
+		const { controller, listeners } = countedLifetime();
+		const fake = fakePort(() => ({ kind: "invalid-length", name }), () => ["creator"]);
+		const guard = setTimeout(() => controller.abort(new Error("test guard")), 2_000);
+		try {
+			expect(await settled(receive(fake.port, ["creator"], controller.signal)))
+				.toBe("failed: creator successor material transport failed");
+			expect(controller.signal.aborted).toBe(false);
+			expect(fake.requests).toHaveLength(1);
+			expect(fake.open()).toBe(0);
+			expect(listeners()).toBe(0);
+		} finally {
+			clearTimeout(guard);
+		}
+	});
+}
 
 for (const [label, bytes] of terminal) {
 	it(`${label} is terminal: one request, no retry`, async () => {
