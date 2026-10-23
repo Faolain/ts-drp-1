@@ -56,6 +56,7 @@ export {
 	captureJournalClosedMembershipInput,
 	captureJournalClosedMembershipReadInput,
 	captureJournalClosedMembershipObservation,
+	journalClosedMembershipCanExtend,
 	captureJournalRetirementControl,
 	journalRetirementControlFields,
 	captureJournalRetirementDrainPlan,

@@ -196,6 +196,12 @@ describe("SAME-owner compound closed-journal classification", () => {
 		const withoutWitness = {...data, image: {...image, canonicalRows: [encodeCanonical(["scopes", [scope.objectId, scope.epoch, scope.anchorDigest],
 			{next_journal_sequence: 1, closed_membership_bytes: encodeCanonical({...membership, orderedVertexDigests: new Uint8Array(32).fill(3), localVertexWitnesses: []})}]), image.canonicalRows[1]]}};
 		expect(execute<boolean>(`${classifierCode} canPrepareClosedJournalDetails(data);`, {...context, data: withoutWitness})).toBe(false);
+		const receivedCarrier = encodeCanonical({kind: "creator-received-close-membership-1", exactCanonicalMembershipBytes: carrier});
+		const received = {...data, image: {...image, canonicalRows: [encodeCanonical(["scopes", [scope.objectId, scope.epoch, scope.anchorDigest],
+			{next_journal_sequence: 1, closed_membership_bytes: receivedCarrier}]), image.canonicalRows[1]]}};
+		expect(execute<boolean>(`${classifierCode} canPrepareClosedJournalDetails(data);`, {...context, data: received})).toBe(true);
+		for (const absent of [{...received, authenticatedScopes: []}, {...received, journalMembershipAuthorities: []}])
+			expect(execute<boolean>(`${classifierCode} canPrepareClosedJournalDetails(data);`, {...context, data: absent})).toBe(false);
 	});
 	it("freshly qualifies the complete original runtime census after detached DATA and new native enrollment", async () => {
 		const runtimeText = readFileSync(new URL("../src/v3-live.ts", import.meta.url), "utf8");

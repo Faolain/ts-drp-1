@@ -9,6 +9,7 @@ import {
 	captureJournalClosedMembershipReadInput,
 	captureJournalClosedMembershipObservation,
 	type LiveJournalClosedMembershipReadResult,
+	journalClosedMembershipCanExtend,
 	captureLiveJournalAnchorReadObservation,
 	captureLiveJournalHistoricalAnchorImportInput,
 	captureLiveJournalInput,
@@ -2145,12 +2146,14 @@ function createJournalStoreOver(
 				if (raw === undefined) throw failureError("not-installed");
 				fromRawScope(raw);
 				const row = raw as Record<string, unknown>;
-				if (Object.hasOwn(row, "closedMembershipBytes")) {
-					if (!sameBytes(row.closedMembershipBytes as Uint8Array, selected.exactCanonicalMembershipBytes))
-						throw failureError("evidence-conflict");
+				if (Object.hasOwn(row, "closedMembershipBytes") &&
+					sameBytes(row.closedMembershipBytes as Uint8Array, selected.exactCanonicalMembershipBytes)) {
 					idempotent = true;
 					expectedAfter = { imageDigest: before.image.imageDigest, controlBytes: beforeBytes };
 				} else {
+					if (Object.hasOwn(row, "closedMembershipBytes") &&
+						!journalClosedMembershipCanExtend(row.closedMembershipBytes as Uint8Array, selected.exactCanonicalMembershipBytes))
+						throw failureError("evidence-conflict");
 					const control = admitRetirementControl(
 						before.control === null ? undefined : nativeRetirementRecord(before.control),
 						selected.scope

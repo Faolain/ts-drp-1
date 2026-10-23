@@ -47,6 +47,7 @@ async function runCase(
 		| "reserved-readiness-scopes"
 		| "incremental-replay-validation"
 		| "closed-membership-after-drain"
+		| "closed-membership-upgrade"
 		| "reserved-retirement-reuse"
 		| "reserved-retirement-abort"
 		| "reserved-retirement-admission"
@@ -155,6 +156,20 @@ test("records native closed membership after completed row-only drain and preser
 	expect(result.reopened).toEqual(result.afterStale);
 	expect(result.retry).toMatchObject({ ok: true, value: { idempotent: true, imageDigest: fresh.value.imageDigest } });
 	expect(result.inlineRejected).toMatchObject({ ok: false });
+});
+
+test("extends exact legacy closed membership with native currency, bounded image and reopen", async ({page}) => {
+	const result = await runCase(page, "closed-membership-upgrade");
+	expect(result.fresh).toMatchObject({ok: true, value: {idempotent: false}});
+	expect(result.stale).toEqual({ok: false, kind: "retirement-stale"});
+	for (const key of ["changed", "downgrade", "rewrite"])
+		expect(result[key], key).toEqual({ok: false, kind: "evidence-conflict"});
+	expect(result.bounded).toMatchObject({ok: false});
+	expect(result.afterRefusals).toEqual(result.legacy);
+	expect(result.upgrade).toMatchObject({ok: true, value: {idempotent: false}});
+	expect(result.upgraded).not.toEqual(result.legacy);
+	expect(result.reopened).toEqual(result.upgraded);
+	expect(result.retry).toMatchObject({ok: true, value: {idempotent: true}});
 });
 
 test("reuses readiness in held native custody and refuses incomplete prefix reuse", async ({page}) => {

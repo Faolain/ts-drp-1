@@ -14,30 +14,17 @@ import {
 	seal,
 } from "./fixtures/track-x/outside-rows-room.js";
 
-// Track X, decision row 60, R5 (owner's option A) refusal cases on the node SQLite host (Grid zone
-// application, creator-trusted-settlement-v1). A Writer's journal scope holding rows outside its
-// signed Cut becomes collectible only when every outside row is this author's own replaced source
-// whose replacement is a member of a later signed Cut and equals the source's derivation by the
-// immutable policy. Otherwise the scope, with the outside row, is retained:
-// (a) R5-chain (owner's C1) changed this case: a replacement that missed its own Cut is followed
-//     to its own replacement, so the scope is retained while no link of the chain is in a signed
-//     Cut yet. Here the move's replacement, and each replacement of it, misses three Cuts in a
-//     row, and the scope is kept through its classification (the install of epoch 4, the only one
-//     at which this Writer holds the scope's own Cut authority) and after it. This case checks
-//     the rule within that window only: a chain that resolves after the window is kept for good
-//     today, which the owner's W1 (keep a retained scope's signed Cut authorities until it is
-//     collected) addresses (RESULT section 13, "The classification window");
-// (b) its durable plan entry names a replacement whose operations are not the derivation: the
-//     source is never accepted as replaced, so nothing of the scope is deleted;
-// (c) R5b (owner's B2) changed this case: a received row outside the Cut (another Writer's move
-//     made during the seal) used to retain its scope for good; it is now kept until this peer has
-//     durably installed the Cut's successor, and across a crash after that install, then collected.
+// The unified Done rule replaces the former later-Cut chain rule. A terminally covered own
+// source whose exact local replacement is complete can retire while that replacement misses
+// later Cuts. Missing or forged completion retains it. Received outside rows wait for durable
+// successor installation. The native schedule below proves that later chain delivery is not a
+// second cleanup requirement; completion/forgery controls live with the shared owner tests.
 
 afterEach(async () => {
 	expect(await closeFixtures(), "native admitted work and owners join").toEqual([]);
 });
 
-it("(a, C1) a scope whose outside move's replacements miss their Cuts stays retained while no link is in a signed Cut", async () => {
+it("collects a terminally covered settled source even while its replacements miss later Cuts", async () => {
 	const room = await open();
 	const creator = required(room.peers[0]);
 	const history: string[] = [];
@@ -68,11 +55,11 @@ it("(a, C1) a scope whose outside move's replacements miss their Cuts stays reta
 		const kept = await protectedEpochs(room, 1);
 		history.push(`epoch ${epoch + 1}: ${installed}; protected [${kept.join(",")}]`);
 		expect(installed, history.join("\n")).toBe("ok");
-		if (epoch >= MISSED + 2 && epoch < LAST) {
-			// The installs of epochs 4 and 5: no link is in a signed Cut this Writer knows (the
-			// scope's classification at the first found none), so the scope stays, past replay.
-			expect(kept, history.join("\n")).toContain(MISSED);
-			expect(await journalHolds(room, 1, required(source).commit.envelope.digest)).toBe(true);
+		if (epoch >= MISSED + 3 && epoch < LAST) {
+			// Its signed terminal coverage and local completion are enough once replay ends.
+			// The replacement's own future acceptance is a separate row's lifecycle.
+			expect(kept, history.join("\n")).not.toContain(MISSED);
+			expect(await journalHolds(room, 1, required(source).commit.envelope.digest)).toBe(false);
 		}
 		if (CHAIN.has(epoch)) {
 			// The install's fence reaches the creator in time (no admission report exists for a

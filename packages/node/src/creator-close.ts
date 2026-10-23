@@ -532,7 +532,8 @@ export interface V3CreatorCloseRegistration {
 	recordReceivedClosedMembership(
 		exactCanonicalCutValueBytes: Uint8Array,
 		exactCanonicalSettlementBytes?: Uint8Array | null,
-		exactCanonicalCloseMembershipBytes?: Uint8Array
+		exactCanonicalCloseMembershipBytes?: Uint8Array,
+		receivedAuthority?: import("./internal/creator-received-close-membership.js").ReceivedCloseAuthorityRecords
 	): Promise<boolean>;
 	/** Exact authenticated whole-source bytes, prepared and joined under this same genuine hold. */
 	prepareClosedEpochArchive(hold: CreatorSnapshotRecoveryCloseHold, limits: ArchiveLimits,

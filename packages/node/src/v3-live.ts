@@ -174,6 +174,8 @@ import {
 import { planClosedEpochCleanup, planClosedEpochRoleCleanup } from "./internal/closed-epoch-cleanup.js";
 import { encodeCreatorCloseMembership, openCreatorCloseMembership,
 	rewriteCreatorCloseMembershipWitnesses } from "./internal/creator-close-membership.js";
+import { encodeReceivedCloseMembership, openReceivedCloseMembership, verifyReceivedClosedJournalAuthority,
+	type ReceivedCloseAuthorityRecords } from "./internal/creator-received-close-membership.js";
 import type { CreatorPendingClassificationCustodyInput } from "./internal/creator-adoption-recover.js";
 import type { CreatorClosedRollbackProofAccounting, CreatorSnapshotRetirementReconstructionRequest,
 	CreatorOrdinaryIssuanceSuffixForSizing, CreatorOrdinarySourceCapture } from "./internal/creator-closed-rollback-data.js";
@@ -218,8 +220,8 @@ import {
 	type CreatorOrdinaryPreparedCapacityDimensions,
 	type CreatorOrdinaryApplicationControlCapture,
 	type CreatorOrdinaryApplicationControlFact,
-	type CreatorReplacedLocalSource,
-	type CreatorReplacedLocalSourceRead,
+	type CreatorSettledLocalSource,
+	type CreatorSettledLocalSourceRead,
 	type CreatorSnapshotRecoveryCloseDependencyRead,
 	type CreatorSnapshotRecoveryCloseHold,
 	type CreatorSnapshotRecoveryCloseLifetime,
@@ -465,7 +467,7 @@ export interface V3LocalSettlementPolicy {
 		}>
 	): boolean;
 	derive(operations: readonly Readonly<Record<string, unknown>>[]): Readonly<{
-		readonly disposition: "rebase" | "transform";
+		readonly disposition: "expire" | "manual-review" | "rebase" | "transform";
 		readonly operations: readonly Readonly<Record<string, unknown>>[];
 	}>;
 }
@@ -927,7 +929,7 @@ export type V3OperationAdmissionReservation =
 	| Readonly<{ readonly kind: "duplicate" | "conflict" }>
 	| Readonly<{ readonly kind: "rejected"; readonly reason?: "capacity" | "encoding" }>;
 
-type NativeReplacementPreparation = ReturnType<V3LocalSettlementPolicy["derive"]> &
+type NativeReplacementPreparation = ReturnType<typeof derivePolicyReplacement> &
 	Readonly<{
 		transformRefusal?: NonNullable<SettlementPlan["entries"][number]["transformRefusal"]>;
 	}>;
@@ -3955,17 +3957,32 @@ function resolveRecoveryCloseHold(
 			// its original fresh closed-ACL key resolver.
 			return facts.context.historicalIssuance?.vertexFacts?.verify ?? verifyReceivedVertex;
 		},
+		readClosedJournalAuthority: function (this: CreatorSnapshotRecoveryCloseLifetime, input) {
+			if (this !== lifetime || !available()) return undefined;
+			try {
+				const genesis = decodeCanonical(input.exactCanonicalPinnedGenesisTrustStateRecordBytes);
+				if (!isObject(genesis) || Reflect.get(genesis, "currentAnchorDigest") !==
+					facts.context.payload.input.pinnedGenesisAnchorDigest) return undefined;
+				const material = openReceivedCloseMembership(input.exactCanonicalMembershipBytes);
+				if (material === undefined) return undefined;
+				const authority = verifyReceivedClosedJournalAuthority({
+					material: { ...material, scope: input.scope }, header: input.header,
+					exactCanonicalPinnedGenesisTrustStateRecordBytes: input.exactCanonicalPinnedGenesisTrustStateRecordBytes,
+				});
+				return available() ? authority : undefined;
+			} catch { return undefined; }
+		},
 		...(facts.registration === undefined
 			? {}
 			: {
-					readReplacedLocalSource: function (
+					readSettledLocalSource: function (
 						this: CreatorSnapshotRecoveryCloseLifetime,
-						source: CreatorReplacedLocalSource
-					): Promise<CreatorReplacedLocalSourceRead | undefined> {
+						source: CreatorSettledLocalSource
+					): Promise<CreatorSettledLocalSourceRead | undefined> {
 						const registration = facts.registration;
 						if (this !== lifetime || !available() || registration === undefined)
 							return Promise.reject(new TypeError("creator recovery close hold is unavailable"));
-						return admit(() => replacedLocalSourceFacts(registration, source));
+						return admit(() => settledLocalSourceFacts(registration, source));
 					},
 				}),
 		captureRoomRetentionLedger: function (this: CreatorSnapshotRecoveryCloseLifetime, create: boolean) {
@@ -9007,7 +9024,7 @@ async function captureCreatorOrdinarySourceLinkedApplicationEffects(registration
 		if (!verifiedSources.has(sources[0]!.authorSequence)) {
 			const original = await snapshot(sources[0]!), selected = original === undefined ? undefined : classifyRebaseRow(registration, original, undefined, vertexFacts);
 			if (selected === undefined || !validRebaseRow(registration, selected) ||
-				!await authenticatedCompletedNativeReplacementSource(registration, selected, plan, vertexFacts, accounting)) return undefined;
+				!await ownSourceSettlementIsComplete(registration, selected, plan, vertexFacts, accounting)) return undefined;
 			verifiedSources.add(sources[0]!.authorSequence);
 		}
 		const entry = plan?.entries.find(entry => entry.sourceSequence === source.sourceSequence);
@@ -10204,6 +10221,7 @@ async function readCreatorRecoveryDependencyCensus(
 	const sourceDependencyTrust = sourceTrust ?? branchSource?.prepared.trust.trust;
 	const displacedSource = registration.displacedSource;
 	const activeObservation = active !== undefined;
+	const canReadUnsettled = activeObservation || sourceBound && observation.liveRegistration !== undefined;
 	const pendingIngress = active?.pendingIngress ?? [];
 	const pendingIngressBytes = active?.pendingIngressBytes;
 	const pendingCurrent = (): boolean => active !== undefined && active.pendingCurrent();
@@ -10492,7 +10510,7 @@ async function readCreatorRecoveryDependencyCensus(
 					return undefined;
 				inheritedComplete = true;
 			}
-			if (activeObservation) {
+			if (canReadUnsettled) {
 				if (!plans.has(scope.author)) {
 					const rawPlan = await readPlan(scope);
 					const plan = rawPlan === null ? null : copySettlementPlan(rawPlan, scope);
@@ -10564,89 +10582,14 @@ async function readCreatorRecoveryDependencyCensus(
 			if (classified.kind === "displaced" && !openSource) {
 				let completedBranch = inheritedComplete;
 				if (!completedBranch && sourceBound && observation.liveRegistration !== undefined) {
-					completedBranch = await authenticatedCompletedNativeReplacementSource(
+					completedBranch = await ownSourceSettlementIsComplete(
 						observation.liveRegistration,
 						ObjectFreeze({ ...classified, row }),
 						inheritancePlan,
 						vertexFacts
 					);
 				}
-				if (sourceBound && branchSource !== undefined && observation.liveRegistration !== undefined) {
-					const plan = copySettlementPlan(await readPlan(scope), scope);
-					const entry = plan?.entries.find((entry) => entry.sourceSequence === row.authorSequence);
-					if (
-						entry !== undefined &&
-						sameBytes(entry.sourceDigest, row.digest) &&
-						plan?.fenceSequence !== null &&
-						plan?.fenceSequence !== undefined &&
-						entry.disposition !== "manual-review"
-					) {
-						if (entry.disposition === "expire") completedBranch = true;
-						else if (entry.replacementSequence !== null) {
-							const chunks = entry.replacementProgress?.chunks ?? [{ replacementSequence: entry.replacementSequence }];
-							let fromIntent = 0;
-							completedBranch = chunks.length > 0;
-							for (const chunk of chunks) {
-								const raw = await registration.issuanceStore.readIssued(scope, chunk.replacementSequence);
-								const paired = outboxRowSnapshot({ commit: raw, publishState: "published" }, scope);
-								const candidate =
-									paired === undefined
-										? undefined
-										: authenticateRecoveryVertex(
-												registration.payload,
-												registration.authorization,
-												paired.canonicalPreimageBytes,
-												paired.signature,
-												vertexFacts
-											);
-								const operation = candidate?.vertex.operation;
-								const operations =
-									operation === undefined || candidate === undefined
-										? undefined
-										: (applicationBatchEntries(registration.payload, operation) ?? [
-												{
-													operation: operation as Readonly<Record<string, unknown>>,
-													logicalTime: candidate.admitted.logicalTime,
-												},
-											]);
-								if (
-									candidate === undefined ||
-									candidate.authorSequence !== chunk.replacementSequence ||
-									candidate.author !== scope.author ||
-									paired === undefined ||
-									candidate.digest !== lowerHexDigest(paired.digest) ||
-									operations === undefined
-								)
-									return undefined;
-								const effect =
-									entry.replacementProgress === undefined
-										? { kind: "replacement" as const, sourceSequence: row.authorSequence }
-										: {
-												kind: "replacement" as const,
-												sourceSequence: row.authorSequence,
-												fromIntent,
-												throughIntent:
-													"throughIntent" in chunk ? chunk.throughIntent : entry.replacementProgress.intentCount,
-												intentDigest: entry.replacementProgress.intentDigest,
-											};
-								const derived = deriveOwnedReplacement(
-									observation.liveRegistration,
-									{ ...classified, row },
-									{ operations, planEffect: effect }
-								);
-								if (
-									derived.disposition !== entry.disposition ||
-									!sameBytes(
-										encodeCanonical(entry.transformRefusal?.proposedIntentDigest ?? null),
-										encodeCanonical(derived.transformRefusal?.proposedIntentDigest ?? null)
-									)
-								)
-									return undefined;
-								fromIntent += operations.length;
-							}
-						}
-					}
-				}
+
 				if (completedBranch) dependencyKind = "source-bound-completed-issuance";
 				const adjacent =
 					sourceBound && displacedSource !== undefined && sourceDependencyTrust !== undefined
@@ -10885,7 +10828,7 @@ async function readCreatorRecoveryDependencyCensus(
 		const rawPlan = await registration.issuanceStore.readSettlementPlan(scope);
 		const plan = rawPlan === null ? null : copySettlementPlan(rawPlan, scope);
 		if (
-			(activeObservation || reusablePlanAuthors.has(scope.author)) &&
+			(canReadUnsettled || reusablePlanAuthors.has(scope.author)) &&
 			plans.has(scope.author) &&
 			(plan === undefined || !sameBytes(encodeCanonical(plans.get(scope.author)), encodeCanonical(plan)))
 		)
@@ -10895,7 +10838,7 @@ async function readCreatorRecoveryDependencyCensus(
 			plan === undefined ||
 			(plan === null
 				? historicalScopes.has(scope.author)
-				: !activeObservation && !settlementPlanPermitsAuthenticatedPruning(plan))
+				: !canReadUnsettled && !settlementPlanPermitsAuthenticatedPruning(plan))
 		) {
 			observation.stage = `settlement-plan-eligibility:${Number(activeObservation)}:${Number(plan?.fenceSequence !== null)}:${Number(plan !== undefined && settlementPlanPermitsAuthenticatedPruning(plan))}`;
 			return undefined;
@@ -10913,7 +10856,7 @@ async function readCreatorRecoveryDependencyCensus(
 			)
 				return undefined;
 		}
-		if (activeObservation && plan !== null) {
+		if (canReadUnsettled && plan !== null) {
 			if (plan.entries.length > registration.payload.parameters.maxEpochVertices) return undefined;
 			for (const entry of plan.entries) {
 				if (entry.disposition === "expire" || entry.disposition === "inherited" || entry.replacementSequence !== null)
@@ -15260,22 +15203,42 @@ type ClassifiedRebaseRow = Readonly<{
 const verifiedNestedNativeSources = new WeakSet<ClassifiedRebaseRow>();
 
 /** Protected native completion, not a portable source-membership grant. */
-async function authenticatedCompletedNativeReplacementSource(
+async function ownSourceSettlementIsComplete(
 	registration: V3PlaneRegistration,
 	selected: ClassifiedRebaseRow,
 	plan: SettlementPlan | null,
 	vertexFacts?: CreatorCensusVertexFacts,
 	sharedAccounting?: CreatorClosedRollbackProofAccounting
 ): Promise<boolean> {
-	const entry = plan?.entries.find((value) => value.sourceSequence === selected.row.authorSequence);
-	if (
-		entry === undefined ||
-		plan === null ||
-		entry.replacementSequence === null ||
-		(entry.disposition !== "rebase" && entry.disposition !== "transform") ||
-		!sameBytes(entry.sourceDigest, selected.row.digest)
-	)
-		return false;
+	const source = selected.authenticated;
+	const scope = registration.issuanceScope;
+	if (!sameScope(selected.row.scope, scope) || source.author !== scope.author ||
+		source.authorSequence !== selected.row.authorSequence || source.digest !== lowerHexDigest(selected.row.digest)) return false;
+	const fence = snapshotClosedRecord(source.vertex.operation, ["action", "fenceSequence", "version"]);
+	if (fence?.action === AUTHOR_FENCE_ACTION && fence.version === 1 &&
+		fence.fenceSequence === selected.row.authorSequence) return true;
+	const policy = registration.payload.input.settlementPolicy;
+	const operations = settlementSourceOperations(registration.payload, source.vertex.operation);
+	const entries = plan?.entries.filter(value => value.sourceSequence === selected.row.authorSequence) ?? [];
+	const entry = entries[0];
+	if (entries.length !== 1 || entry === undefined || policy === undefined ||
+		policy.blueprintDigest !== registration.payload.provenance.blueprintDigest ||
+		operations === undefined || operations.length === 0 || !sameBytes(entry.sourceDigest, selected.row.digest)) return false;
+	let derived: ReturnType<typeof derivePolicySettlement>;
+	try {
+		derived = derivePolicySettlement(policy, operations);
+		if (!sameBytes(encodeCanonical(derived), encodeCanonical(derivePolicySettlement(policy, operations)))) return false;
+	} catch { return false; }
+	if (derived.disposition !== entry.disposition || derived.disposition === "manual-review") return false;
+	if (derived.disposition === "expire") return entry.replacementSequence === null &&
+		entry.replacementProgress === undefined && entry.transformRefusal === undefined;
+	if (entry.replacementSequence === null) return false;
+	const refusal = entry.transformRefusal;
+	if (refusal !== undefined && (derived.disposition !== "transform" ||
+		!sameBytes(refusal.proposedIntentDigest, hashDomain("ts-drp/settlement-transform-proposal/v1",
+			encodeCanonical(derived.operations, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS))))) return false;
+	const expected = refusal === undefined ? derived.operations : operations;
+	const completedOperations: Readonly<Record<string, unknown>>[] = [];
 	const chunks = entry.replacementProgress?.chunks ?? [{ replacementSequence: entry.replacementSequence }];
 	if (chunks.length === 0 || chunks.length > registration.payload.parameters.maxEpochVertices) return false;
 	let throughIntent = 0;
@@ -15288,7 +15251,12 @@ async function authenticatedCompletedNativeReplacementSource(
 		if (sharedAccounting !== undefined && (!sharedAccounting.charge(row.canonicalPreimageBytes) ||
 			!sharedAccounting.charge(row.signature))) return false;
 		const candidate = classifyRebaseRow(registration, row, undefined, vertexFacts);
-		if (candidate === undefined || !validRebaseRow(registration, candidate)) return false;
+		if (candidate === undefined || !validRebaseRow(registration, candidate) ||
+			candidate.authenticated.author !== scope.author ||
+			candidate.authenticated.admitted.epoch <= source.admitted.epoch) return false;
+		const replacementOperations = settlementSourceOperations(registration.payload, candidate.authenticated.vertex.operation);
+		if (replacementOperations === undefined) return false;
+		completedOperations.push(...replacementOperations);
 		const proof = candidate.authenticated.admitted.settlementSource;
 		if (proof === undefined) {
 			const nonportableThrough = completedNonportableReplacementChunk(
@@ -15335,7 +15303,8 @@ async function authenticatedCompletedNativeReplacementSource(
 			return false;
 		throughIntent = record.throughIntent as number;
 	}
-	return entry.replacementProgress === undefined || throughIntent === entry.replacementProgress.intentCount;
+	return (entry.replacementProgress === undefined || throughIntent === entry.replacementProgress.intentCount) &&
+		sameBytes(encodeCanonical(completedOperations), encodeCanonical(expected));
 }
 
 /** Decision row 60: a non-creator author that the target still authorizes, with no creator
@@ -15488,7 +15457,7 @@ function olderSourcePolicyReplacementChunk(
 
 /** Decision row 60 (R5): the application operations one vertex operation carries, as
  * rebaseIntents and completedNonportableReplacementChunk read them; undefined for control. */
-function replacedSourceOperations(
+function settlementSourceOperations(
 	payload: PreparedV3LivePayload,
 	operation: unknown
 ): readonly Readonly<Record<string, unknown>>[] | undefined {
@@ -15502,158 +15471,32 @@ function replacedSourceOperations(
 	return detached === undefined ? undefined : [detached];
 }
 
-/**
- * Decision row 60 (R5): a local source this author replaced, read for journal retirement
- * only. Requires the source's original issued bytes at the journal row's exact digest, a
- * completed rebase/transform entry for it in this author's own settlement plan, and every
- * replacement row that entry names: this author, a later sequence and epoch, no other
- * settlement source, and together exactly the operations the original immutable settlement
- * policy derives from the source (deriveOwnedReplacement's derivation; for a recorded
- * admission refusal, the source's own operations under that derivation's proposal digest).
- * Data, not authority: the journal classifier authenticates the source against its closed
- * ACL and requires every returned replacement digest in a later signed Cut.
- * R7: a row that is this author's own settlement fence (version 1, fenceSequence equal to its own
- * sequence) has no plan entry and no replacement; it is returned with its original bytes, marked
- * as a fence, and the classifier requires a later own fence in a later signed Cut.
- * @returns The source bytes and replacement digests, or undefined when not exactly that.
- */
-async function replacedLocalSourceFacts(
+/** Reads an own source only after the latest installed signed Settle terminally covers it
+ * and its immutable policy's local settlement is complete. The journal classifier independently
+ * authenticates these original bytes against the scope's own closed ACL. */
+async function settledLocalSourceFacts(
 	registration: V3PlaneRegistration,
-	source: CreatorReplacedLocalSource
-): Promise<CreatorReplacedLocalSourceRead | undefined> {
+	source: CreatorSettledLocalSource
+): Promise<CreatorSettledLocalSourceRead | undefined> {
 	try {
 		const scope = registration.issuanceScope;
-		const payload = registration.payload;
-		const policy = payload.input.settlementPolicy;
-		if (
-			!currentRegistration(registration) ||
-			policy === undefined ||
-			policy.blueprintDigest !== payload.provenance.blueprintDigest ||
-			source.author !== scope.author ||
-			!NumberIsSafeInteger(source.authorSequence) ||
-			source.authorSequence < 0
-		)
-			return undefined;
+		if (!currentRegistration(registration) || source.author !== scope.author ||
+			!NumberIsSafeInteger(source.authorSequence) || source.authorSequence < 0) return undefined;
 		const store = creatorOriginalIssuanceStore(registration);
-		const sourceRow = outboxRowSnapshot(
-			{ commit: await store.readIssued(scope, source.authorSequence), publishState: "pending" },
-			scope
-		);
-		if (
-			sourceRow === undefined ||
-			sourceRow.authorSequence !== source.authorSequence ||
-			lowerHexDigest(hashDomain(V3_VERTEX_DOMAIN, sourceRow.canonicalPreimageBytes)) !== source.vertexDigest ||
-			lowerHexDigest(sourceRow.digest) !== source.vertexDigest
-		)
-			return undefined;
-		const sourceVertex = decodeCanonical(sourceRow.canonicalPreimageBytes);
-		const sourceOperation = isObject(sourceVertex) ? Reflect.get(sourceVertex, "operation") : undefined;
-		if (isObject(sourceVertex) && isObject(sourceOperation) && isAuthorFenceOperation(sourceOperation)) {
-			// The decoded operation is a null-prototype record: exactly the three fence fields.
-			if (
-				ReflectOwnKeys(sourceOperation).length !== 3 ||
-				Reflect.get(sourceOperation, "version") !== 1 ||
-				Reflect.get(sourceOperation, "fenceSequence") !== source.authorSequence ||
-				Reflect.get(sourceVertex, "author") !== scope.author ||
-				Reflect.get(sourceVertex, "authorSequence") !== source.authorSequence ||
-				Reflect.get(sourceVertex, "objectId") !== scope.objectId
-			)
-				return undefined;
-			return ObjectFreeze({
-				exactCanonicalPreimageBytes: new Uint8ArrayConstructor(sourceRow.canonicalPreimageBytes),
-				detachedSignature: new Uint8ArrayConstructor(sourceRow.signature),
-				replacementVertexDigests: ObjectFreeze([]),
-				authorFence: true as const,
-			});
-		}
-		const sourceEpoch = isObject(sourceVertex) ? Reflect.get(sourceVertex, "epoch") : undefined;
-		const sourceOperations = isObject(sourceVertex) ? replacedSourceOperations(payload, sourceOperation) : undefined;
-		if (!NumberIsSafeInteger(sourceEpoch) || sourceOperations === undefined || sourceOperations.length === 0)
-			return undefined;
-		const plan = await store.readSettlementPlan(scope);
-		const entries = plan?.entries.filter((value) => value.sourceSequence === source.authorSequence) ?? [];
-		const entry = entries[0];
-		if (
-			entries.length !== 1 ||
-			entry === undefined ||
-			entry.replacementSequence === null ||
-			(entry.disposition !== "rebase" && entry.disposition !== "transform") ||
-			!sameBytes(entry.sourceDigest, sourceRow.digest)
-		)
-			return undefined;
-		const derived = derivePolicyReplacement(policy, sourceOperations);
-		if (!sameBytes(encodeCanonical(derived), encodeCanonical(derivePolicyReplacement(policy, sourceOperations))))
-			return undefined;
-		const refusal = entry.transformRefusal;
-		if (
-			refusal !== undefined &&
-			(derived.disposition !== "transform" ||
-				!sameBytes(
-					refusal.proposedIntentDigest,
-					hashDomain(
-						"ts-drp/settlement-transform-proposal/v1",
-						encodeCanonical(derived.operations, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS)
-					)
-				))
-		)
-			return undefined;
-		if (derived.disposition !== entry.disposition) return undefined;
-		const expected = refusal === undefined ? derived.operations : sourceOperations;
-		const chunks = entry.replacementProgress?.chunks ?? [{ replacementSequence: entry.replacementSequence }];
-		if (chunks.length === 0 || chunks.length > payload.parameters.maxEpochVertices) return undefined;
-		const replaced: Readonly<Record<string, unknown>>[] = [];
-		const replacementVertexDigests: string[] = [];
-		for (const chunk of chunks) {
-			const row = outboxRowSnapshot(
-				{ commit: await store.readIssued(scope, chunk.replacementSequence), publishState: "pending" },
-				scope
-			);
-			const digest = row === undefined ? undefined : lowerHexDigest(hashDomain(V3_VERTEX_DOMAIN, row.canonicalPreimageBytes));
-			const vertex = row === undefined ? undefined : decodeCanonical(row.canonicalPreimageBytes);
-			if (
-				row === undefined ||
-				digest === undefined ||
-				digest !== lowerHexDigest(row.digest) ||
-				!isObject(vertex) ||
-				row.authorSequence !== chunk.replacementSequence ||
-				row.authorSequence <= source.authorSequence ||
-				Reflect.get(vertex, "author") !== scope.author ||
-				Reflect.get(vertex, "objectId") !== scope.objectId ||
-				!NumberIsSafeInteger(Reflect.get(vertex, "epoch")) ||
-				(Reflect.get(vertex, "epoch") as number) <= sourceEpoch
-			)
-				return undefined;
-			const descriptor = Reflect.get(vertex, "settlementSource");
-			if (descriptor !== undefined) {
-				const record = isObject(descriptor)
-					? snapshotClosedRecord({ ...descriptor }, PORTABLE_SETTLEMENT_SOURCE_KEYS)
-					: undefined;
-				if (
-					record === undefined ||
-					record.sourceObjectId !== scope.objectId ||
-					record.sourceAuthor !== scope.author ||
-					record.sourceSequence !== source.authorSequence ||
-					record.sourceDigest !== source.vertexDigest
-				)
-					return undefined;
-			}
-			const operation = Reflect.get(vertex, "operation");
-			const operations = applicationBatchEntries(payload, operation)?.map((value) => value.operation) ?? [operation];
-			for (const value of operations) {
-				if (!isObject(value)) return undefined;
-				replaced.push(value as Readonly<Record<string, unknown>>);
-			}
-			replacementVertexDigests.push(digest);
-		}
-		if (!sameBytes(encodeCanonical(replaced), encodeCanonical(expected))) return undefined;
-		return ObjectFreeze({
-			exactCanonicalPreimageBytes: new Uint8ArrayConstructor(sourceRow.canonicalPreimageBytes),
-			detachedSignature: new Uint8ArrayConstructor(sourceRow.signature),
-			replacementVertexDigests: ObjectFreeze(replacementVertexDigests),
-		});
-	} catch {
-		return undefined;
-	}
+		const row = outboxRowSnapshot({ commit: await store.readIssued(scope, source.authorSequence),
+			publishState: "pending" }, scope);
+		if (row === undefined || lowerHexDigest(row.digest) !== source.vertexDigest) return undefined;
+		const selected = classifyRebaseRow(registration, row);
+		const frontier = settlementFrontierFromHistory(registration.historicalIssuance);
+		if (selected === undefined || selected.authenticated.digest !== source.vertexDigest ||
+			frontier === undefined || !validSettlementFrontierContext(registration.payload, frontier)) return undefined;
+		const terminal = settlementOwnRowClass(selected.authenticated.admitted.epoch, frontier.currentEpoch,
+			source.authorSequence, frontier.admissionEpoch, frontier.terminalThrough);
+		if ((terminal !== "terminal" && terminal !== "old-incarnation") ||
+			!await ownSourceSettlementIsComplete(registration, selected, await store.readSettlementPlan(scope))) return undefined;
+		return ObjectFreeze({ exactCanonicalPreimageBytes: new Uint8ArrayConstructor(row.canonicalPreimageBytes),
+			detachedSignature: new Uint8ArrayConstructor(row.signature) });
+	} catch { return undefined; }
 }
 
 /** Bounded original native linked-source custody; never portable wire authority. */
@@ -15810,7 +15653,7 @@ function rebaseIntents(
 }
 
 /** One invocation of the original immutable settlement policy over detached source operations. */
-function derivePolicyReplacement(
+function derivePolicySettlement(
 	policy: V3LocalSettlementPolicy,
 	operations: readonly Readonly<Record<string, unknown>>[]
 ): ReturnType<V3LocalSettlementPolicy["derive"]> {
@@ -15826,13 +15669,26 @@ function derivePolicyReplacement(
 	const record = canonicalRecord(decoded, ["operations", "disposition"]);
 	if (
 		record === undefined ||
-		(record.disposition !== "rebase" && record.disposition !== "transform") ||
+		(record.disposition !== "rebase" && record.disposition !== "transform" &&
+			record.disposition !== "expire" && record.disposition !== "manual-review") ||
 		!ArrayIsArray(record.operations) ||
-		record.operations.length < 1 ||
+		((record.disposition === "expire" || record.disposition === "manual-review")
+			? record.operations.length !== 0 : record.operations.length < 1) ||
 		record.operations.length > SETTLEMENT_REPLACEMENT_MAX_INTENTS
 	)
 		throw new TypeError("replacement policy result is invalid");
 	return record as unknown as ReturnType<V3LocalSettlementPolicy["derive"]>;
+}
+
+/** The same policy owner, narrowed to work that actually issues replacement operations. */
+function derivePolicyReplacement(policy: V3LocalSettlementPolicy,
+	operations: readonly Readonly<Record<string, unknown>>[]): Readonly<{
+		disposition: "rebase" | "transform"; operations: readonly Readonly<Record<string, unknown>>[];
+	}> {
+	const derived = derivePolicySettlement(policy, operations);
+	if (derived.disposition !== "rebase" && derived.disposition !== "transform")
+		throw new TypeError("settlement disposition creates no replacement");
+	return { ...derived, disposition: derived.disposition };
 }
 
 /** The prepared local application and original authenticated source own semantics. */
@@ -15893,7 +15749,7 @@ function deriveOwnedReplacement(
 	const operations = intents.map((intent) => detachedCanonicalOperation(intent.operation));
 	if (operations.some((operation) => operation === undefined))
 		throw new TypeError("replacement source operations are invalid");
-	const derive = (): ReturnType<V3LocalSettlementPolicy["derive"]> =>
+	const derive = (): ReturnType<typeof derivePolicyReplacement> =>
 		derivePolicyReplacement(policy, operations as readonly Readonly<Record<string, unknown>>[]);
 	let derived: NativeReplacementPreparation = derive();
 	if (!sameBytes(encodeCanonical(derived), encodeCanonical(derive())))
@@ -20005,7 +19861,8 @@ async function recordCreatorReceivedClosedMembership(
 	registration: V3PlaneRegistration,
 	exactCanonicalCutValueBytes: Uint8Array,
 	exactCanonicalSettlementBytes?: Uint8Array | null,
-	exactCanonicalCloseMembershipBytes?: Uint8Array
+	exactCanonicalCloseMembershipBytes?: Uint8Array,
+	receivedAuthority?: ReceivedCloseAuthorityRecords
 ): Promise<boolean> {
 	try {
 		const payload = registration.payload;
@@ -20091,6 +19948,10 @@ async function recordCreatorReceivedClosedMembership(
 			});
 		}
 		if (!available()) return false;
+		if (receivedAuthority !== undefined) membershipBytes = encodeReceivedCloseMembership({
+			exactCanonicalMembershipBytes: membershipBytes, exactCanonicalCutValueBytes: cutBytes,
+			...receivedAuthority,
+		});
 		const before = await journal.readRetirementImage({ objectId: scope.objectId });
 		if (!before.ok || !available()) return false;
 		const recorded = await journal.recordClosedMembership({
@@ -20478,9 +20339,9 @@ function creatorCloseRegistration(
 				})));
 		},
 		recordReceivedClosedMembership: (exactCanonicalCutValueBytes: Uint8Array, exactCanonicalSettlementBytes?: Uint8Array | null,
-			exactCanonicalCloseMembershipBytes?: Uint8Array) =>
+			exactCanonicalCloseMembershipBytes?: Uint8Array, receivedAuthority?: ReceivedCloseAuthorityRecords) =>
 			recordCreatorReceivedClosedMembership(registration, exactCanonicalCutValueBytes, exactCanonicalSettlementBytes,
-				exactCanonicalCloseMembershipBytes),
+				exactCanonicalCloseMembershipBytes, receivedAuthority),
 		// The genuine claim may use a successor alias; the close owner is keyed
 		// by that exact handle, not the registration's underlying raw handle.
 		sealRecoveryDependencies: (required?: boolean) =>

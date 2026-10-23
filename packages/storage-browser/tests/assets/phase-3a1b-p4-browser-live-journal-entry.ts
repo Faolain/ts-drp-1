@@ -58,6 +58,7 @@ declare global {
 				| "reserved-readiness-scopes"
 				| "incremental-replay-validation"
 				| "closed-membership-after-drain"
+				| "closed-membership-upgrade"
 				| "reserved-retirement-reuse"
 				| "reserved-retirement-abort"
 				| "reserved-retirement-admission"
@@ -906,6 +907,43 @@ async function closedMembershipAfterDrain(): Promise<unknown> {
 	}
 }
 
+async function closedMembershipUpgrade(): Promise<unknown> {
+	const {primary, derived, store: opened, values} = await seededPageStore(1);
+	let store = opened as unknown as DurableLiveJournalStore;
+	const scope = values.scope as LiveJournalScope;
+	const read = async () => {
+		const result = await store.readRetirementImage!({objectId: scope.objectId});
+		if (!result.ok) throw new TypeError(result.kind);
+		return result.value;
+	};
+	const currency = (value: Awaited<ReturnType<typeof read>>) => ({imageDigest: value.image.imageDigest,
+		controlBytes: value.control === null ? null : encodeJournalRetirementControl(value.control)});
+	// Opaque mechanical evidence; no fixture bytes establish close authority.
+	const original = encodeCanonical({kind: "creator-close-membership-1", marker: 1});
+	const fields = {kind: "creator-received-close-membership-1", exactCanonicalMembershipBytes: original,
+		exactCanonicalCutValueBytes: Uint8Array.of(1), exactCanonicalCommitQcBytes: Uint8Array.of(2),
+		exactCanonicalSuccessorTrustStateRecordBytes: Uint8Array.of(3)};
+	const extended = encodeCanonical(fields);
+	const record = (bytes: Uint8Array, expectedNativeImage: ReturnType<typeof currency>) =>
+		store.recordClosedMembership!({scope, exactCanonicalMembershipBytes: bytes, expectedNativeImage});
+	try {
+		const empty = await read(), fresh = await record(original, currency(empty)), legacy = await read();
+		const stale = await record(extended, currency(empty));
+		const changed = await record(encodeCanonical({...fields, exactCanonicalMembershipBytes:
+			encodeCanonical({kind: "creator-close-membership-1", marker: 2})}), currency(legacy));
+		const overImage = encodeCanonical({...fields, exactCanonicalCommitQcBytes:
+			new Uint8Array(LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes - extended.byteLength - 15)},
+			{maxBytes: LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes, maxItems: 65_536, maxDepth: 32});
+		const bounded = await record(overImage, currency(legacy)), afterRefusals = await read();
+		const upgrade = await record(extended, currency(legacy)), upgraded = await read();
+		await store.close(); store = await open(primary) as unknown as DurableLiveJournalStore;
+		const reopened = await read(), retry = await record(extended, currency(reopened));
+		const downgrade = await record(original, currency(reopened));
+		const rewrite = await record(encodeCanonical({...fields, exactCanonicalCommitQcBytes: Uint8Array.of(9)}), currency(reopened));
+		return {fresh, stale, changed, bounded, legacy, afterRefusals, upgrade, upgraded, reopened, retry, downgrade, rewrite};
+	} finally { await store.close(); await deleteDatabase(derived); }
+}
+
 // Exact native transaction identities, not database names or portable handles.
 const retirementTransactionIds = new WeakMap<IDBTransaction, number>();
 let nextRetirementTransactionId = 0;
@@ -1463,6 +1501,7 @@ window.phase3a1bP4Run = (caseId): Promise<unknown> => {
 	if (caseId === "reserved-retirement-abort") return reservedRetirementAbort();
 	if (caseId === "reserved-retirement-admission") return reservedRetirementAdmission();
 	if (caseId === "closed-membership-after-drain") return closedMembershipAfterDrain();
+	if (caseId === "closed-membership-upgrade") return closedMembershipUpgrade();
 	if (caseId === "reserved-readiness-reuse") return reservedReadinessReuse();
 	if (caseId === "reserved-readiness-scopes") return reservedReadinessScopes();
 	if (caseId === "incremental-replay-validation") return incrementalReplayValidation();

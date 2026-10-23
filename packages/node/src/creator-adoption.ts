@@ -1462,7 +1462,10 @@ export async function receiveCreatorSuccessorAdoption(
 		// ever become collectible. Exact Cut agreement only; otherwise nothing is
 		// recorded and the scope keeps its original retention.
 		const membershipRecorded = await source.recordReceivedClosedMembership(offer.exactCanonicalCutValueBytes,
-			auxiliary.exactCanonicalSettlementBytes, auxiliary.exactCanonicalCloseMembershipBytes);
+			auxiliary.exactCanonicalSettlementBytes, auxiliary.exactCanonicalCloseMembershipBytes, {
+				exactCanonicalCommitQcBytes: offer.exactCanonicalCommitQcBytes,
+				exactCanonicalSuccessorTrustStateRecordBytes: offer.exactCanonicalTrustStateRecordBytes,
+			});
 		if (auxiliary.exactCanonicalCloseMembershipBytes !== undefined && !membershipRecorded)
 			throw new TypeError("creator received close membership persistence refused");
 		if (await prepareReceivedRecoveryTurnover()) {

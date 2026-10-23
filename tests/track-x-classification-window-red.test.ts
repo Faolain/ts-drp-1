@@ -14,19 +14,12 @@ import {
 	seal,
 } from "./fixtures/track-x/outside-rows-room.js";
 
-// Track X, decision row 60, the classification window (the owner's W1). A Writer classifies its
-// journal scope e only while it holds that scope's Cut authority (its recovery trusts), at the
-// install of e+3, when the latest Cut it knows is cut(e+2). Proof for a row outside the Cut that
-// arrives later was never looked at again: the scope was kept for good, and once a later scope
-// was collected the Writer's plan named retired work, so a later install refused ("settlement
-// plan references retired or absent issued work"). The owner's W1: keep the signed Cut
-// authorities a retained scope needs, as data re-verified against the creator's immutable trust
-// on every use, until the scope is collected (at most the journal's protected-scope limit + 1).
-// The two REDs are the native cases that resolve after the window: a move whose replacement
-// misses three Cuts in a row (R5-chain), and a settlement fence that misses four Cuts in a row
-// (R7). The third case is a guard that passes before W1: a clean scope is classified inside the
-// install of e+4 (its received recovery turnover), so a stop right after that install, or right
-// after the replay install before it, leaks nothing.
+// A received scope retains its exact Cut/QC/trust with membership until its details are Done.
+// Authority outside the ordinary recovery window is reopened against the immutable genesis
+// and signed scope header. Own outside rows need signed terminal coverage and complete local
+// settlement; they do not wait for later replacement Cuts. These schedules cover delayed
+// replacement/fence delivery, a restart with old authority outside the window, and clean-scope
+// restart boundaries. Every retained byte remains under the native image ceiling.
 // Grid zone application, creator-trusted-settlement-v1, the node SQLite host.
 
 afterEach(async () => {
@@ -79,7 +72,7 @@ it("a Writer whose move's replacement misses three Cuts in a row keeps installin
 	expect(required(room.peers[1]).room.projection()).toEqual(creator.room.projection());
 }, 900_000);
 
-it("a Writer whose settlement fence misses four Cuts in a row keeps its scopes bounded", async () => {
+it("a Writer whose settlement fence misses four Cuts survives an out-of-window restart and keeps its scopes bounded", async () => {
 	const room = await openOutsideRowsRoom();
 	const creator = required(room.peers[0]);
 	const history: string[] = [];
@@ -105,6 +98,12 @@ it("a Writer whose settlement fence misses four Cuts in a row keeps its scopes b
 		const kept = await protectedEpochs(room, 1);
 		history.push(`epoch ${epoch + 1}: ${installed}; protected [${kept.join(",")}]`);
 		expect(installed, history.join("\n")).toBe("ok");
+		if (epoch + 1 === 5) {
+			expect(kept).toContain(1);
+			await room.fixture.stop(required(room.peers[1]));
+			room.peers[1] = await room.fixture.open(1, { reopen: true });
+			history.push("reopened at epoch 5 with scope 1 outside the ordinary recovery window");
+		}
 		late = WITHHELD.has(epoch);
 		if (!late) await deliver(room, 1);
 		expect(kept.length, history.join("\n")).toBeLessThanOrEqual(PROTECTED_BOUND);

@@ -25,10 +25,12 @@ function declaration(name: string): string {
 	return found[0]!.getText(parsed);
 }
 const code = [
-	"authenticatedCompletedNativeReplacementSource",
+	"ownSourceSettlementIsComplete",
 	"completedNonportableReplacementChunk",
 	"olderSourcePolicyReplacementChunk",
 	"derivePolicyReplacement",
+	"derivePolicySettlement",
+	"settlementSourceOperations",
 ]
 	.map(declaration)
 	.join("\n");
@@ -36,6 +38,7 @@ const code = [
 const sameBytes = (a: Uint8Array, b: Uint8Array): boolean => Buffer.compare(Buffer.from(a), Buffer.from(b)) === 0;
 const plain = (value: unknown): Record<string, unknown> => JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
 const context = {
+	isObject: (value: unknown) => value !== null && typeof value === "object",
 	ObjectFreeze: Object.freeze,
 	ArrayIsArray: Array.isArray,
 	NumberIsSafeInteger: Number.isSafeInteger,
@@ -43,7 +46,12 @@ const context = {
 	decodeCanonical,
 	hashDomain,
 	sameBytes,
-	lowerHexDigest: (value: unknown) => value,
+	lowerHexDigest: (value: Uint8Array) => Buffer.from(value).toString("hex"),
+	sameScope: (left: unknown, right: unknown) => JSON.stringify(left) === JSON.stringify(right),
+	AUTHOR_FENCE_ACTION: "$drp.author-fence.v1",
+	APPLICATION_BATCH_ACTION: "applicationBatch",
+	isReservedBatchAction: () => false,
+	settlementProfileFor: () => "v1",
 	creatorOriginalIssuanceStore: (registration: { store: unknown }) => registration.store,
 	outboxRowSnapshot: ({ commit }: { commit: unknown }) => commit ?? undefined,
 	classifyRebaseRow: (registration: { classify(row: unknown): unknown }, row: unknown) => registration.classify(row),
@@ -85,9 +93,9 @@ const functions = Function(
 	`"use strict";${
 		ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } })
 			.outputText
-	}return { authenticatedCompletedNativeReplacementSource };`
+	}return { ownSourceSettlementIsComplete };`
 )(...Object.values(context)) as {
-	authenticatedCompletedNativeReplacementSource(
+	ownSourceSettlementIsComplete(
 		registration: unknown,
 		selected: unknown,
 		plan: unknown
@@ -111,7 +119,7 @@ const classify = (value: ReturnType<typeof row>) => ({
 	authenticated: {
 		author: scope.author,
 		authorSequence: value.authorSequence,
-		digest: digest(value.authorSequence),
+		digest: Buffer.from(digest(value.authorSequence)).toString("hex"),
 		admitted: { epoch: value.epoch, anchor: `anchor-${value.epoch}`, logicalTime: 0 },
 		vertex: { operation: value.operation },
 	},
@@ -128,7 +136,9 @@ interface Case {
 	issued?: boolean;
 	disposition?: string;
 	refusal?: Uint8Array;
-	policy?: "rebase" | "transform";
+	policy?: "expire" | "manual-review" | "rebase" | "transform";
+	sourceDigest?: Uint8Array;
+	replacementSequence?: number | null;
 }
 
 async function completed(input: Case = {}): Promise<boolean> {
@@ -144,7 +154,8 @@ async function completed(input: Case = {}): Promise<boolean> {
 					blueprintDigest: "blueprint",
 					derive: (operations: readonly Record<string, unknown>[]) => ({
 						disposition: input.policy ?? "rebase",
-						operations: operations.map((operation) => ({ ...operation, rebased: true })),
+						operations: input.policy === "expire" || input.policy === "manual-review" ? [] :
+							operations.map((operation) => ({ ...operation, rebased: true })),
 					}),
 				},
 			},
@@ -158,16 +169,16 @@ async function completed(input: Case = {}): Promise<boolean> {
 		entries: [
 			{
 				sourceSequence: 7,
-				sourceDigest: digest(7),
+				sourceDigest: input.sourceDigest ?? digest(7),
 				disposition: input.disposition ?? "rebase",
-				replacementSequence: 9,
+				replacementSequence: input.replacementSequence === undefined ? 9 : input.replacementSequence,
 				...(input.refusal === undefined
 					? {}
 					: { transformRefusal: { version: 1, kind: "admission-refused", proposedIntentDigest: input.refusal } }),
 			},
 		],
 	};
-	return functions.authenticatedCompletedNativeReplacementSource(
+	return functions.ownSourceSettlementIsComplete(
 		registration,
 		classify(row(7, input.sourceEpoch ?? 1, move)),
 		plan
@@ -219,5 +230,20 @@ describe("R6-A: a completed nonportable replacement of a source older than the c
 		// derivation is not a fallback for it.
 		expect(await completed({ sourceEpoch: 2 })).toBe(false);
 		expect(await completed({ sourceEpoch: 3 })).toBe(false);
+	});
+});
+
+
+describe("shared own-source completion for expiry and review", () => {
+	it("recognizes expiry only when the immutable policy derives expiry for the exact source", async () => {
+		expect(await completed({ policy: "expire", disposition: "expire", replacementSequence: null, issued: false })).toBe(true);
+		expect(await completed({ disposition: "expire", replacementSequence: null })).toBe(false);
+		expect(await completed({ policy: "expire", disposition: "expire", replacementSequence: null,
+			sourceDigest: digest(8) })).toBe(false);
+		expect(await completed({ policy: "expire", disposition: "expire" })).toBe(false);
+	});
+	it("keeps manual-review unresolved even with a fabricated completed link", async () => {
+		expect(await completed({ policy: "manual-review", disposition: "manual-review", replacementSequence: null })).toBe(false);
+		expect(await completed({ policy: "manual-review", disposition: "manual-review" })).toBe(false);
 	});
 });

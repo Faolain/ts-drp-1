@@ -130,7 +130,7 @@ function captureFixture() {
 		outboxRowSnapshot: ({commit}: any, scope: any) => commit === null ? undefined : ({...commit.envelope, scope}),
 		classifyRebaseRow: (_registration: any, snapshot: any) => state.classify ? {row: snapshot, authenticated: auth(snapshot.canonicalPreimageBytes)} : undefined,
 		validRebaseRow: () => state.classify, createCreatorCensusVertexFacts: () => ({}),
-		authenticatedCompletedNativeReplacementSource: async () => {state.completions++; return state.complete;}});
+		ownSourceSettlementIsComplete: async () => {state.completions++; return state.complete;}});
 	const journal: any[] = [{journalSequence: 0, sourceKind: "received", digest: target.vertexDigest, byteCharge: target.exactCanonicalPreimageBytes.byteLength,
 		exactCanonicalPreimageBytes: target.exactCanonicalPreimageBytes.slice(), detachedSignature: target.detachedSignature.slice(),
 		exactCanonicalVertexBytes: encodeCanonical(auth(target.exactCanonicalPreimageBytes).vertex)}];
@@ -203,24 +203,34 @@ function completedFixture() {
 	const commits = new Map([sourceRow, ...targets].map(value => [value.authorSequence, {envelope: value, issuedRecord: {sequence: value.authorSequence}}]));
 	const store = {readSettlementPlan: async () => plan, readIssued: async (_scope: any, sequence: number) => {
 		state.reads.push(sequence); if (state.fail) throw new Error("original-native-failure"); return commits.get(sequence) ?? null;}};
-	const registration = {payload: {parameters: {maxEpochVertices: 16, maxEpochBytes: 65536}, provenance: {blueprintDigest: "blueprint"}}, issuanceStore: store};
+	const registration = {payload: {parameters: {maxEpochVertices: 16, maxEpochBytes: 65536},
+		provenance: {blueprintDigest: "blueprint"}, input: {settlementPolicy: {blueprintDigest: "blueprint",
+			derive: () => ({disposition: "rebase", operations: targets.map(target => record(target.canonicalPreimageBytes).operation)})}}},
+		issuanceScope: scope, issuanceStore: store};
 	const sourceKeysNode = ts.createSourceFile("original.ts", live, ts.ScriptTarget.Latest, true).statements
 		.filter(ts.isVariableStatement).flatMap(value => [...value.declarationList.declarations])
 		.find(value => ts.isIdentifier(value.name) && value.name.text === "PORTABLE_SETTLEMENT_SOURCE_KEYS")!;
 	const sourceKeys = execute<readonly string[]>(`return ${sourceKeysNode.initializer!.getText()};`, {});
 	const api = execute<(registration: any, selected: any, plan: any, vertexFacts?: any, book?: any) => Promise<boolean>>(`
 		${declaration(live, "verifyNestedNativeSource")}
-		${declaration(live, "authenticatedCompletedNativeReplacementSource")}\nreturn authenticatedCompletedNativeReplacementSource;`, {
+		${declaration(live, "ownSourceSettlementIsComplete")}\nreturn ownSourceSettlementIsComplete;`, {
 		encodeCanonical, decodeCanonical, sameBytes, NumberIsSafeInteger: Number.isSafeInteger,
+		sameScope: (a: any, b: any) => a.objectId === b.objectId && a.author === b.author,
+		AUTHOR_FENCE_ACTION: "$drp.author-fence.v1",
+		settlementSourceOperations: (_payload: any, operation: any) => [operation],
+		derivePolicySettlement: (policy: any, operations: any) => policy.derive(operations),
 		creatorOriginalIssuanceStore: () => store, isObject: (value: unknown) => value !== null && typeof value === "object",
 		PORTABLE_SETTLEMENT_SOURCE_KEYS: sourceKeys,
 		snapshotClosedRecord: (value: any, keys: readonly string[]) => Reflect.ownKeys(value).length === keys.length &&
 			keys.every(key => Object.hasOwn(value, key)) ? {...value} : undefined,
 		outboxRowSnapshot: ({commit}: any) => commit === null ? undefined : commit.envelope,
-		classifyRebaseRow: (_registration: any, value: any) => ({row: value, authenticated: {admitted: record(value.canonicalPreimageBytes)}}),
+		classifyRebaseRow: (_registration: any, value: any) => ({row: value, authenticated: {
+			author: scope.author, authorSequence: value.authorSequence, admitted: record(value.canonicalPreimageBytes),
+			vertex: {operation: record(value.canonicalPreimageBytes).operation}}}),
 		validRebaseRow: () => true, lowerHexDigest: (bytes: Uint8Array) => Buffer.from(bytes).toString("hex"),
 		verifyCreatorSettlementSourceSelection: () => false, creatorSettlementSelectionBytes: encodeCanonical});
-	const selected = {row: sourceRow, authenticated: {digest: source.vertexDigest}};
+	const selected = {row: sourceRow, authenticated: {digest: source.vertexDigest, author: scope.author,
+		authorSequence: sourceRow.authorSequence, admitted: {epoch: 1}, vertex: {operation: record(sourceRow.canonicalPreimageBytes).operation}}};
 	const book = {charge: (bytes: Uint8Array) => {state.charges.push(bytes.slice()); return state.budget;}};
 	return {api, registration, selected, plan, state, book, sourceRow, targets, commits};
 }

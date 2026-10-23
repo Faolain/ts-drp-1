@@ -1,6 +1,7 @@
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { buildMerkleTree, type CloseSetHistoryCommitment } from "@ts-drp/compaction";
 import { LIVE_JOURNAL_RETIREMENT_LIMITS, type LiveJournalScope } from "@ts-drp/live-journal";
+import { openReceivedCloseMembership, RECEIVED_CLOSE_MEMBERSHIP_KIND } from "./creator-received-close-membership.js";
 
 export const CREATOR_CLOSE_MEMBERSHIP_KIND = "creator-close-membership-1" as const;
 export const CREATOR_CLOSE_MEMBERSHIP_MAX_BYTES = LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes;
@@ -256,10 +257,13 @@ export async function openCreatorCloseMembership(
 	}>
 ): Promise<CreatorCloseMembership | undefined> {
 	try {
-		const bytes = boundedBytes(input.bytes);
+		const captured = boundedBytes(input.bytes);
+		const outer = record(decodeCanonical(captured, LIMITS));
+		const received = outer?.kind === RECEIVED_CLOSE_MEMBERSHIP_KIND ? openReceivedCloseMembership(captured) : undefined;
+		const bytes = received?.exactCanonicalMembershipBytes ?? captured;
 		const cutBytes = boundedBytes(input.exactCanonicalCutValueBytes);
 		const cut = cutFacts(cutBytes, input.maxEpochVertices);
-		const carrier = record(decodeCanonical(bytes, LIMITS));
+		const carrier = received === undefined ? outer : record(decodeCanonical(bytes, LIMITS));
 		const scope = record(carrier?.scope);
 		const packed = carrier?.orderedVertexDigests;
 		if (

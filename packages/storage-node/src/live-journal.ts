@@ -7,6 +7,7 @@ import {
 	captureJournalClosedMembershipReadInput,
 	captureJournalClosedMembershipObservation,
 	type LiveJournalClosedMembershipReadResult,
+	journalClosedMembershipCanExtend,
 	captureLiveJournalAnchorReadObservation,
 	captureLiveJournalHistoricalAnchorImportInput,
 	captureLiveJournalInput,
@@ -1930,14 +1931,14 @@ export function createNodeDurableLiveJournalStore(
 					"SELECT closed_membership_bytes FROM scopes WHERE object_id=? AND epoch=? AND anchor_digest=?"
 				).get(...scopeParameters(selected.scope));
 				if (installed === null || current === undefined) refusal = "not-installed";
-				else if (current.closed_membership_bytes !== null) {
-					if (!sameBytes(copyBlob(current.closed_membership_bytes), selected.exactCanonicalMembershipBytes))
-						refusal = "evidence-conflict";
-					else {
-						idempotent = true;
-						expectedAfter = { imageDigest: before.imageDigest, controlBytes: bytes };
-					}
-				} else {
+				else if (current.closed_membership_bytes !== null &&
+					sameBytes(copyBlob(current.closed_membership_bytes), selected.exactCanonicalMembershipBytes)) {
+					idempotent = true;
+					expectedAfter = { imageDigest: before.imageDigest, controlBytes: bytes };
+				} else if (current.closed_membership_bytes !== null &&
+					!journalClosedMembershipCanExtend(copyBlob(current.closed_membership_bytes), selected.exactCanonicalMembershipBytes))
+					refusal = "evidence-conflict";
+				else {
 					const mutation = admitJournalMutation(database, selected.scope);
 					if (!journalRetirementMutationAllows(mutation, selected.scope)) refusal = "retirement-fenced";
 					else {
@@ -1954,8 +1955,8 @@ export function createNodeDurableLiveJournalStore(
 						attempted = true;
 						statement(
 							database,
-							"UPDATE scopes SET closed_membership_bytes=? WHERE object_id=? AND epoch=? AND anchor_digest=? AND closed_membership_bytes IS NULL"
-						).run(selected.exactCanonicalMembershipBytes, ...scopeParameters(selected.scope));
+							"UPDATE scopes SET closed_membership_bytes=? WHERE object_id=? AND epoch=? AND anchor_digest=? AND closed_membership_bytes IS ?"
+						).run(selected.exactCanonicalMembershipBytes, ...scopeParameters(selected.scope), current.closed_membership_bytes);
 						advanceMutation(mutation);
 						if (retirementImage(database, selected.scope.objectId, []).imageDigest !== after.imageDigest)
 							throw new Error("retirement-stale");

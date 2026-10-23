@@ -163,6 +163,29 @@ export function captureJournalClosedMembershipInput(input: unknown): Readonly<{
 		expectedNativeImage: Object.freeze({ imageDigest: digest(expected.imageDigest), controlBytes }),
 	});
 }
+/** One additive encoding transition for interrupted received-close retries. The
+ * original canonical membership remains byte-for-byte inside the new envelope.
+ * This mechanical preservation check grants no authority to either record. */
+export function journalClosedMembershipCanExtend(existing: Uint8Array, proposed: Uint8Array): boolean {
+	try {
+		const limits = { maxBytes: LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes, maxItems: 65_536, maxDepth: 32 };
+		if (existing.byteLength === 0 || proposed.byteLength === 0 ||
+			existing.byteLength > limits.maxBytes || proposed.byteLength > limits.maxBytes) return false;
+		const original = decodeCanonical(existing, limits);
+		const extended = record(decodeCanonical(proposed, limits), ["kind", "exactCanonicalMembershipBytes",
+			"exactCanonicalCutValueBytes", "exactCanonicalCommitQcBytes", "exactCanonicalSuccessorTrustStateRecordBytes"]);
+		if (original === null || typeof original !== "object" || Array.isArray(original) ||
+			Reflect.get(original, "kind") !== "creator-close-membership-1" ||
+			extended.kind !== "creator-received-close-membership-1" ||
+			!equalNative(existing, encodeCanonical(original, limits)) ||
+			!equalNative(proposed, encodeCanonical(extended, limits))) return false;
+		return extended.exactCanonicalMembershipBytes instanceof Uint8Array &&
+			equalNative(existing, extended.exactCanonicalMembershipBytes) &&
+			[extended.exactCanonicalCutValueBytes, extended.exactCanonicalCommitQcBytes,
+				extended.exactCanonicalSuccessorTrustStateRecordBytes].every(value =>
+				value instanceof Uint8Array && value.byteLength > 0);
+	} catch { return false; }
+}
 const scopeKey = (s: LiveJournalScope): string => `${s.epoch.toString().padStart(16, "0")}:${s.anchorDigest}`;
 /**
  * Captures one bounded mechanical frontier; digests are not protocol permission.

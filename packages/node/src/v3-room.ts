@@ -2079,38 +2079,39 @@ function localSettlementPolicy(
 			}
 		},
 		derive(operations: Parameters<V3LocalSettlementPolicy["derive"]>[0]) {
-			let transformed = false;
-			const selected = operations.flatMap((raw) => {
+			if (operations.length === 0) throw new TypeError("v3 room settlement source is empty");
+			const originals = operations.map(raw => {
 				const operation = detachedRoomOperation(raw);
 				const action = operation === undefined ? undefined : Reflect.get(operation, "action");
 				if (operation === undefined || typeof action !== "string")
 					throw new TypeError("v3 room displaced operation is invalid");
 				const policy = policies[action];
-				if (policy === "expire") return [];
-				if (policy !== "rebase" && policy !== "transform")
-					throw new TypeError("v3 room settlement replacement policy is invalid");
+				if (policy === undefined) throw new TypeError("v3 room settlement policy is unavailable");
 				const identity = identityFor(operation);
 				if (typeof identity !== "string" || identity.length === 0 || identityFor(operation) !== identity)
 					throw new TypeError("v3 room displaced operation identity is invalid");
+				return { operation, action, policy, identity };
+			});
+			if (originals.some(value => value.policy === "manual-review"))
+				return Object.freeze({ disposition: "manual-review" as const, operations: Object.freeze([]) });
+			if (originals.every(value => value.policy === "expire"))
+				return Object.freeze({ disposition: "expire" as const, operations: Object.freeze([]) });
+			let transformed = false;
+			const selected = originals.flatMap(({ operation, action, policy, identity }) => {
+				if (policy === "expire") return [];
 				let candidate = operation;
 				if (policy === "transform") {
 					const first = transform === undefined ? undefined : detachedRoomOperation(transform(operation));
 					const second = transform === undefined ? undefined : detachedRoomOperation(transform(operation));
-					if (
-						first === undefined ||
-						second === undefined ||
+					if (first === undefined || second === undefined ||
 						!sameBytes(encodeCanonical(first), encodeCanonical(second)) ||
-						Reflect.get(first, "action") !== action ||
-						identityFor(first) !== identity
-					)
+						Reflect.get(first, "action") !== action || identityFor(first) !== identity)
 						throw new TypeError("v3 room displaced transform is unstable");
 					candidate = first;
 					transformed = true;
 				}
 				decodeCanonical(encodeCanonical(candidate, { maxBytes: 65536, maxDepth: 8, maxItems: 1024 }), {
-					maxBytes: 65536,
-					maxDepth: 8,
-					maxItems: 1024,
+					maxBytes: 65536, maxDepth: 8, maxItems: 1024,
 				});
 				return [candidate];
 			});
@@ -4954,34 +4955,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		sameReplacementProgress(left, right) &&
 		sameBytes(left.sourceDigest, right.sourceDigest);
 	const settlementDisposition = (
-		source: Pick<DisplacedSource, "intents"> & Partial<Pick<DisplacedSource, "authorSequence">>
-	): RoomSettlementPlanEntry["disposition"] | undefined => {
-		if (source.intents.length === 0) return undefined;
-		const policies = source.intents.map((intent) => {
-			const operation = detachedRoomOperation(intent.operation);
-			const action = operation === undefined ? undefined : Reflect.get(operation, "action");
-			if (operation === undefined || typeof action !== "string") {
-				throw new TypeError("v3 room displaced operation is invalid");
-			}
-			const policy = input.application.displacementPolicies[action];
-			if (policy === undefined)
-				throw new TypeError(
-					`v3 room displacement policy is unavailable: ${JSON.stringify({ action, sequence: source.authorSequence })}`
-				);
-			const identity = input.application.displacedOperationIdentity(operation);
-			if (
-				typeof identity !== "string" ||
-				identity.length === 0 ||
-				input.application.displacedOperationIdentity(operation) !== identity
-			) {
-				throw new TypeError("v3 room displaced operation identity is invalid");
-			}
-			return policy;
-		});
-		if (policies.includes("manual-review")) return "manual-review";
-		if (policies.every((policy) => policy === "expire")) return "expire";
-		return policies.includes("transform") ? "transform" : "rebase";
-	};
+		source: Pick<DisplacedSource, "intents">
+	): RoomSettlementPlanEntry["disposition"] | undefined => source.intents.length === 0
+		? undefined : ownedSettlementPolicy.derive(source.intents.map(intent => intent.operation)).disposition;
+
 	/**
 	 * Original plan field constructor shared by native write and prospective sizing.
 	 * @param sources - Original displaced sources, or a proven empty future source list.

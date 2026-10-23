@@ -12,6 +12,7 @@ import type { CreatorPostAdoptionCensusSizing, CreatorPostAdoptionSettlementSizi
 import type { CreatorOrdinaryRuntimeCapacityWidthInput, creatorOrdinaryRuntimeCapacityWidths } from "../v3-live.js";
 import type { CreatorPendingClassificationCustodyInput } from "./creator-adoption-recover.js";
 import type { CreatorOrdinarySourceCapture } from "./creator-closed-rollback-data.js";
+import type { ReceivedClosedJournalAuthority, ReceivedClosedJournalAuthorityRead } from "./creator-received-close-membership.js";
 import type { V3RoomRetirementSession } from "./room-retirement.js";
 
 /** The original issuance retirement owner of one recovery hold. */
@@ -314,25 +315,21 @@ nativeRows: readonly LiveJournalAcceptedRow[], preparedCapacityOnly?: true): Pro
 }>;
 type OrdinaryIssuanceRuntimeResolver = (value: unknown, owners: CreatorSnapshotRecoveryCloseOwners) =>
 	CreatorOrdinaryIssuanceRuntimeLifetime | undefined;
-/** Decision row 60 (R5): one local-issued journal row outside its scope's signed Cut. */
-export type CreatorReplacedLocalSource = Readonly<{ author: string; authorSequence: number; vertexDigest: string }>;
-/** Its original issued bytes and the exact replacement rows its own plan entry names, each of
- * whose operations equal the source's derivation by the original immutable settlement policy.
- * Data only: the journal classifier authenticates the source against its closed ACL and
- * requires every replacement digest in a later signed Cut before any deletion. */
-export type CreatorReplacedLocalSourceRead = Readonly<{
+/** One local-issued journal row outside its scope's signed Cut. */
+export type CreatorSettledLocalSource = Readonly<{ author: string; authorSequence: number; vertexDigest: string }>;
+/** Original own source bytes, returned only after signed terminal coverage and exact local
+ * policy completion. The classifier independently authenticates the source's closed ACL. */
+export type CreatorSettledLocalSourceRead = Readonly<{
 	exactCanonicalPreimageBytes: Uint8Array;
 	detachedSignature: Uint8Array;
-	replacementVertexDigests: readonly string[];
-	/** Decision row 60 (R7): the row is this author's own settlement fence (fenceSequence equal to
-	 * its sequence), which has no plan entry and no replacement; replacementVertexDigests is empty.
-	 * The classifier requires a later own fence in a later signed Cut before any deletion. */
-	authorFence?: true;
 }>;
 export type CreatorSnapshotRecoveryCloseLifetime = Readonly<{
-	/** Decision row 60 (R5): this hold's own registration reads a local source it replaced.
-	 * Undefined unless the source, its plan entry and every replacement row are exactly that. */
-	readReplacedLocalSource?(source: CreatorReplacedLocalSource): Promise<CreatorReplacedLocalSourceRead | undefined>;
+	/** Reopens this image's received Cut/QC against its original signed scope and immutable pin.
+	 * The caller supplies current bytes; no verification result outlives the held classification. */
+	readClosedJournalAuthority?(input: ReceivedClosedJournalAuthorityRead): ReceivedClosedJournalAuthority | undefined;
+	/** This hold's own registration reads a terminally covered, locally settled source.
+	 * Its exact policy, digest-matched plan and completed replacement chunks are rechecked. */
+	readSettledLocalSource?(source: CreatorSettledLocalSource): Promise<CreatorSettledLocalSourceRead | undefined>;
 	/** Private owner geometry only: this lifetime retains no replacement or
 	 * displaced-source physical custody. It is not currency or authorization. */
 	canDetachNativePreparation?: true;

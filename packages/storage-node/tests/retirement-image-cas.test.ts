@@ -512,6 +512,49 @@ function createRetirementStore(...args: Parameters<typeof createNodeDurableLiveJ
 	return store as typeof store & Required<Pick<typeof store, "readRetirementImage" | "acquireRetirementControl">>;
 }
 
+test("closed membership extends exact legacy evidence with native currency, bounded image and reopen", async () => {
+	const directory = await mkdtemp(join(tmpdir(), "ts-drp-membership-upgrade-"));
+	const primaryFilename = join(directory, "journal.sqlite"), current = anchorMaterial(0);
+	let store = createRetirementStore({ primaryFilename });
+	const selector = { objectId: current.scope.objectId };
+	const image = async () => must(await store.readRetirementImage(selector));
+	const currency = (view: Awaited<ReturnType<typeof image>>) => ({imageDigest: view.image.imageDigest,
+		controlBytes: view.control === null ? null : encodeJournalRetirementControl(view.control)});
+	// Mechanical native evidence only; the protocol owner authenticates it separately.
+	const original = encodeCanonical({kind: "creator-close-membership-1", marker: 1});
+	const fields = {kind: "creator-received-close-membership-1", exactCanonicalMembershipBytes: original,
+		exactCanonicalCutValueBytes: Uint8Array.of(1), exactCanonicalCommitQcBytes: Uint8Array.of(2),
+		exactCanonicalSuccessorTrustStateRecordBytes: Uint8Array.of(3)};
+	const extended = encodeCanonical(fields);
+	const record = (bytes: Uint8Array, expectedNativeImage: ReturnType<typeof currency>) =>
+		store.recordClosedMembership!({scope: current.scope, exactCanonicalMembershipBytes: bytes, expectedNativeImage});
+	try {
+		expect(await store.installGenesis(current.install)).toMatchObject({ok: true});
+		const empty = await image();
+		expect(await record(original, currency(empty))).toMatchObject({ok: true, value: {idempotent: false}});
+		const legacy = await image();
+		expect(await record(extended, currency(empty))).toEqual({ok: false, kind: "retirement-stale"});
+		expect(await record(encodeCanonical({...fields, exactCanonicalMembershipBytes:
+			encodeCanonical({kind: "creator-close-membership-1", marker: 2})}), currency(legacy)))
+			.toEqual({ok: false, kind: "evidence-conflict"});
+		const overhead = extended.byteLength - 1;
+		const overImage = encodeCanonical({...fields, exactCanonicalCommitQcBytes:
+			new Uint8Array(LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes - overhead - 16)},
+			{maxBytes: LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes, maxItems: 65_536, maxDepth: 32});
+		expect(await record(overImage, currency(legacy))).toMatchObject({ok: false});
+		expect(await image()).toEqual(legacy);
+		expect(await record(extended, currency(legacy))).toMatchObject({ok: true, value: {idempotent: false}});
+		const upgraded = await image();
+		expect(upgraded.image.byteCharge).toBeGreaterThan(legacy.image.byteCharge);
+		await store.close(); store = createRetirementStore({primaryFilename, initialization: "reopen"});
+		expect(await image()).toEqual(upgraded);
+		expect(await record(extended, currency(upgraded))).toMatchObject({ok: true, value: {idempotent: true}});
+		expect(await record(original, currency(upgraded))).toEqual({ok: false, kind: "evidence-conflict"});
+		expect(await record(encodeCanonical({...fields, exactCanonicalCommitQcBytes: Uint8Array.of(9)}), currency(upgraded)))
+			.toEqual({ok: false, kind: "evidence-conflict"});
+	} finally { await store.close(); await rm(directory, {recursive: true, force: true}); }
+});
+
 // Native encoding conformance for the new received-candidate branch. Real
 // per-author signatures do not make these fixture anchors/ACL portable authority.
 // This is not the integrated128-Writer admission/drainability acceptance test.
