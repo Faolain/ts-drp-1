@@ -1,0 +1,965 @@
+{
+  "schema": "rejoin-contract-evidence-1",
+  "generatedAt": "2026-10-23T13:32:52.761022+00:00",
+  "claim": "Final registry coverage assembled from a complete57-case v3 batch plus the affected shared-head-file v4 rerun. Every selected checker input model file and watchdog match final source hashes. This is not a single new complete run and not native implementation refinement.",
+  "finalSourceHashes": {
+    "packages/protocol-v3/formal/rejoin-head-roles.qnt": "64d9bd7f9d404e557492d2083e57fb12c2d2f2d27f4732cf10fcf32ff59128fd",
+    "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+    "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d",
+    "packages/protocol-v3/formal/check-rejoin-contract.mjs": "bf418ea1ed32a7846fd43acae61316763631bfb1bac99f2d5bc3ace4222029c9",
+    "packages/node/src/v3-live.ts": "85db2432f5c904f9ff702728443c2718f683053252bcfaa877b2a63b6ea4e214",
+    "packages/node/src/creator-close.ts": "a34ecaa7f1670688121d7756aa4df21f214e25076364e23be6d28fdd8a01ff10",
+    "packages/node/src/internal/creator-closed-rollback-data.ts": "1c772b0b66e96ba53167905c2202f6cf754b89b1dafbc5528925744bae5f525e",
+    "packages/storage-node/src/internal/node-issuance-store.ts": "46a07737fdcddae311c0a679a788614862b67b2848256c4a367b2db1a85a1566",
+    "packages/issuance-store/src/retirement.ts": "d04b09a28fb2ff5520e3aa4f9949fbfc1d4481a14ccffc3050ddf00b179c74de"
+  },
+  "checks": 58,
+  "testDeclarations": 54,
+  "counts": {
+    "typecheck": 3,
+    "tests": 4,
+    "ok": 13,
+    "violation": 38
+  },
+  "runs": [
+    {
+      "file": "run-v3.json",
+      "sha256": "22ea351621ada89e622799cc4c5d3438c5983b0c4f5f19d25862e9b19c2b2e43",
+      "checks": 57,
+      "caseFilter": null
+    },
+    {
+      "file": "run-v4.json",
+      "sha256": "5ff033b6255dc818cb85a537cc9b3f2d7841fe4034f2091dc536ad6433b276f4",
+      "checks": 23,
+      "caseFilter": "^(head-|roles-|role-projection-|rejoin-head-roles)"
+    }
+  ],
+  "selectedResults": [
+    {
+      "name": "rejoin-head-roles.qnt-typecheck",
+      "run": "run-v4.json",
+      "log": "v4-rejoin-head-roles.qnt-typecheck.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "64d9bd7f9d404e557492d2083e57fb12c2d2f2d27f4732cf10fcf32ff59128fd",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "typecheck",
+      "expected": "typecheck",
+      "seconds": 1
+    },
+    {
+      "name": "rejoin-unknown-custody.qnt-typecheck",
+      "run": "run-v3.json",
+      "log": "v3-rejoin-unknown-custody.qnt-typecheck.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "typecheck",
+      "expected": "typecheck",
+      "seconds": 1
+    },
+    {
+      "name": "rejoin-pruning-currency.qnt-typecheck",
+      "run": "run-v3.json",
+      "log": "v3-rejoin-pruning-currency.qnt-typecheck.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "typecheck",
+      "expected": "typecheck",
+      "seconds": 1
+    },
+    {
+      "name": "head-tests",
+      "run": "run-v4.json",
+      "log": "v4-head-tests.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "64d9bd7f9d404e557492d2083e57fb12c2d2f2d27f4732cf10fcf32ff59128fd",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "tests",
+      "expected": "tests",
+      "seconds": 2
+    },
+    {
+      "name": "roles-tests",
+      "run": "run-v4.json",
+      "log": "v4-roles-tests.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "64d9bd7f9d404e557492d2083e57fb12c2d2f2d27f4732cf10fcf32ff59128fd",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "tests",
+      "expected": "tests",
+      "seconds": 2
+    },
+    {
+      "name": "custody-tests",
+      "run": "run-v3.json",
+      "log": "v3-custody-tests.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "tests",
+      "expected": "tests",
+      "seconds": 2
+    },
+    {
+      "name": "pruning-tests",
+      "run": "run-v3.json",
+      "log": "v3-pruning-tests.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "tests",
+      "expected": "tests",
+      "seconds": 1
+    },
+    {
+      "name": "head-tlc",
+      "run": "run-v4.json",
+      "log": "v4-head-tlc.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "64d9bd7f9d404e557492d2083e57fb12c2d2f2d27f4732cf10fcf32ff59128fd",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "ok",
+      "expected": "ok",
+      "seconds": 7,
+      "tlcStates": {
+        "generated": 7187,
+        "distinct": 1654,
+        "queue": 0
+      }
+    },
+    {
+      "name": "head-staleStep",
+      "run": "run-v4.json",
+      "log": "v4-head-staleStep.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "64d9bd7f9d404e557492d2083e57fb12c2d2f2d27f4732cf10fcf32ff59128fd",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 7,
+      "tlcStates": {
+        "generated": 57,
+        "distinct": 37,
+        "queue": 23
+      }
+    },
+    {
+      "name": "head-lowerStep",
+      "run": "run-v4.json",
+      "log": "v4-head-lowerStep.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "64d9bd7f9d404e557492d2083e57fb12c2d2f2d27f4732cf10fcf32ff59128fd",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 8,
+      "tlcStates": {
+        "generated": 1011,
+        "distinct": 241,
+        "queue": 71
+      }
+    },
+    {
+      "name": "head-reviveStep",
+      "run": "run-v4.json",
+      "log": "v4-head-reviveStep.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "64d9bd7f9d404e557492d2083e57fb12c2d2f2d27f4732cf10fcf32ff59128fd",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 7,
+      "tlcStates": {
+        "generated": 621,
+        "distinct": 171,
+        "queue": 61
+      }
+    },
+    {
+      "name": "head-signatureStep",
+      "run": "run-v4.json",
+      "log": "v4-head-signatureStep.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "64d9bd7f9d404e557492d2083e57fb12c2d2f2d27f4732cf10fcf32ff59128fd",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 6,
+      "tlcStates": {
+        "generated": 621,
+        "distinct": 171,
+        "queue": 61
+      }
+    },
+    {
+      "name": "head-receiptOnlyStep",
+      "run": "run-v4.json",
+      "log": "v4-head-receiptOnlyStep.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "64d9bd7f9d404e557492d2083e57fb12c2d2f2d27f4732cf10fcf32ff59128fd",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 7,
+      "tlcStates": {
+        "generated": 184,
+        "distinct": 72,
+        "queue": 33
+      }
+    },
+    {
+      "name": "head-receiptAdmissionStep",
+      "run": "run-v4.json",
+      "log": "v4-head-receiptAdmissionStep.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "64d9bd7f9d404e557492d2083e57fb12c2d2f2d27f4732cf10fcf32ff59128fd",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 8,
+      "tlcStates": {
+        "generated": 76,
+        "distinct": 39,
+        "queue": 23
+      }
+    },
+    {
+      "name": "head-receiptTargetStep",
+      "run": "run-v4.json",
+      "log": "v4-head-receiptTargetStep.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "64d9bd7f9d404e557492d2083e57fb12c2d2f2d27f4732cf10fcf32ff59128fd",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 7,
+      "tlcStates": {
+        "generated": 76,
+        "distinct": 39,
+        "queue": 23
+      }
+    },
+    {
+      "name": "head-neverGap",
+      "run": "run-v4.json",
+      "log": "v4-head-neverGap.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "64d9bd7f9d404e557492d2083e57fb12c2d2f2d27f4732cf10fcf32ff59128fd",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 7,
+      "tlcStates": {
+        "generated": 424,
+        "distinct": 125,
+        "queue": 43
+      }
+    },
+    {
+      "name": "head-neverReceiptOnlyRecovery",
+      "run": "run-v4.json",
+      "log": "v4-head-neverReceiptOnlyRecovery.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "64d9bd7f9d404e557492d2083e57fb12c2d2f2d27f4732cf10fcf32ff59128fd",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 7,
+      "tlcStates": {
+        "generated": 178,
+        "distinct": 71,
+        "queue": 32
+      }
+    },
+    {
+      "name": "roles-tlc",
+      "run": "run-v4.json",
+      "log": "v4-roles-tlc.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "64d9bd7f9d404e557492d2083e57fb12c2d2f2d27f4732cf10fcf32ff59128fd",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "ok",
+      "expected": "ok",
+      "seconds": 123,
+      "tlcStates": {
+        "generated": 9396272,
+        "distinct": 2335818,
+        "queue": 0
+      }
+    },
+    {
+      "name": "roles-remoteStep",
+      "run": "run-v4.json",
+      "log": "v4-roles-remoteStep.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "64d9bd7f9d404e557492d2083e57fb12c2d2f2d27f4732cf10fcf32ff59128fd",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 8,
+      "tlcStates": {
+        "generated": 28,
+        "distinct": 26,
+        "queue": 21
+      }
+    },
+    {
+      "name": "roles-protectedStep",
+      "run": "run-v4.json",
+      "log": "v4-roles-protectedStep.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "64d9bd7f9d404e557492d2083e57fb12c2d2f2d27f4732cf10fcf32ff59128fd",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 9,
+      "tlcStates": {
+        "generated": 63,
+        "distinct": 60,
+        "queue": 47
+      }
+    },
+    {
+      "name": "roles-obsoleteStep",
+      "run": "run-v4.json",
+      "log": "v4-roles-obsoleteStep.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "64d9bd7f9d404e557492d2083e57fb12c2d2f2d27f4732cf10fcf32ff59128fd",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 8,
+      "tlcStates": {
+        "generated": 216,
+        "distinct": 205,
+        "queue": 156
+      }
+    },
+    {
+      "name": "roles-mixedStep",
+      "run": "run-v4.json",
+      "log": "v4-roles-mixedStep.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "64d9bd7f9d404e557492d2083e57fb12c2d2f2d27f4732cf10fcf32ff59128fd",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 8,
+      "tlcStates": {
+        "generated": 50,
+        "distinct": 47,
+        "queue": 35
+      }
+    },
+    {
+      "name": "roles-neverNormalized",
+      "run": "run-v4.json",
+      "log": "v4-roles-neverNormalized.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "64d9bd7f9d404e557492d2083e57fb12c2d2f2d27f4732cf10fcf32ff59128fd",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 8,
+      "tlcStates": {
+        "generated": 198,
+        "distinct": 187,
+        "queue": 138
+      }
+    },
+    {
+      "name": "custody-tlc",
+      "run": "run-v3.json",
+      "log": "v3-custody-tlc.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "ok",
+      "expected": "ok",
+      "seconds": 10,
+      "tlcStates": {
+        "generated": 548019,
+        "distinct": 108832,
+        "queue": 0
+      }
+    },
+    {
+      "name": "custody-replayStep",
+      "run": "run-v3.json",
+      "log": "v3-custody-replayStep.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 8,
+      "tlcStates": {
+        "generated": 69,
+        "distinct": 44,
+        "queue": 32
+      }
+    },
+    {
+      "name": "custody-autoExpiryStep",
+      "run": "run-v3.json",
+      "log": "v3-custody-autoExpiryStep.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 7,
+      "tlcStates": {
+        "generated": 69,
+        "distinct": 44,
+        "queue": 32
+      }
+    },
+    {
+      "name": "custody-unknownStep",
+      "run": "run-v3.json",
+      "log": "v3-custody-unknownStep.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 7,
+      "tlcStates": {
+        "generated": 69,
+        "distinct": 44,
+        "queue": 32
+      }
+    },
+    {
+      "name": "custody-consumerStep",
+      "run": "run-v3.json",
+      "log": "v3-custody-consumerStep.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 7,
+      "tlcStates": {
+        "generated": 1705,
+        "distinct": 850,
+        "queue": 521
+      }
+    },
+    {
+      "name": "custody-reserveStep",
+      "run": "run-v3.json",
+      "log": "v3-custody-reserveStep.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 7,
+      "tlcStates": {
+        "generated": 15,
+        "distinct": 15,
+        "queue": 13
+      }
+    },
+    {
+      "name": "custody-undoStep",
+      "run": "run-v3.json",
+      "log": "v3-custody-undoStep.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 7,
+      "tlcStates": {
+        "generated": 1705,
+        "distinct": 850,
+        "queue": 521
+      }
+    },
+    {
+      "name": "custody-foreignStep",
+      "run": "run-v3.json",
+      "log": "v3-custody-foreignStep.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 8,
+      "tlcStates": {
+        "generated": 69,
+        "distinct": 44,
+        "queue": 32
+      }
+    },
+    {
+      "name": "custody-gapCustodyStep",
+      "run": "run-v3.json",
+      "log": "v3-custody-gapCustodyStep.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 7,
+      "tlcStates": {
+        "generated": 69,
+        "distinct": 44,
+        "queue": 32
+      }
+    },
+    {
+      "name": "custody-staleExpiryStep",
+      "run": "run-v3.json",
+      "log": "v3-custody-staleExpiryStep.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 7,
+      "tlcStates": {
+        "generated": 1714,
+        "distinct": 850,
+        "queue": 520
+      }
+    },
+    {
+      "name": "custody-projectionCommitStep",
+      "run": "run-v3.json",
+      "log": "v3-custody-projectionCommitStep.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 7,
+      "tlcStates": {
+        "generated": 69,
+        "distinct": 44,
+        "queue": 32
+      }
+    },
+    {
+      "name": "custody-wrongSourceStep",
+      "run": "run-v3.json",
+      "log": "v3-custody-wrongSourceStep.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 7,
+      "tlcStates": {
+        "generated": 638,
+        "distinct": 352,
+        "queue": 227
+      }
+    },
+    {
+      "name": "custody-neverExpired",
+      "run": "run-v3.json",
+      "log": "v3-custody-neverExpired.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 7,
+      "tlcStates": {
+        "generated": 603,
+        "distinct": 328,
+        "queue": 208
+      }
+    },
+    {
+      "name": "custody-neverUnknownAfterGap",
+      "run": "run-v3.json",
+      "log": "v3-custody-neverUnknownAfterGap.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 7,
+      "tlcStates": {
+        "generated": 30,
+        "distinct": 17,
+        "queue": 12
+      }
+    },
+    {
+      "name": "pruning-tlc",
+      "run": "run-v3.json",
+      "log": "v3-pruning-tlc.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "ok",
+      "expected": "ok",
+      "seconds": 6,
+      "tlcStates": {
+        "generated": 14208,
+        "distinct": 3702,
+        "queue": 0
+      }
+    },
+    {
+      "name": "pruning-forgedStep",
+      "run": "run-v3.json",
+      "log": "v3-pruning-forgedStep.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 6,
+      "tlcStates": {
+        "generated": 15,
+        "distinct": 14,
+        "queue": 11
+      }
+    },
+    {
+      "name": "pruning-staleStep",
+      "run": "run-v3.json",
+      "log": "v3-pruning-staleStep.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 6,
+      "tlcStates": {
+        "generated": 3264,
+        "distinct": 1158,
+        "queue": 560
+      }
+    },
+    {
+      "name": "pruning-receiptProtectedStep",
+      "run": "run-v3.json",
+      "log": "v3-pruning-receiptProtectedStep.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 6,
+      "tlcStates": {
+        "generated": 15,
+        "distinct": 14,
+        "queue": 11
+      }
+    },
+    {
+      "name": "pruning-receiptForeignStep",
+      "run": "run-v3.json",
+      "log": "v3-pruning-receiptForeignStep.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 6,
+      "tlcStates": {
+        "generated": 15,
+        "distinct": 14,
+        "queue": 11
+      }
+    },
+    {
+      "name": "pruning-consumerStep",
+      "run": "run-v3.json",
+      "log": "v3-pruning-consumerStep.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 6,
+      "tlcStates": {
+        "generated": 15,
+        "distinct": 14,
+        "queue": 11
+      }
+    },
+    {
+      "name": "pruning-censusStep",
+      "run": "run-v3.json",
+      "log": "v3-pruning-censusStep.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 6,
+      "tlcStates": {
+        "generated": 15,
+        "distinct": 14,
+        "queue": 11
+      }
+    },
+    {
+      "name": "pruning-neverDeleted",
+      "run": "run-v3.json",
+      "log": "v3-pruning-neverDeleted.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 6,
+      "tlcStates": {
+        "generated": 184,
+        "distinct": 97,
+        "queue": 67
+      }
+    },
+    {
+      "name": "pruning-neverNormalizedCertificate",
+      "run": "run-v3.json",
+      "log": "v3-pruning-neverNormalizedCertificate.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 6,
+      "tlcStates": {
+        "generated": 13,
+        "distinct": 13,
+        "queue": 10
+      }
+    },
+    {
+      "name": "role-projection-tlc",
+      "run": "run-v4.json",
+      "log": "v4-role-projection-tlc.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "64d9bd7f9d404e557492d2083e57fb12c2d2f2d27f4732cf10fcf32ff59128fd",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "ok",
+      "expected": "ok",
+      "seconds": 10,
+      "tlcStates": {
+        "generated": 1765,
+        "distinct": 372,
+        "queue": 0
+      }
+    },
+    {
+      "name": "custody-projection-tlc",
+      "run": "run-v3.json",
+      "log": "v3-custody-projection-tlc.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "ok",
+      "expected": "ok",
+      "seconds": 7,
+      "tlcStates": {
+        "generated": 102,
+        "distinct": 24,
+        "queue": 0
+      }
+    },
+    {
+      "name": "absence-projection-tlc",
+      "run": "run-v3.json",
+      "log": "v3-absence-projection-tlc.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "ok",
+      "expected": "ok",
+      "seconds": 6,
+      "tlcStates": {
+        "generated": 23,
+        "distinct": 10,
+        "queue": 0
+      }
+    },
+    {
+      "name": "role-projection-base",
+      "run": "run-v4.json",
+      "log": "v4-role-projection-base.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "64d9bd7f9d404e557492d2083e57fb12c2d2f2d27f4732cf10fcf32ff59128fd",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "ok",
+      "expected": "ok",
+      "seconds": 10
+    },
+    {
+      "name": "role-projection-step",
+      "run": "run-v4.json",
+      "log": "v4-role-projection-step.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "64d9bd7f9d404e557492d2083e57fb12c2d2f2d27f4732cf10fcf32ff59128fd",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "ok",
+      "expected": "ok",
+      "seconds": 11
+    },
+    {
+      "name": "role-projection-mutation",
+      "run": "run-v4.json",
+      "log": "v4-role-projection-mutation.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-head-roles.qnt": "64d9bd7f9d404e557492d2083e57fb12c2d2f2d27f4732cf10fcf32ff59128fd",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 10
+    },
+    {
+      "name": "custody-projection-base",
+      "run": "run-v3.json",
+      "log": "v3-custody-projection-base.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "ok",
+      "expected": "ok",
+      "seconds": 9
+    },
+    {
+      "name": "custody-projection-step",
+      "run": "run-v3.json",
+      "log": "v3-custody-projection-step.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "ok",
+      "expected": "ok",
+      "seconds": 8
+    },
+    {
+      "name": "custody-projection-mutation",
+      "run": "run-v3.json",
+      "log": "v3-custody-projection-mutation.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-unknown-custody.qnt": "e55bb7fc0136b481f3e8d479487cd41bac0ea9af1f1ac259262fb3bc973c7371",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 8
+    },
+    {
+      "name": "absence-projection-base",
+      "run": "run-v3.json",
+      "log": "v3-absence-projection-base.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "ok",
+      "expected": "ok",
+      "seconds": 7
+    },
+    {
+      "name": "absence-projection-step",
+      "run": "run-v3.json",
+      "log": "v3-absence-projection-step.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "ok",
+      "expected": "ok",
+      "seconds": 7
+    },
+    {
+      "name": "absence-projection-mutation",
+      "run": "run-v3.json",
+      "log": "v3-absence-projection-mutation.log.gz",
+      "inputHashes": {
+        "packages/protocol-v3/formal/rejoin-pruning-currency.qnt": "a744ee4c9424fea98e7b65e5e2aac450285017dd85f46f8fd9bb951ce3de7837",
+        "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d"
+      },
+      "verdict": "violation",
+      "expected": "violation",
+      "seconds": 7
+    }
+  ],
+  "limits": [
+    "Finite domains only; modules are not a machine-checked composition.",
+    "Projected induction is scoped to its declared finite arbitrary-state hypothesis.",
+    "Explicit expiry producer is not implemented in the inspected companion.",
+    "Full-contract arbitrary-state induction and native/cryptographic refinement remain open."
+  ],
+  "archivedPriorInputs": {
+    "packages/protocol-v3/formal/rejoin-head-roles.qnt": {
+      "file": "rejoin-head-roles.qnt.before-receipt-target.gz",
+      "sha256": "cbf93becae62eabdef822584b3ccc72eb744d0674291c8d52efd47972979eb05",
+      "gzipSha256": "9ae2bd8e9671e304f0b43fd6b7e805ffa15430858553a1e730b6965d64a081ce"
+    },
+    "packages/protocol-v3/formal/check-rejoin-contract.mjs": {
+      "file": "check-rejoin-contract.mjs.before-receipt-target.gz",
+      "sha256": "0820723b805d061e54c8e6b86929bffd7e1106098e6c7e327c9a666ac8b074b6",
+      "gzipSha256": "c21c1333482c49a3bba7461ec3c421faec97f74581dd3cee5e83b5825f7d3a0c"
+    }
+  }
+}

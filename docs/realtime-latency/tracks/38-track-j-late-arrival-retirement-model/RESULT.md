@@ -171,3 +171,5 @@ The [native custody and repair adjuncts](NATIVE-CUSTODY.md) add whole-source rec
 portable dependency closure, native send ownership and conditional repair liveness.
 Their evidence also records the later final-source Apalache checks and larger A5
 run, including the still-open contract induction counterexamples.
+
+The [rejoin contract adjunct](REJOIN-CONTRACT.md) separately checks arbitrary-gap attachment, actual local recovery roles, durable unknown-source custody, and current pruning authority. Its signed-expiry law remains an explicit implementation requirement until a producer is mapped; it does not extend the older adjacent-install bridge or close full-contract induction.
