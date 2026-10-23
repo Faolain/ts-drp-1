@@ -1,0 +1,9 @@
+All 116 formal jobs passed, but the model excludes valid bounded transitions and the runner accepts an unreached required witness. These gaps undermine the verification coverage.
+
+Full review comments:
+
+- [P2] Bound installs by the rows actually allocated — /private/tmp/ts-drp-track-j-finish/packages/protocol-v3/formal/settlement-replacement-retirement.qnt:658-658
+  Expiry and manual-review installs reserve `displacedCount` replacement slots here even though `installToAt` allocates no replacements. For example, `proofContractSafetyAnyDelayExpireA` reaches epoch 3 with `next=5` and two displaced moves; this guard disables install 4 at `MAX_SEQ=6`, although it only needs fence slot 5. The same guard in `rejoinEnabled` unnecessarily blocks fresh readmissions. This silently excludes valid within-bound cleanup and recovery schedules from exhaustive checks. Calculate capacity using the selected disposition's actual allocation.
+
+- [P2] Require requested witnesses before passing simulations — /private/tmp/ts-drp-track-j-finish/packages/protocol-v3/formal/settlement-replacement-retirement-mutations/track-j.sh:46-47
+  The default `contractA` simulation reports `reachedQuadMissCollected was witnessed in 0 trace(s) out of 300 explored`, but this branch still returns success. Quint's `--witnesses` only reports coverage; exit zero and `[ok]` do not establish that witnesses were reached. Consequently, the gate silently accepts missing exploration of a required long-chain scenario. Check that every requested witness has a nonzero count, and adjust this case's sampling budget or schedule accordingly.
