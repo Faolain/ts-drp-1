@@ -2,6 +2,7 @@ import "fake-indexeddb/auto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { spawn } from "node:child_process";
 import { build } from "esbuild";
 import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
@@ -14,6 +15,7 @@ import {
 	issuanceRetirementPreparationWithPlanRewrite,
 	issuanceRetirementCommitRows,
 	issuanceRetirementImage,
+	encodeIssuanceRetirementControl,
 } from "@ts-drp/issuance-store/maintenance";
 import { createNodeDurableIssuanceStore } from "../src/issuance.js";
 import { createBrowserDurableIssuanceStore } from "../../storage-browser/src/issuance.js";
@@ -127,4 +129,89 @@ describe.each(["sqlite", "indexeddb"] as const)("%s atomic plan retirement", bac
 		await expect(store.transactWriteSettlementPlan({scope, expectedRevision: after!.revision,
 			plan: {...after!, revision: after!.revision + 1}})).resolves.toEqual({...after!, revision: 2});
 	});
+	it("keeps private transition rows separate from caller census mutations and rejects preparation getters", async () => {
+		const directory = await mkdtemp(join(tmpdir(), "issuance-plan-owned-"));
+		directories.push(directory);
+		const store = await (backend === "sqlite" ? createNodeDurableIssuanceStore({primaryFilename: join(directory, "primary.sqlite")}) :
+			createBrowserDurableIssuanceStore({primaryDatabaseName: `rewrite-owned-${crypto.randomUUID()}`}));
+		stores.push(store);
+		const before = await seed(store);
+		const owner = durableIssuancePruningMaintenanceForStore(store)!;
+		const read = await owner.acquireRetirementControl!({objectId: scope.objectId});
+		const census = await owner.readBoundedRecoveryCensus!({objectId: scope.objectId, limits: ISSUANCE_RETIREMENT_LIMITS});
+		const protectedRecords = closeIssuanceRetirementProtectedRecords({control: read.control, rows: census.rows,
+			throughEpoch: 3, protectedRecords: []});
+		const preparation = issuanceRetirementPreparationWithPlanRewrite(read.control, {throughEpoch: 3,
+			decisionDigest: "a".repeat(64), sourceProofDigest: "b".repeat(64), protectedRecords}, census.rows);
+		let getterCalls = 0;
+		const hostile = Object.defineProperty({...preparation}, "protectedRecords", {
+			enumerable: true, get() { getterCalls++; return protectedRecords; },
+		});
+		await expect(read.prepareFence(hostile)).rejects.toThrow();
+		expect(getterCalls).toBe(0);
+		await read.prepareFence(preparation);
+		await read.release();
+		const prepared = await owner.acquireRetirementControl!({objectId: scope.objectId});
+		// The returned census is caller-owned DATA. It is not the detached native
+		// image captured inside this one-use control or its subsequent writer.
+		census.rows.issued[1]!.canonicalPreimageBytes.fill(0);
+		census.rows.plans[0]!.entries[1]!.sourceDigest.fill(0);
+		Object.defineProperty(census.rows, "outbox", {enumerable: true,
+			get() { throw new Error("caller census getter must not enter native transition"); }});
+		const completed = await prepared.commitPrepared();
+		await prepared.release();
+		expect(completed.active).toBeNull();
+		expect(completed.completed).toEqual(preparation);
+		const {sourceContexts: _released, ...plain} = before;
+		expect(await store.readSettlementPlan(scope)).toEqual({...plain, revision: 1, entries: []});
+		const actual = await owner.readBoundedRecoveryCensus!({objectId: scope.objectId, limits: ISSUANCE_RETIREMENT_LIMITS});
+		expect(actual.image.imageDigest).toBe(preparation.planRewrite!.targetImageDigest);
+	});
+});
+
+it("SQLite rereads a changed native plan under BEGIN before committing a captured retirement target", async () => {
+	const directory = await mkdtemp(join(tmpdir(), "issuance-plan-writer-currency-"));
+	directories.push(directory);
+	const primaryFilename = join(directory, "primary.sqlite");
+	const store = createNodeDurableIssuanceStore({primaryFilename}); stores.push(store);
+	const before = await seed(store);
+	const owner = durableIssuancePruningMaintenanceForStore(store)!;
+	const initial = await owner.acquireRetirementControl!({objectId: scope.objectId});
+	const source = await owner.readBoundedRecoveryCensus!({objectId: scope.objectId, limits: ISSUANCE_RETIREMENT_LIMITS});
+	const protectedRecords = closeIssuanceRetirementProtectedRecords({control: initial.control, rows: source.rows,
+		throughEpoch: 3, protectedRecords: []});
+	const preparation = issuanceRetirementPreparationWithPlanRewrite(initial.control, {throughEpoch: 3,
+		decisionDigest: "a".repeat(64), sourceProofDigest: "b".repeat(64), protectedRecords}, source.rows);
+	await initial.prepareFence(preparation); await initial.release();
+	const prepared = await owner.acquireRetirementControl!({objectId: scope.objectId});
+	const expectedControl = encodeIssuanceRetirementControl(prepared.control);
+	const foreign = new DatabaseSync(`${primaryFilename}.drp-issuance-v1.sqlite`);
+	const exec = DatabaseSync.prototype.exec;
+	let changed = false;
+	try {
+		const storedPlan = JSON.parse(String(foreign.prepare("SELECT entries_json FROM settlement_plans WHERE object_id=? AND author=?")
+			.get(scope.objectId, scope.author)?.entries_json));
+		const changedPlan = {...before, revision: 1};
+		const changedEntries = JSON.stringify({...storedPlan, bytes: Buffer.from(encodeCanonical(changedPlan)).toString("base64")});
+		// A real foreign native mutation lands after the view was captured and
+		// the expected target was derived, before the original writer acquires.
+		foreign.function("issuance_retirement_connection", {varargs: true}, () => 1);
+		DatabaseSync.prototype.exec = function (sql: string): void {
+			if (!changed && this !== foreign && sql === "BEGIN IMMEDIATE") {
+				changed = true;
+				foreign.prepare("UPDATE settlement_plans SET revision=?,entries_json=? WHERE object_id=? AND author=?")
+					.run(changedPlan.revision, changedEntries, scope.objectId, scope.author);
+			}
+			exec.call(this, sql);
+		};
+		await expect(prepared.commitPrepared()).rejects.toThrow("source stale");
+		expect(changed).toBe(true);
+		expect(foreign.prepare("SELECT record FROM retirement_controls WHERE object_id=?").get(scope.objectId)?.record)
+			.toEqual(expectedControl);
+		expect(await store.readSettlementPlan(scope)).toEqual({...before, revision: 1});
+	} finally {
+		DatabaseSync.prototype.exec = exec;
+		foreign.close();
+		await prepared.release();
+	}
 });

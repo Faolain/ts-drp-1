@@ -6,6 +6,7 @@ import {
 	encodeIssuanceRetirementControl,
 	decodeIssuanceRetirementControl,
 	issuanceRetirementCommitRows,
+	issuanceRetirementTransitionRows,
 	issuanceRetirementImage,
 	issuanceRetirementPreparationWithPlanRewrite,
 	issuanceRetirementPlanRewriteResourceForSizing,
@@ -42,6 +43,51 @@ function prepare(rows: IssuanceRetirementRows, sequences: number[]): DurableIssu
 }
 
 describe("native retirement plan law", () => {
+	it.each([
+		{protected: [0], retained: [0, 1, 2]},
+		{protected: [1], retained: [1, 2]},
+		{protected: [2], retained: [2]},
+		{protected: [3], retained: []},
+		{protected: [], retained: []},
+	])("commits exactly the surviving plan consumers for $protected", ({protected: protectedSequences, retained}) => {
+		const rows = decodeCanonical(encodeCanonical(fixture())) as IssuanceRetirementRows;
+		const originalBytes = encodeCanonical(rows), p = prepare(rows, protectedSequences);
+		const prepared = decodeIssuanceRetirementControl(encodeIssuanceRetirementControl({...control,
+			revision: 1, sequence: 1, active: {sequence: 1, preparation: p}}));
+		const completed = {...prepared, revision: 2, active: null, completed: p};
+		const target = issuanceRetirementTransitionRows(prepared, completed, rows);
+		expect(target).toEqual({...rows, plans: [{...rows.plans[0]!,
+			revision: retained.length === 3 ? 7 : 8,
+			entries: retained.map(sequence => rows.plans[0]!.entries[sequence]!)}]});
+		expect(encodeCanonical(rows)).toEqual(originalBytes);
+		expect(reconstructIssuanceRetirementSourceRows(completed, p, target)).toEqual(rows);
+		// Metadata preparation and abort do not perform the plan rewrite.
+		expect(issuanceRetirementTransitionRows(control, prepared, rows)).toBe(rows);
+		expect(issuanceRetirementTransitionRows(prepared, {...prepared, active: null}, rows)).toBe(rows);
+	});
+	it("refuses corrupted native rows before returning any transition target", () => {
+		const rows = fixture(), p = prepare(rows, [1]);
+		const prepared = {...control, revision: 1, sequence: 1, active: {sequence: 1, preparation: p}};
+		const completed = {...prepared, revision: 2, active: null, completed: p};
+		const corruptions: IssuanceRetirementRows[] = [
+			{...rows, outbox: rows.outbox.map(row => row.authorSequence === 0 ? {...row, publishState: "pending"} : row)},
+			{...rows, issued: rows.issued.filter(row => row.authorSequence !== 1)},
+			{...rows, issued: rows.issued.map(row => row.authorSequence === 1 ? {...row,
+				canonicalPreimageBytes: encodeCanonical({unexpected: "not-an-issued-vertex"})} : row)},
+			{...rows, plans: [{...rows.plans[0]!, entries: rows.plans[0]!.entries.map(entry =>
+				entry.sourceSequence === 1 ? {...entry, sourceDigest: new Uint8Array(32).fill(17)} : entry)}]},
+			{...rows, plans: [{...rows.plans[0]!, entries: rows.plans[0]!.entries.map(entry =>
+				entry.sourceSequence === 1 ? {...entry, replacementSequence: 99} : entry)}]},
+		];
+		for (const corrupted of corruptions) {
+			const before = encodeCanonical(corrupted);
+			expect(() => issuanceRetirementTransitionRows(prepared, completed, corrupted)).toThrow();
+			expect(encodeCanonical(corrupted)).toEqual(before);
+		}
+		const substituted = {...p, planRewrite: {...p.planRewrite!, targetImageDigest: "d".repeat(64)}};
+		expect(() => issuanceRetirementTransitionRows({...prepared, active: {sequence: 1, preparation: substituted}},
+			{...completed, completed: substituted}, rows)).toThrow("rewrite differs");
+	});
 	it("retains shared source proof through its last consumer and rejects substituted or orphaned references", () => {
 		const original = fixture();
 		const contexts = [0, 1].map(source => {const bytes = encodeCanonical({source});

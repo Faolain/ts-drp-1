@@ -1991,8 +1991,7 @@ export function issuanceRetirementTransitionRows(control: DurableIssuanceRetirem
 	next: DurableIssuanceRetirementControl, rows: IssuanceRetirementRows): IssuanceRetirementRows {
 	if (control.active === null || next.active !== null || next.completed === null ||
 		!issuanceRetirementBytesEqual(encodeCanonical(control.active.preparation), encodeCanonical(next.completed))) return rows;
-	assertIssuanceRetirementPreparationRows(control, control.active.preparation, rows);
-	return issuanceRetirementCommitRows(control, control.active.preparation, rows);
+	return checkedIssuanceRetirementTargetRows(control, control.active.preparation, rows);
 }
 
 /** Inverts only the exact committed target image, then repeats the forward row law.
@@ -2030,6 +2029,18 @@ export function assertIssuanceRetirementPreparationRows(
 	p: DurableIssuanceRetirementPreparation,
 	rows: IssuanceRetirementRows
 ): void {
+	checkedIssuanceRetirementTargetRows(control, p, rows);
+}
+
+/** Return the exact target whose retained dependencies were checked below.
+ * Native callers supply their detached row capture and invoke this separately
+ * for the expected image and the fresh transaction image. Each call repeats
+ * validation and accepts no previously computed or caller-supplied target. */
+function checkedIssuanceRetirementTargetRows(
+	control: DurableIssuanceRetirementControl,
+	p: DurableIssuanceRetirementPreparation,
+	rows: IssuanceRetirementRows
+): IssuanceRetirementRows {
 	if (rows.lineages.some(l => l.pendingUnsigned !== undefined))
 		throw issuanceRetirementRefusal("issuance entered or reserved unsigned intent is unresolved");
 	const closed = closeIssuanceRetirementProtectedRecords({control, rows, throughEpoch: p.throughEpoch,
@@ -2076,6 +2087,7 @@ export function assertIssuanceRetirementPreparationRows(
 		}
 		assertIssuancePendingInheritanceTargetsAllowed(proposed, plan, rows);
 	}
+	return target;
 }
 
 /**
