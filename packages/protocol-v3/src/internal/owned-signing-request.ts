@@ -109,7 +109,7 @@ export function withAuthoredIdentityChallengeSigningRequest<T>(input: Readonly<{
 		if (frame.version !== 1 || Object.keys(frame).sort().join(",") !== keys.sort().join(",") || frame.kind !== "creator-issuance-possession" ||
 			typeof frame.objectId !== "string" || !Number.isSafeInteger(frame.epoch) || Number(frame.epoch) < 0 || typeof frame.profileId !== "string" ||
 			[frame.aclDigest, frame.pinnedGenesisAnchorDigest, frame.currentAnchorDigest].some(value => typeof value !== "string" || !/^[0-9a-f]{64}$/u.test(value))) throw new TypeError("OWNED_IDENTITY_CHALLENGE_INVALID");
-	} else if (!["creator-successor-material-request", "creator-successor-material-response"].includes(String(frame.kind)) ||
+	} else if (!["creator-successor-material-request", "creator-successor-material-response", "creator-successor-material-unavailable"].includes(String(frame.kind)) ||
 		typeof frame.manifestDigest !== "string" || !/^[0-9a-f]{64}$/u.test(frame.manifestDigest) ||
 		typeof frame.requesterPeer !== "string" || typeof frame.sourcePeer !== "string") throw new TypeError("OWNED_IDENTITY_CHALLENGE_INVALID");
 	if (input.kind === "transport") {
@@ -118,7 +118,12 @@ export function withAuthoredIdentityChallengeSigningRequest<T>(input: Readonly<{
 		const carriesCheckpoint = Object.hasOwn(frame, "exactCanonicalReattachmentCheckpointBytes");
 		const checkpointRequest = frame.kind === "creator-successor-material-request" &&
 			frame.version === 2 && frame.materialKind === "checkpoint";
-		const valid = carriesCheckpoint
+		const unavailable = frame.kind === "creator-successor-material-unavailable";
+		const valid = unavailable
+			? frame.version === 1 && frame.reason === "checkpoint-not-adopted" &&
+				Object.keys(frame).sort().join(",") === ["kind", "version", "nonce", "manifestDigest", "requesterPeer", "sourcePeer", "author", "reason"].sort().join(",") &&
+				input.exactCanonicalChallengeBytes.byteLength <= CREATOR_SUCCESSOR_TRANSPORT_LIMITS.maxRequestBytes
+			: carriesCheckpoint
 			? frame.kind === "creator-successor-material-response" && frame.version === 3 && !carriesMembership &&
 				decodeCreatorReattachmentCheckpoint(frame.exactCanonicalReattachmentCheckpointBytes) !== undefined &&
 				input.exactCanonicalChallengeBytes.byteLength <= CREATOR_SUCCESSOR_TRANSPORT_LIMITS.maxRequestBytes

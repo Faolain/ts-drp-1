@@ -61,6 +61,12 @@ interface SigningIdentity {
 	readonly sign: SignRegisteredVertexDigest;
 	isAuthorizedAuthor(author: string): boolean;
 }
+/** Authenticated current-point unavailability; the admitted fetch may retry until adoption. */
+export class CreatorCheckpointMaterialUnavailable extends Error {
+	readonly code = "creator-checkpoint-not-adopted";
+	readonly retryClass = "transient";
+	constructor() { super("creator checkpoint material is not yet adopted"); this.name = "CreatorCheckpointMaterialUnavailable"; }
+}
 function decode(bytes: Uint8Array, keys: readonly string[]): Record<string, unknown> {
 	const limits = keys.includes("exactCanonicalSettlementBytes") ? FRAME_LIMITS : REQUEST_LIMITS;
 	const value = decodeCanonical(bytes, limits);
@@ -79,6 +85,9 @@ function decode(bytes: Uint8Array, keys: readonly string[]): Record<string, unkn
 		expectedKeys = [...expectedKeys, "exactCanonicalReattachmentCheckpointBytes"];
 	if (value !== null && typeof value === "object" && !keys.includes("exactCanonicalSettlementBytes") &&
 		Object.hasOwn(value, "materialKind")) expectedKeys = [...expectedKeys, "materialKind"];
+	if (value !== null && typeof value === "object" && keys.includes("exactCanonicalSettlementBytes") &&
+		Reflect.get(value, "kind") === "creator-successor-material-unavailable")
+		expectedKeys = ["kind", "version", "nonce", "manifestDigest", "requesterPeer", "sourcePeer", "author", "signature", "reason"];
 	if (
 		value === null ||
 		typeof value !== "object" ||
@@ -243,14 +252,15 @@ export function createCreatorSuccessorMaterialServer(
 			authors.set(stream.peerId, request.author);
 			const { exactCanonicalCloseMembershipBytes: membership,
 				exactCanonicalReattachmentCheckpointBytes: checkpoint, ...common } = auxiliary(input.material as unknown as Record<string, unknown>);
-			if (checkpointRequested && checkpoint === undefined)
-				throw new TypeError("creator checkpoint material is unavailable");
+			const unavailable = checkpointRequested && checkpoint === undefined;
 			const response = {
+				...(unavailable ? { kind: "creator-successor-material-unavailable", version: 1, reason: "checkpoint-not-adopted" } : {
 				...common,
 				...(checkpointRequested ? { exactCanonicalReattachmentCheckpointBytes: checkpoint }
 					: membership === undefined ? {} : { exactCanonicalCloseMembershipBytes: membership }),
 				kind: "creator-successor-material-response",
 				version: checkpointRequested ? 3 : membership === undefined ? 1 : 2,
+				}),
 				nonce: request.nonce,
 				manifestDigest: input.manifestDigest,
 				requesterPeer: stream.peerId,
@@ -341,6 +351,7 @@ async function attemptCreatorSuccessorMaterial(
 	if (lifetime?.aborted === true) lifetimeEnded();
 	let stream: SnapshotChunkProtocolStream | undefined;
 	let received: ReceivedCreatorSuccessorMaterial | undefined;
+	let retryableUnavailable = false;
 	let phase: "stream" | "signing" | "response" = "stream";
 	let failed = false;
 	let cleanupFailed = false;
@@ -373,14 +384,17 @@ async function attemptCreatorSuccessorMaterial(
 			"exactCanonicalHistoryBytes",
 		]);
 		const { signature: responseSignature, ...proof } = response;
+		const unavailable = response.kind === "creator-successor-material-unavailable";
 		if (
-			response.kind !== "creator-successor-material-response" ||
-			(input.materialKind === "checkpoint"
+			(unavailable
+				? input.materialKind !== "checkpoint" || response.version !== 1 || response.reason !== "checkpoint-not-adopted" ||
+					bytes.byteLength > REQUEST_LIMITS.maxBytes
+				: response.kind !== "creator-successor-material-response" || (input.materialKind === "checkpoint"
 				? response.version !== 3 || !Object.hasOwn(response, "exactCanonicalReattachmentCheckpointBytes") ||
 					Object.hasOwn(response, "exactCanonicalCloseMembershipBytes") || bytes.byteLength > REQUEST_LIMITS.maxBytes
 				: (response.version !== 1 && response.version !== 2) ||
 					(response.version === 2) !== Object.hasOwn(response, "exactCanonicalCloseMembershipBytes") ||
-					Object.hasOwn(response, "exactCanonicalReattachmentCheckpointBytes")) ||
+					Object.hasOwn(response, "exactCanonicalReattachmentCheckpointBytes"))) ||
 			response.manifestDigest !== input.manifestDigest ||
 			response.requesterPeer !== input.transport.localPeerId ||
 			response.sourcePeer !== peer ||
@@ -391,6 +405,10 @@ async function attemptCreatorSuccessorMaterial(
 			!(await verify(response.author, responseSignature, proof))
 		)
 			throw new TypeError("creator material source is unauthorized");
+		if (unavailable) {
+			retryableUnavailable = true;
+			throw new CreatorCheckpointMaterialUnavailable();
+		}
 		const author = response.author;
 		received = Object.freeze({
 			...auxiliary(response),
@@ -436,7 +454,7 @@ async function attemptCreatorSuccessorMaterial(
 		}
 		cause = cause.cause;
 	}
-	const terminal = framingViolation || phase === "response" || (phase === "signing" && !controller.signal.aborted);
+	const terminal = framingViolation || (phase === "response" && !retryableUnavailable) || (phase === "signing" && !controller.signal.aborted);
 	return { kind: terminal ? "terminal" : "transient", failure: primary };
 }
 

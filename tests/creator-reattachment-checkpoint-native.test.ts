@@ -5,12 +5,66 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createShippingChatWindowGenesisStateBytes } from "../examples/chat/src/v3-chat-window.js";
 import { openCreatorCheckpointTrust, encodeCreatorReattachmentCheckpoint, decodeCreatorReattachmentCheckpoint } from "../packages/protocol-v3/src/creator-checkpoint.js";
 import { openCreatorCheckpointAttachment, resolveCreatorCheckpointAttachment } from "../packages/node/src/internal/creator-transition-advance.js";
-import { receiveCreatorSuccessorMaterial } from "../packages/node/src/internal/creator-successor-transport.js";
+import { CreatorCheckpointMaterialUnavailable, receiveCreatorSuccessorMaterial } from "../packages/node/src/internal/creator-successor-transport.js";
 import { chatSharesRoomFixture, closeChatSharesRooms, required } from "./fixtures/chat-membership-shares/room.js";
 
 afterEach(async () => expect(await closeChatSharesRooms()).toEqual([]));
 
 describe("native current-checkpoint reattachment proof", () => {
+	it("serves adjacent sealed material and retries a typed gap refusal through creator recovery", async () => {
+		const fixture = await chatSharesRoomFixture({ members: ["genesis"], format: "window",
+			genesisStateBytes: createShippingChatWindowGenesisStateBytes });
+		let creator = await fixture.open(0);
+		await fixture.open(1);
+		expect((await creator.room.sealEpoch()).ok).toBe(true);
+		await creator.room.adoptCreatorSuccessor();
+		expect((await creator.room.sealEpoch()).ok).toBe(true);
+		const sealed = await fixture.readExport();
+		expect(sealed.material.exactCanonicalReattachmentCheckpointBytes).toBeUndefined();
+		let delivery = await fixture.successorDelivery(1);
+		const recipient = required(fixture.identities[1]), sender = required(fixture.identities[0]);
+		const identity = { author: recipient.author, sign: (digest: Uint8Array) => Promise.resolve(ed25519.sign(digest, recipient.seed)),
+			isAuthorizedAuthor: (author: string) => author === sender.author };
+		const common = { identity, peers: delivery.peers, manifestDigest: sealed.declaration.scope.manifestDigest };
+		expect((await receiveCreatorSuccessorMaterial({ ...common, transport: delivery.port })).exactCanonicalSettlementBytes)
+			.toEqual(sealed.material.exactCanonicalSettlementBytes);
+		try {
+			await receiveCreatorSuccessorMaterial({ ...common, transport: delivery.port, materialKind: "checkpoint" });
+			throw new Error("missing checkpoint appeared available");
+		} catch (error) {
+			expect(error).toBeInstanceOf(AggregateError);
+			expect((error as AggregateError).cause).toBeInstanceOf(CreatorCheckpointMaterialUnavailable);
+			expect((error as AggregateError).cause).toMatchObject({ code: "creator-checkpoint-not-adopted", retryClass: "transient" });
+		}
+		let unavailableObserved!: () => void;
+		const unavailable = new Promise<void>(resolve => { unavailableObserved = resolve; });
+		let attempts = 0;
+		const transport = { ...delivery.port, open: async (...args: Parameters<typeof delivery.port.open>) => {
+			attempts++;
+			const stream = await delivery.port.open(...args);
+			return { ...stream, read: async (...readArgs: Parameters<typeof stream.read>) => {
+				const bytes = await stream.read(...readArgs);
+				if (Reflect.get(decodeCanonical(bytes) as object, "kind") === "creator-successor-material-unavailable") unavailableObserved();
+				return bytes;
+			} };
+		} };
+		const lifetime = new AbortController();
+		const timer = setTimeout(() => lifetime.abort(new Error("checkpoint adoption retry timed out")), 20_000);
+		const pending = receiveCreatorSuccessorMaterial({ ...common, transport, materialKind: "checkpoint", retryUntil: lifetime.signal });
+		try {
+			await unavailable;
+			await fixture.stop(creator);
+			creator = await fixture.open(0, { reopen: true });
+			expect(creator.room.authority()?.epoch).toBe(2);
+			delivery = await fixture.successorDelivery(1);
+			expect(delivery.offer).toEqual(sealed.offer);
+			const received = await pending;
+			expect(received.exactCanonicalReattachmentCheckpointBytes).toBeInstanceOf(Uint8Array);
+			expect(received.exactCanonicalCloseMembershipBytes).toBeUndefined();
+			expect(attempts).toBeGreaterThan(1);
+		} finally { clearTimeout(timer); lifetime.abort(); await pending.catch(() => undefined); }
+	}, 120_000);
+
 	it("exports bounded current authority after a gap and rejects signed-carrier substitutions", async () => {
 		const fixture = await chatSharesRoomFixture({ members: ["genesis"], format: "window",
 			genesisStateBytes: createShippingChatWindowGenesisStateBytes });

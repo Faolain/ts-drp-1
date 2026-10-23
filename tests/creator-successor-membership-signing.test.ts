@@ -96,3 +96,13 @@ it("bounds separately requested checkpoint proof without spending the adjacent m
 	expect(decodeCreatorReattachmentCheckpoint(encodeCanonical({ kind: "creator-reattachment-checkpoint-1", version: 1,
 		...point, extra: true }))).toBeUndefined();
 });
+
+it("signs only an exact typed checkpoint unavailable frame", async () => {
+	const unavailable = { kind: "creator-successor-material-unavailable", version: 1, reason: "checkpoint-not-adopted",
+		nonce: base.nonce, author: base.author, manifestDigest: base.manifestDigest,
+		requesterPeer: base.requesterPeer, sourcePeer: base.sourcePeer };
+	expect(await admitted(unavailable)).toBe("transport");
+	for (const change of [{ reason: "arbitrary" }, { version: 3 }, { exactCanonicalSettlementBytes: Uint8Array.of(1) },
+		{ exactCanonicalCloseMembershipBytes: Uint8Array.of(1) }, { materialKind: "checkpoint" }])
+		await expect(admitted({ ...unavailable, ...change })).rejects.toThrow();
+});
