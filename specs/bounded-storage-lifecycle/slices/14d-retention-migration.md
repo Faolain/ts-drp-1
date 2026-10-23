@@ -4,6 +4,10 @@ Status: contract draft, 2026-10-19, under the [slice 14 parent](14-single-databa
 Implementation (Track R3): not started. Until it exists, the room database host refuses
 an existing version-6 room with `V3_ROOM_DATABASE_MIGRATION_UNAVAILABLE` before any
 write. See the [parent status](14-single-database-watermark-retirement.md#status-track-r3-2026-10-19-opt-in-stage-1a-only).
+Default (Track Z, 2026-10-21): the new browser default needs no migration. With no
+`storageHost`, a room created in six databases reopens on the six-database host, so it
+never reaches the refusal; only new rooms use the room database. See the
+[Track Z status](14-single-database-watermark-retirement.md#status-track-z-2026-10-21-the-browser-default-for-new-rooms).
 No review has run. RED precedes GREEN; no implementation acceptance is claimed.
 Guarantee ids are defined, with their sources, in the
 [golden-path guarantee checklist](../golden-path-guarantees.md).

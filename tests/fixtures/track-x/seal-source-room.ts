@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { createV3ZoneApplication } from "../../../examples/grid/src/v3-zone.js";
 import {
 	createBrowserV3RoomDatabaseStorageHost,
+	createBrowserV3SixDatabaseStorageHost,
 	createV3RoomCreatorInviteMaterial,
 	createV3RoomSession,
 	type CreateV3RoomSessionInput,
@@ -23,8 +24,8 @@ import { directories, heads, hex, required, rooms } from "../track-m/room-retent
 
 // Track X: a settlement creator (creator-trusted-settlement-v1, the Grid zone application, as
 // the shipped pages) alone on a browser storage host (fake-indexeddb: mechanism evidence
-// only), with the genuine room session. `host` selects the default six-database host (no
-// `storageHost`: the session's own default) or the opt-in room-database host. The fixture
+// only), with the genuine room session. `host` selects the six-database host (passed
+// explicitly since Track Z made it a non-default) or the room-database host. The fixture
 // records every vertex the creator publishes and can deliver a copy of one back to the
 // creator, as a recipient's retained-history push does in the shipped pages.
 
@@ -104,7 +105,8 @@ export async function sealSourceRoom(host: SealSourceHost) {
 	const name = `tx-seal-${tag}-creator`;
 	const input: CreateV3RoomSessionInput<ReturnType<typeof application.projectAcceptedOperations>> = {
 		application,
-		...(host === "room-database" ? { storageHost: createBrowserV3RoomDatabaseStorageHost() } : {}),
+		storageHost:
+			host === "room-database" ? createBrowserV3RoomDatabaseStorageHost() : createBrowserV3SixDatabaseStorageHost(),
 		author: creator.author,
 		creatorFinalitySigner: (await createRecoverableFinalitySigner({ seed: creator.seed })).signer,
 		creatorInvite: invite,

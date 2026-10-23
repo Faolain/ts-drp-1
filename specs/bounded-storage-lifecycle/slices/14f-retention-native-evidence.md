@@ -4,6 +4,11 @@ Status: contract draft, 2026-10-19, under the [slice 14 parent](14-single-databa
 Evidence (Track R3): cases 1–4 pass in Chromium, Firefox and WebKit; case 10 passes on
 Chromium; cases 5–9 and 11 are open. See the [evidence record](#evidence-record-track-r3-2026-10-19).
 No evidence is accepted yet. The default flip in 14 depends on this slice passing.
+Default (Track Z, 2026-10-21): Track Z reran Track M's cases 5–8 on Chromium, Firefox and
+WebKit and case 11 on Chromium for the flip (the harness bundles the retention path, not
+the default's selection, so the flip does not change what it tests); case 9 stays open
+because the default needs no migration. The record is in
+`docs/realtime-latency/tracks/36-track-z-room-database-default/RESULT.md`.
 Guarantee ids are defined, with their sources, in the
 [golden-path guarantee checklist](../golden-path-guarantees.md).
 

@@ -99,6 +99,8 @@ import {
 	startRecoveryPoolAutoScheduler,
 	type RecoveryPoolAutoMaintenanceOptions,
 } from "./internal/recovery-pool-auto.js";
+import { createScheduledRecoveryPoolLull } from "./internal/recovery-pool-scheduled.js";
+import { retainedPublicationCancelled } from "./internal/retained-publication.js";
 import {
 	attachPresentationIntents,
 	createPresentationOverlay,
@@ -566,6 +568,17 @@ export interface CreateV3RoomSessionInput<Projection extends V3RoomProjectionAut
 	 * arrive while it runs wait and are admitted right after it; none are dropped.
 	 */
 	readonly recoveryPoolAutoMaintenance?: RecoveryPoolAutoMaintenanceOptions;
+	/**
+	 * Opt-in: run `maintainRecoveryPool()` once per epoch, queued in the lifecycle FIFO
+	 * right after this session's creator adoption or recipient install (receive-only
+	 * included), before any later transition. No idle trigger. A later lull call in an
+	 * epoch whose lull settled gets that result without a second lull, and the idle
+	 * scheduler skips that epoch. The browser binding enables it for new rooms on the
+	 * room database with retention. The next seal keeps its inline maintenance as the
+	 * hard-cap backstop. Moves that arrive while it runs wait and are admitted right
+	 * after it; none are dropped.
+	 */
+	readonly recoveryPoolScheduledLull?: boolean;
 	/**
 	 * Opt-in speculative presentation: local moves show at once, remote moves
 	 * show once authenticated (signature + current Writer), both before durable
@@ -2436,6 +2449,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		(typeof input.openCreatorArchive !== "function" || input.creatorFinalitySigner === undefined))
 		throw new TypeError("v3 creator archive requires the original creator close owner");
 	if (input.recoveryPoolAutoMaintenance !== undefined) resolveRecoveryPoolAutoMaintenanceOptions(input.recoveryPoolAutoMaintenance);
+	if (input.recoveryPoolScheduledLull !== undefined && typeof input.recoveryPoolScheduledLull !== "boolean")
+		throw new TypeError("v3 room scheduled recovery-pool lull option is invalid");
 	if (
 		input.application.snapshotReadPolicy !== undefined &&
 		input.application.snapshotReadPolicy !== "authenticated-public" &&
@@ -4239,22 +4254,25 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			assertSessionOpen();
 			if (terminalFailure !== undefined) throw terminalFailure;
 			if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
+			const plane = activeHandle;
 			const result =
 				targetPeerId === undefined
-					? await activeHandle.republishRetained()
-					: await republishV3RetainedTo(activeHandle, targetPeerId);
+					? await plane.republishRetained()
+					: await republishV3RetainedTo(plane, targetPeerId);
 			if (result.ok) return;
 			// An orderly close cancels a retained publication still in flight: it revokes
 			// this transport synchronously, then retires the plane. A send that revocation
 			// refused, or a plane retired before or around the send, is that cancellation,
-			// not a publication fault. Storage and record faults, and every failure outside
-			// an orderly close or after a terminal failure, still reject.
+			// not a publication fault. This session's own successor (an adoption or an
+			// install) cancels it the same way: it retires the plane this publication read,
+			// and the successor serves the next request. Storage and record faults, and every
+			// other failure or any after a terminal failure, still reject.
 			if (
-				sessionCloseTask !== undefined &&
-				terminalFailure === undefined &&
-				(result.kind === "not-active" ||
-					result.kind === "publication-state-unknown" ||
-					result.kind === "publish-failed")
+				retainedPublicationCancelled(result.kind, {
+					terminal: terminalFailure !== undefined,
+					closing: sessionCloseTask !== undefined,
+					superseded: activeHandle !== plane || creatorSuccessorAdoptionTask !== undefined,
+				})
 			)
 				return;
 			throw new TypeError(`v3 room retained publication failed: ${result.kind}`);
@@ -4395,6 +4413,15 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	let lifetimeTransitionsPending = 0;
 	// Opt-in idle scheduler for early recovery-pool turnover; stopped at close.
 	let autoPoolMaintenance: Readonly<{ stop(): void }> | undefined;
+	// Opt-in lull once per epoch, requested right after adoption or install (Track Z).
+	const scheduledLulls =
+		input.recoveryPoolScheduledLull === true
+			? createScheduledRecoveryPoolLull({
+					epoch: () => (activeHandle === undefined ? undefined : session.authority()?.epoch),
+					request: () => session.maintainRecoveryPool(),
+					now: () => performance.now(),
+				})
+			: undefined;
 	// Holds new local issues while an explicit recovery-pool boundary owns the plane.
 	let poolMaintenanceBarrier: Promise<void> | undefined;
 	// Receipt continuations handed from issueWithReceipt to the synchronous start of issue().
@@ -6878,7 +6905,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			if (redirectedSession !== undefined) {
 				return redirectedSession.adoptCreatorSuccessor();
 			}
-			return performCreatorSuccessorAdoption();
+			await performCreatorSuccessorAdoption();
+			scheduledLulls?.schedule();
 		});
 		const shared = attempt.finally(() => {
 			if (creatorSuccessorAdoptionTask === shared) creatorSuccessorAdoptionTask = undefined;
@@ -6959,7 +6987,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			}
 			// Arrivals queued behind the boundary; any refused at the bounded input
 			// pool are repaired through the same authenticated retained path a reconnect uses.
-			if (result.kind === "maintained" && activeHandle === plane && transport === roomTransport)
+			// Not after close: close revoked the transport and the next open asks again.
+			if (result.kind === "maintained" && !closed && activeHandle === plane && transport === roomTransport)
 				roomTransport.requestRetainedHistory();
 			return result;
 		} finally {
@@ -7165,6 +7194,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			// install met the closing plane. Ask the creator for the successor's retained
 			// history once, now that the successor plane admits it.
 			requestMissingRetainedHistory();
+			scheduledLulls?.schedule();
 		});
 		const shared = attempt.finally(() => {
 			if (creatorSuccessorAdoptionTask === shared) creatorSuccessorAdoptionTask = undefined;
@@ -7214,6 +7244,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			}
 			if (primary !== undefined)
 				throw primary instanceof TypeError ? primary : new TypeError("creator promotion failed", { cause: primary });
+			scheduledLulls?.schedule();
 		});
 	};
 	const closeSession = (): Promise<void> => {
@@ -7648,26 +7679,32 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		rehearseMigration,
 		promoteCreatorCheckpoint,
 		maintainRecoveryPool(): Promise<CreatorRecoveryPoolResult> {
+			// The session's own scheduled request claims synchronously, before it queues.
+			const scheduled = scheduledLulls?.claim() === true;
 			return enqueueLifetimeTransition(async (): Promise<CreatorRecoveryPoolResult> => {
 				if (redirectPromise !== undefined) await redirectPromise;
 				if (redirectedSession !== undefined) return redirectedSession.maintainRecoveryPool();
 				assertSessionOpen();
-				if (input.receiveOnly || creatorCloseHandle === undefined) return maintainRecipientRecoveryPool();
-				await rebasePromise;
-				await migrationCompletionBarrier;
-				let open!: () => void;
-				const barrier = new Promise<void>((resolve) => { open = resolve; });
-				poolMaintenanceBarrier = barrier;
-				try {
-					await drainPendingIssues();
-					assertSessionOpen();
-					const plane = activeHandle;
-					if (plane === undefined) return Object.freeze({kind: "deferred", reason: "unsupported"});
-					return await maintainCreatorRecoveryPool(plane);
-				} finally {
-					if (poolMaintenanceBarrier === barrier) poolMaintenanceBarrier = undefined;
-					open();
-				}
+				const lull = async (): Promise<CreatorRecoveryPoolResult> => {
+					if (input.receiveOnly || creatorCloseHandle === undefined) return maintainRecipientRecoveryPool();
+					await rebasePromise;
+					await migrationCompletionBarrier;
+					let open!: () => void;
+					const barrier = new Promise<void>((resolve) => { open = resolve; });
+					poolMaintenanceBarrier = barrier;
+					try {
+						await drainPendingIssues();
+						assertSessionOpen();
+						const plane = activeHandle;
+						if (plane === undefined) return Object.freeze({kind: "deferred", reason: "unsupported"});
+						return await maintainCreatorRecoveryPool(plane);
+					} finally {
+						if (poolMaintenanceBarrier === barrier) poolMaintenanceBarrier = undefined;
+						open();
+					}
+				};
+				// One lull per epoch when scheduled: a settled epoch answers with its result.
+				return scheduledLulls === undefined ? lull() : scheduledLulls.run(scheduled, lull);
 			});
 		},
 		sealEpoch(): Promise<CreatorLiveCloseResult> {
@@ -7784,6 +7821,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				redirectPromise !== undefined || migrationBarrier !== undefined || migrationCompletionBarrier !== undefined,
 			epoch: () => (activeHandle === undefined && redirectedSession === undefined ? undefined : session.authority()?.epoch ?? 0),
 			open: () => !closed && terminalFailure === undefined,
+			// An epoch the scheduled lull settled needs no idle lull.
+			...(scheduledLulls === undefined ? {} : { settled: (epoch: number) => scheduledLulls.settled(epoch) }),
 			maintain: () => session.maintainRecoveryPool(),
 			now: () => performance.now(),
 			setTimer: (callback, milliseconds) => {

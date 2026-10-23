@@ -55,7 +55,7 @@ Abbreviations:
 | G20 | Snapshot lifecycle: verification does not pin forever; TTL is not a dependency lifetime; promotion precedes dependence | BSL:189-191, BSL:204-205, BSL:269 |
 | G21 | Bounded work: cardinality/byte bounds, bounded scans/queues, reviewed limits (not post-hoc constants) | BSL:257-267, R2E:1900 |
 | G22 | Proof budget: every proof pays full operation-local charges; joined acquisitions are separate lifetimes; no refunds; reservation precedes irreversible effects (maintenanceProofBytes 4 MiB) | BSL:21-24, BSL:264-266, R2E:934-982 (reservation before irreversible effects; no refund), types.ts:117-131 (the 4 MiB figure is `maintenanceProofBytes: 4_194_304` at types.ts:128; no spec states it) |
-| G23 | Ingress: during a deferrable lull, arriving ingress queues FIFO, nothing dropped, provenance rechecked at admission | v3-room.ts:548-553, v3-live.ts:19518-19520, v3-live.ts:8094-8099, R2E:1037-1038 |
+| G23 | Ingress: during a deferrable lull, arriving ingress queues FIFO, nothing dropped, provenance rechecked at admission | v3-room.ts:564-581 (the idle and the scheduled lull; refreshed by Track Z, was :548-553), v3-live.ts:19518-19520, v3-live.ts:8094-8099, R2E:1037-1038 |
 | G24 | Startup floor is a trusted expectation, never a substitute for proofs; a regressed floor is never repaired | 02D:14-18, 02D:86-99 |
 | G25 | Migrations/format changes must be authenticated and fence stale connections; no two authorities in the end state | BSL:216-221, BSL:236-241, R2E:3382-3385 |
 | G26 | Latency objectives never justify relaxing safety | PLAN:1275, R2E:49-51, R2E:70 (the latency objectives themselves: PLAN:18309-18312, R2E:71) |

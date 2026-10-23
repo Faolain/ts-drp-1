@@ -312,6 +312,7 @@ vi.mock("@ts-drp/node/v3-live", async (importOriginal) => ({
 }));
 
 const roomModule = import("../examples/v3-room/src/index.js");
+const sixDatabaseStorageHost = (await roomModule).createBrowserV3SixDatabaseStorageHost();
 
 function invite(anchor: string): V3RoomCreatorInviteMaterial {
 	// These canonical records exercise room composition under the existing mocked trust boundary.
@@ -457,6 +458,7 @@ function roomInput(selectedApplication = application()): Readonly<Record<string,
 	});
 	return Object.freeze({
 		application: selectedApplication,
+		storageHost: sixDatabaseStorageHost,
 		author: "author-local",
 		creatorInvite,
 		databaseName: "target-plane",

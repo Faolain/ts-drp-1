@@ -4,6 +4,11 @@ Status: contract draft, 2026-10-19, under the [slice 14 parent](14-single-databa
 Implementation (Track R3): storage only, opt-in (`retirementFences: true`). The node does
 not write or check the fence yet; the room path keeps the floor's existing two-phase
 participant. See the [parent status](14-single-database-watermark-retirement.md#status-track-r3-2026-10-19-opt-in-stage-1a-only).
+Default (Track Z, 2026-10-21): the new browser default does not include 14c; the owner
+deferred it. The existing per-class path writes no per-owner fence, so the open check
+below, as written, would fail closed on every room after its first retirement round;
+no floor in use offers `fenceRetirement`. See the
+[Track Z status](14-single-database-watermark-retirement.md#status-track-z-2026-10-21-the-browser-default-for-new-rooms).
 No review has run. RED precedes GREEN; no implementation acceptance is claimed.
 Guarantee ids are defined, with their sources, in the
 [golden-path guarantee checklist](../golden-path-guarantees.md).

@@ -25,6 +25,8 @@ export type RecoveryPoolAutoSchedulerInput = Readonly<{
 	epoch(): number | undefined;
 	/** False once the session is closed or failed; stops the scheduler. */
 	open(): boolean;
+	/** Optional: whether another lull source (the scheduled lull) already settled `epoch`. */
+	settled?(epoch: number): boolean;
 	maintain(): Promise<CreatorRecoveryPoolResult>;
 	now(): number;
 	setTimer(callback: () => void, milliseconds: number): unknown;
@@ -56,7 +58,8 @@ export function resolveRecoveryPoolAutoMaintenanceOptions(options: RecoveryPoolA
  * Polls for an idle lull and then requests the SAME explicit maintenance call.
  * It never forces work: activity resets the idle clock, `busy` results back off
  * exponentially, and an epoch whose result was `maintained`, `not-needed` or
- * `unsupported` is not retried until the epoch changes. A failure stops the
+ * `unsupported` is not retried until the epoch changes, and an epoch `settled` reports
+ * (another lull source already settled it) is never attempted. A failure stops the
  * scheduler; the room's own halt/recovery rules apply unchanged.
  * @param input - Room observations and the explicit maintenance call.
  * @returns Stop handle; idempotent.
@@ -86,7 +89,7 @@ export function startRecoveryPoolAutoScheduler(input: RecoveryPoolAutoSchedulerI
 			delay = idleMilliseconds;
 			return arm(idleMilliseconds);
 		}
-		if (epoch === settledEpoch) return arm(idleMilliseconds);
+		if (epoch === settledEpoch || input.settled?.(epoch) === true) return arm(idleMilliseconds);
 		let result: CreatorRecoveryPoolResult;
 		const started = input.now();
 		try {

@@ -1,6 +1,15 @@
-import { expect, type Page, test } from "@playwright/test";
+import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 
 import { installGridRoomHeadAuthority } from "./fixtures/phase-3a1b/grid-room-head-authority";
+import {
+	hangTail,
+	installPhaseProbe,
+	lullWindows,
+	pageNow,
+	type PhaseWindow,
+	summarizePhases,
+	takePhases,
+} from "./fixtures/track-z/phase-probe";
 
 // Track V: the shipped Grid page (examples/grid, served by its own dev server with real
 // browser networking, as phase-3a1b-d9346-v3-zone.pw.ts serves it) as a long zone in
@@ -16,10 +25,6 @@ import { installGridRoomHeadAuthority } from "./fixtures/phase-3a1b/grid-room-he
 // recent console lines (TRACK_V_GRID_STUCK). Track V found that on the settlement profile
 // the creator's blocks stop reaching the Writer after four successors (see
 // docs/realtime-latency/tracks/32-track-v-settlement-for-grid-and-chat/RESULT.md).
-// Each epoch also records every move's delivery time (deliveryMs) and the time both pages take
-// to converge after the install (ms.converge). By default play pauses during rollovers;
-// TRACK_V_PLAY_THROUGH_ROLLOVER=1 (Track X, decision row 60) keeps the Writer playing through
-// them, see below.
 const EPOCHS = Number(process.env.TRACK_V_GRID_EPOCHS ?? 16);
 const MOVES = 2;
 const SETTLE_MS = 300;
@@ -29,6 +34,97 @@ const POST_INSTALL_PAUSE_MS = Number(process.env.TRACK_V_GRID_POST_INSTALL_PAUSE
 const PROBE = process.env.TRACK_V_GRID_PROBE === "1";
 // Diagnostics: TRACK_V_GRID_CENSUS=0 skips the IndexedDB census, to rule out any effect of its reads.
 const CENSUS = process.env.TRACK_V_GRID_CENSUS !== "0";
+// Track Z (measurement only, opt-in): TRACK_Z_PHASES=1 installs tests/fixtures/track-z/phase-probe.ts in
+// both pages and prints, per epoch, a TRACK_Z_PHASES line that attributes each window (play, seal, export,
+// adoption, install, convergence, lulls) to the proof events, spans, IndexedDB transactions and long tasks it
+// held. TRACK_Z_LULL=explicit calls maintainRecoveryPool() on the creator's and then the Writer's room after
+// each install, as the latency bench's lull mode does. The shipped zone API has no such call, so the harness
+// adds one to the served /src/v3-zone.ts that delegates to the zone's current room exactly as its
+// sealEpoch() does; nothing else in the page changes. TRACK_Z_PAGE_GLOBALS (JSON) sets page globals for a
+// scratch measurement build (see the probe).
+// TRACK_Z_ROLLOVER_TIMEOUT_MS bounds the creator's seal/export/adopt evaluate, the Writer's install evaluate
+// and the final zone closes, as Track X's TRACK_X_ROLLOVER_TIMEOUT_MS does for Canvas and Chat: a rollover
+// that does not return in time prints TRACK_Z_ROLLOVER_HUNG with the step the creator reached and the
+// recent console lines, and fails the test instead of holding the shared ports until the test timeout.
+const PHASES = process.env.TRACK_Z_PHASES === "1";
+const LULL = process.env.TRACK_Z_LULL ?? "off";
+if (LULL !== "off" && LULL !== "explicit") throw new Error("TRACK_Z_LULL must be off or explicit");
+const ROLLOVER_TIMEOUT_MS = Number(process.env.TRACK_Z_ROLLOVER_TIMEOUT_MS ?? 0);
+// TRACK_Z_WRITER_FIRST=1: each epoch's moves start with the Writer's (ordinals 1, 0, 3, 2), so its first move is
+// issued right after its install, while its own lull and the creator's may still run (addition 3's Writer issue and
+// creator admission during a lull). Ordinals keep their issuer: even the creator, odd the Writer.
+const WRITER_FIRST = process.env.TRACK_Z_WRITER_FIRST === "1";
+
+async function bounded<Value>(evaluation: Promise<Value>, ms: number): Promise<Readonly<{ value: Value }> | undefined> {
+	if (ms <= 0) return { value: await evaluation };
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	try {
+		return await Promise.race([
+			evaluation.then((value) => ({ value })),
+			new Promise<undefined>((resolve) => {
+				timer = setTimeout(() => resolve(undefined), ms);
+			}),
+		]);
+	} finally {
+		if (timer !== undefined) clearTimeout(timer);
+	}
+}
+
+const readStep = async (page: Page): Promise<unknown> =>
+	(
+		await bounded(
+			page.evaluate(() => ({
+				now: Math.round(performance.now()),
+				step: Reflect.get(globalThis, "__TRACK_Z_STEP__") ?? null,
+			})),
+			10_000
+		)
+	)?.value ?? "unresponsive";
+
+interface LullResult {
+	readonly kind: string;
+	readonly reason: string | null;
+	readonly ms: number;
+	readonly start: number;
+	readonly end: number;
+}
+
+async function exposeZoneLull(context: BrowserContext): Promise<void> {
+	await context.route(
+		(url) => url.port === "4174" && url.pathname === "/src/v3-zone.ts",
+		async (route) => {
+			const response = await route.fetch();
+			const body = await response.text();
+			const anchor = /\n([ \t]*)sealEpoch\(\) \{\n/gu;
+			const found = [...body.matchAll(anchor)];
+			if (found.length !== 1) throw new Error("TRACK_Z_ZONE_SEAL_ANCHOR_ABSENT");
+			const indent = found[0]?.[1] ?? "";
+			const method =
+				`\n${indent}maintainRecoveryPool() {\n${indent}  const selected = room;\n` +
+				`${indent}  if (selected === undefined || closeRequested) return Promise.reject(new TypeError("v3 zone is not open"));\n` +
+				`${indent}  return selected.maintainRecoveryPool();\n${indent}},`;
+			const headers = { ...response.headers() };
+			delete headers["content-length"];
+			await route.fulfill({
+				status: response.status(),
+				headers,
+				body: body.replace(anchor, (match) => method + match),
+			});
+		}
+	);
+}
+
+const runLull = (page: Page): Promise<LullResult> =>
+	page.evaluate(async () => {
+		const api = Reflect.get(window, "__TS_DRP_V3_ZONE__") as {
+			maintainRecoveryPool(): Promise<{ kind: string; reason?: string }>;
+		};
+		const start = performance.timeOrigin + performance.now();
+		const result = await api.maintainRecoveryPool();
+		const end = performance.timeOrigin + performance.now();
+		return { kind: result.kind, reason: result.reason ?? null, ms: end - start, start, end };
+	});
+
 // Track X (decision row 60), opt-in: TRACK_V_PLAY_THROUGH_ROLLOVER=1 keeps the Writer playing through
 // every rollover, as a real game does. It places a block every TRACK_V_PLAY_THROUGH_MS (default 75)
 // while the creator seals, exports and adopts and while the Writer installs. A placement the Writer's
@@ -236,6 +332,9 @@ test(`the shipped Grid page runs ${EPOCHS} creator successors with an enrolled W
 	// Independent Writers own independent account floors, as the d9346 rollover test does.
 	await installGridRoomHeadAuthority([creatorContext]);
 	await installGridRoomHeadAuthority([receiverContext], "__TS_DRP_GRID_ROOM_HEAD_AUTHORITY_FOR_OPEN__", "create");
+	if (PHASES || process.env.TRACK_Z_PAGE_GLOBALS !== undefined)
+		await Promise.all([installPhaseProbe(creatorContext), installPhaseProbe(receiverContext)]);
+	if (LULL === "explicit") await Promise.all([exposeZoneLull(creatorContext), exposeZoneLull(receiverContext)]);
 	const creator = await creatorContext.newPage();
 	const receiver = await receiverContext.newPage();
 	const records: unknown[] = [];
@@ -274,27 +373,68 @@ test(`the shipped Grid page runs ${EPOCHS} creator successors with an enrolled W
 		await receiver.click("#joinGrid");
 		await expect.poll(async () => (await zone(receiver)).durableVertexCount).toBe(2);
 		await expect.poll(async () => (await zone(creator)).durableVertexCount).toBe(2);
+		// Track Z: everything before the first epoch (open, create, join) is one window.
+		let phaseFrom = 0;
+		if (PHASES) {
+			const openedAt = (await pageNow(creator)) + 1;
+			const windows: PhaseWindow[] = [{ name: "open", start: 0, end: openedAt }];
+			const [creatorRaw, recipientRaw] = await Promise.all([takePhases(creator), takePhases(receiver)]);
+			process.stdout.write(
+				`TRACK_Z_PHASES ${JSON.stringify({
+					app: "grid",
+					epoch: 0,
+					creator: summarizePhases(creatorRaw, windows),
+					recipient: summarizePhases(recipientRaw, windows),
+					databases: {
+						creator: Object.keys((await census(creator)).databases),
+						recipient: Object.keys((await census(receiver)).databases),
+					},
+				})}\n`
+			);
+			phaseFrom = openedAt;
+		}
 		for (let epoch = 0; epoch < EPOCHS; epoch++) {
 			const issueMs: { creator: number[]; recipient: number[] } = { creator: [], recipient: [] };
-			// Placement to the first poll that sees the block on the other page.
+			// Track Z: [ordinal (even: creator, odd: Writer), issue start, issue ms, first seen by the other page]
+			// in absolute page time.
 			const deliveryMs: { creator: number[]; recipient: number[] } = { creator: [], recipient: [] };
-			for (let ordinal = 0; ordinal < MOVES * 2; ordinal++) {
+			const moveTimes: [number, number, number, number][] = [];
+			for (let step = 0; step < MOVES * 2; step++) {
+				const ordinal = WRITER_FIRST ? step ^ 1 : step;
 				const index = ordinal % 2;
 				const [page, other] = index === 0 ? [creator, receiver] : [receiver, creator];
 				const block = { id: `block-${index}-${ordinal >> 1}`, kind: "stone", x: epoch, y: index };
-				const ms = await page.evaluate(async (value) => {
+				const placedAt = Date.now();
+				const [ms, at] = await page.evaluate(async (value) => {
 					const api = Reflect.get(window, "__TS_DRP_V3_ZONE__") as { placeBlock(input: unknown): Promise<void> };
 					const started = performance.now();
 					await api.placeBlock(value);
-					return performance.now() - started;
+					return [performance.now() - started, performance.timeOrigin + started] as const;
 				}, block);
 				issueMs[index === 0 ? "creator" : "recipient"].push(ms);
-				const placed = Date.now();
+				if (PHASES) {
+					// Polls inside the other page every 5 ms until its zone holds the block.
+					const seen = await other.evaluate(
+						async ({ id, bound }) => {
+							const api = Reflect.get(window, "__TS_DRP_V3_ZONE__") as {
+								snapshot(): { blocks: readonly { id: string }[] };
+							};
+							const started = performance.now();
+							while (!api.snapshot().blocks.some((entry) => entry.id === id)) {
+								if (performance.now() - started > bound) return null;
+								await new Promise((resolve) => setTimeout(resolve, 5));
+							}
+							return performance.timeOrigin + performance.now();
+						},
+						{ id: block.id, bound: 60_000 }
+					);
+					if (seen !== null) moveTimes.push([ordinal, Math.round(at), Math.round(ms), Math.round(seen)]);
+				}
 				try {
 					await expect
 						.poll(async () => (await zone(other)).blocks, { timeout: PROBE ? 20_000 : 60_000, ...POLL })
 						.toContainEqual(block);
-					deliveryMs[index === 0 ? "creator" : "recipient"].push(Date.now() - placed);
+					deliveryMs[index === 0 ? "creator" : "recipient"].push(Date.now() - placedAt);
 				} catch (error) {
 					process.stdout.write(
 						`TRACK_V_GRID_STUCK ${JSON.stringify({ epoch: epoch + 1, ordinal, block, console: consoleTail })}\n`
@@ -304,27 +444,58 @@ test(`the shipped Grid page runs ${EPOCHS} creator successors with an enrolled W
 				}
 			}
 			await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+			const hung = async (phase: string): Promise<never> => {
+				process.stdout.write(
+					`TRACK_Z_ROLLOVER_HUNG ${JSON.stringify({
+						app: "grid",
+						phase,
+						epoch: epoch + 1,
+						creator: await readStep(creator),
+						recipient: await readStep(receiver),
+						...(PHASES ? { tail: { creator: await hangTail(creator), recipient: await hangTail(receiver) } } : {}),
+						console: consoleTail.slice(-60),
+					})}\n`
+				);
+				throw new Error(`TRACK_Z_ROLLOVER_HUNG ${phase} epoch ${epoch + 1}`);
+			};
 			const play = PLAY_THROUGH ? playThrough(receiver, epoch) : undefined;
 			const transition = async () => {
-				const rollover = await creator.evaluate(async () => {
+				const rolloverEvaluation = creator.evaluate(async () => {
 					const api = Reflect.get(window, "__TS_DRP_V3_ZONE__") as {
 						sealEpoch(): Promise<{ ok: boolean; epoch: number; successorEpoch: number }>;
 						exportCreatorSuccessor(): Promise<Record<string, Uint8Array>>;
 						adoptCreatorSuccessor(): Promise<unknown>;
 					};
+					// Absolute page times of the step boundaries (Track Z's windows).
+					const marks: number[] = [];
+					const mark = (): void => {
+						marks.push(performance.timeOrigin + performance.now());
+					};
+					const step = (name: string): void => {
+						Reflect.set(globalThis, "__TRACK_Z_STEP__", { name, at: Math.round(performance.now()) });
+					};
 					let started = performance.now();
+					mark();
+					step("seal");
 					const close = await api.sealEpoch();
 					const seal = performance.now() - started;
+					mark();
 					if (!close.ok) throw new Error("TRACK_V_HEALTHY_CLOSE_REFUSED");
 					started = performance.now();
+					step("export");
 					const offer = await api.exportCreatorSuccessor();
 					const exported = performance.now() - started;
+					mark();
 					started = performance.now();
+					step("adopt");
 					await api.adoptCreatorSuccessor();
 					const adoption = performance.now() - started;
+					mark();
+					step("done");
 					return {
 						close: { ok: close.ok, epoch: close.epoch, successorEpoch: close.successorEpoch },
 						ms: { seal, export: exported, adoption },
+						marks,
 						offer: Object.fromEntries(
 							[
 								"exactCanonicalCutValueBytes",
@@ -335,25 +506,37 @@ test(`the shipped Grid page runs ${EPOCHS} creator successors with an enrolled W
 						),
 					};
 				});
+				// A timed-out evaluation is abandoned; its later rejection (the page closing) is not unhandled.
+				void rolloverEvaluation.catch(() => undefined);
+				const rolloverResult = await bounded(rolloverEvaluation, ROLLOVER_TIMEOUT_MS);
+				if (rolloverResult === undefined) await hung("creator rollover");
+				const rollover = (rolloverResult as NonNullable<typeof rolloverResult>).value;
 				expect(rollover.close).toEqual({ ok: true, epoch, successorEpoch: epoch + 1 });
 				if (play !== undefined) play.phase = "install";
-				const install = await receiver.evaluate(
+				const installEvaluation = receiver.evaluate(
 					async ({ offer, peer }) => {
 						const api = Reflect.get(window, "__TS_DRP_V3_ZONE__") as {
 							installCreatorSuccessor(input: unknown): Promise<unknown>;
 						};
 						const started = performance.now();
+						const start = performance.timeOrigin + started;
 						await api.installCreatorSuccessor({
 							peers: [peer],
 							offer: Object.fromEntries(Object.entries(offer).map(([key, value]) => [key, new Uint8Array(value)])),
 						});
-						return performance.now() - started;
+						const ended = performance.now();
+						return { ms: ended - started, start, end: performance.timeOrigin + ended };
 					},
 					{ offer: rollover.offer, peer: creatorEnrollment.localPeerId }
 				);
-				return { rollover, install };
+				void installEvaluation.catch(() => undefined);
+				const installResult = await bounded(installEvaluation, ROLLOVER_TIMEOUT_MS);
+				if (installResult === undefined) await hung("recipient install");
+				const installed = (installResult as NonNullable<typeof installResult>).value;
+				const install = installed.ms;
+				return { rollover, installed, install };
 			};
-			const { rollover, install } = await transition().catch(async (error: unknown) => {
+			const { rollover, installed, install } = await transition().catch(async (error: unknown) => {
 				if (play !== undefined) {
 					const partial = await play.stop();
 					process.stdout.write(
@@ -372,7 +555,7 @@ test(`the shipped Grid page runs ${EPOCHS} creator successors with an enrolled W
 			// rollover (none when play pauses).
 			const same = (left: Block, right: Block): boolean =>
 				left.id === right.id && left.kind === right.kind && left.x === right.x && left.y === right.y;
-			const installed = Date.now();
+			const convergenceStarted = Date.now();
 			try {
 				await expect
 					.poll(
@@ -394,15 +577,62 @@ test(`the shipped Grid page runs ${EPOCHS} creator successors with an enrolled W
 				);
 				throw error;
 			}
-			const convergeMs = Date.now() - installed;
+			const convergeMs = Date.now() - convergenceStarted;
 			if (POST_INSTALL_PAUSE_MS > 0) await new Promise((resolve) => setTimeout(resolve, POST_INSTALL_PAUSE_MS));
+			// Track Z: the explicit lull, creator first and then the Writer, as the bench orders it.
+			const convergedAt = await pageNow(creator);
+			const lull =
+				LULL === "explicit" ? { creator: await runLull(creator), recipient: await runLull(receiver) } : undefined;
 			const skipped: Census = { databases: {}, usage: null };
+			const censusAt = await pageNow(creator);
 			const [creatorCensus, recipientCensus] = CENSUS
 				? await Promise.all([census(creator), census(receiver)])
 				: [skipped, skipped];
+			if (PHASES) {
+				const takenAt = await pageNow(creator);
+				const [sealAt, exportAt, adoptAt, adoptedAt] = rollover.marks as [number, number, number, number];
+				const windows: PhaseWindow[] = [
+					{ name: "play", start: phaseFrom, end: sealAt },
+					{ name: "seal", start: sealAt, end: exportAt },
+					{ name: "export", start: exportAt, end: adoptAt },
+					{ name: "adopt", start: adoptAt, end: adoptedAt },
+					{ name: "handoff", start: adoptedAt, end: installed.start },
+					{ name: "install", start: installed.start, end: installed.end },
+					{ name: "converge", start: installed.end, end: lull?.creator.start ?? convergedAt },
+					...(lull === undefined
+						? []
+						: [
+								{ name: "lull-creator", start: lull.creator.start, end: lull.creator.end },
+								{ name: "lull-recipient", start: lull.recipient.start, end: lull.recipient.end },
+							]),
+					{ name: "census", start: censusAt, end: takenAt + 1 },
+				];
+				const [creatorRaw, recipientRaw] = await Promise.all([takePhases(creator), takePhases(receiver)]);
+				process.stdout.write(
+					`TRACK_Z_PHASES ${JSON.stringify({
+						app: "grid",
+						epoch: epoch + 1,
+						creator: summarizePhases(creatorRaw, windows),
+						recipient: summarizePhases(recipientRaw, windows),
+						lulls: { creator: lullWindows(creatorRaw), recipient: lullWindows(recipientRaw) },
+						moves: moveTimes,
+						auto: { creator: creatorRaw.auto, recipient: recipientRaw.auto },
+						dropped: { creator: creatorRaw.dropped, recipient: recipientRaw.dropped },
+					})}\n`
+				);
+				phaseFrom = takenAt + 1;
+			}
 			const record = {
 				epoch: epoch + 1,
 				ms: { ...rollover.ms, install, converge: convergeMs },
+				...(lull === undefined
+					? {}
+					: {
+							lull: {
+								creator: { kind: lull.creator.kind, reason: lull.creator.reason, ms: lull.creator.ms },
+								recipient: { kind: lull.recipient.kind, reason: lull.recipient.reason, ms: lull.recipient.ms },
+							},
+						}),
 				issueMs,
 				deliveryMs,
 				...(played === undefined
@@ -429,14 +659,14 @@ test(`the shipped Grid page runs ${EPOCHS} creator successors with an enrolled W
 			contentType: "application/json",
 		});
 	} finally {
-		await Promise.allSettled([
-			creator.evaluate(() =>
+		// With TRACK_Z_ROLLOVER_TIMEOUT_MS, a zone close that joins a hung rollover is abandoned after the same bound.
+		const closes = [creator, receiver].map((page) =>
+			page.evaluate(() =>
 				(Reflect.get(window, "__TS_DRP_V3_ZONE__") as { close(): Promise<void> } | undefined)?.close()
-			),
-			receiver.evaluate(() =>
-				(Reflect.get(window, "__TS_DRP_V3_ZONE__") as { close(): Promise<void> } | undefined)?.close()
-			),
-		]);
+			)
+		);
+		for (const close of closes) void close.catch(() => undefined);
+		await bounded(Promise.allSettled(closes), ROLLOVER_TIMEOUT_MS);
 		await Promise.allSettled([creator.close(), receiver.close(), ...contexts.map((context) => context.close())]);
 	}
 });

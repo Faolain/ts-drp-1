@@ -9,6 +9,7 @@ import { createV3CanvasApplication } from "../../../packages/node/src/applicatio
 import { createV3ZoneApi, type V3ZoneApi } from "../../../examples/grid/src/v3-zone.js";
 import "../../../examples/v3-chat/src/index.js";
 import {
+	createBrowserV3SixDatabaseStorageHost,
 	createV3RoomCreatorInviteMaterial,
 	createV3RoomSession,
 	type V3RoomHeadAuthority,
@@ -122,6 +123,7 @@ Object.assign(globalThis, {
 			heads.push(head);
 			const room = await createV3RoomSession({
 				application,
+				storageHost: createBrowserV3SixDatabaseStorageHost(),
 				author,
 				creatorInvite: invite,
 				creatorFinalitySigner: finality.signer,

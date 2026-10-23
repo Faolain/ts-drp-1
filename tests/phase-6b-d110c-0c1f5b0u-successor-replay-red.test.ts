@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeNetwork } from "./fixtures/phase-4b-v3/live-snapshot.js";
 import { createV3ChatApplication } from "../examples/v3-chat/src/index.js";
 import {
+	createBrowserV3SixDatabaseStorageHost,
 	createV3RoomCreatorInviteMaterial,
 	createV3RoomSession,
 	type CreateV3RoomSessionInput,
@@ -192,6 +193,7 @@ async function genuineSuccessor() {
 	const accepted: string[] = [];
 	const input: CreateV3RoomSessionInput = {
 		application,
+		storageHost: createBrowserV3SixDatabaseStorageHost(),
 		author,
 		creatorInvite,
 		databaseName,

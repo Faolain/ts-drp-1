@@ -2,6 +2,9 @@
 
 Status: contract draft, 2026-10-19, under the [slice 14 parent](14-single-database-watermark-retirement.md).
 Implementation (Track R3): not started. See the [parent status](14-single-database-watermark-retirement.md#status-track-r3-2026-10-19-opt-in-stage-1a-only).
+Default (Track Z, 2026-10-21): the bounds below apply to every new browser room created
+with no `storageHost`; a unit over the cap falls back to the existing per-class path, as
+before. See the [Track Z status](14-single-database-watermark-retirement.md#status-track-z-2026-10-21-the-browser-default-for-new-rooms).
 No review has run. The per-transaction cap below is new policy and needs review
 before acceptance runs (BSL:261-263). RED precedes GREEN.
 Guarantee ids are defined, with their sources, in the

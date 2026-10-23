@@ -1,6 +1,15 @@
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 
 import { installGridRoomHeadAuthority } from "./fixtures/phase-3a1b/grid-room-head-authority";
+import {
+	hangTail,
+	installPhaseProbe,
+	lullWindows,
+	pageNow,
+	type PhaseWindow,
+	summarizePhases,
+	takePhases,
+} from "./fixtures/track-z/phase-probe";
 
 // Track X: the shipped Canvas page (examples/canvas) and the shipped Chat page
 // (examples/chat) as long rooms in Chromium, with the pages' own dev servers and real
@@ -41,6 +50,14 @@ import { installGridRoomHeadAuthority } from "./fixtures/phase-3a1b/grid-room-he
 // the recipient page send the creator a direct retained-history request on the room's history
 // control topic every TRACK_X_HISTORY_STORM_MS ms, so the creator answers with targeted
 // retained republications all the time. It reproduces the creator seal hang far more often.
+//
+// Track Z (measurement only, opt-in): TRACK_Z_PHASES=1 installs tests/fixtures/track-z/phase-probe.ts
+// in both pages and prints, per epoch, a TRACK_Z_PHASES line that attributes each window (play,
+// seal, export, adoption, install, convergence, lulls) to the proof events, spans, IndexedDB
+// transactions and long tasks it held. TRACK_Z_LULL=explicit calls the room's
+// maintainRecoveryPool() on the creator and then on the recipient after each install, as the
+// latency bench's lull mode does, and records each result and its in-page duration.
+// TRACK_Z_PAGE_GLOBALS (JSON) sets page globals for a scratch measurement build (see the probe).
 const EPOCHS = Number(process.env.TRACK_X_EPOCHS ?? 16);
 const MOVES = Number(process.env.TRACK_X_MOVES ?? 2);
 const SETTLE_MS = 300;
@@ -53,6 +70,9 @@ const NET_PROBE = process.env.TRACK_X_NET_PROBE === "1";
 const CONSOLE_ALL = process.env.TRACK_X_CONSOLE_ALL === "1";
 const IDB_PROBE = process.env.TRACK_X_IDB_PROBE === "1";
 const HISTORY_STORM_MS = Number(process.env.TRACK_X_HISTORY_STORM_MS ?? 0);
+const PHASES = process.env.TRACK_Z_PHASES === "1";
+const LULL = process.env.TRACK_Z_LULL ?? "off";
+if (LULL !== "off" && LULL !== "explicit") throw new Error("TRACK_Z_LULL must be off or explicit");
 const ACCESSOR =
 	"\n;globalThis.__TRACK_X_ROOM__ = () => room;\n" + (NET_PROBE ? ";globalThis.__TRACK_X_NODE__ = () => node;\n" : "");
 
@@ -70,8 +90,8 @@ interface ShippedApp {
 	create(page: Page): Promise<string>;
 	/** Joins with the invite through the UI. */
 	join(page: Page, invite: string): Promise<void>;
-	/** Makes one creator move through the UI; returns its key and the in-page ms until the creator shows it. */
-	move(page: Page, epoch: number, ordinal: number): Promise<Readonly<{ key: unknown; ms: number }>>;
+	/** Makes one creator move through the UI; returns its key, the in-page ms until the creator shows it and its absolute page start time. */
+	move(page: Page, epoch: number, ordinal: number): Promise<Readonly<{ key: unknown; ms: number; at: number }>>;
 	/** Whether the page shows the move. */
 	shows(page: Page, key: unknown): Promise<boolean>;
 	/** The page's comparable view of the room's state. */
@@ -108,7 +128,11 @@ const canvas: ShippedApp = {
 				if (performance.now() - started > 60_000) throw new Error("TRACK_X_CANVAS_PAINT_NOT_SHOWN");
 				await new Promise((resolve) => setTimeout(resolve, 5));
 			}
-			return { key: { id: pixelId, color: pixel.style.backgroundColor }, ms: performance.now() - started };
+			return {
+				key: { id: pixelId, color: pixel.style.backgroundColor },
+				ms: performance.now() - started,
+				at: performance.timeOrigin + started,
+			};
 		}, id);
 	},
 	async shows(page, key) {
@@ -160,7 +184,7 @@ const chat: ShippedApp = {
 				if (performance.now() - started > 60_000) throw new Error("TRACK_X_CHAT_MESSAGE_NOT_SHOWN");
 				await new Promise((resolve) => setTimeout(resolve, 5));
 			}
-			return { key: value, ms: performance.now() - started };
+			return { key: value, ms: performance.now() - started, at: performance.timeOrigin + started };
 		}, text);
 	},
 	async shows(page, key) {
@@ -264,6 +288,28 @@ const connectedPeers = (page: Page): Promise<readonly string[]> =>
 				Reflect.get(globalThis, "__TRACK_X_ROOM__") as () => { connectedPeers(): readonly string[] } | undefined
 			)()?.connectedPeers() ?? []
 	);
+
+interface LullResult {
+	readonly kind: string;
+	readonly reason: string | null;
+	readonly ms: number;
+	readonly start: number;
+	readonly end: number;
+}
+
+// Track Z: the room's own maintainRecoveryPool(), with its result and in-page duration (absolute page times).
+const runLull = (page: Page): Promise<LullResult> =>
+	page.evaluate(async () => {
+		const room = (
+			Reflect.get(globalThis, "__TRACK_X_ROOM__") as () => {
+				maintainRecoveryPool(): Promise<{ kind: string; reason?: string }>;
+			}
+		)();
+		const start = performance.timeOrigin + performance.now();
+		const result = await room.maintainRecoveryPool();
+		const end = performance.timeOrigin + performance.now();
+		return { kind: result.kind, reason: result.reason ?? null, ms: end - start, start, end };
+	});
 
 // Observation only: open IndexedDB transactions and Web Locks requests of the page.
 function idbProbeInitScript(): void {
@@ -458,6 +504,37 @@ async function waitShown(app: ShippedApp, page: Page, key: unknown, timeout: num
 	}
 }
 
+/**
+ * Track Z (TRACK_Z_PHASES): waits inside the page, polling every 5 ms, until it shows the move.
+ * @param app - The shipped app.
+ * @param page - The receiving page.
+ * @param key - The move's key.
+ * @param timeout - Bound in ms.
+ * @returns The absolute page time it was first seen, or null on timeout.
+ */
+function seenInPage(app: ShippedApp, page: Page, key: unknown, timeout: number): Promise<number | null> {
+	return page.evaluate(
+		async ({ name, value, bound }) => {
+			const shown = (): boolean => {
+				if (name === "canvas") {
+					const { id, color } = value as { id: string; color: string };
+					return document.getElementById(id)?.style.backgroundColor === color;
+				}
+				return Array.from(document.querySelectorAll(".message-content")).some(
+					(element) => element.textContent === value
+				);
+			};
+			const started = performance.now();
+			while (!shown()) {
+				if (performance.now() - started > bound) return null;
+				await new Promise((resolve) => setTimeout(resolve, 5));
+			}
+			return performance.timeOrigin + performance.now();
+		},
+		{ name: app.name, value: key, bound: timeout }
+	);
+}
+
 for (const app of [canvas, chat])
 	test(`the shipped ${app.name} page runs ${EPOCHS} creator successors with a joined recipient (measurement)`, async ({
 		browser,
@@ -478,6 +555,8 @@ for (const app of [canvas, chat])
 				creatorContext.addInitScript(idbProbeInitScript),
 				receiverContext.addInitScript(idbProbeInitScript),
 			]);
+		if (PHASES || process.env.TRACK_Z_PAGE_GLOBALS !== undefined)
+			await Promise.all([installPhaseProbe(creatorContext), installPhaseProbe(receiverContext)]);
 		const creator = await creatorContext.newPage();
 		const receiver = await receiverContext.newPage();
 		const records: unknown[] = [];
@@ -536,6 +615,14 @@ for (const app of [canvas, chat])
 					: {}),
 				console: consoleTail.slice(-120),
 				consoleAll: consoleAll.slice(-300),
+				// Track Z: the step the creator's rollover reached, and with TRACK_Z_PHASES the spans it completed.
+				step: (
+					await bounded(
+						creator.evaluate(() => Reflect.get(globalThis, "__TRACK_X_STEP__") ?? null),
+						10_000
+					)
+				)?.value,
+				...(PHASES ? { tail: { creator: await hangTail(creator), recipient: await hangTail(receiver) } } : {}),
 			};
 			process.stdout.write(`TRACK_X_ROLLOVER_HUNG ${JSON.stringify(report)}\n`);
 			throw new Error(`TRACK_X_ROLLOVER_HUNG ${app.name} epoch ${epoch} ${phase}`);
@@ -581,14 +668,39 @@ for (const app of [canvas, chat])
 				);
 				process.stdout.write(`TRACK_X_HISTORY_STORM ${JSON.stringify({ ms: HISTORY_STORM_MS, controlId: storm })}\n`);
 			}
+			// Track Z: everything before the first epoch (open, create, join) is one window.
+			let phaseFrom = 0;
+			if (PHASES) {
+				const openedAt = (await pageNow(creator)) + 1;
+				const windows: PhaseWindow[] = [{ name: "open", start: 0, end: openedAt }];
+				const [creatorRaw, recipientRaw] = await Promise.all([takePhases(creator), takePhases(receiver)]);
+				process.stdout.write(
+					`TRACK_Z_PHASES ${JSON.stringify({
+						app: app.name,
+						epoch: 0,
+						creator: summarizePhases(creatorRaw, windows),
+						recipient: summarizePhases(recipientRaw, windows),
+						databases: {
+							creator: Object.keys((await census(creator)).databases),
+							recipient: Object.keys((await census(receiver)).databases),
+						},
+					})}\n`
+				);
+				phaseFrom = openedAt;
+			}
 			for (let epoch = 0; epoch < EPOCHS; epoch++) {
 				const issueMs: number[] = [];
 				const deliveryMs: number[] = [];
+				// Track Z: [ordinal, issue start, issue ms, first seen by the recipient] in absolute page time.
+				const moveTimes: [number, number, number, number][] = [];
 				for (let ordinal = 0; ordinal < MOVES; ordinal++) {
 					const moved = await app.move(creator, epoch, ordinal);
 					issueMs.push(Math.round(moved.ms));
 					const sent = Date.now();
-					if (!(await waitShown(app, receiver, moved.key, CONVERGE_MS))) {
+					const seen = PHASES ? await seenInPage(app, receiver, moved.key, CONVERGE_MS) : undefined;
+					if (seen !== undefined && seen !== null)
+						moveTimes.push([ordinal, Math.round(moved.at), Math.round(moved.ms), Math.round(seen)]);
+					if (seen === null || (seen === undefined && !(await waitShown(app, receiver, moved.key, CONVERGE_MS)))) {
 						const stuck = {
 							app: app.name,
 							epoch: epoch + 1,
@@ -621,23 +733,33 @@ for (const app of [canvas, chat])
 						exportCreatorSuccessor(): Promise<Record<string, Uint8Array>>;
 						adoptCreatorSuccessor(): Promise<unknown>;
 					};
+					// Absolute page times of the step boundaries (Track Z's windows).
+					const marks: number[] = [];
+					const mark = (): void => {
+						marks.push(performance.timeOrigin + performance.now());
+					};
 					let begun = performance.now();
+					mark();
 					step("seal");
 					const close = await room.sealEpoch();
 					const seal = performance.now() - begun;
+					mark();
 					if (!close.ok) throw new Error("TRACK_X_HEALTHY_CLOSE_REFUSED");
 					begun = performance.now();
 					step("export");
 					const offer = await room.exportCreatorSuccessor();
 					const exported = performance.now() - begun;
+					mark();
 					begun = performance.now();
 					step("adopt");
 					await room.adoptCreatorSuccessor();
 					const adoption = performance.now() - begun;
+					mark();
 					step("done");
 					return {
 						close: { ok: close.ok, epoch: close.epoch, successorEpoch: close.successorEpoch },
 						ms: { seal, export: exported, adoption },
+						marks,
 						offer: Object.fromEntries(Object.entries(offer).map(([key, value]) => [key, Array.from(value)])),
 					};
 				});
@@ -653,30 +775,80 @@ for (const app of [canvas, chat])
 							installCreatorSuccessor(input: unknown): Promise<unknown>;
 						};
 						const begun = performance.now();
+						const start = performance.timeOrigin + begun;
 						await room.installCreatorSuccessor({
 							peers: [peer],
 							offer: Object.fromEntries(Object.entries(offer).map(([key, value]) => [key, new Uint8Array(value)])),
 						});
-						return performance.now() - begun;
+						const ended = performance.now();
+						return { ms: ended - begun, start, end: performance.timeOrigin + ended };
 					},
 					{ offer: rollover.offer, peer: creatorPeer }
 				);
 				void installEvaluation.catch(() => undefined);
 				const installResult = await bounded(installEvaluation, ROLLOVER_TIMEOUT_MS);
 				if (installResult === undefined) await hung("recipient install", epoch + 1);
-				const install = (installResult as NonNullable<typeof installResult>).value;
+				const installed = (installResult as NonNullable<typeof installResult>).value;
+				const install = installed.ms;
 				await expect.poll(() => app.view(receiver), { timeout: CONVERGE_MS }).toEqual(await app.view(creator));
 				if (POST_INSTALL_PAUSE_MS > 0) await new Promise((resolve) => setTimeout(resolve, POST_INSTALL_PAUSE_MS));
+				// Track Z: the explicit lull, creator first and then the recipient, as the bench orders it.
+				const convergedAt = await pageNow(creator);
+				const lull =
+					LULL === "explicit" ? { creator: await runLull(creator), recipient: await runLull(receiver) } : undefined;
 				const skipped: Census = { databases: {}, usage: null };
+				const censusAt = await pageNow(creator);
 				const [creatorCensus, recipientCensus] = CENSUS
 					? await Promise.all([census(creator), census(receiver)])
 					: [skipped, skipped];
+				if (PHASES) {
+					const takenAt = await pageNow(creator);
+					const [sealAt, exportAt, adoptAt, adoptedAt] = rollover.marks as [number, number, number, number];
+					const windows: PhaseWindow[] = [
+						{ name: "play", start: phaseFrom, end: sealAt },
+						{ name: "seal", start: sealAt, end: exportAt },
+						{ name: "export", start: exportAt, end: adoptAt },
+						{ name: "adopt", start: adoptAt, end: adoptedAt },
+						{ name: "handoff", start: adoptedAt, end: installed.start },
+						{ name: "install", start: installed.start, end: installed.end },
+						{ name: "converge", start: installed.end, end: lull?.creator.start ?? convergedAt },
+						...(lull === undefined
+							? []
+							: [
+									{ name: "lull-creator", start: lull.creator.start, end: lull.creator.end },
+									{ name: "lull-recipient", start: lull.recipient.start, end: lull.recipient.end },
+								]),
+						{ name: "census", start: censusAt, end: takenAt + 1 },
+					];
+					const [creatorRaw, recipientRaw] = await Promise.all([takePhases(creator), takePhases(receiver)]);
+					process.stdout.write(
+						`TRACK_Z_PHASES ${JSON.stringify({
+							app: app.name,
+							epoch: epoch + 1,
+							creator: summarizePhases(creatorRaw, windows),
+							recipient: summarizePhases(recipientRaw, windows),
+							lulls: { creator: lullWindows(creatorRaw), recipient: lullWindows(recipientRaw) },
+							moves: moveTimes,
+							auto: { creator: creatorRaw.auto, recipient: recipientRaw.auto },
+							dropped: { creator: creatorRaw.dropped, recipient: recipientRaw.dropped },
+						})}\n`
+					);
+					phaseFrom = takenAt + 1;
+				}
 				const record = {
 					app: app.name,
 					epoch: epoch + 1,
 					testMs: Date.now() - started,
 					pageMs: { creator: await pageMs(creator), recipient: await pageMs(receiver) },
 					ms: { ...rollover.ms, install },
+					...(lull === undefined
+						? {}
+						: {
+								lull: {
+									creator: { kind: lull.creator.kind, reason: lull.creator.reason, ms: lull.creator.ms },
+									recipient: { kind: lull.recipient.kind, reason: lull.recipient.reason, ms: lull.recipient.ms },
+								},
+							}),
 					issueMs,
 					deliveryMs,
 					creator: { rows: total(creatorCensus), issuance: issuance(creatorCensus), usage: creatorCensus.usage },

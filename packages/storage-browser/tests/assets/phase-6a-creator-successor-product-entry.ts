@@ -100,6 +100,7 @@ interface DirectRoomDependencies {
 		readonly migration: Readonly<{ canonicalStateBytes(projection: unknown): Uint8Array }>;
 		projectAcceptedOperations(input: Readonly<Record<string, unknown>>): unknown;
 	}>;
+	createBrowserV3SixDatabaseStorageHost(): unknown;
 	createV3RoomCreatorInviteMaterial(input: Readonly<Record<string, unknown>>): Promise<unknown>;
 	createV3RoomSession(input: Readonly<Record<string, unknown>>): Promise<DirectRoomSession>;
 }
@@ -1382,6 +1383,7 @@ async function createDirectRoom(name: string, options: DirectRoomOpenOptions = {
 		);
 	return dependencies.createV3RoomSession({
 		application,
+		storageHost: dependencies.createBrowserV3SixDatabaseStorageHost(),
 		author: authorKeychain.localAuthorId,
 		...(options.withCreatorSigner === false ? {} : { creatorFinalitySigner: finality.signer }),
 		creatorInvite,

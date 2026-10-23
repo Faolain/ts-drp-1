@@ -22,6 +22,7 @@ import { fakeNetwork } from "./phase-4b-v3/live-snapshot.js";
 import { createTransientPayloadApplication } from "./phase-6b-d110c-0c1f5b/transient-payload-application.js";
 import { createV3ChatApplication } from "../../examples/v3-chat/src/index.js";
 import {
+	createBrowserV3SixDatabaseStorageHost,
 	createV3RoomCreatorInviteMaterial,
 	createV3RoomSession,
 	type CreateV3RoomSessionInput,
@@ -861,6 +862,7 @@ async function openRoom(
 				: base;
 		const input: CreateV3RoomSessionInput = {
 			application,
+			storageHost: createBrowserV3SixDatabaseStorageHost(),
 			author: identity.author,
 			creatorInvite: invite,
 			databaseName,
