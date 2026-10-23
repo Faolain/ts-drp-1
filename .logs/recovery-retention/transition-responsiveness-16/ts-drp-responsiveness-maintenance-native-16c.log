@@ -1,0 +1,31 @@
+
+ RUN  v3.1.1 /private/tmp/ts-drp-transition-responsiveness
+
+(node:56529) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ tests/creator-maintenance-host-turn-native.test.ts (2 tests | 1 failed) 15555ms
+   ✓ joins genuine native participant custody before a maintenance host turn and handles close  9283ms
+   × joins genuine native participant custody before a maintenance host turn and handles foreign-native-control 6271ms
+     → database is locked
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/creator-maintenance-host-turn-native.test.ts > joins genuine native participant custody before a maintenance host turn and handles foreign-native-control
+Error: database is locked
+ ❯ StatementSync.<anonymous> tests/creator-maintenance-host-turn-native.test.ts:73:26
+     71|  });
+     72|  vi.spyOn(StatementSync.prototype, "run").mockImplementation(function …
+     73|   const result = Reflect.apply(run, this, args),
+       |                          ^
+     74|    sql = statements.get(this);
+     75|   if (sql !== undefined && /^\s*(INSERT|UPDATE|DELETE|REPLACE)\b/iu.te…
+ ❯ tests/creator-maintenance-host-turn-native.test.ts:217:8
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  12:27:49
+   Duration  20.43s (transform 2.82s, setup 0ms, collect 4.39s, tests 15.55s, environment 0ms, prepare 72ms)
+

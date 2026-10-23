@@ -956,7 +956,7 @@ async function recoverCreatorArchiveCloseExport(
 /** Genuine room-native ports; neither an incoming certificate nor a supplied
  * scope list can grant turnover. No finality signer is required. */
 export type CreatorRecipientRecoveryContext = Pick<CreatorClosedRollbackDataInput,
-	"roomHeadAuthority" | "pinnedGenesisAnchorDigest" | "exactCanonicalPinnedGenesisTrustStateRecordBytes"> &
+	"roomHeadAuthority" | "pinnedGenesisAnchorDigest" | "exactCanonicalPinnedGenesisTrustStateRecordBytes" | "signal"> &
 	Pick<Parameters<typeof createCreatorSigningRecoveryOwner>[0], "voteStore" | "evidenceStore" | "storageIncarnation">;
 type CreatorRecipientSource = NonNullable<ReturnType<typeof resolveCreatorRecipientRegistration>>;
 type ReceivedRecoverySeal = NonNullable<Awaited<ReturnType<CreatorRecipientSource["sealReceivedRecoveryDependencies"]>>>;
@@ -1019,6 +1019,7 @@ async function runReceivedRecoveryTurnoverPasses(input: Readonly<{
 			// window, so a generation drain that suppressed this pass's collectible
 			// journal prefixes requests one more fresh pass (still bounded below).
 			checkpoint = await reconcileCreatorReceivedSnapshotRecoveryRoles({
+				...(context.signal === undefined ? {} : {signal: context.signal}),
 				roomHeadAuthority: context.roomHeadAuthority, pinnedGenesisAnchorDigest: context.pinnedGenesisAnchorDigest,
 				exactCanonicalPinnedGenesisTrustStateRecordBytes: context.exactCanonicalPinnedGenesisTrustStateRecordBytes,
 				catalog: input.catalog,

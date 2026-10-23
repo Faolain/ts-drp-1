@@ -941,6 +941,9 @@ export interface ClosedEpochRetirementIntentInput {
 	/** Acquires a fresh original one-use native control; outer RO has joined. */
 	acquireCoordinator(): Promise<AheRetirementControlRead>;
 	readonly participants: readonly ClosedEpochRetirementParticipant[];
+	/** Original owner may yield only after a participant's native view has
+	 * successfully joined; never between its prepare and retained commit read. */
+	afterParticipantRelease?(): Promise<void>;
 	/** Original owner acquires fresh joint native custody and revalidates all
 	 * captured source/control bytes after global completion, before delivery. */
 	verifyCompleted(control: AheRetirementControl): Promise<void>;
@@ -1013,6 +1016,7 @@ export async function applyClosedEpochRetirementIntent(
 	retirementBytes({ preparation, generations });
 	const acquireCoordinator = input.acquireCoordinator.bind(input);
 	const verifyCompleted = input.verifyCompleted.bind(input);
+	const afterParticipantRelease = input.afterParticipantRelease?.bind(input);
 	const originals = [...input.participants];
 	const nativeDomains = preparation.domains.filter(([roles]) => (roles & 3) === 0);
 	const ahe = preparation.domains.filter(([roles]) => (roles & 3) !== 0);
@@ -1186,8 +1190,10 @@ export async function applyClosedEpochRetirementIntent(
 		return after.read;
 	};
 	if (completedMatches(coordinator)) {
-		for (const participant of participants)
+		for (const participant of participants) {
 			if ((await inspect(participant)) !== "completed") retirementRefusal("incomplete domain behind global completion");
+			if (afterParticipantRelease !== undefined) await afterParticipantRelease();
+		}
 		await verifyCompleted(coordinator);
 		return coordinator;
 	}
@@ -1198,6 +1204,7 @@ export async function applyClosedEpochRetirementIntent(
 		catch (primary) { return releaseRetirementRead(read, async () => { throw primary; }); }
 		if (phase === "completed") {
 			await releaseRetirementRead(read, async () => undefined);
+			if (afterParticipantRelease !== undefined) await afterParticipantRelease();
 			continue;
 		}
 		// These transitions install metadata fences only, never delete payloads.
@@ -1209,10 +1216,13 @@ export async function applyClosedEpochRetirementIntent(
 		if (phase === "old") read = await transition(participant, read, "prepare");
 		const completed = await transition(participant, read, "commit");
 		await releaseRetirementRead(completed, async () => undefined);
+		if (afterParticipantRelease !== undefined) await afterParticipantRelease();
 	}
 	// Recheck every exact completed source/control after the last local commit.
-	for (const participant of participants)
+	for (const participant of participants) {
 		if ((await inspect(participant)) !== "completed") retirementRefusal("native completion changed");
+		if (afterParticipantRelease !== undefined) await afterParticipantRelease();
+	}
 	const read = await acquireCoordinator();
 	let primary: unknown;
 	let failed = false;

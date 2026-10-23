@@ -19850,6 +19850,19 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 	const acquireAhe: typeof ordinaryAcquireAhe = (id) =>
 		room?.session !== undefined ? room.session.acquireAhe(input.store, id) : ordinaryAcquireAhe(id);
 	const checkpoint = createWorkCheckpoint();
+	const afterParticipantRelease = room?.session === undefined && source.floor.pending === null && source.inheritedClassification === undefined
+		? async (): Promise<void> => {
+			// A strict room transaction or pending/classification source retains its
+			// original uninterrupted schedule. Ordinary participants have joined all
+			// native views here; the next original acquisition rechecks its source.
+			checkAbort(input.signal);
+			requireLaw(room?.session === undefined && source.floor.pending === null && source.inheritedClassification === undefined,
+				"floor-stale");
+			await checkpoint();
+			checkAbort(input.signal);
+			requireLaw(room?.session === undefined && source.floor.pending === null && source.inheritedClassification === undefined,
+				"floor-stale");
+		} : undefined;
 	const acquireCoordinator = async (): Promise<AheRetirementControlRead> => {
 		// The original strict room transaction must stay uninterrupted. After
 		// it commits, each original coordinator acquisition rechecks native
@@ -20266,6 +20279,7 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 				acquire,
 			})
 		);
+		if (afterParticipantRelease !== undefined) await afterParticipantRelease();
 	}
 	const firstFloor = await acquireFloor({ scope: floorScope });
 	const floorCommitment = boundDomain(32);
@@ -20549,6 +20563,7 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 			acquire: signingNative,
 		})
 	);
+	if (afterParticipantRelease !== undefined) await afterParticipantRelease();
 	const recordDigests =
 		generationSource?.generations.recordDigests ??
 		source.rows.map((row) => {
@@ -20741,6 +20756,7 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 		generations,
 		participants,
 		acquireCoordinator,
+		...(afterParticipantRelease === undefined ? {} : {afterParticipantRelease}),
 		// The session commits before the ordinary joint custody re-verifies every owner.
 		verifyCompleted: async (coordinator: AheRetirementControl) => {
 			await room?.leave();

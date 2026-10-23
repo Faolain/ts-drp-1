@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import {
 	type AheGenerationPartition,
 	type AheRetirementControl,
@@ -7,12 +6,38 @@ import {
 	type AheRetirementPreparation,
 	type StorageObjectId,
 } from "@ts-drp/storage";
+import { readFileSync } from "node:fs";
+import ts from "typescript";
+import { describe, expect, it } from "vitest";
+
 import {
+	type ClosedEpochRetirementParticipantRead,
 	applyClosedEpochRetirementIntent,
 	captureClosedEpochRetirementMetadataDomain,
 	validateClosedEpochRetirementMetadataDomain,
-	type ClosedEpochRetirementParticipantRead,
 } from "../src/internal/closed-epoch-cleanup.js";
+
+const maintenancePath = new URL("../src/internal/creator-closed-rollback-data.ts", import.meta.url);
+const ast = ts.createSourceFile(
+	maintenancePath.pathname,
+	readFileSync(maintenancePath, "utf8"),
+	ts.ScriptTarget.Latest,
+	true
+);
+function declaration(name: string): ts.FunctionDeclaration {
+	const match = ast.statements.find(
+		(node): node is ts.FunctionDeclaration => ts.isFunctionDeclaration(node) && node.name?.text === name
+	);
+	if (match === undefined) throw Error(`missing original maintenance declaration:${name}`);
+	return match;
+}
+function deferred(): { promise: Promise<void>; resolve(): void } {
+	let resolve!: () => void;
+	const promise = new Promise<void>((done) => {
+		resolve = done;
+	});
+	return { promise, resolve };
+}
 
 it("binds atomic row rewrites to exact prepared and completed native images", () => {
 	const control = {kind: "v3-issuance-retirement-control-1", objectId: "rewrite-room", incarnation: "01".repeat(32),
@@ -95,6 +120,185 @@ function fixture() {
 }
 
 describe("closed retirement original-view sequencing", () => {
+	it("the original released-participant checkpoint suppresses strict custody and rechecks abort and guard after yielding", async (): Promise<void> => {
+		const owner = declaration("installClosedRetirementSource");
+		if (owner.body === undefined) throw Error("missing original maintenance body");
+		const statement = owner.body.statements.find(
+			(statement) =>
+				ts.isVariableStatement(statement) &&
+				statement.declarationList.declarations.some(
+					(value) => ts.isIdentifier(value.name) && value.name.text === "afterParticipantRelease"
+				)
+		);
+		if (statement === undefined) throw Error("missing original released-participant checkpoint");
+		const js = ts.transpile(
+			`${declaration("isAborted").getText(ast)}\n${declaration("checkAbort").getText(ast)}\n${statement.getText(ast)}\nafterParticipantRelease;`,
+			{ target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None }
+		);
+		const abortedGetter = Object.getOwnPropertyDescriptor(AbortSignal.prototype, "aborted")?.get;
+		if (abortedGetter === undefined) throw Error("missing native AbortSignal getter");
+		const create = (
+			state: {
+				room?: { session: unknown };
+				source: { floor: { pending: unknown }; inheritedClassification?: unknown };
+			},
+			controller: AbortController,
+			checkpoint: () => Promise<void> | undefined
+		): (() => Promise<void>) | undefined =>
+			new Function(
+				"room",
+				"source",
+				"input",
+				"checkpoint",
+				"abortedGetter",
+				"Refusal",
+				"failure",
+				"requireLaw",
+				`return eval(${JSON.stringify(js)});`
+			)(
+				state.room,
+				state.source,
+				{ signal: controller.signal },
+				checkpoint,
+				abortedGetter,
+				class extends Error {},
+				(kind: string) => kind,
+				(condition: boolean, kind: string) => {
+					if (!condition) throw Error(kind);
+				}
+			);
+		let calls = 0;
+		for (const state of [
+			{ room: { session: {} }, source: { floor: { pending: null } } },
+			{ source: { floor: { pending: {} } } },
+			{ source: { floor: { pending: null }, inheritedClassification: {} } },
+		]) {
+			expect(
+				create(state, new AbortController(), () => {
+					calls++;
+					return undefined;
+				})
+			).toBeUndefined();
+		}
+		expect(calls).toBe(0);
+		const before = new AbortController();
+		before.abort();
+		await expect(
+			create({ source: { floor: { pending: null } } }, before, () => {
+				calls++;
+				return undefined;
+			})?.()
+		).rejects.toThrow("aborted");
+		expect(calls).toBe(0);
+		const during = new AbortController(),
+			gate = deferred();
+		const pending = create({ source: { floor: { pending: null } } }, during, () => {
+			calls++;
+			return gate.promise;
+		})?.();
+		during.abort();
+		gate.resolve();
+		await expect(pending).rejects.toThrow("aborted");
+		expect(calls).toBe(1);
+		const changed = { room: { session: undefined as unknown }, source: { floor: { pending: null } } },
+			changedGate = deferred();
+		const changing = create(changed, new AbortController(), () => changedGate.promise)?.();
+		changed.room.session = {};
+		changedGate.resolve();
+		await expect(changing).rejects.toThrow("floor-stale");
+	});
+
+	it("calls the scheduling owner only after complete participant views and inspections join", async (): Promise<void> => {
+		const f = fixture();
+		const observations: number[][] = [];
+		await applyClosedEpochRetirementIntent({
+			...f.input,
+			afterParticipantRelease: (): Promise<void> => {
+				expect(f.released).toEqual(f.acquired);
+				observations.push([...f.acquired]);
+				return Promise.resolve();
+			},
+		});
+		expect(observations).toHaveLength(10);
+		expect(observations[0]).toEqual([3, 0, 0, 0, 0]);
+		expect(observations[4]).toEqual([3, 3, 3, 3, 3]);
+		expect(observations[9]).toEqual([4, 4, 4, 4, 4]);
+	});
+	it("preserves the exact active intent when scheduling revokes before the next participant", async (): Promise<void> => {
+		const f = fixture(),
+			revoked = Error("session-revoked");
+		await expect(
+			applyClosedEpochRetirementIntent({
+				...f.input,
+				afterParticipantRelease: (): Promise<void> => {
+					expect(f.released).toEqual(f.acquired);
+					return Promise.reject(revoked);
+				},
+			})
+		).rejects.toBe(revoked);
+		expect(f.acquired).toEqual([3, 0, 0, 0, 0]);
+		expect(f.effects).toEqual(["0:prepare", "0:commit"]);
+		expect(f.coordinator.active?.preparation).toEqual(f.input.preparation);
+		expect(f.verified).toBe(0);
+		await applyClosedEpochRetirementIntent(f.input);
+		expect(f.effects.filter((value) => value.startsWith("0:"))).toEqual(["0:prepare", "0:commit"]);
+		expect(f.verified).toBe(1);
+	});
+	it("reacquires the next original participant after a scheduling turn and rejects its changed source", async (): Promise<void> => {
+		const f = fixture(),
+			participant = f.input.participants[1];
+		if (participant === undefined) throw Error("missing original participant");
+		const original = participant.acquire;
+		let changed = false;
+		participant.acquire = async (): Promise<ClosedEpochRetirementParticipantRead> => {
+			const read = await original();
+			return changed
+				? {
+						...read,
+						commitment: [
+							...read.commitment.slice(0, 3),
+							1,
+							...read.commitment.slice(4),
+						] as unknown as AheRetirementDomain,
+					}
+				: read;
+		};
+		await expect(
+			applyClosedEpochRetirementIntent({
+				...f.input,
+				afterParticipantRelease: (): Promise<void> => {
+					changed = true;
+					return Promise.resolve();
+				},
+			})
+		).rejects.toThrow("native source image changed");
+		expect(f.acquired).toEqual([3, 1, 0, 0, 0]);
+		expect(f.released).toEqual(f.acquired);
+		expect(f.effects).toEqual(["0:prepare", "0:commit"]);
+		expect(f.coordinator.active?.preparation).toEqual(f.input.preparation);
+	});
+	it("never calls the scheduling owner after failed release or failed mutation delivery", async (): Promise<void> => {
+		for (const failAt of ["release", "commit"] as const) {
+			const f = fixture(),
+				failed = Error(`original-${failAt}`);
+			let callbacks = 0;
+			f.hook((index, kind, ordinal) => {
+				if (index === 0 && kind === failAt && (kind === "commit" || ordinal === 3)) throw failed;
+			});
+			await expect(
+				applyClosedEpochRetirementIntent({
+					...f.input,
+					afterParticipantRelease: (): Promise<void> => {
+						callbacks++;
+						return Promise.resolve();
+					},
+				})
+			).rejects.toBe(failed);
+			expect(callbacks).toBe(0);
+			expect(f.acquired.slice(1)).toEqual([0, 0, 0, 0]);
+			expect(f.coordinator.active?.preparation).toEqual(f.input.preparation);
+		}
+	});
 	it("uses the independent prepared readback for same-domain commit, retaining completion readback and final scan", async () => {
 		const f = fixture();
 		const committedOn: number[] = [];

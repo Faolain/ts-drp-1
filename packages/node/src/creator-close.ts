@@ -297,7 +297,7 @@ export interface BindCreatorLiveCloseInput {
 	readonly ordinaryFinishingWindow?: CreatorOrdinaryFinishingWindowLimits;
 	readonly promotionContext?: Pick<
 		CreatorClosedRollbackDataInput,
-		"catalog" | "roomHeadAuthority" | "pinnedGenesisAnchorDigest" | "exactCanonicalPinnedGenesisTrustStateRecordBytes"
+		"catalog" | "roomHeadAuthority" | "pinnedGenesisAnchorDigest" | "exactCanonicalPinnedGenesisTrustStateRecordBytes" | "signal"
 	>;
 	readonly evidenceStore: unknown;
 	readonly exactCanonicalAvailabilityPolicyBytes: Uint8Array;

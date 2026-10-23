@@ -1,0 +1,653 @@
+diff --git a/packages/node/src/creator-adoption.ts b/packages/node/src/creator-adoption.ts
+index b7941195..be8daf7f 100644
+--- a/packages/node/src/creator-adoption.ts
++++ b/packages/node/src/creator-adoption.ts
+@@ -956,7 +956,7 @@ async function recoverCreatorArchiveCloseExport(
+ /** Genuine room-native ports; neither an incoming certificate nor a supplied
+  * scope list can grant turnover. No finality signer is required. */
+ export type CreatorRecipientRecoveryContext = Pick<CreatorClosedRollbackDataInput,
+-	"roomHeadAuthority" | "pinnedGenesisAnchorDigest" | "exactCanonicalPinnedGenesisTrustStateRecordBytes"> &
++	"roomHeadAuthority" | "pinnedGenesisAnchorDigest" | "exactCanonicalPinnedGenesisTrustStateRecordBytes" | "signal"> &
+ 	Pick<Parameters<typeof createCreatorSigningRecoveryOwner>[0], "voteStore" | "evidenceStore" | "storageIncarnation">;
+ type CreatorRecipientSource = NonNullable<ReturnType<typeof resolveCreatorRecipientRegistration>>;
+ type ReceivedRecoverySeal = NonNullable<Awaited<ReturnType<CreatorRecipientSource["sealReceivedRecoveryDependencies"]>>>;
+@@ -1019,6 +1019,7 @@ async function runReceivedRecoveryTurnoverPasses(input: Readonly<{
+ 			// window, so a generation drain that suppressed this pass's collectible
+ 			// journal prefixes requests one more fresh pass (still bounded below).
+ 			checkpoint = await reconcileCreatorReceivedSnapshotRecoveryRoles({
++				...(context.signal === undefined ? {} : {signal: context.signal}),
+ 				roomHeadAuthority: context.roomHeadAuthority, pinnedGenesisAnchorDigest: context.pinnedGenesisAnchorDigest,
+ 				exactCanonicalPinnedGenesisTrustStateRecordBytes: context.exactCanonicalPinnedGenesisTrustStateRecordBytes,
+ 				catalog: input.catalog,
+diff --git a/packages/node/src/creator-close.ts b/packages/node/src/creator-close.ts
+index c99b28bc..1d86104d 100644
+--- a/packages/node/src/creator-close.ts
++++ b/packages/node/src/creator-close.ts
+@@ -297,7 +297,7 @@ export interface BindCreatorLiveCloseInput {
+ 	readonly ordinaryFinishingWindow?: CreatorOrdinaryFinishingWindowLimits;
+ 	readonly promotionContext?: Pick<
+ 		CreatorClosedRollbackDataInput,
+-		"catalog" | "roomHeadAuthority" | "pinnedGenesisAnchorDigest" | "exactCanonicalPinnedGenesisTrustStateRecordBytes"
++		"catalog" | "roomHeadAuthority" | "pinnedGenesisAnchorDigest" | "exactCanonicalPinnedGenesisTrustStateRecordBytes" | "signal"
+ 	>;
+ 	readonly evidenceStore: unknown;
+ 	readonly exactCanonicalAvailabilityPolicyBytes: Uint8Array;
+diff --git a/packages/node/src/internal/closed-epoch-cleanup.ts b/packages/node/src/internal/closed-epoch-cleanup.ts
+index 59f9965d..86f43337 100644
+--- a/packages/node/src/internal/closed-epoch-cleanup.ts
++++ b/packages/node/src/internal/closed-epoch-cleanup.ts
+@@ -941,6 +941,9 @@ export interface ClosedEpochRetirementIntentInput {
+ 	/** Acquires a fresh original one-use native control; outer RO has joined. */
+ 	acquireCoordinator(): Promise<AheRetirementControlRead>;
+ 	readonly participants: readonly ClosedEpochRetirementParticipant[];
++	/** Original owner may yield only after a participant's native view has
++	 * successfully joined; never between its prepare and retained commit read. */
++	afterParticipantRelease?(): Promise<void>;
+ 	/** Original owner acquires fresh joint native custody and revalidates all
+ 	 * captured source/control bytes after global completion, before delivery. */
+ 	verifyCompleted(control: AheRetirementControl): Promise<void>;
+@@ -1013,6 +1016,7 @@ export async function applyClosedEpochRetirementIntent(
+ 	retirementBytes({ preparation, generations });
+ 	const acquireCoordinator = input.acquireCoordinator.bind(input);
+ 	const verifyCompleted = input.verifyCompleted.bind(input);
++	const afterParticipantRelease = input.afterParticipantRelease?.bind(input);
+ 	const originals = [...input.participants];
+ 	const nativeDomains = preparation.domains.filter(([roles]) => (roles & 3) === 0);
+ 	const ahe = preparation.domains.filter(([roles]) => (roles & 3) !== 0);
+@@ -1186,8 +1190,10 @@ export async function applyClosedEpochRetirementIntent(
+ 		return after.read;
+ 	};
+ 	if (completedMatches(coordinator)) {
+-		for (const participant of participants)
++		for (const participant of participants) {
+ 			if ((await inspect(participant)) !== "completed") retirementRefusal("incomplete domain behind global completion");
++			if (afterParticipantRelease !== undefined) await afterParticipantRelease();
++		}
+ 		await verifyCompleted(coordinator);
+ 		return coordinator;
+ 	}
+@@ -1198,6 +1204,7 @@ export async function applyClosedEpochRetirementIntent(
+ 		catch (primary) { return releaseRetirementRead(read, async () => { throw primary; }); }
+ 		if (phase === "completed") {
+ 			await releaseRetirementRead(read, async () => undefined);
++			if (afterParticipantRelease !== undefined) await afterParticipantRelease();
+ 			continue;
+ 		}
+ 		// These transitions install metadata fences only, never delete payloads.
+@@ -1209,10 +1216,13 @@ export async function applyClosedEpochRetirementIntent(
+ 		if (phase === "old") read = await transition(participant, read, "prepare");
+ 		const completed = await transition(participant, read, "commit");
+ 		await releaseRetirementRead(completed, async () => undefined);
++		if (afterParticipantRelease !== undefined) await afterParticipantRelease();
+ 	}
+ 	// Recheck every exact completed source/control after the last local commit.
+-	for (const participant of participants)
++	for (const participant of participants) {
+ 		if ((await inspect(participant)) !== "completed") retirementRefusal("native completion changed");
++		if (afterParticipantRelease !== undefined) await afterParticipantRelease();
++	}
+ 	const read = await acquireCoordinator();
+ 	let primary: unknown;
+ 	let failed = false;
+diff --git a/packages/node/src/internal/creator-closed-rollback-data.ts b/packages/node/src/internal/creator-closed-rollback-data.ts
+index ce43afc9..27fa966b 100644
+--- a/packages/node/src/internal/creator-closed-rollback-data.ts
++++ b/packages/node/src/internal/creator-closed-rollback-data.ts
+@@ -19850,6 +19850,19 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
+ 	const acquireAhe: typeof ordinaryAcquireAhe = (id) =>
+ 		room?.session !== undefined ? room.session.acquireAhe(input.store, id) : ordinaryAcquireAhe(id);
+ 	const checkpoint = createWorkCheckpoint();
++	const afterParticipantRelease = room?.session === undefined && source.floor.pending === null && source.inheritedClassification === undefined
++		? async (): Promise<void> => {
++			// A strict room transaction or pending/classification source retains its
++			// original uninterrupted schedule. Ordinary participants have joined all
++			// native views here; the next original acquisition rechecks its source.
++			checkAbort(input.signal);
++			requireLaw(room?.session === undefined && source.floor.pending === null && source.inheritedClassification === undefined,
++				"floor-stale");
++			await checkpoint();
++			checkAbort(input.signal);
++			requireLaw(room?.session === undefined && source.floor.pending === null && source.inheritedClassification === undefined,
++				"floor-stale");
++		} : undefined;
+ 	const acquireCoordinator = async (): Promise<AheRetirementControlRead> => {
+ 		// The original strict room transaction must stay uninterrupted. After
+ 		// it commits, each original coordinator acquisition rechecks native
+@@ -20266,6 +20279,7 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
+ 				acquire,
+ 			})
+ 		);
++		if (afterParticipantRelease !== undefined) await afterParticipantRelease();
+ 	}
+ 	const firstFloor = await acquireFloor({ scope: floorScope });
+ 	const floorCommitment = boundDomain(32);
+@@ -20549,6 +20563,7 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
+ 			acquire: signingNative,
+ 		})
+ 	);
++	if (afterParticipantRelease !== undefined) await afterParticipantRelease();
+ 	const recordDigests =
+ 		generationSource?.generations.recordDigests ??
+ 		source.rows.map((row) => {
+@@ -20741,6 +20756,7 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
+ 		generations,
+ 		participants,
+ 		acquireCoordinator,
++		...(afterParticipantRelease === undefined ? {} : {afterParticipantRelease}),
+ 		// The session commits before the ordinary joint custody re-verifies every owner.
+ 		verifyCompleted: async (coordinator: AheRetirementControl) => {
+ 			await room?.leave();
+diff --git a/packages/node/src/v3-room.ts b/packages/node/src/v3-room.ts
+index 878ad5f3..da86c1a4 100644
+--- a/packages/node/src/v3-room.ts
++++ b/packages/node/src/v3-room.ts
+@@ -4375,6 +4375,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 						});
+ 					},
+ 					promotionContext: {
++						signal: sessionLifetime.signal,
+ 						catalog: input.application.catalog,
+ 						roomHeadAuthority: input.roomHeadAuthority,
+ 						pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest,
+@@ -6988,6 +6989,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
+ 	const recipientRecoveryContext = async (): Promise<CreatorRecipientRecoveryContext> => {
+ 		const nativeSigning = await ownCreatorSigningStores();
+ 		return {
++			signal: sessionLifetime.signal,
+ 			roomHeadAuthority: input.roomHeadAuthority,
+ 			pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest,
+ 			exactCanonicalPinnedGenesisTrustStateRecordBytes: encodeCanonical({
+diff --git a/packages/node/tests/closed-epoch-retirement-sequencing.test.ts b/packages/node/tests/closed-epoch-retirement-sequencing.test.ts
+index a5e84086..4aef65ae 100644
+--- a/packages/node/tests/closed-epoch-retirement-sequencing.test.ts
++++ b/packages/node/tests/closed-epoch-retirement-sequencing.test.ts
+@@ -1,4 +1,3 @@
+-import { describe, expect, it } from "vitest";
+ import {
+ 	type AheGenerationPartition,
+ 	type AheRetirementControl,
+@@ -7,13 +6,39 @@ import {
+ 	type AheRetirementPreparation,
+ 	type StorageObjectId,
+ } from "@ts-drp/storage";
++import { readFileSync } from "node:fs";
++import ts from "typescript";
++import { describe, expect, it } from "vitest";
++
+ import {
++	type ClosedEpochRetirementParticipantRead,
+ 	applyClosedEpochRetirementIntent,
+ 	captureClosedEpochRetirementMetadataDomain,
+ 	validateClosedEpochRetirementMetadataDomain,
+-	type ClosedEpochRetirementParticipantRead,
+ } from "../src/internal/closed-epoch-cleanup.js";
+ 
++const maintenancePath = new URL("../src/internal/creator-closed-rollback-data.ts", import.meta.url);
++const ast = ts.createSourceFile(
++	maintenancePath.pathname,
++	readFileSync(maintenancePath, "utf8"),
++	ts.ScriptTarget.Latest,
++	true
++);
++function declaration(name: string): ts.FunctionDeclaration {
++	const match = ast.statements.find(
++		(node): node is ts.FunctionDeclaration => ts.isFunctionDeclaration(node) && node.name?.text === name
++	);
++	if (match === undefined) throw Error(`missing original maintenance declaration:${name}`);
++	return match;
++}
++function deferred(): { promise: Promise<void>; resolve(): void } {
++	let resolve!: () => void;
++	const promise = new Promise<void>((done) => {
++		resolve = done;
++	});
++	return { promise, resolve };
++}
++
+ it("binds atomic row rewrites to exact prepared and completed native images", () => {
+ 	const control = {kind: "v3-issuance-retirement-control-1", objectId: "rewrite-room", incarnation: "01".repeat(32),
+ 		revision: 3, sequence: 2, active: null, completed: null};
+@@ -95,6 +120,185 @@ function fixture() {
+ }
+ 
+ describe("closed retirement original-view sequencing", () => {
++	it("the original released-participant checkpoint suppresses strict custody and rechecks abort and guard after yielding", async (): Promise<void> => {
++		const owner = declaration("installClosedRetirementSource");
++		if (owner.body === undefined) throw Error("missing original maintenance body");
++		const statement = owner.body.statements.find(
++			(statement) =>
++				ts.isVariableStatement(statement) &&
++				statement.declarationList.declarations.some(
++					(value) => ts.isIdentifier(value.name) && value.name.text === "afterParticipantRelease"
++				)
++		);
++		if (statement === undefined) throw Error("missing original released-participant checkpoint");
++		const js = ts.transpile(
++			`${declaration("isAborted").getText(ast)}\n${declaration("checkAbort").getText(ast)}\n${statement.getText(ast)}\nafterParticipantRelease;`,
++			{ target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None }
++		);
++		const abortedGetter = Object.getOwnPropertyDescriptor(AbortSignal.prototype, "aborted")?.get;
++		if (abortedGetter === undefined) throw Error("missing native AbortSignal getter");
++		const create = (
++			state: {
++				room?: { session: unknown };
++				source: { floor: { pending: unknown }; inheritedClassification?: unknown };
++			},
++			controller: AbortController,
++			checkpoint: () => Promise<void> | undefined
++		): (() => Promise<void>) | undefined =>
++			new Function(
++				"room",
++				"source",
++				"input",
++				"checkpoint",
++				"abortedGetter",
++				"Refusal",
++				"failure",
++				"requireLaw",
++				`return eval(${JSON.stringify(js)});`
++			)(
++				state.room,
++				state.source,
++				{ signal: controller.signal },
++				checkpoint,
++				abortedGetter,
++				class extends Error {},
++				(kind: string) => kind,
++				(condition: boolean, kind: string) => {
++					if (!condition) throw Error(kind);
++				}
++			);
++		let calls = 0;
++		for (const state of [
++			{ room: { session: {} }, source: { floor: { pending: null } } },
++			{ source: { floor: { pending: {} } } },
++			{ source: { floor: { pending: null }, inheritedClassification: {} } },
++		]) {
++			expect(
++				create(state, new AbortController(), () => {
++					calls++;
++					return undefined;
++				})
++			).toBeUndefined();
++		}
++		expect(calls).toBe(0);
++		const before = new AbortController();
++		before.abort();
++		await expect(
++			create({ source: { floor: { pending: null } } }, before, () => {
++				calls++;
++				return undefined;
++			})?.()
++		).rejects.toThrow("aborted");
++		expect(calls).toBe(0);
++		const during = new AbortController(),
++			gate = deferred();
++		const pending = create({ source: { floor: { pending: null } } }, during, () => {
++			calls++;
++			return gate.promise;
++		})?.();
++		during.abort();
++		gate.resolve();
++		await expect(pending).rejects.toThrow("aborted");
++		expect(calls).toBe(1);
++		const changed = { room: { session: undefined as unknown }, source: { floor: { pending: null } } },
++			changedGate = deferred();
++		const changing = create(changed, new AbortController(), () => changedGate.promise)?.();
++		changed.room.session = {};
++		changedGate.resolve();
++		await expect(changing).rejects.toThrow("floor-stale");
++	});
++
++	it("calls the scheduling owner only after complete participant views and inspections join", async (): Promise<void> => {
++		const f = fixture();
++		const observations: number[][] = [];
++		await applyClosedEpochRetirementIntent({
++			...f.input,
++			afterParticipantRelease: (): Promise<void> => {
++				expect(f.released).toEqual(f.acquired);
++				observations.push([...f.acquired]);
++				return Promise.resolve();
++			},
++		});
++		expect(observations).toHaveLength(10);
++		expect(observations[0]).toEqual([3, 0, 0, 0, 0]);
++		expect(observations[4]).toEqual([3, 3, 3, 3, 3]);
++		expect(observations[9]).toEqual([4, 4, 4, 4, 4]);
++	});
++	it("preserves the exact active intent when scheduling revokes before the next participant", async (): Promise<void> => {
++		const f = fixture(),
++			revoked = Error("session-revoked");
++		await expect(
++			applyClosedEpochRetirementIntent({
++				...f.input,
++				afterParticipantRelease: (): Promise<void> => {
++					expect(f.released).toEqual(f.acquired);
++					return Promise.reject(revoked);
++				},
++			})
++		).rejects.toBe(revoked);
++		expect(f.acquired).toEqual([3, 0, 0, 0, 0]);
++		expect(f.effects).toEqual(["0:prepare", "0:commit"]);
++		expect(f.coordinator.active?.preparation).toEqual(f.input.preparation);
++		expect(f.verified).toBe(0);
++		await applyClosedEpochRetirementIntent(f.input);
++		expect(f.effects.filter((value) => value.startsWith("0:"))).toEqual(["0:prepare", "0:commit"]);
++		expect(f.verified).toBe(1);
++	});
++	it("reacquires the next original participant after a scheduling turn and rejects its changed source", async (): Promise<void> => {
++		const f = fixture(),
++			participant = f.input.participants[1];
++		if (participant === undefined) throw Error("missing original participant");
++		const original = participant.acquire;
++		let changed = false;
++		participant.acquire = async (): Promise<ClosedEpochRetirementParticipantRead> => {
++			const read = await original();
++			return changed
++				? {
++						...read,
++						commitment: [
++							...read.commitment.slice(0, 3),
++							1,
++							...read.commitment.slice(4),
++						] as unknown as AheRetirementDomain,
++					}
++				: read;
++		};
++		await expect(
++			applyClosedEpochRetirementIntent({
++				...f.input,
++				afterParticipantRelease: (): Promise<void> => {
++					changed = true;
++					return Promise.resolve();
++				},
++			})
++		).rejects.toThrow("native source image changed");
++		expect(f.acquired).toEqual([3, 1, 0, 0, 0]);
++		expect(f.released).toEqual(f.acquired);
++		expect(f.effects).toEqual(["0:prepare", "0:commit"]);
++		expect(f.coordinator.active?.preparation).toEqual(f.input.preparation);
++	});
++	it("never calls the scheduling owner after failed release or failed mutation delivery", async (): Promise<void> => {
++		for (const failAt of ["release", "commit"] as const) {
++			const f = fixture(),
++				failed = Error(`original-${failAt}`);
++			let callbacks = 0;
++			f.hook((index, kind, ordinal) => {
++				if (index === 0 && kind === failAt && (kind === "commit" || ordinal === 3)) throw failed;
++			});
++			await expect(
++				applyClosedEpochRetirementIntent({
++					...f.input,
++					afterParticipantRelease: (): Promise<void> => {
++						callbacks++;
++						return Promise.resolve();
++					},
++				})
++			).rejects.toBe(failed);
++			expect(callbacks).toBe(0);
++			expect(f.acquired.slice(1)).toEqual([0, 0, 0, 0]);
++			expect(f.coordinator.active?.preparation).toEqual(f.input.preparation);
++		}
++	});
+ 	it("uses the independent prepared readback for same-domain commit, retaining completion readback and final scan", async () => {
+ 		const f = fixture();
+ 		const committedOn: number[] = [];
+diff --git a/tests/creator-maintenance-host-turn-native.test.ts b/tests/creator-maintenance-host-turn-native.test.ts
+new file mode 100644
+index 00000000..79553245
+--- /dev/null
++++ b/tests/creator-maintenance-host-turn-native.test.ts
+@@ -0,0 +1,240 @@
++/* eslint-disable @typescript-eslint/explicit-function-return-type -- Native scheduling probes preserve production signatures. */
++import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
++import { readdirSync } from "node:fs";
++import { join } from "node:path";
++import { DatabaseSync, StatementSync } from "node:sqlite";
++import { expect, it, vi } from "vitest";
++
++import { creatorDeliveryRoom } from "./fixtures/track-aa/creator-delivery-room.js";
++import { closeFixtures, required } from "./fixtures/track-m/room-retention-fixture.js";
++import * as retirement from "../packages/node/src/internal/closed-epoch-cleanup.js";
++import * as cooperativeWork from "../packages/node/src/internal/cooperative-work.js";
++
++type NativeControl = Readonly<{
++	kind: string;
++	revision: number;
++	active: Readonly<{ preparation: Readonly<Record<string, unknown>> }> | null;
++	completed: Readonly<Record<string, unknown>> | null;
++}>;
++
++function retirementControls(directory: string) {
++	return readdirSync(directory)
++		.filter((name) => name.endsWith(".sqlite"))
++		.flatMap((name) => {
++			const path = join(directory, name),
++				database = new DatabaseSync(path, { readOnly: true });
++			try {
++				if (
++					database.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='retirement_controls'").get() ===
++					undefined
++				)
++					return [];
++				return database
++					.prepare("SELECT object_id, record FROM retirement_controls")
++					.all()
++					.map((row) => ({
++						path,
++						objectId: row.object_id as string,
++						record: new Uint8Array(row.record as Uint8Array),
++						control: decodeCanonical(row.record as Uint8Array) as NativeControl,
++					}));
++			} finally {
++				database.close();
++			}
++		});
++}
++
++function holdReleasedParticipant() {
++	let armed = false,
++		entered!: () => void,
++		resume!: () => void;
++	const arrival = new Promise<void>((resolve) => {
++		entered = resolve;
++	});
++	const gate = new Promise<void>((resolve) => {
++		resume = resolve;
++	});
++	const nativeTransactions = new Set<DatabaseSync>();
++	const statements = new WeakMap<StatementSync, { sql: string; database: DatabaseSync }>();
++	const aheWrites: NativeControl[] = [];
++	const pendingAheWrites = new Map<DatabaseSync, NativeControl[]>();
++	let mutations = 0,
++		acquisitions = 0,
++		withinParticipantRelease = false;
++	const exec = DatabaseSync.prototype.exec,
++		prepare = DatabaseSync.prototype.prepare,
++		run = StatementSync.prototype.run;
++	vi.spyOn(DatabaseSync.prototype, "exec").mockImplementation(function (this: DatabaseSync, sql: string) {
++		const result = exec.call(this, sql);
++		if (/^\s*BEGIN\b/iu.test(sql)) nativeTransactions.add(this);
++		if (/^\s*COMMIT\b/iu.test(sql)) aheWrites.push(...(pendingAheWrites.get(this) ?? []));
++		if (/^\s*(COMMIT|ROLLBACK)\b/iu.test(sql)) {
++			nativeTransactions.delete(this);
++			pendingAheWrites.delete(this);
++		}
++		return result;
++	});
++	vi.spyOn(DatabaseSync.prototype, "prepare").mockImplementation(function (this: DatabaseSync, sql: string) {
++		const statement = prepare.call(this, sql);
++		statements.set(statement, { sql, database: this });
++		return statement;
++	});
++	vi.spyOn(StatementSync.prototype, "run").mockImplementation(function (this: StatementSync, ...args: unknown[]) {
++		const result = Reflect.apply(run, this, args),
++			source = statements.get(this),
++			sql = source?.sql;
++		if (sql !== undefined && /^\s*(INSERT|UPDATE|DELETE|REPLACE)\b/iu.test(sql) && Number(result.changes) !== 0)
++			mutations++;
++		if (sql?.includes("retirement_controls")) {
++			for (const bytes of args.filter((value) => value instanceof Uint8Array)) {
++				const control = decodeCanonical(bytes) as NativeControl;
++				if (control.kind === "ahe-retirement-control-3" && source !== undefined) {
++					if (!nativeTransactions.has(source.database)) aheWrites.push(control);
++					else {
++						let writes = pendingAheWrites.get(source.database);
++						if (writes === undefined) pendingAheWrites.set(source.database, (writes = []));
++						writes.push(control);
++					}
++				}
++			}
++		}
++		return result;
++	});
++	const apply = retirement.applyClosedEpochRetirementIntent;
++	vi.spyOn(retirement, "applyClosedEpochRetirementIntent").mockImplementation((input) =>
++		apply({
++			...input,
++			afterParticipantRelease: async () => {
++				withinParticipantRelease = true;
++				try {
++					await input.afterParticipantRelease?.();
++				} finally {
++					withinParticipantRelease = false;
++				}
++			},
++			participants: input.participants.map((participant) => ({
++				...participant,
++				acquire: async (coordinator) => {
++					acquisitions++;
++					return participant.acquire(coordinator);
++				},
++			})),
++		})
++	);
++	const createCheckpoint = cooperativeWork.createWorkCheckpoint;
++	vi.spyOn(cooperativeWork, "createWorkCheckpoint").mockImplementation(() => {
++		const checkpoint = createCheckpoint();
++		return () => {
++			const original = checkpoint();
++			if (!armed || !withinParticipantRelease) return original;
++			armed = false;
++			return (async () => {
++				await original;
++				entered();
++				await gate;
++			})();
++		};
++	});
++	return {
++		arrival,
++		resume,
++		aheWrites,
++		arm: () => {
++			armed = true;
++		},
++		counts: () => ({ mutations, acquisitions, nativeTransactions: nativeTransactions.size }),
++	};
++}
++
++it.each(["close", "foreign-native-control"] as const)(
++	"joins genuine native participant custody before a maintenance host turn and handles %s",
++	async (mode) => {
++		const gate = holdReleasedParticipant();
++		let maintenance: Promise<unknown> | undefined, closing: Promise<unknown> | undefined;
++		try {
++			const fixture = await creatorDeliveryRoom({ profile: "settlement", writers: 0 });
++			let creator = await fixture.open(0);
++			for (let epoch = 0; epoch < 4; epoch++) {
++				for (let index = 0; index < 16; index++)
++					await creator.room.issue({ action: "placeBlock", id: `slot-${index}`, kind: "stone", x: index, y: epoch });
++				expect((await creator.room.sealEpoch()).ok).toBe(true);
++				await creator.room.adoptCreatorSuccessor();
++			}
++			const projection = creator.room.projection();
++			gate.arm();
++			maintenance = creator.room.maintainRecoveryPool();
++			void maintenance.catch(() => undefined);
++			await Promise.race([
++				gate.arrival,
++				maintenance.then((result) => {
++					throw Error(`released-participant checkpoint was not reached: ${JSON.stringify(result)}`);
++				}),
++			]);
++			expect(gate.counts().nativeTransactions).toBe(0);
++			const controls = retirementControls(fixture.directory);
++			const coordinator = required(controls.find((row) => row.control.kind === "ahe-retirement-control-3"));
++			const active = required(coordinator.control.active);
++			const exactIntent = encodeCanonical(active);
++			const held = gate.counts(),
++				beforeWrites = gate.aheWrites.length;
++			if (mode === "close") {
++				closing = creator.room.close();
++				void closing.catch(() => undefined);
++				await new Promise<void>((resolve) => setImmediate(resolve));
++				gate.resume();
++				await expect(maintenance).rejects.toThrow("aborted");
++				await closing;
++				expect(gate.counts().acquisitions).toBe(held.acquisitions);
++				expect(gate.counts().mutations).toBe(held.mutations);
++				const interrupted = required(
++					retirementControls(fixture.directory).find((row) => row.control.kind === "ahe-retirement-control-3")
++				);
++				expect(encodeCanonical(interrupted.control.active)).toEqual(exactIntent);
++				await creator.floor.close();
++				creator = await fixture.open(0, { reopen: true });
++				expect(creator.room.projection()).toEqual(projection);
++				await creator.room.maintainRecoveryPool();
++				const writes = gate.aheWrites.slice(beforeWrites);
++				const resumed = writes.findIndex(
++					(control) =>
++						control.active === null &&
++						control.completed?.decisionDigest === active.preparation.decisionDigest &&
++						control.completed?.sourceProofDigest === active.preparation.sourceProofDigest
++				);
++				expect(
++					resumed,
++					"the original committed intent completes before a fresh source can replace it"
++				).toBeGreaterThanOrEqual(0);
++				for (const control of writes.slice(0, resumed))
++					if (control.active !== null) expect(encodeCanonical(control.active)).toEqual(exactIntent);
++			} else {
++				const changed = required(
++					controls.find((row) => row.control.kind.startsWith("v3-live-journal-retirement-control-"))
++				);
++				const foreign = new DatabaseSync(changed.path);
++				try {
++					foreign
++						.prepare("UPDATE retirement_controls SET record=? WHERE object_id=?")
++						.run(encodeCanonical({ ...changed.control, revision: changed.control.revision + 1 }), changed.objectId);
++				} finally {
++					foreign.close();
++				}
++				const afterForeignMutation = gate.counts().mutations;
++				gate.resume();
++				await expect(maintenance).rejects.toThrow("native metadata source or phase changed");
++				expect(gate.counts().acquisitions).toBe(held.acquisitions + 1);
++				expect(gate.counts().mutations).toBe(afterForeignMutation);
++				const refused = required(
++					retirementControls(fixture.directory).find((row) => row.control.kind === "ahe-retirement-control-3")
++				);
++				expect(encodeCanonical(refused.control.active)).toEqual(exactIntent);
++			}
++		} finally {
++			gate.resume();
++			await Promise.allSettled([maintenance, closing]);
++			await closeFixtures();
++			vi.restoreAllMocks();
++		}
++	},
++	120_000
++);
+diff --git a/tests/fixtures/active-endurance/tsconfig.json b/tests/fixtures/active-endurance/tsconfig.json
+index 649ce661..6c642b4c 100644
+--- a/tests/fixtures/active-endurance/tsconfig.json
++++ b/tests/fixtures/active-endurance/tsconfig.json
+@@ -24,6 +24,7 @@
+ 		"../../active-app-endurance-native.test.ts",
+ 		"../../active-app-endurance-failures.test.ts",
+ 		"../../creator-adoption-host-turn-native.test.ts",
++		"../../creator-maintenance-host-turn-native.test.ts",
+ 		"../../active-app-continued-play-observations.test.ts",
+ 		"../../active-app-continued-play-native.test.ts"
+ 	],

@@ -1,0 +1,45 @@
+
+ RUN  v3.1.1 /private/tmp/ts-drp-transition-responsiveness
+
+(node:55890) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ packages/node/tests/closed-epoch-retirement-sequencing.test.ts (18 tests) 70ms
+ ❯ tests/creator-maintenance-host-turn-native.test.ts (2 tests | 2 failed) 16588ms
+   × joins genuine native participant custody before a maintenance host turn and handles close 8262ms
+     → the original committed intent completes before a fresh source can replace it: expected -1 to be greater than or equal to 0
+   × joins genuine native participant custody before a maintenance host turn and handles foreign-native-control 8325ms
+     → TRACK_M_REQUIRED_FIXTURE_VALUE
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/creator-maintenance-host-turn-native.test.ts > joins genuine native participant custody before a maintenance host turn and handles close
+AssertionError: the original committed intent completes before a fresh source can replace it: expected -1 to be greater than or equal to 0
+ ❯ tests/creator-maintenance-host-turn-native.test.ts:185:7
+    183|      resumed,
+    184|      "the original committed intent completes before a fresh source ca…
+    185|     ).toBeGreaterThanOrEqual(0);
+       |       ^
+    186|     for (const control of writes.slice(0, resumed))
+    187|      if (control.active !== null) expect(encodeCanonical(control.activ…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/creator-maintenance-host-turn-native.test.ts > joins genuine native participant custody before a maintenance host turn and handles foreign-native-control
+TypeError: TRACK_M_REQUIRED_FIXTURE_VALUE
+ ❯ required tests/fixtures/track-m/room-retention-fixture.ts:43:51
+     41| export const hex = (bytes: Uint8Array): string => Buffer.from(bytes).t…
+     42| export function required<Value>(value: Value | null | undefined): Valu…
+     43|  if (value === undefined || value === null) throw new TypeError("TRACK…
+       |                                                   ^
+     44|  return value;
+     45| }
+ ❯ tests/creator-maintenance-host-turn-native.test.ts:189:15
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  2 failed | 18 passed (20)
+   Start at  12:26:44
+   Duration  21.29s (transform 2.82s, setup 0ms, collect 5.15s, tests 16.66s, environment 0ms, prepare 112ms)
+

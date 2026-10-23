@@ -4375,6 +4375,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 						});
 					},
 					promotionContext: {
+						signal: sessionLifetime.signal,
 						catalog: input.application.catalog,
 						roomHeadAuthority: input.roomHeadAuthority,
 						pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest,
@@ -6988,6 +6989,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	const recipientRecoveryContext = async (): Promise<CreatorRecipientRecoveryContext> => {
 		const nativeSigning = await ownCreatorSigningStores();
 		return {
+			signal: sessionLifetime.signal,
 			roomHeadAuthority: input.roomHeadAuthority,
 			pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest,
 			exactCanonicalPinnedGenesisTrustStateRecordBytes: encodeCanonical({

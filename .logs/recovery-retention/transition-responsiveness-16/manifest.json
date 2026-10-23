@@ -1,0 +1,147 @@
+{
+  "purpose": "Reviewed host turns after original native retirement participant release, original session AbortSignal propagation, native abort and stale-owner controls, and a four-epoch continued-play candidate.",
+  "parentHEAD": "4ab810b72848679cdfe73e2bbdd948dacc6d7d8d",
+  "sourceDiffSha256": "b19ad29864d03cacb74dd8b10d15dc7b788a30c79296ef3b16f86436e67401ba",
+  "sourceDiffMatchesWorkingCodeBeforeEvidence": true,
+  "productionScope": [
+    "Optional post-release callback in original retirement sequencer; never between participant prepare and retained commit read.",
+    "Callback exists only for ordinary no-pending, no-inherited-classification sources; strict room transactions retain original uninterrupted schedule.",
+    "Original session AbortSignal reaches original creator and recipient maintenance inputs; callback checks before and after yield; next native acquisition remains fresh."
+  ],
+  "review": {
+    "result": "No actionable regressions found.",
+    "validation": "Reviewer ran all 20 focused tests and both typechecks successfully. Its focused test invocation also failed the repository global coverage threshold; eight extra tests passed while two additional suites failed at the existing protocol-v3 module-initialization TDZ. Those collection failures are not reported as passing coverage."
+  },
+  "validation": {
+    "latestFocused": "18 sequencer controls plus 2 native tests passed; native tests reran with COMMIT-only AHE write tracing; reviewer reran all 20 after final style/type edits.",
+    "nativeMeaning": "Genuine SQLite handles and original effects; holds only returned scheduling checkpoint. At the gap no native transaction remains held. Close propagates abort, performs no additional participant acquisition/DML, preserves active AHE bytes, and reopens exact app state; foreign control advances revision and original next acquisition refuses with unchanged active AHE bytes and no production DML.",
+    "adoption": "Existing 7 genuine native adoption/close controls passed with AbortSignal propagation in the initial 16 run; the two new maintenance cases in that same early run failed because fixture had not yet reached retirement.",
+    "typecheck": "Final active-endurance and reviewer node typechecks passed. Initial stale compiled public declarations were fixed by rebuilding node; a new test overload typing issue was corrected.",
+    "lint": "New native test has zero lint messages. Legacy sequencing suite has 132 preexisting messages, zero messages on changed lines. See changed-line report; no whole-suite lint-clean claim.",
+    "earlierFailures": "All relevant intermediate logs retained: too-short fixture did not reach actual post-release callback; then SQL control-kind/committed-write observation was corrected; foreign test cleanup restoration unnecessarily locked the database and was removed. Final stale-owner test preserves the foreign change and safely closes disposable fixtures."
+  },
+  "measurement": {
+    "command": "ACTIVE_CONTINUED_PLAY=1 ACTIVE_CONTINUED_PLAY_OUT=/private/tmp/active-continued-play-native-candidate-16 ACTIVE_CONTINUED_PLAY_EPOCHS=4 ACTIVE_CONTINUED_PLAY_WARM_ROWS=0 ACTIVE_CONTINUED_PLAY_REOPEN_AT=2 ACTIVE_CONTINUED_PLAY_TRACE_WORK=0 ACTIVE_CONTINUED_PLAY_PROFILE=0 ACTIVE_CONTINUED_PLAY_REQUIRE_PROGRESS=0 pnpm exec vitest run --workspace /private/tmp/responsiveness-15-candidate.workspace.mjs --coverage.enabled=false --maxWorkers=1 --minWorkers=1 tests/active-app-continued-play-native.test.ts",
+    "result": "Passed four epochs with 57 exact accepted issues, 32-slot bounded state, one repair and one reopen.",
+    "isolation": "Rejoin and Capacity explicitly joined their workers before start; process check had no active test/review jobs. External shared-host load uncontrolled; initial 16.21/23.09/21.13 on 10-core M1 Max.",
+    "comparison": "Same original fixed-state harness as candidate15, but source, scheduling and interleaving differ, and host load is higher. Descriptive observation only; no isolated causal speedup or frame-latency completion claim. Later endurance starvation-gate harness changes are absent."
+  },
+  "files": {
+    "ts-drp-responsiveness-maintenance-controls-16.log": {
+      "originalSHA256": "219f02e1aadbe053d366c98691df1a41a44a16711a105ac766cacff3484c5250",
+      "uncompressedBytes": 1213
+    },
+    "ts-drp-responsiveness-maintenance-controls-16g.log": {
+      "originalSHA256": "91fcaf91e5e0f38638c8c31c8acb636aec50c7081043220b1f33f4c16ed2f2c1",
+      "uncompressedBytes": 330
+    },
+    "ts-drp-responsiveness-maintenance-controls-16h.log": {
+      "originalSHA256": "a6ff8420bf3a2921700972bfbfd4eb88eda8021ff5b90e28fb6483b5ebd34975",
+      "uncompressedBytes": 329
+    },
+    "ts-drp-responsiveness-maintenance-lint-16.log": {
+      "originalSHA256": "ddec1e0c12094444689ded270bb530435525954835fecda19743e1b8de899fc6",
+      "uncompressedBytes": 70804
+    },
+    "ts-drp-responsiveness-maintenance-native-16.log": {
+      "originalSHA256": "89e25573676501bf537d451741b46ca8246108b8844e81a3801731de4eb56dae",
+      "uncompressedBytes": 2568
+    },
+    "ts-drp-responsiveness-maintenance-native-16b.log": {
+      "originalSHA256": "02dca74c0b5e748fff0981188997a77d0593422d417d9093f8b506354bcafe6c",
+      "uncompressedBytes": 2577
+    },
+    "ts-drp-responsiveness-maintenance-native-16c.log": {
+      "originalSHA256": "17cec1d4262b4f579e2737001ee69811b41211e41f7152a25b473bb8c0a6faf3",
+      "uncompressedBytes": 1565
+    },
+    "ts-drp-responsiveness-maintenance-native-16d.log": {
+      "originalSHA256": "b5e1ef57b279dcfb4cdd148571ac74931a9a9f2dcad0b499a803793da351dfdb",
+      "uncompressedBytes": 717
+    },
+    "ts-drp-responsiveness-maintenance-native-16e.log": {
+      "originalSHA256": "f840355c45176b6da5c9088add8a7f704bf426c5da0bcb3986b220a7cca0a72d",
+      "uncompressedBytes": 804
+    },
+    "ts-drp-responsiveness-maintenance-native-16f.log": {
+      "originalSHA256": "096fa691e314cdcd5cb08f82412fa85144471c621d7feb19d63d7eb2f85a0577",
+      "uncompressedBytes": 718
+    },
+    "ts-drp-responsiveness-node-build-16.log": {
+      "originalSHA256": "4f2cb51693d2a6c40b0a9170b5fb928d46ef78c2ce46a3f4f1ae05485721753c",
+      "uncompressedBytes": 343
+    },
+    "ts-drp-responsiveness-review-16.log.gz": {
+      "originalSHA256": "9ff00ce2dd31aa6f5c48ab80ce48de02059e41dbd09945e97de4f3cebb7c361a",
+      "uncompressedBytes": 347800
+    },
+    "ts-drp-responsiveness-typecheck-16.log": {
+      "originalSHA256": "709574e7d8fe2c33b58d2badfd6f7f69fa8ede0c2546f3c200d9104d25c974a6",
+      "uncompressedBytes": 467
+    },
+    "ts-drp-responsiveness-typecheck-16b.log": {
+      "originalSHA256": "1ad145af403736cf2dd7a3fa03c496f441cdcd2074cacb6fea11d975b76cdfe4",
+      "uncompressedBytes": 303
+    },
+    "ts-drp-responsiveness-typecheck-16c.log": {
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "uncompressedBytes": 0
+    },
+    "ts-drp-responsiveness-typecheck-16d.log": {
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "uncompressedBytes": 0
+    },
+    "ts-drp-responsiveness-typecheck-16e.log": {
+      "originalSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "uncompressedBytes": 0
+    },
+    "ts-drp-responsiveness-maintenance-lint-16g.json": {
+      "originalSHA256": "3abe592d08d41d39f4cfd601fce907c126c53afbe2b9ba534ad5dceda4bbb0d2",
+      "uncompressedBytes": 72857
+    },
+    "ts-drp-responsiveness-maintenance-lint-16h.json": {
+      "originalSHA256": "ad8729883921084e49af12eeed816ca48988654014de71516a9be8e7be00b17e",
+      "uncompressedBytes": 70742
+    },
+    "ts-drp-responsiveness-maintenance-lint-16h-changed-lines.json": {
+      "originalSHA256": "45d0019591cd1c74575629d9e339d9554b52215274a82aeea8c074f50016e3d6",
+      "uncompressedBytes": 275
+    },
+    "ts-drp-responsiveness-candidate-16-summary.json": {
+      "originalSHA256": "965017576f5048da2943c69eebc6b7ada8c86cc184deaf3377898438d1259c10",
+      "uncompressedBytes": 13663
+    },
+    "active-continued-play-native-candidate-16.log": {
+      "originalSHA256": "481300b29175fe9ee2532fd4be84788e649f6b28ce085448f8e767cc075d21e7",
+      "uncompressedBytes": 2389
+    },
+    "responsiveness-15-candidate.config.mts": {
+      "originalSHA256": "a262bd4d5a35572bd09800061fc1247dbb92716b4f233ca055af88c0feccc3e9",
+      "uncompressedBytes": 534
+    },
+    "responsiveness-15-candidate.workspace.mjs": {
+      "originalSHA256": "bddec2611deb9d682262d9ebea40acdebb68a4b9ae3cc9b7ca769b9d6b61f039",
+      "uncompressedBytes": 72
+    },
+    "candidate-16/summary.json": {
+      "originalSHA256": "eb2a46170c3eb5667243d23b7d084bc5b8998a53d098e13743abf9e7472560c7",
+      "uncompressedBytes": 9286
+    },
+    "candidate-16/continued-play.jsonl.gz": {
+      "originalSHA256": "6e219cd99c2ffde1f89f159088998eb362444e023a3f3e78cd9f8b1ad6a983d8",
+      "uncompressedBytes": 475526
+    },
+    "candidate-16/observations.jsonl.gz": {
+      "originalSHA256": "11c6e3a31287dfb6c75f8c2f87e49a2c76a6689aabc93bda4be7f14ffd5fa2a1",
+      "uncompressedBytes": 3847795
+    },
+    "candidate-16/source.diff": {
+      "originalSHA256": "b19ad29864d03cacb74dd8b10d15dc7b788a30c79296ef3b16f86436e67401ba",
+      "uncompressedBytes": 28620
+    },
+    "candidate-16/active-app-continued-play-native.test.ts.txt": {
+      "originalSHA256": "268cab1c00d8fbce4986c2fb9bc38f55e49c4d1fae41a89db4c974625a0c3e8b",
+      "uncompressedBytes": 30470
+    }
+  }
+}

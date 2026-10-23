@@ -1,0 +1,27 @@
+
+ RUN  v3.1.1 /private/tmp/ts-drp-transition-responsiveness
+
+ ✓ packages/node/tests/closed-epoch-retirement-sequencing.test.ts (17 tests) 44ms
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/node/tests/creator-recovery-maintenance-job.test.ts [ packages/node/tests/creator-recovery-maintenance-job.test.ts ]
+ReferenceError: Cannot access '__vite_ssr_import_8__' before initialization
+ ❯ createAnchorTrustApi packages/protocol-v3/src/index.ts:1882:4
+    1880|   openCurrentAnchorTrust,
+    1881|   resolveCurrentEpochAuthorizedAuthor,
+    1882|   [certifiedSealAuthorityResolver]: resolveCertifiedSealMaterial,
+       |    ^
+    1883|   [creatorAnchorTrustCheckpointPredecessorMinter]: mintCreatorAnchorTr…
+    1884|   [creatorAnchorTrustResolver]: resolveCreatorAnchorTrustMaterial,
+ ❯ packages/protocol-v3/src/anchor-trust-singleton.ts:12:24
+ ❯ packages/protocol-v3/src/creator-checkpoint.ts:3:1
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  17 passed (17)
+   Start at  12:22:37
+   Duration  1.05s (transform 466ms, setup 0ms, collect 249ms, tests 44ms, environment 0ms, prepare 120ms)
+
