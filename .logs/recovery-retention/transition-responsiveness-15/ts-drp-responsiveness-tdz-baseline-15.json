@@ -1,0 +1,44 @@
+{
+  "baselineRoot": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "baselineHEAD": "cc4a9908c2970dfd97fd26b2b22b827bc42cfdcf",
+  "candidateRoot": "/private/tmp/ts-drp-transition-responsiveness",
+  "candidateHEAD": "329b08ccb2354bfea9dfd68a6ca95ff339d1ed3a",
+  "paths": {
+    "packages/node/src/v3-live.ts": {
+      "baselineSHA256": "6ed0adc59a395f279ad0bc6ff73e520dd5e437d70f71b3a34d9a97f4172df4d7",
+      "candidateHEADSHA256": "6ed0adc59a395f279ad0bc6ff73e520dd5e437d70f71b3a34d9a97f4172df4d7"
+    },
+    "packages/protocol-v3/src/index.ts": {
+      "baselineSHA256": "508c35c79f70a53e35e4e1089d928c8f0d22f064c5cf2445842579f86c8a71c6",
+      "candidateHEADSHA256": "508c35c79f70a53e35e4e1089d928c8f0d22f064c5cf2445842579f86c8a71c6"
+    },
+    "packages/protocol-v3/src/anchor-trust-singleton.ts": {
+      "baselineSHA256": "6f0f78325446b38760f4fb7e4089d42e23d994b8f23769aa77a57525b6ebaf25",
+      "candidateHEADSHA256": "6f0f78325446b38760f4fb7e4089d42e23d994b8f23769aa77a57525b6ebaf25"
+    },
+    "packages/protocol-v3/src/creator-checkpoint.ts": {
+      "baselineSHA256": "2ce129ef85e181180e664337132dc6cd68db68ad56bf588bd9a4211ceb183e3a",
+      "candidateHEADSHA256": "2ce129ef85e181180e664337132dc6cd68db68ad56bf588bd9a4211ceb183e3a"
+    },
+    "tests/phase-3a1b-d9336-authorized-recovery-red.test.ts": {
+      "baselineSHA256": "3e69b9e7ec9dd8d46cfb802df4755f36d1cc22b6368fb62fcfb6e420ce1838fc",
+      "candidateHEADSHA256": "3e69b9e7ec9dd8d46cfb802df4755f36d1cc22b6368fb62fcfb6e420ce1838fc"
+    },
+    "tests/phase-6a-creator-adoption-red.test.ts": {
+      "baselineSHA256": "f7f30b6ed86ddbdeff05706fb46bd26f521e7e4f8dde97f84d05f25185b43e71",
+      "candidateHEADSHA256": "f7f30b6ed86ddbdeff05706fb46bd26f521e7e4f8dde97f84d05f25185b43e71"
+    },
+    "tests/phase-6a-creator-adoption-commit-red.test.ts": {
+      "baselineSHA256": "fb46aeacb16c468d7295d246dc3e397c665635b7309ce43ba75568286c531164",
+      "candidateHEADSHA256": "fb46aeacb16c468d7295d246dc3e397c665635b7309ce43ba75568286c531164"
+    },
+    "tests/phase-6b-d110c-b-hot-adoption.test.ts": {
+      "baselineSHA256": "0725933bab799af6629a1b9a49f7667c5a80bc4fd39183d8f07123a339397bf5",
+      "candidateHEADSHA256": "0725933bab799af6629a1b9a49f7667c5a80bc4fd39183d8f07123a339397bf5"
+    },
+    "vite.config.mts": {
+      "baselineSHA256": "60369abcfa17b486fd19f699ae20ab1a9b6ede2359ba3e02de4e106ac80cb6c0",
+      "candidateHEADSHA256": "60369abcfa17b486fd19f699ae20ab1a9b6ede2359ba3e02de4e106ac80cb6c0"
+    }
+  }
+}

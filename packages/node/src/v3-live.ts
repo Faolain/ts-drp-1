@@ -13208,6 +13208,7 @@ function creatorFilteredIssuanceStore(
 		readLineage: (scope: DurableIssueScope) => issuanceStore.readLineage(scope),
 		readSettlementPlan: (scope: DurableIssueScope) => issuanceStore.readSettlementPlan(scope),
 		readOutboxPage: async (input?: DurableOutboxPageInput) => {
+			const checkpoint = createWorkCheckpoint();
 			const requestedLimit = input?.limit ?? 1;
 			if (!NumberIsSafeInteger(requestedLimit) || requestedLimit < 1) {
 				return issuanceStore.readOutboxPage(input);
@@ -13216,6 +13217,7 @@ function creatorFilteredIssuanceStore(
 			const visible: DurableIssuanceOutboxRecord[] = [];
 			let afterKey = input?.afterKey;
 			for (;;) {
+				await checkpoint();
 				const nativePage = await issuanceStore.readOutboxPage({
 					...(afterKey === undefined || afterKey === null ? {} : { afterKey }),
 					limit: 64,
@@ -13224,6 +13226,7 @@ function creatorFilteredIssuanceStore(
 				const page = captureOutboxPage(nativePage, 64);
 				if (page === undefined || page.length === 0) return visible.length === 0 ? nativePage : ObjectFreeze(visible);
 				for (let pageIndex = 0; pageIndex < page.length; pageIndex++) {
+					await checkpoint();
 					const raw = page.read(pageIndex) as DurableIssuanceOutboxRecord;
 					const row = outboxRowSnapshot(raw, issuanceScope);
 					if (row === undefined || (afterKey !== undefined && afterKey !== null && row.authorSequence <= afterKey[2])) {
@@ -13402,6 +13405,11 @@ function openRecoveryAuthorization(
  */
 export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput): Promise<RecoverV3LiveReplicaResult> {
 	try {
+		// These walks prepare an uninstalled capability. Yield only between
+		// completed rows; retain each original native read, authentication, charge
+		// and policy commit. Live registration replacement remains the later
+		// activation owner's synchronous boundary.
+		const checkpoint = createWorkCheckpoint();
 		const legacyInput =
 			snapshotRecoveryRecord(rawInput, LEGACY_RECOVERY_INPUT_KEYS) ??
 			snapshotRecoveryRecord(rawInput, LEGACY_DISPLACED_RECOVERY_INPUT_KEYS);
@@ -13742,6 +13750,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			let foundActivation = false;
 			let sourceAfter: number | null = null;
 			for (let sequence = 0; sequence < sourceReadiness.rowCount; sequence += 1) {
+				await checkpoint();
 				let page;
 				try {
 					page = await sourceJournal.readPage({
@@ -13929,6 +13938,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			}
 		} else {
 			for (let expectedSequence = 0; expectedSequence < readiness.rowCount; expectedSequence += 1) {
+				await checkpoint();
 				let rawJournalPage;
 				try {
 					rawJournalPage = await journal.readPage({
@@ -14149,6 +14159,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		let displacedIssuanceBoundary: number | undefined;
 		beginHistoricalIssuanceScan(historicalIssuance);
 		for (;;) {
+			await checkpoint();
 			let rawPage: unknown;
 			try {
 				rawPage = await issuance.readOutboxPage(
@@ -14161,6 +14172,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			if (page === undefined) return recoveryFailure("issuance-rejected", "v3 recovery outbox page is invalid");
 			if (page.length === 0) break;
 			for (let pageIndex = 0; pageIndex < page.length; pageIndex++) {
+				await checkpoint();
 				const raw = page.read(pageIndex);
 				if (raw === undefined) return recoveryFailure("issuance-rejected", "v3 recovery outbox page is invalid");
 				const row = outboxRowSnapshot(raw, selectedScope);

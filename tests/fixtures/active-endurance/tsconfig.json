@@ -23,6 +23,7 @@
 		"./*.ts",
 		"../../active-app-endurance-native.test.ts",
 		"../../active-app-endurance-failures.test.ts",
+		"../../creator-adoption-host-turn-native.test.ts",
 		"../../active-app-continued-play-observations.test.ts",
 		"../../active-app-continued-play-native.test.ts"
 	],

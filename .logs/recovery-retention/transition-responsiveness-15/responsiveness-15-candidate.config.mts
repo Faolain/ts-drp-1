@@ -1,0 +1,2 @@
+import config from "/private/tmp/ts-drp-transition-responsiveness/vite.config.mts";
+export default {...config, root: "/private/tmp/ts-drp-transition-responsiveness", test: {...config.test, root: "/private/tmp/ts-drp-transition-responsiveness", globalSetup: ["/private/tmp/ts-drp-transition-responsiveness/scripts/check-shadowed-sources.mjs"], name: "quiet-candidate", include: ["tests/active-app-continued-play-native.test.ts"], exclude: [...(config.test?.exclude ?? []), "**/.claude/**", "**/.logs/**"], coverage: {enabled:false}}};

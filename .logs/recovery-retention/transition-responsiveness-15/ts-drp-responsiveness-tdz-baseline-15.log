@@ -1,0 +1,268 @@
+
+ RUN  v3.1.1 /Users/aristotle/Documents/Projects/ts-drp-1
+
+(node:33963) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:33960) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:33957) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:33961) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:33955) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:33962) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:33959) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:33968) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:33951) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/phase-3a1b-d9336-authorized-recovery-red.test.ts (2 tests) 7821ms
+   ✓ D.93.36 authorized durable recovery RED > recovers one genuine local commit before any live effect  7787ms
+ ✓ .claude/worktrees/agent-a5e3fefad3208def1/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts (2 tests) 6865ms
+   ✓ D.93.36 authorized durable recovery RED > recovers one genuine local commit before any live effect  6822ms
+ ✓ .claude/worktrees/agent-a6747ca659c74d66c/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts (2 tests) 6859ms
+   ✓ D.93.36 authorized durable recovery RED > recovers one genuine local commit before any live effect  6818ms
+ ✓ .claude/worktrees/agent-a64bf5d5c3cd71d98/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts (2 tests) 6891ms
+   ✓ D.93.36 authorized durable recovery RED > recovers one genuine local commit before any live effect  6850ms
+ ✓ .claude/worktrees/agent-a775ab62f83b89066/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts (2 tests) 6868ms
+   ✓ D.93.36 authorized durable recovery RED > recovers one genuine local commit before any live effect  6817ms
+ ✓ .claude/worktrees/agent-a7dca3b495f91714f/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts (2 tests) 6463ms
+   ✓ D.93.36 authorized durable recovery RED > recovers one genuine local commit before any live effect  6426ms
+ ✓ .claude/worktrees/agent-a4a865e0207f6cab8/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts (2 tests) 7645ms
+   ✓ D.93.36 authorized durable recovery RED > recovers one genuine local commit before any live effect  7602ms
+ ✓ .claude/worktrees/agent-a2f612353d58c46ea/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts (2 tests) 7823ms
+   ✓ D.93.36 authorized durable recovery RED > recovers one genuine local commit before any live effect  7721ms
+ ✓ .claude/worktrees/agent-a627b178dd0b3b923/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts (2 tests) 6975ms
+   ✓ D.93.36 authorized durable recovery RED > recovers one genuine local commit before any live effect  6900ms
+(node:34087) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:34091) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:34101) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:34095) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:34092) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:34096) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:34093) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:34094) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:34100) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ .claude/worktrees/agent-a7a653ac48415a524/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts (2 tests) 7063ms
+   ✓ D.93.36 authorized durable recovery RED > recovers one genuine local commit before any live effect  6977ms
+ ✓ .claude/worktrees/agent-a84dc20beddb97044/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts (2 tests) 7077ms
+   ✓ D.93.36 authorized durable recovery RED > recovers one genuine local commit before any live effect  7038ms
+ ✓ .claude/worktrees/agent-a9e24bdc184a70a9d/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts (2 tests) 6692ms
+   ✓ D.93.36 authorized durable recovery RED > recovers one genuine local commit before any live effect  6660ms
+ ✓ .claude/worktrees/agent-a9b9982b4fd998b37/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts (2 tests) 6705ms
+   ✓ D.93.36 authorized durable recovery RED > recovers one genuine local commit before any live effect  6645ms
+ ✓ .claude/worktrees/agent-a90ae1ab4635254fc/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts (2 tests) 6935ms
+   ✓ D.93.36 authorized durable recovery RED > recovers one genuine local commit before any live effect  6881ms
+ ✓ .claude/worktrees/agent-a8b210e262c34980d/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts (2 tests) 6934ms
+   ✓ D.93.36 authorized durable recovery RED > recovers one genuine local commit before any live effect  6859ms
+ ✓ .claude/worktrees/agent-a9be4231f2bd8f2ac/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts (2 tests) 6794ms
+   ✓ D.93.36 authorized durable recovery RED > recovers one genuine local commit before any live effect  6759ms
+ ✓ .claude/worktrees/agent-a869e104e72e01ff1/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts (2 tests) 6970ms
+   ✓ D.93.36 authorized durable recovery RED > recovers one genuine local commit before any live effect  6927ms
+ ✓ .claude/worktrees/agent-a9ab847b594d95e7f/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts (2 tests) 6848ms
+   ✓ D.93.36 authorized durable recovery RED > recovers one genuine local commit before any live effect  6807ms
+(node:34193) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:34192) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:34200) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:34195) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:34199) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:34194) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:34201) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:34203) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ .claude/worktrees/agent-ae5eae11263189894/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts (2 tests) 6450ms
+   ✓ D.93.36 authorized durable recovery RED > recovers one genuine local commit before any live effect  6378ms
+ ✓ .claude/worktrees/agent-aacbd4e4ceff4b065/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts (2 tests) 6542ms
+   ✓ D.93.36 authorized durable recovery RED > recovers one genuine local commit before any live effect  6480ms
+ ✓ .claude/worktrees/agent-aeb6ebdfc4584ace2/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts (2 tests) 6514ms
+   ✓ D.93.36 authorized durable recovery RED > recovers one genuine local commit before any live effect  6475ms
+ ✓ .claude/worktrees/agent-ae04c762f9072aea6/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts (2 tests) 6629ms
+   ✓ D.93.36 authorized durable recovery RED > recovers one genuine local commit before any live effect  6585ms
+ ✓ .claude/worktrees/agent-ababeed392e2221c7/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts (2 tests) 6637ms
+   ✓ D.93.36 authorized durable recovery RED > recovers one genuine local commit before any live effect  6569ms
+ ✓ .claude/worktrees/agent-af75921186ab3a0e5/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts (2 tests) 6591ms
+   ✓ D.93.36 authorized durable recovery RED > recovers one genuine local commit before any live effect  6531ms
+ ✓ .claude/worktrees/agent-afc8a0b30ff709f24/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts (2 tests) 5869ms
+   ✓ D.93.36 authorized durable recovery RED > recovers one genuine local commit before any live effect  5814ms
+ ✓ .claude/worktrees/agent-ae92553c870902843/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts (2 tests) 5915ms
+   ✓ D.93.36 authorized durable recovery RED > recovers one genuine local commit before any live effect  5885ms
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 82 ⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/phase-6a-creator-adoption-commit-red.test.ts [ tests/phase-6a-creator-adoption-commit-red.test.ts ]
+ FAIL  tests/phase-6a-creator-adoption-red.test.ts [ tests/phase-6a-creator-adoption-red.test.ts ]
+ FAIL  tests/phase-6b-d110c-b-hot-adoption.test.ts [ tests/phase-6b-d110c-b-hot-adoption.test.ts ]
+ FAIL  .claude/worktrees/agent-a2f612353d58c46ea/tests/phase-6a-creator-adoption-commit-red.test.ts [ .claude/worktrees/agent-a2f612353d58c46ea/tests/phase-6a-creator-adoption-commit-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a2f612353d58c46ea/tests/phase-6a-creator-adoption-red.test.ts [ .claude/worktrees/agent-a2f612353d58c46ea/tests/phase-6a-creator-adoption-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a2f612353d58c46ea/tests/phase-6b-d110c-b-hot-adoption.test.ts [ .claude/worktrees/agent-a2f612353d58c46ea/tests/phase-6b-d110c-b-hot-adoption.test.ts ]
+ FAIL  .claude/worktrees/agent-a4a865e0207f6cab8/tests/phase-6a-creator-adoption-commit-red.test.ts [ .claude/worktrees/agent-a4a865e0207f6cab8/tests/phase-6a-creator-adoption-commit-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a4a865e0207f6cab8/tests/phase-6a-creator-adoption-red.test.ts [ .claude/worktrees/agent-a4a865e0207f6cab8/tests/phase-6a-creator-adoption-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a4a865e0207f6cab8/tests/phase-6b-d110c-b-hot-adoption.test.ts [ .claude/worktrees/agent-a4a865e0207f6cab8/tests/phase-6b-d110c-b-hot-adoption.test.ts ]
+ FAIL  .claude/worktrees/agent-a627b178dd0b3b923/tests/phase-6a-creator-adoption-commit-red.test.ts [ .claude/worktrees/agent-a627b178dd0b3b923/tests/phase-6a-creator-adoption-commit-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a627b178dd0b3b923/tests/phase-6a-creator-adoption-red.test.ts [ .claude/worktrees/agent-a627b178dd0b3b923/tests/phase-6a-creator-adoption-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a627b178dd0b3b923/tests/phase-6b-d110c-b-hot-adoption.test.ts [ .claude/worktrees/agent-a627b178dd0b3b923/tests/phase-6b-d110c-b-hot-adoption.test.ts ]
+ FAIL  .claude/worktrees/agent-a6747ca659c74d66c/tests/phase-6a-creator-adoption-commit-red.test.ts [ .claude/worktrees/agent-a6747ca659c74d66c/tests/phase-6a-creator-adoption-commit-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a6747ca659c74d66c/tests/phase-6a-creator-adoption-red.test.ts [ .claude/worktrees/agent-a6747ca659c74d66c/tests/phase-6a-creator-adoption-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a6747ca659c74d66c/tests/phase-6b-d110c-b-hot-adoption.test.ts [ .claude/worktrees/agent-a6747ca659c74d66c/tests/phase-6b-d110c-b-hot-adoption.test.ts ]
+ FAIL  .claude/worktrees/agent-a64bf5d5c3cd71d98/tests/phase-6a-creator-adoption-commit-red.test.ts [ .claude/worktrees/agent-a64bf5d5c3cd71d98/tests/phase-6a-creator-adoption-commit-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a64bf5d5c3cd71d98/tests/phase-6a-creator-adoption-red.test.ts [ .claude/worktrees/agent-a64bf5d5c3cd71d98/tests/phase-6a-creator-adoption-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a64bf5d5c3cd71d98/tests/phase-6b-d110c-b-hot-adoption.test.ts [ .claude/worktrees/agent-a64bf5d5c3cd71d98/tests/phase-6b-d110c-b-hot-adoption.test.ts ]
+ FAIL  .claude/worktrees/agent-a775ab62f83b89066/tests/phase-6a-creator-adoption-commit-red.test.ts [ .claude/worktrees/agent-a775ab62f83b89066/tests/phase-6a-creator-adoption-commit-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a775ab62f83b89066/tests/phase-6a-creator-adoption-red.test.ts [ .claude/worktrees/agent-a775ab62f83b89066/tests/phase-6a-creator-adoption-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a775ab62f83b89066/tests/phase-6b-d110c-b-hot-adoption.test.ts [ .claude/worktrees/agent-a775ab62f83b89066/tests/phase-6b-d110c-b-hot-adoption.test.ts ]
+ FAIL  .claude/worktrees/agent-a5e3fefad3208def1/tests/phase-6a-creator-adoption-commit-red.test.ts [ .claude/worktrees/agent-a5e3fefad3208def1/tests/phase-6a-creator-adoption-commit-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a5e3fefad3208def1/tests/phase-6a-creator-adoption-red.test.ts [ .claude/worktrees/agent-a5e3fefad3208def1/tests/phase-6a-creator-adoption-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a5e3fefad3208def1/tests/phase-6b-d110c-b-hot-adoption.test.ts [ .claude/worktrees/agent-a5e3fefad3208def1/tests/phase-6b-d110c-b-hot-adoption.test.ts ]
+ FAIL  .claude/worktrees/agent-a7dca3b495f91714f/tests/phase-6a-creator-adoption-commit-red.test.ts [ .claude/worktrees/agent-a7dca3b495f91714f/tests/phase-6a-creator-adoption-commit-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a7dca3b495f91714f/tests/phase-6a-creator-adoption-red.test.ts [ .claude/worktrees/agent-a7dca3b495f91714f/tests/phase-6a-creator-adoption-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a7dca3b495f91714f/tests/phase-6b-d110c-b-hot-adoption.test.ts [ .claude/worktrees/agent-a7dca3b495f91714f/tests/phase-6b-d110c-b-hot-adoption.test.ts ]
+ FAIL  .claude/worktrees/agent-a7a653ac48415a524/tests/phase-6a-creator-adoption-commit-red.test.ts [ .claude/worktrees/agent-a7a653ac48415a524/tests/phase-6a-creator-adoption-commit-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a7a653ac48415a524/tests/phase-6a-creator-adoption-red.test.ts [ .claude/worktrees/agent-a7a653ac48415a524/tests/phase-6a-creator-adoption-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a7a653ac48415a524/tests/phase-6b-d110c-b-hot-adoption.test.ts [ .claude/worktrees/agent-a7a653ac48415a524/tests/phase-6b-d110c-b-hot-adoption.test.ts ]
+ FAIL  .claude/worktrees/agent-a84dc20beddb97044/tests/phase-6a-creator-adoption-commit-red.test.ts [ .claude/worktrees/agent-a84dc20beddb97044/tests/phase-6a-creator-adoption-commit-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a84dc20beddb97044/tests/phase-6a-creator-adoption-red.test.ts [ .claude/worktrees/agent-a84dc20beddb97044/tests/phase-6a-creator-adoption-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a84dc20beddb97044/tests/phase-6b-d110c-b-hot-adoption.test.ts [ .claude/worktrees/agent-a84dc20beddb97044/tests/phase-6b-d110c-b-hot-adoption.test.ts ]
+ FAIL  .claude/worktrees/agent-a90ae1ab4635254fc/tests/phase-6a-creator-adoption-commit-red.test.ts [ .claude/worktrees/agent-a90ae1ab4635254fc/tests/phase-6a-creator-adoption-commit-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a90ae1ab4635254fc/tests/phase-6a-creator-adoption-red.test.ts [ .claude/worktrees/agent-a90ae1ab4635254fc/tests/phase-6a-creator-adoption-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a90ae1ab4635254fc/tests/phase-6b-d110c-b-hot-adoption.test.ts [ .claude/worktrees/agent-a90ae1ab4635254fc/tests/phase-6b-d110c-b-hot-adoption.test.ts ]
+ FAIL  .claude/worktrees/agent-a8b210e262c34980d/tests/phase-6a-creator-adoption-commit-red.test.ts [ .claude/worktrees/agent-a8b210e262c34980d/tests/phase-6a-creator-adoption-commit-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a8b210e262c34980d/tests/phase-6a-creator-adoption-red.test.ts [ .claude/worktrees/agent-a8b210e262c34980d/tests/phase-6a-creator-adoption-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a8b210e262c34980d/tests/phase-6b-d110c-b-hot-adoption.test.ts [ .claude/worktrees/agent-a8b210e262c34980d/tests/phase-6b-d110c-b-hot-adoption.test.ts ]
+ FAIL  .claude/worktrees/agent-a9ab847b594d95e7f/tests/phase-6a-creator-adoption-commit-red.test.ts [ .claude/worktrees/agent-a9ab847b594d95e7f/tests/phase-6a-creator-adoption-commit-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a9ab847b594d95e7f/tests/phase-6a-creator-adoption-red.test.ts [ .claude/worktrees/agent-a9ab847b594d95e7f/tests/phase-6a-creator-adoption-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a9ab847b594d95e7f/tests/phase-6b-d110c-b-hot-adoption.test.ts [ .claude/worktrees/agent-a9ab847b594d95e7f/tests/phase-6b-d110c-b-hot-adoption.test.ts ]
+ FAIL  .claude/worktrees/agent-a869e104e72e01ff1/tests/phase-6a-creator-adoption-commit-red.test.ts [ .claude/worktrees/agent-a869e104e72e01ff1/tests/phase-6a-creator-adoption-commit-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a869e104e72e01ff1/tests/phase-6a-creator-adoption-red.test.ts [ .claude/worktrees/agent-a869e104e72e01ff1/tests/phase-6a-creator-adoption-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a869e104e72e01ff1/tests/phase-6b-d110c-b-hot-adoption.test.ts [ .claude/worktrees/agent-a869e104e72e01ff1/tests/phase-6b-d110c-b-hot-adoption.test.ts ]
+ FAIL  .claude/worktrees/agent-a9b9982b4fd998b37/tests/phase-6a-creator-adoption-commit-red.test.ts [ .claude/worktrees/agent-a9b9982b4fd998b37/tests/phase-6a-creator-adoption-commit-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a9b9982b4fd998b37/tests/phase-6a-creator-adoption-red.test.ts [ .claude/worktrees/agent-a9b9982b4fd998b37/tests/phase-6a-creator-adoption-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a9b9982b4fd998b37/tests/phase-6b-d110c-b-hot-adoption.test.ts [ .claude/worktrees/agent-a9b9982b4fd998b37/tests/phase-6b-d110c-b-hot-adoption.test.ts ]
+ FAIL  .claude/worktrees/agent-a9e24bdc184a70a9d/tests/phase-6a-creator-adoption-commit-red.test.ts [ .claude/worktrees/agent-a9e24bdc184a70a9d/tests/phase-6a-creator-adoption-commit-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a9e24bdc184a70a9d/tests/phase-6a-creator-adoption-red.test.ts [ .claude/worktrees/agent-a9e24bdc184a70a9d/tests/phase-6a-creator-adoption-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a9e24bdc184a70a9d/tests/phase-6b-d110c-b-hot-adoption.test.ts [ .claude/worktrees/agent-a9e24bdc184a70a9d/tests/phase-6b-d110c-b-hot-adoption.test.ts ]
+ FAIL  .claude/worktrees/agent-a9be4231f2bd8f2ac/tests/phase-6a-creator-adoption-commit-red.test.ts [ .claude/worktrees/agent-a9be4231f2bd8f2ac/tests/phase-6a-creator-adoption-commit-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a9be4231f2bd8f2ac/tests/phase-6a-creator-adoption-red.test.ts [ .claude/worktrees/agent-a9be4231f2bd8f2ac/tests/phase-6a-creator-adoption-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a9be4231f2bd8f2ac/tests/phase-6b-d110c-b-hot-adoption.test.ts [ .claude/worktrees/agent-a9be4231f2bd8f2ac/tests/phase-6b-d110c-b-hot-adoption.test.ts ]
+ FAIL  .claude/worktrees/agent-aacbd4e4ceff4b065/tests/phase-6a-creator-adoption-commit-red.test.ts [ .claude/worktrees/agent-aacbd4e4ceff4b065/tests/phase-6a-creator-adoption-commit-red.test.ts ]
+ FAIL  .claude/worktrees/agent-aacbd4e4ceff4b065/tests/phase-6a-creator-adoption-red.test.ts [ .claude/worktrees/agent-aacbd4e4ceff4b065/tests/phase-6a-creator-adoption-red.test.ts ]
+ FAIL  .claude/worktrees/agent-aacbd4e4ceff4b065/tests/phase-6b-d110c-b-hot-adoption.test.ts [ .claude/worktrees/agent-aacbd4e4ceff4b065/tests/phase-6b-d110c-b-hot-adoption.test.ts ]
+ FAIL  .claude/worktrees/agent-ababeed392e2221c7/tests/phase-6a-creator-adoption-commit-red.test.ts [ .claude/worktrees/agent-ababeed392e2221c7/tests/phase-6a-creator-adoption-commit-red.test.ts ]
+ FAIL  .claude/worktrees/agent-ababeed392e2221c7/tests/phase-6a-creator-adoption-red.test.ts [ .claude/worktrees/agent-ababeed392e2221c7/tests/phase-6a-creator-adoption-red.test.ts ]
+ FAIL  .claude/worktrees/agent-ababeed392e2221c7/tests/phase-6b-d110c-b-hot-adoption.test.ts [ .claude/worktrees/agent-ababeed392e2221c7/tests/phase-6b-d110c-b-hot-adoption.test.ts ]
+ FAIL  .claude/worktrees/agent-ae5eae11263189894/tests/phase-6a-creator-adoption-commit-red.test.ts [ .claude/worktrees/agent-ae5eae11263189894/tests/phase-6a-creator-adoption-commit-red.test.ts ]
+ FAIL  .claude/worktrees/agent-ae5eae11263189894/tests/phase-6a-creator-adoption-red.test.ts [ .claude/worktrees/agent-ae5eae11263189894/tests/phase-6a-creator-adoption-red.test.ts ]
+ FAIL  .claude/worktrees/agent-ae5eae11263189894/tests/phase-6b-d110c-b-hot-adoption.test.ts [ .claude/worktrees/agent-ae5eae11263189894/tests/phase-6b-d110c-b-hot-adoption.test.ts ]
+ FAIL  .claude/worktrees/agent-ae04c762f9072aea6/tests/phase-6a-creator-adoption-commit-red.test.ts [ .claude/worktrees/agent-ae04c762f9072aea6/tests/phase-6a-creator-adoption-commit-red.test.ts ]
+ FAIL  .claude/worktrees/agent-ae04c762f9072aea6/tests/phase-6a-creator-adoption-red.test.ts [ .claude/worktrees/agent-ae04c762f9072aea6/tests/phase-6a-creator-adoption-red.test.ts ]
+ FAIL  .claude/worktrees/agent-ae04c762f9072aea6/tests/phase-6b-d110c-b-hot-adoption.test.ts [ .claude/worktrees/agent-ae04c762f9072aea6/tests/phase-6b-d110c-b-hot-adoption.test.ts ]
+ FAIL  .claude/worktrees/agent-aeb6ebdfc4584ace2/tests/phase-6a-creator-adoption-commit-red.test.ts [ .claude/worktrees/agent-aeb6ebdfc4584ace2/tests/phase-6a-creator-adoption-commit-red.test.ts ]
+ FAIL  .claude/worktrees/agent-aeb6ebdfc4584ace2/tests/phase-6a-creator-adoption-red.test.ts [ .claude/worktrees/agent-aeb6ebdfc4584ace2/tests/phase-6a-creator-adoption-red.test.ts ]
+ FAIL  .claude/worktrees/agent-aeb6ebdfc4584ace2/tests/phase-6b-d110c-b-hot-adoption.test.ts [ .claude/worktrees/agent-aeb6ebdfc4584ace2/tests/phase-6b-d110c-b-hot-adoption.test.ts ]
+ FAIL  .claude/worktrees/agent-af75921186ab3a0e5/tests/phase-6a-creator-adoption-commit-red.test.ts [ .claude/worktrees/agent-af75921186ab3a0e5/tests/phase-6a-creator-adoption-commit-red.test.ts ]
+ FAIL  .claude/worktrees/agent-af75921186ab3a0e5/tests/phase-6a-creator-adoption-red.test.ts [ .claude/worktrees/agent-af75921186ab3a0e5/tests/phase-6a-creator-adoption-red.test.ts ]
+ FAIL  .claude/worktrees/agent-af75921186ab3a0e5/tests/phase-6b-d110c-b-hot-adoption.test.ts [ .claude/worktrees/agent-af75921186ab3a0e5/tests/phase-6b-d110c-b-hot-adoption.test.ts ]
+ FAIL  .claude/worktrees/agent-afc8a0b30ff709f24/tests/phase-6a-creator-adoption-commit-red.test.ts [ .claude/worktrees/agent-afc8a0b30ff709f24/tests/phase-6a-creator-adoption-commit-red.test.ts ]
+ FAIL  .claude/worktrees/agent-afc8a0b30ff709f24/tests/phase-6a-creator-adoption-red.test.ts [ .claude/worktrees/agent-afc8a0b30ff709f24/tests/phase-6a-creator-adoption-red.test.ts ]
+ FAIL  .claude/worktrees/agent-afc8a0b30ff709f24/tests/phase-6b-d110c-b-hot-adoption.test.ts [ .claude/worktrees/agent-afc8a0b30ff709f24/tests/phase-6b-d110c-b-hot-adoption.test.ts ]
+ FAIL  .claude/worktrees/agent-ae92553c870902843/tests/phase-6a-creator-adoption-commit-red.test.ts [ .claude/worktrees/agent-ae92553c870902843/tests/phase-6a-creator-adoption-commit-red.test.ts ]
+ FAIL  .claude/worktrees/agent-ae92553c870902843/tests/phase-6a-creator-adoption-red.test.ts [ .claude/worktrees/agent-ae92553c870902843/tests/phase-6a-creator-adoption-red.test.ts ]
+ FAIL  .claude/worktrees/agent-ae92553c870902843/tests/phase-6b-d110c-b-hot-adoption.test.ts [ .claude/worktrees/agent-ae92553c870902843/tests/phase-6b-d110c-b-hot-adoption.test.ts ]
+ReferenceError: Cannot access '__vite_ssr_import_8__' before initialization
+ ❯ createAnchorTrustApi packages/protocol-v3/src/index.ts:1882:4
+    1880|   openCurrentAnchorTrust,
+    1881|   resolveCurrentEpochAuthorizedAuthor,
+    1882|   [certifiedSealAuthorityResolver]: resolveCertifiedSealMaterial,
+       |    ^
+    1883|   [creatorAnchorTrustCheckpointPredecessorMinter]: mintCreatorAnchorTr…
+    1884|   [creatorAnchorTrustResolver]: resolveCreatorAnchorTrustMaterial,
+ ❯ packages/protocol-v3/src/anchor-trust-singleton.ts:12:24
+ ❯ packages/protocol-v3/src/creator-checkpoint.ts:3:1
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/82]⎯
+
+ FAIL  .claude/worktrees/agent-a22234cd969bc5250/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts [ .claude/worktrees/agent-a22234cd969bc5250/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts ]
+ FAIL  .claude/worktrees/agent-a22234cd969bc5250/tests/phase-6b-d110c-b-hot-adoption.test.ts [ .claude/worktrees/agent-a22234cd969bc5250/tests/phase-6b-d110c-b-hot-adoption.test.ts ]
+Error: Failed to resolve entry for package "@ts-drp/canonical". The package may have incorrect main/module/exports specified in its package.json.
+  Plugin: vite:import-analysis
+  File: /Users/aristotle/Documents/Projects/ts-drp-1/.claude/worktrees/agent-a22234cd969bc5250/tests/phase-3a1b-d9336-authorized-recovery-red.test.ts:1:27
+  1  |  import { hashDomain } from "@ts-drp/canonical";
+     |                              ^
+  2  |  import { describe, expect, it } from "vitest";
+  3  |  import { createGenuinePreparedV3Fixture } from "./fixtures/phase-3a1b-p3/live-fixture.js";
+ ❯ packageEntryFailure node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js:16198:15
+ ❯ resolvePackageEntry node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js:16195:3
+ ❯ tryNodeResolve node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js:16060:18
+ ❯ ResolveIdContext.resolveId node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js:15831:19
+ ❯ EnvironmentPluginContainer.resolveId node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js:42213:17
+ ❯ TransformPluginContext.resolve node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js:42420:15
+ ❯ normalizeUrl node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js:40463:26
+ ❯ node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js:40594:37
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/82]⎯
+
+ FAIL  .claude/worktrees/agent-a22234cd969bc5250/tests/phase-6a-creator-adoption-commit-red.test.ts [ .claude/worktrees/agent-a22234cd969bc5250/tests/phase-6a-creator-adoption-commit-red.test.ts ]
+Error: Failed to resolve entry for package "@ts-drp/canonical". The package may have incorrect main/module/exports specified in its package.json.
+  Plugin: vite:import-analysis
+  File: /Users/aristotle/Documents/Projects/ts-drp-1/.claude/worktrees/agent-a22234cd969bc5250/tests/phase-6a-creator-adoption-commit-red.test.ts:3:49
+  1  |  import "fake-indexeddb/auto";
+  2  |  import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
+     |                                                    ^
+  3  |  import { digestClosure } from "@ts-drp/storage";
+  4  |  import { readFileSync } from "node:fs";
+ ❯ packageEntryFailure node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js:16198:15
+ ❯ resolvePackageEntry node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js:16195:3
+ ❯ tryNodeResolve node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js:16060:18
+ ❯ ResolveIdContext.resolveId node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js:15831:19
+ ❯ EnvironmentPluginContainer.resolveId node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js:42213:17
+ ❯ TransformPluginContext.resolve node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js:42420:15
+ ❯ normalizeUrl node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js:40463:26
+ ❯ node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js:40594:37
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/82]⎯
+
+ FAIL  .claude/worktrees/agent-a22234cd969bc5250/tests/phase-6a-creator-adoption-red.test.ts [ .claude/worktrees/agent-a22234cd969bc5250/tests/phase-6a-creator-adoption-red.test.ts ]
+Error: Failed to resolve entry for package "@ts-drp/canonical". The package may have incorrect main/module/exports specified in its package.json.
+  Plugin: vite:import-analysis
+  File: /Users/aristotle/Documents/Projects/ts-drp-1/.claude/worktrees/agent-a22234cd969bc5250/tests/phase-6a-creator-adoption-red.test.ts:4:61
+  1  |  import "fake-indexeddb/auto";
+  2  |  import { ed25519 } from "@noble/curves/ed25519.js";
+  3  |  import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+     |                                                                ^
+  4  |  import { CompactMerkleAccumulator } from "@ts-drp/compaction";
+  5  |  import {
+ ❯ packageEntryFailure node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js:16198:15
+ ❯ resolvePackageEntry node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js:16195:3
+ ❯ tryNodeResolve node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js:16060:18
+ ❯ ResolveIdContext.resolveId node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js:15831:19
+ ❯ EnvironmentPluginContainer.resolveId node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js:42213:17
+ ❯ TransformPluginContext.resolve node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js:42420:15
+ ❯ normalizeUrl node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js:40463:26
+ ❯ node_modules/.pnpm/vite@6.3.4_@types+node@22.14.0_terser@5.49.0_tsx@4.19.1_yaml@2.8.0/node_modules/vite/dist/node/chunks/dep-Bn81Esdm.js:40594:37
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/82]⎯
+
+
+ Test Files  82 failed | 26 passed (108)
+      Tests  52 passed (52)
+   Start at  11:54:48
+   Duration  30.07s (transform 98.53s, setup 0ms, collect 16.99s, tests 177.38s, environment 10ms, prepare 6.95s)
+

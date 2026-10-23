@@ -1,0 +1,19 @@
+
+ RUN  v3.1.1 /private/tmp/ts-drp-transition-responsiveness
+
+(node:26796) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/creator-adoption-host-turn-native.test.ts (7 tests) 18141ms
+   ✓ retains original public owners while native adoption boundary begin is held  2975ms
+   ✓ retains original public owners while native adoption boundary publish is held  2602ms
+   ✓ retains original public owners while native adoption boundary commit is held  2612ms
+   ✓ retains original public owners while native adoption boundary recovery is held  2627ms
+   ✓ retains original public owners while native adoption boundary activate is held  2611ms
+   ✓ joins session close while native adoption boundary commit is held  2362ms
+   ✓ joins session close while native adoption boundary recovery is held  2350ms
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+   Start at  11:50:47
+   Duration  22.05s (transform 2.33s, setup 0ms, collect 3.62s, tests 18.14s, environment 0ms, prepare 50ms)
+
