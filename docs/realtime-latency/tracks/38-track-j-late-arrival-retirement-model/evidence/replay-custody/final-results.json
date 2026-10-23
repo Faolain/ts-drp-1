@@ -1,0 +1,1925 @@
+{
+  "sourceHashes": {
+    "packages/protocol-v3/formal/replay-read-custody.qnt": "4f2293f58d30d654f7d2ac61c579c0cb455254bf9abb2092def9200e47a8fbc0",
+    "packages/protocol-v3/formal/replay-egress-pool.qnt": "ebf925b3fb12ee0214dd543bccd72af3cb362aeb6bb195bbd7270b343a5368cd",
+    "packages/protocol-v3/formal/replay-broadcast-rounds.qnt": "a3c7349510b2586a79f4ef42f3a7c0d99dccff39c0e038702d7d09e4f4f3fd01",
+    "packages/protocol-v3/formal/retirement-intent-selection.qnt": "3ba89910e43a7c3cf46418955eb1a47b7e2e6cbf0f0f1023880d01d658757c6a",
+    "packages/protocol-v3/formal/current-fence-projection.qnt": "b72d9eb59e75ab9ec7db77b9ef9a9f0b9cd64bdce16a836b46c95138f8a1d7df",
+    "packages/protocol-v3/formal/current-fence-bridge.qnt": "c3be5b947edf32471599d9f1f1a34b7a4189bf94e76421072789984a1ed0378b",
+    "packages/protocol-v3/formal/retirement-recovery-admission.qnt": "787a5e20c321f0b3ef2ba243ea7891fb3a86ef6d8c695df139a342ab28a0b40a",
+    "packages/protocol-v3/formal/issuance-quote-currency.qnt": "21c98e9e5af6c7871c094da10ede594ff72bde1fa45b88bfdbfb6e611ef31983",
+    "packages/protocol-v3/formal/source-age-projection.qnt": "00c88c6e581baef35498eda0162c39725f1264ee23fd3bd31ed533350c5e6605",
+    "packages/protocol-v3/formal/settlement-replacement-retirement-mutations/run-check.mjs": "1a8584df57f8215eafdaf32e39087612c689ccdcb9085ed5fd41aa253c85a06d",
+    "packages/protocol-v3/formal/check-replay-custody.mjs": "e3d0b54a56cf10a00f7a06e913a55b92d6bc2fdc701e37e7344e8659f12eb5a1",
+    "packages/protocol-v3/formal/settlement-replacement-retirement.qnt": "de30525dcd061ec795b2c10ed2cfab09b8a39950269b092e70322e9b9a9dc07b",
+    "packages/node/src/v3-live.ts": "6d2813d3b822eb266ffe760038c35206de0be46418df6e47ab25b85601e465f8",
+    "packages/node/src/creator-close.ts": "46fe49c250c30a64f2fa575949192a81abc2e78425e01988dc9e7e797b03c2ca",
+    "packages/node/src/internal/creator-closed-rollback-data.ts": "b218cda2a68f58b6cf220e1a02e103a457ef57436581b355fe6f170dd46dc374"
+  },
+  "unchanged": true,
+  "results": [
+    {
+      "name": "replay-read-custody.qnt-typecheck",
+      "command": "typecheck",
+      "args": [
+        "packages/protocol-v3/formal/replay-read-custody.qnt"
+      ],
+      "expected": "typecheck",
+      "code": 0,
+      "got": "typecheck",
+      "seconds": 3,
+      "log": {
+        "path": "replay-read-custody.qnt-typecheck.log.gz",
+        "sha256": "f1b651238a58fe290baec6c5e32f3bdb1943dd2bd582f02569231f7a757c7837",
+        "uncompressedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "replay-egress-pool.qnt-typecheck",
+      "command": "typecheck",
+      "args": [
+        "packages/protocol-v3/formal/replay-egress-pool.qnt"
+      ],
+      "expected": "typecheck",
+      "code": 0,
+      "got": "typecheck",
+      "seconds": 3,
+      "log": {
+        "path": "replay-egress-pool.qnt-typecheck.log.gz",
+        "sha256": "f1b651238a58fe290baec6c5e32f3bdb1943dd2bd582f02569231f7a757c7837",
+        "uncompressedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "replay-broadcast-rounds.qnt-typecheck",
+      "command": "typecheck",
+      "args": [
+        "packages/protocol-v3/formal/replay-broadcast-rounds.qnt"
+      ],
+      "expected": "typecheck",
+      "code": 0,
+      "got": "typecheck",
+      "seconds": 1,
+      "log": {
+        "path": "replay-broadcast-rounds.qnt-typecheck.log.gz",
+        "sha256": "f1b651238a58fe290baec6c5e32f3bdb1943dd2bd582f02569231f7a757c7837",
+        "uncompressedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "retirement-intent-selection.qnt-typecheck",
+      "command": "typecheck",
+      "args": [
+        "packages/protocol-v3/formal/retirement-intent-selection.qnt"
+      ],
+      "expected": "typecheck",
+      "code": 0,
+      "got": "typecheck",
+      "seconds": 1,
+      "log": {
+        "path": "retirement-intent-selection.qnt-typecheck.log.gz",
+        "sha256": "f1b651238a58fe290baec6c5e32f3bdb1943dd2bd582f02569231f7a757c7837",
+        "uncompressedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "current-fence-projection.qnt-typecheck",
+      "command": "typecheck",
+      "args": [
+        "packages/protocol-v3/formal/current-fence-projection.qnt"
+      ],
+      "expected": "typecheck",
+      "code": 0,
+      "got": "typecheck",
+      "seconds": 1,
+      "log": {
+        "path": "current-fence-projection.qnt-typecheck.log.gz",
+        "sha256": "f1b651238a58fe290baec6c5e32f3bdb1943dd2bd582f02569231f7a757c7837",
+        "uncompressedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "current-fence-bridge.qnt-typecheck",
+      "command": "typecheck",
+      "args": [
+        "packages/protocol-v3/formal/current-fence-bridge.qnt"
+      ],
+      "expected": "typecheck",
+      "code": 0,
+      "got": "typecheck",
+      "seconds": 13,
+      "log": {
+        "path": "current-fence-bridge.qnt-typecheck.log.gz",
+        "sha256": "f1b651238a58fe290baec6c5e32f3bdb1943dd2bd582f02569231f7a757c7837",
+        "uncompressedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "retirement-recovery-admission.qnt-typecheck",
+      "command": "typecheck",
+      "args": [
+        "packages/protocol-v3/formal/retirement-recovery-admission.qnt"
+      ],
+      "expected": "typecheck",
+      "code": 0,
+      "got": "typecheck",
+      "seconds": 2,
+      "log": {
+        "path": "retirement-recovery-admission.qnt-typecheck.log.gz",
+        "sha256": "f1b651238a58fe290baec6c5e32f3bdb1943dd2bd582f02569231f7a757c7837",
+        "uncompressedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "issuance-quote-currency.qnt-typecheck",
+      "command": "typecheck",
+      "args": [
+        "packages/protocol-v3/formal/issuance-quote-currency.qnt"
+      ],
+      "expected": "typecheck",
+      "code": 0,
+      "got": "typecheck",
+      "seconds": 1,
+      "log": {
+        "path": "issuance-quote-currency.qnt-typecheck.log.gz",
+        "sha256": "f1b651238a58fe290baec6c5e32f3bdb1943dd2bd582f02569231f7a757c7837",
+        "uncompressedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "source-age-projection.qnt-typecheck",
+      "command": "typecheck",
+      "args": [
+        "packages/protocol-v3/formal/source-age-projection.qnt"
+      ],
+      "expected": "typecheck",
+      "code": 0,
+      "got": "typecheck",
+      "seconds": 1,
+      "log": {
+        "path": "source-age-projection.qnt-typecheck.log.gz",
+        "sha256": "f1b651238a58fe290baec6c5e32f3bdb1943dd2bd582f02569231f7a757c7837",
+        "uncompressedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "phase-tests",
+      "command": "test",
+      "args": [
+        "packages/protocol-v3/formal/replay-read-custody.qnt",
+        "--main",
+        "replayReadPhases"
+      ],
+      "expected": "tests",
+      "count": 13,
+      "code": 0,
+      "got": "tests",
+      "seconds": 3,
+      "log": {
+        "path": "phase-tests.log.gz",
+        "sha256": "e021af7adbdde47c6db60bc8cea5c14d512cbd2a52a8b37dbbeaff9517169037",
+        "uncompressedSha256": "86c7091e1fc4cbb26c120afc645258fd83393ce641753cefb18e80576b9e5427"
+      }
+    },
+    {
+      "name": "borrow-tests",
+      "command": "test",
+      "args": [
+        "packages/protocol-v3/formal/replay-read-custody.qnt",
+        "--main",
+        "replayBorrowedCustody"
+      ],
+      "expected": "tests",
+      "count": 7,
+      "code": 0,
+      "got": "tests",
+      "seconds": 3,
+      "log": {
+        "path": "borrow-tests.log.gz",
+        "sha256": "810eb1cadc46fa16cc7a90f9e08e6b054c49e4b45f62fbab4fe7690bcdc4a44c",
+        "uncompressedSha256": "74765216ce8b7547ed0dfcdb5e3a44a1ae64f52a00c2c6f82b42d540377e68d3"
+      }
+    },
+    {
+      "name": "pool-tests",
+      "command": "test",
+      "args": [
+        "packages/protocol-v3/formal/replay-egress-pool.qnt",
+        "--main",
+        "replayEgressPoolSmall"
+      ],
+      "expected": "tests",
+      "count": 9,
+      "code": 0,
+      "got": "tests",
+      "seconds": 3,
+      "log": {
+        "path": "pool-tests.log.gz",
+        "sha256": "e0fec626b154ad01a0c1db97629ac40bfb92900c2306831b361087d7a5853629",
+        "uncompressedSha256": "5031ca786c62ca9d2dfeb13c1962f3625e05a106aa72983144d08eea37db7b16"
+      }
+    },
+    {
+      "name": "pool-32-tests",
+      "command": "test",
+      "args": [
+        "packages/protocol-v3/formal/replay-egress-pool.qnt",
+        "--main",
+        "replayEgressPool32"
+      ],
+      "expected": "tests",
+      "count": 10,
+      "code": 0,
+      "got": "tests",
+      "seconds": 4,
+      "log": {
+        "path": "pool-32-tests.log.gz",
+        "sha256": "7588c3750fd13ec4ccbae94efc84dac8db7b4b984c17803bee165fb0a09d78cb",
+        "uncompressedSha256": "28e21a7f5cea60a1357d1199fd0faa4d18938cc365cc1a1d35cc8e6d246602e3"
+      }
+    },
+    {
+      "name": "broadcast-tests",
+      "command": "test",
+      "args": [
+        "packages/protocol-v3/formal/replay-broadcast-rounds.qnt",
+        "--main",
+        "replayBroadcastRounds"
+      ],
+      "expected": "tests",
+      "count": 5,
+      "code": 0,
+      "got": "tests",
+      "seconds": 2,
+      "log": {
+        "path": "broadcast-tests.log.gz",
+        "sha256": "7cc86387129a2527335fff6f9aabbbd22a052c146c81d85719282190c4fdc8f0",
+        "uncompressedSha256": "a44c108ed47fd1b9716a01b10a903082ddd3c8461eb28e9f0f0ee84fdba93773"
+      }
+    },
+    {
+      "name": "intent-tests",
+      "command": "test",
+      "args": [
+        "packages/protocol-v3/formal/retirement-intent-selection.qnt",
+        "--main",
+        "retirementIntentSelection"
+      ],
+      "expected": "tests",
+      "count": 8,
+      "code": 0,
+      "got": "tests",
+      "seconds": 3,
+      "log": {
+        "path": "intent-tests.log.gz",
+        "sha256": "e6ca53ae0617ccbf1bb16b9cc0267a9b21bfe1a1154e0122297a1a4fe0af97e6",
+        "uncompressedSha256": "490f6ceb634bcc7e3b8e29f03fca191050d7133b305a45ff6d8665cc3680b355"
+      }
+    },
+    {
+      "name": "fence-tests",
+      "command": "test",
+      "args": [
+        "packages/protocol-v3/formal/current-fence-projection.qnt",
+        "--main",
+        "currentFenceProjection"
+      ],
+      "expected": "tests",
+      "count": 3,
+      "code": 0,
+      "got": "tests",
+      "seconds": 3,
+      "log": {
+        "path": "fence-tests.log.gz",
+        "sha256": "79123c3649220bd740993a03ec607b5c1119dadda94a876500fd4e42c227e030",
+        "uncompressedSha256": "09c3d0ef730a860db7d1c0189e41ba709a014678c2466f96c44349d154f08c53"
+      }
+    },
+    {
+      "name": "recovery-tests",
+      "command": "test",
+      "args": [
+        "packages/protocol-v3/formal/retirement-recovery-admission.qnt",
+        "--main",
+        "retirementRecoveryAdmission"
+      ],
+      "expected": "tests",
+      "count": 7,
+      "code": 0,
+      "got": "tests",
+      "seconds": 3,
+      "log": {
+        "path": "recovery-tests.log.gz",
+        "sha256": "e7ce02d4d3e9c779d6f04e679b835472b61f7c97190bfec19fa8743db60f9dec",
+        "uncompressedSha256": "72a1496d91249b2a9b7a4d4385f038d43f0713330787d03053e17043f4b4fd61"
+      }
+    },
+    {
+      "name": "currency-tests",
+      "command": "test",
+      "args": [
+        "packages/protocol-v3/formal/issuance-quote-currency.qnt",
+        "--main",
+        "issuanceQuoteCurrency"
+      ],
+      "expected": "tests",
+      "count": 9,
+      "code": 0,
+      "got": "tests",
+      "seconds": 10,
+      "log": {
+        "path": "currency-tests.log.gz",
+        "sha256": "57b46118f1c082a5aa6d447a0081a0f64682bb719f318cf008ecbeebb5db91e7",
+        "uncompressedSha256": "6f56b676f79cc65ab03ad711f82c4520a5e51e21773d682dfcd7648b4367cf63"
+      }
+    },
+    {
+      "name": "age-tests",
+      "command": "test",
+      "args": [
+        "packages/protocol-v3/formal/source-age-projection.qnt",
+        "--main",
+        "sourceAgeProjection"
+      ],
+      "expected": "tests",
+      "count": 3,
+      "code": 0,
+      "got": "tests",
+      "seconds": 2,
+      "log": {
+        "path": "age-tests.log.gz",
+        "sha256": "aeb6648b47d0c547519bf0cc0d0f3ec08df950195279fcf8f1ab9efdc04c1fec",
+        "uncompressedSha256": "6f713bd011b8da1cb4770a42d28f180f51fef1793f987536a78d0326fa3af11d"
+      }
+    },
+    {
+      "name": "phase-tlc",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/replay-read-custody.qnt",
+        "--main",
+        "replayReadPhases",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 17,
+      "log": {
+        "path": "phase-tlc.log.gz",
+        "sha256": "4174d3584e7fe7db739b30e30ff711aa7d1dd5db9a4aa54a1441a9418d77bf9f",
+        "uncompressedSha256": "8022f292264ed2481f2b8a6db1bce65a4fac55683cf889a934f779a5d3f15fb2"
+      },
+      "states": {
+        "generated": 393033,
+        "distinct": 37382,
+        "remaining": 0
+      },
+      "graphDepth": 21
+    },
+    {
+      "name": "phase-mutation",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/replay-read-custody.qnt",
+        "--main",
+        "replayReadPhases",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "unsafeStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 8,
+      "log": {
+        "path": "phase-mutation.log.gz",
+        "sha256": "e1a83e11a919c5837c6b201e56e6234760ac8f1be10d7dcc74db034d3c7398e4",
+        "uncompressedSha256": "c34d1230fe3be640e71cf20ef7303834c638dceeace41efa02a11f648f033464"
+      },
+      "states": {
+        "generated": 42,
+        "distinct": 26,
+        "remaining": 20
+      },
+      "graphDepth": 3
+    },
+    {
+      "name": "phase-nonvacuity",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/replay-read-custody.qnt",
+        "--main",
+        "replayReadPhases",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "neverSealed",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 8,
+      "log": {
+        "path": "phase-nonvacuity.log.gz",
+        "sha256": "c897c4d3d098eea2de8c7c3c505743db3f83e119e2afa384833364cd8563f038",
+        "uncompressedSha256": "813e478a60f657c3b021dce2b1ee2000ea470bb9be2cac6ab35d0fd5842e0cab"
+      },
+      "states": {
+        "generated": 948,
+        "distinct": 381,
+        "remaining": 268
+      },
+      "graphDepth": 5
+    },
+    {
+      "name": "borrow-tlc",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/replay-read-custody.qnt",
+        "--main",
+        "replayBorrowedCustody",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 8,
+      "log": {
+        "path": "borrow-tlc.log.gz",
+        "sha256": "c147e3f45c8e75b93c163b5f15b33a4742e277cc5b346508309c13e1f7990ab2",
+        "uncompressedSha256": "48d9c2242bb151b8a0d2dc57386bf1bc0b472b2bffe1a833e20bb202edf2ce9e"
+      },
+      "states": {
+        "generated": 215,
+        "distinct": 92,
+        "remaining": 0
+      },
+      "graphDepth": 10
+    },
+    {
+      "name": "borrow-mutation",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/replay-read-custody.qnt",
+        "--main",
+        "replayBorrowedCustody",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "unsafeStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 10,
+      "log": {
+        "path": "borrow-mutation.log.gz",
+        "sha256": "692b5285b1344966fe2ad166fc37d88d50145b1767c8a6c67bd401bd59b11f8e",
+        "uncompressedSha256": "c01ba09d2a04dcb928c58ed5d6f5bac6f23578ee5dfc41761c4297d6b91c80a2"
+      },
+      "states": {
+        "generated": 12,
+        "distinct": 11,
+        "remaining": 5
+      },
+      "graphDepth": 4
+    },
+    {
+      "name": "borrow-nonvacuity",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/replay-read-custody.qnt",
+        "--main",
+        "replayBorrowedCustody",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "neverBorrowed",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 9,
+      "log": {
+        "path": "borrow-nonvacuity.log.gz",
+        "sha256": "e5784fdc9524107a85804db357384e60a2f43a692b56e4c035ea5f1bfd9fe5fe",
+        "uncompressedSha256": "5c118a88ecd91cde524b105ccd63b6346c30f397aef9d8d52f1f83795de02776"
+      },
+      "states": {
+        "generated": 6,
+        "distinct": 6,
+        "remaining": 2
+      },
+      "graphDepth": 3
+    },
+    {
+      "name": "pool-tlc",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/replay-egress-pool.qnt",
+        "--main",
+        "replayEgressPoolSmall",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 11,
+      "log": {
+        "path": "pool-tlc.log.gz",
+        "sha256": "1d8988877734ee1664eaf0dff17b4805624b8352c398671ab5949407e103d457",
+        "uncompressedSha256": "03395b8e9f56725c5ecf8a6bf4405a2c63a8897a546d3fd919936746a3b1a7a4"
+      },
+      "states": {
+        "generated": 214422,
+        "distinct": 26127,
+        "remaining": 0
+      },
+      "graphDepth": 14
+    },
+    {
+      "name": "pool-mutation",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/replay-egress-pool.qnt",
+        "--main",
+        "replayEgressPoolSmall",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "unsafeStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 8,
+      "log": {
+        "path": "pool-mutation.log.gz",
+        "sha256": "2e6ef0ca4409dfdb712abe4aaa7661e59ca8cc7baac41f5e761d7e271c8f8f1b",
+        "uncompressedSha256": "4cf690b9a6f3036b75d6845a0bc81c16dc5abdf8e4bf42596a222ee2f0198ec7"
+      },
+      "states": {
+        "generated": 47,
+        "distinct": 28,
+        "remaining": 23
+      },
+      "graphDepth": 3
+    },
+    {
+      "name": "pool-nonvacuity",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/replay-egress-pool.qnt",
+        "--main",
+        "replayEgressPoolSmall",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "neverRetiredNative",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 8,
+      "log": {
+        "path": "pool-nonvacuity.log.gz",
+        "sha256": "235d7deb63596273050e719bfbd0ad5c74c39dee920f361e454fdbc37c444938",
+        "uncompressedSha256": "d6202530e9acc09bc300af6dc92b726296b2862b9b60158b4b9139f9f11023a1"
+      },
+      "states": {
+        "generated": 142,
+        "distinct": 74,
+        "remaining": 57
+      },
+      "graphDepth": 4
+    },
+    {
+      "name": "broadcast-tlc",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/replay-broadcast-rounds.qnt",
+        "--main",
+        "replayBroadcastRounds",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 9,
+      "log": {
+        "path": "broadcast-tlc.log.gz",
+        "sha256": "0749f7128342b4282a5340496386e607b762f284063717d09a9c976f57d81409",
+        "uncompressedSha256": "163b22a4886e83dbe5020683ad5b17fe86158e32654ff0b13c4c231474ea4807"
+      },
+      "states": {
+        "generated": 1073,
+        "distinct": 307,
+        "remaining": 0
+      },
+      "graphDepth": 20
+    },
+    {
+      "name": "broadcast-mutation",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/replay-broadcast-rounds.qnt",
+        "--main",
+        "replayBroadcastRounds",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "unsafeSafetyStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 8,
+      "log": {
+        "path": "broadcast-mutation.log.gz",
+        "sha256": "5de108e32bd03a0636abbdcd0157499cf517ffa21610371008f4cde02ae6b15e",
+        "uncompressedSha256": "96b442b03ee3412ee95befc2c4992b0c99afe66b6be294961ec4ff142391f15b"
+      },
+      "states": {
+        "generated": 430,
+        "distinct": 153,
+        "remaining": 39
+      },
+      "graphDepth": 8
+    },
+    {
+      "name": "broadcast-nonvacuity",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/replay-broadcast-rounds.qnt",
+        "--main",
+        "replayBroadcastRounds",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "neverComplete",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 8,
+      "log": {
+        "path": "broadcast-nonvacuity.log.gz",
+        "sha256": "54d36b386c3404196d46c4d760b9cdb2537a1007155a5bda01e41734d8acb097",
+        "uncompressedSha256": "23bf00a3afc1d7f77c4bec2deb28707cbd8d6af4e4ed8a7330249aa54fff9eb3"
+      },
+      "states": {
+        "generated": 33,
+        "distinct": 20,
+        "remaining": 11
+      },
+      "graphDepth": 4
+    },
+    {
+      "name": "intent-tlc",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/retirement-intent-selection.qnt",
+        "--main",
+        "retirementIntentSelection",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 8,
+      "log": {
+        "path": "intent-tlc.log.gz",
+        "sha256": "c19694c55e0742eebe3d6c5ab0eeb907053699b22ab542c2c93b85155cff757e",
+        "uncompressedSha256": "340389113edc7278f5aefd5b7d1728c268badfc0f5000089ab0d14d4f0b6e967"
+      },
+      "states": {
+        "generated": 13185,
+        "distinct": 1960,
+        "remaining": 0
+      },
+      "graphDepth": 9
+    },
+    {
+      "name": "intent-mutation",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/retirement-intent-selection.qnt",
+        "--main",
+        "retirementIntentSelection",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "unsafeStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 8,
+      "log": {
+        "path": "intent-mutation.log.gz",
+        "sha256": "5968e529ca259cfd12370b5fa2f3aec8450482acaae19f04b7b9752f82a25581",
+        "uncompressedSha256": "9e308798150481482d1f22f450b68198e0ea976677afc62a7ad4eb1b7035f847"
+      },
+      "states": {
+        "generated": 32,
+        "distinct": 29,
+        "remaining": 25
+      },
+      "graphDepth": 3
+    },
+    {
+      "name": "intent-nonvacuity",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/retirement-intent-selection.qnt",
+        "--main",
+        "retirementIntentSelection",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "neverFreshSameFloor",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 12,
+      "log": {
+        "path": "intent-nonvacuity.log.gz",
+        "sha256": "ba35957cac4b3580da6d243383908777d86327cfcf79270224451961c204c6be",
+        "uncompressedSha256": "2cf4f90c87808523b310eb75bd15d2ce5aa6dbb84c608cfe31fce2991285ae75"
+      },
+      "states": {
+        "generated": 277,
+        "distinct": 188,
+        "remaining": 152
+      },
+      "graphDepth": 4
+    },
+    {
+      "name": "fence-tlc",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/current-fence-projection.qnt",
+        "--main",
+        "currentFenceProjection",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "currentFence",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 8,
+      "log": {
+        "path": "fence-tlc.log.gz",
+        "sha256": "5b920e74cf097acc5f1b996cd93c2e9ae46d113f8fbb413e7ba1b6a5f592f128",
+        "uncompressedSha256": "b875082a9b01324be6017bc8ce0f6d24eddc1b9dc98ce70629c0d4fa0b29d504"
+      },
+      "states": {
+        "generated": 1819,
+        "distinct": 832,
+        "remaining": 0
+      },
+      "graphDepth": 6
+    },
+    {
+      "name": "fence-mutation",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/current-fence-projection.qnt",
+        "--main",
+        "currentFenceProjection",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "unsafeStep",
+        "--init",
+        "init",
+        "--invariants",
+        "currentFence",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 13,
+      "log": {
+        "path": "fence-mutation.log.gz",
+        "sha256": "e46eb3370c61eb41a3981b22768ba28d3f74e18ad6964209e357f7d1475d4d70",
+        "uncompressedSha256": "bb3b6d2c3c7b7bec0a2cb66885d533be70e85edd3a9d925867119cf3463bb855"
+      },
+      "states": {
+        "generated": 61,
+        "distinct": 56,
+        "remaining": 51
+      },
+      "graphDepth": 3
+    },
+    {
+      "name": "fence-nonvacuity",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/current-fence-projection.qnt",
+        "--main",
+        "currentFenceProjection",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "neverInstalled",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 10,
+      "log": {
+        "path": "fence-nonvacuity.log.gz",
+        "sha256": "e02cb7f46cfa89c2644348d6dc1c12d495af44450ba6dff1d1d309b12c78409a",
+        "uncompressedSha256": "7772d469ccfa9652adb0014f6336701114f880fb04161d4ba5dcdf83737c7080"
+      },
+      "states": {
+        "generated": 5,
+        "distinct": 4,
+        "remaining": 2
+      },
+      "graphDepth": 2
+    },
+    {
+      "name": "recovery-tlc",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/retirement-recovery-admission.qnt",
+        "--main",
+        "retirementRecoveryAdmission",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 9,
+      "log": {
+        "path": "recovery-tlc.log.gz",
+        "sha256": "4ce9ff6f46870f1f89579dc4d4156bf3f33143d1cac76331dabe3f69c5d17b4c",
+        "uncompressedSha256": "4e2a33219ebfea39c9c95fb05a82cd7ecd186ed158eafa3bba47c24cbc380f46"
+      },
+      "states": {
+        "generated": 28,
+        "distinct": 13,
+        "remaining": 0
+      },
+      "graphDepth": 7
+    },
+    {
+      "name": "recovery-mutation",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/retirement-recovery-admission.qnt",
+        "--main",
+        "retirementRecoveryAdmission",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "unsafeStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 10,
+      "log": {
+        "path": "recovery-mutation.log.gz",
+        "sha256": "1b1c0e887a21a2e9ea91790dc01a294eb9c9e5a9c15802058bd12e6f3b592c2c",
+        "uncompressedSha256": "9034fb96b0adaed39f16fa5b0eb45f2d812efc33f48ca7017a08da578223c2e7"
+      },
+      "states": {
+        "generated": 5,
+        "distinct": 4,
+        "remaining": 2
+      },
+      "graphDepth": 2
+    },
+    {
+      "name": "recovery-nonvacuity",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/retirement-recovery-admission.qnt",
+        "--main",
+        "retirementRecoveryAdmission",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "neverOrdinary",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 11,
+      "log": {
+        "path": "recovery-nonvacuity.log.gz",
+        "sha256": "aeb7776ebfa798615eb57c4a0f5e54cc61ce0ce9e9ccf5155fda900a64ec52b8",
+        "uncompressedSha256": "247f983c72f2ccd481089352913833911626bab36e29715aed0845819b7b2380"
+      },
+      "states": {
+        "generated": 27,
+        "distinct": 13,
+        "remaining": 0
+      },
+      "graphDepth": 7
+    },
+    {
+      "name": "currency-tlc",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/issuance-quote-currency.qnt",
+        "--main",
+        "issuanceQuoteCurrency",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 8,
+      "log": {
+        "path": "currency-tlc.log.gz",
+        "sha256": "45ef01aec9ab621d2751112f941777eab290b47da5fd2702a8fa440e2d6a513d",
+        "uncompressedSha256": "97fc634ce532f75cc5778df78e90593c9ca78c63ac3dd11aa5cf5c46c6efcba5"
+      },
+      "states": {
+        "generated": 1020,
+        "distinct": 541,
+        "remaining": 0
+      },
+      "graphDepth": 6
+    },
+    {
+      "name": "currency-mutation",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/issuance-quote-currency.qnt",
+        "--main",
+        "issuanceQuoteCurrency",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "unsafeStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 9,
+      "log": {
+        "path": "currency-mutation.log.gz",
+        "sha256": "db62403be009cd9c1d12e959a60065307ce8d096851c178b722a402ec65d8154",
+        "uncompressedSha256": "5e10c21085ae1325ccf162366c364cd0272a436adff21b329dc3de2353a0df76"
+      },
+      "states": {
+        "generated": 463,
+        "distinct": 262,
+        "remaining": 208
+      },
+      "graphDepth": 5
+    },
+    {
+      "name": "currency-nonvacuity",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/issuance-quote-currency.qnt",
+        "--main",
+        "issuanceQuoteCurrency",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "neverCrypto",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 11,
+      "log": {
+        "path": "currency-nonvacuity.log.gz",
+        "sha256": "b6e0b9ca8349439d3a3a43797090d7230046c5ecd498ec5dca67c072a84db950",
+        "uncompressedSha256": "003639454de52e9f72f7025d1dd7bc45501072ea9ce0eee357fa44650702fc3c"
+      },
+      "states": {
+        "generated": 53,
+        "distinct": 52,
+        "remaining": 38
+      },
+      "graphDepth": 4
+    },
+    {
+      "name": "age-tlc",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/source-age-projection.qnt",
+        "--main",
+        "sourceAgeProjection",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 7,
+      "log": {
+        "path": "age-tlc.log.gz",
+        "sha256": "3198d02aa4ef938bcf4d079ef528cc33d9fe422ba8d218fe6665f55699ca6ed2",
+        "uncompressedSha256": "26e4263e7b20385200b3bdccbcaa34712b38137113d3720688f530ab01671171"
+      },
+      "states": {
+        "generated": 3106,
+        "distinct": 765,
+        "remaining": 0
+      },
+      "graphDepth": 6
+    },
+    {
+      "name": "age-mutation",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/source-age-projection.qnt",
+        "--main",
+        "sourceAgeProjection",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "unsafeStep",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 12,
+      "log": {
+        "path": "age-mutation.log.gz",
+        "sha256": "122d8cf546fd0c799efdd3f8bf1a043eb2420374deaa0b5771f184221468454b",
+        "uncompressedSha256": "9400baa6a8394c4774de23651b33b12ed0f9e34255a6ef92790bf6da3e65cc50"
+      },
+      "states": {
+        "generated": 45,
+        "distinct": 43,
+        "remaining": 40
+      },
+      "graphDepth": 3
+    },
+    {
+      "name": "age-nonvacuity",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/source-age-projection.qnt",
+        "--main",
+        "sourceAgeProjection",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "neverAssigned",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 12,
+      "log": {
+        "path": "age-nonvacuity.log.gz",
+        "sha256": "ceda1cd73c3b6d0907d19b0568333094a55d99954e4bae3a28459f14f8ca9f8d",
+        "uncompressedSha256": "e03a984a928fd295e6db46d1ff75c903dc2c9b847a20b803f7c39d772c92476f"
+      },
+      "states": {
+        "generated": 22,
+        "distinct": 20,
+        "remaining": 17
+      },
+      "graphDepth": 3
+    },
+    {
+      "name": "fence-actual-bridge",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/current-fence-bridge.qnt",
+        "--main",
+        "currentFenceBridge",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "bridgeStep",
+        "--init",
+        "bridgeInit",
+        "--invariants",
+        "bridgeSafety",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 73,
+      "log": {
+        "path": "fence-actual-bridge.log.gz",
+        "sha256": "f8afc649e097f17ec221182fc6ece35e0ba0d9a03c1da2a10a4e202e7834ca10",
+        "uncompressedSha256": "ddff0e5d98c24b75aa4f6fbc68fdf562d8f284aeb14077406a261702e31cb465"
+      },
+      "states": {
+        "generated": 32379,
+        "distinct": 9130,
+        "remaining": 0
+      },
+      "graphDepth": 11
+    },
+    {
+      "name": "pool-progress",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/replay-egress-pool.qnt",
+        "--main",
+        "replayEgressPoolSmall",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--temporal",
+        "quiescentShutdown",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 23,
+      "log": {
+        "path": "pool-progress.log.gz",
+        "sha256": "b8bc447387a7ead6edef1506a097d314d776dbf32b37e1e03c257f37d05cce32",
+        "uncompressedSha256": "bc962e35c714fb3ae86a4d9bb32c9f00f5aac4991c024dda26b034c8b9a08686"
+      },
+      "states": {
+        "generated": 214422,
+        "distinct": 26127,
+        "remaining": 0
+      },
+      "graphDepth": 14
+    },
+    {
+      "name": "broadcast-progress",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/replay-broadcast-rounds.qnt",
+        "--main",
+        "replayBroadcastRounds",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--temporal",
+        "fairCompletion",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 15,
+      "log": {
+        "path": "broadcast-progress.log.gz",
+        "sha256": "add121612a5fe5df51d5c86c1c9ebbd840e12332e7a3be0d52c969b0b5bd4c49",
+        "uncompressedSha256": "3dd61cb59a3e5e2439147b9d15240d809b8f335e01042daede0bd7dce6c7a95e"
+      },
+      "states": {
+        "generated": 1073,
+        "distinct": 307,
+        "remaining": 0
+      },
+      "graphDepth": 20
+    },
+    {
+      "name": "broadcast-progress-mutation",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/replay-broadcast-rounds.qnt",
+        "--main",
+        "replayBroadcastRounds",
+        "--backend",
+        "tlc",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "unsafeQuietStep",
+        "--init",
+        "init",
+        "--temporal",
+        "unsafeFairCompletion",
+        "--verbosity=3",
+        "--tlc-config",
+        "/private/tmp/ts-drp-replay-final-v3/tlc.json"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 15,
+      "log": {
+        "path": "broadcast-progress-mutation.log.gz",
+        "sha256": "c7903aa7a9c82fce049b5157fcfdd73a2d32b8d49707b118c4b574096e5f1701",
+        "uncompressedSha256": "caa96f2fc6b95e5ed0bc3f7cc4b8f27878eb66196ebd057537ec68514335519c"
+      },
+      "states": {
+        "generated": 1111,
+        "distinct": 319,
+        "remaining": 0
+      }
+    },
+    {
+      "name": "borrow-apalache-base",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/replay-read-custody.qnt",
+        "--main",
+        "replayBorrowedCustody",
+        "--backend",
+        "apalache",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--apalache-config",
+        "/private/tmp/ts-drp-replay-final-v3/apalache.json",
+        "--max-steps=0"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 20,
+      "log": {
+        "path": "borrow-apalache-base.log.gz",
+        "sha256": "5e70d3d8761337027aec5fc0226aa377392f93c83ba478b72ca71612f7faf20f",
+        "uncompressedSha256": "678ded9e913ac1f650be1f4b8a81599bbf86dab84577bd62f009e054f6797ef1"
+      }
+    },
+    {
+      "name": "borrow-apalache-step",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/replay-read-custody.qnt",
+        "--main",
+        "replayBorrowedCustody",
+        "--backend",
+        "apalache",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "step",
+        "--init",
+        "indInit",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--apalache-config",
+        "/private/tmp/ts-drp-replay-final-v3/apalache.json",
+        "--max-steps=1"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 20,
+      "log": {
+        "path": "borrow-apalache-step.log.gz",
+        "sha256": "257e897ac99fde52e8fb0a4adc7cd38eac5a7f01bad16413d534fb951002c3bb",
+        "uncompressedSha256": "376ead29f77013473819e69f29895739f87c806e9a1a3b804e0e8e4d96a09c17"
+      }
+    },
+    {
+      "name": "pool-apalache-base",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/replay-egress-pool.qnt",
+        "--main",
+        "replayEgressPoolSmall",
+        "--backend",
+        "apalache",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--apalache-config",
+        "/private/tmp/ts-drp-replay-final-v3/apalache.json",
+        "--max-steps=0"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 21,
+      "log": {
+        "path": "pool-apalache-base.log.gz",
+        "sha256": "100d106e221b5bc075cef1826258e1364e389763054f1ebb923433d299e8f8b9",
+        "uncompressedSha256": "da856277d0937714fd81b907716cc1f65c3d2f4889e94aa37495ac701deb0dfe"
+      }
+    },
+    {
+      "name": "pool-apalache-step",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/replay-egress-pool.qnt",
+        "--main",
+        "replayEgressPoolSmall",
+        "--backend",
+        "apalache",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "step",
+        "--init",
+        "indInit",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--apalache-config",
+        "/private/tmp/ts-drp-replay-final-v3/apalache.json",
+        "--max-steps=1"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 28,
+      "log": {
+        "path": "pool-apalache-step.log.gz",
+        "sha256": "a61e48df42bcdd63bf1ef121948c2bbf1e179729d3ab85a75e189b44b6b47149",
+        "uncompressedSha256": "7d85b257c3e80eb5f8052d9941b19a3d253de390b6844b4efd9df56bae965135"
+      }
+    },
+    {
+      "name": "fence-apalache-base",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/current-fence-projection.qnt",
+        "--main",
+        "currentFenceProjection",
+        "--backend",
+        "apalache",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "currentFence",
+        "--verbosity=3",
+        "--apalache-config",
+        "/private/tmp/ts-drp-replay-final-v3/apalache.json",
+        "--max-steps=0"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 14,
+      "log": {
+        "path": "fence-apalache-base.log.gz",
+        "sha256": "2cefeb92b748cdf27cf5d09efdbb83363c714a4fc35f2c22aca16597f7602ed4",
+        "uncompressedSha256": "4ec63388db949479bc0f75296a79eebb970b100d239f68c88c75fe824529660d"
+      }
+    },
+    {
+      "name": "fence-apalache-step",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/current-fence-projection.qnt",
+        "--main",
+        "currentFenceProjection",
+        "--backend",
+        "apalache",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "step",
+        "--init",
+        "indInit",
+        "--invariants",
+        "currentFence",
+        "--verbosity=3",
+        "--apalache-config",
+        "/private/tmp/ts-drp-replay-final-v3/apalache.json",
+        "--max-steps=1"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 16,
+      "log": {
+        "path": "fence-apalache-step.log.gz",
+        "sha256": "b69bc8d8bd25a2dc394ad36ff8426431afe3bf1d3cfae45d0af6ba13e13680d2",
+        "uncompressedSha256": "727e3dd749b67e789e06cc08e67debae5a61314dd684c22d91e3669e0b08e199"
+      }
+    },
+    {
+      "name": "age-apalache-base",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/source-age-projection.qnt",
+        "--main",
+        "sourceAgeProjection",
+        "--backend",
+        "apalache",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "step",
+        "--init",
+        "init",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--apalache-config",
+        "/private/tmp/ts-drp-replay-final-v3/apalache.json",
+        "--max-steps=0"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 18,
+      "log": {
+        "path": "age-apalache-base.log.gz",
+        "sha256": "c461c4610defefbc34089ecb05d66ce3e45234c76ebe484b6b4f43d3b09203bb",
+        "uncompressedSha256": "38f9cfc636ca2ca16ec3e0e875a97fc6ed071ff2943685a1f986ef62e8676162"
+      }
+    },
+    {
+      "name": "age-apalache-step",
+      "command": "verify",
+      "expected": "ok",
+      "args": [
+        "packages/protocol-v3/formal/source-age-projection.qnt",
+        "--main",
+        "sourceAgeProjection",
+        "--backend",
+        "apalache",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "step",
+        "--init",
+        "indInit",
+        "--invariants",
+        "safety",
+        "--verbosity=3",
+        "--apalache-config",
+        "/private/tmp/ts-drp-replay-final-v3/apalache.json",
+        "--max-steps=1"
+      ],
+      "code": 0,
+      "got": "ok",
+      "seconds": 15,
+      "log": {
+        "path": "age-apalache-step.log.gz",
+        "sha256": "fb9b76efbebc0149b189aeca7631acd165a88a0ede8f67c23676caa97d1a39b7",
+        "uncompressedSha256": "d0ec2ca5a661cbe37590b62e32bc1bf3c4c19420055a539de5b6654d88111332"
+      }
+    },
+    {
+      "name": "age-weak-hypothesis",
+      "command": "verify",
+      "expected": "violation",
+      "args": [
+        "packages/protocol-v3/formal/source-age-projection.qnt",
+        "--main",
+        "sourceAgeProjection",
+        "--backend",
+        "apalache",
+        "--apalache-version",
+        "0.56.1",
+        "--server-endpoint",
+        "localhost:8870",
+        "--step",
+        "step",
+        "--init",
+        "weakIndInit",
+        "--invariants",
+        "sourceAge",
+        "--verbosity=3",
+        "--apalache-config",
+        "/private/tmp/ts-drp-replay-final-v3/apalache.json",
+        "--max-steps=1"
+      ],
+      "code": 1,
+      "got": "violation",
+      "seconds": 17,
+      "log": {
+        "path": "age-weak-hypothesis.log.gz",
+        "sha256": "41fea37cd7faf9a6c6c69492b9010ab9077c6a5a45c5c9b6d2c1dafe5301749a",
+        "uncompressedSha256": "3cf093f2e853ec3775930c908a73f12eb006d155c6b1ca8bb79f7a1516d788f7"
+      }
+    }
+  ],
+  "createdUtc": "2026-10-23T11:55:24.511742+00:00",
+  "status": "passed",
+  "checkCount": 59,
+  "testDeclarations": 74,
+  "toolchain": {
+    "quint": "0.32.0",
+    "apalache": "0.56.1",
+    "javaMajor": 17,
+    "node": "22.23.4",
+    "timeoutSecondsPerCheck": 300,
+    "tlcWorkers": 1,
+    "javaHeap": "1 GiB"
+  },
+  "implementationBaseline": {
+    "localReplayCommit": "cd5ec848",
+    "originalReplayCommit": "72532a8d83cb578280a9979e7694dfc8fc252d94",
+    "commonFix": "See companion-implementation.json; baseline predates the common fix."
+  },
+  "runnerOutput": {
+    "path": "runner.log.gz",
+    "sha256": "dee39f136e2dba4b8f0a4d82c372295be1994c01544f7c57394916c47aaa0d66",
+    "uncompressedSha256": "9296475f353699012fdffb6ca6c069380ac5d470c28690996636a65cc012c9f0"
+  },
+  "configs": [
+    {
+      "path": "tlc.json.gz",
+      "sha256": "96cb66311d6c772db0290c6b51b0aa8f5a06d6a851bc3932191309f896ebeb61",
+      "uncompressedSha256": "fddf79f0ad4e4bd651f809e4470c5bae4e5696328740205438d5b8aadd54a765"
+    },
+    {
+      "path": "apalache.json.gz",
+      "sha256": "1e19b7682d09a83d0c770bac780018726df0b38d0d5c5c448d03eb6ccb5c0dac",
+      "uncompressedSha256": "01af430f37a470674d8559d1c947ff277312c45058cde52049f8dd5f4b3f5311"
+    }
+  ],
+  "reviews": [
+    {
+      "pass": 1,
+      "log": {
+        "path": "review-first.log.gz",
+        "sha256": "b43bd280874ea52224e330d6a271a0c9016a0192614884450528a3286ac40468",
+        "uncompressedSha256": "ffeb411fa2865deb7f6739f0a03b410f8086f1f0f360e098bc13cde738e57d79"
+      },
+      "finding": "P2: two documented models omitted from runner and source hashes",
+      "resolution": "Registered recovery and currency for hashing, typecheck, directed tests, safety, mutation and nonvacuity; included in this complete rerun."
+    },
+    {
+      "pass": 2,
+      "log": {
+        "path": "review-final.log.gz",
+        "sha256": "c05443a238a7bef37db0bcada7fb4964d63d5ae0bb7e635d79e491314d5b42a6",
+        "uncompressedSha256": "cc8793463194700f6230938e8cadd2db54d2ee39129d9e2426bb1d072ea48e0e"
+      }
+    }
+  ]
+}

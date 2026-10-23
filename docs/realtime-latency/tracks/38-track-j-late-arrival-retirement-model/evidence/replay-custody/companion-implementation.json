@@ -1,0 +1,24 @@
+{
+  "status": "inspected uncommitted companion snapshot; native commit and validation are integrated separately",
+  "observedUtc": "2026-10-23T11:56:22.305079+00:00",
+  "baseCommit": "7d525f38c09d970d6994b38234ce83d234202328",
+  "sourceHashes": {
+    "packages/node/src/internal/creator-closed-rollback-data.ts": "a6da137d813554d9f62dc300b63e0a111e171e60b0410629658a0d791aff51af",
+    "packages/node/src/v3-live.ts": "271fca1946fa63fcc616d8821388cf7d26ae484c46641f8facb5342275174114",
+    "packages/storage-node/src/internal/node-issuance-store.ts": "46a07737fdcddae311c0a679a788614862b67b2848256c4a367b2db1a85a1566"
+  },
+  "selectionFunction": {
+    "file": "packages/node/src/internal/creator-closed-rollback-data.ts",
+    "symbol": "closedIssuanceProtectedRecordsForRetirement",
+    "extraction": "function keyword through immediately before the following /** Installation consumes comment",
+    "sha256": "260d1fee605e31c60bfc51c7a937ba09a27f301d9d6b68566f9282d717de3c93",
+    "archive": "companion-selection.ts.gz",
+    "archiveSha256": "931a412573b4802e051e4d27bbc9cd8788b8deb10726b08f8ece6f2d591a9980"
+  },
+  "boundaries": [
+    "Exact protectedRecords selection and active-foreign refusal inspected in the captured function.",
+    "Quote-currency counters, own deltas, control/lineage/incarnation comparisons inspected in #transactIssue.",
+    "Recovery qualification and native proof/release behavior remain implementation premises of the abstract gate.",
+    "Quint checks the models; it does not execute or prove TypeScript, SQLite, authentication, or native crash recovery."
+  ]
+}
