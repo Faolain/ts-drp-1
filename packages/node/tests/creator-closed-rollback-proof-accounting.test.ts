@@ -1,3 +1,4 @@
+import {createWorkCheckpoint} from "../src/internal/cooperative-work.js";
 import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { ed25519 } from "@noble/curves/ed25519.js";
@@ -2760,7 +2761,7 @@ const consume = unique((node): node is ts.VariableDeclaration => ts.isVariableDe
 const declarationCode = ["closedRetirementEqual", "selectClosedSigningSummaryEpoch", "closedSigningSummaryResidualRows"].map(declaration).join("\n");
 function execute<T>(code: string, context: Record<string, unknown>): T {
 	const js = ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText;
-	const imports = { encodeCanonical, decodeCanonical, closedRetirementBytes: encodeCanonical,
+	const imports = { createWorkCheckpoint, encodeCanonical, decodeCanonical, closedRetirementBytes: encodeCanonical,
 		CREATOR_ORDINARY_PROOF_MAX_BYTES, CREATOR_MAINTENANCE_PROOF_MAX_BYTES: maintenanceProofMaxBytes(),
 		compareBytes: (a: Uint8Array, b: Uint8Array) => Buffer.compare(Buffer.from(a), Buffer.from(b)), ...context };
 	// Execute in the codec's realm. A separate VM realm would produce foreign

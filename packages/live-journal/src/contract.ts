@@ -1309,7 +1309,20 @@ function validateSnapshotInstall(stored: LiveJournalStoredScope): boolean {
 // Preserve the original defensive recapture: a public input's Array.map can
 // return rows other than those visited by the first capture. Only this private
 // recapture may enroll leaf facts; no caller supplies a "validated" row/token.
-function deriveToken(snapshot: LiveJournalDurableSnapshot, validation?: SnapshotValidationFacts): LiveJournalSnapshotToken | undefined {
+function deriveToken(
+	snapshot: LiveJournalDurableSnapshot,
+	validation: SnapshotValidationFacts | undefined,
+	materialize: false
+): true | undefined;
+function deriveToken(
+	snapshot: LiveJournalDurableSnapshot,
+	validation?: SnapshotValidationFacts
+): LiveJournalSnapshotToken | undefined;
+function deriveToken(
+	snapshot: LiveJournalDurableSnapshot,
+	validation?: SnapshotValidationFacts,
+	materialize = true
+): LiveJournalSnapshotToken | true | undefined {
 	const captured = captureDurableSnapshot(snapshot);
 	if (captured === undefined) return undefined;
 	const stored = captured.scope;
@@ -1336,35 +1349,32 @@ function deriveToken(snapshot: LiveJournalDurableSnapshot, validation?: Snapshot
 	}
 	if (!(validation === undefined ? validateSnapshotInstall(stored) : validation.install(stored))) return undefined;
 	const highWatermark = stored.nextJournalSequence;
-	const orderedRowDigest = lowerHex(
-		hashDomain(
-			LIVE_JOURNAL_DOMAINS.order,
-			encodeCanonical({
-				kind: "v3-live-journal-order-1",
-				objectId: stored.scope.objectId,
-				epoch: stored.scope.epoch,
-				anchorDigest: stored.scope.anchorDigest,
-				highWatermark,
-				rowCommitmentDigests,
-			})
-		)
-	);
+	const orderBytes = encodeCanonical({
+		kind: "v3-live-journal-order-1",
+		objectId: stored.scope.objectId,
+		epoch: stored.scope.epoch,
+		anchorDigest: stored.scope.anchorDigest,
+		highWatermark,
+		rowCommitmentDigests,
+	});
+	// Validation-only native closure checks still run both original canonical
+	// envelope encodings. Every hash is exactly 64 ASCII hex characters, so the
+	// placeholder preserves their byte/item/depth refusals without hashing a
+	// token that this caller discards. Leaf commitment validation stays above.
+	const orderedRowDigest = materialize ? lowerHex(hashDomain(LIVE_JOURNAL_DOMAINS.order, orderBytes)) : "0".repeat(64);
 	const genesisDigest = stored.scope.anchorDigest;
-	const snapshotDigest = lowerHex(
-		hashDomain(
-			LIVE_JOURNAL_DOMAINS.snapshot,
-			encodeCanonical({
-				kind: "v3-live-journal-snapshot-1",
-				objectId: stored.scope.objectId,
-				epoch: stored.scope.epoch,
-				anchorDigest: stored.scope.anchorDigest,
-				highWatermark,
-				genesisDigest,
-				parametersDigest: stored.parametersDigest,
-				orderedRowDigest,
-			})
-		)
-	);
+	const snapshotBytes = encodeCanonical({
+		kind: "v3-live-journal-snapshot-1",
+		objectId: stored.scope.objectId,
+		epoch: stored.scope.epoch,
+		anchorDigest: stored.scope.anchorDigest,
+		highWatermark,
+		genesisDigest,
+		parametersDigest: stored.parametersDigest,
+		orderedRowDigest,
+	});
+	if (!materialize) return true;
+	const snapshotDigest = lowerHex(hashDomain(LIVE_JOURNAL_DOMAINS.snapshot, snapshotBytes));
 	return objectFreeze({
 		genesisDigest,
 		highWatermark,
@@ -1430,6 +1440,28 @@ function deriveCapturedSnapshot(input: SnapshotDerivationInput): SnapshotDerivat
 			return objectFreeze({ kind: "digest-mismatch", ok: false });
 		}
 		return objectFreeze({ ok: true, rows: durable.rows, token });
+	} catch {
+		return objectFreeze({ kind: "store-poisoned", ok: false });
+	}
+}
+
+/**
+ * Validates the complete native closure without unused replay rows or tokens.
+ * @param input - Fresh durable closure and its native owner's optional leaf facts.
+ * @returns Validation success, or the same complete-image refusal as replay derivation.
+ */
+export function validateLiveJournalSnapshot(
+	input: Pick<SnapshotDerivationInput, "durable" | "validation">
+): Readonly<{ readonly ok: true }> | Readonly<{ readonly ok: false; readonly kind: "store-poisoned" }> {
+	try {
+		const complete = captureDurableSnapshot(input.durable);
+		const validation = input.validation === undefined ? undefined : snapshotValidationOwners.get(input.validation);
+		if (complete === undefined || deriveToken(complete, validation, false) !== true) {
+			return objectFreeze({ kind: "store-poisoned", ok: false });
+		}
+		// The validator returns no input or captured data. Leaf facts retain only
+		// deriveToken's second private capture, including for overridden map().
+		return objectFreeze({ ok: true });
 	} catch {
 		return objectFreeze({ kind: "store-poisoned", ok: false });
 	}

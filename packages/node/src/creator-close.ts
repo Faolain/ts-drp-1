@@ -122,6 +122,7 @@ import {
 } from "@ts-drp/storage";
 import { snapshotQuarantineContract, type SnapshotQuarantineDeclaration, type SnapshotQuarantineStore, type SnapshotRecoveryStore } from "@ts-drp/storage/snapshot-transfer";
 
+import { yieldToHost } from "./internal/cooperative-work.js";
 import {
 	createCreatorAuthenticatedNativeFuture,
 	installCreatorAdoptionFacts,
@@ -2478,6 +2479,9 @@ async function reconcileCreatorBoundedRecoveryMaintenance(registration: V3Creato
 	let primary: unknown, failed = false;
 	try {
 		for (let pass = 0; pass < maxMaintenancePasses; pass++) {
+			// The prior pass joined its readers and effects. A fresh hold below
+			// supplies all authority for the next bounded maintenance pass.
+			await yieldToHost();
 			const closeHold = await seal();
 			const checkpoint = await maintenance.reconcile(closeHold, acknowledgeCompletedJournalDrain, requireClosedWorkflowCompletion);
 			if (checkpoint !== "fresh-summary-required") return checkpoint;
@@ -3798,6 +3802,10 @@ export async function bindCreatorLiveClose(
 					stagedSnapshot = snapshot;
 				}
 				lifecycle = "sealed";
+				// Admission is closed and admitted work has joined. The same close
+				// keeps ownership while ordinary timers and ephemeral transport run.
+				await yieldToHost();
+				if (stopping) throw new TypeError("creator close authority is unavailable");
 				if (retirementReconciliationPending && promotionSource !== undefined) {
 					// The prior failed close has joined its maintenance finally blocks.
 					// Its point census may reflect OLD while durable work reached NEW.
@@ -4127,6 +4135,10 @@ export async function bindCreatorLiveClose(
 				const membershipJoins = await Promise.allSettled(membershipSources.map(source => source?.release()));
 				const membershipJoinFailures = membershipJoins.flatMap(result => result.status === "rejected" ? [result.reason] : []);
 				if (membershipJoinFailures.length) throw new AggregateError(membershipJoinFailures, "creator membership source readers failed to join");
+				// All previous native readers joined. Fresh membership/source reads
+				// below re-establish currency after this scheduling boundary.
+				await yieldToHost();
+				if (stopping) throw new TypeError("creator close authority is unavailable");
 				const beforeMembership = await journal.readRetirementImage({ objectId: registration.objectId });
 				if (!beforeMembership.ok) throw new TypeError("creator close native membership image unavailable", { cause: beforeMembership });
 				const recordedMembership = await journal.recordClosedMembership({
@@ -4771,6 +4783,8 @@ export async function bindCreatorLiveClose(
 								let source: CreatorOrdinaryIssuanceProofSource | undefined;
 								let captured = false, maintenanceRan = false, preparationAttempts = 0;
 								const prepareSource = async (): Promise<CreatorOrdinaryIssuanceProofSource | undefined> => {
+									await yieldToHost();
+									if (!available()) throw new TypeError("creator ordinary readiness admission was revoked");
 									const report = (outcome: string, reason?: string): void => {
 										try {
 											const observer = Reflect.get(globalThis, "__warmProofEvent");

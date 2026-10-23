@@ -1,3 +1,4 @@
+import {createWorkCheckpoint, yieldToHost} from "../src/internal/cooperative-work.js";
 import {readFileSync} from "node:fs";
 import {compareBytes, decodeCanonical, encodeCanonical, hashDomain} from "@ts-drp/canonical";
 import * as ts from "typescript";
@@ -134,7 +135,7 @@ function fixture(profileId = "creator-trusted-v1", oldPayloadBytes = 700) {
 	};
 	const bodies = `${declaration("creatorJournalCensusRows")}\n${declaration("captureOrdinaryReadinessPreparationForSizing")}\n${declaration("captureOrdinaryIssuanceRuntimeApplicationControls")}\nreturn captureOrdinaryIssuanceRuntimeApplicationControls;`;
 	const js = ts.transpileModule(bodies, {compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None}}).outputText;
-	const capture = new Function("bindings", `const {${Object.keys(bindings).join(",")}}=bindings;\n${js}`)(bindings) as (...args: any[]) => Promise<any>;
+	const capture = new Function("createWorkCheckpoint", "yieldToHost", "bindings", `const {${Object.keys(bindings).join(",")}}=bindings;\n${js}`)(createWorkCheckpoint, yieldToHost, bindings) as (...args: any[]) => Promise<any>;
 	return {capture, hold, facts, state, accounting, registration, native, journal, base, calls, cursors, geometry,
 		compound, compoundState, resolveCreatorOrdinarySourceCapture};
 }
@@ -186,7 +187,7 @@ describe("original whole-hold boundary readiness producer", () => {
 			closedRetirementHex: (hex: string) => new Uint8Array(Buffer.from(hex, "hex"))},
 			js = ts.transpileModule(`${body(runtime, "creatorAuthenticatedEpochVertexFields")}\n${body(rollback, "creatorOrdinaryCapturedEpochGeometryFits")}\n${body(rollback, "creatorOrdinaryReadinessJournalGeometryIsCompleteForSizing")}\nreturn creatorOrdinaryReadinessJournalGeometryIsCompleteForSizing;`,
 				{compilerOptions: {target: ts.ScriptTarget.ES2022}}).outputText,
-			validate = new Function("bindings", `const {${Object.keys(bindings).join(",")}}=bindings;${js}`)(bindings);
+			validate = new Function("createWorkCheckpoint", "yieldToHost", "bindings", `const {${Object.keys(bindings).join(",")}}=bindings;${js}`)(createWorkCheckpoint, yieldToHost, bindings);
 		const digest = "a".repeat(64), author = "b".repeat(64), preimage = encodeCanonical({kind: "drp-vertex", anchor: digest,
 			objectId: "room", epoch: 0, dependencies: [digest], operation: {payload: "x".repeat(7448)}}), signature = new Uint8Array(64),
 			raw = encodeCanonical(["accepted_entries", ["room", 0, digest, 0], {source_kind: "local-issued", vertex_digest: digest,
@@ -328,7 +329,7 @@ function nativeMetadataReadinessFixture() {
 		}};
 	const js = ts.transpileModule(`${declaration("prepareCreatorOrdinaryNativeMetadataForReadiness")}\nreturn prepareCreatorOrdinaryNativeMetadataForReadiness;`,
 		{compilerOptions: {target: ts.ScriptTarget.ES2022}}).outputText;
-	const prepare = new Function("bindings", `const {${Object.keys(bindings).join(",")}}=bindings;${js}`)(bindings);
+	const prepare = new Function("createWorkCheckpoint", "yieldToHost", "bindings", `const {${Object.keys(bindings).join(",")}}=bindings;${js}`)(createWorkCheckpoint, yieldToHost, bindings);
 	return {calls, registration, state, originalControl, prepare: () => prepare(registration) as Promise<void>};
 }
 
@@ -419,7 +420,7 @@ function readinessMaintenanceBoundary() {
 	};
 	const js = ts.transpileModule(`${declaration("creatorRetirementResumeRequested")}\n${declaration("runCreatorOrdinaryReadinessMaintenance")}\nreturn runCreatorOrdinaryReadinessMaintenance;`,
 		{compilerOptions: {target: ts.ScriptTarget.ES2022}}).outputText;
-	const run = new Function("bindings", `const {${Object.keys(bindings).join(",")}}=bindings;${js}`)(bindings);
+	const run = new Function("createWorkCheckpoint", "yieldToHost", "bindings", `const {${Object.keys(bindings).join(",")}}=bindings;${js}`)(createWorkCheckpoint, yieldToHost, bindings);
 	return {calls, registration, trust, state,
 		// Controlled terminal result of the trusted ORIGINAL reconciliation owner.
 		// runRaw below also exercises incomplete/absent execution handoffs.
@@ -452,7 +453,7 @@ describe("quiescent readiness maintenance through the original queue", () => {
 			nativeBranchDisplacedSource: () => undefined};
 		const js = ts.transpileModule(`${declaration("captureCreatorRecoveryRuntime")}\nreturn captureCreatorRecoveryRuntime;`,
 			{compilerOptions: {target: ts.ScriptTarget.ES2022}}).outputText;
-		const capture = new Function("bindings", `const {${Object.keys(bindings).join(",")}}=bindings;${js}`)(bindings);
+		const capture = new Function("createWorkCheckpoint", "yieldToHost", "bindings", `const {${Object.keys(bindings).join(",")}}=bindings;${js}`)(createWorkCheckpoint, yieldToHost, bindings);
 		expect(capture(r, true, false, false).live()).toBe(true);
 		expect(capture(r, false, false, false).live()).toBe(false);
 		let entered = false; r.blueprintClosing = true;
@@ -690,7 +691,7 @@ function terminalJournalAcknowledgement() {
 	};
 	const js = ts.transpileModule(`${fn.getText(rollback)}\nreturn acknowledgeClosedJournalDrain;`,
 		{compilerOptions: {target: ts.ScriptTarget.ES2022}}).outputText;
-	const ack = new Function("bindings", `const {${Object.keys(bindings).join(",")}}=bindings;${js}`)(bindings);
+	const ack = new Function("createWorkCheckpoint", "yieldToHost", "bindings", `const {${Object.keys(bindings).join(",")}}=bindings;${js}`)(createWorkCheckpoint, yieldToHost, bindings);
 	const acquire = async () => {
 		state.calls.push("acquire"); const control = state.control;
 		return {control, image, drainSource: control.drain == null ? undefined :
@@ -786,7 +787,7 @@ function terminalVerificationCustody() {
 		checkSourceImage: (actual: string, expected: string) => {expect(actual).toBe(expected);},
 	};
 	const js = ts.transpileModule(`return ${matches[0]!.getText(rollback)};`, {compilerOptions: {target: ts.ScriptTarget.ES2022}}).outputText;
-	const verify = new Function("bindings", `const {${Object.keys(bindings).join(",")}}=bindings;${js}`)(bindings);
+	const verify = new Function("createWorkCheckpoint", "yieldToHost", "bindings", `const {${Object.keys(bindings).join(",")}}=bindings;${js}`)(createWorkCheckpoint, yieldToHost, bindings);
 	return {state, run: (classify?: () => Promise<void>, ack?: () => Promise<void>) => verify(coordinator, classify, ack) as Promise<void>};
 }
 
@@ -860,7 +861,7 @@ function closeReadinessJob(options: {supported?: boolean; metadata?: () => Promi
 	 const run=${matches[0]!.getText(close)};
 	 return {run,stop:()=>{stopping=true;},jobs:maintenanceJobs,ready:()=>ordinaryTemplateReady,currentSource:()=>ordinaryProofSource};`;
 	const js = ts.transpileModule(body, {compilerOptions: {target: ts.ScriptTarget.ES2022}}).outputText;
-	return {calls, completionModes, ...new Function("options", "calls", "completionModes", "assertTrust", js)(options, calls, completionModes,
+	return {calls, completionModes, ...new Function("yieldToHost", "options", "calls", "completionModes", "assertTrust", js)(yieldToHost, options, calls, completionModes,
 		(actual: unknown, original: unknown) => {expect(actual).toBe(original);})} as
 		{calls: string[]; completionModes: boolean[]; run(): Promise<void>; stop(): void; jobs: Set<Promise<void>>; ready(): boolean; currentSource(): object | undefined};
 }
@@ -1001,7 +1002,7 @@ function readinessRecoveryAcquisition() {
 		ts.isFunctionDeclaration(node) && node.name?.text === "creatorClosedReconciliationRoleBasis");
 	if (basis === undefined) throw Error("missing original held-source role basis");
 	const js = ts.transpileModule(`${basis.getText(rollback)}\n${prefix}\nreturn reconcileSnapshotRecoveryRoles;`, {compilerOptions: {target: ts.ScriptTarget.ES2022}}).outputText;
-	const reconcile = new Function("bindings", `const {${Object.keys(bindings).join(",")}}=bindings;${js}`)(bindings);
+	const reconcile = new Function("createWorkCheckpoint", "yieldToHost", "bindings", `const {${Object.keys(bindings).join(",")}}=bindings;${js}`)(createWorkCheckpoint, yieldToHost, bindings);
 	return {calls, fullArguments, state, trust, closeHold, fullMaterial, input, borrowedHeader, observations, frames, fullToken, reader, recoveryOwner, recoveryFrame, roles,
 		run: (currentTrust: unknown = trust, hold: unknown = closeHold) => reconcile(input, hold, true, false, currentTrust) as Promise<boolean>,
 		runWithoutHold: () => reconcile(input, undefined, true, false, trust) as Promise<boolean>,
@@ -1021,7 +1022,7 @@ describe("readiness-owned no-effect snapshot readback", () => {
 	};
 	const execute = <T>(body: string, bindings: Record<string, unknown>): T => {
 		const js = ts.transpileModule(body, {compilerOptions: {target: ts.ScriptTarget.ES2022}}).outputText;
-		return new Function("bindings", `const {${Object.keys(bindings).join(",")}}=bindings;${js}`)(bindings) as T;
+		return new Function("createWorkCheckpoint", "yieldToHost", "bindings", `const {${Object.keys(bindings).join(",")}}=bindings;${js}`)(createWorkCheckpoint, yieldToHost, bindings) as T;
 	};
 	const law = (ok: unknown, reason: string): void => {if (!ok) throw Error(reason);};
 	const fixture = () => {
@@ -1421,7 +1422,7 @@ describe("original joined readiness job metadata ordering", () => {
 			reconcileInheritedSnapshotRecoveryRoles: async () => {inheritedEffects++;}};
 		const js = ts.transpileModule(`${fn.getText(rollback)}\nreturn reconcileSnapshotRecoveryRoles;`,
 			{compilerOptions: {target: ts.ScriptTarget.ES2022}}).outputText;
-		const reconcile = new Function("bindings", `const {${Object.keys(bindings).join(",")}}=bindings;${js}`)(bindings);
+		const reconcile = new Function("createWorkCheckpoint", "yieldToHost", "bindings", `const {${Object.keys(bindings).join(",")}}=bindings;${js}`)(createWorkCheckpoint, yieldToHost, bindings);
 		await expect(reconcile({}, undefined, true, true)).rejects.toThrow("snapshot-unavailable");
 		expect(inheritedEffects).toBe(0); // Refuse before unrelated effects, without clearing the recovery halt.
 		await expect(reconcile({}, undefined, true, false)).resolves.toBe(false);
@@ -1445,7 +1446,7 @@ describe("original joined readiness job metadata ordering", () => {
 			}};
 			const js = ts.transpileModule(`${fn.getText(close)}\nreturn reconcileCreatorBoundedRecoveryMaintenance;`,
 				{compilerOptions: {target: ts.ScriptTarget.ES2022}}).outputText;
-			const reconcile = new Function("bindings", `const {${Object.keys(bindings).join(",")}}=bindings;${js}`)(bindings);
+			const reconcile = new Function("createWorkCheckpoint", "yieldToHost", "bindings", `const {${Object.keys(bindings).join(",")}}=bindings;${js}`)(createWorkCheckpoint, yieldToHost, bindings);
 			const success = outcomes.includes("complete"), task = reconcile({objectId: "room"}, {promotionContext: {}}, actor, 0,
 				async () => {calls.push("seal"); return {};}, true, true, trust);
 			if (success) await expect(task).resolves.toBe("complete"); else await expect(task).rejects.toThrow();
@@ -1473,7 +1474,7 @@ describe("original joined readiness job metadata ordering", () => {
 				reconcile: async () => {throw Error("unreached verifier");},
 				release: async () => {releaseEntered(); await gate; joined = true; if (failCleanup) throw cleanup;},
 			})};
-			const reconcile = new Function("bindings", `const {${Object.keys(bindings).join(",")}}=bindings;${js}`)(bindings);
+			const reconcile = new Function("createWorkCheckpoint", "yieldToHost", "bindings", `const {${Object.keys(bindings).join(",")}}=bindings;${js}`)(createWorkCheckpoint, yieldToHost, bindings);
 			let settled = false;
 			const task = reconcile({objectId: "room"}, {promotionContext: {}}, actor, 0, async () => {throw primary;});
 			const observed = task.then(() => {settled = true; return undefined;}, (error: unknown) => {settled = true; return error;});

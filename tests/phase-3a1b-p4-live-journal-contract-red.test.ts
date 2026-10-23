@@ -27,6 +27,7 @@ import {
 } from "./fixtures/phase-3a1b-p4/live-journal-contract.js";
 import {
 	captureLiveJournalInput,
+	validateLiveJournalSnapshot,
 	createLiveJournalSnapshotValidation,
 	deriveLiveJournalSnapshot,
 	deriveLiveJournalSnapshotReadiness,
@@ -133,6 +134,58 @@ describe("live-journal readiness projection", () => {
 		const bad = fresh(); bad.rows[0].exactCanonicalPreimageBytes.fill(255);
 		expect(deriveLiveJournalSnapshot({durable: bad, validation: {release() {}}}))
 			.toEqual({ok: false, kind: "store-poisoned"});
+	});
+
+	it("native closure validation preserves complete checks and keeps all captured leaf facts private", () => {
+		const durable = durableReceived(3);
+		const validation = createLiveJournalSnapshotValidation();
+		const capture = () => validateLiveJournalSnapshot({ durable: structuredClone(durable), validation });
+		expect(capture()).toEqual({ok: true});
+		const full = deriveLiveJournalSnapshot({durable});
+		if (!full.ok) throw new Error("valid fixture refused");
+		// The first public capture may use caller-overridden mapping. Neither
+		// validation's private leaf facts nor public replay outputs may alias it.
+		const original = structuredClone(durable), callerRow = original.rows[0];
+		original.scope.nextJournalSequence = 1;
+		original.rows.splice(1);
+		Object.defineProperty(original.rows, "map", {value: () => [callerRow]});
+		const validationResult = validateLiveJournalSnapshot({durable: original, validation});
+		expect(validationResult).toEqual({ok: true});
+		expect(Object.isFrozen(validationResult)).toBe(true);
+		const projected = deriveLiveJournalSnapshot({durable: original, validation});
+		if (!projected.ok) throw new Error("valid overridden map fixture refused");
+		expect(projected.rows[0]).not.toBe(callerRow);
+		expect(Object.isFrozen(projected.rows[0])).toBe(true);
+		const expected = structuredClone(projected.rows);
+		callerRow.exactCanonicalPreimageBytes.fill(255);
+		callerRow.detachedSignature.fill(255);
+		expect(projected.rows).toEqual(expected);
+		expect(validateLiveJournalSnapshot({durable: original, validation})).toEqual({ok: false, kind: "store-poisoned"});
+		expect(deriveLiveJournalSnapshot({durable, validation})).toEqual(full);
+		expect(capture()).toEqual({ok: true});
+		const changes = [
+			(value: typeof durable) => { value.rows[0].exactCanonicalPreimageBytes.fill(255); },
+			(value: typeof durable) => { value.rows[0].vertexDigest = "f".repeat(64); },
+			(value: typeof durable) => { value.rows[1] = {...value.rows[0], journalSequence: 1}; },
+			(value: typeof durable) => { value.rows[1].journalSequence = 0; },
+			(value: typeof durable) => { value.rows[1].scope = {...value.rows[1].scope, epoch: 1}; },
+			(value: typeof durable) => { value.scope.exactCanonicalAnchorPreimageBytes.fill(255); },
+			(value: typeof durable) => { value.scope.exactCanonicalParametersCarrierBytes.fill(255); },
+			(value: typeof durable) => { value.scope.detachedAnchorSignature = new Uint8Array(63); },
+			(value: typeof durable) => { value.scope.nextJournalSequence--; },
+			(value: typeof durable) => {
+				Object.defineProperty(value.rows, "map", {value: () => [{...value.rows[0], detachedSignature: new Uint8Array(0)}]});
+			},
+		];
+		for (const change of changes) {
+			const value = structuredClone(durable); change(value);
+			expect(deriveLiveJournalSnapshot({durable: value})).toEqual({ok: false, kind: "store-poisoned"});
+			for (const owner of [undefined, validation, {release() {}}]) {
+				expect(validateLiveJournalSnapshot({durable: value, validation: owner})).toEqual({ok: false, kind: "store-poisoned"});
+			}
+		}
+		validation.release();
+		expect(capture()).toEqual({ok: true});
 	});
 
 	it("keeps complete-image poison, stale-prefix and digest refusals identical", () => {

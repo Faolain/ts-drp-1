@@ -93,6 +93,7 @@ import type {
 } from "@ts-drp/storage/room-head";
 import type { DRPNetworkNode, Message } from "@ts-drp/types";
 
+import { createWorkCheckpoint, yieldToHost } from "./internal/cooperative-work.js";
 import { CREATOR_MAINTENANCE_PROOF_MAX_BYTES, createCreatorClosedRollbackProofAccounting, type CreatorLocalSessionWithdrawal } from "./internal/creator-closed-rollback-data.js";
 import { pauseCreatorSuccessorRetainedReads } from "./internal/creator-successor-live.js";
 import type { CreatorOrdinaryApplicationResourceBoundReader, CreatorOrdinaryFinishingWindowLimits } from "./internal/runtime-reclamation.js";
@@ -3605,6 +3606,20 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	});
 	let closePromise: Promise<void> | undefined;
 	let sessionCloseTask: Promise<void> | undefined;
+	const assertSessionOpen = (): void => {
+		localOwner?.assertCurrent();
+		if (closed) {
+			// Automatic terminal cleanup must not erase the original failed close
+			// binding. An explicit caller close still has ordinary closed precedence.
+			if (
+				sessionCloseTask === undefined &&
+				creatorCloseRebindFailure !== undefined &&
+				terminalFailure === creatorCloseRebindFailure
+			)
+				throw creatorCloseRebindFailure;
+			throw new TypeError("v3 room session is closed");
+		}
+	};
 	let creatorSuccessorAdoptionTask: Promise<void> | undefined;
 	let creatorRecipientRecoveryRequired = false;
 	let redirectedSession: V3RoomSession<Projection> | undefined;
@@ -4617,8 +4632,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		| Readonly<{ readonly ok: false; readonly reason: unknown }>;
 	const migrationFollowers = new Set<Promise<MigrationFollowerResult>>();
 	const publishAccepted = async (): Promise<void> => {
+		const checkpoint = createWorkCheckpoint();
 		if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
 		for (;;) {
+			await checkpoint();
+			assertSessionOpen();
 			const published = await activeHandle.publishPending();
 			if (!published.ok) throw new TypeError(`v3 room publication failed: ${published.kind}`);
 			if (published.kind === "empty") return;
@@ -5332,6 +5350,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		return issued;
 	};
 	const drainSettlementOutbox = async (sources: readonly DisplacedSource[]): Promise<void> => {
+		const checkpoint = createWorkCheckpoint();
 		if (sources.length === 0) {
 			const existing = await issuanceStore.readSettlementPlan(settlementScope);
 			const lineage = await issuanceStore.readLineage(settlementScope);
@@ -5363,6 +5382,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			const current = await issuanceStore.readSettlementPlan(settlementScope);
 			if (current === null) throw new TypeError("v3 room replacement recovery plan is unavailable");
 			for (const entry of current.entries) {
+				await checkpoint();
+				assertSessionOpen();
 				if (entry.disposition === "expire" || entry.disposition === "inherited" || entry.replacementSequence !== null)
 					continue;
 				const selected = recoveredSources.get(entry.sourceSequence);
@@ -5389,6 +5410,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		};
 		const orderedBySequence = new Map<number, readonly Readonly<Record<string, unknown>>[]>();
 		for (const entry of plan.entries) {
+			await checkpoint();
+			assertSessionOpen();
 			if (entry.disposition === "expire" || entry.disposition === "inherited" || entry.replacementSequence !== null)
 				continue;
 			const source = sourceBySequence.get(entry.sourceSequence);
@@ -5469,6 +5492,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			plan = (await issuanceStore.readSettlementPlan(settlementScope)) ?? plan;
 		}
 		for (const entry of plan.entries) {
+			await checkpoint();
+			assertSessionOpen();
 			if (entry.disposition === "expire" || entry.disposition === "inherited" || entry.replacementSequence !== null)
 				continue;
 			await refreshSourceOwner();
@@ -5557,6 +5582,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				plan = current;
 			};
 			while (fromIntent < ordered.length) {
+				await checkpoint();
+				assertSessionOpen();
 				await refreshSourceOwner();
 				source = sourceBySequence.get(entry.sourceSequence);
 				if (source === undefined) throw new TypeError("v3 room replacement source is unavailable");
@@ -5675,9 +5702,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 	};
 	const drainRebaseOutbox = async (publication: "immediate" | "after-readiness" = "immediate"): Promise<void> => {
+		const checkpoint = createWorkCheckpoint();
 		if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
 		const sources: DisplacedSource[] = [];
 		for (;;) {
+			await checkpoint();
+			assertSessionOpen();
 			const page = await activeHandle.readRebaseOutbox();
 			if (!page.ok) throw new TypeError(`v3 room rebase outbox failed: ${page.kind}: ${page.detail}`, { cause: page });
 			if (page.kind === "empty") break;
@@ -6666,20 +6696,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			throw error;
 		}
 	}
-	const assertSessionOpen = (): void => {
-		localOwner?.assertCurrent();
-		if (closed) {
-			// Automatic terminal cleanup must not erase the original failed close
-			// binding. An explicit caller close still has ordinary closed precedence.
-			if (
-				sessionCloseTask === undefined &&
-				creatorCloseRebindFailure !== undefined &&
-				terminalFailure === creatorCloseRebindFailure
-			)
-				throw creatorCloseRebindFailure;
-			throw new TypeError("v3 room session is closed");
-		}
-	};
+
 	const performCreatorSuccessorAdoption = async (
 		received?: Awaited<ReturnType<typeof receiveCreatorSuccessorAdoption>>
 	): Promise<void> => {
@@ -6742,6 +6759,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					handle: adoptionOwner,
 				}));
 			if (!verified.ok) throw new TypeError(`v3 room successor verification failed: ${verified.kind}`);
+			// The predecessor floor is still installed; staging validates its own
+			// native currency after this yield under the same lifetime transition.
+			await yieldToHost();
+			assertSessionOpen();
 			if (roomHeadAuthority === undefined || openedRoomHeadState === undefined) {
 				return roomHeadFailure("D110C_FLOOR_MIGRATION_REQUIRED");
 			}
@@ -6756,6 +6777,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					cause: staged.cause === undefined ? staged : staged.cause,
 				});
 			const nextRoomHead = expectedRoomHeadFromDescriptor(staged.descriptor as Readonly<Record<string, unknown>>);
+			await yieldToHost();
+			assertSessionOpen();
+			// Do not add a scheduling checkpoint between starting floor publication
+			// and installing the replacement authority/projection below.
 			const pendingRoomHead = await beginRoomHeadAdvance(
 				roomHeadAuthority,
 				roomHeadScope,
@@ -6884,10 +6909,15 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			try {
 				installSuccessorProjectionBase(replacement, authority);
 				await commitSuccessorProjection();
+				// The native floor and exposed authority now name the same successor.
+				await yieldToHost();
+				assertSessionOpen();
 				if (!input.receiveOnly && settlementProfile === "v1") {
 					await publishAccepted();
 					await drainRebaseOutbox();
 				}
+				await yieldToHost();
+				assertSessionOpen();
 				await prepareCurrentCreatorOrdinaryReadiness();
 			} catch (error) {
 				startupReplay = undefined;

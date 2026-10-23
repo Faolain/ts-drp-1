@@ -212,7 +212,7 @@ import {
 	type ClosedEpochRetirementMetadataRead,
 	validateClosedEpochRetirementMetadataDomain,
 } from "./closed-epoch-cleanup.js";
-
+import { createWorkCheckpoint } from "./cooperative-work.js";
 import {
 	deriveReceivedCreatorTransitionCandidates,
 	matchesCreatorAdoptionReferences,
@@ -3439,7 +3439,8 @@ async function authenticate(
 	parsing?: CreatorClosedAcquisitionSyntax,
 	closeHold?: CreatorSnapshotRecoveryCloseHold,
 	sharedAccounting?: CreatorClosedRollbackProofAccounting,
-	fullRecoverySource?: CreatorClosedFullRecoverySource
+	fullRecoverySource?: CreatorClosedFullRecoverySource,
+	checkpoint?: () => Promise<void> | undefined
 ): Promise<ObservationFacts> {
 	const readUnique = parsing?.unique ?? unique;
 	const readRecord = parsing?.record ?? record;
@@ -3614,12 +3615,15 @@ async function authenticate(
 				exactCanonicalCutValueBytes: cut.bytes,
 				predecessorExactCanonicalLatchedAclBytes: latestClosedAcl.bytes,
 			}, live.closure));
+			await checkpoint?.();
 			checkAbort(input.signal);
 			const ready = await snapshotCall(() => input.readiness({ signal: input.signal }));
 			requireLaw(snapshotOwnerReadable(input, ready), "snapshot-not-ready");
 			let newestAcl: Uint8Array | undefined;
 			let newestSuccessorAcl: Uint8Array | undefined;
 			for (const k of n === 1 ? [0] : [n - 1, n - 2]) {
+				await checkpoint?.();
+				checkAbort(input.signal);
 				const latest = k === n - 1;
 				const closure = latest ? proposed : predecessor;
 				const successorClosure = latest ? live : predecessor;
@@ -3719,6 +3723,7 @@ async function authenticate(
 				);
 			}
 			for (const target of cuts) {
+				await checkpoint?.();
 				checkAbort(input.signal);
 				const lookup = await snapshotCall(() =>
 					input.lookup(
@@ -3736,6 +3741,7 @@ async function authenticate(
 					{objectId: input.objectId, epoch: target.epoch, anchor: target.closedAnchorDigest, manifestDigest: target.manifestDigest},
 					lookup.retention), "snapshot-not-ready");
 			}
+			await checkpoint?.();
 			checkAbort(input.signal);
 			requireLaw(
 				snapshotOwnerReadable(input, await snapshotCall(() => input.readiness({ signal: input.signal }))),
@@ -3747,6 +3753,7 @@ async function authenticate(
 			transitionRecheck?.release();
 		}
 	}
+	await checkpoint?.();
 	checkAbort(input.signal);
 	if (!creatorClosedProofPreparingNativeData(accounting)) {
 		const currency = await checkCurrent();
@@ -3768,6 +3775,7 @@ async function authenticate(
 			frame.recoveryTrusts.add(trust);
 			frame.signingRoleTrusts.add(trust);
 		}
+	await checkpoint?.();
 	checkAbort(input.signal);
 	let rawFloor: unknown;
 	try {
@@ -3796,6 +3804,7 @@ async function authenticate(
 			"floor-stale"
 		);
 	}
+	await checkpoint?.();
 	checkAbort(input.signal);
 	if (!input.snapshotPreparation?.targets?.some(target => heldTargetPreparations.has(target))) {
 		for (const proof of installed) await proof.check();
@@ -5006,11 +5015,12 @@ async function captureCreatorOrdinaryReadOnlySourceWitnesses(
 	capture: NonNullable<ImportFrame["maintenanceCapture"]>;
 	applicationJournalRows: readonly CreatorOrdinaryClosedJournalApplicationRow[];
 }> | undefined> {
-	const available = (): Promise<void> => {
+	const checkpoint = createWorkCheckpoint();
+	const available = async (): Promise<void> => {
+		await checkpoint();
 		requireLaw(frame.alive && frames.get(forward.reader) === frame && ledgers.get(frame.accounting) === frame &&
 			frame.maintenanceCapture === capture && !frame.headerConsumersRevoked && frame.headerMutation === undefined &&
 			frame.headerHold !== undefined && journalHeaderHolds.has(frame.headerHold), "snapshot-unavailable");
-		return Promise.resolve();
 	};
 	await check();
 	await available();
@@ -5328,7 +5338,11 @@ export async function captureCreatorOrdinaryIssuanceProofSource(proof: CreatorIs
 		custody.checkAvailable();
 		requireLaw(frame.maintenanceCapture === originalCapture, "snapshot-unavailable");
 	};
-	const readAvailable = async (): Promise<void> => { available(); };
+		const checkpoint = createWorkCheckpoint();
+		const readAvailable = async (): Promise<void> => {
+			await checkpoint();
+			available();
+		};
 	await custody.check();
 	available();
 	const compound = Object.freeze({}) as CreatorOrdinarySourceCapture;
@@ -5352,6 +5366,7 @@ export async function captureCreatorOrdinaryIssuanceProofSource(proof: CreatorIs
 	const applicationJournalRows = witnesses.applicationJournalRows;
 	const sourceEffects: CreatorOrdinaryApplicationControlFact[] = [], sourceControls: CreatorOrdinaryApplicationControlFact[] = [];
 	for (const row of applicationJournalRows) {
+				await readAvailable();
 		// This is operation DATA from the ORIGINAL whole Cut/ACL/signature prefix,
 		// not a portable source-selection, replacement or admission grant. Exact
 		// native-frame correspondence is still checked by the warm source owner.
@@ -5759,6 +5774,7 @@ async function prepareCreatorOrdinarySourceReadinessForSizing(source: CreatorOrd
 	preparation: NonNullable<import("./runtime-reclamation.js").CreatorOrdinaryApplicationControlCapture["preparation"]>,
 	frame: ImportFrame, capture: Omit<CreatorOrdinaryIssuanceProofFacts["capture"], "journalFrames">, options: CreatorOrdinaryCapacityOptions,
 	check: () => Promise<void>): Promise<(() => void) | undefined> {
+	const checkpoint = createWorkCheckpoint();
 	await check();
 	let application: CreatorOrdinaryIssuanceSourceFacts["capacity"]["application"];
 	let derived: CreatorOrdinaryCapacityDerivation | undefined;
@@ -5815,6 +5831,8 @@ async function prepareCreatorOrdinarySourceReadinessForSizing(source: CreatorOrd
 		// through the public schema and again for header drain adds no observation
 		// or authority. All callbacks above have joined, and the factory still
 		// owes its original complete final currency check before enrollment.
+		await checkpoint();
+		if (!frame.alive || frame.headerConsumersRevoked) return;
 		const currentScope = {objectId: preparation.current.runtime.objectId, epoch: preparation.current.runtime.epoch,
 			anchorDigest: preparation.current.runtime.anchorDigest};
 		const correspondence = creatorOrdinaryJournalObservationCorresponds(originalJournal, originalJournal, currentScope);
@@ -5831,6 +5849,8 @@ async function prepareCreatorOrdinarySourceReadinessForSizing(source: CreatorOrd
 			imageDigest: originalJournal.image.imageDigest, parametersBytes});
 		const preparedCapture = {...observation, preparedJournal: journal, journalFrames: correspondence.nativeFrames};
 		windowObservation = preparedCapture;
+		await checkpoint();
+		if (!frame.alive || frame.headerConsumersRevoked) return;
 		const totals = proofMaterialOwners.get(frame.accounting)!.captureKnownResourceTotals();
 		derived = buildCreatorOrdinaryFinishingResourceProgramForSizing({source, capture: preparedCapture, current: preparation.current,
 			application: Object.freeze({byteLength: value.byteLength, items: value.items, maxDepth: value.maxDepth}),
@@ -5866,6 +5886,8 @@ async function prepareCreatorOrdinarySourceReadinessForSizing(source: CreatorOrd
 			canonicalBytesResourceForSizing(length).byteLength)),
 		acceptedCount: 0, localIssuedCount: 0, acceptedWitnessPayloadBytes: 0,
 		runtimeWidths: preparation.nativeCapacity.runtimeWidths, journalObservationFields, journal});
+	await checkpoint();
+	if (!frame.alive || frame.headerConsumersRevoked) return;
 	const selectedWindow = windowLimits === undefined || windowApplication === undefined || windowObservation === undefined ? undefined :
 		selectCreatorOrdinaryFinishingWindowForSizing({source, preparation, observation: windowObservation, profile: derived.program,
 			application: windowApplication, limits: windowLimits, geometry,
@@ -7591,8 +7613,21 @@ async function acquireClosedData(
 			rows,
 			wholeFloor?.ok ? wholeFloor.state : undefined,
 			maintenance, parsing, closeHold, nativePreparation?.accounting,
-			acquireRoles === undefined ? undefined : {kind: "full-recovery-role-acquisition", owner: input.store,
-				objectId: objectId.value, limits: AHE_BOUNDED_READ_LIMITS, reader: admitted as AheBoundedRecoveryRoleRead}
+			acquireRoles === undefined
+				? undefined
+				: {
+						kind: "full-recovery-role-acquisition",
+						owner: input.store,
+						objectId: objectId.value,
+						limits: AHE_BOUNDED_READ_LIMITS,
+						reader: admitted as AheBoundedRecoveryRoleRead,
+					},
+			// Only an ordinary stable-floor read may hand control back to the host.
+			// Native nomination/stage reacquisition must preserve the caller's
+			// uninterrupted floor publication and authority replacement interval.
+			ownedNomination === undefined && ownedStage === undefined && wholeFloor?.ok && wholeFloor.state.pending === null
+				? createWorkCheckpoint()
+				: undefined
 		);
 		const heldFrame = creatorClosedProofWork(reader);
 		requireLaw(heldFrame !== undefined, "internal-invariant");
@@ -19491,7 +19526,16 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 	// original read on the session's strict transaction; otherwise the ordinary one.
 	const acquireAhe: typeof ordinaryAcquireAhe = (id) =>
 		room?.session !== undefined ? room.session.acquireAhe(input.store, id) : ordinaryAcquireAhe(id);
+	const checkpoint = createWorkCheckpoint();
 	const acquireCoordinator = async (): Promise<AheRetirementControlRead> => {
+		// The original strict room transaction must stay uninterrupted. After
+		// it commits, each original coordinator acquisition rechecks native
+		// currency before the next exact drain/checkpoint. Pending successor
+		// classification never exposes its floor publication interval.
+		if (room?.session === undefined && source.floor.pending === null && source.inheritedClassification === undefined) {
+			await checkpoint();
+			checkAbort(input.signal);
+		}
 		const result = await acquireAhe(objectId);
 		if (!result.ok)
 			throw new Refusal(failure("ahe-rejected", "ahe", `RETIREMENT_COORDINATOR_ACQUIRE:${result.reason}`));
@@ -22692,7 +22736,10 @@ async function reconcileSnapshotRecoveryRoles(
 	let journalHeaderHold: NativeReadReservation | undefined;
 	let retirementSource: ClosedRetirementSource | undefined;
 	let snapshotExclusion: NativeReadReservation | undefined;
+	const checkpoint = createWorkCheckpoint();
 	const checkNativeReservations = async (): Promise<void> => {
+		await checkpoint();
+		checkAbort(input.signal);
 		for (const reservation of nativeReservations) await reservation.check();
 		await snapshotExclusion?.check();
 	};
