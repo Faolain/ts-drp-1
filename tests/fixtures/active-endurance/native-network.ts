@@ -15,13 +15,13 @@ import type { Delivery, Publication } from "../track-x/fence-delivery-room.js";
 // supplies all authority, ACLs, sequence filtering, codecs and channel queues.
 class ReopenableRawOwner extends ControlledRawOwner {
 	override openUnreliableWebRtcRoute(routeId: string) {
-		if (this.opened.get(routeId)?.closed === true) this.opened.delete(routeId);
+		for (const [key, route] of this.opened) if (route.closed) this.opened.delete(key);
 		return super.openUnreliableWebRtcRoute(routeId);
 	}
 }
 
 export async function nativePlayNetwork(delayMs = 20) {
-	const raw = new ControlledRawBus();
+	const raw = new ControlledRawBus(64);
 	const running = Array.from(
 		{ length: 2 },
 		() =>

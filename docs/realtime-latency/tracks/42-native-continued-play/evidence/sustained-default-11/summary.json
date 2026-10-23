@@ -1,0 +1,381 @@
+{
+  "kind": "summary",
+  "status": "passed",
+  "completedEpochs": 3,
+  "epochs": 3,
+  "repaired": 1,
+  "reopened": 1,
+  "acceptedIssues": 51,
+  "expectedBlocks": 32,
+  "counters": {
+    "timerCallbacks": 4135,
+    "offered": [
+      4135,
+      4135
+    ],
+    "busy": [
+      0,
+      0
+    ],
+    "unavailable": [
+      2,
+      2
+    ],
+    "published": [
+      4133,
+      4131
+    ],
+    "rejected": [
+      0,
+      0
+    ],
+    "received": [
+      4128,
+      4128
+    ],
+    "remote": [
+      38,
+      21
+    ]
+  },
+  "timerMaxGapMs": 1080.9200829999972,
+  "eventLoopP99Ms": 26.329087,
+  "eventLoopMaxMs": 1243.611135,
+  "observationRows": 24193,
+  "observationFlushes": 50,
+  "observationHighWater": 512,
+  "raw": {
+    "sends": 64,
+    "routes": 2,
+    "reconciliations": 128
+  },
+  "nativeAfterClose": {
+    "files": 18,
+    "bytes": 901120,
+    "byFile": [
+      {
+        "name": "0e77c3eacaefb824295a69dcf52d3e3b0b697a86fc5c0f02255443c659baf5ca.sqlite.drp-live-journal-v1.sqlite",
+        "bytes": 118784,
+        "kind": "primaryOrOther",
+        "tables": {
+          "accepted_entries": [
+            61,
+            31256
+          ],
+          "retirement_controls": [
+            0,
+            0
+          ],
+          "scopes": [
+            4,
+            23754
+          ]
+        }
+      },
+      {
+        "name": "0f952a1f7f5eceff38a6342dc93becd7abc1893a462e11ec4d3e8788300f53bf.sqlite.drp-issuance-v1.sqlite",
+        "bytes": 49152,
+        "kind": "primaryOrOther",
+        "tables": {
+          "issuance_outbox": [
+            6,
+            870
+          ],
+          "issued_records": [
+            6,
+            3990
+          ],
+          "lineages": [
+            1,
+            104
+          ],
+          "retirement_controls": [
+            1,
+            259
+          ],
+          "settlement_plans": [
+            1,
+            106
+          ]
+        }
+      },
+      {
+        "name": "519c6a49b792424f8ef3a74ffe21f4d2ded72c60f3f61e507c7257b57fcc849e.sqlite.drp-snapshot-quarantine-v1.sqlite",
+        "bytes": 86016,
+        "kind": "primaryOrOther",
+        "tables": {
+          "snapshot_chunks_v2": [
+            2,
+            5582
+          ],
+          "snapshot_dependency_slots": [
+            3,
+            444
+          ],
+          "snapshot_owner_v2": [
+            1,
+            0
+          ],
+          "snapshot_retirement_controls": [
+            1,
+            1016
+          ],
+          "snapshot_scopes_v2": [
+            2,
+            16774
+          ]
+        }
+      },
+      {
+        "name": "519c6a49b792424f8ef3a74ffe21f4d2ded72c60f3f61e507c7257b57fcc849e.sqlite.drp-snapshot-quarantine-v1.sqlite.dependency-0.sqlite",
+        "bytes": 8192,
+        "kind": "primaryOrOther",
+        "tables": {
+          "snapshot_dependency_lock": [
+            1,
+            0
+          ]
+        }
+      },
+      {
+        "name": "519c6a49b792424f8ef3a74ffe21f4d2ded72c60f3f61e507c7257b57fcc849e.sqlite.drp-snapshot-quarantine-v1.sqlite.dependency-1.sqlite",
+        "bytes": 8192,
+        "kind": "primaryOrOther",
+        "tables": {
+          "snapshot_dependency_lock": [
+            1,
+            0
+          ]
+        }
+      },
+      {
+        "name": "519c6a49b792424f8ef3a74ffe21f4d2ded72c60f3f61e507c7257b57fcc849e.sqlite.drp-snapshot-quarantine-v1.sqlite.dependency-2.sqlite",
+        "bytes": 8192,
+        "kind": "primaryOrOther",
+        "tables": {
+          "snapshot_dependency_lock": [
+            1,
+            0
+          ]
+        }
+      },
+      {
+        "name": "5a409435a3ee45078061ca2d518da0b4f44995b49c4fa9d07d81dabb30f10365.sqlite.drp-issuance-v1.sqlite",
+        "bytes": 102400,
+        "kind": "primaryOrOther",
+        "tables": {
+          "issuance_outbox": [
+            49,
+            7105
+          ],
+          "issued_records": [
+            49,
+            31633
+          ],
+          "lineages": [
+            1,
+            104
+          ],
+          "retirement_controls": [
+            1,
+            7687
+          ],
+          "settlement_plans": [
+            1,
+            2513
+          ]
+        }
+      },
+      {
+        "name": "a3154531d65a2ed53616664a30e8a4cbea933bdfda01ff07fb39c0877e7a8078.sqlite",
+        "bytes": 57344,
+        "kind": "primaryOrOther",
+        "tables": {
+          "signing_meta": [
+            1,
+            72
+          ],
+          "signing_rows": [
+            18,
+            30036
+          ]
+        }
+      },
+      {
+        "name": "b0f7d331e30f4e4c3bd4b09765f88a19147b9a997937f942423d0e7ba57d744c.sqlite.drp-snapshot-quarantine-v1.sqlite",
+        "bytes": 49152,
+        "kind": "primaryOrOther",
+        "tables": {
+          "snapshot_chunks_v2": [
+            3,
+            8373
+          ],
+          "snapshot_dependency_slots": [
+            3,
+            612
+          ],
+          "snapshot_owner_v2": [
+            1,
+            0
+          ],
+          "snapshot_retirement_controls": [
+            0,
+            0
+          ],
+          "snapshot_scopes_v2": [
+            3,
+            2793
+          ]
+        }
+      },
+      {
+        "name": "b0f7d331e30f4e4c3bd4b09765f88a19147b9a997937f942423d0e7ba57d744c.sqlite.drp-snapshot-quarantine-v1.sqlite.dependency-0.sqlite",
+        "bytes": 8192,
+        "kind": "primaryOrOther",
+        "tables": {
+          "snapshot_dependency_lock": [
+            1,
+            0
+          ]
+        }
+      },
+      {
+        "name": "b0f7d331e30f4e4c3bd4b09765f88a19147b9a997937f942423d0e7ba57d744c.sqlite.drp-snapshot-quarantine-v1.sqlite.dependency-1.sqlite",
+        "bytes": 8192,
+        "kind": "primaryOrOther",
+        "tables": {
+          "snapshot_dependency_lock": [
+            1,
+            0
+          ]
+        }
+      },
+      {
+        "name": "b0f7d331e30f4e4c3bd4b09765f88a19147b9a997937f942423d0e7ba57d744c.sqlite.drp-snapshot-quarantine-v1.sqlite.dependency-2.sqlite",
+        "bytes": 8192,
+        "kind": "primaryOrOther",
+        "tables": {
+          "snapshot_dependency_lock": [
+            1,
+            0
+          ]
+        }
+      },
+      {
+        "name": "c7c9970c6cd5d7510fb16b4a0d51db6921cfb37a687ba13ec384bc73ba0b1ca5.sqlite",
+        "bytes": 102400,
+        "kind": "primaryOrOther",
+        "tables": {
+          "blobs": [
+            19,
+            24376
+          ],
+          "generations": [
+            4,
+            4465
+          ],
+          "objects": [
+            1,
+            326
+          ],
+          "promotions": [
+            24,
+            4032
+          ],
+          "retirement_controls": [
+            0,
+            0
+          ]
+        }
+      },
+      {
+        "name": "cab58fe2ad79324fae6766861782e5899662a6ff976a3ee6b90aff0d4e839279.sqlite",
+        "bytes": 90112,
+        "kind": "primaryOrOther",
+        "tables": {
+          "blobs": [
+            20,
+            26975
+          ],
+          "generations": [
+            4,
+            4277
+          ],
+          "objects": [
+            1,
+            326
+          ],
+          "promotions": [
+            20,
+            3360
+          ],
+          "retirement_controls": [
+            1,
+            2815
+          ]
+        }
+      },
+      {
+        "name": "de385738a40fe24a8e5038b7c6d6138394b459aac5518e7a01ded74d7bea4194.sqlite.drp-live-journal-v1.sqlite",
+        "bytes": 167936,
+        "kind": "primaryOrOther",
+        "tables": {
+          "accepted_entries": [
+            32,
+            10574
+          ],
+          "retirement_controls": [
+            1,
+            759
+          ],
+          "scopes": [
+            4,
+            23971
+          ]
+        }
+      },
+      {
+        "name": "fa86fe213cfe893e81e84cbb97f5d2055dcc399e2c2c58f9030cc6079ee87626.sqlite",
+        "bytes": 12288,
+        "kind": "primaryOrOther",
+        "tables": {
+          "signing_meta": [
+            2,
+            591
+          ],
+          "signing_rows": [
+            0,
+            0
+          ]
+        }
+      },
+      {
+        "name": "peer-0-external-floor.sqlite",
+        "bytes": 8192,
+        "kind": "primaryOrOther",
+        "tables": {
+          "room_head": [
+            1,
+            467
+          ]
+        }
+      },
+      {
+        "name": "peer-1-external-floor.sqlite",
+        "bytes": 8192,
+        "kind": "primaryOrOther",
+        "tables": {
+          "room_head": [
+            1,
+            651
+          ]
+        }
+      }
+    ],
+    "byKind": {
+      "wal": 0,
+      "sharedMemory": 0,
+      "primaryOrOther": 901120
+    }
+  }
+}

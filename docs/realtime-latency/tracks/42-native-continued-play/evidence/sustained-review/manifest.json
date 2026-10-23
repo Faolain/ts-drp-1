@@ -1,0 +1,33 @@
+{
+  "schema": "continued-play-harness-review-1",
+  "reviewedBase": "77e641a3",
+  "reviewVerdict": "One confirmed P2: strict early reopen occurred before lazy recipient signing storage was created.",
+  "resolution": "Materialize the empty recipient signing store during initial fixture setup; keep every post-reopen acquisition noncreating.",
+  "directionalNegative": "Expected exit1 at receiver1 baseline-after-1:0received,expected>25. Other receiver continued.",
+  "files": {
+    "review.log.gz": {
+      "sha256": "20c2d69964340dba785e2cbc551ed0e0206464f5ccee5709acd4fa09ae3fdbe5",
+      "decodedSha256": "6e88a971e064d6c0f13e739468b08102748caeb053365bb8331a93f649da5134"
+    },
+    "reviewed.patch.gz": {
+      "sha256": "88b127773e8ad4a92f41eeac027d21c1bc8aa2c328cd942ff79e660700641486",
+      "decodedSha256": "fb91e2dae16a8052058a2d07b6a7b807f331ed607b6b77855cdcc043b667c1be"
+    },
+    "default-before-fix.log.gz": {
+      "sha256": "7382d071da0bb85b46aa3c674dd4a553b0f6bfd2da020f74634d3196bea42b5e",
+      "decodedSha256": "60b00803b78da4852911060afc28a08706bbbc4e48293d3e4d21b462e60cc400"
+    },
+    "one-way-negative.log.gz": {
+      "sha256": "583ab786a12e8c52abdf2cf7069130e8cea5ff866db1be3f2a9e6d0db2c05f76",
+      "decodedSha256": "ab3b10e5e74d78e04343757f01e9b1ec2154474c3a6bf8d78e21101993bb0fe2"
+    },
+    "one-way-negative.config.mts.gz": {
+      "sha256": "b683bd5f9b64282c35d0b10f8945bb7c5e3d43a35d63d7f49684da88fac9ce6a",
+      "decodedSha256": "8161dcfb1c0984879b2ef9ea41df5d48c86c3aa347aaec68bd379212cf188a4a"
+    },
+    "lint.log.gz": {
+      "sha256": "ccf5ae8d491d3d0777774b240336e9e94ee3466e5d9e22b1b1e0ff5fc32b3481",
+      "decodedSha256": "2b2cd6ba2eb758de0f32849e18245603bdbd500d075613db34b7e5393abd64c1"
+    }
+  }
+}

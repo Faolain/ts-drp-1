@@ -1,0 +1,92 @@
+{
+  "schema": "native-continued-play-preparation-1",
+  "configuration": {
+    "kind": "configuration",
+    "sourceHead": "77e641a3932fa3f7a0ca5548f80985de526ddbc7",
+    "sourceDiffSha256": "fb91e2dae16a8052058a2d07b6a7b807f331ed607b6b77855cdcc043b667c1be",
+    "load": [
+      10.48095703125,
+      21.6748046875,
+      39.98876953125
+    ],
+    "cpu": "Apple M1 Max",
+    "cores": 10,
+    "epochs": 4,
+    "warmRows": 0,
+    "repairEvery": 2,
+    "reopenAt": 2,
+    "requireProgress": false,
+    "directory": "/private/tmp/active-continued-play-bounded-smoke-08/grid-sqlite-vwxbwv",
+    "durable": "real localhost WebSocket/libp2p, 20ms delayed genuine ingress",
+    "ephemeral": "controlled raw datagrams; production room authority, codec, queue and sequence filter; not real WebRTC or FPS",
+    "tickIntervalMs": 10,
+    "offeredHzPerPeer": 100,
+    "stateSlots": 32,
+    "slotOwnership": "16 disjoint slots per author",
+    "successor": "signed native export over scripted chunk/material transport",
+    "cpuProfiles": false,
+    "observationBufferLimit": 512,
+    "rawHistoryLimit": 64,
+    "taskQuantumHistoryLimit": 256
+  },
+  "verdict": "Short observation-mode preparation smoke passed, process exited0; not final300 or uninterrupted-play proof.",
+  "files": {
+    "continued-play.jsonl.gz": {
+      "sha256": "45bbcc246a9f66e695c49bbde5ebd9011b149781f24a5c470a26c537e1f5954c",
+      "decodedSha256": "c4aa2c4f2ccaa91558097d0c1cfb7fa13677e3ea9dc7d5a7f7865df6ad8c3bc4",
+      "decodedBytes": 444093
+    },
+    "observations.jsonl.gz": {
+      "sha256": "1b97443e8f904d3f70fe54d8ddf09119b5646327c53e9972144ce28740b80aa8",
+      "decodedSha256": "48c37718ab36bf0213826116157005f151b4768896eec01cd555e6bc3aa7b175",
+      "decodedBytes": 5994922
+    },
+    "source.diff.gz": {
+      "sha256": "88b127773e8ad4a92f41eeac027d21c1bc8aa2c328cd942ff79e660700641486",
+      "decodedSha256": "fb91e2dae16a8052058a2d07b6a7b807f331ed607b6b77855cdcc043b667c1be",
+      "decodedBytes": 47149
+    },
+    "summary.json": {
+      "sha256": "361ae838adfbcaaa624049b26440f0cbdabea7953cb64e5e7aa6afe7b6f0bb2d",
+      "decodedSha256": "361ae838adfbcaaa624049b26440f0cbdabea7953cb64e5e7aa6afe7b6f0bb2d"
+    },
+    "test.log.gz": {
+      "sha256": "d525d894de8e17282478cf6ad0412e3cee9dd7b1dca71d4fd5c0138d2f5cf1ef",
+      "decodedSha256": "2c391fa6cea2f2f6259787ae335ceb028491df4236745ccd46b3e9d76e8a037b"
+    },
+    "controls.log.gz": {
+      "sha256": "e23ed6ab9efa6a52ff7f2b2c52b8525f6228581e40916e56e4abedba822e9989",
+      "decodedSha256": "bfa156aa90e5d50795b2c7cca0b00515b59f1a71bdf75c2db997d30a97201644"
+    },
+    "typecheck.log.gz": {
+      "sha256": "f1b651238a58fe290baec6c5e32f3bdb1943dd2bd582f02569231f7a757c7837",
+      "decodedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "claims": {
+    "epochs": 4,
+    "acceptedIssues": 59,
+    "stateSlots": 32,
+    "automaticRepairs": 3,
+    "reopenEpoch": 2,
+    "observationsHighWater": 512,
+    "rawSendHistory": 64,
+    "rawRoutes": 2
+  },
+  "limits": [
+    "Production responsiveness and authenticated rejoin fixes are not composed.",
+    "Native libp2p durable ingress is genuine; raw ephemeral datagrams and successor material transport are controlled test boundaries.",
+    "Both peers share one Node process; process CPU includes all its threads.",
+    "Full physical census is measured before shutdown; native close ordinarily changes WAL files.",
+    "Startup1327ms callbackgap is not assigned to a specific owner in this receipt."
+  ],
+  "largestCallbackGap": {
+    "phase": "maintenance-4",
+    "fromMs": 96155.502,
+    "toMs": 98940.625583,
+    "wallMs": 2785.123583,
+    "processCpuMs": 3101.196,
+    "maintenanceStepWallMs": 2771.312542,
+    "maintenanceStepCpuMs": 3088.905
+  }
+}

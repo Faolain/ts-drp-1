@@ -128,20 +128,68 @@ any new same-cut selection. An earlier broad name filter also selected two other
 failures (an undefined source-extraction binding and a 10-second timeout); that
 failed log is preserved and is not reported as an all-green suite.
 
-## Next combined campaign
+## Sustained harness preparation
 
-After the responsiveness and authenticated rejoin changes compose, extend this
-same native transport probe to 300 configurable epochs over 32 overwritten Grid
-slots with an independent last-value oracle. Keep 100 Hz offered ephemeral ticks
-and record actual per-receiver progress, process CPU, event-loop utilization and
-current-authority mismatch separately. Exercise silent final-copy and first-answer
-loss periodically without an explicit replay. Flush per-epoch samples and retain
-only bounded counters/rings so the measurement harness itself does not grow with
-the epoch count.
+The same probe now accepts a configurable epoch count and keeps exactly 32 Grid
+slots after warmup. Each author owns sixteen disjoint slots; its accepted writes
+advance a separate last-value oracle. Promise completion order between authors
+cannot decide conflicting state. A loss probe targets a newly changed value and
+its exact digest, so an earlier value in that slot cannot satisfy repair.
 
-Count every physical SQLite, WAL and shared-memory file through the existing
-read-only census. Explicitly reopen both peers at epoch 30, preserving transport
-identities and recreating room/channel bindings, then continue for 270 uninterrupted
-epochs. Require exact state before and after reopen. Use no inspector for final
-timings. Keep the Canvas/Chat 300-epoch conservation paths and the larger-records
-capacity axis distinct; this three-epoch probe closes none of those long-run gates.
+Detailed observations flush in batches of at most 512 rows and at every epoch.
+Only two channel bindings, 64 recent raw sends, 64 reconciliations per live raw
+route, and 256 recent timer-delimited CPU intervals per step remain in memory.
+Full interval records stream to disk. Per-epoch signed-envelope observations are
+cleared and successor material ports close after installation. Every epoch records
+exact receiver states and a read-only census of every physical SQLite, WAL and
+shared-memory file, including every user table of every database.
+
+The [four-epoch preparation receipt](evidence/sustained-preparation-08/manifest.json)
+passes in **observation mode** on source `77e641a3` plus its preserved harness patch:
+59 accepted operations, 32 final slots, three quiet automatic repairs, and reopen
+at epoch 2. Each repair observes two requests, one lost gossip copy and one lost
+direct answer. Both genuine network nodes and their identities remain alive across
+reopen; all room and channel objects are recreated using noncreating storage opens.
+Exact state is checked immediately before and after reopen, followed by a separate
+baseline requiring progress at each receiver. The timer continues offering ticks
+during reopen and labels unavailable offers explicitly. Startup request schedules
+are aged out before each periodic-only repair probe.
+
+The smoke retained at most 512 observation rows, 64 raw sends and two raw routes;
+it flushed 46,703 detailed rows in 94 batches. Physical files grew from 33 to 43.
+These are preparation observations, not a long-run plateau. The largest timer gap
+was 2,785 ms spanning the fourth maintenance operation, with 3,101 ms of process
+CPU between callbacks. That maintenance step itself used 2,771 ms wall time and
+3,089 ms process CPU with zero callbacks. Process CPU includes every thread and
+can exceed wall time. A separate 1,327 ms startup gap remains unattributed to a
+specific owner in this receipt. Neither number is a final-source performance result.
+
+[Independent review](evidence/sustained-review/manifest.json) found one early-reopen
+defect: recipient signing storage is normally created by later maintenance, so a
+strict epoch-1 reopen prevented that store's first acquisition. Initial setup now
+materializes that empty owner before opening rooms; every acquisition after reopen
+remains noncreating. The receive negative control suppresses only receiver 1's
+post-transition observations and fails at its own baseline assertion. Unit controls
+also reject a stale value with all 32 IDs still present and check exact observation
+flush coverage and bounded raw-route history.
+
+The [corrected default run](evidence/sustained-default-11/manifest.json) passes three
+epochs, 51 accepted operations and strict reopen at epoch 1, including later
+recipient maintenance. Typechecking and six observation/joined-failure controls
+pass. Its explicit warmup scopes expose a separate scheduling boundary: 32 public
+issues in sixteen sequential author pairs take 990 ms wall time and 1,080 ms
+process CPU, with one timer callback and zero ephemeral receives. Subsequent
+convergence takes 1,194 ms wall time and 1,256 ms process CPU, with three callbacks
+and two receives per peer. Absolute issue times and complete timer CPU records
+preserve the distinction between issuing and catching up. This remains an
+observation-mode pass on the earlier production source.
+
+The final campaign still waits for reviewed responsiveness and authenticated rejoin
+changes to compose. Run 300 epochs with `ACTIVE_CONTINUED_PLAY_EPOCHS=300`,
+`ACTIVE_CONTINUED_PLAY_REOPEN_AT=30`, `ACTIVE_CONTINUED_PLAY_REPAIR_EVERY=25`
+and `ACTIVE_CONTINUED_PLAY_REQUIRE_PROGRESS=1`; leave inspector profiling disabled.
+This requires both receivers to progress inside each transition as well as during
+the surrounding baselines. The existing 100 Hz per-peer offer schedule measures
+actual callbacks and deliveries, including timer starvation. Reopening at 30 leaves
+270 uninterrupted epochs for ordinary WAL behavior; inject no checkpoint or vacuum.
+Keep the Canvas/Chat conservation paths and larger per-epoch capacity axis separate.

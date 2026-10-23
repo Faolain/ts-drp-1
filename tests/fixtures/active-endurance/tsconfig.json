@@ -23,6 +23,7 @@
 		"./*.ts",
 		"../../active-app-endurance-native.test.ts",
 		"../../active-app-endurance-failures.test.ts",
+		"../../active-app-continued-play-observations.test.ts",
 		"../../active-app-continued-play-native.test.ts"
 	],
 	"exclude": ["../../../.claude", "../../../.logs", "../../../node_modules"]

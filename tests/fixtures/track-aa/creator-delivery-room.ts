@@ -294,6 +294,7 @@ export async function creatorDeliveryRoom(options: RoomOptions = {}) {
 			.filter(([, message]) => author === undefined || envelopeVertex(message)?.author === author)
 			.map(([digest, message]) => Object.freeze({ digest, message }));
 	return {
+		directory,
 		host: { storageHost },
 		profile,
 		identities,
@@ -309,6 +310,10 @@ export async function creatorDeliveryRoom(options: RoomOptions = {}) {
 		open,
 		bare,
 		sentBy,
+		clearObservations: () => {
+			sent.clear();
+			for (const seen of accepted.values()) seen.clear();
+		},
 	};
 }
 
