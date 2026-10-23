@@ -1,0 +1,4 @@
+
+> @ts-drp/live-journal@0.11.0 build /Users/aristotle/Documents/Projects/ts-drp-1/packages/live-journal
+> tsc -b tsconfig.build.json
+

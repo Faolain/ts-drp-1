@@ -1,0 +1,18 @@
+
+ RUN  v3.1.1 /private/tmp/ts-drp-transition-responsiveness
+
+(node:51921) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ packages/storage-node/tests/phase-3a1b-p4-node-live-journal-red.test.ts (39 tests | 33 skipped) 7798ms
+   ✓ SQLite bounded snapshot validation ownership > avoids repeated original kernel work compared with the same native fixture's uncached derivation  2519ms
+   ✓ SQLite bounded snapshot validation ownership > refuses fresh native sequence corruption after successful leaf enrollment  1122ms
+   ✓ SQLite bounded snapshot validation ownership > refuses fresh native received-preimage corruption after successful leaf enrollment  1054ms
+   ✓ SQLite bounded snapshot validation ownership > refuses fresh native duplicate corruption after successful leaf enrollment  1116ms
+   ✓ D.93.34 p4-b Node strict live-journal RED > uses exactly one readonly snapshot for readiness and each page and readbacks idempotent no-write paths  1964ms
+ ✓ tests/phase-3a1b-p4-live-journal-contract-red.test.ts (40 tests | 34 skipped) 117ms
+
+ Test Files  2 passed (2)
+      Tests  12 passed | 67 skipped (79)
+   Start at  10:25:24
+   Duration  8.52s (transform 5.23s, setup 0ms, collect 261ms, tests 7.91s, environment 0ms, prepare 71ms)
+

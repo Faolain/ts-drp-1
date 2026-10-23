@@ -1,0 +1,10 @@
+{
+  "actualSourceRoot": "/Users/aristotle/Documents/Projects/ts-drp-1",
+  "actualSourceHead": "613ab64756ffef08e37ee3527eb85073381691f2",
+  "candidateHead": "ef5d986443b6606a864d1c17171ba3f20954486d",
+  "harnessPath": "/private/tmp/ts-drp-transition-responsiveness-baseline/tests/active-app-continued-play-native.test.ts",
+  "harnessSha256": "4f75fc28f5d8f952159509af2968528a2f711c4c8d7741a9be303e2225d67efa",
+  "candidateHarnessSha256": "268cab1c00d8fbce4986c2fb9bc38f55e49c4d1fae41a89db4c974625a0c3e8b",
+  "rootTrackedDiff": "",
+  "sourceSelection": "Absolute existing root fixture imports plus root Vite aliases; all production packages/*/src and examples/*/src are unchanged between baseline HEAD296 and root613. Observer-only cooperative helper is unused by baseline production; inspector and trace disabled for measurement."
+}

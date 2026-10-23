@@ -1,0 +1,206 @@
+{
+  "recordedAtUtc": "2026-10-23T15:08:21.567685+00:00",
+  "baselineSourceHead": "613ab64756ffef08e37ee3527eb85073381691f2",
+  "baselineTrackedDiffBeforeAndAfter": "empty; verified again immediately before root integration",
+  "candidateSourceCommit": "ef5d986443b6606a864d1c17171ba3f20954486d",
+  "integratedProductionCommit": "d24368126d4ba9644e154e268c2250d972a34f75",
+  "integratedFilesMatchCandidate": [
+    {
+      "path": "packages/live-journal/src/contract.ts",
+      "sha256": "8fd54efed31acf623b3eb2bd5182bfbb25593e44d9fd6eb140cd640bd5a698ad"
+    },
+    {
+      "path": "packages/live-journal/src/index.ts",
+      "sha256": "9d38045cb309df603ca3a16d7fdcf481aa52bbe9bf43e9093af392ed58f59c61"
+    },
+    {
+      "path": "packages/node/src/creator-close.ts",
+      "sha256": "3cbe4df4a95657923886d799d32616035a93aca22513b25ae6587802be9f54f2"
+    },
+    {
+      "path": "packages/node/src/internal/cooperative-work.ts",
+      "sha256": "c4a5e532fe7568cd73cab2022601c69a627fea225cd9f9ea157a9d177ed07b75"
+    },
+    {
+      "path": "packages/node/src/internal/creator-closed-rollback-data.ts",
+      "sha256": "6f25573d40ff5a163b89f2326e92ecdb32241a52d7df03612fae276e50ee7aa4"
+    },
+    {
+      "path": "packages/node/src/v3-live.ts",
+      "sha256": "26355f2658d86d0541c4b8724dfdd68c5d50c800e19dc1d02b9f6eb53554ee60"
+    },
+    {
+      "path": "packages/node/src/v3-room.ts",
+      "sha256": "cfee309d6f505622beae05fb2f4264b8b9596abe049fc5ec8993ee6acf388030"
+    },
+    {
+      "path": "packages/node/tests/creator-closed-rollback-proof-accounting.test.ts",
+      "sha256": "0e483670ec2a743dd6e536381de7bf62f89da19a316a034ee0ecce6157e4270f"
+    },
+    {
+      "path": "packages/node/tests/creator-ordinary-application-material.test.ts",
+      "sha256": "11fb7fd1228108787611108f154101bdb3dae8abf66cb44fed3661d6dfea27de"
+    },
+    {
+      "path": "packages/node/tests/creator-ordinary-readiness-producer.test.ts",
+      "sha256": "3d4a380f483c6503c0ec2b7628ac274b8225b045ce895a2ba36e014d750ea1e1"
+    },
+    {
+      "path": "packages/node/tests/creator-replay-seal-native.test.ts",
+      "sha256": "8884aa9414e6bf6a4bc866b6c2dc84aaf0f54f4e590723052492a78b66fe0f82"
+    },
+    {
+      "path": "packages/node/tests/track-x-readiness-ingress-hold.test.ts",
+      "sha256": "70bfaaffc1235765e65e0b8afb69249f169f4e5ba4d34501f907898631ac90e3"
+    },
+    {
+      "path": "packages/storage-browser/src/live-journal.ts",
+      "sha256": "0273e19d79f913da85bb2a0bc8d6a66e1e6687bc1c80b4a151419aab92740b40"
+    },
+    {
+      "path": "packages/storage-node/src/live-journal.ts",
+      "sha256": "94d4bceb8e81c65fb6c4c3f59e4508454ddd31b81b3f474becf56d6f6d1a16a5"
+    },
+    {
+      "path": "tests/phase-3a1b-p4-live-journal-contract-red.test.ts",
+      "sha256": "729f2263d12034392ea9ede6e176a93c4a78d0d9b6a9683dcdc3891ab436b0d4"
+    }
+  ],
+  "validation": {
+    "nativeMigrationAndFixtureCases": {
+      "passed": 34,
+      "log": "validation-native-and-fixtures.log"
+    },
+    "journalContractAndNativeCases": {
+      "passed": 12,
+      "log": "validation-journal.log"
+    },
+    "independentReview": "terminal exit 0, no actionable regressions; its children reaped before measurements",
+    "browserRuntime": "not run successfully; Chromium sandbox launch failed, escalated retry did not execute; no browser-runtime pass claimed",
+    "integratedBuilds": "live-journal, storage-node, storage-browser all passed after cherry-pick"
+  },
+  "limitations": [
+    "One sequential pair on a shared Apple M1 Max host; other agent workers held and reaped, external host load uncontrolled.",
+    "Process CPU includes GC/background threads; timer-delimited quantum spans do not prove a JavaScript task or frame-time bound.",
+    "Candidate aggregate phase CPU was not lower; concurrency places more ephemeral and durable ingress work inside transition phases.",
+    "Maximum candidate timer gap remains 173.882ms; game-loop responsiveness remains incomplete.",
+    "Pending floor observations are telemetry only; the installed ephemeral authority has a distinct lifetime."
+  ],
+  "nextWork": [
+    "Hold genuine native begin/publication/commit/activation Promise delivery and exercise public issue/read/export/close plus E2/provider/projection observations.",
+    "Add only scheduling checkpoints supported by original native ownership/currentness after those held-boundary controls; preserve all charges and native readback.",
+    "Integrate the separate rejoin completion fix and run final bounded 300-epoch endurance after the reviewed changes compose."
+  ],
+  "artifacts": [
+    {
+      "name": "baseline-continued-play.jsonl",
+      "bytes": 420440,
+      "sha256": "25bcfef0b6db05632f9f210c880f9ce52250184fc1203762676e5b31d88f77e3"
+    },
+    {
+      "name": "baseline-harness.source",
+      "bytes": 30764,
+      "sha256": "4f75fc28f5d8f952159509af2968528a2f711c4c8d7741a9be303e2225d67efa"
+    },
+    {
+      "name": "baseline-module-manifest.json",
+      "bytes": 833,
+      "sha256": "dc385d06d38743319e8ea707408a0df62cffb266df05a90d1c565ae019624eb0"
+    },
+    {
+      "name": "baseline-run.log",
+      "bytes": 3654,
+      "sha256": "cd0fbe9719a1120940cd5286473de136c797975ee3378b769029642e8e8b4d58"
+    },
+    {
+      "name": "baseline-source.diff",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "baseline-vite-config.source",
+      "bytes": 317,
+      "sha256": "e866e99d63b74221e135ff14e42a851fff8849446e8d86a4a45f67ab83cddd60"
+    },
+    {
+      "name": "candidate-continued-play.jsonl",
+      "bytes": 457191,
+      "sha256": "0086cba529361042fff6c30bf3f215c9eec12709014b87d888d0f5a65651a5fd"
+    },
+    {
+      "name": "candidate-harness.source",
+      "bytes": 30470,
+      "sha256": "268cab1c00d8fbce4986c2fb9bc38f55e49c4d1fae41a89db4c974625a0c3e8b"
+    },
+    {
+      "name": "candidate-run.log",
+      "bytes": 3288,
+      "sha256": "5249c748237caaca13d0eb183e211490a8a772b728a17b5a5bf8e7b733293070"
+    },
+    {
+      "name": "candidate-source.diff",
+      "bytes": 47035,
+      "sha256": "00cb5300107128bb1e2c77bbdf3b8e3d3880accd191632d523089b0f691431b5"
+    },
+    {
+      "name": "candidate-vite-config.source",
+      "bytes": 310,
+      "sha256": "19679f1a81f1337e22ee892d8e4a67b5d192794b1fe9b8b811762901b339caf4"
+    },
+    {
+      "name": "comparison.json",
+      "bytes": 47296,
+      "sha256": "7c0a8598e43b122e42b0e410dfdd25a4f765c6bff073d91c2547b93d3489c750"
+    },
+    {
+      "name": "harness-diagnostics.patch",
+      "bytes": 7056,
+      "sha256": "e8c2cb26de656aea443a27212d591870e6e665156025c563555ba7514ef80799"
+    },
+    {
+      "name": "review.log",
+      "bytes": 602538,
+      "sha256": "dc7ecb667a00719bc583318b30feda56904ba6f6c4085fb696729837aa7ae21d"
+    },
+    {
+      "name": "validation-harness-lint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "validation-journal-build.log",
+      "bytes": 141,
+      "sha256": "774cf7b17a421d717f18fdf01e8dd8d5f08815b79ab7f5025b58c57399630a5e"
+    },
+    {
+      "name": "validation-journal.log",
+      "bytes": 1364,
+      "sha256": "97346684fce4ba280c0ec8f55f4f79ee151fbd496344a6f644659b99d60fa979"
+    },
+    {
+      "name": "validation-native-and-fixtures.log",
+      "bytes": 3691,
+      "sha256": "1f5beebae53aaf5334463820588ffdda93b6d4ea948b338c6ad1009aecb31d15"
+    },
+    {
+      "name": "validation-source-typecheck.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "integrated-contract-build.log",
+      "bytes": 134,
+      "sha256": "aca1f08d342cdd9490d0c0c46865f93edd9b58e18c286f06e597d9784c041207"
+    },
+    {
+      "name": "integrated-node-build.log",
+      "bytes": 134,
+      "sha256": "f5700a508ce6b6863fea028634b8889324defc1a6b4478755aae85a08372a64a"
+    },
+    {
+      "name": "integrated-browser-build.log",
+      "bytes": 140,
+      "sha256": "8fd833aba6e3f5badb2552b2327f224b95a6712d13c1d157cacd25a049f2a76e"
+    }
+  ]
+}

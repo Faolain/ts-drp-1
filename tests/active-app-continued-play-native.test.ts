@@ -8,7 +8,7 @@ import { type Profiler, Session } from "node:inspector";
 import { cpus, loadavg, tmpdir } from "node:os";
 import { join } from "node:path";
 import { monitorEventLoopDelay, performance as nodePerformance } from "node:perf_hooks";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 
 import {
 	BoundedObservationLog,
@@ -33,11 +33,14 @@ import {
 } from "./fixtures/track-m/room-retention-fixture.js";
 import { settlementDelivery } from "./fixtures/track-m/settlement-room.js";
 import { sqliteFileCensus } from "./fixtures/track-m-apps/app-long-room.js";
+import * as cooperativeWork from "../packages/node/src/internal/cooperative-work.js";
 
 const enabled = process.env.ACTIVE_CONTINUED_PLAY === "1";
 const output = process.env.ACTIVE_CONTINUED_PLAY_OUT ?? join(tmpdir(), `active-continued-play-${Date.now()}`);
+const sourceRoot = process.env.ACTIVE_CONTINUED_PLAY_SOURCE_ROOT ?? process.cwd();
 const epochs = Number(process.env.ACTIVE_CONTINUED_PLAY_EPOCHS ?? 3);
 const warmRows = Number(process.env.ACTIVE_CONTINUED_PLAY_WARM_ROWS ?? 0);
+const traceWork = process.env.ACTIVE_CONTINUED_PLAY_TRACE_WORK === "1";
 const repairEvery = Number(process.env.ACTIVE_CONTINUED_PLAY_REPAIR_EVERY ?? 25);
 const reopenAt = Number(
 	process.env.ACTIVE_CONTINUED_PLAY_REOPEN_AT ?? Math.min(30, Math.max(1, Math.floor(epochs / 2)))
@@ -97,19 +100,22 @@ it.skipIf(!enabled)(
 			appendFileSync(join(output, "continued-play.jsonl"), JSON.stringify(value) + "\n");
 		const observations = new BoundedObservationLog(join(output, "observations.jsonl"));
 		const diff = execFileSync("git", ["diff", "--no-ext-diff", "HEAD"], {
+			cwd: sourceRoot,
 			encoding: "utf8",
 			maxBuffer: 16 * 1024 * 1024,
 		});
 		writeFileSync(join(output, "source.diff"), diff);
 		record({
 			kind: "configuration",
-			sourceHead: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
+			sourceRoot,
+			sourceHead: execFileSync("git", ["rev-parse", "HEAD"], { cwd: sourceRoot, encoding: "utf8" }).trim(),
 			sourceDiffSha256: createHash("sha256").update(diff).digest("hex"),
 			load: loadavg(),
 			cpu: cpus()[0]?.model,
 			cores: cpus().length,
 			epochs,
 			warmRows,
+			traceWork,
 			repairEvery,
 			reopenAt,
 			requireProgress,
@@ -203,6 +209,79 @@ it.skipIf(!enabled)(
 			activeStep.quanta.push(value);
 			observations.add({ kind: "task-quantum", phase, ...value });
 		};
+		let nextWalkId = 0;
+		let floorTransitionObservationCount = 0;
+		const walks: {
+			id: number;
+			phase: string;
+			calls: number;
+			yields: number;
+			interiorTimerCallbacks: number;
+			interiorReceives: number;
+			lastYieldCall: number;
+			owner: string[];
+		}[] = [];
+		const floorTransitionObservations: unknown[] = [];
+		const diagnosticRestores: (() => void)[] = [];
+		if (traceWork) {
+			const originalYield = cooperativeWork.yieldToHost;
+			diagnosticRestores.push(
+				vi.spyOn(cooperativeWork, "yieldToHost").mockImplementation(() => {
+					record({
+						kind: "host-yield",
+						phase,
+						at: performance.now(),
+						stack: new Error().stack?.split("\n").slice(2, 8),
+					});
+					return originalYield();
+				}).mockRestore
+			);
+			const originalFactory = cooperativeWork.createWorkCheckpoint;
+			diagnosticRestores.push(
+				vi.spyOn(cooperativeWork, "createWorkCheckpoint").mockImplementation(() => {
+					const checkpoint = originalFactory();
+					const walk = {
+						id: nextWalkId++,
+						phase,
+						calls: 0,
+						yields: 0,
+						interiorTimerCallbacks: 0,
+						interiorReceives: 0,
+						lastYieldCall: 0,
+						owner: new Error().stack?.split("\n").slice(2, 12) ?? [],
+					};
+					walks.push(walk);
+					return () => {
+						walk.calls++;
+						const pending = checkpoint();
+						if (pending === undefined) return;
+						const beforeTicks = counters.timerCallbacks,
+							beforeReceives = counters.received.reduce((sum, n) => sum + n, 0),
+							at = performance.now();
+						walk.yields++;
+						walk.lastYieldCall = walk.calls;
+						return pending.then(() => {
+							const timers = counters.timerCallbacks - beforeTicks,
+								receives = counters.received.reduce((sum, n) => sum + n, 0) - beforeReceives;
+							if (walk.calls > 1) {
+								walk.interiorTimerCallbacks += timers;
+								walk.interiorReceives += receives;
+							}
+							record({
+								kind: "census-yield",
+								phase,
+								walk: walk.id,
+								call: walk.calls,
+								at,
+								resumed: performance.now(),
+								timers,
+								receives,
+							});
+						});
+					};
+				}).mockRestore
+			);
+		}
 		try {
 			if (process.env.ACTIVE_CONTINUED_PLAY_PROFILE === "1") {
 				profiler = new Session();
@@ -306,6 +385,28 @@ it.skipIf(!enabled)(
 					const sentSequence = ++sequence;
 					const job = (async () => {
 						try {
+							if (traceWork) {
+								// The floor and installed E2 authority have distinct lifetimes.
+								// Record their relationship without inventing a pending-floor gate.
+								const target = required(peers[peer]);
+								const native = await target.floor.read({
+									scope: {
+										objectId: fixture.objectId,
+										pinnedGenesisAnchorDigest: fixture.invite.pinnedGenesisAnchorDigest,
+									},
+								});
+								const epoch = target.room.authority()?.epoch ?? 0;
+								if (
+									!native.ok ||
+									native.state === null ||
+									native.state.pending !== null ||
+									native.state.stable.epoch !== epoch
+								) {
+									floorTransitionObservationCount++;
+									if (floorTransitionObservations.length < 8)
+										floorTransitionObservations.push({ phase, at: performance.now(), peer, epoch, native });
+								}
+							}
 							const accepted = await channelFor(peer).publish({
 								class: "unreliable-sequenced",
 								key: "movement",
@@ -640,6 +741,7 @@ it.skipIf(!enabled)(
 					// Reopen restarts automatic requests; age them out before a later periodic-only loss probe.
 					await step(`reopen-startup-settle-${epoch}`, () => sleep(16_000));
 				}
+				for (const walk of walks.splice(0)) record({ kind: "cooperative-walk", ...walk });
 				completedEpochs = epoch;
 				flushEpoch(epoch);
 			}
@@ -668,8 +770,12 @@ it.skipIf(!enabled)(
 					[...(failure === undefined ? [] : [failure]), ...fixtureFailures, ...networkFailures],
 					"continued play joined cleanup failed"
 				);
+			for (const restore of diagnosticRestores) restore();
+			for (const walk of walks.splice(0)) record({ kind: "cooperative-walk", ...walk });
 			observations.flush();
 			const summary = {
+				floorTransitionObservationCount,
+				floorTransitionObservations,
 				kind: "summary",
 				status: failure === undefined ? "passed" : "failed",
 				completedEpochs,

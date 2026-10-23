@@ -1,0 +1,30 @@
+
+ RUN  v3.1.1 /private/tmp/ts-drp-transition-responsiveness
+
+ ✓ packages/node/tests/creator-ordinary-application-material.test.ts (14 tests) 11184ms
+   ✓ original closed application material continuation > keeps full operations when original local-issued PRE has been lawfully pruned, for both native layouts  948ms
+   ✓ original closed application material continuation > never substitutes digest, scope, duplicate or altered native correspondence for an exact witnessed frame  2152ms
+   ✓ original closed application material continuation > native ambiguity and native-versus-witness PRE/signature mismatches retain the original fallback  1406ms
+   ✓ original closed application material continuation > shares the original profile-gated execution law and byte-identical derivative fields without granting authority  409ms
+   ✓ cold original-owner capture lifetime and book > uses only the resolved original lifetime's optional pure verification dispatch without changing checks or charges  745ms
+   ✓ cold original-owner capture lifetime and book > derives held-target authority only from exact original registered anchor context, never the successor suite  2768ms
+   ✓ cold original-owner capture lifetime and book > charges extracted PRE/signature, not equality metadata, and keeps detached bounded rows  362ms
+   ✓ cold original-owner capture lifetime and book > revocation and original book quota failure cannot publish a captured source  711ms
+   ✓ one admitted cold source witness read > refuses each revoked original owner at the old inner callback before entering the next producer  607ms
+ ✓ packages/node/tests/track-x-readiness-ingress-hold.test.ts (15 tests) 511ms
+(node:51501) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+stdout | tests/track-x-ordinary-prime-migration-native.test.ts > on a migrated epoch-0 target, local and received rows skip the optional prime and are still admitted
+TRACK_X_A_NATIVE {"received":[{"epoch":0,"phase":"received-append","ok":false,"before":{"kind":"ordinary-incremental-source-prime-skipped","epoch":0,"reason":"migration-source"}},{"epoch":0,"phase":"received-append","ok":false,"before":{"kind":"ordinary-incremental-source-prime-skipped","epoch":0,"reason":"migration-source"}},{"epoch":0,"phase":"received-append","ok":false,"before":{"kind":"ordinary-incremental-source-prime-skipped","epoch":0,"reason":"migration-source"}},{"epoch":0,"phase":"received-append","ok":false,"before":{"kind":"ordinary-incremental-source-prime-skipped","epoch":0,"reason":"migration-source"}}],"local":[{"epoch":0,"phase":"local-issuance","ok":false,"before":{"kind":"ordinary-incremental-source-prime-skipped","epoch":0,"reason":"migration-source"}},{"epoch":0,"phase":"local-issuance","ok":false,"before":{"kind":"ordinary-incremental-source-prime-skipped","epoch":0,"reason":"migration-source"}}]}
+
+ ✓ tests/track-x-ordinary-prime-migration-native.test.ts (5 tests) 5138ms
+   ✓ on a migrated epoch-0 target, local and received rows skip the optional prime and are still admitted  1637ms
+   ✓ readiness priming on the migrated target is still entered, never skipped  599ms
+   ✓ the hint follows the registration: a reopen at epoch 0 still skips, the rollover and a reopen at epoch 1 never do  1446ms
+   ✓ a corrupted census read in the mandatory cold quote is still refused before effects, and exact work continues  1171ms
+
+ Test Files  3 passed (3)
+      Tests  34 passed (34)
+   Start at  10:24:40
+   Duration  21.05s (transform 2.10s, setup 0ms, collect 3.72s, tests 16.83s, environment 0ms, prepare 118ms)
+
