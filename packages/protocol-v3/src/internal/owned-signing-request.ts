@@ -1,6 +1,7 @@
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { digestReceivedVertexPreimage, vertexCanonicalBytes } from "../index.js";
 import { prepareCreatorAnchorSigningRequest } from "../creator-close.js";
+import { decodeCreatorReattachmentCheckpoint } from "../creator-checkpoint.js";
 
 declare const ownedSigningRequestBrand: unique symbol;
 export interface OwnedSigningRequest { readonly [ownedSigningRequestBrand]: true; }
@@ -114,11 +115,20 @@ export function withAuthoredIdentityChallengeSigningRequest<T>(input: Readonly<{
 	if (input.kind === "transport") {
 		const membership = frame.exactCanonicalCloseMembershipBytes;
 		const carriesMembership = Object.hasOwn(frame, "exactCanonicalCloseMembershipBytes");
-		if (carriesMembership
-			? frame.kind !== "creator-successor-material-response" || frame.version !== 2 ||
-				!(membership instanceof Uint8Array) || membership.byteLength === 0 ||
-				membership.byteLength > CREATOR_SUCCESSOR_TRANSPORT_LIMITS.maxMembershipBytes
-			: frame.version !== 1 || input.exactCanonicalChallengeBytes.byteLength > CREATOR_SUCCESSOR_TRANSPORT_LIMITS.maxRequestBytes)
+		const carriesCheckpoint = Object.hasOwn(frame, "exactCanonicalReattachmentCheckpointBytes");
+		const checkpointRequest = frame.kind === "creator-successor-material-request" &&
+			frame.version === 2 && frame.materialKind === "checkpoint";
+		const valid = carriesCheckpoint
+			? frame.kind === "creator-successor-material-response" && frame.version === 3 && !carriesMembership &&
+				decodeCreatorReattachmentCheckpoint(frame.exactCanonicalReattachmentCheckpointBytes) !== undefined &&
+				input.exactCanonicalChallengeBytes.byteLength <= CREATOR_SUCCESSOR_TRANSPORT_LIMITS.maxRequestBytes
+			: carriesMembership
+				? frame.kind === "creator-successor-material-response" && frame.version === 2 &&
+					membership instanceof Uint8Array && membership.byteLength > 0 &&
+					membership.byteLength <= CREATOR_SUCCESSOR_TRANSPORT_LIMITS.maxMembershipBytes
+				: (checkpointRequest || (frame.version === 1 && !Object.hasOwn(frame, "materialKind"))) &&
+					input.exactCanonicalChallengeBytes.byteLength <= CREATOR_SUCCESSOR_TRANSPORT_LIMITS.maxRequestBytes;
+		if (!valid || (Object.hasOwn(frame, "materialKind") && !checkpointRequest))
 			throw new TypeError("OWNED_IDENTITY_CHALLENGE_INVALID");
 	}
 	const domain = input.kind === "possession" ? "ts-drp/creator-issuance-possession/v1" : "ts-drp/creator-successor-transport/v1";

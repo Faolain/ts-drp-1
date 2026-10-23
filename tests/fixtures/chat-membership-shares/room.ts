@@ -31,6 +31,7 @@ import {
 	createCreatorSuccessorMaterialServer,
 	readCreatorSuccessorExport,
 } from "../../../packages/node/src/creator-adoption.js";
+import { inspectHead } from "../../../packages/node/src/creator-close.js";
 import { parseStorageObjectId } from "../../../packages/storage/src/index.js";
 import { createNodeRoomHeadAuthority } from "../../../packages/storage-node/src/room-head.js";
 import { createNodeV3RoomStorageHost } from "../../../packages/storage-node/src/v3-room-host.js";
@@ -366,10 +367,12 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 		if (!object.ok) throw new TypeError("CHAT_SHARES_INVALID_OBJECT");
 		const store = await host.openAhe("peer-0--ahe");
 		const snapshotStore = await host.openSnapshots("peer-0");
+		const journalStore = await host.openJournal("peer-0");
 		try {
 			const exported = await readCreatorSuccessorExport({
 				store,
 				snapshotStore,
+				journalStore,
 				catalog: application.catalog,
 				objectId: object.value,
 				pinnedGenesisAnchorDigest: invite.pinnedGenesisAnchorDigest,
@@ -387,9 +390,19 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 			}
 			return { ...exported, chunks };
 		} finally {
+			await journalStore.close();
 			await snapshotStore.close();
 			await store.close();
 		}
+	};
+
+	/** Reads exact native head carriers for verification; supplies no trust capability. */
+	const readHead = async (index: number) => {
+		const object = parseStorageObjectId(objectId);
+		if (!object.ok) throw new TypeError("CHAT_SHARES_INVALID_OBJECT");
+		const store = await host.openAhe(`peer-${index}--ahe`);
+		try { return await inspectHead(store, object.value); }
+		finally { await store.close(); }
 	};
 
 	/** The application state a joiner installs from the creator's current successor export. */
@@ -497,6 +510,8 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 		install,
 		issuedAfter,
 		successorDelivery,
+		readExport,
+		readHead,
 		exportedApplicationStateBytes,
 		census: (index: number) => roomStoreCensus(directory, `peer-${index}`),
 	};

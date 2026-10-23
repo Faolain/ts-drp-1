@@ -3,6 +3,7 @@ import { type SnapshotChunkProtocolPort, type SnapshotChunkProtocolStream } from
 import type { SignRegisteredVertexDigest } from "@ts-drp/protocol-v3";
 import type { OwnedIdentityChallengeAdmission, OwnedSigningRequest } from "@ts-drp/protocol-v3/internal/owned-signing-request";
 import { CREATOR_SUCCESSOR_TRANSPORT_LIMITS } from "@ts-drp/protocol-v3/internal/owned-signing-request";
+import { decodeCreatorReattachmentCheckpoint } from "@ts-drp/protocol-v3/creator-checkpoint";
 import {
 	CREATOR_AUTHOR_ISSUANCE_FRONTIERS_MAX_RECORD_BYTES,
 	CREATOR_AUTHOR_SETTLEMENT_MAX_RECORD_BYTES,
@@ -50,6 +51,8 @@ export interface CreatorSuccessorAuxiliaryMaterial {
 	readonly exactCanonicalHistoryBytes: Uint8Array;
 	/** Digest membership authenticated by the offered Cut; contains no local witnesses. */
 	readonly exactCanonicalCloseMembershipBytes?: Uint8Array;
+	/** Current-point proof, requested separately from adjacent source membership. */
+	readonly exactCanonicalReattachmentCheckpointBytes?: Uint8Array;
 	readonly exactCanonicalRetirementBytes?: Uint8Array;
 	readonly exactCanonicalAggregateBytes?: Uint8Array;
 }
@@ -71,6 +74,11 @@ function decode(bytes: Uint8Array, keys: readonly string[]): Record<string, unkn
 	if (value !== null && typeof value === "object" && keys.includes("exactCanonicalSettlementBytes") &&
 		Object.hasOwn(value, "exactCanonicalCloseMembershipBytes"))
 		expectedKeys = [...expectedKeys, "exactCanonicalCloseMembershipBytes"];
+	if (value !== null && typeof value === "object" && keys.includes("exactCanonicalSettlementBytes") &&
+		Object.hasOwn(value, "exactCanonicalReattachmentCheckpointBytes"))
+		expectedKeys = [...expectedKeys, "exactCanonicalReattachmentCheckpointBytes"];
+	if (value !== null && typeof value === "object" && !keys.includes("exactCanonicalSettlementBytes") &&
+		Object.hasOwn(value, "materialKind")) expectedKeys = [...expectedKeys, "materialKind"];
 	if (
 		value === null ||
 		typeof value !== "object" ||
@@ -151,10 +159,14 @@ function auxiliary(record: Record<string, unknown>): CreatorSuccessorAuxiliaryMa
 	if (membership !== undefined && (!(membership instanceof Uint8Array) || membership.byteLength === 0 ||
 		membership.byteLength > CREATOR_CLOSE_MEMBERSHIP_MAX_BYTES))
 		throw new TypeError("creator material membership bounds are invalid");
+	const checkpoint = record.exactCanonicalReattachmentCheckpointBytes;
+	if (checkpoint !== undefined && decodeCreatorReattachmentCheckpoint(checkpoint) === undefined)
+		throw new TypeError("creator material checkpoint bounds are invalid");
 	return Object.freeze({
 		exactCanonicalSettlementBytes: settlement === null ? null : Uint8Array.from(settlement as Uint8Array),
 		exactCanonicalHistoryBytes: Uint8Array.from(history),
 		...(membership === undefined ? {} : { exactCanonicalCloseMembershipBytes: Uint8Array.from(membership as Uint8Array) }),
+		...(checkpoint === undefined ? {} : { exactCanonicalReattachmentCheckpointBytes: Uint8Array.from(checkpoint as Uint8Array) }),
 		...(settlement === null
 			? {
 					exactCanonicalRetirementBytes: Uint8Array.from(retirement as Uint8Array),
@@ -209,8 +221,9 @@ export function createCreatorSuccessorMaterialServer(
 				"signature",
 			]);
 			const { signature, ...proof } = request;
+			const checkpointRequested = request.version === 2 && request.materialKind === "checkpoint";
 			if (
-				request.version !== 1 ||
+				!(checkpointRequested || (request.version === 1 && !Object.hasOwn(request, "materialKind"))) ||
 				request.manifestDigest !== input.manifestDigest ||
 				request.requesterPeer !== stream.peerId ||
 				request.sourcePeer !== input.localPeerId ||
@@ -228,16 +241,26 @@ export function createCreatorSuccessorMaterialServer(
 			if (!authors.has(stream.peerId) && authors.size >= SNAPSHOT_PULL_MAX_GLOBAL_SESSIONS)
 				throw new TypeError("creator material requester session limit reached");
 			authors.set(stream.peerId, request.author);
+			const { exactCanonicalCloseMembershipBytes: membership,
+				exactCanonicalReattachmentCheckpointBytes: checkpoint, ...common } = auxiliary(input.material as unknown as Record<string, unknown>);
+			if (checkpointRequested && checkpoint === undefined)
+				throw new TypeError("creator checkpoint material is unavailable");
 			const response = {
-				...input.material,
+				...common,
+				...(checkpointRequested ? { exactCanonicalReattachmentCheckpointBytes: checkpoint }
+					: membership === undefined ? {} : { exactCanonicalCloseMembershipBytes: membership }),
 				kind: "creator-successor-material-response",
-				version: input.material.exactCanonicalCloseMembershipBytes === undefined ? 1 : 2,
+				version: checkpointRequested ? 3 : membership === undefined ? 1 : 2,
 				nonce: request.nonce,
 				manifestDigest: input.manifestDigest,
 				requesterPeer: stream.peerId,
 				sourcePeer: input.localPeerId,
 				author: input.identity.author,
 			};
+			// Reserve the whole signed response before entering its signing turn.
+			// The separately requested checkpoint never consumes membership space.
+			const responseLimits = checkpointRequested ? REQUEST_LIMITS : FRAME_LIMITS;
+			encodeCanonical({ ...response, signature: new Uint8Array(64) }, responseLimits);
 			const controller = new AbortController();
 			const timer = setTimeout(
 				() => controller.abort(new Error("creator material response timed out")),
@@ -245,7 +268,8 @@ export function createCreatorSuccessorMaterialServer(
 			);
 			try {
 				await stream.write(
-					encodeCanonical({ ...response, signature: await signTransportFrame(input.identity, response, controller.signal) }, FRAME_LIMITS),
+					encodeCanonical({ ...response, signature: await signTransportFrame(input.identity, response, controller.signal) },
+						responseLimits),
 					{ signal: controller.signal }
 				);
 				await stream.close();
@@ -291,6 +315,7 @@ async function attemptCreatorSuccessorMaterial(
 		transport: SnapshotChunkProtocolPort;
 		identity: SigningIdentity;
 		manifestDigest: string;
+		materialKind?: "checkpoint";
 	}>,
 	peer: string,
 	lifetime: AbortSignal | undefined
@@ -298,7 +323,8 @@ async function attemptCreatorSuccessorMaterial(
 	const nonce = crypto.getRandomValues(new Uint8Array(32));
 	const request = {
 		kind: "creator-successor-material-request",
-		version: 1,
+		version: input.materialKind === "checkpoint" ? 2 : 1,
+		...(input.materialKind === "checkpoint" ? { materialKind: "checkpoint" } : {}),
 		nonce,
 		manifestDigest: input.manifestDigest,
 		requesterPeer: input.transport.localPeerId,
@@ -349,8 +375,12 @@ async function attemptCreatorSuccessorMaterial(
 		const { signature: responseSignature, ...proof } = response;
 		if (
 			response.kind !== "creator-successor-material-response" ||
-			(response.version !== 1 && response.version !== 2) ||
-			(response.version === 2) !== Object.hasOwn(response, "exactCanonicalCloseMembershipBytes") ||
+			(input.materialKind === "checkpoint"
+				? response.version !== 3 || !Object.hasOwn(response, "exactCanonicalReattachmentCheckpointBytes") ||
+					Object.hasOwn(response, "exactCanonicalCloseMembershipBytes") || bytes.byteLength > REQUEST_LIMITS.maxBytes
+				: (response.version !== 1 && response.version !== 2) ||
+					(response.version === 2) !== Object.hasOwn(response, "exactCanonicalCloseMembershipBytes") ||
+					Object.hasOwn(response, "exactCanonicalReattachmentCheckpointBytes")) ||
 			response.manifestDigest !== input.manifestDigest ||
 			response.requesterPeer !== input.transport.localPeerId ||
 			response.sourcePeer !== peer ||
@@ -450,6 +480,8 @@ export async function receiveCreatorSuccessorMaterial(
 		identity: SigningIdentity;
 		peers: readonly string[];
 		manifestDigest: string;
+		/** A gap requests current-point proof instead of the unrelated final-close membership. */
+		materialKind?: "checkpoint";
 		/** The caller's lifetime; when present, transient unavailability is retried until it aborts. */
 		retryUntil?: AbortSignal;
 	}>

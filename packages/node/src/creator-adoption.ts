@@ -12,6 +12,7 @@ import { CREATOR_AUTHOR_SETTLEMENT_MAX_RECORD_BYTES } from "@ts-drp/protocol-v3/
 import { CREATOR_AUTHOR_ISSUANCE_FRONTIERS_MAX_RECORD_BYTES } from "@ts-drp/protocol-v3/creator-author-issuance-frontiers";
 import { CREATOR_ISSUANCE_RETIREMENT_MAX_RECORD_BYTES } from "@ts-drp/protocol-v3/creator-issuance-retirement";
 import {
+	encodeCreatorReattachmentCheckpoint,
 	openCreatorCheckpointTrust,
 	openCreatorForwardPromotionCheckpointTrust,
 } from "@ts-drp/protocol-v3/creator-checkpoint";
@@ -700,6 +701,26 @@ async function readCreatorSuccessorExportMaterial(
 				candidates: Object.freeze(current.candidates.map(candidate => Object.freeze({ ...candidate,
 					bytes: Uint8Array.from(candidate.bytes), ref: Object.freeze({ ...candidate.ref }) }))) }));
 		}
+		let reattachmentCheckpoint: Uint8Array | undefined;
+		// A sealed Q generation still owns its predecessor projection/ACL.
+		// The target L installs the just-closed ACL during adoption; only then
+		// can this optional point proof be exported alongside ordinary material.
+		if (checkpoint.predecessorTrust.currentEpoch >= 1 && settlement !== undefined && !promoted &&
+			successorProjection?.record.epoch === checkpoint.currentTrust.currentEpoch) {
+			const predecessorAcl = uniqueCandidateByKind(current.candidates, "drp-v3-latched-acl");
+			const predecessorSettlement = uniqueCandidateByKind(predecessor, "drp-creator-author-settlement-state");
+			if (predecessorAcl === undefined || predecessorSettlement === undefined ||
+				predecessorAcl.record.epoch !== checkpoint.predecessorTrust.currentEpoch ||
+				hex(hashDomain("ts-drp/latched-acl/v3", predecessorAcl.bytes)) !== chain.currentAnchor.aclDigest)
+				throw new TypeError("creator successor native checkpoint companions are unavailable");
+			reattachmentCheckpoint = encodeCreatorReattachmentCheckpoint({
+				exactCanonicalPredecessorTrustStateRecordBytes: Uint8Array.from(predecessorTrustCandidate.bytes),
+				exactCanonicalPredecessorAclBytes: Uint8Array.from(predecessorAcl.bytes),
+				exactCanonicalPredecessorSettlementBytes: Uint8Array.from(predecessorSettlement.bytes),
+			});
+			if (exportAccounting !== undefined && !exportAccounting.charge(reattachmentCheckpoint))
+				throw new TypeError("creator successor checkpoint transfer proof charge is exhausted");
+		}
 		return Object.freeze({
 			offer: captureCreatorSuccessorOffer({
 				exactCanonicalCutValueBytes: cut.bytes,
@@ -710,6 +731,7 @@ async function readCreatorSuccessorExportMaterial(
 			material: Object.freeze({
 				exactCanonicalSettlementBytes: settlement === undefined ? null : Uint8Array.from(settlement.bytes),
 				exactCanonicalHistoryBytes: Uint8Array.from(history.bytes),
+				...(reattachmentCheckpoint === undefined ? {} : { exactCanonicalReattachmentCheckpointBytes: reattachmentCheckpoint }),
 				...(settlement===undefined?{exactCanonicalRetirementBytes:Uint8Array.from(retirement!.bytes),
 					exactCanonicalAggregateBytes:Uint8Array.from(aggregate!.bytes)}:{}),
 			}),

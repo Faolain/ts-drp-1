@@ -9,6 +9,7 @@ import {
 	resolveCreatorAnchorTrustMaterial,
 } from "./internal/seal-authority-custody.js";
 import { settlementProfileFor } from "./settlement-profile.js";
+import { CREATOR_AUTHOR_SETTLEMENT_MAX_RECORD_BYTES } from "./creator-author-issuance-frontiers.js";
 
 const DIGEST_HEX = /^[0-9a-f]{64}$/u;
 const INPUT_KEYS = Object.freeze([
@@ -37,6 +38,75 @@ const TRUST_KEYS = Object.freeze([
 	"quorum",
 	"version",
 ]);
+
+const REATTACHMENT_KEYS = Object.freeze([
+	"kind", "version", "exactCanonicalPredecessorTrustStateRecordBytes",
+	"exactCanonicalPredecessorAclBytes", "exactCanonicalPredecessorSettlementBytes",
+]);
+
+/** Immutable transport syntax, not authority or a skipped-source classification. */
+export interface CreatorReattachmentCheckpoint {
+	readonly exactCanonicalPredecessorTrustStateRecordBytes: Uint8Array;
+	readonly exactCanonicalPredecessorAclBytes: Uint8Array;
+	readonly exactCanonicalPredecessorSettlementBytes: Uint8Array;
+}
+
+function reattachmentFields(input: CreatorReattachmentCheckpoint): Readonly<Record<string, unknown>> {
+	return { kind: "creator-reattachment-checkpoint-1", version: 1, ...input };
+}
+
+/** Exact maximum of the existing trust, ACL and signed-settlement carrier limits. */
+export const CREATOR_REATTACHMENT_CHECKPOINT_MAX_BYTES = encodeCanonical(reattachmentFields({
+	exactCanonicalPredecessorTrustStateRecordBytes: new Uint8Array(8192),
+	exactCanonicalPredecessorAclBytes: new Uint8Array(65_536),
+	exactCanonicalPredecessorSettlementBytes: new Uint8Array(CREATOR_AUTHOR_SETTLEMENT_MAX_RECORD_BYTES),
+})).byteLength;
+
+/**
+ * Decodes detached bounded syntax; the checkpoint and settlement owners still authenticate every carrier.
+ * @param input - Exact canonical transport bytes.
+ * @returns Copied predecessor carriers, or undefined for any malformed field.
+ */
+export function decodeCreatorReattachmentCheckpoint(input: unknown): CreatorReattachmentCheckpoint | undefined {
+	try {
+		const bytes = copiedBytes(input, CREATOR_REATTACHMENT_CHECKPOINT_MAX_BYTES);
+		if (bytes === undefined) return undefined;
+		const limits = { maxBytes: CREATOR_REATTACHMENT_CHECKPOINT_MAX_BYTES, maxDepth: 2, maxItems: 64 };
+		const { value, exact } = decodeCanonicalWithExactness(bytes, limits);
+		if (!plainRecord(value) || !exactKeys(value, REATTACHMENT_KEYS) ||
+			value.kind !== "creator-reattachment-checkpoint-1" || value.version !== 1 ||
+			(!exact && compareBytes(encodeCanonical(value, limits), bytes) !== 0)) return undefined;
+		// The canonical decoder may return views into its captured input. These
+		// freshly decoded fields cannot carry caller-defined accessors.
+		const field = (value: unknown, maximum: number): Uint8Array | undefined =>
+			value instanceof Uint8Array && value.byteLength > 0 && value.byteLength <= maximum
+				? Uint8Array.from(value) : undefined;
+		const trust = field(value.exactCanonicalPredecessorTrustStateRecordBytes, 8192);
+		const acl = field(value.exactCanonicalPredecessorAclBytes, 65_536);
+		const settlement = field(value.exactCanonicalPredecessorSettlementBytes, CREATOR_AUTHOR_SETTLEMENT_MAX_RECORD_BYTES);
+		return trust === undefined || acl === undefined || settlement === undefined ? undefined : Object.freeze({
+			exactCanonicalPredecessorTrustStateRecordBytes: trust,
+			exactCanonicalPredecessorAclBytes: acl,
+			exactCanonicalPredecessorSettlementBytes: settlement,
+		});
+	} catch { return undefined; }
+}
+
+/**
+ * Encodes only the same bounded syntax accepted by the decoder, without granting checkpoint authority.
+ * @param input - Predecessor carriers authenticated separately by the exporting owner.
+ * @returns Exact detached transport bytes.
+ */
+export function encodeCreatorReattachmentCheckpoint(input: CreatorReattachmentCheckpoint): Uint8Array {
+	if (!plainRecord(input) || !exactKeys(input, REATTACHMENT_KEYS.slice(2)))
+		throw new TypeError("creator reattachment checkpoint fields are invalid");
+	const bytes = encodeCanonical(reattachmentFields(input), {
+		maxBytes: CREATOR_REATTACHMENT_CHECKPOINT_MAX_BYTES, maxDepth: 2, maxItems: 64,
+	});
+	if (decodeCreatorReattachmentCheckpoint(bytes) === undefined)
+		throw new TypeError("creator reattachment checkpoint bounds are invalid");
+	return bytes;
+}
 
 export type CreatorCheckpointFailureReason =
 	| "commit-qc-rejected"
