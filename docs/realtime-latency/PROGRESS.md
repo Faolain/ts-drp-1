@@ -8,6 +8,34 @@ The task is incomplete. Passing a room test that pauses at each rollover does no
 establish uninterrupted play. A formal model proves its stated abstraction and bounds,
 not native storage or network behavior.
 
+## Paused for credit — 2026-10-23
+
+The user requested a pause. No final campaign has started. Root at `05297776`
+contains the reviewed performance scheduling, pure target reuse and latest formal
+checks. Completion work remains **uncommitted** in
+`/private/tmp/ts-drp-rejoin-readmission` at `a847900d` plus its frozen patch;
+independent review was interrupted for this pause. Its durable resume handoff is
+under [rejoin-completion](../../.logs/realtime-resume-2026-10-23/rejoin-completion/).
+
+On resume, finish that review and fixes, commit and integrate completion, then
+implement removed-author abandonment and finish the full recovery-range review.
+Both usable rollback-slot recovery tests remain unfinished: only read-only design
+was done, with no new test files or runs. The intended checks use genuine creator
+owners, cold reopen and authenticated forward promotion from each actual local
+rollback base, exact projection and subsequent useful issue, plus a physical
+custody census that distinguishes the extra source-floor header.
+
+The current-proof 512-offer capacity gate and final 300-epoch campaigns remain
+pending. Campaign preparation is preserved at
+`/private/tmp/ts-drp-final-campaign-preparation` and
+`/private/tmp/ts-drp-final-campaign-config`; refresh the checkout to the final
+reviewed composition and affected preflight before launch. Fresh-build every
+runtime owner and record actual resolved module paths and compiled hashes, since
+a correct source HEAD alone did not prevent a stale package export. Reopen at
+epoch 30 and preserve the unforced WAL interval. Browser permission and rendering
+FPS readiness remain open; the earlier source-specific receipts below do not
+close them.
+
 ## Next agent prompt
 
 Root native production now includes `bb3600e2`: reviewed scheduling after native
