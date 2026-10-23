@@ -10,12 +10,14 @@ not native storage or network behavior.
 
 ## Next agent prompt
 
-Root native production now includes `5abfb079`: the reviewed recovery/outbox scheduling
-checkpoints and seven held native-boundary controls, following the composed rejoin source,
-first responsiveness slice and separate pending-floor model. Genuine recipient SIGKILL
-evidence is integrated at `cc4a9908`; the coarse starvation harness is at `e20cd61d`.
+Root native production now includes `bb3600e2`: reviewed scheduling after native
+maintenance participants release, and reuse of a validated issuance-retirement target
+within one synchronous check. These follow the recovery/outbox checkpoints at `5abfb079`.
+The [track 42 receipts](tracks/42-native-continued-play/RESULT.md) preserve each source;
+the pure refactor supplies no new latency measurement or capacity claim. Genuine recipient
+SIGKILL evidence is integrated at `cc4a9908`; the coarse starvation harness is at `e20cd61d`.
 The full `613ab647` to recovery composition review, historical pending egress after journal
-retirement, full-removal completion/local-author expiry, and guarded maintenance callbacks
+retirement, and full-removal completion/local-author expiry
 remain separate open gates. Do not describe the whole rejoin composition as fully reviewed.
 
 Finish those gates and their affected composed checks before starting the final campaign.
@@ -65,7 +67,7 @@ during Grid timing; continue recording external shared-host load.
 | [Recovery and long-room proof](tracks/41-active-application-endurance/RESULT.md) | PRE-PERF300-02 completed 300 epochs and 3,000 accepted operations in each of Canvas, Grid and Chat, with both peers reopening at epoch 150. This source predates the replay fix and remaining capacity/rejoin changes. The final integrated campaign is pending. |
 | Arbitrary-gap rejoin and same-key readmission | **Open completion/review gates.** The native gap/custody checkpoint is composed into root. [Real recipient process-death evidence](tracks/42-native-continued-play/evidence/rejoin-process-death/RESULT.md) passes receipt-commit and floor-commit recovery of captured A despite newer B, preserving unknown signed work through another install/reopen. The complete `613ab647` to recovery review, durable full-removal completion and local-author expiry remain open. The separate physical census retains the distinction between an extra source-floor header and the oldest usable recovery base. |
 | [Larger work per epoch](../../specs/bounded-storage-lifecycle/capacity-finishability.md) | Common currency, exact-intent and startup-recovery fixes are integrated, together with authenticated pending-bootstrap retention. Isolated shipped-profile campaigns finished 412 serial records across four cycles and 4,208 batched edits across six cycles. Common integration passes 22 focused controls and both real SQLite SIGKILL/recovery edges; final rejoin/performance composition remains open. Historical 357/489-record legacy creator-trusted/NONE failures are not shipped-app G2 regressions. |
-| [Native continued play](tracks/42-native-continued-play/RESULT.md) | **Performance completion remains open.** The first reviewed cooperative-work slice is integrated; its matched native pair reduces the observed maximum timer gap from 2,146 to 174 ms without a CPU-efficiency claim. The subsequent recovery/outbox checkpoint slice is integrated at `5abfb079`; its separate four-epoch candidate records a 146 ms maximum timer gap and does not run the later starvation harness. Guarded maintenance callbacks and final production composition remain pending. The current bounded harness preserves raw phase observations and checks a separately labeled coarse starvation alarm plus each receiver after convergence. Its integrated short smoke and behavioral negatives are distinct from the pending final 300-epoch campaign and finer responsiveness work. |
+| [Native continued play](tracks/42-native-continued-play/RESULT.md) | **Performance completion remains open.** Reviewed cooperative work, recovery/outbox checkpoints, released-participant maintenance scheduling and pure validated-target reuse are integrated through `bb3600e2`. The report keeps the matched pair and separate short candidates within their original source scopes. The pure refactor adds no latency or capacity measurement. Final completion/expiry composition, the 512 native-record offer and the 300-epoch campaign remain pending; the coarse starvation alarm is not smooth-play completion. |
 | Browser parity | Actual three-engine browser launch remains **blocked** on macOS permission. Native libp2p plus controlled raw datagrams supplies no real browser WebRTC or rendering/FPS result. |
 
 The new application harness uses the shipped compositions, two concurrent durable

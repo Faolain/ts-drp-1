@@ -200,8 +200,8 @@ Within-baseline receive-gap maxima are about 19.77 ms. The raw maxima are about
 875 ms and include authority mismatch and reopen intervals. This run uses the
 original observation harness, before the later starvation gate; its production
 composition and interleaving also differ from pair 12. It is descriptive evidence,
-with no paired speedup, CPU-efficiency or smooth-play completion claim. Guarded
-maintenance callbacks and the final rejoin composition still need their own gates.
+with no paired speedup, CPU-efficiency or smooth-play completion claim. The later
+maintenance integration below has its own receipt; final rejoin composition remains open.
 
 The [current coarse gate and controls](evidence/coarse-starvation-gate/manifest.json)
 keep raw phase callbacks, deliveries, CPU and task spans. They use a 1,000 ms
@@ -225,7 +225,31 @@ receiver 0 continues, and fails that receiver's baseline. Both failures join all
 owners. The artifact includes host load, raw samples, per-phase distributions,
 independent review, and the earlier measurement-code failures.
 
-The final campaign waits for the remaining production and composition reviews.
+## Integrated maintenance and validated-target reuse
+
+Root `bb3600e2` includes the reviewed maintenance scheduling change at `697e0401`.
+Its [separate receipt](../../../../.logs/recovery-retention/transition-responsiveness-16/manifest.json)
+checks that a host turn occurs only after the original native participant releases,
+that close propagates the original abort signal, and that the next owner still refuses
+stale native controls. Its four-epoch candidate is a source-specific observation,
+without a paired speedup or smooth-play completion claim.
+
+The [pure target-reuse receipt](evidence/issuance-target-reuse-bb3600e2/manifest.json)
+preserves an independently reviewed reduction within one synchronous validation call.
+The detached expected image before the transaction and the fresh image inside the
+writer still undergo separate complete checks. Caller-returned census data supplies
+neither image. The focused row-law, native mutation and crash checks pass on the
+integrated source after rebuilding and recording the actual runtime owner. This change
+has no new latency measurement, CPU-speedup claim or capacity campaign.
+
+The receipt also reproduces all three broader journal failures on unchanged `697e0401`:
+two stale fixed-bound expectations and the old expectation that an absent optional
+membership field appears as SQL NULL in a canonical frame. The failed configuration
+attempt and the first integration run with a stale compiled owner remain explicitly
+superseded evidence. Neither is reported as a successful check of the modified runtime.
+
+The final campaign waits for the remaining production and composition reviews and the
+512 native-record capacity offer on the completed checkpoint/expiry source.
 Use `ACTIVE_CONTINUED_PLAY_EPOCHS=300`, `ACTIVE_CONTINUED_PLAY_REOPEN_AT=30`,
 `ACTIVE_CONTINUED_PLAY_REPAIR_EVERY=25` and
 `ACTIVE_CONTINUED_PLAY_STARVATION_ALARM_MS=1000`, without inspector profiling.

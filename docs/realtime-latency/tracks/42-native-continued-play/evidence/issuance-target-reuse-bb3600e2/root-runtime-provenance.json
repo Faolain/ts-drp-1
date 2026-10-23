@@ -1,0 +1,24 @@
+{
+  "moduleResolution": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/issuance-store/dist/src/maintenance.js",
+  "loadedTransitionCallsCheckedHelper": true,
+  "loadedTransition": "function issuanceRetirementTransitionRows(control, next, rows) {\n    if (control.active === null || next.active !== null || next.completed === null ||\n        !issuanceRetirementBytesEqual(encodeCanonical(control.active.preparation), encodeCanonical(next.completed)))\n        return rows;\n    return checkedIssuanceRetirementTargetRows(control, control.active.preparation, rows);\n}",
+  "files": {
+    "packages/issuance-store/src/retirement.ts": {
+      "rootSHA256": "b69fe0a2fdf01d8b66dd4bf05eed11eb12a9e6f28fd614da48a3f0627971bff4",
+      "isolatedSHA256": "b69fe0a2fdf01d8b66dd4bf05eed11eb12a9e6f28fd614da48a3f0627971bff4"
+    },
+    "packages/issuance-store/dist/src/retirement.js": {
+      "rootSHA256": "37fcb55b3cd235421eee8439dcd52f8449e626d24c31d6c2afbafa38d00b9ed1",
+      "isolatedSHA256": "37fcb55b3cd235421eee8439dcd52f8449e626d24c31d6c2afbafa38d00b9ed1"
+    },
+    "packages/issuance-store/dist/src/maintenance.js": {
+      "rootSHA256": "4b551ad5f2446d3db412ede8d8be080d59c5d9b8d8ec69397791b62562b707d1",
+      "isolatedSHA256": "4b551ad5f2446d3db412ede8d8be080d59c5d9b8d8ec69397791b62562b707d1"
+    },
+    "packages/issuance-store/package.json": {
+      "rootSHA256": "5bf6728191319712efece469854cfe326277eded05eb50607c376efe911055ce",
+      "isolatedSHA256": "5bf6728191319712efece469854cfe326277eded05eb50607c376efe911055ce"
+    }
+  },
+  "rootAndIsolatedRuntimeIdentical": true
+}
