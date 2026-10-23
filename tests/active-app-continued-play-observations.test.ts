@@ -3,7 +3,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, it } from "vitest";
 
-import { BoundedObservationLog, GridLastValueOracle } from "./fixtures/active-endurance/continued-play-observations.js";
+import {
+	BoundedObservationLog,
+	DurationDistribution,
+	GridLastValueOracle,
+} from "./fixtures/active-endurance/continued-play-observations.js";
 import { ControlledRawBus } from "../packages/node/tests/fixtures/controlled-unreliable-webrtc.js";
 
 it("rejects the previous value of an overwritten slot even when all 32 IDs survive", () => {
@@ -63,4 +67,12 @@ it("bounds raw sends, reconciliations, and closed route history while preserving
 	}
 	expect(delivered).toBe(360);
 	expect(bus.sent).toBe(360);
+});
+
+it("preserves a rare starvation maximum even when percentile gaps remain short", () => {
+	const distribution = new DurationDistribution();
+	for (let tick = 0; tick < 999; tick++) distribution.add(10);
+	distribution.add(1200.1234);
+	expect(distribution.summary()).toMatchObject({ count: 1000, maxMs: 1200.1234 });
+	expect(distribution.summary().p99Ms).toBeLessThan(11);
 });

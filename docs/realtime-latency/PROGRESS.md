@@ -10,7 +10,18 @@ not native storage or network behavior.
 
 ## Next agent prompt
 
-Finish the remaining gates below, then run the combined game path. Preserve
+Root native production includes the composed `a847900d` checkpoint, the first reviewed
+responsiveness slice, and the separate pending-floor model. Genuine recipient SIGKILL
+evidence is integrated at `cc4a9908`. The full `613ab647` to recovery composition review,
+full-removal completion/local-author expiry work, and finer responsiveness slice remain
+separate open gates. Do not describe the whole rejoin composition as fully reviewed.
+
+Finish those gates and their affected composed checks before starting the final campaign.
+The continued-play harness uses a 1,000 ms coarse starvation alarm with per-receiver
+baselines after convergence. Passing it does not establish smooth play or close the
+performance goal. Run Grid continued play and separate Canvas/Chat conservation for
+300 epochs, reopening at 30; preserve the remaining uninterrupted WAL interval without
+manual checkpoint or vacuum. Then run the remaining browser/capacity gates below. Preserve
 the original Claude worktrees: several contain deliberately reversed source files from
 before/after comparisons. Their committed heads and scratchpad progress reports identify
 the candidate fixes. Use isolated checkouts, retain failed runs, and compare the actual
@@ -42,9 +53,9 @@ tests rather than aggregate pass counts. Update this file at each integration ch
 | Authenticated partial-cut membership (F1) | Integrated signed successor membership transfer with native point reads. The endurance harness exports the complete v2 membership carrier. |
 | [Durable classification and cleanup (F2, A-1, H2, H5)](tracks/40-track-x-native-retirement/RESULT.md) | Integrated durable terminal authority and atomic issuance/settlement-plan retirement. Native storage crash evidence is separate from application endurance. |
 | [Recovery and long-room proof](tracks/41-active-application-endurance/RESULT.md) | PRE-PERF300-02 completed 300 epochs and 3,000 accepted operations in each of Canvas, Grid and Chat, with both peers reopening at epoch 150. This source predates the replay fix and remaining capacity/rejoin changes. The final integrated campaign is pending. |
-| Arbitrary-gap rejoin and same-key readmission | **Open.** Public native cold/fault cases, receipt-only recovery and observer installs have isolated evidence; mixed ordinary/gap composition is still under review. The separate physical census distinguishes normalizing an extra source-floor header from the oldest usable recovery base. No incomplete rejoin chain is integrated, and explicit expiry remains proposed. |
+| Arbitrary-gap rejoin and same-key readmission | **Open completion/review gates.** The native gap/custody checkpoint is composed into root. [Real recipient process-death evidence](tracks/42-native-continued-play/evidence/rejoin-process-death/RESULT.md) passes receipt-commit and floor-commit recovery of captured A despite newer B, preserving unknown signed work through another install/reopen. The complete `613ab647` to recovery review, durable full-removal completion and local-author expiry remain open. The separate physical census retains the distinction between an extra source-floor header and the oldest usable recovery base. |
 | [Larger work per epoch](../../specs/bounded-storage-lifecycle/capacity-finishability.md) | Common currency, exact-intent and startup-recovery fixes are integrated, together with authenticated pending-bootstrap retention. Isolated shipped-profile campaigns finished 412 serial records across four cycles and 4,208 batched edits across six cycles. Common integration passes 22 focused controls and both real SQLite SIGKILL/recovery edges; final rejoin/performance composition remains open. Historical 357/489-record legacy creator-trusted/NONE failures are not shipped-app G2 regressions. |
-| [Native continued play](tracks/42-native-continued-play/RESULT.md) | **RED.** The original common-source probe conserves 21 Grid placements and repairs quiet loss, but sealing/adoption consume 150–365 ms of own CPU with zero timer callbacks. The configurable sustained harness now uses 32 overwritten slots, bounded/flushed observations, periodic automatic repair, full native census and persisted reopen with the same transport identities; its short preparation smoke is separate from the pending final 300-epoch run. The production responsiveness fix remains under review. |
+| [Native continued play](tracks/42-native-continued-play/RESULT.md) | **Performance completion remains open.** The first reviewed cooperative-work slice is integrated; its matched native pair reduces the observed maximum timer gap from 2,146 to 174 ms without a CPU-efficiency claim. The current bounded harness preserves raw phase observations and checks a separately labeled coarse starvation alarm plus each receiver after convergence. Its integrated short smoke and behavioral negatives are distinct from the pending final 300-epoch campaign and finer responsiveness work. |
 | Browser parity | Actual three-engine browser launch remains **blocked** on macOS permission. Native libp2p plus controlled raw datagrams supplies no real browser WebRTC or rendering/FPS result. |
 
 The new application harness uses the shipped compositions, two concurrent durable
@@ -56,12 +67,13 @@ maintenance. It does not establish sustained high-rate play, unreliable ephemera
 traffic, automatic libp2p repair or arbitrary offline gaps.
 
 The separate [native transport probe](tracks/42-native-continued-play/RESULT.md)
-now establishes automatic quiet repair and exposes transition timer starvation.
-Earlier profiles preserve their original source; the latest unprofiled smoke
-includes common capacity/bootstrap integration. Per-step CPU and event-loop
-measurements separate the failure from correct rejection of
-frames during staggered epoch installation. The finite capacity receipts and a
-final 300-epoch conservation run cannot substitute for uninterrupted receiver progress.
+establishes automatic quiet repair and retains source-specific transition measurements.
+Earlier profiles and the matched responsiveness pair preserve their original sources.
+Per-phase raw observations remain available even when a short phase has no callback or
+usable overlapping authority. Baselines compare public room/genesis/ACL scope and count
+only codec-accepted deliveries; local channel observations are compared only with that
+channel's starting observation. A coarse alarm or finite conservation receipt cannot
+substitute for uninterrupted smooth play or browser rendering evidence.
 
 The [completed campaign](tracks/41-active-application-endurance/RESULT.md) records
 source `6f414a25` and exact patch hash `25f03f5a…3187449`. Logical rows and primary

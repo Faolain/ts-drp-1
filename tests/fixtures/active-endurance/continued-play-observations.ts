@@ -1,5 +1,6 @@
 /* eslint-disable jsdoc/require-jsdoc -- Bounded measurement and independent test oracle. */
 import { appendFileSync } from "node:fs";
+import { createHistogram } from "node:perf_hooks";
 
 export interface GridBlock {
 	readonly id: string;
@@ -71,5 +72,27 @@ export class BoundedObservationLog {
 
 	get retained(): number {
 		return this.#buffer.length;
+	}
+}
+
+// HDR counts use constant storage. Percentiles are quantized to microseconds
+// and three significant figures; the maximum retains the original measurement.
+export class DurationDistribution {
+	readonly #histogram = createHistogram();
+	#maximum = 0;
+
+	add(ms: number): void {
+		if (!Number.isFinite(ms) || ms < 0) throw new Error("DURATION_MEASUREMENT_INVALID");
+		this.#maximum = Math.max(this.#maximum, ms);
+		this.#histogram.record(Math.max(1, Math.ceil(ms * 1000)));
+	}
+
+	summary(): Readonly<{ count: number; maxMs: number; p95Ms: number | null; p99Ms: number | null }> {
+		return {
+			count: this.#histogram.count,
+			maxMs: this.#maximum,
+			p95Ms: this.#histogram.count === 0 ? null : this.#histogram.percentile(95) / 1000,
+			p99Ms: this.#histogram.count === 0 ? null : this.#histogram.percentile(99) / 1000,
+		};
 	}
 }

@@ -184,12 +184,41 @@ and two receives per peer. Absolute issue times and complete timer CPU records
 preserve the distinction between issuing and catching up. This remains an
 observation-mode pass on the earlier production source.
 
-The final campaign still waits for reviewed responsiveness and authenticated rejoin
-changes to compose. Run 300 epochs with `ACTIVE_CONTINUED_PLAY_EPOCHS=300`,
-`ACTIVE_CONTINUED_PLAY_REOPEN_AT=30`, `ACTIVE_CONTINUED_PLAY_REPAIR_EVERY=25`
-and `ACTIVE_CONTINUED_PLAY_REQUIRE_PROGRESS=1`; leave inspector profiling disabled.
-This requires both receivers to progress inside each transition as well as during
-the surrounding baselines. The existing 100 Hz per-peer offer schedule measures
-actual callbacks and deliveries, including timer starvation. Reopening at 30 leaves
-270 uninterrupted epochs for ordinary WAL behavior; inject no checkpoint or vacuum.
-Keep the Canvas/Chat conservation paths and larger per-epoch capacity axis separate.
+The [integrated recipient crash evidence](evidence/rejoin-process-death/RESULT.md)
+checks real process death after receipt and floor commits on the composed native
+checkpoint. The [matched responsiveness pair](../../../../.logs/recovery-retention/transition-responsiveness-12/manifest.json)
+preserves the earlier baseline and first reviewed cooperative-work candidate; its
+observed maximum timer gap improves from 2,146 to 174 ms. This is neither a
+CPU-efficiency result nor completion of the smooth-game-loop goal.
+
+The [current coarse gate and controls](evidence/coarse-starvation-gate/manifest.json)
+keep raw phase callbacks, deliveries, CPU and task spans. They use a 1,000 ms
+starvation alarm and separate receiver baselines after completed convergence;
+short phases and legitimate authority mismatches do not require fabricated waits.
+The baselines compare public successor/genesis and ACL scope while tracking each
+local channel observation independently. Their gap distributions include the
+window boundaries, so a silent receiver cannot disappear from the statistics.
+The native scope remains real localhost durable transport plus controlled raw
+datagrams, with no browser WebRTC or rendering/FPS claim.
+
+The integrated short smoke on `cc4a9908` plus the recorded harness patch passes
+three epochs and 51 accepted operations, strict reopen at epoch 1, and a lost-copy/
+lost-first-answer repair. The observed maximum timer gap is 133.585 ms, with p95
+12.775 ms and p99 49.983 ms. Matched-authority receive-window maxima are 21.474 and
+21.442 ms for the two receivers. These native observations do not close the
+smooth-game-loop goal. The timer-block negative trips the coarse alarm at
+1,215.246 ms while both receivers still exceed their count threshold; genuine
+one-way loss in the controlled raw bus leaves receiver 1 at zero deliveries while
+receiver 0 continues, and fails that receiver's baseline. Both failures join all
+owners. The artifact includes host load, raw samples, per-phase distributions,
+independent review, and the earlier measurement-code failures.
+
+The final campaign waits for the remaining production and composition reviews.
+Use `ACTIVE_CONTINUED_PLAY_EPOCHS=300`, `ACTIVE_CONTINUED_PLAY_REOPEN_AT=30`,
+`ACTIVE_CONTINUED_PLAY_REPAIR_EVERY=25` and
+`ACTIVE_CONTINUED_PLAY_STARVATION_ALARM_MS=1000`, without inspector profiling.
+The alarm is a coarse starvation regression criterion, not performance completion.
+Keep actual maxima and p95/p99, receiver gaps, CPU, host load and exact accepted-work
+checks even when the alarm passes. Reopening at 30 leaves 270 uninterrupted epochs
+for ordinary WAL behavior; inject no checkpoint or vacuum. Keep the separate
+Canvas/Chat conservation paths and larger per-epoch capacity axis.

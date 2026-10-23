@@ -12,6 +12,7 @@ import { expect, it, vi } from "vitest";
 
 import {
 	BoundedObservationLog,
+	DurationDistribution,
 	type GridBlock,
 	GridLastValueOracle,
 } from "./fixtures/active-endurance/continued-play-observations.js";
@@ -45,7 +46,8 @@ const repairEvery = Number(process.env.ACTIVE_CONTINUED_PLAY_REPAIR_EVERY ?? 25)
 const reopenAt = Number(
 	process.env.ACTIVE_CONTINUED_PLAY_REOPEN_AT ?? Math.min(30, Math.max(1, Math.floor(epochs / 2)))
 );
-const requireProgress = process.env.ACTIVE_CONTINUED_PLAY_REQUIRE_PROGRESS === "1";
+const starvationAlarmMs = Number(process.env.ACTIVE_CONTINUED_PLAY_STARVATION_ALARM_MS ?? 1000);
+if (!Number.isFinite(starvationAlarmMs) || starvationAlarmMs <= 0) throw new Error("CONTINUED_PLAY_STARVATION_ALARM");
 for (const value of [epochs, repairEvery, reopenAt])
 	if (!Number.isSafeInteger(value) || value < 1) throw new Error("CONTINUED_PLAY_POSITIVE_INTEGER");
 if (reopenAt > epochs || !Number.isSafeInteger(warmRows) || warmRows < 0)
@@ -118,7 +120,9 @@ it.skipIf(!enabled)(
 			traceWork,
 			repairEvery,
 			reopenAt,
-			requireProgress,
+			starvationAlarmMs,
+			starvationAlarmMeaning: "coarse starvation regression only; not a smoothness or real-time completion criterion",
+			percentiles: "HDR microseconds, three significant figures; exact observed maxima",
 			directory,
 			durable: "real localhost WebSocket/libp2p, 20ms delayed genuine ingress",
 			ephemeral:
@@ -148,9 +152,28 @@ it.skipIf(!enabled)(
 		};
 		const phaseStats = new Map<
 			string,
-			{ received: number[]; remote: number[]; maxReceiveGapMs: number; maxLatencyMs: number }
+			{
+				received: number[];
+				remote: number[];
+				maxReceiveGapMs: number;
+				maxLatencyMs: number;
+				timerGaps: DurationDistribution;
+				receiveGaps: DurationDistribution[];
+			}
 		>();
-		const phases = () => [...phaseStats].map(([phase, stats]) => ({ phase, ...stats }));
+		const phases = () =>
+			[...phaseStats].map(([phase, stats]) => ({
+				phase,
+				...stats,
+				timerGaps: stats.timerGaps.summary(),
+				receiveGaps: stats.receiveGaps.map((value) => value.summary()),
+			}));
+		const timerGaps = new DurationDistribution(),
+			rawReceiveGaps = [new DurationDistribution(), new DurationDistribution()],
+			validAuthorityReceiveGaps = [new DurationDistribution(), new DurationDistribution()];
+		let receiveWindow:
+			| { authorityJsonByPeer: string[]; authorityChanged: boolean; last: number[]; gaps: DurationDistribution[] }
+			| undefined;
 		let phase = "startup",
 			completedEpochs = 0,
 			repaired = 0,
@@ -176,7 +199,14 @@ it.skipIf(!enabled)(
 		const phaseStatsFor = () => {
 			let stats = phaseStats.get(phase);
 			if (stats === undefined) {
-				stats = { received: [0, 0], remote: [0, 0], maxReceiveGapMs: 0, maxLatencyMs: 0 };
+				stats = {
+					received: [0, 0],
+					remote: [0, 0],
+					maxReceiveGapMs: 0,
+					maxLatencyMs: 0,
+					timerGaps: new DurationDistribution(),
+					receiveGaps: [new DurationDistribution(), new DurationDistribution()],
+				};
 				phaseStats.set(phase, stats);
 			}
 			return stats;
@@ -189,6 +219,8 @@ it.skipIf(!enabled)(
 					maxTaskCpuMs: number;
 					quantumCount: number;
 					quanta: Quantum[];
+					gapDistribution: DurationDistribution;
+					cpuDistribution: DurationDistribution;
 			  }
 			| undefined;
 		const quantum = (at: number, cpu: NodeJS.CpuUsage) => {
@@ -203,6 +235,8 @@ it.skipIf(!enabled)(
 			activeStep.lastAt = at;
 			activeStep.lastCpu = cpu;
 			activeStep.quantumCount++;
+			activeStep.gapDistribution.add(value.wallMs);
+			activeStep.cpuDistribution.add(value.cpuUserMs + value.cpuSystemMs);
 			activeStep.maxTaskGapMs = Math.max(activeStep.maxTaskGapMs, value.wallMs);
 			activeStep.maxTaskCpuMs = Math.max(activeStep.maxTaskCpuMs, value.cpuUserMs + value.cpuSystemMs);
 			if (activeStep.quanta.length === 256) activeStep.quanta.shift();
@@ -316,6 +350,16 @@ it.skipIf(!enabled)(
 			await recipientSigning.close();
 			let peers = [await fixture.open(0), await fixture.open(1)];
 			const originalPeerIds = peers.map((peer) => peer.peerId);
+			const authoritySnapshot = (index: number) => {
+				const peer = required(peers[index]),
+					channel = required(channels.get(index));
+				return {
+					localChannelGeneration: required(channel.authorityGeneration?.()),
+					successor: peer.room.authority(),
+					pinnedGenesisAnchorDigest: fixture.invite.pinnedGenesisAnchorDigest,
+					latchedAcl: peer.room.previewLatchedAcl(),
+				};
+			};
 			const retireChannel = (index: number) => {
 				retiredMismatch[index] = count(retiredMismatch, index) + (channels.get(index)?.stats().authorityMismatch ?? 0);
 				subscriptions.get(index)?.();
@@ -347,6 +391,17 @@ it.skipIf(!enabled)(
 							stats.received[index] = count(stats.received, index) + 1;
 							stats.maxReceiveGapMs = Math.max(stats.maxReceiveGapMs, gapMs);
 							stats.maxLatencyMs = Math.max(stats.maxLatencyMs, latencyMs);
+							required(stats.receiveGaps[index]).add(gapMs);
+							required(rawReceiveGaps[index]).add(gapMs);
+							if (receiveWindow !== undefined) {
+								receiveWindow.authorityChanged ||= peers.some(
+									(_peer, peer) => JSON.stringify(authoritySnapshot(peer)) !== receiveWindow?.authorityJsonByPeer[peer]
+								);
+								const windowGap = at - required(receiveWindow.last[index]);
+								receiveWindow.last[index] = at;
+								required(receiveWindow.gaps[index]).add(windowGap);
+								required(validAuthorityReceiveGaps[index]).add(windowGap);
+							}
 							observations.add({
 								kind: "receive",
 								phase,
@@ -370,6 +425,8 @@ it.skipIf(!enabled)(
 					cpu = process.cpuUsage();
 				lastTimer = at;
 				timerMaxGapMs = Math.max(timerMaxGapMs, gapMs);
+				timerGaps.add(gapMs);
+				phaseStatsFor().timerGaps.add(gapMs);
 				counters.timerCallbacks++;
 				quantum(at, cpu);
 				observations.add({ kind: "timer", phase, at, gapMs, cpu });
@@ -472,6 +529,8 @@ it.skipIf(!enabled)(
 					maxTaskCpuMs: 0,
 					quantumCount: 0,
 					quanta: [],
+					gapDistribution: new DurationDistribution(),
+					cpuDistribution: new DurationDistribution(),
 				};
 				let measurement: Readonly<Record<string, unknown>> = {};
 				let value!: Value;
@@ -496,6 +555,8 @@ it.skipIf(!enabled)(
 						maxTaskCpuMs: activeStep.maxTaskCpuMs,
 						taskQuantumCount: activeStep.quantumCount,
 						taskQuanta: activeStep.quanta,
+						taskGapDistribution: activeStep.gapDistribution.summary(),
+						taskCpuDistribution: activeStep.cpuDistribution.summary(),
 						ephemeralReceivedByPeer: delta(counters.received, receivedBefore),
 						ephemeralReceived: sum(delta(counters.received, receivedBefore)),
 						remoteAcceptedByPeer: delta(counters.remote, remoteBefore),
@@ -515,11 +576,66 @@ it.skipIf(!enabled)(
 				}
 				return { value, measurement };
 			};
+			const checkStarvation = () => {
+				const pendingTimerAgeMs = performance.now() - lastTimer;
+				const maximum = Math.max(timerMaxGapMs, pendingTimerAgeMs);
+				expect(
+					maximum,
+					`coarse starvation regression alarm (${starvationAlarmMs} ms; not smoothness)`
+				).toBeLessThanOrEqual(starvationAlarmMs);
+			};
 			const baseline = async (name: string, ms = 1000) => {
-				const before = [...counters.received];
-				await step(name, () => sleep(ms));
+				const before = [...counters.received],
+					started = performance.now();
+				// These windows follow completed public convergence. Each local binding is
+				// observed independently; only the room/genesis/ACL scope is comparable.
+				exactState();
+				const authorities = peers.map((_peer, peer) => authoritySnapshot(peer));
+				const scopes = authorities.map(({ successor, pinnedGenesisAnchorDigest, latchedAcl }) => ({
+					successor,
+					pinnedGenesisAnchorDigest,
+					latchedAcl,
+				}));
+				for (const authority of authorities)
+					if (authority.successor !== null) expect(authority.successor.lifecycle).toBe("active");
+				expect(scopes[1]).toEqual(scopes[0]);
+				for (let peer = 0; peer < 2; peer++)
+					expect(required(channels.get(peer)).authorizedPeers()).toContain(required(peers[1 - peer]).peerId);
+				const window = {
+					authorityJsonByPeer: authorities.map((authority) => JSON.stringify(authority)),
+					authorityChanged: false,
+					last: [started, started],
+					gaps: [new DurationDistribution(), new DurationDistribution()],
+				};
+				receiveWindow = window;
+				try {
+					await step(name, () => sleep(ms));
+				} finally {
+					receiveWindow = undefined;
+					const stopped = performance.now();
+					for (let peer = 0; peer < 2; peer++) {
+						const tail = stopped - required(window.last[peer]);
+						required(window.gaps[peer]).add(tail);
+						required(validAuthorityReceiveGaps[peer]).add(tail);
+					}
+					record({
+						kind: "valid-authority-receive-window",
+						phase: name,
+						started,
+						stopped,
+						publicScope: scopes[0],
+						localAuthorityObservations: authorities,
+						authorityChanged: window.authorityChanged,
+						receivedByPeer: delta(counters.received, before),
+						gapsIncludingWindowBoundariesByPeer: window.gaps.map((gap) => gap.summary()),
+					});
+				}
+				expect(window.authorityChanged, `stable authority during ${name}`).toBe(false);
+				for (let peer = 0; peer < 2; peer++) expect(authoritySnapshot(peer)).toEqual(authorities[peer]);
+				exactState();
 				for (const [peer, received] of delta(counters.received, before).entries())
 					expect(received, `receiver ${peer} during ${name}`).toBeGreaterThan(25);
+				checkStarvation();
 			};
 			const automaticRepair = async (epoch: number) => {
 				phase = `automatic-repair-${epoch}`;
@@ -607,6 +723,7 @@ it.skipIf(!enabled)(
 					rawSent: network.raw.sent,
 					rawRecent: network.raw.sends.map((send) => ({ ...send, bytes: Buffer.from(send.bytes).toString("base64") })),
 				});
+				checkStarvation();
 				fixture.clearObservations();
 				phaseStats.clear();
 			};
@@ -630,24 +747,18 @@ it.skipIf(!enabled)(
 				const started = performance.now(),
 					receivedBefore = [...counters.received],
 					remoteBefore = [...counters.remote];
-				const transitionSteps: Readonly<Record<string, unknown>>[] = [];
 				const writes = (async () => {
 					for (let ordinal = 0; ordinal < 4; ordinal++) await issue(1, `stream-${epoch}-${ordinal}`);
 				})();
 				const rollover = (async () => {
 					const sealed = await step(`seal-${epoch}`, () => creator.room.sealEpoch());
-					transitionSteps.push(sealed.measurement);
 					expect(sealed.value).toMatchObject({ ok: true });
-					transitionSteps.push((await step(`adopt-${epoch}`, () => creator.room.adoptCreatorSuccessor())).measurement);
+					await step(`adopt-${epoch}`, () => creator.room.adoptCreatorSuccessor());
 					const transfer = (await step(`export-${epoch}`, () => settlementDelivery(fixture))).value;
 					Reflect.set(writer.networkNode, "createSnapshotChunkProtocolHost", () => transfer.port);
 					try {
-						transitionSteps.push(
-							(
-								await step(`install-${epoch}`, () =>
-									writer.room.installCreatorSuccessor({ offer: transfer.offer, peers: transfer.peers })
-								)
-							).measurement
+						await step(`install-${epoch}`, () =>
+							writer.room.installCreatorSuccessor({ offer: transfer.offer, peers: transfer.peers })
 						);
 					} finally {
 						await joined(
@@ -659,12 +770,6 @@ it.skipIf(!enabled)(
 					}
 				})();
 				await joined([writes, rollover]);
-				if (requireProgress)
-					for (const transition of transitionSteps) {
-						expect(transition.timerCallbacks, `${transition.phase}: host timer progress`).toBeGreaterThan(0);
-						for (const [peer, received] of (transition.ephemeralReceivedByPeer as number[]).entries())
-							expect(received, `${transition.phase}: current-authority receive ${peer}`).toBeGreaterThan(0);
-					}
 				record({
 					kind: "transition",
 					epoch,
@@ -786,6 +891,12 @@ it.skipIf(!enabled)(
 				expectedBlocks: oracle.state().length,
 				counters,
 				timerMaxGapMs,
+				timerGapDistribution: timerGaps.summary(),
+				rawReceiveGapDistributionByPeer: rawReceiveGaps.map((gap) => gap.summary()),
+				validAuthorityReceiveGapsIncludingWindowBoundariesByPeer: validAuthorityReceiveGaps.map((gap) => gap.summary()),
+				starvationAlarmMs,
+				starvationAlarmMeaning: "coarse regression only; not smoothness or real-time completion",
+				eventLoopP95Ms: eventLoop.percentile(95) / 1e6,
 				eventLoopP99Ms: eventLoop.percentile(99) / 1e6,
 				eventLoopMaxMs: eventLoop.max / 1e6,
 				observationRows: observations.rows,
