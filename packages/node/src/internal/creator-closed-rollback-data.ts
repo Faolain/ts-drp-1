@@ -9613,14 +9613,27 @@ async function prepareClosedJournalMembershipPrefix(
 	requireLaw(Number.isSafeInteger(watermark) && Number(watermark) >= 0, "chain-invalid");
 	// Missing detail is not permission, even when a valid Cut names membership.
 	if (frames.length !== watermark || frames.length === 0) return undefined;
+	// A recipient may install the signed snapshot without receiving every Cut
+	// member. Its complete native journal is then a subset, not a truncated image.
+	// Only an installed successor permits collection of that subset; replay still
+	// requires the entire Cut. Digest membership is reverified above on every use.
+	const presentMembers = frames.filter(({frame}) => {
+		const row = (frame as unknown[])[2] as Record<string, unknown>;
+		return members.has(String(row.vertex_digest ?? row.vertexDigest));
+	}).length;
+	if (presentMembers < members.size) {
+		const installed = input.installedThroughEpoch?.();
+		if (input.captureApplicationRows !== undefined || !Number.isSafeInteger(installed) || installed! <= input.scope.epoch)
+			return undefined;
+	}
 	// Decision row 60: rows outside the Cut only as this author's replaced local sources (R5,
 	// option A) or own settlement fences superseded by a later own fence in a signed Cut (R7), or
 	// as received rows once this peer has durably installed the successor that the Cut closes into
 	// (R5b, B2). Any other row outside the Cut retains the scope.
 	let outside: ReadonlyMap<string, CreatorReplacedLocalSourceRead> | undefined;
 	const receivedOutside = new Set<string>();
-	if (frames.length !== members.size) {
-		if (frames.length < members.size || input.captureApplicationRows !== undefined) return undefined;
+	if (presentMembers !== frames.length) {
+		if (input.captureApplicationRows !== undefined) return undefined;
 		const localOutside: typeof frames = [];
 		for (const capturedRow of frames) {
 			const frame = capturedRow.frame as unknown[];
@@ -9712,8 +9725,7 @@ async function prepareClosedJournalMembershipPrefix(
 		}));
 	}
 	requireLaw(localSeen.size === localWitnesses.size, "chain-invalid");
-	requireLaw((outside === undefined && receivedOutside.size === 0) ||
-		[...seen].filter(digest => members.has(digest)).length === members.size, "chain-invalid");
+	requireLaw([...seen].filter(digest => members.has(digest)).length === presentMembers, "chain-invalid");
 	// No prefix can escape after source revocation or changed native currency.
 	// This is a fresh admitted check, not reuse of a prior authorization result.
 	// Join revocation already queued during synchronous validation before that

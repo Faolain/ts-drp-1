@@ -172,7 +172,8 @@ import {
 	type V3CreatorCloseRegistration,
 } from "./creator-close.js";
 import { planClosedEpochCleanup, planClosedEpochRoleCleanup } from "./internal/closed-epoch-cleanup.js";
-import { encodeCreatorCloseMembership } from "./internal/creator-close-membership.js";
+import { encodeCreatorCloseMembership, openCreatorCloseMembership,
+	rewriteCreatorCloseMembershipWitnesses } from "./internal/creator-close-membership.js";
 import type { CreatorPendingClassificationCustodyInput } from "./internal/creator-adoption-recover.js";
 import type { CreatorClosedRollbackProofAccounting, CreatorSnapshotRetirementReconstructionRequest,
 	CreatorOrdinaryIssuanceSuffixForSizing, CreatorOrdinarySourceCapture } from "./internal/creator-closed-rollback-data.js";
@@ -20003,7 +20004,8 @@ function creatorReceivedCutWithout(
 async function recordCreatorReceivedClosedMembership(
 	registration: V3PlaneRegistration,
 	exactCanonicalCutValueBytes: Uint8Array,
-	exactCanonicalSettlementBytes?: Uint8Array | null
+	exactCanonicalSettlementBytes?: Uint8Array | null,
+	exactCanonicalCloseMembershipBytes?: Uint8Array
 ): Promise<boolean> {
 	try {
 		const payload = registration.payload;
@@ -20024,54 +20026,70 @@ async function recordCreatorReceivedClosedMembership(
 			ownDataValue(cut, "epoch") !== scope.epoch || ownDataValue(cut, "previousAnchor") !== scope.anchorDigest) return false;
 		const source = await readCreatorClosedArchiveSource(registration, undefined, true);
 		if (source === undefined || !available()) return false;
-		const derive = (frontier: readonly string[], charges: ReadonlyMap<string, number>) => deriveCloseSetHistoryCommitment({
-			authenticatedCanonicalPreimageByteLengths: charges,
-			exactCanonicalEpochAnchorPreimageBytes: new Uint8ArrayConstructor(payload.input.exactCanonicalAnchorPreimageBytes),
-			frontier,
-			maxEpochBytes: payload.parameters.maxEpochBytes,
-			maxEpochVertices: payload.parameters.maxEpochVertices,
-			previousHistorySnapshot,
-			vertices: source.graph.vertices,
-		});
-		const cutEquals = (value: Awaited<ReturnType<typeof derive>>): boolean =>
-			value.closeSetRoot === ownDataValue(cut, "closeSetRoot") &&
-			value.closeSetCount === ownDataValue(cut, "closeSetCount") &&
-			value.historyRoot === ownDataValue(cut, "historyRoot") &&
-			value.historySize === ownDataValue(cut, "historySize");
-		let commitment = await derive(source.graph.frontier, source.graph.charges);
-		// Decision row 60 (R5, R5b): moves made after the creator's seal, this recipient's own or
-		// another Writer's that it admitted, are in its graph but not in the Cut. Only the signed
-		// Cut's exact commitment admits a candidate.
-		let members: ReadonlySet<string> | undefined;
-		if (!cutEquals(commitment)) {
-			const terminalThrough = creatorReceivedSettlementTerminalThrough(exactCanonicalSettlementBytes, scope);
-			const candidates = [
-				...(terminalThrough === undefined ? [] : [creatorReceivedFrontierCandidate(registration, source.graph, terminalThrough)]),
-				creatorReceivedCutCandidate(registration, source, ownDataValue(cut, "closeSetCount")),
-			];
-			for (const candidate of candidates) {
-				if (candidate === undefined || !available()) continue;
-				const derived = await derive(candidate.frontier, candidate.charges);
-				if (!cutEquals(derived)) continue;
-				commitment = derived;
-				members = candidate.members;
-				break;
-			}
-			if (members === undefined || !available()) return false;
+		let membershipBytes: Uint8Array;
+		if (exactCanonicalCloseMembershipBytes !== undefined) {
+			const transferred = await openCreatorCloseMembership({ bytes: exactCanonicalCloseMembershipBytes,
+				exactCanonicalCutValueBytes: cutBytes, maxEpochVertices: payload.parameters.maxEpochVertices });
+			if (transferred === undefined || transferred.localVertexWitnesses.length !== 0 ||
+				!sameBytes(transferred.exactCanonicalLatchedAclBytes, encodeCanonical(authorization.value)) || !available()) return false;
+			const members = new Set(transferred.orderedVertexDigests.map(bytesToLowerHex));
+			membershipBytes = await rewriteCreatorCloseMembershipWitnesses({ bytes: exactCanonicalCloseMembershipBytes,
+				exactCanonicalCutValueBytes: cutBytes, maxEpochVertices: payload.parameters.maxEpochVertices,
+				localVertexWitnesses: source.rows.filter(row => row.sourceKind === "local-issued" && members.has(row.digest))
+					.map(row => ObjectFreeze({ vertexDigest: row.digest,
+						exactCanonicalPreimageBytes: new Uint8ArrayConstructor(row.exactCanonicalPreimageBytes),
+						detachedSignature: new Uint8ArrayConstructor(row.detachedSignature) })),
+			});
+		} else {
+			const derive = (frontier: readonly string[], charges: ReadonlyMap<string, number>) => deriveCloseSetHistoryCommitment({
+				authenticatedCanonicalPreimageByteLengths: charges,
+				exactCanonicalEpochAnchorPreimageBytes: new Uint8ArrayConstructor(payload.input.exactCanonicalAnchorPreimageBytes),
+				frontier,
+				maxEpochBytes: payload.parameters.maxEpochBytes,
+				maxEpochVertices: payload.parameters.maxEpochVertices,
+				previousHistorySnapshot,
+				vertices: source.graph.vertices,
+			});
+			const cutEquals = (value: Awaited<ReturnType<typeof derive>>): boolean =>
+				value.closeSetRoot === ownDataValue(cut, "closeSetRoot") &&
+				value.closeSetCount === ownDataValue(cut, "closeSetCount") &&
+				value.historyRoot === ownDataValue(cut, "historyRoot") &&
+				value.historySize === ownDataValue(cut, "historySize");
+			let commitment = await derive(source.graph.frontier, source.graph.charges);
+			// Decision row 60 (R5, R5b): moves made after the creator's seal, this recipient's own or
+			// another Writer's that it admitted, are in its graph but not in the Cut. Only the signed
+			// Cut's exact commitment admits a candidate.
+			let members: ReadonlySet<string> | undefined;
+			if (!cutEquals(commitment)) {
+				const terminalThrough = creatorReceivedSettlementTerminalThrough(exactCanonicalSettlementBytes, scope);
+				const candidates = [
+					...(terminalThrough === undefined ? [] : [creatorReceivedFrontierCandidate(registration, source.graph, terminalThrough)]),
+					creatorReceivedCutCandidate(registration, source, ownDataValue(cut, "closeSetCount")),
+				];
+				for (const candidate of candidates) {
+					if (candidate === undefined || !available()) continue;
+					const derived = await derive(candidate.frontier, candidate.charges);
+					if (!cutEquals(derived)) continue;
+					commitment = derived;
+					members = candidate.members;
+					break;
+				}
+				if (members === undefined || !available()) return false;
 		}
-		if (!available()) return false;
-		const membershipBytes = await encodeCreatorCloseMembership({
-			exactCanonicalCutValueBytes: cutBytes,
-			exactCanonicalLatchedAclBytes: encodeCanonical(authorization.value),
-			commitment,
-			maxEpochVertices: payload.parameters.maxEpochVertices,
-			localVertexWitnesses: source.rows.filter((row) => row.sourceKind === "local-issued" &&
-				(members === undefined || members.has(row.digest))).map((row) => ObjectFreeze({
-				vertexDigest: row.digest,
-				exactCanonicalPreimageBytes: new Uint8ArrayConstructor(row.exactCanonicalPreimageBytes),
-				detachedSignature: new Uint8ArrayConstructor(row.detachedSignature),
-			})),
-		});
+			if (!available()) return false;
+			membershipBytes = await encodeCreatorCloseMembership({
+				exactCanonicalCutValueBytes: cutBytes,
+				exactCanonicalLatchedAclBytes: encodeCanonical(authorization.value),
+				commitment,
+				maxEpochVertices: payload.parameters.maxEpochVertices,
+				localVertexWitnesses: source.rows.filter((row) => row.sourceKind === "local-issued" &&
+					(members === undefined || members.has(row.digest))).map((row) => ObjectFreeze({
+					vertexDigest: row.digest,
+					exactCanonicalPreimageBytes: new Uint8ArrayConstructor(row.exactCanonicalPreimageBytes),
+					detachedSignature: new Uint8ArrayConstructor(row.detachedSignature),
+				})),
+			});
+		}
 		if (!available()) return false;
 		const before = await journal.readRetirementImage({ objectId: scope.objectId });
 		if (!before.ok || !available()) return false;
@@ -20459,8 +20477,10 @@ function creatorCloseRegistration(
 					detachedSignature: new Uint8ArrayConstructor(row.detachedSignature),
 				})));
 		},
-		recordReceivedClosedMembership: (exactCanonicalCutValueBytes: Uint8Array, exactCanonicalSettlementBytes?: Uint8Array | null) =>
-			recordCreatorReceivedClosedMembership(registration, exactCanonicalCutValueBytes, exactCanonicalSettlementBytes),
+		recordReceivedClosedMembership: (exactCanonicalCutValueBytes: Uint8Array, exactCanonicalSettlementBytes?: Uint8Array | null,
+			exactCanonicalCloseMembershipBytes?: Uint8Array) =>
+			recordCreatorReceivedClosedMembership(registration, exactCanonicalCutValueBytes, exactCanonicalSettlementBytes,
+				exactCanonicalCloseMembershipBytes),
 		// The genuine claim may use a successor alias; the close owner is keyed
 		// by that exact handle, not the registration's underlying raw handle.
 		sealRecoveryDependencies: (required?: boolean) =>

@@ -3424,6 +3424,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				roomHeadAuthority: input.roomHeadAuthority } }),
 			store,
 			catalog: input.application.catalog,
+			journalStore,
 			snapshotStore: await ownRecipientSnapshots(),
 			objectId: objectIdResult.value,
 			pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest,

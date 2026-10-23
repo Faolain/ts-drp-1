@@ -20,6 +20,13 @@ export type OwnedIdentityChallengeAdmission = Readonly<{
 }>;
 const requests = new WeakMap<OwnedSigningRequest, CapturedOwnedSigningRequest>();
 
+/** Routing frame ceilings shared by the transport and original signing admission. */
+export const CREATOR_SUCCESSOR_TRANSPORT_LIMITS = Object.freeze({
+	maxRequestBytes: 212_387,
+	maxMembershipBytes: 2_097_152,
+	maxResponseBytes: 212_387 + 2_097_152,
+});
+
 /** Internal semantic-owner turn. No arbitrary-digest constructor or public root export. */
 async function withRequest<T>(captured: CapturedOwnedSigningRequest, action: (request: OwnedSigningRequest) => Promise<T>): Promise<T> {
 	const request = Object.freeze({}) as OwnedSigningRequest;
@@ -90,20 +97,30 @@ export function withAuthoredIdentityChallengeSigningRequest<T>(input: Readonly<{
 	if (Reflect.ownKeys(input).length !== 3 || !(input.exactCanonicalChallengeBytes instanceof Uint8Array) ||
 		!(input.signerPublicKey instanceof Uint8Array) || input.signerPublicKey.byteLength !== 32 ||
 		!["possession", "transport"].includes(input.kind)) throw new TypeError("OWNED_IDENTITY_CHALLENGE_INVALID");
-	const limits = input.kind === "transport" ? { maxBytes: 212_387, maxDepth: 2, maxItems: 64 } : { maxBytes: 65_536, maxDepth: 4, maxItems: 64 };
+	const limits = input.kind === "transport" ? { maxBytes: CREATOR_SUCCESSOR_TRANSPORT_LIMITS.maxResponseBytes, maxDepth: 2, maxItems: 64 } : { maxBytes: 65_536, maxDepth: 4, maxItems: 64 };
 	const frame = decodeCanonical(input.exactCanonicalChallengeBytes, limits) as Record<string, unknown>;
 	const author = Array.from(input.signerPublicKey, byte => byte.toString(16).padStart(2, "0")).join("");
-	if (frame === null || typeof frame !== "object" || Array.isArray(frame) || frame.author !== author || frame.version !== 1 ||
+	if (frame === null || typeof frame !== "object" || Array.isArray(frame) || frame.author !== author ||
 		!(frame.nonce instanceof Uint8Array) || frame.nonce.byteLength !== 32 ||
 		compareBytes(encodeCanonical(frame, limits), input.exactCanonicalChallengeBytes) !== 0 || Object.hasOwn(frame, "signature")) throw new TypeError("OWNED_IDENTITY_CHALLENGE_INVALID");
 	if (input.kind === "possession") {
 		const keys = ["kind", "version", "nonce", "author", "objectId", "epoch", "aclDigest", "profileId", "pinnedGenesisAnchorDigest", "currentAnchorDigest"];
-		if (Object.keys(frame).sort().join(",") !== keys.sort().join(",") || frame.kind !== "creator-issuance-possession" ||
+		if (frame.version !== 1 || Object.keys(frame).sort().join(",") !== keys.sort().join(",") || frame.kind !== "creator-issuance-possession" ||
 			typeof frame.objectId !== "string" || !Number.isSafeInteger(frame.epoch) || Number(frame.epoch) < 0 || typeof frame.profileId !== "string" ||
 			[frame.aclDigest, frame.pinnedGenesisAnchorDigest, frame.currentAnchorDigest].some(value => typeof value !== "string" || !/^[0-9a-f]{64}$/u.test(value))) throw new TypeError("OWNED_IDENTITY_CHALLENGE_INVALID");
 	} else if (!["creator-successor-material-request", "creator-successor-material-response"].includes(String(frame.kind)) ||
 		typeof frame.manifestDigest !== "string" || !/^[0-9a-f]{64}$/u.test(frame.manifestDigest) ||
 		typeof frame.requesterPeer !== "string" || typeof frame.sourcePeer !== "string") throw new TypeError("OWNED_IDENTITY_CHALLENGE_INVALID");
+	if (input.kind === "transport") {
+		const membership = frame.exactCanonicalCloseMembershipBytes;
+		const carriesMembership = Object.hasOwn(frame, "exactCanonicalCloseMembershipBytes");
+		if (carriesMembership
+			? frame.kind !== "creator-successor-material-response" || frame.version !== 2 ||
+				!(membership instanceof Uint8Array) || membership.byteLength === 0 ||
+				membership.byteLength > CREATOR_SUCCESSOR_TRANSPORT_LIMITS.maxMembershipBytes
+			: frame.version !== 1 || input.exactCanonicalChallengeBytes.byteLength > CREATOR_SUCCESSOR_TRANSPORT_LIMITS.maxRequestBytes)
+			throw new TypeError("OWNED_IDENTITY_CHALLENGE_INVALID");
+	}
 	const domain = input.kind === "possession" ? "ts-drp/creator-issuance-possession/v1" : "ts-drp/creator-successor-transport/v1";
 	return withRequest({ kind: input.kind, digest: hashDomain(domain, input.exactCanonicalChallengeBytes), publicKey: Uint8Array.from(input.signerPublicKey) }, action);
 }

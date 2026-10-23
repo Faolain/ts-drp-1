@@ -525,13 +525,14 @@ export interface V3CreatorCloseRegistration {
 		detachedSignature: Uint8Array;
 	}>[] | undefined>;
 	/** Recipient twin of the close-time membership capture, inside the held received
-	 * gate: records the native carrier only when this recipient's own complete epoch
-	 * graph derives the authenticated Cut's exact close set. Evidence, never authority.
+	 * gate: verifies transferred digest membership against the authenticated Cut,
+	 * or derives it from this recipient's complete graph. Evidence, never authority.
 	 * Decision row 60 (R5b): the successor's authenticated settlement record, when present,
 	 * names each author's last row in the Cut; a hint for the candidate, never membership. */
 	recordReceivedClosedMembership(
 		exactCanonicalCutValueBytes: Uint8Array,
-		exactCanonicalSettlementBytes?: Uint8Array | null
+		exactCanonicalSettlementBytes?: Uint8Array | null,
+		exactCanonicalCloseMembershipBytes?: Uint8Array
 	): Promise<boolean>;
 	/** Exact authenticated whole-source bytes, prepared and joined under this same genuine hold. */
 	prepareClosedEpochArchive(hold: CreatorSnapshotRecoveryCloseHold, limits: ArchiveLimits,

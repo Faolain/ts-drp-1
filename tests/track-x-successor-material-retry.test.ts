@@ -4,6 +4,7 @@ import type { SnapshotChunkProtocolPort, SnapshotChunkProtocolStream } from "@ts
 import { expect, it } from "vitest";
 
 import * as material from "../packages/node/src/internal/creator-successor-transport.js";
+import { CREATOR_CLOSE_MEMBERSHIP_MAX_BYTES } from "../packages/node/src/internal/creator-close-membership.js";
 import { SNAPSHOT_PULL_INACTIVITY_MS } from "../packages/node/src/snapshot-transfer.js";
 
 // Track X, decision row 61, option E (RED first): inside one install, a Writer retries transient
@@ -229,6 +230,41 @@ const receive = (
 		manifestDigest,
 		...(retryUntil === undefined ? {} : { retryUntil }),
 	} as Parameters<typeof material.receiveCreatorSuccessorMaterial>[0]);
+
+it("authenticates and detaches version-2 membership beyond the manifest frame size", async () => {
+	const membership = new Uint8Array(262_144).fill(23);
+	const fake = fakePort(
+		() => ({
+			kind: "serve",
+			bytes: (request) =>
+				response(request, {
+					version: 2,
+					exactCanonicalCloseMembershipBytes: membership,
+				}),
+		}),
+		() => ["creator"]
+	);
+	const received = await receive(fake.port, ["creator"]);
+	expect(received.exactCanonicalCloseMembershipBytes).toEqual(membership);
+	membership.fill(0);
+	expect(received.exactCanonicalCloseMembershipBytes?.[0]).toBe(23);
+	expect(fake.open()).toBe(0);
+});
+
+it.each([
+	{ version: 2 },
+	{ version: 1, exactCanonicalCloseMembershipBytes: new Uint8Array([1]) },
+	{ version: 2, exactCanonicalCloseMembershipBytes: new Uint8Array(0) },
+	{ version: 2, exactCanonicalCloseMembershipBytes: new Uint8Array(CREATOR_CLOSE_MEMBERSHIP_MAX_BYTES + 1) },
+])("refuses mismatched or oversized membership response %#", async (change) => {
+	const fake = fakePort(
+		() => ({ kind: "serve", bytes: (request) => response(request, change) }),
+		() => ["creator"]
+	);
+	await expect(receive(fake.port, ["creator"])).rejects.toThrow("creator successor material transport failed");
+	expect(fake.open()).toBe(0);
+	expect(fake.attempts).toHaveLength(1);
+});
 
 it("the reviewed pacing is named, bounded and below one attempt's own deadline", () => {
 	const initial = (material as Record<string, unknown>).CREATOR_SUCCESSOR_MATERIAL_RETRY_INITIAL_MS;

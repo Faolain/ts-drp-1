@@ -3,12 +3,21 @@ import { buildMerkleTree, type CloseSetHistoryCommitment } from "@ts-drp/compact
 import { LIVE_JOURNAL_RETIREMENT_LIMITS, type LiveJournalScope } from "@ts-drp/live-journal";
 
 export const CREATOR_CLOSE_MEMBERSHIP_KIND = "creator-close-membership-1" as const;
+export const CREATOR_CLOSE_MEMBERSHIP_MAX_BYTES = LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes;
 /** The original full-PRE membership schema. Resource slots do not commit a
  * close set, verify original signatures, or authorize journal retirement. */
-export function creatorCloseMembershipFields(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
-	return {kind: CREATOR_CLOSE_MEMBERSHIP_KIND, cutValueDigest: input.cutValueDigest, scope: input.scope,
-		historyStart: input.historyStart, exactCanonicalLatchedAclBytes: input.exactCanonicalLatchedAclBytes,
-		orderedVertexDigests: input.orderedVertexDigests, localVertexWitnesses: input.localVertexWitnesses};
+export function creatorCloseMembershipFields(
+	input: Readonly<Record<string, unknown>>
+): Readonly<Record<string, unknown>> {
+	return {
+		kind: CREATOR_CLOSE_MEMBERSHIP_KIND,
+		cutValueDigest: input.cutValueDigest,
+		scope: input.scope,
+		historyStart: input.historyStart,
+		exactCanonicalLatchedAclBytes: input.exactCanonicalLatchedAclBytes,
+		orderedVertexDigests: input.orderedVertexDigests,
+		localVertexWitnesses: input.localVertexWitnesses,
+	};
 }
 const LIMITS = {
 	maxBytes: LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes,
@@ -297,6 +306,44 @@ export async function openCreatorCloseMembership(
 	} catch {
 		return undefined;
 	}
+}
+
+/**
+ * Rebinds a verified digest list to the receiving owner's original local rows.
+ * Transport uses no witnesses; a receiver supplies only its own signed member
+ * rows. The signed Cut authenticates the list even when other members were never
+ * delivered. Neither the list nor these witnesses confer a deletion capability.
+ */
+export async function rewriteCreatorCloseMembershipWitnesses(
+	input: Readonly<{
+		bytes: Uint8Array;
+		exactCanonicalCutValueBytes: Uint8Array;
+		maxEpochVertices: number;
+		localVertexWitnesses: readonly CreatorCloseLocalVertexWitnessInput[];
+	}>
+): Promise<Uint8Array> {
+	const membership = await openCreatorCloseMembership(input);
+	if (membership === undefined) throw new TypeError("creator membership differs from authenticated Cut");
+	const packed = new Uint8Array(membership.orderedVertexDigests.length * 32);
+	for (const [index, digest] of membership.orderedVertexDigests.entries()) packed.set(digest, index * 32);
+	const witnesses = localWitnesses(
+		input.localVertexWitnesses,
+		membership.scope,
+		new Set(membership.orderedVertexDigests.map(hex)),
+		membership.exactCanonicalLatchedAclBytes.byteLength
+	);
+	if (witnesses === undefined) throw new TypeError("creator received local witness differs from membership");
+	return encodeCanonical(
+		creatorCloseMembershipFields({
+			cutValueDigest: membership.cutValueDigest,
+			scope: membership.scope,
+			historyStart: membership.historyStart,
+			exactCanonicalLatchedAclBytes: membership.exactCanonicalLatchedAclBytes,
+			orderedVertexDigests: packed,
+			localVertexWitnesses: witnesses,
+		}),
+		LIMITS
+	);
 }
 
 /**

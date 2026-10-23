@@ -2,6 +2,7 @@ import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-
 import { type SnapshotChunkProtocolPort, type SnapshotChunkProtocolStream } from "@ts-drp/network/snapshot-transfer";
 import type { SignRegisteredVertexDigest } from "@ts-drp/protocol-v3";
 import type { OwnedIdentityChallengeAdmission, OwnedSigningRequest } from "@ts-drp/protocol-v3/internal/owned-signing-request";
+import { CREATOR_SUCCESSOR_TRANSPORT_LIMITS } from "@ts-drp/protocol-v3/internal/owned-signing-request";
 import {
 	CREATOR_AUTHOR_ISSUANCE_FRONTIERS_MAX_RECORD_BYTES,
 	CREATOR_AUTHOR_SETTLEMENT_MAX_RECORD_BYTES,
@@ -16,10 +17,14 @@ import {
 	type SnapshotPeerAuthorization,
 } from "../snapshot-transfer.js";
 import { CREATOR_CLOSE_HISTORY_MAX_BYTES } from "./creator-close-history.js";
+import { CREATOR_CLOSE_MEMBERSHIP_MAX_BYTES } from "./creator-close-membership.js";
 
-// One checkpoint, one compact accumulator and framing, within the existing manifest-frame ceiling.
-const MAX_BYTES = 212_387;
+// One bounded checkpoint plus its compact close membership. Requests keep their
+// original manifest-frame ceiling; a response additionally carries at most one
+// journal image's worth of immutable membership data, never vertex bodies.
+const MAX_BYTES = CREATOR_SUCCESSOR_TRANSPORT_LIMITS.maxResponseBytes;
 const FRAME_LIMITS = { maxBytes: MAX_BYTES, maxDepth: 2, maxItems: 64 };
+const REQUEST_LIMITS = { ...FRAME_LIMITS, maxBytes: CREATOR_SUCCESSOR_TRANSPORT_LIMITS.maxRequestBytes };
 
 /**
  * Captures only the bounded attempt roster, without invoking caller array accessors or iterators.
@@ -36,13 +41,15 @@ export function captureCreatorSuccessorPeers(value: unknown): readonly string[] 
 			throw new TypeError("creator recipient peer identity is invalid");
 		peers.push(peer);
 	}
-	encodeCanonical(peers, FRAME_LIMITS);
+	encodeCanonical(peers, REQUEST_LIMITS);
 	return Object.freeze([...new Set(peers)]);
 }
 
 export interface CreatorSuccessorAuxiliaryMaterial {
 	readonly exactCanonicalSettlementBytes: Uint8Array | null;
 	readonly exactCanonicalHistoryBytes: Uint8Array;
+	/** Digest membership authenticated by the offered Cut; contains no local witnesses. */
+	readonly exactCanonicalCloseMembershipBytes?: Uint8Array;
 	readonly exactCanonicalRetirementBytes?: Uint8Array;
 	readonly exactCanonicalAggregateBytes?: Uint8Array;
 }
@@ -52,19 +59,23 @@ interface SigningIdentity {
 	isAuthorizedAuthor(author: string): boolean;
 }
 function decode(bytes: Uint8Array, keys: readonly string[]): Record<string, unknown> {
-	const value = decodeCanonical(bytes, FRAME_LIMITS);
-	const expectedKeys =
+	const limits = keys.includes("exactCanonicalSettlementBytes") ? FRAME_LIMITS : REQUEST_LIMITS;
+	const value = decodeCanonical(bytes, limits);
+	let expectedKeys =
 		value !== null &&
 		typeof value === "object" &&
 		keys.includes("exactCanonicalSettlementBytes") &&
 		Object.hasOwn(value, "exactCanonicalRetirementBytes")
 			? [...keys, "exactCanonicalRetirementBytes", "exactCanonicalAggregateBytes"]
 			: keys;
+	if (value !== null && typeof value === "object" && keys.includes("exactCanonicalSettlementBytes") &&
+		Object.hasOwn(value, "exactCanonicalCloseMembershipBytes"))
+		expectedKeys = [...expectedKeys, "exactCanonicalCloseMembershipBytes"];
 	if (
 		value === null ||
 		typeof value !== "object" ||
 		Array.isArray(value) ||
-		compareBytes(bytes, encodeCanonical(value, FRAME_LIMITS)) !== 0 ||
+		compareBytes(bytes, encodeCanonical(value, limits)) !== 0 ||
 		Object.keys(value).sort().join(",") !== [...expectedKeys].sort().join(",")
 	)
 		throw new TypeError("creator material frame is invalid");
@@ -136,9 +147,14 @@ function auxiliary(record: Record<string, unknown>): CreatorSuccessorAuxiliaryMa
 			: retirement !== undefined || aggregate !== undefined
 	)
 		throw new TypeError("creator material none companions are invalid");
+	const membership = record.exactCanonicalCloseMembershipBytes;
+	if (membership !== undefined && (!(membership instanceof Uint8Array) || membership.byteLength === 0 ||
+		membership.byteLength > CREATOR_CLOSE_MEMBERSHIP_MAX_BYTES))
+		throw new TypeError("creator material membership bounds are invalid");
 	return Object.freeze({
 		exactCanonicalSettlementBytes: settlement === null ? null : Uint8Array.from(settlement as Uint8Array),
 		exactCanonicalHistoryBytes: Uint8Array.from(history),
+		...(membership === undefined ? {} : { exactCanonicalCloseMembershipBytes: Uint8Array.from(membership as Uint8Array) }),
 		...(settlement === null
 			? {
 					exactCanonicalRetirementBytes: Uint8Array.from(retirement as Uint8Array),
@@ -215,7 +231,7 @@ export function createCreatorSuccessorMaterialServer(
 			const response = {
 				...input.material,
 				kind: "creator-successor-material-response",
-				version: 1,
+				version: input.material.exactCanonicalCloseMembershipBytes === undefined ? 1 : 2,
 				nonce: request.nonce,
 				manifestDigest: input.manifestDigest,
 				requesterPeer: stream.peerId,
@@ -333,7 +349,8 @@ async function attemptCreatorSuccessorMaterial(
 		const { signature: responseSignature, ...proof } = response;
 		if (
 			response.kind !== "creator-successor-material-response" ||
-			response.version !== 1 ||
+			(response.version !== 1 && response.version !== 2) ||
+			(response.version === 2) !== Object.hasOwn(response, "exactCanonicalCloseMembershipBytes") ||
 			response.manifestDigest !== input.manifestDigest ||
 			response.requesterPeer !== input.transport.localPeerId ||
 			response.sourcePeer !== peer ||

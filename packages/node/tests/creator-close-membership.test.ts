@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import {
 	encodeCreatorCloseMembership,
 	openCreatorCloseMembership,
+	rewriteCreatorCloseMembershipWitnesses,
 	type CreatorCloseLocalVertexWitnessInput,
 } from "../src/internal/creator-close-membership.js";
 
@@ -166,6 +167,40 @@ function changed(f: Awaited<ReturnType<typeof fixture>>, update: (value: Record<
 }
 
 describe("bounded native closed-membership carrier", () => {
+	it("transfers membership without the source's witnesses and records only the recipient's own subset", async () => {
+		const f = await fixture(3, 7, true);
+		const transferred = await rewriteCreatorCloseMembershipWitnesses({
+			...f,
+			localVertexWitnesses: [],
+		});
+		const transfer = await opened(f, transferred);
+		expect(transfer?.orderedVertexDigests.map(hex)).toEqual(f.commitment.closeSetOrder);
+		expect(transfer?.localVertexWitnesses).toEqual([]);
+		const local = f.localVertexWitnesses.slice(0, 1);
+		const received = await rewriteCreatorCloseMembershipWitnesses({
+			...f,
+			bytes: transferred,
+			localVertexWitnesses: local,
+		});
+		expect((await opened(f, received))?.localVertexWitnesses).toEqual(local);
+		expect((await opened(f, received))?.orderedVertexDigests).toEqual(transfer?.orderedVertexDigests);
+	});
+	it("rejects a transferred list with a changed Cut or a witness outside its membership", async () => {
+		const f = await fixture(2, 0, true);
+		await expect(
+			rewriteCreatorCloseMembershipWitnesses({
+				...f,
+				exactCanonicalCutValueBytes: encodeCanonical({ ...f.cut, closeSetRoot: "ff".repeat(32) }),
+				localVertexWitnesses: [],
+			})
+		).rejects.toThrow("authenticated Cut");
+		await expect(
+			rewriteCreatorCloseMembershipWitnesses({
+				...f,
+				localVertexWitnesses: [{ ...f.localVertexWitnesses[0]!, vertexDigest: "ff".repeat(32) }],
+			})
+		).rejects.toThrow("local witness");
+	});
 	it("round-trips a genuine complete close commitment with packed32-byte digests", async () => {
 		const f = await fixture();
 		const value = await opened(f);
@@ -567,8 +602,9 @@ describe("bounded native closed-membership carrier", () => {
 			LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes
 		);
 		expect(f.bytes.byteLength).toBeLessThan(LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes);
-		expect(f.localVertexWitnesses[0]!.exactCanonicalPreimageBytes.byteLength + largerAcl.byteLength)
-			.toBeGreaterThan(LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes);
+		expect(f.localVertexWitnesses[0]!.exactCanonicalPreimageBytes.byteLength + largerAcl.byteLength).toBeGreaterThan(
+			LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes
+		);
 		await expect(
 			encodeCreatorCloseMembership({
 				commitment: f.commitment,

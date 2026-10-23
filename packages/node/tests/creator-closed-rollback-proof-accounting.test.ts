@@ -1311,9 +1311,9 @@ describe("closed membership synchronous validation and fresh delivery currency",
 	function runPrefix(f: MembershipFixture, check: () => Promise<void>,
 		verify = verifyReceivedVertex, open = openCreatorCloseMembership,
 		captureApplicationRows?: (rows: readonly ApplicationRow[]) => void,
-		decode = decodeCanonical): Promise<Prefix | undefined> {
+		decode = decodeCanonical, installedThroughEpoch?: () => number): Promise<Prefix | undefined> {
 		return execute(`${declaration("prepareClosedJournalMembershipPrefix")}\n${declaration("closedJournalMembershipPrefix")}\nclosedJournalMembershipPrefix(input);`, {
-			input: { scope: f.scope, image: { canonicalRows: f.canonicalRows }, authorities: f.authorities, check,
+			input: { scope: f.scope, image: { canonicalRows: f.canonicalRows }, authorities: f.authorities, check, installedThroughEpoch,
 				...(captureApplicationRows === undefined ? {} : {captureApplicationRows}) },
 			closedRetirementEqual: (a: unknown, b: unknown) => Buffer.compare(Buffer.from(encodeCanonical(a)), Buffer.from(encodeCanonical(b))) === 0,
 			decodeCanonical: decode, record: decodeCanonical, openCreatorCloseMembership: open, openCanonicalLatchedAclSnapshot,
@@ -1878,7 +1878,6 @@ describe("closed membership synchronous validation and fresh delivery currency",
 	it("refuses altered signatures, identities, target context, row order and missing received bytes", async () => {
 		const changes: Array<(f: MembershipFixture) => void> = [
 			f => editRow(f, 1, row => { (row.detachedSignature as Uint8Array)[0]! ^= 1; }),
-			f => editRow(f, 1, row => { row.vertexDigest = "ff".repeat(32); }),
 			f => editRow(f, 1, row => {
 				const vertex = decodeCanonical(row.exactCanonicalPreimageBytes as Uint8Array) as Record<string, unknown>;
 				vertex.epoch = 9; row.exactCanonicalPreimageBytes = encodeCanonical(vertex);
@@ -1893,7 +1892,32 @@ describe("closed membership synchronous validation and fresh delivery currency",
 			const f = await membershipFixture(); change(f);
 			await expect(runPrefix(f, async () => undefined)).rejects.toThrow("chain-invalid");
 		}
+		const changedDigest = await membershipFixture();
+		editRow(changedDigest, 1, row => { row.vertexDigest = "ff".repeat(32); });
+		// An apparent subset is retained before successor installation. Once
+		// collection is eligible, full row authentication still rejects the forgery.
+		expect(await runPrefix(changedDigest, async () => {})).toBeUndefined();
+		await expect(runPrefix(changedDigest, async () => {}, verifyReceivedVertex, openCreatorCloseMembership,
+			undefined, decodeCanonical, () => changedDigest.scope.epoch + 1)).rejects.toThrow("chain-invalid");
 		await expect(runPrefix(await membershipFixture(8, false, true), async () => undefined)).rejects.toThrow("chain-invalid");
+	});
+	it.each([false, true])("collects a complete native subset only after successor installation, never for replay (%s)", async sql => {
+		const f = await membershipFixture(8, sql);
+		f.canonicalRows.pop(); // Last member was never received; all native rows remain present.
+		const header = decodeCanonical(f.canonicalRows[0]!) as unknown[];
+		(header[2] as Record<string, unknown>)[sql ? "next_journal_sequence" : "nextJournalSequence"] = 7;
+		f.canonicalRows[0] = encodeCanonical(header);
+		const run = (installed?: number, capture?: (rows: readonly ApplicationRow[]) => void) =>
+			runPrefix(f, async () => {}, verifyReceivedVertex, openCreatorCloseMembership, capture, decodeCanonical,
+				installed === undefined ? undefined : () => installed);
+		expect(await run()).toBeUndefined();
+		expect(await run(f.scope.epoch)).toBeUndefined();
+		expect(await run(f.scope.epoch + 1)).toEqual({scope: f.scope, snapshot: null, highWatermark: 7, rows: f.expected.slice(0, 7)});
+		let replayed = false;
+		expect(await run(f.scope.epoch + 1, () => {replayed = true;})).toBeUndefined();
+		expect(replayed).toBe(false);
+		f.canonicalRows.pop(); // Now the native watermark promises a row absent from the image.
+		expect(await run(f.scope.epoch + 1)).toBeUndefined();
 	});
 	it("retains refusal for missing detail and local witnesses rather than inventing membership authority", async () => {
 		const missingDetail = await membershipFixture(); missingDetail.canonicalRows.pop();

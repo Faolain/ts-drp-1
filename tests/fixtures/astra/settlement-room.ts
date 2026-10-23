@@ -231,9 +231,11 @@ export async function settlementDelivery(fixture: SettlementRoom, receiverIndex 
 	if (!object.ok) throw new TypeError("TRACK_M_SETTLEMENT_INVALID_OBJECT");
 	const store = await fixture.host.storageHost.openAhe("peer-0--ahe");
 	const snapshotStore = await fixture.host.storageHost.openSnapshots("peer-0");
+	const journalStore = await fixture.host.storageHost.openJournal("peer-0");
 	try {
 		const exported = await readCreatorSuccessorExport({
 			store,
+			journalStore,
 			snapshotStore,
 			catalog: fixture.application.catalog,
 			objectId: object.value,
@@ -313,6 +315,7 @@ export async function settlementDelivery(fixture: SettlementRoom, receiverIndex 
 		ports.add(port);
 		return { offer: exported.offer, port, peers: [sender] };
 	} finally {
+		await journalStore.close();
 		await snapshotStore.close();
 		await store.close();
 	}

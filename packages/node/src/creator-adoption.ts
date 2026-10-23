@@ -84,6 +84,11 @@ import {
 	openCreatorCloseHistory,
 } from "./internal/creator-close-history.js";
 import {
+	CREATOR_CLOSE_MEMBERSHIP_MAX_BYTES,
+	openCreatorCloseMembership,
+	rewriteCreatorCloseMembershipWitnesses,
+} from "./internal/creator-close-membership.js";
+import {
 	acquireCreatorInstalledPromotion,
 	acquireCreatorReceivedPromotion,
 	acquireCreatorSnapshotRetirementReconstructionRequest,
@@ -303,6 +308,40 @@ export function captureCreatorSuccessorOffer(value: unknown): CreatorSuccessorOf
 export async function readCreatorSuccessorExport(
 	input: CreatorSuccessorExportInput
 ): Promise<CreatorSuccessorExport> {
+	const exported = await readCreatorSuccessorExportWithoutMembership(input);
+	if (input.journalStore === undefined) return exported;
+	const image = await input.journalStore.readRetirementImage?.({ objectId: input.objectId });
+	if (image?.ok !== true) throw new TypeError("creator successor membership image is unavailable");
+	const accounting = input.archiveRecovery?.accounting;
+	if (accounting !== undefined && image.value.canonicalRows.some(bytes => !accounting.charge(bytes)))
+		throw new TypeError("creator successor membership proof charge is exhausted");
+	const cut = canonicalRecord(exported.offer.exactCanonicalCutValueBytes);
+	const parameters = cut?.parameters as Readonly<{ maxEpochVertices: number }> | undefined;
+	if (cut === undefined || parameters === undefined) throw new TypeError("creator successor membership Cut is invalid");
+	const headers = image.value.canonicalRows.map(bytes => decodeCanonical(bytes)).filter(frame =>
+		Array.isArray(frame) && frame[0] === "scopes" && Array.isArray(frame[1]) && frame[1].length === 3 &&
+		frame[1][0] === input.objectId && frame[1][1] === cut.epoch && frame[1][2] === cut.previousAnchor);
+	if (headers.length === 0) return exported;
+	if (headers.length !== 1) throw new TypeError("creator successor membership scope is ambiguous");
+	const header = (headers[0] as unknown[])[2] as Record<string, unknown>;
+	const membership = header.closedMembershipBytes ?? header.closed_membership_bytes;
+	// Prior valid installs can lack this optional evidence when their graph was
+	// sparse. Keep their original export usable; absence grants no collection.
+	if (membership === undefined || membership === null) return exported;
+	if (!(membership instanceof Uint8Array) || membership.byteLength > CREATOR_CLOSE_MEMBERSHIP_MAX_BYTES)
+		throw new TypeError("creator successor membership carrier is unavailable");
+	const bytes = await rewriteCreatorCloseMembershipWitnesses({
+		bytes: membership, exactCanonicalCutValueBytes: exported.offer.exactCanonicalCutValueBytes,
+		maxEpochVertices: parameters.maxEpochVertices, localVertexWitnesses: [],
+	});
+	if (accounting !== undefined && !accounting.charge(bytes))
+		throw new TypeError("creator successor membership transfer charge is exhausted");
+	return Object.freeze({ ...exported,
+		material: Object.freeze({ ...exported.material, exactCanonicalCloseMembershipBytes: bytes }),
+	});
+}
+
+async function readCreatorSuccessorExportWithoutMembership(input: CreatorSuccessorExportInput): Promise<CreatorSuccessorExport> {
 	if (input.archiveRecovery === undefined) return readCreatorSuccessorExportMaterial(input);
 	// Capture immutable authenticated carriers once before the recovery workflow's first await.
 	// Ports remain the existing trusted native owners; copied bytes grant no portable authority.
@@ -319,6 +358,8 @@ export async function readCreatorSuccessorExport(
 
 interface CreatorSuccessorExportInput {
 		store: AheDurableStore;
+		/** Supplies complete signed-cut membership even if the recipient missed members. */
+		journalStore?: DurableLiveJournalStore;
 		snapshotStore: SnapshotRecoveryStore<SnapshotVerificationReceipt>;
 		objectId: StorageObjectId;
 		pinnedGenesisAnchorDigest: string;
@@ -1173,6 +1214,14 @@ export async function receiveCreatorSuccessorAdoption(
 			historySize: cut.historySize,
 		});
 		if (receivedHistory === undefined) throw new TypeError("creator received history commitment differs");
+		if (auxiliary.exactCanonicalCloseMembershipBytes !== undefined) {
+			const membership = await openCreatorCloseMembership({ bytes: auxiliary.exactCanonicalCloseMembershipBytes,
+				exactCanonicalCutValueBytes: offer.exactCanonicalCutValueBytes,
+				maxEpochVertices: (cut.parameters as { maxEpochVertices: number }).maxEpochVertices });
+			if (membership === undefined || membership.localVertexWitnesses.length !== 0 ||
+				!sameBytes(membership.exactCanonicalLatchedAclBytes, source.exactCanonicalLatchedAclBytes))
+				throw new TypeError("creator received close membership differs from authenticated source");
+		}
 		const accumulator = CompactMerkleAccumulator.fromSnapshot(receivedHistory);
 		const candidates = [
 			offer.exactCanonicalCutValueBytes,
@@ -1416,7 +1465,10 @@ export async function receiveCreatorSuccessorAdoption(
 		// creator does at close; without it no closed recipient journal scope can
 		// ever become collectible. Exact Cut agreement only; otherwise nothing is
 		// recorded and the scope keeps its original retention.
-		await source.recordReceivedClosedMembership(offer.exactCanonicalCutValueBytes, auxiliary.exactCanonicalSettlementBytes);
+		const membershipRecorded = await source.recordReceivedClosedMembership(offer.exactCanonicalCutValueBytes,
+			auxiliary.exactCanonicalSettlementBytes, auxiliary.exactCanonicalCloseMembershipBytes);
+		if (auxiliary.exactCanonicalCloseMembershipBytes !== undefined && !membershipRecorded)
+			throw new TypeError("creator received close membership persistence refused");
 		if (await prepareReceivedRecoveryTurnover()) {
 			if (promoted) {
 				if (receivedCloseSnapshot === undefined) throw new TypeError("creator received close snapshot unavailable after turnover");
