@@ -10742,6 +10742,11 @@ async function readCreatorRecoveryDependencyCensus(
 			if (
 				classified === undefined ||
 				(classified.kind !== "current" &&
+					// The exact signed bootstrap is independently authenticated from
+					// the pinned genesis contract. Its publication acknowledgement is
+					// not source authority: retain and charge a pending pair as the
+					// same protected dependency, without settling or pruning it.
+					classified.kind !== "pinned-genesis" &&
 					row.publishState !== "published" &&
 					!openSource &&
 					!inheritedComplete &&

@@ -157,8 +157,8 @@ const frameKind = (bytes: Uint8Array): string => {
  * @returns The link's observations and a raw opener.
  */
 export function linkSuccessorProtocol(
-	creator: ReadinessHoldPeer,
-	writer: ReadinessHoldPeer,
+	creator: Pick<ReadinessHoldPeer, "networkNode">,
+	writer: Pick<ReadinessHoldPeer, "networkNode">,
 	options: SuccessorLinkOptions = {}
 ): SuccessorLink {
 	const creatorPeer = creator.networkNode.peerId;
