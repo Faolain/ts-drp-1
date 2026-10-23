@@ -219,13 +219,13 @@ export async function creatorDeliveryRoom(options: RoomOptions = {}) {
 		if (byDigest === undefined) sent.set(from, (byDigest = new Map()));
 		if (!byDigest.has(digest)) byDigest.set(digest, message);
 	});
-	const open = async (index: number, options: Readonly<{ reopen?: true }> = {}) => {
+	const open = async (index: number, openOptions: Readonly<{ reopen?: true }> = {}) => {
 		const identity = required(identities[index]);
 		const name = `peer-${index}`;
 		const peerId = required(roster[index]).peerId;
 		const floor = createNodeRoomHeadAuthority({
 			filename: join(directory, `${name}-external-floor.sqlite`),
-			initialization: { kind: options.reopen ? "reopen" : "create" },
+			initialization: { kind: openOptions.reopen ? "reopen" : "create" },
 		});
 		heads.add(floor);
 		const { network: networkNode, adapter } = network.node(peerId);
@@ -234,7 +234,7 @@ export async function creatorDeliveryRoom(options: RoomOptions = {}) {
 		accepted.set(index, seen);
 		const input: CreateV3RoomSessionInput<ReturnType<typeof application.projectAcceptedOperations>> = {
 			application,
-			storageHost: options.reopen
+			storageHost: openOptions.reopen
 				? createNodeV3RoomStorageHost({ directory, initialization: () => "reopen" })
 				: storageHost,
 			author: identity.author,

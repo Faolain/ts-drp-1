@@ -4,8 +4,8 @@ import { MessageType } from "@ts-drp/types";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
-import { Session, type Profiler } from "node:inspector";
-import { loadavg, tmpdir } from "node:os";
+import { type Profiler, Session } from "node:inspector";
+import { cpus, loadavg, tmpdir } from "node:os";
 import { join } from "node:path";
 import { monitorEventLoopDelay, performance as nodePerformance } from "node:perf_hooks";
 import { gzipSync } from "node:zlib";
@@ -49,6 +49,8 @@ it.skipIf(!enabled)(
 			sourceHead: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
 			sourceDiffSha256: createHash("sha256").update(diff).digest("hex"),
 			load: loadavg(),
+			cpu: cpus()[0]?.model,
+			cores: cpus().length,
 			durable: "real localhost WebSocket/libp2p, 20ms delayed genuine ingress",
 			ephemeral:
 				"controlled raw datagrams; production room authority, codec, queue and sequence filter; not real WebRTC or FPS",
@@ -237,6 +239,11 @@ it.skipIf(!enabled)(
 			};
 			await joined([issue(0, "warm-0", 0), issue(1, "warm-1", 1)]);
 			await converged();
+			for (let receiver = 0; receiver < peers.length; receiver++)
+				expect(
+					remote.filter((sample) => sample.receiver === receiver).length,
+					`remote admission observer ${receiver}`
+				).toBeGreaterThan(0);
 			await sleep(16_000); // Exhaust all startup requests before testing periodic repair.
 			await step("baseline-before", () => sleep(2000));
 			expect(samples.filter((sample) => sample.receiver === 0).length).toBeGreaterThan(500);
@@ -327,6 +334,9 @@ it.skipIf(!enabled)(
 				network.raw.inject(creator.peerId, stale.routeId, writer.peerId, stale.bytes);
 				expect(samples.length).toBe(beforeStale);
 				expect(required(channels.get(0)).stats().authorityMismatch).toBe(authorityBefore + 1);
+				const remoteBeforeMaintenance = peers.map(
+					(_, receiver) => remote.filter((sample) => sample.receiver === receiver).length
+				);
 				await step(`maintenance-${epoch}`, async () => {
 					const maintenanceStart = performance.now(),
 						maintenanceRemote = remote.length;
@@ -346,6 +356,12 @@ it.skipIf(!enabled)(
 					]);
 				});
 				await converged();
+				for (let receiver = 0; receiver < peers.length; receiver++)
+					expect(
+						remote.filter((sample) => sample.receiver === receiver).length -
+							required(remoteBeforeMaintenance[receiver]),
+						`remote admission receiver ${receiver} after maintenance ${epoch}`
+					).toBeGreaterThan(0);
 				const received = peers.map((_, receiver) => samples.filter((sample) => sample.receiver === receiver).length);
 				await step(`baseline-after-${epoch}`, () => sleep(1000));
 				for (let receiver = 0; receiver < peers.length; receiver++)
