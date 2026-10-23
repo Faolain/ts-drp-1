@@ -219,8 +219,13 @@ export async function settlementRoom(options: Readonly<{ retention: boolean; nam
 
 export type SettlementRoom = Awaited<ReturnType<typeof settlementRoom>>;
 
-/** The creator's genuine successor export over scripted native bytes (Track N's transport); no authority. */
-export async function settlementDelivery(fixture: SettlementRoom) {
+/**
+ * The creator's genuine successor export over scripted native bytes (Track N's transport); no authority.
+ * @param fixture - The room fixture.
+ * @param receiverIndex - The installing Writer's roster index (default 1; Track X row 60 adds a second Writer).
+ * @returns The offer, the receiver's port and the source peers.
+ */
+export async function settlementDelivery(fixture: SettlementRoom, receiverIndex = 1) {
 	const object = parseStorageObjectId(fixture.objectId);
 	if (!object.ok) throw new TypeError("TRACK_M_SETTLEMENT_INVALID_OBJECT");
 	const store = await fixture.host.storageHost.openAhe("peer-0--ahe");
@@ -245,7 +250,7 @@ export async function settlementDelivery(fixture: SettlementRoom) {
 			await scope.release();
 		}
 		const sender = required(fixture.roster[0]).peerId;
-		const receiver = required(fixture.roster[1]).peerId;
+		const receiver = required(fixture.roster[receiverIndex]).peerId;
 		const creator = required(fixture.identities[0]);
 		const scripted = new ScriptedSnapshotChunkPort(
 			{ declaration: exported.declaration, chunks } as ConstructorParameters<typeof ScriptedSnapshotChunkPort>[0],

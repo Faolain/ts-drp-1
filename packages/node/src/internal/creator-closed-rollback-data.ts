@@ -271,6 +271,8 @@ import {
 	type CreatorOrdinaryFinishingWindowLimits,
 	type CreatorOrdinaryApplicationControlCapture,
 	type CreatorIssuanceRetirementOwner,
+	type CreatorReplacedLocalSource,
+	type CreatorReplacedLocalSourceRead,
 } from "./runtime-reclamation.js";
 import { v3RoomRetentionOpener, v3RoomRetirementOpener, type V3RoomRetirementSession } from "./room-retirement.js";
 import { type RoomRetentionLedger, type RoomRetentionLedgerRecord, roomRetentionLedgerRecordBytes } from "./room-retention-ledger.js";
@@ -9382,8 +9384,174 @@ async function closedJournalMembershipPrefix(input: Readonly<{
 	/** Invocation-private capture, delivered only after the WHOLE prefix and
 	 * final original source check. The original retirement result stays exact. */
 	captureApplicationRows?(rows: readonly CreatorOrdinaryClosedJournalApplicationRow[]): void;
+	/** Decision row 60 (R5): only the genuine held close lifetime supplies this reader of
+	 * its own registration's replaced local sources (closedJournalReplacedOutsideRows). */
+	readReplacedLocalSource?(source: CreatorReplacedLocalSource): Promise<CreatorReplacedLocalSourceRead | undefined>;
+	/** Decision row 60 (R5b, owner's B2): the epoch of this peer's durable room-head floor, with
+	 * no transition pending, read by the genuine held classification only. A received row outside
+	 * a scope's Cut is collectible only once this exceeds the scope's epoch: this peer has durably
+	 * installed the successor that the Cut closes into. Read only for a scope with such a row. */
+	installedThroughEpoch?(): number | undefined;
 }>): Promise<ClosedJournalDetailClassification["collectiblePrefixes"][number] | undefined> {
 	return prepareClosedJournalMembershipPrefix(input, input.check);
+}
+
+/**
+ * Decision row 60 (R5): a Writer's move made during the creator's seal is in its journal scope
+ * but outside that scope's signed Cut, and the Writer's next install replaces it. Such a scope
+ * is collectible only when every row outside the Cut is a local-issued row of this author whose
+ * replacement is a member of a later signed Cut: the held lifetime's reader returns the source's
+ * original bytes and its replacement digests only when the source's own plan entry names them and
+ * their operations equal the source's derivation by the original immutable settlement policy.
+ * Each replacement digest must be in the closed membership of a later scope of this same image,
+ * opened against that scope's held authenticated Cut. The caller still authenticates every
+ * returned source against this scope's closed ACL. Missing or unreadable facts retain the scope.
+ * R7 (owner's rule): an outside row that is this author's own settlement fence (the reader returns
+ * its original bytes, marked as a fence, with no replacement) is collectible once a later own fence
+ * of the same author, at a higher sequence, is a member of a later scope's signed Cut: a local
+ * witness of that Cut's membership, opened as above, that the reader confirms is the issued fence
+ * at that digest. A later fence that missed its own Cut is no evidence.
+ * R5-chain (owner's C1): a replacement that missed its own Cut too is followed. It must be a
+ * local-issued row of a later scope of this image whose closed membership (opened as above) omits
+ * it, read through the same reader (its own plan entry and derivation), and its replacements must
+ * meet the same rule, the last link being a member of a later signed Cut. A chain of more links
+ * than the journal's protected-scope limit retains the scope.
+ * @returns Each outside row's original source bytes by vertex digest, or undefined to retain.
+ */
+async function closedJournalReplacedOutsideRows(input: Readonly<{
+	scope: LiveJournalScope;
+	captured: readonly Readonly<{ bytes: Uint8Array; frame: unknown }>[];
+	/** This scope's local-issued rows outside its Cut. */
+	frames: readonly Readonly<{ bytes: Uint8Array; frame: unknown }>[];
+	authorities: readonly ClosedJournalMembershipAuthority[];
+	read(source: CreatorReplacedLocalSource): Promise<CreatorReplacedLocalSourceRead | undefined>;
+}>): Promise<ReadonlyMap<string, CreatorReplacedLocalSourceRead> | undefined> {
+	const outside = new Map<string, CreatorReplacedLocalSourceRead>();
+	const later = new Map<string, ReadonlySet<string> | null>();
+	const laterWitnesses = new Map<string, readonly unknown[]>();
+	const laterMembers = async (scope: LiveJournalScope): Promise<ReadonlySet<string> | null> => {
+		const key = JSON.stringify([scope.objectId, scope.epoch, scope.anchorDigest]);
+		const known = later.get(key);
+		if (known !== undefined) return known;
+		later.set(key, null);
+		const headers = input.captured.filter(({ frame }) => Array.isArray(frame) && frame[0] === "scopes" &&
+			closedRetirementEqual(frame[1], [scope.objectId, scope.epoch, scope.anchorDigest]));
+		const header = headers.length === 1 ? (headers[0]!.frame as unknown[])[2] as Record<string, unknown> : undefined;
+		const carrier = header?.closed_membership_bytes ?? header?.closedMembershipBytes;
+		const authority = input.authorities.find(value => closedRetirementEqual(value.scope, scope));
+		if (!(carrier instanceof Uint8Array) || authority === undefined) return null;
+		try {
+			const cut = record(authority.exactCanonicalCutValueBytes);
+			const membership = await openCreatorCloseMembership({ bytes: carrier,
+				exactCanonicalCutValueBytes: authority.exactCanonicalCutValueBytes,
+				maxEpochVertices: (cut.parameters as Readonly<{ maxEpochVertices: number }>).maxEpochVertices });
+			if (membership === undefined || !closedRetirementEqual(membership.scope, scope)) return null;
+			const members = new Set(membership.orderedVertexDigests.map(bytes =>
+				[...bytes].map(byte => byte.toString(16).padStart(2, "0")).join("")));
+			later.set(key, members);
+			laterWitnesses.set(key, Array.isArray(membership.localVertexWitnesses) ? membership.localVertexWitnesses : []);
+			return members;
+		} catch {
+			return null;
+		}
+	};
+	const laterScopes: LiveJournalScope[] = [];
+	for (const { frame } of input.captured) {
+		const key = Array.isArray(frame) && frame[0] === "scopes" ? frame[1] : undefined;
+		if (Array.isArray(key) && key.length === 3 && key[0] === input.scope.objectId && typeof key[1] === "number" &&
+			key[1] > input.scope.epoch && typeof key[2] === "string")
+			laterScopes.push(Object.freeze({ objectId: input.scope.objectId, epoch: key[1], anchorDigest: key[2] }));
+	}
+	// R5-chain: whether a replacement is a member of a later signed Cut, or a replaced local row
+	// outside its own later scope's Cut whose replacements are (`links` counts the chain so far).
+	const linked = async (replacement: string, links: number): Promise<boolean> => {
+		for (const scope of laterScopes) {
+			if ((await laterMembers(scope))?.has(replacement) === true) return true;
+		}
+		if (links >= LIVE_JOURNAL_RETIREMENT_LIMITS.maxScopes) return false;
+		const entries = input.captured.filter(({ frame }) => {
+			if (!Array.isArray(frame) || (frame[0] !== "accepted_entries" && frame[0] !== "acceptedEntries") ||
+				!Array.isArray(frame[1]) || frame[1].length !== 4) return false;
+			const row = frame[2] as Record<string, unknown>;
+			return (row.vertex_digest ?? row.vertexDigest) === replacement;
+		});
+		if (entries.length !== 1) return false;
+		const frame = entries[0]!.frame as unknown[], key = frame[1] as unknown[];
+		const sql = frame[0] === "accepted_entries", row = frame[2] as Record<string, unknown>;
+		const scope = laterScopes.find(value =>
+			closedRetirementEqual([value.objectId, value.epoch, value.anchorDigest], key.slice(0, 3)));
+		const author = row[sql ? "local_author" : "localAuthor"];
+		const authorSequence = row[sql ? "local_author_sequence" : "localAuthorSequence"];
+		const members = scope === undefined ? null : await laterMembers(scope);
+		if (members === null || members.has(replacement) || row[sql ? "source_kind" : "sourceKind"] !== "local-issued" ||
+			typeof author !== "string" || !Number.isSafeInteger(authorSequence)) return false;
+		const read = await input.read(Object.freeze({ author, authorSequence: Number(authorSequence), vertexDigest: replacement }))
+			.catch(() => undefined);
+		if (read === undefined || read.authorFence === true || read.replacementVertexDigests.length === 0) return false;
+		for (const next of read.replacementVertexDigests) if (!(await linked(next, links + 1))) return false;
+		return true;
+	};
+	// R7: whether bytes are this author's own settlement fence at this sequence.
+	const authorFence = (bytes: unknown, author: string, authorSequence: number): boolean => {
+		if (!(bytes instanceof Uint8Array)) return false;
+		try {
+			const vertex = record(bytes), operation = vertex.operation as Readonly<Record<string, unknown>> | null;
+			return vertex.author === author && vertex.authorSequence === authorSequence && typeof operation === "object" &&
+				operation !== null && operation.action === "$drp.author-fence.v1" && operation.version === 1 &&
+				operation.fenceSequence === authorSequence;
+		} catch {
+			return false;
+		}
+	};
+	// R7: whether a later own fence of this author, at a higher sequence, is a member of a later
+	// scope's signed Cut (a local witness of its opened membership that the reader confirms).
+	const laterOwnFence = async (author: string, authorSequence: number): Promise<boolean> => {
+		for (const scope of laterScopes) {
+			const members = await laterMembers(scope);
+			const witnesses = laterWitnesses.get(JSON.stringify([scope.objectId, scope.epoch, scope.anchorDigest]));
+			if (members === null || witnesses === undefined) continue;
+			for (const witness of witnesses) {
+				const value = typeof witness === "object" && witness !== null ? witness as Readonly<Record<string, unknown>> : {};
+				const digest = value.vertexDigest, bytes = value.exactCanonicalPreimageBytes;
+				if (typeof digest !== "string" || !members.has(digest) || !(bytes instanceof Uint8Array)) continue;
+				let sequence: unknown;
+				try {
+					sequence = record(bytes).authorSequence;
+				} catch {
+					continue;
+				}
+				if (!Number.isSafeInteger(sequence) || Number(sequence) <= authorSequence ||
+					!authorFence(bytes, author, Number(sequence))) continue;
+				const read = await input.read(Object.freeze({ author, authorSequence: Number(sequence), vertexDigest: digest }))
+					.catch(() => undefined);
+				if (read?.authorFence === true && read.replacementVertexDigests.length === 0 &&
+					authorFence(read.exactCanonicalPreimageBytes, author, Number(sequence))) return true;
+			}
+		}
+		return false;
+	};
+	for (const { frame } of input.frames) {
+		const row = (frame as unknown[])[2] as Record<string, unknown>;
+		const sql = (frame as unknown[])[0] === "accepted_entries";
+		const digest = row[sql ? "vertex_digest" : "vertexDigest"];
+		if (typeof digest !== "string") return undefined;
+		const author = row[sql ? "local_author" : "localAuthor"], authorSequence = row[sql ? "local_author_sequence" : "localAuthorSequence"];
+		if (row[sql ? "source_kind" : "sourceKind"] !== "local-issued" || typeof author !== "string" ||
+			!Number.isSafeInteger(authorSequence) || outside.has(digest)) return undefined;
+		const read = await input.read(Object.freeze({ author, authorSequence: Number(authorSequence), vertexDigest: digest }))
+			.catch(() => undefined);
+		if (read?.authorFence === true) {
+			if (read.replacementVertexDigests.length !== 0 ||
+				!authorFence(read.exactCanonicalPreimageBytes, author, Number(authorSequence)) ||
+				!(await laterOwnFence(author, Number(authorSequence)))) return undefined;
+			outside.set(digest, read);
+			continue;
+		}
+		if (read === undefined || read.replacementVertexDigests.length === 0) return undefined;
+		for (const replacement of read.replacementVertexDigests) if (!(await linked(replacement, 1))) return undefined;
+		outside.set(digest, read);
+	}
+	return outside.size === input.frames.length ? outside : undefined;
 }
 
 /** The same membership/ACL/original-signature algorithm over private DATA.
@@ -9444,7 +9612,37 @@ async function prepareClosedJournalMembershipPrefix(
 	const watermark = header.next_journal_sequence ?? header.nextJournalSequence;
 	requireLaw(Number.isSafeInteger(watermark) && Number(watermark) >= 0, "chain-invalid");
 	// Missing detail is not permission, even when a valid Cut names membership.
-	if (frames.length !== watermark || frames.length !== members.size || frames.length === 0) return undefined;
+	if (frames.length !== watermark || frames.length === 0) return undefined;
+	// Decision row 60: rows outside the Cut only as this author's replaced local sources (R5,
+	// option A) or own settlement fences superseded by a later own fence in a signed Cut (R7), or
+	// as received rows once this peer has durably installed the successor that the Cut closes into
+	// (R5b, B2). Any other row outside the Cut retains the scope.
+	let outside: ReadonlyMap<string, CreatorReplacedLocalSourceRead> | undefined;
+	const receivedOutside = new Set<string>();
+	if (frames.length !== members.size) {
+		if (frames.length < members.size || input.captureApplicationRows !== undefined) return undefined;
+		const localOutside: typeof frames = [];
+		for (const capturedRow of frames) {
+			const frame = capturedRow.frame as unknown[];
+			const sql = frame[0] === "accepted_entries", row = frame[2] as Record<string, unknown>;
+			const digest = row[sql ? "vertex_digest" : "vertexDigest"], kind = row[sql ? "source_kind" : "sourceKind"];
+			if (typeof digest !== "string" || members.has(digest)) continue;
+			if (kind === "received") receivedOutside.add(digest);
+			else localOutside.push(capturedRow);
+		}
+		const installed = receivedOutside.size === 0 ? undefined : input.installedThroughEpoch?.();
+		if (receivedOutside.size > 0 && !(Number.isSafeInteger(installed) && installed! > input.scope.epoch)) return undefined;
+		const read = input.readReplacedLocalSource;
+		if (localOutside.length > 0) {
+			if (read === undefined) return undefined;
+			outside = await closedJournalReplacedOutsideRows({ scope: input.scope, captured, frames: localOutside,
+				authorities: input.authorities, read: source => read(source) });
+			await checkSource?.();
+			requireLaw(input.image.canonicalRows.length === captured.length && captured.every((row, index) =>
+				compareBytes(row.bytes, input.image.canonicalRows[index]!) === 0), "chain-invalid");
+			if (outside === undefined) return undefined;
+		} else outside = new Map();
+	}
 	const rows: LiveJournalRetirementLocalPrefix["rows"][number][] = [];
 	const applicationRows: CreatorOrdinaryClosedJournalApplicationRow[] = [];
 	const identities = new Set<string>(), seen = new Set<string>(), localSeen = new Set<string>();
@@ -9460,20 +9658,31 @@ async function prepareClosedJournalMembershipPrefix(
 		const sql = frame[0] === "accepted_entries", row = frame[2] as Record<string, unknown>;
 		const digest = row[sql ? "vertex_digest" : "vertexDigest"];
 		const kind = row[sql ? "source_kind" : "sourceKind"];
+		const outsideRow = typeof digest === "string" && !members.has(digest) &&
+			(outside?.has(digest) === true || receivedOutside.has(digest));
 		requireLaw(inScope(frame[1]) && frame[1].length === 4 && Object.is(frame[1][3], ordinal) &&
-			typeof digest === "string" && members.has(digest) && !seen.has(digest) &&
+			typeof digest === "string" && (members.has(digest) || outsideRow) && !seen.has(digest) &&
 			(kind === "received" || kind === "local-issued"), "chain-invalid");
-		const original = kind === "local-issued" ? localWitnesses.get(digest) : undefined;
-		if (kind === "local-issued" && original === undefined) return undefined;
-		const preimage = original?.exactCanonicalPreimageBytes ?? row[sql ? "received_preimage" : "exactCanonicalPreimageBytes"];
-		const signature = original?.detachedSignature ?? row[sql ? "received_signature" : "detachedSignature"];
+		// R5: a replaced local row's original bytes come from its replaced-source facts; a received
+		// row (R5b) carries its own. A row outside the Cut may depend on another outside row,
+		// while a Cut member depends only on members.
+		const replaced = members.has(digest) ? undefined : outside?.get(digest);
+		const original = kind === "local-issued" && replaced === undefined ? localWitnesses.get(digest) : undefined;
+		if (kind === "local-issued" && replaced === undefined && original === undefined) return undefined;
+		const preimage = replaced?.exactCanonicalPreimageBytes ?? original?.exactCanonicalPreimageBytes ??
+			row[sql ? "received_preimage" : "exactCanonicalPreimageBytes"];
+		const signature = replaced?.detachedSignature ?? original?.detachedSignature ??
+			row[sql ? "received_signature" : "detachedSignature"];
 		requireLaw(preimage instanceof Uint8Array && signature instanceof Uint8Array, "chain-invalid");
 		const vertex = record(preimage);
 		requireLaw(vertex.objectId === input.scope.objectId && vertex.epoch === input.scope.epoch &&
 			vertex.anchor === input.scope.anchorDigest && typeof vertex.author === "string" &&
 			Number.isSafeInteger(vertex.authorSequence) && Number(vertex.authorSequence) >= 0 &&
 			Array.isArray(vertex.dependencies) && vertex.dependencies.every(dependency =>
-				dependency === input.scope.anchorDigest || typeof dependency === "string" && members.has(dependency) && seen.has(dependency)), "chain-invalid");
+				dependency === input.scope.anchorDigest || typeof dependency === "string" &&
+					(members.has(dependency) || outsideRow &&
+						(outside?.has(dependency) === true || receivedOutside.has(dependency))) &&
+					seen.has(dependency)), "chain-invalid");
 		const authenticated = (input.verifyVertex ?? verifyReceivedVertex)({ domain: registry.domains.vertex, suiteId,
 			expectedAnchor: input.scope.anchorDigest, receivedCanonicalPreimageBytes: preimage, signature,
 			resolveAuthorPublicKey: author => {
@@ -9488,7 +9697,7 @@ async function prepareClosedJournalMembershipPrefix(
 		if (kind === "local-issued") {
 			requireLaw(row[sql ? "local_author" : "localAuthor"] === author &&
 				row[sql ? "local_author_sequence" : "localAuthorSequence"] === authorSequence, "chain-invalid");
-			localSeen.add(digest);
+			if (replaced === undefined) localSeen.add(digest);
 		}
 		const identity = JSON.stringify([author, authorSequence]);
 		requireLaw(!identities.has(identity), "chain-invalid");
@@ -9503,6 +9712,8 @@ async function prepareClosedJournalMembershipPrefix(
 		}));
 	}
 	requireLaw(localSeen.size === localWitnesses.size, "chain-invalid");
+	requireLaw((outside === undefined && receivedOutside.size === 0) ||
+		[...seen].filter(digest => members.has(digest)).length === members.size, "chain-invalid");
 	// No prefix can escape after source revocation or changed native currency.
 	// This is a fresh admitted check, not reuse of a prior authorization result.
 	// Join revocation already queued during synchronous validation before that
@@ -9644,6 +9855,9 @@ async function classifyClosedJournalDetails(input: Readonly<{
 	check(): Promise<void>;
 	/** SAME admitted owner's local revocation guard, never native currency or authority. */
 	checkAvailable?(): void;
+	/** Decision row 60 (R5): the held close lifetime's reader of its own replaced local
+	 * sources. Held classification only; detached preparation never reads native custody. */
+	readReplacedLocalSource?(source: CreatorReplacedLocalSource): Promise<CreatorReplacedLocalSourceRead | undefined>;
 }>): Promise<ClosedJournalDetailClassification> {
 	return prepareClosedJournalDetails(input, input);
 }
@@ -9652,8 +9866,10 @@ async function classifyClosedJournalDetails(input: Readonly<{
  * supplies actual native reads/currency. Detached eligibility below proves no
  * fallback page is required, then the existing installer freshly qualifies. */
 async function prepareClosedJournalDetails(
-	input: Omit<Parameters<typeof classifyClosedJournalDetails>[0], "journal" | "physical" | "check" | "checkAvailable">,
-	held?: Pick<Parameters<typeof classifyClosedJournalDetails>[0], "journal" | "physical" | "check" | "checkAvailable">
+	input: Omit<Parameters<typeof classifyClosedJournalDetails>[0],
+		"journal" | "physical" | "check" | "checkAvailable" | "readReplacedLocalSource">,
+	held?: Pick<Parameters<typeof classifyClosedJournalDetails>[0],
+		"journal" | "physical" | "check" | "checkAvailable" | "readReplacedLocalSource">
 ): Promise<ClosedJournalDetailClassification> {
 	const census = record(input.censusBytes);
 	const current = census.currentJournal as Readonly<{ scope: LiveJournalScope }>;
@@ -9755,7 +9971,11 @@ async function prepareClosedJournalDetails(
 		const restored = input.resumePlan?.prefixes.filter(prefix =>
 			closedRetirementEqual(prefix.scope, scope)) ?? [];
 		const membershipInput = {scope, image: input.image, authorities: input.journalMembershipAuthorities ?? [],
-			...(input.verifyVertex === undefined ? {} : {verifyVertex: input.verifyVertex})};
+			...(input.verifyVertex === undefined ? {} : {verifyVertex: input.verifyVertex}),
+			...(held?.readReplacedLocalSource === undefined ? {} : {readReplacedLocalSource: held.readReplacedLocalSource}),
+			// R5b: the held classification's own durable floor, nothing pending (else `incomplete`).
+			...(held === undefined ? {} : {installedThroughEpoch: () =>
+				input.floor.pending === null && input.floor.stable.objectId === input.objectId ? input.floor.stable.epoch : undefined})};
 		const membershipPrefix = held === undefined ? await prepareClosedJournalMembershipPrefix(membershipInput) :
 			await closedJournalMembershipPrefix({...membershipInput, check: held.check});
 		held?.checkAvailable?.();
@@ -22134,6 +22354,8 @@ async function planRoomRetentionFromLedger(context: Readonly<{
 				physical: journal.value,
 				...(verifyVertex === undefined ? {} : { verifyVertex: (value: Parameters<typeof verifyReceivedVertex>[0]) =>
 					verifyVertex.call(lifetime, value) }),
+				...(lifetime.readReplacedLocalSource === undefined ? {} : { readReplacedLocalSource:
+					(source: CreatorReplacedLocalSource) => lifetime.readReplacedLocalSource!(source) }),
 				checkAvailable, check: async (): Promise<void> => checkAvailable() });
 			capturedHeaderScopes = headerScopes();
 		}
@@ -23354,6 +23576,8 @@ async function reconcileSnapshotRecoveryRoles(
 			authenticatedScopes: journalScopes,
 			journalMembershipAuthorities: roleProofs.flatMap(proof => proof.journalMembershipAuthorities),
 			...(lifetime.verifyVertex === undefined ? {} : {verifyVertex: value => lifetime.verifyVertex!(value)}),
+			...(lifetime.readReplacedLocalSource === undefined ? {} :
+				{readReplacedLocalSource: source => lifetime.readReplacedLocalSource!(source)}),
 			accounting: sourceFrame.accounting,
 			check: async (): Promise<void> => {
 				requireLaw(sourceFrame.alive, "snapshot-unavailable");

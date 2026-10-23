@@ -3439,10 +3439,71 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		void task.then(() => creatorArchiveRecoveryTasks.delete(task), () => creatorArchiveRecoveryTasks.delete(task));
 		return task;
 	};
+	// Decision row 61, gate serving: this room's successor server answers only once the creator has
+	// adopted the successor it serves, the adoption tail (publication, settlement drain, readiness)
+	// and the startup readiness included. A Writer's install does not retry a refused material
+	// fetch, so an early material request is held, not refused: the material server first
+	// authenticates it and admits its requester under its own session ceiling, and only its
+	// response write waits here, one per peer (a newer request from the same peer supersedes),
+	// within the server's own response deadline (its write signal). Manifest and chunk requests
+	// need an admitted requester, and none is reported before the adoption.
+	// A Writer's install retries a held request that ended at that deadline (option E), so the gate
+	// never fails an install by itself. A held response belongs to one serving generation: a room
+	// close or a serving replacement cancels it before the old port joins its handlers, and a newly
+	// admitted request releases the held requests of peers that are no longer connected.
+	let startupServingReady = false;
+	let successorServingGeneration = 0;
+	const successorServingHolds = new Map<string, (recheck: boolean) => void>();
+	const releaseSuccessorServingHolds = (): void => {
+		for (const release of [...successorServingHolds.values()]) release(true);
+	};
+	const cancelSuccessorServingHolds = (): void => {
+		successorServingGeneration += 1;
+		releaseSuccessorServingHolds();
+	};
+	const releaseDisconnectedSuccessorServingHolds = (connectedPeers: readonly string[]): void => {
+		const connected = new Set(connectedPeers);
+		for (const [peerId, release] of [...successorServingHolds])
+			if (!connected.has(peerId)) release(false);
+	};
+	const successorAdopted = (closedEpoch: number): boolean =>
+		!closed &&
+		terminalFailure === undefined &&
+		startupServingReady &&
+		creatorSuccessorAdoptionTask === undefined &&
+		successorProjectionAuthority !== null &&
+		successorProjectionAuthority.epoch > closedEpoch;
+	const holdUntilSuccessorAdopted = async (
+		closedEpoch: number,
+		peerId: string,
+		signal: AbortSignal,
+		generation = successorServingGeneration
+	): Promise<void> => {
+		for (;;) {
+			signal.throwIfAborted();
+			if (closed || terminalFailure !== undefined || generation !== successorServingGeneration)
+				throw new TypeError("creator successor serving is closed");
+			if (successorAdopted(closedEpoch)) return;
+			successorServingHolds.get(peerId)?.(false);
+			const recheck = await new Promise<boolean>((resolve) => {
+				const release = (again: boolean): void => {
+					signal.removeEventListener("abort", aborted);
+					if (successorServingHolds.get(peerId) === release) successorServingHolds.delete(peerId);
+					resolve(again);
+				};
+				const aborted = (): void => release(true);
+				signal.addEventListener("abort", aborted, { once: true });
+				successorServingHolds.set(peerId, release);
+			});
+			if (!recheck) throw new TypeError("creator successor request was superseded");
+		}
+	};
 	const serveSuccessor = async (): Promise<CreatorSuccessorOffer> => {
 		if (transport === undefined || activeHandle === undefined)
 			throw new TypeError("creator successor transport is unavailable");
 		const exported = await readSuccessorExport();
+		// The old serving's held responses end before its port joins their handlers (row 61).
+		cancelSuccessorServingHolds();
 		await successorServing?.close();
 		await successorServingScope?.release();
 		successorServingScope = await (await ownRecipientSnapshots()).openScope(exported.declaration);
@@ -3463,8 +3524,31 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			connectedPeers: () => port.connectedPeers(),
 		});
 		successorServing = createV3SnapshotTransferOwner({ transport: port });
+		const closedEpoch = exported.declaration.scope.epoch;
+		const generation = successorServingGeneration;
 		successorServing.serve({
-			...server,
+			authorization: Object.freeze({
+				authorForPeer: (peer: string): string | undefined =>
+					successorAdopted(closedEpoch) ? server.authorization.authorForPeer(peer) : undefined,
+				isAuthorizedAuthor: (author: string): boolean => server.authorization.isAuthorizedAuthor(author),
+			}),
+			control: (stream, bytes) =>
+				server.control(
+					Object.freeze({
+						peerId: stream.peerId,
+						...(stream.connection === undefined ? {} : { connection: stream.connection }),
+						abort: (reason?: Error): void => stream.abort(reason),
+						close: (): Promise<void> => stream.close(),
+						read: (maxBytes: number, options: Readonly<{ readonly signal: AbortSignal }>): Promise<Uint8Array> =>
+							stream.read(maxBytes, options),
+						write: async (bytes: Uint8Array, options: Readonly<{ readonly signal: AbortSignal }>): Promise<void> => {
+							releaseDisconnectedSuccessorServingHolds(port.connectedPeers());
+							await holdUntilSuccessorAdopted(closedEpoch, stream.peerId, options.signal, generation);
+							return stream.write(bytes, options);
+						},
+					}),
+					bytes
+				),
 			descriptors: exported.declaration.chunks,
 			exactCanonicalManifestBytes: exported.offer.exactCanonicalSnapshotManifestBytes,
 			quarantine: successorServingScope,
@@ -3492,6 +3576,13 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		? new TypeError("v3 room recovered operation was not accepted by projection")
 		: undefined;
 	let closed = false;
+	// Ends this session's open-ended waits (option E: a Writer's successor material fetch) when the
+	// session closes, before the close joins the work that owns them.
+	const sessionLifetime = new AbortController();
+	const endSessionWaits = (): void => {
+		sessionLifetime.abort(new TypeError("v3 room session is closed"));
+		cancelSuccessorServingHolds();
+	};
 	let creatorCloseRebindFailure: TypeError | undefined;
 	let cancelRedirectCreation!: () => void;
 	const redirectCancellation = new Promise<void>((resolve) => {
@@ -3591,6 +3682,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	const shutdown = (): Promise<void> => {
 		if (closePromise !== undefined) return closePromise;
 		closed = true;
+		endSessionWaits();
 		closePresentation();
 		revokeTransport();
 		cancelRedirectCreation();
@@ -4898,7 +4990,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	const mergedSettlementPlan = (
 		sources: readonly Pick<DisplacedSource, "authorSequence" | "intents" | "vertexDigest">[],
 		current: RoomSettlementPlan | null,
-		inheritances: ReadonlyMap<number, NonNullable<RoomSettlementPlanEntry["inheritance"]>> = new Map()
+		inheritances: ReadonlyMap<number, NonNullable<RoomSettlementPlanEntry["inheritance"]>> = new Map(),
+		prunedSources: ReadonlySet<number> = new Set()
 	): ((priorFenceEpoch: unknown, activeEpoch: number | undefined) => RoomSettlementPlan) => {
 		const priorEntries = new Map(current?.entries.map((entry) => [entry.sourceSequence, entry] as const));
 		const entries: RoomSettlementPlanEntry[] = [];
@@ -4938,7 +5031,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		// A new operational anchor can terminalize a source that was already
 		// replaced. Absence from the current rebase scan does not erase its durable
 		// intent/source/replacement link; authenticated pruning owns that removal.
+		// Decision row 60 (R5): once that pruning has removed a completed entry's own source
+		// (completedSettlementSourcesPruned), the link has no consumer left: no rebase scan or
+		// recovery census can meet the source again. Carrying it would name retired work, which
+		// the store refuses on every later plan write.
 		for (const prior of current?.entries ?? []) {
+			if (prunedSources.has(prior.sourceSequence)) continue;
 			if (!entries.some((entry) => entry.sourceSequence === prior.sourceSequence)) entries.push(prior);
 		}
 		entries.sort((left, right) => left.sourceSequence - right.sourceSequence);
@@ -4969,9 +5067,44 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			return plan;
 		};
 	};
+	/**
+	 * Decision row 60 (R5): the completed local entries whose own source row authenticated
+	 * pruning has removed (the store reads it as pruned). Only an entry that is not in the
+	 * current rebase scan, names a local source and has its replacement issued (or expired);
+	 * an incomplete, manual-review, inherited or migrated entry is always kept.
+	 * @param current - The durable plan before this merge.
+	 * @param sources - The current rebase scan.
+	 * @returns The source sequences whose entries the merge drops.
+	 */
+	const completedSettlementSourcesPruned = async (
+		current: RoomSettlementPlan | null,
+		sources: readonly DisplacedSource[]
+	): Promise<ReadonlySet<number>> => {
+		const pruned = new Set<number>();
+		for (const entry of current?.entries ?? []) {
+			if (
+				entry.sourceObjectId !== undefined ||
+				entry.inheritance !== undefined ||
+				sources.some((source) => source.authorSequence === entry.sourceSequence) ||
+				(entry.disposition !== "expire" &&
+					(entry.disposition === "manual-review" ||
+						entry.disposition === "inherited" ||
+						entry.replacementSequence === null))
+			)
+				continue;
+			if ((await issuanceStore.readIssued(settlementScope, entry.sourceSequence)) === null)
+				pruned.add(entry.sourceSequence);
+		}
+		return pruned;
+	};
 	const writeMergedSettlementPlan = async (sources: readonly DisplacedSource[]): Promise<RoomSettlementPlan> => {
 		const current = await issuanceStore.readSettlementPlan(settlementScope);
-		const completePlan = mergedSettlementPlan(sources, current, await authenticatedSettlementInheritance(sources));
+		const completePlan = mergedSettlementPlan(
+			sources,
+			current,
+			await authenticatedSettlementInheritance(sources),
+			await completedSettlementSourcesPruned(current, sources)
+		);
 		const priorFence =
 			current?.fenceSequence == null
 				? undefined
@@ -5790,6 +5923,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	void rebasePromise.catch((error: unknown) => {
 		terminalFailure = error;
 	});
+	// The startup readiness above ends the startup hold on successor serving (decision row 61).
+	const openStartupSuccessorServing = (): void => {
+		startupServingReady = true;
+		releaseSuccessorServingHolds();
+	};
+	void rebasePromise.then(openStartupSuccessorServing, openStartupSuccessorServing);
 	if (settlementProfile === "v1" && creatorCloseHandle !== undefined) {
 		const startupSettled = rebasePromise.then(
 			() => undefined,
@@ -6748,7 +6887,15 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				},
 			]);
 		}
-		await predecessorClose?.stop();
+		// The replacement authority and its readiness are installed; a failure of this last stop is
+		// the room's terminal failure, so nothing waiting on the adoption (successor serving
+		// included, decision row 61) treats the adoption as complete.
+		try {
+			await predecessorClose?.stop();
+		} catch (error) {
+			terminalFailure = error;
+			throw error;
+		}
 	};
 	const adoptCreatorSuccessor = (): Promise<void> => {
 		if (creatorSuccessorAdoptionTask !== undefined) return creatorSuccessorAdoptionTask;
@@ -6765,6 +6912,9 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			if (creatorSuccessorAdoptionTask === shared) creatorSuccessorAdoptionTask = undefined;
 		});
 		creatorSuccessorAdoptionTask = shared;
+		// Held successor requests re-check once the adoption, its tail included, has settled as its
+		// callers see it (decision row 61).
+		void shared.then(releaseSuccessorServingHolds, releaseSuccessorServingHolds);
 		return shared;
 	};
 	// Genuine room-native turnover ports for this recipient; no finality signer.
@@ -7006,6 +7156,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					exactCanonicalGenesisAnchorPreimageBytes: material.exactCanonicalGenesisAnchorPreimageBytes,
 					detachedGenesisSignature: material.detachedGenesisSignature,
 					...(recoveryContext === undefined ? {} : { recoveryContext }),
+					retryUntil: sessionLifetime.signal,
 				});
 			} catch (error) {
 				// A failed receive may own native retention despite a lost acknowledgement.
@@ -7099,6 +7250,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	const closeSession = (): Promise<void> => {
 		if (sessionCloseTask !== undefined) return sessionCloseTask;
 		closed = true;
+		endSessionWaits();
 		autoPoolMaintenance?.stop();
 		closePresentation();
 		revokeTransport();

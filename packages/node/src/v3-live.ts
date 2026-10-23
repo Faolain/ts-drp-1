@@ -83,6 +83,7 @@ import {
 	resolveCurrentEpochAuthorizedAuthor,
 } from "@ts-drp/protocol-v3/author-authorization";
 import {
+	CREATOR_AUTHOR_SETTLEMENT_KIND,
 	openCreatorAuthorSettlement,
 	resolveCreatorAuthorSettlement,
 } from "@ts-drp/protocol-v3/creator-author-issuance-frontiers";
@@ -216,6 +217,8 @@ import {
 	type CreatorOrdinaryPreparedCapacityDimensions,
 	type CreatorOrdinaryApplicationControlCapture,
 	type CreatorOrdinaryApplicationControlFact,
+	type CreatorReplacedLocalSource,
+	type CreatorReplacedLocalSourceRead,
 	type CreatorSnapshotRecoveryCloseDependencyRead,
 	type CreatorSnapshotRecoveryCloseHold,
 	type CreatorSnapshotRecoveryCloseLifetime,
@@ -3951,6 +3954,19 @@ function resolveRecoveryCloseHold(
 			// its original fresh closed-ACL key resolver.
 			return facts.context.historicalIssuance?.vertexFacts?.verify ?? verifyReceivedVertex;
 		},
+		...(facts.registration === undefined
+			? {}
+			: {
+					readReplacedLocalSource: function (
+						this: CreatorSnapshotRecoveryCloseLifetime,
+						source: CreatorReplacedLocalSource
+					): Promise<CreatorReplacedLocalSourceRead | undefined> {
+						const registration = facts.registration;
+						if (this !== lifetime || !available() || registration === undefined)
+							return Promise.reject(new TypeError("creator recovery close hold is unavailable"));
+						return admit(() => replacedLocalSourceFacts(registration, source));
+					},
+				}),
 		captureRoomRetentionLedger: function (this: CreatorSnapshotRecoveryCloseLifetime, create: boolean) {
 			// Slice 14b stage 2: the hold's own live plane, on an opted-in room host only. The
 			// ledger carries immutable verified facts; this hold's census and every currency
@@ -11039,6 +11055,18 @@ function nativeBranchDisplacedSource(registration: V3PlaneRegistration): V3Displ
 		: undefined;
 }
 
+/** The retained displaced source when it is a cross-object migration source (an activated source
+ * of another object): exactly captureCreatorRecoveryRuntime's `migrationSource` selection, which
+ * puts that source in the recovery census, where the ordinary warm source capture declines it by
+ * design. Read only as creator close's private, negative prime hint; it grants nothing. */
+function migrationDisplacedSource(registration: V3PlaneRegistration): V3DisplacedSourceAuthority | undefined {
+	const source = registration.displacedSource;
+	return source?.activationVertexDigest !== undefined &&
+		source.prepared.trust.trust.objectId !== registration.payload.trust.trust.objectId
+		? source
+		: undefined;
+}
+
 /** One runtime tuple/predicate for complete census and runtime-only custody. */
 function captureCreatorRecoveryRuntime(registration: V3PlaneRegistration, activeObservation: boolean,
 	drainingReceived: boolean, terminalIssuanceObservation: boolean, quiescentBoundary?: () => boolean) {
@@ -15261,6 +15289,23 @@ async function authenticatedCompletedNativeReplacementSource(
 		const candidate = classifyRebaseRow(registration, row, undefined, vertexFacts);
 		if (candidate === undefined || !validRebaseRow(registration, candidate)) return false;
 		const proof = candidate.authenticated.admitted.settlementSource;
+		if (proof === undefined) {
+			const nonportableThrough = completedNonportableReplacementChunk(
+				registration,
+				selected,
+				entry,
+				chunk,
+				candidate,
+				throughIntent
+			);
+			if (
+				nonportableThrough === undefined ||
+				!(await verifyNestedNativeSource(registration, row, vertexFacts, sharedAccounting))
+			)
+				return false;
+			throughIntent = nonportableThrough;
+			continue;
+		}
 		const record =
 			proof === undefined ? undefined : snapshotClosedRecord({ ...proof }, PORTABLE_SETTLEMENT_SOURCE_KEYS);
 		if (
@@ -15290,6 +15335,324 @@ async function authenticatedCompletedNativeReplacementSource(
 		throughIntent = record.throughIntent as number;
 	}
 	return entry.replacementProgress === undefined || throughIntent === entry.replacementProgress.intentCount;
+}
+
+/** Decision row 60: a non-creator author that the target still authorizes, with no creator
+ * selection, issues its replacement nonportable (issueReplacement): the replacement carries no
+ * settlementSource record. The original native plan entry names it, and its exact operations
+ * must be the source's permitted replacement operations for this chunk, derived again by the
+ * original policy (deriveOwnedReplacement), with the plan's disposition and refusal. Native
+ * completion for local recovery only; no recipient ever sees a portable exception for it.
+ * @returns The chunk's end intent, or undefined when it is not that exact replacement. */
+function completedNonportableReplacementChunk(
+	registration: V3PlaneRegistration,
+	selected: ClassifiedRebaseRow,
+	entry: SettlementPlan["entries"][number],
+	chunk: Readonly<{ replacementSequence: number; throughIntent?: number }>,
+	candidate: ClassifiedRebaseRow,
+	fromIntent: number
+): number | undefined {
+	const author = selected.row.scope.author;
+	const operation = candidate.authenticated.vertex.operation;
+	if (
+		resolveCreatorSettlementAuthor(registration.payload.trust.trust) === author ||
+		!isV3ApplicationAuthorAuthorized(registration.authorization, author) ||
+		candidate.authenticated.author !== author ||
+		candidate.authenticated.authorSequence !== chunk.replacementSequence ||
+		operation === undefined
+	)
+		return undefined;
+	const operations = applicationBatchEntries(registration.payload, operation) ?? [
+		{
+			operation: operation as Readonly<Record<string, unknown>>,
+			logicalTime: candidate.authenticated.admitted.logicalTime,
+		},
+	];
+	const progress = entry.replacementProgress;
+	const planEffect =
+		progress === undefined
+			? { kind: "replacement" as const, sourceSequence: selected.row.authorSequence }
+			: {
+					kind: "replacement" as const,
+					sourceSequence: selected.row.authorSequence,
+					fromIntent,
+					throughIntent: chunk.throughIntent ?? progress.intentCount,
+					intentDigest: progress.intentDigest,
+				};
+	let derived: NativeReplacementPreparation;
+	try {
+		derived = deriveOwnedReplacement(registration, selected, { operations, planEffect });
+	} catch {
+		// R6-A: a source older than the immediately closed epoch, whose ACL no longer resolves.
+		return olderSourcePolicyReplacementChunk(
+			registration,
+			selected,
+			entry,
+			operations,
+			fromIntent,
+			"throughIntent" in planEffect ? planEffect.throughIntent : undefined
+		)
+			? fromIntent + operations.length
+			: undefined;
+	}
+	if (
+		derived.disposition !== entry.disposition ||
+		!sameBytes(
+			encodeCanonical(entry.transformRefusal?.proposedIntentDigest ?? null),
+			encodeCanonical(derived.transformRefusal?.proposedIntentDigest ?? null)
+		)
+	)
+		return undefined;
+	return fromIntent + operations.length;
+}
+
+/** Decision row 60 (R6, owner's R6-A): completion of a nonportable replacement chunk whose source
+ * is older than the immediately closed epoch. deriveOwnedReplacement needs the source epoch's ACL
+ * (resolveVerifiedHistoricalSourceAcl), which resolves only for the immediately closed epoch, so
+ * it refuses every older source, and a Writer whose replacement missed the next Cut was refused
+ * at every later install. The source stays authenticated by the census's own classification (a
+ * displaced row of this registration's author); the caller still requires a current non-creator
+ * Writer, the original plan entry naming each replacement row, and each row's own authentication.
+ * The chunk's operations must equal this slice of the original immutable policy's derivation from
+ * the source's operations (derivePolicyReplacement) or, for the plan's recorded admission refusal,
+ * of the source's own operations under that derivation's proposal digest, with the plan's
+ * disposition. Native completion for local recovery only, as completedNonportableReplacementChunk.
+ * @returns Whether the chunk is exactly that replacement. */
+function olderSourcePolicyReplacementChunk(
+	registration: V3PlaneRegistration,
+	selected: ClassifiedRebaseRow,
+	entry: SettlementPlan["entries"][number],
+	operations: readonly Readonly<{ operation: Readonly<Record<string, unknown>> }>[],
+	fromIntent: number,
+	throughIntent: number | undefined
+): boolean {
+	try {
+		const payload = registration.payload;
+		const policy = payload.input.settlementPolicy;
+		const sourceEpoch = selected.authenticated.admitted.epoch;
+		const sourceOperation = selected.authenticated.vertex.operation;
+		if (
+			!currentRegistration(registration) ||
+			policy === undefined ||
+			policy.blueprintDigest !== payload.provenance.blueprintDigest ||
+			selected.kind !== "displaced" ||
+			selected.authenticated.author !== registration.issuanceScope.author ||
+			!NumberIsSafeInteger(sourceEpoch) ||
+			sourceEpoch >= payload.provenance.epoch - 1 ||
+			sourceOperation === undefined ||
+			isControlOperation(sourceOperation, payload.trust.trust.profileId) ||
+			Reflect.get(sourceOperation, "action") === "acl"
+		)
+			return false;
+		const intents = rebaseIntents(payload, selected.authenticated);
+		const sourceOperations = intents?.map((intent) => detachedCanonicalOperation(intent.operation));
+		if (
+			sourceOperations === undefined ||
+			sourceOperations.length === 0 ||
+			sourceOperations.some((operation) => operation === undefined)
+		)
+			return false;
+		const original = sourceOperations as readonly Readonly<Record<string, unknown>>[];
+		const derived = derivePolicyReplacement(policy, original);
+		if (!sameBytes(encodeCanonical(derived), encodeCanonical(derivePolicyReplacement(policy, original)))) return false;
+		const refusal = entry.transformRefusal;
+		if (
+			refusal !== undefined &&
+			(derived.disposition !== "transform" ||
+				!sameBytes(
+					refusal.proposedIntentDigest,
+					hashDomain(
+						"ts-drp/settlement-transform-proposal/v1",
+						encodeCanonical(derived.operations, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS)
+					)
+				))
+		)
+			return false;
+		if (derived.disposition !== entry.disposition) return false;
+		const expected = refusal === undefined ? derived.operations : original;
+		const end = throughIntent ?? expected.length;
+		return (
+			fromIntent >= 0 &&
+			end <= expected.length &&
+			end - fromIntent === operations.length &&
+			sameBytes(
+				encodeCanonical(operations.map((value) => value.operation)),
+				encodeCanonical(expected.slice(fromIntent, end))
+			)
+		);
+	} catch {
+		return false;
+	}
+}
+
+/** Decision row 60 (R5): the application operations one vertex operation carries, as
+ * rebaseIntents and completedNonportableReplacementChunk read them; undefined for control. */
+function replacedSourceOperations(
+	payload: PreparedV3LivePayload,
+	operation: unknown
+): readonly Readonly<Record<string, unknown>>[] | undefined {
+	if (!isObject(operation) || ArrayIsArray(operation)) return undefined;
+	const action = Reflect.get(operation, "action");
+	if (isControlOperation(operation, payload.trust.trust.profileId) || action === "acl") return undefined;
+	if (action === APPLICATION_BATCH_ACTION) return applicationBatchEntries(payload, operation)?.map((entry) => entry.operation);
+	if (typeof action === "string" && isReservedBatchAction(action) && settlementProfileFor(payload.trust.trust.profileId) !== "v1")
+		return undefined;
+	const detached = detachedCanonicalOperation(operation);
+	return detached === undefined ? undefined : [detached];
+}
+
+/**
+ * Decision row 60 (R5): a local source this author replaced, read for journal retirement
+ * only. Requires the source's original issued bytes at the journal row's exact digest, a
+ * completed rebase/transform entry for it in this author's own settlement plan, and every
+ * replacement row that entry names: this author, a later sequence and epoch, no other
+ * settlement source, and together exactly the operations the original immutable settlement
+ * policy derives from the source (deriveOwnedReplacement's derivation; for a recorded
+ * admission refusal, the source's own operations under that derivation's proposal digest).
+ * Data, not authority: the journal classifier authenticates the source against its closed
+ * ACL and requires every returned replacement digest in a later signed Cut.
+ * R7: a row that is this author's own settlement fence (version 1, fenceSequence equal to its own
+ * sequence) has no plan entry and no replacement; it is returned with its original bytes, marked
+ * as a fence, and the classifier requires a later own fence in a later signed Cut.
+ * @returns The source bytes and replacement digests, or undefined when not exactly that.
+ */
+async function replacedLocalSourceFacts(
+	registration: V3PlaneRegistration,
+	source: CreatorReplacedLocalSource
+): Promise<CreatorReplacedLocalSourceRead | undefined> {
+	try {
+		const scope = registration.issuanceScope;
+		const payload = registration.payload;
+		const policy = payload.input.settlementPolicy;
+		if (
+			!currentRegistration(registration) ||
+			policy === undefined ||
+			policy.blueprintDigest !== payload.provenance.blueprintDigest ||
+			source.author !== scope.author ||
+			!NumberIsSafeInteger(source.authorSequence) ||
+			source.authorSequence < 0
+		)
+			return undefined;
+		const store = creatorOriginalIssuanceStore(registration);
+		const sourceRow = outboxRowSnapshot(
+			{ commit: await store.readIssued(scope, source.authorSequence), publishState: "pending" },
+			scope
+		);
+		if (
+			sourceRow === undefined ||
+			sourceRow.authorSequence !== source.authorSequence ||
+			lowerHexDigest(hashDomain(V3_VERTEX_DOMAIN, sourceRow.canonicalPreimageBytes)) !== source.vertexDigest ||
+			lowerHexDigest(sourceRow.digest) !== source.vertexDigest
+		)
+			return undefined;
+		const sourceVertex = decodeCanonical(sourceRow.canonicalPreimageBytes);
+		const sourceOperation = isObject(sourceVertex) ? Reflect.get(sourceVertex, "operation") : undefined;
+		if (isObject(sourceVertex) && isObject(sourceOperation) && isAuthorFenceOperation(sourceOperation)) {
+			// The decoded operation is a null-prototype record: exactly the three fence fields.
+			if (
+				ReflectOwnKeys(sourceOperation).length !== 3 ||
+				Reflect.get(sourceOperation, "version") !== 1 ||
+				Reflect.get(sourceOperation, "fenceSequence") !== source.authorSequence ||
+				Reflect.get(sourceVertex, "author") !== scope.author ||
+				Reflect.get(sourceVertex, "authorSequence") !== source.authorSequence ||
+				Reflect.get(sourceVertex, "objectId") !== scope.objectId
+			)
+				return undefined;
+			return ObjectFreeze({
+				exactCanonicalPreimageBytes: new Uint8ArrayConstructor(sourceRow.canonicalPreimageBytes),
+				detachedSignature: new Uint8ArrayConstructor(sourceRow.signature),
+				replacementVertexDigests: ObjectFreeze([]),
+				authorFence: true as const,
+			});
+		}
+		const sourceEpoch = isObject(sourceVertex) ? Reflect.get(sourceVertex, "epoch") : undefined;
+		const sourceOperations = isObject(sourceVertex) ? replacedSourceOperations(payload, sourceOperation) : undefined;
+		if (!NumberIsSafeInteger(sourceEpoch) || sourceOperations === undefined || sourceOperations.length === 0)
+			return undefined;
+		const plan = await store.readSettlementPlan(scope);
+		const entries = plan?.entries.filter((value) => value.sourceSequence === source.authorSequence) ?? [];
+		const entry = entries[0];
+		if (
+			entries.length !== 1 ||
+			entry === undefined ||
+			entry.replacementSequence === null ||
+			(entry.disposition !== "rebase" && entry.disposition !== "transform") ||
+			!sameBytes(entry.sourceDigest, sourceRow.digest)
+		)
+			return undefined;
+		const derived = derivePolicyReplacement(policy, sourceOperations);
+		if (!sameBytes(encodeCanonical(derived), encodeCanonical(derivePolicyReplacement(policy, sourceOperations))))
+			return undefined;
+		const refusal = entry.transformRefusal;
+		if (
+			refusal !== undefined &&
+			(derived.disposition !== "transform" ||
+				!sameBytes(
+					refusal.proposedIntentDigest,
+					hashDomain(
+						"ts-drp/settlement-transform-proposal/v1",
+						encodeCanonical(derived.operations, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS)
+					)
+				))
+		)
+			return undefined;
+		if (derived.disposition !== entry.disposition) return undefined;
+		const expected = refusal === undefined ? derived.operations : sourceOperations;
+		const chunks = entry.replacementProgress?.chunks ?? [{ replacementSequence: entry.replacementSequence }];
+		if (chunks.length === 0 || chunks.length > payload.parameters.maxEpochVertices) return undefined;
+		const replaced: Readonly<Record<string, unknown>>[] = [];
+		const replacementVertexDigests: string[] = [];
+		for (const chunk of chunks) {
+			const row = outboxRowSnapshot(
+				{ commit: await store.readIssued(scope, chunk.replacementSequence), publishState: "pending" },
+				scope
+			);
+			const digest = row === undefined ? undefined : lowerHexDigest(hashDomain(V3_VERTEX_DOMAIN, row.canonicalPreimageBytes));
+			const vertex = row === undefined ? undefined : decodeCanonical(row.canonicalPreimageBytes);
+			if (
+				row === undefined ||
+				digest === undefined ||
+				digest !== lowerHexDigest(row.digest) ||
+				!isObject(vertex) ||
+				row.authorSequence !== chunk.replacementSequence ||
+				row.authorSequence <= source.authorSequence ||
+				Reflect.get(vertex, "author") !== scope.author ||
+				Reflect.get(vertex, "objectId") !== scope.objectId ||
+				!NumberIsSafeInteger(Reflect.get(vertex, "epoch")) ||
+				(Reflect.get(vertex, "epoch") as number) <= sourceEpoch
+			)
+				return undefined;
+			const descriptor = Reflect.get(vertex, "settlementSource");
+			if (descriptor !== undefined) {
+				const record = isObject(descriptor)
+					? snapshotClosedRecord({ ...descriptor }, PORTABLE_SETTLEMENT_SOURCE_KEYS)
+					: undefined;
+				if (
+					record === undefined ||
+					record.sourceObjectId !== scope.objectId ||
+					record.sourceAuthor !== scope.author ||
+					record.sourceSequence !== source.authorSequence ||
+					record.sourceDigest !== source.vertexDigest
+				)
+					return undefined;
+			}
+			const operation = Reflect.get(vertex, "operation");
+			const operations = applicationBatchEntries(payload, operation)?.map((value) => value.operation) ?? [operation];
+			for (const value of operations) {
+				if (!isObject(value)) return undefined;
+				replaced.push(value as Readonly<Record<string, unknown>>);
+			}
+			replacementVertexDigests.push(digest);
+		}
+		if (!sameBytes(encodeCanonical(replaced), encodeCanonical(expected))) return undefined;
+		return ObjectFreeze({
+			exactCanonicalPreimageBytes: new Uint8ArrayConstructor(sourceRow.canonicalPreimageBytes),
+			detachedSignature: new Uint8ArrayConstructor(sourceRow.signature),
+			replacementVertexDigests: ObjectFreeze(replacementVertexDigests),
+		});
+	} catch {
+		return undefined;
+	}
 }
 
 /** Bounded original native linked-source custody; never portable wire authority. */
@@ -15445,6 +15808,32 @@ function rebaseIntents(
 			]);
 }
 
+/** One invocation of the original immutable settlement policy over detached source operations. */
+function derivePolicyReplacement(
+	policy: V3LocalSettlementPolicy,
+	operations: readonly Readonly<Record<string, unknown>>[]
+): ReturnType<V3LocalSettlementPolicy["derive"]> {
+	const argument = operations.map((operation) => {
+		const copied = detachedCanonicalOperation(operation);
+		if (copied === undefined) throw new TypeError("replacement source operation copy is invalid");
+		return copied;
+	});
+	const raw = policy.derive(ObjectFreeze(argument));
+	const decoded = decodeCanonical(
+		encodeCanonical(raw, { maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes, maxDepth: 16, maxItems: 65536 })
+	);
+	const record = canonicalRecord(decoded, ["operations", "disposition"]);
+	if (
+		record === undefined ||
+		(record.disposition !== "rebase" && record.disposition !== "transform") ||
+		!ArrayIsArray(record.operations) ||
+		record.operations.length < 1 ||
+		record.operations.length > SETTLEMENT_REPLACEMENT_MAX_INTENTS
+	)
+		throw new TypeError("replacement policy result is invalid");
+	return record as unknown as ReturnType<V3LocalSettlementPolicy["derive"]>;
+}
+
 /** The prepared local application and original authenticated source own semantics. */
 function deriveOwnedReplacement(
 	registration: V3PlaneRegistration,
@@ -15503,27 +15892,8 @@ function deriveOwnedReplacement(
 	const operations = intents.map((intent) => detachedCanonicalOperation(intent.operation));
 	if (operations.some((operation) => operation === undefined))
 		throw new TypeError("replacement source operations are invalid");
-	const derive = (): ReturnType<V3LocalSettlementPolicy["derive"]> => {
-		const argument = operations.map((operation) => {
-			const copied = detachedCanonicalOperation(operation);
-			if (copied === undefined) throw new TypeError("replacement source operation copy is invalid");
-			return copied;
-		});
-		const raw = policy.derive(ObjectFreeze(argument));
-		const decoded = decodeCanonical(
-			encodeCanonical(raw, { maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes, maxDepth: 16, maxItems: 65536 })
-		);
-		const record = canonicalRecord(decoded, ["operations", "disposition"]);
-		if (
-			record === undefined ||
-			(record.disposition !== "rebase" && record.disposition !== "transform") ||
-			!ArrayIsArray(record.operations) ||
-			record.operations.length < 1 ||
-			record.operations.length > SETTLEMENT_REPLACEMENT_MAX_INTENTS
-		)
-			throw new TypeError("replacement policy result is invalid");
-		return record as unknown as ReturnType<V3LocalSettlementPolicy["derive"]>;
-	};
+	const derive = (): ReturnType<V3LocalSettlementPolicy["derive"]> =>
+		derivePolicyReplacement(policy, operations as readonly Readonly<Record<string, unknown>>[]);
 	let derived: NativeReplacementPreparation = derive();
 	if (!sameBytes(encodeCanonical(derived), encodeCanonical(derive())))
 		throw new TypeError("replacement policy is unstable");
@@ -15976,64 +16346,84 @@ async function readRebaseOutbox(
 						registration.currentReplacementCustody = custody;
 						// The existing dependency read is fully joined before entering write custody.
 						let settlementAuthorization: Readonly<Record<string, unknown>> | undefined;
-						await withActiveRebaseDependencies(
-							registration,
-							heldSource,
-							(read) =>
-								read.checkWhile(() => {
-									settlementAuthorization = preparePortableSettlementSource(
-										registration,
-										heldSource,
-										owned,
-										read.readExactCanonicalCensus()
-									);
-									return Promise.resolve();
-								}),
-							custody
-						);
-						if (settlementAuthorization === undefined)
-							throw new TypeError("portable replacement source preparation is unavailable");
-						const selectionBytes = creatorSettlementSelectionBytes(settlementAuthorization);
-						const selectionDigest = hashDomain("ts-drp/settlement-source-selection/v1", selectionBytes);
 						const creator = resolveCreatorSettlementAuthor(registration.payload.trust.trust);
-						let selectionSignature =
-							creatorSelection !== undefined && sameBytes(creatorSelection.digest, selectionDigest)
-								? creatorSelection.signature
-								: undefined;
-						if (selectionSignature === undefined && creator === registration.issuanceScope.author) {
-							await withActiveRebaseDependencies(registration, heldSource, read => read.checkWhile(async () => {
-								const exact = preparePortableSettlementSource(registration, heldSource, owned, read.readExactCanonicalCensus());
-								if (!sameBytes(creatorSettlementSelectionBytes(exact), selectionBytes)) throw new TypeError("creator selection native source changed");
-								const target = creatorSelectionProposalTarget(registration, selectionBytes);
-								const valid = (): boolean => currentRegistration(registration) && verifyPortableSettlementSource(registration, target, registration.closeVertices, false, new Set(), true);
-								selectionSignature = await withOwnedCreatorSelectionRequest(registration, custody!, read, selectionBytes, valid,
-									request => owned.signRegisteredVertexDigest(new Uint8ArrayConstructor(selectionDigest), request));
-							}), custody, [selectionBytes, new Uint8ArrayConstructor(64)]);
-						}
-						if (
-							selectionSignature !== undefined &&
-							!verifyCreatorSettlementSourceSelection(
-								registration.payload.trust.trust,
-								selectionBytes,
-								selectionSignature
+						// With no creator selection, a non-creator author that the target still
+						// authorizes issues its replacement nonportable, exactly as the portable
+						// path below ends for it ("Null is explicitly nonportable"). No recipient
+						// ever sees a portable record, so neither the record nor the dependency
+						// read that only it consumes is prepared: the record's closure can reach
+						// other authors' rows of the sealed epoch, which this author's census
+						// never holds, and the read cannot classify a source this drain already
+						// replaced nonportably. The exact native source, plan effect, floor and
+						// write custody of issueLocal are unchanged.
+						const nonportable =
+							creatorSelection === undefined &&
+							creator !== registration.issuanceScope.author &&
+							isV3ApplicationAuthorAuthorized(registration.authorization, registration.issuanceScope.author);
+						if (nonportable) {
+							outcome = await issueLocal(
+								registration,
+								ObjectFreeze({ ...owned, settlementCustody: custody, settlementAuthorization: undefined })
+							);
+						} else {
+							await withActiveRebaseDependencies(
+								registration,
+								heldSource,
+								(read) =>
+									read.checkWhile(() => {
+										settlementAuthorization = preparePortableSettlementSource(
+											registration,
+											heldSource,
+											owned,
+											read.readExactCanonicalCensus()
+										);
+										return Promise.resolve();
+									}),
+								custody
+							);
+							if (settlementAuthorization === undefined)
+								throw new TypeError("portable replacement source preparation is unavailable");
+							const selectionBytes = creatorSettlementSelectionBytes(settlementAuthorization);
+							const selectionDigest = hashDomain("ts-drp/settlement-source-selection/v1", selectionBytes);
+							let selectionSignature =
+								creatorSelection !== undefined && sameBytes(creatorSelection.digest, selectionDigest)
+									? creatorSelection.signature
+									: undefined;
+							if (selectionSignature === undefined && creator === registration.issuanceScope.author) {
+								await withActiveRebaseDependencies(registration, heldSource, read => read.checkWhile(async () => {
+									const exact = preparePortableSettlementSource(registration, heldSource, owned, read.readExactCanonicalCensus());
+									if (!sameBytes(creatorSettlementSelectionBytes(exact), selectionBytes)) throw new TypeError("creator selection native source changed");
+									const target = creatorSelectionProposalTarget(registration, selectionBytes);
+									const valid = (): boolean => currentRegistration(registration) && verifyPortableSettlementSource(registration, target, registration.closeVertices, false, new Set(), true);
+									selectionSignature = await withOwnedCreatorSelectionRequest(registration, custody!, read, selectionBytes, valid,
+										request => owned.signRegisteredVertexDigest(new Uint8ArrayConstructor(selectionDigest), request));
+								}), custody, [selectionBytes, new Uint8ArrayConstructor(64)]);
+							}
+							if (
+								selectionSignature !== undefined &&
+								!verifyCreatorSettlementSourceSelection(
+									registration.payload.trust.trust,
+									selectionBytes,
+									selectionSignature
+								)
 							)
-						)
-							throw new TypeError("explicit creator selection differs from exact source/target");
-						// Null is explicitly nonportable. Exact native source/plan ownership still
-						// permits original local recovery, but never a foreign-recipient exception.
-						settlementAuthorization =
-							selectionSignature === undefined &&
-							isV3ApplicationAuthorAuthorized(registration.authorization, registration.issuanceScope.author)
-								? undefined
-								: ObjectFreeze({
-										...settlementAuthorization,
-										creatorSelectionSignature:
-											selectionSignature === undefined ? null : new Uint8ArrayConstructor(selectionSignature),
-									});
-						outcome = await issueLocal(
-							registration,
-							ObjectFreeze({ ...owned, settlementCustody: custody, settlementAuthorization })
-						);
+								throw new TypeError("explicit creator selection differs from exact source/target");
+							// Null is explicitly nonportable. Exact native source/plan ownership still
+							// permits original local recovery, but never a foreign-recipient exception.
+							settlementAuthorization =
+								selectionSignature === undefined &&
+								isV3ApplicationAuthorAuthorized(registration.authorization, registration.issuanceScope.author)
+									? undefined
+									: ObjectFreeze({
+											...settlementAuthorization,
+											creatorSelectionSignature:
+												selectionSignature === undefined ? null : new Uint8ArrayConstructor(selectionSignature),
+										});
+							outcome = await issueLocal(
+								registration,
+								ObjectFreeze({ ...owned, settlementCustody: custody, settlementAuthorization })
+							);
+						}
 					} catch (error) {
 						outcome = localIssueFailure(
 							"authorization-rejected",
@@ -19476,21 +19866,144 @@ async function readCreatorClosedArchiveSource(registration: V3PlaneRegistration,
 }
 
 /**
+ * Decision row 60 (R5): a recipient Writer's moves made during the creator's seal reach its
+ * own graph but not the Cut. An author's moves chain (each depends on the frontier its last
+ * move joined), so the Cut holds a prefix of this author's rows. The candidate is the graph
+ * without this author's last `count - cut` local rows, only when no remaining vertex depends
+ * on one of them. It is a candidate, never membership: the caller records it only when its
+ * close-set commitment equals the signed Cut's exactly.
+ * @returns The candidate frontier, byte charges and members, or undefined.
+ */
+function creatorReceivedCutCandidate(
+	registration: V3PlaneRegistration,
+	source: Readonly<{ graph: CreatorCloseGraph; rows: readonly CreatorReplayRow[] }>,
+	cutCount: unknown
+): Readonly<{ frontier: string[]; charges: Map<string, number>; members: ReadonlySet<string> }> | undefined {
+	const graph = source.graph;
+	if (!NumberIsSafeInteger(cutCount) || (cutCount as number) < 1) return undefined;
+	const outside = graph.charges.size - (cutCount as number);
+	const author = registration.issuanceScope.author;
+	const local: Readonly<{ digest: string; sequence: number }>[] = [];
+	for (const row of source.rows) {
+		const identity = graph.authors.get(row.digest);
+		if (row.sourceKind === "local-issued" && identity?.author === author)
+			local.push(ObjectFreeze({ digest: row.digest, sequence: identity.authorSequence }));
+	}
+	if (outside < 1 || local.length < outside) return undefined;
+	local.sort((left, right) => right.sequence - left.sequence);
+	return creatorReceivedCutWithout(registration, graph, new Set(local.slice(0, outside).map((row) => row.digest)));
+}
+
+/**
+ * Decision row 60 (R5b, owner's B2): another Writer's move made during the creator's seal can
+ * reach this recipient, still in the sealed epoch, and so its graph, but not the Cut. The
+ * successor's creator-signed settlement record names, per author of the successor ACL, the
+ * last author sequence of the closed epoch's contiguous run (terminalThrough); every row of a
+ * named author beyond it is outside the Cut. The candidate is the graph without those rows,
+ * only when no remaining vertex depends on one of them. The record is a hint here, never
+ * membership: the caller records the candidate only when its close-set commitment equals the
+ * signed Cut's exactly. An author the record does not name keeps all its rows, so an outside
+ * row of such an author leaves the commitment unequal and the scope retained.
+ * @returns The candidate frontier, byte charges and members, or undefined.
+ */
+function creatorReceivedFrontierCandidate(
+	registration: V3PlaneRegistration,
+	graph: CreatorCloseGraph,
+	terminalThrough: ReadonlyMap<string, number | null>
+): Readonly<{ frontier: string[]; charges: Map<string, number>; members: ReadonlySet<string> }> | undefined {
+	const excluded = new Set<string>();
+	for (const [digest, identity] of graph.authors) {
+		if (!terminalThrough.has(identity.author)) continue;
+		const through = terminalThrough.get(identity.author);
+		if (through === null || through === undefined || identity.authorSequence > through) excluded.add(digest);
+	}
+	return excluded.size === 0 ? undefined : creatorReceivedCutWithout(registration, graph, excluded);
+}
+
+/**
+ * Decision row 60 (R5b): the per-author terminalThrough of the successor's creator-signed
+ * settlement record that closes this scope, read as DATA for creatorReceivedFrontierCandidate.
+ * The installer has already opened and authenticated these exact bytes; this reader confers
+ * nothing and any shape it does not recognize yields no hint.
+ * @returns The authors' terminalThrough, or undefined.
+ */
+function creatorReceivedSettlementTerminalThrough(
+	exactCanonicalSettlementBytes: Uint8Array | null | undefined,
+	scope: LiveJournalScope
+): ReadonlyMap<string, number | null> | undefined {
+	if (!(exactCanonicalSettlementBytes instanceof Uint8ArrayConstructor)) return undefined;
+	try {
+		const settlement = decodeCanonical(exactCanonicalSettlementBytes);
+		if (!isObject(settlement) || ownDataValue(settlement, "kind") !== CREATOR_AUTHOR_SETTLEMENT_KIND ||
+			ownDataValue(settlement, "objectId") !== scope.objectId || ownDataValue(settlement, "closedEpoch") !== scope.epoch ||
+			ownDataValue(settlement, "closedAnchorDigest") !== scope.anchorDigest) return undefined;
+		const frontiers = ownDataValue(settlement, "frontiers");
+		if (!ArrayIsArray(frontiers)) return undefined;
+		const terminalThrough = new IntrinsicMap<string, number | null>();
+		for (const entry of frontiers as unknown[]) {
+			if (!ArrayIsArray(entry) || entry.length !== 3) return undefined;
+			const [author, , through] = entry as unknown[];
+			if (typeof author !== "string" || terminalThrough.has(author) ||
+				(through !== null && (!NumberIsSafeInteger(through) || (through as number) < 0))) return undefined;
+			terminalThrough.set(author, through as number | null);
+		}
+		return terminalThrough;
+	} catch {
+		return undefined;
+	}
+}
+
+/** The graph without `excluded`, only when no remaining vertex depends on an excluded one. */
+function creatorReceivedCutWithout(
+	registration: V3PlaneRegistration,
+	graph: CreatorCloseGraph,
+	excluded: ReadonlySet<string>
+): Readonly<{ frontier: string[]; charges: Map<string, number>; members: ReadonlySet<string> }> | undefined {
+	const members = new Set<string>();
+	const dependedOn = new Set<string>();
+	const charges = new IntrinsicMap<string, number>();
+	for (const [digest, charge] of graph.charges) {
+		if (excluded.has(digest)) continue;
+		const vertex = graph.vertices.get(digest);
+		if (vertex === undefined) return undefined;
+		for (const dependency of vertex.dependencies) {
+			if (excluded.has(dependency)) return undefined;
+			dependedOn.add(dependency);
+		}
+		members.add(digest);
+		charges.set(digest, charge);
+	}
+	const frontier = [...members].filter((digest) => !dependedOn.has(digest));
+	return ObjectFreeze({
+		frontier: frontier.length === 0 ? [registration.payload.provenance.anchorDigest] : frontier,
+		charges,
+		members,
+	});
+}
+
+/**
  * Recipient twin of the creator's close-time membership capture. Inside the held
  * received gate, the recipient derives the deterministic close-set commitment of its
  * OWN complete current-epoch graph and records the native carrier only when that
  * commitment equals the caller's authenticated Cut exactly. The carrier is lifecycle
  * evidence, never authority: journal retirement still reopens it against a later
  * independently authenticated Cut/ACL and re-verifies every original signature.
- * Any disagreement (missing or extra rows, changed graph, refused native write) records
+ * Decision row 60 (R5, R5b): when the whole graph differs, the graph without every author's
+ * rows beyond the successor's creator-signed terminalThrough (creatorReceivedFrontierCandidate)
+ * and then the graph without this author's own moves outside the Cut
+ * (creatorReceivedCutCandidate) are tried, each under the same exact Cut equality; the carrier
+ * then holds the Cut's membership and witnesses only.
+ * Any other disagreement (missing or extra rows, changed graph, refused native write) records
  * nothing, so the scope keeps its original retention.
  * @param registration - Genuine recipient registration holding its received gate.
  * @param exactCanonicalCutValueBytes - The Cut that closes this registration's epoch.
+ * @param exactCanonicalSettlementBytes - The successor's authenticated settlement record, if any.
  * @returns Whether an exact carrier is now recorded for this scope.
  */
 async function recordCreatorReceivedClosedMembership(
 	registration: V3PlaneRegistration,
-	exactCanonicalCutValueBytes: Uint8Array
+	exactCanonicalCutValueBytes: Uint8Array,
+	exactCanonicalSettlementBytes?: Uint8Array | null
 ): Promise<boolean> {
 	try {
 		const payload = registration.payload;
@@ -19511,25 +20024,49 @@ async function recordCreatorReceivedClosedMembership(
 			ownDataValue(cut, "epoch") !== scope.epoch || ownDataValue(cut, "previousAnchor") !== scope.anchorDigest) return false;
 		const source = await readCreatorClosedArchiveSource(registration, undefined, true);
 		if (source === undefined || !available()) return false;
-		const commitment = await deriveCloseSetHistoryCommitment({
-			authenticatedCanonicalPreimageByteLengths: source.graph.charges,
+		const derive = (frontier: readonly string[], charges: ReadonlyMap<string, number>) => deriveCloseSetHistoryCommitment({
+			authenticatedCanonicalPreimageByteLengths: charges,
 			exactCanonicalEpochAnchorPreimageBytes: new Uint8ArrayConstructor(payload.input.exactCanonicalAnchorPreimageBytes),
-			frontier: source.graph.frontier,
+			frontier,
 			maxEpochBytes: payload.parameters.maxEpochBytes,
 			maxEpochVertices: payload.parameters.maxEpochVertices,
 			previousHistorySnapshot,
 			vertices: source.graph.vertices,
 		});
-		if (commitment.closeSetRoot !== ownDataValue(cut, "closeSetRoot") ||
-			commitment.closeSetCount !== ownDataValue(cut, "closeSetCount") ||
-			commitment.historyRoot !== ownDataValue(cut, "historyRoot") ||
-			commitment.historySize !== ownDataValue(cut, "historySize") || !available()) return false;
+		const cutEquals = (value: Awaited<ReturnType<typeof derive>>): boolean =>
+			value.closeSetRoot === ownDataValue(cut, "closeSetRoot") &&
+			value.closeSetCount === ownDataValue(cut, "closeSetCount") &&
+			value.historyRoot === ownDataValue(cut, "historyRoot") &&
+			value.historySize === ownDataValue(cut, "historySize");
+		let commitment = await derive(source.graph.frontier, source.graph.charges);
+		// Decision row 60 (R5, R5b): moves made after the creator's seal, this recipient's own or
+		// another Writer's that it admitted, are in its graph but not in the Cut. Only the signed
+		// Cut's exact commitment admits a candidate.
+		let members: ReadonlySet<string> | undefined;
+		if (!cutEquals(commitment)) {
+			const terminalThrough = creatorReceivedSettlementTerminalThrough(exactCanonicalSettlementBytes, scope);
+			const candidates = [
+				...(terminalThrough === undefined ? [] : [creatorReceivedFrontierCandidate(registration, source.graph, terminalThrough)]),
+				creatorReceivedCutCandidate(registration, source, ownDataValue(cut, "closeSetCount")),
+			];
+			for (const candidate of candidates) {
+				if (candidate === undefined || !available()) continue;
+				const derived = await derive(candidate.frontier, candidate.charges);
+				if (!cutEquals(derived)) continue;
+				commitment = derived;
+				members = candidate.members;
+				break;
+			}
+			if (members === undefined || !available()) return false;
+		}
+		if (!available()) return false;
 		const membershipBytes = await encodeCreatorCloseMembership({
 			exactCanonicalCutValueBytes: cutBytes,
 			exactCanonicalLatchedAclBytes: encodeCanonical(authorization.value),
 			commitment,
 			maxEpochVertices: payload.parameters.maxEpochVertices,
-			localVertexWitnesses: source.rows.filter((row) => row.sourceKind === "local-issued").map((row) => ObjectFreeze({
+			localVertexWitnesses: source.rows.filter((row) => row.sourceKind === "local-issued" &&
+				(members === undefined || members.has(row.digest))).map((row) => ObjectFreeze({
 				vertexDigest: row.digest,
 				exactCanonicalPreimageBytes: new Uint8ArrayConstructor(row.exactCanonicalPreimageBytes),
 				detachedSignature: new Uint8ArrayConstructor(row.detachedSignature),
@@ -19922,8 +20459,8 @@ function creatorCloseRegistration(
 					detachedSignature: new Uint8ArrayConstructor(row.detachedSignature),
 				})));
 		},
-		recordReceivedClosedMembership: (exactCanonicalCutValueBytes: Uint8Array) =>
-			recordCreatorReceivedClosedMembership(registration, exactCanonicalCutValueBytes),
+		recordReceivedClosedMembership: (exactCanonicalCutValueBytes: Uint8Array, exactCanonicalSettlementBytes?: Uint8Array | null) =>
+			recordCreatorReceivedClosedMembership(registration, exactCanonicalCutValueBytes, exactCanonicalSettlementBytes),
 		// The genuine claim may use a successor alias; the close owner is keyed
 		// by that exact handle, not the registration's underlying raw handle.
 		sealRecoveryDependencies: (required?: boolean) =>
@@ -19939,6 +20476,9 @@ function creatorCloseRegistration(
 			options?: Parameters<V3CreatorCloseRegistration["runReceivedRecoveryMaintenance"]>[3]
 		) => runCreatorReceivedRecoveryMaintenance(registration,
 			() => sealCreatorReceivedRecoveryDependencies(registration, closePlane, signing, snapshots), consume, options),
+		// Private, negative scheduling hint read at each call, so a reopen, rollover or replaced
+		// source is reflected at once (decision row 73).
+		hasMigrationSourceForOrdinaryPrime: (): boolean => migrationDisplacedSource(registration) !== undefined,
 		sealIssuanceMaintenanceDependencies: (receipt?: object) => {
 			const received = receipt === undefined ? undefined : receivedAppendFacts(registration, receipt);
 			return sealCreatorRecoveryDependencies(registration, true, undefined, closePlane,
