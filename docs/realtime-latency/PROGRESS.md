@@ -26,9 +26,9 @@ rollback base, exact projection and subsequent useful issue, plus a physical
 custody census that distinguishes the extra source-floor header.
 
 The current-proof 512-offer capacity gate and final 300-epoch campaigns remain
-pending. Campaign preparation is preserved at
-`/private/tmp/ts-drp-final-campaign-preparation` and
-`/private/tmp/ts-drp-final-campaign-config`; refresh the checkout to the final
+pending. [Saved campaign preparation and unfinished rollback design](../../.logs/realtime-resume-2026-10-23/endurance-preparation/rollback-design.md)
+include exact copies of the configs and manifest. The prepared checkout remains
+at `/private/tmp/ts-drp-final-campaign-preparation`; refresh it to the final
 reviewed composition and affected preflight before launch. Fresh-build every
 runtime owner and record actual resolved module paths and compiled hashes, since
 a correct source HEAD alone did not prevent a stale package export. Reopen at
