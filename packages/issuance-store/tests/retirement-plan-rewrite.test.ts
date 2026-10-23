@@ -1,4 +1,4 @@
-import { encodeCanonical, decodeCanonical } from "@ts-drp/canonical";
+import { encodeCanonical, decodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { describe, expect, it } from "vitest";
 import {
 	assertIssuanceRetirementPreparationRows,
@@ -15,6 +15,7 @@ import {
 	type IssuanceRetirementRows,
 } from "../src/retirement.js";
 import { d109bCommit } from "../../../tests/fixtures/phase-6b/issuance-retention-contract.js";
+import { copySettlementPlan, assertSettlementPlanProgressTransition } from "../src/contract.js";
 
 const scope = {objectId: "retirement-room", author: "writer"};
 const control: DurableIssuanceRetirementControl = {kind: "v3-issuance-retirement-control-1", objectId: scope.objectId,
@@ -41,6 +42,34 @@ function prepare(rows: IssuanceRetirementRows, sequences: number[]): DurableIssu
 }
 
 describe("native retirement plan law", () => {
+	it("retains shared source proof through its last consumer and rejects substituted or orphaned references", () => {
+		const original = fixture();
+		const contexts = [0, 1].map(source => {const bytes = encodeCanonical({source});
+			return {digest: hashDomain("ts-drp/settlement-source-context/v1", bytes), exactCanonicalContextBytes: bytes};});
+		const plan = {...original.plans[0]!, sourceContexts: [...contexts].sort((a,b) => Buffer.compare(a.digest,b.digest)),
+			entries: original.plans[0]!.entries.map((entry,index) => ({...entry, sourceContextDigest: contexts[index === 2 ? 1 : 0]!.digest}))};
+		const rows = {...original, plans: [plan]};
+		const copied = copySettlementPlan(plan, scope)!;
+		expect(copied).toEqual(plan);
+		expect(copied.sourceContexts![0]!.exactCanonicalContextBytes).not.toBe(plan.sourceContexts[0]!.exactCanonicalContextBytes);
+		const partial = issuanceRetirementCommitRows(control, prepare(rows, [2]), rows).plans[0]!;
+		expect(partial.entries.map(entry => entry.sourceSequence)).toEqual([2]);
+		expect(partial.sourceContexts).toEqual([contexts[1]]);
+		const complete = issuanceRetirementCommitRows(control, prepare(rows, []), rows).plans[0]!;
+		expect(complete.entries).toEqual([]);
+		expect(complete.sourceContexts).toBeUndefined();
+		const heldRows = {...rows, plans: [{...plan, entries: plan.entries.map((entry,index) => index === 0 ?
+			{...entry, disposition: "manual-review" as const, replacementSequence: null} : entry)}]};
+		const held = issuanceRetirementCommitRows(control, prepare(heldRows, []), heldRows).plans[0]!;
+		expect(held.entries.map(entry => entry.sourceSequence)).toEqual([0]);
+		expect(held.sourceContexts).toEqual([contexts[0]]);
+		expect(copySettlementPlan({...plan, sourceContexts: [contexts[0]]}, scope)).toBeUndefined();
+		expect(copySettlementPlan({...plan, sourceContexts: [...plan.sourceContexts, plan.sourceContexts[0]]}, scope)).toBeUndefined();
+		expect(copySettlementPlan({...plan, sourceContexts: plan.sourceContexts.map(context => ({...context,
+			exactCanonicalContextBytes: encodeCanonical({source: "swapped"})}))}, scope)).toBeUndefined();
+		const unbound = {...plan, entries: plan.entries.map(({sourceContextDigest: _source, ...entry}) => entry), sourceContexts: undefined};
+		expect(() => assertSettlementPlanProgressTransition(plan, unbound)).toThrow("retained source changed");
+	});
 	it("closes retained replacement chains to a fixed point", () => {
 		const rows = fixture(), p = prepare(rows, [0]);
 		expect(p.protectedRecords.map(value => value.authorSequence)).toEqual([0, 1, 2, 3]);

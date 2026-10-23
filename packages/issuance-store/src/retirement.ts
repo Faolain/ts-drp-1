@@ -7,6 +7,7 @@ import {
 	copyDurableIssuanceBytes,
 	copyDurableIssueScope,
 	copySettlementPlan,
+	settlementSourceContextsForEntries,
 	copySettlementPlanEffect,
 	createDurableIssuanceFailure,
 	DurableIssuanceInvalidArgumentError,
@@ -133,6 +134,133 @@ export interface IssuanceUnsignedPhaseWidths {
 	readonly canonicalRowBytes: readonly number[];
 	readonly encodedControlBytes: number;
 	readonly nativeCensusBytes: number;
+}
+
+/** A numerical alternative for retaining accepted source work after a future
+ * authenticated checkpoint. This is not a plan, source proof or disposition. */
+export interface IssuanceSourceCustodyGeometry {
+	readonly maxContextByteLength: number;
+	readonly maxNativeReadByteLength: number;
+}
+
+export const CANONICAL_SETTLEMENT_PLAN_STORAGE_KIND = "canonical-settlement-plan-1";
+/** Exact ASCII JSON/base64 width used by the native whole-plan carrier. */
+export function issuanceCanonicalSettlementPlanStorageByteLength(canonicalByteLength: number): number {
+	if (!Number.isSafeInteger(canonicalByteLength) || canonicalByteLength < 1 ||
+		canonicalByteLength > ISSUANCE_RETIREMENT_LIMITS.maxBytes) throw invalid();
+	return JSON.stringify({kind: CANONICAL_SETTLEMENT_PLAN_STORAGE_KIND, bytes: ""}).length +
+		4 * Math.ceil(canonicalByteLength / 3);
+}
+
+/** Original legacy native plan entries representation, shared with SQLite. */
+export function issuanceLegacySettlementPlanEntriesJson(plan: SettlementPlan): string {
+	return JSON.stringify(
+		plan.entries.map((entry) => ({
+			disposition: entry.disposition,
+			...(entry.sourceObjectId === undefined ? {} : { sourceObjectId: entry.sourceObjectId }),
+			...(entry.transformRefusal===undefined?{}:{transformRefusal:{...entry.transformRefusal,proposedIntentDigest:[...entry.transformRefusal.proposedIntentDigest]}}),
+			...(entry.inheritance === undefined
+				? {}
+				: {
+						inheritance: {
+							...entry.inheritance,
+							targetVertexDigest: [...entry.inheritance.targetVertexDigest],
+						},
+					}),
+			...(entry.replacementProgress === undefined
+				? {}
+				: {
+						replacementProgress: {
+							chunks: entry.replacementProgress.chunks.map((chunk) => ({ ...chunk })),
+							intentCount: entry.replacementProgress.intentCount,
+							intentDigest: [...entry.replacementProgress.intentDigest],
+							version: 1,
+						},
+					}),
+			replacementSequence: entry.replacementSequence,
+			sourceDigest: [...entry.sourceDigest],
+			sourceSequence: entry.sourceSequence,
+		}))
+	);
+}
+
+export function issuanceSettlementPlanStorageByteLength(plan: SettlementPlan): number {
+	return plan.sourceContexts === undefined
+		? new TextEncoder().encode(issuanceLegacySettlementPlanEntriesJson(plan)).byteLength
+		: issuanceCanonicalSettlementPlanStorageByteLength(encodeCanonical(plan, unsignedEncodingLimits).byteLength);
+}
+
+/** Source-context and entry fields are sized by the original plan codec. Every
+ * existing entry/context remains whole. One future current-epoch context and
+ * every potentially unresolved own row are charged without inventing bytes. */
+export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueScope, prior: SettlementPlan | null,
+	maxSourceCount: number, geometry: IssuanceSourceCustodyGeometry): Readonly<{
+		byteLength: number; items: number; maxDepth: number; nativeStorageByteLength: number;
+	}> {
+	assertDurableIssueScope(scope);
+	const captured = prior === null ? null : copySettlementPlan(prior, scope);
+	if (captured === undefined || !isClosedDurableIssuanceRecord(geometry, ["maxContextByteLength", "maxNativeReadByteLength"]) ||
+		!Number.isSafeInteger(maxSourceCount) || maxSourceCount < 0 || maxSourceCount > ISSUANCE_RETIREMENT_LIMITS.maxRows ||
+		!Number.isSafeInteger(geometry.maxContextByteLength) || geometry.maxContextByteLength < 1 ||
+		!Number.isSafeInteger(geometry.maxNativeReadByteLength) || geometry.maxNativeReadByteLength < 1 ||
+		geometry.maxNativeReadByteLength > ISSUANCE_RETIREMENT_LIMITS.maxBytes ||
+		geometry.maxContextByteLength > geometry.maxNativeReadByteLength) throw invalid();
+	const bytesWidth = (length: number) => 1 + unsignedVaruintWidth(length) + length;
+	const digest = bytesWidth(32), integer = encodeCanonical(Number.MAX_SAFE_INTEGER).byteLength;
+	const leaf = Object.freeze({items: 1, maxDepth: 0});
+	const originalEntries = captured?.entries ?? [];
+	if (originalEntries.length + maxSourceCount > ISSUANCE_RETIREMENT_LIMITS.maxRows) throw invalid();
+	const entryWidths = originalEntries.map(entry => {
+		const {sourceContextDigest: _context, ...fields} = entry;
+		return unsignedRecordWidth(fields, {sourceContextDigest: digest});
+	});
+	const entryShapes = originalEntries.map(entry => {
+		const {sourceContextDigest: _context, ...fields} = entry;
+		return unsignedRecordShape(fields, {sourceContextDigest: leaf});
+	});
+	const entryFields = {disposition: "manual-review", replacementSequence: null};
+	const entryWidth = unsignedRecordWidth(entryFields, {sourceSequence: integer, sourceDigest: digest, sourceContextDigest: digest});
+	const entryShape = unsignedRecordShape(entryFields, {sourceSequence: leaf, sourceDigest: leaf, sourceContextDigest: leaf});
+	// Potential rows need not be current APPs. Counting all of them is a positive
+	// bound only; actual retention must still authenticate and classify each row.
+	for (let index = 0; index < maxSourceCount; index++) { entryWidths.push(entryWidth); entryShapes.push(entryShape); }
+	const contexts = captured?.sourceContexts ?? [];
+	const contextWidths = contexts.map(context => encodeCanonical(context, unsignedEncodingLimits).byteLength);
+	contextWidths.push(unsignedRecordWidth({}, {digest, exactCanonicalContextBytes: bytesWidth(geometry.maxContextByteLength)}));
+	const contextShapes = [...contexts.map(unsignedCanonicalShape), unsignedRecordShape({}, {digest: leaf, exactCanonicalContextBytes: leaf})];
+	const byteLength = unsignedRecordWidth({scope}, {revision: integer, fenceSequence: integer,
+		entries: unsignedArrayWidth(entryWidths), sourceContexts: unsignedArrayWidth(contextWidths)});
+	const shape = unsignedRecordShape({scope}, {revision: leaf, fenceSequence: leaf,
+		entries: unsignedArrayShape(entryShapes), sourceContexts: unsignedArrayShape(contextShapes)});
+	const nativeStorageByteLength = issuanceCanonicalSettlementPlanStorageByteLength(byteLength);
+	if (byteLength > geometry.maxNativeReadByteLength || nativeStorageByteLength > geometry.maxNativeReadByteLength)
+		throw issuanceRetirementRefusal("source custody plan exceeds original native read bound");
+	return Object.freeze({byteLength, ...shape, nativeStorageByteLength});
+}
+
+function sourceCustodyPlanWidths(plans: readonly SettlementPlan[], scope: DurableIssueScope, sourceCount: number,
+	geometry: IssuanceSourceCustodyGeometry | undefined, nativeMaterialWithoutPlans: number): Readonly<{
+		widths: readonly number[]; shapes: readonly IssuanceUnsignedCanonicalShape[];
+	}> {
+	if (geometry === undefined) return {widths: plans.map(plan => encodeCanonical(plan, unsignedEncodingLimits).byteLength),
+		shapes: plans.map(unsignedCanonicalShape)};
+	const own = plans.find(plan => plan.scope.objectId === scope.objectId && plan.scope.author === scope.author);
+	const resource = issuanceSourceCustodyPlanResourceForSizing(scope, own ?? null, sourceCount, geometry);
+	const widths = plans.map(plan => plan === own ? resource.byteLength : encodeCanonical(plan, unsignedEncodingLimits).byteLength);
+	const shapes = plans.map(plan => plan === own ? resource : unsignedCanonicalShape(plan));
+	if (own === undefined) { widths.push(resource.byteLength); shapes.push(resource); }
+	const nativeStorage = nativeMaterialWithoutPlans + resource.nativeStorageByteLength +
+		plans.filter(plan => plan !== own).reduce((total, plan) => total + issuanceSettlementPlanStorageByteLength(plan), 0);
+	if (!Number.isSafeInteger(nativeStorage) || nativeStorage > geometry.maxNativeReadByteLength)
+		throw issuanceRetirementRefusal("source custody native material exceeds original read bound");
+	return {widths, shapes};
+}
+
+function checkSourceCustodyNativeWidths(widths: IssuanceUnsignedPhaseWidths,
+	geometry: IssuanceSourceCustodyGeometry | undefined): IssuanceUnsignedPhaseWidths {
+	if (geometry !== undefined && widths.canonicalRowsBytes > geometry.maxNativeReadByteLength)
+		throw issuanceRetirementRefusal("source custody canonical census exceeds original read bound");
+	return widths;
 }
 
 type UnsignedFinalRows = Omit<IssuanceRetirementRows, "issued"> & {
@@ -383,7 +511,8 @@ export function issuanceUnsignedPostimageWidths(
 	rows: IssuanceRetirementRows,
 	scope: DurableIssueScope,
 	input: IssuanceUnsignedProspectiveIntent,
-	control: DurableIssuanceRetirementControl | null
+	control: DurableIssuanceRetirementControl | null,
+	sourceCustody?: IssuanceSourceCustodyGeometry
 ): Readonly<{
 	reserved: IssuanceUnsignedPhaseWidths;
 	entered: IssuanceUnsignedPhaseWidths;
@@ -469,7 +598,11 @@ export function issuanceUnsignedPostimageWidths(
 		const usedIssued =
 			phase === "final" ? issuedWidths : rows.issued.map((r) => encodeCanonical(r, unsignedEncodingLimits).byteLength);
 		const outboxWidths = selectedRows.outbox.map((r) => encodeCanonical(r, unsignedEncodingLimits).byteLength);
-		const planWidths = selectedRows.plans.map((r) => encodeCanonical(r, unsignedEncodingLimits).byteLength);
+		const nativeMaterial = finalRows.issued.reduce((sum, row) => sum + row.canonicalPreimageBytes.byteLength + 96, 0) +
+			(phase === "final" ? 0 : intentWidth);
+		const planWidths = sourceCustodyPlanWidths(selectedRows.plans, scope,
+			finalRows.issued.filter(row => row.author === scope.author && row.objectId === scope.objectId).length,
+			sourceCustody, nativeMaterial).widths;
 		const delta =
 			(inherited === undefined ? 1 : 0) +
 			(phase === "reserved" || inherited?.phase === "entered" ? 0 : 1) +
@@ -481,8 +614,8 @@ export function issuanceUnsignedPostimageWidths(
 			planWidths,
 			unsignedNativeControlWidth(originalControl, scope.objectId, delta)
 		);
-		if (phase === "final" && widths.canonicalRowsBytes !== finalSize.logicalBytes) throw invalid();
-		return widths;
+		if (sourceCustody === undefined && phase === "final" && widths.canonicalRowsBytes !== finalSize.logicalBytes) throw invalid();
+		return checkSourceCustodyNativeWidths(widths, sourceCustody);
 	};
 	return Object.freeze({ reserved: make("reserved"), entered: make("entered"), final: make("final") });
 }
@@ -545,6 +678,8 @@ export function issuanceOrdinaryFinishingCapacityWidths(input: Readonly<{
 	maxAdditionalCurrentPreimageBytes?: number;
 	/** Existing NONE constructor has no successor fence or plan. */
 	successorFenceCount?: 0 | 1;
+	/** Named future custody-plan alternative; leaves existing phase defaults exact. */
+	sourceCustody?: IssuanceSourceCustodyGeometry;
 }>): Readonly<{
 	ordinaryPending: IssuanceUnsignedPhaseWidths;
 	ordinaryFinal: IssuanceUnsignedPhaseWidths;
@@ -564,11 +699,13 @@ export function issuanceOrdinaryFinishingCapacityWidths(input: Readonly<{
 	 * The caller must separately enforce its whole proof's depth/item bounds. */
 	canonicalRowsShape: Readonly<Record<"ordinaryPending" | "ordinaryFinal" | "successorPending" | "successorFinal",
 		IssuanceUnsignedCanonicalShape>>;
+	planRewriteResource?: Readonly<{byteLength: number; items: number; maxDepth: number}>;
 }> {
 	if (!isClosedDurableIssuanceRecord(input, ["rows", "scope", "control",
 		"maxAdditionalCurrentIssued", "maxCanonicalPreimageByteLength",
 		...(Object.hasOwn(input, "maxOrdinaryPreimageByteLength") ? ["maxOrdinaryPreimageByteLength"] : []),
 		...(Object.hasOwn(input, "maxAdditionalCurrentPreimageBytes") ? ["maxAdditionalCurrentPreimageBytes"] : []),
+		...(Object.hasOwn(input, "sourceCustody") ? ["sourceCustody"] : []),
 		...(Object.hasOwn(input, "successorFenceCount") ? ["successorFenceCount"] : [])])) throw invalid();
 	assertDurableIssueScope(input.scope);
 	issuanceRetirementImage(input.rows, input.scope.objectId);
@@ -641,11 +778,15 @@ export function issuanceOrdinaryFinishingCapacityWidths(input: Readonly<{
 		issued.push(rowWidth - preimage + payloadPerRow + Number(index < payloadRemainder));
 		outbox.push(outboxWidth);
 	}
-	const plans = rows.plans.map(row => encodeCanonical(row, unsignedEncodingLimits).byteLength);
 	const intentWidth = unsignedRecordWidth({ kind: "v3-issuance-pending-unsigned-1", phase: "reserved" }, {
 		authorSequence: integerWidth, canonicalPreimageBytes: preimageWidth, digest: digestWidth,
 		incarnation: control === null ? signatureWidth : encodeCanonical(control.incarnation).byteLength,
 	});
+	const custodySourceCount = rows.issued.filter(row => row.objectId === scope.objectId && row.author === scope.author).length + count;
+	const custody = sourceCustodyPlanWidths(rows.plans, scope, custodySourceCount, input.sourceCustody,
+		rows.issued.reduce((sum, row) => sum + row.canonicalPreimageBytes.byteLength + 96, 0) +
+		aggregatePreimageBytes + count * 96 + intentWidth);
+	const plans = custody.widths;
 	const pendingLineages = lineageWidths.map((width, index) => index === lineageIndex
 		? unsignedRecordWidth(lineageFields, { next: integerWidth, pendingUnsigned: intentWidth }) : width);
 	const ordinaryPending = unsignedNativePhaseWidths(pendingLineages, issued, outbox, plans, encodedControlBytes);
@@ -662,9 +803,13 @@ export function issuanceOrdinaryFinishingCapacityWidths(input: Readonly<{
 		// Only numerical fields leave this owner; the runtime still must prove
 		// the original room preview/frontier before using the one-fence domain.
 		successorPlan = issuanceOrdinarySuccessorPlanResourceForSizing(scope, ownPlan ?? null);
-		const fencePlanWidth = successorPlan.byteLength;
+		const custodyPlan = input.sourceCustody === undefined ? undefined :
+			issuanceSourceCustodyPlanResourceForSizing(scope, ownPlan ?? null, custodySourceCount + fenceCount, input.sourceCustody);
+		const fencePlanWidth = Math.max(successorPlan.byteLength, custodyPlan?.byteLength ?? 0);
 		successorPlans = ownPlan === undefined ? [...plans, fencePlanWidth] :
 			plans.map((width, index) => rows.plans[index] === ownPlan ? fencePlanWidth : width);
+		// The custody alternative already contains the absent own plan slot.
+		if (ownPlan === undefined && input.sourceCustody !== undefined) successorPlans = [...plans.slice(0, -1), fencePlanWidth];
 		successorIssued = [...issued, rowWidth]; successorOutbox = [...outbox, outboxWidth];
 		const fenceIntentWidth = unsignedRecordWidth({ kind: "v3-issuance-pending-unsigned-1", phase: "reserved",
 			planEffect: { kind: "fence" } }, {
@@ -672,6 +817,10 @@ export function issuanceOrdinaryFinishingCapacityWidths(input: Readonly<{
 			incarnation: control === null ? signatureWidth : encodeCanonical(control.incarnation).byteLength,
 			exactCanonicalPlanBytes: bytesWidth(fencePlanWidth),
 		});
+		if (input.sourceCustody !== undefined) sourceCustodyPlanWidths(rows.plans, scope,
+			custodySourceCount + fenceCount, input.sourceCustody,
+			rows.issued.reduce((sum, row) => sum + row.canonicalPreimageBytes.byteLength + 96, 0) +
+			aggregatePreimageBytes + count * 96 + preimage + 96 + fenceIntentWidth);
 		fencePendingLineages = lineageWidths.map((width, index) => index === lineageIndex
 			? unsignedRecordWidth(lineageFields, { next: integerWidth, pendingUnsigned: fenceIntentWidth }) : width);
 	}
@@ -702,10 +851,16 @@ export function issuanceOrdinaryFinishingCapacityWidths(input: Readonly<{
 		? unsignedRecordShape(lineageFields, {next: leaf, pendingUnsigned: fenceIntentShape}) : shape);
 	const issuedShapes = [...rows.issued.map(unsignedCanonicalShape), ...Array.from({ length: count }, () => rowShape)];
 	const outboxShapes = [...rows.outbox.map(unsignedCanonicalShape), ...Array.from({ length: count }, () => outboxShape)];
-	const planShapes = rows.plans.map(unsignedCanonicalShape);
-	const successorPlanShapes = ownPlan === undefined && successorPlan !== undefined
+	const planShapes = custody.shapes;
+	let successorPlanShapes: readonly IssuanceUnsignedCanonicalShape[] = ownPlan === undefined && successorPlan !== undefined
 		? [...planShapes, successorPlan] : rows.plans.map(row => row === ownPlan && successorPlan !== undefined
 			? successorPlan : unsignedCanonicalShape(row));
+	if (input.sourceCustody !== undefined && fenceCount === 1) {
+		const resource = issuanceSourceCustodyPlanResourceForSizing(scope, ownPlan ?? null,
+			custodySourceCount + fenceCount, input.sourceCustody);
+		successorPlanShapes = ownPlan === undefined ? [...planShapes.slice(0, -1), resource] :
+			rows.plans.map(row => row === ownPlan ? resource : unsignedCanonicalShape(row));
+	}
 	const rowsShape = (lineages: readonly IssuanceUnsignedCanonicalShape[], successor: boolean) =>
 		unsignedRecordShape({}, { lineages: unsignedArrayShape(lineages),
 			issued: unsignedArrayShape(successor && fenceCount === 1 ? [...issuedShapes, rowShape] : issuedShapes),
@@ -723,9 +878,9 @@ export function issuanceOrdinaryFinishingCapacityWidths(input: Readonly<{
 		planCount: integerWidth, imageDigest: bytesWidth(64)});
 	const nativeImageShape = unsignedRecordShape({}, {logicalBytes: leaf, lineageCount: leaf,
 		issuedCount: leaf, outboxCount: leaf, planCount: leaf, imageDigest: leaf});
-	const withImageCapacity = (phase: IssuanceUnsignedPhaseWidths): IssuanceUnsignedPhaseWidths => Object.freeze({...phase,
+	const withImageCapacity = (phase: IssuanceUnsignedPhaseWidths): IssuanceUnsignedPhaseWidths => checkSourceCustodyNativeWidths(Object.freeze({...phase,
 		nativeCensusBytes: unsignedRecordWidth({}, {rows: phase.canonicalRowsBytes,
-			image: nativeImageByteLength, control: phase.encodedControlBytes})});
+			image: nativeImageByteLength, control: phase.encodedControlBytes})}), input.sourceCustody);
 	// SQLite's committed image contains either the current unsigned intent OR
 	// its issued/outbox pair: commitCandidate clears pending and inserts both in
 	// one transaction. Older pairs remain complete. This is ONE image's geometry,
@@ -753,9 +908,12 @@ export function issuanceOrdinaryFinishingCapacityWidths(input: Readonly<{
 	const currentAdmission = Object.freeze({pendingNativeCensusByteLength,
 		finalNativeCensusByteLength: currentFinal.nativeCensusBytes,
 		additionalIssuedByteLength: count * ordinaryRowOverhead + aggregatePreimageBytes});
+	const planRewriteResource = issuanceRetirementPlanRewriteResourceForSizing(rows.plans,
+		input.sourceCustody === undefined ? undefined : {scope, maxSourceCount: custodySourceCount + fenceCount, geometry: input.sourceCustody});
 	return Object.freeze({ordinaryPending: withImageCapacity(ordinaryPending), ordinaryFinal: withImageCapacity(ordinaryFinal),
 		successorPending: withImageCapacity(successorPending), successorFinal: withImageCapacity(successorFinal),
-		currentAdmission, canonicalRowsShape, nativeImageByteLength, nativeImageShape});
+		currentAdmission, canonicalRowsShape, nativeImageByteLength, nativeImageShape,
+		...(planRewriteResource === undefined ? {} : {planRewriteResource})});
 }
 
 /** Candidate-free numerical projection of the ORIGINAL sources=[] successor
@@ -784,15 +942,20 @@ export function issuanceOrdinarySuccessorPlanResourceForSizing(scope: DurableIss
 /** Numerical capacity of any entry-removal rewrite of these original plans.
  * Both byte leaves use the original complete plan with a widened revision. No
  * target plan, authority, digest or receipt is fabricated by this projection. */
-export function issuanceRetirementPlanRewriteResourceForSizing(plans: readonly SettlementPlan[]):
+export function issuanceRetirementPlanRewriteResourceForSizing(plans: readonly SettlementPlan[],
+	sourceCustody?: Readonly<{scope: DurableIssueScope; maxSourceCount: number; geometry: IssuanceSourceCustodyGeometry}>):
 	Readonly<{byteLength: number; items: number; maxDepth: number}> | undefined {
-	const lengths = plans.filter(plan => plan.entries.length !== 0).map(plan => {
+	const own = sourceCustody === undefined ? undefined : plans.find(plan =>
+		plan.scope.objectId === sourceCustody.scope.objectId && plan.scope.author === sourceCustody.scope.author);
+	const lengths = plans.filter(plan => plan !== own && plan.entries.length !== 0).map(plan => {
 		const captured = copySettlementPlan(plan, plan.scope);
 		if (captured === undefined) throw invalid();
 		const {revision: _revision, fenceSequence: _fence, ...fields} = captured;
 		const integerWidth = encodeCanonical(Number.MAX_SAFE_INTEGER).byteLength;
 		return unsignedRecordWidth(fields, {revision: integerWidth, fenceSequence: integerWidth});
 	});
+	if (sourceCustody !== undefined) lengths.push(issuanceSourceCustodyPlanResourceForSizing(sourceCustody.scope,
+		own ?? null, sourceCustody.maxSourceCount, sourceCustody.geometry).byteLength);
 	if (lengths.length === 0) return undefined;
 	const scalar = {items: 1, maxDepth: 0};
 	const pairShape = unsignedRecordShape({}, {before: scalar, after: scalar});
@@ -960,7 +1123,8 @@ export function issuanceUnsignedSuccessorFenceWidths(
 	input: IssuanceUnsignedProspectiveIntent | undefined,
 	control: DurableIssuanceRetirementControl | null,
 	successor: Readonly<{ plan: SettlementPlan; canonicalPreimageByteLength: number;
-		continuation?: readonly IssuanceUnsignedContinuationJob[] }>
+		continuation?: readonly IssuanceUnsignedContinuationJob[] }>,
+	sourceCustody?: IssuanceSourceCustodyGeometry
 ): Readonly<Record<"reserved" | "entered" | "final", IssuanceUnsignedSuccessorFencePhaseWidths>> {
 	// This call preserves all existing exact source, pending identity, unsigned,
 	// plan-effect and codec-limit guards before constructing width-only leaves.
@@ -1092,14 +1256,18 @@ export function issuanceUnsignedSuccessorFenceWidths(
 					]
 				: outboxBefore
 		);
-		const planWidths = [...plans]
+		const phasePlans = [...plans]
 			.sort((left, right) =>
 				compareDurableIssuanceCompoundKeys(
 					[left.scope.objectId, left.scope.author, 0],
 					[right.scope.objectId, right.scope.author, 0]
 				)
 			)
-			.map((p) => encodeCanonical(phase === "final" && p === plan ? finalPlan : p, unsignedEncodingLimits).byteLength);
+			.map((p) => phase === "final" && p === plan ? finalPlan : p);
+		const planWidths = sourceCustodyPlanWidths(phasePlans, scope,
+			immediate.issued.filter(row => row.author === scope.author && row.objectId === scope.objectId).length + 1,
+			sourceCustody, immediate.issued.reduce((sum, row) => sum + row.canonicalPreimageBytes.byteLength + 96, 0) +
+				successor.canonicalPreimageByteLength + 96 + (phase === "final" ? 0 : intentWidth)).widths;
 		const controlRevisionDelta = revisionDeltas[phase];
 		const widths = unsignedNativePhaseWidths(
 			lineages,
@@ -1108,6 +1276,7 @@ export function issuanceUnsignedSuccessorFenceWidths(
 			planWidths,
 			unsignedNativeControlWidth(originalControl, scope.objectId, immediateDelta + controlRevisionDelta)
 		);
+		checkSourceCustodyNativeWidths(widths, sourceCustody);
 		return Object.freeze({
 			...widths,
 			controlRevisionDelta,
@@ -1299,7 +1468,8 @@ function retirementPlanFromBytes(input: unknown): SettlementPlan {
 	const bytes = copyDurableIssuanceBytes(input);
 	if (bytes === undefined || bytes.byteLength > ISSUANCE_RETIREMENT_LIMITS.maxBytes) throw invalid();
 	const value = decodeCanonical(bytes);
-	if (!isClosedDurableIssuanceRecord(value, ["scope", "revision", "fenceSequence", "entries"])) throw invalid();
+	const hasContexts = typeof value === "object" && value !== null && Object.hasOwn(value, "sourceContexts");
+	if (!isClosedDurableIssuanceRecord(value, ["scope", "revision", "fenceSequence", "entries", ...(hasContexts ? ["sourceContexts"] : [])])) throw invalid();
 	assertDurableIssueScope(value.scope);
 	const plan = copySettlementPlan(value, value.scope);
 	if (plan === undefined || !issuanceRetirementBytesEqual(bytes, retirementPlanBytes(plan))) throw invalid();
@@ -1776,7 +1946,9 @@ function issuanceRetirementTargetRows(control: DurableIssuanceRetirementControl 
 		const entries = plan.entries.filter(entry => retirementEntryIsRetained(control, p, plan, entry, rows));
 		if (entries.length === plan.entries.length) return plan;
 		if (plan.revision === Number.MAX_SAFE_INTEGER) throw issuanceRetirementRefusal("settlement plan revision exhausted");
-		return {...plan, revision: plan.revision + 1, entries};
+		const {sourceContexts: _contexts, ...plain} = plan;
+		const sourceContexts = settlementSourceContextsForEntries(plan, entries);
+		return {...plain, revision: plan.revision + 1, entries, ...(sourceContexts === undefined ? {} : {sourceContexts})};
 	});
 	return {...rows, plans};
 }

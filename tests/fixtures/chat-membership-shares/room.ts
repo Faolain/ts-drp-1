@@ -31,6 +31,7 @@ import {
 	createCreatorSuccessorMaterialServer,
 	readCreatorSuccessorExport,
 } from "../../../packages/node/src/creator-adoption.js";
+import { inspectHead } from "../../../packages/node/src/creator-close.js";
 import { parseStorageObjectId } from "../../../packages/storage/src/index.js";
 import { createNodeRoomHeadAuthority } from "../../../packages/storage-node/src/room-head.js";
 import { createNodeV3RoomStorageHost } from "../../../packages/storage-node/src/v3-room-host.js";
@@ -77,6 +78,8 @@ const PARAMETERS = Object.freeze({
 export type ChatSharesMember = "genesis" | "genesis-admin" | "late";
 
 export interface ChatSharesRoomOptions {
+	/** Existing externally owned directory for real process-death recovery. */
+	readonly directory?: string;
 	/** Members after the creator (peer 0). */
 	readonly members: readonly ChatSharesMember[];
 	/** Which shipped catalog the room's genesis signs. */
@@ -85,6 +88,9 @@ export interface ChatSharesRoomOptions {
 	genesisStateBytes(input: Readonly<{ exactCanonicalLatchedAclBytes: Uint8Array }>): Uint8Array;
 	/** Keep each peer's shipped device archive beside the room's databases. */
 	readonly archives?: boolean;
+	/** Fault injection after an actual durable floor write. */
+	readonly afterFloorWrite?: (peer: number, phase: "begin" | "commit") => void | Promise<void>;
+	readonly beforeFloorWrite?: (peer: number, phase: "begin" | "commit") => void | Promise<void>;
 }
 
 const track = Object.freeze({
@@ -118,8 +124,8 @@ export async function closeChatSharesRooms(): Promise<unknown[]> {
  * @returns The room's peers, helpers and observation handles.
  */
 export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
-	const directory = mkdtempSync(join(tmpdir(), "chat-membership-shares-"));
-	track.directories.add(directory);
+	const directory = options.directory ?? mkdtempSync(join(tmpdir(), "chat-membership-shares-"));
+	if (options.directory === undefined) track.directories.add(directory);
 	const kinds: readonly ("creator" | ChatSharesMember)[] = ["creator", ...options.members];
 	const identities = kinds.map((_, index) => {
 		const seed = new Uint8Array(32).fill(0x41 + index);
@@ -215,10 +221,19 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 			});
 			track.archives.add(archive);
 		}
-		const floor = createNodeRoomHeadAuthority({
+		const nativeFloor = createNodeRoomHeadAuthority({
 			filename: join(directory, `${name}-external-floor.sqlite`),
 			initialization: { kind: reopening ? "reopen" : "create" },
 		});
+		const floor = options.afterFloorWrite === undefined && options.beforeFloorWrite === undefined ? nativeFloor : Object.freeze({...nativeFloor,
+			async begin(input: Parameters<typeof nativeFloor.begin>[0]) {
+				await options.beforeFloorWrite?.(index, "begin");
+				const result = await nativeFloor.begin(input); await options.afterFloorWrite?.(index, "begin"); return result;
+			},
+			async commit(input: Parameters<typeof nativeFloor.commit>[0]) {
+				await options.beforeFloorWrite?.(index, "commit");
+				const result = await nativeFloor.commit(input); await options.afterFloorWrite?.(index, "commit"); return result;
+			}});
 		track.heads.add(floor);
 		let ingress: ((message: Message) => void) | undefined;
 		let topic: string | undefined;
@@ -366,10 +381,12 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 		if (!object.ok) throw new TypeError("CHAT_SHARES_INVALID_OBJECT");
 		const store = await host.openAhe("peer-0--ahe");
 		const snapshotStore = await host.openSnapshots("peer-0");
+		const journalStore = await host.openJournal("peer-0");
 		try {
 			const exported = await readCreatorSuccessorExport({
 				store,
 				snapshotStore,
+				journalStore,
 				catalog: application.catalog,
 				objectId: object.value,
 				pinnedGenesisAnchorDigest: invite.pinnedGenesisAnchorDigest,
@@ -387,9 +404,19 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 			}
 			return { ...exported, chunks };
 		} finally {
+			await journalStore.close();
 			await snapshotStore.close();
 			await store.close();
 		}
+	};
+
+	/** Reads exact native head carriers for verification; supplies no trust capability. */
+	const readHead = async (index: number) => {
+		const object = parseStorageObjectId(objectId);
+		if (!object.ok) throw new TypeError("CHAT_SHARES_INVALID_OBJECT");
+		const store = await host.openAhe(`peer-${index}--ahe`);
+		try { return await inspectHead(store, object.value); }
+		finally { await store.close(); }
 	};
 
 	/** The application state a joiner installs from the creator's current successor export. */
@@ -497,6 +524,8 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 		install,
 		issuedAfter,
 		successorDelivery,
+		readExport,
+		readHead,
 		exportedApplicationStateBytes,
 		census: (index: number) => roomStoreCensus(directory, `peer-${index}`),
 	};

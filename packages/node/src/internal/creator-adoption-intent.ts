@@ -13,6 +13,8 @@ import {
 } from "@ts-drp/storage";
 
 import type { CreatorSuccessorLiveMaterial, CreatorSuccessorLiveSeed } from "./creator-successor-live.js";
+import { resolveCreatorCheckpointAttachment } from "./creator-transition-advance.js";
+import type { CreatorExpectedRoomHead } from "./creator-room-head.js";
 
 export type CreatorAdoptionIntent = Readonly<Record<never, never>>;
 export type PreparedCreatorSuccessorAdoption = Readonly<Record<never, never>>;
@@ -453,4 +455,23 @@ export function consumeStagedCreatorSuccessorAdoption(
 		descriptor: Object.freeze({ ...retained.material.descriptor }),
 		intent: retained.material.intent,
 	});
+}
+
+/** A floor jump requires the original unconsumed, owner-bound staged checkpoint. */
+export function permitsStagedCreatorCheckpointFloorAdvance(
+	capability: unknown,
+	owner: unknown,
+	previous: CreatorExpectedRoomHead,
+	next: CreatorExpectedRoomHead
+): boolean {
+	if (capability === null || typeof capability !== "object" || owner === null || typeof owner !== "object") return false;
+	const staged = stagedCustody.get(capability);
+	if (staged === undefined || staged.owner !== owner) return false;
+	const activation = staged.material.intent.activation;
+	const point = activation.checkpoint === undefined ? undefined : resolveCreatorCheckpointAttachment(activation.checkpoint);
+	return point !== undefined && point.localBase.trust === activation.predecessor.trust &&
+		previous.objectId === point.localBase.trust.objectId && previous.epoch === point.localBase.trust.currentEpoch &&
+		previous.currentAnchorDigest === point.localBase.trust.currentAnchorDigest &&
+		next.objectId === point.target.trust.objectId && next.epoch === point.target.trust.currentEpoch &&
+		next.currentAnchorDigest === point.target.trust.currentAnchorDigest;
 }

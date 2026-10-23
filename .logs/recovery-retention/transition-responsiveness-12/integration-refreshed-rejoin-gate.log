@@ -1,0 +1,38 @@
+
+ RUN  v3.1.1 /Users/aristotle/Documents/Projects/ts-drp-1
+
+(node:3897) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/creator-rejoin-readmission-native.test.ts (12 tests) 94255ms
+   ✓ native same-replica creator recovery > attaches custody without rewriting existing settlement disposition or progress  774ms
+   ✓ native same-replica creator recovery > preserves independently accepted source epochs through repeated checkpoint gaps  27159ms
+   ✓ native same-replica creator recovery > rejects a plausible forged actual rollback edge while every point signature remains authentic  13189ms
+   ✓ native same-replica creator recovery > refuses a stale native head after genuine point verification before publication  787ms
+   ✓ native same-replica creator recovery > rejects a historical absence receipt relabelled as current protected-scope authority  21460ms
+   ✓ native same-replica creator recovery > reopens both actual rollback points after authorized source-base normalization before publication  24269ms
+   ✓ native same-replica creator recovery > recovers checkpoint adoption after lost before-begin acknowledgement  1137ms
+   ✓ native same-replica creator recovery > recovers checkpoint adoption after lost begin acknowledgement  768ms
+   ✓ native same-replica creator recovery > recovers checkpoint adoption after lost commit acknowledgement  728ms
+   ✓ native same-replica creator recovery > refuses an unauthenticated own source before checkpoint publication or floor advance  611ms
+   ✓ native same-replica creator recovery > rejoins after two missed installs and preserves accepted offline work  1319ms
+   ✓ native same-replica creator recovery > retains accepted pending work through removal and re-admission on the same stores  2055ms
+(node:7950) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/creator-rejoin-recovery-composition-native.test.ts (11 tests) 66892ms
+   ✓ native recovery across ordinary and checkpoint histories > preserves install history [ 1, 3, 5, 7 ]  8432ms
+   ✓ native recovery across ordinary and checkpoint histories > preserves install history [ 2, 3, 5, 7 ]  7532ms
+   ✓ native recovery across ordinary and checkpoint histories > preserves install history [ 1, 2, 4, 5, 7, 9 ]  12526ms
+   ✓ native recovery across ordinary and checkpoint histories > preserves install history [ 1, 2, 3, 4, 5 ]  7811ms
+   ✓ native recovery across ordinary and checkpoint histories > checks native retirement identity on ordinary cold reopen before a checkpoint jump  8922ms
+   ✓ native recovery across ordinary and checkpoint histories > checks signed retirement identity on ordinary cold reopen before a checkpoint jump  9432ms
+   ✓ native recovery across ordinary and checkpoint histories > checks foreign retirement identity on ordinary cold reopen before a checkpoint jump  8126ms
+   ✓ native recovery across ordinary and checkpoint histories > preserves proven completion and unknown omission across Writer revocation and same-key readmission  1131ms
+   ✓ native recovery across ordinary and checkpoint histories > reopens an observer with no local settlement plan after a checkpoint gap  661ms
+   ✓ native recovery across ordinary and checkpoint histories > recovers an interruption at source-custody without reusing an obsolete source commitment  802ms
+   ✓ native recovery across ordinary and checkpoint histories > recovers an interruption at candidate-stage without reusing an obsolete source commitment  1515ms
+
+ Test Files  2 passed (2)
+      Tests  23 passed (23)
+   Start at  11:25:36
+   Duration  165.21s (transform 2.05s, setup 0ms, collect 3.57s, tests 161.15s, environment 0ms, prepare 99ms)
+

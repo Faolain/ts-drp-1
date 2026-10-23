@@ -12,6 +12,8 @@ import {
 	resolveCreatorAnchorTrustMaterial,
 } from "./internal/seal-authority-custody.js";
 import { settlementProfileFor } from "./settlement-profile.js";
+import { CREATOR_AUTHOR_SETTLEMENT_MAX_RECORD_BYTES } from "./internal/creator-settlement-limits.js";
+export { CREATOR_AUTHOR_SETTLEMENT_MAX_RECORD_BYTES } from "./internal/creator-settlement-limits.js";
 
 export const CREATOR_AUTHOR_ISSUANCE_FRONTIERS_KIND = "drp-creator-author-issuance-frontiers-state" as const;
 export const CREATOR_AUTHOR_ISSUANCE_FRONTIERS_MAX_RECORD_BYTES = 8192 as const;
@@ -507,7 +509,6 @@ export function resolveCreatorAuthorIssuanceFrontiers(
 }
 
 export const CREATOR_AUTHOR_SETTLEMENT_KIND = "drp-creator-author-settlement-state" as const;
-export const CREATOR_AUTHOR_SETTLEMENT_MAX_RECORD_BYTES = 32_768 as const;
 export const CREATOR_AUTHOR_SETTLEMENT_GENESIS_SENTINEL = hex(
 	hashDomain(
 		"ts-drp/creator-author-settlement/genesis/v1",

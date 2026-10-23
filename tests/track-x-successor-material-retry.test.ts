@@ -44,6 +44,24 @@ const identity = {
 	isAuthorizedAuthor: (author: string): boolean => author === creatorAuthor,
 };
 
+it("only authenticated exact checkpoint unavailability is retryable", async () => {
+	for (const change of [ { reason: "arbitrary" }, { version: 3 }, { author: strangerAuthor },
+		{ manifestDigest: "0".repeat(64) }, { nonce: new Uint8Array(32) }, { signature: new Uint8Array(64) },
+		{ exactCanonicalSettlementBytes: Uint8Array.of(1) } ]) {
+		const scripted = fakePort(() => ({ kind: "serve", bytes: request => {
+			const proof = { kind: "creator-successor-material-unavailable", version: 1, reason: "checkpoint-not-adopted",
+				nonce: request.nonce, manifestDigest, requesterPeer: request.requesterPeer, sourcePeer: request.sourcePeer,
+				author: creatorAuthor };
+			return encodeCanonical({ ...proof, signature: ed25519.sign(hashDomain(DOMAIN, encodeCanonical(proof)), creatorSeed), ...change });
+		} }), () => ["creator"]);
+		const lifetime = new AbortController();
+		await expect(material.receiveCreatorSuccessorMaterial({ identity, transport: scripted.port, peers: ["creator"],
+			manifestDigest, materialKind: "checkpoint", retryUntil: lifetime.signal })).rejects.toThrow();
+		expect(scripted.attempts).toHaveLength(1);
+		expect(scripted.open()).toBe(0);
+	}
+});
+
 type Request = Readonly<{
 	nonce: Uint8Array;
 	requesterPeer: string;

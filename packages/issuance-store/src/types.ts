@@ -86,6 +86,8 @@ export interface SettlementTransformRefusal {
 export interface SettlementPlanEntry {
 	/** Original external native source; shared held migration custody authenticates it. */
 	readonly sourceObjectId?: string;
+	/** Mechanical reference to exact historical authentication bytes; the node re-verifies their authority. */
+	readonly sourceContextDigest?: Uint8Array;
 	readonly sourceSequence: number;
 	readonly sourceDigest: Uint8Array;
 	readonly disposition: SettlementDisposition;
@@ -95,11 +97,18 @@ export interface SettlementPlanEntry {
 	readonly transformRefusal?: SettlementTransformRefusal;
 }
 
+/** Shared exact bytes, retained for as long as any settlement source refers to them. */
+export interface SettlementSourceContext {
+	readonly digest: Uint8Array;
+	readonly exactCanonicalContextBytes: Uint8Array;
+}
+
 export interface SettlementPlan {
 	readonly scope: DurableIssueScope;
 	readonly revision: number;
 	readonly fenceSequence: number | null;
 	readonly entries: readonly SettlementPlanEntry[];
+	readonly sourceContexts?: readonly SettlementSourceContext[];
 }
 
 export interface DurableIssueCommit {

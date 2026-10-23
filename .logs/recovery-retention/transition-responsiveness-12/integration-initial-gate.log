@@ -1,0 +1,212 @@
+
+ RUN  v3.1.1 /Users/aristotle/Documents/Projects/ts-drp-1
+
+ ✓ packages/node/tests/creator-ordinary-readiness-producer.test.ts (71 tests) 10847ms
+   ✓ original whole-hold boundary readiness producer > refuses copied brackets, foreign holds/books, revocation and changed runtime at deferred commit  1009ms
+   ✓ original whole-hold boundary readiness producer > retains exact owner, revocation, source and machine guards at staged commit without overwriting prior geometry  543ms
+   ✓ terminal completed-drain acknowledgement > refuses partial, foreign, stale or insufficiently charged acknowledgements before the native attempt  377ms
+   ✓ terminal verification custody > holds the real coordinator exclusion across journal acknowledgement and joins it on success or failure  319ms
+   ✓ terminal verification custody > keeps snapshot classification distinct and refuses two mutation callbacks before acquiring views  320ms
+   ✓ readiness-owned recovery source acquisition > refuses copied or wrong-head trust and missing/foreign close custody before native acquisition  823ms
+   ✓ readiness-owned recovery source acquisition > binds the same complete protected source to every owner, exact genesis bytes, whole floor and actual native head  1305ms
+   ✓ readiness-owned recovery source acquisition > requires the fully authenticated result's latest source and complete current-head identity to match  932ms
+   ✓ readiness-owned recovery source acquisition > refuses missing, foreign or dead private source owners and absent source-only callbacks before opening the union  697ms
+(node:94855) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ tests/creator-rejoin-readmission-native.test.ts (12 tests | 8 failed) 9607ms
+   ✓ native same-replica creator recovery > attaches custody without rewriting existing settlement disposition or progress  758ms
+   × native same-replica creator recovery > preserves independently accepted source epochs through repeated checkpoint gaps 723ms
+     → checkpoint install at epoch 2 failed
+   × native same-replica creator recovery > rejects a plausible forged actual rollback edge while every point signature remains authentic 693ms
+     → D110C_FLOOR_UNAVAILABLE
+   ✓ native same-replica creator recovery > refuses a stale native head after genuine point verification before publication  672ms
+   × native same-replica creator recovery > rejects a historical absence receipt relabelled as current protected-scope authority 689ms
+     → D110C_FLOOR_UNAVAILABLE
+   × native same-replica creator recovery > reopens both actual rollback points after authorized source-base normalization before publication 671ms
+     → D110C_FLOOR_UNAVAILABLE
+   × native same-replica creator recovery > recovers checkpoint adoption after lost before-begin acknowledgement 677ms
+     → D110C_FLOOR_UNAVAILABLE
+   × native same-replica creator recovery > recovers checkpoint adoption after lost begin acknowledgement 696ms
+     → D110C_FLOOR_UNAVAILABLE
+   × native same-replica creator recovery > recovers checkpoint adoption after lost commit acknowledgement 672ms
+     → D110C_FLOOR_UNAVAILABLE
+   ✓ native same-replica creator recovery > refuses an unauthenticated own source before checkpoint publication or floor advance  651ms
+   × native same-replica creator recovery > rejoins after two missed installs and preserves accepted offline work 693ms
+     → D110C_FLOOR_UNAVAILABLE
+   ✓ native same-replica creator recovery > retains accepted pending work through removal and re-admission on the same stores  2010ms
+(node:95044) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ✓ tests/creator-reattachment-checkpoint-native.test.ts (3 tests) 1759ms
+   ✓ native current-checkpoint reattachment proof > serves adjacent sealed material and retries a typed gap refusal through creator recovery  1046ms
+   ✓ native current-checkpoint reattachment proof > exports bounded current authority after a gap and rejects signed-carrier substitutions  711ms
+(node:95212) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ tests/creator-rejoin-recovery-composition-native.test.ts (11 tests | 8 failed) 41864ms
+   × native recovery across ordinary and checkpoint histories > preserves install history [ 1, 3, 5, 7 ] 1543ms
+     → D110C_FLOOR_UNAVAILABLE
+   × native recovery across ordinary and checkpoint histories > preserves install history [ 2, 3, 5, 7 ] 682ms
+     → D110C_FLOOR_UNAVAILABLE
+   × native recovery across ordinary and checkpoint histories > preserves install history [ 1, 2, 4, 5, 7, 9 ] 1925ms
+     → D110C_FLOOR_UNAVAILABLE
+   ✓ native recovery across ordinary and checkpoint histories > preserves install history [ 1, 2, 3, 4, 5 ]  7822ms
+   × native recovery across ordinary and checkpoint histories > checks native retirement identity on ordinary cold reopen before a checkpoint jump 8875ms
+     → D110C_FLOOR_UNAVAILABLE
+   × native recovery across ordinary and checkpoint histories > checks signed retirement identity on ordinary cold reopen before a checkpoint jump 8898ms
+     → D110C_FLOOR_UNAVAILABLE
+   ✓ native recovery across ordinary and checkpoint histories > checks foreign retirement identity on ordinary cold reopen before a checkpoint jump  8259ms
+   ✓ native recovery across ordinary and checkpoint histories > preserves proven completion and unknown omission across Writer revocation and same-key readmission  1103ms
+   × native recovery across ordinary and checkpoint histories > reopens an observer with no local settlement plan after a checkpoint gap 624ms
+     → D110C_FLOOR_UNAVAILABLE
+   × native recovery across ordinary and checkpoint histories > recovers an interruption at source-custody without reusing an obsolete source commitment 680ms
+     → D110C_FLOOR_UNAVAILABLE
+   × native recovery across ordinary and checkpoint histories > recovers an interruption at candidate-stage without reusing an obsolete source commitment 1452ms
+     → D110C_FLOOR_UNAVAILABLE
+(node:95570) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+stderr | tests/creator-pending-bootstrap-turnover-native.test.ts > retains and authenticates an unpublished pinned bootstrap after old snapshots retire
+::v3-ingress not-authenticated
+
+stderr | tests/creator-pending-bootstrap-turnover-native.test.ts > retains and authenticates an unpublished pinned bootstrap after old snapshots retire
+::v3-ingress not-authenticated
+
+stderr | tests/creator-pending-bootstrap-turnover-native.test.ts > retains and authenticates an unpublished pinned bootstrap after old snapshots retire
+::v3-ingress not-authenticated
+
+stderr | tests/creator-pending-bootstrap-turnover-native.test.ts > refuses a pending bootstrap operation substitution before successor publication
+::v3-ingress not-authenticated
+
+stderr | tests/creator-pending-bootstrap-turnover-native.test.ts > refuses a pending bootstrap operation substitution before successor publication
+::v3-ingress not-authenticated
+
+stderr | tests/creator-pending-bootstrap-turnover-native.test.ts > refuses a pending bootstrap object substitution before successor publication
+::v3-ingress not-authenticated
+
+stderr | tests/creator-pending-bootstrap-turnover-native.test.ts > refuses a pending bootstrap object substitution before successor publication
+::v3-ingress not-authenticated
+
+stderr | tests/creator-pending-bootstrap-turnover-native.test.ts > refuses a pending bootstrap author substitution before successor publication
+::v3-ingress not-authenticated
+
+stderr | tests/creator-pending-bootstrap-turnover-native.test.ts > refuses a pending bootstrap author substitution before successor publication
+::v3-ingress not-authenticated
+
+stderr | tests/creator-pending-bootstrap-turnover-native.test.ts > refuses a pending bootstrap genesis substitution before successor publication
+::v3-ingress not-authenticated
+
+stderr | tests/creator-pending-bootstrap-turnover-native.test.ts > refuses a pending bootstrap genesis substitution before successor publication
+::v3-ingress not-authenticated
+
+stderr | tests/creator-pending-bootstrap-turnover-native.test.ts > refuses a pending bootstrap signature substitution before successor publication
+::v3-ingress not-authenticated
+
+stderr | tests/creator-pending-bootstrap-turnover-native.test.ts > refuses a pending bootstrap signature substitution before successor publication
+::v3-ingress not-authenticated
+
+ ✓ tests/creator-pending-bootstrap-turnover-native.test.ts (6 tests) 21122ms
+   ✓ retains and authenticates an unpublished pinned bootstrap after old snapshots retire  14619ms
+   ✓ refuses a pending bootstrap operation substitution before successor publication  1278ms
+   ✓ refuses a pending bootstrap object substitution before successor publication  1244ms
+   ✓ refuses a pending bootstrap author substitution before successor publication  1307ms
+   ✓ refuses a pending bootstrap genesis substitution before successor publication  1332ms
+   ✓ refuses a pending bootstrap signature substitution before successor publication  1341ms
+ ✓ packages/issuance-store/tests/source-custody-capacity.test.ts (5 tests) 19ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 16 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/creator-rejoin-readmission-native.test.ts > native same-replica creator recovery > preserves independently accepted source epochs through repeated checkpoint gaps
+Error: checkpoint install at epoch 2 failed
+ ❯ tests/creator-rejoin-readmission-native.test.ts:82:56
+     80|     expect((await creator.room.sealEpoch()).ok).toBe(true); await crea…
+     81|    }
+     82|    try {await f.install(member);} catch (cause) {throw new Error(`chec…
+       |                                                        ^
+     83|    const unresolved = await member.room.unresolvedAcceptedWork();
+     84|    expect(unresolved.map(row => row.sourceEpoch)).toEqual(Array.from({…
+
+Caused by: TypeError: D110C_FLOOR_UNAVAILABLE
+ ❯ roomHeadFailure packages/node/src/v3-room.ts:1287:8
+ ❯ callRoomHeadAuthority packages/node/src/v3-room.ts:1372:10
+ ❯ beginRoomHeadAdvance packages/node/src/v3-room.ts:1445:19
+ ❯ performCreatorSuccessorAdoption packages/node/src/v3-room.ts:6803:28
+ ❯ packages/node/src/v3-room.ts:7237:6
+ ❯ withCreatorReceivedPromotionDependencies packages/node/src/v3-room.ts:763:10
+ ❯ packages/node/src/v3-room.ts:7235:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/16]⎯
+
+ FAIL  tests/creator-rejoin-readmission-native.test.ts > native same-replica creator recovery > rejects a plausible forged actual rollback edge while every point signature remains authentic
+ FAIL  tests/creator-rejoin-readmission-native.test.ts > native same-replica creator recovery > rejects a historical absence receipt relabelled as current protected-scope authority
+ FAIL  tests/creator-rejoin-readmission-native.test.ts > native same-replica creator recovery > reopens both actual rollback points after authorized source-base normalization before publication
+ FAIL  tests/creator-rejoin-readmission-native.test.ts > native same-replica creator recovery > rejoins after two missed installs and preserves accepted offline work
+ FAIL  tests/creator-rejoin-recovery-composition-native.test.ts > native recovery across ordinary and checkpoint histories > preserves install history [ 1, 3, 5, 7 ]
+ FAIL  tests/creator-rejoin-recovery-composition-native.test.ts > native recovery across ordinary and checkpoint histories > preserves install history [ 2, 3, 5, 7 ]
+ FAIL  tests/creator-rejoin-recovery-composition-native.test.ts > native recovery across ordinary and checkpoint histories > preserves install history [ 1, 2, 4, 5, 7, 9 ]
+ FAIL  tests/creator-rejoin-recovery-composition-native.test.ts > native recovery across ordinary and checkpoint histories > checks native retirement identity on ordinary cold reopen before a checkpoint jump
+ FAIL  tests/creator-rejoin-recovery-composition-native.test.ts > native recovery across ordinary and checkpoint histories > checks signed retirement identity on ordinary cold reopen before a checkpoint jump
+ FAIL  tests/creator-rejoin-recovery-composition-native.test.ts > native recovery across ordinary and checkpoint histories > reopens an observer with no local settlement plan after a checkpoint gap
+ FAIL  tests/creator-rejoin-recovery-composition-native.test.ts > native recovery across ordinary and checkpoint histories > recovers an interruption at source-custody without reusing an obsolete source commitment
+TypeError: D110C_FLOOR_UNAVAILABLE
+ ❯ roomHeadFailure packages/node/src/v3-room.ts:1287:8
+    1285| 
+    1286| function roomHeadFailure(code: string): never {
+    1287|  throw new TypeError(code);
+       |        ^
+    1288| }
+    1289| 
+ ❯ callRoomHeadAuthority packages/node/src/v3-room.ts:1372:10
+ ❯ beginRoomHeadAdvance packages/node/src/v3-room.ts:1445:19
+ ❯ performCreatorSuccessorAdoption packages/node/src/v3-room.ts:6803:28
+ ❯ packages/node/src/v3-room.ts:7237:6
+ ❯ withCreatorReceivedPromotionDependencies packages/node/src/v3-room.ts:763:10
+ ❯ packages/node/src/v3-room.ts:7235:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/16]⎯
+
+ FAIL  tests/creator-rejoin-readmission-native.test.ts > native same-replica creator recovery > recovers checkpoint adoption after lost before-begin acknowledgement
+ FAIL  tests/creator-rejoin-readmission-native.test.ts > native same-replica creator recovery > recovers checkpoint adoption after lost begin acknowledgement
+ FAIL  tests/creator-rejoin-readmission-native.test.ts > native same-replica creator recovery > recovers checkpoint adoption after lost commit acknowledgement
+TypeError: D110C_FLOOR_UNAVAILABLE
+ ❯ roomHeadFailure packages/node/src/v3-room.ts:1287:8
+    1285| 
+    1286| function roomHeadFailure(code: string): never {
+    1287|  throw new TypeError(code);
+       |        ^
+    1288| }
+    1289| 
+ ❯ callRoomHeadAuthority packages/node/src/v3-room.ts:1372:10
+ ❯ beginRoomHeadAdvance packages/node/src/v3-room.ts:1445:19
+ ❯ packages/node/src/v3-room.ts:2899:70
+ ❯ withCreatorReceivedPromotionDependencies packages/node/src/v3-room.ts:763:10
+ ❯ selectRetainedRoomCustody packages/node/src/v3-room.ts:2883:4
+ ❯ createV3RoomSessionOwned packages/node/src/v3-room.ts:2923:4
+ ❯ Object.open tests/fixtures/chat-membership-shares/room.ts:291:16
+ ❯ tests/creator-rejoin-readmission-native.test.ts:277:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/16]⎯
+
+ FAIL  tests/creator-rejoin-recovery-composition-native.test.ts > native recovery across ordinary and checkpoint histories > recovers an interruption at candidate-stage without reusing an obsolete source commitment
+TypeError: D110C_FLOOR_UNAVAILABLE
+ ❯ roomHeadFailure packages/node/src/v3-room.ts:1287:8
+    1285| 
+    1286| function roomHeadFailure(code: string): never {
+    1287|  throw new TypeError(code);
+       |        ^
+    1288| }
+    1289| 
+ ❯ callRoomHeadAuthority packages/node/src/v3-room.ts:1372:10
+ ❯ beginRoomHeadAdvance packages/node/src/v3-room.ts:1445:19
+ ❯ packages/node/src/v3-room.ts:2899:70
+ ❯ withCreatorReceivedPromotionDependencies packages/node/src/v3-room.ts:763:10
+ ❯ selectRetainedRoomCustody packages/node/src/v3-room.ts:2883:4
+ ❯ createV3RoomSessionOwned packages/node/src/v3-room.ts:2923:4
+ ❯ Object.open tests/fixtures/chat-membership-shares/room.ts:291:16
+ ❯ tests/creator-rejoin-recovery-composition-native.test.ts:159:34
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/16]⎯
+
+
+ Test Files  2 failed | 4 passed (6)
+      Tests  16 failed | 92 passed (108)
+   Start at  11:17:09
+   Duration  93.59s (transform 2.83s, setup 0ms, collect 7.27s, tests 85.22s, environment 1ms, prepare 273ms)
+

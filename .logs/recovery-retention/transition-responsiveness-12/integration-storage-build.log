@@ -1,0 +1,4 @@
+
+> @ts-drp/storage@0.11.0 build /Users/aristotle/Documents/Projects/ts-drp-1/packages/storage
+> tsc -b tsconfig.build.json
+

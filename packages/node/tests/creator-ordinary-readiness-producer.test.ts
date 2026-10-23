@@ -127,6 +127,8 @@ function fixture(profileId = "creator-trusted-v1", oldPayloadBytes = 700) {
 		creatorRuntimeActiveCensusFields: () => ({pendingIngress: {roots: [], wireByteCharge: 0, admission: "unadmitted", graphClosure: "no-pending-roots"}}),
 		liveJournalScope: () => ({objectId: "room", epoch: 2, anchorDigest: anchor}),
 		creatorOrdinaryRuntimeCapacityWidths: (...args: any[]) => {calls.push(["runtimeWidths", ...args]); return {currentClose: 100};},
+		// Width/source authentication remains a controlled premise in this owner-bracket test.
+		creatorSourceCustodyGeometryForSizing: () => undefined,
 		issuanceOrdinaryFinishingCapacityWidths: (...args: any[]) => {calls.push(["issuerWidths", ...args]); return {nativeImageByteLength: 200};},
 		ordinaryApplicationResourceCursors: cursors,
 		ordinaryRuntimeCapacityGeometry: geometry,
@@ -1239,7 +1241,7 @@ describe("readiness-owned recovery source acquisition", () => {
 		for (const owner of ["ahe", "borrowed-header", "issuer", "floor"])
 			expect(f.calls.indexOf(`check:${owner}`)).toBeLessThan(full);
 		expect(f.calls.filter(call => call === "check:lifetime")).toHaveLength(2);
-		expect(f.fullArguments[0]).toEqual([f.input, undefined, undefined, true, f.closeHold, undefined, false, undefined, true, f.borrowedHeader]);
+		expect(f.fullArguments[0]).toEqual([f.input, undefined, undefined, true, f.closeHold, undefined, false, undefined, true, f.borrowedHeader, undefined, undefined, undefined]);
 		expect(f.calls.indexOf("sealed-census")).toBeGreaterThan(full);
 		expect(f.calls.filter(call => call === "check:union")).toHaveLength(1); // Still the original full protected-union check.
 		expect(f.calls.filter(call => call === "release:full")).toHaveLength(1);
