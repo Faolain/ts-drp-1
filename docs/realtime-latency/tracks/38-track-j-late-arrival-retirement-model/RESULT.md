@@ -173,3 +173,5 @@ Their evidence also records the later final-source Apalache checks and larger A5
 run, including the still-open contract induction counterexamples.
 
 The [rejoin contract adjunct](REJOIN-CONTRACT.md) separately checks arbitrary-gap attachment, actual local recovery roles, durable unknown-source custody, and current pruning authority. Its signed-expiry law remains an explicit implementation requirement until a producer is mapped; it does not extend the older adjacent-install bridge or close full-contract induction.
+
+The [pending-floor E2 adjunct](PENDING-FLOOR-EPHEMERAL.md) separately checks installed ephemeral authority under host callbacks, delayed old frames, registration replacement, and cold recovery. A stronger suspension policy is modeled as an optional contract, not a proven missing product gate.
