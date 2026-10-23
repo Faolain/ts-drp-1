@@ -1,0 +1,23 @@
+# Native atomic issuance retirement
+
+Logical issuance retirement and removal of completed settlement-plan entries now share each original native owner transaction. A completed local entry is removed when its source retires. Retained entries protect every replacement and chunk transitively; unresolved reviews, pending unsigned/publication work and inherited/external source custody retain their existing refusal laws. One plan per author remains, with a monotone revision and its current fence, so deletion cannot recreate a null-revision CAS.
+
+The preparation optionally carries a bounded, versioned before/after plan envelope. It is mechanical recovery data. The native owner independently derives it from the actual source rows and chosen protection, then atomically writes the projected plans and completed control. SQLite and ordinary IndexedDB independently read back the exact target image. The room database commits the original owner writes together. Carrier, target rows and control bytes are charged before writes; room write accounting includes each rewritten plan.
+
+Same-intent recovery accepts the carrier only when the actual native target and each after-plan match exactly, restores the original plan bytes, repeats the forward row law, and rechecks the authenticated source and durable coordinator commitments. The metadata domain separately commits the original and completed data images. Digest and revision mismatches refuse; a later completed physical-maintenance image is acquired as a fresh source.
+
+## Portable proof consumers
+
+`verifyLocalNativeSettlementSource` and `verifyNestedNativeSource` in `packages/node/src/v3-live.ts` still reopen the original native source and matching settlement-plan entry. A retained portable replacement therefore pins those dependencies, recursively. The latter verifier bounds the walk by the installed profile's `maxEpochVertices` and `maxEpochBytes`. An embedded source descriptor alone does not discharge that consumer.
+
+The 32-link law regression keeps all 33 rows while the endpoint requires replay, then releases all chain entries once the authenticated selection no longer retains the endpoint. This is conditional release, not proof of eventual landing or unlimited accepted work under unbounded delays. The browser tests use synthetic signatures to exercise native storage mechanics; protocol eligibility and the hundreds-of-epochs application campaign remain separate gates.
+
+## Evidence
+
+- Seven shared-law tests cover dependency closure, exact inverse reconstruction, forged carrier/reference/hole rejection, unresolved review, monotonic retirement, external object/ordinal custody and the 32-link portable chain.
+- Three native adapter tests cover SQLite and IndexedDB commit/reopen/next-plan CAS, including five genuine parent-owned SQLite SIGKILL edges: before and after plan write, after control write, before COMMIT and after COMMIT. Every reopen is exact prepared-old or completed-new.
+- Fifteen native browser cases pass across Chromium, Firefox and WebKit: ordinary owner, room owner, room-section commit, room-section abort and one-byte-under-budget refusal with zero writes. The successful room section counts one plan rewrite plus its control write, with all charges preceding writes.
+- Three source-label recovery regressions distinguish exact retry, fresh completed maintenance after another owner changes, and active-intent source/target drift. Thirteen metadata/sequencer tests, twelve ordinary resource tests and the updated preparation-charge resource oracle pass; eleven existing room owner/binding tests pass. Changed Node, SQLite and browser source plus new tests typecheck with current issuance source routed explicitly.
+- The broader unchanged retirement-image-CAS suite passes 39 of 42 cases. Three journal assertions are stale relative to the base: two hardcode older byte/row limits, and one expects a nullable closed-membership field absent from the canonical row. These are recorded separately, not counted as green H5 evidence.
+
+Independent Codex review found three issues: stale completed-intent recovery selection, cross-object portable source aliasing, and a missing capacity-oracle binding. All three were reproduced and fixed, with regressions passing. The reviewer also reproduced two unrelated resource-test failures against the original HEAD; they are not counted as passing evidence. Native-browser execution was blocked inside the reviewer's sandbox; the separate authorized three-engine run passed all fifteen cases after the fixes. Exact source hashes and compressed logs are recorded in the accompanying manifest. Full application crash recovery, signed delivery/re-admission and long-room stability still require their own integration evidence.

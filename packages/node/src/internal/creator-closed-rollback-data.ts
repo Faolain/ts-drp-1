@@ -26,6 +26,11 @@ import {
 	issuanceUnsignedContinuationWidths,
 	issuanceOrdinaryFinishingCapacityWidths,
 	issuanceRetirementControlFields,
+	closeIssuanceRetirementProtectedRecords,
+	issuanceRetirementImage,
+	issuanceRetirementPreparationWithPlanRewrite,
+	issuanceRetirementPlanRewriteResourceForSizing,
+	reconstructIssuanceRetirementSourceRows,
 	encodeIssuanceRetirementControl,
 	ISSUANCE_RETIREMENT_LIMITS,
 } from "@ts-drp/issuance-store/maintenance";
@@ -12772,6 +12777,7 @@ function deriveCreatorOrdinarySourceResourceProgramForSizing(profile: CreatorOrd
 			basis.authorMaximum, ...(current.currentJournalMaximumAuthorByteLength === 0 ? [] : [{
 				byteLength: current.currentJournalMaximumAuthorByteLength, items: 1, maxDepth: 0}])];
 		setResource("author.maximum", Object.freeze({byteLength: Math.max(...authorResources.map(value => value.byteLength)), items: Math.max(...authorResources.map(value => value.items)), maxDepth: Math.max(...authorResources.map(value => value.maxDepth))}));
+		setResource("issuance.planRewrite", issuanceRetirementPlanRewriteResourceForSizing(rows.plans) ?? actual(null));
 		let oldSigning: ReturnType<typeof closedSigningControl>, signingEpochCount: number, evidenceCount: number, summaryCount: number;
 		if (signingUnchanged) {
 			oldSigning = preparedSigning!.control as ReturnType<typeof closedSigningControl>;
@@ -13825,7 +13831,8 @@ function buildCreatorOrdinaryFinishingResourceProgramForSizing(input: Readonly<{
 		const summarySource = record({entries: summaryEntries, sourceDataDigest: digest, resumeBasisDigest: digest, eligibilityFence: signingPrep});
 		const summaryPrep = record({...labels, protectedEpochs: array(signingEpochCountTerm, integer), summarySource});
 		const participantPreps = [record({...labels, protectedScopes: array(protectedSnapshotCountTerm, pair)}), record({...labels, protectedScopes: protectedHeaders}),
-			record({...labels, protectedRecords}), maximum(signingPrep, summaryPrep)];
+			record({...labels, protectedRecords, planRewrite: inputResource("issuance.planRewrite",
+				issuanceRetirementPlanRewriteResourceForSizing(rows.plans) ?? nil)}), maximum(signingPrep, summaryPrep)];
 		const preparation = record({head, floorEpoch: integer, floorAnchor: digest, decisionDigest: digest, sourceProofDigest: digest,
 			generationRecordDigests: recordDigests, snapshotScopes: snapshotHoles, protectedIndices: array(snapshotCountTerm, integer),
 			retireIndices: array(snapshotCountTerm, integer), domains});
@@ -14142,9 +14149,9 @@ function buildCreatorOrdinaryFinishingResourceProgramForSizing(input: Readonly<{
 			classifier, summarySource.byteLength, journalRawSupplement);
 		const metadataControlBytes = sum(...participantBounds.map(control => 3 * control.byteLength), 3 * floorImage.byteLength, 2 * ahePoint.byteLength);
 		const metadataEpisode = sum(metadataControlBytes, record({preparation, generations: partition}).byteLength,
-			aheControl.byteLength, serialAhePrepared.byteLength, serialAheCompleted.byteLength, sourceAndDecision);
+			aheControl.byteLength, serialAhePrepared.byteLength, serialAheCompleted.byteLength, sourceAndDecision, participantPreps[2]!.byteLength);
 		const generationMetadataEpisode = sum(metadataControlBytes, record({preparation: generationPreparation, generations: partition}).byteLength,
-			4 * aheControl.byteLength, generationSourceAndDecision);
+			4 * aheControl.byteLength, generationSourceAndDecision, participantPreps[2]!.byteLength);
 		const signingBatches = 1 + Math.ceil(Math.max(evidenceCount, summaryCount) / SIGNING_DETAIL_RETIREMENT_BATCH_ROWS);
 		const journalBatches = 1 + Math.ceil((journal.rowCount + headerDrain.count) / LIVE_JOURNAL_RETIREMENT_BATCH_ROWS);
 		// sourcePhysicalWidths/evidenceFrame reserve one immutable row-plan, either
@@ -14239,9 +14246,9 @@ function buildCreatorOrdinaryFinishingResourceProgramForSizing(input: Readonly<{
 			const metadataControlTerm = compiler.sum(...participantBounds.map(value => compiler.product(3, width(value))),
 				compiler.product(3, width(floorImage)), compiler.product(2, width(ahePoint)));
 			const metadataTerm = compiler.sum(metadataControlTerm, width(record({preparation, generations: partition})),
-				width(aheControl), width(serialAhePrepared), width(serialAheCompleted), sourceDecisionTerm);
+				width(aheControl), width(serialAhePrepared), width(serialAheCompleted), sourceDecisionTerm, width(participantPreps[2]!));
 			const generationMetadataTerm = compiler.sum(metadataControlTerm, width(record({preparation: generationPreparation, generations: partition})),
-				compiler.product(4, width(aheControl)), width(generationSourceCarrier), width(generationDecisionCarrier));
+				compiler.product(4, width(aheControl)), width(generationSourceCarrier), width(generationDecisionCarrier), width(participantPreps[2]!));
 			const signingBatchTerm = compiler.sum(1, compiler.ceilDivide(compiler.maximum(evidenceCountTerm, summaryCountTerm), SIGNING_DETAIL_RETIREMENT_BATCH_ROWS));
 			const journalBatchTerm = compiler.sum(1, compiler.ceilDivide(compiler.sum(inputNumber("journal.rowCount", journal.rowCount),
 				inputNumber("journal.retiredHeaders", headerDrain.count)), LIVE_JOURNAL_RETIREMENT_BATCH_ROWS));
@@ -15575,6 +15582,11 @@ export function evaluateCreatorOrdinaryFinishingCapacityTemplate(
 		set("native.image", issuer.nativeImageByteLength);
 		set("native.image.items", issuer.nativeImageShape.items);
 		set("native.image.depth", issuer.nativeImageShape.maxDepth);
+		const planRewriteResource = issuanceRetirementPlanRewriteResourceForSizing(native.rows.plans) ??
+			{byteLength: 1, items: 1, maxDepth: 0};
+		set("native.planRewrite", planRewriteResource.byteLength);
+		set("native.planRewrite.items", planRewriteResource.items);
+		set("native.planRewrite.depth", planRewriteResource.maxDepth);
 		set("material.whole", creatorFinishingMaterialWidth(input, facts.frame.accounting, seed));
 		const currentScope = {objectId: seed.objectId, epoch: seed.currentTrust.currentEpoch,
 			anchorDigest: seed.currentTrust.currentAnchorDigest};
@@ -16688,6 +16700,21 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 		};
 		const finalNativeRowsForSizing = nativeRowsCapacity(preclose ? "ordinaryFinal" : "successorFinal", postAdoptionCensus.nativeRowsByteLength);
 		const finalNativeImageForSizing = nativeImageCapacity(postAdoptionCensus.nativeImageByteLength);
+		const exactPlanRewriteResource = postAdoptionCensus.nativePlanRewriteResource;
+		if (native.rows.plans.some(plan => plan.entries.length !== 0) && exactPlanRewriteResource === undefined)
+			return Object.freeze({ok: false, reason: "MAINTENANCE_PLAN_REWRITE_WIDTH_UNAVAILABLE"});
+		const capacityPlanRewriteResource = capacityDimensions === undefined ? undefined :
+			issuanceRetirementPlanRewriteResourceForSizing(native.rows.plans) ?? {byteLength: 1, items: 1, maxDepth: 0};
+		if (capacityPlanRewriteResource !== undefined && exactPlanRewriteResource !== undefined &&
+			(capacityPlanRewriteResource.byteLength < exactPlanRewriteResource.byteLength ||
+			 capacityPlanRewriteResource.items < exactPlanRewriteResource.items || capacityPlanRewriteResource.maxDepth < exactPlanRewriteResource.maxDepth))
+			return Object.freeze({ok: false, reason: "MAINTENANCE_PLAN_REWRITE_CAPACITY_INCONCLUSIVE"});
+		const finalPlanRewriteResource = capacityPlanRewriteResource ?? exactPlanRewriteResource;
+		if (compiler !== undefined && capacityPlanRewriteResource !== undefined) {
+			compiler.bind("native.planRewrite", capacityPlanRewriteResource.byteLength);
+			compiler.bind("native.planRewrite.items", capacityPlanRewriteResource.items);
+			compiler.bind("native.planRewrite.depth", capacityPlanRewriteResource.maxDepth);
+		}
 		const finalRuntimeForSizing = checkedRuntimeCapacity(preclose ? "currentClose" : "successorFinal",
 			postAdoptionCensus.runtimeCensusOverheadByteLength,
 			{rows: finalNativeRowsForSizing, image: finalNativeImageForSizing, control: native.control});
@@ -17342,7 +17369,8 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 		const preparationSeeds: Readonly<Record<string, unknown>>[] = [
 			{ ...labels, protectedScopes: sourceSnapshots },
 			{ ...labels, protectedScopes: protectedJournalScopes },
-			{ ...labels, protectedRecords },
+			{ ...labels, protectedRecords, planRewrite: finalPlanRewriteResource === undefined ? null :
+				maintenanceEncodedWidth(finalPlanRewriteResource.byteLength, finalPlanRewriteResource) },
 			{ ...labels, protectedEpochs: signingEpochs },
 		];
 		if (native.rows.lineages.some((row) => row.author !== issuanceScope.author && row.pendingUnsigned !== undefined))
@@ -17987,6 +18015,9 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 					branchPreparations: readonly unknown[] = preparations,
 					reuseJournalSourceOld = false
 				): void => {
+					// Source construction charges the standalone exact issuance preparation,
+					// including the bounded before/after plan carrier, before native writes.
+					add(branchPreparations[2]);
 					for (let index = 0; index < maintenanceParticipants.length; index++) {
 						const old = maintenanceParticipants[index]!;
 						const p = branchPreparations[index];
@@ -19220,7 +19251,7 @@ function closedIssuanceProtectedRecordsForRetirement(input: Readonly<{
 	const classified = Array.isArray(input.censusRows) ? input.censusRows : [];
 	const same = input.control?.active?.preparation.throughEpoch === input.throughEpoch
 		? input.control.active.preparation : input.control?.completed?.throughEpoch === input.throughEpoch ? input.control.completed : undefined;
-	return Object.freeze(input.rows.issued.filter(row => {
+	const selected = Object.freeze(input.rows.issued.filter(row => {
 		const value = record(row.canonicalPreimageBytes), epoch = value.epoch;
 		requireLaw(typeof epoch === "number" && Number.isSafeInteger(epoch) && epoch >= 0, "chain-invalid");
 		requireLaw(row.objectId === input.objectId && value.objectId === input.objectId && value.author === row.author &&
@@ -19251,6 +19282,8 @@ function closedIssuanceProtectedRecordsForRetirement(input: Readonly<{
 			const left = JSON.stringify([a.author, a.authorSequence, a.digest]), right = JSON.stringify([b.author, b.authorSequence, b.digest]);
 			return left < right ? -1 : left > right ? 1 : 0;
 		}));
+	return closeIssuanceRetirementProtectedRecords({control: input.control, rows: input.rows,
+		throughEpoch: input.throughEpoch, protectedRecords: selected});
 }
 
 /** Installation consumes only the original native image's exact-byte syntax
@@ -19435,21 +19468,21 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 	const census = record(source.census),
 		nativeIssuance = census.nativeIssuance;
 	requireLaw(nativeIssuance !== null && typeof nativeIssuance === "object" && !Array.isArray(nativeIssuance));
-	const issuanceImage = (nativeIssuance as Readonly<{ image: Readonly<{ imageDigest: string }> }>).image;
-	const issuanceRows = (
-		nativeIssuance as Readonly<{
-			rows: Readonly<{
-				issued: readonly Readonly<{
-					author: string;
-					authorSequence: number;
-					digest: Uint8Array;
-					canonicalPreimageBytes: Uint8Array;
-				}>[];
-			}>;
-		}>
-	).rows;
-	const issuanceControl = (nativeIssuance as Readonly<{ control?: unknown }>).control;
+	const native = nativeIssuance as Readonly<{rows: IssuanceRetirementRows;
+		image: ReturnType<typeof issuanceRetirementImage>; control?: DurableIssuanceRetirementControl | null}>;
+	const issuanceControl = native.control;
 	requireLaw(issuanceControl !== undefined, "snapshot-unavailable");
+	const coordinatorIntent = source.aheControl?.active?.preparation ?? source.aheControl?.completed;
+	const priorRewrite = issuanceControl?.active === null && issuanceControl.completed?.throughEpoch === cut.epoch &&
+		issuanceControl.completed.planRewrite !== undefined && coordinatorIntent != null &&
+		coordinatorIntent.decisionDigest === issuanceControl.completed.decisionDigest &&
+		coordinatorIntent.sourceProofDigest === issuanceControl.completed.sourceProofDigest ? issuanceControl.completed : undefined;
+	const exactRewriteTarget = priorRewrite !== undefined && native.image.imageDigest === priorRewrite.planRewrite!.targetImageDigest;
+	// An active global intent must resume its exact image. Once globally complete,
+	// later authenticated physical maintenance may establish a fresh source instead.
+	if (priorRewrite !== undefined && source.aheControl?.active != null) requireLaw(exactRewriteTarget, "floor-stale");
+	const restoredIssuanceRows = exactRewriteTarget ?
+		reconstructIssuanceRetirementSourceRows(issuanceControl!, priorRewrite!, native.rows) : undefined;
 	const signingData = closedSigningDataRows(source.signingRows, input.objectId);
 	const journalPrefixes: readonly LiveJournalRetirementLocalPrefix[] = Object.freeze(
 		(source.signingSummaries === undefined && source.generationSource === undefined
@@ -19479,63 +19512,82 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 	const summaries = source.signingSummaries;
 	const retainedSigningData =
 		summaries === undefined ? signingData : closedSigningSummaryResidualRows(signingData, summaries.entries);
-	const resumeBasisDigest =
-		summaries === undefined
-			? undefined
-			: closedRetirementDigest(
-					"ts-drp/closed-retirement-resume-basis/v2",
-					sourceBytes,
-					closedRetirementBytes({ rows: issuanceRows, image: issuanceImage }),
-					...retainedSigningData,
-					...source.journal.canonicalRows
-				);
-	if (summaries?.resumeBasisDigest !== undefined)
-		requireLaw(summaries.resumeBasisDigest === resumeBasisDigest, "floor-stale");
-	let summarySource: SigningSummaryRetirementSource | undefined;
-	if (summaries !== undefined) {
-		requireLaw(resumeBasisDigest !== undefined, "chain-invalid");
-		summarySource = Object.freeze({
-			entries: summaries.entries,
-			sourceDataDigest: summaries.sourceDataDigest,
-			resumeBasisDigest,
-			eligibilityFence: summaries.eligibilityFence,
-		});
-	}
-	let generationSource: AheRetirementGenerationSource | undefined;
-	if (generationPlan !== undefined) {
-		const basis = closedRetirementDigest(
-			"ts-drp/closed-ahe-retirement-resume-basis/v3",
-			sourceBytes,
-			closedRetirementBytes({ rows: issuanceRows, image: issuanceImage }),
-			...signingData,
-			...source.journal.canonicalRows
-		);
-		if (generationPlan.resumeBasisDigest !== undefined)
-			requireLaw(generationPlan.resumeBasisDigest === basis, "floor-stale");
-		generationSource = captureAheRetirementGenerationSource({ ...generationPlan, resumeBasisDigest: basis });
-	}
-	const sourceProofDigest =
-		generationSource !== undefined
-			? closedRetirementDigest("ts-drp/closed-retirement-source/v3", closedRetirementBytes(generationSource))
-			: summarySource === undefined
-				? closedRetirementDigest(
-						"ts-drp/closed-retirement-source/v1",
+	// Inversion is recovery only when the whole authenticated source still names
+	// the completed intent. Another owner's fresh image can legitimately change
+	// after global completion while issuance itself remains at the same target.
+	const deriveSourceLabels = (issuanceRows: IssuanceRetirementRows,
+		issuanceImage: ReturnType<typeof issuanceRetirementImage>) => {
+		const resumeBasisDigest =
+			summaries === undefined
+				? undefined
+				: closedRetirementDigest(
+						"ts-drp/closed-retirement-resume-basis/v2",
 						sourceBytes,
 						closedRetirementBytes({ rows: issuanceRows, image: issuanceImage }),
-						...signingData,
+						...retainedSigningData,
 						...source.journal.canonicalRows
-					)
-				: closedRetirementDigest("ts-drp/closed-retirement-source/v2", closedRetirementBytes(summarySource));
-	const decisionBytes = closedRetirementBytes(closedRetirementDecisionCarrierFields({
-		cut,
-		sourceProofDigest,
-		generationSource: generationSource !== undefined,
-		summarySource: summarySource !== undefined,
-		evidenceDraining,
-		journalDraining: draining,
-	}));
+					);
+		let resumeBasisMatches = summaries?.resumeBasisDigest === undefined || summaries.resumeBasisDigest === resumeBasisDigest;
+		let summarySource: SigningSummaryRetirementSource | undefined;
+		if (summaries !== undefined) {
+			requireLaw(resumeBasisDigest !== undefined, "chain-invalid");
+			summarySource = Object.freeze({
+				entries: summaries.entries,
+				sourceDataDigest: summaries.sourceDataDigest,
+				resumeBasisDigest,
+				eligibilityFence: summaries.eligibilityFence,
+			});
+		}
+		let generationSource: AheRetirementGenerationSource | undefined;
+		if (generationPlan !== undefined) {
+			const basis = closedRetirementDigest(
+				"ts-drp/closed-ahe-retirement-resume-basis/v3",
+				sourceBytes,
+				closedRetirementBytes({ rows: issuanceRows, image: issuanceImage }),
+				...signingData,
+				...source.journal.canonicalRows
+			);
+			resumeBasisMatches &&= generationPlan.resumeBasisDigest === undefined || generationPlan.resumeBasisDigest === basis;
+			generationSource = captureAheRetirementGenerationSource({ ...generationPlan, resumeBasisDigest: basis });
+		}
+		const sourceProofDigest =
+			generationSource !== undefined
+				? closedRetirementDigest("ts-drp/closed-retirement-source/v3", closedRetirementBytes(generationSource))
+				: summarySource === undefined
+					? closedRetirementDigest(
+							"ts-drp/closed-retirement-source/v1",
+							sourceBytes,
+							closedRetirementBytes({ rows: issuanceRows, image: issuanceImage }),
+							...signingData,
+							...source.journal.canonicalRows
+						)
+					: closedRetirementDigest("ts-drp/closed-retirement-source/v2", closedRetirementBytes(summarySource));
+		const decisionBytes = closedRetirementBytes(closedRetirementDecisionCarrierFields({
+			cut,
+			sourceProofDigest,
+			generationSource: generationSource !== undefined,
+			summarySource: summarySource !== undefined,
+			evidenceDraining,
+			journalDraining: draining,
+		}));
+		const decisionDigest = closedRetirementDigest("ts-drp/closed-retirement-decision/v1", decisionBytes);
+		return {resumeBasisMatches, summarySource, generationSource, sourceProofDigest, decisionDigest, decisionBytes};
+	};
+	const restoredIssuanceImage = restoredIssuanceRows === undefined ? undefined :
+		issuanceRetirementImage(restoredIssuanceRows, input.objectId);
+	const restoredLabels = restoredIssuanceRows === undefined ? undefined : deriveSourceLabels(restoredIssuanceRows, restoredIssuanceImage!);
+	const sameRewriteSource = restoredLabels !== undefined && restoredLabels.resumeBasisMatches && priorRewrite !== undefined &&
+		restoredLabels.decisionDigest === priorRewrite.decisionDigest && restoredLabels.sourceProofDigest === priorRewrite.sourceProofDigest;
+	if (priorRewrite !== undefined && source.aheControl?.active != null) requireLaw(sameRewriteSource, "floor-stale");
+	const completedRewrite = sameRewriteSource ? priorRewrite : undefined;
+	const issuanceRows = completedRewrite === undefined ? native.rows : restoredIssuanceRows!;
+	const issuanceImage = completedRewrite === undefined ? native.image : restoredIssuanceImage!;
+	const {resumeBasisMatches, summarySource, generationSource, sourceProofDigest, decisionDigest, decisionBytes} =
+		completedRewrite === undefined ? deriveSourceLabels(issuanceRows, issuanceImage) : restoredLabels!;
+	requireLaw(resumeBasisMatches, "floor-stale");
+	if (completedRewrite !== undefined)
+		requireLaw(accounting.charge(closedRetirementBytes(completedRewrite)), "proof-budget-exceeded");
 	requireLaw(accounting.charge(decisionBytes), "proof-budget-exceeded");
-	const decisionDigest = closedRetirementDigest("ts-drp/closed-retirement-decision/v1", decisionBytes);
 	if (source.inheritedClassification?.phase === "confirm") {
 		const pending = source.inheritedClassification.inventory.owner.classificationIntent;
 		// The pending pointer is an additional refusal fence, never authority.
@@ -19699,7 +19751,7 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 		}
 	};
 	const protectedRecords = closedIssuanceProtectedRecordsForRetirement({objectId: input.objectId, throughEpoch: cut.epoch,
-		rows: (nativeIssuance as {rows: IssuanceRetirementRows}).rows, control: issuanceControl as DurableIssuanceRetirementControl | null,
+		rows: issuanceRows, control: issuanceControl,
 		censusRows: census.rows, protectedReplayScopes: source.journalDetails.protectedReplayScopes,
 		physicalJournalRows: source.journalPhysical.canonicalRows,
 		dependenciesClassified: source.issuanceDependenciesClassified === true && source.inheritedClassification === undefined});
@@ -19712,11 +19764,14 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 				epoch: record(row.canonicalPreimageBytes).epoch})),
 			classifications: Array.isArray(census.rows) ? [...new Set(census.rows.map(row => `${row.classification}:${row.dependencyKind}`))] : []});
 	} catch { /* Observation neither unprotects nor prunes any record. */ }
-	const issuancePreparation = Object.freeze({ ...labels, protectedRecords });
+	const issuancePreparation = issuanceRetirementPreparationWithPlanRewrite(issuanceControl, {...labels, protectedRecords}, issuanceRows);
+	requireLaw(accounting.charge(closedRetirementBytes(issuancePreparation)), "proof-budget-exceeded");
+	const issuanceCompletedImage = issuancePreparation.planRewrite?.targetImageDigest ?? issuanceImage.imageDigest;
 	const issuanceNative = async (): Promise<ClosedEpochRetirementMetadataRead> => {
 		const read = await (room?.session !== undefined ? room.issuanceIn(room.session) : source.acquireIssuance());
 		try {
-			checkSourceImage(read.image.imageDigest, issuanceImage.imageDigest);
+			const isCompleted = read.control.active === null && closedRetirementEqual(read.control.completed, issuancePreparation);
+			checkSourceImage(read.image.imageDigest, isCompleted ? issuanceCompletedImage : issuanceImage.imageDigest);
 			requireLaw(accounting.charge(closedRetirementBytes(read.control)), "proof-budget-exceeded");
 			return Object.freeze({
 				control: read.control,
@@ -19764,6 +19819,7 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 				roles,
 				preparation,
 				initial,
+				...(roles === 16 ? {completedImageDigest: issuanceCompletedImage} : {}),
 				...(boundDomain(roles) === undefined ? {} : { durableCommitment: boundDomain(roles) }),
 				...(roles === 8
 					? {

@@ -136,6 +136,7 @@ describe("ordinary settlement finite capacity through existing owners (no proof 
 		expect(controls.serialAhePrepared.byteLength).toBeGreaterThanOrEqual(encodeCanonical(serialEmitted[1]).byteLength);
 		expect(controls.serialAheCompleted.byteLength).toBeGreaterThanOrEqual(encodeCanonical(serialEmitted[2]).byteLength);
 		const metadataBindings={...bindings,...controls,participantBounds:[footprint(old),footprint(old),footprint(old),footprint(old)],
+			participantPreps:[footprint(null),footprint(null),footprint({preparationBytes:new Uint8Array(257)}),footprint(null)],
 			floorImage:footprint({oldFloor:1}),ahePoint:footprint({head:1}),preparation:footprint(ordinary),partition:footprint(partition),
 			generationPreparation:footprint({...ordinary,generationSource:{bytes:new Uint8Array(4096)}}),aheControl:footprint(old),
 			sourceAndDecision:encodeCanonical(fullEvidenceSource).byteLength+decisionBytes.byteLength,
@@ -145,6 +146,9 @@ describe("ordinary settlement finite capacity through existing owners (no proof 
 			measure=(value:typeof metadataBindings)=>new Function("bindings",`const {${Object.keys(value).join(",")}}=bindings;${metadataJs};return [metadataEpisode,generationMetadataEpisode];`)(value),
 			baseline=measure(metadataBindings),changed=measure({...metadataBindings,sourceAndDecision:metadataBindings.sourceAndDecision+8334});
 		expect(changed).toEqual([baseline[0]+8334,baseline[1]]); // No evidence source occurs in GEN metadata.
+		const widerPreparation = measure({...metadataBindings, participantPreps: metadataBindings.participantPreps.map((value: ReturnType<typeof footprint>, index: number) =>
+			index === 2 ? {...value, byteLength:value.byteLength + 131} : value)});
+		expect(widerPreparation).toEqual([baseline[0]+131, baseline[1]+131]);
 		const compiler=createCreatorNoneResourceProgramCompiler(),compiledBindings={...metadataBindings,compiler,record:compiler.backend(limits).record,
 			width:(value:any)=>compiler.references(value).byteLength,sourceDecisionTerm:compiler.inputNumber("test.evidenceSource",metadataBindings.sourceAndDecision),
 			generationSourceCarrier:resource.generationSourceCarrier,generationDecisionCarrier:resource.generationDecisionCarrier};

@@ -9,8 +9,27 @@ import {
 } from "@ts-drp/storage";
 import {
 	applyClosedEpochRetirementIntent,
+	captureClosedEpochRetirementMetadataDomain,
+	validateClosedEpochRetirementMetadataDomain,
 	type ClosedEpochRetirementParticipantRead,
 } from "../src/internal/closed-epoch-cleanup.js";
+
+it("binds atomic row rewrites to exact prepared and completed native images", () => {
+	const control = {kind: "v3-issuance-retirement-control-1", objectId: "rewrite-room", incarnation: "01".repeat(32),
+		revision: 3, sequence: 2, active: null, completed: null};
+	const preparation = {decisionDigest: "02".repeat(32), sourceProofDigest: "03".repeat(32), throughEpoch: 4, protectedRecords: []};
+	const before = "04".repeat(32), after = "05".repeat(32);
+	const domain = captureClosedEpochRetirementMetadataDomain(16, control, before, preparation, undefined, after);
+	const prepared = {...control, revision: 4, sequence: 3, active: {sequence: 3, preparation}};
+	const completed = {...control, revision: 5, sequence: 3, completed: preparation};
+	expect(validateClosedEpochRetirementMetadataDomain(control, before, preparation, domain, undefined, after)).toBe("old");
+	expect(validateClosedEpochRetirementMetadataDomain(prepared, before, preparation, domain, undefined, after)).toBe("prepared");
+	expect(validateClosedEpochRetirementMetadataDomain(completed, after, preparation, domain, undefined, after)).toBe("completed");
+	for (const [observed, image, projected] of [[prepared, after, after], [prepared, before, before],
+		[completed, before, after], [completed, "06".repeat(32), after]] as const) {
+		expect(() => validateClosedEpochRetirementMetadataDomain(observed, image, preparation, domain, undefined, projected)).toThrow();
+	}
+});
 
 /** This exercises the real sequencer and native codecs. The fixture supplies
  * already authenticated participant facts; it does not claim signature/storage

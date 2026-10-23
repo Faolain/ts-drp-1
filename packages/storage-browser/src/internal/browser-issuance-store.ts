@@ -76,9 +76,12 @@ import {
 	ISSUANCE_RETIREMENT_LIMITS,
 	issuanceRetirementAllows,
 	issuanceRetirementBytesEqual,
+	issuanceRetirementCommitRows,
 	issuanceRetirementHex,
 	issuanceRetirementImage,
 	issuanceRetirementRefusal,
+	issuanceRetirementPreparationWithPlanRewrite,
+	issuanceRetirementTransitionRows,
 	type IssuanceRetirementRows,
 	issuanceUnsignedPostimageCharge,
 	joinIssuanceNativeSign,
@@ -592,6 +595,15 @@ async function browserRetirementRows(
 	};
 }
 
+async function browserWriteRetirementPlanChanges(transaction: IDBTransaction,
+	before: IssuanceRetirementRows, after: IssuanceRetirementRows): Promise<void> {
+	for (let index = 0; index < before.plans.length; index++) {
+		if (before.plans[index] === after.plans[index]) continue;
+		await requestResult(transaction.objectStore(roomStoreName(transaction.db, "issuance", "settlementPlans"))
+			.put(nativeSettlementPlan(after.plans[index]!)));
+	}
+}
+
 /** Private data for ONE object in ONE genuine readonly transaction. No
  * authentication, control, classification or protocol currency is retained. */
 interface HeldIssuanceRecoveryImage {
@@ -950,11 +962,12 @@ class BrowserIssuanceImplementation {
 		const control = snapshot.control as DurableIssuanceRetirementControl,
 			image = snapshot.image;
 		return createIssuanceRetirementControlRead(control, image, (next, p) =>
-			this.#trackRetirement(this.#compareRetirement(control, image.imageDigest, next, p))
+			this.#trackRetirement(this.#compareRetirement(control, snapshot.rows, image.imageDigest, next, p))
 		);
 	}
 	async #compareRetirement(
 		control: DurableIssuanceRetirementControl,
+		capturedRows: IssuanceRetirementRows,
 		imageDigest: string,
 		next: DurableIssuanceRetirementControl,
 		p?: DurableIssuanceRetirementPreparation
@@ -962,6 +975,8 @@ class BrowserIssuanceImplementation {
 		this.#assertAvailable();
 		if (this.#readReservations.view())
 			throw issuanceRetirementRefusal("join issuance native readonly reservation before retirement");
+		const expectedRows = issuanceRetirementTransitionRows(control, next, capturedRows);
+		const expectedImage = issuanceRetirementImage(expectedRows, control.objectId);
 		const objectId = control.objectId,
 			transaction = this.#startTransaction("readwrite"),
 			terminal = transactionResult(transaction);
@@ -979,6 +994,10 @@ class BrowserIssuanceImplementation {
 			)
 				throw issuanceRetirementRefusal("issuance retirement source stale");
 			if (p) assertIssuanceRetirementPreparationRows(current, p, rows);
+			const targetRows = issuanceRetirementTransitionRows(current, next, rows);
+			if (issuanceRetirementImage(targetRows, objectId).imageDigest !== expectedImage.imageDigest)
+				throw issuanceRetirementRefusal("issuance retirement target stale");
+			await browserWriteRetirementPlanChanges(transaction, rows, targetRows);
 			await requestResult(
 				transaction.objectStore(roomStoreName(transaction.db, "issuance", "retirementControls")).put({ objectId, record: encodeIssuanceRetirementControl(next) })
 			);
@@ -1004,7 +1023,7 @@ class BrowserIssuanceImplementation {
 				encodeIssuanceRetirementControl(observed.control),
 				encodeIssuanceRetirementControl(next)
 			) &&
-			observed.image.imageDigest === imageDigest
+			observed.image.imageDigest === expectedImage.imageDigest
 		)
 			return observed.control;
 		if (
@@ -2848,16 +2867,16 @@ export function browserRoomIssuanceRetentionSection(databaseName: string, store?
 					);
 				const protectedRecords = chosen.protectedRecords.map((record) => ({ ...record }));
 				const preparation = (labels: Readonly<{ decisionDigest: string; sourceProofDigest: string }>) =>
-					captureIssuanceRetirementPreparation({
+					issuanceRetirementPreparationWithPlanRewrite(control, captureIssuanceRetirementPreparation({
 						decisionDigest: labels.decisionDigest,
 						sourceProofDigest: labels.sourceProofDigest,
 						throughEpoch: through,
 						protectedRecords,
-					});
+					}), rows);
 				const current = control;
+				const probe = preparation({ decisionDigest: "0".repeat(64), sourceProofDigest: "0".repeat(64) });
 				// The original preparation row law, label-independent, before anything is written.
 				try {
-					const probe = preparation({ decisionDigest: "0".repeat(64), sourceProofDigest: "0".repeat(64) });
 					if (current.completed !== null && probe.throughEpoch < current.completed.throughEpoch)
 						return retentionStale("issuance:advance");
 					assertIssuanceRetirementPreparationRows(current, probe, rows);
@@ -2865,6 +2884,17 @@ export function browserRoomIssuanceRetentionSection(databaseName: string, store?
 					if (cause instanceof RoomRetentionRefusal) throw cause;
 					return retentionStale(`issuance:rows:${cause instanceof Error ? cause.message : ""}`);
 				}
+				const targetRows = issuanceRetirementCommitRows(current, probe, rows);
+				book.charge("issuance", encodeCanonical(probe).byteLength);
+				const rewrites = Object.freeze(rows.plans.flatMap((before, index) => {
+					const after = targetRows.plans[index]!;
+					if (after === before) return [];
+					const key = [objectId, after.scope.author], value = nativeSettlementPlan(after);
+					chargeRetentionRow(book, "issuance", "settlementPlans", key, value);
+					return [Object.freeze({store: "settlementPlans", key,
+						before: retentionValueDigest("settlementPlans", key, nativeSettlementPlan(before)),
+						after: retentionValueDigest("settlementPlans", key, value), value})];
+				}));
 				const { revision: _revision, ...state } = current;
 				const section: RoomRetentionSectionDraft = Object.freeze({
 					owner: "issuance" as const,
@@ -2873,7 +2903,7 @@ export function browserRoomIssuanceRetentionSection(databaseName: string, store?
 					control: roomRetentionControlDigest(encodeIssuanceRetirementControl(current)),
 					through,
 					deletes: Object.freeze([]),
-					rewrites: Object.freeze([]),
+					rewrites,
 					compose: async (labels: RoomRetentionLabels) => {
 						let committed: DurableIssuanceRetirementControl;
 						try {
@@ -2885,6 +2915,7 @@ export function browserRoomIssuanceRetentionSection(databaseName: string, store?
 							return retentionStale("issuance:transition");
 						}
 						const value = { objectId, record: encodeIssuanceRetirementControl(committed) };
+						chargeRetentionRow(book, "issuance", "retirementControls", objectId, value);
 						return Object.freeze({
 							value,
 							digest: retentionValueDigest("retirementControls", objectId, value),
@@ -2893,6 +2924,10 @@ export function browserRoomIssuanceRetentionSection(databaseName: string, store?
 					},
 					write: (target: RoomRetentionTarget, writeBook: RoomRetentionProofBook) =>
 						session.run(async (writer) => {
+							for (const row of rewrites) {
+								writeBook.write({ kind: "rewrite", owner: "issuance", store: "settlementPlans" });
+								await requestResult(writer.objectStore(roomStoreName(writer.db, "issuance", "settlementPlans")).put(row.value));
+							}
 							writeBook.write({ kind: "control", owner: "issuance" });
 							await requestResult(
 								writer.objectStore(roomStoreName(writer.db, "issuance", "retirementControls")).put(target.value)
@@ -3030,7 +3065,7 @@ export async function acquireBrowserRoomIssuanceRetirement(
 		const rows = await browserRetirementRows(transaction, objectId),
 			control = await browserRetirementControl(transaction, objectId),
 			image = issuanceRetirementImage(rows, objectId);
-		if (control !== null) return { control, image };
+		if (control !== null) return { control, image, rows };
 		const born: DurableIssuanceRetirementControl = {
 			kind: "v3-issuance-retirement-control-1",
 			objectId,
@@ -3045,12 +3080,14 @@ export async function acquireBrowserRoomIssuanceRetirement(
 				.objectStore(roomStoreName(transaction.db, "issuance", "retirementControls"))
 				.add({ objectId, record: encodeIssuanceRetirementControl(born) })
 		);
-		return { control: born, image };
+		return { control: born, image, rows };
 	});
 	const control = snapshot.control,
 		image = snapshot.image;
 	return createIssuanceRetirementControlRead(control, image, async (next, p) => {
 		guard();
+		const expectedRows = issuanceRetirementTransitionRows(control, next, snapshot.rows);
+		const expectedImage = issuanceRetirementImage(expectedRows, objectId);
 		await session.run(async (transaction) => {
 			const current = await browserRetirementControl(transaction, objectId),
 				rows = await browserRetirementRows(transaction, objectId);
@@ -3064,6 +3101,10 @@ export async function acquireBrowserRoomIssuanceRetirement(
 			)
 				throw issuanceRetirementRefusal("issuance retirement source stale");
 			if (p) assertIssuanceRetirementPreparationRows(current, p, rows);
+			const targetRows = issuanceRetirementTransitionRows(current, next, rows);
+			if (issuanceRetirementImage(targetRows, objectId).imageDigest !== expectedImage.imageDigest)
+				throw issuanceRetirementRefusal("issuance retirement target stale");
+			await browserWriteRetirementPlanChanges(transaction, rows, targetRows);
 			await requestResult(
 				transaction
 					.objectStore(roomStoreName(transaction.db, "issuance", "retirementControls"))

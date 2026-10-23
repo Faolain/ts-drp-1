@@ -1,0 +1,12 @@
+Read-only probes reproduced two retirement regressions, and the capacity change introduces an existing-test failure. The 22 focused tests passed, but native-browser validation was blocked by sandbox launch permissions.
+
+Full review comments:
+
+- [P1] Allow fresh maintenance after a globally completed rewrite — /private/tmp/ts-drp-track-x-h5-native/packages/node/src/internal/creator-closed-rollback-data.ts:19571-19575
+  When the coordinator is globally completed and issuance rows remain unchanged, this selects the previous rewrite even if another owner's authenticated source has changed. The label check at lines 19676–19678 then rejects the new pass with `floor-stale`. Executing the source-label prefix reproduced this by changing only the journal image after completion; the exact same-intent retry succeeded. This blocks subsequent summary/generation maintenance that legitimately needs a fresh source. Distinguish completed-intent recovery from fresh maintenance rather than selecting recovery solely from the issuance target digest.
+
+- [P2] Preserve cross-object replacement dependency handling — /private/tmp/ts-drp-track-x-h5-native/packages/issuance-store/src/retirement.ts:1695-1701
+  For a retained replacement produced by the supported cross-object migration path, `settlementSource.sourceObjectId` names the original object, not this issuance object; its sequence also belongs to a separate lineage. This unconditional local-source check therefore rejects retirement with `issuance portable source identity is unclassified`. A native-law comparison accepted the same protected external replacement on HEAD and rejected it in this worktree. `ownedReplacementSignContext` already handles these external sources through separate native custody; dependency closure needs to preserve that distinction instead of requiring every portable source to be local.
+
+- [P2] Update the capacity oracle for the added preparation charge — /private/tmp/ts-drp-track-x-h5-native/packages/node/src/internal/creator-closed-rollback-data.ts:14242-14245
+  The existing `creator-ordinary-settlement-capacity.test.ts` extracts these expressions and evaluates them with explicit bindings, but its scalar and compiled metadata bindings do not include `participantPreps`. The generation-source metadata test now fails with `ReferenceError: participantPreps is not defined`; evaluating the HEAD expressions passes that test. Update both oracle bindings and assertions alongside this added charge so the prewrite-capacity regression test remains executable.

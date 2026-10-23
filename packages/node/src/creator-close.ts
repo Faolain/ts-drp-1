@@ -353,12 +353,15 @@ export interface CreatorPostAdoptionCensusSizing {
 		nativeRowsByteLength: number;
 		nativeImageByteLength: number;
 		nativeControlRevisionDelta: number;
+		nativePlanRewriteResource?: Readonly<{byteLength: number; items: number; maxDepth: number}>;
 	}>;
 	readonly runtimeCensusOverheadByteLength: number;
 	readonly nativeRowsByteLength: number;
 	readonly nativeImageByteLength: number;
 	/** Relative to immediate unsigned FINAL, including original ACKs and successor settlement writes. */
 	readonly nativeControlRevisionDelta: number;
+	/** Exact original plan shapes bound the optional atomic retirement carrier. */
+	readonly nativePlanRewriteResource?: Readonly<{byteLength: number; items: number; maxDepth: number}>;
 	/** Original terminal successor fence append; digest remains an unknown encoded-width leaf. */
 	readonly successorJournalAppendForSizing?: Readonly<{ author: string; authorSequence: number }>;
 	/** Transient original fence job states; never non-active/final source alternatives. */

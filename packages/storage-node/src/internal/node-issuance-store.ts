@@ -76,6 +76,7 @@ import {
 	issuanceRetirementHex,
 	issuanceRetirementImage,
 	issuanceRetirementRefusal,
+	issuanceRetirementTransitionRows,
 	issuanceUnsignedPostimageCharge,
 	joinIssuanceNativeSign,
 	type IssuanceRetirementRows,
@@ -1191,6 +1192,8 @@ class NodeIssuanceImplementation {
 		// eslint-disable-next-line @typescript-eslint/require-await
 		return createIssuanceRetirementControlRead(control, captured, async (next, p) => {
 			this.#assertAvailable();
+			const expectedRows = issuanceRetirementTransitionRows(control, next, snapshot.rows);
+			const expectedImage = issuanceRetirementImage(expectedRows, objectId);
 			let began = false;
 			let primary: unknown;
 			try {
@@ -1208,6 +1211,18 @@ class NodeIssuanceImplementation {
 				)
 					throw issuanceRetirementRefusal("issuance retirement source stale");
 				if (p) assertIssuanceRetirementPreparationRows(current, p, rows);
+				const targetRows = issuanceRetirementTransitionRows(current, next, rows);
+				if (issuanceRetirementImage(targetRows, objectId).imageDigest !== expectedImage.imageDigest)
+					throw issuanceRetirementRefusal("issuance retirement target stale");
+				for (let index = 0; index < rows.plans.length; index++) {
+					const before = rows.plans[index]!, after = targetRows.plans[index]!;
+					if (after === before) continue;
+					const written = statement(this.#database,
+						"UPDATE settlement_plans SET revision=?,fence_sequence=?,entries_json=? WHERE object_id=? AND author=? AND revision=?")
+						.run(after.revision, after.fenceSequence, settlementPlanEntriesJson(after),
+							after.scope.objectId, after.scope.author, before.revision);
+					if (written.changes !== 1) throw issuanceRetirementRefusal("issuance retirement plan CAS stale");
+				}
 				statement(this.#database, "UPDATE retirement_controls SET record=? WHERE object_id=?").run(
 					encodeIssuanceRetirementControl(next),
 					objectId
@@ -1240,7 +1255,7 @@ class NodeIssuanceImplementation {
 					encodeIssuanceRetirementControl(observed.control),
 					encodeIssuanceRetirementControl(next)
 				) &&
-				observed.image.imageDigest === captured.imageDigest
+				observed.image.imageDigest === expectedImage.imageDigest
 			)
 				return observed.control;
 			if (

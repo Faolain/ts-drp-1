@@ -39,6 +39,14 @@ export interface DurableIssuanceRetirementPreparation {
 	readonly sourceProofDigest: string;
 	readonly throughEpoch: number;
 	readonly protectedRecords: readonly DurableIssuanceRetirementHole[];
+	/** Bounded exact native image delta. This is recovery custody, never eligibility. */
+	readonly planRewrite?: DurableIssuanceRetirementPlanRewrite;
+}
+export interface DurableIssuanceRetirementPlanRewrite {
+	readonly kind: "v3-issuance-retirement-plan-rewrite-1";
+	readonly sourceImageDigest: string;
+	readonly targetImageDigest: string;
+	readonly plans: readonly Readonly<{ before: Uint8Array; after: Uint8Array }>[];
 }
 export interface DurableIssuanceRetirementControl {
 	readonly kind: "v3-issuance-retirement-control-1";
@@ -744,6 +752,31 @@ export function issuanceOrdinarySuccessorPlanResourceForSizing(scope: DurableIss
 		items: shape.items, maxDepth: shape.maxDepth});
 }
 
+/** Numerical capacity of any entry-removal rewrite of these original plans.
+ * Both byte leaves use the original complete plan with a widened revision. No
+ * target plan, authority, digest or receipt is fabricated by this projection. */
+export function issuanceRetirementPlanRewriteResourceForSizing(plans: readonly SettlementPlan[]):
+	Readonly<{byteLength: number; items: number; maxDepth: number}> | undefined {
+	const lengths = plans.filter(plan => plan.entries.length !== 0).map(plan => {
+		const captured = copySettlementPlan(plan, plan.scope);
+		if (captured === undefined) throw invalid();
+		const {revision: _revision, fenceSequence: _fence, ...fields} = captured;
+		const integerWidth = encodeCanonical(Number.MAX_SAFE_INTEGER).byteLength;
+		return unsignedRecordWidth(fields, {revision: integerWidth, fenceSequence: integerWidth});
+	});
+	if (lengths.length === 0) return undefined;
+	const scalar = {items: 1, maxDepth: 0};
+	const pairShape = unsignedRecordShape({}, {before: scalar, after: scalar});
+	const known = {kind: "v3-issuance-retirement-plan-rewrite-1", sourceImageDigest: "0".repeat(64),
+		targetImageDigest: "0".repeat(64)};
+	const shape = unsignedRecordShape(known, {plans: unsignedArrayShape(lengths.map(() => pairShape))});
+	const width = unsignedRecordWidth(known, {plans: unsignedArrayWidth(lengths.map(length => {
+		const bytes = 1 + unsignedVaruintWidth(length) + length;
+		return unsignedRecordWidth({}, {before: bytes, after: bytes});
+	}))});
+	return Object.freeze({byteLength: width, ...shape});
+}
+
 export interface IssuanceUnsignedSuccessorFencePhaseWidths extends IssuanceUnsignedPhaseWidths {
 	readonly controlRevisionDelta: number;
 	readonly nativeImageBytes: number;
@@ -1227,14 +1260,56 @@ export function captureIssuanceRetirementObject(input: unknown): string {
 function key(h: DurableIssuanceRetirementHole): string {
 	return JSON.stringify([h.author, h.authorSequence, h.digest]);
 }
+
+function retirementPlanBytes(plan: SettlementPlan): Uint8Array {
+	return encodeCanonical(plan, { maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes, maxDepth: 12,
+		maxItems: ISSUANCE_RETIREMENT_LIMITS.maxRows * 32 });
+}
+
+function retirementPlanFromBytes(input: unknown): SettlementPlan {
+	const bytes = copyDurableIssuanceBytes(input);
+	if (bytes === undefined || bytes.byteLength > ISSUANCE_RETIREMENT_LIMITS.maxBytes) throw invalid();
+	const value = decodeCanonical(bytes);
+	if (!isClosedDurableIssuanceRecord(value, ["scope", "revision", "fenceSequence", "entries"])) throw invalid();
+	assertDurableIssueScope(value.scope);
+	const plan = copySettlementPlan(value, value.scope);
+	if (plan === undefined || !issuanceRetirementBytesEqual(bytes, retirementPlanBytes(plan))) throw invalid();
+	return plan;
+}
+
+function captureIssuanceRetirementPlanRewrite(input: unknown): DurableIssuanceRetirementPlanRewrite {
+	if (!isClosedDurableIssuanceRecord(input, ["kind", "sourceImageDigest", "targetImageDigest", "plans"]) ||
+		input.kind !== "v3-issuance-retirement-plan-rewrite-1" || !Array.isArray(input.plans) ||
+		Object.getPrototypeOf(input.plans) !== Array.prototype || input.plans.length === 0 ||
+		input.plans.length > ISSUANCE_RETIREMENT_LIMITS.maxRows ||
+		Reflect.ownKeys(input.plans).length !== input.plans.length + 1) throw invalid();
+	let prior = "";
+	const plans: {before: Uint8Array; after: Uint8Array}[] = [];
+	for (let index = 0; index < input.plans.length; index++) {
+		const descriptor = Object.getOwnPropertyDescriptor(input.plans, String(index));
+		if (!descriptor || !("value" in descriptor) || !descriptor.enumerable ||
+			!isClosedDurableIssuanceRecord(descriptor.value, ["before", "after"])) throw invalid();
+		const before = retirementPlanFromBytes(descriptor.value.before), after = retirementPlanFromBytes(descriptor.value.after);
+		const address = JSON.stringify([before.scope.objectId, before.scope.author]);
+		if (address <= prior || before.scope.objectId !== after.scope.objectId || before.scope.author !== after.scope.author ||
+			before.revision === Number.MAX_SAFE_INTEGER || after.revision !== before.revision + 1 ||
+			after.fenceSequence !== before.fenceSequence || after.entries.length >= before.entries.length) throw invalid();
+		prior = address;
+		plans.push(Object.freeze({ before: retirementPlanBytes(before), after: retirementPlanBytes(after) }));
+	}
+	return Object.freeze({ kind: "v3-issuance-retirement-plan-rewrite-1", sourceImageDigest: digest(input.sourceImageDigest),
+		targetImageDigest: digest(input.targetImageDigest), plans: Object.freeze(plans) });
+}
 /**
  *
  * @param input - Untrusted closed input.
  * @returns The detached owner result or a typed refusal.
  */
 export function captureIssuanceRetirementPreparation(input: unknown): DurableIssuanceRetirementPreparation {
+	const hasRewrite = typeof input === "object" && input !== null && Object.hasOwn(input, "planRewrite");
 	if (
-		!isClosedDurableIssuanceRecord(input, ["decisionDigest", "sourceProofDigest", "throughEpoch", "protectedRecords"])
+		!isClosedDurableIssuanceRecord(input, ["decisionDigest", "sourceProofDigest", "throughEpoch", "protectedRecords",
+			...(hasRewrite ? ["planRewrite"] : [])])
 	)
 		throw invalid();
 	const records = input.protectedRecords;
@@ -1273,6 +1348,7 @@ export function captureIssuanceRetirementPreparation(input: unknown): DurableIss
 		sourceProofDigest: digest(input.sourceProofDigest),
 		throughEpoch: integer(input.throughEpoch),
 		protectedRecords: Object.freeze(holes),
+		...(hasRewrite ? { planRewrite: captureIssuanceRetirementPlanRewrite(input.planRewrite) } : {}),
 	});
 	encodeCanonical(result, {
 		maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes,
@@ -1542,6 +1618,206 @@ export function issuanceRetirementImage(
 		planCount: rows.plans.length,
 	});
 }
+
+type RetirementIssuedRow = IssuanceRetirementRows["issued"][number];
+
+function retirementKeepsRow(control: DurableIssuanceRetirementControl | null,
+	p: DurableIssuanceRetirementPreparation, row: RetirementIssuedRow): boolean {
+	const epoch = decodeDurableIssuancePreimage(row.canonicalPreimageBytes, row, row.authorSequence)?.epoch;
+	if (epoch === undefined) throw issuanceRetirementRefusal("issuance retirement row is unclassified");
+	return issuanceRetirementAllows(control, row, row.authorSequence, row.canonicalPreimageBytes, row.digest) &&
+		(epoch > p.throughEpoch || p.protectedRecords.some(hole => hole.author === row.author &&
+			hole.authorSequence === row.authorSequence && hole.digest === issuanceRetirementHex(row.digest)));
+}
+
+function retirementLocalSource(plan: SettlementPlan, entry: SettlementPlan["entries"][number],
+	rows: IssuanceRetirementRows): RetirementIssuedRow | undefined {
+	if (entry.sourceObjectId !== undefined || entry.disposition === "inherited") return undefined;
+	const row = rows.issued.find(value => value.author === plan.scope.author && value.authorSequence === entry.sourceSequence);
+	if (row !== undefined && !issuanceRetirementBytesEqual(row.digest, entry.sourceDigest))
+		throw issuanceRetirementRefusal("issuance retirement plan source digest changed");
+	return row;
+}
+
+function retirementEntryIsRetained(control: DurableIssuanceRetirementControl | null,
+	p: DurableIssuanceRetirementPreparation, plan: SettlementPlan, entry: SettlementPlan["entries"][number],
+	rows: IssuanceRetirementRows): boolean {
+	if (entry.sourceObjectId !== undefined || entry.disposition === "inherited" ||
+		!settlementPlanPermitsAuthenticatedPruning({ fenceSequence: plan.fenceSequence, entries: [entry] })) return true;
+	const source = retirementLocalSource(plan, entry, rows);
+	return source !== undefined && retirementKeepsRow(control, p, source);
+}
+
+function retirementEntrySequences(entry: SettlementPlan["entries"][number]): readonly number[] {
+	return [...(entry.replacementSequence === null ? [] : [entry.replacementSequence]),
+		...(entry.replacementProgress?.chunks.map(chunk => chunk.replacementSequence) ?? [])];
+}
+
+/** Closes selected protection under the surviving plan's dependencies. The fixed point
+ * matters when a replacement is itself the source of another retained entry. It never
+ * resurrects a permanently retired row or grants retirement eligibility. */
+export function closeIssuanceRetirementProtectedRecords(input: Readonly<{
+	control: DurableIssuanceRetirementControl | null; rows: IssuanceRetirementRows;
+	throughEpoch: number; protectedRecords: readonly DurableIssuanceRetirementHole[];
+}>): readonly DurableIssuanceRetirementHole[] {
+	const { control, rows } = input;
+	const holes = new Map(input.protectedRecords.map(hole => [key(hole), hole]));
+	const preparation = (): DurableIssuanceRetirementPreparation => ({decisionDigest: "0".repeat(64),
+		sourceProofDigest: "0".repeat(64), throughEpoch: input.throughEpoch, protectedRecords: [...holes.values()]});
+	const protect = (author: string, sequence: number): void => {
+		const row = rows.issued.find(value => value.author === author && value.authorSequence === sequence);
+		if (row === undefined || !issuanceRetirementAllows(control, row, sequence, row.canonicalPreimageBytes, row.digest))
+			throw issuanceRetirementRefusal("issuance retirement retained plan dependency is absent or permanently retired");
+		const epoch = decodeDurableIssuancePreimage(row.canonicalPreimageBytes, row, sequence)?.epoch;
+		if (epoch === undefined) throw issuanceRetirementRefusal("issuance retirement dependency epoch is unclassified");
+		if (epoch <= input.throughEpoch) {
+			const hole = {author, authorSequence: sequence, digest: issuanceRetirementHex(row.digest)};
+			holes.set(key(hole), hole);
+		}
+	};
+	let prior: number;
+	do {
+		prior = holes.size;
+		const p = preparation();
+		// The original portable verifier still opens its exact native source and plan
+		// entry. Keep those consumers until the target itself retires; an embedded
+		// descriptor does not independently discharge that native verification law.
+		for (const row of rows.issued) {
+			if (!retirementKeepsRow(control, p, row)) continue;
+			const vertex = decodeCanonical(row.canonicalPreimageBytes);
+			if (typeof vertex !== "object" || vertex === null || Array.isArray(vertex) ||
+				!Object.hasOwn(vertex, "settlementSource")) continue;
+			const source: unknown = Reflect.get(vertex, "settlementSource");
+			if (typeof source !== "object" || source === null || Array.isArray(source))
+				throw issuanceRetirementRefusal("issuance portable source is malformed");
+			const objectId: unknown = Reflect.get(source, "sourceObjectId"), author: unknown = Reflect.get(source, "sourceAuthor"),
+				sequence: unknown = Reflect.get(source, "sourceSequence"), sourceDigest: unknown = Reflect.get(source, "sourceDigest");
+			if (!isValidDurableScopeField(objectId) || author !== row.author || !isValidDurableAuthorSequence(sequence) ||
+				typeof sourceDigest !== "string")
+				throw issuanceRetirementRefusal("issuance portable source identity is unclassified");
+			const plan = rows.plans.find(value => value.scope.author === row.author);
+			if (objectId !== row.objectId) {
+				// Cross-object migration owns its source through a separately held
+				// native store. Its ordinal must never alias this target's lineage.
+				const entry = plan?.entries.find(value => value.sourceObjectId === objectId &&
+					value.sourceSequence === sequence && retirementEntrySequences(value).includes(row.authorSequence));
+				if (entry === undefined || issuanceRetirementHex(entry.sourceDigest) !== sourceDigest)
+					throw issuanceRetirementRefusal("issuance portable external source dependency is absent");
+				continue;
+			}
+			if (sequence >= row.authorSequence) throw issuanceRetirementRefusal("issuance portable source order is unclassified");
+			const original = rows.issued.find(value => value.author === author && value.authorSequence === sequence);
+			const entry = plan?.entries.find(value => value.sourceObjectId === undefined && value.disposition !== "inherited" &&
+				value.sourceSequence === sequence && retirementEntrySequences(value).includes(row.authorSequence));
+			if (original === undefined || entry === undefined || issuanceRetirementHex(original.digest) !== sourceDigest ||
+				!issuanceRetirementBytesEqual(entry.sourceDigest, original.digest))
+				throw issuanceRetirementRefusal("issuance portable native source dependency is absent");
+			protect(author, sequence);
+		}
+		for (const plan of rows.plans) {
+			// One plan per author survives successor installs with a monotone CAS revision.
+			if (plan.fenceSequence !== null) protect(plan.scope.author, plan.fenceSequence);
+			for (const entry of plan.entries) {
+				if (!retirementEntryIsRetained(control, p, plan, entry, rows)) continue;
+				if (entry.sourceObjectId === undefined && entry.disposition !== "inherited") {
+					retirementLocalSource(plan, entry, rows);
+					protect(plan.scope.author, entry.sourceSequence);
+				}
+				for (const sequence of retirementEntrySequences(entry)) protect(plan.scope.author, sequence);
+				if (plan.fenceSequence === null && entry.inheritance !== undefined) {
+					const target = entry.inheritance;
+					const row = rows.issued.find(value => value.objectId === target.targetObjectId &&
+						value.author === target.targetAuthor && value.authorSequence === target.targetAuthorSequence);
+					if (row !== undefined) {
+						if (!issuanceRetirementBytesEqual(row.digest, target.targetVertexDigest))
+							throw issuanceRetirementRefusal("issuance inherited target digest changed");
+						protect(row.author, row.authorSequence);
+					}
+				}
+			}
+		}
+	} while (holes.size !== prior);
+	return captureIssuanceRetirementPreparation({...preparation(), protectedRecords:
+		[...holes.values()].sort((left, right) => key(left) < key(right) ? -1 : key(left) > key(right) ? 1 : 0)}).protectedRecords;
+}
+
+function issuanceRetirementTargetRows(control: DurableIssuanceRetirementControl | null,
+	p: DurableIssuanceRetirementPreparation, rows: IssuanceRetirementRows): IssuanceRetirementRows {
+	const plans = rows.plans.map(plan => {
+		const entries = plan.entries.filter(entry => retirementEntryIsRetained(control, p, plan, entry, rows));
+		if (entries.length === plan.entries.length) return plan;
+		if (plan.revision === Number.MAX_SAFE_INTEGER) throw issuanceRetirementRefusal("settlement plan revision exhausted");
+		return {...plan, revision: plan.revision + 1, entries};
+	});
+	return {...rows, plans};
+}
+
+/** Constructs the exact bounded plan delta from the original selected rows. The native
+ * owner independently repeats this derivation before preparation and atomic commit. */
+export function issuanceRetirementPreparationWithPlanRewrite(control: DurableIssuanceRetirementControl | null,
+	input: DurableIssuanceRetirementPreparation, rows: IssuanceRetirementRows): DurableIssuanceRetirementPreparation {
+	const {planRewrite: _prior, ...plain} = captureIssuanceRetirementPreparation(input);
+	const objectId = control?.objectId ?? rows.lineages[0]?.objectId ?? rows.plans[0]?.scope.objectId;
+	if (objectId === undefined) return captureIssuanceRetirementPreparation(plain);
+	const sourceImage = issuanceRetirementImage(rows, objectId);
+	const target = issuanceRetirementTargetRows(control, plain, rows);
+	const plans = rows.plans.flatMap((before, index) => {
+		const after = target.plans[index]!;
+		return after === before ? [] : [{before: retirementPlanBytes(before), after: retirementPlanBytes(after)}];
+	}).sort((left, right) => {
+		const a = retirementPlanFromBytes(left.before).scope, b = retirementPlanFromBytes(right.before).scope;
+		const ka = JSON.stringify([a.objectId, a.author]), kb = JSON.stringify([b.objectId, b.author]);
+		return ka < kb ? -1 : ka > kb ? 1 : 0;
+	});
+	if (plans.length === 0) return captureIssuanceRetirementPreparation(plain);
+	return captureIssuanceRetirementPreparation({...plain, planRewrite: {
+		kind: "v3-issuance-retirement-plan-rewrite-1", sourceImageDigest: sourceImage.imageDigest,
+		targetImageDigest: issuanceRetirementImage(target, objectId).imageDigest, plans}});
+}
+
+/** Native commit's plan projection. Exact source/control CAS still belongs to the
+ * adapter transaction; this function checks the original law and full image delta. */
+export function issuanceRetirementCommitRows(control: DurableIssuanceRetirementControl,
+	p: DurableIssuanceRetirementPreparation, rows: IssuanceRetirementRows): IssuanceRetirementRows {
+	const expected = issuanceRetirementPreparationWithPlanRewrite(control, p, rows);
+	if (!issuanceRetirementBytesEqual(encodeCanonical(expected), encodeCanonical(p)))
+		throw issuanceRetirementRefusal("issuance retirement plan rewrite differs from original row law");
+	return issuanceRetirementTargetRows(control, p, rows);
+}
+
+/** The one metadata transition that also changes plans is the prepared commit. */
+export function issuanceRetirementTransitionRows(control: DurableIssuanceRetirementControl,
+	next: DurableIssuanceRetirementControl, rows: IssuanceRetirementRows): IssuanceRetirementRows {
+	if (control.active === null || next.active !== null || next.completed === null ||
+		!issuanceRetirementBytesEqual(encodeCanonical(control.active.preparation), encodeCanonical(next.completed))) return rows;
+	assertIssuanceRetirementPreparationRows(control, control.active.preparation, rows);
+	return issuanceRetirementCommitRows(control, control.active.preparation, rows);
+}
+
+/** Inverts only the exact committed target image, then repeats the forward row law.
+ * Callers must also reauthenticate their source and durable coordinator commitment. */
+export function reconstructIssuanceRetirementSourceRows(control: DurableIssuanceRetirementControl,
+	p: DurableIssuanceRetirementPreparation, rows: IssuanceRetirementRows): IssuanceRetirementRows {
+	const rewrite = p.planRewrite;
+	if (rewrite === undefined) return rows;
+	if (issuanceRetirementImage(rows, control.objectId).imageDigest !== rewrite.targetImageDigest)
+		throw issuanceRetirementRefusal("issuance retirement rewrite target changed");
+	const plans = [...rows.plans];
+	for (const change of rewrite.plans) {
+		const before = retirementPlanFromBytes(change.before), after = retirementPlanFromBytes(change.after);
+		const index = plans.findIndex(plan => plan.scope.objectId === after.scope.objectId && plan.scope.author === after.scope.author);
+		if (index < 0 || !issuanceRetirementBytesEqual(retirementPlanBytes(plans[index]!), change.after))
+			throw issuanceRetirementRefusal("issuance retirement rewrite plan changed");
+		plans[index] = before;
+	}
+	const original = {...rows, plans};
+	if (issuanceRetirementImage(original, control.objectId).imageDigest !== rewrite.sourceImageDigest)
+		throw issuanceRetirementRefusal("issuance retirement rewrite source changed");
+	const target = issuanceRetirementCommitRows(control, p, original);
+	if (issuanceRetirementImage(target, control.objectId).imageDigest !== rewrite.targetImageDigest)
+		throw issuanceRetirementRefusal("issuance retirement rewrite projection changed");
+	return original;
+}
 /**
  *
  * @param control - Actual native complete control.
@@ -1555,6 +1831,10 @@ export function assertIssuanceRetirementPreparationRows(
 ): void {
 	if (rows.lineages.some(l => l.pendingUnsigned !== undefined))
 		throw issuanceRetirementRefusal("issuance entered or reserved unsigned intent is unresolved");
+	const closed = closeIssuanceRetirementProtectedRecords({control, rows, throughEpoch: p.throughEpoch,
+		protectedRecords: p.protectedRecords});
+	if (!issuanceRetirementBytesEqual(encodeCanonical(closed), encodeCanonical(p.protectedRecords)))
+		throw issuanceRetirementRefusal("issuance retirement protected records are not dependency closed");
 	for (const h of p.protectedRecords) {
 		const r = rows.issued.find(
 			(r) =>
@@ -1579,9 +1859,10 @@ export function assertIssuanceRetirementPreparationRows(
 		if (!allowed && out.publishState === "pending")
 			throw issuanceRetirementRefusal("issuance retirement pending publication is unprotected");
 	}
-	for (const plan of rows.plans) {
-		if (settlementPlanPermitsAuthenticatedPruning(plan)) continue;
-		const refs = plan.entries.filter((e) => e.disposition !== "inherited").map((e) => e.sourceSequence);
+	const target = issuanceRetirementCommitRows(control, p, rows);
+	for (const plan of target.plans) {
+		const refs = plan.entries.filter((e) => e.disposition !== "inherited" && e.sourceObjectId === undefined)
+			.map((e) => e.sourceSequence);
 		if (plan.fenceSequence !== null) refs.push(plan.fenceSequence);
 		for (const e of plan.entries) {
 			if (e.replacementSequence !== null) refs.push(e.replacementSequence);
@@ -1590,7 +1871,7 @@ export function assertIssuanceRetirementPreparationRows(
 		for (const seq of refs) {
 			const r = rows.issued.find((r) => r.author === plan.scope.author && r.authorSequence === seq);
 			if (!r || !issuanceRetirementAllows(proposed, r, seq, r.canonicalPreimageBytes, r.digest))
-				throw issuanceRetirementRefusal("issuance retirement unsettled plan dependency is unprotected");
+				throw issuanceRetirementRefusal("issuance retirement retained plan dependency is unprotected");
 		}
 		assertIssuancePendingInheritanceTargetsAllowed(proposed, plan, rows);
 	}
@@ -1641,7 +1922,8 @@ export function assertIssuanceRetirementPlanAllowed(
 		throw issuanceRetirementRefusal("settlement context has unresolved unsigned intent");
 	assertIssuancePendingInheritanceTargetsAllowed(control, plan, rows);
 	if (!control || (!control.active && !control.completed)) return;
-	const refs = plan.entries.filter((e) => e.disposition !== "inherited").map((e) => e.sourceSequence);
+	const refs = plan.entries.filter((e) => e.disposition !== "inherited" && e.sourceObjectId === undefined)
+		.map((e) => e.sourceSequence);
 	if (plan.fenceSequence !== null) refs.push(plan.fenceSequence);
 	for (const e of plan.entries) {
 		if (e.replacementSequence !== null) refs.push(e.replacementSequence);

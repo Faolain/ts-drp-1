@@ -53,6 +53,7 @@ import {
 	issuanceUnsignedSuccessorFenceWidths,
 	issuanceUnsignedSuccessorFenceRevisionDeltas,
 	issuanceOrdinaryFinishingCapacityWidths,
+	issuanceRetirementPlanRewriteResourceForSizing,
 	settlementPlanPermitsAuthenticatedPruning,
 } from "@ts-drp/issuance-store/maintenance";
 import {
@@ -18667,6 +18668,11 @@ function prospectiveCreatorPostAdoptionCensusSizing(
 			successorFenceCount: settlementProfile === "v1" ? 1 : 0,
 			successorFencePreimageByteLength: settlementProfile === "v1" ? candidate.bytes.byteLength : 0}).currentClose;
 	})();
+	const currentPlans = continuation?.widths.finalRows.plans ?? nativeRows.plans.map(plan =>
+		plan === candidatePlan && settlement?.planEffect !== undefined && !receivedAppend ?
+			applySettlementPlanEffect(plan, settlement.planEffect, candidate.sequence,
+				settlementReplacementLastLogicalTimeFromPreimage(candidate.bytes)) : plan);
+	const currentPlanRewriteResource = issuanceRetirementPlanRewriteResourceForSizing(currentPlans);
 	const currentPublishedCensusSizing = ObjectFreeze({
 		runtimeCensusOverheadByteLength: currentRuntimeOverhead,
 		nativeRowsByteLength: currentNativeRowsByteLength,
@@ -18683,6 +18689,7 @@ function prospectiveCreatorPostAdoptionCensusSizing(
 			{ imageDigest: 1 + prospectiveCensusCountWidth(64) + 64 }
 		),
 		nativeControlRevisionDelta: continuation?.widths.final.controlRevisionDelta ?? currentAcknowledgementCount,
+		...(currentPlanRewriteResource === undefined ? {} : {nativePlanRewriteResource: currentPlanRewriteResource}),
 	});
 	const currentContinuation =
 		continuation === undefined || futureJobs.length === 0
@@ -19077,6 +19084,7 @@ function prospectiveCreatorPostAdoptionCensusSizing(
 			lineageIndex,
 			planIndex: planOrder.findIndex((row) => row.scope.author === author),
 		}));
+		const nativePlanRewriteResource = issuanceRetirementPlanRewriteResourceForSizing(plans);
 		const results: CreatorPostAdoptionCensusSizing[] = [];
 		// An original signed settlement frontier selects the raw successor
 		// store (installCreatorSuccessorLive); unlike the no-settlement branch
@@ -19196,6 +19204,7 @@ function prospectiveCreatorPostAdoptionCensusSizing(
 							rows: arrayWidth([...rows.map((row) => encodeCanonical(row).byteLength), fenceDescriptorWidth]),
 						}) - 1,
 					nativeRowsByteLength,
+					...(nativePlanRewriteResource === undefined ? {} : {nativePlanRewriteResource}),
 					nativeImageByteLength,
 					nativeControlRevisionDelta:
 						(continuation?.widths.final.controlRevisionDelta ??

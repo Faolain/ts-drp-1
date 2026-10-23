@@ -828,7 +828,8 @@ export function captureClosedEpochRetirementMetadataDomain(
 	control: ClosedEpochRetirementMetadataControl,
 	imageDigest: string,
 	preparation: unknown,
-	projectCompleted: (control: ClosedEpochRetirementMetadataControl) => ClosedEpochRetirementMetadataControl = control => control
+	projectCompleted: (control: ClosedEpochRetirementMetadataControl) => ClosedEpochRetirementMetadataControl = control => control,
+	completedImageDigest: string = imageDigest
 ): AheRetirementDomain {
 	if (control.active !== null || control.revision > Number.MAX_SAFE_INTEGER - 2 ||
 		control.sequence === Number.MAX_SAFE_INTEGER) retirementRefusal("native metadata is not preparable");
@@ -839,7 +840,7 @@ export function captureClosedEpochRetirementMetadataDomain(
 		hashDomain("ts-drp/closed-epoch-native-domain/v1", retirementBytes({ kind: control.kind, objectId: control.objectId })),
 		hashDomain("ts-drp/closed-epoch-native-incarnation/v1", retirementBytes({ kind: control.kind,
 			objectId: control.objectId, incarnation: control.incarnation })),
-		control.revision, metadataImage(control, imageDigest), metadataImage(completed, imageDigest), control.sequence,
+		control.revision, metadataImage(control, imageDigest), metadataImage(completed, completedImageDigest), control.sequence,
 	]);
 }
 
@@ -852,7 +853,8 @@ export function validateClosedEpochRetirementMetadataDomain(
 	imageDigest: string,
 	preparation: unknown,
 	commitment: AheRetirementDomain,
-	projectCompleted: (control: ClosedEpochRetirementMetadataControl) => ClosedEpochRetirementMetadataControl = control => control
+	projectCompleted: (control: ClosedEpochRetirementMetadataControl) => ClosedEpochRetirementMetadataControl = control => control,
+	completedImageDigest: string = imageDigest
 ): ClosedEpochRetirementParticipantRead["phase"] {
 	const domain = hashDomain("ts-drp/closed-epoch-native-domain/v1",
 		retirementBytes({ kind: control.kind, objectId: control.objectId }));
@@ -868,7 +870,7 @@ export function validateClosedEpochRetirementMetadataDomain(
 		const old = { ...control, revision: commitment[3], sequence: commitment[6], active: null };
 		const completed = projectCompleted({ ...control, revision: commitment[3] + 2, active: null, completed: preparation });
 		if (compareBytes(metadataImage(old, imageDigest), commitment[4]) === 0 &&
-			compareBytes(metadataImage(completed, imageDigest), commitment[5]) === 0) return "prepared";
+			compareBytes(metadataImage(completed, completedImageDigest), commitment[5]) === 0) return "prepared";
 	}
 	if (control.active === null && control.revision === commitment[3] + 2 &&
 		control.sequence === commitment[6] + 1 && retirementEqual(control.completed, preparation) &&
@@ -898,6 +900,8 @@ export async function createClosedEpochRetirementMetadataParticipant(input: Read
 	durableCommitment?: AheRetirementDomain;
 	/** Original native owner defines only its exact completed metadata delta. */
 	projectCompleted?(control: ClosedEpochRetirementMetadataControl): ClosedEpochRetirementMetadataControl;
+	/** Exact data postimage independently derived by an owner that atomically rewrites rows. */
+	completedImageDigest?: string;
 	acquire(coordinator: AheRetirementControl): Promise<ClosedEpochRetirementMetadataRead>;
 }>): Promise<ClosedEpochRetirementParticipant> {
 	const preparation = input.preparation;
@@ -905,9 +909,10 @@ export async function createClosedEpochRetirementMetadataParticipant(input: Read
 	const projectCompleted = input.projectCompleted?.bind(input);
 	const commitment = await releaseRetirementRead(input.initial, async () => {
 		const captured = input.durableCommitment ?? captureClosedEpochRetirementMetadataDomain(
-			input.roles, input.initial.control, input.initial.imageDigest, preparation, projectCompleted);
+			input.roles, input.initial.control, input.initial.imageDigest, preparation, projectCompleted, input.completedImageDigest);
 		if (captured[0] !== input.roles) retirementRefusal("native metadata role changed");
-		validateClosedEpochRetirementMetadataDomain(input.initial.control, input.initial.imageDigest, preparation, captured, projectCompleted);
+		validateClosedEpochRetirementMetadataDomain(input.initial.control, input.initial.imageDigest, preparation, captured,
+			projectCompleted, input.completedImageDigest);
 		return captured;
 	});
 	return Object.freeze({
@@ -915,7 +920,8 @@ export async function createClosedEpochRetirementMetadataParticipant(input: Read
 		acquire: async (coordinator: AheRetirementControl): Promise<ClosedEpochRetirementParticipantRead> => {
 			const read = await acquire(coordinator);
 			try {
-				const phase = validateClosedEpochRetirementMetadataDomain(read.control, read.imageDigest, preparation, commitment, projectCompleted);
+				const phase = validateClosedEpochRetirementMetadataDomain(read.control, read.imageDigest, preparation, commitment,
+					projectCompleted, input.completedImageDigest);
 				return Object.freeze({ commitment, phase, prepareFence: read.prepareFence.bind(read),
 					commitPrepared: read.commitPrepared.bind(read), release: read.release.bind(read) });
 			} catch (primary) {

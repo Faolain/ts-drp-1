@@ -1,0 +1,132 @@
+{
+  "kind": "h5-native-retirement-validation-1",
+  "base_commit": "32f7f4b3",
+  "sources": [
+    {
+      "path": "packages/issuance-store/src/retirement.ts",
+      "sha256": "805a2f552a017e74dad9178acc7e989583e11b2b92f90fc4d16b2a5b77e7cdf0"
+    },
+    {
+      "path": "packages/issuance-store/tests/retirement-plan-rewrite.test.ts",
+      "sha256": "932df8ef11a4b28a84858a2fb001f11a903b84bc210b5d58456bd609b96ba22d"
+    },
+    {
+      "path": "packages/node/src/creator-close.ts",
+      "sha256": "7c1129bafa04717ad3d1148db01df1a1d8449c650ff11bf2bc706ccc9b8a7675"
+    },
+    {
+      "path": "packages/node/src/internal/closed-epoch-cleanup.ts",
+      "sha256": "deadc3592fc8f33267abd30986f5753fd6b64b29784929d89ca4d19decb4393d"
+    },
+    {
+      "path": "packages/node/src/internal/creator-closed-rollback-data.ts",
+      "sha256": "2e7e1f76a627c4a4c0109c0c3f4d7be26bcf90581df5ec4256657d737d78bd10"
+    },
+    {
+      "path": "packages/node/src/v3-live.ts",
+      "sha256": "e410ee9d8e8a875bc8fb8f7293299d5a0f99480668afddc79b6178b3c087c894"
+    },
+    {
+      "path": "packages/node/tests/closed-epoch-issuance-rewrite-recovery.test.ts",
+      "sha256": "538ddf979b8fa582a6a5d889f6e9e351840fd8215352d5f0a8f04533717e3271"
+    },
+    {
+      "path": "packages/node/tests/closed-epoch-retirement-sequencing.test.ts",
+      "sha256": "c5f3da1cbf8f5407a54927795e070ef4177768b155d11966a672345cfb0ed715"
+    },
+    {
+      "path": "packages/node/tests/creator-ordinary-settlement-capacity.test.ts",
+      "sha256": "c1bc5962387fd38f05dba63632abe91be053fed1da74dab26ab54b27725325f1"
+    },
+    {
+      "path": "packages/storage-browser/playwright.issuance-plan-rewrite.config.ts",
+      "sha256": "1e292b7aa862a9ce2960ee2e93b4c70a052265e4d22348822ae6586b24771886"
+    },
+    {
+      "path": "packages/storage-browser/src/internal/browser-issuance-store.ts",
+      "sha256": "46391ad541b949da82a9b4a7c3629abf976207a7d68f6a6efc9b3abb63217c30"
+    },
+    {
+      "path": "packages/storage-browser/tests/assets/issuance-plan-rewrite-entry.ts",
+      "sha256": "1d161d3a4902d0a85b4c3d19ba03213f28189281291e7714d30ae9c54a5aa0ec"
+    },
+    {
+      "path": "packages/storage-browser/tests/issuance-plan-rewrite.pw.ts",
+      "sha256": "75700a77bf2d555c347cbd3689222283edf5e2fcb0e838ba2cc903bc7fa138e2"
+    },
+    {
+      "path": "packages/storage-node/src/internal/node-issuance-store.ts",
+      "sha256": "c156ef6e4ab61dc5e8a4927f87fc6255a179374d9aa06106b6e24c7a143908c7"
+    },
+    {
+      "path": "packages/storage-node/tests/fixtures/issuance-plan-rewrite-child.mjs",
+      "sha256": "14443140c201fa3bc381d952e9f2ca5e187f354a036980ba616229d1c0f94597"
+    },
+    {
+      "path": "packages/storage-node/tests/issuance-retirement-plan-rewrite.test.ts",
+      "sha256": "5dea756a525a79d2cd6b733ce77506afe9471db78d28c0f98e9d5b56bcfebbc8"
+    }
+  ],
+  "source_set_sha256": "fa3442f84f54760f6b6d2937c8a1c639b2998dca29beb8f48165b723c3c36b53",
+  "checks": {
+    "focused_tests_passed": 39,
+    "existing_room_tests_passed": 11,
+    "native_browser_cases_passed": 15,
+    "native_browser_engines": [
+      "chromium",
+      "firefox",
+      "webkit"
+    ],
+    "sqlite_parent_owned_sigkill_edges": 5,
+    "changed_source_typechecks": [
+      "node",
+      "storage-node",
+      "storage-browser"
+    ]
+  },
+  "logs": [
+    {
+      "path": "evidence/reviewed-targeted.log.gz",
+      "sha256_uncompressed": "f42229e0e0275556b55fc1ed65ad06e7b3cd8e6a2d7c5f5935fe40b04ac35c79"
+    },
+    {
+      "path": "evidence/reviewed-resource-oracle.log.gz",
+      "sha256_uncompressed": "a872aa32e594ceb08859af97f2bc8514eb45cbe41d569d814ea099029239a19c"
+    },
+    {
+      "path": "evidence/native-browser.log.gz",
+      "sha256_uncompressed": "151af7b5b91aa78f128c28cc3b490c460813dda8be0a622a4747104f22c7e96b"
+    },
+    {
+      "path": "evidence/reviewed-node-typecheck.log.gz",
+      "sha256_uncompressed": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/reviewed-storage-node-typecheck.log.gz",
+      "sha256_uncompressed": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/reviewed-storage-browser-typecheck.log.gz",
+      "sha256_uncompressed": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/existing-native.log.gz",
+      "sha256_uncompressed": "1daac202db3dfda7290088297c29b697550351b3a055567c65d2da7e475ef2dd"
+    },
+    {
+      "path": "evidence/existing-cas-source.log.gz",
+      "sha256_uncompressed": "9c6b929b66a2a26c1bb90512d15f06d04f4f4a3b5c971cc1a95e5fe72202c179"
+    }
+  ],
+  "review": {
+    "findings": 3,
+    "resolved": 3,
+    "path": "evidence/review-findings.txt"
+  },
+  "limits": [
+    "Synthetic signatures in mechanism tests do not prove authenticated eligibility.",
+    "32-link chain release is conditional on endpoint disposition, not eventual delivery.",
+    "Broader unchanged CAS suite has3journal fixture failures; existing settlement-capacity suite has2baseline failures independently reproduced by reviewer.",
+    "Full signed application crash/recovery, long-room endurance and performance remain separate integration gates."
+  ]
+}
