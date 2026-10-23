@@ -10,11 +10,13 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { directories, heads, hex, ports, required, roomHost, rooms } from "./room-retention-fixture.js";
 import { createV3ZoneApplication } from "../../../examples/grid/src/v3-zone.js";
 import {
 	createV3RoomCreatorInviteMaterial,
 	createV3RoomSession,
 	type CreateV3RoomSessionInput,
+	type V3RoomStorageHost,
 	waitForV3RoomStartupForDiagnostics,
 } from "../../../examples/v3-room/src/index.js";
 import { createRecoverableFinalitySigner } from "../../../packages/keychain/src/finality.js";
@@ -26,7 +28,6 @@ import { parseStorageObjectId } from "../../../packages/storage/src/index.js";
 import { createNodeRoomHeadAuthority } from "../../../packages/storage-node/src/room-head.js";
 import { fakeNetwork } from "../phase-4b-v3/live-snapshot.js";
 import { ScriptedSnapshotChunkPort } from "../phase-4c-v3/snapshot-pull-transport.js";
-import { directories, heads, hex, ports, required, roomHost, rooms } from "./room-retention-fixture.js";
 
 // Track M: Track N's long-room settlement room (tests/recipient-long-room-issuance-retention-
 // native.test.ts: Grid zone application, the settlement-v1 creator profile, the creator and
@@ -225,7 +226,12 @@ export type SettlementRoom = Awaited<ReturnType<typeof settlementRoom>>;
  * @param receiverIndex - The installing Writer's roster index (default 1; Track X row 60 adds a second Writer).
  * @returns The offer, the receiver's port and the source peers.
  */
-export async function settlementDelivery(fixture: SettlementRoom, receiverIndex = 1) {
+export async function settlementDelivery(
+	fixture: Pick<SettlementRoom, "objectId" | "application" | "invite" | "roster" | "identities"> & {
+		readonly host: { readonly storageHost: Pick<V3RoomStorageHost, "openAhe" | "openJournal" | "openSnapshots"> };
+	},
+	receiverIndex = 1
+) {
 	const object = parseStorageObjectId(fixture.objectId);
 	if (!object.ok) throw new TypeError("TRACK_M_SETTLEMENT_INVALID_OBJECT");
 	const store = await fixture.host.storageHost.openAhe("peer-0--ahe");

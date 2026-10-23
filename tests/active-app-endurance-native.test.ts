@@ -20,10 +20,13 @@ const enabled = process.env.ACTIVE_ENDURANCE === "1";
 const epochs = Number(process.env.ACTIVE_ENDURANCE_EPOCHS ?? 300);
 const moves = Number(process.env.ACTIVE_ENDURANCE_MOVES ?? 2);
 const streamLimit = Number(process.env.ACTIVE_ENDURANCE_STREAM ?? 4);
+const reopenAt = Number(process.env.ACTIVE_ENDURANCE_REOPEN_AT ?? Math.min(30, Math.max(1, Math.floor(epochs / 2))));
 const apps = (process.env.ACTIVE_ENDURANCE_APPS ?? "canvas,grid,chat").split(",");
 for (const app of apps) if (!["canvas", "grid", "chat"].includes(app)) throw new Error(`ENDURANCE_APP:${app}`);
 for (const value of [epochs, moves, streamLimit])
 	if (!Number.isSafeInteger(value) || value < 1) throw new Error("ENDURANCE_POSITIVE_INTEGER_REQUIRED");
+if (!Number.isSafeInteger(reopenAt) || reopenAt < 1 || reopenAt > epochs)
+	throw new Error("ENDURANCE_REOPEN_EPOCH_INVALID");
 const output = process.env.ACTIVE_ENDURANCE_OUT ?? join(tmpdir(), `active-endurance-${Date.now()}`);
 
 it.skipIf(!enabled).each(apps)(
@@ -55,7 +58,7 @@ it.skipIf(!enabled).each(apps)(
 			epochs,
 			moves,
 			streamLimit,
-			reopenAt: Math.max(1, Math.floor(epochs / 2)),
+			reopenAt,
 			host: "SQLite",
 			transport: "scripted signed-byte first-copy loss/delay and explicit durable replay",
 			successorMembership: "v2 native journal point read",

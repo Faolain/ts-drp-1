@@ -90,6 +90,11 @@ function journalStore(fixture: GenuinePreparedV3Fixture, trace?: string[]): Dura
 			snapshotDigest: "3".repeat(64),
 		});
 	return Object.freeze({
+		// This early live-fold fixture models one active anchor only. Later-history
+		// operations must fail explicitly instead of implying native checkpoint custody.
+		readAnchorPreimage: vi.fn(() => Promise.reject(new Error("PHASE_4B_JOURNAL_ANCHOR_READ_UNSUPPORTED"))),
+		readSignedAnchorEnvelope: vi.fn(() => Promise.reject(new Error("PHASE_4B_JOURNAL_SIGNED_ANCHOR_READ_UNSUPPORTED"))),
+		importHistoricalAnchor: vi.fn(() => Promise.reject(new Error("PHASE_4B_JOURNAL_HISTORICAL_IMPORT_UNSUPPORTED"))),
 		appendAccepted: vi.fn((input) => {
 			trace?.push("journal");
 			const existing = rows.find((row) => row.vertexDigest === input.vertexDigest);
