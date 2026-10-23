@@ -3,7 +3,7 @@ import { withAuthoredGenesisSigningRequest } from "@ts-drp/protocol-v3/internal/
 import { CompactMerkleAccumulator } from "@ts-drp/compaction";
 import { createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
 import type { EphemeralChannel, EphemeralChannelOptions } from "@ts-drp/ephemeral";
-import { SETTLEMENT_REPLACEMENT_DIGEST_LIMITS, SETTLEMENT_REPLACEMENT_MAX_INTENTS } from "@ts-drp/issuance-store";
+import { SETTLEMENT_REPLACEMENT_DIGEST_LIMITS, SETTLEMENT_REPLACEMENT_MAX_INTENTS, settlementSourceContextsForEntries } from "@ts-drp/issuance-store";
 import { nativeIssuanceSignAdmissionForStore } from "@ts-drp/issuance-store/maintenance";
 import { MessageQueueManager } from "@ts-drp/message-queue";
 import { createSnapshotChunkProtocolPort, CREATOR_SUCCESSOR_PROTOCOL } from "@ts-drp/network/snapshot-transfer";
@@ -4970,6 +4970,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		left.sourceSequence === right.sourceSequence &&
 		left.disposition === right.disposition &&
 		left.replacementSequence === right.replacementSequence &&
+		sameBytes(encodeCanonical(left.sourceContextDigest ?? null), encodeCanonical(right.sourceContextDigest ?? null)) &&
 		sameBytes(encodeCanonical(left.transformRefusal ?? null), encodeCanonical(right.transformRefusal ?? null)) &&
 		sameBytes(encodeCanonical(left.inheritance ?? null), encodeCanonical(right.inheritance ?? null)) &&
 		sameReplacementProgress(left, right) &&
@@ -5020,6 +5021,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					...(inheritance === undefined ? {} : { inheritance }),
 					...(prior?.replacementProgress === undefined ? {} : { replacementProgress: prior.replacementProgress }),
 					...(prior?.transformRefusal === undefined ? {} : { transformRefusal: prior.transformRefusal }),
+					...(prior?.sourceContextDigest === undefined ? {} : { sourceContextDigest: prior.sourceContextDigest }),
 					replacementSequence: prior?.replacementSequence ?? null,
 					sourceDigest,
 					sourceSequence: source.authorSequence,
@@ -5056,8 +5058,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				});
 			if (unchanged) return current;
 			const expectedRevision = current?.revision ?? null;
+			const sourceContexts = current === null ? undefined : settlementSourceContextsForEntries(current, entries);
 			const plan = Object.freeze({
 				entries: Object.freeze(entries),
+				...(sourceContexts === undefined ? {} : {sourceContexts}),
 				fenceSequence,
 				revision: expectedRevision === null ? 0 : expectedRevision + 1,
 				scope: settlementScope,

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { build } from "esbuild";
+import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { afterEach, describe, expect, it } from "vitest";
 import type { DurableIssuanceStore, DurableIssueCommit } from "@ts-drp/issuance-store";
 import {
@@ -78,7 +79,10 @@ const scope = {objectId: "rewrite-room", author: "writer"};
 async function seed(store: DurableIssuanceStore) {
 	const commits: DurableIssueCommit[] = [];
 	for (let epoch = 0; epoch < 5; epoch++) commits.push(await d109bIssue(store, scope, epoch));
-	const plan = {scope, revision: 0, fenceSequence: 4, entries: [0, 1, 2].map(sequence => ({
+	const contextBytes = encodeCanonical({historicalSource: "mechanical-custody-fixture"});
+	const context = {digest: hashDomain("ts-drp/settlement-source-context/v1", contextBytes), exactCanonicalContextBytes: contextBytes};
+	const plan = {scope, revision: 0, fenceSequence: 4, sourceContexts: [context], entries: [0, 1, 2].map(sequence => ({
+		sourceContextDigest: context.digest,
 		sourceSequence: sequence, sourceDigest: commits[sequence]!.envelope.digest,
 		disposition: "rebase" as const, replacementSequence: sequence + 1}))};
 	await store.transactWriteSettlementPlan({scope, expectedRevision: null, plan});

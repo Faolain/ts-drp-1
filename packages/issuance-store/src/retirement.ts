@@ -7,6 +7,7 @@ import {
 	copyDurableIssuanceBytes,
 	copyDurableIssueScope,
 	copySettlementPlan,
+	settlementSourceContextsForEntries,
 	copySettlementPlanEffect,
 	createDurableIssuanceFailure,
 	DurableIssuanceInvalidArgumentError,
@@ -1270,7 +1271,8 @@ function retirementPlanFromBytes(input: unknown): SettlementPlan {
 	const bytes = copyDurableIssuanceBytes(input);
 	if (bytes === undefined || bytes.byteLength > ISSUANCE_RETIREMENT_LIMITS.maxBytes) throw invalid();
 	const value = decodeCanonical(bytes);
-	if (!isClosedDurableIssuanceRecord(value, ["scope", "revision", "fenceSequence", "entries"])) throw invalid();
+	const hasContexts = typeof value === "object" && value !== null && Object.hasOwn(value, "sourceContexts");
+	if (!isClosedDurableIssuanceRecord(value, ["scope", "revision", "fenceSequence", "entries", ...(hasContexts ? ["sourceContexts"] : [])])) throw invalid();
 	assertDurableIssueScope(value.scope);
 	const plan = copySettlementPlan(value, value.scope);
 	if (plan === undefined || !issuanceRetirementBytesEqual(bytes, retirementPlanBytes(plan))) throw invalid();
@@ -1747,7 +1749,9 @@ function issuanceRetirementTargetRows(control: DurableIssuanceRetirementControl 
 		const entries = plan.entries.filter(entry => retirementEntryIsRetained(control, p, plan, entry, rows));
 		if (entries.length === plan.entries.length) return plan;
 		if (plan.revision === Number.MAX_SAFE_INTEGER) throw issuanceRetirementRefusal("settlement plan revision exhausted");
-		return {...plan, revision: plan.revision + 1, entries};
+		const {sourceContexts: _contexts, ...plain} = plan;
+		const sourceContexts = settlementSourceContextsForEntries(plan, entries);
+		return {...plain, revision: plan.revision + 1, entries, ...(sourceContexts === undefined ? {} : {sourceContexts})};
 	});
 	return {...rows, plans};
 }

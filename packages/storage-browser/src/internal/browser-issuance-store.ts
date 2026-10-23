@@ -221,6 +221,7 @@ function issuanceWriteTurn(transaction: IDBTransaction): {
 }
 
 interface NativeSettlementPlan extends DurableIssueScope {
+	readonly sourceContexts?: SettlementPlan["sourceContexts"];
 	readonly entries: readonly (SettlementPlanEntry & {
 		readonly replacementProgress?: SettlementPlanEntry["replacementProgress"];
 	})[];
@@ -465,8 +466,9 @@ function copyNativeOutbox(value: unknown): NativeOutboxRecord | undefined {
 }
 
 function copyNativeSettlementPlan(value: unknown, scope: DurableIssueScope): SettlementPlan | undefined {
+	const hasContexts = typeof value === "object" && value !== null && Object.hasOwn(value, "sourceContexts");
 	if (
-		!isClosedDurableIssuanceRecord(value, ["author", "entries", "fenceSequence", "objectId", "revision"]) ||
+		!isClosedDurableIssuanceRecord(value, ["author", "entries", "fenceSequence", "objectId", "revision", ...(hasContexts ? ["sourceContexts"] : [])]) ||
 		value.author !== scope.author ||
 		value.objectId !== scope.objectId
 	) {
@@ -475,6 +477,7 @@ function copyNativeSettlementPlan(value: unknown, scope: DurableIssueScope): Set
 	return copySettlementPlan(
 		{
 			entries: value.entries,
+			...(hasContexts ? {sourceContexts: value.sourceContexts} : {}),
 			fenceSequence: value.fenceSequence,
 			revision: value.revision,
 			scope,
@@ -488,6 +491,7 @@ function nativeSettlementPlan(plan: SettlementPlan): NativeSettlementPlan {
 	return {
 		...copyDurableIssueScope(detached.scope),
 		entries: detached.entries,
+		...(detached.sourceContexts === undefined ? {} : {sourceContexts: detached.sourceContexts}),
 		fenceSequence: detached.fenceSequence,
 		revision: detached.revision,
 	};

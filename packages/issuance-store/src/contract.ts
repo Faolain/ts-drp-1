@@ -1,6 +1,6 @@
-import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
+import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 
-import { MAXIMUM_DURABLE_ISSUANCE_SCOPE_UTF16_UNITS, SETTLEMENT_REPLACEMENT_MAX_INTENTS } from "./types.js";
+import { MAXIMUM_DURABLE_ISSUANCE_SCOPE_UTF16_UNITS, SETTLEMENT_REPLACEMENT_MAX_INTENTS, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS } from "./types.js";
 import type {
 	DurableIssuanceError,
 	DurableIssuanceErrorCode,
@@ -12,6 +12,7 @@ import type {
 	SettlementInheritance,
 	SettlementPlan,
 	SettlementPlanEntry,
+	SettlementSourceContext,
 	SettlementReplacementChunk,
 	SettlementReplacementProgress,
 } from "./types.js";
@@ -474,6 +475,7 @@ function copySettlementInheritance(value: unknown): SettlementInheritance | unde
 }
 
 function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefined {
+	const hasSourceContext = typeof value === "object" && value !== null && Object.hasOwn(value, "sourceContextDigest");
 	const hasSourceObjectId =
 		typeof value === "object" && value !== null && Object.prototype.hasOwnProperty.call(value, "sourceObjectId");
 	const hasTransformRefusal =
@@ -486,6 +488,7 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
 		!isClosedDurableIssuanceRecord(value, [
 			"disposition",
 			...(hasSourceObjectId ? ["sourceObjectId"] : []),
+			...(hasSourceContext ? ["sourceContextDigest"] : []),
 			...(hasTransformRefusal ? ["transformRefusal"] : []),
 			...(hasInheritance ? ["inheritance"] : []),
 			...(hasProgress ? ["replacementProgress"] : []),
@@ -504,6 +507,7 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
 		return undefined;
 	}
 	const sourceDigest = copyDurableIssuanceBytes(value.sourceDigest);
+	const sourceContextDigest = hasSourceContext ? copyDurableIssuanceBytes(value.sourceContextDigest) : undefined;
 	const replacementProgress = hasProgress ? copySettlementReplacementProgress(value.replacementProgress) : undefined;
 	const inheritance = hasInheritance ? copySettlementInheritance(value.inheritance) : undefined;
 	const rawRefusal = hasTransformRefusal ? value.transformRefusal : undefined;
@@ -529,6 +533,7 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
 			: undefined;
 	if (
 		sourceDigest === undefined ||
+		(hasSourceContext && sourceContextDigest?.byteLength !== 32) ||
 		(hasSourceObjectId && (!isValidDurableScopeField(value.sourceObjectId) || value.disposition === "inherited")) ||
 		(hasTransformRefusal && (transformRefusal === undefined || value.disposition !== "transform")) ||
 		(hasProgress && replacementProgress === undefined) ||
@@ -547,6 +552,7 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
 	}
 	return {
 		disposition: value.disposition,
+		...(sourceContextDigest === undefined ? {} : { sourceContextDigest }),
 		...(hasSourceObjectId ? { sourceObjectId: value.sourceObjectId as string } : {}),
 		...(transformRefusal === undefined ? {} : { transformRefusal }),
 		...(inheritance === undefined ? {} : { inheritance }),
@@ -564,8 +570,9 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
  * @returns The detached plan, or undefined when invalid.
  */
 export function copySettlementPlan(value: unknown, scope: DurableIssueScope): SettlementPlan | undefined {
+	const hasContexts = typeof value === "object" && value !== null && Object.hasOwn(value, "sourceContexts");
 	if (
-		!isClosedDurableIssuanceRecord(value, ["entries", "fenceSequence", "revision", "scope"]) ||
+		!isClosedDurableIssuanceRecord(value, ["entries", "fenceSequence", "revision", "scope", ...(hasContexts ? ["sourceContexts"] : [])]) ||
 		!Array.isArray(value.entries) ||
 		!isValidDurableAuthorSequence(value.revision) ||
 		(value.fenceSequence !== null && !isValidDurableAuthorSequence(value.fenceSequence))
@@ -592,12 +599,43 @@ export function copySettlementPlan(value: unknown, scope: DurableIssueScope): Se
 		entries.push(entry);
 		prior = entry.sourceSequence;
 	}
+	const sourceContexts: SettlementSourceContext[] = [];
+	if (hasContexts) {
+		if (!Array.isArray(value.sourceContexts) || value.sourceContexts.length === 0 ||
+			value.sourceContexts.length > entries.length) return undefined;
+		let priorDigest = "";
+		let contextBytes = 0;
+		for (const raw of value.sourceContexts) {
+			if (!isClosedDurableIssuanceRecord(raw, ["digest", "exactCanonicalContextBytes"])) return undefined;
+			const digest = copyDurableIssuanceBytes(raw.digest);
+			const bytes = copyDurableIssuanceBytes(raw.exactCanonicalContextBytes);
+			if (digest?.byteLength !== 32 || bytes === undefined ||
+				(contextBytes += bytes.byteLength) > SETTLEMENT_REPLACEMENT_DIGEST_LIMITS.maxBytes ||
+				!durableIssuanceBytesEqual(digest, hashDomain("ts-drp/settlement-source-context/v1", bytes))) return undefined;
+			const key = Array.from(digest, byte => byte.toString(16).padStart(2, "0")).join("");
+			if (key <= priorDigest || !entries.some(entry => entry.sourceContextDigest !== undefined &&
+				durableIssuanceBytesEqual(entry.sourceContextDigest, digest))) return undefined;
+			priorDigest = key;
+			sourceContexts.push({digest, exactCanonicalContextBytes: bytes});
+		}
+	}
+	if (entries.some(entry => entry.sourceContextDigest !== undefined && !sourceContexts.some(context =>
+		durableIssuanceBytesEqual(entry.sourceContextDigest!, context.digest)))) return undefined;
 	return {
 		entries,
+		...(hasContexts ? { sourceContexts } : {}),
 		fenceSequence: value.fenceSequence,
 		revision: value.revision,
 		scope: copyDurableIssueScope(scope),
 	};
+}
+
+/** Last-consumer projection for the original atomic retirement/plan owners. */
+export function settlementSourceContextsForEntries(plan: SettlementPlan, entries: readonly SettlementPlanEntry[]):
+	readonly SettlementSourceContext[] | undefined {
+	const retained = plan.sourceContexts?.filter(context => entries.some(entry => entry.sourceContextDigest !== undefined &&
+		durableIssuanceBytesEqual(entry.sourceContextDigest, context.digest)));
+	return retained?.length === 0 ? undefined : retained;
 }
 
 /**
@@ -609,6 +647,7 @@ export function cloneSettlementPlan(plan: SettlementPlan): SettlementPlan {
 	return {
 		entries: plan.entries.map((entry) => ({
 			disposition: entry.disposition,
+			...(entry.sourceContextDigest === undefined ? {} : {sourceContextDigest: new Uint8Array(entry.sourceContextDigest)}),
 			...(entry.sourceObjectId === undefined ? {} : { sourceObjectId: entry.sourceObjectId }),
 			...(entry.transformRefusal === undefined
 				? {}
@@ -640,6 +679,9 @@ export function cloneSettlementPlan(plan: SettlementPlan): SettlementPlan {
 			sourceDigest: new Uint8Array(entry.sourceDigest),
 			sourceSequence: entry.sourceSequence,
 		})),
+		...(plan.sourceContexts === undefined ? {} : {sourceContexts: plan.sourceContexts.map(context => ({
+			digest: new Uint8Array(context.digest), exactCanonicalContextBytes: new Uint8Array(context.exactCanonicalContextBytes),
+		}))}),
 		fenceSequence: plan.fenceSequence,
 		revision: plan.revision,
 		scope: copyDurableIssueScope(plan.scope),
@@ -664,6 +706,8 @@ export function assertSettlementPlanProgressTransition(current: SettlementPlan |
 		if (
 			candidate.disposition !== prior.disposition ||
 			candidate.sourceObjectId !== prior.sourceObjectId ||
+			(prior.sourceContextDigest !== undefined && (candidate.sourceContextDigest === undefined ||
+				!durableIssuanceBytesEqual(prior.sourceContextDigest, candidate.sourceContextDigest))) ||
 			(prior.transformRefusal !== undefined &&
 				(candidate.transformRefusal === undefined ||
 					candidate.transformRefusal.reason !== prior.transformRefusal.reason ||

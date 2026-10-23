@@ -513,6 +513,9 @@ function copyOutboxRow(value: unknown): NativeOutboxRow | undefined {
 }
 
 function settlementPlanEntriesJson(plan: SettlementPlan): string {
+	if (plan.sourceContexts !== undefined) return JSON.stringify({kind: "canonical-settlement-plan-1",
+		bytes: Buffer.from(encodeCanonical(plan, {maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes, maxDepth: 12,
+			maxItems: ISSUANCE_RETIREMENT_LIMITS.maxRows * 32})).toString("base64")});
 	return JSON.stringify(
 		plan.entries.map((entry) => ({
 			disposition: entry.disposition,
@@ -553,6 +556,14 @@ function copySettlementPlanRow(value: unknown, scope: DurableIssueScope): Settle
 	if (objectId !== scope.objectId || author !== scope.author || typeof entriesJson !== "string") return undefined;
 	try {
 		const decoded: unknown = JSON.parse(entriesJson);
+		if (isClosedDurableIssuanceRecord(decoded, ["kind", "bytes"]) && decoded.kind === "canonical-settlement-plan-1") {
+			if (typeof decoded.bytes !== "string" || decoded.bytes.length > Math.ceil(ISSUANCE_RETIREMENT_LIMITS.maxBytes / 3) * 4)
+				return undefined;
+			const bytes = Buffer.from(decoded.bytes, "base64");
+			if (bytes.toString("base64") !== decoded.bytes || bytes.byteLength > ISSUANCE_RETIREMENT_LIMITS.maxBytes) return undefined;
+			const plan = copySettlementPlan(decodeCanonical(bytes), scope);
+			return plan !== undefined && plan.revision === revision && plan.fenceSequence === fenceSequence ? plan : undefined;
+		}
 		if (!Array.isArray(decoded)) return undefined;
 		const entries = decoded.map((entry) => {
 			if (typeof entry !== "object" || entry === null) {

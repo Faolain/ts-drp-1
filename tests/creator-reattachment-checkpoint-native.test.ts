@@ -1,4 +1,4 @@
-import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
+import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { openCurrentAnchorTrust } from "@ts-drp/protocol-v3";
 import { afterEach, describe, expect, it } from "vitest";
@@ -6,6 +6,7 @@ import { createShippingChatWindowGenesisStateBytes } from "../examples/chat/src/
 import { openCreatorCheckpointTrust, encodeCreatorReattachmentCheckpoint, decodeCreatorReattachmentCheckpoint } from "../packages/protocol-v3/src/creator-checkpoint.js";
 import { openCreatorCheckpointAttachment, resolveCreatorCheckpointAttachment } from "../packages/node/src/internal/creator-transition-advance.js";
 import { CreatorCheckpointMaterialUnavailable, receiveCreatorSuccessorMaterial } from "../packages/node/src/internal/creator-successor-transport.js";
+import { captureCreatorSourceContext, openCreatorSourceCustody, resolveCreatorSourceCustody } from "../packages/node/src/internal/creator-source-custody.js";
 import { chatSharesRoomFixture, closeChatSharesRooms, required } from "./fixtures/chat-membership-shares/room.js";
 
 afterEach(async () => expect(await closeChatSharesRooms()).toEqual([]));
@@ -75,6 +76,9 @@ describe("native current-checkpoint reattachment proof", () => {
 		const local = openCurrentAnchorTrust({ exactCanonicalTrustStateRecordBytes: localTrustBytes,
 			expectedObjectId: fixture.objectId, pinnedGenesisAnchorDigest: fixture.invite.pinnedGenesisAnchorDigest });
 		if (!local.ok) throw new TypeError(`local genesis trust unavailable: ${local.reason}`);
+		const localAcl = fixture.invite.exactCanonicalLatchedAclBytes;
+		const blueprintDigest = String(Reflect.get(decodeCanonical(fixture.invite.exactCanonicalGenesisAnchorPreimageBytes) as object, "blueprintDigest"));
+		const sourceContext = captureCreatorSourceContext(local.trust, localAcl, blueprintDigest);
 		for (let epoch = 0; epoch < 2; epoch++) {
 			expect((await creator.room.sealEpoch()).ok).toBe(true);
 			await creator.room.adoptCreatorSuccessor();
@@ -121,6 +125,20 @@ describe("native current-checkpoint reattachment proof", () => {
 		const attachment = openCreatorCheckpointAttachment(attachmentInput);
 		expect(attachment).toMatchObject({ ok: true });
 		if (!attachment.ok) throw new TypeError(attachment.reason);
+		const targetTrust = required(resolveCreatorCheckpointAttachment(attachment.capability)).target.trust;
+		const sourceCustody = required(openCreatorSourceCustody({currentTrust: targetTrust, context: sourceContext,
+			expectedBlueprintDigest: blueprintDigest}));
+		expect(resolveCreatorSourceCustody(sourceCustody)?.trust).toMatchObject({currentEpoch: 0, currentAnchorDigest: local.trust.currentAnchorDigest});
+		expect(resolveCreatorSourceCustody({})).toBeUndefined();
+		const sourceFields = decodeCanonical(sourceContext.exactCanonicalContextBytes) as Record<string, unknown>;
+		for (const changes of [{anchorSignature: new Uint8Array(64)}, {aclBytes: encodeCanonical({...decodeCanonical(localAcl) as object, epoch: 1})},
+			{anchorPreimage: fixture.invite.exactCanonicalGenesisAnchorPreimageBytes.slice(1)}]) {
+			const exactCanonicalContextBytes = encodeCanonical({...sourceFields, ...changes});
+			expect(openCreatorSourceCustody({currentTrust: targetTrust, expectedBlueprintDigest: blueprintDigest,
+				context: {exactCanonicalContextBytes, digest: hashDomain("ts-drp/settlement-source-context/v1", exactCanonicalContextBytes)}})).toBeUndefined();
+		}
+		expect(openCreatorSourceCustody({currentTrust: {...targetTrust}, context: sourceContext, expectedBlueprintDigest: blueprintDigest})).toBeUndefined();
+		expect(openCreatorSourceCustody({currentTrust: targetTrust, context: sourceContext, expectedBlueprintDigest: "00".repeat(32)})).toBeUndefined();
 		expect(resolveCreatorCheckpointAttachment(attachment.capability)).toMatchObject({ kind: "checkpoint",
 			sourceClassification: "unknown", localBase: { head: localBase.head, trust: { currentEpoch: 0 } },
 			remoteCheckpoint: { predecessorTrust: { currentEpoch: 1 } }, target: { trust: { currentEpoch: 2 } } });
