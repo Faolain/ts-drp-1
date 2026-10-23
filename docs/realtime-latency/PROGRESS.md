@@ -37,14 +37,15 @@ tests rather than aggregate pass counts. Update this file at each integration ch
 | Work | State and next gate |
 | --- | --- |
 | [Track X: settlement delivery and migration admission](tracks/34-track-x-settlement-fence-delivery/RESULT.md) | Integrated. The combined application campaign and the larger-capacity admission gate remain open. |
-| [Track AA: creator delivery repair](tracks/39-track-aa-creator-delivery-repair/RESULT.md) | Integrated quiet-room retries and the reviewed replay lifetime/resource fix. Combined H5 validation is next. Final quiet timings wait for the remaining reviewed production fixes. |
+| [Track AA: creator delivery repair](tracks/39-track-aa-creator-delivery-repair/RESULT.md) | Integrated quiet-room retries and the reviewed replay lifetime/resource fix. Combined replay/H5 validation passed 51 checks, including held successor sends and native rewrite crash recovery. Real localhost libp2p repair also recovers a lost final copy and first answer without another move. Final quiet timings remain open. |
 | [Track J: late-arrival model](tracks/38-track-j-late-arrival-retirement-model/REPLAY-CUSTODY.md) | The replay/custody adjunct passed 59 checks and 74 test declarations, including projected Apalache base/preservation proofs. Earlier finite A5 progress exhausted 2,174,196 states. Full-contract arbitrary-state induction and refinement remain **open**. |
 | Authenticated partial-cut membership (F1) | Integrated signed successor membership transfer with native point reads. The endurance harness exports the complete v2 membership carrier. |
 | [Durable classification and cleanup (F2, A-1, H2, H5)](tracks/40-track-x-native-retirement/RESULT.md) | Integrated durable terminal authority and atomic issuance/settlement-plan retirement. Native storage crash evidence is separate from application endurance. |
 | [Recovery and long-room proof](tracks/41-active-application-endurance/RESULT.md) | PRE-PERF300-02 completed 300 epochs and 3,000 accepted operations in each of Canvas, Grid and Chat, with both peers reopening at epoch 150. This source predates the replay fix and remaining capacity/rejoin changes. The final integrated campaign is pending. |
 | Arbitrary-gap rejoin and same-key readmission | **Open.** The isolated shipped-Chat implementation passes six public SQLite cold/fault cases. Repeated gaps, actual-head G18 retention and expiry/last-consumer work remain in progress; no incomplete rejoin chain is integrated. |
-| Larger work per epoch | **Open for shipped settlement profiles.** The 357/489-record diagnostic failures used legacy creator-trusted/NONE, whose growing retention is intentionally preserved under the owner's ledger row 28. They are not shipped-app G2 regressions. The larger campaign now exercises the shipped settlement profile; shared currency, intent and crash-recovery defects exposed by those diagnostics are being corrected. |
-| Continued play and browser parity | Automatic room/network repair, receiver-observed progress during rollover/maintenance, and high-rate ephemeral ticks remain separate gates. The signed-byte endurance driver supplies none of those transport claims. Actual three-engine browser validation remains **blocked** on macOS launch permission. |
+| [Larger work per epoch](../../specs/bounded-storage-lifecycle/capacity-finishability.md) | Common currency, exact-intent and startup-recovery fixes are integrated, together with authenticated pending-bootstrap retention. Isolated shipped-profile campaigns finished 412 serial records across four cycles and 4,208 batched edits across six cycles. Common integration passes 22 focused controls and both real SQLite SIGKILL/recovery edges; final rejoin/performance composition remains open. Historical 357/489-record legacy creator-trusted/NONE failures are not shipped-app G2 regressions. |
+| [Native continued play](tracks/42-native-continued-play/RESULT.md) | **RED.** Genuine durable networking repairs the lost final move and first repair answer; all 21 Grid placements survive three transitions on the common integrated source. Controlled raw datagrams exercise actual room ephemeral authority, but sealing/adoption consume 150–365 ms of own CPU with zero 10 ms timer callbacks; neither receiver progresses during rollover. Scoped CPU profiles and unprofiled baselines identify the work. The responsiveness fix and sustained 300-epoch genuine-network gate remain open. |
+| Browser parity | Actual three-engine browser launch remains **blocked** on macOS permission. Native libp2p plus controlled raw datagrams supplies no real browser WebRTC or rendering/FPS result. |
 
 The new application harness uses the shipped compositions, two concurrent durable
 writers, deliberately lost first copies, explicit durable replay, settlement-plan
@@ -53,6 +54,14 @@ state; Chat also uses an independent whole-window retention oracle. The current 
 two initial writes per writer, four writes overlapping rollover, and writes overlapping
 maintenance. It does not establish sustained high-rate play, unreliable ephemeral
 traffic, automatic libp2p repair or arbitrary offline gaps.
+
+The separate [native transport probe](tracks/42-native-continued-play/RESULT.md)
+now establishes automatic quiet repair and exposes transition timer starvation.
+Earlier profiles preserve their original source; the latest unprofiled smoke
+includes common capacity/bootstrap integration. Per-step CPU and event-loop
+measurements separate the failure from correct rejection of
+frames during staggered epoch installation. The finite capacity receipts and a
+final 300-epoch conservation run cannot substitute for uninterrupted receiver progress.
 
 The [completed campaign](tracks/41-active-application-endurance/RESULT.md) records
 source `6f414a25` and exact patch hash `25f03f5a…3187449`. Logical rows and primary

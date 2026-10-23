@@ -1,0 +1,42 @@
+{
+  "run": "active-continued-play-native-03",
+  "configuration": {
+    "kind": "configuration",
+    "sourceHead": "37bb60809f7a008dd54f3aaff63b4c82695f6d91",
+    "sourceDiffSha256": "2109c51b2c1608d927a2ac679eb306c7efb7c04b8e7ab95f5e267b90a88464c0",
+    "load": [
+      116.4111328125,
+      123.33544921875,
+      125.98388671875
+    ],
+    "durable": "real localhost WebSocket/libp2p, 20ms delayed genuine ingress",
+    "ephemeral": "controlled raw datagrams; production room authority, codec, queue and sequence filter; not real WebRTC or FPS",
+    "tickIntervalMs": 10,
+    "successor": "signed native export over scripted chunk/material transport",
+    "epochs": 3
+  },
+  "terminalExitCode": 0,
+  "testPassed": true,
+  "sourcePatchSha256": "2109c51b2c1608d927a2ac679eb306c7efb7c04b8e7ab95f5e267b90a88464c0",
+  "scope": "Two Grid peers in one process; actual localhost WebSocket/libp2p durable traffic; controlled raw ephemeral datagrams; scripted authenticated successor material",
+  "responsiveness": "RED: own CPU and zero timer callbacks during seal/adopt, no ephemeral receipts throughout rollover",
+  "limits": [
+    "shared loaded host, not isolated latency",
+    "no browser, real WebRTC or render/FPS evidence",
+    "Initial timerMaxGap includes room setup and is invalid; per-step CPU/callback/receipt measurements remain valid"
+  ],
+  "filesSha256": {
+    "continued-play.jsonl.gz": "57d7fff4ec2960ba9d7581b2682afec8dd756829fc89a8f954e29e164255aa56",
+    "samples.json.gz": "80423c137bbbea36aedebd8e2bfdab5d73f21f65d13d1d8e1c9c71fcc8310898",
+    "source.diff.gz": "fef7f565e9daa10cbb265e92d45687dd435657f5c3518a835def73dc6f776e01",
+    "summary.json": "9cf1559c58ff4970620624b22b31df6051db73b8e7b0c03d7525ca3cab9ef572",
+    "test.log.gz": "fb897ce06d7df5645ee9992eecee891710258bdaa6c847b6003cab186734f6d1"
+  },
+  "hardware": {
+    "cpu": "Apple M1 Max",
+    "cores": 10,
+    "node": "v22.23.4",
+    "platform": "darwin",
+    "arch": "arm64"
+  }
+}

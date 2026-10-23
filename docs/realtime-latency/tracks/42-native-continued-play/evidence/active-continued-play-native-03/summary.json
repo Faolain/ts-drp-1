@@ -1,0 +1,590 @@
+{
+  "kind": "summary",
+  "expectedBlocks": 21,
+  "phases": [
+    {
+      "phase": "startup",
+      "attempted": 2636,
+      "published": 2634,
+      "rejected": 0,
+      "received": [
+        1316,
+        1316
+      ],
+      "maxReceiveGapMs": 97.88154199999917,
+      "maxLatencyMs": 71.80358299999716,
+      "remoteAccepted": 4
+    },
+    {
+      "phase": "baseline-before",
+      "attempted": 336,
+      "published": 336,
+      "rejected": 0,
+      "received": [
+        168,
+        168
+      ],
+      "maxReceiveGapMs": 29.64833400000134,
+      "maxLatencyMs": 16.664416999999958,
+      "remoteAccepted": 0
+    },
+    {
+      "phase": "automatic-repair",
+      "attempted": 1566,
+      "published": 1566,
+      "rejected": 0,
+      "received": [
+        783,
+        783
+      ],
+      "maxReceiveGapMs": 74.61091599999781,
+      "maxLatencyMs": 20.708915999995952,
+      "remoteAccepted": 1
+    },
+    {
+      "phase": "install-1",
+      "attempted": 2,
+      "published": 2,
+      "rejected": 0,
+      "received": [
+        0,
+        0
+      ],
+      "maxReceiveGapMs": 0,
+      "maxLatencyMs": 0,
+      "remoteAccepted": 0
+    },
+    {
+      "phase": "settled-1",
+      "attempted": 8,
+      "published": 8,
+      "rejected": 0,
+      "received": [
+        4,
+        4
+      ],
+      "maxReceiveGapMs": 1417.5847920000015,
+      "maxLatencyMs": 0.3562919999967562,
+      "remoteAccepted": 4
+    },
+    {
+      "phase": "maintenance-1",
+      "attempted": 4,
+      "published": 4,
+      "rejected": 0,
+      "received": [
+        2,
+        2
+      ],
+      "maxReceiveGapMs": 64.08012500000041,
+      "maxLatencyMs": 0.3000000000029104,
+      "remoteAccepted": 2
+    },
+    {
+      "phase": "baseline-after-1",
+      "attempted": 170,
+      "published": 170,
+      "rejected": 0,
+      "received": [
+        85,
+        85
+      ],
+      "maxReceiveGapMs": 117.35254200000054,
+      "maxLatencyMs": 20.330416000004334,
+      "remoteAccepted": 0
+    },
+    {
+      "phase": "install-2",
+      "attempted": 2,
+      "published": 2,
+      "rejected": 0,
+      "received": [
+        0,
+        0
+      ],
+      "maxReceiveGapMs": 0,
+      "maxLatencyMs": 0,
+      "remoteAccepted": 0
+    },
+    {
+      "phase": "settled-2",
+      "attempted": 8,
+      "published": 8,
+      "rejected": 0,
+      "received": [
+        4,
+        4
+      ],
+      "maxReceiveGapMs": 1964.870167000001,
+      "maxLatencyMs": 0.49262499999895226,
+      "remoteAccepted": 4
+    },
+    {
+      "phase": "maintenance-2",
+      "attempted": 4,
+      "published": 4,
+      "rejected": 0,
+      "received": [
+        2,
+        2
+      ],
+      "maxReceiveGapMs": 72.70745799999713,
+      "maxLatencyMs": 0.3194580000053975,
+      "remoteAccepted": 2
+    },
+    {
+      "phase": "baseline-after-2",
+      "attempted": 154,
+      "published": 154,
+      "rejected": 0,
+      "received": [
+        77,
+        77
+      ],
+      "maxReceiveGapMs": 239.58991600000445,
+      "maxLatencyMs": 85.39737500000047,
+      "remoteAccepted": 0
+    },
+    {
+      "phase": "install-3",
+      "attempted": 2,
+      "published": 2,
+      "rejected": 0,
+      "received": [
+        0,
+        0
+      ],
+      "maxReceiveGapMs": 0,
+      "maxLatencyMs": 0,
+      "remoteAccepted": 0
+    },
+    {
+      "phase": "settled-3",
+      "attempted": 8,
+      "published": 8,
+      "rejected": 0,
+      "received": [
+        4,
+        4
+      ],
+      "maxReceiveGapMs": 3029.945375000003,
+      "maxLatencyMs": 0.5918329999985872,
+      "remoteAccepted": 4
+    },
+    {
+      "phase": "maintenance-3",
+      "attempted": 6,
+      "published": 6,
+      "rejected": 0,
+      "received": [
+        3,
+        3
+      ],
+      "maxReceiveGapMs": 1274.6259580000042,
+      "maxLatencyMs": 0.32158300000446616,
+      "remoteAccepted": 2
+    },
+    {
+      "phase": "baseline-after-3",
+      "attempted": 156,
+      "published": 156,
+      "rejected": 0,
+      "received": [
+        78,
+        78
+      ],
+      "maxReceiveGapMs": 66.60645800000202,
+      "maxLatencyMs": 8.359166999995068,
+      "remoteAccepted": 0
+    }
+  ],
+  "steps": [
+    {
+      "kind": "step",
+      "phase": "baseline-before",
+      "ms": 2002.9579169999997,
+      "cpuUserMs": 174.307,
+      "cpuSystemMs": 20.693,
+      "eventLoop": {
+        "idle": 1617.5014650000012,
+        "active": 385.29749401679874,
+        "utilization": 0.19237951581817592
+      },
+      "timerCallbacks": 168,
+      "ephemeralReceived": 336,
+      "remoteAccepted": 0,
+      "authorityEpochsBefore": [
+        null,
+        null
+      ],
+      "authorityEpochsAfter": [
+        null,
+        null
+      ],
+      "authorityMismatch": 0
+    },
+    {
+      "kind": "step",
+      "phase": "seal-1",
+      "ms": 299.72733299999527,
+      "cpuUserMs": 176.301,
+      "cpuSystemMs": 23.822,
+      "eventLoop": {
+        "idle": 0,
+        "active": 299.7109169960022,
+        "utilization": 1
+      },
+      "timerCallbacks": 0,
+      "ephemeralReceived": 0,
+      "remoteAccepted": 0,
+      "authorityEpochsBefore": [
+        null,
+        null
+      ],
+      "authorityEpochsAfter": [
+        null,
+        null
+      ],
+      "authorityMismatch": 0
+    },
+    {
+      "kind": "step",
+      "phase": "adopt-1",
+      "ms": 402.85191699999996,
+      "cpuUserMs": 244.587,
+      "cpuSystemMs": 26.949,
+      "eventLoop": {
+        "idle": 0,
+        "active": 402.8439998626709,
+        "utilization": 1
+      },
+      "timerCallbacks": 0,
+      "ephemeralReceived": 0,
+      "remoteAccepted": 0,
+      "authorityEpochsBefore": [
+        null,
+        null
+      ],
+      "authorityEpochsAfter": [
+        1,
+        null
+      ],
+      "authorityMismatch": 0
+    },
+    {
+      "kind": "step",
+      "phase": "export-1",
+      "ms": 17.447791999999026,
+      "cpuUserMs": 10.622,
+      "cpuSystemMs": 1.747,
+      "eventLoop": {
+        "idle": 0,
+        "active": 17.450999975204468,
+        "utilization": 1
+      },
+      "timerCallbacks": 0,
+      "ephemeralReceived": 0,
+      "remoteAccepted": 0,
+      "authorityEpochsBefore": [
+        1,
+        null
+      ],
+      "authorityEpochsAfter": [
+        1,
+        null
+      ],
+      "authorityMismatch": 0
+    },
+    {
+      "kind": "step",
+      "phase": "install-1",
+      "ms": 650.9024170000048,
+      "cpuUserMs": 394,
+      "cpuSystemMs": 29.422,
+      "eventLoop": {
+        "idle": 0,
+        "active": 650.8876249790192,
+        "utilization": 1
+      },
+      "timerCallbacks": 1,
+      "ephemeralReceived": 0,
+      "remoteAccepted": 0,
+      "authorityEpochsBefore": [
+        1,
+        null
+      ],
+      "authorityEpochsAfter": [
+        1,
+        1
+      ],
+      "authorityMismatch": 2
+    },
+    {
+      "kind": "step",
+      "phase": "baseline-after-1",
+      "ms": 1019.9475410000014,
+      "cpuUserMs": 67.406,
+      "cpuSystemMs": 5.876,
+      "eventLoop": {
+        "idle": 831.0734570000022,
+        "active": 188.85937595631185,
+        "utilization": 0.1851684442875476
+      },
+      "timerCallbacks": 85,
+      "ephemeralReceived": 170,
+      "remoteAccepted": 0,
+      "authorityEpochsBefore": [
+        1,
+        1
+      ],
+      "authorityEpochsAfter": [
+        1,
+        1
+      ],
+      "authorityMismatch": 0
+    },
+    {
+      "kind": "step",
+      "phase": "seal-2",
+      "ms": 234.37866599999688,
+      "cpuUserMs": 147.703,
+      "cpuSystemMs": 17.868,
+      "eventLoop": {
+        "idle": 0,
+        "active": 234.38054203987122,
+        "utilization": 1
+      },
+      "timerCallbacks": 0,
+      "ephemeralReceived": 0,
+      "remoteAccepted": 0,
+      "authorityEpochsBefore": [
+        1,
+        1
+      ],
+      "authorityEpochsAfter": [
+        1,
+        1
+      ],
+      "authorityMismatch": 0
+    },
+    {
+      "kind": "step",
+      "phase": "adopt-2",
+      "ms": 567.8993750000009,
+      "cpuUserMs": 243.869,
+      "cpuSystemMs": 18.176,
+      "eventLoop": {
+        "idle": 0,
+        "active": 567.9024579524994,
+        "utilization": 1
+      },
+      "timerCallbacks": 0,
+      "ephemeralReceived": 0,
+      "remoteAccepted": 0,
+      "authorityEpochsBefore": [
+        1,
+        1
+      ],
+      "authorityEpochsAfter": [
+        2,
+        1
+      ],
+      "authorityMismatch": 0
+    },
+    {
+      "kind": "step",
+      "phase": "export-2",
+      "ms": 25.22283299999981,
+      "cpuUserMs": 18.204,
+      "cpuSystemMs": 1.906,
+      "eventLoop": {
+        "idle": 0,
+        "active": 25.227874994277954,
+        "utilization": 1
+      },
+      "timerCallbacks": 0,
+      "ephemeralReceived": 0,
+      "remoteAccepted": 0,
+      "authorityEpochsBefore": [
+        2,
+        1
+      ],
+      "authorityEpochsAfter": [
+        2,
+        1
+      ],
+      "authorityMismatch": 0
+    },
+    {
+      "kind": "step",
+      "phase": "install-2",
+      "ms": 1099.1779999999999,
+      "cpuUserMs": 628.902,
+      "cpuSystemMs": 32.704,
+      "eventLoop": {
+        "idle": 0,
+        "active": 1099.1801249980927,
+        "utilization": 1
+      },
+      "timerCallbacks": 1,
+      "ephemeralReceived": 0,
+      "remoteAccepted": 0,
+      "authorityEpochsBefore": [
+        2,
+        1
+      ],
+      "authorityEpochsAfter": [
+        2,
+        2
+      ],
+      "authorityMismatch": 2
+    },
+    {
+      "kind": "step",
+      "phase": "baseline-after-2",
+      "ms": 1000.679041000003,
+      "cpuUserMs": 73.601,
+      "cpuSystemMs": 7.338,
+      "eventLoop": {
+        "idle": 717.9881679999999,
+        "active": 282.6848320972749,
+        "utilization": 0.2824947131278603
+      },
+      "timerCallbacks": 77,
+      "ephemeralReceived": 154,
+      "remoteAccepted": 0,
+      "authorityEpochsBefore": [
+        2,
+        2
+      ],
+      "authorityEpochsAfter": [
+        2,
+        2
+      ],
+      "authorityMismatch": 0
+    },
+    {
+      "kind": "step",
+      "phase": "seal-3",
+      "ms": 443.07587500000227,
+      "cpuUserMs": 214.754,
+      "cpuSystemMs": 23.086,
+      "eventLoop": {
+        "idle": 0,
+        "active": 443.0796248912811,
+        "utilization": 1
+      },
+      "timerCallbacks": 0,
+      "ephemeralReceived": 0,
+      "remoteAccepted": 0,
+      "authorityEpochsBefore": [
+        2,
+        2
+      ],
+      "authorityEpochsAfter": [
+        2,
+        2
+      ],
+      "authorityMismatch": 0
+    },
+    {
+      "kind": "step",
+      "phase": "adopt-3",
+      "ms": 567.8188339999979,
+      "cpuUserMs": 316.635,
+      "cpuSystemMs": 22.775,
+      "eventLoop": {
+        "idle": 0,
+        "active": 567.8211250305176,
+        "utilization": 1
+      },
+      "timerCallbacks": 0,
+      "ephemeralReceived": 0,
+      "remoteAccepted": 0,
+      "authorityEpochsBefore": [
+        2,
+        2
+      ],
+      "authorityEpochsAfter": [
+        3,
+        2
+      ],
+      "authorityMismatch": 0
+    },
+    {
+      "kind": "step",
+      "phase": "export-3",
+      "ms": 10.173209000000497,
+      "cpuUserMs": 8.056,
+      "cpuSystemMs": 1.057,
+      "eventLoop": {
+        "idle": 0,
+        "active": 10.176709175109863,
+        "utilization": 1
+      },
+      "timerCallbacks": 0,
+      "ephemeralReceived": 0,
+      "remoteAccepted": 0,
+      "authorityEpochsBefore": [
+        3,
+        2
+      ],
+      "authorityEpochsAfter": [
+        3,
+        2
+      ],
+      "authorityMismatch": 0
+    },
+    {
+      "kind": "step",
+      "phase": "install-3",
+      "ms": 1998.9674999999988,
+      "cpuUserMs": 807.777,
+      "cpuSystemMs": 44.805,
+      "eventLoop": {
+        "idle": 0.0852919999997539,
+        "active": 1998.8872500475009,
+        "utilization": 0.9999573320802534
+      },
+      "timerCallbacks": 1,
+      "ephemeralReceived": 0,
+      "remoteAccepted": 0,
+      "authorityEpochsBefore": [
+        3,
+        2
+      ],
+      "authorityEpochsAfter": [
+        3,
+        3
+      ],
+      "authorityMismatch": 2
+    },
+    {
+      "kind": "step",
+      "phase": "baseline-after-3",
+      "ms": 1002.6286670000045,
+      "cpuUserMs": 192.586,
+      "cpuSystemMs": 36.36,
+      "eventLoop": {
+        "idle": 639.8582600000009,
+        "active": 362.767823135604,
+        "utilization": 0.3618176598808269
+      },
+      "timerCallbacks": 78,
+      "ephemeralReceived": 156,
+      "remoteAccepted": 0,
+      "authorityEpochsBefore": [
+        3,
+        3
+      ],
+      "authorityEpochsAfter": [
+        3,
+        3
+      ],
+      "authorityMismatch": 0
+    }
+  ],
+  "timerMaxGapMs": 2904.528790999999,
+  "eventLoopP99Ms": 42.958847,
+  "eventLoopMaxMs": 1993.342975
+}

@@ -1,0 +1,39 @@
+{
+  "productionSource": "296cedf7c4ff068b47273630b768d62c5e5e1084",
+  "buildPackagesExitCode": 0,
+  "focusedNamedControls": {
+    "passed": 22,
+    "skipped": 415,
+    "exitCode": 0
+  },
+  "earlierOverscopedFilter": {
+    "passed": 37,
+    "failed": 2,
+    "failures": [
+      "source-extraction fixture ReferenceError: pin is not defined",
+      "10-second timeout in runtime-only nominal custody fallback case"
+    ]
+  },
+  "crashEdges": {
+    "journal": {
+      "mutationExitCode": 1,
+      "deathSignal": "SIGKILL",
+      "actualCommittedBoundary": true,
+      "recoveryExitCode": 0,
+      "exactFrozenIntentFirst": "not-applicable: no active issuance preparation at this kill edge"
+    },
+    "issuance": {
+      "mutationExitCode": 1,
+      "deathSignal": "SIGKILL",
+      "actualCommittedBoundary": true,
+      "recoveryExitCode": 0,
+      "exactFrozenIntentFirst": true
+    }
+  },
+  "focusedTypecheckExitCode": 0,
+  "changedHarnessEslint": {
+    "exitCode": 0,
+    "errors": 0,
+    "preExistingJSDocWarnings": 17
+  }
+}
