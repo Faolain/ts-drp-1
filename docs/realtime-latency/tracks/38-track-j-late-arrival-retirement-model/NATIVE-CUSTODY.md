@@ -60,8 +60,10 @@ entire recovery implementation.
 
 ## Contract induction remains open
 
-The final transition source passes the larger A5 exhaustive safety instance and
-the decided-rule Apalache base/step pair. The contract candidate hypothesis is
+The final transition source passes the larger A5 exhaustive safety and bounded
+progress instances, and the decided-rule Apalache base/step pair. The A5 progress
+check exhausts 2,174,196 distinct states at depth 17; it checks the stated progress
+invariants, not unbounded temporal liveness. The contract candidate hypothesis is
 still not inductive. Its move counterexample permits epoch 1 to be installed with
 no current fence. Its seal counterexample permits an epoch-0 row to carry an
 expiry entry before any epoch has been sealed. Neither is a reachable trace from

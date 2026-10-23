@@ -861,24 +861,34 @@
             "queued": 0,
             "depth": 17
           }
+        },
+        {
+          "main": "exhContractProgressA5",
+          "code": 0,
+          "got": "ok",
+          "seconds": 734,
+          "log": {
+            "path": "largerBounds-exhContractProgressA5.log.gz",
+            "sha256": "11c03bcef6a98eb868d20655746c77bcadc39a7149e7070aaf5ecfc0f7ee6265",
+            "uncompressedSha256": "057a3bdd1e44d729a681b9fbcd5490caba14c34d38f4a027fd04e6b014a2ef1d"
+          },
+          "states": {
+            "generated": 7140007,
+            "distinct": 2174196,
+            "queued": 0,
+            "depth": 17
+          },
+          "previousRunningSnapshot": {
+            "path": "largerBounds-progress-snapshot.log.gz",
+            "sha256": "4b274a966fb33e1add94ecaa3fe659a9bba4fb9780ed2f5bf7a676d8a7cbfb71",
+            "uncompressedSha256": "a73bb39992a815446289928722448e7d4638871e1bb050680dba8170ee8630ed"
+          }
         }
       ],
       "runner": {
         "path": "largerBounds-run.mjs.gz",
         "sha256": "867ee6d8ef614d47ce8b9b5ab661110e5af6ed0c799051e87871376692dbf62e",
         "uncompressedSha256": "dd09614e370cbaf5407391b1a976e970080ad2b61a8257ddf52f71ef3badf0b7"
-      },
-      "incomplete": {
-        "main": "exhContractProgressA5",
-        "status": "running-at-artifact-snapshot",
-        "log": {
-          "path": "largerBounds-progress-snapshot.log.gz",
-          "sha256": "4b274a966fb33e1add94ecaa3fe659a9bba4fb9780ed2f5bf7a676d8a7cbfb71",
-          "uncompressedSha256": "a73bb39992a815446289928722448e7d4638871e1bb050680dba8170ee8630ed"
-        },
-        "liveLog": "/private/tmp/ts-drp-track-j-a5-final/exhContractProgressA5.log",
-        "watchdogSeconds": 900,
-        "sessionId": 52013
       }
     },
     "review": {
