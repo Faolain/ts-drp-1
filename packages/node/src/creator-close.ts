@@ -3933,7 +3933,13 @@ export async function bindCreatorLiveClose(
 						currentEpoch: registration.currentTrust.currentEpoch,
 						...(earlyTurnover === undefined ? {} : {earlyTurnover}),
 					});
-					if (owner.recoveryScopes >= owner.limits.maxRecoveryScopes || resume || capacityMaintenance) {
+					// A promoted successor carries no recovery-role certificate, so its
+					// first epoch cannot authenticate snapshot turnover. This close adds
+					// one recovery scope; reconcile now unless that leaves headroom.
+					const promotionPoolMaintenance = promotedEpoch !== undefined &&
+						owner.recoveryScopes >= owner.limits.maxRecoveryScopes - 1;
+					if (owner.recoveryScopes >= owner.limits.maxRecoveryScopes || resume || capacityMaintenance ||
+						promotionPoolMaintenance) {
 						// Keep this SAME close's unfinished request across lost delivery.
 						// Turnover can reduce the pool before an intent exists; retries
 						// must still reacquire the original whole authenticated proof.

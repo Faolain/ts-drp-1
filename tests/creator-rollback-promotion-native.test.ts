@@ -57,8 +57,9 @@ const census = async (f: Fixture, peer: Peer) => ({
 /** Normalized/source-floor headers: physically present, base `none`, never a usable slot. */
 const sourceFloorHeaders = (native: NativeCensus) => native.generations.filter(row => row.base === "none");
 
-// Floor 4 is the first steady-state floor (bounded generations full) beside floor 6.
-describe.each([2, 4, 6])("original creator at floor %i", floor => {
+// Floor 3 is the first floor with a normalized source-floor header; floor 4 is
+// the first steady-state floor (bounded generations full) beside floor 6.
+describe.each([2, 3, 4, 6])("original creator at floor %i", floor => {
 	it.each([1, 2])(`promotes usable rollback slot floor-%i after a genuine cold open`, async offset => {
 		const selected = floor - offset;
 		const { f, creator: live, closed } = await creatorChain(floor);
