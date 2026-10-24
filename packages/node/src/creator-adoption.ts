@@ -1074,9 +1074,10 @@ export async function maintainCreatorRecipientRecoveryPool(input: Readonly<{
 		return Object.freeze({kind: "deferred", reason: "busy"});
 	// Observational point reads before any admission: "not-needed" leaves the
 	// received gate, ordinary issuance and native state untouched. A resume is
-	// requested by the plane's own halt, not by pool pressure.
+	// requested by the plane's own halt, not by pool pressure. The head read is
+	// queued behind the plane's turns, which may hold its native writer reservation.
 	if (resume ? !source.needsOrdinaryReadinessRecovery() :
-		!(await receivedRecoveryTurnoverDue(source, input.snapshotStore, (await inspectHead(source.store, source.objectId)).candidates)))
+		!(await receivedRecoveryTurnoverDue(source, input.snapshotStore, (await source.inspectQueuedNativeHead()).candidates)))
 		return Object.freeze({kind: "not-needed"});
 	const context = input.recoveryContext;
 	const opened = await createCreatorSigningRecoveryOwner({currentTrust: source.currentTrust,

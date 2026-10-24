@@ -441,6 +441,12 @@ export interface V3CreatorCloseRegistration {
 			readRetiredGenerations(): readonly GenerationRecord[]}>>, requireClosedWorkflowCompletion: boolean) => Promise<"complete">,
 		options?: Readonly<{deferrable?: boolean; resume?: boolean}>
 	): Promise<"ran" | "deferred">;
+	/** Observational native head inspection in this plane's own queue, after the
+	 * turns already queued. Queue turns hold the store's native writer reservation
+	 * across awaits; the recovery read's synchronous BEGIN IMMEDIATE must never
+	 * meet one, or it blocks the loop until the busy timeout and fails. Observation
+	 * only: it grants no admission and enters no gate. */
+	inspectQueuedNativeHead(): ReturnType<typeof inspectHead>;
 	sealIssuanceMaintenanceDependencies(receivedReceipt?: object): Promise<CreatorSnapshotRecoveryCloseHold | undefined>;
 	/** @internal Private live scheduling hint, read at each call: whether this registration now
 	 * retains a cross-object migration source, whose census the ordinary warm source capture
@@ -911,6 +917,17 @@ function plainRecord(value: unknown): value is Readonly<Record<string, unknown>>
 function successfulValue<T>(value: unknown): T | undefined {
 	if (!plainRecord(value) || value.ok !== true || !Object.hasOwn(value, "value")) return undefined;
 	return value.value as T;
+}
+
+/**
+ * Diagnostic spelling of a refused store result; never classifies or grants.
+ * @param value - The store's original result.
+ * @returns A bounded ": REASON[: cause]" suffix, or "" for anything else.
+ */
+function storeRefusalSuffix(value: unknown): string {
+	if (!plainRecord(value) || value.ok !== false || typeof value.reason !== "string") return "";
+	const cause = value.cause instanceof Error ? value.cause.message : undefined;
+	return `: ${value.reason.slice(0, 64)}${cause === undefined ? "" : `: ${cause.slice(0, 256)}`}`;
 }
 
 function successfulUndefined(value: unknown): boolean {
@@ -3107,9 +3124,13 @@ export async function inspectHead(
 		trustRef: GenerationRef;
 	}>
 > {
-	const recovered = successfulValue<Readonly<Record<string, unknown>>>(await store.recoverActiveGeneration(objectId));
+	const result = await store.recoverActiveGeneration(objectId);
+	const recovered = successfulValue<Readonly<Record<string, unknown>>>(result);
 	if (recovered?.kind !== "active" || !plainRecord(recovered.head) || !Array.isArray(recovered.references)) {
-		throw new TypeError("creator close active generation is unavailable");
+		// Diagnostic only: the store's own refusal travels with the error.
+		throw new TypeError(`creator close active generation is unavailable${storeRefusalSuffix(result)}`, {
+			cause: result,
+		});
 	}
 	const references = Object.freeze((recovered.references as GenerationRef[]).map(copiedRef));
 	const blobs: Array<Readonly<{ bytes: Uint8Array; ref: GenerationRef }>> = [];

@@ -186,6 +186,7 @@ import {
 	type CreatorPostAdoptionSettlementSizing,
 	type CreatorRoomSettlementPreview,
 	type V3CreatorCloseRegistration,
+	inspectHead,
 } from "./creator-close.js";
 import { planClosedEpochCleanup, planClosedEpochRoleCleanup } from "./internal/closed-epoch-cleanup.js";
 import { inspectCreatorClosedCutSuccessorBinding } from "@ts-drp/protocol-v3/creator-close";
@@ -21661,6 +21662,12 @@ function creatorCloseRegistration(
 			options?: Parameters<V3CreatorCloseRegistration["runReceivedRecoveryMaintenance"]>[3]
 		) => runCreatorReceivedRecoveryMaintenance(registration,
 			() => sealCreatorReceivedRecoveryDependencies(registration, closePlane, signing, snapshots), consume, options),
+		// Same FIFO as every turn that holds this store's native writer reservation.
+		inspectQueuedNativeHead: () =>
+			enqueueRegistrationTask(
+				registration,
+				() => () => inspectHead(registration.payload.input.store, registration.payload.input.objectId)
+			),
 		// Private, negative scheduling hint read at each call, so a reopen, rollover or replaced
 		// source is reflected at once (decision row 73).
 		hasMigrationSourceForOrdinaryPrime: (): boolean => migrationDisplacedSource(registration) !== undefined,
