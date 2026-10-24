@@ -1,5 +1,8 @@
 import { compareBytes, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { ISSUANCE_RETIREMENT_LIMITS } from "@ts-drp/issuance-store/maintenance";
+import { LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES } from "@ts-drp/live-journal";
 import {
+	AHE_RETIREMENT_CONTROL_LIMITS,
 	type AheGenerationPartition,
 	type AheRetirementControl,
 	type AheRetirementControlRead,
@@ -949,7 +952,14 @@ export interface ClosedEpochRetirementIntentInput {
 	verifyCompleted(control: AheRetirementControl): Promise<void>;
 }
 
-const RETIREMENT_ENCODING_LIMITS = Object.freeze({ maxBytes: 262_144, maxItems: 65_536, maxDepth: 128 });
+// Metadata images bind whole participant controls. Each owner's own codec
+// bounds its control; the image adds only its record wrapper and digest.
+const RETIREMENT_ENCODING_LIMITS = Object.freeze({
+	maxBytes: Math.max(ISSUANCE_RETIREMENT_LIMITS.maxBytes, LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES,
+		AHE_RETIREMENT_CONTROL_LIMITS.maxBytes) + 1_024,
+	maxItems: 65_536,
+	maxDepth: 128,
+});
 function retirementBytes(value: unknown): Uint8Array {
 	return encodeCanonical(value, RETIREMENT_ENCODING_LIMITS);
 }

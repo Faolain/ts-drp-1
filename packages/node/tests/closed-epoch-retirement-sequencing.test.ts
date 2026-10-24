@@ -5,7 +5,11 @@ import {
 	type AheRetirementDomain,
 	type AheRetirementPreparation,
 	type StorageObjectId,
+	AHE_RETIREMENT_CONTROL_LIMITS,
 } from "@ts-drp/storage";
+import { encodeCanonical } from "@ts-drp/canonical";
+import { ISSUANCE_RETIREMENT_LIMITS } from "@ts-drp/issuance-store/maintenance";
+import { LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES } from "@ts-drp/live-journal";
 import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
@@ -38,6 +42,22 @@ function deferred(): { promise: Promise<void>; resolve(): void } {
 	});
 	return { promise, resolve };
 }
+
+it("binds a metadata control as large as any participant's own control codec admits", () => {
+	// Plans carrying exact source and completion proof exceeded a 256 KiB
+	// metadata ceiling in Grid continued play while the issuance codec admits 1 MiB.
+	const control = {kind: "v3-issuance-retirement-control-1", objectId: "large-room", incarnation: "01".repeat(32),
+		revision: 3, sequence: 2, active: null, completed: null};
+	const image = "04".repeat(32);
+	const preparation = {planBytes: new Uint8Array(ISSUANCE_RETIREMENT_LIMITS.maxBytes - 1_024)};
+	expect(encodeCanonical({control: {...control, completed: preparation}, imageDigest: image}).byteLength).toBeGreaterThan(262_144);
+	const domain = captureClosedEpochRetirementMetadataDomain(16, control, image, preparation);
+	const prepared = {...control, revision: 4, sequence: 3, active: {sequence: 3, preparation}};
+	expect(validateClosedEpochRetirementMetadataDomain(prepared, image, preparation, domain)).toBe("prepared");
+	const oversized = {planBytes: new Uint8Array(Math.max(ISSUANCE_RETIREMENT_LIMITS.maxBytes,
+		LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES, AHE_RETIREMENT_CONTROL_LIMITS.maxBytes) + 4_096)};
+	expect(() => captureClosedEpochRetirementMetadataDomain(16, control, image, oversized)).toThrow("canonical value exceeds byte limit");
+});
 
 it("binds atomic row rewrites to exact prepared and completed native images", () => {
 	const control = {kind: "v3-issuance-retirement-control-1", objectId: "rewrite-room", incarnation: "01".repeat(32),
