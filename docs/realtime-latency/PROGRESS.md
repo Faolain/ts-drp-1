@@ -43,6 +43,10 @@ not native storage or network behavior.
     receive p95 3230 ms, transition p50/p95/max 3778/4788/16210 ms.
   - Grid: **300/300, 3000 accepted, 2166 s**; issue p50/p95/max 61/186/239 ms, receive p95
     2941 ms, transition p50/p95/max 3565/4138/5072 ms.
+  - Chat: **300/300, 3000 accepted, 3123 s**; issue p50/p95/max 165/768/1420 ms, receive p95
+    3356 ms, transition p50/p95/max 4138/4702/7173 ms.
+  - **All three conservation 300 PASS on `041c4136`** (EXIT 0, 3 passed, 8210 s total) — first
+    since PRE-PERF300-02. Rerun on `1f8f8b65` queued (`final-1f8f8b65/conservation-300.log`).
 - Recipient prune fixed (`d3b9e401` RED, `8ab3c8cb` fix, cherry-picked from `fix/recipient-prune`):
   epoch-0 kept close authority now verified by the genesis→epoch-1 rule (was `predecessor-rejected`);
   1515daab's fence early-return narrowed so a current member with only terminal retained work
@@ -65,6 +69,14 @@ not native storage or network behavior.
 - **Final campaign source `1f8f8b65`** (`/private/tmp/ts-drp-merge-probe`, configs
   `/private/tmp/ts-drp-final-1f8f-config`): Grid continued play 300 launched; conservation 300
   ×3 to follow. Logs `.logs/realtime-resume-2026-10-23/final-1f8f8b65/`.
+  - Grid continued play 300 on `1f8f8b65`: **FAIL at epoch 62** (`maintenance-62`): `creator
+    close active generation is unavailable`. A/B: `8ab3c8cb` (no abandonment) fails the same way
+    at epoch 6 of a 70-run and in a 40-run, so it is nondeterministic and not from the merge.
+    Instrumented: `recoverActiveGeneration` → `SUBSTRATE_FAILURE: database is locked` at
+    `BEGIN IMMEDIATE` from the recipient recovery pool's `inspectHead`; with `busy_timeout=1000`
+    on synchronous `DatabaseSync` this also blocks the loop ≈1.1 s (the 1162 ms task gap).
+    Another same-process connection holds the AHE write lock across an await. Fix agent on
+    `fix/ahe-locked-race`. [Diag](../../.logs/realtime-resume-2026-10-23/grid-continued-8ab3/diag-1.log).
 
 ## Stopped for shutdown — 2026-10-24
 
