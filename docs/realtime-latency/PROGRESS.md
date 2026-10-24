@@ -92,6 +92,14 @@ not native storage or network behavior.
   [Report](../../.logs/realtime-resume-2026-10-23/ahe-locked-race/RESULT.md).
 - **Final campaign source `6c9b5935`** (`/private/tmp/ts-drp-merge-probe`): Grid continued play 300
   and conservation 300 ×3 running concurrently. Logs `.logs/realtime-resume-2026-10-23/final-6c9b5935/`.
+  - **Grid continued play 300 / reopen 30: PASS** (3068 s, 1845 accepted issues, 13 repairs,
+    0 busy/rejected, 48 unavailable per peer). Timer gap p95/p99/max 68/170/371 ms over 148,840
+    callbacks (alarm 1000 ms). Install median 2696 → 3003 → 3125 ms at epochs 1–10 / 141–150 /
+    291–300: bounded but still drifting ≈15% over 300 epochs.
+  - Per phase (first 175 epochs): seal 226 ms and adopt 395 ms at event-loop utilization 1.0,
+    ephemeral delivery 13/s and 9/s vs 183/s between transitions; install ≈3.0 s and
+    maintenance ≈3.1 s deliver 62/s and 46/s with task gaps ≤343 ms. Adoption still degrades
+    play; this is the next performance target.
 
 ## Stopped for shutdown — 2026-10-24
 
