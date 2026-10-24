@@ -306,6 +306,7 @@ describe("explicit local-author source abandonment", () => {
 		const sourceHex = Buffer.from(original.commit.envelope.canonicalPreimageBytes).toString("hex");
 		expect(published.slice(publishedBefore).some(bytes => Buffer.from(bytes).toString("hex").includes(sourceHex))).toBe(false);
 		expect(await member.room.unresolvedAcceptedWork()).toEqual([]);
-		expect(creator.room.projection().messages.map(row => row.clientOperationId)).not.toContain("before-removal");
+		expect((creator.room.projection() as unknown as { messages: { clientOperationId: string }[] }).messages
+			.map(row => row.clientOperationId)).not.toContain("before-removal");
 	}, 240_000);
 });

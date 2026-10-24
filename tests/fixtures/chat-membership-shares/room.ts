@@ -97,6 +97,8 @@ export interface ChatSharesRoomOptions {
 	 * through the native owned-key path. Observation helpers use reopen aliases.
 	 */
 	readonly localMembers?: readonly number[];
+	/** Process-death recovery: reopen these existing owned local sessions instead of creating them. */
+	readonly localSelectors?: Readonly<Record<number, Readonly<{ slot: number; incarnation: number }>>>;
 }
 
 const track = Object.freeze({
@@ -148,7 +150,9 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 	const identities: { seed: Uint8Array; author: string }[] = [];
 	for (let index = 0; index < kinds.length; index++) {
 		if (localMembers.has(index)) {
-			const lease = await required(localHost).acquireLocalSession({ kind: "create" });
+			const existing = options.localSelectors?.[index];
+			const lease = await required(localHost).acquireLocalSession(existing === undefined ? { kind: "create" } :
+				{ kind: "reopen", selector: { slot: existing.slot, incarnation: existing.incarnation } });
 			track.heads.add(lease);
 			localSelectors.set(index, lease.selector);
 			freshLeases.set(index, lease);
@@ -585,6 +589,9 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 		directory,
 		identities,
 		withIssuance,
+		/** Owned local session selectors (host-local custody only), for process-death recovery. */
+		localSelectors: Object.freeze(Object.fromEntries([...localSelectors].map(([index, selector]) =>
+			[index, Object.freeze({ slot: selector.slot, incarnation: selector.incarnation })]))),
 		peers,
 		application,
 		genesis,
