@@ -26,6 +26,45 @@ not native storage or network behavior.
   still fails `MAINTENANCE_AUTHENTICATED_SOURCE_HEADROOM` (needs a decision on which
   pre-promotion generations a post-promotion certificate may retire).
   [Report](../../.logs/realtime-resume-2026-10-23/rollback-promotion/RESULT-fixes.md).
+- Conservation probe, 40 epochs, reopen 30, on `041c4136`: all three pass (Canvas 576 s,
+  Grid 377 s, Chat 484 s). Per-epoch wall time plateaus after epoch 5 (Canvas ≈15 s,
+  Grid ≈10 s, Chat ≈11 s), unlike continued-play install time, which grows linearly.
+  [Log](../../.logs/realtime-resume-2026-10-23/endurance-probe-02/run.log).
+- Source abandonment (`feat/source-abandonment`, 7 commits `a5e5e202`…`51aad355`, not yet
+  integrated): unit/store/T8 native 6/6 + negatives, T9 kill-after-CAS recovers, rejoin
+  suites green. Open: SIGKILL right after the removed author's retirement-preparation commit
+  fails reopen with `snapshot-unavailable` (gated by `RUN_SOURCE_ABANDONMENT_RETIREMENT_CRASH=1`;
+  same kill without abandonment recovers); join-time FENCE at seq 1 is a permanent hole so
+  the abandoned row is retired but never physically pruned in the fixture.
+  [Report](../../.logs/realtime-resume-2026-10-23/abandonment-impl/RESULT.md).
+- Launched: 300-epoch conservation campaign on `041c4136`
+  (`.logs/realtime-resume-2026-10-23/endurance-300-01/`, JSONL in `/private/tmp/ts-drp-endurance-300-01`).
+  - Canvas: **300/300, 3000 accepted, 2919 s**, clean tree; issue p50/p95/max 118/708/1216 ms,
+    receive p95 3230 ms, transition p50/p95/max 3778/4788/16210 ms.
+  - Grid: **300/300, 3000 accepted, 2166 s**; issue p50/p95/max 61/186/239 ms, receive p95
+    2941 ms, transition p50/p95/max 3565/4138/5072 ms.
+- Recipient prune fixed (`d3b9e401` RED, `8ab3c8cb` fix, cherry-picked from `fix/recipient-prune`):
+  epoch-0 kept close authority now verified by the genesis→epoch-1 rule (was `predecessor-rejected`);
+  1515daab's fence early-return narrowed so a current member with only terminal retained work
+  fences again; a terminal drain's reconstructed journal is declined once when fresh labels
+  re-derive a different P. Recipient long-room 2/2 (prunedThrough 3→33, issued/outbox flat at 16),
+  Canvas long-room, readmission 12/12, composition 15/15, plan-rewrite suites green.
+  [Report](../../.logs/realtime-resume-2026-10-23/recipient-prune-fix/RESULT.md).
+  Integrated checkout `/private/tmp/ts-drp-campaign-8ab3` (configs `/private/tmp/ts-drp-campaign-8ab3-config`).
+  - Grid continued play 40 / reopen 30 on `8ab3c8cb`: **PASS** (390 s; was FAIL at 29). Per-epoch
+    install flat ≈2.65 s from epoch 5 to 40 (was 16→26 s growing); timer max gap 264 ms,
+    p99 151 ms; event-loop p99 140 ms.
+    [Log](../../.logs/realtime-resume-2026-10-23/grid-continued-8ab3/grid40-run.log).
+- Source abandonment merged: `1f8f8b65` (one import conflict in owned-signing-request,
+  kept the cycle-free reattachment import). Acceptance on the merge, one file at a time: module
+  order 4/4, received-close 2/2, recipient/Canvas long-room, expiry signing/verifier, abandonment
+  6/6 + crash 1 (+1 gated), readmission 12/12, composition 15/15, bootstrap turnover 9/9,
+  host turn 7/7, issuance-store 28/28, plan-rewrite 16/16, host-source-expiry 3/3, keychain 39/39,
+  closed-epoch sequencing 19/19, close membership 24/24.
+  [Summary](../../.logs/realtime-resume-2026-10-23/merge-abandonment-01/summary.txt).
+- **Final campaign source `1f8f8b65`** (`/private/tmp/ts-drp-merge-probe`, configs
+  `/private/tmp/ts-drp-final-1f8f-config`): Grid continued play 300 launched; conservation 300
+  ×3 to follow. Logs `.logs/realtime-resume-2026-10-23/final-1f8f8b65/`.
 
 ## Stopped for shutdown — 2026-10-24
 
