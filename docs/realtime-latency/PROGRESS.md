@@ -8,7 +8,26 @@ The task is incomplete. Passing a room test that pauses at each rollover does no
 establish uninterrupted play. A formal model proves its stated abstraction and bounds,
 not native storage or network behavior.
 
-## Stopped for shutdown — 2026-10-24 (resume here)
+## Campaign blockers found by runs — 2026-10-24 afternoon (current)
+
+- `12b3794f`: retirement-metadata 256 KiB cap → Grid now passes epoch 15 and the reopen at 30.
+- `041c4136`: protocol-v3 import cycle (owned-signing-request → creator-checkpoint → trust
+  singleton while the index evaluates) stopped `active-app-endurance-native` from collecting
+  on root since merge `33453720`. Fixed with a RED-first module-order test; harness runs again.
+- Writer-recipient issuance never prunes (bisected: good `34b08cd7`, first bad `1515daab`).
+  This drives linearly growing install cost and the Grid continued-play starvation alarm
+  (pre-merge 2131 ms, merged 1260 ms at the reopen-30 baseline). The completion merge
+  adds per-epoch committed custody entries on top of that (plan 3 KB → 335 KB at 30 epochs).
+  [A/B findings](../../.logs/realtime-resume-2026-10-23/grid-ab-01/FINDINGS.md). Fix in
+  progress on `fix/recipient-prune`; acceptance is the recipient/Canvas long-room
+  bounded-issuance tests plus the rejoin suites.
+- Rollback promotion (`fix/rollback-promotion`: `8f964632`, `b49c2cfa`, `c0ff0afa`): BUSY,
+  floor-3 recovery and post-promotion reopen fixed; the first issue after any promotion
+  still fails `MAINTENANCE_AUTHENTICATED_SOURCE_HEADROOM` (needs a decision on which
+  pre-promotion generations a post-promotion certificate may retire).
+  [Report](../../.logs/realtime-resume-2026-10-23/rollback-promotion/RESULT-fixes.md).
+
+## Stopped for shutdown — 2026-10-24
 
 Root is `12b3794f` (plus this docs commit). In flight when stopped, all killed by shutdown:
 
