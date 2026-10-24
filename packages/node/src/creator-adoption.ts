@@ -2667,8 +2667,11 @@ async function authenticatedSuccessorIssuanceScope(
 			const scope = {objectId, author: input.author};
 			const plan = copySettlementPlan(await input.issuanceStore.readSettlementPlan(scope), scope);
 			for (const entry of plan?.entries ?? []) {
+				// A signed local-author expiry remains this author's terminal native custody
+				// (until retirement prunes it), exactly like a signed completion. Reopen
+				// authenticates its signature before any consumer reads it.
 				if (entry.sourceContextDigest === undefined || entry.replacementSequence !== null ||
-					entry.disposition === "expire" || entry.disposition === "inherited") continue;
+					(entry.disposition === "expire" && entry.sourceResolutionDigest === undefined) || entry.disposition === "inherited") continue;
 				const context = plan?.sourceContexts?.find(value => sameBytes(value.digest, entry.sourceContextDigest!));
 				const capability = context === undefined ? undefined : openCreatorSourceCustody({currentTrust, context});
 				const source = capability === undefined ? undefined : resolveCreatorSourceCustody(capability);

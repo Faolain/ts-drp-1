@@ -35,6 +35,7 @@ import {
 	type DurableIssuancePruningMaintenance,
 	type DurableIssuancePruningReceipt,
 	type DurableIssuancePruningState,
+	assertSettlementExpiryPublicationExclusive,
 	settlementPlanPermitsAuthenticatedPruning,
 } from "./maintenance.js";
 import { DEFAULT_DURABLE_ISSUANCE_PAGE_LIMIT, MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT } from "./types.js";
@@ -213,6 +214,7 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
 		if (!sameBytes(commit.envelope.digest, digest)) {
 			throw new InvalidArgumentFailure("publication digest does not identify the issued closure");
 		}
+		assertSettlementExpiryPublicationExclusive(this.#plans.get(scopeKey(scope)), [{authorSequence, publishState: "published"}]);
 		if (outbox.publishState === "pending") {
 			this.#outbox.set(key, { commit, publishState: "published" });
 		}
@@ -267,6 +269,10 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
 			throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan revision changed");
 		}
 		assertSettlementPlanProgressTransition(current ?? null, captured.plan);
+		assertSettlementExpiryPublicationExclusive(captured.plan, captured.plan.entries.flatMap(entry => {
+			const row = this.#outbox.get(recordKey(captured.scope, entry.sourceSequence));
+			return row === undefined ? [] : [{authorSequence: entry.sourceSequence, publishState: row.publishState}];
+		}));
 		const durable = cloneSettlementPlan(captured.plan);
 		this.#plans.set(key, durable);
 		return cloneSettlementPlan(durable);

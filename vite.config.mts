@@ -22,6 +22,7 @@ const config = defineConfig({
 	resolve: {
 		alias: {
 			"@ts-drp/protocol-v3/internal/owned-signing-request": path.resolve(__dirname, "packages/protocol-v3/src/internal/owned-signing-request.ts"),
+			"@ts-drp/protocol-v3/internal/creator-source-expiry": path.resolve(__dirname, "packages/protocol-v3/src/internal/creator-source-expiry.ts"),
 			"@ts-drp/storage/snapshot-transfer": path.resolve(__dirname, "packages/storage/src/snapshot-transfer.ts"),
 			"@ts-drp/network/snapshot-transfer": path.resolve(__dirname, "packages/network/src/snapshot-transfer.ts"),
 			"@ts-drp/example-v3-room": path.resolve(__dirname, "examples/v3-room/src/index.ts"),

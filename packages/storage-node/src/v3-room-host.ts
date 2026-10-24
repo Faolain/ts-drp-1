@@ -3,8 +3,9 @@
 import { ROOM_HEAD_IMAGE_LIMITS, type RoomHeadAuthority, type RoomHeadInitialization } from "@ts-drp/storage";
 import { hashDomain } from "@ts-drp/canonical";
 import { createRecoverableFinalitySigner, retireRecoverableFinalitySigner, signOwnedLocalRequest } from "@ts-drp/keychain/finality";
-import { inspectOwnedGenesisSigningRequest, withAuthoredCreatorSelectionSigningRequest, withAuthoredIdentityChallengeSigningRequest, type OwnedSigningRequest } from "@ts-drp/protocol-v3/internal/owned-signing-request";
-import { consumeOwnedCreatorSelectionSigningRequest } from "@ts-drp/node/v3-live";
+import { inspectOwnedGenesisSigningRequest, withAuthoredCreatorSelectionSigningRequest, withAuthoredIdentityChallengeSigningRequest, withAuthoredSourceExpirySigningRequest, type OwnedSigningRequest } from "@ts-drp/protocol-v3/internal/owned-signing-request";
+import { creatorSourceExpiryDigest } from "@ts-drp/protocol-v3/internal/creator-source-expiry";
+import { consumeOwnedCreatorSelectionSigningRequest, consumeOwnedCreatorSourceExpirySigningRequest } from "@ts-drp/node/v3-live";
 import { consumeOwnedLocalRoomBindingRequest, consumeOwnedLocalSessionTerminalRequest, resolveOwnedLocalSessionTerminalAdmission } from "@ts-drp/node/v3-room";
 import { consumeOwnedCreatorPossessionSigningRequest, consumeOwnedCreatorTransportSigningRequest } from "@ts-drp/node/creator-adoption";
 import { createHash } from "node:crypto";
@@ -222,6 +223,20 @@ export function createNodeV3RoomStorageHost(options: NodeV3RoomStorageHostOption
 							lifetime.assertCurrent(); return signature;
 						} catch (cause) { failed = true; primary = cause; throw cause; }
 						finally { try { finish(); } catch (cleanup) { if (failed) throw new AggregateError([primary, cleanup], "owned identity challenge and joined local release failed", { cause: primary }); throw cleanup; } }
+					}
+					const expiry = consumeOwnedCreatorSourceExpirySigningRequest(request);
+					if (expiry !== undefined) {
+						lifetime.assertOwnedPublicKey(expiry.publicKey);
+						const finish = lifetime.enterOwnedSigning(); // Before retained native checks/crypto.
+						let failed = false, primary: unknown;
+						try {
+							// The turn digest is recomputed from the exact receipt, never taken from the admission.
+							const signature = await expiry.checkWhile(() => lifetime.withOwnedSourceExpirySigning(creatorSourceExpiryDigest(expiry.bytes),
+								() => withAuthoredSourceExpirySigningRequest({ exactCanonicalReceiptBytes: expiry.bytes, signerPublicKey: expiry.publicKey },
+									captured => signOwnedLocalRequest({ signer: signingIdentity.signer, request: captured }))));
+							lifetime.assertCurrent(); return signature;
+						} catch (cause) { failed = true; primary = cause; throw cause; }
+						finally { try { finish(); } catch (cleanup) { if (failed) throw new AggregateError([primary, cleanup], "owned source expiry and joined local release failed", { cause: primary }); throw cleanup; } }
 					}
 					const admitted = consumeOwnedCreatorSelectionSigningRequest(request);
 					if (admitted === undefined) return signOwnedLocalRequest({ signer: signingIdentity.signer, request });

@@ -5,6 +5,8 @@ import { mintCreatorAnchorTrustSourceContext, resolveCreatorAnchorTrustMaterial 
 
 export { copyCanonicalForAdmittedView, digestReceivedVertexPreimage, openAuthorFenceOperation, vertexCanonicalBytes, verifyReceivedVertex } from "../index.js";
 
+export { verifyCreatorSourceExpiryReceipt } from "./creator-source-expiry.js";
+
 export type { RegisteredVertexVerification, VerifyReceivedVertexInput } from "../index.js";
 
 /** Reads the original authenticated fixed creator identity; supplied signer functions grant nothing. */

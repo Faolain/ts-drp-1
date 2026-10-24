@@ -7,10 +7,23 @@ import {
 	type SigningNativeAdmission,
 } from "@ts-drp/protocol-v3/internal/seal-signing-request";
 import { beforeEach, expect, test, vi } from "vitest";
+import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import type * as OwnedRequests from "@ts-drp/protocol-v3/internal/owned-signing-request";
+import { withAuthoredCreatorSelectionSigningRequest, withAuthoredSourceExpirySigningRequest } from "@ts-drp/protocol-v3/internal/owned-signing-request";
+import { creatorSourceExpiryFields } from "@ts-drp/protocol-v3/internal/creator-source-expiry";
+import { LocalSessionLifetime } from "../../storage-node/src/internal/local-session-lifetime.js";
 
-import { type FinalitySigner, signSealRegisteredDigest } from "../src/finality.js";
+import { createRecoverableFinalitySigner, type FinalitySigner, signOwnedLocalRequest, signSealRegisteredDigest } from "../src/finality.js";
 import { Keychain } from "../src/keychain.js";
 
+const forgedKind = vi.hoisted(() => ({ kind: undefined as string | undefined }));
+vi.mock("@ts-drp/protocol-v3/internal/owned-signing-request", async (importOriginal) => {
+	const actual = await importOriginal<typeof OwnedRequests>();
+	return { ...actual, consumeOwnedSigningRequest(request: unknown) {
+		const captured = actual.consumeOwnedSigningRequest(request);
+		return captured === undefined || forgedKind.kind === undefined ? captured : { ...captured, kind: forgedKind.kind };
+	} };
+});
 const hooks = vi.hoisted(() => ({
 	generationWait: undefined as Promise<void> | undefined,
 	failGeneration: false,
@@ -66,6 +79,7 @@ function deferred(): Readonly<{ promise: Promise<void>; release(): void }> {
 	return { promise, release };
 }
 beforeEach(() => {
+	forgedKind.kind = undefined;
 	hooks.generationWait = undefined;
 	hooks.failGeneration = false;
 	hooks.signingWait = undefined;
@@ -173,4 +187,48 @@ test("shutdown joins an in-flight creator acquisition without delivering a stale
 	await refusal;
 	await stopping;
 	expect(joined).toBe(true);
+});
+
+async function ownedExpirySigner() {
+	const seed = new Uint8Array(32).fill(5);
+	const lifetime = new LocalSessionLifetime(() => undefined, () => ({ release: () => undefined }));
+	const created = await createRecoverableFinalitySigner({ seed: Uint8Array.from(seed) }, lifetime);
+	const author = Buffer.from(created.publicKey).toString("hex");
+	lifetime.bindOwnedAuthor(author);
+	const receipt = encodeCanonical(creatorSourceExpiryFields({ objectId: "unit:expiry-dispatch", pinnedGenesisAnchorDigest: "a".repeat(64),
+		sourceAuthor: author, sourceSequence: 0, sourceDigest: new Uint8Array(32).fill(1), sourceContextDigest: new Uint8Array(32).fill(2),
+		signingEpoch: 1, signingAnchorDigest: "b".repeat(64), signingNativeHeadDigest: new Uint8Array(32).fill(3),
+		signingFloorDigest: new Uint8Array(32).fill(4) }));
+	const expiryDigest = hashDomain("ts-drp/settlement-source-expiry/v1", receipt);
+	const signExpiry = (): Promise<Uint8Array> => withAuthoredSourceExpirySigningRequest({ exactCanonicalReceiptBytes: receipt,
+		signerPublicKey: created.publicKey }, (request) => signOwnedLocalRequest({ signer: created.signer, request }));
+	return { lifetime, created, receipt, expiryDigest, signExpiry };
+}
+
+test("owned source expiry signs only inside its own native lifetime turn", async () => {
+	const { lifetime, created, receipt, expiryDigest, signExpiry } = await ownedExpirySigner();
+	await expect(signExpiry()).rejects.toThrow("LOCAL_SESSION_ORIGINAL_SOURCE_EXPIRY_ADMISSION_REQUIRED");
+	// Other admitted turns for the same digest grant nothing.
+	await expect(lifetime.withOwnedSelectionSigning(expiryDigest, signExpiry)).rejects.toThrow("LOCAL_SESSION_ORIGINAL_SOURCE_EXPIRY_ADMISSION_REQUIRED");
+	await expect(lifetime.withOwnedOperationSigning(expiryDigest, signExpiry)).rejects.toThrow("LOCAL_SESSION_ORIGINAL_SOURCE_EXPIRY_ADMISSION_REQUIRED");
+	await expect(lifetime.withOwnedIdentityChallengeSigning("transport", expiryDigest, signExpiry))
+		.rejects.toThrow("LOCAL_SESSION_ORIGINAL_SOURCE_EXPIRY_ADMISSION_REQUIRED");
+	// The expiry turn does not admit a selection request over the same bytes.
+	await expect(lifetime.withOwnedSourceExpirySigning(expiryDigest, () => withAuthoredCreatorSelectionSigningRequest({
+		exactCanonicalSelectionBytes: receipt, signerPublicKey: created.publicKey }, (request) => signOwnedLocalRequest({ signer: created.signer, request }))))
+		.rejects.toThrow("LOCAL_SESSION_ORIGINAL_SELECTION_ADMISSION_REQUIRED");
+	const signature = await lifetime.withOwnedSourceExpirySigning(expiryDigest, signExpiry);
+	expect(ed25519.verify(signature, expiryDigest, created.publicKey, { zip215: false })).toBe(true);
+	lifetime.revoke();
+	await expect(lifetime.withOwnedSourceExpirySigning(expiryDigest, signExpiry)).rejects.toThrow("LOCAL_SESSION_REVOKED");
+});
+
+test("owned request dispatch is exhaustive: an unknown kind never falls into a challenge turn", async () => {
+	const { lifetime, expiryDigest, signExpiry } = await ownedExpirySigner();
+	// Even with a genuine transport turn open for this exact digest, an
+	// unclassified request kind must refuse instead of being treated as one.
+	forgedKind.kind = "unclassified-kind";
+	await expect(lifetime.withOwnedIdentityChallengeSigning("transport", expiryDigest, signExpiry))
+		.rejects.toThrow("UNTRUSTED_OWNED_SIGNING_REQUEST_KIND");
+	await expect(lifetime.withOwnedSourceExpirySigning(expiryDigest, signExpiry)).rejects.toThrow("UNTRUSTED_OWNED_SIGNING_REQUEST_KIND");
 });

@@ -10243,6 +10243,7 @@ async function prepareClosedJournalDetails(
 				(value.classification === "covered-historical" &&
 					(value.dependencyKind === "signed-settled-issuance" || value.dependencyKind === "source-committed-inclusion" ||
 						value.dependencyKind === "authenticated-covered-native-issuance") ||
+					value.classification === "displaced" && value.dependencyKind === "source-authenticated-expiry" ||
 					// The original pinned bootstrap verifier authenticates this exact
 					// epoch-zero control. Its journal consumer follows the same covered
 					// class as native retirement; publication still must be acknowledged.
@@ -10259,7 +10260,8 @@ async function prepareClosedJournalDetails(
 			original === undefined ||
 			paired === undefined ||
 			coverage === undefined ||
-			(paired.publishState !== "published" && coverage.dependencyKind !== "source-committed-inclusion") ||
+			(paired.publishState !== "published" && coverage.dependencyKind !== "source-committed-inclusion" &&
+				coverage.dependencyKind !== "source-authenticated-expiry") ||
 			!closedRetirementEqual(original.digest, paired.digest) ||
 			!closedRetirementEqual(original.digest, coverage.digest) ||
 			!closedRetirementEqual(original.digest, closedRetirementHex(row.vertexDigest))
@@ -19731,11 +19733,15 @@ function closedIssuanceProtectedRecordsForRetirement(input: Readonly<{
 			proof.authorSequence === row.authorSequence &&
 			((proof.classification === "covered-historical" || proof.classification === "filtered-settlement-source") &&
 				(proof.dependencyKind === "signed-settled-issuance" || proof.dependencyKind === "source-committed-inclusion" || proof.dependencyKind === "authenticated-covered-native-issuance") ||
+			 // Signed local-author abandonment: authenticated terminal, never published.
+			 proof.classification === "displaced" && proof.dependencyKind === "source-authenticated-expiry" ||
 			 proof.classification === "pinned-genesis" && epoch === 0 &&
 				(proof.dependencyKind === "pinned-genesis" || proof.dependencyKind === "authenticated-covered-native-issuance")) &&
 			proof.digest instanceof Uint8Array && compareBytes(proof.digest, row.digest) === 0);
+		const expired = covered.length === 1 && covered[0].dependencyKind === "source-authenticated-expiry";
 		const paired = input.rows.outbox.filter(out => out.objectId === input.objectId && out.author === row.author &&
-			out.authorSequence === row.authorSequence && out.publishState === "published" && compareBytes(out.digest, row.digest) === 0);
+			out.authorSequence === row.authorSequence && (out.publishState === "published" || expired && out.publishState === "pending") &&
+			compareBytes(out.digest, row.digest) === 0);
 		const retired = epoch <= input.throughEpoch - 2 && covered.length === 1 && paired.length === 1 &&
 			!input.protectedReplayScopes.some(scope => scope.objectId === input.objectId && scope.epoch === epoch && scope.anchorDigest === value.anchor) &&
 			!physicalScopes.has(JSON.stringify([input.objectId, epoch, value.anchor]));

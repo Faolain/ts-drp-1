@@ -85,6 +85,8 @@ import {
 	type IssuanceRetirementRows,
 	issuanceUnsignedPostimageCharge,
 	joinIssuanceNativeSign,
+	assertSettlementExpiryPublicationExclusive,
+	settlementEntryIsAuthenticatedExpiry,
 	settlementPlanPermitsAuthenticatedPruning,
 } from "@ts-drp/issuance-store/maintenance";
 import {
@@ -1154,7 +1156,21 @@ class BrowserIssuanceImplementation {
 				reason = invalid("publication digest does not identify the issued closure");
 			} else if (status === "corrupt") {
 				reason = this.#latchCorruption("publication closure is incomplete or malformed");
-			} else if (status === "pending") {
+			}
+			if (reason === undefined && (status === "pending" || status === "published")) {
+				const rawPlan = await requestResult(transaction.objectStore(roomStoreName(transaction.db, "issuance", "settlementPlans"))
+					.get([captured.scope.objectId, captured.scope.author]));
+				const plan = rawPlan === undefined ? null : copyNativeSettlementPlan(rawPlan, captured.scope);
+				if (plan === undefined) reason = this.#latchCorruption("stored settlement plan is malformed");
+				else {
+					try {
+						assertSettlementExpiryPublicationExclusive(plan, [{authorSequence: captured.authorSequence, publishState: "published"}]);
+					} catch (error) {
+						reason = error instanceof Error ? error : issuanceRetirementRefusal("settlement source expiry and publication are exclusive");
+					}
+				}
+			}
+			if (reason === undefined && status === "pending") {
 				const row = observation.outboxRecord;
 				if (row === null) throw this.#latchCorruption("publication outbox row disappeared");
 				const writtenKey = await requestResult(
@@ -1269,6 +1285,17 @@ class BrowserIssuanceImplementation {
 				}
 			}
 			if (reason === undefined) {
+				const outbox = transaction.objectStore(roomStoreName(transaction.db, "issuance", "issuanceOutbox"));
+				const states: { authorSequence: number; publishState: "pending" | "published" }[] = [];
+				for (const entry of captured.plan.entries) {
+					if (entry.sourceObjectId !== undefined || !settlementEntryIsAuthenticatedExpiry(entry)) continue;
+					const raw: unknown = await requestResult(outbox.get([captured.scope.objectId, captured.scope.author, entry.sourceSequence]));
+					if (raw === undefined) continue;
+					const state: unknown = typeof raw === "object" && raw !== null ? Reflect.get(raw, "publishState") : undefined;
+					if (state !== "pending" && state !== "published") throw this.#latchCorruption("stored outbox publication state is malformed");
+					states.push({authorSequence: entry.sourceSequence, publishState: state});
+				}
+				assertSettlementExpiryPublicationExclusive(captured.plan, states);
 				const retired = await browserRetirementControl(transaction, captured.scope.objectId);
 				if (retired)
 					assertIssuanceRetirementPlanAllowed(

@@ -2095,7 +2095,9 @@ function checkedIssuanceRetirementTargetRows(
 		const out = rows.outbox.find(
 			(o) => o.author === r.author && o.authorSequence === r.authorSequence
 		) as IssuanceRetirementRows["outbox"][number];
-		if (!allowed && out.publishState === "pending")
+		// Signed local-author expiry terminates the exact pending source without
+		// publication. Store-level exclusivity keeps it from ever publishing.
+		if (!allowed && out.publishState === "pending" && !issuanceRowHasAuthenticatedExpiry(rows, r))
 			throw issuanceRetirementRefusal("issuance retirement pending publication is unprotected");
 	}
 	const target = issuanceRetirementCommitRows(control, p, rows);
@@ -2327,26 +2329,75 @@ export function createIssuanceRetirementControlRead(
 	});
 }
 
+type SettlementPruningEntry = Readonly<{
+	readonly disposition: SettlementPlan["entries"][number]["disposition"];
+	readonly inheritance?: SettlementPlan["entries"][number]["inheritance"];
+	readonly replacementSequence: number | null;
+	readonly sourceContextDigest?: Uint8Array;
+	readonly sourceResolutionDigest?: Uint8Array;
+}>;
+
+/**
+ * Structural shape of a terminal source whose exact resolution bytes are retained:
+ * a signed completion (`committed`) or a signed local-author expiry (`expire`).
+ * Authentication belongs to the native census and reopen verifiers, not this test.
+ * @param entry - One plan entry.
+ * @returns Whether the entry carries a retained terminal resolution.
+ */
+export function settlementEntryHasAuthenticatedTerminalResolution(entry: SettlementPruningEntry): boolean {
+	return (entry.disposition === "committed" || entry.disposition === "expire") && entry.replacementSequence === null &&
+		entry.sourceContextDigest !== undefined && entry.sourceResolutionDigest !== undefined;
+}
+
+/**
+ * Structural shape of signed local-author expiry (abandonment) for one exact source.
+ * @param entry - One plan entry.
+ * @returns Whether the entry is an `expire` carrying a retained resolution.
+ */
+export function settlementEntryIsAuthenticatedExpiry(entry: SettlementPruningEntry): boolean {
+	return entry.disposition === "expire" && settlementEntryHasAuthenticatedTerminalResolution(entry);
+}
+
+function issuanceRowHasAuthenticatedExpiry(rows: IssuanceRetirementRows, row: RetirementIssuedRow): boolean {
+	const plan = rows.plans.find(value => value.scope.objectId === row.objectId && value.scope.author === row.author);
+	return plan?.entries.some(entry => entry.sourceObjectId === undefined && entry.sourceSequence === row.authorSequence &&
+		issuanceRetirementBytesEqual(entry.sourceDigest, row.digest) && settlementEntryIsAuthenticatedExpiry(entry)) === true;
+}
+
+/**
+ * Signed local-author expiry and publication are mutually exclusive for one source.
+ * Plan writes pass the scope's outbox rows; publication passes its proposed row.
+ * @param plan - The plan that will be (or is) durable for this scope.
+ * @param rows - Outbox rows of the same scope, with their resulting publish state.
+ */
+export function assertSettlementExpiryPublicationExclusive(plan: Pick<SettlementPlan, "entries"> | null | undefined,
+	rows: readonly Readonly<{ authorSequence: number; publishState: "pending" | "published" }>[]): void {
+	for (const entry of plan?.entries ?? []) {
+		if (entry.sourceObjectId !== undefined || !settlementEntryIsAuthenticatedExpiry(entry)) continue;
+		if (rows.some(row => row.authorSequence === entry.sourceSequence && row.publishState === "published"))
+			throw issuanceRetirementRefusal("settlement source expiry and publication are exclusive");
+	}
+}
+
 /**
  * Tests whether one durable settlement plan permits authenticated prefix reclamation.
  * @param plan - The transactionally observed plan, or no durable plan.
  * @returns Whether every source and mandatory fence have retained completion links.
+ * A fully removed author has no Writer grant and therefore never issues a FENCE;
+ * its plan permits pruning only when every entry is a retained terminal resolution.
  * This is a structural predicate: the shared migration owner must authenticate
  * inherited target references and protect their cross-object dependencies.
  */
 export function settlementPlanPermitsAuthenticatedPruning(
 	plan: Readonly<{
-		readonly entries: readonly Readonly<{
-			readonly disposition: SettlementPlan["entries"][number]["disposition"];
-			readonly inheritance?: SettlementPlan["entries"][number]["inheritance"];
-			readonly replacementSequence: number | null;
-		}>[];
+		readonly entries: readonly SettlementPruningEntry[];
 		readonly fenceSequence: number | null;
 	}> | null
 ): boolean {
 	return (
 		plan !== null &&
-		plan.fenceSequence !== null &&
+		(plan.fenceSequence !== null ||
+			(plan.entries.length > 0 && plan.entries.every(settlementEntryHasAuthenticatedTerminalResolution))) &&
 		plan.entries.every(
 			(entry) =>
 				entry.disposition === "expire" || entry.disposition === "committed" ||

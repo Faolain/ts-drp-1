@@ -538,10 +538,12 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
 	if (
 		sourceDigest === undefined ||
 		(hasSourceContext && sourceContextDigest?.byteLength !== 32) ||
-		// Only authenticated completion has a resolution consumer. Expiry needs its own
-		// verifier before a resolution may terminate unknown work.
+		// A resolution is exactly one of two signed terminal proofs: received-close
+		// completion (`committed`) or local-author expiry (`expire`). Each has its
+		// own native reopen verifier; neither may carry replacement work.
 		(hasSourceResolution && (sourceResolutionDigest?.byteLength !== 32 || !hasSourceContext ||
-			value.disposition !== "committed")) ||
+			(value.disposition !== "committed" && value.disposition !== "expire"))) ||
+		(value.disposition === "expire" && hasSourceResolution && (value.replacementSequence !== null || hasInheritance)) ||
 		(value.disposition === "committed" && (!hasSourceResolution || value.replacementSequence !== null || hasProgress || hasInheritance)) ||
 		(hasSourceObjectId && (!isValidDurableScopeField(value.sourceObjectId) || value.disposition === "inherited")) ||
 		(hasTransformRefusal && (transformRefusal === undefined || value.disposition !== "transform")) ||
@@ -719,12 +721,16 @@ export function assertSettlementPlanProgressTransition(current: SettlementPlan |
 				prior.sourceResolutionDigest === undefined && candidate.sourceResolutionDigest !== undefined &&
 				prior.disposition !== "expire" && prior.disposition !== "committed" && prior.disposition !== "inherited" &&
 				prior.replacementSequence === null && prior.replacementProgress === undefined &&
-				candidate.disposition === "committed")) ||
+				(candidate.disposition === "committed" || candidate.disposition === "expire"))) ||
 			candidate.sourceObjectId !== prior.sourceObjectId ||
 			(prior.sourceContextDigest !== undefined && (candidate.sourceContextDigest === undefined ||
 				!durableIssuanceBytesEqual(prior.sourceContextDigest, candidate.sourceContextDigest))) ||
 			(prior.sourceResolutionDigest !== undefined && (candidate.sourceResolutionDigest === undefined ||
 				!durableIssuanceBytesEqual(prior.sourceResolutionDigest, candidate.sourceResolutionDigest))) ||
+			// A resolution arrives only with the one-way unresolved->terminal change above;
+			// an already-terminal (e.g. retained-fence) expiry never gains one later.
+			(prior.sourceResolutionDigest === undefined && candidate.sourceResolutionDigest !== undefined &&
+				candidate.disposition === prior.disposition) ||
 			(prior.transformRefusal !== undefined &&
 				(candidate.transformRefusal === undefined ||
 					candidate.transformRefusal.reason !== prior.transformRefusal.reason ||
