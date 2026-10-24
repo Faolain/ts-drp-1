@@ -41,6 +41,7 @@ export interface LocalFinalitySigningCustody {
 	assertOwnedOperationSigning(digest: Uint8Array): void;
 	assertOwnedGenesisSigning(digest: Uint8Array): void;
 	assertOwnedSelectionSigning(digest: Uint8Array): void;
+	assertOwnedSourceExpirySigning(digest: Uint8Array): void;
 	assertOwnedIdentityChallengeSigning(kind: "possession" | "transport", digest: Uint8Array): void;
 }
 
@@ -287,10 +288,17 @@ export async function signOwnedLocalRequest(input: Readonly<{ signer: FinalitySi
 	if (request === undefined || !state.publicKey.every((byte, index) => byte === request.publicKey[index])) throw new TypeError("UNTRUSTED_OWNED_SIGNING_REQUEST");
 	const check = async (): Promise<void> => {
 		state.localCustody!.assertCurrent();
-		if (request.kind === "operation") state.localCustody!.assertOwnedOperationSigning(request.digest);
-		else if (request.kind === "genesis") state.localCustody!.assertOwnedGenesisSigning(request.digest);
-		else if (request.kind === "creator-selection") state.localCustody!.assertOwnedSelectionSigning(request.digest);
-		else state.localCustody!.assertOwnedIdentityChallengeSigning(request.kind, request.digest);
+		// Exhaustive: every request kind names its own native admission turn. An
+		// unclassified kind must never fall into another kind's check.
+		switch (request.kind) {
+			case "operation": state.localCustody!.assertOwnedOperationSigning(request.digest); break;
+			case "genesis": state.localCustody!.assertOwnedGenesisSigning(request.digest); break;
+			case "creator-selection": state.localCustody!.assertOwnedSelectionSigning(request.digest); break;
+			case "source-expiry": state.localCustody!.assertOwnedSourceExpirySigning(request.digest); break;
+			case "possession":
+			case "transport": state.localCustody!.assertOwnedIdentityChallengeSigning(request.kind, request.digest); break;
+			default: throw new TypeError("UNTRUSTED_OWNED_SIGNING_REQUEST_KIND");
+		}
 		state.localCustody!.assertCurrent();
 	};
 	await check();

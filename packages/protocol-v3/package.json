@@ -74,6 +74,10 @@
 			"types": "./dist/src/internal/creator-issuance-retirement-signing-request.d.ts",
 			"import": "./dist/src/internal/creator-issuance-retirement-signing-request.js"
 		},
+		"./internal/creator-source-expiry": {
+			"types": "./dist/src/internal/creator-source-expiry.d.ts",
+			"import": "./dist/src/internal/creator-source-expiry.js"
+		},
 		"./internal/received-vertex-authentication": {
 			"types": "./dist/src/internal/received-vertex-authentication.d.ts",
 			"import": "./dist/src/internal/received-vertex-authentication.js"

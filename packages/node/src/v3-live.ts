@@ -105,6 +105,13 @@ import {
 	verifyReceivedVertex,
 } from "@ts-drp/protocol-v3/internal/received-vertex-authentication";
 import {
+	CREATOR_SOURCE_EXPIRY_HEAD_DOMAIN,
+	creatorSourceExpiryDigest,
+	creatorSourceExpiryFields,
+	openCreatorSourceExpiryReceipt,
+	verifyCreatorSourceExpiryReceipt,
+} from "@ts-drp/protocol-v3/internal/creator-source-expiry";
+import {
 	authorizeLatchedAclOperation,
 	authorizeLatchedApplicationWrite,
 	authorizeLatchedEnvelopeAuthor,
@@ -7157,6 +7164,59 @@ async function withOwnedCreatorSelectionRequest<T>(registration: V3PlaneRegistra
 	}));
 	try { return await action(request); }
 	finally { active = false; ownedCreatorSelectionRequests.delete(request); }
+}
+
+type OwnedCreatorSourceExpiryAdmission = Readonly<{
+	bytes: Uint8Array;
+	digest: Uint8Array;
+	publicKey: Uint8Array;
+	checkWhile<T>(action: () => Promise<T>): Promise<T>;
+}>;
+const ownedCreatorSourceExpiryRequests = new WeakMap<OwnedSigningRequest, OwnedCreatorSourceExpiryAdmission>();
+
+/** Consumer only: the exact original v3-live module's lexical abandonment registry.
+ * Raw protocol receipts, callbacks or structural fields never create entries. */
+export function consumeOwnedCreatorSourceExpirySigningRequest(request: unknown): OwnedCreatorSourceExpiryAdmission | undefined {
+	if (request === null || typeof request !== "object") return undefined;
+	const admitted = ownedCreatorSourceExpiryRequests.get(request as OwnedSigningRequest);
+	ownedCreatorSourceExpiryRequests.delete(request as OwnedSigningRequest);
+	return admitted === undefined ? undefined : ObjectFreeze({ ...admitted, bytes: new Uint8ArrayConstructor(admitted.bytes),
+		digest: new Uint8ArrayConstructor(admitted.digest), publicKey: new Uint8ArrayConstructor(admitted.publicKey) });
+}
+
+/** Private exact semantic owner for local-author abandonment: invoked only inside
+ * the registration FIFO turn, its whole-floor custody and the charged dependency
+ * read. `valid()` re-runs the native source checks inside the turn. */
+async function withOwnedCreatorSourceExpiryRequest<T>(registration: V3PlaneRegistration, custody: LocalReplacementCustody,
+	read: CreatorSnapshotRecoveryCloseDependencyRead, bytes: Uint8Array, valid: () => Promise<boolean>,
+	action: (request: OwnedSigningRequest) => Promise<T>): Promise<T> {
+	const author = registration.issuanceScope.author;
+	const receipt = openCreatorSourceExpiryReceipt(bytes);
+	if (receipt === undefined || receipt.sourceAuthor !== author || !(await valid()))
+		throw new TypeError("creator source expiry exact owner is unavailable");
+	await custody.check();
+	if (!currentRegistration(registration) || !(await valid())) throw new TypeError("creator source expiry exact owner is revoked");
+	const request = ObjectFreeze({}) as OwnedSigningRequest;
+	let active = true;
+	ownedCreatorSourceExpiryRequests.set(request, ObjectFreeze({ bytes: new Uint8ArrayConstructor(bytes),
+		digest: creatorSourceExpiryDigest(bytes),
+		publicKey: Uint8ArrayConstructor.from(author.match(/../gu)!.map(byte => Number.parseInt(byte, 16))),
+		checkWhile: async <Result>(consume: () => Promise<Result>): Promise<Result> => {
+			if (!active || !currentRegistration(registration) || !(await valid())) throw new TypeError("creator source expiry original owner is revoked");
+			let result!: Result;
+			await read.checkWhile(async () => {
+				await custody.check();
+				if (!active || !currentRegistration(registration)) throw new TypeError("creator source expiry original owner is revoked");
+				result = await consume();
+				await custody.check();
+				if (!active || !currentRegistration(registration)) throw new TypeError("creator source expiry delivery is revoked");
+			});
+			if (!active || !currentRegistration(registration) || !(await valid())) throw new TypeError("creator source expiry delivery is revoked");
+			return result;
+		},
+	}));
+	try { return await action(request); }
+	finally { active = false; ownedCreatorSourceExpiryRequests.delete(request); }
 }
 
 function authorizeCreatorSettlementSelection(

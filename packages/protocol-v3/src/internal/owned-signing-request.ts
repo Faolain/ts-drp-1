@@ -2,11 +2,12 @@ import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-
 import { digestReceivedVertexPreimage, vertexCanonicalBytes } from "../index.js";
 import { prepareCreatorAnchorSigningRequest } from "../creator-close.js";
 import { decodeCreatorReattachmentCheckpoint } from "../creator-checkpoint.js";
+import { creatorSourceExpiryDigest, openCreatorSourceExpiryReceipt } from "./creator-source-expiry.js";
 
 declare const ownedSigningRequestBrand: unique symbol;
 export interface OwnedSigningRequest { readonly [ownedSigningRequestBrand]: true; }
 export type CapturedOwnedSigningRequest = Readonly<{
-	kind: "operation" | "genesis" | "creator-selection" | "possession" | "transport";
+	kind: "operation" | "genesis" | "creator-selection" | "source-expiry" | "possession" | "transport";
 	digest: Uint8Array;
 	publicKey: Uint8Array;
 	genesis?: Readonly<{ objectId: string; bindingDigest: Uint8Array }>;
@@ -86,6 +87,24 @@ export function withAuthoredCreatorSelectionSigningRequest<T>(input: Readonly<{
 	if (Reflect.ownKeys(input).length !== 2 || !(input.exactCanonicalSelectionBytes instanceof Uint8Array) ||
 		!(input.signerPublicKey instanceof Uint8Array) || input.signerPublicKey.byteLength !== 32) throw new TypeError("OWNED_SELECTION_PREIMAGE_INVALID");
 	return withRequest({ kind: "creator-selection", digest: hashDomain("ts-drp/settlement-source-selection/v1", input.exactCanonicalSelectionBytes), publicKey: Uint8Array.from(input.signerPublicKey) }, action);
+}
+
+/** Authored local-author abandonment receipt, NOT abandonment authority. The
+ * request carries no caller digest: it opens the exact closed canonical receipt,
+ * requires the signer to be its own source author and computes the digest. The
+ * native consumer separately requires v3-live's private admitted expiry turn. */
+export function withAuthoredSourceExpirySigningRequest<T>(input: Readonly<{
+	exactCanonicalReceiptBytes: Uint8Array;
+	signerPublicKey: Uint8Array;
+}>, action: (request: OwnedSigningRequest) => Promise<T>): Promise<T> {
+	if (input === null || typeof input !== "object" || Reflect.ownKeys(input).length !== 2 ||
+		!(input.exactCanonicalReceiptBytes instanceof Uint8Array) ||
+		!(input.signerPublicKey instanceof Uint8Array) || input.signerPublicKey.byteLength !== 32) throw new TypeError("OWNED_SOURCE_EXPIRY_RECEIPT_INVALID");
+	const bytes = Uint8Array.from(input.exactCanonicalReceiptBytes);
+	const receipt = openCreatorSourceExpiryReceipt(bytes);
+	const author = Array.from(input.signerPublicKey, byte => byte.toString(16).padStart(2, "0")).join("");
+	if (receipt === undefined || receipt.sourceAuthor !== author) throw new TypeError("OWNED_SOURCE_EXPIRY_RECEIPT_INVALID");
+	return withRequest({ kind: "source-expiry", digest: creatorSourceExpiryDigest(bytes), publicKey: Uint8Array.from(input.signerPublicKey) }, action);
 }
 
 /** Canonical bytes alone are NOT native admission. Genuine creator-adoption /

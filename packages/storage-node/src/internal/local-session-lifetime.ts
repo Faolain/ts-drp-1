@@ -55,6 +55,7 @@ export class LocalSessionLifetime {
 	readonly #operationSignatures = new Map<string, number>();
 	readonly #genesisSignatures = new Map<string, number>();
 	readonly #selectionSignatures = new Map<string, number>();
+	readonly #sourceExpirySignatures = new Map<string, number>();
 	readonly #possessionSignatures = new Map<string, number>();
 	readonly #transportSignatures = new Map<string, number>();
 	readonly #nativeFiles = new Map<string, string>();
@@ -121,6 +122,9 @@ export class LocalSessionLifetime {
 	async withOwnedSelectionSigning<T>(digest: Uint8Array, operation: () => Promise<T>): Promise<T> {
 		return this.#withSigningTurn(this.#selectionSignatures, digest, "LOCAL_SESSION_SELECTION_DIGEST_INVALID", operation);
 	}
+	async withOwnedSourceExpirySigning<T>(digest: Uint8Array, operation: () => Promise<T>): Promise<T> {
+		return this.#withSigningTurn(this.#sourceExpirySignatures, digest, "LOCAL_SESSION_SOURCE_EXPIRY_DIGEST_INVALID", operation);
+	}
 	async withOwnedIdentityChallengeSigning<T>(kind: "possession" | "transport", digest: Uint8Array, operation: () => Promise<T>): Promise<T> {
 		return this.#withSigningTurn(kind === "possession" ? this.#possessionSignatures : this.#transportSignatures,
 			digest, "LOCAL_SESSION_IDENTITY_CHALLENGE_DIGEST_INVALID", operation);
@@ -138,6 +142,11 @@ export class LocalSessionLifetime {
 	assertOwnedSelectionSigning(digest: Uint8Array): void {
 		this.assertCurrent();
 		if (digest.byteLength !== 32 || !this.#selectionSignatures.has(Buffer.from(digest).toString("hex"))) throw new Error("LOCAL_SESSION_ORIGINAL_SELECTION_ADMISSION_REQUIRED");
+	}
+	assertOwnedSourceExpirySigning(digest: Uint8Array): void {
+		this.assertCurrent();
+		if (digest.byteLength !== 32 || !this.#sourceExpirySignatures.has(Buffer.from(digest).toString("hex")))
+			throw new Error("LOCAL_SESSION_ORIGINAL_SOURCE_EXPIRY_ADMISSION_REQUIRED");
 	}
 	assertOwnedIdentityChallengeSigning(kind: "possession" | "transport", digest: Uint8Array): void {
 		this.assertCurrent();
