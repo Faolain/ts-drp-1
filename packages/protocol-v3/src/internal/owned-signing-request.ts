@@ -1,7 +1,7 @@
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { digestReceivedVertexPreimage, vertexCanonicalBytes } from "../index.js";
 import { prepareCreatorAnchorSigningRequest } from "../creator-close.js";
-import { decodeCreatorReattachmentCheckpoint } from "../creator-checkpoint.js";
+import { decodeCreatorReattachmentCheckpoint } from "./creator-reattachment-checkpoint.js";
 
 declare const ownedSigningRequestBrand: unique symbol;
 export interface OwnedSigningRequest { readonly [ownedSigningRequestBrand]: true; }
