@@ -140,6 +140,9 @@ export interface IssuanceUnsignedPhaseWidths {
  * authenticated checkpoint. This is not a plan, source proof or disposition. */
 export interface IssuanceSourceCustodyGeometry {
 	readonly maxContextByteLength: number;
+	readonly maxCompletionByteLength: number;
+	readonly maxCompletionMemberByteLength: number;
+	readonly maxExpiryByteLength: number;
 	readonly maxNativeReadByteLength: number;
 }
 
@@ -192,42 +195,57 @@ export function issuanceSettlementPlanStorageByteLength(plan: SettlementPlan): n
 
 /** Source-context and entry fields are sized by the original plan codec. Every
  * existing entry/context remains whole. One future current-epoch context and
- * every potentially unresolved own row are charged without inventing bytes. */
+ * every potentially unresolved own row and its terminal receipt are charged without inventing bytes. */
 export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueScope, prior: SettlementPlan | null,
 	maxSourceCount: number, geometry: IssuanceSourceCustodyGeometry): Readonly<{
 		byteLength: number; items: number; maxDepth: number; nativeStorageByteLength: number;
 	}> {
 	assertDurableIssueScope(scope);
 	const captured = prior === null ? null : copySettlementPlan(prior, scope);
-	if (captured === undefined || !isClosedDurableIssuanceRecord(geometry, ["maxContextByteLength", "maxNativeReadByteLength"]) ||
+	if (captured === undefined || !isClosedDurableIssuanceRecord(geometry, ["maxContextByteLength", "maxCompletionByteLength", "maxCompletionMemberByteLength", "maxExpiryByteLength", "maxNativeReadByteLength"]) ||
 		!Number.isSafeInteger(maxSourceCount) || maxSourceCount < 0 || maxSourceCount > ISSUANCE_RETIREMENT_LIMITS.maxRows ||
 		!Number.isSafeInteger(geometry.maxContextByteLength) || geometry.maxContextByteLength < 1 ||
+		!Number.isSafeInteger(geometry.maxCompletionByteLength) || geometry.maxCompletionByteLength < 1 ||
+		!Number.isSafeInteger(geometry.maxCompletionMemberByteLength) || geometry.maxCompletionMemberByteLength < 1 ||
+		!Number.isSafeInteger(geometry.maxExpiryByteLength) || geometry.maxExpiryByteLength < 1 ||
 		!Number.isSafeInteger(geometry.maxNativeReadByteLength) || geometry.maxNativeReadByteLength < 1 ||
 		geometry.maxNativeReadByteLength > ISSUANCE_RETIREMENT_LIMITS.maxBytes ||
-		geometry.maxContextByteLength > geometry.maxNativeReadByteLength) throw invalid();
+		geometry.maxContextByteLength + geometry.maxCompletionByteLength > geometry.maxNativeReadByteLength) throw invalid();
 	const bytesWidth = (length: number) => 1 + unsignedVaruintWidth(length) + length;
 	const digest = bytesWidth(32), integer = encodeCanonical(Number.MAX_SAFE_INTEGER).byteLength;
 	const leaf = Object.freeze({items: 1, maxDepth: 0});
 	const originalEntries = captured?.entries ?? [];
 	if (originalEntries.length + maxSourceCount > ISSUANCE_RETIREMENT_LIMITS.maxRows) throw invalid();
 	const entryWidths = originalEntries.map(entry => {
-		const {sourceContextDigest: _context, ...fields} = entry;
-		return unsignedRecordWidth(fields, {sourceContextDigest: digest});
+		const {sourceContextDigest: _context, sourceResolutionDigest: _resolution, ...fields} = entry;
+		return unsignedRecordWidth(fields, {sourceContextDigest: digest, sourceResolutionDigest: digest});
 	});
 	const entryShapes = originalEntries.map(entry => {
-		const {sourceContextDigest: _context, ...fields} = entry;
-		return unsignedRecordShape(fields, {sourceContextDigest: leaf});
+		const {sourceContextDigest: _context, sourceResolutionDigest: _resolution, ...fields} = entry;
+		return unsignedRecordShape(fields, {sourceContextDigest: leaf, sourceResolutionDigest: leaf});
 	});
 	const entryFields = {disposition: "manual-review", replacementSequence: null};
-	const entryWidth = unsignedRecordWidth(entryFields, {sourceSequence: integer, sourceDigest: digest, sourceContextDigest: digest});
-	const entryShape = unsignedRecordShape(entryFields, {sourceSequence: leaf, sourceDigest: leaf, sourceContextDigest: leaf});
+	const entryWidth = unsignedRecordWidth(entryFields, {sourceSequence: integer, sourceDigest: digest, sourceContextDigest: digest, sourceResolutionDigest: digest});
+	const entryShape = unsignedRecordShape(entryFields, {sourceSequence: leaf, sourceDigest: leaf, sourceContextDigest: leaf, sourceResolutionDigest: leaf});
 	// Potential rows need not be current APPs. Counting all of them is a positive
 	// bound only; actual retention must still authenticate and classify each row.
 	for (let index = 0; index < maxSourceCount; index++) { entryWidths.push(entryWidth); entryShapes.push(entryShape); }
 	const contexts = captured?.sourceContexts ?? [];
 	const contextWidths = contexts.map(context => encodeCanonical(context, unsignedEncodingLimits).byteLength);
-	contextWidths.push(unsignedRecordWidth({}, {digest, exactCanonicalContextBytes: bytesWidth(geometry.maxContextByteLength)}));
-	const contextShapes = [...contexts.map(unsignedCanonicalShape), unsignedRecordShape({}, {digest: leaf, exactCanonicalContextBytes: leaf})];
+	const contextShape = unsignedRecordShape({}, {digest: leaf, exactCanonicalContextBytes: leaf});
+	const contextShapes = [...contexts.map(unsignedCanonicalShape)];
+	const expiryCount = maxSourceCount + originalEntries.filter(entry => entry.sourceResolutionDigest === undefined &&
+		entry.disposition !== "expire" && entry.disposition !== "inherited" && entry.replacementSequence === null).length;
+	const additionalContexts = [geometry.maxContextByteLength, geometry.maxCompletionByteLength +
+		(maxSourceCount + originalEntries.length) * geometry.maxCompletionMemberByteLength,
+		...Array.from({length: expiryCount}, () => geometry.maxExpiryByteLength)];
+	for (const length of additionalContexts) {
+		contextWidths.push(unsignedRecordWidth({}, {digest, exactCanonicalContextBytes: bytesWidth(length)}));
+		contextShapes.push(contextShape);
+	}
+	if (contexts.reduce((sum, context) => sum + context.exactCanonicalContextBytes.byteLength, 0) +
+		additionalContexts.reduce((sum, length) => sum + length, 0) > SETTLEMENT_REPLACEMENT_DIGEST_LIMITS.maxBytes)
+		throw issuanceRetirementRefusal("source custody contexts exceed original plan bound");
 	const byteLength = unsignedRecordWidth({scope}, {revision: integer, fenceSequence: integer,
 		entries: unsignedArrayWidth(entryWidths), sourceContexts: unsignedArrayWidth(contextWidths)});
 	const shape = unsignedRecordShape({scope}, {revision: leaf, fenceSequence: leaf,
@@ -1075,7 +1093,7 @@ export function issuanceUnsignedContinuationWidths(
 			const prior = projected.plans.find(row => row.scope.author === scope.author);
 			const entry = prior?.entries.find(row => row.sourceSequence === progress.sourceSequence);
 			if (prior === undefined || entry === undefined || entry.replacementSequence !== null ||
-				entry.replacementProgress !== undefined || entry.disposition === "expire" || entry.disposition === "manual-review" || entry.disposition === "inherited" ||
+				entry.replacementProgress !== undefined || entry.disposition === "expire" || entry.disposition === "committed" || entry.disposition === "manual-review" || entry.disposition === "inherited" ||
 				!Number.isSafeInteger(progress.intentCount) || progress.intentCount < 1 ||
 				!(progress.intentDigest instanceof Uint8Array) || progress.intentDigest.byteLength !== 32) throw invalid();
 			const next = copySettlementPlan({ ...prior, revision: prior.revision + 1,
@@ -1838,6 +1856,10 @@ function retirementLocalSource(plan: SettlementPlan, entry: SettlementPlan["entr
 	return row;
 }
 
+function retirementEntryOwnsTerminalSourceProof(entry: SettlementPlan["entries"][number]): boolean {
+	return entry.sourceContextDigest !== undefined && (entry.disposition === "committed" || entry.disposition === "expire");
+}
+
 function retirementEntryIsRetained(control: DurableIssuanceRetirementControl | null,
 	p: DurableIssuanceRetirementPreparation, plan: SettlementPlan, entry: SettlementPlan["entries"][number],
 	rows: IssuanceRetirementRows): boolean {
@@ -1943,7 +1965,12 @@ export function closeIssuanceRetirementProtectedRecords(input: Readonly<{
 function issuanceRetirementTargetRows(control: DurableIssuanceRetirementControl | null,
 	p: DurableIssuanceRetirementPreparation, rows: IssuanceRetirementRows): IssuanceRetirementRows {
 	const plans = rows.plans.map(plan => {
-		const entries = plan.entries.filter(entry => retirementEntryIsRetained(control, p, plan, entry, rows));
+		// A terminal historical proof still authenticates the exact physical source
+		// until the original prefix pruner removes it. Earlier protected rows can
+		// delay that drain beyond this metadata transaction and later issuance.
+		// Keeping these bytes is custody, not a protected source hole.
+		const entries = plan.entries.filter(entry => retirementEntryIsRetained(control, p, plan, entry, rows) ||
+			retirementEntryOwnsTerminalSourceProof(entry) && retirementLocalSource(plan, entry, rows) !== undefined);
 		if (entries.length === plan.entries.length) return plan;
 		if (plan.revision === Number.MAX_SAFE_INTEGER) throw issuanceRetirementRefusal("settlement plan revision exhausted");
 		const {sourceContexts: _contexts, ...plain} = plan;
@@ -2062,7 +2089,11 @@ export function assertIssuanceRetirementPreparationRows(
 	}
 	const target = issuanceRetirementCommitRows(control, p, rows);
 	for (const plan of target.plans) {
-		const refs = plan.entries.filter((e) => e.disposition !== "inherited" && e.sourceObjectId === undefined)
+		const refs = plan.entries.filter((e) => e.disposition !== "inherited" && e.sourceObjectId === undefined &&
+			// A retained terminal proof may describe an already retired physical
+			// source. The native image still checks its exact digest/pair; it does
+			// not revive that source or make it a protected dependency.
+			(!retirementEntryOwnsTerminalSourceProof(e) || retirementEntryIsRetained(control, p, plan, e, rows)))
 			.map((e) => e.sourceSequence);
 		if (plan.fenceSequence !== null) refs.push(plan.fenceSequence);
 		for (const e of plan.entries) {
@@ -2123,7 +2154,29 @@ export function assertIssuanceRetirementPlanAllowed(
 		throw issuanceRetirementRefusal("settlement context has unresolved unsigned intent");
 	assertIssuancePendingInheritanceTargetsAllowed(control, plan, rows);
 	if (!control || (!control.active && !control.completed)) return;
-	const refs = plan.entries.filter((e) => e.disposition !== "inherited" && e.sourceObjectId === undefined)
+	const prior = rows.plans.find(value => value.scope.objectId === plan.scope.objectId && value.scope.author === plan.scope.author);
+	const unchangedTerminalProof = (entry: SettlementPlan["entries"][number]): boolean => {
+		if (!retirementEntryOwnsTerminalSourceProof(entry)) return false;
+		const previous = prior?.entries.find(value => value.sourceSequence === entry.sourceSequence);
+		if (previous === undefined || !issuanceRetirementBytesEqual(encodeCanonical(previous), encodeCanonical(entry))) return false;
+		const source = retirementLocalSource(plan, entry, rows);
+		if (source === undefined) {
+			const lineage = rows.lineages.find(value => value.author === plan.scope.author);
+			if (lineage === undefined || !durableIssuanceAddressIsPruned(lineage.prunedThroughAuthorSequence, entry.sourceSequence)) return false;
+		} else if (!rows.outbox.some(value => value.author === plan.scope.author && value.authorSequence === entry.sourceSequence &&
+			issuanceRetirementBytesEqual(value.digest, entry.sourceDigest))) return false;
+		return [entry.sourceContextDigest, entry.sourceResolutionDigest].every(digest => {
+			if (digest === undefined) return true;
+			const before = prior?.sourceContexts?.find(context => issuanceRetirementBytesEqual(context.digest, digest));
+			const after = plan.sourceContexts?.find(context => issuanceRetirementBytesEqual(context.digest, digest));
+			return before !== undefined && after !== undefined &&
+				issuanceRetirementBytesEqual(before.exactCanonicalContextBytes, after.exactCanonicalContextBytes);
+		});
+	};
+	// Preserve an exact already-owned terminal proof across unrelated plan/fence
+	// progress. This neither admits a new reference to retired work nor permits
+	// mutation of the source, completion, or their original context bytes.
+	const refs = plan.entries.filter((e) => e.disposition !== "inherited" && e.sourceObjectId === undefined && !unchangedTerminalProof(e))
 		.map((e) => e.sourceSequence);
 	if (plan.fenceSequence !== null) refs.push(plan.fenceSequence);
 	for (const e of plan.entries) {
@@ -2284,7 +2337,7 @@ export function settlementPlanPermitsAuthenticatedPruning(
 		plan.fenceSequence !== null &&
 		plan.entries.every(
 			(entry) =>
-				entry.disposition === "expire" ||
+				entry.disposition === "expire" || entry.disposition === "committed" ||
 				(entry.disposition === "inherited" && entry.inheritance !== undefined && entry.replacementSequence === null) ||
 				(entry.disposition !== "manual-review" &&
 					entry.disposition !== "inherited" &&

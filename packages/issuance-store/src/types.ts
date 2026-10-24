@@ -45,7 +45,7 @@ export interface DurableIssuanceOutboxEntry {
 	readonly scope: DurableIssueScope;
 }
 
-export type SettlementDisposition = "expire" | "rebase" | "transform" | "manual-review" | "inherited";
+export type SettlementDisposition = "expire" | "rebase" | "transform" | "manual-review" | "inherited" | "committed";
 
 export const SETTLEMENT_REPLACEMENT_MAX_INTENTS = 16;
 export const SETTLEMENT_REPLACEMENT_DIGEST_LIMITS = Object.freeze({
@@ -88,6 +88,8 @@ export interface SettlementPlanEntry {
 	readonly sourceObjectId?: string;
 	/** Mechanical reference to exact historical authentication bytes; the node re-verifies their authority. */
 	readonly sourceContextDigest?: Uint8Array;
+	/** Exact retained resolution evidence; only the original Node proof owner authenticates it. */
+	readonly sourceResolutionDigest?: Uint8Array;
 	readonly sourceSequence: number;
 	readonly sourceDigest: Uint8Array;
 	readonly disposition: SettlementDisposition;

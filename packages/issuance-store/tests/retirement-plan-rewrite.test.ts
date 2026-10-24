@@ -70,6 +70,23 @@ describe("native retirement plan law", () => {
 		const unbound = {...plan, entries: plan.entries.map(({sourceContextDigest: _source, ...entry}) => entry), sourceContexts: undefined};
 		expect(() => assertSettlementPlanProgressTransition(plan, unbound)).toThrow("retained source changed");
 	});
+	it("admits a source resolution only as authenticated completion until an expiry verifier exists", () => {
+		const original = fixture();
+		const [source, proof] = [0, 1].map(marker => {const bytes = encodeCanonical({marker});
+			return {digest: hashDomain("ts-drp/settlement-source-context/v1", bytes), exactCanonicalContextBytes: bytes};});
+		const reviewed = {...original.plans[0]!.entries[0]!, disposition: "manual-review" as const, replacementSequence: null,
+			sourceContextDigest: source!.digest};
+		const prior = copySettlementPlan({...original.plans[0]!, entries: [reviewed], sourceContexts: [source]}, scope)!;
+		expect(prior).toBeDefined();
+		const resolved = (disposition: "committed" | "expire") => ({...prior, revision: prior.revision + 1,
+			entries: [{...reviewed, disposition, sourceResolutionDigest: proof!.digest}],
+			sourceContexts: [source!, proof!].sort((a, b) => Buffer.compare(a.digest, b.digest))});
+		const committed = copySettlementPlan(resolved("committed"), scope)!;
+		expect(committed).toBeDefined();
+		expect(() => assertSettlementPlanProgressTransition(prior, committed)).not.toThrow();
+		expect(copySettlementPlan(resolved("expire"), scope)).toBeUndefined();
+		expect(() => assertSettlementPlanProgressTransition(prior, resolved("expire"))).toThrow("retained source changed");
+	});
 	it("closes retained replacement chains to a fixed point", () => {
 		const rows = fixture(), p = prepare(rows, [0]);
 		expect(p.protectedRecords.map(value => value.authorSequence)).toEqual([0, 1, 2, 3]);

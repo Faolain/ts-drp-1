@@ -1,14 +1,32 @@
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { canonicalRecordResourceForSizing, canonicalBytesResourceForSizing, canonicalArrayResourceForSizing,
+	type CanonicalResourceFootprint } from "@ts-drp/canonical/resource";
 import { isClosedDurableIssuanceRecord, type SettlementSourceContext } from "@ts-drp/issuance-store";
 import type { IssuanceSourceCustodyGeometry } from "@ts-drp/issuance-store/maintenance";
 import { AHE_BOUNDED_READ_LIMITS } from "@ts-drp/storage";
 import type { CurrentAnchorTrust } from "@ts-drp/protocol-v3";
-import { openCreatorSettlementSourceTrust, readCreatorSettlementSourceAnchor } from "@ts-drp/protocol-v3/internal/received-vertex-authentication";
+import { openCreatorSettlementSourceTrust, readCreatorSettlementSourceAnchor, readCreatorSettlementSourceConstants } from "@ts-drp/protocol-v3/internal/received-vertex-authentication";
 import { openCanonicalLatchedAclSnapshot, type LatchedAclSnapshot } from "@ts-drp/protocol-v3/latched-acl";
+import { openCreatorSuccessorTrust, openCreatorForwardPromotionSuccessorTrust, creatorSuccessorAnchorFields, creatorSuccessorTrustFields } from "@ts-drp/protocol-v3/creator-close";
+import { creatorCloseMembershipSubsetFields, creatorCloseMembershipSubsetMemberFields, openCreatorCloseMembership,
+	captureCreatorCloseMembershipSubset, openCreatorCloseMembershipSubset } from "./creator-close-membership.js";
+import { openReceivedCloseMembership, RECEIVED_CLOSE_AUTHORITY_MAX_RECORD_BYTES } from "./creator-received-close-membership.js";
+import {creatorQ1SealQcFields, creatorQ1SealVoteFields} from "@ts-drp/seal/creator";
 import registry from "@ts-drp/protocol-v3/registry/registry-v1.json" with {type: "json"};
 
 const KIND = "creator-settlement-source-context-1";
 const DOMAIN = "ts-drp/settlement-source-context/v1";
+const COMPLETION_KIND = "creator-settlement-source-completion-1";
+const EXPIRY_KIND = "creator-settlement-source-expiry-1";
+/** Original unsigned local-author abandonment schema, including exact current
+ * native-head and whole-floor digests. These identities never grant freshness. */
+export function creatorSourceExpiryFields(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
+	return {kind: "creator-source-expiry-1", version: 1, objectId: input.objectId,
+		pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest, sourceAuthor: input.sourceAuthor,
+		sourceSequence: input.sourceSequence, sourceDigest: input.sourceDigest, sourceContextDigest: input.sourceContextDigest,
+		signingEpoch: input.signingEpoch, signingAnchorDigest: input.signingAnchorDigest,
+		signingNativeHeadDigest: input.signingNativeHeadDigest, signingFloorDigest: input.signingFloorDigest};
+}
 const MAX_PARAMETERS = encodeCanonical(Object.fromEntries(registry.kinds.parameters.fields.map(field =>
 	[field.name, field.constraints.maximum]))).byteLength;
 // Exact existing anchor, ACL and registered parameter-schema bounds, with canonical field overhead.
@@ -16,6 +34,8 @@ export const CREATOR_SOURCE_CONTEXT_MAX_BYTES = encodeCanonical({kind: KIND, ver
 	anchorPreimage: new Uint8Array(8192), anchorSignature: new Uint8Array(64), aclBytes: new Uint8Array(65536),
 	parametersBytes: new Uint8Array(MAX_PARAMETERS)}).byteLength;
 const limits = {maxBytes: CREATOR_SOURCE_CONTEXT_MAX_BYTES, maxDepth: 2, maxItems: 32};
+const completionLimits = {maxBytes: 1_048_640, maxDepth: 4, maxItems: 64};
+const sizingLimits = {...completionLimits, maxDepth: 32, maxItems: 65_536};
 
 export interface VerifiedCreatorSourceCustody { readonly __verifiedCreatorSourceCustody?: never }
 export interface CreatorSourceCustodyIdentity {
@@ -31,7 +51,7 @@ const verified = new WeakMap<object, CreatorSourceCustodyIdentity>();
  * bound custody for any accepted operation in this epoch. Parameters use the
  * registered complete domain. This creates no context, reference or plan. */
 export function creatorSourceCustodyGeometryForSizing(trust: CurrentAnchorTrust,
-	exactCanonicalAclBytes: Uint8Array): IssuanceSourceCustodyGeometry | undefined {
+	exactCanonicalAclBytes: Uint8Array, maxEpochVertices: number): IssuanceSourceCustodyGeometry | undefined {
 	if (trust.profileId !== "creator-trusted-settlement-v1") return undefined;
 	const anchor = readCreatorSettlementSourceAnchor(trust);
 	if (anchor === undefined) throw new TypeError("creator source sizing trust is unavailable");
@@ -40,11 +60,50 @@ export function creatorSourceCustodyGeometryForSizing(trust: CurrentAnchorTrust,
 		expectedAclDigest: String(fields.aclDigest), expectedEpoch: trust.currentEpoch,
 		expectedObjectId: trust.objectId, expectedProfileId: trust.profileId});
 	if (!acl.ok) throw new TypeError("creator source sizing ACL is not authenticated");
+	if (!Number.isSafeInteger(maxEpochVertices) || maxEpochVertices < 1) throw new TypeError("creator source sizing parameters are unavailable");
+	const bytes = (length: number) => canonicalBytesResourceForSizing(length, sizingLimits);
+	const record = (fields: Readonly<Record<string, unknown>>) =>
+		canonicalRecordResourceForSizing(fields as Readonly<Record<string, CanonicalResourceFootprint | null | boolean | number | string>>, sizingLimits);
+	const member = record(creatorCloseMembershipSubsetMemberFields({vertexDigest: bytes(32), leafIndex: Number.MAX_SAFE_INTEGER,
+		treeSize: Number.MAX_SAFE_INTEGER, auditPath: bytes((Math.ceil(Math.log2(Math.max(1, maxEpochVertices - 1))) + 1) * 32)}));
+	const membership = record(creatorCloseMembershipSubsetFields({cutValueDigest: "0".repeat(64),
+		members: canonicalArrayResourceForSizing(0, member, sizingLimits)}));
+	const constant = readCreatorSettlementSourceConstants(trust);
+	const signerSet = constant === undefined ? undefined : decodeCanonical(constant.exactCanonicalSignerSetBytes);
+	const signerId = Array.isArray(signerSet) && signerSet.length === 1 ? (signerSet[0] as Record<string, unknown>).signerId : undefined;
+	if (constant === undefined || typeof signerId !== "string") throw new TypeError("creator source sizing signer is unavailable");
+	const digest = "0".repeat(64), integer = Number.MAX_SAFE_INTEGER;
+	const qc = record(creatorQ1SealQcFields({epoch: integer, objectId: trust.objectId, phase: "commit",
+		proposalDigest: digest, proposalHash: digest, round: integer}, canonicalArrayResourceForSizing(1,
+		record(creatorQ1SealVoteFields({signature: "0".repeat(128), signerId, voteDigest: digest})), sizingLimits)));
+	const successorAnchor = record(creatorSuccessorAnchorFields({currentAnchor: fields, cut: {
+		aclDigest: digest, archiveIndexRoot: digest, blueprintDigest: digest, historyRoot: digest, historySize: integer,
+		objectId: trust.objectId, previousAnchor: digest}, cutDigest: digest, successorEpoch: integer, effectiveStateDigest: digest}));
+	const successorTrust = record(creatorSuccessorTrustFields({currentAnchorDigest: digest, currentEpoch: integer,
+		detachedCurrentAnchorSignature: bytes(64), exactCanonicalCurrentAnchorPreimageBytes: bytes(successorAnchor.byteLength),
+		exactCanonicalProfileBytes: bytes(constant.exactCanonicalProfileBytes.byteLength),
+		exactCanonicalSignerSetBytes: bytes(constant.exactCanonicalSignerSetBytes.byteLength),
+		genesisAnchorDigest: digest, objectId: trust.objectId, profileId: trust.profileId}));
+	// The variable Cut keeps its original opener ceiling. Fixed creator QC and
+	// trust use their original schemas and the authenticated immutable constants.
+	// The count and opaque subset BYTES can each grow from one to three
+	// varuint bytes under the original native ceiling. No encoded proof is made.
+	const maxCompletionByteLength = record({kind: COMPLETION_KIND, version: 1,
+		exactCanonicalCutValueBytes: bytes(RECEIVED_CLOSE_AUTHORITY_MAX_RECORD_BYTES),
+		exactCanonicalCommitQcBytes: bytes(qc.byteLength),
+		exactCanonicalSuccessorTrustStateRecordBytes: bytes(successorTrust.byteLength),
+		exactCanonicalMembershipSubsetBytes: bytes(membership.byteLength)}).byteLength + 4;
+	const maxCompletionMemberByteLength = member.byteLength;
+	const expiry = record(creatorSourceExpiryFields({objectId: trust.objectId, pinnedGenesisAnchorDigest: digest,
+		sourceAuthor: digest, sourceSequence: integer, sourceDigest: bytes(32), sourceContextDigest: bytes(32),
+		signingEpoch: integer, signingAnchorDigest: digest, signingNativeHeadDigest: bytes(32), signingFloorDigest: bytes(32)}));
+	const maxExpiryByteLength = record({kind: EXPIRY_KIND, version: 1, exactCanonicalReceiptBytes: bytes(expiry.byteLength),
+		detachedSignature: bytes(64)}).byteLength;
 	const varuintWidth = (value: number): number => { let width = 1; while (value >= 128) { value = Math.floor(value / 128); width++; } return width; };
 	const emptyParameters = encodeCanonical({kind: KIND, version: 1, ...anchor, aclBytes: exactCanonicalAclBytes,
 		parametersBytes: new Uint8Array()}).byteLength;
 	return Object.freeze({maxContextByteLength: emptyParameters + MAX_PARAMETERS + varuintWidth(MAX_PARAMETERS) - 1,
-		maxNativeReadByteLength: AHE_BOUNDED_READ_LIMITS.maxUnionBytes});
+		maxCompletionByteLength, maxCompletionMemberByteLength, maxExpiryByteLength, maxNativeReadByteLength: AHE_BOUNDED_READ_LIMITS.maxUnionBytes});
 }
 
 /** Historical authority only: no inclusion, noninclusion, current Writer grant or native currency. */
@@ -116,4 +175,57 @@ export function captureCreatorSourceContext(trust: CurrentAnchorTrust, exactCano
 	const identity = capability === undefined ? undefined : resolveCreatorSourceCustody(capability);
 	if (identity === undefined) throw new TypeError("creator source context is not authenticated");
 	return identity.context;
+}
+
+/** Exact inclusion is immutable historical DATA. It grants no current role,
+ * native currency, or permission to collect a source with remaining consumers. */
+export async function openCreatorSourceCompletion(source: VerifiedCreatorSourceCustody,
+	context: SettlementSourceContext): Promise<ReadonlySet<string> | undefined> {
+	try {
+		const identity = resolveCreatorSourceCustody(source);
+		const bytes = new Uint8Array(context.exactCanonicalContextBytes);
+		if (identity === undefined || compareBytes(hashDomain(DOMAIN, bytes), context.digest) !== 0) return undefined;
+		const value = decodeCanonical(bytes, completionLimits);
+		if (!isClosedDurableIssuanceRecord(value, ["kind", "version", "exactCanonicalCutValueBytes", "exactCanonicalCommitQcBytes",
+			"exactCanonicalSuccessorTrustStateRecordBytes", "exactCanonicalMembershipSubsetBytes"]) ||
+			value.kind !== COMPLETION_KIND || value.version !== 1 ||
+			![value.exactCanonicalCutValueBytes, value.exactCanonicalCommitQcBytes, value.exactCanonicalSuccessorTrustStateRecordBytes,
+				value.exactCanonicalMembershipSubsetBytes].every(field => field instanceof Uint8Array) ||
+			compareBytes(bytes, encodeCanonical(value, completionLimits)) !== 0) return undefined;
+		const cutBytes = value.exactCanonicalCutValueBytes as Uint8Array;
+		const cut = decodeCanonical(cutBytes) as Record<string, unknown>;
+		const successor = (cut.forwardPromotion === undefined ? openCreatorSuccessorTrust : openCreatorForwardPromotionSuccessorTrust)({
+			currentTrust: identity.trust, exactCanonicalCutValueBytes: cutBytes,
+			exactCanonicalCommitQcBytes: value.exactCanonicalCommitQcBytes,
+			exactCanonicalTrustStateRecordBytes: value.exactCanonicalSuccessorTrustStateRecordBytes});
+		if (!successor.ok || successor.trust.currentEpoch !== identity.trust.currentEpoch + 1 ||
+			cut.epoch !== identity.trust.currentEpoch || cut.previousAnchor !== identity.trust.currentAnchorDigest) return undefined;
+		const parameters = decodeCanonical(identity.exactCanonicalParametersBytes) as Record<string, unknown>;
+		return openCreatorCloseMembershipSubset({bytes: value.exactCanonicalMembershipSubsetBytes as Uint8Array,
+			exactCanonicalCutValueBytes: cutBytes, maxEpochVertices: Number(parameters.maxEpochVertices)});
+	} catch {return undefined;}
+}
+
+/** Transfer the original signed received proof once per source epoch. Local
+ * witnesses remain in their original issued rows; exact membership and all
+ * signed close carriers stay together until the final plan consumer leaves. */
+export async function captureCreatorSourceCompletion(source: VerifiedCreatorSourceCustody,
+	exactCanonicalReceivedMembershipBytes: Uint8Array, vertexDigests: readonly Uint8Array[]): Promise<SettlementSourceContext> {
+	const receivedBytes = new Uint8Array(exactCanonicalReceivedMembershipBytes), selectedDigests = vertexDigests.map(value => new Uint8Array(value));
+	const identity = resolveCreatorSourceCustody(source), received = openReceivedCloseMembership(receivedBytes);
+	if (identity === undefined || received === undefined) throw new TypeError("creator source completion is unavailable");
+	const parameters = decodeCanonical(identity.exactCanonicalParametersBytes) as Record<string, unknown>;
+	const membership = await openCreatorCloseMembership({bytes: receivedBytes,
+		exactCanonicalCutValueBytes: received.exactCanonicalCutValueBytes, maxEpochVertices: Number(parameters.maxEpochVertices)});
+	if (membership === undefined || compareBytes(membership.exactCanonicalLatchedAclBytes, encodeCanonical(identity.acl)) !== 0)
+		throw new TypeError("creator source completion ACL differs");
+	const subset = await captureCreatorCloseMembershipSubset({bytes: receivedBytes,
+		exactCanonicalCutValueBytes: received.exactCanonicalCutValueBytes, maxEpochVertices: Number(parameters.maxEpochVertices), vertexDigests: selectedDigests});
+	const bytes = encodeCanonical({kind: COMPLETION_KIND, version: 1,
+		exactCanonicalCutValueBytes: received.exactCanonicalCutValueBytes, exactCanonicalCommitQcBytes: received.exactCanonicalCommitQcBytes,
+		exactCanonicalSuccessorTrustStateRecordBytes: received.exactCanonicalSuccessorTrustStateRecordBytes,
+		exactCanonicalMembershipSubsetBytes: subset}, completionLimits);
+	const context = {digest: hashDomain(DOMAIN, bytes), exactCanonicalContextBytes: bytes};
+	if (await openCreatorSourceCompletion(source, context) === undefined) throw new TypeError("creator source completion is not authenticated");
+	return context;
 }

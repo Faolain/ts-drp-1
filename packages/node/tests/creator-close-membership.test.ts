@@ -1,3 +1,4 @@
+import "@ts-drp/protocol-v3";
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import {
 	buildMerkleTree,
@@ -10,6 +11,7 @@ import { describe, expect, it } from "vitest";
 
 import {
 	encodeCreatorCloseMembership,
+	captureCreatorCloseMembershipSubset, openCreatorCloseMembershipSubset,
 	openCreatorCloseMembership,
 	rewriteCreatorCloseMembershipWitnesses,
 	type CreatorCloseLocalVertexWitnessInput,
@@ -167,6 +169,39 @@ function changed(f: Awaited<ReturnType<typeof fixture>>, update: (value: Record<
 }
 
 describe("bounded native closed-membership carrier", () => {
+	it("retains sparse original inclusion paths with exact index, tree size and Cut root bindings", async () => {
+		const f = await fixture(17, 11), original = await opened(f);
+		const selected = [original!.orderedVertexDigests[1]!, original!.orderedVertexDigests[15]!];
+		const bytes = await captureCreatorCloseMembershipSubset({...f, vertexDigests: selected});
+		const open = (candidate = bytes, cut = f.exactCanonicalCutValueBytes) =>
+			openCreatorCloseMembershipSubset({...f, bytes: candidate, exactCanonicalCutValueBytes: cut});
+		expect([...open()!]).toEqual(selected.map(hex));
+		for (const mutate of [
+			(value: Record<string, unknown>) => {value.leafIndex = Number(value.leafIndex) + 1;},
+			(value: Record<string, unknown>) => {value.treeSize = Number(value.treeSize) + 1;},
+			(value: Record<string, unknown>) => {(value.vertexDigest as Uint8Array)[0] ^= 1;},
+			(value: Record<string, unknown>) => {(value.auditPath as Uint8Array)[0] ^= 1;},
+			(value: Record<string, unknown>) => {value.auditPath = (value.auditPath as Uint8Array).slice(32);},
+		]) {
+			const subset = decodeCanonical(bytes) as {members: Record<string, unknown>[]};
+			mutate(subset.members[0]!); expect(open(encodeCanonical(subset))).toBeUndefined();
+		}
+		for (const changedCut of [{...f.cut, closeSetRoot: "ff".repeat(32)}, {...f.cut, objectId: "ff".repeat(32)},
+			{...f.cut, epoch: f.cut.epoch + 1}, {...f.cut, previousHistorySize: f.cut.previousHistorySize + 1, historySize: f.cut.historySize + 1}]) {
+			const cut = encodeCanonical(changedCut), subset = decodeCanonical(bytes) as Record<string, unknown>;
+			subset.cutValueDigest = hex(hashDomain("ts-drp/hard-epoch-cut/v3", cut));
+			expect(open(encodeCanonical(subset), cut)).toBeUndefined();
+		}
+	});
+	it("detaches inclusion projection inputs before asynchronous work and rejects nonmembers", async () => {
+		const f = await fixture(3, 4), original = await opened(f), selected = new Uint8Array(original!.orderedVertexDigests[1]!);
+		const bytes = new Uint8Array(f.bytes), cut = new Uint8Array(f.exactCanonicalCutValueBytes);
+		const pending = captureCreatorCloseMembershipSubset({...f, bytes, exactCanonicalCutValueBytes: cut, vertexDigests: [selected]});
+		bytes.fill(0); cut.fill(0); selected.fill(0);
+		expect([...openCreatorCloseMembershipSubset({...f, bytes: await pending})!]).toEqual([hex(original!.orderedVertexDigests[1]!)]);
+		await expect(captureCreatorCloseMembershipSubset({...f, vertexDigests: [new Uint8Array(32)]})).rejects.toThrow("outside the Cut");
+	});
+
 	it("transfers membership without the source's witnesses and records only the recipient's own subset", async () => {
 		const f = await fixture(3, 7, true);
 		const transferred = await rewriteCreatorCloseMembershipWitnesses({

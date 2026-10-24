@@ -64,8 +64,9 @@ describe("native same-replica creator recovery", () => {
 			await creator.room.issue({action: "acl", kind: "revoke", group: "writer", target: scope.author});
 			expect((await creator.room.sealEpoch()).ok).toBe(true); await creator.room.adoptCreatorSuccessor();
 			await f.install(member);
-			expect((await store.readSettlementPlan(scope))?.entries).toMatchObject([{disposition: "rebase", replacementProgress: progress,
-				sourceContextDigest: expect.any(Uint8Array), replacementSequence: null}]);
+			expect((await store.readSettlementPlan(scope))?.entries.find(entry => entry.sourceSequence === original.commit.authorSequence))
+				.toMatchObject({disposition: "rebase", replacementProgress: progress,
+					sourceContextDigest: expect.any(Uint8Array), replacementSequence: null});
 			expect(await member.room.unresolvedAcceptedWork()).toMatchObject([{operations: [message("already-pending")], commitment: "unknown"}]);
 		} finally {await store.close();}
 	}, 120_000);

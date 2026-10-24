@@ -5000,6 +5000,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		left.disposition === right.disposition &&
 		left.replacementSequence === right.replacementSequence &&
 		sameBytes(encodeCanonical(left.sourceContextDigest ?? null), encodeCanonical(right.sourceContextDigest ?? null)) &&
+		sameBytes(encodeCanonical(left.sourceResolutionDigest ?? null), encodeCanonical(right.sourceResolutionDigest ?? null)) &&
 		sameBytes(encodeCanonical(left.transformRefusal ?? null), encodeCanonical(right.transformRefusal ?? null)) &&
 		sameBytes(encodeCanonical(left.inheritance ?? null), encodeCanonical(right.inheritance ?? null)) &&
 		sameReplacementProgress(left, right) &&
@@ -5052,6 +5053,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					...(prior?.replacementProgress === undefined ? {} : { replacementProgress: prior.replacementProgress }),
 					...(prior?.transformRefusal === undefined ? {} : { transformRefusal: prior.transformRefusal }),
 					...(prior?.sourceContextDigest === undefined ? {} : { sourceContextDigest: prior.sourceContextDigest }),
+					...(prior?.sourceResolutionDigest === undefined ? {} : { sourceResolutionDigest: prior.sourceResolutionDigest }),
 					replacementSequence: prior?.replacementSequence ?? null,
 					sourceDigest,
 					sourceSequence: source.authorSequence,
@@ -5118,7 +5120,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				entry.sourceObjectId !== undefined ||
 				entry.inheritance !== undefined ||
 				sources.some((source) => source.authorSequence === entry.sourceSequence) ||
-				(entry.disposition !== "expire" &&
+				(entry.disposition !== "expire" && entry.disposition !== "committed" &&
 					(entry.disposition === "manual-review" ||
 						entry.disposition === "inherited" ||
 						entry.replacementSequence === null))
@@ -5387,7 +5389,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		// A retained source context preserves unknown work, including pre-existing
 		// policy/progress metadata. Its presence grants no replacement decision.
 		const eligible = (entry: RoomSettlementPlan["entries"][number]): boolean => entry.sourceContextDigest === undefined &&
-			entry.disposition !== "expire" && entry.disposition !== "inherited" && entry.disposition !== "manual-review" &&
+			entry.disposition !== "expire" && entry.disposition !== "committed" && entry.disposition !== "inherited" && entry.disposition !== "manual-review" &&
 			entry.replacementSequence === null;
 		if (plan.entries.some(entry => entry.sourceContextDigest !== undefined) && !plan.entries.some(eligible)) return;
 		const sourceBySequence = new Map(sources.map((source) => [source.authorSequence, source] as const));

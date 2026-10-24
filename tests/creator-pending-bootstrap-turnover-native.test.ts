@@ -74,19 +74,28 @@ it("retains and authenticates an unpublished pinned bootstrap after old snapshot
 	expect(await eventually(() => f.creator.room.projection().blocks.some(block => block.id === "recipient-current"), 10_000)).toBe(true);
 }, 120_000);
 
-it.each(["operation", "object", "author", "genesis", "signature"] as const)(
-	"refuses a pending bootstrap %s substitution before successor publication", async change => {
+it.each([
+	...["operation", "object", "author", "genesis", "signature"].map(change => ({change, publication: "pending"})),
+	...["operation", "epoch", "signature"].map(change => ({change, publication: "published"})),
+])("refuses a $publication bootstrap $change substitution before successor publication", async ({change, publication}) => {
 		const f = await pendingBootstrapRoom();
 		for (let epoch = 2; epoch <= 3; epoch++) { await f.closeNext(epoch); await f.adopt(epoch); }
 		await f.closeNext(4);
 		const offer = await f.creator.room.exportCreatorSuccessor();
 		await f.creator.room.adoptCreatorSuccessor();
+		if (publication === "published") {
+			const store = await f.host.openIssuance(f.recipient.name);
+			try {await store.compareAndMarkOutboxPublished({scope: f.original.commit.issuedRecord.scope,
+				authorSequence: 0, digest: f.original.commit.envelope.digest});}
+			finally {await store.close();}
+		}
 		const preimage = decodeCanonical(f.original.commit.envelope.canonicalPreimageBytes) as Record<string, unknown>;
 		const substituted = { ...preimage,
 			...(change === "operation" ? { operation: { action: "placeBlock", id: "arbitrary-pending", kind: "gold", x: 1, y: 1 } } : {}),
 			...(change === "object" ? { objectId: `${f.fixture.objectId}-alien` } : {}),
 			...(change === "author" ? { author: required(f.fixture.identities[0]).author } : {}),
 			...(change === "genesis" ? { anchor: "00".repeat(32), dependencies: ["00".repeat(32)] } : {}),
+			...(change === "epoch" ? { epoch: 1 } : {}),
 		};
 		const bytes = encodeCanonical(substituted), digest = hashDomain("ts-drp/vertex/v3", bytes);
 		const signature = ed25519.sign(digest, required(f.fixture.identities[change === "author" ? 0 : 1]).seed);

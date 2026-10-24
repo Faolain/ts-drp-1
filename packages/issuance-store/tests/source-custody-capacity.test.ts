@@ -6,16 +6,18 @@ import {issuanceCanonicalSettlementPlanStorageByteLength, issuanceSourceCustodyP
 import {d109bCommit} from "../../../tests/fixtures/phase-6b/issuance-retention-contract.js";
 
 const scope = {objectId: "source-custody-capacity", author: "writer"};
-const geometry = {maxContextByteLength: 74_107, maxNativeReadByteLength: 786_432};
+const geometry = {maxContextByteLength: 74_107, maxCompletionByteLength: 70_432, maxCompletionMemberByteLength: 512, maxExpiryByteLength: 1_024, maxNativeReadByteLength: 786_432};
 const empty: IssuanceRetirementRows = {lineages: [], issued: [], outbox: [], plans: []};
 
 describe("accepted source custody numerical reserve", () => {
 	it.each([1, 127, 128])("bounds a maximum context and %i exact references in the full native carrier", count => {
 		const bytes = new Uint8Array(geometry.maxContextByteLength), digest = hashDomain("ts-drp/settlement-source-context/v1", bytes);
+		const proof = new Uint8Array(geometry.maxCompletionByteLength + count * geometry.maxCompletionMemberByteLength), resolution = hashDomain("ts-drp/settlement-source-context/v1", proof);
 		const plan = copySettlementPlan({scope, revision: Number.MAX_SAFE_INTEGER, fenceSequence: Number.MAX_SAFE_INTEGER,
 			entries: Array.from({length: count}, (_, sourceSequence) => ({sourceSequence, sourceDigest: new Uint8Array(32),
-				sourceContextDigest: digest, disposition: "manual-review", replacementSequence: null})),
-			sourceContexts: [{digest, exactCanonicalContextBytes: bytes}]}, scope)!;
+				sourceContextDigest: digest, sourceResolutionDigest: resolution, disposition: "committed", replacementSequence: null})),
+			sourceContexts: [{digest, exactCanonicalContextBytes: bytes}, {digest: resolution, exactCanonicalContextBytes: proof}]
+				.sort((a, b) => Buffer.compare(a.digest, b.digest))}, scope)!;
 		expect(plan).toBeDefined();
 		const canonical = encodeCanonical(plan), resource = issuanceSourceCustodyPlanResourceForSizing(scope, null, count, geometry);
 		expect(canonical.byteLength).toBeLessThanOrEqual(resource.byteLength);
@@ -37,6 +39,26 @@ describe("accepted source custody numerical reserve", () => {
 		expect(exact.final.canonicalRowsBytes - plain.final.canonicalRowsBytes).toBeGreaterThan(geometry.maxContextByteLength);
 		expect(warmed.ordinaryFinal.canonicalRowsBytes).toBeGreaterThanOrEqual(exact.final.canonicalRowsBytes);
 		expect(warmed.planRewriteResource!.byteLength).toBeGreaterThan(2 * geometry.maxContextByteLength);
+	});
+	it("accepts the exact native carrier ceiling and refuses one byte below with maximum source and completion contexts", () => {
+		const size = issuanceSourceCustodyPlanResourceForSizing(scope, null, 128, geometry);
+		expect(issuanceSourceCustodyPlanResourceForSizing(scope, null, 128,
+			{...geometry, maxNativeReadByteLength: size.nativeStorageByteLength})).toEqual(size);
+		expect(() => issuanceSourceCustodyPlanResourceForSizing(scope, null, 128,
+			{...geometry, maxNativeReadByteLength: size.nativeStorageByteLength - 1})).toThrow("native read bound");
+	});
+	it("retains existing whole contexts when reserving another epoch completion", () => {
+		const context = (size: number, marker: number) => {const exactCanonicalContextBytes = new Uint8Array(size).fill(marker);
+			return {digest: hashDomain("ts-drp/settlement-source-context/v1", exactCanonicalContextBytes), exactCanonicalContextBytes};};
+		const source = context(geometry.maxContextByteLength, 1), proof = context(geometry.maxCompletionByteLength, 2);
+		const prior = copySettlementPlan({scope, revision: 0, fenceSequence: null, entries: [{sourceSequence: 0,
+			sourceDigest: new Uint8Array(32), sourceContextDigest: source.digest, sourceResolutionDigest: proof.digest,
+			disposition: "committed", replacementSequence: null}], sourceContexts: [source, proof].sort((a, b) => Buffer.compare(a.digest, b.digest))}, scope)!;
+		const baseline = issuanceSourceCustodyPlanResourceForSizing(scope, null, 1, geometry);
+		const retained = issuanceSourceCustodyPlanResourceForSizing(scope, prior, 1, geometry);
+		expect(retained.byteLength - baseline.byteLength).toBeGreaterThan(source.exactCanonicalContextBytes.length + proof.exactCanonicalContextBytes.length);
+		expect(() => issuanceSourceCustodyPlanResourceForSizing(scope, prior, 1,
+			{...geometry, maxNativeReadByteLength: baseline.nativeStorageByteLength})).toThrow("native read bound");
 	});
 	it("refuses a native wrapper overflow even when the canonical plan still fits", () => {
 		const size = issuanceSourceCustodyPlanResourceForSizing(scope, null, 1, geometry);

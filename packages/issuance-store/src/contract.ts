@@ -476,6 +476,7 @@ function copySettlementInheritance(value: unknown): SettlementInheritance | unde
 
 function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefined {
 	const hasSourceContext = typeof value === "object" && value !== null && Object.hasOwn(value, "sourceContextDigest");
+	const hasSourceResolution = typeof value === "object" && value !== null && Object.hasOwn(value, "sourceResolutionDigest");
 	const hasSourceObjectId =
 		typeof value === "object" && value !== null && Object.prototype.hasOwnProperty.call(value, "sourceObjectId");
 	const hasTransformRefusal =
@@ -489,6 +490,7 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
 			"disposition",
 			...(hasSourceObjectId ? ["sourceObjectId"] : []),
 			...(hasSourceContext ? ["sourceContextDigest"] : []),
+			...(hasSourceResolution ? ["sourceResolutionDigest"] : []),
 			...(hasTransformRefusal ? ["transformRefusal"] : []),
 			...(hasInheritance ? ["inheritance"] : []),
 			...(hasProgress ? ["replacementProgress"] : []),
@@ -502,12 +504,14 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
 			value.disposition !== "rebase" &&
 			value.disposition !== "transform" &&
 			value.disposition !== "manual-review" &&
+			value.disposition !== "committed" &&
 			value.disposition !== "inherited")
 	) {
 		return undefined;
 	}
 	const sourceDigest = copyDurableIssuanceBytes(value.sourceDigest);
 	const sourceContextDigest = hasSourceContext ? copyDurableIssuanceBytes(value.sourceContextDigest) : undefined;
+	const sourceResolutionDigest = hasSourceResolution ? copyDurableIssuanceBytes(value.sourceResolutionDigest) : undefined;
 	const replacementProgress = hasProgress ? copySettlementReplacementProgress(value.replacementProgress) : undefined;
 	const inheritance = hasInheritance ? copySettlementInheritance(value.inheritance) : undefined;
 	const rawRefusal = hasTransformRefusal ? value.transformRefusal : undefined;
@@ -534,6 +538,11 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
 	if (
 		sourceDigest === undefined ||
 		(hasSourceContext && sourceContextDigest?.byteLength !== 32) ||
+		// Only authenticated completion has a resolution consumer. Expiry needs its own
+		// verifier before a resolution may terminate unknown work.
+		(hasSourceResolution && (sourceResolutionDigest?.byteLength !== 32 || !hasSourceContext ||
+			value.disposition !== "committed")) ||
+		(value.disposition === "committed" && (!hasSourceResolution || value.replacementSequence !== null || hasProgress || hasInheritance)) ||
 		(hasSourceObjectId && (!isValidDurableScopeField(value.sourceObjectId) || value.disposition === "inherited")) ||
 		(hasTransformRefusal && (transformRefusal === undefined || value.disposition !== "transform")) ||
 		(hasProgress && replacementProgress === undefined) ||
@@ -553,6 +562,7 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
 	return {
 		disposition: value.disposition,
 		...(sourceContextDigest === undefined ? {} : { sourceContextDigest }),
+		...(sourceResolutionDigest === undefined ? {} : { sourceResolutionDigest }),
 		...(hasSourceObjectId ? { sourceObjectId: value.sourceObjectId as string } : {}),
 		...(transformRefusal === undefined ? {} : { transformRefusal }),
 		...(inheritance === undefined ? {} : { inheritance }),
@@ -602,7 +612,7 @@ export function copySettlementPlan(value: unknown, scope: DurableIssueScope): Se
 	const sourceContexts: SettlementSourceContext[] = [];
 	if (hasContexts) {
 		if (!Array.isArray(value.sourceContexts) || value.sourceContexts.length === 0 ||
-			value.sourceContexts.length > entries.length) return undefined;
+			value.sourceContexts.length > entries.length * 2) return undefined;
 		let priorDigest = "";
 		let contextBytes = 0;
 		for (const raw of value.sourceContexts) {
@@ -613,14 +623,14 @@ export function copySettlementPlan(value: unknown, scope: DurableIssueScope): Se
 				(contextBytes += bytes.byteLength) > SETTLEMENT_REPLACEMENT_DIGEST_LIMITS.maxBytes ||
 				!durableIssuanceBytesEqual(digest, hashDomain("ts-drp/settlement-source-context/v1", bytes))) return undefined;
 			const key = Array.from(digest, byte => byte.toString(16).padStart(2, "0")).join("");
-			if (key <= priorDigest || !entries.some(entry => entry.sourceContextDigest !== undefined &&
-				durableIssuanceBytesEqual(entry.sourceContextDigest, digest))) return undefined;
+			if (key <= priorDigest || !entries.some(entry => [entry.sourceContextDigest, entry.sourceResolutionDigest]
+				.some(reference => reference !== undefined && durableIssuanceBytesEqual(reference, digest)))) return undefined;
 			priorDigest = key;
 			sourceContexts.push({digest, exactCanonicalContextBytes: bytes});
 		}
 	}
-	if (entries.some(entry => entry.sourceContextDigest !== undefined && !sourceContexts.some(context =>
-		durableIssuanceBytesEqual(entry.sourceContextDigest!, context.digest)))) return undefined;
+	if (entries.some(entry => [entry.sourceContextDigest, entry.sourceResolutionDigest].some(reference =>
+		reference !== undefined && !sourceContexts.some(context => durableIssuanceBytesEqual(reference, context.digest))))) return undefined;
 	return {
 		entries,
 		...(hasContexts ? { sourceContexts } : {}),
@@ -633,8 +643,8 @@ export function copySettlementPlan(value: unknown, scope: DurableIssueScope): Se
 /** Last-consumer projection for the original atomic retirement/plan owners. */
 export function settlementSourceContextsForEntries(plan: SettlementPlan, entries: readonly SettlementPlanEntry[]):
 	readonly SettlementSourceContext[] | undefined {
-	const retained = plan.sourceContexts?.filter(context => entries.some(entry => entry.sourceContextDigest !== undefined &&
-		durableIssuanceBytesEqual(entry.sourceContextDigest, context.digest)));
+	const retained = plan.sourceContexts?.filter(context => entries.some(entry => [entry.sourceContextDigest, entry.sourceResolutionDigest]
+		.some(reference => reference !== undefined && durableIssuanceBytesEqual(reference, context.digest))));
 	return retained?.length === 0 ? undefined : retained;
 }
 
@@ -648,6 +658,7 @@ export function cloneSettlementPlan(plan: SettlementPlan): SettlementPlan {
 		entries: plan.entries.map((entry) => ({
 			disposition: entry.disposition,
 			...(entry.sourceContextDigest === undefined ? {} : {sourceContextDigest: new Uint8Array(entry.sourceContextDigest)}),
+			...(entry.sourceResolutionDigest === undefined ? {} : {sourceResolutionDigest: new Uint8Array(entry.sourceResolutionDigest)}),
 			...(entry.sourceObjectId === undefined ? {} : { sourceObjectId: entry.sourceObjectId }),
 			...(entry.transformRefusal === undefined
 				? {}
@@ -704,10 +715,16 @@ export function assertSettlementPlanProgressTransition(current: SettlementPlan |
 			continue;
 		}
 		if (
-			candidate.disposition !== prior.disposition ||
+			(candidate.disposition !== prior.disposition && !(prior.sourceContextDigest !== undefined &&
+				prior.sourceResolutionDigest === undefined && candidate.sourceResolutionDigest !== undefined &&
+				prior.disposition !== "expire" && prior.disposition !== "committed" && prior.disposition !== "inherited" &&
+				prior.replacementSequence === null && prior.replacementProgress === undefined &&
+				candidate.disposition === "committed")) ||
 			candidate.sourceObjectId !== prior.sourceObjectId ||
 			(prior.sourceContextDigest !== undefined && (candidate.sourceContextDigest === undefined ||
 				!durableIssuanceBytesEqual(prior.sourceContextDigest, candidate.sourceContextDigest))) ||
+			(prior.sourceResolutionDigest !== undefined && (candidate.sourceResolutionDigest === undefined ||
+				!durableIssuanceBytesEqual(prior.sourceResolutionDigest, candidate.sourceResolutionDigest))) ||
 			(prior.transformRefusal !== undefined &&
 				(candidate.transformRefusal === undefined ||
 					candidate.transformRefusal.reason !== prior.transformRefusal.reason ||
