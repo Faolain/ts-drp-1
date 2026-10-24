@@ -1,12 +1,35 @@
 # Real-time game completion
 
-Updated 2026-10-23. This is the current continuation point; the [decision log](README.md)
+Updated 2026-10-24. This is the current continuation point; the [decision log](README.md)
 and track reports preserve the earlier evidence. The owner has authorized correcting
 assumptions and using executable models to find a sound, performant design.
 
 The task is incomplete. Passing a room test that pauses at each rollover does not
 establish uninterrupted play. A formal model proves its stated abstraction and bounds,
 not native storage or network behavior.
+
+## Resumed — 2026-10-24
+
+Goal: the 300-epoch Grid/Canvas/Chat campaigns green again on the integrated source;
+only executed tests and model checks count as evidence. Performance tuning follows.
+
+- Completion delta reviewed (independent Claude review; no P0/P1). Fixed F1 (store
+  admitted `→ expire` + resolution without a verifier; now legal only on `committed`)
+  and F4 (retransmit labelled `published` without a publish). Committed `01944b66`,
+  merged into root as `8ccac3f4`. Merged tree: fresh build, 97/97 focused tests.
+  [Triage](../../.logs/realtime-resume-2026-10-23/rejoin-completion/resume-02/TRIAGE.md)
+  keeps F2 (reserve over-counts own rows; fails safe) for the 512 gate to measure.
+- Rollback-slot promotion gate written (`/private/tmp/ts-drp-rollback-promotion`):
+  refusal controls pass, both usable-slot promotions FAIL on pre-existing production
+  defects (floor 2: post-promotion issue headroom/reopen; floor 3: recovery-failed;
+  floor ≥4: journal header `NATIVE_READ_RESERVATION_BUSY` against capacity
+  maintenance). [Report](../../.logs/realtime-resume-2026-10-23/rollback-promotion/RESULT.md).
+  Fix work in progress on `fix/rollback-promotion`.
+- Source abandonment designed ([DESIGN](../../.logs/realtime-resume-2026-10-23/abandonment-design/DESIGN.md));
+  implementation in progress on `feat/source-abandonment`, including the fence-less
+  pruning liveness gap (removed author's committed entries never prunable).
+- Campaign checkout refreshed to `8ccac3f4`; affected preflight then Grid and
+  Canvas/Chat 300 follow. [Campaign evidence](../../.logs/realtime-resume-2026-10-23/campaign-01/).
 
 ## Paused for credit — 2026-10-23
 
