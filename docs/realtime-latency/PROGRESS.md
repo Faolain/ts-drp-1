@@ -77,6 +77,21 @@ not native storage or network behavior.
     on synchronous `DatabaseSync` this also blocks the loop ≈1.1 s (the 1162 ms task gap).
     Another same-process connection holds the AHE write lock across an await. Fix agent on
     `fix/ahe-locked-race`. [Diag](../../.logs/realtime-resume-2026-10-23/grid-continued-8ab3/diag-1.log).
+  - Conservation 300 on `1f8f8b65`: Canvas **300/300, 3000 accepted, 2779 s** (issue p95 696 ms,
+    transition p95 4031 ms); stopped at Grid 141 to move the campaign to `6c9b5935`.
+- AHE locked race fixed (`7ee07f70` RED, `6c9b5935` fix). Measured holder: the recipient's
+  retained publication read turn (`withCurrentRetainedRead` → native read reservation, `BEGIN
+  IMMEDIATE` on a second connection, held across awaits inside the registration FIFO); waiter:
+  the pool's turnover-due pre-check outside that FIFO (acquired 1.0–1.2 ms after the holder,
+  blocked 1101/1106 ms). Fix: `inspectQueuedNativeHead()` runs the same `inspectHead` as a turn in
+  the plane FIFO; `inspectHead` errors now carry the store reason. RED test held the read turn
+  and got `SUBSTRATE_FAILURE: database is locked` after a 1082 ms stall. 3× consecutive Grid
+  continued play 40 pass (timer max gap 270/264/290 ms); 3 concurrent fixed runs also pass
+  (654/460/478 ms) where 3 of 4 unfixed failed. Remaining out-of-FIFO `inspectHead` callers
+  (install-time adoption, `nativeHeadUnchanged`) never failed; left unmoved pending measurement.
+  [Report](../../.logs/realtime-resume-2026-10-23/ahe-locked-race/RESULT.md).
+- **Final campaign source `6c9b5935`** (`/private/tmp/ts-drp-merge-probe`): Grid continued play 300
+  and conservation 300 ×3 running concurrently. Logs `.logs/realtime-resume-2026-10-23/final-6c9b5935/`.
 
 ## Stopped for shutdown — 2026-10-24
 
