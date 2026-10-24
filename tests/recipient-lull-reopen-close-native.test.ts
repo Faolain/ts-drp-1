@@ -3,6 +3,7 @@ import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical"
 import type { DurableIssueCommit } from "@ts-drp/issuance-store";
 import type { SnapshotChunkProtocolPort } from "@ts-drp/network/snapshot-transfer";
 import { Message, MessageType, V3Envelope } from "@ts-drp/types";
+import { createHash } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -22,6 +23,7 @@ import { Keychain } from "../packages/keychain/src/keychain.js";
 import { type CanvasProjection, createV3CanvasApplication } from "../packages/node/src/applications/canvas.js";
 import { readCreatorSuccessorExport } from "../packages/node/src/creator-adoption.js";
 import { parseStorageObjectId } from "../packages/storage/src/index.js";
+import { SqliteNativeReadReservationOwner } from "../packages/storage-node/src/internal/native-read-reservation.js";
 import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-head.js";
 import { createNodeV3RoomStorageHost } from "../packages/storage-node/src/v3-room-host.js";
 
@@ -249,7 +251,7 @@ async function lullFixture() {
 			await store.close();
 		}
 	};
-	return { creator, observer, objectId, invite, host, application, open, issued, stop, retirementControl };
+	return { creator, observer, objectId, invite, host, application, open, issued, stop, retirementControl, directory };
 }
 
 type LullFixture = Awaited<ReturnType<typeof lullFixture>>;
@@ -526,4 +528,106 @@ it("an orderly close cancels a retained send that its own transport revocation r
 	await closing;
 	expect(retiredAtRefusal, "the revocation refused the send while the plane was current").toBe(false);
 	expect(await served, "transport operation failure").toBeUndefined();
+}, 900_000);
+
+// The room host addresses each native store by sha256([family, name]); an address only.
+const aheFilename = (directory: string, name: string) =>
+	join(
+		directory,
+		`${createHash("sha256")
+			.update(JSON.stringify(["ahe", `${name}--ahe`]))
+			.digest("hex")}.sqlite`
+	);
+
+it("a recipient lull queues behind a read turn holding its native AHE custody instead of stalling on the write lock", async () => {
+	const fixture = await lullFixture();
+	const creator = await fixture.open("creator", fixture.creator);
+	const recipient = await fixture.open("observer", fixture.observer, { receiveOnly: true });
+	// Two rollovers put the recipient at epoch 2, where its lull inspects the native head.
+	for (let epoch = 0; epoch < 2; epoch++) await rollover(fixture, creator, recipient, epoch);
+	await creator.room.issue(paint("held-read", [5, 5, 5]));
+	await deliverEpoch(fixture, recipient, 2);
+
+	// A retained read turn runs in the recipient plane's FIFO and holds the store's native
+	// writer reservation (a real BEGIN IMMEDIATE on a second connection) across its awaits.
+	// Hold the first such reservation on the recipient's own AHE file, exactly as a slow turn
+	// would, while the lull starts.
+	const target = aheFilename(fixture.directory, "observer");
+	const acquire = SqliteNativeReadReservationOwner.prototype.acquire;
+	let armed = true;
+	let entered!: () => void;
+	const holding = new Promise<void>((resolve) => {
+		entered = resolve;
+	});
+	let release!: () => void;
+	const released = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	SqliteNativeReadReservationOwner.prototype.acquire = async function (
+		this: SqliteNativeReadReservationOwner,
+		...args: Parameters<typeof acquire>
+	) {
+		const held = await acquire.apply(this, args);
+		if (armed && Reflect.get(this, "filename") === target) {
+			armed = false;
+			entered();
+			await released;
+		}
+		return held;
+	};
+	let maxGapMs = 0;
+	let last = performance.now();
+	const ticker = setInterval(() => {
+		const now = performance.now();
+		maxGapMs = Math.max(maxGapMs, now - last);
+		last = now;
+	}, 5);
+	try {
+		Reflect.set(recipient.networkNode, "getAllPeers", () => ["canvas-creator"]);
+		const served = recipient
+			.publisher()("canvas-creator")
+			.then(
+				() => undefined,
+				(reason: unknown) => reason
+			);
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		await Promise.race([
+			holding,
+			new Promise((_, reject) => {
+				timer = setTimeout(() => reject(new TypeError("LULL_HELD_READ_NEVER_RESERVED_AHE")), 30_000);
+			}),
+		]).finally(() => clearTimeout(timer));
+		last = performance.now();
+		maxGapMs = 0;
+		let settledWhileHeld = false;
+		const lull = recipient.room.maintainRecoveryPool().then(
+			(value) => ({ ok: true as const, value }),
+			(reason: unknown) => ({ ok: false as const, reason: String(reason) })
+		);
+		void lull.finally(() => {
+			settledWhileHeld = true;
+		});
+		// Give the lull every chance to reach its native head inspection while the turn holds.
+		await new Promise((resolve) => setTimeout(resolve, 250));
+		const gapWhileHeld = maxGapMs;
+		const pendingWhileHeld = !settledWhileHeld;
+		release();
+		const outcome = await lull;
+		expect(outcome.ok ? "settled" : outcome.reason, "the lull waits for the holding turn, not its write lock").toBe(
+			"settled"
+		);
+		expect(gapWhileHeld, "no synchronous busy-timeout spin on the event loop").toBeLessThan(500);
+		expect(pendingWhileHeld, "the lull's head inspection queued behind the holding turn").toBe(true);
+		expect(outcome.ok && outcome.value.kind, "an observational lull at epoch 2").not.toBe("deferred");
+		expect(await served, "the held retained read completes").toBeUndefined();
+	} finally {
+		clearInterval(ticker);
+		armed = false;
+		release();
+		SqliteNativeReadReservationOwner.prototype.acquire = acquire;
+	}
+	// The recipient keeps following the room after the lull.
+	await creator.room.issue(paint("after-held-read", [6, 6, 6]));
+	await deliverEpoch(fixture, recipient, 2);
+	expect(recipient.room.projection().state).toEqual(creator.room.projection().state);
 }, 900_000);
