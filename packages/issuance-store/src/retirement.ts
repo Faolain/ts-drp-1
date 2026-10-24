@@ -2084,7 +2084,9 @@ export function assertIssuanceRetirementPreparationRows(
 		const out = rows.outbox.find(
 			(o) => o.author === r.author && o.authorSequence === r.authorSequence
 		) as IssuanceRetirementRows["outbox"][number];
-		if (!allowed && out.publishState === "pending")
+		// Signed local-author expiry terminates the exact pending source without
+		// publication. Store-level exclusivity keeps it from ever publishing.
+		if (!allowed && out.publishState === "pending" && !issuanceRowHasAuthenticatedExpiry(rows, r))
 			throw issuanceRetirementRefusal("issuance retirement pending publication is unprotected");
 	}
 	const target = issuanceRetirementCommitRows(control, p, rows);
@@ -2333,6 +2335,36 @@ type SettlementPruningEntry = Readonly<{
 export function settlementEntryHasAuthenticatedTerminalResolution(entry: SettlementPruningEntry): boolean {
 	return (entry.disposition === "committed" || entry.disposition === "expire") && entry.replacementSequence === null &&
 		entry.sourceContextDigest !== undefined && entry.sourceResolutionDigest !== undefined;
+}
+
+/**
+ * Structural shape of signed local-author expiry (abandonment) for one exact source.
+ * @param entry - One plan entry.
+ * @returns Whether the entry is an `expire` carrying a retained resolution.
+ */
+export function settlementEntryIsAuthenticatedExpiry(entry: SettlementPruningEntry): boolean {
+	return entry.disposition === "expire" && settlementEntryHasAuthenticatedTerminalResolution(entry);
+}
+
+function issuanceRowHasAuthenticatedExpiry(rows: IssuanceRetirementRows, row: RetirementIssuedRow): boolean {
+	const plan = rows.plans.find(value => value.scope.objectId === row.objectId && value.scope.author === row.author);
+	return plan?.entries.some(entry => entry.sourceObjectId === undefined && entry.sourceSequence === row.authorSequence &&
+		issuanceRetirementBytesEqual(entry.sourceDigest, row.digest) && settlementEntryIsAuthenticatedExpiry(entry)) === true;
+}
+
+/**
+ * Signed local-author expiry and publication are mutually exclusive for one source.
+ * Plan writes pass the scope's outbox rows; publication passes its proposed row.
+ * @param plan - The plan that will be (or is) durable for this scope.
+ * @param rows - Outbox rows of the same scope, with their resulting publish state.
+ */
+export function assertSettlementExpiryPublicationExclusive(plan: Pick<SettlementPlan, "entries"> | null | undefined,
+	rows: readonly Readonly<{ authorSequence: number; publishState: "pending" | "published" }>[]): void {
+	for (const entry of plan?.entries ?? []) {
+		if (entry.sourceObjectId !== undefined || !settlementEntryIsAuthenticatedExpiry(entry)) continue;
+		if (rows.some(row => row.authorSequence === entry.sourceSequence && row.publishState === "published"))
+			throw issuanceRetirementRefusal("settlement source expiry and publication are exclusive");
+	}
 }
 
 /**

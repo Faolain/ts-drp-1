@@ -26,6 +26,25 @@ describe("accepted source custody numerical reserve", () => {
 		expect(Buffer.byteLength(native)).toBeLessThanOrEqual(resource.nativeStorageByteLength);
 		expect(resource.nativeStorageByteLength).toBeGreaterThan(resource.byteLength);
 	});
+	it.each([1, 64, 128])("bounds %i sources all abandoned with maximum signed expiry resolutions", count => {
+		const bytes = new Uint8Array(geometry.maxContextByteLength), digest = hashDomain("ts-drp/settlement-source-context/v1", bytes);
+		const expiries = Array.from({length: count}, (_, index) => {
+			const exactCanonicalContextBytes = new Uint8Array(geometry.maxExpiryByteLength).fill(index % 251, 0, 4);
+			exactCanonicalContextBytes.set(new Uint8Array(new Uint32Array([index]).buffer), 4);
+			return {digest: hashDomain("ts-drp/settlement-source-context/v1", exactCanonicalContextBytes), exactCanonicalContextBytes};
+		});
+		const plan = copySettlementPlan({scope, revision: Number.MAX_SAFE_INTEGER, fenceSequence: null,
+			entries: expiries.map((expiry, sourceSequence) => ({sourceSequence, sourceDigest: new Uint8Array(32),
+				sourceContextDigest: digest, sourceResolutionDigest: expiry.digest, disposition: "expire", replacementSequence: null})),
+			sourceContexts: [{digest, exactCanonicalContextBytes: bytes}, ...expiries].sort((a, b) => Buffer.compare(a.digest, b.digest))}, scope)!;
+		// count + 1 contexts stays within the entries * 2 context cap.
+		expect(plan).toBeDefined();
+		expect(plan.sourceContexts).toHaveLength(count + 1);
+		const canonical = encodeCanonical(plan), resource = issuanceSourceCustodyPlanResourceForSizing(scope, null, count, geometry);
+		expect(canonical.byteLength).toBeLessThanOrEqual(resource.byteLength);
+		const native = JSON.stringify({kind: "canonical-settlement-plan-1", bytes: Buffer.from(canonical).toString("base64")});
+		expect(Buffer.byteLength(native)).toBeLessThanOrEqual(resource.nativeStorageByteLength);
+	});
 	it("charges the same custody alternative in exact and warmed native forecasts", () => {
 		const commit = d109bCommit(scope, 0, 0);
 		const intent = {kind: "v3-issuance-pending-unsigned-1" as const, authorSequence: 0,

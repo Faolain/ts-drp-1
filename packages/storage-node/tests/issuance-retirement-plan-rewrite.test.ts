@@ -216,6 +216,105 @@ describe.each(["sqlite", "indexeddb"] as const)("%s atomic plan retirement", bac
 		expect(await store.readIssued(scope, 0)).not.toBeNull();
 	});
 
+	it("retires and prunes an abandoned pending source of a fence-less author while its outbox stays pending", async () => {
+		const directory = await mkdtemp(join(tmpdir(), "issuance-abandoned-")); directories.push(directory);
+		const primaryFilename = join(directory, "primary.sqlite"), primaryDatabaseName = `abandoned-${crypto.randomUUID()}`;
+		const open = () => backend === "sqlite" ? createNodeDurableIssuanceStore({primaryFilename}) :
+			createBrowserDurableIssuanceStore({primaryDatabaseName});
+		const store = await open(); stores.push(store);
+		const commits: DurableIssueCommit[] = [];
+		for (let epoch = 0; epoch < 5; epoch++) commits.push(await d109bIssue(store, scope, epoch, epoch !== 0));
+		const context = (kind: string) => {const exactCanonicalContextBytes = encodeCanonical({kind});
+			return {digest: hashDomain("ts-drp/settlement-source-context/v1", exactCanonicalContextBytes), exactCanonicalContextBytes};};
+		const [source, expiry, sibling] = [context("abandoned-source"), context("abandoned-expiry"), context("sibling-source")];
+		// Custody-born: 0 and 1 unresolved reviews, 2 an unresolved (retained-fence) expiry.
+		const reviewed = {scope, revision: 0, fenceSequence: null, entries: [
+			{sourceSequence: 0, sourceDigest: commits[0]!.envelope.digest, sourceContextDigest: source.digest,
+				disposition: "manual-review" as const, replacementSequence: null},
+			{sourceSequence: 1, sourceDigest: commits[1]!.envelope.digest, sourceContextDigest: sibling.digest,
+				disposition: "manual-review" as const, replacementSequence: null},
+			{sourceSequence: 2, sourceDigest: commits[2]!.envelope.digest, sourceContextDigest: sibling.digest,
+				disposition: "expire" as const, replacementSequence: null}],
+			sourceContexts: [source, sibling].sort((a,b) => Buffer.compare(a.digest, b.digest))};
+		await store.transactWriteSettlementPlan({scope, expectedRevision: null, plan: reviewed});
+		const maintenance = durableIssuancePruningMaintenanceForStore(store)!;
+		const protectedNow = async () => {
+			const read = await maintenance.acquireRetirementControl!({objectId: scope.objectId});
+			try {
+				const native = await maintenance.readBoundedRecoveryCensus!({objectId: scope.objectId, limits: ISSUANCE_RETIREMENT_LIMITS});
+				return closeIssuanceRetirementProtectedRecords({control: read.control, rows: native.rows,
+					throughEpoch: 3, protectedRecords: []}).map(hole => hole.authorSequence);
+			} finally {await read.release();}
+		};
+		const retire = async () => {
+			const read = await maintenance.acquireRetirementControl!({objectId: scope.objectId});
+			try {
+				const native = await maintenance.readBoundedRecoveryCensus!({objectId: scope.objectId, limits: ISSUANCE_RETIREMENT_LIMITS});
+				const protectedRecords = closeIssuanceRetirementProtectedRecords({control: read.control, rows: native.rows,
+					throughEpoch: 3, protectedRecords: []});
+				await read.prepareFence(issuanceRetirementPreparationWithPlanRewrite(read.control, {throughEpoch: 3,
+					decisionDigest: "a".repeat(64), sourceProofDigest: "b".repeat(64), protectedRecords}, native.rows));
+			} finally {await read.release();}
+			const prepared = await maintenance.acquireRetirementControl!({objectId: scope.objectId});
+			try {await prepared.commitPrepared();} finally {await prepared.release();}
+		};
+		expect(await protectedNow()).toEqual([0, 1, 2]);
+		// One CAS: entry 0 becomes signed expiry. Fence stays null, no new issuance.
+		const abandoned = {...reviewed, revision: 1, entries: [{...reviewed.entries[0]!, disposition: "expire" as const,
+			sourceResolutionDigest: expiry.digest}, reviewed.entries[1]!, reviewed.entries[2]!],
+			sourceContexts: [source, expiry, sibling].sort((a,b) => Buffer.compare(a.digest, b.digest))};
+		await store.transactWriteSettlementPlan({scope, expectedRevision: 0, plan: abandoned});
+		expect(await protectedNow()).toEqual([1, 2]);
+		await retire();
+		expect((await store.readOutboxPage({scope, limit: 2})).map(row => row.publishState)).toEqual(["pending", "published"]);
+		// The open review and the unresolved expiry keep the fence-less plan from pruning.
+		await expect(maintenance.pruneAuthenticatedSettledPrefix(d109bPruningInput(await maintenance.inspectPruningState(scope), 3, 0)))
+			.rejects.toThrow("settlement plan is incomplete");
+		expect(await store.readIssued(scope, 0)).not.toBeNull();
+		// Drop the siblings the way their own terminal owners would, then prune.
+		const only = {scope, revision: 2, fenceSequence: null, entries: [abandoned.entries[0]!],
+			sourceContexts: [source, expiry].sort((a,b) => Buffer.compare(a.digest, b.digest))};
+		await store.transactWriteSettlementPlan({scope, expectedRevision: 1, plan: only});
+		await maintenance.pruneAuthenticatedSettledPrefix(d109bPruningInput(await maintenance.inspectPruningState(scope), 3, 0));
+		expect(await store.readIssued(scope, 0)).toBeNull();
+		// Never published: the pending row was deleted by pruning, not acknowledged.
+		expect((await store.readOutboxPage({scope, limit: 8})).some(row => row.commit.authorSequence === 0)).toBe(false);
+		await retire();
+		expect(await store.readSettlementPlan(scope)).toEqual({scope, revision: 3, fenceSequence: null, entries: []});
+	});
+
+	it("keeps signed expiry and publication exclusive for one source", async () => {
+		const directory = await mkdtemp(join(tmpdir(), "issuance-expiry-exclusive-")); directories.push(directory);
+		const primaryFilename = join(directory, "primary.sqlite"), primaryDatabaseName = `exclusive-${crypto.randomUUID()}`;
+		const open = () => backend === "sqlite" ? createNodeDurableIssuanceStore({primaryFilename}) :
+			createBrowserDurableIssuanceStore({primaryDatabaseName});
+		const store = await open(); stores.push(store);
+		const commits: DurableIssueCommit[] = [];
+		for (let epoch = 0; epoch < 3; epoch++) commits.push(await d109bIssue(store, scope, epoch, epoch === 1));
+		const context = (kind: string) => {const exactCanonicalContextBytes = encodeCanonical({kind});
+			return {digest: hashDomain("ts-drp/settlement-source-context/v1", exactCanonicalContextBytes), exactCanonicalContextBytes};};
+		const [source, expiry] = [context("exclusive-source"), context("exclusive-expiry")];
+		const reviewed = (sequence: number) => ({sourceSequence: sequence, sourceDigest: commits[sequence]!.envelope.digest,
+			sourceContextDigest: source.digest, disposition: "manual-review" as const, replacementSequence: null});
+		const prior = {scope, revision: 0, fenceSequence: null, entries: [reviewed(0), reviewed(1)], sourceContexts: [source]};
+		await store.transactWriteSettlementPlan({scope, expectedRevision: null, plan: prior});
+		const expire = (sequence: number) => ({...prior, revision: 1, entries: prior.entries.map(entry => entry.sourceSequence !== sequence ? entry :
+			{...entry, disposition: "expire" as const, sourceResolutionDigest: expiry.digest}),
+			sourceContexts: [source, expiry].sort((a,b) => Buffer.compare(a.digest, b.digest))});
+		// Expiry over an already published row (replay after publication) is refused.
+		await expect(store.transactWriteSettlementPlan({scope, expectedRevision: 0, plan: expire(1)}))
+			.rejects.toThrow("expiry and publication are exclusive");
+		expect(await store.readSettlementPlan(scope)).toEqual(prior);
+		await store.transactWriteSettlementPlan({scope, expectedRevision: 0, plan: expire(0)});
+		// Publication of an authenticated-expiry source is refused; the row stays pending.
+		await expect(store.compareAndMarkOutboxPublished({scope, authorSequence: 0, digest: commits[0]!.envelope.digest}))
+			.rejects.toThrow("expiry and publication are exclusive");
+		expect((await store.readOutboxPage({scope, limit: 1}))[0]?.publishState).toBe("pending");
+		// Unrelated sources still publish.
+		await store.compareAndMarkOutboxPublished({scope, authorSequence: 2, digest: commits[2]!.envelope.digest});
+		expect((await store.readOutboxPage({scope, limit: 3}))[2]?.publishState).toBe("published");
+	});
+
 	it("keeps the old plan through preparation and commits the exact new plan/control together", async () => {
 		const directory = await mkdtemp(join(tmpdir(), "issuance-plan-rewrite-"));
 		directories.push(directory);

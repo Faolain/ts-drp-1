@@ -9871,6 +9871,10 @@ async function prepareCreatorRetainedSourceContracts(plan: SettlementPlan | null
 		const contract = contexts.get(lowerHexDigest(entry.sourceContextDigest)!);
 		let completion: SettlementSourceContext | undefined;
 		if (contract === undefined) throw new TypeError("creator retained source reference is invalid");
+		// The store admits a signed expiry resolution structurally; until its native
+		// verifier opens it, any expiry resolution fails reopen closed.
+		if (entry.disposition === "expire" && entry.sourceResolutionDigest !== undefined)
+			throw new TypeError("creator source expiry proof is invalid");
 		if (entry.disposition === "committed") {
 			const resolution = plan?.sourceContexts?.find(value => entry.sourceResolutionDigest !== undefined &&
 				sameBytes(value.digest, entry.sourceResolutionDigest));

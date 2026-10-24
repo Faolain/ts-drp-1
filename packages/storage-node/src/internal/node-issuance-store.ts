@@ -83,6 +83,8 @@ import {
 	issuanceUnsignedOwnMaterialByteLength,
 	joinIssuanceNativeSign,
 	type IssuanceRetirementRows,
+	assertSettlementExpiryPublicationExclusive,
+	settlementEntryIsAuthenticatedExpiry,
 	settlementPlanPermitsAuthenticatedPruning,
 } from "@ts-drp/issuance-store/maintenance";
 import { DatabaseSync, type StatementSync } from "node:sqlite";
@@ -1363,6 +1365,9 @@ class NodeIssuanceImplementation {
 				throw invalid("publication digest does not identify the issued closure");
 			}
 			if (status === "corrupt") throw this.#latchCorruption("publication closure is incomplete or malformed");
+			const expiryPlan = readSettlementPlanRow(this.#database, captured.scope);
+			if (expiryPlan === undefined) throw this.#latchCorruption("stored settlement plan is malformed");
+			assertSettlementExpiryPublicationExclusive(expiryPlan, [{authorSequence: captured.authorSequence, publishState: "published"}]);
 			if (status === "pending") {
 				const changes = statement(
 					this.#database,
@@ -1481,6 +1486,17 @@ class NodeIssuanceImplementation {
 				throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan revision changed");
 			}
 			assertSettlementPlanProgressTransition(current, captured.plan);
+			assertSettlementExpiryPublicationExclusive(captured.plan, captured.plan.entries
+				.filter(entry => entry.sourceObjectId === undefined && settlementEntryIsAuthenticatedExpiry(entry))
+				.flatMap(entry => {
+					const row = statement(this.#database,
+						"SELECT publish_state FROM issuance_outbox WHERE object_id=? AND author=? AND author_sequence=?")
+						.get(captured.scope.objectId, captured.scope.author, entry.sourceSequence);
+					const state = row === undefined ? undefined : Reflect.get(row, "publish_state");
+					if (row !== undefined && state !== "pending" && state !== "published")
+						throw this.#latchCorruption("stored outbox publication state is malformed");
+					return state === undefined ? [] : [{authorSequence: entry.sourceSequence, publishState: state as "pending" | "published"}];
+				}));
 			const retired = readRetirementControl(this.#database, captured.scope.objectId);
 			if (retired)
 				assertIssuanceRetirementPlanAllowed(

@@ -17,6 +17,8 @@ import {
 } from "../src/retirement.js";
 import { d109bCommit } from "../../../tests/fixtures/phase-6b/issuance-retention-contract.js";
 import { copySettlementPlan, assertSettlementPlanProgressTransition } from "../src/contract.js";
+import { createEphemeralDurableIssuanceStore } from "../src/conformance.js";
+import { d109bIssue } from "../../../tests/fixtures/phase-6b/issuance-retention-contract.js";
 
 const scope = {objectId: "retirement-room", author: "writer"};
 const control: DurableIssuanceRetirementControl = {kind: "v3-issuance-retirement-control-1", objectId: scope.objectId,
@@ -71,22 +73,69 @@ describe("native retirement plan law", () => {
 		const unbound = {...plan, entries: plan.entries.map(({sourceContextDigest: _source, ...entry}) => entry), sourceContexts: undefined};
 		expect(() => assertSettlementPlanProgressTransition(plan, unbound)).toThrow("retained source changed");
 	});
-	it("admits a source resolution only as authenticated completion until an expiry verifier exists", () => {
+	it("admits a source resolution only as signed completion or signed expiry, one way from unresolved work", () => {
 		const original = fixture();
-		const [source, proof] = [0, 1].map(marker => {const bytes = encodeCanonical({marker});
+		const [source, proof, other] = [0, 1, 2].map(marker => {const bytes = encodeCanonical({marker});
 			return {digest: hashDomain("ts-drp/settlement-source-context/v1", bytes), exactCanonicalContextBytes: bytes};});
 		const reviewed = {...original.plans[0]!.entries[0]!, disposition: "manual-review" as const, replacementSequence: null,
 			sourceContextDigest: source!.digest};
 		const prior = copySettlementPlan({...original.plans[0]!, entries: [reviewed], sourceContexts: [source]}, scope)!;
 		expect(prior).toBeDefined();
-		const resolved = (disposition: "committed" | "expire") => ({...prior, revision: prior.revision + 1,
-			entries: [{...reviewed, disposition, sourceResolutionDigest: proof!.digest}],
+		const resolved = (disposition: "committed" | "expire" | "manual-review", extra: Record<string, unknown> = {}) => ({...prior,
+			revision: prior.revision + 1, entries: [{...reviewed, disposition, sourceResolutionDigest: proof!.digest, ...extra}],
 			sourceContexts: [source!, proof!].sort((a, b) => Buffer.compare(a.digest, b.digest))});
 		const committed = copySettlementPlan(resolved("committed"), scope)!;
 		expect(committed).toBeDefined();
 		expect(() => assertSettlementPlanProgressTransition(prior, committed)).not.toThrow();
-		expect(copySettlementPlan(resolved("expire"), scope)).toBeUndefined();
-		expect(() => assertSettlementPlanProgressTransition(prior, resolved("expire"))).toThrow("retained source changed");
+		// Signed local-author expiry is the second (and only other) resolution kind.
+		// Authentication of the resolution bytes belongs to the native reopen verifier.
+		const expired = copySettlementPlan(resolved("expire"), scope)!;
+		expect(expired).toBeDefined();
+		expect(() => assertSettlementPlanProgressTransition(prior, expired)).not.toThrow();
+		// Terminal in both directions (Q7): no expire<->committed or resolution swap.
+		expect(() => assertSettlementPlanProgressTransition(expired, {...committed, revision: expired.revision + 1}))
+			.toThrow("retained source changed");
+		expect(() => assertSettlementPlanProgressTransition(committed, {...expired, revision: committed.revision + 1}))
+			.toThrow("retained source changed");
+		const swapped = {...expired, revision: expired.revision + 1, entries: [{...expired.entries[0]!, sourceResolutionDigest: other!.digest}],
+			sourceContexts: [source!, other!].sort((a, b) => Buffer.compare(a.digest, b.digest))};
+		expect(() => assertSettlementPlanProgressTransition(expired, swapped)).toThrow("retained source changed");
+		// Only exact unresolved shapes carry a resolution.
+		expect(copySettlementPlan(resolved("manual-review"), scope)).toBeUndefined();
+		expect(copySettlementPlan(resolved("expire", {replacementSequence: 3}), scope)).toBeUndefined();
+		const {sourceContextDigest: _context, ...contextless} = reviewed;
+		expect(copySettlementPlan({...prior, entries: [{...contextless, disposition: "expire", sourceResolutionDigest: proof!.digest}],
+			sourceContexts: [proof!]}, scope)).toBeUndefined();
+		// An unresolved expiry (a retained fence) never gains a resolution later.
+		const fence = copySettlementPlan({...prior, entries: [{...reviewed, disposition: "expire"}]}, scope)!;
+		expect(() => assertSettlementPlanProgressTransition(fence, {...expired, revision: fence.revision + 1}))
+			.toThrow("retained source changed");
+	});
+	it("retires a pending source only under an authenticated expiry and keeps an unresolved one protected", () => {
+		const original = fixture();
+		const [source, proof] = [0, 1].map(marker => {const bytes = encodeCanonical({marker});
+			return {digest: hashDomain("ts-drp/settlement-source-context/v1", bytes), exactCanonicalContextBytes: bytes};});
+		const outbox = original.outbox.map(row => row.authorSequence === 0 ? {...row, publishState: "pending" as const} : row);
+		const entry = {sourceSequence: 0, sourceDigest: original.issued[0]!.digest, sourceContextDigest: source!.digest,
+			replacementSequence: null};
+		const contexts = [source!, proof!].sort((a, b) => Buffer.compare(a.digest, b.digest));
+		const expired: IssuanceRetirementRows = {...original, outbox, plans: [{scope, revision: 1, fenceSequence: null,
+			entries: [{...entry, disposition: "expire", sourceResolutionDigest: proof!.digest}], sourceContexts: contexts}]};
+		const p = prepare(expired, []);
+		expect(p.protectedRecords).toEqual([]);
+		expect(() => assertIssuanceRetirementPreparationRows(control, p, expired)).not.toThrow();
+		// Without a retained resolution the same pending source stays protected.
+		const unresolved: IssuanceRetirementRows = {...expired, plans: [{scope, revision: 1, fenceSequence: null,
+			entries: [{...entry, disposition: "expire"}], sourceContexts: [source!]}]};
+		const held = prepare(unresolved, []);
+		expect(held.protectedRecords.map(value => value.authorSequence)).toEqual([0]);
+		expect(() => assertIssuanceRetirementPreparationRows(control, held, unresolved)).not.toThrow();
+		// A committed resolution does not excuse a still-pending pair: completion
+		// publishes through the original CAS before its source may retire.
+		const committedPending: IssuanceRetirementRows = {...expired, plans: [{...expired.plans[0]!,
+			entries: [{...expired.plans[0]!.entries[0]!, disposition: "committed"}]}]};
+		expect(() => assertIssuanceRetirementPreparationRows(control, prepare(committedPending, []), committedPending))
+			.toThrow("pending publication is unprotected");
 	});
 	it("permits fence-less pruning only when every entry is an authenticated terminal resolution", () => {
 		const digest = (marker: number) => hashDomain("ts-drp/settlement-source-context/v1", encodeCanonical({marker}));
@@ -216,5 +265,24 @@ describe("native retirement plan law", () => {
 				 sourceDigest: new Uint8Array(32).fill(171)}]}]};
 			expect(() => prepare(swapped, [1])).toThrow("external source dependency is absent");
 		}
+	});
+	it("keeps signed expiry and publication exclusive in the ephemeral conformance owner", async () => {
+		const store = createEphemeralDurableIssuanceStore();
+		const commits = [await d109bIssue(store, scope, 0, false), await d109bIssue(store, scope, 1, true)];
+		const [source, expiry] = [0, 1].map(marker => {const bytes = encodeCanonical({exclusive: marker});
+			return {digest: hashDomain("ts-drp/settlement-source-context/v1", bytes), exactCanonicalContextBytes: bytes};});
+		const reviewed = (sequence: number) => ({sourceSequence: sequence, sourceDigest: commits[sequence]!.envelope.digest,
+			sourceContextDigest: source!.digest, disposition: "manual-review" as const, replacementSequence: null});
+		const prior = {scope, revision: 0, fenceSequence: null, entries: [reviewed(0), reviewed(1)], sourceContexts: [source!]};
+		await store.transactWriteSettlementPlan({scope, expectedRevision: null, plan: prior});
+		const expire = (sequence: number) => ({...prior, revision: 1, entries: prior.entries.map(entry => entry.sourceSequence !== sequence ? entry :
+			{...entry, disposition: "expire" as const, sourceResolutionDigest: expiry!.digest}),
+			sourceContexts: [source!, expiry!].sort((a, b) => Buffer.compare(a.digest, b.digest))});
+		await expect(store.transactWriteSettlementPlan({scope, expectedRevision: 0, plan: expire(1)}))
+			.rejects.toThrow("expiry and publication are exclusive");
+		await store.transactWriteSettlementPlan({scope, expectedRevision: 0, plan: expire(0)});
+		await expect(store.compareAndMarkOutboxPublished({scope, authorSequence: 0, digest: commits[0]!.envelope.digest}))
+			.rejects.toThrow("expiry and publication are exclusive");
+		expect((await store.readOutboxPage({scope, limit: 1}))[0]?.publishState).toBe("pending");
 	});
 });
