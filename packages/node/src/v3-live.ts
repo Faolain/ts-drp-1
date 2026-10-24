@@ -22662,6 +22662,8 @@ async function activateCreatorSuccessorLive(
 		// authenticated; join source custody before either native write boundary.
 		const headerSource = material.sourceRuntimeHandle?.deref();
 		if (headerSource !== undefined) await releaseCreatorCloseHeaderCustody(headerSource);
+		// Promotion snapshots are current up to the moment their custody ends.
+		await material.promotionDependencies?.checkSnapshots();
 		await material.promotionDependencies?.release();
 		const validatedPredecessor = await recoverV3LiveReplica({
 			...(receiveOnly ? { receiveOnly: true as const } : {}),

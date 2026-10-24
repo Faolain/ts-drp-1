@@ -438,8 +438,10 @@ async function activateMaterial(
 	let primary: unknown;
 	try {
 		await dependencies.checkSnapshots();
+		// Live activation checks these snapshots once more and then ends their
+		// custody before its native writes; a released source has nothing left
+		// to check here. Cleanup below still joins (idempotently) on failure.
 		result = await activateMaterialOwned(material, bindings);
-		await dependencies.checkSnapshots();
 	} catch (error) {
 		failed = true;
 		primary = error;

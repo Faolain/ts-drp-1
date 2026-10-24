@@ -129,6 +129,28 @@ describe.each([2, 4, 6])("original creator at floor %i", floor => {
 		expect(creator.room.projection().messages.map(row => row.clientOperationId)).toEqual([...historical.messages, useful, `${useful}-after-reopen`]);
 	}, 600_000);
 
+	it("keeps a promotion across a genuine cold reopen before any further issue", async () => {
+		const selected = floor - 1;
+		const { f, creator: live, closed } = await creatorChain(floor);
+		const historical = required(closed.get(selected));
+		await f.stop(live);
+		let creator = await f.open(0, { reopen: true });
+		await creator.room.promoteCreatorCheckpoint({ closedEpoch: selected });
+		const promoted = await census(f, creator);
+		log(`floor${floor}-reopen-promoted`, promoted);
+		await f.stop(creator);
+		creator = await f.open(0, { reopen: true });
+		const reopened = await census(f, creator);
+		log(`floor${floor}-reopen-reopened`, reopened);
+		expect(reopened.epoch).toBe(floor + 1);
+		expect(reopened.floor).toEqual(promoted.floor);
+		expect(reopened.native.head).toEqual(promoted.native.head);
+		expect(hex(creator.stateBytes())).toBe(historical.state);
+		expect(creator.room.projection().messages.map(row => row.clientOperationId)).toEqual(historical.messages);
+		expect(reopened.native.generations.find(row => row.generationId === promoted.native.head.generationId))
+			.toMatchObject({ forwardPromotionClosedEpoch: selected });
+	}, 600_000);
+
 	it.runIf(floor !== 4)("refuses a non-slot or tampered selection with no physical effect", async () => {
 		const { f, creator: live } = await creatorChain(floor);
 		await f.stop(live);
