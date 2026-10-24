@@ -7132,12 +7132,13 @@ export async function acquireCreatorIssuanceMaintenanceProof(
 					const owner = snapshotInventory.owner;
 					const required = currentCreatorMaintenanceRequiresSnapshotReceiptCapture(forward.reader.generations.length,
 						owner, images.ahe.value.control?.completed, forward.currentTrust.currentEpoch);
-					const authenticated = required ? selectAuthenticatedSnapshotTurnoverInventory({
+					const authenticated = !required ? undefined : forward.certificates.length === 0 && forward.installed.length !== 0
+						? installedPromotionSnapshotTurnoverInventory(snapshotInventory) : selectAuthenticatedSnapshotTurnoverInventory({
 						predecessorTrust: forward.predecessorTrust, recoveryRoleTransfer: forward.certificates[0]?.transfer ?? null,
 						recoveryDependencyAnchors: forward.certificates[0]?.dependencyAnchors ?? null,
 						recoveryCertificateDigest: forward.certificates[0]?.certificateDigest ?? null,
 						retirementProtectedScopes: forward.certificates[0]?.protectedScopes ?? null,
-					}, lifetime, snapshotInventory) : undefined;
+					}, lifetime, snapshotInventory);
 					const selection = !required ? {survivingScopes: snapshotInventory.scopes.map(row => row.scope), retiringScopes: []} :
 						authenticated === undefined ? undefined : selectCurrentSnapshotTurnoverInventory(authenticated, snapshotInventory,
 							images.snapshot, forward.wholeFloor.stable);
@@ -8404,6 +8405,15 @@ export interface CreatorForwardPromotionSourceMaterial {
 	readonly recoveryCertificateDigest: string | null;
 	readonly retirementProtectedScopes: readonly SnapshotQuarantineScopeKey[] | null;
 	releaseClassifiedDependencies(): Promise<void>;
+	/**
+	 * Ends this source's live journal header exclusion before the same close's
+	 * native retirement, which must take the journal's write control. Header
+	 * consumers are revoked first and every admitted check joins; held historical
+	 * snapshots, readers and proofs stay held until release(). The source then
+	 * grants no further currency: the caller releases and independently
+	 * reacquires it after maintenance.
+	 */
+	releaseJournalHeaderCustody(): Promise<void>;
 	readonly currentTrust: CurrentAnchorTrust;
 	readonly predecessorTrust: CurrentAnchorTrust;
 	readonly current: CreatorTransitionClosure;
@@ -8541,6 +8551,7 @@ export function resolveCreatorForwardPromotionSource(
 	const pendingChecks = lifetime.pendingChecks;
 	let nominationSource: CreatorForwardPromotionSourceMaterial | undefined;
 	let nominationTask: Promise<void> | undefined;
+	let headerCustodyReleaseTask: Promise<void> | undefined;
 	let aliasRevoked = false;
 	let aliasRelease: Promise<void> | undefined;
 	const releaseOriginal = (): Promise<void> => {
@@ -8987,6 +8998,19 @@ export function resolveCreatorForwardPromotionSource(
 				await joinSourceReleases(forward.certificates.map((proof) => (): Promise<void> => proof.releaseClassified()));
 			})().finally(() => { lifetime.classifiedReleasing = false; });
 			return lifetime.classifiedReleaseTask;
+		},
+		releaseJournalHeaderCustody: (): Promise<void> => {
+			if (aliasRevoked || nominationTask !== undefined || lifetime.released)
+				return Promise.reject(new Refusal(failure("snapshot-unavailable")));
+			if (nominationSource !== undefined) return nominationSource.releaseJournalHeaderCustody();
+			if (headerCustodyReleaseTask !== undefined) return headerCustodyReleaseTask;
+			// Revoke before joining so no new header consumer is admitted.
+			sourceFrame.headerConsumersRevoked = true;
+			headerCustodyReleaseTask = (async (): Promise<void> => {
+				await Promise.allSettled([...pendingChecks, ...sourceFrame.pending]);
+				await sourceFrame.headerHold?.release();
+			})();
+			return headerCustodyReleaseTask;
 		},
 		currentTrust: forward.currentTrust,
 		predecessorTrust: forward.predecessorTrust,
@@ -15431,6 +15455,21 @@ function selectAuthenticatedSnapshotTurnoverInventory(
 }
 
 /**
+ * The first epoch above an authenticated installed forward promotion carries no
+ * recovery-role transfer yet; its own close derives one from the installed
+ * source. Until then nothing is turnover-eligible, so sizing keeps the whole
+ * CURRENT pool, exactly as a blocked completed fence does. Callers still refuse
+ * a full pool. Scheduling only, never a native retirement capability.
+ * @param inventory - Complete native scope inventory.
+ * @returns Every scope surviving and none retiring.
+ */
+function installedPromotionSnapshotTurnoverInventory(
+	inventory: SnapshotRecoveryRoleInventory
+): NonNullable<ReturnType<typeof selectAuthenticatedSnapshotTurnoverInventory>> {
+	return Object.freeze({survivingScopes: Object.freeze(inventory.scopes.map(row => row.scope)), retiringScopes: Object.freeze([])});
+}
+
+/**
  * Matches every exact recovery identity against the complete physical source.
  * Only higher-than-frontier quarantine may remain outside that role inventory.
  * @param inventory - Complete native scope and incarnation inventory.
@@ -15531,7 +15570,9 @@ export function readProspectiveCreatorSnapshotTurnoverForSizing(proof: CreatorIs
 	const lifetime = resolveCreatorSnapshotRecoveryCloseHold(capture.closeHold, {
 		store: frame.input.store, liveJournalStore: frame.input.liveJournalStore, currentTrust: capture.currentTrust });
 	const held = resolveCreatorForwardPromotionSource(proof.observation, frame.input.store, frame.input.snapshotStore);
-	const authenticated = lifetime === undefined || held === undefined ? undefined : selectAuthenticatedSnapshotTurnoverInventory(held, lifetime, inventory);
+	const authenticated = lifetime === undefined || held === undefined ? undefined :
+		held.recoveryRoleTransfer === null && held.installedPromotion !== null ? installedPromotionSnapshotTurnoverInventory(inventory) :
+			selectAuthenticatedSnapshotTurnoverInventory(held, lifetime, inventory);
 	const selection = authenticated === undefined ? undefined : selectCurrentSnapshotTurnoverInventory(
 		authenticated, inventory, capture.snapshot, forward.wholeFloor.stable);
 	if (selection === undefined || (fullPool && selection.retiringScopes.length === 0))

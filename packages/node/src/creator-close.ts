@@ -3948,6 +3948,11 @@ export async function bindCreatorLiveClose(
 						// Release only this source's classified readers. Selected and
 						// retained historical snapshots stay held throughout maintenance.
 						await promotionSource?.releaseClassifiedDependencies();
+						// Maintenance takes the live journal's retirement write control,
+						// which this source's header read reservation excludes. End only
+						// that header custody (the snapshots above stay held); the source
+						// is released and independently reacquired after maintenance.
+						await promotionSource?.releaseJournalHeaderCustody();
 						await reconcileCreatorBoundedRecoveryMaintenance(registration, input, actor, capacity.value.generations.length,
 							() => registration.sealRecoveryDependencies(priorCutRecord?.recoveryRoles !== undefined),
 							false, false, registration.currentTrust);
