@@ -9989,6 +9989,20 @@ function creatorRetainedCompletionMatchesPlan(source: CreatorRetainedSourceRow, 
 			sameBytes(actual.exactCanonicalContextBytes, expected.exactCanonicalContextBytes)) === true);
 }
 
+/** Signed expiry proof is reusable only while the fresh native plan retains its
+ * exact source, context and resolution owners. */
+function creatorRetainedExpiryMatchesPlan(source: CreatorRetainedSourceRow, sequence: number,
+	plan: SettlementPlan | null | undefined): boolean {
+	const expiry = source.expiry, context = source.contract.identity.context;
+	if (expiry === undefined || plan == null) return false;
+	const entry = plan.entries.find(value => value.sourceSequence === sequence);
+	return entry?.disposition === "expire" && entry.replacementSequence === null && sameBytes(entry.sourceDigest, source.sourceDigest) &&
+		entry.sourceContextDigest !== undefined && sameBytes(entry.sourceContextDigest, context.digest) &&
+		entry.sourceResolutionDigest !== undefined && sameBytes(entry.sourceResolutionDigest, expiry.digest) &&
+		[context, expiry].every(expected => plan.sourceContexts?.some(actual => sameBytes(actual.digest, expected.digest) &&
+			sameBytes(actual.exactCanonicalContextBytes, expected.exactCanonicalContextBytes)) === true);
+}
+
 function authenticateRetainedSourceVertex(source: CreatorRetainedSourceContract, bytes: Uint8Array, signature: Uint8Array,
 	digest: Uint8Array, author: string, sequence: number, vertexFacts?: CreatorCensusVertexFacts): AuthenticatedRecoveryVertex | undefined {
 	const identity = resolveCreatorSourceCustody(source.capability);
@@ -10178,7 +10192,7 @@ export async function sealCreatorReceivedRecoveryReplay(
 const CREATOR_ISSUANCE_CENSUS_DEPENDENCY_KINDS = ObjectFreeze([
 	"current-issuance", "unsettled-issuance", "pinned-genesis", "signed-settled-issuance", "source-committed-inclusion",
 	"source-bound-completed-issuance", "adjacent-author-fence", "separate-source-author-fence",
-	"authenticated-closed-issuance", "authenticated-covered-native-issuance",
+	"authenticated-closed-issuance", "authenticated-covered-native-issuance", "source-authenticated-expiry",
 ] as const);
 const CREATOR_ISSUANCE_CENSUS_CLASSIFICATIONS = ObjectFreeze([
 	"covered-historical", "current", "displaced", "pinned-genesis", "filtered-settlement-source",
@@ -11254,8 +11268,17 @@ async function readCreatorRecoveryDependencyCensus(
 			if (retainedCompletion?.completion !== undefined && !durablyCommitted) {
 				observation.stage = `retained-source-completion:${row.authorSequence}`; return undefined;
 			}
+			// Signed local-author abandonment: terminal, never published, retained
+			// and charged until the ORIGINAL retirement owner retires it.
+			const durablyExpired = scope.author === registration.issuanceScope.author && !openSource &&
+				retainedCompletion?.expiry !== undefined && sameBytes(retainedCompletion.sourceDigest, row.digest) &&
+				classified?.kind === "displaced" && classified.authenticated.digest === lowerHexDigest(row.digest) &&
+				creatorRetainedExpiryMatchesPlan(retainedCompletion, row.authorSequence, inheritancePlan);
+			if (retainedCompletion?.expiry !== undefined && !durablyExpired) {
+				observation.stage = `retained-source-expiry:${row.authorSequence}`; return undefined;
+			}
 			const terminalCoveredPending =
-				durablyCommitted || classified?.kind === "displaced" &&
+				durablyCommitted || durablyExpired || classified?.kind === "displaced" &&
 				row.publishState === "pending" &&
 				scope.author === registration.issuanceScope.author &&
 				terminalFrontier?.terminalThrough !== null &&
@@ -11368,7 +11391,7 @@ async function readCreatorRecoveryDependencyCensus(
 				const retainedClosedIssuance =
 					closedCovered !== undefined && closedCovered.digest === classified.authenticated.digest;
 				if (retainedClosedIssuance) dependencyKind = "authenticated-closed-issuance";
-				if (!retainedAdjacentFence && !retainedHistoricalFence && !retainedClosedIssuance && !completedBranch) {
+				if (!retainedAdjacentFence && !retainedHistoricalFence && !retainedClosedIssuance && !completedBranch && !durablyExpired) {
 					const frontier = settlementFrontierFromHistory(registration.historicalIssuance);
 					if (
 						scope.author !== registration.issuanceScope.author ||
@@ -11390,6 +11413,7 @@ async function readCreatorRecoveryDependencyCensus(
 					);
 					if (covered === undefined || covered.digest !== classified.authenticated.digest) return undefined;
 				}
+				if (durablyExpired) dependencyKind = "source-authenticated-expiry";
 			}
 			const vertex = classified.authenticated.vertex;
 			if (typeof vertex.anchor !== "string") return undefined;
