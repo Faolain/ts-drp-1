@@ -8,6 +8,37 @@ The task is incomplete. Passing a room test that pauses at each rollover does no
 establish uninterrupted play. A formal model proves its stated abstraction and bounds,
 not native storage or network behavior.
 
+## Stopped for shutdown — 2026-10-24 (resume here)
+
+Root is `12b3794f` (plus this docs commit). In flight when stopped, all killed by shutdown:
+
+1. **Grid 300 on `8ccac3f4` FAILED at epoch 15**: `canonical value exceeds byte limit`
+   in `closed-epoch-cleanup.ts` retirement metadata (fixed 256 KiB vs the 1 MiB issuance
+   control codec; completion proofs in plans crossed it). Fixed with a RED-first test in
+   `12b3794f`. Evidence: `.logs/realtime-resume-2026-10-23/campaign-01/` and
+   `.logs/realtime-resume-2026-10-24-shutdown/grid-300-01-failed/`.
+2. **Next step**: a 40-epoch Grid probe on `12b3794f` (reopen 30), whose log was
+   `.logs/realtime-resume-2026-10-23/campaign-02/grid40-run.log`, was running. Rerun it, then
+   a short Canvas/Chat probe, then full Grid 300 → Canvas/Chat 300 (env exactly as in
+   `endurance-preparation/preparation.json`; reopen 30; no forced checkpoint/vacuum).
+   Campaign checkout `/private/tmp/ts-drp-final-campaign-preparation`: if `/tmp` was wiped,
+   recreate it with `git worktree add --detach <path> 12b3794f`, then
+   `pnpm install --frozen-lockfile`, then build `packages/node`, then `packages/storage-node`,
+   then `pnpm -r build` (the first recursive build fails on that ordering). Recreate configs from
+   `endurance-preparation/*.mjs` under `/private/tmp/ts-drp-final-campaign-config/`
+   (hashes in `copy-manifest.json`). Affected preflight passed 16/16 on `8ccac3f4`
+   (`campaign-01/preflight.log`).
+3. **Rollback promotion fixes**: branch `fix/rollback-promotion` (base `c5b62bb5`); work
+   was uncommitted. Snapshot: `.logs/realtime-resume-2026-10-24-shutdown/ts-drp-rollback-promotion.*`.
+   Gate and report: `.logs/realtime-resume-2026-10-23/rollback-promotion/`.
+4. **Source abandonment**: branch `feat/source-abandonment` at `dc53aaa0` (store-level
+   expiry and publication exclusivity committed); further work uncommitted. Snapshot:
+   `…-shutdown/ts-drp-source-abandonment.uncommitted.patch`. Results so far:
+   `.logs/realtime-resume-2026-10-23/abandonment-impl/`.
+
+Neither 3 nor 4 blocks the endurance campaigns; merge each into root only after its own
+tests pass and then rerun the affected preflight.
+
 ## Resumed — 2026-10-24
 
 Goal: the 300-epoch Grid/Canvas/Chat campaigns green again on the integrated source;
