@@ -8,7 +8,25 @@ The task is incomplete. Passing a room test that pauses at each rollover does no
 establish uninterrupted play. A formal model proves its stated abstraction and bounds,
 not native storage or network behavior.
 
-## Campaign blockers found by runs — 2026-10-24 afternoon (current)
+## North star met — 2026-10-24 evening (current)
+
+Every 300-epoch endurance run passes on one clean source, `6c9b5935` (reopen at 30):
+
+| Run | Result | Wall | Issue p95 / max | Transition p50 / p95 |
+| --- | --- | ---: | ---: | ---: |
+| Canvas conservation | 300/300, 3000 accepted | 2867 s | 705 / — ms | 3742 / 4471 ms |
+| Grid conservation | 300/300, 3000 accepted | 2194 s | 187 / — ms | 3570 / 4492 ms |
+| Chat conservation | 300/300, 3000 accepted | 3156 s | 765 / 3235 ms | 4014 / 5206 ms |
+| Grid continued play | 300/300, 1845 issues, 13 repairs | 3068 s | timer max gap 371 ms | install 2.7→3.1 s |
+
+[Logs](../../.logs/realtime-resume-2026-10-23/final-6c9b5935/). Against PRE-PERF300-02, issue tails
+are lower but transitions are ≈2× slower and seal/adopt still saturate the event loop
+(next: per-merge transition-cost measurement between `6f414a25` and `6c9b5935`, then make
+seal/adopt cooperative and cut install/maintenance CPU). Still open: rollback-promotion
+post-promotion generation lifecycle, abandonment retirement-crash edge, 512-offer capacity
+gate, browser/FPS.
+
+## Campaign blockers found by runs — 2026-10-24 afternoon
 
 - `12b3794f`: retirement-metadata 256 KiB cap → Grid now passes epoch 15 and the reopen at 30.
 - `041c4136`: protocol-v3 import cycle (owned-signing-request → creator-checkpoint → trust
