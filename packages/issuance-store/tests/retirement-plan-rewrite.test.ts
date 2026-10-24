@@ -10,6 +10,7 @@ import {
 	issuanceRetirementPreparationWithPlanRewrite,
 	issuanceRetirementPlanRewriteResourceForSizing,
 	reconstructIssuanceRetirementSourceRows,
+	settlementPlanPermitsAuthenticatedPruning,
 	type DurableIssuanceRetirementControl,
 	type DurableIssuanceRetirementPreparation,
 	type IssuanceRetirementRows,
@@ -86,6 +87,35 @@ describe("native retirement plan law", () => {
 		expect(() => assertSettlementPlanProgressTransition(prior, committed)).not.toThrow();
 		expect(copySettlementPlan(resolved("expire"), scope)).toBeUndefined();
 		expect(() => assertSettlementPlanProgressTransition(prior, resolved("expire"))).toThrow("retained source changed");
+	});
+	it("permits fence-less pruning only when every entry is an authenticated terminal resolution", () => {
+		const digest = (marker: number) => hashDomain("ts-drp/settlement-source-context/v1", encodeCanonical({marker}));
+		const terminal = (disposition: "committed" | "expire", sequence: number) => ({sourceSequence: sequence,
+			sourceDigest: digest(100 + sequence), sourceContextDigest: digest(sequence), sourceResolutionDigest: digest(50 + sequence),
+			disposition, replacementSequence: null});
+		type Entries = NonNullable<Parameters<typeof settlementPlanPermitsAuthenticatedPruning>[0]>["entries"];
+		const permits = (fenceSequence: number | null, entries: Entries) =>
+			settlementPlanPermitsAuthenticatedPruning({fenceSequence, entries});
+		// A fully removed author has no Writer grant and therefore no FENCE.
+		expect(permits(null, [terminal("committed", 0)])).toBe(true);
+		expect(permits(null, [terminal("committed", 0), terminal("expire", 1)])).toBe(true);
+		expect(permits(null, [terminal("expire", 0)])).toBe(true);
+		// Negatives: an unauthenticated terminal, an open review, or replacement work
+		// still needs the mandatory fence (or is never prunable).
+		const {sourceResolutionDigest: _r, ...unresolvedExpire} = terminal("expire", 2);
+		const {sourceResolutionDigest: _c, ...unresolvedCommit} = terminal("committed", 3);
+		const {sourceContextDigest: _x, ...contextless} = terminal("committed", 4);
+		expect(permits(null, [terminal("committed", 0), unresolvedExpire])).toBe(false);
+		expect(permits(null, [unresolvedCommit])).toBe(false);
+		expect(permits(null, [contextless])).toBe(false);
+		expect(permits(null, [terminal("committed", 0), {...terminal("committed", 5), disposition: "manual-review"}])).toBe(false);
+		expect(permits(null, [terminal("committed", 0), {...terminal("committed", 6), disposition: "rebase", replacementSequence: 9}])).toBe(false);
+		expect(permits(null, [])).toBe(false);
+		expect(settlementPlanPermitsAuthenticatedPruning(null)).toBe(false);
+		// The fenced rule is unchanged.
+		expect(permits(4, [unresolvedExpire, unresolvedCommit])).toBe(true);
+		expect(permits(4, [{...terminal("committed", 5), disposition: "manual-review"}])).toBe(false);
+		expect(permits(4, [])).toBe(true);
 	});
 	it("closes retained replacement chains to a fixed point", () => {
 		const rows = fixture(), p = prepare(rows, [0]);

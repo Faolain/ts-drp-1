@@ -146,6 +146,76 @@ describe.each(["sqlite", "indexeddb"] as const)("%s atomic plan retirement", bac
 			.rejects.toThrow("retired or absent issued work");
 	});
 
+	it("prunes a fence-less removed author's authenticated committed source without a FENCE", async () => {
+		const directory = await mkdtemp(join(tmpdir(), "issuance-fenceless-terminal-")); directories.push(directory);
+		const primaryFilename = join(directory, "primary.sqlite"), primaryDatabaseName = `fenceless-${crypto.randomUUID()}`;
+		const open = () => backend === "sqlite" ? createNodeDurableIssuanceStore({primaryFilename}) :
+			createBrowserDurableIssuanceStore({primaryDatabaseName});
+		const store = await open(); stores.push(store);
+		const commits: DurableIssueCommit[] = [];
+		for (let epoch = 0; epoch < 5; epoch++) commits.push(await d109bIssue(store, scope, epoch));
+		const context = (kind: string) => {const exactCanonicalContextBytes = encodeCanonical({kind});
+			return {digest: hashDomain("ts-drp/settlement-source-context/v1", exactCanonicalContextBytes), exactCanonicalContextBytes};};
+		const source = context("fenceless-source"), proof = context("fenceless-completion");
+		// A custody-born plan for a fully removed author: no Writer grant, no FENCE.
+		const plan = {scope, revision: 0, fenceSequence: null, entries: [{sourceSequence: 0,
+			sourceDigest: commits[0]!.envelope.digest, sourceContextDigest: source.digest, sourceResolutionDigest: proof.digest,
+			disposition: "committed" as const, replacementSequence: null}],
+			sourceContexts: [source, proof].sort((a,b) => Buffer.compare(a.digest, b.digest))};
+		await store.transactWriteSettlementPlan({scope, expectedRevision: null, plan});
+		const maintenance = durableIssuancePruningMaintenanceForStore(store)!;
+		const retire = async (expectProtected: boolean) => {
+			const read = await maintenance.acquireRetirementControl!({objectId: scope.objectId});
+			try {
+				const native = await maintenance.readBoundedRecoveryCensus!({objectId: scope.objectId, limits: ISSUANCE_RETIREMENT_LIMITS});
+				const protectedRecords = closeIssuanceRetirementProtectedRecords({control: read.control, rows: native.rows,
+					throughEpoch: 3, protectedRecords: []});
+				expect(protectedRecords.some(hole => hole.authorSequence === 0)).toBe(expectProtected);
+				await read.prepareFence(issuanceRetirementPreparationWithPlanRewrite(read.control, {throughEpoch: 3,
+					decisionDigest: "a".repeat(64), sourceProofDigest: "b".repeat(64), protectedRecords}, native.rows));
+			} finally {await read.release();}
+			const prepared = await maintenance.acquireRetirementControl!({objectId: scope.objectId});
+			try {await prepared.commitPrepared();} finally {await prepared.release();}
+		};
+		await retire(false);
+		expect(await store.readSettlementPlan(scope)).toEqual(plan);
+		await maintenance.pruneAuthenticatedSettledPrefix(d109bPruningInput(await maintenance.inspectPruningState(scope), 3, 0));
+		expect(await store.readIssued(scope, 0)).toBeNull();
+		await retire(false);
+		expect(await store.readSettlementPlan(scope)).toEqual({scope, revision: 1, fenceSequence: null, entries: []});
+	});
+
+	it("keeps a fence-less plan's review or unauthenticated sibling source protected", async () => {
+		const directory = await mkdtemp(join(tmpdir(), "issuance-fenceless-negative-")); directories.push(directory);
+		const primaryFilename = join(directory, "primary.sqlite"), primaryDatabaseName = `fenceless-neg-${crypto.randomUUID()}`;
+		const open = () => backend === "sqlite" ? createNodeDurableIssuanceStore({primaryFilename}) :
+			createBrowserDurableIssuanceStore({primaryDatabaseName});
+		const store = await open(); stores.push(store);
+		const commits: DurableIssueCommit[] = [];
+		for (let epoch = 0; epoch < 5; epoch++) commits.push(await d109bIssue(store, scope, epoch));
+		const context = (kind: string) => {const exactCanonicalContextBytes = encodeCanonical({kind});
+			return {digest: hashDomain("ts-drp/settlement-source-context/v1", exactCanonicalContextBytes), exactCanonicalContextBytes};};
+		const [source, sibling, proof] = [context("s0"), context("s1"), context("p0")];
+		const plan = {scope, revision: 0, fenceSequence: null, entries: [{sourceSequence: 0,
+			sourceDigest: commits[0]!.envelope.digest, sourceContextDigest: source.digest, sourceResolutionDigest: proof.digest,
+			disposition: "committed" as const, replacementSequence: null}, {sourceSequence: 1,
+			sourceDigest: commits[1]!.envelope.digest, sourceContextDigest: sibling.digest,
+			disposition: "manual-review" as const, replacementSequence: null}],
+			sourceContexts: [source, sibling, proof].sort((a,b) => Buffer.compare(a.digest, b.digest))};
+		await store.transactWriteSettlementPlan({scope, expectedRevision: null, plan});
+		const maintenance = durableIssuancePruningMaintenanceForStore(store)!;
+		const read = await maintenance.acquireRetirementControl!({objectId: scope.objectId});
+		try {
+			const native = await maintenance.readBoundedRecoveryCensus!({objectId: scope.objectId, limits: ISSUANCE_RETIREMENT_LIMITS});
+			const protectedRecords = closeIssuanceRetirementProtectedRecords({control: read.control, rows: native.rows,
+				throughEpoch: 3, protectedRecords: []});
+			expect(protectedRecords.map(hole => hole.authorSequence)).toEqual([1]);
+		} finally {await read.release();}
+		await expect(maintenance.pruneAuthenticatedSettledPrefix(d109bPruningInput(await maintenance.inspectPruningState(scope), 3, 0)))
+			.rejects.toThrow("settlement plan is incomplete");
+		expect(await store.readIssued(scope, 0)).not.toBeNull();
+	});
+
 	it("keeps the old plan through preparation and commits the exact new plan/control together", async () => {
 		const directory = await mkdtemp(join(tmpdir(), "issuance-plan-rewrite-"));
 		directories.push(directory);

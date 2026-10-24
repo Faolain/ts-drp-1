@@ -2315,26 +2315,45 @@ export function createIssuanceRetirementControlRead(
 	});
 }
 
+type SettlementPruningEntry = Readonly<{
+	readonly disposition: SettlementPlan["entries"][number]["disposition"];
+	readonly inheritance?: SettlementPlan["entries"][number]["inheritance"];
+	readonly replacementSequence: number | null;
+	readonly sourceContextDigest?: Uint8Array;
+	readonly sourceResolutionDigest?: Uint8Array;
+}>;
+
+/**
+ * Structural shape of a terminal source whose exact resolution bytes are retained:
+ * a signed completion (`committed`) or a signed local-author expiry (`expire`).
+ * Authentication belongs to the native census and reopen verifiers, not this test.
+ * @param entry - One plan entry.
+ * @returns Whether the entry carries a retained terminal resolution.
+ */
+export function settlementEntryHasAuthenticatedTerminalResolution(entry: SettlementPruningEntry): boolean {
+	return (entry.disposition === "committed" || entry.disposition === "expire") && entry.replacementSequence === null &&
+		entry.sourceContextDigest !== undefined && entry.sourceResolutionDigest !== undefined;
+}
+
 /**
  * Tests whether one durable settlement plan permits authenticated prefix reclamation.
  * @param plan - The transactionally observed plan, or no durable plan.
  * @returns Whether every source and mandatory fence have retained completion links.
+ * A fully removed author has no Writer grant and therefore never issues a FENCE;
+ * its plan permits pruning only when every entry is a retained terminal resolution.
  * This is a structural predicate: the shared migration owner must authenticate
  * inherited target references and protect their cross-object dependencies.
  */
 export function settlementPlanPermitsAuthenticatedPruning(
 	plan: Readonly<{
-		readonly entries: readonly Readonly<{
-			readonly disposition: SettlementPlan["entries"][number]["disposition"];
-			readonly inheritance?: SettlementPlan["entries"][number]["inheritance"];
-			readonly replacementSequence: number | null;
-		}>[];
+		readonly entries: readonly SettlementPruningEntry[];
 		readonly fenceSequence: number | null;
 	}> | null
 ): boolean {
 	return (
 		plan !== null &&
-		plan.fenceSequence !== null &&
+		(plan.fenceSequence !== null ||
+			(plan.entries.length > 0 && plan.entries.every(settlementEntryHasAuthenticatedTerminalResolution))) &&
 		plan.entries.every(
 			(entry) =>
 				entry.disposition === "expire" || entry.disposition === "committed" ||
