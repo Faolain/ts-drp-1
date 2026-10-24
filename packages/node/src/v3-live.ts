@@ -141,6 +141,7 @@ import {
 	type BlobDigest,
 	digestBlob,
 	digestClosure,
+	encodeHeadRecordV1,
 	type ExpectedHead,
 	type GenerationId,
 	type GenerationRecord,
@@ -195,7 +196,7 @@ import { encodeReceivedCloseMembership, openReceivedCloseMembership, verifyRecei
 	type ReceivedCloseAuthorityRecords } from "./internal/creator-received-close-membership.js";
 import type { CreatorPendingClassificationCustodyInput } from "./internal/creator-adoption-recover.js";
 import { creatorSourceCustodyGeometryForSizing, captureCreatorSourceContext, openCreatorSourceCustody, resolveCreatorSourceCustody,
-	captureCreatorSourceCompletion, openCreatorSourceCompletion,
+	captureCreatorSourceCompletion, openCreatorSourceCompletion, captureCreatorSourceExpiry, openCreatorSourceExpiry,
 	type VerifiedCreatorSourceCustody, type CreatorSourceCustodyIdentity } from "./internal/creator-source-custody.js";
 import type { CreatorClosedRollbackProofAccounting, CreatorSnapshotRetirementReconstructionRequest,
 	CreatorOrdinaryIssuanceSuffixForSizing, CreatorOrdinarySourceCapture } from "./internal/creator-closed-rollback-data.js";
@@ -8957,6 +8958,8 @@ interface CreatorRetainedSourceRow {
 	readonly sourceDigest: Uint8Array;
 	readonly contract: CreatorRetainedSourceContract;
 	readonly completion?: SettlementSourceContext;
+	/** Authenticated signed local-author abandonment: terminal, never publishable. */
+	readonly expiry?: SettlementSourceContext;
 }
 
 interface SettlementFrontierContext {
@@ -9931,10 +9934,17 @@ async function prepareCreatorRetainedSourceContracts(plan: SettlementPlan | null
 		const contract = contexts.get(lowerHexDigest(entry.sourceContextDigest)!);
 		let completion: SettlementSourceContext | undefined;
 		if (contract === undefined) throw new TypeError("creator retained source reference is invalid");
-		// The store admits a signed expiry resolution structurally; until its native
-		// verifier opens it, any expiry resolution fails reopen closed.
-		if (entry.disposition === "expire" && entry.sourceResolutionDigest !== undefined)
-			throw new TypeError("creator source expiry proof is invalid");
+		let expiry: SettlementSourceContext | undefined;
+		// The store admits a signed expiry structurally; only the source author's
+		// exact signature over this retained source and context authenticates it.
+		if (entry.disposition === "expire" && entry.sourceResolutionDigest !== undefined) {
+			const resolution = plan?.sourceContexts?.find(value => sameBytes(value.digest, entry.sourceResolutionDigest!));
+			if (plan == null || resolution === undefined || openCreatorSourceExpiry(contract.capability, resolution,
+				{sourceAuthor: plan.scope.author, sourceSequence: entry.sourceSequence, sourceDigest: entry.sourceDigest}) === undefined)
+				throw new TypeError("creator source expiry proof is invalid");
+			expiry = ObjectFreeze({digest: new Uint8ArrayConstructor(resolution.digest),
+				exactCanonicalContextBytes: new Uint8ArrayConstructor(resolution.exactCanonicalContextBytes)});
+		}
 		if (entry.disposition === "committed") {
 			const resolution = plan?.sourceContexts?.find(value => entry.sourceResolutionDigest !== undefined &&
 				sameBytes(value.digest, entry.sourceResolutionDigest));
@@ -9952,7 +9962,7 @@ async function prepareCreatorRetainedSourceContracts(plan: SettlementPlan | null
 			completion = proof.context;
 		}
 		sources.set(entry.sourceSequence, ObjectFreeze({contract, sourceDigest: new Uint8ArrayConstructor(entry.sourceDigest),
-			...(completion === undefined ? {} : {completion})}));
+			...(completion === undefined ? {} : {completion}), ...(expiry === undefined ? {} : {expiry})}));
 	}
 	return sources;
 }
@@ -23595,4 +23605,205 @@ async function readCreatorUnresolvedAcceptedWork(registration: V3PlaneRegistrati
 		if (!currentRegistration(registration) || registration.payload !== payload || before.image.imageDigest !== after.image.imageDigest)
 			throw new TypeError("creator unresolved source currency changed");
 		return ObjectFreeze(result);
+}
+
+export interface V3SourceAbandonmentRequest {
+	readonly sourceSequence: number;
+	readonly sourceDigest: string;
+	readonly sourceContextDigest: string;
+	readonly signal?: AbortSignal;
+}
+
+/** Terminal local-author abandonment. Never claims publication or commitment. */
+export interface V3SourceAbandonment {
+	readonly author: string;
+	readonly sourceSequence: number;
+	readonly sourceDigest: string;
+	readonly sourceContextDigest: string;
+	readonly disposition: "expire";
+	readonly commitment: "unknown";
+	readonly expiryDigest: string;
+}
+
+function creatorSourceAbandonmentResult(author: string, entry: SettlementPlan["entries"][number]): V3SourceAbandonment {
+	return ObjectFreeze({author, sourceSequence: entry.sourceSequence, sourceDigest: lowerHexDigest(entry.sourceDigest)!,
+		sourceContextDigest: lowerHexDigest(entry.sourceContextDigest!)!, disposition: "expire", commitment: "unknown",
+		expiryDigest: lowerHexDigest(entry.sourceResolutionDigest!)!});
+}
+
+const digestBytesFromHex = (value: string): Uint8Array =>
+	Uint8ArrayConstructor.from(value.match(/../gu)!.map(byte => Number.parseInt(byte, 16)));
+
+/**
+ * Explicit local-author abandonment of one durable unresolved accepted source:
+ * the original registration FIFO signs an exact expiry receipt with the owned
+ * local key and records it in the original settlement plan. No vertex, FENCE,
+ * Writer grant or publication is produced; the outbox row stays pending.
+ * @param plane - Original live handle.
+ * @param raw - Exact source selector, optional cancellation and the owned signer.
+ * @returns The terminal abandonment record (idempotent for the same source).
+ */
+export function abandonV3UnresolvedAcceptedWork(plane: V3PlaneHandle, raw: V3SourceAbandonmentRequest &
+	Readonly<{signRegisteredVertexDigest: SignRegisteredVertexDigest}>): Promise<V3SourceAbandonment> {
+	const registration = v3HandleRegistrations.get(plane);
+	if (registration === undefined || !currentRegistration(registration))
+		return Promise.reject(new TypeError("creator source abandonment owner is unavailable"));
+	return enqueueRegistrationTask(registration, (inputCustody) => {
+		const keys = ["sourceSequence", "sourceDigest", "sourceContextDigest", "signRegisteredVertexDigest"];
+		const input = snapshotClosedRecord(raw, keys) ?? snapshotClosedRecord(raw, [...keys, "signal"]);
+		if (input === undefined || !NumberIsSafeInteger(input.sourceSequence) || (input.sourceSequence as number) < 0 ||
+			!isDigestHex(input.sourceDigest) || !isDigestHex(input.sourceContextDigest) ||
+			typeof input.signRegisteredVertexDigest !== "function" || inputCustody === undefined)
+			throw new TypeError("creator source abandonment input is invalid");
+		const signal = input.signal as AbortSignal | undefined;
+		if (signal !== undefined && !(signal instanceof AbortSignal)) throw new TypeError("creator source abandonment cancellation signal is invalid");
+		const scope = registration.issuanceScope;
+		const selector = ObjectFreeze({sourceSequence: input.sourceSequence as number, sourceDigest: digestBytesFromHex(input.sourceDigest),
+			sourceContextDigest: digestBytesFromHex(input.sourceContextDigest)});
+		// Exact receipt geometry for this room, plus detached signature and selector.
+		const receiptBound = encodeCanonical(creatorSourceExpiryFields({objectId: scope.objectId,
+			pinnedGenesisAnchorDigest: registration.payload.input.pinnedGenesisAnchorDigest, sourceAuthor: scope.author,
+			sourceSequence: Number.MAX_SAFE_INTEGER, sourceDigest: new Uint8ArrayConstructor(32), sourceContextDigest: new Uint8ArrayConstructor(32),
+			signingEpoch: Number.MAX_SAFE_INTEGER, signingAnchorDigest: "0".repeat(64), signingNativeHeadDigest: new Uint8ArrayConstructor(32),
+			signingFloorDigest: new Uint8ArrayConstructor(32)})).byteLength;
+		inputCustody.chargeBytes(receiptBound + 64 + 72);
+		const sign = input.signRegisteredVertexDigest as SignRegisteredVertexDigest;
+		return async () => {
+			const controller = new AbortController(), cancel = (): void => controller.abort();
+			registration.settlementSelectionControllers ??= new Set();
+			registration.settlementSelectionControllers.add(controller);
+			signal?.addEventListener("abort", cancel, {once: true});
+			if (signal?.aborted) cancel();
+			let custody: LocalReplacementCustody | undefined;
+			try {
+				return await abandonCreatorUnresolvedSource(registration, selector, sign, controller.signal, (owned) => { custody = owned; });
+			} finally {
+				signal?.removeEventListener("abort", cancel);
+				registration.settlementSelectionControllers.delete(controller);
+				await custody?.release();
+			}
+		};
+	}, {
+		pool: "input",
+		refuse: (): never => { throw new TypeError("creator source abandonment task capacity exhausted"); },
+		refuseCapture: (): never => { throw new TypeError("creator source abandonment input capacity exhausted"); },
+	});
+}
+
+async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
+	selector: Readonly<{sourceSequence: number; sourceDigest: Uint8Array; sourceContextDigest: Uint8Array}>,
+	sign: SignRegisteredVertexDigest, aborted: AbortSignal, own: (custody: LocalReplacementCustody) => void): Promise<V3SourceAbandonment> {
+	const payload = registration.payload, scope = registration.issuanceScope;
+	const current = (): boolean => !aborted.aborted && currentRegistration(registration) && registration.payload === payload &&
+		registration.issuanceScope === scope;
+	if (!current()) throw new TypeError("creator source abandonment owner is unavailable");
+	const store = creatorOriginalIssuanceStore(registration);
+	const census = durableIssuancePruningMaintenanceForStore(store)?.readBoundedRecoveryCensus;
+	if (census === undefined) throw new TypeError("creator source abandonment census is unavailable");
+	const censusInput = {objectId: scope.objectId, limits: {maxRows: ISSUANCE_RETIREMENT_LIMITS.maxRows,
+		maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes}};
+	// Fresh native source state. Every caller-visible field is re-derived here.
+	const inspect = async () => {
+		const read = await census(censusInput);
+		const plan = read.rows.plans.find(value => sameScope(value.scope, scope)) ?? null;
+		const entry = plan?.entries.find(value => value.sourceSequence === selector.sourceSequence);
+		if (plan === null || entry === undefined || !sameBytes(entry.sourceDigest, selector.sourceDigest) ||
+			entry.sourceContextDigest === undefined || !sameBytes(entry.sourceContextDigest, selector.sourceContextDigest))
+			throw new TypeError("creator source abandonment selector differs from the retained source");
+		const sources = await prepareCreatorRetainedSourceContracts(plan, payload.trust.trust, payload.input.catalog);
+		const retained = sources.get(entry.sourceSequence);
+		if (retained === undefined || !creatorRetainedSourceMatchesPlan(retained, entry.sourceSequence, plan))
+			throw new TypeError("creator source abandonment retained contract is unavailable");
+		return {read, plan, entry, retained};
+	};
+	const first = await inspect();
+	if (!current()) throw new TypeError("creator source abandonment owner changed during native read");
+	// Idempotent retry: the same authenticated receipt, never a second signature.
+	if (first.entry.disposition === "expire" && first.entry.sourceResolutionDigest !== undefined) {
+		if (first.retained.expiry === undefined) throw new TypeError("creator source expiry proof is invalid");
+		return creatorSourceAbandonmentResult(scope.author, first.entry);
+	}
+	const unresolved = (value: typeof first): boolean => {
+		const {read, entry, retained} = value;
+		if (entry.disposition === "expire" || entry.disposition === "committed" || entry.disposition === "inherited" ||
+			entry.replacementSequence !== null || entry.replacementProgress !== undefined || entry.sourceResolutionDigest !== undefined) return false;
+		const issued = read.rows.issued.filter(row => sameScope(row, scope) && row.authorSequence === entry.sourceSequence);
+		const outbox = read.rows.outbox.filter(row => sameScope(row, scope) && row.authorSequence === entry.sourceSequence);
+		// Replay after publication is refused: only never-acknowledged work may be abandoned.
+		if (issued.length !== 1 || outbox.length !== 1 || !sameBytes(issued[0]!.digest, entry.sourceDigest) ||
+			!sameBytes(outbox[0]!.digest, entry.sourceDigest) || outbox[0]!.publishState !== "pending") return false;
+		const authenticated = authenticateRetainedSourceVertex(retained.contract, issued[0]!.canonicalPreimageBytes, issued[0]!.signature,
+			issued[0]!.digest, scope.author, issued[0]!.authorSequence);
+		return authenticated !== undefined && authenticated.digest === lowerHexDigest(entry.sourceDigest);
+	};
+	if (!unresolved(first)) throw new TypeError("creator source abandonment requires unresolved never-published work");
+	const sourceEpoch = first.retained.contract.identity.trust.currentEpoch;
+	if (payload.trust.trust.currentEpoch <= sourceEpoch) throw new TypeError("creator source abandonment requires a later epoch");
+	// Whole-floor capture under the original native custody, without the issuance reservation.
+	const floor = payload.input.settlementFloor;
+	if (floor === undefined) throw new TypeError("creator source abandonment whole-floor owner is unavailable");
+	const image = await floor.readRetirementImage({scope: {objectId: scope.objectId,
+		pinnedGenesisAnchorDigest: payload.input.pinnedGenesisAnchorDigest}});
+	if (image.state.pending !== null || !sameCreatorRoomHead(image.state.stable, payload.trust.trust) || !isDigestHex(image.imageDigest))
+		throw new TypeError("creator source abandonment whole-floor is stale");
+	const custody = await acquireLocalReplacementCustody(registration, encodeCanonical(image));
+	own(custody);
+	await custody.check();
+	const bytes = encodeCanonical(creatorSourceExpiryFields({objectId: scope.objectId,
+		pinnedGenesisAnchorDigest: payload.input.pinnedGenesisAnchorDigest, sourceAuthor: scope.author,
+		sourceSequence: first.entry.sourceSequence, sourceDigest: new Uint8ArrayConstructor(first.entry.sourceDigest),
+		sourceContextDigest: new Uint8ArrayConstructor(first.entry.sourceContextDigest!), signingEpoch: payload.trust.trust.currentEpoch,
+		signingAnchorDigest: payload.trust.trust.currentAnchorDigest,
+		signingNativeHeadDigest: hashDomain(CREATOR_SOURCE_EXPIRY_HEAD_DOMAIN, encodeHeadRecordV1(payload.trust.head)),
+		signingFloorDigest: digestBytesFromHex(image.imageDigest)}));
+	const digest = creatorSourceExpiryDigest(bytes);
+	const valid = async (): Promise<boolean> => {
+		if (!current()) return false;
+		try {
+			const now = await inspect();
+			return current() && now.read.image.imageDigest === first.read.image.imageDigest && unresolved(now);
+		} catch { return false; }
+	};
+	let signature: Uint8Array | undefined;
+	await withActiveRebaseDependencies(registration, undefined, (read) => read.checkWhile(async () => {
+		if (!(await valid())) throw new TypeError("creator source abandonment source currency changed");
+		signature = copyDetachedBytes(await withOwnedCreatorSourceExpiryRequest(registration, custody, read, bytes, valid,
+			request => sign(new Uint8ArrayConstructor(digest), request)));
+	}), custody, [bytes, new Uint8ArrayConstructor(64)]);
+	const expiry = signature === undefined || signature.byteLength !== 64 ? undefined : captureCreatorSourceExpiry(bytes, signature);
+	if (expiry === undefined || openCreatorSourceExpiry(first.retained.contract.capability, expiry,
+		{sourceAuthor: scope.author, sourceSequence: first.entry.sourceSequence, sourceDigest: first.entry.sourceDigest}) === undefined)
+		throw new TypeError("creator source abandonment signed receipt is invalid");
+	// Plan CAS after leaving the charged dependency turn (outside the issuance
+	// read reservation), still under the original whole-floor custody.
+	await custody.check();
+	const second = await inspect();
+	if (!current() || second.read.image.imageDigest !== first.read.image.imageDigest || second.plan.revision !== first.plan.revision ||
+		!unresolved(second)) throw new TypeError("creator source abandonment source currency changed");
+	const prior = second.plan;
+	const entries = prior.entries.map(entry => entry.sourceSequence !== selector.sourceSequence ? entry :
+		{...entry, disposition: "expire" as const, replacementSequence: null, sourceResolutionDigest: new Uint8ArrayConstructor(expiry.digest)});
+	const contexts = [...(prior.sourceContexts ?? [])];
+	if (!contexts.some(value => sameBytes(value.digest, expiry.digest))) contexts.push(expiry);
+	contexts.sort((a, b) => lowerHexDigest(a.digest)!.localeCompare(lowerHexDigest(b.digest)!));
+	const plan = copySettlementPlan({scope, revision: prior.revision + 1, fenceSequence: prior.fenceSequence, entries,
+		sourceContexts: contexts}, scope);
+	if (plan == null) throw new TypeError("creator source abandonment plan is invalid");
+	const future = {...second.read.rows, plans: [...second.read.rows.plans.filter(value => !sameScope(value.scope, scope)), plan]};
+	encodeCanonical(future, {maxBytes: censusInput.limits.maxBytes, maxDepth: 32, maxItems: 65536});
+	const nativeBytes = future.issued.reduce((sum, row) => sum + row.canonicalPreimageBytes.byteLength + row.signature.byteLength + row.digest.byteLength, 0) +
+		future.plans.reduce((sum, value) => sum + issuanceSettlementPlanStorageByteLength(value), 0) +
+		future.lineages.reduce((sum, value) => sum + (value.pendingUnsigned === undefined ? 0 : encodeCanonical(value.pendingUnsigned).byteLength), 0);
+	if (nativeBytes > censusInput.limits.maxBytes) throw new TypeError("creator source abandonment exceeds reserved native material");
+	const written = await store.transactWriteSettlementPlan({expectedRevision: prior.revision, plan, scope});
+	const limits = {maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes, maxDepth: 32, maxItems: 65536};
+	const after = await census(censusInput);
+	const stored = after.rows.plans.find(value => sameScope(value.scope, scope)) ?? null;
+	if (written === null || stored === null || !sameBytes(encodeCanonical(written, limits), encodeCanonical(plan, limits)) ||
+		!sameBytes(encodeCanonical(stored, limits), encodeCanonical(plan, limits)))
+		throw new TypeError("creator source abandonment plan readback differs");
+	await custody.check();
+	const recorded = plan.entries.find(entry => entry.sourceSequence === selector.sourceSequence);
+	if (recorded === undefined) throw new TypeError("creator source abandonment plan readback differs");
+	return creatorSourceAbandonmentResult(scope.author, recorded);
 }

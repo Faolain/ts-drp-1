@@ -51,7 +51,10 @@ import {
 	prepareV3LiveGeneration,
 	prepareV3TerminalMigrationSource,
 	queryV3RetainedHashes,
+	abandonV3UnresolvedAcceptedWork,
 	inspectV3UnresolvedAcceptedWork,
+	type V3SourceAbandonment,
+	type V3SourceAbandonmentRequest,
 	type V3UnresolvedAcceptedWork,
 	readV3ApplicationProjectionOrder,
 	recoverV3LiveReplica,
@@ -652,6 +655,13 @@ export interface V3RoomSession<Projection extends V3RoomProjectionAuthority = V3
 	pendingOperations(): readonly V3RoomPendingOperation[];
 	/** Durable accepted work whose commitment is unknown after reattachment. */
 	unresolvedAcceptedWork(): Promise<readonly V3UnresolvedAcceptedWork[]>;
+	/**
+	 * Explicit, terminal local-author abandonment of one durable unresolved,
+	 * never-published accepted source. Owned local sessions only; it signs an
+	 * exact expiry receipt with the session key and records it in the native
+	 * settlement plan. It never publishes, fences, or grants Writer.
+	 */
+	abandonUnresolvedAcceptedWork(input: V3SourceAbandonmentRequest): Promise<V3SourceAbandonment>;
 	previewLatchedAcl(): Readonly<Record<string, unknown>>;
 	projection(): Projection;
 	/**
@@ -7707,6 +7717,17 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			await rebasePromise;
 			if (activeHandle === undefined) throw new TypeError("v3 room source custody owner is unavailable");
 			return inspectV3UnresolvedAcceptedWork(activeHandle);
+		},
+		async abandonUnresolvedAcceptedWork(request: V3SourceAbandonmentRequest): Promise<V3SourceAbandonment> {
+			if (redirectedSession !== undefined) return redirectedSession.abandonUnresolvedAcceptedWork(request);
+			assertSessionOpen();
+			// Q3: only the genuine owned local key may abandon its own accepted work.
+			if (localOwner === undefined || input.receiveOnly === true)
+				throw new TypeError("v3 room source abandonment requires an owned local session");
+			localOwner.assertCurrent();
+			await rebasePromise;
+			if (activeHandle === undefined) throw new TypeError("v3 room source custody owner is unavailable");
+			return abandonV3UnresolvedAcceptedWork(activeHandle, {...request, signRegisteredVertexDigest: input.signRegisteredVertexDigest});
 		},
 		speculativeProjection(): Projection {
 			if (redirectedSession !== undefined) return redirectedSession.speculativeProjection();

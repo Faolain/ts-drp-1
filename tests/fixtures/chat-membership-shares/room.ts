@@ -5,7 +5,7 @@ import type { DurableIssuanceOutboxRecord } from "@ts-drp/issuance-store";
 import type { SnapshotChunkProtocolPort, SnapshotChunkProtocolStream } from "@ts-drp/network/snapshot-transfer";
 import { Message, MessageType, V3Envelope } from "@ts-drp/types";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -91,6 +91,12 @@ export interface ChatSharesRoomOptions {
 	/** Fault injection after an actual durable floor write. */
 	readonly afterFloorWrite?: (peer: number, phase: "begin" | "commit") => void | Promise<void>;
 	readonly beforeFloorWrite?: (peer: number, phase: "begin" | "commit") => void | Promise<void>;
+	/**
+	 * Peers (by index, never the creator) opened through a genuine owned local
+	 * session: the host generates and keeps the key, and the room signs only
+	 * through the native owned-key path. Observation helpers use reopen aliases.
+	 */
+	readonly localMembers?: readonly number[];
 }
 
 const track = Object.freeze({
@@ -127,10 +133,39 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 	const directory = options.directory ?? mkdtempSync(join(tmpdir(), "chat-membership-shares-"));
 	if (options.directory === undefined) track.directories.add(directory);
 	const kinds: readonly ("creator" | ChatSharesMember)[] = ["creator", ...options.members];
-	const identities = kinds.map((_, index) => {
+	const localMembers = new Set(options.localMembers ?? []);
+	if (localMembers.has(0)) throw new TypeError("CHAT_SHARES_LOCAL_CREATOR_UNSUPPORTED");
+	let localHost: ReturnType<typeof createNodeV3RoomStorageHost> | undefined;
+	if (localMembers.size > 0) {
+		const localDirectory = join(directory, "local-sessions");
+		mkdirSync(localDirectory, { recursive: true, mode: 0o700 });
+		localHost = createNodeV3RoomStorageHost({ directory: localDirectory, initialization: () => "create",
+			localSessionSlots: 4, localSessionStoreScopes: 32, localSessionHandles: 160 });
+	}
+	type LocalLease = Awaited<ReturnType<NonNullable<typeof localHost>["acquireLocalSession"]>>;
+	const localSelectors = new Map<number, LocalLease["selector"]>();
+	const freshLeases = new Map<number, LocalLease>();
+	const identities: { seed: Uint8Array; author: string }[] = [];
+	for (let index = 0; index < kinds.length; index++) {
+		if (localMembers.has(index)) {
+			const lease = await required(localHost).acquireLocalSession({ kind: "create" });
+			track.heads.add(lease);
+			localSelectors.set(index, lease.selector);
+			freshLeases.set(index, lease);
+			// The owned seed never leaves native custody: no seed is available here.
+			identities.push({ seed: new Uint8Array(0), author: lease.signing.author });
+			continue;
+		}
 		const seed = new Uint8Array(32).fill(0x41 + index);
-		return { seed, author: hex(ed25519.getPublicKey(seed)) };
-	});
+		identities.push({ seed, author: hex(ed25519.getPublicKey(seed)) });
+	}
+	/** Runs one observation through a reopen alias of a local member's session. */
+	const withLocalAlias = async <T>(index: number, action: (host: LocalLease["storageHost"]) => Promise<T>): Promise<T> => {
+		const alias = await required(localHost).acquireLocalSession({ kind: "reopen", selector: required(localSelectors.get(index)) });
+		try { return await action(alias.storageHost); } finally { await alias.close(); }
+	};
+	const observationHost = (index: number) => localMembers.has(index)
+		? undefined : host;
 	const creator = required(identities[0]);
 	const peers = identities.map((_, index) => (index === 0 ? "chat-creator" : `chat-member-${index}`));
 	const objectId = `creator:${hex(hashDomain("chat-membership-shares-object/v1", new TextEncoder().encode(directory))).slice(0, 32)}`;
@@ -263,7 +298,7 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 			migrationDatabaseNamespace: name,
 			initialLogicalTime: 3,
 			objectId,
-			publicKeyBytes: ed25519.getPublicKey(identity.seed),
+			publicKeyBytes: localMembers.has(index) ? new Uint8Array(32) : ed25519.getPublicKey(identity.seed),
 			roomHeadAuthority: floor,
 			signRegisteredVertexDigest: (digest) => Promise.resolve(ed25519.sign(digest, identity.seed)),
 			onProjection: (projection) => archive?.observe(projection),
@@ -289,7 +324,16 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 				};
 			},
 		};
-		const room = await createV3RoomSession(input);
+		let lease: LocalLease | undefined;
+		if (localMembers.has(index)) {
+			lease = freshLeases.get(index) ?? await required(localHost).acquireLocalSession({ kind: "reopen", selector: required(localSelectors.get(index)) });
+			freshLeases.delete(index);
+			track.heads.add(lease);
+		}
+		const room = lease === undefined ? await createV3RoomSession(input) : await createV3RoomSession((() => {
+			const { storageHost: _host, author: _author, publicKeyBytes: _key, signRegisteredVertexDigest: _sign, ...rest } = input;
+			return { ...rest, localSession: { lease } };
+		})());
 		track.rooms.add(room);
 		await waitForV3RoomStartupForDiagnostics(room);
 		archive?.observe(room.projection());
@@ -337,7 +381,7 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 		const wasAccepted = (row: DurableIssuanceOutboxRecord) => accepted.has(hex(row.commit.envelope.digest));
 		/** The canonical state bytes this peer shows (its current projection). */
 		const stateBytes = () => required(application.migration).canonicalStateBytes(room.projection());
-		return { index, name, room, floor, networkNode, receive, wasAccepted, archive, stateBytes,
+		return { index, name, room, floor, lease, networkNode, receive, wasAccepted, archive, stateBytes,
 			republish: (targetPeerId?: string) => required(retainedPublisher)(targetPeerId) };
 	};
 	type Peer = Awaited<ReturnType<typeof open>>;
@@ -355,6 +399,7 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 		}
 		await peer.floor.close();
 		track.heads.delete(peer.floor);
+		if (peer.lease !== undefined) { await peer.lease.close(); track.heads.delete(peer.lease); }
 	};
 
 	/**
@@ -364,6 +409,14 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 	 * @param name
 	 */
 	const issuedAfter = async (index: number, after: number | null, name = `peer-${index}`) => {
+		if (localMembers.has(index)) return withLocalAlias(index, async (alias) => {
+			const store = await alias.openIssuance(name);
+			try {
+				const author = required(identities[index]).author;
+				return await store.readOutboxPage({ scope: { objectId, author },
+					afterKey: after === null ? null : [objectId, author, after], limit: 128 });
+			} finally { await store.close(); }
+		});
 		const store = await host.openIssuance(name);
 		try {
 			const author = required(identities[index]).author;
@@ -416,6 +469,10 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 	const readHead = async (index: number) => {
 		const object = parseStorageObjectId(objectId);
 		if (!object.ok) throw new TypeError("CHAT_SHARES_INVALID_OBJECT");
+		if (localMembers.has(index)) return withLocalAlias(index, async (alias) => {
+			const store = await alias.openAhe(`peer-${index}--ahe`);
+			try { return await inspectHead(store, object.value); } finally { await store.close(); }
+		});
 		const store = await host.openAhe(`peer-${index}--ahe`);
 		try { return await inspectHead(store, object.value); }
 		finally { await store.close(); }
@@ -513,9 +570,21 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 		await peer.room.installCreatorSuccessor({ offer: transfer.offer, peers: transfer.peers });
 	};
 
+	/** Observation-only native issuance owner for one peer (a reopen alias for local members). */
+	const withIssuance = async <T>(index: number, action: (store: Awaited<ReturnType<typeof host.openIssuance>>) => Promise<T>): Promise<T> => {
+		const name = `peer-${index}`;
+		if (localMembers.has(index)) return withLocalAlias(index, async (alias) => {
+			const store = await alias.openIssuance(name);
+			try { return await action(store as Awaited<ReturnType<typeof host.openIssuance>>); } finally { await store.close(); }
+		});
+		const store = await required(observationHost(index)).openIssuance(name);
+		try { return await action(store); } finally { await store.close(); }
+	};
+
 	return {
 		directory,
 		identities,
+		withIssuance,
 		peers,
 		application,
 		genesis,
