@@ -5388,11 +5388,22 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		settlementHeld = plan.entries.some(entry => entry.disposition === "manual-review" && entry.sourceContextDigest === undefined);
 		if (settlementHeld) return;
 		// A retained source context preserves unknown work, including pre-existing
-		// policy/progress metadata. Its presence grants no replacement decision.
+		// policy/progress metadata. Its presence grants no replacement decision, and
+		// unknown retained work still withholds the author fence. Retained terminal
+		// completion alone does not: a current member keeps fencing each successor
+		// (the fence owner reopens every retained source contract itself), because
+		// retirement releases a terminal retained entry only under a fenced plan.
 		const eligible = (entry: RoomSettlementPlan["entries"][number]): boolean => entry.sourceContextDigest === undefined &&
 			entry.disposition !== "expire" && entry.disposition !== "committed" && entry.disposition !== "inherited" && entry.disposition !== "manual-review" &&
 			entry.replacementSequence === null;
-		if (plan.entries.some(entry => entry.sourceContextDigest !== undefined) && !plan.entries.some(eligible)) return;
+		const retained = plan.entries.filter((entry) => entry.sourceContextDigest !== undefined);
+		const terminalOnly = retained.every((entry) => entry.disposition === "committed" || entry.disposition === "expire");
+		if (
+			retained.length !== 0 &&
+			!plan.entries.some(eligible) &&
+			(!terminalOnly || activeHandle?.currentEphemeralAuthority()?.isCurrentMember(settlementScope.author) !== true)
+		)
+			return;
 		const sourceBySequence = new Map(sources.map((source) => [source.authorSequence, source] as const));
 		let sourceOwner = activeHandle;
 		const refreshSourceOwner = async (): Promise<void> => {

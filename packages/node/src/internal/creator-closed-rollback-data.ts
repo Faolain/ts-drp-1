@@ -860,6 +860,18 @@ function failure(
 		...(owner === undefined || reason === undefined ? {} : { cause: Object.freeze({ owner, reason }) }),
 	});
 }
+/** A terminal drain's reconstructed journal cannot be resumed by a different fresh P. */
+class ClosedJournalReconstructionDeclined extends Error {
+	constructor(readonly identity: string) {
+		super("closed journal reconstruction declined");
+	}
+}
+/** Exact terminal drain P whose reconstruction the next pass of this journal declines. */
+const declinedClosedJournalReconstructions = new WeakMap<object, string>();
+const closedJournalDrainIdentity = (
+	p: Readonly<{ throughEpoch: number; decisionDigest: string; sourceProofDigest: string }>
+): string => JSON.stringify([p.throughEpoch, p.decisionDigest, p.sourceProofDigest]);
+
 class Refusal {
 	readonly diagnosticStack = new Error().stack;
 	constructor(readonly result: Failure) {}
@@ -20058,6 +20070,24 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 	const issuanceImage = completedRewrite === undefined ? native.image : restoredIssuanceImage!;
 	const {resumeBasisMatches, summarySource, generationSource, sourceProofDigest, decisionDigest, decisionBytes} =
 		completedRewrite === undefined ? deriveSourceLabels(issuanceRows, issuanceImage) : restoredLabels!;
+	// A reconstructed journal is only the resume of its own drain's P, exactly as
+	// a restored issuance rewrite above. When the whole fresh source no longer
+	// re-derives that P while P is already terminal (no active coordinator, every
+	// drain item applied), there is nothing of P left to resume: decline the
+	// reconstruction so the original path re-acquires the physical journal as a
+	// fresh decision, as it does when P drained nothing. An active P still refuses.
+	const physicalDrain = source.journalPhysical.control?.drain;
+	const physicalDrainP = physicalDrain?.plan.baseControl.completed;
+	if (
+		source.journalReconstructed &&
+		physicalDrain != null &&
+		physicalDrainP != null &&
+		source.aheControl?.active == null &&
+		physicalDrain.cursor === journalRetirementDrainItemCount(physicalDrain.plan) &&
+		source.journal.image.imageDigest !== source.journalPhysical.image.imageDigest &&
+		(physicalDrainP.decisionDigest !== decisionDigest || physicalDrainP.sourceProofDigest !== sourceProofDigest)
+	)
+		throw new ClosedJournalReconstructionDeclined(closedJournalDrainIdentity(physicalDrainP));
 
 	requireLaw(resumeBasisMatches, "floor-stale");
 	if (completedRewrite !== undefined)
@@ -23901,7 +23931,12 @@ async function reconcileSnapshotRecoveryRoles(
 		const journalPlan = journal.value.control?.drain?.plan;
 		const originalJournalP = journalPlan?.baseControl.completed;
 		const coordinatorP = aheControl.value?.active?.preparation ?? aheControl.value?.completed;
+		// One-shot: a terminal P whose reconstruction a prior pass declined is
+		// acquired physically (scheduling only; every check below still runs).
+		const declined = declinedClosedJournalReconstructions.get(input.liveJournalStore);
+		declinedClosedJournalReconstructions.delete(input.liveJournalStore);
 		const journalReconstructed =
+			(originalJournalP == null || declined !== closedJournalDrainIdentity(originalJournalP)) &&
 			journal.value.drainSource !== undefined &&
 			originalJournalP != null &&
 			coordinatorP != null &&
@@ -24349,7 +24384,19 @@ async function reconcileSnapshotRecoveryRoles(
 	// runs the existing path from a fresh acquisition.
 	if (retentionDeferred) return retentionPlan === undefined ? true : applyRoomRetentionPass(retentionPlan);
 	if (retentionPlan !== undefined) await planRoomRetentionBesideExistingPass(retentionPlan);
-	return installClosedRetirementSourceInRoom(retirementSource, acknowledgeCompletedJournalDrain, drainSuppressedJournalPrefixes);
+	try {
+		return await installClosedRetirementSourceInRoom(
+			retirementSource,
+			acknowledgeCompletedJournalDrain,
+			drainSuppressedJournalPrefixes
+		);
+	} catch (error) {
+		if (!(error instanceof ClosedJournalReconstructionDeclined)) throw error;
+		// Nothing was committed (the room session aborted). Request one fresh
+		// original pass, which acquires this terminal P's journal physically.
+		declinedClosedJournalReconstructions.set(input.liveJournalStore, error.identity);
+		return true;
+	}
 }
 
 /**

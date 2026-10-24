@@ -1,10 +1,12 @@
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { LIVE_JOURNAL_RETIREMENT_LIMITS, type LiveJournalScope } from "@ts-drp/live-journal";
+import { openCurrentAnchorTrust } from "@ts-drp/protocol-v3";
 import { SEAL_CANONICAL_RECORD_MAX_BYTES } from "@ts-drp/protocol-v3/seal";
 import {
 	openCreatorCheckpointTrust,
 	openCreatorForwardPromotionCheckpointTrust,
 } from "@ts-drp/protocol-v3/creator-checkpoint";
+import { openCreatorSuccessorTrust } from "@ts-drp/protocol-v3/creator-close";
 
 /** Received-only durable material. These bytes carry no authority until reopened against the
  * immutable genesis and the original signed journal header on each classification. */
@@ -163,23 +165,53 @@ export function verifyReceivedClosedJournalAuthority(
 			typeof successor.currentAnchorDigest !== "string"
 		)
 			return undefined;
-		const predecessorRecordBytes =
-			scope.epoch === 0
-				? input.exactCanonicalPinnedGenesisTrustStateRecordBytes.slice()
-				: encodeCanonical({
-						currentAnchorDigest: scope.anchorDigest,
-						currentEpoch: scope.epoch,
-						detachedCurrentAnchorSignature: header.detachedAnchorSignature.slice(),
-						exactCanonicalCurrentAnchorPreimageBytes: header.exactCanonicalAnchorPreimageBytes.slice(),
-						exactCanonicalProfileBytes: genesis.exactCanonicalProfileBytes,
-						exactCanonicalSignerSetBytes: genesis.exactCanonicalSignerSetBytes,
-						genesisAnchorDigest: genesis.currentAnchorDigest,
-						kind: "drp-anchor-trust-state",
-						objectId: scope.objectId,
-						profileId: genesis.profileId,
-						quorum: 1,
-						version: 1,
-					});
+		const authority = Object.freeze({
+			scope: Object.freeze({ ...scope }),
+			exactCanonicalCutValueBytes: material.exactCanonicalCutValueBytes.slice(),
+			closedAclDigest: anchor.aclDigest,
+			profileId: genesis.profileId,
+			suiteId: anchor.cryptoSuiteId,
+		});
+		if (scope.epoch === 0) {
+			// The genesis scope closes the pinned genesis trust itself. Its predecessor is
+			// not a checkpoint trust record: the original genesis-successor state equation
+			// (QC, Cut binding and successor anchor) authenticates it from the pin.
+			if (genesis.currentAnchorDigest !== scope.anchorDigest || Object.hasOwn(cut, "forwardPromotion"))
+				return undefined;
+			const pin = openCurrentAnchorTrust({
+				exactCanonicalTrustStateRecordBytes: input.exactCanonicalPinnedGenesisTrustStateRecordBytes.slice(),
+				expectedObjectId: scope.objectId,
+				pinnedGenesisAnchorDigest: genesis.currentAnchorDigest,
+			});
+			if (!pin.ok || pin.trust.currentEpoch !== 0 || pin.trust.currentAnchorDigest !== scope.anchorDigest)
+				return undefined;
+			const opened = openCreatorSuccessorTrust({
+				currentTrust: pin.trust,
+				exactCanonicalCommitQcBytes: material.exactCanonicalCommitQcBytes.slice(),
+				exactCanonicalCutValueBytes: material.exactCanonicalCutValueBytes.slice(),
+				exactCanonicalTrustStateRecordBytes: material.exactCanonicalSuccessorTrustStateRecordBytes.slice(),
+			});
+			return opened.ok &&
+				opened.trust.objectId === scope.objectId &&
+				opened.trust.currentEpoch === 1 &&
+				opened.trust.currentAnchorDigest === successor.currentAnchorDigest
+				? authority
+				: undefined;
+		}
+		const predecessorRecordBytes = encodeCanonical({
+			currentAnchorDigest: scope.anchorDigest,
+			currentEpoch: scope.epoch,
+			detachedCurrentAnchorSignature: header.detachedAnchorSignature.slice(),
+			exactCanonicalCurrentAnchorPreimageBytes: header.exactCanonicalAnchorPreimageBytes.slice(),
+			exactCanonicalProfileBytes: genesis.exactCanonicalProfileBytes,
+			exactCanonicalSignerSetBytes: genesis.exactCanonicalSignerSetBytes,
+			genesisAnchorDigest: genesis.currentAnchorDigest,
+			kind: "drp-anchor-trust-state",
+			objectId: scope.objectId,
+			profileId: genesis.profileId,
+			quorum: 1,
+			version: 1,
+		});
 		const open = Object.hasOwn(cut, "forwardPromotion")
 			? openCreatorForwardPromotionCheckpointTrust
 			: openCreatorCheckpointTrust;
@@ -206,13 +238,7 @@ export function verifyReceivedClosedJournalAuthority(
 			opened.currentTrust.currentEpoch !== scope.epoch + 1
 		)
 			return undefined;
-		return Object.freeze({
-			scope: Object.freeze({ ...scope }),
-			exactCanonicalCutValueBytes: material.exactCanonicalCutValueBytes.slice(),
-			closedAclDigest: anchor.aclDigest,
-			profileId: genesis.profileId,
-			suiteId: anchor.cryptoSuiteId,
-		});
+		return authority;
 	} catch {
 		return undefined;
 	}
