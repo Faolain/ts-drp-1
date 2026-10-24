@@ -13,20 +13,13 @@ import { creatorCloseMembershipSubsetFields, creatorCloseMembershipSubsetMemberF
 import { openReceivedCloseMembership, RECEIVED_CLOSE_AUTHORITY_MAX_RECORD_BYTES } from "./creator-received-close-membership.js";
 import {creatorQ1SealQcFields, creatorQ1SealVoteFields} from "@ts-drp/seal/creator";
 import registry from "@ts-drp/protocol-v3/registry/registry-v1.json" with {type: "json"};
+import { creatorSourceExpiryFields, verifyCreatorSourceExpiryReceipt, type CreatorSourceExpiryReceipt } from "@ts-drp/protocol-v3/internal/creator-source-expiry";
 
 const KIND = "creator-settlement-source-context-1";
 const DOMAIN = "ts-drp/settlement-source-context/v1";
 const COMPLETION_KIND = "creator-settlement-source-completion-1";
 const EXPIRY_KIND = "creator-settlement-source-expiry-1";
-/** Original unsigned local-author abandonment schema, including exact current
- * native-head and whole-floor digests. These identities never grant freshness. */
-export function creatorSourceExpiryFields(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
-	return {kind: "creator-source-expiry-1", version: 1, objectId: input.objectId,
-		pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest, sourceAuthor: input.sourceAuthor,
-		sourceSequence: input.sourceSequence, sourceDigest: input.sourceDigest, sourceContextDigest: input.sourceContextDigest,
-		signingEpoch: input.signingEpoch, signingAnchorDigest: input.signingAnchorDigest,
-		signingNativeHeadDigest: input.signingNativeHeadDigest, signingFloorDigest: input.signingFloorDigest};
-}
+export { creatorSourceExpiryFields };
 const MAX_PARAMETERS = encodeCanonical(Object.fromEntries(registry.kinds.parameters.fields.map(field =>
 	[field.name, field.constraints.maximum]))).byteLength;
 // Exact existing anchor, ACL and registered parameter-schema bounds, with canonical field overhead.
@@ -35,6 +28,7 @@ export const CREATOR_SOURCE_CONTEXT_MAX_BYTES = encodeCanonical({kind: KIND, ver
 	parametersBytes: new Uint8Array(MAX_PARAMETERS)}).byteLength;
 const limits = {maxBytes: CREATOR_SOURCE_CONTEXT_MAX_BYTES, maxDepth: 2, maxItems: 32};
 const completionLimits = {maxBytes: 1_048_640, maxDepth: 4, maxItems: 64};
+const expiryLimits = {maxBytes: 16_384, maxDepth: 4, maxItems: 64};
 const sizingLimits = {...completionLimits, maxDepth: 32, maxItems: 65_536};
 
 export interface VerifiedCreatorSourceCustody { readonly __verifiedCreatorSourceCustody?: never }
@@ -228,4 +222,40 @@ export async function captureCreatorSourceCompletion(source: VerifiedCreatorSour
 	const context = {digest: hashDomain(DOMAIN, bytes), exactCanonicalContextBytes: bytes};
 	if (await openCreatorSourceCompletion(source, context) === undefined) throw new TypeError("creator source completion is not authenticated");
 	return context;
+}
+
+/** Wraps the exact signed receipt as one retained plan context (no authority). */
+export function captureCreatorSourceExpiry(exactCanonicalReceiptBytes: Uint8Array, detachedSignature: Uint8Array): SettlementSourceContext {
+	if (!(exactCanonicalReceiptBytes instanceof Uint8Array) || !(detachedSignature instanceof Uint8Array) || detachedSignature.byteLength !== 64)
+		throw new TypeError("creator source expiry carrier is invalid");
+	const bytes = encodeCanonical({kind: EXPIRY_KIND, version: 1, exactCanonicalReceiptBytes: new Uint8Array(exactCanonicalReceiptBytes),
+		detachedSignature: new Uint8Array(detachedSignature)}, expiryLimits);
+	return {digest: hashDomain(DOMAIN, bytes), exactCanonicalContextBytes: bytes};
+}
+
+/** Exact signed local-author abandonment of one retained source. Historical
+ * DATA only: the signer must be the source author, exactly one member of the
+ * source epoch's authenticated ACL (not a current Writer), and sign after that
+ * epoch. Head/floor/anchor digests are recorded identities, never freshness. */
+export function openCreatorSourceExpiry(source: VerifiedCreatorSourceCustody, context: SettlementSourceContext,
+	expected: Readonly<{sourceAuthor: string; sourceSequence: number; sourceDigest: Uint8Array}>): CreatorSourceExpiryReceipt | undefined {
+	try {
+		const identity = resolveCreatorSourceCustody(source);
+		const bytes = new Uint8Array(context.exactCanonicalContextBytes);
+		if (identity === undefined || !(context.digest instanceof Uint8Array) || compareBytes(hashDomain(DOMAIN, bytes), context.digest) !== 0) return undefined;
+		const value = decodeCanonical(bytes, expiryLimits);
+		if (!isClosedDurableIssuanceRecord(value, ["kind", "version", "exactCanonicalReceiptBytes", "detachedSignature"]) ||
+			value.kind !== EXPIRY_KIND || value.version !== 1 || !(value.exactCanonicalReceiptBytes instanceof Uint8Array) ||
+			!(value.detachedSignature instanceof Uint8Array) || value.detachedSignature.byteLength !== 64 ||
+			compareBytes(bytes, encodeCanonical(value, expiryLimits)) !== 0) return undefined;
+		const receipt = verifyCreatorSourceExpiryReceipt(value.exactCanonicalReceiptBytes, value.detachedSignature);
+		if (receipt === undefined || receipt.objectId !== identity.trust.objectId ||
+			receipt.pinnedGenesisAnchorDigest !== identity.trust.genesisAnchorDigest ||
+			compareBytes(receipt.sourceContextDigest, identity.context.digest) !== 0 ||
+			receipt.sourceAuthor !== expected.sourceAuthor || receipt.sourceSequence !== expected.sourceSequence ||
+			!(expected.sourceDigest instanceof Uint8Array) || compareBytes(receipt.sourceDigest, expected.sourceDigest) !== 0 ||
+			receipt.signingEpoch <= identity.trust.currentEpoch ||
+			identity.acl.members.filter(member => member.author === receipt.sourceAuthor).length !== 1) return undefined;
+		return receipt;
+	} catch { return undefined; }
 }
