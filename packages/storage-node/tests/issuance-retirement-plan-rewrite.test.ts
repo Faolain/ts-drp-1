@@ -16,10 +16,11 @@ import {
 	issuanceRetirementCommitRows,
 	issuanceRetirementImage,
 	encodeIssuanceRetirementControl,
+	issuanceRetirementPlanRewriteResourceForSizing,
 } from "@ts-drp/issuance-store/maintenance";
 import { createNodeDurableIssuanceStore } from "../src/issuance.js";
 import { createBrowserDurableIssuanceStore } from "../../storage-browser/src/issuance.js";
-import { d109bIssue } from "../../../tests/fixtures/phase-6b/issuance-retention-contract.js";
+import { d109bIssue, d109bPruningInput } from "../../../tests/fixtures/phase-6b/issuance-retention-contract.js";
 
 const directories: string[] = [];
 const stores: DurableIssuanceStore[] = [];
@@ -92,6 +93,61 @@ async function seed(store: DurableIssuanceStore) {
 }
 
 describe.each(["sqlite", "indexeddb"] as const)("%s atomic plan retirement", backend => {
+	it("keeps terminal proof through physical custody and later plan progress, then releases it after the native drain", async () => {
+		const directory = await mkdtemp(join(tmpdir(), "issuance-terminal-proof-")); directories.push(directory);
+		const primaryFilename = join(directory, "primary.sqlite"), primaryDatabaseName = `terminal-proof-${crypto.randomUUID()}`;
+		const open = () => backend === "sqlite" ? createNodeDurableIssuanceStore({primaryFilename}) :
+			createBrowserDurableIssuanceStore({primaryDatabaseName});
+		let store = await open(); stores.push(store);
+		const commits: DurableIssueCommit[] = [];
+		for (let epoch = 0; epoch < 5; epoch++) commits.push(await d109bIssue(store, scope, epoch, epoch !== 0));
+		const context = (kind: string) => {const exactCanonicalContextBytes = encodeCanonical({kind});
+			return {digest: hashDomain("ts-drp/settlement-source-context/v1", exactCanonicalContextBytes), exactCanonicalContextBytes};};
+		const source = context("mechanical-source"), proof = context("mechanical-completion");
+		const before = {scope, revision: 0, fenceSequence: 4, entries: [{sourceSequence: 0,
+			sourceDigest: commits[0]!.envelope.digest, sourceContextDigest: source.digest, sourceResolutionDigest: proof.digest,
+			disposition: "committed" as const, replacementSequence: null}],
+			sourceContexts: [source, proof].sort((a,b) => Buffer.compare(a.digest, b.digest))};
+		await store.transactWriteSettlementPlan({scope, expectedRevision: null, plan: before});
+		const retire = async () => {
+			const maintenance = durableIssuancePruningMaintenanceForStore(store)!;
+			const read = await maintenance.acquireRetirementControl!({objectId: scope.objectId});
+			try {
+				const native = await maintenance.readBoundedRecoveryCensus!({objectId: scope.objectId, limits: ISSUANCE_RETIREMENT_LIMITS});
+				const protectedRecords = closeIssuanceRetirementProtectedRecords({control: read.control, rows: native.rows,
+					throughEpoch: 3, protectedRecords: []});
+				expect(protectedRecords.some(hole => hole.authorSequence === 0)).toBe(false);
+				const p = issuanceRetirementPreparationWithPlanRewrite(read.control, {throughEpoch: 3,
+					decisionDigest: "a".repeat(64), sourceProofDigest: "b".repeat(64), protectedRecords}, native.rows);
+				if (p.planRewrite !== undefined) expect(encodeCanonical(p.planRewrite).byteLength).toBeLessThanOrEqual(
+					issuanceRetirementPlanRewriteResourceForSizing(native.rows.plans)!.byteLength);
+				await read.prepareFence(p);
+			} finally {await read.release();}
+			const prepared = await maintenance.acquireRetirementControl!({objectId: scope.objectId});
+			try {await prepared.commitPrepared();} finally {await prepared.release();}
+		};
+		await expect(retire()).rejects.toThrow("pending publication is unprotected");
+		expect((await store.readOutboxPage({scope, limit: 1}))[0]?.publishState).toBe("pending");
+		await store.compareAndMarkOutboxPublished({scope, authorSequence: 0, digest: commits[0]!.envelope.digest});
+		await retire();
+		expect(await store.readSettlementPlan(scope)).toEqual(before);
+		// An independent current write changes the exact target image. Durable
+		// context ownership survives without borrowing an obsolete inverse.
+		await d109bIssue(store, scope, 5);
+		await store.transactWriteSettlementPlan({scope, expectedRevision: 0, plan: {...before, revision: 1}});
+		await store.close(); stores.splice(stores.indexOf(store), 1);
+		store = await open(); stores.push(store);
+		expect(await store.readSettlementPlan(scope)).toEqual({...before, revision: 1});
+		const maintenance = durableIssuancePruningMaintenanceForStore(store)!;
+		await maintenance.pruneAuthenticatedSettledPrefix(d109bPruningInput(await maintenance.inspectPruningState(scope), 3, 0));
+		expect(await store.readIssued(scope, 0)).toBeNull();
+		expect((await store.readSettlementPlan(scope))?.sourceContexts).toEqual(before.sourceContexts);
+		await retire();
+		expect(await store.readSettlementPlan(scope)).toEqual({scope, revision: 2, fenceSequence: 4, entries: []});
+		await expect(store.transactWriteSettlementPlan({scope, expectedRevision: 2, plan: {...before, revision: 3}}))
+			.rejects.toThrow("retired or absent issued work");
+	});
+
 	it("keeps the old plan through preparation and commits the exact new plan/control together", async () => {
 		const directory = await mkdtemp(join(tmpdir(), "issuance-plan-rewrite-"));
 		directories.push(directory);

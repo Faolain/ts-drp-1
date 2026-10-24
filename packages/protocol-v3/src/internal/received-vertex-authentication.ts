@@ -20,6 +20,16 @@ export function readCreatorSettlementSourceAnchor(trust: CurrentAnchorTrust): Re
 		anchorSignature: creator.detachedCurrentAnchorSignature};
 }
 
+/** Immutable original fixed-creator material, for native resource sizing only. */
+export function readCreatorSettlementSourceConstants(trust: CurrentAnchorTrust): Readonly<{
+	exactCanonicalProfileBytes: Uint8Array; exactCanonicalSignerSetBytes: Uint8Array;
+}> | undefined {
+	const creator = resolveCreatorAnchorTrustMaterial(trust);
+	return creator === undefined ? undefined : {
+		exactCanonicalProfileBytes: new Uint8Array(creator.exactCanonicalProfileBytes),
+		exactCanonicalSignerSetBytes: new Uint8Array(creator.exactCanonicalSignerSetBytes)};
+}
+
 /** Exact source selection is current creator authorization, not evidence of past private timing. */
 export function verifyCreatorSettlementSourceSelection(
 	trust: CurrentAnchorTrust,

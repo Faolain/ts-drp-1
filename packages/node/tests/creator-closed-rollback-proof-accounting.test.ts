@@ -1,3 +1,4 @@
+import "@ts-drp/protocol-v3";
 import {createWorkCheckpoint} from "../src/internal/cooperative-work.js";
 import { readFileSync } from "node:fs";
 import ts from "typescript";
@@ -61,7 +62,7 @@ describe("private issuance hole selection", () => {
 		expect(selected).toHaveLength(3); expect(ownClass).toBeDefined();
 		const run = (changes: Record<string, unknown> = {}) => {
 			let authenticated = 0;
-			const context = {sourceBound: true, openSource: false, registration: {issuanceScope: {author: "author"}},
+			const context = {sourceBound: true, openSource: false, retainedNoop: false, registration: {issuanceScope: {author: "author"}},
 				row: {publishState: "published", authorSequence: 7}, scope: {author: "author"}, vertex: {epoch: 1},
 				currentTrust: {currentEpoch: 4}, classified: {authenticated: {digest: "exact"}},
 				settlementFrontierFromHistory: () => ({currentEpoch: 4, admissionEpoch: 0, terminalThrough: 7}),
@@ -4846,6 +4847,10 @@ const sizingJournalProtection = unique(
 	(node): node is ts.VariableDeclaration =>
 		ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === "protectedJournalScopes"
 );
+const nativeJournalDetailScopes = unique(
+	(node): node is ts.VariableDeclaration =>
+		ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === "journalDetailScopes"
+);
 const nativeJournalPreparation = unique(
 	(node): node is ts.VariableDeclaration =>
 		ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === "journalPreparation"
@@ -4859,9 +4864,17 @@ const journalPhysicalScopes = [
 	journalScope(5),
 	journalScope(6),
 ];
-function journalProtectionForSource(carried: Record<string, unknown> | undefined) {
+function journalProtectionForSource(carried: Record<string, unknown> | undefined, emptyEpochs: readonly number[] = [],
+	protectedReplayScopes: readonly ReturnType<typeof journalScope>[] = []) {
 	const original = { throughEpoch: 3, protectedScopes: journalPhysicalScopes.slice(0, 3) };
-	const capture = { journal: { control: { completed: original } } };
+	const canonicalRows = journalPhysicalScopes.flatMap(scope => [
+		encodeCanonical(["scopes", [scope.objectId, scope.epoch, scope.anchorDigest], {}]),
+		...(emptyEpochs.includes(scope.epoch) ? [] : [encodeCanonical(["accepted_entries",
+			[scope.objectId, scope.epoch, scope.anchorDigest, 0], {source_kind: "local-issued", journal_sequence: 0,
+				vertex_digest: "a".repeat(64), local_author: "writer", local_author_sequence: scope.epoch,
+				received_preimage: null, received_signature: null}])]),
+	]);
+	const capture = { journal: { control: { completed: original }, canonicalRows } };
 	const precloseControls = carried === undefined ? undefined : { participants: [{}, carried, {}, {}] };
 	const before = encodeCanonical({ capture, physical: journalPhysicalScopes, carried: carried ?? null });
 	const forecast = execute<unknown[]>(
@@ -4876,9 +4889,10 @@ function journalProtectionForSource(carried: Record<string, unknown> | undefined
 		}
 	);
 	const native = execute<{ protectedScopes: unknown[] }>(
-		`const ${nativeJournalPreparation.getText(parsed)}; journalPreparation;`,
+		`const ${nativeJournalDetailScopes.getText(parsed)}; const ${nativeJournalPreparation.getText(parsed)}; journalPreparation;`,
 		{
-			source: { journal: { control: carried ?? capture.journal.control } },
+			decodeCanonical,
+			source: { journal: { control: carried ?? capture.journal.control, canonicalRows }, journalDetails: {protectedReplayScopes} },
 			journalScopes: journalPhysicalScopes.filter((scope) => scope.epoch <= 5),
 			journalPrefixes: [],
 			labels: { throughEpoch: 5, decisionDigest: "test-only", sourceProofDigest: "test-only" },
@@ -4894,6 +4908,13 @@ function journalProtectionForSource(carried: Record<string, unknown> | undefined
 	};
 }
 describe("R8 carried journal frontier affected controls", () => {
+	it("retains live empty replay scopes while unused empty headers do not keep detail holes", () => {
+		const result = journalProtectionForSource({completed: null}, [2, 3, 5], [journalScope(2), journalScope(5)]);
+		expect(result.native).toEqual([journalScope(0), journalScope(2), journalScope(4), journalScope(5)]);
+		// The numerical forecast remains a conservative whole-image bound.
+		expect(result.forecast).toEqual(journalPhysicalScopes.filter(scope => scope.epoch <= 5));
+		expect(result.after).toEqual(result.before);
+	});
 	it("uses the joined CURRENT frontier without resurrecting its fenced epoch2 hole", () => {
 		const result = journalProtectionForSource({
 			completed: { throughEpoch: 4, protectedScopes: [journalScope(0), journalScope(3), journalScope(4)] },

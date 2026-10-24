@@ -236,6 +236,7 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 			}});
 		track.heads.add(floor);
 		let ingress: ((message: Message) => void) | undefined;
+		let retainedPublisher: ((targetPeerId?: string) => Promise<void>) | undefined;
 		let topic: string | undefined;
 		const accepted = new Set<string>();
 		const acknowledged = new Map<string, () => void>();
@@ -280,7 +281,7 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 						throw new TypeError("CHAT_SHARES_EPHEMERAL_UNUSED");
 					},
 					requestRetainedHistory: () => undefined,
-					setRetainedPublisher: () => undefined,
+					setRetainedPublisher: publisher => { retainedPublisher = publisher; },
 					setIngressHandler: (selectedTopic, handler) => {
 						topic = selectedTopic;
 						ingress = handler;
@@ -336,7 +337,8 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 		const wasAccepted = (row: DurableIssuanceOutboxRecord) => accepted.has(hex(row.commit.envelope.digest));
 		/** The canonical state bytes this peer shows (its current projection). */
 		const stateBytes = () => required(application.migration).canonicalStateBytes(room.projection());
-		return { index, name, room, floor, networkNode, receive, wasAccepted, archive, stateBytes };
+		return { index, name, room, floor, networkNode, receive, wasAccepted, archive, stateBytes,
+			republish: (targetPeerId?: string) => required(retainedPublisher)(targetPeerId) };
 	};
 	type Peer = Awaited<ReturnType<typeof open>>;
 

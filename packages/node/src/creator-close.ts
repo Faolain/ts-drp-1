@@ -2238,7 +2238,8 @@ async function prepareCreatorIssuanceMaintenanceQuote(
 				digest: hashDomain("ts-drp/vertex/v3", unsignedBytes),
 				...(planEffect === undefined ? {} : { planEffect, exactCanonicalPlanBytes: encodeCanonical(plan) }),
 			},
-			nativeControl, creatorSourceCustodyGeometryForSizing(registration.currentTrust, registration.exactCanonicalLatchedAclBytes)
+			nativeControl, creatorSourceCustodyGeometryForSizing(registration.currentTrust, registration.exactCanonicalLatchedAclBytes,
+				Number((decodeCanonical(registration.exactCanonicalParametersBytes) as Record<string, unknown>).maxEpochVertices))
 		);
 		const ordinarySignMaterialByteLength = receivedReceipt === undefined && planEffect === undefined &&
 			registration.currentTrust.profileId === "creator-trusted-v1" && nativeRows.plans.length === 0
@@ -2819,7 +2820,8 @@ async function prepareCreatorOrdinaryIssuanceMaintenanceQuote(
 		const issuancePhases = received === undefined ? issuanceUnsignedPostimageWidths(nativeRows, registration.issuanceScope,
 			{kind: "v3-issuance-pending-unsigned-1", authorSequence: unsigned.authorSequence, canonicalPreimageBytes: unsignedBytes,
 				digest: hashDomain("ts-drp/vertex/v3", unsignedBytes)}, nativeControl,
-			creatorSourceCustodyGeometryForSizing(registration.currentTrust, registration.exactCanonicalLatchedAclBytes)) : undefined;
+			creatorSourceCustodyGeometryForSizing(registration.currentTrust, registration.exactCanonicalLatchedAclBytes,
+				Number((decodeCanonical(registration.exactCanonicalParametersBytes) as Record<string, unknown>).maxEpochVertices))) : undefined;
 		stage = "signing-widths";
 		const signing = readCreatorCloseSigningFramesForSizing({currentTrust: registration.currentTrust,
 			genuinePreparedClose: material.prepared.close, exactCanonicalCutValueBytes: material.prepared.exactCanonicalCutValueBytes,

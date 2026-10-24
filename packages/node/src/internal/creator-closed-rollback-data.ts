@@ -9700,10 +9700,12 @@ function collectClosedJournalHeaderScopeData(input: Omit<ClosedJournalHeaderCons
 }
 function classifyClosedJournalHeaders(input: ClosedJournalHeaderConsumers & {
 	journal: LiveJournalRetirementImageObservation; floor: CreatorProtectedRecoveryRoleSummary["floor"]; unclassified: boolean;
+	resumePlan?: LiveJournalRetirementDrainPlan;
 }): ClosedRetirementSource["journalHeaders"] {
 	if (input.unclassified || input.floor.pending !== null || input.forward.wholeCensus !== true) return undefined;
 	const protectedHeaderScopes = collectClosedJournalHeaderScopes(input);
 	return prepareClosedJournalHeaders({journal: input.journal, protectedHeaderScopes,
+		...(input.resumePlan === undefined ? {} : {resumePlan: input.resumePlan}),
 		pinnedGenesisAnchorDigest: input.frame.input.pinnedGenesisAnchorDigest, accounting: input.frame.accounting});
 }
 /** Native header consumers are captured by the held owner before release;
@@ -9711,6 +9713,7 @@ function classifyClosedJournalHeaders(input: ClosedJournalHeaderConsumers & {
 function prepareClosedJournalHeaders(input: Readonly<{
 	journal: LiveJournalRetirementImageObservation;
 	protectedHeaderScopes: readonly LiveJournalScope[];
+	resumePlan?: LiveJournalRetirementDrainPlan;
 	pinnedGenesisAnchorDigest: string;
 	accounting: CreatorClosedRollbackProofAccounting;
 }>): ClosedRetirementSource["journalHeaders"] {
@@ -9722,11 +9725,25 @@ function prepareClosedJournalHeaders(input: Readonly<{
 		!protectedMap.has(JSON.stringify(key)) &&
 		!journalRetirementAllows(input.journal.control, { objectId: String(key[0]), epoch: key[1], anchorDigest: String(key[2]) }) &&
 		!decoded.some(({ frame: [kind, rowKey] }) => kind !== "scopes" && closedRetirementEqual(rowKey.slice(0, 3), key)))
+		.filter(({frame: [, key]}) => input.resumePlan === undefined || input.resumePlan.retiredEmptyHeaders?.some(header =>
+			closedRetirementEqual([header.scope.objectId, header.scope.epoch, header.scope.anchorDigest], key)) === true)
 		.slice(0, LIVE_JOURNAL_RETIREMENT_BATCH_ROWS).map(({ bytes, frame: [, key] }) => Object.freeze({
 			scope: Object.freeze({ objectId: String(key[0]), epoch: Number(key[1]), anchorDigest: String(key[2]) }),
 			exactCanonicalNativeFrameBytes: bytes.slice() }));
-	if (selected.length === 0) return undefined;
-	const journalHeaders = Object.freeze({ retiredEmptyHeaders: Object.freeze(selected), protectedHeaderScopes });
+	// A resumed header drain owns its exact original descriptor and conservative
+	// consumer inventory. Newly unneeded headers wait for a fresh intent. Every
+	// old selected header must still be empty, not protected by current consumers,
+	// and byte-identical in the reconstructed original native image.
+	const resumed = input.resumePlan?.retiredEmptyHeaders;
+	const headers = input.resumePlan === undefined ? selected : (resumed ?? []).map(expected => {
+		const actual = selected.find(value => closedRetirementEqual(value.scope, expected.scope) &&
+			closedRetirementEqual(value.exactCanonicalNativeFrameBytes, expected.exactCanonicalNativeFrameBytes));
+		requireLaw(actual !== undefined, "chain-invalid");
+		return actual;
+	});
+	if (headers.length === 0) return undefined;
+	const journalHeaders = Object.freeze({ retiredEmptyHeaders: Object.freeze(headers),
+		protectedHeaderScopes: input.resumePlan?.protectedHeaderScopes ?? protectedHeaderScopes });
 	requireLaw(input.accounting.charge(closedRetirementBytes(journalHeaders)), "proof-budget-exceeded");
 	return journalHeaders;
 }
@@ -10211,9 +10228,14 @@ async function prepareClosedJournalDetails(
 				value.scope.objectId === scope.objectId &&
 				value.scope.author === row.author &&
 				value.authorSequence === row.authorSequence &&
-				value.classification === "covered-historical" &&
-				(value.dependencyKind === "signed-settled-issuance" ||
-					value.dependencyKind === "authenticated-covered-native-issuance")
+				(value.classification === "covered-historical" &&
+					(value.dependencyKind === "signed-settled-issuance" || value.dependencyKind === "source-committed-inclusion" ||
+						value.dependencyKind === "authenticated-covered-native-issuance") ||
+					// The original pinned bootstrap verifier authenticates this exact
+					// epoch-zero control. Its journal consumer follows the same covered
+					// class as native retirement; publication still must be acknowledged.
+					scope.epoch === 0 && value.classification === "pinned-genesis" &&
+						(value.dependencyKind === "pinned-genesis" || value.dependencyKind === "authenticated-covered-native-issuance"))
 		);
 		const original = issued[0],
 			paired = outbox[0],
@@ -10225,7 +10247,7 @@ async function prepareClosedJournalDetails(
 			original === undefined ||
 			paired === undefined ||
 			coverage === undefined ||
-			paired.publishState !== "published" ||
+			(paired.publishState !== "published" && coverage.dependencyKind !== "source-committed-inclusion") ||
 			!closedRetirementEqual(original.digest, paired.digest) ||
 			!closedRetirementEqual(original.digest, coverage.digest) ||
 			!closedRetirementEqual(original.digest, closedRetirementHex(row.vertexDigest))
@@ -10256,6 +10278,13 @@ async function prepareClosedJournalDetails(
 		};
 		if (protectedReplayScopes.some((protectedScope) => closedRetirementEqual(protectedScope, scope))) {
 			retain("replay-required");
+			continue;
+		}
+		// Reconstruct only the old drain's exact prefix selection. An intervening
+		// publication ACK may make another prefix eligible; it needs a new intent,
+		// never expansion of this previously authenticated descriptor set.
+		if (input.resumePlan !== undefined && !input.resumePlan.prefixes.some(prefix => closedRetirementEqual(prefix.scope, scope))) {
+			retain("unclassified-prefix");
 			continue;
 		}
 		let authorities = input.journalMembershipAuthorities ?? [];
@@ -10407,6 +10436,7 @@ async function prepareClosedJournalDetails(
 	if (reconstructedPlan !== undefined) {
 		// Absence of a row is never evidence of eligibility. Every original
 		// descriptor must still have its same authenticated whole-prefix class.
+
 		requireLaw(closedRetirementEqual(reconstructedPlan.prefixes,
 			collectiblePrefixes.map(prefix => ({ scope: prefix.scope, highWatermark: prefix.highWatermark,
 				rows: prefix.rows }))), "chain-invalid");
@@ -13010,7 +13040,7 @@ function creatorOrdinaryResourceNativeCapacityForSizing(facts: CreatorOrdinaryRe
 		// stays complete. The explicit future suffix here is genuinely all-local.
 		maxAdditionalCurrentIssued: future?.additionalCurrentRows ?? (runtime.kind === "received-append" ? 0 : 1),
 		maxCanonicalPreimageByteLength: preimage, successorFenceCount: current.successorFenceCount,
-		sourceCustody: creatorSourceCustodyGeometryForSizing(facts.sourceFacts.currentTrust, runtime.exactCanonicalLatchedAclBytes)});
+		sourceCustody: creatorSourceCustodyGeometryForSizing(facts.sourceFacts.currentTrust, runtime.exactCanonicalLatchedAclBytes, current.parameters.maxEpochVertices)});
 	return {receivedPreimages: Object.freeze(receivedPreimages), preimage, fencePreimage, runtimeWidths, issuance};
 }
 function creatorOrdinaryResourceCurrentFactsEligible(facts: CreatorOrdinaryResourceDimensionFacts,
@@ -13488,7 +13518,7 @@ function prepareCreatorOrdinaryFinishingWindowForSizing(input: Readonly<{
 				maxAdditionalCurrentIssued: branch.localCount, maxAdditionalCurrentPreimageBytes: localPreimageRaw,
 				maxCanonicalPreimageByteLength: preimage, maxOrdinaryPreimageByteLength: limits.maxCanonicalPreimageByteLength,
 				successorFenceCount: fence,
-				sourceCustody: creatorSourceCustodyGeometryForSizing(source.currentTrust, runtime.exactCanonicalLatchedAclBytes)});
+				sourceCustody: creatorSourceCustodyGeometryForSizing(source.currentTrust, runtime.exactCanonicalLatchedAclBytes, current.parameters.maxEpochVertices)});
 			const journal = journalSeed.projection.quote({maxAdditionalCurrentRows: count, canonicalPreimageByteLength: limits.maxCanonicalPreimageByteLength,
 				canonicalAuthorByteLength: canonicalPrimitiveResourceForSizing(runtime.issuanceScope.author).byteLength,
 				successorAnchorByteLength: output(first, "artifacts.anchor.bytes"), parametersByteLength: journalSeed.parametersBytes.byteLength,
@@ -15983,7 +16013,7 @@ export function evaluateCreatorOrdinaryFinishingCapacityTemplate(
 			parameters.set(key, value);
 		};
 		const issuer = issuanceOrdinaryFinishingCapacityWidths({rows: native.rows, scope, control: native.control ?? null,
-			sourceCustody: creatorSourceCustodyGeometryForSizing(seed.currentTrust, input.exactCanonicalCurrentLatchedAclBytes),
+			sourceCustody: creatorSourceCustodyGeometryForSizing(seed.currentTrust, input.exactCanonicalCurrentLatchedAclBytes, Number((cut.parameters as Record<string, unknown>).maxEpochVertices)),
 			successorFenceCount: dimensions.successorFenceCount,
 			maxAdditionalCurrentIssued: received === undefined ? 1 : 0,
 			maxCanonicalPreimageByteLength: Math.max(dimensions.canonicalPreimageByteLength,
@@ -17059,7 +17089,7 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 							exactCanonicalPlanBytes: encodeCanonical(issuancePlan),
 						}),
 			},
-			native.control, creatorSourceCustodyGeometryForSizing(trust, input.exactCanonicalCurrentLatchedAclBytes)
+			native.control, creatorSourceCustodyGeometryForSizing(trust, input.exactCanonicalCurrentLatchedAclBytes, Number((cut.parameters as Record<string, unknown>).maxEpochVertices))
 		) : undefined;
 		if (issuancePhases === undefined ? input.issuancePhases !== undefined :
 			!closedRetirementEqual(issuancePhases, input.issuancePhases))
@@ -17072,7 +17102,7 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 		// checked, and no row/control is manufactured from a capacity dimension.
 		const issuanceCapacity = capacityDimensions === undefined ? undefined : issuanceOrdinaryFinishingCapacityWidths({
 			rows: native.rows, scope: issuanceScope, control: native.control,
-			sourceCustody: creatorSourceCustodyGeometryForSizing(trust, input.exactCanonicalCurrentLatchedAclBytes),
+			sourceCustody: creatorSourceCustodyGeometryForSizing(trust, input.exactCanonicalCurrentLatchedAclBytes, Number((cut.parameters as Record<string, unknown>).maxEpochVertices)),
 			successorFenceCount: capacityDimensions.successorFenceCount,
 			maxAdditionalCurrentIssued: received === undefined ? 1 : 0,
 			maxCanonicalPreimageByteLength: Math.max(capacityDimensions.canonicalPreimageByteLength,
@@ -19688,7 +19718,7 @@ function closedIssuanceProtectedRecordsForRetirement(input: Readonly<{
 		const covered = classified.filter(proof => proof?.scope?.objectId === input.objectId && proof.scope.author === row.author &&
 			proof.authorSequence === row.authorSequence &&
 			((proof.classification === "covered-historical" || proof.classification === "filtered-settlement-source") &&
-				(proof.dependencyKind === "signed-settled-issuance" || proof.dependencyKind === "authenticated-covered-native-issuance") ||
+				(proof.dependencyKind === "signed-settled-issuance" || proof.dependencyKind === "source-committed-inclusion" || proof.dependencyKind === "authenticated-covered-native-issuance") ||
 			 proof.classification === "pinned-genesis" && epoch === 0 &&
 				(proof.dependencyKind === "pinned-genesis" || proof.dependencyKind === "authenticated-covered-native-issuance")) &&
 			proof.digest instanceof Uint8Array && compareBytes(proof.digest, row.digest) === 0);
@@ -20028,6 +20058,7 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 	const issuanceImage = completedRewrite === undefined ? native.image : restoredIssuanceImage!;
 	const {resumeBasisMatches, summarySource, generationSource, sourceProofDigest, decisionDigest, decisionBytes} =
 		completedRewrite === undefined ? deriveSourceLabels(issuanceRows, issuanceImage) : restoredLabels!;
+
 	requireLaw(resumeBasisMatches, "floor-stale");
 	if (completedRewrite !== undefined)
 		requireLaw(accounting.charge(closedRetirementBytes(completedRewrite)), "proof-budget-exceeded");
@@ -20126,9 +20157,19 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 			source.journalScopes.some((authenticated) => closedRetirementEqual(authenticated, prefix.scope)),
 			"chain-invalid"
 		);
+	// Actual accepted entries and the original protected replay scopes are
+	// detail consumers. Retrospective signing trusts protect headers separately;
+	// an unused empty header alone must not keep a replay hole forever.
+	const journalDetailScopes = new Set(source.journal.canonicalRows.flatMap(bytes => {
+		const frame = decodeCanonical(bytes) as unknown[];
+		return (frame[0] === "accepted_entries" || frame[0] === "acceptedEntries") && Array.isArray(frame[1])
+			? [JSON.stringify(frame[1].slice(0, 3))] : [];
+	}));
 	const journalPreparation = Object.freeze({
 		...labels,
 		protectedScopes: journalScopes.filter((scope) => {
+			if (!journalDetailScopes.has(JSON.stringify([scope.objectId, scope.epoch, scope.anchorDigest])) &&
+				!source.journalDetails.protectedReplayScopes.some(required => closedRetirementEqual(required, scope))) return false;
 			if (journalPrefixes.some((prefix) => closedRetirementEqual(prefix.scope, scope))) return false;
 			const prior = source.journal.control?.completed;
 			// A later intent must never resurrect a permanently fenced old hole.
@@ -24150,8 +24191,10 @@ async function reconcileSnapshotRecoveryRoles(
 		const retirementJournal = signingSummaries === undefined ? journalProof : journal.value;
 		const journalHeaders = detachedClassification ? (capturedHeaderScopes === undefined || unclassifiedSigning ? undefined :
 			prepareClosedJournalHeaders({journal: retirementJournal, protectedHeaderScopes: capturedHeaderScopes,
+				...(signingSummaries === undefined && journalReconstructed ? {resumePlan: journalPlan!} : {}),
 				pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest, accounting: classificationAccounting})) :
 			sourceFrame.closeDependencies === undefined ? undefined : classifyClosedJournalHeaders({ frame: sourceFrame, forward, journal: retirementJournal,
+			...(signingSummaries === undefined && journalReconstructed ? {resumePlan: journalPlan!} : {}),
 			floor: roles.floor, closeAnchors: sourceFrame.closeDependencies.dependencyAnchors, protectedScopes: closeUnion.snapshotScopes,
 			proofs: roleProofs, unclassified: unclassifiedSigning });
 		// Slice 14b: the retention path selects its AHE units itself (same classifier).

@@ -1,5 +1,5 @@
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
-import { buildMerkleTree, type CloseSetHistoryCommitment } from "@ts-drp/compaction";
+import { buildMerkleTree, inclusionProof, verifyInclusion, type CloseSetHistoryCommitment } from "@ts-drp/compaction";
 import { LIVE_JOURNAL_RETIREMENT_LIMITS, type LiveJournalScope } from "@ts-drp/live-journal";
 import { openReceivedCloseMembership, RECEIVED_CLOSE_MEMBERSHIP_KIND } from "./creator-received-close-membership.js";
 
@@ -310,6 +310,73 @@ export async function openCreatorCloseMembership(
 	} catch {
 		return undefined;
 	}
+}
+
+/** Original exact inclusion schema. Signed Cut facts supply the scope, history
+ * ordinal and tree size; caller metadata never supplies those bindings. */
+export function creatorCloseMembershipSubsetFields(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
+	return {kind: "creator-close-membership-subset-1", version: 1, cutValueDigest: input.cutValueDigest, members: input.members};
+}
+export function creatorCloseMembershipSubsetMemberFields(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
+	return {vertexDigest: input.vertexDigest, leafIndex: input.leafIndex, treeSize: input.treeSize, auditPath: input.auditPath};
+}
+
+/** Reopens only exact local inclusions through the original RFC 9162 verifier.
+ * It proves membership, never original vertex signatures or deletion currency. */
+export function openCreatorCloseMembershipSubset(input: Readonly<{bytes: Uint8Array;
+	exactCanonicalCutValueBytes: Uint8Array; maxEpochVertices: number}>): ReadonlySet<string> | undefined {
+	try {
+		const bytes = boundedBytes(input.bytes), cut = cutFacts(boundedBytes(input.exactCanonicalCutValueBytes), input.maxEpochVertices);
+		const carrier = record(decodeCanonical(bytes, LIMITS));
+		if (cut === undefined || carrier === undefined || Object.keys(carrier).sort().join(",") !== "cutValueDigest,kind,members,version" ||
+			carrier.kind !== "creator-close-membership-subset-1" || carrier.version !== 1 || carrier.cutValueDigest !== cut.cutValueDigest ||
+			!Array.isArray(carrier.members) || carrier.members.length < 1 || carrier.members.length > cut.count ||
+			compareBytes(bytes, encodeCanonical(carrier, LIMITS)) !== 0) return undefined;
+		const result = new Set<string>(), root = Uint8Array.from(cut.root.match(/../gu)!, byte => Number.parseInt(byte, 16));
+		let previousIndex = -1;
+		for (const raw of carrier.members) {
+			const member = record(raw);
+			if (member === undefined || Object.keys(member).sort().join(",") !== "auditPath,leafIndex,treeSize,vertexDigest" ||
+				!(member.vertexDigest instanceof Uint8Array) || member.vertexDigest.byteLength !== 32 ||
+				!safe(member.leafIndex) || member.leafIndex <= previousIndex || member.leafIndex >= cut.count ||
+				member.treeSize !== cut.count || !(member.auditPath instanceof Uint8Array) || member.auditPath.byteLength % 32 !== 0 ||
+				member.auditPath.byteLength / 32 > Math.ceil(Math.log2(Math.max(1, cut.count))) + 1) return undefined;
+			const hash = hex(member.vertexDigest), auditPath: Uint8Array[] = [];
+			for (let offset = 0; offset < member.auditPath.byteLength; offset += 32) auditPath.push(member.auditPath.slice(offset, offset + 32));
+			if (result.has(hash) || !verifyInclusion(historyLeaf(cut.scope, cut.historyStart, member.leafIndex, hash),
+				{auditPath, leafIndex: member.leafIndex, treeSize: cut.count}, root)) return undefined;
+			result.add(hash); previousIndex = member.leafIndex;
+		}
+		return result;
+	} catch {return undefined;}
+}
+
+/** Projects an already complete original membership into exact local inclusion
+ * paths. The full list is reverified before projection; only its own tree owner
+ * builds paths, and cold readers run the same original inclusion verifier. */
+export async function captureCreatorCloseMembershipSubset(input: Readonly<{bytes: Uint8Array;
+	exactCanonicalCutValueBytes: Uint8Array; maxEpochVertices: number; vertexDigests: readonly Uint8Array[]}>): Promise<Uint8Array> {
+	const bytes = boundedBytes(input.bytes), cut = boundedBytes(input.exactCanonicalCutValueBytes), maxEpochVertices = input.maxEpochVertices;
+	const selected = new Set(input.vertexDigests.map(digest => {
+		if (!(digest instanceof Uint8Array) || digest.byteLength !== 32) throw new TypeError("creator completion digest is invalid");
+		return hex(digest);
+	}));
+	if (selected.size === 0 || selected.size !== input.vertexDigests.length) throw new TypeError("creator completion selection is invalid");
+	const membership = await openCreatorCloseMembership({bytes, exactCanonicalCutValueBytes: cut, maxEpochVertices});
+	if (membership === undefined) throw new TypeError("creator completion membership is invalid");
+	const tree = await buildMerkleTree(membership.orderedVertexDigests.map((digest, index) =>
+		historyLeaf(membership.scope, membership.historyStart, index, hex(digest))));
+	const members = membership.orderedVertexDigests.flatMap((vertexDigest, leafIndex) => {
+		if (!selected.has(hex(vertexDigest))) return [];
+		selected.delete(hex(vertexDigest));
+		const proof = inclusionProof(tree, leafIndex), auditPath = new Uint8Array(proof.auditPath.length * 32);
+		proof.auditPath.forEach((digest, index) => auditPath.set(digest, index * 32));
+		return [creatorCloseMembershipSubsetMemberFields({vertexDigest, leafIndex, treeSize: proof.treeSize, auditPath})];
+	});
+	if (selected.size !== 0) throw new TypeError("creator completion selection is outside the Cut");
+	const subset = encodeCanonical(creatorCloseMembershipSubsetFields({cutValueDigest: membership.cutValueDigest, members}), LIMITS);
+	if (openCreatorCloseMembershipSubset({bytes: subset, exactCanonicalCutValueBytes: cut, maxEpochVertices}) === undefined) throw new TypeError("creator completion projection is invalid");
+	return subset;
 }
 
 /**
