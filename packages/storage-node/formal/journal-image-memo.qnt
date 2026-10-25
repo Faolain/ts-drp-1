@@ -32,11 +32,12 @@ module journalImageMemo {
   // Any injective-enough pure function of the ordered rows stands for the digest.
   pure def image(rows: List[int]): int = rows.foldl(rows.length(), (acc, row) => acc * 5 + row)
   pure def isPrefix(short: List[int], long: List[int]): bool =
-    short.length() <= long.length() and short.indices().forall(i => short[i] == long[i])
-  // Rows matched (and therefore deferred) before the first difference.
+    short.length() <= long.length() and 0.to(MAX_ROWS - 1).forall(i => i >= short.length() or short[i] == long[i])
+  // Rows matched (and therefore deferred) before the first difference. Every row
+  // list is bounded by MAX_ROWS, so the constant range is exact (and Apalache-encodable).
   pure def matchedPrefix(scan: List[int], remembered: List[int]): int =
-    range(0, scan.length()).foldl(0, (n, i) =>
-      if (n == i and i < remembered.length() and scan[i] == remembered[i]) n + 1 else n)
+    range(0, MAX_ROWS).foldl(0, (n, i) =>
+      if (n == i and i < scan.length() and i < remembered.length() and scan[i] == remembered[i]) n + 1 else n)
 
   type Entry = { has: bool, rows: List[int], img: int }
   type Read = { live: bool, conn: int, rows: List[int], refused: bool,
