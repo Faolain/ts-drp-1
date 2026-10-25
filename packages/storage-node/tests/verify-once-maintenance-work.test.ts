@@ -13,7 +13,9 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { describe, expect, test, vi } from "vitest";
 
+import { anchorMaterial } from "../../../tests/fixtures/journal-anchor-read/material.js";
 import { createSqliteAheDurableStore } from "../src/index.js";
+import { createNodeDurableLiveJournalStore } from "../src/live-journal.js";
 
 // Counts the actual codec work underneath the native AHE maintenance entry
 // points: control admission (acquire), image point reads and control compare.
@@ -220,6 +222,41 @@ describe("native AHE maintenance verifies each exact byte string once", () => {
 			}
 		} finally {
 			await f.dispose();
+		}
+	});
+
+	test("journal control readback decodes and verifies identical control bytes once", async () => {
+		const directory = await mkdtemp(join(tmpdir(), "ts-drp-verify-once-journal-"));
+		const primaryFilename = join(directory, "journal.sqlite");
+		const store = createNodeDurableLiveJournalStore({ primaryFilename });
+		const raw = new DatabaseSync(`${primaryFilename}.drp-live-journal-v1.sqlite`);
+		try {
+			const current = anchorMaterial(0),
+				selector = { objectId: current.scope.objectId };
+			if (!store.readRetirementImage || !store.acquireRetirementControl) throw new Error("journal retirement unavailable");
+			must(await store.installGenesis(current.install));
+			const born = must(await store.acquireRetirementControl(selector));
+			await born.release();
+			const first = must(await store.readRetirementImage(selector));
+			const [second, journal] = await measure(async () => must(await store.readRetirementImage!(selector)));
+			console.info("journal image point steady-state control work", JSON.stringify(journal));
+			expect(second.control).toEqual(first.control);
+			expect(second.control).not.toBe(first.control);
+			// The control is not decoded or canonically re-verified again. What
+			// remains is the image digest over freshly captured rows (hash 1) and
+			// the exposed exact control carrier encoding (encode 1).
+			expect(journal).toEqual({ encode: 1, decode: 0, hash: 1 });
+			// Another connection's same-length noncanonical control rewrite is refused.
+			const row = raw.prepare("SELECT record FROM retirement_controls WHERE object_id=?").get(selector.objectId)
+				?.record as Uint8Array;
+			const corrupt = row.slice();
+			corrupt[corrupt.length - 1] ^= 0xff;
+			raw.prepare("UPDATE retirement_controls SET record=? WHERE object_id=?").run(corrupt, selector.objectId);
+			expect((await store.readRetirementImage(selector)).ok).toBe(false);
+		} finally {
+			raw.close();
+			await store.close();
+			await rm(directory, { recursive: true, force: true });
 		}
 	});
 });
