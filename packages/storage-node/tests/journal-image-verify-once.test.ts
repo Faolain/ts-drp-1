@@ -67,7 +67,7 @@ async function journal() {
 		return store as typeof store & Required<Pick<typeof store, "readRetirementImage" | "acquireRetirementControl">>;
 	};
 	const store = open();
-	must(await store.installGenesis(current.install));
+	expect(await store.installGenesis(current.install)).toMatchObject({ ok: true });
 	for (let ordinal = 0; ordinal < ROWS; ordinal++)
 		expect(await store.appendAccepted({ scope: current.scope, sourceKind: "local-issued", author: "creator",
 			authorSequence: ordinal, vertexDigest: ordinal.toString(16).repeat(64).slice(0, 64) })).toMatchObject({ ok: true });
