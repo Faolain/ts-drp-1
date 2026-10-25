@@ -1040,6 +1040,8 @@ const verifiedControls = new ExactBytesMemo<AheRetirementControl>(64, 2 * 1024 *
  * @param imageDigest - Same-transaction validated bounded native image commitment.
  * @param compare - Captured native CAS function.
  * @param nativeOwner
+ * @param controlBytes - Optional exact canonical bytes of `control` already held by the native owner
+ * (the verified row it was decoded from, or its own encoding); only its length is used.
  * @returns Original-instance one-use observation.
  */
 export function createAheRetirementControlRead(
@@ -1050,13 +1052,19 @@ export function createAheRetirementControlRead(
 		next: AheRetirementControl,
 		mutation?: AheRetirementNativeMutation
 	) => Promise<StoreResult<AheRetirementControl>>,
-	nativeOwner?: object
+	nativeOwner?: object,
+	controlBytes?: Uint8Array
 ): AheRetirementControlRead {
 	let used = false,
 		released = false;
 	const ownControl = captureAheRetirementControl(control),
 		ownHead = copyExpectedHead(head);
 	const ownImageDigest = digest(imageDigest);
+	// ownHead is a private frozen flat copy: encode it at most once and compare
+	// each proposed head's canonical bytes against that held encoding.
+	let ownHeadBytes: Uint8Array | undefined;
+	const sameOwnHead = (other: unknown): boolean =>
+		bytesEqual(encodeCanonical(other), (ownHeadBytes ??= encodeCanonical(ownHead)));
 	const future = (phase: "stage" | "publish", capability: unknown): Promise<StoreResult<AheRetirementControl>> => {
 		if (released || used) return Promise.resolve({ ok: false, reason: "READ_RELEASED" });
 		used = true;
@@ -1079,7 +1087,7 @@ export function createAheRetirementControlRead(
 				original.objectId !== ownControl.objectId ||
 				!baseExpectedHead ||
 				baseExpectedHead.kind !== "present" ||
-				!bytesEqual(encodeCanonical(baseExpectedHead), encodeCanonical(ownHead)) ||
+				!sameOwnHead(baseExpectedHead) ||
 				integer(original.epoch) <= ownControl.completed.throughEpoch
 			)
 				return Promise.resolve({ ok: false, reason: "READ_STALE_HEAD" });
@@ -1165,7 +1173,7 @@ export function createAheRetirementControlRead(
 		// Public typed byte carriers cannot be frozen; never expose private CAS input.
 		control: captureAheRetirementControl(ownControl),
 		head: Object.freeze(ownHead),
-		metadataBytes: encodeAheRetirementControl(ownControl).byteLength,
+		metadataBytes: controlBytes?.byteLength ?? encodeAheRetirementControl(ownControl).byteLength,
 		imageDigest: ownImageDigest,
 		prepare: function (
 			this: AheRetirementControlRead,
@@ -1176,7 +1184,7 @@ export function createAheRetirementControlRead(
 			let next: AheRetirementControl;
 			try {
 				const preparation = captureAheRetirementPreparation(input, ownControl.objectId);
-				if (!bytesEqual(encodeCanonical(preparation.head), encodeCanonical(ownHead)))
+				if (!sameOwnHead(preparation.head))
 					return Promise.resolve({ ok: false, reason: "READ_STALE_HEAD" });
 				if (ownControl.active !== null || ownControl.completed !== null)
 					return Promise.resolve({ ok: false, reason: "RETIREMENT_FENCED" });
@@ -1213,17 +1221,14 @@ export function createAheRetirementControlRead(
 					(ownControl.completed !== null && ownControl.kind !== "ahe-retirement-control-3")
 				)
 					return Promise.resolve({ ok: false, reason: "RETIREMENT_FENCED" });
-				if (!bytesEqual(encodeCanonical(preparation.head), encodeCanonical(ownHead)))
+				if (!sameOwnHead(preparation.head))
 					return Promise.resolve({ ok: false, reason: "READ_STALE_HEAD" });
 				const completed = ownControl.completed;
 				if (
 					preparation.generationSource &&
 					(preparation.generationSource.sourceImageDigest !== ownImageDigest ||
 						!bytesEqual(encodeCanonical(preparation.generationSource.generations), encodeCanonical(binding)) ||
-						!bytesEqual(
-							encodeCanonical(preparation.generationSource.reclamation.expectedHead),
-							encodeCanonical(ownHead)
-						) ||
+						!sameOwnHead(preparation.generationSource.reclamation.expectedHead) ||
 						preparation.generationSource.reclamation.closedEpoch !== preparation.floorEpoch)
 				)
 					return Promise.resolve({ ok: false, reason: "READ_STALE_HEAD" });
@@ -1314,7 +1319,7 @@ export function createAheRetirementControlRead(
 				return Promise.resolve({ ok: false, reason: "REVISION_EXHAUSTED" });
 			if (
 				ownImageDigest !== drain.source.sourceImageDigest ||
-				!bytesEqual(encodeCanonical(ownHead), encodeCanonical(drain.source.reclamation.expectedHead))
+				!sameOwnHead(drain.source.reclamation.expectedHead)
 			)
 				return Promise.resolve({ ok: false, reason: "READ_STALE_ROLE_VIEW" });
 			const next = captureAheRetirementControl({
