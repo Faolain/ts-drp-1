@@ -215,7 +215,7 @@ import {
 	type ClosedEpochRetirementMetadataRead,
 	validateClosedEpochRetirementMetadataDomain,
 } from "./closed-epoch-cleanup.js";
-import { createWorkCheckpoint } from "./cooperative-work.js";
+import { createWorkCheckpoint, yieldToHost } from "./cooperative-work.js";
 import {
 	deriveReceivedCreatorTransitionCandidates,
 	matchesCreatorAdoptionReferences,
@@ -8253,6 +8253,13 @@ async function acquireClosedData(
 			const signing = signingDependencies;
 			for (const bytes of signing.readExactCanonicalRows())
 				requireLaw(chargeProofObservation(work.accounting, bytes), "proof-budget-exceeded");
+			if (nativePreparation !== undefined && headerHold === undefined) {
+				// Detached preparation released every native reservation. Qualification
+				// reacquires them and compares each complete image with the prepared
+				// one, so this host turn cannot carry a stale observation forward.
+				await yieldToHost();
+				checkAbort(input.signal);
+			}
 			await qualifyNativePreparation();
 			await qualifyPreparedSnapshots();
 			// Historical envelopes and exact signing authority selection above are

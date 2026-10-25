@@ -123,7 +123,7 @@ import {
 } from "@ts-drp/storage";
 import { snapshotQuarantineContract, type SnapshotQuarantineDeclaration, type SnapshotQuarantineStore, type SnapshotRecoveryStore } from "@ts-drp/storage/snapshot-transfer";
 
-import { yieldToHost } from "./internal/cooperative-work.js";
+import { createWorkCheckpoint, yieldToHost } from "./internal/cooperative-work.js";
 import {
 	createCreatorAuthenticatedNativeFuture,
 	installCreatorAdoptionFacts,
@@ -2530,7 +2530,8 @@ async function captureCreatorOrdinarySourceWithoutForecast(
 	registration: V3CreatorCloseRegistration,
 	input: BindCreatorLiveCloseInput,
 	receivedReceipt?: object,
-	readiness = false
+	readiness = false,
+	cooperate?: () => Promise<void>
 ): Promise<CreatorOrdinaryIssuanceProofSource | undefined> {
 	if (input.promotionContext === undefined || input.archive !== undefined ||
 		input.readOrdinaryApplicationResourceBound === undefined) return undefined;
@@ -2570,6 +2571,9 @@ async function captureCreatorOrdinarySourceWithoutForecast(
 	let source: CreatorOrdinaryIssuanceProofSource | undefined;
 	let primary: unknown, failed = false;
 	try {
+		// The acquired proof keeps its native custody across the caller's
+		// boundary; capture still opens with the proof's own custody checks.
+		await cooperate?.();
 		// Capture brackets all retained facts with the ORIGINAL cold terminal
 		// custody checks; the cold proof does not expose the warm check API.
 		source = await captureCreatorOrdinaryIssuanceProofSource(proof, readiness ? {
@@ -2595,7 +2599,8 @@ async function captureCreatorOrdinarySourceWithoutForecast(
 async function refreshCreatorOrdinarySourceReadiness(
 	registration: V3CreatorCloseRegistration,
 	input: BindCreatorLiveCloseInput,
-	prior: CreatorOrdinaryIssuanceProofSource
+	prior: CreatorOrdinaryIssuanceProofSource,
+	cooperate?: () => Promise<void>
 ): Promise<CreatorOrdinaryIssuanceProofSource | undefined> {
 	if (input.promotionContext === undefined || input.archive !== undefined ||
 		input.readOrdinaryApplicationResourceBound === undefined) return undefined;
@@ -2612,6 +2617,7 @@ async function refreshCreatorOrdinarySourceReadiness(
 			...input.promotionContext, objectId: registration.objectId, store: registration.store,
 			snapshotStore: input.snapshotStore as CreatorClosedRollbackDataInput["snapshotStore"],
 			liveJournalStore: registration.liveJournalStore}, hold, registration.currentTrust, prior);
+		if (proof !== undefined) await cooperate?.();
 		if (proof !== undefined)
 			source = await prepareCreatorOrdinaryIssuanceProofSourceReadiness(proof, {
 				reader: input.readOrdinaryApplicationResourceBound, storageIncarnation: input.storageIncarnation,
@@ -3561,6 +3567,13 @@ export async function bindCreatorLiveClose(
 			};
 			return Promise.resolve().then(async () => {
 				let quote: CreatorIssuanceMaintenanceQuote | CreatorOrdinaryIssuanceMaintenanceQuote | CreatorIncrementalIssuanceMaintenanceQuote | undefined;
+				// The queued issuance job keeps its quote's native custody across
+				// these boundaries; the issuer's own write transaction starts later.
+				const checkpoint = createWorkCheckpoint();
+				const cooperate = async (): Promise<void> => {
+					await checkpoint();
+					if (stopping) throw new TypeError("creator issuance maintenance admission was revoked");
+				};
 				try {
 					if (stopping) throw new TypeError("creator issuance maintenance admission was revoked");
 					const ordinaryDomain = planEffect === undefined && input.archive === undefined &&
@@ -3622,6 +3635,7 @@ export async function bindCreatorLiveClose(
 					if (quote === undefined) {
 						const cold = await prepareCreatorIssuanceMaintenanceQuote(registration, input, unsignedBytes, planEffect, receivedReceipt);
 						quote = cold;
+						await cooperate();
 						// The required fence already owns a complete authenticated cold
 						// source before its UNKNOWN forecast is charged. Retain only the
 						// same owner's bounded immutable DATA, bound to this exact native
@@ -3631,6 +3645,7 @@ export async function bindCreatorLiveClose(
 						const fenceSource = planEffect?.kind === "fence" && receivedReceipt === undefined &&
 							input.archive === undefined && input.readOrdinaryApplicationResourceBound !== undefined
 							? await captureCreatorOrdinaryIssuanceProofSourceForFence(cold.proof, unsignedBytes) : undefined;
+						await cooperate();
 						// A missing LOCAL/RECEIVED program compiles into the SAME
 						// immutable source cell; it never swaps in a new paid source.
 						let capture = ordinaryDomain ? ordinaryProofSource : undefined;
@@ -3639,6 +3654,7 @@ export async function bindCreatorLiveClose(
 							report({kind: "ordinary-finishing-source-capture", ok: capture !== undefined});
 						}
 						const compiled = await chargeCreatorIssuanceMaintenanceQuote(cold, unsignedBytes, planEffect, capture);
+						await cooperate();
 						if (fenceSource !== undefined) {
 							ordinaryProofSource = fenceSource; ordinaryTemplateReady = false;
 							report({kind: "ordinary-fence-source-hint", retained: true});
@@ -4175,6 +4191,10 @@ export async function bindCreatorLiveClose(
 						controlBytes: beforeMembership.value.control === null ? null : encodeJournalRetirementControl(beforeMembership.value.control) },
 				});
 				if (!recordedMembership.ok) throw new TypeError("creator close native membership persistence refused", { cause: recordedMembership });
+				// The membership write has joined and no source reader is held yet.
+				// The replay and source reads below re-establish currency afresh.
+				await yieldToHost();
+				if (stopping) throw new TypeError("creator close authority is unavailable");
 				if (!(await durableReplay.verify())) throw new TypeError("creator close replay changed during membership persistence");
 				if (promotionBeforeMembership !== undefined) {
 					if (promotedEpoch === undefined) throw new TypeError("creator membership promotion target unavailable");
@@ -4186,8 +4206,12 @@ export async function bindCreatorLiveClose(
 					recoverySource = await acquireRecoverySource();
 					if (recoverySource === undefined || compareBytes(sourceIdentity(recoverySource), recoveryBeforeMembership) !== 0)
 						throw new TypeError("creator membership recovery source changed");
-					await recoverySource.checkCurrent();
 				}
+				// The reacquired sources keep their native exclusion across this
+				// boundary. Their currency is checked after it, before signing.
+				await yieldToHost();
+				if (stopping) throw new TypeError("creator close authority is unavailable");
+				await recoverySource?.checkCurrent();
 				await promotionSource?.checkCurrent();
 				const finalized = await actor.close({ closeInput });
 				if (
@@ -4212,6 +4236,10 @@ export async function bindCreatorLiveClose(
 				) {
 					throw new TypeError("creator successor epoch identity failed");
 				}
+				// The QC is final, so this close owns completion: stop joins it rather
+				// than abandoning a signed cut. Every later effect rechecks its sources
+				// or is a compare-and-set on the head read above.
+				await yieldToHost();
 				// Reuse the authenticated current creator/QC owner. Records govern
 				// this closing epoch, not the newly minted successor epoch.
 				const signingContext = captureCreatorIssuanceRetirementSigningContext({
@@ -4326,6 +4354,9 @@ export async function bindCreatorLiveClose(
 					successorTrust: successor.trust,
 				});
 				if (!advance.ok) throw new TypeError(`creator trust advance failed: ${advance.reason}`);
+				// Role and promotion certification below check each held source's
+				// currency after this boundary and before the generation stage.
+				await yieldToHost();
 				if (recoverySource !== undefined) {
 					const transferred = openCreatorSnapshotRecoveryRoleTransfer({
 						currentTrust: registration.currentTrust,
@@ -4809,6 +4840,13 @@ export async function bindCreatorLiveClose(
 								if (!available()) throw new TypeError("creator ordinary readiness admission was revoked");
 								let source: CreatorOrdinaryIssuanceProofSource | undefined;
 								let captured = false, maintenanceRan = false, preparationAttempts = 0;
+								// This admitted job keeps its proof's native custody across the
+								// boundary and is revoked, never resumed, once unavailable.
+								const checkpoint = createWorkCheckpoint();
+								const cooperate = async (): Promise<void> => {
+									await checkpoint();
+									if (!available()) throw new TypeError("creator ordinary readiness admission was revoked");
+								};
 								const prepareSource = async (): Promise<CreatorOrdinaryIssuanceProofSource | undefined> => {
 									await yieldToHost();
 									if (!available()) throw new TypeError("creator ordinary readiness admission was revoked");
@@ -4821,7 +4859,7 @@ export async function bindCreatorLiveClose(
 										} catch { /* Observation supplies neither source facts nor admission. */ }
 									};
 									if (!maintenanceRan && priorOrdinarySource !== undefined) {
-										const refreshed = await refreshCreatorOrdinarySourceReadiness(registration, input, priorOrdinarySource);
+										const refreshed = await refreshCreatorOrdinarySourceReadiness(registration, input, priorOrdinarySource, cooperate);
 										if (!available()) throw new TypeError("creator ordinary readiness admission was revoked");
 										if (refreshed !== undefined) {
 											report("joined-refresh-delivery");
@@ -4832,7 +4870,7 @@ export async function bindCreatorLiveClose(
 									report("cold-boundary-fallback", maintenanceRan ? "required-maintenance" :
 										priorOrdinarySource === undefined ? "no-retained-hint" : "warm-postimage-inconclusive");
 									if (!available()) throw new TypeError("creator ordinary readiness admission was revoked");
-									return captureCreatorOrdinarySourceWithoutForecast(registration, input, undefined, true);
+									return captureCreatorOrdinarySourceWithoutForecast(registration, input, undefined, true, cooperate);
 								};
 								// Match the existing optional source-capture domain: unsupported
 								// readiness must not acquire new native prerequisites or effects.
