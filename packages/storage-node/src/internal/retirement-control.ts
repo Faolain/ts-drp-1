@@ -18,6 +18,9 @@ import { loadNodeBoundedReadRequest } from "./bounded-read.js";
 import { hasExpectedPhysicalSchema } from "./schema-sqlite.js";
 import { cachedStatement } from "./sqlite-statement-cache.js";
 
+/** A decoded native control and the exact row bytes it was verified from. */
+export type NodeRetirementControlRecord = Readonly<{ control: AheRetirementControl; bytes: Uint8Array }>;
+
 /**
  * Reads the exact addressed native row inside the caller's existing transaction.
  * @param connection - Owning native transaction connection.
@@ -28,6 +31,22 @@ export function readNodeRetirementControl(
 	connection: DatabaseSync,
 	objectId: StorageObjectId
 ): AheRetirementControl | null {
+	return readNodeRetirementControlRecord(connection, objectId)?.control ?? null;
+}
+
+/**
+ * Reads the exact addressed native row and keeps its exact bytes. The decoder
+ * accepted those bytes only because they equal the canonical encoding of the
+ * returned control, so callers compare these held bytes instead of encoding
+ * the control again.
+ * @param connection - Owning native transaction connection.
+ * @param objectId - Exact addressed owner.
+ * @returns Detached validated control with a private copy of its exact bytes, or native absence.
+ */
+export function readNodeRetirementControlRecord(
+	connection: DatabaseSync,
+	objectId: StorageObjectId
+): NodeRetirementControlRecord | null {
 	if (!hasExpectedPhysicalSchema(connection)) throw new PersistedStorageError("UNSUPPORTED_STORAGE_SCHEMA");
 	const row = cachedStatement(
 		connection,
@@ -35,9 +54,10 @@ export function readNodeRetirementControl(
 	).get(AHE_RETIREMENT_CONTROL_LIMITS.maxBytes, objectId);
 	if (row === undefined) return null;
 	if (!(row.record instanceof Uint8Array)) throw new PersistedStorageError("NON_CANONICAL_RECORD");
-	const decoded = decodeAheRetirementControl(row.record);
+	const bytes = new Uint8Array(row.record),
+		decoded = decodeAheRetirementControl(bytes);
 	if (!decoded.ok || decoded.value.objectId !== objectId) throw new PersistedStorageError("NON_CANONICAL_RECORD");
-	return decoded.value;
+	return Object.freeze({ control: decoded.value, bytes });
 }
 
 /**

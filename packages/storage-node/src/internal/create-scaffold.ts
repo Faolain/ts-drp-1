@@ -64,6 +64,8 @@ import {
 	admitNodeRetirementControl,
 	advanceNodeRetirementControl,
 	readNodeRetirementControl,
+	readNodeRetirementControlRecord,
+	type NodeRetirementControlRecord,
 } from "./retirement-control.js";
 import { hasExpectedPhysicalSchema, SCHEMA } from "./schema-sqlite.js";
 import { sqliteFilename } from "./sqlite-filename.js";
@@ -246,13 +248,15 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 			} else this.#heldRetirementImage = undefined;
 			this.connection.exec("BEGIN");
 			active = true;
-			const control = this.readControl(objectId);
+			const record = this.readControlRecord(objectId),
+				control = record?.control ?? null;
 			if (control === null && !allowAbsent) {
 				this.connection.exec("COMMIT");
 				active = false;
 				return Promise.resolve({ ok: false, reason: "INVALID_ARGUMENT" });
 			}
-			const bytes = control === null ? null : encodeAheRetirementControl(control),
+			// The held row bytes are the verified canonical encoding of `control`.
+			const bytes = record?.bytes ?? null,
 				head = this.readHeadWithinTransaction(objectId),
 				image = admitNodeRetirementControl(this.connection, objectId, bytes);
 			this.connection.exec("COMMIT");
@@ -304,7 +308,8 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 				active = false;
 				return Promise.resolve(head);
 			}
-			let control = this.readControl(objectId);
+			const record = this.readControlRecord(objectId);
+			let control = record?.control ?? null;
 			const absent = control === null;
 			if (control === null) {
 				control = {
@@ -317,7 +322,8 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 					completed: null,
 				};
 			}
-			const expected = encodeAheRetirementControl(control);
+			// An existing row's held bytes are the verified canonical encoding of `control`.
+			const expected = record?.bytes ?? encodeAheRetirementControl(control);
 			const admitted = admitNodeRetirementControl(this.connection, objectId, expected);
 			if (!admitted.ok) {
 				this.connection.exec("ROLLBACK");
@@ -345,7 +351,8 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 						Promise.resolve(
 							this.compareControl(objectId, expected, expectedHead, admitted.value.imageDigest, next, mutation)
 						),
-					this
+					this,
+					expected
 				),
 			});
 		} catch (cause) {
@@ -368,6 +375,10 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 		return readNodeRetirementControl(this.connection, objectId);
 	}
 
+	private readControlRecord(objectId: StorageObjectId): NodeRetirementControlRecord | null {
+		return readNodeRetirementControlRecord(this.connection, objectId);
+	}
+
 	private compareControl(
 		objectId: StorageObjectId,
 		expected: Uint8Array,
@@ -383,7 +394,8 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 		try {
 			this.connection.exec("BEGIN IMMEDIATE");
 			active = true;
-			const current = this.readControl(objectId),
+			const currentRecord = this.readControlRecord(objectId),
+				current = currentRecord?.control ?? null,
 				head = this.readHeadWithinTransaction(objectId);
 			if (!head.ok) {
 				this.connection.exec("ROLLBACK");
@@ -392,7 +404,8 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 			}
 			if (
 				current === null ||
-				!Buffer.from(encodeAheRetirementControl(current)).equals(expected) ||
+				currentRecord === null ||
+				!Buffer.from(currentRecord.bytes).equals(expected) ||
 				headFingerprint(head.value) !== expectedHead
 			) {
 				this.connection.exec("ROLLBACK");
@@ -537,7 +550,7 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 			requireOneChange(write.changes, "retirement control write");
 			this.connection.exec("COMMIT");
 			active = false;
-			return this.readControlPostimage(objectId, next, postimage);
+			return this.readControlPostimage(objectId, next, postimage, bytes);
 		} catch (cause) {
 			if (active) {
 				try {
@@ -561,17 +574,20 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 	private readControlPostimage(
 		objectId: StorageObjectId,
 		next: AheRetirementControl,
-		imageDigest: string
+		imageDigest: string,
+		written?: Uint8Array
 	): StoreResult<AheRetirementControl> {
 		let active = false;
 		try {
 			this.connection.exec("BEGIN");
 			active = true;
-			const current = this.readControl(objectId),
-				image = admitNodeRetirementControl(this.connection, objectId, encodeAheRetirementControl(next));
+			// `written` is the exact encodeAheRetirementControl(next) this owner just wrote.
+			const current = this.readControlRecord(objectId),
+				nextBytes = written ?? encodeAheRetirementControl(next),
+				image = admitNodeRetirementControl(this.connection, objectId, nextBytes);
 			const matches =
 				current !== null &&
-				Buffer.from(encodeAheRetirementControl(current)).equals(encodeAheRetirementControl(next)) &&
+				Buffer.from(current.bytes).equals(nextBytes) &&
 				image.ok &&
 				image.value.imageDigest === imageDigest;
 			this.connection.exec("COMMIT");
@@ -773,7 +789,8 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 				this.connection.exec("BEGIN IMMEDIATE");
 				transactionActive = true;
 				if (!("objectId" in prepared.command)) throw new Error("mutation command lacks object scope");
-				const control = this.readControl(prepared.command.objectId);
+				const record = this.readControlRecord(prepared.command.objectId),
+					control = record?.control ?? null;
 				if (control !== null && (control.active !== null || control.completed !== null)) {
 					this.connection.exec("ROLLBACK");
 					transactionActive = false;
@@ -784,12 +801,8 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 					transactionActive = false;
 					return { ok: false, reason: "REVISION_EXHAUSTED" };
 				}
-				if (control !== null) {
-					const admitted = admitNodeRetirementControl(
-						this.connection,
-						control.objectId,
-						encodeAheRetirementControl(control)
-					);
+				if (control !== null && record !== null) {
+					const admitted = admitNodeRetirementControl(this.connection, control.objectId, record.bytes);
 					if (!admitted.ok) {
 						this.connection.exec("ROLLBACK");
 						transactionActive = false;
