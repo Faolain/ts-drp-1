@@ -69,6 +69,7 @@ import { DatabaseSync, type StatementSync } from "node:sqlite";
 
 import { SqliteNativeReadReservationOwner } from "./internal/native-read-reservation.js";
 import { iterateSqliteRows } from "./internal/sqlite-iterator.js";
+import { journalImageRowKey, journalImageRowMatches, type JournalImageRowKey, journalRetirementImageMemo } from "./internal/journal-image-memo.js";
 import { sqliteFilename } from "./internal/sqlite-filename.js";
 import { enforceNativeLocalSessionFile, nativeLocalSessionSchemaRows, type LocalSessionLifetime } from "./internal/local-session-lifetime.js";
 import type { NodeNativeReadPort } from "./index.js";
@@ -415,6 +416,26 @@ function retirementImage(
 	)
 		throw new Error("retirement-fenced");
 	const capture = createJournalRetirementImageCapture();
+	// Verify once per exact rows: a remembered image is reused only when every
+	// scanned row matches it exactly and in order. Matched rows wait, bounded by
+	// that already-charged image, and are captured in their original order as
+	// soon as any row differs, so a changed image is charged exactly as before.
+	const memo = journalRetirementImageMemo(database),
+		known = memo.candidate(objectId, frames !== undefined),
+		firstFrame = frames?.length ?? 0,
+		keys: JournalImageRowKey[] = [],
+		deferred: [table: "scopes" | "accepted_entries", row: Record<string, unknown>, key: unknown[] | undefined][] = [];
+	let matching = known !== undefined,
+		keyable = true;
+	const append = (table: "scopes" | "accepted_entries", row: Record<string, unknown>, key: unknown[] | undefined): void => {
+		const frame = capture.append(table, row, key);
+		if (frame !== undefined) frames!.push(frame);
+	};
+	const diverge = (): void => {
+		matching = false;
+		for (const [table, row, key] of deferred) append(table, row, key);
+		deferred.length = 0;
+	};
 	const collect = (table: "scopes" | "accepted_entries"): void => {
 		// Bound native BLOB extraction, then charge each row before retaining the next.
 		const columns =
@@ -458,8 +479,21 @@ function retirementImage(
 				key = [captured.object_id, captured.epoch, captured.anchor_digest];
 				if (table !== "scopes") key.push(captured.journal_sequence);
 			}
-			const frame = capture.append(table, captured, key);
-			if (frame !== undefined) frames!.push(frame);
+			if (matching) {
+				const remembered = known!.rows[keys.length];
+				if (remembered !== undefined && journalImageRowMatches(remembered, table, captured)) {
+					keys.push(remembered);
+					deferred.push([table, captured, key]);
+					continue;
+				}
+				diverge();
+			}
+			if (keyable) {
+				const rowKey = journalImageRowKey(table, captured);
+				if (rowKey === undefined) keyable = false;
+				else keys.push(rowKey);
+			}
+			append(table, captured, key);
 		}
 		// Keep the original StatementSync alive through iterator completion. The
 		// iterator alone does not own its statement on the installed Node runtime.
@@ -468,7 +502,15 @@ function retirementImage(
 	try {
 		collect("scopes");
 		collect("accepted_entries");
-		return capture.finish();
+		if (matching && keys.length === known!.rows.length) {
+			memo.touch(objectId);
+			if (frames !== undefined) for (const frame of known!.frames!) frames.push(frame.slice());
+			return known!.image;
+		}
+		if (matching) diverge();
+		const image = capture.finish();
+		if (keyable) memo.remember(objectId, keys, image, frames?.slice(firstFrame));
+		return image;
 	} finally { capture.release(); }
 }
 function admitJournalMutation(database: DatabaseSync, selected: LiveJournalScope): LiveJournalRetirementControl | null {
