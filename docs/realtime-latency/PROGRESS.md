@@ -56,6 +56,17 @@ Recipient install is the whole regression: +≈860 ms at the rejoin merge (8 com
 `1515daab`, `0e73815a`) and +≈1100 ms at completion custody (`01944b66`). Seal is flat, adopt
 +≈80 ms. The prune, abandonment and lock-race fixes cost nothing measurable.
 
+### Transition CPU profile (where to optimize)
+
+Phase-scoped V8 profiles at `296cedf7` vs `6c9b5935` (profiled CPU per epoch: install 1359 → 4291 ms,
+seal 481 → 664, adopt 574 → 865; continued-play maintenance 4061 ms). One dominant pattern:
+durable canonical records are re-verified on every access (decode → rebuild → re-encode →
+byte-compare → deep copy) instead of once per write. Ranked: issuance retirement control
+re-validation from ~6 sites per issue (~900 ms), `issuanceRetirementBytesEqual` via
+`Array.every` closure (457 ms self), settlement-plan decode + deep copy (~400 ms), census
+re-authentication, per-call SQL `prepare`, codec round-trips and blob re-hashing in maintenance,
+then yield points for seal/adopt. [Optimization map](../../.logs/realtime-resume-2026-10-23/install-profile-01/OPTIMIZATION-MAP.md).
+
 ## Campaign blockers found by runs — 2026-10-24 afternoon
 
 - `12b3794f`: retirement-metadata 256 KiB cap → Grid now passes epoch 15 and the reopen at 30.
