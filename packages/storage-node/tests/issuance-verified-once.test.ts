@@ -117,7 +117,7 @@ describe("native issuance verify-once work counts", () => {
 		const { store, primaryFilename, epoch } = await retiredStore();
 		// Warm: the first issue after the retirement sees the rewrite's plan bytes for the first time.
 		await nativeIssue(store, scope, epoch);
-		const perIssue: { control: number; plan: number; planRow: number; images: number }[] = [];
+		const perIssue: { control: number; plan: number; planRow: number; images: number; reads: number }[] = [];
 		for (let index = 1; index <= 4; index++) {
 			const before = controlRevision(primaryFilename);
 			resetIssuanceRetirementVerificationCounts();
@@ -126,7 +126,8 @@ describe("native issuance verify-once work counts", () => {
 			const counts = issuanceRetirementVerificationCounts();
 			perIssue.push({ control: counts.control.verifications, plan: counts.plan.verifications,
 				planRow: nodeSettlementPlanRowVerificationCounts().verifications,
-				images: controlRevision(primaryFilename) - before + 1 });
+				images: controlRevision(primaryFilename) - before + 1,
+				reads: counts.control.verifications + counts.control.hits });
 		}
 		console.info("verify-once per issue", JSON.stringify(perIssue));
 		for (const issue of perIssue) {

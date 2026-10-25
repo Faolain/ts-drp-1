@@ -24,6 +24,12 @@ import {
 	SETTLEMENT_REPLACEMENT_DIGEST_LIMITS,
 	type SettlementPlan,
 } from "./types.js";
+import {
+	detachIssuanceVerifiedValue,
+	issuanceExactBytesEqual,
+	IssuanceVerifiedOnceBytes,
+	type IssuanceVerifiedOnceCounts,
+} from "./verified-once.js";
 
 // Reuse the issuance owner's existing finite canonical envelope. Not protocol eligibility.
 export const ISSUANCE_RETIREMENT_LIMITS = Object.freeze({
@@ -1482,42 +1488,59 @@ function retirementPlanBytes(plan: SettlementPlan): Uint8Array {
 		maxItems: ISSUANCE_RETIREMENT_LIMITS.maxRows * 32 });
 }
 
-/** Work counts for one verify-once memo: full verifications run and verified results reused. */
-export interface IssuanceVerifiedOnceCounts {
-	readonly verifications: number;
-	readonly hits: number;
-}
-let controlVerifications = 0, planVerifications = 0;
+// Verify-once memos keyed by exact canonical bytes (see verified-once.ts). Bounded
+// so that a full-size (1 MiB) record still fits; entries never escape.
+const VERIFIED_ONCE_LIMITS = Object.freeze({ maxEntries: 32, maxBytes: 8 * ISSUANCE_RETIREMENT_LIMITS.maxBytes });
+const verifiedPlans = new IssuanceVerifiedOnceBytes<SettlementPlan>(VERIFIED_ONCE_LIMITS);
+const verifiedControls = new IssuanceVerifiedOnceBytes<DurableIssuanceRetirementControl>(VERIFIED_ONCE_LIMITS);
+let countsBase = { control: { verifications: 0, hits: 0 }, plan: { verifications: 0, hits: 0 } };
 /**
  * Diagnostic work counts for the retirement control and embedded plan verifications.
- * @returns Full verifications and memo hits since the last clear.
+ * @returns Full verifications and memo hits since the last reset.
  */
 export function issuanceRetirementVerificationCounts(): Readonly<{
 	control: IssuanceVerifiedOnceCounts; plan: IssuanceVerifiedOnceCounts;
 }> {
-	return {control: {verifications: controlVerifications, hits: 0}, plan: {verifications: planVerifications, hits: 0}};
+	const control = verifiedControls.counts(), plan = verifiedPlans.counts();
+	return {
+		control: { verifications: control.verifications - countsBase.control.verifications, hits: control.hits - countsBase.control.hits },
+		plan: { verifications: plan.verifications - countsBase.plan.verifications, hits: plan.hits - countsBase.plan.hits },
+	};
 }
 /** Resets the diagnostic work counts and keeps every verified result. */
 export function resetIssuanceRetirementVerificationCounts(): void {
-	controlVerifications = 0;
-	planVerifications = 0;
+	countsBase = { control: verifiedControls.counts(), plan: verifiedPlans.counts() };
 }
-/** Drops every verified result and resets the diagnostic work counts. */
+/** Drops every verified result and resets the diagnostic work counts. Never needed for soundness. */
 export function clearIssuanceRetirementVerifiedOnce(): void {
+	verifiedControls.clear();
+	verifiedPlans.clear();
 	resetIssuanceRetirementVerificationCounts();
 }
 
-function retirementPlanFromBytes(input: unknown): SettlementPlan {
-	planVerifications++;
+/**
+ * Verifies exact canonical settlement-plan bytes at most once per byte image.
+ * @param input - Untrusted plan bytes.
+ * @returns `plan`, the SHARED verified plan (read it, never let it escape or mutate it),
+ * and `bytes`, this call's own copy of the input, which equals `retirementPlanBytes(plan)`.
+ */
+function verifiedRetirementPlan(input: unknown): Readonly<{ plan: SettlementPlan; bytes: Uint8Array }> {
 	const bytes = copyDurableIssuanceBytes(input);
 	if (bytes === undefined || bytes.byteLength > ISSUANCE_RETIREMENT_LIMITS.maxBytes) throw invalid();
-	const value = decodeCanonical(bytes);
-	const hasContexts = typeof value === "object" && value !== null && Object.hasOwn(value, "sourceContexts");
-	if (!isClosedDurableIssuanceRecord(value, ["scope", "revision", "fenceSequence", "entries", ...(hasContexts ? ["sourceContexts"] : [])])) throw invalid();
-	assertDurableIssueScope(value.scope);
-	const plan = copySettlementPlan(value, value.scope);
-	if (plan === undefined || !issuanceRetirementBytesEqual(bytes, retirementPlanBytes(plan))) throw invalid();
-	return plan;
+	const plan = verifiedPlans.verify(bytes, () => {
+		const value = decodeCanonical(bytes);
+		const hasContexts = typeof value === "object" && value !== null && Object.hasOwn(value, "sourceContexts");
+		if (!isClosedDurableIssuanceRecord(value, ["scope", "revision", "fenceSequence", "entries", ...(hasContexts ? ["sourceContexts"] : [])])) throw invalid();
+		assertDurableIssueScope(value.scope);
+		const verified = copySettlementPlan(value, value.scope);
+		if (verified === undefined || !issuanceRetirementBytesEqual(bytes, retirementPlanBytes(verified))) throw invalid();
+		return verified;
+	});
+	return { plan, bytes };
+}
+
+function retirementPlanFromBytes(input: unknown): SettlementPlan {
+	return detachIssuanceVerifiedValue(verifiedRetirementPlan(input).plan);
 }
 
 function captureIssuanceRetirementPlanRewrite(input: unknown): DurableIssuanceRetirementPlanRewrite {
@@ -1532,13 +1555,15 @@ function captureIssuanceRetirementPlanRewrite(input: unknown): DurableIssuanceRe
 		const descriptor = Object.getOwnPropertyDescriptor(input.plans, String(index));
 		if (!descriptor || !("value" in descriptor) || !descriptor.enumerable ||
 			!isClosedDurableIssuanceRecord(descriptor.value, ["before", "after"])) throw invalid();
-		const before = retirementPlanFromBytes(descriptor.value.before), after = retirementPlanFromBytes(descriptor.value.after);
+		// Read-only views of the shared verified plans; only this call's byte copies escape.
+		const verifiedBefore = verifiedRetirementPlan(descriptor.value.before), before = verifiedBefore.plan;
+		const verifiedAfter = verifiedRetirementPlan(descriptor.value.after), after = verifiedAfter.plan;
 		const address = JSON.stringify([before.scope.objectId, before.scope.author]);
 		if (address <= prior || before.scope.objectId !== after.scope.objectId || before.scope.author !== after.scope.author ||
 			before.revision === Number.MAX_SAFE_INTEGER || after.revision !== before.revision + 1 ||
 			after.fenceSequence !== before.fenceSequence || after.entries.length >= before.entries.length) throw invalid();
 		prior = address;
-		plans.push(Object.freeze({ before: retirementPlanBytes(before), after: retirementPlanBytes(after) }));
+		plans.push(Object.freeze({ before: verifiedBefore.bytes, after: verifiedAfter.bytes }));
 	}
 	return Object.freeze({ kind: "v3-issuance-retirement-plan-rewrite-1", sourceImageDigest: digest(input.sourceImageDigest),
 		targetImageDigest: digest(input.targetImageDigest), plans: Object.freeze(plans) });
@@ -1682,12 +1707,27 @@ export function decodeIssuanceRetirementControl(value: unknown): DurableIssuance
 		(typeof SharedArrayBuffer !== "undefined" && value.buffer instanceof SharedArrayBuffer)
 	)
 		throw invalid();
-	controlVerifications++;
 	const own = new Uint8Array(value);
-	const control = captureIssuanceRetirementControl(decodeCanonical(own));
-	const exact = encodeIssuanceRetirementControl(control);
-	if (!issuanceRetirementBytesEqual(own, exact)) throw invalid();
-	return control;
+	return detachIssuanceRetirementControl(verifiedControls.verify(own, () => {
+		const control = captureIssuanceRetirementControl(decodeCanonical(own));
+		const exact = encodeIssuanceRetirementControl(control);
+		if (!issuanceRetirementBytesEqual(own, exact)) throw invalid();
+		return control;
+	}));
+}
+function detachIssuanceRetirementPreparation(p: DurableIssuanceRetirementPreparation): DurableIssuanceRetirementPreparation {
+	// Frozen digests and protected records are shared; only the embedded plan bytes are mutable.
+	const rewrite = p.planRewrite;
+	return Object.freeze({ ...p, ...(rewrite === undefined ? {} : { planRewrite: Object.freeze({ ...rewrite,
+		plans: Object.freeze(rewrite.plans.map(plan => Object.freeze({ before: new Uint8Array(plan.before),
+			after: new Uint8Array(plan.after) }))) }) }) });
+}
+/** Fresh frozen control around shared frozen leaves and freshly copied plan bytes. */
+function detachIssuanceRetirementControl(control: DurableIssuanceRetirementControl): DurableIssuanceRetirementControl {
+	return Object.freeze({ ...control,
+		active: control.active === null ? null : Object.freeze({ ...control.active,
+			preparation: detachIssuanceRetirementPreparation(control.active.preparation) }),
+		completed: control.completed === null ? null : detachIssuanceRetirementPreparation(control.completed) });
 }
 /**
  *
@@ -1696,7 +1736,7 @@ export function decodeIssuanceRetirementControl(value: unknown): DurableIssuance
  * @returns The detached owner result or a typed refusal.
  */
 export function issuanceRetirementBytesEqual(a: Uint8Array, b: Uint8Array): boolean {
-	return a.length === b.length && a.every((v, i) => v === b[i]);
+	return issuanceExactBytesEqual(a, b);
 }
 /**
  *
@@ -2020,7 +2060,7 @@ export function issuanceRetirementPreparationWithPlanRewrite(control: DurableIss
 		const after = target.plans[index]!;
 		return after === before ? [] : [{before: retirementPlanBytes(before), after: retirementPlanBytes(after)}];
 	}).sort((left, right) => {
-		const a = retirementPlanFromBytes(left.before).scope, b = retirementPlanFromBytes(right.before).scope;
+		const a = verifiedRetirementPlan(left.before).plan.scope, b = verifiedRetirementPlan(right.before).plan.scope;
 		const ka = JSON.stringify([a.objectId, a.author]), kb = JSON.stringify([b.objectId, b.author]);
 		return ka < kb ? -1 : ka > kb ? 1 : 0;
 	});
@@ -2058,7 +2098,7 @@ export function reconstructIssuanceRetirementSourceRows(control: DurableIssuance
 		throw issuanceRetirementRefusal("issuance retirement rewrite target changed");
 	const plans = [...rows.plans];
 	for (const change of rewrite.plans) {
-		const before = retirementPlanFromBytes(change.before), after = retirementPlanFromBytes(change.after);
+		const before = retirementPlanFromBytes(change.before), after = verifiedRetirementPlan(change.after).plan;
 		const index = plans.findIndex(plan => plan.scope.objectId === after.scope.objectId && plan.scope.author === after.scope.author);
 		if (index < 0 || !issuanceRetirementBytesEqual(retirementPlanBytes(plans[index]!), change.after))
 			throw issuanceRetirementRefusal("issuance retirement rewrite plan changed");

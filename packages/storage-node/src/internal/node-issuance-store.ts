@@ -16,6 +16,7 @@ import {
 	copySettlementPlanEffect,
 	createDurableIssuanceFailure,
 	DEFAULT_DURABLE_ISSUANCE_PAGE_LIMIT,
+	detachIssuanceVerifiedValue,
 	type DurableBuildAndSign,
 	DurableIssuanceContractError,
 	DurableIssuanceInvalidArgumentError,
@@ -33,6 +34,7 @@ import {
 	isClosedDurableIssuanceRecord,
 	isValidDurableAuthorSequence,
 	isValidDurableScopeField,
+	IssuanceVerifiedOnceText,
 	MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT,
 	type SettlementPlan,
 	settlementPlanHasExactEffectLink,
@@ -524,26 +526,58 @@ function settlementPlanEntriesJson(plan: SettlementPlan): string {
 	return issuanceLegacySettlementPlanEntriesJson(plan);
 }
 
-let settlementPlanRowVerifications = 0;
+// Verify-once memo for stored settlement-plan rows, keyed by every row field the
+// verification reads (address, revision, fence and the exact stored entries text).
+// A write, rollback, reopen or another connection's write changes that key, so an
+// entry is only ever returned for an identical row. Entries never escape.
+const verifiedSettlementPlanRows = new IssuanceVerifiedOnceText<SettlementPlan>({
+	maxEntries: 64,
+	maxChars: 8 * (Math.ceil(ISSUANCE_RETIREMENT_LIMITS.maxBytes / 3) * 4 + 64),
+});
+let settlementPlanRowCountsBase = { verifications: 0, hits: 0 };
 /**
  * Diagnostic work counts for stored settlement-plan row verification.
- * @returns Full verifications and memo hits since the last clear.
+ * @returns Full verifications and memo hits since the last reset.
  */
 export function nodeSettlementPlanRowVerificationCounts(): Readonly<{ verifications: number; hits: number }> {
-	return { verifications: settlementPlanRowVerifications, hits: 0 };
+	const counts = verifiedSettlementPlanRows.counts();
+	return {
+		verifications: counts.verifications - settlementPlanRowCountsBase.verifications,
+		hits: counts.hits - settlementPlanRowCountsBase.hits,
+	};
 }
 /** Resets the diagnostic work counts and keeps every verified result. */
 export function resetNodeSettlementPlanRowVerificationCounts(): void {
-	settlementPlanRowVerifications = 0;
+	settlementPlanRowCountsBase = verifiedSettlementPlanRows.counts();
 }
-/** Drops every verified result and resets the diagnostic work counts. */
+/** Drops every verified result and resets the diagnostic work counts. Never needed for soundness. */
 export function clearNodeSettlementPlanRowVerifiedOnce(): void {
+	verifiedSettlementPlanRows.clear();
 	resetNodeSettlementPlanRowVerificationCounts();
 }
+const exactRowInteger = (value: unknown): value is number =>
+	typeof value === "number" && Number.isSafeInteger(value) && !Object.is(value, -0);
 
 function copySettlementPlanRow(value: unknown, scope: DurableIssueScope): SettlementPlan | undefined {
 	if (typeof value !== "object" || value === null) return undefined;
-	settlementPlanRowVerifications++;
+	const objectId = Reflect.get(value, "object_id");
+	const author = Reflect.get(value, "author");
+	const revision = Reflect.get(value, "revision");
+	const fenceSequence = Reflect.get(value, "fence_sequence");
+	const entriesJson = Reflect.get(value, "entries_json");
+	if (objectId !== scope.objectId || author !== scope.author || typeof entriesJson !== "string") return undefined;
+	const row = { object_id: objectId, author, revision, fence_sequence: fenceSequence, entries_json: entriesJson };
+	// Only exact scalar rows are memoized; any other shape is verified afresh every time.
+	if (!exactRowInteger(revision) || (fenceSequence !== null && !exactRowInteger(fenceSequence)))
+		return verifySettlementPlanRow(row, scope);
+	// The JSON prefix is self-delimiting, so the key is injective over the read fields.
+	const key = JSON.stringify([objectId, author, revision, fenceSequence]) + entriesJson;
+	const plan = verifiedSettlementPlanRows.verify(key, () => verifySettlementPlanRow(row, scope));
+	return plan === undefined ? undefined : detachIssuanceVerifiedValue(plan);
+}
+
+function verifySettlementPlanRow(value: unknown, scope: DurableIssueScope): SettlementPlan | undefined {
+	if (typeof value !== "object" || value === null) return undefined;
 	const objectId = Reflect.get(value, "object_id");
 	const author = Reflect.get(value, "author");
 	const revision = Reflect.get(value, "revision");
@@ -661,19 +695,30 @@ function sameLineage(left: NativeLineage, right: NativeLineage): boolean {
 }
 
 function readRetirementControl(database: DatabaseSync, objectId: string): DurableIssuanceRetirementControl | null {
+	return readRetirementControlRecord(database, objectId)?.control ?? null;
+}
+/**
+ * Reads the control and its exact stored bytes. Decoding refuses unless
+ * `encodeIssuanceRetirementControl(control)` is exactly the stored record, so `bytes`
+ * is that encoding without re-encoding the control (and its embedded plans) again.
+ */
+function readRetirementControlRecord(
+	database: DatabaseSync,
+	objectId: string
+): Readonly<{ control: DurableIssuanceRetirementControl; bytes: Uint8Array }> | null {
 	const length = statement(database, "SELECT length(record) AS size FROM retirement_controls WHERE object_id=?").get(
 		objectId
 	);
 	if (!length) return null;
 	if (typeof length.size !== "number" || length.size > ISSUANCE_RETIREMENT_LIMITS.maxBytes)
 		throw issuanceRetirementRefusal("issuance retirement control exceeds bound");
-	return decodeIssuanceRetirementControl(
-		(
-			statement(database, "SELECT record FROM retirement_controls WHERE object_id=?").get(objectId) as {
-				record: unknown;
-			}
-		).record
-	);
+	const record = (
+		statement(database, "SELECT record FROM retirement_controls WHERE object_id=?").get(objectId) as {
+			record: unknown;
+		}
+	).record;
+	const control = decodeIssuanceRetirementControl(record);
+	return { control, bytes: new Uint8Array(record as Uint8Array) };
 }
 function registerRetirementConnection(database: DatabaseSync): void {
 	database.function("issuance_retirement_connection", (objectId) => {
@@ -1770,10 +1815,10 @@ class NodeIssuanceImplementation {
 						ordinaryDataVersion = dataVersion();
 						ordinaryTotalChanges = totalChanges();
 					}
-					const control = readRetirementControl(database as DatabaseSync, detached.objectId);
+					const control = readRetirementControlRecord(database as DatabaseSync, detached.objectId);
 					return {
 						imageDigest: image.imageDigest,
-						controlBytes: control === null ? null : encodeIssuanceRetirementControl(control),
+						controlBytes: control === null ? null : control.bytes,
 					};
 				};
 				const checkQuoteCurrency = (): void => {
@@ -1785,8 +1830,7 @@ class NodeIssuanceImplementation {
 					if (ordinaryDataVersion !== undefined) {
 						if (dataVersion() !== ordinaryDataVersion || totalChanges() !== ordinaryTotalChanges)
 							throw issuanceRetirementRefusal("native issuance quote currency changed");
-						const control = readRetirementControl(database as DatabaseSync, detached.objectId);
-						const bytes = control === null ? null : encodeIssuanceRetirementControl(control);
+						const bytes = readRetirementControlRecord(database as DatabaseSync, detached.objectId)?.bytes ?? null;
 						if (bytes === null ? quoteCurrency.controlBytes !== null : quoteCurrency.controlBytes === null ||
 							!issuanceRetirementBytesEqual(bytes, quoteCurrency.controlBytes))
 							throw issuanceRetirementRefusal("native issuance quote control changed");
@@ -1809,8 +1853,8 @@ class NodeIssuanceImplementation {
 						!Number.isSafeInteger(ordinaryTotalChanges + ownChanges) || totalChanges() !== ordinaryTotalChanges + ownChanges)
 						throw issuanceRetirementRefusal("native issuance quote currency changed");
 					ordinaryTotalChanges += ownChanges;
-					const control = readRetirementControl(database as DatabaseSync, detached.objectId);
-					quoteCurrency = {...quoteCurrency, controlBytes: control === null ? null : encodeIssuanceRetirementControl(control)};
+					const control = readRetirementControlRecord(database as DatabaseSync, detached.objectId);
+					quoteCurrency = {...quoteCurrency, controlBytes: control === null ? null : control.bytes};
 				};
 				checkQuoteCurrency();
 				if (!current || !sameLineage(current, prior) || current.exhausted)

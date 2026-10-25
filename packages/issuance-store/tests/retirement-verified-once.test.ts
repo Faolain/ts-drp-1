@@ -146,6 +146,18 @@ describe("retirement control verify-once soundness", () => {
 		expect(() => encodeIssuanceRetirementControl(first)).toThrow();
 	});
 
+	it("never lets a mutated capture result poison the verified plan bytes", () => {
+		const control = completedControl(2);
+		const captured = captureIssuanceRetirementControl(control);
+		const poisoned = planBytes(captured).before;
+		poisoned.fill(0, 0, 64);
+		// The poisoned bytes are judged on their own, never matched to the verified plan.
+		expect(() => captureIssuanceRetirementControl({ ...control, completed: { ...control.completed!,
+			planRewrite: { ...control.completed!.planRewrite!, plans: [{ before: poisoned, after: planBytes(control).after }] } } }))
+			.toThrow();
+		expect(captureIssuanceRetirementControl(control)).toEqual(control);
+	});
+
 	it("detaches every embedded plan read back from verified bytes", () => {
 		const source = rows();
 		const control = completedControl(2);
