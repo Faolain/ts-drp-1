@@ -42,6 +42,16 @@ harness. [Logs](../../.logs/realtime-resume-2026-10-23/transition-bisect-01/summ
 | `041c4136` | 3411 | 221 | 382 | 2786 |
 | `6c9b5935` final | 3359 | 210 | 373 | 2734 |
 
+Inside the rejoin merge (`613ab647` base): `33453720` (rejoin branch + root, before yielding)
+install 1514 ms; `a847900d` (after cooperative yielding `0e73815a`, which does not build alone)
+1657 ms; merge `79cf717c` 1761 ms. So ≈620 ms comes from the rejoin branch's added verification
+(checkpoint attachment/history authentication, historical source proof, pending bootstrap) and
+≈140 ms from deliberate yielding. `34b08cd7`/`1515daab` cannot run the harness
+(`nodeHostFor` absent), so the branch is not split further by bisect; a CPU profile of install
+is the next instrument. Host load during these runs was 11–54 from another project's
+long-running `tsgolint`/`tsgo` processes; the ordering is unaffected (fastest point ran at 46).
+[Inner logs](../../.logs/realtime-resume-2026-10-23/transition-bisect-01/summary-inner.txt).
+
 Recipient install is the whole regression: +≈860 ms at the rejoin merge (8 commits incl.
 `1515daab`, `0e73815a`) and +≈1100 ms at completion custody (`01944b66`). Seal is flat, adopt
 +≈80 ms. The prune, abandonment and lock-race fixes cost nothing measurable.
