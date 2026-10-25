@@ -8,7 +8,37 @@ The task is incomplete. Passing a room test that pauses at each rollover does no
 establish uninterrupted play. A formal model proves its stated abstraction and bounds,
 not native storage or network behavior.
 
-## North star met — 2026-10-24 evening (current)
+## Verify-once perf integrated — 2026-10-25 (current)
+
+Root `a3b1f276` = `6c9b5935` + three slices, each RED → GREEN with work-count tests:
+issuance verify-once (`bd7f90cf`, Quint `issuance-store/formal/verified-once-cache.qnt`),
+per-connection SQLite statement reuse (`f3a89775`), maintenance verify-once (`a3b1f276`, Quint
+`storage/formal/verified-image-cache.qnt`). Caches are keyed by exact bytes, never cache a
+refusal, are bounded (32–64 entries, ≤ a few MB) and return frozen/detached values. Per issue:
+control verifications 25 → 3, plan verifications 130 → 0, SQL prepares 15–27 → 0. Targeted
+suites green ([acceptance](../../.logs/realtime-resume-2026-10-23/perf-integration-02/summary.txt));
+`retirement-image-cas` has the same 3 failures on `6c9b5935`.
+
+Grid conservation 40 (serial, base `6c9b5935` → new, two runs each): transition 4466/3947 →
+2587/2131 ms, install 3651/3186 → 1940/1622, seal 277/245 → 198/177, adopt 479/433 → 373/319.
+
+Continued play 40, base and new run **concurrently** (same host noise), four pairs
+([table](../../.logs/realtime-resume-2026-10-23/perf-timing-01/paired.txt)): all 8 pass; process
+CPU 302–390 s → 260–270 s; GC 24.1/22.6 s → 18.4/17.6 s; timer max gap base 524/561/1384/— vs new
+375/1954/790/1062. Serial runs earlier showed new stalls up to 1671 ms (one tripped the 1000 ms
+alarm), which looked like a regression. The stall probe (`perf-timing-01/stallprobe.mjs`:
+per-gap CPU, page faults, context switches, GC) shows the long gaps are the process not being
+scheduled (wall ≫ CPU, no swap faults, GC ≤ 5 s of 20–80 s idle-stall wall), and they hit
+base equally (base-p3 1384 ms, base-p4 59 idle quanta) on a host at load 40–119 with 22 GB
+swap in use. Cached `get`/`all` statements do not hold WAL snapshots (`ck.mjs`). Conclusion:
+no tail regression; the timer max on this host measures host load, not the code. Seal/adopt
+remain CPU-bound blocking tasks (≈200–500 ms quanta) in both.
+
+Next: cooperative yield points in seal/adopt; remaining canonical re-encode-to-compare
+(`closedRetirementEqual`, signing image, journal image digest); then rerun the 300-epoch
+campaign on the optimized root.
+
+## North star met — 2026-10-24 evening
 
 Every 300-epoch endurance run passes on one clean source, `6c9b5935` (reopen at 30):
 
