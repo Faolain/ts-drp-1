@@ -31,6 +31,7 @@ import { SqliteNativeReadReservationOwner } from "./internal/native-read-reserva
 import type { LocalSessionLifetime } from "./internal/local-session-lifetime.js";
 import { acquireSnapshotDependencyLock } from "./internal/snapshot-dependency-lock.js";
 import { consumeLocalSessionCleanupReceipt, resolveLocalSessionPreparedTerminal } from "./internal/local-session-catalog.js";
+import { cachedStatement } from "./internal/sqlite-statement-cache.js";
 import { resolveOwnedLocalSessionTerminalAdmission } from "@ts-drp/node/v3-room";
 
 const SCHEMA =
@@ -168,14 +169,14 @@ export function createNodeRoomHeadAuthority(options: NodeRoomHeadOptions, sessio
 		if (initialization.kind !== "reopen") {
 			database.exec("BEGIN IMMEDIATE");
 			try {
-				const schema = database.prepare("SELECT 1 FROM sqlite_schema WHERE name NOT GLOB 'sqlite_*' LIMIT 3").all();
+				const schema = cachedStatement(database, "SELECT 1 FROM sqlite_schema WHERE name NOT GLOB 'sqlite_*' LIMIT 3").all();
 				if (schema.length === 0) {
 					if (profile !== undefined && existed) throw new Error("DISPOSABLE_SESSION_ACCOUNT_LOST");
 					database.exec(SCHEMA);
 					if (profile !== undefined) {
 						for (const ddl of ACCOUNT_SCHEMA) database.exec(ddl);
-						database.prepare("INSERT INTO room_session_policy VALUES(1,?,?,?,?,'initializing')").run(randomBytes(32), profile.slots, profile.storeScopes, profile.handles);
-						for (let slot = 0; slot < profile.slots; slot++) database.prepare("INSERT INTO room_session_slots(slot,incarnation,status) VALUES(?,0,'free')").run(slot);
+						cachedStatement(database, "INSERT INTO room_session_policy VALUES(1,?,?,?,?,'initializing')").run(randomBytes(32), profile.slots, profile.storeScopes, profile.handles);
+						for (let slot = 0; slot < profile.slots; slot++) cachedStatement(database, "INSERT INTO room_session_slots(slot,incarnation,status) VALUES(?,0,'free')").run(slot);
 					}
 				}
 				database.exec("COMMIT");
@@ -186,7 +187,7 @@ export function createNodeRoomHeadAuthority(options: NodeRoomHeadOptions, sessio
 		}
 		const schemaBytes = Math.max(Buffer.byteLength(SCHEMA), Buffer.byteLength(GENESIS_SCHEMA), ...ACCOUNT_SCHEMA.map(ddl => Buffer.byteLength(ddl)));
 		const expected = profile === undefined ? [SCHEMA] : [SCHEMA, ...ACCOUNT_SCHEMA];
-		const schema = database.prepare(`SELECT CASE WHEN typeof(type)='text' AND length(CAST(type AS BLOB))<=16 THEN type ELSE NULL END AS type,CASE WHEN typeof(name)='text' AND length(CAST(name AS BLOB))<=32 THEN name ELSE NULL END AS name,CASE WHEN typeof(sql)='text' AND length(CAST(sql AS BLOB))<=${schemaBytes} THEN sql ELSE NULL END AS sql FROM sqlite_schema WHERE name NOT GLOB 'sqlite_*' ORDER BY name LIMIT ${expected.length + 2}`).all();
+		const schema = cachedStatement(database, `SELECT CASE WHEN typeof(type)='text' AND length(CAST(type AS BLOB))<=16 THEN type ELSE NULL END AS type,CASE WHEN typeof(name)='text' AND length(CAST(name AS BLOB))<=32 THEN name ELSE NULL END AS name,CASE WHEN typeof(sql)='text' AND length(CAST(sql AS BLOB))<=${schemaBytes} THEN sql ELSE NULL END AS sql FROM sqlite_schema WHERE name NOT GLOB 'sqlite_*' ORDER BY name LIMIT ${expected.length + 2}`).all();
 		if (
 			(schema.length !== expected.length && schema.length !== expected.length + 1) ||
 			expected.some(ddl => !schema.some(row => row.type === "table" && row.sql === ddl)) ||
@@ -194,7 +195,7 @@ export function createNodeRoomHeadAuthority(options: NodeRoomHeadOptions, sessio
 		)
 			throw new Error("ROOM_HEAD_UNSUPPORTED_SCHEMA");
 		if (initialization.kind !== "reopen") database.exec("PRAGMA journal_mode=WAL");
-		if (database.prepare("PRAGMA journal_mode").get()?.journal_mode !== "wal")
+		if (cachedStatement(database, "PRAGMA journal_mode").get()?.journal_mode !== "wal")
 			throw new Error("ROOM_HEAD_UNSUPPORTED_DURABILITY");
 		database.exec("PRAGMA synchronous=FULL");
 	} catch (cause) {
@@ -226,14 +227,14 @@ export function createNodeRoomHeadAuthority(options: NodeRoomHeadOptions, sessio
 	function load(scope?: RoomHeadScope): RoomHeadImage | null {
 		if (account !== undefined) {
 			if (scope === undefined) throw new Error("DISPOSABLE_SESSION_EXACT_SCOPE_REQUIRED");
-			const row = database.prepare("SELECT incarnation, CASE WHEN typeof(image)='blob' AND length(image)<=16384 THEN image ELSE NULL END AS image FROM room_session_heads WHERE slot=? AND scope=?").get(account.selector.slot, scopeDigest(scope));
+			const row = cachedStatement(database, "SELECT incarnation, CASE WHEN typeof(image)='blob' AND length(image)<=16384 THEN image ELSE NULL END AS image FROM room_session_heads WHERE slot=? AND scope=?").get(account.selector.slot, scopeDigest(scope));
 			if (row === undefined) return null;
 			if (row.incarnation !== account.selector.incarnation || !(row.image instanceof Uint8Array)) throw new Error("DISPOSABLE_SESSION_ROOM_HEAD_LOST");
 			const image = captureRoomHeadImage(row.image);
 			if (!sameRoomHeadValue(image.scope, scope)) throw new Error("DISPOSABLE_SESSION_ROOM_HEAD_CONFLICT");
 			return image;
 		}
-		const rows = database.prepare("SELECT id, length(image) AS bytes FROM room_head LIMIT 2").all();
+		const rows = cachedStatement(database, "SELECT id, length(image) AS bytes FROM room_head LIMIT 2").all();
 		if (rows.length === 0) return null;
 		if (
 			rows.length !== 1 ||
@@ -242,17 +243,16 @@ export function createNodeRoomHeadAuthority(options: NodeRoomHeadOptions, sessio
 			rows[0].bytes > ROOM_HEAD_IMAGE_LIMITS.maxBytes
 		)
 			throw new Error("ROOM_HEAD_UNEXPECTED_ROWS");
-		return captureRoomHeadImage(database.prepare("SELECT image FROM room_head WHERE id=1").get()?.image);
+		return captureRoomHeadImage(cachedStatement(database, "SELECT image FROM room_head WHERE id=1").get()?.image);
 	}
 	function save(image: RoomHeadImage): void {
 		if (account !== undefined) {
-			const key = scopeDigest(image.scope), before = database.prepare("SELECT 1 FROM room_session_heads WHERE slot=? AND scope=?").get(account.selector.slot, key);
-			if (before === undefined && Number(database.prepare("SELECT count(*) AS n FROM room_session_heads WHERE slot=?").get(account.selector.slot)?.n) >= account.profile.storeScopes) throw new Error("LOCAL_SESSION_STORE_SCOPE_CAPACITY");
-			database.prepare("INSERT INTO room_session_heads(slot,incarnation,scope,image) VALUES(?,?,?,?) ON CONFLICT(slot,scope) DO UPDATE SET image=excluded.image WHERE room_session_heads.incarnation=excluded.incarnation").run(account.selector.slot, account.selector.incarnation, key, encodeCanonical(image, ROOM_HEAD_IMAGE_LIMITS));
+			const key = scopeDigest(image.scope), before = cachedStatement(database, "SELECT 1 FROM room_session_heads WHERE slot=? AND scope=?").get(account.selector.slot, key);
+			if (before === undefined && Number(cachedStatement(database, "SELECT count(*) AS n FROM room_session_heads WHERE slot=?").get(account.selector.slot)?.n) >= account.profile.storeScopes) throw new Error("LOCAL_SESSION_STORE_SCOPE_CAPACITY");
+			cachedStatement(database, "INSERT INTO room_session_heads(slot,incarnation,scope,image) VALUES(?,?,?,?) ON CONFLICT(slot,scope) DO UPDATE SET image=excluded.image WHERE room_session_heads.incarnation=excluded.incarnation").run(account.selector.slot, account.selector.incarnation, key, encodeCanonical(image, ROOM_HEAD_IMAGE_LIMITS));
 			return;
 		}
-		database
-			.prepare("INSERT INTO room_head(id,image) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET image=excluded.image")
+		cachedStatement(database, "INSERT INTO room_head(id,image) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET image=excluded.image")
 			.run(encodeCanonical(image, ROOM_HEAD_IMAGE_LIMITS));
 	}
 	function transact<T>(write: boolean, action: () => T): T {
@@ -423,7 +423,7 @@ export function createNodeRoomHeadAuthority(options: NodeRoomHeadOptions, sessio
 		close,
 		inspectDisposableSessions: () => {
 			if (profile === undefined || account !== undefined) throw new Error("DISPOSABLE_SESSION_ACCOUNT_PROVIDER_REQUIRED");
-			return transact(false, () => database.prepare("SELECT slot,incarnation,CASE WHEN typeof(status)='text' AND length(CAST(status AS BLOB))<=8 THEN status ELSE NULL END AS status FROM room_session_slots ORDER BY slot LIMIT ?").all(profile.slots + 1).map(row => Object.freeze({ slot: Number(row.slot), incarnation: Number(row.incarnation), status: row.status as "free" | "reserved" | "active" | "retiring" })));
+			return transact(false, () => cachedStatement(database, "SELECT slot,incarnation,CASE WHEN typeof(status)='text' AND length(CAST(status AS BLOB))<=8 THEN status ELSE NULL END AS status FROM room_session_slots ORDER BY slot LIMIT ?").all(profile.slots + 1).map(row => Object.freeze({ slot: Number(row.slot), incarnation: Number(row.incarnation), status: row.status as "free" | "reserved" | "active" | "retiring" })));
 		},
 	};
 	if (profile !== undefined && account === undefined) {
@@ -435,24 +435,24 @@ export function createNodeRoomHeadAuthority(options: NodeRoomHeadOptions, sessio
 			return Uint8Array.from(value);
 		};
 		const validate = (): void => {
-			const p = database.prepare("SELECT CASE WHEN typeof(identity)='blob' AND length(identity)=32 THEN identity ELSE NULL END AS identity,CASE WHEN typeof(slots)='integer' THEN slots ELSE NULL END AS slots,CASE WHEN typeof(store_scopes)='integer' THEN store_scopes ELSE NULL END AS store_scopes,CASE WHEN typeof(handles)='integer' THEN handles ELSE NULL END AS handles,CASE WHEN typeof(setup)='text' AND length(CAST(setup AS BLOB))<=12 THEN setup ELSE NULL END AS setup FROM room_session_policy WHERE id=1").get();
+			const p = cachedStatement(database, "SELECT CASE WHEN typeof(identity)='blob' AND length(identity)=32 THEN identity ELSE NULL END AS identity,CASE WHEN typeof(slots)='integer' THEN slots ELSE NULL END AS slots,CASE WHEN typeof(store_scopes)='integer' THEN store_scopes ELSE NULL END AS store_scopes,CASE WHEN typeof(handles)='integer' THEN handles ELSE NULL END AS handles,CASE WHEN typeof(setup)='text' AND length(CAST(setup AS BLOB))<=12 THEN setup ELSE NULL END AS setup FROM room_session_policy WHERE id=1").get();
 			if (!(p?.identity instanceof Uint8Array) || p.slots !== profile.slots || p.store_scopes !== profile.storeScopes || p.handles !== profile.handles ||
-				!["initializing", "ready"].includes(String(p.setup)) || database.prepare("SELECT count(*) AS n FROM room_session_policy").get()?.n !== 1 || database.prepare("SELECT count(*) AS n FROM room_session_slots").get()?.n !== profile.slots) throw new Error("DISPOSABLE_SESSION_ACCOUNT_POLICY_LOST");
+				!["initializing", "ready"].includes(String(p.setup)) || cachedStatement(database, "SELECT count(*) AS n FROM room_session_policy").get()?.n !== 1 || cachedStatement(database, "SELECT count(*) AS n FROM room_session_slots").get()?.n !== profile.slots) throw new Error("DISPOSABLE_SESSION_ACCOUNT_POLICY_LOST");
 			if (providerIdentity !== undefined && !Buffer.from(p.identity).equals(providerIdentity)) throw new Error("DISPOSABLE_SESSION_ACCOUNT_IDENTITY_CHANGED");
 			providerIdentity ??= Uint8Array.from(p.identity);
-			const rows = database.prepare(`SELECT ${projection} FROM room_session_slots ORDER BY slot LIMIT ?`).all(profile.slots + 1);
+			const rows = cachedStatement(database, `SELECT ${projection} FROM room_session_slots ORDER BY slot LIMIT ?`).all(profile.slots + 1);
 			if (rows.length !== profile.slots || rows.some((row, slot) => row.slot !== slot || !Number.isSafeInteger(row.incarnation) || Number(row.incarnation) < 0 ||
 				!["free", "reserved", "active", "retiring"].includes(String(row.status)) || (row.status !== "free" && (row.incarnation === 0 || !(row.owner instanceof Uint8Array))) ||
 				(row.status !== "free" && !(row.public_key instanceof Uint8Array)) || (row.status === "retiring" && !(row.terminal instanceof Uint8Array)) ||
 				(row.status === "free" && (row.public_key !== null || ((row.owner === null) !== (row.terminal === null)))))) throw new Error("DISPOSABLE_SESSION_ACCOUNT_STATE_LOST");
-			if (Number(database.prepare("SELECT count(*) AS n FROM room_session_heads").get()?.n) > profile.slots * profile.storeScopes ||
-				database.prepare("SELECT 1 FROM room_session_heads AS h LEFT JOIN room_session_slots AS s ON s.slot=h.slot WHERE s.slot IS NULL OR s.status='free' OR h.incarnation<>s.incarnation OR typeof(h.scope)<>'blob' OR length(h.scope)<>32 OR typeof(h.image)<>'blob' OR length(h.image)>16384 OR (h.genesis IS NOT NULL AND (typeof(h.genesis)<>'blob' OR length(h.genesis)<>32)) OR (h.root IS NOT NULL AND (typeof(h.root)<>'blob' OR length(h.root)<>32)) LIMIT 1").get() ||
-				database.prepare("SELECT 1 FROM room_session_heads GROUP BY slot HAVING count(*)>? LIMIT 1").get(profile.storeScopes)) throw new Error("DISPOSABLE_SESSION_ACCOUNT_HEAD_STATE_LOST");
-			if (database.prepare("SELECT 1 FROM room_session_slots WHERE (status='free' AND seed IS NOT NULL) OR (status IN ('reserved','active') AND (typeof(seed)<>'blob' OR length(seed)<>32)) OR (seed IS NOT NULL AND (typeof(seed)<>'blob' OR length(seed)<>32)) LIMIT 1").get()) throw new Error("DISPOSABLE_SESSION_ACCOUNT_KEY_STATE_LOST");
+			if (Number(cachedStatement(database, "SELECT count(*) AS n FROM room_session_heads").get()?.n) > profile.slots * profile.storeScopes ||
+				cachedStatement(database, "SELECT 1 FROM room_session_heads AS h LEFT JOIN room_session_slots AS s ON s.slot=h.slot WHERE s.slot IS NULL OR s.status='free' OR h.incarnation<>s.incarnation OR typeof(h.scope)<>'blob' OR length(h.scope)<>32 OR typeof(h.image)<>'blob' OR length(h.image)>16384 OR (h.genesis IS NOT NULL AND (typeof(h.genesis)<>'blob' OR length(h.genesis)<>32)) OR (h.root IS NOT NULL AND (typeof(h.root)<>'blob' OR length(h.root)<>32)) LIMIT 1").get() ||
+				cachedStatement(database, "SELECT 1 FROM room_session_heads GROUP BY slot HAVING count(*)>? LIMIT 1").get(profile.storeScopes)) throw new Error("DISPOSABLE_SESSION_ACCOUNT_HEAD_STATE_LOST");
+			if (cachedStatement(database, "SELECT 1 FROM room_session_slots WHERE (status='free' AND seed IS NOT NULL) OR (status IN ('reserved','active') AND (typeof(seed)<>'blob' OR length(seed)<>32)) OR (seed IS NOT NULL AND (typeof(seed)<>'blob' OR length(seed)<>32)) LIMIT 1").get()) throw new Error("DISPOSABLE_SESSION_ACCOUNT_KEY_STATE_LOST");
 			if (p.setup === "initializing") {
-				if (rows.some(row => row.incarnation !== 0 || row.status !== "free") || database.prepare("SELECT 1 FROM room_session_heads LIMIT 1").get()) throw new Error("DISPOSABLE_SESSION_ACCOUNT_SETUP_POISONED");
+				if (rows.some(row => row.incarnation !== 0 || row.status !== "free") || cachedStatement(database, "SELECT 1 FROM room_session_heads LIMIT 1").get()) throw new Error("DISPOSABLE_SESSION_ACCOUNT_SETUP_POISONED");
 				for (let slot = 0; slot < profile.slots; slot++) acquireSnapshotDependencyLock(lockFile(slot), "exclusive", true).release();
-				database.prepare("UPDATE room_session_policy SET setup='ready' WHERE id=1 AND setup='initializing'").run();
+				cachedStatement(database, "UPDATE room_session_policy SET setup='ready' WHERE id=1 AND setup='initializing'").run();
 			} else for (let slot = 0; slot < profile.slots; slot++) if (!existsSync(lockFile(slot))) throw new Error("DISPOSABLE_SESSION_ACCOUNT_COORDINATION_LOST");
 		};
 		transact(true, validate); // Committed initializing intent precedes exact coord installation.
@@ -476,7 +476,7 @@ export function createNodeRoomHeadAuthority(options: NodeRoomHeadOptions, sessio
 				selector = Object.freeze({ slot: Number(captured.slot), incarnation: Number(captured.incarnation) });
 			} else selector = transact(true, () => {
 				validate();
-				const free = database.prepare(`SELECT ${projection} FROM room_session_slots WHERE status='free' ORDER BY slot LIMIT 1`).get();
+				const free = cachedStatement(database, `SELECT ${projection} FROM room_session_slots WHERE status='free' ORDER BY slot LIMIT 1`).get();
 				if (free === undefined) throw new Error("LOCAL_SESSION_CAPACITY");
 				if (!Number.isSafeInteger(free.incarnation) || free.incarnation === Number.MAX_SAFE_INTEGER) throw new Error("LOCAL_SESSION_INCARNATION_EXHAUSTED");
 				const exclusive = acquireSnapshotDependencyLock(lockFile(Number(free.slot)), "exclusive");
@@ -486,7 +486,7 @@ export function createNodeRoomHeadAuthority(options: NodeRoomHeadOptions, sessio
 					try {
 						const key = createPrivateKey({ key: encoded, format: "der", type: "pkcs8" });
 						const publicKey = createPublicKey(key).export({ format: "der", type: "spki" }).subarray(-32);
-						database.prepare("UPDATE room_session_slots SET incarnation=?,status='reserved',owner=?,seed=?,public_key=?,terminal=NULL WHERE slot=? AND status='free'").run(next.incarnation, owner, seed, publicKey, next.slot);
+						cachedStatement(database, "UPDATE room_session_slots SET incarnation=?,status='reserved',owner=?,seed=?,public_key=?,terminal=NULL WHERE slot=? AND status='free'").run(next.incarnation, owner, seed, publicKey, next.slot);
 					} finally { seed.fill(0); encoded.fill(0); }
 					return next;
 				} finally { exclusive.release(); }
@@ -496,7 +496,7 @@ export function createNodeRoomHeadAuthority(options: NodeRoomHeadOptions, sessio
 			let cleanupLock: ReturnType<typeof acquireSnapshotDependencyLock> | undefined;
 			const row = (allowRetiring = false): Record<string, unknown> => {
 				ensureOpen(); validate();
-				const current = database.prepare(`SELECT ${projection} FROM room_session_slots WHERE slot=?`).get(selector.slot);
+				const current = cachedStatement(database, `SELECT ${projection} FROM room_session_slots WHERE slot=?`).get(selector.slot);
 				if (current?.incarnation !== selector.incarnation || !(current.owner instanceof Uint8Array) || !Buffer.from(current.owner).equals(owner) ||
 					!(allowRetiring ? ["reserved", "active", "retiring", ...(fields.kind === "resume-terminal" ? ["free"] : [])] : ["reserved", "active"]).includes(String(current.status))) throw new Error("DISPOSABLE_SESSION_INDEPENDENT_INCARNATION_REVOKED");
 				return current;
@@ -510,7 +510,7 @@ export function createNodeRoomHeadAuthority(options: NodeRoomHeadOptions, sessio
 			accountKeys.set(token, async lifetime => {
 				check();
 				const seed = transact(false, () => {
-					row(); const captured = database.prepare("SELECT CASE WHEN typeof(seed)='blob' AND length(seed)=32 THEN seed ELSE NULL END AS seed FROM room_session_slots WHERE slot=? AND incarnation=?").get(selector.slot, selector.incarnation);
+					row(); const captured = cachedStatement(database, "SELECT CASE WHEN typeof(seed)='blob' AND length(seed)=32 THEN seed ELSE NULL END AS seed FROM room_session_slots WHERE slot=? AND incarnation=?").get(selector.slot, selector.incarnation);
 					if (!(captured?.seed instanceof Uint8Array)) throw new Error("DISPOSABLE_SESSION_ACCOUNT_KEY_STATE_LOST");
 					return Uint8Array.from(captured.seed);
 				});
@@ -546,13 +546,13 @@ export function createNodeRoomHeadAuthority(options: NodeRoomHeadOptions, sessio
 					const current = row(); if (!(current.public_key instanceof Uint8Array) || !Buffer.from(current.public_key).equals(publicKey)) throw new Error("DISPOSABLE_SESSION_OWNED_KEY_CONFLICT");
 				}); },
 				assertBound: () => { check(); transact(false, () => { const current = row();
-					if (current.status !== "active" || !(current.public_key instanceof Uint8Array) || !database.prepare("SELECT 1 FROM room_session_heads WHERE slot=? AND incarnation=? AND root IS NOT NULL LIMIT 1").get(selector.slot, selector.incarnation)) throw new Error("DISPOSABLE_SESSION_AUTHENTICATED_ROOT_REQUIRED");
+					if (current.status !== "active" || !(current.public_key instanceof Uint8Array) || !cachedStatement(database, "SELECT 1 FROM room_session_heads WHERE slot=? AND incarnation=? AND root IS NOT NULL LIMIT 1").get(selector.slot, selector.incarnation)) throw new Error("DISPOSABLE_SESSION_AUTHENTICATED_ROOT_REQUIRED");
 				}); },
 				bindRoot: (scope, bytes) => { const root = exactBytes(bytes, "DISPOSABLE_SESSION_ROOT_INVALID"); transact(true, () => {
-					const current = row(), key = scopeDigest(scope), entry = database.prepare("SELECT CASE WHEN typeof(root)='blob' AND length(root)=32 THEN root ELSE NULL END AS root FROM room_session_heads WHERE slot=? AND incarnation=? AND scope=?").get(selector.slot, selector.incarnation, key);
+					const current = row(), key = scopeDigest(scope), entry = cachedStatement(database, "SELECT CASE WHEN typeof(root)='blob' AND length(root)=32 THEN root ELSE NULL END AS root FROM room_session_heads WHERE slot=? AND incarnation=? AND scope=?").get(selector.slot, selector.incarnation, key);
 					if (!(current.public_key instanceof Uint8Array) || entry === undefined || (entry.root !== null && !Buffer.from(entry.root as Uint8Array).equals(root))) throw new Error("DISPOSABLE_SESSION_ROOT_BINDING_CONFLICT");
-					database.prepare("UPDATE room_session_heads SET root=? WHERE slot=? AND incarnation=? AND scope=?").run(root, selector.slot, selector.incarnation, key);
-					database.prepare("UPDATE room_session_slots SET status='active' WHERE slot=? AND incarnation=?").run(selector.slot, selector.incarnation);
+					cachedStatement(database, "UPDATE room_session_heads SET root=? WHERE slot=? AND incarnation=? AND scope=?").run(root, selector.slot, selector.incarnation, key);
+					cachedStatement(database, "UPDATE room_session_slots SET status='active' WHERE slot=? AND incarnation=?").run(selector.slot, selector.incarnation);
 				}); },
 				fence: (admission, nativePreparation) => {
 					const source = resolveOwnedLocalSessionTerminalAdmission(admission), native = resolveLocalSessionPreparedTerminal(nativePreparation);
@@ -563,12 +563,12 @@ export function createNodeRoomHeadAuthority(options: NodeRoomHeadOptions, sessio
 					const current = row(true); if (current.terminal !== null && !Buffer.from(current.terminal as Uint8Array).equals(digest)) throw new Error("DISPOSABLE_SESSION_TERMINAL_INTENT_CONFLICT");
 					if (!(current.public_key instanceof Uint8Array) || Buffer.from(current.public_key).toString("hex") !== native.author || (source !== undefined && (source.selector.slot !== selector.slot || source.selector.incarnation !== selector.incarnation))) throw new Error("DISPOSABLE_SESSION_TERMINAL_SOURCE_MISMATCH");
 					if (native.empty) {
-						if (current.status !== "reserved" || database.prepare("SELECT 1 FROM room_session_heads WHERE slot=? AND incarnation=? LIMIT 1").get(selector.slot, selector.incarnation)) throw new Error("LOCAL_SESSION_PROTOCOL_DISPOSITION_REQUIRED");
+						if (current.status !== "reserved" || cachedStatement(database, "SELECT 1 FROM room_session_heads WHERE slot=? AND incarnation=? LIMIT 1").get(selector.slot, selector.incarnation)) throw new Error("LOCAL_SESSION_PROTOCOL_DISPOSITION_REQUIRED");
 					} else {
-						const stored = database.prepare("SELECT CASE WHEN typeof(image)='blob' AND length(image)<=16384 THEN image ELSE NULL END AS image FROM room_session_heads WHERE slot=? AND incarnation=? AND scope=?").get(selector.slot, selector.incarnation, scopeDigest(expected!.scope));
-						if (!(stored?.image instanceof Uint8Array) || !sameRoomHeadValue(captureRoomHeadImage(stored.image), expected) || database.prepare("SELECT count(*) AS n FROM room_session_heads WHERE slot=? AND incarnation=?").get(selector.slot, selector.incarnation)?.n !== 1) throw new Error("DISPOSABLE_SESSION_TERMINAL_FLOOR_STALE");
+						const stored = cachedStatement(database, "SELECT CASE WHEN typeof(image)='blob' AND length(image)<=16384 THEN image ELSE NULL END AS image FROM room_session_heads WHERE slot=? AND incarnation=? AND scope=?").get(selector.slot, selector.incarnation, scopeDigest(expected!.scope));
+						if (!(stored?.image instanceof Uint8Array) || !sameRoomHeadValue(captureRoomHeadImage(stored.image), expected) || cachedStatement(database, "SELECT count(*) AS n FROM room_session_heads WHERE slot=? AND incarnation=?").get(selector.slot, selector.incarnation)?.n !== 1) throw new Error("DISPOSABLE_SESSION_TERMINAL_FLOOR_STALE");
 					}
-					database.prepare("UPDATE room_session_slots SET status='retiring',terminal=? WHERE slot=? AND incarnation=?").run(digest, selector.slot, selector.incarnation);
+					cachedStatement(database, "UPDATE room_session_slots SET status='retiring',terminal=? WHERE slot=? AND incarnation=?").run(digest, selector.slot, selector.incarnation);
 				}); },
 				terminalDigest: () => { check(true); return exactBytes(transact(false, () => row(true).terminal), "DISPOSABLE_SESSION_TERMINAL_INTENT_REQUIRED"); },
 				beginCleanup: () => {
@@ -593,8 +593,8 @@ export function createNodeRoomHeadAuthority(options: NodeRoomHeadOptions, sessio
 						const current = row(true);
 						if (!(current.terminal instanceof Uint8Array) || !Buffer.from(current.terminal).equals(completed.digest) || !["retiring", "free"].includes(String(current.status))) throw new Error("DISPOSABLE_SESSION_NATIVE_COMPLETION_MISMATCH");
 						if (current.status === "free") return; // Exact last-incarnation retry only.
-						database.prepare("DELETE FROM room_session_heads WHERE slot=? AND incarnation=?").run(selector.slot, selector.incarnation);
-						database.prepare("UPDATE room_session_slots SET status='free',seed=NULL,public_key=NULL WHERE slot=? AND incarnation=? AND status='retiring'").run(selector.slot, selector.incarnation);
+						cachedStatement(database, "DELETE FROM room_session_heads WHERE slot=? AND incarnation=?").run(selector.slot, selector.incarnation);
+						cachedStatement(database, "UPDATE room_session_slots SET status='free',seed=NULL,public_key=NULL WHERE slot=? AND incarnation=? AND status='retiring'").run(selector.slot, selector.incarnation);
 					});
 				},
 				release: () => { if (released) return; (cleanupLock ?? held).release(); released = true; },
@@ -614,13 +614,13 @@ export function createNodeRoomHeadAuthority(options: NodeRoomHeadOptions, sessio
 		let held: NativeReadReservation | undefined, failed = false, primary: unknown, result!: T;
 		const readBinding = (): Uint8Array | undefined => {
 			if (account !== undefined) {
-				const row = database.prepare("SELECT CASE WHEN genesis IS NULL THEN 0 WHEN typeof(genesis)='blob' AND length(genesis)=32 THEN 1 ELSE -1 END AS valid, CASE WHEN typeof(genesis)='blob' AND length(genesis)=32 THEN genesis ELSE NULL END AS binding FROM room_session_heads WHERE slot=? AND incarnation=? AND scope=?").get(account.selector.slot, account.selector.incarnation, scopeDigest(scope));
+				const row = cachedStatement(database, "SELECT CASE WHEN genesis IS NULL THEN 0 WHEN typeof(genesis)='blob' AND length(genesis)=32 THEN 1 ELSE -1 END AS valid, CASE WHEN typeof(genesis)='blob' AND length(genesis)=32 THEN genesis ELSE NULL END AS binding FROM room_session_heads WHERE slot=? AND incarnation=? AND scope=?").get(account.selector.slot, account.selector.incarnation, scopeDigest(scope));
 				if (row?.valid === -1) throw new Error("ROOM_GENESIS_RESERVATION_LOST");
 				return row?.valid === 1 ? Uint8Array.from(row.binding as Uint8Array) : undefined;
 			}
-			const exists = database.prepare("SELECT 1 FROM sqlite_schema WHERE type='table' AND name='room_genesis_creation'").get();
+			const exists = cachedStatement(database, "SELECT 1 FROM sqlite_schema WHERE type='table' AND name='room_genesis_creation'").get();
 			if (exists === undefined) return undefined;
-			const rows = database.prepare("SELECT id, CASE WHEN typeof(binding)='blob' AND length(binding)=32 THEN binding ELSE NULL END AS binding FROM room_genesis_creation LIMIT 2").all();
+			const rows = cachedStatement(database, "SELECT id, CASE WHEN typeof(binding)='blob' AND length(binding)=32 THEN binding ELSE NULL END AS binding FROM room_genesis_creation LIMIT 2").all();
 			if (rows.length !== 1 || rows[0]?.id !== 1 || !(rows[0]?.binding instanceof Uint8Array)) throw new Error("ROOM_GENESIS_RESERVATION_LOST");
 			return Uint8Array.from(rows[0].binding);
 		};
@@ -639,11 +639,11 @@ export function createNodeRoomHeadAuthority(options: NodeRoomHeadOptions, sessio
 				// expires or becomes unseen after abort; external account custody retains it.
 				if (account === undefined) {
 					database.exec(GENESIS_SCHEMA);
-					database.prepare("INSERT INTO room_genesis_creation(id,binding) VALUES(1,?)").run(binding);
+					cachedStatement(database, "INSERT INTO room_genesis_creation(id,binding) VALUES(1,?)").run(binding);
 				}
 				save({ version: 1, scope, state: { stable: { objectId: scope.objectId, epoch: 0, currentAnchorDigest: scope.pinnedGenesisAnchorDigest }, pending: null },
 					control: { incarnation: randomBytes(32).toString("hex"), revision: 0, active: null, completed: null } });
-				if (account !== undefined) database.prepare("UPDATE room_session_heads SET genesis=? WHERE slot=? AND incarnation=? AND scope=? AND genesis IS NULL").run(binding, account.selector.slot, account.selector.incarnation, scopeDigest(scope));
+				if (account !== undefined) cachedStatement(database, "UPDATE room_session_heads SET genesis=? WHERE slot=? AND incarnation=? AND scope=? AND genesis IS NULL").run(binding, account.selector.slot, account.selector.incarnation, scopeDigest(scope));
 			});
 			held = await reservations.acquire();
 			await held.check(); transact(false, exact);

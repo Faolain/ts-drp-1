@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
 import { enforceNativeLocalSessionFile, type LocalSessionLifetime } from "./local-session-lifetime.js";
+import { cachedStatement } from "./sqlite-statement-cache.js";
 
 /**
  * Captures a mechanical object selector without executing getters.
@@ -115,7 +116,7 @@ export class SqliteNativeReadReservationOwner {
 				this.session?.assertCurrent();
 				if (released || this.#closed) throw new Error("NATIVE_READ_RESERVATION_RELEASED");
 				if (!active) throw new Error("NATIVE_READ_RESERVATION_LOST");
-				database.prepare("SELECT name FROM sqlite_schema LIMIT 1").get();
+				cachedStatement(database, "SELECT name FROM sqlite_schema LIMIT 1").get();
 			},
 			release,
 		});

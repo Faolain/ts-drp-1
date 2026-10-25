@@ -20,6 +20,7 @@ import { resolve } from "node:path";
 
 import { SqliteNativeReadReservationOwner } from "./internal/native-read-reservation.js";
 import { sqliteFilename } from "./internal/sqlite-filename.js";
+import { cachedStatement } from "./internal/sqlite-statement-cache.js";
 
 export interface NodeArchiveStorageOptions {
 	readonly filename: string;
@@ -225,16 +226,23 @@ export function createNodeArchiveStorage(options: NodeArchiveStorageOptions): Ar
 			) > c.maxTotalEncodedBytes
 		)
 			throw failure("ARCHIVE_CAPACITY");
-		if (sum(control.storedArtifacts, sum(control.pending?.reservedArtifacts ?? 0,
-			control.capacityPromise?.reservedArtifacts ?? 0)) > c.maxArtifacts) throw failure("ARCHIVE_CAPACITY");
-		database
-			.prepare("INSERT INTO archive_control(id,bytes) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET bytes=excluded.bytes")
-			.run(encoded);
+		if (
+			sum(
+				control.storedArtifacts,
+				sum(control.pending?.reservedArtifacts ?? 0, control.capacityPromise?.reservedArtifacts ?? 0)
+			) > c.maxArtifacts
+		)
+			throw failure("ARCHIVE_CAPACITY");
+		cachedStatement(
+			database,
+			"INSERT INTO archive_control(id,bytes) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET bytes=excluded.bytes"
+		).run(encoded);
 	};
 	const load = (): Control => {
-		const width = database.prepare("SELECT length(bytes) AS width FROM archive_control WHERE id=1").get()?.width;
+		const width = cachedStatement(database, "SELECT length(bytes) AS width FROM archive_control WHERE id=1").get()
+			?.width;
 		if (typeof width !== "number" || width < 1 || width > c.maxControlBytes) throw failure("ARCHIVE_CORRUPT");
-		const raw = database.prepare("SELECT bytes FROM archive_control WHERE id=1").get()?.bytes;
+		const raw = cachedStatement(database, "SELECT bytes FROM archive_control WHERE id=1").get()?.bytes;
 		if (!(raw instanceof Uint8Array)) throw failure("ARCHIVE_CORRUPT");
 		const value = fields(decode(raw, c.maxControlBytes), [
 			"objectId",
@@ -329,13 +337,17 @@ export function createNodeArchiveStorage(options: NodeArchiveStorageOptions): Ar
 	try {
 		database.exec("PRAGMA busy_timeout=1000");
 		if (o.initialization === "create") {
-			if (database.prepare("SELECT name FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%' LIMIT 1").get() !== undefined)
+			if (
+				cachedStatement(database, "SELECT name FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%' LIMIT 1").get() !==
+				undefined
+			)
 				throw failure("ARCHIVE_CREATE_REQUIRES_EMPTY_STORE");
 			database.exec("PRAGMA journal_mode=WAL");
 			database.exec("PRAGMA synchronous=FULL");
 			transact(true, () => {
 				if (
-					database.prepare("SELECT name FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%' LIMIT 1").get() !== undefined
+					cachedStatement(database, "SELECT name FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%' LIMIT 1").get() !==
+					undefined
 				)
 					throw failure("ARCHIVE_CREATE_REQUIRES_EMPTY_STORE");
 				for (const sql of SCHEMA) database.exec(sql);
@@ -356,12 +368,13 @@ export function createNodeArchiveStorage(options: NodeArchiveStorageOptions): Ar
 				});
 			});
 		}
-		const schema = database
-			.prepare("SELECT sql FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
-			.all();
+		const schema = cachedStatement(
+			database,
+			"SELECT sql FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+		).all();
 		if (schema.length !== SCHEMA.length || schema.map((row) => row.sql).some((sql) => !SCHEMA.includes(sql as string)))
 			throw failure("ARCHIVE_UNSUPPORTED_SCHEMA");
-		if (database.prepare("PRAGMA journal_mode").get()?.journal_mode !== "wal")
+		if (cachedStatement(database, "PRAGMA journal_mode").get()?.journal_mode !== "wal")
 			throw failure("ARCHIVE_UNSUPPORTED_DURABILITY");
 		database.exec("PRAGMA synchronous=FULL");
 		load();
@@ -404,12 +417,15 @@ export function createNodeArchiveStorage(options: NodeArchiveStorageOptions): Ar
 		return task;
 	};
 	const readArtifact = (reference: ArchiveArtifactRef): Uint8Array => {
-		const width = database
-			.prepare("SELECT byte_length,length(bytes) AS width FROM archive_artifacts WHERE digest=?")
-			.get(reference.digest);
+		const width = cachedStatement(
+			database,
+			"SELECT byte_length,length(bytes) AS width FROM archive_artifacts WHERE digest=?"
+		).get(reference.digest);
 		if (width?.byte_length !== reference.byteLength || width.width !== reference.byteLength)
 			throw failure("ARCHIVE_ARTIFACT_MISSING_OR_ALTERED");
-		const raw = database.prepare("SELECT bytes FROM archive_artifacts WHERE digest=?").get(reference.digest)?.bytes;
+		const raw = cachedStatement(database, "SELECT bytes FROM archive_artifacts WHERE digest=?").get(
+			reference.digest
+		)?.bytes;
 		if (!(raw instanceof Uint8Array)) throw failure("ARCHIVE_CORRUPT");
 		const exact = bytes(raw, c.maxArtifactBytes);
 		if (!same(lookupArtifact(reference.digest), reference) || artifactDigest(reference, exact) !== reference.digest)
@@ -431,12 +447,15 @@ export function createNodeArchiveStorage(options: NodeArchiveStorageOptions): Ar
 		return blobDigest(exact);
 	};
 	const lookupArtifact = (id: string): ArchiveArtifactRef => {
-		const width = database
-			.prepare("SELECT length(ref_bytes) AS width FROM archive_artifacts WHERE digest=?")
-			.get(digest(id))?.width;
+		const width = cachedStatement(
+			database,
+			"SELECT length(ref_bytes) AS width FROM archive_artifacts WHERE digest=?"
+		).get(digest(id))?.width;
 		if (typeof width !== "number" || width < 1 || width > c.maxControlBytes)
 			throw failure("ARCHIVE_ARTIFACT_MISSING_OR_ALTERED");
-		const exact = database.prepare("SELECT ref_bytes FROM archive_artifacts WHERE digest=?").get(id)?.ref_bytes;
+		const exact = cachedStatement(database, "SELECT ref_bytes FROM archive_artifacts WHERE digest=?").get(
+			id
+		)?.ref_bytes;
 		if (!(exact instanceof Uint8Array)) throw failure("ARCHIVE_CORRUPT");
 		const reference = ref(decode(exact, c.maxControlBytes), c);
 		if (reference.digest !== id) throw failure("ARCHIVE_CORRUPT");
@@ -461,7 +480,7 @@ export function createNodeArchiveStorage(options: NodeArchiveStorageOptions): Ar
 		return entry;
 	};
 	const node = (start: number, size: number): Uint8Array => {
-		const row = database.prepare("SELECT hash FROM archive_nodes WHERE start=? AND size=?").get(start, size);
+		const row = cachedStatement(database, "SELECT hash FROM archive_nodes WHERE start=? AND size=?").get(start, size);
 		if (row?.hash instanceof Uint8Array && row.hash.byteLength === 32) return new Uint8Array(row.hash);
 		if (row !== undefined) throw failure("ARCHIVE_CORRUPT");
 		if (size < 2 || 2 ** Math.floor(Math.log2(size)) === size) throw failure("ARCHIVE_INDEX_NODE_MISSING");
@@ -482,9 +501,9 @@ export function createNodeArchiveStorage(options: NodeArchiveStorageOptions): Ar
 	});
 	const verifyLast = (control: Control): void => {
 		if (control.position.size === 0) return;
-		const leaf = database
-			.prepare("SELECT digest FROM archive_leaves WHERE leaf_index=?")
-			.get(control.position.size - 1);
+		const leaf = cachedStatement(database, "SELECT digest FROM archive_leaves WHERE leaf_index=?").get(
+			control.position.size - 1
+		);
 		if (typeof leaf?.digest !== "string") throw failure("ARCHIVE_INDEX_FRONTIER_MISSING");
 		const exact = readArtifact(lookupArtifact(leaf.digest));
 		if (
@@ -734,9 +753,9 @@ export function createNodeArchiveStorage(options: NodeArchiveStorageOptions): Ar
 						let reserve = 0,
 							newArtifacts = 0;
 						for (const artifact of captured.artifacts) {
-							const prior = database
-								.prepare("SELECT byte_length FROM archive_artifacts WHERE digest=?")
-								.get(artifact.digest);
+							const prior = cachedStatement(database, "SELECT byte_length FROM archive_artifacts WHERE digest=?").get(
+								artifact.digest
+							);
 							if (prior === undefined) {
 								reserve = sum(reserve, sum(artifact.byteLength, metadataCharge(artifact)));
 								newArtifacts++;
@@ -856,9 +875,9 @@ export function createNodeArchiveStorage(options: NodeArchiveStorageOptions): Ar
 							pending = pendingFor(control, capturedId);
 						if (!pending.declaration.artifacts.some((artifact) => same(artifact, reference)))
 							throw failure("ARCHIVE_ARTIFACT_NOT_DECLARED");
-						const prior = database
-							.prepare("SELECT byte_length FROM archive_artifacts WHERE digest=?")
-							.get(reference.digest);
+						const prior = cachedStatement(database, "SELECT byte_length FROM archive_artifacts WHERE digest=?").get(
+							reference.digest
+						);
 						if (prior !== undefined) {
 							if (compareBytes(readArtifact(reference), exact) !== 0)
 								throw failure("ARCHIVE_ARTIFACT_MISSING_OR_ALTERED");
@@ -867,9 +886,10 @@ export function createNodeArchiveStorage(options: NodeArchiveStorageOptions): Ar
 						const metadata = metadataCharge(reference);
 						if (pending.prepared !== null || pending.reservedBytes < sum(exact.byteLength, metadata))
 							throw failure("ARCHIVE_INTENT_CONFLICT");
-						database
-							.prepare("INSERT INTO archive_artifacts(digest,byte_length,ref_bytes,bytes) VALUES(?,?,?,?)")
-							.run(reference.digest, reference.byteLength, encodeCanonical(reference), exact);
+						cachedStatement(
+							database,
+							"INSERT INTO archive_artifacts(digest,byte_length,ref_bytes,bytes) VALUES(?,?,?,?)"
+						).run(reference.digest, reference.byteLength, encodeCanonical(reference), exact);
 						control.storedArtifactBytes = sum(control.storedArtifactBytes, exact.byteLength);
 						control.storedArtifacts++;
 						pending.reservedArtifacts--;
@@ -904,9 +924,10 @@ export function createNodeArchiveStorage(options: NodeArchiveStorageOptions): Ar
 						for (const [offset, artifact] of pending.declaration.indexEntries.entries()) {
 							const exact = readArtifact(artifact),
 								entry = entryFields(exact);
-							const row = database
-								.prepare("SELECT leaf_index,digest,start_ordinal FROM archive_leaves WHERE leaf_index=?")
-								.get(sum(pending.declaration.expected.size, offset));
+							const row = cachedStatement(
+								database,
+								"SELECT leaf_index,digest,start_ordinal FROM archive_leaves WHERE leaf_index=?"
+							).get(sum(pending.declaration.expected.size, offset));
 							if (row?.digest !== artifact.digest || row.start_ordinal !== integer(entry.startOrdinal))
 								throw failure("ARCHIVE_READBACK_FAILED");
 							if (
@@ -923,17 +944,21 @@ export function createNodeArchiveStorage(options: NodeArchiveStorageOptions): Ar
 					const insertNode = (start: number, size: number, hash: Uint8Array): void => {
 						const charge = metadataCharge({ start, size, hash });
 						if (pending.reservedBytes < charge) throw failure("ARCHIVE_CAPACITY");
-						const existing = database
-							.prepare("SELECT hash FROM archive_nodes WHERE start=? AND size=?")
-							.get(start, size);
+						const existing = cachedStatement(database, "SELECT hash FROM archive_nodes WHERE start=? AND size=?").get(
+							start,
+							size
+						);
 						if (existing !== undefined) {
 							if (!(existing.hash instanceof Uint8Array) || compareBytes(existing.hash, hash) !== 0)
 								throw failure("ARCHIVE_CORRUPT");
 							return;
 						}
-						database
-							.prepare("INSERT INTO archive_nodes(start,size,hash,charge) VALUES(?,?,?,?)")
-							.run(start, size, hash, charge);
+						cachedStatement(database, "INSERT INTO archive_nodes(start,size,hash,charge) VALUES(?,?,?,?)").run(
+							start,
+							size,
+							hash,
+							charge
+						);
 						pending.reservedBytes -= charge;
 						control.storedIndexMetadataBytes = sum(control.storedIndexMetadataBytes, charge);
 					};
@@ -949,11 +974,10 @@ export function createNodeArchiveStorage(options: NodeArchiveStorageOptions): Ar
 							endOrdinal: entry.endOrdinal,
 						});
 						if (pending.reservedBytes < charge) throw failure("ARCHIVE_CAPACITY");
-						database
-							.prepare(
-								"INSERT INTO archive_leaves(leaf_index,digest,start_ordinal,end_ordinal,charge) VALUES(?,?,?,?,?)"
-							)
-							.run(leafIndex, artifact.digest, integer(entry.startOrdinal), integer(entry.endOrdinal), charge);
+						cachedStatement(
+							database,
+							"INSERT INTO archive_leaves(leaf_index,digest,start_ordinal,end_ordinal,charge) VALUES(?,?,?,?,?)"
+						).run(leafIndex, artifact.digest, integer(entry.startOrdinal), integer(entry.endOrdinal), charge);
 						pending.reservedBytes -= charge;
 						control.storedIndexMetadataBytes = sum(control.storedIndexMetadataBytes, charge);
 						let hash = merkleLeafHash(exact),
@@ -1106,19 +1130,19 @@ export function createNodeArchiveStorage(options: NodeArchiveStorageOptions): Ar
 							return read(
 								() => {
 									if (limit > c.maxReadPageEntries) throw failure("ARCHIVE_CAPACITY");
-									const rows = database
-										.prepare(
-											"SELECT leaf_index,digest FROM archive_leaves WHERE leaf_index>? AND leaf_index<? ORDER BY leaf_index LIMIT ?"
-										)
-										.all(after, captured.size, limit);
+									const rows = cachedStatement(
+										database,
+										"SELECT leaf_index,digest FROM archive_leaves WHERE leaf_index>? AND leaf_index<? ORDER BY leaf_index LIMIT ?"
+									).all(after, captured.size, limit);
 									const page = [];
 									let total = 0;
 									for (const row of rows) {
 										if (typeof row.digest !== "string" || typeof row.leaf_index !== "number")
 											throw failure("ARCHIVE_CORRUPT");
-										const metadata = database
-											.prepare("SELECT byte_length FROM archive_artifacts WHERE digest=?")
-											.get(row.digest);
+										const metadata = cachedStatement(
+											database,
+											"SELECT byte_length FROM archive_artifacts WHERE digest=?"
+										).get(row.digest);
 										const width = integer(metadata?.byte_length, 1),
 											audit = proof(row.leaf_index, captured.size);
 										total = sum(total, sum(width, audit.auditPath.length * 32));

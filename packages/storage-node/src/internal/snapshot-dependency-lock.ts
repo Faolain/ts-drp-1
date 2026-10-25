@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 
 import { sqliteFilename } from "./sqlite-filename.js";
+import { cachedStatement } from "./sqlite-statement-cache.js";
 
 /**
  * A stable numbered coordination file, never an epoch file or wire authority.
@@ -18,7 +19,7 @@ export function acquireSnapshotDependencyLock(
 	let active = false;
 	try {
 		database.exec("PRAGMA busy_timeout=0");
-		const names = database.prepare("SELECT name FROM sqlite_schema WHERE type='table'").all();
+		const names = cachedStatement(database, "SELECT name FROM sqlite_schema WHERE type='table'").all();
 		if (names.length === 0 && initialize) {
 			// Allocation occurs under the primary owner's native writer transaction.
 			// Stable files are never unlinked or replaced, including on slot reuse.
@@ -27,24 +28,24 @@ export function acquireSnapshotDependencyLock(
 			);
 		}
 		if (
-			String(database.prepare("PRAGMA journal_mode").get()?.journal_mode).toLowerCase() !== "delete" ||
+			String(cachedStatement(database, "PRAGMA journal_mode").get()?.journal_mode).toLowerCase() !== "delete" ||
 			names.length > 1 ||
 			(names.length === 1 && names[0]?.name !== "snapshot_dependency_lock") ||
-			database.prepare("SELECT sql FROM sqlite_schema WHERE name='snapshot_dependency_lock'").get()?.sql !==
+			cachedStatement(database, "SELECT sql FROM sqlite_schema WHERE name='snapshot_dependency_lock'").get()?.sql !==
 				"CREATE TABLE snapshot_dependency_lock(id INTEGER PRIMARY KEY CHECK(id=1)) STRICT" ||
-			database.prepare("SELECT count(*) AS n, min(id) AS id FROM snapshot_dependency_lock").get()?.n !== 1
+			cachedStatement(database, "SELECT count(*) AS n, min(id) AS id FROM snapshot_dependency_lock").get()?.n !== 1
 		)
 			throw new Error("SNAPSHOT_DEPENDENCY_LOCK_POISONED");
 		database.exec(mode === "shared" ? "BEGIN" : "BEGIN EXCLUSIVE");
 		active = true;
 		// In DELETE mode this establishes a genuine native SHARED lock. BEGIN by
 		// itself is insufficient; WAL snapshot transactions are never used here.
-		if (database.prepare("SELECT id FROM snapshot_dependency_lock").get()?.id !== 1)
+		if (cachedStatement(database, "SELECT id FROM snapshot_dependency_lock").get()?.id !== 1)
 			throw new Error("SNAPSHOT_DEPENDENCY_LOCK_POISONED");
 		return Object.freeze({
 			check(): void {
 				if (!active) throw new Error("SNAPSHOT_DEPENDENCY_LOCK_RELEASED");
-				if (database.prepare("SELECT id FROM snapshot_dependency_lock").get()?.id !== 1)
+				if (cachedStatement(database, "SELECT id FROM snapshot_dependency_lock").get()?.id !== 1)
 					throw new Error("SNAPSHOT_DEPENDENCY_LOCK_LOST");
 			},
 			release(): void {

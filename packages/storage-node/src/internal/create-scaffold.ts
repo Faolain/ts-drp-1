@@ -69,6 +69,7 @@ import { hasExpectedPhysicalSchema, SCHEMA } from "./schema-sqlite.js";
 import { sqliteFilename } from "./sqlite-filename.js";
 import type { LocalSessionLifetime } from "./local-session-lifetime.js";
 import { enforceNativeLocalSessionFile, nativeLocalSessionSchemaExtraRows } from "./local-session-lifetime.js";
+import { cachedStatement } from "./sqlite-statement-cache.js";
 
 export type SqliteMutationOperation = Exclude<
 	StorageAdapterCommand["kind"],
@@ -325,9 +326,10 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 				return Promise.resolve(admitted);
 			}
 			if (absent) {
-				const insert = this.connection
-					.prepare("INSERT INTO retirement_controls(object_id, record) VALUES (?, ?)")
-					.run(objectId, expected);
+				const insert = cachedStatement(
+					this.connection,
+					"INSERT INTO retirement_controls(object_id, record) VALUES (?, ?)"
+				).run(objectId, expected);
 				requireOneChange(insert.changes, "retirement control initialization");
 			}
 			const expectedHead = headFingerprint(head.value);
@@ -528,9 +530,10 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 				return { ok: false, reason: "READ_STALE_ROLE_VIEW" };
 			}
 			postimage = after.value.imageDigest;
-			const write = this.connection
-				.prepare("UPDATE retirement_controls SET record = ? WHERE object_id = ?")
-				.run(bytes, objectId);
+			const write = cachedStatement(
+				this.connection,
+				"UPDATE retirement_controls SET record = ? WHERE object_id = ?"
+			).run(bytes, objectId);
 			requireOneChange(write.changes, "retirement control write");
 			this.connection.exec("COMMIT");
 			active = false;
@@ -880,9 +883,9 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 		for (const requirement of prepared.requirements) {
 			switch (requirement.kind) {
 				case "head": {
-					const row = this.connection
-						.prepare("SELECT head_record FROM objects WHERE object_id = ?")
-						.get(requirement.objectId) as DatabaseRow | undefined;
+					const row = cachedStatement(this.connection, "SELECT head_record FROM objects WHERE object_id = ?").get(
+						requirement.objectId
+					) as DatabaseRow | undefined;
 					const classified = classifyPersistedState({
 						kind: "head",
 						objectId: requirement.objectId,
@@ -900,16 +903,14 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 				case "generation-page": {
 					const rows = (
 						requirement.afterGenerationId === null
-							? this.connection
-									.prepare(
-										"SELECT generation_id, record FROM generations WHERE object_id = ? ORDER BY generation_id LIMIT ?"
-									)
-									.all(requirement.objectId, requirement.limitPlusOne)
-							: this.connection
-									.prepare(
-										"SELECT generation_id, record FROM generations WHERE object_id = ? AND generation_id > ? ORDER BY generation_id LIMIT ?"
-									)
-									.all(requirement.objectId, requirement.afterGenerationId, requirement.limitPlusOne)
+							? cachedStatement(
+									this.connection,
+									"SELECT generation_id, record FROM generations WHERE object_id = ? ORDER BY generation_id LIMIT ?"
+								).all(requirement.objectId, requirement.limitPlusOne)
+							: cachedStatement(
+									this.connection,
+									"SELECT generation_id, record FROM generations WHERE object_id = ? AND generation_id > ? ORDER BY generation_id LIMIT ?"
+								).all(requirement.objectId, requirement.afterGenerationId, requirement.limitPlusOne)
 					) as DatabaseRow[];
 					facts.push({
 						afterGenerationId: requirement.afterGenerationId,
@@ -946,9 +947,10 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 		return facts;
 	}
 	private loadGeneration(objectId: StorageObjectId, generationId: GenerationId, facts: StorageAdapterFact[]): void {
-		const row = this.connection
-			.prepare("SELECT record FROM generations WHERE object_id = ? AND generation_id = ?")
-			.get(objectId, generationId) as DatabaseRow | undefined;
+		const row = cachedStatement(
+			this.connection,
+			"SELECT record FROM generations WHERE object_id = ? AND generation_id = ?"
+		).get(objectId, generationId) as DatabaseRow | undefined;
 		if (row === undefined) {
 			facts.push({ kind: "generation", objectId, generationId, generationRecord: null });
 			return;
@@ -965,7 +967,7 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 
 	private loadBlob(digest: BlobDigest, facts: StorageAdapterFact[], loaded: Set<BlobDigest>): void {
 		if (loaded.has(digest)) return;
-		const row = this.connection.prepare("SELECT bytes FROM blobs WHERE digest = ?").get(digest) as
+		const row = cachedStatement(this.connection, "SELECT bytes FROM blobs WHERE digest = ?").get(digest) as
 			| DatabaseRow
 			| undefined;
 		facts.push({ kind: "blob", digest, bytes: row === undefined ? null : databaseBytes(row.bytes) });
@@ -979,9 +981,10 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 	): void {
 		const key = `${scope.objectId}\0${scope.generationId}\0${scope.digest}`;
 		if (loaded.has(key)) return;
-		const row = this.connection
-			.prepare("SELECT 1 FROM promotions WHERE object_id = ? AND generation_id = ? AND digest = ?")
-			.get(scope.objectId, scope.generationId, scope.digest);
+		const row = cachedStatement(
+			this.connection,
+			"SELECT 1 FROM promotions WHERE object_id = ? AND generation_id = ? AND digest = ?"
+		).get(scope.objectId, scope.generationId, scope.digest);
 		if (row !== undefined) facts.push({ kind: "promotion", ...scope });
 		loaded.add(key);
 	}
@@ -1027,9 +1030,9 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 	}
 
 	private readHeadWithinTransaction(objectId: StorageObjectId): StoreResult<ExpectedHead> {
-		const row = this.connection.prepare("SELECT head_record FROM objects WHERE object_id = ?").get(objectId) as
-			| DatabaseRow
-			| undefined;
+		const row = cachedStatement(this.connection, "SELECT head_record FROM objects WHERE object_id = ?").get(
+			objectId
+		) as DatabaseRow | undefined;
 		const classified = classifyPersistedState({
 			kind: "head",
 			objectId,
@@ -1050,16 +1053,14 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 		for (;;) {
 			const rows = (
 				after === null
-					? this.connection
-							.prepare(
-								"SELECT generation_id, record FROM generations WHERE object_id = ? ORDER BY generation_id LIMIT ?"
-							)
-							.all(objectId, 129)
-					: this.connection
-							.prepare(
-								"SELECT generation_id, record FROM generations WHERE object_id = ? AND generation_id > ? ORDER BY generation_id LIMIT ?"
-							)
-							.all(objectId, after, 129)
+					? cachedStatement(
+							this.connection,
+							"SELECT generation_id, record FROM generations WHERE object_id = ? ORDER BY generation_id LIMIT ?"
+						).all(objectId, 129)
+					: cachedStatement(
+							this.connection,
+							"SELECT generation_id, record FROM generations WHERE object_id = ? AND generation_id > ? ORDER BY generation_id LIMIT ?"
+						).all(objectId, after, 129)
 			) as DatabaseRow[];
 			for (const row of rows) {
 				const classified = classifyPersistedState({
@@ -1146,14 +1147,15 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 		) {
 			if (request.kind === "promotion") {
 				const present =
-					this.connection
-						.prepare("SELECT 1 FROM promotions WHERE object_id = ? AND generation_id = ? AND digest = ?")
-						.get(objectId, generation.generationId, request.reference.digest) !== undefined;
+					cachedStatement(
+						this.connection,
+						"SELECT 1 FROM promotions WHERE object_id = ? AND generation_id = ? AND digest = ?"
+					).get(objectId, generation.generationId, request.reference.digest) !== undefined;
 				storageAdapterClosureVerifier.acceptPromotion(session, present);
 			} else {
-				const row = this.connection
-					.prepare("SELECT bytes FROM blobs WHERE digest = ?")
-					.get(request.reference.digest) as DatabaseRow | undefined;
+				const row = cachedStatement(this.connection, "SELECT bytes FROM blobs WHERE digest = ?").get(
+					request.reference.digest
+				) as DatabaseRow | undefined;
 				storageAdapterClosureVerifier.acceptBlob(session, row === undefined ? null : row.bytes);
 			}
 		}
@@ -1182,17 +1184,24 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 				) {
 					throw new Error("adapter emitted an invalid generation write");
 				}
-				this.connection
-					.prepare("INSERT OR IGNORE INTO objects(object_id, head_record) VALUES (?, NULL)")
-					.run(write.objectId);
+				cachedStatement(this.connection, "INSERT OR IGNORE INTO objects(object_id, head_record) VALUES (?, NULL)").run(
+					write.objectId
+				);
 				observe("object-ensure");
-				const exists = this.connection
-					.prepare("SELECT 1 FROM generations WHERE object_id = ? AND generation_id = ?")
-					.get(write.objectId, write.generationId);
+				const exists = cachedStatement(
+					this.connection,
+					"SELECT 1 FROM generations WHERE object_id = ? AND generation_id = ?"
+				).get(write.objectId, write.generationId);
 				const statement =
 					exists === undefined
-						? this.connection.prepare("INSERT INTO generations(object_id, generation_id, record) VALUES (?, ?, ?)")
-						: this.connection.prepare("UPDATE generations SET record = ? WHERE object_id = ? AND generation_id = ?");
+						? cachedStatement(
+								this.connection,
+								"INSERT INTO generations(object_id, generation_id, record) VALUES (?, ?, ?)"
+							)
+						: cachedStatement(
+								this.connection,
+								"UPDATE generations SET record = ? WHERE object_id = ? AND generation_id = ?"
+							);
 				const result =
 					exists === undefined
 						? statement.run(write.objectId, write.generationId, new Uint8Array(write.record))
@@ -1206,28 +1215,29 @@ class SqliteAheDurableStore implements AheBoundedRecoveryRoleStore {
 				if (!decoded.ok || decoded.value.kind !== "present" || decoded.value.objectId !== write.objectId) {
 					throw new Error("adapter emitted an invalid head write");
 				}
-				const result = this.connection
-					.prepare(
-						"INSERT INTO objects(object_id, head_record) VALUES (?, ?) " +
-							"ON CONFLICT(object_id) DO UPDATE SET head_record = excluded.head_record"
-					)
-					.run(write.objectId, new Uint8Array(write.record));
+				const result = cachedStatement(
+					this.connection,
+					"INSERT INTO objects(object_id, head_record) VALUES (?, ?) " +
+						"ON CONFLICT(object_id) DO UPDATE SET head_record = excluded.head_record"
+				).run(write.objectId, new Uint8Array(write.record));
 				observe("head-upsert");
 				requireOneChange(result.changes, "head write");
 				return;
 			}
 			case "insert-blob": {
-				const result = this.connection
-					.prepare("INSERT INTO blobs(digest, bytes) VALUES (?, ?)")
-					.run(write.digest, new Uint8Array(write.bytes));
+				const result = cachedStatement(this.connection, "INSERT INTO blobs(digest, bytes) VALUES (?, ?)").run(
+					write.digest,
+					new Uint8Array(write.bytes)
+				);
 				observe("blob-insert");
 				requireOneChange(result.changes, "blob insert");
 				return;
 			}
 			case "insert-promotion": {
-				const result = this.connection
-					.prepare("INSERT INTO promotions(object_id, generation_id, digest) VALUES (?, ?, ?)")
-					.run(write.objectId, write.generationId, write.digest);
+				const result = cachedStatement(
+					this.connection,
+					"INSERT INTO promotions(object_id, generation_id, digest) VALUES (?, ?, ?)"
+				).run(write.objectId, write.generationId, write.digest);
 				observe("promotion-insert");
 				requireOneChange(result.changes, "promotion insert");
 			}
@@ -1279,30 +1289,32 @@ function configureConnection(connection: DatabaseSync, initialization: "create" 
 	connection.exec("PRAGMA foreign_keys = ON");
 	if (initialization === "reopen") {
 		if (
-			Number(Object.values(connection.prepare("PRAGMA user_version").get() ?? {})[0]) !== 2 ||
+			Number(Object.values(cachedStatement(connection, "PRAGMA user_version").get() ?? {})[0]) !== 2 ||
 			!hasExpectedPhysicalSchema(connection) ||
-			String(Object.values(connection.prepare("PRAGMA journal_mode").get() ?? {})[0]).toLowerCase() !== "wal"
+			String(Object.values(cachedStatement(connection, "PRAGMA journal_mode").get() ?? {})[0]).toLowerCase() !== "wal"
 		)
 			throw new PersistedStorageError("UNSUPPORTED_STORAGE_SCHEMA");
 		connection.exec("PRAGMA synchronous = FULL");
 		return;
 	}
 	const tableCount = (
-		connection
-			.prepare("SELECT count(*) AS count FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
-			.get() as DatabaseRow
+		cachedStatement(
+			connection,
+			"SELECT count(*) AS count FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
+		).get() as DatabaseRow
 	).count;
 	if (Number(tableCount) - nativeLocalSessionSchemaExtraRows(connection) === 0) {
-		if (Number(Object.values(connection.prepare("PRAGMA user_version").get() ?? {})[0]) !== 0)
+		if (Number(Object.values(cachedStatement(connection, "PRAGMA user_version").get() ?? {})[0]) !== 0)
 			throw new PersistedStorageError("UNSUPPORTED_STORAGE_SCHEMA");
 		connection.exec("BEGIN IMMEDIATE");
 		try {
-			const nativeTableCount = connection
-				.prepare("SELECT count(*) AS count FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
-				.get() as DatabaseRow;
+			const nativeTableCount = cachedStatement(
+				connection,
+				"SELECT count(*) AS count FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
+			).get() as DatabaseRow;
 			if (
 				Number(nativeTableCount.count) - nativeLocalSessionSchemaExtraRows(connection) !== 0 ||
-				Number(Object.values(connection.prepare("PRAGMA user_version").get() ?? {})[0]) !== 0
+				Number(Object.values(cachedStatement(connection, "PRAGMA user_version").get() ?? {})[0]) !== 0
 			)
 				throw new PersistedStorageError("UNSUPPORTED_STORAGE_SCHEMA");
 			connection.exec(SCHEMA);
@@ -1318,13 +1330,13 @@ function configureConnection(connection: DatabaseSync, initialization: "create" 
 			throw error;
 		}
 	}
-	const version = Number(Object.values(connection.prepare("PRAGMA user_version").get() ?? {})[0]);
+	const version = Number(Object.values(cachedStatement(connection, "PRAGMA user_version").get() ?? {})[0]);
 	if (version === 0 && hasExpectedPhysicalSchema(connection, 0)) {
 		connection.exec("BEGIN IMMEDIATE");
 		try {
 			if (
 				!hasExpectedPhysicalSchema(connection, 0) ||
-				Number(Object.values(connection.prepare("PRAGMA user_version").get() ?? {})[0]) !== 0
+				Number(Object.values(cachedStatement(connection, "PRAGMA user_version").get() ?? {})[0]) !== 0
 			)
 				throw new PersistedStorageError("UNSUPPORTED_STORAGE_SCHEMA");
 			connection.exec(
@@ -1347,7 +1359,7 @@ function configureConnection(connection: DatabaseSync, initialization: "create" 
 		try {
 			if (
 				!hasExpectedPhysicalSchema(connection, 1) ||
-				connection.prepare("SELECT 1 FROM retirement_controls LIMIT 1").get() !== undefined
+				cachedStatement(connection, "SELECT 1 FROM retirement_controls LIMIT 1").get() !== undefined
 			)
 				throw new PersistedStorageError("UNSUPPORTED_STORAGE_SCHEMA");
 			connection.exec("PRAGMA user_version = 2");
@@ -1362,7 +1374,7 @@ function configureConnection(connection: DatabaseSync, initialization: "create" 
 			throw cause;
 		}
 	}
-	if (Number(Object.values(connection.prepare("PRAGMA user_version").get() ?? {})[0]) !== 2)
+	if (Number(Object.values(cachedStatement(connection, "PRAGMA user_version").get() ?? {})[0]) !== 2)
 		throw new PersistedStorageError("UNSUPPORTED_STORAGE_SCHEMA");
 	if (!hasExpectedPhysicalSchema(connection)) throw new PersistedStorageError("UNSUPPORTED_STORAGE_SCHEMA");
 	connection.exec("PRAGMA journal_mode = WAL");

@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { acquireSnapshotDependencyLock } from "./snapshot-dependency-lock.js";
 import { sqliteFilename } from "./sqlite-filename.js";
+import { cachedStatement } from "./sqlite-statement-cache.js";
 
 export interface LocalSessionSelector { readonly slot: number; readonly incarnation: number; }
 export interface LocalSessionObservation extends LocalSessionSelector { readonly status: "active" | "retiring" | "free"; }
@@ -90,9 +91,9 @@ export class LocalSessionCatalog {
 			if (!this.#initialized && !this.#catalogExisted) chmodSync(catalogFilename, 0o600);
 			database.exec("PRAGMA busy_timeout=0; PRAGMA synchronous=FULL");
 			if (!this.#initialized) database.exec("PRAGMA journal_mode=WAL");
-			else if (database.prepare("PRAGMA journal_mode").get()?.journal_mode !== "wal") throw new Error("LOCAL_SESSION_CATALOG_DURABILITY_LOST");
+			else if (cachedStatement(database, "PRAGMA journal_mode").get()?.journal_mode !== "wal") throw new Error("LOCAL_SESSION_CATALOG_DURABILITY_LOST");
 			database.exec(write ? "BEGIN IMMEDIATE" : "BEGIN"); active = true;
-			const schema = database.prepare(`SELECT CASE WHEN typeof(name)='text' AND length(CAST(name AS BLOB))<=32 THEN name ELSE NULL END AS name,CASE WHEN typeof(sql)='text' AND length(CAST(sql AS BLOB))<=${schemaBytes} THEN sql ELSE NULL END AS sql FROM sqlite_schema WHERE name NOT GLOB 'sqlite_*' LIMIT ${expectedSchema.length + 1}`).all();
+			const schema = cachedStatement(database, `SELECT CASE WHEN typeof(name)='text' AND length(CAST(name AS BLOB))<=32 THEN name ELSE NULL END AS name,CASE WHEN typeof(sql)='text' AND length(CAST(sql AS BLOB))<=${schemaBytes} THEN sql ELSE NULL END AS sql FROM sqlite_schema WHERE name NOT GLOB 'sqlite_*' LIMIT ${expectedSchema.length + 1}`).all();
 			if (!schema.length) {
 				if (this.#initialized || this.#catalogExisted) throw new Error("LOCAL_SESSION_CATALOG_LOST");
 				// Missing/empty catalog beside a preexisting stable lease file is
@@ -100,10 +101,10 @@ export class LocalSessionCatalog {
 				for (let slot = 0; slot < this.slots; slot++) if (existsSync(this.#lockFile(slot))) throw new Error("LOCAL_SESSION_CATALOG_LOST");
 				for (let handle = 0; handle < this.handles; handle++) if (existsSync(this.#handleFile(handle))) throw new Error("LOCAL_SESSION_CATALOG_LOST");
 				for (const ddl of expectedSchema) database.exec(ddl);
-				if (this.#accountIdentity !== undefined) database.prepare("INSERT INTO local_session_account VALUES(1,?,?)").run(this.#accountIdentity.identity, this.#accountIdentity.owner);
-				database.prepare("INSERT INTO local_session_policy VALUES(1,?,?,?,'initializing')").run(this.slots, this.storeScopes, this.handles);
+				if (this.#accountIdentity !== undefined) cachedStatement(database, "INSERT INTO local_session_account VALUES(1,?,?)").run(this.#accountIdentity.identity, this.#accountIdentity.owner);
+				cachedStatement(database, "INSERT INTO local_session_policy VALUES(1,?,?,?,'initializing')").run(this.slots, this.storeScopes, this.handles);
 				for (let slot = 0; slot < this.slots; slot++) {
-					database.prepare("INSERT INTO local_session_slots VALUES(?,0,'free',1)").run(slot);
+					cachedStatement(database, "INSERT INTO local_session_slots VALUES(?,0,'free',1)").run(slot);
 				}
 				// Commit the exact finite installation intent BEFORE any coordination
 				// file is created. A crash during their installation can resume from
@@ -112,36 +113,36 @@ export class LocalSessionCatalog {
 				database.exec("BEGIN IMMEDIATE"); active = true;
 			} else if (schema.length !== expectedSchema.length || expectedSchema.some((ddl) => !schema.some((row) => row.sql === ddl))) throw new Error("LOCAL_SESSION_CATALOG_POISONED");
 			if (this.#accountIdentity !== undefined) {
-				const identity = database.prepare("SELECT id,CASE WHEN typeof(identity)='blob' AND length(identity)=32 THEN identity ELSE NULL END AS identity,CASE WHEN typeof(owner)='blob' AND length(owner)=32 THEN owner ELSE NULL END AS owner FROM local_session_account LIMIT 2").all();
+				const identity = cachedStatement(database, "SELECT id,CASE WHEN typeof(identity)='blob' AND length(identity)=32 THEN identity ELSE NULL END AS identity,CASE WHEN typeof(owner)='blob' AND length(owner)=32 THEN owner ELSE NULL END AS owner FROM local_session_account LIMIT 2").all();
 				if (identity.length !== 1 || identity[0]?.id !== 1 || !(identity[0].identity instanceof Uint8Array) || !(identity[0].owner instanceof Uint8Array) || !Buffer.from(identity[0].identity).equals(this.#accountIdentity.identity) || !Buffer.from(identity[0].owner).equals(this.#accountIdentity.owner)) throw new Error("LOCAL_SESSION_ACCOUNT_IDENTITY_CHANGED");
-				if (Number(database.prepare("SELECT count(*) AS n FROM local_session_terminal").get()?.n) > this.slots || database.prepare(`SELECT 1 FROM local_session_terminal AS t LEFT JOIN local_session_slots AS s ON s.slot=t.slot WHERE s.slot IS NULL OR t.incarnation<>s.incarnation OR typeof(t.frame)<>'blob' OR length(t.frame)>${terminalLimits.maxBytes} LIMIT 1`).get()) throw new Error("LOCAL_SESSION_TERMINAL_INTENT_POISONED");
+				if (Number(cachedStatement(database, "SELECT count(*) AS n FROM local_session_terminal").get()?.n) > this.slots || cachedStatement(database, `SELECT 1 FROM local_session_terminal AS t LEFT JOIN local_session_slots AS s ON s.slot=t.slot WHERE s.slot IS NULL OR t.incarnation<>s.incarnation OR typeof(t.frame)<>'blob' OR length(t.frame)>${terminalLimits.maxBytes} LIMIT 1`).get()) throw new Error("LOCAL_SESSION_TERMINAL_INTENT_POISONED");
 			}
-			const policy = database.prepare("SELECT CASE WHEN typeof(id)='integer' THEN id ELSE NULL END AS id,CASE WHEN typeof(slots)='integer' THEN slots ELSE NULL END AS slots,CASE WHEN typeof(store_scopes)='integer' THEN store_scopes ELSE NULL END AS store_scopes,CASE WHEN typeof(handles)='integer' THEN handles ELSE NULL END AS handles,CASE WHEN typeof(setup)='text' AND length(CAST(setup AS BLOB))<=12 THEN setup ELSE NULL END AS setup FROM local_session_policy LIMIT 2").all();
+			const policy = cachedStatement(database, "SELECT CASE WHEN typeof(id)='integer' THEN id ELSE NULL END AS id,CASE WHEN typeof(slots)='integer' THEN slots ELSE NULL END AS slots,CASE WHEN typeof(store_scopes)='integer' THEN store_scopes ELSE NULL END AS store_scopes,CASE WHEN typeof(handles)='integer' THEN handles ELSE NULL END AS handles,CASE WHEN typeof(setup)='text' AND length(CAST(setup AS BLOB))<=12 THEN setup ELSE NULL END AS setup FROM local_session_policy LIMIT 2").all();
 			if (policy.length !== 1 || policy[0]?.id !== 1 || policy[0]?.slots !== this.slots || policy[0]?.store_scopes !== this.storeScopes || policy[0]?.handles !== this.handles ||
 				!["initializing", "ready"].includes(String(policy[0]?.setup)) ||
-				database.prepare("SELECT count(*) AS n FROM local_session_slots").get()?.n !== this.slots) throw new Error("LOCAL_SESSION_CATALOG_POLICY_OR_STATE_MISMATCH");
-			const slots = database.prepare(`SELECT ${slotProjection} FROM local_session_slots ORDER BY slot LIMIT ?`).all(this.slots + 1);
+				cachedStatement(database, "SELECT count(*) AS n FROM local_session_slots").get()?.n !== this.slots) throw new Error("LOCAL_SESSION_CATALOG_POLICY_OR_STATE_MISMATCH");
+			const slots = cachedStatement(database, `SELECT ${slotProjection} FROM local_session_slots ORDER BY slot LIMIT ?`).all(this.slots + 1);
 			if (slots.length !== this.slots || slots.some((row, slot) => row.slot !== slot || !Number.isSafeInteger(row.incarnation) ||
 				Number(row.incarnation) < 0 || !["active", "retiring", "free"].includes(String(row.status)) ||
 				(row.status !== "free" && row.incarnation === 0))) throw new Error("LOCAL_SESSION_CATALOG_POISONED");
-			if (Number(database.prepare("SELECT count(*) AS n FROM local_session_files").get()?.n) > this.slots * this.storeScopes ||
-				database.prepare("SELECT 1 FROM local_session_files AS f LEFT JOIN local_session_slots AS s ON s.slot=f.slot WHERE s.slot IS NULL OR s.incarnation<>f.incarnation OR s.status='free' OR typeof(f.digest)<>'text' OR length(CAST(f.digest AS BLOB))<>64 OR f.digest GLOB '*[^0-9a-f]*' OR typeof(f.family)<>'text' OR length(CAST(f.family AS BLOB))>9 OR f.family NOT IN ('ahe','issuance','journal','snapshots','signing','room-head') LIMIT 1").get())
+			if (Number(cachedStatement(database, "SELECT count(*) AS n FROM local_session_files").get()?.n) > this.slots * this.storeScopes ||
+				cachedStatement(database, "SELECT 1 FROM local_session_files AS f LEFT JOIN local_session_slots AS s ON s.slot=f.slot WHERE s.slot IS NULL OR s.incarnation<>f.incarnation OR s.status='free' OR typeof(f.digest)<>'text' OR length(CAST(f.digest AS BLOB))<>64 OR f.digest GLOB '*[^0-9a-f]*' OR typeof(f.family)<>'text' OR length(CAST(f.family AS BLOB))>9 OR f.family NOT IN ('ahe','issuance','journal','snapshots','signing','room-head') LIMIT 1").get())
 				throw new Error("LOCAL_SESSION_FILE_DECLARATION_POISONED");
-			if (Number(database.prepare("SELECT count(*) AS n FROM local_session_keys").get()?.n) > this.slots ||
-				database.prepare(`SELECT 1 FROM local_session_slots AS s LEFT JOIN local_session_keys AS k ON k.slot=s.slot WHERE typeof(s.key_retired)<>'integer' OR s.key_retired NOT IN (0,1) OR (s.status='active' AND s.key_retired<>0) OR (s.status='free' AND s.key_retired<>1) OR (s.key_retired=0 AND (k.slot IS NULL OR k.incarnation<>s.incarnation OR ${this.account === undefined ? "typeof(k.seed)<>'blob' OR length(k.seed)<>32" : "k.seed IS NOT NULL"} OR (k.public_key IS NOT NULL AND (typeof(k.public_key)<>'blob' OR length(k.public_key)<>32)) OR (k.room_binding IS NOT NULL AND (typeof(k.room_binding)<>'blob' OR length(k.room_binding)<>32)))) OR (s.key_retired=1 AND k.slot IS NOT NULL) LIMIT 1`).get() ||
-				database.prepare("SELECT 1 FROM local_session_keys AS k LEFT JOIN local_session_slots AS s ON s.slot=k.slot WHERE s.slot IS NULL LIMIT 1").get()) throw new Error("LOCAL_SESSION_OWNED_KEY_STATE_LOST");
-			if (database.prepare("SELECT 1 FROM local_session_keys WHERE genesis_binding IS NOT NULL AND (typeof(genesis_binding)<>'blob' OR length(genesis_binding)<>32) LIMIT 1").get()) throw new Error("LOCAL_SESSION_OWNED_KEY_STATE_LOST");
+			if (Number(cachedStatement(database, "SELECT count(*) AS n FROM local_session_keys").get()?.n) > this.slots ||
+				cachedStatement(database, `SELECT 1 FROM local_session_slots AS s LEFT JOIN local_session_keys AS k ON k.slot=s.slot WHERE typeof(s.key_retired)<>'integer' OR s.key_retired NOT IN (0,1) OR (s.status='active' AND s.key_retired<>0) OR (s.status='free' AND s.key_retired<>1) OR (s.key_retired=0 AND (k.slot IS NULL OR k.incarnation<>s.incarnation OR ${this.account === undefined ? "typeof(k.seed)<>'blob' OR length(k.seed)<>32" : "k.seed IS NOT NULL"} OR (k.public_key IS NOT NULL AND (typeof(k.public_key)<>'blob' OR length(k.public_key)<>32)) OR (k.room_binding IS NOT NULL AND (typeof(k.room_binding)<>'blob' OR length(k.room_binding)<>32)))) OR (s.key_retired=1 AND k.slot IS NOT NULL) LIMIT 1`).get() ||
+				cachedStatement(database, "SELECT 1 FROM local_session_keys AS k LEFT JOIN local_session_slots AS s ON s.slot=k.slot WHERE s.slot IS NULL LIMIT 1").get()) throw new Error("LOCAL_SESSION_OWNED_KEY_STATE_LOST");
+			if (cachedStatement(database, "SELECT 1 FROM local_session_keys WHERE genesis_binding IS NOT NULL AND (typeof(genesis_binding)<>'blob' OR length(genesis_binding)<>32) LIMIT 1").get()) throw new Error("LOCAL_SESSION_OWNED_KEY_STATE_LOST");
 			if (policy[0]?.setup === "initializing") {
 				// Installation cannot have admitted a key, lease or store. Never turn
 				// mutated/lost active state back into a fresh slot incarnation.
 				if (this.#initialized || slots.some(row => row.incarnation !== 0 || row.status !== "free") ||
-					database.prepare("SELECT 1 FROM local_session_keys LIMIT 1").get() ||
-					database.prepare("SELECT 1 FROM local_session_files LIMIT 1").get()) throw new Error("LOCAL_SESSION_CATALOG_SETUP_POISONED");
+					cachedStatement(database, "SELECT 1 FROM local_session_keys LIMIT 1").get() ||
+					cachedStatement(database, "SELECT 1 FROM local_session_files LIMIT 1").get()) throw new Error("LOCAL_SESSION_CATALOG_SETUP_POISONED");
 				// Existing exact lock files validate; an interrupted empty lock-file
 				// installation is completed only under this committed setup intent.
 				for (let slot = 0; slot < this.slots; slot++) acquireSnapshotDependencyLock(this.#lockFile(slot), "exclusive", true).release();
 				for (let handle = 0; handle < this.handles; handle++) acquireSnapshotDependencyLock(this.#handleFile(handle), "exclusive", true).release();
-				database.prepare("UPDATE local_session_policy SET setup='ready' WHERE id=1 AND setup='initializing'").run();
+				cachedStatement(database, "UPDATE local_session_policy SET setup='ready' WHERE id=1 AND setup='initializing'").run();
 			} else if (!this.#initialized) {
 				for (let slot = 0; slot < this.slots; slot++) if (!existsSync(this.#lockFile(slot))) throw new Error("LOCAL_SESSION_COORDINATION_LOST");
 				for (let handle = 0; handle < this.handles; handle++) if (!existsSync(this.#handleFile(handle))) throw new Error("LOCAL_SESSION_COORDINATION_LOST");
@@ -160,12 +161,12 @@ export class LocalSessionCatalog {
 		return Object.freeze({ slot, incarnation });
 	}
 	#row(database: DatabaseSync, selector: LocalSessionSelector): LocalSessionObservation {
-		const row = database.prepare(`SELECT ${slotProjection} FROM local_session_slots WHERE slot=?`).get(selector.slot);
+		const row = cachedStatement(database, `SELECT ${slotProjection} FROM local_session_slots WHERE slot=?`).get(selector.slot);
 		if (row?.incarnation !== selector.incarnation || !["active", "retiring", "free"].includes(String(row.status))) throw new Error("STALE_OR_CORRUPT_LOCAL_SESSION");
 		return row as unknown as LocalSessionObservation;
 	}
 	inspect(): readonly LocalSessionObservation[] {
-		return this.#transaction(false, (database) => Object.freeze(database.prepare(`SELECT ${slotProjection} FROM local_session_slots ORDER BY slot LIMIT ?`).all(this.slots + 1).map((row, slot) => {
+		return this.#transaction(false, (database) => Object.freeze(cachedStatement(database, `SELECT ${slotProjection} FROM local_session_slots ORDER BY slot LIMIT ?`).all(this.slots + 1).map((row, slot) => {
 			if (row.slot !== slot || !Number.isSafeInteger(row.incarnation) || Number(row.incarnation) < 0 || !["active", "retiring", "free"].includes(String(row.status))) throw new Error("LOCAL_SESSION_CATALOG_POISONED");
 			return Object.freeze({ slot, incarnation: Number(row.incarnation), status: row.status as LocalSessionObservation["status"] });
 		})));
@@ -174,18 +175,18 @@ export class LocalSessionCatalog {
 	allocate(): LocalSessionSelector {
 		if (this.account !== undefined) throw new Error("LOCAL_SESSION_INDEPENDENT_ACQUISITION_REQUIRED");
 		return this.#transaction(true, (database) => {
-			const row = database.prepare(`SELECT ${slotProjection} FROM local_session_slots WHERE status='free' ORDER BY slot LIMIT 1`).get();
+			const row = cachedStatement(database, `SELECT ${slotProjection} FROM local_session_slots WHERE status='free' ORDER BY slot LIMIT 1`).get();
 			if (!row) throw new Error("LOCAL_SESSION_CAPACITY");
 			if (!Number.isSafeInteger(row.incarnation) || Number(row.incarnation) < 0 || row.incarnation === Number.MAX_SAFE_INTEGER) throw new Error("LOCAL_SESSION_INCARNATION_EXHAUSTED");
 			const selector = Object.freeze({ slot: Number(row.slot), incarnation: Number(row.incarnation) + 1 });
 			if (!Number.isSafeInteger(selector.slot) || selector.slot < 0 || selector.slot >= this.slots) throw new Error("LOCAL_SESSION_CATALOG_POISONED");
 			const lock = acquireSnapshotDependencyLock(this.#lockFile(selector.slot), "exclusive");
 			try {
-				if (database.prepare("SELECT 1 FROM local_session_files WHERE slot=? LIMIT 1").get(selector.slot)) throw new Error("LOCAL_SESSION_UNRECLAIMED_FILES");
+				if (cachedStatement(database, "SELECT 1 FROM local_session_files WHERE slot=? LIMIT 1").get(selector.slot)) throw new Error("LOCAL_SESSION_UNRECLAIMED_FILES");
 				const seed = randomBytes(32);
-				try { database.prepare("INSERT INTO local_session_keys(slot,incarnation,seed) VALUES(?,?,?)").run(selector.slot, selector.incarnation, seed); }
+				try { cachedStatement(database, "INSERT INTO local_session_keys(slot,incarnation,seed) VALUES(?,?,?)").run(selector.slot, selector.incarnation, seed); }
 				finally { seed.fill(0); }
-				database.prepare("UPDATE local_session_slots SET incarnation=?,status='active',key_retired=0 WHERE slot=? AND status='free'").run(selector.incarnation, selector.slot);
+				cachedStatement(database, "UPDATE local_session_slots SET incarnation=?,status='active',key_retired=0 WHERE slot=? AND status='free'").run(selector.incarnation, selector.slot);
 			} finally { lock.release(); }
 			return selector;
 		});
@@ -197,15 +198,15 @@ export class LocalSessionCatalog {
 		if (this.account === undefined || account.authority !== this.account || !Buffer.from(account.identity).equals(this.#accountIdentity!.identity) || !Buffer.from(account.owner).equals(this.#accountIdentity!.owner)) throw new Error("LOCAL_SESSION_ACCOUNT_IDENTITY_CHANGED");
 		const selector = this.capture(account.selector);
 		return this.#transaction(true, database => {
-			const prior = database.prepare(`SELECT ${slotProjection} FROM local_session_slots WHERE slot=?`).get(selector.slot);
+			const prior = cachedStatement(database, `SELECT ${slotProjection} FROM local_session_slots WHERE slot=?`).get(selector.slot);
 			if (prior?.incarnation === selector.incarnation && prior.status === "active") return selector; // Exact interrupted/resumed mirror only.
-			if (prior?.status !== "free" || !Number.isSafeInteger(prior.incarnation) || Number(prior.incarnation) >= selector.incarnation || database.prepare("SELECT 1 FROM local_session_files WHERE slot=? LIMIT 1").get(selector.slot)) throw new Error("LOCAL_SESSION_RETAINED_INCARNATION_CONFLICT");
+			if (prior?.status !== "free" || !Number.isSafeInteger(prior.incarnation) || Number(prior.incarnation) >= selector.incarnation || cachedStatement(database, "SELECT 1 FROM local_session_files WHERE slot=? LIMIT 1").get(selector.slot)) throw new Error("LOCAL_SESSION_RETAINED_INCARNATION_CONFLICT");
 			const held = acquireSnapshotDependencyLock(this.#lockFile(selector.slot), "exclusive");
 			try {
 				account.check();
-				database.prepare("DELETE FROM local_session_terminal WHERE slot=?").run(selector.slot);
-				database.prepare("INSERT INTO local_session_keys(slot,incarnation,seed) VALUES(?,?,NULL)").run(selector.slot, selector.incarnation);
-				database.prepare("UPDATE local_session_slots SET incarnation=?,status='active',key_retired=0 WHERE slot=? AND status='free'").run(selector.incarnation, selector.slot);
+				cachedStatement(database, "DELETE FROM local_session_terminal WHERE slot=?").run(selector.slot);
+				cachedStatement(database, "INSERT INTO local_session_keys(slot,incarnation,seed) VALUES(?,?,NULL)").run(selector.slot, selector.incarnation);
+				cachedStatement(database, "UPDATE local_session_slots SET incarnation=?,status='active',key_retired=0 WHERE slot=? AND status='free'").run(selector.incarnation, selector.slot);
 			} finally { held.release(); }
 			return selector;
 		});
@@ -228,10 +229,10 @@ export class LocalSessionCatalog {
 		const digest = hashDomain("ts-drp/disposable-local-terminal-native-intent/v1", frame);
 		this.#transaction(true, database => {
 			if (this.#row(database, selector).status !== "active") throw new Error("LOCAL_SESSION_REVOKED");
-			if (database.prepare("SELECT 1 FROM local_session_terminal WHERE slot=? AND incarnation=? LIMIT 1").get(selector.slot, selector.incarnation)) throw new Error("LOCAL_SESSION_TERMINAL_PREPARATION_PENDING");
-			const row = database.prepare("SELECT CASE WHEN typeof(public_key)='blob' AND length(public_key)=32 THEN public_key ELSE NULL END AS public_key,CASE WHEN typeof(room_binding)='blob' AND length(room_binding)=32 THEN room_binding ELSE NULL END AS room_binding FROM local_session_keys WHERE slot=? AND incarnation=?").get(selector.slot, selector.incarnation);
+			if (cachedStatement(database, "SELECT 1 FROM local_session_terminal WHERE slot=? AND incarnation=? LIMIT 1").get(selector.slot, selector.incarnation)) throw new Error("LOCAL_SESSION_TERMINAL_PREPARATION_PENDING");
+			const row = cachedStatement(database, "SELECT CASE WHEN typeof(public_key)='blob' AND length(public_key)=32 THEN public_key ELSE NULL END AS public_key,CASE WHEN typeof(room_binding)='blob' AND length(room_binding)=32 THEN room_binding ELSE NULL END AS room_binding FROM local_session_keys WHERE slot=? AND incarnation=?").get(selector.slot, selector.incarnation);
 			if (!(row?.public_key instanceof Uint8Array) || !(row.room_binding instanceof Uint8Array) || Buffer.from(row.public_key).toString("hex") !== original.author || !Buffer.from(row.room_binding).equals(original.bindingDigest)) throw new Error("LOCAL_SESSION_TERMINAL_SOURCE_MISMATCH");
-			database.prepare("INSERT INTO local_session_terminal VALUES(?,?,?) ON CONFLICT(slot) DO UPDATE SET incarnation=excluded.incarnation,frame=excluded.frame").run(selector.slot, selector.incarnation, frame);
+			cachedStatement(database, "INSERT INTO local_session_terminal VALUES(?,?,?) ON CONFLICT(slot) DO UPDATE SET incarnation=excluded.incarnation,frame=excluded.frame").run(selector.slot, selector.incarnation, frame);
 		});
 		const token = Object.freeze({});
 		preparedTerminals.set(token, Object.freeze({ admission, authority: this.account, selector, identity: Uint8Array.from(this.#accountIdentity!.identity), owner: Uint8Array.from(this.#accountIdentity!.owner), frame, digest, empty: false, author: original.author,
@@ -244,15 +245,15 @@ export class LocalSessionCatalog {
 		if (this.account === undefined) throw new Error("LOCAL_SESSION_INDEPENDENT_ACQUISITION_REQUIRED");
 		session.assertCurrent();
 		return this.#transaction(true, database => {
-			if (this.#row(database, selector).status !== "active" || database.prepare("SELECT 1 FROM local_session_files WHERE slot=? AND incarnation=? LIMIT 1").get(selector.slot, selector.incarnation)) throw new Error("LOCAL_SESSION_PROTOCOL_DISPOSITION_REQUIRED");
-			if (database.prepare("SELECT 1 FROM local_session_terminal WHERE slot=? AND incarnation=? LIMIT 1").get(selector.slot, selector.incarnation)) throw new Error("LOCAL_SESSION_TERMINAL_PREPARATION_PENDING");
-			const key = database.prepare("SELECT CASE WHEN typeof(public_key)='blob' AND length(public_key)=32 THEN public_key ELSE NULL END AS public_key,room_binding IS NULL AS room_unbound,genesis_binding IS NULL AS genesis_unbound FROM local_session_keys WHERE slot=? AND incarnation=?").get(selector.slot, selector.incarnation);
+			if (this.#row(database, selector).status !== "active" || cachedStatement(database, "SELECT 1 FROM local_session_files WHERE slot=? AND incarnation=? LIMIT 1").get(selector.slot, selector.incarnation)) throw new Error("LOCAL_SESSION_PROTOCOL_DISPOSITION_REQUIRED");
+			if (cachedStatement(database, "SELECT 1 FROM local_session_terminal WHERE slot=? AND incarnation=? LIMIT 1").get(selector.slot, selector.incarnation)) throw new Error("LOCAL_SESSION_TERMINAL_PREPARATION_PENDING");
+			const key = cachedStatement(database, "SELECT CASE WHEN typeof(public_key)='blob' AND length(public_key)=32 THEN public_key ELSE NULL END AS public_key,room_binding IS NULL AS room_unbound,genesis_binding IS NULL AS genesis_unbound FROM local_session_keys WHERE slot=? AND incarnation=?").get(selector.slot, selector.incarnation);
 			if (!(key?.public_key instanceof Uint8Array) || key.room_unbound !== 1 || key.genesis_unbound !== 1) throw new Error("LOCAL_SESSION_PROTOCOL_DISPOSITION_REQUIRED");
 			const author = Buffer.from(key.public_key).toString("hex"); session.assertOwnedAuthor(author);
 			const frame = encodeCanonical(["r11-native-terminal-v2", this.#accountIdentity!.identity, this.#accountIdentity!.owner,
 				selector.slot, selector.incarnation, author, null, encodeCanonical(["never-bound-exclusive-native-1"], ROOM_HEAD_IMAGE_LIMITS), [], handleIndex], terminalLimits);
 			const digest = hashDomain("ts-drp/disposable-local-terminal-native-intent/v1", frame);
-			database.prepare("INSERT INTO local_session_terminal VALUES(?,?,?) ON CONFLICT(slot) DO UPDATE SET incarnation=excluded.incarnation,frame=excluded.frame").run(selector.slot, selector.incarnation, frame);
+			cachedStatement(database, "INSERT INTO local_session_terminal VALUES(?,?,?) ON CONFLICT(slot) DO UPDATE SET incarnation=excluded.incarnation,frame=excluded.frame").run(selector.slot, selector.incarnation, frame);
 			const token = Object.freeze({});
 			preparedTerminals.set(token, Object.freeze({ admission: undefined, authority: this.account!, selector, identity: Uint8Array.from(this.#accountIdentity!.identity), owner: Uint8Array.from(this.#accountIdentity!.owner), frame, digest, empty: true, author,
 				check: () => this.#checkLivePreparation(selector, frame, preparationHandle), }));
@@ -275,7 +276,7 @@ export class LocalSessionCatalog {
 		if (this.account === undefined || account.authority !== this.account || account.selector.slot !== selector.slot || account.selector.incarnation !== selector.incarnation) throw new Error("LOCAL_SESSION_TERMINAL_SOURCE_MISMATCH");
 		const frame = this.#transaction(false, database => {
 			if (this.#row(database, selector).status !== "active") throw new Error("LOCAL_SESSION_REVOKED");
-			return database.prepare("SELECT 1 FROM local_session_terminal WHERE slot=? AND incarnation=?").get(selector.slot, selector.incarnation) ? this.#terminalFrame(database, selector) : undefined;
+			return cachedStatement(database, "SELECT 1 FROM local_session_terminal WHERE slot=? AND incarnation=?").get(selector.slot, selector.incarnation) ? this.#terminalFrame(database, selector) : undefined;
 		});
 		if (frame === undefined) return;
 		const index = (decodeCanonical(frame, terminalLimits) as unknown[])[9] as number;
@@ -292,7 +293,7 @@ export class LocalSessionCatalog {
 		preparation: ReturnType<typeof acquireSnapshotDependencyLock>): Promise<void> {
 		const index = this.#preparationHandleIndex(preparation);
 		const frame = this.#transaction(false, database => {
-			if (!database.prepare("SELECT 1 FROM local_session_terminal WHERE slot=? AND incarnation=?").get(selector.slot, selector.incarnation)) return undefined;
+			if (!cachedStatement(database, "SELECT 1 FROM local_session_terminal WHERE slot=? AND incarnation=?").get(selector.slot, selector.incarnation)) return undefined;
 			const captured = this.#terminalFrame(database, selector);
 			if ((decodeCanonical(captured, terminalLimits) as unknown[])[9] !== index) throw new Error("LOCAL_SESSION_TERMINAL_PREPARATION_CHANGED");
 			return captured;
@@ -312,7 +313,7 @@ export class LocalSessionCatalog {
 			this.#transaction(true, database => {
 				preparation.check(); account.assertUnfenced();
 				if (this.#row(database, selector).status !== "active" || !Buffer.from(this.#terminalFrame(database, selector)).equals(frame)) throw new Error("LOCAL_SESSION_TERMINAL_PREPARATION_CHANGED");
-				if (database.prepare("DELETE FROM local_session_terminal WHERE slot=? AND incarnation=? AND frame=?").run(selector.slot, selector.incarnation, frame).changes !== 1) throw new Error("LOCAL_SESSION_TERMINAL_PREPARATION_CHANGED");
+				if (cachedStatement(database, "DELETE FROM local_session_terminal WHERE slot=? AND incarnation=? AND frame=?").run(selector.slot, selector.incarnation, frame).changes !== 1) throw new Error("LOCAL_SESSION_TERMINAL_PREPARATION_CHANGED");
 			});
 			await original.check();
 		} catch (cause) { failed = true; primary = cause; }
@@ -328,11 +329,11 @@ export class LocalSessionCatalog {
 			const row = this.#row(database, selector), intent = this.#terminalFrame(database, selector);
 			if (!Buffer.from(hashDomain("ts-drp/disposable-local-terminal-native-intent/v1", intent)).equals(expected)) throw new Error("LOCAL_SESSION_TERMINAL_INTENT_MISMATCH");
 			if (row.status === "free") return;
-			database.prepare("UPDATE local_session_slots SET status='retiring' WHERE slot=? AND incarnation=?").run(selector.slot, selector.incarnation);
+			cachedStatement(database, "UPDATE local_session_slots SET status='retiring' WHERE slot=? AND incarnation=?").run(selector.slot, selector.incarnation);
 		});
 	}
 	#terminalFrame(database: DatabaseSync, selector: LocalSessionSelector): Uint8Array {
-		const row = database.prepare(`SELECT CASE WHEN typeof(frame)='blob' AND length(frame)<=${terminalLimits.maxBytes} THEN frame ELSE NULL END AS frame FROM local_session_terminal WHERE slot=? AND incarnation=?`).get(selector.slot, selector.incarnation);
+		const row = cachedStatement(database, `SELECT CASE WHEN typeof(frame)='blob' AND length(frame)<=${terminalLimits.maxBytes} THEN frame ELSE NULL END AS frame FROM local_session_terminal WHERE slot=? AND incarnation=?`).get(selector.slot, selector.incarnation);
 		if (!(row?.frame instanceof Uint8Array)) throw new Error("LOCAL_SESSION_TERMINAL_INTENT_REQUIRED");
 		const frame = Uint8Array.from(row.frame), fields = decodeCanonical(frame, terminalLimits);
 		if (!Array.isArray(fields) || fields.length !== 10 || fields[0] !== "r11-native-terminal-v2" || !(fields[1] instanceof Uint8Array) || !(fields[2] instanceof Uint8Array) || !Buffer.from(fields[1]).equals(this.#accountIdentity!.identity) || !Buffer.from(fields[2]).equals(this.#accountIdentity!.owner) || fields[3] !== selector.slot || fields[4] !== selector.incarnation || !Array.isArray(fields[8]) || fields[8].length > this.storeScopes || typeof fields[9] !== "number" || !Number.isSafeInteger(fields[9]) || fields[9] < 0 || fields[9] >= this.handles) throw new Error("LOCAL_SESSION_TERMINAL_INTENT_MISMATCH");
@@ -343,7 +344,7 @@ export class LocalSessionCatalog {
 		if (this.account !== undefined) throw new Error("LOCAL_SESSION_EXTERNAL_ACCOUNT_KEY_CUSTODY");
 		return this.#transaction(false, (database) => {
 			if (this.#row(database, selector).status !== "active") throw new Error("LOCAL_SESSION_REVOKED");
-			const row = database.prepare("SELECT CASE WHEN typeof(seed)='blob' AND length(seed)=32 THEN seed ELSE NULL END AS seed FROM local_session_keys WHERE slot=? AND incarnation=?").get(selector.slot, selector.incarnation);
+			const row = cachedStatement(database, "SELECT CASE WHEN typeof(seed)='blob' AND length(seed)=32 THEN seed ELSE NULL END AS seed FROM local_session_keys WHERE slot=? AND incarnation=?").get(selector.slot, selector.incarnation);
 			if (!(row?.seed instanceof Uint8Array) || row.seed.byteLength !== 32) throw new Error("LOCAL_SESSION_OWNED_KEY_STATE_LOST");
 			return Uint8Array.from(row.seed);
 		});
@@ -352,9 +353,9 @@ export class LocalSessionCatalog {
 		if (!(publicKey instanceof Uint8Array) || publicKey.byteLength !== 32) throw new TypeError("LOCAL_SESSION_OWNED_KEY_INVALID");
 		this.#transaction(true, (database) => {
 			if (this.#row(database, selector).status !== "active") throw new Error("LOCAL_SESSION_REVOKED");
-			const row = database.prepare("SELECT CASE WHEN typeof(public_key)='blob' AND length(public_key)=32 THEN public_key ELSE NULL END AS public_key FROM local_session_keys WHERE slot=? AND incarnation=?").get(selector.slot, selector.incarnation);
+			const row = cachedStatement(database, "SELECT CASE WHEN typeof(public_key)='blob' AND length(public_key)=32 THEN public_key ELSE NULL END AS public_key FROM local_session_keys WHERE slot=? AND incarnation=?").get(selector.slot, selector.incarnation);
 			if (!row || (row.public_key !== null && !Buffer.from(row.public_key as Uint8Array).equals(publicKey))) throw new Error("LOCAL_SESSION_OWNED_KEY_STATE_LOST");
-			database.prepare("UPDATE local_session_keys SET public_key=? WHERE slot=? AND incarnation=?").run(publicKey, selector.slot, selector.incarnation);
+			cachedStatement(database, "UPDATE local_session_keys SET public_key=? WHERE slot=? AND incarnation=?").run(publicKey, selector.slot, selector.incarnation);
 		});
 	}
 	assertOwnedGenesis(selector: LocalSessionSelector, binding: Uint8Array): void { this.#genesisBinding(selector, binding, false); }
@@ -364,9 +365,9 @@ export class LocalSessionCatalog {
 		if (!(binding instanceof Uint8Array) || binding.byteLength !== 32) throw new TypeError("LOCAL_SESSION_GENESIS_BINDING_INVALID");
 		this.#transaction(write, database => {
 			if (this.#row(database, selector).status !== "active") throw new Error("LOCAL_SESSION_REVOKED");
-			const row = database.prepare("SELECT room_binding IS NOT NULL AS room_bound,CASE WHEN genesis_binding IS NULL THEN 0 WHEN typeof(genesis_binding)='blob' AND length(genesis_binding)=32 THEN 1 ELSE -1 END AS valid,CASE WHEN typeof(genesis_binding)='blob' AND length(genesis_binding)=32 THEN genesis_binding ELSE NULL END AS binding FROM local_session_keys WHERE slot=? AND incarnation=?").get(selector.slot, selector.incarnation);
+			const row = cachedStatement(database, "SELECT room_binding IS NOT NULL AS room_bound,CASE WHEN genesis_binding IS NULL THEN 0 WHEN typeof(genesis_binding)='blob' AND length(genesis_binding)=32 THEN 1 ELSE -1 END AS valid,CASE WHEN typeof(genesis_binding)='blob' AND length(genesis_binding)=32 THEN genesis_binding ELSE NULL END AS binding FROM local_session_keys WHERE slot=? AND incarnation=?").get(selector.slot, selector.incarnation);
 			if (!row || row.valid === -1 || (row.valid === 0 && row.room_bound === 1) || (row.valid === 1 && !Buffer.from(row.binding as Uint8Array).equals(binding))) throw new Error("LOCAL_SESSION_GENESIS_BINDING_CONFLICT");
-			if (write) database.prepare("UPDATE local_session_keys SET genesis_binding=? WHERE slot=? AND incarnation=?").run(binding, selector.slot, selector.incarnation);
+			if (write) cachedStatement(database, "UPDATE local_session_keys SET genesis_binding=? WHERE slot=? AND incarnation=?").run(binding, selector.slot, selector.incarnation);
 		});
 	}
 	/** Exact authenticated SDK root binding, not portable authority or freshness. */
@@ -374,9 +375,9 @@ export class LocalSessionCatalog {
 		if (!(binding instanceof Uint8Array) || binding.byteLength !== 32) throw new TypeError("LOCAL_SESSION_ROOM_BINDING_INVALID");
 		this.#transaction(true, (database) => {
 			if (this.#row(database, selector).status !== "active") throw new Error("LOCAL_SESSION_REVOKED");
-			const row = database.prepare("SELECT CASE WHEN typeof(room_binding)='blob' AND length(room_binding)=32 THEN room_binding ELSE NULL END AS room_binding FROM local_session_keys WHERE slot=? AND incarnation=?").get(selector.slot, selector.incarnation);
+			const row = cachedStatement(database, "SELECT CASE WHEN typeof(room_binding)='blob' AND length(room_binding)=32 THEN room_binding ELSE NULL END AS room_binding FROM local_session_keys WHERE slot=? AND incarnation=?").get(selector.slot, selector.incarnation);
 			if (!row || (row.room_binding !== null && !Buffer.from(row.room_binding as Uint8Array).equals(binding))) throw new Error("LOCAL_SESSION_ROOM_BINDING_CONFLICT");
-			database.prepare("UPDATE local_session_keys SET room_binding=? WHERE slot=? AND incarnation=?").run(binding, selector.slot, selector.incarnation);
+			cachedStatement(database, "UPDATE local_session_keys SET room_binding=? WHERE slot=? AND incarnation=?").run(binding, selector.slot, selector.incarnation);
 		});
 	}
 	acquire(selector: LocalSessionSelector): ReturnType<typeof acquireSnapshotDependencyLock> {
@@ -387,7 +388,7 @@ export class LocalSessionCatalog {
 	reserveHandle(selector?: LocalSessionSelector, excludePreparation = false): ReturnType<typeof acquireSnapshotDependencyLock> {
 		if (selector) this.assertActive(selector);
 		const preparationIndex = selector && excludePreparation && this.account !== undefined ? this.#transaction(false, database =>
-			database.prepare("SELECT 1 FROM local_session_terminal WHERE slot=? AND incarnation=?").get(selector.slot, selector.incarnation)
+			cachedStatement(database, "SELECT 1 FROM local_session_terminal WHERE slot=? AND incarnation=?").get(selector.slot, selector.incarnation)
 				? (decodeCanonical(this.#terminalFrame(database, selector), terminalLimits) as unknown[])[9] as number : -1) : -1;
 		for (let handle = 0; handle < this.handles; handle++) {
 			if (handle === preparationIndex) continue; // A fresh reopen must not occupy its own orphan-detection handle.
@@ -413,9 +414,9 @@ export class LocalSessionCatalog {
 			if (this.#row(database, selector).status === "free") throw new Error("LOCAL_SESSION_ALREADY_RETIRED");
 			// Refusal is pre-effect: without protocol disposition, ordinary close /
 			// exact reopen must remain usable rather than strand durable obligations.
-			if (database.prepare("SELECT 1 FROM local_session_files WHERE slot=? AND incarnation=? LIMIT 1").get(selector.slot, selector.incarnation))
+			if (cachedStatement(database, "SELECT 1 FROM local_session_files WHERE slot=? AND incarnation=? LIMIT 1").get(selector.slot, selector.incarnation))
 				throw new Error("LOCAL_SESSION_PROTOCOL_DISPOSITION_REQUIRED");
-			database.prepare("UPDATE local_session_slots SET status='retiring' WHERE slot=? AND incarnation=?").run(selector.slot, selector.incarnation);
+			cachedStatement(database, "UPDATE local_session_slots SET status='retiring' WHERE slot=? AND incarnation=?").run(selector.slot, selector.incarnation);
 		});
 	}
 	#basename(selector: LocalSessionSelector, family: SessionStoreFamily, digest: string): string {
@@ -434,15 +435,15 @@ export class LocalSessionCatalog {
 		const digest = createHash("sha256").update(JSON.stringify([family, name])).digest("hex");
 		return this.#transaction(true, (database) => {
 			if (this.#row(database, selector).status !== "active") throw new Error("LOCAL_SESSION_REVOKED");
-			const before = database.prepare("SELECT installed FROM local_session_files WHERE slot=? AND incarnation=? AND family=? AND digest=?").get(selector.slot, selector.incarnation, family, digest);
+			const before = cachedStatement(database, "SELECT installed FROM local_session_files WHERE slot=? AND incarnation=? AND family=? AND digest=?").get(selector.slot, selector.incarnation, family, digest);
 			if (!before) {
-				if (this.account !== undefined && database.prepare("SELECT 1 FROM local_session_terminal WHERE slot=? AND incarnation=? LIMIT 1").get(selector.slot, selector.incarnation)) throw new Error("LOCAL_SESSION_TERMINAL_PREPARATION_PENDING");
+				if (this.account !== undefined && cachedStatement(database, "SELECT 1 FROM local_session_terminal WHERE slot=? AND incarnation=? LIMIT 1").get(selector.slot, selector.incarnation)) throw new Error("LOCAL_SESSION_TERMINAL_PREPARATION_PENDING");
 				if (requireExisting) throw new Error("LOCAL_SESSION_RETAINED_STORE_MISSING");
-				const count = Number(database.prepare("SELECT count(*) AS n FROM local_session_files WHERE slot=?").get(selector.slot)?.n);
+				const count = Number(cachedStatement(database, "SELECT count(*) AS n FROM local_session_files WHERE slot=?").get(selector.slot)?.n);
 				if (count >= this.storeScopes) throw new Error("LOCAL_SESSION_STORE_SCOPE_CAPACITY");
 				const primary = this.#primary(join(this.directory, this.#basename(selector, family, digest)), family);
 				if (["", "-wal", "-shm", "-journal"].some((suffix) => this.#exists(`${primary}${suffix}`))) throw new Error("LOCAL_SESSION_UNDECLARED_EXISTING_BYTES");
-				database.prepare("INSERT INTO local_session_files VALUES(?,?,?,?,0)").run(selector.slot, selector.incarnation, family, digest);
+				cachedStatement(database, "INSERT INTO local_session_files VALUES(?,?,?,?,0)").run(selector.slot, selector.incarnation, family, digest);
 			}
 			return Object.freeze({ filename: join(this.directory, this.#basename(selector, family, digest)), digest, initialization: before?.installed === 1 ? "reopen" : "create" });
 		});
@@ -450,7 +451,7 @@ export class LocalSessionCatalog {
 	installed(selector: LocalSessionSelector, family: SessionStoreFamily, digest: string): void {
 		this.#transaction(true, (database) => {
 			if (this.#row(database, selector).status !== "active") throw new Error("LOCAL_SESSION_REVOKED");
-			if (database.prepare("UPDATE local_session_files SET installed=1 WHERE slot=? AND incarnation=? AND family=? AND digest=?").run(selector.slot, selector.incarnation, family, digest).changes !== 1) throw new Error("LOCAL_SESSION_FILE_DECLARATION_LOST");
+			if (cachedStatement(database, "UPDATE local_session_files SET installed=1 WHERE slot=? AND incarnation=? AND family=? AND digest=?").run(selector.slot, selector.incarnation, family, digest).changes !== 1) throw new Error("LOCAL_SESSION_FILE_DECLARATION_LOST");
 		});
 	}
 	/** Whole-file coverage check, not deletion eligibility. The original protocol
@@ -471,7 +472,7 @@ export class LocalSessionCatalog {
 			session.assertCurrent();
 			const batch = this.#transaction(false, database => {
 				if (this.#row(database, selector).status !== "active") throw new Error("LOCAL_SESSION_REVOKED");
-				return database.prepare(`SELECT ${fileProjection},installed FROM local_session_files WHERE slot=? AND incarnation=? AND (family,digest)>(?,?) ORDER BY family,digest LIMIT 16`).all(selector.slot, selector.incarnation, afterFamily, afterDigest);
+				return cachedStatement(database, `SELECT ${fileProjection},installed FROM local_session_files WHERE slot=? AND incarnation=? AND (family,digest)>(?,?) ORDER BY family,digest LIMIT 16`).all(selector.slot, selector.incarnation, afterFamily, afterDigest);
 			});
 			if (!batch.length) break;
 			for (const entry of batch) {
@@ -490,19 +491,19 @@ export class LocalSessionCatalog {
 					try {
 						connection = new DatabaseSync(sqliteFilename(primary, "reopen"));
 						enforceNativeLocalSessionFile(connection, primary, session, false);
-						const names = connection.prepare("SELECT CASE WHEN typeof(name)='text' AND length(CAST(name AS BLOB))<=64 THEN name ELSE NULL END AS name FROM sqlite_schema WHERE type='table' AND name NOT GLOB 'sqlite_*' LIMIT 16").all();
+						const names = cachedStatement(connection, "SELECT CASE WHEN typeof(name)='text' AND length(CAST(name AS BLOB))<=64 THEN name ELSE NULL END AS name FROM sqlite_schema WHERE type='table' AND name NOT GLOB 'sqlite_*' LIMIT 16").all();
 						const allowed = ["local_session_custody_guard", ...objectTables[family], ...(family === "ahe" ? ["blobs"] : family === "snapshots" ? ["snapshot_owner_v2"] : family === "signing" ? ["signing_meta"] : [])];
 						if (names.length >= 16 || names.some(row => typeof row.name !== "string" || !allowed.includes(row.name))) throw new Error("LOCAL_SESSION_UNCLASSIFIED_NATIVE_SCOPE");
 						if (entry.installed === 0 && names.some(row => row.name !== "local_session_custody_guard")) throw new Error("LOCAL_SESSION_UNCLASSIFIED_NATIVE_SCOPE");
 						for (const table of objectTables[family]) {
 							if (!names.some(row => row.name === table)) { if (entry.installed === 1) throw new Error("LOCAL_SESSION_UNCLASSIFIED_NATIVE_SCOPE"); else continue; }
-							if (connection.prepare(`SELECT 1 FROM ${table} WHERE ${table === "snapshot_dependency_slots" ? "object_id IS NOT NULL AND " : ""}(typeof(object_id)<>'text' OR object_id<>?) LIMIT 1`).get(objectId)) throw new Error("LOCAL_SESSION_FOREIGN_PROTECTED_SCOPE");
+							if (cachedStatement(connection, `SELECT 1 FROM ${table} WHERE ${table === "snapshot_dependency_slots" ? "object_id IS NOT NULL AND " : ""}(typeof(object_id)<>'text' OR object_id<>?) LIMIT 1`).get(objectId)) throw new Error("LOCAL_SESSION_FOREIGN_PROTECTED_SCOPE");
 						}
 						if (family === "signing" && names.some(row => row.name === "signing_meta")) {
 							const key = createSigningStorageCodec(AHE_BOUNDED_READ_LIMITS).keyFor(objectId);
-							if (connection.prepare("SELECT 1 FROM signing_meta WHERE key NOT IN ('incarnation',?) LIMIT 1").get(key)) throw new Error("LOCAL_SESSION_FOREIGN_PROTECTED_SCOPE");
+							if (cachedStatement(connection, "SELECT 1 FROM signing_meta WHERE key NOT IN ('incarnation',?) LIMIT 1").get(key)) throw new Error("LOCAL_SESSION_FOREIGN_PROTECTED_SCOPE");
 						}
-						controlBytes = Number(connection.prepare("SELECT length(binding) AS n FROM local_session_custody_guard WHERE id=1").get()?.n);
+						controlBytes = Number(cachedStatement(connection, "SELECT length(binding) AS n FROM local_session_custody_guard WHERE id=1").get()?.n);
 						if (!Number.isSafeInteger(controlBytes) || controlBytes < 1 || controlBytes > 16_384) throw new Error("DISPOSABLE_SESSION_NATIVE_CUSTODY_POISONED");
 						session.assertCurrent();
 					} catch (primaryError) {
@@ -550,10 +551,10 @@ export class LocalSessionCatalog {
 				// No existing room-owner terminal disposition currently covers these
 				// families. Fail before retiring the key or deleting any byte, including
 				// on restart. An empty never-opened lease can still retire normally.
-				if (account === undefined && database.prepare("SELECT 1 FROM local_session_files WHERE slot=? AND incarnation=? LIMIT 1").get(selector.slot, selector.incarnation))
+				if (account === undefined && cachedStatement(database, "SELECT 1 FROM local_session_files WHERE slot=? AND incarnation=? LIMIT 1").get(selector.slot, selector.incarnation))
 					throw new Error("LOCAL_SESSION_PROTOCOL_DISPOSITION_REQUIRED");
-				database.prepare("DELETE FROM local_session_keys WHERE slot=? AND incarnation=?").run(selector.slot, selector.incarnation);
-				database.prepare("UPDATE local_session_slots SET key_retired=1 WHERE slot=? AND incarnation=?").run(selector.slot, selector.incarnation);
+				cachedStatement(database, "DELETE FROM local_session_keys WHERE slot=? AND incarnation=?").run(selector.slot, selector.incarnation);
+				cachedStatement(database, "UPDATE local_session_slots SET key_retired=1 WHERE slot=? AND incarnation=?").run(selector.slot, selector.incarnation);
 			});
 			let done = false;
 			while (!done) this.#transaction(true, (database) => {
@@ -561,7 +562,7 @@ export class LocalSessionCatalog {
 				const row = this.#row(database, selector);
 				if (row.status === "free") { done = true; return; }
 				if (row.status !== "retiring") throw new Error("LOCAL_SESSION_NOT_RETIRING");
-				const batch = database.prepare(`SELECT ${fileProjection} FROM local_session_files WHERE slot=? AND incarnation=? ORDER BY family,digest LIMIT 16`).all(selector.slot, selector.incarnation);
+				const batch = cachedStatement(database, `SELECT ${fileProjection} FROM local_session_files WHERE slot=? AND incarnation=? ORDER BY family,digest LIMIT 16`).all(selector.slot, selector.incarnation);
 				for (const entry of batch) {
 					const family = entry.family as SessionStoreFamily, digest = String(entry.digest), base = join(this.directory, this.#basename(selector, family, digest));
 					const suffix = family === "issuance" ? ".drp-issuance-v1.sqlite" : family === "journal" ? ".drp-live-journal-v1.sqlite" : family === "snapshots" ? ".drp-snapshot-quarantine-v1.sqlite" : "";
@@ -592,14 +593,14 @@ export class LocalSessionCatalog {
 						}
 					}
 					this.#removePrimary(`${base}${suffix}`);
-					database.prepare("DELETE FROM local_session_files WHERE slot=? AND incarnation=? AND family=? AND digest=?").run(selector.slot, selector.incarnation, family, digest);
+					cachedStatement(database, "DELETE FROM local_session_files WHERE slot=? AND incarnation=? AND family=? AND digest=?").run(selector.slot, selector.incarnation, family, digest);
 				}
-				if (!batch.length) { database.prepare("UPDATE local_session_slots SET status='free' WHERE slot=? AND incarnation=? AND status='retiring'").run(selector.slot, selector.incarnation); done = true; }
+				if (!batch.length) { cachedStatement(database, "UPDATE local_session_slots SET status='free' WHERE slot=? AND incarnation=? AND status='retiring'").run(selector.slot, selector.incarnation); done = true; }
 			});
 			if (account !== undefined) {
 				const check = (): void => this.#transaction(false, database => {
 					account.checkCleanup(); this.#checkTerminalIntent(database, selector, terminalDigest!);
-					if (this.#row(database, selector).status !== "free" || database.prepare("SELECT key_retired FROM local_session_slots WHERE slot=? AND incarnation=?").get(selector.slot, selector.incarnation)?.key_retired !== 1 || database.prepare("SELECT 1 FROM local_session_files WHERE slot=? AND incarnation=? LIMIT 1").get(selector.slot, selector.incarnation) || database.prepare("SELECT 1 FROM local_session_keys WHERE slot=? AND incarnation=? LIMIT 1").get(selector.slot, selector.incarnation)) throw new Error("LOCAL_SESSION_NATIVE_CLEANUP_INCOMPLETE");
+					if (this.#row(database, selector).status !== "free" || cachedStatement(database, "SELECT key_retired FROM local_session_slots WHERE slot=? AND incarnation=?").get(selector.slot, selector.incarnation)?.key_retired !== 1 || cachedStatement(database, "SELECT 1 FROM local_session_files WHERE slot=? AND incarnation=? LIMIT 1").get(selector.slot, selector.incarnation) || cachedStatement(database, "SELECT 1 FROM local_session_keys WHERE slot=? AND incarnation=? LIMIT 1").get(selector.slot, selector.incarnation)) throw new Error("LOCAL_SESSION_NATIVE_CLEANUP_INCOMPLETE");
 				});
 				check(); const receipt = Object.freeze({});
 				cleanupReceipts.set(receipt, { check, facts: Object.freeze({ authority: this.account!, selector, identity: Uint8Array.from(this.#accountIdentity!.identity), owner: Uint8Array.from(this.#accountIdentity!.owner), digest: Uint8Array.from(terminalDigest!) }) });
@@ -613,7 +614,7 @@ export class LocalSessionCatalog {
 		if (!Buffer.from(hashDomain("ts-drp/disposable-local-terminal-native-intent/v1", frame)).equals(digest)) throw new Error("LOCAL_SESSION_TERMINAL_INTENT_MISMATCH");
 		const fields = decodeCanonical(frame, terminalLimits) as unknown[], manifest = fields[8] as unknown[];
 		if (typeof fields[5] !== "string" || !/^[0-9a-f]{64}$/u.test(fields[5]) || !(fields[7] instanceof Uint8Array)) throw new Error("LOCAL_SESSION_TERMINAL_INTENT_MISMATCH");
-		if (database.prepare("SELECT count(*) AS n FROM local_session_files WHERE slot=? AND incarnation=?").get(selector.slot, selector.incarnation)!.n as number > manifest.length) throw new Error("LOCAL_SESSION_TERMINAL_MANIFEST_MISMATCH");
+		if (cachedStatement(database, "SELECT count(*) AS n FROM local_session_files WHERE slot=? AND incarnation=?").get(selector.slot, selector.incarnation)!.n as number > manifest.length) throw new Error("LOCAL_SESSION_TERMINAL_MANIFEST_MISMATCH");
 		for (const file of database.prepare(`SELECT ${fileProjection},installed FROM local_session_files WHERE slot=? AND incarnation=?`).iterate(selector.slot, selector.incarnation)) {
 			if (!manifest.some(row => Array.isArray(row) && row.length === 4 && row[0] === file.family && row[1] === file.digest && row[2] === (file.installed === 1))) throw new Error("LOCAL_SESSION_TERMINAL_MANIFEST_MISMATCH");
 		}

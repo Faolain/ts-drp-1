@@ -5,6 +5,7 @@ import {
 	type GenerationId,
 	parseGenerationId,
 	parseStorageObjectId,
+	type StorageObjectId,
 } from "@ts-drp/storage";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -16,6 +17,7 @@ import { phase2lCCommit, PHASE_2L_C_SCOPE } from "./fixtures/phase-2l-c-node-iss
 import { fixture, receiptFor } from "../../../tests/fixtures/snapshot-recovery-owner/contract.js";
 import { createSqliteAheDurableStore } from "../src/index.js";
 import { LocalSessionLifetime } from "../src/internal/local-session-lifetime.js";
+import { cachedStatement } from "../src/internal/sqlite-statement-cache.js";
 import { createNodeDurableIssuanceStore } from "../src/issuance.js";
 import { createNodeSnapshotQuarantineStore } from "../src/snapshot-transfer.js";
 
@@ -126,7 +128,11 @@ async function adopt(
 	return must(await store.swapHead({ expectedHead: head, generationId, objectId: OBJECT })).head;
 }
 
-type RetirementImageReader = Required<Pick<AheDurableStore, "readRetirementAdmissionImage">>;
+interface RetirementImageReader {
+	readRetirementAdmissionImage(
+		objectId: StorageObjectId
+	): Promise<Readonly<{ ok: true; value: unknown }> | Readonly<{ ok: false; reason: string }>>;
+}
 type RecoveryLookup = {
 	lookupRecoveryDeclaration(input: unknown): Promise<unknown>;
 	readRetirementAdmissionImage(input: Readonly<{ objectId: string }>): Promise<unknown>;
@@ -296,6 +302,118 @@ describe("native SQLite statements never outlive their connection incarnation", 
 			expect(after.settled.size + after.streamed.size).toBe(0);
 		} finally {
 			await store.close().catch(() => undefined);
+		}
+	});
+});
+
+describe("per-connection statement cache lifetime", () => {
+	const SQL = "SELECT ?1 AS value";
+
+	it("reuses one statement per connection and exact text, never across connections", () => {
+		const first = new DatabaseSync(":memory:");
+		const second = new DatabaseSync(":memory:");
+		try {
+			const statement = cachedStatement(first, SQL);
+			expect(cachedStatement(first, SQL)).toBe(statement);
+			expect(cachedStatement(first, `${SQL} `)).not.toBe(statement);
+			expect(cachedStatement(second, SQL)).not.toBe(statement);
+			// Reuse is equivalent to a fresh statement: bindings never leak between calls.
+			expect(cachedStatement(first, "SELECT ?1 AS a, ?2 AS b").get(1, 2)).toEqual({ a: 1, b: 2 });
+			expect(cachedStatement(first, "SELECT ?1 AS a, ?2 AS b").get(3)).toEqual({ a: 3, b: null });
+			expect(typeof cachedStatement(first, "SELECT 1 AS one").get()?.one).toBe("number");
+		} finally {
+			first.close();
+			second.close();
+		}
+	});
+
+	it("never returns a statement after its connection closes", () => {
+		const database = new DatabaseSync(":memory:");
+		const statement = cachedStatement(database, SQL);
+		database.close();
+		let returned: unknown;
+		let refused: unknown;
+		try {
+			returned = cachedStatement(database, SQL);
+		} catch (error) {
+			refused = error;
+		}
+		// Identity comparisons stay boolean: a finalized statement throws on inspection.
+		expect(returned === statement).toBe(false);
+		expect(returned).toBeUndefined();
+		expect(refused).toMatchObject({ code: "ERR_INVALID_STATE", message: "database is not open" });
+	});
+
+	it("never reuses a statement across close and reopen of the same connection object", () => {
+		const database = new DatabaseSync(":memory:");
+		try {
+			const statement = cachedStatement(database, SQL);
+			expect(statement.get(1)).toEqual({ value: 1 });
+			database.close();
+			database.open();
+			const reopened = cachedStatement(database, SQL);
+			expect(reopened === statement).toBe(false);
+			expect(reopened.get(2)).toEqual({ value: 2 });
+			expect(cachedStatement(database, SQL) === reopened).toBe(true);
+		} finally {
+			database.close();
+		}
+	});
+
+	it("never reuses a statement in a replacement connection to the same file", () => {
+		const filename = join(directory("replacement"), "replacement.sqlite");
+		const first = new DatabaseSync(filename);
+		const statement = cachedStatement(first, SQL);
+		first.close();
+		const replacement = new DatabaseSync(filename);
+		try {
+			expect(cachedStatement(replacement, SQL) === statement).toBe(false);
+		} finally {
+			replacement.close();
+		}
+	});
+
+	it("routes every acquisition through an interposed prepare, uncached", () => {
+		const database = new DatabaseSync(":memory:");
+		const native = DatabaseSync.prototype.prepare;
+		try {
+			const cached = cachedStatement(database, SQL);
+			let interposed = 0;
+			DatabaseSync.prototype.prepare = function (this: DatabaseSync, sql: string): StatementSync {
+				interposed++;
+				return Reflect.apply(native, this, [sql]) as StatementSync;
+			};
+			const during = [cachedStatement(database, SQL), cachedStatement(database, SQL)];
+			expect(interposed).toBe(2);
+			expect(during[0]).not.toBe(cached);
+			expect(during[1]).not.toBe(during[0]);
+			DatabaseSync.prototype.prepare = native;
+			expect(cachedStatement(database, SQL)).toBe(cached);
+		} finally {
+			DatabaseSync.prototype.prepare = native;
+			database.close();
+		}
+	});
+
+	it("reports the native prepare cost it removes (informational)", () => {
+		const database = new DatabaseSync(":memory:");
+		try {
+			database.exec("CREATE TABLE t(object_id TEXT, record BLOB)");
+			const sql =
+				"SELECT length(record) AS size,CASE WHEN typeof(record)='blob' AND length(record) BETWEEN 1 AND 65536 THEN record ELSE NULL END AS record FROM t WHERE object_id=?";
+			const rounds = 20_000;
+			const time = (run: () => void): number => {
+				const started = process.hrtime.bigint();
+				for (let index = 0; index < rounds; index++) run();
+				return Number(process.hrtime.bigint() - started) / rounds;
+			};
+			time(() => database.prepare(sql).get("x"));
+			const fresh = time(() => database.prepare(sql).get("x"));
+			const cached = time(() => cachedStatement(database, sql).get("x"));
+			console.info("prepare+get vs cached+get (ns per call)", { fresh: Math.round(fresh), cached: Math.round(cached) });
+			expect(cached).toBeLessThan(fresh);
+		} finally {
+			database.close();
 		}
 	});
 });
