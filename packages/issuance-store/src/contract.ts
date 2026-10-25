@@ -1,5 +1,6 @@
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 
+import { durablePreimageHeader } from "./preimage-header.js";
 import { MAXIMUM_DURABLE_ISSUANCE_SCOPE_UTF16_UNITS, SETTLEMENT_REPLACEMENT_MAX_INTENTS, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS } from "./types.js";
 import type {
 	DurableIssuanceError,
@@ -227,15 +228,8 @@ export function durablePreimageMatchesScopeAndSequence(
 	authorSequence: number
 ): boolean {
 	try {
-		const decoded: unknown = decodeCanonical(canonicalPreimageBytes);
-		return (
-			typeof decoded === "object" &&
-			decoded !== null &&
-			!Array.isArray(decoded) &&
-			(decoded as Record<string, unknown>).author === scope.author &&
-			(decoded as Record<string, unknown>).objectId === scope.objectId &&
-			(decoded as Record<string, unknown>).authorSequence === authorSequence
-		);
+		const header = durablePreimageHeader(canonicalPreimageBytes);
+		return header.author === scope.author && header.objectId === scope.objectId && header.authorSequence === authorSequence;
 	} catch {
 		return false;
 	}
