@@ -24,7 +24,7 @@ Grid conservation 40 (serial, base `6c9b5935` → new, two runs each): transitio
 
 Continued play 40, base and new run **concurrently** (same host noise), four pairs
 ([table](../../.logs/realtime-resume-2026-10-23/perf-timing-01/paired.txt)): all 8 pass; process
-CPU 302–390 s → 260–270 s; GC 24.1/22.6 s → 18.4/17.6 s; timer max gap base 524/561/1384/— vs new
+CPU 360–390 s → 260–270 s; GC 24.1/26.1 s → 18.4/17.6 s; timer max gap base 524/561/1384/1485 vs new
 375/1954/790/1062. Serial runs earlier showed new stalls up to 1671 ms (one tripped the 1000 ms
 alarm), which looked like a regression. The stall probe (`perf-timing-01/stallprobe.mjs`:
 per-gap CPU, page faults, context switches, GC) shows the long gaps are the process not being
