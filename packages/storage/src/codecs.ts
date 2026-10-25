@@ -15,6 +15,7 @@ import {
 	type StoreResult,
 } from "./types.js";
 import { digestClosure } from "./values.js";
+import { ExactBytesMemo } from "./internal/exact-bytes-memo.js";
 
 type Envelope = {
 	readonly storageSchemaVersion: number;
@@ -126,6 +127,15 @@ export function encodeHeadRecordV1(value: ExpectedHead): Uint8Array {
  * @returns The decoded head or a stable rejection.
  */
 export function decodeHeadRecordV1(bytes: Uint8Array, bounded?: "head"): StoreResult<ExpectedHead> {
+	return verifiedOnce(
+		bounded === undefined ? heads : boundedHeads,
+		bytes,
+		bounded === undefined ? undefined : LIMITS.maxHeadBytes,
+		() => decodeHeadRecordV1Uncached(bytes, bounded),
+		(value) => copyExpectedHead(value)!
+	);
+}
+function decodeHeadRecordV1Uncached(bytes: Uint8Array, bounded?: "head"): StoreResult<ExpectedHead> {
 	const decoded = decodeEnvelope(bytes, bounded);
 	if (!decoded.ok) return decoded;
 	if (decoded.value.storageSchemaVersion !== 1 || decoded.value.kind !== "head") {
@@ -154,6 +164,18 @@ export function encodeGenerationRecordV1(value: GenerationRecord): Uint8Array {
  * @returns The decoded generation or a stable rejection.
  */
 export function decodeGenerationRecordV1(bytes: Uint8Array, bounded?: "generation"): StoreResult<GenerationRecord> {
+	return verifiedOnce(
+		bounded === undefined ? generations : boundedGenerations,
+		bytes,
+		bounded === undefined ? undefined : LIMITS.maxGenerationBytes,
+		() => decodeGenerationRecordV1Uncached(bytes, bounded),
+		(value) => copyGenerationRecord(value)!
+	);
+}
+function decodeGenerationRecordV1Uncached(
+	bytes: Uint8Array,
+	bounded?: "generation"
+): StoreResult<GenerationRecord> {
 	const decoded = decodeEnvelope(bytes, bounded);
 	if (!decoded.ok) return decoded;
 	if (decoded.value.storageSchemaVersion !== 1 || decoded.value.kind !== "generation") {
@@ -164,4 +186,30 @@ export function decodeGenerationRecordV1(bytes: Uint8Array, bounded?: "generatio
 	} catch {
 		return nonCanonical();
 	}
+}
+
+// Verify once per exact bytes and decoding profile. A decode is a pure
+// function of the exact bytes; only successful verifications are retained, and
+// every call (hit or miss) returns a fresh detached copy, as before.
+const heads = new ExactBytesMemo<ExpectedHead>(256, 512 * 1024, 65536),
+	boundedHeads = new ExactBytesMemo<ExpectedHead>(256, 512 * 1024, LIMITS.maxHeadBytes),
+	generations = new ExactBytesMemo<GenerationRecord>(256, 1024 * 1024, 65536),
+	boundedGenerations = new ExactBytesMemo<GenerationRecord>(256, 1024 * 1024, LIMITS.maxGenerationBytes);
+
+function verifiedOnce<T>(
+	memo: ExactBytesMemo<T>,
+	bytes: Uint8Array,
+	limit: number | undefined,
+	decode: () => StoreResult<T>,
+	copy: (value: T) => T
+): StoreResult<T> {
+	// Inputs the original path refuses before decoding keep that exact path.
+	if (!(bytes instanceof Uint8Array) || hasSharedBacking(bytes) || (limit !== undefined && bytes.byteLength > limit))
+		return decode();
+	const own = new Uint8Array(bytes),
+		known = memo.get(own);
+	if (known !== undefined) return { ok: true, value: copy(known) };
+	const result = decode();
+	if (result.ok) memo.set(own, copy(result.value));
+	return result;
 }

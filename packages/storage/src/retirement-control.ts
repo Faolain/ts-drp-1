@@ -13,6 +13,7 @@ import {
 	type StoreResult,
 } from "./types.js";
 import { digestBlob, digestClosure } from "./values.js";
+import { ExactBytesMemo } from "./internal/exact-bytes-memo.js";
 
 export interface AheGenerationPartition {
 	readonly recordDigests: readonly string[];
@@ -1016,13 +1017,20 @@ export function decodeAheRetirementControl(bytes: Uint8Array): StoreResult<AheRe
 		if (!(bytes instanceof Uint8Array) || hasSharedBacking(bytes)) return { ok: false, reason: "NON_CANONICAL_RECORD" };
 		if (bytes.byteLength > AHE_RETIREMENT_CONTROL_LIMITS.maxBytes) return { ok: false, reason: "READ_BUDGET_EXCEEDED" };
 		const own = new Uint8Array(bytes),
-			value = captureAheRetirementControl(decodeCanonical(own, AHE_RETIREMENT_CONTROL_LIMITS));
+			known = verifiedControls.get(own);
+		// A hit is the verification of byte-identical input; each caller still
+		// receives its own detached capture with fresh byte carriers.
+		if (known !== undefined) return { ok: true, value: captureAheRetirementControl(known) };
+		const value = captureAheRetirementControl(decodeCanonical(own, AHE_RETIREMENT_CONTROL_LIMITS));
 		if (!bytesEqual(own, encodeAheRetirementControl(value))) return { ok: false, reason: "NON_CANONICAL_RECORD" };
+		verifiedControls.set(own, captureAheRetirementControl(value));
 		return { ok: true, value };
 	} catch {
 		return { ok: false, reason: "NON_CANONICAL_RECORD" };
 	}
 }
+// Verify-once decode + canonical re-encode, keyed by exact control bytes.
+const verifiedControls = new ExactBytesMemo<AheRetirementControl>(64, 2 * 1024 * 1024, AHE_RETIREMENT_CONTROL_LIMITS.maxBytes);
 
 /**
  * Builds a one-use observation under the native store's captured CAS, without a second registry.

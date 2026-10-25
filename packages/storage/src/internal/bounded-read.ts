@@ -22,6 +22,7 @@ import type {
 	StoreResult,
 } from "../types.js";
 import { digestBlob } from "../values.js";
+import { ExactBytesMemo, sameBytes } from "./exact-bytes-memo.js";
 import {
 	bytesEqual,
 	hasSharedBacking,
@@ -71,13 +72,77 @@ function varUintBytes(length: number): number {
 function logicalByteRow(store: string, key: unknown, value: Record<string, unknown>, length: number): number {
 	return encodeCanonical({ store, key, value }).byteLength + length + varUintBytes(length) - 1;
 }
+// Pure frame widths of admission rows. Each memo key spells every input of the
+// encoded frame: fixed 64-hex generation id and digest fields first (so the
+// variable-length object id last keeps the spelling injective), then the
+// native family. The payload length is still added on every call.
+const rowFrames = new Map<string, number>();
+const ROW_FRAME_ENTRIES = 8192;
+function memoRowWidth(key: string, width: () => number): number {
+	let known = rowFrames.get(key);
+	if (known === undefined) {
+		known = width();
+		if (rowFrames.size >= ROW_FRAME_ENTRIES) rowFrames.clear();
+		rowFrames.set(key, known);
+	}
+	return known;
+}
+function generationRowCharge(objectId: StorageObjectId, generationId: GenerationId, browser: boolean, length: number): number {
+	const oid = browser ? "objectId" : "object_id",
+		gid = browser ? "generationId" : "generation_id";
+	return (
+		memoRowWidth(`g${browser ? 1 : 0}${generationId}${objectId}`, () =>
+			logicalByteRow("generations", [objectId, generationId], { [oid]: objectId, [gid]: generationId, record: ZERO_BYTES }, 0)
+		) +
+		length +
+		varUintBytes(length) -
+		varUintBytes(0)
+	);
+}
+function promotionRowCharge(objectId: StorageObjectId, generationId: GenerationId, digest: BlobDigest, browser: boolean): number {
+	const oid = browser ? "objectId" : "object_id",
+		gid = browser ? "generationId" : "generation_id";
+	return memoRowWidth(`p${browser ? 1 : 0}${generationId}${digest}${objectId}`, () =>
+		encodeCanonical({
+			store: "promotions",
+			key: [objectId, generationId, digest],
+			value: { [oid]: objectId, [gid]: generationId, digest },
+		}).byteLength
+	);
+}
+function blobRowCharge(digest: BlobDigest, length: number): number {
+	return (
+		memoRowWidth(`b${digest}`, () => logicalByteRow("blobs", digest, { digest, bytes: ZERO_BYTES }, 0)) +
+		length +
+		varUintBytes(length) -
+		varUintBytes(0)
+	);
+}
+function objectRowCharge(objectId: StorageObjectId, browser: boolean, length: number): number {
+	const oid = browser ? "objectId" : "object_id";
+	return (
+		memoRowWidth(`o${browser ? 1 : 0}${objectId}`, () =>
+			logicalByteRow("objects", objectId, { [oid]: objectId, [browser ? "record" : "head_record"]: ZERO_BYTES }, 0)
+		) +
+		length +
+		varUintBytes(length) -
+		varUintBytes(0)
+	);
+}
 function controlCharge(objectId: StorageObjectId, length: number, browser: boolean): number {
 	const key = browser ? `ahe-retirement:${objectId}` : objectId;
-	return logicalByteRow(
-		browser ? "storageMeta" : "retirement_controls",
-		key,
-		{ [browser ? "key" : "object_id"]: key, record: ZERO_BYTES },
-		length
+	return (
+		memoRowWidth(`c${browser ? 1 : 0}${objectId}`, () =>
+			logicalByteRow(
+				browser ? "storageMeta" : "retirement_controls",
+				key,
+				{ [browser ? "key" : "object_id"]: key, record: ZERO_BYTES },
+				0
+			)
+		) +
+		length +
+		varUintBytes(length) -
+		varUintBytes(0)
 	);
 }
 function maximumLogicalCharge(browser: boolean): number {
@@ -547,24 +612,12 @@ export function* boundedRetirementAdmissionSteps(
 	if (promotions.length > MAX_PROMOTIONS) return { ok: false, reason: "READ_BUDGET_EXCEEDED" };
 	const promoted = new Set<string>(),
 		generations = new Map(census.value.generations.map((g) => [g.generationId, g]));
-	const oid = browser ? "objectId" : "object_id",
-		gid = browser ? "generationId" : "generation_id";
 	let charge =
 		(metadataBytes === null ? 0 : controlCharge(objectId, metadataBytes, browser)) +
-		logicalByteRow(
-			"objects",
-			objectId,
-			{ [oid]: objectId, [browser ? "record" : "head_record"]: ZERO_BYTES },
-			census.value.headRecord.byteLength
-		);
+		objectRowCharge(objectId, browser, census.value.headRecord.byteLength);
 	for (let index = 0; index < census.value.generations.length; index++) {
 		const generation = census.value.generations[index];
-		charge += logicalByteRow(
-			"generations",
-			[objectId, generation.generationId],
-			{ [oid]: objectId, [gid]: generation.generationId, record: ZERO_BYTES },
-			census.value.records[index].byteLength
-		);
+		charge += generationRowCharge(objectId, generation.generationId, browser, census.value.records[index].byteLength);
 	}
 	for (const row of promotions) {
 		if (
@@ -578,11 +631,7 @@ export function* boundedRetirementAdmissionSteps(
 		if (!generation || !generation.closure.some((ref) => ref.digest === row.digest) || promoted.has(key))
 			return { ok: false, reason: "NON_CANONICAL_RECORD" };
 		promoted.add(key);
-		charge += encodeCanonical({
-			store: "promotions",
-			key: [objectId, row.generationId, row.digest],
-			value: { [oid]: objectId, [gid]: row.generationId, digest: row.digest },
-		}).byteLength;
+		charge += promotionRowCharge(objectId, row.generationId, row.digest, browser);
 	}
 	const references = new Map<BlobDigest, GenerationRef>(),
 		required = new Set<BlobDigest>();
@@ -629,7 +678,7 @@ export function* boundedRetirementAdmissionSteps(
 				return {ok: false, reason: "READ_BUDGET_EXCEEDED"};
 			payloadBytes += certified;
 			if (payloadBytes > LIMITS.maxUnionBytes) return {ok: false, reason: "READ_BUDGET_EXCEEDED"};
-			charge += logicalByteRow("blobs", ref.digest, {digest: ref.digest, bytes: ZERO_BYTES}, certified);
+			charge += blobRowCharge(ref.digest, certified);
 			presentBlobs++; presentDigests.push(ref.digest);
 			continue;
 		}
@@ -664,7 +713,7 @@ export function* boundedRetirementAdmissionSteps(
 			if (!browser) return {ok: false, reason: "BLOB_CORRUPT"};
 			browserBlobRefusal = "BLOB_CORRUPT"; raw = undefined; continue;
 		}
-		charge += logicalByteRow("blobs", ref.digest, { digest: ref.digest, bytes: ZERO_BYTES }, raw.byteLength);
+		charge += blobRowCharge(ref.digest, raw.byteLength);
 		presentBlobs++;
 		presentDigests.push(ref.digest);
 		raw = undefined;
@@ -684,13 +733,85 @@ export function* boundedRetirementAdmissionSteps(
 	// acquisition is a different source image even with unchanged head/control.
 	// Canonical metadata stays bounded by the original head/generation/row caps;
 	// this does not copy payloads or increase any native/proof admission budget.
+	const promotionList = [...promoted].sort(),
+		presentList = presentDigests.sort();
+	const imageDigest = retirementImageDigest(census.value.headRecord, census.value.records, promotionList, presentList);
+	const boundGenerations = census.value.generations.map((generation, index) => {
+		const bytes = census.value.records[index];
+		if (bytes === undefined) throw new TypeError("native generation image incomplete");
+		// The record and identity digests are pure functions of the exact record
+		// bytes (`generation` is their decode); verify once per byte string.
+		let digests = generationDigests.get(bytes);
+		if (digests === undefined) {
+			const hashed = digestBlob(bytes);
+			if (!hashed.ok) throw new TypeError("native generation digest failed");
+			digests = Object.freeze({ recordDigest: hashed.value, identityDigest: aheRetirementGenerationIdentity(generation) });
+			generationDigests.set(bytes, digests);
+		}
+		return Object.freeze({
+			generationId: generation.generationId,
+			recordDigest: digests.recordDigest,
+			identityDigest: digests.identityDigest,
+		});
+	});
+	return {
+		ok: true,
+		value: Object.freeze({ logicalBytes: charge, imageDigest, generations: Object.freeze(boundGenerations) }),
+	};
+}
+
+const generationDigests = new ExactBytesMemo<Readonly<{ recordDigest: BlobDigest; identityDigest: string }>>(
+	256,
+	1024 * 1024,
+	LIMITS.maxGenerationBytes
+);
+type ImageEntry = Readonly<{
+	head: Uint8Array;
+	records: readonly Uint8Array[];
+	promotions: string;
+	present: string;
+	digest: string;
+}>;
+const IMAGE_ENTRIES = 16;
+const imageDigests: ImageEntry[] = [];
+/**
+ * Commits the exact admitted native image. Verified once per exact input: a
+ * hit requires the same promotion and present-blob spellings and byte-equal
+ * head and generation records, compared against private copies.
+ * @param head - Exact head record bytes.
+ * @param records - Exact generation record bytes in key order.
+ * @param promotions - Sorted promotion spellings.
+ * @param present - Sorted present blob digests.
+ * @returns Domain-separated hex digest of the canonical image.
+ */
+function retirementImageDigest(
+	head: Uint8Array,
+	records: readonly Uint8Array[],
+	promotions: readonly string[],
+	present: readonly string[]
+): string {
+	const promotionKey = promotions.join(","),
+		presentKey = present.join(",");
+	for (let index = 0; index < imageDigests.length; index++) {
+		const entry = imageDigests[index]!;
+		if (
+			entry.promotions === promotionKey &&
+			entry.present === presentKey &&
+			entry.records.length === records.length &&
+			sameBytes(entry.head, head) &&
+			entry.records.every((record, i) => sameBytes(record, records[i]!))
+		) {
+			if (index !== 0) {
+				imageDigests.splice(index, 1);
+				imageDigests.unshift(entry);
+			}
+			return entry.digest;
+		}
+	}
+	// Canonical metadata stays bounded by the original head/generation/row caps;
+	// this does not copy payloads or increase any native/proof admission budget.
 	const imageBytes = encodeCanonical(
-		{
-			head: census.value.headRecord,
-			generations: census.value.records,
-			promotions: [...promoted].sort(),
-			presentBlobs: presentDigests.sort(),
-		},
+		{ head, generations: records, promotions, presentBlobs: present },
 		{
 			maxBytes:
 				LIMITS.maxHeadBytes +
@@ -701,24 +822,20 @@ export function* boundedRetirementAdmissionSteps(
 			maxDepth: 3,
 		}
 	);
-	const imageDigest = Array.from(hashDomain("ts-drp-storage/retirement-image/v1", imageBytes), (byte) =>
+	const digest = Array.from(hashDomain("ts-drp-storage/retirement-image/v1", imageBytes), (byte) =>
 		byte.toString(16).padStart(2, "0")
 	).join("");
-	const boundGenerations = census.value.generations.map((generation, index) => {
-		const bytes = census.value.records[index];
-		if (bytes === undefined) throw new TypeError("native generation image incomplete");
-		const hashed = digestBlob(bytes);
-		if (!hashed.ok) throw new TypeError("native generation digest failed");
-		return Object.freeze({
-			generationId: generation.generationId,
-			recordDigest: hashed.value,
-			identityDigest: aheRetirementGenerationIdentity(generation),
-		});
-	});
-	return {
-		ok: true,
-		value: Object.freeze({ logicalBytes: charge, imageDigest, generations: Object.freeze(boundGenerations) }),
-	};
+	imageDigests.unshift(
+		Object.freeze({
+			head: new Uint8Array(head),
+			records: Object.freeze(records.map((record) => new Uint8Array(record))),
+			promotions: promotionKey,
+			present: presentKey,
+			digest,
+		})
+	);
+	if (imageDigests.length > IMAGE_ENTRIES) imageDigests.length = IMAGE_ENTRIES;
+	return digest;
 }
 
 /**

@@ -1,5 +1,7 @@
 import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
 
+import { ExactBytesMemo } from "./internal/exact-bytes-memo.js";
+
 import {
 	copyClosure,
 	hasSharedBacking,
@@ -91,8 +93,18 @@ export function digestBlob(bytes: Uint8Array): ParseResult<BlobDigest> {
 	if (!(bytes instanceof Uint8Array)) return invalid();
 	if (hasSharedBacking(bytes)) return { ok: false, reason: "SHARED_BUFFER_INPUT" };
 	const copied = new Uint8Array(bytes);
-	return ok(hex(hashDomain("ts-drp-storage/blob/v1", copied)) as BlobDigest);
+	// Verify once per exact bytes: a hit requires byte equality with a private
+	// copy that was hashed, so changed bytes can never reuse an old digest.
+	let digest = blobDigests.get(copied);
+	if (digest === undefined) {
+		digest = hex(hashDomain("ts-drp-storage/blob/v1", copied)) as BlobDigest;
+		blobDigests.set(copied, digest);
+	}
+	return ok(digest);
 }
+
+// Bounded: at most 1024 private copies and 4 MiB, each no larger than one blob.
+const blobDigests = new ExactBytesMemo<BlobDigest>(1024, 4 * 1024 * 1024, 65536);
 
 /**
  * Hashes a validated digest-sorted closure in the storage closure domain.
