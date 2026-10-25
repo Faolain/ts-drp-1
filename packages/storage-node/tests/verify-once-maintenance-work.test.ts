@@ -242,10 +242,11 @@ describe("native AHE maintenance verifies each exact byte string once", () => {
 			console.info("journal image point steady-state control work", JSON.stringify(journal));
 			expect(second.control).toEqual(first.control);
 			expect(second.control).not.toBe(first.control);
-			// The control is not decoded or canonically re-verified again. What
-			// remains is the image digest over freshly captured rows (hash 1) and
-			// the exposed exact control carrier encoding (encode 1).
-			expect(journal).toEqual({ encode: 1, decode: 0, hash: 1 });
+			// The control is not decoded or canonically re-verified again, and the
+			// freshly scanned rows equal the remembered image's rows, so the image
+			// is not re-hashed either. What remains is the exposed exact control
+			// carrier encoding (encode 1).
+			expect(journal).toEqual({ encode: 1, decode: 0, hash: 0 });
 			// Another connection's same-length noncanonical control rewrite is refused.
 			const row = raw.prepare("SELECT record FROM retirement_controls WHERE object_id=?").get(selector.objectId)
 				?.record as Uint8Array;

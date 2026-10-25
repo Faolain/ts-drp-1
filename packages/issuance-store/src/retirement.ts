@@ -16,6 +16,7 @@ import {
 	isValidDurableScopeField,
 	settlementReplacementLastLogicalTimeFromPreimage,
 } from "./contract.js";
+import { durablePreimageHeader } from "./preimage-header.js";
 import {
 	type DurableIssueCommit,
 	type DurableIssueScope,
@@ -2519,18 +2520,16 @@ export function decodeDurableIssuancePreimage(
 	authorSequence: number
 ): Readonly<{ readonly epoch: number }> | undefined {
 	try {
-		const decoded: unknown = decodeCanonical(canonicalPreimageBytes);
-		if (typeof decoded !== "object" || decoded === null || Array.isArray(decoded)) return undefined;
-		const record = decoded as Record<string, unknown>;
+		const header = durablePreimageHeader(canonicalPreimageBytes);
 		if (
-			record.kind === "drp-vertex" &&
-			record.protocolMajor === 3 &&
-			isValidDurableAuthorSequence(record.epoch) &&
-			record.authorSequence === authorSequence &&
-			record.author === scope.author &&
-			record.objectId === scope.objectId
+			header.kind === "drp-vertex" &&
+			header.protocolMajor === 3 &&
+			isValidDurableAuthorSequence(header.epoch) &&
+			header.authorSequence === authorSequence &&
+			header.author === scope.author &&
+			header.objectId === scope.objectId
 		) {
-			return Object.freeze({ epoch: record.epoch });
+			return Object.freeze({ epoch: header.epoch });
 		}
 		return undefined;
 	} catch {
