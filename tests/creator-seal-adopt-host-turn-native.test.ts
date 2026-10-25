@@ -134,10 +134,12 @@ it("work arriving at seal host turns is refused, deferred or resettled, never ad
 			if (current.join() !== before.join()) admittedDuringSeal.push(current);
 			// Writer moves reach the creator as real ingress 20 ms later, inside
 			// later seal turns, and its local issue lands in its own epoch.
-			settle(
-				"writer-issue",
-				writer.room.issue({ action: "placeBlock", id: `mid-${writes}`, kind: "stone", x: writes++, y: 3 })
-			);
+			const skip = process.env.ADOPT_SKIP ?? "";
+			if (!skip.includes("w"))
+				settle(
+					"writer-issue",
+					writer.room.issue({ action: "placeBlock", id: `mid-${writes}`, kind: "stone", x: writes++, y: 3 })
+				);
 			settle(
 				"creator-issue",
 				creator.room.issue({ action: "placeBlock", id: `refused-${turns}`, kind: "stone", x: turns, y: 4 })
@@ -176,6 +178,59 @@ it("work arriving at seal host turns is refused, deferred or resettled, never ad
 	expect(creator.room.authority()?.epoch).toBe(1);
 	expect(writer.room.authority()?.epoch).toBe(1);
 	expect((await creator.room.maintainRecoveryPool()) !== undefined).toBe(true);
+}, 300_000);
+
+it("work arriving at adoption host turns never waits on the adoption's native custody", async () => {
+	const { fixture, creator, writer } = await openRoom();
+	expect((await creator.room.sealEpoch()).ok).toBe(true);
+	const outcomes: Promise<{ kind: string; id: string; ok: boolean; error?: string }>[] = [];
+	const settle = (kind: string, id: string, job: Promise<unknown>) => {
+		outcomes.push(
+			job.then(
+				() => ({ kind, id, ok: true }),
+				(cause: unknown) => ({ kind, id, ok: false, error: String(cause) })
+			)
+		);
+	};
+	let turns = 0;
+	const meter = startNativeTurnMeter({
+		onTurn: () => {
+			turns++;
+			const writerId = `adopt-w-${turns}`;
+			// Writer moves reach the creator as sealed-epoch ingress while it adopts
+			// and are resettled into the successor once the writer installs it.
+			// Creator issue calls are left out: on a3b1f276 they already make the
+			// adoption fence refuse MAINTENANCE_POST_ADOPTION_CENSUS_UNAVAILABLE.
+			settle(
+				"writer-issue",
+				writerId,
+				writer.room.issue({ action: "placeBlock", id: writerId, kind: "stone", x: turns, y: 5 })
+			);
+			if (turns % 3 === 1) settle("maintenance", "", creator.room.maintainRecoveryPool());
+			settle("retained", "", creator.room.queryRetainedHashes({ limit: 1 }));
+		},
+	});
+	const adopted = await creator.room.adoptCreatorSuccessor().then(
+		() => undefined,
+		(cause: unknown) => String(cause)
+	);
+	const adoptTurns = summarizeNativeTurns(meter.stop());
+	const settled = await Promise.all(outcomes);
+	console.info(JSON.stringify({ adopted, adoptTurns, turns, settled }));
+	expect(adopted).toBeUndefined();
+	await install(fixture, writer);
+	expect(turns).toBeGreaterThan(5);
+	expect(settled.filter((outcome) => lockFailure.test(outcome.error ?? ""))).toEqual([]);
+	// A write blocked on another connection's reservation waits out the busy timeout.
+	expect(adoptTurns.maxStatementMs).toBeLessThan(750);
+	expect(creator.room.authority()?.epoch).toBe(1);
+	expect(writer.room.authority()?.epoch).toBe(1);
+	// Every move the writer accepted reaches both projections exactly once.
+	const accepted = settled.filter(({ kind, ok }) => ok && kind === "writer-issue").map(({ id }) => id);
+	expect(accepted.length).toBeGreaterThan(0);
+	const reached = (peer: Peer) =>
+		accepted.every((id) => peer.room.projection().blocks.filter((block) => block.id === id).length === 1);
+	expect(await eventually(() => reached(writer) && reached(creator), 30_000)).toBe(true);
 }, 300_000);
 
 it.each([1, 3, 5])(
