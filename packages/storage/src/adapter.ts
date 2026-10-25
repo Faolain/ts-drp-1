@@ -188,6 +188,8 @@ const GENERATION_PAGE_CURSOR_PREFIX = "ts-drp-storage/generation-page/v1\0";
 export const storageAdapterClosureVerifier = Object.freeze({ start, next, acceptPromotion, acceptBlob, finish });
 
 export { classifyPersistedState, PersistedStorageError } from "./internal/persisted-state.js";
+/** Verify-once memo for pure functions of exact bytes; shared with native owners. */
+export { ExactBytesMemo } from "./internal/exact-bytes-memo.js";
 
 export {
 	BoundedReadBudgetError,

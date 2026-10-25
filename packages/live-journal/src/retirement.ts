@@ -6,6 +6,7 @@ import {
 	hashDomain,
 } from "@ts-drp/canonical";
 import { AHE_BOUNDED_READ_LIMITS, LOCAL_WORKLOAD_CAPACITY } from "@ts-drp/storage";
+import { ExactBytesMemo } from "@ts-drp/storage/adapter";
 import {canonicalPrimitiveResourceForSizing, canonicalBytesResourceForSizing,
 	canonicalArrayResourcesForSizing, canonicalRecordResourceForSizing,
 	type CanonicalResourceFootprint} from "@ts-drp/canonical/resource";
@@ -650,6 +651,15 @@ function decodeCapturedJournalRetirementNativeCarriers(
 		return new Uint8Array(value);
 	};
 	const bytes = capture(controlBytes);
+	// Bytes already verified as a complete legacy (non-native) control take the
+	// same branch below without decoding them twice more.
+	const verified = verifiedJournalControl(bytes);
+	if (verified !== undefined) {
+		if (planBytes !== undefined) throw new TypeError("store-poisoned");
+		if (verified.drain != null) throw new TypeError("store-poisoned");
+		if (syntax !== undefined) syntax.plan = undefined;
+		return verified;
+	}
 	const raw = decodeCanonical(bytes);
 	if (raw === null || typeof raw !== "object" || Array.isArray(raw)) throw new TypeError("store-poisoned");
 	if ((raw as { kind?: unknown }).kind !== "v3-live-journal-retirement-native-control-1") {
@@ -808,11 +818,27 @@ export function decodeJournalRetirementControl(value: unknown): LiveJournalRetir
 	)
 		throw new TypeError("store-poisoned");
 	const own = new Uint8Array(value);
+	const known = verifiedJournalControls.get(own);
+	// A hit is the verification of byte-identical input; each caller still
+	// receives its own complete capture with detached byte leaves.
+	if (known !== undefined) return captureJournalRetirementControl(known);
 	const control = captureJournalRetirementControl(decodeCanonical(own));
 	const encoded = encodeCapturedJournalRetirementControl(control);
-	if (own.length !== encoded.length || !own.every((b, i) => b === encoded[i])) throw new TypeError("store-poisoned");
+	if (own.length !== encoded.length) throw new TypeError("store-poisoned");
+	for (let index = 0; index < own.length; index++) if (own[index] !== encoded[index]) throw new TypeError("store-poisoned");
+	verifiedJournalControls.set(own, captureJournalRetirementControl(control));
 	return control;
 }
+/** Verify-once decode + canonical re-encode of exact journal control bytes. */
+function verifiedJournalControl(bytes: Uint8Array): LiveJournalRetirementControl | undefined {
+	const known = verifiedJournalControls.get(bytes);
+	return known === undefined ? undefined : captureJournalRetirementControl(known);
+}
+const verifiedJournalControls = new ExactBytesMemo<LiveJournalRetirementControl>(
+	64,
+	2 * 1024 * 1024,
+	LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES
+);
 /**
  * Applies both the active fence and permanent frontier to an exact scope.
  * @param control - Actual native object control, or absent birth.
