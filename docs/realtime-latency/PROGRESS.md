@@ -26,6 +26,26 @@ seal/adopt cooperative and cut install/maintenance CPU). Still open: rollback-pr
 post-promotion generation lifecycle, abandonment retirement-crash edge, 512-offer capacity
 gate, browser/FPS.
 
+### Transition cost by merge (measured, Grid conservation 40 / reopen 30, one at a time)
+
+Medians over epochs 6–40; cycle fix `041c4136` cherry-picked where the import cycle blocks the
+harness. [Logs](../../.logs/realtime-resume-2026-10-23/transition-bisect-01/summary.txt).
+
+| Checkpoint | Transition | Seal | Adopt | Install |
+| --- | ---: | ---: | ---: | ---: |
+| `37bb6080` harness baseline | 1475 | 243 | 317 | 903 |
+| `296cedf7` | 1455 | 242 | 300 | 894 |
+| `79cf717c` rejoin + responsiveness merge | 2404 | 224 | 406 | **1761** |
+| `5abfb079` | 2306 | 210 | 388 | 1689 |
+| `bb3600e2` | 2300 | 222 | 394 | 1668 |
+| `12b3794f` completion merge (`01944b66`) + cap fix | 3412 | 214 | 373 | **2814** |
+| `041c4136` | 3411 | 221 | 382 | 2786 |
+| `6c9b5935` final | 3359 | 210 | 373 | 2734 |
+
+Recipient install is the whole regression: +≈860 ms at the rejoin merge (8 commits incl.
+`1515daab`, `0e73815a`) and +≈1100 ms at completion custody (`01944b66`). Seal is flat, adopt
++≈80 ms. The prune, abandonment and lock-race fixes cost nothing measurable.
+
 ## Campaign blockers found by runs — 2026-10-24 afternoon
 
 - `12b3794f`: retirement-metadata 256 KiB cap → Grid now passes epoch 15 and the reopen at 30.
