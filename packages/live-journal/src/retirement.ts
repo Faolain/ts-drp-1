@@ -6,7 +6,6 @@ import {
 	hashDomain,
 } from "@ts-drp/canonical";
 import { AHE_BOUNDED_READ_LIMITS, LOCAL_WORKLOAD_CAPACITY } from "@ts-drp/storage";
-import { ExactBytesMemo } from "@ts-drp/storage/adapter";
 import {canonicalPrimitiveResourceForSizing, canonicalBytesResourceForSizing,
 	canonicalArrayResourcesForSizing, canonicalRecordResourceForSizing,
 	type CanonicalResourceFootprint} from "@ts-drp/canonical/resource";
@@ -818,7 +817,7 @@ export function decodeJournalRetirementControl(value: unknown): LiveJournalRetir
 	)
 		throw new TypeError("store-poisoned");
 	const own = new Uint8Array(value);
-	const known = verifiedJournalControls.get(own);
+	const known = knownJournalControl(own);
 	// A hit is the verification of byte-identical input; each caller still
 	// receives its own complete capture with detached byte leaves.
 	if (known !== undefined) return captureJournalRetirementControl(known);
@@ -826,19 +825,42 @@ export function decodeJournalRetirementControl(value: unknown): LiveJournalRetir
 	const encoded = encodeCapturedJournalRetirementControl(control);
 	if (own.length !== encoded.length) throw new TypeError("store-poisoned");
 	for (let index = 0; index < own.length; index++) if (own[index] !== encoded[index]) throw new TypeError("store-poisoned");
-	verifiedJournalControls.set(own, captureJournalRetirementControl(control));
+	rememberJournalControl(own, captureJournalRetirementControl(control));
 	return control;
 }
 /** Verify-once decode + canonical re-encode of exact journal control bytes. */
 function verifiedJournalControl(bytes: Uint8Array): LiveJournalRetirementControl | undefined {
-	const known = verifiedJournalControls.get(bytes);
+	const known = knownJournalControl(bytes);
 	return known === undefined ? undefined : captureJournalRetirementControl(known);
 }
-const verifiedJournalControls = new ExactBytesMemo<LiveJournalRetirementControl>(
-	64,
-	2 * 1024 * 1024,
-	LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES
-);
+// Bounded verify-once cache: private copies of verified control bytes, most
+// recent last. Every hit requires full byte equality, so the cached value is
+// always the verification of exactly the presented bytes; no invalidation is
+// needed because the verification is a pure function of those bytes.
+const VERIFIED_JOURNAL_CONTROL_ENTRIES = 64,
+	VERIFIED_JOURNAL_CONTROL_BYTES = 2 * 1024 * 1024;
+const verifiedJournalControls: { readonly bytes: Uint8Array; readonly control: LiveJournalRetirementControl }[] = [];
+let verifiedJournalControlBytes = 0;
+function knownJournalControl(bytes: Uint8Array): LiveJournalRetirementControl | undefined {
+	search: for (let index = verifiedJournalControls.length - 1; index >= 0; index--) {
+		const entry = verifiedJournalControls[index]!;
+		if (entry.bytes.length !== bytes.length) continue;
+		for (let at = 0; at < bytes.length; at++) if (entry.bytes[at] !== bytes[at]) continue search;
+		if (index !== verifiedJournalControls.length - 1) verifiedJournalControls.push(...verifiedJournalControls.splice(index, 1));
+		return entry.control;
+	}
+	return undefined;
+}
+function rememberJournalControl(bytes: Uint8Array, control: LiveJournalRetirementControl): void {
+	if (bytes.length > LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES) return;
+	verifiedJournalControls.push({ bytes: bytes.slice(), control });
+	verifiedJournalControlBytes += bytes.length;
+	while (
+		verifiedJournalControls.length > VERIFIED_JOURNAL_CONTROL_ENTRIES ||
+		verifiedJournalControlBytes > VERIFIED_JOURNAL_CONTROL_BYTES
+	)
+		verifiedJournalControlBytes -= verifiedJournalControls.shift()!.bytes.length;
+}
 /**
  * Applies both the active fence and permanent frontier to an exact scope.
  * @param control - Actual native object control, or absent birth.
