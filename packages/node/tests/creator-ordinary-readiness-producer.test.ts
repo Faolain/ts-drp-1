@@ -863,7 +863,7 @@ function closeReadinessJob(options: {supported?: boolean; metadata?: () => Promi
 	 const run=${matches[0]!.getText(close)};
 	 return {run,stop:()=>{stopping=true;},jobs:maintenanceJobs,ready:()=>ordinaryTemplateReady,currentSource:()=>ordinaryProofSource};`;
 	const js = ts.transpileModule(body, {compilerOptions: {target: ts.ScriptTarget.ES2022}}).outputText;
-	return {calls, completionModes, ...new Function("yieldToHost", "options", "calls", "completionModes", "assertTrust", js)(yieldToHost, options, calls, completionModes,
+	return {calls, completionModes, ...new Function("yieldToHost", "createWorkCheckpoint", "options", "calls", "completionModes", "assertTrust", js)(yieldToHost, createWorkCheckpoint, options, calls, completionModes,
 		(actual: unknown, original: unknown) => {expect(actual).toBe(original);})} as
 		{calls: string[]; completionModes: boolean[]; run(): Promise<void>; stop(): void; jobs: Set<Promise<void>>; ready(): boolean; currentSource(): object | undefined};
 }

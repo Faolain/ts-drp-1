@@ -405,7 +405,9 @@ describe("mandatory fence immutable source handoff", () => {
 				prepareCreatorIssuanceMaintenanceQuote: async () => {events.push("cold-proof"); return {proof};},
 				captureCreatorOrdinaryIssuanceProofSourceForFence: capture,
 				captureCreatorOrdinaryIssuanceProofSource: () => {throw Error("not ordinary operation authority");},
-				chargeCreatorIssuanceMaintenanceQuote: charge, report: () => {events.push("observe");}};
+				chargeCreatorIssuanceMaintenanceQuote: charge, report: () => {events.push("observe");},
+				// The job's host checkpoint between cold quote spans; its budget never expires here.
+				cooperate: async () => undefined};
 			const js = ts.transpileModule(`return (async()=>{let quote,ordinaryProofSource,ordinaryTemplateReady=false;
 			 const ordinaryDomain=false,{input,planEffect,receivedReceipt}=state;
 			 ${matches[0]!.getText(tree)}
