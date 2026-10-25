@@ -1482,7 +1482,33 @@ function retirementPlanBytes(plan: SettlementPlan): Uint8Array {
 		maxItems: ISSUANCE_RETIREMENT_LIMITS.maxRows * 32 });
 }
 
+/** Work counts for one verify-once memo: full verifications run and verified results reused. */
+export interface IssuanceVerifiedOnceCounts {
+	readonly verifications: number;
+	readonly hits: number;
+}
+let controlVerifications = 0, planVerifications = 0;
+/**
+ * Diagnostic work counts for the retirement control and embedded plan verifications.
+ * @returns Full verifications and memo hits since the last clear.
+ */
+export function issuanceRetirementVerificationCounts(): Readonly<{
+	control: IssuanceVerifiedOnceCounts; plan: IssuanceVerifiedOnceCounts;
+}> {
+	return {control: {verifications: controlVerifications, hits: 0}, plan: {verifications: planVerifications, hits: 0}};
+}
+/** Resets the diagnostic work counts and keeps every verified result. */
+export function resetIssuanceRetirementVerificationCounts(): void {
+	controlVerifications = 0;
+	planVerifications = 0;
+}
+/** Drops every verified result and resets the diagnostic work counts. */
+export function clearIssuanceRetirementVerifiedOnce(): void {
+	resetIssuanceRetirementVerificationCounts();
+}
+
 function retirementPlanFromBytes(input: unknown): SettlementPlan {
+	planVerifications++;
 	const bytes = copyDurableIssuanceBytes(input);
 	if (bytes === undefined || bytes.byteLength > ISSUANCE_RETIREMENT_LIMITS.maxBytes) throw invalid();
 	const value = decodeCanonical(bytes);
@@ -1656,6 +1682,7 @@ export function decodeIssuanceRetirementControl(value: unknown): DurableIssuance
 		(typeof SharedArrayBuffer !== "undefined" && value.buffer instanceof SharedArrayBuffer)
 	)
 		throw invalid();
+	controlVerifications++;
 	const own = new Uint8Array(value);
 	const control = captureIssuanceRetirementControl(decodeCanonical(own));
 	const exact = encodeIssuanceRetirementControl(control);

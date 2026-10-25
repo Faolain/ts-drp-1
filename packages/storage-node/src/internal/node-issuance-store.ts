@@ -524,8 +524,26 @@ function settlementPlanEntriesJson(plan: SettlementPlan): string {
 	return issuanceLegacySettlementPlanEntriesJson(plan);
 }
 
+let settlementPlanRowVerifications = 0;
+/**
+ * Diagnostic work counts for stored settlement-plan row verification.
+ * @returns Full verifications and memo hits since the last clear.
+ */
+export function nodeSettlementPlanRowVerificationCounts(): Readonly<{ verifications: number; hits: number }> {
+	return { verifications: settlementPlanRowVerifications, hits: 0 };
+}
+/** Resets the diagnostic work counts and keeps every verified result. */
+export function resetNodeSettlementPlanRowVerificationCounts(): void {
+	settlementPlanRowVerifications = 0;
+}
+/** Drops every verified result and resets the diagnostic work counts. */
+export function clearNodeSettlementPlanRowVerifiedOnce(): void {
+	resetNodeSettlementPlanRowVerificationCounts();
+}
+
 function copySettlementPlanRow(value: unknown, scope: DurableIssueScope): SettlementPlan | undefined {
 	if (typeof value !== "object" || value === null) return undefined;
+	settlementPlanRowVerifications++;
 	const objectId = Reflect.get(value, "object_id");
 	const author = Reflect.get(value, "author");
 	const revision = Reflect.get(value, "revision");
