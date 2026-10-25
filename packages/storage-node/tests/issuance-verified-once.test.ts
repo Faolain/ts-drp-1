@@ -204,6 +204,15 @@ describe("native issuance verify-once soundness across connections, rollback and
 		const fresh = (await store.readSettlementPlan(scope))!;
 		expect(fresh.entries.length).toBe(1);
 		expect(fresh.sourceContexts![0]!.exactCanonicalContextBytes).toEqual(contextBytes);
+		// The census hands out the native row plans directly (no outer clone).
+		const maintenance = durableIssuancePruningMaintenanceForStore(store)!;
+		const census = () => maintenance.readBoundedRecoveryCensus!({ objectId: scope.objectId, limits: ISSUANCE_RETIREMENT_LIMITS });
+		const censusPlan = (await census()).rows.plans[0]!;
+		expect(censusPlan).toEqual(fresh);
+		(censusPlan.entries as unknown[]).length = 0;
+		(censusPlan.sourceContexts![0]!.exactCanonicalContextBytes as Uint8Array).fill(0);
+		expect((await census()).rows.plans[0]).toEqual(fresh);
+		expect(await store.readSettlementPlan(scope)).toEqual(fresh);
 		// A refused write leaves the exact prior row.
 		await expect(store.transactWriteSettlementPlan({ scope, expectedRevision: fresh.revision + 5,
 			plan: { ...fresh, revision: fresh.revision + 6 } })).rejects.toThrow();

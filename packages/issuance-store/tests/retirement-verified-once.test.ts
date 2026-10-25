@@ -148,9 +148,15 @@ describe("retirement control verify-once soundness", () => {
 
 	it("never lets a mutated capture result poison the verified plan bytes", () => {
 		const control = completedControl(2);
+		// Cold memo: this capture is the first verification of these plan bytes.
+		clearIssuanceRetirementVerifiedOnce();
 		const captured = captureIssuanceRetirementControl(control);
 		const poisoned = planBytes(captured).before;
+		const verified = issuanceRetirementVerificationCounts().plan.verifications;
 		poisoned.fill(0, 0, 64);
+		// The memo's own key is untouched: the original bytes still hit.
+		captureIssuanceRetirementControl(control);
+		expect(issuanceRetirementVerificationCounts().plan.verifications).toBe(verified);
 		// The poisoned bytes are judged on their own, never matched to the verified plan.
 		expect(() => captureIssuanceRetirementControl({ ...control, completed: { ...control.completed!,
 			planRewrite: { ...control.completed!.planRewrite!, plans: [{ before: poisoned, after: planBytes(control).after }] } } }))
