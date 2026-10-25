@@ -29,6 +29,7 @@ import {
 	advanceNodeRetirementControl,
 	readNodeRetirementControl,
 } from "./retirement-control.js";
+import { cachedStatement } from "./sqlite-statement-cache.js";
 
 export type NodeAheReclamationCrashEdge =
 	| "after-floor-rewrite"
@@ -62,7 +63,7 @@ function databaseBytes(value: unknown): Uint8Array {
 function loadSnapshot(connection: DatabaseSync, objectId: string, bounded = false): AheReclamationSnapshot {
 	const parsedObjectId = parseStorageObjectId(objectId);
 	if (!parsedObjectId.ok) throw createAheReclamationError("AHE_RECLAMATION_INVALID_ARGUMENT", "object ID invalid");
-	const objectRow = connection.prepare("SELECT head_record FROM objects WHERE object_id = ?").get(objectId) as
+	const objectRow = cachedStatement(connection, "SELECT head_record FROM objects WHERE object_id = ?").get(objectId) as
 		| Row
 		| undefined;
 	let head: ExpectedHead = { kind: "none", objectId: parsedObjectId.value };
@@ -75,9 +76,10 @@ function loadSnapshot(connection: DatabaseSync, objectId: string, bounded = fals
 	}
 
 	const generations: GenerationRecord[] = [];
-	for (const row of connection
-		.prepare("SELECT object_id, generation_id, record FROM generations ORDER BY object_id, generation_id")
-		.all() as Row[]) {
+	for (const row of cachedStatement(
+		connection,
+		"SELECT object_id, generation_id, record FROM generations ORDER BY object_id, generation_id"
+	).all() as Row[]) {
 		const decoded = decodeGenerationRecordV1(databaseBytes(row.record));
 		if (!decoded.ok || decoded.value.objectId !== row.object_id || decoded.value.generationId !== row.generation_id) {
 			throw createAheReclamationError("AHE_RECLAMATION_CORRUPT", "generation row was malformed or misbound");
@@ -103,21 +105,21 @@ function loadSnapshot(connection: DatabaseSync, objectId: string, bounded = fals
 			"addressed native generation census exceeds bound"
 		);
 	const promotions = (
-		connection
-			.prepare("SELECT object_id, generation_id, digest FROM promotions ORDER BY object_id, generation_id, digest")
-			.all() as Row[]
+		cachedStatement(
+			connection,
+			"SELECT object_id, generation_id, digest FROM promotions ORDER BY object_id, generation_id, digest"
+		).all() as Row[]
 	).map(
 		(row) =>
 			({ objectId: row.object_id, generationId: row.generation_id, digest: row.digest }) as AheReclamationPromotion
 	);
 	const blobs = [];
-	for (const row of connection
-		.prepare(
-			"SELECT blobs.digest, blobs.bytes FROM blobs " +
-				"INNER JOIN (SELECT DISTINCT digest FROM promotions) AS referenced ON referenced.digest = blobs.digest " +
-				"ORDER BY blobs.digest"
-		)
-		.all() as Row[]) {
+	for (const row of cachedStatement(
+		connection,
+		"SELECT blobs.digest, blobs.bytes FROM blobs " +
+			"INNER JOIN (SELECT DISTINCT digest FROM promotions) AS referenced ON referenced.digest = blobs.digest " +
+			"ORDER BY blobs.digest"
+	).all() as Row[]) {
 		const capturedBytes = databaseBytes(row.bytes);
 		blobs.push({ digest: row.digest, bytes: capturedBytes });
 	}
@@ -249,13 +251,10 @@ export function applyNodeBoundedAheReclamation(
 			expectCount(
 				store,
 				changed(
-					connection
-						.prepare("UPDATE generations SET record = ? WHERE object_id = ? AND generation_id = ?")
-						.run(
-							encodeGenerationRecordV1(source.rewrittenGeneration),
-							captured.objectId,
-							source.generation.generationId
-						)
+					cachedStatement(
+						connection,
+						"UPDATE generations SET record = ? WHERE object_id = ? AND generation_id = ?"
+					).run(encodeGenerationRecordV1(source.rewrittenGeneration), captured.objectId, source.generation.generationId)
 				),
 				1,
 				"floor rewrite"
@@ -265,13 +264,11 @@ export function applyNodeBoundedAheReclamation(
 		expectCount(
 			store,
 			changed(
-				connection
-					.prepare("UPDATE generations SET record = ? WHERE object_id = ? AND generation_id = ?")
-					.run(
-						encodeGenerationRecordV1(decision.floor.rewrittenGeneration),
-						captured.objectId,
-						captured.lineageFloor.generationId
-					)
+				cachedStatement(connection, "UPDATE generations SET record = ? WHERE object_id = ? AND generation_id = ?").run(
+					encodeGenerationRecordV1(decision.floor.rewrittenGeneration),
+					captured.objectId,
+					captured.lineageFloor.generationId
+				)
 			),
 			1,
 			"floor rewrite"
@@ -279,7 +276,8 @@ export function applyNodeBoundedAheReclamation(
 		observer?.("after-floor-rewrite");
 	}
 	let promotionDeletes = 0;
-	const deletePromotion = connection.prepare(
+	const deletePromotion = cachedStatement(
+		connection,
 		"DELETE FROM promotions WHERE object_id = ? AND generation_id = ? AND digest = ?"
 	);
 	for (const promotion of decision.deletePromotions) {
@@ -289,7 +287,10 @@ export function applyNodeBoundedAheReclamation(
 	if (decision.floor.normalizedThisCall) observer?.("after-promotion-delete");
 
 	let generationDeletes = 0;
-	const deleteGeneration = connection.prepare("DELETE FROM generations WHERE object_id = ? AND generation_id = ?");
+	const deleteGeneration = cachedStatement(
+		connection,
+		"DELETE FROM generations WHERE object_id = ? AND generation_id = ?"
+	);
 	for (const generationId of decision.deleteGenerationIds) {
 		generationDeletes += changed(deleteGeneration.run(captured.objectId, generationId));
 	}
@@ -297,7 +298,7 @@ export function applyNodeBoundedAheReclamation(
 	if (decision.floor.normalizedThisCall) observer?.("after-generation-delete");
 
 	let blobDeletes = 0;
-	const deleteBlob = connection.prepare("DELETE FROM blobs WHERE digest = ?");
+	const deleteBlob = cachedStatement(connection, "DELETE FROM blobs WHERE digest = ?");
 	for (const digest of decision.deleteBlobDigests) blobDeletes += changed(deleteBlob.run(digest));
 	expectCount(store, blobDeletes, decision.deleteBlobDigests.length, "blob delete");
 	if (decision.floor.normalizedThisCall) observer?.("after-blob-delete");

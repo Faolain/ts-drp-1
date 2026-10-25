@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { nativeLocalSessionSchemaRows, nativeLocalSessionSchemaExtraRows } from "./local-session-lifetime.js";
+import { cachedStatement } from "./sqlite-statement-cache.js";
 
 export const SCHEMA = `
 CREATE TABLE IF NOT EXISTS objects (
@@ -76,14 +77,18 @@ const EXPECTED_FOREIGN_KEY_COLUMNS = Object.freeze({
  * @returns Whether schema objects, constraints, keys and physical form are supported.
  */
 export function hasExpectedPhysicalSchema(connection: DatabaseSync, version: 0 | 1 | 2 = 2): boolean {
-	if (connection.prepare("PRAGMA user_version").get()?.user_version !== version) return false;
+	if (cachedStatement(connection, "PRAGMA user_version").get()?.user_version !== version) return false;
 	const legacy = version === 0;
 	const expectedNames = Object.keys(EXPECTED_COLUMNS)
 		.filter((name) => !legacy || name !== "retirement_controls")
 		.sort();
-	const tables = nativeLocalSessionSchemaRows(connection, connection
-		.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name LIMIT ?")
-		.all(expectedNames.length + 1 + nativeLocalSessionSchemaExtraRows(connection)) as DatabaseRow[]);
+	const tables = nativeLocalSessionSchemaRows(
+		connection,
+		cachedStatement(
+			connection,
+			"SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name LIMIT ?"
+		).all(expectedNames.length + 1 + nativeLocalSessionSchemaExtraRows(connection)) as DatabaseRow[]
+	);
 	if (tables.length !== expectedNames.length || tables.some((row, index) => row.name !== expectedNames[index])) {
 		return false;
 	}
@@ -100,8 +105,10 @@ export function hasExpectedPhysicalSchema(connection: DatabaseSync, version: 0 |
 			compact(match[0].slice(0, -1)),
 		])
 	);
-	const catalog = nativeLocalSessionSchemaRows(connection, connection
-		.prepare(
+	const catalog = nativeLocalSessionSchemaRows(
+		connection,
+		cachedStatement(
+			connection,
 			"SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%' OR type='index' ORDER BY type,name LIMIT ?"
 		)
 		.all(expectedNames.length * 2 + 1 + nativeLocalSessionSchemaExtraRows(connection)) as DatabaseRow[]);
@@ -130,7 +137,7 @@ export function hasExpectedPhysicalSchema(connection: DatabaseSync, version: 0 |
 		} else return false;
 	}
 	for (const tableName of expectedNames as (keyof typeof EXPECTED_COLUMNS)[]) {
-		const indexes = connection.prepare(`PRAGMA index_list("${tableName}")`).all() as DatabaseRow[];
+		const indexes = cachedStatement(connection, `PRAGMA index_list("${tableName}")`).all() as DatabaseRow[];
 		if (
 			indexes.length !== 1 ||
 			indexes[0]?.name !== `sqlite_autoindex_${tableName}_1` ||
@@ -139,7 +146,7 @@ export function hasExpectedPhysicalSchema(connection: DatabaseSync, version: 0 |
 			Number(indexes[0].partial) !== 0
 		)
 			return false;
-		const columns = connection.prepare(`PRAGMA table_info("${tableName}")`).all() as DatabaseRow[];
+		const columns = cachedStatement(connection, `PRAGMA table_info("${tableName}")`).all() as DatabaseRow[];
 		const expectedColumns = EXPECTED_COLUMNS[tableName];
 		if (
 			columns.length !== expectedColumns.length ||
@@ -157,7 +164,9 @@ export function hasExpectedPhysicalSchema(connection: DatabaseSync, version: 0 |
 		) {
 			return false;
 		}
-		const foreignKeyColumns = (connection.prepare(`PRAGMA foreign_key_list("${tableName}")`).all() as DatabaseRow[])
+		const foreignKeyColumns = (
+			cachedStatement(connection, `PRAGMA foreign_key_list("${tableName}")`).all() as DatabaseRow[]
+		)
 			.map((row) => `${String(row.table)}:${String(row.from)}:${String(row.to)}`)
 			.sort();
 		const expectedForeignKeyColumns = [...EXPECTED_FOREIGN_KEY_COLUMNS[tableName]].sort();

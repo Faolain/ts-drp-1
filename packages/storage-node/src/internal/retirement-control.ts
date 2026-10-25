@@ -16,6 +16,7 @@ import type { DatabaseSync } from "node:sqlite";
 
 import { loadNodeBoundedReadRequest } from "./bounded-read.js";
 import { hasExpectedPhysicalSchema } from "./schema-sqlite.js";
+import { cachedStatement } from "./sqlite-statement-cache.js";
 
 /**
  * Reads the exact addressed native row inside the caller's existing transaction.
@@ -28,11 +29,10 @@ export function readNodeRetirementControl(
 	objectId: StorageObjectId
 ): AheRetirementControl | null {
 	if (!hasExpectedPhysicalSchema(connection)) throw new PersistedStorageError("UNSUPPORTED_STORAGE_SCHEMA");
-	const row = connection
-		.prepare(
-			"SELECT CASE WHEN typeof(record)='blob' AND length(record)<=? THEN record ELSE NULL END AS record FROM retirement_controls WHERE object_id = ?"
-		)
-		.get(AHE_RETIREMENT_CONTROL_LIMITS.maxBytes, objectId);
+	const row = cachedStatement(
+		connection,
+		"SELECT CASE WHEN typeof(record)='blob' AND length(record)<=? THEN record ELSE NULL END AS record FROM retirement_controls WHERE object_id = ?"
+	).get(AHE_RETIREMENT_CONTROL_LIMITS.maxBytes, objectId);
 	if (row === undefined) return null;
 	if (!(row.record instanceof Uint8Array)) throw new PersistedStorageError("NON_CANONICAL_RECORD");
 	const decoded = decodeAheRetirementControl(row.record);
@@ -54,9 +54,10 @@ export function advanceNodeRetirementControl(
 	const bytes = encodeAheRetirementControl({ ...control, revision: control.revision + 1 });
 	const admitted = admitNodeRetirementControl(connection, control.objectId, bytes);
 	if (!admitted.ok) return admitted;
-	const result = connection
-		.prepare("UPDATE retirement_controls SET record = ? WHERE object_id = ?")
-		.run(bytes, control.objectId);
+	const result = cachedStatement(connection, "UPDATE retirement_controls SET record = ? WHERE object_id = ?").run(
+		bytes,
+		control.objectId
+	);
 	if (Number(result.changes) !== 1) throw new PersistedStorageError("NON_CANONICAL_RECORD");
 	return { ok: true, value: undefined };
 }

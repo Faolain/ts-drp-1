@@ -72,6 +72,7 @@ import { iterateSqliteRows } from "./internal/sqlite-iterator.js";
 import { sqliteFilename } from "./internal/sqlite-filename.js";
 import { enforceNativeLocalSessionFile, nativeLocalSessionSchemaRows, type LocalSessionLifetime } from "./internal/local-session-lifetime.js";
 import type { NodeNativeReadPort } from "./index.js";
+import { configuredStatement } from "./internal/sqlite-statement-cache.js";
 
 export interface NodeDurableLiveJournalStoreOptions {
 	readonly primaryFilename: string;
@@ -210,7 +211,7 @@ function statement(database: DatabaseSync, sql: string): StatementSync {
 }
 
 function scalar(database: DatabaseSync, sql: string): unknown {
-	const row = statement(database, sql).get();
+	const row = configuredStatement(database, sql).get();
 	return row === undefined ? undefined : Object.values(row)[0];
 }
 
@@ -223,7 +224,10 @@ function dataVersion(database: DatabaseSync): number {
 function admit(database: DatabaseSync, initialization: "create" | "reopen" = "create"): void {
 	database.exec("PRAGMA busy_timeout=1000");
 	database.exec("PRAGMA synchronous=FULL");
-	const initial = nativeLocalSessionSchemaRows(database, statement(database, "SELECT type,name,tbl_name,sql FROM sqlite_schema ORDER BY type,name").all());
+	const initial = nativeLocalSessionSchemaRows(
+		database,
+		configuredStatement(database, "SELECT type,name,tbl_name,sql FROM sqlite_schema ORDER BY type,name").all()
+	);
 	const version = scalar(database, "PRAGMA user_version");
 	if (initialization === "reopen" && version !== 2 && version !== 3 && version !== 4)
 		throw new Error("unsupported-schema");
@@ -261,7 +265,10 @@ function admit(database: DatabaseSync, initialization: "create" | "reopen" = "cr
 		}
 		database.exec("BEGIN IMMEDIATE");
 		try {
-			const locked = nativeLocalSessionSchemaRows(database, statement(database, "SELECT type,name,tbl_name,sql FROM sqlite_schema ORDER BY type,name").all());
+			const locked = nativeLocalSessionSchemaRows(
+				database,
+				configuredStatement(database, "SELECT type,name,tbl_name,sql FROM sqlite_schema ORDER BY type,name").all()
+			);
 			if (scalar(database, "PRAGMA user_version") !== version || JSON.stringify(locked) !== JSON.stringify(initial))
 				throw new Error("unsupported-schema");
 			if (fresh) {
@@ -277,7 +284,7 @@ function admit(database: DatabaseSync, initialization: "create" | "reopen" = "cr
 			if (currentV2 || currentV3) {
 				// Finish each bounded point read before rewriting that same WITHOUT ROWID
 				// record. An open table iterator can revisit the rewritten payload.
-				const old = statement(
+				const old = configuredStatement(
 					database,
 					"SELECT object_id, CASE WHEN typeof(record)='blob' AND length(record)<=? THEN record ELSE NULL END AS record FROM retirement_controls WHERE object_id>? ORDER BY object_id LIMIT 1"
 				);
@@ -302,7 +309,10 @@ function admit(database: DatabaseSync, initialization: "create" | "reopen" = "cr
 			throw error;
 		}
 	}
-	const catalog = nativeLocalSessionSchemaRows(database, statement(database, "SELECT type,name,tbl_name,sql FROM sqlite_schema ORDER BY type,name").all());
+	const catalog = nativeLocalSessionSchemaRows(
+		database,
+		configuredStatement(database, "SELECT type,name,tbl_name,sql FROM sqlite_schema ORDER BY type,name").all()
+	);
 	if (
 		catalog.length !== EXPECTED_CATALOG.length ||
 		catalog.some((row, index) => {
@@ -331,7 +341,7 @@ function readRetirementNativeCarriers(
 ): Readonly<{record: unknown; planRecord: unknown}> | undefined {
 	const bounded =
 		"typeof(record)='blob' AND length(record)>0 AND (plan_record IS NULL OR (typeof(plan_record)='blob' AND length(plan_record)>0)) AND length(record)+COALESCE(length(plan_record),0)<=?";
-	const row = statement(
+	const row = configuredStatement(
 		database,
 		`SELECT CASE WHEN ${bounded} THEN record ELSE NULL END AS record, CASE WHEN ${bounded} THEN plan_record ELSE NULL END AS plan_record, plan_record IS NOT NULL AS has_plan FROM retirement_controls WHERE object_id=?`
 	).get(LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES, LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES, objectId);
@@ -364,7 +374,7 @@ function writeRetirementNativeCarriers(
 	objectId: string,
 	carriers: Readonly<{controlBytes: Uint8Array; planBytes?: Uint8Array}>
 ): void {
-	statement(
+	configuredStatement(
 		database,
 		"INSERT INTO retirement_controls(object_id,record,plan_record) VALUES(?,?,?) ON CONFLICT(object_id) DO UPDATE SET record=excluded.record,plan_record=CASE WHEN retirement_controls.plan_record IS excluded.plan_record THEN retirement_controls.plan_record ELSE excluded.plan_record END"
 	).run(objectId, carriers.controlBytes, carriers.planBytes ?? null);
@@ -391,14 +401,14 @@ function retirementImage(
 	}>
 ): LiveJournalRetirementImage {
 	const count = (table: string): number => {
-		const row = statement(database, `SELECT count(*) AS n FROM ${table} WHERE object_id=?`).get(objectId);
+		const row = configuredStatement(database, `SELECT count(*) AS n FROM ${table} WHERE object_id=?`).get(objectId);
 		if (row === undefined || !Number.isSafeInteger(row.n)) throw new Error("store-poisoned");
 		return row.n as number;
 	};
 	if (!journalRetirementImageCountsFit(count("scopes"), count("accepted_entries")))
 		throw new Error("retirement-fenced");
 	if (
-		statement(
+		configuredStatement(
 			database,
 			"SELECT 1 AS invalid FROM scopes WHERE object_id=? AND closed_membership_bytes IS NOT NULL AND (typeof(closed_membership_bytes)<>'blob' OR length(closed_membership_bytes)=0 OR length(closed_membership_bytes)>?) LIMIT 1"
 		).get(objectId, LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes) !== undefined
@@ -512,7 +522,7 @@ function validateDrainNativeRows(database: DatabaseSync, control: LiveJournalRet
 		const header = readScope(database, prefix.scope);
 		if (header === null || header.nextJournalSequence !== prefix.highWatermark) throw new Error("retirement-stale");
 		const removed = Math.max(0, Math.min(prefix.rows.length, state.cursor - index));
-		const count = statement(
+		const count = configuredStatement(
 			database,
 			"SELECT count(*) AS n FROM accepted_entries WHERE object_id=? AND epoch=? AND anchor_digest=?"
 		).get(...scopeParameters(prefix.scope));
@@ -521,7 +531,7 @@ function validateDrainNativeRows(database: DatabaseSync, control: LiveJournalRet
 			const selected = { scope: prefix.scope, row };
 			const expected = retirementFrame(selected);
 			if (journalRetirementFrameDigest(expected) !== row.nativeFrameDigest) throw new Error("retirement-stale");
-			const actual = statement(
+			const actual = configuredStatement(
 				database,
 				`SELECT ${ROW_COLUMNS} FROM accepted_entries WHERE object_id=? AND epoch=? AND anchor_digest=? AND journal_sequence=?`
 			).get(...scopeParameters(prefix.scope), row.journalSequence);
@@ -541,9 +551,15 @@ function validateDrainNativeRows(database: DatabaseSync, control: LiveJournalRet
 		}
 	}
 	for (const selected of state.plan.retiredEmptyHeaders ?? []) {
-		const actual = statement(database, "SELECT * FROM scopes WHERE object_id=? AND epoch=? AND anchor_digest=?").get(...scopeParameters(selected.scope));
+		const actual = configuredStatement(
+			database,
+			"SELECT * FROM scopes WHERE object_id=? AND epoch=? AND anchor_digest=?"
+		).get(...scopeParameters(selected.scope));
 		if (actual?.closed_membership_bytes === null) delete actual.closed_membership_bytes;
-		const count = statement(database, "SELECT count(*) AS n FROM accepted_entries WHERE object_id=? AND epoch=? AND anchor_digest=?").get(...scopeParameters(selected.scope));
+		const count = configuredStatement(
+			database,
+			"SELECT count(*) AS n FROM accepted_entries WHERE object_id=? AND epoch=? AND anchor_digest=?"
+		).get(...scopeParameters(selected.scope));
 		if (count?.n !== 0) throw new Error("retirement-stale");
 		if (index++ < state.cursor) {
 			if (actual !== undefined) throw new Error("retirement-stale");
@@ -569,7 +585,7 @@ function sqlBlob(value: Uint8Array): string {
 }
 
 function readScope(database: DatabaseSync, scope: LiveJournalScope): StoredScope | null {
-	const row = statement(
+	const row = configuredStatement(
 		database,
 		"SELECT object_id,epoch,anchor_digest,next_journal_sequence,exact_anchor_preimage,detached_anchor_signature,parameters_digest,exact_parameters_carrier FROM scopes WHERE object_id=? AND epoch=? AND anchor_digest=?"
 	).get(...scopeParameters(scope));
@@ -585,7 +601,7 @@ function readScope(database: DatabaseSync, scope: LiveJournalScope): StoredScope
 }
 
 function readScopeWriter(database: DatabaseSync, scope: LiveJournalScope): StoredScope | null {
-	const row = statement(
+	const row = configuredStatement(
 		database,
 		"SELECT object_id,epoch,anchor_digest,next_journal_sequence,exact_anchor_preimage,detached_anchor_signature,parameters_digest,exact_parameters_carrier FROM scopes WHERE object_id=? AND epoch=? AND anchor_digest=?"
 	).get(...scopeParameters(scope));
@@ -606,7 +622,7 @@ type SignedScopeRead =
 
 function readSignedScope(database: DatabaseSync, input: LiveJournalSignedAnchorReadInput): SignedScopeRead {
 	// All physical metadata and every carrier are gated before their projection into JS.
-	const row = statement(
+	const row = configuredStatement(
 		database,
 		`WITH addressed AS (
 			SELECT *, typeof(object_id)='text' AND length(CAST(object_id AS BLOB)) BETWEEN 1 AND 4096
@@ -663,7 +679,7 @@ function readEmptyClosure(database: DatabaseSync, input: LiveJournalSignedAnchor
 	const scope = readSignedScope(database, input);
 	// Probe by complete scope regardless of the physical sequence key's type or value.
 	const exists =
-		statement(
+		configuredStatement(
 			database,
 			"SELECT 1 AS present FROM accepted_entries WHERE object_id=? AND epoch=? AND anchor_digest=? LIMIT 1"
 		).get(...scopeParameters(input.scope)) !== undefined;
@@ -717,7 +733,7 @@ function rowFromSql(row: Readonly<Record<string, unknown>>): StoredRow {
 }
 
 function readRows(database: DatabaseSync, scope: LiveJournalScope): readonly StoredRow[] {
-	return statement(
+	return configuredStatement(
 		database,
 		"SELECT object_id,epoch,anchor_digest,journal_sequence,source_kind,vertex_digest,received_preimage,received_signature,local_author,local_author_sequence FROM accepted_entries WHERE object_id=? AND epoch=? AND anchor_digest=? ORDER BY journal_sequence"
 	)
@@ -729,7 +745,7 @@ const ROW_COLUMNS =
 	"object_id,epoch,anchor_digest,journal_sequence,source_kind,vertex_digest,received_preimage,received_signature,local_author,local_author_sequence";
 
 function readRowBySequence(database: DatabaseSync, scope: LiveJournalScope, journalSequence: number): StoredRow | null {
-	const row = statement(
+	const row = configuredStatement(
 		database,
 		`SELECT ${ROW_COLUMNS} FROM accepted_entries WHERE object_id=? AND epoch=? AND anchor_digest=? AND journal_sequence=?`
 	).get(...scopeParameters(scope), journalSequence);
@@ -737,7 +753,7 @@ function readRowBySequence(database: DatabaseSync, scope: LiveJournalScope, jour
 }
 
 function readRowByDigest(database: DatabaseSync, scope: LiveJournalScope, vertexDigest: string): StoredRow | undefined {
-	const row = statement(
+	const row = configuredStatement(
 		database,
 		`SELECT ${ROW_COLUMNS} FROM accepted_entries WHERE object_id=? AND epoch=? AND anchor_digest=? AND vertex_digest=?`
 	).get(...scopeParameters(scope), vertexDigest);
@@ -750,7 +766,7 @@ function readRowByLocalReference(
 	author: string,
 	authorSequence: number
 ): StoredRow | undefined {
-	const row = statement(
+	const row = configuredStatement(
 		database,
 		`SELECT ${ROW_COLUMNS} FROM accepted_entries WHERE object_id=? AND epoch=? AND anchor_digest=? AND local_author=? AND local_author_sequence=?`
 	).get(...scopeParameters(scope), author, authorSequence);
@@ -882,11 +898,11 @@ function readReplaySnapshotReadonly(
 					scope.anchorDigest === basis.token.scope.anchorDigest &&
 					basis.token.highWatermark === basis.scope.nextJournalSequence);
 		const row = reusable
-			? statement(
+			? configuredStatement(
 					database,
 					"SELECT object_id,epoch,anchor_digest,next_journal_sequence,exact_anchor_preimage,detached_anchor_signature,parameters_digest,exact_parameters_carrier FROM scopes WHERE object_id=? AND epoch=? AND anchor_digest=?"
 				).get(...scopeParameters(scope))
-			: statement(
+			: configuredStatement(
 					database,
 					"SELECT object_id,epoch,anchor_digest,next_journal_sequence,exact_anchor_preimage,detached_anchor_signature,parameters_digest,exact_parameters_carrier FROM scopes WHERE object_id=? AND epoch=? ORDER BY (anchor_digest=?) DESC LIMIT 1"
 				).get(scope.objectId, scope.epoch, scope.anchorDigest);
@@ -902,7 +918,7 @@ function readReplaySnapshotReadonly(
 			sameInstalledScope(stored, basis.scope);
 		const rows =
 			addressed && page !== undefined
-				? statement(
+				? configuredStatement(
 						database,
 						`SELECT ${ROW_COLUMNS} FROM accepted_entries WHERE object_id=? AND epoch=? AND anchor_digest=? AND journal_sequence>? AND journal_sequence<? ORDER BY journal_sequence LIMIT ?`
 					)
@@ -1026,7 +1042,7 @@ export function createNodeDurableLiveJournalStore(
 			// witness. No callback/await crosses this fixed connection-local gate.
 			deletingScope = scope;
 			try {
-				statement(
+				configuredStatement(
 					database,
 					"UPDATE scopes SET closed_membership_bytes=NULL WHERE object_id=? AND epoch=? AND anchor_digest=? AND closed_membership_bytes IS NOT NULL"
 				).run(...scopeParameters(scope));
@@ -1181,7 +1197,7 @@ export function createNodeDurableLiveJournalStore(
 					database.exec(
 						`INSERT INTO scopes(object_id,epoch,anchor_digest,next_journal_sequence,exact_anchor_preimage,detached_anchor_signature,parameters_digest,exact_parameters_carrier) VALUES(${sqlText(selected.stored.scope.objectId)},${selected.stored.scope.epoch},${sqlText(selected.stored.scope.anchorDigest)},0,${sqlBlob(selected.stored.exactCanonicalAnchorPreimageBytes)},${sqlBlob(selected.stored.detachedAnchorSignature)},${sqlText(selected.stored.parametersDigest)},${sqlBlob(selected.stored.exactCanonicalParametersCarrierBytes)})`
 					);
-					statement(
+					configuredStatement(
 						database,
 						"UPDATE scopes SET next_journal_sequence=next_journal_sequence WHERE object_id=? AND epoch=? AND anchor_digest=?"
 					).run(...scopeParameters(selected.stored.scope));
@@ -1311,7 +1327,7 @@ export function createNodeDurableLiveJournalStore(
 				if (storedRows?.length !== 0) rejected = "store-poisoned";
 				else {
 					rejected =
-						statement(database, "SELECT 1 AS present FROM main.scopes WHERE object_id=? AND epoch=? LIMIT 1").get(
+						configuredStatement(database, "SELECT 1 AS present FROM main.scopes WHERE object_id=? AND epoch=? LIMIT 1").get(
 							candidate.scope.objectId,
 							candidate.scope.epoch
 						) === undefined
@@ -1380,7 +1396,7 @@ export function createNodeDurableLiveJournalStore(
 					database.exec(
 						`INSERT INTO accepted_entries(object_id,epoch,anchor_digest,journal_sequence,source_kind,vertex_digest,received_preimage,received_signature,local_author,local_author_sequence) VALUES(${sqlText(candidate.scope.objectId)},${candidate.scope.epoch},${sqlText(candidate.scope.anchorDigest)},${journalSequence},${sqlText(candidate.sourceKind)},${sqlText(candidate.vertexDigest)},${candidate.sourceKind === "received" ? sqlBlob(candidate.exactCanonicalPreimageBytes) : "NULL"},${candidate.sourceKind === "received" ? sqlBlob(candidate.detachedSignature) : "NULL"},${candidate.sourceKind === "local-issued" ? sqlText(candidate.author) : "NULL"},${candidate.sourceKind === "local-issued" ? candidate.authorSequence : "NULL"})`
 					);
-					const update = statement(
+					const update = configuredStatement(
 						database,
 						"UPDATE scopes SET next_journal_sequence=? WHERE object_id=? AND epoch=? AND anchor_digest=? AND next_journal_sequence=?"
 					).run(journalSequence + 1, ...scopeParameters(candidate.scope), journalSequence);
@@ -1695,7 +1711,7 @@ export function createNodeDurableLiveJournalStore(
 			database.exec("BEGIN");
 			// Exact equality to the captured canonical key bounds every projected key.
 			// CASE short-circuits the BLOB projection until physical type/length and allowance pass.
-			const row = statement(
+			const row = configuredStatement(
 				database,
 				`WITH addressed AS (
 					SELECT object_id, epoch, anchor_digest, exact_anchor_preimage,
@@ -1792,7 +1808,9 @@ export function createNodeDurableLiveJournalStore(
 		try {
 			database.exec("BEGIN");
 			// CASE prevents SQLite from copying an oversized BLOB into JavaScript.
-			const row = statement(database, `SELECT CASE
+			const row = configuredStatement(
+				database,
+				`SELECT CASE
 				WHEN closed_membership_bytes IS NULL THEN 'missing'
 				WHEN typeof(closed_membership_bytes)!='blob' OR length(closed_membership_bytes)=0
 					OR length(closed_membership_bytes)>? THEN 'store-poisoned'
@@ -1929,7 +1947,7 @@ export function createNodeDurableLiveJournalStore(
 				refusal = "retirement-stale";
 			else {
 				const installed = readScopeWriter(database, selected.scope);
-				const current = statement(
+				const current = configuredStatement(
 					database,
 					"SELECT closed_membership_bytes FROM scopes WHERE object_id=? AND epoch=? AND anchor_digest=?"
 				).get(...scopeParameters(selected.scope));
@@ -1956,7 +1974,7 @@ export function createNodeDurableLiveJournalStore(
 							controlBytes: next === null ? null : encodeJournalRetirementControl(next),
 						};
 						attempted = true;
-						statement(
+						configuredStatement(
 							database,
 							"UPDATE scopes SET closed_membership_bytes=? WHERE object_id=? AND epoch=? AND anchor_digest=? AND closed_membership_bytes IS ?"
 						).run(selected.exactCanonicalMembershipBytes, ...scopeParameters(selected.scope), current.closed_membership_bytes);
@@ -2283,9 +2301,16 @@ export function createNodeDurableLiveJournalStore(
 							for (const selected of deletions) {
 								try {
 									deletingScope = selected.scope;
-									const deleted = "row" in selected
-										? statement(database, "DELETE FROM accepted_entries WHERE object_id=? AND epoch=? AND anchor_digest=? AND journal_sequence=?").run(...scopeParameters(selected.scope), selected.row.journalSequence)
-										: statement(database, "DELETE FROM scopes WHERE object_id=? AND epoch=? AND anchor_digest=?").run(...scopeParameters(selected.scope));
+									const deleted =
+										"row" in selected
+											? configuredStatement(
+													database,
+													"DELETE FROM accepted_entries WHERE object_id=? AND epoch=? AND anchor_digest=? AND journal_sequence=?"
+												).run(...scopeParameters(selected.scope), selected.row.journalSequence)
+											: configuredStatement(
+													database,
+													"DELETE FROM scopes WHERE object_id=? AND epoch=? AND anchor_digest=?"
+												).run(...scopeParameters(selected.scope));
 									if (deleted.changes !== 1) throw new Error("retirement-stale");
 									invalidateWatermark(selected.scope);
 									verifiedReplay = undefined;

@@ -8,6 +8,7 @@ import { pathToFileURL } from "node:url";
 
 import { SqliteNativeReadReservationOwner } from "./native-read-reservation.js";
 import { enforceNativeLocalSessionFile, nativeLocalSessionSchemaRows, type LocalSessionLifetime } from "./local-session-lifetime.js";
+import { cachedStatement } from "./sqlite-statement-cache.js";
 
 export type SigningTable = "signerState" | "sealEvidence" | "voteSlots" | "voteOutbox";
 export type SigningKey = readonly [string, number, string] | readonly [string, number, number, string, string];
@@ -109,13 +110,16 @@ export class SqliteSigningDatabase {
 			if (fields.initialization.value === "create") {
 				database.exec("BEGIN IMMEDIATE");
 				try {
-					const catalog = nativeLocalSessionSchemaRows(database, database.prepare("SELECT name FROM sqlite_schema WHERE name NOT GLOB 'sqlite_*'").all());
+					const catalog = nativeLocalSessionSchemaRows(
+						database,
+						cachedStatement(database, "SELECT name FROM sqlite_schema WHERE name NOT GLOB 'sqlite_*'").all()
+					);
 					if (catalog.length === 0) {
 						database.exec(ROW_SCHEMA);
 						database.exec(META_SCHEMA);
-						database
-							.prepare("INSERT INTO signing_meta(key,value) VALUES('incarnation',?)")
-							.run(encodeCanonical({ key: "incarnation", value: randomBytes(16).toString("hex") }));
+						cachedStatement(database, "INSERT INTO signing_meta(key,value) VALUES('incarnation',?)").run(
+							encodeCanonical({ key: "incarnation", value: randomBytes(16).toString("hex") })
+						);
 					}
 					database.exec("COMMIT");
 				} catch (cause) {
@@ -123,9 +127,13 @@ export class SqliteSigningDatabase {
 					throw cause;
 				}
 			}
-			const catalog = nativeLocalSessionSchemaRows(database, database
-				.prepare("SELECT type,name,sql FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%' ORDER BY name")
-				.all());
+			const catalog = nativeLocalSessionSchemaRows(
+				database,
+				cachedStatement(
+					database,
+					"SELECT type,name,sql FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%' ORDER BY name"
+				).all()
+			);
 			if (
 				catalog.length !== 2 ||
 				catalog[0]?.type !== "table" ||
@@ -137,13 +145,16 @@ export class SqliteSigningDatabase {
 			)
 				throw new Error("SIGNING_UNSUPPORTED_SCHEMA");
 			if (fields.initialization.value === "create") database.exec("PRAGMA journal_mode=WAL");
-			if (database.prepare("PRAGMA journal_mode").get()?.journal_mode !== "wal")
+			if (cachedStatement(database, "PRAGMA journal_mode").get()?.journal_mode !== "wal")
 				throw new Error("SIGNING_UNSUPPORTED_DURABILITY");
 			database.exec("PRAGMA synchronous=FULL");
-			const raw = database.prepare("SELECT length(value) AS bytes FROM signing_meta WHERE key='incarnation'").get();
+			const raw = cachedStatement(
+				database,
+				"SELECT length(value) AS bytes FROM signing_meta WHERE key='incarnation'"
+			).get();
 			if (!safe(raw?.bytes) || raw.bytes > LIMITS.maxBytes) throw new Error("STORAGE_LOSS");
 			const value = decodeCanonical(
-				database.prepare("SELECT value FROM signing_meta WHERE key='incarnation'").get()?.value as Uint8Array,
+				cachedStatement(database, "SELECT value FROM signing_meta WHERE key='incarnation'").get()?.value as Uint8Array,
 				LIMITS
 			);
 			if (
@@ -195,9 +206,13 @@ export class SqliteSigningDatabase {
 		}
 		if (identity.dev !== this.#fileIdentity.dev || identity.ino !== this.#fileIdentity.ino)
 			throw new Error("STORAGE_LOSS");
-		const catalog = nativeLocalSessionSchemaRows(this.#database, this.#database
-			.prepare("SELECT type,name,sql FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%' ORDER BY name")
-			.all());
+		const catalog = nativeLocalSessionSchemaRows(
+			this.#database,
+			cachedStatement(
+				this.#database,
+				"SELECT type,name,sql FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%' ORDER BY name"
+			).all()
+		);
 		if (
 			catalog.length !== 2 ||
 			catalog[0]?.type !== "table" ||
@@ -255,11 +270,13 @@ export class SqliteSigningDatabase {
 	 */
 	getMeta(key: string): unknown {
 		this.#within();
-		const width = this.#database.prepare("SELECT length(value) AS bytes FROM signing_meta WHERE key=?").get(key);
+		const width = cachedStatement(this.#database, "SELECT length(value) AS bytes FROM signing_meta WHERE key=?").get(
+			key
+		);
 		if (width === undefined) return undefined;
 		if (!safe(width.bytes) || width.bytes > LIMITS.maxBytes) throw new Error("SIGNING_IMAGE_FULL");
 		return decodeCanonical(
-			this.#database.prepare("SELECT value FROM signing_meta WHERE key=?").get(key)?.value as Uint8Array,
+			cachedStatement(this.#database, "SELECT value FROM signing_meta WHERE key=?").get(key)?.value as Uint8Array,
 			LIMITS
 		);
 	}
@@ -271,9 +288,10 @@ export class SqliteSigningDatabase {
 	 */
 	putMeta(key: string, value: unknown): void {
 		this.#write();
-		this.#database
-			.prepare("INSERT INTO signing_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
-			.run(key, encodeCanonical(value, LIMITS));
+		cachedStatement(
+			this.#database,
+			"INSERT INTO signing_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value"
+		).run(key, encodeCanonical(value, LIMITS));
 	}
 
 	/**
@@ -284,13 +302,14 @@ export class SqliteSigningDatabase {
 	get(table: SigningTable, input: SigningKey): unknown {
 		this.#within();
 		const key = encodeCanonical(captureKey(table, input), LIMITS);
-		const width = this.#database
-			.prepare("SELECT length(value) AS bytes FROM signing_rows WHERE family=? AND row_key=?")
-			.get(table, key);
+		const width = cachedStatement(
+			this.#database,
+			"SELECT length(value) AS bytes FROM signing_rows WHERE family=? AND row_key=?"
+		).get(table, key);
 		if (width === undefined) return undefined;
 		if (!safe(width.bytes) || width.bytes > LIMITS.maxBytes) throw new Error("SIGNING_IMAGE_FULL");
 		return decodeCanonical(
-			this.#database.prepare("SELECT value FROM signing_rows WHERE family=? AND row_key=?").get(table, key)
+			cachedStatement(this.#database, "SELECT value FROM signing_rows WHERE family=? AND row_key=?").get(table, key)
 				?.value as Uint8Array,
 			LIMITS
 		);
@@ -309,9 +328,13 @@ export class SqliteSigningDatabase {
 		const sql = add
 			? "INSERT INTO signing_rows(family,object_id,epoch,row_key,value) VALUES(?,?,?,?,?)"
 			: "INSERT INTO signing_rows(family,object_id,epoch,row_key,value) VALUES(?,?,?,?,?) ON CONFLICT(family,row_key) DO UPDATE SET value=excluded.value";
-		this.#database
-			.prepare(sql)
-			.run(table, key[0], key[1], encodeCanonical(key, LIMITS), encodeCanonical(value, LIMITS));
+		cachedStatement(this.#database, sql).run(
+			table,
+			key[0],
+			key[1],
+			encodeCanonical(key, LIMITS),
+			encodeCanonical(value, LIMITS)
+		);
 	}
 
 	/**
@@ -322,9 +345,10 @@ export class SqliteSigningDatabase {
 	delete(table: SigningTable, key: SigningKey): boolean {
 		this.#write();
 		return (
-			this.#database
-				.prepare("DELETE FROM signing_rows WHERE family=? AND row_key=?")
-				.run(table, encodeCanonical(captureKey(table, key), LIMITS)).changes === 1
+			cachedStatement(this.#database, "DELETE FROM signing_rows WHERE family=? AND row_key=?").run(
+				table,
+				encodeCanonical(captureKey(table, key), LIMITS)
+			).changes === 1
 		);
 	}
 
@@ -348,15 +372,16 @@ export class SqliteSigningDatabase {
 		if (!TABLES.includes(table)) throw new TypeError("INVALID_SIGNING_ADDRESS");
 		const where = objectId === undefined ? "family=?" : "family=? AND object_id=?";
 		const args = objectId === undefined ? [table] : [table, objectId];
-		const count = this.#database
-			.prepare(
-				`SELECT count(*) AS count,coalesce(sum(length(row_key)+length(value)),0) AS bytes FROM signing_rows WHERE ${where}`
-			)
-			.get(...args);
+		const count = cachedStatement(
+			this.#database,
+			`SELECT count(*) AS count,coalesce(sum(length(row_key)+length(value)),0) AS bytes FROM signing_rows WHERE ${where}`
+		).get(...args);
 		if (!safe(count?.count) || count.count > 65_536 || !safe(count.bytes) || count.bytes > LIMITS.maxBytes)
 			throw new Error("SIGNING_IMAGE_FULL");
-		const rows = this.#database
-			.prepare(`SELECT row_key,object_id,epoch,value FROM signing_rows WHERE ${where}`)
+		const rows = cachedStatement(
+			this.#database,
+			`SELECT row_key,object_id,epoch,value FROM signing_rows WHERE ${where}`
+		)
 			.all(...args)
 			.map((row) => {
 				const key = captureKey(table, decodeCanonical(row.row_key as Uint8Array, LIMITS));
@@ -373,14 +398,14 @@ export class SqliteSigningDatabase {
 	assertImagePayloadBound(objectId: string): void {
 		this.#within();
 		if (!text(objectId)) throw new TypeError("INVALID_SIGNING_ADDRESS");
-		const rows = this.#database
-			.prepare(
-				"SELECT count(*) AS count,coalesce(sum(length(row_key)+length(value)),0) AS bytes FROM signing_rows WHERE object_id=?"
-			)
-			.get(objectId);
-		const meta = this.#database
-			.prepare("SELECT coalesce(sum(length(value)),0) AS bytes FROM signing_meta WHERE key IN ('incarnation',?,?)")
-			.get(`ahe-retirement:${objectId}`, `signing-retirement:${objectId}`);
+		const rows = cachedStatement(
+			this.#database,
+			"SELECT count(*) AS count,coalesce(sum(length(row_key)+length(value)),0) AS bytes FROM signing_rows WHERE object_id=?"
+		).get(objectId);
+		const meta = cachedStatement(
+			this.#database,
+			"SELECT coalesce(sum(length(value)),0) AS bytes FROM signing_meta WHERE key IN ('incarnation',?,?)"
+		).get(`ahe-retirement:${objectId}`, `signing-retirement:${objectId}`);
 		if (
 			!safe(rows?.count) ||
 			rows.count + 3 > 65_536 ||

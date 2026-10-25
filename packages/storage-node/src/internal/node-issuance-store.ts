@@ -95,6 +95,7 @@ import { SqliteNativeReadReservationOwner } from "./native-read-reservation.js";
 import type { NodeNativeReadPort } from "../index.js";
 import { iterateSqliteRows } from "./sqlite-iterator.js";
 import { sqliteFilename } from "./sqlite-filename.js";
+import { configuredStatement } from "./sqlite-statement-cache.js";
 
 const DATABASE_SUFFIX = ".drp-issuance-v1.sqlite";
 const SCHEMA_VERSION = 5;
@@ -271,12 +272,15 @@ function statement(database: DatabaseSync, sql: string): StatementSync {
 }
 
 function scalar(database: DatabaseSync, sql: string): unknown {
-	const row = statement(database, sql).get();
+	const row = configuredStatement(database, sql).get();
 	return row === undefined ? undefined : Object.values(row)[0];
 }
 
 function catalog(database: DatabaseSync): readonly Record<string, unknown>[] {
-	return nativeLocalSessionSchemaRows(database, statement(database, "SELECT type,name,tbl_name,sql FROM sqlite_schema ORDER BY type,name").all());
+	return nativeLocalSessionSchemaRows(
+		database,
+		configuredStatement(database, "SELECT type,name,tbl_name,sql FROM sqlite_schema ORDER BY type,name").all()
+	);
 }
 
 function catalogMatches(
@@ -461,7 +465,7 @@ function readNativeLineage(
 	authority: "snapshot" | "writer" = "snapshot"
 ): NativeLineage | undefined {
 	const table = authority === "writer" ? "lineages" : "main.lineages";
-	const pendingSize = statement(
+	const pendingSize = configuredStatement(
 		database,
 		`SELECT length(pending_unsigned) AS n FROM ${table} WHERE object_id=? AND author=?`
 	).get(scope.objectId, scope.author)?.n;
@@ -471,7 +475,7 @@ function readNativeLineage(
 		(typeof pendingSize !== "number" || pendingSize > ISSUANCE_RETIREMENT_LIMITS.maxBytes)
 	)
 		throw issuanceRetirementRefusal("issuance unsigned metadata exceeds bound");
-	const row = statement(
+	const row = configuredStatement(
 		database,
 		`SELECT next,exhausted,pruned_through_author_sequence,pending_unsigned FROM ${table} WHERE object_id=? AND author=?`
 	).get(scope.objectId, scope.author);
@@ -664,7 +668,7 @@ function verifySettlementPlanRow(value: unknown, scope: DurableIssueScope): Sett
 }
 
 function readSettlementPlanRow(database: DatabaseSync, scope: DurableIssueScope): SettlementPlan | null | undefined {
-	const raw = statement(
+	const raw = configuredStatement(
 		database,
 		"SELECT object_id,author,revision,fence_sequence,entries_json FROM settlement_plans WHERE object_id=? AND author=?"
 	).get(scope.objectId, scope.author);
@@ -706,14 +710,14 @@ function readRetirementControlRecord(
 	database: DatabaseSync,
 	objectId: string
 ): Readonly<{ control: DurableIssuanceRetirementControl; bytes: Uint8Array }> | null {
-	const length = statement(database, "SELECT length(record) AS size FROM retirement_controls WHERE object_id=?").get(
+	const length = configuredStatement(database, "SELECT length(record) AS size FROM retirement_controls WHERE object_id=?").get(
 		objectId
 	);
 	if (!length) return null;
 	if (typeof length.size !== "number" || length.size > ISSUANCE_RETIREMENT_LIMITS.maxBytes)
 		throw issuanceRetirementRefusal("issuance retirement control exceeds bound");
 	const record = (
-		statement(database, "SELECT record FROM retirement_controls WHERE object_id=?").get(objectId) as {
+		configuredStatement(database, "SELECT record FROM retirement_controls WHERE object_id=?").get(objectId) as {
 			record: unknown;
 		}
 	).record;
@@ -760,28 +764,29 @@ function retirementRows(
 	let count = 0;
 	for (const table of tables) {
 		const n = (
-			statement(database, `SELECT count(*) AS n FROM ${table} WHERE object_id=?`).get(objectId) as { n: unknown }
+			configuredStatement(database, `SELECT count(*) AS n FROM ${table} WHERE object_id=?`).get(objectId) as { n: unknown }
 		).n;
 		if (typeof n !== "number") throw issuanceRetirementRefusal("issuance retirement census unreadable");
 		count += n;
 	}
 	if (count > limits.maxRows) throw issuanceRetirementRefusal("issuance retirement census exceeds bound");
 	const issuedBytes = (
-		statement(
+		configuredStatement(
 			database,
 			"SELECT coalesce(sum(length(canonical_preimage)+length(digest)+length(signature)),0) AS n FROM issued_records WHERE object_id=?"
 		).get(objectId) as { n: unknown }
 	).n;
 	const planBytes = (
-		statement(
+		configuredStatement(
 			database,
 			"SELECT coalesce(sum(length(CAST(entries_json AS BLOB))),0) AS n FROM settlement_plans WHERE object_id=?"
 		).get(objectId) as { n: unknown }
 	).n;
 	const pendingBytes = (
-		statement(database, "SELECT coalesce(sum(length(pending_unsigned)),0) AS n FROM lineages WHERE object_id=?").get(
-			objectId
-		) as { n: unknown }
+		configuredStatement(
+			database,
+			"SELECT coalesce(sum(length(pending_unsigned)),0) AS n FROM lineages WHERE object_id=?"
+		).get(objectId) as { n: unknown }
 	).n;
 	if (
 		typeof issuedBytes !== "number" ||
@@ -932,19 +937,19 @@ function reserveUnsignedIntent(
 	}
 	assertRetirementRow(database, scope, captured.sequence, captured.bytes, captured.digest);
 	if (priorControl === null)
-		statement(database, "INSERT INTO retirement_controls (object_id,record) VALUES(?,?)").run(
+		configuredStatement(database, "INSERT INTO retirement_controls (object_id,record) VALUES(?,?)").run(
 			scope.objectId,
 			encodeIssuanceRetirementControl(control)
 		);
 	if (old === undefined) {
 		if (current.present)
-			statement(database, "UPDATE lineages SET pending_unsigned=? WHERE object_id=? AND author=?").run(
+			configuredStatement(database, "UPDATE lineages SET pending_unsigned=? WHERE object_id=? AND author=?").run(
 				encodeCanonical(pending),
 				scope.objectId,
 				scope.author
 			);
 		else
-			statement(
+			configuredStatement(
 				database,
 				"INSERT INTO lineages (object_id,author,next,exhausted,pending_unsigned) VALUES(?,?,?,0,?)"
 			).run(scope.objectId, scope.author, current.next, encodeCanonical(pending));
@@ -956,7 +961,7 @@ function reserveUnsignedIntent(
 function bumpRetirement(database: DatabaseSync, objectId: string): void {
 	const current = readRetirementControl(database, objectId);
 	if (current)
-		statement(database, "UPDATE retirement_controls SET record=? WHERE object_id=?").run(
+		configuredStatement(database, "UPDATE retirement_controls SET record=? WHERE object_id=?").run(
 			encodeIssuanceRetirementControl(advanceIssuanceRetirementControl(current)),
 			objectId
 		);
@@ -1224,7 +1229,7 @@ class NodeIssuanceImplementation {
 					issuanceRetirementImage(currentRows, objectId).imageDigest !== snapshot.image.imageDigest
 				)
 					throw issuanceRetirementRefusal("issuance retirement birth stale");
-				statement(this.#database, "INSERT INTO retirement_controls(object_id,record) VALUES(?,?)").run(
+				configuredStatement(this.#database, "INSERT INTO retirement_controls(object_id,record) VALUES(?,?)").run(
 					objectId,
 					encodeIssuanceRetirementControl(born)
 				);
@@ -1282,13 +1287,20 @@ class NodeIssuanceImplementation {
 				for (let index = 0; index < rows.plans.length; index++) {
 					const before = rows.plans[index]!, after = targetRows.plans[index]!;
 					if (after === before) continue;
-					const written = statement(this.#database,
-						"UPDATE settlement_plans SET revision=?,fence_sequence=?,entries_json=? WHERE object_id=? AND author=? AND revision=?")
-						.run(after.revision, after.fenceSequence, settlementPlanEntriesJson(after),
-							after.scope.objectId, after.scope.author, before.revision);
+					const written = configuredStatement(
+						this.#database,
+						"UPDATE settlement_plans SET revision=?,fence_sequence=?,entries_json=? WHERE object_id=? AND author=? AND revision=?"
+					).run(
+						after.revision,
+						after.fenceSequence,
+						settlementPlanEntriesJson(after),
+						after.scope.objectId,
+						after.scope.author,
+						before.revision
+					);
 					if (written.changes !== 1) throw issuanceRetirementRefusal("issuance retirement plan CAS stale");
 				}
-				statement(this.#database, "UPDATE retirement_controls SET record=? WHERE object_id=?").run(
+				configuredStatement(this.#database, "UPDATE retirement_controls SET record=? WHERE object_id=?").run(
 					encodeIssuanceRetirementControl(next),
 					objectId
 				);
@@ -1432,7 +1444,7 @@ class NodeIssuanceImplementation {
 			if (expiryPlan === undefined) throw this.#latchCorruption("stored settlement plan is malformed");
 			assertSettlementExpiryPublicationExclusive(expiryPlan, [{authorSequence: captured.authorSequence, publishState: "published"}]);
 			if (status === "pending") {
-				const changes = statement(
+				const changes = configuredStatement(
 					this.#database,
 					"UPDATE issuance_outbox SET publish_state = 'published' WHERE object_id=? AND author=? AND author_sequence=? AND digest=? AND publish_state = 'pending'"
 				).run(captured.scope.objectId, captured.scope.author, captured.authorSequence, captured.digest).changes;
@@ -1549,17 +1561,23 @@ class NodeIssuanceImplementation {
 				throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan revision changed");
 			}
 			assertSettlementPlanProgressTransition(current, captured.plan);
-			assertSettlementExpiryPublicationExclusive(captured.plan, captured.plan.entries
-				.filter(entry => entry.sourceObjectId === undefined && settlementEntryIsAuthenticatedExpiry(entry))
-				.flatMap(entry => {
-					const row = statement(this.#database,
-						"SELECT publish_state FROM issuance_outbox WHERE object_id=? AND author=? AND author_sequence=?")
-						.get(captured.scope.objectId, captured.scope.author, entry.sourceSequence);
-					const state = row === undefined ? undefined : Reflect.get(row, "publish_state");
-					if (row !== undefined && state !== "pending" && state !== "published")
-						throw this.#latchCorruption("stored outbox publication state is malformed");
-					return state === undefined ? [] : [{authorSequence: entry.sourceSequence, publishState: state as "pending" | "published"}];
-				}));
+			assertSettlementExpiryPublicationExclusive(
+				captured.plan,
+				captured.plan.entries
+					.filter((entry) => entry.sourceObjectId === undefined && settlementEntryIsAuthenticatedExpiry(entry))
+					.flatMap((entry) => {
+						const row = configuredStatement(
+							this.#database,
+							"SELECT publish_state FROM issuance_outbox WHERE object_id=? AND author=? AND author_sequence=?"
+						).get(captured.scope.objectId, captured.scope.author, entry.sourceSequence);
+						const state = row === undefined ? undefined : Reflect.get(row, "publish_state");
+						if (row !== undefined && state !== "pending" && state !== "published")
+							throw this.#latchCorruption("stored outbox publication state is malformed");
+						return state === undefined
+							? []
+							: [{ authorSequence: entry.sourceSequence, publishState: state as "pending" | "published" }];
+					})
+			);
 			const retired = readRetirementControl(this.#database, captured.scope.objectId);
 			if (retired)
 				assertIssuanceRetirementPlanAllowed(
@@ -1569,7 +1587,7 @@ class NodeIssuanceImplementation {
 				);
 			const changes =
 				current === null
-					? statement(
+					? configuredStatement(
 							this.#database,
 							"INSERT INTO settlement_plans (object_id,author,revision,fence_sequence,entries_json) VALUES(?,?,?,?,?)"
 						).run(
@@ -1579,7 +1597,7 @@ class NodeIssuanceImplementation {
 							captured.plan.fenceSequence,
 							settlementPlanEntriesJson(captured.plan)
 						).changes
-					: statement(
+					: configuredStatement(
 							this.#database,
 							"UPDATE settlement_plans SET revision=?,fence_sequence=?,entries_json=? WHERE object_id=? AND author=? AND revision=?"
 						).run(
@@ -1683,7 +1701,7 @@ class NodeIssuanceImplementation {
 					if (records.length > parsed.limit) records.pop();
 				}
 			}
-			const orphan = statement(
+			const orphan = configuredStatement(
 				this.#database,
 				"SELECT o.object_id FROM issuance_outbox AS o LEFT JOIN issued_records AS i " +
 					"ON i.object_id=o.object_id AND i.author=o.author AND i.author_sequence=o.author_sequence " +
@@ -1796,13 +1814,13 @@ class NodeIssuanceImplementation {
 				let ordinaryDataVersion: number | undefined;
 				let ordinaryTotalChanges: number | undefined;
 				const dataVersion = (): number => {
-					const row = statement(database as DatabaseSync, "PRAGMA main.data_version").get();
+					const row = configuredStatement(database as DatabaseSync, "PRAGMA main.data_version").get();
 					if (typeof row?.data_version !== "number" || !Number.isSafeInteger(row.data_version) || row.data_version < 0)
 						throw issuanceRetirementRefusal("native issuance data version is unavailable");
 					return row.data_version;
 				};
 				const totalChanges = (): number => {
-					const row = statement(database as DatabaseSync, "SELECT total_changes() AS changes").get();
+					const row = configuredStatement(database as DatabaseSync, "SELECT total_changes() AS changes").get();
 					if (typeof row?.changes !== "number" || !Number.isSafeInteger(row.changes) || row.changes < 0)
 						throw issuanceRetirementRefusal("native issuance change count is unavailable");
 					return row.changes;
@@ -1895,7 +1913,7 @@ class NodeIssuanceImplementation {
 				const enteringChanges = ownedPending.phase !== "entered" ? 2 : 0;
 				if (ownedPending.phase !== "entered") {
 					ownedPending = { ...ownedPending, phase: "entered" };
-					statement(database, "UPDATE lineages SET pending_unsigned=? WHERE object_id=? AND author=?").run(
+					configuredStatement(database, "UPDATE lineages SET pending_unsigned=? WHERE object_id=? AND author=?").run(
 						encodeCanonical(ownedPending),
 						detached.objectId,
 						detached.author
@@ -1992,7 +2010,7 @@ class NodeIssuanceImplementation {
 							actual !== undefined &&
 							issuanceRetirementBytesEqual(encodeCanonical(actual), encodeCanonical(ownedPending))
 						) {
-							statement(database, "UPDATE lineages SET pending_unsigned=NULL WHERE object_id=? AND author=?").run(
+							configuredStatement(database, "UPDATE lineages SET pending_unsigned=NULL WHERE object_id=? AND author=?").run(
 								detached.objectId,
 								detached.author
 							);
@@ -2132,11 +2150,11 @@ class NodeIssuanceImplementation {
 			}
 			for (let pageFrom = from; pageFrom <= captured.throughAuthorSequence; pageFrom += 64) {
 				const pageThrough = Math.min(captured.throughAuthorSequence, pageFrom + 63);
-				const issuedRows = statement(
+				const issuedRows = configuredStatement(
 					this.#database,
 					"SELECT object_id,author,author_sequence,canonical_preimage,digest,signature FROM issued_records WHERE object_id=? AND author=? AND author_sequence BETWEEN ? AND ? ORDER BY author_sequence"
 				).all(captured.scope.objectId, captured.scope.author, pageFrom, pageThrough);
-				const outboxRows = statement(
+				const outboxRows = configuredStatement(
 					this.#database,
 					"SELECT object_id,author,author_sequence,digest,publish_state FROM issuance_outbox WHERE object_id=? AND author=? AND author_sequence BETWEEN ? AND ? ORDER BY author_sequence"
 				).all(captured.scope.objectId, captured.scope.author, pageFrom, pageThrough);
@@ -2170,21 +2188,21 @@ class NodeIssuanceImplementation {
 					}
 				}
 			}
-			const issuedChanges = statement(
+			const issuedChanges = configuredStatement(
 				this.#database,
 				"DELETE FROM issued_records WHERE object_id=? AND author=? AND author_sequence BETWEEN ? AND ?"
 			).run(captured.scope.objectId, captured.scope.author, from, captured.throughAuthorSequence).changes;
 			if (issuedChanges !== captured.throughAuthorSequence - from + 1) {
 				throw this.#latchCorruption("issued deletion changed an impossible row count");
 			}
-			const outboxChanges = statement(
+			const outboxChanges = configuredStatement(
 				this.#database,
 				"DELETE FROM issuance_outbox WHERE object_id=? AND author=? AND author_sequence BETWEEN ? AND ?"
 			).run(captured.scope.objectId, captured.scope.author, from, captured.throughAuthorSequence).changes;
 			if (outboxChanges !== captured.throughAuthorSequence - from + 1) {
 				throw this.#latchCorruption("outbox deletion changed an impossible row count");
 			}
-			const watermarkChanges = statement(
+			const watermarkChanges = configuredStatement(
 				this.#database,
 				"UPDATE lineages SET pruned_through_author_sequence=? WHERE object_id=? AND author=? AND next=? AND exhausted=? AND ((pruned_through_author_sequence IS NULL AND ? IS NULL) OR pruned_through_author_sequence=?)"
 			).run(
@@ -2272,7 +2290,7 @@ class NodeIssuanceImplementation {
 					settlementReplacementLastLogicalTime(candidate)
 				);
 				expectedPlan = updated;
-				const planChanges = statement(
+				const planChanges = configuredStatement(
 					database,
 					"UPDATE settlement_plans SET revision=?,fence_sequence=?,entries_json=? WHERE object_id=? AND author=? AND revision=?"
 				).run(
@@ -2289,18 +2307,18 @@ class NodeIssuanceImplementation {
 			const next = exhausted ? prior.next : prior.next + 1;
 			let lineageChanges: number | bigint;
 			if (!prior.present) {
-				lineageChanges = statement(
+				lineageChanges = configuredStatement(
 					database,
 					"INSERT INTO lineages (object_id,author,next,exhausted) VALUES(?,?,?,?)"
 				).run(scope.objectId, scope.author, next, exhausted ? 1 : 0).changes;
 			} else {
-				lineageChanges = statement(
+				lineageChanges = configuredStatement(
 					database,
 					"UPDATE lineages SET next=?,exhausted=?,pending_unsigned=NULL WHERE object_id=? AND author=? AND next=? AND exhausted=?"
 				).run(next, exhausted ? 1 : 0, scope.objectId, scope.author, prior.next, prior.exhausted ? 1 : 0).changes;
 			}
 			if (lineageChanges !== 1) throw this.#latchCorruption("lineage CAS changed an impossible row count");
-			const issuedChanges = statement(
+			const issuedChanges = configuredStatement(
 				database,
 				"INSERT INTO issued_records (object_id,author,author_sequence,canonical_preimage,digest,signature) VALUES(?,?,?,?,?,?)"
 			).run(
@@ -2312,7 +2330,7 @@ class NodeIssuanceImplementation {
 				candidate.envelope.signature
 			).changes;
 			if (issuedChanges !== 1) throw this.#latchCorruption("issued insert changed an impossible row count");
-			const outboxChanges = statement(
+			const outboxChanges = configuredStatement(
 				database,
 				"INSERT INTO issuance_outbox (object_id,author,author_sequence,digest,publish_state) VALUES(?,?,?,?,?)"
 			).run(scope.objectId, scope.author, candidate.authorSequence, candidate.envelope.digest, "pending").changes;
@@ -2432,11 +2450,11 @@ class NodeIssuanceImplementation {
 
 	#queryTerminal(scope: DurableIssueScope, authorSequence: number, database = this.#database): TerminalReadback {
 		const lineage = readNativeLineage(database, scope, "writer");
-		const issuedRaw = statement(
+		const issuedRaw = configuredStatement(
 			database,
 			"SELECT object_id,author,author_sequence,canonical_preimage,digest,signature FROM issued_records WHERE object_id=? AND author=? AND author_sequence=?"
 		).get(scope.objectId, scope.author, authorSequence);
-		const outboxRaw = statement(
+		const outboxRaw = configuredStatement(
 			database,
 			"SELECT object_id,author,author_sequence,digest,publish_state FROM issuance_outbox WHERE object_id=? AND author=? AND author_sequence=?"
 		).get(scope.objectId, scope.author, authorSequence);
