@@ -47,8 +47,14 @@ const EDGES = [
 	"adoption-floor-stable",
 ] as const;
 type Edge = (typeof EDGES)[number];
-// The fatal close runs at creator epoch >= 3, where readiness maintenance applies.
-const WARM_SEALS = 3;
+// Warm seals before the fatal close. Three: the fatal close at epoch 3 fills the
+// four-scope recovery pool and its retry's capacity check meets the retained
+// scope. Five (steady state): readiness maintenance retires the classified
+// scope after every adoption, so the reopened creator's readiness turnover
+// itself meets the interrupted close's retained scope.
+const WARM_SEALS = Number(process.env.CREATOR_CLOSE_CRASH_WARM ?? 3);
+const STEADY_EDGES = ["close-scope-retained", ...SEAL_PHASES.map((phase) => `seal-${phase}` as const)] as const;
+const CASES = [...EDGES.map((edge) => [edge, 3] as const), ...STEADY_EDGES.map((edge) => [edge, 5] as const)];
 
 const message = (clientOperationId: string) => ({
 	action: "message",
@@ -250,10 +256,10 @@ it.runIf(INNER)(
 	600_000
 );
 
-it.skipIf(INNER).each(EDGES)(
-	"SIGKILL right after the creator's %s commit recovers and the room continues",
-	async (edge) => {
-		const directory = mkdtempSync(join(tmpdir(), `creator-close-crash-${edge}-`));
+it.skipIf(INNER).each(CASES)(
+	"SIGKILL right after the creator's %s commit (after %i warm seals) recovers and the room continues",
+	async (edge, warm) => {
+		const directory = mkdtempSync(join(tmpdir(), `creator-close-crash-${edge}-w${warm}-`));
 		const file = fileURLToPath(import.meta.url);
 		const fork = (mode: "mutate" | "recover") =>
 			new Promise<{ status: number | null; stdout: string; stderr: string }>((resolve, reject) => {
@@ -266,6 +272,7 @@ it.skipIf(INNER).each(EDGES)(
 						RUN_CREATOR_CLOSE_CRASH: "1",
 						CREATOR_CLOSE_CRASH_DIRECTORY: directory,
 						CREATOR_CLOSE_CRASH_EDGE: edge,
+						CREATOR_CLOSE_CRASH_WARM: String(warm),
 						CREATOR_CLOSE_CRASH_MODE: mode,
 					},
 				});
