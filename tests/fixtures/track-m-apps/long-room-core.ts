@@ -550,7 +550,7 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 	// App mode: the role runs its application's own rollover policy. The creator's published
 	// successor offers wait here until the harness carries them to the other role (as a host would).
 	const publishedOffers: WireOffer[] = [];
-	const rolloverEvents: V3RoomRolloverEvent[] = [];
+	const rolloverEvents: (V3RoomRolloverEvent & Readonly<{ endedAt: number }>)[] = [];
 	const rolloverErrors: string[] = [];
 	const policy = appMode
 		? appRolloverPolicy(
@@ -561,7 +561,7 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 					publishSuccessor: (offer) => {
 						publishedOffers.push(Object.fromEntries(OFFER_FIELDS.map((field) => [field, toBase64(offer[field])])));
 					},
-					onRollover: (event) => rolloverEvents.push(event),
+					onRollover: (event) => rolloverEvents.push({ ...event, endedAt: performance.timeOrigin + performance.now() }),
 					onError: (error) => rolloverErrors.push(error instanceof Error ? error.message : String(error)),
 				}
 			)

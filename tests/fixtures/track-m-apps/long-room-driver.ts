@@ -65,6 +65,8 @@ export interface RolloverObservation {
 		moves: number;
 		weight: number;
 		ms: number;
+		/** When the rollover finished (epoch milliseconds); it began `ms` earlier. */
+		endedAt: number;
 	}>[];
 }
 

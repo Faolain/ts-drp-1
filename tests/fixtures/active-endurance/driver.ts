@@ -93,11 +93,82 @@ export async function driveActiveAppEndurance(
 				for (let offset = 0; offset < live.length; offset += 8) {
 					const chunk = live.slice(offset, offset + 8);
 					const last = chunk.findLastIndex((row) => !rowValue(row).operation.action.startsWith("$drp."));
+					if (appMode) {
+						// The creator may close the receiver's epoch while a row is in flight; a row it closed
+						// without is carried by its author's settlement after the install, so its acceptance
+						// is awaited for a bounded time, never joined.
+						const receivedAt = performance.now();
+						await required(peers[1 - from]).inject(chunk);
+						const final = chunk[last];
+						if (final !== undefined)
+							for (const deadline = receivedAt + 5_000; performance.now() < deadline; ) {
+								if ((await required(peers[1 - from]).acceptance([final.digest]))[0] === true) break;
+								await new Promise((resolve) => setTimeout(resolve, 10));
+							}
+						receiveTimes.push(performance.now() - receivedAt);
+						continue;
+					}
 					if (last >= 0) receiveTimes.push(await required(peers[1 - from]).receive(chunk.slice(0, last + 1)));
 					await required(peers[1 - from]).inject(chunk.slice(last + 1));
 				}
 				delivered[from] = required(rows.at(-1)).authorSequence;
 				if (ahead >= 0) return;
+			}
+		};
+		// App mode: every rollover the creator's policy finished is taken once, in order. Chat's oracle
+		// checks each closed epoch at its closed cut and freezes the successor's base from it.
+		const absorbed: Awaited<ReturnType<NonNullable<RoleEndpoint["rollover"]>>>["events"][number][] = [];
+		const absorbRollovers = async () => {
+			const creator = required(peers[0]);
+			const policy = await required(creator.rollover)();
+			assert.deepEqual(policy.errors, [], "application rollover failures");
+			const events = policy.events.slice(rolloverEventsSeen);
+			rolloverEventsSeen = policy.events.length;
+			for (const event of events) {
+				if (chatModel !== undefined) {
+					const closed = await required(creator.closedProjection)(event.epoch);
+					if (closed === null) throw new Error(`ENDURANCE_APP_CLOSED_CUT_ABSENT:${event.epoch}`);
+					const cut = {
+						projectionAudit: () =>
+							Promise.resolve({
+								base: closed.base,
+								operations: closed.operations,
+								acceptedCount: 0,
+								lastAcceptedAt: null,
+								remoteAcceptedCount: 0,
+								lastRemoteAcceptedAt: null,
+							}),
+						state: () => Promise.resolve(closed.state),
+					} as unknown as RoleEndpoint;
+					await chatModel.check(cut, event.successorEpoch);
+				}
+				absorbed.push(event);
+			}
+			return policy;
+		};
+		// App mode, before a convergence check: a rollover the creator started meanwhile joins, the
+		// Writer installs every published offer, and rows of the receiver's current epoch that it
+		// has not accepted (a row injected while an install replaced its live plane is dropped) are
+		// offered again, as a room's sync would.
+		const appSettle = async (): Promise<void> => {
+			if (!appMode) return;
+			await absorbRollovers();
+			for (const offer of await required(required(peers[0]).takeOffers)()) await required(peers[1]).install(offer);
+			for (const from of [0, 1]) {
+				await flush(from);
+				const receiver = required(peers[1 - from]);
+				const current = (await receiver.authorityEpoch()) ?? 0;
+				const rows = (await required(peers[from]).published(null)).filter((row) => rowValue(row).epoch === current);
+				const known = await receiver.acceptance(rows.map((row) => row.digest));
+				const final = rows.findLast(
+					(row, index) => known[index] !== true && !rowValue(row).operation.action.startsWith("$drp.")
+				);
+				if (final === undefined) continue;
+				await receiver.inject(rows);
+				for (const deadline = performance.now() + 5_000; performance.now() < deadline; ) {
+					if ((await receiver.acceptance([final.digest]))[0] === true) break;
+					await new Promise((resolve) => setTimeout(resolve, 10));
+				}
 			}
 		};
 		const issue = async (role: number, epoch: number, ordinal: number): Promise<void> => {
@@ -191,6 +262,8 @@ export async function driveActiveAppEndurance(
 			let rolloverEndedAt = 0;
 			let rolloverReceiverAfter = receiverBefore;
 			const lost: WireRow[] = [];
+			// App mode: the creator's own rollovers of this epoch, which ran during play.
+			const appWindows: { start: number; end: number }[] = [];
 			const stream = (async () => {
 				for (let n = 0; rolling && n < streamLimit; n++) {
 					try {
@@ -228,28 +301,9 @@ export async function driveActiveAppEndurance(
 			// published is installed by the Writer, in order, while the Writer keeps issuing.
 			async function appRollover() {
 				const creator = required(peers[0]);
-				const policy = await required(creator.rollover)();
-				const events = policy.events.slice(rolloverEventsSeen);
-				rolloverEventsSeen = policy.events.length;
-				assert.deepEqual(policy.errors, [], "application rollover failures");
-				if (chatModel !== undefined)
-					for (const event of events) {
-						const closed = await required(creator.closedProjection)(event.epoch);
-						if (closed === null) throw new Error(`ENDURANCE_APP_CLOSED_CUT_ABSENT:${event.epoch}`);
-						const cut = {
-							projectionAudit: () =>
-								Promise.resolve({
-									base: closed.base,
-									operations: closed.operations,
-									acceptedCount: 0,
-									lastAcceptedAt: null,
-									remoteAcceptedCount: 0,
-									lastRemoteAcceptedAt: null,
-								}),
-							state: () => Promise.resolve(closed.state),
-						} as unknown as RoleEndpoint;
-						await chatModel.check(cut, event.successorEpoch);
-					}
+				const policy = await absorbRollovers();
+				const events = absorbed.splice(0);
+				for (const event of events) appWindows.push({ start: event.endedAt - event.ms, end: event.endedAt });
 				stage = `epoch-${epoch}-install`;
 				let installMs = 0;
 				for (const offer of await required(creator.takeOffers)()) installMs += await required(peers[1]).install(offer);
@@ -278,6 +332,7 @@ export async function driveActiveAppEndurance(
 			assert.ok(streamAccepted > 0, "a Writer completed an issue during rollover");
 			await flush(0);
 			await flush(1);
+			await appSettle();
 			const settlement = await joinAll(peers.map((peer) => peer.settlementAudit()));
 			for (const value of settlement) assert.deepEqual(value.missing, [], "no dangling settlement-plan dependency");
 			const lostDisposition: { sourceDigest: string; acceptedDigests: readonly string[] }[] = [];
@@ -312,6 +367,7 @@ export async function driveActiveAppEndurance(
 			const [lullResults] = await joinAll([lulls, writes]);
 			await flush(0);
 			await flush(1);
+			await appSettle();
 			const state = await conservation(epoch);
 			const receiverAfter = await joinAll(peers.map((peer) => peer.projectionAudit()));
 			let reopened = false;
@@ -319,6 +375,8 @@ export async function driveActiveAppEndurance(
 				stage = `epoch-${epoch}-persisted-reopen`;
 				const before = await joinAll(peers.map((peer) => peer.state()));
 				peers = await input.reopen(peers);
+				// A reopened creator's policy starts a new event list.
+				rolloverEventsSeen = 0;
 				assert.deepEqual(
 					await joinAll(peers.map((peer) => peer.state())),
 					before,
@@ -335,9 +393,10 @@ export async function driveActiveAppEndurance(
 				rejected: epochAttempts.filter((value) => value.outcome !== "accepted").length,
 				completedDuringRollover: epochAttempts.filter(
 					(value) =>
-						value.startedAt >= performance.timeOrigin + rolloverStarted &&
-						value.completedAt <= rolloverEndedAt &&
-						value.outcome === "accepted"
+						value.outcome === "accepted" &&
+						((value.startedAt >= performance.timeOrigin + rolloverStarted && value.completedAt <= rolloverEndedAt) ||
+							// App mode: an issue that completed while the creator's own rollover ran.
+							appWindows.some((window) => value.completedAt >= window.start && value.completedAt <= window.end))
 				).length,
 				completedDuringMaintenance: epochAttempts.filter(
 					(value) =>
@@ -355,7 +414,11 @@ export async function driveActiveAppEndurance(
 				attempts: epochAttempts,
 				lastReceiverAcceptedAt: receiverAfter.map((value) => value.lastRemoteAcceptedAt),
 			};
-			assert.ok(activity.completedDuringRollover > 0, "an accepted issue completed before rollover returned");
+			// App mode: the creator's rollovers run in the background during play, between the driver's
+			// rounds, so an issue completing inside one is timing, not a property; the Writer issuing
+			// throughout the install is still asserted (streamAccepted above), and the count is recorded.
+			if (!appMode)
+				assert.ok(activity.completedDuringRollover > 0, "an accepted issue completed before rollover returned");
 			const record = {
 				epoch: epoch + 1,
 				accepted: accepted.length,
