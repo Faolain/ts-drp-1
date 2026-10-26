@@ -374,6 +374,7 @@ export const RETENTION_CASES = [
 	"owned-retain-missing",
 	"owned-retain-conflict",
 	"uncertainty-ttl-race",
+	"supersede-lower-temporary",
 ] as const;
 export type RetentionCase = (typeof RETENTION_CASES)[number];
 
@@ -454,6 +455,48 @@ export async function runRetentionCase(name: RetentionCase, env: RetentionEnviro
 	const originalNow = Date.now;
 	let now = 2_000_000_000_000;
 	Date.now = (): number => now;
+	if (name === "supersede-lower-temporary") {
+		// A receive that died after opening its predecessor scope (then a checkpoint
+		// past that epoch) leaves a temporary scope no install can ever retain. The
+		// next retention of the SAME object at a higher epoch supersedes it; a
+		// recovery scope, a higher temporary scope and another object's scope stay.
+		try {
+			const store = await env.open();
+			try {
+				const opened = async (objectId: string, epoch: number, verified: boolean): Promise<RetentionScope> => {
+					const selected = createSnapshotQuarantineFixture({
+						objectId,
+						epoch,
+						chunks: [Uint8Array.of(3, 5, epoch, 13)],
+					});
+					const scope = await store.openScope(selected.declaration);
+					if (verified) await scope.complete(await receiptFor(scope, selected));
+					return scope;
+				};
+				const recovered = await opened("retention-supersede", 0, true);
+				await retain(recovered);
+				await recovered.release();
+				const handles = [
+					await opened("retention-supersede", 1, true),
+					await opened("retention-supersede", 2, false),
+					await opened("retention-supersede", 5, true),
+					await opened("retention-other", 1, true),
+				];
+				const current = await opened("retention-supersede", 3, true);
+				const before = (await env.image()).durableScopes.length;
+				await retain(current);
+				for (const handle of [...handles, current]) await handle.release();
+				const rows = (await env.image()).durableScopes
+					.map((row) => [row.object_id ?? row.objectId, Number(row.epoch), row.retention])
+					.sort((a, b) => (JSON.stringify(a) < JSON.stringify(b) ? -1 : 1));
+				return { before, rows, recoveryScopes: (await store.recoveryStatus()).recoveryScopes };
+			} finally {
+				await store.close();
+			}
+		} finally {
+			Date.now = originalNow;
+		}
+	}
 	if (name === "legacy-barrier") {
 		try {
 			const legacy = await seedLegacy(env);
@@ -740,6 +783,17 @@ export async function runRetentionCase(name: RetentionCase, env: RetentionEnviro
  * @returns Expected behavior independent of actual observations.
  */
 export function expectedRetentionCase(name: RetentionCase): unknown {
+	if (name === "supersede-lower-temporary")
+		return {
+			before: 6,
+			rows: [
+				["retention-other", 1, "temporary"],
+				["retention-supersede", 0, "recovery"],
+				["retention-supersede", 3, "recovery"],
+				["retention-supersede", 5, "temporary"],
+			],
+			recoveryScopes: 2,
+		};
 	if (name === "owned-combined-write-missing" || name === "owned-combined-write-conflict")
 		return {
 			code: "poisoned",
