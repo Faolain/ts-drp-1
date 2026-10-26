@@ -2267,6 +2267,48 @@ function createSnapshotStoreOver(
 												.objectStore(roomStoreName(transaction.db, "snapshot", "owner"))
 												.put({ ...owner, id: "owner", recoveryScopes, recoveryContentBytes } satisfies OwnerRow)
 										);
+										// Retention at epoch E supersedes every temporary quarantine of the
+										// same object below E: no install can retain it again (each retains at
+										// or above its current head), so a receive that died after opening it
+										// (then a checkpoint past it) would otherwise leave a non-role scope
+										// below the head until the TTL. Same collectible predicate as the
+										// sweep: protected, retired or in-flight-intent rows stay (fail closed).
+										const control = await readControl(transaction, declaration.scope.objectId);
+										if (control?.active == null) {
+											const lower = await requestResult(
+												transaction
+													.objectStore(roomStoreName(transaction.db, "snapshot", "scopes"))
+													.getAll(
+														IDBKeyRange.bound(
+															[declaration.scope.objectId],
+															[declaration.scope.objectId, declaration.scope.epoch],
+															false,
+															true
+														)
+													)
+											);
+											for (const raw of lower) {
+												const candidate = fromScopeRow(raw);
+												if (
+													candidate.retention !== "temporary" ||
+													candidate.objectId !== declaration.scope.objectId ||
+													candidate.epoch >= declaration.scope.epoch
+												)
+													continue;
+												const selected = snapshotQuarantineContract.captureScope({
+													objectId: candidate.objectId,
+													epoch: candidate.epoch,
+													anchor: candidate.anchor,
+													manifestDigest: candidate.manifestDigest,
+												});
+												if (
+													!snapshotRetirementContract.allows(control, selected, candidate.incarnation) ||
+													snapshotRetirementContract.protected(control, selected, candidate.incarnation)
+												)
+													continue;
+												await deleteScope(transaction, selected);
+											}
+										}
 									},
 									{ signal, requireStrictDurability: true }
 								);
