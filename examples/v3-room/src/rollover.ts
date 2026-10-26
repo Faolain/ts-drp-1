@@ -287,8 +287,8 @@ export function createV3RoomRolloverPolicy(
 		role,
 		bind(selected: RolloverRoom): void {
 			if (room !== undefined) throw new TypeError("v3 room rollover policy is already bound");
+			// The room's epoch is read at the policy's first decision, not here.
 			room = selected;
-			advance(currentEpoch());
 		},
 		observe(vertex: Pick<V3RoomAcceptedVertex, "author" | "epoch"> & Partial<V3RoomAcceptedVertex>): void {
 			if (closed) return;
