@@ -148,7 +148,6 @@ import {
 	creatorCloseRecoveryRoleClassifiedScopesForSizing,
 	creatorCloseRecoveryRoleInventoryScopesForSizing,
 	isCreatorOrdinarySourceCapacityRefusal,
-	creatorClosedRollbackRefusalDiagnostic,
 	reserveCreatorOrdinaryFinishingCapacity,
 	captureCreatorOrdinaryFinishingCapacityTemplate,
 	evaluateCreatorOrdinaryFinishingCapacityTemplate,
@@ -5004,9 +5003,8 @@ export async function bindCreatorLiveClose(
 								ordinaryProofSource = undefined; ordinaryTemplateReady = false;
 								if (cause instanceof AggregateError) maintenanceReleaseFailure = cause;
 								// A typed data refusal is not an Error; the room surfaces this as its
-								// terminal failure, which must name the refusal kind.
-								const refusal = creatorClosedRollbackRefusalDiagnostic(cause);
-								if (refusal !== undefined) throw new TypeError(`creator ordinary readiness refused: ${refusal}`, {cause});
+								// terminal failure, which must name the refusal kind (its string form).
+								if (!(cause instanceof Error)) throw new TypeError(`creator ordinary readiness refused: ${String(cause)}`, {cause});
 								throw cause;
 							} finally {
 								releaseForeground();
