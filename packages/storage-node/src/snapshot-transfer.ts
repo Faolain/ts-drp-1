@@ -2334,6 +2334,17 @@ export function createNodeSnapshotQuarantineStore(
 										database,
 										"UPDATE snapshot_owner_v2 SET recovery_scopes=?,recovery_content_bytes=? WHERE id=1"
 									).run(recoveryScopes, recoveryContentBytes);
+									// Retention at epoch E supersedes every temporary quarantine of the
+									// same object below E: no install can retain it again (each retains
+									// at or above its current head), so a receive that died after opening
+									// it (then a checkpoint past it) would otherwise leave a non-role scope
+									// below the head until the TTL. Same collectible predicate as the sweep:
+									// protected, retired or in-flight-intent rows stay (fail closed).
+									if (readControl(declaration.scope.objectId)?.active == null)
+										cachedStatement(
+											database,
+											"DELETE FROM snapshot_scopes_v2 WHERE object_id=? AND epoch<? AND retention='temporary' AND snapshot_collectible_v4(object_id,epoch,anchor,manifest_digest,incarnation)=1"
+										).run(declaration.scope.objectId, declaration.scope.epoch);
 								});
 							});
 						}),
