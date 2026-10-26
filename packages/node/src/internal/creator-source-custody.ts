@@ -41,6 +41,18 @@ export interface CreatorSourceCustodyIdentity {
 }
 const verified = new WeakMap<object, CreatorSourceCustodyIdentity>();
 
+/** Settlement work admitted at epoch E stays retained until the readiness
+ * maintenance of epoch E+3 retires it (a closed row retires only once
+ * throughEpoch - 2 covers it). Every adoption in between issues a mandatory
+ * author fence, and any admission at E+2 projects the E+3 adoption fence, so
+ * E's ordinary work reserves the adoption fence (E+1) plus these two later
+ * fence-shaped records (E+2, E+3). The latter matters because an admission at
+ * E+2 can be a received append (another writer's own mandatory fence), which
+ * cannot be refused without stranding it in pending ingress. Received appends
+ * add no issued row on this issuer, so the reserve does not scale with the
+ * writer count. A fence keeps only its own single successor reserve. */
+export const CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE = 2;
+
 /** The current source anchor and ACL are immutable, so their actual widths
  * bound custody for any accepted operation in this epoch. Parameters use the
  * registered complete domain. This creates no context, reference or plan. */

@@ -1,4 +1,4 @@
-import { creatorSourceCustodyGeometryForSizing } from "./creator-source-custody.js";
+import { CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE, creatorSourceCustodyGeometryForSizing } from "./creator-source-custody.js";
 import type { TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog";
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { canonicalRecordResourceForSizing,
@@ -886,6 +886,18 @@ export function creatorClosedRollbackRefusalDiagnostic(value: unknown): string |
 	if (!(value instanceof Refusal)) return undefined;
 	const {kind, cause} = value.result;
 	return cause === undefined ? kind : `${kind}:${cause.owner}:${cause.reason.slice(0, 512)}`;
+}
+/** Successor-phase fence reserves of one admission (see
+ * CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE): only local non-fence work
+ * under the one-successor-fence law reserves them. */
+function settlementAdoptionReserveFences(successorFenceCount: 0 | 1, localWork: boolean): 0 | 2 {
+	return successorFenceCount === 1 && localWork ? CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE : 0;
+}
+/** Protected records those reserves add beyond the adoption fence, which the
+ * one successor fence already counts: every retained reserve except the last. */
+function settlementAdoptionReserveProtections(successorFenceCount: 0 | 1, localWork: boolean): number {
+	const reserves = settlementAdoptionReserveFences(successorFenceCount, localWork);
+	return reserves === 0 ? 0 : reserves - 1;
 }
 /** Only the ORIGINAL joined acquisition's local accounting refusal. This is
  * negative classification for an optional preparation fallback, not authority
@@ -13126,7 +13138,7 @@ function creatorOrdinaryResourceNativeCapacityForSizing(facts: CreatorOrdinaryRe
 		maxAdditionalCurrentIssued: future?.additionalCurrentRows ?? (runtime.kind === "received-append" ? 0 : 1),
 		maxCanonicalPreimageByteLength: preimage, successorFenceCount: current.successorFenceCount,
 		// Local work also reserves the adoption fence's own successor fence.
-		adoptionReserveFenceCount: runtime.kind === "received-append" ? 0 : current.successorFenceCount,
+		adoptionReserveFenceCount: settlementAdoptionReserveFences(current.successorFenceCount, runtime.kind !== "received-append"),
 		sourceCustody: creatorSourceCustodyGeometryForSizing(facts.sourceFacts.currentTrust, runtime.exactCanonicalLatchedAclBytes, current.parameters.maxEpochVertices)});
 	return {receivedPreimages: Object.freeze(receivedPreimages), preimage, fencePreimage, runtimeWidths, issuance};
 }
@@ -13300,7 +13312,8 @@ function deriveCreatorOrdinarySourceResourceProgramForSizing(profile: CreatorOrd
 			basis.recoveryContentBytes - basis.retiredSnapshotContentBytes + snapshotQuarantineContract.recoveryContentBytes(payloadBytes, manifestBytes) > basis.maxRecoveryContentBytes) return undefined;
 		parameters.set("snapshot.physical", basis.physicalSnapshotCount); parameters.set("snapshot.protected", basis.protectedSnapshotCount);
 		parameters.set("generation.count", generationCount); parameters.set("issued.count", rows.issued.length +
-			Number(runtime.kind !== "received-append") + current.successorFenceCount);
+			Number(runtime.kind !== "received-append") + current.successorFenceCount +
+			settlementAdoptionReserveProtections(current.successorFenceCount, runtime.kind !== "received-append"));
 		const authorResources = [primitive(runtime.issuanceScope.author), ...rows.issued.map(row => primitive(row.author)),
 			...(frames ?? []).flatMap(entry => { const value = entry.row.localAuthor ?? entry.row.local_author; return entry.frame[0] !== "scopes" && typeof value === "string" ? [primitive(value)] : []; }),
 			basis.authorMaximum, ...(current.currentJournalMaximumAuthorByteLength === 0 ? [] : [{
@@ -13604,7 +13617,7 @@ function prepareCreatorOrdinaryFinishingWindowForSizing(input: Readonly<{
 			const issuance = issuanceOrdinaryFinishingCapacityWidths({rows, scope: runtime.issuanceScope, control: capture.nativeIssuance.control ?? null,
 				maxAdditionalCurrentIssued: branch.localCount, maxAdditionalCurrentPreimageBytes: localPreimageRaw,
 				maxCanonicalPreimageByteLength: preimage, maxOrdinaryPreimageByteLength: limits.maxCanonicalPreimageByteLength,
-				successorFenceCount: fence, adoptionReserveFenceCount: branch.localCount === 0 ? 0 : fence,
+				successorFenceCount: fence, adoptionReserveFenceCount: settlementAdoptionReserveFences(fence, branch.localCount !== 0),
 				sourceCustody: creatorSourceCustodyGeometryForSizing(source.currentTrust, runtime.exactCanonicalLatchedAclBytes, current.parameters.maxEpochVertices)});
 			const journal = journalSeed.projection.quote({maxAdditionalCurrentRows: count, canonicalPreimageByteLength: limits.maxCanonicalPreimageByteLength,
 				canonicalAuthorByteLength: canonicalPrimitiveResourceForSizing(runtime.issuanceScope.author).byteLength,
@@ -13644,7 +13657,8 @@ function prepareCreatorOrdinaryFinishingWindowForSizing(input: Readonly<{
 				parameters.set(`journal.group.${index}.localPossible`, Number(group.localPossible));
 				parameters.set(`journal.group.${index}.pageCount`, group.pageCount);
 			}
-			parameters.set("issued.count", rows.issued.length + branch.localCount + fence);
+			parameters.set("issued.count", rows.issued.length + branch.localCount + fence +
+				settlementAdoptionReserveProtections(fence, branch.localCount !== 0));
 			parameters.set("journal.retiredHeaders", journalSeed.projection.snapshot.headerDrain.count);
 			setResource("journal.headerDrain", journalSeed.projection.snapshot.headerDrain.descriptors);
 			parameters.set("journal.rowCount", journal.rowCount); parameters.set("journal.rawBytes", journal.canonicalRowByteLengthsTotal);
@@ -13869,7 +13883,7 @@ function creatorOrdinarySuffixCapacityForSizing(facts: CreatorOrdinaryResourceDi
 			: preparedJournal.projection.quote(journalInput);
 		const futureNative = creatorOrdinaryFutureNativeResourceForSizing(facts,
 			nativeCapacity, journal.successorFenceFrameByteLength);
-		parameters.set("issued.count", native.rows.issued.length + count + fence);
+		parameters.set("issued.count", native.rows.issued.length + count + fence + settlementAdoptionReserveProtections(fence, count !== 0));
 		for (const phase of ["currentClose", "successorReserved", "successorEntered", "successorFinal"] as const) {
 			parameters.set(`runtime.${phase}.bytes`, runtimeWidths[phase]);
 			parameters.set(`runtime.${phase}.items`, runtimeWidths.runtimeCensusOverheadShape[phase].items);
@@ -14336,7 +14350,8 @@ function buildCreatorOrdinaryFinishingResourceProgramForSizing(input: Readonly<{
 				return primitive(author);
 			}));
 		const authorWidth = inputResource("author.maximum", authorMaximum);
-		const protectedRecords = array(inputNumber("issued.count", rows.issued.length + Number(!input.received) + current.successorFenceCount), record({author: authorWidth, authorSequence: integer, digest}));
+		const protectedRecords = array(inputNumber("issued.count", rows.issued.length + Number(!input.received) + current.successorFenceCount +
+			settlementAdoptionReserveProtections(current.successorFenceCount, !input.received)), record({author: authorWidth, authorSequence: integer, digest}));
 		const oldSigning = closedSigningControl(capture.signingRows, runtime.objectId);
 		const signingData = closedSigningDataRows(capture.signingRows, runtime.objectId), signingFrames = signingData.map(raw => decodeCanonical(raw) as unknown[]);
 		const incarnations = capture.signingRows.flatMap(raw => {
@@ -16125,7 +16140,7 @@ export function evaluateCreatorOrdinaryFinishingCapacityTemplate(
 		const issuer = issuanceOrdinaryFinishingCapacityWidths({rows: native.rows, scope, control: native.control ?? null,
 			sourceCustody: creatorSourceCustodyGeometryForSizing(seed.currentTrust, input.exactCanonicalCurrentLatchedAclBytes, Number((cut.parameters as Record<string, unknown>).maxEpochVertices)),
 			successorFenceCount: dimensions.successorFenceCount,
-			adoptionReserveFenceCount: received === undefined ? dimensions.successorFenceCount : 0,
+			adoptionReserveFenceCount: settlementAdoptionReserveFences(dimensions.successorFenceCount, received === undefined),
 			maxAdditionalCurrentIssued: received === undefined ? 1 : 0,
 			maxCanonicalPreimageByteLength: Math.max(dimensions.canonicalPreimageByteLength,
 				dimensions.canonicalSuccessorFencePreimageByteLength)});
@@ -17229,7 +17244,8 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 			successorFenceCount: capacityDimensions.successorFenceCount,
 			// Ordinary local work reserves the adoption fence's own successor fence
 			// (see the post-adoption census); a received append adds no local row.
-			adoptionReserveFenceCount: received === undefined && input.planEffect?.kind !== "fence" ? capacityDimensions.successorFenceCount : 0,
+			adoptionReserveFenceCount: settlementAdoptionReserveFences(capacityDimensions.successorFenceCount,
+				received === undefined && input.planEffect?.kind !== "fence"),
 			maxAdditionalCurrentIssued: received === undefined ? 1 : 0,
 			maxCanonicalPreimageByteLength: Math.max(capacityDimensions.canonicalPreimageByteLength,
 				capacityDimensions.canonicalSuccessorFencePreimageByteLength),
@@ -17722,12 +17738,18 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 					authorSequence: append.authorSequence,
 					digest: append.vertexDigest,
 				})),
-			// Ordinary work reserves the mandatory adoption fence's own sizing:
-			// there that fence is the current candidate, protected in this same
-			// preparation. The fence itself keeps only its successor reserve; a
-			// received append adds no local issued row and reserves nothing more.
+			// Ordinary work reserves the sizing of the later admissions that run
+			// while it is retained: the adoption fence is protected there (it is
+			// the current candidate), and at E+2 so is the next adoption fence
+			// (CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE). The fence itself keeps
+			// only its successor reserve; a received append adds no local issued
+			// row and reserves nothing more.
 			...(!preclose && received === undefined && successorJournalAppend !== undefined && input.planEffect?.kind !== "fence"
-				? [{ author: successorJournalAppend.author, authorSequence: successorJournalAppend.authorSequence, digest }]
+				? Array.from({ length: CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE }, (_, index) => ({
+						author: successorJournalAppend.author,
+						authorSequence: successorJournalAppend.authorSequence + index,
+						digest,
+					}))
 				: []),
 		];
 		if (compiler !== undefined) {

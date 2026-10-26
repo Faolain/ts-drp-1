@@ -703,11 +703,11 @@ export function issuanceOrdinaryFinishingCapacityWidths(input: Readonly<{
 	maxAdditionalCurrentPreimageBytes?: number;
 	/** Existing NONE constructor has no successor fence or plan. */
 	successorFenceCount?: 0 | 1;
-	/** Ordinary work's room for the adoption fence's own admission: that fence
-	 * (the successor fence above) reserves ITS successor fence, so ordinary work
-	 * reserves one more fence-shaped issued/outbox pair and custody source in the
-	 * successor phases. Requires the one successor fence. Zero for the fence. */
-	adoptionReserveFenceCount?: 0 | 1;
+	/** Fence-shaped issued/outbox pairs and custody sources reserved in the
+	 * successor phases beyond the one successor fence above: the later epochs'
+	 * mandatory fences that are issued while this work is still retained.
+	 * Requires the one successor fence. Zero for the fence itself. */
+	adoptionReserveFenceCount?: 0 | 1 | 2;
 	/** Named future custody-plan alternative; leaves existing phase defaults exact. */
 	sourceCustody?: IssuanceSourceCustodyGeometry;
 }>): Readonly<{
@@ -747,7 +747,7 @@ export function issuanceOrdinaryFinishingCapacityWidths(input: Readonly<{
 	if (!Number.isSafeInteger(count) || count < 0 || count > ISSUANCE_RETIREMENT_LIMITS.maxRows ||
 		!Number.isSafeInteger(preimage) || preimage < 1 || preimage > ISSUANCE_RETIREMENT_LIMITS.maxBytes ||
 		!Number.isSafeInteger(ordinaryPreimage) || ordinaryPreimage < 1 || ordinaryPreimage > preimage ||
-		(fenceCount !== 0 && fenceCount !== 1) || (reserveCount !== 0 && reserveCount !== 1) || reserveCount > fenceCount)
+		(fenceCount !== 0 && fenceCount !== 1) || (reserveCount !== 0 && reserveCount !== 1 && reserveCount !== 2) || (reserveCount !== 0 && fenceCount !== 1))
 		throw invalid();
 	const aggregatePreimageBytes = Object.hasOwn(input, "maxAdditionalCurrentPreimageBytes")
 		? input.maxAdditionalCurrentPreimageBytes! : count * ordinaryPreimage;

@@ -196,7 +196,7 @@ import { encodeCreatorCloseMembership, openCreatorCloseMembership,
 import { encodeReceivedCloseMembership, openReceivedCloseMembership, verifyReceivedClosedJournalAuthority,
 	type ReceivedCloseAuthorityRecords } from "./internal/creator-received-close-membership.js";
 import type { CreatorPendingClassificationCustodyInput } from "./internal/creator-adoption-recover.js";
-import { creatorSourceCustodyGeometryForSizing, captureCreatorSourceContext, openCreatorSourceCustody, resolveCreatorSourceCustody,
+import { CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE, creatorSourceCustodyGeometryForSizing, captureCreatorSourceContext, openCreatorSourceCustody, resolveCreatorSourceCustody,
 	captureCreatorSourceCompletion, openCreatorSourceCompletion, captureCreatorSourceExpiry, openCreatorSourceExpiry,
 	type VerifiedCreatorSourceCustody, type CreatorSourceCustodyIdentity } from "./internal/creator-source-custody.js";
 import type { CreatorClosedRollbackProofAccounting, CreatorSnapshotRetirementReconstructionRequest,
@@ -12044,6 +12044,7 @@ async function captureOrdinaryReadinessPreparationForSizing(facts: Pick<Recovery
 		canonicalEpochVertexByteLength: vertexWidth, successorFencePreimageByteLength: fencePreimage, successorFenceCount}, journalRows, undefined, true);
 	const issuance = issuanceOrdinaryFinishingCapacityWidths({rows: native, scope: registration.issuanceScope, control: control ?? null,
 		maxAdditionalCurrentIssued: 1, maxCanonicalPreimageByteLength: preimage, successorFenceCount,
+		adoptionReserveFenceCount: successorFenceCount === 0 ? 0 : CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE,
 		sourceCustody: creatorSourceCustodyGeometryForSizing(trust, encodeCanonical(registration.authorization.value), registration.payload.parameters.maxEpochVertices)});
 	const issued = new Map<string, string>();
 	for (const row of native.issued) {
@@ -20059,29 +20060,36 @@ function prospectiveCreatorPostAdoptionCensusSizing(
 		const unknownFencePreimageWidth =
 			1 + prospectiveCensusCountWidth(fencePreimageByteLength) + fencePreimageByteLength;
 		// Ordinary work must leave room for the work that finishes it. Adoption
-		// issues the mandatory fence above on the successor live plane, and that
-		// fence's own admission reserves ITS successor fence two epochs ahead
-		// (the one-successor-fence law). Every candidate other than that fence
-		// therefore also reserves the fence's successor: one more fence-shaped
-		// issued/outbox pair, plan custody source and lineage ordinal. The fence
-		// itself keeps the single successor reserve. A received append adds no
-		// local issued row, protected record or custody source, so it cannot
-		// change this author's adoption census and reserves nothing more.
-		const adoptionReserve = settlement.planEffect?.kind === "fence" || receivedAppend ? 0 : 1;
-		const reserveFenceSequence = fenceSequence + 1;
-		const reserveFencePreimageByteLength = prospectiveCensusRecordWidth(
-			{
-				...unsignedFields,
-				author: candidate.scope.author,
-				authorSequence: reserveFenceSequence,
-				epoch: epoch + 2,
-				// The epoch+2 anchor is unknown; every anchor digest has this width.
-				anchor: anchorRead.anchorDigest,
-				dependencies: [anchorRead.anchorDigest],
-				operation: ObjectFreeze({ action: AUTHOR_FENCE_ACTION, fenceSequence: reserveFenceSequence, version: 1 }),
-			},
-			{ logicalTime: encodeCanonical(Number.MAX_SAFE_INTEGER).byteLength }
-		);
+		// issues the mandatory fence above on the successor live plane; that
+		// fence's own admission reserves ITS successor fence (the
+		// one-successor-fence law), and this work stays retained until E+3
+		// readiness maintenance, so an admission at E+2 (possibly another
+		// writer's received fence) projects the E+3 adoption fence too
+		// (CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE). Every candidate other
+		// than the fence therefore reserves those later fence-shaped
+		// issued/outbox pairs, plan custody sources and lineage ordinals. The
+		// fence itself keeps the single successor reserve. A received append
+		// adds no local issued row, protected record or custody source, so it
+		// cannot change this author's adoption census and reserves nothing more.
+		const adoptionReserve = settlement.planEffect?.kind === "fence" || receivedAppend ? 0 :
+			CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE;
+		const reserveFences = Array.from({ length: adoptionReserve }, (_, index) => {
+			const sequence = fenceSequence + 1 + index;
+			const byteLength = prospectiveCensusRecordWidth(
+				{
+					...unsignedFields,
+					author: candidate.scope.author,
+					authorSequence: sequence,
+					epoch: epoch + 2 + index,
+					// Later anchors are unknown; every anchor digest has this width.
+					anchor: anchorRead.anchorDigest,
+					dependencies: [anchorRead.anchorDigest],
+					operation: ObjectFreeze({ action: AUTHOR_FENCE_ACTION, fenceSequence: sequence, version: 1 }),
+				},
+				{ logicalTime: encodeCanonical(Number.MAX_SAFE_INTEGER).byteLength }
+			);
+			return { sequence, preimageWidth: 1 + prospectiveCensusCountWidth(byteLength) + byteLength };
+		});
 		const fenceJobWidths = issuanceUnsignedSuccessorFenceWidths(nativeRows, candidate.scope, immediateIntent, control, {
 			plan,
 			canonicalPreimageByteLength: fencePreimageByteLength,
@@ -20092,8 +20100,8 @@ function prospectiveCreatorPostAdoptionCensusSizing(
 		// The successor merge keeps the entries and bumps a fenced plan's
 		// revision (previewCreatorOrdinarySuccessorSettlement); the reserve fence
 		// then fences that merged plan. Width data only, never an installed plan.
-		const finalPlan = adoptionReserve === 0 ? fencedPlan : applySettlementPlanEffect(
-			{ ...fencedPlan, revision: fencedPlan.revision + 1, fenceSequence: null }, { kind: "fence" }, reserveFenceSequence);
+		const finalPlan = reserveFences.reduce((last, reserve) => applySettlementPlanEffect(
+			{ ...last, revision: last.revision + 1, fenceSequence: null }, { kind: "fence" }, reserve.sequence), fencedPlan);
 		const plansFor = (last: SettlementPlan): SettlementPlan[] =>
 			candidatePlan === undefined
 				? [...nativeRows.plans, last]
@@ -20189,13 +20197,11 @@ function prospectiveCreatorPostAdoptionCensusSizing(
 				...candidate.scope, next: 0, exhausted: false, prunedThroughAuthorSequence: null };
 			return encodeCanonical({ ...fields, next: fenceSequence + 1, exhausted: false }).byteLength;
 		}), issuedWidths, outboxWidths, plansFor(fencedPlan));
-		if (adoptionReserve !== 0) {
-			const reserveFencePreimageWidth =
-				1 + prospectiveCensusCountWidth(reserveFencePreimageByteLength) + reserveFencePreimageByteLength;
-			issuedWidths.push(prospectiveCensusRecordWidth({ ...candidate.scope, authorSequence: reserveFenceSequence },
-				{ canonicalPreimageBytes: reserveFencePreimageWidth, digest: unknownDigest32, signature: unknown64 }));
+		for (const reserve of reserveFences) {
+			issuedWidths.push(prospectiveCensusRecordWidth({ ...candidate.scope, authorSequence: reserve.sequence },
+				{ canonicalPreimageBytes: reserve.preimageWidth, digest: unknownDigest32, signature: unknown64 }));
 			outboxWidths.push(prospectiveCensusRecordWidth(
-				{ ...candidate.scope, authorSequence: reserveFenceSequence, publishState: "published" }, { digest: unknownDigest32 }));
+				{ ...candidate.scope, authorSequence: reserve.sequence, publishState: "published" }, { digest: unknownDigest32 }));
 		}
 		const computedRowsByteLength = rowsWidth(lineageWidths, issuedWidths, outboxWidths, plans);
 		// The issuance owner projects only the single successor fence. Carry
