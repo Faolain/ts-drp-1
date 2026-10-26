@@ -1,6 +1,6 @@
 # Real-time game completion
 
-Updated 2026-10-25. This is the current continuation point; the [decision log](README.md)
+Updated 2026-10-26. This is the current continuation point; the [decision log](README.md)
 and track reports preserve the earlier evidence. The owner has authorized correcting
 assumptions and using executable models to find a sound, performant design.
 
@@ -8,7 +8,69 @@ The task is incomplete. Passing a room test that pauses at each rollover does no
 establish uninterrupted play. A formal model proves its stated abstraction and bounds,
 not native storage or network behavior.
 
-## Seal/adopt yields + maintenance re-encode — 2026-10-25 evening (current)
+## Integration-4 — 2026-10-26 (current)
+
+**All four 300-epoch runs pass on `ad6b32b3`**, merged into this root as `d00b1c3d`. Grid
+continued play 300 (1000 ms alarm, AC power, load ≈7–8, stall probe attached):
+
+| Grid continued play 300 | `6c9b5935` | `cdcc9cf4` | `ad6b32b3` |
+| --- | --- | --- | --- |
+| Result | 300/300, 1845 issues, 13 repairs | 300/300, 1845 issues, 13 repairs | 300/300, 1845 issues, 13 repairs |
+| Duration | 3068 s | 2567 s | 2177 s |
+| Event-loop p99 / timer max gap | 164 / 371 ms | 106 / 548 ms | 90 / 284 ms |
+| Install wall / CPU median | 3022 / 3196 ms | 1920 / 2186 ms | 1488 / 1650 ms |
+| Maintenance wall / CPU median | 3158 / 3663 ms | 2470 / 2823 ms | 2054 / 2515 ms |
+| Adopt / seal wall median | 398 / 225 ms | 314 / 232 ms | 257 / 214 ms |
+| Install, first 50 → last 50 epochs | 2840 → 3087 ms | 1814 → 2161 ms | 1449 → 1512 ms |
+
+Install growth over the run fell from +19 % to +4 %. The runs were sequential, not paired.
+
+300-epoch conservation (Canvas, Grid and Chat concurrently, load ≈60–75): all pass, 1941 / 2570 /
+3045 s; issue p95 112 / 757 / 901 ms. Issues slower than 1 s remain only in maintenance overlap
+(Canvas 43, Chat 101 of 600). The same campaign on `b609a27a` also passed under load 50–150.
+
+`perf/integration-4` = `350525f4` + six slices:
+- **Install drift** (`perf/install-drift`): the growth was heap leaks and census memo saturation,
+  not durable storage. Strong statement cache with an amortized sweep of closed connections; census
+  fork copies only the rows the predecessor used; per-wait ephemeral close waiters.
+- **Host foreground priority** (`perf/issue-tail`): a creator issue or readiness job holds a
+  foreground ticket; co-located recovery-pool maintenance runs in a background lane whose host
+  turns defer until the foreground cohort empties (bounded: 5 idle polls of 10 ms, 1 s hard bound).
+  Quint `node/formal/host-foreground-priority.qnt`.
+- **Seal close-phase turns** (`perf/seal-quanta`): host turns between committed native
+  transactions in the seal close phases, and sealed acquisition checkpoints in closed rollback data.
+- **Rollback promotion lifecycle** (`fix/rollback-promotion-2`): promotion support stays protected
+  while the promoted epoch is live; the next certificate re-verifies independently through the
+  readback route (generalized from epoch 0 to a source at n-3/n-4); no pre-promotion generation
+  remains by the close of E+3. Also fixes the warm maintenance proof borrowing the full trust vector,
+  and the legacy pruner stranding a retained source's journal prefix. Continued play after promotion
+  (4 epochs + cold reopen) 8 failing → 0; Quint `node/formal/creator-promotion-*.qnt`.
+- **Recipient crash recovery** (`fix/abandonment-crash-edge`): retaining epoch E for recovery deletes
+  the object's collectible temporary quarantine scopes below E (node and browser stores). A
+  recipient killed inside its successor install no longer refuses with `snapshot-unavailable`; the
+  source-abandonment crash test runs by default. Quint `storage-node/formal/received-quarantine-supersede.qnt`.
+- **Capacity bound** (`fix/capacity-512`): incremental settlement admission is bounded by the AHE
+  native image limit (it accepted 48 records where the exact composer stops at 42).
+
+Each fix's RED/GREEN was rerun by the lead. Acceptance vs `b609a27a` by failing-test name: no
+new-only failures ([compare](../../.logs/realtime-resume-2026-10-23/final-int4/accept-compare.txt)).
+Apalache: journal-image memo sound to depth 12 (9 h), broken prefix control caught.
+
+Still open:
+1. **512-offer gate.** `fix/capacity-adoption-reserve` (not merged) makes accepted work finish:
+   admission reserves the adoption fence's successor fence (settlement 42 → 41 records), and a full
+   ordinary book declines the optional warm source instead of failing adoption. Fresh admission
+   after the epoch still fails on both profiles: settlement wedges on another writer's
+   capacity-refused mandatory fence (`dependency hold unavailable:replay`); the shipped profile's
+   epoch-1 cold quote is refused because retained epoch-0 material fills the book (passes at
+   offer 440, not 455).
+2. Maintenance-overlap issue tail in Canvas/Chat (seconds under load).
+3. Removed-author FENCE at seq 1 never retires: one row per removed author. Release design and
+   Quint model in `.logs/realtime-resume-2026-10-23/abandonment-crash-edge/FENCE-DESIGN.md`; needs a version gate.
+4. A creator killed inside its own close recovers with `floor-stale` (scratch control, not investigated).
+5. Browser/FPS readiness.
+
+## Seal/adopt yields + maintenance re-encode — 2026-10-25 evening
 
 **All four 300-epoch runs pass on `cdcc9cf4`**, merged into this root as `0f8584c1`. Grid
 continued play 300 (1000 ms alarm, AC power, load ≈11) against the north-star run on `6c9b5935`:
