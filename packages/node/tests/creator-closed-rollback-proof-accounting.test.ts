@@ -5837,6 +5837,11 @@ describe("conservative CURRENT to FUTURE capacity envelope", () => {
 		const sizing=closeFile.statements.filter((node):node is ts.FunctionDeclaration=>ts.isFunctionDeclaration(node)&&
 			node.name?.text==="creatorIssuanceMaintenanceQuoteSizing");
 		if(sizing.length!==1)throw Error(`CAPACITY_QUOTE_SIZING_NOT_UNIQUE:${sizing.length}`);
+		// The caller's own next-epoch forecast; this composer stub fills no
+		// forecast sink, so it leaves the original charge outcome unchanged.
+		const forecast=closeFile.statements.filter((node):node is ts.FunctionDeclaration=>ts.isFunctionDeclaration(node)&&
+			node.name?.text==="creatorNextEpochAdmissionForecast");
+		if(forecast.length!==1)throw Error(`CAPACITY_NEXT_EPOCH_FORECAST_NOT_UNIQUE:${forecast.length}`);
 		const bytes=(length:number)=>new Uint8Array(length).fill(length),known=[1,2,3,4,5,6,7,8,9].map(bytes),carrier=bytes(10);
 		// Existing known cut is deduplicated; existing unknown three bytes are
 		// not. The two seven-byte future unknowns remain separate occurrences.
@@ -5858,7 +5863,9 @@ describe("conservative CURRENT to FUTURE capacity envelope", () => {
 				runtimeCensusOverheadByteLength:5,postAdoptionCensusSizing,exactCanonicalCurrentLatchedAclBytes:bytes(11)};
 			const running=execute<Promise<void>>(`${declaration("readProspectiveCreatorMaintenancePrefixesForSizing").replace(/^export /,"")}
 				${sizing[0]!.getText(closeFile)}
+				${forecast[0]!.getText(closeFile)}
 				${charge[0]!.getText(closeFile)}\nchargeCreatorIssuanceMaintenanceQuote(quote,unsigned);`,{
+				CREATOR_NEXT_EPOCH_FIXED_CUSTODY_BYTES:4096,
 				quote,unsigned:bytes(12),observations:new WeakMap([[observation,facts]]),frames:new WeakMap([[reader,frame]]),ledgers:new WeakMap([[book,frame]]),
 				proofMaterialOwners:materials,resolveCreatorPostAdoptionCensusSizing:()=>postAdoptionCensusSizing,
 				readProspectiveCreatorSnapshotTurnoverForSizing:()=>({ok:true,required:false}),resolveCreatorForwardPromotionSource:()=>undefined,

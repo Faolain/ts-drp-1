@@ -703,6 +703,11 @@ export function issuanceOrdinaryFinishingCapacityWidths(input: Readonly<{
 	maxAdditionalCurrentPreimageBytes?: number;
 	/** Existing NONE constructor has no successor fence or plan. */
 	successorFenceCount?: 0 | 1;
+	/** Fence-shaped issued/outbox pairs and custody sources reserved in the
+	 * successor phases beyond the one successor fence above: the later epochs'
+	 * mandatory fences that are issued while this work is still retained.
+	 * Requires the one successor fence. Zero for the fence itself. */
+	adoptionReserveFenceCount?: 0 | 1 | 2;
 	/** Named future custody-plan alternative; leaves existing phase defaults exact. */
 	sourceCustody?: IssuanceSourceCustodyGeometry;
 }>): Readonly<{
@@ -731,16 +736,18 @@ export function issuanceOrdinaryFinishingCapacityWidths(input: Readonly<{
 		...(Object.hasOwn(input, "maxOrdinaryPreimageByteLength") ? ["maxOrdinaryPreimageByteLength"] : []),
 		...(Object.hasOwn(input, "maxAdditionalCurrentPreimageBytes") ? ["maxAdditionalCurrentPreimageBytes"] : []),
 		...(Object.hasOwn(input, "sourceCustody") ? ["sourceCustody"] : []),
-		...(Object.hasOwn(input, "successorFenceCount") ? ["successorFenceCount"] : [])])) throw invalid();
+		...(Object.hasOwn(input, "successorFenceCount") ? ["successorFenceCount"] : []),
+		...(Object.hasOwn(input, "adoptionReserveFenceCount") ? ["adoptionReserveFenceCount"] : [])])) throw invalid();
 	assertDurableIssueScope(input.scope);
 	issuanceRetirementImage(input.rows, input.scope.objectId);
 	const count = input.maxAdditionalCurrentIssued, preimage = input.maxCanonicalPreimageByteLength;
 	const ordinaryPreimage = input.maxOrdinaryPreimageByteLength ?? preimage;
 	const fenceCount = input.successorFenceCount ?? 1;
+	const reserveCount = input.adoptionReserveFenceCount ?? 0;
 	if (!Number.isSafeInteger(count) || count < 0 || count > ISSUANCE_RETIREMENT_LIMITS.maxRows ||
 		!Number.isSafeInteger(preimage) || preimage < 1 || preimage > ISSUANCE_RETIREMENT_LIMITS.maxBytes ||
 		!Number.isSafeInteger(ordinaryPreimage) || ordinaryPreimage < 1 || ordinaryPreimage > preimage ||
-		(fenceCount !== 0 && fenceCount !== 1))
+		(fenceCount !== 0 && fenceCount !== 1) || (reserveCount !== 0 && reserveCount !== 1 && reserveCount !== 2) || (reserveCount !== 0 && fenceCount !== 1))
 		throw invalid();
 	const aggregatePreimageBytes = Object.hasOwn(input, "maxAdditionalCurrentPreimageBytes")
 		? input.maxAdditionalCurrentPreimageBytes! : count * ordinaryPreimage;
@@ -751,7 +758,7 @@ export function issuanceOrdinaryFinishingCapacityWidths(input: Readonly<{
 	if (control !== null && (control.objectId !== scope.objectId || control.active !== null)) throw invalid();
 	if (rows.lineages.some(row => row.pendingUnsigned !== undefined) || (fenceCount === 0 && rows.plans.length !== 0)) throw invalid();
 	const lineage = rows.lineages.find(row => row.author === scope.author);
-	if (lineage !== undefined && (lineage.exhausted || lineage.next > Number.MAX_SAFE_INTEGER - count - fenceCount - 1))
+	if (lineage !== undefined && (lineage.exhausted || lineage.next > Number.MAX_SAFE_INTEGER - count - fenceCount - reserveCount - 1))
 		throw invalid();
 	const bytesWidth = (length: number): number => 1 + unsignedVaruintWidth(length) + length;
 	const digestWidth = bytesWidth(32), signatureWidth = bytesWidth(64), preimageWidth = bytesWidth(preimage);
@@ -768,7 +775,7 @@ export function issuanceOrdinaryFinishingCapacityWidths(input: Readonly<{
 	// has no such job, plan, or added row. This is only
 	// the issuer counter component; the composer still proves other owners'
 	// complete finite maintenance horizons and their counter currency.
-	const delta = count * 4 + fenceCount * 5 + rows.outbox.filter(row => row.publishState === "pending").length;
+	const delta = count * 4 + (fenceCount + reserveCount) * 5 + rows.outbox.filter(row => row.publishState === "pending").length;
 	if (!Number.isSafeInteger(delta) || (control !== null && control.revision > Number.MAX_SAFE_INTEGER - delta))
 		throw invalid();
 	// Original reserve creates the absent lineage at ordinal zero. Only its
@@ -829,13 +836,14 @@ export function issuanceOrdinaryFinishingCapacityWidths(input: Readonly<{
 		// the original room preview/frontier before using the one-fence domain.
 		successorPlan = issuanceOrdinarySuccessorPlanResourceForSizing(scope, ownPlan ?? null);
 		const custodyPlan = input.sourceCustody === undefined ? undefined :
-			issuanceSourceCustodyPlanResourceForSizing(scope, ownPlan ?? null, custodySourceCount + fenceCount, input.sourceCustody);
+			issuanceSourceCustodyPlanResourceForSizing(scope, ownPlan ?? null, custodySourceCount + fenceCount + reserveCount, input.sourceCustody);
 		const fencePlanWidth = Math.max(successorPlan.byteLength, custodyPlan?.byteLength ?? 0);
 		successorPlans = ownPlan === undefined ? [...plans, fencePlanWidth] :
 			plans.map((width, index) => rows.plans[index] === ownPlan ? fencePlanWidth : width);
 		// The custody alternative already contains the absent own plan slot.
 		if (ownPlan === undefined && input.sourceCustody !== undefined) successorPlans = [...plans.slice(0, -1), fencePlanWidth];
-		successorIssued = [...issued, rowWidth]; successorOutbox = [...outbox, outboxWidth];
+		successorIssued = [...issued, rowWidth, ...Array.from({length: reserveCount}, () => rowWidth)];
+		successorOutbox = [...outbox, outboxWidth, ...Array.from({length: reserveCount}, () => outboxWidth)];
 		const fenceIntentWidth = unsignedRecordWidth({ kind: "v3-issuance-pending-unsigned-1", phase: "reserved",
 			planEffect: { kind: "fence" } }, {
 			authorSequence: integerWidth, canonicalPreimageBytes: preimageWidth, digest: digestWidth,
@@ -843,9 +851,9 @@ export function issuanceOrdinaryFinishingCapacityWidths(input: Readonly<{
 			exactCanonicalPlanBytes: bytesWidth(fencePlanWidth),
 		});
 		if (input.sourceCustody !== undefined) sourceCustodyPlanWidths(rows.plans, scope,
-			custodySourceCount + fenceCount, input.sourceCustody,
+			custodySourceCount + fenceCount + reserveCount, input.sourceCustody,
 			rows.issued.reduce((sum, row) => sum + row.canonicalPreimageBytes.byteLength + 96, 0) +
-			aggregatePreimageBytes + count * 96 + preimage + 96 + fenceIntentWidth);
+			aggregatePreimageBytes + count * 96 + (1 + reserveCount) * (preimage + 96) + fenceIntentWidth);
 		fencePendingLineages = lineageWidths.map((width, index) => index === lineageIndex
 			? unsignedRecordWidth(lineageFields, { next: integerWidth, pendingUnsigned: fenceIntentWidth }) : width);
 	}
@@ -882,14 +890,16 @@ export function issuanceOrdinaryFinishingCapacityWidths(input: Readonly<{
 			? successorPlan : unsignedCanonicalShape(row));
 	if (input.sourceCustody !== undefined && fenceCount === 1) {
 		const resource = issuanceSourceCustodyPlanResourceForSizing(scope, ownPlan ?? null,
-			custodySourceCount + fenceCount, input.sourceCustody);
+			custodySourceCount + fenceCount + reserveCount, input.sourceCustody);
 		successorPlanShapes = ownPlan === undefined ? [...planShapes.slice(0, -1), resource] :
 			rows.plans.map(row => row === ownPlan ? resource : unsignedCanonicalShape(row));
 	}
 	const rowsShape = (lineages: readonly IssuanceUnsignedCanonicalShape[], successor: boolean) =>
 		unsignedRecordShape({}, { lineages: unsignedArrayShape(lineages),
-			issued: unsignedArrayShape(successor && fenceCount === 1 ? [...issuedShapes, rowShape] : issuedShapes),
-			outbox: unsignedArrayShape(successor && fenceCount === 1 ? [...outboxShapes, outboxShape] : outboxShapes),
+			issued: unsignedArrayShape(successor && fenceCount === 1 ? [...issuedShapes, rowShape,
+				...Array.from({length: reserveCount}, () => rowShape)] : issuedShapes),
+			outbox: unsignedArrayShape(successor && fenceCount === 1 ? [...outboxShapes, outboxShape,
+				...Array.from({length: reserveCount}, () => outboxShape)] : outboxShapes),
 			plans: unsignedArrayShape(successor && fenceCount === 1 ? successorPlanShapes : planShapes) });
 	const canonicalRowsShape = Object.freeze({ ordinaryPending: rowsShape(pendingLineageShapes, false),
 		ordinaryFinal: rowsShape(finalLineageShapes, false), successorPending: rowsShape(fenceLineageShapes, true),
@@ -934,7 +944,7 @@ export function issuanceOrdinaryFinishingCapacityWidths(input: Readonly<{
 		finalNativeCensusByteLength: currentFinal.nativeCensusBytes,
 		additionalIssuedByteLength: count * ordinaryRowOverhead + aggregatePreimageBytes});
 	const planRewriteResource = issuanceRetirementPlanRewriteResourceForSizing(rows.plans,
-		input.sourceCustody === undefined ? undefined : {scope, maxSourceCount: custodySourceCount + fenceCount, geometry: input.sourceCustody});
+		input.sourceCustody === undefined ? undefined : {scope, maxSourceCount: custodySourceCount + fenceCount + reserveCount, geometry: input.sourceCustody});
 	return Object.freeze({ordinaryPending: withImageCapacity(ordinaryPending), ordinaryFinal: withImageCapacity(ordinaryFinal),
 		successorPending: withImageCapacity(successorPending), successorFinal: withImageCapacity(successorFinal),
 		currentAdmission, canonicalRowsShape, nativeImageByteLength, nativeImageShape,

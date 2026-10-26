@@ -65,6 +65,39 @@ function nativeImage(directory: string) {
 	};
 }
 
+/**
+ * Whether every peer's live journal holds the same vertex digests at the newest epoch.
+ * @param directory - The fixture directory.
+ * @returns True when at least two journals reached the newest epoch with equal vertex sets.
+ */
+function newestJournalsConverged(directory: string): boolean {
+	const journals = readdirSync(directory, { recursive: true })
+		.map(String)
+		.filter((file) => file.endsWith("drp-live-journal-v1.sqlite"))
+		.map((file) => {
+			const database = new DatabaseSync(join(directory, file), { readOnly: true });
+			try {
+				const rows = database
+					.prepare(
+						"SELECT epoch, vertex_digest FROM accepted_entries WHERE epoch = (SELECT MAX(epoch) FROM accepted_entries)"
+					)
+					.all();
+				return {
+					epoch: Number(rows[0]?.epoch ?? -1),
+					digests: rows
+						.map((row) => String(row.vertex_digest))
+						.sort()
+						.join(","),
+				};
+			} finally {
+				database.close();
+			}
+		});
+	const newest = Math.max(...journals.map((journal) => journal.epoch));
+	const current = journals.filter((journal) => journal.epoch === newest);
+	return current.length >= 2 && current.every((journal) => journal.digests === current[0]?.digests);
+}
+
 function errorDetails(error: unknown): unknown[] {
 	const details: unknown[] = [],
 		seen = new Set<unknown>();
@@ -114,7 +147,7 @@ afterEach(async () => {
  * @param exactOnly - Decline the incremental source-program reservation, so the
  * original exact composer decides every admission.
  * @param limit - Maximum number of records offered.
- * @returns Accepted count, refusal text and the native image around the refusal.
+ * @returns Accepted count, refusal text, the native image around the refusal, and the open room.
  */
 async function settlementAdmissionBoundary(exactOnly: boolean, limit: number) {
 	const fixture = await creatorDeliveryRoom({ profile: "settlement" });
@@ -133,10 +166,17 @@ async function settlementAdmissionBoundary(exactOnly: boolean, limit: number) {
 					y: index,
 				});
 			} catch (error) {
-				return { accepted: index, error: String(error), before, after: nativeImage(fixture.directory).tables };
+				return {
+					accepted: index,
+					error: String(error),
+					before,
+					after: nativeImage(fixture.directory).tables,
+					fixture,
+					creator,
+				};
 			}
 		}
-		return { accepted: limit, error: undefined, before: undefined, after: undefined };
+		return { accepted: limit, error: undefined, before: undefined, after: undefined, fixture, creator };
 	} finally {
 		incremental.mockRestore();
 	}
@@ -162,6 +202,72 @@ it("incremental settlement admission never accepts a record the exact maintenanc
 	).toBeLessThanOrEqual(exact.accepted);
 }, 600_000);
 
+it.each([
+	["exact", true],
+	["incremental", false],
+] as const)(
+	"%s settlement admission reserves the adoption fence and its successor, so the full epoch seals and adopts",
+	async (_label, exactOnly) => {
+		const boundary = await settlementAdmissionBoundary(exactOnly, 96);
+		expect(boundary.accepted, "admission finds a finite settlement boundary").toBeLessThan(96);
+		expect(capacityRefusal(boundary.error), String(boundary.error)).toBe(true);
+		expect(boundary.after, "the boundary refusal performs no native writes").toEqual(boundary.before);
+		const { fixture, creator } = boundary;
+		const seal = await creator.room.sealEpoch();
+		expect(seal.ok).toBe(true);
+		linkSuccessorProtocol(creator, await fixture.open(1), { joinHandlersOnClose: true });
+		await creator.room.exportCreatorSuccessor();
+		// Adoption issues the mandatory fence on the successor live plane; that
+		// fence's own admission reserves ITS successor fence. Accepted work must
+		// leave room for both, or the close authority is lost here.
+		await creator.room.adoptCreatorSuccessor();
+		expect(creator.room.status().closeAuthority).toBe("available");
+	},
+	600_000
+);
+
+it("a full ordinary proof book declines the optional readiness source instead of failing adoption", async () => {
+	const fixture = await creatorDeliveryRoom({ profile: "shipped" });
+	const creator = await fixture.open(0);
+	for (let index = 0; index < 8; index++)
+		await creator.room.issue({ action: "placeBlock", id: `readiness-${index}`, kind: "stone", x: index, y: 0 });
+	expect((await creator.room.sealEpoch()).ok).toBe(true);
+	linkSuccessorProtocol(creator, await fixture.open(1), { joinHandlersOnClose: true });
+	await creator.room.exportCreatorSuccessor();
+	// After a full epoch the first successor readiness retains every closed
+	// journal row's PRE/signature beside the whole cold census: measured at 512
+	// offered, 1,233,566 B were charged before 483 closed rows needing 242,398 B
+	// against the 1,310,720 B ordinary book. Reproduce that exhausted book here.
+	const original = closedRollbackData.captureCreatorOrdinaryIssuanceProofSource;
+	let exhausted = 0;
+	const refusals: string[] = [];
+	const capture = vi
+		.spyOn(closedRollbackData, "captureCreatorOrdinaryIssuanceProofSource")
+		.mockImplementation(async (proof, readiness, fence) => {
+			if (readiness === undefined) return original(proof, readiness, fence);
+			const { accounting } = proof;
+			expect(accounting.chargeUnknownEncodedLength(accounting.maxBytes - accounting.chargedBytes - 1)).toBe(true);
+			exhausted++;
+			try {
+				return await original(proof, readiness, fence);
+			} catch (error) {
+				// A typed refusal is not an Error; wherever it surfaces it names its kind.
+				refusals.push(String(error));
+				throw error;
+			}
+		});
+	try {
+		await creator.room.adoptCreatorSuccessor();
+	} finally {
+		capture.mockRestore();
+	}
+	expect(exhausted, "adoption prepared successor readiness on an exhausted book").toBeGreaterThan(0);
+	expect(refusals).toEqual(["creator closed rollback refusal: proof-budget-exceeded"]);
+	expect(creator.room.status().closeAuthority).toBe("available");
+	// The exact cold route still admits fresh work in the successor epoch.
+	await creator.room.issue({ action: "placeBlock", id: "readiness-after", kind: "stone", x: 0, y: 1 });
+}, 600_000);
+
 it.runIf(process.env.RUN_CREATOR_CAPACITY === "1")(
 	"accepted native work finishes and admission recovers at the current proof capacity",
 	async () => {
@@ -174,7 +280,11 @@ it.runIf(process.env.RUN_CREATOR_CAPACITY === "1")(
 		const creator = await fixture.open(0);
 		const directory = required([...directories].at(-1));
 		const events: unknown[] = [];
+		// Cold issuance books in order; each names the next epoch's forecast.
+		const issuanceBooks: { chargedBytes: number; maxBytes: number; nextEpochForecastBytes?: number }[] = [];
 		Reflect.set(globalThis, "__warmProofEvent", (event: unknown) => {
+			if ((event as { kind?: string }).kind === "creator-issuance-maintenance-book")
+				issuanceBooks.push(event as (typeof issuanceBooks)[number]);
 			if ((event as { kind?: string }).kind === "closed-retirement-selection")
 				console.info(`CREATOR_RETIREMENT ${JSON.stringify(event)}`);
 			if (
@@ -208,6 +318,8 @@ it.runIf(process.env.RUN_CREATOR_CAPACITY === "1")(
 		try {
 			for (let cycle = 0; cycle < cycles; cycle++) {
 				refusal = undefined;
+				// The largest next-epoch forecast an accepted admission of this cycle made.
+				let acceptedForecast: number | undefined;
 				const admittedBeforeCycle = accepted;
 				const nativeVerticesBeforeCycle = creator.accepted.size;
 				for (let index = 0; index < count; index += batchSize) {
@@ -220,10 +332,14 @@ it.runIf(process.env.RUN_CREATOR_CAPACITY === "1")(
 						y: cycle * count + index + offset,
 					}));
 					try {
+						issuanceBooks.length = 0;
 						const outcomes = await Promise.allSettled(operations.map((operation) => creator.room.issue(operation)));
 						accepted += outcomes.filter((outcome) => outcome.status === "fulfilled").length;
 						const failed = outcomes.find((outcome) => outcome.status === "rejected");
 						if (failed?.status === "rejected") throw failed.reason;
+						for (const book of issuanceBooks)
+							if (book.nextEpochForecastBytes !== undefined)
+								acceptedForecast = Math.max(acceptedForecast ?? 0, book.nextEpochForecastBytes);
 					} catch (error) {
 						refusal = error;
 						emit("refusal", {
@@ -304,7 +420,15 @@ it.runIf(process.env.RUN_CREATOR_CAPACITY === "1")(
 				let nextIssued = false;
 				for (let round = 0; round < 4; round++) {
 					const nextAt = performance.now();
+					// The receiver's own successor work (its author fence) reaches the
+					// creator asynchronously and is admitted on a later creator turn. Let
+					// both journals hold the same newest-epoch vertices first, so the
+					// no-write comparison below observes only this issue. (A received
+					// vertex the creator refuses never converges; the wait then expires.)
+					await fixture.network.idle();
+					await eventually(() => newestJournalsConverged(directory), 30_000);
 					const preIssue = nativeImage(directory);
+					issuanceBooks.length = 0;
 					try {
 						await creator.room.issue({
 							action: "placeBlock",
@@ -323,11 +447,20 @@ it.runIf(process.env.RUN_CREATOR_CAPACITY === "1")(
 						).toEqual(preIssue.tables);
 					}
 					if (nextIssued) {
+						const firstColdBook = issuanceBooks[0]?.chargedBytes;
 						emit("next-issue", {
 							round,
 							durationMs: Math.round(performance.now() - nextAt),
+							acceptedForecast,
+							firstColdBook,
 							native: nativeImage(directory),
 						});
+						// The previous epoch's accepted forecast bounds the next epoch's
+						// first cold admission book it reserved for.
+						if (round === 0 && acceptedForecast !== undefined && firstColdBook !== undefined)
+							expect(firstColdBook, "next-epoch first cold book within the accepted forecast").toBeLessThanOrEqual(
+								acceptedForecast
+							);
 						break;
 					}
 					// Only the settlement profile has a required, already-admitted fence

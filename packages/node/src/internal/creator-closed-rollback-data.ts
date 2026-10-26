@@ -1,4 +1,4 @@
-import { creatorSourceCustodyGeometryForSizing } from "./creator-source-custody.js";
+import { CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE, creatorSourceCustodyGeometryForSizing } from "./creator-source-custody.js";
 import type { TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog";
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { canonicalRecordResourceForSizing,
@@ -875,12 +875,29 @@ const closedJournalDrainIdentity = (
 class Refusal {
 	readonly diagnosticStack = new Error().stack;
 	constructor(readonly result: Failure) {}
+	/** A Refusal is typed data, not an Error. Wherever one surfaces through
+	 * string conversion it must still name its refusal kind, not `[object Object]`. */
+	toString(): string {
+		return `creator closed rollback refusal: ${creatorClosedRollbackRefusalDiagnostic(this)}`;
+	}
 }
 /** Diagnostic spelling only. Never classifies a structural lookalike as owner authority. */
 export function creatorClosedRollbackRefusalDiagnostic(value: unknown): string | undefined {
 	if (!(value instanceof Refusal)) return undefined;
 	const {kind, cause} = value.result;
 	return cause === undefined ? kind : `${kind}:${cause.owner}:${cause.reason.slice(0, 512)}`;
+}
+/** Successor-phase fence reserves of one admission (see
+ * CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE): only local non-fence work
+ * under the one-successor-fence law reserves them. */
+function settlementAdoptionReserveFences(successorFenceCount: 0 | 1, localWork: boolean): 0 | 2 {
+	return successorFenceCount === 1 && localWork ? CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE : 0;
+}
+/** Protected records those reserves add beyond the adoption fence, which the
+ * one successor fence already counts: every retained reserve except the last. */
+function settlementAdoptionReserveProtections(successorFenceCount: 0 | 1, localWork: boolean): number {
+	const reserves = settlementAdoptionReserveFences(successorFenceCount, localWork);
+	return reserves === 0 ? 0 : reserves - 1;
 }
 /** Only the ORIGINAL joined acquisition's local accounting refusal. This is
  * negative classification for an optional preparation fallback, not authority
@@ -7248,12 +7265,10 @@ export async function acquireCreatorIssuanceMaintenanceProof(
 		requireLaw(
 			closedRetirementEqual(qualifiedSnapshotInventory.scopes, snapshotInventory.scopes) &&
 				closedRetirementEqual(qualifiedSnapshotInventory.owner, snapshotInventory.owner) &&
-			snapshotInventory.scopes.length === snapshot.image.scopes.length &&
-				snapshotInventory.scopes.every((row) =>
-					snapshot.image.scopes.some((pair) =>
-						closedRetirementEqual(pair, { scope: row.scope, incarnation: row.incarnation })
-					)
-				),
+			// Every role scope is physically present; outside the role pool only
+			// the CURRENT epoch's in-flight close quarantine may exist (a close that
+			// died after opening its own scope). Unknown older scopes still refuse.
+			completeSnapshotRecoveryInventoryIsPresent(snapshotInventory, snapshot, forward.wholeFloor.stable),
 			"floor-stale"
 		);
 		let receivedRecoveryScopes: readonly SnapshotQuarantineScopeKey[] | undefined;
@@ -13120,6 +13135,8 @@ function creatorOrdinaryResourceNativeCapacityForSizing(facts: CreatorOrdinaryRe
 		// stays complete. The explicit future suffix here is genuinely all-local.
 		maxAdditionalCurrentIssued: future?.additionalCurrentRows ?? (runtime.kind === "received-append" ? 0 : 1),
 		maxCanonicalPreimageByteLength: preimage, successorFenceCount: current.successorFenceCount,
+		// Local work also reserves the adoption fence's own successor fence.
+		adoptionReserveFenceCount: settlementAdoptionReserveFences(current.successorFenceCount, runtime.kind !== "received-append"),
 		sourceCustody: creatorSourceCustodyGeometryForSizing(facts.sourceFacts.currentTrust, runtime.exactCanonicalLatchedAclBytes, current.parameters.maxEpochVertices)});
 	return {receivedPreimages: Object.freeze(receivedPreimages), preimage, fencePreimage, runtimeWidths, issuance};
 }
@@ -13293,7 +13310,8 @@ function deriveCreatorOrdinarySourceResourceProgramForSizing(profile: CreatorOrd
 			basis.recoveryContentBytes - basis.retiredSnapshotContentBytes + snapshotQuarantineContract.recoveryContentBytes(payloadBytes, manifestBytes) > basis.maxRecoveryContentBytes) return undefined;
 		parameters.set("snapshot.physical", basis.physicalSnapshotCount); parameters.set("snapshot.protected", basis.protectedSnapshotCount);
 		parameters.set("generation.count", generationCount); parameters.set("issued.count", rows.issued.length +
-			Number(runtime.kind !== "received-append") + current.successorFenceCount);
+			Number(runtime.kind !== "received-append") + current.successorFenceCount +
+			settlementAdoptionReserveProtections(current.successorFenceCount, runtime.kind !== "received-append"));
 		const authorResources = [primitive(runtime.issuanceScope.author), ...rows.issued.map(row => primitive(row.author)),
 			...(frames ?? []).flatMap(entry => { const value = entry.row.localAuthor ?? entry.row.local_author; return entry.frame[0] !== "scopes" && typeof value === "string" ? [primitive(value)] : []; }),
 			basis.authorMaximum, ...(current.currentJournalMaximumAuthorByteLength === 0 ? [] : [{
@@ -13597,7 +13615,7 @@ function prepareCreatorOrdinaryFinishingWindowForSizing(input: Readonly<{
 			const issuance = issuanceOrdinaryFinishingCapacityWidths({rows, scope: runtime.issuanceScope, control: capture.nativeIssuance.control ?? null,
 				maxAdditionalCurrentIssued: branch.localCount, maxAdditionalCurrentPreimageBytes: localPreimageRaw,
 				maxCanonicalPreimageByteLength: preimage, maxOrdinaryPreimageByteLength: limits.maxCanonicalPreimageByteLength,
-				successorFenceCount: fence,
+				successorFenceCount: fence, adoptionReserveFenceCount: settlementAdoptionReserveFences(fence, branch.localCount !== 0),
 				sourceCustody: creatorSourceCustodyGeometryForSizing(source.currentTrust, runtime.exactCanonicalLatchedAclBytes, current.parameters.maxEpochVertices)});
 			const journal = journalSeed.projection.quote({maxAdditionalCurrentRows: count, canonicalPreimageByteLength: limits.maxCanonicalPreimageByteLength,
 				canonicalAuthorByteLength: canonicalPrimitiveResourceForSizing(runtime.issuanceScope.author).byteLength,
@@ -13637,7 +13655,8 @@ function prepareCreatorOrdinaryFinishingWindowForSizing(input: Readonly<{
 				parameters.set(`journal.group.${index}.localPossible`, Number(group.localPossible));
 				parameters.set(`journal.group.${index}.pageCount`, group.pageCount);
 			}
-			parameters.set("issued.count", rows.issued.length + branch.localCount + fence);
+			parameters.set("issued.count", rows.issued.length + branch.localCount + fence +
+				settlementAdoptionReserveProtections(fence, branch.localCount !== 0));
 			parameters.set("journal.retiredHeaders", journalSeed.projection.snapshot.headerDrain.count);
 			setResource("journal.headerDrain", journalSeed.projection.snapshot.headerDrain.descriptors);
 			parameters.set("journal.rowCount", journal.rowCount); parameters.set("journal.rawBytes", journal.canonicalRowByteLengthsTotal);
@@ -13862,7 +13881,7 @@ function creatorOrdinarySuffixCapacityForSizing(facts: CreatorOrdinaryResourceDi
 			: preparedJournal.projection.quote(journalInput);
 		const futureNative = creatorOrdinaryFutureNativeResourceForSizing(facts,
 			nativeCapacity, journal.successorFenceFrameByteLength);
-		parameters.set("issued.count", native.rows.issued.length + count + fence);
+		parameters.set("issued.count", native.rows.issued.length + count + fence + settlementAdoptionReserveProtections(fence, count !== 0));
 		for (const phase of ["currentClose", "successorReserved", "successorEntered", "successorFinal"] as const) {
 			parameters.set(`runtime.${phase}.bytes`, runtimeWidths[phase]);
 			parameters.set(`runtime.${phase}.items`, runtimeWidths.runtimeCensusOverheadShape[phase].items);
@@ -14329,7 +14348,8 @@ function buildCreatorOrdinaryFinishingResourceProgramForSizing(input: Readonly<{
 				return primitive(author);
 			}));
 		const authorWidth = inputResource("author.maximum", authorMaximum);
-		const protectedRecords = array(inputNumber("issued.count", rows.issued.length + Number(!input.received) + current.successorFenceCount), record({author: authorWidth, authorSequence: integer, digest}));
+		const protectedRecords = array(inputNumber("issued.count", rows.issued.length + Number(!input.received) + current.successorFenceCount +
+			settlementAdoptionReserveProtections(current.successorFenceCount, !input.received)), record({author: authorWidth, authorSequence: integer, digest}));
 		const oldSigning = closedSigningControl(capture.signingRows, runtime.objectId);
 		const signingData = closedSigningDataRows(capture.signingRows, runtime.objectId), signingFrames = signingData.map(raw => decodeCanonical(raw) as unknown[]);
 		const incarnations = capture.signingRows.flatMap(raw => {
@@ -15271,7 +15291,18 @@ export function evaluateCreatorFinishingWidthProgramForSizing(
 	} catch { return undefined; }
 }
 
+/** Receives the forecast of the next epoch's first cold admission from the
+ * successor (non-preclose) composition. Sizing data only: it carries no proof,
+ * native capability or credit. */
+export interface CreatorNextEpochAdmissionForecastSink {
+	/** Largest forecast over the post-adoption alternatives, in proof bytes
+	 * relative to this admission's book: the retained journal observation, the
+	 * adopted census and runtime census, and the new close's native readers. */
+	delta?: number;
+}
 interface ProspectiveCreatorMaintenancePrefixInput {
+	/** Next-epoch admission forecast receiver; absent means no forecast. */
+	readonly nextEpochAdmissionForecast?: CreatorNextEpochAdmissionForecastSink;
 	/** Compiler exists only during the original cold compose invocation. */
 	readonly ordinaryFinishingTemplateCapture?: ReturnType<typeof createCreatorFinishingWidthCompiler>;
 	/** Source-owned ACTUAL counts before candidate, plus precisely one candidate
@@ -15478,7 +15509,24 @@ function selectAuthenticatedSnapshotTurnoverInventory(
 			source.currentEpoch !== held.predecessorTrust.currentEpoch || source.currentAnchorDigest !== held.predecessorTrust.currentAnchorDigest)) ||
 		!lifetime.dependencyAnchors.every(dependency => dependencies.some(anchor =>
 			anchor.epoch === dependency.epoch && anchor.anchorDigest === dependency.anchorDigest))) return undefined;
-	return selectSnapshotTurnoverScopeInventory(roles, protectedScopes, inventory.scopes.map(row => row.scope), source);
+	// An unprotected, unclassified scope above the certificate's predecessor
+	// epoch can only be the CURRENT epoch's own close quarantine, retained by a
+	// close that died before adopting. That close may already have bound its
+	// recovery roles (membership and seal evidence) to this pool, and its retry
+	// reuses that exact scope without a new slot, so turnover must not change
+	// the pool under it: keep the whole pool and retire nothing until the close
+	// adopts. Unknown scopes at or below the predecessor still refuse.
+	const predecessor = held.predecessorTrust;
+	const sameScope = (a: SnapshotQuarantineScopeKey, b: SnapshotQuarantineScopeKey): boolean =>
+		a.objectId === b.objectId && a.epoch === b.epoch && a.anchor === b.anchor && a.manifestDigest === b.manifestDigest;
+	const inFlight = (scope: SnapshotQuarantineScopeKey): boolean =>
+		scope.objectId === predecessor.objectId && scope.epoch > predecessor.currentEpoch &&
+		!protectedScopes.some(known => sameScope(known, scope)) && !roles.classifiedScopes.some(known => sameScope(known, scope));
+	const scopes = inventory.scopes.map(row => row.scope);
+	const selection = selectSnapshotTurnoverScopeInventory(roles, protectedScopes,
+		scopes.filter(scope => !inFlight(scope)), source);
+	if (selection === undefined || !scopes.some(inFlight)) return selection;
+	return Object.freeze({survivingScopes: Object.freeze(scopes), retiringScopes: Object.freeze([])});
 }
 
 /**
@@ -16118,6 +16166,7 @@ export function evaluateCreatorOrdinaryFinishingCapacityTemplate(
 		const issuer = issuanceOrdinaryFinishingCapacityWidths({rows: native.rows, scope, control: native.control ?? null,
 			sourceCustody: creatorSourceCustodyGeometryForSizing(seed.currentTrust, input.exactCanonicalCurrentLatchedAclBytes, Number((cut.parameters as Record<string, unknown>).maxEpochVertices)),
 			successorFenceCount: dimensions.successorFenceCount,
+			adoptionReserveFenceCount: settlementAdoptionReserveFences(dimensions.successorFenceCount, received === undefined),
 			maxAdditionalCurrentIssued: received === undefined ? 1 : 0,
 			maxCanonicalPreimageByteLength: Math.max(dimensions.canonicalPreimageByteLength,
 				dimensions.canonicalSuccessorFencePreimageByteLength)});
@@ -16571,6 +16620,103 @@ function copyProspectiveMaintenanceBranchSeeds<T>(value: T, compiler?: ReturnTyp
 		return output;
 	};
 	return copy(value) as T;
+}
+
+/**
+ * Forecasts how much larger the next epoch's first cold admission book is than
+ * this admission's book, from this epoch's exact captured census and journal and
+ * the successor composition's own post-adoption geometry. The next epoch's first
+ * cold acquisition observes the same native stores after close and adoption:
+ * - its journal image carries every retained row of this epoch, the closed
+ *   scope's membership and the successor scope header (the composition's exact
+ *   successor postimage);
+ * - its AHE census and runtime census lose this epoch's current-journal rows,
+ *   reclassify this epoch's issuance rows as closed, gain the candidate's closed
+ *   row and native rows, one dependency anchor and one historical depth;
+ * - its native reader holds the close and live generations' closures.
+ * Liveness sizing only: the next epoch's real book still bounds every charge.
+ *
+ * Scope: only an epoch whose census retains no closed epoch (every row is
+ * still current, i.e. the room's first epoch) forecasts. A later epoch's book
+ * already carries the previous closes' retained rows (journal protection keeps
+ * the current and two preceding closed epochs), and one more close on top of a
+ * full first epoch exceeds the ordinary book whatever the later epoch admits:
+ * forecasting there would refuse that epoch's first admission, which is the
+ * recovery this forecast exists to guarantee. Later epochs stay bounded by
+ * their own book; their recovery is the retention window's, not this reserve's.
+ * @returns The book delta, or undefined when the scope above excludes it.
+ */
+function creatorNextEpochAdmissionForecastDelta(input: Readonly<{
+	exactWidth: (value: unknown) => number;
+	capture: Readonly<{ journal: Pick<LiveJournalRetirementImageObservation, "control" | "image" | "canonicalRows"> & { readonly drainSource?: unknown } }>;
+	census: Readonly<Record<string, unknown>>;
+	successorCensus: CreatorPostAdoptionCensusSizing;
+	finalJournal: Readonly<{ canonicalRowsBytes: number }>;
+	finalJournalControl: unknown;
+	journalImage: unknown;
+	digest: MaintenanceWidthAtom;
+	bytes32: MaintenanceWidthAtom;
+	readerBlobs: AheBoundedActiveRead["blobs"];
+	closeRefs: readonly unknown[];
+	liveRefs: readonly unknown[];
+}>): number | undefined {
+	const {exactWidth, census} = input;
+	const rows = census.rows as readonly Readonly<Record<string, unknown>>[];
+	if (rows.some(row => row.classification !== "current")) return undefined;
+	const journal = input.capture.journal;
+	const drain = journal.drainSource === undefined ? {} : {drainSource: journal.drainSource};
+	const journalNow = closedRetirementBytes({control: journal.control, image: journal.image,
+		canonicalRows: journal.canonicalRows, ...drain}).byteLength;
+	const journalNext = exactWidth({control: input.finalJournalControl, image: input.journalImage,
+		canonicalRows: maintenanceEncodedWidth(input.finalJournal.canonicalRowsBytes, undefined,
+			LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes), ...drain});
+	// Closing reclassifies every current row: the genesis row is pinned, the
+	// rest are closed issuance.
+	const closed = (row: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> =>
+		row.authorSequence === 0
+			? {...row, classification: "pinned-genesis", dependencyKind: "pinned-genesis"}
+			: {...row, classification: "displaced", dependencyKind: "authenticated-closed-issuance"};
+	const template = rows.at(-1);
+	const candidateRow = template === undefined ? [] : [closed({...template, digest: input.bytes32,
+		authorSequence: Number(template.authorSequence) + 1})];
+	const currentJournal = census.currentJournal as Readonly<Record<string, unknown>>;
+	const scope = currentJournal.scope as Readonly<Record<string, unknown>>;
+	const anchors = census.dependencyAnchors as readonly unknown[];
+	const unsettled = census.activeUnsettled as Readonly<Record<string, unknown>>;
+	const nextRuntime = {
+		...census,
+		rows: [...rows.map(closed), ...candidateRow],
+		currentJournal: {...currentJournal, rows: [], scope: {...scope, epoch: Number(scope.epoch) + 1, anchorDigest: input.digest}},
+		dependencyAnchors: [...anchors, {epoch: Number(scope.epoch) + 1, anchorDigest: input.digest}],
+		graphVersion: 0,
+		activeUnsettled: {...unsettled, availableHistoricalDepth: Number(unsettled.availableHistoricalDepth) + 1},
+	};
+	// The runtime census overhead charge is the census without its native
+	// issuance value; the next candidate adds what this one added.
+	const runtimeNow = exactWidth({...census, nativeIssuance: 1}) - 1;
+	const runtimeNext = exactWidth({...nextRuntime, nativeIssuance: 1}) - 1;
+	const native = census.nativeIssuance as Readonly<{ rows: unknown; image: unknown; control: unknown }>;
+	const control = native.control as Readonly<Record<string, unknown>> | null;
+	const controlNext = control === null ? null :
+		{...control, revision: Number(control.revision) + input.successorCensus.nativeControlRevisionDelta};
+	const nativeGrowth = input.successorCensus.nativeRowsByteLength - exactWidth(native.rows) +
+		input.successorCensus.nativeImageByteLength - exactWidth(native.image) +
+		exactWidth(controlNext) - exactWidth(control);
+	const censusNow = exactWidth(census), censusNext = exactWidth(nextRuntime) + nativeGrowth;
+	const readerNow = input.readerBlobs.reduce((sum, blob) => sum + blob.bytes.byteLength, 0);
+	// Known leaves deduplicate by digest, and every leaf read now stays read:
+	// no retirement credit. The close and live closures name the same new
+	// unknown trust, QC (and archive Cut) and metadata leaves, so the close
+	// closure's unknown leaves count once.
+	const known = new Map<string, number>(), unknownWidths: number[] = [];
+	for (const blob of input.readerBlobs) known.set(blob.ref.digest, blob.bytes.byteLength);
+	for (const [refs, countUnknown] of [[input.closeRefs, true], [input.liveRefs, false]] as const)
+		for (const ref of refs as readonly Readonly<{ digest: unknown; byteLength: number }>[]) {
+			if (typeof ref.digest === "string") known.set(ref.digest, ref.byteLength);
+			else if (countUnknown) unknownWidths.push(ref.byteLength);
+		}
+	const readerNext = [...known.values(), ...unknownWidths].reduce((sum, width) => sum + width, 0);
+	return journalNext - journalNow + censusNext - censusNow + runtimeNext - runtimeNow + readerNext - readerNow;
 }
 
 /**
@@ -17219,6 +17365,10 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 			rows: native.rows, scope: issuanceScope, control: native.control,
 			sourceCustody: creatorSourceCustodyGeometryForSizing(trust, input.exactCanonicalCurrentLatchedAclBytes, Number((cut.parameters as Record<string, unknown>).maxEpochVertices)),
 			successorFenceCount: capacityDimensions.successorFenceCount,
+			// Ordinary local work reserves the adoption fence's own successor fence
+			// (see the post-adoption census); a received append adds no local row.
+			adoptionReserveFenceCount: settlementAdoptionReserveFences(capacityDimensions.successorFenceCount,
+				received === undefined && input.planEffect?.kind !== "fence"),
 			maxAdditionalCurrentIssued: received === undefined ? 1 : 0,
 			maxCanonicalPreimageByteLength: Math.max(capacityDimensions.canonicalPreimageByteLength,
 				capacityDimensions.canonicalSuccessorFencePreimageByteLength),
@@ -17405,6 +17555,14 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 			: journal.afterSuccessorLocal === undefined || journalAfterSuccessorControl === null
 				? journalAfterSuccessorControl
 				: { ...journalAfterSuccessorControl, revision: Number(journalAfterSuccessorControl.revision) + 1 };
+		if (!preclose && received === undefined && input.nextEpochAdmissionForecast !== undefined) {
+			const forecast = creatorNextEpochAdmissionForecastDelta({
+				exactWidth: syntax.canonicalWidth, capture, census, successorCensus, finalJournal, finalJournalControl,
+				journalImage, digest, bytes32, readerBlobs: forward.reader.blobs, closeRefs, liveRefs,
+			});
+			const sink = input.nextEpochAdmissionForecast;
+			if (forecast !== undefined) sink.delta = Math.max(sink.delta ?? Number.NEGATIVE_INFINITY, forecast);
+		}
 		// Each complete postimage remains subject to the original native-image
 		// ceiling. It is not another acquisition by this issuance proof:
 		// endWrite joins/releases its native reservations before issueOneVertex
@@ -17711,6 +17869,19 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 					authorSequence: append.authorSequence,
 					digest: append.vertexDigest,
 				})),
+			// Ordinary work reserves the sizing of the later admissions that run
+			// while it is retained: the adoption fence is protected there (it is
+			// the current candidate), and at E+2 so is the next adoption fence
+			// (CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE). The fence itself keeps
+			// only its successor reserve; a received append adds no local issued
+			// row and reserves nothing more.
+			...(!preclose && received === undefined && successorJournalAppend !== undefined && input.planEffect?.kind !== "fence"
+				? Array.from({ length: CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE }, (_, index) => ({
+						author: successorJournalAppend.author,
+						authorSequence: successorJournalAppend.authorSequence + index,
+						digest,
+					}))
+				: []),
 		];
 		if (compiler !== undefined) {
 			const authorWidth = Math.max(closedRetirementBytes(unsigned.author).byteLength,
