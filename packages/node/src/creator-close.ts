@@ -419,7 +419,8 @@ export type CreatorIssuanceMaintenanceConsumer = (
 
 export interface V3CreatorCloseRegistration {
 	readonly receiveOnly?: true;
-	bindSnapshotReadinessOwner(store: SnapshotQuarantineStore<SnapshotVerificationReceipt>): boolean;
+	/** Captures the native snapshot owner; the genesis plane also detects its own interrupted close here. */
+	bindSnapshotReadinessOwner(store: SnapshotQuarantineStore<SnapshotVerificationReceipt>): Promise<boolean>;
 	beginReceived(): Promise<boolean>;
 	terminalizeReceived(): boolean;
 	sealRecoveryDependencies(required?: boolean): Promise<CreatorSnapshotRecoveryCloseHold | undefined>;
@@ -3466,7 +3467,7 @@ export async function bindCreatorLiveClose(
 		if (existing !== undefined) return Object.freeze({ handle: existing, ok: true as const });
 		const registration = claimCreatorCloseRegistration(input.plane);
 		if (registration === undefined) return Object.freeze({ ok: false as const, reason: "CREATOR_CLOSE_UNAVAILABLE" });
-		if (!registration.bindSnapshotReadinessOwner(input.snapshotStore))
+		if (!(await registration.bindSnapshotReadinessOwner(input.snapshotStore)))
 			return Object.freeze({ ok: false as const, reason: "CREATOR_SNAPSHOT_OWNER_UNAVAILABLE" });
 		const epoch = registration.currentTrust.currentEpoch;
 		if (!Number.isSafeInteger(epoch) || epoch < 0 || epoch === Number.MAX_SAFE_INTEGER) {

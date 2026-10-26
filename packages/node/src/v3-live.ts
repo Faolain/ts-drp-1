@@ -3251,7 +3251,8 @@ interface V3PlaneRegistration {
 	}>;
 	creatorMaintenanceBound?: boolean;
 	creatorMaintenanceAdmission?: CreatorIssuanceMaintenanceConsumer;
-	/** Durable reopen found this epoch's own close scope (temporary or retained,
+	/** A creator reopen (successor durable reopen, or the genesis plane's close
+	 * binding) found this epoch's own close scope (temporary or retained,
 	 * unadopted) on disk: the close died before adopting. Its retry must run on
 	 * the exact durable state, so no ordinary local or received work may enter
 	 * this epoch. The registration retires at adoption; it is never cleared. */
@@ -15272,6 +15273,28 @@ function capturedLocalIssueInput(
 	});
 }
 
+/**
+ * Whether the creator's own close of `epoch` died before adopting: that close's
+ * snapshot scope (temporary or retained) is on disk at an epoch >= `epoch`. The
+ * one predicate for every creator reopen path (successor durable reopen and the
+ * genesis plane's close binding).
+ * @param store - The creator's native snapshot owner.
+ * @param objectId - The room.
+ * @param epoch - The reopened (current) epoch.
+ * @returns Whether an interrupted close scope is on disk; rejects when the image is unavailable.
+ */
+async function creatorCloseScopeOnDisk(
+	store: SnapshotQuarantineStore<SnapshotVerificationReceipt>,
+	objectId: string,
+	epoch: number
+): Promise<boolean> {
+	const reader = (store as Partial<Pick<SnapshotRecoveryStore<SnapshotVerificationReceipt>,
+		"readRetirementAdmissionImage">>).readRetirementAdmissionImage;
+	if (reader === undefined) return false;
+	const admissionImage = await reader.call(store, { objectId });
+	return admissionImage.image.scopes.some((pair) => pair.scope.objectId === objectId && pair.scope.epoch >= epoch);
+}
+
 /** Capture the genuine native reader once; subsequent bindings cannot retarget it. */
 function bindSnapshotReadinessOwner(
 	registration: V3PlaneRegistration,
@@ -21770,8 +21793,24 @@ function creatorCloseRegistration(
 				if (registration.creatorMaintenanceAdmission === consumer) registration.creatorMaintenanceAdmission = undefined;
 			};
 		},
-		bindSnapshotReadinessOwner: (store: SnapshotQuarantineStore<SnapshotVerificationReceipt>): boolean =>
-			bindSnapshotReadinessOwner(registration, store),
+		bindSnapshotReadinessOwner: async (store: SnapshotQuarantineStore<SnapshotVerificationReceipt>): Promise<boolean> => {
+			// A successor captured its owner (and detected its interrupted close) at
+			// activation. The genesis plane captures its owner here, at close binding:
+			// detect its own interrupted close before the capture, so a failed read
+			// leaves the owner uncaptured and the binding refused.
+			if (registration.snapshotReadiness !== undefined || registration.receiveOnly)
+				return bindSnapshotReadinessOwner(registration, store);
+			let interruptedClose: boolean;
+			try {
+				interruptedClose = await creatorCloseScopeOnDisk(store, registration.payload.input.objectId,
+					registration.payload.trust.trust.currentEpoch);
+			} catch {
+				return false;
+			}
+			if (!bindSnapshotReadinessOwner(registration, store)) return false;
+			if (interruptedClose) registration.creatorInterruptedClose = true;
+			return true;
+		},
 		store: registration.payload.input.store,
 		terminalize: (sealed: Parameters<V3CreatorCloseRegistration["terminalize"]>[0]): boolean => {
 			if (!currentRegistration(registration) || !registration.blueprintFolded) return false;
@@ -22943,13 +22982,10 @@ async function activateCreatorSuccessorLive(
 		// A close at this epoch that died before adopting left its own snapshot
 		// scope (temporary or retained) at an epoch >= the reopened one.
 		let interruptedClose = false;
-		const admissionImageReader = (material.snapshotStore as Partial<Pick<SnapshotRecoveryStore<SnapshotVerificationReceipt>,
-			"readRetirementAdmissionImage">>).readRetirementAdmissionImage;
-		if (material.origin === "durable-reopen" && material.receiveOnly !== true && admissionImageReader !== undefined) {
-			const objectId = material.successor.trust.objectId, epoch = material.successor.trust.currentEpoch;
+		if (material.origin === "durable-reopen" && material.receiveOnly !== true) {
 			try {
-				const admissionImage = await admissionImageReader.call(material.snapshotStore, { objectId });
-				interruptedClose = admissionImage.image.scopes.some(pair => pair.scope.objectId === objectId && pair.scope.epoch >= epoch);
+				interruptedClose = await creatorCloseScopeOnDisk(material.snapshotStore, material.successor.trust.objectId,
+					material.successor.trust.currentEpoch);
 			} catch (cause) {
 				return rejected("recovery-rejected", "creator successor snapshot admission image is unavailable", cause);
 			}
