@@ -3933,7 +3933,13 @@ export async function bindCreatorLiveClose(
 						currentEpoch: registration.currentTrust.currentEpoch,
 						...(earlyTurnover === undefined ? {} : {earlyTurnover}),
 					});
-					if (owner.recoveryScopes >= owner.limits.maxRecoveryScopes || resume || capacityMaintenance) {
+					// A promoted successor carries no recovery-role certificate, so its
+					// first epoch cannot authenticate snapshot turnover. This close adds
+					// one recovery scope; reconcile now unless that leaves headroom.
+					const promotionPoolMaintenance = promotedEpoch !== undefined &&
+						owner.recoveryScopes >= owner.limits.maxRecoveryScopes - 1;
+					if (owner.recoveryScopes >= owner.limits.maxRecoveryScopes || resume || capacityMaintenance ||
+						promotionPoolMaintenance) {
 						// Keep this SAME close's unfinished request across lost delivery.
 						// Turnover can reduce the pool before an intent exists; retries
 						// must still reacquire the original whole authenticated proof.
@@ -3948,6 +3954,11 @@ export async function bindCreatorLiveClose(
 						// Release only this source's classified readers. Selected and
 						// retained historical snapshots stay held throughout maintenance.
 						await promotionSource?.releaseClassifiedDependencies();
+						// Maintenance takes the live journal's retirement write control,
+						// which this source's header read reservation excludes. End only
+						// that header custody (the snapshots above stay held); the source
+						// is released and independently reacquired after maintenance.
+						await promotionSource?.releaseJournalHeaderCustody();
 						await reconcileCreatorBoundedRecoveryMaintenance(registration, input, actor, capacity.value.generations.length,
 							() => registration.sealRecoveryDependencies(priorCutRecord?.recoveryRoles !== undefined),
 							false, false, registration.currentTrust);
