@@ -14,6 +14,8 @@ function required<T>(value: T | undefined): T {
 	if (value === undefined) throw new Error("ENDURANCE_REQUIRED");
 	return value;
 }
+/** App mode: a policy that has not rolled over after this many moves per role has stranded. */
+const APP_ROLLOVER_MAX_MOVES = 200;
 const q = (values: number[], p: number): number =>
 	[...values].sort((a, b) => a - b)[Math.min(values.length - 1, Math.floor(values.length * p))] ?? 0;
 const rowValue = (row: WireRow) =>
@@ -43,10 +45,19 @@ export async function driveActiveAppEndurance(
 		peers: readonly [RoleEndpoint, RoleEndpoint];
 		reopenAt?: number;
 		reopen?(peers: readonly [RoleEndpoint, RoleEndpoint]): Promise<readonly [RoleEndpoint, RoleEndpoint]>;
+		/**
+		 * "harness" (default): the driver seals, adopts and exports after each epoch's moves. "app":
+		 * the creator's application policy rolls the room over by itself (the peers must be opened
+		 * with `rollover: "app"`); each epoch plays rounds of `moves` per role until the creator's
+		 * room has advanced, then the driver carries the published offers to the Writer as a host
+		 * would. An epoch of this driver is then one application rollover.
+		 */
+		rollover?: "harness" | "app";
 		write(record: Readonly<Record<string, unknown>>): void;
 	}>
 ) {
 	const { app, epochs, moves, streamLimit } = input;
+	const appMode = input.rollover === "app";
 	let peers = input.peers;
 	const started = performance.now();
 	const issueTimes: number[] = [];
@@ -64,14 +75,20 @@ export async function driveActiveAppEndurance(
 	}[] = [];
 	let completed = 0;
 	let stage = "open";
+	let rolloverEventsSeen = 0;
 	try {
 		const chatModel = app === "chat" ? new ChatWindowOracle(await required(peers[0]).state()) : undefined;
 		const delivered: (number | null)[] = [null, null];
 		const flush = async (from: number): Promise<void> => {
 			for (;;) {
-				const rows = await required(peers[from]).published(required(delivered[from]));
-				if (!rows.length) return;
+				const published = await required(peers[from]).published(required(delivered[from]));
+				if (!published.length) return;
 				const current = await required(peers[1 - from]).authorityEpoch();
+				// A row of an epoch the receiver has not installed yet waits for its install (app mode:
+				// the creator rolls over by itself, ahead of the Writer).
+				const ahead = published.findIndex((row) => rowValue(row).epoch > (current ?? 0));
+				const rows = ahead < 0 ? published : published.slice(0, ahead);
+				if (!rows.length) return;
 				const live = rows.filter((row) => rowValue(row).epoch === current);
 				for (let offset = 0; offset < live.length; offset += 8) {
 					const chunk = live.slice(offset, offset + 8);
@@ -80,6 +97,7 @@ export async function driveActiveAppEndurance(
 					await required(peers[1 - from]).inject(chunk.slice(last + 1));
 				}
 				delivered[from] = required(rows.at(-1)).authorSequence;
+				if (ahead >= 0) return;
 			}
 		};
 		const issue = async (role: number, epoch: number, ordinal: number): Promise<void> => {
@@ -143,10 +161,26 @@ export async function driveActiveAppEndurance(
 			stage = `epoch-${epoch}-play`;
 			const acceptedBefore = accepted.length;
 			const attemptsBefore = attempts.length;
-			for (let ordinal = 0; ordinal < moves; ordinal++) {
-				await joinAll([issue(0, epoch, ordinal), issue(1, epoch, ordinal)]);
-				await flush(0);
-				await flush(1);
+			// The next free ordinal of this epoch (app mode plays several rounds per epoch).
+			let next = moves;
+			if (!appMode)
+				for (let ordinal = 0; ordinal < moves; ordinal++) {
+					await joinAll([issue(0, epoch, ordinal), issue(1, epoch, ordinal)]);
+					await flush(0);
+					await flush(1);
+				}
+			else {
+				// Play until the creator's own policy has rolled the room over.
+				const startEpoch = (await required(peers[0]).authorityEpoch()) ?? 0;
+				for (next = 0; ; ) {
+					for (let round = 0; round < moves; round++, next++) {
+						await joinAll([issue(0, epoch, next), issue(1, epoch, next)]);
+						await flush(0);
+						await flush(1);
+					}
+					if (((await required(peers[0]).authorityEpoch()) ?? 0) !== startEpoch) break;
+					if (next >= APP_ROLLOVER_MAX_MOVES) throw new Error("ENDURANCE_APP_ROLLOVER_NOT_TRIGGERED");
+				}
 			}
 			stage = `epoch-${epoch}-rollover`;
 			let rolling = true;
@@ -160,7 +194,7 @@ export async function driveActiveAppEndurance(
 			const stream = (async () => {
 				for (let n = 0; rolling && n < streamLimit; n++) {
 					try {
-						await issue(1, epoch, moves + n);
+						await issue(1, epoch, next + n);
 						streamAccepted++;
 					} catch (error) {
 						failures.push(String(error));
@@ -174,6 +208,7 @@ export async function driveActiveAppEndurance(
 				}
 			})();
 			const rollover = (async () => {
+				if (appMode) return appRollover();
 				const sealMs = await required(peers[0]).seal(epoch);
 				await chatModel?.check(required(peers[0]), epoch + 1);
 				stage = `epoch-${epoch}-adopt`;
@@ -188,6 +223,54 @@ export async function driveActiveAppEndurance(
 			})().finally(() => {
 				rolling = false;
 			});
+			// App mode: the creator already sealed, adopted and exported in the background. Every epoch
+			// it closed is checked against the Chat oracle at its closed cut, and every offer it
+			// published is installed by the Writer, in order, while the Writer keeps issuing.
+			async function appRollover() {
+				const creator = required(peers[0]);
+				const policy = await required(creator.rollover)();
+				const events = policy.events.slice(rolloverEventsSeen);
+				rolloverEventsSeen = policy.events.length;
+				assert.deepEqual(policy.errors, [], "application rollover failures");
+				if (chatModel !== undefined)
+					for (const event of events) {
+						const closed = await required(creator.closedProjection)(event.epoch);
+						if (closed === null) throw new Error(`ENDURANCE_APP_CLOSED_CUT_ABSENT:${event.epoch}`);
+						const cut = {
+							projectionAudit: () =>
+								Promise.resolve({
+									base: closed.base,
+									operations: closed.operations,
+									acceptedCount: 0,
+									lastAcceptedAt: null,
+									remoteAcceptedCount: 0,
+									lastRemoteAcceptedAt: null,
+								}),
+							state: () => Promise.resolve(closed.state),
+						} as unknown as RoleEndpoint;
+						await chatModel.check(cut, event.successorEpoch);
+					}
+				stage = `epoch-${epoch}-install`;
+				let installMs = 0;
+				for (const offer of await required(creator.takeOffers)()) installMs += await required(peers[1]).install(offer);
+				assert.equal(await required(peers[1]).authorityEpoch(), policy.epoch, "the Writer follows every rollover");
+				rolling = false;
+				rolloverEndedAt = performance.timeOrigin + performance.now();
+				rolloverReceiverAfter = await joinAll(peers.map((peer) => peer.projectionAudit()));
+				return {
+					// One application rollover is its seal, adoption and export together.
+					sealMs: events.reduce((sum, event) => sum + event.ms, 0),
+					adoptMs: 0,
+					exportMs: 0,
+					installMs,
+					rollovers: events.map(({ epoch: closed, trigger, moves: most, weight }) => ({
+						closed,
+						trigger,
+						most,
+						weight,
+					})),
+				};
+			}
 			const [phases] = await joinAll([rollover, stream]);
 			const transitionMs = performance.now() - rolloverStarted;
 			transitionTimes.push(transitionMs);
@@ -222,7 +305,7 @@ export async function driveActiveAppEndurance(
 			});
 			const writes = joinAll(
 				[0, 1].map(async (role) => {
-					await issue(role, epoch, moves + streamLimit);
+					await issue(role, epoch, next + streamLimit);
 					await flush(role);
 				})
 			);

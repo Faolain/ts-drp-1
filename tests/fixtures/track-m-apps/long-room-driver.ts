@@ -33,6 +33,39 @@ export interface LongRoomOptions {
 	 * never prunes issued records.
 	 */
 	readonly profile?: GenesisProfileChoice;
+	/**
+	 * Who rolls the room over. Default (absent) "harness": the driver seals, adopts and exports
+	 * itself. "app": each role runs its application's own rollover policy (the creator seals at the
+	 * app's budget or after an idle period; a Writer only re-offers refused moves), and the harness
+	 * only carries each published successor offer to the other role, as a host would.
+	 */
+	readonly rollover?: RolloverChoice;
+	/**
+	 * App mode, tests only: replaces the application's trigger values (its weight included) with
+	 * these, keeping its refusal classification, so a test can reach the native or application
+	 * ceiling and exercise the refusal path.
+	 */
+	readonly rolloverBudget?: Readonly<{ movesPerAuthor: number; idleMs: number }>;
+}
+
+export type RolloverChoice = "harness" | "app";
+
+/** One role's application rollover policy (app mode), observation only. */
+export interface RolloverObservation {
+	readonly epoch: number;
+	readonly rollovers: number;
+	/** Moves of this role waiting to be offered again after a capacity refusal. */
+	readonly waiting: number;
+	/** Rollover and offer-publication failures the policy reported (it retries rollovers). */
+	readonly errors: readonly string[];
+	readonly events: readonly Readonly<{
+		epoch: number;
+		successorEpoch: number;
+		trigger: string;
+		moves: number;
+		weight: number;
+		ms: number;
+	}>[];
 }
 
 export type GenesisProfileChoice = "settlement-v1" | "trusted-v1";
@@ -173,6 +206,19 @@ export interface RoleEndpoint {
 	storageUsage?(): Promise<number | null>;
 	/** Observer events since the previous drain. */
 	drainEvents(): Promise<ObservedEvent[]>;
+	/** App mode, creator: the successor offers its policy published since the last call, in order. */
+	takeOffers?(): Promise<WireOffer[]>;
+	/**
+	 * App mode: the last projection this role made in `epoch` (its input and canonical state), or
+	 * null once it is older than the few epochs kept. For an epoch the creator closed, the closed cut.
+	 */
+	closedProjection?(epoch: number): Promise<Readonly<{
+		base: Readonly<{ epoch: number; state: string }> | null;
+		operations: readonly Readonly<{ author: string; operation: Readonly<Record<string, unknown>> }>[];
+		state: string;
+	}> | null>;
+	/** App mode: joins this role's in-flight rollover, then reports its policy. */
+	rollover?(): Promise<RolloverObservation>;
 	close(): Promise<void>;
 }
 
@@ -183,6 +229,10 @@ export interface DriveHooks {
 	log?(line: string): void;
 }
 
+/**
+ *
+ * @param bytes
+ */
 export function toBase64(bytes: Uint8Array): string {
 	let text = "";
 	for (let offset = 0; offset < bytes.length; offset += 0x8000)
@@ -190,10 +240,18 @@ export function toBase64(bytes: Uint8Array): string {
 	return btoa(text);
 }
 
+/**
+ *
+ * @param text
+ */
 export function fromBase64(text: string): Uint8Array {
 	return Uint8Array.from(atob(text), (character) => character.charCodeAt(0));
 }
 
+/**
+ *
+ * @param options
+ */
 export function labelOf(options: LongRoomOptions): string {
 	const format =
 		options.app === "chat" && options.chatFormat !== undefined && options.chatFormat !== "window"

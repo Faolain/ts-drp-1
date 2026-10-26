@@ -29,7 +29,13 @@ const rowAction = (row: WireRow): string => rowValue(row).operation.action;
 // an own issue, or a remote copy not accepted within the poll window, ends the fill.
 const enabled = process.env.APP_ROLLOVER_CEILING === "1";
 const apps = (process.env.APP_ROLLOVER_CEILING_APPS ?? "canvas,chat,grid").split(",") as AppKind[];
-const recipients = (process.env.APP_ROLLOVER_CEILING_RECIPIENTS ?? "receive-only,writer").split(",") as RecipientMode[];
+// "silent-writer" opens the recipient as an enrolled Writer that issues nothing: a creator-only
+// measurement for Grid, whose members are enrolled Writers (a receive-only Grid recipient is not
+// authorised to fetch successor material, so it cannot follow a rolled room).
+type CeilingRecipient = RecipientMode | "silent-writer";
+const recipients = (process.env.APP_ROLLOVER_CEILING_RECIPIENTS ?? "receive-only,writer").split(
+	","
+) as CeilingRecipient[];
 const limit = Number(process.env.APP_ROLLOVER_CEILING_LIMIT ?? 600);
 const prior = Number(process.env.APP_ROLLOVER_CEILING_PRIOR ?? 0);
 const priorMoves = Number(process.env.APP_ROLLOVER_CEILING_PRIOR_MOVES ?? 2);
@@ -37,7 +43,8 @@ const pollMs = Number(process.env.APP_ROLLOVER_CEILING_POLL_MS ?? 10_000);
 const output = process.env.APP_ROLLOVER_CEILING_OUT ?? join(tmpdir(), `app-rollover-ceiling-${Date.now()}`);
 for (const app of apps) if (!["canvas", "chat", "grid"].includes(app)) throw new Error(`CEILING_APP:${app}`);
 for (const mode of recipients)
-	if (mode !== "receive-only" && mode !== "writer") throw new Error(`CEILING_RECIPIENT:${mode}`);
+	if (mode !== "receive-only" && mode !== "writer" && mode !== "silent-writer")
+		throw new Error(`CEILING_RECIPIENT:${mode}`);
 
 const cases = apps.flatMap((app) => recipients.map((recipient) => [app, recipient] as const));
 
@@ -54,6 +61,7 @@ it.skipIf(!enabled).each(cases)(
 		const events: Readonly<Record<string, unknown>>[] = [];
 		const restore = await installEnvironment("node", (event) => events.push(event));
 		const writer = recipient === "writer";
+		const enrolled: RecipientMode = recipient === "receive-only" ? "receive-only" : "writer";
 		const log = (record: Readonly<Record<string, unknown>>) =>
 			appendFileSync(
 				join(output, `ceiling.jsonl`),
@@ -63,7 +71,7 @@ it.skipIf(!enabled).each(cases)(
 			const options = {
 				app,
 				host: "node" as const,
-				recipient,
+				recipient: enrolled,
 				creatorLull: false,
 				epochs: 1,
 				moves: 1,

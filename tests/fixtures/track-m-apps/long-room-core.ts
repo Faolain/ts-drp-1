@@ -22,6 +22,7 @@ import {
 	type LongRoomOptions,
 	type ObservedEvent,
 	type RoleEndpoint,
+	type RolloverObservation,
 	type StoreCensus,
 	toBase64,
 	type WireOffer,
@@ -48,6 +49,11 @@ import {
 	type V3RoomProjectionInput,
 	waitForV3RoomStartupForDiagnostics,
 } from "../../../examples/v3-room/src/index.js";
+import type {
+	V3RoomRolloverEvent,
+	V3RoomRolloverHooks,
+	V3RoomRolloverPolicy,
+} from "../../../examples/v3-room/src/rollover.js";
 import { toCanvasWireOperation } from "../../../packages/blueprints/src/v3-canvas.js";
 import { createRecoverableFinalitySigner } from "../../../packages/keychain/src/finality.js";
 import { createV3CanvasApplication } from "../../../packages/node/src/applications/canvas.js";
@@ -100,8 +106,16 @@ export interface LongRoomHost {
 	census(name: string): Promise<StoreCensus>;
 }
 
+/**
+ *
+ * @param bytes
+ */
 export const hex = (bytes: Uint8Array): string =>
 	Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+/**
+ *
+ * @param value
+ */
 export function required<Value>(value: Value | null | undefined): Value {
 	if (value === undefined || value === null) throw new TypeError("TRACK_M_APPS_REQUIRED_FIXTURE_VALUE");
 	return value;
@@ -122,7 +136,10 @@ function payloadBytes(value: unknown): number {
 	return 0;
 }
 
-/** Rows and value payload bytes of every object store of one database (its own connection). */
+/**
+ * Rows and value payload bytes of every object store of one database (its own connection).
+ * @param database
+ */
 export async function databaseCensus(database: string): Promise<StoreCensus> {
 	const db = await new Promise<IDBDatabase>((resolve, reject) => {
 		const request = indexedDB.open(database);
@@ -154,7 +171,10 @@ export async function databaseCensus(database: string): Promise<StoreCensus> {
 	}
 }
 
-/** Every database of one role on the six-database host, by database suffix. */
+/**
+ * Every database of one role on the six-database host, by database suffix.
+ * @param prefix
+ */
 async function prefixCensus(prefix: string): Promise<StoreCensus> {
 	const out: Record<string, readonly [number, number]> = {};
 	const databases = (await indexedDB.databases()).flatMap(({ name }) =>
@@ -318,7 +338,10 @@ function operationFor(app: AppKind, role: number, epoch: number, ordinal: number
 	});
 }
 
-/** The network node surface the room touches here (tests/fixtures/phase-4b-v3 `fakeNetwork`, without call recording). */
+/**
+ * The network node surface the room touches here (tests/fixtures/phase-4b-v3 `fakeNetwork`, without call recording).
+ * @param peerId
+ */
 function loopbackNetwork(peerId: string): DRPNetworkNode {
 	const topics = new Set<string>();
 	return {
@@ -361,6 +384,24 @@ const OFFER_FIELDS = [
 	"exactCanonicalTrustStateRecordBytes",
 	"exactCanonicalSnapshotManifestBytes",
 ] as const;
+
+/**
+ * App mode: the application's own rollover policy for one role, or undefined when the application
+ * has none. The shipped pages have none yet: they never seal, so a room stays in its first epoch.
+ * @param _app - The application.
+ * @param _role - The creator, or a member (a Writer or receive-only recipient).
+ * @param _context - The room's object and genesis ACL.
+ * @param _hooks - Where the policy publishes its successor offers.
+ * @returns The policy, or undefined.
+ */
+function appRolloverPolicy(
+	_app: AppKind,
+	_role: "creator" | "member",
+	_context: Readonly<{ objectId: string; exactCanonicalLatchedAclBytes: Uint8Array }>,
+	_hooks: V3RoomRolloverHooks
+): V3RoomRolloverPolicy | undefined {
+	return undefined;
+}
 
 /**
  * The profile and latched-ACL version the creator signs into genesis. By default: Canvas from
@@ -423,12 +464,21 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 	const chatFormat = options.chatFormat ?? "window";
 	const selected = await applicationFor(options.app, exactCanonicalLatchedAclBytes, options.creatorLull, chatFormat);
 	const projectionInputs = new WeakMap<object, V3RoomProjectionInput>();
+	const appMode = options.rollover === "app";
+	// App mode: the last projection of each recent epoch. The application's own policy seals in the
+	// background, so the closed cut is read back from here instead of at a harness seal.
+	const lastProjections = new Map<number, Readonly<{ input: V3RoomProjectionInput; result: object }>>();
 	const originalApplication = selected.application;
 	const application = {
 		...originalApplication,
 		projectAcceptedOperations: (value: V3RoomProjectionInput) => {
 			const result = originalApplication.projectAcceptedOperations(value);
 			projectionInputs.set(result, value);
+			if (appMode) {
+				const epoch = value.authenticatedBase?.epoch ?? 0;
+				lastProjections.set(epoch, { input: value, result });
+				for (const kept of lastProjections.keys()) if (kept < epoch - 3) lastProjections.delete(kept);
+			}
 			return result;
 		},
 	};
@@ -477,6 +527,40 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 	const acknowledged = new Map<string, () => void>();
 	const networkNode = loopbackNetwork(peers[index]);
 	const receiveOnly = index === 1 && !writerRecipient;
+	let scripted: ScriptedSnapshotChunkPort | undefined;
+	// App mode: the role runs its application's own rollover policy. The creator's published
+	// successor offers wait here until the harness carries them to the other role (as a host would).
+	const publishedOffers: WireOffer[] = [];
+	const rolloverEvents: V3RoomRolloverEvent[] = [];
+	const rolloverErrors: string[] = [];
+	const policy = appMode
+		? appRolloverPolicy(
+				options.app,
+				index === 0 ? "creator" : "member",
+				{ objectId, exactCanonicalLatchedAclBytes },
+				{
+					publishSuccessor: (offer) => {
+						publishedOffers.push(Object.fromEntries(OFFER_FIELDS.map((field) => [field, toBase64(offer[field])])));
+					},
+					onRollover: (event) => rolloverEvents.push(event),
+					onError: (error) => rolloverErrors.push(error instanceof Error ? error.message : String(error)),
+				}
+			)
+		: undefined;
+	if (appMode && index === 0)
+		// The creator's successor material host: a fresh scripted port per serving (the seal and the
+		// export each open one); `dispatch` answers the recipient's requests on the newest. Only the
+		// serving side of the port is used, so it needs no fixture.
+		Reflect.set(networkNode, "createSnapshotChunkProtocolHost", () => {
+			const port = new ScriptedSnapshotChunkPort(
+				{ declaration: undefined, chunks: [] } as unknown as ConstructorParameters<typeof ScriptedSnapshotChunkPort>[0],
+				new Map([[peers[1], "honest"]]),
+				peers[0]
+			);
+			track.ports.add(port);
+			scripted = port;
+			return port;
+		});
 	const input = {
 		application,
 		storageHost: host.storageHost,
@@ -496,7 +580,8 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 		roomHeadAuthority: floor,
 		signRegisteredVertexDigest: (digest: Uint8Array) => Promise.resolve(ed25519.sign(digest, identity.seed)),
 		onProjection: observe,
-		onAcceptedVertex: (vertex: Readonly<{ digest: Uint8Array; author: string }>) => {
+		onAcceptedVertex: (vertex: Readonly<{ digest: Uint8Array; author: string; epoch: number }>) => {
+			policy?.observe(vertex);
 			const digest = hex(vertex.digest);
 			if (!accepted.has(digest)) {
 				acceptedCount++;
@@ -528,6 +613,7 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 	};
 	const room = await createV3RoomSession(input as unknown as Parameters<typeof createV3RoomSession>[0]);
 	track.rooms.add(room);
+	policy?.bind(room);
 	await waitForV3RoomStartupForDiagnostics(room);
 	observe(room.projection());
 
@@ -565,7 +651,6 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 			await store.close();
 		}
 	};
-	let scripted: ScriptedSnapshotChunkPort | undefined;
 	let drained = 0;
 	const kindOf = (result: unknown) => {
 		const value = result as { kind: string; reason?: string };
@@ -647,7 +732,8 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 		},
 		issue: async (epoch: number, ordinal: number) => {
 			const started = performance.now();
-			await room.issue(operationFor(options.app, index, epoch, ordinal));
+			const operation = operationFor(options.app, index, epoch, ordinal);
+			await (policy === undefined ? room.issue(operation) : policy.issue(operation));
 			return performance.now() - started;
 		},
 		// Every published own row above `after`, in issue order (observation handle).
@@ -811,7 +897,30 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 			drained = events.length;
 			return out;
 		},
+		takeOffers: async () => publishedOffers.splice(0),
+		closedProjection: async (epoch: number) => {
+			const entry = lastProjections.get(epoch);
+			if (entry === undefined) return null;
+			const base = entry.input.authenticatedBase;
+			return {
+				base: base === undefined ? null : { epoch: base.epoch, state: hex(base.exactCanonicalApplicationStateBytes) },
+				operations: entry.input.currentEpochOperations.map(({ author, operation }) => ({ author, operation })),
+				state: hex(required(application.migration).canonicalStateBytes(entry.result as never)),
+			};
+		},
+		rollover: async (): Promise<RolloverObservation> => {
+			await policy?.settled();
+			const stats = policy?.stats();
+			return {
+				epoch: stats?.epoch ?? room.authority()?.epoch ?? 0,
+				rollovers: stats?.rollovers ?? 0,
+				waiting: policy?.waiting() ?? 0,
+				errors: [...rolloverErrors],
+				events: [...rolloverEvents],
+			};
+		},
 		close: async () => {
+			policy?.close();
 			await room.close();
 			track.rooms.delete(room);
 			await floor.close();

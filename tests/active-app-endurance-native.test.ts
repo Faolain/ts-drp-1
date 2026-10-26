@@ -34,6 +34,11 @@ const output = process.env.ACTIVE_ENDURANCE_OUT ?? join(tmpdir(), `active-endura
 const profile = process.env.ACTIVE_ENDURANCE_PROFILE;
 if (profile !== undefined && profile !== "trusted-v1" && profile !== "settlement-v1")
 	throw new Error(`ENDURANCE_PROFILE:${profile}`);
+// ACTIVE_ENDURANCE_ROLLOVER=app: each app's own rollover policy (examples/<app>/src/rollover.ts) rolls
+// the room over instead of the harness; an epoch is then one application rollover, and the harness
+// only carries the creator's published successor offers to the Writer. Default "harness".
+const rollover = process.env.ACTIVE_ENDURANCE_ROLLOVER ?? "harness";
+if (rollover !== "harness" && rollover !== "app") throw new Error(`ENDURANCE_ROLLOVER:${rollover}`);
 
 it.skipIf(!enabled).each(apps)(
 	"%s: active writers conserve work and native storage through endurance",
@@ -66,6 +71,7 @@ it.skipIf(!enabled).each(apps)(
 			streamLimit,
 			reopenAt,
 			profile: app === "canvas" ? "shipped" : (profile ?? "settlement-v1"),
+			rollover,
 			host: "SQLite",
 			transport: "scripted signed-byte first-copy loss/delay and explicit durable replay",
 			successorMembership: "v2 native journal point read",
@@ -85,6 +91,7 @@ it.skipIf(!enabled).each(apps)(
 				moves,
 				chatFormat: "shares" as const,
 				...(profile === "trusted-v1" && app !== "canvas" ? { profile } : {}),
+				...(rollover === "app" ? { rollover } : {}),
 			};
 			const openPeers = async (reopen: boolean): Promise<readonly [RoleEndpoint, RoleEndpoint]> => {
 				const host = nodeHostFor("node", directory, reopen);
@@ -114,6 +121,7 @@ it.skipIf(!enabled).each(apps)(
 				streamLimit,
 				peers: await openPeers(false),
 				reopenAt: metadata.reopenAt,
+				rollover,
 				reopen: async (peers) => {
 					await Promise.all(peers.map((peer) => peer.close()));
 					return openPeers(true);
