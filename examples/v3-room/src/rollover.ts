@@ -223,7 +223,9 @@ export function createV3RoomRolloverPolicy(
 		scheduled = true;
 		later(() => {
 			scheduled = false;
-			void roll(trigger);
+			// A rollover that ran meanwhile (a refused move's) may have cleared the trigger.
+			const due = trigger === "budget" ? overBudget() : (advance(currentEpoch()), most(moves) > 0);
+			if (due) void roll(trigger);
 		});
 	};
 	const armIdle = (): void => {
