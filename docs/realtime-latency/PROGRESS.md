@@ -10,7 +10,22 @@ not native storage or network behavior.
 
 ## Seal/adopt yields + maintenance re-encode — 2026-10-25 evening (current)
 
-Branch `perf/integration-2` (`cdcc9cf4`, not yet on this root) = `54a7d818` + two slices:
+**All four 300-epoch runs pass on `cdcc9cf4`**, merged into this root as `0f8584c1`. Grid
+continued play 300 (1000 ms alarm, AC power, load ≈11) against the north-star run on `6c9b5935`:
+
+| Grid continued play 300 | `6c9b5935` | `cdcc9cf4` |
+| --- | --- | --- |
+| Result | 300/300, 1845 issues, 13 repairs | 300/300, 1845 issues, 13 repairs |
+| Duration | 3068 s | 2567 s |
+| Event-loop p99 / timer max gap | 164 / 371 ms | 106 / 548 ms |
+| Install wall / CPU median | 3022 / 3196 ms | 1920 / 2186 ms |
+| Maintenance wall / CPU median | 3158 / 3663 ms | 2470 / 2823 ms |
+| Adopt / seal wall median | 398 / 225 ms | 314 / 232 ms |
+| Install, first 50 → last 50 epochs | 2840 → 3087 ms | 1814 → 2161 ms |
+
+Install still grows over the run (+19 %), now from a lower base.
+
+`perf/integration-2` (`cdcc9cf4`) = `54a7d818` + two slices:
 - **Maintenance re-encode** (`perf/maintenance-reencode`): durable preimage header verified once
   per exact bytes (48 → 0 decodes per six images) and the native journal retirement image
   verified once per exact rows (90 captures / 6 hashes → 0 per six reads; Quint
@@ -53,12 +68,16 @@ seal/adopt yield model no violation to 22 steps; verified-once cache to 13; veri
 to 7 (step 8 alone ran ~50 min); broken controls caught. The journal memo model ranged over a
 non-constant list length; `cdcc9cf4` bounds it by `MAX_ROWS` (exact), Apalache run pending.
 
-**Grid continued play 300 not yet passed on `cdcc9cf4`.** Run 1 stopped at epoch 145 on the
-1000 ms alarm: the gap was 1065 ms wall / 178 ms CPU, 1177 involuntary context switches (host
-preemption; load 11 → 25 with Apalache, two other projects' `tsgolint` at ~85 % each and
-OrbStack). Run 2 tripped at epoch 5 the same way (1620 / 312 ms). A paired 300 (`6c9b5935` vs
-`cdcc9cf4`, alarm 5000) died when the laptop entered battery sleep (both processes: 104 s at
-~0 CPU, `pmset` "Entering Sleep state … Using Batt"). Needs AC power and a quieter host.
+Grid continued play attempts before the pass were stopped by the host, not the code. Run 1
+stopped at epoch 145 on the 1000 ms alarm with a 1065 ms wall / 178 ms CPU gap and 1177
+involuntary context switches (preemption at load 11 → 25 with Apalache, two other projects'
+`tsgolint` and OrbStack). Run 2 tripped at epoch 5 the same way (1620 / 312 ms). A paired 300
+died when the laptop entered battery sleep (104 s at ~0 CPU in both processes). The passing run
+used AC power, `caffeinate -dims` and no Apalache alongside.
+
+Still open: the creator-issue tail above; seal's residual 100–200 ms quantum; install growth
+over 300 epochs; rollback-promotion lifecycle, abandonment retirement-crash edge, 512-offer
+capacity gate, browser/FPS.
 
 ## Verify-once perf integrated — 2026-10-25
 
