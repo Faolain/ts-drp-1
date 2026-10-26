@@ -34,6 +34,12 @@ import {
 } from "./fixtures/track-m/room-retention-fixture.js";
 import { settlementDelivery } from "./fixtures/track-m/settlement-room.js";
 import { sqliteFileCensus } from "./fixtures/track-m-apps/app-long-room.js";
+import { GRID_ROLLOVER_BUDGET } from "../examples/grid/src/rollover.js";
+import {
+	createV3RoomRolloverPolicy,
+	type V3RoomRolloverEvent,
+	type V3RoomRolloverPolicy,
+} from "../examples/v3-room/src/rollover.js";
 import * as cooperativeWork from "../packages/node/src/internal/cooperative-work.js";
 
 const enabled = process.env.ACTIVE_CONTINUED_PLAY === "1";
@@ -47,6 +53,13 @@ const reopenAt = Number(
 	process.env.ACTIVE_CONTINUED_PLAY_REOPEN_AT ?? Math.min(30, Math.max(1, Math.floor(epochs / 2)))
 );
 const starvationAlarmMs = Number(process.env.ACTIVE_CONTINUED_PLAY_STARVATION_ALARM_MS ?? 1000);
+// "harness" (default): each transition seals, adopts and exports. "app": the creator runs the shipped
+// Grid rollover policy (examples/grid/src/rollover.ts); each transition streams Writer moves until the
+// creator's policy has rolled the room over, then the Writer installs it as a host would.
+const rolloverMode = process.env.ACTIVE_CONTINUED_PLAY_ROLLOVER ?? "harness";
+if (rolloverMode !== "harness" && rolloverMode !== "app") throw new Error(`CONTINUED_PLAY_ROLLOVER:${rolloverMode}`);
+/** App mode: a transition whose Writer stream has not triggered a rollover after this many moves stranded. */
+const APP_ROLLOVER_MAX_MOVES = 64;
 if (!Number.isFinite(starvationAlarmMs) || starvationAlarmMs <= 0) throw new Error("CONTINUED_PLAY_STARVATION_ALARM");
 for (const value of [epochs, repairEvery, reopenAt])
 	if (!Number.isSafeInteger(value) || value < 1) throw new Error("CONTINUED_PLAY_POSITIVE_INTEGER");
@@ -121,6 +134,7 @@ it.skipIf(!enabled)(
 			repairEvery,
 			reopenAt,
 			starvationAlarmMs,
+			rollover: rolloverMode,
 			starvationAlarmMeaning: "coarse starvation regression only; not a smoothness or real-time completion criterion",
 			percentiles: "HDR microseconds, three significant figures; exact observed maxima",
 			directory,
@@ -329,12 +343,20 @@ it.skipIf(!enabled)(
 					)
 				);
 			}
+			// App mode: the creator's rollover policy, rebound after a reopen. Declared before the room
+			// fixture so its acceptance observer can feed it.
+			let policy: V3RoomRolloverPolicy | undefined;
+			const rolloverEvents: V3RoomRolloverEvent[] = [];
+			const rolloverErrors: string[] = [];
 			const fixture = await creatorDeliveryRoom({
 				profile: "settlement",
 				directory,
 				network,
 				peerIds: network.peerIds,
 				onAccepted: (receiver, digest, author) => {
+					// The creator's policy counts every vertex its room accepts (the shipped page's onAcceptedVertex).
+					if (receiver === 0 && policy !== undefined)
+						policy.observe({ author, epoch: required(peers[0]).room.authority()?.epoch ?? 0 });
 					if (author === fixture.identities[receiver]?.author) return;
 					counters.remote[receiver] = count(counters.remote, receiver) + 1;
 					const stats = phaseStatsFor();
@@ -349,6 +371,20 @@ it.skipIf(!enabled)(
 			const recipientSigning = await fixture.host.storageHost.openSealVote("peer-1");
 			await recipientSigning.close();
 			let peers = [await fixture.open(0), await fixture.open(1)];
+			const openPolicy = (): void => {
+				if (rolloverMode !== "app") return;
+				policy?.close();
+				policy = createV3RoomRolloverPolicy({
+					role: "creator",
+					budget: GRID_ROLLOVER_BUDGET,
+					hooks: {
+						onRollover: (event) => rolloverEvents.push(event),
+						onError: (error) => rolloverErrors.push(String(error)),
+					},
+				});
+				policy.bind(required(peers[0]).room);
+			};
+			openPolicy();
 			const originalPeerIds = peers.map((peer) => peer.peerId);
 			const authoritySnapshot = (index: number) => {
 				const peer = required(peers[index]),
@@ -485,7 +521,9 @@ it.skipIf(!enabled)(
 			}, 10);
 			const issue = async (peer: number, label: string, block = oracle.propose(peer)) => {
 				const started = performance.now();
-				await required(peers[peer]).room.issue({ action: "placeBlock", ...block });
+				const operation = { action: "placeBlock", ...block };
+				if (peer === 0 && policy !== undefined) await policy.issue(operation);
+				else await required(peers[peer]).room.issue(operation);
 				oracle.accept(block);
 				const stopped = performance.now();
 				record({ kind: "issue", phase, peer, label, block, started, stopped, ms: stopped - started });
@@ -747,13 +785,28 @@ it.skipIf(!enabled)(
 				const started = performance.now(),
 					receivedBefore = [...counters.received],
 					remoteBefore = [...counters.remote];
+				const closing = creator.room.authority()?.epoch ?? 0;
 				const writes = (async () => {
+					if (rolloverMode === "app") {
+						// Until the creator's own policy has adopted a successor.
+						for (let ordinal = 0; (creator.room.authority()?.epoch ?? 0) === closing; ordinal++) {
+							if (ordinal >= APP_ROLLOVER_MAX_MOVES) throw new Error("CONTINUED_PLAY_APP_ROLLOVER_NOT_TRIGGERED");
+							await issue(1, `stream-${epoch}-${ordinal}`);
+						}
+						return;
+					}
 					for (let ordinal = 0; ordinal < 4; ordinal++) await issue(1, `stream-${epoch}-${ordinal}`);
 				})();
 				const rollover = (async () => {
-					const sealed = await step(`seal-${epoch}`, () => creator.room.sealEpoch());
-					expect(sealed.value).toMatchObject({ ok: true });
-					await step(`adopt-${epoch}`, () => creator.room.adoptCreatorSuccessor());
+					if (rolloverMode === "app") {
+						await writes;
+						await step(`policy-rollover-${epoch}`, () => required(policy).settled());
+						expect(rolloverErrors).toEqual([]);
+					} else {
+						const sealed = await step(`seal-${epoch}`, () => creator.room.sealEpoch());
+						expect(sealed.value).toMatchObject({ ok: true });
+						await step(`adopt-${epoch}`, () => creator.room.adoptCreatorSuccessor());
+					}
 					const transfer = (await step(`export-${epoch}`, () => settlementDelivery(fixture))).value;
 					Reflect.set(writer.networkNode, "createSnapshotChunkProtocolHost", () => transfer.port);
 					try {
@@ -774,6 +827,7 @@ it.skipIf(!enabled)(
 					kind: "transition",
 					epoch,
 					ms: performance.now() - started,
+					...(rolloverMode === "app" ? { rollovers: rolloverEvents.splice(0) } : {}),
 					ephemeralReceivedByPeer: delta(counters.received, receivedBefore),
 					remoteAcceptedByPeer: delta(counters.remote, remoteBefore),
 				});
@@ -825,6 +879,7 @@ it.skipIf(!enabled)(
 					);
 					await network.idle();
 					peers = [await fixture.open(0, { reopen: true }), await fixture.open(1, { reopen: true })];
+					openPolicy();
 					expect(peers.map((peer) => peer.peerId)).toEqual(originalPeerIds);
 					for (let peer = 0; peer < 2; peer++) {
 						expect(required(peers[peer]).room).not.toBe(required(oldPeers[peer]).room);
