@@ -126,14 +126,21 @@ function capacityRefusal(error: unknown): boolean {
 	return /proof reserve is exhausted|MAINTENANCE_NATIVE_IMAGE_EXHAUSTED/u.test(String(error));
 }
 
+/** The capacity gate's profile labels: the signed profile, not which product ships it. */
+type CapacityProfileLabel = "settlement" | "trusted-v1";
+
 /**
- * The fixture knows `settlement` and `shipped` (creator-trusted-v1); `trusted` names the latter.
+ * Reads CREATOR_CAPACITY_PROFILE. `settlement` (default) is creator-trusted-settlement-v1 and
+ * `trusted-v1` is creator-trusted-v1. The old values `shipped` and `trusted` remain aliases of
+ * `trusted-v1`: only the shipped Grid example and the v3-chat demo sign that profile (Canvas and
+ * Chat ship the settlement profile), so "shipped" no longer names it.
  * @param value - The CREATOR_CAPACITY_PROFILE value.
- * @returns The fixture profile.
+ * @returns The gate label and the delivery-room fixture profile it selects.
  */
-function capacityProfile(value: string | undefined): Profile {
-	if (value === undefined || value === "settlement") return "settlement";
-	if (value === "shipped" || value === "trusted") return "shipped";
+function capacityProfile(value: string | undefined): Readonly<{ label: CapacityProfileLabel; fixture: Profile }> {
+	if (value === undefined || value === "settlement") return { label: "settlement", fixture: "settlement" };
+	if (value === "trusted-v1" || value === "shipped" || value === "trusted")
+		return { label: "trusted-v1", fixture: "shipped" };
 	throw new TypeError(`unknown CREATOR_CAPACITY_PROFILE: ${value}`);
 }
 
@@ -273,10 +280,10 @@ it.runIf(process.env.RUN_CREATOR_CAPACITY === "1")(
 	async () => {
 		const count = Number(process.env.CREATOR_CAPACITY_EDITS ?? 512);
 		const batchSize = Number(process.env.CREATOR_CAPACITY_BATCH_SIZE ?? 1);
-		const profile = capacityProfile(process.env.CREATOR_CAPACITY_PROFILE);
+		const { label: profile, fixture: fixtureProfile } = capacityProfile(process.env.CREATOR_CAPACITY_PROFILE);
 		const cycles = Number(process.env.CREATOR_CAPACITY_CYCLES ?? 1);
 		const stateSlots = Number(process.env.CREATOR_CAPACITY_STATE_SLOTS ?? count * cycles);
-		const fixture = await creatorDeliveryRoom({ profile });
+		const fixture = await creatorDeliveryRoom({ profile: fixtureProfile });
 		const creator = await fixture.open(0);
 		const directory = required([...directories].at(-1));
 		const events: unknown[] = [];
