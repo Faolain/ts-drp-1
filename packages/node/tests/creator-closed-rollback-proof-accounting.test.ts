@@ -9505,6 +9505,8 @@ describe("ordinary source prime joined lifecycle without future preparation", ()
 				suffix: undefined, newWindowAdmission: options.windowAdmission ?? false,
 				registration, input, unsignedBytes, receivedReceipt: receipt, planEffect: undefined,
 				report: () => undefined,
+				// The job's host checkpoint between cold quote spans; its budget never expires here.
+				cooperate: async () => undefined,
 				captureCreatorOrdinarySourceWithoutForecast: async (...args: unknown[]) => {
 					expect(args).toEqual([registration, input, receipt]); calls.prime++; events.push("prime");
 					if (options.primeError !== undefined) throw options.primeError;

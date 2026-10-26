@@ -7833,6 +7833,9 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				await publishCurrentGenesisBootstrap();
 				assertSessionOpen();
 				const result = await creatorCloseHandle.close();
+				// The successor and its adoption facts are installed. Serving reads its
+				// export afresh in a later host turn of this same lifetime transition.
+				await yieldToHost();
 				await serveAvailableSuccessor();
 				return result;
 			});
