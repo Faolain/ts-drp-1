@@ -22390,6 +22390,17 @@ async function cleanupCreatorSettlementSuccessor(
 		publishState: "pending" | "published";
 	}[] = [];
 	let throughAuthorSequence: number | null = null;
+	const journalConsumers = new Map<string, boolean>();
+	const journalScopeConsumes = async (epoch: number, anchorDigest: string): Promise<boolean> => {
+		const key = JSON.stringify([epoch, anchorDigest]);
+		const known = journalConsumers.get(key);
+		if (known !== undefined) return known;
+		const readiness = await material.liveJournalStore.readiness({
+			scope: { objectId: material.issuanceScope.objectId, epoch, anchorDigest } });
+		const consumes = !readiness.ok || (readiness.ready && readiness.rowCount > 0);
+		journalConsumers.set(key, consumes);
+		return consumes;
+	};
 	if (closedEpoch >= 2 && settlementPlanPermitsAuthenticatedPruning(plan)) {
 		let afterKey: DurableOutboxPageInput["afterKey"] =
 			state.prunedThroughAuthorSequence === null
@@ -22428,6 +22439,28 @@ async function cleanupCreatorSettlementSuccessor(
 						(frontier.terminalThrough !== null && row.authorSequence <= frontier.terminalThrough)
 					)
 				) {
+					done = true;
+					break;
+				}
+				// Before the closed-retirement coordinator owns issuance holes, this
+				// legacy pruner keeps the coordinator's own rule for a non-genesis
+				// epoch (closedIssuanceProtectedRecordsForRetirement): an issued row
+				// never leaves while its journal scope still holds accepted entries.
+				// Such a prefix is classified only by these issued/outbox rows unless
+				// the epoch later becomes a certificate role with a membership
+				// authority. A promotion's classified retained source never does, and
+				// after a floor-2 promotion no coordinator has run when this pruner
+				// reaches it: pruning first strands that prefix and the epoch's
+				// signing evidence for good (the seal then refuses an unclassified
+				// signing epoch once its trust leaves the role window). An ordinary
+				// room reaches the coordinator before any non-genesis epoch is due
+				// here, so its pruning is unchanged. The genesis epoch keeps its
+				// original pre-coordinator pruning (retaining it measurably overruns
+				// the prospective settlement anchor bound); its trust is the pinned
+				// genesis, so a stranded epoch-zero prefix strands no signing
+				// dependency. An unreadable journal scope retains.
+				if (coordinatedIssuance === undefined && source.admitted.epoch > 0 &&
+					await journalScopeConsumes(source.admitted.epoch, source.admitted.anchor)) {
 					done = true;
 					break;
 				}

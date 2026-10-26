@@ -1187,6 +1187,10 @@ interface ImportFrame {
 	// Only authenticated live/recovery-role consumers enter the bounded signing borrow.
 	readonly signingRoleTrusts: Set<CurrentAnchorTrust>;
 	signingDependencies?: CreatorSigningDependencyRead;
+	/** The exact vector `signingDependencies` was borrowed with. It differs from
+	 * `signingRoleTrusts` only when the original bounded selection by ACTUAL
+	 * native signing rows dropped historical proof coverage (more than seven). */
+	signingBorrowTrusts?: readonly CurrentAnchorTrust[];
 	readonly input: Captured;
 	readonly reader: SourceReader;
 	readonly accounting: CreatorClosedRollbackProofAccounting;
@@ -2582,22 +2586,29 @@ async function acquireRecoveryRoleCertificate(
 			sourceMaterials.push({ closure, snapshot });
 			retainSource(closure, scope);
 		}
-		// The first ordinary certificate after the pinned-genesis bootstrap promotion
-		// can authenticate the prior projection independently from its signed
-		// Cut/QC, the exact epoch-zero source, and the original anchor chain.
-		// This selects that EXISTING readback route only. No support is classified
-		// or delivered until its genuine transfer below verifies the whole tuple.
-		// Epoch three is the bootstrap source-correlation boundary (genesis zero,
-		// promoted one, ordinary two), not an epoch-based authority grant. Later
-		// ordinary certificates use the unchanged non-promotion route; unrelated
-		// or nested promotion shapes keep the original full-support fallback.
+		// The first ordinary certificate above an installed promotion (the promoted
+		// epoch n-1 is now closed; its Cut names the promotion source as its one
+		// operational role) authenticates every fact a recovery, reopen or rollback
+		// still needs independently: the readback below re-opens the signed
+		// promotion Cut, the operational source's own closure, Cut/QC and FULL
+		// snapshot against the original anchor chain, and checks the closed promoted
+		// projection against that source. The promoted epoch is closed, so its base
+		// is no longer reconstructed from the source, and the promotion decision's
+		// own P/Q support (decision row, ancestry link, unused historical L) has no
+		// remaining consumer. This selects that EXISTING readback route only. No
+		// support is classified or delivered until its genuine transfer below
+		// verifies the whole tuple and the coverage law binds every protected scope
+		// to exactly one present source generation. The source is one of the two
+		// usable rollback slots of the promotion's close (n-3 or n-4).
 		const historicalPromotion = priorCut.forwardPromotion === undefined ? undefined : captureForwardPromotion(priorCut.forwardPromotion);
-		const independentHistoricalReadback = n === 3 && latestCut.forwardPromotion === undefined &&
-			historicalPromotion !== undefined && historicalPromotion.source.closedEpoch === 0 &&
+		const independentHistoricalReadback = latestCut.forwardPromotion === undefined &&
+			historicalPromotion !== undefined &&
+			(historicalPromotion.source.closedEpoch === n - 3 || historicalPromotion.source.closedEpoch === n - 4) &&
 			historicalPromotion.genesisAnchorDigest === currentTrust.genesisAnchorDigest &&
-			historicalPromotion.source.closedAnchorDigest === currentTrust.genesisAnchorDigest &&
+			(historicalPromotion.source.closedEpoch !== 0 ||
+				historicalPromotion.source.closedAnchorDigest === currentTrust.genesisAnchorDigest) &&
 			roles.genesisAnchorDigest === currentTrust.genesisAnchorDigest &&
-			roles.currentClose.epoch === 2 && roles.previousClose?.epoch === 1 &&
+			roles.currentClose.epoch === n - 1 && roles.previousClose?.epoch === n - 2 &&
 			roles.operationalSources.length === 1 &&
 			closedRetirementEqual(roles.operationalSources[0],historicalPromotion.source) &&
 			state.retired.size === 0 && receivedPendingFloor === undefined;
@@ -4329,6 +4340,7 @@ interface CreatorOrdinaryIssuanceSourceFacts {
 	readonly summary: Summary;
 	readonly currentTrust: CurrentAnchorTrust;
 	readonly signingTrusts: readonly CurrentAnchorTrust[];
+	readonly signingBorrowTrusts: readonly CurrentAnchorTrust[];
 	readonly generations: readonly GenerationRecord[];
 	readonly blobs: AheBoundedActiveRead["blobs"];
 	readonly head: PresentHead;
@@ -5914,6 +5926,10 @@ export async function captureCreatorOrdinaryIssuanceProofSource(proof: CreatorIs
 		// would erase the original seal registry identity required by fresh signing.
 		summary: detach(observation!.summary), currentTrust: capture.currentTrust,
 		signingTrusts: creatorSigningRoleTrustVector(frame.signingRoleTrusts),
+		// A warm reuse borrows the SAME authorities its source proof borrowed:
+		// historical proof coverage is not a live signing consumer, and the fresh
+		// seal acquisition still verifies every current native signing row.
+		signingBorrowTrusts: frame.signingBorrowTrusts ?? creatorSigningRoleTrustVector(frame.signingRoleTrusts),
 		generations: Object.freeze(forward.reader.generations.map(detachedGeneration)),
 		blobs: Object.freeze(forward.reader.blobs.map(blob => Object.freeze({ref: Object.freeze({...blob.ref}), bytes: blob.bytes.slice()}))),
 		head: detach(forward.reader.head), floor: detach(forward.wholeFloor!), floorImage: detach(capture.floorImage),
@@ -6555,7 +6571,7 @@ export async function acquireCreatorOrdinaryIssuanceMaintenanceProof(value: Crea
 		// a borrowed signing read is owned (released) as soon as it exists.
 		const nativeIssuanceSource = sourceRead(() => runtime.readNativeIssuance());
 		const signingSource = sourceRead(async () => {
-			const borrowed = await runtime.borrowSigningDependencies(seed.signingTrusts);
+			const borrowed = await runtime.borrowSigningDependencies(seed.signingBorrowTrusts);
 			signing = borrowed; return borrowed;
 		});
 		const [aheOutcome] = await Promise.allSettled([aheSource, journalSource, snapshotSource, floorSource, inventorySource,
@@ -6712,7 +6728,7 @@ export async function acquireCreatorOrdinaryIssuanceMaintenanceProof(value: Crea
 		frame = {ordinarySource: source, headerScopes: new Map(seed.headerScopes.map(scope =>
 			[JSON.stringify([scope.objectId, scope.epoch, scope.anchorDigest]), scope])),
 			headerHold: journalHold, recoveryTrusts: new Set(seed.signingTrusts), signingRoleTrusts: new Set(seed.signingTrusts),
-			signingDependencies: signing, input, reader, accounting, pending: new Set(), requirements: new Set(), alive: true};
+			signingDependencies: signing, signingBorrowTrusts: seed.signingBorrowTrusts, input, reader, accounting, pending: new Set(), requirements: new Set(), alive: true};
 		frames.set(reader, frame); ledgers.set(accounting, frame);
 		const capturedFrame = frame, capturedReader = reader;
 		// Shared original point checks retain abort, source, held-native, signing
@@ -8306,6 +8322,7 @@ async function acquireClosedData(
 			const frame = activateCreatorClosedProofWork(reader);
 			frame.closeDependencies = child;
 			frame.signingDependencies = signing;
+			frame.signingBorrowTrusts = signingTrusts;
 		}
 		if (facts.forward !== undefined && !frames.has(reader)) {
 			await qualifyNativePreparation();
@@ -9339,7 +9356,11 @@ function creatorConditionalSourceGenerationCandidatesForSizing(input: Readonly<{
 			selected.some(row => row.generationId === generation.generationId)) continue;
 		const original = input.currentRows.find(row => row.generationId === generation.generationId);
 		const originalBindings = bindings.filter(binding => binding.generation.generationId === generation.generationId);
-		if (original === undefined || !closedRetirementEqual(original, generation) ||
+		// A CURRENT preclose pass may have drained this row's base; its post rows
+		// then carry the same generation with only the native lineage-floor
+		// normalization (base none, closedGenerationPostRows). Nothing else may differ.
+		if (original === undefined || !(closedRetirementEqual(original, generation) ||
+			closedRetirementEqual(original, {...generation, baseExpectedHead: {kind: "none", objectId: generation.objectId}})) ||
 			!originalBindings.every(binding => (binding.alreadyRetired ||
 				input.snapshotRetiringScopes.some(scope => closedRetirementEqual(scope, binding.scope))) &&
 				!input.futureRequiredScopes.some(scope => closedRetirementEqual(scope, binding.scope)))) continue;
@@ -16989,42 +17010,54 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 					proofRefs: [companionCut.ref, companionQc.ref],
 				}).ok;
 		}
-		// The supported first ordinary close after an epoch-two historical
-		// promotion has a different native P/Q support lifecycle. Preserve every
-		// CURRENT installed support/source in PRE. Only the later independently
-		// verified readback above can replace historical preparation support with
-		// its exact current/previous/operational source bindings. This is a width
-		// correlation, never a future transfer capability or deletion command.
-		// Nonmatching shapes retain their existing complete support and forecast;
-		// this does not declare those shapes unsupported or relax native limits.
+		// The first ordinary close above an installed promotion (this epoch is the
+		// promoted epoch) has a different native P/Q support lifecycle. Preserve
+		// every CURRENT installed support/source in PRE: until this epoch closes,
+		// reopen and both rollback slots still re-verify the promotion decision.
+		// The NEXT epoch's certificate takes the independent readback route (see
+		// acquireRecoveryRoleCertificate), which reads only the new current L, this
+		// epoch's L (previous close, truthful promotion Cut) and one source closure
+		// per operational/classified role scope. Installed support outside those
+		// closures (the decision Q, its ancestry link, an L for no role scope) is
+		// then unprotected. This is a width correlation, never a future transfer
+		// capability or deletion command: the future certificate's own excluded
+		// source authenticator must still grant actual custody. Nonmatching shapes
+		// retain their existing complete support and forecast; this does not
+		// declare those shapes unsupported or relax native limits.
 		let independentInstalledFutureCandidates: readonly GenerationRecord[] = [];
 		const installed = forward.installed.length === 1 ? forward.installed[0] : undefined;
 		const installedIdentity = installed === undefined ? undefined : resolveCreatorForwardPromotion(installed.promotion);
-		if (!preclose && epoch === 2 && forward.wholeCensus === true && forward.rows.length === 3 &&
+		const installedSourceAge = installedIdentity === undefined ? undefined : epoch - installedIdentity.source.closedEpoch;
+		if (!preclose && forward.wholeCensus === true && forward.rows.length === 3 &&
 			forward.pending === undefined && forward.certificates.length === 0 && installed !== undefined &&
 			installedIdentity !== undefined && installedIdentity.successorEpoch === epoch &&
 			installedIdentity.objectId === objectId && installedIdentity.genesisAnchorDigest === trust.genesisAnchorDigest &&
-			installedIdentity.successorAnchorDigest === trust.currentAnchorDigest && installedIdentity.source.closedEpoch === 0 &&
-			installedIdentity.source.closedAnchorDigest === trust.genesisAnchorDigest &&
+			installedIdentity.successorAnchorDigest === trust.currentAnchorDigest &&
+			(installedSourceAge === 2 || installedSourceAge === 3) &&
+			(installedIdentity.source.closedEpoch !== 0 || installedIdentity.source.closedAnchorDigest === trust.genesisAnchorDigest) &&
 			cut.forwardPromotion === undefined && futureRoles !== undefined && futureRoles.currentClose.epoch === epoch &&
-			futureRoles.previousClose?.epoch === 1 && futureRoles.operationalSources.length === 1 &&
+			futureRoles.previousClose?.epoch === epoch - 1 && futureRoles.operationalSources.length === 1 &&
 			closedRetirementEqual(futureRoles.operationalSources[0],installedIdentity.source) &&
-			futureRoles.classifiedScopes.length === 0 && capture.receivedRecoveryScopes?.length === 0 &&
-			installed.authenticatedSourceGenerations.length === 2 &&
+			capture.receivedRecoveryScopes?.length === 0 &&
 			installed.supportGenerations.every(row => currentRows.some(actual => closedRetirementEqual(actual,row)))) {
-			const originalSourceScope = {objectId,epoch:0,anchor:installedIdentity.source.closedAnchorDigest,
+			const originalSourceScope = {objectId,epoch:installedIdentity.source.closedEpoch,anchor:installedIdentity.source.closedAnchorDigest,
 				manifestDigest:installedIdentity.source.manifestRef.digest};
-			const source = installed.authenticatedSourceGenerations.filter(binding => closedRetirementEqual(binding.scope,originalSourceScope));
-			const previous = installed.authenticatedSourceGenerations.filter(binding => closedRetirementEqual(binding.scope,futureRoles.previousClose));
+			const bindings = (scope: SnapshotQuarantineScopeKey | null | undefined) =>
+				installed.authenticatedSourceGenerations.filter(binding => closedRetirementEqual(binding.scope,scope));
+			// The future certificate retains one source closure per operational and
+			// classified scope; each must be a present installed source binding.
+			const futureSources = [originalSourceScope, ...futureRoles.classifiedScopes].map(bindings);
+			const previous = bindings(futureRoles.previousClose);
 			const currentCut = select(currentClosure.candidates,"drp-hard-epoch-cut",epoch - 1);
 			const currentCutRecord = currentCut === undefined ? undefined : canonicalCreatorDataRecord(currentCut.bytes);
-			if (source.length === 1 && previous.length === 1 && source[0] !== undefined && previous[0] !== undefined &&
-				currentRows.some(row => closedRetirementEqual(row,source[0]!.generation)) && currentCutRecord !== undefined &&
+			if (futureSources.every(row => row.length === 1 && row[0] !== undefined &&
+					currentRows.some(actual => closedRetirementEqual(actual,row[0]!.generation))) &&
+				previous.length === 1 && previous[0] !== undefined && currentCutRecord !== undefined &&
 				currentCutRecord.previousAnchor === futureRoles.previousClose!.anchor &&
 				currentCutRecord.snapshotManifestDigest === futureRoles.previousClose!.manifestDigest &&
 				currentCutRecord.forwardPromotion !== undefined &&
 				closedRetirementEqual(captureForwardPromotion(currentCutRecord.forwardPromotion)?.source,installedIdentity.source)) {
-				const required = new Set([current.generationId,source[0].generation.generationId]);
+				const required = new Set([current.generationId, ...futureSources.map(row => row[0]!.generation.generationId)]);
 				independentInstalledFutureCandidates = Object.freeze(installed.supportGenerations.filter(row => !required.has(row.generationId)));
 			}
 		}
@@ -18955,7 +18988,13 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 						forward.certificates.some(certificate => certificate.retiredClassifiedSnapshotScopes.length !== 0)) &&
 					closedRetirementEqual(futureRoles.currentClose, newScope) &&
 					closedRetirementEqual(futureRoles.previousClose, turnoverRoles.currentClose) &&
-					forward.certificates.every((certificate) => certificate.roles.operationalSources.length === 0)
+					// The first certificate above a closed promoted epoch still names the
+					// promotion source as its operational role. The next certificate reads
+					// that source only as a classified role, so it stays a FUTURE required
+					// scope here and its binding is never a candidate.
+					forward.certificates.every((certificate) => certificate.roles.operationalSources.every(source =>
+						futureRoles.classifiedScopes.some(scope => closedRetirementEqual(scope, {objectId, epoch: source.closedEpoch,
+							anchor: source.closedAnchorDigest, manifestDigest: source.manifestRef.digest}))))
 				) {
 					// Original certificate source bindings are CURRENT dependencies. Once
 					// the exact authenticated classified snapshot turnover joins, the next
