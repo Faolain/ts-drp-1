@@ -13120,6 +13120,8 @@ function creatorOrdinaryResourceNativeCapacityForSizing(facts: CreatorOrdinaryRe
 		// stays complete. The explicit future suffix here is genuinely all-local.
 		maxAdditionalCurrentIssued: future?.additionalCurrentRows ?? (runtime.kind === "received-append" ? 0 : 1),
 		maxCanonicalPreimageByteLength: preimage, successorFenceCount: current.successorFenceCount,
+		// Local work also reserves the adoption fence's own successor fence.
+		adoptionReserveFenceCount: runtime.kind === "received-append" ? 0 : current.successorFenceCount,
 		sourceCustody: creatorSourceCustodyGeometryForSizing(facts.sourceFacts.currentTrust, runtime.exactCanonicalLatchedAclBytes, current.parameters.maxEpochVertices)});
 	return {receivedPreimages: Object.freeze(receivedPreimages), preimage, fencePreimage, runtimeWidths, issuance};
 }
@@ -13597,7 +13599,7 @@ function prepareCreatorOrdinaryFinishingWindowForSizing(input: Readonly<{
 			const issuance = issuanceOrdinaryFinishingCapacityWidths({rows, scope: runtime.issuanceScope, control: capture.nativeIssuance.control ?? null,
 				maxAdditionalCurrentIssued: branch.localCount, maxAdditionalCurrentPreimageBytes: localPreimageRaw,
 				maxCanonicalPreimageByteLength: preimage, maxOrdinaryPreimageByteLength: limits.maxCanonicalPreimageByteLength,
-				successorFenceCount: fence,
+				successorFenceCount: fence, adoptionReserveFenceCount: branch.localCount === 0 ? 0 : fence,
 				sourceCustody: creatorSourceCustodyGeometryForSizing(source.currentTrust, runtime.exactCanonicalLatchedAclBytes, current.parameters.maxEpochVertices)});
 			const journal = journalSeed.projection.quote({maxAdditionalCurrentRows: count, canonicalPreimageByteLength: limits.maxCanonicalPreimageByteLength,
 				canonicalAuthorByteLength: canonicalPrimitiveResourceForSizing(runtime.issuanceScope.author).byteLength,
@@ -16118,6 +16120,7 @@ export function evaluateCreatorOrdinaryFinishingCapacityTemplate(
 		const issuer = issuanceOrdinaryFinishingCapacityWidths({rows: native.rows, scope, control: native.control ?? null,
 			sourceCustody: creatorSourceCustodyGeometryForSizing(seed.currentTrust, input.exactCanonicalCurrentLatchedAclBytes, Number((cut.parameters as Record<string, unknown>).maxEpochVertices)),
 			successorFenceCount: dimensions.successorFenceCount,
+			adoptionReserveFenceCount: received === undefined ? dimensions.successorFenceCount : 0,
 			maxAdditionalCurrentIssued: received === undefined ? 1 : 0,
 			maxCanonicalPreimageByteLength: Math.max(dimensions.canonicalPreimageByteLength,
 				dimensions.canonicalSuccessorFencePreimageByteLength)});
@@ -17219,6 +17222,9 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 			rows: native.rows, scope: issuanceScope, control: native.control,
 			sourceCustody: creatorSourceCustodyGeometryForSizing(trust, input.exactCanonicalCurrentLatchedAclBytes, Number((cut.parameters as Record<string, unknown>).maxEpochVertices)),
 			successorFenceCount: capacityDimensions.successorFenceCount,
+			// Ordinary local work reserves the adoption fence's own successor fence
+			// (see the post-adoption census); a received append adds no local row.
+			adoptionReserveFenceCount: received === undefined && input.planEffect?.kind !== "fence" ? capacityDimensions.successorFenceCount : 0,
 			maxAdditionalCurrentIssued: received === undefined ? 1 : 0,
 			maxCanonicalPreimageByteLength: Math.max(capacityDimensions.canonicalPreimageByteLength,
 				capacityDimensions.canonicalSuccessorFencePreimageByteLength),
@@ -17711,6 +17717,13 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 					authorSequence: append.authorSequence,
 					digest: append.vertexDigest,
 				})),
+			// Ordinary work reserves the mandatory adoption fence's own sizing:
+			// there that fence is the current candidate, protected in this same
+			// preparation. The fence itself keeps only its successor reserve; a
+			// received append adds no local issued row and reserves nothing more.
+			...(!preclose && received === undefined && successorJournalAppend !== undefined && input.planEffect?.kind !== "fence"
+				? [{ author: successorJournalAppend.author, authorSequence: successorJournalAppend.authorSequence, digest }]
+				: []),
 		];
 		if (compiler !== undefined) {
 			const authorWidth = Math.max(closedRetirementBytes(unsigned.author).byteLength,
