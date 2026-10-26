@@ -1,0 +1,320 @@
+import type { V3RoomAcceptedVertex, V3RoomSession } from "@ts-drp/node/v3-room";
+
+/** The adopted successor's offer (the four exact canonical byte strings a member installs). */
+export type V3RoomSuccessorOffer = Awaited<ReturnType<V3RoomSession["exportCreatorSuccessor"]>>;
+
+/**
+ * When a room's creator rolls the epoch over. Each application chooses its own values (in its own
+ * `rollover.ts`) under the ceiling it measured; only the scheduling is shared.
+ *
+ * A move counts against the epoch it was admitted in, per author: the native ceilings are per
+ * author (the creator's own issuance image; each Writer's own rows), and so is Chat's allowance.
+ */
+export interface V3RoomRolloverBudget {
+	/** The creator seals once one author has this many admitted moves in the current epoch. */
+	readonly movesPerAuthor: number;
+	/**
+	 * Optional application weight of one admitted move (Chat: its canonical message bytes), and the
+	 * per-author total in one epoch at which the creator seals.
+	 */
+	readonly weight?: Readonly<{ perAuthor: number; of(vertex: V3RoomAcceptedVertex): number }>;
+	/** The creator seals after this long without an admission, once the epoch holds a move. */
+	readonly idleMs: number;
+}
+
+/** What the policy did, for the page's status line and for measurement. Observation only. */
+export type V3RoomRolloverEvent = Readonly<{
+	epoch: number;
+	successorEpoch: number;
+	trigger: "budget" | "idle" | "refusal";
+	/** The most moves (and weight) any one author had admitted in the closed epoch. */
+	moves: number;
+	weight: number;
+	ms: number;
+}>;
+
+export interface V3RoomRolloverHooks {
+	/**
+	 * Creator: hands the adopted successor's offer to the room's other members, who install it with
+	 * `installCreatorSuccessor`. Members cannot follow the room without it. A failure is reported
+	 * through `onError`; the creator keeps the offer and the next rollover publishes its own.
+	 */
+	publishSuccessor?(offer: V3RoomSuccessorOffer, successorEpoch: number): void | Promise<void>;
+	onRollover?(event: V3RoomRolloverEvent): void;
+	onError?(error: unknown): void;
+	/**
+	 * An application refusal that a rollover clears (Chat: its allowance is per checkpoint).
+	 * Native capacity refusals are recognised without it.
+	 */
+	clearedByRollover?(error: unknown): boolean;
+}
+
+type RolloverRoom = Pick<
+	V3RoomSession,
+	"adoptCreatorSuccessor" | "authority" | "exportCreatorSuccessor" | "issue" | "sealEpoch"
+>;
+
+export interface V3RoomRolloverPolicy {
+	/** "creator" seals; a "member" (Writer) never seals and only re-offers refused moves. */
+	readonly role: "creator" | "member";
+	/** Binds the opened room. Moves observed before it count from then on. */
+	bind(room: RolloverRoom): void;
+	/** Every accepted vertex, own and remote (the session's `onAcceptedVertex`). */
+	observe(vertex: Pick<V3RoomAcceptedVertex, "author" | "epoch"> & Partial<V3RoomAcceptedVertex>): void;
+	/**
+	 * Issues one move. A move refused at a capacity that a rollover clears is never dropped: the
+	 * creator rolls over at once and offers the same move again; a member offers it again once
+	 * its room has installed a later epoch. After `maxOffers` refusals the last one is thrown,
+	 * so the page can show it and keep the move.
+	 */
+	issue(operation: Readonly<Record<string, unknown>>): Promise<void>;
+	/** Moves waiting to be offered again, for the page's status line. */
+	waiting(): number;
+	/** Joins an in-flight rollover (tests and orderly shutdown). */
+	settled(): Promise<void>;
+	stats(): Readonly<{ epoch: number; rollovers: number; moves: number; weight: number }>;
+	close(): void;
+}
+
+/** Native refusals that end with the epoch: the creator's issuance image and proof capacities. */
+const ROLLOVER_REFUSAL = /MAINTENANCE_[A-Z_]+|maintenance prefix sizing is unavailable|proof capacity refused/u;
+/** Refusals that clear once admitted work joins, without a rollover. */
+const TRANSIENT_REFUSAL = /retry after admitted work joins/u;
+const SESSION_CLOSED = /v3 room session is closed/u;
+const MAX_OFFERS = 4;
+const TRANSIENT_RETRY_MS = 50;
+const MEMBER_EPOCH_POLL_MS = 250;
+const RETRY_BACKOFF_MS = [1_000, 2_000, 5_000, 10_000, 30_000] as const;
+
+function message(error: unknown): string {
+	if (error instanceof Error) return `${error.message} ${message(error.cause)}`;
+	return error === undefined ? "" : String(error);
+}
+
+/**
+ * Runs `work` in a later host task, at idle priority where the host has one: the rollover is
+ * background work and never runs inside the turn that admitted a move. The room's seal already
+ * yields between its native phases and defers to registered foreground issues.
+ * @param work - The rollover.
+ */
+function later(work: () => void): void {
+	const idle = Reflect.get(globalThis, "requestIdleCallback") as
+		| ((callback: () => void, options: Readonly<{ timeout: number }>) => unknown)
+		| undefined;
+	if (typeof idle === "function") idle(work, { timeout: 1_000 });
+	else setTimeout(work, 0);
+}
+
+/**
+ * The shared scheduling of every application's rollover policy. The creator counts each author's
+ * admitted moves in the current epoch and seals, adopts and exports the successor once one author
+ * reaches the application's budget, after an idle period, or at once when its own move is refused
+ * at a capacity a rollover clears. One rollover runs at a time; a failed one is reported and
+ * retried after a backoff. Members never seal.
+ * @param input - The local role, the application's budget and hooks.
+ * @returns The policy; bind it to the room once the room is open.
+ */
+export function createV3RoomRolloverPolicy(
+	input: Readonly<{ role: "creator" | "member"; budget: V3RoomRolloverBudget; hooks?: V3RoomRolloverHooks }>
+): V3RoomRolloverPolicy {
+	const { role, budget } = input;
+	const hooks = input.hooks ?? {};
+	if (!Number.isSafeInteger(budget.movesPerAuthor) || budget.movesPerAuthor < 1)
+		throw new TypeError("v3 room rollover budget is invalid");
+	if (!Number.isFinite(budget.idleMs) || budget.idleMs <= 0) throw new TypeError("v3 room rollover idle is invalid");
+	let room: RolloverRoom | undefined;
+	let closed = false;
+	let epoch = 0;
+	let rollovers = 0;
+	const moves = new Map<string, number>();
+	const weights = new Map<string, number>();
+	let idleTimer: ReturnType<typeof setTimeout> | undefined;
+	let rolling: Promise<void> | undefined;
+	let scheduled = false;
+	let retryAt = 0;
+	let failures = 0;
+	let waiting = 0;
+	const epochWaiters = new Set<() => void>();
+	function close(): void {
+		closed = true;
+		if (idleTimer !== undefined) clearTimeout(idleTimer);
+		for (const wake of [...epochWaiters]) wake();
+	}
+
+	const most = (values: ReadonlyMap<string, number>): number => Math.max(0, ...values.values());
+	const currentEpoch = (): number => Math.max(epoch, room?.authority()?.epoch ?? 0);
+	const advance = (next: number): void => {
+		if (next <= epoch) return;
+		epoch = next;
+		moves.clear();
+		weights.clear();
+		for (const wake of [...epochWaiters]) wake();
+	};
+	// The room can advance without this policy (a host's own seal, a member's install); its
+	// authority is read before every decision so counts of a closed epoch never trigger one.
+	const overBudget = (): boolean => {
+		advance(currentEpoch());
+		return (
+			most(moves) >= budget.movesPerAuthor || (budget.weight !== undefined && most(weights) >= budget.weight.perAuthor)
+		);
+	};
+
+	const roll = (trigger: V3RoomRolloverEvent["trigger"]): Promise<void> => {
+		if (rolling !== undefined) return rolling;
+		const selected = room;
+		if (selected === undefined || closed || role !== "creator") return Promise.resolve();
+		const started = performance.now();
+		const closing = { epoch: currentEpoch(), moves: most(moves), weight: most(weights) };
+		const task = (async (): Promise<void> => {
+			const sealed = await selected.sealEpoch();
+			await selected.adoptCreatorSuccessor();
+			const offer = await selected.exportCreatorSuccessor();
+			rollovers++;
+			failures = 0;
+			retryAt = 0;
+			advance(sealed.successorEpoch);
+			hooks.onRollover?.(
+				Object.freeze({
+					...closing,
+					epoch: sealed.epoch,
+					successorEpoch: sealed.successorEpoch,
+					trigger,
+					ms: performance.now() - started,
+				})
+			);
+			try {
+				await hooks.publishSuccessor?.(offer, sealed.successorEpoch);
+			} catch (error) {
+				hooks.onError?.(error);
+			}
+		})();
+		rolling = task
+			.then(
+				() => undefined,
+				(error: unknown) => {
+					// A closed session ends its policy; nothing is retried on it.
+					if (SESSION_CLOSED.test(message(error))) {
+						close();
+						return;
+					}
+					failures++;
+					retryAt = Date.now() + (RETRY_BACKOFF_MS[Math.min(failures, RETRY_BACKOFF_MS.length) - 1] ?? 30_000);
+					hooks.onError?.(error);
+				}
+			)
+			.finally(() => {
+				rolling = undefined;
+				// Work admitted while the rollover ran counts in the successor epoch.
+				if (overBudget()) schedule("budget");
+			});
+		return rolling;
+	};
+	const schedule = (trigger: "budget" | "idle"): void => {
+		if (scheduled || rolling !== undefined || closed || role !== "creator") return;
+		if (Date.now() < retryAt) {
+			// After a failed rollover, try again once the backoff ends.
+			scheduled = true;
+			setTimeout(() => {
+				scheduled = false;
+				schedule(trigger);
+			}, retryAt - Date.now());
+			return;
+		}
+		scheduled = true;
+		later(() => {
+			scheduled = false;
+			void roll(trigger);
+		});
+	};
+	const armIdle = (): void => {
+		if (role !== "creator" || closed) return;
+		if (idleTimer !== undefined) clearTimeout(idleTimer);
+		idleTimer = setTimeout(() => {
+			idleTimer = undefined;
+			advance(currentEpoch());
+			if (most(moves) > 0) schedule("idle");
+		}, budget.idleMs);
+	};
+	const clearedByRollover = (error: unknown): boolean =>
+		ROLLOVER_REFUSAL.test(message(error)) || hooks.clearedByRollover?.(error) === true;
+	// A member's room advances when the host installs the successor; it polls its own authority.
+	const nextEpoch = (after: number): Promise<void> =>
+		new Promise<void>((resolve, reject) => {
+			let timer: ReturnType<typeof setTimeout> | undefined;
+			const done = (): void => {
+				epochWaiters.delete(done);
+				if (timer !== undefined) clearTimeout(timer);
+				if (closed) reject(new TypeError("v3 room rollover policy is closed"));
+				else resolve();
+			};
+			const poll = (): void => {
+				if (closed || currentEpoch() > after) {
+					advance(currentEpoch());
+					done();
+					return;
+				}
+				timer = setTimeout(poll, MEMBER_EPOCH_POLL_MS);
+			};
+			epochWaiters.add(done);
+			poll();
+		});
+
+	return Object.freeze({
+		role,
+		bind(selected: RolloverRoom): void {
+			if (room !== undefined) throw new TypeError("v3 room rollover policy is already bound");
+			room = selected;
+			advance(currentEpoch());
+		},
+		observe(vertex: Pick<V3RoomAcceptedVertex, "author" | "epoch"> & Partial<V3RoomAcceptedVertex>): void {
+			if (closed) return;
+			advance(Math.max(vertex.epoch, currentEpoch()));
+			if (vertex.epoch < epoch) return;
+			moves.set(vertex.author, (moves.get(vertex.author) ?? 0) + 1);
+			if (budget.weight !== undefined)
+				weights.set(
+					vertex.author,
+					(weights.get(vertex.author) ?? 0) + budget.weight.of(vertex as V3RoomAcceptedVertex)
+				);
+			armIdle();
+			if (overBudget()) schedule("budget");
+		},
+		async issue(operation: Readonly<Record<string, unknown>>): Promise<void> {
+			const selected = room;
+			if (selected === undefined) throw new TypeError("v3 room rollover policy is not bound");
+			for (let offer = 1; ; offer++) {
+				const attempted = currentEpoch();
+				try {
+					await selected.issue(operation);
+					return;
+				} catch (error) {
+					if (closed || offer >= MAX_OFFERS) throw error;
+					if (TRANSIENT_REFUSAL.test(message(error))) {
+						await new Promise((resolve) => setTimeout(resolve, TRANSIENT_RETRY_MS * offer));
+						continue;
+					}
+					if (!clearedByRollover(error)) throw error;
+					// The refused move was not admitted (its issue transaction or admission refused it);
+					// the same move is offered again in a later epoch.
+					waiting++;
+					try {
+						if (role === "creator") {
+							if (currentEpoch() === attempted) await roll("refusal");
+							if (currentEpoch() === attempted) throw error;
+						} else await nextEpoch(attempted);
+					} finally {
+						waiting--;
+					}
+				}
+			}
+		},
+		waiting: (): number => waiting,
+		settled: async (): Promise<void> => {
+			while (rolling !== undefined || scheduled) {
+				await (rolling ?? new Promise((resolve) => setTimeout(resolve, 10)));
+			}
+		},
+		stats: () => Object.freeze({ epoch: currentEpoch(), rollovers, moves: most(moves), weight: most(weights) }),
+		close,
+	});
+}
