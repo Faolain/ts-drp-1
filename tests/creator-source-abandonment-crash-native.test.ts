@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type -- Native probe inference. */
 import { decodeCanonical } from "@ts-drp/canonical";
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -194,27 +194,33 @@ it.runIf(INNER)("abandonment survives process death at its real committed bounda
 	}
 }, 300_000);
 
-// KNOWN DEFECT (blocked, reported): killing the removed author's retirement
-// preparation that first stops protecting the abandoned source does not recover:
-// the next install refuses with "creator snapshot role reconciliation refused:
-// snapshot-unavailable" (selectCurrentSnapshotTurnoverInventory). Controls with
-// the same kill point and no abandonment (revoked author, still-Writer author with
-// retiring rows) recover. Opt in with RUN_SOURCE_ABANDONMENT_RETIREMENT_CRASH=1.
-const DRIVEN = EDGES.filter(edge => edge === "plan-cas" || process.env.RUN_SOURCE_ABANDONMENT_RETIREMENT_CRASH === "1");
-it.skipIf(INNER).each(DRIVEN)("SIGKILL right after the %s commit recovers to one authenticated terminal expiry", (edge) => {
+// Both edges run by default. The retirement-prepare edge dies INSIDE the member's
+// successor install (its received predecessor quarantine is open, not yet
+// retained); recovery installs a checkpoint past that epoch, whose retention
+// supersedes the dead receive's temporary scope (see
+// creator-recipient-crash-recovery-native.test.ts for the same defect without abandonment).
+it.skipIf(INNER).each(EDGES)("SIGKILL right after the %s commit recovers to one authenticated terminal expiry", async (edge) => {
 	const directory = mkdtempSync(join(tmpdir(), `source-abandonment-crash-${edge}-`));
 	const file = fileURLToPath(import.meta.url);
-	const fork = (mode: "mutate" | "recover") => spawnSync("npx", ["vitest", "run", file, "--no-file-parallelism", "--coverage.enabled=false"], {
-		cwd: join(fileURLToPath(new URL(".", import.meta.url)), ".."), encoding: "utf8", timeout: 600_000,
-		env: { ...process.env, RUN_SOURCE_ABANDONMENT_CRASH: "1", SOURCE_ABANDONMENT_CRASH_DIRECTORY: directory,
-			SOURCE_ABANDONMENT_CRASH_EDGE: edge, SOURCE_ABANDONMENT_CRASH_MODE: mode } });
+	const fork = (mode: "mutate" | "recover") => new Promise<{ status: number | null; stdout: string; stderr: string }>((resolve, reject) => {
+		// Asynchronous child: a synchronous spawn starves this worker's RPC for minutes.
+		const child = spawn("npx", ["vitest", "run", file, "--no-file-parallelism", "--coverage.enabled=false"], {
+			cwd: join(fileURLToPath(new URL(".", import.meta.url)), ".."), timeout: 600_000,
+			env: { ...process.env, RUN_SOURCE_ABANDONMENT_CRASH: "1", SOURCE_ABANDONMENT_CRASH_DIRECTORY: directory,
+				SOURCE_ABANDONMENT_CRASH_EDGE: edge, SOURCE_ABANDONMENT_CRASH_MODE: mode } });
+		let stdout = "", stderr = "";
+		child.stdout.on("data", (chunk: Buffer) => { stdout += String(chunk); });
+		child.stderr.on("data", (chunk: Buffer) => { stderr += String(chunk); });
+		child.on("error", reject);
+		child.on("close", status => resolve({ status, stdout, stderr }));
+	});
 	try {
-		const mutate = fork("mutate");
+		const mutate = await fork("mutate");
 		expect(existsSync(join(directory, "death.json")), mutate.stdout + mutate.stderr).toBe(true);
 		const death = JSON.parse(readFileSync(join(directory, "death.json"), "utf8")) as { signal: string; edge: string };
 		expect(death).toMatchObject({ signal: "SIGKILL", edge });
 		expect(mutate.status, "the mutate fork died; vitest reports the lost worker").not.toBe(0);
-		const recover = fork("recover");
+		const recover = await fork("recover");
 		expect(recover.status, recover.stdout + recover.stderr).toBe(0);
 		const recovered = JSON.parse(readFileSync(join(directory, "recovered.json"), "utf8")) as Record<string, unknown>;
 		expect(recovered).toMatchObject({ edge });

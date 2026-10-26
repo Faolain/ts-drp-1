@@ -9138,7 +9138,12 @@ interface CreatorCensusVertexFacts {
  * Captured bytes are isolated even from private callers, so a handoff cannot
  * associate an old successful fact with subsequently mutated input. Raw native
  * hidden rows do not use this owner. A successor copies only successful pure
- * verification tuples, not the predecessor's ABI, admitted views or owner.
+ * verification tuples, not the predecessor's ABI, admitted views or owner, and
+ * only for rows the predecessor itself used: a row handed forward and never
+ * read again belongs to history, not to the retention window, so it is not
+ * carried. Without that, every handoff re-carried all prior epochs' rows until
+ * the finite caps saturated, after which no new vertex could be retained and
+ * each census repeated full extraction for the rest of the process.
  * Only genuine bounded decoder/admission output reaches the existing cloner.
  * Saturation falls back to the original functions, never capacity refusal. */
 function createCreatorCensusVertexFacts(seeds: readonly Readonly<{
@@ -9148,21 +9153,26 @@ function createCreatorCensusVertexFacts(seeds: readonly Readonly<{
 	type Input = AdmitReceivedVertexInput | Parameters<typeof verifyReceivedVertex>[0];
 	type Fact = Readonly<{ purpose: "extract" | "verify"; domain: string; anchor: string; suite: string;
 		admission: unknown; key: string; format: string; signature: string; result: unknown }>;
-	type Source = { bytes: Uint8Array; parsed: unknown; facts: Fact[] };
+	// used: read by this owner (not merely seeded by a handoff); only used rows fork.
+	type Source = { bytes: Uint8Array; parsed: unknown; facts: Fact[]; used: boolean };
 	const sources = new IntrinsicMap<string, Source>();
 	let retainedBytes = 0, retainedFacts = 0, released = false;
-	const source = (bytes: Uint8Array): Source | undefined => {
+	const source = (bytes: Uint8Array, use = true): Source | undefined => {
 		if (released) return undefined;
 		const digest = bytesToLowerHex(hashDomain(V3_VERTEX_DOMAIN, bytes));
 		const old = ReflectApply(MapPrototypeGet, sources, [digest]) as Source | undefined;
-		if (old !== undefined) return sameBytes(old.bytes, bytes) ? old : undefined;
+		if (old !== undefined) {
+			if (!sameBytes(old.bytes, bytes)) return undefined;
+			if (use) old.used = true;
+			return old;
+		}
 		if (retainedFacts >= ISSUANCE_RETIREMENT_LIMITS.maxRows ||
 			bytes.byteLength > AHE_BOUNDED_READ_LIMITS.maxUnionBytes - retainedBytes) return undefined;
 		const captured = copyDetachedBytes(bytes);
 		if (captured === undefined) return undefined;
 		let parsed: unknown;
 		try { parsed = decodeCanonical(captured); } catch { return undefined; }
-		const added = { bytes: captured, parsed, facts: [] };
+		const added = { bytes: captured, parsed, facts: [], used: use };
 		ReflectApply(MapPrototypeSet, sources, [digest, added]);
 		retainedBytes += captured.byteLength;
 		retainedFacts++;
@@ -9170,8 +9180,8 @@ function createCreatorCensusVertexFacts(seeds: readonly Readonly<{
 	};
 	// Only this private owner's fork or original retained-admission producer
 	// supplies tuples, never a wire format or a caller's claimed acceptance.
-	const retainVerification = (seed: typeof seeds[number]): void => {
-		const row = source(seed.bytes);
+	const retainVerification = (seed: typeof seeds[number], use: boolean): void => {
+		const row = source(seed.bytes, use);
 		// Extraction under more than one ABI can prove the SAME pure tuple.
 		// Do not multiply that fact across successive epoch handoffs.
 		if (row?.facts.some(fact => fact.domain === seed.domain && fact.anchor === seed.anchor && fact.suite === seed.suite &&
@@ -9186,7 +9196,7 @@ function createCreatorCensusVertexFacts(seeds: readonly Readonly<{
 		retainedBytes += cost;
 		retainedFacts++;
 	};
-	for (const seed of seeds) retainVerification(seed);
+	for (const seed of seeds) retainVerification(seed, false);
 	const reuse = <T>(purpose: Fact["purpose"], input: Input, run: () => T): T => {
 		const row = source(input.receivedCanonicalPreimageBytes);
 		const author = isObject(row?.parsed) ? Reflect.get(row.parsed, "author") : undefined;
@@ -9244,12 +9254,13 @@ function createCreatorCensusVertexFacts(seeds: readonly Readonly<{
 			if (released) return;
 			retainVerification({bytes: fact.preimage, domain: fact.domain, anchor: fact.payload.provenance.anchorDigest,
 				suite: fact.suite, key: bytesToLowerHex(fact.key), format: fact.format,
-				signature: bytesToLowerHex(fact.signature), digest: fact.originalAdmitted.digest});
+				signature: bytesToLowerHex(fact.signature), digest: fact.originalAdmitted.digest}, true);
 		},
 		forkVerification: (): CreatorCensusVertexFacts => {
 			const seeds: {bytes: Uint8Array; domain: string; anchor: string; suite: string;
 				key: string; format: string; signature: string; digest: Uint8Array}[] = [];
 			for (const [, row] of ReflectApply(MapPrototypeEntries, sources, []) as Iterable<[string, Source]>) {
+				if (!row.used) continue;
 				for (const fact of row.facts) {
 					if (!isObject(fact.result)) continue;
 					const vertex = fact.purpose === "extract" && Reflect.get(fact.result, "ok") === true
@@ -22379,6 +22390,17 @@ async function cleanupCreatorSettlementSuccessor(
 		publishState: "pending" | "published";
 	}[] = [];
 	let throughAuthorSequence: number | null = null;
+	const journalConsumers = new Map<string, boolean>();
+	const journalScopeConsumes = async (epoch: number, anchorDigest: string): Promise<boolean> => {
+		const key = JSON.stringify([epoch, anchorDigest]);
+		const known = journalConsumers.get(key);
+		if (known !== undefined) return known;
+		const readiness = await material.liveJournalStore.readiness({
+			scope: { objectId: material.issuanceScope.objectId, epoch, anchorDigest } });
+		const consumes = !readiness.ok || (readiness.ready && readiness.rowCount > 0);
+		journalConsumers.set(key, consumes);
+		return consumes;
+	};
 	if (closedEpoch >= 2 && settlementPlanPermitsAuthenticatedPruning(plan)) {
 		let afterKey: DurableOutboxPageInput["afterKey"] =
 			state.prunedThroughAuthorSequence === null
@@ -22417,6 +22439,28 @@ async function cleanupCreatorSettlementSuccessor(
 						(frontier.terminalThrough !== null && row.authorSequence <= frontier.terminalThrough)
 					)
 				) {
+					done = true;
+					break;
+				}
+				// Before the closed-retirement coordinator owns issuance holes, this
+				// legacy pruner keeps the coordinator's own rule for a non-genesis
+				// epoch (closedIssuanceProtectedRecordsForRetirement): an issued row
+				// never leaves while its journal scope still holds accepted entries.
+				// Such a prefix is classified only by these issued/outbox rows unless
+				// the epoch later becomes a certificate role with a membership
+				// authority. A promotion's classified retained source never does, and
+				// after a floor-2 promotion no coordinator has run when this pruner
+				// reaches it: pruning first strands that prefix and the epoch's
+				// signing evidence for good (the seal then refuses an unclassified
+				// signing epoch once its trust leaves the role window). An ordinary
+				// room reaches the coordinator before any non-genesis epoch is due
+				// here, so its pruning is unchanged. The genesis epoch keeps its
+				// original pre-coordinator pruning (retaining it measurably overruns
+				// the prospective settlement anchor bound); its trust is the pinned
+				// genesis, so a stranded epoch-zero prefix strands no signing
+				// dependency. An unreadable journal scope retains.
+				if (coordinatedIssuance === undefined && source.admitted.epoch > 0 &&
+					await journalScopeConsumes(source.admitted.epoch, source.admitted.anchor)) {
 					done = true;
 					break;
 				}
@@ -22651,6 +22695,8 @@ async function activateCreatorSuccessorLive(
 		// authenticated; join source custody before either native write boundary.
 		const headerSource = material.sourceRuntimeHandle?.deref();
 		if (headerSource !== undefined) await releaseCreatorCloseHeaderCustody(headerSource);
+		// Promotion snapshots are current up to the moment their custody ends.
+		await material.promotionDependencies?.checkSnapshots();
 		await material.promotionDependencies?.release();
 		const validatedPredecessor = await recoverV3LiveReplica({
 			...(receiveOnly ? { receiveOnly: true as const } : {}),

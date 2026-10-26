@@ -62,6 +62,7 @@ import {
 } from "@ts-drp/storage/snapshot-transfer";
 
 import { completeCreatorCertifiedArchiveAppend, type CreatorLiveCloseResult, inspectHead } from "./creator-close.js";
+import { runInBackgroundLane } from "./internal/cooperative-work.js";
 import {
 	createCreatorAdoptionIntent,
 	createCreatorAuthenticatedNativeFuture,
@@ -1085,12 +1086,17 @@ export async function maintainCreatorRecipientRecoveryPool(input: Readonly<{
 	if (!opened.ok) throw new TypeError(`creator recipient signing custody unavailable: ${opened.reason}`);
 	let outcome: "ran" | "deferred";
 	try {
-		outcome = await source.runReceivedRecoveryMaintenance(opened.owner, input.snapshotStore, async (seal, requireClosedWorkflowCompletion) => {
+		outcome = await source.runReceivedRecoveryMaintenance(opened.owner, input.snapshotStore, (seal, requireClosedWorkflowCompletion) => {
 			// These generations belong to this stable boundary. The next install's
 			// own turnover (if any) classifies from the state it then observes.
-			await runReceivedRecoveryTurnoverPasses({source, snapshotStore: input.snapshotStore, catalog: input.catalog,
-				context, signing: opened.owner, requireClosedWorkflowCompletion}, seal);
-			return "complete";
+			const passes = async (): Promise<"complete"> => {
+				await runReceivedRecoveryTurnoverPasses({source, snapshotStore: input.snapshotStore, catalog: input.catalog,
+					context, signing: opened.owner, requireClosedWorkflowCompletion}, seal);
+				return "complete";
+			};
+			// A lull is background: its walks defer host turns behind co-located
+			// foreground work. A startup resume holds this room's issues, so it is not.
+			return resume ? passes() : runInBackgroundLane(passes);
 		}, resume ? {resume: true} : {deferrable: true});
 	} finally {
 		await opened.owner.stop();

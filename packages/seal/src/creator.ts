@@ -1163,6 +1163,17 @@ function nextRecord(
 	});
 }
 
+/**
+ * Ends the host task after one close phase has committed natively. Native stores
+ * resolve synchronously, so without it the whole close is a single host task.
+ * Each phase is its own committed transaction guarded by an expected revision or
+ * evidence phase, and runClose rechecks stopping after every boundary.
+ * @returns Completion of the scheduling boundary.
+ */
+function closePhaseBoundary(): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 async function runClose(
 	state: ActorState,
 	input: Readonly<{ closeInput: Readonly<Record<string, unknown>> }>
@@ -1206,6 +1217,7 @@ async function runClose(
 			const evidenceFailure = await persistEvidence(state, record, null);
 			if (evidenceFailure !== undefined) return failure(evidenceFailure);
 			emit(state, "close_evidence_committed");
+			await closePhaseBoundary();
 		} else if (
 			record.anchor !== identity.anchor ||
 			record.epoch !== identity.epoch ||
@@ -1243,6 +1255,7 @@ async function runClose(
 			const evidenceFailure = await persistEvidence(state, record, state.evidenceRecord?.phase ?? null);
 			if (evidenceFailure !== undefined) return failure(evidenceFailure);
 			emit(state, "prepare_vote_committed");
+			await closePhaseBoundary();
 		}
 		if (state.stopRequested) return failure("STOPPED");
 
@@ -1262,6 +1275,7 @@ async function runClose(
 			const evidenceFailure = await persistEvidence(state, record, state.evidenceRecord?.phase ?? null);
 			if (evidenceFailure !== undefined) return failure(evidenceFailure);
 			emit(state, "prepare_qc_committed");
+			await closePhaseBoundary();
 		} else {
 			prepareQcBytes ??= voterStatus.highestPrepareQcBytes;
 		}
@@ -1282,6 +1296,7 @@ async function runClose(
 			const evidenceFailure = await persistEvidence(state, record, state.evidenceRecord?.phase ?? null);
 			if (evidenceFailure !== undefined) return failure(evidenceFailure);
 			emit(state, "commit_vote_committed");
+			await closePhaseBoundary();
 		}
 		if (state.stopRequested) return failure("STOPPED");
 
@@ -1301,6 +1316,7 @@ async function runClose(
 			const evidenceFailure = await persistEvidence(state, record, state.evidenceRecord?.phase ?? null);
 			if (evidenceFailure !== undefined) return failure(evidenceFailure);
 			emit(state, "commit_qc_committed");
+			await closePhaseBoundary();
 		} else if (commitQcBytes === null) {
 			const durable = await durableVoteCarrier(voter, preparedClose.exactCanonicalCutValueBytes, "commit");
 			if (!durable.ok) return failure(durable.reason);
@@ -1344,6 +1360,7 @@ async function runClose(
 			const evidenceFailure = await persistEvidence(state, record, state.evidenceRecord?.phase ?? null);
 			if (evidenceFailure !== undefined) return failure(evidenceFailure);
 			emit(state, "successor_completed");
+			await closePhaseBoundary();
 		}
 
 		const reopened = (promotion ? openCreatorForwardPromotionSuccessorTrust : openCreatorSuccessorTrust)({

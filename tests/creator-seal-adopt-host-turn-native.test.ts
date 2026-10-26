@@ -1,10 +1,12 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type -- Native host-turn probes over the real room surface. */
+import { createHash } from "node:crypto";
 import { afterEach, expect, it } from "vitest";
 
 import { nativePlayNetwork } from "./fixtures/active-endurance/native-network.js";
 import {
 	installNativeStatementOwners,
 	startNativeTurnMeter,
+	summarizeNativeClass,
 	summarizeNativeTurns,
 } from "./fixtures/host-turns/native-turn-meter.js";
 import { creatorDeliveryRoom, eventually } from "./fixtures/track-aa/creator-delivery-room.js";
@@ -110,6 +112,38 @@ it("seal and adopt give the host bounded native turns across rollovers", async (
 		expect(adoption.maxStatementMs).toBeLessThan(750);
 	}
 	expect(sealFrames).toBeGreaterThanOrEqual(3 * 5);
+}, 300_000);
+
+// The file of a peer's signing stores (storage-node v3-room-host naming).
+function signingStoreFile(name: string) {
+	return `/${createHash("sha256")
+		.update(JSON.stringify(["signing", name]))
+		.digest("hex")}.sqlite`;
+}
+
+it("each durable phase of the seal actor ends at a host boundary", async () => {
+	const { fixture, creator, writer } = await openRoom();
+	// The creator's vote and evidence stores share one file, which no other owner
+	// writes while the epoch is sealing, so its per-turn statement counts depend
+	// only on the source and are the same in every rollover.
+	const signing = signingStoreFile("peer-0");
+	const seals: ReturnType<typeof summarizeNativeClass>[] = [];
+	for (let epoch = 1; epoch <= 3; epoch++) {
+		const meter = startNativeTurnMeter({ classes: { signing: (location) => location.endsWith(signing) } });
+		expect((await creator.room.sealEpoch()).ok).toBe(true);
+		seals.push(summarizeNativeClass(meter.stop(), "signing"));
+		await creator.room.adoptCreatorSuccessor();
+		await install(fixture, writer);
+		await creator.room.maintainRecoveryPool();
+	}
+	console.info(JSON.stringify({ seals }));
+	for (const seal of seals) {
+		// Evidence, the prepare vote, the prepare QC, the commit vote, the commit QC
+		// and the successor anchor each commit natively and then end their turn,
+		// so the close is six turns plus the later retirement signing, not one.
+		expect(seal.busyTurns).toBeGreaterThanOrEqual(7);
+		expect(seal.maxStatements).toBeLessThanOrEqual(400);
+	}
 }, 300_000);
 
 it("work arriving at seal host turns is refused, deferred or resettled, never admitted into the sealed epoch", async () => {

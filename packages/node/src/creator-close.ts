@@ -123,7 +123,7 @@ import {
 } from "@ts-drp/storage";
 import { snapshotQuarantineContract, type SnapshotQuarantineDeclaration, type SnapshotQuarantineStore, type SnapshotRecoveryStore } from "@ts-drp/storage/snapshot-transfer";
 
-import { createWorkCheckpoint, yieldToHost } from "./internal/cooperative-work.js";
+import { beginForegroundWork, createWorkCheckpoint, runInBackgroundLane, yieldToHost } from "./internal/cooperative-work.js";
 import {
 	createCreatorAuthenticatedNativeFuture,
 	installCreatorAdoptionFacts,
@@ -3561,7 +3561,11 @@ export async function bindCreatorLiveClose(
 				finish = resolve;
 			});
 			maintenanceJobs.add(joined);
+			// The admitted job is the host's foreground until its slot is released:
+			// co-located background walks defer their host turns behind it.
+			const releaseForeground = beginForegroundWork();
 			const finishJoined = (): void => {
+				releaseForeground();
 				maintenanceJobs.delete(joined);
 				finish();
 			};
@@ -3738,9 +3742,12 @@ export async function bindCreatorLiveClose(
 			})();
 			return dependencyReleaseTask;
 		};
+		// A sealed acquisition runs inside the close after admission closed and
+		// admitted writers joined; only it may end host turns while authenticating.
 		const acquireSource = async (
 			closedEpoch: number,
-			purpose: "promotion" | "recovery role transfer"
+			purpose: "promotion" | "recovery role transfer",
+			sealed = false
 		): Promise<CreatorForwardPromotionSourceMaterial> => {
 			if (input.promotionContext === undefined) throw new TypeError(`creator ${purpose} authority is unavailable`);
 			const acquired = await acquireCreatorForwardPromotionSource(
@@ -3751,7 +3758,8 @@ export async function bindCreatorLiveClose(
 					snapshotStore: input.snapshotStore as CreatorClosedRollbackDataInput["snapshotStore"],
 					liveJournalStore: registration.liveJournalStore,
 				},
-				closedEpoch
+				closedEpoch,
+				sealed ? { sealed } : undefined
 			);
 			if (!acquired.ok) throw new TypeError(`creator ${purpose} source failed: ${JSON.stringify(acquired)}`);
 			const source = resolveCreatorForwardPromotionSource(
@@ -3762,8 +3770,8 @@ export async function bindCreatorLiveClose(
 			if (source === undefined) throw new TypeError(`creator ${purpose} custody is unavailable`);
 			return source;
 		};
-		const acquireRecoverySource = async (): Promise<CreatorForwardPromotionSourceMaterial> => {
-			return recoverySource = await acquireSource(epoch - 1, "recovery role transfer");
+		const acquireRecoverySource = async (sealed = false): Promise<CreatorForwardPromotionSourceMaterial> => {
+			return recoverySource = await acquireSource(epoch - 1, "recovery role transfer", sealed);
 		};
 		const sourceIdentity = (source: CreatorForwardPromotionSourceMaterial): Uint8Array => encodeCanonical({
 			sources: source.sources, historicalSnapshots: source.historicalSnapshots,
@@ -3773,8 +3781,11 @@ export async function bindCreatorLiveClose(
 				genesisAnchorDigest: source.currentTrust.genesisAnchorDigest, profileId: source.currentTrust.profileId,
 				currentEpoch: source.currentTrust.currentEpoch, currentAnchorDigest: source.currentTrust.currentAnchorDigest},
 		});
-		const acquirePromotionSource = async (closedEpoch: number): Promise<CreatorForwardPromotionSourceMaterial> => {
-			const source = await acquireSource(closedEpoch, "promotion");
+		const acquirePromotionSource = async (
+			closedEpoch: number,
+			sealed = false
+		): Promise<CreatorForwardPromotionSourceMaterial> => {
+			const source = await acquireSource(closedEpoch, "promotion", sealed);
 			try {
 				// Equality witnesses only: the new original source independently
 				// authenticates every role and its current native census.
@@ -3855,7 +3866,7 @@ export async function bindCreatorLiveClose(
 					await promotionSource.release();
 					promotionSource = undefined;
 				}
-				if (promotionSource === undefined && promotedEpoch !== undefined) await acquirePromotionSource(promotedEpoch);
+				if (promotionSource === undefined && promotedEpoch !== undefined) await acquirePromotionSource(promotedEpoch, true);
 				await promotionSource?.checkCurrent();
 				const priorCutCandidate = boundHead.candidates.find(({ bytes }) => {
 					const value = decodeCanonical(bytes);
@@ -3871,7 +3882,7 @@ export async function bindCreatorLiveClose(
 					epoch >= 2 &&
 					(priorCutRecord?.forwardPromotion !== undefined || (epoch === 2 && input.promotionContext !== undefined))
 				)
-					await acquireRecoverySource();
+					await acquireRecoverySource(true);
 				capturedGraph ??= registration.captureCloseGraph();
 				if (capturedGraph === undefined) throw new TypeError("creator close graph capture failed");
 				let snapshot = stagedSnapshot;
@@ -3922,7 +3933,13 @@ export async function bindCreatorLiveClose(
 						currentEpoch: registration.currentTrust.currentEpoch,
 						...(earlyTurnover === undefined ? {} : {earlyTurnover}),
 					});
-					if (owner.recoveryScopes >= owner.limits.maxRecoveryScopes || resume || capacityMaintenance) {
+					// A promoted successor carries no recovery-role certificate, so its
+					// first epoch cannot authenticate snapshot turnover. This close adds
+					// one recovery scope; reconcile now unless that leaves headroom.
+					const promotionPoolMaintenance = promotedEpoch !== undefined &&
+						owner.recoveryScopes >= owner.limits.maxRecoveryScopes - 1;
+					if (owner.recoveryScopes >= owner.limits.maxRecoveryScopes || resume || capacityMaintenance ||
+						promotionPoolMaintenance) {
 						// Keep this SAME close's unfinished request across lost delivery.
 						// Turnover can reduce the pool before an intent exists; retries
 						// must still reacquire the original whole authenticated proof.
@@ -3937,6 +3954,11 @@ export async function bindCreatorLiveClose(
 						// Release only this source's classified readers. Selected and
 						// retained historical snapshots stay held throughout maintenance.
 						await promotionSource?.releaseClassifiedDependencies();
+						// Maintenance takes the live journal's retirement write control,
+						// which this source's header read reservation excludes. End only
+						// that header custody (the snapshots above stay held); the source
+						// is released and independently reacquired after maintenance.
+						await promotionSource?.releaseJournalHeaderCustody();
 						await reconcileCreatorBoundedRecoveryMaintenance(registration, input, actor, capacity.value.generations.length,
 							() => registration.sealRecoveryDependencies(priorCutRecord?.recoveryRoles !== undefined),
 							false, false, registration.currentTrust);
@@ -3946,7 +3968,7 @@ export async function bindCreatorLiveClose(
 							promotionSource = undefined;
 							// Every maintenance pass has joined. Replace the old whole-pool
 							// currency view, never relax it after an owned generation drain.
-							await acquirePromotionSource(promotedEpoch);
+							await acquirePromotionSource(promotedEpoch, true);
 						}
 						retirementReconciliationPending = false;
 					}
@@ -3960,7 +3982,7 @@ export async function bindCreatorLiveClose(
 					epoch >= 2 &&
 					(priorCutRecord?.recoveryRoles !== undefined || priorCutRecord?.forwardPromotion !== undefined)
 				)
-					await acquireRecoverySource();
+					await acquireRecoverySource(true);
 				if (archive !== undefined && archivePreparation === undefined) {
 					if (input.promotionContext === undefined) throw new TypeError("archive close original source owner is unavailable");
 					// The promotion/recovery proof owns journal native exclusion too.
@@ -4023,12 +4045,12 @@ export async function bindCreatorLiveClose(
 					if (errors.length) throw new AggregateError(errors, "archive close preparation and source join failed", { cause: errors[0] });
 					if (promotionBeforeArchive !== undefined) {
 						if (promotedEpoch === undefined) throw new TypeError("creator archive promotion target unavailable");
-						promotionSource = await acquirePromotionSource(promotedEpoch);
+						promotionSource = await acquirePromotionSource(promotedEpoch, true);
 						if (compareBytes(sourceIdentity(promotionSource), promotionBeforeArchive) !== 0)
 							throw new TypeError("creator archive promotion source changed");
 					}
 					if (recoveryBeforeArchive !== undefined) {
-						recoverySource = await acquireRecoverySource();
+						recoverySource = await acquireRecoverySource(true);
 						if (compareBytes(sourceIdentity(recoverySource), recoveryBeforeArchive) !== 0)
 							throw new TypeError("creator archive recovery source changed");
 						await recoverySource.checkCurrent();
@@ -4036,6 +4058,13 @@ export async function bindCreatorLiveClose(
 					await promotionSource?.checkCurrent();
 				}
 				if (archivePreparation !== undefined) archiveIndexRoot = archivePreparation.binding.targetArchiveIndexRoot;
+				// The held sources keep their native exclusion across this boundary
+				// between their acquisition and the close derivation. Their currency
+				// is checked again after it, before anything is derived from them.
+				await yieldToHost();
+				if (stopping) throw new TypeError("creator close authority is unavailable");
+				await recoverySource?.checkCurrent();
+				await promotionSource?.checkCurrent();
 				persistedSnapshot ??= await persistSnapshot(input.snapshotStore, {
 					aclDigest,
 					anchor: registration.currentTrust.currentAnchorDigest,
@@ -4198,12 +4227,12 @@ export async function bindCreatorLiveClose(
 				if (!(await durableReplay.verify())) throw new TypeError("creator close replay changed during membership persistence");
 				if (promotionBeforeMembership !== undefined) {
 					if (promotedEpoch === undefined) throw new TypeError("creator membership promotion target unavailable");
-					promotionSource = await acquirePromotionSource(promotedEpoch);
+					promotionSource = await acquirePromotionSource(promotedEpoch, true);
 					if (promotionSource === undefined || compareBytes(sourceIdentity(promotionSource), promotionBeforeMembership) !== 0)
 						throw new TypeError("creator membership promotion source changed");
 				}
 				if (recoveryBeforeMembership !== undefined) {
-					recoverySource = await acquireRecoverySource();
+					recoverySource = await acquireRecoverySource(true);
 					if (recoverySource === undefined || compareBytes(sourceIdentity(recoverySource), recoveryBeforeMembership) !== 0)
 						throw new TypeError("creator membership recovery source changed");
 				}
@@ -4833,6 +4862,8 @@ export async function bindCreatorLiveClose(
 						let finish!: () => void;
 						const joined = new Promise<void>(resolve => {finish = resolve;});
 						maintenanceJobs.add(joined);
+						// Arrivals wait behind readiness: it is foreground until its slot is released.
+						const releaseForeground = beginForegroundWork();
 						const priorOrdinarySource = ordinaryProofSource;
 						ordinaryProofSource = undefined; ordinaryTemplateReady = false;
 						return Promise.resolve().then(async () => {
@@ -4956,6 +4987,7 @@ export async function bindCreatorLiveClose(
 								if (cause instanceof AggregateError) maintenanceReleaseFailure = cause;
 								throw cause;
 							} finally {
+								releaseForeground();
 								maintenanceJobs.delete(joined); finish();
 								registration.resumePendingIngress();
 							}
@@ -4998,8 +5030,10 @@ export async function bindCreatorLiveClose(
 						let detached = false;
 						try {
 							ordinaryProofSource = undefined; ordinaryTemplateReady = false; detached = true;
+							// Pool maintenance is background: its walks defer host turns behind
+							// co-located foreground work, and recheck availability after each.
 							const outcome = await registration.runOrdinaryReadinessMaintenance(
-								input.snapshotStore as SnapshotRecoveryStore<SnapshotVerificationReceipt>, async (seal, requireClosedWorkflowCompletion) => {
+								input.snapshotStore as SnapshotRecoveryStore<SnapshotVerificationReceipt>, (seal, requireClosedWorkflowCompletion) => runInBackgroundLane(async () => {
 									if (!available()) throw new TypeError("creator pool maintenance admission was revoked");
 									// Slice 14b stage 2: an opted-in room host decides this boundary from its
 									// plane's verified-fact ledger when it can; otherwise the original below.
@@ -5024,7 +5058,7 @@ export async function bindCreatorLiveClose(
 										}, true, requireClosedWorkflowCompletion, registration.currentTrust);
 									if (!available()) throw new TypeError("creator pool maintenance admission was revoked");
 									return checkpoint;
-								}, {deferrable: true, after: async () => {
+								}), {deferrable: true, after: () => runInBackgroundLane(async () => {
 									// Runs in the boundary's queue slot after it released, before
 									// queued arrivals: they cannot change the census mid-capture.
 									const control = await native.readRetirementControl?.(registration.objectId);
@@ -5041,7 +5075,7 @@ export async function bindCreatorLiveClose(
 									ordinaryProofSource = source; detached = false;
 									ordinaryTemplateReady = source !== undefined &&
 										creatorOrdinaryIssuanceSourceReadinessPrepared(source, resourceBound);
-								}});
+								})});
 							if (outcome === "deferred") {
 								// No hold, freeze or native work occurred: restore the joined hint,
 								// which every ordinary call still checks for fresh currency.

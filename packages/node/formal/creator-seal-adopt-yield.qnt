@@ -6,10 +6,14 @@ module creatorSealAdoptYield {
   // sub-sequence of these interleavings, so every property here holds for it too.
   //
   // Seal (creator-close.ts close()): new maintenance admission closes, admitted
-  // jobs join and the source identity is captured; the membership write; [Y1]
-  // sources are reacquired and compared; [Y2] currency is checked and the QC
-  // signed; [Y3] the trust advance; [Y4] the generation stage; [serve] the
-  // successor export. Adoption's begin-to-projection span is one action.
+  // jobs join and the sources are acquired, held across host turns of their
+  // authentication walk; [A] their currency is rechecked and the close derived
+  // from them; the membership write; [Y1] sources are reacquired and compared;
+  // [Y2] currency is checked and the actor's evidence and prepare phases commit;
+  // [P] the commit vote and commit QC; [P] the successor anchor (each [P] is a
+  // boundary after a committed phase inside the seal actor's close); [Y3] the
+  // trust advance; [Y4] the generation stage; [serve] the successor export.
+  // Adoption's begin-to-projection span is one action.
   //
   // Every native owner of the creator handle (local and received issuance,
   // ordinary readiness, pool maintenance) is admitted through one job slot
@@ -24,19 +28,21 @@ module creatorSealAdoptYield {
   pure val WRITES = Set(1, 2)
   pure val NONE = 0
   pure val MAX_AUX = 2
-  pure val SEALING = Set("captured", "membership", "reacquired", "signed", "advanced", "staged", "served")
+  pure val SEALING = Set("acquired", "captured", "membership", "reacquired", "signing", "committed", "signed",
+    "advanced", "staged", "served")
 
   type Image = { moves: Set[int], aux: int }
   type Mutants = {
     admitWhileClosing: bool, // ingress written into the epoch without the closing gate
     abortAfterQC: bool,      // stop abandons the close at Y3
+    abortInsideSigning: bool, // stop reaches the actor at a [P] boundary instead of joining it
     noQualify: bool,         // a detached preparation is used without image comparison
     retainAtWrite: bool,     // a job keeps its reservation into its own write
     dropAcks: bool,          // refused ingress is acknowledged to the writer
     writerOutsideSlot: bool, // a native writer that bypasses the job slot
   }
-  pure val SOUND: Mutants = { admitWhileClosing: false, abortAfterQC: false, noQualify: false,
-    retainAtWrite: false, dropAcks: false, writerOutsideSlot: false }
+  pure val SOUND: Mutants = { admitWhileClosing: false, abortAfterQC: false, abortInsideSigning: false,
+    noQualify: false, retainAtWrite: false, dropAcks: false, writerOutsideSlot: false }
 
   var phase: str
   var held: bool            // seal sources' native read reservations
@@ -214,11 +220,21 @@ module creatorSealAdoptYield {
     held' = held, identity' = identity, cut' = cut, qcs' = qcs, stopReq' = stopReq,
     keepJob, keepWriter, keepStore, keepFlags,
   }
-  // Admitted jobs join; the stage closes admission; the identity is captured.
+  // Admitted jobs join; the stage closes admission; the sources are acquired
+  // over the identity and stay held across the host turns of their walk.
   action sealCapture = all {
     phase == "closing", job == "idle",
-    if (stopReq) all { phase' = "aborted", identity' = identity } else all { phase' = "captured", identity' = imageOf(0) },
-    held' = false, cut' = cut, qcs' = qcs, stopReq' = stopReq,
+    if (stopReq) all { phase' = "aborted", identity' = identity, held' = false }
+    else all { phase' = "acquired", identity' = imageOf(0), held' = true },
+    cut' = cut, qcs' = qcs, stopReq' = stopReq,
+    keepJob, keepWriter, keepStore, keepFlags,
+  }
+  // [A] Currency is rechecked before the close is derived from the held sources,
+  // which are joined before the membership write.
+  action sealDerive = all {
+    phase == "acquired",
+    phase' = if (stopReq or imageOf(0) != identity) "aborted" else "captured", held' = false,
+    identity' = identity, cut' = cut, qcs' = qcs, stopReq' = stopReq,
     keepJob, keepWriter, keepStore, keepFlags,
   }
   // The membership write; no reservation is held by any owner.
@@ -237,12 +253,28 @@ module creatorSealAdoptYield {
     identity' = identity, cut' = cut, qcs' = qcs, stopReq' = stopReq,
     keepJob, keepWriter, keepStore, keepFlags,
   }
-  // [Y2] Check currency, then sign the QC over the cut.
-  action sealSign = all {
+  // [Y2] Check currency; the actor's evidence and prepare phases commit.
+  action sealSignBegin = all {
     phase == "reacquired",
-    if (stopReq or imageOf(0) != identity) all { phase' = "aborted", held' = false, cut' = cut, qcs' = qcs }
-    else all { phase' = "signed", held' = held, cut' = identity, qcs' = qcs + 1 },
+    if (stopReq or imageOf(0) != identity) all { phase' = "aborted", held' = false }
+    else all { phase' = "signing", held' = held },
+    identity' = identity, cut' = cut, qcs' = qcs, stopReq' = stopReq,
+    keepJob, keepWriter, keepStore, keepFlags,
+  }
+  // [P] The commit vote and the commit QC over the cut the close was prepared on.
+  // The handle's stop joins the close task, so the actor never observes it here.
+  action sealCommit(m: Mutants): bool = all {
+    phase == "signing",
+    if (m.abortInsideSigning and stopReq) all { phase' = "aborted", held' = false, cut' = cut, qcs' = qcs }
+    else all { phase' = "committed", held' = held, cut' = identity, qcs' = qcs + 1 },
     identity' = identity, stopReq' = stopReq,
+    keepJob, keepWriter, keepStore, keepFlags,
+  }
+  // [P] The successor anchor completes the close.
+  action sealSuccessor(m: Mutants): bool = all {
+    phase == "committed",
+    if (m.abortInsideSigning and stopReq) all { phase' = "aborted", held' = false } else all { phase' = "signed", held' = held },
+    identity' = identity, cut' = cut, qcs' = qcs, stopReq' = stopReq,
     keepJob, keepWriter, keepStore, keepFlags,
   }
   // [Y3] The QC is final: stop joins completion.
@@ -293,7 +325,8 @@ module creatorSealAdoptYield {
     all { inFlight != Set(), nondet msg = inFlight.oneOf() deliver(m, msg) },
     all { m.writerOutsideSlot, outsideWrite },
     jobPrepare, jobQualify(m), jobCharge, jobWrite(m),
-    sealBegin, sealCapture, sealMembership, sealReacquire, sealSign, sealAdvance(m), sealStage, sealServe,
+    sealBegin, sealCapture, sealDerive, sealMembership, sealReacquire, sealSignBegin, sealCommit(m), sealSuccessor(m),
+    sealAdvance(m), sealStage, sealServe,
     adopt, reopen, stop,
   }
 
@@ -305,29 +338,48 @@ module creatorSealAdoptYield {
       .expect(revoked and job == "idle" and not(jobHeld) and safety)
   // Ingress refused while sealing stays the writer's and lands in the successor.
   run testRefusedIngressResettles =
-    init.then(writerIssue(1)).then(sealBegin).then(sealCapture).then(deliver(SOUND, (1, 0)))
-      .then(sealMembership).then(sealReacquire).then(sealSign).then(sealAdvance(SOUND))
-      .then(sealStage).then(sealServe).then(writerInstall).then(adopt).then(writerResend(1))
-      .then(deliver(SOUND, (1, 1))).then(jobPrepare).then(jobQualify(SOUND)).then(jobCharge)
-      .then(jobWrite(SOUND))
+    init.then(writerIssue(1)).then(sealBegin).then(sealCapture).then(sealDerive).then(deliver(SOUND, (1, 0)))
+      .then(sealMembership).then(sealReacquire).then(sealSignBegin).then(sealCommit(SOUND))
+      .then(sealSuccessor(SOUND)).then(sealAdvance(SOUND)).then(sealStage).then(sealServe).then(writerInstall)
+      .then(adopt).then(writerResend(1)).then(deliver(SOUND, (1, 1))).then(jobPrepare).then(jobQualify(SOUND))
+      .then(jobCharge).then(jobWrite(SOUND))
       .expect(journal1 == Set(1) and journal0 == Set() and writerAcked == Set(1) and safety)
   // A move admitted before the seal is in the cut; stop after the QC joins completion.
   run testStopAfterQCJoins =
     init.then(writerIssue(1)).then(deliver(SOUND, (1, 0))).then(jobPrepare).then(jobQualify(SOUND))
-      .then(jobCharge).then(jobWrite(SOUND)).then(sealBegin).then(sealCapture).then(sealMembership)
-      .then(sealReacquire).then(sealSign).then(stop).then(sealAdvance(SOUND)).then(sealStage)
-      .then(sealServe).then(adopt)
+      .then(jobCharge).then(jobWrite(SOUND)).then(sealBegin).then(sealCapture).then(sealDerive)
+      .then(sealMembership).then(sealReacquire).then(sealSignBegin).then(sealCommit(SOUND))
+      .then(sealSuccessor(SOUND)).then(stop).then(sealAdvance(SOUND)).then(sealStage).then(sealServe).then(adopt)
       .expect(phase == "adopted" and qcs == 1 and cut.moves == Set(1) and safety)
   // The mutated close abandons its signed QC, and a retry signs a second one.
   run testAbortAfterQCDoubleSigns =
-    init.then(sealBegin).then(sealCapture).then(sealMembership).then(sealReacquire).then(sealSign)
-      .then(stop).then(sealAdvance(SOUND.with("abortAfterQC", true))).then(reopen).then(sealBegin)
-      .then(sealCapture).then(sealMembership).then(sealReacquire).then(sealSign)
+    init.then(sealBegin).then(sealCapture).then(sealDerive).then(sealMembership).then(sealReacquire)
+      .then(sealSignBegin).then(sealCommit(SOUND)).then(sealSuccessor(SOUND)).then(stop)
+      .then(sealAdvance(SOUND.with("abortAfterQC", true))).then(reopen).then(sealBegin).then(sealCapture)
+      .then(sealDerive).then(sealMembership).then(sealReacquire).then(sealSignBegin).then(sealCommit(SOUND))
       .expect(not(noOrphanQC) or not(singleSuccessor))
+
+  // Stop between the commit QC and the successor anchor joins completion.
+  run testStopInsideSigningJoins =
+    init.then(sealBegin).then(sealCapture).then(sealDerive).then(sealMembership).then(sealReacquire)
+      .then(sealSignBegin).then(sealCommit(SOUND)).then(stop).then(sealSuccessor(SOUND)).then(sealAdvance(SOUND))
+      .then(sealStage).then(sealServe).then(adopt)
+      .expect(phase == "adopted" and qcs == 1 and safety)
+  // Stop at the acquisition boundary aborts before any membership or QC.
+  run testStopAtAcquiredBoundaryAborts =
+    init.then(sealBegin).then(sealCapture).then(stop).then(sealDerive)
+      .expect(phase == "aborted" and not(held) and qcs == 0 and safety)
+  // A stop that reaches the actor between its committed phases orphans the QC.
+  run testAbortInsideSigningOrphansQC =
+    init.then(sealBegin).then(sealCapture).then(sealDerive).then(sealMembership).then(sealReacquire)
+      .then(sealSignBegin).then(sealCommit(SOUND)).then(stop)
+      .then(sealSuccessor(SOUND.with("abortInsideSigning", true)))
+      .expect(not(noOrphanQC))
 
   action step = stepWith(SOUND)
   action brokenAdmitWhileClosing = stepWith(SOUND.with("admitWhileClosing", true))
   action brokenAbortAfterQC = stepWith(SOUND.with("abortAfterQC", true))
+  action brokenAbortInsideSigning = stepWith(SOUND.with("abortInsideSigning", true))
   action brokenRetainAtWrite = stepWith(SOUND.with("retainAtWrite", true))
   action brokenDropAcks = stepWith(SOUND.with("dropAcks", true))
   // A writer outside the slot meets a job holding custody across a boundary.

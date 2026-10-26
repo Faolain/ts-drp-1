@@ -257,6 +257,38 @@ describe("held census exact syntax and crypto facts", () => {
 			expect(regular.facts.decode(prototypeBytes).nested.__r10HeldCensusInherited).toBeUndefined();
 		} finally { Reflect.deleteProperty(Object.prototype, "__r10HeldCensusInherited"); }
 	});
+	it("keeps per-epoch kernel work constant across successive handoffs: history never saturates the owner", () => {
+		// Each epoch forks the live owner into its successor, retires the old
+		// owner, and runs a census over a bounded retention window (the newest
+		// WINDOW epochs of vertices). Work per epoch must depend on the window,
+		// not on how many epochs ever handed facts forward.
+		const CAP = 256, NEW_PER_EPOCH = 4, WINDOW = 3, EPOCHS = 120;
+		const f = heldFactsFixture(AHE_BOUNDED_READ_LIMITS, CAP);
+		const vertex = (epoch: number, ordinal: number) => ({ ...f.input, preparedBlueprintAdmission: undefined as unknown,
+			receivedCanonicalPreimageBytes: encodeCanonical({ author: "alice", operation: { epoch, ordinal } }) });
+		let owner = f.facts;
+		const work: number[] = [];
+		for (let epoch = 1; epoch <= EPOCHS; epoch++) {
+			const successor = owner.forkVerification();
+			owner.release();
+			owner = successor;
+			const abi = { epoch }; // Every generation prepares its own blueprint admission.
+			const before = f.extract.mock.calls.length + f.verify.mock.calls.length;
+			for (let census = 0; census < 2; census++)
+				for (let back = WINDOW - 1; back >= 0; back--)
+					for (let ordinal = 0; ordinal < NEW_PER_EPOCH && epoch - back >= 1; ordinal++) {
+						const input = { ...vertex(epoch - back, ordinal), preparedBlueprintAdmission: abi };
+						expect(owner.extract(input).ok).toBe(true);
+						expect(owner.verify(input).accepted).toBe(true);
+					}
+			work.push(f.extract.mock.calls.length + f.verify.mock.calls.length - before);
+		}
+		// Steady state: one extraction per window vertex per generation, all
+		// repeats and verifications reused. Identical early and late.
+		const steady = WINDOW * NEW_PER_EPOCH;
+		expect({ epoch10: work[9], epoch60: work[59], epoch120: work[EPOCHS - 1], max: Math.max(...work.slice(WINDOW)) })
+			.toEqual({ epoch10: steady, epoch60: steady, epoch120: steady, max: steady });
+	});
 });
 
 // Exercise the ORIGINAL private owner declarations at deterministic seams.
