@@ -14535,6 +14535,12 @@ function buildCreatorOrdinaryFinishingResourceProgramForSizing(input: Readonly<{
 		const nativeRows = inputResource("native.rows", futureNative.rows);
 		const nativeImage = inputResource("native.image", Object.freeze({byteLength: issuance.nativeImageByteLength, ...issuance.nativeImageShape}));
 		const census = record({rows: nativeRows, image: nativeImage, control: participantBounds[2]});
+		// The exact composer observes this same issuance census (rows, image and a
+		// control holding both completed and active preparations) as one native
+		// point image under the AHE union bound. The reservation keeps that bound;
+		// a miss falls back to the exact composer rather than admitting past it.
+		if (census.byteLength > AHE_BOUNDED_READ_LIMITS.maxUnionBytes) return undefined;
+		compiler?.limit(compiler.references(census).byteLength, AHE_BOUNDED_READ_LIMITS.maxUnionBytes, 1);
 		const runtimeEnvelopeTerms = ["currentClose", "successorReserved", "successorEntered", "successorFinal"].map(key => {
 			const phase = key as keyof typeof runtimeWidths.runtimeCensusOverheadShape, shape = runtimeWidths.runtimeCensusOverheadShape[phase];
 			if (shape.items + census.items > 65_536 || Math.max(shape.maxDepth, 1 + census.maxDepth) > 128)
