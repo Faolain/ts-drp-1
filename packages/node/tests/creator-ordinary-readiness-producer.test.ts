@@ -1,4 +1,4 @@
-import {createWorkCheckpoint, yieldToHost} from "../src/internal/cooperative-work.js";
+import {beginForegroundWork, createWorkCheckpoint, yieldToHost} from "../src/internal/cooperative-work.js";
 import {readFileSync} from "node:fs";
 import {compareBytes, decodeCanonical, encodeCanonical, hashDomain} from "@ts-drp/canonical";
 import * as ts from "typescript";
@@ -863,7 +863,7 @@ function closeReadinessJob(options: {supported?: boolean; metadata?: () => Promi
 	 const run=${matches[0]!.getText(close)};
 	 return {run,stop:()=>{stopping=true;},jobs:maintenanceJobs,ready:()=>ordinaryTemplateReady,currentSource:()=>ordinaryProofSource};`;
 	const js = ts.transpileModule(body, {compilerOptions: {target: ts.ScriptTarget.ES2022}}).outputText;
-	return {calls, completionModes, ...new Function("yieldToHost", "createWorkCheckpoint", "options", "calls", "completionModes", "assertTrust", js)(yieldToHost, createWorkCheckpoint, options, calls, completionModes,
+	return {calls, completionModes, ...new Function("yieldToHost", "createWorkCheckpoint", "beginForegroundWork", "options", "calls", "completionModes", "assertTrust", js)(yieldToHost, createWorkCheckpoint, beginForegroundWork, options, calls, completionModes,
 		(actual: unknown, original: unknown) => {expect(actual).toBe(original);})} as
 		{calls: string[]; completionModes: boolean[]; run(): Promise<void>; stop(): void; jobs: Set<Promise<void>>; ready(): boolean; currentSource(): object | undefined};
 }
