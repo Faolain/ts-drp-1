@@ -58,6 +58,9 @@ const starvationAlarmMs = Number(process.env.ACTIVE_CONTINUED_PLAY_STARVATION_AL
 // creator's policy has rolled the room over, then the Writer installs it as a host would.
 const rolloverMode = process.env.ACTIVE_CONTINUED_PLAY_ROLLOVER ?? "harness";
 if (rolloverMode !== "harness" && rolloverMode !== "app") throw new Error(`CONTINUED_PLAY_ROLLOVER:${rolloverMode}`);
+/** Harness mode: Writer moves issued concurrently with each seal, adoption and install. */
+const streamMoves = Number(process.env.ACTIVE_CONTINUED_PLAY_STREAM ?? 4);
+const convergeMs = Number(process.env.ACTIVE_CONTINUED_PLAY_CONVERGE_MS ?? 20_000);
 /** App mode: a transition whose Writer stream has not triggered a rollover after this many moves stranded. */
 const APP_ROLLOVER_MAX_MOVES = 64;
 if (!Number.isFinite(starvationAlarmMs) || starvationAlarmMs <= 0) throw new Error("CONTINUED_PLAY_STARVATION_ALARM");
@@ -535,10 +538,22 @@ it.skipIf(!enabled)(
 				return { expected: oracle.state(), receivers: state };
 			};
 			const converged = async () => {
-				expect(
-					await eventually(() => peers.every(({ room }) => oracle.matches(room.projection().blocks)), 20_000),
-					`durable convergence in ${phase}`
-				).toBe(true);
+				const matches = () => peers.every(({ room }) => oracle.matches(room.projection().blocks));
+				let matched: boolean;
+				if (policy === undefined) matched = await eventually(matches, convergeMs);
+				else {
+					// App mode: the Writer's settlement replays its moves into the successor, and the
+					// creator's policy may roll over again on them; the Writer follows as a host would.
+					const deadline = performance.now() + convergeMs;
+					for (let round = 0; ; round++) {
+						await followRollover(`${phase}-converge-${round}`);
+						matched = await eventually(matches, Math.min(2_000, Math.max(0, deadline - performance.now())));
+						if (matched || performance.now() >= deadline) break;
+					}
+				}
+				// A miss reports the exact per-peer difference first.
+				if (!matched) exactState();
+				expect(matched, `durable convergence in ${phase}`).toBe(true);
 				return exactState();
 			};
 			const step = async <Value>(
@@ -765,9 +780,41 @@ it.skipIf(!enabled)(
 				fixture.clearObservations();
 				phaseStats.clear();
 			};
+			// App mode, outside a transition: a rollover the creator's policy started joins and the Writer
+			// installs it, as a host would (one at a time: each move pair is followed before the next).
+			const followRollover = async (label: string): Promise<void> => {
+				if (policy === undefined) return;
+				await policy.settled();
+				expect(rolloverErrors).toEqual([]);
+				const creator = required(peers[0]),
+					writer = required(peers[1]);
+				if ((writer.room.authority()?.epoch ?? 0) >= (creator.room.authority()?.epoch ?? 0)) return;
+				// Called inside a step (steps do not nest), so it times itself.
+				const started = performance.now();
+				const transfer = await settlementDelivery(fixture);
+				Reflect.set(writer.networkNode, "createSnapshotChunkProtocolHost", () => transfer.port);
+				try {
+					await writer.room.installCreatorSuccessor({ offer: transfer.offer, peers: transfer.peers });
+				} finally {
+					await joined(
+						[...ports].map(async (port) => {
+							await port.close();
+							ports.delete(port);
+						})
+					);
+				}
+				expect(writer.room.authority()?.epoch).toBe(creator.room.authority()?.epoch);
+				record({ kind: "app-follow", label, ms: performance.now() - started, rollovers: rolloverEvents.splice(0) });
+			};
 			await step("warm-population", async () => {
-				for (let ordinal = 0; ordinal < 16; ordinal++) await joined([issue(0, "warm-slot"), issue(1, "warm-slot")]);
-				for (let ordinal = 0; ordinal < warmRows; ordinal++) await issue(1, "extra-census-row");
+				for (let ordinal = 0; ordinal < 16; ordinal++) {
+					await joined([issue(0, "warm-slot"), issue(1, "warm-slot")]);
+					await followRollover(`warm-${ordinal}`);
+				}
+				for (let ordinal = 0; ordinal < warmRows; ordinal++) {
+					await issue(1, "extra-census-row");
+					await followRollover(`warm-row-${ordinal}`);
+				}
 			});
 			await step("warm-convergence", converged);
 			for (const [peer, accepted] of counters.remote.entries())
@@ -788,14 +835,24 @@ it.skipIf(!enabled)(
 				const closing = creator.room.authority()?.epoch ?? 0;
 				const writes = (async () => {
 					if (rolloverMode === "app") {
-						// Until the creator's own policy has adopted a successor.
-						for (let ordinal = 0; (creator.room.authority()?.epoch ?? 0) === closing; ordinal++) {
+						// Until the creator's own policy has counted its budget (then its rollover runs while
+						// the Writer's last moves are in flight) or has already adopted a successor.
+						const counting = required(policy);
+						for (
+							let ordinal = 0;
+							(creator.room.authority()?.epoch ?? 0) === closing &&
+							counting.stats().moves < GRID_ROLLOVER_BUDGET.movesPerAuthor;
+							ordinal++
+						) {
 							if (ordinal >= APP_ROLLOVER_MAX_MOVES) throw new Error("CONTINUED_PLAY_APP_ROLLOVER_NOT_TRIGGERED");
 							await issue(1, `stream-${epoch}-${ordinal}`);
 						}
+						await counting.settled();
+						if ((creator.room.authority()?.epoch ?? 0) === closing)
+							throw new Error("CONTINUED_PLAY_APP_ROLLOVER_NOT_TRIGGERED");
 						return;
 					}
-					for (let ordinal = 0; ordinal < 4; ordinal++) await issue(1, `stream-${epoch}-${ordinal}`);
+					for (let ordinal = 0; ordinal < streamMoves; ordinal++) await issue(1, `stream-${epoch}-${ordinal}`);
 				})();
 				const rollover = (async () => {
 					if (rolloverMode === "app") {
@@ -850,6 +907,7 @@ it.skipIf(!enabled)(
 						issue(1, `maintenance-${epoch}-1`),
 					])
 				);
+				await followRollover(`maintenance-${epoch}`);
 				await converged();
 				for (const [peer, accepted] of delta(counters.remote, maintenanceBefore).entries())
 					expect(accepted, `remote admission receiver ${peer} after maintenance ${epoch}`).toBeGreaterThan(0);
