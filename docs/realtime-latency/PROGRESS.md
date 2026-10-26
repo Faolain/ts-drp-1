@@ -1,6 +1,6 @@
 # Real-time game completion
 
-Updated 2026-10-24. This is the current continuation point; the [decision log](README.md)
+Updated 2026-10-25. This is the current continuation point; the [decision log](README.md)
 and track reports preserve the earlier evidence. The owner has authorized correcting
 assumptions and using executable models to find a sound, performant design.
 
@@ -8,7 +8,59 @@ The task is incomplete. Passing a room test that pauses at each rollover does no
 establish uninterrupted play. A formal model proves its stated abstraction and bounds,
 not native storage or network behavior.
 
-## Verify-once perf integrated — 2026-10-25 (current)
+## Seal/adopt yields + maintenance re-encode — 2026-10-25 evening (current)
+
+Branch `perf/integration-2` (`cdcc9cf4`, not yet on this root) = `54a7d818` + two slices:
+- **Maintenance re-encode** (`perf/maintenance-reencode`): durable preimage header verified once
+  per exact bytes (48 → 0 decodes per six images) and the native journal retirement image
+  verified once per exact rows (90 captures / 6 hashes → 0 per six reads; Quint
+  `storage-node/formal/journal-image-memo.qnt`). Maintenance CPU −2…5 % per epoch in paired runs.
+- **Seal/adopt cooperative host turns** (`perf/seal-adopt-yield`): yields at already-rechecked
+  boundaries in seal (after membership write, after source reacquisition, after QC, after trust
+  advance, before serving), 8 ms checkpoints in the issuance/readiness jobs, and before qualifying
+  a detached closed-data preparation. Quint `node/formal/creator-seal-adopt-yield.qnt` models
+  native exclusion (lock conflict), sealed-epoch freeze, single successor, no orphan QC, no
+  stale admission, no lost accepted write; six mutants caught.
+
+Acceptance on the merge vs `a3b1f276`, run concurrently: identical failing test names in every
+group, +20 new tests pass ([compare](../../.logs/realtime-resume-2026-10-23/perf-integration-03/compare.txt)).
+
+Continued play 40, two concurrent pairs vs `a3b1f276`
+([summary](../../.logs/realtime-resume-2026-10-23/perf-seal-adopt-yield/paired-final/summary.txt)):
+seal longest CPU-bound quantum median 132/114 → 75/76 ms, >100 ms quanta 36/32 → 12/8; adopt
+136/139 → 69/69 ms, >100 ms quanta 43/41 → 2/3; process CPU unchanged (248/247 vs 249/247 s);
+event-loop p99 123/122 → 118/109 ms. Seal still has a 100–200 ms quantum in ~¼ of epochs.
+
+**300-epoch conservation on `cdcc9cf4` passes** (Canvas/Grid/Chat run concurrently, load ≈21
+vs ≈10 for the sequential `6c9b5935` campaign; [logs](../../.logs/realtime-resume-2026-10-23/final-int2/)):
+
+| App | Transition p50 (old → new) | Install p50 | Issue p95 |
+| --- | ---: | ---: | ---: |
+| Canvas | 3742 → 3454 | 3005 → 2558 | 705 → 1072 |
+| Grid | 3570 → 3401 | 2933 → 2573 | 187 → 156 |
+| Chat | 4014 → 3356 | 3045 → 2352 | 765 → 1096 |
+
+Known tradeoff, measured: issues issued by the **creator** during post-install maintenance have
+a longer tail. Concurrent three-way Chat 40 ×2 (base / maintenance-only / yield-only): creator
+issue p50 988 / 947 / 1164 ms, >1 s 37 / 32 / 63 of 80; recipient issues unaffected. Cause: the
+issuance job's 8 ms checkpoints let the co-located recipient's maintenance chunks run between
+its chunks. Removing them fails the bounded-turn test (2125 > 1250 statements in one rollover
+turn; variant diff in `final-int2/paired-cons/nojob-variant.diff`). Candidate fix (untested):
+background maintenance defers its turns while a foreground issue job is in flight.
+
+Deep Apalache ([summary](../../.logs/realtime-resume-2026-10-23/deep-apalache-01/summary.txt)):
+seal/adopt yield model no violation to 22 steps; verified-once cache to 13; verified-image cache
+to 7 (step 8 alone ran ~50 min); broken controls caught. The journal memo model ranged over a
+non-constant list length; `cdcc9cf4` bounds it by `MAX_ROWS` (exact), Apalache run pending.
+
+**Grid continued play 300 not yet passed on `cdcc9cf4`.** Run 1 stopped at epoch 145 on the
+1000 ms alarm: the gap was 1065 ms wall / 178 ms CPU, 1177 involuntary context switches (host
+preemption; load 11 → 25 with Apalache, two other projects' `tsgolint` at ~85 % each and
+OrbStack). Run 2 tripped at epoch 5 the same way (1620 / 312 ms). A paired 300 (`6c9b5935` vs
+`cdcc9cf4`, alarm 5000) died when the laptop entered battery sleep (both processes: 104 s at
+~0 CPU, `pmset` "Entering Sleep state … Using Batt"). Needs AC power and a quieter host.
+
+## Verify-once perf integrated — 2026-10-25
 
 Root `a3b1f276` = `6c9b5935` + three slices, each RED → GREEN with work-count tests:
 issuance verify-once (`bd7f90cf`, Quint `issuance-store/formal/verified-once-cache.qnt`),
