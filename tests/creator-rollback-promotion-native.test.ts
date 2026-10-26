@@ -10,6 +10,14 @@
 // source-floor header as a usable slot, and never bypasses candidate
 // authentication. Usable slots are the two the original source law admits:
 // closedEpoch = floor - 1 and floor - 2.
+//
+// Continued play. After the promoted epoch is used and survives a cold reopen,
+// each slot case seals, adopts and issues in four further epochs and cold-opens
+// once more. Every epoch must stay inside the native bounds, and the census must
+// show the pre-promotion generations (projection epoch <= floor) and their
+// snapshots actually leaving custody: the promotion's own support is released
+// only after the promoted epoch closes, never earlier. Each epoch issues, so the
+// retained source's journal, issuance and signing rows are exercised too.
 import { DatabaseSync } from "node:sqlite";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
@@ -128,7 +136,55 @@ describe.each([2, 3, 4, 6])("original creator at floor %i", floor => {
 			.toMatchObject({ forwardPromotionClosedEpoch: selected });
 		await creator.room.issue(message(`${useful}-after-reopen`));
 		expect(creator.room.projection().messages.map(row => row.clientOperationId)).toEqual([...historical.messages, useful, `${useful}-after-reopen`]);
-	}, 600_000);
+
+		// Continued play: four more ordinary epochs, each sealed, adopted and used.
+		// The physical census must stay within the native bounds and show the
+		// pre-promotion chain (every row whose projection epoch is <= the prior
+		// floor) actually leaving custody, not merely the issue refusal clearing.
+		const expected = [...historical.messages, useful, `${useful}-after-reopen`];
+		const prePromotion = (native: NativeCensus) => native.generations.filter(row =>
+			row.projectionEpoch !== null && row.projectionEpoch <= floor);
+		let preCount = prePromotion(reopened.native).length;
+		expect(preCount).toBeGreaterThan(0);
+		let continued = reopened;
+		for (let step = 1; step <= 4; step++) {
+			expect((await creator.room.sealEpoch()).ok).toBe(true);
+			await creator.room.adoptCreatorSuccessor();
+			const epoch = floor + 1 + step;
+			expect(creator.room.authority()?.epoch).toBe(epoch);
+			const id = `${useful}-epoch-${epoch}`;
+			await creator.room.issue(message(id));
+			expected.push(id);
+			expect(creator.room.projection().messages.map(row => row.clientOperationId)).toEqual(expected);
+			continued = await census(f, creator);
+			const pre = prePromotion(continued.native);
+			log(`floor${floor}-slot${selected}-continued-${epoch}`, { ...continued,
+				prePromotion: pre.map(row => `${row.generationId.slice(0, 12)}:p${row.projectionEpoch}:c${row.cutEpoch}:${row.base === "none" ? "header" : "linked"}`) });
+			expect(continued.floor).toMatchObject({ stableEpoch: epoch, pending: null });
+			expect(continued.native.generations.length).toBeLessThanOrEqual(7);
+			expect(continued.native.snapshots.length).toBeLessThanOrEqual(4);
+			expect(pre.length).toBeLessThanOrEqual(preCount);
+			preCount = pre.length;
+			// From the second post-promotion close on, no pre-promotion close (Q) row
+			// remains: neither the promotion decision nor its ancestry link.
+			if (step >= 2) expect(pre.filter(row => row.cutEpoch === row.projectionEpoch)).toEqual([]);
+		}
+		// The whole pre-promotion chain and its snapshots have left native custody.
+		expect(prePromotion(continued.native)).toEqual([]);
+		expect(continued.native.snapshots.filter(row => row.epoch <= floor)).toEqual([]);
+
+		// A genuine cold reopen after continued play keeps epoch, floor and history.
+		await f.stop(creator);
+		creator = await f.open(0, { reopen: true });
+		const final = await census(f, creator);
+		log(`floor${floor}-slot${selected}-final-reopened`, final);
+		expect(final.epoch).toBe(floor + 5);
+		expect(final.floor).toEqual(continued.floor);
+		expect(final.native).toEqual(continued.native);
+		expect(creator.room.projection().messages.map(row => row.clientOperationId)).toEqual(expected);
+		await creator.room.issue(message(`${useful}-final`));
+		expect(creator.room.projection().messages.map(row => row.clientOperationId)).toEqual([...expected, `${useful}-final`]);
+	}, 900_000);
 
 	it("keeps a promotion across a genuine cold reopen before any further issue", async () => {
 		const selected = floor - 1;

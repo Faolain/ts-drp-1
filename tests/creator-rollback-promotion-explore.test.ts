@@ -98,3 +98,41 @@ it.runIf(process.env.EXPLORE_BUSY === "1")("explores which native reservation is
 		await expect(creator.room.promoteCreatorCheckpoint({ closedEpoch: 3 })).rejects.toThrow("NATIVE_READ_RESERVATION_BUSY");
 	} finally { prototype.acquire = original; }
 }, 600_000);
+
+// Post-promotion lifecycle probe: promote, then keep sealing/adopting/issuing with
+// a physical census after every step. Diagnostic only; opt-in by environment.
+const continueCases = (process.env.EXPLORE_CONTINUE ?? "2:1").split(",").map(row => row.split(":").map(Number) as [number, number]);
+(process.env.EXPLORE_CONTINUE === undefined ? it.skip : it).each(continueCases)("explores epochs after promoting floor %i slot %i", async (target, selected) => {
+	const log = (label: string, value: unknown) => console.log(`CENSUS ${label} ${JSON.stringify(value)}`);
+	const shape = (native: Awaited<ReturnType<typeof nativeCensus>>) => ({ head: native.head.generationId?.slice(0, 12),
+		rows: native.generations.map(row => `${row.generationId.slice(0, 8)}:${row.state[0]}:${row.base === "none" ? "none" : row.base.slice(0, 8)}:p${row.projectionEpoch}:c${row.cutEpoch}${row.forwardPromotionClosedEpoch === null ? "" : `:fp${row.forwardPromotionClosedEpoch}`}`),
+		snapshots: native.snapshots.map(row => `${row.epoch}${row.retirement ? "r" : ""}`), scopes: native.owner.recoveryScopes });
+	const f = await chatSharesRoomFixture({ members: ["genesis"], format: "window", genesisStateBytes: createShippingChatWindowGenesisStateBytes });
+	let creator = await f.open(0);
+	for (let epoch = 0; epoch < target; epoch++) {
+		await creator.room.issue(message(`creator-epoch-${epoch}`));
+		expect((await creator.room.sealEpoch()).ok).toBe(true); await creator.room.adoptCreatorSuccessor();
+		log(`ordinary-${epoch + 1}`, shape(await nativeCensus(f.directory, f.objectId, "peer-0")));
+	}
+	await creator.room.issue(message(`creator-epoch-${target}`));
+	if (selected >= 0) {
+		await f.stop(creator); creator = await f.open(0, { reopen: true });
+		await creator.room.promoteCreatorCheckpoint({ closedEpoch: selected });
+		log("promoted", shape(await nativeCensus(f.directory, f.objectId, "peer-0")));
+	}
+	const steps = Number(process.env.EXPLORE_STEPS ?? "3");
+	for (let step = 0; step <= steps; step++) {
+		const at = creator.room.authority()?.epoch;
+		try { await creator.room.issue(message(`continue-${step}`)); log(`issued-${at}`, shape(await nativeCensus(f.directory, f.objectId, "peer-0"))); }
+		catch (error) { log(`issue-error-${at}`, { detail: inspect(error, { depth: 10, breakLength: Infinity }) }); throw error; }
+		if (step === steps) break;
+		try { expect((await creator.room.sealEpoch()).ok).toBe(true); log(`sealed-${at}`, shape(await nativeCensus(f.directory, f.objectId, "peer-0"))); }
+		catch (error) { log(`seal-error-${at}`, { detail: inspect(error, { depth: 10, breakLength: Infinity }) }); throw error; }
+		try { await creator.room.adoptCreatorSuccessor(); log(`adopted-${creator.room.authority()?.epoch}`, shape(await nativeCensus(f.directory, f.objectId, "peer-0"))); }
+		catch (error) { log(`adopt-error-${at}`, { detail: inspect(error, { depth: 10, breakLength: Infinity }) }); throw error; }
+	}
+	await f.stop(creator); creator = await f.open(0, { reopen: true });
+	log("reopened", { epoch: creator.room.authority()?.epoch, messages: creator.room.projection().messages.map(row => row.clientOperationId) });
+	await creator.room.issue(message("after-final-reopen"));
+	log("final", shape(await nativeCensus(f.directory, f.objectId, "peer-0")));
+}, 1_800_000);
