@@ -363,6 +363,28 @@ const OFFER_FIELDS = [
 ] as const;
 
 /**
+ * The profile and latched-ACL version the creator signs into genesis. By default: Canvas from
+ * examples/canvas/src/profile.ts (creator-trusted-v1 before Track T), Grid and Chat
+ * creator-trusted-settlement-v1 with a version-3 ACL. `options.profile === "trusted-v1"` (Grid and
+ * Chat only) signs creator-trusted-v1 with a version-1 ACL, as the shipped Grid example
+ * (examples/grid/src/v3-zone.ts createCreatorInviteMaterial) and the v3-chat demo do; the protocol
+ * requires version 3 exactly for the settlement profile (latched-acl.ts).
+ * @param options - The long-room options.
+ * @returns The signed profile identifier and latched-ACL version.
+ */
+function genesisProfileFor(options: LongRoomOptions): Readonly<{ profileId: string; latchedAclVersion: number }> {
+	if (options.profile === "trusted-v1") {
+		if (options.app === "canvas") throw new TypeError("LONG_ROOM_PROFILE_OVERRIDE_GRID_OR_CHAT_ONLY");
+		return { profileId: "creator-trusted-v1", latchedAclVersion: 1 };
+	}
+	if (options.profile !== undefined && options.profile !== "settlement-v1")
+		throw new TypeError(`LONG_ROOM_PROFILE_UNKNOWN:${String(options.profile)}`);
+	return options.app === "canvas"
+		? CANVAS_GENESIS_PROFILE
+		: { profileId: "creator-trusted-settlement-v1", latchedAclVersion: 3 };
+}
+
+/**
  * Opens one role of the long room (0 = creator, 1 = recipient) as an endpoint. Both roles
  * derive the same object, ACL, application and creator invite from `options` and
  * `env.unique` (the invite signature is deterministic Ed25519).
@@ -385,6 +407,7 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 	const name = (["creator", "recipient"] as const)[index];
 	const objectId = `creator:${hex(hashDomain("track-m-apps-object/v1", new TextEncoder().encode(env.unique))).slice(0, 32)}`;
 	const writerRecipient = options.recipient === "writer";
+	const genesisProfile = genesisProfileFor(options);
 	const exactCanonicalLatchedAclBytes = encodeCanonical({
 		epoch: 0,
 		kind: "drp-v3-latched-acl",
@@ -394,9 +417,8 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 		].sort((left, right) => left.author.localeCompare(right.author)),
 		objectId,
 		permissionless: false,
-		// The shipped Canvas signs the version its profile requires (examples/canvas/src/profile.ts);
-		// the shipped Chat signs version 3.
-		version: options.app !== "canvas" ? 3 : CANVAS_GENESIS_PROFILE.latchedAclVersion,
+		// The version the signed profile requires (version 3 exactly for the settlement profile).
+		version: genesisProfile.latchedAclVersion,
 	});
 	const chatFormat = options.chatFormat ?? "window";
 	const selected = await applicationFor(options.app, exactCanonicalLatchedAclBytes, options.creatorLull, chatFormat);
@@ -434,9 +456,7 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 		exactCanonicalParametersCarrierBytes: encodeCanonical(PARAMETERS),
 		exactCanonicalProfileBytes: encodeCanonical({
 			cryptoSuiteId: "ed25519-sha256-v3",
-			// The shipped profiles: Canvas from examples/canvas/src/profile.ts (creator-trusted-v1
-			// before Track T), Chat creator-trusted-settlement-v1.
-			profileId: options.app !== "canvas" ? "creator-trusted-settlement-v1" : CANVAS_GENESIS_PROFILE.profileId,
+			profileId: genesisProfile.profileId,
 			quorum: 1,
 			signers,
 		}),

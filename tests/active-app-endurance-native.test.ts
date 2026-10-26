@@ -28,6 +28,12 @@ for (const value of [epochs, moves, streamLimit])
 if (!Number.isSafeInteger(reopenAt) || reopenAt < 1 || reopenAt > epochs)
 	throw new Error("ENDURANCE_REOPEN_EPOCH_INVALID");
 const output = process.env.ACTIVE_ENDURANCE_OUT ?? join(tmpdir(), `active-endurance-${Date.now()}`);
+// Grid and Chat sign creator-trusted-settlement-v1 by default. ACTIVE_ENDURANCE_PROFILE=trusted-v1
+// runs them on the legacy creator-trusted-v1 profile the shipped Grid example and the v3-chat demo
+// sign today (it never prunes issued records). Canvas always follows its shipped profile.
+const profile = process.env.ACTIVE_ENDURANCE_PROFILE;
+if (profile !== undefined && profile !== "trusted-v1" && profile !== "settlement-v1")
+	throw new Error(`ENDURANCE_PROFILE:${profile}`);
 
 it.skipIf(!enabled).each(apps)(
 	"%s: active writers conserve work and native storage through endurance",
@@ -59,6 +65,7 @@ it.skipIf(!enabled).each(apps)(
 			moves,
 			streamLimit,
 			reopenAt,
+			profile: app === "canvas" ? "shipped" : (profile ?? "settlement-v1"),
 			host: "SQLite",
 			transport: "scripted signed-byte first-copy loss/delay and explicit durable replay",
 			successorMembership: "v2 native journal point read",
@@ -77,6 +84,7 @@ it.skipIf(!enabled).each(apps)(
 				epochs,
 				moves,
 				chatFormat: "shares" as const,
+				...(profile === "trusted-v1" && app !== "canvas" ? { profile } : {}),
 			};
 			const openPeers = async (reopen: boolean): Promise<readonly [RoleEndpoint, RoleEndpoint]> => {
 				const host = nodeHostFor("node", directory, reopen);
