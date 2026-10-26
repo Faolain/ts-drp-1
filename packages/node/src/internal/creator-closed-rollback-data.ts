@@ -7265,12 +7265,10 @@ export async function acquireCreatorIssuanceMaintenanceProof(
 		requireLaw(
 			closedRetirementEqual(qualifiedSnapshotInventory.scopes, snapshotInventory.scopes) &&
 				closedRetirementEqual(qualifiedSnapshotInventory.owner, snapshotInventory.owner) &&
-			snapshotInventory.scopes.length === snapshot.image.scopes.length &&
-				snapshotInventory.scopes.every((row) =>
-					snapshot.image.scopes.some((pair) =>
-						closedRetirementEqual(pair, { scope: row.scope, incarnation: row.incarnation })
-					)
-				),
+			// Every role scope is physically present; outside the role pool only
+			// the CURRENT epoch's in-flight close quarantine may exist (a close that
+			// died after opening its own scope). Unknown older scopes still refuse.
+			completeSnapshotRecoveryInventoryIsPresent(snapshotInventory, snapshot, forward.wholeFloor.stable),
 			"floor-stale"
 		);
 		let receivedRecoveryScopes: readonly SnapshotQuarantineScopeKey[] | undefined;
@@ -15511,7 +15509,24 @@ function selectAuthenticatedSnapshotTurnoverInventory(
 			source.currentEpoch !== held.predecessorTrust.currentEpoch || source.currentAnchorDigest !== held.predecessorTrust.currentAnchorDigest)) ||
 		!lifetime.dependencyAnchors.every(dependency => dependencies.some(anchor =>
 			anchor.epoch === dependency.epoch && anchor.anchorDigest === dependency.anchorDigest))) return undefined;
-	return selectSnapshotTurnoverScopeInventory(roles, protectedScopes, inventory.scopes.map(row => row.scope), source);
+	// An unprotected, unclassified scope above the certificate's predecessor
+	// epoch can only be the CURRENT epoch's own close quarantine, retained by a
+	// close that died before adopting. That close may already have bound its
+	// recovery roles (membership and seal evidence) to this pool, and its retry
+	// reuses that exact scope without a new slot, so turnover must not change
+	// the pool under it: keep the whole pool and retire nothing until the close
+	// adopts. Unknown scopes at or below the predecessor still refuse.
+	const predecessor = held.predecessorTrust;
+	const sameScope = (a: SnapshotQuarantineScopeKey, b: SnapshotQuarantineScopeKey): boolean =>
+		a.objectId === b.objectId && a.epoch === b.epoch && a.anchor === b.anchor && a.manifestDigest === b.manifestDigest;
+	const inFlight = (scope: SnapshotQuarantineScopeKey): boolean =>
+		scope.objectId === predecessor.objectId && scope.epoch > predecessor.currentEpoch &&
+		!protectedScopes.some(known => sameScope(known, scope)) && !roles.classifiedScopes.some(known => sameScope(known, scope));
+	const scopes = inventory.scopes.map(row => row.scope);
+	const selection = selectSnapshotTurnoverScopeInventory(roles, protectedScopes,
+		scopes.filter(scope => !inFlight(scope)), source);
+	if (selection === undefined || !scopes.some(inFlight)) return selection;
+	return Object.freeze({survivingScopes: Object.freeze(scopes), retiringScopes: Object.freeze([])});
 }
 
 /**
