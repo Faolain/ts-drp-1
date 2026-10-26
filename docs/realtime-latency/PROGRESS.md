@@ -8,7 +8,58 @@ The task is incomplete. Passing a room test that pauses at each rollover does no
 establish uninterrupted play. A formal model proves its stated abstraction and bounds,
 not native storage or network behavior.
 
-## Integration-4 — 2026-10-26 (current)
+## Integration-5 — 2026-10-26 evening (current)
+
+**All four 300-epoch runs pass on `f9a1f33c`**, merged into this root as `38682519`.
+`perf/integration-5` = `d00b1c3d` + two fixes, each rerun RED/GREEN by the lead:
+- **Creator death inside its own close** (`fix/creator-close-crash` @ `bade0a9d`). A creator killed after
+  committing its close quarantine scope but before adoption could not reopen: readiness refused
+  `floor-stale` (it required the retirement image to equal the recovery pool exactly) and turnover
+  refused `chain-invalid` (the close's own retained scope is neither protected nor classified by the last
+  certificate). Readiness now uses the existing presence check (pool present; only current-epoch scopes
+  may lie outside it); turnover keeps the whole pool and retires nothing while that in-flight scope exists.
+  Kill-point test, 12 phases after 3 warm seals plus 7 at steady state: base 15 fail / 4 pass, fix 19/19.
+  Quint `node/formal/creator-close-crash-recovery.qnt` with 3 broken controls, all caught by Apalache.
+- **512-offer gate** (`fix/capacity-adoption-reserve` @ `bbab9f5b`). Settlement work reserves the adoption
+  fence plus the two later fences issued while its rows stay retained, so another writer's mandatory
+  fence is never capacity-refused into pending ingress. First-epoch admission forecasts the next epoch's
+  first cold admission book. Gate at offer 512: settlement 40 accepted (was 42, unfinishable), trusted-v1
+  449 (was 482, stranded); both seal, adopt, install and accept the next issue.
+
+| Grid continued play 300 | `ad6b32b3` | `f9a1f33c` |
+| --- | --- | --- |
+| Result | 300/300, 1845 issues, 13 repairs | 300/300, 1845 issues, 13 repairs |
+| Duration | 2177 s | 2153 s |
+| Event-loop p99 / timer max gap | 90 / 284 ms | 89 / 239 ms |
+| Install / maintenance wall median | 1488 / 2054 ms | 1480 / 2031 ms |
+| Adopt / seal wall median | 257 / 214 ms | 258 / 212 ms |
+| Install, first 50 → last 50 epochs | 1449 → 1512 ms | 1443 → 1499 ms |
+
+300-epoch conservation (concurrent, load ≈100): Canvas, Grid and Chat pass (3632 / 3025 / 4775 s). A first
+attempt failed all three at the same wall-clock moment with `TRACK_M_APPS_REMOTE_ADMISSION_TIMEOUT`
+while the host swapped (load 250–317, swap 25.9 of 27.6 GB); logs kept as `conservation-*-r1.log`.
+Acceptance vs integration-4 by failing-test name: no regressions; 16 new-only failures under thrash
+were timeouts or reran clean, or fail identically on integration-4 in isolation
+([reruns](../../.logs/realtime-resume-2026-10-23/final-int5/accept/reruns/status.txt)).
+
+**What the endurance runs do not cover (found 2026-10-26):**
+- No shipped page rolls an epoch over; only the endurance harness calls `sealEpoch()`. Real rooms stay in
+  epoch 0, capped by one epoch's admission (≈40 records on settlement, ≈449 on trusted-v1 at the gate).
+  Owner decision: a per-app rollover policy; Grid's Track V switch to settlement lands with Grid's policy.
+- The shipped Grid UI (`examples/grid/src/v3-zone.ts`) and v3-chat create `creator-trusted-v1` rooms, but
+  the endurance fixture signs Grid and Chat as `creator-trusted-settlement-v1`. Trusted-v1 never deletes
+  issued records (README row 28 rejected a deleter), so a real Grid room has a lifetime bound of about
+  511 issued records (≈ epoch 255 at the endurance rate, extrapolated).
+
+Still open:
+1. Per-app rollover policy plus the Grid settlement switch (`feat/app-rollover-policy`, in progress).
+2. Work offered to a reopened creator before its interrupted close retries still wedges (pre-existing);
+   design (a), hold admission until the retry, in progress on `fix/creator-close-crash`.
+3. Maintenance-overlap issue tail in Canvas/Chat (seconds under load).
+4. Removed-author FENCE at seq 1 never retires (design in `abandonment-crash-edge/FENCE-DESIGN.md`).
+5. Browser/FPS readiness.
+
+## Integration-4 — 2026-10-26
 
 **All four 300-epoch runs pass on `ad6b32b3`**, merged into this root as `d00b1c3d`. Grid
 continued play 300 (1000 ms alarm, AC power, load ≈7–8, stall probe attached):
