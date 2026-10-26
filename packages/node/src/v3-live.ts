@@ -3251,6 +3251,11 @@ interface V3PlaneRegistration {
 	}>;
 	creatorMaintenanceBound?: boolean;
 	creatorMaintenanceAdmission?: CreatorIssuanceMaintenanceConsumer;
+	/** Durable reopen found this epoch's own close scope (temporary or retained,
+	 * unadopted) on disk: the close died before adopting. Its retry must run on
+	 * the exact durable state, so no ordinary local or received work may enter
+	 * this epoch. The registration retires at adoption; it is never cleared. */
+	creatorInterruptedClose?: true;
 	/** One nominal context sentinel and its exact ACL byte DATA, never admission authority. */
 	ordinaryIssuanceSourceIdentity?: Readonly<{ token: object; bindings: readonly unknown[]; aclBytes: Uint8Array;
 		/** Numerical byte correspondence only; never native freshness or ACL authority. */
@@ -7829,6 +7834,11 @@ function releasePendingIngress(registration: V3PlaneRegistration, digest: string
 	registration.pendingIngressBytes -= pending.pendingByteCharge;
 }
 
+/** Ordinary admission is closed while the creator's own interrupted close is on disk. */
+function creatorInterruptedClosePending(registration: V3PlaneRegistration): boolean {
+	return registration.creatorInterruptedClose === true && registration.creatorMaintenanceBound === true;
+}
+
 function retainPendingIngress(
 	registration: V3PlaneRegistration,
 	evidence: VerifiedV3IngressEvidence,
@@ -8365,6 +8375,11 @@ async function authenticateV3Ingress(registration: V3PlaneRegistration, captured
 			signature: new Uint8ArrayConstructor(signature),
 			transportSender: captured.sender,
 		});
+		// Refused, not retained: held work would block the interrupted close's own
+		// recovery dependency hold (it requires an empty pending ingress). The
+		// sender's row stays in its outbox and is redelivered after the close.
+		if (!registration.index.has(authenticated.digest) && creatorInterruptedClosePending(registration))
+			return ingressFailureLog("admission-rejected", "creator-interrupted-close-pending");
 		if (!registration.index.has(authenticated.digest) && !hasInstalledDependencies(registration.index, authenticated)) {
 			retainPendingIngress(registration, evidence, exactWireBytes.byteLength);
 			// A dependency is missing (for example a settlement fence that arrived before this
@@ -15872,6 +15887,9 @@ async function issueLocal(
 	if (readinessFailure !== undefined) return readinessFailure;
 	if (registration.blueprintClosing || registration.terminalState !== "active" || registration.retainedBootstrapHold)
 		return localIssueFailure("not-active", "v3 plane is not accepting local issues");
+	// Retryable like any closing plane: reissue once that close has adopted.
+	if (creatorInterruptedClosePending(registration))
+		return localIssueFailure("not-active", "close-pending: v3 creator's interrupted epoch close must complete before new local work");
 	if (isAuthorFenceOperation(first.operation)) return issueAuthorFence(registration, input);
 	// Plain local work has no historical source/effect binding. Use the existing
 	// NEW-operation owner before frontier joins can sign or mutate native state;
@@ -22922,6 +22940,20 @@ async function activateCreatorSuccessorLive(
 			return rejected("recovery-rejected", "creator successor is not the addressed retirement source");
 		if (retirementControl?.nominee != null && retirementControl.active !== null)
 			return rejected("recovery-rejected", "creator successor retirement source has an unresolved nominee");
+		// A close at this epoch that died before adopting left its own snapshot
+		// scope (temporary or retained) at an epoch >= the reopened one.
+		let interruptedClose = false;
+		const admissionImageReader = (material.snapshotStore as Partial<Pick<SnapshotRecoveryStore<SnapshotVerificationReceipt>,
+			"readRetirementAdmissionImage">>).readRetirementAdmissionImage;
+		if (material.origin === "durable-reopen" && material.receiveOnly !== true && admissionImageReader !== undefined) {
+			const objectId = material.successor.trust.objectId, epoch = material.successor.trust.currentEpoch;
+			try {
+				const admissionImage = await admissionImageReader.call(material.snapshotStore, { objectId });
+				interruptedClose = admissionImage.image.scopes.some(pair => pair.scope.objectId === objectId && pair.scope.epoch >= epoch);
+			} catch (cause) {
+				return rejected("recovery-rejected", "creator successor snapshot admission image is unavailable", cause);
+			}
+		}
 		const receipt = material.retirementReconstruction;
 		if (
 			receipt !== undefined &&
@@ -22946,6 +22978,7 @@ async function activateCreatorSuccessorLive(
 		// actual activation and this gate on the SAME private registration.
 		if (!bindSnapshotReadinessOwner(activatedRegistration, material.snapshotStore))
 			return await rejectReplacement("recovery-rejected", "creator successor snapshot readiness owner is unavailable");
+		if (interruptedClose) activatedRegistration.creatorInterruptedClose = true;
 		const resumeCheckpoint =
 			(retirementControl?.active !== null && retirementControl?.active !== undefined) ||
 			// First-successor classification fences retain every byte and have no
