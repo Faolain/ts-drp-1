@@ -465,11 +465,11 @@ export function createEphemeralChannel(
 	let activeEntries = 0;
 	let nextSequence = 1;
 	const reliableIdleWaiters = new Set<() => void>();
-	let resolveClosed: (() => void) | undefined;
 	let resolveQueueSpace: (() => void) | undefined;
-	const closedResult = new Promise<false>((resolve) => {
-		resolveClosed = (): void => resolve(false);
-	});
+	// Waiters released by close(). Each waiter is removed as soon as its own wait
+	// settles: racing a session-long pending "closed" promise would attach one
+	// reaction per wait that only close() could release, growing per frame.
+	const closeWaiters = new Set<() => void>();
 	let queueSpace = new Promise<void>((resolve) => {
 		resolveQueueSpace = resolve;
 	});
@@ -674,6 +674,7 @@ export function createEphemeralChannel(
 					});
 					const onAbort = (): void => resolveAborted(false);
 					entrySignal.addEventListener("abort", onAbort, { once: true });
+					closeWaiters.add(onAbort);
 					try {
 						accepted = await Promise.race([
 							port.send({
@@ -682,13 +683,13 @@ export function createEphemeralChannel(
 								recipients: entry.recipients,
 								signal: entrySignal,
 							}),
-							closedResult,
 							aborted,
 						]);
 					} catch {
 						accepted = false;
 					} finally {
 						entrySignal.removeEventListener("abort", onAbort);
+						closeWaiters.delete(onAbort);
 					}
 					if (accepted) break;
 				}
@@ -790,7 +791,16 @@ export function createEphemeralChannel(
 					generation === reliableGeneration &&
 					retainedEntryCount() >= QUEUE_CAPACITY - UNRELIABLE_QUEUE_RESERVE
 				) {
-					await Promise.race([queueSpace, closedResult]);
+					let releaseWait!: () => void;
+					const closing = new Promise<void>((resolve) => {
+						releaseWait = resolve;
+					});
+					closeWaiters.add(releaseWait);
+					try {
+						await Promise.race([queueSpace, closing]);
+					} finally {
+						closeWaiters.delete(releaseWait);
+					}
 				}
 				return closed || generation !== reliableGeneration ? false : enqueue();
 			})();
@@ -868,7 +878,8 @@ export function createEphemeralChannel(
 			closed = true;
 			void resetReliable();
 			unreliableTransportController.abort(new Error("ephemeral channel closed"));
-			resolveClosed?.();
+			for (const waiter of [...closeWaiters]) waiter();
+			closeWaiters.clear();
 			unsubscribe();
 			unsubscribePeerDisconnect();
 			for (const entry of reliableQueue.splice(0)) entry.resolve(false);
