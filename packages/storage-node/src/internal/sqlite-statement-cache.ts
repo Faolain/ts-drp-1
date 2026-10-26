@@ -3,12 +3,21 @@ import { DatabaseSync, type StatementSync } from "node:sqlite";
 // Per-connection reuse of native prepared statements.
 //
 // Ownership: entries are keyed by the connection object, then by the exact SQL
-// text, so a statement can never cross connections and is unreachable once its
-// connection is. node:sqlite finalizes every statement of a connection when it
-// closes; each hit re-checks that, and a finalized hit drops the connection's
-// whole entry. No statement therefore outlives its connection incarnation,
-// including close() followed by open() on the same object. A closed connection
-// reaches native prepare, which throws exactly as an uncached acquisition did.
+// text, so a statement can never cross connections. node:sqlite finalizes every
+// statement of a connection when it closes; each hit re-checks that, and a
+// finalized hit drops the connection's whole entry. No statement therefore
+// outlives its connection incarnation, including close() followed by open() on
+// the same object. A closed connection reaches native prepare, which throws
+// exactly as an uncached acquisition did.
+//
+// Retention: a StatementSync holds its DatabaseSync through a native strong
+// reference, so a cache entry pins its connection regardless of JavaScript
+// reachability; a WeakMap entry would never die and every connection ever
+// opened would stay in the heap. Entries are therefore owned by a strong map
+// and released by a sweep that drops every closed (finalized) connection.
+// The sweep runs when the map reaches twice its live size after the previous
+// sweep (at least SWEEP_FLOOR), so it is amortized O(1) per new connection and
+// retained closed connections are bounded by the live set, not by history.
 //
 // Transparency: reuse applies only while prepare is the native implementation.
 // When prepare has been replaced (instrumentation or fault injection), every
@@ -25,7 +34,17 @@ const NATIVE_PREPARE = nativePrepare();
 // A safety bound on distinct texts per connection; SQL texts are fixed or
 // interpolate bounded constants, so this is never reached in practice.
 const MAX_STATEMENTS_PER_CONNECTION = 1024;
-const connections = new WeakMap<DatabaseSync, Map<string, StatementSync>>();
+const SWEEP_FLOOR = 16;
+const connections = new Map<DatabaseSync, Map<string, StatementSync>>();
+let sweepAt = SWEEP_FLOOR;
+
+function sweepClosedConnections(): void {
+	for (const [database, statements] of connections) {
+		const first = statements.values().next();
+		if (first.done === true || !live(first.value)) connections.delete(database);
+	}
+	sweepAt = Math.max(SWEEP_FLOOR, 2 * connections.size);
+}
 
 function nativePrepare(): DatabaseSync["prepare"] | undefined {
 	const prepare = DatabaseSync.prototype.prepare;
@@ -85,6 +104,7 @@ function acquire(database: DatabaseSync, sql: string, configure: boolean): State
 	}
 	const prepared = configured(database.prepare(sql));
 	if (statements === undefined) {
+		if (connections.size >= sweepAt) sweepClosedConnections();
 		statements = new Map();
 		connections.set(database, statements);
 	}
