@@ -67,10 +67,17 @@ const OFFERED = [
 	["close-scope-retained", 5],
 	["seal-finalized", 5],
 ] as const;
+// Genesis (zero warm seals): the creator dies inside the room's FIRST close
+// (epoch 0 to 1). Its reopen is the genesis plane, not a successor's durable
+// reopen, so the interrupted close must be detected on that path too.
+const GENESIS_EDGES = ["close-scope-open", "close-scope-retained", ...SEAL_PHASES.map((phase) => `seal-${phase}` as const)] as const;
+const GENESIS_OFFERED = ["close-scope-open", "close-scope-retained", "seal-prepared", "seal-finalized"] as const;
 const CASES = [
 	...EDGES.map((edge) => [edge, 3, ""] as const),
 	...STEADY_EDGES.map((edge) => [edge, 5, ""] as const),
 	...OFFERED.map(([edge, warm]) => [edge, warm, " with work offered before the retry"] as const),
+	...GENESIS_EDGES.map((edge) => [edge, 0, ""] as const),
+	...GENESIS_OFFERED.map((edge) => [edge, 0, " with work offered before the retry"] as const),
 ];
 // A retryable refusal of a creator issue while its interrupted close is on disk.
 const RETRYABLE_REFUSAL = /close-pending/;
@@ -120,6 +127,8 @@ type Fixture = Awaited<ReturnType<typeof fixture>>;
 type Peer = Awaited<ReturnType<Fixture["open"]>>;
 
 const texts = (peer: Peer) => peer.room.projection().messages.map((entry) => entry.clientOperationId);
+// The room's current epoch: genesis (0) carries no successor authority.
+const epochOf = (peer: Peer) => peer.room.authority()?.epoch ?? 0;
 
 it.runIf(INNER)(
 	"a creator survives process death inside its own epoch close",
@@ -234,7 +243,7 @@ it.runIf(INNER)(
 				delivered = await deliver(f, creator, delivered);
 				accepted.push("member-fatal");
 				expect(texts(creator)).toEqual(expect.arrayContaining(accepted));
-				const epochBefore = required(creator.room.authority()).epoch;
+				const epochBefore = epochOf(creator);
 				writeFileSync(setupFile, JSON.stringify({ selectors: f.localSelectors, accepted, delivered, epochBefore }));
 				armed.value = true;
 				armed.stage = "seal";
@@ -257,7 +266,7 @@ it.runIf(INNER)(
 			const f = await fixture(directory, setup.selectors);
 			const creator = await f.open(0, { reopen: true }),
 				member = await f.open(1, { reopen: true, promote: true });
-			const reopenedEpoch = required(creator.room.authority()).epoch;
+			const reopenedEpoch = epochOf(creator);
 			// Exactly one of: the dead close's epoch adopted, or not sealed.
 			expect([setup.epochBefore, setup.epochBefore + 1]).toContain(reopenedEpoch);
 			// Nothing the creator accepted is lost across the death.
