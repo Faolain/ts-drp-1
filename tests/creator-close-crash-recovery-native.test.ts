@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type -- Native probe inference. */
 import { decodeCanonical } from "@ts-drp/canonical";
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync, StatementSync } from "node:sqlite";
@@ -54,7 +54,50 @@ type Edge = (typeof EDGES)[number];
 // itself meets the interrupted close's retained scope.
 const WARM_SEALS = Number(process.env.CREATOR_CLOSE_CRASH_WARM ?? 3);
 const STEADY_EDGES = ["close-scope-retained", ...SEAL_PHASES.map((phase) => `seal-${phase}` as const)] as const;
-const CASES = [...EDGES.map((edge) => [edge, 3] as const), ...STEADY_EDGES.map((edge) => [edge, 5] as const)];
+// Offered: after reopen and BEFORE the interrupted close retries, the creator
+// is offered its own new work and a member's append. Neither may enter the
+// interrupted epoch's state: each is refused retryably or deferred, the retry
+// completes on the exact same scope and incarnation, and the offered work is
+// accepted once reissued after the retry.
+const OFFERED = [
+	["close-scope-open", 3],
+	["close-scope-retained", 3],
+	["seal-prepared", 3],
+	["seal-finalized", 3],
+	["close-scope-retained", 5],
+	["seal-finalized", 5],
+] as const;
+const CASES = [
+	...EDGES.map((edge) => [edge, 3, ""] as const),
+	...STEADY_EDGES.map((edge) => [edge, 5, ""] as const),
+	...OFFERED.map(([edge, warm]) => [edge, warm, " with work offered before the retry"] as const),
+];
+// A retryable refusal of a creator issue while its interrupted close is on disk.
+const RETRYABLE_REFUSAL = /close-pending/;
+
+type CloseScopeRow = { object_id: string; epoch: number; anchor: string; manifest_digest: string; incarnation: string };
+/**
+ * Every native snapshot scope row at `epoch` in the directory (identity and incarnation).
+ * @param directory - The crash directory.
+ * @param epoch - The interrupted close's epoch.
+ * @returns The rows, ordered.
+ */
+const closeScopes = (directory: string, epoch: number): CloseScopeRow[] =>
+	readdirSync(directory)
+		.filter((name) => name.endsWith(".drp-snapshot-quarantine-v1.sqlite"))
+		.sort()
+		.flatMap((name) => {
+			const database = new DatabaseSync(join(directory, name), { readOnly: true });
+			try {
+				return database
+					.prepare(
+						"SELECT object_id, epoch, anchor, manifest_digest, incarnation FROM snapshot_scopes_v2 WHERE epoch = ? ORDER BY object_id, anchor, manifest_digest"
+					)
+					.all(epoch) as CloseScopeRow[];
+			} finally {
+				database.close();
+			}
+		});
 
 const message = (clientOperationId: string) => ({
 	action: "message",
@@ -84,6 +127,7 @@ it.runIf(INNER)(
 		const directory = required(process.env.CREATOR_CLOSE_CRASH_DIRECTORY);
 		const edge = required(process.env.CREATOR_CLOSE_CRASH_EDGE) as Edge;
 		const mode = required(process.env.CREATOR_CLOSE_CRASH_MODE);
+		const offer = process.env.CREATOR_CLOSE_CRASH_OFFER === "1";
 		const reportFile = join(directory, "death.json"),
 			setupFile = join(directory, "setup.json");
 		const prepare = DatabaseSync.prototype.prepare,
@@ -208,6 +252,8 @@ it.runIf(INNER)(
 				delivered: number | null;
 				epochBefore: number;
 			};
+			// The interrupted close's own scope as the death left it (read before any reopen).
+			const scopesAtDeath = closeScopes(directory, setup.epochBefore);
 			const f = await fixture(directory, setup.selectors);
 			const creator = await f.open(0, { reopen: true }),
 				member = await f.open(1, { reopen: true, promote: true });
@@ -217,7 +263,54 @@ it.runIf(INNER)(
 			// Nothing the creator accepted is lost across the death.
 			expect(texts(creator)).toEqual(expect.arrayContaining(setup.accepted));
 			const epochs: number[] = [];
-			for (let seal = 0; seal < 2; seal++) {
+			const offered: string[] = [];
+			let offeredOutcome: Record<string, unknown> | undefined;
+			if (offer) {
+				expect(reopenedEpoch).toBe(setup.epochBefore);
+				expect(scopesAtDeath).toHaveLength(1);
+				// The creator's own new work, before the interrupted close retries.
+				let creatorSettled: { accepted: true } | { accepted: false; reason: string } | undefined;
+				const creatorIssue = creator.room.issue(message("creator-offered")).then(
+					() => {
+						creatorSettled = { accepted: true };
+					},
+					(error: unknown) => {
+						creatorSettled = { accepted: false, reason: String(error) };
+					}
+				);
+				await Promise.race([creatorIssue, new Promise((resolve) => setTimeout(resolve, 30_000))]);
+				const creatorRefused = creatorSettled?.accepted === false ? creatorSettled.reason : undefined;
+				// Never admitted into the interrupted epoch: refused retryably, or still deferred.
+				expect(creatorSettled?.accepted, "the creator admitted work into the interrupted epoch").not.toBe(true);
+				if (creatorRefused !== undefined) expect(creatorRefused).toMatch(RETRYABLE_REFUSAL);
+				// A member's append, offered to the creator before the retry.
+				await member.room.issue(message("member-offered"));
+				const memberRows = await f.issuedAfter(1, setup.delivered);
+				expect(memberRows).toHaveLength(1);
+				const receivedBeforeRetry = await creator.receive(memberRows, 1, 30_000);
+				expect(receivedBeforeRetry, "the creator admitted a member append into the interrupted epoch").toBe(false);
+				expect(texts(creator)).not.toContain("creator-offered");
+				expect(texts(creator)).not.toContain("member-offered");
+				// The retry runs on the exact scope and incarnation the death left.
+				const retried = await creator.room.sealEpoch();
+				expect(retried.ok, JSON.stringify(retried)).toBe(true);
+				await creator.room.adoptCreatorSuccessor();
+				await f.install(member);
+				epochs.push(required(creator.room.authority()).epoch);
+				expect(closeScopes(directory, setup.epochBefore)).toEqual(scopesAtDeath);
+				// The offered work is accepted once reissued (or once its deferral completes).
+				if (creatorRefused === undefined) {
+					await creatorIssue;
+					expect(creatorSettled).toEqual({ accepted: true });
+				} else await creator.room.issue(message("creator-offered"));
+				// The member's offered row was signed in the interrupted epoch; its
+				// install of the adopted successor carries that unsettled work forward.
+				setup.delivered = await deliver(f, creator, setup.delivered);
+				expect(texts(creator)).toContain("member-offered");
+				offered.push("creator-offered", "member-offered");
+				offeredOutcome = { creatorRefused: creatorRefused ?? "deferred", receivedBeforeRetry, scopesAtDeath };
+			}
+			for (let seal = epochs.length; seal < 2; seal++) {
 				expect((await creator.room.sealEpoch()).ok).toBe(true);
 				await creator.room.adoptCreatorSuccessor();
 				await f.install(member);
@@ -228,7 +321,7 @@ it.runIf(INNER)(
 			await creator.room.issue(message("creator-after"));
 			await member.room.issue(message("member-after"));
 			await deliver(f, creator, setup.delivered);
-			const all = [...setup.accepted, "creator-after", "member-after"];
+			const all = [...setup.accepted, ...offered, "creator-after", "member-after"];
 			expect(texts(creator)).toEqual(expect.arrayContaining(all));
 			expect((await creator.room.sealEpoch()).ok).toBe(true);
 			await creator.room.adoptCreatorSuccessor();
@@ -240,6 +333,8 @@ it.runIf(INNER)(
 				JSON.stringify({
 					edge,
 					death,
+					offer,
+					...(offeredOutcome === undefined ? {} : { offeredOutcome }),
 					epochBefore: setup.epochBefore,
 					reopenedEpoch,
 					epochs,
@@ -257,9 +352,11 @@ it.runIf(INNER)(
 );
 
 it.skipIf(INNER).each(CASES)(
-	"SIGKILL right after the creator's %s commit (after %i warm seals) recovers and the room continues",
-	async (edge, warm) => {
-		const directory = mkdtempSync(join(tmpdir(), `creator-close-crash-${edge}-w${warm}-`));
+	"SIGKILL right after the creator's %s commit (after %i warm seals)%s recovers and the room continues",
+	async (edge, warm, offered) => {
+		const directory = mkdtempSync(
+			join(tmpdir(), `creator-close-crash-${edge}-w${warm}${offered === "" ? "" : "-offer"}-`)
+		);
 		const file = fileURLToPath(import.meta.url);
 		const fork = (mode: "mutate" | "recover") =>
 			new Promise<{ status: number | null; stdout: string; stderr: string }>((resolve, reject) => {
@@ -273,6 +370,7 @@ it.skipIf(INNER).each(CASES)(
 						CREATOR_CLOSE_CRASH_DIRECTORY: directory,
 						CREATOR_CLOSE_CRASH_EDGE: edge,
 						CREATOR_CLOSE_CRASH_WARM: String(warm),
+						CREATOR_CLOSE_CRASH_OFFER: offered === "" ? "0" : "1",
 						CREATOR_CLOSE_CRASH_MODE: mode,
 					},
 				});
