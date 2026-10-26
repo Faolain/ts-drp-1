@@ -4,6 +4,7 @@ import {compareBytes, decodeCanonical, encodeCanonical, hashDomain} from "@ts-dr
 import * as ts from "typescript";
 import {describe, expect, it} from "vitest";
 import {sameCreatorRoomHead} from "../src/internal/creator-room-head.js";
+import {CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE} from "../src/internal/creator-source-custody.js";
 
 // Execute the actual boundary producer bodies. Authentication/storage and the
 // original numerical width laws are controlled premises here, not proved by
@@ -129,6 +130,7 @@ function fixture(profileId = "creator-trusted-v1", oldPayloadBytes = 700) {
 		creatorOrdinaryRuntimeCapacityWidths: (...args: any[]) => {calls.push(["runtimeWidths", ...args]); return {currentClose: 100};},
 		// Width/source authentication remains a controlled premise in this owner-bracket test.
 		creatorSourceCustodyGeometryForSizing: () => undefined,
+		CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE,
 		issuanceOrdinaryFinishingCapacityWidths: (...args: any[]) => {calls.push(["issuerWidths", ...args]); return {nativeImageByteLength: 200};},
 		ordinaryApplicationResourceCursors: cursors,
 		ordinaryRuntimeCapacityGeometry: geometry,

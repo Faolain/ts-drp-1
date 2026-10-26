@@ -163,6 +163,7 @@ import {
 	type CreatorOrdinaryIssuanceProofSource,
 	type CreatorOrdinaryIssuanceSourceMaterial,
 	type CreatorSnapshotRetirementReconstructionRequest,
+	type CreatorNextEpochAdmissionForecastSink,
 	readProspectiveCreatorMaintenancePrefixesForSizing,
 	readCreatorOrdinaryFinishingCapacityForSizing,
 	readCreatorOrdinaryPreimageCapacityForSizing,
@@ -2588,7 +2589,24 @@ async function captureCreatorOrdinarySourceWithoutForecast(
 		if (failed) throw new AggregateError([primary, cleanup], "creator ordinary source prime and joined release failed", {cause: primary});
 		throw cleanup;
 	}
-	if (failed) throw primary;
+	if (failed) {
+		// The captured source is an OPTIONAL warm hint: retaining every closed
+		// journal row's PRE/signature beside the whole cold census can exceed the
+		// ordinary book although each exact cold admission still fits (the first
+		// post-adoption readiness after a full epoch). Only that original capacity
+		// refusal declines, after the joined release; the caller keeps the exact
+		// cold route. Admission does not reserve proof capacity for a hint, and
+		// readiness must not turn finished, accepted work into a terminal failure.
+		if (isCreatorOrdinarySourceCapacityRefusal(primary)) {
+			try {
+				const observer = Reflect.get(globalThis, "__warmProofEvent");
+				if (typeof observer === "function") observer({kind: "ordinary-source-capture-refused",
+					epoch: registration.currentTrust.currentEpoch, reason: "ordinary-source-retention-capacity", readiness});
+			} catch { /* Diagnostics never alter the original owner outcome. */ }
+			return undefined;
+		}
+		throw primary;
+	}
 	return source;
 }
 
@@ -2943,6 +2961,35 @@ function creatorIssuanceMaintenanceQuoteSizing(
 	return {knownBasis, receivedSignature, unknownBasis, fields};
 }
 
+/** Fixed custody one more retained close adds to the next epoch's first cold
+ * acquisition that the forecast does not derive: the closed snapshot's scope
+ * in the snapshot wrapper and inventory, the signing preparation rows and the
+ * maintenance prefix carriers. Measured 1.2-1.5 KB; reserved at 4 KiB. */
+const CREATOR_NEXT_EPOCH_FIXED_CUSTODY_BYTES = 4096;
+
+/**
+ * Forecasts the next epoch's first cold admission book after this admission:
+ * this book plus the composition's journal/census/runtime/native-reader delta,
+ * the closed snapshot's evidence (this close's successor payload and manifest)
+ * and the closed epoch's final signing rows. Undefined when no forecast applies.
+ */
+function creatorNextEpochAdmissionForecast(
+	quote: CreatorIssuanceMaintenanceQuote,
+	chargedBytes: number,
+	sink: CreatorNextEpochAdmissionForecastSink,
+	planEffect?: NonNullable<DurableIssueCommit["planEffect"]>
+): number | undefined {
+	if (sink.delta === undefined || planEffect !== undefined || quote.receivedSignature !== undefined ||
+		quote.archiveCapacity !== undefined) return undefined;
+	const { material, signingFrames } = quote;
+	// The next epoch reads each closed signing row once, in its final phase.
+	const finalFrames = new Map<string, number>();
+	for (const frame of signingFrames) finalFrames.set(JSON.stringify([frame.store, frame.key]), frame.canonicalFrameByteLength);
+	const signing = [...finalFrames.values()].reduce((sum, width) => sum + width, 0);
+	const snapshotEvidence = material.preview.exactCanonicalPayloadBytes.byteLength + material.snapshot.exactCanonicalManifestBytes.byteLength;
+	return chargedBytes + sink.delta + snapshotEvidence + signing + CREATOR_NEXT_EPOCH_FIXED_CUSTODY_BYTES;
+}
+
 async function chargeCreatorIssuanceMaintenanceQuote(
 	quote: CreatorIssuanceMaintenanceQuote,
 	unsignedBytes: Uint8Array,
@@ -2951,7 +2998,8 @@ async function chargeCreatorIssuanceMaintenanceQuote(
 ): Promise<boolean> {
 	const {proof} = quote, accounting = proof.accounting;
 	const {knownBasis, receivedSignature, unknownBasis, fields} = creatorIssuanceMaintenanceQuoteSizing(quote, unsignedBytes, planEffect);
-	const prefixInput = {...fields, proof};
+	const nextEpochAdmissionForecast: CreatorNextEpochAdmissionForecastSink = {};
+	const prefixInput = {...fields, proof, nextEpochAdmissionForecast};
 	// Source capture and compilation precede every NEW UNKNOWN charge. The
 	// compiler retains numerical fields only in this handle's one source cell.
 	const captured = source === undefined ? undefined : await captureCreatorOrdinaryFinishingCapacityTemplate(prefixInput, source);
@@ -2979,6 +3027,17 @@ async function chargeCreatorIssuanceMaintenanceQuote(
 	for (const length of unknown)
 		if (!accounting.chargeUnknownEncodedLength(length))
 			throw new TypeError("creator issuance maintenance proof reserve is exhausted");
+	// Admission must leave the next epoch's first cold admission room in the
+	// same ordinary book after this epoch closes and adopts; otherwise retained
+	// material strands admission with no protocol drain.
+	const forecast = creatorNextEpochAdmissionForecast(quote, accounting.chargedBytes, nextEpochAdmissionForecast, planEffect);
+	try {
+		const observer = Reflect.get(globalThis, "__warmProofEvent");
+		if (typeof observer === "function") observer({kind: "creator-issuance-maintenance-book",
+			chargedBytes: accounting.chargedBytes, maxBytes: accounting.maxBytes, nextEpochForecastBytes: forecast});
+	} catch { /* Diagnostics cannot alter admission. */ }
+	if (forecast !== undefined && forecast > accounting.maxBytes)
+		throw new TypeError("creator next-epoch admission proof reserve is exhausted");
 	return captured?.captured ?? false;
 }
 
@@ -4985,6 +5044,9 @@ export async function bindCreatorLiveClose(
 							} catch (cause) {
 								ordinaryProofSource = undefined; ordinaryTemplateReady = false;
 								if (cause instanceof AggregateError) maintenanceReleaseFailure = cause;
+								// A typed data refusal is not an Error; the room surfaces this as its
+								// terminal failure, which must name the refusal kind (its string form).
+								if (!(cause instanceof Error)) throw new TypeError(`creator ordinary readiness refused: ${String(cause)}`, {cause});
 								throw cause;
 							} finally {
 								releaseForeground();

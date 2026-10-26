@@ -196,7 +196,7 @@ import { encodeCreatorCloseMembership, openCreatorCloseMembership,
 import { encodeReceivedCloseMembership, openReceivedCloseMembership, verifyReceivedClosedJournalAuthority,
 	type ReceivedCloseAuthorityRecords } from "./internal/creator-received-close-membership.js";
 import type { CreatorPendingClassificationCustodyInput } from "./internal/creator-adoption-recover.js";
-import { creatorSourceCustodyGeometryForSizing, captureCreatorSourceContext, openCreatorSourceCustody, resolveCreatorSourceCustody,
+import { CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE, creatorSourceCustodyGeometryForSizing, captureCreatorSourceContext, openCreatorSourceCustody, resolveCreatorSourceCustody,
 	captureCreatorSourceCompletion, openCreatorSourceCompletion, captureCreatorSourceExpiry, openCreatorSourceExpiry,
 	type VerifiedCreatorSourceCustody, type CreatorSourceCustodyIdentity } from "./internal/creator-source-custody.js";
 import type { CreatorClosedRollbackProofAccounting, CreatorSnapshotRetirementReconstructionRequest,
@@ -12044,6 +12044,7 @@ async function captureOrdinaryReadinessPreparationForSizing(facts: Pick<Recovery
 		canonicalEpochVertexByteLength: vertexWidth, successorFencePreimageByteLength: fencePreimage, successorFenceCount}, journalRows, undefined, true);
 	const issuance = issuanceOrdinaryFinishingCapacityWidths({rows: native, scope: registration.issuanceScope, control: control ?? null,
 		maxAdditionalCurrentIssued: 1, maxCanonicalPreimageByteLength: preimage, successorFenceCount,
+		adoptionReserveFenceCount: successorFenceCount === 0 ? 0 : CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE,
 		sourceCustody: creatorSourceCustodyGeometryForSizing(trust, encodeCanonical(registration.authorization.value), registration.payload.parameters.maxEpochVertices)});
 	const issued = new Map<string, string>();
 	for (const row of native.issued) {
@@ -20058,17 +20059,54 @@ function prospectiveCreatorPostAdoptionCensusSizing(
 		);
 		const unknownFencePreimageWidth =
 			1 + prospectiveCensusCountWidth(fencePreimageByteLength) + fencePreimageByteLength;
+		// Ordinary work must leave room for the work that finishes it. Adoption
+		// issues the mandatory fence above on the successor live plane; that
+		// fence's own admission reserves ITS successor fence (the
+		// one-successor-fence law), and this work stays retained until E+3
+		// readiness maintenance, so an admission at E+2 (possibly another
+		// writer's received fence) projects the E+3 adoption fence too
+		// (CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE). Every candidate other
+		// than the fence therefore reserves those later fence-shaped
+		// issued/outbox pairs, plan custody sources and lineage ordinals. The
+		// fence itself keeps the single successor reserve. A received append
+		// adds no local issued row, protected record or custody source, so it
+		// cannot change this author's adoption census and reserves nothing more.
+		const adoptionReserve = settlement.planEffect?.kind === "fence" || receivedAppend ? 0 :
+			CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE;
+		const reserveFences = Array.from({ length: adoptionReserve }, (_, index) => {
+			const sequence = fenceSequence + 1 + index;
+			const byteLength = prospectiveCensusRecordWidth(
+				{
+					...unsignedFields,
+					author: candidate.scope.author,
+					authorSequence: sequence,
+					epoch: epoch + 2 + index,
+					// Later anchors are unknown; every anchor digest has this width.
+					anchor: anchorRead.anchorDigest,
+					dependencies: [anchorRead.anchorDigest],
+					operation: ObjectFreeze({ action: AUTHOR_FENCE_ACTION, fenceSequence: sequence, version: 1 }),
+				},
+				{ logicalTime: encodeCanonical(Number.MAX_SAFE_INTEGER).byteLength }
+			);
+			return { sequence, preimageWidth: 1 + prospectiveCensusCountWidth(byteLength) + byteLength };
+		});
 		const fenceJobWidths = issuanceUnsignedSuccessorFenceWidths(nativeRows, candidate.scope, immediateIntent, control, {
 			plan,
 			canonicalPreimageByteLength: fencePreimageByteLength,
 			...(continuation === undefined ? {} : { continuation: futureJobs }),
 		}, sourceCustody);
 		const unknownDigest32 = 1 + prospectiveCensusCountWidth(32) + 32;
-		const finalPlan = applySettlementPlanEffect(plan, { kind: "fence" }, fenceSequence);
-		const plans =
+		const fencedPlan = applySettlementPlanEffect(plan, { kind: "fence" }, fenceSequence);
+		// The successor merge keeps the entries and bumps a fenced plan's
+		// revision (previewCreatorOrdinarySuccessorSettlement); the reserve fence
+		// then fences that merged plan. Width data only, never an installed plan.
+		const finalPlan = reserveFences.reduce((last, reserve) => applySettlementPlanEffect(
+			{ ...last, revision: last.revision + 1, fenceSequence: null }, { kind: "fence" }, reserve.sequence), fencedPlan);
+		const plansFor = (last: SettlementPlan): SettlementPlan[] =>
 			candidatePlan === undefined
-				? [...nativeRows.plans, finalPlan]
-				: nativeRows.plans.map((row) => (row === candidatePlan ? finalPlan : row));
+				? [...nativeRows.plans, last]
+				: nativeRows.plans.map((row) => (row === candidatePlan ? last : row));
+		const plans = plansFor(finalPlan);
 		const unknown64 = 1 + prospectiveCensusCountWidth(64) + 64;
 		const arrayWidth = (widths: readonly number[]): number =>
 			1 + prospectiveCensusCountWidth(widths.length) + widths.reduce((sum, width) => sum + width, 0);
@@ -20084,7 +20122,7 @@ function prospectiveCreatorPostAdoptionCensusSizing(
 				exhausted: false,
 				prunedThroughAuthorSequence: null,
 			};
-			return encodeCanonical({ ...fields, next: fenceSequence + 1, exhausted: false }).byteLength;
+			return encodeCanonical({ ...fields, next: fenceSequence + 1 + adoptionReserve, exhausted: false }).byteLength;
 		});
 		const issuedWidths = nativeRows.issued.map((row) => encodeCanonical(row).byteLength);
 		if (!receivedAppend) issuedWidths.push(
@@ -20147,15 +20185,29 @@ function prospectiveCreatorPostAdoptionCensusSizing(
 				{ digest: unknownDigest32 }
 			)
 		);
-		const nativeRowsByteLength = Math.max(fenceJobWidths.final.canonicalRowsBytes, prospectiveCensusRecordWidth(
-			{},
-			{
-				lineages: arrayWidth(lineageWidths),
-				issued: arrayWidth(issuedWidths),
-				outbox: arrayWidth(outboxWidths),
-				plans: arrayWidth(plans.map((row) => encodeCanonical(row).byteLength)),
-			}
-		));
+		const rowsWidth = (lineages: readonly number[], issuedRows: readonly number[], outboxRows: readonly number[],
+			planRows: readonly SettlementPlan[]): number => prospectiveCensusRecordWidth({}, {
+			lineages: arrayWidth(lineages), issued: arrayWidth(issuedRows), outbox: arrayWidth(outboxRows),
+			plans: arrayWidth(planRows.map((row) => encodeCanonical(row).byteLength)),
+		});
+		const singleFenceRowsByteLength = adoptionReserve === 0 ? 0 : rowsWidth(authors.map((author) => {
+			const original = nativeRows.lineages.find((row) => row.author === author);
+			if (author !== candidate.scope.author) return encodeCanonical(original).byteLength;
+			const { pendingUnsigned: _pending, ...fields } = original ?? {
+				...candidate.scope, next: 0, exhausted: false, prunedThroughAuthorSequence: null };
+			return encodeCanonical({ ...fields, next: fenceSequence + 1, exhausted: false }).byteLength;
+		}), issuedWidths, outboxWidths, plansFor(fencedPlan));
+		for (const reserve of reserveFences) {
+			issuedWidths.push(prospectiveCensusRecordWidth({ ...candidate.scope, authorSequence: reserve.sequence },
+				{ canonicalPreimageBytes: reserve.preimageWidth, digest: unknownDigest32, signature: unknown64 }));
+			outboxWidths.push(prospectiveCensusRecordWidth(
+				{ ...candidate.scope, authorSequence: reserve.sequence, publishState: "published" }, { digest: unknownDigest32 }));
+		}
+		const computedRowsByteLength = rowsWidth(lineageWidths, issuedWidths, outboxWidths, plans);
+		// The issuance owner projects only the single successor fence. Carry
+		// the reserve's exact computed growth onto that projection as well.
+		const nativeRowsByteLength = Math.max(computedRowsByteLength, fenceJobWidths.final.canonicalRowsBytes +
+			(adoptionReserve === 0 ? 0 : computedRowsByteLength - singleFenceRowsByteLength));
 		if (
 			lineageWidths.length + issuedWidths.length + outboxWidths.length + plans.length >
 				ISSUANCE_RETIREMENT_LIMITS.maxRows ||
@@ -20179,7 +20231,7 @@ function prospectiveCreatorPostAdoptionCensusSizing(
 			planIndex: planOrder.findIndex((row) => row.scope.author === author),
 		}));
 		const nativePlanRewriteResource = issuanceRetirementPlanRewriteResourceForSizing(plans, sourceCustody === undefined ? undefined :
-			{scope: candidate.scope, maxSourceCount: custodySourceCount + 1, geometry: sourceCustody});
+			{scope: candidate.scope, maxSourceCount: custodySourceCount + 1 + adoptionReserve, geometry: sourceCustody});
 		const results: CreatorPostAdoptionCensusSizing[] = [];
 		// An original signed settlement frontier selects the raw successor
 		// store (installCreatorSuccessorLive); unlike the no-settlement branch
@@ -20310,7 +20362,7 @@ function prospectiveCreatorPostAdoptionCensusSizing(
 									row.publishState === "pending"
 							).length + Number(!receivedAppend)) +
 						(priorPlan === null || plan.revision !== priorPlan.revision ? 1 : 0) +
-						4,
+						4 + 5 * adoptionReserve,
 					successorJournalAppendForSizing: ObjectFreeze({
 						author: candidate.scope.author,
 						authorSequence: fenceSequence,

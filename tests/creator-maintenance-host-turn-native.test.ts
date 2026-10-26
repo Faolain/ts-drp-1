@@ -154,8 +154,14 @@ it.each(["close", "foreign-native-control"] as const)(
 		try {
 			const fixture = await creatorDeliveryRoom({ profile: "settlement", writers: 0 });
 			let creator = await fixture.open(0);
+			// Settlement admission reserves the adoption fence and the later fences
+			// issued while its work is retained, and closed epochs stay retained until
+			// an E3+ pool turnover (retirement needs epoch <= throughEpoch - 2).
+			// Measured with the single adoption reserve: E0..E2 together admit 39
+			// ordinary records (16/epoch refuses at E2 record 8, 14/epoch at E2 record
+			// 12). 12/epoch also passes under the retention reserve.
 			for (let epoch = 0; epoch < 4; epoch++) {
-				for (let index = 0; index < 16; index++)
+				for (let index = 0; index < 12; index++)
 					await creator.room.issue({ action: "placeBlock", id: `slot-${index}`, kind: "stone", x: index, y: epoch });
 				expect((await creator.room.sealEpoch()).ok).toBe(true);
 				await creator.room.adoptCreatorSuccessor();
