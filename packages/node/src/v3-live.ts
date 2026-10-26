@@ -3251,11 +3251,12 @@ interface V3PlaneRegistration {
 	}>;
 	creatorMaintenanceBound?: boolean;
 	creatorMaintenanceAdmission?: CreatorIssuanceMaintenanceConsumer;
-	/** A creator reopen (successor durable reopen, or the genesis plane's close
-	 * binding) found this epoch's own close scope (temporary or retained,
-	 * unadopted) on disk: the close died before adopting. Its retry must run on
-	 * the exact durable state, so no ordinary local or received work may enter
-	 * this epoch. The registration retires at adoption; it is never cleared. */
+	/** This epoch's own close was interrupted: a creator reopen (successor
+	 * durable reopen, or the genesis plane's close binding) found its scope
+	 * (temporary or retained, unadopted) on disk, or the close failed in process
+	 * after staging. Its retry must run on the exact durable state, so no
+	 * ordinary local or received work may enter this epoch. The registration
+	 * retires at adoption; it is never cleared. */
 	creatorInterruptedClose?: true;
 	/** One nominal context sentinel and its exact ACL byte DATA, never admission authority. */
 	ordinaryIssuanceSourceIdentity?: Readonly<{ token: object; bindings: readonly unknown[]; aclBytes: Uint8Array;
@@ -6039,6 +6040,9 @@ function egressSuccess(kind: "empty" | "published"): Extract<V3EgressResult, { r
 	return ObjectFreeze({ kind, ok: true as const });
 }
 
+// Retryable like any closing plane: reissue once that close has adopted.
+const CREATOR_CLOSE_PENDING = "close-pending: v3 creator's interrupted epoch close must complete before new local work";
+
 function localIssueFailure(
 	kind: Exclude<Extract<V3LocalIssueResult, { readonly ok: false }>["kind"], "split-required">,
 	detail: string
@@ -6245,6 +6249,8 @@ export function authorizeV3NewLocalOperation(
 		if (registration === undefined) {
 			return localIssueFailure("malformed-input", "v3 new operation plane has no provenance");
 		}
+		if (currentRegistration(registration) && !registration.receiveOnly && creatorInterruptedClosePending(registration))
+			return localIssueFailure("not-active", CREATOR_CLOSE_PENDING);
 		if (
 			!currentRegistration(registration) ||
 			registration.receiveOnly ||
@@ -15894,6 +15900,9 @@ async function issueLocal(
 	input: CapturedLocalIssueInput
 ): Promise<V3LocalIssueResult> {
 	if (registration.receiveOnly) return localIssueFailure("authorization-rejected", "v3 plane is receive-only");
+	// An interrupted close holds its (possibly still staged) plane: one refusal.
+	if (currentRegistration(registration) && creatorInterruptedClosePending(registration))
+		return localIssueFailure("not-active", CREATOR_CLOSE_PENDING);
 	if (
 		!currentRegistration(registration) ||
 		registration.blueprintClosing ||
@@ -15910,9 +15919,7 @@ async function issueLocal(
 	if (readinessFailure !== undefined) return readinessFailure;
 	if (registration.blueprintClosing || registration.terminalState !== "active" || registration.retainedBootstrapHold)
 		return localIssueFailure("not-active", "v3 plane is not accepting local issues");
-	// Retryable like any closing plane: reissue once that close has adopted.
-	if (creatorInterruptedClosePending(registration))
-		return localIssueFailure("not-active", "close-pending: v3 creator's interrupted epoch close must complete before new local work");
+	if (creatorInterruptedClosePending(registration)) return localIssueFailure("not-active", CREATOR_CLOSE_PENDING);
 	if (isAuthorFenceOperation(first.operation)) return issueAuthorFence(registration, input);
 	// Plain local work has no historical source/effect binding. Use the existing
 	// NEW-operation owner before frontier joins can sign or mutate native state;
@@ -21584,6 +21591,9 @@ function creatorCloseRegistration(
 				return false;
 			registration.blueprintClosing = false;
 			return true;
+		},
+		markInterruptedClose: (): void => {
+			if (currentRegistration(registration)) registration.creatorInterruptedClose = true;
 		},
 		captureCloseGraph: () => captureCreatorCloseGraph(registration),
 		prepareClosedEpochArchive: (hold: Parameters<V3CreatorCloseRegistration["prepareClosedEpochArchive"]>[0],

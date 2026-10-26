@@ -497,6 +497,8 @@ export interface V3CreatorCloseRegistration {
 	): readonly CreatorPostAdoptionCensusSizing[];
 	installIssuanceMaintenanceConsumer(consumer: CreatorIssuanceMaintenanceConsumer): (() => void) | undefined;
 	abortSnapshotStage(): boolean;
+	/** This epoch's close failed after staging: hold ordinary admission (close-pending) until adoption. */
+	markInterruptedClose(): void;
 	readonly currentTrust: CurrentAnchorTrust;
 	readonly retirementReconstruction?: CreatorSnapshotRetirementReconstructionRequest;
 	readonly exactCanonicalAnchorPreimageBytes: Uint8Array;
@@ -4681,7 +4683,13 @@ export async function bindCreatorLiveClose(
 			})().catch((error) => {
 				closeTask = undefined;
 				if (stagedSnapshot === undefined && registration.abortSnapshotStage()) lifecycle = "active";
-				else lifecycle = "sealed";
+				else {
+					lifecycle = "sealed";
+					// A staged close may have left its own snapshot scope on disk; its
+					// retry must run on exactly that state. Hold ordinary admission with
+					// the same close-pending gate a reopen sets, until adoption.
+					registration.markInterruptedClose();
+				}
 				maintenanceClosing = lifecycle !== "active";
 				finishRetainedReplayClose(false);
 				throw error;

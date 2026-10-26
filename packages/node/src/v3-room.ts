@@ -4711,7 +4711,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			if (request.source !== "public-new") continue;
 			const authorized = authorizeV3NewLocalOperation({ plane: activeHandle, operation: request.operation });
 			if (!authorized.ok) {
-				rejectOwned(owned, new TypeError(`v3 room new operation is not authorized: ${authorized.kind}`));
+				rejectOwned(owned, new TypeError(`v3 room new operation is not authorized: ${authorized.kind}: ${authorized.detail}`));
 				return;
 			}
 		}
@@ -7609,7 +7609,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
 					const authorized = authorizeV3NewLocalOperation({ plane: activeHandle, operation: captured });
 					if (!authorized.ok) {
-						throw new TypeError(`v3 room new operation is not authorized: ${authorized.kind}`);
+						throw new TypeError(`v3 room new operation is not authorized: ${authorized.kind}: ${authorized.detail}`);
 					}
 					const current = logicalTime;
 					logicalTime += 2;
