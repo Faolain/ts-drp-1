@@ -83,6 +83,27 @@ function errorDetails(error: unknown): unknown[] {
 	return details;
 }
 
+/**
+ * Pre-write budget refusals of the same admission sizing: the proof book or the
+ * maintenance native image bound. Either must leave the native image unchanged.
+ * @param error - The rejected issue.
+ * @returns Whether the refusal is a capacity refusal.
+ */
+function capacityRefusal(error: unknown): boolean {
+	return /proof reserve is exhausted|MAINTENANCE_NATIVE_IMAGE_EXHAUSTED/u.test(String(error));
+}
+
+/**
+ * The fixture knows `settlement` and `shipped` (creator-trusted-v1); `trusted` names the latter.
+ * @param value - The CREATOR_CAPACITY_PROFILE value.
+ * @returns The fixture profile.
+ */
+function capacityProfile(value: string | undefined): Profile {
+	if (value === undefined || value === "settlement") return "settlement";
+	if (value === "shipped" || value === "trusted") return "shipped";
+	throw new TypeError(`unknown CREATOR_CAPACITY_PROFILE: ${value}`);
+}
+
 afterEach(async () => {
 	vi.restoreAllMocks();
 	expect(await closeFixtures()).toEqual([]);
@@ -146,7 +167,7 @@ it.runIf(process.env.RUN_CREATOR_CAPACITY === "1")(
 	async () => {
 		const count = Number(process.env.CREATOR_CAPACITY_EDITS ?? 512);
 		const batchSize = Number(process.env.CREATOR_CAPACITY_BATCH_SIZE ?? 1);
-		const profile = (process.env.CREATOR_CAPACITY_PROFILE ?? "settlement") as Profile;
+		const profile = capacityProfile(process.env.CREATOR_CAPACITY_PROFILE);
 		const cycles = Number(process.env.CREATOR_CAPACITY_CYCLES ?? 1);
 		const stateSlots = Number(process.env.CREATOR_CAPACITY_STATE_SLOTS ?? count * cycles);
 		const fixture = await creatorDeliveryRoom({ profile });
@@ -220,7 +241,7 @@ it.runIf(process.env.RUN_CREATOR_CAPACITY === "1")(
 				}
 				if (refusal !== undefined) {
 					expect(refusal).toBeInstanceOf(TypeError);
-					expect(String(refusal)).toContain("proof reserve is exhausted");
+					expect(capacityRefusal(refusal), String(refusal)).toBe(true);
 					if (batchSize === 1)
 						expect(nativeImage(directory).tables, "refusal performs no native writes").toEqual(before.tables);
 				}
@@ -295,7 +316,7 @@ it.runIf(process.env.RUN_CREATOR_CAPACITY === "1")(
 						nextIssued = true;
 					} catch (error) {
 						emit("next-issue-failed", { round, error: String(error), status: creator.room.status(), events });
-						if (!String(error).includes("proof reserve is exhausted")) throw error;
+						if (!capacityRefusal(error)) throw error;
 						expect(
 							nativeImage(directory).tables,
 							"a capacity refusal before a fresh retry performs no native writes"
