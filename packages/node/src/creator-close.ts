@@ -148,6 +148,7 @@ import {
 	creatorCloseRecoveryRoleClassifiedScopesForSizing,
 	creatorCloseRecoveryRoleInventoryScopesForSizing,
 	isCreatorOrdinarySourceCapacityRefusal,
+	creatorClosedRollbackRefusalDiagnostic,
 	reserveCreatorOrdinaryFinishingCapacity,
 	captureCreatorOrdinaryFinishingCapacityTemplate,
 	evaluateCreatorOrdinaryFinishingCapacityTemplate,
@@ -2588,7 +2589,24 @@ async function captureCreatorOrdinarySourceWithoutForecast(
 		if (failed) throw new AggregateError([primary, cleanup], "creator ordinary source prime and joined release failed", {cause: primary});
 		throw cleanup;
 	}
-	if (failed) throw primary;
+	if (failed) {
+		// The captured source is an OPTIONAL warm hint: retaining every closed
+		// journal row's PRE/signature beside the whole cold census can exceed the
+		// ordinary book although each exact cold admission still fits (the first
+		// post-adoption readiness after a full epoch). Only that original capacity
+		// refusal declines, after the joined release; the caller keeps the exact
+		// cold route. Admission does not reserve proof capacity for a hint, and
+		// readiness must not turn finished, accepted work into a terminal failure.
+		if (isCreatorOrdinarySourceCapacityRefusal(primary)) {
+			try {
+				const observer = Reflect.get(globalThis, "__warmProofEvent");
+				if (typeof observer === "function") observer({kind: "ordinary-source-capture-refused",
+					epoch: registration.currentTrust.currentEpoch, reason: "ordinary-source-retention-capacity", readiness});
+			} catch { /* Diagnostics never alter the original owner outcome. */ }
+			return undefined;
+		}
+		throw primary;
+	}
 	return source;
 }
 
@@ -4985,6 +5003,10 @@ export async function bindCreatorLiveClose(
 							} catch (cause) {
 								ordinaryProofSource = undefined; ordinaryTemplateReady = false;
 								if (cause instanceof AggregateError) maintenanceReleaseFailure = cause;
+								// A typed data refusal is not an Error; the room surfaces this as its
+								// terminal failure, which must name the refusal kind.
+								const refusal = creatorClosedRollbackRefusalDiagnostic(cause);
+								if (refusal !== undefined) throw new TypeError(`creator ordinary readiness refused: ${refusal}`, {cause});
 								throw cause;
 							} finally {
 								releaseForeground();

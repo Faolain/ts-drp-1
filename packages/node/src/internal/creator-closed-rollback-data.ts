@@ -875,6 +875,11 @@ const closedJournalDrainIdentity = (
 class Refusal {
 	readonly diagnosticStack = new Error().stack;
 	constructor(readonly result: Failure) {}
+	/** A Refusal is typed data, not an Error. Wherever one surfaces through
+	 * string conversion it must still name its refusal kind, not `[object Object]`. */
+	toString(): string {
+		return `creator closed rollback refusal: ${creatorClosedRollbackRefusalDiagnostic(this)}`;
+	}
 }
 /** Diagnostic spelling only. Never classifies a structural lookalike as owner authority. */
 export function creatorClosedRollbackRefusalDiagnostic(value: unknown): string | undefined {
