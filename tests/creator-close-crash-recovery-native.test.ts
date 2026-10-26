@@ -162,12 +162,51 @@ const warmRoom = async (f: Fixture, creator: Peer, member: Peer, warm: number) =
 	return { accepted, delivered };
 };
 
+// The interrupted close must complete on its own (no harness sealEpoch) within this bound.
+const AUTO_RETRY_BOUND_MS = 90_000;
+
 /**
- * While the creator's interrupted close of `epochBefore` is on disk, offers the
- * creator's own new work and a member's append; neither may enter that epoch
- * (refused retryably, or still deferred). Then retries the close, which must
- * complete on the exact scope and incarnation `scopesBefore`, adopts, and
- * shows both offered items accepted afterwards, each exactly once.
+ * Waits until the session's own retry of its interrupted close of
+ * `epochBefore` has sealed and adopted (the creator's epoch advances), with
+ * no harness sealEpoch. Fails past the bound.
+ * @param creator - The creator.
+ * @param epochBefore - The interrupted close's epoch.
+ * @returns Milliseconds until the adopted successor was observed.
+ */
+const awaitAutoRetry = async (creator: Peer, epochBefore: number) => {
+	const started = performance.now();
+	while (epochOf(creator) === epochBefore) {
+		if (performance.now() - started > AUTO_RETRY_BOUND_MS)
+			throw new Error(
+				`the interrupted close of epoch ${epochBefore} did not complete on its own within ${AUTO_RETRY_BOUND_MS} ms`
+			);
+		await new Promise((resolve) => setTimeout(resolve, 100));
+	}
+	expect(epochOf(creator)).toBe(epochBefore + 1);
+	return Math.round(performance.now() - started);
+};
+
+type CreatorOffer = { accepted: true; epoch: number } | { accepted: false; reason: string };
+/**
+ * Offers the creator's own new work now. It either is refused with the
+ * retryable close-pending refusal, or is accepted only once the interrupted
+ * close has adopted (never into the interrupted epoch).
+ * @param creator - The creator.
+ * @returns The settled outcome and the epoch it settled in.
+ */
+const offerCreatorWork = (creator: Peer): Promise<CreatorOffer> =>
+	creator.room.issue(message("creator-offered")).then(
+		() => ({ accepted: true as const, epoch: epochOf(creator) }),
+		(error: unknown) => ({ accepted: false as const, reason: String(error) })
+	);
+
+/**
+ * While the creator's interrupted close of `epochBefore` is on disk (or its
+ * own retry is under way), a member's append is offered; with the creator's
+ * offer, neither may enter that epoch. With NO harness sealEpoch, the session
+ * retries the close itself: it must complete within the bound on the exact
+ * scope and incarnation `scopesBefore` and adopt; both offered items are then
+ * accepted (the creator's reissued if refused), each exactly once.
  * @param f - The room fixture.
  * @param creator - The creator.
  * @param member - The member.
@@ -175,71 +214,49 @@ const warmRoom = async (f: Fixture, creator: Peer, member: Peer, warm: number) =
  * @param epochBefore - The interrupted close's epoch.
  * @param delivered - The last member sequence delivered to the creator.
  * @param scopesBefore - The interrupted close's scope rows before the retry.
+ * @param creatorOffer - The creator's offer, made as early as the case allows.
  * @returns The new delivered sequence and the measured outcome.
  */
-const offerThenRetry = async (
+const offerThenAutoRetry = async (
 	f: Fixture,
 	creator: Peer,
 	member: Peer,
 	directory: string,
 	epochBefore: number,
 	delivered: number | null,
-	scopesBefore: CloseScopeRow[]
+	scopesBefore: CloseScopeRow[],
+	creatorOffer: Promise<CreatorOffer>
 ) => {
-	expect(epochOf(creator)).toBe(epochBefore);
 	expect(scopesBefore).toHaveLength(1);
-	// The creator's own new work, before the interrupted close retries.
-	let creatorSettled: { accepted: true } | { accepted: false; reason: string } | undefined;
-	const creatorIssue = creator.room.issue(message("creator-offered")).then(
-		() => {
-			creatorSettled = { accepted: true };
-		},
-		(error: unknown) => {
-			creatorSettled = { accepted: false, reason: String(error) };
-		}
-	);
-	await Promise.race([creatorIssue, new Promise((resolve) => setTimeout(resolve, 30_000))]);
-	const creatorRefused = creatorSettled?.accepted === false ? creatorSettled.reason : undefined;
-	// Never admitted into the interrupted epoch: refused retryably, or still deferred.
-	expect(creatorSettled?.accepted, "the creator admitted work into the interrupted epoch").not.toBe(true);
-	if (creatorRefused !== undefined) expect(creatorRefused).toMatch(RETRYABLE_REFUSAL);
-	// A member's append, offered to the creator before the retry.
+	const offered = await creatorOffer;
+	if (offered.accepted)
+		expect(offered.epoch, "the creator admitted work into the interrupted epoch").toBe(epochBefore + 1);
+	else expect(offered.reason).toMatch(RETRYABLE_REFUSAL);
+	// A member's append, offered to the creator while (or right after) the close retries.
 	await member.room.issue(message("member-offered"));
 	const memberRows = await f.issuedAfter(1, delivered);
 	expect(memberRows).toHaveLength(1);
-	const receivedBeforeRetry = await creator.receive(memberRows, 1, 30_000);
-	expect(receivedBeforeRetry, "the creator admitted a member append into the interrupted epoch").toBe(false);
-	expect(texts(creator)).not.toContain("creator-offered");
+	const receivedBeforeInstall = await creator.receive(memberRows, 1, 5_000);
+	expect(receivedBeforeInstall, "the creator admitted a member append signed in the interrupted epoch").toBe(false);
+	if (!offered.accepted) expect(texts(creator)).not.toContain("creator-offered");
 	expect(texts(creator)).not.toContain("member-offered");
-	// The retry runs on the exact scope and incarnation the interruption left.
-	const retried = await creator.room.sealEpoch();
-	expect(retried.ok, JSON.stringify(retried)).toBe(true);
-	await creator.room.adoptCreatorSuccessor();
+	// No harness sealEpoch: the session's own retry completes the close.
+	const retryMs = await awaitAutoRetry(creator, epochBefore);
 	expect(closeScopes(directory, epochBefore)).toEqual(scopesBefore);
-	// Redelivery, measured: the refused row was signed in the interrupted epoch,
-	// which the retry closed without it. Offered again before the member installs
-	// the adopted successor, it is still not admitted (it cannot enter the new epoch).
-	const redeliveredBeforeInstall = await creator.receive(memberRows, 1, 10_000);
-	expect(redeliveredBeforeInstall).toBe(false);
-	// The member's install of THAT successor (the retry's own product, not an
-	// unrelated epoch) carries its unsettled row forward as one new row.
+	// The member's install of the retry's successor carries its row forward as a new row.
 	await f.install(member);
 	const carried = await f.issuedAfter(1, delivered);
 	expect(digestOf(required(carried.at(-1)))).not.toBe(digestOf(required(memberRows[0])));
-	// The offered work is accepted once reissued (or once its deferral completes).
-	if (creatorRefused === undefined) {
-		await creatorIssue;
-		expect(creatorSettled).toEqual({ accepted: true });
-	} else await creator.room.issue(message("creator-offered"));
+	if (!offered.accepted) await creator.room.issue(message("creator-offered"));
 	const nextDelivered = await deliver(f, creator, delivered);
 	expect(count(creator, "creator-offered")).toBe(1);
 	expect(count(creator, "member-offered")).toBe(1);
 	return {
 		delivered: nextDelivered,
 		outcome: {
-			creatorRefused: creatorRefused ?? "deferred",
-			receivedBeforeRetry,
-			redeliveredBeforeInstall,
+			creatorOffer: offered,
+			receivedBeforeInstall,
+			retryMs,
 			refusedRow: {
 				sequence: required(memberRows[0]).commit.authorSequence,
 				digest: digestOf(required(memberRows[0])),
@@ -368,9 +385,15 @@ it.runIf(INNER)(
 			// The interrupted close's own scope as the death left it (read before any reopen).
 			const scopesAtDeath = closeScopes(directory, setup.epochBefore);
 			const f = await fixture(directory, setup.selectors);
-			const creator = await f.open(0, { reopen: true }),
-				member = await f.open(1, { reopen: true, promote: true });
+			const creator = await f.open(0, { reopen: true });
+			// Read at once: the session's own retry may advance the epoch from here on.
 			const reopenedEpoch = epochOf(creator);
+			// The creator's own new work, offered as soon as it has reopened.
+			const creatorOffer = offer ? offerCreatorWork(creator) : undefined;
+			const member = await f.open(1, { reopen: true, promote: true });
+			// Its own close scope on disk at the reopened epoch: the close was interrupted
+			// and the session retries it itself.
+			const interrupted = reopenedEpoch === setup.epochBefore && scopesAtDeath.length > 0;
 			// Exactly one of: the dead close's epoch adopted, or not sealed.
 			expect([setup.epochBefore, setup.epochBefore + 1]).toContain(reopenedEpoch);
 			// Nothing the creator accepted is lost across the death.
@@ -378,20 +401,29 @@ it.runIf(INNER)(
 			const epochs: number[] = [];
 			const offered: string[] = [];
 			let offeredOutcome: Record<string, unknown> | undefined;
+			let retryMs: number | undefined;
 			if (offer) {
-				const offeredRun = await offerThenRetry(
+				expect(interrupted).toBe(true);
+				const offeredRun = await offerThenAutoRetry(
 					f,
 					creator,
 					member,
 					directory,
 					setup.epochBefore,
 					setup.delivered,
-					scopesAtDeath
+					scopesAtDeath,
+					required(creatorOffer)
 				);
 				setup.delivered = offeredRun.delivered;
 				epochs.push(required(creator.room.authority()).epoch);
 				offered.push("creator-offered", "member-offered");
 				offeredOutcome = offeredRun.outcome;
+			} else if (interrupted) {
+				// No harness sealEpoch: the session completes its interrupted close itself.
+				retryMs = await awaitAutoRetry(creator, setup.epochBefore);
+				expect(closeScopes(directory, setup.epochBefore)).toEqual(scopesAtDeath);
+				await f.install(member);
+				epochs.push(required(creator.room.authority()).epoch);
 			}
 			for (let seal = epochs.length; seal < 2; seal++) {
 				expect((await creator.room.sealEpoch()).ok).toBe(true);
@@ -420,6 +452,8 @@ it.runIf(INNER)(
 					...(offeredOutcome === undefined ? {} : { offeredOutcome }),
 					epochBefore: setup.epochBefore,
 					reopenedEpoch,
+					interrupted,
+					...(retryMs === undefined ? {} : { retryMs }),
 					epochs,
 					finalEpoch: required(creator.room.authority()).epoch,
 				})
@@ -490,20 +524,38 @@ it.skipIf(INNER).each(CASES)(
 );
 
 // In-process close failure, no process death: the first native write after the
-// fatal close's scope reaches recovery retention fails once (an injected storage
+// fatal close's scope reaches recovery retention fails (an injected storage
 // error). The SAME session must not admit ordinary work into that epoch: its own
 // new work and a member's append are refused retryably (the same close-pending
-// gate as a reopen) or deferred, and the retry completes on the exact scope.
-it.skipIf(INNER).each([0, 3, 5] as const)(
-	"an in-process failure right after the creator's close-scope-retained commit (after %i warm seals) admits no work into that epoch before the close retries",
-	async (warm) => {
+// gate as a reopen), and with NO further harness sealEpoch the session retries
+// the close itself on the exact scope. "Once": only that write fails. Control,
+// "persistent": that same write keeps failing for a window; the session's own
+// retries back off (growing gaps, bounded count) and never admit work, then
+// complete once the failure clears.
+const IN_PROCESS = [
+	[0, "once"],
+	[3, "once"],
+	[5, "once"],
+	[3, "persistent"],
+] as const;
+const PERSISTENT_WINDOW_MS = 12_000;
+it.skipIf(INNER).each(IN_PROCESS)(
+	"an in-process failure right after the creator's close-scope-retained commit (after %i warm seals, %s) admits no work into that epoch and the session retries the close itself",
+	async (warm, failure) => {
 		const directory = mkdtempSync(join(tmpdir(), `creator-close-failure-w${warm}-`));
 		const prepare = DatabaseSync.prototype.prepare,
 			run = StatementSync.prototype.run,
 			exec = DatabaseSync.prototype.exec;
 		const statements = new WeakMap<StatementSync, { database: DatabaseSync; sql: string }>();
 		const written = new WeakSet<DatabaseSync>();
-		const injection = { armed: false, retainedCommitted: false, failedWrite: undefined as string | undefined };
+		const injection = {
+			armed: false,
+			retainedCommitted: false,
+			failing: true,
+			failedWrite: undefined as string | undefined,
+			failedSql: undefined as string | undefined,
+			failures: [] as number[],
+		};
 		DatabaseSync.prototype.prepare = function (sql: string) {
 			const statement = prepare.call(this, sql);
 			statements.set(statement, { database: this, sql });
@@ -511,13 +563,17 @@ it.skipIf(INNER).each([0, 3, 5] as const)(
 		};
 		StatementSync.prototype.run = function (...args: unknown[]) {
 			const source = statements.get(this);
-			if (
+			const first =
+				injection.failedSql === undefined &&
 				injection.retainedCommitted &&
-				injection.failedWrite === undefined &&
 				source !== undefined &&
-				/^\s*(INSERT|UPDATE|DELETE|REPLACE)\b/i.test(source.sql)
-			) {
-				injection.failedWrite = `${source.database.location() ?? ""}: ${source.sql.slice(0, 96)}`;
+				/^\s*(INSERT|UPDATE|DELETE|REPLACE)\b/i.test(source.sql);
+			const again =
+				failure === "persistent" && injection.failing && source !== undefined && source.sql === injection.failedSql;
+			if (first || again) {
+				injection.failedSql ??= source?.sql;
+				injection.failedWrite ??= `${source?.database.location() ?? ""}: ${source?.sql.slice(0, 96) ?? ""}`;
+				injection.failures.push(performance.now());
 				throw new Error("SQLITE_IOERR: injected in-process close failure");
 			}
 			const result = Reflect.apply(run, this, args) as ReturnType<typeof run>;
@@ -560,7 +616,45 @@ it.skipIf(INNER).each([0, 3, 5] as const)(
 			expect(injection.failedWrite, JSON.stringify(failed)).toBeDefined();
 			expect(failed.settled === "rejected" || !failed.result.ok, JSON.stringify(failed)).toBe(true);
 			const scopesAtFailure = closeScopes(directory, epochBefore);
-			const offeredRun = await offerThenRetry(f, creator, member, directory, epochBefore, delivered, scopesAtFailure);
+			const creatorOffer = offerCreatorWork(creator);
+			let backoff: Record<string, unknown> | undefined;
+			if (failure === "persistent") {
+				// The session keeps retrying on its own while the write keeps failing.
+				const first = await creatorOffer;
+				expect(first.accepted).toBe(false);
+				const refusals: string[] = [];
+				const windowStart = required(injection.failures[0]);
+				while (performance.now() - windowStart < PERSISTENT_WINDOW_MS) {
+					await new Promise((resolve) => setTimeout(resolve, 2_000));
+					expect(epochOf(creator)).toBe(epochBefore);
+					const later = await offerCreatorWork(creator);
+					expect(later.accepted, "a failing retry admitted work into the interrupted epoch").toBe(false);
+					if (!later.accepted) refusals.push(later.reason);
+				}
+				for (const reason of refusals) expect(reason).toMatch(RETRYABLE_REFUSAL);
+				expect(texts(creator)).not.toContain("creator-offered");
+				const gaps = injection.failures
+					.slice(1)
+					.map((at, index) => Math.round(at - required(injection.failures[index])));
+				backoff = { failures: injection.failures.length, gaps, refusals: refusals.length };
+				// It retried on its own, with growing gaps and a bounded count.
+				expect(injection.failures.length, JSON.stringify(backoff)).toBeGreaterThanOrEqual(3);
+				expect(injection.failures.length, JSON.stringify(backoff)).toBeLessThanOrEqual(10);
+				for (let index = 1; index < gaps.length; index++)
+					expect(required(gaps[index]), JSON.stringify(backoff)).toBeGreaterThan(required(gaps[index - 1]));
+				expect(closeScopes(directory, epochBefore)).toEqual(scopesAtFailure);
+				injection.failing = false;
+			}
+			const offeredRun = await offerThenAutoRetry(
+				f,
+				creator,
+				member,
+				directory,
+				epochBefore,
+				delivered,
+				scopesAtFailure,
+				failure === "persistent" ? Promise.resolve(await creatorOffer) : creatorOffer
+			);
 			delivered = offeredRun.delivered;
 			const adopted = epochOf(creator);
 			expect(adopted).toBe(epochBefore + 1);
@@ -577,7 +671,7 @@ it.skipIf(INNER).each([0, 3, 5] as const)(
 			expect(texts(creator)).toEqual(expect.arrayContaining(all));
 			expect(texts(member)).toEqual(expect.arrayContaining(all));
 			console.info(
-				`CREATOR_CLOSE_FAILURE ${JSON.stringify({ warm, failedWrite: injection.failedWrite, failed, epochBefore, adopted, finalEpoch: epochOf(creator), ...offeredRun.outcome })}`
+				`CREATOR_CLOSE_FAILURE ${JSON.stringify({ warm, failure, failedWrite: injection.failedWrite, failed, epochBefore, adopted, finalEpoch: epochOf(creator), ...(backoff === undefined ? {} : { backoff }), ...offeredRun.outcome })}`
 			);
 		} finally {
 			DatabaseSync.prototype.prepare = prepare;
