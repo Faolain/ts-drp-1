@@ -4134,14 +4134,21 @@ export async function authenticateCreatorClosedRollbackData(
  * Acquires bounded native old-scope bytes in the existing owner; observations never imply installation custody.
  * @param value - Trusted floor, catalog and actual bounded native store methods.
  * @param closedEpoch - One of the two retained closed epochs selected for promotion.
+ * @param options - Scheduling only, never custody or authority.
+ * @param options.sealed - The caller's epoch admission is closed and its admitted
+ * writers joined, so the authentication walk may end host turns on a stable floor.
  * @returns A nominal acquisition with joined native lifetime, or the primary refusal.
  */
 export async function acquireCreatorForwardPromotionSource(
 	value: CreatorClosedRollbackDataInput,
-	closedEpoch: number
+	closedEpoch: number,
+	options?: Readonly<{ sealed: true }>
 ): Promise<CreatorClosedRollbackDataResult> {
 	if (!Number.isSafeInteger(closedEpoch) || closedEpoch < 0) return failure("malformed-input");
-	return acquireClosedData(value, closedEpoch);
+	if (options?.sealed !== true) return acquireClosedData(value, closedEpoch);
+	// prettier-ignore
+	return acquireClosedData(value, closedEpoch, undefined, undefined, undefined, undefined, undefined, undefined,
+		undefined, undefined, undefined, undefined, undefined, true);
 }
 
 /**
@@ -7502,7 +7509,8 @@ async function acquireClosedData(
 		/** Returns only NEW genuine native custody after complete fresh images
 		 * qualify. It receives the original book, never a live proof/frame. */
 		qualify(accounting: CreatorClosedRollbackProofAccounting): Promise<NativeReadReservation>;
-	}>
+	}>,
+	sealedHostTurns = false
 ): Promise<CreatorClosedRollbackDataResult> {
 	// The maintenance job captured these input bindings before its first pass.
 	// A new observation object still owns every actual read and native lifetime;
@@ -7586,6 +7594,12 @@ async function acquireClosedData(
 			protectedUnion || ownedNomination !== undefined || issuancePreview
 				? captureCreatorRoomHeadState(rawFloor, input.objectId, input.pinnedGenesisAnchorDigest)
 				: undefined;
+		// A sealed caller's floor qualifies for host turns only while nothing is pending.
+		const turnFloor =
+			wholeFloor ??
+			(sealedHostTurns
+				? captureCreatorRoomHeadState(rawFloor, input.objectId, input.pinnedGenesisAnchorDigest)
+				: undefined);
 		// Only the protected pass owns the exact actual stable/pending floor image.
 		const floor =
 			wholeFloor === undefined
@@ -7898,7 +7912,7 @@ async function acquireClosedData(
 			// Only an ordinary stable-floor read may hand control back to the host.
 			// Native nomination/stage reacquisition must preserve the caller's
 			// uninterrupted floor publication and authority replacement interval.
-			ownedNomination === undefined && ownedStage === undefined && wholeFloor?.ok && wholeFloor.state.pending === null
+			ownedNomination === undefined && ownedStage === undefined && turnFloor?.ok && turnFloor.state.pending === null
 				? createWorkCheckpoint()
 				: undefined
 		);

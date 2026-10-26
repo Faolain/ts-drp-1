@@ -9,6 +9,8 @@ export type NativeHostTurn = {
 	readonly maxStatementMs: number;
 	readonly wallMs: number;
 	readonly cpuMs: number;
+	/** Statements per named file class, when the meter was given classes. */
+	readonly byClass: Readonly<Record<string, number>>;
 };
 
 const statementMethods = ["run", "get", "all", "iterate"] as const;
@@ -69,17 +71,22 @@ export function installNativeStatementOwners(): void {
  * scenario and the source, unlike wall time on a loaded host.
  * @param options - Optional measurement scope.
  * @param options.select - Counts only statements on database files it accepts.
+ * @param options.classes - Named file classes whose statements each turn also counts.
  * @param options.onTurn - Runs at each turn boundary, where test work may join.
  * @returns A meter whose stop() ends the measurement.
  */
 export function startNativeTurnMeter(
 	options: {
 		select?(location: string): boolean;
+		/** Named file classes counted separately in every turn. */
+		classes?: Readonly<Record<string, (location: string) => boolean>>;
 		onTurn?(turn: number): void;
 	} = {}
 ) {
 	if (!ownersInstalled) throw new Error("NATIVE_STATEMENT_OWNERS_NOT_INSTALLED");
 	if (active !== undefined) throw new Error("NATIVE_TURN_METER_BUSY");
+	const classes = Object.entries(options.classes ?? {});
+	let byClass: Record<string, number> = {};
 	let statements = 0,
 		maxStatementMs = 0,
 		stopped = false,
@@ -87,6 +94,7 @@ export function startNativeTurnMeter(
 		cpu = process.cpuUsage();
 	const turns: NativeHostTurn[] = [];
 	active = (location, elapsedMs) => {
+		for (const [name, matches] of classes) if (matches(location)) byClass[name] = (byClass[name] ?? 0) + 1;
 		if (options.select !== undefined && !options.select(location)) return;
 		statements++;
 		maxStatementMs = Math.max(maxStatementMs, elapsedMs);
@@ -94,7 +102,8 @@ export function startNativeTurnMeter(
 	const close = () => {
 		const at = performance.now(),
 			used = process.cpuUsage(cpu);
-		turns.push({ statements, maxStatementMs, wallMs: at - wall, cpuMs: (used.user + used.system) / 1000 });
+		turns.push({ statements, maxStatementMs, wallMs: at - wall, cpuMs: (used.user + used.system) / 1000, byClass });
+		byClass = {};
 		statements = 0;
 		maxStatementMs = 0;
 		wall = at;
@@ -116,6 +125,22 @@ export function startNativeTurnMeter(
 			}
 			return turns;
 		},
+	};
+}
+
+/**
+ * Summarizes one file class of a measurement taken with classes.
+ * @param turns - Turns returned by a stopped meter.
+ * @param name - Class name given to the meter.
+ * @returns Busy turns of that class, its total, and its largest turn.
+ */
+export function summarizeNativeClass(turns: readonly NativeHostTurn[], name: string) {
+	const counts = turns.map((turn) => turn.byClass[name] ?? 0).filter((count) => count > 0);
+	return {
+		busyTurns: counts.length,
+		statements: counts.reduce((sum, count) => sum + count, 0),
+		maxStatements: Math.max(0, ...counts),
+		turns: counts,
 	};
 }
 
