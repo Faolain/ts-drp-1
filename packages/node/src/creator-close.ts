@@ -123,7 +123,7 @@ import {
 } from "@ts-drp/storage";
 import { snapshotQuarantineContract, type SnapshotQuarantineDeclaration, type SnapshotQuarantineStore, type SnapshotRecoveryStore } from "@ts-drp/storage/snapshot-transfer";
 
-import { createWorkCheckpoint, yieldToHost } from "./internal/cooperative-work.js";
+import { beginForegroundWork, createWorkCheckpoint, runInBackgroundLane, yieldToHost } from "./internal/cooperative-work.js";
 import {
 	createCreatorAuthenticatedNativeFuture,
 	installCreatorAdoptionFacts,
@@ -3561,7 +3561,11 @@ export async function bindCreatorLiveClose(
 				finish = resolve;
 			});
 			maintenanceJobs.add(joined);
+			// The admitted job is the host's foreground until its slot is released:
+			// co-located background walks defer their host turns behind it.
+			const releaseForeground = beginForegroundWork();
 			const finishJoined = (): void => {
+				releaseForeground();
 				maintenanceJobs.delete(joined);
 				finish();
 			};
@@ -4833,6 +4837,8 @@ export async function bindCreatorLiveClose(
 						let finish!: () => void;
 						const joined = new Promise<void>(resolve => {finish = resolve;});
 						maintenanceJobs.add(joined);
+						// Arrivals wait behind readiness: it is foreground until its slot is released.
+						const releaseForeground = beginForegroundWork();
 						const priorOrdinarySource = ordinaryProofSource;
 						ordinaryProofSource = undefined; ordinaryTemplateReady = false;
 						return Promise.resolve().then(async () => {
@@ -4956,6 +4962,7 @@ export async function bindCreatorLiveClose(
 								if (cause instanceof AggregateError) maintenanceReleaseFailure = cause;
 								throw cause;
 							} finally {
+								releaseForeground();
 								maintenanceJobs.delete(joined); finish();
 								registration.resumePendingIngress();
 							}
@@ -4998,8 +5005,10 @@ export async function bindCreatorLiveClose(
 						let detached = false;
 						try {
 							ordinaryProofSource = undefined; ordinaryTemplateReady = false; detached = true;
+							// Pool maintenance is background: its walks defer host turns behind
+							// co-located foreground work, and recheck availability after each.
 							const outcome = await registration.runOrdinaryReadinessMaintenance(
-								input.snapshotStore as SnapshotRecoveryStore<SnapshotVerificationReceipt>, async (seal, requireClosedWorkflowCompletion) => {
+								input.snapshotStore as SnapshotRecoveryStore<SnapshotVerificationReceipt>, (seal, requireClosedWorkflowCompletion) => runInBackgroundLane(async () => {
 									if (!available()) throw new TypeError("creator pool maintenance admission was revoked");
 									// Slice 14b stage 2: an opted-in room host decides this boundary from its
 									// plane's verified-fact ledger when it can; otherwise the original below.
@@ -5024,7 +5033,7 @@ export async function bindCreatorLiveClose(
 										}, true, requireClosedWorkflowCompletion, registration.currentTrust);
 									if (!available()) throw new TypeError("creator pool maintenance admission was revoked");
 									return checkpoint;
-								}, {deferrable: true, after: async () => {
+								}), {deferrable: true, after: () => runInBackgroundLane(async () => {
 									// Runs in the boundary's queue slot after it released, before
 									// queued arrivals: they cannot change the census mid-capture.
 									const control = await native.readRetirementControl?.(registration.objectId);
@@ -5041,7 +5050,7 @@ export async function bindCreatorLiveClose(
 									ordinaryProofSource = source; detached = false;
 									ordinaryTemplateReady = source !== undefined &&
 										creatorOrdinaryIssuanceSourceReadinessPrepared(source, resourceBound);
-								}});
+								})});
 							if (outcome === "deferred") {
 								// No hold, freeze or native work occurred: restore the joined hint,
 								// which every ordinary call still checks for fresh currency.

@@ -99,7 +99,7 @@ import type {
 } from "@ts-drp/storage/room-head";
 import type { DRPNetworkNode, Message } from "@ts-drp/types";
 
-import { createWorkCheckpoint, yieldToHost } from "./internal/cooperative-work.js";
+import { beginForegroundWork, createWorkCheckpoint, yieldToHost } from "./internal/cooperative-work.js";
 import { CREATOR_MAINTENANCE_PROOF_MAX_BYTES, createCreatorClosedRollbackProofAccounting, type CreatorLocalSessionWithdrawal } from "./internal/creator-closed-rollback-data.js";
 import { pauseCreatorSuccessorRetainedReads } from "./internal/creator-successor-live.js";
 import type { CreatorOrdinaryApplicationResourceBoundReader, CreatorOrdinaryFinishingWindowLimits } from "./internal/runtime-reclamation.js";
@@ -4805,9 +4805,13 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			draining = true;
 			const snapshot = Object.freeze(pendingIssues);
 			pendingIssues = [];
+			// Issuing through publication is the host's foreground: co-located
+			// background walks defer their host turns until this drain joins.
+			const releaseForeground = beginForegroundWork();
 			try {
 				await drainSnapshot(snapshot);
 			} finally {
+				releaseForeground();
 				// A resolved caller's operation remains in this frozen snapshot until
 				// the complete drain joins. Do not refund that still-retained custody.
 				for (const request of snapshot) request.releasePublicInput?.();
