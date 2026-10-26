@@ -11,6 +11,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync, StatementSync } from "node:sqlite";
+import { setFlagsFromString } from "node:v8";
+import { runInNewContext } from "node:vm";
+import { setFlagsFromString } from "node:v8";
+import { runInNewContext } from "node:vm";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { phase2lCCommit, PHASE_2L_C_SCOPE } from "./fixtures/phase-2l-c-node-issuance-contract.js";
@@ -371,6 +375,41 @@ describe("per-connection statement cache lifetime", () => {
 		} finally {
 			replacement.close();
 		}
+	});
+
+	it("retains no closed connection: connection history never accumulates in the heap", async () => {
+		// A cached StatementSync holds its DatabaseSync through a native strong
+		// reference, so a cache entry that outlives close() pins the connection
+		// (and every cached statement) for the life of the process regardless of
+		// JavaScript reachability. Closed connections must become collectable.
+		setFlagsFromString("--expose-gc");
+		const gc = runInNewContext("gc") as () => void;
+		const collect = async (): Promise<void> => {
+			for (let round = 0; round < 4; round++) {
+				await new Promise((resolve) => setImmediate(resolve));
+				gc();
+			}
+		};
+		const filename = join(directory("history"), "history.sqlite");
+		const seed = new DatabaseSync(filename);
+		seed.exec("CREATE TABLE t(x)");
+		seed.close();
+		const alive = async (connections: number): Promise<number> => {
+			const references: WeakRef<DatabaseSync>[] = [];
+			for (let index = 0; index < connections; index++) {
+				const database = new DatabaseSync(filename);
+				references.push(new WeakRef(database));
+				cachedStatement(database, "SELECT count(*) AS rows FROM t").get();
+				cachedStatement(database, SQL).get(index);
+				database.close();
+			}
+			await collect();
+			return references.filter((reference) => reference.deref() !== undefined).length;
+		};
+		// Retained closed connections are bounded by a constant (the cache's sweep
+		// slack), never by how many connections were ever opened.
+		const retained = { after32: await alive(32), after256: await alive(256) };
+		expect(Math.max(retained.after32, retained.after256), JSON.stringify(retained)).toBeLessThanOrEqual(16);
 	});
 
 	it("routes every acquisition through an interposed prepare, uncached", () => {
