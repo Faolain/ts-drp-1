@@ -27,7 +27,7 @@ function immediatePort(): EphemeralTransportPort {
 		isAuthorized: () => true,
 		maxEnvelopeBytes: () => 1024,
 		onMessage: () => () => undefined,
-		send: async () => true,
+		send: () => Promise.resolve(true),
 	};
 }
 

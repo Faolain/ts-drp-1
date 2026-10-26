@@ -13,8 +13,6 @@ import { join } from "node:path";
 import { DatabaseSync, StatementSync } from "node:sqlite";
 import { setFlagsFromString } from "node:v8";
 import { runInNewContext } from "node:vm";
-import { setFlagsFromString } from "node:v8";
-import { runInNewContext } from "node:vm";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { phase2lCCommit, PHASE_2L_C_SCOPE } from "./fixtures/phase-2l-c-node-issuance-contract.js";
