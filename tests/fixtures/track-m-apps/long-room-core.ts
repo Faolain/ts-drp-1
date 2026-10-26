@@ -29,7 +29,12 @@ import {
 	type WireRow,
 } from "./long-room-driver.js";
 import { CANVAS_GENESIS_PROFILE } from "../../../examples/canvas/src/profile.js";
+import { CANVAS_ROLLOVER_BUDGET } from "../../../examples/canvas/src/rollover.js";
 import { openShippingChatCatalogs } from "../../../examples/chat/src/chat-catalogs.js";
+import {
+	shippingChatRefusalClearedByRollover,
+	shippingChatRolloverBudget,
+} from "../../../examples/chat/src/rollover.js";
 import {
 	createShippingChatGenesisStateBytes,
 	createShippingChatSharesGenesisStateBytes,
@@ -41,6 +46,7 @@ import {
 	openShippingChatLocalArchive,
 	type ShippingChatArchiveStore,
 } from "../../../examples/chat/src/v3-chat-archive.js";
+import { GRID_ROLLOVER_BUDGET } from "../../../examples/grid/src/rollover.js";
 import { createV3ZoneApplication } from "../../../examples/grid/src/v3-zone.js";
 import {
 	createBrowserV3RoomDatabaseStorageHost,
@@ -49,10 +55,11 @@ import {
 	type V3RoomProjectionInput,
 	waitForV3RoomStartupForDiagnostics,
 } from "../../../examples/v3-room/src/index.js";
-import type {
-	V3RoomRolloverEvent,
-	V3RoomRolloverHooks,
-	V3RoomRolloverPolicy,
+import {
+	createV3RoomRolloverPolicy,
+	type V3RoomRolloverEvent,
+	type V3RoomRolloverHooks,
+	type V3RoomRolloverPolicy,
 } from "../../../examples/v3-room/src/rollover.js";
 import { toCanvasWireOperation } from "../../../packages/blueprints/src/v3-canvas.js";
 import { createRecoverableFinalitySigner } from "../../../packages/keychain/src/finality.js";
@@ -386,21 +393,33 @@ const OFFER_FIELDS = [
 ] as const;
 
 /**
- * App mode: the application's own rollover policy for one role, or undefined when the application
- * has none. The shipped pages have none yet: they never seal, so a room stays in its first epoch.
- * @param _app - The application.
- * @param _role - The creator, or a member (a Writer or receive-only recipient).
- * @param _context - The room's object and genesis ACL.
- * @param _hooks - Where the policy publishes its successor offers.
- * @returns The policy, or undefined.
+ * App mode: the application's own rollover policy for one role, with the trigger values the
+ * shipped page uses (examples/<app>/src/rollover.ts) and the shared scheduling of
+ * examples/v3-room. Chat's long room signs the shares format, as the shipped Chat does.
+ * @param app - The application.
+ * @param role - The creator, or a member (a Writer or receive-only recipient).
+ * @param context - The room's object.
+ * @param hooks - Where the policy publishes its successor offers.
+ * @returns The policy.
  */
 function appRolloverPolicy(
-	_app: AppKind,
-	_role: "creator" | "member",
-	_context: Readonly<{ objectId: string; exactCanonicalLatchedAclBytes: Uint8Array }>,
-	_hooks: V3RoomRolloverHooks
-): V3RoomRolloverPolicy | undefined {
-	return undefined;
+	app: AppKind,
+	role: "creator" | "member",
+	context: Readonly<{ objectId: string; chatFormat: ChatFormat; override?: LongRoomOptions["rolloverBudget"] }>,
+	hooks: V3RoomRolloverHooks
+): V3RoomRolloverPolicy {
+	const chat = app === "chat";
+	const shipped =
+		app === "canvas"
+			? CANVAS_ROLLOVER_BUDGET
+			: app === "grid"
+				? GRID_ROLLOVER_BUDGET
+				: shippingChatRolloverBudget({ objectId: context.objectId, shares: context.chatFormat === "shares" });
+	return createV3RoomRolloverPolicy({
+		role,
+		budget: context.override ?? shipped,
+		hooks: chat ? { ...hooks, clearedByRollover: shippingChatRefusalClearedByRollover } : hooks,
+	});
 }
 
 /**
@@ -537,7 +556,7 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 		? appRolloverPolicy(
 				options.app,
 				index === 0 ? "creator" : "member",
-				{ objectId, exactCanonicalLatchedAclBytes },
+				{ objectId, chatFormat, override: options.rolloverBudget },
 				{
 					publishSuccessor: (offer) => {
 						publishedOffers.push(Object.fromEntries(OFFER_FIELDS.map((field) => [field, toBase64(offer[field])])));
@@ -566,6 +585,10 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 		storageHost: host.storageHost,
 		author: identity.author,
 		...(receiveOnly ? { receiveOnly: true as const } : {}),
+		// App mode runs as the shipped pages do: the browser binding schedules one recovery-pool lull
+		// per epoch after each adoption or install (examples/v3-room createV3RoomSession), where
+		// harness mode calls `lull` itself.
+		...(appMode ? { recoveryPoolScheduledLull: true } : {}),
 		...(index === 0
 			? { creatorFinalitySigner: (await createRecoverableFinalitySigner({ seed: creator.seed })).signer }
 			: {}),

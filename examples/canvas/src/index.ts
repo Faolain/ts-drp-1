@@ -10,9 +10,12 @@ import {
 } from "@ts-drp/example-browser-network";
 import {
 	createV3RoomCreatorInviteMaterial,
+	createV3RoomRolloverPolicy,
 	createV3RoomSession,
 	type V3RoomCreatorInviteMaterial,
 	type V3RoomHeadAuthority,
+	type V3RoomRolloverHooks,
+	type V3RoomRolloverPolicy,
 	type V3RoomSession,
 } from "@ts-drp/example-v3-room";
 import { DRPNode } from "@ts-drp/node";
@@ -20,6 +23,7 @@ import { type CanvasProjection, createV3CanvasApplication } from "@ts-drp/node/a
 import { DRP_DISCOVERY_TOPIC } from "@ts-drp/types";
 
 import { CANVAS_GENESIS_PROFILE } from "./profile";
+import { CANVAS_ROLLOVER_BUDGET } from "./rollover";
 
 type CanvasHeadFactory = (
 	context: Readonly<{
@@ -39,6 +43,11 @@ declare global {
 		__TS_DRP_CANVAS_ROOM_HEAD_AUTHORITY_FOR_OPEN__?: CanvasHeadFactory;
 		__TS_DRP_CANVAS_SETTLEMENT_SOURCE_APPROVAL__?: CanvasSettlementApproval;
 		__TS_DRP_CANVAS_SESSION__?: ModularBrowserNetworkSession;
+		/**
+		 * The application host's delivery of each adopted successor offer to the canvas's observers,
+		 * who install it to keep following the canvas. Without it the creator still rolls over.
+		 */
+		__TS_DRP_CANVAS_SUCCESSOR_PUBLISHER__?: NonNullable<V3RoomRolloverHooks["publishSuccessor"]>;
 	}
 }
 
@@ -46,6 +55,8 @@ const CANVAS_SIDE = 10;
 const descriptor = createV3CanvasDescriptor(CANVAS_SIDE, CANVAS_SIDE);
 const application = createV3CanvasApplication(CANVAS_SIDE, CANVAS_SIDE);
 let room: V3RoomSession<CanvasProjection> | undefined;
+// The creator's rollover policy (examples/canvas/src/rollover.ts); observers never seal.
+let rollover: V3RoomRolloverPolicy | undefined;
 let projection: CanvasProjection | undefined;
 let node: DRPNode | undefined;
 let renderedCanvasId: string | undefined;
@@ -197,6 +208,21 @@ async function openCanvas(operation: "create" | "join"): Promise<void> {
 		const author = selectedNode.keychain.localAuthorId;
 		const authority = await factory(Object.freeze({ author, creatorInvite: invite, objectId, operation }));
 		const databaseName = `ts-drp-v3-canvas--${hex(hashDomain("ts-drp/canvas-database/v1", new TextEncoder().encode(objectId)))}`;
+		const publishSuccessor = window.__TS_DRP_CANVAS_SUCCESSOR_PUBLISHER__;
+		if (publishSuccessor !== undefined && typeof publishSuccessor !== "function")
+			throw new TypeError("canvas successor publisher is invalid");
+		// Only the creator seals: it rolls the canvas over at its budget or after an idle period.
+		const policy =
+			operation === "create"
+				? createV3RoomRolloverPolicy({
+						role: "creator",
+						budget: CANVAS_ROLLOVER_BUDGET,
+						hooks: {
+							...(publishSuccessor === undefined ? {} : { publishSuccessor }),
+							onError: (error) => console.warn("Canvas rollover failed; it is retried", error),
+						},
+					})
+				: undefined;
 		opened = await createV3RoomSession<CanvasProjection>({
 			application,
 			author,
@@ -216,13 +242,15 @@ async function openCanvas(operation: "create" | "join"): Promise<void> {
 			publicKeyBytes: bytes(author),
 			signRegisteredVertexDigest: (digest) => selectedNode.keychain.signWithLocalAuthor(digest),
 			openTransport: (id) => selectedNode.openRoomNetwork(id),
-			onAcceptedVertex: () => undefined,
+			onAcceptedVertex: (vertex) => policy?.observe(vertex),
 			onProjection: (value) => {
 				projection = value;
 				render();
 			},
 		});
 		if (closing) throw new TypeError("canvas closed during open");
+		policy?.bind(opened);
+		rollover = policy;
 		room = opened;
 		observer = operation === "join";
 		projection = opened.projection();
@@ -234,6 +262,8 @@ async function openCanvas(operation: "create" | "join"): Promise<void> {
 		);
 		render();
 	} catch (error) {
+		rollover?.close();
+		rollover = undefined;
 		await opened?.close();
 		projection = undefined;
 		connectionStatus(
@@ -262,16 +292,14 @@ async function paintPixel(pixel: HTMLDivElement): Promise<void> {
 		Math.floor(Math.random() * 256),
 		Math.floor(Math.random() * 256),
 	];
-	// One immutable intent per independent click. Any retry retains this command.
+	// One immutable intent per independent click. Any retry retains this command: a paint refused
+	// at the epoch's capacity is offered again after the creator's rollover.
 	const command = toCanvasWireOperation({ action: "paint", offset: [x, y], rgb }, crypto.randomUUID());
 	try {
-		await selected.issue(command);
+		await (rollover ?? selected).issue(command);
 	} catch (error) {
 		console.error("Canvas paint failed", error);
-		connectionStatus(
-			"Paint was refused. Wait for admitted work to finish or roll over the epoch before retrying.",
-			"error"
-		);
+		connectionStatus("Paint was refused. Wait for admitted work to finish before retrying.", "error");
 	}
 }
 
@@ -336,6 +364,7 @@ async function main(): Promise<void> {
 				void (async (): Promise<void> => {
 					try {
 						await openTask;
+						rollover?.close();
 						await room?.close();
 					} finally {
 						try {

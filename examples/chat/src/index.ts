@@ -9,9 +9,12 @@ import {
 } from "@ts-drp/example-browser-network";
 import {
 	createV3RoomCreatorInviteMaterial,
+	createV3RoomRolloverPolicy,
 	createV3RoomSession,
 	type V3RoomCreatorInviteMaterial,
 	type V3RoomHeadAuthority,
+	type V3RoomRolloverHooks,
+	type V3RoomRolloverPolicy,
 	type V3RoomSession,
 } from "@ts-drp/example-v3-room";
 import { DRPNode } from "@ts-drp/node";
@@ -19,6 +22,7 @@ import { authenticateV3RoomCreatorInvite } from "@ts-drp/node/v3-room";
 import { DRP_DISCOVERY_TOPIC } from "@ts-drp/types";
 
 import { openShippingChatCatalogs, type ShippingChatCatalog } from "./chat-catalogs";
+import { shippingChatRefusalClearedByRollover, shippingChatRolloverBudget } from "./rollover";
 import { setupCopyButton } from "./util/clipboard";
 import { createPeerNameElement, formatPeerItem, shortenId, styleMessageElement } from "./util/peerIdentity";
 import { initializeToastContainer, showToast, ToastType } from "./util/toast";
@@ -56,6 +60,12 @@ declare global {
 		__TS_DRP_CHAT_ROOM_HEAD_AUTHORITY_FOR_OPEN__?: ChatHeadFactory;
 		__TS_DRP_CHAT_SETTLEMENT_SOURCE_APPROVAL__?: ChatSettlementApproval;
 		__TS_DRP_CHAT_SESSION__?: ModularBrowserNetworkSession;
+		/**
+		 * The application host's delivery of each adopted successor offer to the room's members, who
+		 * install it to follow the room (a joiner must follow a checkpoint before it can send).
+		 * Without it the creator still rolls over.
+		 */
+		__TS_DRP_CHAT_SUCCESSOR_PUBLISHER__?: NonNullable<V3RoomRolloverHooks["publishSuccessor"]>;
 	}
 }
 
@@ -81,6 +91,18 @@ interface ChatOpenContext {
 
 let node: DRPNode | undefined;
 let room: V3RoomSession<ShippingChatProjection> | undefined;
+// Each open session's rollover policy (examples/chat/src/rollover.ts): the creator's seals at its
+// budget; a Writer's only offers a refused message again after the next checkpoint.
+const rollovers = new WeakMap<V3RoomSession<ShippingChatProjection>, V3RoomRolloverPolicy>();
+/**
+ * Closes a session and ends its rollover policy.
+ * @param session - The session to close.
+ */
+async function closeSession(session: V3RoomSession<ShippingChatProjection> | undefined): Promise<void> {
+	if (session === undefined) return;
+	rollovers.get(session)?.close();
+	await session.close();
+}
 let projection: ShippingChatProjection | undefined;
 // This device's history of the open room (outside room storage; display only).
 let archive: ShippingChatLocalArchive | undefined;
@@ -380,7 +402,23 @@ async function openSession(
 			? await factory(Object.freeze({ author, creatorInvite: invite, objectId, operation }))
 			: reopenedAuthority(reopen);
 	roomAuthority = reopen ?? authority;
-	return createV3RoomSession<ShippingChatProjection>({
+	const publishSuccessor = window.__TS_DRP_CHAT_SUCCESSOR_PUBLISHER__;
+	if (publishSuccessor !== undefined && typeof publishSuccessor !== "function")
+		throw new TypeError("Chat successor publisher is invalid");
+	// Only the creator's first open holds the finality signer, so only it seals. An observer issues
+	// nothing and needs no policy.
+	const policy = receiveOnly
+		? undefined
+		: createV3RoomRolloverPolicy({
+				role: operation === "create" ? "creator" : "member",
+				budget: shippingChatRolloverBudget({ objectId, shares: context.shares }),
+				hooks: {
+					...(publishSuccessor === undefined ? {} : { publishSuccessor }),
+					clearedByRollover: shippingChatRefusalClearedByRollover,
+					onError: (error) => console.warn("Chat rollover failed; it is retried", error),
+				},
+			});
+	const session = await createV3RoomSession<ShippingChatProjection>({
 		application,
 		author,
 		creatorInvite: invite,
@@ -401,7 +439,7 @@ async function openSession(
 		...(approveSettlementSourceSelection === undefined ? {} : { approveSettlementSourceSelection }),
 		signRegisteredVertexDigest: (digest) => selectedNode.keychain.signWithLocalAuthor(digest),
 		openTransport: (id) => selectedNode.openRoomNetwork(id),
-		onAcceptedVertex: () => undefined,
+		onAcceptedVertex: (vertex) => policy?.observe(vertex),
 		onProjection: (value) => {
 			projection = value;
 			// O(1): the archive writes in a later task, off this callback.
@@ -410,6 +448,11 @@ async function openSession(
 			updateShares();
 		},
 	});
+	if (policy !== undefined) {
+		policy.bind(session);
+		rollovers.set(session, policy);
+	}
+	return session;
 }
 
 /**
@@ -429,11 +472,11 @@ async function promoteToWriter(): Promise<boolean> {
 	status("Opening this device as a Writer…", "joining");
 	room = undefined;
 	render();
-	await current.close();
+	await closeSession(current);
 	try {
 		const opened = await openSession(context, "join", false, authority);
 		if (closing) {
-			await opened.close();
+			await closeSession(opened);
 			return false;
 		}
 		room = opened;
@@ -449,7 +492,7 @@ async function promoteToWriter(): Promise<boolean> {
 	try {
 		const reopened = await openSession(context, "join", true, authority);
 		if (closing) {
-			await reopened.close();
+			await closeSession(reopened);
 			return false;
 		}
 		room = reopened;
@@ -626,7 +669,7 @@ async function openChat(operation: "create" | "join"): Promise<void> {
 		render();
 		updateShares();
 	} catch (error) {
-		await opened?.close();
+		await closeSession(opened);
 		await openedArchive?.close();
 		archive = undefined;
 		openContext = undefined;
@@ -676,7 +719,8 @@ async function issueMessage(): Promise<void> {
 			});
 		}
 		const command = pendingSend;
-		await selected.issue({ ...command.operation });
+		// A message refused at the checkpoint's allowance is offered again after the next rollover.
+		await (rollovers.get(selected) ?? selected).issue({ ...command.operation });
 		if (room !== selected) return;
 		if (messageInput.value === command.operation.text) messageInput.value = "";
 		if (pendingSend === command) pendingSend = undefined;
@@ -777,7 +821,7 @@ async function main(): Promise<void> {
 					await issueTask;
 					await memberTask;
 					await shareTask;
-					await room?.close();
+					await closeSession(room);
 					await archive?.close();
 					await (modular?.stop() ?? node?.stop());
 					identity.release();

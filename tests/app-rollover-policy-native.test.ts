@@ -20,7 +20,7 @@ import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-h
 // App rollover policy: each shipped application rolls its own room over. Measured on native
 // SQLite (app-rollover-ceiling-native.test.ts), one epoch admits at most 40 of the creator's own
 // moves in Canvas and Grid (the creator's issuance image), and 14 of one author's short messages
-// in Chat (its per-checkpoint allowance). Each case plays 2.5 times that ceiling per role with no
+// in Chat (its per-checkpoint allowance). Each case plays well past that ceiling per role with no
 // harness seal: the creator's application policy must roll the room over by itself, every move
 // must be accepted (none strands at the ceiling, none is lost), and both roles must converge on
 // state that contains every accepted move. The harness only carries rows and each published
@@ -113,10 +113,20 @@ async function playPastCeiling(
 	const [creator, other] = peers;
 	const writer = recipient === "writer";
 	const delivered: (number | null)[] = [null, null];
+	// Like a host, the harness installs each published offer as soon as it appears, concurrently
+	// with play. A failed install is recorded with the epoch it was for.
+	const installFailures: string[] = [];
 	let pumping = true;
 	const installs = (async (): Promise<void> => {
 		while (pumping) {
-			for (const offer of (await creator.takeOffers?.()) ?? []) await other.install(offer);
+			for (const offer of (await creator.takeOffers?.()) ?? []) {
+				const from = await other.authorityEpoch();
+				try {
+					await other.install(offer);
+				} catch (error) {
+					installFailures.push(`install from epoch ${from}: ${error instanceof Error ? error.stack : String(error)}`);
+				}
+			}
 			await new Promise((resolve) => setTimeout(resolve, 20));
 		}
 	})();
@@ -146,30 +156,72 @@ async function playPastCeiling(
 			await new Promise((resolve) => setTimeout(resolve, 10));
 		}
 	};
+	// Like a room's sync after a reconnect: rows of the receiver's current epoch that it has not
+	// accepted (a row injected while its install was replacing the live plane is dropped) are
+	// offered again.
+	const redeliver = async (from: 0 | 1): Promise<void> => {
+		const receiver = peers[from === 0 ? 1 : 0];
+		const current = (await receiver.authorityEpoch()) ?? 0;
+		const rows = (await peers[from].published(null)).filter((row) => rowValue(row).epoch === current);
+		if (rows.length === 0) return;
+		const known = await receiver.acceptance(rows.map((row) => row.digest));
+		const missing = rows.filter(
+			(row, index) => known[index] !== true && !rowValue(row).operation.action.startsWith("$drp.")
+		);
+		const final = missing.at(-1);
+		if (final === undefined) return;
+		await receiver.inject(rows);
+		for (const deadline = performance.now() + 5_000; performance.now() < deadline; ) {
+			if ((await receiver.acceptance([final.digest]))[0] === true) return;
+			await new Promise((resolve) => setTimeout(resolve, 10));
+		}
+	};
 	const accepted: { role: number; ordinal: number }[] = [];
+	// A stalled run says where it stands (which role's move, and each policy's view).
+	let step = "open";
+	const watchdog = setInterval(() => {
+		void Promise.all([creator.rollover?.(), other.rollover?.(), other.authorityEpoch()]).then(([own, member, epoch]) =>
+			process.stdout.write(
+				`ROLLOVER_PROGRESS ${app}/${recipient} step=${step} creator=${JSON.stringify({ epoch: own?.epoch, rollovers: own?.rollovers, waiting: own?.waiting, errors: own?.errors })} member=${JSON.stringify({ epoch, waiting: member?.waiting })}\n`
+			)
+		);
+	}, 30_000);
 	try {
 		for (let ordinal = 0; ordinal < moves; ordinal++) {
+			step = `creator#${ordinal}`;
 			await creator.issue(0, ordinal);
 			accepted.push({ role: 0, ordinal });
 			await deliver(0);
+			// The member's own rows go to the creator even when it makes no move: each install
+			// publishes the member's settlement of the epoch it leaves.
+			await deliver(1);
 			if (!writer) continue;
+			step = `writer#${ordinal}`;
 			await other.issue(0, ordinal);
 			accepted.push({ role: 1, ordinal });
 			await deliver(1);
 		}
 		// Quiesce: the last rollover joins, its offer is installed, and every row is delivered.
+		step = "quiesce";
 		for (let round = 0; round < 4; round++) {
 			await creator.rollover?.();
 			await new Promise((resolve) => setTimeout(resolve, 100));
 			await deliver(0);
 			await deliver(1);
+			await redeliver(0);
+			await redeliver(1);
 		}
 	} finally {
+		clearInterval(watchdog);
 		pumping = false;
 		await installs;
 	}
 	const policy = await creator.rollover?.();
 	const member = await other.rollover?.();
+	process.stdout.write(
+		`ROLLOVER_EVENTS ${app}/${recipient} moves=${moves} ${JSON.stringify(policy?.events.map((event) => [event.epoch, event.trigger, event.moves, Math.round(event.ms)]))}\n`
+	);
+	expect(installFailures).toEqual([]);
 	expect(policy?.errors ?? ["no creator policy"]).toEqual([]);
 	expect(member?.waiting ?? 0).toBe(0);
 	expect(await other.authorityEpoch()).toBe(policy?.epoch);
@@ -204,6 +256,8 @@ it.each(cases)(
 		try {
 			const policy = await playPastCeiling(app, recipient, MOVES[app]);
 			expect(policy?.rollovers ?? 0).toBeGreaterThanOrEqual(3);
+			// The budget is safely under every epoch's ceiling: no move ever met a capacity refusal.
+			expect(policy?.events.filter((event) => event.trigger === "refusal")).toEqual([]);
 		} finally {
 			restore();
 		}

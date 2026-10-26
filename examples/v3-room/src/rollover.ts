@@ -64,8 +64,10 @@ export interface V3RoomRolloverPolicy {
 	/**
 	 * Issues one move. A move refused at a capacity that a rollover clears is never dropped: the
 	 * creator rolls over at once and offers the same move again; a member offers it again once
-	 * its room has installed a later epoch. After `maxOffers` refusals the last one is thrown,
-	 * so the page can show it and keep the move.
+	 * its room has installed a later epoch. A move refused because the epoch is closing (sealed
+	 * and not yet adopted or installed) is offered again once the room is past it. After
+	 * `MAX_OFFERS` capacity refusals, or a closing longer than CLOSING_LIMIT_MS, the last refusal is
+	 * thrown, so the page can show it and keep the move.
 	 */
 	issue(operation: Readonly<Record<string, unknown>>): Promise<void>;
 	/** Moves waiting to be offered again, for the page's status line. */
@@ -80,10 +82,29 @@ export interface V3RoomRolloverPolicy {
 const ROLLOVER_REFUSAL = /MAINTENANCE_[A-Z_]+|maintenance prefix sizing is unavailable|proof capacity refused/u;
 /** Refusals that clear once admitted work joins, without a rollover. */
 const TRANSIENT_REFUSAL = /retry after admitted work joins/u;
+/**
+ * The local plane stopped accepting new operations because its epoch is closing (the creator
+ * sealed it and has not adopted the successor yet, or a member received the close and has not
+ * installed the successor yet, or its live plane is being replaced by that install). The move is
+ * offered again once the room is in a later epoch.
+ */
+const CLOSING_REFUSAL = /: not-active\b|live plane is unavailable/u;
 const SESSION_CLOSED = /v3 room session is closed/u;
-const MAX_OFFERS = 4;
+/**
+ * Capacity refusals of one move before the last is thrown. The creator's issuance image spans the
+ * current epoch and up to three before it (measured: a full epoch makes the next two refuse their
+ * first move too), so a move may need a rollover per spanned epoch before one admits it.
+ */
+const MAX_OFFERS = 6;
 const TRANSIENT_RETRY_MS = 50;
 const MEMBER_EPOCH_POLL_MS = 250;
+/**
+ * A move refused while the epoch closes is offered again when the room reaches a later epoch or
+ * after this pause, whichever is first (the refusal can come from an install that already
+ * reports the new epoch), until the closing has lasted CLOSING_LIMIT_MS.
+ */
+const CLOSING_RETRY_MS = 250;
+const CLOSING_LIMIT_MS = 120_000;
 const RETRY_BACKOFF_MS = [1_000, 2_000, 5_000, 10_000, 30_000] as const;
 
 function message(error: unknown): string {
@@ -240,8 +261,9 @@ export function createV3RoomRolloverPolicy(
 	const clearedByRollover = (error: unknown): boolean =>
 		ROLLOVER_REFUSAL.test(message(error)) || hooks.clearedByRollover?.(error) === true;
 	// A member's room advances when the host installs the successor; it polls its own authority.
-	const nextEpoch = (after: number): Promise<void> =>
+	const nextEpoch = (after: number, within = Number.POSITIVE_INFINITY): Promise<void> =>
 		new Promise<void>((resolve, reject) => {
+			const deadline = performance.now() + within;
 			let timer: ReturnType<typeof setTimeout> | undefined;
 			const done = (): void => {
 				epochWaiters.delete(done);
@@ -250,7 +272,7 @@ export function createV3RoomRolloverPolicy(
 				else resolve();
 			};
 			const poll = (): void => {
-				if (closed || currentEpoch() > after) {
+				if (closed || currentEpoch() > after || performance.now() >= deadline) {
 					advance(currentEpoch());
 					done();
 					return;
@@ -284,13 +306,32 @@ export function createV3RoomRolloverPolicy(
 		async issue(operation: Readonly<Record<string, unknown>>): Promise<void> {
 			const selected = room;
 			if (selected === undefined) throw new TypeError("v3 room rollover policy is not bound");
+			let closingSince: number | undefined;
 			for (let offer = 1; ; offer++) {
+				// A move never enters the creator's own rollover between its seal and its adoption.
+				if (rolling !== undefined) await rolling;
 				const attempted = currentEpoch();
 				try {
 					await selected.issue(operation);
 					return;
 				} catch (error) {
-					if (closed || offer >= MAX_OFFERS) throw error;
+					if (closed) throw error;
+					if (CLOSING_REFUSAL.test(message(error))) {
+						// Not an offer of the move: the room was between epochs. Bounded by the closing's length.
+						closingSince ??= performance.now();
+						if (performance.now() - closingSince >= CLOSING_LIMIT_MS) throw error;
+						offer--;
+						waiting++;
+						try {
+							await (rolling ?? Promise.resolve());
+							await nextEpoch(attempted, CLOSING_RETRY_MS);
+						} finally {
+							waiting--;
+						}
+						continue;
+					}
+					closingSince = undefined;
+					if (offer >= MAX_OFFERS) throw error;
 					if (TRANSIENT_REFUSAL.test(message(error))) {
 						await new Promise((resolve) => setTimeout(resolve, TRANSIENT_RETRY_MS * offer));
 						continue;

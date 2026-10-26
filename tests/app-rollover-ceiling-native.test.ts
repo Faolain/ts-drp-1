@@ -122,7 +122,15 @@ it.skipIf(!enabled).each(cases)(
 			};
 			for (let epoch = 0; epoch < prior; epoch++) {
 				for (let ordinal = 0; ordinal < priorMoves; ordinal++) {
-					await creator.issue(epoch, ordinal);
+					// A prior epoch that cannot hold priorMoves is itself a measurement: it is recorded and
+					// sealed short, as the application's policy would after a refusal.
+					try {
+						await creator.issue(epoch, ordinal);
+					} catch (error) {
+						log({ kind: "prior-refusal", epoch, ordinal, reason: String(error) });
+						process.stdout.write(`CEILING_PRIOR_REFUSAL ${app}/${recipient} epoch=${epoch} accepted=${ordinal}\n`);
+						break;
+					}
 					expect(await deliver(0)).toBe(true);
 					if (!writer) continue;
 					await other.issue(epoch, ordinal);

@@ -11,12 +11,15 @@ import {
 	type V3ZoneApi,
 	type V3ZoneRoomHeadAuthorityForOpen,
 	type V3ZoneSettlementSourceApproval,
+	type V3ZoneSuccessorPublisher,
 } from "./v3-zone";
 
 declare global {
 	interface Window {
 		__TS_DRP_GRID_ROOM_HEAD_AUTHORITY_FOR_OPEN__?: V3ZoneRoomHeadAuthorityForOpen;
 		__TS_DRP_GRID_SETTLEMENT_SOURCE_APPROVAL__?: V3ZoneSettlementSourceApproval;
+		/** The host's delivery of the creator's rollover offers to the zone's members. */
+		__TS_DRP_GRID_SUCCESSOR_PUBLISHER__?: V3ZoneSuccessorPublisher;
 	}
 }
 
@@ -121,7 +124,8 @@ async function main(): Promise<void> {
 				return factory(context);
 			},
 			window.__TS_DRP_GRID_SETTLEMENT_SOURCE_APPROVAL__,
-			presentation.transient
+			presentation.transient,
+			window.__TS_DRP_GRID_SUCCESSOR_PUBLISHER__
 		);
 		target.__TS_DRP_GRID_SESSION__ = session;
 		target.__TS_DRP_V3_ZONE__ = zone;
