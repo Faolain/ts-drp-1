@@ -70,7 +70,11 @@ const OFFERED = [
 // Genesis (zero warm seals): the creator dies inside the room's FIRST close
 // (epoch 0 to 1). Its reopen is the genesis plane, not a successor's durable
 // reopen, so the interrupted close must be detected on that path too.
-const GENESIS_EDGES = ["close-scope-open", "close-scope-retained", ...SEAL_PHASES.map((phase) => `seal-${phase}` as const)] as const;
+const GENESIS_EDGES = [
+	"close-scope-open",
+	"close-scope-retained",
+	...SEAL_PHASES.map((phase) => `seal-${phase}` as const),
+] as const;
 const GENESIS_OFFERED = ["close-scope-open", "close-scope-retained", "seal-prepared", "seal-finalized"] as const;
 const CASES = [
 	...EDGES.map((edge) => [edge, 3, ""] as const),
@@ -129,6 +133,122 @@ type Peer = Awaited<ReturnType<Fixture["open"]>>;
 const texts = (peer: Peer) => peer.room.projection().messages.map((entry) => entry.clientOperationId);
 // The room's current epoch: genesis (0) carries no successor authority.
 const epochOf = (peer: Peer) => peer.room.authority()?.epoch ?? 0;
+const count = (peer: Peer, text: string) => texts(peer).filter((entry) => entry === text).length;
+const digestOf = (row: { commit: { envelope: { digest: Uint8Array } } }) =>
+	Buffer.from(row.commit.envelope.digest).toString("hex");
+
+// Delivers every member row above `after` to the creator; returns the last delivered sequence.
+const deliver = async (f: Fixture, creator: Peer, after: number | null) => {
+	const rows = await f.issuedAfter(1, after);
+	if (rows.length === 0) return after;
+	expect(await creator.receive(rows, 1)).toBe(true);
+	return required(rows.at(-1)).commit.authorSequence;
+};
+
+// `warm` sealed and adopted epochs, each with one creator and one member message.
+const warmRoom = async (f: Fixture, creator: Peer, member: Peer, warm: number) => {
+	const accepted: string[] = [];
+	let delivered: number | null = null;
+	for (let seal = 0; seal < warm; seal++) {
+		await creator.room.issue(message(`creator-${seal}`));
+		accepted.push(`creator-${seal}`);
+		await member.room.issue(message(`member-${seal}`));
+		delivered = await deliver(f, creator, delivered);
+		accepted.push(`member-${seal}`);
+		expect((await creator.room.sealEpoch()).ok).toBe(true);
+		await creator.room.adoptCreatorSuccessor();
+		await f.install(member);
+	}
+	return { accepted, delivered };
+};
+
+/**
+ * While the creator's interrupted close of `epochBefore` is on disk, offers the
+ * creator's own new work and a member's append; neither may enter that epoch
+ * (refused retryably, or still deferred). Then retries the close, which must
+ * complete on the exact scope and incarnation `scopesBefore`, adopts, and
+ * shows both offered items accepted afterwards, each exactly once.
+ * @param f - The room fixture.
+ * @param creator - The creator.
+ * @param member - The member.
+ * @param directory - The room directory.
+ * @param epochBefore - The interrupted close's epoch.
+ * @param delivered - The last member sequence delivered to the creator.
+ * @param scopesBefore - The interrupted close's scope rows before the retry.
+ * @returns The new delivered sequence and the measured outcome.
+ */
+const offerThenRetry = async (
+	f: Fixture,
+	creator: Peer,
+	member: Peer,
+	directory: string,
+	epochBefore: number,
+	delivered: number | null,
+	scopesBefore: CloseScopeRow[]
+) => {
+	expect(epochOf(creator)).toBe(epochBefore);
+	expect(scopesBefore).toHaveLength(1);
+	// The creator's own new work, before the interrupted close retries.
+	let creatorSettled: { accepted: true } | { accepted: false; reason: string } | undefined;
+	const creatorIssue = creator.room.issue(message("creator-offered")).then(
+		() => {
+			creatorSettled = { accepted: true };
+		},
+		(error: unknown) => {
+			creatorSettled = { accepted: false, reason: String(error) };
+		}
+	);
+	await Promise.race([creatorIssue, new Promise((resolve) => setTimeout(resolve, 30_000))]);
+	const creatorRefused = creatorSettled?.accepted === false ? creatorSettled.reason : undefined;
+	// Never admitted into the interrupted epoch: refused retryably, or still deferred.
+	expect(creatorSettled?.accepted, "the creator admitted work into the interrupted epoch").not.toBe(true);
+	if (creatorRefused !== undefined) expect(creatorRefused).toMatch(RETRYABLE_REFUSAL);
+	// A member's append, offered to the creator before the retry.
+	await member.room.issue(message("member-offered"));
+	const memberRows = await f.issuedAfter(1, delivered);
+	expect(memberRows).toHaveLength(1);
+	const receivedBeforeRetry = await creator.receive(memberRows, 1, 30_000);
+	expect(receivedBeforeRetry, "the creator admitted a member append into the interrupted epoch").toBe(false);
+	expect(texts(creator)).not.toContain("creator-offered");
+	expect(texts(creator)).not.toContain("member-offered");
+	// The retry runs on the exact scope and incarnation the interruption left.
+	const retried = await creator.room.sealEpoch();
+	expect(retried.ok, JSON.stringify(retried)).toBe(true);
+	await creator.room.adoptCreatorSuccessor();
+	expect(closeScopes(directory, epochBefore)).toEqual(scopesBefore);
+	// Redelivery, measured: the refused row was signed in the interrupted epoch,
+	// which the retry closed without it. Offered again before the member installs
+	// the adopted successor, it is still not admitted (it cannot enter the new epoch).
+	const redeliveredBeforeInstall = await creator.receive(memberRows, 1, 10_000);
+	expect(redeliveredBeforeInstall).toBe(false);
+	// The member's install of THAT successor (the retry's own product, not an
+	// unrelated epoch) carries its unsettled row forward as one new row.
+	await f.install(member);
+	const carried = await f.issuedAfter(1, delivered);
+	expect(digestOf(required(carried.at(-1)))).not.toBe(digestOf(required(memberRows[0])));
+	// The offered work is accepted once reissued (or once its deferral completes).
+	if (creatorRefused === undefined) {
+		await creatorIssue;
+		expect(creatorSettled).toEqual({ accepted: true });
+	} else await creator.room.issue(message("creator-offered"));
+	const nextDelivered = await deliver(f, creator, delivered);
+	expect(count(creator, "creator-offered")).toBe(1);
+	expect(count(creator, "member-offered")).toBe(1);
+	return {
+		delivered: nextDelivered,
+		outcome: {
+			creatorRefused: creatorRefused ?? "deferred",
+			receivedBeforeRetry,
+			redeliveredBeforeInstall,
+			refusedRow: {
+				sequence: required(memberRows[0]).commit.authorSequence,
+				digest: digestOf(required(memberRows[0])),
+			},
+			carriedRows: carried.map((row) => ({ sequence: row.commit.authorSequence, digest: digestOf(row) })),
+			scopesBefore,
+		},
+	};
+};
 
 it.runIf(INNER)(
 	"a creator survives process death inside its own epoch close",
@@ -212,30 +332,14 @@ it.runIf(INNER)(
 				return result;
 			};
 		}
-		// Delivers every member row above `after` to the creator; returns the last delivered sequence.
-		const deliver = async (f: Fixture, creator: Peer, after: number | null) => {
-			const rows = await f.issuedAfter(1, after);
-			if (rows.length === 0) return after;
-			expect(await creator.receive(rows, 1)).toBe(true);
-			return required(rows.at(-1)).commit.authorSequence;
-		};
 		try {
 			if (mode === "mutate") {
 				const f = await fixture(directory);
 				const creator = await f.open(0),
 					member = await f.open(1);
-				const accepted: string[] = [];
-				let delivered: number | null = null;
-				for (let seal = 0; seal < WARM_SEALS; seal++) {
-					await creator.room.issue(message(`creator-${seal}`));
-					accepted.push(`creator-${seal}`);
-					await member.room.issue(message(`member-${seal}`));
-					delivered = await deliver(f, creator, delivered);
-					accepted.push(`member-${seal}`);
-					expect((await creator.room.sealEpoch()).ok).toBe(true);
-					await creator.room.adoptCreatorSuccessor();
-					await f.install(member);
-				}
+				const warmed = await warmRoom(f, creator, member, WARM_SEALS);
+				const accepted = warmed.accepted;
+				let delivered = warmed.delivered;
 				// Work admitted into the epoch the creator dies closing.
 				await creator.room.issue(message("creator-fatal"));
 				accepted.push("creator-fatal");
@@ -275,49 +379,19 @@ it.runIf(INNER)(
 			const offered: string[] = [];
 			let offeredOutcome: Record<string, unknown> | undefined;
 			if (offer) {
-				expect(reopenedEpoch).toBe(setup.epochBefore);
-				expect(scopesAtDeath).toHaveLength(1);
-				// The creator's own new work, before the interrupted close retries.
-				let creatorSettled: { accepted: true } | { accepted: false; reason: string } | undefined;
-				const creatorIssue = creator.room.issue(message("creator-offered")).then(
-					() => {
-						creatorSettled = { accepted: true };
-					},
-					(error: unknown) => {
-						creatorSettled = { accepted: false, reason: String(error) };
-					}
+				const offeredRun = await offerThenRetry(
+					f,
+					creator,
+					member,
+					directory,
+					setup.epochBefore,
+					setup.delivered,
+					scopesAtDeath
 				);
-				await Promise.race([creatorIssue, new Promise((resolve) => setTimeout(resolve, 30_000))]);
-				const creatorRefused = creatorSettled?.accepted === false ? creatorSettled.reason : undefined;
-				// Never admitted into the interrupted epoch: refused retryably, or still deferred.
-				expect(creatorSettled?.accepted, "the creator admitted work into the interrupted epoch").not.toBe(true);
-				if (creatorRefused !== undefined) expect(creatorRefused).toMatch(RETRYABLE_REFUSAL);
-				// A member's append, offered to the creator before the retry.
-				await member.room.issue(message("member-offered"));
-				const memberRows = await f.issuedAfter(1, setup.delivered);
-				expect(memberRows).toHaveLength(1);
-				const receivedBeforeRetry = await creator.receive(memberRows, 1, 30_000);
-				expect(receivedBeforeRetry, "the creator admitted a member append into the interrupted epoch").toBe(false);
-				expect(texts(creator)).not.toContain("creator-offered");
-				expect(texts(creator)).not.toContain("member-offered");
-				// The retry runs on the exact scope and incarnation the death left.
-				const retried = await creator.room.sealEpoch();
-				expect(retried.ok, JSON.stringify(retried)).toBe(true);
-				await creator.room.adoptCreatorSuccessor();
-				await f.install(member);
+				setup.delivered = offeredRun.delivered;
 				epochs.push(required(creator.room.authority()).epoch);
-				expect(closeScopes(directory, setup.epochBefore)).toEqual(scopesAtDeath);
-				// The offered work is accepted once reissued (or once its deferral completes).
-				if (creatorRefused === undefined) {
-					await creatorIssue;
-					expect(creatorSettled).toEqual({ accepted: true });
-				} else await creator.room.issue(message("creator-offered"));
-				// The member's offered row was signed in the interrupted epoch; its
-				// install of the adopted successor carries that unsettled work forward.
-				setup.delivered = await deliver(f, creator, setup.delivered);
-				expect(texts(creator)).toContain("member-offered");
 				offered.push("creator-offered", "member-offered");
-				offeredOutcome = { creatorRefused: creatorRefused ?? "deferred", receivedBeforeRetry, scopesAtDeath };
+				offeredOutcome = offeredRun.outcome;
 			}
 			for (let seal = epochs.length; seal < 2; seal++) {
 				expect((await creator.room.sealEpoch()).ok).toBe(true);
@@ -413,4 +487,106 @@ it.skipIf(INNER).each(CASES)(
 		}
 	},
 	1_900_000
+);
+
+// In-process close failure, no process death: the first native write after the
+// fatal close's scope reaches recovery retention fails once (an injected storage
+// error). The SAME session must not admit ordinary work into that epoch: its own
+// new work and a member's append are refused retryably (the same close-pending
+// gate as a reopen) or deferred, and the retry completes on the exact scope.
+it.skipIf(INNER).each([0, 3, 5] as const)(
+	"an in-process failure right after the creator's close-scope-retained commit (after %i warm seals) admits no work into that epoch before the close retries",
+	async (warm) => {
+		const directory = mkdtempSync(join(tmpdir(), `creator-close-failure-w${warm}-`));
+		const prepare = DatabaseSync.prototype.prepare,
+			run = StatementSync.prototype.run,
+			exec = DatabaseSync.prototype.exec;
+		const statements = new WeakMap<StatementSync, { database: DatabaseSync; sql: string }>();
+		const written = new WeakSet<DatabaseSync>();
+		const injection = { armed: false, retainedCommitted: false, failedWrite: undefined as string | undefined };
+		DatabaseSync.prototype.prepare = function (sql: string) {
+			const statement = prepare.call(this, sql);
+			statements.set(statement, { database: this, sql });
+			return statement;
+		};
+		StatementSync.prototype.run = function (...args: unknown[]) {
+			const source = statements.get(this);
+			if (
+				injection.retainedCommitted &&
+				injection.failedWrite === undefined &&
+				source !== undefined &&
+				/^\s*(INSERT|UPDATE|DELETE|REPLACE)\b/i.test(source.sql)
+			) {
+				injection.failedWrite = `${source.database.location() ?? ""}: ${source.sql.slice(0, 96)}`;
+				throw new Error("SQLITE_IOERR: injected in-process close failure");
+			}
+			const result = Reflect.apply(run, this, args) as ReturnType<typeof run>;
+			if (
+				injection.armed &&
+				source !== undefined &&
+				source.sql.startsWith("UPDATE snapshot_scopes_v2 SET retention='recovery'")
+			)
+				written.add(source.database);
+			return result;
+		};
+		DatabaseSync.prototype.exec = function (sql: string) {
+			const result = exec.call(this, sql);
+			if (sql === "ROLLBACK") written.delete(this);
+			if ((sql === "COMMIT" || sql.endsWith("COMMIT")) && written.has(this)) {
+				written.delete(this);
+				injection.armed = false;
+				injection.retainedCommitted = true;
+			}
+			return result;
+		};
+		const keep = process.env.CREATOR_CLOSE_CRASH_KEEP === "1";
+		try {
+			const f = await fixture(directory);
+			const creator = await f.open(0),
+				member = await f.open(1);
+			const warmed = await warmRoom(f, creator, member, warm);
+			let delivered = warmed.delivered;
+			await creator.room.issue(message("creator-fatal"));
+			await member.room.issue(message("member-fatal"));
+			delivered = await deliver(f, creator, delivered);
+			const accepted = [...warmed.accepted, "creator-fatal", "member-fatal"];
+			const epochBefore = epochOf(creator);
+			injection.armed = true;
+			const failed = await creator.room.sealEpoch().then(
+				(result) => ({ settled: "resolved" as const, result }),
+				(error: unknown) => ({ settled: "rejected" as const, reason: String(error) })
+			);
+			injection.armed = false;
+			expect(injection.failedWrite, JSON.stringify(failed)).toBeDefined();
+			expect(failed.settled === "rejected" || !failed.result.ok, JSON.stringify(failed)).toBe(true);
+			const scopesAtFailure = closeScopes(directory, epochBefore);
+			const offeredRun = await offerThenRetry(f, creator, member, directory, epochBefore, delivered, scopesAtFailure);
+			delivered = offeredRun.delivered;
+			const adopted = epochOf(creator);
+			expect(adopted).toBe(epochBefore + 1);
+			expect((await creator.room.sealEpoch()).ok).toBe(true);
+			await creator.room.adoptCreatorSuccessor();
+			await f.install(member);
+			await creator.room.issue(message("creator-after"));
+			await member.room.issue(message("member-after"));
+			await deliver(f, creator, delivered);
+			const all = [...accepted, "creator-offered", "member-offered", "creator-after", "member-after"];
+			expect((await creator.room.sealEpoch()).ok).toBe(true);
+			await creator.room.adoptCreatorSuccessor();
+			await f.install(member);
+			expect(texts(creator)).toEqual(expect.arrayContaining(all));
+			expect(texts(member)).toEqual(expect.arrayContaining(all));
+			console.info(
+				`CREATOR_CLOSE_FAILURE ${JSON.stringify({ warm, failedWrite: injection.failedWrite, failed, epochBefore, adopted, finalEpoch: epochOf(creator), ...offeredRun.outcome })}`
+			);
+		} finally {
+			DatabaseSync.prototype.prepare = prepare;
+			StatementSync.prototype.run = run;
+			DatabaseSync.prototype.exec = exec;
+			expect(await closeChatSharesRooms()).toEqual([]);
+			if (keep) console.info(`CREATOR_CLOSE_FAILURE_DIRECTORY ${directory}`);
+			else rmSync(directory, { recursive: true, force: true });
+		}
+	},
+	900_000
 );
