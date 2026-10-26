@@ -590,3 +590,45 @@ it.skipIf(INNER).each([0, 3, 5] as const)(
 	},
 	900_000
 );
+
+// False-positive guard: a clean durable reopen (no interrupted close; after
+// normal adoptions at steady state, or at genesis) never sets the
+// interrupted-close gate: the reopened creator issues and admits at once.
+it.skipIf(INNER).each([0, 3, 5] as const)(
+	"a clean durable reopen after %i warm seals does not hold the creator's ordinary work",
+	async (warm) => {
+		const directory = mkdtempSync(join(tmpdir(), `creator-clean-reopen-w${warm}-`));
+		const keep = process.env.CREATOR_CLOSE_CRASH_KEEP === "1";
+		try {
+			const f = await fixture(directory);
+			let creator = await f.open(0),
+				member = await f.open(1);
+			const warmed = await warmRoom(f, creator, member, warm);
+			const epoch = epochOf(creator);
+			// No close is in flight: no scope at or above the current epoch.
+			expect(closeScopes(directory, epoch)).toEqual([]);
+			await f.stop(member);
+			await f.stop(creator);
+			creator = await f.open(0, { reopen: true });
+			member = await f.open(1, { reopen: true, promote: true });
+			expect(epochOf(creator)).toBe(epoch);
+			// Immediately, before any close: the creator's own work and a member's append.
+			await creator.room.issue(message("creator-after-reopen"));
+			await member.room.issue(message("member-after-reopen"));
+			const delivered = await deliver(f, creator, warmed.delivered);
+			const all = [...warmed.accepted, "creator-after-reopen", "member-after-reopen"];
+			expect(texts(creator)).toEqual(expect.arrayContaining(all));
+			expect((await creator.room.sealEpoch()).ok).toBe(true);
+			await creator.room.adoptCreatorSuccessor();
+			await f.install(member);
+			expect(epochOf(creator)).toBe(epoch + 1);
+			expect(texts(member)).toEqual(expect.arrayContaining(all));
+			console.info(`CREATOR_CLEAN_REOPEN ${JSON.stringify({ warm, epoch, delivered, finalEpoch: epochOf(creator) })}`);
+		} finally {
+			expect(await closeChatSharesRooms()).toEqual([]);
+			if (keep) console.info(`CREATOR_CLEAN_REOPEN_DIRECTORY ${directory}`);
+			else rmSync(directory, { recursive: true, force: true });
+		}
+	},
+	900_000
+);
