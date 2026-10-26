@@ -280,7 +280,11 @@ it.runIf(process.env.RUN_CREATOR_CAPACITY === "1")(
 		const creator = await fixture.open(0);
 		const directory = required([...directories].at(-1));
 		const events: unknown[] = [];
+		// Cold issuance books in order; each names the next epoch's forecast.
+		const issuanceBooks: { chargedBytes: number; maxBytes: number; nextEpochForecastBytes?: number }[] = [];
 		Reflect.set(globalThis, "__warmProofEvent", (event: unknown) => {
+			if ((event as { kind?: string }).kind === "creator-issuance-maintenance-book")
+				issuanceBooks.push(event as (typeof issuanceBooks)[number]);
 			if ((event as { kind?: string }).kind === "closed-retirement-selection")
 				console.info(`CREATOR_RETIREMENT ${JSON.stringify(event)}`);
 			if (
@@ -314,6 +318,8 @@ it.runIf(process.env.RUN_CREATOR_CAPACITY === "1")(
 		try {
 			for (let cycle = 0; cycle < cycles; cycle++) {
 				refusal = undefined;
+				// The largest next-epoch forecast an accepted admission of this cycle made.
+				let acceptedForecast: number | undefined;
 				const admittedBeforeCycle = accepted;
 				const nativeVerticesBeforeCycle = creator.accepted.size;
 				for (let index = 0; index < count; index += batchSize) {
@@ -326,10 +332,14 @@ it.runIf(process.env.RUN_CREATOR_CAPACITY === "1")(
 						y: cycle * count + index + offset,
 					}));
 					try {
+						issuanceBooks.length = 0;
 						const outcomes = await Promise.allSettled(operations.map((operation) => creator.room.issue(operation)));
 						accepted += outcomes.filter((outcome) => outcome.status === "fulfilled").length;
 						const failed = outcomes.find((outcome) => outcome.status === "rejected");
 						if (failed?.status === "rejected") throw failed.reason;
+						for (const book of issuanceBooks)
+							if (book.nextEpochForecastBytes !== undefined)
+								acceptedForecast = Math.max(acceptedForecast ?? 0, book.nextEpochForecastBytes);
 					} catch (error) {
 						refusal = error;
 						emit("refusal", {
@@ -418,6 +428,7 @@ it.runIf(process.env.RUN_CREATOR_CAPACITY === "1")(
 					await fixture.network.idle();
 					await eventually(() => newestJournalsConverged(directory), 30_000);
 					const preIssue = nativeImage(directory);
+					issuanceBooks.length = 0;
 					try {
 						await creator.room.issue({
 							action: "placeBlock",
@@ -436,11 +447,20 @@ it.runIf(process.env.RUN_CREATOR_CAPACITY === "1")(
 						).toEqual(preIssue.tables);
 					}
 					if (nextIssued) {
+						const firstColdBook = issuanceBooks[0]?.chargedBytes;
 						emit("next-issue", {
 							round,
 							durationMs: Math.round(performance.now() - nextAt),
+							acceptedForecast,
+							firstColdBook,
 							native: nativeImage(directory),
 						});
+						// The previous epoch's accepted forecast bounds the next epoch's
+						// first cold admission book it reserved for.
+						if (round === 0 && acceptedForecast !== undefined && firstColdBook !== undefined)
+							expect(firstColdBook, "next-epoch first cold book within the accepted forecast").toBeLessThanOrEqual(
+								acceptedForecast
+							);
 						break;
 					}
 					// Only the settlement profile has a required, already-admitted fence

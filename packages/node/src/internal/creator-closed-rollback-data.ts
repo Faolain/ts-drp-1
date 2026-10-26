@@ -15293,7 +15293,18 @@ export function evaluateCreatorFinishingWidthProgramForSizing(
 	} catch { return undefined; }
 }
 
+/** Receives the forecast of the next epoch's first cold admission from the
+ * successor (non-preclose) composition. Sizing data only: it carries no proof,
+ * native capability or credit. */
+export interface CreatorNextEpochAdmissionForecastSink {
+	/** Largest forecast over the post-adoption alternatives, in proof bytes
+	 * relative to this admission's book: the retained journal observation, the
+	 * adopted census and runtime census, and the new close's native readers. */
+	delta?: number;
+}
 interface ProspectiveCreatorMaintenancePrefixInput {
+	/** Next-epoch admission forecast receiver; absent means no forecast. */
+	readonly nextEpochAdmissionForecast?: CreatorNextEpochAdmissionForecastSink;
 	/** Compiler exists only during the original cold compose invocation. */
 	readonly ordinaryFinishingTemplateCapture?: ReturnType<typeof createCreatorFinishingWidthCompiler>;
 	/** Source-owned ACTUAL counts before candidate, plus precisely one candidate
@@ -16597,6 +16608,103 @@ function copyProspectiveMaintenanceBranchSeeds<T>(value: T, compiler?: ReturnTyp
 }
 
 /**
+ * Forecasts how much larger the next epoch's first cold admission book is than
+ * this admission's book, from this epoch's exact captured census and journal and
+ * the successor composition's own post-adoption geometry. The next epoch's first
+ * cold acquisition observes the same native stores after close and adoption:
+ * - its journal image carries every retained row of this epoch, the closed
+ *   scope's membership and the successor scope header (the composition's exact
+ *   successor postimage);
+ * - its AHE census and runtime census lose this epoch's current-journal rows,
+ *   reclassify this epoch's issuance rows as closed, gain the candidate's closed
+ *   row and native rows, one dependency anchor and one historical depth;
+ * - its native reader holds the close and live generations' closures.
+ * Liveness sizing only: the next epoch's real book still bounds every charge.
+ *
+ * Scope: only an epoch whose census retains no closed epoch (every row is
+ * still current, i.e. the room's first epoch) forecasts. A later epoch's book
+ * already carries the previous closes' retained rows (journal protection keeps
+ * the current and two preceding closed epochs), and one more close on top of a
+ * full first epoch exceeds the ordinary book whatever the later epoch admits:
+ * forecasting there would refuse that epoch's first admission, which is the
+ * recovery this forecast exists to guarantee. Later epochs stay bounded by
+ * their own book; their recovery is the retention window's, not this reserve's.
+ * @returns The book delta, or undefined when the scope above excludes it.
+ */
+function creatorNextEpochAdmissionForecastDelta(input: Readonly<{
+	exactWidth: (value: unknown) => number;
+	capture: Readonly<{ journal: Pick<LiveJournalRetirementImageObservation, "control" | "image" | "canonicalRows"> & { readonly drainSource?: unknown } }>;
+	census: Readonly<Record<string, unknown>>;
+	successorCensus: CreatorPostAdoptionCensusSizing;
+	finalJournal: Readonly<{ canonicalRowsBytes: number }>;
+	finalJournalControl: unknown;
+	journalImage: unknown;
+	digest: MaintenanceWidthAtom;
+	bytes32: MaintenanceWidthAtom;
+	readerBlobs: AheBoundedActiveRead["blobs"];
+	closeRefs: readonly unknown[];
+	liveRefs: readonly unknown[];
+}>): number | undefined {
+	const {exactWidth, census} = input;
+	const rows = census.rows as readonly Readonly<Record<string, unknown>>[];
+	if (rows.some(row => row.classification !== "current")) return undefined;
+	const journal = input.capture.journal;
+	const drain = journal.drainSource === undefined ? {} : {drainSource: journal.drainSource};
+	const journalNow = closedRetirementBytes({control: journal.control, image: journal.image,
+		canonicalRows: journal.canonicalRows, ...drain}).byteLength;
+	const journalNext = exactWidth({control: input.finalJournalControl, image: input.journalImage,
+		canonicalRows: maintenanceEncodedWidth(input.finalJournal.canonicalRowsBytes, undefined,
+			LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes), ...drain});
+	// Closing reclassifies every current row: the genesis row is pinned, the
+	// rest are closed issuance.
+	const closed = (row: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> =>
+		row.authorSequence === 0
+			? {...row, classification: "pinned-genesis", dependencyKind: "pinned-genesis"}
+			: {...row, classification: "displaced", dependencyKind: "authenticated-closed-issuance"};
+	const template = rows.at(-1);
+	const candidateRow = template === undefined ? [] : [closed({...template, digest: input.bytes32,
+		authorSequence: Number(template.authorSequence) + 1})];
+	const currentJournal = census.currentJournal as Readonly<Record<string, unknown>>;
+	const scope = currentJournal.scope as Readonly<Record<string, unknown>>;
+	const anchors = census.dependencyAnchors as readonly unknown[];
+	const unsettled = census.activeUnsettled as Readonly<Record<string, unknown>>;
+	const nextRuntime = {
+		...census,
+		rows: [...rows.map(closed), ...candidateRow],
+		currentJournal: {...currentJournal, rows: [], scope: {...scope, epoch: Number(scope.epoch) + 1, anchorDigest: input.digest}},
+		dependencyAnchors: [...anchors, {epoch: Number(scope.epoch) + 1, anchorDigest: input.digest}],
+		graphVersion: 0,
+		activeUnsettled: {...unsettled, availableHistoricalDepth: Number(unsettled.availableHistoricalDepth) + 1},
+	};
+	// The runtime census overhead charge is the census without its native
+	// issuance value; the next candidate adds what this one added.
+	const runtimeNow = exactWidth({...census, nativeIssuance: 1}) - 1;
+	const runtimeNext = exactWidth({...nextRuntime, nativeIssuance: 1}) - 1;
+	const native = census.nativeIssuance as Readonly<{ rows: unknown; image: unknown; control: unknown }>;
+	const control = native.control as Readonly<Record<string, unknown>> | null;
+	const controlNext = control === null ? null :
+		{...control, revision: Number(control.revision) + input.successorCensus.nativeControlRevisionDelta};
+	const nativeGrowth = input.successorCensus.nativeRowsByteLength - exactWidth(native.rows) +
+		input.successorCensus.nativeImageByteLength - exactWidth(native.image) +
+		exactWidth(controlNext) - exactWidth(control);
+	const censusNow = exactWidth(census), censusNext = exactWidth(nextRuntime) + nativeGrowth;
+	const readerNow = input.readerBlobs.reduce((sum, blob) => sum + blob.bytes.byteLength, 0);
+	// Known leaves deduplicate by digest, and every leaf read now stays read:
+	// no retirement credit. The close and live closures name the same new
+	// unknown trust, QC (and archive Cut) and metadata leaves, so the close
+	// closure's unknown leaves count once.
+	const known = new Map<string, number>(), unknownWidths: number[] = [];
+	for (const blob of input.readerBlobs) known.set(blob.ref.digest, blob.bytes.byteLength);
+	for (const [refs, countUnknown] of [[input.closeRefs, true], [input.liveRefs, false]] as const)
+		for (const ref of refs as readonly Readonly<{ digest: unknown; byteLength: number }>[]) {
+			if (typeof ref.digest === "string") known.set(ref.digest, ref.byteLength);
+			else if (countUnknown) unknownWidths.push(ref.byteLength);
+		}
+	const readerNext = [...known.values(), ...unknownWidths].reduce((sum, width) => sum + width, 0);
+	return journalNext - journalNow + censusNext - censusNow + runtimeNext - runtimeNow + readerNext - readerNow;
+}
+
+/**
  * Original runtime dimensions have already resolved; private recursion explores complete width alternatives.
  * @param input - Original nominally resolved quote material.
  * @param summaryEpochSchedule - Private whole-epoch lifetime alternative, never caller authority.
@@ -17432,6 +17540,14 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 			: journal.afterSuccessorLocal === undefined || journalAfterSuccessorControl === null
 				? journalAfterSuccessorControl
 				: { ...journalAfterSuccessorControl, revision: Number(journalAfterSuccessorControl.revision) + 1 };
+		if (!preclose && received === undefined && input.nextEpochAdmissionForecast !== undefined) {
+			const forecast = creatorNextEpochAdmissionForecastDelta({
+				exactWidth: syntax.canonicalWidth, capture, census, successorCensus, finalJournal, finalJournalControl,
+				journalImage, digest, bytes32, readerBlobs: forward.reader.blobs, closeRefs, liveRefs,
+			});
+			const sink = input.nextEpochAdmissionForecast;
+			if (forecast !== undefined) sink.delta = Math.max(sink.delta ?? Number.NEGATIVE_INFINITY, forecast);
+		}
 		// Each complete postimage remains subject to the original native-image
 		// ceiling. It is not another acquisition by this issuance proof:
 		// endWrite joins/releases its native reservations before issueOneVertex
