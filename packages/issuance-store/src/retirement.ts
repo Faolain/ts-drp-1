@@ -1962,6 +1962,17 @@ function retirementEntryOwnsTerminalSourceProof(entry: SettlementPlan["entries"]
 	return entry.sourceContextDigest !== undefined && (entry.disposition === "committed" || entry.disposition === "expire");
 }
 
+/** A completed local entry is custody while the store still holds its source. Logical
+ * retirement and the prefix pruner are separate commits, and the creator recovery
+ * census classifies every held displaced source by its completed entry, so the entry
+ * outlives retirement until its source is pruned. Custody is not a dependency: it
+ * neither protects nor requires its source or its replacement. */
+function retirementEntryIsCustody(plan: SettlementPlan, entry: SettlementPlan["entries"][number]): boolean {
+	return retirementEntryOwnsTerminalSourceProof(entry) ||
+		entry.sourceObjectId === undefined && entry.disposition !== "inherited" &&
+		settlementPlanPermitsAuthenticatedPruning({ fenceSequence: plan.fenceSequence, entries: [entry] });
+}
+
 function retirementEntryIsRetained(control: DurableIssuanceRetirementControl | null,
 	p: DurableIssuanceRetirementPreparation, plan: SettlementPlan, entry: SettlementPlan["entries"][number],
 	rows: IssuanceRetirementRows): boolean {
@@ -2067,12 +2078,13 @@ export function closeIssuanceRetirementProtectedRecords(input: Readonly<{
 function issuanceRetirementTargetRows(control: DurableIssuanceRetirementControl | null,
 	p: DurableIssuanceRetirementPreparation, rows: IssuanceRetirementRows): IssuanceRetirementRows {
 	const plans = rows.plans.map(plan => {
-		// A terminal historical proof still authenticates the exact physical source
-		// until the original prefix pruner removes it. Earlier protected rows can
-		// delay that drain beyond this metadata transaction and later issuance.
-		// Keeping these bytes is custody, not a protected source hole.
+		// A completed entry still classifies its exact physical source (a terminal
+		// historical proof, or the completion the recovery census reads) until the
+		// prefix pruner removes it. Earlier protected rows can delay that drain beyond
+		// this metadata transaction and later issuance. Keeping these bytes is
+		// custody, not a protected source hole.
 		const entries = plan.entries.filter(entry => retirementEntryIsRetained(control, p, plan, entry, rows) ||
-			retirementEntryOwnsTerminalSourceProof(entry) && retirementLocalSource(plan, entry, rows) !== undefined);
+			retirementEntryIsCustody(plan, entry) && retirementLocalSource(plan, entry, rows) !== undefined);
 		if (entries.length === plan.entries.length) return plan;
 		if (plan.revision === Number.MAX_SAFE_INTEGER) throw issuanceRetirementRefusal("settlement plan revision exhausted");
 		const {sourceContexts: _contexts, ...plain} = plan;
@@ -2204,14 +2216,16 @@ function checkedIssuanceRetirementTargetRows(
 	}
 	const target = issuanceRetirementCommitRows(control, p, rows);
 	for (const plan of target.plans) {
-		const refs = plan.entries.filter((e) => e.disposition !== "inherited" && e.sourceObjectId === undefined &&
-			// A retained terminal proof may describe an already retired physical
-			// source. The native image still checks its exact digest/pair; it does
-			// not revive that source or make it a protected dependency.
-			(!retirementEntryOwnsTerminalSourceProof(e) || retirementEntryIsRetained(control, p, plan, e, rows)))
+		// A custody entry may describe an already retired physical source and
+		// replacement. The native image still checks its exact digest/pair; it does
+		// not revive either row or make it a protected dependency.
+		const custody = (e: SettlementPlan["entries"][number]): boolean =>
+			retirementEntryIsCustody(plan, e) && !retirementEntryIsRetained(control, p, plan, e, rows);
+		const refs = plan.entries.filter((e) => e.disposition !== "inherited" && e.sourceObjectId === undefined && !custody(e))
 			.map((e) => e.sourceSequence);
 		if (plan.fenceSequence !== null) refs.push(plan.fenceSequence);
 		for (const e of plan.entries) {
+			if (custody(e)) continue;
 			if (e.replacementSequence !== null) refs.push(e.replacementSequence);
 			for (const chunk of e.replacementProgress?.chunks ?? []) refs.push(chunk.replacementSequence);
 		}
@@ -2271,8 +2285,8 @@ export function assertIssuanceRetirementPlanAllowed(
 	assertIssuancePendingInheritanceTargetsAllowed(control, plan, rows);
 	if (!control || (!control.active && !control.completed)) return;
 	const prior = rows.plans.find(value => value.scope.objectId === plan.scope.objectId && value.scope.author === plan.scope.author);
-	const unchangedTerminalProof = (entry: SettlementPlan["entries"][number]): boolean => {
-		if (!retirementEntryOwnsTerminalSourceProof(entry)) return false;
+	const unchangedCustody = (entry: SettlementPlan["entries"][number]): boolean => {
+		if (!retirementEntryIsCustody(plan, entry)) return false;
 		const previous = prior?.entries.find(value => value.sourceSequence === entry.sourceSequence);
 		if (previous === undefined || !issuanceRetirementBytesEqual(encodeCanonical(previous), encodeCanonical(entry))) return false;
 		const source = retirementLocalSource(plan, entry, rows);
@@ -2289,13 +2303,15 @@ export function assertIssuanceRetirementPlanAllowed(
 				issuanceRetirementBytesEqual(before.exactCanonicalContextBytes, after.exactCanonicalContextBytes);
 		});
 	};
-	// Preserve an exact already-owned terminal proof across unrelated plan/fence
-	// progress. This neither admits a new reference to retired work nor permits
-	// mutation of the source, completion, or their original context bytes.
-	const refs = plan.entries.filter((e) => e.disposition !== "inherited" && e.sourceObjectId === undefined && !unchangedTerminalProof(e))
+	// Preserve an exact already-owned custody entry (a terminal proof or a completed
+	// replacement) across unrelated plan/fence progress. This neither admits a new
+	// reference to retired work nor permits mutation of the source, completion, or
+	// their original context bytes.
+	const refs = plan.entries.filter((e) => e.disposition !== "inherited" && e.sourceObjectId === undefined && !unchangedCustody(e))
 		.map((e) => e.sourceSequence);
 	if (plan.fenceSequence !== null) refs.push(plan.fenceSequence);
 	for (const e of plan.entries) {
+		if (unchangedCustody(e)) continue;
 		if (e.replacementSequence !== null) refs.push(e.replacementSequence);
 		for (const c of e.replacementProgress?.chunks ?? []) refs.push(c.replacementSequence);
 	}

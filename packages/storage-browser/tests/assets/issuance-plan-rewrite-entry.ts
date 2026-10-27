@@ -6,7 +6,7 @@ import { closeIssuanceRetirementProtectedRecords, durableIssuancePruningMaintena
 	ISSUANCE_RETIREMENT_LIMITS, issuanceRetirementPreparationWithPlanRewrite } from "@ts-drp/issuance-store/maintenance";
 import { createRoomRetentionProofBook, type RoomRetentionSelection } from "@ts-drp/storage/room-head";
 import type { DurableIssueCommit } from "@ts-drp/issuance-store";
-import { d109bIssue } from "../../../../tests/fixtures/phase-6b/issuance-retention-contract.js";
+import { d109bIssue, d109bPruningInput } from "../../../../tests/fixtures/phase-6b/issuance-retention-contract.js";
 
 // Native IndexedDB mechanism evidence; synthetic signatures do not establish protocol eligibility.
 Reflect.set(globalThis, "runIssuanceRewrite", async (mode: string) => {
@@ -22,6 +22,9 @@ Reflect.set(globalThis, "runIssuanceRewrite", async (mode: string) => {
 			fenceSequence: 4, entries: [0, 1, 2].map(sequence => ({sourceSequence: sequence,
 				sourceDigest: commits[sequence]!.envelope.digest, disposition: "rebase", replacementSequence: sequence + 1}))}});
 		const owner = durableIssuancePruningMaintenanceForStore(store)!;
+		// A completed entry whose source the store still holds is custody; the rewrite
+		// drops the entries whose sources the authenticated prefix pruner removed.
+		await owner.pruneAuthenticatedSettledPrefix(d109bPruningInput(await owner.inspectPruningState(scope), 3, 2));
 		const read = await owner.acquireRetirementControl!({objectId: scope.objectId});
 		const source = await owner.readBoundedRecoveryCensus!({objectId: scope.objectId, limits: ISSUANCE_RETIREMENT_LIMITS});
 		const holes = closeIssuanceRetirementProtectedRecords({control: read.control, rows: source.rows, throughEpoch: 3, protectedRecords: []});

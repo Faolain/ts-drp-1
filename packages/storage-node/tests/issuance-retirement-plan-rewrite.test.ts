@@ -79,7 +79,10 @@ it("SQLite SIGKILL reopens exact prepared-old or completed-new at every rewrite 
 	}
 }, 60_000);
 const scope = {objectId: "rewrite-room", author: "writer"};
-async function seed(store: DurableIssuanceStore) {
+/** Rows 0..4 with completed rebase entries 0 -> 1, 1 -> 2, 2 -> 3 and fence 4. A completed
+ * entry is custody while its source is held, so the retirement rewrite drops only the
+ * entries whose sources the authenticated prefix pruner already removed (through `pruned`). */
+async function seed(store: DurableIssuanceStore, pruned = 0) {
 	const commits: DurableIssueCommit[] = [];
 	for (let epoch = 0; epoch < 5; epoch++) commits.push(await d109bIssue(store, scope, epoch));
 	const contextBytes = encodeCanonical({historicalSource: "mechanical-custody-fixture"});
@@ -89,6 +92,8 @@ async function seed(store: DurableIssuanceStore) {
 		sourceSequence: sequence, sourceDigest: commits[sequence]!.envelope.digest,
 		disposition: "rebase" as const, replacementSequence: sequence + 1}))};
 	await store.transactWriteSettlementPlan({scope, expectedRevision: null, plan});
+	const maintenance = durableIssuancePruningMaintenanceForStore(store)!;
+	await maintenance.pruneAuthenticatedSettledPrefix(d109bPruningInput(await maintenance.inspectPruningState(scope), 3, pruned));
 	return plan;
 }
 
@@ -146,6 +151,52 @@ describe.each(["sqlite", "indexeddb"] as const)("%s atomic plan retirement", bac
 		expect(await store.readSettlementPlan(scope)).toEqual({scope, revision: 2, fenceSequence: 4, entries: []});
 		await expect(store.transactWriteSettlementPlan({scope, expectedRevision: 2, plan: {...before, revision: 3}}))
 			.rejects.toThrow("retired or absent issued work");
+	});
+
+	it("keeps a completed rebase entry while its retired source is held, admits it unchanged, and drops it once pruned", async () => {
+		const directory = await mkdtemp(join(tmpdir(), "issuance-rebase-custody-")); directories.push(directory);
+		const primaryFilename = join(directory, "primary.sqlite"), primaryDatabaseName = `rebase-custody-${crypto.randomUUID()}`;
+		const store = await (backend === "sqlite" ? createNodeDurableIssuanceStore({primaryFilename}) :
+			createBrowserDurableIssuanceStore({primaryDatabaseName}));
+		stores.push(store);
+		const commits: DurableIssueCommit[] = [];
+		for (let epoch = 0; epoch < 5; epoch++) commits.push(await d109bIssue(store, scope, epoch));
+		const entry = (sequence: number) => ({sourceSequence: sequence, sourceDigest: commits[sequence]!.envelope.digest,
+			disposition: "rebase" as const, replacementSequence: sequence + 1});
+		const before = {scope, revision: 0, fenceSequence: 4, entries: [entry(0), entry(1)]};
+		await store.transactWriteSettlementPlan({scope, expectedRevision: null, plan: before});
+		const maintenance = durableIssuancePruningMaintenanceForStore(store)!;
+		const retire = async () => {
+			const read = await maintenance.acquireRetirementControl!({objectId: scope.objectId});
+			try {
+				const native = await maintenance.readBoundedRecoveryCensus!({objectId: scope.objectId, limits: ISSUANCE_RETIREMENT_LIMITS});
+				const protectedRecords = closeIssuanceRetirementProtectedRecords({control: read.control, rows: native.rows,
+					throughEpoch: 3, protectedRecords: []});
+				// Custody is not a dependency: it protects neither its source nor its replacement.
+				expect(protectedRecords).toEqual([]);
+				await read.prepareFence(issuanceRetirementPreparationWithPlanRewrite(read.control, {throughEpoch: 3,
+					decisionDigest: "a".repeat(64), sourceProofDigest: "b".repeat(64), protectedRecords}, native.rows));
+			} finally {await read.release();}
+			const prepared = await maintenance.acquireRetirementControl!({objectId: scope.objectId});
+			try {await prepared.commitPrepared();} finally {await prepared.release();}
+		};
+		// Rows 0..3 retire, but the store still holds them: the recovery census classifies a
+		// held displaced source by its completed entry, so both entries stay.
+		await retire();
+		expect(await store.readIssued(scope, 0)).not.toBeNull();
+		expect(await store.readSettlementPlan(scope)).toEqual(before);
+		// Later plan progress carries them unchanged.
+		await store.transactWriteSettlementPlan({scope, expectedRevision: 0, plan: {...before, revision: 1}});
+		// A new entry naming a retired, still held row is not custody: it is refused.
+		await expect(store.transactWriteSettlementPlan({scope, expectedRevision: 1,
+			plan: {...before, revision: 2, entries: [entry(0), entry(1), entry(2)]}})).rejects.toThrow("retired or absent issued work");
+		// The authenticated prefix pruner removes both sources; the unchanged entries stay
+		// admissible until the next retirement rewrite drops them.
+		await maintenance.pruneAuthenticatedSettledPrefix(d109bPruningInput(await maintenance.inspectPruningState(scope), 3, 1));
+		expect(await store.readIssued(scope, 1)).toBeNull();
+		await store.transactWriteSettlementPlan({scope, expectedRevision: 1, plan: {...before, revision: 2}});
+		await retire();
+		expect(await store.readSettlementPlan(scope)).toEqual({scope, revision: 3, fenceSequence: 4, entries: []});
 	});
 
 	it("prunes a fence-less removed author's authenticated committed source without a FENCE", async () => {
@@ -328,7 +379,7 @@ describe.each(["sqlite", "indexeddb"] as const)("%s atomic plan retirement", bac
 		const maintenance = durableIssuancePruningMaintenanceForStore(store)!;
 		const read = await maintenance.acquireRetirementControl!({objectId: scope.objectId});
 		const source = await maintenance.readBoundedRecoveryCensus!({objectId: scope.objectId, limits: ISSUANCE_RETIREMENT_LIMITS});
-		const replacement = source.rows.issued[1]!;
+		const replacement = source.rows.issued.find(row => row.authorSequence === 1)!;
 		const protectedRecords = closeIssuanceRetirementProtectedRecords({control: read.control, rows: source.rows,
 			throughEpoch: 3, protectedRecords: [{author: scope.author, authorSequence: 1,
 				digest: Buffer.from(replacement.digest).toString("hex")}]});
@@ -360,7 +411,7 @@ describe.each(["sqlite", "indexeddb"] as const)("%s atomic plan retirement", bac
 		const store = await (backend === "sqlite" ? createNodeDurableIssuanceStore({primaryFilename: join(directory, "primary.sqlite")}) :
 			createBrowserDurableIssuanceStore({primaryDatabaseName: `rewrite-owned-${crypto.randomUUID()}`}));
 		stores.push(store);
-		const before = await seed(store);
+		const before = await seed(store, 2);
 		const owner = durableIssuancePruningMaintenanceForStore(store)!;
 		const read = await owner.acquireRetirementControl!({objectId: scope.objectId});
 		const census = await owner.readBoundedRecoveryCensus!({objectId: scope.objectId, limits: ISSUANCE_RETIREMENT_LIMITS});

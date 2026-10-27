@@ -20,7 +20,7 @@ import {
 	resetNodeSettlementPlanRowVerificationCounts,
 	nodeSettlementPlanRowVerificationCounts,
 } from "../src/internal/node-issuance-store.js";
-import { d109bCommit, d109bIssue } from "../../../tests/fixtures/phase-6b/issuance-retention-contract.js";
+import { d109bCommit, d109bIssue, d109bPruningInput } from "../../../tests/fixtures/phase-6b/issuance-retention-contract.js";
 
 // Verify-once work counts for the durable issuance records that every native issue
 // re-reads: the retirement control (which embeds whole settlement-plan bytes in its
@@ -55,9 +55,11 @@ async function retiredStore(): Promise<{ store: DurableIssuanceStore; primaryFil
 			disposition: "rebase" as const, replacementSequence: sequence + 1,
 		})),
 	} });
-	// Retire epochs 0..1 with sources 0 and 1 unprotected: the rewrite drops them
-	// and keeps the shared context, so both sides of the rewrite carry ~40 KB.
+	// Prune sources 0 and 1, then retire epochs 0..1: the rewrite drops their entries
+	// (a completed entry whose source is still held is custody and stays) and keeps
+	// the shared context, so both sides of the rewrite carry ~40 KB.
 	const maintenance = durableIssuancePruningMaintenanceForStore(store)!;
+	await maintenance.pruneAuthenticatedSettledPrefix(d109bPruningInput(await maintenance.inspectPruningState(scope), 3, 1));
 	const read = await maintenance.acquireRetirementControl!({ objectId: scope.objectId });
 	try {
 		const native = await maintenance.readBoundedRecoveryCensus!({ objectId: scope.objectId, limits: ISSUANCE_RETIREMENT_LIMITS });
