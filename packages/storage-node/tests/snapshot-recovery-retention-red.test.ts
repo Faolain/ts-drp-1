@@ -6,6 +6,7 @@ import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createNodeSnapshotQuarantineStore as createLegacy } from "./fixtures/legacy-snapshot-transfer.mjs";
+import { allowOutOfBandWrites } from "./fixtures/out-of-band-sqlite.js";
 import { createSnapshotQuarantineFixture } from "../../../tests/fixtures/phase-4c-v3/snapshot-quarantine-contract.js";
 import type {
 	LegacyStore,
@@ -357,7 +358,8 @@ function environment(): RetentionEnvironment {
 			}
 		},
 		fault: (kind, objectId, charge): Promise<void> => {
-			const db = new DatabaseSync(filename);
+			// Storage damage is out-of-band: past the owner's snapshot_writer_v4 fence.
+			const db = allowOutOfBandWrites(new DatabaseSync(filename));
 			try {
 				db.exec("BEGIN IMMEDIATE");
 				if (kind === "identity-conflict")
