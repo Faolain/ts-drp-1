@@ -32,8 +32,9 @@ import { FPS_THRESHOLDS_STATUS, type FpsThresholds, fpsThresholds } from "./fixt
 // Input is the pages' own input path: Grid movement is real key presses (w/a/s/d) on both pages, sent
 // over the browser's own WebRTC ephemeral channel; Grid has no block-placement control, so blocks are
 // placed through the page's zone API (`__TS_DRP_V3_ZONE__.placeBlock`, the page's own issue path through
-// its rollover policy); Canvas paints are real clicks on pixels; Chat messages are typed into the input
-// and sent with a real Enter. Canvas and Chat join their second page as the shipped observer.
+// its rollover policy); Canvas paints are real clicks on pixels; Chat messages are typed into each page's
+// input and sent with a real Enter. Canvas joins its second page as the shipped receive-only observer;
+// Chat's creator makes its joiner a Writer through the page's membership control.
 //
 // Harness offer passing is refused (served-rollover-observation.ts): the successor-publisher test hooks
 // throw on assignment and the Grid window API's seal/export/adopt/install throw when called; any attempt
@@ -585,13 +586,37 @@ function canvasDriver(): AppDriver {
 
 function chatDriver(): AppDriver {
 	const origin = "http://127.0.0.1:4181";
-	const sent: { text: string; enterAt?: number; creatorAt?: number; observerAt?: number }[] = [];
-	const shownCreator = new Map<string, number>();
-	const shownObserver = new Map<string, number>();
-	const creatorLatency = new FixedHistogram();
-	const observerLatency = new FixedHistogram();
+	const prefix: Readonly<Record<Role, string>> = { creator: "fps creator ", member: "fps member " };
+	interface Sent {
+		text: string;
+		enterAt?: number;
+		ownAt?: number;
+		otherAt?: number;
+	}
+	const sent = new Map<Role, Sent[]>([
+		["creator", []],
+		["member", []],
+	]);
+	const cursor = new Map<Role, number>([
+		["creator", 0],
+		["member", 0],
+	]);
+	// First render of each message text on each page (forgotten once both pages showed it).
+	const shown = new Map<Role, Map<string, number>>([
+		["creator", new Map()],
+		["member", new Map()],
+	]);
+	const ownLatency = new Map<Role, FixedHistogram>([
+		["creator", new FixedHistogram()],
+		["member", new FixedHistogram()],
+	]);
+	const otherLatency = new Map<Role, FixedHistogram>([
+		["creator", new FixedHistogram()],
+		["member", new FixedHistogram()],
+	]);
 	const issues: { role: Role; start: number; end: number; ok: boolean }[] = [];
-	let enterCursor = 0;
+	let memberWriterAt: number | undefined;
+	let memberWaitedForShareMs = 0;
 	const waitForRelay = (page: Page): Promise<unknown> =>
 		page.waitForFunction(
 			() =>
@@ -607,6 +632,13 @@ function chatDriver(): AppDriver {
 		page.evaluate(() =>
 			Array.from(document.querySelectorAll(".message-content"), (element) => element.textContent ?? "")
 		);
+	const send = async (page: Page, role: Role, index: number): Promise<void> => {
+		const text = `${prefix[role]}${String(index).padStart(4, "0")}`;
+		(sent.get(role) as Sent[]).push({ text });
+		await page.locator("#messageInput").fill(text);
+		await page.locator("#messageInput").press("Enter");
+		await expect(page.locator("#messageInput")).toHaveValue("", { timeout: 120_000 });
+	};
 	return {
 		origin,
 		installAuthority: async (contexts) => {
@@ -634,79 +666,129 @@ function chatDriver(): AppDriver {
 			await member.locator("#roomInput").press("Enter");
 			await expect(member.locator("#chatId")).toHaveAttribute("data-full-id", roomId ?? "", { timeout: 60_000 });
 			await expect(creator.locator("#messageInput")).toBeEnabled({ timeout: 60_000 });
+			// The admin's page makes the joiner a Writer through its membership control. The grant latches at
+			// the next checkpoint and the joiner's share is in force a checkpoint later; the creator's own
+			// rollover policy produces those checkpoints while play runs, and the joiner's first Send reopens
+			// its page as a Writer (the shipped path).
+			const memberAuthor = (await member.locator("#authorId").getAttribute("data-author")) ?? "";
+			expect(memberAuthor).toMatch(/^[0-9a-f]{64}$/u);
+			await expect(creator.locator("#membershipPanel")).toBeVisible({ timeout: 60_000 });
+			await creator.locator("#memberInput").fill(memberAuthor);
+			await creator.locator("#grantWriter").click();
+			await expect(creator.getByRole("status", { name: "Chat connection status" })).toContainText(/Writer granted/u, {
+				timeout: 60_000,
+			});
 		},
-		play: (creator) =>
-			loop(CHAT_MS, async (index) => {
-				const text = `fps message ${String(index).padStart(4, "0")}`;
-				sent.push({ text });
-				await creator.locator("#messageInput").fill(text);
-				await creator.locator("#messageInput").press("Enter");
-				await expect(creator.locator("#messageInput")).toHaveValue("", { timeout: 120_000 });
-			}),
+		play: (creator, member) => {
+			const started = Date.now();
+			let memberSends = 0;
+			return together([
+				loop(CHAT_MS, (index) => send(creator, "creator", index)),
+				loop(CHAT_MS, async () => {
+					if (!(await member.locator("#messageInput").isEnabled())) {
+						if (memberWriterAt === undefined) memberWaitedForShareMs = Date.now() - started;
+						await sleep(250);
+						return;
+					}
+					memberWriterAt ??= Date.now() - started;
+					await send(member, "member", memberSends++);
+				}),
+			]);
+		},
 		consume: (meter) => {
-			for (const [at, key] of (meter.keydowns.get("creator") as [number, string][]).splice(0)) {
-				if (key !== "Enter") continue;
-				const entry = sent[enterCursor++];
-				if (entry !== undefined) entry.enterAt = at;
-			}
-			meter.keydowns.get("member")?.splice(0);
-			for (const [role, shown] of [
-				["creator", shownCreator],
-				["member", shownObserver],
-			] as const)
+			for (const role of ["creator", "member"] as const) {
+				const queue = sent.get(role) as Sent[];
+				for (const [at, key] of (meter.keydowns.get(role) as [number, string][]).splice(0)) {
+					if (key !== "Enter") continue;
+					const index = cursor.get(role) as number;
+					const entry = queue[index];
+					if (entry !== undefined) {
+						entry.enterAt = at;
+						cursor.set(role, index + 1);
+					}
+				}
+				const seen = shown.get(role) as Map<string, number>;
 				for (const [at, key, text] of (meter.observations.get(role) as [number, string, string][]).splice(0))
-					if (key.startsWith("m:") && !shown.has(text)) shown.set(text, at);
-			for (const entry of sent) {
-				if (entry.enterAt === undefined) continue;
-				const atCreator = shownCreator.get(entry.text);
-				const atObserver = shownObserver.get(entry.text);
-				if (atCreator !== undefined && entry.creatorAt === undefined) {
-					entry.creatorAt = atCreator;
-					creatorLatency.add(atCreator - entry.enterAt);
-					issues.push({ role: "creator", start: entry.enterAt, end: atCreator, ok: true });
-				}
-				if (atObserver !== undefined && entry.observerAt === undefined) {
-					entry.observerAt = atObserver;
-					observerLatency.add(atObserver - entry.enterAt);
-				}
+					if (key.startsWith("m:") && !seen.has(text)) seen.set(text, at);
 			}
-			// Bounded: forget messages both pages have shown.
-			while (sent.length > 0 && sent[0]?.creatorAt !== undefined && sent[0]?.observerAt !== undefined) {
-				const done = sent.shift() as { text: string };
-				shownCreator.delete(done.text);
-				shownObserver.delete(done.text);
-				enterCursor--;
+			for (const role of ["creator", "member"] as const) {
+				const other: Role = role === "creator" ? "member" : "creator";
+				const queue = sent.get(role) as Sent[];
+				for (const entry of queue) {
+					if (entry.enterAt === undefined) continue;
+					const own = shown.get(role)?.get(entry.text);
+					const remote = shown.get(other)?.get(entry.text);
+					if (own !== undefined && entry.ownAt === undefined) {
+						entry.ownAt = own;
+						(ownLatency.get(role) as FixedHistogram).add(own - entry.enterAt);
+						issues.push({ role, start: entry.enterAt, end: own, ok: true });
+					}
+					if (remote !== undefined && entry.otherAt === undefined) {
+						entry.otherAt = remote;
+						(otherLatency.get(role) as FixedHistogram).add(remote - entry.enterAt);
+					}
+				}
+				// Bounded: forget messages both pages have shown.
+				while (queue.length > 0 && queue[0]?.ownAt !== undefined && queue[0]?.otherAt !== undefined) {
+					const done = queue.shift() as Sent;
+					shown.get("creator")?.delete(done.text);
+					shown.get("member")?.delete(done.text);
+					cursor.set(role, (cursor.get(role) as number) - 1);
+				}
 			}
 		},
 		conserve: async (creator, member) => {
 			const deadline = Date.now() + 180_000;
+			const ours = (values: string[]): string[] => values.filter((text) => text.startsWith("fps ")).sort();
 			let pair: [string[], string[]];
 			for (;;) {
-				pair = [await texts(creator), await texts(member)];
-				if (JSON.stringify([...pair[0]].sort()) === JSON.stringify([...pair[1]].sort()) || Date.now() > deadline) break;
+				pair = [ours(await texts(creator)), ours(await texts(member))];
+				if (JSON.stringify(pair[0]) === JSON.stringify(pair[1]) || Date.now() > deadline) break;
 				await sleep(500);
 			}
 			const [c, m] = pair;
-			const mine = c.filter((text) => text.startsWith("fps message "));
-			const expected = new Set(mine);
-			const missing = mine.filter((text) => !m.includes(text));
-			const duplicated = [...expected].filter((text) => m.filter((value) => value === text).length !== 1);
+			const union = [...new Set([...c, ...m])];
+			const missing = (values: string[]): string[] => union.filter((text) => !values.includes(text));
+			const duplicated = (values: string[]): string[] =>
+				[...new Set(values)].filter((text) => values.filter((value) => value === text).length !== 1);
+			const counts = (values: string[]) => ({
+				creatorMessages: values.filter((text) => text.startsWith(prefix.creator)).length,
+				memberMessages: values.filter((text) => text.startsWith(prefix.member)).length,
+			});
 			return {
-				rule: "every message the creator sent is shown once on both pages",
-				creatorMessages: mine.length,
-				observerMessages: m.filter((text) => text.startsWith("fps message ")).length,
-				missingOnObserver: missing.slice(0, 50),
-				duplicatedOnObserver: duplicated.slice(0, 50),
-				passed: missing.length === 0 && duplicated.length === 0 && mine.length > 0,
+				rule: "every message either page sent is shown exactly once on both pages",
+				onCreatorPage: counts(c),
+				onMemberPage: counts(m),
+				missingOnCreator: missing(c).slice(0, 50),
+				missingOnMember: missing(m).slice(0, 50),
+				duplicated: [...duplicated(c), ...duplicated(m)].slice(0, 50),
+				passed:
+					missing(c).length === 0 &&
+					missing(m).length === 0 &&
+					duplicated(c).length === 0 &&
+					duplicated(m).length === 0 &&
+					counts(c).creatorMessages > 0 &&
+					counts(c).memberMessages > 0,
 			};
 		},
 		issues: () => issues,
 		report: () => ({
 			input:
-				"messages typed into the creator's input and sent with a real Enter; the joiner is the shipped receive-only observer",
-			memberMoves: "none: the joiner follows receive-only (the shipped Chat rollover e2e's configuration)",
-			enterToCreatorRenderMs: creatorLatency.summary(),
-			enterToObserverRenderMs: observerLatency.summary(),
+				"messages typed into each page's input and sent with a real Enter; the creator's page makes the joiner a Writer through its membership control",
+			memberWriter: {
+				becameWriterAfterPlayMs: memberWriterAt ?? null,
+				waitedForShareMs: memberWaitedForShareMs,
+				qualification:
+					"the grant latches at the next checkpoint and the share is in force at a later one; the member's first Send reopens its page as a Writer",
+			},
+			enterToOwnRenderMs: {
+				creator: (ownLatency.get("creator") as FixedHistogram).summary(),
+				member: (ownLatency.get("member") as FixedHistogram).summary(),
+			},
+			enterToOtherPageRenderMs: {
+				creatorMessagesOnMember: (otherLatency.get("creator") as FixedHistogram).summary(),
+				memberMessagesOnCreator: (otherLatency.get("member") as FixedHistogram).summary(),
+			},
 			webRtcEphemeral: "not used by Chat; its room transport is the node's own",
 		}),
 	};

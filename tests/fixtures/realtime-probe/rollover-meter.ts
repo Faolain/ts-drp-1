@@ -455,6 +455,8 @@ export class MovementDirection {
 	readonly deliveries: { sentAtMs: number; receivedAtMs: number }[] = [];
 	/** Gaps between successive presses: the source's own cadence, which age of information includes. */
 	readonly sendGaps = new FixedHistogram();
+	/** Presses less than 20 ms after the previous one (delayed input delivered in a burst). */
+	burstPresses = 0;
 	sent = 0;
 	shown = 0;
 	coalesced = 0;
@@ -484,7 +486,10 @@ export class MovementDirection {
 	 */
 	send(sentAt: number, x: number, y: number): void {
 		this.sent++;
-		if (this.lastSentAt !== undefined) this.sendGaps.add(sentAt - this.lastSentAt);
+		if (this.lastSentAt !== undefined) {
+			this.sendGaps.add(sentAt - this.lastSentAt);
+			if (sentAt - this.lastSentAt < 20) this.burstPresses++;
+		}
 		this.firstSentAt ??= sentAt;
 		this.lastSentAt = sentAt;
 		this.pending.push({ sentAt, x, y });
@@ -558,6 +563,7 @@ export class MovementDirection {
 			neverShown: this.neverShown + this.pending.length,
 			unmatchedRenders: this.unmatchedRenders,
 			sendGapMs: this.sendGaps.summary(),
+			burstPresses: this.burstPresses,
 			firstSends: this.firstSends,
 			firstUnmatchedRenders: this.firstUnmatched,
 			inputToRemoteRenderMs: {
