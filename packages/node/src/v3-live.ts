@@ -35,6 +35,7 @@ import {
 	SETTLEMENT_REPLACEMENT_MAX_INTENTS,
 	type SettlementPlan,
 	type SettlementSourceContext,
+	settlementHandBacksWith,
 	settlementReplacementLastLogicalTimeFromPreimage,
 } from "@ts-drp/issuance-store";
 import {
@@ -9919,7 +9920,8 @@ async function retainCreatorAcceptedSourceCustody(registration: V3PlaneRegistrat
 		entries.sort((a, b) => a.sourceSequence - b.sourceSequence);
 		contexts.sort((a, b) => lowerHexDigest(a.digest)!.localeCompare(lowerHexDigest(b.digest)!));
 		const plan = copySettlementPlan({scope, revision: prior === null ? 0 : prior.revision + 1,
-			fenceSequence: prior?.fenceSequence ?? null, entries, sourceContexts: contexts}, scope);
+			fenceSequence: prior?.fenceSequence ?? null, entries, sourceContexts: contexts,
+			...(prior?.handBacks === undefined ? {} : {handBacks: prior.handBacks})}, scope);
 		if (plan == null) throw new TypeError("creator source custody plan is invalid");
 		const future = {...before.rows, plans: [...before.rows.plans.filter(value => !sameScope(value.scope, scope)), plan]};
 		encodeCanonical(future, {maxBytes: censusInput.limits.maxBytes, maxDepth: 32, maxItems: 65536});
@@ -15314,14 +15316,27 @@ function capturedLocalIssueInput(
 	}
 	let planEffect: NonNullable<DurableIssueCommit["planEffect"]> | undefined;
 	if (ObjectGetOwnPropertyDescriptor(input, "planEffect") !== undefined) {
-		const fence = snapshotClosedRecord(input.planEffect, ["kind"]);
+		const handBack = snapshotClosedRecord(input.planEffect, ["intent", "kind", "sourceSequence"]);
+		const fence = handBack === undefined ? snapshotClosedRecord(input.planEffect, ["kind"]) : undefined;
 		const replacement =
 			fence === undefined ? snapshotClosedRecord(input.planEffect, ["kind", "sourceSequence"]) : undefined;
 		const progressReplacement =
 			fence === undefined && replacement === undefined
 				? snapshotClosedRecord(input.planEffect, PROGRESS_REPLACEMENT_EFFECT_KEYS)
 				: undefined;
-		if (fence?.kind === "fence") {
+		if (
+			handBack?.kind === "hand-back" &&
+			NumberIsSafeInteger(handBack.sourceSequence) &&
+			(handBack.sourceSequence as number) >= 0 &&
+			NumberIsSafeInteger(handBack.intent) &&
+			(handBack.intent as number) >= 0
+		) {
+			planEffect = ObjectFreeze({
+				intent: handBack.intent as number,
+				kind: "hand-back" as const,
+				sourceSequence: handBack.sourceSequence as number,
+			});
+		} else if (fence?.kind === "fence") {
 			planEffect = ObjectFreeze({ kind: "fence" as const });
 		} else if (
 			replacement?.kind === "replacement" &&
@@ -15405,6 +15420,9 @@ function capturedLocalIssueInput(
 	}
 	if (planEffect !== undefined && settlementProfileFor(payload.trust.trust.profileId) !== "v1") {
 		return localIssueFailure("malformed-input", "v3 local issue plan effect is unavailable");
+	}
+	if (planEffect?.kind === "hand-back" && operations.length !== 1) {
+		return localIssueFailure("malformed-input", "v3 local issue hand-back carries exactly its one operation");
 	}
 	if (
 		planEffect?.kind === "replacement" &&
@@ -16067,7 +16085,7 @@ async function issueLocal(
 	// settlement-profile membership alone does not grant current Writer rights.
 	// A halted native debt retains the original issuer's admission-rejected
 	// outcome; the public preflight's not-active result is not its substitute.
-	if (input.planEffect === undefined && !registration.operationAdmissionHalted) {
+	if ((input.planEffect === undefined || input.planEffect.kind === "hand-back") && !registration.operationAdmissionHalted) {
 		for (const { operation } of input.operations) {
 			const authorized = authorizeV3NewLocalOperation({ plane: registration.handle, operation });
 			if (!authorized.ok) return authorized;
@@ -16075,9 +16093,36 @@ async function issueLocal(
 	}
 	if (
 		input.planEffect !== undefined &&
-		(input.planEffect.kind !== "replacement" || isReservedBatchAction(String(Reflect.get(first.operation, "action"))))
+		((input.planEffect.kind !== "replacement" && input.planEffect.kind !== "hand-back") ||
+			isReservedBatchAction(String(Reflect.get(first.operation, "action"))) ||
+			(input.planEffect.kind === "hand-back" && (input.operations.length !== 1 || input.settlementSource !== undefined)))
 	) {
 		return localIssueFailure("malformed-input", "v3 local issue plan effect is invalid");
+	}
+	if (input.planEffect?.kind === "hand-back") {
+		// A move the settlement window (or the creator's frontier) gave back, offered again as a new move:
+		// its row consumes the durable hand-back record in its own issuance transaction (the store
+		// refuses a consumed or absent record). It must carry exactly the handed-back operation.
+		const effect = input.planEffect;
+		let plan;
+		try {
+			plan = copySettlementPlan(
+				await registration.issuanceStore.readSettlementPlan(registration.issuanceScope),
+				registration.issuanceScope
+			);
+		} catch {
+			return localIssueFailure("issuance-rejected", "v3 settlement hand-back plan read failed");
+		}
+		const record = plan?.handBacks?.find(
+			(candidate) => candidate.sourceSequence === effect.sourceSequence && candidate.intent === effect.intent
+		);
+		if (
+			record === undefined ||
+			record.reissueSequence !== null ||
+			!sameBytes(record.exactCanonicalOperationBytes, encodeCanonical(first.operation))
+		) {
+			return localIssueFailure("issuance-rejected", "v3 settlement hand-back is unavailable");
+		}
 	}
 	if (input.planEffect?.kind === "replacement" && input.settlementSource === undefined) {
 		return localIssueFailure(
@@ -24261,6 +24306,21 @@ async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
 	if (!current() || second.read.image.imageDigest !== first.read.image.imageDigest || second.plan.revision !== first.plan.revision ||
 		!await unresolved(second)) throw new TypeError("creator source abandonment source currency changed");
 	const prior = second.plan;
+	// The moves of a row the creator's frontier proves was never admitted are given back to the
+	// application in this same plan write (durable hand-back records, consumed by their reissue).
+	let handBacks = prior.handBacks;
+	if (frontierProof) {
+		const row = second.read.rows.issued.find(value => sameScope(value, scope) && value.authorSequence === selector.sourceSequence);
+		const authenticated = row === undefined ? undefined : authenticateRetainedSourceVertex(second.retained.contract,
+			row.canonicalPreimageBytes, row.signature, row.digest, scope.author, row.authorSequence);
+		const intents = authenticated === undefined ? undefined : rebaseIntents(second.retained.contract, authenticated);
+		if (authenticated !== undefined && intents !== undefined && intents.length > 0 &&
+			await frontierRetainedResolution(registration, selector.sourceSequence, authenticated.vertex.epoch) === "never-admitted")
+			handBacks = settlementHandBacksWith(prior.handBacks, intents.map((intent, index) => ObjectFreeze({
+				sourceSequence: selector.sourceSequence, sourceDigest: new Uint8ArrayConstructor(second.entry.sourceDigest),
+				sourceEpoch: authenticated.vertex.epoch, intent: index, exactCanonicalOperationBytes: encodeCanonical(intent.operation),
+				reissueSequence: null}))) ?? prior.handBacks;
+	}
 	const entries = prior.entries.map(entry => entry.sourceSequence !== selector.sourceSequence ? entry :
 		{...entry, disposition: "expire" as const, replacementSequence: null, sourceResolutionDigest: new Uint8ArrayConstructor(expiry.digest),
 			...(frontierProof ? {sourceResolutionKind: "frontier" as const} : {})});
@@ -24268,7 +24328,7 @@ async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
 	if (!contexts.some(value => sameBytes(value.digest, expiry.digest))) contexts.push(expiry);
 	contexts.sort((a, b) => lowerHexDigest(a.digest)!.localeCompare(lowerHexDigest(b.digest)!));
 	const plan = copySettlementPlan({scope, revision: prior.revision + 1, fenceSequence: prior.fenceSequence, entries,
-		sourceContexts: contexts}, scope);
+		sourceContexts: contexts, ...(handBacks === undefined ? {} : {handBacks})}, scope);
 	if (plan == null) throw new TypeError("creator source abandonment plan is invalid");
 	const future = {...second.read.rows, plans: [...second.read.rows.plans.filter(value => !sameScope(value.scope, scope)), plan]};
 	encodeCanonical(future, {maxBytes: censusInput.limits.maxBytes, maxDepth: 32, maxItems: 65536});
