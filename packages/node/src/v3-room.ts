@@ -13,6 +13,8 @@ import {
 	captureCreatorSuccessorPeers,
 	createCreatorSuccessorMaterialServer,
 	CreatorSuccessorExportUnavailable,
+	creatorSuccessorDepartedCarrierOf,
+	type CreatorSuccessorDepartedCarrier,
 	creatorRecipientRetirementResumeRequested,
 	type CreatorRecipientRecoveryContext,
 	type CreatorSuccessorOffer,
@@ -1205,6 +1207,13 @@ function selectNewestCreatorSuccessorOffer(
  * up to ~60 s in a loaded browser.
  */
 export const V3_ROOM_ADOPTION_ISSUE_HOLD_MS = 120_000;
+
+/**
+ * How many closed epochs' departed-scope carriers a creator keeps in memory (fix/skip-scope-carrier).
+ * A member skipping from an older epoch gets none, and that one scope keeps today's retention.
+ * At most 16 x (3 x 65,536 + CREATOR_CLOSE_MEMBERSHIP_MAX_BYTES) bytes.
+ */
+export const CREATOR_DEPARTED_CARRIERS_RETAINED = 16;
 
 /**
  * A move held for a creator-successor adoption that did not settle within
@@ -3699,6 +3708,15 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			if (!recheck) throw new TypeError("creator successor request was superseded");
 		}
 	};
+	// fix/skip-scope-carrier: the departed-scope carriers of this creator's last closes, for a
+	// member's skip install from one of those epochs. In memory only: a restarted creator answers
+	// "unavailable" and that member's departed scope keeps today's retention.
+	const departedCarriers = new Map<string, Readonly<{ epoch: number; carrier: CreatorSuccessorDepartedCarrier }>>();
+	const departedCarrier = (scope: Readonly<{ epoch: number; anchorDigest: string }>): CreatorSuccessorDepartedCarrier | undefined => {
+		const held = departedCarriers.get(`${scope.epoch}:${scope.anchorDigest}`);
+		// Only a close whose successor this creator adopted: never a carrier it may still abandon.
+		return held !== undefined && successorAdopted(held.epoch) ? held.carrier : undefined;
+	};
 	const successorServingAdopted = (serving: SuccessorServing): boolean => {
 		if (closed || terminalFailure !== undefined) return false;
 		// Adoption is permanent: a later adoption in progress does not withdraw a retained serving.
@@ -3709,6 +3727,16 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		if (transport === undefined || activeHandle === undefined)
 			throw new TypeError("creator successor transport is unavailable");
 		const exported = await readSuccessorExport();
+		const departed = creatorSuccessorDepartedCarrierOf(exported);
+		if (departed !== undefined) {
+			const key = `${departed.scope.epoch}:${departed.scope.anchorDigest}`;
+			departedCarriers.delete(key);
+			departedCarriers.set(key, Object.freeze({ epoch: departed.scope.epoch, carrier: departed.carrier }));
+			for (const oldest of departedCarriers.keys()) {
+				if (departedCarriers.size <= CREATOR_DEPARTED_CARRIERS_RETAINED) break;
+				departedCarriers.delete(oldest);
+			}
+		}
 		const manifestDigest = exported.declaration.scope.manifestDigest;
 		const closedEpoch = exported.declaration.scope.epoch;
 		// The replaced serving's held responses end before its port joins their handlers (row 61).
@@ -3747,6 +3775,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			localPeerId: port.localPeerId,
 			manifestDigest,
 			material: exported.material,
+			departed: departedCarrier,
 			connectedPeers: () => port.connectedPeers(),
 			// Only an authorized request's response waits for the adoption; a refusal is written at once.
 			admitResponse: async (peerId: string, signal: AbortSignal): Promise<void> => {

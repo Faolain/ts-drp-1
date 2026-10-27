@@ -122,6 +122,10 @@ import {
 } from "./internal/creator-successor-live.js";
 import {
 	type CreatorSuccessorAuxiliaryMaterial,
+	captureCreatorSuccessorDepartedCarrier,
+	type CreatorSuccessorDepartedCarrier,
+	type CreatorSuccessorDepartedScope,
+	receiveCreatorSuccessorDepartedCarrier,
 	receiveCreatorSuccessorMaterial,
 } from "./internal/creator-successor-transport.js";
 import {
@@ -146,7 +150,30 @@ export {
 	captureCreatorSuccessorPeers,
 	createCreatorSuccessorMaterialServer,
 	consumeOwnedCreatorTransportSigningRequest,
+	type CreatorSuccessorDepartedCarrier,
+	type CreatorSuccessorDepartedScope,
 } from "./internal/creator-successor-transport.js";
+
+/**
+ * The departed-scope carrier an export supplies (fix/skip-scope-carrier): the scope its Cut closes
+ * and the Cut, QC, successor trust record and closed membership a member skipping past that epoch
+ * needs to retire it. Undefined when the export carries no membership (a sparse close).
+ * @param exported - A creator successor export.
+ * @returns The scope and its carrier, or undefined.
+ */
+export function creatorSuccessorDepartedCarrierOf(exported: CreatorSuccessorExport):
+	Readonly<{ scope: CreatorSuccessorDepartedScope; carrier: CreatorSuccessorDepartedCarrier }> | undefined {
+	const cut = canonicalRecord(exported.offer.exactCanonicalCutValueBytes);
+	if (cut === undefined || typeof cut.epoch !== "number" || typeof cut.previousAnchor !== "string") return undefined;
+	const carrier = captureCreatorSuccessorDepartedCarrier({
+		exactCanonicalCutValueBytes: exported.offer.exactCanonicalCutValueBytes,
+		exactCanonicalCommitQcBytes: exported.offer.exactCanonicalCommitQcBytes,
+		exactCanonicalTrustStateRecordBytes: exported.offer.exactCanonicalTrustStateRecordBytes,
+		exactCanonicalCloseMembershipBytes: exported.material.exactCanonicalCloseMembershipBytes,
+	});
+	return carrier === undefined ? undefined
+		: Object.freeze({ scope: Object.freeze({ epoch: cut.epoch, anchorDigest: cut.previousAnchor }), carrier });
+}
 
 const PROFILE = Object.freeze({
 	maxManifestBytes: 212_387,
@@ -1255,6 +1282,51 @@ export async function receiveCreatorSuccessorAdoption(
 			() => source.sealReceivedRecoveryDependencies(openedCustody.owner, input.snapshotStore)));
 		return true;
 	};
+	// fix/skip-scope-carrier: a skip install's material authenticates the target from the Cut before
+	// it, so the scope this member departs from (its current epoch) closes on a Cut it never received.
+	// The departed carrier supplies that Cut, its QC, the successor trust record and the closed
+	// membership; it is authenticated here against this member's own current trust exactly as an
+	// adjacent offer is, and recorded below through the adjacent path. Optional: an older creator, a
+	// creator that no longer holds it, or any failure yields none, and that scope keeps today's
+	// retention (the journal retirement re-verifies a recorded carrier on every classification).
+	let departed: CreatorSuccessorDepartedCarrier | undefined;
+	const receiveDepartedCarrier = async (): Promise<CreatorSuccessorDepartedCarrier | undefined> => {
+		const departedScope = Object.freeze({ epoch: source.currentTrust.currentEpoch, anchorDigest: source.currentTrust.currentAnchorDigest });
+		const carrier = await receiveCreatorSuccessorDepartedCarrier({
+			transport: input.transport,
+			peers: input.peers,
+			manifestDigest: manifest.manifestDigest,
+			departed: departedScope,
+			identity: {
+				author: input.author,
+				sign: input.signRegisteredVertexDigest,
+				isAuthorizedAuthor: (author) => {
+					const currentAuthority = input.plane.currentEphemeralAuthority();
+					return currentAuthority !== undefined && currentAuthority.objectId === source.objectId &&
+						currentAuthority.epoch === source.currentTrust.currentEpoch &&
+						currentAuthority.anchorDigest === source.currentTrust.currentAnchorDigest &&
+						(author === creatorSourceAuthor || currentAuthority.isCurrentWriter(author));
+				},
+			},
+		}).catch(() => undefined);
+		if (carrier === undefined) return undefined;
+		const departedCut = canonicalRecord(carrier.exactCanonicalCutValueBytes);
+		if (departedCut === undefined || departedCut.epoch !== departedScope.epoch || departedCut.previousAnchor !== departedScope.anchorDigest)
+			return undefined;
+		const authority = (Object.hasOwn(departedCut, "forwardPromotion") ? openCreatorForwardPromotionSuccessorTrust : openCreatorSuccessorTrust)({
+			currentTrust: source.currentTrust,
+			exactCanonicalCutValueBytes: carrier.exactCanonicalCutValueBytes,
+			exactCanonicalCommitQcBytes: carrier.exactCanonicalCommitQcBytes,
+			exactCanonicalTrustStateRecordBytes: carrier.exactCanonicalTrustStateRecordBytes,
+		});
+		if (!authority.ok || authority.trust.currentEpoch !== departedScope.epoch + 1) return undefined;
+		const membership = await openCreatorCloseMembership({ bytes: carrier.exactCanonicalCloseMembershipBytes,
+			exactCanonicalCutValueBytes: carrier.exactCanonicalCutValueBytes,
+			maxEpochVertices: (departedCut.parameters as { maxEpochVertices: number } | undefined)?.maxEpochVertices ?? 0 }).catch(() => undefined);
+		if (membership === undefined || membership.localVertexWitnesses.length !== 0 ||
+			!sameBytes(membership.exactCanonicalLatchedAclBytes, source.exactCanonicalLatchedAclBytes)) return undefined;
+		return carrier;
+	};
 	try {
 		transfer = createV3SnapshotTransferOwner({ transport: input.transport });
 		const auxiliary = await receiveCreatorSuccessorMaterial({
@@ -1297,6 +1369,7 @@ export async function receiveCreatorSuccessorAdoption(
 				currentPoint.predecessorTrust.currentAnchorDigest !== manifest.manifest.anchor)
 				throw new TypeError("creator checkpoint current authority is invalid");
 			opened = {ok: true, trust: currentPoint.currentTrust};
+			departed = await receiveDepartedCarrier();
 		}
 		if (!opened?.ok) throw new TypeError("creator successor authority is invalid");
 		const receivedTrust = opened.trust;
@@ -1593,6 +1666,14 @@ export async function receiveCreatorSuccessorAdoption(
 			});
 		if (auxiliary.exactCanonicalCloseMembershipBytes !== undefined && !membershipRecorded)
 			throw new TypeError("creator received close membership persistence refused");
+		// A skip install records the departed scope's authenticated carrier through the same path.
+		// Never fatal: a refusal leaves that scope with today's retention.
+		if (checkpoint !== undefined && departed !== undefined)
+			await source.recordReceivedDepartedClosedMembership(departed.exactCanonicalCutValueBytes,
+				departed.exactCanonicalCloseMembershipBytes, {
+					exactCanonicalCommitQcBytes: departed.exactCanonicalCommitQcBytes,
+					exactCanonicalSuccessorTrustStateRecordBytes: departed.exactCanonicalTrustStateRecordBytes,
+				}).catch(() => false);
 		if (await prepareReceivedRecoveryTurnover()) {
 			if (promoted) {
 				if (receivedCloseSnapshot === undefined) throw new TypeError("creator received close snapshot unavailable after turnover");

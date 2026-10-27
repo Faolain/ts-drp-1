@@ -21994,6 +21994,10 @@ function creatorCloseRegistration(
 			receivedMembership = observed;
 			return true;
 		},
+		recordReceivedDepartedClosedMembership: async (exactCanonicalCutValueBytes: Uint8Array, exactCanonicalCloseMembershipBytes: Uint8Array,
+			receivedAuthority: ReceivedCloseAuthorityRecords): Promise<boolean> =>
+			await recordCreatorReceivedClosedMembership(registration, exactCanonicalCutValueBytes, null,
+				exactCanonicalCloseMembershipBytes, receivedAuthority) !== false,
 		// The genuine claim may use a successor alias; the close owner is keyed
 		// by that exact handle, not the registration's underlying raw handle.
 		sealRecoveryDependencies: (required?: boolean) =>
