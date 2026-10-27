@@ -556,8 +556,24 @@ async function readCreatorSuccessorExportMaterial(
 				break;
 			}
 		}
-		if (predecessor === undefined || predecessorTrustCandidate === undefined)
+		if (predecessor === undefined || predecessorTrustCandidate === undefined) {
+			// A head installed from a reattachment checkpoint (an install more than one epoch ahead)
+			// holds only the compact point proof of its own transition, never a predecessor generation
+			// ("not a second current trust or a native intermediate generation"), so the transition it
+			// would serve cannot be re-verified here. It is not a successor-material source: nothing to
+			// serve, which every caller already treats as such (startup serving opens and serves nothing).
+			// The creator and any adjacent installer still serve; this head's next adjacent install has
+			// it as predecessor and is a source again.
+			const point = uniqueCandidateByKind(current.candidates, "creator-reattachment-proof-1");
+			const pointTrust = point?.record.exactCanonicalPredecessorTrustStateRecordBytes;
+			const pointEpoch =
+				pointTrust instanceof Uint8Array ? canonicalRecord(pointTrust)?.currentEpoch : undefined;
+			if (pointEpoch !== undefined && pointEpoch === cut.record.epoch)
+				throw new CreatorSuccessorExportUnavailable(
+					"creator successor export from a reattachment checkpoint head is unavailable"
+				);
 			throw new TypeError("creator successor native predecessor is unavailable");
+		}
 		const genesis =
 			Number(cut.record.epoch) === 0
 				? openCurrentAnchorTrust({

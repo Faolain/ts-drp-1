@@ -187,16 +187,6 @@ it.runIf(PHASE === "stuck")(
 				await rows.toWriter();
 				await rows.toCreator();
 				log.push({ label: "reconnected", epoch, plan: await planImage(directory, writerAuthor), settlement: await writer.settlementStatus?.() });
-				// The Writer follows consecutive epochs so its installed head keeps a retained predecessor
-				// (a member reopened right after a skip install refuses to open, on c08d8680 too:
-				// "creator successor native predecessor is unavailable" in serveAvailableSuccessor).
-				for (let extra = 0; extra < Number(process.env.SW_VERSION_FOLLOW ?? "0"); extra++) {
-					epoch = await rollCreator(creator, rows.toWriter, ordinal);
-					await wire.caughtUp(epoch, 60_000);
-					await rows.toWriter();
-					await rows.toCreator();
-					log.push({ label: `followed-${extra}`, epoch, plan: await planImage(directory, writerAuthor), settlement: await writer.settlementStatus?.() });
-				}
 				writeFileSync(
 					join(directory, "stuck.json"),
 					JSON.stringify({ epoch, ordinal: ordinal.next, writerAuthor, original, log })
