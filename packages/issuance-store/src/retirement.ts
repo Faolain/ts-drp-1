@@ -1938,11 +1938,69 @@ function retirementEntryOwnsTerminalSourceProof(entry: SettlementPlan["entries"]
 	return entry.sourceContextDigest !== undefined && (entry.disposition === "committed" || entry.disposition === "expire");
 }
 
+const AUTHOR_FENCE_ACTION = "$drp.author-fence.v1";
+
+/** A retained FENCE: the author's own signed `$drp.author-fence.v1` no-op whose
+ * `fenceSequence` is its own ordinal, kept as an `expire` entry with no resolution
+ * once it stops being the plan's current fence. It has no intent to reissue, rebase
+ * or abandon, so it never gains a resolution (the transition law forbids one). */
+function retirementEntryIsRetainedFence(plan: SettlementPlan, entry: SettlementPlan["entries"][number],
+	rows: IssuanceRetirementRows): boolean {
+	if (entry.sourceObjectId !== undefined || entry.inheritance !== undefined || entry.disposition !== "expire" ||
+		entry.replacementSequence !== null || entry.replacementProgress !== undefined ||
+		entry.sourceContextDigest === undefined || entry.sourceResolutionDigest !== undefined) return false;
+	const row = retirementLocalSource(plan, entry, rows);
+	if (row === undefined) return false;
+	const vertex = decodeCanonical(row.canonicalPreimageBytes);
+	if (typeof vertex !== "object" || vertex === null || Array.isArray(vertex)) return false;
+	const operation: unknown = Reflect.get(vertex, "operation");
+	return typeof operation === "object" && operation !== null && !Array.isArray(operation) &&
+		Reflect.get(operation, "action") === AUTHOR_FENCE_ACTION && Reflect.get(operation, "version") === 1 &&
+		Reflect.get(operation, "fenceSequence") === entry.sourceSequence;
+}
+
+/** Releasing a removed author's retained FENCE (FENCE-DESIGN.md candidate A; model
+ * formal/removed-author-fence-release.qnt). Structural clauses owned by this law:
+ * R1 the plan has no current fence (a fully removed author has no Writer grant and
+ * therefore issues none; a later fence makes the ordinary rule apply instead) and
+ * R2 every other entry carries an authenticated terminal resolution or is itself a
+ * retained fence: nothing is left to rebase, reissue or abandon below it. The row
+ * then stays only while the original owner protects it (R3: rollback window, replay
+ * scope, physical journal consumer). Release never touches the durable lineage. */
+function retirementFenceIsReleasable(plan: SettlementPlan, entry: SettlementPlan["entries"][number],
+	rows: IssuanceRetirementRows): boolean {
+	return plan.fenceSequence === null && retirementEntryIsRetainedFence(plan, entry, rows) &&
+		plan.entries.every(other => other === entry || settlementEntryHasAuthenticatedTerminalResolution(other) ||
+			retirementEntryIsRetainedFence(plan, other, rows)) &&
+		// Unpublished work the plan does not classify yet is unresolved too, unless its
+		// signed local-author expiry terminates it.
+		rows.outbox.every(out => out.objectId !== plan.scope.objectId || out.author !== plan.scope.author ||
+			out.publishState === "published" || rows.issued.some(issued => issued.author === out.author &&
+				issued.authorSequence === out.authorSequence && issuanceRowHasAuthenticatedExpiry(rows, issued)));
+}
+
+/**
+ * Whether one exact local issued row is a releasable retained FENCE under the plan law.
+ * The original hole selector uses it so both owners apply one rule; it grants no
+ * retirement by itself (the rollback window and replay guards still decide).
+ * @param rows - Complete bounded native issuance image.
+ * @param row - The exact issued row.
+ * @returns Whether the row is its author's releasable retained FENCE.
+ */
+export function issuanceRetirementFenceIsReleasable(rows: IssuanceRetirementRows,
+	row: Readonly<{ objectId: string; author: string; authorSequence: number; digest: Uint8Array }>): boolean {
+	const plan = rows.plans.find(value => value.scope.objectId === row.objectId && value.scope.author === row.author);
+	const entry = plan?.entries.find(value => value.sourceObjectId === undefined && value.sourceSequence === row.authorSequence);
+	return plan !== undefined && entry !== undefined && issuanceRetirementBytesEqual(entry.sourceDigest, row.digest) &&
+		retirementFenceIsReleasable(plan, entry, rows);
+}
+
 function retirementEntryIsRetained(control: DurableIssuanceRetirementControl | null,
 	p: DurableIssuanceRetirementPreparation, plan: SettlementPlan, entry: SettlementPlan["entries"][number],
 	rows: IssuanceRetirementRows): boolean {
 	if (entry.sourceObjectId !== undefined || entry.disposition === "inherited" ||
-		!settlementPlanPermitsAuthenticatedPruning({ fenceSequence: plan.fenceSequence, entries: [entry] })) return true;
+		!settlementPlanPermitsAuthenticatedPruning({ fenceSequence: plan.fenceSequence, entries: [entry] }) &&
+		!retirementFenceIsReleasable(plan, entry, rows)) return true;
 	const source = retirementLocalSource(plan, entry, rows);
 	return source !== undefined && retirementKeepsRow(control, p, source);
 }
@@ -2047,6 +2105,8 @@ function issuanceRetirementTargetRows(control: DurableIssuanceRetirementControl 
 		// until the original prefix pruner removes it. Earlier protected rows can
 		// delay that drain beyond this metadata transaction and later issuance.
 		// Keeping these bytes is custody, not a protected source hole.
+		// A released retained FENCE keeps its entry here too: the recovery walk still
+		// authenticates the exact physical no-op through its retained source contract.
 		const entries = plan.entries.filter(entry => retirementEntryIsRetained(control, p, plan, entry, rows) ||
 			retirementEntryOwnsTerminalSourceProof(entry) && retirementLocalSource(plan, entry, rows) !== undefined);
 		if (entries.length === plan.entries.length) return plan;

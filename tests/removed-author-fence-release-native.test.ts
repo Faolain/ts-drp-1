@@ -72,7 +72,10 @@ async function releaseThenReadmit(f: Fixture, creator: Peer, member: Peer, label
 	expect(image.retiredThroughEpoch).toBeGreaterThanOrEqual(3);
 	// RELEASED: the fence row is no longer a protected hole and its plan entry is gone.
 	expect(image.holes).toEqual([]);
-	expect(image.plan?.entries.some(entry => entry.sequence === fence.sequence) ?? false).toBe(false);
+	// Its entry stays as custody while the row is physically present: the recovery walk
+	// still authenticates the exact no-op through its retained source contract.
+	expect(image.plan?.entries.find(entry => entry.sequence === fence.sequence)).toEqual(
+		{ sequence: fence.sequence, disposition: "expire", resolved: false });
 	// The durable lineage never moves (no seq is ever re-signed).
 	expect(image.lineage).toEqual(removed.lineage);
 	expect(image.plan?.fenceSequence ?? null).toBeNull();
@@ -90,6 +93,13 @@ async function releaseThenReadmit(f: Fixture, creator: Peer, member: Peer, label
 	await member.room.issue(message(`${label}-after-readmission`));
 	const after = await nativeImage(f, 1);
 	expect(after.outbox.at(-1)).toMatchObject({ sequence: next + 1, action: "message" });
+	// With a current fence again, the ordinary prefix pruner removes the released row and
+	// the retirement drops its entry; the fresh fence stays the plan's current fence.
+	const pruned = await roll(f, creator, member, `${label}-readmitted`);
+	expect(pruned.prunedThrough).toBeGreaterThanOrEqual(fence.sequence);
+	expect(pruned.plan?.entries.some(entry => entry.sequence === fence.sequence) ?? false).toBe(false);
+	expect(pruned.outbox.some(row => row.sequence === fence.sequence)).toBe(false);
+	expect(pruned.lineage.next).toBeGreaterThan(next + 1);
 	return { fence: fence.sequence, next };
 }
 
