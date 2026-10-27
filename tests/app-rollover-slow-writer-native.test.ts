@@ -284,17 +284,18 @@ it("a slow Writer that follows by skip installs keeps following and every move i
 	}
 }, 1_200_000);
 
-// PINNED DEFECT (not fixed here; it needs a protocol decision). A skip install authenticates the target
-// head from a reattachment checkpoint, whose material carries the Cut before the target only; the
-// closed-membership carrier of the epoch the Writer departed from is recorded only on an adjacent
-// install (creator-adoption's recordReceivedClosedMembership). That journal scope holds the creator's
-// received rows, so it is never a collectible prefix ("unclassified-prefix" or
-// "source-coverage-incomplete") and stays protected forever. With no lagging move at all (no retained
-// work, no hand-back), six skips and a few adjacent epochs reach the protected-scope bound
-// (LIVE_JOURNAL_RETIREMENT_LIMITS.maxScopes = AHE maxObjectGenerations = 7): the next install's journal
-// retirement refuses "malformed-input" and the Writer's session closes. When this is fixed the test
-// fails; replace it with one that asserts the Writer keeps following.
-it("pinned defect: each skip install leaves its departed journal scope uncollectible, and past the 7-scope bound the Writer's journal retirement refuses", async () => {
+// A skip install authenticates the target head from a reattachment checkpoint, whose material carries
+// the Cut before the target only. The epoch the Writer departed from used to get no closed-membership
+// carrier (recorded only on an adjacent install, creator-adoption's recordReceivedClosedMembership), so
+// that journal scope, holding the creator's received rows, was never collectible and stayed protected:
+// six skips and a few adjacent epochs reached the protected-scope bound
+// (LIVE_JOURNAL_RETIREMENT_LIMITS.maxScopes = AHE maxObjectGenerations = 7), the next install's journal
+// retirement refused "malformed-input" and the Writer's session closed. The owner's decision
+// (fix/skip-scope-carrier): a skip install also fetches the departed epoch's Cut, its authority and its
+// closed membership, authenticates them as an adjacent install would, and records them, so the
+// departed scope is retired exactly as after an adjacent install. Ten skips, then adjacent epochs: the
+// Writer keeps following and never refuses an install.
+it("a Writer that follows by ten skip installs keeps following: each departed journal scope is collectible", async () => {
 	const restore = await installEnvironment("node", () => undefined);
 	const directory = mkdtempSync(join(tmpdir(), "app-rollover-skip-scopes-"));
 	directories.push(directory);
@@ -304,35 +305,32 @@ it("pinned defect: each skip install leaves its departed journal scope uncollect
 		const rows = rowWire(creator, writer);
 		const ordinal = { next: 0 };
 		let epoch = 0;
-		let stopped: unknown;
+		let skips = 0;
 		try {
 			let next = 100;
-			for (let round = 0; round < 6; round++) {
+			for (let round = 0; round < Number(process.env.SKIP_SCOPES_ROUNDS ?? 10); round++) {
 				await writer.issue(1, next++);
 				await rows.toCreator();
 				await wire.pause();
+				const before = (await writer.authorityEpoch()) ?? 0;
 				epoch = await rollCreator(creator, rows.toWriter, ordinal);
 				epoch = await rollCreator(creator, async () => undefined, ordinal);
 				wire.resume();
 				await follow(wire, writer, epoch);
+				if (epoch - before > 1) skips++;
 				await rows.toWriter();
 			}
-			for (let round = 0; round < 8 && stopped === undefined; round++) {
+			for (let round = 0; round < 4; round++) {
 				await rows.toCreator();
 				epoch = await rollCreator(creator, rows.toWriter, ordinal);
-				try {
-					await follow(wire, writer, epoch);
-					await rows.toWriter();
-				} catch (error) {
-					stopped = error;
-				}
+				await follow(wire, writer, epoch);
+				await rows.toWriter();
 			}
 			const member = (await writer.successorDelivery?.()) as { refusals?: readonly string[] } | undefined;
-			process.stdout.write(`SKIP_SCOPES_SUMMARY ${JSON.stringify({ epoch, member })}\n`);
-			expect(stopped).toBeDefined();
-			expect(member?.refusals?.some((refusal) => refusal.includes("journal retirement refused: malformed-input"))).toBe(
-				true
-			);
+			process.stdout.write(`SKIP_SCOPES_SUMMARY ${JSON.stringify({ epoch, skips, member })}\n`);
+			expect(skips).toBeGreaterThanOrEqual(10);
+			expect((member?.refusals ?? []).filter((refusal) => refusal.includes("journal retirement refused"))).toEqual([]);
+			expect(await writer.authorityEpoch()).toBe(epoch);
 		} finally {
 			await wire.stop();
 		}

@@ -157,8 +157,10 @@ const ROLLS = Number(process.env.SLOW_MEMBER_ROLLS ?? 12);
  * second; the member must follow it and keep issuing. With `conserve`, every move is then expected
  * to land on the creator exactly once.
  * @param conserve - Whether to check conservation after the member caught up.
+ * @param rollCount - The creator's rollovers while the member is slow.
+ * @param minSkips - Skip installs (more than one epoch ahead) the slow phase must make.
  */
-async function slowFollow(conserve: boolean) {
+async function slowFollow(conserve: boolean, rollCount = ROLLS, minSkips = 0) {
 	const restore = await installEnvironment("node", () => undefined);
 	const directory = mkdtempSync(join(tmpdir(), "app-rollover-slow-member-"));
 	directories.push(directory);
@@ -292,7 +294,7 @@ async function slowFollow(conserve: boolean) {
 					await sleep(500);
 				}
 			})();
-			for (let roll = 0; roll < ROLLS; roll++) {
+			for (let roll = 0; roll < rollCount; roll++) {
 				const epoch = await rollCreator(creator, async () => undefined, ordinal);
 				rolls.push({ epoch, at: performance.now(), member: (await writer.authorityEpoch()) ?? 0 });
 				process.stdout.write(`SLOW_MEMBER_ROLL ${JSON.stringify(rolls.at(-1))}\n`);
@@ -311,8 +313,12 @@ async function slowFollow(conserve: boolean) {
 				Math.floor(rolledFor / perInstall) - 1
 			);
 			expect(creatorEpoch - memberAtEnd, "the member's lag when the creator stopped").toBeLessThanOrEqual(
-				Math.ceil(perInstall / (rolledFor / ROLLS)) + 2
+				Math.ceil(perInstall / (rolledFor / rollCount)) + 2
 			);
+			// Each skip install leaves a departed journal scope; past the 7-scope bound a member whose
+			// skips leak them refuses its next install ("journal retirement refused").
+			const skips = finished.filter((install) => (install.epochAfter ?? 0) - install.epochBefore > 1).length;
+			expect(skips, "skip installs while the creator rolled").toBeGreaterThanOrEqual(minSkips);
 			// The creator stops: the member reaches its epoch within one more install.
 			await wire.caughtUp(creatorEpoch, perInstall * 2 + 30_000);
 			stopped = true;
@@ -350,6 +356,11 @@ async function slowFollow(conserve: boolean) {
 			await sleep(1_000);
 			expect(await acceptedCounts(creator, writerAuthor, ids)).toEqual(ids.map(() => 1));
 			expect(await writer.state()).toBe(await creator.state());
+			const delivery = (await writer.successorDelivery?.()) as { refusals?: readonly string[] } | undefined;
+			expect(
+				(delivery?.refusals ?? []).filter((refusal) => refusal.includes("journal retirement refused")),
+				"journal retirement refusals"
+			).toEqual([]);
 		} finally {
 			stopped = true;
 			pumping = false;
@@ -377,14 +388,13 @@ it(
 
 // Moves the member made in epochs the creator had already closed, while it skip-installed (each
 // install jumped several epochs), come back through the settlement window and must land once the
-// member caught up. Measured: they do not (retained work across repeated skip installs ends in
-// "manual-review" and leaves the member's own status; see the report of fix/slow-member-follow). The
-// retained-work resolution is the silent-writer settlement code (fix/silent-writer-catchup), not
-// changed here; this test pins the contract for it.
+// member caught up: across at least eight skip installs (past the journal's 7-scope bound, which a
+// skip install's departed scope used to leak into: fix/skip-scope-carrier), every move lands on the
+// creator exactly once and the member never refuses an install.
 it(
-	"every move a slow member made while it skip-installed lands on the creator exactly once",
-	() => slowFollow(true),
-	900_000
+	"every move a slow member made across eight or more skip installs lands on the creator exactly once",
+	() => slowFollow(true, Number(process.env.SLOW_MEMBER_CONSERVE_ROLLS ?? 27), 8),
+	1_200_000
 );
 
 it("a move made straight to the room while the member's install runs lands after the install, exactly once", async () => {
