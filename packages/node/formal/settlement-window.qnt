@@ -49,6 +49,16 @@
 //   volatile   the hand-back at 1803f975: listed from the plan's expired entry while that
 //              entry (and its row) is retained, taken by the app into memory, and never
 //              consumed by the reissue.
+//   strict     the frontier rule at 1803f975..201dc4db: a retained row is proven committed only
+//              while no own fence follows it. A row the Writer signed before its epoch's fence
+//              (a move issued between an install and that epoch's fence, or the first row before
+//              the first fence) that the creator admitted stays manual-review forever, so the
+//              author fence stays withheld and nothing later is ever proven (slow Writer test).
+//
+// Fence closure (fix/silent-writer-catchup): a fence follows every own row signed before it in
+// its epoch (a local issue depends on the plane's tips), so its admission admits them; the fence
+// is modelled as delivered with its issue (a fence signed but never admitted while an earlier row
+// of its epoch was admitted is not modelled, and the code leaves that row manual-review).
 //
 // Hand-back custody and crashes (fix/silent-writer-catchup, item 2). A move given back
 // ("given") is recorded: FIXED in a durable hand-back record in the settlement plan, written
@@ -85,6 +95,7 @@ module settlementWindow {
   var rec: int -> str              // hand-back record: none | durable (FIXED) | derived (VOLATILE)
   var owed: int -> bool            // the app holds a given-back move in memory, not yet reissued
   var crashes: int
+  var fencedAfter: int -> bool     // the move's current row was followed by its epoch's own fence
 
   pure def max(a: int, b: int): int = if (a > b) a else b
   pure def min(a: int, b: int): int = if (a < b) a else b
@@ -107,6 +118,7 @@ module settlementWindow {
     activeGen' = MOVES.mapBy(m => NONE), origin' = MOVES.mapBy(m => NONE), gen' = MOVES.mapBy(m => 0),
     published' = Set(), admitted' = Set(), closed' = false, mode' = v,
     rec' = MOVES.mapBy(m => "none"), owed' = MOVES.mapBy(m => false), crashes' = 0,
+    fencedAfter' = MOVES.mapBy(m => false),
   }
   action init = initWith("fixed")
   action initC08 = initWith("c08")
@@ -114,9 +126,10 @@ module settlementWindow {
   action initRetained = initWith("retained")
   action initGap = initWith("gap")
   action initVolatile = initWith("volatile")
+  action initStrict = initWith("strict")
   // The record a give-back writes.
   def givenRecord: str = if (mode == "volatile") "derived" else "durable"
-  action keepHand = all { rec' = rec, owed' = owed, crashes' = crashes }
+  action keepHand = all { rec' = rec, owed' = owed, crashes' = crashes, fencedAfter' = fencedAfter }
 
   action keepWriter = all {
     writerEpoch' = writerEpoch, ownSettled' = ownSettled, fenceEpoch' = fenceEpoch, moveState' = moveState,
@@ -168,7 +181,7 @@ module settlementWindow {
       // FIXED: the reissue's issuance transaction consumes the durable record (plan effect
       // "hand-back"); VOLATILE's derived listing stays while its entry is retained.
       rec' = rec.set(m, if (rec.get(m) == "durable") "none" else rec.get(m)), owed' = owed.set(m, false),
-      crashes' = crashes,
+      crashes' = crashes, fencedAfter' = fencedAfter.set(m, false),
     }
   }
   // A signed row reaches the creator's ingress: admitted only under the current anchor.
@@ -184,14 +197,20 @@ module settlementWindow {
   val fenceWithheld = MOVES.exists(m => moveState.get(m) == "retained")
   // Withheld while unknown retained work remains (v3-room: "unknown retained work still
   // withholds the author fence").
-  action fence: bool = all {
-    not(closed), link == "up", writerEpoch == creatorEpoch, fenceEpoch < writerEpoch,
-    not(fenceWithheld),
-    fenceEpoch' = writerEpoch,
-    creatorEpoch' = creatorEpoch, link' = link, outages' = outages, admitted' = admitted,
-    writerEpoch' = writerEpoch, ownSettled' = ownSettled, moveState' = moveState, activeEpoch' = activeEpoch,
-    activeGen' = activeGen, origin' = origin, gen' = gen, published' = published, closed' = closed,
-    mode' = mode, keepHand,
+  // The fence follows the rows signed before it in its epoch, and its admission admits them.
+  action fence: bool = {
+    val before = MOVES.filter(m => moveState.get(m) == "flight" and activeEpoch.get(m) == writerEpoch)
+    all {
+      not(closed), link == "up", writerEpoch == creatorEpoch, fenceEpoch < writerEpoch,
+      not(fenceWithheld),
+      fenceEpoch' = writerEpoch,
+      admitted' = admitted.union(before.map(m => row(m))),
+      fencedAfter' = MOVES.mapBy(m => fencedAfter.get(m) or before.contains(m)),
+      creatorEpoch' = creatorEpoch, link' = link, outages' = outages,
+      writerEpoch' = writerEpoch, ownSettled' = ownSettled, moveState' = moveState, activeEpoch' = activeEpoch,
+      activeGen' = activeGen, origin' = origin, gen' = gen, published' = published, closed' = closed,
+      mode' = mode, rec' = rec, owed' = owed, crashes' = crashes,
+    }
   }
   // The Writer installs the creator's latest offer (checkpoint catch-up) and settles its
   // own rows from the closed epochs against the creator's cut. An install more than one
@@ -227,6 +246,7 @@ module settlementWindow {
       admitted' = admitted, mode' = mode,
       // The expiry and its hand-back record are one plan write.
       rec' = MOVES.mapBy(m => if (expiring.contains(m)) givenRecord else rec.get(m)), owed' = owed, crashes' = crashes,
+      fencedAfter' = MOVES.mapBy(m => if (rebasing.contains(m)) false else fencedAfter.get(m)),
     }
   }
   action install: bool = {
@@ -237,8 +257,10 @@ module settlementWindow {
   // in the installed checkpoint. Its epoch is closed; the frontier settled the row (it was
   // committed: done) or proves it was never admitted (fence-guarded displaced: the move goes
   // back to the app). RETAINED (the broken control) and c08 leave it manual-review.
+  // STRICT proves an admitted row committed only while no own fence follows it.
   def canResolve(m: int): bool =
-    mode != "retained" and mode != "c08" and not(closed) and moveState.get(m) == "retained" and activeEpoch.get(m) < writerEpoch
+    mode != "retained" and mode != "c08" and not(closed) and moveState.get(m) == "retained" and activeEpoch.get(m) < writerEpoch and
+      not(mode == "strict" and admitted.contains(row(m)) and fencedAfter.get(m))
   action resolveMove(m: int): bool = all {
     canResolve(m),
     val committed = admitted.contains(row(m))
@@ -251,6 +273,7 @@ module settlementWindow {
     creatorEpoch' = creatorEpoch, link' = link, outages' = outages, admitted' = admitted,
     writerEpoch' = writerEpoch, ownSettled' = ownSettled, fenceEpoch' = fenceEpoch, activeGen' = activeGen,
     gen' = gen, published' = published, closed' = closed, mode' = mode, owed' = owed, crashes' = crashes,
+    fencedAfter' = fencedAfter,
   }
   // PREMATURE only: hands a move back at the early signal while its row's epoch may
   // still be open at the creator.
@@ -261,14 +284,14 @@ module settlementWindow {
       creatorEpoch' = creatorEpoch, link' = link, outages' = outages, admitted' = admitted,
       writerEpoch' = writerEpoch, ownSettled' = ownSettled, fenceEpoch' = fenceEpoch, activeGen' = activeGen,
       gen' = gen, published' = published, closed' = closed, mode' = mode,
-      rec' = rec.set(m, givenRecord), owed' = owed, crashes' = crashes,
+      rec' = rec.set(m, givenRecord), owed' = owed, crashes' = crashes, fencedAfter' = fencedAfter,
     }
   }
 
   // The app takes a listed hand-back into its kept moves (memory).
   action takeMove(m: int): bool = all {
     not(closed), moveState.get(m) == "given", rec.get(m) != "none",
-    moveState' = moveState.set(m, "app"), owed' = owed.set(m, true), rec' = rec, crashes' = crashes,
+    moveState' = moveState.set(m, "app"), owed' = owed.set(m, true), rec' = rec, crashes' = crashes, fencedAfter' = fencedAfter,
     creatorEpoch' = creatorEpoch, link' = link, outages' = outages, admitted' = admitted,
     writerEpoch' = writerEpoch, ownSettled' = ownSettled, fenceEpoch' = fenceEpoch, activeEpoch' = activeEpoch,
     activeGen' = activeGen, origin' = origin, gen' = gen, published' = published, closed' = closed, mode' = mode,
@@ -277,7 +300,7 @@ module settlementWindow {
   // it), after the app has taken the move. A durable record is not retirement's to remove.
   action pruneMove(m: int): bool = all {
     rec.get(m) == "derived", moveState.get(m) != "given",
-    rec' = rec.set(m, "none"), owed' = owed, crashes' = crashes,
+    rec' = rec.set(m, "none"), owed' = owed, crashes' = crashes, fencedAfter' = fencedAfter,
     creatorEpoch' = creatorEpoch, link' = link, outages' = outages, admitted' = admitted,
     writerEpoch' = writerEpoch, ownSettled' = ownSettled, fenceEpoch' = fenceEpoch, moveState' = moveState,
     activeEpoch' = activeEpoch, activeGen' = activeGen, origin' = origin, gen' = gen, published' = published,
@@ -287,7 +310,7 @@ module settlementWindow {
   // holds is listed again (and taken as a new kept move); a given-back move the app held with
   // no record left is lost.
   action crash: bool = all {
-    not(closed), crashes < MAX_CRASHES, crashes' = crashes + 1,
+    not(closed), crashes < MAX_CRASHES, crashes' = crashes + 1, fencedAfter' = fencedAfter,
     moveState' = MOVES.mapBy(m =>
       if (moveState.get(m) == "app" and owed.get(m)) (if (rec.get(m) != "none") "given" else "lost")
       // VOLATILE: a reissued move's derived listing is still there, and a fresh app takes it again.
@@ -341,11 +364,16 @@ module settlementWindow {
     moveState.get(m) == "given"
   def applied(m: int): bool = admitted.exists(r => r._1 == m)
   val vars = (creatorEpoch, writerEpoch, link, outages, ownSettled, fenceEpoch, moveState, activeEpoch, activeGen,
-    origin, gen, published, admitted, closed, mode, rec, owed, crashes)
+    origin, gen, published, admitted, closed, mode, rec, owed, crashes, fencedAfter)
   temporal writerWritesAgain =
     (weakFair(reconnect, vars) and weakFair(install, vars) and weakFair(issue, vars) and weakFair(deliver, vars)
       and weakFair(fence, vars) and weakFair(resolve, vars) and weakFair(take, vars))
     implies always(wanting(0) implies eventually(applied(0)))
+  // Retained work is eventually resolved (the author fence is not withheld forever).
+  temporal retainedResolves =
+    (weakFair(reconnect, vars) and weakFair(install, vars) and weakFair(issue, vars) and weakFair(deliver, vars)
+      and weakFair(fence, vars) and weakFair(resolve, vars) and weakFair(take, vars))
+    implies always(moveState.get(0) == "retained" implies eventually(moveState.get(0) != "retained"))
 
   // Witnesses.
   action silentFor(n: int): bool = n.reps(_ => creatorAdvance.then(installWith(Set())))
@@ -373,6 +401,15 @@ module settlementWindow {
     .then(drop("down")).then(creatorAdvance).then(creatorAdvance).then(creatorAdvance).then(reconnect)
     .then(installWith(Set()))
     .then(all { assert(moveState.get(0) == "retained" and not(canResolve(0)) and fenceWithheld and not(applied(0))), creatorAdvance })
+  // A move signed before its epoch's fence, admitted with the fence, then a skip install: FIXED
+  // proves it committed by fence closure and the fence resumes; STRICT leaves it retained forever.
+  action fencedBeforeSkip(start: bool): bool = start.then(creatorAdvance).then(installWith(Set())).then(issueMove(0)).then(fence)
+    .then(drop("down")).then(creatorAdvance).then(creatorAdvance).then(creatorAdvance).then(reconnect).then(installWith(Set()))
+  run fencedClosureTest = fencedBeforeSkip(init)
+    .then(all { assert(moveState.get(0) == "retained" and applied(0) and fencedAfter.get(0) and canResolve(0)), resolveMove(0) })
+    .then(all { assert(moveState.get(0) == "done" and not(fenceWithheld) and appliedCount(0) == 1 and safety), fence })
+  run strictStuckTest = fencedBeforeSkip(initStrict)
+    .then(all { assert(moveState.get(0) == "retained" and applied(0) and not(canResolve(0)) and fenceWithheld), creatorAdvance })
   // A premature reissue: the original and the reissue are both admitted.
   run prematureDoubleTest = initPremature.then(issueMove(0)).then(prematureHandBackMove(0)).then(takeMove(0)).then(issueMove(0)).then(deliver).then(deliver)
     .then(all { assert(appliedCount(0) == 2 and not(atMostOnce)), creatorAdvance })
