@@ -45,7 +45,19 @@
 //              may be read as displaced and expired or replaced;
 //   retained   the code at 94d117ca (and c08d8680): an install more than one epoch ahead
 //              retains the Writer's current rows as unknown work ("manual-review") that
-//              nothing resolves, and the author fence stays withheld.
+//              nothing resolves, and the author fence stays withheld;
+//   volatile   the hand-back at 1803f975: listed from the plan's expired entry while that
+//              entry (and its row) is retained, taken by the app into memory, and never
+//              consumed by the reissue.
+//
+// Hand-back custody and crashes (fix/silent-writer-catchup, item 2). A move given back
+// ("given") is recorded: FIXED in a durable hand-back record in the settlement plan, written
+// in the same transaction as the expiry or frontier resolution that gives it back, which
+// survives row pruning and is consumed only by the issuance transaction that writes the
+// reissued row (the plan effect "hand-back"). VOLATILE derives the listing from the expired
+// entry ("derived"): retirement removes it with the row, and a reissue does not consume it.
+// The app takes a listed move into memory ("app", owed); a crash drops the app's memory and
+// the room lists again whatever its record still holds.
 module settlementWindow {
   pure val D = 4            // V3_SETTLEMENT_OWN_WINDOW_EPOCHS
   pure val MAX_SCOPES = 7   // LIVE_JOURNAL_RETIREMENT_LIMITS.maxScopes
@@ -53,6 +65,7 @@ module settlementWindow {
   pure val MAX_OUTAGES = 2
   pure val MOVES = Set(0)   // run.sh also checks safety with two moves (MAX_EPOCH 7)
   pure val NONE = -1
+  pure val MAX_CRASHES = 1
 
   var creatorEpoch: int
   var writerEpoch: int
@@ -69,6 +82,9 @@ module settlementWindow {
   var admitted: Set[(int, int, int)]   // rows the creator admitted
   var closed: bool                 // the session closed (journal retirement refused)
   var mode: str
+  var rec: int -> str              // hand-back record: none | durable (FIXED) | derived (VOLATILE)
+  var owed: int -> bool            // the app holds a given-back move in memory, not yet reissued
+  var crashes: int
 
   pure def max(a: int, b: int): int = if (a > b) a else b
   pure def min(a: int, b: int): int = if (a < b) a else b
@@ -90,17 +106,22 @@ module settlementWindow {
     moveState' = MOVES.mapBy(m => "app"), activeEpoch' = MOVES.mapBy(m => NONE),
     activeGen' = MOVES.mapBy(m => NONE), origin' = MOVES.mapBy(m => NONE), gen' = MOVES.mapBy(m => 0),
     published' = Set(), admitted' = Set(), closed' = false, mode' = v,
+    rec' = MOVES.mapBy(m => "none"), owed' = MOVES.mapBy(m => false), crashes' = 0,
   }
   action init = initWith("fixed")
   action initC08 = initWith("c08")
   action initPremature = initWith("premature")
   action initRetained = initWith("retained")
   action initGap = initWith("gap")
+  action initVolatile = initWith("volatile")
+  // The record a give-back writes.
+  def givenRecord: str = if (mode == "volatile") "derived" else "durable"
+  action keepHand = all { rec' = rec, owed' = owed, crashes' = crashes }
 
   action keepWriter = all {
     writerEpoch' = writerEpoch, ownSettled' = ownSettled, fenceEpoch' = fenceEpoch, moveState' = moveState,
     activeEpoch' = activeEpoch, activeGen' = activeGen, origin' = origin, gen' = gen, published' = published,
-    closed' = closed, mode' = mode,
+    closed' = closed, mode' = mode, keepHand,
   }
 
   // The creator closes its epoch and adopts the next one (independently of the Writer).
@@ -111,7 +132,7 @@ module settlementWindow {
     creatorEpoch < MAX_EPOCH, creatorEpoch' = creatorEpoch + 1, link' = link, outages' = outages,
     admitted' = admitted, published' = published.filter(r => r._2 > creatorEpoch),
     writerEpoch' = writerEpoch, ownSettled' = ownSettled, fenceEpoch' = fenceEpoch, moveState' = moveState,
-    activeEpoch' = activeEpoch, activeGen' = activeGen, origin' = origin, gen' = gen, closed' = closed, mode' = mode,
+    activeEpoch' = activeEpoch, activeGen' = activeGen, origin' = origin, gen' = gen, closed' = closed, mode' = mode, keepHand,
   }
   // Connectivity drops (bounded) and returns.
   action drop(target: str): bool = all {
@@ -129,7 +150,7 @@ module settlementWindow {
       creatorEpoch' = creatorEpoch, link' = link, outages' = outages, admitted' = admitted,
       writerEpoch' = writerEpoch, ownSettled' = ownSettled, fenceEpoch' = fenceEpoch, activeEpoch' = activeEpoch,
       activeGen' = activeGen, origin' = origin, gen' = gen, published' = published, closed' = closed,
-      mode' = mode,
+      mode' = mode, keepHand,
     }
   }
   // The Writer issues a move the app holds, in its current epoch. FIXED: refused while
@@ -144,6 +165,10 @@ module settlementWindow {
       creatorEpoch' = creatorEpoch, link' = link, outages' = outages, admitted' = admitted,
       writerEpoch' = writerEpoch, ownSettled' = ownSettled, fenceEpoch' = fenceEpoch, closed' = closed,
       mode' = mode,
+      // FIXED: the reissue's issuance transaction consumes the durable record (plan effect
+      // "hand-back"); VOLATILE's derived listing stays while its entry is retained.
+      rec' = rec.set(m, if (rec.get(m) == "durable") "none" else rec.get(m)), owed' = owed.set(m, false),
+      crashes' = crashes,
     }
   }
   // A signed row reaches the creator's ingress: admitted only under the current anchor.
@@ -166,7 +191,7 @@ module settlementWindow {
     creatorEpoch' = creatorEpoch, link' = link, outages' = outages, admitted' = admitted,
     writerEpoch' = writerEpoch, ownSettled' = ownSettled, moveState' = moveState, activeEpoch' = activeEpoch,
     activeGen' = activeGen, origin' = origin, gen' = gen, published' = published, closed' = closed,
-    mode' = mode,
+    mode' = mode, keepHand,
   }
   // The Writer installs the creator's latest offer (checkpoint catch-up) and settles its
   // own rows from the closed epochs against the creator's cut. An install more than one
@@ -183,7 +208,7 @@ module settlementWindow {
     val rebasing = MOVES.filter(m => not(skip) and displacedAt(m, misread) and not(expiresAt(m, e)))
     val states = MOVES.mapBy(m =>
       if (retaining.contains(m)) "retained"
-      else if (settledNow.contains(m)) "done" else if (expiring.contains(m)) "app" else moveState.get(m))
+      else if (settledNow.contains(m)) "done" else if (expiring.contains(m)) "given" else moveState.get(m))
     val origins = MOVES.mapBy(m => if (settledNow.contains(m) or expiring.contains(m)) NONE else origin.get(m))
     val settled = max(max(ownSettled, fenceEpoch), if (mode == "c08") ownSettled else e - D)
     all {
@@ -200,6 +225,8 @@ module settlementWindow {
       closed' = scopesOf(e, states, origins, settled) > MAX_SCOPES,
       creatorEpoch' = creatorEpoch, link' = link, outages' = outages, fenceEpoch' = fenceEpoch,
       admitted' = admitted, mode' = mode,
+      // The expiry and its hand-back record are one plan write.
+      rec' = MOVES.mapBy(m => if (expiring.contains(m)) givenRecord else rec.get(m)), owed' = owed, crashes' = crashes,
     }
   }
   action install: bool = {
@@ -216,32 +243,72 @@ module settlementWindow {
     canResolve(m),
     val committed = admitted.contains(row(m))
     all {
-      moveState' = moveState.set(m, if (committed) "done" else "app"),
+      moveState' = moveState.set(m, if (committed) "done" else "given"),
       activeEpoch' = activeEpoch.set(m, NONE), origin' = origin.set(m, NONE),
+      // The frontier resolution and its hand-back record are one plan write.
+      rec' = if (committed) rec else rec.set(m, givenRecord),
     },
     creatorEpoch' = creatorEpoch, link' = link, outages' = outages, admitted' = admitted,
     writerEpoch' = writerEpoch, ownSettled' = ownSettled, fenceEpoch' = fenceEpoch, activeGen' = activeGen,
-    gen' = gen, published' = published, closed' = closed, mode' = mode,
+    gen' = gen, published' = published, closed' = closed, mode' = mode, owed' = owed, crashes' = crashes,
   }
   // PREMATURE only: hands a move back at the early signal while its row's epoch may
   // still be open at the creator.
   action prematureHandBackMove(m: int): bool = {
     all {
       mode == "premature", not(closed), moveState.get(m) == "flight", activeEpoch.get(m) == writerEpoch,
-      moveState' = moveState.set(m, "app"), activeEpoch' = activeEpoch.set(m, NONE), origin' = origin.set(m, NONE),
+      moveState' = moveState.set(m, "given"), activeEpoch' = activeEpoch.set(m, NONE), origin' = origin.set(m, NONE),
       creatorEpoch' = creatorEpoch, link' = link, outages' = outages, admitted' = admitted,
       writerEpoch' = writerEpoch, ownSettled' = ownSettled, fenceEpoch' = fenceEpoch, activeGen' = activeGen,
       gen' = gen, published' = published, closed' = closed, mode' = mode,
+      rec' = rec.set(m, givenRecord), owed' = owed, crashes' = crashes,
     }
   }
 
+  // The app takes a listed hand-back into its kept moves (memory).
+  action takeMove(m: int): bool = all {
+    not(closed), moveState.get(m) == "given", rec.get(m) != "none",
+    moveState' = moveState.set(m, "app"), owed' = owed.set(m, true), rec' = rec, crashes' = crashes,
+    creatorEpoch' = creatorEpoch, link' = link, outages' = outages, admitted' = admitted,
+    writerEpoch' = writerEpoch, ownSettled' = ownSettled, fenceEpoch' = fenceEpoch, activeEpoch' = activeEpoch,
+    activeGen' = activeGen, origin' = origin, gen' = gen, published' = published, closed' = closed, mode' = mode,
+  }
+  // Retirement removes the expired entry and its row (VOLATILE: and the listing derived from
+  // it), after the app has taken the move. A durable record is not retirement's to remove.
+  action pruneMove(m: int): bool = all {
+    rec.get(m) == "derived", moveState.get(m) != "given",
+    rec' = rec.set(m, "none"), owed' = owed, crashes' = crashes,
+    creatorEpoch' = creatorEpoch, link' = link, outages' = outages, admitted' = admitted,
+    writerEpoch' = writerEpoch, ownSettled' = ownSettled, fenceEpoch' = fenceEpoch, moveState' = moveState,
+    activeEpoch' = activeEpoch, activeGen' = activeGen, origin' = origin, gen' = gen, published' = published,
+    closed' = closed, mode' = mode,
+  }
+  // The process dies and reopens: the app's memory is gone. Whatever the room's record still
+  // holds is listed again (and taken as a new kept move); a given-back move the app held with
+  // no record left is lost.
+  action crash: bool = all {
+    not(closed), crashes < MAX_CRASHES, crashes' = crashes + 1,
+    moveState' = MOVES.mapBy(m =>
+      if (moveState.get(m) == "app" and owed.get(m)) (if (rec.get(m) != "none") "given" else "lost")
+      // VOLATILE: a reissued move's derived listing is still there, and a fresh app takes it again.
+      else if (rec.get(m) == "derived" and (moveState.get(m) == "flight" or moveState.get(m) == "done")) "given"
+      else moveState.get(m)),
+    owed' = MOVES.mapBy(m => false), rec' = rec,
+    creatorEpoch' = creatorEpoch, link' = link, outages' = outages, admitted' = admitted,
+    writerEpoch' = writerEpoch, ownSettled' = ownSettled, fenceEpoch' = fenceEpoch, activeEpoch' = activeEpoch,
+    activeGen' = activeGen, origin' = origin, gen' = gen, published' = published, closed' = closed, mode' = mode,
+  }
+
   action issue: bool = { nondet m = MOVES.oneOf() issueMove(m) }
+  action take: bool = { nondet m = MOVES.oneOf() takeMove(m) }
+  action prune: bool = { nondet m = MOVES.oneOf() pruneMove(m) }
   action want: bool = { nondet m = MOVES.oneOf() wantMove(m) }
   action prematureHandBack: bool = { nondet m = MOVES.oneOf() prematureHandBackMove(m) }
   action resolve: bool = { nondet m = MOVES.oneOf() resolveMove(m) }
 
   action step = any {
     creatorAdvance, outage, reconnect, want, issue, deliver, fence, install, prematureHandBack, resolve,
+    take, prune, crash,
   }
 
   // Safety.
@@ -259,19 +326,25 @@ module settlementWindow {
   val retiredUnadmittable = published.forall(r => isActive(r) or admitted.contains(r) or r._2 < creatorEpoch)
   // The re-replacement is bounded by the window: a chain spans at most D epochs.
   val chainBounded = MOVES.forall(m => moveState.get(m) != "flight" or activeEpoch.get(m) - origin.get(m) <= D - 1)
-  val safety = scopesBounded and atMostOnce and retiredUnadmittable and chainBounded and not(closed)
+  // No given-back move is ever lost: until reissued it is held by the room's record or the app.
+  val noLoss = MOVES.forall(m => moveState.get(m) != "lost")
+  // FIXED: the durable record exists exactly while the move is given back and not reissued.
+  val recordExact = mode == "volatile" or MOVES.forall(m =>
+    (rec.get(m) == "durable") == (moveState.get(m) == "given" or (moveState.get(m) == "app" and owed.get(m))))
+  val safety = scopesBounded and atMostOnce and retiredUnadmittable and chainBounded and not(closed) and noLoss and recordExact
 
   // Liveness: under weak fairness of connectivity returning and of the Writer's own
   // steps and deliveries, every move the app wants is eventually applied by the creator
   // (the Writer writes again). The model has no explicit terminal refusal: the session
   // closing (c08) is the defect, not an allowed terminal.
-  def wanting(m: int): bool = moveState.get(m) == "app" or moveState.get(m) == "flight" or moveState.get(m) == "retained"
+  def wanting(m: int): bool = moveState.get(m) == "app" or moveState.get(m) == "flight" or moveState.get(m) == "retained" or
+    moveState.get(m) == "given"
   def applied(m: int): bool = admitted.exists(r => r._1 == m)
   val vars = (creatorEpoch, writerEpoch, link, outages, ownSettled, fenceEpoch, moveState, activeEpoch, activeGen,
-    origin, gen, published, admitted, closed, mode)
+    origin, gen, published, admitted, closed, mode, rec, owed, crashes)
   temporal writerWritesAgain =
     (weakFair(reconnect, vars) and weakFair(install, vars) and weakFair(issue, vars) and weakFair(deliver, vars)
-      and weakFair(fence, vars) and weakFair(resolve, vars))
+      and weakFair(fence, vars) and weakFair(resolve, vars) and weakFair(take, vars))
     implies always(wanting(0) implies eventually(applied(0)))
 
   // Witnesses.
@@ -279,8 +352,8 @@ module settlementWindow {
   // A Writer silent for 9 epochs with a move in flight: at most D scopes, the move handed
   // back at the bound, the chain never longer than D, and on reconnect it is applied once.
   run silentWriterTest = init.then(issueMove(0)).then(drop("silent")).then(silentFor(9))
-    .then(all { assert(writerEpoch == 9 and safety and scopes <= D and moveState.get(0) == "app" and appliedCount(0) == 0), reconnect })
-    .then(issueMove(0)).then(deliver)
+    .then(all { assert(writerEpoch == 9 and safety and scopes <= D and moveState.get(0) == "given" and appliedCount(0) == 0), reconnect })
+    .then(takeMove(0)).then(issueMove(0)).then(deliver)
     .then(all { assert(appliedCount(0) == 1 and safety), fence })
   // c08d8680: the eighth epoch without the Writer's settlement closes the session.
   // (A move unsettled since epoch 0 holds epoch 0 too: the seventh silent install closes it.)
@@ -293,7 +366,7 @@ module settlementWindow {
     .then(creatorAdvance).then(creatorAdvance).then(creatorAdvance)
     .then(reconnect).then(installWith(Set()))
     .then(all { assert(writerEpoch == 4 and moveState.get(0) == "retained" and fenceWithheld), resolveMove(0) })
-    .then(all { assert(moveState.get(0) == "app" and appliedCount(0) == 0), issueMove(0) }).then(deliver)
+    .then(all { assert(moveState.get(0) == "given" and appliedCount(0) == 0), takeMove(0) }).then(issueMove(0)).then(deliver)
     .then(all { assert(appliedCount(0) == 1 and safety), fence })
   // 94d117ca: the retained move is never resolved, so it is never applied and no fence goes out.
   run retainedStuckTest = initRetained.then(creatorAdvance).then(installWith(Set())).then(issueMove(0))
@@ -301,7 +374,25 @@ module settlementWindow {
     .then(installWith(Set()))
     .then(all { assert(moveState.get(0) == "retained" and not(canResolve(0)) and fenceWithheld and not(applied(0))), creatorAdvance })
   // A premature reissue: the original and the reissue are both admitted.
-  run prematureDoubleTest = initPremature.then(issueMove(0)).then(prematureHandBackMove(0)).then(issueMove(0)).then(deliver).then(deliver)
+  run prematureDoubleTest = initPremature.then(issueMove(0)).then(prematureHandBackMove(0)).then(takeMove(0)).then(issueMove(0)).then(deliver).then(deliver)
+    .then(all { assert(appliedCount(0) == 2 and not(atMostOnce)), creatorAdvance })
+  // Hand-back custody across a crash. The move is given back at the window bound (silent).
+  action givenBack = init.then(issueMove(0)).then(drop("silent")).then(silentFor(4))
+  action givenBackVolatile = initVolatile.then(issueMove(0)).then(drop("silent")).then(silentFor(4))
+  // FIXED: taken, crash before the reissue: listed again from the durable record, reissued once.
+  run durableCrashBeforeReissueTest = givenBack.then(all { assert(moveState.get(0) == "given" and rec.get(0) == "durable"), takeMove(0) })
+    .then(crash).then(all { assert(moveState.get(0) == "given" and noLoss), reconnect }).then(takeMove(0)).then(issueMove(0)).then(deliver)
+    .then(all { assert(appliedCount(0) == 1 and rec.get(0) == "none" and safety), creatorAdvance })
+  // FIXED: reissued, crash after: the record was consumed with the reissue, nothing is listed again.
+  run durableCrashAfterReissueTest = givenBack.then(reconnect).then(takeMove(0)).then(issueMove(0)).then(crash)
+    .then(all { assert(moveState.get(0) == "flight" and rec.get(0) == "none"), deliver })
+    .then(all { assert(appliedCount(0) == 1 and safety), creatorAdvance })
+  // VOLATILE: taken, the entry retired, then a crash: the move is lost.
+  run volatileLossTest = givenBackVolatile.then(takeMove(0)).then(pruneMove(0)).then(crash)
+    .then(all { assert(moveState.get(0) == "lost" and not(noLoss)), creatorAdvance })
+  // VOLATILE: reissued and admitted, then a crash before retirement: listed again, reissued, applied twice.
+  run volatileDoubleTest = givenBackVolatile.then(reconnect).then(takeMove(0)).then(issueMove(0)).then(deliver).then(crash)
+    .then(takeMove(0)).then(issueMove(0)).then(deliver)
     .then(all { assert(appliedCount(0) == 2 and not(atMostOnce)), creatorAdvance })
   // Without the fence guard: an admitted row read as displaced is replaced and admitted again.
   run gapDoubleTest = initGap.then(issueMove(0)).then(deliver).then(creatorAdvance)
