@@ -2354,6 +2354,10 @@ async function d110cFloorMatrix(): Promise<Readonly<Record<string, unknown>>> {
 	});
 }
 
+// This harness seals, adopts and installs by hand, so it opens the product room without the demo's
+// automatic rollover and successor delivery (v3-chat's test override, read when a room opens).
+Reflect.set(globalThis, "__TS_DRP_V3_CHAT_ROLLOVER__", "manual");
+
 function productApi(): ProductApi {
 	const selected = Reflect.get(globalThis, "d9336V3Chat");
 	if (selected === null || typeof selected !== "object") throw new TypeError("D.108d2 chat product is unavailable");
