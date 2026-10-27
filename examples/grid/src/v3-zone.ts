@@ -727,23 +727,23 @@ export function createV3ZoneApi(
 				localAuthor === creatorAuthor ? await node.keychain.acquireLocalAuthorFinalitySigner() : undefined;
 			if (closeRequested) throw new Error("v3 zone closed during open");
 			const application = createV3ZoneApplication(bootstrapMembers, creatorPeerId, creatorAuthor, blueprintDigestFromInvite(creatorInvite));
-			const successors = openV3RoomSuccessorDelivery(
-				node,
-				selectedZoneId,
-				creatorFinalitySigner === undefined ? "member" : "creator",
-				{
+			// Delivery runs on the room's own object id and installs into its own session, so it
+			// follows a migration redirect: the migrated room's members (redirected or joined
+			// afterwards) are on the target's queue, and only the target session installs its offers.
+			const openDelivery = (objectId: string): V3RoomSuccessorDelivery =>
+				openV3RoomSuccessorDelivery(node, objectId, creatorFinalitySigner === undefined ? "member" : "creator", {
 					onError: (error) => console.warn("v3 zone successor delivery failed; it is retried", error),
 					onRefused: (error) => console.warn("v3 zone successor offer was refused", error),
-				}
-			);
-			delivery = successors;
+				});
+			delivery = openDelivery(selectedZoneId);
 			// Only the creator, which holds the finality signer, seals.
 			const policy = createV3RoomRolloverPolicy({
 				role: creatorFinalitySigner === undefined ? "member" : "creator",
 				budget: GRID_ROLLOVER_BUDGET,
 				hooks: {
-					publishSuccessor: publishSuccessor ?? ((offer, epoch): Promise<void> => successors.publish(offer, epoch)),
-					requestSuccessor: () => successors.request(),
+					publishSuccessor:
+						publishSuccessor ?? ((offer, epoch): Promise<void> => delivery?.publish(offer, epoch) ?? Promise.resolve()),
+					requestSuccessor: () => delivery?.request(),
 					onStatus: (status) => {
 						if (status.state === "successor-unavailable")
 							console.warn("v3 zone is waiting for the creator's next epoch; kept placements", status.kept);
@@ -780,6 +780,10 @@ export function createV3ZoneApi(
 					if (sourceRoom !== undefined) retainedSourceBridges.add(sourceRoom);
 					room = target;
 					zoneId = targetObjectId;
+					delivery?.close();
+					const followed = openDelivery(targetObjectId);
+					delivery = followed;
+					followed.bind(target);
 					tradeIntent = undefined;
 					recoveredTradeIntent = false;
 					ephemeral?.close();
@@ -822,8 +826,9 @@ export function createV3ZoneApi(
 			});
 			sourceRoom = opened;
 			// A migrated source forwards issue and seal to its target, so the policy stays bound to it.
+			// Delivery is bound to the target by the redirect instead.
 			policy.bind(opened);
-			successors.bind(opened);
+			if (redirectedDuringOpen === undefined) delivery?.bind(opened);
 			if (redirectedDuringOpen !== undefined) retainedSourceBridges.add(opened);
 			if (closeRequested) throw new Error("v3 zone closed during open");
 			if (redirectedDuringOpen === undefined) {

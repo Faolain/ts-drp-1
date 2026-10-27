@@ -7559,7 +7559,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		installCreatorSuccessor,
 		exportCreatorSuccessor: () =>
 			enqueueLifetimeTransition(async () => {
+				if (redirectPromise !== undefined) await redirectPromise;
 				assertSessionOpen();
+				// A migrated source seals and adopts on its target, so the successor it serves is the target's.
+				if (redirectedSession !== undefined) return redirectedSession.exportCreatorSuccessor();
 				return serveSuccessor();
 			}),
 		authority(): V3RoomSuccessorAuthority | null {
