@@ -11,6 +11,14 @@ import type { CreatorRecoveryPoolResult } from "./creator-recovery-pool.js";
  * `deferred:unsupported`, the idle scheduler's rule) answers every later call with that
  * result, without a second boundary. A `deferred:busy` result settles nothing. Local
  * scheduling policy only; it grants and decides nothing.
+ *
+ * With `defer`, the request is held until the session's next lifecycle admission (the session
+ * calls `flush()` before admitting it, so the lull still runs before any later transition) or
+ * until `defer`'s callback fires, whichever is first. The one admission allowed ahead of a held
+ * lull is the export of the successor this epoch's adoption produced: the session admits that
+ * export and then flushes, so the offer a member installs from is not published behind a full
+ * pool turnover (from the epoch the bounded pool fills, about 1.3 s on SQLite and several
+ * seconds on IndexedDB). The lull's body and its once-per-epoch rule are unchanged.
  */
 export type ScheduledRecoveryPoolLull = Readonly<{
 	/** After an adoption or install: requests one lull for the current epoch, once per epoch. */
@@ -21,6 +29,10 @@ export type ScheduledRecoveryPoolLull = Readonly<{
 	run(scheduled: boolean, lull: () => Promise<CreatorRecoveryPoolResult>): Promise<CreatorRecoveryPoolResult>;
 	/** Whether a lull settled `epoch` (the idle scheduler skips it). */
 	settled(epoch: number): boolean;
+	/** With `defer`: requests a held lull now (before the session admits another transition). */
+	flush(): void;
+	/** With `defer`: drops a held lull that was not requested yet (the session is closing). */
+	cancel(): void;
 }>;
 
 export type ScheduledRecoveryPoolLullInput = Readonly<{
@@ -29,6 +41,11 @@ export type ScheduledRecoveryPoolLullInput = Readonly<{
 	/** The session's own `maintainRecoveryPool()`. */
 	request(): Promise<unknown>;
 	now(): number;
+	/**
+	 * Optional: holds a scheduled request until `flush()` or until `callback` runs (a later
+	 * macrotask). Returns the hold's cancel. Without it `schedule()` requests at once.
+	 */
+	defer?(callback: () => void): () => void;
 }>;
 
 const kindOf = (result: CreatorRecoveryPoolResult): string =>
@@ -52,23 +69,47 @@ export function createScheduledRecoveryPoolLull(input: ScheduledRecoveryPoolLull
 	let requested: number | undefined;
 	let claimable = false;
 	let settledLull: Readonly<{ epoch: number; result: CreatorRecoveryPoolResult }> | undefined;
+	// The held request's cancel, while a deferred schedule() has not requested yet.
+	let held: (() => void) | undefined;
+	const requestNow = (): void => {
+		claimable = true;
+		let pending: Promise<unknown>;
+		try {
+			pending = input.request();
+		} catch {
+			// A refused admission is the room's own lifecycle answer; nothing to schedule.
+			return;
+		} finally {
+			claimable = false;
+		}
+		// The lull's own failure is observed in `run` and handled by the room's rules.
+		pending.catch(() => undefined);
+	};
 	return Object.freeze({
 		schedule(): void {
 			const epoch = input.epoch();
 			if (epoch === undefined || epoch === requested || settledLull?.epoch === epoch) return;
 			requested = epoch;
-			claimable = true;
-			let pending: Promise<unknown>;
-			try {
-				pending = input.request();
-			} catch {
-				// A refused admission is the room's own lifecycle answer; nothing to schedule.
+			if (input.defer === undefined) {
+				requestNow();
 				return;
-			} finally {
-				claimable = false;
 			}
-			// The lull's own failure is observed in `run` and handled by the room's rules.
-			pending.catch(() => undefined);
+			held?.();
+			held = input.defer(() => {
+				held = undefined;
+				requestNow();
+			});
+		},
+		flush(): void {
+			const cancel = held;
+			if (cancel === undefined) return;
+			held = undefined;
+			cancel();
+			requestNow();
+		},
+		cancel(): void {
+			held?.();
+			held = undefined;
 		},
 		claim(): boolean {
 			const claimed = claimable;

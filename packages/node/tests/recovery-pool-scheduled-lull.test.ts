@@ -117,6 +117,93 @@ describe("the scheduled recovery-pool lull", () => {
 	});
 });
 
+describe("a deferred scheduled lull (the session holds it until its next admission)", () => {
+	function deferred() {
+		const room = { epoch: 4 as number | undefined };
+		const claims: boolean[] = [];
+		const holds: { callback(): void; cancelled: boolean }[] = [];
+		const lull = vi.fn((): Promise<CreatorRecoveryPoolResult> => Promise.resolve({ kind: "maintained" }));
+		const request = vi.fn((): Promise<CreatorRecoveryPoolResult> => {
+			const scheduled = schedule.claim();
+			claims.push(scheduled);
+			return Promise.resolve().then(() => schedule.run(scheduled, lull));
+		});
+		const schedule = createScheduledRecoveryPoolLull({
+			epoch: () => room.epoch,
+			request,
+			now: () => 0,
+			defer: (callback) => {
+				const hold = { callback, cancelled: false };
+				holds.push(hold);
+				return () => {
+					hold.cancelled = true;
+				};
+			},
+		});
+		const previous = Reflect.get(globalThis, "__warmProofEvent");
+		Reflect.set(globalThis, "__warmProofEvent", () => undefined);
+		const restore = () => Reflect.set(globalThis, "__warmProofEvent", previous);
+		return { room, claims, holds, lull, request, schedule, restore };
+	}
+
+	it("requests nothing at schedule(); flush() requests it once, as the scheduled one", async () => {
+		const d = deferred();
+		try {
+			d.schedule.schedule();
+			d.schedule.schedule();
+			expect(d.request).not.toHaveBeenCalled();
+			expect(d.holds).toHaveLength(1);
+			d.schedule.flush();
+			d.schedule.flush();
+			expect(d.request).toHaveBeenCalledTimes(1);
+			expect(d.claims).toEqual([true]);
+			expect(d.holds[0]?.cancelled).toBe(true);
+			await vi.waitFor(() => expect(d.schedule.settled(4)).toBe(true));
+			expect(d.schedule.claim()).toBe(false);
+		} finally {
+			d.restore();
+		}
+	});
+
+	it("requests it when the hold fires, if nothing flushed it first", async () => {
+		const d = deferred();
+		try {
+			d.schedule.schedule();
+			d.holds[0]?.callback();
+			expect(d.request).toHaveBeenCalledTimes(1);
+			expect(d.claims).toEqual([true]);
+			d.schedule.flush();
+			expect(d.request).toHaveBeenCalledTimes(1);
+			await vi.waitFor(() => expect(d.lull).toHaveBeenCalledTimes(1));
+		} finally {
+			d.restore();
+		}
+	});
+
+	it("drops a held request at cancel()", () => {
+		const d = deferred();
+		try {
+			d.schedule.schedule();
+			d.schedule.cancel();
+			d.schedule.flush();
+			expect(d.holds[0]?.cancelled).toBe(true);
+			expect(d.request).not.toHaveBeenCalled();
+		} finally {
+			d.restore();
+		}
+	});
+
+	it("a flush with nothing held requests nothing", () => {
+		const d = deferred();
+		try {
+			d.schedule.flush();
+			expect(d.request).not.toHaveBeenCalled();
+		} finally {
+			d.restore();
+		}
+	});
+});
+
 describe("the idle scheduler meets the scheduled lull", () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
