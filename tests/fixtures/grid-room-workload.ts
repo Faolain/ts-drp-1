@@ -726,6 +726,8 @@ async function openRoom(
 				.sort((a, b) => (a.author < b.author ? -1 : 1)),
 		}),
 		exactCanonicalParametersCarrierBytes: encodeCanonical(parameters),
+		// Deliberately chosen per scenario (`legacy` selects creator-trusted-v1): this fixture tests
+		// both profiles' mechanics; it does not mirror a shipped app's profile.
 		exactCanonicalProfileBytes: encodeCanonical({
 			cryptoSuiteId: "ed25519-sha256-v3",
 			profileId: legacy ? "creator-trusted-v1" : "creator-trusted-settlement-v1",

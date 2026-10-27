@@ -132,8 +132,8 @@ type CapacityProfileLabel = "settlement" | "trusted-v1";
 /**
  * Reads CREATOR_CAPACITY_PROFILE. `settlement` (default) is creator-trusted-settlement-v1 and
  * `trusted-v1` is creator-trusted-v1. The old values `shipped` and `trusted` remain aliases of
- * `trusted-v1`: only the shipped Grid example and the v3-chat demo sign that profile (Canvas and
- * Chat ship the settlement profile), so "shipped" no longer names it.
+ * `trusted-v1`, which no shipped app signs by default any more (each app's own profile is in
+ * examples/<app>/src/profile.ts), so "shipped" no longer names it.
  * @param value - The CREATOR_CAPACITY_PROFILE value.
  * @returns The gate label and the delivery-room fixture profile it selects.
  */

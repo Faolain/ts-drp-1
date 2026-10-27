@@ -28,6 +28,7 @@ import {
 	type WireRow,
 } from "./long-room-driver.js";
 import { CANVAS_GENESIS_PROFILE } from "../../../examples/canvas/src/profile.js";
+import { CHAT_GENESIS_PROFILE } from "../../../examples/chat/src/profile.js";
 import catalogMaterial from "../../../examples/chat/src/chat-catalog-material.json";
 import {
 	createShippingChatGenesisStateBytes,
@@ -359,6 +360,7 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 	const name = (["creator", "recipient"] as const)[index];
 	const objectId = `creator:${hex(hashDomain("canvas-chat-lull-object/v1", new TextEncoder().encode(env.unique))).slice(0, 32)}`;
 	const writerRecipient = options.recipient === "writer";
+	const genesisProfile = options.app === "chat" ? CHAT_GENESIS_PROFILE : CANVAS_GENESIS_PROFILE;
 	const exactCanonicalLatchedAclBytes = encodeCanonical({
 		epoch: 0,
 		kind: "drp-v3-latched-acl",
@@ -368,9 +370,8 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 		].sort((left, right) => left.author.localeCompare(right.author)),
 		objectId,
 		permissionless: false,
-		// The shipped Canvas signs the version its profile requires (examples/canvas/src/profile.ts,
-		// Track T); the shipped Chat signs version 3.
-		version: options.app === "chat" ? 3 : CANVAS_GENESIS_PROFILE.latchedAclVersion,
+		// The latched-ACL version the app's own exported profile requires.
+		version: genesisProfile.latchedAclVersion,
 	});
 	const selected = await applicationFor(options.app, exactCanonicalLatchedAclBytes, options.bound);
 	const application = selected.application;
@@ -382,9 +383,9 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 		exactCanonicalParametersCarrierBytes: encodeCanonical(PARAMETERS),
 		exactCanonicalProfileBytes: encodeCanonical({
 			cryptoSuiteId: "ed25519-sha256-v3",
-			// The shipped profiles: Canvas from examples/canvas/src/profile.ts (creator-trusted-settlement-v1
-			// since Track T), Chat creator-trusted-settlement-v1.
-			profileId: options.app === "chat" ? "creator-trusted-settlement-v1" : CANVAS_GENESIS_PROFILE.profileId,
+			// Each app's own exported genesis profile (examples/<app>/src/profile.ts), so this room
+			// signs what the shipped page signs.
+			profileId: genesisProfile.profileId,
 			quorum: 1,
 			signers,
 		}),

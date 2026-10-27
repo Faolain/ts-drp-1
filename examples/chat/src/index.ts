@@ -25,6 +25,7 @@ import { authenticateV3RoomCreatorInvite } from "@ts-drp/node/v3-room";
 import { DRP_DISCOVERY_TOPIC } from "@ts-drp/types";
 
 import { openShippingChatCatalogs, type ShippingChatCatalog } from "./chat-catalogs";
+import { CHAT_GENESIS_PROFILE } from "./profile";
 import { shippingChatRefusalClearedByRollover, shippingChatRolloverBudget } from "./rollover";
 import { setupCopyButton } from "./util/clipboard";
 import { createPeerNameElement, formatPeerItem, shortenId, styleMessageElement } from "./util/peerIdentity";
@@ -562,7 +563,7 @@ async function openChat(operation: "create" | "join"): Promise<void> {
 				members: [{ author, finalityKey: author, groups: ["admin", "finality", "writer"] }],
 				objectId,
 				permissionless: false,
-				version: 3,
+				version: CHAT_GENESIS_PROFILE.latchedAclVersion,
 			});
 			const signers = [{ publicKey: author, signerId: "creator" }];
 			invite = await createV3RoomCreatorInviteMaterial({
@@ -583,7 +584,7 @@ async function openChat(operation: "create" | "join"): Promise<void> {
 				}),
 				exactCanonicalProfileBytes: encodeCanonical({
 					cryptoSuiteId: "ed25519-sha256-v3",
-					profileId: "creator-trusted-settlement-v1",
+					profileId: CHAT_GENESIS_PROFILE.profileId,
 					quorum: 1,
 					signers,
 				}),

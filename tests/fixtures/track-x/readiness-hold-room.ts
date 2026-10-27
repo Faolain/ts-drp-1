@@ -129,6 +129,8 @@ export async function readinessHoldRoom(
 				version: 3,
 			}),
 			exactCanonicalParametersCarrierBytes: encodeCanonical(parameters),
+			// Deliberately creator-trusted-settlement-v1: this fixture tests that profile's settlement,
+			// whatever profile a shipped app signs; it does not mirror a shipped app.
 			exactCanonicalProfileBytes: encodeCanonical({
 				cryptoSuiteId: "ed25519-sha256-v3",
 				profileId: "creator-trusted-settlement-v1",

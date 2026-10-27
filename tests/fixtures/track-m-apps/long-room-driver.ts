@@ -26,11 +26,11 @@ export interface LongRoomOptions {
 	/** Chat only: the format the creator signs into genesis (default "window", what Chat ships). */
 	readonly chatFormat?: ChatFormat;
 	/**
-	 * Grid and Chat only: the trust profile the creator signs into genesis. Default (absent)
-	 * "settlement-v1", creator-trusted-settlement-v1 with a version-3 latched ACL. "trusted-v1"
-	 * signs the legacy creator-trusted-v1 profile with a version-1 latched ACL, which the shipped
-	 * Grid example (examples/grid/src/v3-zone.ts) and the v3-chat demo sign today; that profile
-	 * never prunes issued records.
+	 * The trust profile the creator signs into genesis. Default (absent, or "settlement-v1"): the
+	 * app's own exported profile (examples/<app>/src/profile.ts, via genesis-profile.ts), so the long
+	 * room signs what the shipped page signs. "trusted-v1" (Grid and Chat only) is the explicit
+	 * opt-in override: the legacy trusted profile with a version-1 latched ACL, which never prunes
+	 * issued records.
 	 */
 	readonly profile?: GenesisProfileChoice;
 	/**

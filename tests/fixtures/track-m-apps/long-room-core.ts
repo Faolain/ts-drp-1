@@ -13,6 +13,7 @@ import { openBrowserSealVoteStore } from "@ts-drp/storage-browser/seal-vote";
 import { createBrowserSnapshotQuarantineStore } from "@ts-drp/storage-browser/snapshot-transfer";
 import { type DRPNetworkNode, Message, MessageType, V3Envelope } from "@ts-drp/types";
 
+import { genesisProfileFor } from "./genesis-profile.js";
 import {
 	type AppKind,
 	type ArchiveObservation,
@@ -28,7 +29,6 @@ import {
 	type WireOffer,
 	type WireRow,
 } from "./long-room-driver.js";
-import { CANVAS_GENESIS_PROFILE } from "../../../examples/canvas/src/profile.js";
 import { CANVAS_ROLLOVER_BUDGET } from "../../../examples/canvas/src/rollover.js";
 import { openShippingChatCatalogs } from "../../../examples/chat/src/chat-catalogs.js";
 import {
@@ -444,28 +444,6 @@ function describeError(error: unknown): string {
 	};
 	walk(error, 0);
 	return parts.join(" <- ").slice(0, 1000);
-}
-
-/**
- * The profile and latched-ACL version the creator signs into genesis. By default: Canvas from
- * examples/canvas/src/profile.ts (creator-trusted-v1 before Track T), Grid and Chat
- * creator-trusted-settlement-v1 with a version-3 ACL. `options.profile === "trusted-v1"` (Grid and
- * Chat only) signs creator-trusted-v1 with a version-1 ACL, as the shipped Grid example
- * (examples/grid/src/v3-zone.ts createCreatorInviteMaterial) and the v3-chat demo do; the protocol
- * requires version 3 exactly for the settlement profile (latched-acl.ts).
- * @param options - The long-room options.
- * @returns The signed profile identifier and latched-ACL version.
- */
-function genesisProfileFor(options: LongRoomOptions): Readonly<{ profileId: string; latchedAclVersion: number }> {
-	if (options.profile === "trusted-v1") {
-		if (options.app === "canvas") throw new TypeError("LONG_ROOM_PROFILE_OVERRIDE_GRID_OR_CHAT_ONLY");
-		return { profileId: "creator-trusted-v1", latchedAclVersion: 1 };
-	}
-	if (options.profile !== undefined && options.profile !== "settlement-v1")
-		throw new TypeError(`LONG_ROOM_PROFILE_UNKNOWN:${String(options.profile)}`);
-	return options.app === "canvas"
-		? CANVAS_GENESIS_PROFILE
-		: { profileId: "creator-trusted-settlement-v1", latchedAclVersion: 3 };
 }
 
 /**

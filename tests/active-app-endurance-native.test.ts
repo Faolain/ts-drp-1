@@ -9,6 +9,7 @@ import { expect, it } from "vitest";
 
 import { APP_MEMBER_ROLLOVER_ISSUE_BOUND_MS, driveActiveAppEndurance } from "./fixtures/active-endurance/driver.js";
 import { installEnvironment, nodeHostFor, sqliteFileCensus } from "./fixtures/track-m-apps/app-long-room.js";
+import { genesisProfileFor } from "./fixtures/track-m-apps/genesis-profile.js";
 import { openRole } from "./fixtures/track-m-apps/long-room-core.js";
 import type { AppKind, RoleEndpoint } from "./fixtures/track-m-apps/long-room-driver.js";
 import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-head.js";
@@ -28,9 +29,10 @@ for (const value of [epochs, moves, streamLimit])
 if (!Number.isSafeInteger(reopenAt) || reopenAt < 1 || reopenAt > epochs)
 	throw new Error("ENDURANCE_REOPEN_EPOCH_INVALID");
 const output = process.env.ACTIVE_ENDURANCE_OUT ?? join(tmpdir(), `active-endurance-${Date.now()}`);
-// Grid and Chat sign creator-trusted-settlement-v1 by default. ACTIVE_ENDURANCE_PROFILE=trusted-v1
-// runs them on the legacy creator-trusted-v1 profile the shipped Grid example and the v3-chat demo
-// sign today (it never prunes issued records). Canvas always follows its shipped profile.
+// Every app signs its own exported genesis profile (examples/<app>/src/profile.ts) by default.
+// ACTIVE_ENDURANCE_PROFILE=trusted-v1 is the explicit opt-in override for Grid and Chat (the legacy
+// trusted profile, which never prunes issued records); it is recorded in the configuration line.
+// Canvas always follows its shipped profile.
 const profile = process.env.ACTIVE_ENDURANCE_PROFILE;
 if (profile !== undefined && profile !== "trusted-v1" && profile !== "settlement-v1")
 	throw new Error(`ENDURANCE_PROFILE:${profile}`);
@@ -78,7 +80,11 @@ it.skipIf(!enabled).each(apps)(
 			moves,
 			streamLimit,
 			reopenAt,
-			profile: app === "canvas" ? "shipped" : (profile ?? "settlement-v1"),
+			genesisProfile: genesisProfileFor({
+				app,
+				...(profile === "trusted-v1" && app !== "canvas" ? { profile } : {}),
+			}),
+			profileOverride: profile === "trusted-v1" && app !== "canvas" ? "trusted-v1" : null,
 			rollover,
 			...(rollover === "app"
 				? {
@@ -105,8 +111,8 @@ it.skipIf(!enabled).each(apps)(
 				epochs,
 				moves,
 				chatFormat: "shares" as const,
-				...(profile === "trusted-v1" && app !== "canvas" ? { profile } : {}),
-				...(rollover === "app" ? { rollover } : {}),
+				...(profile === "trusted-v1" && app !== "canvas" ? { profile: "trusted-v1" as const } : {}),
+				...(rollover === "app" ? { rollover: "app" as const } : {}),
 			};
 			const openPeers = async (reopen: boolean): Promise<readonly [RoleEndpoint, RoleEndpoint]> => {
 				const host = nodeHostFor("node", directory, reopen);
