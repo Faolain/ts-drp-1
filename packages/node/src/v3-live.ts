@@ -11312,10 +11312,13 @@ async function readCreatorRecoveryDependencyCensus(
 				observation.stage = `retained-source-completion:${row.authorSequence}`; return undefined;
 			}
 			// Signed local-author abandonment: terminal, never published, retained
-			// and charged until the ORIGINAL retirement owner retires it.
+			// and charged until the ORIGINAL retirement owner retires it. A frontier
+			// resolution signs the same receipt for a row it proves committed: that row
+			// is in history (covered, or the pinned bootstrap row, which is never pruned).
 			const durablyExpired = scope.author === registration.issuanceScope.author && !openSource &&
 				retainedCompletion?.expiry !== undefined && sameBytes(retainedCompletion.sourceDigest, row.digest) &&
-				classified?.kind === "displaced" && classified.authenticated.digest === lowerHexDigest(row.digest) &&
+				(classified?.kind === "displaced" || classified?.kind === "covered-historical" || classified?.kind === "pinned-genesis") &&
+				classified.authenticated.digest === lowerHexDigest(row.digest) &&
 				creatorRetainedExpiryMatchesPlan(retainedCompletion, row.authorSequence, inheritancePlan);
 			if (retainedCompletion?.expiry !== undefined && !durablyExpired) {
 				observation.stage = `retained-source-expiry:${row.authorSequence}`; return undefined;
@@ -13282,11 +13285,12 @@ async function ownEpochFences(store: DurableIssuanceStore, scope: DurableIssueSc
 	return (await scanOwnFences(store, scope)).lowest;
 }
 
-/** The own fence scan of ownEpochFences, with the highest own fence sequence (any epoch). */
+/** The own fence scan of ownEpochFences, with the highest own fence row (any epoch) and its epoch. */
 async function scanOwnFences(store: DurableIssuanceStore, scope: DurableIssueScope):
-	Promise<Readonly<{ lowest: ReadonlyMap<number, number>; highest: number | undefined }>> {
+	Promise<Readonly<{ lowest: ReadonlyMap<number, number>; highest: number | undefined; highestEpoch: number | undefined }>> {
 	const fences = new Map<number, number>();
 	let highest: number | undefined;
+	let highestEpoch: number | undefined;
 	let afterKey: readonly [string, string, number] | undefined;
 	for (let pages = 0; pages < 256; pages++) {
 		const page = captureOutboxPage(
@@ -13294,7 +13298,7 @@ async function scanOwnFences(store: DurableIssuanceStore, scope: DurableIssueSco
 			64
 		);
 		if (page === undefined) throw new TypeError("own fence scan page is invalid");
-		if (page.length === 0) return ObjectFreeze({ lowest: fences, highest });
+		if (page.length === 0) return ObjectFreeze({ lowest: fences, highest, highestEpoch });
 		for (let index = 0; index < page.length; index++) {
 			const row = outboxRowSnapshot(page.read(index), scope);
 			if (row === undefined) throw new TypeError("own fence scan row is invalid");
@@ -13304,7 +13308,10 @@ async function scanOwnFences(store: DurableIssuanceStore, scope: DurableIssueSco
 			const epoch = preimage.epoch;
 			// Any own fence row (whatever its fenceSequence) bounds what contiguity can prove.
 			if (isObject(operation) && Reflect.get(operation, "action") === AUTHOR_FENCE_ACTION &&
-				(highest === undefined || row.authorSequence > highest)) highest = row.authorSequence;
+				(highest === undefined || row.authorSequence > highest)) {
+				highest = row.authorSequence;
+				highestEpoch = typeof epoch === "number" && NumberIsSafeInteger(epoch) ? epoch : undefined;
+			}
 			if (!isObject(operation) || Reflect.get(operation, "action") !== AUTHOR_FENCE_ACTION ||
 				Reflect.get(operation, "version") !== 1 || Reflect.get(operation, "fenceSequence") !== row.authorSequence ||
 				typeof epoch !== "number" || !NumberIsSafeInteger(epoch)) continue;
@@ -13332,7 +13339,11 @@ function settlementOwnRowFenceGuarded(fences: ReadonlyMap<number, number>, epoch
  *   again exactly once.
  * - "committed": within terminalThrough while no own fence follows it: the frontier reached it only
  *   through contiguous admitted slots (a fence is the only other way to the boundary), so it is in a
- *   closed Cut.
+ *   closed Cut. Or within terminalThrough and followed, in its own epoch, by the author's highest
+ *   fence row while that fence is within terminalThrough too: that fence was admitted (it is the
+ *   frontier's boundary or inside its contiguous run; no higher own fence can be the boundary), and
+ *   it follows the row in the row's epoch, so it depends on it (a local issue depends on the plane's
+ *   tips): its admission admitted the row (fence closure).
  * Anything else (an old incarnation, a fence after it, an unguarded gap) proves nothing and stays
  * manual-review.
  * @param registration - The live plane whose installed history holds the frontier.
@@ -13351,7 +13362,8 @@ async function frontierRetainedResolution(registration: V3PlaneRegistration, sou
 	if (rowClass === "displaced" && settlementOwnRowFenceGuarded(fences.lowest, sourceEpoch, sourceSequence, frontier.terminalThrough))
 		return "never-admitted";
 	if (rowClass === "terminal" && frontier.terminalThrough !== null && sourceSequence <= frontier.terminalThrough &&
-		sourceEpoch >= frontier.admissionEpoch && (fences.highest === undefined || fences.highest < sourceSequence)) return "committed";
+		sourceEpoch >= frontier.admissionEpoch && (fences.highest === undefined || fences.highest < sourceSequence ||
+			(fences.highest <= frontier.terminalThrough && fences.highestEpoch === sourceEpoch))) return "committed";
 	return undefined;
 }
 
