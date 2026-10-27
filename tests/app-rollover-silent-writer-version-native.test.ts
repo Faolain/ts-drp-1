@@ -139,12 +139,21 @@ async function planImage(directory: string, author: string) {
 		const store = await nodeHostFor("node", directory, true).observe.openIssuance("recipient");
 		try {
 			const plan = await store.readSettlementPlan({ objectId, author });
-			return plan?.entries.map((entry) => ({
-				sequence: entry.sourceSequence,
-				disposition: entry.disposition,
-				resolved: entry.sourceResolutionDigest !== undefined,
-				kind: (entry as { sourceResolutionKind?: string }).sourceResolutionKind ?? null,
-			})) ?? null;
+			if (plan === null) return null;
+			const handBacks = (plan as { handBacks?: readonly { sourceSequence: number; intent: number; reissueSequence: number | null }[] })
+				.handBacks;
+			return [
+				...plan.entries.map((entry) => ({
+					sequence: entry.sourceSequence,
+					disposition: entry.disposition,
+					resolved: entry.sourceResolutionDigest !== undefined,
+					kind: (entry as { sourceResolutionKind?: string }).sourceResolutionKind ?? null,
+				})),
+				// Durable hand-back records (fix/silent-writer-catchup): [source, intent, reissue row or null].
+				...(handBacks === undefined
+					? []
+					: [{ handBacks: handBacks.map((record) => [record.sourceSequence, record.intent, record.reissueSequence]) }]),
+			];
 		} finally {
 			await (store as unknown as { close?: () => Promise<void> }).close?.();
 		}
