@@ -214,7 +214,8 @@ it.runIf(INNER)(
 		const directory = process.env.HANDBACK_CRASH_DIRECTORY!;
 		const edge = process.env.HANDBACK_CRASH_EDGE as Edge;
 		const deathFile = join(directory, "death.json"),
-			setupFile = join(directory, "setup.json");
+			setupFile = join(directory, "setup.json"),
+			admittedFile = join(directory, "admitted.json");
 		const file = issuanceFile(directory, "recipient");
 		const exec = DatabaseSync.prototype.exec;
 		const watch = {
@@ -268,9 +269,19 @@ it.runIf(INNER)(
 		try {
 			const { creator, writer } = await openPair(directory, false);
 			const wire = successorWire(() => [creator, writer] as const);
-			const rows = rowWire(creator, writer);
+			const wireRows = rowWire(creator, writer);
 			const ordinal = { next: 0 };
 			const ids: string[] = [];
+			// The creator's admissions are observed in memory (acceptedVertices), so the reopened process
+			// cannot see what this one admitted. Every carry of the Writer's rows records them durably first.
+			const rows = {
+				toWriter: wireRows.toWriter,
+				toCreator: async () => {
+					await wireRows.toCreator();
+					if (watch.author !== "")
+						writeFileSync(admittedFile, JSON.stringify(await acceptedCounts(creator, watch.author, ids)));
+				},
+			};
 			let epoch = 0;
 			const save = (reconnected: boolean) =>
 				writeFileSync(
@@ -338,7 +349,12 @@ it.skipIf(INNER).each(EDGES)(
 		if (!existsSync(deathFile)) throw new Error(`the Writer did not die at ${edge}:\n${output.slice(-6000)}`);
 		const death = JSON.parse(readFileSync(deathFile, "utf8")) as Record<string, unknown>;
 		const setup = JSON.parse(readFileSync(join(directory, "setup.json"), "utf8")) as Setup;
-		process.stdout.write(`HANDBACK_CRASH_DEATH ${JSON.stringify({ death, setup })}\n`);
+		// What the creator admitted before the death (its in-memory observation does not survive reopen).
+		const admittedFile = join(directory, "admitted.json");
+		const before = existsSync(admittedFile) ? (JSON.parse(readFileSync(admittedFile, "utf8")) as number[]) : [];
+		process.stdout.write(`HANDBACK_CRASH_DEATH ${JSON.stringify({ death, setup, before })}\n`);
+		const total = async (role: RoleEndpoint) =>
+			(await acceptedCounts(role, setup.writerAuthor, setup.ids)).map((count, index) => count + (before[index] ?? 0));
 		expect(death).toMatchObject({ signal: "SIGKILL", edge });
 
 		const restore = await installEnvironment("node", () => undefined);
@@ -359,7 +375,7 @@ it.skipIf(INNER).each(EDGES)(
 					await rows.toWriter();
 					await rows.toCreator();
 					const status = (await writer.rolloverStatus?.()) as Status;
-					counts = await acceptedCounts(creator, setup.writerAuthor, setup.ids);
+					counts = await total(creator);
 					process.stdout.write(
 						`HANDBACK_CRASH_AFTER ${JSON.stringify({ edge, epoch, state: status.state, kept: status.kept.map((op) => op.id), counts, settlement: await writer.settlementStatus?.() })}\n`
 					);
@@ -369,7 +385,7 @@ it.skipIf(INNER).each(EDGES)(
 					"the creator admits every move of the Writer",
 					async () => {
 						await rows.toCreator();
-						return acceptedCounts(creator, setup.writerAuthor, setup.ids);
+						return total(creator);
 					},
 					(value) => value.every((count) => count >= 1)
 				);
@@ -381,7 +397,7 @@ it.skipIf(INNER).each(EDGES)(
 				epoch = await rollCreator(creator, rows.toWriter, ordinal);
 				await follow(wire, writer, epoch);
 				await rows.toWriter();
-				expect(await acceptedCounts(creator, setup.writerAuthor, setup.ids)).toEqual(setup.ids.map(() => 1));
+				expect(await total(creator)).toEqual(setup.ids.map(() => 1));
 				expect(((await writer.settlementStatus?.()) as { undelivered: unknown[] }).undelivered).toEqual([]);
 				expect(await writer.state()).toBe(await creator.state());
 			} finally {

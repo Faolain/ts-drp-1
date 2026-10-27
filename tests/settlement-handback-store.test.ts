@@ -13,6 +13,7 @@ import {
 	copySettlementPlanEffect,
 	settlementPlanHasExactEffectLink,
 } from "../packages/issuance-store/src/contract.js";
+import { captureIssuanceRetirementPreparation } from "../packages/issuance-store/src/retirement.js";
 import { createBrowserDurableIssuanceStore } from "../packages/storage-browser/src/issuance.js";
 import { createNodeDurableIssuanceStore } from "../packages/storage-node/src/issuance.js";
 
@@ -134,6 +135,28 @@ describe("settlement hand-back record contract", () => {
 		expect(() => applySettlementPlanEffect(linked, copySettlementPlanEffect(effect())!, 10)).toThrow();
 		// No record for that intent.
 		expect(() => applySettlementPlanEffect(copied!, copySettlementPlanEffect(effect(1))!, 9)).toThrow();
+	});
+
+	it("carries hand-back records through a retirement plan rewrite", () => {
+		// A retirement that retires an entry's source rewrites the plan; the record outlives the row.
+		const before = copySettlementPlan(
+			{ ...plan(3, [record()]), entries: [expired, { ...expired, sourceSequence: 9 }] },
+			SCOPE
+		)!;
+		const after = copySettlementPlan({ ...plan(4, [record()]), entries: [{ ...expired, sourceSequence: 9 }] }, SCOPE)!;
+		const preparation = captureIssuanceRetirementPreparation({
+			decisionDigest: "a".repeat(64),
+			sourceProofDigest: "b".repeat(64),
+			throughEpoch: 3,
+			protectedRecords: [],
+			planRewrite: {
+				kind: "v3-issuance-retirement-plan-rewrite-1",
+				sourceImageDigest: "c".repeat(64),
+				targetImageDigest: "d".repeat(64),
+				plans: [{ before: encodeCanonical(before), after: encodeCanonical(after) }],
+			},
+		});
+		expect(preparation.planRewrite?.plans).toHaveLength(1);
 	});
 
 	it("refuses malformed records and effects", () => {
