@@ -821,6 +821,11 @@ export type V3EgressResult =
 type V3RebaseSource = Readonly<{
 	readonly author: string;
 	readonly authorSequence: number;
+	/** The source row's own signed epoch (an observation for the settlement window; no authority). */
+	readonly epoch: number;
+	/** The creator's signed settlement frontier classifies this row displaced: its epoch closed without
+	 * it, so it can never be admitted (the settlement window may expire it). */
+	readonly frontierDisplaced: boolean;
 	issueReplacement(
 		input: V3LocalIssueInput & Readonly<{ planEffect: NonNullable<DurableIssueCommit["planEffect"]> }>
 	): Promise<V3LocalIssueResult>;
@@ -11112,6 +11117,8 @@ async function readCreatorRecoveryDependencyCensus(
 	if (sourceTrust !== undefined) anchors.set(sourceTrust.currentEpoch, sourceTrust.currentAnchorDigest);
 	let afterKey: DurableOutboxPageInput["afterKey"] = null;
 	let scanned = 0;
+	// The author's own fences per epoch, read once when a row first reaches the settlement window.
+	let windowFences: Promise<ReadonlyMap<number, number>> | undefined;
 	for (;;) {
 		await checkpoint();
 		if (!live()) return undefined;
@@ -11448,6 +11455,20 @@ async function readCreatorRecoveryDependencyCensus(
 					if (covered === undefined || covered.digest !== classified.authenticated.digest) return undefined;
 				}
 				if (durablyExpired) dependencyKind = "source-authenticated-expiry";
+				// Past the own-row settlement window, a displaced row whose own settlement is complete
+				// (an expired fence or source) is resolved as expired: the signed frontier shows the
+				// creator closed its epoch without it, and no later plane can admit it.
+				const windowFrontier = settlementFrontierFromHistory(registration.historicalIssuance);
+				const windowExpired = sourceBound && scope.author === registration.issuanceScope.author &&
+					windowFrontier !== undefined && validSettlementFrontierContext(registration.payload, windowFrontier) &&
+					(retainedHistoricalFence || completedBranch) &&
+					settlementOwnRowClass(classified.authenticated.vertex.epoch, windowFrontier.currentEpoch, row.authorSequence,
+						windowFrontier.admissionEpoch, windowFrontier.terminalThrough) === "displaced" &&
+					settlementOwnRowWindowExpired(classified.authenticated.vertex.epoch, windowFrontier.currentEpoch) &&
+					settlementOwnRowFenceGuarded(await (windowFences ??= ownEpochFences(
+						creatorOriginalIssuanceStore(registration), registration.issuanceScope)),
+					classified.authenticated.vertex.epoch, row.authorSequence, windowFrontier.terminalThrough);
+				if (windowExpired) dependencyKind = "source-authenticated-expiry";
 			}
 			const vertex = classified.authenticated.vertex;
 			if (typeof vertex.anchor !== "string") return undefined;
@@ -13222,6 +13243,83 @@ function settlementOwnRowClass(
 	if (epoch < admissionEpoch) return "old-incarnation";
 	if (epoch < currentEpoch) return "displaced";
 	return "current";
+}
+
+/**
+ * The own-row settlement window, in epochs. A displaced own row (its epoch is closed and its sequence
+ * is above the creator-signed terminalThrough) is in no closed Cut: the frontier is contiguous
+ * (deriveCreatorAuthorSettlementFrontier; an author's admitted slots are causally closed) and
+ * monotone, and ingress admits only the current epoch's anchor, so the row can never enter history.
+ * A Writer whose settlements never reach the creator would otherwise retain every such row, and the
+ * journal scopes protecting them, until a fence of its is delivered: one more protected scope per
+ * epoch until the retirement preparation refuses (AHE_BOUNDED_READ_LIMITS.maxObjectGenerations = 7
+ * scopes, at the eighth unsettled epoch). Past this depth the Writer resolves such a row as expired
+ * on the creator's signed exclusion. Four is the age at which a connected Writer collects its own
+ * rows: the retirement's recovery trusts reach back current - 4, and a deeper window leaves a
+ * collected scope outside them (measured: depth 5 refuses "chain-invalid").
+ */
+export const V3_SETTLEMENT_OWN_WINDOW_EPOCHS = 4;
+function settlementOwnRowWindowExpired(epoch: number, currentEpoch: number): boolean {
+	return NumberIsSafeInteger(epoch) && NumberIsSafeInteger(currentEpoch) &&
+		epoch <= currentEpoch - V3_SETTLEMENT_OWN_WINDOW_EPOCHS;
+}
+
+/**
+ * The lowest own author fence (fenceSequence = its own sequence) of each epoch among the author's
+ * retained own rows. A local issue's dependencies are the plane's tips, so an author's admitted rows
+ * of one epoch are causally closed: when the author's fence of an epoch precedes a row of that epoch
+ * and the row was admitted, so were the fence and every row between, and the creator's frontier
+ * (boundary fence - 1, then contiguous slots) reaches the row. A displaced row so guarded was never
+ * admitted. A row with no such fence (the fence was withheld) may sit above a gap: its displaced
+ * class then proves nothing, and the settlement window never expires it.
+ * @param store - The author's original issuance store.
+ * @param scope - The author's own scope.
+ * @returns Epoch to lowest fence sequence.
+ */
+async function ownEpochFences(store: DurableIssuanceStore, scope: DurableIssueScope): Promise<ReadonlyMap<number, number>> {
+	const fences = new Map<number, number>();
+	let afterKey: readonly [string, string, number] | undefined;
+	for (let pages = 0; pages < 256; pages++) {
+		const page = captureOutboxPage(
+			await store.readOutboxPage(afterKey === undefined ? { limit: 64, scope } : { afterKey, limit: 64, scope }),
+			64
+		);
+		if (page === undefined) throw new TypeError("own fence scan page is invalid");
+		if (page.length === 0) return fences;
+		for (let index = 0; index < page.length; index++) {
+			const row = outboxRowSnapshot(page.read(index), scope);
+			if (row === undefined) throw new TypeError("own fence scan row is invalid");
+			afterKey = ObjectFreeze([scope.objectId, scope.author, row.authorSequence] as const);
+			const preimage = decodeCanonical(row.canonicalPreimageBytes) as Record<string, unknown>;
+			const operation = preimage.operation;
+			const epoch = preimage.epoch;
+			if (!isObject(operation) || Reflect.get(operation, "action") !== AUTHOR_FENCE_ACTION ||
+				Reflect.get(operation, "version") !== 1 || Reflect.get(operation, "fenceSequence") !== row.authorSequence ||
+				typeof epoch !== "number" || !NumberIsSafeInteger(epoch)) continue;
+			const prior = fences.get(epoch);
+			if (prior === undefined || row.authorSequence < prior) fences.set(epoch, row.authorSequence);
+		}
+	}
+	throw new TypeError("own fence scan is unbounded");
+}
+
+/** A displaced own row provably never admitted (see ownEpochFences): the lowest unsettled sequence,
+ * or preceded by its own epoch's fence. */
+function settlementOwnRowFenceGuarded(fences: ReadonlyMap<number, number>, epoch: number, sequence: number,
+	terminalThrough: number | null): boolean {
+	const fence = fences.get(epoch);
+	return sequence === (terminalThrough ?? -1) + 1 || (fence !== undefined && fence <= sequence);
+}
+
+/** One own-fence scan per rebase snapshot (the scan the settlement window classifies against). */
+const rebaseSnapshotFenceScans = new WeakMap<object, Promise<ReadonlyMap<number, number>>>();
+function rebaseSnapshotFences(registration: V3PlaneRegistration, snapshot: object): Promise<ReadonlyMap<number, number>> {
+	let scan = rebaseSnapshotFenceScans.get(snapshot);
+	if (scan === undefined) {
+		scan = ownEpochFences(creatorOriginalIssuanceStore(registration), registration.issuanceScope);
+		rebaseSnapshotFenceScans.set(snapshot, scan);
+	}
+	return scan;
 }
 
 const settlementSourceByVertex = new WeakMap<EpochVertex, Readonly<Record<string, unknown>>>();
@@ -16140,6 +16238,21 @@ async function ownSourceSettlementIsComplete(
 		derived = derivePolicySettlement(policy, operations);
 		if (!sameBytes(encodeCanonical(derived), encodeCanonical(derivePolicySettlement(policy, operations)))) return false;
 	} catch { return false; }
+	// Settlement window (V3_SETTLEMENT_OWN_WINDOW_EPOCHS): the room's drain resolved this displaced
+	// source as expired instead of replacing it again, and handed its operations back to the
+	// application. Its epoch is closed and the creator's signed frontier excluded it (the drain
+	// expires only frontier-displaced sources), so no plane can admit it and no replacement of it
+	// is ever signed: the exact entry with no replacement is its complete settlement.
+	if (entry.disposition === "expire" && (derived.disposition === "rebase" || derived.disposition === "transform")) {
+		const frontier = settlementFrontierFromHistory(registration.historicalIssuance);
+		return frontier !== undefined && validSettlementFrontierContext(registration.payload, frontier) &&
+			source.admitted.epoch < frontier.currentEpoch &&
+			settlementOwnRowClass(source.admitted.epoch, frontier.currentEpoch, source.authorSequence,
+				frontier.admissionEpoch, frontier.terminalThrough) !== "current" &&
+			entry.replacementSequence === null && entry.replacementProgress === undefined && entry.transformRefusal === undefined &&
+			settlementOwnRowFenceGuarded(await ownEpochFences(creatorOriginalIssuanceStore(registration), scope),
+				source.admitted.epoch, source.authorSequence, frontier.terminalThrough);
+	}
 	if (derived.disposition !== entry.disposition || derived.disposition === "manual-review") return false;
 	if (derived.disposition === "expire") return entry.replacementSequence === null &&
 		entry.replacementProgress === undefined && entry.transformRefusal === undefined;
@@ -16403,8 +16516,17 @@ async function settledLocalSourceFacts(
 			frontier === undefined || !validSettlementFrontierContext(registration.payload, frontier)) return undefined;
 		const terminal = settlementOwnRowClass(selected.authenticated.admitted.epoch, frontier.currentEpoch,
 			source.authorSequence, frontier.admissionEpoch, frontier.terminalThrough);
-		if ((terminal !== "terminal" && terminal !== "old-incarnation") ||
-			!await ownSourceSettlementIsComplete(registration, selected, await store.readSettlementPlan(scope))) return undefined;
+		const expired = terminal === "displaced" &&
+			settlementOwnRowWindowExpired(selected.authenticated.admitted.epoch, frontier.currentEpoch) &&
+			settlementOwnRowFenceGuarded(await ownEpochFences(store, scope), selected.authenticated.admitted.epoch,
+				source.authorSequence, frontier.terminalThrough);
+		const pinnedBytes = registration.exactCanonicalPinnedGenesisBootstrapOperationBytes;
+		const expiredBootstrap = expired && pinnedBytes !== undefined && selected.authenticated.admitted.epoch === 0 &&
+			authenticatedPinnedGenesisOutboxRow(row, scope, registration.payload, registration.payload.trust.trust.genesisAnchorDigest,
+				pinnedBytes)?.digest === source.vertexDigest;
+		const settled = expiredBootstrap ||
+			await ownSourceSettlementIsComplete(registration, selected, await store.readSettlementPlan(scope));
+		if ((terminal !== "terminal" && terminal !== "old-incarnation" && !expired) || !settled) return undefined;
 		return ObjectFreeze({ exactCanonicalPreimageBytes: new Uint8ArrayConstructor(row.canonicalPreimageBytes),
 			detachedSignature: new Uint8ArrayConstructor(row.signature) });
 	} catch { return undefined; }
@@ -17058,6 +17180,16 @@ async function readRebaseOutbox(
 	const commonSource = {
 		author: selected.authenticated.author,
 		authorSequence: selected.row.authorSequence,
+		epoch: selected.authenticated.admitted.epoch,
+		frontierDisplaced:
+			settlementFrontier !== undefined &&
+			selected.row.scope.objectId === registration.payload.provenance.objectId &&
+			selected.authenticated.author === registration.issuanceScope.author &&
+			validSettlementFrontierContext(registration.payload, settlementFrontier) &&
+			settlementOwnRowClass(selected.authenticated.admitted.epoch, settlementFrontier.currentEpoch,
+				selected.row.authorSequence, settlementFrontier.admissionEpoch, settlementFrontier.terminalThrough) === "displaced" &&
+			settlementOwnRowFenceGuarded(await rebaseSnapshotFences(registration, snapshot),
+				selected.authenticated.admitted.epoch, selected.row.authorSequence, settlementFrontier.terminalThrough),
 		intents: ObjectFreeze(intents),
 		vertexDigest: selected.authenticated.digest,
 	};
@@ -22511,6 +22643,7 @@ async function cleanupCreatorSettlementSuccessor(
 		publishState: "pending" | "published";
 	}[] = [];
 	let throughAuthorSequence: number | null = null;
+	let windowFences: Promise<ReadonlyMap<number, number>> | undefined;
 	const journalConsumers = new Map<string, boolean>();
 	const journalScopeConsumes = async (epoch: number, anchorDigest: string): Promise<boolean> => {
 		const key = JSON.stringify([epoch, anchorDigest]);
@@ -22557,7 +22690,15 @@ async function cleanupCreatorSettlementSuccessor(
 						(source.admitted.epoch > classifiedThroughEpoch || row.publishState !== "published")) ||
 					!(
 						source.admitted.epoch < frontier.admissionEpoch ||
-						(frontier.terminalThrough !== null && row.authorSequence <= frontier.terminalThrough)
+						(frontier.terminalThrough !== null && row.authorSequence <= frontier.terminalThrough) ||
+						// Past the own-row window a displaced row is resolved as expired; only the
+						// closed-retirement coordinator (which left it unprotected) may drain it.
+						(coordinatedIssuance !== undefined &&
+							settlementOwnRowClass(source.admitted.epoch, frontier.currentEpoch, row.authorSequence,
+								frontier.admissionEpoch, frontier.terminalThrough) === "displaced" &&
+							settlementOwnRowWindowExpired(source.admitted.epoch, frontier.currentEpoch) &&
+							settlementOwnRowFenceGuarded(await (windowFences ??= ownEpochFences(material.issuanceStore,
+								material.issuanceScope)), source.admitted.epoch, row.authorSequence, frontier.terminalThrough))
 					)
 				) {
 					done = true;
