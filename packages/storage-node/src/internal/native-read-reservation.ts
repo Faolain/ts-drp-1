@@ -3,7 +3,12 @@ import { resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
 import { enforceNativeLocalSessionFile, type LocalSessionLifetime } from "./local-session-lifetime.js";
-import { holdNativeWriter } from "./native-writer-gate.js";
+import {
+	awaitNativeWriterFree,
+	holdNativeWriter,
+	nativeWriterBusyError,
+	nativeWriterHeld,
+} from "./native-writer-gate.js";
 import { cachedStatement } from "./sqlite-statement-cache.js";
 
 /**
@@ -125,6 +130,13 @@ export class SqliteNativeReadReservationOwner {
 		});
 		this.#held = held;
 		try {
+			if (nativeWriterHeld(this.filename)) {
+				// Another private writer in this thread holds across awaits; BEGIN IMMEDIATE would sleep it out.
+				const free = await awaitNativeWriterFree(this.filename, 1000);
+				this.session?.assertCurrent();
+				if (this.#closed || released) throw new Error("NATIVE_READ_RESERVATION_RELEASED");
+				if (!free) throw nativeWriterBusyError();
+			}
 			database.exec("PRAGMA busy_timeout=1000");
 			releaseWriter = holdNativeWriter(this.filename);
 			database.exec("BEGIN IMMEDIATE");

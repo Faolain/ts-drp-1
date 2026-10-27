@@ -86,3 +86,16 @@ export async function awaitNativeWriterFree(filename: string, boundMs: number): 
 	}
 	return true;
 }
+
+/**
+ * The refusal a private writer gives when its bounded wait expires: the same
+ * shape node:sqlite throws for SQLITE_BUSY, without having slept the thread.
+ * @returns A busy error equivalent to the BEGIN IMMEDIATE it replaces.
+ */
+export function nativeWriterBusyError(): Error {
+	return Object.assign(new Error("database is locked"), {
+		code: "ERR_SQLITE_ERROR",
+		errcode: 5,
+		errstr: "database is locked",
+	});
+}

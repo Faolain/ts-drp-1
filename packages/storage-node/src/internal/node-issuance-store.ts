@@ -1182,13 +1182,18 @@ class NodeIssuanceImplementation {
 				else resolve();
 			}));
 		this.#signReleases.add(release);
-		// Native BEGIN/check happen synchronously before the original crypto task.
+		// Native BEGIN/check happen synchronously before the original crypto task,
+		// unless another private writer in this thread holds: then BEGIN waits for it.
 		return joinIssuanceNativeSign(
-			// eslint-disable-next-line @typescript-eslint/require-await
 			async () => {
 				this.#assertAvailable();
 				if (released) throw issuanceRetirementRefusal("native sign reservation released");
 				if (!began) {
+					const contended = this.#writerFree("native sign admission failed");
+					if (contended !== undefined) {
+						await contended;
+						if (released) throw issuanceRetirementRefusal("native sign reservation released");
+					}
 					database.exec(`PRAGMA busy_timeout=${BUSY_TIMEOUT}`);
 					releaseWriter ??= holdNativeWriter(this.#filename);
 					database.exec("BEGIN IMMEDIATE");
@@ -1786,13 +1791,31 @@ class NodeIssuanceImplementation {
 		let primaryFailed = false;
 		let primary: unknown;
 		try {
-			const nativeSignAdmission: NonNullable<Parameters<DurableBuildAndSign>[1]> = (bytes, sign, context) => {
+			let admissionDeferred = false;
+			const admitSign = (
+				bytes: Uint8Array,
+				sign: () => Promise<Uint8Array>,
+				context: Parameters<NonNullable<Parameters<DurableBuildAndSign>[1]>>[2],
+				waited: boolean
+			): Promise<Uint8Array> => {
 				this.#assertAvailable();
-				if (hookEnded || admitted !== undefined) throw invalid("native issue sign admission is one-use");
+				if ((!waited && (hookEnded || admissionDeferred)) || admitted !== undefined)
+					throw invalid("native issue sign admission is one-use");
 				const captured = captureIssuanceNativeSignInput({ scope: detached, exactCanonicalUnsignedVertexBytes: bytes });
 				const capturedContext = captureIssuanceNativeSignContext(context);
 				if (captured.sequence !== prior.next || typeof sign !== "function")
 					throw invalid("native issue sign input changed");
+				if (!waited) {
+					// Another private writer in this thread holds across awaits: its BEGIN
+					// IMMEDIATE would sleep the thread it needs. Admit once it releases.
+					const contended = this.#writerFree("issuance write failed");
+					if (contended !== undefined) {
+						admissionDeferred = true;
+						signing = contended.then(() => admitSign(bytes, sign, context, true));
+						void signing.catch(() => undefined);
+						return signing;
+					}
+				}
 				enter();
 				admitted = captured;
 				database = new DatabaseSync(this.#filename, {
@@ -1971,6 +1994,8 @@ class NodeIssuanceImplementation {
 				void signing.catch(() => undefined);
 				return signing;
 			};
+			const nativeSignAdmission: NonNullable<Parameters<DurableBuildAndSign>[1]> = (bytes, sign, context) =>
+				admitSign(bytes, sign, context, false);
 			const built = await buildAndSign(prior.next, nativeSignAdmission);
 			hookEnded = true;
 			if (signing !== undefined) await signing;
