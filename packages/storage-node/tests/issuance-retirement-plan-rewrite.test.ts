@@ -185,18 +185,20 @@ describe.each(["sqlite", "indexeddb"] as const)("%s atomic plan retirement", bac
 		await retire();
 		expect(await store.readIssued(scope, 0)).not.toBeNull();
 		expect(await store.readSettlementPlan(scope)).toEqual(before);
-		// Later plan progress carries them unchanged.
-		await store.transactWriteSettlementPlan({scope, expectedRevision: 0, plan: {...before, revision: 1}});
+		// Later plan progress carries them unchanged, including the successor install's
+		// merge that clears the author fence until it issues the next one.
+		await store.transactWriteSettlementPlan({scope, expectedRevision: 0, plan: {...before, revision: 1, fenceSequence: null}});
+		await store.transactWriteSettlementPlan({scope, expectedRevision: 1, plan: {...before, revision: 2}});
 		// A new entry naming a retired, still held row is not custody: it is refused.
-		await expect(store.transactWriteSettlementPlan({scope, expectedRevision: 1,
-			plan: {...before, revision: 2, entries: [entry(0), entry(1), entry(2)]}})).rejects.toThrow("retired or absent issued work");
+		await expect(store.transactWriteSettlementPlan({scope, expectedRevision: 2,
+			plan: {...before, revision: 3, entries: [entry(0), entry(1), entry(2)]}})).rejects.toThrow("retired or absent issued work");
 		// The authenticated prefix pruner removes both sources; the unchanged entries stay
 		// admissible until the next retirement rewrite drops them.
 		await maintenance.pruneAuthenticatedSettledPrefix(d109bPruningInput(await maintenance.inspectPruningState(scope), 3, 1));
 		expect(await store.readIssued(scope, 1)).toBeNull();
-		await store.transactWriteSettlementPlan({scope, expectedRevision: 1, plan: {...before, revision: 2}});
+		await store.transactWriteSettlementPlan({scope, expectedRevision: 2, plan: {...before, revision: 3}});
 		await retire();
-		expect(await store.readSettlementPlan(scope)).toEqual({scope, revision: 3, fenceSequence: 4, entries: []});
+		expect(await store.readSettlementPlan(scope)).toEqual({scope, revision: 4, fenceSequence: 4, entries: []});
 	});
 
 	it("prunes a fence-less removed author's authenticated committed source without a FENCE", async () => {
