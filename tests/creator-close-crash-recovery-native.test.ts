@@ -10,6 +10,7 @@ import { expect, it } from "vitest";
 
 import { chatSharesRoomFixture, closeChatSharesRooms, required } from "./fixtures/chat-membership-shares/room.js";
 import { createShippingChatWindowGenesisStateBytes } from "../examples/chat/src/v3-chat-window.js";
+import { isV3RoomClosePendingRefusal } from "../packages/node/src/v3-room.js";
 
 // The CREATOR dies by SIGKILL immediately AFTER a real SQLite COMMIT inside its
 // own epoch close, at each committed boundary of the close. A separate recover
@@ -186,7 +187,7 @@ const awaitAutoRetry = async (creator: Peer, epochBefore: number) => {
 	return Math.round(performance.now() - started);
 };
 
-type CreatorOffer = { accepted: true; epoch: number } | { accepted: false; reason: string };
+type CreatorOffer = { accepted: true; epoch: number } | { accepted: false; reason: string; closePending: boolean };
 /**
  * Offers the creator's own new work now. It either is refused with the
  * retryable close-pending refusal, or is accepted only once the interrupted
@@ -197,7 +198,12 @@ type CreatorOffer = { accepted: true; epoch: number } | { accepted: false; reaso
 const offerCreatorWork = (creator: Peer): Promise<CreatorOffer> =>
 	creator.room.issue(message("creator-offered")).then(
 		() => ({ accepted: true as const, epoch: epochOf(creator) }),
-		(error: unknown) => ({ accepted: false as const, reason: String(error) })
+		(error: unknown) => ({
+			accepted: false as const,
+			reason: String(error),
+			// The stable marker callers use to wait (the session retries the close itself).
+			closePending: isV3RoomClosePendingRefusal(error),
+		})
 	);
 
 /**
@@ -231,7 +237,10 @@ const offerThenAutoRetry = async (
 	const offered = await creatorOffer;
 	if (offered.accepted)
 		expect(offered.epoch, "the creator admitted work into the interrupted epoch").toBe(epochBefore + 1);
-	else expect(offered.reason).toMatch(RETRYABLE_REFUSAL);
+	else {
+		expect(offered.reason).toMatch(RETRYABLE_REFUSAL);
+		expect(offered.closePending).toBe(true);
+	}
 	// A member's append, offered to the creator while (or right after) the close retries.
 	await member.room.issue(message("member-offered"));
 	const memberRows = await f.issuedAfter(1, delivered);
@@ -629,7 +638,10 @@ it.skipIf(INNER).each(IN_PROCESS)(
 					expect(epochOf(creator)).toBe(epochBefore);
 					const later = await offerCreatorWork(creator);
 					expect(later.accepted, "a failing retry admitted work into the interrupted epoch").toBe(false);
-					if (!later.accepted) refusals.push(later.reason);
+					if (!later.accepted) {
+						expect(later.closePending).toBe(true);
+						refusals.push(later.reason);
+					}
 				}
 				for (const reason of refusals) expect(reason).toMatch(RETRYABLE_REFUSAL);
 				expect(texts(creator)).not.toContain("creator-offered");

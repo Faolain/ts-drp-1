@@ -283,6 +283,8 @@ export interface CreatorLiveCloseHandle {
 		Readonly<{ head: PresentHead; references: readonly GenerationRef[]; trustRef: GenerationRef }>
 	>;
 	status(): CreatorLiveCloseStatus;
+	/** This epoch's close is interrupted and holds ordinary admission until it adopts; the room retries it itself. */
+	interruptedClosePending?(): boolean;
 	stop(): Promise<void>;
 }
 
@@ -499,6 +501,8 @@ export interface V3CreatorCloseRegistration {
 	abortSnapshotStage(): boolean;
 	/** This epoch's close failed after staging: hold ordinary admission (close-pending) until adoption. */
 	markInterruptedClose(): void;
+	/** This epoch's close is interrupted (reopen, genesis binding or in-process failure) and not yet adopted. */
+	interruptedClosePending(): boolean;
 	readonly currentTrust: CurrentAnchorTrust;
 	readonly retirementReconstruction?: CreatorSnapshotRetirementReconstructionRequest;
 	readonly exactCanonicalAnchorPreimageBytes: Uint8Array;
@@ -4698,6 +4702,8 @@ export async function bindCreatorLiveClose(
 		};
 		const handle: CreatorLiveCloseHandle = Object.freeze({
 			close,
+			interruptedClosePending: (): boolean =>
+				!stopping && lifecycle !== "successor-adopted" && registration.interruptedClosePending(),
 			acquireLocalSessionWithdrawal: (author: string): Promise<CreatorLocalSessionWithdrawal> => {
 				if (stopping || maintenanceJobs.size !== 0 || acquisitionTask !== undefined || closeTask !== undefined ||
 					maintenanceReleaseFailure !== undefined || dependenciesReleased || dependencyReleaseTask !== undefined || actor.status().terminal ||

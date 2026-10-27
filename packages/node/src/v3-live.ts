@@ -21595,6 +21595,8 @@ function creatorCloseRegistration(
 		markInterruptedClose: (): void => {
 			if (currentRegistration(registration)) registration.creatorInterruptedClose = true;
 		},
+		interruptedClosePending: (): boolean =>
+			currentRegistration(registration) && creatorInterruptedClosePending(registration),
 		captureCloseGraph: () => captureCreatorCloseGraph(registration),
 		prepareClosedEpochArchive: (hold: Parameters<V3CreatorCloseRegistration["prepareClosedEpochArchive"]>[0],
 			limits: Parameters<V3CreatorCloseRegistration["prepareClosedEpochArchive"]>[1],
