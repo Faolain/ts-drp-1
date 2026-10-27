@@ -43,6 +43,10 @@ import { consumeCreatorAdoptionPendingRecovery } from "@ts-drp/node/internal/cre
 import { permitsStagedCreatorCheckpointFloorAdvance } from "./internal/creator-adoption-intent.js";
 import { createV3SnapshotTransferOwner } from "@ts-drp/node/snapshot-transfer";
 import {
+	createCreatorSuccessorServingRouter,
+	type CreatorSuccessorServingRouter,
+} from "./internal/creator-successor-serving.js";
+import {
 	activateV3LivePlane,
 	authorizeV3NewLocalOperation,
 	bindV3BlueprintLivePlane,
@@ -2929,8 +2933,26 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		if (errors.length > 1) throw new AggregateError(errors, "v3 room retained promotion cleanup failed");
 	};
 	let recipientSnapshotStore: Awaited<ReturnType<V3RoomStorageHost["openSnapshots"]>> | undefined;
-	let successorServing: ReturnType<typeof createV3SnapshotTransferOwner> | undefined;
-	let successorServingScope: Awaited<ReturnType<NonNullable<typeof recipientSnapshotStore>["openScope"]>> | undefined;
+	// The newest successor serving and, once adopted, the one it replaced
+	// (CREATOR_SUCCESSOR_SERVINGS_RETAINED), on one protocol port routed by manifest.
+	type SuccessorServing = {
+		readonly manifestDigest: string;
+		readonly closedEpoch: number;
+		owner?: ReturnType<typeof createV3SnapshotTransferOwner>;
+		scope?: Awaited<ReturnType<NonNullable<typeof recipientSnapshotStore>["openScope"]>>;
+		adopted: boolean;
+	};
+	let successorServing: SuccessorServing | undefined;
+	let retainedSuccessorServing: SuccessorServing | undefined;
+	let successorServingRouter: CreatorSuccessorServingRouter | undefined;
+	const closeSuccessorServing = async (serving: SuccessorServing | undefined): Promise<void> => {
+		if (serving === undefined) return;
+		try {
+			await serving.owner?.close();
+		} finally {
+			await serving.scope?.release();
+		}
+	};
 	const ownRecipientSnapshots = async (): Promise<NonNullable<typeof recipientSnapshotStore>> => {
 		if (recipientSnapshotStore === undefined) {
 			recipientSnapshotStore = await input.storageHost.openSnapshots(input.databaseName);
@@ -2941,13 +2963,15 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				} catch (error) {
 					failures.push(error);
 				}
-				try {
-					await successorServing?.close();
-				} catch (error) {
-					failures.push(error);
+				for (const serving of [successorServing, retainedSuccessorServing]) {
+					try {
+						await closeSuccessorServing(serving);
+					} catch (error) {
+						failures.push(error);
+					}
 				}
 				try {
-					await successorServingScope?.release();
+					await successorServingRouter?.close();
 				} catch (error) {
 					failures.push(error);
 				}
@@ -3641,17 +3665,41 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			if (!recheck) throw new TypeError("creator successor request was superseded");
 		}
 	};
+	const successorServingAdopted = (serving: SuccessorServing): boolean => {
+		if (closed || terminalFailure !== undefined) return false;
+		// Adoption is permanent: a later adoption in progress does not withdraw a retained serving.
+		if (!serving.adopted && successorAdopted(serving.closedEpoch)) serving.adopted = true;
+		return serving.adopted;
+	};
 	const serveSuccessor = async (): Promise<CreatorSuccessorOffer> => {
 		if (transport === undefined || activeHandle === undefined)
 			throw new TypeError("creator successor transport is unavailable");
 		const exported = await readSuccessorExport();
-		// The old serving's held responses end before its port joins their handlers (row 61).
-		cancelSuccessorServingHolds();
-		await successorServing?.close();
-		await successorServingScope?.release();
-		successorServingScope = await (await ownRecipientSnapshots()).openScope(exported.declaration);
-		const port = createSnapshotChunkProtocolPort(transport.networkNode, CREATOR_SUCCESSOR_PROTOCOL);
+		const manifestDigest = exported.declaration.scope.manifestDigest;
 		const closedEpoch = exported.declaration.scope.epoch;
+		// The replaced serving's held responses end before its port joins their handlers (row 61).
+		// An adopted serving holds none, so it is kept, and the serving it replaced is closed.
+		cancelSuccessorServingHolds();
+		const previous = successorServing;
+		successorServing = undefined;
+		const evicted: (SuccessorServing | undefined)[] = [];
+		if (previous !== undefined && previous.manifestDigest !== manifestDigest && successorServingAdopted(previous)) {
+			evicted.push(retainedSuccessorServing);
+			retainedSuccessorServing = previous;
+		} else evicted.push(previous);
+		if (retainedSuccessorServing?.manifestDigest === manifestDigest) {
+			evicted.push(retainedSuccessorServing);
+			retainedSuccessorServing = undefined;
+		}
+		for (const serving of evicted) await closeSuccessorServing(serving);
+		const router = (successorServingRouter ??= createCreatorSuccessorServingRouter());
+		if (!successorServingRouter.attached())
+			await router.attach(createSnapshotChunkProtocolPort(transport.networkNode, CREATOR_SUCCESSOR_PROTOCOL));
+		const serving: SuccessorServing = { manifestDigest, closedEpoch, adopted: false };
+		successorServing = serving;
+		serving.scope = await (await ownRecipientSnapshots()).openScope(exported.declaration);
+		const port = router.port(manifestDigest);
+		router.setCurrent(manifestDigest);
 		const generation = successorServingGeneration;
 		const server = createCreatorSuccessorMaterialServer({
 			...(input.application.snapshotReadPolicy === "authenticated-public"
@@ -3664,20 +3712,22 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					activeHandle?.currentEphemeralAuthority()?.isCurrentWriter(author) === true,
 			},
 			localPeerId: port.localPeerId,
-			manifestDigest: exported.declaration.scope.manifestDigest,
+			manifestDigest,
 			material: exported.material,
 			connectedPeers: () => port.connectedPeers(),
 			// Only an authorized request's response waits for the adoption; a refusal is written at once.
 			admitResponse: async (peerId: string, signal: AbortSignal): Promise<void> => {
+				if (successorServingAdopted(serving)) return;
 				releaseDisconnectedSuccessorServingHolds(port.connectedPeers());
 				await holdUntilSuccessorAdopted(closedEpoch, peerId, signal, generation);
+				serving.adopted = true;
 			},
 		});
-		successorServing = createV3SnapshotTransferOwner({ transport: port });
-		successorServing.serve({
+		serving.owner = createV3SnapshotTransferOwner({ transport: port });
+		serving.owner.serve({
 			authorization: Object.freeze({
 				authorForPeer: (peer: string): string | undefined =>
-					successorAdopted(closedEpoch) ? server.authorization.authorForPeer(peer) : undefined,
+					successorServingAdopted(serving) ? server.authorization.authorForPeer(peer) : undefined,
 				isAuthorizedAuthor: (author: string): boolean => server.authorization.isAuthorizedAuthor(author),
 			}),
 			control: (stream, bytes) =>
@@ -3696,7 +3746,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				),
 			descriptors: exported.declaration.chunks,
 			exactCanonicalManifestBytes: exported.offer.exactCanonicalSnapshotManifestBytes,
-			quarantine: successorServingScope,
+			quarantine: serving.scope,
 		});
 		return exported.offer;
 	};
