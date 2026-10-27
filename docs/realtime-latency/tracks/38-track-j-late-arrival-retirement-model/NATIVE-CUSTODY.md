@@ -12,7 +12,13 @@ The [retirement adjunct](../../../../packages/protocol-v3/formal/native-retireme
 represents a replacement chain, its live plan entries, a prepared native rewrite,
 the atomic commit, and same-intent recovery. Dependency closure includes the
 backward edge required when a retained portable row still consumes its source.
-Completed entries disappear only when their source retires. A crash exposes the
+Logical retirement and physical pruning are separate commits, and the creator
+recovery census classifies every source the store still holds by its completed
+entry. So a completed entry outlives its source's retirement as custody, without
+protecting the source or its replacement, and a later merge drops it once the
+prefix pruner removes the source (`entryKept`). The `nativeRetirementCustodyToday`
+instance is the broken control: dropping the entry when its source retires loses
+the entry of a held row, and a later merge that rebuilds it is refused. A crash exposes the
 prepared original image or the committed target image. Recovery selects the
 original source only when both the native target and the whole authenticated
 source match; later journal, snapshot or floor changes require a fresh selection
