@@ -3693,8 +3693,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 		for (const serving of evicted) await closeSuccessorServing(serving);
 		const router = (successorServingRouter ??= createCreatorSuccessorServingRouter());
-		if (!successorServingRouter.attached())
-			await router.attach(createSnapshotChunkProtocolPort(transport.networkNode, CREATOR_SUCCESSOR_PROTOCOL));
+		await router.attach(createSnapshotChunkProtocolPort(transport.networkNode, CREATOR_SUCCESSOR_PROTOCOL));
 		const serving: SuccessorServing = { manifestDigest, closedEpoch, adopted: false };
 		successorServing = serving;
 		serving.scope = await (await ownRecipientSnapshots()).openScope(exported.declaration);
@@ -4629,16 +4628,20 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	let pendingInputEntries = 0;
 	let pendingInputBytes = 0;
 	let pendingIssues: PendingIssue[] = [];
-	// A move made while a creator-successor adoption (a creator's own, or a member's install) owns
-	// the plane under the settlement profile: held, not refused, and issued once that adoption has
-	// settled, in logical-time order, on the plane it left (the successor when it succeeded). An
-	// install first drains the moves held by the adoption before it (installPreDrain), so
-	// back-to-back installs never starve them. Held at most V3_ROOM_ADOPTION_ISSUE_HOLD_MS.
+	// A move made while a member's install owns the plane under the settlement profile: held, not
+	// refused, and issued once that install has settled, in logical-time order, on the plane it left
+	// (the successor when it succeeded). An install first drains the moves held by the install before
+	// it (installPreDrain), so back-to-back installs never starve them. Held at most
+	// V3_ROOM_ADOPTION_ISSUE_HOLD_MS. A creator's own adoption still refuses (its moves are its own
+	// policy's, issued between its short adoptions).
 	let heldIssues: PendingIssue[] = [];
 	const heldIssueTimers = new Map<PendingIssue, ReturnType<typeof setTimeout>>();
 	let installPreDrain = false;
+	let recipientInstallTask: Promise<void> | undefined;
 	const adoptionHoldsIssues = (): boolean =>
-		settlementProfile === "v1" && creatorSuccessorAdoptionTask !== undefined;
+		settlementProfile === "v1" &&
+		creatorSuccessorAdoptionTask !== undefined &&
+		creatorSuccessorAdoptionTask === recipientInstallTask;
 	const holdIssue = (request: PendingIssue): void => {
 		heldIssues.push(request);
 		heldIssueTimers.set(
@@ -7747,11 +7750,13 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			requestMissingRetainedHistory();
 			scheduledLulls?.schedule();
 		});
-		const shared = attempt.finally(() => {
+		const shared: Promise<void> = attempt.finally(() => {
 			if (creatorSuccessorAdoptionTask === shared) creatorSuccessorAdoptionTask = undefined;
+			if (recipientInstallTask === shared) recipientInstallTask = undefined;
 			releaseHeldIssues();
 		});
 		creatorSuccessorAdoptionTask = shared;
+		recipientInstallTask = shared;
 		return shared;
 	};
 	const promoteCreatorCheckpoint = (request: Readonly<{ closedEpoch: number }>): Promise<void> => {

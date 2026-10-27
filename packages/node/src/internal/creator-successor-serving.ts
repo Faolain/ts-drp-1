@@ -34,12 +34,11 @@ export interface CreatorSuccessorServingRouter {
 	 */
 	port(manifestDigest: string): SnapshotChunkProtocolPort;
 	/**
-	 * Serves on the protocol port (the host keeps one server per protocol), after closing any port
-	 * attached before. Routes are kept.
+	 * Serves on a newly opened protocol port (the host keeps one server per protocol, and a host may
+	 * hand out a new port per opening). The previous port stops taking streams but keeps the ones in
+	 * flight (a fetch of the serving now retained) until the next attach closes it. Routes are kept.
 	 */
 	attach(port: SnapshotChunkProtocolPort): Promise<void>;
-	/** Whether a protocol port is attached. */
-	attached(): boolean;
 	/** The manifest a stream naming no served manifest goes to (the newest serving refuses it). */
 	setCurrent(manifestDigest: string): void;
 	close(): Promise<void>;
@@ -94,6 +93,7 @@ export function createCreatorSuccessorServingRouter(): CreatorSuccessorServingRo
 	const routes = new Map<string, Route>();
 	let current: string | undefined;
 	let attached: SnapshotChunkProtocolPort | undefined;
+	let draining: SnapshotChunkProtocolPort | undefined;
 	let stopAttached: (() => void) | undefined;
 	let closed = false;
 	const incoming = async (stream: SnapshotChunkProtocolStream): Promise<void> => {
@@ -154,15 +154,15 @@ export function createCreatorSuccessorServingRouter(): CreatorSuccessorServingRo
 		},
 		async attach(port: SnapshotChunkProtocolPort): Promise<void> {
 			if (closed) throw new TypeError("creator successor serving is closed");
-			const previous = attached;
+			const older = draining;
 			stopAttached?.();
 			stopAttached = undefined;
+			draining = attached;
 			attached = undefined;
-			await previous?.close();
+			await older?.close();
 			stopAttached = port.serve(incoming);
 			attached = port;
 		},
-		attached: (): boolean => attached !== undefined,
 		setCurrent(manifestDigest: string): void {
 			current = manifestDigest;
 		},
@@ -173,9 +173,10 @@ export function createCreatorSuccessorServingRouter(): CreatorSuccessorServingRo
 			await Promise.allSettled(selected.map(([digest, route]) => stopRoute(digest, route)));
 			stopAttached?.();
 			stopAttached = undefined;
-			const previous = attached;
+			const previous = [attached, draining];
 			attached = undefined;
-			await previous?.close();
+			draining = undefined;
+			await Promise.allSettled(previous.map((port) => port?.close()));
 		},
 	});
 }
