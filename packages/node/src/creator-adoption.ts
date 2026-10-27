@@ -983,6 +983,34 @@ async function receivedRecoveryTurnoverDue(source: CreatorRecipientSource,
 		(inventory.owner.recoveryScopes >= inventory.owner.limits.maxRecoveryScopes || classifiedPresent);
 }
 
+/** What a recipient lull's complete received turnover reconciled: the room head, the
+ * exact current Cut it classified from, and the recovery-role inventory it left (all but
+ * the single-use custody). Keyed by the live plane handle, so a successor plane, a
+ * recovery reopen (including a retirement-halt discharge) and a new session never see
+ * it; a lull clears it on entry and an install consumes it. Scheduling only: it lets an
+ * install skip a turnover whose every input is unchanged, never grants admission, and a
+ * full pool, a promotion or a checkpoint install never skips. */
+type ReceivedTurnoverBoundary = Readonly<{ objectId: string; epoch: number; anchorDigest: string; cut: Uint8Array; inventory: string }>;
+const reconciledReceivedTurnovers = new WeakMap<object, ReceivedTurnoverBoundary>();
+
+async function captureReceivedTurnoverBoundary(source: CreatorRecipientSource,
+	snapshotStore: SnapshotRecoveryStore<SnapshotVerificationReceipt>,
+	currentCandidates: Awaited<ReturnType<typeof inspectHead>>["candidates"]): Promise<ReceivedTurnoverBoundary | undefined> {
+	const epoch = source.currentTrust.currentEpoch;
+	const cut = uniqueCreatorTransitionCandidate(currentCandidates, "drp-hard-epoch-cut", epoch - 1);
+	const inventory = await snapshotStore.captureRecoveryRoleInventory?.({objectId: source.objectId});
+	if (epoch < 2 || cut === undefined || inventory === undefined || inventory.owner.migration !== "ready" ||
+		inventory.owner.recoveryScopes >= inventory.owner.limits.maxRecoveryScopes) return undefined;
+	const { custody: _custody, ...observed } = inventory;
+	return Object.freeze({objectId: source.objectId, epoch, anchorDigest: source.currentTrust.currentAnchorDigest,
+		cut: Uint8Array.from(cut.bytes), inventory: JSON.stringify(observed)});
+}
+
+function sameReceivedTurnoverBoundary(left: ReceivedTurnoverBoundary, right: ReceivedTurnoverBoundary): boolean {
+	return left.objectId === right.objectId && left.epoch === right.epoch && left.anchorDigest === right.anchorDigest &&
+		sameBytes(left.cut, right.cut) && left.inventory === right.inventory;
+}
+
 /** The original bounded received turnover: one signing census bounds the passes;
  * each pass seals the received dependencies, reconciles, and joins its hold. */
 async function runReceivedRecoveryTurnoverPasses(input: Readonly<{
@@ -1047,9 +1075,11 @@ export function creatorRecipientRetirementResumeRequested(plane: V3PlaneHandle):
 
 /**
  * Explicit opt-in early recipient turnover at a caller-chosen quiescent lull.
- * Because the install's predicate is state-based, the SAME original passes run
- * now make it false at the next install; inline install turnover remains the
- * backstop. This grants no authority: an unavailable or busy boundary is
+ * The SAME original passes run now; when they complete, the boundary they
+ * reconciled is recorded for this plane, and the next install skips its own
+ * turnover only if that boundary is still exactly current (the install's
+ * predicate alone stays due while the current Cut classifies a retained scope).
+ * Inline install turnover remains the backstop. This grants no authority: an unavailable or busy boundary is
  * reported before entry, never forced. After entry, any failure is recovery work.
  * With `resume`, the SAME passes instead discharge a durable reopen's halt on a
  * retirement this copy completed at its current epoch (a creator's readiness
@@ -1068,6 +1098,8 @@ export async function maintainCreatorRecipientRecoveryPool(input: Readonly<{
 	resume?: true;
 }>): Promise<CreatorRecoveryPoolResult> {
 	const resume = input.resume === true;
+	// Any lull entry, even one that defers, ends the previous lull's boundary.
+	reconciledReceivedTurnovers.delete(input.plane);
 	const source = resolveCreatorRecipientRegistration(input.plane, resume);
 	if (source === undefined || input.snapshotStore.captureRecoveryRoleInventory === undefined)
 		return Object.freeze({kind: "deferred", reason: "unsupported"});
@@ -1100,6 +1132,14 @@ export async function maintainCreatorRecipientRecoveryPool(input: Readonly<{
 		}, resume ? {resume: true} : {deferrable: true});
 	} finally {
 		await opened.owner.stop();
+	}
+	// Record what the completed passes reconciled (a resume discharges a halt; it records nothing).
+	if (outcome === "ran" && !resume) {
+		try {
+			const boundary = await captureReceivedTurnoverBoundary(source, input.snapshotStore,
+				(await source.inspectQueuedNativeHead()).candidates);
+			if (boundary !== undefined) reconciledReceivedTurnovers.set(input.plane, boundary);
+		} catch { /* No boundary: the next install turns over as before. */ }
 	}
 	return Object.freeze(outcome === "deferred" ? {kind: "deferred", reason: "busy"} : {kind: "maintained"});
 }
@@ -1142,6 +1182,9 @@ export async function receiveCreatorSuccessorAdoption(
 		retryUntil?: AbortSignal;
 	}>
 ): Promise<ReceivedCreatorSuccessorAdoption> {
+	// Every install attempt consumes the plane's lull boundary.
+	const reconciledBoundary = reconciledReceivedTurnovers.get(input.plane);
+	reconciledReceivedTurnovers.delete(input.plane);
 	const source = resolveCreatorRecipientRegistration(input.plane);
 	if (source === undefined || !sameCreatorRoomHead(input.expectedRoomHead, source.currentTrust))
 		throw new TypeError("creator recipient current authority is unavailable");
@@ -1220,7 +1263,7 @@ export async function receiveCreatorSuccessorAdoption(
 			cleanupErrors.push(error);
 		}
 	};
-	const observeReceivedTurnover = (outcome: "not-due" | "ran"): void => {
+	const observeReceivedTurnover = (outcome: "not-due" | "reconciled" | "ran"): void => {
 		try {
 			const observer = Reflect.get(globalThis, "__warmProofEvent");
 			if (typeof observer === "function")
@@ -1231,6 +1274,15 @@ export async function receiveCreatorSuccessorAdoption(
 		if (!(await receivedRecoveryTurnoverDue(source, input.snapshotStore, current.candidates))) {
 			observeReceivedTurnover("not-due");
 			return false;
+		}
+		// This plane's own lull already ran the SAME passes at this exact boundary (head,
+		// current Cut, recovery inventory) and nothing has reconciled or retained since.
+		if (reconciledBoundary !== undefined && !promoted && !checkpointRequested) {
+			const boundary = await captureReceivedTurnoverBoundary(source, input.snapshotStore, current.candidates);
+			if (boundary !== undefined && sameReceivedTurnoverBoundary(boundary, reconciledBoundary)) {
+				observeReceivedTurnover("reconciled");
+				return false;
+			}
 		}
 		const context = input.recoveryContext;
 		if (context === undefined) throw new TypeError("creator recipient turnover native owners are unavailable");
