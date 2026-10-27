@@ -592,7 +592,9 @@ it("native retained read-control admission remains finite and close joins queued
 		release();
 	}
 	const outcomes = await Promise.all(work);
-	expect(outcomes.every((value) => value.includes("stale"))).toBe(true);
+	// Close retires the plane's retained read phase (f7e1f3a2): every queued query is
+	// refused by the retired phase; none is delivered.
+	expect(outcomes).toEqual(Array.from({ length: 32 }, () => "TypeError: v3 retained query read phase is unavailable"));
 	await closing;
 	expect(closed).toBe(true);
 }, 120_000);
