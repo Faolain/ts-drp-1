@@ -1220,8 +1220,18 @@ export async function receiveCreatorSuccessorAdoption(
 			cleanupErrors.push(error);
 		}
 	};
+	const observeReceivedTurnover = (outcome: "not-due" | "ran"): void => {
+		try {
+			const observer = Reflect.get(globalThis, "__warmProofEvent");
+			if (typeof observer === "function")
+				observer({kind: "recipient-received-turnover", epoch: source.currentTrust.currentEpoch, outcome});
+		} catch { /* Diagnostics never alter the original owner outcome. */ }
+	};
 	const prepareReceivedRecoveryTurnover = async (): Promise<boolean> => {
-		if (!(await receivedRecoveryTurnoverDue(source, input.snapshotStore, current.candidates))) return false;
+		if (!(await receivedRecoveryTurnoverDue(source, input.snapshotStore, current.candidates))) {
+			observeReceivedTurnover("not-due");
+			return false;
+		}
 		const context = input.recoveryContext;
 		if (context === undefined) throw new TypeError("creator recipient turnover native owners are unavailable");
 		const openedCustody = await createCreatorSigningRecoveryOwner({currentTrust: source.currentTrust,
@@ -1237,6 +1247,7 @@ export async function receiveCreatorSuccessorAdoption(
 		retiredGenerations.push(...await runReceivedRecoveryTurnoverPasses({source, snapshotStore: input.snapshotStore,
 			catalog: input.catalog, context, signing: openedCustody.owner},
 			() => source.sealReceivedRecoveryDependencies(openedCustody.owner, input.snapshotStore)));
+		observeReceivedTurnover("ran");
 		return true;
 	};
 	try {
