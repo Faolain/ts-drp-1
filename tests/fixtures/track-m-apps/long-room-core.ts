@@ -64,6 +64,7 @@ import {
 import {
 	createV3RoomSuccessorDelivery,
 	type V3RoomSuccessorChannel,
+	type V3RoomSuccessorDelivery,
 } from "../../../examples/v3-room/src/successor-delivery.js";
 import { toCanvasWireOperation } from "../../../packages/blueprints/src/v3-canvas.js";
 import { createRecoverableFinalitySigner } from "../../../packages/keychain/src/finality.js";
@@ -103,6 +104,11 @@ export interface RoleEnvironment {
 	 * (never a room database) and its census. Without it the role keeps no archive.
 	 */
 	openArchive?(name: string): Promise<Readonly<{ store: ShippingChatArchiveStore; census(): Promise<StoreCensus> }>>;
+	/**
+	 * App mode: the room this role's successor delivery binds to (default: the room itself). A test
+	 * wraps it to model a slow host, e.g. an install that starts late.
+	 */
+	deliveryRoom?(room: Awaited<ReturnType<typeof createV3RoomSession>>): Parameters<V3RoomSuccessorDelivery["bind"]>[0];
 }
 
 export interface LongRoomHost {
@@ -732,7 +738,7 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 	track.rooms.add(room);
 	policy?.bind(room);
 	await waitForV3RoomStartupForDiagnostics(room);
-	delivery?.bind(room);
+	delivery?.bind(env.deliveryRoom?.(room) ?? room);
 	observe(room.projection());
 
 	// The creator's genuine successor export over scripted native bytes; it grants nothing.
@@ -862,6 +868,12 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 			const started = performance.now();
 			const operation = operationFor(options.app, index, epoch, ordinal);
 			await (policy === undefined ? room.issue(operation) : policy.issue(operation));
+			return performance.now() - started;
+		},
+		// The same move straight to the room, past the application's rollover policy.
+		issueRoom: async (epoch: number, ordinal: number) => {
+			const started = performance.now();
+			await room.issue(operationFor(options.app, index, epoch, ordinal));
 			return performance.now() - started;
 		},
 		// Every published own row above `after`, in issue order (observation handle).

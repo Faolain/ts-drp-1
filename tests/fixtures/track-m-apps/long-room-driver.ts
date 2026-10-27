@@ -262,6 +262,8 @@ export interface ObservedEvent {
 export interface RoleEndpoint {
 	/** Issues one ordinary move; returns its wall time. */
 	issue(epoch: number, ordinal: number): Promise<number>;
+	/** The same move straight to the room, past an application rollover policy. */
+	issueRoom?(epoch: number, ordinal: number): Promise<number>;
 	/** Every published own row above `after` (an author sequence), in issue order. */
 	published(after: number | null): Promise<WireRow[]>;
 	/** Delivers the other role's rows; returns the wall time until the last one is accepted. */
