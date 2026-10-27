@@ -352,7 +352,8 @@ export interface V3RoomSuccessorAuthority {
 	readonly genesisAnchorDigest: string;
 	readonly lifecycle: "active";
 	readonly objectId: string;
-	readonly profileId: "creator-trusted-v1";
+	/** The profile the room's genesis signed. */
+	readonly profileId: "creator-trusted-v1" | "creator-trusted-settlement-v1";
 }
 
 export type {
@@ -833,7 +834,8 @@ function successorAuthority(trust: unknown, handle: RoomPlaneHandle): V3RoomSucc
 		genesisAnchorDigest,
 		lifecycle: "active" as const,
 		objectId,
-		profileId,
+		// Checked above: creator-trusted-v1 or the one settlement profile (settlementProfileFor).
+		profileId: profileId as V3RoomSuccessorAuthority["profileId"],
 	});
 }
 
