@@ -224,7 +224,11 @@ test("members follow the demo's own rollovers, and a closed member catches up wh
 	const [alice, bob, carol] = clients.map(({ page }) => page) as [Page, Page, Page];
 	const run = crypto.randomUUID();
 	const channelName = `v3-chat-rollover-${run}`;
-	const input = (clientId: string) => ({ channelName, clientId, databaseName: `v3-chat-rollover-${clientId}-${run}` });
+	const input = (clientId: string): Readonly<{ channelName: string; clientId: string; databaseName: string }> => ({
+		channelName,
+		clientId,
+		databaseName: `v3-chat-rollover-${clientId}-${run}`,
+	});
 	try {
 		await Promise.all([install(alice), install(bob), install(carol)]);
 		const invite = await alice.evaluate((value) => window.v3ChatRollover.create(value), input("alice"));

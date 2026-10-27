@@ -18,7 +18,10 @@ type Demo = Readonly<{
 const demo = Reflect.get(globalThis, "d9336V3Chat") as Demo;
 let head: Awaited<ReturnType<typeof createBrowserRoomHeadAuthority>> | undefined;
 
-async function openHead(databaseName: string, kind: "create" | "reopen") {
+async function openHead(
+	databaseName: string,
+	kind: "create" | "reopen"
+): Promise<Awaited<ReturnType<typeof createBrowserRoomHeadAuthority>>> {
 	head = await createBrowserRoomHeadAuthority({ databaseName: `${databaseName}--room-head`, initialization: { kind } });
 	return head;
 }
