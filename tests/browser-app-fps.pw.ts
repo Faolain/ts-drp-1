@@ -859,6 +859,51 @@ function evaluateGate(
 
 const sourceHead = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
 
+/** Per-rollover issue latency: the worst issue of each role overlapping each window plus its tail. */
+function issueLatency(meter: RolloverMeter, driver: AppDriver) {
+	const windows = meter.rolloverWindows();
+	const issues = driver.issues();
+	const perWindow = windows.map((window) => {
+		const until = window.end + ROLLOVER_TAIL_MS;
+		const worst = (role: Role): number | null => {
+			const values = issues
+				.filter((issue) => issue.role === role && issue.start <= until && issue.end >= window.start)
+				.map((issue) => issue.end - issue.start);
+			return values.length === 0 ? null : Math.max(...values);
+		};
+		return { ...window, worstCreatorIssueMs: worst("creator"), worstMemberIssueMs: worst("member") };
+	});
+	const distribution = (values: readonly (number | null)[]) => {
+		const histogram = new FixedHistogram();
+		for (const value of values) if (value !== null) histogram.add(value);
+		return histogram.summary();
+	};
+	const memberWorst = perWindow.map((window) => window.worstMemberIssueMs);
+	const memberOverBound = memberWorst.filter(
+		(value) => value !== null && value > APP_MEMBER_ROLLOVER_ISSUE_BOUND_MS
+	).length;
+	const rolloverIssueLatency = {
+		windowRule: `seal start to the later of the creator's last stage and the member's install of that successor, plus ${ROLLOVER_TAIL_MS} ms`,
+		member: {
+			boundMs: APP_MEMBER_ROLLOVER_ISSUE_BOUND_MS,
+			windowsWithMemberIssues: memberWorst.filter((value) => value !== null).length,
+			overBound: memberOverBound,
+			worstPerWindowMs: distribution(memberWorst),
+		},
+		creator: { worstPerWindowMs: distribution(perWindow.map((window) => window.worstCreatorIssueMs)) },
+		perWindow: perWindow.map((window) => ({
+			successorEpoch: window.successorEpoch,
+			creatorMs: Math.round(window.creatorMs),
+			sealMs: Math.round(window.sealMs),
+			installEndAfterSealMs:
+				window.memberInstallEnd === null ? null : Math.round(window.memberInstallEnd - window.start),
+			worstCreatorIssueMs: window.worstCreatorIssueMs === null ? null : Math.round(window.worstCreatorIssueMs),
+			worstMemberIssueMs: window.worstMemberIssueMs === null ? null : Math.round(window.worstMemberIssueMs),
+		})),
+	};
+	return { windows, memberOverBound, rolloverIssueLatency };
+}
+
 for (const app of APPS)
 	test(`${app}: the shipped page keeps rendering through its own rollovers`, async ({ browser, browserName }) => {
 		mkdirSync(OUT, { recursive: true });
@@ -999,28 +1044,7 @@ for (const app of APPS)
 				)
 			).flat();
 			const pages = { creator: meter.report("creator"), member: meter.report("member") };
-			// Per-rollover issue latency: the worst issue of each role overlapping each window plus its tail.
-			const windows = meter.rolloverWindows();
-			const issues = driver.issues();
-			const perWindow = windows.map((window) => {
-				const until = window.end + ROLLOVER_TAIL_MS;
-				const worst = (role: Role): number | null => {
-					const values = issues
-						.filter((issue) => issue.role === role && issue.start <= until && issue.end >= window.start)
-						.map((issue) => issue.end - issue.start);
-					return values.length === 0 ? null : Math.max(...values);
-				};
-				return { ...window, worstCreatorIssueMs: worst("creator"), worstMemberIssueMs: worst("member") };
-			});
-			const distribution = (values: readonly (number | null)[]) => {
-				const histogram = new FixedHistogram();
-				for (const value of values) if (value !== null) histogram.add(value);
-				return histogram.summary();
-			};
-			const memberWorst = perWindow.map((window) => window.worstMemberIssueMs);
-			const memberOverBound = memberWorst.filter(
-				(value) => value !== null && value > APP_MEMBER_ROLLOVER_ISSUE_BOUND_MS
-			).length;
+			const { windows, memberOverBound, rolloverIssueLatency } = issueLatency(meter, driver);
 			const stageCounts = {
 				creator: meter.totals("creator")?.stageCounts ?? {},
 				member: meter.totals("member")?.stageCounts ?? {},
@@ -1053,25 +1077,7 @@ for (const app of APPS)
 				stageCounts,
 				stageDurationsMs: meter.stageDurations(),
 				pages,
-				rolloverIssueLatency: {
-					windowRule: `seal start to the later of the creator's last stage and the member's install of that successor, plus ${ROLLOVER_TAIL_MS} ms`,
-					member: {
-						boundMs: APP_MEMBER_ROLLOVER_ISSUE_BOUND_MS,
-						windowsWithMemberIssues: memberWorst.filter((value) => value !== null).length,
-						overBound: memberOverBound,
-						worstPerWindowMs: distribution(memberWorst),
-					},
-					creator: { worstPerWindowMs: distribution(perWindow.map((window) => window.worstCreatorIssueMs)) },
-					perWindow: perWindow.map((window) => ({
-						successorEpoch: window.successorEpoch,
-						creatorMs: Math.round(window.creatorMs),
-						sealMs: Math.round(window.sealMs),
-						installEndAfterSealMs:
-							window.memberInstallEnd === null ? null : Math.round(window.memberInstallEnd - window.start),
-						worstCreatorIssueMs: window.worstCreatorIssueMs === null ? null : Math.round(window.worstCreatorIssueMs),
-						worstMemberIssueMs: window.worstMemberIssueMs === null ? null : Math.round(window.worstMemberIssueMs),
-					})),
-				},
+				rolloverIssueLatency,
 				app: { ...driver.report(meter), name: app },
 				successorDelivery: delivery,
 				harnessBridgeViolations: violations,
@@ -1102,7 +1108,28 @@ for (const app of APPS)
 					failure: String(failure).slice(0, 4_000),
 					stageCounts: { creator: meter.totals("creator")?.stageCounts, member: meter.totals("member")?.stageCounts },
 					adoptedEpochs: { creator: meter.epoch("creator"), member: meter.epoch("member") },
+					hostLoadAverageAtEnd: loadavg(),
 				};
+			if (failure !== undefined && !("pages" in summary)) {
+				// What the instrument saw up to the failure: the same report, marked partial.
+				try {
+					await meter.drain();
+					driver.consume(meter);
+					meter.finish();
+					summary.partialAtFailure = {
+						qualification: "measured from play start up to the failure; no conservation or gate verdict",
+						rolloversObserved: meter.rolloverWindows().length,
+						stageDurationsMs: meter.stageDurations(),
+						pages: { creator: meter.report("creator"), member: meter.report("member") },
+						rolloverIssueLatency: issueLatency(meter, driver).rolloverIssueLatency,
+						app: { ...driver.report(meter), name: app },
+						clock: meter.clockCalibration(),
+						pageErrors,
+					};
+				} catch (error) {
+					summary.partialAtFailureError = String(error).slice(0, 1_000);
+				}
+			}
 			writeFileSync(join(OUT, `${base}-summary.json`), JSON.stringify(summary, null, 2));
 			writeFileSync(join(OUT, `${base}-console.txt`), consoleTail.join("\n") + "\n");
 			await Promise.allSettled(contexts.map((context) => context.close()));
