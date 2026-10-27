@@ -1898,7 +1898,10 @@ class NodeIssuanceImplementation {
 				retainOwnQuotePostimage(reservedChanges);
 				// A provisional ordinal is durable before any crypto. No signature or
 				// eligibility is inferred from this mechanical native intent.
+				// The gate follows SQLite's reservation: a same-process writer may land in this gap.
+				releaseWriter?.();
 				database.exec("COMMIT");
+				releaseWriter = holdNativeWriter(this.#filename);
 				database.exec("BEGIN IMMEDIATE");
 				this.#assertAvailable();
 				const reserved = readNativeLineage(database, detached, "writer");
@@ -1927,7 +1930,9 @@ class NodeIssuanceImplementation {
 					bumpRetirement(database, detached.objectId);
 				}
 				retainOwnQuotePostimage(enteringChanges);
+				releaseWriter?.();
 				database.exec("COMMIT"); // entered marker survives an escaped signature
+				releaseWriter = holdNativeWriter(this.#filename);
 				database.exec("BEGIN IMMEDIATE");
 				checkQuoteCurrency();
 				const entered = readNativeLineage(database, detached, "writer");
