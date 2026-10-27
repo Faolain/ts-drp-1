@@ -58,6 +58,7 @@ Still open:
 3. Maintenance-overlap issue tail in Canvas/Chat (seconds under load).
 4. Removed-author FENCE at seq 1 never retires (design in `abandonment-crash-edge/FENCE-DESIGN.md`).
 5. Browser/FPS readiness.
+6. Next after integration-6 (owner-approved): a multiplayer three.js 3D movement example, planned as slices first (ephemeral movement vs durable events, rollover budget, FPS target, endurance and browser tests). Chess or checkers optional after it.
 
 ## Integration-4 — 2026-10-26
 
