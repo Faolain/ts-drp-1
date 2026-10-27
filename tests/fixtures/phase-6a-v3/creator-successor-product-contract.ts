@@ -2,6 +2,8 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import ts from "typescript";
 
+import { V3_CHAT_GENESIS_PROFILE } from "../../../examples/v3-chat/src/profile.js";
+
 export const REPOSITORY_ROOT = resolve(import.meta.dirname, "../../..");
 
 export const D108E2B_RED_PATHS = Object.freeze([
@@ -714,12 +716,20 @@ export function d108e5SourceOwnership(room = read(D108E3_GREEN_PATHS[0])): Reado
 	});
 }
 
+/** A room's genesis profile, as its authority projection reports it. */
+export type RoomProfileId = "creator-trusted-v1" | "creator-trusted-settlement-v1";
+/** The profile the product (v3-chat) room signs: the demo's own export. */
+export const PRODUCT_ROOM_PROFILE_ID: RoomProfileId = V3_CHAT_GENESIS_PROFILE.profileId;
+/** The profile the harness's legacy direct room signs (its native Grid variant signs settlement). */
+export const LEGACY_DIRECT_ROOM_PROFILE_ID: RoomProfileId = "creator-trusted-v1";
+
 /**
  * Validates the exact frozen product authority projection without opening node authority.
  * @param value - Candidate room/chat authority value.
+ * @param expectedProfileId - The profile that room's genesis signed (each room states its own).
  * @returns Whether the value is the exact epoch-one creator projection.
  */
-export function isD108d2Authority(value: unknown): boolean {
+export function isD108d2Authority(value: unknown, expectedProfileId: RoomProfileId): boolean {
 	if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
 	const record = value as Readonly<Record<string, unknown>>;
 	if (
@@ -739,7 +749,7 @@ export function isD108d2Authority(value: unknown): boolean {
 		record.lifecycle === "active" &&
 		typeof record.objectId === "string" &&
 		record.objectId.length > 0 &&
-		record.profileId === "creator-trusted-v1"
+		record.profileId === expectedProfileId
 	);
 }
 
@@ -747,9 +757,14 @@ export function isD108d2Authority(value: unknown): boolean {
  * Validates one exact D.110c-b successor-authority projection at the supplied epoch.
  * @param value - Candidate room/chat authority value.
  * @param expectedEpoch - Positive safe authenticated epoch expected by the caller.
+ * @param expectedProfileId - The profile that room's genesis signed (each room states its own).
  * @returns Whether the candidate has the unchanged authority key roster and exact epoch.
  */
-export function isD110cBSuccessorAuthority(value: unknown, expectedEpoch: number): boolean {
+export function isD110cBSuccessorAuthority(
+	value: unknown,
+	expectedEpoch: number,
+	expectedProfileId: RoomProfileId
+): boolean {
 	if (!Number.isSafeInteger(expectedEpoch) || expectedEpoch < 1) return false;
 	if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
 	const record = value as Readonly<Record<string, unknown>>;
@@ -770,6 +785,6 @@ export function isD110cBSuccessorAuthority(value: unknown, expectedEpoch: number
 		record.lifecycle === "active" &&
 		typeof record.objectId === "string" &&
 		record.objectId.length > 0 &&
-		record.profileId === "creator-trusted-v1"
+		record.profileId === expectedProfileId
 	);
 }

@@ -794,7 +794,8 @@ async function rawAuthorityAtEpoch(databaseName: string, expectedEpoch: number):
 			genesisAnchorDigest: trust.genesisAnchorDigest,
 			lifecycle: "active",
 			objectId: trust.objectId,
-			profileId: "creator-trusted-v1",
+			// The profile the room's own genesis signed, as its trust state records it.
+			profileId: trust.profileId,
 		});
 	} finally {
 		database.close();

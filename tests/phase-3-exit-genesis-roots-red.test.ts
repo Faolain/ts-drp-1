@@ -4,6 +4,7 @@ import { Keychain } from "@ts-drp/keychain";
 import { createHash } from "node:crypto";
 import { describe, expect, expectTypeOf, it, vi } from "vitest";
 
+import { V3_CHAT_GENESIS_PROFILE } from "../examples/v3-chat/src/profile.js";
 import type {
 	createV3RoomCreatorInviteMaterial as exportedCreateV3RoomCreatorInviteMaterial,
 	V3RoomCreatorInviteMaterial,
@@ -244,7 +245,7 @@ async function expectedChatAcl(objectId: string): Promise<Uint8Array> {
 			.sort((left, right) => (left.author < right.author ? -1 : left.author > right.author ? 1 : 0)),
 		objectId,
 		permissionless: false,
-		version: 1,
+		version: V3_CHAT_GENESIS_PROFILE.latchedAclVersion,
 	});
 }
 
@@ -609,7 +610,7 @@ describe.skipIf(!canonicalStateInputReady)("D.93.56 shared genesis-root builder 
 			acl: await expectedChatAcl(chatObjectId),
 			blueprintDigest: chatBlueprintDigest,
 			objectId: chatObjectId,
-			profileId: "creator-trusted-v1",
+			profileId: V3_CHAT_GENESIS_PROFILE.profileId,
 			signerAuthor: creatorFinality.localAuthorId,
 			stateBytes: chatStateBytes,
 		});

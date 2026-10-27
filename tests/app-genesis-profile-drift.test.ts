@@ -10,6 +10,7 @@ import {
 import { CANVAS_GENESIS_PROFILE } from "../examples/canvas/src/profile.js";
 import { CHAT_GENESIS_PROFILE } from "../examples/chat/src/profile.js";
 import { GRID_GENESIS_PROFILE } from "../examples/grid/src/profile.js";
+import { V3_CHAT_GENESIS_PROFILE } from "../examples/v3-chat/src/profile.js";
 
 // Drift guard: the endurance fixture (tests/fixtures/track-m-apps) can never sign a different
 // genesis profile from the shipped app. Each shipped app exports its profile from one place
@@ -23,6 +24,11 @@ const APPS = [
 	{ app: "canvas", exported: CANVAS_GENESIS_PROFILE, name: "CANVAS_GENESIS_PROFILE" },
 	{ app: "chat", exported: CHAT_GENESIS_PROFILE, name: "CHAT_GENESIS_PROFILE" },
 	{ app: "grid", exported: GRID_GENESIS_PROFILE, name: "GRID_GENESIS_PROFILE" },
+] as const;
+// Pages with an exported profile but no endurance fixture: the v3-chat demo.
+const PAGES = [
+	...APPS,
+	{ app: "v3-chat", exported: V3_CHAT_GENESIS_PROFILE, name: "V3_CHAT_GENESIS_PROFILE" },
 ] as const;
 
 const sources = (directory: string): string[] =>
@@ -54,7 +60,7 @@ it("the only other profile the fixture signs is the explicit trusted-v1 opt-in",
 	);
 });
 
-it.each(APPS)("the $app page and session code create rooms with the app's export only", ({ app, name }) => {
+it.each(PAGES)("the $app page and session code create rooms with the app's export only", ({ app, name }) => {
 	const files = sources(`examples/${app}/src`).filter((path) => !path.endsWith(`${app}/src/profile.ts`));
 	const signing: string[] = [];
 	for (const path of files) {
