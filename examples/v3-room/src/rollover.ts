@@ -1,5 +1,5 @@
 import { isV3RoomClosePendingRefusal } from "@ts-drp/node/v3-room";
-import type { V3RoomAcceptedVertex, V3RoomSession } from "@ts-drp/node/v3-room";
+import type { V3RoomAcceptedVertex, V3RoomSession, V3RoomSettlementStatus } from "@ts-drp/node/v3-room";
 
 /** The adopted successor's offer (the four exact canonical byte strings a member installs). */
 export type V3RoomSuccessorOffer = Awaited<ReturnType<V3RoomSession["exportCreatorSuccessor"]>>;
@@ -51,6 +51,12 @@ export interface V3RoomRolloverHooks {
 	/** Every change of `status()`, for the page's status line. */
 	onStatus?(status: V3RoomRolloverStatus): void;
 	/**
+	 * Member: whether the creator is reachable now (the successor delivery's `creatorReachable`).
+	 * While it is not, the member is read-only: a move is kept (V3RoomReadOnly), not issued, and
+	 * offered again once the creator is back and the room has installed a later epoch.
+	 */
+	creatorReachable?(): boolean;
+	/**
 	 * An application refusal that a rollover clears (Chat: its allowance is per checkpoint).
 	 * Native capacity refusals are recognised without it.
 	 */
@@ -61,11 +67,20 @@ export interface V3RoomRolloverHooks {
  * The policy's state for the page. "waiting": a member's move waits for the next epoch.
  * "successor-unavailable": no successor arrived within the member's bound; the kept moves are
  * offered again, in order, once the room installs a later epoch.
+ * "not-reaching-host": a member's own moves have not reached the creator for `unsettledEpochs`
+ * epochs (from V3_ROOM_NOT_REACHING_HOST_EPOCHS on). The member still writes; at `window` unsettled
+ * epochs the room stops re-offering a move and gives it back, and the policy keeps it (`kept`) until
+ * the member's moves reach the creator again.
+ * "read-only": the creator is unreachable (hooks.creatorReachable); moves are kept, not issued.
  */
 export type V3RoomRolloverStatus = Readonly<{
-	state: "ready" | "waiting" | "successor-unavailable";
+	state: "ready" | "waiting" | "successor-unavailable" | "not-reaching-host" | "read-only";
 	epoch: number;
 	kept: readonly Readonly<Record<string, unknown>>[];
+	/** A member's own settlement lag (V3RoomSettlementStatus); 0 for a creator or an unknown room. */
+	unsettledEpochs: number;
+	/** The room's settlement window in epochs; 0 when the room reports none. */
+	window: number;
 }>;
 
 /**
@@ -92,6 +107,32 @@ export class V3RoomSuccessorUnavailable extends Error {
 }
 
 /**
+ * A member's move refused because the creator is unreachable (hooks.creatorReachable). The move is
+ * not lost: the policy keeps it and offers it again once the creator is back and the room has
+ * installed a later epoch (`status().kept`).
+ */
+export class V3RoomReadOnly extends Error {
+	/**
+	 * @param operation - The move kept until the creator is reachable.
+	 * @param epoch - The epoch the member was in.
+	 */
+	constructor(
+		readonly operation: Readonly<Record<string, unknown>>,
+		readonly epoch: number
+	) {
+		super("the room's creator is unreachable; this member is read-only and the move is kept");
+		this.name = "V3RoomReadOnly";
+	}
+}
+
+/**
+ * The early signal: a member whose own moves have not reached the creator for this many epochs is
+ * told so (status "not-reaching-host"). It is two epochs before the room's settlement window, at
+ * which the room stops re-offering a move and gives it back.
+ */
+export const V3_ROOM_NOT_REACHING_HOST_MARGIN = 2;
+
+/**
  * How long a member waits for the room's next epoch after a capacity refusal before it tells the
  * page and keeps the move. A rollover (seal, adopt, export) measured 1-3 s natively; delivery and
  * install add a few seconds more. Thirty seconds is ten times that and still short for a person.
@@ -103,7 +144,8 @@ const KEPT_POLL_MS = 1_000;
 type RolloverRoom = Pick<
 	V3RoomSession,
 	"adoptCreatorSuccessor" | "authority" | "exportCreatorSuccessor" | "issue" | "sealEpoch"
->;
+> &
+	Partial<Pick<V3RoomSession, "settlementStatus">>;
 
 export interface V3RoomRolloverPolicy {
 	/** "creator" seals; a "member" (Writer) never seals and only re-offers refused moves. */
@@ -236,23 +278,46 @@ export function createV3RoomRolloverPolicy(
 	const kept: Readonly<Record<string, unknown>>[] = [];
 	let keptEpoch = 0;
 	let keptTimer: ReturnType<typeof setTimeout> | undefined;
+	// A member's view of its own settlement (the room's settlementStatus), and the given-back moves it
+	// has already kept (by the digest of the row that last carried each).
+	let settlement: V3RoomSettlementStatus | undefined;
+	const takenBack = new Set<string>();
+	let settlementTimer: ReturnType<typeof setTimeout> | undefined;
 	let lastStatus = "";
 	const epochWaiters = new Set<() => void>();
 	function close(): void {
 		closed = true;
 		if (idleTimer !== undefined) clearTimeout(idleTimer);
 		if (keptTimer !== undefined) clearTimeout(keptTimer);
+		if (settlementTimer !== undefined) clearTimeout(settlementTimer);
 		for (const wake of [...epochWaiters]) wake();
 	}
+	// Member only: the creator is unreachable now (read-only), or its moves are not reaching it.
+	const readOnly = (): boolean => role === "member" && hooks.creatorReachable?.() === false;
+	const notReachingHost = (): boolean =>
+		role === "member" &&
+		settlement !== undefined &&
+		settlement.window > 0 &&
+		settlement.unsettledEpochs >= Math.max(1, settlement.window - V3_ROOM_NOT_REACHING_HOST_MARGIN);
 	const status = (): V3RoomRolloverStatus =>
 		Object.freeze({
-			state: kept.length > 0 ? "successor-unavailable" : successorWaits > 0 ? "waiting" : "ready",
+			state: readOnly()
+				? "read-only"
+				: notReachingHost()
+					? "not-reaching-host"
+					: kept.length > 0
+						? "successor-unavailable"
+						: successorWaits > 0
+							? "waiting"
+							: "ready",
 			epoch: currentEpoch(),
 			kept: Object.freeze([...kept]),
+			unsettledEpochs: role === "member" ? (settlement?.unsettledEpochs ?? 0) : 0,
+			window: settlement?.window ?? 0,
 		});
 	const reportStatus = (): void => {
 		const next = status();
-		const key = `${next.state}:${next.kept.length}`;
+		const key = `${next.state}:${next.kept.length}:${next.unsettledEpochs}`;
 		if (key === lastStatus) return;
 		lastStatus = key;
 		try {
@@ -389,7 +454,9 @@ export function createV3RoomRolloverPolicy(
 		keptTimer = setTimeout(() => {
 			keptTimer = undefined;
 			if (closed || kept.length === 0) return;
-			if (currentEpoch() <= keptEpoch) {
+			// Kept moves wait for a later epoch, a reachable creator, and (for moves the room gave back)
+			// for this member's moves to reach the creator again.
+			if (currentEpoch() <= keptEpoch || readOnly() || notReachingHost()) {
 				watchKept();
 				return;
 			}
@@ -415,9 +482,44 @@ export function createV3RoomRolloverPolicy(
 		watchKept();
 	};
 
+	// A member follows its own settlement: the moves the room's settlement window gave back are kept
+	// (in order) and offered again by watchKept, and the status follows the room's lag and the
+	// creator's reachability.
+	const watchSettlement = (): void => {
+		if (closed || role !== "member" || settlementTimer !== undefined) return;
+		settlementTimer = setTimeout(() => {
+			settlementTimer = undefined;
+			if (closed) return;
+			try {
+				const next = room?.settlementStatus?.();
+				if (next !== undefined) {
+					settlement = next;
+					const listed = new Set<string>();
+					for (const given of next.undelivered) {
+						listed.add(given.vertexDigest);
+						if (takenBack.has(given.vertexDigest)) continue;
+						takenBack.add(given.vertexDigest);
+						for (const operation of given.operations) keep(operation, next.epoch);
+					}
+					// The room lists a given-back move until its rows are retired; forget it after.
+					for (const digest of [...takenBack]) if (!listed.has(digest)) takenBack.delete(digest);
+				}
+			} catch (error) {
+				hooks.onError?.(error);
+			}
+			reportStatus();
+			watchSettlement();
+		}, KEPT_POLL_MS);
+	};
+
 	async function issue(operation: Readonly<Record<string, unknown>>): Promise<void> {
 		const selected = room;
 		if (selected === undefined) throw new TypeError("v3 room rollover policy is not bound");
+		if (readOnly()) {
+			// The creator is unreachable: a move issued now could only wait out the settlement window.
+			keep(operation, currentEpoch());
+			throw new V3RoomReadOnly(operation, currentEpoch());
+		}
 		let closingSince: number | undefined;
 		for (let offer = 1; ; offer++) {
 			// A move never enters the creator's own rollover between its seal and its adoption.
@@ -509,6 +611,7 @@ export function createV3RoomRolloverPolicy(
 			if (room !== undefined) throw new TypeError("v3 room rollover policy is already bound");
 			// The room's epoch is read at the policy's first decision, not here.
 			room = selected;
+			watchSettlement();
 		},
 		observe(vertex: Pick<V3RoomAcceptedVertex, "author" | "epoch"> & Partial<V3RoomAcceptedVertex>): void {
 			if (closed) return;

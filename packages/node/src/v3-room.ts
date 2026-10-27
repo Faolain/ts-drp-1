@@ -52,6 +52,7 @@ import {
 	prepareV3TerminalMigrationSource,
 	queryV3RetainedHashes,
 	abandonV3UnresolvedAcceptedWork,
+	inspectV3RetainedWorkFrontier,
 	inspectV3UnresolvedAcceptedWork,
 	type V3SourceAbandonment,
 	type V3SourceAbandonmentRequest,
@@ -63,6 +64,7 @@ import {
 	routeV3Ingress,
 	routeV3RetainedIngress,
 	speculateV3IngressVertex,
+	V3_SETTLEMENT_OWN_WINDOW_EPOCHS,
 	type V3AdmittedVertexSink,
 	type V3ApplicationProjectionOrder,
 	type V3DeliveryGap,
@@ -330,6 +332,29 @@ export interface V3RoomCreatorInviteMaterialInput {
 }
 
 export type V3RoomAcceptedVertex = AdmittedReceivedVertexView;
+
+/**
+ * A Writer's own settlement as of its last install or adoption. A row of its own counts as unsettled
+ * when the creator's signed settlement frontier closed the row's epoch without it (its moves did not
+ * reach the creator in time). Each install re-offers such a move (a replacement in the new epoch); once
+ * a move has waited `window` epochs (V3_SETTLEMENT_OWN_WINDOW_EPOCHS) it is not replaced again: its
+ * original rows can never be admitted (their epochs are closed and the creator excluded them), and the
+ * move is given back here so the application can offer it again as a new move.
+ */
+export type V3RoomSettlementStatus = Readonly<{
+	/** The epoch the status was taken at (the room's epoch after that install or adoption). */
+	epoch: number;
+	/** Epochs since the oldest own row the creator closed an epoch without; 0 when none is waiting. */
+	unsettledEpochs: number;
+	window: number;
+	/** Moves the window gave back, oldest first: each was in no closed epoch and is never replaced. */
+	undelivered: readonly Readonly<{
+		/** The digest of the last row that carried the move (stable: the key for "already taken"). */
+		vertexDigest: string;
+		epoch: number;
+		operations: readonly Readonly<Record<string, unknown>>[];
+	}>[];
+}>;
 
 export interface V3RoomAcceptedOperation {
 	readonly author: string;
@@ -657,6 +682,12 @@ export interface V3RoomSession<Projection extends V3RoomProjectionAuthority = V3
 	pendingOperations(): readonly V3RoomPendingOperation[];
 	/** Durable accepted work whose commitment is unknown after reattachment. */
 	unresolvedAcceptedWork(): Promise<readonly V3UnresolvedAcceptedWork[]>;
+	/**
+	 * This author's own settlement against the creator, as of the last install or adoption: how many
+	 * epochs its oldest own row has waited without the creator's signed settlement, and the moves the
+	 * settlement window gave back. Observation only (absent on room stubs). See V3RoomSettlementStatus.
+	 */
+	settlementStatus?(): V3RoomSettlementStatus;
 	/**
 	 * Explicit, terminal local-author abandonment of one durable unresolved,
 	 * never-published accepted source. Owned local sessions only; it signs an
@@ -4944,6 +4975,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	type DisplacedSource = Readonly<{
 		author: string;
 		authorSequence: number;
+		epoch: number;
+		frontierDisplaced: boolean;
 		intents: readonly Readonly<{
 			logicalTime: number;
 			operation: Readonly<Record<string, unknown>>;
@@ -4981,6 +5014,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	}>;
 	type RoomSettlementIssueResult = Awaited<ReturnType<RoomPlaneHandle["issueLocal"]>> | null;
 	const settlementScope = Object.freeze({ author: input.author, objectId: input.objectId });
+	const undeliveredSettlements = new Map<string, V3RoomSettlementStatus["undelivered"][number]>();
+	// Moves of retained work (an install more than one epoch ahead) that the creator's frontier proves
+	// were never admitted, while their resolved rows are retained (resolveRetainedFromFrontier).
+	const retainedHandBacks = new Map<string, V3RoomSettlementStatus["undelivered"][number]>();
+	let settlementStatusSnapshot: V3RoomSettlementStatus | undefined;
 	const authenticatedSettlementInheritance = (
 		sources: readonly DisplacedSource[]
 	): Promise<ReadonlyMap<number, NonNullable<RoomSettlementPlanEntry["inheritance"]>>> => {
@@ -5051,6 +5089,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		left.replacementSequence === right.replacementSequence &&
 		sameBytes(encodeCanonical(left.sourceContextDigest ?? null), encodeCanonical(right.sourceContextDigest ?? null)) &&
 		sameBytes(encodeCanonical(left.sourceResolutionDigest ?? null), encodeCanonical(right.sourceResolutionDigest ?? null)) &&
+		left.sourceResolutionKind === right.sourceResolutionKind &&
 		sameBytes(encodeCanonical(left.transformRefusal ?? null), encodeCanonical(right.transformRefusal ?? null)) &&
 		sameBytes(encodeCanonical(left.inheritance ?? null), encodeCanonical(right.inheritance ?? null)) &&
 		sameReplacementProgress(left, right) &&
@@ -5070,15 +5109,18 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		sources: readonly Pick<DisplacedSource, "authorSequence" | "intents" | "vertexDigest">[],
 		current: RoomSettlementPlan | null,
 		inheritances: ReadonlyMap<number, NonNullable<RoomSettlementPlanEntry["inheritance"]>> = new Map(),
-		prunedSources: ReadonlySet<number> = new Set()
+		prunedSources: ReadonlySet<number> = new Set(),
+		windowExpired: ReadonlySet<number> = new Set()
 	): ((priorFenceEpoch: unknown, activeEpoch: number | undefined) => RoomSettlementPlan) => {
 		const priorEntries = new Map(current?.entries.map((entry) => [entry.sourceSequence, entry] as const));
 		const entries: RoomSettlementPlanEntry[] = [];
 		for (const source of [...sources].sort((left, right) => left.authorSequence - right.authorSequence)) {
 			const prior = priorEntries.get(source.authorSequence);
 			const inheritance = inheritances.get(source.authorSequence) ?? prior?.inheritance;
+			// The settlement window resolves an unreplaced displaced move as expired (settlementWindowExpired).
+			const expired = windowExpired.has(source.authorSequence);
 			const disposition = prior?.sourceContextDigest !== undefined ? prior.disposition :
-				inheritance === undefined ? settlementDisposition(source) : "inherited";
+				inheritance === undefined ? (expired ? "expire" : settlementDisposition(source)) : "inherited";
 			if (disposition === undefined) continue;
 			const sourceDigest = bytes(source.vertexDigest);
 			const sourceObjectId =
@@ -5090,7 +5132,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				prior !== undefined &&
 				(prior.sourceObjectId !== sourceObjectId ||
 					!sameBytes(prior.sourceDigest, sourceDigest) ||
-					prior.disposition !== disposition ||
+					// Only an unreplaced replacement decision may become the window's expiry.
+					(prior.disposition !== disposition &&
+						!(expired && disposition === "expire" && prior.replacementSequence === null &&
+							prior.replacementProgress === undefined && prior.transformRefusal === undefined)) ||
 					!sameBytes(encodeCanonical(prior.inheritance ?? null), encodeCanonical(inheritance ?? null)))
 			) {
 				throw new TypeError("v3 room settlement plan source differs");
@@ -5104,6 +5149,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					...(prior?.transformRefusal === undefined ? {} : { transformRefusal: prior.transformRefusal }),
 					...(prior?.sourceContextDigest === undefined ? {} : { sourceContextDigest: prior.sourceContextDigest }),
 					...(prior?.sourceResolutionDigest === undefined ? {} : { sourceResolutionDigest: prior.sourceResolutionDigest }),
+					...(prior?.sourceResolutionKind === undefined ? {} : { sourceResolutionKind: prior.sourceResolutionKind }),
 					replacementSequence: prior?.replacementSequence ?? null,
 					sourceDigest,
 					sourceSequence: source.authorSequence,
@@ -5181,13 +5227,73 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 		return pruned;
 	};
+	/**
+	 * The settlement window: the displaced own moves this install no longer replaces. A move waits from
+	 * the epoch of its first row (found through the plan's replacement links back from the displaced
+	 * row; a link whose source row is already retired is older than the window). Once it has waited
+	 * V3_SETTLEMENT_OWN_WINDOW_EPOCHS epochs, the unreplaced displaced row is resolved as expired and the
+	 * move is given back to the application (settlementStatus().undelivered). Only rows the creator's
+	 * signed frontier classifies displaced qualify: their epochs closed without them, so neither they nor
+	 * any earlier row of the same move can ever be admitted, and no replacement of them is signed after.
+	 * @param current - The durable plan before this merge.
+	 * @param sources - The current rebase scan.
+	 * @returns The source sequences the merge resolves as expired.
+	 */
+	const settlementWindowExpired = async (
+		current: RoomSettlementPlan | null,
+		sources: readonly DisplacedSource[]
+	): Promise<ReadonlySet<number>> => {
+		const expired = new Set<number>();
+		const active = activeHandle?.epoch;
+		if (active === undefined) return expired;
+		for (const source of sources) {
+			if (!source.frontierDisplaced || source.intents.length === 0) continue;
+			const prior = current?.entries.find((entry) => entry.sourceSequence === source.authorSequence);
+			if (
+				prior !== undefined &&
+				(prior.replacementSequence !== null ||
+					prior.replacementProgress !== undefined ||
+					prior.transformRefusal !== undefined ||
+					prior.sourceContextDigest !== undefined ||
+					prior.sourceObjectId !== undefined ||
+					prior.inheritance !== undefined ||
+					(prior.disposition !== "rebase" && prior.disposition !== "transform" && prior.disposition !== "expire"))
+			)
+				continue;
+			// A move the application's policy itself expires is not given back.
+			const policy = settlementDisposition(source);
+			if (policy !== "rebase" && policy !== "transform") continue;
+			let origin = source.epoch;
+			let sequence = source.authorSequence;
+			let retired = false;
+			for (let depth = 0; depth <= 64 && !retired; depth++) {
+				const link = current?.entries.find(
+					(entry) =>
+						entry.sourceObjectId === undefined &&
+						(entry.replacementSequence === sequence ||
+							entry.replacementProgress?.chunks.some((chunk) => chunk.replacementSequence === sequence) === true)
+				);
+				if (link === undefined) break;
+				const row = await issuanceStore.readIssued(settlementScope, link.sourceSequence);
+				const epoch =
+					row === null ? undefined : Reflect.get(decodeCanonical(row.envelope.canonicalPreimageBytes) as object, "epoch");
+				if (typeof epoch !== "number" || !Number.isSafeInteger(epoch)) retired = true;
+				else origin = Math.min(origin, epoch);
+				sequence = link.sourceSequence;
+			}
+			if (retired || origin <= active - V3_SETTLEMENT_OWN_WINDOW_EPOCHS) expired.add(source.authorSequence);
+		}
+		return expired;
+	};
 	const writeMergedSettlementPlan = async (sources: readonly DisplacedSource[]): Promise<RoomSettlementPlan> => {
 		const current = await issuanceStore.readSettlementPlan(settlementScope);
+		const windowExpired = await settlementWindowExpired(current, sources);
 		const completePlan = mergedSettlementPlan(
 			sources,
 			current,
 			await authenticatedSettlementInheritance(sources),
-			await completedSettlementSourcesPruned(current, sources)
+			await completedSettlementSourcesPruned(current, sources),
+			windowExpired
 		);
 		const priorFence =
 			current?.fenceSequence == null
@@ -5198,12 +5304,114 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				? undefined
 				: Reflect.get(decodeCanonical(priorFence.envelope.canonicalPreimageBytes) as object, "epoch");
 		const plan = completePlan(priorFenceEpoch, activeHandle?.epoch);
-		if (current !== null && plan === current) return current;
-		return issuanceStore.transactWriteSettlementPlan({
-			expectedRevision: current?.revision ?? null,
-			plan,
-			scope: settlementScope,
+		const written =
+			current !== null && plan === current
+				? current
+				: await issuanceStore.transactWriteSettlementPlan({
+						expectedRevision: current?.revision ?? null,
+						plan,
+						scope: settlementScope,
+					});
+		recordSettlementStatus(sources, written, windowExpired);
+		return written;
+	};
+	/**
+	 * Observation of this author's settlement after a durable plan write (settlementStatus()). The
+	 * given-back moves are the window's durable expiries still in the plan, so a reopened session
+	 * reports them again until their rows are retired; the application keys them by vertex digest.
+	 */
+	const recordSettlementStatus = (
+		sources: readonly DisplacedSource[],
+		plan: RoomSettlementPlan,
+		windowExpired: ReadonlySet<number>
+	): void => {
+		const epoch = activeHandle?.epoch;
+		if (epoch === undefined) return;
+		const waiting = sources.filter((source) => source.frontierDisplaced).map((source) => source.epoch);
+		for (const source of sources) {
+			if (!windowExpired.has(source.authorSequence) || undeliveredSettlements.has(source.vertexDigest)) continue;
+			const entry = plan.entries.find((candidate) => candidate.sourceSequence === source.authorSequence);
+			if (entry?.disposition !== "expire" || entry.replacementSequence !== null) continue;
+			undeliveredSettlements.set(
+				source.vertexDigest,
+				Object.freeze({
+					vertexDigest: source.vertexDigest,
+					epoch: source.epoch,
+					operations: Object.freeze(source.intents.map((intent) => intent.operation)),
+				})
+			);
+		}
+		// A given-back move is listed while its expired entry (and so its row) is retained: retirement
+		// removes it after the application has had at least two epochs to take it.
+		const retained = new Set(plan.entries.filter((entry) => entry.disposition === "expire").map((entry) => hex(entry.sourceDigest)));
+		for (const digest of [...undeliveredSettlements.keys()]) if (!retained.has(digest)) undeliveredSettlements.delete(digest);
+		settlementStatusSnapshot = Object.freeze({
+			epoch,
+			unsettledEpochs: waiting.length === 0 ? 0 : Math.max(0, epoch - Math.min(...waiting)),
+			window: V3_SETTLEMENT_OWN_WINDOW_EPOCHS,
+			undelivered: Object.freeze([
+				...undeliveredSettlements.values(),
+				...[...retainedHandBacks.values()].filter((given) => !undeliveredSettlements.has(given.vertexDigest)),
+			]),
 		});
+	};
+	/**
+	 * Retained work (an install more than one epoch ahead keeps this author's rows of its last epoch as
+	 * unknown accepted work, which withholds the author fence) is resolved from the creator's signed
+	 * frontier in the installed checkpoint (v3-live frontierRetainedResolution): a row the frontier
+	 * proves committed or never admitted gets a signed local-author expiry receipt (the existing
+	 * resolution record), and the move of a never-admitted row is given back to the application like a
+	 * window expiry. Rows the frontier proves nothing about stay manual-review. Refusals leave the
+	 * fence withheld; the next drain tries again.
+	 * @param plan - The durable plan after this drain's merge.
+	 * @returns The plan after any resolution.
+	 */
+	const resolveRetainedFromFrontier = async (plan: RoomSettlementPlan): Promise<RoomSettlementPlan> => {
+		const owner = activeHandle;
+		if (owner === undefined || !plan.entries.some((entry) => entry.sourceContextDigest !== undefined)) {
+			if (retainedHandBacks.size !== 0) retainedHandBacks.clear();
+			return plan;
+		}
+		// The drain signs this author's own settlement with its own key (as its fences); a local owner, when
+		// the host has one, must still be current.
+		if (input.receiveOnly === true) return plan;
+		localOwner?.assertCurrent();
+		const work = await inspectV3RetainedWorkFrontier(owner);
+		let changed = false;
+		for (const item of work) {
+			if (item.resolved || item.frontier === undefined) continue;
+			assertSessionOpen();
+			try {
+				await abandonV3UnresolvedAcceptedWork(owner, {
+					sourceSequence: item.sourceSequence,
+					sourceDigest: item.sourceDigest,
+					sourceContextDigest: item.sourceContextDigest,
+					frontierProof: true,
+					signRegisteredVertexDigest: input.signRegisteredVertexDigest,
+				});
+				changed = true;
+			} catch (error) {
+				if (activeHandle !== owner) throw error;
+			}
+		}
+		retainedHandBacks.clear();
+		for (const item of work)
+			if (item.frontier === "never-admitted")
+				retainedHandBacks.set(
+					item.sourceDigest,
+					Object.freeze({ vertexDigest: item.sourceDigest, epoch: item.sourceEpoch, operations: item.operations })
+				);
+		const current = changed ? await issuanceStore.readSettlementPlan(settlementScope) : plan;
+		if (current === null) throw new TypeError("v3 room settlement plan is unavailable after retained resolution");
+		if (settlementStatusSnapshot !== undefined)
+			settlementStatusSnapshot = Object.freeze({
+				...settlementStatusSnapshot,
+				undelivered: Object.freeze([
+					...undeliveredSettlements.values(),
+					...[...retainedHandBacks.values()].filter((given) => !undeliveredSettlements.has(given.vertexDigest)),
+				]),
+			});
+		return current;
 	};
 	const readSettlementEffect = (
 		prior: RoomSettlementPlan,
@@ -5436,6 +5644,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		let plan = await writeMergedSettlementPlan(sources);
 		settlementHeld = plan.entries.some(entry => entry.disposition === "manual-review" && entry.sourceContextDigest === undefined);
 		if (settlementHeld) return;
+		plan = await resolveRetainedFromFrontier(plan);
 		// A retained source context preserves unknown work, including pre-existing
 		// policy/progress metadata. Its presence grants no replacement decision, and
 		// unknown retained work still withholds the author fence. Retained terminal
@@ -7831,6 +8040,18 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		pendingOperations(): readonly V3RoomPendingOperation[] {
 			if (redirectedSession !== undefined) return redirectedSession.pendingOperations();
 			return presentation?.pending() ?? Object.freeze([]);
+		},
+		settlementStatus(): V3RoomSettlementStatus {
+			if (redirectedSession?.settlementStatus !== undefined) return redirectedSession.settlementStatus();
+			return (
+				settlementStatusSnapshot ??
+				Object.freeze({
+					epoch: activeHandle?.epoch ?? 0,
+					unsettledEpochs: 0,
+					window: V3_SETTLEMENT_OWN_WINDOW_EPOCHS,
+					undelivered: Object.freeze([]),
+				})
+			);
 		},
 		async unresolvedAcceptedWork(): Promise<readonly V3UnresolvedAcceptedWork[]> {
 			if (redirectedSession !== undefined) return redirectedSession.unresolvedAcceptedWork();

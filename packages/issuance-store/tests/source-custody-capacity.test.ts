@@ -45,6 +45,32 @@ describe("accepted source custody numerical reserve", () => {
 		const native = JSON.stringify({kind: "canonical-settlement-plan-1", bytes: Buffer.from(canonical).toString("base64")});
 		expect(Buffer.byteLength(native)).toBeLessThanOrEqual(resource.nativeStorageByteLength);
 	});
+	it.each([2, 64, 128])("bounds %i sources resolved from the settlement frontier beside a maximum completion", count => {
+		// One source committed by a maximum completion proof; every other source resolved from the
+		// frontier with a maximum signed expiry. The frontier kind is charged on every potential row.
+		const bytes = new Uint8Array(geometry.maxContextByteLength), digest = hashDomain("ts-drp/settlement-source-context/v1", bytes);
+		const proof = new Uint8Array(geometry.maxCompletionByteLength + count * geometry.maxCompletionMemberByteLength), completion = hashDomain("ts-drp/settlement-source-context/v1", proof);
+		const expiries = Array.from({length: count - 1}, (_, index) => {
+			const exactCanonicalContextBytes = new Uint8Array(geometry.maxExpiryByteLength).fill(index % 251, 0, 4);
+			exactCanonicalContextBytes.set(new Uint8Array(new Uint32Array([index]).buffer), 4);
+			return {digest: hashDomain("ts-drp/settlement-source-context/v1", exactCanonicalContextBytes), exactCanonicalContextBytes};
+		});
+		const base = Number.MAX_SAFE_INTEGER - count;
+		const plan = copySettlementPlan({scope, revision: Number.MAX_SAFE_INTEGER, fenceSequence: Number.MAX_SAFE_INTEGER,
+			entries: [{sourceSequence: base, sourceDigest: new Uint8Array(32), sourceContextDigest: digest,
+				sourceResolutionDigest: completion, disposition: "committed" as const, replacementSequence: null},
+			...expiries.map((expiry, index) => ({sourceSequence: base + 1 + index, sourceDigest: new Uint8Array(32),
+				sourceContextDigest: digest, sourceResolutionDigest: expiry.digest, sourceResolutionKind: "frontier" as const,
+				disposition: "expire" as const, replacementSequence: null}))],
+			sourceContexts: [{digest, exactCanonicalContextBytes: bytes}, {digest: completion, exactCanonicalContextBytes: proof}, ...expiries]
+				.sort((a, b) => Buffer.compare(a.digest, b.digest))}, scope)!;
+		expect(plan).toBeDefined();
+		expect(plan.entries.filter(entry => entry.sourceResolutionKind === "frontier")).toHaveLength(count - 1);
+		const canonical = encodeCanonical(plan), resource = issuanceSourceCustodyPlanResourceForSizing(scope, null, count, geometry);
+		expect(canonical.byteLength).toBeLessThanOrEqual(resource.byteLength);
+		const native = JSON.stringify({kind: "canonical-settlement-plan-1", bytes: Buffer.from(canonical).toString("base64")});
+		expect(Buffer.byteLength(native)).toBeLessThanOrEqual(resource.nativeStorageByteLength);
+	});
 	it("charges the same custody alternative in exact and warmed native forecasts", () => {
 		const commit = d109bCommit(scope, 0, 0);
 		const intent = {kind: "v3-issuance-pending-unsigned-1" as const, authorSequence: 0,

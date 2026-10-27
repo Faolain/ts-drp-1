@@ -172,6 +172,11 @@ export interface V3RoomSuccessorDelivery {
 	publish(offer: V3RoomSuccessorOffer, successorEpoch: number): Promise<void>;
 	/** Member: ask the creator for its latest offer now (rate limited). */
 	request(): void;
+	/**
+	 * Whether the creator is connected on the room's successor channel now (a creator: always). The
+	 * rollover policy's `creatorReachable`: with no creator a member cannot follow or settle.
+	 */
+	creatorReachable(): boolean;
 	/** Settles when no install is running or queued (tests and orderly shutdown). */
 	idle(): Promise<void>;
 	stats(): V3RoomSuccessorDeliveryStats;
@@ -459,6 +464,8 @@ export function createV3RoomSuccessorDelivery(
 			await Promise.all(targets.map((peerId) => send(peerId, bytes)));
 		},
 		request,
+		creatorReachable: (): boolean =>
+			role === "creator" || (!closed && creatorPeer !== undefined && channel.peers().includes(creatorPeer)),
 		idle: async (): Promise<void> => {
 			while (installing !== undefined) await installing;
 		},

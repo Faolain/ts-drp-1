@@ -744,9 +744,17 @@ export function createV3ZoneApi(
 				hooks: {
 					publishSuccessor: publishSuccessor ?? ((offer, epoch): Promise<void> => successors.publish(offer, epoch)),
 					requestSuccessor: () => successors.request(),
+					creatorReachable: () => successors.creatorReachable(),
 					onStatus: (status) => {
 						if (status.state === "successor-unavailable")
 							console.warn("v3 zone is waiting for the creator's next epoch; kept placements", status.kept);
+						if (status.state === "not-reaching-host")
+							console.warn(
+								`v3 zone: your moves are not reaching the host (${status.unsettledEpochs} epochs); kept placements`,
+								status.kept
+							);
+						if (status.state === "read-only")
+							console.warn("v3 zone: the host is unreachable; read-only until it is back; kept placements", status.kept);
 					},
 					onError: (error) => console.warn("v3 zone rollover failed; it is retried", error),
 				},

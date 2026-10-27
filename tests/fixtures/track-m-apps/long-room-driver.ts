@@ -336,6 +336,16 @@ export interface RoleEndpoint {
 	}> | null>;
 	/** App mode: joins this role's in-flight rollover, then reports its policy. */
 	rollover?(): Promise<RolloverObservation>;
+	/** Every accepted vertex (own and remote): digest, author, epoch, sequence, operation JSON. */
+	acceptedVertices?(): Promise<
+		readonly Readonly<{ digest: string; author: string; epoch: number; authorSequence: number; operation: string }>[]
+	>;
+	/** The room's own settlement observation (V3RoomSession.settlementStatus), or null. */
+	settlementStatus?(): Promise<unknown>;
+	/** App mode: the application policy's status (examples/v3-room rollover status()), or null. */
+	rolloverStatus?(): Promise<unknown>;
+	/** App mode: takes the other peer off (false) or back onto (true) this role's successor channel. */
+	setPeerConnected?(connected: boolean): Promise<void>;
 	close(): Promise<void>;
 }
 

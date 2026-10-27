@@ -51,6 +51,7 @@ export type {
 	V3RoomProjectionAuthority,
 	V3RoomProjectionInput,
 	V3RoomSession,
+	V3RoomSettlementStatus,
 	V3RoomSuccessorAuthority,
 	V3RoomTransport,
 } from "@ts-drp/node/v3-room";
@@ -58,6 +59,8 @@ export type { V3RoomStorageHost } from "@ts-drp/node/v3-room-host";
 export {
 	createV3RoomRolloverPolicy,
 	V3_ROOM_MEMBER_SUCCESSOR_WAIT_MS,
+	V3_ROOM_NOT_REACHING_HOST_MARGIN,
+	V3RoomReadOnly,
 	type V3RoomRolloverBudget,
 	type V3RoomRolloverEvent,
 	type V3RoomRolloverHooks,
