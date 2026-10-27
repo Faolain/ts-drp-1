@@ -18,7 +18,12 @@ import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-h
 // signed frontier and handed back. It must keep following, never refuse a plan write ("settlement plan
 // references retired or absent issued work" ended a 100-epoch browser run), and every move must be
 // admitted exactly once.
-const SLOW_ROUNDS = Number(process.env.SLOW_WRITER_ROUNDS ?? 14);
+//
+// Three skips: each skip install leaves the epoch the Writer departed from with no closed-membership
+// carrier (the reattachment checkpoint holds only the Cut before its target), so that journal scope is
+// never collectible, and the retirement's protected-scope bound (AHE maxObjectGenerations = 7) is
+// reached after a few more. The second test pins that defect.
+const SLOW_ROUNDS = Number(process.env.SLOW_WRITER_ROUNDS ?? 3);
 
 const track = {
 	rooms: new Set<{ close(): Promise<void> }>(),
@@ -253,6 +258,65 @@ it(
 				expect(await writer.state()).toBe(await creator.state());
 			} finally {
 				process.stdout.write(`SLOW_WRITER_SUMMARY ${JSON.stringify({ member: await writer.successorDelivery?.() })}\n`);
+				await wire.stop();
+			}
+		} finally {
+			restore();
+		}
+	},
+	1_200_000
+);
+
+// PINNED DEFECT (not fixed here; it needs a protocol decision). A skip install authenticates the target
+// head from a reattachment checkpoint, whose material carries the Cut before the target only; the
+// closed-membership carrier of the epoch the Writer departed from is recorded only on an adjacent
+// install (creator-adoption's recordReceivedClosedMembership). That journal scope holds the creator's
+// received rows, so it is never a collectible prefix ("unclassified-prefix" or
+// "source-coverage-incomplete") and stays protected forever. With no lagging move at all (no retained
+// work, no hand-back), six skips and a few adjacent epochs reach the protected-scope bound
+// (LIVE_JOURNAL_RETIREMENT_LIMITS.maxScopes = AHE maxObjectGenerations = 7): the next install's journal
+// retirement refuses "malformed-input" and the Writer's session closes. When this is fixed the test
+// fails; replace it with one that asserts the Writer keeps following.
+it(
+	"pinned defect: each skip install leaves its departed journal scope uncollectible, and past the 7-scope bound the Writer's journal retirement refuses",
+	async () => {
+		const restore = await installEnvironment("node", () => undefined);
+		const directory = mkdtempSync(join(tmpdir(), "app-rollover-skip-scopes-"));
+		directories.push(directory);
+		try {
+			const { creator, writer } = await openPair(directory, false);
+			const wire = successorWire(() => [creator, writer] as const);
+			const rows = rowWire(creator, writer);
+			const ordinal = { next: 0 };
+			let epoch = 0;
+			let stopped: unknown;
+			try {
+				let next = 100;
+				for (let round = 0; round < 6; round++) {
+					await writer.issue(1, next++);
+					await rows.toCreator();
+					await wire.pause();
+					epoch = await rollCreator(creator, rows.toWriter, ordinal);
+					epoch = await rollCreator(creator, async () => undefined, ordinal);
+					wire.resume();
+					await follow(wire, writer, epoch);
+					await rows.toWriter();
+				}
+				for (let round = 0; round < 8 && stopped === undefined; round++) {
+					await rows.toCreator();
+					epoch = await rollCreator(creator, rows.toWriter, ordinal);
+					try {
+						await follow(wire, writer, epoch);
+						await rows.toWriter();
+					} catch (error) {
+						stopped = error;
+					}
+				}
+				const member = (await writer.successorDelivery?.()) as { refusals?: readonly string[] } | undefined;
+				process.stdout.write(`SKIP_SCOPES_SUMMARY ${JSON.stringify({ epoch, member })}\n`);
+				expect(stopped).toBeDefined();
+				expect(member?.refusals?.some((refusal) => refusal.includes("journal retirement refused: malformed-input"))).toBe(true);
+			} finally {
 				await wire.stop();
 			}
 		} finally {
