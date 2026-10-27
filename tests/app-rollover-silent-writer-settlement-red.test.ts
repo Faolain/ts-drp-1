@@ -21,6 +21,17 @@ import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-h
 //
 // Found running app-rollover-policy-native's ["grid", "silent-writer"] case without delivering the
 // Writer's rows (deliver(1)). Run it with APP_ROLLOVER_SILENT_WRITER_RED=1.
+//
+// Diagnosis (fix/recipient-stuck-authority): two defects. (1) The trigger: each epoch whose own
+// rows the creator never acknowledged leaves the Writer one protected journal scope, and at
+// epoch 8 the received turnover's journal retirement preparation carries 8 protected scopes,
+// above LIVE_JOURNAL_RETIREMENT_LIMITS.maxScopes (7, the AHE generation bound), so
+// captureJournalRetirementPreparation refuses it ("journal retirement refused: malformed-input")
+// at the Writer's lull and every retry. Still open. (2) The wedge: that failed lull marks the room
+// for recovery, whose reopen is halted on the lull's completed retirement; before the fix every
+// later install refused "creator recipient current authority is unavailable". Fixed: the
+// recovery reopen now runs the retirement resume, which hits (1) again and ends the session with
+// that explicit error instead of a silent wedge.
 const enabled = process.env.APP_ROLLOVER_SILENT_WRITER_RED === "1";
 const MOVES = Number(process.env.APP_ROLLOVER_SILENT_WRITER_MOVES ?? 100);
 
