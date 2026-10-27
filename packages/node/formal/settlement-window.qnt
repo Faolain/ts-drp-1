@@ -42,7 +42,10 @@
 //   premature  hands a move back while its row may still be admitted (its epoch still
 //              open): a reissue races the original;
 //   gap        classifies without the fence guard: a committed row above a frontier gap
-//              may be read as displaced and expired or replaced.
+//              may be read as displaced and expired or replaced;
+//   retained   the code at 94d117ca (and c08d8680): an install more than one epoch ahead
+//              retains the Writer's current rows as unknown work ("manual-review") that
+//              nothing resolves, and the author fence stays withheld.
 module settlementWindow {
   pure val D = 4            // V3_SETTLEMENT_OWN_WINDOW_EPOCHS
   pure val MAX_SCOPES = 7   // LIVE_JOURNAL_RETIREMENT_LIMITS.maxScopes
@@ -57,7 +60,7 @@ module settlementWindow {
   var outages: int
   var ownSettled: int              // own settlement complete through this epoch
   var fenceEpoch: int              // the epoch of the Writer's last fence the creator admitted
-  var moveState: int -> str        // idle | app (held by the app) | flight (a plan chain) | done
+  var moveState: int -> str        // idle | app (held by the app) | flight (a plan chain) | retained | done
   var activeEpoch: int -> int      // the chain's current row
   var activeGen: int -> int
   var origin: int -> int           // the chain's first row's epoch
@@ -70,6 +73,8 @@ module settlementWindow {
   pure def max(a: int, b: int): int = if (a > b) a else b
   pure def min(a: int, b: int): int = if (a < b) a else b
   // The oldest epoch whose own settlement is still held (protected), given the chains.
+  // Retained work does not hold its journal scope: its source context (trust, ACL,
+  // blueprint, parameters) authenticates the row without it.
   pure def oldestHeld(states: int -> str, origins: int -> int, settled: int): int =
     MOVES.filter(m => states.get(m) == "flight").fold(settled + 1, (acc, m) => min(acc, origins.get(m)))
   pure def scopesOf(epoch: int, states: int -> str, origins: int -> int, settled: int): int =
@@ -89,6 +94,7 @@ module settlementWindow {
   action init = initWith("fixed")
   action initC08 = initWith("c08")
   action initPremature = initWith("premature")
+  action initRetained = initWith("retained")
   action initGap = initWith("gap")
 
   action keepWriter = all {
@@ -150,8 +156,12 @@ module settlementWindow {
     }
   }
   // The Writer's settlement fence for its current epoch reaches the creator.
+  val fenceWithheld = MOVES.exists(m => moveState.get(m) == "retained")
+  // Withheld while unknown retained work remains (v3-room: "unknown retained work still
+  // withholds the author fence").
   action fence: bool = all {
     not(closed), link == "up", writerEpoch == creatorEpoch, fenceEpoch < writerEpoch,
+    not(fenceWithheld),
     fenceEpoch' = writerEpoch,
     creatorEpoch' = creatorEpoch, link' = link, outages' = outages, admitted' = admitted,
     writerEpoch' = writerEpoch, ownSettled' = ownSettled, moveState' = moveState, activeEpoch' = activeEpoch,
@@ -159,21 +169,29 @@ module settlementWindow {
     mode' = mode,
   }
   // The Writer installs the creator's latest offer (checkpoint catch-up) and settles its
-  // own rows from the closed epochs against the creator's cut.
+  // own rows from the closed epochs against the creator's cut. An install more than one
+  // epoch ahead (a skip: the Writer missed offers, e.g. while the creator was unreachable)
+  // has no received close for its own epoch: its current rows are retained as unknown
+  // accepted work (retainCreatorAcceptedSourceCustody, "manual-review" with a source
+  // context), neither replaced nor expired by the window.
   action installWith(misread: Set[int]): bool = {
     val e = creatorEpoch
-    val settledNow = MOVES.filter(m => moveState.get(m) == "flight" and not(displacedAt(m, misread)))
-    val expiring = MOVES.filter(m => displacedAt(m, misread) and expiresAt(m, e))
-    val rebasing = MOVES.filter(m => displacedAt(m, misread) and not(expiresAt(m, e)))
+    val skip = e > writerEpoch + 1
+    val retaining = if (skip) MOVES.filter(m => moveState.get(m) == "flight") else Set()
+    val settledNow = MOVES.filter(m => moveState.get(m) == "flight" and not(skip) and not(displacedAt(m, misread)))
+    val expiring = MOVES.filter(m => not(skip) and displacedAt(m, misread) and expiresAt(m, e))
+    val rebasing = MOVES.filter(m => not(skip) and displacedAt(m, misread) and not(expiresAt(m, e)))
     val states = MOVES.mapBy(m =>
-      if (settledNow.contains(m)) "done" else if (expiring.contains(m)) "app" else moveState.get(m))
+      if (retaining.contains(m)) "retained"
+      else if (settledNow.contains(m)) "done" else if (expiring.contains(m)) "app" else moveState.get(m))
     val origins = MOVES.mapBy(m => if (settledNow.contains(m) or expiring.contains(m)) NONE else origin.get(m))
     val settled = max(max(ownSettled, fenceEpoch), if (mode == "c08") ownSettled else e - D)
     all {
       not(closed), link != "down", writerEpoch < creatorEpoch, mode == "gap" or misread == Set(),
       writerEpoch' = e, ownSettled' = settled, moveState' = states, origin' = origins,
       activeEpoch' = MOVES.mapBy(m =>
-        if (rebasing.contains(m)) e else if (states.get(m) != "flight") NONE else activeEpoch.get(m)),
+        if (rebasing.contains(m)) e
+        else if (states.get(m) != "flight" and states.get(m) != "retained") NONE else activeEpoch.get(m)),
       activeGen' = MOVES.mapBy(m => if (rebasing.contains(m)) gen.get(m) + 1 else activeGen.get(m)),
       gen' = MOVES.mapBy(m => if (rebasing.contains(m)) gen.get(m) + 1 else gen.get(m)),
       published' = published.union(rebasing.map(m => (m, e, gen.get(m) + 1))),
@@ -187,6 +205,23 @@ module settlementWindow {
   action install: bool = {
     nondet misread = MOVES.powerset().oneOf()
     installWith(misread)
+  }
+  // FIXED (and premature, gap): retained work is resolved from the creator's signed frontier
+  // in the installed checkpoint. Its epoch is closed; the frontier settled the row (it was
+  // committed: done) or proves it was never admitted (fence-guarded displaced: the move goes
+  // back to the app). RETAINED (the broken control) and c08 leave it manual-review.
+  def canResolve(m: int): bool =
+    mode != "retained" and mode != "c08" and not(closed) and moveState.get(m) == "retained" and activeEpoch.get(m) < writerEpoch
+  action resolveMove(m: int): bool = all {
+    canResolve(m),
+    val committed = admitted.contains(row(m))
+    all {
+      moveState' = moveState.set(m, if (committed) "done" else "app"),
+      activeEpoch' = activeEpoch.set(m, NONE), origin' = origin.set(m, NONE),
+    },
+    creatorEpoch' = creatorEpoch, link' = link, outages' = outages, admitted' = admitted,
+    writerEpoch' = writerEpoch, ownSettled' = ownSettled, fenceEpoch' = fenceEpoch, activeGen' = activeGen,
+    gen' = gen, published' = published, closed' = closed, mode' = mode,
   }
   // PREMATURE only: hands a move back at the early signal while its row's epoch may
   // still be open at the creator.
@@ -203,8 +238,11 @@ module settlementWindow {
   action issue: bool = { nondet m = MOVES.oneOf() issueMove(m) }
   action want: bool = { nondet m = MOVES.oneOf() wantMove(m) }
   action prematureHandBack: bool = { nondet m = MOVES.oneOf() prematureHandBackMove(m) }
+  action resolve: bool = { nondet m = MOVES.oneOf() resolveMove(m) }
 
-  action step = any { creatorAdvance, outage, reconnect, want, issue, deliver, fence, install, prematureHandBack }
+  action step = any {
+    creatorAdvance, outage, reconnect, want, issue, deliver, fence, install, prematureHandBack, resolve,
+  }
 
   // Safety.
   val scopes = scopesOf(writerEpoch, moveState, origin, ownSettled)
@@ -214,7 +252,8 @@ module settlementWindow {
   // its reissues, whatever order the rows arrive in.
   val atMostOnce = MOVES.forall(m => appliedCount(m) <= 1)
   def isActive(r: (int, int, int)): bool =
-    moveState.get(r._1) == "flight" and activeEpoch.get(r._1) == r._2 and activeGen.get(r._1) == r._3
+    (moveState.get(r._1) == "flight" or moveState.get(r._1) == "retained") and activeEpoch.get(r._1) == r._2 and
+      activeGen.get(r._1) == r._3
   // A row the Writer retired (replaced, expired or handed back) and the creator did not
   // admit lies in a closed epoch: no ingress path can admit it later.
   val retiredUnadmittable = published.forall(r => isActive(r) or admitted.contains(r) or r._2 < creatorEpoch)
@@ -226,13 +265,13 @@ module settlementWindow {
   // steps and deliveries, every move the app wants is eventually applied by the creator
   // (the Writer writes again). The model has no explicit terminal refusal: the session
   // closing (c08) is the defect, not an allowed terminal.
-  def wanting(m: int): bool = moveState.get(m) == "app" or moveState.get(m) == "flight"
+  def wanting(m: int): bool = moveState.get(m) == "app" or moveState.get(m) == "flight" or moveState.get(m) == "retained"
   def applied(m: int): bool = admitted.exists(r => r._1 == m)
   val vars = (creatorEpoch, writerEpoch, link, outages, ownSettled, fenceEpoch, moveState, activeEpoch, activeGen,
     origin, gen, published, admitted, closed, mode)
   temporal writerWritesAgain =
     (weakFair(reconnect, vars) and weakFair(install, vars) and weakFair(issue, vars) and weakFair(deliver, vars)
-      and weakFair(fence, vars))
+      and weakFair(fence, vars) and weakFair(resolve, vars))
     implies always(wanting(0) implies eventually(applied(0)))
 
   // Witnesses.
@@ -248,6 +287,19 @@ module settlementWindow {
   run c08DiesTest = initC08.then(issueMove(0)).then(drop("silent"))
     .then(silentFor(6)).then(all { assert(scopes == 7 and not(closed)), creatorAdvance }).then(installWith(Set()))
     .then(all { assert(closed and scopes == 8 and not(scopesBounded)), reconnect })
+  // A move in flight while the creator is unreachable, then a skip install: the move is
+  // retained, resolved from the frontier (never admitted: given back) and applied once.
+  run inFlightSkipTest = init.then(creatorAdvance).then(installWith(Set())).then(issueMove(0)).then(drop("down"))
+    .then(creatorAdvance).then(creatorAdvance).then(creatorAdvance)
+    .then(reconnect).then(installWith(Set()))
+    .then(all { assert(writerEpoch == 4 and moveState.get(0) == "retained" and fenceWithheld), resolveMove(0) })
+    .then(all { assert(moveState.get(0) == "app" and appliedCount(0) == 0), issueMove(0) }).then(deliver)
+    .then(all { assert(appliedCount(0) == 1 and safety), fence })
+  // 94d117ca: the retained move is never resolved, so it is never applied and no fence goes out.
+  run retainedStuckTest = initRetained.then(creatorAdvance).then(installWith(Set())).then(issueMove(0))
+    .then(drop("down")).then(creatorAdvance).then(creatorAdvance).then(creatorAdvance).then(reconnect)
+    .then(installWith(Set()))
+    .then(all { assert(moveState.get(0) == "retained" and not(canResolve(0)) and fenceWithheld and not(applied(0))), creatorAdvance })
   // A premature reissue: the original and the reissue are both admitted.
   run prematureDoubleTest = initPremature.then(issueMove(0)).then(prematureHandBackMove(0)).then(issueMove(0)).then(deliver).then(deliver)
     .then(all { assert(appliedCount(0) == 2 and not(atMostOnce)), creatorAdvance })
