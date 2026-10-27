@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type, jsdoc/require-jsdoc -- Test boundary preserves the production owners' inferred signatures. */
-import type { Message } from "@ts-drp/types";
+import { type Message, MessageType } from "@ts-drp/types";
 
 import { DRPNetworkNode } from "../../../packages/network/src/node.js";
 import { NodeEphemeralAdapter } from "../../../packages/node/src/ephemeral.js";
@@ -42,6 +42,9 @@ export async function nativePlayNetwork(delayMs = 20) {
 		{ network: DRPNetworkNode; adapter: NodeRoomNetworkAdapter; ephemeral: NodeEphemeralAdapter }
 	>();
 	const failures: unknown[] = [];
+	// Per-peer custom message queues (a DRPNode's messageQueueManager for MESSAGE_TYPE_CUSTOM): the
+	// pages' successor delivery runs on these over the same genuine direct streams.
+	const customQueues = new Map<string, Map<string, (message: Message) => void | Promise<void>>>();
 	let closing = false;
 	const close = async () => {
 		closing = true;
@@ -74,6 +77,20 @@ export async function nativePlayNetwork(delayMs = 20) {
 			registrations.set(network.peerId, { network, adapter, ephemeral });
 			network.subscribeToMessageQueue((message: Message) => {
 				if (closing) return;
+				const custom =
+					message.type === MessageType.MESSAGE_TYPE_CUSTOM
+						? customQueues.get(network.peerId)?.get(message.objectId)
+						: undefined;
+				if (custom !== undefined) {
+					const job = Promise.resolve()
+						.then(() => custom(message))
+						.catch((cause: unknown) => {
+							failures.push(cause);
+						});
+					pending.add(job);
+					void job.then(() => pending.delete(job));
+					return;
+				}
 				const delivery: Delivery = {
 					kind: network.gossipTopicFor(message) === undefined ? "direct" : "gossip",
 					from: message.sender,
@@ -116,6 +133,31 @@ export async function nativePlayNetwork(delayMs = 20) {
 				return () => losses.delete(predicate);
 			},
 			publications: [] as readonly Publication[],
+			/**
+			 * The peer's node as the pages' successor delivery uses a DRPNode (examples/v3-room
+			 * successor-delivery `V3RoomSuccessorNode`): direct sends on the genuine node, and a custom
+			 * message queue fed by its genuine ingress.
+			 * @param peerId - The peer.
+			 * @returns The node view.
+			 */
+			successorNode: (peerId: string) => {
+				const selected = registrations.get(peerId);
+				if (selected === undefined) throw new Error("NATIVE_PLAY_UNKNOWN_PEER");
+				let queues = customQueues.get(peerId);
+				if (queues === undefined) customQueues.set(peerId, (queues = new Map()));
+				const owned = queues;
+				return {
+					networkNode: selected.network,
+					messageQueueManager: {
+						subscribe: (queueId: string, handler: (message: Message) => void | Promise<void>) => {
+							owned.set(queueId, handler);
+						},
+						close: (queueId: string) => {
+							owned.delete(queueId);
+						},
+					},
+				};
+			},
 			// Joins observed ingress only; this is not a claim that sockets are quiescent.
 			idle: async () => {
 				while (pending.size > 0) await Promise.allSettled([...pending]);

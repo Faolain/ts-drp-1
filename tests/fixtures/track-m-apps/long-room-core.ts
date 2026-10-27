@@ -61,6 +61,10 @@ import {
 	type V3RoomRolloverHooks,
 	type V3RoomRolloverPolicy,
 } from "../../../examples/v3-room/src/rollover.js";
+import {
+	createV3RoomSuccessorDelivery,
+	type V3RoomSuccessorChannel,
+} from "../../../examples/v3-room/src/successor-delivery.js";
 import { toCanvasWireOperation } from "../../../packages/blueprints/src/v3-canvas.js";
 import { createRecoverableFinalitySigner } from "../../../packages/keychain/src/finality.js";
 import { createV3CanvasApplication } from "../../../packages/node/src/applications/canvas.js";
@@ -423,6 +427,26 @@ function appRolloverPolicy(
 }
 
 /**
+ * An error's message with its causes (and an aggregate's errors), for observation records.
+ * @param error - The error.
+ * @returns One line, at most 1000 characters.
+ */
+function describeError(error: unknown): string {
+	const parts: string[] = [];
+	const walk = (value: unknown, depth: number): void => {
+		if (depth > 6 || value === undefined) return;
+		if (value instanceof AggregateError) for (const inner of value.errors) walk(inner, depth + 1);
+		if (value instanceof Error) {
+			const code = Reflect.get(value, "code");
+			parts.push(`${value.name}: ${value.message}${typeof code === "string" ? ` [${code}]` : ""}`);
+			walk(value.cause, depth + 1);
+		} else parts.push(String(value));
+	};
+	walk(error, 0);
+	return parts.join(" <- ").slice(0, 1000);
+}
+
+/**
  * The profile and latched-ACL version the creator signs into genesis. By default: Canvas from
  * examples/canvas/src/profile.ts (creator-trusted-v1 before Track T), Grid and Chat
  * creator-trusted-settlement-v1 with a version-3 ACL. `options.profile === "trusted-v1"` (Grid and
@@ -547,9 +571,41 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 	const networkNode = loopbackNetwork(peers[index]);
 	const receiveOnly = index === 1 && !writerRecipient;
 	let scripted: ScriptedSnapshotChunkPort | undefined;
-	// App mode: the role runs its application's own rollover policy. The creator's published
-	// successor offers wait here until the harness carries them to the other role (as a host would).
-	const publishedOffers: WireOffer[] = [];
+	// App mode: the role runs its application's own rollover policy, and successor offers travel by
+	// the pages' own delivery (examples/v3-room successor-delivery): the creator's delivery announces
+	// each adopted offer and answers requests; the member's delivery asks, authenticates by install
+	// and installs. Only the wire is scripted: the delivery's frames wait in this role's outbox until
+	// the driver carries them, as it carries signed rows (there is no libp2p in this harness).
+	const successorOutbox: string[] = [];
+	const successorListeners = new Set<(sender: string, bytes: Uint8Array) => void>();
+	const successorChannel: V3RoomSuccessorChannel = {
+		localPeerId: peers[index],
+		peers: () => [peers[1 - index]],
+		send: (_peer, bytes, signal) => {
+			signal.throwIfAborted();
+			successorOutbox.push(toBase64(bytes));
+			return Promise.resolve();
+		},
+		listen: (listener) => {
+			successorListeners.add(listener);
+			return () => successorListeners.delete(listener);
+		},
+		onPeerConnected: () => () => undefined,
+		close: () => successorListeners.clear(),
+	};
+	const deliveryRefusals: string[] = [];
+	const delivery = appMode
+		? createV3RoomSuccessorDelivery({
+				role: index === 0 ? "creator" : "member",
+				objectId,
+				// The scripted peers are not the object's creator routing hint.
+				creatorPeer: peers[0],
+				channel: successorChannel,
+				hooks: {
+					onRefused: (error) => deliveryRefusals.push(describeError(error)),
+				},
+			})
+		: undefined;
 	const rolloverEvents: (V3RoomRolloverEvent & Readonly<{ endedAt: number }>)[] = [];
 	const rolloverErrors: string[] = [];
 	const policy = appMode
@@ -558,9 +614,8 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 				index === 0 ? "creator" : "member",
 				{ objectId, chatFormat, override: options.rolloverBudget },
 				{
-					publishSuccessor: (offer) => {
-						publishedOffers.push(Object.fromEntries(OFFER_FIELDS.map((field) => [field, toBase64(offer[field])])));
-					},
+					publishSuccessor: (offer, successorEpoch) => required(delivery).publish(offer, successorEpoch),
+					requestSuccessor: () => required(delivery).request(),
 					onRollover: (event) => rolloverEvents.push({ ...event, endedAt: performance.timeOrigin + performance.now() }),
 					onError: (error) => rolloverErrors.push(error instanceof Error ? error.message : String(error)),
 				}
@@ -580,6 +635,48 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 			scripted = port;
 			return port;
 		});
+	// The recipient's material port: each request goes to the creator's material host through the
+	// environment relay (the scripted material wire).
+	const relayPort = (): SnapshotChunkProtocolPort => {
+		const relay = required(env.relay);
+		const port: SnapshotChunkProtocolPort = {
+			localPeerId: peers[1],
+			connectedPeers: () => [peers[0]],
+			close: () => Promise.resolve(),
+			serve: () => () => undefined,
+			open: (peer) => {
+				const frames: Uint8Array[] = [];
+				let closed = false;
+				return Promise.resolve({
+					peerId: peer,
+					abort: () => {
+						closed = true;
+					},
+					close: () => {
+						closed = true;
+						return Promise.resolve();
+					},
+					read: (maximum, readOptions) =>
+						Promise.resolve().then(() => {
+							readOptions.signal.throwIfAborted();
+							if (closed) throw new TypeError("TRACK_M_APPS_STREAM_CLOSED");
+							const frame = required(frames.shift());
+							if (frame.byteLength > maximum) throw new TypeError("TRACK_M_APPS_MATERIAL_FRAME_LIMIT");
+							return frame;
+						}),
+					write: async (bytes, writeOptions) => {
+						writeOptions.signal.throwIfAborted();
+						if (closed) throw new TypeError("TRACK_M_APPS_STREAM_CLOSED");
+						frames.push(...(await relay(toBase64(bytes))).map((frame) => fromBase64(frame)));
+					},
+				});
+			},
+		};
+		track.ports.add(port);
+		return port;
+	};
+	// App mode: the member's delivery installs on its own, so its material host is always the relay.
+	if (appMode && index === 1) Reflect.set(networkNode, "createSnapshotChunkProtocolHost", relayPort);
 	const input = {
 		application,
 		storageHost: host.storageHost,
@@ -638,6 +735,7 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 	track.rooms.add(room);
 	policy?.bind(room);
 	await waitForV3RoomStartupForDiagnostics(room);
+	delivery?.bind(room);
 	observe(room.projection());
 
 	// The creator's genuine successor export over scripted native bytes; it grants nothing.
@@ -833,41 +931,9 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 		dispatch: async (request: string) =>
 			(await required(scripted).dispatch(peers[1], [fromBase64(request)])).map((frame) => toBase64(frame)),
 		install: async (offer: WireOffer) => {
-			const relay = required(env.relay);
-			const port: SnapshotChunkProtocolPort = {
-				localPeerId: peers[1],
-				connectedPeers: () => [peers[0]],
-				close: () => Promise.resolve(),
-				serve: () => () => undefined,
-				open: (peer) => {
-					const frames: Uint8Array[] = [];
-					let closed = false;
-					return Promise.resolve({
-						peerId: peer,
-						abort: () => {
-							closed = true;
-						},
-						close: () => {
-							closed = true;
-							return Promise.resolve();
-						},
-						read: (maximum, readOptions) =>
-							Promise.resolve().then(() => {
-								readOptions.signal.throwIfAborted();
-								if (closed) throw new TypeError("TRACK_M_APPS_STREAM_CLOSED");
-								const frame = required(frames.shift());
-								if (frame.byteLength > maximum) throw new TypeError("TRACK_M_APPS_MATERIAL_FRAME_LIMIT");
-								return frame;
-							}),
-						write: async (bytes, writeOptions) => {
-							writeOptions.signal.throwIfAborted();
-							if (closed) throw new TypeError("TRACK_M_APPS_STREAM_CLOSED");
-							frames.push(...(await relay(toBase64(bytes))).map((frame) => fromBase64(frame)));
-						},
-					});
-				},
-			};
-			track.ports.add(port);
+			// App mode carries offers by the pages' own delivery; harness offer passing is refused.
+			if (appMode) throw new TypeError("TRACK_M_APPS_APP_MODE_HARNESS_OFFER_PASSING");
+			const port = relayPort();
 			Reflect.set(networkNode, "createSnapshotChunkProtocolHost", () => port);
 			const decoded = Object.fromEntries(OFFER_FIELDS.map((field) => [field, fromBase64(required(offer[field]))]));
 			const started = performance.now();
@@ -920,7 +986,26 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 			drained = events.length;
 			return out;
 		},
-		takeOffers: async () => publishedOffers.splice(0),
+		successorFrames: async () => successorOutbox.splice(0),
+		deliverSuccessorFrames: async (frames: readonly string[]) => {
+			for (const frame of frames)
+				for (const listener of [...successorListeners]) listener(peers[1 - index], fromBase64(frame));
+		},
+		successorDelivery: async () => {
+			await delivery?.idle();
+			const stats = delivery?.stats();
+			return {
+				epoch: room.authority()?.epoch ?? 0,
+				installed: stats?.installed ?? 0,
+				refused: stats?.refused ?? 0,
+				announced: stats?.announced ?? 0,
+				answered: stats?.answered ?? 0,
+				requested: stats?.requested ?? 0,
+				largestOfferBytes: stats?.largestOfferBytes ?? 0,
+				refusals: [...deliveryRefusals],
+				...(stats?.lastError === undefined ? {} : { lastError: stats.lastError }),
+			};
+		},
 		closedProjection: async (epoch: number) => {
 			const entry = lastProjections.get(epoch);
 			if (entry === undefined) return null;
@@ -944,6 +1029,7 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 		},
 		close: async () => {
 			policy?.close();
+			delivery?.close();
 			await room.close();
 			track.rooms.delete(room);
 			await floor.close();

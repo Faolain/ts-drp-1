@@ -16,6 +16,7 @@ import {
 	type GridBlock,
 	GridLastValueOracle,
 } from "./fixtures/active-endurance/continued-play-observations.js";
+import { APP_MEMBER_ROLLOVER_ISSUE_BOUND_MS } from "./fixtures/active-endurance/driver.js";
 import { nativePlayNetwork } from "./fixtures/active-endurance/native-network.js";
 import {
 	creatorDeliveryRoom,
@@ -40,6 +41,11 @@ import {
 	type V3RoomRolloverEvent,
 	type V3RoomRolloverPolicy,
 } from "../examples/v3-room/src/rollover.js";
+import {
+	createV3RoomSuccessorChannel,
+	createV3RoomSuccessorDelivery,
+	type V3RoomSuccessorDelivery,
+} from "../examples/v3-room/src/successor-delivery.js";
 import * as cooperativeWork from "../packages/node/src/internal/cooperative-work.js";
 
 const enabled = process.env.ACTIVE_CONTINUED_PLAY === "1";
@@ -55,7 +61,11 @@ const reopenAt = Number(
 const starvationAlarmMs = Number(process.env.ACTIVE_CONTINUED_PLAY_STARVATION_ALARM_MS ?? 1000);
 // "harness" (default): each transition seals, adopts and exports. "app": the creator runs the shipped
 // Grid rollover policy (examples/grid/src/rollover.ts); each transition streams Writer moves until the
-// creator's policy has rolled the room over, then the Writer installs it as a host would.
+// creator's policy has rolled the room over. Successor offers travel by the pages' own delivery
+// (examples/v3-room successor-delivery) over the genuine libp2p direct streams, and the Writer's
+// delivery installs each one with material fetched from the creator over libp2p; harness offer
+// passing (settlementDelivery) is refused. ACTIVE_CONTINUED_PLAY_EPOCHS then counts adopted epochs
+// (the creator room's authenticated epoch), not transitions.
 const rolloverMode = process.env.ACTIVE_CONTINUED_PLAY_ROLLOVER ?? "harness";
 if (rolloverMode !== "harness" && rolloverMode !== "app") throw new Error(`CONTINUED_PLAY_ROLLOVER:${rolloverMode}`);
 /** Harness mode: Writer moves issued concurrently with each seal, adoption and install. */
@@ -63,6 +73,18 @@ const streamMoves = Number(process.env.ACTIVE_CONTINUED_PLAY_STREAM ?? 4);
 const convergeMs = Number(process.env.ACTIVE_CONTINUED_PLAY_CONVERGE_MS ?? 20_000);
 /** App mode: a transition whose Writer stream has not triggered a rollover after this many moves stranded. */
 const APP_ROLLOVER_MAX_MOVES = 64;
+/** App mode: the window around each automatic rollover runs from its seal start to this long after adoption. */
+const APP_ROLLOVER_WINDOW_TAIL_MS = 1_000;
+/**
+ * App mode: the most a Writer's issue overlapping a rollover's window may take before it counts as
+ * starved; the same bound and reasoning as the endurance driver's APP_MEMBER_ROLLOVER_ISSUE_BOUND_MS.
+ */
+const memberRolloverIssueBoundMs = Number(
+	process.env.ACTIVE_CONTINUED_PLAY_MEMBER_ROLLOVER_ISSUE_BOUND_MS ?? APP_MEMBER_ROLLOVER_ISSUE_BOUND_MS
+);
+/** App mode: how long the Writer's delivery may take to install the creator's latest successor. */
+const APP_DELIVERY_DEADLINE_MS = 60_000;
+if (!(memberRolloverIssueBoundMs > 0)) throw new Error("CONTINUED_PLAY_MEMBER_ROLLOVER_ISSUE_BOUND");
 if (!Number.isFinite(starvationAlarmMs) || starvationAlarmMs <= 0) throw new Error("CONTINUED_PLAY_STARVATION_ALARM");
 for (const value of [epochs, repairEvery, reopenAt])
 	if (!Number.isSafeInteger(value) || value < 1) throw new Error("CONTINUED_PLAY_POSITIVE_INTEGER");
@@ -107,6 +129,13 @@ function physicalCensus(directory: string) {
 	};
 }
 
+function worstSummary(values: readonly number[]) {
+	if (values.length === 0) return null;
+	const sorted = [...values].sort((left, right) => left - right);
+	const at = (p: number) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))] ?? 0;
+	return { p50: at(0.5), p95: at(0.95), max: at(1), windows: values.length };
+}
+
 type Quantum = { started: number; stopped: number; wallMs: number; cpuUserMs: number; cpuSystemMs: number };
 
 it.skipIf(!enabled)(
@@ -138,6 +167,15 @@ it.skipIf(!enabled)(
 			reopenAt,
 			starvationAlarmMs,
 			rollover: rolloverMode,
+			...(rolloverMode === "app"
+				? {
+						epochsCount: "adopted epochs (the creator room's authenticated epoch), not transitions",
+						successorOffers:
+							"pages' own successor delivery over genuine libp2p direct streams; harness offer passing refused",
+						memberRolloverIssueBoundMs,
+						rolloverWindowTailMs: APP_ROLLOVER_WINDOW_TAIL_MS,
+					}
+				: {}),
 			starvationAlarmMeaning: "coarse starvation regression only; not a smoothness or real-time completion criterion",
 			percentiles: "HDR microseconds, three significant figures; exact observed maxima",
 			directory,
@@ -333,6 +371,53 @@ it.skipIf(!enabled)(
 				}).mockRestore
 			);
 		}
+		// App mode: the pages' successor delivery for the creator and the Writer, rebound after a
+		// reopen, and the real chapters: every automatic rollover by trigger, with the issue-latency
+		// window around each one (bounded: windows are evaluated and dropped at each epoch flush).
+		const deliveries: (V3RoomSuccessorDelivery | undefined)[] = [undefined, undefined];
+		const deliveryRefusals: string[] = [];
+		const rolloversByTrigger: Record<string, number> = {};
+		const pendingWindows: { closed: number; trigger: string; start: number; end: number; ms: number }[] = [];
+		const recentIssues: { peer: number; started: number; stopped: number }[] = [];
+		const memberWorstByWindow: number[] = [];
+		const creatorWorstByWindow: number[] = [];
+		let worstMemberWindow: Readonly<Record<string, unknown>> | undefined;
+		let transitions = 0;
+		const evaluateWindows = (all = false) => {
+			const now = performance.now();
+			const ready = pendingWindows.filter((window) => all || window.end + APP_ROLLOVER_WINDOW_TAIL_MS < now);
+			for (const window of ready) pendingWindows.splice(pendingWindows.indexOf(window), 1);
+			const evaluated = ready.map((window) => {
+				const until = window.end + APP_ROLLOVER_WINDOW_TAIL_MS;
+				const overlapping = recentIssues.filter((issue) => issue.started <= until && issue.stopped >= window.start);
+				const worstMs = [0, 1].map((peer) => {
+					const values = overlapping
+						.filter((issue) => issue.peer === peer)
+						.map((issue) => issue.stopped - issue.started);
+					return values.length === 0 ? null : Math.max(...values);
+				});
+				const issues = [0, 1].map((peer) => overlapping.filter((issue) => issue.peer === peer).length);
+				if (worstMs[0] !== null && worstMs[0] !== undefined) creatorWorstByWindow.push(worstMs[0]);
+				const member = worstMs[1];
+				if (member !== null && member !== undefined) {
+					memberWorstByWindow.push(member);
+					if (worstMemberWindow === undefined || member > Number(worstMemberWindow.memberWorstMs))
+						worstMemberWindow = { ...window, memberWorstMs: member };
+				}
+				return { ...window, issues, worstMs };
+			});
+			// Issues older than every window still pending are no longer needed.
+			const oldest = Math.min(now - 60_000, ...pendingWindows.map((window) => window.start));
+			while (recentIssues.length > 0 && required(recentIssues[0]).stopped < oldest) recentIssues.shift();
+			for (const window of evaluated) {
+				const member = window.worstMs[1];
+				expect(
+					member ?? 0,
+					`member issue starved around the rollover closing epoch ${window.closed} (bound ${memberRolloverIssueBoundMs} ms)`
+				).toBeLessThanOrEqual(memberRolloverIssueBoundMs);
+			}
+			return evaluated;
+		};
 		try {
 			if (process.env.ACTIVE_CONTINUED_PLAY_PROFILE === "1") {
 				profiler = new Session();
@@ -377,15 +462,67 @@ it.skipIf(!enabled)(
 			const openPolicy = (): void => {
 				if (rolloverMode !== "app") return;
 				policy?.close();
+				for (const delivery of deliveries) delivery?.close();
+				// The pages' delivery on each peer's genuine node; the scripted peer ids are not the
+				// object's creator routing hint, so the creator's peer is named.
+				const creatorPeer = required(peers[0]).peerId;
+				for (let index = 0; index < 2; index++) {
+					const delivery = createV3RoomSuccessorDelivery({
+						role: index === 0 ? "creator" : "member",
+						objectId: fixture.objectId,
+						creatorPeer,
+						channel: createV3RoomSuccessorChannel(
+							network.successorNode(required(peers[index]).peerId),
+							fixture.objectId
+						),
+						hooks: {
+							onRefused: (error) => deliveryRefusals.push(String(error)),
+						},
+					});
+					deliveries[index] = delivery;
+				}
 				policy = createV3RoomRolloverPolicy({
 					role: "creator",
 					budget: GRID_ROLLOVER_BUDGET,
 					hooks: {
-						onRollover: (event) => rolloverEvents.push(event),
+						publishSuccessor: (offer, successorEpoch) => required(deliveries[0]).publish(offer, successorEpoch),
+						onRollover: (event) => {
+							const end = performance.now();
+							rolloverEvents.push(event);
+							rolloversByTrigger[event.trigger] = (rolloversByTrigger[event.trigger] ?? 0) + 1;
+							pendingWindows.push({
+								closed: event.epoch,
+								trigger: event.trigger,
+								start: end - event.ms,
+								end,
+								ms: event.ms,
+							});
+						},
 						onError: (error) => rolloverErrors.push(String(error)),
 					},
 				});
 				policy.bind(required(peers[0]).room);
+				for (let index = 0; index < 2; index++) required(deliveries[index]).bind(required(peers[index]).room);
+			};
+			// Harness mode only: the harness exports the creator's successor and hands it to the Writer.
+			const harnessOffer = () => {
+				if (rolloverMode === "app") throw new Error("CONTINUED_PLAY_APP_MODE_HARNESS_OFFER_PASSING");
+				return settlementDelivery(fixture);
+			};
+			// App mode: waits until the Writer's own delivery has installed the creator's epoch.
+			const deliveredTo = async (epoch: number) => {
+				const deadline = performance.now() + APP_DELIVERY_DEADLINE_MS;
+				const writer = () => required(peers[1]).room;
+				while ((writer().authority()?.epoch ?? 0) < epoch) {
+					if (performance.now() > deadline)
+						throw new Error(
+							`CONTINUED_PLAY_APP_DELIVERY_STALLED epoch=${epoch} writer=${writer().authority()?.epoch ?? 0} member=${JSON.stringify(deliveries[1]?.stats())} creator=${JSON.stringify(deliveries[0]?.stats())}`
+						);
+					// The Writer asks for the creator's latest (rate limited) and its install joins.
+					deliveries[1]?.request();
+					await deliveries[1]?.idle();
+					await sleep(20);
+				}
 			};
 			openPolicy();
 			const originalPeerIds = peers.map((peer) => peer.peerId);
@@ -529,6 +666,7 @@ it.skipIf(!enabled)(
 				else await required(peers[peer]).room.issue(operation);
 				oracle.accept(block);
 				const stopped = performance.now();
+				if (policy !== undefined) recentIssues.push({ peer, started, stopped });
 				record({ kind: "issue", phase, peer, label, block, started, stopped, ms: stopped - started });
 			};
 			const exactState = () => {
@@ -780,8 +918,8 @@ it.skipIf(!enabled)(
 				fixture.clearObservations();
 				phaseStats.clear();
 			};
-			// App mode, outside a transition: a rollover the creator's policy started joins and the Writer
-			// installs it, as a host would (one at a time: each move pair is followed before the next).
+			// App mode, outside a transition: a rollover the creator's policy started joins and the Writer's
+			// own delivery installs it (one at a time: each move pair is followed before the next).
 			const followRollover = async (label: string): Promise<void> => {
 				if (policy === undefined) return;
 				await policy.settled();
@@ -791,18 +929,7 @@ it.skipIf(!enabled)(
 				if ((writer.room.authority()?.epoch ?? 0) >= (creator.room.authority()?.epoch ?? 0)) return;
 				// Called inside a step (steps do not nest), so it times itself.
 				const started = performance.now();
-				const transfer = await settlementDelivery(fixture);
-				Reflect.set(writer.networkNode, "createSnapshotChunkProtocolHost", () => transfer.port);
-				try {
-					await writer.room.installCreatorSuccessor({ offer: transfer.offer, peers: transfer.peers });
-				} finally {
-					await joined(
-						[...ports].map(async (port) => {
-							await port.close();
-							ports.delete(port);
-						})
-					);
-				}
+				await deliveredTo(creator.room.authority()?.epoch ?? 0);
 				expect(writer.room.authority()?.epoch).toBe(creator.room.authority()?.epoch);
 				record({ kind: "app-follow", label, ms: performance.now() - started, rollovers: rolloverEvents.splice(0) });
 			};
@@ -823,7 +950,12 @@ it.skipIf(!enabled)(
 			await baseline("baseline-start", 2000);
 			await automaticRepair(0);
 			flushEpoch(0);
-			for (let epoch = 1; epoch <= epochs; epoch++) {
+			const adoptedEpochs = () => required(peers[0]).room.authority()?.epoch ?? 0;
+			let reopenDone = false;
+			// Harness mode: one transition per epoch. App mode: transitions until `epochs` epochs were
+			// adopted (warm-up and maintenance rollovers count; they are real chapters too).
+			for (let epoch = 1; rolloverMode === "app" ? adoptedEpochs() < epochs : epoch <= epochs; epoch++) {
+				transitions = epoch;
 				await baseline(`baseline-before-${epoch}`);
 				phase = `transition-${epoch}`;
 				const creator = required(peers[0]),
@@ -847,7 +979,18 @@ it.skipIf(!enabled)(
 							if (ordinal >= APP_ROLLOVER_MAX_MOVES) throw new Error("CONTINUED_PLAY_APP_ROLLOVER_NOT_TRIGGERED");
 							await issue(1, `stream-${epoch}-${ordinal}`);
 						}
-						await counting.settled();
+						// The Writer keeps playing while the creator's rollover runs (as harness mode streams
+						// moves through seal, adoption and install), so its issue latency around the rollover
+						// is measured (evaluateWindows), up to the harness stream's length.
+						const settling = counting.settled();
+						let rolled = false;
+						void settling.then(
+							() => (rolled = true),
+							() => (rolled = true)
+						);
+						for (let extra = 0; !rolled && extra < streamMoves; extra++)
+							await issue(1, `stream-${epoch}-during-${extra}`);
+						await settling;
 						if ((creator.room.authority()?.epoch ?? 0) === closing)
 							throw new Error("CONTINUED_PLAY_APP_ROLLOVER_NOT_TRIGGERED");
 						return;
@@ -864,7 +1007,12 @@ it.skipIf(!enabled)(
 						expect(sealed.value).toMatchObject({ ok: true });
 						await step(`adopt-${epoch}`, () => creator.room.adoptCreatorSuccessor());
 					}
-					const transfer = (await step(`export-${epoch}`, () => settlementDelivery(fixture))).value;
+					if (rolloverMode === "app") {
+						// The creator's delivery announced the offer; the Writer's delivery installs it.
+						await step(`install-${epoch}`, () => deliveredTo(creator.room.authority()?.epoch ?? 0));
+						return;
+					}
+					const transfer = (await step(`export-${epoch}`, () => harnessOffer())).value;
 					Reflect.set(writer.networkNode, "createSnapshotChunkProtocolHost", () => transfer.port);
 					try {
 						await step(`install-${epoch}`, () =>
@@ -918,7 +1066,8 @@ it.skipIf(!enabled)(
 					await automaticRepair(epoch);
 				}
 				await baseline(`baseline-after-${epoch}`);
-				if (epoch === reopenAt) {
+				if (rolloverMode === "app" ? !reopenDone && adoptedEpochs() >= reopenAt : epoch === reopenAt) {
+					reopenDone = true;
 					phase = `reopen-${epoch}`;
 					const stateBefore = exactState(),
 						oldPeers = peers,
@@ -960,9 +1109,19 @@ it.skipIf(!enabled)(
 					await step(`reopen-startup-settle-${epoch}`, () => sleep(16_000));
 				}
 				for (const walk of walks.splice(0)) record({ kind: "cooperative-walk", ...walk });
-				completedEpochs = epoch;
+				completedEpochs = rolloverMode === "app" ? adoptedEpochs() : epoch;
+				if (rolloverMode === "app")
+					record({
+						kind: "chapters",
+						transition: epoch,
+						adoptedEpochs: adoptedEpochs(),
+						writerEpoch: required(peers[1]).room.authority()?.epoch ?? 0,
+						rolloversByTrigger: { ...rolloversByTrigger },
+						rolloverWindows: evaluateWindows(),
+					});
 				flushEpoch(epoch);
 			}
+			if (rolloverMode === "app") record({ kind: "rollover-windows", rolloverWindows: evaluateWindows(true) });
 			expect(counters.rejected, "ephemeral publication exceptions").toEqual([0, 0]);
 			record({
 				kind: "complete",
@@ -976,6 +1135,7 @@ it.skipIf(!enabled)(
 			failure = cause;
 			record({ kind: "failure", phase, completedEpochs, error: String(cause) });
 		} finally {
+			for (const delivery of deliveries) delivery?.close();
 			if (timer !== undefined) clearInterval(timer);
 			await Promise.allSettled([...pendingTicks]);
 			for (const unsubscribe of subscriptions.values()) unsubscribe();
@@ -998,6 +1158,30 @@ it.skipIf(!enabled)(
 				status: failure === undefined ? "passed" : "failed",
 				completedEpochs,
 				epochs,
+				...(rolloverMode === "app"
+					? {
+							chapters: {
+								target: epochs,
+								adoptedEpochs: completedEpochs,
+								transitions,
+								rolloversByTrigger,
+								rolloversTotal: Object.values(rolloversByTrigger).reduce((total, value) => total + value, 0),
+							},
+							rolloverIssueWorstMs: {
+								creator: worstSummary(creatorWorstByWindow),
+								member: worstSummary(memberWorstByWindow),
+								worstMemberWindow,
+								memberBoundMs: memberRolloverIssueBoundMs,
+								windowTailMs: APP_ROLLOVER_WINDOW_TAIL_MS,
+							},
+							successorDelivery: {
+								creator: deliveries[0]?.stats(),
+								member: deliveries[1]?.stats(),
+								refusals: deliveryRefusals.slice(-8),
+								refusalCount: deliveryRefusals.length,
+							},
+						}
+					: {}),
 				repaired,
 				reopened,
 				acceptedIssues: oracle.accepted,

@@ -3,7 +3,13 @@ import { decodeCanonical } from "@ts-drp/canonical";
 import assert from "node:assert/strict";
 
 import { ChatWindowOracle } from "./chat-oracle.js";
-import { type AppKind, fromBase64, type RoleEndpoint, type WireRow } from "../track-m-apps/long-room-driver.js";
+import {
+	type AppKind,
+	fromBase64,
+	type RoleEndpoint,
+	successorWire,
+	type WireRow,
+} from "../track-m-apps/long-room-driver.js";
 
 interface AppState {
 	counters?: number[][];
@@ -16,6 +22,22 @@ function required<T>(value: T | undefined): T {
 }
 /** App mode: a policy that has not rolled over after this many moves per role has stranded. */
 const APP_ROLLOVER_MAX_MOVES = 200;
+/**
+ * App mode: the window around each automatic rollover in which issue latency is measured runs from
+ * the creator's seal start until this long after its adoption (the member's install follows it).
+ */
+export const APP_ROLLOVER_WINDOW_TAIL_MS = 1_000;
+/**
+ * App mode: the default bound on a member's issue that overlaps an automatic rollover's window.
+ * Harness mode has no latency bound per rollover, only liveness (an accepted issue completes before
+ * the rollover returns), and continued play's 1 s starvation alarm measures timer gaps, not issues.
+ * A member's move may legitimately wait out the creator's whole rollover (measured 0.3-2.3 s for
+ * seal, adoption and export natively) and then its own install; five seconds is above both
+ * together, so a member issue above it is starved rather than jittery (for example a move refused
+ * at capacity that waits up to V3_ROOM_MEMBER_SUCCESSOR_WAIT_MS for a successor). Measured worst
+ * member issue in a window, 12 adopted epochs per app: Canvas 803 ms, Grid 515 ms, Chat 517 ms.
+ */
+export const APP_MEMBER_ROLLOVER_ISSUE_BOUND_MS = 5_000;
 const q = (values: number[], p: number): number =>
 	[...values].sort((a, b) => a - b)[Math.min(values.length - 1, Math.floor(values.length * p))] ?? 0;
 const rowValue = (row: WireRow) =>
@@ -49,10 +71,17 @@ export async function driveActiveAppEndurance(
 		 * "harness" (default): the driver seals, adopts and exports after each epoch's moves. "app":
 		 * the creator's application policy rolls the room over by itself (the peers must be opened
 		 * with `rollover: "app"`); each epoch plays rounds of `moves` per role until the creator's
-		 * room has advanced, then the driver carries the published offers to the Writer as a host
-		 * would. An epoch of this driver is then one application rollover.
+		 * room has advanced. Offers travel by the pages' own successor delivery over a scripted wire
+		 * (`successorWire`); harness offer passing is refused. `epochs` then counts adopted epochs (the
+		 * creator room's authenticated epoch), not driver rounds; a round may close more than one.
 		 */
 		rollover?: "harness" | "app";
+		/**
+		 * App mode: the most a member's (the Writer's) issue may take when it overlaps an automatic
+		 * rollover's window (seal start to `APP_ROLLOVER_WINDOW_TAIL_MS` after adoption). Above it the
+		 * member is starved and the run fails.
+		 */
+		memberRolloverIssueBoundMs?: number;
 		write(record: Readonly<Record<string, unknown>>): void;
 	}>
 ) {
@@ -76,6 +105,54 @@ export async function driveActiveAppEndurance(
 	let completed = 0;
 	let stage = "open";
 	let rolloverEventsSeen = 0;
+	// App mode: real chapters. Every automatic rollover the creator's policy finished, by trigger,
+	// and the issue-latency window around each one.
+	const rolloversByTrigger: Record<string, number> = {};
+	const pendingWindows: { closed: number; trigger: string; start: number; end: number; ms: number }[] = [];
+	const rolloverWindows: {
+		closed: number;
+		trigger: string;
+		ms: number;
+		start: number;
+		end: number;
+		issues: number[];
+		worstMs: (number | null)[];
+	}[] = [];
+	let firstEpoch = 0;
+	let rounds = 0;
+	const memberBound = input.memberRolloverIssueBoundMs ?? Number.POSITIVE_INFINITY;
+	// Evaluates every window whose tail has passed: each role's worst latency over its issues that
+	// overlap the window (all of which have completed, since the driver joins every issue it starts
+	// before a window is evaluated, and the window ended before `now`).
+	const evaluateWindows = (now: number, all = false) => {
+		const ready = all ? pendingWindows.splice(0) : [];
+		if (!all)
+			for (let index = pendingWindows.length - 1; index >= 0; index--)
+				if (required(pendingWindows[index]).end + APP_ROLLOVER_WINDOW_TAIL_MS < now)
+					ready.unshift(...pendingWindows.splice(index, 1));
+		const evaluated: typeof rolloverWindows = [];
+		for (const window of ready) {
+			const until = window.end + APP_ROLLOVER_WINDOW_TAIL_MS;
+			const overlapping = attempts.filter((value) => value.startedAt <= until && value.completedAt >= window.start);
+			const byRole = [0, 1].map((role) => overlapping.filter((value) => value.role === role));
+			const measured = {
+				...window,
+				issues: byRole.map((values) => values.length),
+				worstMs: byRole.map((values) =>
+					values.length === 0 ? null : Math.max(...values.map((value) => value.completedAt - value.startedAt))
+				),
+			};
+			evaluated.push(measured);
+			rolloverWindows.push(measured);
+			const member = measured.worstMs[1];
+			assert.ok(
+				member === null || member === undefined || member <= memberBound,
+				`member issue starved around the rollover closing epoch ${window.closed}: ${Math.round(member ?? 0)} ms > ${memberBound} ms`
+			);
+		}
+		return evaluated;
+	};
+	const wire = appMode ? successorWire(() => peers) : undefined;
 	try {
 		const chatModel = app === "chat" ? new ChatWindowOracle(await required(peers[0]).state()) : undefined;
 		const delivered: (number | null)[] = [null, null];
@@ -125,6 +202,14 @@ export async function driveActiveAppEndurance(
 			const events = policy.events.slice(rolloverEventsSeen);
 			rolloverEventsSeen = policy.events.length;
 			for (const event of events) {
+				rolloversByTrigger[event.trigger] = (rolloversByTrigger[event.trigger] ?? 0) + 1;
+				pendingWindows.push({
+					closed: event.epoch,
+					trigger: event.trigger,
+					start: event.endedAt - event.ms,
+					end: event.endedAt,
+					ms: event.ms,
+				});
 				if (chatModel !== undefined) {
 					const closed = await required(creator.closedProjection)(event.epoch);
 					if (closed === null) throw new Error(`ENDURANCE_APP_CLOSED_CUT_ABSENT:${event.epoch}`);
@@ -152,8 +237,8 @@ export async function driveActiveAppEndurance(
 		// offered again, as a room's sync would.
 		const appSettle = async (): Promise<void> => {
 			if (!appMode) return;
-			await absorbRollovers();
-			for (const offer of await required(required(peers[0]).takeOffers)()) await required(peers[1]).install(offer);
+			const policy = await absorbRollovers();
+			await required(wire).caughtUp(policy.epoch);
 			for (const from of [0, 1]) {
 				await flush(from);
 				const receiver = required(peers[1 - from]);
@@ -228,7 +313,12 @@ export async function driveActiveAppEndurance(
 				rows: state.messages?.length ?? state.blocks?.length ?? required(state.counters).length,
 			};
 		};
-		for (let epoch = 0; epoch < epochs; epoch++) {
+		firstEpoch = (await required(peers[0]).authorityEpoch()) ?? 0;
+		const adopted = async () => ((await required(peers[0]).authorityEpoch()) ?? 0) - firstEpoch;
+		let reopenedOnce = false;
+		// Harness mode: one round per epoch. App mode: rounds until `epochs` epochs were adopted.
+		for (let epoch = 0; appMode ? (await adopted()) < epochs : epoch < epochs; epoch++) {
+			rounds = epoch + 1;
 			stage = `epoch-${epoch}-play`;
 			const acceptedBefore = accepted.length;
 			const attemptsBefore = attempts.length;
@@ -300,13 +390,14 @@ export async function driveActiveAppEndurance(
 			// it closed is checked against the Chat oracle at its closed cut, and every offer it
 			// published is installed by the Writer, in order, while the Writer keeps issuing.
 			async function appRollover() {
-				const creator = required(peers[0]);
 				const policy = await absorbRollovers();
 				const events = absorbed.splice(0);
 				for (const event of events) appWindows.push({ start: event.endedAt - event.ms, end: event.endedAt });
 				stage = `epoch-${epoch}-install`;
-				let installMs = 0;
-				for (const offer of await required(creator.takeOffers)()) installMs += await required(peers[1]).install(offer);
+				// The member's own delivery installs each offer the creator's delivery announced.
+				const installStarted = performance.now();
+				const delivery = await required(wire).caughtUp(policy.epoch);
+				const installMs = performance.now() - installStarted;
 				assert.equal(await required(peers[1]).authorityEpoch(), policy.epoch, "the Writer follows every rollover");
 				rolling = false;
 				rolloverEndedAt = performance.timeOrigin + performance.now();
@@ -317,6 +408,7 @@ export async function driveActiveAppEndurance(
 					adoptMs: 0,
 					exportMs: 0,
 					installMs,
+					delivery,
 					rollovers: events.map(({ epoch: closed, trigger, moves: most, weight }) => ({
 						closed,
 						trigger,
@@ -371,10 +463,19 @@ export async function driveActiveAppEndurance(
 			const state = await conservation(epoch);
 			const receiverAfter = await joinAll(peers.map((peer) => peer.projectionAudit()));
 			let reopened = false;
-			if (input.reopen !== undefined && epoch + 1 === input.reopenAt) {
+			const adoptedNow = appMode ? await adopted() : epoch + 1;
+			if (
+				input.reopen !== undefined &&
+				input.reopenAt !== undefined &&
+				!reopenedOnce &&
+				(appMode ? adoptedNow >= input.reopenAt : epoch + 1 === input.reopenAt)
+			) {
+				reopenedOnce = true;
 				stage = `epoch-${epoch}-persisted-reopen`;
 				const before = await joinAll(peers.map((peer) => peer.state()));
+				await wire?.pause();
 				peers = await input.reopen(peers);
+				wire?.resume();
 				// A reopened creator's policy starts a new event list.
 				rolloverEventsSeen = 0;
 				assert.deepEqual(
@@ -415,12 +516,26 @@ export async function driveActiveAppEndurance(
 				lastReceiverAcceptedAt: receiverAfter.map((value) => value.lastRemoteAcceptedAt),
 			};
 			// App mode: the creator's rollovers run in the background during play, between the driver's
-			// rounds, so an issue completing inside one is timing, not a property; the Writer issuing
-			// throughout the install is still asserted (streamAccepted above), and the count is recorded.
+			// rounds, so an issue completing inside one is timing, not a property. Its timing-robust
+			// replacement is the per-rollover window (evaluateWindows): every member issue overlapping
+			// an automatic rollover must finish within memberRolloverIssueBoundMs.
 			if (!appMode)
 				assert.ok(activity.completedDuringRollover > 0, "an accepted issue completed before rollover returned");
+			const windows = appMode ? evaluateWindows(performance.timeOrigin + performance.now()) : [];
 			const record = {
 				epoch: epoch + 1,
+				...(appMode
+					? {
+							chapters: {
+								round: epoch + 1,
+								adoptedEpochs: adoptedNow,
+								creatorEpoch: await required(peers[0]).authorityEpoch(),
+								memberEpoch: await required(peers[1]).authorityEpoch(),
+								rolloversByTrigger: { ...rolloversByTrigger },
+							},
+							rolloverWindows: windows,
+						}
+					: {}),
 				accepted: accepted.length,
 				epochAccepted: accepted.length - acceptedBefore,
 				streamAccepted,
@@ -436,14 +551,48 @@ export async function driveActiveAppEndurance(
 				elapsedMs: performance.now() - started,
 			};
 			input.write(record);
-			completed = epoch + 1;
-			if (completed <= 3 || completed % 10 === 0)
+			const previous = completed;
+			completed = adoptedNow;
+			if (completed <= 3 || Math.floor(completed / 10) !== Math.floor(previous / 10))
 				console.log(
-					`ACTIVE_ENDURANCE ${app} ${completed}/${epochs} accepted=${accepted.length} transition=${Math.round(transitionMs)}ms`
+					`ACTIVE_ENDURANCE ${app} ${completed}/${epochs}${appMode ? ` adopted rounds=${epoch + 1} rollovers=${JSON.stringify(rolloversByTrigger)}` : ""} accepted=${accepted.length} transition=${Math.round(transitionMs)}ms`
 				);
 		}
+		const finalWindows = appMode ? evaluateWindows(0, true) : [];
+		if (finalWindows.length) input.write({ kind: "rollover-windows", rolloverWindows: finalWindows });
+		const worst = (role: number) => {
+			const values = rolloverWindows.flatMap((window) => {
+				const value = window.worstMs[role];
+				return value === null || value === undefined ? [] : [value];
+			});
+			return values.length === 0
+				? null
+				: { p50: q(values, 0.5), p95: q(values, 0.95), max: Math.max(...values), windows: values.length };
+		};
 		const summary = {
 			completed,
+			...(appMode
+				? {
+						chapters: {
+							target: epochs,
+							adoptedEpochs: completed,
+							rounds,
+							rolloversByTrigger,
+							rolloversTotal: Object.values(rolloversByTrigger).reduce((sum, value) => sum + value, 0),
+						},
+						rolloverIssueWorstMs: {
+							creator: worst(0),
+							member: worst(1),
+							memberBoundMs: Number.isFinite(memberBound) ? memberBound : null,
+							windowTailMs: APP_ROLLOVER_WINDOW_TAIL_MS,
+						},
+						successorDelivery: {
+							framesCarried: required(wire).carried(),
+							member: await required(peers[1]).successorDelivery?.(),
+							creator: await required(peers[0]).successorDelivery?.(),
+						},
+					}
+				: {}),
 			accepted: accepted.length,
 			elapsedMs: performance.now() - started,
 			issueMs: {
@@ -461,7 +610,17 @@ export async function driveActiveAppEndurance(
 		};
 		return summary;
 	} catch (error) {
-		input.write({ kind: "failure", completed, stage, error: String(error), stack: (error as Error).stack });
+		input.write({
+			kind: "failure",
+			completed,
+			rounds,
+			stage,
+			error: String(error),
+			stack: (error as Error).stack,
+			...(appMode ? { rolloversByTrigger } : {}),
+		});
 		throw error;
+	} finally {
+		await wire?.stop().catch(() => undefined);
 	}
 }

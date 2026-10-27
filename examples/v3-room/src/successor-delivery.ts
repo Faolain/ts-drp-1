@@ -254,13 +254,18 @@ export function createV3RoomSuccessorDelivery(
 		role: "creator" | "member";
 		objectId: string;
 		channel: V3RoomSuccessorChannel;
+		/**
+		 * The creator's peer when the room's object id carries no routing hint for it (a scripted
+		 * transport whose peer names are not the object's creator hint). Defaults to the hint.
+		 */
+		creatorPeer?: string;
 		pollMs?: number;
 		hooks?: V3RoomSuccessorDeliveryHooks;
 	}>
 ): V3RoomSuccessorDelivery {
 	const { role, channel } = input;
 	const hooks = input.hooks ?? {};
-	const creatorPeer = v3RoomCreatorPeer(input.objectId);
+	const creatorPeer = input.creatorPeer ?? v3RoomCreatorPeer(input.objectId);
 	if (role === "member" && creatorPeer === undefined) throw new TypeError("v3 room creator peer is unknown");
 	const pollMs = input.pollMs ?? V3_ROOM_SUCCESSOR_POLL_MS;
 	let room: DeliveryRoom | undefined;

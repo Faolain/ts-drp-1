@@ -13,6 +13,7 @@ import {
 	fromBase64,
 	type RecipientMode,
 	type RoleEndpoint,
+	successorWire,
 	type WireRow,
 } from "./fixtures/track-m-apps/long-room-driver.js";
 import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-head.js";
@@ -23,8 +24,8 @@ import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-h
 // in Chat (its per-checkpoint allowance). Each case plays well past that ceiling per role with no
 // harness seal: the creator's application policy must roll the room over by itself, every move
 // must be accepted (none strands at the ceiling, none is lost), and both roles must converge on
-// state that contains every accepted move. The harness only carries rows and each published
-// successor offer to the other role, as a host would.
+// state that contains every accepted move. Successor offers travel by the pages' own delivery
+// (examples/v3-room successor-delivery); the harness only carries rows and the delivery's frames.
 const MOVES: Readonly<Record<AppKind, number>> = { canvas: 100, grid: 100, chat: 35 };
 // Creator-only play has a receive-only recipient, except in Grid: its members are enrolled
 // Writers (a receive-only recipient is not authorised to fetch Grid's successor material), so its
@@ -92,10 +93,11 @@ async function openApp(
 }
 
 /**
- * Plays `moves` per role (alternating, the creator first) with no harness seal. Like a host, the
- * harness carries each published successor offer to the other role as soon as it appears (its own
- * loop, concurrent with play: a Writer's move refused at capacity waits for that install) and every
- * published row in the receiver's epoch. It then checks that every move was accepted, both roles
+ * Plays `moves` per role (alternating, the creator first) with no harness seal. The creator's
+ * delivery announces each adopted offer and the member's delivery installs it; the harness wire
+ * carries their frames in the background, concurrent with play (a Writer's move refused at
+ * capacity waits for that install), and the harness carries every published row in the receiver's
+ * epoch. It then checks that every move was accepted, both roles
  * converged, and the state holds every accepted move.
  * @param app - The application.
  * @param recipient - The other role.
@@ -113,23 +115,7 @@ async function playPastCeiling(
 	const [creator, other] = peers;
 	const writer = recipient === "writer";
 	const delivered: (number | null)[] = [null, null];
-	// Like a host, the harness installs each published offer as soon as it appears, concurrently
-	// with play. A failed install is recorded with the epoch it was for.
-	const installFailures: string[] = [];
-	let pumping = true;
-	const installs = (async (): Promise<void> => {
-		while (pumping) {
-			for (const offer of (await creator.takeOffers?.()) ?? []) {
-				const from = await other.authorityEpoch();
-				try {
-					await other.install(offer);
-				} catch (error) {
-					installFailures.push(`install from epoch ${from}: ${error instanceof Error ? error.stack : String(error)}`);
-				}
-			}
-			await new Promise((resolve) => setTimeout(resolve, 20));
-		}
-	})();
+	const wire = successorWire(() => peers);
 	// Every new row of `from` in the receiver's current epoch, then a bounded wait for the last
 	// one's acceptance. Rows of an earlier epoch are not delivered, and a row the receiver does not
 	// accept is not retried here: a Writer's row the creator closed its epoch without is replaced
@@ -204,7 +190,7 @@ async function playPastCeiling(
 		// Quiesce: the last rollover joins, its offer is installed, and every row is delivered.
 		step = "quiesce";
 		for (let round = 0; round < 4; round++) {
-			await creator.rollover?.();
+			await wire.caughtUp((await creator.rollover?.())?.epoch ?? 0);
 			await new Promise((resolve) => setTimeout(resolve, 100));
 			await deliver(0);
 			await deliver(1);
@@ -213,15 +199,16 @@ async function playPastCeiling(
 		}
 	} finally {
 		clearInterval(watchdog);
-		pumping = false;
-		await installs;
+		await wire.stop();
 	}
 	const policy = await creator.rollover?.();
 	const member = await other.rollover?.();
 	process.stdout.write(
 		`ROLLOVER_EVENTS ${app}/${recipient} moves=${moves} ${JSON.stringify(policy?.events.map((event) => [event.epoch, event.trigger, event.moves, Math.round(event.ms)]))}\n`
 	);
-	expect(installFailures).toEqual([]);
+	const delivery = await other.successorDelivery?.();
+	process.stdout.write(`ROLLOVER_DELIVERY ${app}/${recipient} ${JSON.stringify(delivery)}\n`);
+	expect(delivery?.installed ?? 0, "the member's own delivery installed the successors").toBeGreaterThan(0);
 	expect(policy?.errors ?? ["no creator policy"]).toEqual([]);
 	expect(member?.waiting ?? 0).toBe(0);
 	expect(await other.authorityEpoch()).toBe(policy?.epoch);
