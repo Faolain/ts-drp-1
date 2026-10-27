@@ -138,9 +138,13 @@ const TRANSIENT_REFUSAL = /retry after admitted work joins/u;
  * The local plane stopped accepting new operations because its epoch is closing (the creator
  * sealed it and has not adopted the successor yet, or a member received the close and has not
  * installed the successor yet, or its live plane is being replaced by that install). The move is
- * offered again once the room is in a later epoch.
+ * offered again once the room is in a later epoch. "creator recovery dependency hold
+ * unavailable:replay" is the creator's issue finding its live plane replaced (by its own adoption)
+ * while it captured its recovery dependencies; a refusal at any other stage of that capture is not
+ * a closing.
  */
-const CLOSING_REFUSAL = /: not-active\b|live plane is unavailable/u;
+const CLOSING_REFUSAL =
+	/: not-active\b|live plane is unavailable|creator recovery dependency hold unavailable:replay\b/u;
 const SESSION_CLOSED = /v3 room session is closed/u;
 /**
  * Capacity refusals of one move before the last is thrown. The creator's issuance image spans the
