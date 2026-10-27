@@ -56,6 +56,7 @@ import {
 	issuanceUnsignedSuccessorFenceWidths,
 	issuanceUnsignedSuccessorFenceRevisionDeltas,
 	issuanceOrdinaryFinishingCapacityWidths,
+	issuanceRetirementAllows,
 	issuanceRetirementPlanRewriteResourceForSizing,
 	settlementPlanPermitsAuthenticatedPruning,
 } from "@ts-drp/issuance-store/maintenance";
@@ -11496,9 +11497,14 @@ async function readCreatorRecoveryDependencyCensus(
 				branchSource !== undefined &&
 				vertex.epoch === branchSource.prepared.provenance.epoch &&
 				vertex.anchor === branchSource.prepared.provenance.anchorDigest;
+			// A row the native issuance retirement has already retired is held only
+			// until the prefix pruner reaches it (its completed entry is custody, not
+			// a dependency). Nothing replays it, so it keeps no historical anchor.
+			const retiredCustody = objectCensus.control !== undefined && objectCensus.control !== null &&
+				!issuanceRetirementAllows(objectCensus.control, scope, row.authorSequence, row.canonicalPreimageBytes, row.digest);
 			// A verified detached source capsule owns its historical anchor/ACL/ABI
 			// in the charged native plan. It does not consume an old live generation.
-			if (!separateSourceAnchor && !terminallyCovered && classified.sourceContract === undefined) {
+			if (!separateSourceAnchor && !terminallyCovered && !retiredCustody && classified.sourceContract === undefined) {
 				if (anchors.has(vertex.epoch) && anchors.get(vertex.epoch) !== vertex.anchor) return undefined;
 				anchors.set(vertex.epoch, vertex.anchor);
 			}

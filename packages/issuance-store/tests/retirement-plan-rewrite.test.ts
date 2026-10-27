@@ -35,8 +35,15 @@ function fixture(): IssuanceRetirementRows {
 			sourceSequence: sequence, sourceDigest: commits[sequence]!.envelope.digest,
 			disposition: "rebase", replacementSequence: sequence + 1}))}]};
 }
+/** The authenticated prefix pruner's effect: rows through `through` are gone. A completed
+ * entry is custody while its source is held, so only these entries are rewrite candidates. */
+function pruneThrough(rows: IssuanceRetirementRows, through: number): IssuanceRetirementRows {
+	return {...rows, lineages: rows.lineages.map(lineage => ({...lineage, prunedThroughAuthorSequence: through})),
+		issued: rows.issued.filter(row => row.authorSequence > through),
+		outbox: rows.outbox.filter(row => row.authorSequence > through)};
+}
 function hole(rows: IssuanceRetirementRows, sequence: number) {
-	const row = rows.issued[sequence]!;
+	const row = rows.issued.find(value => value.authorSequence === sequence)!;
 	return {author: scope.author, authorSequence: sequence, digest: Buffer.from(row.digest).toString("hex")};
 }
 function prepare(rows: IssuanceRetirementRows, sequences: number[]): DurableIssuanceRetirementPreparation {
@@ -47,13 +54,19 @@ function prepare(rows: IssuanceRetirementRows, sequences: number[]): DurableIssu
 
 describe("native retirement plan law", () => {
 	it.each([
-		{protected: [0], retained: [0, 1, 2]},
-		{protected: [1], retained: [1, 2]},
-		{protected: [2], retained: [2]},
-		{protected: [3], retained: []},
-		{protected: [], retained: []},
-	])("commits exactly the surviving plan consumers for $protected", ({protected: protectedSequences, retained}) => {
-		const rows = decodeCanonical(encodeCanonical(fixture())) as IssuanceRetirementRows;
+		{protected: [0], pruned: -1, retained: [0, 1, 2]},
+		// Retired sources the store still holds keep their completed entries (custody).
+		{protected: [1], pruned: -1, retained: [0, 1, 2]},
+		{protected: [3], pruned: -1, retained: [0, 1, 2]},
+		{protected: [], pruned: -1, retained: [0, 1, 2]},
+		{protected: [1], pruned: 0, retained: [1, 2]},
+		{protected: [2], pruned: 1, retained: [2]},
+		{protected: [3], pruned: 2, retained: []},
+		{protected: [], pruned: 2, retained: []},
+	])("commits exactly the surviving plan consumers for $protected with the prefix pruned through $pruned",
+		({protected: protectedSequences, pruned, retained}) => {
+		const held = decodeCanonical(encodeCanonical(fixture())) as IssuanceRetirementRows;
+		const rows = pruned < 0 ? held : pruneThrough(held, pruned);
 		const originalBytes = encodeCanonical(rows), p = prepare(rows, protectedSequences);
 		const prepared = decodeIssuanceRetirementControl(encodeIssuanceRetirementControl({...control,
 			revision: 1, sequence: 1, active: {sequence: 1, preparation: p}}));
@@ -69,18 +82,18 @@ describe("native retirement plan law", () => {
 		expect(issuanceRetirementTransitionRows(prepared, {...prepared, active: null}, rows)).toBe(rows);
 	});
 	it("refuses corrupted native rows before returning any transition target", () => {
-		const rows = fixture(), p = prepare(rows, [1]);
+		const rows = pruneThrough(fixture(), 0), p = prepare(rows, [2]);
 		const prepared = {...control, revision: 1, sequence: 1, active: {sequence: 1, preparation: p}};
 		const completed = {...prepared, revision: 2, active: null, completed: p};
 		const corruptions: IssuanceRetirementRows[] = [
-			{...rows, outbox: rows.outbox.map(row => row.authorSequence === 0 ? {...row, publishState: "pending"} : row)},
+			{...rows, outbox: rows.outbox.map(row => row.authorSequence === 1 ? {...row, publishState: "pending"} : row)},
 			{...rows, issued: rows.issued.filter(row => row.authorSequence !== 1)},
 			{...rows, issued: rows.issued.map(row => row.authorSequence === 1 ? {...row,
 				canonicalPreimageBytes: encodeCanonical({unexpected: "not-an-issued-vertex"})} : row)},
 			{...rows, plans: [{...rows.plans[0]!, entries: rows.plans[0]!.entries.map(entry =>
 				entry.sourceSequence === 1 ? {...entry, sourceDigest: new Uint8Array(32).fill(17)} : entry)}]},
 			{...rows, plans: [{...rows.plans[0]!, entries: rows.plans[0]!.entries.map(entry =>
-				entry.sourceSequence === 1 ? {...entry, replacementSequence: 99} : entry)}]},
+				entry.sourceSequence === 2 ? {...entry, replacementSequence: 99} : entry)}]},
 		];
 		for (const corrupted of corruptions) {
 			const before = encodeCanonical(corrupted);
@@ -101,17 +114,23 @@ describe("native retirement plan law", () => {
 		const copied = copySettlementPlan(plan, scope)!;
 		expect(copied).toEqual(plan);
 		expect(copied.sourceContexts![0]!.exactCanonicalContextBytes).not.toBe(plan.sourceContexts[0]!.exactCanonicalContextBytes);
-		const partial = issuanceRetirementCommitRows(control, prepare(rows, [2]), rows).plans[0]!;
+		// Held sources keep their completed entries and contexts (custody); pruned ones release them.
+		const custody = issuanceRetirementCommitRows(control, prepare(rows, []), rows).plans[0]!;
+		expect(custody).toBe(plan);
+		const partialRows = pruneThrough(rows, 1);
+		const partial = issuanceRetirementCommitRows(control, prepare(partialRows, [2]), partialRows).plans[0]!;
 		expect(partial.entries.map(entry => entry.sourceSequence)).toEqual([2]);
 		expect(partial.sourceContexts).toEqual([contexts[1]]);
-		const complete = issuanceRetirementCommitRows(control, prepare(rows, []), rows).plans[0]!;
+		const completeRows = pruneThrough(rows, 2);
+		const complete = issuanceRetirementCommitRows(control, prepare(completeRows, []), completeRows).plans[0]!;
 		expect(complete.entries).toEqual([]);
 		expect(complete.sourceContexts).toBeUndefined();
 		const heldRows = {...rows, plans: [{...plan, entries: plan.entries.map((entry,index) => index === 0 ?
 			{...entry, disposition: "manual-review" as const, replacementSequence: null} : entry)}]};
 		const held = issuanceRetirementCommitRows(control, prepare(heldRows, []), heldRows).plans[0]!;
-		expect(held.entries.map(entry => entry.sourceSequence)).toEqual([0]);
-		expect(held.sourceContexts).toEqual([contexts[0]]);
+		// The open review is retained; the completed siblings are custody of their held sources.
+		expect(held.entries.map(entry => entry.sourceSequence)).toEqual([0, 1, 2]);
+		expect(held.sourceContexts).toEqual(plan.sourceContexts);
 		expect(copySettlementPlan({...plan, sourceContexts: [contexts[0]]}, scope)).toBeUndefined();
 		expect(copySettlementPlan({...plan, sourceContexts: [...plan.sourceContexts, plan.sourceContexts[0]]}, scope)).toBeUndefined();
 		expect(copySettlementPlan({...plan, sourceContexts: plan.sourceContexts.map(context => ({...context,
@@ -260,8 +279,16 @@ describe("native retirement plan law", () => {
 		expect(() => assertIssuanceRetirementPreparationRows(control, {...labels, protectedRecords: [hole(rows, 0)]}, rows))
 			.toThrow("not dependency closed");
 	});
-	it("drops only retired sources and reconstructs the exact original image", () => {
+	it("keeps retired held sources' completed entries without a rewrite", () => {
 		const rows = fixture(), p = prepare(rows, [1]);
+		expect(p.protectedRecords.map(value => value.authorSequence)).toEqual([1, 2, 3]);
+		// Source 0 retires, but the store still holds it: its entry is custody, not a dependency.
+		expect(p.planRewrite).toBeUndefined();
+		assertIssuanceRetirementPreparationRows(control, p, rows);
+		expect(issuanceRetirementCommitRows(control, p, rows)).toEqual(rows);
+	});
+	it("drops only pruned sources and reconstructs the exact original image", () => {
+		const rows = pruneThrough(fixture(), 0), p = prepare(rows, [1]);
 		expect(p.protectedRecords.map(value => value.authorSequence)).toEqual([1, 2, 3]);
 		expect(p.planRewrite?.plans).toHaveLength(1);
 		expect(encodeCanonical(p.planRewrite).byteLength).toBeLessThanOrEqual(
@@ -277,7 +304,7 @@ describe("native retirement plan law", () => {
 		expect(decodeIssuanceRetirementControl(encodeIssuanceRetirementControl(completed))).toEqual(completed);
 	});
 	it("rejects missing, substituted and independently changed rewrite evidence", () => {
-		const rows = fixture(), p = prepare(rows, [1]);
+		const rows = pruneThrough(fixture(), 0), p = prepare(rows, [1]);
 		expect(() => assertIssuanceRetirementPreparationRows(control, {...labels, protectedRecords: p.protectedRecords}, rows))
 			.toThrow("rewrite differs");
 		const after = decodeCanonical(p.planRewrite!.plans[0]!.after) as Record<string, unknown>;
@@ -331,7 +358,13 @@ describe("native retirement plan law", () => {
 		expect(completed).toEqual([]);
 		const p = issuanceRetirementPreparationWithPlanRewrite(control, {...labels, throughEpoch: last, protectedRecords: completed}, rows);
 		assertIssuanceRetirementPreparationRows(control, p, rows);
-		expect(issuanceRetirementCommitRows(control, p, rows).plans[0]).toEqual({...rows.plans[0], revision: 10, entries: []});
+		// Every link is custody while the store holds it; the prefix pruner then releases the chain.
+		expect(issuanceRetirementCommitRows(control, p, rows)).toEqual(rows);
+		const drained = pruneThrough(rows, last);
+		const released = issuanceRetirementPreparationWithPlanRewrite(control, {...labels, throughEpoch: last,
+			protectedRecords: closeIssuanceRetirementProtectedRecords({control, rows: drained, throughEpoch: last, protectedRecords: []})}, drained);
+		assertIssuanceRetirementPreparationRows(control, released, drained);
+		expect(issuanceRetirementCommitRows(control, released, drained).plans[0]).toEqual({...rows.plans[0], revision: 10, entries: []});
 	});
 	it("keeps external replacement custody separate from colliding local ordinals", () => {
 		const original = fixture(), target = original.issued[1]!;
