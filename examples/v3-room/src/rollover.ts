@@ -1,3 +1,4 @@
+import { isV3RoomClosePendingRefusal } from "@ts-drp/node/v3-room";
 import type { V3RoomAcceptedVertex, V3RoomSession } from "@ts-drp/node/v3-room";
 
 /** The adopted successor's offer (the four exact canonical byte strings a member installs). */
@@ -148,12 +149,11 @@ const CLOSING_REFUSAL =
 /**
  * An interrupted creator close that the room retries by itself (fix/creator-close-crash): new
  * operations are refused with "v3 room new operation is not authorized: not-active: close-pending:
- * ..." until the retried close lands. The move waits for the room's epoch to advance (within the
- * closing bound) and is offered again; the policy never seals for it and never counts it as a
- * capacity offer. Matches the refusal's stable marker until this branch has v3-room's
- * V3_ROOM_CLOSE_PENDING / isV3RoomClosePendingRefusal(error), which replaces it at integration.
+ * ..." until the retried close lands (isV3RoomClosePendingRefusal). The move waits for the room's
+ * epoch to advance (within the closing bound) and is offered again; the policy never seals for it
+ * and never counts it as a capacity offer. A rollover the policy starts meanwhile is that same
+ * close: the room's sealEpoch joins its in-flight retry or runs it in place of the pending one.
  */
-const CLOSE_PENDING_REFUSAL = /: close-pending: /u;
 const SESSION_CLOSED = /v3 room session is closed/u;
 /**
  * Capacity refusals of one move before the last is thrown. The creator's issuance image spans the
@@ -428,7 +428,7 @@ export function createV3RoomRolloverPolicy(
 				return;
 			} catch (error) {
 				if (closed) throw error;
-				if (CLOSE_PENDING_REFUSAL.test(message(error))) {
+				if (isV3RoomClosePendingRefusal(error)) {
 					// Not an offer of the move, and no seal: the room retries its interrupted close by itself.
 					// Wait for that retry (the epoch advancing), within the closing bound, then offer again.
 					closingSince ??= performance.now();
