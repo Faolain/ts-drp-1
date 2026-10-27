@@ -195,7 +195,7 @@ export function issuanceLegacySettlementPlanEntriesJson(plan: SettlementPlan): s
 }
 
 export function issuanceSettlementPlanStorageByteLength(plan: SettlementPlan): number {
-	return plan.sourceContexts === undefined
+	return plan.sourceContexts === undefined && plan.handBacks === undefined
 		? new TextEncoder().encode(issuanceLegacySettlementPlanEntriesJson(plan)).byteLength
 		: issuanceCanonicalSettlementPlanStorageByteLength(encodeCanonical(plan, unsignedEncodingLimits).byteLength);
 }
@@ -265,10 +265,20 @@ export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueSc
 	if (contexts.reduce((sum, context) => sum + context.exactCanonicalContextBytes.byteLength, 0) +
 		additionalContexts.reduce((sum, length) => sum + length, 0) > SETTLEMENT_REPLACEMENT_DIGEST_LIMITS.maxBytes)
 		throw issuanceRetirementRefusal("source custody contexts exceed original plan bound");
+	// Hand-back records already in the plan are charged exactly. Records a later frontier resolution adds
+	// are bounded by SETTLEMENT_HAND_BACK_LIMITS (contract), far below the native read bound; reserving
+	// that cap here for every author made each creator close quote exceed its prospective census.
+	const existingHandBacks = captured?.handBacks;
+	const handBacks = existingHandBacks === undefined ? undefined : {
+		width: encodeCanonical(existingHandBacks, unsignedEncodingLimits).byteLength,
+		shape: unsignedCanonicalShape(existingHandBacks),
+	};
 	const byteLength = unsignedRecordWidth({scope}, {revision: integer, fenceSequence: integer,
-		entries: unsignedArrayWidth(entryWidths), sourceContexts: unsignedArrayWidth(contextWidths)});
+		entries: unsignedArrayWidth(entryWidths), sourceContexts: unsignedArrayWidth(contextWidths),
+		...(handBacks === undefined ? {} : {handBacks: handBacks.width})});
 	const shape = unsignedRecordShape({scope}, {revision: leaf, fenceSequence: leaf,
-		entries: unsignedArrayShape(entryShapes), sourceContexts: unsignedArrayShape(contextShapes)});
+		entries: unsignedArrayShape(entryShapes), sourceContexts: unsignedArrayShape(contextShapes),
+		...(handBacks === undefined ? {} : {handBacks: handBacks.shape})});
 	const nativeStorageByteLength = issuanceCanonicalSettlementPlanStorageByteLength(byteLength);
 	if (byteLength > geometry.maxNativeReadByteLength || nativeStorageByteLength > geometry.maxNativeReadByteLength)
 		throw issuanceRetirementRefusal("source custody plan exceeds original native read bound");
@@ -1553,7 +1563,9 @@ function verifiedRetirementPlan(input: unknown): Readonly<{ plan: SettlementPlan
 	const plan = verifiedPlans.verify(bytes, () => {
 		const value = decodeCanonical(bytes);
 		const hasContexts = typeof value === "object" && value !== null && Object.hasOwn(value, "sourceContexts");
-		if (!isClosedDurableIssuanceRecord(value, ["scope", "revision", "fenceSequence", "entries", ...(hasContexts ? ["sourceContexts"] : [])])) throw invalid();
+		const hasHandBacks = typeof value === "object" && value !== null && Object.hasOwn(value, "handBacks");
+		if (!isClosedDurableIssuanceRecord(value, ["scope", "revision", "fenceSequence", "entries",
+			...(hasContexts ? ["sourceContexts"] : []), ...(hasHandBacks ? ["handBacks"] : [])])) throw invalid();
 		assertDurableIssueScope(value.scope);
 		const verified = copySettlementPlan(value, value.scope);
 		if (verified === undefined || !issuanceRetirementBytesEqual(bytes, retirementPlanBytes(verified))) throw invalid();

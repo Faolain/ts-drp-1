@@ -112,12 +112,41 @@ export interface SettlementSourceContext {
 	readonly exactCanonicalContextBytes: Uint8Array;
 }
 
+/**
+ * Bounds on a plan's hand-back records (all records, consumed or not): an unconsumed record is an
+ * application move held for the application, so their number and bytes are capped. A move given back
+ * beyond the cap is not recorded.
+ */
+export const SETTLEMENT_HAND_BACK_LIMITS = Object.freeze({
+	maxRecords: 64,
+	maxOperationBytes: 16_384,
+});
+
+/**
+ * One operation the settlement window (or the creator's signed frontier) gave back to the application:
+ * the exact canonical operation of intent `intent` of the resolved own row `sourceSequence`. Written in
+ * the same plan write as that resolution, so it outlives the row's retirement; consumed by the issuance
+ * transaction of the row that offers the move again (plan effect `hand-back`), which sets
+ * `reissueSequence`. Plan writes never drop or alter an unconsumed record. Older readers refuse the
+ * field (closed record).
+ */
+export interface SettlementHandBack {
+	readonly sourceSequence: number;
+	readonly sourceDigest: Uint8Array;
+	readonly sourceEpoch: number;
+	readonly intent: number;
+	readonly exactCanonicalOperationBytes: Uint8Array;
+	readonly reissueSequence: number | null;
+}
+
 export interface SettlementPlan {
 	readonly scope: DurableIssueScope;
 	readonly revision: number;
 	readonly fenceSequence: number | null;
 	readonly entries: readonly SettlementPlanEntry[];
 	readonly sourceContexts?: readonly SettlementSourceContext[];
+	/** Sorted by (sourceSequence, intent); absent when empty. */
+	readonly handBacks?: readonly SettlementHandBack[];
 }
 
 export interface DurableIssueCommit {
@@ -134,7 +163,8 @@ export interface DurableIssueCommit {
 				readonly kind: "replacement";
 				readonly sourceSequence: number;
 				readonly throughIntent: number;
-		  }>;
+		  }>
+		| Readonly<{ readonly intent: number; readonly kind: "hand-back"; readonly sourceSequence: number }>;
 }
 
 export interface DurableIssueSignContext {

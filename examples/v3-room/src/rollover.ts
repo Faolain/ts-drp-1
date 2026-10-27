@@ -1,5 +1,5 @@
 import { isV3RoomClosePendingRefusal } from "@ts-drp/node/v3-room";
-import type { V3RoomAcceptedVertex, V3RoomSession, V3RoomSettlementStatus } from "@ts-drp/node/v3-room";
+import type { V3RoomAcceptedVertex, V3RoomHandBack, V3RoomSession, V3RoomSettlementStatus } from "@ts-drp/node/v3-room";
 
 /** The adopted successor's offer (the four exact canonical byte strings a member installs). */
 export type V3RoomSuccessorOffer = Awaited<ReturnType<V3RoomSession["exportCreatorSuccessor"]>>;
@@ -279,9 +279,12 @@ export function createV3RoomRolloverPolicy(
 	let keptEpoch = 0;
 	let keptTimer: ReturnType<typeof setTimeout> | undefined;
 	// A member's view of its own settlement (the room's settlementStatus), and the given-back moves it
-	// has already kept (by the digest of the row that last carried each).
+	// has already kept this session (by their durable hand-back record). A kept given-back operation
+	// is offered again with its record, whose consumption is part of the new row's own issuance
+	// transaction: after a crash the room lists it again only if that row was never issued.
 	let settlement: V3RoomSettlementStatus | undefined;
 	const takenBack = new Set<string>();
+	const handBackOf = new WeakMap<object, V3RoomHandBack>();
 	let settlementTimer: ReturnType<typeof setTimeout> | undefined;
 	let lastStatus = "";
 	const epochWaiters = new Set<() => void>();
@@ -496,13 +499,17 @@ export function createV3RoomRolloverPolicy(
 					settlement = next;
 					const listed = new Set<string>();
 					for (const given of next.undelivered) {
-						listed.add(given.vertexDigest);
-						if (takenBack.has(given.vertexDigest)) continue;
-						takenBack.add(given.vertexDigest);
-						for (const operation of given.operations) keep(operation, next.epoch);
+						const key = `${given.handBack.sourceSequence}:${given.handBack.intent}`;
+						listed.add(key);
+						if (takenBack.has(key)) continue;
+						takenBack.add(key);
+						for (const operation of given.operations) {
+							handBackOf.set(operation, given.handBack);
+							keep(operation, next.epoch);
+						}
 					}
-					// The room lists a given-back move until its rows are retired; forget it after.
-					for (const digest of [...takenBack]) if (!listed.has(digest)) takenBack.delete(digest);
+					// The room lists a given-back move until the row offering it again consumes its record.
+					for (const key of [...takenBack]) if (!listed.has(key)) takenBack.delete(key);
 				}
 			} catch (error) {
 				hooks.onError?.(error);
@@ -526,7 +533,9 @@ export function createV3RoomRolloverPolicy(
 			if (rolling !== undefined) await rolling;
 			const attempted = currentEpoch();
 			try {
-				await selected.issue(operation);
+				const handBack = handBackOf.get(operation);
+				await selected.issue(operation, handBack === undefined ? undefined : { handBack });
+				handBackOf.delete(operation);
 				return;
 			} catch (error) {
 				if (closed) throw error;
