@@ -1079,8 +1079,8 @@ export function creatorRecipientRetirementResumeRequested(plane: V3PlaneHandle):
  * reconciled is recorded for this plane, and the next install skips its own
  * turnover only if that boundary is still exactly current (the install's
  * predicate alone stays due while the current Cut classifies a retained scope).
- * Inline install turnover remains the backstop. This grants no authority: an unavailable or busy boundary is
- * reported before entry, never forced. After entry, any failure is recovery work.
+ * Inline install turnover remains the backstop. This grants no authority: an
+ * unavailable or busy boundary is reported before entry, never forced. After entry, any failure is recovery work.
  * With `resume`, the SAME passes instead discharge a durable reopen's halt on a
  * retirement this copy completed at its current epoch (a creator's readiness
  * boundary does this for the creator): they must reach the original terminal
