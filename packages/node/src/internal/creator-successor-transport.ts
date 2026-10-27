@@ -185,6 +185,96 @@ function auxiliary(record: Record<string, unknown>): CreatorSuccessorAuxiliaryMa
 	});
 }
 
+/** Why a creator's material server refused a request outright (it will never answer it). */
+export type CreatorSuccessorMaterialRefusalReason = "unauthorized" | "stale";
+const REFUSAL_REASONS: readonly string[] = ["unauthorized", "stale"];
+const REFUSAL_KEYS = ["kind", "nonce", "reason", "requesterPeer", "sourcePeer", "version"] as const;
+const REFUSAL_MAX_BYTES = 512;
+const REFUSAL_LIMITS = { maxBytes: REFUSAL_MAX_BYTES, maxDepth: 2, maxItems: 64 };
+
+/** The source refused this request explicitly: terminal for that source, never retried. */
+export class CreatorSuccessorMaterialRefused extends Error {
+	readonly code = "creator-successor-material-refused";
+	readonly retryClass = "terminal";
+	/**
+	 * @param reason - Why the creator refused.
+	 */
+	constructor(readonly reason: CreatorSuccessorMaterialRefusalReason) {
+		super(`creator material request was refused: ${reason}`);
+		this.name = "CreatorSuccessorMaterialRefused";
+	}
+}
+
+async function refuse(
+	stream: SnapshotChunkProtocolStream,
+	nonce: unknown,
+	reason: CreatorSuccessorMaterialRefusalReason,
+	sourcePeer: string
+): Promise<void> {
+	const controller = new AbortController();
+	const timer = setTimeout(
+		() => controller.abort(new Error("creator material refusal timed out")),
+		SNAPSHOT_PULL_INACTIVITY_MS
+	);
+	try {
+		await stream.write(
+			encodeCanonical(
+				{
+					kind: "creator-successor-material-refused",
+					version: 1,
+					reason,
+					nonce: nonce instanceof Uint8Array && nonce.byteLength === 32 ? Uint8Array.from(nonce) : new Uint8Array(0),
+					requesterPeer: stream.peerId,
+					sourcePeer,
+				},
+				REFUSAL_LIMITS
+			),
+			{ signal: controller.signal }
+		);
+		await stream.close();
+	} finally {
+		clearTimeout(timer);
+	}
+}
+
+/**
+ * The source's explicit refusal of this exact request, or undefined when the frame is not one.
+ * @param bytes - The response frame.
+ * @param nonce - This request's nonce.
+ * @param requesterPeer - This requester.
+ * @param sourcePeer - The source asked.
+ * @returns The refusal reason.
+ */
+function refusalOf(
+	bytes: Uint8Array,
+	nonce: Uint8Array,
+	requesterPeer: string,
+	sourcePeer: string
+): CreatorSuccessorMaterialRefusalReason | undefined {
+	if (bytes.byteLength > REFUSAL_MAX_BYTES) return undefined;
+	let value: unknown;
+	try {
+		value = decodeCanonical(bytes, REFUSAL_LIMITS);
+	} catch {
+		return undefined;
+	}
+	if (value === null || typeof value !== "object" || Array.isArray(value)) return undefined;
+	const record = value as Record<string, unknown>;
+	if (
+		record.kind !== "creator-successor-material-refused" ||
+		Object.keys(record).sort().join(",") !== REFUSAL_KEYS.join(",") ||
+		record.version !== 1 ||
+		typeof record.reason !== "string" ||
+		!REFUSAL_REASONS.includes(record.reason) ||
+		record.requesterPeer !== requesterPeer ||
+		record.sourcePeer !== sourcePeer ||
+		!(record.nonce instanceof Uint8Array) ||
+		compareBytes(record.nonce, nonce) !== 0
+	)
+		return undefined;
+	return record.reason as CreatorSuccessorMaterialRefusalReason;
+}
+
 /**
  * Peer possession binds routing, while signed protocol carriers remain the only successor authority.
  * @param input Native source material, its current application identity and authenticated transport peers.
@@ -199,6 +289,11 @@ export function createCreatorSuccessorMaterialServer(
 		manifestDigest: string;
 		material: CreatorSuccessorAuxiliaryMaterial;
 		connectedPeers(): readonly string[];
+		/**
+		 * Optional gate before an authorized request's signed response (decision row 61: the room
+		 * holds it until the creator has adopted the successor it serves). A refusal never waits.
+		 */
+		admitResponse?(peerId: string, signal: AbortSignal): Promise<void>;
 	}>
 ): Readonly<{
 	authorization: SnapshotPeerAuthorization;
@@ -231,9 +326,12 @@ export function createCreatorSuccessorMaterialServer(
 			]);
 			const { signature, ...proof } = request;
 			const checkpointRequested = request.version === 2 && request.materialKind === "checkpoint";
-			if (
+			// A request this server will never answer gets an explicit refusal, so the requester stops
+			// instead of retrying an abort it must treat as transient. The refusal is unsigned: it is
+			// bound to the authenticated stream's peers and the request's nonce, grants nothing, and
+			// only ends the requester's attempts at this one peer.
+			const refusal: CreatorSuccessorMaterialRefusalReason | undefined =
 				!(checkpointRequested || (request.version === 1 && !Object.hasOwn(request, "materialKind"))) ||
-				request.manifestDigest !== input.manifestDigest ||
 				request.requesterPeer !== stream.peerId ||
 				request.sourcePeer !== input.localPeerId ||
 				!(request.nonce instanceof Uint8Array) ||
@@ -241,15 +339,22 @@ export function createCreatorSuccessorMaterialServer(
 				typeof request.author !== "string" ||
 				!(input.isAuthorizedReader ?? input.identity.isAuthorizedAuthor)(request.author) ||
 				!(await verify(request.author, signature, proof))
-			)
-				throw new TypeError("creator material requester is unauthorized");
+					? "unauthorized"
+					: request.manifestDigest !== input.manifestDigest
+						? "stale"
+						: undefined;
+			if (refusal !== undefined) {
+				await refuse(stream, request.nonce, refusal, input.localPeerId);
+				return true;
+			}
 			// Routing possession is transient and bounded by the existing transfer session ceiling.
 			const connected = new Set(input.connectedPeers());
 			for (const peer of authors.keys()) if (!connected.has(peer)) authors.delete(peer);
 			if (!connected.has(stream.peerId)) throw new TypeError("creator material requester disconnected");
 			if (!authors.has(stream.peerId) && authors.size >= SNAPSHOT_PULL_MAX_GLOBAL_SESSIONS)
 				throw new TypeError("creator material requester session limit reached");
-			authors.set(stream.peerId, request.author);
+			// A string: any other author was refused above.
+			authors.set(stream.peerId, request.author as string);
 			const { exactCanonicalCloseMembershipBytes: membership,
 				exactCanonicalReattachmentCheckpointBytes: checkpoint, ...common } = auxiliary(input.material as unknown as Record<string, unknown>);
 			const unavailable = checkpointRequested && checkpoint === undefined;
@@ -277,6 +382,7 @@ export function createCreatorSuccessorMaterialServer(
 				SNAPSHOT_PULL_INACTIVITY_MS
 			);
 			try {
+				await input.admitResponse?.(stream.peerId, controller.signal);
 				await stream.write(
 					encodeCanonical({ ...response, signature: await signTransportFrame(input.identity, response, controller.signal) },
 						responseLimits),
@@ -312,7 +418,8 @@ type ReceivedCreatorSuccessorMaterial = CreatorSuccessorAuxiliaryMaterial &
 /**
  * One material attempt's outcome. Transient: the attempt's own deadline or the caller's lifetime
  * ended it, or opening, writing or reading the stream failed (a reset, an ended stream, no
- * connection). Terminal: signing failed, or the response itself is unacceptable (malformed frame,
+ * connection). Terminal: signing failed, the source refused the request explicitly (an
+ * unauthorized reader, or a successor it no longer serves), or the response itself is unacceptable (malformed frame,
  * wrong kind, version, manifest, peers or nonce, unauthorized author, bad signature, invalid
  * bounds). Uncertain cleanup: the stream's release could not be confirmed.
  */
@@ -371,6 +478,8 @@ async function attemptCreatorSuccessorMaterial(
 		await stream.write(encodeCanonical({ ...request, signature }, FRAME_LIMITS), { signal: controller.signal });
 		const bytes = await stream.read(MAX_BYTES, { signal: controller.signal });
 		phase = "response";
+		const refused = refusalOf(bytes, nonce, input.transport.localPeerId, peer);
+		if (refused !== undefined) throw new CreatorSuccessorMaterialRefused(refused);
 		const response = decode(bytes, [
 			"kind",
 			"version",

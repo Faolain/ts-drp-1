@@ -353,7 +353,8 @@ export interface V3RoomSuccessorAuthority {
 	readonly genesisAnchorDigest: string;
 	readonly lifecycle: "active";
 	readonly objectId: string;
-	readonly profileId: "creator-trusted-v1";
+	/** The profile the room's genesis signed. */
+	readonly profileId: "creator-trusted-v1" | "creator-trusted-settlement-v1";
 }
 
 export type {
@@ -834,7 +835,8 @@ function successorAuthority(trust: unknown, handle: RoomPlaneHandle): V3RoomSucc
 		genesisAnchorDigest,
 		lifecycle: "active" as const,
 		objectId,
-		profileId,
+		// Checked above: creator-trusted-v1 or the one settlement profile (settlementProfileFor).
+		profileId: profileId as V3RoomSuccessorAuthority["profileId"],
 	});
 }
 
@@ -3492,9 +3494,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	// and the startup readiness included. A Writer's install does not retry a refused material
 	// fetch, so an early material request is held, not refused: the material server first
 	// authenticates it and admits its requester under its own session ceiling, and only its
-	// response write waits here, one per peer (a newer request from the same peer supersedes),
-	// within the server's own response deadline (its write signal). Manifest and chunk requests
-	// need an admitted requester, and none is reported before the adoption.
+	// signed response waits here (the server's admitResponse gate), one per peer (a newer request from the same peer supersedes),
+	// within the server's own response deadline. A request the server will never answer (an
+	// unauthorized reader, a successor it no longer serves) is refused at once, explicitly.
+	// Manifest and chunk requests need an admitted requester, and none is reported before the adoption.
 	// A Writer's install retries a held request that ended at that deadline (option E), so the gate
 	// never fails an install by itself. A held response belongs to one serving generation: a room
 	// close or a serving replacement cancels it before the old port joins its handlers, and a newly
@@ -3556,6 +3559,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		await successorServingScope?.release();
 		successorServingScope = await (await ownRecipientSnapshots()).openScope(exported.declaration);
 		const port = createSnapshotChunkProtocolPort(transport.networkNode, CREATOR_SUCCESSOR_PROTOCOL);
+		const closedEpoch = exported.declaration.scope.epoch;
+		const generation = successorServingGeneration;
 		const server = createCreatorSuccessorMaterialServer({
 			...(input.application.snapshotReadPolicy === "authenticated-public"
 				? { isAuthorizedReader: (): boolean => true }
@@ -3570,10 +3575,13 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			manifestDigest: exported.declaration.scope.manifestDigest,
 			material: exported.material,
 			connectedPeers: () => port.connectedPeers(),
+			// Only an authorized request's response waits for the adoption; a refusal is written at once.
+			admitResponse: async (peerId: string, signal: AbortSignal): Promise<void> => {
+				releaseDisconnectedSuccessorServingHolds(port.connectedPeers());
+				await holdUntilSuccessorAdopted(closedEpoch, peerId, signal, generation);
+			},
 		});
 		successorServing = createV3SnapshotTransferOwner({ transport: port });
-		const closedEpoch = exported.declaration.scope.epoch;
-		const generation = successorServingGeneration;
 		successorServing.serve({
 			authorization: Object.freeze({
 				authorForPeer: (peer: string): string | undefined =>
@@ -3589,11 +3597,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 						close: (): Promise<void> => stream.close(),
 						read: (maxBytes: number, options: Readonly<{ readonly signal: AbortSignal }>): Promise<Uint8Array> =>
 							stream.read(maxBytes, options),
-						write: async (bytes: Uint8Array, options: Readonly<{ readonly signal: AbortSignal }>): Promise<void> => {
-							releaseDisconnectedSuccessorServingHolds(port.connectedPeers());
-							await holdUntilSuccessorAdopted(closedEpoch, stream.peerId, options.signal, generation);
-							return stream.write(bytes, options);
-						},
+						write: (bytes: Uint8Array, options: Readonly<{ readonly signal: AbortSignal }>): Promise<void> =>
+							stream.write(bytes, options),
 					}),
 					bytes
 				),
@@ -3605,8 +3610,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	};
 	const serveAvailableSuccessor = async (): Promise<void> => {
 		// Serving is optional for a field-free local close. An explicit public export
-		// still calls serveSuccessor and requires the real protocol owner.
+		// still calls serveSuccessor and requires the real protocol owner. A receive-only
+		// session never serves: a recipient accepts material only from the creator or a current
+		// Writer, so its server could answer no one, and a reopened observer whose received
+		// predecessor is no longer retained must still open.
 		if (
+			input.receiveOnly === true ||
 			transport === undefined ||
 			typeof Reflect.get(transport.networkNode, "createSnapshotChunkProtocolHost") !== "function"
 		)

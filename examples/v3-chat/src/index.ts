@@ -2,7 +2,10 @@ import { openTrustedBlueprintCatalogBytes } from "@ts-drp/blueprint-catalog/byte
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import {
 	createV3RoomCreatorInviteMaterial,
+	createV3RoomRolloverPolicy,
 	createV3RoomSession,
+	createV3RoomSuccessorChannel,
+	createV3RoomSuccessorDelivery,
 	type V3RoomAcceptedOperation,
 	type V3RoomApplication,
 	type V3RoomCreatorInviteMaterial,
@@ -12,8 +15,10 @@ import {
 	type V3RoomMigrationProjection,
 	type V3RoomMigrationRehearsalReceipt,
 	type V3RoomProjectionInput,
+	type V3RoomRolloverPolicy,
 	type V3RoomSession,
 	type V3RoomSuccessorAuthority,
+	type V3RoomSuccessorDelivery,
 	type V3RoomTransport,
 } from "@ts-drp/example-v3-room";
 import { Keychain } from "@ts-drp/keychain";
@@ -21,6 +26,13 @@ import { createRecoverableFinalitySigner, type FinalitySigner } from "@ts-drp/ke
 import { type DRPNetworkNode, type Message, MessageType } from "@ts-drp/types";
 
 import catalogMaterial from "./catalog-material.json" with { type: "json" };
+import { V3_CHAT_GENESIS_PROFILE } from "./profile.js";
+import { V3_CHAT_ROLLOVER_BUDGET } from "./rollover.js";
+import {
+	createV3ChatSnapshotPort,
+	createV3ChatSuccessorNode,
+	type SnapshotChunkProtocolPort,
+} from "./successor-network.js";
 
 const OBJECT_ID = `creator:${"d".repeat(32)}`;
 const CREATOR_FINALITY_KEYCHAIN_SEED = "d107d-v3-chat-creator-finality";
@@ -49,6 +61,15 @@ const CLIENTS: Readonly<Record<ClientId, Readonly<{ logicalTime: number; seed: s
 	heidi: Object.freeze({ logicalTime: 10, seed: "d9339-v3-chat-heidi" }),
 });
 const ACL_VIEW_CLIENT_IDS = ["alice", "bob", "dave"] as const;
+/**
+ * Test override only. By default the creator rolls the room over by the demo's policy
+ * (rollover.ts) and announces each successor, and members install it through the successor
+ * delivery. A harness that seals, adopts and installs by hand sets this global to "manual" before
+ * it creates or joins a room: the room then opens with the demo's composition before it rolled
+ * over by itself (no policy, no delivery, no successor serving).
+ */
+const ROLLOVER_OVERRIDE = "__TS_DRP_V3_CHAT_ROLLOVER__";
+
 interface JoinInput {
 	readonly roomHeadAuthority: V3RoomHeadAuthority;
 	readonly channelName: string;
@@ -126,6 +147,10 @@ interface ChatSnapshot {
 
 interface ActiveChat {
 	readonly accepted: Map<string, ProjectedMessage>;
+	/** The room's rollover policy and successor delivery (absent in "manual" mode). */
+	readonly policy: V3RoomRolloverPolicy | undefined;
+	readonly delivery: V3RoomSuccessorDelivery | undefined;
+	closeSuccessorNode(): void;
 	readonly clientId: ClientId;
 	readonly clientAuthors: Readonly<Record<ClientId, string>>;
 	readonly databaseName: string;
@@ -486,14 +511,14 @@ async function createCreatorAuthorityMaterial(objectId = OBJECT_ID): Promise<Cre
 		}).sort((left, right) => compareText(left.author, right.author)),
 		objectId,
 		permissionless: false,
-		version: 1,
+		version: V3_CHAT_GENESIS_PROFILE.latchedAclVersion,
 	});
 	const application = applicationMaterial();
 	const signerSet = Object.freeze([Object.freeze({ publicKey: finalityKeychain.localAuthorId, signerId: "creator" })]);
 	const exactCanonicalSignerSetBytes = encodeCanonical(signerSet);
 	const exactCanonicalProfileBytes = encodeCanonical({
 		cryptoSuiteId: "ed25519-sha256-v3",
-		profileId: "creator-trusted-v1",
+		profileId: V3_CHAT_GENESIS_PROFILE.profileId,
 		quorum: 1,
 		signers: signerSet,
 	});
@@ -517,7 +542,12 @@ async function createCreatorInviteMaterial(objectId = OBJECT_ID): Promise<V3Room
 	return (await createCreatorAuthorityMaterial(objectId)).material;
 }
 
-function createRoomNetwork(peerId: string, channelName: string, knownPeerIds: readonly string[]): V3RoomTransport {
+function createRoomNetwork(
+	peerId: string,
+	channelName: string,
+	knownPeerIds: readonly string[],
+	successors: boolean
+): V3RoomTransport {
 	const channel = new BroadcastChannel(channelName);
 	const topics = new Set<string>();
 	const retainedDeliveries = new WeakSet<Message>();
@@ -565,6 +595,14 @@ function createRoomNetwork(peerId: string, channelName: string, knownPeerIds: re
 		},
 		sendGroupMessageRandomPeer: (): Promise<void> => Promise.resolve(),
 		subscribeToMessageQueue: (): void => undefined,
+		// The room serves and fetches successor material on this protocol (the creator after each
+		// adoption, a member at each install).
+		...(successors
+			? {
+					createSnapshotChunkProtocolHost: (protocol?: string): SnapshotChunkProtocolPort =>
+						createV3ChatSnapshotPort(peerId, channelName, knownPeerIds, protocol ?? "snapshot"),
+				}
+			: {}),
 	} as unknown as DRPNetworkNode;
 	channel.addEventListener("message", (event: MessageEvent<unknown>) => {
 		if (typeof event.data !== "object" || event.data === null) return;
@@ -722,50 +760,105 @@ async function joinRoom(input: RoomJoinInput): Promise<ActiveChat> {
 	let redirectedRoom: V3RoomSession<ChatProjection> | undefined;
 	let currentObjectId = OBJECT_ID;
 	const source = { room: undefined as V3RoomSession<ChatProjection> | undefined };
-	const room: V3RoomSession<ChatProjection> = await createV3RoomSession({
-		application,
-		author,
-		...(input.creatorFinalitySigner === undefined ? {} : { creatorFinalitySigner: input.creatorFinalitySigner }),
-		creatorInvite: input.creatorInvite,
-		databaseName: input.databaseName,
-		initialLogicalTime: selected.logicalTime,
-		issuanceDatabaseName: input.databaseName,
-		migrationDatabaseNamespace: input.databaseName,
-		objectId: OBJECT_ID,
-		openTransport: (openedObjectId) =>
-			createRoomNetwork(
-				author,
-				`${input.channelName}--${digest(
-					"ts-drp/v3-chat-room-channel/v1",
-					encodeCanonical({ objectId: openedObjectId })
-				)}`,
-				Object.values(clientAuthors)
-			),
-		onAcceptedVertex: () => undefined,
-		onMigrationTarget: (target, targetObjectId): void => {
-			redirectedRoom = target;
-			currentObjectId = targetObjectId;
-			if (source.room !== undefined) retainedSourceBridges.add(source.room);
-		},
-		onProjection: (projection): void => {
-			accepted.clear();
-			for (const [index, message] of projection.accepted.entries()) {
-				accepted.set(
-					isSnapshotAcceptedMessage(message)
-						? `authenticated-snapshot:${index}:${message.clientOperationId}`
-						: `${message.digest}:${message.operationIndex}`,
-					message
-				);
-			}
-		},
-		publicKeyBytes: bytes(author),
-		roomHeadAuthority: input.roomHeadAuthority,
-		signRegisteredVertexDigest: (registeredDigest) => keychain.signWithLocalAuthor(registeredDigest),
-	});
+	const roomChannelName = (openedObjectId: string): string =>
+		`${input.channelName}--${digest("ts-drp/v3-chat-room-channel/v1", encodeCanonical({ objectId: openedObjectId }))}`;
+	const knownPeerIds = Object.values(clientAuthors);
+	// The demo's own rollover (rollover.ts) and successor delivery on the room's channel. Only the
+	// creator's open holds the finality signer, so only it seals; members install each successor
+	// the delivery brings. A migration target is not rolled over (its source's policy and delivery
+	// end at the redirect).
+	const automatic = Reflect.get(globalThis, ROLLOVER_OVERRIDE) !== "manual";
+	const role = input.creatorFinalitySigner === undefined ? "member" : "creator";
+	const successorNode = automatic
+		? createV3ChatSuccessorNode(author, roomChannelName(OBJECT_ID), knownPeerIds)
+		: undefined;
+	const delivery =
+		successorNode === undefined
+			? undefined
+			: createV3RoomSuccessorDelivery({
+					role,
+					objectId: OBJECT_ID,
+					channel: createV3RoomSuccessorChannel(successorNode, OBJECT_ID),
+					// The demo's peers are its authors; the object id carries no creator routing hint.
+					creatorPeer: clientAuthors.alice,
+					hooks: {
+						onError: (error) => console.warn("v3 chat successor delivery failed; it is retried", error),
+						onRefused: (error) => console.warn("v3 chat successor offer was refused", error),
+					},
+				});
+	const policy =
+		delivery === undefined
+			? undefined
+			: createV3RoomRolloverPolicy({
+					role,
+					budget: V3_CHAT_ROLLOVER_BUDGET,
+					hooks: {
+						publishSuccessor: (offer, epoch): Promise<void> => delivery.publish(offer, epoch),
+						requestSuccessor: () => delivery.request(),
+						onError: (error) => console.warn("v3 chat rollover failed; it is retried", error),
+					},
+				});
+	const endSuccessors = (): void => {
+		policy?.close();
+		delivery?.close();
+		successorNode?.close();
+	};
+	let room: V3RoomSession<ChatProjection>;
+	try {
+		room = await createV3RoomSession({
+			application,
+			author,
+			...(input.creatorFinalitySigner === undefined ? {} : { creatorFinalitySigner: input.creatorFinalitySigner }),
+			creatorInvite: input.creatorInvite,
+			databaseName: input.databaseName,
+			initialLogicalTime: selected.logicalTime,
+			issuanceDatabaseName: input.databaseName,
+			migrationDatabaseNamespace: input.databaseName,
+			objectId: OBJECT_ID,
+			openTransport: (openedObjectId) =>
+				createRoomNetwork(author, roomChannelName(openedObjectId), knownPeerIds, automatic),
+			// The policy ends at a migration redirect, so it counts the source room only.
+			onAcceptedVertex: (vertex) => policy?.observe(vertex),
+			onMigrationTarget: (target, targetObjectId): void => {
+				redirectedRoom = target;
+				currentObjectId = targetObjectId;
+				endSuccessors();
+				if (source.room !== undefined) retainedSourceBridges.add(source.room);
+			},
+			onProjection: (projection): void => {
+				accepted.clear();
+				for (const [index, message] of projection.accepted.entries()) {
+					accepted.set(
+						isSnapshotAcceptedMessage(message)
+							? `authenticated-snapshot:${index}:${message.clientOperationId}`
+							: `${message.digest}:${message.operationIndex}`,
+						message
+					);
+				}
+			},
+			publicKeyBytes: bytes(author),
+			roomHeadAuthority: input.roomHeadAuthority,
+			signRegisteredVertexDigest: (registeredDigest) => keychain.signWithLocalAuthor(registeredDigest),
+		});
+	} catch (error) {
+		endSuccessors();
+		throw error;
+	}
 	source.room = room;
 	if (redirectedRoom !== undefined) retainedSourceBridges.add(room);
+	else {
+		policy?.bind(room);
+		delivery?.bind(room);
+	}
 	return Object.freeze({
 		accepted,
+		get policy(): V3RoomRolloverPolicy | undefined {
+			return redirectedRoom === undefined ? policy : undefined;
+		},
+		get delivery(): V3RoomSuccessorDelivery | undefined {
+			return redirectedRoom === undefined ? delivery : undefined;
+		},
+		closeSuccessorNode: endSuccessors,
 		clientId: input.clientId,
 		clientAuthors,
 		databaseName: input.databaseName,
@@ -830,7 +923,24 @@ const api = Object.freeze({
 		const selected = active;
 		if (selected === undefined) throw new TypeError("v3 chat client is not joined");
 		if (typeof text !== "string" || text.length === 0) throw new TypeError("v3 chat message is empty");
-		await selected.room.issue(Object.freeze({ action: "message", clientOperationId: crypto.randomUUID(), text }));
+		// Through the rollover policy, so a message refused at a capacity a rollover clears is offered
+		// again after it.
+		await (selected.policy ?? selected.room).issue(
+			Object.freeze({ action: "message", clientOperationId: crypto.randomUUID(), text })
+		);
+	},
+	/**
+	 * The room's rollover and successor delivery, for the page's status line and tests.
+	 * @returns The policy's state and counts and the delivery's counts (null in "manual" mode).
+	 */
+	rollover() {
+		const selected = active;
+		if (selected === undefined) throw new TypeError("v3 chat client is not joined");
+		const { policy, delivery } = selected;
+		return Object.freeze({
+			policy: policy === undefined ? null : Object.freeze({ ...policy.stats(), status: policy.status() }),
+			delivery: delivery?.stats() ?? null,
+		});
 	},
 	async rehearseMigration(): Promise<V3RoomMigrationRehearsalReceipt> {
 		const selected = active;
@@ -900,6 +1010,7 @@ const api = Object.freeze({
 		active = undefined;
 		const sources = [...retainedSourceBridges];
 		retainedSourceBridges.clear();
+		selected?.closeSuccessorNode();
 		await Promise.all([selected?.room.close(), ...sources.map((source) => source.close())]);
 	},
 });

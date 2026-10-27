@@ -23,8 +23,8 @@ import {
 } from "@ts-drp/storage-browser/maintenance";
 import { createBrowserRoomHeadAuthority } from "@ts-drp/storage-browser/room-head";
 import { openBrowserSealEvidenceStore } from "@ts-drp/storage-browser/seal-evidence";
-import { openBrowserSealVoteStore } from "@ts-drp/storage-browser/seal-vote";
 import { openBrowserSealSigningStore } from "@ts-drp/storage-browser/seal-signing";
+import { openBrowserSealVoteStore } from "@ts-drp/storage-browser/seal-vote";
 import { createBrowserSnapshotQuarantineStore } from "@ts-drp/storage-browser/snapshot-transfer";
 
 export { createV3RoomCreatorInviteMaterial, waitForV3RoomStartupForDiagnostics } from "@ts-drp/node/v3-room";
@@ -55,6 +55,30 @@ export type {
 	V3RoomTransport,
 } from "@ts-drp/node/v3-room";
 export type { V3RoomStorageHost } from "@ts-drp/node/v3-room-host";
+export {
+	createV3RoomRolloverPolicy,
+	V3_ROOM_MEMBER_SUCCESSOR_WAIT_MS,
+	type V3RoomRolloverBudget,
+	type V3RoomRolloverEvent,
+	type V3RoomRolloverHooks,
+	type V3RoomRolloverPolicy,
+	type V3RoomRolloverStatus,
+	V3RoomSuccessorUnavailable,
+	type V3RoomSuccessorOffer,
+} from "./rollover.js";
+export {
+	createV3RoomSuccessorChannel,
+	createV3RoomSuccessorDelivery,
+	openV3RoomSuccessorDelivery,
+	V3_ROOM_SUCCESSOR_OFFER_MAX_BYTES,
+	V3_ROOM_SUCCESSOR_POLL_MS,
+	v3RoomCreatorPeer,
+	type V3RoomSuccessorChannel,
+	type V3RoomSuccessorDelivery,
+	type V3RoomSuccessorDeliveryHooks,
+	type V3RoomSuccessorDeliveryStats,
+	type V3RoomSuccessorNode,
+} from "./successor-delivery.js";
 
 const browserStorageHost: V3RoomStorageHost = Object.freeze({
 	openAhe: (databaseName: string) => createBrowserAheDurableStore({ databaseName }),
@@ -63,7 +87,7 @@ const browserStorageHost: V3RoomStorageHost = Object.freeze({
 	openSnapshots: (primaryDatabaseName: string) => createBrowserSnapshotQuarantineStore({ primaryDatabaseName }),
 	openSealVote: (databaseName: string) => openBrowserSealVoteStore({ databaseName }),
 	openSealEvidence: (databaseName: string) => openBrowserSealEvidenceStore({ databaseName }),
-	openCreatorSigningStores: (databaseName: string) => openBrowserSealSigningStore({databaseName}),
+	openCreatorSigningStores: (databaseName: string) => openBrowserSealSigningStore({ databaseName }),
 	openRoomHead: (databaseName: string, initialization: V3RoomHeadInitialization) =>
 		createBrowserRoomHeadAuthority({ databaseName, initialization }),
 });
@@ -154,7 +178,8 @@ export function createBrowserV3RoomDatabaseStorageHost(
 		openSnapshots: async (name: string) => createBrowserRoomSnapshotQuarantineStore({ databaseName: await room(name) }),
 		openSealVote: async (name: string) => openBrowserRoomSealVoteStore({ databaseName: await room(name) }),
 		openSealEvidence: async (name: string) => openBrowserRoomSealEvidenceStore({ databaseName: await room(name) }),
-		openCreatorSigningStores: async (name: string) => openBrowserRoomSealSigningStore({ databaseName: await room(name) }),
+		openCreatorSigningStores: async (name: string) =>
+			openBrowserRoomSealSigningStore({ databaseName: await room(name) }),
 		openRoomRetirement: (name: string) => openBrowserRoomRetirement({ databaseName: name }),
 		openRoomHead: (databaseName: string, initialization: V3RoomHeadInitialization) =>
 			createBrowserRoomHeadAuthority({ databaseName, initialization }),
