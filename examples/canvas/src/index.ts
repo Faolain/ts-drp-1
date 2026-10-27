@@ -12,11 +12,13 @@ import {
 	createV3RoomCreatorInviteMaterial,
 	createV3RoomRolloverPolicy,
 	createV3RoomSession,
+	openV3RoomSuccessorDelivery,
 	type V3RoomCreatorInviteMaterial,
 	type V3RoomHeadAuthority,
 	type V3RoomRolloverHooks,
 	type V3RoomRolloverPolicy,
 	type V3RoomSession,
+	type V3RoomSuccessorDelivery,
 } from "@ts-drp/example-v3-room";
 import { DRPNode } from "@ts-drp/node";
 import { type CanvasProjection, createV3CanvasApplication } from "@ts-drp/node/applications/canvas";
@@ -44,8 +46,10 @@ declare global {
 		__TS_DRP_CANVAS_SETTLEMENT_SOURCE_APPROVAL__?: CanvasSettlementApproval;
 		__TS_DRP_CANVAS_SESSION__?: ModularBrowserNetworkSession;
 		/**
-		 * The application host's delivery of each adopted successor offer to the canvas's observers,
-		 * who install it to keep following the canvas. Without it the creator still rolls over.
+		 * Test override of the creator's successor announcement. By default the page's successor
+		 * delivery (examples/v3-room) announces each adopted offer to the canvas's observers over the
+		 * page's own node and answers their requests; with this hook, the hook receives the offers
+		 * instead and the page announces nothing.
 		 */
 		__TS_DRP_CANVAS_SUCCESSOR_PUBLISHER__?: NonNullable<V3RoomRolloverHooks["publishSuccessor"]>;
 	}
@@ -57,6 +61,8 @@ const application = createV3CanvasApplication(CANVAS_SIDE, CANVAS_SIDE);
 let room: V3RoomSession<CanvasProjection> | undefined;
 // The creator's rollover policy (examples/canvas/src/rollover.ts); observers never seal.
 let rollover: V3RoomRolloverPolicy | undefined;
+// Every page's successor delivery: the creator announces offers, observers install them.
+let delivery: V3RoomSuccessorDelivery | undefined;
 let projection: CanvasProjection | undefined;
 let node: DRPNode | undefined;
 let renderedCanvasId: string | undefined;
@@ -211,6 +217,16 @@ async function openCanvas(operation: "create" | "join"): Promise<void> {
 		const publishSuccessor = window.__TS_DRP_CANVAS_SUCCESSOR_PUBLISHER__;
 		if (publishSuccessor !== undefined && typeof publishSuccessor !== "function")
 			throw new TypeError("canvas successor publisher is invalid");
+		const successors = openV3RoomSuccessorDelivery(
+			selectedNode,
+			objectId,
+			operation === "create" ? "creator" : "member",
+			{
+				onError: (error) => console.warn("Canvas successor delivery failed; it is retried", error),
+				onRefused: (error) => console.warn("Canvas successor offer was refused", error),
+			}
+		);
+		delivery = successors;
 		// Only the creator seals: it rolls the canvas over at its budget or after an idle period.
 		const policy =
 			operation === "create"
@@ -218,7 +234,7 @@ async function openCanvas(operation: "create" | "join"): Promise<void> {
 						role: "creator",
 						budget: CANVAS_ROLLOVER_BUDGET,
 						hooks: {
-							...(publishSuccessor === undefined ? {} : { publishSuccessor }),
+							publishSuccessor: publishSuccessor ?? ((offer, epoch): Promise<void> => successors.publish(offer, epoch)),
 							onError: (error) => console.warn("Canvas rollover failed; it is retried", error),
 						},
 					})
@@ -250,6 +266,7 @@ async function openCanvas(operation: "create" | "join"): Promise<void> {
 		});
 		if (closing) throw new TypeError("canvas closed during open");
 		policy?.bind(opened);
+		successors.bind(opened);
 		rollover = policy;
 		room = opened;
 		observer = operation === "join";
@@ -264,6 +281,8 @@ async function openCanvas(operation: "create" | "join"): Promise<void> {
 	} catch (error) {
 		rollover?.close();
 		rollover = undefined;
+		delivery?.close();
+		delivery = undefined;
 		await opened?.close();
 		projection = undefined;
 		connectionStatus(
@@ -365,6 +384,7 @@ async function main(): Promise<void> {
 					try {
 						await openTask;
 						rollover?.close();
+						delivery?.close();
 						await room?.close();
 					} finally {
 						try {

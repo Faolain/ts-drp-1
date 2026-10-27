@@ -5,6 +5,7 @@ import { decodeEntityDeltaBatch, encodeEntityDeltaBatch, type EphemeralChannel }
 import {
 	createV3RoomCreatorInviteMaterial,
 	createV3RoomRolloverPolicy,
+	openV3RoomSuccessorDelivery,
 	createV3RoomSession,
 	type V3RoomAcceptedOperation,
 	type V3RoomCreatorInviteMaterial,
@@ -15,6 +16,7 @@ import {
 	type V3RoomProjectionInput,
 	type V3RoomRolloverHooks,
 	type V3RoomRolloverPolicy,
+	type V3RoomSuccessorDelivery,
 	type V3RoomSession,
 } from "@ts-drp/example-v3-room";
 import type { DRPNode } from "@ts-drp/node";
@@ -386,7 +388,9 @@ export interface V3ZoneApi {
  * @param onProjection Observer for deterministic durable and transient projections.
  * @param roomHeadAuthorityForOpen Host-owned authority acquisition; initialization belongs to the host.
  * @param onTransient Optional UI-only position observer; full public snapshots remain fresh.
- * @param publishSuccessor Optional host delivery of the creator's rollover offers to members.
+ * @param publishSuccessor Test override of the creator's successor announcement. By default the
+ * zone's successor delivery (examples/v3-room) announces each adopted offer to the zone's members
+ * over this node and answers their requests; with this hook, the hook receives the offers instead.
  * @returns The bounded zone application API.
  */
 export function createV3ZoneApi(
@@ -419,6 +423,8 @@ export function createV3ZoneApi(
 	// The creator's rollover policy (examples/grid/src/rollover.ts); a member's only offers a refused
 	// block placement again once its room installed the next epoch.
 	let rollover: V3RoomRolloverPolicy | undefined;
+	// The zone's successor delivery: the creator announces offers, members install them.
+	let delivery: V3RoomSuccessorDelivery | undefined;
 	let ephemeral: EphemeralChannel | undefined;
 	let projection = emptyProjection(localAuthor, localPeerId);
 	// Accepted-history identity belongs to the durable projection, not to an
@@ -721,12 +727,27 @@ export function createV3ZoneApi(
 				localAuthor === creatorAuthor ? await node.keychain.acquireLocalAuthorFinalitySigner() : undefined;
 			if (closeRequested) throw new Error("v3 zone closed during open");
 			const application = createV3ZoneApplication(bootstrapMembers, creatorPeerId, creatorAuthor, blueprintDigestFromInvite(creatorInvite));
+			const successors = openV3RoomSuccessorDelivery(
+				node,
+				selectedZoneId,
+				creatorFinalitySigner === undefined ? "member" : "creator",
+				{
+					onError: (error) => console.warn("v3 zone successor delivery failed; it is retried", error),
+					onRefused: (error) => console.warn("v3 zone successor offer was refused", error),
+				}
+			);
+			delivery = successors;
 			// Only the creator, which holds the finality signer, seals.
 			const policy = createV3RoomRolloverPolicy({
 				role: creatorFinalitySigner === undefined ? "member" : "creator",
 				budget: GRID_ROLLOVER_BUDGET,
 				hooks: {
-					...(publishSuccessor === undefined ? {} : { publishSuccessor }),
+					publishSuccessor: publishSuccessor ?? ((offer, epoch): Promise<void> => successors.publish(offer, epoch)),
+					requestSuccessor: () => successors.request(),
+					onStatus: (status) => {
+						if (status.state === "successor-unavailable")
+							console.warn("v3 zone is waiting for the creator's next epoch; kept placements", status.kept);
+					},
 					onError: (error) => console.warn("v3 zone rollover failed; it is retried", error),
 				},
 			});
@@ -802,6 +823,7 @@ export function createV3ZoneApi(
 			sourceRoom = opened;
 			// A migrated source forwards issue and seal to its target, so the policy stays bound to it.
 			policy.bind(opened);
+			successors.bind(opened);
 			if (redirectedDuringOpen !== undefined) retainedSourceBridges.add(opened);
 			if (closeRequested) throw new Error("v3 zone closed during open");
 			if (redirectedDuringOpen === undefined) {
@@ -817,6 +839,8 @@ export function createV3ZoneApi(
 		} catch (error) {
 			rollover?.close();
 			rollover = undefined;
+			delivery?.close();
+			delivery = undefined;
 			await Promise.allSettled([opened?.close(), redirectedDuringOpen?.close()]);
 			resetZoneState();
 			throw error;
@@ -1016,6 +1040,8 @@ export function createV3ZoneApi(
 				retainedSourceBridges.clear();
 				rollover?.close();
 				rollover = undefined;
+				delivery?.close();
+				delivery = undefined;
 				room = undefined;
 				ephemeral = undefined;
 				resetZoneState();

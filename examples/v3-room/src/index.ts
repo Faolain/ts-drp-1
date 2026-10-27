@@ -57,12 +57,28 @@ export type {
 export type { V3RoomStorageHost } from "@ts-drp/node/v3-room-host";
 export {
 	createV3RoomRolloverPolicy,
+	V3_ROOM_MEMBER_SUCCESSOR_WAIT_MS,
 	type V3RoomRolloverBudget,
 	type V3RoomRolloverEvent,
 	type V3RoomRolloverHooks,
 	type V3RoomRolloverPolicy,
+	type V3RoomRolloverStatus,
+	V3RoomSuccessorUnavailable,
 	type V3RoomSuccessorOffer,
 } from "./rollover.js";
+export {
+	createV3RoomSuccessorChannel,
+	createV3RoomSuccessorDelivery,
+	openV3RoomSuccessorDelivery,
+	V3_ROOM_SUCCESSOR_OFFER_MAX_BYTES,
+	V3_ROOM_SUCCESSOR_POLL_MS,
+	v3RoomCreatorPeer,
+	type V3RoomSuccessorChannel,
+	type V3RoomSuccessorDelivery,
+	type V3RoomSuccessorDeliveryHooks,
+	type V3RoomSuccessorDeliveryStats,
+	type V3RoomSuccessorNode,
+} from "./successor-delivery.js";
 
 const browserStorageHost: V3RoomStorageHost = Object.freeze({
 	openAhe: (databaseName: string) => createBrowserAheDurableStore({ databaseName }),

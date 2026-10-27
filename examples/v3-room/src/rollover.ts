@@ -43,11 +43,61 @@ export interface V3RoomRolloverHooks {
 	onRollover?(event: V3RoomRolloverEvent): void;
 	onError?(error: unknown): void;
 	/**
+	 * Member: a move waits for the room's next epoch (refused at a capacity only a rollover
+	 * clears). The page's successor delivery asks the creator for its latest offer.
+	 */
+	requestSuccessor?(): void;
+	/** Every change of `status()`, for the page's status line. */
+	onStatus?(status: V3RoomRolloverStatus): void;
+	/**
 	 * An application refusal that a rollover clears (Chat: its allowance is per checkpoint).
 	 * Native capacity refusals are recognised without it.
 	 */
 	clearedByRollover?(error: unknown): boolean;
 }
+
+/**
+ * The policy's state for the page. "waiting": a member's move waits for the next epoch.
+ * "successor-unavailable": no successor arrived within the member's bound; the kept moves are
+ * offered again, in order, once the room installs a later epoch.
+ */
+export type V3RoomRolloverStatus = Readonly<{
+	state: "ready" | "waiting" | "successor-unavailable";
+	epoch: number;
+	kept: readonly Readonly<Record<string, unknown>>[];
+}>;
+
+/**
+ * A member's move refused at a capacity only a rollover clears, when no later epoch arrived within
+ * the member's bound. The move is not lost: the policy keeps it and offers it again once the room
+ * installs a later epoch (`status().kept`).
+ */
+export class V3RoomSuccessorUnavailable extends Error {
+	/**
+	 * @param operation - The move kept for the next installed epoch.
+	 * @param epoch - The epoch the member waited in.
+	 * @param waitedMs - How long it waited.
+	 * @param options - The refusal that only a rollover clears, as the cause.
+	 */
+	constructor(
+		readonly operation: Readonly<Record<string, unknown>>,
+		readonly epoch: number,
+		readonly waitedMs: number,
+		options?: ErrorOptions
+	) {
+		super(`no successor epoch arrived within ${Math.round(waitedMs)} ms; the move is kept`, options);
+		this.name = "V3RoomSuccessorUnavailable";
+	}
+}
+
+/**
+ * How long a member waits for the room's next epoch after a capacity refusal before it tells the
+ * page and keeps the move. A rollover (seal, adopt, export) measured 1-3 s natively; delivery and
+ * install add a few seconds more. Thirty seconds is ten times that and still short for a person.
+ */
+export const V3_ROOM_MEMBER_SUCCESSOR_WAIT_MS = 30_000;
+/** How often a member with kept moves looks for a later epoch. */
+const KEPT_POLL_MS = 1_000;
 
 type RolloverRoom = Pick<
 	V3RoomSession,
@@ -72,6 +122,8 @@ export interface V3RoomRolloverPolicy {
 	issue(operation: Readonly<Record<string, unknown>>): Promise<void>;
 	/** Moves waiting to be offered again, for the page's status line. */
 	waiting(): number;
+	/** The state the page shows, with the moves a member kept (see V3RoomSuccessorUnavailable). */
+	status(): V3RoomRolloverStatus;
 	/** Joins an in-flight rollover (tests and orderly shutdown). */
 	settled(): Promise<void>;
 	stats(): Readonly<{ epoch: number; rollovers: number; moves: number; weight: number }>;
@@ -136,10 +188,18 @@ function later(work: () => void): void {
  * @returns The policy; bind it to the room once the room is open.
  */
 export function createV3RoomRolloverPolicy(
-	input: Readonly<{ role: "creator" | "member"; budget: V3RoomRolloverBudget; hooks?: V3RoomRolloverHooks }>
+	input: Readonly<{
+		role: "creator" | "member";
+		budget: V3RoomRolloverBudget;
+		hooks?: V3RoomRolloverHooks;
+		/** A member's bound on waiting for the next epoch (default V3_ROOM_MEMBER_SUCCESSOR_WAIT_MS). */
+		memberWaitMs?: number;
+	}>
 ): V3RoomRolloverPolicy {
 	const { role, budget } = input;
 	const hooks = input.hooks ?? {};
+	const memberWaitMs = input.memberWaitMs ?? V3_ROOM_MEMBER_SUCCESSOR_WAIT_MS;
+	if (!Number.isFinite(memberWaitMs) || memberWaitMs <= 0) throw new TypeError("v3 room member wait is invalid");
 	if (!Number.isSafeInteger(budget.movesPerAuthor) || budget.movesPerAuthor < 1)
 		throw new TypeError("v3 room rollover budget is invalid");
 	if (!Number.isFinite(budget.idleMs) || budget.idleMs <= 0) throw new TypeError("v3 room rollover idle is invalid");
@@ -155,12 +215,35 @@ export function createV3RoomRolloverPolicy(
 	let retryAt = 0;
 	let failures = 0;
 	let waiting = 0;
+	let successorWaits = 0;
+	const kept: Readonly<Record<string, unknown>>[] = [];
+	let keptEpoch = 0;
+	let keptTimer: ReturnType<typeof setTimeout> | undefined;
+	let lastStatus = "";
 	const epochWaiters = new Set<() => void>();
 	function close(): void {
 		closed = true;
 		if (idleTimer !== undefined) clearTimeout(idleTimer);
+		if (keptTimer !== undefined) clearTimeout(keptTimer);
 		for (const wake of [...epochWaiters]) wake();
 	}
+	const status = (): V3RoomRolloverStatus =>
+		Object.freeze({
+			state: kept.length > 0 ? "successor-unavailable" : successorWaits > 0 ? "waiting" : "ready",
+			epoch: currentEpoch(),
+			kept: Object.freeze([...kept]),
+		});
+	const reportStatus = (): void => {
+		const next = status();
+		const key = `${next.state}:${next.kept.length}`;
+		if (key === lastStatus) return;
+		lastStatus = key;
+		try {
+			hooks.onStatus?.(next);
+		} catch (error) {
+			hooks.onError?.(error);
+		}
+	};
 
 	const most = (values: ReadonlyMap<string, number>): number => Math.max(0, ...values.values());
 	const currentEpoch = (): number => Math.max(epoch, room?.authority()?.epoch ?? 0);
@@ -283,6 +366,110 @@ export function createV3RoomRolloverPolicy(
 			poll();
 		});
 
+	// Kept moves are offered again, in order, once the room is past the epoch that refused them.
+	const watchKept = (): void => {
+		if (keptTimer !== undefined || closed || kept.length === 0) return;
+		keptTimer = setTimeout(() => {
+			keptTimer = undefined;
+			if (closed || kept.length === 0) return;
+			if (currentEpoch() <= keptEpoch) {
+				watchKept();
+				return;
+			}
+			advance(currentEpoch());
+			const pending = kept.splice(0, kept.length);
+			reportStatus();
+			void (async (): Promise<void> => {
+				for (const operation of pending) {
+					try {
+						await issue(operation);
+					} catch (error) {
+						// A move refused again for want of a successor is kept again by issue().
+						if (!(error instanceof V3RoomSuccessorUnavailable)) hooks.onError?.(error);
+					}
+				}
+			})();
+		}, KEPT_POLL_MS);
+	};
+	const keep = (operation: Readonly<Record<string, unknown>>, attempted: number): void => {
+		kept.push(operation);
+		keptEpoch = Math.max(keptEpoch, attempted);
+		reportStatus();
+		watchKept();
+	};
+
+	async function issue(operation: Readonly<Record<string, unknown>>): Promise<void> {
+		const selected = room;
+		if (selected === undefined) throw new TypeError("v3 room rollover policy is not bound");
+		let closingSince: number | undefined;
+		for (let offer = 1; ; offer++) {
+			// A move never enters the creator's own rollover between its seal and its adoption.
+			if (rolling !== undefined) await rolling;
+			const attempted = currentEpoch();
+			try {
+				await selected.issue(operation);
+				return;
+			} catch (error) {
+				if (closed) throw error;
+				if (CLOSING_REFUSAL.test(message(error))) {
+					// Not an offer of the move: the room was between epochs. Bounded by the closing's length.
+					closingSince ??= performance.now();
+					if (performance.now() - closingSince >= CLOSING_LIMIT_MS) throw error;
+					offer--;
+					waiting++;
+					try {
+						await (rolling ?? Promise.resolve());
+						await nextEpoch(attempted, CLOSING_RETRY_MS);
+					} finally {
+						waiting--;
+					}
+					continue;
+				}
+				closingSince = undefined;
+				if (offer >= MAX_OFFERS) throw error;
+				if (TRANSIENT_REFUSAL.test(message(error))) {
+					await new Promise((resolve) => setTimeout(resolve, TRANSIENT_RETRY_MS * offer));
+					continue;
+				}
+				if (!clearedByRollover(error)) throw error;
+				// The refused move was not admitted (its issue transaction or admission refused it);
+				// the same move is offered again in a later epoch.
+				waiting++;
+				try {
+					if (role === "creator") {
+						if (currentEpoch() === attempted) await roll("refusal");
+						if (currentEpoch() === attempted) throw error;
+					} else {
+						// A member's successor comes from the creator through the page's delivery. Ask for it,
+						// and wait a bounded time: with no successor, the page is told and the move kept.
+						successorWaits++;
+						reportStatus();
+						const started = performance.now();
+						try {
+							hooks.requestSuccessor?.();
+						} catch (requestError) {
+							hooks.onError?.(requestError);
+						}
+						try {
+							await nextEpoch(attempted, memberWaitMs);
+						} finally {
+							successorWaits--;
+						}
+						if (currentEpoch() <= attempted) {
+							keep(operation, attempted);
+							throw new V3RoomSuccessorUnavailable(operation, attempted, performance.now() - started, {
+								cause: error,
+							});
+						}
+						reportStatus();
+					}
+				} finally {
+					waiting--;
+				}
+			}
+		}
+	}
+
 	return Object.freeze({
 		role,
 		bind(selected: RolloverRoom): void {
@@ -303,55 +490,9 @@ export function createV3RoomRolloverPolicy(
 			armIdle();
 			if (overBudget()) schedule("budget");
 		},
-		async issue(operation: Readonly<Record<string, unknown>>): Promise<void> {
-			const selected = room;
-			if (selected === undefined) throw new TypeError("v3 room rollover policy is not bound");
-			let closingSince: number | undefined;
-			for (let offer = 1; ; offer++) {
-				// A move never enters the creator's own rollover between its seal and its adoption.
-				if (rolling !== undefined) await rolling;
-				const attempted = currentEpoch();
-				try {
-					await selected.issue(operation);
-					return;
-				} catch (error) {
-					if (closed) throw error;
-					if (CLOSING_REFUSAL.test(message(error))) {
-						// Not an offer of the move: the room was between epochs. Bounded by the closing's length.
-						closingSince ??= performance.now();
-						if (performance.now() - closingSince >= CLOSING_LIMIT_MS) throw error;
-						offer--;
-						waiting++;
-						try {
-							await (rolling ?? Promise.resolve());
-							await nextEpoch(attempted, CLOSING_RETRY_MS);
-						} finally {
-							waiting--;
-						}
-						continue;
-					}
-					closingSince = undefined;
-					if (offer >= MAX_OFFERS) throw error;
-					if (TRANSIENT_REFUSAL.test(message(error))) {
-						await new Promise((resolve) => setTimeout(resolve, TRANSIENT_RETRY_MS * offer));
-						continue;
-					}
-					if (!clearedByRollover(error)) throw error;
-					// The refused move was not admitted (its issue transaction or admission refused it);
-					// the same move is offered again in a later epoch.
-					waiting++;
-					try {
-						if (role === "creator") {
-							if (currentEpoch() === attempted) await roll("refusal");
-							if (currentEpoch() === attempted) throw error;
-						} else await nextEpoch(attempted);
-					} finally {
-						waiting--;
-					}
-				}
-			}
-		},
+		issue,
 		waiting: (): number => waiting,
+		status,
 		settled: async (): Promise<void> => {
 			while (rolling !== undefined || scheduled) {
 				await (rolling ?? new Promise((resolve) => setTimeout(resolve, 10)));

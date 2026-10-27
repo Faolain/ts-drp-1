@@ -18,7 +18,10 @@ declare global {
 	interface Window {
 		__TS_DRP_GRID_ROOM_HEAD_AUTHORITY_FOR_OPEN__?: V3ZoneRoomHeadAuthorityForOpen;
 		__TS_DRP_GRID_SETTLEMENT_SOURCE_APPROVAL__?: V3ZoneSettlementSourceApproval;
-		/** The host's delivery of the creator's rollover offers to the zone's members. */
+		/**
+		 * Test override of the creator's successor announcement; by default the zone's successor
+		 * delivery announces offers to the zone's members over this page's node.
+		 */
 		__TS_DRP_GRID_SUCCESSOR_PUBLISHER__?: V3ZoneSuccessorPublisher;
 	}
 }
