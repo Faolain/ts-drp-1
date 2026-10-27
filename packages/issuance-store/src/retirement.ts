@@ -1967,10 +1967,13 @@ function retirementEntryOwnsTerminalSourceProof(entry: SettlementPlan["entries"]
  * census classifies every held displaced source by its completed entry, so the entry
  * outlives retirement until its source is pruned. Custody is not a dependency: it
  * neither protects nor requires its source or its replacement. */
-function retirementEntryIsCustody(plan: SettlementPlan, entry: SettlementPlan["entries"][number]): boolean {
+function retirementEntryIsCustody(entry: SettlementPlan["entries"][number]): boolean {
+	// The entry's own completion only: the author fence a successor install clears and
+	// reissues gates whole-plan pruning, not whether this entry completed its source.
 	return retirementEntryOwnsTerminalSourceProof(entry) ||
 		entry.sourceObjectId === undefined && entry.disposition !== "inherited" &&
-		settlementPlanPermitsAuthenticatedPruning({ fenceSequence: plan.fenceSequence, entries: [entry] });
+		(entry.disposition === "expire" || entry.disposition === "committed" ||
+			entry.disposition !== "manual-review" && entry.replacementSequence !== null);
 }
 
 function retirementEntryIsRetained(control: DurableIssuanceRetirementControl | null,
@@ -2084,7 +2087,7 @@ function issuanceRetirementTargetRows(control: DurableIssuanceRetirementControl 
 		// this metadata transaction and later issuance. Keeping these bytes is
 		// custody, not a protected source hole.
 		const entries = plan.entries.filter(entry => retirementEntryIsRetained(control, p, plan, entry, rows) ||
-			retirementEntryIsCustody(plan, entry) && retirementLocalSource(plan, entry, rows) !== undefined);
+			retirementEntryIsCustody(entry) && retirementLocalSource(plan, entry, rows) !== undefined);
 		if (entries.length === plan.entries.length) return plan;
 		if (plan.revision === Number.MAX_SAFE_INTEGER) throw issuanceRetirementRefusal("settlement plan revision exhausted");
 		const {sourceContexts: _contexts, ...plain} = plan;
@@ -2220,7 +2223,7 @@ function checkedIssuanceRetirementTargetRows(
 		// replacement. The native image still checks its exact digest/pair; it does
 		// not revive either row or make it a protected dependency.
 		const custody = (e: SettlementPlan["entries"][number]): boolean =>
-			retirementEntryIsCustody(plan, e) && !retirementEntryIsRetained(control, p, plan, e, rows);
+			retirementEntryIsCustody(e) && !retirementEntryIsRetained(control, p, plan, e, rows);
 		const refs = plan.entries.filter((e) => e.disposition !== "inherited" && e.sourceObjectId === undefined && !custody(e))
 			.map((e) => e.sourceSequence);
 		if (plan.fenceSequence !== null) refs.push(plan.fenceSequence);
@@ -2286,7 +2289,7 @@ export function assertIssuanceRetirementPlanAllowed(
 	if (!control || (!control.active && !control.completed)) return;
 	const prior = rows.plans.find(value => value.scope.objectId === plan.scope.objectId && value.scope.author === plan.scope.author);
 	const unchangedCustody = (entry: SettlementPlan["entries"][number]): boolean => {
-		if (!retirementEntryIsCustody(plan, entry)) return false;
+		if (!retirementEntryIsCustody(entry)) return false;
 		const previous = prior?.entries.find(value => value.sourceSequence === entry.sourceSequence);
 		if (previous === undefined || !issuanceRetirementBytesEqual(encodeCanonical(previous), encodeCanonical(entry))) return false;
 		const source = retirementLocalSource(plan, entry, rows);
