@@ -1,10 +1,11 @@
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import type { DurableIssuanceStore, DurableIssueCommit, DurableIssueScope } from "@ts-drp/issuance-store";
 import { nativeIssuanceSignAdmissionForStore } from "@ts-drp/issuance-store/maintenance";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+
 import { createNodeDurableIssuanceStore } from "../src/issuance.js";
 
 /**
@@ -56,7 +57,7 @@ function commitFor(sequence: number): DurableIssueCommit {
 	};
 }
 
-function deferred(): { promise: Promise<void>; resolve: () => void } {
+function deferred(): { promise: Promise<void>; resolve(): void } {
 	let resolve!: () => void;
 	const promise = new Promise<void>((settle) => {
 		resolve = settle;
@@ -69,11 +70,10 @@ type Holder = "issue-signing-connection" | "room-native-sign-admission" | "nativ
 /**
  * Starts an in-process holder of the issuance file's SQLite writer reservation and
  * resolves once it holds. `release` lets it finish; `done` joins it.
+ * @param store
+ * @param holder
  */
-async function hold(
-	store: DurableIssuanceStore,
-	holder: Holder
-): Promise<{ release: () => void; done: Promise<unknown> }> {
+async function hold(store: DurableIssuanceStore, holder: Holder): Promise<{ release(): void; done: Promise<unknown> }> {
 	const signGate = deferred();
 	const entered = deferred();
 	if (holder === "native-read-reservation") {
@@ -85,7 +85,8 @@ async function hold(
 	}
 	const done = store.transactIssue(scope, async (sequence, ownAdmission) => {
 		const commit = commitFor(sequence);
-		const admit = holder === "room-native-sign-admission" ? nativeIssuanceSignAdmissionForStore(store, scope) : ownAdmission;
+		const admit =
+			holder === "room-native-sign-admission" ? nativeIssuanceSignAdmissionForStore(store, scope) : ownAdmission;
 		if (admit === undefined) throw new Error(`${holder} is unavailable`);
 		await admit(commit.envelope.canonicalPreimageBytes, async () => {
 			entered.resolve();
@@ -127,53 +128,85 @@ function planFor(commit: DurableIssueCommit, revision: number) {
 	};
 }
 
-describe.each([
-	"issue-signing-connection",
-	"room-native-sign-admission",
-	"native-read-reservation",
-] as const)("a main-connection write meeting the store's own %s", (holder) => {
-	it("waits for the holder instead of failing a transient busy that nothing retries", async () => {
-		const store = await openStore();
-		const seeded = await seed(store);
-		const held = await hold(store, holder);
-		// The holder releases from a timer: it can only fire if the write yields the event loop.
-		const releaseTimer = setTimeout(held.release, 20);
-		const started = performance.now();
-		const written = store.transactWriteSettlementPlan({ scope, expectedRevision: null, plan: planFor(seeded, 0) });
-		const outcome = await written.then(
-			(plan) => ({ ok: true as const, plan }),
-			(error: unknown) => ({
-				ok: false as const,
-				error: `${(error as Error).message} code=${String(Reflect.get(error as object, "code"))} retryClass=${String(
-					Reflect.get(error as object, "retryClass")
-				)}`,
-			})
-		);
-		const elapsedMs = Math.round(performance.now() - started);
-		clearTimeout(releaseTimer);
-		held.release();
-		await held.done.catch(() => undefined);
-		console.log(`[${holder}] settlement plan write ${outcome.ok ? "committed" : `failed: ${outcome.error}`} after ${elapsedMs} ms`);
-		expect(outcome.ok ? "committed" : outcome.error).toBe("committed");
-		expect(outcome.ok ? outcome.plan : undefined).toEqual(planFor(seeded, 0));
-		expect(await store.readSettlementPlan(scope)).toEqual(planFor(seeded, 0));
-	});
-
-	it("marks an outbox row published while the holder is held", async () => {
-		const store = await openStore();
-		const seeded = await seed(store);
-		const held = await hold(store, holder);
-		const releaseTimer = setTimeout(held.release, 20);
-		const outcome = await store
-			.compareAndMarkOutboxPublished({ scope, authorSequence: seeded.authorSequence, digest: seeded.envelope.digest })
-			.then(
-				() => "published",
-				(error: unknown) => `failed: ${(error as Error).message}`
+describe.each(["issue-signing-connection", "room-native-sign-admission", "native-read-reservation"] as const)(
+	"a main-connection write meeting the store's own %s",
+	(holder) => {
+		it("waits for the holder instead of failing a transient busy that nothing retries", async () => {
+			const store = await openStore();
+			const seeded = await seed(store);
+			const held = await hold(store, holder);
+			// The holder releases from a timer: it can only fire if the write yields the event loop.
+			const releaseTimer = setTimeout(held.release, 20);
+			const started = performance.now();
+			const written = store.transactWriteSettlementPlan({ scope, expectedRevision: null, plan: planFor(seeded, 0) });
+			const outcome = await written.then(
+				(plan) => ({ ok: true as const, plan }),
+				(error: unknown) => ({
+					ok: false as const,
+					error: `${(error as Error).message} code=${String(Reflect.get(error as object, "code"))} retryClass=${String(
+						Reflect.get(error as object, "retryClass")
+					)}`,
+				})
 			);
-		clearTimeout(releaseTimer);
-		held.release();
-		await held.done.catch(() => undefined);
-		expect(outcome).toBe("published");
-		expect((await store.readOutboxPage({ scope, limit: 1 }))[0]?.publishState).toBe("published");
-	});
+			const elapsedMs = Math.round(performance.now() - started);
+			clearTimeout(releaseTimer);
+			held.release();
+			await held.done.catch(() => undefined);
+			console.log(
+				`[${holder}] settlement plan write ${outcome.ok ? "committed" : `failed: ${outcome.error}`} after ${elapsedMs} ms`
+			);
+			expect(outcome.ok ? "committed" : outcome.error).toBe("committed");
+			expect(outcome.ok ? outcome.plan : undefined).toEqual(planFor(seeded, 0));
+			expect(await store.readSettlementPlan(scope)).toEqual(planFor(seeded, 0));
+		});
+
+		it("marks an outbox row published while the holder is held", async () => {
+			const store = await openStore();
+			const seeded = await seed(store);
+			const held = await hold(store, holder);
+			const releaseTimer = setTimeout(held.release, 20);
+			const outcome = await store
+				.compareAndMarkOutboxPublished({ scope, authorSequence: seeded.authorSequence, digest: seeded.envelope.digest })
+				.then(
+					() => "published",
+					(error: unknown) => `failed: ${(error as Error).message}`
+				);
+			clearTimeout(releaseTimer);
+			held.release();
+			await held.done.catch(() => undefined);
+			expect(outcome).toBe("published");
+			expect((await store.readOutboxPage({ scope, limit: 1 }))[0]?.publishState).toBe("published");
+		});
+	}
+);
+
+it("a holder that outlives the busy budget still fails transient, but without freezing the event loop", async () => {
+	const store = await openStore();
+	const seeded = await seed(store);
+	const held = await hold(store, "room-native-sign-admission");
+	let ticks = 0;
+	const ticker = setInterval(() => {
+		ticks++;
+	}, 10);
+	const started = performance.now();
+	const outcome = await store
+		.transactWriteSettlementPlan({ scope, expectedRevision: null, plan: planFor(seeded, 0) })
+		.then(
+			() => "committed",
+			(error: unknown) =>
+				`${(error as Error).message} code=${String(Reflect.get(error as object, "code"))} retryClass=${String(
+					Reflect.get(error as object, "retryClass")
+				)}`
+		);
+	const elapsedMs = Math.round(performance.now() - started);
+	clearInterval(ticker);
+	held.release();
+	await held.done.catch(() => undefined);
+	console.log(`[outlived budget] ${outcome} after ${elapsedMs} ms with ${ticks} event-loop ticks`);
+	expect(outcome).toBe("settlement plan write failed code=ISSUANCE_SUBSTRATE_FAILURE retryClass=transient");
+	// The wait is the busy budget (1 s); a frozen loop would tick zero times.
+	expect(ticks).toBeGreaterThanOrEqual(20);
+	// The holder was never disturbed: its issue still commits after the refusal.
+	await held.done;
+	expect(await store.readSettlementPlan(scope)).toBeNull();
 });

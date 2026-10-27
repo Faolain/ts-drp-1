@@ -92,6 +92,7 @@ import {
 import { DatabaseSync, type StatementSync } from "node:sqlite";
 
 import { SqliteNativeReadReservationOwner } from "./native-read-reservation.js";
+import { awaitNativeWriterFree, holdNativeWriter, nativeWriterHeld } from "./native-writer-gate.js";
 import type { NodeNativeReadPort } from "../index.js";
 import { iterateSqliteRows } from "./sqlite-iterator.js";
 import { sqliteFilename } from "./sqlite-filename.js";
@@ -1155,6 +1156,7 @@ class NodeIssuanceImplementation {
 		const database = acquired;
 		let released = false,
 			began = false;
+		let releaseWriter: (() => void) | undefined;
 		let releasePromise: Promise<void> | undefined;
 		const release = (): Promise<void> =>
 			(releasePromise ??= new Promise<void>((resolve, reject) => {
@@ -1171,6 +1173,7 @@ class NodeIssuanceImplementation {
 				} catch (error) {
 					failures.push(error);
 				}
+				releaseWriter?.();
 				this.#signReleases.delete(release);
 				if (!failures.length) try { releaseLocal?.(); } catch (cause) { failures.push(cause); }
 				if (failures.length === 1) reject(failures[0]);
@@ -1187,6 +1190,7 @@ class NodeIssuanceImplementation {
 				if (released) throw issuanceRetirementRefusal("native sign reservation released");
 				if (!began) {
 					database.exec(`PRAGMA busy_timeout=${BUSY_TIMEOUT}`);
+					releaseWriter ??= holdNativeWriter(this.#filename);
 					database.exec("BEGIN IMMEDIATE");
 					began = true;
 					if (scalar(database, "PRAGMA user_version") !== SCHEMA_VERSION || !catalogMatches(catalog(database)))
@@ -1203,7 +1207,6 @@ class NodeIssuanceImplementation {
 	}
 
 	// Async preserves promise rejection for input/native failures.
-	// eslint-disable-next-line @typescript-eslint/require-await
 	async acquireRetirementControl(input: { readonly objectId: string }): Promise<DurableIssuanceRetirementControlRead> {
 		this.#assertAvailable();
 		const objectId = captureIssuanceRetirementObject(input);
@@ -1219,6 +1222,8 @@ class NodeIssuanceImplementation {
 				active: null,
 				completed: null,
 			};
+			const contended = this.#writerFree("issuance retirement birth failed");
+			if (contended !== undefined) await contended;
 			let began = false;
 			try {
 				this.#database.exec("BEGIN IMMEDIATE");
@@ -1259,9 +1264,10 @@ class NodeIssuanceImplementation {
 		const control = snapshot.control as DurableIssuanceRetirementControl;
 		const captured = snapshot.image;
 		// Native SQLite CAS is synchronous; the capability keeps async delivery.
-		// eslint-disable-next-line @typescript-eslint/require-await
 		return createIssuanceRetirementControlRead(control, captured, async (next, p) => {
 			this.#assertAvailable();
+			const contended = this.#writerFree("issuance retirement transition failed");
+			if (contended !== undefined) await contended;
 			const expectedRows = issuanceRetirementTransitionRows(control, next, snapshot.rows);
 			const expectedImage = issuanceRetirementImage(expectedRows, objectId);
 			let began = false;
@@ -1405,10 +1411,11 @@ class NodeIssuanceImplementation {
 	}
 
 	// Async is intentional: input and availability failures are Promise rejections.
-	// eslint-disable-next-line @typescript-eslint/require-await
 	async compareAndMarkOutboxPublished(input: DurableOutboxPublicationTransitionInput): Promise<void> {
 		this.#assertAvailable();
 		const captured = this.#capturePublicationInput(input);
+		const contended = this.#writerFree("publication write failed");
+		if (contended !== undefined) await contended;
 		let began = false;
 		let committing = false;
 		try {
@@ -1542,15 +1549,12 @@ class NodeIssuanceImplementation {
 		}
 	}
 
-	transactWriteSettlementPlan(input: unknown): Promise<SettlementPlan> {
-		let captured: ReturnType<typeof captureSettlementPlanWriteInput>;
-		try {
-			captured = captureSettlementPlanWriteInput(input);
-			this.session?.assertOwnedAuthor(captured.scope.author);
-			this.#assertAvailable();
-		} catch (error) {
-			return Promise.reject(error);
-		}
+	async transactWriteSettlementPlan(input: unknown): Promise<SettlementPlan> {
+		const captured = captureSettlementPlanWriteInput(input);
+		this.session?.assertOwnedAuthor(captured.scope.author);
+		this.#assertAvailable();
+		const contended = this.#writerFree("settlement plan write failed");
+		if (contended !== undefined) await contended;
 		let began = false;
 		try {
 			this.#database.exec("BEGIN IMMEDIATE");
@@ -1612,7 +1616,7 @@ class NodeIssuanceImplementation {
 			bumpRetirement(this.#database, captured.scope.objectId);
 			this.#database.exec("COMMIT");
 			began = false;
-			return Promise.resolve(cloneSettlementPlan(captured.plan));
+			return cloneSettlementPlan(captured.plan);
 		} catch (error) {
 			if (began) {
 				try {
@@ -1621,7 +1625,7 @@ class NodeIssuanceImplementation {
 					// Preserve the settlement plan failure.
 				}
 			}
-			return Promise.reject(this.#mapOperationError(error, "settlement plan write failed"));
+			throw this.#mapOperationError(error, "settlement plan write failed");
 		}
 	}
 
@@ -1772,6 +1776,7 @@ class NodeIssuanceImplementation {
 		}
 		if (prior.exhausted) throw failure("ISSUANCE_EXHAUSTED", "author sequence is exhausted");
 		let database: DatabaseSync | undefined;
+		let releaseWriter: (() => void) | undefined;
 		let admitted: ReturnType<typeof captureIssuanceNativeSignInput> | undefined;
 		let hookEnded = false;
 		let signing: Promise<Uint8Array> | undefined;
@@ -1799,6 +1804,7 @@ class NodeIssuanceImplementation {
 				database.exec(`PRAGMA busy_timeout=${BUSY_TIMEOUT}`);
 				database.exec("PRAGMA synchronous=FULL");
 				registerRetirementConnection(database);
+				releaseWriter = holdNativeWriter(this.#filename);
 				database.exec("BEGIN IMMEDIATE");
 				verifyAuthority(database);
 				const current = readNativeLineage(database, detached, "writer");
@@ -1971,6 +1977,11 @@ class NodeIssuanceImplementation {
 					!issuanceRetirementBytesEqual(candidate.envelope.digest, admitted.digest))
 			)
 				throw invalid("native issue candidate differs from admitted unsigned bytes");
+			if (database === undefined) {
+				// Main-connection commit: another job's writer reservation may be held.
+				const contended = this.#writerFree("issuance write failed");
+				if (contended !== undefined) await contended;
+			}
 			return this.#commitCandidate(detached, prior, candidate, database, database !== undefined);
 		} catch (error) {
 			primaryFailed = true;
@@ -2026,6 +2037,7 @@ class NodeIssuanceImplementation {
 				} catch (error) {
 					cleanup = cleanup === undefined ? error : new AggregateError([cleanup, error], "native issue release failed");
 				}
+				releaseWriter?.();
 				if (cleanup !== undefined)
 					throw primaryFailed
 						? new AggregateError([primary, cleanup], "native issue and release failed", { cause: primary })
@@ -2067,14 +2079,11 @@ class NodeIssuanceImplementation {
 		return this.#prunePrefix(input, false);
 	}
 
-	#prunePrefix(input: unknown, authenticatedSettled: boolean): Promise<DurableIssuancePruningReceipt> {
-		let captured: ReturnType<typeof captureDurableIssuancePruningInput>;
-		try {
-			captured = captureDurableIssuancePruningInput(input);
-			this.#assertAvailable();
-		} catch (error) {
-			return Promise.reject(error);
-		}
+	async #prunePrefix(input: unknown, authenticatedSettled: boolean): Promise<DurableIssuancePruningReceipt> {
+		const captured = captureDurableIssuancePruningInput(input);
+		this.#assertAvailable();
+		const contended = this.#writerFree("issuance pruning failed");
+		if (contended !== undefined) await contended;
 		let began = false;
 		try {
 			this.#database.exec("BEGIN IMMEDIATE");
@@ -2105,7 +2114,7 @@ class NodeIssuanceImplementation {
 			) {
 				this.#database.exec("COMMIT");
 				began = false;
-				return Promise.resolve(createDurableIssuancePruningReceipt(captured, lineage, null));
+				return createDurableIssuancePruningReceipt(captured, lineage, null);
 			}
 			if (
 				current.prunedThroughAuthorSequence !== captured.expectedPrunedThroughAuthorSequence ||
@@ -2220,7 +2229,7 @@ class NodeIssuanceImplementation {
 			bumpRetirement(this.#database, captured.scope.objectId);
 			this.#database.exec("COMMIT");
 			began = false;
-			return Promise.resolve(createDurableIssuancePruningReceipt(captured, lineage, from));
+			return createDurableIssuancePruningReceipt(captured, lineage, from);
 		} catch (error) {
 			if (began) {
 				try {
@@ -2229,7 +2238,7 @@ class NodeIssuanceImplementation {
 					// Preserve the pruning failure.
 				}
 			}
-			return Promise.reject(this.#mapOperationError(error, "issuance pruning failed"));
+			throw this.#mapOperationError(error, "issuance pruning failed");
 		}
 	}
 
@@ -2576,6 +2585,25 @@ class NodeIssuanceImplementation {
 	#latchCorruption(message: string): DurableIssuanceContractError {
 		this.#poison ??= Object.freeze(failure("ISSUANCE_RECOVERY_CORRUPT", message));
 		return this.#poison;
+	}
+
+	/**
+	 * A main-connection write must not busy-wait on this file's in-process writer
+	 * reservations (see native-writer-gate.ts): it would sleep the thread their
+	 * release needs and always fail after busy_timeout. Uncontended, this is
+	 * undefined and the write proceeds synchronously as before. Contended, it waits
+	 * for the holders asynchronously within the same busy budget and then rejects with
+	 * the transient busy failure the synchronous wait would have produced, without
+	 * freezing the event loop. The caller begins its write before any further await.
+	 * @param message - The write's substrate failure message.
+	 * @returns Undefined when uncontended, else the wait (rejecting past the busy budget).
+	 */
+	#writerFree(message: string): Promise<void> | undefined {
+		if (!nativeWriterHeld(this.#filename)) return undefined;
+		return awaitNativeWriterFree(this.#filename, BUSY_TIMEOUT).then((free) => {
+			this.#assertAvailable();
+			if (!free) throw createDurableIssuanceFailure("ISSUANCE_SUBSTRATE_FAILURE", message, "transient");
+		});
 	}
 
 	#mapOperationError(error: unknown, message: string): Error {
