@@ -859,6 +859,35 @@ function evaluateGate(
 
 const sourceHead = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
 
+const REFUSAL_PATTERN = /refused|failed|invariant|unavailable|not-active|not authorized/u;
+
+/**
+ * Runs in the page: an error with its cause chain and AggregateError members, or JSON for other values.
+ * @param value - One console argument.
+ */
+function describeConsoleValue(value: unknown): string {
+	const walk = (item: unknown, depth: number): string => {
+		if (item instanceof Error) {
+			const parts = [`${item.name}: ${item.message}`];
+			const members = (item as { errors?: unknown }).errors;
+			if (Array.isArray(members) && depth < 4)
+				parts.push(`errors: [${members.map((member) => walk(member, depth + 1)).join(" | ")}]`);
+			if (item.cause !== undefined && depth < 4) parts.push(`cause: ${walk(item.cause, depth + 1)}`);
+			if (item.stack !== undefined) parts.push(`stack: ${item.stack}`);
+			return parts.join("; ");
+		}
+		if (typeof item === "object" && item !== null) {
+			try {
+				return JSON.stringify(item);
+			} catch {
+				return String(item);
+			}
+		}
+		return String(item);
+	};
+	return walk(value, 0);
+}
+
 /** Per-rollover issue latency: the worst issue of each role overlapping each window plus its tail. */
 function issueLatency(meter: RolloverMeter, driver: AppDriver) {
 	const windows = meter.rolloverWindows();
@@ -951,6 +980,7 @@ for (const app of APPS)
 		const member = await contexts[1].newPage();
 		const pageErrors: string[] = [];
 		const consoleTail: string[] = [];
+		const refusals: string[] = [];
 		for (const [name, page] of [
 			["creator", creator],
 			["member", member],
@@ -958,8 +988,23 @@ for (const app of APPS)
 			page.on("pageerror", (error) => pageErrors.push(`${name}: ${String(error).slice(0, 600)}`));
 			page.on("console", (message) => {
 				if (message.type() !== "warning" && message.type() !== "error") return;
-				consoleTail.push(`${new Date().toISOString()} ${name} ${message.type()} ${message.text().slice(0, 400)}`);
-				if (consoleTail.length > 400) consoleTail.shift();
+				const at = new Date().toISOString();
+				const text = message.text();
+				const record = (body: string): void => {
+					consoleTail.push(`${at} ${name} ${message.type()} ${body.slice(0, 2_000)}`);
+					if (consoleTail.length > 400) consoleTail.shift();
+					if (REFUSAL_PATTERN.test(body) && refusals.length < 60)
+						refusals.push(`${at} ${name} ${message.type()} ${body.slice(0, 20_000)}`);
+				};
+				// Firefox renders object arguments as "JSHandle@object", and no engine's text carries an
+				// error's cause or AggregateError members: resolve the arguments in the page instead.
+				if (!text.includes("JSHandle@") && !REFUSAL_PATTERN.test(text)) return record(text);
+				void Promise.all(
+					message.args().map((argument) => argument.evaluate(describeConsoleValue).catch(() => "<unreadable>"))
+				).then(
+					(parts) => record(parts.join(" ")),
+					() => record(text)
+				);
 			});
 		}
 		const meter = new RolloverMeter(
@@ -1132,6 +1177,7 @@ for (const app of APPS)
 			}
 			writeFileSync(join(OUT, `${base}-summary.json`), JSON.stringify(summary, null, 2));
 			writeFileSync(join(OUT, `${base}-console.txt`), consoleTail.join("\n") + "\n");
+			writeFileSync(join(OUT, `${base}-refusals.txt`), refusals.join("\n\n") + "\n");
 			await Promise.allSettled(contexts.map((context) => context.close()));
 		}
 	});
