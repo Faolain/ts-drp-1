@@ -13277,7 +13277,14 @@ function settlementOwnRowWindowExpired(epoch: number, currentEpoch: number): boo
  * @returns Epoch to lowest fence sequence.
  */
 async function ownEpochFences(store: DurableIssuanceStore, scope: DurableIssueScope): Promise<ReadonlyMap<number, number>> {
+	return (await scanOwnFences(store, scope)).lowest;
+}
+
+/** The own fence scan of ownEpochFences, with the highest own fence sequence (any epoch). */
+async function scanOwnFences(store: DurableIssuanceStore, scope: DurableIssueScope):
+	Promise<Readonly<{ lowest: ReadonlyMap<number, number>; highest: number | undefined }>> {
 	const fences = new Map<number, number>();
+	let highest: number | undefined;
 	let afterKey: readonly [string, string, number] | undefined;
 	for (let pages = 0; pages < 256; pages++) {
 		const page = captureOutboxPage(
@@ -13285,7 +13292,7 @@ async function ownEpochFences(store: DurableIssuanceStore, scope: DurableIssueSc
 			64
 		);
 		if (page === undefined) throw new TypeError("own fence scan page is invalid");
-		if (page.length === 0) return fences;
+		if (page.length === 0) return ObjectFreeze({ lowest: fences, highest });
 		for (let index = 0; index < page.length; index++) {
 			const row = outboxRowSnapshot(page.read(index), scope);
 			if (row === undefined) throw new TypeError("own fence scan row is invalid");
@@ -13293,6 +13300,9 @@ async function ownEpochFences(store: DurableIssuanceStore, scope: DurableIssueSc
 			const preimage = decodeCanonical(row.canonicalPreimageBytes) as Record<string, unknown>;
 			const operation = preimage.operation;
 			const epoch = preimage.epoch;
+			// Any own fence row (whatever its fenceSequence) bounds what contiguity can prove.
+			if (isObject(operation) && Reflect.get(operation, "action") === AUTHOR_FENCE_ACTION &&
+				(highest === undefined || row.authorSequence > highest)) highest = row.authorSequence;
 			if (!isObject(operation) || Reflect.get(operation, "action") !== AUTHOR_FENCE_ACTION ||
 				Reflect.get(operation, "version") !== 1 || Reflect.get(operation, "fenceSequence") !== row.authorSequence ||
 				typeof epoch !== "number" || !NumberIsSafeInteger(epoch)) continue;
@@ -13309,6 +13319,38 @@ function settlementOwnRowFenceGuarded(fences: ReadonlyMap<number, number>, epoch
 	terminalThrough: number | null): boolean {
 	const fence = fences.get(epoch);
 	return sequence === (terminalThrough ?? -1) + 1 || (fence !== undefined && fence <= sequence);
+}
+
+/**
+ * What the creator's signed settlement frontier (in the installed checkpoint) proves about one own
+ * row retained as unknown accepted work by an install more than one epoch ahead. The row's epoch must
+ * be closed in that frontier.
+ * - "never-admitted": displaced and fence-guarded (see ownEpochFences): it is in no closed Cut and
+ *   ingress admits only the current anchor, so it can never enter history; its move may be offered
+ *   again exactly once.
+ * - "committed": within terminalThrough while no own fence follows it: the frontier reached it only
+ *   through contiguous admitted slots (a fence is the only other way to the boundary), so it is in a
+ *   closed Cut.
+ * Anything else (an old incarnation, a fence after it, an unguarded gap) proves nothing and stays
+ * manual-review.
+ * @param registration - The live plane whose installed history holds the frontier.
+ * @param sourceSequence - The retained row's author sequence.
+ * @param sourceEpoch - The retained row's own signed epoch.
+ * @returns The proven outcome, or undefined.
+ */
+async function frontierRetainedResolution(registration: V3PlaneRegistration, sourceSequence: number, sourceEpoch: number):
+	Promise<"committed" | "never-admitted" | undefined> {
+	const frontier = settlementFrontierFromHistory(registration.historicalIssuance);
+	if (frontier === undefined || !validSettlementFrontierContext(registration.payload, frontier) ||
+		!NumberIsSafeInteger(sourceEpoch) || sourceEpoch >= frontier.currentEpoch) return undefined;
+	const rowClass = settlementOwnRowClass(sourceEpoch, frontier.currentEpoch, sourceSequence, frontier.admissionEpoch,
+		frontier.terminalThrough);
+	const fences = await scanOwnFences(creatorOriginalIssuanceStore(registration), registration.issuanceScope);
+	if (rowClass === "displaced" && settlementOwnRowFenceGuarded(fences.lowest, sourceEpoch, sourceSequence, frontier.terminalThrough))
+		return "never-admitted";
+	if (rowClass === "terminal" && frontier.terminalThrough !== null && sourceSequence <= frontier.terminalThrough &&
+		sourceEpoch >= frontier.admissionEpoch && (fences.highest === undefined || fences.highest < sourceSequence)) return "committed";
+	return undefined;
 }
 
 /** One own-fence scan per rebase snapshot (the scan the settlement window classifies against). */
@@ -23970,11 +24012,76 @@ async function readCreatorUnresolvedAcceptedWork(registration: V3PlaneRegistrati
 		return ObjectFreeze(result);
 }
 
+/** One retained own row and what the creator's signed frontier proves about it (frontierRetainedResolution). */
+export interface V3RetainedWorkFrontier {
+	readonly sourceSequence: number;
+	readonly sourceDigest: string;
+	readonly sourceContextDigest: string;
+	readonly sourceEpoch: number;
+	/** Already resolved by a signed local-author expiry receipt. */
+	readonly resolved: boolean;
+	readonly frontier: "committed" | "never-admitted" | undefined;
+	readonly operations: readonly Readonly<Record<string, unknown>>[];
+}
+
+/**
+ * Retained own work (unresolved, or resolved by a signed expiry) with the creator frontier's proof
+ * for each row. Fresh native/source verification, as inspectV3UnresolvedAcceptedWork.
+ * @param plane - Original live handle.
+ * @returns Every retained application row with its frontier proof.
+ */
+export async function inspectV3RetainedWorkFrontier(plane: V3PlaneHandle): Promise<readonly V3RetainedWorkFrontier[]> {
+	const registration = v3HandleRegistrations.get(plane);
+	if (registration === undefined || !currentRegistration(registration)) throw new TypeError("creator source custody owner is unavailable");
+	return enqueueRegistrationTask(registration, () => async () => {
+		const payload = registration.payload, scope = registration.issuanceScope;
+		const store = creatorOriginalIssuanceStore(registration);
+		const read = durableIssuancePruningMaintenanceForStore(store)?.readBoundedRecoveryCensus;
+		if (read === undefined) throw new TypeError("creator source custody census is unavailable");
+		const readInput = {objectId: scope.objectId, limits: {maxRows: ISSUANCE_RETIREMENT_LIMITS.maxRows,
+			maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes}};
+		const before = await read(readInput);
+		const plan = before.rows.plans.find(value => sameScope(value.scope, scope)) ?? null;
+		if (!plan?.entries.some(entry => entry.sourceContextDigest !== undefined)) return ObjectFreeze([]);
+		const sources = await prepareCreatorRetainedSourceContracts(plan, payload.trust.trust, payload.input.catalog);
+		const result: V3RetainedWorkFrontier[] = [];
+		for (const entry of plan.entries) {
+			if (entry.sourceContextDigest === undefined || entry.replacementSequence !== null || entry.replacementProgress !== undefined) continue;
+			const resolved = entry.disposition === "expire" && entry.sourceResolutionDigest !== undefined;
+			if (!resolved && (entry.disposition === "expire" || entry.disposition === "committed" || entry.disposition === "inherited" ||
+				entry.sourceResolutionDigest !== undefined)) continue;
+			const retained = sources.get(entry.sourceSequence);
+			const issued = before.rows.issued.find(row => sameScope(row, scope) && row.authorSequence === entry.sourceSequence);
+			if (retained === undefined || issued === undefined || !sameBytes(issued.digest, entry.sourceDigest)) continue;
+			const authenticated = authenticateRetainedSourceVertex(retained.contract, issued.canonicalPreimageBytes, issued.signature,
+				issued.digest, scope.author, issued.authorSequence);
+			const intents = authenticated === undefined ? undefined : rebaseIntents(retained.contract, authenticated);
+			if (authenticated === undefined || intents === undefined || intents.length === 0) continue;
+			const sourceEpoch = retained.contract.identity.trust.currentEpoch;
+			if (authenticated.vertex.epoch !== sourceEpoch) continue;
+			result.push(ObjectFreeze({sourceSequence: entry.sourceSequence, sourceDigest: authenticated.digest,
+				sourceContextDigest: lowerHexDigest(entry.sourceContextDigest)!, sourceEpoch, resolved,
+				frontier: await frontierRetainedResolution(registration, entry.sourceSequence, sourceEpoch),
+				operations: ObjectFreeze(intents.map(intent => intent.operation))}));
+		}
+		const after = await read(readInput);
+		if (!currentRegistration(registration) || registration.payload !== payload || before.image.imageDigest !== after.image.imageDigest)
+			throw new TypeError("creator retained source currency changed");
+		return ObjectFreeze(result);
+	});
+}
+
 export interface V3SourceAbandonmentRequest {
 	readonly sourceSequence: number;
 	readonly sourceDigest: string;
 	readonly sourceContextDigest: string;
 	readonly signal?: AbortSignal;
+	/**
+	 * Resolve on the creator's signed frontier instead of the user's word: the row's epoch is closed and
+	 * the frontier proves it committed or never admitted (frontierRetainedResolution). Published work
+	 * qualifies; nothing else does.
+	 */
+	readonly frontierProof?: true;
 }
 
 /** Terminal local-author abandonment. Never claims publication or commitment. */
@@ -24013,8 +24120,10 @@ export function abandonV3UnresolvedAcceptedWork(plane: V3PlaneHandle, raw: V3Sou
 		return Promise.reject(new TypeError("creator source abandonment owner is unavailable"));
 	return enqueueRegistrationTask(registration, (inputCustody) => {
 		const keys = ["sourceSequence", "sourceDigest", "sourceContextDigest", "signRegisteredVertexDigest"];
-		const input = snapshotClosedRecord(raw, keys) ?? snapshotClosedRecord(raw, [...keys, "signal"]);
+		const input = snapshotClosedRecord(raw, keys) ?? snapshotClosedRecord(raw, [...keys, "signal"]) ??
+			snapshotClosedRecord(raw, [...keys, "frontierProof"]) ?? snapshotClosedRecord(raw, [...keys, "signal", "frontierProof"]);
 		if (input === undefined || !NumberIsSafeInteger(input.sourceSequence) || (input.sourceSequence as number) < 0 ||
+			(Object.hasOwn(input, "frontierProof") && input.frontierProof !== true) ||
 			!isDigestHex(input.sourceDigest) || !isDigestHex(input.sourceContextDigest) ||
 			typeof input.signRegisteredVertexDigest !== "function" || inputCustody === undefined)
 			throw new TypeError("creator source abandonment input is invalid");
@@ -24039,7 +24148,8 @@ export function abandonV3UnresolvedAcceptedWork(plane: V3PlaneHandle, raw: V3Sou
 			if (signal?.aborted) cancel();
 			let custody: LocalReplacementCustody | undefined;
 			try {
-				return await abandonCreatorUnresolvedSource(registration, selector, sign, controller.signal, (owned) => { custody = owned; });
+				return await abandonCreatorUnresolvedSource(registration, selector, sign, controller.signal, (owned) => { custody = owned; },
+					input.frontierProof === true);
 			} finally {
 				signal?.removeEventListener("abort", cancel);
 				registration.settlementSelectionControllers.delete(controller);
@@ -24055,7 +24165,8 @@ export function abandonV3UnresolvedAcceptedWork(plane: V3PlaneHandle, raw: V3Sou
 
 async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
 	selector: Readonly<{sourceSequence: number; sourceDigest: Uint8Array; sourceContextDigest: Uint8Array}>,
-	sign: SignRegisteredVertexDigest, aborted: AbortSignal, own: (custody: LocalReplacementCustody) => void): Promise<V3SourceAbandonment> {
+	sign: SignRegisteredVertexDigest, aborted: AbortSignal, own: (custody: LocalReplacementCustody) => void,
+	frontierProof = false): Promise<V3SourceAbandonment> {
 	const payload = registration.payload, scope = registration.issuanceScope;
 	const current = (): boolean => !aborted.aborted && currentRegistration(registration) && registration.payload === payload &&
 		registration.issuanceScope === scope;
@@ -24086,20 +24197,26 @@ async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
 		if (first.retained.expiry === undefined) throw new TypeError("creator source expiry proof is invalid");
 		return creatorSourceAbandonmentResult(scope.author, first.entry);
 	}
-	const unresolved = (value: typeof first): boolean => {
+	const unresolved = async (value: typeof first): Promise<boolean> => {
 		const {read, entry, retained} = value;
 		if (entry.disposition === "expire" || entry.disposition === "committed" || entry.disposition === "inherited" ||
 			entry.replacementSequence !== null || entry.replacementProgress !== undefined || entry.sourceResolutionDigest !== undefined) return false;
 		const issued = read.rows.issued.filter(row => sameScope(row, scope) && row.authorSequence === entry.sourceSequence);
 		const outbox = read.rows.outbox.filter(row => sameScope(row, scope) && row.authorSequence === entry.sourceSequence);
-		// Replay after publication is refused: only never-acknowledged work may be abandoned.
+		// Replay after publication is refused: only never-acknowledged work may be abandoned on the
+		// user's word. The creator's signed frontier may resolve published work too: its epoch is closed
+		// and the frontier proves the row committed or never admitted.
 		if (issued.length !== 1 || outbox.length !== 1 || !sameBytes(issued[0]!.digest, entry.sourceDigest) ||
-			!sameBytes(outbox[0]!.digest, entry.sourceDigest) || outbox[0]!.publishState !== "pending") return false;
+			!sameBytes(outbox[0]!.digest, entry.sourceDigest) || (!frontierProof && outbox[0]!.publishState !== "pending")) return false;
 		const authenticated = authenticateRetainedSourceVertex(retained.contract, issued[0]!.canonicalPreimageBytes, issued[0]!.signature,
 			issued[0]!.digest, scope.author, issued[0]!.authorSequence);
-		return authenticated !== undefined && authenticated.digest === lowerHexDigest(entry.sourceDigest);
+		if (authenticated === undefined || authenticated.digest !== lowerHexDigest(entry.sourceDigest)) return false;
+		return !frontierProof || (authenticated.vertex.epoch === retained.contract.identity.trust.currentEpoch &&
+			await frontierRetainedResolution(registration, entry.sourceSequence, authenticated.vertex.epoch) !== undefined);
 	};
-	if (!unresolved(first)) throw new TypeError("creator source abandonment requires unresolved never-published work");
+	if (!await unresolved(first)) throw new TypeError(frontierProof
+		? "creator source frontier resolution requires a row the creator's frontier proves"
+		: "creator source abandonment requires unresolved never-published work");
 	const sourceEpoch = first.retained.contract.identity.trust.currentEpoch;
 	if (payload.trust.trust.currentEpoch <= sourceEpoch) throw new TypeError("creator source abandonment requires a later epoch");
 	// Whole-floor capture under the original native custody, without the issuance reservation.
@@ -24124,7 +24241,7 @@ async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
 		if (!current()) return false;
 		try {
 			const now = await inspect();
-			return current() && now.read.image.imageDigest === first.read.image.imageDigest && unresolved(now);
+			return current() && now.read.image.imageDigest === first.read.image.imageDigest && await unresolved(now);
 		} catch { return false; }
 	};
 	let signature: Uint8Array | undefined;
@@ -24142,10 +24259,11 @@ async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
 	await custody.check();
 	const second = await inspect();
 	if (!current() || second.read.image.imageDigest !== first.read.image.imageDigest || second.plan.revision !== first.plan.revision ||
-		!unresolved(second)) throw new TypeError("creator source abandonment source currency changed");
+		!await unresolved(second)) throw new TypeError("creator source abandonment source currency changed");
 	const prior = second.plan;
 	const entries = prior.entries.map(entry => entry.sourceSequence !== selector.sourceSequence ? entry :
-		{...entry, disposition: "expire" as const, replacementSequence: null, sourceResolutionDigest: new Uint8ArrayConstructor(expiry.digest)});
+		{...entry, disposition: "expire" as const, replacementSequence: null, sourceResolutionDigest: new Uint8ArrayConstructor(expiry.digest),
+			...(frontierProof ? {sourceResolutionKind: "frontier" as const} : {})});
 	const contexts = [...(prior.sourceContexts ?? [])];
 	if (!contexts.some(value => sameBytes(value.digest, expiry.digest))) contexts.push(expiry);
 	contexts.sort((a, b) => lowerHexDigest(a.digest)!.localeCompare(lowerHexDigest(b.digest)!));

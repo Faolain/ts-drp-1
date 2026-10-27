@@ -90,6 +90,13 @@ export interface SettlementPlanEntry {
 	readonly sourceContextDigest?: Uint8Array;
 	/** Exact retained resolution evidence; only the original Node proof owner authenticates it. */
 	readonly sourceResolutionDigest?: Uint8Array;
+	/**
+	 * "frontier": the resolution was decided on the creator's signed settlement frontier, which proves
+	 * the source committed or never admitted in its closed epoch (an `expire` with the author's signed
+	 * receipt). Unlike a local-author abandonment it may follow publication. Absent: the original
+	 * resolution kinds. Older readers refuse the field (closed record).
+	 */
+	readonly sourceResolutionKind?: "frontier";
 	readonly sourceSequence: number;
 	readonly sourceDigest: Uint8Array;
 	readonly disposition: SettlementDisposition;

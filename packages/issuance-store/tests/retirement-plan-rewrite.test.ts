@@ -17,7 +17,7 @@ import {
 	type IssuanceRetirementRows,
 } from "../src/retirement.js";
 import { d109bCommit } from "../../../tests/fixtures/phase-6b/issuance-retention-contract.js";
-import { copySettlementPlan, assertSettlementPlanProgressTransition } from "../src/contract.js";
+import { copySettlementPlan, cloneSettlementPlan, assertSettlementPlanProgressTransition } from "../src/contract.js";
 import { createEphemeralDurableIssuanceStore } from "../src/conformance.js";
 import { d109bIssue } from "../../../tests/fixtures/phase-6b/issuance-retention-contract.js";
 
@@ -156,6 +156,47 @@ describe("native retirement plan law", () => {
 		const fence = copySettlementPlan({...prior, entries: [{...reviewed, disposition: "expire"}]}, scope)!;
 		expect(() => assertSettlementPlanProgressTransition(fence, {...expired, revision: fence.revision + 1}))
 			.toThrow("retained source changed");
+	});
+	it("admits a frontier resolution only as a signed expiry arriving with its resolution, never changed after", () => {
+		const original = fixture();
+		const [source, proof] = [0, 1].map(marker => {const bytes = encodeCanonical({frontier: marker});
+			return {digest: hashDomain("ts-drp/settlement-source-context/v1", bytes), exactCanonicalContextBytes: bytes};});
+		const reviewed = {...original.plans[0]!.entries[0]!, disposition: "manual-review" as const, replacementSequence: null,
+			sourceContextDigest: source!.digest};
+		const prior = copySettlementPlan({...original.plans[0]!, entries: [reviewed], sourceContexts: [source]}, scope)!;
+		const resolved = (entry: Record<string, unknown>) => ({...prior, revision: prior.revision + 1, entries: [{...reviewed, ...entry}],
+			sourceContexts: [source!, proof!].sort((a, b) => Buffer.compare(a.digest, b.digest))});
+		const frontier = copySettlementPlan(resolved({disposition: "expire", sourceResolutionDigest: proof!.digest,
+			sourceResolutionKind: "frontier"}), scope)!;
+		expect(frontier.entries[0]!.sourceResolutionKind).toBe("frontier");
+		expect(() => assertSettlementPlanProgressTransition(prior, frontier)).not.toThrow();
+		// Only a frontier expiry with its resolution.
+		expect(copySettlementPlan(resolved({disposition: "expire", sourceResolutionDigest: proof!.digest, sourceResolutionKind: "other"}), scope)).toBeUndefined();
+		expect(copySettlementPlan(resolved({disposition: "committed", sourceResolutionDigest: proof!.digest, sourceResolutionKind: "frontier"}), scope)).toBeUndefined();
+		expect(copySettlementPlan(resolved({disposition: "expire", sourceResolutionKind: "frontier"}), scope)).toBeUndefined();
+		expect(copySettlementPlan(resolved({disposition: "manual-review", sourceResolutionKind: "frontier"}), scope)).toBeUndefined();
+		// The kind never appears, disappears or is added after its resolution.
+		const plain = copySettlementPlan(resolved({disposition: "expire", sourceResolutionDigest: proof!.digest}), scope)!;
+		expect(() => assertSettlementPlanProgressTransition(plain, {...frontier, revision: plain.revision + 1})).toThrow("retained source changed");
+		expect(() => assertSettlementPlanProgressTransition(frontier, {...plain, revision: frontier.revision + 1})).toThrow("retained source changed");
+		expect(cloneSettlementPlan(frontier).entries[0]!.sourceResolutionKind).toBe("frontier");
+	});
+	it("lets a frontier resolution follow publication while a local-author expiry stays exclusive", async () => {
+		const store = createEphemeralDurableIssuanceStore();
+		const commits = [await d109bIssue(store, scope, 0, true), await d109bIssue(store, scope, 1, true)];
+		const [source, expiry] = [0, 1].map(marker => {const bytes = encodeCanonical({frontierExclusive: marker});
+			return {digest: hashDomain("ts-drp/settlement-source-context/v1", bytes), exactCanonicalContextBytes: bytes};});
+		const reviewed = (sequence: number) => ({sourceSequence: sequence, sourceDigest: commits[sequence]!.envelope.digest,
+			sourceContextDigest: source!.digest, disposition: "manual-review" as const, replacementSequence: null});
+		const prior = {scope, revision: 0, fenceSequence: null, entries: [reviewed(0), reviewed(1)], sourceContexts: [source!]};
+		await store.transactWriteSettlementPlan({scope, expectedRevision: null, plan: prior});
+		const expire = (sequence: number, kind: boolean) => ({...prior, revision: 1, entries: prior.entries.map(entry => entry.sourceSequence !== sequence ? entry :
+			{...entry, disposition: "expire" as const, sourceResolutionDigest: expiry!.digest, ...(kind ? {sourceResolutionKind: "frontier" as const} : {})}),
+			sourceContexts: [source!, expiry!].sort((a, b) => Buffer.compare(a.digest, b.digest))});
+		await expect(store.transactWriteSettlementPlan({scope, expectedRevision: 0, plan: expire(1, false)}))
+			.rejects.toThrow("expiry and publication are exclusive");
+		await store.transactWriteSettlementPlan({scope, expectedRevision: 0, plan: expire(1, true)});
+		expect((await store.readSettlementPlan(scope))?.entries[1]?.sourceResolutionKind).toBe("frontier");
 	});
 	it("retires a pending source only under an authenticated expiry and keeps an unresolved one protected", () => {
 		const original = fixture();

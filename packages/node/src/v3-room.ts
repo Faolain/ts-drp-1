@@ -52,6 +52,7 @@ import {
 	prepareV3TerminalMigrationSource,
 	queryV3RetainedHashes,
 	abandonV3UnresolvedAcceptedWork,
+	inspectV3RetainedWorkFrontier,
 	inspectV3UnresolvedAcceptedWork,
 	type V3SourceAbandonment,
 	type V3SourceAbandonmentRequest,
@@ -5014,6 +5015,9 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	type RoomSettlementIssueResult = Awaited<ReturnType<RoomPlaneHandle["issueLocal"]>> | null;
 	const settlementScope = Object.freeze({ author: input.author, objectId: input.objectId });
 	const undeliveredSettlements = new Map<string, V3RoomSettlementStatus["undelivered"][number]>();
+	// Moves of retained work (an install more than one epoch ahead) that the creator's frontier proves
+	// were never admitted, while their resolved rows are retained (resolveRetainedFromFrontier).
+	const retainedHandBacks = new Map<string, V3RoomSettlementStatus["undelivered"][number]>();
 	let settlementStatusSnapshot: V3RoomSettlementStatus | undefined;
 	const authenticatedSettlementInheritance = (
 		sources: readonly DisplacedSource[]
@@ -5085,6 +5089,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		left.replacementSequence === right.replacementSequence &&
 		sameBytes(encodeCanonical(left.sourceContextDigest ?? null), encodeCanonical(right.sourceContextDigest ?? null)) &&
 		sameBytes(encodeCanonical(left.sourceResolutionDigest ?? null), encodeCanonical(right.sourceResolutionDigest ?? null)) &&
+		left.sourceResolutionKind === right.sourceResolutionKind &&
 		sameBytes(encodeCanonical(left.transformRefusal ?? null), encodeCanonical(right.transformRefusal ?? null)) &&
 		sameBytes(encodeCanonical(left.inheritance ?? null), encodeCanonical(right.inheritance ?? null)) &&
 		sameReplacementProgress(left, right) &&
@@ -5144,6 +5149,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					...(prior?.transformRefusal === undefined ? {} : { transformRefusal: prior.transformRefusal }),
 					...(prior?.sourceContextDigest === undefined ? {} : { sourceContextDigest: prior.sourceContextDigest }),
 					...(prior?.sourceResolutionDigest === undefined ? {} : { sourceResolutionDigest: prior.sourceResolutionDigest }),
+					...(prior?.sourceResolutionKind === undefined ? {} : { sourceResolutionKind: prior.sourceResolutionKind }),
 					replacementSequence: prior?.replacementSequence ?? null,
 					sourceDigest,
 					sourceSequence: source.authorSequence,
@@ -5343,8 +5349,69 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			epoch,
 			unsettledEpochs: waiting.length === 0 ? 0 : Math.max(0, epoch - Math.min(...waiting)),
 			window: V3_SETTLEMENT_OWN_WINDOW_EPOCHS,
-			undelivered: Object.freeze([...undeliveredSettlements.values()]),
+			undelivered: Object.freeze([
+				...undeliveredSettlements.values(),
+				...[...retainedHandBacks.values()].filter((given) => !undeliveredSettlements.has(given.vertexDigest)),
+			]),
 		});
+	};
+	/**
+	 * Retained work (an install more than one epoch ahead keeps this author's rows of its last epoch as
+	 * unknown accepted work, which withholds the author fence) is resolved from the creator's signed
+	 * frontier in the installed checkpoint (v3-live frontierRetainedResolution): a row the frontier
+	 * proves committed or never admitted gets a signed local-author expiry receipt (the existing
+	 * resolution record), and the move of a never-admitted row is given back to the application like a
+	 * window expiry. Rows the frontier proves nothing about stay manual-review. Refusals leave the
+	 * fence withheld; the next drain tries again.
+	 * @param plan - The durable plan after this drain's merge.
+	 * @returns The plan after any resolution.
+	 */
+	const resolveRetainedFromFrontier = async (plan: RoomSettlementPlan): Promise<RoomSettlementPlan> => {
+		const owner = activeHandle;
+		if (owner === undefined || !plan.entries.some((entry) => entry.sourceContextDigest !== undefined)) {
+			if (retainedHandBacks.size !== 0) retainedHandBacks.clear();
+			return plan;
+		}
+		// The drain signs this author's own settlement with its own key (as its fences); a local owner, when
+		// the host has one, must still be current.
+		if (input.receiveOnly === true) return plan;
+		localOwner?.assertCurrent();
+		const work = await inspectV3RetainedWorkFrontier(owner);
+		let changed = false;
+		for (const item of work) {
+			if (item.resolved || item.frontier === undefined) continue;
+			assertSessionOpen();
+			try {
+				await abandonV3UnresolvedAcceptedWork(owner, {
+					sourceSequence: item.sourceSequence,
+					sourceDigest: item.sourceDigest,
+					sourceContextDigest: item.sourceContextDigest,
+					frontierProof: true,
+					signRegisteredVertexDigest: input.signRegisteredVertexDigest,
+				});
+				changed = true;
+			} catch (error) {
+				if (activeHandle !== owner) throw error;
+			}
+		}
+		retainedHandBacks.clear();
+		for (const item of work)
+			if (item.frontier === "never-admitted")
+				retainedHandBacks.set(
+					item.sourceDigest,
+					Object.freeze({ vertexDigest: item.sourceDigest, epoch: item.sourceEpoch, operations: item.operations })
+				);
+		const current = changed ? await issuanceStore.readSettlementPlan(settlementScope) : plan;
+		if (current === null) throw new TypeError("v3 room settlement plan is unavailable after retained resolution");
+		if (settlementStatusSnapshot !== undefined)
+			settlementStatusSnapshot = Object.freeze({
+				...settlementStatusSnapshot,
+				undelivered: Object.freeze([
+					...undeliveredSettlements.values(),
+					...[...retainedHandBacks.values()].filter((given) => !undeliveredSettlements.has(given.vertexDigest)),
+				]),
+			});
+		return current;
 	};
 	const readSettlementEffect = (
 		prior: RoomSettlementPlan,
@@ -5577,6 +5644,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		let plan = await writeMergedSettlementPlan(sources);
 		settlementHeld = plan.entries.some(entry => entry.disposition === "manual-review" && entry.sourceContextDigest === undefined);
 		if (settlementHeld) return;
+		plan = await resolveRetainedFromFrontier(plan);
 		// A retained source context preserves unknown work, including pre-existing
 		// policy/progress metadata. Its presence grants no replacement decision, and
 		// unknown retained work still withholds the author fence. Retained terminal

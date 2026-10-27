@@ -223,17 +223,29 @@ export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueSc
 	const leaf = Object.freeze({items: 1, maxDepth: 0});
 	const originalEntries = captured?.entries ?? [];
 	if (originalEntries.length + maxSourceCount > ISSUANCE_RETIREMENT_LIMITS.maxRows) throw invalid();
-	const entryWidths = originalEntries.map(entry => {
+	// An existing entry still without a resolution may later be resolved from the settlement
+	// frontier: charge it as expire with the frontier kind too, keeping the wider form.
+	const originalEntryForms = (entry: SettlementPlan["entries"][number]) => {
 		const {sourceContextDigest: _context, sourceResolutionDigest: _resolution, ...fields} = entry;
-		return unsignedRecordWidth(fields, {sourceContextDigest: digest, sourceResolutionDigest: digest});
-	});
+		return entry.sourceResolutionDigest !== undefined || entry.sourceContextDigest === undefined ? [fields]
+			: [fields, {...fields, disposition: "expire", sourceResolutionKind: "frontier"}];
+	};
+	const entryWidths = originalEntries.map(entry => Math.max(...originalEntryForms(entry).map(fields =>
+		unsignedRecordWidth(fields, {sourceContextDigest: digest, sourceResolutionDigest: digest}))));
 	const entryShapes = originalEntries.map(entry => {
-		const {sourceContextDigest: _context, sourceResolutionDigest: _resolution, ...fields} = entry;
-		return unsignedRecordShape(fields, {sourceContextDigest: leaf, sourceResolutionDigest: leaf});
+		const shapes = originalEntryForms(entry).map(fields => unsignedRecordShape(fields, {sourceContextDigest: leaf, sourceResolutionDigest: leaf}));
+		return Object.freeze({items: Math.max(...shapes.map(shape => shape.items)), maxDepth: Math.max(...shapes.map(shape => shape.maxDepth))});
 	});
-	const entryFields = {disposition: "manual-review", replacementSequence: null};
-	const entryWidth = unsignedRecordWidth(entryFields, {sourceSequence: integer, sourceDigest: digest, sourceContextDigest: digest, sourceResolutionDigest: digest});
-	const entryShape = unsignedRecordShape(entryFields, {sourceSequence: leaf, sourceDigest: leaf, sourceContextDigest: leaf, sourceResolutionDigest: leaf});
+	// A potential row ends either in manual review or resolved from the settlement frontier
+	// (expire plus the frontier kind); the wider alternative is charged.
+	const entryAlternatives = [{disposition: "manual-review", replacementSequence: null},
+		{disposition: "expire", replacementSequence: null, sourceResolutionKind: "frontier"}];
+	const entryWidth = Math.max(...entryAlternatives.map(entryFields => unsignedRecordWidth(entryFields,
+		{sourceSequence: integer, sourceDigest: digest, sourceContextDigest: digest, sourceResolutionDigest: digest})));
+	const entryAlternativeShapes = entryAlternatives.map(entryFields => unsignedRecordShape(entryFields,
+		{sourceSequence: leaf, sourceDigest: leaf, sourceContextDigest: leaf, sourceResolutionDigest: leaf}));
+	const entryShape = Object.freeze({items: Math.max(...entryAlternativeShapes.map(shape => shape.items)),
+		maxDepth: Math.max(...entryAlternativeShapes.map(shape => shape.maxDepth))});
 	// Potential rows need not be current APPs. Counting all of them is a positive
 	// bound only; actual retention must still authenticate and classify each row.
 	for (let index = 0; index < maxSourceCount; index++) { entryWidths.push(entryWidth); entryShapes.push(entryShape); }
@@ -2413,6 +2425,7 @@ type SettlementPruningEntry = Readonly<{
 	readonly replacementSequence: number | null;
 	readonly sourceContextDigest?: Uint8Array;
 	readonly sourceResolutionDigest?: Uint8Array;
+	readonly sourceResolutionKind?: "frontier";
 }>;
 
 /**
@@ -2443,7 +2456,8 @@ function issuanceRowHasAuthenticatedExpiry(rows: IssuanceRetirementRows, row: Re
 }
 
 /**
- * Signed local-author expiry and publication are mutually exclusive for one source.
+ * Signed local-author expiry and publication are mutually exclusive for one source (a frontier
+ * resolution excepted).
  * Plan writes pass the scope's outbox rows; publication passes its proposed row.
  * @param plan - The plan that will be (or is) durable for this scope.
  * @param rows - Outbox rows of the same scope, with their resulting publish state.
@@ -2451,7 +2465,10 @@ function issuanceRowHasAuthenticatedExpiry(rows: IssuanceRetirementRows, row: Re
 export function assertSettlementExpiryPublicationExclusive(plan: Pick<SettlementPlan, "entries"> | null | undefined,
 	rows: readonly Readonly<{ authorSequence: number; publishState: "pending" | "published" }>[]): void {
 	for (const entry of plan?.entries ?? []) {
-		if (entry.sourceObjectId !== undefined || !settlementEntryIsAuthenticatedExpiry(entry)) continue;
+		// A frontier resolution may follow publication: the creator's signed frontier proved the source
+		// committed or never admitted in its closed epoch, where a republication can admit nothing.
+		if (entry.sourceObjectId !== undefined || !settlementEntryIsAuthenticatedExpiry(entry) ||
+			entry.sourceResolutionKind === "frontier") continue;
 		if (rows.some(row => row.authorSequence === entry.sourceSequence && row.publishState === "published"))
 			throw issuanceRetirementRefusal("settlement source expiry and publication are exclusive");
 	}

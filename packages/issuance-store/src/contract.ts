@@ -471,6 +471,7 @@ function copySettlementInheritance(value: unknown): SettlementInheritance | unde
 function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefined {
 	const hasSourceContext = typeof value === "object" && value !== null && Object.hasOwn(value, "sourceContextDigest");
 	const hasSourceResolution = typeof value === "object" && value !== null && Object.hasOwn(value, "sourceResolutionDigest");
+	const hasResolutionKind = typeof value === "object" && value !== null && Object.hasOwn(value, "sourceResolutionKind");
 	const hasSourceObjectId =
 		typeof value === "object" && value !== null && Object.prototype.hasOwnProperty.call(value, "sourceObjectId");
 	const hasTransformRefusal =
@@ -485,6 +486,7 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
 			...(hasSourceObjectId ? ["sourceObjectId"] : []),
 			...(hasSourceContext ? ["sourceContextDigest"] : []),
 			...(hasSourceResolution ? ["sourceResolutionDigest"] : []),
+			...(hasResolutionKind ? ["sourceResolutionKind"] : []),
 			...(hasTransformRefusal ? ["transformRefusal"] : []),
 			...(hasInheritance ? ["inheritance"] : []),
 			...(hasProgress ? ["replacementProgress"] : []),
@@ -538,6 +540,9 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
 		(hasSourceResolution && (sourceResolutionDigest?.byteLength !== 32 || !hasSourceContext ||
 			(value.disposition !== "committed" && value.disposition !== "expire"))) ||
 		(value.disposition === "expire" && hasSourceResolution && (value.replacementSequence !== null || hasInheritance)) ||
+		// A frontier resolution is a signed expiry decided on the creator's signed frontier.
+		(hasResolutionKind && (value.sourceResolutionKind !== "frontier" || !hasSourceResolution || value.disposition !== "expire" ||
+			hasProgress || hasTransformRefusal)) ||
 		(value.disposition === "committed" && (!hasSourceResolution || value.replacementSequence !== null || hasProgress || hasInheritance)) ||
 		(hasSourceObjectId && (!isValidDurableScopeField(value.sourceObjectId) || value.disposition === "inherited")) ||
 		(hasTransformRefusal && (transformRefusal === undefined || value.disposition !== "transform")) ||
@@ -559,6 +564,7 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
 		disposition: value.disposition,
 		...(sourceContextDigest === undefined ? {} : { sourceContextDigest }),
 		...(sourceResolutionDigest === undefined ? {} : { sourceResolutionDigest }),
+		...(hasResolutionKind ? { sourceResolutionKind: "frontier" as const } : {}),
 		...(hasSourceObjectId ? { sourceObjectId: value.sourceObjectId as string } : {}),
 		...(transformRefusal === undefined ? {} : { transformRefusal }),
 		...(inheritance === undefined ? {} : { inheritance }),
@@ -655,6 +661,7 @@ export function cloneSettlementPlan(plan: SettlementPlan): SettlementPlan {
 			disposition: entry.disposition,
 			...(entry.sourceContextDigest === undefined ? {} : {sourceContextDigest: new Uint8Array(entry.sourceContextDigest)}),
 			...(entry.sourceResolutionDigest === undefined ? {} : {sourceResolutionDigest: new Uint8Array(entry.sourceResolutionDigest)}),
+			...(entry.sourceResolutionKind === undefined ? {} : {sourceResolutionKind: entry.sourceResolutionKind}),
 			...(entry.sourceObjectId === undefined ? {} : { sourceObjectId: entry.sourceObjectId }),
 			...(entry.transformRefusal === undefined
 				? {}
@@ -725,6 +732,10 @@ export function assertSettlementPlanProgressTransition(current: SettlementPlan |
 			// an already-terminal (e.g. retained-fence) expiry never gains one later.
 			(prior.sourceResolutionDigest === undefined && candidate.sourceResolutionDigest !== undefined &&
 				candidate.disposition === prior.disposition) ||
+			// The resolution kind arrives with its resolution and never changes after.
+			(prior.sourceResolutionDigest !== undefined && candidate.sourceResolutionKind !== prior.sourceResolutionKind) ||
+			(prior.sourceResolutionDigest === undefined && candidate.sourceResolutionKind !== undefined &&
+				candidate.sourceResolutionDigest === undefined) ||
 			(prior.transformRefusal !== undefined &&
 				(candidate.transformRefusal === undefined ||
 					candidate.transformRefusal.reason !== prior.transformRefusal.reason ||
