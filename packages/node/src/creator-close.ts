@@ -284,6 +284,8 @@ export interface CreatorLiveCloseHandle {
 		Readonly<{ head: PresentHead; references: readonly GenerationRef[]; trustRef: GenerationRef }>
 	>;
 	status(): CreatorLiveCloseStatus;
+	/** This epoch's close is interrupted and holds ordinary admission until it adopts; the room retries it itself. */
+	interruptedClosePending?(): boolean;
 	stop(): Promise<void>;
 }
 
@@ -420,7 +422,8 @@ export type CreatorIssuanceMaintenanceConsumer = (
 
 export interface V3CreatorCloseRegistration {
 	readonly receiveOnly?: true;
-	bindSnapshotReadinessOwner(store: SnapshotQuarantineStore<SnapshotVerificationReceipt>): boolean;
+	/** Captures the native snapshot owner; the genesis plane also detects its own interrupted close here. */
+	bindSnapshotReadinessOwner(store: SnapshotQuarantineStore<SnapshotVerificationReceipt>): Promise<boolean>;
 	beginReceived(): Promise<boolean>;
 	terminalizeReceived(): boolean;
 	sealRecoveryDependencies(required?: boolean): Promise<CreatorSnapshotRecoveryCloseHold | undefined>;
@@ -497,6 +500,10 @@ export interface V3CreatorCloseRegistration {
 	): readonly CreatorPostAdoptionCensusSizing[];
 	installIssuanceMaintenanceConsumer(consumer: CreatorIssuanceMaintenanceConsumer): (() => void) | undefined;
 	abortSnapshotStage(): boolean;
+	/** This epoch's close failed after staging: hold ordinary admission (close-pending) until adoption. */
+	markInterruptedClose(): void;
+	/** This epoch's close is interrupted (reopen, genesis binding or in-process failure) and not yet adopted. */
+	interruptedClosePending(): boolean;
 	readonly currentTrust: CurrentAnchorTrust;
 	readonly retirementReconstruction?: CreatorSnapshotRetirementReconstructionRequest;
 	readonly exactCanonicalAnchorPreimageBytes: Uint8Array;
@@ -3525,7 +3532,7 @@ export async function bindCreatorLiveClose(
 		if (existing !== undefined) return Object.freeze({ handle: existing, ok: true as const });
 		const registration = claimCreatorCloseRegistration(input.plane);
 		if (registration === undefined) return Object.freeze({ ok: false as const, reason: "CREATOR_CLOSE_UNAVAILABLE" });
-		if (!registration.bindSnapshotReadinessOwner(input.snapshotStore))
+		if (!(await registration.bindSnapshotReadinessOwner(input.snapshotStore)))
 			return Object.freeze({ ok: false as const, reason: "CREATOR_SNAPSHOT_OWNER_UNAVAILABLE" });
 		const epoch = registration.currentTrust.currentEpoch;
 		if (!Number.isSafeInteger(epoch) || epoch < 0 || epoch === Number.MAX_SAFE_INTEGER) {
@@ -4739,7 +4746,13 @@ export async function bindCreatorLiveClose(
 			})().catch((error) => {
 				closeTask = undefined;
 				if (stagedSnapshot === undefined && registration.abortSnapshotStage()) lifecycle = "active";
-				else lifecycle = "sealed";
+				else {
+					lifecycle = "sealed";
+					// A staged close may have left its own snapshot scope on disk; its
+					// retry must run on exactly that state. Hold ordinary admission with
+					// the same close-pending gate a reopen sets, until adoption.
+					registration.markInterruptedClose();
+				}
 				maintenanceClosing = lifecycle !== "active";
 				finishRetainedReplayClose(false);
 				throw error;
@@ -4748,6 +4761,8 @@ export async function bindCreatorLiveClose(
 		};
 		const handle: CreatorLiveCloseHandle = Object.freeze({
 			close,
+			interruptedClosePending: (): boolean =>
+				!stopping && lifecycle !== "successor-adopted" && registration.interruptedClosePending(),
 			acquireLocalSessionWithdrawal: (author: string): Promise<CreatorLocalSessionWithdrawal> => {
 				if (stopping || maintenanceJobs.size !== 0 || acquisitionTask !== undefined || closeTask !== undefined ||
 					maintenanceReleaseFailure !== undefined || dependenciesReleased || dependencyReleaseTask !== undefined || actor.status().terminal ||

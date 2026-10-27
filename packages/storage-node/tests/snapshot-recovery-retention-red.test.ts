@@ -14,10 +14,13 @@ import type {
 } from "../../../tests/fixtures/snapshot-recovery-owner/contract.js";
 import { fixture, outcome, receiptFor, stable } from "../../../tests/fixtures/snapshot-recovery-owner/contract.js";
 import {
+	expectedOrphanedCloseScopeCase,
 	expectedRetentionCase,
 	expectedTemporaryAdmissionCase,
+	ORPHANED_CLOSE_SCOPE_CASES,
 	RETENTION_CASES,
 	type RetentionEnvironment,
+	runOrphanedCloseScopeCase,
 	runRetentionCase,
 	runTemporaryAdmissionCase,
 	TEMPORARY_ADMISSION_CASES,
@@ -394,6 +397,10 @@ describe("1a-1 native SQLite retention RED", () => {
 	for (const name of TEMPORARY_ADMISSION_CASES)
 		it(`native temporary admission ${name}`, async () => {
 			expect(await runTemporaryAdmissionCase(name, environment())).toEqual(expectedTemporaryAdmissionCase(name));
+		});
+	for (const name of ORPHANED_CLOSE_SCOPE_CASES)
+		it(`native orphaned close scope ${name} is visible to the admission image`, async () => {
+			expect(await runOrphanedCloseScopeCase(name, environment())).toEqual(expectedOrphanedCloseScopeCase(name));
 		});
 	for (const name of RETENTION_CASES)
 		it(name, async () => {

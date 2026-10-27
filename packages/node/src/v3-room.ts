@@ -108,6 +108,7 @@ import {
 	startRecoveryPoolAutoScheduler,
 	type RecoveryPoolAutoMaintenanceOptions,
 } from "./internal/recovery-pool-auto.js";
+import { type InterruptedCloseRetry, startInterruptedCloseRetry } from "./internal/interrupted-close-retry.js";
 import { createScheduledRecoveryPoolLull } from "./internal/recovery-pool-scheduled.js";
 import { retainedPublicationCancelled } from "./internal/retained-publication.js";
 import {
@@ -1087,6 +1088,23 @@ function authenticateCreatorInviteMaterial(
 		expectedBlueprintDigest: provenance.blueprintDigest,
 	});
 	return Object.freeze({ objectId: provenance.objectId, blueprintDigest: provenance.blueprintDigest });
+}
+
+/**
+ * Stable marker of the creator's close-pending refusal. Its cause clears on its
+ * own: the creator session retries its interrupted epoch close itself, and once
+ * that close adopts, reissued work is admitted. Callers wait and reissue; they
+ * need not (and must not) treat it as a closing epoch to seal.
+ */
+export const V3_ROOM_CLOSE_PENDING = "close-pending";
+
+/**
+ * Whether a room issue refusal is the creator's close-pending refusal (see V3_ROOM_CLOSE_PENDING).
+ * @param error - A rejection from a room issue.
+ * @returns True for the retryable close-pending refusal only.
+ */
+export function isV3RoomClosePendingRefusal(error: unknown): boolean {
+	return error instanceof Error && error.message.includes(`: ${V3_ROOM_CLOSE_PENDING}: `);
 }
 
 /**
@@ -4472,6 +4490,14 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	let lifetimeTransitionsPending = 0;
 	// Opt-in idle scheduler for early recovery-pool turnover; stopped at close.
 	let autoPoolMaintenance: Readonly<{ stop(): void }> | undefined;
+	// The session's own retry of an interrupted creator close (creator only).
+	let interruptedCloseRetry: InterruptedCloseRetry | undefined;
+	// The retry in flight: a manual sealEpoch joins its close, and the matching
+	// manual adoptCreatorSuccessor joins its adoption, instead of closing again.
+	let interruptedCloseRetryJoin:
+		| Readonly<{ sealed: Promise<CreatorLiveCloseResult>; adopted: Promise<void> }>
+		| undefined;
+	let joinedRetryAdoption: Promise<void> | undefined;
 	// Opt-in lull once per epoch, requested right after adoption or install (Track Z).
 	const scheduledLulls =
 		input.recoveryPoolScheduledLull === true
@@ -4711,7 +4737,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			if (request.source !== "public-new") continue;
 			const authorized = authorizeV3NewLocalOperation({ plane: activeHandle, operation: request.operation });
 			if (!authorized.ok) {
-				rejectOwned(owned, new TypeError(`v3 room new operation is not authorized: ${authorized.kind}`));
+				rejectOwned(owned, new TypeError(`v3 room new operation is not authorized: ${authorized.kind}: ${authorized.detail}`));
 				return;
 			}
 		}
@@ -7348,6 +7374,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		closed = true;
 		endSessionWaits();
 		autoPoolMaintenance?.stop();
+		interruptedCloseRetry?.stop();
 		closePresentation();
 		revokeTransport();
 		cancelRedirectCreation();
@@ -7415,6 +7442,28 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			}
 		};
 	}
+	// One creator close of the current epoch, in the lifetime FIFO.
+	const sealEpochNow = (): Promise<CreatorLiveCloseResult> =>
+		enqueueLifetimeTransition(async () => {
+			if (redirectPromise !== undefined) await redirectPromise;
+			if (redirectedSession !== undefined) return redirectedSession.sealEpoch();
+			assertSessionOpen();
+			if (creatorCloseHandle === undefined) throw new TypeError("creator close authority is unavailable");
+			await rebasePromise;
+			await migrationCompletionBarrier;
+			await drainPendingIssues();
+			assertSessionOpen();
+			// Current bootstrap/publication debt must join while its original
+			// plane can still publish it. Historical replay is not an ACK.
+			await publishCurrentGenesisBootstrap();
+			assertSessionOpen();
+			const result = await creatorCloseHandle.close();
+			// The successor and its adoption facts are installed. Serving reads its
+			// export afresh in a later host turn of this same lifetime transition.
+			await yieldToHost();
+			await serveAvailableSuccessor();
+			return result;
+		});
 	const session: V3RoomSession<Projection> = Object.freeze({
 		...(localOwner === undefined ? {} : { localSession: localOwner.control }),
 		activateMigration,
@@ -7450,6 +7499,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			});
 		},
 		adoptCreatorSuccessor(): Promise<void> {
+			const joined = joinedRetryAdoption;
+			if (joined !== undefined) {
+				joinedRetryAdoption = undefined;
+				return joined;
+			}
 			return adoptCreatorSuccessor();
 		},
 		installCreatorSuccessor,
@@ -7609,7 +7663,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
 					const authorized = authorizeV3NewLocalOperation({ plane: activeHandle, operation: captured });
 					if (!authorized.ok) {
-						throw new TypeError(`v3 room new operation is not authorized: ${authorized.kind}`);
+						throw new TypeError(`v3 room new operation is not authorized: ${authorized.kind}: ${authorized.detail}`);
 					}
 					const current = logicalTime;
 					logicalTime += 2;
@@ -7823,25 +7877,19 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		},
 		sealEpoch(): Promise<CreatorLiveCloseResult> {
 			if (input.receiveOnly) return Promise.reject(new TypeError("v3 room is receive-only"));
-			return enqueueLifetimeTransition(async () => {
-				if (redirectPromise !== undefined) await redirectPromise;
-				if (redirectedSession !== undefined) return redirectedSession.sealEpoch();
-				assertSessionOpen();
-				if (creatorCloseHandle === undefined) throw new TypeError("creator close authority is unavailable");
-				await rebasePromise;
-				await migrationCompletionBarrier;
-				await drainPendingIssues();
-				assertSessionOpen();
-				// Current bootstrap/publication debt must join while its original
-				// plane can still publish it. Historical replay is not an ACK.
-				await publishCurrentGenesisBootstrap();
-				assertSessionOpen();
-				const result = await creatorCloseHandle.close();
-				// The successor and its adoption facts are installed. Serving reads its
-				// export afresh in a later host turn of this same lifetime transition.
-				await yieldToHost();
-				await serveAvailableSuccessor();
-				return result;
+			// The session's own retry of an interrupted close is in flight: this is
+			// that close, not another one.
+			const joined = interruptedCloseRetryJoin;
+			if (joined !== undefined)
+				return joined.sealed.then((result) => {
+					joinedRetryAdoption = joined.adopted;
+					return result;
+				});
+			interruptedCloseRetry?.cancelPending();
+			return sealEpochNow().catch((error: unknown) => {
+				// A failed close may have set the interrupted-close gate: retry it, backing off.
+				interruptedCloseRetry?.kick(true);
+				throw error;
 			});
 		},
 		status(): CreatorLiveCloseStatus {
@@ -7950,6 +7998,38 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			},
 			clearTimer: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
 		});
+	if (input.receiveOnly !== true && input.creatorFinalitySigner !== undefined) {
+		interruptedCloseRetry = startInterruptedCloseRetry({
+			pending: () =>
+				!closed &&
+				terminalFailure === undefined &&
+				redirectedSession === undefined &&
+				activeHandle !== undefined &&
+				creatorCloseHandle?.interruptedClosePending?.() === true,
+			retry: async (): Promise<void> => {
+				// The same close a manual retry runs (exact durable scope and
+				// incarnation), unless it already sealed; then adopt its successor.
+				const sealed =
+					creatorCloseHandle?.status().lifecycle === "successor-pending-adoption" ? undefined : sealEpochNow();
+				const adopted = (sealed ?? Promise.resolve()).then(() => adoptCreatorSuccessor());
+				const join = sealed === undefined ? undefined : Object.freeze({ sealed, adopted });
+				interruptedCloseRetryJoin = join;
+				try {
+					await adopted;
+				} finally {
+					if (interruptedCloseRetryJoin === join) interruptedCloseRetryJoin = undefined;
+				}
+			},
+			setTimer: (callback, milliseconds) => {
+				const handle = setTimeout(callback, milliseconds);
+				(handle as { unref?(): void }).unref?.();
+				return handle;
+			},
+			clearTimer: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+		});
+		// Reopen or genesis binding may have found this epoch's own interrupted close.
+		interruptedCloseRetry.kick();
+	}
 	return session;
 }
 
