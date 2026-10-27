@@ -7128,17 +7128,78 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 	};
 	// A durable reopen right after this recipient completed a retirement at its
-	// current epoch (a lull's early turnover) halts its admission until the ORIGINAL
-	// received reconciliation runs again, as a creator's readiness boundary does for
-	// a creator. Discharge it once, in the lifecycle FIFO before startup reports
-	// ready, holding local issues meanwhile. A failure after entry is terminal; a
-	// plane without that request is left exactly as it was.
-	let recipientRetirementResume: Promise<void> = Promise.resolve();
-	if (
+	// current epoch (a lull's early turnover, or an install's received turnover)
+	// halts its admission until the ORIGINAL received reconciliation runs again, as
+	// a creator's readiness boundary does for a creator. Every durable reopen of a
+	// recipient plane runs it, in the lifecycle FIFO, holding local issues: session
+	// startup, and the recovery reopen a retried install performs after a failed
+	// receive (the halted plane resolves for no install, so without it every later
+	// install refused "creator recipient current authority is unavailable" and the
+	// member never followed again). A failure after entry is terminal; a plane
+	// without that request is left exactly as it was.
+	const resumeRecipientRetirement = async (): Promise<void> => {
+		await rebasePromise;
+		await migrationCompletionBarrier;
+		await refreshRoomHeadState();
+		await drainPendingIssues();
+		assertSessionOpen();
+		const plane = activeHandle,
+			roomTransport = transport,
+			roomHead = openedRoomHeadState?.stable;
+		if (
+			plane === undefined ||
+			roomTransport === undefined ||
+			roomHead === undefined ||
+			openedRoomHeadState?.pending !== null
+		)
+			throw new TypeError("v3 room recipient retirement resume owner is unavailable");
+		const result = await maintainCreatorRecipientRecoveryPool({
+			plane,
+			catalog: input.application.catalog,
+			expectedRoomHead: roomHead,
+			snapshotStore: await ownRecipientSnapshots(),
+			recoveryContext: await recipientRecoveryContext(),
+			resume: true,
+		});
+		// Ingress refused while admission was halted is repaired through the
+		// same authenticated retained path a reconnect uses.
+		if (result.kind === "maintained" && !closed && activeHandle === plane && transport === roomTransport)
+			roomTransport.requestRetainedHistory();
+	};
+	const recipientRetirementResumeRequested = (): boolean =>
 		input.creatorFinalitySigner === undefined &&
 		activeHandle !== undefined &&
-		creatorRecipientRetirementResumeRequested(activeHandle)
-	) {
+		creatorRecipientRetirementResumeRequested(activeHandle);
+	// The same discharge for a plane an install's recovery just reopened, inside that
+	// install's lifecycle transition. It must leave the plane admitted for the install:
+	// a halt it could not discharge is the session's explicit terminal failure, never
+	// a refusal every later install repeats.
+	const resumeRecoveredRecipientRetirement = async (): Promise<void> => {
+		if (!recipientRetirementResumeRequested()) return;
+		let open!: () => void;
+		const barrier = new Promise<void>((resolve) => {
+			open = resolve;
+		});
+		poolMaintenanceBarrier = barrier;
+		try {
+			await resumeRecipientRetirement();
+			if (recipientRetirementResumeRequested())
+				throw new TypeError("v3 room recipient retirement resume did not discharge the recovered plane's halt");
+		} catch (error) {
+			terminalFailure = error;
+			try {
+				await shutdown();
+			} catch (cleanup) {
+				throw combineFailures(error, cleanup);
+			}
+			throw error;
+		} finally {
+			if (poolMaintenanceBarrier === barrier) poolMaintenanceBarrier = undefined;
+			open();
+		}
+	};
+	let recipientRetirementResume: Promise<void> = Promise.resolve();
+	if (recipientRetirementResumeRequested()) {
 		let open!: () => void;
 		const barrier = new Promise<void>((resolve) => { open = resolve; });
 		poolMaintenanceBarrier = barrier;
@@ -7149,28 +7210,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		try {
 			recipientRetirementResume = enqueueLifetimeTransition(async () => {
 				try {
-					await rebasePromise;
-					await migrationCompletionBarrier;
-					await refreshRoomHeadState();
-					await drainPendingIssues();
-					assertSessionOpen();
-					const plane = activeHandle,
-						roomTransport = transport,
-						roomHead = openedRoomHeadState?.stable;
-					if (plane === undefined || roomTransport === undefined || roomHead === undefined || openedRoomHeadState?.pending !== null)
-						throw new TypeError("v3 room recipient retirement resume owner is unavailable");
-					const result = await maintainCreatorRecipientRecoveryPool({
-						plane,
-						catalog: input.application.catalog,
-						expectedRoomHead: roomHead,
-						snapshotStore: await ownRecipientSnapshots(),
-						recoveryContext: await recipientRecoveryContext(),
-						resume: true,
-					});
-					// Ingress refused while admission was halted is repaired through the
-					// same authenticated retained path a reconnect uses.
-					if (result.kind === "maintained" && !closed && activeHandle === plane && transport === roomTransport)
-						roomTransport.requestRetainedHistory();
+					await resumeRecipientRetirement();
 				} catch (error) {
 					terminalFailure = error;
 					try {
@@ -7250,6 +7290,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				const previous = openedRoomHeadState?.stable;
 				await recoverSettlementOwner(true);
 				await refreshRoomHeadState();
+				await resumeRecoveredRecipientRetirement();
 				if (await matchesInstalledOffer()) {
 					creatorRecipientRecoveryRequired = false;
 					return;
