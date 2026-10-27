@@ -1966,7 +1966,15 @@ function retirementEntryIsRetainedFence(plan: SettlementPlan, entry: SettlementP
  * R2 every other entry carries an authenticated terminal resolution or is itself a
  * retained fence: nothing is left to rebase, reissue or abandon below it. The row
  * then stays only while the original owner protects it (R3: rollback window, replay
- * scope, physical journal consumer). Release never touches the durable lineage. */
+ * scope, physical journal consumer). Release never touches the durable lineage.
+ *
+ * Version gate (owner decision G0): no wire or storage-format change and no schema
+ * version bump. Upgrading is transparent (an older store releases its fence at the
+ * next retirement). Downgrading after a release is UNSUPPORTED: an older build
+ * reopens the store but fails closed on its first install ("issuance retirement
+ * retained plan dependency is absent or permanently retired"), because it still
+ * expects the released fence to be protected. Measured by
+ * tests/removed-author-fence-release-version-native.test.ts. */
 function retirementFenceIsReleasable(plan: SettlementPlan, entry: SettlementPlan["entries"][number],
 	rows: IssuanceRetirementRows): boolean {
 	return plan.fenceSequence === null && retirementEntryIsRetainedFence(plan, entry, rows) &&
