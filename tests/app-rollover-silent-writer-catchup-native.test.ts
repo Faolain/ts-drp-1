@@ -388,8 +388,10 @@ async function unreachableCreator(inFlight: boolean) {
 			expect(readOnly.state).toBe("read-only");
 			expect(readOnly.kept.map((operation) => operation.id)).toEqual([moveId(51)]);
 			expect(await writer.authorityEpoch()).toBe(before);
-			// The creator carries on alone for more than the window.
-			while (epoch < before + WINDOW + 2) epoch = await rollCreator(creator, async () => undefined, ordinal);
+			// The creator carries on alone for more than the window (with a move in flight, for more epochs
+			// than the journal may protect: the retained work must not hold its scope).
+			const absence = inFlight ? MAX_PROTECTED_SCOPES + 2 : WINDOW + 2;
+			while (epoch < before + absence) epoch = await rollCreator(creator, async () => undefined, ordinal);
 			expect(await writer.authorityEpoch()).toBe(before);
 			expect((await writer.rolloverStatus?.()) as Status).toMatchObject({ state: "read-only" });
 
@@ -400,6 +402,7 @@ async function unreachableCreator(inFlight: boolean) {
 			await follow(wire, writer, epoch);
 			await rows.toWriter();
 			await rows.toCreator();
+			expect(journalRetirement(directory, "recipient").protectedScopes.length).toBeLessThanOrEqual(MAX_PROTECTED_SCOPES);
 			const reconnected = epoch;
 			process.stdout.write(
 				`UNREACHABLE_CREATOR_RECONNECTED ${JSON.stringify({ epoch, settlement: await writer.settlementStatus?.(), plan: await writer.settlementAudit(), own: (await writer.published(null)).map((row) => [row.authorSequence, rowValue(row).epoch, rowValue(row).operation.action, rowValue(row).operation.id]) })}\n`
@@ -458,17 +461,16 @@ it(
 	900_000
 );
 
-// KNOWN DEFECT, skipped RED (pre-existing at c08d8680; needs an owner decision). A Writer that installs
-// a successor more than one epoch ahead (here: the creator was unreachable) retains the old epoch's
-// own rows as unknown accepted work (v3-live retainCreatorAcceptedSourceCustody, disposition
+// A move in flight when the creator becomes unreachable. Before the fix (94d117ca, and already at
+// c08d8680): a Writer that installs a successor more than one epoch ahead retains its old epoch's own
+// rows as unknown accepted work (v3-live retainCreatorAcceptedSourceCustody: disposition
 // "manual-review" with a retained source context), and the drain then withholds the author fence for
-// good ("unknown retained work still withholds the author fence"). With a move in flight at the
-// disconnect, the creator's frontier stops below that move, and every later row of the Writer stays
-// unsettled: it is never fenced, never replaced, and the settlement window may not expire it (no fence
-// of its epoch precedes it, so it may sit above a gap). Resolving that work from the creator's signed
-// frontier would need a new retained-source resolution record (a storage-format change). Run it with
-// APP_ROLLOVER_UNREACHABLE_IN_FLIGHT_RED=1.
-it.skipIf(process.env.APP_ROLLOVER_UNREACHABLE_IN_FLIGHT_RED !== "1")(
+// good ("unknown retained work still withholds the author fence"). The creator's frontier stops below
+// the in-flight move, every later row of the Writer stays unsettled, and the page is told
+// "not-reaching-host" forever with the move kept and never offered again. The fix resolves that
+// retained work from the creator's signed frontier: a row the frontier settled was committed, a row it
+// proves was never admitted is expired and its move handed back to the application.
+it(
 	"with a move in flight when the creator becomes unreachable, the Writer's settlement lands again after it resumes",
 	() => unreachableCreator(true),
 	900_000
