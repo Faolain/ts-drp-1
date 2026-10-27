@@ -145,6 +145,15 @@ const TRANSIENT_REFUSAL = /retry after admitted work joins/u;
  */
 const CLOSING_REFUSAL =
 	/: not-active\b|live plane is unavailable|creator recovery dependency hold unavailable:replay\b/u;
+/**
+ * An interrupted creator close that the room retries by itself (fix/creator-close-crash): new
+ * operations are refused with "v3 room new operation is not authorized: not-active: close-pending:
+ * ..." until the retried close lands. The move waits for the room's epoch to advance (within the
+ * closing bound) and is offered again; the policy never seals for it and never counts it as a
+ * capacity offer. Matches the refusal's stable marker until this branch has v3-room's
+ * V3_ROOM_CLOSE_PENDING / isV3RoomClosePendingRefusal(error), which replaces it at integration.
+ */
+const CLOSE_PENDING_REFUSAL = /: close-pending: /u;
 const SESSION_CLOSED = /v3 room session is closed/u;
 /**
  * Capacity refusals of one move before the last is thrown. The creator's issuance image spans the
@@ -198,12 +207,16 @@ export function createV3RoomRolloverPolicy(
 		hooks?: V3RoomRolloverHooks;
 		/** A member's bound on waiting for the next epoch (default V3_ROOM_MEMBER_SUCCESSOR_WAIT_MS). */
 		memberWaitMs?: number;
+		/** How long a move waits through a closing or a close-pending retry (default 120 s). */
+		closingLimitMs?: number;
 	}>
 ): V3RoomRolloverPolicy {
 	const { role, budget } = input;
 	const hooks = input.hooks ?? {};
 	const memberWaitMs = input.memberWaitMs ?? V3_ROOM_MEMBER_SUCCESSOR_WAIT_MS;
 	if (!Number.isFinite(memberWaitMs) || memberWaitMs <= 0) throw new TypeError("v3 room member wait is invalid");
+	const closingLimitMs = input.closingLimitMs ?? CLOSING_LIMIT_MS;
+	if (!Number.isFinite(closingLimitMs) || closingLimitMs <= 0) throw new TypeError("v3 room closing limit is invalid");
 	if (!Number.isSafeInteger(budget.movesPerAuthor) || budget.movesPerAuthor < 1)
 		throw new TypeError("v3 room rollover budget is invalid");
 	if (!Number.isFinite(budget.idleMs) || budget.idleMs <= 0) throw new TypeError("v3 room rollover idle is invalid");
@@ -415,10 +428,26 @@ export function createV3RoomRolloverPolicy(
 				return;
 			} catch (error) {
 				if (closed) throw error;
+				if (CLOSE_PENDING_REFUSAL.test(message(error))) {
+					// Not an offer of the move, and no seal: the room retries its interrupted close by itself.
+					// Wait for that retry (the epoch advancing), within the closing bound, then offer again.
+					closingSince ??= performance.now();
+					const remaining = closingLimitMs - (performance.now() - closingSince);
+					if (remaining <= 0) throw error;
+					offer--;
+					waiting++;
+					try {
+						await nextEpoch(attempted, remaining);
+					} finally {
+						waiting--;
+					}
+					if (currentEpoch() <= attempted) throw error;
+					continue;
+				}
 				if (CLOSING_REFUSAL.test(message(error))) {
 					// Not an offer of the move: the room was between epochs. Bounded by the closing's length.
 					closingSince ??= performance.now();
-					if (performance.now() - closingSince >= CLOSING_LIMIT_MS) throw error;
+					if (performance.now() - closingSince >= closingLimitMs) throw error;
 					offer--;
 					waiting++;
 					try {
