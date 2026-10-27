@@ -651,7 +651,7 @@ export interface V3RoomSession<Projection extends V3RoomProjectionAuthority = V3
 	adoptCreatorSuccessor(): Promise<void>;
 	authorizeSettlementSourceSelection(request: V3SettlementSourceSelectionRequest): Promise<Uint8Array>;
 	exportCreatorSuccessor(): Promise<CreatorSuccessorOffer>;
-	installCreatorSuccessor(input: Readonly<{ offer: CreatorSuccessorOffer; peers: readonly string[] }>): Promise<void>;
+	installCreatorSuccessor(input: V3RoomCreatorSuccessorInstallRequest): Promise<void>;
 	promoteCreatorCheckpoint(input: Readonly<{ closedEpoch: number }>): Promise<void>;
 	authority(): V3RoomSuccessorAuthority | null;
 	close(): Promise<void>;
@@ -1121,6 +1121,67 @@ function authenticateCreatorInviteMaterial(
 		expectedBlueprintDigest: provenance.blueprintDigest,
 	});
 	return Object.freeze({ objectId: provenance.objectId, blueprintDigest: provenance.blueprintDigest });
+}
+
+/**
+ * A member's successor install request. `newest`, when given, is asked once, right before the
+ * install fetches the creator's material, for the newest offer its caller knows of then (undefined:
+ * keep `offer`). The creator serves only its latest successor, so an install that waited (in the
+ * room's lifecycle queue, a recovery, slow storage) while the creator rolled over again fetches the
+ * newest offer instead of a successor the creator no longer serves. Whatever it returns is
+ * authenticated by the install exactly as `offer` would be.
+ */
+export type V3RoomCreatorSuccessorInstallRequest = Readonly<{
+	offer: CreatorSuccessorOffer;
+	peers: readonly string[];
+	newest?: () => Readonly<{ offer: CreatorSuccessorOffer; peers: readonly string[] }> | undefined;
+}>;
+
+/**
+ * Asks an install request's `newest` for a later offer; a failure or a malformed answer keeps the
+ * original (never fails the install by itself).
+ * @param newest - The request's `newest`, if any.
+ * @returns The captured newer offer and its peers, or undefined.
+ */
+function selectNewestCreatorSuccessorOffer(
+	newest: (() => unknown) | undefined
+): Readonly<{ offer: CreatorSuccessorOffer; peers: readonly string[] }> | undefined {
+	if (newest === undefined) return undefined;
+	try {
+		const fields = exactRecord(newest(), ["offer", "peers"]);
+		if (fields === undefined) return undefined;
+		return Object.freeze({
+			offer: captureCreatorSuccessorOffer(fields.offer),
+			peers: captureCreatorSuccessorPeers(fields.peers),
+		});
+	} catch {
+		return undefined;
+	}
+}
+
+/**
+ * How long a move made while a creator-successor adoption owns the room's plane (a creator's own
+ * adoption, or a member's install, under the settlement profile) is held before it is refused with
+ * V3RoomAdoptionHoldExpired. Held moves are issued as soon as that adoption settles; only an
+ * adoption that has not settled within this bound refuses them. Two minutes: an install measured
+ * up to ~60 s in a loaded browser.
+ */
+export const V3_ROOM_ADOPTION_ISSUE_HOLD_MS = 120_000;
+
+/**
+ * A move held for a creator-successor adoption that did not settle within
+ * V3_ROOM_ADOPTION_ISSUE_HOLD_MS. The move was not issued; the caller still owns it. Its message
+ * keeps the room's closing wording ("live plane is unavailable"), so an application policy that
+ * waits through a closing treats it as one.
+ */
+export class V3RoomAdoptionHoldExpired extends TypeError {
+	/**
+	 * @param heldMs - How long the move was held.
+	 */
+	constructor(readonly heldMs: number) {
+		super(`v3 room live plane is unavailable: a successor adoption held this move for ${heldMs} ms`);
+		this.name = "V3RoomAdoptionHoldExpired";
+	}
 }
 
 /**
@@ -4518,6 +4579,41 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	let pendingInputEntries = 0;
 	let pendingInputBytes = 0;
 	let pendingIssues: PendingIssue[] = [];
+	// A move made while a creator-successor adoption (a creator's own, or a member's install) owns
+	// the plane under the settlement profile: held, not refused, and issued once that adoption has
+	// settled, in logical-time order, on the plane it left (the successor when it succeeded). An
+	// install first drains the moves held by the adoption before it (installPreDrain), so
+	// back-to-back installs never starve them. Held at most V3_ROOM_ADOPTION_ISSUE_HOLD_MS.
+	let heldIssues: PendingIssue[] = [];
+	const heldIssueTimers = new Map<PendingIssue, ReturnType<typeof setTimeout>>();
+	let installPreDrain = false;
+	const adoptionHoldsIssues = (): boolean =>
+		settlementProfile === "v1" && creatorSuccessorAdoptionTask !== undefined;
+	const holdIssue = (request: PendingIssue): void => {
+		heldIssues.push(request);
+		heldIssueTimers.set(
+			request,
+			setTimeout(() => {
+				heldIssueTimers.delete(request);
+				const index = heldIssues.indexOf(request);
+				if (index < 0) return;
+				heldIssues.splice(index, 1);
+				request.reject(new V3RoomAdoptionHoldExpired(V3_ROOM_ADOPTION_ISSUE_HOLD_MS));
+				request.releasePublicInput?.();
+			}, V3_ROOM_ADOPTION_ISSUE_HOLD_MS)
+		);
+	};
+	const releaseHeldIssues = (): void => {
+		if (heldIssues.length === 0) return;
+		const released = heldIssues.sort((left, right) => left.logicalTime - right.logicalTime);
+		heldIssues = [];
+		for (const request of released) {
+			clearTimeout(heldIssueTimers.get(request));
+			heldIssueTimers.delete(request);
+		}
+		pendingIssues = [...released, ...pendingIssues];
+		scheduleDrain();
+	};
 	let drainScheduled = false;
 	let draining = false;
 	let drainPromise: Promise<void> = Promise.resolve();
@@ -4769,7 +4865,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	};
 	const issueOwned = async (owned: readonly PendingIssue[]): Promise<void> => {
 		if (owned.length === 0) return;
-		if (activeHandle === undefined || (settlementProfile === "v1" && creatorSuccessorAdoptionTask !== undefined)) {
+		if (activeHandle !== undefined && adoptionHoldsIssues() && !installPreDrain && owned.every(({ source }) => source === "public-new")) {
+			for (const request of owned) holdIssue(request);
+			return;
+		}
+		if (activeHandle === undefined || (adoptionHoldsIssues() && !installPreDrain)) {
 			rejectOwned(owned, new TypeError("v3 room live plane is unavailable"));
 			return;
 		}
@@ -4880,7 +4980,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				releaseForeground();
 				// A resolved caller's operation remains in this frozen snapshot until
 				// the complete drain joins. Do not refund that still-retained custody.
-				for (const request of snapshot) request.releasePublicInput?.();
+				// A request held for an adoption keeps it until its own drain (or its hold expiry).
+				for (const request of snapshot) if (!heldIssues.includes(request)) request.releasePublicInput?.();
 				draining = false;
 				if (pendingIssues.length > 0) scheduleDrain();
 			}
@@ -7249,6 +7350,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		});
 		const shared = attempt.finally(() => {
 			if (creatorSuccessorAdoptionTask === shared) creatorSuccessorAdoptionTask = undefined;
+			releaseHeldIssues();
 		});
 		creatorSuccessorAdoptionTask = shared;
 		// Held successor requests re-check once the adoption, its tail included, has settled as its
@@ -7440,16 +7542,18 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			terminalFailure = error;
 		});
 	}
-	const installCreatorSuccessor = (
-		request: Readonly<{ offer: CreatorSuccessorOffer; peers: readonly string[] }>
-	): Promise<void> => {
+	const installCreatorSuccessor = (request: V3RoomCreatorSuccessorInstallRequest): Promise<void> => {
 		let offer: CreatorSuccessorOffer;
 		let peers: readonly string[];
+		let newest: (() => unknown) | undefined;
 		try {
-			const fields = exactRecord(request, ["offer", "peers"]);
-			if (fields === undefined) throw new TypeError("creator recipient request is invalid");
+			const fields =
+				exactRecord(request, ["offer", "peers"]) ?? exactRecord(request, ["newest", "offer", "peers"]);
+			if (fields === undefined || (fields.newest !== undefined && typeof fields.newest !== "function"))
+				throw new TypeError("creator recipient request is invalid");
 			offer = captureCreatorSuccessorOffer(fields.offer);
 			peers = captureCreatorSuccessorPeers(fields.peers);
+			newest = fields.newest as (() => unknown) | undefined;
 		} catch (error) {
 			return Promise.reject(error);
 		}
@@ -7457,6 +7561,16 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			return Promise.reject(new TypeError("creator recipient installation is already owned"));
 		const attempt = enqueueLifetimeTransition(async () => {
 			assertSessionOpen();
+			// The moves held by the adoption before this one (and any issue in flight) go out first, on
+			// the plane that adoption left, so back-to-back installs never starve them. Moves made from
+			// here on are held for this install.
+			installPreDrain = true;
+			try {
+				releaseHeldIssues();
+				await drainPendingIssues();
+			} finally {
+				installPreDrain = false;
+			}
 			await rebasePromise;
 			await migrationCompletionBarrier;
 			await refreshRoomHeadState();
@@ -7524,6 +7638,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			let received: Awaited<ReturnType<typeof receiveCreatorSuccessorAdoption>>;
 			try {
 				const recoveryContext = openedRoomHeadState.stable.epoch >= 2 ? await recipientRecoveryContext() : undefined;
+				// The creator serves only its latest successor. Everything above may have waited (the
+				// lifecycle queue, a recovery, slow storage) while the creator rolled over again, so the
+				// install fetches the newest offer its caller knows of now, not the one it was queued
+				// with. The offer is authenticated by the receive below exactly as the original would be.
+				const selected = selectNewestCreatorSuccessorOffer(newest);
+				if (selected !== undefined) ({ offer, peers } = selected);
 				received = await receiveCreatorSuccessorAdoption({
 					plane: activeHandle,
 					catalog: input.application.catalog,
@@ -7579,6 +7699,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		});
 		const shared = attempt.finally(() => {
 			if (creatorSuccessorAdoptionTask === shared) creatorSuccessorAdoptionTask = undefined;
+			releaseHeldIssues();
 		});
 		creatorSuccessorAdoptionTask = shared;
 		return shared;
@@ -7920,9 +8041,14 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					if (terminalFailure !== undefined) throw terminalFailure;
 					if (closed) throw new TypeError("v3 room session is closed");
 					if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
-					const authorized = authorizeV3NewLocalOperation({ plane: activeHandle, operation: captured });
-					if (!authorized.ok) {
-						throw new TypeError(`v3 room new operation is not authorized: ${authorized.kind}: ${authorized.detail}`);
+					// An adoption owns the plane: the move waits for it and is authorized against the plane
+					// it leaves when its drain issues it (issueOwned), never refused for the adoption.
+					const held = adoptionHoldsIssues();
+					if (!held) {
+						const authorized = authorizeV3NewLocalOperation({ plane: activeHandle, operation: captured });
+						if (!authorized.ok) {
+							throw new TypeError(`v3 room new operation is not authorized: ${authorized.kind}: ${authorized.detail}`);
+						}
 					}
 					const current = logicalTime;
 					logicalTime += 2;
@@ -7931,19 +8057,19 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 						presentationHook((overlay) => overlay.bindLocal(id, current));
 					}
 					const promise = new Promise<void>((resolve, reject) => {
-						pendingIssues.push(
-							Object.freeze({
-								source: "public-new",
-								logicalTime: current,
-								operation: captured,
-								releasePublicInput,
-								reject,
-								resolve,
-							})
-						);
+						const request: PendingIssue = Object.freeze({
+							source: "public-new",
+							logicalTime: current,
+							operation: captured,
+							releasePublicInput,
+							reject,
+							resolve,
+						});
+						if (held) holdIssue(request);
+						else pendingIssues.push(request);
 						transferred = true;
 					});
-					scheduleDrain();
+					if (!held) scheduleDrain();
 					await promise;
 					settleFollower?.(Object.freeze({ ok: true }));
 					if (presented !== undefined) {
@@ -8253,7 +8379,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			options: input.recoveryPoolAutoMaintenance,
 			// Identity changes only: a new projection, issued logical time or plane.
 			activity: () => [projection, logicalTime, activeHandle, redirectedSession],
-			busy: () => pendingIssues.length > 0 || drainScheduled || draining || lifetimeTransitionsPending > 0 ||
+			busy: () => pendingIssues.length > 0 || heldIssues.length > 0 || drainScheduled || draining || lifetimeTransitionsPending > 0 ||
 				redirectPromise !== undefined || migrationBarrier !== undefined || migrationCompletionBarrier !== undefined,
 			epoch: () => (activeHandle === undefined && redirectedSession === undefined ? undefined : session.authority()?.epoch ?? 0),
 			open: () => !closed && terminalFailure === undefined,

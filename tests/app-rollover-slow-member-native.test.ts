@@ -180,6 +180,28 @@ it(
 			const rolls: { epoch: number; at: number; member: number }[] = [];
 			const started = performance.now();
 			let stopped = false;
+			// Observation: every move the member's room listed as given back, and for how long.
+			const givenBack = new Map<string, { ids: string[]; epoch: number; first: number; last: number }>();
+			const watchGivenBack = (async () => {
+				while (!stopped) {
+					const status = (await writer.settlementStatus?.()) as
+						| { undelivered: { vertexDigest: string; epoch: number; operations: { id?: string }[] }[] }
+						| null;
+					const now = Math.round(performance.now() - started);
+					for (const given of status?.undelivered ?? []) {
+						const seen = givenBack.get(given.vertexDigest);
+						if (seen === undefined)
+							givenBack.set(given.vertexDigest, {
+								ids: given.operations.map((operation) => String(operation.id)),
+								epoch: given.epoch,
+								first: now,
+								last: now,
+							});
+						else seen.last = now;
+					}
+					await sleep(50);
+				}
+			})();
 			try {
 				// The creator rolls over back to back; the member follows through the pages' own delivery,
 				// and makes a move every half second (through the application's rollover policy).
@@ -255,8 +277,13 @@ it(
 				expect(await writer.state()).toBe(await creator.state());
 			} finally {
 				stopped = true;
+				await watchGivenBack;
+				const own = (await writer.published(null)).map((row) => {
+					const value = rowValue(row);
+					return [value.authorSequence, value.epoch, value.operation.action, value.operation.id];
+				});
 				process.stdout.write(
-					`SLOW_MEMBER_SUMMARY ${JSON.stringify({ rolls, issued, installs, member: await writer.successorDelivery?.(), creatorErrors: (await creator.rollover?.())?.errors, status: await writer.rolloverStatus?.() })}\n`
+					`SLOW_MEMBER_SUMMARY ${JSON.stringify({ givenBack: [...givenBack.values()], own, plan: await writer.settlementAudit(), rolls, issued, installs, member: await writer.successorDelivery?.(), creatorErrors: (await creator.rollover?.())?.errors, status: await writer.rolloverStatus?.() })}\n`
 				);
 				await wire.stop();
 			}
