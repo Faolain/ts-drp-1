@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { DatabaseSync, type SQLInputValue, type StatementSync } from "node:sqlite";
 
 import { createNodeSnapshotQuarantineStore as createLegacy } from "./legacy-snapshot-transfer.mjs";
+import { allowOutOfBandWrites } from "./out-of-band-sqlite.js";
 import {
 	bounded,
 	check,
@@ -192,8 +193,9 @@ export async function observeSQLite(
  */
 export function sqliteEnvironment(primaryFilename: string): DiscoveryEnvironment {
 	const filename = `${primaryFilename}${suffix}`;
+	// Fixture damage (put/remove/chunks) is out-of-band: past the native owner's write fence.
 	const use = <T>(action: (database: DatabaseSync) => T): T => {
-		const db = new DatabaseSync(filename);
+		const db = allowOutOfBandWrites(new DatabaseSync(filename));
 		try {
 			return action(db);
 		} finally {
