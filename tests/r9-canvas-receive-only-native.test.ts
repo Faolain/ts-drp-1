@@ -274,8 +274,23 @@ async function canvasFixture(realNetwork = false) {
 		await opened.floor.close();
 		heads.delete(opened.floor);
 	};
+	// A second native issuance owner beside a LIVE room: the room's retained replay may
+	// hold the native writer reservation across a network send (in production its own
+	// writers queue behind it in the plane FIFO). This harness connection's synchronous
+	// SQLite busy wait blocks the event loop, so the in-process holder cannot release
+	// during it; yield and retry only that transient admission refusal.
+	const openObserverIssuance = async (name: string) => {
+		for (let attempt = 0; ; attempt++) {
+			try {
+				return await host.openIssuance(name);
+			} catch (error) {
+				if (attempt >= 20 || (error as { retryClass?: unknown }).retryClass !== "transient") throw error;
+				await new Promise<void>((resolve) => setTimeout(resolve, 25));
+			}
+		}
+	};
 	const observerEffects = async (name: string) => {
-		const store = await host.openIssuance(name);
+		const store = await openObserverIssuance(name);
 		try {
 			const scope = { author: observer.localAuthorId, objectId };
 			return {
