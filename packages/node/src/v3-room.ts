@@ -4,7 +4,7 @@ import { withAuthoredGenesisSigningRequest } from "@ts-drp/protocol-v3/internal/
 import { CompactMerkleAccumulator } from "@ts-drp/compaction";
 import { createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
 import type { EphemeralChannel, EphemeralChannelOptions } from "@ts-drp/ephemeral";
-import { SETTLEMENT_REPLACEMENT_DIGEST_LIMITS, SETTLEMENT_REPLACEMENT_MAX_INTENTS, settlementSourceContextsForEntries } from "@ts-drp/issuance-store";
+import { SETTLEMENT_HAND_BACK_LIMITS, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS, SETTLEMENT_REPLACEMENT_MAX_INTENTS, settlementSourceContextsForEntries } from "@ts-drp/issuance-store";
 import { nativeIssuanceSignAdmissionForStore } from "@ts-drp/issuance-store/maintenance";
 import { MessageQueueManager } from "@ts-drp/message-queue";
 import { createSnapshotChunkProtocolPort, CREATOR_SUCCESSOR_PROTOCOL } from "@ts-drp/network/snapshot-transfer";
@@ -1172,6 +1172,35 @@ export const V3_ROOM_CLOSE_PENDING = "close-pending";
  */
 export function isV3RoomClosePendingRefusal(error: unknown): boolean {
 	return error instanceof Error && error.message.includes(`: ${V3_ROOM_CLOSE_PENDING}: `);
+}
+
+/**
+ * The most undelivered own moves a Writer keeps: the settlement plan's hand-back record bound
+ * (SETTLEMENT_HAND_BACK_LIMITS.maxRecords), so the window can give back every move it holds.
+ */
+export const V3_ROOM_LOCAL_BACKLOG_LIMIT = SETTLEMENT_HAND_BACK_LIMITS.maxRecords;
+
+/**
+ * A new local move refused up front because the Writer's undelivered own moves have reached
+ * V3_ROOM_LOCAL_BACKLOG_LIMIT: its moves are not reaching the host. The backlog is the Writer's live
+ * replaced moves (displaced rows the room re-offers), its retained work, and the settlement plan's
+ * hand-back records, as of the last install; a move accepted in the current epoch counts once an install
+ * displaces it, so a Writer whose moves are delivered every epoch never reaches it. Nothing is accepted,
+ * so nothing can be lost later. It clears once an install settles delivered moves, or a given-back move's
+ * reissued row settles. A given-back move offered again with its hand-back record is never refused here.
+ */
+export class V3RoomLocalBacklogFull extends Error {
+	/**
+	 * @param backlog - The Writer's undelivered moves.
+	 * @param bound - V3_ROOM_LOCAL_BACKLOG_LIMIT.
+	 */
+	constructor(
+		readonly backlog: number,
+		readonly bound: number
+	) {
+		super(`v3 room local backlog is full: ${backlog} of ${bound} own moves are not reaching the host`);
+		this.name = "V3RoomLocalBacklogFull";
+	}
 }
 
 /**
@@ -5061,6 +5090,35 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	const settlementScope = Object.freeze({ author: input.author, objectId: input.objectId });
 	type RoomHandBack = NonNullable<RoomSettlementPlan["handBacks"]>[number];
 	let settlementStatusSnapshot: V3RoomSettlementStatus | undefined;
+	// The Writer's undelivered own moves (V3RoomLocalBacklogFull) as of its last plan write, and the
+	// displaced rows of the last rebase scan that counted them.
+	let settlementBacklog = 0;
+	let settlementDisplaced: ReadonlySet<number> = new Set();
+	/**
+	 * The backlog V3RoomLocalBacklogFull bounds: each live replaced move once (the entry of its newest
+	 * displaced row, whose replacement is not itself displaced, or which is not yet replaced), each
+	 * retained source (manual-review), and every hand-back record (a consumed one keeps its reissued
+	 * move's slot until the next merge drops it and the reissued row is counted live, if displaced).
+	 * @param plan - The durable plan.
+	 * @param displaced - The displaced own rows of the last rebase scan.
+	 * @returns The backlog.
+	 */
+	const settlementBacklogOf = (plan: RoomSettlementPlan | null, displaced: ReadonlySet<number>): number => {
+		let live = 0;
+		for (const entry of plan?.entries ?? []) {
+			if (entry.sourceObjectId !== undefined) continue;
+			if (entry.disposition === "manual-review") {
+				live++;
+				continue;
+			}
+			if (entry.disposition !== "rebase" && entry.disposition !== "transform") continue;
+			if (!displaced.has(entry.sourceSequence)) continue;
+			if (entry.replacementSequence !== null && displaced.has(entry.replacementSequence)) continue;
+			if (entry.replacementProgress?.chunks.some((chunk) => displaced.has(chunk.replacementSequence)) === true) continue;
+			live++;
+		}
+		return live + (plan?.handBacks?.length ?? 0);
+	};
 	/**
 	 * The given-back moves: the plan's unconsumed hand-back records (written with the window's expiry or
 	 * the frontier resolution, consumed by the reissued row's own issuance transaction).
@@ -5084,6 +5142,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		);
 	const refreshHandBackListing = async (): Promise<void> => {
 		const plan = await issuanceStore.readSettlementPlan(settlementScope);
+		settlementBacklog = settlementBacklogOf(plan, settlementDisplaced);
 		if (settlementStatusSnapshot !== undefined)
 			settlementStatusSnapshot = Object.freeze({ ...settlementStatusSnapshot, undelivered: handBackListing(plan) });
 	};
@@ -5362,35 +5421,44 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		const windowExpired = await settlementWindowExpired(current, sources);
 		// Each move the window resolves as expired now is given back to the application in this same plan
 		// write: one durable hand-back record per operation, kept until its reissued row consumes it (it
-		// outlives the row's retirement). Consumed records are dropped. A move beyond the record bound
-		// (SETTLEMENT_HAND_BACK_LIMITS) is not recorded.
+		// outlives the row's retirement). Consumed records are dropped. An accepted move is never expired
+		// unrecorded: one whose records do not fit the record bound (SETTLEMENT_HAND_BACK_LIMITS) is not
+		// expired now; it stays live (replaced again) and is given back by a later install once records
+		// are free. The backlog bound (V3RoomLocalBacklogFull) keeps that from happening except after a
+		// burst of moves within one epoch.
 		let handBacks: readonly RoomHandBack[] | undefined = current?.handBacks?.filter(
 			(record) => record.reissueSequence === null
 		);
+		const expired = new Set<number>();
 		for (const source of [...sources].sort((left, right) => left.authorSequence - right.authorSequence)) {
 			if (!windowExpired.has(source.authorSequence)) continue;
-			if (current?.entries.find((entry) => entry.sourceSequence === source.authorSequence)?.disposition === "expire") continue;
-			handBacks =
-				settlementHandBacksWith(
-					handBacks,
-					source.intents.map((intent, index) =>
-						Object.freeze({
-							sourceSequence: source.authorSequence,
-							sourceDigest: bytes(source.vertexDigest),
-							sourceEpoch: source.epoch,
-							intent: index,
-							exactCanonicalOperationBytes: encodeCanonical(intent.operation),
-							reissueSequence: null,
-						})
-					)
-				) ?? handBacks;
+			if (current?.entries.find((entry) => entry.sourceSequence === source.authorSequence)?.disposition === "expire") {
+				expired.add(source.authorSequence);
+				continue;
+			}
+			const recorded = settlementHandBacksWith(
+				handBacks,
+				source.intents.map((intent, index) =>
+					Object.freeze({
+						sourceSequence: source.authorSequence,
+						sourceDigest: bytes(source.vertexDigest),
+						sourceEpoch: source.epoch,
+						intent: index,
+						exactCanonicalOperationBytes: encodeCanonical(intent.operation),
+						reissueSequence: null,
+					})
+				)
+			);
+			if (recorded === undefined) continue;
+			handBacks = recorded;
+			expired.add(source.authorSequence);
 		}
 		const completePlan = mergedSettlementPlan(
 			sources,
 			current,
 			await authenticatedSettlementInheritance(sources),
 			await completedSettlementSourcesPruned(current, sources),
-			windowExpired,
+			expired,
 			handBacks
 		);
 		const priorFence =
@@ -5422,6 +5490,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		const epoch = activeHandle?.epoch;
 		if (epoch === undefined) return;
 		const waiting = sources.filter((source) => source.frontierDisplaced).map((source) => source.epoch);
+		settlementDisplaced = new Set(sources.map((source) => source.authorSequence));
+		settlementBacklog = settlementBacklogOf(plan, settlementDisplaced);
 		settlementStatusSnapshot = Object.freeze({
 			epoch,
 			unsettledEpochs: waiting.length === 0 ? 0 : Math.max(0, epoch - Math.min(...waiting)),
@@ -5467,6 +5537,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 		const current = changed ? await issuanceStore.readSettlementPlan(settlementScope) : plan;
 		if (current === null) throw new TypeError("v3 room settlement plan is unavailable after retained resolution");
+		settlementBacklog = settlementBacklogOf(current, settlementDisplaced);
 		if (settlementStatusSnapshot !== undefined)
 			settlementStatusSnapshot = Object.freeze({ ...settlementStatusSnapshot, undelivered: handBackListing(current) });
 		return current;
@@ -7902,6 +7973,15 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			localOwner?.assertCurrent();
 			const handBack = issueHandBack(options);
 			if (input.receiveOnly) throw new TypeError("v3 room is receive-only");
+			// Back-pressure: a new move is refused up front while the Writer's undelivered moves fill the
+			// backlog; a given-back move's reissue keeps its own slot (its record) and is never refused.
+			if (
+				handBack === undefined &&
+				redirectPromise === undefined &&
+				redirectedSession === undefined &&
+				settlementBacklog >= V3_ROOM_LOCAL_BACKLOG_LIMIT
+			)
+				throw new V3RoomLocalBacklogFull(settlementBacklog, V3_ROOM_LOCAL_BACKLOG_LIMIT);
 			if (redirectPromise === undefined && redirectedSession === undefined) {
 				if (terminalFailure !== undefined) throw terminalFailure;
 				if (closed) throw new TypeError("v3 room session is closed");

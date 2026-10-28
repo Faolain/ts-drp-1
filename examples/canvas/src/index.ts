@@ -15,10 +15,13 @@ import {
 	openV3RoomSuccessorDelivery,
 	type V3RoomCreatorInviteMaterial,
 	type V3RoomHeadAuthority,
+	V3RoomNotReachingHost,
+	V3RoomReadOnly,
 	type V3RoomRolloverHooks,
 	type V3RoomRolloverPolicy,
 	type V3RoomSession,
 	type V3RoomSuccessorDelivery,
+	V3RoomSuccessorUnavailable,
 } from "@ts-drp/example-v3-room";
 import { DRPNode } from "@ts-drp/node";
 import { type CanvasProjection, createV3CanvasApplication } from "@ts-drp/node/applications/canvas";
@@ -317,6 +320,28 @@ async function paintPixel(pixel: HTMLDivElement): Promise<void> {
 	try {
 		await (rollover ?? selected).issue(command);
 	} catch (error) {
+		// Refused before acceptance and kept by the room's policy: sent once the cause clears.
+		if (error instanceof V3RoomNotReachingHost) {
+			connectionStatus(
+				"Can't paint: your paints are not reaching the host. This paint is kept and sent once they do.",
+				"error"
+			);
+			return;
+		}
+		if (error instanceof V3RoomReadOnly) {
+			connectionStatus(
+				"Can't paint: the canvas host is unreachable. This paint is kept and sent once it is back.",
+				"error"
+			);
+			return;
+		}
+		if (error instanceof V3RoomSuccessorUnavailable) {
+			connectionStatus(
+				"No new checkpoint has arrived from the host yet. This paint is kept and sent once it does.",
+				"error"
+			);
+			return;
+		}
 		console.error("Canvas paint failed", error);
 		connectionStatus("Paint was refused. Wait for admitted work to finish before retrying.", "error");
 	}

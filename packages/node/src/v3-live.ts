@@ -24333,11 +24333,16 @@ async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
 			row.canonicalPreimageBytes, row.signature, row.digest, scope.author, row.authorSequence);
 		const intents = authenticated === undefined ? undefined : rebaseIntents(second.retained.contract, authenticated);
 		if (authenticated !== undefined && intents !== undefined && intents.length > 0 &&
-			await frontierRetainedResolution(registration, selector.sourceSequence, authenticated.vertex.epoch) === "never-admitted")
+			await frontierRetainedResolution(registration, selector.sourceSequence, authenticated.vertex.epoch) === "never-admitted") {
 			handBacks = settlementHandBacksWith(prior.handBacks, intents.map((intent, index) => ObjectFreeze({
 				sourceSequence: selector.sourceSequence, sourceDigest: new Uint8ArrayConstructor(second.entry.sourceDigest),
 				sourceEpoch: authenticated.vertex.epoch, intent: index, exactCanonicalOperationBytes: encodeCanonical(intent.operation),
-				reissueSequence: null}))) ?? prior.handBacks;
+				reissueSequence: null})));
+			// An accepted move is never expired unrecorded: with no free hand-back record the source stays
+			// retained (the next drain resolves it once a record is free).
+			if (handBacks === undefined)
+				throw new TypeError("creator source abandonment hand-back records are full");
+		}
 	}
 	const entries = prior.entries.map(entry => entry.sourceSequence !== selector.sourceSequence ? entry :
 		{...entry, disposition: "expire" as const, replacementSequence: null, sourceResolutionDigest: new Uint8ArrayConstructor(expiry.digest),
