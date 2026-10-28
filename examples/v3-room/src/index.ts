@@ -27,7 +27,12 @@ import { openBrowserSealSigningStore } from "@ts-drp/storage-browser/seal-signin
 import { openBrowserSealVoteStore } from "@ts-drp/storage-browser/seal-vote";
 import { createBrowserSnapshotQuarantineStore } from "@ts-drp/storage-browser/snapshot-transfer";
 
-export { createV3RoomCreatorInviteMaterial, waitForV3RoomStartupForDiagnostics } from "@ts-drp/node/v3-room";
+export {
+	createV3RoomCreatorInviteMaterial,
+	V3_ROOM_LOCAL_BACKLOG_LIMIT,
+	V3RoomLocalBacklogFull,
+	waitForV3RoomStartupForDiagnostics,
+} from "@ts-drp/node/v3-room";
 export type {
 	V3RoomAcceptedOperation,
 	V3RoomAcceptedVertex,
@@ -60,6 +65,7 @@ export {
 	createV3RoomRolloverPolicy,
 	V3_ROOM_MEMBER_SUCCESSOR_WAIT_MS,
 	V3_ROOM_NOT_REACHING_HOST_MARGIN,
+	V3RoomNotReachingHost,
 	V3RoomReadOnly,
 	type V3RoomRolloverBudget,
 	type V3RoomRolloverEvent,

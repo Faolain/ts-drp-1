@@ -13429,14 +13429,15 @@ function settlementOwnRowFenceGuarded(fences: ReadonlyMap<number, number>, epoch
  * @param sourceEpoch - The retained row's own signed epoch.
  * @returns The proven outcome, or undefined.
  */
-async function frontierRetainedResolution(registration: V3PlaneRegistration, sourceSequence: number, sourceEpoch: number):
+async function frontierRetainedResolution(registration: V3PlaneRegistration, sourceSequence: number, sourceEpoch: number,
+	scan?: () => ReturnType<typeof scanOwnFences>):
 	Promise<"committed" | "never-admitted" | undefined> {
 	const frontier = settlementFrontierFromHistory(registration.historicalIssuance);
 	if (frontier === undefined || !validSettlementFrontierContext(registration.payload, frontier) ||
 		!NumberIsSafeInteger(sourceEpoch) || sourceEpoch >= frontier.currentEpoch) return undefined;
 	const rowClass = settlementOwnRowClass(sourceEpoch, frontier.currentEpoch, sourceSequence, frontier.admissionEpoch,
 		frontier.terminalThrough);
-	const fences = await scanOwnFences(creatorOriginalIssuanceStore(registration), registration.issuanceScope);
+	const fences = await (scan ?? (() => scanOwnFences(creatorOriginalIssuanceStore(registration), registration.issuanceScope)))();
 	if (rowClass === "displaced" && settlementOwnRowFenceGuarded(fences.lowest, sourceEpoch, sourceSequence, frontier.terminalThrough))
 		return "never-admitted";
 	if (rowClass === "terminal" && frontier.terminalThrough !== null && sourceSequence <= frontier.terminalThrough &&
@@ -16729,10 +16730,16 @@ async function settledLocalSourceFacts(
 			settlementOwnRowFenceGuarded(await ownEpochFences(store, scope), selected.authenticated.admitted.epoch,
 				source.authorSequence, frontier.terminalThrough);
 		const pinnedBytes = registration.exactCanonicalPinnedGenesisBootstrapOperationBytes;
-		const expiredBootstrap = expired && pinnedBytes !== undefined && selected.authenticated.admitted.epoch === 0 &&
+		// This author's own pinned bootstrap (its sequence 0 at the genesis anchor) is no application
+		// move and has no settlement entry: once the creator's frontier has passed it (terminal) or
+		// closed its epoch without it (expired), nothing replays or replaces it. Otherwise its journal
+		// scope 0 is never collectible, so it and every later own row stay retirement holes.
+		// Only "terminal" (or expired): an old-incarnation bootstrap still needs its own settlement entry.
+		const settledBootstrap = (expired || terminal === "terminal") && pinnedBytes !== undefined &&
+			selected.authenticated.admitted.epoch === 0 &&
 			authenticatedPinnedGenesisOutboxRow(row, scope, registration.payload, registration.payload.trust.trust.genesisAnchorDigest,
 				pinnedBytes)?.digest === source.vertexDigest;
-		const settled = expiredBootstrap ||
+		const settled = settledBootstrap ||
 			await ownSourceSettlementIsComplete(registration, selected, await store.readSettlementPlan(scope));
 		if ((terminal !== "terminal" && terminal !== "old-incarnation" && !expired) || !settled) return undefined;
 		return ObjectFreeze({ exactCanonicalPreimageBytes: new Uint8ArrayConstructor(row.canonicalPreimageBytes),
@@ -24226,6 +24233,10 @@ export async function inspectV3RetainedWorkFrontier(plane: V3PlaneHandle): Promi
 		if (!plan?.entries.some(entry => entry.sourceContextDigest !== undefined)) return ObjectFreeze([]);
 		const sources = await prepareCreatorRetainedSourceContracts(plan, payload.trust.trust, payload.input.catalog);
 		const result: V3RetainedWorkFrontier[] = [];
+		// One own-fence scan for the whole inspection (one registration task; the image check below
+		// refuses a changed store), not one full outbox scan per retained entry.
+		let fences: ReturnType<typeof scanOwnFences> | undefined;
+		const scan = (): ReturnType<typeof scanOwnFences> => (fences ??= scanOwnFences(store, scope));
 		for (const entry of plan.entries) {
 			if (entry.sourceContextDigest === undefined || entry.replacementSequence !== null || entry.replacementProgress !== undefined) continue;
 			const resolved = entry.disposition === "expire" && entry.sourceResolutionDigest !== undefined;
@@ -24242,7 +24253,7 @@ export async function inspectV3RetainedWorkFrontier(plane: V3PlaneHandle): Promi
 			if (authenticated.vertex.epoch !== sourceEpoch) continue;
 			result.push(ObjectFreeze({sourceSequence: entry.sourceSequence, sourceDigest: authenticated.digest,
 				sourceContextDigest: lowerHexDigest(entry.sourceContextDigest)!, sourceEpoch, resolved,
-				frontier: await frontierRetainedResolution(registration, entry.sourceSequence, sourceEpoch),
+				frontier: await frontierRetainedResolution(registration, entry.sourceSequence, sourceEpoch, scan),
 				operations: ObjectFreeze(intents.map(intent => intent.operation))}));
 		}
 		const after = await read(readInput);
@@ -24451,11 +24462,16 @@ async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
 			row.canonicalPreimageBytes, row.signature, row.digest, scope.author, row.authorSequence);
 		const intents = authenticated === undefined ? undefined : rebaseIntents(second.retained.contract, authenticated);
 		if (authenticated !== undefined && intents !== undefined && intents.length > 0 &&
-			await frontierRetainedResolution(registration, selector.sourceSequence, authenticated.vertex.epoch) === "never-admitted")
+			await frontierRetainedResolution(registration, selector.sourceSequence, authenticated.vertex.epoch) === "never-admitted") {
 			handBacks = settlementHandBacksWith(prior.handBacks, intents.map((intent, index) => ObjectFreeze({
 				sourceSequence: selector.sourceSequence, sourceDigest: new Uint8ArrayConstructor(second.entry.sourceDigest),
 				sourceEpoch: authenticated.vertex.epoch, intent: index, exactCanonicalOperationBytes: encodeCanonical(intent.operation),
-				reissueSequence: null}))) ?? prior.handBacks;
+				reissueSequence: null})));
+			// An accepted move is never expired unrecorded: with no free hand-back record the source stays
+			// retained (the next drain resolves it once a record is free).
+			if (handBacks === undefined)
+				throw new TypeError("creator source abandonment hand-back records are full");
+		}
 	}
 	const entries = prior.entries.map(entry => entry.sourceSequence !== selector.sourceSequence ? entry :
 		{...entry, disposition: "expire" as const, replacementSequence: null, sourceResolutionDigest: new Uint8ArrayConstructor(expiry.digest),

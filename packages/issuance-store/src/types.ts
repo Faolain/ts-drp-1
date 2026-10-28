@@ -114,8 +114,9 @@ export interface SettlementSourceContext {
 
 /**
  * Bounds on a plan's hand-back records (all records, consumed or not): an unconsumed record is an
- * application move held for the application, so their number and bytes are capped. A move given back
- * beyond the cap is not recorded.
+ * application move held for the application, so their number and bytes are capped. A move whose
+ * records do not fit is not given back yet: the writer keeps it live (it is not expired) until records
+ * are free, and refuses new local moves while its backlog fills the record bound (V3RoomLocalBacklogFull).
  */
 export const SETTLEMENT_HAND_BACK_LIMITS = Object.freeze({
 	maxRecords: 64,

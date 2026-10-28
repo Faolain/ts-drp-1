@@ -14,6 +14,8 @@ import {
 	createV3RoomSession,
 	type V3RoomCreatorInviteMaterial,
 	type V3RoomHeadAuthority,
+	V3RoomNotReachingHost,
+	V3RoomReadOnly,
 	type V3RoomRolloverHooks,
 	type V3RoomRolloverPolicy,
 	type V3RoomSuccessorDelivery,
@@ -757,6 +759,19 @@ async function issueMessage(): Promise<void> {
 		if (pendingSend === command) pendingSend = undefined;
 		status("Message accepted locally; remote delivery follows the room transport.", "ready");
 	} catch (error) {
+		if (error instanceof V3RoomNotReachingHost || error instanceof V3RoomReadOnly) {
+			// Not accepted, so nothing is lost: the room's policy keeps the message and sends it once this
+			// member's messages reach the host again.
+			if (pendingSend?.operation.text === messageInput.value) messageInput.value = "";
+			pendingSend = undefined;
+			status(
+				error instanceof V3RoomReadOnly
+					? `Can't send: the room's host is unreachable. Your message "${String(error.operation.text ?? "")}" is kept and is sent once the host is back.`
+					: `Can't send: your messages are not reaching the host. Your message "${String(error.operation.text ?? "")}" is kept and is sent once they do.`,
+				"error"
+			);
+			return;
+		}
 		if (error instanceof V3RoomSuccessorUnavailable) {
 			// The room's policy keeps the message and sends it once the next checkpoint arrives.
 			if (pendingSend?.operation.text === messageInput.value) messageInput.value = "";

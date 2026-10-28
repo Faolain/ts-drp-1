@@ -1,4 +1,4 @@
-import { isV3RoomClosePendingRefusal } from "@ts-drp/node/v3-room";
+import { isV3RoomClosePendingRefusal, V3RoomLocalBacklogFull } from "@ts-drp/node/v3-room";
 import type { V3RoomAcceptedVertex, V3RoomHandBack, V3RoomSession, V3RoomSettlementStatus } from "@ts-drp/node/v3-room";
 
 /** The adopted successor's offer (the four exact canonical byte strings a member installs). */
@@ -68,9 +68,10 @@ export interface V3RoomRolloverHooks {
  * "successor-unavailable": no successor arrived within the member's bound; the kept moves are
  * offered again, in order, once the room installs a later epoch.
  * "not-reaching-host": a member's own moves have not reached the creator for `unsettledEpochs`
- * epochs (from V3_ROOM_NOT_REACHING_HOST_EPOCHS on). The member still writes; at `window` unsettled
- * epochs the room stops re-offering a move and gives it back, and the policy keeps it (`kept`) until
- * the member's moves reach the creator again.
+ * epochs (from V3_ROOM_NOT_REACHING_HOST_EPOCHS on), or the room refused a new move because its
+ * undelivered moves fill the room's backlog (V3RoomNotReachingHost). The member still writes until
+ * then; at `window` unsettled epochs the room stops re-offering a move and gives it back, and the
+ * policy keeps it (`kept`) until the member's moves reach the creator again.
  * "read-only": the creator is unreachable (hooks.creatorReachable); moves are kept, not issued.
  */
 export type V3RoomRolloverStatus = Readonly<{
@@ -122,6 +123,28 @@ export class V3RoomReadOnly extends Error {
 	) {
 		super("the room's creator is unreachable; this member is read-only and the move is kept");
 		this.name = "V3RoomReadOnly";
+	}
+}
+
+/**
+ * A member's new move refused because its undelivered moves fill the room's backlog
+ * (V3RoomLocalBacklogFull): they are not reaching the host. The move was never accepted, so it is not
+ * lost: the policy keeps it and offers it again once the member's moves reach the creator
+ * (`status().kept`, state "not-reaching-host").
+ */
+export class V3RoomNotReachingHost extends Error {
+	/**
+	 * @param operation - The move kept until the member's moves reach the creator.
+	 * @param epoch - The epoch the member was in.
+	 * @param options - The room's backlog refusal, as the cause.
+	 */
+	constructor(
+		readonly operation: Readonly<Record<string, unknown>>,
+		readonly epoch: number,
+		options?: ErrorOptions
+	) {
+		super("this member's moves are not reaching the host; the move is kept and sent once they do", options);
+		this.name = "V3RoomNotReachingHost";
 	}
 }
 
@@ -297,11 +320,15 @@ export function createV3RoomRolloverPolicy(
 	}
 	// Member only: the creator is unreachable now (read-only), or its moves are not reaching it.
 	const readOnly = (): boolean => role === "member" && hooks.creatorReachable?.() === false;
+	// The epoch in which the room last refused a new move at its backlog bound: until the room installs a
+	// later epoch (or a move is accepted) the member's moves are not reaching the host.
+	let backlogFullEpoch: number | undefined;
 	const notReachingHost = (): boolean =>
 		role === "member" &&
-		settlement !== undefined &&
-		settlement.window > 0 &&
-		settlement.unsettledEpochs >= Math.max(1, settlement.window - V3_ROOM_NOT_REACHING_HOST_MARGIN);
+		((backlogFullEpoch !== undefined && currentEpoch() <= backlogFullEpoch) ||
+			(settlement !== undefined &&
+				settlement.window > 0 &&
+				settlement.unsettledEpochs >= Math.max(1, settlement.window - V3_ROOM_NOT_REACHING_HOST_MARGIN)));
 	const status = (): V3RoomRolloverStatus =>
 		Object.freeze({
 			state: readOnly()
@@ -536,9 +563,22 @@ export function createV3RoomRolloverPolicy(
 				const handBack = handBackOf.get(operation);
 				await selected.issue(operation, handBack === undefined ? undefined : { handBack });
 				handBackOf.delete(operation);
+				if (backlogFullEpoch !== undefined) {
+					backlogFullEpoch = undefined;
+					reportStatus();
+				}
 				return;
 			} catch (error) {
 				if (closed) throw error;
+				if (
+					error instanceof V3RoomLocalBacklogFull ||
+					(error instanceof Error && error.name === "V3RoomLocalBacklogFull")
+				) {
+					// Refused before acceptance: the member's moves are not reaching the host. Keep the move.
+					backlogFullEpoch = attempted;
+					keep(operation, attempted);
+					throw new V3RoomNotReachingHost(operation, attempted, { cause: error });
+				}
 				if (isV3RoomClosePendingRefusal(error)) {
 					// Not an offer of the move, and no seal: the room retries its interrupted close by itself.
 					// Wait for that retry (the epoch advancing), within the closing bound, then offer again.
