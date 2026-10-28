@@ -37,7 +37,10 @@ import {
 	resolveCreatorAuthorSettlement,
 } from "../../packages/protocol-v3/src/creator-author-issuance-frontiers.js";
 import { createBrowserAheDurableStore } from "../../packages/storage-browser/src/index.js";
-import { PHASE_5E_SCHEMA_AUTHORITY } from "../../packages/storage-browser/src/internal/schema-idb.js";
+import {
+	CURRENT_BROWSER_SCHEMA_VERSION,
+	PHASE_5E_SCHEMA_AUTHORITY,
+} from "../../packages/storage-browser/src/internal/schema-idb.js";
 import { createBrowserDurableIssuanceStore } from "../../packages/storage-browser/src/issuance.js";
 import { createBrowserRoomHeadAuthority } from "../../packages/storage-browser/src/room-head.js";
 
@@ -203,9 +206,17 @@ vi.mock("../../packages/storage-browser/dist/src/issuance.js", async () => {
 		...real,
 		createBrowserDurableIssuanceStore: async (input: { primaryDatabaseName: string }) => {
 			const store = await real.createBrowserDurableIssuanceStore(input);
-			const transactIssue = store.transactIssue;
-			const readLineage = store.readLineage;
-			Reflect.set(store, "readLineage", (scope: Parameters<typeof readLineage>[0]) => {
+			// The facade is frozen (its methods delegate to the native implementation on
+			// every call), so the observers sit on that exact implementation instance. The
+			// facade keeps its maintenance WeakMap identity; nothing is minted or rebound.
+			const implementation = browserIssuanceImplementationForTest(store);
+			if (implementation === undefined) throw new Error("F5B_NATIVE_ISSUANCE_IDENTITY_LOST");
+			const observe = (name: string, value: unknown) => {
+				if (!Reflect.set(implementation, name, value)) throw new Error(`F5B_OBSERVER_NOT_INSTALLED:${name}`);
+			};
+			const transactIssue: DurableIssuanceStore["transactIssue"] = implementation.transactIssue.bind(implementation);
+			const readLineage: DurableIssuanceStore["readLineage"] = implementation.readLineage.bind(implementation);
+			observe("readLineage", (scope: Parameters<typeof readLineage>[0]) => {
 				if (observed.failRecoveryReadFor === input.primaryDatabaseName)
 					return Promise.reject(new Error("F5B_RECOVERY_DURABLE_READ_UNAVAILABLE"));
 				return readLineage(scope);
@@ -225,7 +236,7 @@ vi.mock("../../packages/storage-browser/dist/src/issuance.js", async () => {
 			};
 			// Observe methods on the EXACT backend facade. Its existing maintenance
 			// WeakMap identity remains intact; no capability is minted or rebound.
-			Reflect.set(store, "transactIssue", (async (scope, build) => {
+			observe("transactIssue", (async (scope, build) => {
 				let selected: DurableIssueCommit | undefined;
 				const ambiguity = observed.ambiguous?.database === input.primaryDatabaseName ? observed.ambiguous : undefined;
 				const result = await transactIssue(scope, async (sequence, nativeJob) => {
@@ -271,8 +282,9 @@ vi.mock("../../packages/storage-browser/dist/src/issuance.js", async () => {
 				}
 				return result;
 			}) satisfies DurableIssuanceStore["transactIssue"]);
-			const publish = store.compareAndMarkOutboxPublished;
-			Reflect.set(store, "compareAndMarkOutboxPublished", (async (value) => {
+			const publish: DurableIssuanceStore["compareAndMarkOutboxPublished"] =
+				implementation.compareAndMarkOutboxPublished.bind(implementation);
+			observe("compareAndMarkOutboxPublished", (async (value) => {
 				await publish(value);
 				observed.timeline.push({
 					database: input.primaryDatabaseName,
@@ -286,18 +298,17 @@ vi.mock("../../packages/storage-browser/dist/src/issuance.js", async () => {
 					handle: observed.planes.get(input.primaryDatabaseName),
 				});
 			}) satisfies DurableIssuanceStore["compareAndMarkOutboxPublished"]);
-			const writePlan = store.transactWriteSettlementPlan;
-			Reflect.set(store, "transactWriteSettlementPlan", (async (value) => {
+			const writePlan: DurableIssuanceStore["transactWriteSettlementPlan"] =
+				implementation.transactWriteSettlementPlan.bind(implementation);
+			observe("transactWriteSettlementPlan", (async (value) => {
 				const plan = await writePlan(value);
 				observed.planWrites.push({ database: input.primaryDatabaseName, plan: structuredClone(plan) });
 				observed.timeline.push({ database: input.primaryDatabaseName, kind: "plan", revision: plan.revision });
 				return plan;
 			}) satisfies DurableIssuanceStore["transactWriteSettlementPlan"]);
-			const implementation = browserIssuanceImplementationForTest(store);
-			if (implementation === undefined) throw new Error("F5B_NATIVE_ISSUANCE_IDENTITY_LOST");
 			const prune = implementation.pruneAuthenticatedSettledPrefix.bind(implementation);
 			// Forward without a global spy registry retaining every closed store owner.
-			Reflect.set(implementation, "pruneAuthenticatedSettledPrefix", async (value: Parameters<typeof prune>[0]) => {
+			observe("pruneAuthenticatedSettledPrefix", async (value: Parameters<typeof prune>[0]) => {
 				const event: (typeof observed.prunes)[number] = {
 					database: input.primaryDatabaseName,
 					input: structuredClone(value),
@@ -490,7 +501,9 @@ async function transferDatabase(sourceName: string, targetName: string): Promise
 		sourceScope[4] !== targetScope[4]
 	)
 		throw new TypeError("F5B_TRANSFER_DATABASE_SCOPE_INVALID");
-	const schema = PHASE_5E_SCHEMA_AUTHORITY;
+	// Versions 4-6 keep the phase-5e stores (local control and signing-writer fences);
+	// the product opens and writes the current version.
+	const schema = { stores: PHASE_5E_SCHEMA_AUTHORITY.stores, version: CURRENT_BROWSER_SCHEMA_VERSION };
 	const expectedStores = [...schema.stores].sort((left, right) => left.name.localeCompare(right.name));
 	const schemaFor = async (database: IDBDatabase) => {
 		const transaction = database.transaction([...database.objectStoreNames], "readonly");
