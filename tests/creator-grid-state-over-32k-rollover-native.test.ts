@@ -1,6 +1,8 @@
 import { afterEach, expect, it } from "vitest";
 
-import { closeFixtures } from "./fixtures/track-m/room-retention-fixture.js";
+import { closeFixtures, required } from "./fixtures/track-m/room-retention-fixture.js";
+import { settlementDelivery, type SettlementRoom } from "./fixtures/track-m/settlement-room.js";
+import { isControl } from "./fixtures/track-x/outside-rows-room.js";
 import { readinessHoldRoom } from "./fixtures/track-x/readiness-hold-room.js";
 
 // RED (fix/int7-handback-policy, round-2 slow-member): a Grid room whose application state passes
@@ -52,3 +54,45 @@ it("a Grid creator whose state passes 32 KiB still seals and adopts its successo
 	expect(failure, "every successor is sealed and adopted").toBeUndefined();
 	expect(creator.room.authority()?.epoch).toBe(EPOCHS);
 }, 600_000);
+
+it("a Writer installs every successor of a Grid room whose state passes 32 KiB", async () => {
+	const fixture = await readinessHoldRoom();
+	const creator = await fixture.open(0);
+	const writer = await fixture.open(1);
+	let delivered: number | null = null;
+	const deliverCreator = async (): Promise<void> => {
+		const rows = await fixture.publishedAfter(0, delivered);
+		for (let start = 0; start < rows.length; start += 16) {
+			const chunk = rows.slice(start, start + 16);
+			const last = chunk.findLastIndex((row) => !isControl(row));
+			if (last >= 0) await writer.receive(chunk.slice(0, last + 1), 0);
+			writer.inject(chunk.slice(last + 1), 0);
+		}
+		if (rows.length !== 0) delivered = required(rows.at(-1)).commit.authorSequence;
+	};
+	const failures: string[] = [];
+	for (let epoch = 0; epoch < EPOCHS && failures.length === 0; epoch++) {
+		for (let index = 0; index < PER_EPOCH; index++) {
+			const ordinal = epoch * PER_EPOCH + index;
+			const id = `${String(ordinal).padStart(4, "0")}-${"b".repeat(ID_BYTES)}`;
+			await creator.room.issue({ action: "placeBlock", id, kind: "stone", x: ordinal % 16, y: epoch });
+		}
+		await deliverCreator();
+		try {
+			const sealed = await creator.room.sealEpoch();
+			expect((sealed as { ok?: boolean }).ok, JSON.stringify(sealed)).toBe(true);
+			await creator.room.adoptCreatorSuccessor();
+			const transfer = await settlementDelivery(fixture as unknown as SettlementRoom);
+			Reflect.set(writer.networkNode, "createSnapshotChunkProtocolHost", () => transfer.port);
+			await writer.room.installCreatorSuccessor({ offer: transfer.offer, peers: transfer.peers });
+			expect(writer.room.authority()?.epoch).toBe(epoch + 1);
+		} catch (error) {
+			failures.push(`epoch ${epoch}: ${error instanceof Error ? error.message : String(error)}`);
+		}
+	}
+	console.log(
+		`GRID_STATE_OVER_32K_WRITER ${JSON.stringify({ failures, blocks: writer.room.projection().blocks.length })}`
+	);
+	expect(failures, "the Writer installs every successor").toEqual([]);
+	expect(writer.room.projection().blocks.length).toBe(EPOCHS * PER_EPOCH);
+}, 900_000);
