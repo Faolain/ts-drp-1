@@ -225,13 +225,18 @@ function mapSubstrate(error: unknown, message: string, fallback: "permanent" | "
 	}
 	const number = errorNumber(error);
 	const text = errorText(error);
-	if (number === 5 || number === 6 || /\b(?:busy|locked)\b/iu.test(text)) {
-		return createDurableIssuanceFailure("ISSUANCE_SUBSTRATE_FAILURE", message, "transient");
-	}
-	if (number === 7 || number === 13 || /\b(?:full|no memory|out of memory)\b/iu.test(text)) {
-		return createDurableIssuanceFailure("ISSUANCE_SUBSTRATE_FAILURE", message, "resource-exhausted");
-	}
-	return createDurableIssuanceFailure("ISSUANCE_SUBSTRATE_FAILURE", message, fallback);
+	// Diagnostics only: the substrate error stays reachable as `cause` (the message is unchanged).
+	const failure = createDurableIssuanceFailure(
+		"ISSUANCE_SUBSTRATE_FAILURE",
+		message,
+		number === 5 || number === 6 || /\b(?:busy|locked)\b/iu.test(text)
+			? "transient"
+			: number === 7 || number === 13 || /\b(?:full|no memory|out of memory)\b/iu.test(text)
+				? "resource-exhausted"
+				: fallback
+	);
+	Object.defineProperty(failure, "cause", { configurable: true, enumerable: false, value: error, writable: true });
+	return failure;
 }
 
 function capturePrimaryFilename(value: unknown): { primaryFilename: string; initialization: "create" | "reopen" } {
