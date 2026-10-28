@@ -1,7 +1,9 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type -- Native room helpers retain fixture types. */
 import { decodeCanonical } from "@ts-drp/canonical";
+import { createHash } from "node:crypto";
 import type { SnapshotChunkProtocolPort } from "@ts-drp/network/snapshot-transfer";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { DatabaseSync } from "node:sqlite";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, it } from "vitest";
@@ -137,6 +139,44 @@ async function acceptedCounts(role: RoleEndpoint, author: string, ids: readonly 
 	return ids.map((id) => vertices.filter((vertex) => vertex.author === author && idOf(vertex.operation) === id).length);
 }
 
+
+/** The member's live-journal scopes and the retirement's protected scopes, read from its SQLite file. */
+function journalRetirement(directory: string, name: string) {
+	const file = join(
+		directory,
+		`${createHash("sha256").update(JSON.stringify(["journal", name])).digest("hex")}.sqlite.drp-live-journal-v1.sqlite`
+	);
+	if (!existsSync(file)) return { scopes: [] as number[], protectedScopes: [] as number[], activeProtected: [] as number[] };
+	const db = new DatabaseSync(file, { readOnly: true });
+	try {
+		const scopes = db.prepare("SELECT epoch FROM scopes ORDER BY epoch").all().map((row) => Number(row.epoch));
+		let protectedScopes: number[] = [];
+		let activeProtected: number[] = [];
+		for (const row of db.prepare("SELECT record FROM retirement_controls").all()) {
+			const value = decodeCanonical(row.record as Uint8Array) as {
+				completed: { protectedScopes: { epoch: number }[] } | null;
+				active: { preparation?: { protectedScopes?: { epoch: number }[] } } | null;
+			};
+			protectedScopes = value.completed?.protectedScopes.map((scope) => scope.epoch) ?? protectedScopes;
+			activeProtected = value.active?.preparation?.protectedScopes?.map((scope) => scope.epoch) ?? activeProtected;
+		}
+		return { scopes, protectedScopes, activeProtected };
+	} finally {
+		db.close();
+	}
+}
+
+/** The departed-carrier proof events (fix/skip-scope-carrier), observation only. */
+type CarrierEvent = Readonly<{ kind: string; departedEpoch: number; outcome: string; detail?: string; ring?: number[] }>;
+const carrierTally = (events: readonly CarrierEvent[]) => {
+	const tally: Record<string, number> = {};
+	for (const event of events) {
+		const key = `${event.kind === "creator-departed-carrier" ? "creator" : "member"}:${event.outcome}${event.detail === undefined ? "" : `:${event.detail}`}`;
+		tally[key] = (tally[key] ?? 0) + 1;
+	}
+	return tally;
+};
+
 // The member's install starts this long after its delivery chose the offer: longer than the creator
 // takes for several rollovers. It stands for a host whose lifecycle queue (a recovery-pool lull, a
 // recovery after a refused install, slow storage) holds the install before it reaches the creator.
@@ -168,6 +208,11 @@ const LANDING_CREATOR_MOVE_MS = Number(process.env.SLOW_MEMBER_LANDING_CREATOR_M
  */
 async function slowFollow(conserve: boolean, rollCount = ROLLS, minSkips = 0) {
 	const restore = await installEnvironment("node", () => undefined);
+	const carrierEvents: CarrierEvent[] = [];
+	Reflect.set(globalThis, "__warmProofEvent", (event: unknown) => {
+		const kind = typeof event === "object" && event !== null ? Reflect.get(event, "kind") : undefined;
+		if (kind === "recipient-departed-carrier" || kind === "creator-departed-carrier") carrierEvents.push(event as CarrierEvent);
+	});
 	const directory = mkdtempSync(join(tmpdir(), "app-rollover-slow-member-"));
 	directories.push(directory);
 	const installs: {
@@ -326,6 +371,8 @@ async function slowFollow(conserve: boolean, rollCount = ROLLS, minSkips = 0) {
 						undeliveredEpochs: [...new Set(settlement?.undelivered.map((given) => given.epoch) ?? [])],
 						state: status?.state,
 						kept: status?.kept?.length,
+						journal: journalRetirement(directory, "recipient"),
+						carriers: carrierTally(carrierEvents),
 					})}\n`
 				);
 			};
@@ -422,11 +469,12 @@ async function slowFollow(conserve: boolean, rollCount = ROLLS, minSkips = 0) {
 				return [value.authorSequence, value.epoch, value.operation.action, value.operation.id];
 			});
 			process.stdout.write(
-				`SLOW_MEMBER_SUMMARY ${JSON.stringify({ givenBack: [...givenBack.values()], own, plan: await within(writer.settlementAudit()), rolls, issued, installs, member: await within(writer.successorDelivery?.()), creatorErrors: await within(creator.rollover?.().then((rollover) => rollover?.errors)), status: await within(writer.rolloverStatus?.()) })}\n`
+				`SLOW_MEMBER_SUMMARY ${JSON.stringify({ givenBack: [...givenBack.values()], carrierEvents, journal: journalRetirement(directory, "recipient"), own, plan: await within(writer.settlementAudit()), rolls, issued, installs, member: await within(writer.successorDelivery?.()), creatorErrors: await within(creator.rollover?.().then((rollover) => rollover?.errors)), status: await within(writer.rolloverStatus?.()) })}\n`
 			);
 			await wire.stop();
 		}
 	} finally {
+		Reflect.deleteProperty(globalThis, "__warmProofEvent");
 		restore();
 	}
 }

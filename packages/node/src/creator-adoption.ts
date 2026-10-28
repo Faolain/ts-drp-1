@@ -1290,6 +1290,16 @@ export async function receiveCreatorSuccessorAdoption(
 	// creator that no longer holds it, or any failure yields none, and that scope keeps today's
 	// retention (the journal retirement re-verifies a recorded carrier on every classification).
 	let departed: CreatorSuccessorDepartedCarrier | undefined;
+	// Observation only (the "__warmProofEvent" proof hook): what each skip install did with the
+	// departed scope's carrier. Never alters the install's outcome.
+	const observeDeparted = (outcome: string, detail?: string): void => {
+		try {
+			const observer = Reflect.get(globalThis, "__warmProofEvent");
+			if (typeof observer === "function")
+				observer({ kind: "recipient-departed-carrier", departedEpoch: source.currentTrust.currentEpoch, outcome,
+					...(detail === undefined ? {} : { detail }) });
+		} catch { /* Diagnostics never alter the original owner outcome. */ }
+	};
 	const receiveDepartedCarrier = async (): Promise<CreatorSuccessorDepartedCarrier | undefined> => {
 		const departedScope = Object.freeze({ epoch: source.currentTrust.currentEpoch, anchorDigest: source.currentTrust.currentAnchorDigest });
 		const carrier = await receiveCreatorSuccessorDepartedCarrier({
@@ -1309,22 +1319,34 @@ export async function receiveCreatorSuccessorAdoption(
 				},
 			},
 		}).catch(() => undefined);
-		if (carrier === undefined) return undefined;
-		const departedCut = canonicalRecord(carrier.exactCanonicalCutValueBytes);
-		if (departedCut === undefined || departedCut.epoch !== departedScope.epoch || departedCut.previousAnchor !== departedScope.anchorDigest)
+		if (carrier === undefined) {
+			observeDeparted("none");
 			return undefined;
+		}
+		const departedCut = canonicalRecord(carrier.exactCanonicalCutValueBytes);
+		if (departedCut === undefined || departedCut.epoch !== departedScope.epoch || departedCut.previousAnchor !== departedScope.anchorDigest) {
+			observeDeparted("rejected", "cut-scope");
+			return undefined;
+		}
 		const authority = (Object.hasOwn(departedCut, "forwardPromotion") ? openCreatorForwardPromotionSuccessorTrust : openCreatorSuccessorTrust)({
 			currentTrust: source.currentTrust,
 			exactCanonicalCutValueBytes: carrier.exactCanonicalCutValueBytes,
 			exactCanonicalCommitQcBytes: carrier.exactCanonicalCommitQcBytes,
 			exactCanonicalTrustStateRecordBytes: carrier.exactCanonicalTrustStateRecordBytes,
 		});
-		if (!authority.ok || authority.trust.currentEpoch !== departedScope.epoch + 1) return undefined;
+		if (!authority.ok || authority.trust.currentEpoch !== departedScope.epoch + 1) {
+			observeDeparted("rejected", "authority");
+			return undefined;
+		}
 		const membership = await openCreatorCloseMembership({ bytes: carrier.exactCanonicalCloseMembershipBytes,
 			exactCanonicalCutValueBytes: carrier.exactCanonicalCutValueBytes,
 			maxEpochVertices: (departedCut.parameters as { maxEpochVertices: number } | undefined)?.maxEpochVertices ?? 0 }).catch(() => undefined);
 		if (membership === undefined || membership.localVertexWitnesses.length !== 0 ||
-			!sameBytes(membership.exactCanonicalLatchedAclBytes, source.exactCanonicalLatchedAclBytes)) return undefined;
+			!sameBytes(membership.exactCanonicalLatchedAclBytes, source.exactCanonicalLatchedAclBytes)) {
+			observeDeparted("rejected", "membership");
+			return undefined;
+		}
+		observeDeparted("authenticated");
 		return carrier;
 	};
 	try {
@@ -1669,11 +1691,11 @@ export async function receiveCreatorSuccessorAdoption(
 		// A skip install records the departed scope's authenticated carrier through the same path.
 		// Never fatal: a refusal leaves that scope with today's retention.
 		if (checkpoint !== undefined && departed !== undefined)
-			await source.recordReceivedDepartedClosedMembership(departed.exactCanonicalCutValueBytes,
+			observeDeparted(await source.recordReceivedDepartedClosedMembership(departed.exactCanonicalCutValueBytes,
 				departed.exactCanonicalCloseMembershipBytes, {
 					exactCanonicalCommitQcBytes: departed.exactCanonicalCommitQcBytes,
 					exactCanonicalSuccessorTrustStateRecordBytes: departed.exactCanonicalTrustStateRecordBytes,
-				}).catch(() => false);
+				}).catch(() => false) ? "recorded" : "record-refused");
 		if (await prepareReceivedRecoveryTurnover()) {
 			if (promoted) {
 				if (receivedCloseSnapshot === undefined) throw new TypeError("creator received close snapshot unavailable after turnover");

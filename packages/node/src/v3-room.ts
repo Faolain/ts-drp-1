@@ -3715,7 +3715,16 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	const departedCarrier = (scope: Readonly<{ epoch: number; anchorDigest: string }>): CreatorSuccessorDepartedCarrier | undefined => {
 		const held = departedCarriers.get(`${scope.epoch}:${scope.anchorDigest}`);
 		// Only a close whose successor this creator adopted: never a carrier it may still abandon.
-		return held !== undefined && successorAdopted(held.epoch) ? held.carrier : undefined;
+		const served = held !== undefined && successorAdopted(held.epoch) ? held.carrier : undefined;
+		// Observation only (the "__warmProofEvent" proof hook); never alters the answer.
+		try {
+			const observer = Reflect.get(globalThis, "__warmProofEvent");
+			if (typeof observer === "function")
+				observer({ kind: "creator-departed-carrier", departedEpoch: scope.epoch,
+					outcome: served !== undefined ? "served" : held === undefined ? "not-held" : "not-adopted",
+					ring: [...departedCarriers.values()].map((value) => value.epoch) });
+		} catch { /* Diagnostics never alter the original owner outcome. */ }
+		return served;
 	};
 	const successorServingAdopted = (serving: SuccessorServing): boolean => {
 		if (closed || terminalFailure !== undefined) return false;
