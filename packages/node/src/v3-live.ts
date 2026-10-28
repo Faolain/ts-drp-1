@@ -24355,24 +24355,6 @@ export function abandonV3UnresolvedAcceptedWork(plane: V3PlaneHandle, raw: V3Sou
 	});
 }
 
-/**
- * Whether the application can offer an operation again as a move: its settlement policy derives it.
- * With no settlement policy every operation is offered (the policy owns the distinction).
- * @param policy - The room's settlement policy, if any.
- * @param operation - One original operation of a displaced row.
- * @returns True when the operation may be given back.
- */
-function settlementPolicyGivesBack(policy: V3LocalSettlementPolicy | undefined,
-	operation: Readonly<Record<string, unknown>>): boolean {
-	if (policy === undefined) return true;
-	try {
-		policy.derive(ObjectFreeze([operation]));
-		return true;
-	} catch {
-		return false;
-	}
-}
-
 async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
 	selector: Readonly<{sourceSequence: number; sourceDigest: Uint8Array; sourceContextDigest: Uint8Array}>,
 	sign: SignRegisteredVertexDigest, aborted: AbortSignal, own: (custody: LocalReplacementCustody) => void,
@@ -24473,20 +24455,23 @@ async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
 	const prior = second.plan;
 	// The moves of a row the creator's frontier proves was never admitted are given back to the
 	// application in this same plan write (durable hand-back records, consumed by their reissue).
-	// Only a move is given back: an operation the settlement policy cannot derive (the Writer's own
-	// bootstrap operation, Grid's installRoster) offered again would be a row no later settlement can
-	// derive once displaced. A row with no move is expired unrecorded.
+	// The author's own pinned bootstrap row (epoch 0 at the genesis anchor, carrying exactly the
+	// registered bootstrap operation, Grid's installRoster) is not a move: offered again it would be a
+	// row no settlement policy derives once displaced. It is expired unrecorded; every other row's
+	// operations are given back.
 	let handBacks = prior.handBacks;
 	if (frontierProof) {
 		const row = second.read.rows.issued.find(value => sameScope(value, scope) && value.authorSequence === selector.sourceSequence);
 		const authenticated = row === undefined ? undefined : authenticateRetainedSourceVertex(second.retained.contract,
 			row.canonicalPreimageBytes, row.signature, row.digest, scope.author, row.authorSequence);
 		const intents = authenticated === undefined ? undefined : rebaseIntents(second.retained.contract, authenticated);
-		const moves = intents?.flatMap((intent, index) =>
-			settlementPolicyGivesBack(registration.payload.input.settlementPolicy, intent.operation) ? [{intent, index}] : []);
-		if (authenticated !== undefined && moves !== undefined && moves.length > 0 &&
+		const pinnedBootstrap = registration.exactCanonicalPinnedGenesisBootstrapOperationBytes;
+		const bootstrapRow = pinnedBootstrap !== undefined && authenticated !== undefined && intents?.length === 1 &&
+			authenticated.vertex.epoch === 0 && authenticated.vertex.anchor === registration.payload.trust.trust.genesisAnchorDigest &&
+			sameBytes(encodeCanonical(intents[0].operation), pinnedBootstrap);
+		if (authenticated !== undefined && intents !== undefined && intents.length > 0 && !bootstrapRow &&
 			await frontierRetainedResolution(registration, selector.sourceSequence, authenticated.vertex.epoch) === "never-admitted") {
-			handBacks = settlementHandBacksWith(prior.handBacks, moves.map(({intent, index}) => ObjectFreeze({
+			handBacks = settlementHandBacksWith(prior.handBacks, intents.map((intent, index) => ObjectFreeze({
 				sourceSequence: selector.sourceSequence, sourceDigest: new Uint8ArrayConstructor(second.entry.sourceDigest),
 				sourceEpoch: authenticated.vertex.epoch, intent: index, exactCanonicalOperationBytes: encodeCanonical(intent.operation),
 				reissueSequence: null})));
