@@ -1065,9 +1065,22 @@ async function sameKeyReentry() {
 		"F5B_C09_STALE_INCARNATION_REJECTED_AT_REAL_INGRESS"
 	).not.toContain("old-incarnation-unadmitted");
 	await fixture.stop(writer);
-	// A fresh installation receives the very same published authenticated bytes;
-	// no issued/outbox/plan row from the returning device is copied to it.
-	const fresh = {
+	// The same key on a fresh installation in the incarnation the returning device is using.
+	const fresh = await freshInstallation(fixture, writer);
+	await fixture.reopen(fresh, 3, true);
+	await expectFreshDeviceBehindItsFrontier(fixture, creator, fresh, "fresh-device-reentry");
+	await fixture.stop(fresh);
+	await fixture.stop(creator);
+}
+
+/**
+ * A fresh installation of an existing Writer key. It receives the very same published
+ * authenticated bytes; no issued/outbox/plan row from the other device is copied to it.
+ * @param fixture
+ * @param writer
+ */
+async function freshInstallation(fixture: Awaited<ReturnType<typeof openRoom>>, writer: Peer): Promise<Peer> {
+	return {
 		...writer,
 		databaseName: `${writer.databaseName}-fresh`,
 		// floorOwner now opens its own native floor for one database and scope (async).
@@ -1082,7 +1095,66 @@ async function sameKeyReentry() {
 			openTransport: fixture.transportFor(`${writer.databaseName}-fresh`),
 		},
 	};
-	await fixture.reopen(fresh, 3, true);
+}
+
+/**
+ * Decision B (sync before sending): a fresh installation whose key already has admitted
+ * sequences in the current incarnation is behind its own authenticated frontier (its lineage is
+ * at 0). Signing slot 0 there would fork the author's lineage while the other device may still
+ * hold the key (a Web Lock is per device), so the room refuses it and nothing is signed: a
+ * restored device stays failed closed until an explicit replacement (docs/realtime-latency/
+ * README.md, "Healing a restored device").
+ * @param fixture
+ * @param creator
+ * @param fresh
+ * @param clientOperationId
+ */
+async function expectFreshDeviceBehindItsFrontier(
+	fixture: Awaited<ReturnType<typeof openRoom>>,
+	creator: Peer,
+	fresh: Peer,
+	clientOperationId: string
+): Promise<void> {
+	expect(fresh.room.localIssueCurrency?.(), "F5B_C08_FRESH_DEVICE_BEHIND_ITS_FRONTIER").toBe("not-yet-current");
+	expect(
+		await fresh.room.confirmCurrent?.(required(creator.room.currencyStatement?.())),
+		"F5B_C08_FRESH_DEVICE_BEHIND_ITS_FRONTIER"
+	).toBe("behind-frontier");
+	await expect(
+		fixture.issue(fresh, clientOperationId),
+		"F5B_C08_FRESH_DEVICE_REFUSED_IN_THE_KEYS_CURRENT_INCARNATION"
+	).rejects.toMatchObject({ code: "V3_ROOM_NOT_YET_CURRENT", reason: "behind-frontier" });
+	expect((await durable(fresh)).lineage.next, "F5B_C08_REFUSED_FRESH_DEVICE_SIGNED_NOTHING").toBe(0);
+}
+
+/**
+ * Case 8 readmission. The explicit replacement is complete removal and regrant: the key gets a
+ * new authenticated incarnation with a null boundary, in which the fresh device is current at 0.
+ * (A separate room from cases 6-9: this grid fixture's creator refuses a fifth close with
+ * snapshot recovery-full, which is not a currency question; this room needs four.)
+ */
+async function freshDeviceReplacement() {
+	const fixture = await openRoom(2);
+	const creator = required(fixture.peers[0]);
+	const writer = required(fixture.peers[1]);
+	// A fresh installation opens only where its key's boundary is null (a non-null boundary already
+	// refuses its reopen as chain-invalid): a new incarnation's first epoch. The key's other device
+	// reenters that incarnation first, which puts the fresh device behind its frontier.
+	await fixture.issue(creator, "replacement-creator-initial");
+	await fixture.issue(writer, "replacement-writer-initial");
+	await fixture.stop(writer);
+	const incarnation = await regrant(fixture, creator, writer);
+	await fixture.reopen(writer, incarnation - 1, true);
+	await fixture.issue(writer, "replacement-other-device");
+	await fixture.stop(writer);
+	const fresh = await freshInstallation(fixture, writer);
+	await fixture.reopen(fresh, incarnation - 1, true);
+	await expectFreshDeviceBehindItsFrontier(fixture, creator, fresh, "fresh-device-before-replacement");
+	await fixture.stop(fresh);
+	const replaced = await regrant(fixture, creator, writer);
+	expect(replaced, "F5B_C08_REPLACEMENT_IS_A_LATER_INCARNATION").toBeGreaterThan(incarnation);
+	await fixture.reopen(fresh, replaced - 1, true);
+	expect(fresh.room.localIssueCurrency?.(), "F5B_C08_FRESH_DEVICE_CURRENT_AFTER_REPLACEMENT").toBe("current");
 	await fixture.issue(fresh, "fresh-device-reentry");
 	expect((await durable(fresh)).lineage.next, "F5B_C08_FRESH_DEVICE_STARTS_AT_ZERO").toBeGreaterThanOrEqual(1);
 	const freshStore = await createBrowserDurableIssuanceStore({ primaryDatabaseName: fresh.databaseName });
@@ -1091,7 +1163,7 @@ async function sameKeyReentry() {
 		// settlement profile): the fresh device's own first work is slot 0 in the new incarnation.
 		const zero = required(await freshStore.readIssued({ author: fresh.author, objectId: fixture.objectId }, 0));
 		const vertex = record(zero.envelope.canonicalPreimageBytes);
-		expect(vertex.epoch, "F5B_C08_FRESH_DEVICE_SLOT_ZERO_IN_NEW_INCARNATION").toBeGreaterThanOrEqual(returning[1]);
+		expect(vertex.epoch, "F5B_C08_FRESH_DEVICE_SLOT_ZERO_IN_NEW_INCARNATION").toBe(replaced);
 		expect(
 			[
 				{ action: "$drp.author-fence.v1", fenceSequence: 0, version: 1 },
@@ -1104,6 +1176,31 @@ async function sameKeyReentry() {
 	}
 	await fixture.stop(fresh);
 	await fixture.stop(creator);
+}
+
+/**
+ * The explicit replacement: complete removal (absent at one close) and regrant gives the key a
+ * new authenticated incarnation with a null boundary. Returns that incarnation's first epoch.
+ * @param fixture
+ * @param creator
+ * @param writer
+ */
+async function regrant(fixture: Awaited<ReturnType<typeof openRoom>>, creator: Peer, writer: Peer): Promise<number> {
+	await creator.room.issue({ action: "acl", group: "writer", kind: "revoke", target: writer.author });
+	await fixture.close();
+	expect(
+		frontierFor(fixture.checkpoint().capability, writer.author),
+		"F5B_C08_REPLACEMENT_REMOVES_THE_KEY"
+	).toBeUndefined();
+	await creator.room.adoptCreatorSuccessor();
+	await creator.room.issue({ action: "acl", group: "writer", kind: "grant", target: writer.author });
+	const closed = await fixture.close();
+	expect(
+		frontierFor(fixture.checkpoint().capability, writer.author),
+		"F5B_C08_REPLACEMENT_IS_A_NEW_INCARNATION"
+	).toEqual([writer.author, closed.successorEpoch, null]);
+	await creator.room.adoptCreatorSuccessor();
+	return closed.successorEpoch;
 }
 
 async function manualReviewHold() {
@@ -1862,7 +1959,11 @@ describe("D.110c-0c1f5b parent genuine settlement composition", () => {
 		"case 1 withholds a distinct dependent author sequence until its delayed predecessor is settled",
 		delayedDependency
 	);
-	it("cases 6-9 authenticate same-key removal and same-device and fresh-device readmission", sameKeyReentry);
+	it(
+		"cases 6-9 authenticate same-key removal and same-device readmission, and refuse a fresh device behind its frontier",
+		sameKeyReentry
+	);
+	it("case 8 readmits a fresh same-key device only through removal and regrant", freshDeviceReplacement);
 	it(
 		"case 11 retains the hold across close and cold reopen until authenticated author-wide readmission",
 		manualReviewHold
