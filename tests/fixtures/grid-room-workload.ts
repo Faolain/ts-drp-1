@@ -958,6 +958,12 @@ async function openRoom(
 		});
 		wideDiagnostic("reopen-session", "end", closedEpoch + 1, peer.databaseName);
 		sessions.add(peer.room);
+		// Decision B (sync before sending): a reopened Writer signs nothing until it is current. The
+		// pages' successor delivery hands it the creator's statement on bind; this fixture does it.
+		if (peer !== origin && sessions.has(origin.room)) {
+			const statement = origin.room.currencyStatement?.();
+			if (statement !== undefined) await peer.room.confirmCurrent?.(statement);
+		}
 		if (observeEmissions) {
 			required(emitted.get(peer.databaseName)).owner = peer.room;
 			emittedProjection(peer);

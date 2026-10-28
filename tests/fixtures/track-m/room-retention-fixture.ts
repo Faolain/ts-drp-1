@@ -142,6 +142,7 @@ export async function lullFixture(options: RoomHostOptions) {
 		`tm-${hex(hashDomain("track-m-room-host/v1", new TextEncoder().encode(directory))).slice(0, 16)}`,
 		options
 	);
+	let creatorRoom: Awaited<ReturnType<typeof createV3RoomSession<CanvasProjection>>> | undefined;
 	const open = async (name: string, identity: Keychain, openOptions: { reopen?: boolean; receiveOnly?: true } = {}) => {
 		const floor = createNodeRoomHeadAuthority({
 			filename: join(directory, `${name}-external-floor.sqlite`),
@@ -201,6 +202,13 @@ export async function lullFixture(options: RoomHostOptions) {
 		const room = await createV3RoomSession(input);
 		rooms.add(room);
 		await waitForV3RoomStartupForDiagnostics(room);
+		if (identity === creator) creatorRoom = room;
+		// Decision B (sync before sending): a reopened Writer signs nothing until it is current. The
+		// pages' successor delivery hands it the creator's statement on bind; this fixture does it.
+		else if (openOptions.reopen && !openOptions.receiveOnly && creatorRoom !== undefined && rooms.has(creatorRoom)) {
+			const statement = creatorRoom.currencyStatement?.();
+			if (statement !== undefined) await room.confirmCurrent?.(statement);
+		}
 		const receive = async (envelopes: readonly DurableIssueCommit["envelope"][], finalDigest: string) => {
 			if (accepted.has(finalDigest)) return;
 			let timer: ReturnType<typeof setTimeout> | undefined;
