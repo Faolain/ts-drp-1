@@ -1,4 +1,5 @@
 import { CanonicalEncodingError, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { settlementHandBacksWith } from "@ts-drp/issuance-store";
 import { withAuthoredGenesisSigningRequest } from "@ts-drp/protocol-v3/internal/owned-signing-request";
 import { CompactMerkleAccumulator } from "@ts-drp/compaction";
 import { createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
@@ -12,6 +13,9 @@ import {
 	captureCreatorSuccessorPeers,
 	createCreatorSuccessorMaterialServer,
 	CreatorSuccessorExportUnavailable,
+	creatorSuccessorDepartedCarrierOf,
+	readCreatorSuccessorDepartedCarrier,
+	type CreatorSuccessorDepartedCarrier,
 	creatorRecipientRetirementResumeRequested,
 	type CreatorRecipientRecoveryContext,
 	type CreatorSuccessorOffer,
@@ -43,6 +47,11 @@ import { consumeCreatorAdoptionPendingRecovery } from "@ts-drp/node/internal/cre
 import { permitsStagedCreatorCheckpointFloorAdvance } from "./internal/creator-adoption-intent.js";
 import { createV3SnapshotTransferOwner } from "@ts-drp/node/snapshot-transfer";
 import {
+	createCreatorSuccessorServingRouter,
+	creatorDepartedCloseAdopted,
+	type CreatorSuccessorServingRouter,
+} from "./internal/creator-successor-serving.js";
+import {
 	activateV3LivePlane,
 	authorizeV3NewLocalOperation,
 	bindV3BlueprintLivePlane,
@@ -52,6 +61,7 @@ import {
 	prepareV3TerminalMigrationSource,
 	queryV3RetainedHashes,
 	abandonV3UnresolvedAcceptedWork,
+	inspectV3RetainedWorkFrontier,
 	inspectV3UnresolvedAcceptedWork,
 	type V3SourceAbandonment,
 	type V3SourceAbandonmentRequest,
@@ -63,6 +73,7 @@ import {
 	routeV3Ingress,
 	routeV3RetainedIngress,
 	speculateV3IngressVertex,
+	V3_SETTLEMENT_OWN_WINDOW_EPOCHS,
 	type V3AdmittedVertexSink,
 	type V3ApplicationProjectionOrder,
 	type V3DeliveryGap,
@@ -330,6 +341,46 @@ export interface V3RoomCreatorInviteMaterialInput {
 }
 
 export type V3RoomAcceptedVertex = AdmittedReceivedVertexView;
+
+/**
+ * A Writer's own settlement as of its last install or adoption. A row of its own counts as unsettled
+ * when the creator's signed settlement frontier closed the row's epoch without it (its moves did not
+ * reach the creator in time). Each install re-offers such a move (a replacement in the new epoch); once
+ * a move has waited `window` epochs (V3_SETTLEMENT_OWN_WINDOW_EPOCHS) it is not replaced again: its
+ * original rows can never be admitted (their epochs are closed and the creator excluded them), and the
+ * move is given back here so the application can offer it again as a new move.
+ */
+export type V3RoomSettlementStatus = Readonly<{
+	/** The epoch the status was taken at (the room's epoch after that install or adoption). */
+	epoch: number;
+	/** Epochs since the oldest own row the creator closed an epoch without; 0 when none is waiting. */
+	unsettledEpochs: number;
+	window: number;
+	/**
+	 * Moves given back, oldest first: each was in no closed epoch and is never replaced. Each is one
+	 * durable hand-back record (one operation of the last row that carried the move), listed until the
+	 * row that offers it again is issued with `issue(operation, { handBack })`, whose issuance
+	 * transaction consumes the record: across a crash it is either still listed or never listed again.
+	 */
+	undelivered: readonly Readonly<{
+		/** The digest of the last row that carried the move. */
+		vertexDigest: string;
+		epoch: number;
+		/** Exactly the one handed-back operation. */
+		operations: readonly Readonly<Record<string, unknown>>[];
+		/** The record's key: pass it back with the operation to consume the record. */
+		handBack: V3RoomHandBack;
+	}>[];
+}>;
+
+/** The key of one durable hand-back record (V3RoomSettlementStatus.undelivered). */
+export type V3RoomHandBack = Readonly<{ sourceSequence: number; intent: number }>;
+
+/** Options of one issued move. */
+export type V3RoomIssueOptions = Readonly<{
+	/** The move is the given-back operation of this record; its row consumes the record. */
+	handBack?: V3RoomHandBack;
+}>;
 
 export interface V3RoomAcceptedOperation {
 	readonly author: string;
@@ -633,9 +684,7 @@ export interface V3RoomSession<Projection extends V3RoomProjectionAuthority = V3
 	 * (sync before sending, live install rule): a session that is not yet current installs only
 	 * with it, and only above this author's live frontier in it; a current session ignores it.
 	 */
-	installCreatorSuccessor(
-		input: Readonly<{ offer: CreatorSuccessorOffer; peers: readonly string[]; currency?: V3RoomCurrencyStatement }>
-	): Promise<void>;
+	installCreatorSuccessor(input: V3RoomCreatorSuccessorInstallRequest): Promise<void>;
 	promoteCreatorCheckpoint(input: Readonly<{ closedEpoch: number }>): Promise<void>;
 	authority(): V3RoomSuccessorAuthority | null;
 	close(): Promise<void>;
@@ -647,7 +696,7 @@ export interface V3RoomSession<Projection extends V3RoomProjectionAuthority = V3
 	requestRetainedRepair(input?: Readonly<{ targetPeerId?: string }>): Promise<Readonly<{ kind: "scheduled" }>>;
 	activateMigration(input: V3RoomMigrationActivationInput): Promise<V3RoomMigrationActivationReceipt>;
 	inspectDurableHead(): ReturnType<CreatorLiveCloseHandle["inspectDurableHead"]>;
-	issue(operation: Readonly<Record<string, unknown>>): Promise<void>;
+	issue(operation: Readonly<Record<string, unknown>>, options?: V3RoomIssueOptions): Promise<void>;
 	/**
 	 * Opt-in (`presentation`) staged issue: `visible` settles once the move is in
 	 * speculativeProjection(), `durable` once the durable projection contains it,
@@ -666,6 +715,12 @@ export interface V3RoomSession<Projection extends V3RoomProjectionAuthority = V3
 	pendingOperations(): readonly V3RoomPendingOperation[];
 	/** Durable accepted work whose commitment is unknown after reattachment. */
 	unresolvedAcceptedWork(): Promise<readonly V3UnresolvedAcceptedWork[]>;
+	/**
+	 * This author's own settlement against the creator, as of the last install or adoption: how many
+	 * epochs its oldest own row has waited without the creator's signed settlement, and the moves the
+	 * settlement window gave back. Observation only (absent on room stubs). See V3RoomSettlementStatus.
+	 */
+	settlementStatus?(): V3RoomSettlementStatus;
 	/**
 	 * Explicit, terminal local-author abandonment of one durable unresolved,
 	 * never-published accepted source. Owned local sessions only; it signs an
@@ -762,6 +817,22 @@ function unavailableCreatorCloseStatus(
 			text: "Creator-certified; one of one; not Byzantine-fault-tolerant." as const,
 		}),
 	});
+}
+
+/**
+ * Captures the options of one issued move.
+ * @param options - Caller options.
+ * @returns The hand-back record key, if any.
+ */
+function issueHandBack(options: V3RoomIssueOptions | undefined): V3RoomHandBack | undefined {
+	if (options === undefined) return undefined;
+	const handBack = options.handBack;
+	if (handBack === undefined) return undefined;
+	const sourceSequence = handBack.sourceSequence,
+		intent = handBack.intent;
+	if (!Number.isSafeInteger(sourceSequence) || sourceSequence < 0 || !Number.isSafeInteger(intent) || intent < 0)
+		throw new TypeError("v3 room hand-back is invalid");
+	return Object.freeze({ sourceSequence, intent });
 }
 
 function hex(value: Uint8Array): string {
@@ -1109,6 +1180,104 @@ function authenticateCreatorInviteMaterial(
 		expectedBlueprintDigest: provenance.blueprintDigest,
 	});
 	return Object.freeze({ objectId: provenance.objectId, blueprintDigest: provenance.blueprintDigest });
+}
+
+/**
+ * A member's successor install request. `newest`, when given, is asked once, right before the
+ * install fetches the creator's material, for the newest offer its caller knows of then (undefined:
+ * keep `offer`). The creator serves only its latest successor, so an install that waited (in the
+ * room's lifecycle queue, a recovery, slow storage) while the creator rolled over again fetches the
+ * newest offer instead of a successor the creator no longer serves. Whatever it returns is
+ * authenticated by the install exactly as `offer` would be. `currency` (here and in the newest
+ * answer) is the creator's statement for that offer's epoch (sync before sending).
+ */
+export type V3RoomCreatorSuccessorInstallRequest = Readonly<{
+	offer: CreatorSuccessorOffer;
+	peers: readonly string[];
+	currency?: V3RoomCurrencyStatement;
+	newest?: () =>
+		| Readonly<{ offer: CreatorSuccessorOffer; peers: readonly string[]; currency?: V3RoomCurrencyStatement }>
+		| undefined;
+}>;
+
+/**
+ * Asks an install request's `newest` for a later offer; a failure or a malformed answer keeps the
+ * original (never fails the install by itself).
+ * @param newest - The request's `newest`, if any.
+ * @returns The captured newer offer, its peers and its statement if given, or undefined.
+ */
+function selectNewestCreatorSuccessorOffer(
+	newest: (() => unknown) | undefined
+):
+	| Readonly<{ offer: CreatorSuccessorOffer; peers: readonly string[]; currency: V3RoomCurrencyStatement | undefined }>
+	| undefined {
+	if (newest === undefined) return undefined;
+	try {
+		const answer = newest();
+		const fields = exactRecord(answer, ["offer", "peers"]) ?? exactRecord(answer, ["currency", "offer", "peers"]);
+		if (fields === undefined) return undefined;
+		return Object.freeze({
+			offer: captureCreatorSuccessorOffer(fields.offer),
+			peers: captureCreatorSuccessorPeers(fields.peers),
+			currency: fields.currency === undefined ? undefined : captureCurrencyStatement(fields.currency),
+		});
+	} catch {
+		return undefined;
+	}
+}
+
+/**
+ * How long a move made while a creator-successor adoption owns the room's plane (a creator's own
+ * adoption, or a member's install, under the settlement profile) is held before it is refused with
+ * V3RoomAdoptionHoldExpired. Held moves are issued as soon as that adoption settles; only an
+ * adoption that has not settled within this bound refuses them. Two minutes: an install measured
+ * up to ~60 s in a loaded browser.
+ */
+export const V3_ROOM_ADOPTION_ISSUE_HOLD_MS = 120_000;
+
+/**
+ * How many closed epochs' departed-scope carriers a creator keeps in memory (fix/skip-scope-carrier).
+ * A member skipping from an older epoch gets none, and that one scope keeps today's retention.
+ * At most 16 x (3 x 65,536 + CREATOR_CLOSE_MEMBERSHIP_MAX_BYTES) bytes.
+ */
+export const CREATOR_DEPARTED_CARRIERS_RETAINED = 16;
+
+/**
+ * A move held for a creator-successor adoption that did not settle within
+ * V3_ROOM_ADOPTION_ISSUE_HOLD_MS. The move was not issued; the caller still owns it. Its message
+ * keeps the room's closing wording ("live plane is unavailable"), so an application policy that
+ * waits through a closing treats it as one.
+ */
+/**
+ * Row 72, the owner's decision (2026-10-27): the total time a member's successor install may wait
+ * for the creator's material (all retries of the fetch, decision row 61 option E, included). An
+ * install that reaches it ends with V3RoomSuccessorInstallExpired and changes nothing; its caller
+ * (the page's delivery) re-targets the newest offer, the same one included.
+ */
+export const V3_ROOM_SUCCESSOR_INSTALL_DEADLINE_MS = 120_000;
+
+/** A member's successor install that the creator's material did not reach within the deadline. */
+export class V3RoomSuccessorInstallExpired extends TypeError {
+	/** The install stage that expired. */
+	readonly stage = "material" as const;
+	/**
+	 * @param deadlineMs - The deadline that passed.
+	 * @param options - The material fetch's last failure.
+	 */
+	constructor(readonly deadlineMs: number, options?: ErrorOptions) {
+		super(`v3 room successor install expired: the creator's material did not arrive within ${deadlineMs} ms`, options);
+		this.name = "V3RoomSuccessorInstallExpired";
+	}
+}
+
+export class V3RoomAdoptionHoldExpired extends TypeError {
+	/**
+	 * @param heldMs - How long the move was held.
+	 */
+	constructor(readonly heldMs: number) {
+		super(`v3 room live plane is unavailable: a successor adoption held this move for ${heldMs} ms`);
+		this.name = "V3RoomAdoptionHoldExpired";
+	}
 }
 
 /**
@@ -2928,8 +3097,26 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		if (errors.length > 1) throw new AggregateError(errors, "v3 room retained promotion cleanup failed");
 	};
 	let recipientSnapshotStore: Awaited<ReturnType<V3RoomStorageHost["openSnapshots"]>> | undefined;
-	let successorServing: ReturnType<typeof createV3SnapshotTransferOwner> | undefined;
-	let successorServingScope: Awaited<ReturnType<NonNullable<typeof recipientSnapshotStore>["openScope"]>> | undefined;
+	// The newest successor serving and, once adopted, the one it replaced
+	// (CREATOR_SUCCESSOR_SERVINGS_RETAINED), on one protocol port routed by manifest.
+	type SuccessorServing = {
+		readonly manifestDigest: string;
+		readonly closedEpoch: number;
+		owner?: ReturnType<typeof createV3SnapshotTransferOwner>;
+		scope?: Awaited<ReturnType<NonNullable<typeof recipientSnapshotStore>["openScope"]>>;
+		adopted: boolean;
+	};
+	let successorServing: SuccessorServing | undefined;
+	let retainedSuccessorServing: SuccessorServing | undefined;
+	let successorServingRouter: CreatorSuccessorServingRouter | undefined;
+	const closeSuccessorServing = async (serving: SuccessorServing | undefined): Promise<void> => {
+		if (serving === undefined) return;
+		try {
+			await serving.owner?.close();
+		} finally {
+			await serving.scope?.release();
+		}
+	};
 	const ownRecipientSnapshots = async (): Promise<NonNullable<typeof recipientSnapshotStore>> => {
 		if (recipientSnapshotStore === undefined) {
 			recipientSnapshotStore = await input.storageHost.openSnapshots(input.databaseName);
@@ -2940,13 +3127,15 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				} catch (error) {
 					failures.push(error);
 				}
-				try {
-					await successorServing?.close();
-				} catch (error) {
-					failures.push(error);
+				for (const serving of [successorServing, retainedSuccessorServing]) {
+					try {
+						await closeSuccessorServing(serving);
+					} catch (error) {
+						failures.push(error);
+					}
 				}
 				try {
-					await successorServingScope?.release();
+					await successorServingRouter?.close();
 				} catch (error) {
 					failures.push(error);
 				}
@@ -3641,17 +3830,101 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			if (!recheck) throw new TypeError("creator successor request was superseded");
 		}
 	};
+	// fix/skip-scope-carrier: the departed-scope carriers of this creator's last closes, for a
+	// member's skip install from one of those epochs. The in-memory list is a cache: on a miss (a
+	// restarted creator, or a close older than the list) the carrier is rebuilt from the native
+	// generations the store still retains and this creator's journal, and cached.
+	const departedCarriers = new Map<string, Readonly<{ epoch: number; carrier: CreatorSuccessorDepartedCarrier }>>();
+	const holdDepartedCarrier = (scope: Readonly<{ epoch: number; anchorDigest: string }>,
+		carrier: CreatorSuccessorDepartedCarrier): void => {
+		const key = `${scope.epoch}:${scope.anchorDigest}`;
+		departedCarriers.delete(key);
+		departedCarriers.set(key, Object.freeze({ epoch: scope.epoch, carrier }));
+		for (const oldest of departedCarriers.keys()) {
+			if (departedCarriers.size <= CREATOR_DEPARTED_CARRIERS_RETAINED) break;
+			departedCarriers.delete(oldest);
+		}
+	};
+	const readDurableDepartedCarrier = async (
+		scope: Readonly<{ epoch: number; anchorDigest: string }>
+	): Promise<CreatorSuccessorDepartedCarrier | undefined> => {
+		const store = aheStores[0];
+		if (closed || terminalFailure !== undefined || store === undefined) return undefined;
+		const task = readCreatorSuccessorDepartedCarrier({ store, journalStore, objectId: objectIdResult.value,
+			pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest, scope });
+		// Same close ordering as the successor export: a room close waits for this native read.
+		if (input.openCreatorArchive !== undefined) {
+			creatorArchiveRecoveryTasks.add(task);
+			void task.then(() => creatorArchiveRecoveryTasks.delete(task), () => creatorArchiveRecoveryTasks.delete(task));
+		}
+		return task.catch(() => undefined);
+	};
+	const departedCarrier = async (
+		scope: Readonly<{ epoch: number; anchorDigest: string }>
+	): Promise<CreatorSuccessorDepartedCarrier | undefined> => {
+		const held = departedCarriers.get(`${scope.epoch}:${scope.anchorDigest}`);
+		// Only a close whose successor this creator adopted: never a carrier it may still abandon.
+		const adopted = (): boolean => creatorDepartedCloseAdopted(scope.epoch, {
+			serving: !closed && terminalFailure === undefined && startupServingReady,
+			projectionEpoch: successorProjectionAuthority?.epoch ?? null,
+			adopting: creatorSuccessorAdoptionTask !== undefined,
+		});
+		let served = held !== undefined && adopted() ? held.carrier : undefined;
+		let outcome = served !== undefined ? "served" : held === undefined ? "not-held" : "not-adopted";
+		// The rebuilt carrier passes the same adoption check (its native generation may already be
+		// Adopted while that successor's adoption tail still runs).
+		if (held === undefined && adopted()) {
+			served = await readDurableDepartedCarrier(scope);
+			if (served !== undefined) {
+				holdDepartedCarrier(scope, served);
+				outcome = "served-durable";
+			}
+		}
+		// Observation only (the "__warmProofEvent" proof hook); never alters the answer.
+		try {
+			const observer = Reflect.get(globalThis, "__warmProofEvent");
+			if (typeof observer === "function")
+				observer({ kind: "creator-departed-carrier", departedEpoch: scope.epoch, outcome,
+					ring: [...departedCarriers.values()].map((value) => value.epoch) });
+		} catch { /* Diagnostics never alter the original owner outcome. */ }
+		return served;
+	};
+	const successorServingAdopted = (serving: SuccessorServing): boolean => {
+		if (closed || terminalFailure !== undefined) return false;
+		// Adoption is permanent: a later adoption in progress does not withdraw a retained serving.
+		if (!serving.adopted && successorAdopted(serving.closedEpoch)) serving.adopted = true;
+		return serving.adopted;
+	};
 	const serveSuccessor = async (): Promise<CreatorSuccessorOffer> => {
 		if (transport === undefined || activeHandle === undefined)
 			throw new TypeError("creator successor transport is unavailable");
 		const exported = await readSuccessorExport();
-		// The old serving's held responses end before its port joins their handlers (row 61).
-		cancelSuccessorServingHolds();
-		await successorServing?.close();
-		await successorServingScope?.release();
-		successorServingScope = await (await ownRecipientSnapshots()).openScope(exported.declaration);
-		const port = createSnapshotChunkProtocolPort(transport.networkNode, CREATOR_SUCCESSOR_PROTOCOL);
+		const departed = creatorSuccessorDepartedCarrierOf(exported);
+		if (departed !== undefined) holdDepartedCarrier(departed.scope, departed.carrier);
+		const manifestDigest = exported.declaration.scope.manifestDigest;
 		const closedEpoch = exported.declaration.scope.epoch;
+		// The replaced serving's held responses end before its port joins their handlers (row 61).
+		// An adopted serving holds none, so it is kept, and the serving it replaced is closed.
+		cancelSuccessorServingHolds();
+		const previous = successorServing;
+		successorServing = undefined;
+		const evicted: (SuccessorServing | undefined)[] = [];
+		if (previous !== undefined && previous.manifestDigest !== manifestDigest && successorServingAdopted(previous)) {
+			evicted.push(retainedSuccessorServing);
+			retainedSuccessorServing = previous;
+		} else evicted.push(previous);
+		if (retainedSuccessorServing?.manifestDigest === manifestDigest) {
+			evicted.push(retainedSuccessorServing);
+			retainedSuccessorServing = undefined;
+		}
+		for (const serving of evicted) await closeSuccessorServing(serving);
+		const router = (successorServingRouter ??= createCreatorSuccessorServingRouter());
+		await router.attach(createSnapshotChunkProtocolPort(transport.networkNode, CREATOR_SUCCESSOR_PROTOCOL));
+		const serving: SuccessorServing = { manifestDigest, closedEpoch, adopted: false };
+		successorServing = serving;
+		serving.scope = await (await ownRecipientSnapshots()).openScope(exported.declaration);
+		const port = router.port(manifestDigest);
+		router.setCurrent(manifestDigest);
 		const generation = successorServingGeneration;
 		const server = createCreatorSuccessorMaterialServer({
 			...(input.application.snapshotReadPolicy === "authenticated-public"
@@ -3664,20 +3937,23 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					activeHandle?.currentEphemeralAuthority()?.isCurrentWriter(author) === true,
 			},
 			localPeerId: port.localPeerId,
-			manifestDigest: exported.declaration.scope.manifestDigest,
+			manifestDigest,
 			material: exported.material,
+			departed: departedCarrier,
 			connectedPeers: () => port.connectedPeers(),
 			// Only an authorized request's response waits for the adoption; a refusal is written at once.
 			admitResponse: async (peerId: string, signal: AbortSignal): Promise<void> => {
+				if (successorServingAdopted(serving)) return;
 				releaseDisconnectedSuccessorServingHolds(port.connectedPeers());
 				await holdUntilSuccessorAdopted(closedEpoch, peerId, signal, generation);
+				serving.adopted = true;
 			},
 		});
-		successorServing = createV3SnapshotTransferOwner({ transport: port });
-		successorServing.serve({
+		serving.owner = createV3SnapshotTransferOwner({ transport: port });
+		serving.owner.serve({
 			authorization: Object.freeze({
 				authorForPeer: (peer: string): string | undefined =>
-					successorAdopted(closedEpoch) ? server.authorization.authorForPeer(peer) : undefined,
+					successorServingAdopted(serving) ? server.authorization.authorForPeer(peer) : undefined,
 				isAuthorizedAuthor: (author: string): boolean => server.authorization.isAuthorizedAuthor(author),
 			}),
 			control: (stream, bytes) =>
@@ -3696,7 +3972,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				),
 			descriptors: exported.declaration.chunks,
 			exactCanonicalManifestBytes: exported.offer.exactCanonicalSnapshotManifestBytes,
-			quarantine: successorServingScope,
+			quarantine: serving.scope,
 		});
 		return exported.offer;
 	};
@@ -4556,6 +4832,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		// Minted only by private public-issue or authenticated-rebase owners, never operation data.
 		source: "public-new" | "authenticated-historical";
 		group?: string;
+		handBack?: V3RoomHandBack;
 		logicalTime: number;
 		operation: Readonly<Record<string, unknown>>;
 		releasePublicInput?(): void;
@@ -4667,6 +4944,45 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	sessionLifetime.signal.addEventListener("abort", () => refuseHeldUntilCurrent(sessionLifetime.signal.reason), {
 		once: true,
 	});
+	// A move made while a member's install owns the plane under the settlement profile: held, not
+	// refused, and issued once that install has settled, in logical-time order, on the plane it left
+	// (the successor when it succeeded). An install first drains the moves held by the install before
+	// it (installPreDrain), so back-to-back installs never starve them. Held at most
+	// V3_ROOM_ADOPTION_ISSUE_HOLD_MS. A creator's own adoption still refuses (its moves are its own
+	// policy's, issued between its short adoptions).
+	let heldIssues: PendingIssue[] = [];
+	const heldIssueTimers = new Map<PendingIssue, ReturnType<typeof setTimeout>>();
+	let installPreDrain = false;
+	let recipientInstallTask: Promise<void> | undefined;
+	const adoptionHoldsIssues = (): boolean =>
+		settlementProfile === "v1" &&
+		creatorSuccessorAdoptionTask !== undefined &&
+		creatorSuccessorAdoptionTask === recipientInstallTask;
+	const holdIssue = (request: PendingIssue): void => {
+		heldIssues.push(request);
+		heldIssueTimers.set(
+			request,
+			setTimeout(() => {
+				heldIssueTimers.delete(request);
+				const index = heldIssues.indexOf(request);
+				if (index < 0) return;
+				heldIssues.splice(index, 1);
+				request.reject(new V3RoomAdoptionHoldExpired(V3_ROOM_ADOPTION_ISSUE_HOLD_MS));
+				request.releasePublicInput?.();
+			}, V3_ROOM_ADOPTION_ISSUE_HOLD_MS)
+		);
+	};
+	const releaseHeldIssues = (): void => {
+		if (heldIssues.length === 0) return;
+		const released = heldIssues.sort((left, right) => left.logicalTime - right.logicalTime);
+		heldIssues = [];
+		for (const request of released) {
+			clearTimeout(heldIssueTimers.get(request));
+			heldIssueTimers.delete(request);
+		}
+		pendingIssues = [...released, ...pendingIssues];
+		scheduleDrain();
+	};
 	let drainScheduled = false;
 	let draining = false;
 	let drainPromise: Promise<void> = Promise.resolve();
@@ -4938,7 +5254,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	};
 	const issueOwned = async (owned: readonly PendingIssue[]): Promise<void> => {
 		if (owned.length === 0) return;
-		if (activeHandle === undefined || (settlementProfile === "v1" && creatorSuccessorAdoptionTask !== undefined)) {
+		if (activeHandle !== undefined && adoptionHoldsIssues() && !installPreDrain && owned.every(({ source }) => source === "public-new")) {
+			for (const request of owned) holdIssue(request);
+			return;
+		}
+		if (activeHandle === undefined || (adoptionHoldsIssues() && !installPreDrain)) {
 			rejectOwned(owned, new TypeError("v3 room live plane is unavailable"));
 			return;
 		}
@@ -4958,6 +5278,15 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					)
 				),
 				signRegisteredVertexDigest: input.signRegisteredVertexDigest,
+				...(owned.length === 1 && owned[0]?.handBack !== undefined
+					? {
+							planEffect: Object.freeze({
+								intent: owned[0].handBack.intent,
+								kind: "hand-back" as const,
+								sourceSequence: owned[0].handBack.sourceSequence,
+							}),
+						}
+					: {}),
 			})
 			.catch((error: unknown) => {
 				rejectOwned(owned, error);
@@ -4996,6 +5325,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			rejectOwned(owned, new TypeError(PROJECTION_REFUSED_ISSUE));
 			return;
 		}
+		if (owned.some((request) => request.handBack !== undefined)) await refreshHandBackListing().catch(() => undefined);
 		try {
 			await publishAccepted();
 			for (const request of owned) request.resolve();
@@ -5049,7 +5379,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				releaseForeground();
 				// A resolved caller's operation remains in this frozen snapshot until
 				// the complete drain joins. Do not refund that still-retained custody.
-				for (const request of snapshot) request.releasePublicInput?.();
+				// A request held for an adoption keeps it until its own drain (or its hold expiry).
+				for (const request of snapshot) if (!heldIssues.includes(request)) request.releasePublicInput?.();
 				draining = false;
 				if (pendingIssues.length > 0) scheduleDrain();
 			}
@@ -5144,6 +5475,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	type DisplacedSource = Readonly<{
 		author: string;
 		authorSequence: number;
+		epoch: number;
+		frontierDisplaced: boolean;
 		intents: readonly Readonly<{
 			logicalTime: number;
 			operation: Readonly<Record<string, unknown>>;
@@ -5181,6 +5514,34 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	}>;
 	type RoomSettlementIssueResult = Awaited<ReturnType<RoomPlaneHandle["issueLocal"]>> | null;
 	const settlementScope = Object.freeze({ author: input.author, objectId: input.objectId });
+	type RoomHandBack = NonNullable<RoomSettlementPlan["handBacks"]>[number];
+	let settlementStatusSnapshot: V3RoomSettlementStatus | undefined;
+	/**
+	 * The given-back moves: the plan's unconsumed hand-back records (written with the window's expiry or
+	 * the frontier resolution, consumed by the reissued row's own issuance transaction).
+	 * @param plan - The durable plan.
+	 * @returns The listing, oldest first.
+	 */
+	const handBackListing = (plan: RoomSettlementPlan | null): V3RoomSettlementStatus["undelivered"] =>
+		Object.freeze(
+			(plan?.handBacks ?? [])
+				.filter((record) => record.reissueSequence === null)
+				.map((record) =>
+					Object.freeze({
+						vertexDigest: hex(record.sourceDigest),
+						epoch: record.sourceEpoch,
+						operations: Object.freeze([
+							Object.freeze(decodeCanonical(record.exactCanonicalOperationBytes) as Record<string, unknown>),
+						]),
+						handBack: Object.freeze({ sourceSequence: record.sourceSequence, intent: record.intent }),
+					})
+				)
+		);
+	const refreshHandBackListing = async (): Promise<void> => {
+		const plan = await issuanceStore.readSettlementPlan(settlementScope);
+		if (settlementStatusSnapshot !== undefined)
+			settlementStatusSnapshot = Object.freeze({ ...settlementStatusSnapshot, undelivered: handBackListing(plan) });
+	};
 	const authenticatedSettlementInheritance = (
 		sources: readonly DisplacedSource[]
 	): Promise<ReadonlyMap<number, NonNullable<RoomSettlementPlanEntry["inheritance"]>>> => {
@@ -5251,6 +5612,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		left.replacementSequence === right.replacementSequence &&
 		sameBytes(encodeCanonical(left.sourceContextDigest ?? null), encodeCanonical(right.sourceContextDigest ?? null)) &&
 		sameBytes(encodeCanonical(left.sourceResolutionDigest ?? null), encodeCanonical(right.sourceResolutionDigest ?? null)) &&
+		left.sourceResolutionKind === right.sourceResolutionKind &&
 		sameBytes(encodeCanonical(left.transformRefusal ?? null), encodeCanonical(right.transformRefusal ?? null)) &&
 		sameBytes(encodeCanonical(left.inheritance ?? null), encodeCanonical(right.inheritance ?? null)) &&
 		sameReplacementProgress(left, right) &&
@@ -5270,15 +5632,20 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		sources: readonly Pick<DisplacedSource, "authorSequence" | "intents" | "vertexDigest">[],
 		current: RoomSettlementPlan | null,
 		inheritances: ReadonlyMap<number, NonNullable<RoomSettlementPlanEntry["inheritance"]>> = new Map(),
-		prunedSources: ReadonlySet<number> = new Set()
+		prunedSources: ReadonlySet<number> = new Set(),
+		windowExpired: ReadonlySet<number> = new Set(),
+		handBacks: readonly RoomHandBack[] | undefined = current?.handBacks?.filter((record) => record.reissueSequence === null)
 	): ((priorFenceEpoch: unknown, activeEpoch: number | undefined) => RoomSettlementPlan) => {
+		const selectedHandBacks = handBacks === undefined || handBacks.length === 0 ? undefined : handBacks;
 		const priorEntries = new Map(current?.entries.map((entry) => [entry.sourceSequence, entry] as const));
 		const entries: RoomSettlementPlanEntry[] = [];
 		for (const source of [...sources].sort((left, right) => left.authorSequence - right.authorSequence)) {
 			const prior = priorEntries.get(source.authorSequence);
 			const inheritance = inheritances.get(source.authorSequence) ?? prior?.inheritance;
+			// The settlement window resolves an unreplaced displaced move as expired (settlementWindowExpired).
+			const expired = windowExpired.has(source.authorSequence);
 			const disposition = prior?.sourceContextDigest !== undefined ? prior.disposition :
-				inheritance === undefined ? settlementDisposition(source) : "inherited";
+				inheritance === undefined ? (expired ? "expire" : settlementDisposition(source)) : "inherited";
 			if (disposition === undefined) continue;
 			const sourceDigest = bytes(source.vertexDigest);
 			const sourceObjectId =
@@ -5290,7 +5657,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				prior !== undefined &&
 				(prior.sourceObjectId !== sourceObjectId ||
 					!sameBytes(prior.sourceDigest, sourceDigest) ||
-					prior.disposition !== disposition ||
+					// Only an unreplaced replacement decision may become the window's expiry.
+					(prior.disposition !== disposition &&
+						!(expired && disposition === "expire" && prior.replacementSequence === null &&
+							prior.replacementProgress === undefined && prior.transformRefusal === undefined)) ||
 					!sameBytes(encodeCanonical(prior.inheritance ?? null), encodeCanonical(inheritance ?? null)))
 			) {
 				throw new TypeError("v3 room settlement plan source differs");
@@ -5304,6 +5674,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					...(prior?.transformRefusal === undefined ? {} : { transformRefusal: prior.transformRefusal }),
 					...(prior?.sourceContextDigest === undefined ? {} : { sourceContextDigest: prior.sourceContextDigest }),
 					...(prior?.sourceResolutionDigest === undefined ? {} : { sourceResolutionDigest: prior.sourceResolutionDigest }),
+					...(prior?.sourceResolutionKind === undefined ? {} : { sourceResolutionKind: prior.sourceResolutionKind }),
 					replacementSequence: prior?.replacementSequence ?? null,
 					sourceDigest,
 					sourceSequence: source.authorSequence,
@@ -5333,6 +5704,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			const unchanged =
 				current !== null &&
 				current.fenceSequence === fenceSequence &&
+				sameBytes(encodeCanonical(current.handBacks ?? null), encodeCanonical(selectedHandBacks ?? null)) &&
 				current.entries.length === entries.length &&
 				current.entries.every((entry, index) => {
 					const candidate = entries[index];
@@ -5345,6 +5717,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				entries: Object.freeze(entries),
 				...(sourceContexts === undefined ? {} : {sourceContexts}),
 				fenceSequence,
+				...(selectedHandBacks === undefined ? {} : { handBacks: Object.freeze([...selectedHandBacks]) }),
 				revision: expectedRevision === null ? 0 : expectedRevision + 1,
 				scope: settlementScope,
 			});
@@ -5381,13 +5754,99 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 		return pruned;
 	};
+	/**
+	 * The settlement window: the displaced own moves this install no longer replaces. A move waits from
+	 * the epoch of its first row (found through the plan's replacement links back from the displaced
+	 * row; a link whose source row is already retired is older than the window). Once it has waited
+	 * V3_SETTLEMENT_OWN_WINDOW_EPOCHS epochs, the unreplaced displaced row is resolved as expired and the
+	 * move is given back to the application (settlementStatus().undelivered). Only rows the creator's
+	 * signed frontier classifies displaced qualify: their epochs closed without them, so neither they nor
+	 * any earlier row of the same move can ever be admitted, and no replacement of them is signed after.
+	 * @param current - The durable plan before this merge.
+	 * @param sources - The current rebase scan.
+	 * @returns The source sequences the merge resolves as expired.
+	 */
+	const settlementWindowExpired = async (
+		current: RoomSettlementPlan | null,
+		sources: readonly DisplacedSource[]
+	): Promise<ReadonlySet<number>> => {
+		const expired = new Set<number>();
+		const active = activeHandle?.epoch;
+		if (active === undefined) return expired;
+		for (const source of sources) {
+			if (!source.frontierDisplaced || source.intents.length === 0) continue;
+			const prior = current?.entries.find((entry) => entry.sourceSequence === source.authorSequence);
+			if (
+				prior !== undefined &&
+				(prior.replacementSequence !== null ||
+					prior.replacementProgress !== undefined ||
+					prior.transformRefusal !== undefined ||
+					prior.sourceContextDigest !== undefined ||
+					prior.sourceObjectId !== undefined ||
+					prior.inheritance !== undefined ||
+					(prior.disposition !== "rebase" && prior.disposition !== "transform" && prior.disposition !== "expire"))
+			)
+				continue;
+			// A move the application's policy itself expires is not given back.
+			const policy = settlementDisposition(source);
+			if (policy !== "rebase" && policy !== "transform") continue;
+			let origin = source.epoch;
+			let sequence = source.authorSequence;
+			let retired = false;
+			for (let depth = 0; depth <= 64 && !retired; depth++) {
+				const link = current?.entries.find(
+					(entry) =>
+						entry.sourceObjectId === undefined &&
+						(entry.replacementSequence === sequence ||
+							entry.replacementProgress?.chunks.some((chunk) => chunk.replacementSequence === sequence) === true)
+				);
+				if (link === undefined) break;
+				const row = await issuanceStore.readIssued(settlementScope, link.sourceSequence);
+				const epoch =
+					row === null ? undefined : Reflect.get(decodeCanonical(row.envelope.canonicalPreimageBytes) as object, "epoch");
+				if (typeof epoch !== "number" || !Number.isSafeInteger(epoch)) retired = true;
+				else origin = Math.min(origin, epoch);
+				sequence = link.sourceSequence;
+			}
+			if (retired || origin <= active - V3_SETTLEMENT_OWN_WINDOW_EPOCHS) expired.add(source.authorSequence);
+		}
+		return expired;
+	};
 	const writeMergedSettlementPlan = async (sources: readonly DisplacedSource[]): Promise<RoomSettlementPlan> => {
 		const current = await issuanceStore.readSettlementPlan(settlementScope);
+		const windowExpired = await settlementWindowExpired(current, sources);
+		// Each move the window resolves as expired now is given back to the application in this same plan
+		// write: one durable hand-back record per operation, kept until its reissued row consumes it (it
+		// outlives the row's retirement). Consumed records are dropped. A move beyond the record bound
+		// (SETTLEMENT_HAND_BACK_LIMITS) is not recorded.
+		let handBacks: readonly RoomHandBack[] | undefined = current?.handBacks?.filter(
+			(record) => record.reissueSequence === null
+		);
+		for (const source of [...sources].sort((left, right) => left.authorSequence - right.authorSequence)) {
+			if (!windowExpired.has(source.authorSequence)) continue;
+			if (current?.entries.find((entry) => entry.sourceSequence === source.authorSequence)?.disposition === "expire") continue;
+			handBacks =
+				settlementHandBacksWith(
+					handBacks,
+					source.intents.map((intent, index) =>
+						Object.freeze({
+							sourceSequence: source.authorSequence,
+							sourceDigest: bytes(source.vertexDigest),
+							sourceEpoch: source.epoch,
+							intent: index,
+							exactCanonicalOperationBytes: encodeCanonical(intent.operation),
+							reissueSequence: null,
+						})
+					)
+				) ?? handBacks;
+		}
 		const completePlan = mergedSettlementPlan(
 			sources,
 			current,
 			await authenticatedSettlementInheritance(sources),
-			await completedSettlementSourcesPruned(current, sources)
+			await completedSettlementSourcesPruned(current, sources),
+			windowExpired,
+			handBacks
 		);
 		const priorFence =
 			current?.fenceSequence == null
@@ -5398,12 +5857,74 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				? undefined
 				: Reflect.get(decodeCanonical(priorFence.envelope.canonicalPreimageBytes) as object, "epoch");
 		const plan = completePlan(priorFenceEpoch, activeHandle?.epoch);
-		if (current !== null && plan === current) return current;
-		return issuanceStore.transactWriteSettlementPlan({
-			expectedRevision: current?.revision ?? null,
-			plan,
-			scope: settlementScope,
+		const written =
+			current !== null && plan === current
+				? current
+				: await issuanceStore.transactWriteSettlementPlan({
+						expectedRevision: current?.revision ?? null,
+						plan,
+						scope: settlementScope,
+					});
+		recordSettlementStatus(sources, written);
+		return written;
+	};
+	/**
+	 * Observation of this author's settlement after a durable plan write (settlementStatus()). The
+	 * given-back moves are the window's durable expiries still in the plan, so a reopened session
+	 * reports them again until their rows are retired; the application keys them by vertex digest.
+	 */
+	const recordSettlementStatus = (sources: readonly DisplacedSource[], plan: RoomSettlementPlan): void => {
+		const epoch = activeHandle?.epoch;
+		if (epoch === undefined) return;
+		const waiting = sources.filter((source) => source.frontierDisplaced).map((source) => source.epoch);
+		settlementStatusSnapshot = Object.freeze({
+			epoch,
+			unsettledEpochs: waiting.length === 0 ? 0 : Math.max(0, epoch - Math.min(...waiting)),
+			window: V3_SETTLEMENT_OWN_WINDOW_EPOCHS,
+			undelivered: handBackListing(plan),
 		});
+	};
+	/**
+	 * Retained work (an install more than one epoch ahead keeps this author's rows of its last epoch as
+	 * unknown accepted work, which withholds the author fence) is resolved from the creator's signed
+	 * frontier in the installed checkpoint (v3-live frontierRetainedResolution): a row the frontier
+	 * proves committed or never admitted gets a signed local-author expiry receipt (the existing
+	 * resolution record), and the move of a never-admitted row is given back to the application like a
+	 * window expiry. Rows the frontier proves nothing about stay manual-review. Refusals leave the
+	 * fence withheld; the next drain tries again.
+	 * @param plan - The durable plan after this drain's merge.
+	 * @returns The plan after any resolution.
+	 */
+	const resolveRetainedFromFrontier = async (plan: RoomSettlementPlan): Promise<RoomSettlementPlan> => {
+		const owner = activeHandle;
+		if (owner === undefined || !plan.entries.some((entry) => entry.sourceContextDigest !== undefined)) return plan;
+		// The drain signs this author's own settlement with its own key (as its fences); a local owner, when
+		// the host has one, must still be current.
+		if (input.receiveOnly === true) return plan;
+		localOwner?.assertCurrent();
+		const work = await inspectV3RetainedWorkFrontier(owner);
+		let changed = false;
+		for (const item of work) {
+			if (item.resolved || item.frontier === undefined) continue;
+			assertSessionOpen();
+			try {
+				await abandonV3UnresolvedAcceptedWork(owner, {
+					sourceSequence: item.sourceSequence,
+					sourceDigest: item.sourceDigest,
+					sourceContextDigest: item.sourceContextDigest,
+					frontierProof: true,
+					signRegisteredVertexDigest: input.signRegisteredVertexDigest,
+				});
+				changed = true;
+			} catch (error) {
+				if (activeHandle !== owner) throw error;
+			}
+		}
+		const current = changed ? await issuanceStore.readSettlementPlan(settlementScope) : plan;
+		if (current === null) throw new TypeError("v3 room settlement plan is unavailable after retained resolution");
+		if (settlementStatusSnapshot !== undefined)
+			settlementStatusSnapshot = Object.freeze({ ...settlementStatusSnapshot, undelivered: handBackListing(current) });
+		return current;
 	};
 	const readSettlementEffect = (
 		prior: RoomSettlementPlan,
@@ -5636,6 +6157,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		let plan = await writeMergedSettlementPlan(sources);
 		settlementHeld = plan.entries.some(entry => entry.disposition === "manual-review" && entry.sourceContextDigest === undefined);
 		if (settlementHeld) return;
+		plan = await resolveRetainedFromFrontier(plan);
 		// A retained source context preserves unknown work, including pre-existing
 		// policy/progress metadata. Its presence grants no replacement decision, and
 		// unknown retained work still withholds the author fence. Retained terminal
@@ -7240,6 +7762,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		});
 		const shared = attempt.finally(() => {
 			if (creatorSuccessorAdoptionTask === shared) creatorSuccessorAdoptionTask = undefined;
+			releaseHeldIssues();
 		});
 		creatorSuccessorAdoptionTask = shared;
 		// Held successor requests re-check once the adoption, its tail included, has settled as its
@@ -7431,19 +7954,26 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			terminalFailure = error;
 		});
 	}
-	const installCreatorSuccessor = (
-		request: Readonly<{ offer: CreatorSuccessorOffer; peers: readonly string[]; currency?: V3RoomCurrencyStatement }>
-	): Promise<void> => {
+	const installCreatorSuccessor = (request: V3RoomCreatorSuccessorInstallRequest): Promise<void> => {
 		let offer: CreatorSuccessorOffer;
 		let peers: readonly string[];
 		let currency: V3RoomCurrencyStatement | undefined;
+		let newest: (() => unknown) | undefined;
 		try {
 			const withCurrency = request !== null && typeof request === "object" && Object.hasOwn(request, "currency");
-			const fields = exactRecord(request, withCurrency ? ["currency", "offer", "peers"] : ["offer", "peers"]);
-			if (fields === undefined) throw new TypeError("creator recipient request is invalid");
+			const withNewest = request !== null && typeof request === "object" && Object.hasOwn(request, "newest");
+			const fields = exactRecord(request, [
+				...(withCurrency ? ["currency"] : []),
+				...(withNewest ? ["newest"] : []),
+				"offer",
+				"peers",
+			]);
+			if (fields === undefined || (withNewest && typeof fields.newest !== "function"))
+				throw new TypeError("creator recipient request is invalid");
 			offer = captureCreatorSuccessorOffer(fields.offer);
 			peers = captureCreatorSuccessorPeers(fields.peers);
 			currency = withCurrency ? captureCurrencyStatement(fields.currency) : undefined;
+			newest = withNewest ? (fields.newest as () => unknown) : undefined;
 		} catch (error) {
 			return Promise.reject(error);
 		}
@@ -7452,6 +7982,16 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		let installFromEpoch: number | undefined;
 		const attempt = enqueueLifetimeTransition(async () => {
 			assertSessionOpen();
+			// The moves held by the adoption before this one (and any issue in flight) go out first, on
+			// the plane that adoption left, so back-to-back installs never starve them. Moves made from
+			// here on are held for this install.
+			installPreDrain = true;
+			try {
+				releaseHeldIssues();
+				await drainPendingIssues();
+			} finally {
+				installPreDrain = false;
+			}
 			await rebasePromise;
 			await migrationCompletionBarrier;
 			await refreshRoomHeadState();
@@ -7523,8 +8063,25 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			// frontier in it; otherwise it is refused before anything is adopted or signed.
 			if (!localIssueCurrent) await checkInstallCurrency(offer, currency);
 			let received: Awaited<ReturnType<typeof receiveCreatorSuccessorAdoption>>;
+			// Row 72: the material fetch's retries end at the install deadline as well as at the close.
+			const installDeadline = new AbortController();
+			const installTimer = setTimeout(
+				() => installDeadline.abort(new V3RoomSuccessorInstallExpired(V3_ROOM_SUCCESSOR_INSTALL_DEADLINE_MS)),
+				V3_ROOM_SUCCESSOR_INSTALL_DEADLINE_MS
+			);
 			try {
 				const recoveryContext = openedRoomHeadState.stable.epoch >= 2 ? await recipientRecoveryContext() : undefined;
+				// The creator serves only its latest successor. Everything above may have waited (the
+				// lifecycle queue, a recovery, slow storage) while the creator rolled over again, so the
+				// install fetches the newest offer its caller knows of now, not the one it was queued
+				// with. The offer is authenticated by the receive below exactly as the original would be.
+				// A session that is not yet current takes the later offer only with the creator's statement
+				// for its epoch, checked like the original's (live install rule).
+				const selected = selectNewestCreatorSuccessorOffer(newest);
+				if (selected !== undefined && (localIssueCurrent || selected.currency !== undefined)) {
+					if (!localIssueCurrent) await checkInstallCurrency(selected.offer, selected.currency);
+					({ offer, peers } = selected);
+				}
 				received = await receiveCreatorSuccessorAdoption({
 					plane: activeHandle,
 					catalog: input.application.catalog,
@@ -7538,13 +8095,24 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					exactCanonicalGenesisAnchorPreimageBytes: material.exactCanonicalGenesisAnchorPreimageBytes,
 					detachedGenesisSignature: material.detachedGenesisSignature,
 					...(recoveryContext === undefined ? {} : { recoveryContext }),
-					retryUntil: sessionLifetime.signal,
+					retryUntil: AbortSignal.any([sessionLifetime.signal, installDeadline.signal]),
 				});
 			} catch (error) {
 				// A failed receive may own native retention despite a lost acknowledgement.
 				// Retry must reacquire native custody before preparing any old/new writer.
 				creatorRecipientRecoveryRequired = true;
+				// Only the material fetch's own failure at the deadline is the typed expiry; any other
+				// failure, and a close, keep their own outcome.
+				if (
+					installDeadline.signal.aborted &&
+					!sessionLifetime.signal.aborted &&
+					error instanceof AggregateError &&
+					error.message === "creator successor material transport failed"
+				)
+					throw new V3RoomSuccessorInstallExpired(V3_ROOM_SUCCESSOR_INSTALL_DEADLINE_MS, { cause: error });
 				throw error;
+			} finally {
+				clearTimeout(installTimer);
 			}
 			try {
 				await withCreatorReceivedPromotionDependencies(received, async () => {
@@ -7578,13 +8146,18 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			requestMissingRetainedHistory();
 			scheduledLulls?.schedule();
 		});
-		const shared = attempt.finally(() => {
+		const shared: Promise<void> = attempt.finally(() => {
 			if (creatorSuccessorAdoptionTask === shared) creatorSuccessorAdoptionTask = undefined;
+			if (recipientInstallTask === shared) recipientInstallTask = undefined;
+			// Moves held for this install were made while current; moves held until current are older
+			// still, so they are released last and go out first.
+			releaseHeldIssues();
 			// Sync before sending: the adopted plane holds this author's closed frontier, and the
 			// statement checked before adoption (checkInstallCurrency) its live frontier.
 			if (installFromEpoch !== undefined && currentEpoch() > installFromEpoch) becomeLocalIssueCurrent();
 		});
 		creatorSuccessorAdoptionTask = shared;
+		recipientInstallTask = shared;
 		return shared;
 	};
 	const promoteCreatorCheckpoint = (request: Readonly<{ closedEpoch: number }>): Promise<void> => {
@@ -7888,11 +8461,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			if (creatorCloseHandle === undefined) throw new TypeError("creator close authority is unavailable");
 			return creatorCloseHandle.inspectDurableHead();
 		},
-		async issue(operation: Readonly<Record<string, unknown>>): Promise<void> {
+		async issue(operation: Readonly<Record<string, unknown>>, options?: V3RoomIssueOptions): Promise<void> {
 			// Captured synchronously: only issueWithReceipt sets it, immediately around this call.
 			const receiptHooks = nextIssueReceiptHooks;
 			nextIssueReceiptHooks = undefined;
 			localOwner?.assertCurrent();
+			const handBack = issueHandBack(options);
 			if (input.receiveOnly) throw new TypeError("v3 room is receive-only");
 			if (redirectPromise === undefined && redirectedSession === undefined) {
 				if (terminalFailure !== undefined) throw terminalFailure;
@@ -7932,7 +8506,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				const captured = capture.operation;
 				if (redirectPromise !== undefined) await redirectPromise;
 				if (redirectedSession !== undefined) {
-					if (recoveredActivation !== undefined) return await redirectedSession.issue(captured);
+					if (recoveredActivation !== undefined) return await redirectedSession.issue(captured, options);
 					throw new TypeError("v3 room terminal source cannot issue operations");
 				}
 				if (terminalFailure !== undefined) throw terminalFailure;
@@ -7971,9 +8545,14 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					if (terminalFailure !== undefined) throw terminalFailure;
 					if (closed) throw new TypeError("v3 room session is closed");
 					if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
-					const authorized = authorizeV3NewLocalOperation({ plane: activeHandle, operation: captured });
-					if (!authorized.ok) {
-						throw new TypeError(`v3 room new operation is not authorized: ${authorized.kind}: ${authorized.detail}`);
+					// An adoption owns the plane: the move waits for it and is authorized against the plane
+					// it leaves when its drain issues it (issueOwned), never refused for the adoption.
+					const held = adoptionHoldsIssues();
+					if (!held) {
+						const authorized = authorizeV3NewLocalOperation({ plane: activeHandle, operation: captured });
+						if (!authorized.ok) {
+							throw new TypeError(`v3 room new operation is not authorized: ${authorized.kind}: ${authorized.detail}`);
+						}
 					}
 					const current = logicalTime;
 					logicalTime += 2;
@@ -7985,17 +8564,24 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					const promise = new Promise<void>((resolve, reject) => {
 						const request: PendingIssue = Object.freeze({
 							source: "public-new",
+							// A given-back move is its own row: its issuance transaction consumes the record.
+							...(handBack === undefined
+								? {}
+								: { handBack, group: `hand-back:${handBack.sourceSequence}:${handBack.intent}` }),
 							logicalTime: current,
 							operation: captured,
 							releasePublicInput,
 							reject,
 							resolve,
 						});
-						if (localIssueCurrent) pendingIssues.push(request);
-						else holdUntilCurrent(request);
+						// Not yet current: held until current (sync before sending). Current, during a
+						// member's install: held for that install.
+						if (!localIssueCurrent) holdUntilCurrent(request);
+						else if (held) holdIssue(request);
+						else pendingIssues.push(request);
 						transferred = true;
 					});
-					scheduleDrain();
+					if (!held) scheduleDrain();
 					await promise;
 					settleFollower?.(Object.freeze({ ok: true }));
 					if (presented !== undefined) {
@@ -8092,6 +8678,18 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		pendingOperations(): readonly V3RoomPendingOperation[] {
 			if (redirectedSession !== undefined) return redirectedSession.pendingOperations();
 			return presentation?.pending() ?? Object.freeze([]);
+		},
+		settlementStatus(): V3RoomSettlementStatus {
+			if (redirectedSession?.settlementStatus !== undefined) return redirectedSession.settlementStatus();
+			return (
+				settlementStatusSnapshot ??
+				Object.freeze({
+					epoch: activeHandle?.epoch ?? 0,
+					unsettledEpochs: 0,
+					window: V3_SETTLEMENT_OWN_WINDOW_EPOCHS,
+					undelivered: Object.freeze([]),
+				})
+			);
 		},
 		async unresolvedAcceptedWork(): Promise<readonly V3UnresolvedAcceptedWork[]> {
 			if (redirectedSession !== undefined) return redirectedSession.unresolvedAcceptedWork();
@@ -8293,7 +8891,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			options: input.recoveryPoolAutoMaintenance,
 			// Identity changes only: a new projection, issued logical time or plane.
 			activity: () => [projection, logicalTime, activeHandle, redirectedSession],
-			busy: () => pendingIssues.length > 0 || drainScheduled || draining || lifetimeTransitionsPending > 0 ||
+			busy: () => pendingIssues.length > 0 || heldIssues.length > 0 || drainScheduled || draining || lifetimeTransitionsPending > 0 ||
 				redirectPromise !== undefined || migrationBarrier !== undefined || migrationCompletionBarrier !== undefined,
 			epoch: () => (activeHandle === undefined && redirectedSession === undefined ? undefined : session.authority()?.epoch ?? 0),
 			open: () => !closed && terminalFailure === undefined,

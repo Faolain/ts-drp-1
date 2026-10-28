@@ -11,7 +11,7 @@ import { openRole } from "./fixtures/track-m-apps/long-room-core.js";
 import { fromBase64, successorWire, type WireRow } from "./fixtures/track-m-apps/long-room-driver.js";
 import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-head.js";
 
-// KNOWN DEFECT, skipped RED (assigned separately; not fixed here). A Grid Writer whose own rows
+// Fixed (fix/silent-writer-catchup): formerly a skipped RED. A Grid Writer whose own rows
 // never reach the creator (it makes no move, and nothing carries its settlement rows: a Writer
 // that cannot send) follows the creator's automatic rollovers by the pages' own successor
 // delivery. After about eight rollovers its install fails hard: the creator's journal retirement
@@ -27,12 +27,14 @@ import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-h
 // epoch 8 the received turnover's journal retirement preparation carries 8 protected scopes,
 // above LIVE_JOURNAL_RETIREMENT_LIMITS.maxScopes (7, the AHE generation bound), so
 // captureJournalRetirementPreparation refuses it ("journal retirement refused: malformed-input")
-// at the Writer's lull and every retry. Still open. (2) The wedge: that failed lull marks the room
-// for recovery, whose reopen is halted on the lull's completed retirement; before the fix every
-// later install refused "creator recipient current authority is unavailable". Fixed: the
-// recovery reopen now runs the retirement resume, which hits (1) again and ends the session with
-// that explicit error instead of a silent wedge.
-const enabled = process.env.APP_ROLLOVER_SILENT_WRITER_RED === "1";
+// at the Writer's lull and every retry. Fixed by fix/silent-writer-catchup: the settlement window
+// (V3_SETTLEMENT_OWN_WINDOW_EPOCHS) resolves a displaced own row as expired once it has waited the
+// window (tests/app-rollover-silent-writer-catchup-native.test.ts covers moves, the status and the
+// reconnect). (2) The wedge: that failed lull marks the room for recovery, whose reopen is halted on
+// the lull's completed retirement; before the fix every later install refused "creator recipient
+// current authority is unavailable". Fixed: the recovery reopen now runs the retirement resume.
+// The final state comparison carries the creator's last rows once the Writer has caught up.
+const enabled = process.env.APP_ROLLOVER_SILENT_WRITER_RED !== "0";
 const MOVES = Number(process.env.APP_ROLLOVER_SILENT_WRITER_MOVES ?? 100);
 
 const track = {
@@ -121,6 +123,11 @@ it.skipIf(!enabled)(
 				await wire.stop();
 			}
 			expect(await writer.authorityEpoch()).toBe((await creator.rollover?.())?.epoch);
+			// Remote ingress is asynchronous: wait (bounded) for the delivered rows to join.
+			await deliverCreator();
+			const deadline = performance.now() + 30_000;
+			while ((await writer.state()) !== (await creator.state()) && performance.now() < deadline)
+				await new Promise((resolve) => setTimeout(resolve, 100));
 			expect(await writer.state()).toBe(await creator.state());
 		} finally {
 			restore();

@@ -299,7 +299,12 @@ import { type RoomRetentionLedger, type RoomRetentionLedgerRecord, roomRetention
 import type { CreatorPostAdoptionCensusSizing, CreatorPostAdoptionSettlementSizing, CreatorRoomSettlementPreview } from "../creator-close.js";
 import type { CreatorOrdinaryRuntimeCapacityWidthInput, creatorOrdinaryRuntimeCapacityWidths } from "../v3-live.js";
 import { openCreatorCloseMembership } from "./creator-close-membership.js";
-import type { ReceivedClosedJournalAuthority, ReceivedClosedJournalAuthorityRead } from "./creator-received-close-membership.js";
+import {
+	openReceivedCloseMembership,
+	verifyReceivedClosedJournalAuthority,
+	type ReceivedClosedJournalAuthority,
+	type ReceivedClosedJournalAuthorityRead,
+} from "./creator-received-close-membership.js";
 
 export type VerifiedCreatorClosedRollbackData = Readonly<Record<never, never>>;
 type VerifiedClosedAnchorDependency = Readonly<Record<never, never>>;
@@ -9842,6 +9847,49 @@ function prepareClosedJournalHeaders(input: Readonly<{
 }
 
 /** Reuses the exact native scope identity already consumed by R4 preparation. */
+/**
+ * Whether a closed journal scope's own signed header, in this exact retirement image, re-verifies
+ * as that scope's closed authority: its kept received-close membership (Cut, commit QC, successor
+ * trust) and the header's anchor and signature, reopened against the immutable pinned genesis
+ * (verifyReceivedClosedJournalAuthority: the anchor signature under the genesis signer set, the
+ * Cut/QC successor equation, the Cut naming exactly this scope). It is the classifier's
+ * out-of-window authority (classifyClosedJournalDetails, fd342d90), recomputed by the installer
+ * from bytes the installer binds, never taken from the classifier's result.
+ * @param input - The retirement image, the scope and the source's pinned genesis.
+ * @returns Whether the scope's header authenticates it.
+ */
+export function closedJournalHeaderAuthenticates(input: Readonly<{
+	image: Pick<LiveJournalRetirementImageObservation, "canonicalRows">;
+	scope: LiveJournalScope;
+	exactCanonicalPinnedGenesisTrustStateRecordBytes: Uint8Array;
+	pinnedGenesisAnchorDigest: string;
+}>): boolean {
+	try {
+		const { scope } = input;
+		const headers = input.image.canonicalRows.map(bytes => decodeCanonical(bytes)).filter(frame =>
+			Array.isArray(frame) && frame[0] === "scopes" &&
+			closedRetirementEqual(frame[1], [scope.objectId, scope.epoch, scope.anchorDigest])) as unknown[][];
+		if (headers.length !== 1) return false;
+		const header = headers[0]![2] as Record<string, unknown>;
+		const carrier = header.closed_membership_bytes ?? header.closedMembershipBytes;
+		const preimage = header.exact_anchor_preimage ?? header.exactCanonicalAnchorPreimageBytes;
+		const signature = header.detached_anchor_signature ?? header.detachedAnchorSignature;
+		if (!(carrier instanceof Uint8Array) || !(preimage instanceof Uint8Array) || !(signature instanceof Uint8Array)) return false;
+		const genesis = record(input.exactCanonicalPinnedGenesisTrustStateRecordBytes);
+		if (genesis.currentAnchorDigest !== input.pinnedGenesisAnchorDigest) return false;
+		const material = openReceivedCloseMembership(carrier);
+		if (material === undefined) return false;
+		const authority = verifyReceivedClosedJournalAuthority({
+			material: { ...material, scope },
+			header: { exactCanonicalAnchorPreimageBytes: preimage, detachedAnchorSignature: signature },
+			exactCanonicalPinnedGenesisTrustStateRecordBytes: input.exactCanonicalPinnedGenesisTrustStateRecordBytes,
+		});
+		return authority !== undefined && closedRetirementEqual(authority.scope, scope);
+	} catch {
+		return false;
+	}
+}
+
 function closedNativeJournalScopes(
 	objectId: string,
 	journal: LiveJournalRetirementImageObservation
@@ -20465,10 +20513,19 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 	);
 	// Retained physical headers are not fresh replay/deletion consumers. Old
 	// fenced holes stay fenced below; unclassified live scopes remain protected.
-	// Only actionable prefixes need the original authenticated source coverage.
+	// Only actionable prefixes need the original authenticated source coverage:
+	// a recovery trust, or (outside the retained trust window) the scope's own
+	// signed header re-verified here against the pinned genesis with its kept
+	// closed authority, as the classifier accepted it. Anything else is refused.
 	for (const prefix of journalPrefixes)
 		requireLaw(
-			source.journalScopes.some((authenticated) => closedRetirementEqual(authenticated, prefix.scope)),
+			source.journalScopes.some((authenticated) => closedRetirementEqual(authenticated, prefix.scope)) ||
+				closedJournalHeaderAuthenticates({
+					image: source.journal,
+					scope: prefix.scope,
+					exactCanonicalPinnedGenesisTrustStateRecordBytes: source.input.exactCanonicalPinnedGenesisTrustStateRecordBytes,
+					pinnedGenesisAnchorDigest: source.input.pinnedGenesisAnchorDigest,
+				}),
 			"chain-invalid"
 		);
 	// Actual accepted entries and the original protected replay scopes are

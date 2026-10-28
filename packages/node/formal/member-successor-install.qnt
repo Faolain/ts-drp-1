@@ -56,6 +56,20 @@
 // reopen. Expected wedge: lull at h (completed = h - 1), an install fails, the next
 // install's recovery reopens halted, precheck refuses, sets the flag, the next
 // recovery reopens halted again: a refusal that can never be escaped.
+// Startup serving after a reopen (fix/silent-writer-catchup). A session that reopens on a
+// successor head serves its installed successor (v3-room serveAvailableSuccessor ->
+// creator-adoption readCreatorSuccessorExport). The export re-verifies the transition it
+// would vouch for against the predecessor closure the member holds (verifyChain over the
+// predecessor generation). An install more than one epoch ahead is a reattachment
+// checkpoint: its closure keeps only the compact point proof (creator-transition-advance
+// "not a second current trust or a native intermediate generation"), so no predecessor
+// generation exists until the member installs the next epoch adjacently.
+//   serveMode "fixed":  a checkpoint head is not an export source
+//                       (CreatorSuccessorExportUnavailable): the session opens, serves nothing;
+//   serveMode "refuse": the code at c08d8680: the export throws "creator successor native
+//                       predecessor is unavailable" and the reopen fails (BROKEN);
+//   serveMode "widen":  tolerance widened blindly: serve from a checkpoint head without the
+//                       predecessor closure to verify it (BROKEN).
 module memberSuccessorInstall {
   pure val MAX_EPOCH = 5
   pure val MAX_FAILURES = 2
@@ -77,26 +91,36 @@ module memberSuccessorInstall {
   var failures: int
   var deaths: int
   var fixed: bool
+  var serveMode: str        // fixed | refuse | widen
+  var checkpointHead: bool  // the head was installed more than one epoch ahead (a checkpoint)
+  var openRefused: bool     // a reopen refused to open (startup serving threw)
+  var servedUnverified: bool // a startup serve vouched for a transition it could not re-verify
 
   pure def reopenHalted(h: int, c: int): bool = h >= 2 and c + 1 == h
   // The registration a reopen leaves for an install (before any discharge).
   pure def reopened(h: int, c: int): str = if (reopenHalted(h, c)) "halted" else "active"
   pure def max(a: int, b: int): int = if (a > b) a else b
 
-  action initWith(f: bool): bool = all {
+  action initServe(f: bool, m: str): bool = all {
     creatorEpoch' = 0, headEpoch' = 0, headPending' = false, regEpoch' = 0, regStatus' = "active",
     completed' = NONE, recoveryRequired' = false, phase' = "idle", target' = NONE, candidate' = NONE,
     terminal' = false, refusals' = 0, failures' = 0, deaths' = 0, fixed' = f,
+    serveMode' = m, checkpointHead' = false, openRefused' = false, servedUnverified' = false,
   }
+  action initWith(f: bool): bool = initServe(f, "fixed")
   action init = initWith(true)
   action initBroken = initWith(false)
+  action initServeRefuse = initServe(true, "refuse")
+  action initServeWiden = initServe(true, "widen")
 
   // Unchanged-variable helpers.
-  action keepCreator = all { creatorEpoch' = creatorEpoch, fixed' = fixed }
+  action keepServe = all { serveMode' = serveMode, checkpointHead' = checkpointHead, openRefused' = openRefused,
+    servedUnverified' = servedUnverified }
+  action keepCreator = all { creatorEpoch' = creatorEpoch, fixed' = fixed, keepServe }
 
   // The creator seals and adopts its next epoch, independently of the member.
   action creatorAdvance: bool = all {
-    creatorEpoch < MAX_EPOCH, creatorEpoch' = creatorEpoch + 1, fixed' = fixed,
+    creatorEpoch < MAX_EPOCH, creatorEpoch' = creatorEpoch + 1, fixed' = fixed, keepServe,
     headEpoch' = headEpoch, headPending' = headPending, regEpoch' = regEpoch, regStatus' = regStatus,
     completed' = completed, recoveryRequired' = recoveryRequired, phase' = phase, target' = target,
     candidate' = candidate, terminal' = terminal, refusals' = refusals, failures' = failures, deaths' = deaths,
@@ -201,7 +225,11 @@ module memberSuccessorInstall {
     refusals' = refusals, failures' = failures, deaths' = deaths,
   }
   action commit: bool = all {
-    phase == "pending", keepCreator, phase' = "committed", headPending' = false, headEpoch' = target,
+    phase == "pending", creatorEpoch' = creatorEpoch, fixed' = fixed, serveMode' = serveMode,
+    openRefused' = openRefused, servedUnverified' = servedUnverified,
+    // A target more than one epoch ahead installs as a reattachment checkpoint.
+    checkpointHead' = target > headEpoch + 1,
+    phase' = "committed", headPending' = false, headEpoch' = target,
     regEpoch' = regEpoch, regStatus' = regStatus, completed' = completed, recoveryRequired' = recoveryRequired,
     target' = target, candidate' = candidate, terminal' = terminal, refusals' = refusals, failures' = failures,
     deaths' = deaths,
@@ -244,11 +272,19 @@ module memberSuccessorInstall {
   // resolves forward (consumeCreatorAdoptionPendingRecovery). Startup reopens the plane
   // and discharges a halted reopen in both variants (it always did).
   action die: bool = all {
-    deaths < MAX_DEATHS, keepCreator, deaths' = deaths + 1,
+    not(openRefused), deaths < MAX_DEATHS, creatorEpoch' = creatorEpoch, fixed' = fixed, serveMode' = serveMode,
+    deaths' = deaths + 1,
     val h = if (headPending) target else headEpoch
+    // The head the reopen starts on, and whether it is a checkpoint.
+    val ck = if (headPending) target > headEpoch + 1 else checkpointHead
+    // Startup serving (selectRoomStartup() == "successor": any head past genesis).
+    val serving = h >= 1
+    val refused = serving and ck and serveMode == "refuse"
     all {
-      headEpoch' = h, headPending' = false, regEpoch' = h, regStatus' = "active",
-      phase' = "idle", candidate' = NONE, recoveryRequired' = false, terminal' = false,
+      headEpoch' = h, headPending' = false, regEpoch' = h, regStatus' = if (refused) "terminal" else "active",
+      phase' = "idle", candidate' = NONE, recoveryRequired' = false, terminal' = refused,
+      checkpointHead' = ck, openRefused' = refused,
+      servedUnverified' = (servedUnverified or (serving and ck and serveMode == "widen")),
     },
     completed' = completed, target' = target, refusals' = 0, failures' = failures,
   }
@@ -276,14 +312,19 @@ module memberSuccessorInstall {
     else recoveryLeavesResolvable
   // The two records never disagree on the epoch outside an install's own steps.
   val headMatchesRegistration = if (phase != "idle") true else if (terminal) true else regEpoch == headEpoch
-  val safety = if (not(refusalEscapable)) false else headMatchesRegistration
+  // A reopen always opens, and startup serving vouches only for a transition it re-verified.
+  val reopenOpens = not(openRefused)
+  val servesOnlyVerified = not(servedUnverified)
+  val serveSafety = reopenOpens and servesOnlyVerified
+  val safety = if (not(refusalEscapable)) false else if (not(headMatchesRegistration)) false else serveSafety
 
   // Liveness: under weak fairness of the member's own steps, a member behind the
   // creator eventually catches up, or the session ends in an explicit terminal refusal.
   val behind = headEpoch < creatorEpoch
   val caughtUpOrTerminal = if (terminal) true else headEpoch == creatorEpoch
   val vars = (creatorEpoch, headEpoch, headPending, regEpoch, regStatus, completed, recoveryRequired, phase,
-    target, candidate, terminal, refusals, failures, deaths, fixed)
+    target, candidate, terminal, refusals, failures, deaths, fixed, serveMode, checkpointHead, openRefused,
+    servedUnverified)
   temporal memberFollows = weakFair(memberStep, vars) implies always(behind implies eventually(caughtUpOrTerminal))
 
   // Witnesses.
@@ -305,6 +346,19 @@ module memberSuccessorInstall {
     .then(all { assert(refusalEscapable), offer }).then(start).then(recover).then(all { assert(regStatus == "active"), precheck })
     .then(fetch).then(turnover).then(pending).then(commit).then(activate)
     .then(all { assert(headEpoch == 3 and creatorEpoch == 3 and safety), creatorAdvance })
+  // A skip install (the creator two epochs ahead), then a reopen: FIXED opens and serves nothing;
+  // the c08d8680 code refuses to open; a widened tolerance serves an unverified transition.
+  action skipThenDie = creatorAdvance.then(creatorAdvance).then(follow).then(die)
+  run reopenAfterSkipTest = init.then(creatorAdvance).then(follow).then(skipThenDie)
+    .then(all { assert(headEpoch == 3 and checkpointHead and serveSafety and safety), creatorAdvance })
+  run reopenAfterSkipRefusedTest = initServeRefuse.then(creatorAdvance).then(follow).then(skipThenDie)
+    .then(all { assert(openRefused and not(reopenOpens)), creatorAdvance })
+  run reopenAfterSkipWidenedTest = initServeWiden.then(creatorAdvance).then(follow).then(skipThenDie)
+    .then(all { assert(servedUnverified and not(servesOnlyVerified)), creatorAdvance })
+  // After the next adjacent install the head has its predecessor and is an export source again.
+  run adjacentAfterSkipTest = initServeRefuse.then(creatorAdvance).then(follow).then(creatorAdvance)
+    .then(creatorAdvance).then(follow).then(creatorAdvance).then(follow).then(die)
+    .then(all { assert(not(checkpointHead) and reopenOpens), creatorAdvance })
   // A stale target (the creator advanced during the install) fails and the newer offer installs.
   run staleThenNewerTest = init.then(creatorAdvance).then(offer).then(start).then(skipRecover).then(precheck)
     .then(creatorAdvance).then(offer).then(fetch).then(all { assert(recoveryRequired and candidate == 2), start })

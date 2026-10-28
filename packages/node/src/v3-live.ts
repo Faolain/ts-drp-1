@@ -35,6 +35,7 @@ import {
 	SETTLEMENT_REPLACEMENT_MAX_INTENTS,
 	type SettlementPlan,
 	type SettlementSourceContext,
+	settlementHandBacksWith,
 	settlementReplacementLastLogicalTimeFromPreimage,
 } from "@ts-drp/issuance-store";
 import {
@@ -55,6 +56,7 @@ import {
 	issuanceUnsignedSuccessorFenceWidths,
 	issuanceUnsignedSuccessorFenceRevisionDeltas,
 	issuanceOrdinaryFinishingCapacityWidths,
+	issuanceRetirementAllows,
 	issuanceRetirementPlanRewriteResourceForSizing,
 	settlementPlanPermitsAuthenticatedPruning,
 } from "@ts-drp/issuance-store/maintenance";
@@ -821,6 +823,11 @@ export type V3EgressResult =
 type V3RebaseSource = Readonly<{
 	readonly author: string;
 	readonly authorSequence: number;
+	/** The source row's own signed epoch (an observation for the settlement window; no authority). */
+	readonly epoch: number;
+	/** The creator's signed settlement frontier classifies this row displaced: its epoch closed without
+	 * it, so it can never be admitted (the settlement window may expire it). */
+	readonly frontierDisplaced: boolean;
 	issueReplacement(
 		input: V3LocalIssueInput & Readonly<{ planEffect: NonNullable<DurableIssueCommit["planEffect"]> }>
 	): Promise<V3LocalIssueResult>;
@@ -9986,7 +9993,8 @@ async function retainCreatorAcceptedSourceCustody(registration: V3PlaneRegistrat
 		entries.sort((a, b) => a.sourceSequence - b.sourceSequence);
 		contexts.sort((a, b) => lowerHexDigest(a.digest)!.localeCompare(lowerHexDigest(b.digest)!));
 		const plan = copySettlementPlan({scope, revision: prior === null ? 0 : prior.revision + 1,
-			fenceSequence: prior?.fenceSequence ?? null, entries, sourceContexts: contexts}, scope);
+			fenceSequence: prior?.fenceSequence ?? null, entries, sourceContexts: contexts,
+			...(prior?.handBacks === undefined ? {} : {handBacks: prior.handBacks})}, scope);
 		if (plan == null) throw new TypeError("creator source custody plan is invalid");
 		const future = {...before.rows, plans: [...before.rows.plans.filter(value => !sameScope(value.scope, scope)), plan]};
 		encodeCanonical(future, {maxBytes: censusInput.limits.maxBytes, maxDepth: 32, maxItems: 65536});
@@ -11184,6 +11192,8 @@ async function readCreatorRecoveryDependencyCensus(
 	if (sourceTrust !== undefined) anchors.set(sourceTrust.currentEpoch, sourceTrust.currentAnchorDigest);
 	let afterKey: DurableOutboxPageInput["afterKey"] = null;
 	let scanned = 0;
+	// The author's own fences per epoch, read once when a row first reaches the settlement window.
+	let windowFences: Promise<ReadonlyMap<number, number>> | undefined;
 	for (;;) {
 		await checkpoint();
 		if (!live()) return undefined;
@@ -11375,10 +11385,13 @@ async function readCreatorRecoveryDependencyCensus(
 				observation.stage = `retained-source-completion:${row.authorSequence}`; return undefined;
 			}
 			// Signed local-author abandonment: terminal, never published, retained
-			// and charged until the ORIGINAL retirement owner retires it.
+			// and charged until the ORIGINAL retirement owner retires it. A frontier
+			// resolution signs the same receipt for a row it proves committed: that row
+			// is in history (covered, or the pinned bootstrap row, which is never pruned).
 			const durablyExpired = scope.author === registration.issuanceScope.author && !openSource &&
 				retainedCompletion?.expiry !== undefined && sameBytes(retainedCompletion.sourceDigest, row.digest) &&
-				classified?.kind === "displaced" && classified.authenticated.digest === lowerHexDigest(row.digest) &&
+				(classified?.kind === "displaced" || classified?.kind === "covered-historical" || classified?.kind === "pinned-genesis") &&
+				classified.authenticated.digest === lowerHexDigest(row.digest) &&
 				creatorRetainedExpiryMatchesPlan(retainedCompletion, row.authorSequence, inheritancePlan);
 			if (retainedCompletion?.expiry !== undefined && !durablyExpired) {
 				observation.stage = `retained-source-expiry:${row.authorSequence}`; return undefined;
@@ -11520,6 +11533,20 @@ async function readCreatorRecoveryDependencyCensus(
 					if (covered === undefined || covered.digest !== classified.authenticated.digest) return undefined;
 				}
 				if (durablyExpired) dependencyKind = "source-authenticated-expiry";
+				// Past the own-row settlement window, a displaced row whose own settlement is complete
+				// (an expired fence or source) is resolved as expired: the signed frontier shows the
+				// creator closed its epoch without it, and no later plane can admit it.
+				const windowFrontier = settlementFrontierFromHistory(registration.historicalIssuance);
+				const windowExpired = sourceBound && scope.author === registration.issuanceScope.author &&
+					windowFrontier !== undefined && validSettlementFrontierContext(registration.payload, windowFrontier) &&
+					(retainedHistoricalFence || completedBranch) &&
+					settlementOwnRowClass(classified.authenticated.vertex.epoch, windowFrontier.currentEpoch, row.authorSequence,
+						windowFrontier.admissionEpoch, windowFrontier.terminalThrough) === "displaced" &&
+					settlementOwnRowWindowExpired(classified.authenticated.vertex.epoch, windowFrontier.currentEpoch) &&
+					settlementOwnRowFenceGuarded(await (windowFences ??= ownEpochFences(
+						creatorOriginalIssuanceStore(registration), registration.issuanceScope)),
+					classified.authenticated.vertex.epoch, row.authorSequence, windowFrontier.terminalThrough);
+				if (windowExpired) dependencyKind = "source-authenticated-expiry";
 			}
 			const vertex = classified.authenticated.vertex;
 			if (typeof vertex.anchor !== "string") return undefined;
@@ -11542,9 +11569,14 @@ async function readCreatorRecoveryDependencyCensus(
 				branchSource !== undefined &&
 				vertex.epoch === branchSource.prepared.provenance.epoch &&
 				vertex.anchor === branchSource.prepared.provenance.anchorDigest;
+			// A row the native issuance retirement has already retired is held only
+			// until the prefix pruner reaches it (its completed entry is custody, not
+			// a dependency). Nothing replays it, so it keeps no historical anchor.
+			const retiredCustody = objectCensus.control !== undefined && objectCensus.control !== null &&
+				!issuanceRetirementAllows(objectCensus.control, scope, row.authorSequence, row.canonicalPreimageBytes, row.digest);
 			// A verified detached source capsule owns its historical anchor/ACL/ABI
 			// in the charged native plan. It does not consume an old live generation.
-			if (!separateSourceAnchor && !terminallyCovered && classified.sourceContract === undefined) {
+			if (!separateSourceAnchor && !terminallyCovered && !retiredCustody && classified.sourceContract === undefined) {
 				if (anchors.has(vertex.epoch) && anchors.get(vertex.epoch) !== vertex.anchor) return undefined;
 				anchors.set(vertex.epoch, vertex.anchor);
 			}
@@ -13294,6 +13326,134 @@ function settlementOwnRowClass(
 	if (epoch < admissionEpoch) return "old-incarnation";
 	if (epoch < currentEpoch) return "displaced";
 	return "current";
+}
+
+/**
+ * The own-row settlement window, in epochs. A displaced own row (its epoch is closed and its sequence
+ * is above the creator-signed terminalThrough) is in no closed Cut: the frontier is contiguous
+ * (deriveCreatorAuthorSettlementFrontier; an author's admitted slots are causally closed) and
+ * monotone, and ingress admits only the current epoch's anchor, so the row can never enter history.
+ * A Writer whose settlements never reach the creator would otherwise retain every such row, and the
+ * journal scopes protecting them, until a fence of its is delivered: one more protected scope per
+ * epoch until the retirement preparation refuses (AHE_BOUNDED_READ_LIMITS.maxObjectGenerations = 7
+ * scopes, at the eighth unsettled epoch). Past this depth the Writer resolves such a row as expired
+ * on the creator's signed exclusion. Four is the age at which a connected Writer collects its own
+ * rows: the retirement's recovery trusts reach back current - 4, and a deeper window leaves a
+ * collected scope outside them (measured: depth 5 refuses "chain-invalid").
+ */
+export const V3_SETTLEMENT_OWN_WINDOW_EPOCHS = 4;
+function settlementOwnRowWindowExpired(epoch: number, currentEpoch: number): boolean {
+	return NumberIsSafeInteger(epoch) && NumberIsSafeInteger(currentEpoch) &&
+		epoch <= currentEpoch - V3_SETTLEMENT_OWN_WINDOW_EPOCHS;
+}
+
+/**
+ * The lowest own author fence (fenceSequence = its own sequence) of each epoch among the author's
+ * retained own rows. A local issue's dependencies are the plane's tips, so an author's admitted rows
+ * of one epoch are causally closed: when the author's fence of an epoch precedes a row of that epoch
+ * and the row was admitted, so were the fence and every row between, and the creator's frontier
+ * (boundary fence - 1, then contiguous slots) reaches the row. A displaced row so guarded was never
+ * admitted. A row with no such fence (the fence was withheld) may sit above a gap: its displaced
+ * class then proves nothing, and the settlement window never expires it.
+ * @param store - The author's original issuance store.
+ * @param scope - The author's own scope.
+ * @returns Epoch to lowest fence sequence.
+ */
+async function ownEpochFences(store: DurableIssuanceStore, scope: DurableIssueScope): Promise<ReadonlyMap<number, number>> {
+	return (await scanOwnFences(store, scope)).lowest;
+}
+
+/** The own fence scan of ownEpochFences, with the highest own fence row (any epoch) and its epoch. */
+async function scanOwnFences(store: DurableIssuanceStore, scope: DurableIssueScope):
+	Promise<Readonly<{ lowest: ReadonlyMap<number, number>; highest: number | undefined; highestEpoch: number | undefined }>> {
+	const fences = new Map<number, number>();
+	let highest: number | undefined;
+	let highestEpoch: number | undefined;
+	let afterKey: readonly [string, string, number] | undefined;
+	for (let pages = 0; pages < 256; pages++) {
+		const page = captureOutboxPage(
+			await store.readOutboxPage(afterKey === undefined ? { limit: 64, scope } : { afterKey, limit: 64, scope }),
+			64
+		);
+		if (page === undefined) throw new TypeError("own fence scan page is invalid");
+		if (page.length === 0) return ObjectFreeze({ lowest: fences, highest, highestEpoch });
+		for (let index = 0; index < page.length; index++) {
+			const row = outboxRowSnapshot(page.read(index), scope);
+			if (row === undefined) throw new TypeError("own fence scan row is invalid");
+			afterKey = ObjectFreeze([scope.objectId, scope.author, row.authorSequence] as const);
+			const preimage = decodeCanonical(row.canonicalPreimageBytes) as Record<string, unknown>;
+			const operation = preimage.operation;
+			const epoch = preimage.epoch;
+			// Any own fence row (whatever its fenceSequence) bounds what contiguity can prove.
+			if (isObject(operation) && Reflect.get(operation, "action") === AUTHOR_FENCE_ACTION &&
+				(highest === undefined || row.authorSequence > highest)) {
+				highest = row.authorSequence;
+				highestEpoch = typeof epoch === "number" && NumberIsSafeInteger(epoch) ? epoch : undefined;
+			}
+			if (!isObject(operation) || Reflect.get(operation, "action") !== AUTHOR_FENCE_ACTION ||
+				Reflect.get(operation, "version") !== 1 || Reflect.get(operation, "fenceSequence") !== row.authorSequence ||
+				typeof epoch !== "number" || !NumberIsSafeInteger(epoch)) continue;
+			const prior = fences.get(epoch);
+			if (prior === undefined || row.authorSequence < prior) fences.set(epoch, row.authorSequence);
+		}
+	}
+	throw new TypeError("own fence scan is unbounded");
+}
+
+/** A displaced own row provably never admitted (see ownEpochFences): the lowest unsettled sequence,
+ * or preceded by its own epoch's fence. */
+function settlementOwnRowFenceGuarded(fences: ReadonlyMap<number, number>, epoch: number, sequence: number,
+	terminalThrough: number | null): boolean {
+	const fence = fences.get(epoch);
+	return sequence === (terminalThrough ?? -1) + 1 || (fence !== undefined && fence <= sequence);
+}
+
+/**
+ * What the creator's signed settlement frontier (in the installed checkpoint) proves about one own
+ * row retained as unknown accepted work by an install more than one epoch ahead. The row's epoch must
+ * be closed in that frontier.
+ * - "never-admitted": displaced and fence-guarded (see ownEpochFences): it is in no closed Cut and
+ *   ingress admits only the current anchor, so it can never enter history; its move may be offered
+ *   again exactly once.
+ * - "committed": within terminalThrough while no own fence follows it: the frontier reached it only
+ *   through contiguous admitted slots (a fence is the only other way to the boundary), so it is in a
+ *   closed Cut. Or within terminalThrough and followed, in its own epoch, by the author's highest
+ *   fence row while that fence is within terminalThrough too: that fence was admitted (it is the
+ *   frontier's boundary or inside its contiguous run; no higher own fence can be the boundary), and
+ *   it follows the row in the row's epoch, so it depends on it (a local issue depends on the plane's
+ *   tips): its admission admitted the row (fence closure).
+ * Anything else (an old incarnation, a fence after it, an unguarded gap) proves nothing and stays
+ * manual-review.
+ * @param registration - The live plane whose installed history holds the frontier.
+ * @param sourceSequence - The retained row's author sequence.
+ * @param sourceEpoch - The retained row's own signed epoch.
+ * @returns The proven outcome, or undefined.
+ */
+async function frontierRetainedResolution(registration: V3PlaneRegistration, sourceSequence: number, sourceEpoch: number):
+	Promise<"committed" | "never-admitted" | undefined> {
+	const frontier = settlementFrontierFromHistory(registration.historicalIssuance);
+	if (frontier === undefined || !validSettlementFrontierContext(registration.payload, frontier) ||
+		!NumberIsSafeInteger(sourceEpoch) || sourceEpoch >= frontier.currentEpoch) return undefined;
+	const rowClass = settlementOwnRowClass(sourceEpoch, frontier.currentEpoch, sourceSequence, frontier.admissionEpoch,
+		frontier.terminalThrough);
+	const fences = await scanOwnFences(creatorOriginalIssuanceStore(registration), registration.issuanceScope);
+	if (rowClass === "displaced" && settlementOwnRowFenceGuarded(fences.lowest, sourceEpoch, sourceSequence, frontier.terminalThrough))
+		return "never-admitted";
+	if (rowClass === "terminal" && frontier.terminalThrough !== null && sourceSequence <= frontier.terminalThrough &&
+		sourceEpoch >= frontier.admissionEpoch && (fences.highest === undefined || fences.highest < sourceSequence ||
+			(fences.highest <= frontier.terminalThrough && fences.highestEpoch === sourceEpoch))) return "committed";
+	return undefined;
+}
+
+/** One own-fence scan per rebase snapshot (the scan the settlement window classifies against). */
+const rebaseSnapshotFenceScans = new WeakMap<object, Promise<ReadonlyMap<number, number>>>();
+function rebaseSnapshotFences(registration: V3PlaneRegistration, snapshot: object): Promise<ReadonlyMap<number, number>> {
+	let scan = rebaseSnapshotFenceScans.get(snapshot);
+	if (scan === undefined) {
+		scan = ownEpochFences(creatorOriginalIssuanceStore(registration), registration.issuanceScope);
+		rebaseSnapshotFenceScans.set(snapshot, scan);
+	}
+	return scan;
 }
 
 const settlementSourceByVertex = new WeakMap<EpochVertex, Readonly<Record<string, unknown>>>();
@@ -15272,14 +15432,27 @@ function capturedLocalIssueInput(
 	}
 	let planEffect: NonNullable<DurableIssueCommit["planEffect"]> | undefined;
 	if (ObjectGetOwnPropertyDescriptor(input, "planEffect") !== undefined) {
-		const fence = snapshotClosedRecord(input.planEffect, ["kind"]);
+		const handBack = snapshotClosedRecord(input.planEffect, ["intent", "kind", "sourceSequence"]);
+		const fence = handBack === undefined ? snapshotClosedRecord(input.planEffect, ["kind"]) : undefined;
 		const replacement =
 			fence === undefined ? snapshotClosedRecord(input.planEffect, ["kind", "sourceSequence"]) : undefined;
 		const progressReplacement =
 			fence === undefined && replacement === undefined
 				? snapshotClosedRecord(input.planEffect, PROGRESS_REPLACEMENT_EFFECT_KEYS)
 				: undefined;
-		if (fence?.kind === "fence") {
+		if (
+			handBack?.kind === "hand-back" &&
+			NumberIsSafeInteger(handBack.sourceSequence) &&
+			(handBack.sourceSequence as number) >= 0 &&
+			NumberIsSafeInteger(handBack.intent) &&
+			(handBack.intent as number) >= 0
+		) {
+			planEffect = ObjectFreeze({
+				intent: handBack.intent as number,
+				kind: "hand-back" as const,
+				sourceSequence: handBack.sourceSequence as number,
+			});
+		} else if (fence?.kind === "fence") {
 			planEffect = ObjectFreeze({ kind: "fence" as const });
 		} else if (
 			replacement?.kind === "replacement" &&
@@ -15363,6 +15536,9 @@ function capturedLocalIssueInput(
 	}
 	if (planEffect !== undefined && settlementProfileFor(payload.trust.trust.profileId) !== "v1") {
 		return localIssueFailure("malformed-input", "v3 local issue plan effect is unavailable");
+	}
+	if (planEffect?.kind === "hand-back" && operations.length !== 1) {
+		return localIssueFailure("malformed-input", "v3 local issue hand-back carries exactly its one operation");
 	}
 	if (
 		planEffect?.kind === "replacement" &&
@@ -16030,7 +16206,7 @@ async function issueLocal(
 	// settlement-profile membership alone does not grant current Writer rights.
 	// A halted native debt retains the original issuer's admission-rejected
 	// outcome; the public preflight's not-active result is not its substitute.
-	if (input.planEffect === undefined && !registration.operationAdmissionHalted) {
+	if ((input.planEffect === undefined || input.planEffect.kind === "hand-back") && !registration.operationAdmissionHalted) {
 		for (const { operation } of input.operations) {
 			const authorized = authorizeV3NewLocalOperation({ plane: registration.handle, operation });
 			if (!authorized.ok) return authorized;
@@ -16038,9 +16214,36 @@ async function issueLocal(
 	}
 	if (
 		input.planEffect !== undefined &&
-		(input.planEffect.kind !== "replacement" || isReservedBatchAction(String(Reflect.get(first.operation, "action"))))
+		((input.planEffect.kind !== "replacement" && input.planEffect.kind !== "hand-back") ||
+			isReservedBatchAction(String(Reflect.get(first.operation, "action"))) ||
+			(input.planEffect.kind === "hand-back" && (input.operations.length !== 1 || input.settlementSource !== undefined)))
 	) {
 		return localIssueFailure("malformed-input", "v3 local issue plan effect is invalid");
+	}
+	if (input.planEffect?.kind === "hand-back") {
+		// A move the settlement window (or the creator's frontier) gave back, offered again as a new move:
+		// its row consumes the durable hand-back record in its own issuance transaction (the store
+		// refuses a consumed or absent record). It must carry exactly the handed-back operation.
+		const effect = input.planEffect;
+		let plan;
+		try {
+			plan = copySettlementPlan(
+				await registration.issuanceStore.readSettlementPlan(registration.issuanceScope),
+				registration.issuanceScope
+			);
+		} catch {
+			return localIssueFailure("issuance-rejected", "v3 settlement hand-back plan read failed");
+		}
+		const record = plan?.handBacks?.find(
+			(candidate) => candidate.sourceSequence === effect.sourceSequence && candidate.intent === effect.intent
+		);
+		if (
+			record === undefined ||
+			record.reissueSequence !== null ||
+			!sameBytes(record.exactCanonicalOperationBytes, encodeCanonical(first.operation))
+		) {
+			return localIssueFailure("issuance-rejected", "v3 settlement hand-back is unavailable");
+		}
 	}
 	if (input.planEffect?.kind === "replacement" && input.settlementSource === undefined) {
 		return localIssueFailure(
@@ -16243,6 +16446,21 @@ async function ownSourceSettlementIsComplete(
 		derived = derivePolicySettlement(policy, operations);
 		if (!sameBytes(encodeCanonical(derived), encodeCanonical(derivePolicySettlement(policy, operations)))) return false;
 	} catch { return false; }
+	// Settlement window (V3_SETTLEMENT_OWN_WINDOW_EPOCHS): the room's drain resolved this displaced
+	// source as expired instead of replacing it again, and handed its operations back to the
+	// application. Its epoch is closed and the creator's signed frontier excluded it (the drain
+	// expires only frontier-displaced sources), so no plane can admit it and no replacement of it
+	// is ever signed: the exact entry with no replacement is its complete settlement.
+	if (entry.disposition === "expire" && (derived.disposition === "rebase" || derived.disposition === "transform")) {
+		const frontier = settlementFrontierFromHistory(registration.historicalIssuance);
+		return frontier !== undefined && validSettlementFrontierContext(registration.payload, frontier) &&
+			source.admitted.epoch < frontier.currentEpoch &&
+			settlementOwnRowClass(source.admitted.epoch, frontier.currentEpoch, source.authorSequence,
+				frontier.admissionEpoch, frontier.terminalThrough) !== "current" &&
+			entry.replacementSequence === null && entry.replacementProgress === undefined && entry.transformRefusal === undefined &&
+			settlementOwnRowFenceGuarded(await ownEpochFences(creatorOriginalIssuanceStore(registration), scope),
+				source.admitted.epoch, source.authorSequence, frontier.terminalThrough);
+	}
 	if (derived.disposition !== entry.disposition || derived.disposition === "manual-review") return false;
 	if (derived.disposition === "expire") return entry.replacementSequence === null &&
 		entry.replacementProgress === undefined && entry.transformRefusal === undefined;
@@ -16506,8 +16724,17 @@ async function settledLocalSourceFacts(
 			frontier === undefined || !validSettlementFrontierContext(registration.payload, frontier)) return undefined;
 		const terminal = settlementOwnRowClass(selected.authenticated.admitted.epoch, frontier.currentEpoch,
 			source.authorSequence, frontier.admissionEpoch, frontier.terminalThrough);
-		if ((terminal !== "terminal" && terminal !== "old-incarnation") ||
-			!await ownSourceSettlementIsComplete(registration, selected, await store.readSettlementPlan(scope))) return undefined;
+		const expired = terminal === "displaced" &&
+			settlementOwnRowWindowExpired(selected.authenticated.admitted.epoch, frontier.currentEpoch) &&
+			settlementOwnRowFenceGuarded(await ownEpochFences(store, scope), selected.authenticated.admitted.epoch,
+				source.authorSequence, frontier.terminalThrough);
+		const pinnedBytes = registration.exactCanonicalPinnedGenesisBootstrapOperationBytes;
+		const expiredBootstrap = expired && pinnedBytes !== undefined && selected.authenticated.admitted.epoch === 0 &&
+			authenticatedPinnedGenesisOutboxRow(row, scope, registration.payload, registration.payload.trust.trust.genesisAnchorDigest,
+				pinnedBytes)?.digest === source.vertexDigest;
+		const settled = expiredBootstrap ||
+			await ownSourceSettlementIsComplete(registration, selected, await store.readSettlementPlan(scope));
+		if ((terminal !== "terminal" && terminal !== "old-incarnation" && !expired) || !settled) return undefined;
 		return ObjectFreeze({ exactCanonicalPreimageBytes: new Uint8ArrayConstructor(row.canonicalPreimageBytes),
 			detachedSignature: new Uint8ArrayConstructor(row.signature) });
 	} catch { return undefined; }
@@ -17161,6 +17388,16 @@ async function readRebaseOutbox(
 	const commonSource = {
 		author: selected.authenticated.author,
 		authorSequence: selected.row.authorSequence,
+		epoch: selected.authenticated.admitted.epoch,
+		frontierDisplaced:
+			settlementFrontier !== undefined &&
+			selected.row.scope.objectId === registration.payload.provenance.objectId &&
+			selected.authenticated.author === registration.issuanceScope.author &&
+			validSettlementFrontierContext(registration.payload, settlementFrontier) &&
+			settlementOwnRowClass(selected.authenticated.admitted.epoch, settlementFrontier.currentEpoch,
+				selected.row.authorSequence, settlementFrontier.admissionEpoch, settlementFrontier.terminalThrough) === "displaced" &&
+			settlementOwnRowFenceGuarded(await rebaseSnapshotFences(registration, snapshot),
+				selected.authenticated.admitted.epoch, selected.row.authorSequence, settlementFrontier.terminalThrough),
 		intents: ObjectFreeze(intents),
 		vertexDigest: selected.authenticated.digest,
 	};
@@ -21876,6 +22113,10 @@ function creatorCloseRegistration(
 			receivedMembership = observed;
 			return true;
 		},
+		recordReceivedDepartedClosedMembership: async (exactCanonicalCutValueBytes: Uint8Array, exactCanonicalCloseMembershipBytes: Uint8Array,
+			receivedAuthority: ReceivedCloseAuthorityRecords): Promise<boolean> =>
+			await recordCreatorReceivedClosedMembership(registration, exactCanonicalCutValueBytes, null,
+				exactCanonicalCloseMembershipBytes, receivedAuthority) !== false,
 		// The genuine claim may use a successor alias; the close owner is keyed
 		// by that exact handle, not the registration's underlying raw handle.
 		sealRecoveryDependencies: (required?: boolean) =>
@@ -22625,6 +22866,7 @@ async function cleanupCreatorSettlementSuccessor(
 		publishState: "pending" | "published";
 	}[] = [];
 	let throughAuthorSequence: number | null = null;
+	let windowFences: Promise<ReadonlyMap<number, number>> | undefined;
 	const journalConsumers = new Map<string, boolean>();
 	const journalScopeConsumes = async (epoch: number, anchorDigest: string): Promise<boolean> => {
 		const key = JSON.stringify([epoch, anchorDigest]);
@@ -22671,7 +22913,15 @@ async function cleanupCreatorSettlementSuccessor(
 						(source.admitted.epoch > classifiedThroughEpoch || row.publishState !== "published")) ||
 					!(
 						source.admitted.epoch < frontier.admissionEpoch ||
-						(frontier.terminalThrough !== null && row.authorSequence <= frontier.terminalThrough)
+						(frontier.terminalThrough !== null && row.authorSequence <= frontier.terminalThrough) ||
+						// Past the own-row window a displaced row is resolved as expired; only the
+						// closed-retirement coordinator (which left it unprotected) may drain it.
+						(coordinatedIssuance !== undefined &&
+							settlementOwnRowClass(source.admitted.epoch, frontier.currentEpoch, row.authorSequence,
+								frontier.admissionEpoch, frontier.terminalThrough) === "displaced" &&
+							settlementOwnRowWindowExpired(source.admitted.epoch, frontier.currentEpoch) &&
+							settlementOwnRowFenceGuarded(await (windowFences ??= ownEpochFences(material.issuanceStore,
+								material.issuanceScope)), source.admitted.epoch, row.authorSequence, frontier.terminalThrough))
 					)
 				) {
 					done = true;
@@ -23943,11 +24193,76 @@ async function readCreatorUnresolvedAcceptedWork(registration: V3PlaneRegistrati
 		return ObjectFreeze(result);
 }
 
+/** One retained own row and what the creator's signed frontier proves about it (frontierRetainedResolution). */
+export interface V3RetainedWorkFrontier {
+	readonly sourceSequence: number;
+	readonly sourceDigest: string;
+	readonly sourceContextDigest: string;
+	readonly sourceEpoch: number;
+	/** Already resolved by a signed local-author expiry receipt. */
+	readonly resolved: boolean;
+	readonly frontier: "committed" | "never-admitted" | undefined;
+	readonly operations: readonly Readonly<Record<string, unknown>>[];
+}
+
+/**
+ * Retained own work (unresolved, or resolved by a signed expiry) with the creator frontier's proof
+ * for each row. Fresh native/source verification, as inspectV3UnresolvedAcceptedWork.
+ * @param plane - Original live handle.
+ * @returns Every retained application row with its frontier proof.
+ */
+export async function inspectV3RetainedWorkFrontier(plane: V3PlaneHandle): Promise<readonly V3RetainedWorkFrontier[]> {
+	const registration = v3HandleRegistrations.get(plane);
+	if (registration === undefined || !currentRegistration(registration)) throw new TypeError("creator source custody owner is unavailable");
+	return enqueueRegistrationTask(registration, () => async () => {
+		const payload = registration.payload, scope = registration.issuanceScope;
+		const store = creatorOriginalIssuanceStore(registration);
+		const read = durableIssuancePruningMaintenanceForStore(store)?.readBoundedRecoveryCensus;
+		if (read === undefined) throw new TypeError("creator source custody census is unavailable");
+		const readInput = {objectId: scope.objectId, limits: {maxRows: ISSUANCE_RETIREMENT_LIMITS.maxRows,
+			maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes}};
+		const before = await read(readInput);
+		const plan = before.rows.plans.find(value => sameScope(value.scope, scope)) ?? null;
+		if (!plan?.entries.some(entry => entry.sourceContextDigest !== undefined)) return ObjectFreeze([]);
+		const sources = await prepareCreatorRetainedSourceContracts(plan, payload.trust.trust, payload.input.catalog);
+		const result: V3RetainedWorkFrontier[] = [];
+		for (const entry of plan.entries) {
+			if (entry.sourceContextDigest === undefined || entry.replacementSequence !== null || entry.replacementProgress !== undefined) continue;
+			const resolved = entry.disposition === "expire" && entry.sourceResolutionDigest !== undefined;
+			if (!resolved && (entry.disposition === "expire" || entry.disposition === "committed" || entry.disposition === "inherited" ||
+				entry.sourceResolutionDigest !== undefined)) continue;
+			const retained = sources.get(entry.sourceSequence);
+			const issued = before.rows.issued.find(row => sameScope(row, scope) && row.authorSequence === entry.sourceSequence);
+			if (retained === undefined || issued === undefined || !sameBytes(issued.digest, entry.sourceDigest)) continue;
+			const authenticated = authenticateRetainedSourceVertex(retained.contract, issued.canonicalPreimageBytes, issued.signature,
+				issued.digest, scope.author, issued.authorSequence);
+			const intents = authenticated === undefined ? undefined : rebaseIntents(retained.contract, authenticated);
+			if (authenticated === undefined || intents === undefined || intents.length === 0) continue;
+			const sourceEpoch = retained.contract.identity.trust.currentEpoch;
+			if (authenticated.vertex.epoch !== sourceEpoch) continue;
+			result.push(ObjectFreeze({sourceSequence: entry.sourceSequence, sourceDigest: authenticated.digest,
+				sourceContextDigest: lowerHexDigest(entry.sourceContextDigest)!, sourceEpoch, resolved,
+				frontier: await frontierRetainedResolution(registration, entry.sourceSequence, sourceEpoch),
+				operations: ObjectFreeze(intents.map(intent => intent.operation))}));
+		}
+		const after = await read(readInput);
+		if (!currentRegistration(registration) || registration.payload !== payload || before.image.imageDigest !== after.image.imageDigest)
+			throw new TypeError("creator retained source currency changed");
+		return ObjectFreeze(result);
+	});
+}
+
 export interface V3SourceAbandonmentRequest {
 	readonly sourceSequence: number;
 	readonly sourceDigest: string;
 	readonly sourceContextDigest: string;
 	readonly signal?: AbortSignal;
+	/**
+	 * Resolve on the creator's signed frontier instead of the user's word: the row's epoch is closed and
+	 * the frontier proves it committed or never admitted (frontierRetainedResolution). Published work
+	 * qualifies; nothing else does.
+	 */
+	readonly frontierProof?: true;
 }
 
 /** Terminal local-author abandonment. Never claims publication or commitment. */
@@ -23986,8 +24301,10 @@ export function abandonV3UnresolvedAcceptedWork(plane: V3PlaneHandle, raw: V3Sou
 		return Promise.reject(new TypeError("creator source abandonment owner is unavailable"));
 	return enqueueRegistrationTask(registration, (inputCustody) => {
 		const keys = ["sourceSequence", "sourceDigest", "sourceContextDigest", "signRegisteredVertexDigest"];
-		const input = snapshotClosedRecord(raw, keys) ?? snapshotClosedRecord(raw, [...keys, "signal"]);
+		const input = snapshotClosedRecord(raw, keys) ?? snapshotClosedRecord(raw, [...keys, "signal"]) ??
+			snapshotClosedRecord(raw, [...keys, "frontierProof"]) ?? snapshotClosedRecord(raw, [...keys, "signal", "frontierProof"]);
 		if (input === undefined || !NumberIsSafeInteger(input.sourceSequence) || (input.sourceSequence as number) < 0 ||
+			(Object.hasOwn(input, "frontierProof") && input.frontierProof !== true) ||
 			!isDigestHex(input.sourceDigest) || !isDigestHex(input.sourceContextDigest) ||
 			typeof input.signRegisteredVertexDigest !== "function" || inputCustody === undefined)
 			throw new TypeError("creator source abandonment input is invalid");
@@ -24012,7 +24329,8 @@ export function abandonV3UnresolvedAcceptedWork(plane: V3PlaneHandle, raw: V3Sou
 			if (signal?.aborted) cancel();
 			let custody: LocalReplacementCustody | undefined;
 			try {
-				return await abandonCreatorUnresolvedSource(registration, selector, sign, controller.signal, (owned) => { custody = owned; });
+				return await abandonCreatorUnresolvedSource(registration, selector, sign, controller.signal, (owned) => { custody = owned; },
+					input.frontierProof === true);
 			} finally {
 				signal?.removeEventListener("abort", cancel);
 				registration.settlementSelectionControllers.delete(controller);
@@ -24028,7 +24346,8 @@ export function abandonV3UnresolvedAcceptedWork(plane: V3PlaneHandle, raw: V3Sou
 
 async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
 	selector: Readonly<{sourceSequence: number; sourceDigest: Uint8Array; sourceContextDigest: Uint8Array}>,
-	sign: SignRegisteredVertexDigest, aborted: AbortSignal, own: (custody: LocalReplacementCustody) => void): Promise<V3SourceAbandonment> {
+	sign: SignRegisteredVertexDigest, aborted: AbortSignal, own: (custody: LocalReplacementCustody) => void,
+	frontierProof = false): Promise<V3SourceAbandonment> {
 	const payload = registration.payload, scope = registration.issuanceScope;
 	const current = (): boolean => !aborted.aborted && currentRegistration(registration) && registration.payload === payload &&
 		registration.issuanceScope === scope;
@@ -24059,20 +24378,26 @@ async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
 		if (first.retained.expiry === undefined) throw new TypeError("creator source expiry proof is invalid");
 		return creatorSourceAbandonmentResult(scope.author, first.entry);
 	}
-	const unresolved = (value: typeof first): boolean => {
+	const unresolved = async (value: typeof first): Promise<boolean> => {
 		const {read, entry, retained} = value;
 		if (entry.disposition === "expire" || entry.disposition === "committed" || entry.disposition === "inherited" ||
 			entry.replacementSequence !== null || entry.replacementProgress !== undefined || entry.sourceResolutionDigest !== undefined) return false;
 		const issued = read.rows.issued.filter(row => sameScope(row, scope) && row.authorSequence === entry.sourceSequence);
 		const outbox = read.rows.outbox.filter(row => sameScope(row, scope) && row.authorSequence === entry.sourceSequence);
-		// Replay after publication is refused: only never-acknowledged work may be abandoned.
+		// Replay after publication is refused: only never-acknowledged work may be abandoned on the
+		// user's word. The creator's signed frontier may resolve published work too: its epoch is closed
+		// and the frontier proves the row committed or never admitted.
 		if (issued.length !== 1 || outbox.length !== 1 || !sameBytes(issued[0]!.digest, entry.sourceDigest) ||
-			!sameBytes(outbox[0]!.digest, entry.sourceDigest) || outbox[0]!.publishState !== "pending") return false;
+			!sameBytes(outbox[0]!.digest, entry.sourceDigest) || (!frontierProof && outbox[0]!.publishState !== "pending")) return false;
 		const authenticated = authenticateRetainedSourceVertex(retained.contract, issued[0]!.canonicalPreimageBytes, issued[0]!.signature,
 			issued[0]!.digest, scope.author, issued[0]!.authorSequence);
-		return authenticated !== undefined && authenticated.digest === lowerHexDigest(entry.sourceDigest);
+		if (authenticated === undefined || authenticated.digest !== lowerHexDigest(entry.sourceDigest)) return false;
+		return !frontierProof || (authenticated.vertex.epoch === retained.contract.identity.trust.currentEpoch &&
+			await frontierRetainedResolution(registration, entry.sourceSequence, authenticated.vertex.epoch) !== undefined);
 	};
-	if (!unresolved(first)) throw new TypeError("creator source abandonment requires unresolved never-published work");
+	if (!await unresolved(first)) throw new TypeError(frontierProof
+		? "creator source frontier resolution requires a row the creator's frontier proves"
+		: "creator source abandonment requires unresolved never-published work");
 	const sourceEpoch = first.retained.contract.identity.trust.currentEpoch;
 	if (payload.trust.trust.currentEpoch <= sourceEpoch) throw new TypeError("creator source abandonment requires a later epoch");
 	// Whole-floor capture under the original native custody, without the issuance reservation.
@@ -24097,7 +24422,7 @@ async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
 		if (!current()) return false;
 		try {
 			const now = await inspect();
-			return current() && now.read.image.imageDigest === first.read.image.imageDigest && unresolved(now);
+			return current() && now.read.image.imageDigest === first.read.image.imageDigest && await unresolved(now);
 		} catch { return false; }
 	};
 	let signature: Uint8Array | undefined;
@@ -24115,15 +24440,31 @@ async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
 	await custody.check();
 	const second = await inspect();
 	if (!current() || second.read.image.imageDigest !== first.read.image.imageDigest || second.plan.revision !== first.plan.revision ||
-		!unresolved(second)) throw new TypeError("creator source abandonment source currency changed");
+		!await unresolved(second)) throw new TypeError("creator source abandonment source currency changed");
 	const prior = second.plan;
+	// The moves of a row the creator's frontier proves was never admitted are given back to the
+	// application in this same plan write (durable hand-back records, consumed by their reissue).
+	let handBacks = prior.handBacks;
+	if (frontierProof) {
+		const row = second.read.rows.issued.find(value => sameScope(value, scope) && value.authorSequence === selector.sourceSequence);
+		const authenticated = row === undefined ? undefined : authenticateRetainedSourceVertex(second.retained.contract,
+			row.canonicalPreimageBytes, row.signature, row.digest, scope.author, row.authorSequence);
+		const intents = authenticated === undefined ? undefined : rebaseIntents(second.retained.contract, authenticated);
+		if (authenticated !== undefined && intents !== undefined && intents.length > 0 &&
+			await frontierRetainedResolution(registration, selector.sourceSequence, authenticated.vertex.epoch) === "never-admitted")
+			handBacks = settlementHandBacksWith(prior.handBacks, intents.map((intent, index) => ObjectFreeze({
+				sourceSequence: selector.sourceSequence, sourceDigest: new Uint8ArrayConstructor(second.entry.sourceDigest),
+				sourceEpoch: authenticated.vertex.epoch, intent: index, exactCanonicalOperationBytes: encodeCanonical(intent.operation),
+				reissueSequence: null}))) ?? prior.handBacks;
+	}
 	const entries = prior.entries.map(entry => entry.sourceSequence !== selector.sourceSequence ? entry :
-		{...entry, disposition: "expire" as const, replacementSequence: null, sourceResolutionDigest: new Uint8ArrayConstructor(expiry.digest)});
+		{...entry, disposition: "expire" as const, replacementSequence: null, sourceResolutionDigest: new Uint8ArrayConstructor(expiry.digest),
+			...(frontierProof ? {sourceResolutionKind: "frontier" as const} : {})});
 	const contexts = [...(prior.sourceContexts ?? [])];
 	if (!contexts.some(value => sameBytes(value.digest, expiry.digest))) contexts.push(expiry);
 	contexts.sort((a, b) => lowerHexDigest(a.digest)!.localeCompare(lowerHexDigest(b.digest)!));
 	const plan = copySettlementPlan({scope, revision: prior.revision + 1, fenceSequence: prior.fenceSequence, entries,
-		sourceContexts: contexts}, scope);
+		sourceContexts: contexts, ...(handBacks === undefined ? {} : {handBacks})}, scope);
 	if (plan == null) throw new TypeError("creator source abandonment plan is invalid");
 	const future = {...second.read.rows, plans: [...second.read.rows.plans.filter(value => !sameScope(value.scope, scope)), plan]};
 	encodeCanonical(future, {maxBytes: censusInput.limits.maxBytes, maxDepth: 32, maxItems: 65536});

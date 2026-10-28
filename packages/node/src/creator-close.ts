@@ -559,6 +559,14 @@ export interface V3CreatorCloseRegistration {
 		exactCanonicalCloseMembershipBytes?: Uint8Array,
 		receivedAuthority?: import("./internal/creator-received-close-membership.js").ReceivedCloseAuthorityRecords
 	): Promise<boolean>;
+	/** The skip-install twin (fix/skip-scope-carrier): records the departed scope's transferred
+	 * membership with its authority exactly as recordReceivedClosedMembership does, without becoming
+	 * the adjacent completion evidence (a skip's target is not this Cut's successor). */
+	recordReceivedDepartedClosedMembership(
+		exactCanonicalCutValueBytes: Uint8Array,
+		exactCanonicalCloseMembershipBytes: Uint8Array,
+		receivedAuthority: import("./internal/creator-received-close-membership.js").ReceivedCloseAuthorityRecords
+	): Promise<boolean>;
 	/** Exact authenticated whole-source bytes, prepared and joined under this same genuine hold. */
 	prepareClosedEpochArchive(hold: CreatorSnapshotRecoveryCloseHold, limits: ArchiveLimits,
 		sharedAccounting?: import("./internal/creator-closed-rollback-data.js").CreatorClosedRollbackProofAccounting): Promise<ClosedEpochArchive | undefined>;

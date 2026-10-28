@@ -17,10 +17,15 @@ import type { V3RoomSuccessorOffer } from "./rollover.js";
  *   reconnect needs no creator memory of members. The creator serves only its latest successor,
  *   so a member that missed rollovers installs the latest offer directly (the install fetches the
  *   creator's reattachment checkpoint for the gap).
+ *   An install that waited (its host's lifecycle queue, a recovery, slow storage) asks the delivery
+ *   for its newest offer right before it fetches the material (`newest`), so a member slower than
+ *   the creator's rollovers never chases a successor the creator has moved past.
  * - An offer is authenticated only by `installCreatorSuccessor` (its commit QC, trust record and
  *   manifest against the member's own current trust). The envelope's epoch is an untrusted hint
  *   used to skip offers that cannot be newer; a forged or stale offer is refused by the install
- *   with no state change, and is not retried before a backoff.
+ *   with no state change, and is not retried before a backoff. An install whose material did not
+ *   arrive within its deadline (V3RoomSuccessorInstallExpired, row 72) is retried at once from the
+ *   creator's latest offer, the same one included: the member never stops following.
  * - Material comes from the creator only (members never serve successor material), so the
  *   install's peers are the creator.
  * - Sync before sending (owner decision B): a member already at the creator's epoch gets the
@@ -184,6 +189,11 @@ export interface V3RoomSuccessorDelivery {
 	publish(offer: V3RoomSuccessorOffer, successorEpoch: number): Promise<void>;
 	/** Member: ask the creator for its latest offer now (rate limited). */
 	request(): void;
+	/**
+	 * Whether the creator is connected on the room's successor channel now (a creator: always). The
+	 * rollover policy's `creatorReachable`: with no creator a member cannot follow or settle.
+	 */
+	creatorReachable(): boolean;
 	/** Settles when no install is running or queued (tests and orderly shutdown). */
 	idle(): Promise<void>;
 	stats(): V3RoomSuccessorDeliveryStats;
@@ -286,6 +296,13 @@ function decodeFrame(bytes: Uint8Array): Frame | undefined {
 			exactCanonicalSnapshotManifestBytes: manifest,
 		}),
 	};
+}
+
+/** The room's typed install expiry (V3RoomSuccessorInstallExpired, row 72), by name: no runtime import. */
+function installExpired(error: unknown): boolean {
+	for (let value: unknown = error, depth = 0; value instanceof Error && depth < 8; value = value.cause, depth++)
+		if (value.name === "V3RoomSuccessorInstallExpired") return true;
+	return false;
 }
 
 function message(error: unknown): string {
@@ -398,11 +415,15 @@ export function createV3RoomSuccessorDelivery(
 
 	const backoffOf = (bytes: Uint8Array): (typeof failed)[number] | undefined =>
 		failed.find((entry) => compareBytes(entry.bytes, bytes) === 0);
+	const inBackoff = (offer: Extract<Frame, { kind: "offer" }>): boolean => {
+		const previous = backoffOf(offer.bytes);
+		return previous !== undefined && Date.now() < previous.retryAt;
+	};
 	const install = (): void => {
 		if (installing !== undefined || closed) return;
 		installing = (async (): Promise<void> => {
 			while (!closed && candidate !== undefined) {
-				const selected = candidate;
+				let selected = candidate;
 				candidate = undefined;
 				const selectedRoom = room;
 				if (selectedRoom === undefined || creatorPeer === undefined) return;
@@ -410,19 +431,38 @@ export function createV3RoomSuccessorDelivery(
 					stats.ignored++;
 					continue;
 				}
-				const previous = backoffOf(selected.bytes);
-				if (previous !== undefined && Date.now() < previous.retryAt) {
+				if (inBackoff(selected)) {
 					stats.ignored++;
 					continue;
 				}
-				const currency = aheadStatement?.epoch === selected.successorEpoch ? aheadStatement : undefined;
+				const peers = [creatorPeer];
+				const currencyFor = (successorEpoch: number): V3RoomCurrencyStatement | undefined =>
+					aheadStatement?.epoch === successorEpoch ? aheadStatement : undefined;
+				const currency = currencyFor(selected.successorEpoch);
 				try {
 					await selectedRoom.installCreatorSuccessor({
 						offer: selected.offer,
-						peers: [creatorPeer],
+						peers,
 						...(currency === undefined ? {} : { currency }),
+						// The creator serves only its latest successor: the room asks, right before it fetches
+						// the material, for an offer that arrived while the install waited, and installs that.
+						// A room that is not yet current installs a later epoch only with the creator's
+						// statement for it (live install rule), so without one it keeps the checked offer.
+						newest: () => {
+							const later = candidate;
+							if (later === undefined || later.successorEpoch <= selected.successorEpoch || inBackoff(later))
+								return undefined;
+							const laterCurrency = currencyFor(later.successorEpoch);
+							if (laterCurrency === undefined && selectedRoom.localIssueCurrency?.() === "not-yet-current")
+								return undefined;
+							candidate = undefined;
+							stats.ignored++;
+							selected = later;
+							return { offer: later.offer, peers, ...(laterCurrency === undefined ? {} : { currency: laterCurrency }) };
+						},
 					});
 					stats.installed++;
+					const previous = backoffOf(selected.bytes);
 					if (previous !== undefined) failed.splice(failed.indexOf(previous), 1);
 					hooks.onInstalled?.(epoch());
 				} catch (error) {
@@ -431,6 +471,17 @@ export function createV3RoomSuccessorDelivery(
 					if (Reflect.get(error as object, "reason") === "statement-required") awaitingStatement = selected;
 					stats.refused++;
 					stats.lastError = message(error).slice(0, 400);
+					hooks.onRefused?.(error);
+					// Row 72: an install whose material did not arrive within its deadline already waited its
+					// whole bound. Never back that offer off: ask for the creator's latest now and install it,
+					// the same offer again included, so the member never stops following.
+					if (installExpired(error)) {
+						const previous = backoffOf(selected.bytes);
+						if (previous !== undefined) failed.splice(failed.indexOf(previous), 1);
+						setTimeout(() => request(), REQUEST_MIN_INTERVAL_MS);
+						continue;
+					}
+					const previous = backoffOf(selected.bytes);
 					const entry = previous ?? { bytes: selected.bytes, retryAt: 0, failures: 0 };
 					entry.failures++;
 					entry.retryAt =
@@ -439,9 +490,14 @@ export function createV3RoomSuccessorDelivery(
 						failed.push(entry);
 						if (failed.length > FAILED_OFFERS_MAX) failed.shift();
 					}
-					hooks.onRefused?.(error);
-					// The creator may have rolled over meanwhile; ask for its latest after the backoff.
-					if (!closed) setTimeout(() => request(), Math.max(REQUEST_MIN_INTERVAL_MS, entry.retryAt - Date.now()));
+					// A successor the creator no longer serves: ask for its latest now. Otherwise the creator
+					// may have rolled over meanwhile; ask for its latest after the backoff.
+					const stale = message(error).includes("refused: stale");
+					if (!closed)
+						setTimeout(
+							() => request(),
+							stale ? REQUEST_MIN_INTERVAL_MS : Math.max(REQUEST_MIN_INTERVAL_MS, entry.retryAt - Date.now())
+						);
 				}
 			}
 		})().finally(() => {
@@ -579,6 +635,8 @@ export function createV3RoomSuccessorDelivery(
 			await Promise.all(targets.map((peerId) => send(peerId, bytes)));
 		},
 		request,
+		creatorReachable: (): boolean =>
+			role === "creator" || (!closed && creatorPeer !== undefined && channel.peers().includes(creatorPeer)),
 		idle: async (): Promise<void> => {
 			while (installing !== undefined) await installing;
 		},

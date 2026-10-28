@@ -795,6 +795,7 @@ async function joinRoom(input: RoomJoinInput): Promise<ActiveChat> {
 					hooks: {
 						publishSuccessor: (offer, epoch): Promise<void> => delivery.publish(offer, epoch),
 						requestSuccessor: () => delivery.request(),
+						creatorReachable: () => delivery.creatorReachable(),
 						onError: (error) => console.warn("v3 chat rollover failed; it is retried", error),
 					},
 				});

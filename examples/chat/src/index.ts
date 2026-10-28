@@ -433,6 +433,7 @@ async function openSession(
 				hooks: {
 					publishSuccessor: publishSuccessor ?? ((offer, epoch): Promise<void> => successors.publish(offer, epoch)),
 					requestSuccessor: () => successors.request(),
+					creatorReachable: () => successors.creatorReachable(),
 					clearedByRollover: shippingChatRefusalClearedByRollover,
 					onError: (error) => console.warn("Chat rollover failed; it is retried", error),
 				},

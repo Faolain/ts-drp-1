@@ -1,7 +1,7 @@
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 
 import { durablePreimageHeader } from "./preimage-header.js";
-import { MAXIMUM_DURABLE_ISSUANCE_SCOPE_UTF16_UNITS, SETTLEMENT_REPLACEMENT_MAX_INTENTS, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS } from "./types.js";
+import { MAXIMUM_DURABLE_ISSUANCE_SCOPE_UTF16_UNITS, SETTLEMENT_HAND_BACK_LIMITS, SETTLEMENT_REPLACEMENT_MAX_INTENTS, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS } from "./types.js";
 import type {
 	DurableIssuanceError,
 	DurableIssuanceErrorCode,
@@ -10,6 +10,7 @@ import type {
 	DurableIssuedRecord,
 	DurableIssueScope,
 	DurableSignedEnvelope,
+	SettlementHandBack,
 	SettlementInheritance,
 	SettlementPlan,
 	SettlementPlanEntry,
@@ -325,6 +326,12 @@ export function cloneDurableIssueCommit(commit: DurableIssueCommit): DurableIssu
 					planEffect:
 						commit.planEffect.kind === "fence"
 							? { kind: "fence" as const }
+							: commit.planEffect.kind === "hand-back"
+								? {
+										intent: commit.planEffect.intent,
+										kind: "hand-back" as const,
+										sourceSequence: commit.planEffect.sourceSequence,
+									}
 							: "fromIntent" in commit.planEffect
 								? {
 										fromIntent: commit.planEffect.fromIntent,
@@ -344,6 +351,14 @@ export function cloneDurableIssueCommit(commit: DurableIssueCommit): DurableIssu
  * @returns The detached effect, or undefined when invalid.
  */
 export function copySettlementPlanEffect(value: unknown): SettlementPlanEffect | undefined {
+	if (isClosedDurableIssuanceRecord(value, ["intent", "kind", "sourceSequence"])) {
+		return value.kind === "hand-back" &&
+			isValidDurableAuthorSequence(value.sourceSequence) &&
+			isValidDurableAuthorSequence(value.intent) &&
+			value.intent < SETTLEMENT_HAND_BACK_LIMITS.maxRecords
+			? { intent: value.intent, kind: "hand-back", sourceSequence: value.sourceSequence }
+			: undefined;
+	}
 	if (!isClosedDurableIssuanceRecord(value, ["kind"])) {
 		if (isClosedDurableIssuanceRecord(value, ["kind", "sourceSequence"])) {
 			return value.kind === "replacement" && isValidDurableAuthorSequence(value.sourceSequence)
@@ -471,6 +486,7 @@ function copySettlementInheritance(value: unknown): SettlementInheritance | unde
 function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefined {
 	const hasSourceContext = typeof value === "object" && value !== null && Object.hasOwn(value, "sourceContextDigest");
 	const hasSourceResolution = typeof value === "object" && value !== null && Object.hasOwn(value, "sourceResolutionDigest");
+	const hasResolutionKind = typeof value === "object" && value !== null && Object.hasOwn(value, "sourceResolutionKind");
 	const hasSourceObjectId =
 		typeof value === "object" && value !== null && Object.prototype.hasOwnProperty.call(value, "sourceObjectId");
 	const hasTransformRefusal =
@@ -485,6 +501,7 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
 			...(hasSourceObjectId ? ["sourceObjectId"] : []),
 			...(hasSourceContext ? ["sourceContextDigest"] : []),
 			...(hasSourceResolution ? ["sourceResolutionDigest"] : []),
+			...(hasResolutionKind ? ["sourceResolutionKind"] : []),
 			...(hasTransformRefusal ? ["transformRefusal"] : []),
 			...(hasInheritance ? ["inheritance"] : []),
 			...(hasProgress ? ["replacementProgress"] : []),
@@ -538,6 +555,9 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
 		(hasSourceResolution && (sourceResolutionDigest?.byteLength !== 32 || !hasSourceContext ||
 			(value.disposition !== "committed" && value.disposition !== "expire"))) ||
 		(value.disposition === "expire" && hasSourceResolution && (value.replacementSequence !== null || hasInheritance)) ||
+		// A frontier resolution is a signed expiry decided on the creator's signed frontier.
+		(hasResolutionKind && (value.sourceResolutionKind !== "frontier" || !hasSourceResolution || value.disposition !== "expire" ||
+			hasProgress || hasTransformRefusal)) ||
 		(value.disposition === "committed" && (!hasSourceResolution || value.replacementSequence !== null || hasProgress || hasInheritance)) ||
 		(hasSourceObjectId && (!isValidDurableScopeField(value.sourceObjectId) || value.disposition === "inherited")) ||
 		(hasTransformRefusal && (transformRefusal === undefined || value.disposition !== "transform")) ||
@@ -559,6 +579,7 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
 		disposition: value.disposition,
 		...(sourceContextDigest === undefined ? {} : { sourceContextDigest }),
 		...(sourceResolutionDigest === undefined ? {} : { sourceResolutionDigest }),
+		...(hasResolutionKind ? { sourceResolutionKind: "frontier" as const } : {}),
 		...(hasSourceObjectId ? { sourceObjectId: value.sourceObjectId as string } : {}),
 		...(transformRefusal === undefined ? {} : { transformRefusal }),
 		...(inheritance === undefined ? {} : { inheritance }),
@@ -575,10 +596,103 @@ function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefine
  * @param scope - Validated scope the plan must match.
  * @returns The detached plan, or undefined when invalid.
  */
+function copySettlementHandBack(value: unknown): SettlementHandBack | undefined {
+	if (
+		!isClosedDurableIssuanceRecord(value, [
+			"exactCanonicalOperationBytes",
+			"intent",
+			"reissueSequence",
+			"sourceDigest",
+			"sourceEpoch",
+			"sourceSequence",
+		]) ||
+		!isValidDurableAuthorSequence(value.sourceSequence) ||
+		!isValidDurableAuthorSequence(value.sourceEpoch) ||
+		!isValidDurableAuthorSequence(value.intent) ||
+		value.intent >= SETTLEMENT_HAND_BACK_LIMITS.maxRecords ||
+		(value.reissueSequence !== null &&
+			(!isValidDurableAuthorSequence(value.reissueSequence) || value.reissueSequence <= value.sourceSequence))
+	)
+		return undefined;
+	const sourceDigest = copyDurableIssuanceBytes(value.sourceDigest);
+	const operation = copyDurableIssuanceBytes(value.exactCanonicalOperationBytes);
+	if (
+		sourceDigest?.byteLength !== 32 ||
+		operation === undefined ||
+		operation.byteLength === 0 ||
+		operation.byteLength > SETTLEMENT_HAND_BACK_LIMITS.maxOperationBytes
+	)
+		return undefined;
+	return {
+		exactCanonicalOperationBytes: operation,
+		intent: value.intent,
+		reissueSequence: value.reissueSequence,
+		sourceDigest,
+		sourceEpoch: value.sourceEpoch,
+		sourceSequence: value.sourceSequence,
+	};
+}
+
+/**
+ * Validates a plan's hand-back records: present only when non-empty, ordered by (source, intent)
+ * without duplicates, and within SETTLEMENT_HAND_BACK_LIMITS.
+ * @param value - Untrusted records.
+ * @returns The detached records, or undefined when invalid.
+ */
+function copySettlementHandBacks(value: unknown): SettlementHandBack[] | undefined {
+	if (!Array.isArray(value) || value.length === 0 || value.length > SETTLEMENT_HAND_BACK_LIMITS.maxRecords) return undefined;
+	const records: SettlementHandBack[] = [];
+	let bytes = 0;
+	for (const raw of value) {
+		const record = copySettlementHandBack(raw);
+		const prior = records.at(-1);
+		if (
+			record === undefined ||
+			(prior !== undefined &&
+				(record.sourceSequence < prior.sourceSequence ||
+					(record.sourceSequence === prior.sourceSequence && record.intent <= prior.intent))) ||
+			(bytes += record.exactCanonicalOperationBytes.byteLength) > SETTLEMENT_HAND_BACK_LIMITS.maxOperationBytes
+		)
+			return undefined;
+		records.push(record);
+	}
+	return records;
+}
+
+/**
+ * The plan's hand-back records with `added` merged in (ordered), or undefined when that would exceed
+ * SETTLEMENT_HAND_BACK_LIMITS or name an existing record: the caller then records none of them.
+ * @param current - The plan's records (absent when none).
+ * @param added - New unconsumed records for one resolved source.
+ * @returns The merged records, or undefined.
+ */
+export function settlementHandBacksWith(
+	current: readonly SettlementHandBack[] | undefined,
+	added: readonly SettlementHandBack[]
+): readonly SettlementHandBack[] | undefined {
+	const merged = [...(current ?? []), ...added].sort((left, right) =>
+		left.sourceSequence === right.sourceSequence ? left.intent - right.intent : left.sourceSequence - right.sourceSequence
+	);
+	return copySettlementHandBacks(merged);
+}
+
+function settlementHandBacksEqual(left: SettlementHandBack, right: SettlementHandBack): boolean {
+	return (
+		left.sourceSequence === right.sourceSequence &&
+		left.sourceEpoch === right.sourceEpoch &&
+		left.intent === right.intent &&
+		left.reissueSequence === right.reissueSequence &&
+		durableIssuanceBytesEqual(left.sourceDigest, right.sourceDigest) &&
+		durableIssuanceBytesEqual(left.exactCanonicalOperationBytes, right.exactCanonicalOperationBytes)
+	);
+}
+
 export function copySettlementPlan(value: unknown, scope: DurableIssueScope): SettlementPlan | undefined {
 	const hasContexts = typeof value === "object" && value !== null && Object.hasOwn(value, "sourceContexts");
+	const hasHandBacks = typeof value === "object" && value !== null && Object.hasOwn(value, "handBacks");
 	if (
-		!isClosedDurableIssuanceRecord(value, ["entries", "fenceSequence", "revision", "scope", ...(hasContexts ? ["sourceContexts"] : [])]) ||
+		!isClosedDurableIssuanceRecord(value, ["entries", "fenceSequence", "revision", "scope",
+			...(hasContexts ? ["sourceContexts"] : []), ...(hasHandBacks ? ["handBacks"] : [])]) ||
 		!Array.isArray(value.entries) ||
 		!isValidDurableAuthorSequence(value.revision) ||
 		(value.fenceSequence !== null && !isValidDurableAuthorSequence(value.fenceSequence))
@@ -591,6 +705,8 @@ export function copySettlementPlan(value: unknown, scope: DurableIssueScope): Se
 		return undefined;
 	}
 	if (!durableIssueScopesEqual(value.scope, scope)) return undefined;
+	const handBacks = hasHandBacks ? copySettlementHandBacks(value.handBacks) : undefined;
+	if (hasHandBacks && handBacks === undefined) return undefined;
 	const entries: SettlementPlanEntry[] = [];
 	let prior = -1;
 	for (const rawEntry of value.entries) {
@@ -631,6 +747,7 @@ export function copySettlementPlan(value: unknown, scope: DurableIssueScope): Se
 		entries,
 		...(hasContexts ? { sourceContexts } : {}),
 		fenceSequence: value.fenceSequence,
+		...(handBacks === undefined ? {} : { handBacks }),
 		revision: value.revision,
 		scope: copyDurableIssueScope(scope),
 	};
@@ -655,6 +772,7 @@ export function cloneSettlementPlan(plan: SettlementPlan): SettlementPlan {
 			disposition: entry.disposition,
 			...(entry.sourceContextDigest === undefined ? {} : {sourceContextDigest: new Uint8Array(entry.sourceContextDigest)}),
 			...(entry.sourceResolutionDigest === undefined ? {} : {sourceResolutionDigest: new Uint8Array(entry.sourceResolutionDigest)}),
+			...(entry.sourceResolutionKind === undefined ? {} : {sourceResolutionKind: entry.sourceResolutionKind}),
 			...(entry.sourceObjectId === undefined ? {} : { sourceObjectId: entry.sourceObjectId }),
 			...(entry.transformRefusal === undefined
 				? {}
@@ -690,6 +808,18 @@ export function cloneSettlementPlan(plan: SettlementPlan): SettlementPlan {
 			digest: new Uint8Array(context.digest), exactCanonicalContextBytes: new Uint8Array(context.exactCanonicalContextBytes),
 		}))}),
 		fenceSequence: plan.fenceSequence,
+		...(plan.handBacks === undefined
+			? {}
+			: {
+					handBacks: plan.handBacks.map((record) => ({
+						exactCanonicalOperationBytes: new Uint8Array(record.exactCanonicalOperationBytes),
+						intent: record.intent,
+						reissueSequence: record.reissueSequence,
+						sourceDigest: new Uint8Array(record.sourceDigest),
+						sourceEpoch: record.sourceEpoch,
+						sourceSequence: record.sourceSequence,
+					})),
+				}),
 		revision: plan.revision,
 		scope: copyDurableIssueScope(plan.scope),
 	};
@@ -701,6 +831,22 @@ export function cloneSettlementPlan(plan: SettlementPlan): SettlementPlan {
  * @param next - Proposed next plan revision.
  */
 export function assertSettlementPlanProgressTransition(current: SettlementPlan | null, next: SettlementPlan): void {
+	// Hand-back records: a plan write adds records only unconsumed, never alters one, and drops only
+	// consumed ones; consumption belongs to the reissued row's own issuance transaction.
+	for (const record of next.handBacks ?? []) {
+		const prior = current?.handBacks?.find(
+			(value) => value.sourceSequence === record.sourceSequence && value.intent === record.intent
+		);
+		if (prior === undefined ? record.reissueSequence !== null : !settlementHandBacksEqual(prior, record))
+			throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement hand-back changed");
+	}
+	for (const prior of current?.handBacks ?? []) {
+		if (
+			prior.reissueSequence === null &&
+			!next.handBacks?.some((value) => value.sourceSequence === prior.sourceSequence && value.intent === prior.intent)
+		)
+			throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement hand-back changed");
+	}
 	if (current === null) return;
 	for (const prior of current.entries) {
 		const candidate = next.entries.find((entry) => entry.sourceSequence === prior.sourceSequence);
@@ -725,6 +871,10 @@ export function assertSettlementPlanProgressTransition(current: SettlementPlan |
 			// an already-terminal (e.g. retained-fence) expiry never gains one later.
 			(prior.sourceResolutionDigest === undefined && candidate.sourceResolutionDigest !== undefined &&
 				candidate.disposition === prior.disposition) ||
+			// The resolution kind arrives with its resolution and never changes after.
+			(prior.sourceResolutionDigest !== undefined && candidate.sourceResolutionKind !== prior.sourceResolutionKind) ||
+			(prior.sourceResolutionDigest === undefined && candidate.sourceResolutionKind !== undefined &&
+				candidate.sourceResolutionDigest === undefined) ||
 			(prior.transformRefusal !== undefined &&
 				(candidate.transformRefusal === undefined ||
 					candidate.transformRefusal.reason !== prior.transformRefusal.reason ||
@@ -826,6 +976,23 @@ export function applySettlementPlanEffect(
 	if (plan.revision === Number.MAX_SAFE_INTEGER) {
 		throw createDurableIssuanceFailure("ISSUANCE_RECOVERY_CORRUPT", "settlement plan revision is exhausted");
 	}
+	if (effect.kind === "hand-back") {
+		const index = plan.handBacks?.findIndex(
+			(record) => record.sourceSequence === effect.sourceSequence && record.intent === effect.intent
+		) ?? -1;
+		const record = plan.handBacks?.[index];
+		if (record === undefined || record.reissueSequence !== null || authorSequence <= record.sourceSequence) {
+			throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement hand-back precondition changed");
+		}
+		const detached = cloneSettlementPlan(plan);
+		return {
+			...detached,
+			handBacks: detached.handBacks!.map((value, valueIndex) =>
+				valueIndex === index ? { ...value, reissueSequence: authorSequence } : value
+			),
+			revision: plan.revision + 1,
+		};
+	}
 	if (effect.kind === "fence") {
 		if (plan.fenceSequence !== null || plan.entries.some((entry) => entry.disposition === "manual-review" && entry.sourceContextDigest === undefined)) {
 			throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement fence precondition changed");
@@ -910,6 +1077,15 @@ export function settlementPlanHasExactEffectLink(
 	authorSequence: number
 ): boolean {
 	if (effect.kind === "fence") return plan?.fenceSequence === authorSequence;
+	if (effect.kind === "hand-back")
+		return (
+			plan?.handBacks?.some(
+				(record) =>
+					record.sourceSequence === effect.sourceSequence &&
+					record.intent === effect.intent &&
+					record.reissueSequence === authorSequence
+			) === true
+		);
 	const entry = plan?.entries.find((candidate) => candidate.sourceSequence === effect.sourceSequence);
 	if (!("fromIntent" in effect)) return entry?.replacementSequence === authorSequence;
 	const progress = entry?.replacementProgress;
