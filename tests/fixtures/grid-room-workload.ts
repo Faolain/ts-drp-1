@@ -630,6 +630,16 @@ async function floorOwner(databaseName: string, scope: { objectId: string; pinne
 		authority,
 		read,
 		receive: async (published: V3RoomHeadState) => {
+			// A fresh device's floor is still empty: create it at genesis, then follow.
+			const current = await authority.read({ scope });
+			if (!current.ok) throw new TypeError("F5B_NATIVE_FLOOR_READ_CONFLICT");
+			if (current.state === null || current.state === undefined) {
+				const created = await authority.create({
+					scope,
+					stable: { objectId: scope.objectId, epoch: 0, currentAnchorDigest: scope.pinnedGenesisAnchorDigest },
+				});
+				if (!created.ok) throw new TypeError("F5B_NATIVE_FLOOR_CREATE_CONFLICT");
+			}
 			let state = await read();
 			const same = (left: unknown, right: unknown) => hex(encodeCanonical(left)) === hex(encodeCanonical(right));
 			if (same(state, published)) return;

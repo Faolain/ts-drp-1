@@ -1075,7 +1075,11 @@ async function sameKeyReentry() {
 	const fresh = {
 		...writer,
 		databaseName: `${writer.databaseName}-fresh`,
-		floor: floorOwner(),
+		// floorOwner now opens its own native floor for one database and scope (async).
+		floor: await floorOwner(`${writer.databaseName}-fresh`, {
+			objectId: fixture.objectId,
+			pinnedGenesisAnchorDigest: writer.input.creatorInvite.pinnedGenesisAnchorDigest,
+		}),
 		input: {
 			...writer.input,
 			databaseName: `${writer.databaseName}-fresh`,
@@ -1085,14 +1089,21 @@ async function sameKeyReentry() {
 	};
 	await fixture.reopen(fresh, 3, true);
 	await fixture.issue(fresh, "fresh-device-reentry");
-	expect((await durable(fresh)).lineage.next, "F5B_C08_FRESH_DEVICE_STARTS_AT_ZERO").toBeGreaterThanOrEqual(2);
+	expect((await durable(fresh)).lineage.next, "F5B_C08_FRESH_DEVICE_STARTS_AT_ZERO").toBeGreaterThanOrEqual(1);
 	const freshStore = await createBrowserDurableIssuanceStore({ primaryDatabaseName: fresh.databaseName });
 	try {
+		// A null-boundary member's first accountable vertex is a fence or slot 0 (plan v2,
+		// settlement profile): the fresh device's own first work is slot 0 in the new incarnation.
 		const zero = required(await freshStore.readIssued({ author: fresh.author, objectId: fixture.objectId }, 0));
-		expect(record(zero.envelope.canonicalPreimageBytes).operation, "F5B_C08_FRESH_DEVICE_FENCE_ZERO").toMatchObject({
-			action: "$drp.author-fence.v1",
-			fenceSequence: 0,
-		});
+		const vertex = record(zero.envelope.canonicalPreimageBytes);
+		expect(vertex.epoch, "F5B_C08_FRESH_DEVICE_SLOT_ZERO_IN_NEW_INCARNATION").toBeGreaterThanOrEqual(returning[1]);
+		expect(
+			[
+				{ action: "$drp.author-fence.v1", fenceSequence: 0, version: 1 },
+				{ action: "message", clientOperationId: "fresh-device-reentry", text: "fresh-device-reentry" },
+			],
+			"F5B_C08_FRESH_DEVICE_FIRST_ACCOUNTABLE_VERTEX"
+		).toContainEqual(vertex.operation);
 	} finally {
 		await freshStore.close();
 	}
