@@ -242,20 +242,36 @@ const offerThenAutoRetry = async (
 		expect(offered.closePending).toBe(true);
 	}
 	// A member's append, offered to the creator while (or right after) the close retries.
-	await member.room.issue(message("member-offered"));
-	const memberRows = await f.issuedAfter(1, delivered);
-	expect(memberRows).toHaveLength(1);
-	const receivedBeforeInstall = await creator.receive(memberRows, 1, 5_000);
-	expect(receivedBeforeInstall, "the creator admitted a member append signed in the interrupted epoch").toBe(false);
+	// Sync before sending: the reopened member confirmed the creator's statement when it opened.
+	// If the creator's own retry had already adopted the next epoch by then, the statement names
+	// another epoch, so the member is not current and its append is held until its install: it
+	// signs nothing in the interrupted epoch. Otherwise it signs there and the creator refuses it.
+	const heldUntilInstall = member.room.localIssueCurrency?.() === "not-yet-current";
+	const memberAppend = member.room.issue(message("member-offered"));
+	memberAppend.catch(() => undefined); // awaited below; a refusal fails the test there
+	let memberRows: Awaited<ReturnType<Fixture["issuedAfter"]>> = [];
+	let receivedBeforeInstall = false;
+	if (heldUntilInstall)
+		expect(await f.issuedAfter(1, delivered), "a member that is not current signs nothing").toEqual([]);
+	else {
+		await memberAppend;
+		memberRows = await f.issuedAfter(1, delivered);
+		expect(memberRows).toHaveLength(1);
+		receivedBeforeInstall = await creator.receive(memberRows, 1, 5_000);
+		expect(receivedBeforeInstall, "the creator admitted a member append signed in the interrupted epoch").toBe(false);
+	}
 	if (!offered.accepted) expect(texts(creator)).not.toContain("creator-offered");
 	expect(texts(creator)).not.toContain("member-offered");
 	// No harness sealEpoch: the session's own retry completes the close.
 	const retryMs = await awaitAutoRetry(creator, epochBefore);
 	expect(closeScopes(directory, epochBefore)).toEqual(scopesBefore);
-	// The member's install of the retry's successor carries its row forward as a new row.
+	// The member's install of the retry's successor carries a signed row forward as a new row, or
+	// makes the member current and so signs its held append in the new epoch.
 	await f.install(member);
+	await memberAppend;
 	const carried = await f.issuedAfter(1, delivered);
-	expect(digestOf(required(carried.at(-1)))).not.toBe(digestOf(required(memberRows[0])));
+	expect(carried.length).toBeGreaterThan(0);
+	if (!heldUntilInstall) expect(digestOf(required(carried.at(-1)))).not.toBe(digestOf(required(memberRows[0])));
 	if (!offered.accepted) await creator.room.issue(message("creator-offered"));
 	const nextDelivered = await deliver(f, creator, delivered);
 	expect(count(creator, "creator-offered")).toBe(1);
@@ -266,10 +282,11 @@ const offerThenAutoRetry = async (
 			creatorOffer: offered,
 			receivedBeforeInstall,
 			retryMs,
-			refusedRow: {
-				sequence: required(memberRows[0]).commit.authorSequence,
-				digest: digestOf(required(memberRows[0])),
-			},
+			heldUntilInstall,
+			refusedRow:
+				memberRows[0] === undefined
+					? null
+					: { sequence: memberRows[0].commit.authorSequence, digest: digestOf(memberRows[0]) },
 			carriedRows: carried.map((row) => ({ sequence: row.commit.authorSequence, digest: digestOf(row) })),
 			scopesBefore,
 		},

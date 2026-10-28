@@ -572,6 +572,8 @@ async function gridFixture(
 	let sourceAuthorizer: Parameters<NonNullable<V3RoomTransport["setSettlementSourceAuthorizer"]>>[0] | undefined;
 	const approvals: Readonly<Record<string, unknown>>[] = [];
 	const publicationRefusals = new Set<number>();
+	const creatorRooms = new Set<V3RoomSession>();
+	const lastCreatorStatements = new Map<string, NonNullable<ReturnType<NonNullable<V3RoomSession["currencyStatement"]>>>>();
 	const open = async (
 		kind: "create" | "reopen",
 		name = "source",
@@ -744,6 +746,17 @@ async function gridFixture(
 		const room = await createV3RoomSession(input);
 		openRooms.add(room);
 		await waitForV3RoomStartupForDiagnostics(room);
+		if (index === 0) creatorRooms.add(room);
+		else if (kind === "reopen") {
+			// Decision B (sync before sending): a reopened Writer signs nothing until it is current. This
+			// harness has no successor delivery, so it hands over the statement of the room's open
+			// creator (following a migration redirect), as the delivery does on bind.
+			const creatorRoom = [...creatorRooms].find(
+				(candidate) => openRooms.has(candidate) && candidate.objectId === selectedObjectId
+			);
+			const statement = creatorRoom?.currencyStatement?.() ?? lastCreatorStatements.get(selectedObjectId);
+			if (statement !== undefined) await room.confirmCurrent?.(statement);
+		}
 		const receiveSignedRows = async (
 			rows: readonly { commit: { envelope: { canonicalPreimageBytes: Uint8Array; signature: Uint8Array } } }[],
 			finalDigest: string,
@@ -878,6 +891,15 @@ async function gridFixture(
 		);
 	};
 	const stop = async (opened: Awaited<ReturnType<typeof open>>) => {
+		// The creator's last statement, for a Writer that reopens after the creator handed off.
+		if (creatorRooms.has(opened.room)) {
+			try {
+				const statement = opened.room.currencyStatement?.();
+				if (statement !== undefined) lastCreatorStatements.set(statement.objectId, statement);
+			} catch {
+				// A creator that cannot state its epoch (failed or closed) leaves none.
+			}
+		}
 		await opened.room.close();
 		openRooms.delete(opened.room);
 		await opened.floor.close();
@@ -3381,7 +3403,15 @@ it.each([false, true])(
 			await expect(recipient.room.issue(oldContext)).rejects.toThrow();
 			expect(required(fixture.application.migration).canonicalStateBytes(recipient.room.projection())).toEqual(state);
 			await fixture.stop(recipient);
+			// Decision B (sync before sending): the reopened recipient signs nothing until it confirms the
+			// target creator's statement, so the target's creator comes online (its rehearsed replica);
+			// the fixture hands its statement to the reopened Writer.
+			const name = migrationName(fixture.objectId, targetObjectId, nonce);
+			const targetCreator = await fixture.open("create", name, targetInvite, targetObjectId, {
+				issuanceName: `${name}--issuance`,
+			});
 			const reopened = await fixture.open("reopen", "remote-recipient", targetInvite, targetObjectId, { index: 1 });
+			expect(reopened.room.localIssueCurrency?.()).toBe("current");
 			expect(Reflect.get(reopened.room.projection(), "outcomes")).toEqual(
 				Reflect.get(source.room.projection(), "outcomes")
 			);
@@ -3389,6 +3419,7 @@ it.each([false, true])(
 			const continued = fixture.outcome(reopened.room, "remote-target-continued");
 			await reopened.room.issue(continued);
 			expect(Reflect.get(reopened.room.projection(), "outcomes")).toEqual(expect.arrayContaining([continued]));
+			await fixture.stop(targetCreator);
 		} finally {
 			await issuance.close();
 		}

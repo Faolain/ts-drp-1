@@ -378,17 +378,29 @@ describe("native recovery across ordinary and checkpoint histories", () => {
 				{objectId: scope.objectId, epoch: scope.epoch, anchor: scope.anchor})));
 			expect(receipts.filter(Boolean)).toHaveLength(phase === "source-custody" ? 0 : 1);
 		} finally {await snapshots.close();}
-		await f.stop(member); member = await f.open(1, {reopen: true, promote: true});
+		// Sync before sending (decision B): the reopened member is behind the creator's epoch, so it
+		// signs nothing until it installs. source-custody: its move is held and signed by the install.
+		// candidate-stage: it stays two epochs behind (no install follows), so its moves are refused.
+		const hold = {localIssueCurrencyHoldMs: 2_000};
+		await f.stop(member); member = await f.open(1, {reopen: true, promote: true, ...hold});
 		if (phase === "candidate-stage") expect(member.room.authority()?.epoch).toBe(2);
-		await member.room.issue(message("accepted-after-reopen"));
-		if (phase === "source-custody") await f.install(member);
+		expect(member.room.localIssueCurrency?.()).toBe("not-yet-current");
+		const afterReopen = member.room.issue(message("accepted-after-reopen"));
+		if (phase === "source-custody") {
+			await f.install(member);
+			await afterReopen;
+		} else await expect(afterReopen).rejects.toThrow(/V3_ROOM_NOT_YET_CURRENT/u);
 		expect(member.room.authority()?.epoch).toBe(2);
 		const unresolved = await member.room.unresolvedAcceptedWork();
+		// The held move was signed in the installed epoch (never in the stale one), so only the move
+		// from before the interrupted install is unresolved.
 		expect(unresolved.flatMap(row => row.operations).map(operation => Reflect.get(operation as object, "clientOperationId")))
-			.toEqual(phase === "source-custody" ? ["accepted-before-intent", "accepted-after-reopen"] : ["accepted-before-intent"]);
-		await f.stop(member); member = await f.open(1, {reopen: true, promote: true});
+			.toEqual(["accepted-before-intent"]);
+		await f.stop(member); member = await f.open(1, {reopen: true, promote: true, ...hold});
 		expect(member.room.authority()?.epoch).toBe(2);
 		expect(await member.room.unresolvedAcceptedWork()).toEqual(unresolved);
-		await member.room.issue(message("fresh-after-second-reopen"));
-	}, 120_000);
+		const fresh = member.room.issue(message("fresh-after-second-reopen"));
+		if (phase === "source-custody") await fresh;
+		else await expect(fresh).rejects.toThrow(/V3_ROOM_NOT_YET_CURRENT/u);
+	}, 180_000);
 });

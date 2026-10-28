@@ -4893,8 +4893,15 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	// creator's statement of the current epoch with this author's admitted frontier in it below its
 	// lineage. Moves made before that wait, in order, and are refused with V3RoomNotYetCurrent after
 	// the hold; none is signed. The creator (it defines the current epoch), a receive-only session
-	// and a lineage this open created (nothing it signed can exist elsewhere) start current.
-	let localIssueCurrent = input.creatorFinalitySigner !== undefined || input.receiveOnly === true || freshLocalLineage;
+	// and a lineage this open created (nothing it signed can exist elsewhere) start current. So does
+	// a migration rehearsal's scratch target (opened internally, with no room head and a transport
+	// that publishes nothing) when this author is that target's creator: it is the creator of a room
+	// no one else has joined yet, re-entered only to resume its own exact authenticated prefix.
+	let localIssueCurrent =
+		input.creatorFinalitySigner !== undefined ||
+		input.receiveOnly === true ||
+		freshLocalLineage ||
+		(skipRoomHeadAuthority && input.author === roomCreatorAuthor);
 	let localIssueRefusal: V3RoomNotYetCurrent | undefined;
 	const currentEpoch = (): number => successorProjectionAuthority?.epoch ?? 0;
 	const notYetCurrentHoldMs = input.localIssueCurrencyHoldMs ?? V3_ROOM_NOT_YET_CURRENT_HOLD_MS;
@@ -8430,6 +8437,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			return redirectedSession?.localIssueCurrency?.() ?? (localIssueCurrent ? "current" : "not-yet-current");
 		},
 		currencyStatement(): V3RoomCurrencyStatement {
+			if (redirectedSession?.currencyStatement !== undefined) return redirectedSession.currencyStatement();
 			if (input.creatorFinalitySigner === undefined) throw new TypeError("v3 room currency statement is the creator's");
 			const epoch = currentEpoch();
 			const frontiers = new Map<string, number>();
@@ -8446,6 +8454,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			});
 		},
 		async confirmCurrent(statement: V3RoomCurrencyStatement): Promise<V3RoomCurrencyResult> {
+			if (redirectedSession?.confirmCurrent !== undefined) return redirectedSession.confirmCurrent(statement);
 			if (localIssueCurrent) return "current";
 			if (localIssueRefusal !== undefined) return "behind-frontier";
 			const epoch = currentEpoch();
