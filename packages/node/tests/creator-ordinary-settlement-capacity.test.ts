@@ -8,6 +8,7 @@ import {createCreatorClosedRollbackProofAccounting, createCreatorNoneResourcePro
 	creatorOrdinaryPreimageResourceGeometryForSizing, readCreatorOrdinaryPreimageCapacityForSizing,
 	captureCreatorOrdinaryFinishingWindowLimitsForSizing} from "../src/internal/creator-closed-rollback-data.js";
 import {creatorAuthenticatedEpochVertexFields} from "../src/internal/runtime-reclamation.js";
+import {CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE} from "../src/internal/creator-source-custody.js";
 import * as ts from "typescript";
 import {describe, expect, it} from "vitest";
 
@@ -22,7 +23,25 @@ function declaration(name: string): string {
 	if (found.length !== 1) throw new Error(`missing original numerical owner: ${name}:${found.length}`);
 	return found[0]!.getText(tree).replace(/^export /, "");
 }
-function execute<T>(names: readonly string[], result: string, bindings: Record<string, unknown>): T {
+// 974f78d0/3a28ab80: every finishing/sizing owner applies the retained-fence
+// reserve through these two original helpers and the custody constant. Extract
+// them (never a stub) whenever an extracted owner references them.
+const RESERVE_HELPERS = ["settlementAdoptionReserveFences", "settlementAdoptionReserveProtections"] as const;
+function withReserveHelpers(names: readonly string[], bindings: Record<string, unknown>) {
+	const code = names.map(declaration).join("\n");
+	const helpers = RESERVE_HELPERS.filter(name => !names.includes(name) && new RegExp(`\\b${name}\\(`).test(code));
+	const reserve = helpers.length === 0 || "CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE" in bindings ? {} : {CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE};
+	// 1515daab: sizing owners also take accepted source custody geometry from
+	// creatorSourceCustodyGeometryForSizing (authenticated anchor + latched ACL).
+	// As in the same commit's readiness-producer test, custody stays a controlled
+	// premise here (no custody alternative); its numerical reserve is owned by
+	// packages/issuance-store/tests/source-custody-capacity.test.ts.
+	const custody = /\bcreatorSourceCustodyGeometryForSizing\(/.test(code) && !("creatorSourceCustodyGeometryForSizing" in bindings) ?
+		{creatorSourceCustodyGeometryForSizing: () => undefined} : {};
+	return {names: [...names, ...helpers], bindings: {...bindings, ...reserve, ...custody}};
+}
+function execute<T>(requested: readonly string[], result: string, requestedBindings: Record<string, unknown>): T {
+	const {names, bindings} = withReserveHelpers(requested, requestedBindings);
 	const js = ts.transpileModule(names.map(declaration).join("\n"),
 		{compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None}}).outputText;
 	return new Function("bindings", `const {${Object.keys(bindings).join(",")}} = bindings;\n${js}\nreturn ${result};`)(bindings) as T;
@@ -185,7 +204,9 @@ describe("ordinary settlement finite capacity through existing owners (no proof 
 		};
 		for (const supplement of [0, 127, 128]) {
 			const expected = scalar(1000, supplement), changed = scalar(2000, supplement);
-			expect(expected.rawSourcePhysical).toBe(sum([120, 130, 140, 11, 150, 13, 13, 14, 15, 16, 17, 180, 19, supplement]));
+			// ea4eb158: each fresh RAW source also owns one complete ready snapshot
+			// inventory (futureInventory, 27); the journal wrapper stays outside.
+			expect(expected.rawSourcePhysical).toBe(sum([120, 130, 140, 11, 150, 13, 13, 27, 14, 15, 16, 17, 180, 19, supplement]));
 			expect(changed.closeEnvelope).toBe(expected.closeEnvelope);
 			expect(changed.currentEnvelope).toBe(expected.currentEnvelope);
 			expect(expected.envelopes[0]).toBe(expected.closeEnvelope); expect(changed.envelopes).toEqual(expected.envelopes);
@@ -519,11 +540,16 @@ describe("ordinary settlement finite capacity through existing owners (no proof 
 				check: async () => {events.push("fresh-check"); if (outcome === "revoked") frame.alive = false;
 					if (outcome === "native-failure") throw Error("original-native-delivery-failure");}};
 			const run = new Function("bindings", `const {${Object.keys(bindings).join(",")}} = bindings;\n${code}`)(bindings);
+			// The owner now stages its publication and returns it; the caller
+			// publishes only after its own complete delivery. Nothing is visible before.
+			let publish: unknown;
 			if (outcome === "native-failure") await expect(run()).rejects.toThrow("original-native-delivery-failure");
-			else await run();
+			else publish = await run();
+			expect(source.capacity).toEqual({}); expect(events).toEqual(["select", "fresh-check"]);
 			if (outcome === "revoked" || outcome === "native-failure") {
-				expect(source.capacity).toEqual({}); expect(events).toEqual(["select", "fresh-check"]);
+				expect(publish).toBeUndefined();
 			} else {
+				expect(typeof publish).toBe("function"); (publish as () => void)();
 				expect(events).toEqual(["select", "fresh-check", "commit"]);
 				expect(source.capacity.template).toBe(program); expect(source.capacity.application).toBe(application);
 				expect(source.capacity.readiness.sourceIdentity).toBe(identity); expect(source.capacity.readiness.geometry).toBe(geometry);
@@ -571,7 +597,10 @@ describe("ordinary settlement finite capacity through existing owners (no proof 
 				{scope: planOnly, revision: 0, fenceSequence: null, entries: []}]};
 		facts.proofFacts.capture.nativeIssuance = {rows, control: null};
 		Object.assign(facts.current.runtime, {objectId: "room", epoch: 3, anchorDigest: "a".repeat(64), issuanceScope: scope});
-		Object.assign(facts.current, {nativeCounts: {currentJournalRows: 1}, candidate: {exactCanonicalEpochVertexBytes: Uint8Array.of(5)}});
+		// 1515daab: the native owner also reads the registered epoch-vertex domain
+		// for source custody sizing (a controlled premise here, see execute()).
+		Object.assign(facts.current, {nativeCounts: {currentJournalRows: 1}, candidate: {exactCanonicalEpochVertexBytes: Uint8Array.of(5)},
+			parameters: {maxEpochVertices: 8192}});
 		let request: any;
 		Object.assign(facts.proofFacts.runtime, {readCapacityLeafWidths: () => ({canonicalPreimageByteLength: 127, canonicalEpochVertexByteLength: 128}),
 			readCapacityWidths: (input: unknown) => {request = input; return {currentClose: 10, successorReserved: 20, successorEntered: 30, successorFinal: 40};}});
@@ -584,13 +613,14 @@ describe("ordinary settlement finite capacity through existing owners (no proof 
 		expect(result.preimage).toBe(512); expect(request.maxAdditionalCurrentJournalRows).toBe(1);
 		expect(request.canonicalEpochVertexByteLength).toBe(1);
 		expect(encodeCanonical(rows)).toEqual(before);
+		// 974f78d0/3a28ab80: local work also reserves the retained adoption fences.
 		const expected = issuanceOrdinaryFinishingCapacityWidths({rows, scope, control: null,
-			maxAdditionalCurrentIssued: 1, maxCanonicalPreimageByteLength: 512, successorFenceCount: 1});
+			maxAdditionalCurrentIssued: 1, maxCanonicalPreimageByteLength: 512, successorFenceCount: 1, adoptionReserveFenceCount: 2});
 		expect(result.issuance).toEqual(expected); // Old foreign PRE, debt and plans remain exact, not a future-row maximum.
 		facts.current.runtime.kind = "received-append";
 		const received = native(facts, f.bytes, []);
 		expect(received.issuance).toEqual(issuanceOrdinaryFinishingCapacityWidths({rows, scope, control: null,
-			maxAdditionalCurrentIssued: 0, maxCanonicalPreimageByteLength: 512, successorFenceCount: 1}));
+			maxAdditionalCurrentIssued: 0, maxCanonicalPreimageByteLength: 512, successorFenceCount: 1, adoptionReserveFenceCount: 0}));
 		expect(received.issuance.ordinaryFinal.rowCount).toBe(result.issuance.ordinaryFinal.rowCount - 2);
 		expect(received.issuance.ordinaryFinal.canonicalRowsBytes).toBeLessThan(result.issuance.ordinaryFinal.canonicalRowsBytes);
 		expect(received.issuance.successorFinal.rowCount).toBe(received.issuance.ordinaryFinal.rowCount + 2);
@@ -616,7 +646,7 @@ describe("ordinary settlement finite capacity through existing owners (no proof 
 		expect(request.canonicalPreimageByteLength).toBe(32_768);
 		expect(request.successorFencePreimageByteLength).toBe(32_768);
 		expect(wide.issuance).toEqual(issuanceOrdinaryFinishingCapacityWidths({rows: largerRows, scope, control: null,
-			maxAdditionalCurrentIssued: 1, maxCanonicalPreimageByteLength: 32_768, successorFenceCount: 1}));
+			maxAdditionalCurrentIssued: 1, maxCanonicalPreimageByteLength: 32_768, successorFenceCount: 1, adoptionReserveFenceCount: 2}));
 		expect(wide.issuance.ordinaryFinal.canonicalRowsBytes).toBeGreaterThan(larger.issuance.ordinaryFinal.canonicalRowsBytes);
 	});
 	it("replays the captured E3 refusal and fixes only the impossible NEW protected-prefix plan", () => {
