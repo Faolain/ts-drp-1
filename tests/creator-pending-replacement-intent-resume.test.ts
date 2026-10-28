@@ -291,6 +291,55 @@ describe("C03 layer 2: a Writer crashed between signing and committing a replace
 		await expectResumed(setup, "next-epoch");
 	});
 
+	// C03 layer 3, the custody side: the dead drain's unpublished fence is kept (never dropped),
+	// the new epoch's own fence supersedes it, and the Writer keeps working across the next close.
+	it("keeps the dead drain's unpublished fence as custody, superseded by the new epoch's fence, across the next close", async () => {
+		const setup = await crashBetweenSignAndCommit();
+		const { fixture, creator, writer } = setup;
+		const isFence = (row: DurableIssueCommit) =>
+			record(row.envelope.canonicalPreimageBytes).operation !== undefined &&
+			(record(row.envelope.canonicalPreimageBytes).operation as Record<string, unknown>).action ===
+				"$drp.author-fence.v1";
+		const deadFence = required(
+			ownCommits(writer).findLast((row) => isFence(row) && record(row.envelope.canonicalPreimageBytes).epoch === 1)
+		);
+		const crashed = await durable(writer);
+		expect(
+			crashed.rows.find((row) => row.commit.authorSequence === deadFence.authorSequence)?.publishState,
+			"LAYER3_FENCE_COMMITTED_UNPUBLISHED"
+		).toBe("pending");
+		await fixture.issue(creator, "creator-during-writer-crash");
+		await fixture.close();
+		fixture.checkpoint();
+		await creator.room.adoptCreatorSuccessor();
+		await fixture.reopen(writer, 1, true);
+		await fixture.issue(writer, "next-epoch-after-resume");
+		const after = await durable(writer);
+		expect(
+			after.rows.find((row) => row.commit.authorSequence === deadFence.authorSequence)?.commit.envelope.digest,
+			"LAYER3_FENCE_CUSTODY_KEPT"
+		).toEqual(deadFence.envelope.digest);
+		const superseding = ownCommits(writer).filter(
+			(row) => isFence(row) && record(row.envelope.canonicalPreimageBytes).epoch === 2
+		);
+		expect(superseding, "LAYER3_NEW_EPOCH_FENCE").toHaveLength(1);
+		expect(required(superseding[0]).authorSequence, "LAYER3_NEW_FENCE_SUPERSEDES").toBeGreaterThan(
+			deadFence.authorSequence
+		);
+		await fixture.issue(creator, "creator-epoch-2");
+		await fixture.close();
+		fixture.checkpoint();
+		await creator.room.adoptCreatorSuccessor();
+		await fixture.reopen(writer, 2, true);
+		await fixture.issue(writer, "epoch-3-after-layer-3");
+		const same = () => Buffer.from(productState(writer)).equals(Buffer.from(productState(creator)));
+		for (let attempt = 0; attempt < 200 && !same(); attempt += 1) await sleep(50);
+		expect(Buffer.from(productState(writer)).toString("hex"), "LAYER3_STATES_CONVERGE_NEXT_CLOSE").toBe(
+			Buffer.from(productState(creator)).toString("hex")
+		);
+		await Promise.all(fixture.peers.map(fixture.stop));
+	});
+
 	// Sync before sending, the honest device: reopened before it has the creator's statement, its
 	// startup drain leaves the intent pending and signs nothing; the statement makes it current
 	// and that drain then runs, resuming the intent before any held move.
