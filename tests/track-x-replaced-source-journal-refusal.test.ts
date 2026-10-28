@@ -29,11 +29,16 @@ it("collects a terminally covered settled source even while its replacements mis
 	const creator = required(room.peers[0]);
 	const history: string[] = [];
 	const MISSED = 1;
+	// A settlement recipient keeps three native heads (current, first rollback and the oldest
+	// rollback point, 1515daab), so the journal protects the three epochs before each install
+	// regardless of any source. The chain must outlast that window, or the check below would see
+	// the window, not the source's own retention.
+	const HELD_WINDOW = 3;
 	// The replacements issued by the installs after these seals miss the next Cut.
-	const CHAIN = new Set([MISSED, MISSED + 1, MISSED + 2]);
+	const CHAIN = new Set(Array.from({ length: HELD_WINDOW + 1 }, (_, offset) => MISSED + offset));
 	// The last link, issued by the install after the last chain seal, is in cut(LAST); this Writer
 	// knows that Cut from its install after seal LAST.
-	const LAST = MISSED + 4;
+	const LAST = MISSED + CHAIN.size + 1;
 	// Through the install of epoch LAST (the evidence run for the window sets more: its install of
 	// epoch 8 refuses, "settlement plan references retired or absent issued work").
 	const EPOCHS = Number(process.env.TRACK_X_R5_REFUSAL_A_EPOCHS ?? LAST);
@@ -55,7 +60,7 @@ it("collects a terminally covered settled source even while its replacements mis
 		const kept = await protectedEpochs(room, 1);
 		history.push(`epoch ${epoch + 1}: ${installed}; protected [${kept.join(",")}]`);
 		expect(installed, history.join("\n")).toBe("ok");
-		if (epoch >= MISSED + 3 && epoch < LAST) {
+		if (epoch >= MISSED + CHAIN.size && epoch < LAST) {
 			// Its signed terminal coverage and local completion are enough once replay ends.
 			// The replacement's own future acceptance is a separate row's lifecycle.
 			expect(kept, history.join("\n")).not.toContain(MISSED);

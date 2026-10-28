@@ -55,6 +55,19 @@ import { createSqliteAheDurableStore } from "../src/index.js";
 import { createNodeDurableLiveJournalStore } from "../src/live-journal.js";
 import type { LiveJournalRetirementImageReader } from "@ts-drp/live-journal";
 
+
+/**
+ * The canonical native scope row as the journal captures it: an absent closed membership
+ * (NULL closed_membership_bytes, ea4eb158/9b41a0e4) is omitted, so a scope without one has
+ * the same exact bytes it had before the column existed.
+ * @param row - A raw `SELECT *` scopes row.
+ * @returns The row the retirement image encodes.
+ */
+function canonicalScopeRow<T extends Record<string, unknown>>(row: T): T {
+	const copy = { ...row };
+	if (copy.closed_membership_bytes === null) delete copy.closed_membership_bytes;
+	return copy;
+}
 test("journal invocation capture preserves original SQL image, frames, NULLs and detached lifetimes", () => {
 	const capture = createJournalRetirementImageCapture(), source = Uint8Array.of(7, 9),
 		scope = {object_id: "room", epoch: 2, anchor_digest: "a", next_journal_sequence: 1,
@@ -1002,11 +1015,12 @@ test("journal native source image distinguishes byte ceilings from malformed row
 		expect(await store.installGenesis(material.install)).toMatchObject({ ok: true });
 		const original = raw.prepare("SELECT * FROM scopes").get();
 		if (original === undefined) throw new Error("missing original native scope");
-		const empty = { ...original, exact_parameters_carrier: new Uint8Array() };
+		const empty = { ...canonicalScopeRow(original), exact_parameters_carrier: new Uint8Array() };
 		const ceiling = LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes;
-		expect(ceiling).toBe(786_432);
+		// ea4eb158: the native journal image ceiling is LOCAL_WORKLOAD_CAPACITY.journalImageBytes.
+		expect(ceiling).toBe(2_097_152);
 		const bytes = new Uint8Array(ceiling - encodeCanonical(empty).length - 8);
-		const candidate = { ...original, exact_parameters_carrier: bytes };
+		const candidate = { ...canonicalScopeRow(original), exact_parameters_carrier: bytes };
 		const key = [original.object_id, original.epoch, original.anchor_digest];
 		expect(encodeCanonical(candidate).length).toBeLessThanOrEqual(ceiling);
 		expect(encodeCanonical(["scopes", key, candidate]).length).toBeGreaterThan(ceiling);
@@ -1036,7 +1050,7 @@ test("journal native source image distinguishes byte ceilings from malformed row
 		raw.prepare("UPDATE scopes SET next_journal_sequence=?").run(original.next_journal_sequence);
 		const restored = must(await store.readRetirementImage({ objectId: material.scope.objectId }));
 		expect(restored.control).toBeNull();
-		expect(restored.canonicalRows).toEqual([encodeCanonical(["scopes", key, { ...original }])]);
+		expect(restored.canonicalRows).toEqual([encodeCanonical(["scopes", key, canonicalScopeRow(original)])]);
 		expect(raw.prepare("SELECT count(*) AS n FROM retirement_controls").get()?.n).toBe(0);
 	} finally {
 		raw.close();
@@ -1249,7 +1263,9 @@ test("journal retirement exposes exact bounded native rows with joined one-use c
 		const scopes = raw.prepare("SELECT * FROM scopes ORDER BY epoch,anchor_digest").all();
 		const rows = raw.prepare("SELECT * FROM accepted_entries ORDER BY epoch,anchor_digest,journal_sequence").all();
 		const expected = [
-			...scopes.map((row) => encodeCanonical(["scopes", [row.object_id, row.epoch, row.anchor_digest], { ...row }])),
+			...scopes.map((row) =>
+				encodeCanonical(["scopes", [row.object_id, row.epoch, row.anchor_digest], canonicalScopeRow(row)])
+			),
 			...rows.map((row) =>
 				encodeCanonical([
 					"accepted_entries",
@@ -2827,7 +2843,9 @@ test("journal physical eight-header image is complete while role and resource bo
 			.map((row) => ({ ...row })),
 	});
 	try {
-		expect(LIVE_JOURNAL_RETIREMENT_LIMITS).toMatchObject({ maxScopes: 7, maxRows: 8192, maxImageBytes: 262_144 });
+		// ea4eb158: rows and image bytes are the local workload capacity (24576 rows, 2 MiB),
+		// distinct from the seven-scope AHE role bound.
+		expect(LIVE_JOURNAL_RETIREMENT_LIMITS).toMatchObject({ maxScopes: 7, maxRows: 24_576, maxImageBytes: 2_097_152 });
 		for (const [epoch, material] of materials.entries()) {
 			expect(
 				await (epoch === 0 ? store.installGenesis(material.install) : store.installEpochAnchor(material.install))
@@ -2844,7 +2862,9 @@ test("journal physical eight-header image is complete while role and resource bo
 		}
 		const before = native();
 		const expected = [
-			...before.scopes.map((row) => encodeCanonical(["scopes", [row.object_id, row.epoch, row.anchor_digest], row])),
+			...before.scopes.map((row) =>
+				encodeCanonical(["scopes", [row.object_id, row.epoch, row.anchor_digest], canonicalScopeRow(row)])
+			),
 			...before.rows.map((row) =>
 				encodeCanonical(["accepted_entries", [row.object_id, row.epoch, row.anchor_digest, row.journal_sequence], row])
 			),

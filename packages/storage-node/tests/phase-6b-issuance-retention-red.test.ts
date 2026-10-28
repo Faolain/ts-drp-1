@@ -14,6 +14,7 @@ import { DatabaseSync, type StatementSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { allowOutOfBandWrites } from "./fixtures/out-of-band-sqlite.js";
 import {
 	PHASE_2L_C_DDL,
 	PHASE_2L_C_V1_LINEAGES_DDL,
@@ -67,6 +68,12 @@ function scalar(database: DatabaseSync, sql: string): unknown {
 	const row = statement.get();
 	return row === undefined ? undefined : Object.values(row)[0];
 }
+
+// The v5 lineage (ea4eb158) adds the nullable pending_unsigned carrier to the D.109b lineage.
+const CURRENT_LINEAGES_DDL = PHASE_2L_C_DDL.lineages.replace(
+	"\n  PRIMARY KEY (object_id,author)",
+	"\n  pending_unsigned BLOB CHECK(pending_unsigned IS NULL OR (typeof(pending_unsigned) = 'blob' AND length(pending_unsigned) > 0)),\n  PRIMARY KEY (object_id,author)"
+);
 
 function catalog(database: DatabaseSync): readonly Record<string, unknown>[] {
 	const statement = database.prepare("SELECT type,name,tbl_name,sql FROM sqlite_schema ORDER BY type,name");
@@ -502,7 +509,8 @@ describe("D.109b Node issuance-retention RED", () => {
 		const seeded = issuance.createNodeDurableIssuanceStore({ primaryFilename });
 		for (let index = 0; index < 3; index += 1) await d109bIssue(seeded, D109B_SCOPE, 4);
 		await seeded.close();
-		const raw = new DatabaseSync(derived(primaryFilename));
+		// Out-of-band native damage: the raw mutant is no issuance owner (ea4eb158 fences).
+		const raw = allowOutOfBandWrites(new DatabaseSync(derived(primaryFilename)));
 		mutate(raw);
 		const before = {
 			issued: scalar(raw, "SELECT count(*) FROM issued_records"),
@@ -645,8 +653,9 @@ describe("D.109b Node issuance-retention RED", () => {
 		expect(fs.statSync(filename).ino).toBe(inode);
 		const after = new DatabaseSync(filename, { readOnly: true });
 		try {
-			expect(scalar(after, "PRAGMA user_version")).toBe(3);
-			expect(catalog(after).find(({ name }) => name === "lineages")?.sql).toBe(PHASE_2L_C_DDL.lineages);
+			// v1 now migrates to the current schema (ea4eb158: SCHEMA_VERSION 5).
+			expect(scalar(after, "PRAGMA user_version")).toBe(5);
+			expect(catalog(after).find(({ name }) => name === "lineages")?.sql).toBe(CURRENT_LINEAGES_DDL);
 			expect(catalog(after).find(({ name }) => name === "settlement_plans")?.sql).toBe(
 				PHASE_2L_C_V3_DDL.settlement_plans
 			);
@@ -702,8 +711,8 @@ describe("D.109b Node issuance-retention RED", () => {
 			);
 			const raced = new DatabaseSync(derived(racingPrimary), { readOnly: true });
 			try {
-				expect(scalar(raced, "PRAGMA user_version")).toBe(3);
-				expect(catalog(raced).find(({ name }) => name === "lineages")?.sql).toBe(PHASE_2L_C_DDL.lineages);
+				expect(scalar(raced, "PRAGMA user_version")).toBe(5);
+				expect(catalog(raced).find(({ name }) => name === "lineages")?.sql).toBe(CURRENT_LINEAGES_DDL);
 				expect(catalog(raced).find(({ name }) => name === "settlement_plans")?.sql).toBe(
 					PHASE_2L_C_V3_DDL.settlement_plans
 				);

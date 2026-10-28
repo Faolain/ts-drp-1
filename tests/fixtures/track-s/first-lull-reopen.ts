@@ -102,6 +102,7 @@ async function sqliteSettlementRoom() {
 		signGenesisAnchorDigest: (digest) => Promise.resolve(ed25519.sign(digest, creator.seed)),
 	});
 	const storageHost = createNodeV3RoomStorageHost({ directory, initialization: () => "create" });
+	let creatorRoom: Awaited<ReturnType<typeof createV3RoomSession>> | undefined;
 	const open = async (index: number, openOptions: { reopen?: boolean } = {}) => {
 		const identity = required(identities[index]);
 		const name = `peer-${index}`;
@@ -159,6 +160,13 @@ async function sqliteSettlementRoom() {
 		const room = await createV3RoomSession(input);
 		rooms.add(room);
 		await waitForV3RoomStartupForDiagnostics(room);
+		if (index === 0) creatorRoom = room;
+		// Decision B (sync before sending): a reopened Writer signs nothing until it is current. The
+		// pages' successor delivery hands it the creator's statement on bind; this fixture does it.
+		else if (openOptions.reopen && creatorRoom !== undefined && rooms.has(creatorRoom)) {
+			const statement = creatorRoom.currencyStatement?.();
+			if (statement !== undefined) await room.confirmCurrent?.(statement);
+		}
 		// Authenticated signed rows of another peer, in issue order; the final ordinary
 		// move's application acceptance joins the delivery.
 		const receive = async (rows: readonly DurableIssuanceOutboxRecord[], sender: number) => {

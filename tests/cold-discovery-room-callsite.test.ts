@@ -35,21 +35,26 @@ function keys(node: ts.CallExpression): ReadonlySet<string> {
 		if (ts.isSpreadAssignment(property)) {
 			let expression = property.expression;
 			while (ts.isParenthesizedExpression(expression)) expression = expression.expression;
-			// The existing native classification addition has two literal branches;
-			// neither can introduce an unresolved top-level recovery declaration.
+			// An optional addition is a conditional with two literal branches of named
+			// data properties (classificationOwners, proofAccounting, receiveOnly,
+			// classifyTerminalVertex today). Every name either branch can contribute
+			// counts as present, so a declaration hidden in a branch is still seen.
 			if (!ts.isConditionalExpression(expression)) throw new Error("CALL_PROPERTY_UNRESOLVED");
+			const optional = new Set<string>();
 			for (const branch of [expression.whenTrue, expression.whenFalse]) {
 				if (!ts.isObjectLiteralExpression(branch)) throw new Error("CALL_PROPERTY_UNRESOLVED");
 				for (const field of branch.properties) {
 					if (
-						!ts.isPropertyAssignment(field) ||
-						!ts.isIdentifier(field.name) ||
-						field.name.text !== "classificationOwners"
+						(!ts.isPropertyAssignment(field) && !ts.isShorthandPropertyAssignment(field)) ||
+						!ts.isIdentifier(field.name)
 					)
 						throw new Error("CALL_PROPERTY_UNRESOLVED");
-					if (result.has(field.name.text)) throw new Error("CALL_PROPERTY_DUPLICATE");
-					result.add(field.name.text);
+					optional.add(field.name.text);
 				}
+			}
+			for (const name of optional) {
+				if (result.has(name)) throw new Error("CALL_PROPERTY_DUPLICATE");
+				result.add(name);
 			}
 			continue;
 		}
@@ -163,6 +168,15 @@ describe("declaration-free recovery room wiring (source-only)", () => {
 		const observed = inspect(mutateCall(source, "consumeCreatorAdoptionPendingRecovery", "add"));
 		expect(observed.pending).toBe(false);
 		expect(() => expect(observed.pending, "MUTANT_PENDING_KEY").toBe(true)).toThrow("MUTANT_PENDING_KEY");
+	});
+	it("a declaration inside an optional spread branch kills the cold and pending assertions", () => {
+		for (const name of ["reopenCreatorSuccessorAdoption", "consumeCreatorAdoptionPendingRecovery"]) {
+			const marker = `${name}({`;
+			const observed = inspect(
+				source.replace(marker, `${marker}...(input.receiveOnly ? { snapshotDeclaration: obsolete } : {}),`)
+			);
+			expect(name === "reopenCreatorSuccessorAdoption" ? observed.cold : observed.pending).toBe(false);
+		}
 	});
 	it("old hint and unrelated selectors kill the actual selector assertion", () => {
 		const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);

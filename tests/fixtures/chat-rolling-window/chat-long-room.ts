@@ -228,6 +228,7 @@ export async function chatWindowRoomFixture(options: ChatWindowRoomOptions) {
 		return archive;
 	};
 
+	let creatorRoom: V3RoomSession<ShippingChatProjection> | undefined;
 	// A persisted reopen recreates the owners over the SAME databases, floor and archive file.
 	const open = async (index: number, openOptions: { reopen?: boolean } = {}) => {
 		const identity = required(identities[index]);
@@ -289,6 +290,15 @@ export async function chatWindowRoomFixture(options: ChatWindowRoomOptions) {
 		const room = await createV3RoomSession(input);
 		track.rooms.add(room);
 		await waitForV3RoomStartupForDiagnostics(room);
+		if (index === 0) creatorRoom = room;
+		else if (openOptions.reopen === true && creatorRoom !== undefined && track.rooms.has(creatorRoom)) {
+			// Decision B: a reopened Writer signs nothing until it is current; this harness has no
+			// successor delivery, so it hands over the creator's statement as the delivery does on bind.
+			const statement = creatorRoom.currencyStatement?.();
+			const verdict = statement === undefined ? "unsupported" : await room.confirmCurrent?.(statement);
+			if (verdict !== undefined && verdict !== "current" && verdict !== "unsupported")
+				throw new TypeError(`CHAT_WINDOW_REOPEN_NOT_CURRENT ${name} ${verdict}`);
+		}
 		// The shipped app shows the opened projection at once, so the archive sees it too.
 		archive.observe(room.projection());
 		// Delivers authenticated signed rows of another peer in issue order; the final row's

@@ -53,13 +53,21 @@ describe("D.110c-0c1f5b0b rejected-GREEN corrective RED", () => {
 
 	it("[RED] preserves legacy join structural retirement without exposing an application intent", async () => {
 		const result = await runSharedPlaneScenario({ sourceOperationProfile: "join" });
-		expect(result.rebaseOutbox).toEqual({
+		// The displaced source now also carries its capability methods (withDependencies,
+		// issueReplacement, prepareReplacement, authorizeReplacement) and the
+		// requiresCreatorSelection decision; the data fields stay exact.
+		const page = result.rebaseOutbox as { source?: Record<string, unknown> };
+		const source = Object.fromEntries(
+			Object.entries(page.source ?? {}).filter(([, value]) => typeof value !== "function")
+		);
+		expect({ ...page, source }).toEqual({
 			kind: "displaced",
 			ok: true,
 			source: {
 				author: result.sourceRowAuthor,
 				authorSequence: 1,
 				intents: [],
+				requiresCreatorSelection: false,
 				vertexDigest: result.sourceDigest,
 			},
 		});

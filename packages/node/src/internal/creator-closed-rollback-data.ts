@@ -20557,7 +20557,7 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 	try {
 		const observer = Reflect.get(globalThis, "__warmProofEvent");
 		if (typeof observer === "function") observer({kind: "closed-retirement-issuance-holes", epoch: current.epoch,
-			issued: issuanceRows.issued.length, protected: protectedRecords.length,
+			throughEpoch: cut.epoch, holes: protectedRecords, issued: issuanceRows.issued.length, protected: protectedRecords.length,
 			unprotected: issuanceRows.issued.filter(row => !protectedRecords.some(hole => hole.author === row.author &&
 				hole.authorSequence === row.authorSequence)).map(row => ({authorSequence: row.authorSequence,
 				epoch: record(row.canonicalPreimageBytes).epoch})),

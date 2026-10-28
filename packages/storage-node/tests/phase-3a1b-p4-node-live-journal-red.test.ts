@@ -16,6 +16,7 @@ import {
 	P4_NODE_SQLITE_CATALOG,
 } from "./fixtures/phase-3a1b-p4-node-contract.js";
 import * as nodePreload from "./fixtures/phase-3a1b-p4-node-preload.mjs";
+import { allowOutOfBandWrites } from "./fixtures/out-of-band-sqlite.js";
 import {
 	isPhase3a1bP4NodeMutationScopeRead,
 	referencesPhase3a1bP4NodeTable,
@@ -144,7 +145,7 @@ async function loadDecisionMutantCandidate(label: string): Promise<Candidate> {
 }
 
 interface SnapshotValidationObservation {
-	readonly kind: "create" | "readiness" | "snapshot";
+	readonly kind: "create" | "readiness" | "snapshot" | "validate";
 	readonly objectId?: string;
 	readonly validation: object | undefined;
 }
@@ -207,6 +208,14 @@ async function loadSnapshotValidationObservedCandidate(label: string, omitValida
 						snapshotValidationObservations.push({kind: "snapshot", validation: originalInput.validation,
 							objectId: input.durable?.scope?.scope?.objectId});
 						return original.deriveLiveJournalSnapshot(originalInput);
+					}
+					// d2436812: the append path's addressed closure validates through
+					// validateLiveJournalSnapshot instead of deriving a snapshot.
+					export function validateLiveJournalSnapshot(input) {
+						const originalInput = ${omitValidation} ? {...input, validation: undefined} : input;
+						snapshotValidationObservations.push({kind: "validate", validation: originalInput.validation,
+							objectId: input.durable?.scope?.scope?.objectId});
+						return original.validateLiveJournalSnapshot(originalInput);
 					}
 					export function deriveLiveJournalSnapshotReadiness(input) {
 						const originalInput = ${omitValidation} ? {...input, validation: undefined} : input;
@@ -397,7 +406,7 @@ describe("bounded replay pages", () => {
 			const name = "candidate";
 			const filename = primary(`absent-scope-${operation}-${name}`);
 			const store = candidate.createNodeDurableLiveJournalStore({ primaryFilename: filename });
-			const foreign = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
+			const foreign = allowOutOfBandWrites(new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`));
 			const values = exactInputs();
 			try {
 				expect(await store.installGenesis(values.install)).toMatchObject({ ok: true });
@@ -427,7 +436,7 @@ describe("bounded replay pages", () => {
 			const name = "candidate";
 			const filename = primary(`wrong-scope-${operation}-${name}`);
 			const store = candidate.createNodeDurableLiveJournalStore({ primaryFilename: filename });
-			const foreign = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
+			const foreign = allowOutOfBandWrites(new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`));
 			const values = exactInputs();
 			try {
 				expect(await store.installGenesis(values.install)).toMatchObject({ ok: true });
@@ -553,7 +562,7 @@ describe("bounded replay pages", () => {
 
 	it("revalidates repeated readiness after foreign off-page corruption", async () => {
 		const { store, filename, values } = await populated("readiness-foreign-reuse", 8);
-		const foreign = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
+		const foreign = allowOutOfBandWrites(new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`));
 		try {
 			// The native catalog requires each connection's own retirement predicate.
 			// This negative intentionally corrupts one unfenced row, not the fence/control.
@@ -621,7 +630,7 @@ describe("bounded replay pages", () => {
 						phase,
 						occurrence: 1,
 						callback: () => {
-							const foreign = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
+							const foreign = allowOutOfBandWrites(new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`));
 							try {
 								foreign.exec("UPDATE accepted_entries SET vertex_digest='malformed' WHERE journal_sequence=7");
 							} finally {
@@ -685,7 +694,7 @@ describe("bounded replay pages", () => {
 			["malformed", "UPDATE accepted_entries SET vertex_digest='malformed' WHERE journal_sequence=7"],
 		] as const) {
 			const { store, filename, values, ready } = await populated(`page-${label}`, 8);
-			const foreign = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
+			const foreign = allowOutOfBandWrites(new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`));
 			try {
 				foreign.exec(sql);
 				const measured = await measuredPage(store, {
@@ -712,7 +721,7 @@ describe("bounded replay pages", () => {
 
 	it("does not hide off-page duplicate commitments when a foreign connection corrupts the catalog", async () => {
 		const { store, filename, values, ready } = await populated("page-duplicate", 8);
-		const foreign = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
+		const foreign = allowOutOfBandWrites(new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`));
 		try {
 			// Negative integrity fixture only: native UNIQUE normally forbids this.
 			foreign.exec(
@@ -761,7 +770,7 @@ describe("bounded replay pages", () => {
 	it("preserves wrong-scope, forged token, malformed input and stale high-watermark failures", async () => {
 		const { store, filename, values, ready } = await populated("page-token", 8);
 		const token = ready.snapshot as Readonly<Record<string, unknown>>;
-		const foreign = new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`);
+		const foreign = allowOutOfBandWrites(new DatabaseSync(`${filename}.drp-live-journal-v1.sqlite`));
 		try {
 			expect(
 				await store.readPage({
@@ -1104,12 +1113,12 @@ function rawClosure(primaryFilename: string): {
 }
 
 function corruptReceivedSignature(primaryFilename: string, objectId: string, byteLength = 63): void {
-	const database = new DatabaseSync(`${primaryFilename}.drp-live-journal-v1.sqlite`, {
+	const database = allowOutOfBandWrites(new DatabaseSync(`${primaryFilename}.drp-live-journal-v1.sqlite`, {
 		allowExtension: false,
 		enableDoubleQuotedStringLiterals: false,
 		enableForeignKeyConstraints: false,
 		readOnly: false,
-	});
+	}));
 	try {
 		database.exec("BEGIN IMMEDIATE");
 		const update = database
@@ -1129,6 +1138,51 @@ function corruptReceivedSignature(primaryFilename: string, objectId: string, byt
 	} finally {
 		database.close();
 	}
+}
+
+/**
+ * The frozen p4 catalog plus the ea4eb158 native retirement additions: the nullable
+ * closed_membership_bytes scope column (as SQLite spells an ADD COLUMN), the
+ * retirement_controls table, and the six owner-fence triggers.
+ * @returns Rows in sqlite_schema ORDER BY type,name order.
+ */
+function currentNodeSqliteCatalog(): readonly Record<string, unknown>[] {
+	const fence = (table: string, operation: "DELETE" | "INSERT" | "UPDATE"): Record<string, unknown> => {
+		const allows = (ref: string): string =>
+			`journal_retirement_allows(${ref}.object_id,${ref}.epoch,${ref}.anchor_digest)=0`;
+		const when = operation === "UPDATE" ? `${allows("OLD")} OR ${allows("NEW")}` : allows(operation === "DELETE" ? "OLD" : "NEW");
+		const name = `retirement_${table}_${operation.toLowerCase()}`;
+		return {
+			name,
+			sql: `CREATE TRIGGER ${name} BEFORE ${operation} ON ${table} WHEN ${when} BEGIN SELECT RAISE(ABORT,'retirement-fenced'); END`,
+			tbl_name: table,
+			type: "trigger",
+		};
+	};
+	const rows: Record<string, unknown>[] = [
+		...P4_NODE_SQLITE_CATALOG.map((row) =>
+			row.name === "scopes"
+				? {
+						...row,
+						sql: String(row.sql).replace(
+							"exact_parameters_carrier BLOB NOT NULL,",
+							"exact_parameters_carrier BLOB NOT NULL, closed_membership_bytes BLOB,"
+						),
+					}
+				: { ...row }
+		),
+		{
+			name: "retirement_controls",
+			sql: "CREATE TABLE retirement_controls (object_id TEXT PRIMARY KEY, record BLOB NOT NULL, plan_record BLOB) WITHOUT ROWID",
+			tbl_name: "retirement_controls",
+			type: "table",
+		},
+		...["accepted_entries", "scopes"].flatMap((table) =>
+			(["DELETE", "INSERT", "UPDATE"] as const).map((operation) => fence(table, operation))
+		),
+	];
+	const key = (row: Record<string, unknown>): string => `${String(row.type)}\u0000${String(row.name)}`;
+	return rows.sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
 }
 
 function rawCatalog(primaryFilename: string): readonly Record<string, unknown>[] {
@@ -1152,12 +1206,12 @@ function applyNodeReadbackFate(
 	operation: "append" | "install",
 	fate: "exact-old" | "mixed"
 ): void {
-	const database = new DatabaseSync(`${primaryFilename}.drp-live-journal-v1.sqlite`, {
+	const database = allowOutOfBandWrites(new DatabaseSync(`${primaryFilename}.drp-live-journal-v1.sqlite`, {
 		allowExtension: false,
 		enableDoubleQuotedStringLiterals: false,
 		enableForeignKeyConstraints: false,
 		readOnly: false,
-	});
+	}));
 	try {
 		database.exec("BEGIN IMMEDIATE");
 		if (operation === "install") {
@@ -1703,19 +1757,32 @@ describe("D.93.34 p4-b Node strict live-journal RED", () => {
 			"./issuance-maintenance",
 			"./live-journal",
 			...(Object.hasOwn(manifest.exports ?? {}, "./maintenance") ? ["./maintenance"] : []),
+			// ea4eb158: room-head, seal evidence/vote and the shared v3 room host.
+			"./room-head",
+			"./seal-evidence",
+			"./seal-vote",
 			"./snapshot-transfer",
+			"./v3-room-host",
 		]);
 		expect(Object.keys(manifest.dependencies ?? {}).sort()).toEqual([
+			// ea4eb158: canonical, keychain, node, protocol-v3 and seal for the room-head/seal/room-host subpaths.
+			"@ts-drp/canonical",
 			"@ts-drp/compaction",
 			"@ts-drp/issuance-store",
+			"@ts-drp/keychain",
 			"@ts-drp/live-journal",
+			"@ts-drp/node",
+			"@ts-drp/protocol-v3",
+			"@ts-drp/seal",
 			"@ts-drp/storage",
 		]);
-		expect(
-			createHash("sha256")
-				.update(fs.readFileSync(path.join(PACKAGE_DIRECTORY, "src/index.ts")))
-				.digest("hex")
-		).toBe("14688ec0442cf331f329a5cb944bfa893f6a6ef08eeedd8bb6352651283d7211");
+		// The root changed for other owners (a116318a bounded role reader, ea4eb158 archive and
+		// native read port); the live journal itself still never reaches the root entry.
+		const root = fs.readFileSync(path.join(PACKAGE_DIRECTORY, "src/index.ts"), "utf8");
+		expect(root).not.toMatch(/live-journal|LiveJournal/u);
+		expect(createHash("sha256").update(root).digest("hex")).toBe(
+			"3048a62cce8e5519ccb3cfadc70f1bffbca1dde3dd9719a4d7d56b343d88cdc2"
+		);
 	});
 
 	it("opens a genuine strict facade with six methods and an injective sidecar filename", async () => {
@@ -1723,10 +1790,23 @@ describe("D.93.34 p4-b Node strict live-journal RED", () => {
 		const primaryFilename = primary("surface");
 		const store = createNodeDurableLiveJournalStore({ primaryFilename });
 		try {
-			expect(Object.keys(store).sort()).toEqual([...P4_NODE_METHODS].sort());
+			expect(Object.keys(store).sort()).toEqual(
+				[
+					...P4_NODE_METHODS,
+					// Later additive owner ports: historical anchors (02c7b67f), native retirement,
+					// read reservation and close membership (ea4eb158), membership point read (9b41a0e4).
+					"importHistoricalAnchor",
+					"readSignedAnchorEnvelope",
+					"acquireNativeReadReservation",
+					"acquireRetirementControl",
+					"readRetirementImage",
+					"recordClosedMembership",
+					"readClosedMembership",
+				].sort()
+			);
 			expect(fs.existsSync(primaryFilename)).toBe(false);
 			expect(fs.existsSync(`${primaryFilename}.drp-live-journal-v1.sqlite`)).toBe(true);
-			expect(rawCatalog(primaryFilename)).toEqual(P4_NODE_SQLITE_CATALOG);
+			expect(rawCatalog(primaryFilename)).toEqual(currentNodeSqliteCatalog());
 		} finally {
 			await store.close();
 		}
@@ -1783,6 +1863,8 @@ describe("D.93.34 p4-b Node strict live-journal RED", () => {
 			expect(closure.scopes).toHaveLength(1);
 			expect(Object.keys(closure.scopes[0] ?? {}).sort()).toEqual([
 				"anchor_digest",
+				// ea4eb158: opaque creator-close membership evidence on the scope row.
+				"closed_membership_bytes",
 				"detached_anchor_signature",
 				"epoch",
 				"exact_anchor_preimage",

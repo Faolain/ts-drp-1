@@ -128,11 +128,17 @@ describe("Phase 2c-a Node SQLite strict store RED", () => {
 				"./issuance-maintenance",
 				"./live-journal",
 				"./maintenance",
+				// ea4eb158: room-head, seal evidence/vote and the shared v3 room host.
+				"./room-head",
+				"./seal-evidence",
+				"./seal-vote",
 				"./snapshot-transfer",
+				"./v3-room-host",
 			],
 			private: true,
 		});
-		expect(Object.keys(storageNode)).toEqual(["createSqliteAheDurableStore"]);
+		// ea4eb158 added the archive storage factory to the root entry.
+		expect(Object.keys(storageNode)).toEqual(["createNodeArchiveStorage", "createSqliteAheDurableStore"]);
 		const store = createSqliteAheDurableStore({ filename: await databaseFilename() });
 		expect(store.capabilities).toEqual({
 			durability: "strict",

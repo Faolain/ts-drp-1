@@ -28,6 +28,7 @@ import { parseStorageObjectId } from "../../../packages/storage/src/index.js";
 import { createNodeRoomHeadAuthority } from "../../../packages/storage-node/src/room-head.js";
 import { fakeNetwork } from "../phase-4b-v3/live-snapshot.js";
 import { ScriptedSnapshotChunkPort } from "../phase-4c-v3/snapshot-pull-transport.js";
+import { creatorCurrency } from "../creator-currency.js";
 
 // Track M: Track N's long-room settlement room (tests/recipient-long-room-issuance-retention-
 // native.test.ts: Grid zone application, the settlement-v1 creator profile, the creator and
@@ -97,6 +98,7 @@ export async function settlementRoom(options: Readonly<{ retention: boolean; nam
 		`tm-s-${hex(hashDomain("track-m-settlement-host/v1", new TextEncoder().encode(directory))).slice(0, 16)}`,
 		options.retention ? { retention: true, creatorLull: true } : { retention: false, creatorLull: true }
 	);
+	let creatorRoom: Awaited<ReturnType<typeof createV3RoomSession>> | undefined;
 	const open = async (index: number, openOptions: { reopen?: boolean } = {}) => {
 		const identity = required(identities[index]);
 		const name = `peer-${index}`;
@@ -152,6 +154,13 @@ export async function settlementRoom(options: Readonly<{ retention: boolean; nam
 		const room = await createV3RoomSession(input);
 		rooms.add(room);
 		await waitForV3RoomStartupForDiagnostics(room);
+		if (index === 0) creatorRoom = room;
+		// Decision B (sync before sending): a reopened Writer signs nothing until it is current. The
+		// pages' successor delivery hands it the creator's statement on bind; this fixture does it.
+		else if (openOptions.reopen && creatorRoom !== undefined && rooms.has(creatorRoom)) {
+			const statement = creatorRoom.currencyStatement?.();
+			if (statement !== undefined) await room.confirmCurrent?.(statement);
+		}
 		// Authenticated signed rows of another peer, in issue order; the final ordinary
 		// move's application acceptance joins the delivery.
 		const receive = async (rows: readonly DurableIssuanceOutboxRecord[], sender: number) => {
@@ -368,5 +377,5 @@ export async function settlementTransition(
 	await creator.room.adoptCreatorSuccessor();
 	const transfer = await settlementDelivery(fixture);
 	Reflect.set(recipient.networkNode, "createSnapshotChunkProtocolHost", () => transfer.port);
-	await recipient.room.installCreatorSuccessor({ offer: transfer.offer, peers: transfer.peers });
+	await recipient.room.installCreatorSuccessor({ offer: transfer.offer, peers: transfer.peers, ...creatorCurrency(creator.room) });
 }

@@ -98,6 +98,11 @@ export interface GenuineCreatorAdoptionFixtureModules {
 
 export async function defaultCreatorAdoptionFixtureModules(): Promise<GenuineCreatorAdoptionFixtureModules> {
 	const source = (relative: string): string => pathToFileURL(resolve(REPOSITORY_ROOT, relative)).href;
+	// The node src modules import each other in a cycle. Under vitest's module runner, starting
+	// several dynamic imports into that cycle at once never settles (each waits on a module the
+	// other is still evaluating); native ESM and a single entry import are fine. Evaluate the
+	// cycle through one entry first so the concurrent imports below resolve from the module cache.
+	await import(source("packages/node/src/creator-adoption-activate.ts"));
 	const [
 		activation,
 		v3Live,
@@ -845,6 +850,19 @@ async function recoverWithDurableStores(
 	});
 	const issuanceStore = decorateIssuanceStore?.(nativeStorageOwners ? rawIssuanceStore : baseIssuanceStore) ?? (nativeStorageOwners ? rawIssuanceStore : baseIssuanceStore);
 	const baseJournal: DurableLiveJournalStore = Object.freeze<DurableLiveJournalStore>({
+		// Native retirement/membership ports (ea4eb158: creator close records its membership
+		// through them). The image reader is passed as the ORIGINAL frozen function, whose
+		// identity carries its owner port; the wrapper only observes rows read by readPage.
+		...(rawJournal.readRetirementImage === undefined ? {} : { readRetirementImage: rawJournal.readRetirementImage }),
+		...(rawJournal.readClosedMembership === undefined
+			? {}
+			: { readClosedMembership: (input) => rawJournal.readClosedMembership!(input) }),
+		...(rawJournal.recordClosedMembership === undefined
+			? {}
+			: { recordClosedMembership: (input) => rawJournal.recordClosedMembership!(input) }),
+		...(rawJournal.acquireRetirementControl === undefined
+			? {}
+			: { acquireRetirementControl: (input) => rawJournal.acquireRetirementControl!(input) }),
 		appendAccepted: (input) => rawJournal.appendAccepted(input),
 		close: () => rawJournal.close(),
 		installEpochAnchor: (input) => rawJournal.installEpochAnchor(input),

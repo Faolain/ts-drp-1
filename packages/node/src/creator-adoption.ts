@@ -130,8 +130,10 @@ import {
 	inspectCreatorCheckpointTransition,
 	inspectCreatorTransitionAdvance,
 	openCreatorCheckpointAttachment,
+	openVerifiedCreatorHistoricalIssuance,
 	resolveCreatorCheckpointAttachment,
 	resolveCreatorForwardPromotion,
+	resolveVerifiedCreatorHistoricalIssuance,
 	uniqueCreatorTransitionCandidate,
 	type VerifiedCreatorForwardPromotion,
 	type VerifiedCreatorCheckpointAttachment,
@@ -2714,7 +2716,8 @@ async function authenticatedSuccessorIssuanceScope(
 	exactCanonicalLatchedAclBytes: Uint8Array,
 	expectedProfileId: string,
 	checkNativeCurrency: () => Promise<void>,
-	currentTrust: CurrentAnchorTrust
+	currentTrust: CurrentAnchorTrust,
+	successorClosure: CreatorTransitionClosure
 ): Promise<AuthenticatedSuccessorIssuanceScopeResult> {
 	let lineageAuthors: readonly string[];
 	try {
@@ -2824,15 +2827,27 @@ async function authenticatedSuccessorIssuanceScope(
 			await assertEmptyReceiveOnlyIssuance(input.issuanceStore, scope);
 			return Object.freeze({ ok: true as const, scope });
 		}
+		// The room's authenticated closed frontier for the SELECTED author. A local
+		// lineage at or below it never issued work the room already admitted from this
+		// key: a stale copy or another store's clone, never this author's authority.
+		const historical = openVerifiedCreatorHistoricalIssuance({ author: input.author, closure: successorClosure,
+			floorTrust: currentTrust });
+		const identity = historical === undefined ? undefined : resolveVerifiedCreatorHistoricalIssuance(historical);
+		const admitted = identity?.author === input.author && identity.objectId === objectId &&
+			identity.successorEpoch === expectedEpoch ? identity.admittedAuthorSequence : null;
 		for (const author of lineageAuthors) {
 			const scope = Object.freeze({ author, objectId });
 			const lineage = await input.issuanceStore.readLineage(scope);
 			if (lineage.exhausted !== false || !Number.isSafeInteger(lineage.next) || lineage.next < 0) {
 				return Object.freeze({ ok: false as const, reason: "lineage" as const });
 			}
-			// Other authenticated writers can already have issued in this same object.
-			// Their watermarks are not the selected author's issuance authority: the
-			// scope below remains bound to that author's current ACL and possession.
+			if (author === input.author && admitted !== null && lineage.next <= admitted) {
+				return Object.freeze({ ok: false as const, reason: "lineage" as const });
+			}
+			// Other authenticated writers can already have issued in this same object
+			// (same-origin tabs share one room database). Their watermarks are not the
+			// selected author's issuance authority: the scope below remains bound to
+			// that author's current ACL, possession and authenticated frontier.
 		}
 		return Object.freeze({ ok: true as const, scope: Object.freeze({ author: input.author, objectId }) });
 	} catch {
@@ -2916,7 +2931,7 @@ async function reopenCreatorSuccessorMaterial(
 				const issuance = await authenticatedSuccessorIssuanceScope(input, objectId, String(chain.successorAnchor.aclDigest),
 					chain.successorEpoch, exactCanonicalLatchedAclBytes, chain.successorTrust.profileId, async () => {
 						if (!(await capturedReader.checkCurrency()).ok) throw new TypeError("creator checkpoint cold native census changed");
-					}, chain.successorTrust);
+					}, chain.successorTrust, {candidates: activeCandidates, closure: active.references});
 				if (!issuance.ok) return coldFailure("chain-invalid", `creator checkpoint issuance ${issuance.reason} is invalid`);
 				const material: CreatorSuccessorLiveMaterial = Object.freeze({checkpoint: context.checkpoint,
 					...(input.receiveOnly ? {receiveOnly: true as const} : {}), origin: "durable-reopen", catalog: factsForCatalog(resolved),
@@ -3252,7 +3267,8 @@ async function reopenCreatorSuccessorMaterial(
 				async () => {
 					if (!(await possessionReader.checkCurrency()).ok) throw new TypeError("creator possession native recovery census changed");
 				},
-				successorTrust
+				successorTrust,
+				{ candidates: activeCandidates, closure: active.references }
 			);
 			if (!issuance.ok) {
 				const detail =

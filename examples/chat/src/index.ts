@@ -19,6 +19,7 @@ import {
 	type V3RoomSuccessorDelivery,
 	V3RoomSuccessorUnavailable,
 	type V3RoomSession,
+	prepareV3RoomPlayerDatabase,
 } from "@ts-drp/example-v3-room";
 import { DRPNode } from "@ts-drp/node";
 import { authenticateV3RoomCreatorInvite } from "@ts-drp/node/v3-room";
@@ -649,13 +650,15 @@ async function openChat(operation: "create" | "join"): Promise<void> {
 		} catch (error) {
 			console.warn("Chat device archive is unavailable; showing the room's shared window only", error);
 		}
+		// Decision A: this player's own room database; the shared (objectId-only) one migrates once.
+		const { databaseName } = await prepareV3RoomPlayerDatabase({ application: "chat", objectId, author });
 		const context: ChatOpenContext = Object.freeze({
 			author,
 			objectId,
 			invite,
 			application,
 			shares: format === catalogs.shares,
-			databaseName: "ts-drp-v3-chat--" + hex(hashDomain("ts-drp/chat-database/v1", new TextEncoder().encode(objectId))),
+			databaseName,
 			archive: openedArchive,
 		});
 		// Signed genesis membership selects acquisition, not portable Writer

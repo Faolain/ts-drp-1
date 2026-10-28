@@ -6,7 +6,7 @@ import {
 	type EphemeralChannelOptions,
 	type EphemeralTransportPort,
 } from "@ts-drp/ephemeral";
-import type { DRPNetworkNode, IDRP, IDRPObject, Message } from "@ts-drp/types";
+import type { DRPNetworkNode, Message } from "@ts-drp/types";
 import { describe, expect, it } from "vitest";
 
 import { type EphemeralAuthorizationProvider, NodeEphemeralAdapter } from "../src/ephemeral.js";
@@ -82,7 +82,7 @@ function controlledNode(input: {
 		currentAuthority: () => AUTHORITY,
 		isCurrentWriter: (author): boolean => input.writers.has(author),
 	};
-	const adapter = new NodeEphemeralAdapter(network, () => undefined, owner);
+	const adapter = new NodeEphemeralAdapter(network, owner);
 	return {
 		adapter,
 		channel: adapter.openAuthorized("zone", provider, OPTIONS),
@@ -409,7 +409,7 @@ describe("E3-02 v3 zone transport adoption RED", () => {
 			isCurrentWriter: (author): boolean => writers.has(author),
 		};
 		const owner = bus.owner("peer-a");
-		const adapter = new NodeEphemeralAdapter(network, () => undefined, owner);
+		const adapter = new NodeEphemeralAdapter(network, owner);
 		const channel = adapter.openAuthorized("zone", provider, OPTIONS);
 		const route = onlyRoute(owner);
 		const publication = channel.publish({ class: "reliable-unordered", key: null, payload: payload("blocked") });
@@ -529,40 +529,5 @@ describe("E3-02 v3 zone transport adoption RED", () => {
 			right.channel.close();
 		}
 		expect(route.closed).toBe(true);
-	});
-
-	it("keeps every legacy class on the reliable carrier and never opens raw", async () => {
-		const bus = new ControlledRawBus();
-		const owner = bus.owner("peer-legacy");
-		const reliable: Message[] = [];
-		const network = {
-			getGroupPeers: (): readonly string[] => ["peer-b"],
-			peerId: "peer-legacy",
-			publishMessage: (_topic: string, message: Message): Promise<boolean> => {
-				reliable.push(message);
-				return Promise.resolve(true);
-			},
-			sendMessage: (): Promise<void> => Promise.resolve(),
-			subscribe: (): void => undefined,
-			unsubscribe: (): void => undefined,
-		} as unknown as DRPNetworkNode;
-		const object = { acl: { query_isWriter: (): boolean => true } } as unknown as IDRPObject<IDRP>;
-		const adapter = new NodeEphemeralAdapter(network, () => object, owner);
-		const channel = adapter.open("legacy-zone", OPTIONS);
-		try {
-			for (const deliveryClass of ["reliable-unordered", "unreliable-unordered", "unreliable-sequenced"] as const) {
-				expect(
-					await channel.publish({
-						class: deliveryClass,
-						key: deliveryClass === "unreliable-sequenced" ? "movement" : null,
-						payload: payload(deliveryClass),
-					})
-				).toBe(true);
-			}
-			expect(reliable).toHaveLength(3);
-			expect(owner.opened.size).toBe(0);
-		} finally {
-			channel.close();
-		}
 	});
 });

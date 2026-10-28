@@ -25,6 +25,7 @@ import { parseStorageObjectId } from "../../../packages/storage/src/index.js";
 import { createNodeRoomHeadAuthority } from "../../../packages/storage-node/src/room-head.js";
 import { fakeNetwork } from "../phase-4b-v3/live-snapshot.js";
 import { ScriptedSnapshotChunkPort } from "../phase-4c-v3/snapshot-pull-transport.js";
+import { creatorCurrency } from "../creator-currency.js";
 
 // Track M (slice 14b): the R3 room-database lull fixture (tests/room-database-retirement-
 // native.test.ts), shared by the Track M tests. One creator and one receive-only recipient
@@ -142,6 +143,7 @@ export async function lullFixture(options: RoomHostOptions) {
 		`tm-${hex(hashDomain("track-m-room-host/v1", new TextEncoder().encode(directory))).slice(0, 16)}`,
 		options
 	);
+	let creatorRoom: Awaited<ReturnType<typeof createV3RoomSession<CanvasProjection>>> | undefined;
 	const open = async (name: string, identity: Keychain, openOptions: { reopen?: boolean; receiveOnly?: true } = {}) => {
 		const floor = createNodeRoomHeadAuthority({
 			filename: join(directory, `${name}-external-floor.sqlite`),
@@ -201,6 +203,13 @@ export async function lullFixture(options: RoomHostOptions) {
 		const room = await createV3RoomSession(input);
 		rooms.add(room);
 		await waitForV3RoomStartupForDiagnostics(room);
+		if (identity === creator) creatorRoom = room;
+		// Decision B (sync before sending): a reopened Writer signs nothing until it is current. The
+		// pages' successor delivery hands it the creator's statement on bind; this fixture does it.
+		else if (openOptions.reopen && !openOptions.receiveOnly && creatorRoom !== undefined && rooms.has(creatorRoom)) {
+			const statement = creatorRoom.currencyStatement?.();
+			if (statement !== undefined) await room.confirmCurrent?.(statement);
+		}
 		const receive = async (envelopes: readonly DurableIssueCommit["envelope"][], finalDigest: string) => {
 			if (accepted.has(finalDigest)) return;
 			let timer: ReturnType<typeof setTimeout> | undefined;
@@ -356,7 +365,7 @@ export async function transition(fixture: LullFixture, creator: OpenedRoom, reci
 	await creator.room.adoptCreatorSuccessor();
 	const transfer = await delivery(fixture, creator);
 	Reflect.set(recipient.networkNode, "createSnapshotChunkProtocolHost", () => transfer.port);
-	await recipient.room.installCreatorSuccessor({ offer: transfer.offer, peers: transfer.peers });
+	await recipient.room.installCreatorSuccessor({ offer: transfer.offer, peers: transfer.peers, ...creatorCurrency(creator.room) });
 	expect(recipient.room.authority()).toMatchObject({ epoch: epoch + 1, objectId: fixture.objectId });
 }
 

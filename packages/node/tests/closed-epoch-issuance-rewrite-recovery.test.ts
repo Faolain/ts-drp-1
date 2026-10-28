@@ -41,9 +41,12 @@ function fixture() {
 		incarnation: "c".repeat(64), revision: 0, sequence: 0, active: null, completed: null};
 	const census = (value: IssuanceRetirementRows, current: DurableIssuanceRetirementControl | null) =>
 		encodeCanonical({nativeIssuance: {rows: value, image: issuanceRetirementImage(value, scope.objectId), control: current}});
+	const journal = {image: {imageDigest: "1".repeat(64)}, canonicalRows: [], control: null};
 	const source = {input: {objectId: scope.objectId}, summary: {}, accounting: {charge: () => true},
 		census: census(rows, control), aheControl: null, signingRows: [], floor: {}, rows: [], snapshots: [], snapshotImage: {image: {}},
-		journal: {image: {imageDigest: "1".repeat(64)}, canonicalRows: []}, journalDetails: {collectiblePrefixes: []}, signingDetails: []};
+		journal, journalDetails: {collectiblePrefixes: []}, signingDetails: [],
+		// An unreconstructed source observes the physical journal as its journal (8ab3c8cb).
+		journalPhysical: journal, journalReconstructed: false};
 	const cut = {epoch: 3}, labels = read(source, cut).labels;
 	const p = issuanceRetirementPreparationWithPlanRewrite(control, {...labels, protectedRecords: []}, rows);
 	const target = issuanceRetirementCommitRows(control, p, rows), completed = {...control, revision: 2, sequence: 1, completed: p};

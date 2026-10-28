@@ -543,7 +543,12 @@ describe("D.93.29 Seam 2 shared durable publication contract", () => {
 			...(Object.hasOwn((nodeManifest.exports as Record<string, unknown>) ?? {}, "./maintenance")
 				? ["./maintenance"]
 				: []),
+			// ea4eb158: the Node room-head, seal evidence/vote and shared v3 room host subpaths.
+			"./room-head",
+			"./seal-evidence",
+			"./seal-vote",
 			"./snapshot-transfer",
+			"./v3-room-host",
 		]);
 		expect(Object.keys((browserManifest.exports as Record<string, unknown>) ?? {}).sort()).toEqual([
 			".",
@@ -553,7 +558,10 @@ describe("D.93.29 Seam 2 shared durable publication contract", () => {
 			...(Object.hasOwn((browserManifest.exports as Record<string, unknown>) ?? {}, "./maintenance")
 				? ["./maintenance"]
 				: []),
+			// ea4eb158: the browser room-head and seal-signing subpaths.
+			"./room-head",
 			"./seal-evidence",
+			"./seal-signing",
 			"./seal-vote",
 			"./snapshot-transfer",
 		]);
@@ -578,6 +586,8 @@ describe("D.93.29 Seam 2 shared durable publication contract", () => {
 			"DurableIssuanceContractError",
 			"DurableIssuanceInvalidArgumentError",
 			"DurableIssuanceUnknownOutcomeError",
+			"IssuanceVerifiedOnceBytes",
+			"IssuanceVerifiedOnceText",
 			"MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT",
 			"MAXIMUM_DURABLE_ISSUANCE_SCOPE_UTF16_UNITS",
 			"SETTLEMENT_REPLACEMENT_DIGEST_LIMITS",
@@ -599,23 +609,29 @@ describe("D.93.29 Seam 2 shared durable publication contract", () => {
 			"copySettlementPlan",
 			"copySettlementPlanEffect",
 			"createDurableIssuanceFailure",
+			"detachIssuanceVerifiedValue",
 			"durableIssuanceBytesEqual",
 			"durableIssueScopesEqual",
 			"durablePreimageMatchesScopeAndSequence",
 			"isClosedDurableIssuanceRecord",
 			"isValidDurableAuthorSequence",
 			"isValidDurableScopeField",
+			"issuanceExactBytesEqual",
 			"settlementPlanHasExactEffectLink",
 			"settlementReplacementLastLogicalTime",
+			"settlementReplacementLastLogicalTimeFromPreimage",
+			"settlementSourceContextsForEntries",
 		]);
 		expect(sha256(source("packages/issuance-store/src/contract.ts"))).toBe(
-			"2e2d160f7e59d643d01fb4d10e321c573ace252bef43040156ff26d92e837042"
+			// Last changed by 110c5f2a (verify each durable preimage header once per exact bytes).
+			"030d39c3ad459f046a8634d36c7e9dde7f8841aa66a0ccc9c6b29187e76df1b8"
 		);
 		expect(sha256(source("packages/issuance-store/src/terminal.ts"))).toBe(
 			"a71b32967ca152c12b10adad4f3303696fb42d4379892cc27c4937af19d42a4a"
 		);
 		expect(sha256(source("packages/issuance-store/src/index.ts"))).toBe(
-			"62b3b2c62e7cc230820ba56e8867be76f17861dde3b45d645c2855a11b6afa93"
+			// Last changed by 8d5fdaf5 (verify durable issuance records once per exact bytes).
+			"3b1f61ee0cdfb45abc6ae54edee95f817ee3e27cfdf8c2fd033dc8a34bb2f3ef"
 		);
 		for (const owner of [
 			"packages/issuance-store/src/conformance.ts",

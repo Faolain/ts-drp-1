@@ -5,6 +5,7 @@ import {issuanceOrdinaryFinishingCapacityWidths, issuanceOrdinarySuccessorPlanRe
 	issuanceUnsignedSuccessorFenceWidths} from "../../issuance-store/src/retirement.js";
 import type {IssuanceRetirementRows} from "../../issuance-store/src/retirement.js";
 import type {SettlementPlan} from "../../issuance-store/src/types.js";
+import {settlementSourceContextsForEntries} from "../../issuance-store/src/contract.js";
 import * as ts from "typescript";
 import {describe, expect, it} from "vitest";
 
@@ -22,14 +23,16 @@ function find(node: ts.Node): void {
 }
 find(roomTree);
 if (mergeDeclaration?.initializer === undefined) throw new Error("missing original room merge");
-const originalMerge = new Function("settlementScope", "sameSettlementEntry", ts.transpileModule(
+// 34b08cd7: the merge carries each retained entry's exact source contexts
+// through the genuine settlementSourceContextsForEntries.
+const originalMerge = new Function("settlementScope", "sameSettlementEntry", "settlementSourceContextsForEntries", ts.transpileModule(
 	`const mergedSettlementPlan = ${mergeDeclaration.initializer.getText(roomTree)};\nreturn mergedSettlementPlan;`,
 	{compilerOptions: {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None}}).outputText);
 const scope = Object.freeze({objectId: "room", author: "a".repeat(64)});
 const limits = {maxBytes: 4_194_304, maxItems: 131_072, maxDepth: 128};
 const equal = (left: unknown, right: unknown) => Buffer.from(encodeCanonical(left)).equals(Buffer.from(encodeCanonical(right)));
 function successor(prior: SettlementPlan | null, priorFenceEpoch: number | undefined, epoch: number): SettlementPlan {
-	return originalMerge(scope, equal)([], prior)(priorFenceEpoch, epoch);
+	return originalMerge(scope, equal, settlementSourceContextsForEntries)([], prior)(priorFenceEpoch, epoch);
 }
 function rows(plan?: SettlementPlan): IssuanceRetirementRows {
 	return {lineages: [{...scope, next: 0, exhausted: false, prunedThroughAuthorSequence: null}],

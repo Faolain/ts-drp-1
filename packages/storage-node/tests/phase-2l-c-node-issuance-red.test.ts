@@ -25,6 +25,7 @@ import path from "node:path";
 import { DatabaseSync, StatementSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { allowOutOfBandWrites } from "./fixtures/out-of-band-sqlite.js";
 import {
 	derivedFilename,
 	errorShape,
@@ -53,6 +54,40 @@ import {
 const temporaryDirectories: string[] = [];
 const lockFixture = new URL("./fixtures/phase-2l-c-node-lock-child.mjs", import.meta.url);
 const raceFixture = new URL("./fixtures/phase-2l-c-node-race-child.mjs", import.meta.url);
+// Current native catalog (ea4eb158, SCHEMA_VERSION 5): lineages gains pending_unsigned, and
+// retirement_controls plus twelve owner-fence triggers guard every product table. Spelled out
+// here, independently of the product constants, so any catalog drift fails this file.
+const ISSUANCE_SCHEMA_VERSION = 5;
+const CURRENT_LINEAGES_DDL =
+	"CREATE TABLE lineages (\n  object_id TEXT NOT NULL,\n  author TEXT NOT NULL,\n  next INTEGER NOT NULL CHECK(next BETWEEN 0 AND 9007199254740991),\n  exhausted INTEGER NOT NULL CHECK(exhausted IN (0,1)),\n  pruned_through_author_sequence INTEGER CHECK(pruned_through_author_sequence IS NULL OR pruned_through_author_sequence BETWEEN 0 AND 9007199254740991),\n  pending_unsigned BLOB CHECK(pending_unsigned IS NULL OR (typeof(pending_unsigned) = 'blob' AND length(pending_unsigned) > 0)),\n  PRIMARY KEY (object_id,author)\n) WITHOUT ROWID";
+const RETIREMENT_CONTROLS_DDL =
+	"CREATE TABLE retirement_controls (object_id TEXT PRIMARY KEY NOT NULL, record BLOB NOT NULL) WITHOUT ROWID";
+const ISSUANCE_FENCE_TRIGGERS = ["issuance_outbox", "issued_records", "lineages", "settlement_plans"]
+	.flatMap((table) =>
+		(["delete", "insert", "update"] as const).map((op) => {
+			const row = op === "delete" ? "OLD" : "NEW";
+			const record =
+				table === "issued_records" && op !== "delete"
+					? ` OR issuance_retirement_record(${row}.object_id,${row}.author,${row}.author_sequence,${row}.canonical_preimage,${row}.digest) != 1`
+					: "";
+			const name = `issuance_retirement_${table}_${op}`;
+			return {
+				name,
+				sql: `CREATE TRIGGER ${name} BEFORE ${op.toUpperCase()} ON ${table} WHEN issuance_retirement_connection(${row}.object_id) != 1${record} BEGIN SELECT RAISE(ABORT, 'issuance retirement fence'); END`,
+				tbl_name: table,
+				type: "trigger",
+			};
+		})
+	)
+	.sort((left, right) => (left.name < right.name ? -1 : left.name > right.name ? 1 : 0));
+const CURRENT_ISSUANCE_TABLE_DDL = Object.freeze([
+	CURRENT_LINEAGES_DDL,
+	PHASE_2L_C_DDL.issued_records,
+	PHASE_2L_C_DDL.issuance_outbox,
+	PHASE_2L_C_V3_DDL.settlement_plans,
+	RETIREMENT_CONTROLS_DDL,
+] as const);
+
 const admissionObserverFixture = new URL("./fixtures/phase-2l-c-node-admission-observer-child.mjs", import.meta.url);
 
 const currencySeed = new Uint8Array(Buffer.from(contract.privateKeySeedHex, "hex"));
@@ -905,12 +940,13 @@ async function withStore<T>(primaryFilename: string, run: (store: DurableIssuanc
 }
 
 describe("Phase 2l-c synchronous factory and exact SQLite admission", () => {
-	it("exports one runtime factory and returns the frozen eight-member capability synchronously", async () => {
+	it("exports one runtime factory and returns the frozen nine-member capability synchronously", async () => {
 		const namespace = await loadPhase2lCNodeModule();
 		expect(Object.keys(namespace)).toEqual(["createNodeDurableIssuanceStore"]);
 		const result = namespace.createNodeDurableIssuanceStore({ primaryFilename: primary("surface") });
 		expect(result).not.toBeInstanceOf(Promise);
 		expect(Object.keys(result).sort()).toEqual([
+			"acquireNativeReadReservation",
 			"close",
 			"compareAndMarkOutboxPublished",
 			"readIssued",
@@ -921,6 +957,7 @@ describe("Phase 2l-c synchronous factory and exact SQLite admission", () => {
 			"transactWriteSettlementPlan",
 		]);
 		expect(Reflect.ownKeys(result).sort()).toEqual([
+			"acquireNativeReadReservation",
 			"close",
 			"compareAndMarkOutboxPublished",
 			"readIssued",
@@ -1024,7 +1061,9 @@ describe("Phase 2l-c synchronous factory and exact SQLite admission", () => {
 		const store = createNodeDurableIssuanceStore(options);
 		expect(getCalls).toBe(0);
 		expect(ownKeysCalls).toBe(1);
-		expect(descriptorCalls).toBe(1);
+		// One pass, one descriptor read per admitted key: optional `initialization` (ea4eb158)
+		// and `primaryFilename`. No key is read twice and no getter runs.
+		expect(descriptorCalls).toBe(2);
 		expect(prototypeCalls).toBe(1);
 		optionsTarget.primaryFilename = `${captured}-mutated`;
 		expect(fs.existsSync(derivedFilename(captured))).toBe(true);
@@ -1091,7 +1130,7 @@ describe("Phase 2l-c synchronous factory and exact SQLite admission", () => {
 		expect(fs.existsSync(derivedFilename(whitespace.trim()))).toBe(false);
 	});
 
-	it("creates, byte-verifies and reopens exactly one authority at schema v3 in the stable v1-derived file", async () => {
+	it("creates, byte-verifies and reopens exactly one authority at schema v5 in the stable v1-derived file", async () => {
 		const primaryFilename = primary("schema");
 		const { createNodeDurableIssuanceStore } = await loadPhase2lCNodeModule();
 		const first = createNodeDurableIssuanceStore({ primaryFilename });
@@ -1103,12 +1142,14 @@ describe("Phase 2l-c synchronous factory and exact SQLite admission", () => {
 			rows: Record<string, unknown>[];
 			userVersion: number;
 		};
-		expect(observed).toMatchObject({ journalMode: "wal", pageSize: 4096, userVersion: 3 });
+		expect(observed).toMatchObject({ journalMode: "wal", pageSize: 4096, userVersion: ISSUANCE_SCHEMA_VERSION });
 		expect(observed.rows).toEqual([
-			expect.objectContaining({ name: "issuance_outbox", sql: PHASE_2L_C_DDL.issuance_outbox, type: "table" }),
-			expect.objectContaining({ name: "issued_records", sql: PHASE_2L_C_DDL.issued_records, type: "table" }),
-			expect.objectContaining({ name: "lineages", sql: PHASE_2L_C_DDL.lineages, type: "table" }),
-			expect.objectContaining({ name: "settlement_plans", sql: PHASE_2L_C_V3_DDL.settlement_plans, type: "table" }),
+			{ name: "issuance_outbox", sql: PHASE_2L_C_DDL.issuance_outbox, tbl_name: "issuance_outbox", type: "table" },
+			{ name: "issued_records", sql: PHASE_2L_C_DDL.issued_records, tbl_name: "issued_records", type: "table" },
+			{ name: "lineages", sql: CURRENT_LINEAGES_DDL, tbl_name: "lineages", type: "table" },
+			{ name: "retirement_controls", sql: RETIREMENT_CONTROLS_DDL, tbl_name: "retirement_controls", type: "table" },
+			{ name: "settlement_plans", sql: PHASE_2L_C_V3_DDL.settlement_plans, tbl_name: "settlement_plans", type: "table" },
+			...ISSUANCE_FENCE_TRIGGERS,
 		]);
 		const reopened = createNodeDurableIssuanceStore({ primaryFilename });
 		await reopened.close();
@@ -1150,7 +1191,10 @@ describe("Phase 2l-c synchronous factory and exact SQLite admission", () => {
 		const events = observation.events as Array<{ kind: string; result?: Record<string, unknown>; sql: string }>;
 		expect(
 			events.filter(({ kind, sql }) => kind === "exec" && /^CREATE TABLE\b/u.test(sql)).map(({ sql }) => sql)
-		).toEqual(Object.values(PHASE_2L_C_V3_DDL));
+		).toEqual(CURRENT_ISSUANCE_TABLE_DDL);
+		expect(
+			events.filter(({ kind, sql }) => kind === "exec" && /^CREATE TRIGGER\b/u.test(sql)).map(({ sql }) => sql).sort()
+		).toEqual(ISSUANCE_FENCE_TRIGGERS.map(({ sql }) => sql).sort());
 		const busyWrite = events.findIndex(({ sql }) => /^\s*PRAGMA\s+busy_timeout\s*=\s*1000\s*$/iu.test(sql));
 		const busyRead = events.findIndex(
 			({ result, sql }, index) =>
@@ -1176,7 +1220,11 @@ describe("Phase 2l-c synchronous factory and exact SQLite admission", () => {
 		empty.close();
 		const recovered = createNodeDurableIssuanceStore({ primaryFilename: retryPrimary });
 		await recovered.close();
-		expect(schema(retryFilename)).toMatchObject({ journalMode: "wal", pageSize: 4096, userVersion: 3 });
+		expect(schema(retryFilename)).toMatchObject({
+			journalMode: "wal",
+			pageSize: 4096,
+			userVersion: ISSUANCE_SCHEMA_VERSION,
+		});
 
 		for (const [label, statements] of [
 			["partial", [PHASE_2L_C_DDL.lineages]],
@@ -1206,6 +1254,17 @@ describe("Phase 2l-c synchronous factory and exact SQLite admission", () => {
 			["wrong-version", Object.values(PHASE_2L_C_V3_DDL), { userVersion: 4 }],
 			["wrong-page", Object.values(PHASE_2L_C_V3_DDL), { pageSize: 8192, userVersion: 3 }],
 			["wrong-journal", Object.values(PHASE_2L_C_V3_DDL), { journalMode: "DELETE", userVersion: 3 }],
+			// The complete current catalog at the current version plus one foreign table: only the
+			// extra row can be the reason for refusal.
+			[
+				"extra-current",
+				[
+					...CURRENT_ISSUANCE_TABLE_DDL,
+					...ISSUANCE_FENCE_TRIGGERS.map(({ sql }) => sql),
+					"CREATE TABLE foreign_table (id TEXT PRIMARY KEY)",
+				],
+				{ userVersion: ISSUANCE_SCHEMA_VERSION },
+			],
 		] as const) {
 			const primaryFilename = primary(label);
 			const filename = derivedFilename(primaryFilename);
@@ -1499,7 +1558,8 @@ describe("Phase 2l-c real transaction, lifecycle and paging contract", () => {
 		const { createNodeDurableIssuanceStore } = await loadPhase2lCNodeModule();
 		const admitted = createNodeDurableIssuanceStore({ primaryFilename });
 		await admitted.close();
-		const raw = new DatabaseSync(derivedFilename(primaryFilename));
+		// Out-of-band seeding fixture (ea4eb158 fences raw writers; see out-of-band-sqlite.ts).
+		const raw = allowOutOfBandWrites(new DatabaseSync(derivedFilename(primaryFilename)));
 		const issued = raw.prepare(
 			"INSERT INTO issued_records(object_id,author,author_sequence,canonical_preimage,digest,signature) VALUES(?,?,?,?,?,?)"
 		);
@@ -1741,7 +1801,9 @@ describe("Phase 2l-c real transaction, lifecycle and paging contract", () => {
 			const result = Reflect.apply(originalGet, this, parameters) as ReturnType<StatementSync["get"]>;
 			if (armed) {
 				const sql = sqlByStatement.get(this) ?? "";
-				if (/^\s*SELECT\b[\s\S]*\bFROM\s+lineages\b/iu.test(sql)) trace.push("lineage-select");
+				if (/^\s*SELECT\s+length\(pending_unsigned\)[\s\S]*\bFROM\s+lineages\b/iu.test(sql))
+					trace.push("lineage-size");
+				else if (/^\s*SELECT\b[\s\S]*\bFROM\s+lineages\b/iu.test(sql)) trace.push("lineage-select");
 				else if (/^\s*SELECT\b[\s\S]*\bFROM\s+issued_records\b/iu.test(sql)) trace.push("issued-read");
 				else if (/^\s*SELECT\b[\s\S]*\bFROM\s+issuance_outbox\b/iu.test(sql)) trace.push("outbox-read");
 			}
@@ -1773,14 +1835,21 @@ describe("Phase 2l-c real transaction, lifecycle and paging contract", () => {
 		armed = true;
 		try {
 			await store.transactIssue(PHASE_2L_C_SCOPE, (selected) => Promise.resolve(phase2lCCommit(selected)));
+			// ea4eb158: every lineage point read is size-bounded first (pending_unsigned), and the
+			// writer reads the lineage twice inside its one IMMEDIATE transaction (the commit
+			// guard and the retirement-row check) before any write.
 			expect(trace).toEqual([
 				"begin-immediate",
+				"lineage-size",
+				"lineage-select",
+				"lineage-size",
 				"lineage-select",
 				"lineage-write",
 				"issued-insert",
 				"outbox-insert",
 				"mutation-commit",
 				"readonly-begin",
+				"lineage-size",
 				"lineage-select",
 				"issued-read",
 				"outbox-read",
@@ -1868,7 +1937,7 @@ describe("Phase 2l-c real transaction, lifecycle and paging contract", () => {
 		const poisonPrimary = primary("poison");
 		const seed = createNodeDurableIssuanceStore({ primaryFilename: poisonPrimary });
 		await seed.close();
-		const raw = new DatabaseSync(derivedFilename(poisonPrimary));
+		const raw = allowOutOfBandWrites(new DatabaseSync(derivedFilename(poisonPrimary)));
 		const candidate = phase2lCCommit(0);
 		raw
 			.prepare(

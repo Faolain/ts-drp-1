@@ -2,23 +2,23 @@ import { compareBytes, encodeCanonical } from "@ts-drp/canonical";
 import type { DatabaseSync } from "node:sqlite";
 import { resolve } from "node:path";
 import { resolveNodeDisposableSessionAccount, type NodeDisposableSessionAccountLease } from "../room-head.js";
-import { cachedStatement } from "./sqlite-statement-cache.js";
+import { configuredStatement } from "./sqlite-statement-cache.js";
 
 const CUSTODY_TABLE = "local_session_custody_guard";
 const CUSTODY_SCHEMA = "CREATE TABLE local_session_custody_guard(id INTEGER PRIMARY KEY CHECK(id=1),binding BLOB NOT NULL CHECK(length(binding)<=16384)) STRICT";
 const guardedDatabases = new WeakSet<DatabaseSync>();
 /** Exact bounded mechanical guard read. It grants no native port or deletion. */
 export function assertNativeLocalSessionFileBinding(database: DatabaseSync, expected: Uint8Array): void {
-	const schema = cachedStatement(database, "SELECT CASE WHEN typeof(sql)='text' AND length(CAST(sql AS BLOB))<=512 THEN sql ELSE NULL END AS sql FROM sqlite_schema WHERE name=?").get(CUSTODY_TABLE);
+	const schema = configuredStatement(database, "SELECT CASE WHEN typeof(sql)='text' AND length(CAST(sql AS BLOB))<=512 THEN sql ELSE NULL END AS sql FROM sqlite_schema WHERE name=?").get(CUSTODY_TABLE);
 	if (schema?.sql !== CUSTODY_SCHEMA) throw new Error("DISPOSABLE_SESSION_NATIVE_CUSTODY_POISONED");
-	const rows = cachedStatement(database, "SELECT id, CASE WHEN typeof(binding)='blob' AND length(binding)<=16384 THEN binding ELSE NULL END AS binding FROM local_session_custody_guard LIMIT 2").all();
+	const rows = configuredStatement(database, "SELECT id, CASE WHEN typeof(binding)='blob' AND length(binding)<=16384 THEN binding ELSE NULL END AS binding FROM local_session_custody_guard LIMIT 2").all();
 	if (rows.length !== 1 || rows[0]?.id !== 1 || !(rows[0].binding instanceof Uint8Array) || compareBytes(rows[0].binding, expected) !== 0) throw new Error("DISPOSABLE_SESSION_NATIVE_CUSTODY_MISMATCH");
 }
 /** Existing native owners call this before schema/data effects. Persisted
  * disposable custody cannot be bypassed by reopening an unguarded raw alias. */
 export function enforceNativeLocalSessionFile(database: DatabaseSync, filename: string,
 	session: LocalSessionLifetime | undefined, create: boolean): void {
-	const schema = cachedStatement(database, "SELECT CASE WHEN typeof(sql)='text' AND length(CAST(sql AS BLOB))<=512 THEN sql ELSE NULL END AS sql FROM sqlite_schema WHERE name=?").get(CUSTODY_TABLE);
+	const schema = configuredStatement(database, "SELECT CASE WHEN typeof(sql)='text' AND length(CAST(sql AS BLOB))<=512 THEN sql ELSE NULL END AS sql FROM sqlite_schema WHERE name=?").get(CUSTODY_TABLE);
 	const expected = session?.captureNativeFileBinding(filename);
 	if (schema === undefined && expected === undefined) return; // Ordinary/persistent stores unchanged.
 	if (expected === undefined) throw new Error("DISPOSABLE_SESSION_NATIVE_CUSTODY_REQUIRED");
@@ -26,9 +26,9 @@ export function enforceNativeLocalSessionFile(database: DatabaseSync, filename: 
 		if (!create) throw new Error("DISPOSABLE_SESSION_NATIVE_CUSTODY_LOST");
 		database.exec("PRAGMA synchronous=FULL; BEGIN IMMEDIATE");
 		try {
-			if (cachedStatement(database, "SELECT 1 FROM sqlite_schema WHERE name NOT GLOB 'sqlite_*' LIMIT 1").get()) throw new Error("DISPOSABLE_SESSION_UNBOUND_NATIVE_BYTES");
+			if (configuredStatement(database, "SELECT 1 FROM sqlite_schema WHERE name NOT GLOB 'sqlite_*' LIMIT 1").get()) throw new Error("DISPOSABLE_SESSION_UNBOUND_NATIVE_BYTES");
 			database.exec(CUSTODY_SCHEMA);
-			cachedStatement(database, "INSERT INTO local_session_custody_guard VALUES(1,?)").run(expected);
+			configuredStatement(database, "INSERT INTO local_session_custody_guard VALUES(1,?)").run(expected);
 			session!.assertCurrent(); database.exec("COMMIT");
 		} catch (primary) { try { database.exec("ROLLBACK"); } catch { /* Preserve original. */ } throw primary; }
 	} else {

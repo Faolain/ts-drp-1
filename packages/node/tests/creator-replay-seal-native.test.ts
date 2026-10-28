@@ -401,7 +401,9 @@ describe("ordinary runtime candidate-free readiness producer", () => {
 		};
 		const f = make(), accounting = {}, staged = await f.method.call(f.lifetime, accounting);
 		expect(staged.preparation).toBe(f.preparation);
-		expect(f.capture).toHaveBeenCalledExactlyOnceWith(f.facts, f.registration, f.state.identity, f.state.native.rows, null, accounting);
+		// ea4eb158: the capture's control parameter is DurableIssuanceRetirementControl | undefined;
+		// the producer normalizes an absent native control (null) to undefined.
+		expect(f.capture).toHaveBeenCalledExactlyOnceWith(f.facts, f.registration, f.state.identity, f.state.native.rows, undefined, accounting);
 		expect(staged.commit()).toBe(true);
 		f.state.identity = {}; expect(staged.commit()).toBe(false);
 		const changed = make(), pending = await changed.method.call(changed.lifetime, accounting);

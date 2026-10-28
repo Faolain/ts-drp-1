@@ -6043,6 +6043,30 @@ function egressSuccess(kind: "empty" | "published"): Extract<V3EgressResult, { r
 // Retryable like any closing plane: reissue once that close has adopted.
 const CREATOR_CLOSE_PENDING = "close-pending: v3 creator's interrupted epoch close must complete before new local work";
 
+/**
+ * D.108d1b (amended): the local author never signs at or below its authenticated
+ * closed frontier. Such a store is a stale copy or a restored backup of this key; a
+ * signature there would be a second vertex for a slot the room already admitted.
+ */
+export class V3LocalLineageBehindFrontier extends TypeError {
+	readonly code = "V3_LOCAL_LINEAGE_BEHIND_FRONTIER";
+	constructor(
+		readonly author: string,
+		readonly next: number,
+		readonly admitted: number
+	) {
+		super(`V3_LOCAL_LINEAGE_BEHIND_FRONTIER: local lineage ${next} is at or below the admitted frontier ${admitted}`);
+	}
+}
+
+/** The registration's authenticated closed frontier for its own local author, if any. */
+function localAdmittedFrontier(registration: V3PlaneRegistration, scope: DurableIssueScope): number | null {
+	const historical = registration.historicalIssuance;
+	const identity = historical === undefined ? undefined : resolveVerifiedCreatorHistoricalIssuance(historical.capability);
+	return identity !== undefined && identity.author === scope.author && identity.objectId === scope.objectId &&
+		identity.successorEpoch === registration.payload.provenance.epoch ? identity.admittedAuthorSequence : null;
+}
+
 function localIssueFailure(
 	kind: Exclude<Extract<V3LocalIssueResult, { readonly ok: false }>["kind"], "split-required">,
 	detail: string
@@ -13412,6 +13436,11 @@ function creatorFilteredIssuanceStore(
 	)
 		throw new TypeError("filtered issuance original owner is unavailable");
 	const acquireNativeReadReservation: unknown = Reflect.get(issuanceStore, "acquireNativeReadReservation");
+	// A call that fills its page reads past its last visible row and authenticates the
+	// filtered rows there. The very next call that continues from that visible row resumes
+	// after them instead of authenticating and reading their issued records again, so a scan
+	// reads each row once. Any other call discards the cursor; rows appended later are read.
+	let verifiedSkip: Readonly<{ after: number; resume: readonly [string, string, number] }> | undefined;
 	const filtered = ObjectFreeze({
 		...(typeof acquireNativeReadReservation !== "function"
 			? {}
@@ -13434,6 +13463,18 @@ function creatorFilteredIssuanceStore(
 			const vertexFacts = historicalIssuance?.vertexFacts;
 			const visible: DurableIssuanceOutboxRecord[] = [];
 			let afterKey = input?.afterKey;
+			const skip = verifiedSkip;
+			verifiedSkip = undefined;
+			if (
+				skip !== undefined &&
+				afterKey !== undefined &&
+				afterKey !== null &&
+				afterKey[0] === issuanceScope.objectId &&
+				afterKey[1] === issuanceScope.author &&
+				afterKey[2] === skip.after
+			)
+				afterKey = skip.resume;
+			let lastVisible: number | undefined;
 			for (;;) {
 				await checkpoint();
 				const nativePage = await issuanceStore.readOutboxPage({
@@ -13442,7 +13483,13 @@ function creatorFilteredIssuanceStore(
 					scope: issuanceScope,
 				});
 				const page = captureOutboxPage(nativePage, 64);
-				if (page === undefined || page.length === 0) return visible.length === 0 ? nativePage : ObjectFreeze(visible);
+				if (page === undefined || page.length === 0) {
+					if (visible.length === 0) return nativePage;
+					if (page !== undefined && lastVisible !== undefined && afterKey !== undefined && afterKey !== null &&
+						afterKey[2] > lastVisible)
+						verifiedSkip = ObjectFreeze({ after: lastVisible, resume: afterKey });
+					return ObjectFreeze(visible);
+				}
 				for (let pageIndex = 0; pageIndex < page.length; pageIndex++) {
 					await checkpoint();
 					const raw = page.read(pageIndex) as DurableIssuanceOutboxRecord;
@@ -13463,6 +13510,7 @@ function creatorFilteredIssuanceStore(
 						// which verifies their fresh plan/context and terminal consumers.
 						// A detached historical contract is not a signed-frontier filter.
 						visible.push(raw);
+						lastVisible = row.authorSequence;
 						afterKey = [issuanceScope.objectId, issuanceScope.author, row.authorSequence];
 						if (visible.length >= requestedLimit) return ObjectFreeze(visible);
 						continue;
@@ -13547,6 +13595,7 @@ function creatorFilteredIssuanceStore(
 							(authenticatedGenesisRow !== undefined || authenticatedHistoricalRow !== undefined)
 						) {
 							visible.push(raw);
+							lastVisible = row.authorSequence;
 							afterKey = ObjectFreeze([issuanceScope.objectId, issuanceScope.author, row.authorSequence]) as readonly [
 								string,
 								string,
@@ -13563,6 +13612,7 @@ function creatorFilteredIssuanceStore(
 						continue;
 					}
 					visible.push(raw);
+					lastVisible = row.authorSequence;
 					afterKey = ObjectFreeze([issuanceScope.objectId, issuanceScope.author, row.authorSequence]) as readonly [
 						string,
 						string,
@@ -15395,6 +15445,7 @@ async function issueOneVertex(
 		return localIssueFailure("admission-rejected", "v3 local operation was rejected before issuance");
 	}
 
+	const admittedFrontier = localAdmittedFrontier(registration, scope);
 	let commit: unknown;
 	let capacityRejected = false;
 	let cryptoEntered = false;
@@ -15428,6 +15479,10 @@ async function issueOneVertex(
 					});
 				};
 				const buildInNativeJob: DurableBuildAndSign = async (authorSequence, nativeSignAdmission) => {
+					// Every local signature (ordinary, fence, replacement, reissue) passes here
+					// with the store's CAS-selected sequence, before anything is signed.
+					if (admittedFrontier !== null && authorSequence <= admittedFrontier)
+						throw new V3LocalLineageBehindFrontier(selectedScope.author, authorSequence, admittedFrontier);
 					if (replacementContext !== undefined && nativeSignAdmission === undefined)
 						throw new TypeError("source-bound replacement requires its original native job");
 					if (registration.creatorMaintenanceBound && nativeSignAdmission === undefined)

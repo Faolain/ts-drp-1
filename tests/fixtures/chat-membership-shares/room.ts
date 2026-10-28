@@ -20,6 +20,7 @@ import {
 	type ShippingChatLocalArchive,
 } from "../../../examples/chat/src/v3-chat-archive.js";
 import {
+	createBrowserV3RoomDatabaseStorageHost,
 	createV3RoomCreatorInviteMaterial,
 	createV3RoomSession,
 	type CreateV3RoomSessionInput,
@@ -99,6 +100,12 @@ export interface ChatSharesRoomOptions {
 	readonly localMembers?: readonly number[];
 	/** Process-death recovery: reopen these existing owned local sessions instead of creating them. */
 	readonly localSelectors?: Readonly<Record<number, Readonly<{ slot: number; incarnation: number }>>>;
+	/**
+	 * "browser-room": every room database on the browser room-database host (the shipped pages'
+	 * default) over a fresh fake-indexeddb factory with a process Web Locks manager, instead of the
+	 * Node SQLite host. Floors and archives stay SQLite files.
+	 */
+	readonly storage?: "node" | "browser-room";
 }
 
 const track = Object.freeze({
@@ -221,7 +228,24 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 		objectId,
 		signGenesisAnchorDigest: (digest) => Promise.resolve(ed25519.sign(digest, creator.seed)),
 	});
-	const host = createNodeV3RoomStorageHost({ directory, initialization: () => "create" });
+	const browserRoom = options.storage === "browser-room";
+	if (browserRoom) {
+		await import("fake-indexeddb/auto");
+		const { IDBFactory } = await import("fake-indexeddb");
+		Reflect.set(globalThis, "indexedDB", new IDBFactory());
+		if (Reflect.get(navigator, "locks") === undefined) {
+			const { createProcessLockManager } = await import("../track-m/room-retention-fixture.js");
+			Object.defineProperty(navigator, "locks", { configurable: true, value: createProcessLockManager() });
+		}
+	}
+	const host = (browserRoom
+		? createBrowserV3RoomDatabaseStorageHost()
+		: createNodeV3RoomStorageHost({ directory, initialization: () => "create" })) as ReturnType<
+		typeof createNodeV3RoomStorageHost
+	>;
+	// Sync before sending (owner decision B): a member that reopened its lineage confirms the
+	// creator's statement of the current epoch, as the page's successor delivery does on bind.
+	let creatorRoom: V3RoomSession<ShippingChatProjection> | undefined;
 
 	// Whether the native host already holds a store (packages/storage-node/src/v3-room-host.ts names
 	// each store's files after sha256(JSON.stringify([family, name]))).
@@ -239,16 +263,27 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 	 * and a store only a Writer uses (seal votes and evidence) is created the first time, as the
 	 * browser's IndexedDB host creates a missing store when it opens it.
 	 * `name` lets one identity open a second, independent replica.
+	 * `currency: false` skips confirming the open creator's currency statement (sync before sending).
+	 * `localIssueCurrencyHoldMs` shortens how long a not-yet-current move is held.
 	 * @param index
 	 * @param openOptions
 	 * @param openOptions.reopen
 	 * @param openOptions.promote
 	 * @param openOptions.receiveOnly
 	 * @param openOptions.name
+	 * @param openOptions.currency
+	 * @param openOptions.localIssueCurrencyHoldMs
 	 */
 	const open = async (
 		index: number,
-		openOptions: { reopen?: boolean; promote?: boolean; receiveOnly?: boolean; name?: string } = {}
+		openOptions: {
+			reopen?: boolean;
+			promote?: boolean;
+			receiveOnly?: boolean;
+			name?: string;
+			currency?: boolean;
+			localIssueCurrencyHoldMs?: number;
+		} = {}
 	) => {
 		const reopening = openOptions.reopen === true || openOptions.promote === true;
 		const identity = required(identities[index]);
@@ -282,7 +317,9 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 		const networkNode = fakeNetwork(required(peers[index]), false);
 		const input: CreateV3RoomSessionInput<ShippingChatProjection> = {
 			application,
-			storageHost: openOptions.promote
+			storageHost: browserRoom
+				? host
+				: openOptions.promote
 				? createNodeV3RoomStorageHost({
 						directory,
 						initialization: (store) => (storeExists(store.name, store.family) ? "reopen" : "create"),
@@ -295,6 +332,9 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 				? { creatorFinalitySigner: (await createRecoverableFinalitySigner({ seed: creator.seed })).signer }
 				: {}),
 			...(openOptions.receiveOnly === true ? { receiveOnly: true as const } : {}),
+			...(openOptions.localIssueCurrencyHoldMs === undefined
+				? {}
+				: { localIssueCurrencyHoldMs: openOptions.localIssueCurrencyHoldMs }),
 			createOperationAdmissionPolicy: application.createOperationAdmissionPolicy,
 			creatorInvite: invite,
 			databaseName: name,
@@ -341,6 +381,11 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 		track.rooms.add(room);
 		await waitForV3RoomStartupForDiagnostics(room);
 		archive?.observe(room.projection());
+		if (index === 0) creatorRoom = room;
+		else if (openOptions.currency !== false && openOptions.receiveOnly !== true && creatorRoom !== undefined) {
+			const statement = creatorRoom.currencyStatement?.();
+			if (statement !== undefined) await room.confirmCurrent?.(statement);
+		}
 		const deliver = (rows: readonly DurableIssuanceOutboxRecord[], sender: number) => {
 			for (const row of rows)
 				required(ingress)(
@@ -395,6 +440,7 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 	 * @param peer
 	 */
 	const stop = async (peer: Peer) => {
+		if (peer.room === creatorRoom) creatorRoom = undefined;
 		await peer.room.close();
 		track.rooms.delete(peer.room);
 		if (peer.archive !== undefined) {
@@ -571,7 +617,14 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 	const install = async (peer: Peer) => {
 		const transfer = await successorDelivery(peer.index);
 		Reflect.set(peer.networkNode, "createSnapshotChunkProtocolHost", () => transfer.port);
-		await peer.room.installCreatorSuccessor({ offer: transfer.offer, peers: transfer.peers });
+		// Sync before sending (live install rule): the creator's statement for the offered epoch travels
+		// with the offer, as the pages' successor delivery sends it; a current peer ignores it.
+		const currency = creatorRoom?.currencyStatement?.();
+		await peer.room.installCreatorSuccessor({
+			offer: transfer.offer,
+			peers: transfer.peers,
+			...(currency === undefined ? {} : { currency }),
+		});
 	};
 
 	/** Observation-only native issuance owner for one peer (a reopen alias for local members). */
