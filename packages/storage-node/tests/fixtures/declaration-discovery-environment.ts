@@ -12,7 +12,7 @@ import {
 	preCopy,
 	SQLITE_MATERIALIZATION_LIMITS,
 } from "../../../../tests/fixtures/snapshot-declaration-discovery/contract.js";
-import { fixture } from "../../../../tests/fixtures/snapshot-recovery-owner/contract.js";
+import { fixture, outcome } from "../../../../tests/fixtures/snapshot-recovery-owner/contract.js";
 import { createNodeSnapshotQuarantineStore } from "../../src/snapshot-transfer.js";
 
 const columns: Record<string, string> = {
@@ -281,8 +281,17 @@ export function sqliteEnvironment(primaryFilename: string): DiscoveryEnvironment
 			const selected = fixture("discovery-native-control");
 			await store.openScope(selected.declaration);
 			const longKey: Key = { ...selected.declaration.scope, objectId: "x".repeat(5000) };
-			await store.openScope({ ...selected.declaration, scope: longKey });
+			// ea4eb158: the native owner refuses an object identifier over the manifest protocol's
+			// 1024 characters; the stored long-key row these copy controls need is planted out of band.
+			const refused = await outcome(() => store.openScope({ ...selected.declaration, scope: longKey }));
+			check(refused.code, "malformed-input", "native owner refuses an over-long object identifier");
 			await store.close();
+			use((db) => {
+				const columnList = "object_id,epoch,anchor,manifest_digest,exact_manifest_bytes,total_bytes,chunk_count,expires_at,state,retention,incarnation,descriptors";
+				db.prepare(
+					`INSERT INTO snapshot_scopes_v2 (${columnList}) SELECT ?,${columnList.split(",").slice(1).join(",")} FROM snapshot_scopes_v2 WHERE ${where}`
+				).run(longKey.objectId, ...parameters(selected.declaration.scope));
+			});
 			const transactionModes = [];
 			for (const mode of ["BEGIN", "BEGIN IMMEDIATE"]) {
 				const observed = await observeSQLite(() =>
