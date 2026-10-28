@@ -83,6 +83,27 @@ describe("decision A: per-player room database names", () => {
 			expect(source, file).toContain(`application: "${application}"`);
 		}
 	});
+
+	it("[RED] where the platform has no IndexedDB (an injected storage host) there is no shared database to migrate", async () => {
+		// The Grid zone runs in Node with an injected storage host (app-rollover-delivery-grid-native);
+		// a platform without IndexedDB never held a shared browser database, so the name is all it needs.
+		const saved = Object.getOwnPropertyDescriptor(globalThis, "indexedDB");
+		Reflect.deleteProperty(globalThis, "indexedDB");
+		try {
+			const prepared = await (
+				room as Binding & {
+					prepareV3RoomPlayerDatabase(input: { application: string; objectId: string; author: string }): Promise<{
+						databaseName: string;
+						migration: { kind: string };
+					}>;
+				}
+			).prepareV3RoomPlayerDatabase({ application: "zone", objectId, author: alice });
+			expect(prepared.databaseName).toBe(room.v3RoomPlayerDatabaseName({ application: "zone", objectId, author: alice }));
+			expect(prepared.migration).toEqual({ kind: "no-indexeddb", writers: [], copied: [] });
+		} finally {
+			if (saved !== undefined) Object.defineProperty(globalThis, "indexedDB", saved);
+		}
+	});
 });
 
 /** A three-peer shipped Chat room on the browser room-database host. */
