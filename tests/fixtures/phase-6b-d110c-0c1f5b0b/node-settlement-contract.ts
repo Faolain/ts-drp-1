@@ -46,15 +46,21 @@ export async function runNativeHistoricalReplacement(
 	fallback = false,
 	fabricatedMembership = false,
 	splitProgress = false,
-	retryLinked = false
+	retryLinked = false,
+	progressChunkIntents = 0
 ): Promise<Readonly<Record<string, unknown>>> {
+	// One genuine applicationBatch replacement chunk carrying every intent of an
+	// N-entry source batch (store logical-time pin). Exclusive with splitProgress.
+	const chunked = progressChunkIntents > 0 && !splitProgress;
+	const batched = splitProgress || chunked;
+	const chunkIntents = Array.from({ length: chunked ? progressChunkIntents : 0 }, () => ({ action: "add", value: 1 }));
 	const directory = mkdtempSync(path.join(tmpdir(), "drp-r8-historical-source-"));
 	const followerSeed = "42".repeat(32);
 	const follower = Buffer.from(ed25519.getPublicKey(hexBytes(followerSeed))).toString("hex");
 	const receiverSeed = "43".repeat(32),
 		receiverAuthor = Buffer.from(ed25519.getPublicKey(hexBytes(receiverSeed))).toString("hex");
 	const options = {
-		applicationBatch: splitProgress,
+		applicationBatch: batched,
 		authorizationMode: "latched-acl" as const,
 		creatorTrustProfileId: "creator-trusted-settlement-v1" as const,
 		authorizedPrivateKeySeedHexes: [contract.privateKeySeedHex, followerSeed, ...(remote ? [receiverSeed] : [])],
@@ -156,7 +162,7 @@ export async function runNativeHistoricalReplacement(
 		if (!bootstrapPublished.ok)
 			throw new TypeError(`historical pinned bootstrap publication refused:${bootstrapPublished.kind}`);
 		const sourceIssued = await old.issueLocal({
-			operations: splitProgress ? [
+			operations: chunked ? chunkIntents.map((operation, index) => ({ logicalTime: 2 + index, operation })) : splitProgress ? [
 				{ logicalTime: 2, operation: { action: "add", value: 10 } },
 				{ logicalTime: 3, operation: { action: "add", value: 20 } },
 			] : [{ logicalTime: 2, operation: { action: "add", value: 10 } }],
@@ -166,7 +172,7 @@ export async function runNativeHistoricalReplacement(
 		old.deactivate();
 		const modules = await defaultCreatorAdoptionFixtureModules();
 		creator = await openGenuineCreatorAdoptionFixture({
-			applicationBatch: splitProgress,
+			applicationBatch: batched,
 			nativeAheOwner: true,
 			nativeStorageOwners: true,
 			modules,
@@ -344,6 +350,17 @@ export async function runNativeHistoricalReplacement(
 		const persistedPreparation = await issuanceStore.readSettlementPlan(scope);
 		const splitIntentDigest = hashDomain("ts-drp/settlement-replacement-intents/v1",
 			encodeCanonical([{action:"add",value:10},{action:"add",value:20}]));
+		const chunkIntentDigest = hashDomain("ts-drp/settlement-replacement-intents/v1", encodeCanonical(chunkIntents));
+		if (chunked) {
+			const plan = await issuanceStore.readSettlementPlan(scope);
+			if (plan === null) throw new TypeError("chunk source native plan missing");
+			await issuanceStore.transactWriteSettlementPlan({ scope, expectedRevision: plan.revision,
+				plan: { ...plan, revision: plan.revision + 1, entries: plan.entries.map((entry) => entry.sourceSequence === 1 ?
+					{ ...entry, replacementProgress: { version: 1, intentCount: chunkIntents.length, intentDigest: chunkIntentDigest, chunks: [] } } : entry) } });
+		}
+		const chunkEffect = chunked ? { kind: "replacement" as const, sourceSequence: 1, fromIntent: 0, throughIntent: chunkIntents.length, intentDigest: chunkIntentDigest } : undefined;
+		const chunkOperations = chunkIntents.map((operation, index) => ({ logicalTime: 6 + 2 * index, operation }));
+		const chunkPlanBefore = chunked ? await issuanceStore.readSettlementPlan(scope) : undefined;
 		if(splitProgress) {
 			const plan=await issuanceStore.readSettlementPlan(scope);
 			if(plan===null)throw new TypeError("split source native plan missing");
@@ -354,8 +371,8 @@ export async function runNativeHistoricalReplacement(
 		if (remote) await source.authorizeReplacement(async ({digest}) => ed25519.sign(digest, hexBytes(contract.privateKeySeedHex)));
 		let signerCalls = 0;
 		const replacement = await source.issueReplacement({
-			operations: [{ logicalTime: 6, operation: { action: "add", value: 10 } }],
-			planEffect: splitProgress ? {kind:"replacement",sourceSequence:1,fromIntent:0,throughIntent:1,intentDigest:splitIntentDigest} :
+			operations: chunked ? chunkOperations : [{ logicalTime: 6, operation: { action: "add", value: 10 } }],
+			planEffect: chunkEffect !== undefined ? chunkEffect : splitProgress ? {kind:"replacement",sourceSequence:1,fromIntent:0,throughIntent:1,intentDigest:splitIntentDigest} :
 				{ kind: "replacement", sourceSequence: 1 },
 			signRegisteredVertexDigest: async (value) => {
 				signerCalls++;
@@ -867,6 +884,16 @@ export async function runNativeHistoricalReplacement(
 			replacement,
 			...(finalSplitReplacement===undefined?{}:{finalSplitReplacement}),
 			...(linkedRetry === undefined ? {} : { linkedRetry }),
+			...(chunkEffect === undefined || !replacement.ok ? {} : {
+				progressChunk: {
+					effect: chunkEffect,
+					operations: chunkOperations,
+					planBefore: chunkPlanBefore,
+					planAfter: await issuanceStore.readSettlementPlan(scope),
+					row: await issuanceStore.readIssued(scope, replacement.authorSequence),
+					history: await Promise.all(Array.from({ length: replacement.authorSequence }, (_, sequence) => issuanceStore.readIssued(scope, sequence))),
+				},
+			}),
 			signerCalls,
 			ordinaryNew,
 			newSignerCalls,
