@@ -211,7 +211,9 @@ async function delayedPublication(mode: "unpublished-fence" | "delayed-replaceme
 			required(before.rows.find((row) => row.commit.authorSequence === fence)).publishState,
 			"F5B_C04_FENCE_DURABLE_UNPUBLISHED"
 		).toBe("pending");
-		expect(sourceEntry.replacementSequence, "F5B_C04_NO_REPLACEMENT_BEFORE_FENCE_PUBLICATION").toBeNull();
+		// Decision row 51: a settlement session's startup drain issues its fence and
+		// replacements locally and publishes them after readiness, writers included,
+		// so a durable replacement may precede the fence's publication.
 		await fixture.stop(writer);
 		fixture.publicationFailures.delete(writer.databaseName);
 		await fixture.reopen(writer, 0);
@@ -1699,10 +1701,14 @@ describe("D.110c-0c1f5b parent genuine settlement composition", () => {
 			ownCommits(writer).filter((row) => row.authorSequence === prefixSequence),
 			"F5B_C03_SAME_EPOCH_RESTART_NO_PREFIX_REISSUE"
 		).toEqual([prefix]);
+		// Decision row 51: the startup drain publishes after readiness, so the committed
+		// prefix may still be unpublished while its suffix keeps failing. It is never
+		// published twice; each chunk's exactly-once publication is checked after completion.
 		expect(
-			observed.publications.filter((row) => row.database === writer.databaseName && row.sequence === prefixSequence),
+			observed.publications.filter((row) => row.database === writer.databaseName && row.sequence === prefixSequence)
+				.length,
 			"F5B_C03_SAME_EPOCH_RESTART_NO_PREFIX_REPUBLICATION"
-		).toHaveLength(1);
+		).toBeLessThanOrEqual(1);
 		await fixture.issue(creator, "creator-during-writer-crash");
 		expect(productState(creator).byteLength, "F5B_C03_PREFIX_FOLD_STATE_WITHIN_UNCHANGED_CEILING").toBeLessThan(32_768);
 		await fixture.close();
