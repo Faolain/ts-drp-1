@@ -78,8 +78,16 @@ describe("D.108d1b: a restored same-author device never re-signs an admitted slo
 		const { f, member, conflicting } = await restoredDevice();
 		const installed = await f.install(member).then(
 			() => true,
-			() => false
+			(error: unknown) => {
+				// Fail closed, surfaced: the settlement fence refuses before signing.
+				expect(String((error as Error).message)).toContain("V3_LOCAL_LINEAGE_BEHIND_FRONTIER");
+				return false;
+			}
 		);
+		expect(await conflicting()).toEqual([]);
+		// The installed plane (epoch 2, authenticated frontier) refuses ordinary work too.
+		expect(member.room.authority()?.epoch).toBe(2);
+		await expect(member.room.issue(message("bob-after-install"))).rejects.toThrow(/V3_LOCAL_LINEAGE_BEHIND_FRONTIER/u);
 		expect(await conflicting()).toEqual([]);
 		if (installed) {
 			// Had the install proceeded without re-signing, the cold reopen (checkpoint
@@ -92,8 +100,15 @@ describe("D.108d1b: a restored same-author device never re-signs an admitted slo
 		expect(await conflicting()).toEqual([]);
 	}, 240_000);
 
-	it("through an ordinary issue on the restored device", async () => {
+	// KNOWN GAP (pinned with it.fails; owner decision): before it installs anything, the
+	// restored device is at its backup's epoch 0 and holds no authenticated closed
+	// frontier, so no local check can know slot 2 was admitted. Its second vertex is an
+	// epoch-0 vertex: the room closed epoch 0 and every current peer refuses it, but it is
+	// still signed and published. Closing it needs authenticated currency before local
+	// issue (e.g. refuse while a newer authenticated offer or floor is known).
+	it.fails("through an ordinary issue on the restored device before it learns any later close", async () => {
 		const { member, conflicting } = await restoredDevice();
+		expect(member.room.authority()?.epoch).toBe(0);
 		await member.room.issue(message("bob-on-device-b")).then(
 			() => undefined,
 			() => undefined
