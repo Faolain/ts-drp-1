@@ -735,7 +735,7 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 				"future-outbox-read-failure",
 				"current-outbox-read-failure",
 				"current-outbox-issued-mismatch",
-				"copied-creator-lineage",
+				"stale-same-author-clone",
 				"wrong-author-right-signer",
 				"right-author-wrong-signer",
 				"two-nonzero-lineages",
@@ -752,6 +752,7 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 				"ed25519-unavailable",
 				"negative-lineage-next",
 				"unsafe-lineage-next",
+				"two-tab-shared-room-database",
 			]);
 		const [
 			established,
@@ -761,8 +762,55 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 			backingFailure,
 			currentBackingFailure,
 			currentMismatch,
-			...rejected
+			...remaining
 		] = results;
+		// Owner decision (D.108d1b amended after ea4eb158): other writers' nonzero lineages
+		// in the same room database are accepted; only the selected author's own lineage
+		// is bound, against its authenticated closed frontier.
+		const multiWriterNames = ["two-nonzero-lineages", "two-tab-shared-room-database"];
+		const multiWriter = multiWriterNames.map((name) => remaining.find((candidate) => candidate.name === name));
+		const rejected = remaining.filter((candidate) => !multiWriterNames.includes(String(candidate.name)));
+		for (const accepted of multiWriter) {
+			expect(accepted).toMatchObject({
+				effects: {
+					adoptionSwapCount: 0,
+					aheRecoverCount: 1,
+					installEpochAnchorCount: 1,
+					issuanceStoreShape: true,
+					publicationCount: 0,
+					snapshotOpenCount: 1,
+					subscribeCount: 1,
+					transactIssueCount: 1,
+				},
+				issued: {
+					acceptedJournalAuthor: proof?.authors?.bob,
+					author: proof?.authors?.bob,
+					authorSequence: 1,
+					issuedRowAuthor: proof?.authors?.bob,
+					outboxRowAuthor: proof?.authors?.bob,
+				},
+				result: { lifecycle: "active", ok: true, recovery: "active-new" },
+			});
+			// Only Bob's own lineage gains a row; every co-resident writer's is untouched.
+			const before = accepted?.lineagesBefore as readonly Readonly<{ author: string; next: number }>[] | undefined;
+			const after = accepted?.lineagesAfter as readonly Readonly<{ author: string; next: number }>[] | undefined;
+			expect(before?.length).toBeGreaterThanOrEqual(2);
+			expect(after?.map(({ author }) => author)).toEqual(before?.map(({ author }) => author));
+			for (const lineage of before ?? []) {
+				const next = after?.find(({ author }) => author === lineage.author)?.next;
+				if (lineage.author === proof?.authors?.bob) expect(next).toBe(lineage.next + 1);
+				else {
+					expect(lineage.next).toBeGreaterThan(0);
+					expect(next).toBe(lineage.next);
+				}
+			}
+			expect(before?.find(({ author }) => author === proof?.authors?.bob)?.next).toBe(1);
+		}
+		expect(
+			(multiWriter[1]?.lineagesBefore as readonly Readonly<{ author: string }>[] | undefined)?.some(
+				({ author }) => author === proof?.authors?.alice
+			)
+		).toBe(true);
 		expect(established).toMatchObject({
 			issued: {
 				acceptedJournalAuthor: proof?.authors?.bob,
@@ -845,6 +893,8 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 		for (const [accepted, reopenCount] of [
 			[established, 2],
 			[fresh, 1],
+			[multiWriter[0], 1],
+			[multiWriter[1], 1],
 		] as const) {
 			const effects = accepted?.effects as
 				| Readonly<{
@@ -945,9 +995,10 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 			kind: "chain-invalid",
 			ok: false,
 		});
+		const staleClone = rejected.find((candidate) => candidate.name === "stale-same-author-clone");
+		expect(staleClone?.lineagesBefore).toEqual([{ author: proof?.authors?.bob, exhausted: false, next: 0 }]);
 		for (const name of [
-			"copied-creator-lineage",
-			"two-nonzero-lineages",
+			"stale-same-author-clone",
 			"selected-exhausted-lineage",
 			"foreign-exhausted-lineage",
 			"malformed-exhausted-lineage",

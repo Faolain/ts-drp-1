@@ -954,6 +954,26 @@ async function runCase(material, index, input) {
 		seedSnapshot(material, events, effects, suffix),
 	]);
 	const issuance = await seedIssuance(material, suffix, input.carriers, effects, input);
+	// Every lineage the store holds (seeded authors plus the selected one), read from the
+	// raw store so the snapshot is not an instrumented reopen effect.
+	const storeAuthors = [
+		...new Set([
+			input.authority.author,
+			...input.carriers.map(
+				(carrier) => (carrier.commit ?? carrierCommit(carrier, material.proposed.head.objectId)).issuedRecord.scope.author
+			),
+		]),
+	].sort();
+	const lineageSnapshot = async () =>
+		Object.freeze(
+			await Promise.all(
+				storeAuthors.map(async (author) => {
+					const lineage = await issuance.raw.readLineage({ author, objectId: material.proposed.head.objectId });
+					return Object.freeze({ author, exhausted: lineage.exhausted, next: lineage.next });
+				})
+			)
+		);
+	const lineagesBefore = await lineageSnapshot();
 	const node = network(events, publications, `d108d1b-target-${index}`);
 	const observations = [];
 	const state = { use: "possession" };
@@ -1013,6 +1033,7 @@ async function runCase(material, index, input) {
 			subscribeCount: events.filter((event) => event === "subscribe").length,
 			transactIssueCount: effects.transactIssueCount,
 		},
+		lineagesBefore,
 		name: input.name,
 		...(effects.issuedMismatchEvidence === undefined ? {} : { issuedMismatchEvidence: effects.issuedMismatchEvidence }),
 		signerCalls: [...observations],
@@ -1077,6 +1098,7 @@ async function runCase(material, index, input) {
 		return {
 			...shared(),
 			issued: firstIssued,
+			lineagesAfter: await lineageSnapshot(),
 			...(repeat === undefined ? {} : { repeat }),
 			result: { lifecycle: result.lifecycle, ok: true, recovery: result.recovery },
 		};
@@ -1898,10 +1920,14 @@ async function matrix(material) {
 			scenario: "valid",
 			wrongAuthority: carol,
 		},
+		// Owner decision (D.108d1b amended): a store whose SELECTED author's lineage is
+		// at or below that author's authenticated closed frontier is a stale copy or a
+		// clone of another store holding the same key. The genuine close admitted Bob's
+		// epoch-zero vertex (frontier 0); this store never issued it (next 0).
 		{
 			authority: bob,
-			carriers: [bobCarrier, ...creatorRows],
-			name: "copied-creator-lineage",
+			carriers: [],
+			name: "stale-same-author-clone",
 			scenario: "valid",
 			wrongAuthority: carol,
 		},
@@ -1984,6 +2010,16 @@ async function matrix(material) {
 			carriers: [bobCarrier],
 			lineageFault: "unsafe-next",
 			name: "unsafe-lineage-next",
+			scenario: "valid",
+			wrongAuthority: carol,
+		},
+		// Same-origin tabs share one room database (ea4eb158: identity slots + objectId-only
+		// database names): Alice's tab (slot 0) issued the creator rows, Bob's tab (slot 1)
+		// his epoch-zero vertex. Bob's cold reopen must bind only Bob.
+		{
+			authority: bob,
+			carriers: [bobCarrier, ...creatorRows],
+			name: "two-tab-shared-room-database",
 			scenario: "valid",
 			wrongAuthority: carol,
 		},
