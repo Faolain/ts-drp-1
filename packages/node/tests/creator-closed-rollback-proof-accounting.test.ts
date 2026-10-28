@@ -40,7 +40,7 @@ import {
 } from "../src/internal/creator-closed-rollback-data.js";
 import { canonicalCreatorDataRecord, createCreatorCanonicalSyntaxReader } from "../src/internal/creator-snapshot-data.js";
 import { creatorAuthenticatedEpochVertexFields } from "../src/internal/runtime-reclamation.js";
-import { uniqueCreatorTransitionCandidate } from "../src/internal/creator-transition-advance.js";
+import { resolveCreatorNativeCheckpointRecoveryTransfer, uniqueCreatorTransitionCandidate } from "../src/internal/creator-transition-advance.js";
 import {openReceivedCertificate} from "../src/creator-adoption.js";
 import {capturePromotionRecord, capturePromotionArray, capturePromotionBytes} from "@ts-drp/protocol-v3/internal/creator-forward-promotion";
 import {LIVE_JOURNAL_RETIREMENT_CONTROL_MAX_BYTES} from "@ts-drp/live-journal";
@@ -640,6 +640,13 @@ describe("synchronous maintenance syntax ownership", () => {
 		expect(reader.record(bytes)).toEqual({ kind: "two", epoch: 4 });
 		expect(first).toEqual({ kind: "one", epoch: 3 });
 		expect(reader.record(new Uint8Array(bytes))).not.toBe(reader.record(bytes));
+		// ea4eb158: a distinct array holding identical bytes shares this owner's
+		// exact-byte capture (fresh native readers detach their buffers), so it is
+		// not a third parse. Authority stays exact bytes: the in-place mutation
+		// above reparsed, and a same-length copy with different bytes reparses.
+		expect(counts()).toEqual({ parses: 2, roundtrips: 2 });
+		const other = Uint8Array.from(bytes); other.set(encodeCanonical({ kind: "one", epoch: 3 }));
+		expect(reader.record(other)).toEqual({ kind: "one", epoch: 3 });
 		expect(counts()).toEqual({ parses: 3, roundtrips: 3 });
 		bytes[0] = 255;
 		expect(reader.record(bytes)).toBeUndefined();
@@ -2002,7 +2009,12 @@ describe("optional native borrowing describes captured replacement custody", () 
 	}
 	async function proof(f:ReturnType<typeof fixture>) {
 		const observations=new WeakMap(),frames=new WeakMap(),ledgers=new WeakMap(),requirements=new WeakMap(),observation={},reader={generations:[],blobs:[],release:async()=>{f.events.push("reader-release");}};
-		const snapshot={image:{scopes:[]},control:null},inventory={scopes:[],owner:{migration:"ready"}},head={stable:{objectId:f.trust.objectId,epoch:4,currentAnchorDigest:f.trust.currentAnchorDigest},pending:null};
+		// 4c4f192c: a lifetime without replacement/source custody may detach native
+		// preparation, but only for a "ready" snapshot owner. This test owns the
+		// independent fallback, so the owner still requires classification (a real
+		// production decline). ea4eb158: the qualified inventory must be complete
+		// against the native image (scopeCount === scopes.length).
+		const snapshot={image:{scopes:[],scopeCount:0},control:null},inventory={scopes:[],owner:{migration:"classification-required"}},head={stable:{objectId:f.trust.objectId,epoch:4,currentAnchorDigest:f.trust.currentAnchorDigest},pending:null};
 		const input={objectId:f.trust.objectId,pinnedGenesisAnchorDigest:"genesis",store:Object.assign(f.store,{readRetirementAdmissionImage:async()=>({ok:true,value:{control:null}})}),
 			liveJournalStore:Object.assign(f.journal,{readRetirementImage:async()=>({ok:true,value:{exactCanonicalControlCarriers:[],canonicalRows:[],control:null}})}),
 			roomHeadAuthority:Object.assign(f.floor,{readRetirementImage:async()=>({state:head})}),
@@ -2011,7 +2023,7 @@ describe("optional native borrowing describes captured replacement custody", () 
 		// authentication and owner floor reads are deterministic controlled seams;
 		// this does not claim native SQLite/IndexedDB or cryptographic acceptance.
 		return execute<Promise<{beginWrite():Promise<void>;release():Promise<void>;accounting:typeof f.accounting}>>(
-			`${declaration("joinSourceReleases")}\n${declaration("acquireCreatorIssuanceMaintenanceProof").replace(/^export /,"")}\nacquireCreatorIssuanceMaintenanceProof(value,closeHold,currentTrust);`,{
+			`${declaration("joinSourceReleases")}\n${declaration("closedRetirementEqual")}\n${declaration("completeSnapshotRecoveryInventoryIsPresent")}\n${declaration("acquireCreatorIssuanceMaintenanceProof").replace(/^export /,"")}\nacquireCreatorIssuanceMaintenanceProof(value,closeHold,currentTrust);`,{
 			value:input,closeHold:f.hold,currentTrust:f.trust,capture:(value:unknown)=>value,
 			resolveCreatorSnapshotRecoveryCloseHold:f.resolve,observations,frames,ledgers,requirements,maintenanceTerminalCustody:new WeakMap(),
 			bindMethod:(object:Record<string,unknown>,name:string)=>(object[name] as (...args:unknown[])=>unknown).bind(object),ownJournalHeaderHold:(_owner:unknown,reservation:Reservation)=>reservation,
@@ -2359,7 +2371,7 @@ describe("snapshot retirement fact fields shared with prospective sizing", () =>
 				lifetime: {captureClassificationMetadataOwners: () => ({signing: {acquireEvidence: async () => ({
 					readExactCanonicalRows: () => bytes, check: async () => {checked = true; if (failure) throw Error(failure);},
 					release: async () => {released = true;},
-				})}})}, frame: {accounting: {}}, forward: {currentTrust: trusts[8]}, input: {objectId: "room"},
+				})}})}, frame: {accounting: {}}, work: {accounting: {}}, forward: {currentTrust: trusts[8]}, input: {objectId: "room"},
 				chargeProofObservation: (_: unknown, value: Uint8Array) => {charged.push(value); return true;},
 				requireLaw: (value: unknown, reason: string) => {if (!value) throw Error(reason);},
 			});
@@ -2381,20 +2393,26 @@ describe("snapshot retirement fact fields shared with prospective sizing", () =>
 		const selected = ["retirementJournal", "journalHeaders"].map(name => unique((node): node is ts.VariableDeclaration =>
 			ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === name && node.pos >= owner.pos && node.end <= owner.end));
 		const old = {canonicalRows: ["obsolete-header", "old-detail"]}, residual = {canonicalRows: []};
-		for (const summaries of [undefined, {}]) {
+		// 4c4f192c: a detachable lifetime prepares headers from captured scopes
+		// (prepareClosedJournalHeaders) instead of the live classifier. Both header
+		// selectors must consume the SAME residual journal.
+		for (const detachedClassification of [false, true]) for (const summaries of [undefined, {}]) {
 			let headerInput: unknown;
 			const value = execute<unknown>(`${selected.map(n => `const ${n.getText(parsed)};`).join("\n")}\nretirementJournal;`, {
 				signingSummaries: summaries, journalProof: old, journal: {value: residual},
 				sourceFrame: {closeDependencies: {dependencyAnchors: []}}, forward: {}, roles: {floor: {}},
 				closeUnion: {snapshotScopes: []}, roleProofs: [], unclassifiedSigning: false,
+				detachedClassification, journalReconstructed: false, capturedHeaderScopes: [], input: {pinnedGenesisAnchorDigest: "genesis"},
+				classificationAccounting: {},
 				classifyClosedJournalHeaders: (input: {journal: unknown}) => {headerInput = input.journal; return undefined;},
+				prepareClosedJournalHeaders: (input: {journal: unknown}) => {headerInput = input.journal; return undefined;},
 			});
 			expect(value).toBe(summaries === undefined ? old : residual); expect(headerInput).toBe(value);
 		}
 		const fields: ts.PropertyAssignment[] = [];
 		const visit = (node: ts.Node): void => {if (ts.isPropertyAssignment(node) && node.name.getText(parsed) === "journal" &&
 			node.initializer.getText(parsed) === "retirementJournal") fields.push(node); ts.forEachChild(node, visit);};
-		visit(owner); expect(fields).toHaveLength(2); // Header selector and returned source, one owner.
+		visit(owner); expect(fields).toHaveLength(3); // Both header selectors and the returned source, one owner.
 	});
 	it("keeps exact received generation consumers protected without treating receipt syntax as authority", () => {
 		const equal = (a: unknown, b: unknown) => Buffer.from(encodeCanonical(a)).equals(Buffer.from(encodeCanonical(b)));
@@ -2423,6 +2441,9 @@ describe("snapshot retirement fact fields shared with prospective sizing", () =>
 			closedGenerationCertificateCoverage: () => coverage,
 			view: (_: unknown, index: number) => [previous, next][index], uniqueCreatorTransitionCandidate,
 			deriveCreatorCloseHistory: () => history,
+			// 1515daab: a native-checkpoint transfer may make the generation the
+			// historical point; this proof carries no such transfer (genuine resolver).
+			resolveCreatorNativeCheckpointRecoveryTransfer,
 		});
 		const frame = {input: {objectId, pinnedGenesisAnchorDigest: certificate.pinnedGenesisAnchorDigest},
 			reader: {generations: [old, current]}, authenticatedExcludedGenerations: []};
