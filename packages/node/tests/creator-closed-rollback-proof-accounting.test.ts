@@ -3367,7 +3367,7 @@ describe("actual CURRENT/FUTURE journal recipe freshly validates complete native
 	function owner() {
 		let calls = 0;
 		const recipe = unique((node): node is ts.VariableDeclaration => ts.isVariableDeclaration(node) &&
-			ts.isIdentifier(node.name) && node.name.text === "journal" && ts.isCallExpression(node.initializer!) &&
+			ts.isIdentifier(node.name) && node.name.text === "journal" && node.initializer !== undefined && ts.isCallExpression(node.initializer) &&
 			node.initializer!.expression.getText(parsed) === "journalFutureAppendPostimageWidths" &&
 			node.initializer!.getText(parsed).includes("successorJournalAppend")).getText(parsed);
 		const reader = createCreatorCanonicalSyntaxReader();
@@ -5221,6 +5221,14 @@ describe("R8 FUTURE snapshot turnover affected controls", () => {
 				aheOriginal: {},
 				observe: () => undefined,
 				maintenanceWidthSum: (values: number[]) => values.reduce((sum, value) => sum + value, 0),
+				// ea4eb158: source widths take the sizing compiler's maximum; with no
+				// compiler it is exactly Math.max (the production fallback).
+				maximumWidth: (widths: readonly number[]) => Math.max(...widths),
+				// ea4eb158: each fresh source also charges the ready snapshot
+				// inventory (retained or cold-projected), the larger of the two.
+				retainedInventory: snapshotPairs75.map((pair) => pair.scope),
+				retainedOwner: { migration: "ready", recoveryScopes: 3, recoveryContentBytes: 100 },
+				coldSnapshotInventoryWidths: [],
 			}
 		);
 		expect(result.first[0]).toBe(beforeWidth);
