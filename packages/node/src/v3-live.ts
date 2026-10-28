@@ -11414,6 +11414,27 @@ async function readCreatorRecoveryDependencyCensus(
 					terminalFrontier,
 					vertexFacts
 				)?.digest === classified.authenticated.digest;
+			// C03 layer 3: the exact own author fence of a closed epoch whose startup drain committed it
+			// (published only after readiness) and died before publishing it. No plane admits it any
+			// more, it has nothing to replan (no intents, so no plan entry), and the new epoch's fence
+			// supersedes it. It is the same signed no-op as a published historical fence: retained,
+			// charged and anchored below (retainedHistoricalFence), never refused.
+			// Model: packages/node/formal/creator-unpublished-fence-census.qnt.
+			const unpublishedFence = classified?.kind === "displaced" && row.publishState === "pending"
+				? snapshotClosedRecord(classified.authenticated.vertex.operation, ["action", "fenceSequence", "version"])
+				: undefined;
+			const unpublishedHistoricalFence =
+				classified?.kind === "displaced" &&
+				sourceBound &&
+				scope.author === registration.issuanceScope.author &&
+				settlementProfileFor(currentTrust.profileId) === "v1" &&
+				classified.authenticated.author === scope.author &&
+				classified.authenticated.authorSequence === row.authorSequence &&
+				classified.authenticated.digest === lowerHexDigest(row.digest) &&
+				classified.authenticated.vertex.epoch < currentTrust.currentEpoch &&
+				unpublishedFence?.action === AUTHOR_FENCE_ACTION &&
+				unpublishedFence.version === 1 &&
+				unpublishedFence.fenceSequence === row.authorSequence;
 			if (
 				classified === undefined ||
 				(classified.kind !== "current" &&
@@ -11425,7 +11446,8 @@ async function readCreatorRecoveryDependencyCensus(
 					row.publishState !== "published" &&
 					!openSource &&
 					!inheritedComplete &&
-					!terminalCoveredPending)
+					!terminalCoveredPending &&
+					!unpublishedHistoricalFence)
 			)
 				return undefined;
 			let dependencyKind: CreatorIssuanceCensusDependencyKind = durablyCommitted ? "source-committed-inclusion" : openSource
