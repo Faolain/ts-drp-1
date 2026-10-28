@@ -607,3 +607,7 @@ Notes:
 - **Recipient install total:** +42 ms mean in Track H's pairs, within noise. Re-measure if it persists.
 - **Not repaired:** rooms that already leaked journal scopes before Track K stay fail-closed until an explicit
   migration.
+- **Ordinary generation-closure sizing:** a tighter, data-driven closure capacity (the largest retained generation
+  closure, instead of the static `AHE_BOUNDED_READ_LIMITS.maxClosureReferences`) was planned but never landed. Its
+  only trace was an orphan RED with no owner in any commit, deleted on fix/preexisting-failures. The static bound is
+  safe but over-reserves.
