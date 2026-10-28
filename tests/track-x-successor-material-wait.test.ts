@@ -326,6 +326,48 @@ it("a Writer restarted while its install waited installs after the creator adopt
 	await expectLive(room, "after");
 }, 240_000);
 
+// Row 72, the owner's decision (2026-10-27): a member's successor install has a bounded total
+// deadline over the material fetch (V3_ROOM_SUCCESSOR_INSTALL_DEADLINE_MS = 120 s). On expiry it ends
+// with a typed refusal (V3RoomSuccessorInstallExpired, stage "material") that the delivery shows and
+// re-targets from (the newest offer, or the same one again); every terminal check stays. Here the
+// creator seals and exports but does not adopt: the install must end with that refusal within the
+// bound, and the Writer installs once the creator adopts. (The constant is written out so this test
+// does not depend on the export it pins.)
+const INSTALL_DEADLINE_MS = 120_000;
+
+it("a Writer whose creator never adopts ends its install with a typed material expiry within the bound, then installs once the creator adopts", async () => {
+	const room = await sealedRoom();
+	const started = performance.now();
+	const installing = room.peers[1].room
+		.installCreatorSuccessor({ offer: room.offer, peers: [room.peers[0].networkNode.peerId] })
+		.then(
+			() => ({ ok: true as const, at: performance.now() }),
+			(error: unknown) => ({ ok: false as const, error, at: performance.now() })
+		);
+	await until(() => room.link.requests.length === 1, "the Writer's first material request");
+	const outcome = await Promise.race([installing, sleep(INSTALL_DEADLINE_MS + 30_000).then(() => "still pending" as const)]);
+	const error = typeof outcome === "object" && !outcome.ok ? (outcome.error as { name?: string; stage?: string }) : undefined;
+	console.log(
+		`TRACK_X_INSTALL_DEADLINE ${JSON.stringify({
+			outcome: typeof outcome === "string" ? outcome : outcome.ok ? "ok" : `${error?.name}: ${String((outcome.error as Error)?.message).slice(0, 200)}`,
+			endedMs: typeof outcome === "string" ? null : Math.round(outcome.at - started),
+			requests: room.link.requests.length,
+		})}`
+	);
+	expect(outcome, "the install ends within the deadline").not.toBe("still pending");
+	expect(typeof outcome === "object" && outcome.ok, "nothing was adopted, so nothing installs").toBe(false);
+	expect(error?.name).toBe("V3RoomSuccessorInstallExpired");
+	expect(error?.stage).toBe("material");
+	expect(room.link.responses, "nothing served before the adoption").toEqual([]);
+	expect(room.peers[1].room.authority()?.epoch ?? 0, "the refused install changed nothing").toBe(0);
+	// The creator adopts; the Writer's next install of the same offer succeeds.
+	await room.peers[0].room.adoptCreatorSuccessor();
+	expect(await room.install(), "the install after the adoption").toBe("ok");
+	expect(room.peers[1].room.authority()?.epoch).toBe(1);
+	expectNoNewWire(room.link);
+	await expectLive(room, "after");
+}, 360_000);
+
 const DOMAIN = "ts-drp/creator-successor-transport/v1";
 
 /**
