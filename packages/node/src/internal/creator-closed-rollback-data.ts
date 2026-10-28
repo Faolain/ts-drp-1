@@ -2118,6 +2118,22 @@ function recoveryCertificateRequiredGenerations(proof: RecoveryRoleCertificate):
 type CreatorConditionalGenerationResourceCertificate = Pick<RecoveryRoleCertificate,
 	"roles" | "supportGenerations" | "authenticatedSourceGenerations" | "retiredClassifiedSnapshotScopes">;
 
+/** The close hold's census names each held issuance dependency's anchor; the certificate must have
+ * authenticated every one. The refusal names the uncovered epochs: a stage label would only say how far
+ * the source loop got before this law ran.
+ * @param required - The close hold's dependency anchors.
+ * @param covered - The anchors this certificate authenticated.
+ */
+function requireRecoveryDependencyAnchorsCovered(
+	required: readonly Readonly<{epoch: number; anchorDigest: string}>[],
+	covered: readonly Readonly<{epoch: number; anchorDigest: string}>[]
+): void {
+	const uncovered = required.filter(anchor => !covered.some(actual =>
+		actual.epoch === anchor.epoch && actual.anchorDigest === anchor.anchorDigest));
+	if (uncovered.length !== 0) throw new Refusal(failure("chain-invalid", "snapshot",
+		`RECOVERY_DEPENDENCY_ANCHOR_UNCOVERED:${uncovered.map(anchor => anchor.epoch).join(",")}`));
+}
+
 async function acquireRecoveryRoleCertificate(
 	input: Captured,
 	expectedHead: PresentHead,
@@ -2233,6 +2249,7 @@ async function acquireRecoveryRoleCertificate(
 				snapshot: null | {exactCanonicalManifestBytes: Uint8Array; exactCanonicalPayloadBytes: Uint8Array}}[] = [];
 			const authenticatedSourceGenerations: {scope: SnapshotQuarantineScopeKey; generation: GenerationRecord}[] = [];
 			const sourceTrusts = new Set<CurrentAnchorTrust>([pin.trust, currentTrust, predecessorTrust]);
+			const linkAnchors: {epoch: number; anchorDigest: string}[] = [];
 			for (const generation of reader.generations) {
 				const closure = view(reader, reader.generations.indexOf(generation));
 				const carrier = readUnique(closure, "drp-anchor-trust-state"), carrierRecord = readRecord(carrier.bytes);
@@ -2257,6 +2274,8 @@ async function acquireRecoveryRoleCertificate(
 					requireLaw(sourceTrust !== undefined && sourceTrust.currentEpoch === epoch && epoch <= currentTrust.currentEpoch);
 					sourceTrusts.add(sourceTrust);
 					if (opened?.ok === true) requireLaw(accounting.charge(opened.derivedPredecessorTrustStateRecordBytes), "proof-budget-exceeded");
+					if (opened?.ok === true) linkAnchors.push({epoch: opened.predecessorTrust.currentEpoch, anchorDigest: opened.predecessorTrust.currentAnchorDigest});
+					if (historical !== undefined) linkAnchors.push({epoch: epoch - 1, anchorDigest: String(historical.binding.cut.previousAnchor)});
 					const cut = readRecord(readUnique(closure, "drp-hard-epoch-cut", epoch - 1).bytes);
 					const scope = Object.freeze({objectId: input.objectId, epoch: epoch - 1,
 						anchor: String(cut.previousAnchor), manifestDigest: String(cut.snapshotManifestDigest)});
@@ -2290,10 +2309,10 @@ async function acquireRecoveryRoleCertificate(
 					roles, currentTrust, certificateDigest, accounting, input.classificationRead, undefined, identity.historicalAbsenceBases,
 					identity.signedCertificateDigest);
 			const state = await retirementState();
-			const dependencyAnchors = Object.freeze([...sourceTrusts].map(trust => Object.freeze({
-				epoch: trust.currentEpoch, anchorDigest: trust.currentAnchorDigest})));
-			requireLaw(requiredDependencyAnchors.every(required => dependencyAnchors.some(actual =>
-				actual.epoch === required.epoch && actual.anchorDigest === required.anchorDigest)), "chain-invalid");
+			const dependencyAnchors = Object.freeze([...[...sourceTrusts].map(trust => ({
+				epoch: trust.currentEpoch, anchorDigest: trust.currentAnchorDigest})), ...linkAnchors].filter((anchor, index, all) =>
+				all.findIndex(other => other.epoch === anchor.epoch && other.anchorDigest === anchor.anchorDigest) === index).map(anchor => Object.freeze(anchor)));
+			requireRecoveryDependencyAnchorsCovered(requiredDependencyAnchors, dependencyAnchors);
 			const protectedScopes = Object.freeze([roles.currentClose, ...(roles.previousClose === null ? [] : [roles.previousClose]),
 				...roles.additionalRollbackSources.map(source => Object.freeze({objectId: input.objectId, epoch: source.closedEpoch,
 					anchor: source.closedAnchorDigest, manifestDigest: source.manifestRef.digest}))]);
@@ -2818,9 +2837,7 @@ async function acquireRecoveryRoleCertificate(
 				})
 			),
 		]);
-		requireLaw(requiredDependencyAnchors.every(required =>
-			required.epoch === 0 && required.anchorDigest === currentTrust.genesisAnchorDigest ||
-			dependencyAnchors.some(actual => actual.epoch === required.epoch && actual.anchorDigest === required.anchorDigest)), "chain-invalid");
+		requireRecoveryDependencyAnchorsCovered(requiredDependencyAnchors, dependencyAnchors);
 		const protectedScopes = Object.freeze([
 			resolved.currentClose,
 			resolved.previousClose,
