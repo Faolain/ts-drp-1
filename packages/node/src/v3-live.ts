@@ -21168,7 +21168,9 @@ async function readCreatorClosedArchiveSource(registration: V3PlaneRegistration,
 			original.authorSequence !== identity.authorSequence || graph.charges.get(row.digest) !== row.byteCharge ||
 			row.byteCharge !== row.exactCanonicalPreimageBytes.byteLength) return undefined;
 		const sequences = identities.get(identity.author) ?? new Set<number>();
-		if (sequences.has(identity.authorSequence)) return undefined;
+		// Only the issuance author must be unique here; a foreign same-slot duplicate stays
+		// in the graph and the settlement frontier freezes that author (case 23).
+		if (sequences.has(identity.authorSequence) && identity.author === registration.issuanceScope.author) return undefined;
 		sequences.add(identity.authorSequence); identities.set(identity.author, sequences); digests.add(row.digest);
 	}
 	return ObjectFreeze({ graph, rows });
