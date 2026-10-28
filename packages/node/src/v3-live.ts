@@ -13412,6 +13412,11 @@ function creatorFilteredIssuanceStore(
 	)
 		throw new TypeError("filtered issuance original owner is unavailable");
 	const acquireNativeReadReservation: unknown = Reflect.get(issuanceStore, "acquireNativeReadReservation");
+	// A call that fills its page reads past its last visible row and authenticates the
+	// filtered rows there. The very next call that continues from that visible row resumes
+	// after them instead of authenticating and reading their issued records again, so a scan
+	// reads each row once. Any other call discards the cursor; rows appended later are read.
+	let verifiedSkip: Readonly<{ after: number; resume: readonly [string, string, number] }> | undefined;
 	const filtered = ObjectFreeze({
 		...(typeof acquireNativeReadReservation !== "function"
 			? {}
@@ -13434,6 +13439,18 @@ function creatorFilteredIssuanceStore(
 			const vertexFacts = historicalIssuance?.vertexFacts;
 			const visible: DurableIssuanceOutboxRecord[] = [];
 			let afterKey = input?.afterKey;
+			const skip = verifiedSkip;
+			verifiedSkip = undefined;
+			if (
+				skip !== undefined &&
+				afterKey !== undefined &&
+				afterKey !== null &&
+				afterKey[0] === issuanceScope.objectId &&
+				afterKey[1] === issuanceScope.author &&
+				afterKey[2] === skip.after
+			)
+				afterKey = skip.resume;
+			let lastVisible: number | undefined;
 			for (;;) {
 				await checkpoint();
 				const nativePage = await issuanceStore.readOutboxPage({
@@ -13442,7 +13459,13 @@ function creatorFilteredIssuanceStore(
 					scope: issuanceScope,
 				});
 				const page = captureOutboxPage(nativePage, 64);
-				if (page === undefined || page.length === 0) return visible.length === 0 ? nativePage : ObjectFreeze(visible);
+				if (page === undefined || page.length === 0) {
+					if (visible.length === 0) return nativePage;
+					if (page !== undefined && lastVisible !== undefined && afterKey !== undefined && afterKey !== null &&
+						afterKey[2] > lastVisible)
+						verifiedSkip = ObjectFreeze({ after: lastVisible, resume: afterKey });
+					return ObjectFreeze(visible);
+				}
 				for (let pageIndex = 0; pageIndex < page.length; pageIndex++) {
 					await checkpoint();
 					const raw = page.read(pageIndex) as DurableIssuanceOutboxRecord;
@@ -13463,6 +13486,7 @@ function creatorFilteredIssuanceStore(
 						// which verifies their fresh plan/context and terminal consumers.
 						// A detached historical contract is not a signed-frontier filter.
 						visible.push(raw);
+						lastVisible = row.authorSequence;
 						afterKey = [issuanceScope.objectId, issuanceScope.author, row.authorSequence];
 						if (visible.length >= requestedLimit) return ObjectFreeze(visible);
 						continue;
@@ -13547,6 +13571,7 @@ function creatorFilteredIssuanceStore(
 							(authenticatedGenesisRow !== undefined || authenticatedHistoricalRow !== undefined)
 						) {
 							visible.push(raw);
+							lastVisible = row.authorSequence;
 							afterKey = ObjectFreeze([issuanceScope.objectId, issuanceScope.author, row.authorSequence]) as readonly [
 								string,
 								string,
@@ -13563,6 +13588,7 @@ function creatorFilteredIssuanceStore(
 						continue;
 					}
 					visible.push(raw);
+					lastVisible = row.authorSequence;
 					afterKey = ObjectFreeze([issuanceScope.objectId, issuanceScope.author, row.authorSequence]) as readonly [
 						string,
 						string,
