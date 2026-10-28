@@ -24,6 +24,12 @@ import { chatSharesRoomFixture, closeChatSharesRooms } from "./fixtures/chat-mem
 //     single-author historical frontier names only Bob). The fully-pruned-lineage and
 //     filtered-facade (hidden-native) branches of the same census share that assumption.
 //     Bob's plane then stops accepting work and every later install refuses the same way.
+//
+// Owner decision A (2026-10-28): one room database per player; the node stays single-writer. The
+// shared layout is kept below as documentation of why it failed (it.fails: both still fail), and
+// the same two scenarios run per player, each writer on its own database and floor, and pass.
+// The pages' naming and the one-time migration out of the shared database are proven in
+// per-player-room-database-red.test.ts.
 afterEach(async () => expect(await closeChatSharesRooms()).toEqual([]));
 
 const message = (clientOperationId: string) => ({
@@ -47,8 +53,12 @@ async function sharedRoom() {
 	const creator = await f.open(0);
 	const sent = new Map<number, number | null>();
 	/** Delivers a writer's new rows (shared database) to the creator. */
-	const deliver = async (index: 1 | 2, timeoutMs = 3_000) => {
-		const rows: readonly DurableIssuanceOutboxRecord[] = await f.issuedAfter(index, sent.get(index) ?? null, "shared");
+	const deliver = async (index: 1 | 2, timeoutMs = 3_000, name = "shared") => {
+		const rows: readonly DurableIssuanceOutboxRecord[] = await f.issuedAfter(
+			index,
+			sent.get(index) ?? null,
+			name === "own" ? `peer-${index}` : name
+		);
 		if (rows.length === 0) return;
 		await creator.receive(rows, index, timeoutMs);
 		sent.set(index, rows.at(-1)!.commit.authorSequence);
@@ -72,7 +82,7 @@ async function sharedRoom() {
 	return { f, creator, deliver, close, aliceRows };
 }
 
-it("[RED] two writers live on one room database both install the next successor", async () => {
+it.fails("[shared layout, documents decision A] two writers live on one room database both install the next successor", async () => {
 	const { f, creator, deliver, close } = await sharedRoom();
 	const alice = await f.open(1, { name: "shared" });
 	const bob = await f.open(2, { name: "shared", promote: true });
@@ -85,7 +95,7 @@ it("[RED] two writers live on one room database both install the next successor"
 	expect({ alice: await outcome(f.install(alice)), bob: await outcome(f.install(bob)) }).toEqual({ alice: "ok", bob: "ok" });
 }, 300_000);
 
-it("[RED] a writer opening the room database another writer used installs the next successor", async () => {
+it.fails("[shared layout, documents decision A] a writer opening the room database another writer used installs the next successor", async () => {
 	const { f, creator, deliver, close, aliceRows } = await sharedRoom();
 	const alice = await f.open(1, { name: "shared" });
 	await alice.room.issue(message("alice-1"));
@@ -105,6 +115,45 @@ it("[RED] a writer opening the room database another writer used installs the ne
 	expect(bob.room.authority()?.epoch).toBe(6);
 	await bob.room.issue(message("bob-1"));
 	await deliver(2);
+	await close();
+	expect(creator.room.authority()?.epoch).toBe(7);
+	expect(await outcome(f.install(bob))).toBe("ok");
+	expect(await outcome(bob.room.issue(message("bob-2")))).toBe("ok");
+}, 600_000);
+
+it("[per player] two writers live, each on its own room database, both install the next successor", async () => {
+	const { f, creator, deliver, close } = await sharedRoom();
+	const alice = await f.open(1);
+	const bob = await f.open(2);
+	await alice.room.issue(message("alice-1"));
+	await bob.room.issue(message("bob-1"));
+	await deliver(1, 30_000, "own");
+	await deliver(2, 30_000, "own");
+	await close();
+	expect(creator.room.authority()?.epoch).toBe(1);
+	expect({ alice: await outcome(f.install(alice)), bob: await outcome(f.install(bob)) }).toEqual({ alice: "ok", bob: "ok" });
+	expect(await outcome(alice.room.issue(message("alice-2")))).toBe("ok");
+	expect(await outcome(bob.room.issue(message("bob-2")))).toBe("ok");
+}, 300_000);
+
+it("[per player] a writer opening its own database after another writer's slot used six epochs installs and issues", async () => {
+	const { f, creator, deliver, close } = await sharedRoom();
+	const alice = await f.open(1);
+	await alice.room.issue(message("alice-1"));
+	await deliver(1, 30_000, "own");
+	for (let step = 0; step < 6; step++) {
+		await close();
+		await f.install(alice);
+		await deliver(1, 3_000, "own");
+	}
+	expect(alice.room.authority()?.epoch).toBe(6);
+	await f.stop(alice);
+
+	const bob = await f.open(2);
+	await f.install(bob);
+	expect(bob.room.authority()?.epoch).toBe(6);
+	await bob.room.issue(message("bob-1"));
+	await deliver(2, 30_000, "own");
 	await close();
 	expect(creator.room.authority()?.epoch).toBe(7);
 	expect(await outcome(f.install(bob))).toBe("ok");
