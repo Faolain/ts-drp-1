@@ -184,6 +184,9 @@ async function skipFollow(restart: boolean) {
 					await peers.creator.close();
 					peers.creator = await openRole(OPTIONS, 0, envFor(directory, true));
 					rows = rowWire(peers.creator, writer);
+					// A reopened creator's delivery has no offer to answer with until its next adoption, so
+					// it rolls once more; its in-memory carriers then hold only closes after the departed one.
+					epoch = await rollCreator(peers.creator, async () => undefined, ordinal);
 				}
 				wire.resume();
 				await follow(wire, writer, epoch);
