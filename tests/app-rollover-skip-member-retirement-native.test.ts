@@ -184,7 +184,7 @@ async function followThenDeliver(SKIPS: number, DELIVERING: number) {
 	const restore = await installEnvironment("node", () => undefined);
 	if (process.env.SKIP_MEMBER_OBSERVE === "1")
 		Reflect.set(globalThis, "__warmProofEvent", (event: { kind: string }) => {
-			if (event.kind === "closed-retirement-issuance-holes" || event.kind === "DEBUG-prefix")
+			if (event.kind === "closed-retirement-issuance-holes")
 				process.stdout.write(`SKIP_MEMBER_OBSERVE ${JSON.stringify(event)}\n`);
 		});
 	const directory = mkdtempSync(join(tmpdir(), "app-rollover-skip-member-retirement-"));
