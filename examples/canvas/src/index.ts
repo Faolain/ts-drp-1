@@ -19,6 +19,7 @@ import {
 	type V3RoomRolloverPolicy,
 	type V3RoomSession,
 	type V3RoomSuccessorDelivery,
+	prepareV3RoomPlayerDatabase,
 } from "@ts-drp/example-v3-room";
 import { DRPNode } from "@ts-drp/node";
 import { type CanvasProjection, createV3CanvasApplication } from "@ts-drp/node/applications/canvas";
@@ -213,7 +214,8 @@ async function openCanvas(operation: "create" | "join"): Promise<void> {
 			throw new TypeError("canvas settlement approval policy is invalid");
 		const author = selectedNode.keychain.localAuthorId;
 		const authority = await factory(Object.freeze({ author, creatorInvite: invite, objectId, operation }));
-		const databaseName = `ts-drp-v3-canvas--${hex(hashDomain("ts-drp/canvas-database/v1", new TextEncoder().encode(objectId)))}`;
+		// Decision A: this player's own room database; the shared (objectId-only) one migrates once.
+		const { databaseName } = await prepareV3RoomPlayerDatabase({ application: "canvas", objectId, author });
 		const publishSuccessor = window.__TS_DRP_CANVAS_SUCCESSOR_PUBLISHER__;
 		if (publishSuccessor !== undefined && typeof publishSuccessor !== "function")
 			throw new TypeError("canvas successor publisher is invalid");

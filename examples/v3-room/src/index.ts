@@ -79,6 +79,15 @@ export {
 	type V3RoomSuccessorDeliveryStats,
 	type V3RoomSuccessorNode,
 } from "./successor-delivery.js";
+export {
+	migrateV3RoomPlayerDatabase,
+	prepareV3RoomPlayerDatabase,
+	type V3RoomPlayerDatabaseApplication,
+	type V3RoomPlayerDatabaseMigration,
+	V3RoomPlayerDatabaseMigrationUnavailable,
+	v3RoomLegacyDatabaseName,
+	v3RoomPlayerDatabaseName,
+} from "./player-database.js";
 
 const browserStorageHost: V3RoomStorageHost = Object.freeze({
 	openAhe: (databaseName: string) => createBrowserAheDurableStore({ databaseName }),

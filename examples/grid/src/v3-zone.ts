@@ -18,6 +18,7 @@ import {
 	type V3RoomRolloverPolicy,
 	type V3RoomSuccessorDelivery,
 	type V3RoomSession,
+	prepareV3RoomPlayerDatabase,
 } from "@ts-drp/example-v3-room";
 import type { DRPNode } from "@ts-drp/node";
 import {
@@ -752,6 +753,12 @@ export function createV3ZoneApi(
 				},
 			});
 			rollover = policy;
+			// Decision A: this player's own room database; the shared (zoneId-only) one migrates once.
+			const { databaseName } = await prepareV3RoomPlayerDatabase({
+				application: "zone",
+				objectId: zoneId,
+				author: localAuthor,
+			});
 			opened = await createV3RoomSession<ZoneProjection>({
 				application,
 				author: localAuthor,
@@ -769,9 +776,9 @@ export function createV3ZoneApi(
 							? {}
 							: { authenticatedApplicationStateBytes: context.authenticatedApplicationStateBytes }),
 					}),
-				databaseName: `ts-drp-v3-zone--${digest("ts-drp/d9346-zone-database/v1", new TextEncoder().encode(zoneId))}`,
+				databaseName,
 				initialLogicalTime: 3,
-				issuanceDatabaseName: `ts-drp-v3-zone--${digest("ts-drp/d9346-zone-database/v1", new TextEncoder().encode(zoneId))}`,
+				issuanceDatabaseName: databaseName,
 				migrationDatabaseNamespace: `${localAuthor}:${zoneId}`,
 				objectId: zoneId,
 				onAcceptedVertex: (vertex) => policy.observe(vertex),
