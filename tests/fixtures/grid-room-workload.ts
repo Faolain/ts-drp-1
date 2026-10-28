@@ -128,8 +128,10 @@ vi.mock(
 	"../../packages/node/dist/src/creator-adoption-recover.js",
 	() => import("../../packages/node/src/creator-adoption-recover.js")
 );
-vi.mock("../../packages/node/dist/src/creator-adoption-activate.js", async () => {
-	const real = await import("../../packages/node/src/creator-adoption-activate.js");
+// v3-room imports "@ts-drp/node/creator-adoption-activate", which the root config
+// aliases to src (ea4eb158); a dist-path mock no longer reaches the room.
+vi.mock("../../packages/node/src/creator-adoption-activate.js", async (importOriginal) => {
+	const real = await importOriginal<typeof import("../../packages/node/src/creator-adoption-activate.js")>();
 	type ActivationRealm = typeof real;
 	const realms = new Map<string, Promise<ActivationRealm>>();
 	// Independent physical clients have independent module-local activeOwners.
@@ -238,7 +240,9 @@ vi.mock("../../packages/storage-browser/dist/src/issuance.js", async () => {
 			// WeakMap identity remains intact; no capability is minted or rebound.
 			observe("transactIssue", (async (scope, build) => {
 				let selected: DurableIssueCommit | undefined;
+				let uncommitted: DurableIssueCommit | undefined;
 				const ambiguity = observed.ambiguous?.database === input.primaryDatabaseName ? observed.ambiguous : undefined;
+				const abandoned = new Error("F5B_AMBIGUOUS_UNCOMMITTED_ABORT");
 				const result = await transactIssue(scope, async (sequence, nativeJob) => {
 					// The native writer is entered by build's signing admission hook,
 					// not by transactIssue's callback entry. Observe before it is held.
@@ -248,10 +252,11 @@ vi.mock("../../packages/storage-browser/dist/src/issuance.js", async () => {
 					observed.issueAttempts.push(candidate);
 					const effect = candidate.planEffect;
 					if (ambiguity !== undefined && ambiguity.kind === effect?.kind && !ambiguity.committed) {
-						await ambiguousReadback(candidate);
-						if (ambiguity.recoveryFails === true) observed.failRecoveryReadFor = input.primaryDatabaseName;
-						observed.ambiguous = undefined;
-						throw new DurableIssuanceUnknownOutcomeError(scope);
+						// The native writer is held from build() until this callback settles,
+						// so durable truth cannot be read from inside it (a store read here
+						// waits on this very job). Abort the transaction and read back after.
+						uncommitted = candidate;
+						throw abandoned;
 					}
 					if (
 						input.primaryDatabaseName === observed.failSuffixFor &&
@@ -264,6 +269,14 @@ vi.mock("../../packages/storage-browser/dist/src/issuance.js", async () => {
 					}
 					selected = candidate;
 					return candidate;
+				}).catch(async (error: unknown) => {
+					// The store reports a callback that throws after native entry as an
+					// unknown commit outcome, so the sentinel itself does not surface here.
+					if (uncommitted === undefined || ambiguity === undefined) throw error;
+					await ambiguousReadback(uncommitted);
+					if (ambiguity.recoveryFails === true) observed.failRecoveryReadFor = input.primaryDatabaseName;
+					observed.ambiguous = undefined;
+					throw new DurableIssuanceUnknownOutcomeError(scope);
 				});
 				if (selected !== undefined) {
 					observed.commits.push(selected);
@@ -387,8 +400,11 @@ const hex = (value: Uint8Array) => Buffer.from(value).toString("hex");
  * @param value
  */
 const record = (value: Uint8Array) => decodeCanonical(value) as Record<string, unknown>;
+// ea4eb158: a local head exactly one epoch behind the authenticated floor is first
+// tried as a direct received transition; with no received successor material that
+// closure cannot be built, so reopen refuses there, before the floor comparison.
 const STALE_LOCAL_HEAD_FAILURE =
-	"v3 room successor reopen failed: D110C_FLOOR_MISMATCH: creator successor differs from the authenticated room-head floor";
+	"v3 room successor reopen failed: chain-invalid: creator received projection replacement is invalid";
 let ordinal = 0;
 
 const wideDiagnosticState = {
@@ -630,6 +646,16 @@ async function floorOwner(databaseName: string, scope: { objectId: string; pinne
 		authority,
 		read,
 		receive: async (published: V3RoomHeadState) => {
+			// A fresh device's floor is still empty: create it at genesis, then follow.
+			const current = await authority.read({ scope });
+			if (!current.ok) throw new TypeError("F5B_NATIVE_FLOOR_READ_CONFLICT");
+			if (current.state === null || current.state === undefined) {
+				const created = await authority.create({
+					scope,
+					stable: { objectId: scope.objectId, epoch: 0, currentAnchorDigest: scope.pinnedGenesisAnchorDigest },
+				});
+				if (!created.ok) throw new TypeError("F5B_NATIVE_FLOOR_CREATE_CONFLICT");
+			}
 			let state = await read();
 			const same = (left: unknown, right: unknown) => hex(encodeCanonical(left)) === hex(encodeCanonical(right));
 			if (same(state, published)) return;
@@ -1242,8 +1268,28 @@ async function assertRetainedRollbackPair(peer: Peer) {
 	const retained = facts.generations.filter((generation) => generation.state === "Superseded");
 	// Cleanup retains physical generations, including preparation/close ancestors.
 	const expected = 2;
-	expect(retained, "F5B_C13_C24C_PRODUCT_TRUE_BOUNDED_ROLLBACK_WINDOW").toHaveLength(expected);
-	expect(facts.generations, "F5B_C13_BOUNDED_ACTIVE_AND_ROLLBACK_GENERATIONS").toHaveLength(expected + 1);
+	// ea4eb158: cleanup also keeps the caller-authenticated independent source
+	// generations (at most four, closed-epoch-cleanup), outside the rollback pair.
+	// Read them from the cleanup that produced this exact head: a peer's own latest
+	// cleanup can lag the store observed here by one close.
+	type CleanupPlan = {
+		activeGenerationId: string;
+		rollbackGenerationIds: readonly string[];
+		independentSourceGenerations?: readonly { generationId: string }[];
+	};
+	const plan = observed.cleanup
+		.map((event) => (event.result as { plan?: CleanupPlan }).plan)
+		.findLast((candidate) => candidate?.activeGenerationId === facts.head.generationId);
+	const independent = (plan?.independentSourceGenerations ?? []).map((generation) => generation.generationId);
+	expect(independent.length, "F5B_C13_INDEPENDENT_SOURCES_BOUNDED").toBeLessThanOrEqual(4);
+	expect(required(plan).rollbackGenerationIds, "F5B_C13_C24C_PRODUCT_TRUE_BOUNDED_ROLLBACK_WINDOW").toHaveLength(expected);
+	expect(
+		retained.map((generation) => generation.generationId).sort(),
+		"F5B_C13_RETAINED_EXACTLY_ROLLBACK_PAIR_AND_INDEPENDENT_SOURCES"
+	).toEqual([...required(plan).rollbackGenerationIds, ...independent].sort());
+	expect(facts.generations, "F5B_C13_BOUNDED_ACTIVE_AND_ROLLBACK_GENERATIONS").toHaveLength(
+		expected + independent.length + 1
+	);
 	const active = required(facts.generations.find((generation) => generation.generationId === facts.head.generationId));
 	expect(active.state).toBe("Adopted");
 	let base = active.baseExpectedHead;
