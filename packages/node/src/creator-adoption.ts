@@ -1084,13 +1084,17 @@ async function receivedRecoveryTurnoverDue(source: CreatorRecipientSource,
 }
 
 /** What a recipient lull's complete received turnover reconciled: the room head, the
- * exact current Cut it classified from, and the recovery-role inventory it left (all but
- * the single-use custody). Keyed by the live plane handle, so a successor plane, a
- * recovery reopen (including a retirement-halt discharge) and a new session never see
- * it; a lull clears it on entry and an install consumes it. Scheduling only: it lets an
- * install skip a turnover whose every input is unchanged, never grants admission, and a
- * full pool, a promotion or a checkpoint install never skips. */
-type ReceivedTurnoverBoundary = Readonly<{ objectId: string; epoch: number; anchorDigest: string; cut: Uint8Array; inventory: string }>;
+ * exact current Cut it classified from, the recovery-role inventory it left (all but
+ * the single-use custody) and the member's own settlement plan (its held unresolved
+ * work, which the journal classification reads: an abandonment or a settlement
+ * resolution rewrites it without moving the head, the Cut or the inventory). Keyed by
+ * the live plane handle, so a successor plane, a recovery reopen (including a
+ * retirement-halt discharge) and a new session never see it; a lull clears it on entry
+ * and an install consumes it. Scheduling only: it lets an install skip a turnover whose
+ * every input is unchanged, never grants admission, and a full pool, a promotion, a
+ * checkpoint install or a retained scope at the received window's edge never skips. */
+type ReceivedTurnoverBoundary = Readonly<{ objectId: string; epoch: number; anchorDigest: string; cut: Uint8Array; inventory: string;
+	plan: Uint8Array }>;
 const reconciledReceivedTurnovers = new WeakMap<object, ReceivedTurnoverBoundary>();
 
 async function captureReceivedTurnoverBoundary(source: CreatorRecipientSource,
@@ -1102,13 +1106,44 @@ async function captureReceivedTurnoverBoundary(source: CreatorRecipientSource,
 	if (epoch < 2 || cut === undefined || inventory === undefined || inventory.owner.migration !== "ready" ||
 		inventory.owner.recoveryScopes >= inventory.owner.limits.maxRecoveryScopes) return undefined;
 	const { custody: _custody, ...observed } = inventory;
+	const plan = encodeCanonical(await source.issuanceStore.readSettlementPlan(source.issuanceScope));
 	return Object.freeze({objectId: source.objectId, epoch, anchorDigest: source.currentTrust.currentAnchorDigest,
-		cut: Uint8Array.from(cut.bytes), inventory: JSON.stringify(observed)});
+		cut: Uint8Array.from(cut.bytes), inventory: JSON.stringify(observed), plan});
 }
 
 function sameReceivedTurnoverBoundary(left: ReceivedTurnoverBoundary, right: ReceivedTurnoverBoundary): boolean {
 	return left.objectId === right.objectId && left.epoch === right.epoch && left.anchorDigest === right.anchorDigest &&
-		sameBytes(left.cut, right.cut) && left.inventory === right.inventory;
+		sameBytes(left.cut, right.cut) && left.inventory === right.inventory && sameBytes(left.plan, right.plan);
+}
+
+/** The install's own input, which no lull boundary can carry: the received successor
+ * takes one slot of the bounded recovery window (AHE_BOUNDED_READ_LIMITS
+ * .maxObjectGenerations), so the install's classification authenticates one historical
+ * source generation fewer than a lull's at the same head. A closed journal scope at or
+ * below the received epoch minus that bound that nothing else protects (the retirement
+ * control's protected scopes) loses its header's protection inside the install's
+ * turnover, which retires it. While the journal holds one, the install turns over.
+ * Observation only; an unavailable read turns over. */
+async function receivedWindowEdgeScopeRetained(source: CreatorRecipientSource): Promise<boolean> {
+	const edge = source.currentTrust.currentEpoch + 1 - AHE_BOUNDED_READ_LIMITS.maxObjectGenerations;
+	if (edge < 1) return false;
+	try {
+		const read = await source.liveJournalStore.readRetirementImage?.({objectId: source.objectId});
+		if (read === undefined || !read.ok) return true;
+		const protectedScopes = read.value.control?.completed?.protectedScopes ?? [];
+		for (const bytes of read.value.canonicalRows) {
+			const frame = decodeCanonical(bytes);
+			if (!Array.isArray(frame) || frame[0] !== "scopes") continue;
+			const key: unknown = frame[1];
+			if (!Array.isArray(key) || typeof key[1] !== "number" || typeof key[2] !== "string") return true;
+			const epoch = key[1];
+			if (epoch >= 1 && epoch <= edge && !protectedScopes.some(scope =>
+				scope.objectId === key[0] && scope.epoch === epoch && scope.anchorDigest === key[2])) return true;
+		}
+		return false;
+	} catch {
+		return true;
+	}
 }
 
 /** The original bounded received turnover: one signing census bounds the passes;
@@ -1177,7 +1212,8 @@ export function creatorRecipientRetirementResumeRequested(plane: V3PlaneHandle):
  * Explicit opt-in early recipient turnover at a caller-chosen quiescent lull.
  * The SAME original passes run now; when they complete, the boundary they
  * reconciled is recorded for this plane, and the next install skips its own
- * turnover only if that boundary is still exactly current (the install's
+ * turnover only if that boundary is still exactly current and its received successor
+ * pushes no retained scope out of the bounded window (the install's
  * predicate alone stays due while the current Cut classifies a retained scope).
  * Inline install turnover remains the backstop. This grants no authority: an
  * unavailable or busy boundary is reported before entry, never forced. After entry, any failure is recovery work.
@@ -1376,10 +1412,12 @@ export async function receiveCreatorSuccessorAdoption(
 			return false;
 		}
 		// This plane's own lull already ran the SAME passes at this exact boundary (head,
-		// current Cut, recovery inventory) and nothing has reconciled or retained since.
+		// current Cut, recovery inventory, own settlement plan) and nothing has reconciled or
+		// retained since, and the received successor pushes no retained scope out of the window.
 		if (reconciledBoundary !== undefined && !promoted && !checkpointRequested) {
 			const boundary = await captureReceivedTurnoverBoundary(source, input.snapshotStore, current.candidates);
-			if (boundary !== undefined && sameReceivedTurnoverBoundary(boundary, reconciledBoundary)) {
+			if (boundary !== undefined && sameReceivedTurnoverBoundary(boundary, reconciledBoundary) &&
+				!(await receivedWindowEdgeScopeRetained(source))) {
 				observeReceivedTurnover("reconciled");
 				return false;
 			}
