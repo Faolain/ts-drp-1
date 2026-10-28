@@ -1266,6 +1266,58 @@ async function creatorFenceScan(duplicate = false, stale = false) {
 	await fixture.stop(creator);
 }
 
+// Case 23, contiguous variant. The creator-trusted-v1 close derives its checkpoint from
+// the issuance frontiers (the settlement profile only sizes them), so this runs in a
+// legacy room. The Writer's duplicated slot is the next one after its prior boundary:
+// without the duplicate-author freeze, the contiguous scan would carry the Writer past it.
+async function creatorContiguousDuplicateFreeze() {
+	const fixture = await openRoom(2, true);
+	const creator = required(fixture.peers[0]);
+	const writer = required(fixture.peers[1]);
+	const issuanceBoundary = (author: string) => {
+		const proposed = required(observed.advances.at(-1)).proposed as { candidates: { bytes: Uint8Array }[] };
+		const state = required(
+			proposed.candidates.find(({ bytes }) => record(bytes).kind === "drp-creator-author-issuance-frontiers-state")
+		);
+		const frontier = (record(state.bytes).frontiers as [string, number | null][]).find(([key]) => key === author);
+		return required(frontier)[1];
+	};
+	await fixture.issue(creator, "contiguous-creator-before");
+	await fixture.issue(writer, "contiguous-writer-before");
+	await fixture.close();
+	const priorWriter = issuanceBoundary(writer.author);
+	const priorCreator = issuanceBoundary(creator.author);
+	await creator.room.adoptCreatorSuccessor();
+	await fixture.reopen(writer, 0, true);
+	await fixture.issue(writer, "contiguous-writer-current");
+	const honest = required(ownCommits(writer).at(-1));
+	expect(honest.authorSequence, "F5B_C23C_DUPLICATED_SLOT_IS_CONTIGUOUS_WITH_THE_BOUNDARY").toBe(
+		required(priorWriter) + 1
+	);
+	// The Writer signs a second vertex at the same slot. Only these bytes are adversarial.
+	const preimage = record(honest.envelope.canonicalPreimageBytes);
+	const canonicalPreimage = encodeCanonical({ ...preimage, logicalTime: (preimage.logicalTime as number) + 1 });
+	const digest = hashDomain("ts-drp/vertex/v3", canonicalPreimage);
+	fixture.deliver(
+		Message.create({
+			objectId: required(observed.planes.get(creator.databaseName)).topic,
+			data: V3Envelope.encode({ canonicalPreimage, signature: ed25519.sign(digest, writer.seed) }).finish(),
+			sender: writer.databaseName,
+			type: MessageType.MESSAGE_TYPE_V3_ENVELOPE,
+		})
+	);
+	await fixture.issue(writer, "contiguous-writer-after"); // FIFO ingress acknowledgement
+	await fixture.issue(creator, "contiguous-independent-creator");
+	await fixture.close();
+	expect(issuanceBoundary(writer.author), "F5B_C23C_CONTIGUOUS_DUPLICATE_FREEZES_PRIOR_BOUNDARY").toBe(priorWriter);
+	expect(issuanceBoundary(creator.author), "F5B_C23C_OTHER_AUTHOR_ADVANCES_DESPITE_DUPLICATE").toBeGreaterThan(
+		required(priorCreator)
+	);
+	await creator.room.adoptCreatorSuccessor();
+	await fixture.stop(writer);
+	await fixture.stop(creator);
+}
+
 beforeEach(() => {
 	Object.defineProperty(navigator, "storage", {
 		configurable: true,
@@ -1819,6 +1871,8 @@ describe("D.110c-0c1f5b parent genuine settlement composition", () => {
 	it("case 12 ignores a stale fence at or below the authenticated terminal boundary", () =>
 		creatorFenceScan(false, true));
 	it("case 23 freezes only the equivocating author below a fence", () => creatorFenceScan(true));
+	it("case 23 freezes an equivocating author whose duplicated slot is contiguous with its boundary", () =>
+		creatorContiguousDuplicateFreeze());
 	it.each(["unpublished-fence", "delayed-replacement", "delayed-fence"] as const)(
 		"cases 4 15 16 preserve %s custody",
 		delayedPublication
