@@ -13,6 +13,14 @@ import { settlementRoom, settlementTransition } from "./fixtures/track-m/settlem
 // `snapshot-unavailable`. That refusal drops the ledger, so a settlement recipient is
 // never planned from the ledger and is never shadow-compared. A boundary shape the planner
 // does not model must be decided by it or declined as a shape, not refused.
+//
+// Live impact: this planner is NOT shadow-only. roomRetentionLedgerMode() defaults to
+// "apply", so on every opted-in room host (the room database, the default for new
+// browser rooms) its plan is applied through applyRoomRetentionPass. This test runs it in
+// "shadow" only to compare. The defect fails safe: the Refusal maps to drop:true, the
+// boundary returns undefined and stage 1 decides it. A settlement-v1 recipient therefore
+// never applies a wrong plan; it rebuilds and drops its ledger at every boundary and always
+// pays for stage 1.
 
 type Event = Readonly<Record<string, unknown>>;
 const ledger: Event[] = [];
