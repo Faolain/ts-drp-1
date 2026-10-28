@@ -16626,10 +16626,15 @@ async function settledLocalSourceFacts(
 			settlementOwnRowFenceGuarded(await ownEpochFences(store, scope), selected.authenticated.admitted.epoch,
 				source.authorSequence, frontier.terminalThrough);
 		const pinnedBytes = registration.exactCanonicalPinnedGenesisBootstrapOperationBytes;
-		const expiredBootstrap = expired && pinnedBytes !== undefined && selected.authenticated.admitted.epoch === 0 &&
+		// This author's own pinned bootstrap (its sequence 0 at the genesis anchor) is no application
+		// move and has no settlement entry: once the creator's frontier has passed it (terminal) or
+		// closed its epoch without it (expired), nothing replays or replaces it. Otherwise its journal
+		// scope 0 is never collectible, so it and every later own row stay retirement holes.
+		const settledBootstrap = (expired || terminal === "terminal") && pinnedBytes !== undefined &&
+			selected.authenticated.admitted.epoch === 0 &&
 			authenticatedPinnedGenesisOutboxRow(row, scope, registration.payload, registration.payload.trust.trust.genesisAnchorDigest,
 				pinnedBytes)?.digest === source.vertexDigest;
-		const settled = expiredBootstrap ||
+		const settled = settledBootstrap ||
 			await ownSourceSettlementIsComplete(registration, selected, await store.readSettlementPlan(scope));
 		if ((terminal !== "terminal" && terminal !== "old-incarnation" && !expired) || !settled) return undefined;
 		return ObjectFreeze({ exactCanonicalPreimageBytes: new Uint8ArrayConstructor(row.canonicalPreimageBytes),
