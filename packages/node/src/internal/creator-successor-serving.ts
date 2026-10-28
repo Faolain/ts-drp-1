@@ -180,3 +180,25 @@ export function createCreatorSuccessorServingRouter(): CreatorSuccessorServingRo
 		},
 	});
 }
+
+/** What the creator's room reports when it answers a member's departed-carrier request. */
+export interface CreatorDepartedAdoptionState {
+	/** The room serves successors: open, not terminal, its startup serving ready. */
+	readonly serving: boolean;
+	/** The epoch of the creator's adopted projection authority, or null before any. */
+	readonly projectionEpoch: number | null;
+	/** A successor adoption (its tail included) is running now. */
+	readonly adopting: boolean;
+}
+
+/**
+ * fix/skip-scope-carrier: whether the close of `departedEpoch` has a successor (epoch
+ * `departedEpoch + 1`) this creator adopted, so its carrier may be served: never one it may still
+ * abandon.
+ * @param departedEpoch - The epoch the member departed from (the Cut's epoch).
+ * @param state - The creator room's adoption state now.
+ * @returns Whether the carrier may be served.
+ */
+export function creatorDepartedCloseAdopted(departedEpoch: number, state: CreatorDepartedAdoptionState): boolean {
+	return state.serving && !state.adopting && state.projectionEpoch !== null && state.projectionEpoch > departedEpoch;
+}

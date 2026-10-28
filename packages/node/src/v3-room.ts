@@ -47,6 +47,7 @@ import { permitsStagedCreatorCheckpointFloorAdvance } from "./internal/creator-a
 import { createV3SnapshotTransferOwner } from "@ts-drp/node/snapshot-transfer";
 import {
 	createCreatorSuccessorServingRouter,
+	creatorDepartedCloseAdopted,
 	type CreatorSuccessorServingRouter,
 } from "./internal/creator-successor-serving.js";
 import {
@@ -3715,7 +3716,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	const departedCarrier = (scope: Readonly<{ epoch: number; anchorDigest: string }>): CreatorSuccessorDepartedCarrier | undefined => {
 		const held = departedCarriers.get(`${scope.epoch}:${scope.anchorDigest}`);
 		// Only a close whose successor this creator adopted: never a carrier it may still abandon.
-		const served = held !== undefined && successorAdopted(held.epoch) ? held.carrier : undefined;
+		const served = held !== undefined && creatorDepartedCloseAdopted(held.epoch, {
+			serving: !closed && terminalFailure === undefined && startupServingReady,
+			projectionEpoch: successorProjectionAuthority?.epoch ?? null,
+			adopting: creatorSuccessorAdoptionTask !== undefined,
+		}) ? held.carrier : undefined;
 		// Observation only (the "__warmProofEvent" proof hook); never alters the answer.
 		try {
 			const observer = Reflect.get(globalThis, "__warmProofEvent");
