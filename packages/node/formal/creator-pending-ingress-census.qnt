@@ -27,7 +27,12 @@
 //   EVICT (candidate b): BASE plus eviction of a pending entry after a timeout
 //     (nondeterministic here): safe, but refuses until the eviction fires and
 //     discards honest work that repair would have completed.
-// Broken controls: dependsOnPending (local dependencies include pending
+// Backstop (part of SOUND): the census has a row budget (BUDGET). When admitted
+//   rows + pending roots + the new row exceed it, the issue first evicts the newest
+//   foreign pending entries (their copies count as lost; repair fetches them again).
+//   Admitted and own vertices are never evicted.
+// Broken controls: noBackstop (issue past the budget), evictAdmittedOrOwn (the
+// backstop evicts admitted/own vertices), dependsOnPending (local dependencies include pending
 // vertices), censusIgnoresPending (the census omits the pending roots),
 // unboundedPending (no pending cap), closeIncludesPending (the cut takes pending
 // vertices).
@@ -40,13 +45,16 @@ module creatorPendingIngressCensus {
   pure val NC = 3            // creator local issues
   pure val MAX_PENDING = 2   // maxPendingEntries
   pure val MAX_LOSSES = 3    // finitely many losses
+  pure val BUDGET = 4        // census rows the issue's hold can size (admitted + pending + the new row)
   pure val C0 = 100          // creator local vertex j is C0 + j
 
   // Rule selectors.
   type Mutants = { refuseWhilePending: bool, evict: bool, dependsOnPending: bool, censusIgnoresPending: bool,
-                   unboundedPending: bool, closeIncludesPending: bool, noRepair: bool }
+                   unboundedPending: bool, closeIncludesPending: bool, noRepair: bool,
+                   noBackstop: bool, evictAdmittedOrOwn: bool }
   pure val SOUND: Mutants = { refuseWhilePending: false, evict: false, dependsOnPending: false, censusIgnoresPending: false,
-                              unboundedPending: false, closeIncludesPending: false, noRepair: false }
+                              unboundedPending: false, closeIncludesPending: false, noRepair: false,
+                              noBackstop: false, evictAdmittedOrOwn: false }
   pure val BASE: Mutants = { ...SOUND, refuseWhilePending: true }
 
   // Transport state per Writer vertex.
@@ -70,6 +78,7 @@ module creatorPendingIngressCensus {
   var losses: int
   var refused: int             // creator issues refused because of pending ingress
   var censusShort: bool        // some issue sized its census below its recovery state
+  var overBudget: bool         // some issue's census exceeded BUDGET
   var closed: bool
   var cut: Set[int]
   var mutants: Mutants
@@ -92,7 +101,7 @@ module creatorPendingIngressCensus {
     deps' = KEYS.mapBy(_ => Set()),
     admitted' = Set(), pending' = Set(),
     pos' = KEYS.mapBy(_ => 0), nextPos' = 1,
-    losses' = 0, refused' = 0, censusShort' = false, closed' = false, cut' = Set(),
+    losses' = 0, refused' = 0, censusShort' = false, overBudget' = false, closed' = false, cut' = Set(),
     mutants' = mu,
   }
   action init = initWith(SOUND)
@@ -103,6 +112,8 @@ module creatorPendingIngressCensus {
   action initCensusIgnoresPending = initWith({ ...SOUND, censusIgnoresPending: true })
   action initUnboundedPending = initWith({ ...SOUND, unboundedPending: true })
   action initCloseIncludesPending = initWith({ ...SOUND, closeIncludesPending: true })
+  action initNoBackstop = initWith({ ...SOUND, noBackstop: true })
+  action initEvictAdmittedOrOwn = initWith({ ...SOUND, evictAdmittedOrOwn: true })
 
   // The Writer issues its next vertex; it may also depend on creator locals it has seen.
   action writerIssue: bool = all {
@@ -116,7 +127,7 @@ module creatorPendingIngressCensus {
       deps' = deps.set(i, (if (i > 1) Set(i - 1) else Set()).union(extra)),
     },
     cIssued' = cIssued, admitted' = admitted, pending' = pending, pos' = pos, nextPos' = nextPos,
-    losses' = losses, refused' = refused, censusShort' = censusShort, closed' = closed, cut' = cut, mutants' = mutants,
+    losses' = losses, refused' = refused, censusShort' = censusShort, overBudget' = overBudget, closed' = closed, cut' = cut, mutants' = mutants,
   }
 
   // Non-adversarial loss of one copy in flight (stream reset, queue drop under jank).
@@ -124,7 +135,7 @@ module creatorPendingIngressCensus {
     net.get(i) == FLIGHT, losses < MAX_LOSSES,
     net' = net.set(i, LOST), losses' = losses + 1,
     wIssued' = wIssued, cIssued' = cIssued, deps' = deps, admitted' = admitted, pending' = pending, pos' = pos,
-    nextPos' = nextPos, refused' = refused, censusShort' = censusShort, closed' = closed, cut' = cut, mutants' = mutants,
+    nextPos' = nextPos, refused' = refused, censusShort' = censusShort, overBudget' = overBudget, closed' = closed, cut' = cut, mutants' = mutants,
   }
 
   // A copy reaches the creator's live plane.
@@ -145,7 +156,7 @@ module creatorPendingIngressCensus {
       net' = net.set(i, LOST), admitted' = admitted, pending' = pending, pos' = pos, nextPos' = nextPos,
     },
     wIssued' = wIssued, cIssued' = cIssued, deps' = deps, losses' = losses, refused' = refused,
-    censusShort' = censusShort, closed' = closed, cut' = cut, mutants' = mutants,
+    censusShort' = censusShort, overBudget' = overBudget, closed' = closed, cut' = cut, mutants' = mutants,
   }
 
   // Track AA: the creator asks the sender for its retained history; a lost copy is resent.
@@ -153,7 +164,7 @@ module creatorPendingIngressCensus {
     not(closed), not(mutants.noRepair), net.get(i) == LOST, not(admitted.contains(i)), not(pending.contains(i)),
     net' = net.set(i, FLIGHT),
     wIssued' = wIssued, cIssued' = cIssued, deps' = deps, admitted' = admitted, pending' = pending, pos' = pos,
-    nextPos' = nextPos, losses' = losses, refused' = refused, censusShort' = censusShort, closed' = closed, cut' = cut,
+    nextPos' = nextPos, losses' = losses, refused' = refused, censusShort' = censusShort, overBudget' = overBudget, closed' = closed, cut' = cut,
     mutants' = mutants,
   }
 
@@ -162,25 +173,43 @@ module creatorPendingIngressCensus {
     not(closed), mutants.evict, pending.contains(i),
     pending' = pending.exclude(Set(i)), net' = net.set(i, LOST),
     wIssued' = wIssued, cIssued' = cIssued, deps' = deps, admitted' = admitted, pos' = pos, nextPos' = nextPos,
-    losses' = losses, refused' = refused, censusShort' = censusShort, closed' = closed, cut' = cut, mutants' = mutants,
+    losses' = losses, refused' = refused, censusShort' = censusShort, overBudget' = overBudget, closed' = closed, cut' = cut, mutants' = mutants,
   }
 
-  // The creator's own local issue.
+  // The k newest members of a set under a stamp (highest stamp first).
+  pure def newest(xs: Set[int], stamp: int -> int, k: int): Set[int] =
+    xs.filter(v => xs.filter(u => stamp.get(u) > stamp.get(v)).size() < k)
+
+  // The creator's own local issue. Backstop (proposal c): when admitted + pending + the
+  // new row exceeds BUDGET, the newest foreign pending entries are evicted first (their
+  // copies count as lost; repair fetches them again). An issue whose admitted rows alone
+  // exceed BUDGET waits for the close (not a pending refusal).
   action creatorIssue: bool = all {
     not(closed), cIssued < NC,
     val refuse = mutants.refuseWhilePending and pending.size() > 0
     val c = C0 + cIssued + 1
-    val localDeps = if (mutants.dependsOnPending) admitted.union(pending) else admitted
-    val sized = admitted.size() + (if (mutants.censusIgnoresPending) 0 else pending.size()) + 1
-    val actual = admitted.size() + pending.size() + 1
+    val over = admitted.size() + pending.size() + 1 - BUDGET
+    val k = if (mutants.noBackstop or over < 0) 0 else over
+    // Newest pending = highest author sequence (one Writer chain); broken control: newest admitted by journal position.
+    val evictedPending = if (mutants.evictAdmittedOrOwn) Set() else newest(pending, WRITERS.union(LOCALS).mapBy(v => v), k)
+    val evictedAdmitted = if (mutants.evictAdmittedOrOwn) newest(admitted, pos, k) else Set()
+    val adm = admitted.exclude(evictedAdmitted)
+    val pend = pending.exclude(evictedPending)
+    val fits = mutants.noBackstop or adm.size() + pend.size() + 1 <= BUDGET
+    val localDeps = if (mutants.dependsOnPending) adm.union(pend) else adm
+    val sized = adm.size() + (if (mutants.censusIgnoresPending) 0 else pend.size()) + 1
+    val actual = adm.size() + pend.size() + 1
     if (refuse) all {
-      refused' = refused + 1, cIssued' = cIssued, deps' = deps, admitted' = admitted, pos' = pos, nextPos' = nextPos,
-      censusShort' = censusShort,
+      refused' = refused + 1, cIssued' = cIssued, deps' = deps, admitted' = admitted, pending' = pending, net' = net,
+      pos' = pos, nextPos' = nextPos, censusShort' = censusShort, overBudget' = overBudget,
     } else all {
-      refused' = refused, cIssued' = cIssued + 1, deps' = deps.set(c, localDeps), admitted' = admitted.union(Set(c)),
+      fits,
+      refused' = refused, cIssued' = cIssued + 1, deps' = deps.set(c, localDeps), admitted' = adm.union(Set(c)),
+      pending' = pend, net' = WRITERS.mapBy(i => if (evictedPending.contains(i)) LOST else net.get(i)),
       pos' = pos.set(c, nextPos), nextPos' = nextPos + 1, censusShort' = (censusShort or sized < actual),
+      overBudget' = (overBudget or actual > BUDGET),
     },
-    wIssued' = wIssued, net' = net, pending' = pending, losses' = losses, closed' = closed, cut' = cut, mutants' = mutants,
+    wIssued' = wIssued, losses' = losses, closed' = closed, cut' = cut, mutants' = mutants,
   }
 
   // The creator closes the epoch at its admitted index.
@@ -188,13 +217,13 @@ module creatorPendingIngressCensus {
     not(closed),
     closed' = true, cut' = if (mutants.closeIncludesPending) admitted.union(pending) else admitted,
     wIssued' = wIssued, cIssued' = cIssued, net' = net, deps' = deps, admitted' = admitted, pending' = pending,
-    pos' = pos, nextPos' = nextPos, losses' = losses, refused' = refused, censusShort' = censusShort, mutants' = mutants,
+    pos' = pos, nextPos' = nextPos, losses' = losses, refused' = refused, censusShort' = censusShort, overBudget' = overBudget, mutants' = mutants,
   }
 
   action stutter: bool = all {
     closed,
     wIssued' = wIssued, cIssued' = cIssued, net' = net, deps' = deps, admitted' = admitted, pending' = pending,
-    pos' = pos, nextPos' = nextPos, losses' = losses, refused' = refused, censusShort' = censusShort, closed' = closed,
+    pos' = pos, nextPos' = nextPos, losses' = losses, refused' = refused, censusShort' = censusShort, overBudget' = overBudget, closed' = closed,
     cut' = cut, mutants' = mutants,
   }
 
@@ -217,7 +246,12 @@ module creatorPendingIngressCensus {
   val pendingDisjoint: bool = admitted.intersect(pending) == Set()
   val pendingBounded: bool = pending.size() <= MAX_PENDING
   val censusCovers: bool = not(censusShort)
-  val safety: bool = journalTopological and cutSound and pendingDisjoint and pendingBounded and censusCovers
+  // The census never exceeds its budget.
+  val censusFits: bool = not(overBudget)
+  // Eviction never removes an admitted (or own) vertex: once journaled, always admitted.
+  val admittedMonotone: bool = KEYS.forall(v => pos.get(v) > 0 implies admitted.contains(v))
+  val safety: bool = journalTopological and cutSound and pendingDisjoint and pendingBounded and censusCovers and
+    censusFits and admittedMonotone
   // Liveness proxy: a creator issue is never refused because of foreign pending ingress.
   val noPendingRefusal: bool = refused == 0
   val all_: bool = safety and noPendingRefusal
@@ -249,4 +283,26 @@ module creatorPendingIngressCensus {
     .then(writerIssue).then(deliver(1)).then(writerIssue).then(lose(2)).then(writerIssue).then(deliver(3))
     .then(close)
     .then(all { assert(not(cutSound)), stutter })
+  // Backstop: w1 admitted, w2 lost, w3 and w4 pending. The second issue does not fit
+  // (2 admitted + 2 pending + 1 > 4): the newest pending entry (w4) is evicted and resent.
+  run budgetEvictTest = init
+    .then(writerIssue).then(deliver(1)).then(writerIssue).then(lose(2)).then(writerIssue).then(deliver(3))
+    .then(writerIssue).then(deliver(4))
+    .then(all { assert(pending == Set(3, 4)), creatorIssue })
+    .then(creatorIssue)
+    .then(all { assert(pending == Set(3) and net.get(4) == LOST and refused == 0 and safety), repair(2) })
+    .then(deliver(2))
+    .then(all { assert(admitted == Set(1, 2, 3, 101, 102) and pending == Set()), repair(4) })
+    .then(deliver(4))
+    .then(all { assert(admitted.contains(4) and safety), close })
+  run evictAdmittedOrOwnTest = initEvictAdmittedOrOwn
+    .then(writerIssue).then(deliver(1)).then(writerIssue).then(lose(2)).then(writerIssue).then(deliver(3))
+    .then(writerIssue).then(deliver(4))
+    .then(creatorIssue).then(creatorIssue)
+    .then(all { assert(not(admittedMonotone)), close })
+  run noBackstopTest = initNoBackstop
+    .then(writerIssue).then(deliver(1)).then(writerIssue).then(lose(2)).then(writerIssue).then(deliver(3))
+    .then(writerIssue).then(deliver(4))
+    .then(creatorIssue).then(creatorIssue)
+    .then(all { assert(not(censusFits)), close })
 }
