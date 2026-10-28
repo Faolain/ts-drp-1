@@ -1,13 +1,13 @@
 import "fake-indexeddb/auto";
 
 import { encodeCanonical } from "@ts-drp/canonical";
-import type { DurableIssuanceStore } from "@ts-drp/issuance-store";
+import type { DurableIssuanceStore, DurableIssueCommit } from "@ts-drp/issuance-store";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { openSettlementNode } from "./fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.js";
+import { runNativeHistoricalReplacement } from "./fixtures/phase-6b-d110c-0c1f5b0b/node-settlement-contract.js";
 import {
 	code,
 	commit,
@@ -78,51 +78,50 @@ function batch(times: readonly number[]): unknown {
 
 describe("D.110c-0c1f5b0u exact store logical-time owner", () => {
 	it("pins a real Node-assembled sixteen-entry progress chunk to its final child logical time", async () => {
-		const node = await openSettlementNode("creator-trusted-settlement-v1", true);
+		// Since ea4eb158 Node assembles a replacement only through its owning displaced
+		// source, so the sixteen-entry chunk comes from the genuine historical
+		// replacement (a real close and cold adoption, then source.issueReplacement).
+		const result = await runNativeHistoricalReplacement(false, false, false, false, false, false, false, false, 16);
+		expect(result.replacement, JSON.stringify(result)).toMatchObject({ ok: true });
+		const chunk = result.progressChunk as {
+			effect: never;
+			operations: readonly { logicalTime: number }[];
+			planBefore: never;
+			planAfter: unknown;
+			row: DurableIssueCommit;
+			history: readonly DurableIssueCommit[];
+		};
+		expect(chunk.operations).toHaveLength(16);
+		const last = (chunk.operations.at(-1) as { logicalTime: number }).logicalTime;
+		const pinned = { entries: [{ replacementProgress: { chunks: [{ lastLogicalTime: last, throughIntent: 16 }] } }] };
+		expect(snapshot(chunk.planAfter as never), "D110C_0C1F5B0U_NODE_STORE_PINS_FINAL_CHILD").toMatchObject(pinned);
+		const scope = chunk.row.issuedRecord.scope;
 		const realStore = createEphemeralDurableIssuanceStore();
 		try {
-			const selectedPlan = { ...plan(progressEntry(progress(16))), scope: node.scope };
-			await node.issuanceStore.transactWriteSettlementPlan({
-				expectedRevision: null,
-				plan: selectedPlan as never,
-				scope: node.scope,
-			});
-			const operations = Array.from({ length: 16 }, (_, index) => ({
-				logicalTime: 3 + 2 * index,
-				operation: { action: "add", value: 1 },
-			}));
-			const issued = await node.plane.issueLocal({
-				operations,
-				planEffect: progressEffect(0, 16),
-				signRegisteredVertexDigest: node.fixture.signRegisteredVertexDigest,
-			} as never);
-			expect(issued).toMatchObject({ ok: true });
-			const bootstrap = await node.issuanceStore.readIssued(node.scope, 0);
-			const signedBatch = await node.issuanceStore.readIssued(node.scope, 1);
-			if (bootstrap === null || signedBatch === null)
-				throw new TypeError("D110C_0C1F5B0U_REAL_NODE_SIGNED_BATCH_MISSING");
-			await realStore.transactIssue(node.scope, (sequence) => {
-				expect(sequence).toBe(bootstrap.authorSequence);
-				return Promise.resolve(bootstrap);
-			});
+			for (const row of chunk.history)
+				await realStore.transactIssue(scope, (sequence) => {
+					expect(sequence).toBe(row.authorSequence);
+					return Promise.resolve(row);
+				});
+			// A first write carries revision 0; the plan content is the exact pre-chunk native plan.
 			await realStore.transactWriteSettlementPlan({
 				expectedRevision: null,
-				plan: selectedPlan as never,
-				scope: node.scope,
+				plan: { ...(chunk.planBefore as object), revision: 0 } as never,
+				scope,
 			});
-			await realStore.transactIssue(node.scope, (sequence) => {
-				expect(sequence).toBe(signedBatch.authorSequence);
-				return Promise.resolve(signedBatch);
+			await realStore.transactIssue(scope, (sequence) => {
+				expect(sequence).toBe(chunk.row.authorSequence);
+				return Promise.resolve({ ...chunk.row, planEffect: chunk.effect });
 			});
-			expect(await realStore.readIssued(node.scope, 1)).toEqual(signedBatch);
-			expect(snapshot(await realStore.readSettlementPlan(node.scope))).toMatchObject({
-				entries: [{ replacementProgress: { chunks: [{ lastLogicalTime: 33, throughIntent: 16 }] } }],
-			});
+			// The memory store keeps the transaction instruction on its row; the signed bytes are the native ones.
+			expect(await realStore.readIssued(scope, chunk.row.authorSequence)).toEqual({ ...chunk.row, planEffect: chunk.effect });
+			expect(snapshot(await realStore.readSettlementPlan(scope)), "D110C_0C1F5B0U_REPLAYED_STORE_PINS_FINAL_CHILD").toMatchObject(
+				pinned
+			);
 		} finally {
 			await realStore.close();
-			await node.close();
 		}
-	});
+	}, 120_000);
 	it.each(["entries", "batch.entries"] as const)(
 		"ordinary %s fields do not impersonate an application batch",
 		async (field) => {

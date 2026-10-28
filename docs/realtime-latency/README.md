@@ -625,3 +625,11 @@ Notes:
   `admittedAuthorSequence` (8b857b4a, one check in v3-live `issueOneVertex`; typed
   `V3_LOCAL_LINEAGE_BEHIND_FRONTIER`). Known gap (pinned with it.fails): a restored device that has installed nothing
   holds no authenticated frontier and can still sign an epoch-0 vertex that peers refuse.
+- **Healing a restored device (open, future feature):** a device whose store is behind its authenticated frontier
+  stays failed closed. It could fast-forward to `next = admitted + 1` (pruned watermark `admitted`, justified by
+  the authenticated frontier capability), because vertex dependencies need no own-predecessor link and the
+  close slot law accepts a first new sequence or author fence at boundary + 1. That also needs the retirement
+  boundary derivation to read the pruned watermark, and the restored device must not inherit the other device's
+  unsettled settlement sources. The hazard is the other device still being live with the same key (a Web Lock is
+  per device), so healing waits for an explicit "this device replaces the other" action plus an author fence at
+  `admitted + 1`.
