@@ -146,10 +146,21 @@ function journalRetirement(directory: string, name: string) {
 		directory,
 		`${createHash("sha256").update(JSON.stringify(["journal", name])).digest("hex")}.sqlite.drp-live-journal-v1.sqlite`
 	);
-	if (!existsSync(file)) return { scopes: [] as number[], protectedScopes: [] as number[], activeProtected: [] as number[] };
+	if (!existsSync(file))
+		return { scopes: [] as number[], protectedScopes: [] as number[], activeProtected: [] as number[], detail: [] as number[][] };
 	const db = new DatabaseSync(file, { readOnly: true });
 	try {
 		const scopes = db.prepare("SELECT epoch FROM scopes ORDER BY epoch").all().map((row) => Number(row.epoch));
+		// Per scope: [epoch, closed membership held (1/0), received entries, local-issued entries].
+		const detail = db
+			.prepare(
+				"SELECT s.epoch AS epoch, s.closed_membership_bytes IS NOT NULL AS membership, " +
+					"(SELECT count(*) FROM accepted_entries e WHERE e.epoch=s.epoch AND e.anchor_digest=s.anchor_digest AND e.source_kind='received') AS received, " +
+					"(SELECT count(*) FROM accepted_entries e WHERE e.epoch=s.epoch AND e.anchor_digest=s.anchor_digest AND e.source_kind='local-issued') AS local " +
+					"FROM scopes s ORDER BY s.epoch"
+			)
+			.all()
+			.map((row) => [Number(row.epoch), Number(row.membership), Number(row.received), Number(row.local)]);
 		let protectedScopes: number[] = [];
 		let activeProtected: number[] = [];
 		for (const row of db.prepare("SELECT record FROM retirement_controls").all()) {
@@ -160,7 +171,7 @@ function journalRetirement(directory: string, name: string) {
 			protectedScopes = value.completed?.protectedScopes.map((scope) => scope.epoch) ?? protectedScopes;
 			activeProtected = value.active?.preparation?.protectedScopes?.map((scope) => scope.epoch) ?? activeProtected;
 		}
-		return { scopes, protectedScopes, activeProtected };
+		return { scopes, protectedScopes, activeProtected, detail };
 	} finally {
 		db.close();
 	}
