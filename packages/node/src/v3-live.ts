@@ -24585,13 +24585,21 @@ async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
 	const prior = second.plan;
 	// The moves of a row the creator's frontier proves was never admitted are given back to the
 	// application in this same plan write (durable hand-back records, consumed by their reissue).
+	// The author's own pinned bootstrap row (epoch 0 at the genesis anchor, carrying exactly the
+	// registered bootstrap operation, Grid's installRoster) is not a move: offered again it would be a
+	// row no settlement policy derives once displaced. It is expired unrecorded; every other row's
+	// operations are given back.
 	let handBacks = prior.handBacks;
 	if (frontierProof) {
 		const row = second.read.rows.issued.find(value => sameScope(value, scope) && value.authorSequence === selector.sourceSequence);
 		const authenticated = row === undefined ? undefined : authenticateRetainedSourceVertex(second.retained.contract,
 			row.canonicalPreimageBytes, row.signature, row.digest, scope.author, row.authorSequence);
 		const intents = authenticated === undefined ? undefined : rebaseIntents(second.retained.contract, authenticated);
-		if (authenticated !== undefined && intents !== undefined && intents.length > 0 &&
+		const pinnedBootstrap = registration.exactCanonicalPinnedGenesisBootstrapOperationBytes;
+		const bootstrapRow = pinnedBootstrap !== undefined && authenticated !== undefined && intents?.length === 1 &&
+			authenticated.vertex.epoch === 0 && authenticated.vertex.anchor === registration.payload.trust.trust.genesisAnchorDigest &&
+			sameBytes(encodeCanonical(intents[0].operation), pinnedBootstrap);
+		if (authenticated !== undefined && intents !== undefined && intents.length > 0 && !bootstrapRow &&
 			await frontierRetainedResolution(registration, selector.sourceSequence, authenticated.vertex.epoch) === "never-admitted") {
 			handBacks = settlementHandBacksWith(prior.handBacks, intents.map((intent, index) => ObjectFreeze({
 				sourceSequence: selector.sourceSequence, sourceDigest: new Uint8ArrayConstructor(second.entry.sourceDigest),
