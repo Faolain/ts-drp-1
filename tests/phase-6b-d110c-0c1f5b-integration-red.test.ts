@@ -418,8 +418,8 @@ async function staleLocalHead() {
 	await creator.room.adoptCreatorSuccessor();
 	// Only the genuinely newer floor is transported. Local AHE/snapshot and
 	// issuance bytes remain untouched; no old floor is restored or manufactured.
-	writer.floor.receive(creator.floor.read());
-	const newer = writer.floor.read();
+	await writer.floor.receive(await creator.floor.read());
+	const newer = await writer.floor.read();
 	const mutations = observed.commits.length;
 	await expect(fixture.reopen(writer, 0), "F5B_C24A_STALE_LOCAL_HEAD_FAILS_CLOSED").rejects.toThrow(
 		STALE_LOCAL_HEAD_FAILURE
@@ -428,7 +428,7 @@ async function staleLocalHead() {
 		encodeCanonical(await durable(writer)),
 		"F5B_C24A_PLAN_REVISION_FENCE_ENTRIES_PROGRESS_LINEAGE_UNCHANGED"
 	).toEqual(encodeCanonical(linked));
-	expect(writer.floor.read(), "F5B_C24A_NEWER_FLOOR_NEVER_REGRESSES").toEqual(newer);
+	expect(await writer.floor.read(), "F5B_C24A_NEWER_FLOOR_NEVER_REGRESSES").toEqual(newer);
 	expect(observed.commits.length, "F5B_C24A_REJECTED_REOPEN_ISSUES_NOTHING").toBe(mutations);
 	const offset = ownCommits(writer).length;
 	await fixture.reopen(writer, 1, true);
@@ -574,7 +574,7 @@ async function sixtyFourWriterGoldenPath() {
 						hex(hashDomain("ts-drp/latched-acl/v3", encodeCanonical(acl)))
 					);
 					expect(current.profileId, "F5B_64_SETTLEMENT_AUTHORITY_NO_DOWNGRADE").toBe("creator-trusted-settlement-v1");
-					const floor = peer.floor.read();
+					const floor = await peer.floor.read();
 					expect(floor.pending).toBeNull();
 					expect(floor.stable).toMatchObject({ epoch, currentAnchorDigest: current.anchorDigest });
 					const ownRecovered = displaced.filter((row) => row.peer === peer && row.epoch === epoch - 1);
@@ -761,7 +761,7 @@ async function sixtyFourWriterGoldenPath() {
 			const head = await assertRetainedRollbackPair(creator);
 			expect(authority.anchorDigest).toBe(checkpoint.identity.successorAnchorDigest);
 			expect(authority.aclDigest).toBe(checkpoint.identity.successorAclDigest);
-			expect(creator.floor.read().stable.epoch, "F5B_C24C_MONOTONE_AUTHENTICATED_FLOOR").toBe(epoch + 1);
+			expect((await creator.floor.read()).stable.epoch, "F5B_C24C_MONOTONE_AUTHENTICATED_FLOOR").toBe(epoch + 1);
 			const previous = adopted.at(-1);
 			if (previous !== undefined)
 				expect(head.head.revision, "F5B_C24C_MONOTONE_ACTIVE_HEAD_REVISION").toBeGreaterThan(previous.revision);
@@ -1863,8 +1863,8 @@ describe("D.110c-0c1f5b parent genuine settlement composition", () => {
 		const untouched = await durable(floorWriter);
 		await floorControl.close();
 		await floorCreator.room.adoptCreatorSuccessor();
-		floorWriter.floor.receive(floorCreator.floor.read());
-		const currentFloor = floorWriter.floor.read();
+		await floorWriter.floor.receive(await floorCreator.floor.read());
+		const currentFloor = await floorWriter.floor.read();
 		// No live owner competes with this stale durable-copy probe. The newer
 		// creator floor stays committed; stopping a session never rewinds it.
 		await floorControl.stop(floorCreator);
@@ -1873,6 +1873,6 @@ describe("D.110c-0c1f5b parent genuine settlement composition", () => {
 			"F5B_C24A_EXACT_REACHABLE_FLOOR_REJECTION_CONTROL"
 		).rejects.toThrow(STALE_LOCAL_HEAD_FAILURE);
 		expect(await durable(floorWriter)).toEqual(untouched);
-		expect(floorWriter.floor.read()).toEqual(currentFloor);
+		expect(await floorWriter.floor.read()).toEqual(currentFloor);
 	});
 });

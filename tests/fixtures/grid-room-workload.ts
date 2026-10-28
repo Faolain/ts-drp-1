@@ -400,8 +400,11 @@ const hex = (value: Uint8Array) => Buffer.from(value).toString("hex");
  * @param value
  */
 const record = (value: Uint8Array) => decodeCanonical(value) as Record<string, unknown>;
+// ea4eb158: a local head exactly one epoch behind the authenticated floor is first
+// tried as a direct received transition; with no received successor material that
+// closure cannot be built, so reopen refuses there, before the floor comparison.
 const STALE_LOCAL_HEAD_FAILURE =
-	"v3 room successor reopen failed: D110C_FLOOR_MISMATCH: creator successor differs from the authenticated room-head floor";
+	"v3 room successor reopen failed: chain-invalid: creator received projection replacement is invalid";
 let ordinal = 0;
 
 const wideDiagnosticState = {
