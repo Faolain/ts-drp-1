@@ -974,9 +974,11 @@ async function openRoom(
 		wideDiagnostic("reopen-session", "begin", closedEpoch + 1, peer.databaseName);
 		peer.room = await createV3RoomSession({
 			...reopenInput,
-			// Legacy keeps its existing restriction. Settlement creator restart must
-			// authenticate this existing input pair and rebind close authority.
-			...(!legacy && creatorFinalitySigner !== undefined ? { creatorFinalitySigner } : {}),
+			// A restarted creator authenticates this existing input pair and rebinds close
+			// authority, as the pages' owned session always does for the creator (both
+			// profiles). Without its signer a reopened creator is an ordinary Writer that
+			// nothing can make current (Decision B: the currency statement is the creator's).
+			...(creatorFinalitySigner !== undefined ? { creatorFinalitySigner } : {}),
 			application,
 			onProjection: observeEmissions ? observeProjection(peer.databaseName, application) : reopenInput.onProjection,
 			roomHeadAuthority: { ...peer.floor.authority, initialization: { kind: "reopen" } },
