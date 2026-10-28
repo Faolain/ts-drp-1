@@ -25,7 +25,160 @@ export interface LongRoomOptions {
 	readonly moves: number;
 	/** Chat only: the format the creator signs into genesis (default "window", what Chat ships). */
 	readonly chatFormat?: ChatFormat;
+	/**
+	 * The trust profile the creator signs into genesis. Default (absent, or "settlement-v1"): the
+	 * app's own exported profile (examples/<app>/src/profile.ts, via genesis-profile.ts), so the long
+	 * room signs what the shipped page signs. "trusted-v1" (Grid and Chat only) is the explicit
+	 * opt-in override: the legacy trusted profile with a version-1 latched ACL, which never prunes
+	 * issued records.
+	 */
+	readonly profile?: GenesisProfileChoice;
+	/**
+	 * Who rolls the room over. Default (absent) "harness": the driver seals, adopts and exports
+	 * itself. "app": each role runs its application's own rollover policy (the creator seals at the
+	 * app's budget or after an idle period; a Writer only re-offers refused moves). Successor offers
+	 * travel by the pages' own delivery; the harness only carries its frames (`successorWire`), and
+	 * harness offer passing (`install`) is refused.
+	 */
+	readonly rollover?: RolloverChoice;
+	/**
+	 * App mode, tests only: replaces the application's trigger values (its weight included) with
+	 * these, keeping its refusal classification, so a test can reach the native or application
+	 * ceiling and exercise the refusal path.
+	 */
+	readonly rolloverBudget?: Readonly<{ movesPerAuthor: number; idleMs: number }>;
 }
+
+export type RolloverChoice = "harness" | "app";
+
+/** One role's application rollover policy (app mode), observation only. */
+export interface RolloverObservation {
+	readonly epoch: number;
+	readonly rollovers: number;
+	/** Moves of this role waiting to be offered again after a capacity refusal. */
+	readonly waiting: number;
+	/** Rollover and offer-publication failures the policy reported (it retries rollovers). */
+	readonly errors: readonly string[];
+	readonly events: readonly Readonly<{
+		epoch: number;
+		successorEpoch: number;
+		trigger: string;
+		moves: number;
+		weight: number;
+		ms: number;
+		/** When the rollover finished (epoch milliseconds); it began `ms` earlier. */
+		endedAt: number;
+	}>[];
+}
+
+/** One role's successor delivery (app mode), observation only. */
+export interface SuccessorDeliveryObservation {
+	readonly epoch: number;
+	readonly installed: number;
+	readonly refused: number;
+	readonly announced: number;
+	readonly answered: number;
+	readonly requested: number;
+	readonly largestOfferBytes: number;
+	readonly refusals: readonly string[];
+	readonly lastError?: string;
+}
+
+/** See `successorWire`. */
+export interface SuccessorWire {
+	carried(): number;
+	pause(): Promise<void>;
+	resume(): void;
+	caughtUp(epoch: number, timeoutMs?: number): Promise<SuccessorDeliveryObservation>;
+	stop(): Promise<void>;
+}
+
+/**
+ * App mode: the scripted wire for the pages' successor delivery. It runs in the background, as a
+ * network would, carrying every frame each role's delivery sends to the other role every `everyMs`.
+ * It carries bytes only: what is announced, requested, authenticated and installed is the
+ * delivery's own decision. `caughtUp` waits until the member's room has installed `epoch`.
+ * @param peers - The creator and the member, read on every carry (a reopen replaces them).
+ * @param everyMs - Carry interval.
+ * @returns The wire.
+ */
+export function successorWire(peers: () => readonly [RoleEndpoint, RoleEndpoint], everyMs = 20): SuccessorWire {
+	let stopped = false;
+	let failure: unknown;
+	let carried = 0;
+	const carry = async (): Promise<number> => {
+		const [creator, member] = peers();
+		const down = (await creator.successorFrames?.()) ?? [];
+		const up = (await member.successorFrames?.()) ?? [];
+		if (down.length) await member.deliverSuccessorFrames?.(down);
+		if (up.length) await creator.deliverSuccessorFrames?.(up);
+		carried += down.length + up.length;
+		return down.length + up.length;
+	};
+	let paused: Promise<void> | undefined;
+	let resume: (() => void) | undefined;
+	const loop = (async (): Promise<void> => {
+		while (!stopped) {
+			if (paused !== undefined) await paused;
+			if (stopped) return;
+			try {
+				await carry();
+			} catch (error) {
+				failure ??= error;
+			}
+			await new Promise((resolve) => setTimeout(resolve, everyMs));
+		}
+	})();
+	return {
+		/**
+		 * Frames carried so far.
+		 * @returns The count.
+		 */
+		carried: () => carried,
+		/** Holds the wire while the roles are closed and reopened. */
+		pause: async (): Promise<void> => {
+			paused ??= new Promise<void>((resolve) => (resume = resolve));
+			// Let a carry in flight finish.
+			await new Promise((resolve) => setTimeout(resolve, everyMs * 2));
+		},
+		resume: (): void => {
+			resume?.();
+			paused = undefined;
+			resume = undefined;
+		},
+		/**
+		 * Waits until the member's room has installed `epoch` (its delivery idle), or throws after
+		 * `timeoutMs` with both roles' delivery counters.
+		 * @param epoch - The epoch the member must reach.
+		 * @param timeoutMs - How long it may take.
+		 * @returns The member's delivery observation.
+		 */
+		caughtUp: async (epoch: number, timeoutMs = 60_000): Promise<SuccessorDeliveryObservation> => {
+			const deadline = performance.now() + timeoutMs;
+			for (;;) {
+				if (failure !== undefined) throw failure;
+				const [creator, member] = peers();
+				await carry();
+				const observed = await member.successorDelivery?.();
+				if (observed === undefined) throw new TypeError("TRACK_M_APPS_SUCCESSOR_DELIVERY_ABSENT");
+				if (observed.epoch >= epoch) return observed;
+				if (performance.now() > deadline)
+					throw new TypeError(
+						`TRACK_M_APPS_SUCCESSOR_DELIVERY_STALLED epoch=${epoch} member=${JSON.stringify(observed)} creator=${JSON.stringify(await creator.successorDelivery?.())}`
+					);
+				await new Promise((resolve) => setTimeout(resolve, everyMs));
+			}
+		},
+		stop: async (): Promise<void> => {
+			stopped = true;
+			resume?.();
+			await loop;
+			if (failure !== undefined) throw failure;
+		},
+	};
+}
+
+export type GenesisProfileChoice = "settlement-v1" | "trusted-v1";
 
 export type StoreCensus = Readonly<Record<string, readonly [rows: number, bytes: number]>>;
 
@@ -163,6 +316,26 @@ export interface RoleEndpoint {
 	storageUsage?(): Promise<number | null>;
 	/** Observer events since the previous drain. */
 	drainEvents(): Promise<ObservedEvent[]>;
+	/**
+	 * App mode: the frames this role's successor delivery (examples/v3-room successor-delivery) sent
+	 * since the last call (base64), for the scripted wire to carry to the other role.
+	 */
+	successorFrames?(): Promise<string[]>;
+	/** App mode: hands frames the other role's delivery sent to this role's delivery. */
+	deliverSuccessorFrames?(frames: readonly string[]): Promise<void>;
+	/** App mode: joins this role's running install, then reports its epoch and delivery counters. */
+	successorDelivery?(): Promise<SuccessorDeliveryObservation>;
+	/**
+	 * App mode: the last projection this role made in `epoch` (its input and canonical state), or
+	 * null once it is older than the few epochs kept. For an epoch the creator closed, the closed cut.
+	 */
+	closedProjection?(epoch: number): Promise<Readonly<{
+		base: Readonly<{ epoch: number; state: string }> | null;
+		operations: readonly Readonly<{ author: string; operation: Readonly<Record<string, unknown>> }>[];
+		state: string;
+	}> | null>;
+	/** App mode: joins this role's in-flight rollover, then reports its policy. */
+	rollover?(): Promise<RolloverObservation>;
 	close(): Promise<void>;
 }
 
@@ -173,6 +346,10 @@ export interface DriveHooks {
 	log?(line: string): void;
 }
 
+/**
+ *
+ * @param bytes
+ */
 export function toBase64(bytes: Uint8Array): string {
 	let text = "";
 	for (let offset = 0; offset < bytes.length; offset += 0x8000)
@@ -180,10 +357,18 @@ export function toBase64(bytes: Uint8Array): string {
 	return btoa(text);
 }
 
+/**
+ *
+ * @param text
+ */
 export function fromBase64(text: string): Uint8Array {
 	return Uint8Array.from(atob(text), (character) => character.charCodeAt(0));
 }
 
+/**
+ *
+ * @param options
+ */
 export function labelOf(options: LongRoomOptions): string {
 	const format =
 		options.app === "chat" && options.chatFormat !== undefined && options.chatFormat !== "window"

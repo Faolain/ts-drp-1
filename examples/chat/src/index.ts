@@ -9,9 +9,15 @@ import {
 } from "@ts-drp/example-browser-network";
 import {
 	createV3RoomCreatorInviteMaterial,
+	createV3RoomRolloverPolicy,
+	openV3RoomSuccessorDelivery,
 	createV3RoomSession,
 	type V3RoomCreatorInviteMaterial,
 	type V3RoomHeadAuthority,
+	type V3RoomRolloverHooks,
+	type V3RoomRolloverPolicy,
+	type V3RoomSuccessorDelivery,
+	V3RoomSuccessorUnavailable,
 	type V3RoomSession,
 } from "@ts-drp/example-v3-room";
 import { DRPNode } from "@ts-drp/node";
@@ -19,6 +25,8 @@ import { authenticateV3RoomCreatorInvite } from "@ts-drp/node/v3-room";
 import { DRP_DISCOVERY_TOPIC } from "@ts-drp/types";
 
 import { openShippingChatCatalogs, type ShippingChatCatalog } from "./chat-catalogs";
+import { CHAT_GENESIS_PROFILE } from "./profile";
+import { shippingChatRefusalClearedByRollover, shippingChatRolloverBudget } from "./rollover";
 import { setupCopyButton } from "./util/clipboard";
 import { createPeerNameElement, formatPeerItem, shortenId, styleMessageElement } from "./util/peerIdentity";
 import { initializeToastContainer, showToast, ToastType } from "./util/toast";
@@ -56,6 +64,13 @@ declare global {
 		__TS_DRP_CHAT_ROOM_HEAD_AUTHORITY_FOR_OPEN__?: ChatHeadFactory;
 		__TS_DRP_CHAT_SETTLEMENT_SOURCE_APPROVAL__?: ChatSettlementApproval;
 		__TS_DRP_CHAT_SESSION__?: ModularBrowserNetworkSession;
+		/**
+		 * Test override of the creator's successor announcement. By default the page's successor
+		 * delivery (examples/v3-room) announces each adopted offer to the room's members over the
+		 * page's own node and answers their requests (a joiner must follow a checkpoint before it can
+		 * send); with this hook, the hook receives the offers instead and the page announces nothing.
+		 */
+		__TS_DRP_CHAT_SUCCESSOR_PUBLISHER__?: NonNullable<V3RoomRolloverHooks["publishSuccessor"]>;
 	}
 }
 
@@ -81,6 +96,21 @@ interface ChatOpenContext {
 
 let node: DRPNode | undefined;
 let room: V3RoomSession<ShippingChatProjection> | undefined;
+// Each open session's rollover policy (examples/chat/src/rollover.ts): the creator's seals at its
+// budget; a Writer's only offers a refused message again after the next checkpoint.
+const rollovers = new WeakMap<V3RoomSession<ShippingChatProjection>, V3RoomRolloverPolicy>();
+// Each open session's successor delivery: the creator announces offers, members install them.
+const deliveries = new WeakMap<V3RoomSession<ShippingChatProjection>, V3RoomSuccessorDelivery>();
+/**
+ * Closes a session and ends its rollover policy and successor delivery.
+ * @param session - The session to close.
+ */
+async function closeSession(session: V3RoomSession<ShippingChatProjection> | undefined): Promise<void> {
+	if (session === undefined) return;
+	rollovers.get(session)?.close();
+	deliveries.get(session)?.close();
+	await session.close();
+}
 let projection: ShippingChatProjection | undefined;
 // This device's history of the open room (outside room storage; display only).
 let archive: ShippingChatLocalArchive | undefined;
@@ -380,36 +410,76 @@ async function openSession(
 			? await factory(Object.freeze({ author, creatorInvite: invite, objectId, operation }))
 			: reopenedAuthority(reopen);
 	roomAuthority = reopen ?? authority;
-	return createV3RoomSession<ShippingChatProjection>({
-		application,
-		author,
-		creatorInvite: invite,
+	const publishSuccessor = window.__TS_DRP_CHAT_SUCCESSOR_PUBLISHER__;
+	if (publishSuccessor !== undefined && typeof publishSuccessor !== "function")
+		throw new TypeError("Chat successor publisher is invalid");
+	const successors = openV3RoomSuccessorDelivery(
+		selectedNode,
 		objectId,
-		databaseName,
-		issuanceDatabaseName: databaseName,
-		migrationDatabaseNamespace: author + ":" + objectId,
-		initialLogicalTime: 3,
-		...(receiveOnly ? { receiveOnly: true as const } : {}),
-		...(operation === "create"
-			? { creatorFinalitySigner: await selectedNode.keychain.acquireLocalAuthorFinalitySigner() }
-			: {}),
-		roomHeadAuthority: authority,
-		publicKeyBytes: bytes(author),
-		createOperationAdmissionPolicy: application.createOperationAdmissionPolicy,
-		// The host explicitly decides only after the shared owner authenticates
-		// the exact proposal. No policy means protected work awaits approval.
-		...(approveSettlementSourceSelection === undefined ? {} : { approveSettlementSourceSelection }),
-		signRegisteredVertexDigest: (digest) => selectedNode.keychain.signWithLocalAuthor(digest),
-		openTransport: (id) => selectedNode.openRoomNetwork(id),
-		onAcceptedVertex: () => undefined,
-		onProjection: (value) => {
-			projection = value;
-			// O(1): the archive writes in a later task, off this callback.
-			deviceArchive?.observe(value);
-			render();
-			updateShares();
-		},
-	});
+		operation === "create" ? "creator" : "member",
+		{
+			onError: (error) => console.warn("Chat successor delivery failed; it is retried", error),
+			onRefused: (error) => console.warn("Chat successor offer was refused", error),
+		}
+	);
+	// Only the creator's first open holds the finality signer, so only it seals. An observer issues
+	// nothing and needs no policy; its delivery still installs each successor.
+	const policy = receiveOnly
+		? undefined
+		: createV3RoomRolloverPolicy({
+				role: operation === "create" ? "creator" : "member",
+				budget: shippingChatRolloverBudget({ objectId, shares: context.shares }),
+				hooks: {
+					publishSuccessor: publishSuccessor ?? ((offer, epoch): Promise<void> => successors.publish(offer, epoch)),
+					requestSuccessor: () => successors.request(),
+					clearedByRollover: shippingChatRefusalClearedByRollover,
+					onError: (error) => console.warn("Chat rollover failed; it is retried", error),
+				},
+			});
+	let session: V3RoomSession<ShippingChatProjection>;
+	try {
+		session = await createV3RoomSession<ShippingChatProjection>({
+			application,
+			author,
+			creatorInvite: invite,
+			objectId,
+			databaseName,
+			issuanceDatabaseName: databaseName,
+			migrationDatabaseNamespace: author + ":" + objectId,
+			initialLogicalTime: 3,
+			...(receiveOnly ? { receiveOnly: true as const } : {}),
+			...(operation === "create"
+				? { creatorFinalitySigner: await selectedNode.keychain.acquireLocalAuthorFinalitySigner() }
+				: {}),
+			roomHeadAuthority: authority,
+			publicKeyBytes: bytes(author),
+			createOperationAdmissionPolicy: application.createOperationAdmissionPolicy,
+			// The host explicitly decides only after the shared owner authenticates
+			// the exact proposal. No policy means protected work awaits approval.
+			...(approveSettlementSourceSelection === undefined ? {} : { approveSettlementSourceSelection }),
+			signRegisteredVertexDigest: (digest) => selectedNode.keychain.signWithLocalAuthor(digest),
+			openTransport: (id) => selectedNode.openRoomNetwork(id),
+			onAcceptedVertex: (vertex) => policy?.observe(vertex),
+			onProjection: (value) => {
+				projection = value;
+				// O(1): the archive writes in a later task, off this callback.
+				deviceArchive?.observe(value);
+				render();
+				updateShares();
+			},
+		});
+	} catch (error) {
+		policy?.close();
+		successors.close();
+		throw error;
+	}
+	if (policy !== undefined) {
+		policy.bind(session);
+		rollovers.set(session, policy);
+	}
+	successors.bind(session);
+	deliveries.set(session, successors);
+	return session;
 }
 
 /**
@@ -429,11 +499,11 @@ async function promoteToWriter(): Promise<boolean> {
 	status("Opening this device as a Writer…", "joining");
 	room = undefined;
 	render();
-	await current.close();
+	await closeSession(current);
 	try {
 		const opened = await openSession(context, "join", false, authority);
 		if (closing) {
-			await opened.close();
+			await closeSession(opened);
 			return false;
 		}
 		room = opened;
@@ -449,7 +519,7 @@ async function promoteToWriter(): Promise<boolean> {
 	try {
 		const reopened = await openSession(context, "join", true, authority);
 		if (closing) {
-			await reopened.close();
+			await closeSession(reopened);
 			return false;
 		}
 		room = reopened;
@@ -493,7 +563,7 @@ async function openChat(operation: "create" | "join"): Promise<void> {
 				members: [{ author, finalityKey: author, groups: ["admin", "finality", "writer"] }],
 				objectId,
 				permissionless: false,
-				version: 3,
+				version: CHAT_GENESIS_PROFILE.latchedAclVersion,
 			});
 			const signers = [{ publicKey: author, signerId: "creator" }];
 			invite = await createV3RoomCreatorInviteMaterial({
@@ -514,7 +584,7 @@ async function openChat(operation: "create" | "join"): Promise<void> {
 				}),
 				exactCanonicalProfileBytes: encodeCanonical({
 					cryptoSuiteId: "ed25519-sha256-v3",
-					profileId: "creator-trusted-settlement-v1",
+					profileId: CHAT_GENESIS_PROFILE.profileId,
 					quorum: 1,
 					signers,
 				}),
@@ -626,7 +696,7 @@ async function openChat(operation: "create" | "join"): Promise<void> {
 		render();
 		updateShares();
 	} catch (error) {
-		await opened?.close();
+		await closeSession(opened);
 		await openedArchive?.close();
 		archive = undefined;
 		openContext = undefined;
@@ -676,12 +746,23 @@ async function issueMessage(): Promise<void> {
 			});
 		}
 		const command = pendingSend;
-		await selected.issue({ ...command.operation });
+		// A message refused at the checkpoint's allowance is offered again after the next rollover.
+		await (rollovers.get(selected) ?? selected).issue({ ...command.operation });
 		if (room !== selected) return;
 		if (messageInput.value === command.operation.text) messageInput.value = "";
 		if (pendingSend === command) pendingSend = undefined;
 		status("Message accepted locally; remote delivery follows the room transport.", "ready");
 	} catch (error) {
+		if (error instanceof V3RoomSuccessorUnavailable) {
+			// The room's policy keeps the message and sends it once the next checkpoint arrives.
+			if (pendingSend?.operation.text === messageInput.value) messageInput.value = "";
+			pendingSend = undefined;
+			status(
+				`No new checkpoint has arrived from the creator yet. Your message "${String(error.operation.text ?? "")}" is kept and is sent once it arrives.`,
+				"error"
+			);
+			return;
+		}
 		// Complete author/identity/time payload and text survive a refused retry.
 		status(error instanceof Error ? error.message : "Message refused. Retained text can be retried.", "error");
 		showToast("Message refused. Your text is retained for retry.", ToastType.ERROR, 5000);
@@ -777,7 +858,7 @@ async function main(): Promise<void> {
 					await issueTask;
 					await memberTask;
 					await shareTask;
-					await room?.close();
+					await closeSession(room);
 					await archive?.close();
 					await (modular?.stop() ?? node?.stop());
 					identity.release();

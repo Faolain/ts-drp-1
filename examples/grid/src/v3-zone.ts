@@ -4,6 +4,8 @@ import type { CanonicalResourceFootprint } from "@ts-drp/canonical/resource";
 import { decodeEntityDeltaBatch, encodeEntityDeltaBatch, type EphemeralChannel } from "@ts-drp/ephemeral";
 import {
 	createV3RoomCreatorInviteMaterial,
+	createV3RoomRolloverPolicy,
+	openV3RoomSuccessorDelivery,
 	createV3RoomSession,
 	type V3RoomAcceptedOperation,
 	type V3RoomCreatorInviteMaterial,
@@ -12,6 +14,9 @@ import {
 	type V3RoomMigrationProjection,
 	type V3RoomMigrationRehearsalReceipt,
 	type V3RoomProjectionInput,
+	type V3RoomRolloverHooks,
+	type V3RoomRolloverPolicy,
+	type V3RoomSuccessorDelivery,
 	type V3RoomSession,
 } from "@ts-drp/example-v3-room";
 import type { DRPNode } from "@ts-drp/node";
@@ -27,6 +32,8 @@ import {
 	verifyOutcomeCommitOperation,
 } from "@ts-drp/outcome-commit";
 
+import { GRID_GENESIS_PROFILE } from "./profile.js";
+import { GRID_ROLLOVER_BUDGET } from "./rollover.js";
 import catalogMaterial from "./zone-catalog-material.json" with { type: "json" };
 import predecessorCatalogMaterial from "./zone-catalog-predecessor-material.json" with {type:"json"};
 import { createZoneStateKernel, emptyZoneState, type ZonePlacementGrowthMaterial, type ZoneState, type ZoneStateKernel } from "./zone-state.js";
@@ -79,6 +86,12 @@ export type V3ZoneRoomHeadAuthorityForOpen = (
 export type V3ZoneSettlementSourceApproval = NonNullable<
 	Parameters<typeof createV3RoomSession<ZoneProjection>>[0]["approveSettlementSourceSelection"]
 >;
+
+/**
+ * The application host's delivery of each adopted successor offer to the zone's other members,
+ * who install it with `installCreatorSuccessor`. Without it the creator still rolls over.
+ */
+export type V3ZoneSuccessorPublisher = NonNullable<V3RoomRolloverHooks["publishSuccessor"]>;
 
 type EntityDelta = ReturnType<typeof decodeEntityDeltaBatch>[number];
 
@@ -375,6 +388,9 @@ export interface V3ZoneApi {
  * @param onProjection Observer for deterministic durable and transient projections.
  * @param roomHeadAuthorityForOpen Host-owned authority acquisition; initialization belongs to the host.
  * @param onTransient Optional UI-only position observer; full public snapshots remain fresh.
+ * @param publishSuccessor Test override of the creator's successor announcement. By default the
+ * zone's successor delivery (examples/v3-room) announces each adopted offer to the zone's members
+ * over this node and answers their requests; with this hook, the hook receives the offers instead.
  * @returns The bounded zone application API.
  */
 export function createV3ZoneApi(
@@ -382,7 +398,8 @@ export function createV3ZoneApi(
 	onProjection: (snapshot: ZoneSnapshot) => void,
 	roomHeadAuthorityForOpen: V3ZoneRoomHeadAuthorityForOpen,
 	approveSettlementSourceSelection?: V3ZoneSettlementSourceApproval,
-	onTransient?: (snapshot: ZoneTransientSnapshot) => void
+	onTransient?: (snapshot: ZoneTransientSnapshot) => void,
+	publishSuccessor?: V3ZoneSuccessorPublisher
 ): V3ZoneApi {
 	if (typeof roomHeadAuthorityForOpen !== "function") {
 		throw new TypeError("v3 zone room-head authority factory is required");
@@ -391,6 +408,8 @@ export function createV3ZoneApi(
 		throw new TypeError("v3 zone settlement approval policy is invalid");
 	if (onTransient !== undefined && typeof onTransient !== "function")
 		throw new TypeError("v3 zone transient presentation observer is invalid");
+	if (publishSuccessor !== undefined && typeof publishSuccessor !== "function")
+		throw new TypeError("v3 zone successor publisher is invalid");
 	const localAuthor = node.keychain.localAuthorId;
 	const localPeerId = node.networkNode.peerId;
 	const enrollment = encodeEnrollment({ author: localAuthor, peerId: localPeerId });
@@ -401,6 +420,11 @@ export function createV3ZoneApi(
 	const fabricTrials = new Map<string, FabricTrialState>();
 	const transientPositions = new Map<string, Readonly<{ x: number; y: number }>>();
 	let room: Awaited<ReturnType<typeof createV3RoomSession<ZoneProjection>>> | undefined;
+	// The creator's rollover policy (examples/grid/src/rollover.ts); a member's only offers a refused
+	// block placement again once its room installed the next epoch.
+	let rollover: V3RoomRolloverPolicy | undefined;
+	// The zone's successor delivery: the creator announces offers, members install them.
+	let delivery: V3RoomSuccessorDelivery | undefined;
 	let ephemeral: EphemeralChannel | undefined;
 	let projection = emptyProjection(localAuthor, localPeerId);
 	// Accepted-history identity belongs to the durable projection, not to an
@@ -703,6 +727,31 @@ export function createV3ZoneApi(
 				localAuthor === creatorAuthor ? await node.keychain.acquireLocalAuthorFinalitySigner() : undefined;
 			if (closeRequested) throw new Error("v3 zone closed during open");
 			const application = createV3ZoneApplication(bootstrapMembers, creatorPeerId, creatorAuthor, blueprintDigestFromInvite(creatorInvite));
+			// Delivery runs on the room's own object id and installs into its own session, so it
+			// follows a migration redirect: the migrated room's members (redirected or joined
+			// afterwards) are on the target's queue, and only the target session installs its offers.
+			const openDelivery = (objectId: string): V3RoomSuccessorDelivery =>
+				openV3RoomSuccessorDelivery(node, objectId, creatorFinalitySigner === undefined ? "member" : "creator", {
+					onError: (error) => console.warn("v3 zone successor delivery failed; it is retried", error),
+					onRefused: (error) => console.warn("v3 zone successor offer was refused", error),
+				});
+			delivery = openDelivery(selectedZoneId);
+			// Only the creator, which holds the finality signer, seals.
+			const policy = createV3RoomRolloverPolicy({
+				role: creatorFinalitySigner === undefined ? "member" : "creator",
+				budget: GRID_ROLLOVER_BUDGET,
+				hooks: {
+					publishSuccessor:
+						publishSuccessor ?? ((offer, epoch): Promise<void> => delivery?.publish(offer, epoch) ?? Promise.resolve()),
+					requestSuccessor: () => delivery?.request(),
+					onStatus: (status) => {
+						if (status.state === "successor-unavailable")
+							console.warn("v3 zone is waiting for the creator's next epoch; kept placements", status.kept);
+					},
+					onError: (error) => console.warn("v3 zone rollover failed; it is retried", error),
+				},
+			});
+			rollover = policy;
 			opened = await createV3RoomSession<ZoneProjection>({
 				application,
 				author: localAuthor,
@@ -725,12 +774,16 @@ export function createV3ZoneApi(
 				issuanceDatabaseName: `ts-drp-v3-zone--${digest("ts-drp/d9346-zone-database/v1", new TextEncoder().encode(zoneId))}`,
 				migrationDatabaseNamespace: `${localAuthor}:${zoneId}`,
 				objectId: zoneId,
-				onAcceptedVertex: () => undefined,
+				onAcceptedVertex: (vertex) => policy.observe(vertex),
 				onMigrationTarget: (target, targetObjectId): void => {
 					redirectedDuringOpen = target;
 					if (sourceRoom !== undefined) retainedSourceBridges.add(sourceRoom);
 					room = target;
 					zoneId = targetObjectId;
+					delivery?.close();
+					const followed = openDelivery(targetObjectId);
+					delivery = followed;
+					followed.bind(target);
 					tradeIntent = undefined;
 					recoveredTradeIntent = false;
 					ephemeral?.close();
@@ -772,6 +825,10 @@ export function createV3ZoneApi(
 				signRegisteredVertexDigest: (registeredDigest) => node.keychain.signWithLocalAuthor(registeredDigest),
 			});
 			sourceRoom = opened;
+			// A migrated source forwards issue and seal to its target, so the policy stays bound to it.
+			// Delivery is bound to the target by the redirect instead.
+			policy.bind(opened);
+			if (redirectedDuringOpen === undefined) delivery?.bind(opened);
 			if (redirectedDuringOpen !== undefined) retainedSourceBridges.add(opened);
 			if (closeRequested) throw new Error("v3 zone closed during open");
 			if (redirectedDuringOpen === undefined) {
@@ -785,6 +842,10 @@ export function createV3ZoneApi(
 			migrationMembers = Object.freeze(bootstrapMembers.map((member) => Object.freeze({ ...member })));
 			emit();
 		} catch (error) {
+			rollover?.close();
+			rollover = undefined;
+			delivery?.close();
+			delivery = undefined;
 			await Promise.allSettled([opened?.close(), redirectedDuringOpen?.close()]);
 			resetZoneState();
 			throw error;
@@ -982,6 +1043,10 @@ export function createV3ZoneApi(
 				const selectedEphemeral = ephemeral;
 				const sources = [...retainedSourceBridges];
 				retainedSourceBridges.clear();
+				rollover?.close();
+				rollover = undefined;
+				delivery?.close();
+				delivery = undefined;
 				room = undefined;
 				ephemeral = undefined;
 				resetZoneState();
@@ -1208,7 +1273,8 @@ export function createV3ZoneApi(
 			) {
 				throw new TypeError("v3 zone block is invalid");
 			}
-			await selected.issue(
+			// A placement refused at the epoch's capacity is offered again after the next rollover.
+			await (rollover ?? selected).issue(
 				Object.freeze({ action: "placeBlock", id: input.id, kind: input.kind, x: input.x, y: input.y })
 			);
 		},
@@ -1876,13 +1942,13 @@ async function createCreatorInviteMaterial(
 			.sort((left, right) => compareText(left.author, right.author)),
 		objectId,
 		permissionless: false,
-		version: 1,
+		version: GRID_GENESIS_PROFILE.latchedAclVersion,
 	});
 	const signerSet = Object.freeze([Object.freeze({ publicKey: node.keychain.localAuthorId, signerId: "creator" })]);
 	const exactCanonicalSignerSetBytes = encodeCanonical(signerSet);
 	const exactCanonicalProfileBytes = encodeCanonical({
 		cryptoSuiteId: "ed25519-sha256-v3",
-		profileId: "creator-trusted-v1",
+		profileId: GRID_GENESIS_PROFILE.profileId,
 		quorum: 1,
 		signers: signerSet,
 	});

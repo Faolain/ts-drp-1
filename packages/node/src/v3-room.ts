@@ -108,6 +108,7 @@ import {
 	startRecoveryPoolAutoScheduler,
 	type RecoveryPoolAutoMaintenanceOptions,
 } from "./internal/recovery-pool-auto.js";
+import { type InterruptedCloseRetry, startInterruptedCloseRetry } from "./internal/interrupted-close-retry.js";
 import { createScheduledRecoveryPoolLull } from "./internal/recovery-pool-scheduled.js";
 import { retainedPublicationCancelled } from "./internal/retained-publication.js";
 import {
@@ -352,7 +353,8 @@ export interface V3RoomSuccessorAuthority {
 	readonly genesisAnchorDigest: string;
 	readonly lifecycle: "active";
 	readonly objectId: string;
-	readonly profileId: "creator-trusted-v1";
+	/** The profile the room's genesis signed. */
+	readonly profileId: "creator-trusted-v1" | "creator-trusted-settlement-v1";
 }
 
 export type {
@@ -833,7 +835,8 @@ function successorAuthority(trust: unknown, handle: RoomPlaneHandle): V3RoomSucc
 		genesisAnchorDigest,
 		lifecycle: "active" as const,
 		objectId,
-		profileId,
+		// Checked above: creator-trusted-v1 or the one settlement profile (settlementProfileFor).
+		profileId: profileId as V3RoomSuccessorAuthority["profileId"],
 	});
 }
 
@@ -1087,6 +1090,23 @@ function authenticateCreatorInviteMaterial(
 		expectedBlueprintDigest: provenance.blueprintDigest,
 	});
 	return Object.freeze({ objectId: provenance.objectId, blueprintDigest: provenance.blueprintDigest });
+}
+
+/**
+ * Stable marker of the creator's close-pending refusal. Its cause clears on its
+ * own: the creator session retries its interrupted epoch close itself, and once
+ * that close adopts, reissued work is admitted. Callers wait and reissue; they
+ * need not (and must not) treat it as a closing epoch to seal.
+ */
+export const V3_ROOM_CLOSE_PENDING = "close-pending";
+
+/**
+ * Whether a room issue refusal is the creator's close-pending refusal (see V3_ROOM_CLOSE_PENDING).
+ * @param error - A rejection from a room issue.
+ * @returns True for the retryable close-pending refusal only.
+ */
+export function isV3RoomClosePendingRefusal(error: unknown): boolean {
+	return error instanceof Error && error.message.includes(`: ${V3_ROOM_CLOSE_PENDING}: `);
 }
 
 /**
@@ -3474,9 +3494,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	// and the startup readiness included. A Writer's install does not retry a refused material
 	// fetch, so an early material request is held, not refused: the material server first
 	// authenticates it and admits its requester under its own session ceiling, and only its
-	// response write waits here, one per peer (a newer request from the same peer supersedes),
-	// within the server's own response deadline (its write signal). Manifest and chunk requests
-	// need an admitted requester, and none is reported before the adoption.
+	// signed response waits here (the server's admitResponse gate), one per peer (a newer request from the same peer supersedes),
+	// within the server's own response deadline. A request the server will never answer (an
+	// unauthorized reader, a successor it no longer serves) is refused at once, explicitly.
+	// Manifest and chunk requests need an admitted requester, and none is reported before the adoption.
 	// A Writer's install retries a held request that ended at that deadline (option E), so the gate
 	// never fails an install by itself. A held response belongs to one serving generation: a room
 	// close or a serving replacement cancels it before the old port joins its handlers, and a newly
@@ -3538,6 +3559,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		await successorServingScope?.release();
 		successorServingScope = await (await ownRecipientSnapshots()).openScope(exported.declaration);
 		const port = createSnapshotChunkProtocolPort(transport.networkNode, CREATOR_SUCCESSOR_PROTOCOL);
+		const closedEpoch = exported.declaration.scope.epoch;
+		const generation = successorServingGeneration;
 		const server = createCreatorSuccessorMaterialServer({
 			...(input.application.snapshotReadPolicy === "authenticated-public"
 				? { isAuthorizedReader: (): boolean => true }
@@ -3552,10 +3575,13 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			manifestDigest: exported.declaration.scope.manifestDigest,
 			material: exported.material,
 			connectedPeers: () => port.connectedPeers(),
+			// Only an authorized request's response waits for the adoption; a refusal is written at once.
+			admitResponse: async (peerId: string, signal: AbortSignal): Promise<void> => {
+				releaseDisconnectedSuccessorServingHolds(port.connectedPeers());
+				await holdUntilSuccessorAdopted(closedEpoch, peerId, signal, generation);
+			},
 		});
 		successorServing = createV3SnapshotTransferOwner({ transport: port });
-		const closedEpoch = exported.declaration.scope.epoch;
-		const generation = successorServingGeneration;
 		successorServing.serve({
 			authorization: Object.freeze({
 				authorForPeer: (peer: string): string | undefined =>
@@ -3571,11 +3597,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 						close: (): Promise<void> => stream.close(),
 						read: (maxBytes: number, options: Readonly<{ readonly signal: AbortSignal }>): Promise<Uint8Array> =>
 							stream.read(maxBytes, options),
-						write: async (bytes: Uint8Array, options: Readonly<{ readonly signal: AbortSignal }>): Promise<void> => {
-							releaseDisconnectedSuccessorServingHolds(port.connectedPeers());
-							await holdUntilSuccessorAdopted(closedEpoch, stream.peerId, options.signal, generation);
-							return stream.write(bytes, options);
-						},
+						write: (bytes: Uint8Array, options: Readonly<{ readonly signal: AbortSignal }>): Promise<void> =>
+							stream.write(bytes, options),
 					}),
 					bytes
 				),
@@ -3587,8 +3610,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	};
 	const serveAvailableSuccessor = async (): Promise<void> => {
 		// Serving is optional for a field-free local close. An explicit public export
-		// still calls serveSuccessor and requires the real protocol owner.
+		// still calls serveSuccessor and requires the real protocol owner. A receive-only
+		// session never serves: a recipient accepts material only from the creator or a current
+		// Writer, so its server could answer no one, and a reopened observer whose received
+		// predecessor is no longer retained must still open.
 		if (
+			input.receiveOnly === true ||
 			transport === undefined ||
 			typeof Reflect.get(transport.networkNode, "createSnapshotChunkProtocolHost") !== "function"
 		)
@@ -4472,6 +4499,14 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	let lifetimeTransitionsPending = 0;
 	// Opt-in idle scheduler for early recovery-pool turnover; stopped at close.
 	let autoPoolMaintenance: Readonly<{ stop(): void }> | undefined;
+	// The session's own retry of an interrupted creator close (creator only).
+	let interruptedCloseRetry: InterruptedCloseRetry | undefined;
+	// The retry in flight: a manual sealEpoch joins its close, and the matching
+	// manual adoptCreatorSuccessor joins its adoption, instead of closing again.
+	let interruptedCloseRetryJoin:
+		| Readonly<{ sealed: Promise<CreatorLiveCloseResult>; adopted: Promise<void> }>
+		| undefined;
+	let joinedRetryAdoption: Promise<void> | undefined;
 	// Opt-in lull once per epoch, requested right after adoption or install (Track Z).
 	const scheduledLulls =
 		input.recoveryPoolScheduledLull === true
@@ -4711,7 +4746,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			if (request.source !== "public-new") continue;
 			const authorized = authorizeV3NewLocalOperation({ plane: activeHandle, operation: request.operation });
 			if (!authorized.ok) {
-				rejectOwned(owned, new TypeError(`v3 room new operation is not authorized: ${authorized.kind}`));
+				rejectOwned(owned, new TypeError(`v3 room new operation is not authorized: ${authorized.kind}: ${authorized.detail}`));
 				return;
 			}
 		}
@@ -7093,17 +7128,78 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 	};
 	// A durable reopen right after this recipient completed a retirement at its
-	// current epoch (a lull's early turnover) halts its admission until the ORIGINAL
-	// received reconciliation runs again, as a creator's readiness boundary does for
-	// a creator. Discharge it once, in the lifecycle FIFO before startup reports
-	// ready, holding local issues meanwhile. A failure after entry is terminal; a
-	// plane without that request is left exactly as it was.
-	let recipientRetirementResume: Promise<void> = Promise.resolve();
-	if (
+	// current epoch (a lull's early turnover, or an install's received turnover)
+	// halts its admission until the ORIGINAL received reconciliation runs again, as
+	// a creator's readiness boundary does for a creator. Every durable reopen of a
+	// recipient plane runs it, in the lifecycle FIFO, holding local issues: session
+	// startup, and the recovery reopen a retried install performs after a failed
+	// receive (the halted plane resolves for no install, so without it every later
+	// install refused "creator recipient current authority is unavailable" and the
+	// member never followed again). A failure after entry is terminal; a plane
+	// without that request is left exactly as it was.
+	const resumeRecipientRetirement = async (): Promise<void> => {
+		await rebasePromise;
+		await migrationCompletionBarrier;
+		await refreshRoomHeadState();
+		await drainPendingIssues();
+		assertSessionOpen();
+		const plane = activeHandle,
+			roomTransport = transport,
+			roomHead = openedRoomHeadState?.stable;
+		if (
+			plane === undefined ||
+			roomTransport === undefined ||
+			roomHead === undefined ||
+			openedRoomHeadState?.pending !== null
+		)
+			throw new TypeError("v3 room recipient retirement resume owner is unavailable");
+		const result = await maintainCreatorRecipientRecoveryPool({
+			plane,
+			catalog: input.application.catalog,
+			expectedRoomHead: roomHead,
+			snapshotStore: await ownRecipientSnapshots(),
+			recoveryContext: await recipientRecoveryContext(),
+			resume: true,
+		});
+		// Ingress refused while admission was halted is repaired through the
+		// same authenticated retained path a reconnect uses.
+		if (result.kind === "maintained" && !closed && activeHandle === plane && transport === roomTransport)
+			roomTransport.requestRetainedHistory();
+	};
+	const recipientRetirementResumeRequested = (): boolean =>
 		input.creatorFinalitySigner === undefined &&
 		activeHandle !== undefined &&
-		creatorRecipientRetirementResumeRequested(activeHandle)
-	) {
+		creatorRecipientRetirementResumeRequested(activeHandle);
+	// The same discharge for a plane an install's recovery just reopened, inside that
+	// install's lifecycle transition. It must leave the plane admitted for the install:
+	// a halt it could not discharge is the session's explicit terminal failure, never
+	// a refusal every later install repeats.
+	const resumeRecoveredRecipientRetirement = async (): Promise<void> => {
+		if (!recipientRetirementResumeRequested()) return;
+		let open!: () => void;
+		const barrier = new Promise<void>((resolve) => {
+			open = resolve;
+		});
+		poolMaintenanceBarrier = barrier;
+		try {
+			await resumeRecipientRetirement();
+			if (recipientRetirementResumeRequested())
+				throw new TypeError("v3 room recipient retirement resume did not discharge the recovered plane's halt");
+		} catch (error) {
+			terminalFailure = error;
+			try {
+				await shutdown();
+			} catch (cleanup) {
+				throw combineFailures(error, cleanup);
+			}
+			throw error;
+		} finally {
+			if (poolMaintenanceBarrier === barrier) poolMaintenanceBarrier = undefined;
+			open();
+		}
+	};
+	let recipientRetirementResume: Promise<void> = Promise.resolve();
+	if (recipientRetirementResumeRequested()) {
 		let open!: () => void;
 		const barrier = new Promise<void>((resolve) => { open = resolve; });
 		poolMaintenanceBarrier = barrier;
@@ -7114,28 +7210,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		try {
 			recipientRetirementResume = enqueueLifetimeTransition(async () => {
 				try {
-					await rebasePromise;
-					await migrationCompletionBarrier;
-					await refreshRoomHeadState();
-					await drainPendingIssues();
-					assertSessionOpen();
-					const plane = activeHandle,
-						roomTransport = transport,
-						roomHead = openedRoomHeadState?.stable;
-					if (plane === undefined || roomTransport === undefined || roomHead === undefined || openedRoomHeadState?.pending !== null)
-						throw new TypeError("v3 room recipient retirement resume owner is unavailable");
-					const result = await maintainCreatorRecipientRecoveryPool({
-						plane,
-						catalog: input.application.catalog,
-						expectedRoomHead: roomHead,
-						snapshotStore: await ownRecipientSnapshots(),
-						recoveryContext: await recipientRecoveryContext(),
-						resume: true,
-					});
-					// Ingress refused while admission was halted is repaired through the
-					// same authenticated retained path a reconnect uses.
-					if (result.kind === "maintained" && !closed && activeHandle === plane && transport === roomTransport)
-						roomTransport.requestRetainedHistory();
+					await resumeRecipientRetirement();
 				} catch (error) {
 					terminalFailure = error;
 					try {
@@ -7215,6 +7290,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				const previous = openedRoomHeadState?.stable;
 				await recoverSettlementOwner(true);
 				await refreshRoomHeadState();
+				await resumeRecoveredRecipientRetirement();
 				if (await matchesInstalledOffer()) {
 					creatorRecipientRecoveryRequired = false;
 					return;
@@ -7348,6 +7424,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		closed = true;
 		endSessionWaits();
 		autoPoolMaintenance?.stop();
+		interruptedCloseRetry?.stop();
 		closePresentation();
 		revokeTransport();
 		cancelRedirectCreation();
@@ -7415,6 +7492,28 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			}
 		};
 	}
+	// One creator close of the current epoch, in the lifetime FIFO.
+	const sealEpochNow = (): Promise<CreatorLiveCloseResult> =>
+		enqueueLifetimeTransition(async () => {
+			if (redirectPromise !== undefined) await redirectPromise;
+			if (redirectedSession !== undefined) return redirectedSession.sealEpoch();
+			assertSessionOpen();
+			if (creatorCloseHandle === undefined) throw new TypeError("creator close authority is unavailable");
+			await rebasePromise;
+			await migrationCompletionBarrier;
+			await drainPendingIssues();
+			assertSessionOpen();
+			// Current bootstrap/publication debt must join while its original
+			// plane can still publish it. Historical replay is not an ACK.
+			await publishCurrentGenesisBootstrap();
+			assertSessionOpen();
+			const result = await creatorCloseHandle.close();
+			// The successor and its adoption facts are installed. Serving reads its
+			// export afresh in a later host turn of this same lifetime transition.
+			await yieldToHost();
+			await serveAvailableSuccessor();
+			return result;
+		});
 	const session: V3RoomSession<Projection> = Object.freeze({
 		...(localOwner === undefined ? {} : { localSession: localOwner.control }),
 		activateMigration,
@@ -7450,12 +7549,20 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			});
 		},
 		adoptCreatorSuccessor(): Promise<void> {
+			const joined = joinedRetryAdoption;
+			if (joined !== undefined) {
+				joinedRetryAdoption = undefined;
+				return joined;
+			}
 			return adoptCreatorSuccessor();
 		},
 		installCreatorSuccessor,
 		exportCreatorSuccessor: () =>
 			enqueueLifetimeTransition(async () => {
+				if (redirectPromise !== undefined) await redirectPromise;
 				assertSessionOpen();
+				// A migrated source seals and adopts on its target, so the successor it serves is the target's.
+				if (redirectedSession !== undefined) return redirectedSession.exportCreatorSuccessor();
 				return serveSuccessor();
 			}),
 		authority(): V3RoomSuccessorAuthority | null {
@@ -7609,7 +7716,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
 					const authorized = authorizeV3NewLocalOperation({ plane: activeHandle, operation: captured });
 					if (!authorized.ok) {
-						throw new TypeError(`v3 room new operation is not authorized: ${authorized.kind}`);
+						throw new TypeError(`v3 room new operation is not authorized: ${authorized.kind}: ${authorized.detail}`);
 					}
 					const current = logicalTime;
 					logicalTime += 2;
@@ -7823,25 +7930,19 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		},
 		sealEpoch(): Promise<CreatorLiveCloseResult> {
 			if (input.receiveOnly) return Promise.reject(new TypeError("v3 room is receive-only"));
-			return enqueueLifetimeTransition(async () => {
-				if (redirectPromise !== undefined) await redirectPromise;
-				if (redirectedSession !== undefined) return redirectedSession.sealEpoch();
-				assertSessionOpen();
-				if (creatorCloseHandle === undefined) throw new TypeError("creator close authority is unavailable");
-				await rebasePromise;
-				await migrationCompletionBarrier;
-				await drainPendingIssues();
-				assertSessionOpen();
-				// Current bootstrap/publication debt must join while its original
-				// plane can still publish it. Historical replay is not an ACK.
-				await publishCurrentGenesisBootstrap();
-				assertSessionOpen();
-				const result = await creatorCloseHandle.close();
-				// The successor and its adoption facts are installed. Serving reads its
-				// export afresh in a later host turn of this same lifetime transition.
-				await yieldToHost();
-				await serveAvailableSuccessor();
-				return result;
+			// The session's own retry of an interrupted close is in flight: this is
+			// that close, not another one.
+			const joined = interruptedCloseRetryJoin;
+			if (joined !== undefined)
+				return joined.sealed.then((result) => {
+					joinedRetryAdoption = joined.adopted;
+					return result;
+				});
+			interruptedCloseRetry?.cancelPending();
+			return sealEpochNow().catch((error: unknown) => {
+				// A failed close may have set the interrupted-close gate: retry it, backing off.
+				interruptedCloseRetry?.kick(true);
+				throw error;
 			});
 		},
 		status(): CreatorLiveCloseStatus {
@@ -7950,6 +8051,38 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			},
 			clearTimer: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
 		});
+	if (input.receiveOnly !== true && input.creatorFinalitySigner !== undefined) {
+		interruptedCloseRetry = startInterruptedCloseRetry({
+			pending: () =>
+				!closed &&
+				terminalFailure === undefined &&
+				redirectedSession === undefined &&
+				activeHandle !== undefined &&
+				creatorCloseHandle?.interruptedClosePending?.() === true,
+			retry: async (): Promise<void> => {
+				// The same close a manual retry runs (exact durable scope and
+				// incarnation), unless it already sealed; then adopt its successor.
+				const sealed =
+					creatorCloseHandle?.status().lifecycle === "successor-pending-adoption" ? undefined : sealEpochNow();
+				const adopted = (sealed ?? Promise.resolve()).then(() => adoptCreatorSuccessor());
+				const join = sealed === undefined ? undefined : Object.freeze({ sealed, adopted });
+				interruptedCloseRetryJoin = join;
+				try {
+					await adopted;
+				} finally {
+					if (interruptedCloseRetryJoin === join) interruptedCloseRetryJoin = undefined;
+				}
+			},
+			setTimer: (callback, milliseconds) => {
+				const handle = setTimeout(callback, milliseconds);
+				(handle as { unref?(): void }).unref?.();
+				return handle;
+			},
+			clearTimer: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+		});
+		// Reopen or genesis binding may have found this epoch's own interrupted close.
+		interruptedCloseRetry.kick();
+	}
 	return session;
 }
 
