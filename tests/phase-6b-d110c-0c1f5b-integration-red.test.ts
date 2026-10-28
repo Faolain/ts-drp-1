@@ -963,20 +963,15 @@ async function displacedControls() {
 	await fixture.close();
 	fixture.checkpoint();
 	await creator.room.adoptCreatorSuccessor();
-	const decisions: { action: string; commits: number; planWrites: number }[] = [];
+	// ea4eb158: displacementPolicies may name only batchable application actions
+	// (validateDisplacementPolicy), so the application can no longer give the displaced
+	// ACL control a policy. The room must still hold it durably as manual review.
 	const application: CreateV3RoomSessionInput["application"] = {
 		...writer.input.application,
 		displacedOperationIdentity: (operation) =>
 			operation.action === "acl"
 				? hex(encodeCanonical(operation))
 				: writer.input.application.displacedOperationIdentity(operation),
-		displacementPolicies: {
-			...writer.input.application.displacementPolicies,
-			get acl() {
-				decisions.push({ action: "acl", commits: ownCommits(writer).length, planWrites: observed.planWrites.length });
-				return "manual-review" as const;
-			},
-		},
 	};
 	const before = ownCommits(writer).length;
 	await fixture.reopen(writer, 0, true, application);
@@ -984,11 +979,9 @@ async function displacedControls() {
 		fixture.issue(writer, "acl-review-barrier"),
 		"F5B_C21_DISPLACED_ACL_HOLDS_BEFORE_FENCE"
 	).rejects.toThrow();
-	expect(decisions.length, "F5B_C21_ACL_SURFACED_TO_REAL_APPLICATION_POLICY").toBeGreaterThan(0);
-	expect(
-		decisions.every((decision) => decision.commits === before),
-		"F5B_C21_POLICY_PRECEDES_ANY_NEW_ISSUE"
-	).toBe(true);
+	expect(ownCommits(writer).length, "F5B_C21_HOLD_PRECEDES_ANY_NEW_ISSUE").toBe(before);
+	// RED: today derive() throws "v3 room settlement policy is unavailable" on every issue
+	// and nothing durable records the displaced ACL (plan entries []).
 	const held = await durable(writer);
 	expect(held.plan).toMatchObject({
 		fenceSequence: null,
