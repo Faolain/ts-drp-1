@@ -194,11 +194,15 @@ export interface CreatorDepartedAdoptionState {
 /**
  * fix/skip-scope-carrier: whether the close of `departedEpoch` has a successor (epoch
  * `departedEpoch + 1`) this creator adopted, so its carrier may be served: never one it may still
- * abandon.
+ * abandon. Adoptions run one at a time, so an adopted projection at `departedEpoch + 2` or later
+ * means that successor's adoption, tail included, finished before the running one began: a later
+ * rollover's adoption does not withhold an older close's carrier. At exactly `departedEpoch + 1`
+ * the running adoption may be that successor's own tail, so the carrier waits for it to end.
  * @param departedEpoch - The epoch the member departed from (the Cut's epoch).
  * @param state - The creator room's adoption state now.
  * @returns Whether the carrier may be served.
  */
 export function creatorDepartedCloseAdopted(departedEpoch: number, state: CreatorDepartedAdoptionState): boolean {
-	return state.serving && !state.adopting && state.projectionEpoch !== null && state.projectionEpoch > departedEpoch;
+	if (!state.serving || state.projectionEpoch === null) return false;
+	return state.projectionEpoch > departedEpoch + 1 || (state.projectionEpoch > departedEpoch && !state.adopting);
 }
