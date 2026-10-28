@@ -343,6 +343,10 @@ export function createV3RoomSuccessorDelivery(
 	const answeredAt = new Map<string, number>();
 	// Member.
 	let candidate: Extract<Frame, { kind: "offer" }> | undefined;
+	// Sync before sending (live install rule): the creator's statement for an epoch ahead of the
+	// room, kept for the install of that epoch; and an offer refused only for want of it.
+	let aheadStatement: V3RoomCurrencyStatement | undefined;
+	let awaitingStatement: Extract<Frame, { kind: "offer" }> | undefined;
 	let installing: Promise<void> | undefined;
 	let requestedAt = 0;
 	let pollTimer: ReturnType<typeof setTimeout> | undefined;
@@ -411,13 +415,20 @@ export function createV3RoomSuccessorDelivery(
 					stats.ignored++;
 					continue;
 				}
+				const currency = aheadStatement?.epoch === selected.successorEpoch ? aheadStatement : undefined;
 				try {
-					await selectedRoom.installCreatorSuccessor({ offer: selected.offer, peers: [creatorPeer] });
+					await selectedRoom.installCreatorSuccessor({
+						offer: selected.offer,
+						peers: [creatorPeer],
+						...(currency === undefined ? {} : { currency }),
+					});
 					stats.installed++;
 					if (previous !== undefined) failed.splice(failed.indexOf(previous), 1);
 					hooks.onInstalled?.(epoch());
 				} catch (error) {
 					if (closed) return;
+					// Only the creator's statement is missing: it travels with the offer and installs on arrival.
+					if (Reflect.get(error as object, "reason") === "statement-required") awaitingStatement = selected;
 					stats.refused++;
 					stats.lastError = message(error).slice(0, 400);
 					const entry = previous ?? { bytes: selected.bytes, retryAt: 0, failures: 0 };
@@ -470,7 +481,22 @@ export function createV3RoomSuccessorDelivery(
 			if (answeredAt.size > KNOWN_PEERS_MAX) answeredAt.delete(answeredAt.keys().next().value as string);
 			if (newer) {
 				stats.answered++;
-				void send(sender, latest!.bytes);
+				// A member behind this creator may have reopened its lineage from storage: it installs only
+				// with this creator's statement for the offered epoch, so the statement goes first, in the
+				// same answer (no extra round trip).
+				let statement: Uint8Array | undefined;
+				if (room?.currencyStatement !== undefined && epoch() === latest!.successorEpoch) {
+					try {
+						statement = encodeCurrency(room.currencyStatement());
+					} catch (error) {
+						report(error);
+					}
+				}
+				const offerBytes = latest!.bytes;
+				void (async (): Promise<void> => {
+					if (statement !== undefined && (await send(sender, statement))) stats.currencyAnswered++;
+					await send(sender, offerBytes);
+				})();
 			} else {
 				stats.currencyAnswered++;
 				void send(sender, currency!);
@@ -480,7 +506,21 @@ export function createV3RoomSuccessorDelivery(
 		if (frame.kind === "currency") {
 			const selected = room;
 			if (role !== "member" || sender !== creatorPeer || selected?.confirmCurrent === undefined) return;
-			if (selected.localIssueCurrency?.() === "current" || frame.statement.epoch !== epoch()) return;
+			if (selected.localIssueCurrency?.() === "current") return;
+			if (frame.statement.epoch > epoch()) {
+				// For the install of that epoch; an offer that waited only for it installs now.
+				if (aheadStatement === undefined || frame.statement.epoch >= aheadStatement.epoch) aheadStatement = frame.statement;
+				const waiting = awaitingStatement;
+				if (waiting !== undefined && waiting.successorEpoch === frame.statement.epoch) {
+					awaitingStatement = undefined;
+					const entry = backoffOf(waiting.bytes);
+					if (entry !== undefined) entry.retryAt = 0;
+					if (candidate === undefined || waiting.successorEpoch >= candidate.successorEpoch) candidate = waiting;
+					install();
+				}
+				return;
+			}
+			if (frame.statement.epoch !== epoch()) return;
 			void selected.confirmCurrent(frame.statement).then(
 				(result) => {
 					if (result === "current") stats.currencyConfirmed++;

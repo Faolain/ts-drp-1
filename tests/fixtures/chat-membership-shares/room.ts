@@ -617,7 +617,14 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 	const install = async (peer: Peer) => {
 		const transfer = await successorDelivery(peer.index);
 		Reflect.set(peer.networkNode, "createSnapshotChunkProtocolHost", () => transfer.port);
-		await peer.room.installCreatorSuccessor({ offer: transfer.offer, peers: transfer.peers });
+		// Sync before sending (live install rule): the creator's statement for the offered epoch travels
+		// with the offer, as the pages' successor delivery sends it; a current peer ignores it.
+		const currency = creatorRoom?.currencyStatement?.();
+		await peer.room.installCreatorSuccessor({
+			offer: transfer.offer,
+			peers: transfer.peers,
+			...(currency === undefined ? {} : { currency }),
+		});
 	};
 
 	/** Observation-only native issuance owner for one peer (a reopen alias for local members). */

@@ -628,7 +628,14 @@ export interface V3RoomSession<Projection extends V3RoomProjectionAuthority = V3
 	adoptCreatorSuccessor(): Promise<void>;
 	authorizeSettlementSourceSelection(request: V3SettlementSourceSelectionRequest): Promise<Uint8Array>;
 	exportCreatorSuccessor(): Promise<CreatorSuccessorOffer>;
-	installCreatorSuccessor(input: Readonly<{ offer: CreatorSuccessorOffer; peers: readonly string[] }>): Promise<void>;
+	/**
+	 * Installs the creator's successor. `currency` is the creator's statement for the offered epoch
+	 * (sync before sending, live install rule): a session that is not yet current installs only
+	 * with it, and only above this author's live frontier in it; a current session ignores it.
+	 */
+	installCreatorSuccessor(
+		input: Readonly<{ offer: CreatorSuccessorOffer; peers: readonly string[]; currency?: V3RoomCurrencyStatement }>
+	): Promise<void>;
 	promoteCreatorCheckpoint(input: Readonly<{ closedEpoch: number }>): Promise<void>;
 	authority(): V3RoomSuccessorAuthority | null;
 	close(): Promise<void>;
@@ -1140,7 +1147,7 @@ export class V3RoomNotYetCurrent extends TypeError {
 	 * @param detail - What the writer waited for, or the frontier it is behind.
 	 */
 	constructor(
-		readonly reason: "hold-expired" | "behind-frontier",
+		readonly reason: "hold-expired" | "behind-frontier" | "statement-required",
 		detail: string
 	) {
 		super(`V3_ROOM_NOT_YET_CURRENT: ${reason}: ${detail}`);
@@ -1349,6 +1356,33 @@ function exactRecord(value: unknown, expectedKeys: readonly string[]): Readonly<
 		output[key] = descriptor.value;
 	}
 	return Object.freeze(output);
+}
+
+/** A currency statement handed in from outside (delivery or a test), captured exactly. */
+function captureCurrencyStatement(value: unknown): V3RoomCurrencyStatement {
+	const fields = exactRecord(value, ["anchorDigest", "epoch", "frontiers", "objectId"]);
+	if (
+		fields === undefined ||
+		typeof fields.objectId !== "string" ||
+		typeof fields.anchorDigest !== "string" ||
+		!Number.isSafeInteger(fields.epoch) ||
+		Number(fields.epoch) < 0 ||
+		!Array.isArray(fields.frontiers)
+	)
+		throw new TypeError("v3 room currency statement is invalid");
+	const frontiers = (fields.frontiers as unknown[]).map((entry) => {
+		if (!Array.isArray(entry) || entry.length !== 2) throw new TypeError("v3 room currency statement is invalid");
+		const [author, admittedThrough] = entry as unknown[];
+		if (typeof author !== "string" || !Number.isSafeInteger(admittedThrough) || Number(admittedThrough) < 0)
+			throw new TypeError("v3 room currency statement is invalid");
+		return Object.freeze([author, Number(admittedThrough)] as const);
+	});
+	return Object.freeze({
+		objectId: fields.objectId,
+		epoch: Number(fields.epoch),
+		anchorDigest: fields.anchorDigest,
+		frontiers: Object.freeze(frontiers),
+	});
 }
 
 const ROOM_HEAD_KEYS = Object.freeze(["currentAnchorDigest", "epoch", "objectId"]);
@@ -4579,6 +4613,48 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			}, notYetCurrentHoldMs)
 		);
 	};
+	/**
+	 * Live install rule: refuses a not-yet-current session's install unless the creator's statement
+	 * names the offered epoch and anchor and this author's live frontier there is below its lineage.
+	 * @param offer - The authenticated-later successor offer (its trust record names the epoch).
+	 * @param statement - The creator's statement handed in with the offer, if any.
+	 */
+	const checkInstallCurrency = async (
+		offer: CreatorSuccessorOffer,
+		statement: V3RoomCurrencyStatement | undefined
+	): Promise<void> => {
+		if (localIssueRefusal !== undefined) throw localIssueRefusal;
+		let offered: unknown;
+		try {
+			offered = decodeCanonical(offer.exactCanonicalTrustStateRecordBytes);
+		} catch {
+			offered = undefined;
+		}
+		const offeredEpoch = typeof offered === "object" && offered !== null ? Reflect.get(offered, "currentEpoch") : undefined;
+		const offeredAnchor =
+			typeof offered === "object" && offered !== null ? Reflect.get(offered, "currentAnchorDigest") : undefined;
+		if (
+			statement === undefined ||
+			statement.objectId !== input.objectId ||
+			statement.epoch !== offeredEpoch ||
+			statement.anchorDigest !== offeredAnchor
+		)
+			throw new V3RoomNotYetCurrent(
+				"statement-required",
+				`a reopened writer installs epoch ${String(offeredEpoch)} only with the creator's statement for it`
+			);
+		const admitted = statement.frontiers.find(([author]) => author === input.author)?.[1];
+		if (admitted === undefined) return;
+		const lineage = await issuanceStore.readLineage(settlementScope);
+		if (lineage.exhausted || !Number.isSafeInteger(lineage.next) || lineage.next <= admitted) {
+			localIssueRefusal = new V3RoomNotYetCurrent(
+				"behind-frontier",
+				`the room admitted sequence ${admitted} of this author in epoch ${statement.epoch}; local lineage is at ${lineage.next}`
+			);
+			refuseHeldUntilCurrent(localIssueRefusal);
+			throw localIssueRefusal;
+		}
+	};
 	const becomeLocalIssueCurrent = (): void => {
 		if (localIssueCurrent || localIssueRefusal !== undefined) return;
 		localIssueCurrent = true;
@@ -7336,15 +7412,18 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		});
 	}
 	const installCreatorSuccessor = (
-		request: Readonly<{ offer: CreatorSuccessorOffer; peers: readonly string[] }>
+		request: Readonly<{ offer: CreatorSuccessorOffer; peers: readonly string[]; currency?: V3RoomCurrencyStatement }>
 	): Promise<void> => {
 		let offer: CreatorSuccessorOffer;
 		let peers: readonly string[];
+		let currency: V3RoomCurrencyStatement | undefined;
 		try {
-			const fields = exactRecord(request, ["offer", "peers"]);
+			const withCurrency = request !== null && typeof request === "object" && Object.hasOwn(request, "currency");
+			const fields = exactRecord(request, withCurrency ? ["currency", "offer", "peers"] : ["offer", "peers"]);
 			if (fields === undefined) throw new TypeError("creator recipient request is invalid");
 			offer = captureCreatorSuccessorOffer(fields.offer);
 			peers = captureCreatorSuccessorPeers(fields.peers);
+			currency = withCurrency ? captureCurrencyStatement(fields.currency) : undefined;
 		} catch (error) {
 			return Promise.reject(error);
 		}
@@ -7418,6 +7497,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				openedRoomHeadState.pending !== null
 			)
 				throw new TypeError("creator recipient current floor is unavailable");
+			// Sync before sending, live install rule: the install proves only the closed frontier. A
+			// session that reopened its lineage from storage installs (adopts, then signs its settlement
+			// fence) only with the creator's statement for the offered epoch, above this author's live
+			// frontier in it; otherwise it is refused before anything is adopted or signed.
+			if (!localIssueCurrent) await checkInstallCurrency(offer, currency);
 			let received: Awaited<ReturnType<typeof receiveCreatorSuccessorAdoption>>;
 			try {
 				const recoveryContext = openedRoomHeadState.stable.epoch >= 2 ? await recipientRecoveryContext() : undefined;
@@ -7476,7 +7560,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		});
 		const shared = attempt.finally(() => {
 			if (creatorSuccessorAdoptionTask === shared) creatorSuccessorAdoptionTask = undefined;
-			// Sync before sending: an adopted successor plane holds this author's authenticated frontier.
+			// Sync before sending: the adopted plane holds this author's closed frontier, and the
+			// statement checked before adoption (checkInstallCurrency) its live frontier.
 			if (installFromEpoch !== undefined && currentEpoch() > installFromEpoch) becomeLocalIssueCurrent();
 		});
 		creatorSuccessorAdoptionTask = shared;
