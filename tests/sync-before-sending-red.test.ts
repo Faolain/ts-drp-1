@@ -114,4 +114,27 @@ describe("decision B: sync before sending", () => {
 		expect(await settle(member.room.issue(message("expired")))).toMatch(/V3_ROOM_NOT_YET_CURRENT: hold-expired/u);
 		expect((await f.issuedAfter(1, null)).length).toBe(before);
 	}, 240_000);
+
+	it("the read-only window of a reopened Writer: one statement at the current epoch, one install per missed epoch run", async () => {
+		const { f, close } = await room();
+		let member = await f.open(1);
+		await f.stop(member);
+		// At the current epoch: the fixture confirms the creator's statement right after the open,
+		// as the page's delivery does on bind (one round trip to the creator, no install).
+		let started = performance.now();
+		member = await f.open(1, { reopen: true });
+		const atCurrent = { installs: 0, ms: Math.round(performance.now() - started) };
+		expect(member.room.localIssueCurrency?.()).toBe("current");
+		await f.stop(member);
+		// Behind by two epochs: one install of the creator's latest successor.
+		await close();
+		await close();
+		started = performance.now();
+		member = await f.open(1, { reopen: true });
+		expect(member.room.localIssueCurrency?.()).toBe("not-yet-current");
+		await f.install(member);
+		const behind = { installs: 1, ms: Math.round(performance.now() - started) };
+		expect(member.room.localIssueCurrency?.()).toBe("current");
+		console.info("[read-only window]", JSON.stringify({ atCurrent, behindTwoEpochs: behind }), "(open included; loaded host)");
+	}, 300_000);
 });

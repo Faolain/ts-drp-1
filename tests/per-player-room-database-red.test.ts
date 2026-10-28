@@ -133,6 +133,10 @@ describe("decision A: the shared database migrates once into per-player database
 		await deliver(2, "shared");
 		await close();
 		expect(creator.room.authority()?.epoch).toBe(1);
+		// An unsettled move: signed and published at the closed epoch 0, never admitted. It must be
+		// handed back from Alice's copy, not lost. (In a copy that kept her rows, Bob's install
+		// refuses at the recovery census on it: "outbox-classification:0:displaced:published".)
+		await alice.room.issue(message("alice-late"));
 		const aliceShared = await sequences(f, 1, "shared");
 		const bobShared = await sequences(f, 2, "shared");
 		await f.stop(alice);
@@ -176,7 +180,8 @@ describe("decision A: the shared database migrates once into per-player database
 			await deliver(2, "bob");
 			await close();
 		}
-		expect(texts()).toEqual(["alice-1", "alice-2", "alice-3", "bob-1", "bob-2", "bob-3"]);
+		expect(texts()).toEqual(["alice-1", "alice-2", "alice-3", "alice-late", "bob-1", "bob-2", "bob-3"]);
+		expect(await alice.room.unresolvedAcceptedWork()).toEqual([]);
 	}, 900_000);
 
 	it("[RED] a slot's shared database is claimed whole by its only writer, who continues its lineage; another slot starts fresh", async () => {
