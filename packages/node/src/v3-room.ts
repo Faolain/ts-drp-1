@@ -981,7 +981,20 @@ function strictCanonicalBytes(value: unknown, name: string): Uint8Array {
 	return output;
 }
 
-function normalizeApplicationStateBytes(value: unknown, purpose: "genesis" | "migration"): Uint8Array {
+/**
+ * The exact canonical application state, copied and checked.
+ * @param value - The candidate state bytes.
+ * @param purpose - Genesis or migration (the error label).
+ * @param maxBytes - The byte bound. 32,768 by default: a migration record carries the state and is
+ * itself bounded (49,152 bytes). A successor's projection base is not carried in any record; it
+ * takes the native plane's own application-state bound (the room's maxSnapshotBytes).
+ * @returns The detached exact state.
+ */
+function normalizeApplicationStateBytes(
+	value: unknown,
+	purpose: "genesis" | "migration",
+	maxBytes = 32_768
+): Uint8Array {
 	let backing: unknown;
 	let backingByteLength: unknown;
 	let byteLength: unknown;
@@ -1011,10 +1024,10 @@ function normalizeApplicationStateBytes(value: unknown, purpose: "genesis" | "mi
 	}
 	const exactState = new INTRINSIC_UINT8_ARRAY(byteLength);
 	Reflect.apply(INTRINSIC_UINT8_ARRAY_SET, exactState, [new INTRINSIC_UINT8_ARRAY(backing, byteOffset, byteLength)]);
-	if (exactState.byteLength > 32_768) throw new TypeError(`v3 room ${purpose} state is unbounded`);
+	if (exactState.byteLength > maxBytes) throw new TypeError(`v3 room ${purpose} state is unbounded`);
 	let decodedState: unknown;
 	try {
-		decodedState = decodeCanonical(exactState, { maxBytes: 32_768, maxDepth: 16, maxItems: 16_384 });
+		decodedState = decodeCanonical(exactState, { maxBytes, maxDepth: 16, maxItems: 16_384 });
 	} catch {
 		throw new TypeError(`v3 room ${purpose} state is invalid`);
 	}
@@ -2851,6 +2864,14 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	decodeCanonical(exactCanonicalPinnedGenesisBootstrapOperationBytes, APPLICATION_BATCH_LIMITS);
 	const { invite, material, settlementProfile } = captureInvite(input.creatorInvite);
 	const ownedSettlementPolicy = localSettlementPolicy(input.application, material);
+	// A successor's projection base comes from the native plane, which bounds application state by
+	// the room's maxSnapshotBytes (with at most 16,384 items); the room accepts every state it seals.
+	const successorStateMaxBytes = Reflect.get(
+		decodeCanonical(material.exactCanonicalParametersCarrierBytes) as object,
+		"maxSnapshotBytes"
+	) as unknown;
+	if (!Number.isSafeInteger(successorStateMaxBytes) || (successorStateMaxBytes as number) < 32_768)
+		throw new TypeError("v3 room snapshot bound is invalid");
 	if (
 		input.createOperationAdmissionPolicy !== undefined &&
 		typeof input.createOperationAdmissionPolicy !== "function"
@@ -3567,7 +3588,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 		const exactCanonicalApplicationStateBytes = normalizeApplicationStateBytes(
 			projectionBaseResult.exactCanonicalApplicationStateBytes,
-			"migration"
+			"migration",
+			successorStateMaxBytes as number
 		);
 		if (
 			projectionBaseResult.objectId !== input.objectId ||
@@ -3593,7 +3615,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 		const projectedStateBytes = normalizeApplicationStateBytes(
 			Reflect.apply(canonicalStateBytes, input.application.migration, [baseProjection]) as Uint8Array,
-			"migration"
+			"migration",
+			successorStateMaxBytes as number
 		);
 		if (!sameBytes(projectedStateBytes, exactCanonicalApplicationStateBytes)) {
 			throw new TypeError("v3 room successor projection state differs");
