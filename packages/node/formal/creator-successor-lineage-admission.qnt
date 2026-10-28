@@ -30,10 +30,39 @@
 // Out of scope (inherent): two stores with the same key issuing concurrently
 // before any close admits either; the creator close detects that duplicate
 // slot ("author slot is ambiguous").
+//
+// Owner decisions of 2026-10-28, layered on top:
+//   A  one room database per player. The shared "tabs" layout above is kept as
+//      the broken control; per-player databases ("aliceDb", "bobDb") each have
+//      exactly one writing author (singleWriter). A migration copies one
+//      author's lineage out of the shared database, which then only reads
+//      (retired); the unfiltered copy (every author's rows) is a mutant.
+//   B  sync before sending. A store that reopened a lineage from storage (a
+//      copy, a restored backup, a migrated database) is not current: it signs
+//      nothing until it installs the room's current successor (it then knows
+//      the closed frontier) or confirms the creator's statement: the store is
+//      at the room's epoch and its lineage is above the author's admitted
+//      sequence in it (liveAdmitted). The creator's live admission is explicit
+//      (deliver), so a vertex still in flight is not in the statement.
+//      noCurrentReissue is now the strong property: no store signs a slot the
+//      room has admitted at that moment (closed or live), with or without the
+//      frontier known. A fresh lineage (freshSeed) starts current, as shipped:
+//      it assumes a fresh lineage holds a fresh key (testFreshSeedResidual).
+//   Found by this model: the shipped install proves the closed frontier only, so a
+//   device restored from a backup taken before the original signed in the epoch it
+//   installs re-signs that slot with its install fence (perPlayerStep, known gap,
+//   testRestoreInstallReissuesLiveSlotKnownGap). Checking the creator's statement for
+//   the installed epoch before the fence (installRule "live", not shipped) closes it
+//   (perPlayerStepLiveInstall). Currency is per database here, so the shared layout
+//   (one database, two authors) also breaks it: decision A is required for B.
+//   Residuals by construction: the dead device's vertex still in flight after the
+//   restore became current (testInFlightResidual); two live devices holding one key.
 module creatorSuccessorLineageAdmission {
   pure val AUTHORS = Set("alice", "bob")
-  pure val STORES = Set("tabs", "copy")
+  pure val STORES = Set("tabs", "copy", "aliceDb", "bobDb")
+  pure val PLAYER_DB = Map("alice" -> "aliceDb", "bob" -> "bobDb")
   pure val MAX_SEQUENCE = 3
+  pure val MAX_EPOCH = 2
 
   type Rule = str // "frontier" | "noCheck" | "oldRule"
 
@@ -47,7 +76,16 @@ module creatorSuccessorLineageAdmission {
   var known: str -> (str -> int)     // store -> the authenticated frontier its adopted generation carries
   var backupLineage: str -> int      // a backup of the tabs database (lineage per author)
   var backupKnown: str -> int        // ... and the frontier that backup knew
-  var currentReissue: bool           // history: an admitted slot re-signed by a store that KNEW the frontier
+  var currentReissue: bool           // history: a slot the room had admitted (closed or live) signed again
+  // Decision B (sync before sending):
+  var current: str -> bool           // store -> may sign new moves
+  var liveAdmitted: str -> int       // author -> highest sequence the creator admitted in the open epoch (-1: none)
+  var roomEpoch: int                 // the creator's current epoch
+  var epochOf: str -> int            // store -> the epoch its plane is at
+  var backupEpoch: int               // ... the epoch the backup's plane was at
+  var backupFrom: str                // ... the store it was taken from
+  // Decision A (per-player databases):
+  var retired: Set[str]              // databases that only read (the migrated shared one)
 
   pure def reopenOk(rule: Rule, l: str -> (str -> int), adm: str -> int, st: str, a: str): bool =
     if (rule == "frontier") l.get(st).get(a) > adm.get(a)
@@ -63,13 +101,17 @@ module creatorSuccessorLineageAdmission {
   val soleCustodianLive = soleCustodianLiveWith("frontier")
   val oldRuleLive = soleCustodianLiveWith("oldRule") // broken-control target only
   val inv = noAdmittedReissue and soleCustodianLive
+  def roomFrontier(a: str): int = if (admitted.get(a) > liveAdmitted.get(a)) admitted.get(a) else liveAdmitted.get(a)
+  // Decision A: an author writes in a database when it holds the key there or its lineage rows are there.
+  def writersOf(st: str): Set[str] = AUTHORS.filter(a => custody.get(st).contains(a) or lineage.get(st).get(a) > 0)
+  val singleWriter = STORES.forall(st => retired.contains(st) or writersOf(st).size() <= 1)
   val issuanceInv = soleCustodianLive  // plus noCurrentReissue (declared with the issuance layer)
 
   // One origin, two tabs: Alice (slot 0) and Bob (slot 1) share the "tabs"
   // database. The "copy" store starts empty and keyless.
   action init = all {
     lineage' = STORES.mapBy(_ => AUTHORS.mapBy(_ => 0)),
-    custody' = Map("tabs" -> AUTHORS, "copy" -> Set()),
+    custody' = STORES.mapBy(st => if (st == "tabs") AUTHORS else Set()),
     admitted' = AUTHORS.mapBy(_ => -1),
     published' = Set(),
     reissued' = false,
@@ -78,6 +120,37 @@ module creatorSuccessorLineageAdmission {
     backupLineage' = AUTHORS.mapBy(_ => 0),
     backupKnown' = AUTHORS.mapBy(_ => -1),
     currentReissue' = false,
+    current' = STORES.mapBy(st => st == "tabs"),
+    liveAdmitted' = AUTHORS.mapBy(_ => -1),
+    roomEpoch' = 0,
+    epochOf' = STORES.mapBy(_ => 0),
+    backupEpoch' = 0,
+    backupFrom' = "tabs",
+    retired' = Set(),
+  }
+  // Decision A as shipped from the start: each player on its own new database.
+  action initPerPlayer = all {
+    lineage' = STORES.mapBy(_ => AUTHORS.mapBy(_ => 0)),
+    custody' = Map("tabs" -> Set(), "copy" -> Set(), "aliceDb" -> Set("alice"), "bobDb" -> Set("bob")),
+    admitted' = AUTHORS.mapBy(_ => -1),
+    published' = Set(),
+    reissued' = false,
+    everHeld' = Map("alice" -> Set("aliceDb"), "bob" -> Set("bobDb")),
+    known' = STORES.mapBy(_ => AUTHORS.mapBy(_ => -1)),
+    backupLineage' = AUTHORS.mapBy(_ => 0),
+    backupKnown' = AUTHORS.mapBy(_ => -1),
+    currentReissue' = false,
+    current' = STORES.mapBy(st => st == "aliceDb" or st == "bobDb"),
+    liveAdmitted' = AUTHORS.mapBy(_ => -1),
+    roomEpoch' = 0,
+    epochOf' = STORES.mapBy(_ => 0),
+    backupEpoch' = 0,
+    backupFrom' = "aliceDb",
+    retired' = Set(),
+  }
+  action unchangedB = all {
+    current' = current, liveAdmitted' = liveAdmitted, roomEpoch' = roomEpoch, epochOf' = epochOf,
+    backupEpoch' = backupEpoch, backupFrom' = backupFrom, retired' = retired,
   }
 
   action issueWith(rule: Rule, st: str, a: str): bool = all {
@@ -88,18 +161,32 @@ module creatorSuccessorLineageAdmission {
     all {
       published' = published.union(Set((a, sequence, st))),
       reissued' = (reissued or sequence <= admitted.get(a)),
-      currentReissue' = (currentReissue or sequence <= admitted.get(a)),
+      currentReissue' = (currentReissue or sequence <= roomFrontier(a)),
       lineage' = lineage.setBy(st, row => row.setBy(a, n => n + 1)),
     },
     custody' = custody, admitted' = admitted, everHeld' = everHeld, known' = known, backupLineage' = backupLineage, backupKnown' = backupKnown,
+    unchangedB,
   }
 
   // A close admits, per author, the highest published sequence.
+  // (Decision B: the epoch advances and the open epoch's live admission is folded in.)
   action close: bool = all {
+    roomEpoch < MAX_EPOCH,
     admitted' = AUTHORS.mapBy(a => published.fold(admitted.get(a), (m, v) =>
       if (v._1 == a and v._2 > m) v._2 else m)),
     lineage' = lineage, custody' = custody, published' = published, reissued' = reissued, everHeld' = everHeld,
     known' = known, backupLineage' = backupLineage, backupKnown' = backupKnown, currentReissue' = currentReissue,
+    current' = current, liveAdmitted' = AUTHORS.mapBy(_ => -1), roomEpoch' = roomEpoch + 1, epochOf' = epochOf,
+    backupEpoch' = backupEpoch, backupFrom' = backupFrom, retired' = retired,
+  }
+  // Decision B: the creator admits, live, every vertex published so far (what its statement reports).
+  action deliver: bool = all {
+    liveAdmitted' = AUTHORS.mapBy(a => published.fold(liveAdmitted.get(a), (m, v) =>
+      if (v._1 == a and v._2 > m and v._2 > admitted.get(a)) v._2 else m)),
+    lineage' = lineage, custody' = custody, admitted' = admitted, published' = published, reissued' = reissued,
+    everHeld' = everHeld, known' = known, backupLineage' = backupLineage, backupKnown' = backupKnown,
+    currentReissue' = currentReissue, current' = current, roomEpoch' = roomEpoch, epochOf' = epochOf,
+    backupEpoch' = backupEpoch, backupFrom' = backupFrom, retired' = retired,
   }
 
   // The "copy" store becomes a stale copy of the tabs database (profile copy),
@@ -111,6 +198,9 @@ module creatorSuccessorLineageAdmission {
     everHeld' = everHeld.keys().mapBy(a => if (custody.get("tabs").contains(a)) everHeld.get(a).union(Set("copy")) else everHeld.get(a)),
     known' = known.set("copy", known.get("tabs")),
     backupLineage' = backupLineage, backupKnown' = backupKnown, currentReissue' = currentReissue,
+    // Decision B: a copied lineage reopens not current.
+    current' = current.set("copy", false), liveAdmitted' = liveAdmitted, roomEpoch' = roomEpoch,
+    epochOf' = epochOf.set("copy", epochOf.get("tabs")), backupEpoch' = backupEpoch, backupFrom' = backupFrom, retired' = retired,
   }
   action freshSeed(a: str): bool = all {
     lineage' = lineage.set("copy", AUTHORS.mapBy(_ => 0)),
@@ -119,14 +209,19 @@ module creatorSuccessorLineageAdmission {
     everHeld' = everHeld.setBy(a, held => held.union(Set("copy"))),
     known' = known.set("copy", AUTHORS.mapBy(_ => -1)),
     backupLineage' = backupLineage, backupKnown' = backupKnown, currentReissue' = currentReissue,
+    // As shipped: a lineage this open created starts current (it assumes a fresh key).
+    current' = current.set("copy", true), liveAdmitted' = liveAdmitted, roomEpoch' = roomEpoch,
+    epochOf' = epochOf.set("copy", 0), backupEpoch' = backupEpoch, backupFrom' = backupFrom, retired' = retired,
   }
 
   // ---- Issuance-time layer ----
   // Guard: "everyIssue" (shipped: v3-live issueOneVertex refuses seq <= known
   // frontier for every local signature) or "reopenOnly" (before the guard: only
   // cold reopen checked the frontier; the install's settlement fence did not).
-  pure def signOk(guard: str, kind: str, sequence: int, knownFrontier: int): bool =
-    if (guard == "everyIssue") sequence > knownFrontier
+  // Guard "syncBeforeSending" (shipped, decision B): everyIssue, and only a current store signs.
+  pure def signOk(guard: str, kind: str, sequence: int, knownFrontier: int, isCurrent: bool): bool =
+    if (guard == "syncBeforeSending") isCurrent and sequence > knownFrontier
+    else if (guard == "everyIssue") sequence > knownFrontier
     else if (kind == "fence") true
     else sequence > knownFrontier
 
@@ -136,25 +231,36 @@ module creatorSuccessorLineageAdmission {
     lineage.get(st).get(a) < MAX_SEQUENCE,
     val sequence = lineage.get(st).get(a)
     all {
-      signOk(guard, kind, sequence, known.get(st).get(a)),
+      not(retired.contains(st)),
+      signOk(guard, kind, sequence, known.get(st).get(a), current.get(st)),
       published' = published.union(Set((a, sequence, st))),
       reissued' = (reissued or sequence <= admitted.get(a)),
-      currentReissue' = (currentReissue or (sequence <= admitted.get(a) and known.get(st).get(a) == admitted.get(a))),
+      currentReissue' = (currentReissue or sequence <= roomFrontier(a)),
       lineage' = lineage.setBy(st, row => row.setBy(a, n => n + 1)),
     },
     custody' = custody, admitted' = admitted, everHeld' = everHeld, known' = known, backupLineage' = backupLineage, backupKnown' = backupKnown,
+    unchangedB,
   }
   // Install of the current successor: the store learns the authenticated
   // frontier, then the settlement issues one author fence for a.
-  action installWith(guard: str, st: str, a: str): bool = all {
+  // (Decision B: the store adopts the room's current epoch and is current from then on.)
+  // installRule "closed" (shipped): the install learns the closed frontier only. "live" (proposed,
+  // not shipped): before the fence the store also checks the creator's statement for the epoch it
+  // installs (the live frontier); at or below it, the fence is refused and the store stays
+  // read-only (behind-frontier).
+  action installWith(guard: str, st: str, a: str): bool = installRuleWith("closed", guard, st, a)
+  action installRuleWith(installRule: str, guard: str, st: str, a: str): bool = all {
     custody.get(st).contains(a),
+    not(retired.contains(st)),
+    epochOf.get(st) < roomEpoch,
     val learned = known.set(st, admitted)
     val sequence = lineage.get(st).get(a)
-    if (sequence < MAX_SEQUENCE and signOk(guard, "fence", sequence, admitted.get(a))) all {
+    val liveOk = installRule == "closed" or sequence > liveAdmitted.get(a)
+    if (sequence < MAX_SEQUENCE and liveOk and signOk(guard, "fence", sequence, admitted.get(a), true)) all {
       known' = learned,
       published' = published.union(Set((a, sequence, st))),
       reissued' = (reissued or sequence <= admitted.get(a)),
-      currentReissue' = (currentReissue or sequence <= admitted.get(a)),
+      currentReissue' = (currentReissue or sequence <= roomFrontier(a)),
       lineage' = lineage.setBy(st, row => row.setBy(a, n => n + 1)),
     } else all {
       // Fail closed: the generation is adopted, the fence is refused before signing.
@@ -163,39 +269,165 @@ module creatorSuccessorLineageAdmission {
     },
     custody' = custody, admitted' = admitted, everHeld' = everHeld,
     backupLineage' = backupLineage, backupKnown' = backupKnown,
+    current' = current.set(st, installRule == "closed" or lineage.get(st).get(a) > liveAdmitted.get(a)),
+    liveAdmitted' = liveAdmitted, roomEpoch' = roomEpoch,
+    epochOf' = epochOf.set(st, roomEpoch), backupEpoch' = backupEpoch, backupFrom' = backupFrom, retired' = retired,
   }
-  action takeBackup: bool = all {
-    backupLineage' = lineage.get("tabs"), backupKnown' = known.get("tabs"),
+  // Decision B: the store confirms the creator's statement. "frontier" (shipped): it is at the
+  // room's epoch and its lineage is above the author's live-admitted sequence; "noFrontier"
+  // (mutant): the epoch alone.
+  action confirmWith(rule: str, st: str, a: str): bool = all {
+    custody.get(st).contains(a),
+    not(current.get(st)),
+    epochOf.get(st) == roomEpoch,
+    rule == "noFrontier" or lineage.get(st).get(a) > liveAdmitted.get(a),
+    current' = current.set(st, true),
     lineage' = lineage, custody' = custody, admitted' = admitted, published' = published, reissued' = reissued,
-    everHeld' = everHeld, known' = known, currentReissue' = currentReissue,
+    everHeld' = everHeld, known' = known, backupLineage' = backupLineage, backupKnown' = backupKnown,
+    currentReissue' = currentReissue, liveAdmitted' = liveAdmitted, roomEpoch' = roomEpoch, epochOf' = epochOf,
+    backupEpoch' = backupEpoch, backupFrom' = backupFrom, retired' = retired,
   }
-  // Another device restored from that backup (same keys, stale lineage and knowledge).
-  action restoreBackup: bool = all {
-    lineage' = lineage.set("copy", backupLineage), known' = known.set("copy", backupKnown),
-    custody' = custody.set("copy", custody.get("tabs")),
-    everHeld' = everHeld.keys().mapBy(a => if (custody.get("tabs").contains(a)) everHeld.get(a).union(Set("copy")) else everHeld.get(a)),
+  // Decision A: author a's lineage moves out of the shared database into its own ("filtered":
+  // shipped, only a's rows; "whole": mutant, every author's rows). The shared database then only
+  // reads. The migrated database reopens not current (decision B).
+  action migrateWith(rule: str, a: str): bool = all {
+    custody.get("tabs").contains(a) or retired.contains("tabs"),
+    everHeld.get(a).contains("tabs"),
+    custody.get(PLAYER_DB.get(a)) == Set(),
+    val target = PLAYER_DB.get(a)
+    val rows = if (rule == "filtered") AUTHORS.mapBy(other => if (other == a) lineage.get("tabs").get(a) else 0)
+               else lineage.get("tabs")
+    all {
+      lineage' = lineage.set(target, rows),
+      custody' = custody.set(target, Set(a)).setBy("tabs", held => held.exclude(Set(a))),
+      known' = known.set(target, known.get("tabs")),
+      everHeld' = everHeld.setBy(a, held => held.union(Set(target))),
+      // New code never writes the shared database again: it only reads, for the next migration.
+      current' = current.set(target, false).set("tabs", false),
+      epochOf' = epochOf.set(target, epochOf.get("tabs")),
+      retired' = retired.union(Set("tabs")),
+    },
     admitted' = admitted, published' = published, reissued' = reissued,
     backupLineage' = backupLineage, backupKnown' = backupKnown, currentReissue' = currentReissue,
+    liveAdmitted' = liveAdmitted, roomEpoch' = roomEpoch, backupEpoch' = backupEpoch, backupFrom' = backupFrom,
+  }
+  action takeBackupOf(src: str): bool = all {
+    backupLineage' = lineage.get(src), backupKnown' = known.get(src),
+    backupEpoch' = epochOf.get(src), backupFrom' = src,
+    lineage' = lineage, custody' = custody, admitted' = admitted, published' = published, reissued' = reissued,
+    everHeld' = everHeld, known' = known, currentReissue' = currentReissue,
+    current' = current, liveAdmitted' = liveAdmitted, roomEpoch' = roomEpoch, epochOf' = epochOf, retired' = retired,
+  }
+  action takeBackup: bool = takeBackupOf("tabs")
+  // Another device restored from that backup (same keys, stale lineage and knowledge). It
+  // reopened a lineage from storage, so it is not current (decision B).
+  action restoreBackup: bool = all {
+    lineage' = lineage.set("copy", backupLineage), known' = known.set("copy", backupKnown),
+    custody' = custody.set("copy", custody.get(backupFrom)),
+    everHeld' = everHeld.keys().mapBy(a => if (custody.get(backupFrom).contains(a)) everHeld.get(a).union(Set("copy")) else everHeld.get(a)),
+    admitted' = admitted, published' = published, reissued' = reissued,
+    backupLineage' = backupLineage, backupKnown' = backupKnown, currentReissue' = currentReissue,
+    current' = current.set("copy", false), epochOf' = epochOf.set("copy", backupEpoch),
+    liveAdmitted' = liveAdmitted, roomEpoch' = roomEpoch, backupEpoch' = backupEpoch, backupFrom' = backupFrom, retired' = retired,
+  }
+  // The restored device replaces the original: the original stops. Its vertices the creator has
+  // admitted remain; those it had not delivered die with it (the crash). A vertex of the dead
+  // device that is still in flight and reaches the creator after the restore became current is
+  // the documented residual (inFlight = true; testInFlightResidual): no statement can name it.
+  action restoreReplacing: bool = restoreReplacingWith(false)
+  action restoreReplacingWith(inFlight: bool): bool = all {
+    lineage' = lineage.set("copy", backupLineage), known' = known.set("copy", backupKnown),
+    custody' = custody.set("copy", custody.get(backupFrom)).set(backupFrom, Set()),
+    everHeld' = everHeld.keys().mapBy(a => if (custody.get(backupFrom).contains(a)) everHeld.get(a).union(Set("copy")) else everHeld.get(a)),
+    admitted' = admitted, reissued' = reissued,
+    published' = if (inFlight) published else published.filter(v => v._3 != backupFrom or v._2 <= roomFrontier(v._1)),
+    backupLineage' = backupLineage, backupKnown' = backupKnown, currentReissue' = currentReissue,
+    current' = current.set("copy", false).set(backupFrom, false), epochOf' = epochOf.set("copy", backupEpoch),
+    liveAdmitted' = liveAdmitted, roomEpoch' = roomEpoch, backupEpoch' = backupEpoch, backupFrom' = backupFrom, retired' = retired,
   }
   // Every issue source under one guard (the reopen rule stays "frontier").
-  action issuanceStepWith(guard: str): bool = any {
+  // (With decision B's state threaded through; the shared tabs layout, no confirmations.)
+  action issuanceStepWith(guard: str): bool = issuanceStepRuleWith("closed", guard)
+  action issuanceStepRuleWith(installRule: str, guard: str): bool = any {
     nondet st = STORES.oneOf()
     nondet a = AUTHORS.oneOf()
     nondet kind = Set("ordinary", "fence").oneOf()
     signWith(guard, kind, st, a),
     nondet st = STORES.oneOf()
     nondet a = AUTHORS.oneOf()
-    installWith(guard, st, a),
+    installRuleWith(installRule, guard, st, a),
+    deliver,
     issueWith("frontier", "tabs", "alice"),
     close,
     takeBackup,
-    restoreBackup,
+    // The restored device replaces the original (decision B is about a reopened or cold-started
+    // device). Two live devices holding one key and signing concurrently stay out of scope: no
+    // guard on either device can see the other's unadmitted vertex (the creator close detects
+    // the ambiguous slot).
+    all { custody.get("copy") == Set(), restoreReplacing },
   }
-  action issuanceStep = issuanceStepWith("everyIssue")
+  action issuanceStep = issuanceStepWith("syncBeforeSending")
+  // Known gap of the shipped install (found by this model, 2026-10-28): the install proves the
+  // closed frontier, not the open epoch's. A device restored from a backup taken before the
+  // original signed in the epoch it installs re-signs those slots (its fence first).
+  // The proposed live check closes it:
+  action issuanceStepLiveInstall = issuanceStepRuleWith("live", "syncBeforeSending")
   action brokenReopenOnly = issuanceStepWith("reopenOnly")
-  // Never re-sign an admitted slot with the frontier known; the known gap (a
-  // device behind every later close) re-signs only at a closed, inadmissible epoch.
+  // Decision B, broken control: the frontier guard alone (8b857b4a), no currency gate.
+  action brokenIssueBeforeCurrent = issuanceStepWith("everyIssue")
+  // Never sign a slot the room has admitted (closed or live), frontier known or not. Before
+  // decision B this held only for stores that knew the frontier; the restored device behind
+  // every later close was the known gap.
   val noCurrentReissue = not(currentReissue)
+
+  // ---- Decision A + B: per-player databases, sync before sending ----
+  // Every player issues from its own database; backups, restores (replacing the original device),
+  // the creator's live admission, closes, installs and statement confirmations interleave.
+  action perPlayerStepWith(guard: str, confirm: str): bool = perPlayerStepRuleWith("closed", guard, confirm)
+  action perPlayerStepRuleWith(installRule: str, guard: str, confirm: str): bool = any {
+    nondet a = AUTHORS.oneOf()
+    nondet kind = Set("ordinary", "fence").oneOf()
+    nondet st = Set(PLAYER_DB.get(a), "copy").oneOf()
+    signWith(guard, kind, st, a),
+    nondet a = AUTHORS.oneOf()
+    nondet st = Set(PLAYER_DB.get(a), "copy").oneOf()
+    installRuleWith(installRule, guard, st, a),
+    nondet a = AUTHORS.oneOf()
+    nondet st = Set(PLAYER_DB.get(a), "copy").oneOf()
+    confirmWith(confirm, st, a),
+    deliver,
+    close,
+    nondet src = Set("aliceDb", "bobDb").oneOf()
+    takeBackupOf(src),
+    all { custody.get("copy") == Set(), restoreReplacing },
+  }
+  action perPlayerStep = perPlayerStepWith("syncBeforeSending", "frontier")
+  action perPlayerStepLiveInstall = perPlayerStepRuleWith("live", "syncBeforeSending", "frontier")
+  action brokenPerPlayerIssueBeforeCurrent = perPlayerStepRuleWith("live", "everyIssue", "frontier")
+  action brokenConfirmWithoutFrontier = perPlayerStepRuleWith("live", "syncBeforeSending", "noFrontier")
+  val perPlayerInv = noCurrentReissue and singleWriter
+  // The migration out of the shared layout: both tabs write, then each migrates and carries on.
+  action migrationStepWith(rule: str): bool = any {
+    nondet a = AUTHORS.oneOf()
+    all { not(retired.contains("tabs")), signWith("syncBeforeSending", "ordinary", "tabs", a) },
+    nondet a = AUTHORS.oneOf()
+    migrateWith(rule, a),
+    nondet a = AUTHORS.oneOf()
+    nondet kind = Set("ordinary", "fence").oneOf()
+    signWith("syncBeforeSending", kind, PLAYER_DB.get(a), a),
+    nondet a = AUTHORS.oneOf()
+    installWith("syncBeforeSending", PLAYER_DB.get(a), a),
+    nondet a = AUTHORS.oneOf()
+    confirmWith("frontier", PLAYER_DB.get(a), a),
+    deliver,
+    close,
+  }
+  action migrationStep = migrationStepWith("filtered")
+  action brokenWholeCopyMigration = migrationStepWith("whole")
+  // The shared layout violates singleWriter from its first state; after the migrations the
+  // per-player databases each have one writer and the shared one only reads.
+  val playerDbSingleWriter = PLAYER_DB.keys().forall(a => writersOf(PLAYER_DB.get(a)).size() <= 1)
+  val migrationInv = noCurrentReissue and playerDbSingleWriter
 
   action stepWith(rule: Rule): bool = any {
     nondet st = STORES.oneOf()
@@ -256,10 +488,84 @@ module creatorSuccessorLineageAdmission {
     init.then(takeBackup).then(signWith("everyIssue", "ordinary", "tabs", "bob")).then(close)
       .then(restoreBackup).then(installWith("reopenOnly", "copy", "bob"))
       .expect(currentReissue)
-  // Known gap: before it learns any later close, the restored device re-signs at
-  // its stale epoch (reissued, but not with the frontier known).
-  run testRestoreBeforeInstallKnownGap =
+  // The former known gap, closed by decision B: before it learns any later close the restored
+  // device is not current, so it cannot sign at all.
+  run testRestoreBeforeInstallNotCurrent =
+    init.then(takeBackup).then(signWith("syncBeforeSending", "ordinary", "tabs", "bob")).then(close)
+      .then(restoreBackup).then(signWith("syncBeforeSending", "ordinary", "copy", "bob")).fail()
+  // Broken control: issuing before current (the frontier guard alone) re-signs Bob 0.
+  run testRestoreIssueBeforeCurrentReissues =
     init.then(takeBackup).then(signWith("everyIssue", "ordinary", "tabs", "bob")).then(close)
       .then(restoreBackup).then(signWith("everyIssue", "ordinary", "copy", "bob"))
-      .expect(reissued and not(currentReissue))
+      .expect(reissued and currentReissue and not(noCurrentReissue))
+  // ... and once it installed the current successor it is current, and the guard holds.
+  run testRestoreInstallThenCurrent =
+    init.then(takeBackup).then(signWith("syncBeforeSending", "ordinary", "tabs", "bob")).then(close)
+      .then(restoreBackup).then(installWith("syncBeforeSending", "copy", "bob"))
+      .expect(current.get("copy") and noCurrentReissue)
+
+  // ---- Decision B, same epoch: the statement's live frontier ----
+  // Bob's device signs Bob 0, the creator admits it live; a device restored from the pre-issue
+  // backup at the same epoch cannot confirm the statement, so it stays read-only.
+  run testSameEpochRestoreCannotConfirm =
+    initPerPlayer.then(takeBackupOf("bobDb")).then(signWith("syncBeforeSending", "ordinary", "bobDb", "bob"))
+      .then(deliver).then(restoreReplacing).then(confirmWith("frontier", "copy", "bob")).fail()
+  // Broken control: confirming on the epoch alone lets it re-sign Bob 0.
+  run testSameEpochNoFrontierReissues =
+    initPerPlayer.then(takeBackupOf("bobDb")).then(signWith("syncBeforeSending", "ordinary", "bobDb", "bob"))
+      .then(deliver).then(restoreReplacing).then(confirmWith("noFrontier", "copy", "bob"))
+      .then(signWith("syncBeforeSending", "ordinary", "copy", "bob"))
+      .expect(not(noCurrentReissue))
+  // A reopened database at the room's epoch with nothing admitted above it confirms and issues.
+  run testReopenConfirmsAndIssues =
+    initPerPlayer.then(signWith("syncBeforeSending", "ordinary", "bobDb", "bob")).then(deliver)
+      .then(takeBackupOf("bobDb")).then(restoreReplacing).then(confirmWith("frontier", "copy", "bob"))
+      .then(signWith("syncBeforeSending", "ordinary", "copy", "bob"))
+      .expect(perPlayerInv and lineage.get("copy").get("bob") == 2)
+  // Known gap of the shipped install: Bob's device installs epoch 1 (fence Bob 0, admitted live);
+  // a device restored from the epoch-0 backup replaces it and installs epoch 1 too: its fence
+  // re-signs Bob 0. With the proposed live check the restored device stays read-only.
+  run testRestoreInstallReissuesLiveSlotKnownGap =
+    initPerPlayer.then(takeBackupOf("bobDb")).then(close).then(installWith("syncBeforeSending", "bobDb", "bob"))
+      .then(deliver).then(restoreReplacing).then(installWith("syncBeforeSending", "copy", "bob"))
+      .expect(not(noCurrentReissue))
+  run testRestoreLiveInstallRefuses =
+    initPerPlayer.then(takeBackupOf("bobDb")).then(close).then(installWith("syncBeforeSending", "bobDb", "bob"))
+      .then(deliver).then(restoreReplacing).then(installRuleWith("live", "syncBeforeSending", "copy", "bob"))
+      .expect(noCurrentReissue and not(current.get("copy")) and epochOf.get("copy") == 1)
+  // Residual: Bob 0 is still in flight from the dead device when the restored one confirms; the
+  // creator then admits it and the restored device re-signs that slot.
+  run testInFlightResidual =
+    initPerPlayer.then(takeBackupOf("bobDb")).then(signWith("syncBeforeSending", "ordinary", "bobDb", "bob"))
+      .then(restoreReplacingWith(true)).then(confirmWith("frontier", "copy", "bob")).then(deliver)
+      .then(signWith("syncBeforeSending", "ordinary", "copy", "bob"))
+      .expect(not(noCurrentReissue))
+  // Residual, as shipped: a fresh lineage beside a key that already signed starts current.
+  run testFreshSeedResidual =
+    init.then(signWith("syncBeforeSending", "ordinary", "tabs", "bob")).then(close).then(freshSeed("bob"))
+      .then(signWith("syncBeforeSending", "ordinary", "copy", "bob"))
+      .expect(not(noCurrentReissue))
+
+  // ---- Decision A: one writing author per database ----
+  // Broken control: the shared layout has two writers in one database.
+  run testSharedLayoutTwoWriters =
+    init.then(signWith("syncBeforeSending", "ordinary", "tabs", "alice")).then(signWith("syncBeforeSending", "ordinary", "tabs", "bob"))
+      .expect(not(singleWriter))
+  // The migration moves each author's own lineage, continuous, into its own database.
+  run testMigrationFiltered =
+    init.then(signWith("syncBeforeSending", "ordinary", "tabs", "alice")).then(signWith("syncBeforeSending", "ordinary", "tabs", "bob"))
+      .then(close).then(migrateWith("filtered", "alice")).then(migrateWith("filtered", "bob"))
+      .then(installWith("syncBeforeSending", "aliceDb", "alice")).then(installWith("syncBeforeSending", "bobDb", "bob"))
+      .then(signWith("syncBeforeSending", "ordinary", "aliceDb", "alice"))
+      .expect(singleWriter and noCurrentReissue and lineage.get("aliceDb").get("alice") == 3
+        and lineage.get("aliceDb").get("bob") == 0 and lineage.get("bobDb").get("bob") == 2)
+  // ... a migrated database is not current until it installs or confirms.
+  run testMigratedNotCurrent =
+    init.then(signWith("syncBeforeSending", "ordinary", "tabs", "alice")).then(migrateWith("filtered", "alice"))
+      .then(signWith("syncBeforeSending", "ordinary", "aliceDb", "alice")).fail()
+  // Broken control: the whole copy puts Bob's rows in Alice's database.
+  run testMigrationWholeCopyTwoWriters =
+    init.then(signWith("syncBeforeSending", "ordinary", "tabs", "alice")).then(signWith("syncBeforeSending", "ordinary", "tabs", "bob"))
+      .then(migrateWith("whole", "alice"))
+      .expect(not(singleWriter))
 }
