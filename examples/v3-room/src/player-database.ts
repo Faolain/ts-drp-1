@@ -81,7 +81,8 @@ const ISSUANCE_STORES = new Set(["lineages", "issuedRecords", "issuanceOutbox", 
 const JOURNAL_ENTRIES = "acceptedEntries";
 
 export type V3RoomPlayerDatabaseMigration = Readonly<{
-	kind: "present" | "fresh" | "claimed" | "claimed-filtered";
+	/** "no-indexeddb": the platform has no IndexedDB (an injected storage host), so no shared database. */
+	kind: "present" | "fresh" | "claimed" | "claimed-filtered" | "no-indexeddb";
 	/** Authors with issuance rows for the room in the shared database (empty unless read). */
 	writers: readonly string[];
 	/** Databases copied, by player name. */
@@ -333,6 +334,9 @@ export async function migrateV3RoomPlayerDatabase(
 ): Promise<V3RoomPlayerDatabaseMigration> {
 	const { legacyName, playerName, objectId, author } = input;
 	if (legacyName === playerName) throw new TypeError("v3 room player database must differ from the shared database");
+	// A platform without IndexedDB never held a shared browser room database.
+	if (Reflect.get(globalThis, "indexedDB") === undefined)
+		return Object.freeze({ kind: "no-indexeddb", writers: Object.freeze([]), copied: Object.freeze([]) });
 	return withMigrationLock(legacyName, async () => {
 		const pending = `${playerName}${PENDING_SUFFIX}`;
 		const targets = SUFFIXES.map((suffix) => `${playerName}${suffix}`);
