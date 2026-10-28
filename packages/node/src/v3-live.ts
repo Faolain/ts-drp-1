@@ -24285,6 +24285,114 @@ function creatorSourceAbandonmentResult(author: string, entry: SettlementPlan["e
 const digestBytesFromHex = (value: string): Uint8Array =>
 	Uint8ArrayConstructor.from(value.match(/../gu)!.map(byte => Number.parseInt(byte, 16)));
 
+/** What resuming a pending unsigned intent concluded. Only "resumed" signed. */
+export type V3PendingIntentResume =
+	| Readonly<{ ok: true; kind: "none" }>
+	| Readonly<{ ok: true; kind: "resumed"; currentEpoch: boolean }>
+	| Readonly<{ ok: false; kind: "not-current" | "behind-frontier"; authorSequence: number; detail: string }>;
+
+/**
+ * C03 layer 2. A crash between entering an intent's signature and committing it leaves the intent
+ * as pending unsigned custody at lineage.next: the store refuses every settlement plan write and
+ * every other intent at that ordinal until the identical intent commits, and has no abandonment.
+ * An intent built in an earlier epoch can never be rebuilt identically (its epoch and dependencies
+ * are gone), so the next epoch's startup drain was refused at its first plan write. This commits
+ * the exact pending intent, with its plan effect, before any plan write: the state a crash just
+ * after that commit leaves. An intent of a closed epoch is then read by the rebase outbox as a
+ * displaced source of that epoch, like every other unpublished row; one of the plane's own epoch
+ * (its rebuild is not identical once the plane has moved on) joins the plane when the room
+ * recovers the plane from storage, as after that crash.
+ * It signs only when the room is current (sync before sending: this author's live frontier is
+ * below lineage.next, which is the pending ordinal) and the ordinal is above the plane's
+ * authenticated closed frontier. Otherwise the intent stays pending and nothing is signed.
+ * Model: packages/node/formal/creator-pending-intent-resume.qnt.
+ * @param plane - Original live handle.
+ * @param raw - Whether the room is current, and the owned signer.
+ * @returns What was concluded.
+ */
+export function resumeV3PendingIssuanceIntent(
+	plane: V3PlaneHandle,
+	raw: Readonly<{ current: boolean; signRegisteredVertexDigest: SignRegisteredVertexDigest }>
+): Promise<V3PendingIntentResume> {
+	const registration = v3HandleRegistrations.get(plane);
+	if (registration === undefined || !currentRegistration(registration))
+		return Promise.reject(new TypeError("v3 pending intent resume owner is unavailable"));
+	const current = raw.current === true;
+	const sign = raw.signRegisteredVertexDigest;
+	if (typeof sign !== "function") return Promise.reject(new TypeError("v3 pending intent resume signer is invalid"));
+	if (registration.receiveOnly) return Promise.resolve(ObjectFreeze({ ok: true as const, kind: "none" as const }));
+	return enqueueRegistrationTask(registration, () => async (): Promise<V3PendingIntentResume> => {
+		const scope = registration.issuanceScope;
+		const read = durableIssuancePruningMaintenanceForStore(creatorOriginalIssuanceStore(registration))?.readBoundedRecoveryCensus;
+		if (read === undefined) return ObjectFreeze({ ok: true as const, kind: "none" as const });
+		const census = await read({
+			objectId: scope.objectId,
+			limits: { maxRows: ISSUANCE_RETIREMENT_LIMITS.maxRows, maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes },
+		});
+		if (!currentRegistration(registration)) throw new TypeError("v3 pending intent resume owner is stale");
+		const pending = census.rows.lineages.find((row) => row.author === scope.author && row.objectId === scope.objectId)
+			?.pendingUnsigned;
+		if (pending === undefined) return ObjectFreeze({ ok: true as const, kind: "none" as const });
+		const preimage = decodeCanonical(pending.canonicalPreimageBytes);
+		const epoch = isObject(preimage) ? Reflect.get(preimage, "epoch") : undefined;
+		if (
+			!isObject(preimage) ||
+			Reflect.get(preimage, "author") !== scope.author ||
+			Reflect.get(preimage, "objectId") !== scope.objectId ||
+			Reflect.get(preimage, "authorSequence") !== pending.authorSequence ||
+			!NumberIsSafeInteger(epoch) ||
+			(epoch as number) > registration.payload.provenance.epoch
+		)
+			throw new TypeError("v3 pending unsigned intent is not this author's");
+		const admitted = localAdmittedFrontier(registration, scope);
+		if (admitted !== null && pending.authorSequence <= admitted)
+			return ObjectFreeze({
+				ok: false as const,
+				kind: "behind-frontier" as const,
+				authorSequence: pending.authorSequence,
+				detail: `the room admitted sequence ${admitted} of this author; the pending intent is at ${pending.authorSequence}`,
+			});
+		if (!current)
+			return ObjectFreeze({
+				ok: false as const,
+				kind: "not-current" as const,
+				authorSequence: pending.authorSequence,
+				detail: "a pending intent is signed only once this session is current",
+			});
+		await registration.issuanceStore.transactIssue(scope, async (authorSequence, nativeSignAdmission) => {
+			if (authorSequence !== pending.authorSequence) throw new TypeError("v3 pending intent ordinal changed");
+			if (nativeSignAdmission === undefined) throw new TypeError("v3 pending intent resume requires its native job");
+			const canonicalPreimageBytes = new Uint8ArrayConstructor(pending.canonicalPreimageBytes);
+			const digest = hashDomain(V3_VERTEX_DOMAIN, canonicalPreimageBytes);
+			if (!sameBytes(digest, pending.digest)) throw new TypeError("v3 pending intent digest differs");
+			const signed = await nativeSignAdmission(
+				new Uint8ArrayConstructor(canonicalPreimageBytes),
+				() =>
+					withAuthoredOperationSigningRequest(canonicalPreimageBytes, (request) =>
+						sign(new Uint8ArrayConstructor(digest), request)
+					),
+				pending.planEffect === undefined ? undefined : { planEffect: pending.planEffect }
+			);
+			const signature = copyDetachedBytes(signed);
+			if (signature === undefined || signature.byteLength !== 64)
+				throw new TypeError("v3 pending intent signature is invalid");
+			const envelope = ObjectFreeze({ canonicalPreimageBytes, digest, signature });
+			const commit = ObjectFreeze({
+				authorSequence,
+				envelope,
+				issuedRecord: ObjectFreeze({ authorSequence, envelope, scope }),
+				outboxEntry: ObjectFreeze({ authorSequence, envelope, scope }),
+			});
+			return pending.planEffect === undefined ? commit : ObjectFreeze({ ...commit, planEffect: pending.planEffect });
+		});
+		return ObjectFreeze({
+			ok: true as const,
+			kind: "resumed" as const,
+			currentEpoch: epoch === registration.payload.provenance.epoch,
+		});
+	});
+}
+
 /**
  * Explicit local-author abandonment of one durable unresolved accepted source:
  * the original registration FIFO signs an exact expiry receipt with the owned

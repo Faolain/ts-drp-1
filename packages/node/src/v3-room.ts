@@ -61,6 +61,7 @@ import {
 	prepareV3TerminalMigrationSource,
 	queryV3RetainedHashes,
 	abandonV3UnresolvedAcceptedWork,
+	resumeV3PendingIssuanceIntent,
 	inspectV3RetainedWorkFrontier,
 	inspectV3UnresolvedAcceptedWork,
 	type V3SourceAbandonment,
@@ -4867,6 +4868,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	// and a lineage this open created (nothing it signed can exist elsewhere) start current.
 	let localIssueCurrent = input.creatorFinalitySigner !== undefined || input.receiveOnly === true || freshLocalLineage;
 	let localIssueRefusal: V3RoomNotYetCurrent | undefined;
+	// A pending unsigned intent the settlement drain left for currency (C03 layer 2), and the drain
+	// that resumes it once the session is current, before any held move is released.
+	let pendingIntentAwaitsCurrency = false;
+	let pendingIntentResumeDrain: Promise<void> | undefined;
 	const currentEpoch = (): number => successorProjectionAuthority?.epoch ?? 0;
 	const notYetCurrentHoldMs = input.localIssueCurrencyHoldMs ?? V3_ROOM_NOT_YET_CURRENT_HOLD_MS;
 	const heldUntilCurrent = new Map<PendingIssue, ReturnType<typeof setTimeout>>();
@@ -4933,7 +4938,21 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 	};
 	const becomeLocalIssueCurrent = (): void => {
-		if (localIssueCurrent || localIssueRefusal !== undefined) return;
+		if (localIssueCurrent || localIssueRefusal !== undefined || pendingIntentResumeDrain !== undefined) return;
+		if (pendingIntentAwaitsCurrency) {
+			pendingIntentAwaitsCurrency = false;
+			pendingIntentResumeDrain = enqueueLifetimeTransition(() => drainRebaseOutbox()).then(
+				() => {
+					pendingIntentResumeDrain = undefined;
+					becomeLocalIssueCurrent();
+				},
+				(error: unknown) => {
+					terminalFailure ??= error;
+					refuseHeldUntilCurrent(error);
+				}
+			);
+			return;
+		}
 		localIssueCurrent = true;
 		const released = [...heldUntilCurrent.keys()].sort((left, right) => left.logicalTime - right.logicalTime);
 		for (const request of released) clearTimeout(heldUntilCurrent.get(request));
@@ -6505,9 +6524,37 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			}
 		}
 	};
+	// C03 layer 2: a pending unsigned intent (a crash between signing and committing it) resumes
+	// before the drain writes a plan. Resuming signs, so only a current session resumes it (sync
+	// before sending); until then the drain is left undone and nothing is signed, and a session
+	// behind this author's frontier never resumes it.
+	const resumePendingIssuanceIntent = async (): Promise<boolean> => {
+		for (;;) {
+			if (localIssueRefusal !== undefined) return false;
+			if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
+			const resumed = await resumeV3PendingIssuanceIntent(activeHandle, {
+				current: localIssueCurrent || pendingIntentResumeDrain !== undefined,
+				signRegisteredVertexDigest: input.signRegisteredVertexDigest,
+			});
+			if (resumed.ok) {
+				// An intent of this epoch joins the plane as after a crash just after its commit.
+				if (resumed.kind === "resumed" && resumed.currentEpoch) await recoverSettlementOwner();
+				return true;
+			}
+			if (resumed.kind === "behind-frontier") {
+				localIssueRefusal ??= new V3RoomNotYetCurrent("behind-frontier", resumed.detail);
+				refuseHeldUntilCurrent(localIssueRefusal);
+				return false;
+			}
+			if (localIssueCurrent) continue;
+			pendingIntentAwaitsCurrency = true;
+			return false;
+		}
+	};
 	const drainRebaseOutbox = async (publication: "immediate" | "after-readiness" = "immediate"): Promise<void> => {
 		const checkpoint = createWorkCheckpoint();
 		if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
+		if (settlementProfile === "v1" && !(await resumePendingIssuanceIntent())) return;
 		const sources: DisplacedSource[] = [];
 		for (;;) {
 			await checkpoint();
@@ -8396,6 +8443,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			}
 			if (currentEpoch() !== epoch) return "other-epoch";
 			becomeLocalIssueCurrent();
+			await pendingIntentResumeDrain;
 			return "current";
 		},
 		get invite(): string {
