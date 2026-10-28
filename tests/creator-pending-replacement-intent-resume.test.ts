@@ -274,6 +274,23 @@ describe("C03 layer 2: a Writer crashed between signing and committing a replace
 		await Promise.all(fixture.peers.map(fixture.stop));
 	});
 
+	// [RED] C03 layer 3, independent of the pending intent: the epoch-1 startup drain committed its
+	// author fence (published only after readiness) and the replacement prefix, then died. In the
+	// next epoch that fence is an unpublished displaced row with no plan entry, and the recovery
+	// census refuses it, so the startup drain fails:
+	//   creator recovery dependency hold unavailable:outbox-classification:<fence>:displaced:pending
+	// The same failure with no pending intent at all (the suffix failing before native entry):
+	// .logs/realtime-resume-2026-10-23/preexisting/c03l2-int7/control-before-entry-01.log.
+	it("[RED layer 3] the Writer issues again in the next epoch after its startup drain died with its fence unpublished", async () => {
+		const setup = await crashBetweenSignAndCommit();
+		await setup.fixture.issue(setup.creator, "creator-during-writer-crash");
+		await setup.fixture.close();
+		setup.fixture.checkpoint();
+		await setup.creator.room.adoptCreatorSuccessor();
+		await setup.fixture.reopen(setup.writer, 1, true);
+		await expectResumed(setup, "next-epoch");
+	});
+
 	// Sync before sending, the honest device: reopened before it has the creator's statement, its
 	// startup drain leaves the intent pending and signs nothing; the statement makes it current
 	// and that drain then runs, resuming the intent before any held move.
