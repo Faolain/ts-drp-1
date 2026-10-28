@@ -2127,12 +2127,6 @@ class NodeIssuanceImplementation {
 				from,
 				captured.throughAuthorSequence
 			);
-			assertIssuanceInheritedTargetPruningAllowed(
-				retirementRows(this.#database, captured.scope.objectId).plans,
-				captured.scope,
-				from,
-				captured.throughAuthorSequence
-			);
 			if (!authenticatedSettled) {
 				plan = readSettlementPlanRow(this.#database, captured.scope);
 				if (plan === undefined) throw this.#latchCorruption("stored settlement plan is malformed");
@@ -2188,6 +2182,14 @@ class NodeIssuanceImplementation {
 					}
 				}
 			}
+			// Its whole-object census refuses any unclassified row as retryable, so it runs only
+			// after the selected prefix has latched its own corruption; still before any write.
+			assertIssuanceInheritedTargetPruningAllowed(
+				retirementRows(this.#database, captured.scope.objectId).plans,
+				captured.scope,
+				from,
+				captured.throughAuthorSequence
+			);
 			const issuedChanges = configuredStatement(
 				this.#database,
 				"DELETE FROM issued_records WHERE object_id=? AND author=? AND author_sequence BETWEEN ? AND ?"
