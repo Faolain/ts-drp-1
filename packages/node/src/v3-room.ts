@@ -4507,13 +4507,22 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		| Readonly<{ sealed: Promise<CreatorLiveCloseResult>; adopted: Promise<void> }>
 		| undefined;
 	let joinedRetryAdoption: Promise<void> | undefined;
-	// Opt-in lull once per epoch, requested right after adoption or install (Track Z).
+	// Opt-in lull once per epoch, requested right after adoption or install (Track Z). The
+	// request is held until the next lifecycle admission, so the export of the successor an
+	// adoption produced is admitted ahead of the lull and the offer is not published behind a
+	// pool turnover; every other admission flushes the held lull first.
 	const scheduledLulls =
 		input.recoveryPoolScheduledLull === true
 			? createScheduledRecoveryPoolLull({
 					epoch: () => (activeHandle === undefined ? undefined : session.authority()?.epoch),
 					request: () => session.maintainRecoveryPool(),
 					now: () => performance.now(),
+					defer: (callback) => {
+						const handle = setTimeout(callback, 0);
+						// Never keep a host process alive for optional maintenance.
+						(handle as { unref?: () => void }).unref?.();
+						return () => clearTimeout(handle);
+					},
 				})
 			: undefined;
 	// Holds new local issues while an explicit recovery-pool boundary owns the plane.
@@ -4521,7 +4530,14 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	// Receipt continuations handed from issueWithReceipt to the synchronous start of issue().
 	let nextIssueReceiptHooks: LocalPresentationHooks | undefined;
 	type LifetimeDispatchResult<Result> = Readonly<{ readonly result: Result | Promise<Result> }>;
-	const enqueueLifetimeTransition = <Result>(transition: () => Promise<Result>): Promise<Result> => {
+	// `aheadOfScheduledLull`: only the export of the successor this epoch's adoption produced. It
+	// is admitted before a held scheduled lull, which is then requested right behind it; every
+	// other admission requests a held lull first, so the lull still runs before it.
+	const enqueueLifetimeTransition = <Result>(
+		transition: () => Promise<Result>,
+		aheadOfScheduledLull = false
+	): Promise<Result> => {
+		if (!aheadOfScheduledLull) scheduledLulls?.flush();
 		const dispatch = (): Promise<Result> => {
 			localOwner?.assertCurrent();
 			const selected = lifetimeTransitionTail.then(() => { localOwner?.assertCurrent(); return transition(); });
@@ -4534,7 +4550,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		};
 		// Preserve every admitted FIFO call; refuse excess before retaining a
 		// new transition. Native custody/job tokens are not payload/proof bytes.
-		return localOwner === undefined ? dispatch() : localOwner.lease.admit(dispatch);
+		try {
+			return localOwner === undefined ? dispatch() : localOwner.lease.admit(dispatch);
+		} finally {
+			if (aheadOfScheduledLull) scheduledLulls?.flush();
+		}
 	};
 	const boundedMigrationCreatorInvite = (value: unknown): string => {
 		if (typeof value === "string") {
@@ -7424,6 +7444,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		closed = true;
 		endSessionWaits();
 		autoPoolMaintenance?.stop();
+		scheduledLulls?.cancel();
 		interruptedCloseRetry?.stop();
 		closePresentation();
 		revokeTransport();
@@ -7564,7 +7585,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				// A migrated source seals and adopts on its target, so the successor it serves is the target's.
 				if (redirectedSession !== undefined) return redirectedSession.exportCreatorSuccessor();
 				return serveSuccessor();
-			}),
+			}, true),
 		authority(): V3RoomSuccessorAuthority | null {
 			return redirectedSession?.authority() ?? successorProjectionAuthority;
 		},

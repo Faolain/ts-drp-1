@@ -775,7 +775,7 @@ it.skipIf(!enabled)(
 					`coarse starvation regression alarm (${starvationAlarmMs} ms; not smoothness)`
 				).toBeLessThanOrEqual(starvationAlarmMs);
 			};
-			const baseline = async (name: string, ms = 1000) => {
+			const baselineWindow = async (name: string, ms: number) => {
 				const before = [...counters.received],
 					started = performance.now();
 				// These windows follow completed public convergence. Each local binding is
@@ -827,6 +827,31 @@ it.skipIf(!enabled)(
 				for (const [peer, received] of delta(counters.received, before).entries())
 					expect(received, `receiver ${peer} during ${name}`).toBeGreaterThan(25);
 				checkStarvation();
+			};
+			// App mode: the Writer's settlement replays its moves into each successor after convergence
+			// already matched (the replayed blocks are identical), and the creator's policy counts them, so
+			// it may roll over again at any moment. A window such a rollover interrupts follows it and is
+			// measured again; only a window whose epoch advanced by a reported policy rollover is retried.
+			const baseline = async (name: string, ms = 1000) => {
+				if (policy === undefined) return baselineWindow(name, ms);
+				for (let attempt = 0; ; attempt++) {
+					await followRollover(`${name}-before-window-${attempt}`);
+					const epoch = required(peers[0]).room.authority()?.epoch ?? 0,
+						reported = rolloverEvents.length;
+					try {
+						return await baselineWindow(name, ms);
+					} catch (error) {
+						const advanced = (required(peers[0]).room.authority()?.epoch ?? 0) > epoch;
+						if (attempt >= 3 || !advanced || rolloverEvents.length === reported) throw error;
+						record({
+							kind: "baseline-interrupted-by-policy-rollover",
+							phase: name,
+							attempt,
+							epoch,
+							error: String(error),
+						});
+					}
+				}
 			};
 			const automaticRepair = async (epoch: number) => {
 				phase = `automatic-repair-${epoch}`;
