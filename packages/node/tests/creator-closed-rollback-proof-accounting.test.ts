@@ -933,6 +933,8 @@ describe("native census consumes the certificate's complete authenticated anchor
 				certificates: pending ? [] : [certificate], ...(pending ? {pending:{trust:{currentEpoch:7,currentAnchorDigest:"anchor-7"},installed:[],certificates:[certificate]}} : {}) },
 			facts: { summary: { cuts: [{ epoch: 4, closedAnchorDigest: "anchor-4", successorAnchorDigest: "anchor-5" }] } },
 			child: { dependencyAnchors: dependencies },
+			// The known chain also names the pinned genesis anchor at epoch 0.
+			pin: { trust: { currentAnchorDigest: "anchor-0" } },
 			requireLaw: (value: unknown, reason: string) => { if (!value) throw new Error(reason); },
 		});
 	};
@@ -6984,6 +6986,8 @@ describe("ordinary finishing scalar codec capacity affected controls", () => {
 		};
 		const owner = execute<(input: Input) => Capacity>(`${constant("invalid")}\n${constant("unsignedEncodingLimits")}\n${[
 			"unsignedCanonicalShape", "unsignedArrayShape", "unsignedRecordShape", "unsignedVaruintWidth", "unsignedRecordWidth", "unsignedArrayWidth", "unsignedNativeImageWidth", "unsignedNativePhaseWidths",
+			// 1515daab: source-custody plan sizing and its native read bound joined the owner.
+			"sourceCustodyPlanWidths", "checkSourceCustodyNativeWidths",
 			"issuanceOrdinaryFinishingCapacityWidths",
 		].map(extract).join("\n")}\nissuanceOrdinaryFinishingCapacityWidths;`, {...codec, ...contract});
 		const scope = {objectId: "room", author: "1".repeat(64)}, foreignScope = {...scope, author: "2".repeat(64)};
@@ -8441,8 +8445,11 @@ describe("ordinary complete runtime wrapper capacity affected controls", () => {
 				scope: {...input.currentScope, epoch: maximum}, rows});
 			const rows = Array(input.maxIssuerDescriptors + (input.futureRows?.issuerDescriptorGrowth ?? 1)).fill(descriptor), debt = Array(input.maxDebtDescriptors + 1).fill({scope: input.scope,
 				lineageIndex: maximum, planIndex: maximum}), anchors = Array(input.maxDependencyAnchors).fill({epoch: maximum, anchorDigest: digest});
+			// 1515daab: a fence-issuing successor reserves one future manual-review
+			// unsettled source per issuer descriptor in activeUnsettled.sources; the
+			// actual carrier holds exactly those maximal entries (none without a fence).
 			const active = api.active({pendingRoots, wireByteCharge: pendingRoots.length === 0 ? 0 : maximum,
-				unsettledSources: [], cursor: null, cacheSourceSequences: [], epoch: input.currentScope.epoch + 1});
+				unsettledSources: futureUnsettledSources(input), cursor: null, cacheSourceSequences: [], epoch: input.currentScope.epoch + 1});
 			const optionalPending = input.receivedPendingIngressByteLength === undefined ? {} : {pendingIngress: active.pendingIngress};
 			const current = api.runtime(currentJournal(Array(input.maxCurrentJournalRows + (input.maxAdditionalCurrentJournalRows ?? 1)).fill(received ? remote : local)), rows, debt, maximum, anchors);
 			const precursor = api.runtime(currentJournal([]), rows, debt, maximum, anchors);
@@ -8456,6 +8463,12 @@ describe("ordinary complete runtime wrapper capacity affected controls", () => {
 				successorReserved: noFence ? {...final, ...optionalPending, nativeIssuance: false} : {...precursor, ...active, nativeIssuance: false},
 				successorEntered: noFence ? {...final, ...optionalPending, nativeIssuance: false} : {...precursor, ...active, nativeIssuance: false},
 				successorFinal: {...final, ...optionalPending, nativeIssuance: false}, pending: active.pendingIngress, local, remote};
+		}
+		function futureUnsettledSources(input: Input) {
+			if (input.successorFenceCount === 0) return [];
+			return Array(input.maxIssuerDescriptors + (input.futureRows?.issuerDescriptorGrowth ?? 1)).fill({
+				scope: {objectId: input.scope.objectId, author: input.scope.author}, disposition: "manual-review",
+				replacementProgress: null, sourceSequence: Number.MAX_SAFE_INTEGER, sourceDigest: new Uint8Array(32)});
 		}
 		function dominates(bound: Capacity, values: ReturnType<typeof actual>) {
 			for (const phase of ["currentClose", "successorReserved", "successorEntered", "successorFinal"] as const) {
@@ -8805,7 +8818,14 @@ describe("ordinary complete runtime wrapper capacity affected controls", () => {
 		const f = await fixture(), input = {...f.input, successorFenceCount: 0 as const, successorFencePreimageByteLength: 0};
 		const zero = f.api.capacity(input), one = f.api.capacity(f.input);
 		for (const received of [false, true]) f.dominates(zero, f.actual(input, received));
-		expect(zero.currentClose).toBe(one.currentClose);
+		// 1515daab: without a successor fence no future manual-review source is
+		// reserved, so the zero-fence close is exactly its own carrier and differs
+		// from the one-fence close by exactly those source entries, never by an
+		// invented descriptor or journal row.
+		expect(zero.currentClose).toBe(encodeCanonical(f.actual(input, true).currentClose).byteLength - 1);
+		const zeroActive = f.actual(input, true).currentClose as Record<string, unknown>, oneActive = f.actual(f.input, true).currentClose as Record<string, unknown>;
+		expect(encodeCanonical({...oneActive, activeUnsettled: zeroActive.activeUnsettled})).toEqual(encodeCanonical(zeroActive));
+		expect(one.currentClose - zero.currentClose).toBe(encodeCanonical(oneActive).byteLength - encodeCanonical(zeroActive).byteLength);
 		expect(zero.successorFinal).toBe(encodeCanonical(f.actual(input, true).successorFinal).byteLength - 1);
 		expect(zero.successorFinal).toBeLessThan(one.successorFinal);
 		expect(zero.successorReserved).toBe(zero.successorFinal);
@@ -8865,6 +8885,9 @@ describe("ordinary complete runtime wrapper capacity affected controls", () => {
 			readOrdinaryRuntimeCapacityWidths: (input: Input) => {calls.push(input); return f.api.capacity(input);}};
 		const census: Record<string, unknown> = {...f.actual(f.input, false).currentClose};
 		census.currentJournal = {...census.currentJournal as object, scope: f.input.currentScope};
+		// The consumer reads the PRESENT census, which holds no unsettled source;
+		// the maximal future manual-review entries are only the sizing carrier.
+		census.activeUnsettled = {...census.activeUnsettled as object, sources: []};
 		const phase = (phase: "reserved" | "entered", bytes: number) => ({phase, canonicalUnsignedVertexByteLength: bytes,
 			runtimeCensusOverheadByteLength: 1, nativeRowsByteLength: 1, nativeImageByteLength: 1, nativeControlRevisionDelta: 1});
 		const variant = (bytes: number) => ({runtimeCensusOverheadByteLength: 1, nativeRowsByteLength: 1, nativeImageByteLength: 1,
