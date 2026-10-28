@@ -212,3 +212,46 @@ it(
 	() => repeatedSkips(0),
 	600_000
 );
+
+// RED (fix/int7-handback-policy): a Writer whose first install is a skip gives back its own bootstrap
+// operation. The Writer's sequence-0 row carries the application's bootstrapOperation (Grid:
+// installRoster), which the creator never received; the settlement window resolves it as expired and
+// writeMergedSettlementPlan records a hand-back for it like a move. The application then offers
+// installRoster again as a move, and when that row is displaced in turn the room's settlement policy
+// has no displacement policy for it ("v3 room settlement policy is unavailable"), the install fails
+// and the session closes. Only operations the application can re-derive (those with a displacement
+// policy) may be given back.
+it("a Writer whose first install is a skip gives back only its moves, never its bootstrap operation", async () => {
+	const restore = await installEnvironment("node", () => undefined);
+	const directory = mkdtempSync(join(tmpdir(), "app-rollover-first-skip-bootstrap-"));
+	directories.push(directory);
+	try {
+		const { creator, writer } = await openPair(directory);
+		const wire = successorWire(() => [creator, writer] as const);
+		const rows = rowWire(creator, writer);
+		const ordinal = { next: 0 };
+		let epoch = 0;
+		try {
+			for (let k = 0; k < 2; k++) await writer.issue(epoch, k);
+			await wire.pause();
+			for (let roll = 0; roll < 3; roll++) epoch = await rollCreator(creator, () => Promise.resolve(), ordinal);
+			wire.resume();
+			await wire.caughtUp(epoch);
+			await rows.toWriter();
+			const status = (await writer.settlementStatus?.()) as {
+				undelivered?: readonly { operations: readonly Record<string, unknown>[] }[];
+			} | null;
+			const givenBack = (status?.undelivered ?? []).flatMap((entry) => entry.operations.map((op) => op.action));
+			process.stdout.write(`FIRST_SKIP_BOOTSTRAP ${JSON.stringify({ epoch, givenBack })}\n`);
+			expect(givenBack.length, "the Writer's two moves are given back").toBeGreaterThan(0);
+			expect(
+				givenBack.filter((action) => action !== "placeBlock"),
+				"given back only moves"
+			).toEqual([]);
+		} finally {
+			await wire.stop();
+		}
+	} finally {
+		restore();
+	}
+}, 300_000);
