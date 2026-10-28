@@ -612,9 +612,16 @@ Notes:
   closure, instead of the static `AHE_BOUNDED_READ_LIMITS.maxClosureReferences`) was planned but never landed. Its
   only trace was an orphan RED with no owner in any commit, deleted on fix/preexisting-failures. The static bound is
   safe but over-reserves.
-- **Shared room database, pruned co-writer (follow-up candidate, static analysis only):** the creator recovery
-  census (`readCreatorRecoveryDependencyCensus` in v3-live.ts) reads every author's lineage in the object. It
-  refuses (returns undefined) when a co-resident author has a lineage but no visible rows, unless the
-  registration's single-author historical issuance names that author. In a same-origin shared database (row 74),
-  once Alice's rows in the object are all pruned, Bob's next close hold or recovery seal therefore fails. Not
-  reproduced; no fix made.
+- **Shared room database (row 74), reproduced, no fix (owner decision):** two writers of one room in one browser
+  share its room database. RED 2725235d (`tests/shared-room-database-cowriter-red.test.ts`) fails in both layouts:
+  - Concurrent tabs: both writers' first successor install refuses "creator recipient native replay is invalid".
+    The durable replay requires every journal row of the object to be a vertex of the session's own retained close
+    graph, and the other session's rows are not.
+  - Slot handover (Alice used the database, then Bob opens it): Bob's first install refuses at the recovery census
+    on Alice's retained published row ("outbox-classification:3:displaced:published"). Every coverage path there,
+    and the pruned-lineage and filtered-facade branches, assume the registration's single author.
+  The choice is per-identity room databases, or a multi-author census and journal replay.
+- **Local issue below the authenticated frontier:** the local author never signs at or below its authenticated
+  `admittedAuthorSequence` (8b857b4a, one check in v3-live `issueOneVertex`; typed
+  `V3_LOCAL_LINEAGE_BEHIND_FRONTIER`). Known gap (pinned with it.fails): a restored device that has installed nothing
+  holds no authenticated frontier and can still sign an epoch-0 vertex that peers refuse.
