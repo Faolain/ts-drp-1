@@ -136,9 +136,13 @@ describe("DRPNetworkNode startup bootstrap healing", () => {
 		) => Promise<void>;
 		const addr = multiaddr(BOOTSTRAP_ADDR);
 
-		await dialWithRetry.call(node, addr, capturedNode, new AbortController().signal);
+		const retrySignal = new AbortController().signal;
 
-		expect(safeDial).toHaveBeenCalledWith(addr, capturedNode);
+		await dialWithRetry.call(node, addr, capturedNode, retrySignal);
+
+		// 9388ffdf threads the retry chain's abort signal into each dial so stop() also
+		// cancels an in-flight bootstrap dial, not only the backoff between dials.
+		expect(safeDial).toHaveBeenCalledWith(addr, capturedNode, retrySignal);
 	});
 
 	test("starts retry chains for the default bootstrap list", async () => {
