@@ -909,6 +909,39 @@ async function positiveAuthenticatedPruning() {
 				expect(events, "F5B_C13_NO_PREFIX_DELETE_BEFORE_FULL_WINDOW_AND_OLDER_PREFIX").toHaveLength(0);
 				continue;
 			}
+			if (peer !== creator) {
+				// C13 classification A (stale expectation, coordinator 2026-10-28): the Writer's
+				// issuance retention is bounded by the retained cut window, not by an epoch-2
+				// prefix delete. Its rows stay protected while their journal scopes are replay
+				// scopes (closedJournalProtectedReplayScopes: the current scope and each retained
+				// Cut's closed and successor scope); the retained Cuts at closedEpoch e are
+				// e - 2 .. e here (cuts [0, 1, 2] at the epoch-3 turnover). In this 3-close room
+				// every Writer scope is inside that window: it keeps exactly its committed rows of
+				// the window's epochs and deletes none. (This grid fixture's 4th close fails
+				// recovery-full at the creator, so the window's lower edge moving past epoch 0,
+				// where those rows must go, is out of its reach.)
+				expect(events, "F5B_C13_WRITER_DELETES_NOTHING_INSIDE_THE_WINDOW").toHaveLength(0);
+				const windowStart = Math.max(0, epoch - 2);
+				const epochOf = (bytes: Uint8Array) => record(bytes).epoch as number;
+				const committed = [
+					...new Set(
+						ownCommits(peer)
+							.filter((row) => epochOf(row.envelope.canonicalPreimageBytes) >= windowStart)
+							.map((row) => row.authorSequence)
+					),
+				].sort((left, right) => left - right);
+				const retained = (await durable(peer)).rows;
+				expect(committed.length, "F5B_C13_WRITER_COMMITTED_IN_EVERY_EPOCH").toBeGreaterThanOrEqual(epoch + 1);
+				expect(
+					retained.map((row) => row.commit.authorSequence),
+					"F5B_C13_WRITER_RETAINS_EXACTLY_ITS_ROWS_INSIDE_THE_WINDOW"
+				).toEqual(committed);
+				expect(
+					retained.every((row) => epochOf(row.commit.envelope.canonicalPreimageBytes) >= windowStart),
+					"F5B_C13_WRITER_RETAINS_NOTHING_OUTSIDE_THE_WINDOW"
+				).toBe(true);
+				continue;
+			}
 			expect(events.length, "F5B_C13_PARENT_OWNER_ACTUALLY_DELETES_ISSUANCE").toBeGreaterThan(0);
 			const first = required(events[0]);
 			expect(

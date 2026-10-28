@@ -172,6 +172,8 @@ interface Peer {
 	readonly acknowledged: Map<string, () => void>;
 	zone?: V3ZoneApi;
 	room?: V3RoomSession<never>;
+	/** The issuance database the zone opened for this peer (its own: one room database per player). */
+	issuanceDatabaseName?: string;
 	floor?: ReturnType<typeof createNodeRoomHeadAuthority>;
 	networkNode?: DRPNetworkNode;
 	ingress?(message: Message): void;
@@ -256,6 +258,7 @@ async function gridLongRoomFixture() {
 		const opened = required(wiring.opened.findLast((entry) => entry.author === peer.author));
 		peer.room = (await opened.session) as V3RoomSession<never>;
 		await waitForV3RoomStartupForDiagnostics(peer.room);
+		peer.issuanceDatabaseName = (opened.input as RoomInput).issuanceDatabaseName;
 		return opened.input as RoomInput;
 	};
 	// The shipped page order: the member's page enrolls, the creator creates the zone with
@@ -270,7 +273,6 @@ async function gridLongRoomFixture() {
 	await settleOpen(recipient);
 	const material = creatorInput.creatorInvite as V3RoomCreatorInviteMaterial;
 	const objectId = creatorInput.objectId;
-	const databaseName = creatorInput.issuanceDatabaseName;
 	const application = creatorInput.application as {
 		readonly catalog: Parameters<typeof readCreatorSuccessorExport>[0]["catalog"];
 	};
@@ -289,6 +291,13 @@ async function gridLongRoomFixture() {
 	const reopen = async (peer: Peer) => {
 		await zoneFor(peer, { reopen: true }).join(invite);
 		await settleOpen(peer);
+		// Decision B (sync before sending): a reopened Writer signs nothing until it is current. This
+		// harness passes successor offers by hand, so it also hands over the creator's statement, as
+		// the pages' successor delivery does on bind.
+		if (peer !== creator && creator.room !== undefined) {
+			const statement = creator.room.currencyStatement?.();
+			if (statement !== undefined) await required(peer.room).confirmCurrent?.(statement);
+		}
 	};
 	// Delivers authenticated signed rows of the other peer in issue order; the final row's
 	// application acceptance joins the delivery.
@@ -322,7 +331,7 @@ async function gridLongRoomFixture() {
 	// Native census only: the issuance owner's own bounded recovery image and pruning
 	// watermark, never a grant; plus the bytes the peer's directory holds on disk.
 	const issuance = async (peer: Peer) => {
-		const store = await peer.host.openIssuance(databaseName);
+		const store = await peer.host.openIssuance(required(peer.issuanceDatabaseName));
 		try {
 			const scope = { objectId, author: peer.author };
 			const maintenance = required(nodeIssuancePruningMaintenanceForStore(store));
@@ -367,7 +376,7 @@ async function gridLongRoomFixture() {
 		);
 	// Every published row above the last delivered ordinal, in issue order.
 	const publishedAfter = async (peer: Peer, after: number | null) => {
-		const store = await peer.host.openIssuance(databaseName);
+		const store = await peer.host.openIssuance(required(peer.issuanceDatabaseName));
 		try {
 			const rows = await store.readOutboxPage({
 				scope: { objectId, author: peer.author },
