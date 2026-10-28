@@ -128,8 +128,10 @@ vi.mock(
 	"../../packages/node/dist/src/creator-adoption-recover.js",
 	() => import("../../packages/node/src/creator-adoption-recover.js")
 );
-vi.mock("../../packages/node/dist/src/creator-adoption-activate.js", async () => {
-	const real = await import("../../packages/node/src/creator-adoption-activate.js");
+// v3-room imports "@ts-drp/node/creator-adoption-activate", which the root config
+// aliases to src (ea4eb158); a dist-path mock no longer reaches the room.
+vi.mock("../../packages/node/src/creator-adoption-activate.js", async (importOriginal) => {
+	const real = await importOriginal<typeof import("../../packages/node/src/creator-adoption-activate.js")>();
 	type ActivationRealm = typeof real;
 	const realms = new Map<string, Promise<ActivationRealm>>();
 	// Independent physical clients have independent module-local activeOwners.
@@ -238,7 +240,9 @@ vi.mock("../../packages/storage-browser/dist/src/issuance.js", async () => {
 			// WeakMap identity remains intact; no capability is minted or rebound.
 			observe("transactIssue", (async (scope, build) => {
 				let selected: DurableIssueCommit | undefined;
+				let uncommitted: DurableIssueCommit | undefined;
 				const ambiguity = observed.ambiguous?.database === input.primaryDatabaseName ? observed.ambiguous : undefined;
+				const abandoned = new Error("F5B_AMBIGUOUS_UNCOMMITTED_ABORT");
 				const result = await transactIssue(scope, async (sequence, nativeJob) => {
 					// The native writer is entered by build's signing admission hook,
 					// not by transactIssue's callback entry. Observe before it is held.
@@ -248,10 +252,11 @@ vi.mock("../../packages/storage-browser/dist/src/issuance.js", async () => {
 					observed.issueAttempts.push(candidate);
 					const effect = candidate.planEffect;
 					if (ambiguity !== undefined && ambiguity.kind === effect?.kind && !ambiguity.committed) {
-						await ambiguousReadback(candidate);
-						if (ambiguity.recoveryFails === true) observed.failRecoveryReadFor = input.primaryDatabaseName;
-						observed.ambiguous = undefined;
-						throw new DurableIssuanceUnknownOutcomeError(scope);
+						// The native writer is held from build() until this callback settles,
+						// so durable truth cannot be read from inside it (a store read here
+						// waits on this very job). Abort the transaction and read back after.
+						uncommitted = candidate;
+						throw abandoned;
 					}
 					if (
 						input.primaryDatabaseName === observed.failSuffixFor &&
@@ -264,6 +269,14 @@ vi.mock("../../packages/storage-browser/dist/src/issuance.js", async () => {
 					}
 					selected = candidate;
 					return candidate;
+				}).catch(async (error: unknown) => {
+					// The store reports a callback that throws after native entry as an
+					// unknown commit outcome, so the sentinel itself does not surface here.
+					if (uncommitted === undefined || ambiguity === undefined) throw error;
+					await ambiguousReadback(uncommitted);
+					if (ambiguity.recoveryFails === true) observed.failRecoveryReadFor = input.primaryDatabaseName;
+					observed.ambiguous = undefined;
+					throw new DurableIssuanceUnknownOutcomeError(scope);
 				});
 				if (selected !== undefined) {
 					observed.commits.push(selected);
