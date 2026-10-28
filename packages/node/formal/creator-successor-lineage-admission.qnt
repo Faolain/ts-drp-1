@@ -48,13 +48,15 @@
 //      room has admitted at that moment (closed or live), with or without the
 //      frontier known. A fresh lineage (freshSeed) starts current, as shipped:
 //      it assumes a fresh lineage holds a fresh key (testFreshSeedResidual).
-//   Found by this model: the shipped install proves the closed frontier only, so a
+//   Found by this model, then fixed: an install proves the closed frontier only, so a
 //   device restored from a backup taken before the original signed in the epoch it
-//   installs re-signs that slot with its install fence (perPlayerStep, known gap,
-//   testRestoreInstallReissuesLiveSlotKnownGap). Checking the creator's statement for
-//   the installed epoch before the fence (installRule "live", not shipped) closes it
-//   (perPlayerStepLiveInstall). Currency is per database here, so the shared layout
-//   (one database, two authors) also breaks it: decision A is required for B.
+//   installs re-signed those slots (installRule "closed", now the broken control
+//   brokenPerPlayerClosedInstall, testClosedInstallReissuesLiveSlot; the room's RED is
+//   tests/live-slot-install-gap-red.test.ts). Shipped, installRule "live": a store that
+//   is not current installs only above the author's live frontier in the creator's
+//   statement for the installed epoch; otherwise it is refused before it adopts or
+//   signs anything. Currency is per database here, so the shared layout (one
+//   database, two authors) still breaks it: decision A is required for B.
 //   Residuals by construction: the dead device's vertex still in flight after the
 //   restore became current (testInFlightResidual); two live devices holding one key.
 module creatorSuccessorLineageAdmission {
@@ -244,19 +246,20 @@ module creatorSuccessorLineageAdmission {
   // Install of the current successor: the store learns the authenticated
   // frontier, then the settlement issues one author fence for a.
   // (Decision B: the store adopts the room's current epoch and is current from then on.)
-  // installRule "closed" (shipped): the install learns the closed frontier only. "live" (proposed,
-  // not shipped): before the fence the store also checks the creator's statement for the epoch it
-  // installs (the live frontier); at or below it, the fence is refused and the store stays
-  // read-only (behind-frontier).
-  action installWith(guard: str, st: str, a: str): bool = installRuleWith("closed", guard, st, a)
+  // installRule "live" (shipped): a store that is not current installs only when its lineage is
+  // above the author's live frontier in the creator's statement for the installed epoch; otherwise
+  // the install is refused before anything is adopted or signed (the action is not enabled; the
+  // room refuses "behind-frontier", or "statement-required" without a statement). "closed" (broken
+  // control, the install before the fix): the install learns the closed frontier only.
+  action installWith(guard: str, st: str, a: str): bool = installRuleWith("live", guard, st, a)
   action installRuleWith(installRule: str, guard: str, st: str, a: str): bool = all {
     custody.get(st).contains(a),
     not(retired.contains(st)),
     epochOf.get(st) < roomEpoch,
+    installRule == "closed" or current.get(st) or lineage.get(st).get(a) > liveAdmitted.get(a),
     val learned = known.set(st, admitted)
     val sequence = lineage.get(st).get(a)
-    val liveOk = installRule == "closed" or sequence > liveAdmitted.get(a)
-    if (sequence < MAX_SEQUENCE and liveOk and signOk(guard, "fence", sequence, admitted.get(a), true)) all {
+    if (sequence < MAX_SEQUENCE and signOk(guard, "fence", sequence, admitted.get(a), true)) all {
       known' = learned,
       published' = published.union(Set((a, sequence, st))),
       reissued' = (reissued or sequence <= admitted.get(a)),
@@ -269,7 +272,7 @@ module creatorSuccessorLineageAdmission {
     },
     custody' = custody, admitted' = admitted, everHeld' = everHeld,
     backupLineage' = backupLineage, backupKnown' = backupKnown,
-    current' = current.set(st, installRule == "closed" or lineage.get(st).get(a) > liveAdmitted.get(a)),
+    current' = current.set(st, true),
     liveAdmitted' = liveAdmitted, roomEpoch' = roomEpoch,
     epochOf' = epochOf.set(st, roomEpoch), backupEpoch' = backupEpoch, backupFrom' = backupFrom, retired' = retired,
   }
@@ -347,7 +350,7 @@ module creatorSuccessorLineageAdmission {
   }
   // Every issue source under one guard (the reopen rule stays "frontier").
   // (With decision B's state threaded through; the shared tabs layout, no confirmations.)
-  action issuanceStepWith(guard: str): bool = issuanceStepRuleWith("closed", guard)
+  action issuanceStepWith(guard: str): bool = issuanceStepRuleWith("live", guard)
   action issuanceStepRuleWith(installRule: str, guard: str): bool = any {
     nondet st = STORES.oneOf()
     nondet a = AUTHORS.oneOf()
@@ -366,12 +369,9 @@ module creatorSuccessorLineageAdmission {
     // the ambiguous slot).
     all { custody.get("copy") == Set(), restoreReplacing },
   }
+  // The shared layout (tabs holds both authors): currency is per database, so it still breaks
+  // noCurrentReissue (decision A is required for B); kept to show that.
   action issuanceStep = issuanceStepWith("syncBeforeSending")
-  // Known gap of the shipped install (found by this model, 2026-10-28): the install proves the
-  // closed frontier, not the open epoch's. A device restored from a backup taken before the
-  // original signed in the epoch it installs re-signs those slots (its fence first).
-  // The proposed live check closes it:
-  action issuanceStepLiveInstall = issuanceStepRuleWith("live", "syncBeforeSending")
   action brokenReopenOnly = issuanceStepWith("reopenOnly")
   // Decision B, broken control: the frontier guard alone (8b857b4a), no currency gate.
   action brokenIssueBeforeCurrent = issuanceStepWith("everyIssue")
@@ -383,7 +383,7 @@ module creatorSuccessorLineageAdmission {
   // ---- Decision A + B: per-player databases, sync before sending ----
   // Every player issues from its own database; backups, restores (replacing the original device),
   // the creator's live admission, closes, installs and statement confirmations interleave.
-  action perPlayerStepWith(guard: str, confirm: str): bool = perPlayerStepRuleWith("closed", guard, confirm)
+  action perPlayerStepWith(guard: str, confirm: str): bool = perPlayerStepRuleWith("live", guard, confirm)
   action perPlayerStepRuleWith(installRule: str, guard: str, confirm: str): bool = any {
     nondet a = AUTHORS.oneOf()
     nondet kind = Set("ordinary", "fence").oneOf()
@@ -402,9 +402,10 @@ module creatorSuccessorLineageAdmission {
     all { custody.get("copy") == Set(), restoreReplacing },
   }
   action perPlayerStep = perPlayerStepWith("syncBeforeSending", "frontier")
-  action perPlayerStepLiveInstall = perPlayerStepRuleWith("live", "syncBeforeSending", "frontier")
-  action brokenPerPlayerIssueBeforeCurrent = perPlayerStepRuleWith("live", "everyIssue", "frontier")
-  action brokenConfirmWithoutFrontier = perPlayerStepRuleWith("live", "syncBeforeSending", "noFrontier")
+  // Broken control: the install before the live rule (closed frontier only).
+  action brokenPerPlayerClosedInstall = perPlayerStepRuleWith("closed", "syncBeforeSending", "frontier")
+  action brokenPerPlayerIssueBeforeCurrent = perPlayerStepWith("everyIssue", "frontier")
+  action brokenConfirmWithoutFrontier = perPlayerStepWith("syncBeforeSending", "noFrontier")
   val perPlayerInv = noCurrentReissue and singleWriter
   // The migration out of the shared layout: both tabs write, then each migrates and carries on.
   action migrationStepWith(rule: str): bool = any {
@@ -522,17 +523,22 @@ module creatorSuccessorLineageAdmission {
       .then(takeBackupOf("bobDb")).then(restoreReplacing).then(confirmWith("frontier", "copy", "bob"))
       .then(signWith("syncBeforeSending", "ordinary", "copy", "bob"))
       .expect(perPlayerInv and lineage.get("copy").get("bob") == 2)
-  // Known gap of the shipped install: Bob's device installs epoch 1 (fence Bob 0, admitted live);
-  // a device restored from the epoch-0 backup replaces it and installs epoch 1 too: its fence
-  // re-signs Bob 0. With the proposed live check the restored device stays read-only.
-  run testRestoreInstallReissuesLiveSlotKnownGap =
+  // Broken control (the install before the live rule): Bob's device installs epoch 1 (fence Bob 0,
+  // admitted live); a device restored from the epoch-0 backup replaces it and installs epoch 1
+  // too: its fence re-signs Bob 0.
+  run testClosedInstallReissuesLiveSlot =
     initPerPlayer.then(takeBackupOf("bobDb")).then(close).then(installWith("syncBeforeSending", "bobDb", "bob"))
-      .then(deliver).then(restoreReplacing).then(installWith("syncBeforeSending", "copy", "bob"))
+      .then(deliver).then(restoreReplacing).then(installRuleWith("closed", "syncBeforeSending", "copy", "bob"))
       .expect(not(noCurrentReissue))
-  run testRestoreLiveInstallRefuses =
+  // Shipped: the live rule refuses that install before anything is adopted or signed ...
+  run testRestoreLiveInstallRefused =
     initPerPlayer.then(takeBackupOf("bobDb")).then(close).then(installWith("syncBeforeSending", "bobDb", "bob"))
-      .then(deliver).then(restoreReplacing).then(installRuleWith("live", "syncBeforeSending", "copy", "bob"))
-      .expect(noCurrentReissue and not(current.get("copy")) and epochOf.get("copy") == 1)
+      .then(deliver).then(restoreReplacing).then(installWith("syncBeforeSending", "copy", "bob")).fail()
+  // ... and the restored device stays read-only (not current, at its backup's epoch).
+  run testRestoreLiveInstallReadOnly =
+    initPerPlayer.then(takeBackupOf("bobDb")).then(close).then(installWith("syncBeforeSending", "bobDb", "bob"))
+      .then(deliver).then(restoreReplacing)
+      .expect(noCurrentReissue and not(current.get("copy")) and epochOf.get("copy") == 0)
   // Residual: Bob 0 is still in flight from the dead device when the restored one confirms; the
   // creator then admits it and the restored device re-signs that slot.
   run testInFlightResidual =
