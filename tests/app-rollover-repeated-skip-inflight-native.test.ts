@@ -243,11 +243,12 @@ it("a Writer whose first install is a skip gives back only its moves, never its 
 			} | null;
 			const givenBack = (status?.undelivered ?? []).flatMap((entry) => entry.operations.map((op) => op.action));
 			process.stdout.write(`FIRST_SKIP_BOOTSTRAP ${JSON.stringify({ epoch, givenBack })}\n`);
-			expect(givenBack.length, "the Writer's two moves are given back").toBeGreaterThan(0);
 			expect(
 				givenBack.filter((action) => action !== "placeBlock"),
 				"given back only moves"
 			).toEqual([]);
+			// Control: both of the Writer's never-admitted moves are still given back.
+			expect(givenBack, "the Writer's two moves are given back").toEqual(["placeBlock", "placeBlock"]);
 		} finally {
 			await wire.stop();
 		}
