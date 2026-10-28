@@ -23,7 +23,9 @@ import type { V3RoomSuccessorOffer } from "./rollover.js";
  * - An offer is authenticated only by `installCreatorSuccessor` (its commit QC, trust record and
  *   manifest against the member's own current trust). The envelope's epoch is an untrusted hint
  *   used to skip offers that cannot be newer; a forged or stale offer is refused by the install
- *   with no state change, and is not retried before a backoff.
+ *   with no state change, and is not retried before a backoff. An install whose material did not
+ *   arrive within its deadline (V3RoomSuccessorInstallExpired, row 72) is retried at once from the
+ *   creator's latest offer, the same one included: the member never stops following.
  * - Material comes from the creator only (members never serve successor material), so the
  *   install's peers are the creator.
  *
@@ -245,6 +247,13 @@ function decodeFrame(bytes: Uint8Array): Frame | undefined {
 	};
 }
 
+/** The room's typed install expiry (V3RoomSuccessorInstallExpired, row 72), by name: no runtime import. */
+function installExpired(error: unknown): boolean {
+	for (let value: unknown = error, depth = 0; value instanceof Error && depth < 8; value = value.cause, depth++)
+		if (value.name === "V3RoomSuccessorInstallExpired") return true;
+	return false;
+}
+
 function message(error: unknown): string {
 	if (error instanceof AggregateError)
 		return `${error.message} ${error.errors.map(message).join(" ")} ${message(error.cause)}`.trim();
@@ -394,6 +403,16 @@ export function createV3RoomSuccessorDelivery(
 					if (closed) return;
 					stats.refused++;
 					stats.lastError = message(error).slice(0, 400);
+					hooks.onRefused?.(error);
+					// Row 72: an install whose material did not arrive within its deadline already waited its
+					// whole bound. Never back that offer off: ask for the creator's latest now and install it,
+					// the same offer again included, so the member never stops following.
+					if (installExpired(error)) {
+						const previous = backoffOf(selected.bytes);
+						if (previous !== undefined) failed.splice(failed.indexOf(previous), 1);
+						setTimeout(() => request(), REQUEST_MIN_INTERVAL_MS);
+						continue;
+					}
 					const previous = backoffOf(selected.bytes);
 					const entry = previous ?? { bytes: selected.bytes, retryAt: 0, failures: 0 };
 					entry.failures++;
@@ -403,7 +422,6 @@ export function createV3RoomSuccessorDelivery(
 						failed.push(entry);
 						if (failed.length > FAILED_OFFERS_MAX) failed.shift();
 					}
-					hooks.onRefused?.(error);
 					// A successor the creator no longer serves: ask for its latest now. Otherwise the creator
 					// may have rolled over meanwhile; ask for its latest after the backoff.
 					const stale = message(error).includes("refused: stale");

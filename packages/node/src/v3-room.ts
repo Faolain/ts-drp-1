@@ -1223,6 +1223,28 @@ export const CREATOR_DEPARTED_CARRIERS_RETAINED = 16;
  * keeps the room's closing wording ("live plane is unavailable"), so an application policy that
  * waits through a closing treats it as one.
  */
+/**
+ * Row 72, the owner's decision (2026-10-27): the total time a member's successor install may wait
+ * for the creator's material (all retries of the fetch, decision row 61 option E, included). An
+ * install that reaches it ends with V3RoomSuccessorInstallExpired and changes nothing; its caller
+ * (the page's delivery) re-targets the newest offer, the same one included.
+ */
+export const V3_ROOM_SUCCESSOR_INSTALL_DEADLINE_MS = 120_000;
+
+/** A member's successor install that the creator's material did not reach within the deadline. */
+export class V3RoomSuccessorInstallExpired extends TypeError {
+	/** The install stage that expired. */
+	readonly stage = "material" as const;
+	/**
+	 * @param deadlineMs - The deadline that passed.
+	 * @param options - The material fetch's last failure.
+	 */
+	constructor(readonly deadlineMs: number, options?: ErrorOptions) {
+		super(`v3 room successor install expired: the creator's material did not arrive within ${deadlineMs} ms`, options);
+		this.name = "V3RoomSuccessorInstallExpired";
+	}
+}
+
 export class V3RoomAdoptionHoldExpired extends TypeError {
 	/**
 	 * @param heldMs - How long the move was held.
@@ -7820,6 +7842,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			)
 				throw new TypeError("creator recipient current floor is unavailable");
 			let received: Awaited<ReturnType<typeof receiveCreatorSuccessorAdoption>>;
+			// Row 72: the material fetch's retries end at the install deadline as well as at the close.
+			const installDeadline = new AbortController();
+			const installTimer = setTimeout(
+				() => installDeadline.abort(new V3RoomSuccessorInstallExpired(V3_ROOM_SUCCESSOR_INSTALL_DEADLINE_MS)),
+				V3_ROOM_SUCCESSOR_INSTALL_DEADLINE_MS
+			);
 			try {
 				const recoveryContext = openedRoomHeadState.stable.epoch >= 2 ? await recipientRecoveryContext() : undefined;
 				// The creator serves only its latest successor. Everything above may have waited (the
@@ -7841,13 +7869,24 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					exactCanonicalGenesisAnchorPreimageBytes: material.exactCanonicalGenesisAnchorPreimageBytes,
 					detachedGenesisSignature: material.detachedGenesisSignature,
 					...(recoveryContext === undefined ? {} : { recoveryContext }),
-					retryUntil: sessionLifetime.signal,
+					retryUntil: AbortSignal.any([sessionLifetime.signal, installDeadline.signal]),
 				});
 			} catch (error) {
 				// A failed receive may own native retention despite a lost acknowledgement.
 				// Retry must reacquire native custody before preparing any old/new writer.
 				creatorRecipientRecoveryRequired = true;
+				// Only the material fetch's own failure at the deadline is the typed expiry; any other
+				// failure, and a close, keep their own outcome.
+				if (
+					installDeadline.signal.aborted &&
+					!sessionLifetime.signal.aborted &&
+					error instanceof AggregateError &&
+					error.message === "creator successor material transport failed"
+				)
+					throw new V3RoomSuccessorInstallExpired(V3_ROOM_SUCCESSOR_INSTALL_DEADLINE_MS, { cause: error });
 				throw error;
+			} finally {
+				clearTimeout(installTimer);
 			}
 			try {
 				await withCreatorReceivedPromotionDependencies(received, async () => {
