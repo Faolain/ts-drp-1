@@ -347,15 +347,26 @@ test("native source-derived archive bytes remain prepared until independent crea
 	if (!close.ok) throw new Error(close.reason);
 	const opened = modules.seal.openSealAuthority({ signerPublicKey: hashBytes(CREATOR_PUBLIC_KEY_HEX), trust: source.currentTrust });
 	if (!opened.ok) throw new Error(opened.reason);
+	// A commit vote requires this authority's verified prepare QC for the same round and value
+	// (ad4539d1, before this test existed): run the q=1 prepare round first.
+	const prepareVote = modules.seal.prepareSealVote({ authority: opened.authority, exactCanonicalCutValueBytes: close.exactCanonicalCutValueBytes, phase: "prepare", round: 0 });
+	if (!prepareVote.ok) throw new Error(prepareVote.reason);
+	// ea4eb158: consuming a seal signing request yields its captured {digest, scope, admission}.
+	const prepareDigest = consumeSealSigningRequest(prepareVote.signingRequest)?.digest;
+	if (!(prepareDigest instanceof Uint8Array)) throw new Error("missing one-use archive prepare vote request");
+	const prepareQc = independentQc({ exactCanonicalPreimageBytes: prepareVote.exactCanonicalPreimageBytes,
+		signature: ed25519.sign(prepareDigest, hashBytes(CREATOR_PRIVATE_KEY_SEED_HEX)) });
+	const verifiedPrepare = modules.seal.verifySealQC({ authority: opened.authority, exactCanonicalQcBytes: prepareQc.exactCanonicalQcBytes });
+	if (!verifiedPrepare.ok) throw new Error(verifiedPrepare.reason);
 	const vote = modules.seal.prepareSealVote({ authority: opened.authority, exactCanonicalCutValueBytes: close.exactCanonicalCutValueBytes, phase: "commit", round: 0 });
 	if (!vote.ok) throw new Error(vote.reason);
-	const voteDigest = consumeSealSigningRequest(vote.signingRequest);
+	const voteDigest = consumeSealSigningRequest(vote.signingRequest)?.digest;
 	if (!(voteDigest instanceof Uint8Array)) throw new Error("missing one-use archive vote request");
 	const qc = independentQc({ exactCanonicalPreimageBytes: vote.exactCanonicalPreimageBytes,
 		signature: ed25519.sign(voteDigest, hashBytes(CREATOR_PRIVATE_KEY_SEED_HEX)) });
 	const successor = modules.creator.prepareCreatorSuccessor({ authority: opened.authority, close: close.close, exactCanonicalCommitQcBytes: qc.exactCanonicalQcBytes });
 	if (!successor.ok) throw new Error(successor.reason);
-	const anchorDigest = modules.request.consumeCreatorAnchorSigningRequest(successor.signingRequest);
+	const anchorDigest = modules.request.consumeCreatorAnchorSigningRequest(successor.signingRequest)?.digest;
 	if (!(anchorDigest instanceof Uint8Array)) throw new Error("missing one-use archive anchor request");
 	const completed = modules.creator.completeCreatorSuccessor({ preparation: successor.preparation,
 		detachedSignature: ed25519.sign(anchorDigest, hashBytes(CREATOR_PRIVATE_KEY_SEED_HEX)) });
