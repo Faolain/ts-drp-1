@@ -30,7 +30,7 @@ import {
 	type LiveJournalRetirementControl,
 } from "@ts-drp/live-journal";
 import { describe, expect, it } from "vitest";
-import { ISSUANCE_RETIREMENT_LIMITS } from "../../issuance-store/src/retirement.js";
+import { ISSUANCE_RETIREMENT_LIMITS, closeIssuanceRetirementProtectedRecords } from "../../issuance-store/src/retirement.js";
 
 import {
 	createCreatorClosedRollbackProofAccounting,
@@ -4628,13 +4628,16 @@ function issuanceProtectedRecordsForSource(sourceEpoch: number): {
 	before: Uint8Array;
 	after: Uint8Array;
 } {
-	const unsigned = { objectId: "room", author: "alice", authorSequence: 4, epoch: 5 };
+	// 8f21d1fd: protected records now close over durable rows, whose preimage
+	// header must classify (drp-vertex, protocol 3) before any hole is selected.
+	const header = { kind: "drp-vertex", protocolMajor: 3 };
+	const unsigned = { ...header, objectId: "room", author: "alice", authorSequence: 4, epoch: 5 };
 	const issued = [4, 5, 6].map((epoch, index) => ({
 		objectId: "room",
 		author: "alice",
 		authorSequence: index + 1,
 		digest: new Uint8Array(32).fill(index + 1),
-		canonicalPreimageBytes: encodeCanonical({ objectId: "room", author: "alice", authorSequence: index + 1, epoch }),
+		canonicalPreimageBytes: encodeCanonical({ ...header, objectId: "room", author: "alice", authorSequence: index + 1, epoch }),
 	}));
 	const before = encodeCanonical(issued);
 	const vertexDigest = "04".repeat(32);
@@ -4647,15 +4650,27 @@ function issuanceProtectedRecordsForSource(sourceEpoch: number): {
 		received: undefined,
 		currentContinuationAppends: [],
 		record: decodeCanonical,
+		// 974f78d0/3a28ab80: FUTURE (non-preclose) local work also protects the
+		// retained-fence reserve, but only for a successor journal append. This
+		// chronology fixture has none, so the reserve contributes no record.
+		preclose: sourceEpoch === 4,
+		successorJournalAppend: undefined,
+		input: {},
+		digest: vertexDigest,
+		CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE: 2,
 	});
 	const native = execute(`${declaration("closedIssuanceProtectedRecordsForRetirement")}\nconst ${nativeProtectedRecords.getText(parsed)}; protectedRecords;`, {
-		nativeIssuance: {rows: {
+		// 8f21d1fd/07252cc7: retirement reads the (possibly restored) issuanceRows
+		// and the exact retirement intent labels, not nativeIssuance.rows.
+		issuanceRows: {
 			issued: [
 				...issued,
 				{ ...unsigned, digest: new Uint8Array(32).fill(4), canonicalPreimageBytes: encodeCanonical(unsigned) },
 			],
 			outbox: [],
-		}},
+			plans: [],
+		},
+		labels: undefined, closeIssuanceRetirementProtectedRecords,
 		input: {objectId: "room"}, issuanceControl: null, census: {rows: []},
 		source: {journalDetails: {protectedReplayScopes: []}, journalPhysical: {canonicalRows: []}},
 		record: decodeCanonical,
@@ -6120,7 +6135,7 @@ describe("same-hold issuance census data and joined lifetime affected controls",
 		const s = seam(), capability = {}, registry = new WeakMap(), store = {}, journal = {}, events: string[] = [];
 		const trust = {objectId: "room", currentEpoch: 4, currentAnchorDigest: "anchor"};
 		const bytes = encodeCanonical({completeCensus: "sealed"});
-		const state = {live: true, checks: 0, captures: 0, releases: 0, acquisitions: 0,
+		const state = {live: true, checks: 0, captures: 0, releases: 0, acquisitions: 0, prepared: 0,
 			failCheck: 0, changed: false, capture: undefined as (() => Promise<void>) | undefined,
 			acquire: undefined as (() => Promise<void>) | undefined, release: undefined as (() => Promise<void>) | undefined};
 		const original: Reservation = {check: async () => {state.checks++; events.push("native-check"); if (state.checks === state.failCheck) throw Error("native-currentness-failed");},
@@ -6135,6 +6150,9 @@ describe("same-hold issuance census data and joined lifetime affected controls",
 		// native storage acceptance. Production live() is not replaced in source.
 		const owner = execute<{facts: {pending: Set<Promise<unknown>>; releasing: boolean}; lifetime: Lifetime; held(): Held | undefined}>(`
 			let issuanceRead: CreatorHeldIssuanceCensusRead | undefined;
+			// ea4eb158: check/ownIssuanceReservation also own the unchanged-held fast
+			// cell and the optional current-journal enrollment (closure state).
+			let unchangedHeldCensus, mayPrepareUnchanged = false, journalCurrent;
 			const census = ${s.variable(s.fn("sealCreatorRecoveryDependencies"), "census").split(" = ").slice(1).join(" = ")};
 			const facts = {kind: "full-census", context: registration, pending: new Set(), releasing: false, dependencyAnchors: [], exactCanonicalCensusBytes: sealed, ${s.check}, ${s.factory}};
 			recoveryCloseHolds.set(capability, facts);
@@ -6144,6 +6162,12 @@ describe("same-hold issuance census data and joined lifetime affected controls",
 			ObjectFreeze: Object.freeze, registration, currentTrust: trust, capability, recoveryCloseHolds: registry,
 			owners: {store, liveJournalStore: journal, currentTrust: trust}, sealed: bytes, live: () => state.live,
 			sameBytes: (a: Uint8Array, b: Uint8Array) => Buffer.compare(a, b) === 0,
+			// No source/branch/migration dependency: enrollment may prepare the fast
+			// cell after its first full held check. The controlled preparer declines
+			// (undefined), so every check stays the original full held walk.
+			sourceDependencies: undefined, activeSource: undefined, runtime: {nativeBranchSource: undefined, migrationSource: undefined},
+			replay: undefined, readJournalCurrent: undefined,
+			prepareCreatorUnchangedHeldCensusRead: (..._args: unknown[]) => {state.prepared++; return undefined;},
 			captureCensus: async (held?: Held) => {state.captures++; events.push(held === undefined ? "unheld-census" : "held-census");
 				if (held !== undefined) expect(held.store).toBe(issuanceStore); await state.capture?.(); return state.changed ? encodeCanonical({completeCensus: "changed"}) : bytes;},
 		});
@@ -6154,6 +6178,7 @@ describe("same-hold issuance census data and joined lifetime affected controls",
 		const acquiring = f.lifetime.acquireNativeIssuanceReservation(); await acquired.promise; expect(f.facts.pending.size).toBe(1); expect(f.held()).toBeUndefined();
 		resume.resolve(); const child = await acquiring; expect(child).not.toBe(f.original); expect(f.held()?.available()).toBe(true); expect(f.facts.pending.size).toBe(0);
 		await f.lifetime.check(); expect(f.events).toEqual(["native-check", "held-census", "native-check"]);
+		expect(f.state.prepared).toBe(1); // Only after the first complete held check.
 		f.state.changed = true; await expect(f.lifetime.check()).rejects.toThrow("stale or unclassified"); expect(f.state.checks).toBe(4);
 		f.state.changed = false; f.state.failCheck = 5; const before = f.state.captures;
 		await expect(f.lifetime.check()).rejects.toThrow("native-currentness-failed"); expect(f.state.captures).toBe(before);
@@ -8281,7 +8306,10 @@ describe("ordinary preimage and expanded-container capacity affected controls", 
 			width(bytes: number, shape?: {items: number; maxDepth: number}): object; array(count: number, child: object): object;
 			bytes(length: number): object; measure(value: unknown): number}>(`const ${symbol.getText(parsed)};\n${[
 			"maintenanceEncodedWidth", "maintenanceEncodedArrayCapacity", "maintenanceVarUintWidth", "maintenanceWidthSum", "maintenanceCanonicalWidth",
-			"maintenanceEncodedBytes", "readCreatorOrdinaryPreimageCapacityForSizing"].map(name => declaration(name).replace(/^export /, "")).join("\n")}\n
+			// ea4eb158: the reader delegates its field geometry to
+			// creatorOrdinaryPreimageResourceGeometryForSizing (its catch would
+			// otherwise turn the missing binding into a silent undefined).
+			"maintenanceEncodedBytes", "creatorOrdinaryPreimageResourceGeometryForSizing", "readCreatorOrdinaryPreimageCapacityForSizing"].map(name => declaration(name).replace(/^export /, "")).join("\n")}\n
 			({preimage: readCreatorOrdinaryPreimageCapacityForSizing, width: maintenanceEncodedWidth,
 			array: maintenanceEncodedArrayCapacity, bytes: maintenanceEncodedBytes, measure: maintenanceCanonicalWidth});`, {canonicalCreatorDataRecord, AHE_BOUNDED_READ_LIMITS});
 	}
