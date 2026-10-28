@@ -476,6 +476,14 @@ export async function driveActiveAppEndurance(
 				await wire?.pause();
 				peers = await input.reopen(peers);
 				wire?.resume();
+				// Decision B: a reopened Writer signs nothing until it is current. App mode: its own
+				// successor delivery asks the creator on bind and confirms the answer (the wire carries
+				// it). Harness mode passes offers by hand, so it also hands over the creator's statement.
+				if (!appMode) {
+					const verdict = await required(peers[1]).confirmCurrent?.(await required(peers[0]).currencyStatement?.());
+					if (verdict !== undefined && verdict !== "current" && verdict !== "unsupported")
+						throw new Error(`ENDURANCE_REOPEN_NOT_CURRENT:${verdict}`);
+				}
 				// A reopened creator's policy starts a new event list.
 				rolloverEventsSeen = 0;
 				assert.deepEqual(

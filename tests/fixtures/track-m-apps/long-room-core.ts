@@ -922,6 +922,11 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 			return performance.now() - started;
 		},
 		authorityEpoch: async () => room.authority()?.epoch ?? null,
+		currencyStatement: async () => room.currencyStatement?.() ?? null,
+		confirmCurrent: async (statement: unknown) =>
+			statement === null || room.confirmCurrent === undefined
+				? "unsupported"
+				: room.confirmCurrent(statement as Parameters<NonNullable<typeof room.confirmCurrent>>[0]),
 		lull: async () => {
 			const started = performance.now();
 			const result = await room.maintainRecoveryPool();

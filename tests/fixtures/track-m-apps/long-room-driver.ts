@@ -307,6 +307,14 @@ export interface RoleEndpoint {
 	/** Recipient: installs the offered successor (material through the environment relay). */
 	install(offer: WireOffer): Promise<number>;
 	authorityEpoch(): Promise<number | null>;
+	/**
+	 * Decision B (sync before sending): the creator's currency statement (its epoch, anchor and
+	 * admitted frontiers), or null where the room has none. A harness that passes offers by hand
+	 * also hands this statement to a reopened Writer, as the pages' successor delivery does.
+	 */
+	currencyStatement?(): Promise<unknown>;
+	/** Decision B: a reopened Writer confirms the creator's statement; returns the room's verdict. */
+	confirmCurrent?(statement: unknown): Promise<string>;
 	/** `maintainRecoveryPool()`: wall time and result kind. */
 	lull(): Promise<Readonly<{ ms: number; kind: string }>>;
 	census(): Promise<StoreCensus>;
