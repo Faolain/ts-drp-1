@@ -43,6 +43,11 @@ module creatorSuccessorLineageAdmission {
   var published: Set[(str, int, str)] // (author, sequence, issuing store)
   var reissued: bool                 // history: an admitted slot was issued again
   var everHeld: str -> Set[str]      // history: author -> every store that ever held its key
+  // Issuance-time layer (every local signature, not only reopen):
+  var known: str -> (str -> int)     // store -> the authenticated frontier its adopted generation carries
+  var backupLineage: str -> int      // a backup of the tabs database (lineage per author)
+  var backupKnown: str -> int        // ... and the frontier that backup knew
+  var currentReissue: bool           // history: an admitted slot re-signed by a store that KNEW the frontier
 
   pure def reopenOk(rule: Rule, l: str -> (str -> int), adm: str -> int, st: str, a: str): bool =
     if (rule == "frontier") l.get(st).get(a) > adm.get(a)
@@ -58,6 +63,7 @@ module creatorSuccessorLineageAdmission {
   val soleCustodianLive = soleCustodianLiveWith("frontier")
   val oldRuleLive = soleCustodianLiveWith("oldRule") // broken-control target only
   val inv = noAdmittedReissue and soleCustodianLive
+  val issuanceInv = soleCustodianLive  // plus noCurrentReissue (declared with the issuance layer)
 
   // One origin, two tabs: Alice (slot 0) and Bob (slot 1) share the "tabs"
   // database. The "copy" store starts empty and keyless.
@@ -68,6 +74,10 @@ module creatorSuccessorLineageAdmission {
     published' = Set(),
     reissued' = false,
     everHeld' = AUTHORS.mapBy(_ => Set("tabs")),
+    known' = STORES.mapBy(_ => AUTHORS.mapBy(_ => -1)),
+    backupLineage' = AUTHORS.mapBy(_ => 0),
+    backupKnown' = AUTHORS.mapBy(_ => -1),
+    currentReissue' = false,
   }
 
   action issueWith(rule: Rule, st: str, a: str): bool = all {
@@ -78,9 +88,10 @@ module creatorSuccessorLineageAdmission {
     all {
       published' = published.union(Set((a, sequence, st))),
       reissued' = (reissued or sequence <= admitted.get(a)),
+      currentReissue' = (currentReissue or sequence <= admitted.get(a)),
       lineage' = lineage.setBy(st, row => row.setBy(a, n => n + 1)),
     },
-    custody' = custody, admitted' = admitted, everHeld' = everHeld,
+    custody' = custody, admitted' = admitted, everHeld' = everHeld, known' = known, backupLineage' = backupLineage, backupKnown' = backupKnown,
   }
 
   // A close admits, per author, the highest published sequence.
@@ -88,6 +99,7 @@ module creatorSuccessorLineageAdmission {
     admitted' = AUTHORS.mapBy(a => published.fold(admitted.get(a), (m, v) =>
       if (v._1 == a and v._2 > m) v._2 else m)),
     lineage' = lineage, custody' = custody, published' = published, reissued' = reissued, everHeld' = everHeld,
+    known' = known, backupLineage' = backupLineage, backupKnown' = backupKnown, currentReissue' = currentReissue,
   }
 
   // The "copy" store becomes a stale copy of the tabs database (profile copy),
@@ -97,13 +109,93 @@ module creatorSuccessorLineageAdmission {
     custody' = custody.set("copy", custody.get("tabs")),
     admitted' = admitted, published' = published, reissued' = reissued,
     everHeld' = everHeld.keys().mapBy(a => if (custody.get("tabs").contains(a)) everHeld.get(a).union(Set("copy")) else everHeld.get(a)),
+    known' = known.set("copy", known.get("tabs")),
+    backupLineage' = backupLineage, backupKnown' = backupKnown, currentReissue' = currentReissue,
   }
   action freshSeed(a: str): bool = all {
     lineage' = lineage.set("copy", AUTHORS.mapBy(_ => 0)),
     custody' = custody.set("copy", Set(a)),
     admitted' = admitted, published' = published, reissued' = reissued,
     everHeld' = everHeld.setBy(a, held => held.union(Set("copy"))),
+    known' = known.set("copy", AUTHORS.mapBy(_ => -1)),
+    backupLineage' = backupLineage, backupKnown' = backupKnown, currentReissue' = currentReissue,
   }
+
+  // ---- Issuance-time layer ----
+  // Guard: "everyIssue" (shipped: v3-live issueOneVertex refuses seq <= known
+  // frontier for every local signature) or "reopenOnly" (before the guard: only
+  // cold reopen checked the frontier; the install's settlement fence did not).
+  pure def signOk(guard: str, kind: str, sequence: int, knownFrontier: int): bool =
+    if (guard == "everyIssue") sequence > knownFrontier
+    else if (kind == "fence") true
+    else sequence > knownFrontier
+
+  // One local signature by store st as author a, against what st knows.
+  action signWith(guard: str, kind: str, st: str, a: str): bool = all {
+    custody.get(st).contains(a),
+    lineage.get(st).get(a) < MAX_SEQUENCE,
+    val sequence = lineage.get(st).get(a)
+    all {
+      signOk(guard, kind, sequence, known.get(st).get(a)),
+      published' = published.union(Set((a, sequence, st))),
+      reissued' = (reissued or sequence <= admitted.get(a)),
+      currentReissue' = (currentReissue or (sequence <= admitted.get(a) and known.get(st).get(a) == admitted.get(a))),
+      lineage' = lineage.setBy(st, row => row.setBy(a, n => n + 1)),
+    },
+    custody' = custody, admitted' = admitted, everHeld' = everHeld, known' = known, backupLineage' = backupLineage, backupKnown' = backupKnown,
+  }
+  // Install of the current successor: the store learns the authenticated
+  // frontier, then the settlement issues one author fence for a.
+  action installWith(guard: str, st: str, a: str): bool = all {
+    custody.get(st).contains(a),
+    val learned = known.set(st, admitted)
+    val sequence = lineage.get(st).get(a)
+    if (sequence < MAX_SEQUENCE and signOk(guard, "fence", sequence, admitted.get(a))) all {
+      known' = learned,
+      published' = published.union(Set((a, sequence, st))),
+      reissued' = (reissued or sequence <= admitted.get(a)),
+      currentReissue' = (currentReissue or sequence <= admitted.get(a)),
+      lineage' = lineage.setBy(st, row => row.setBy(a, n => n + 1)),
+    } else all {
+      // Fail closed: the generation is adopted, the fence is refused before signing.
+      known' = learned, published' = published, reissued' = reissued, currentReissue' = currentReissue,
+      lineage' = lineage,
+    },
+    custody' = custody, admitted' = admitted, everHeld' = everHeld,
+    backupLineage' = backupLineage, backupKnown' = backupKnown,
+  }
+  action takeBackup: bool = all {
+    backupLineage' = lineage.get("tabs"), backupKnown' = known.get("tabs"),
+    lineage' = lineage, custody' = custody, admitted' = admitted, published' = published, reissued' = reissued,
+    everHeld' = everHeld, known' = known, currentReissue' = currentReissue,
+  }
+  // Another device restored from that backup (same keys, stale lineage and knowledge).
+  action restoreBackup: bool = all {
+    lineage' = lineage.set("copy", backupLineage), known' = known.set("copy", backupKnown),
+    custody' = custody.set("copy", custody.get("tabs")),
+    everHeld' = everHeld.keys().mapBy(a => if (custody.get("tabs").contains(a)) everHeld.get(a).union(Set("copy")) else everHeld.get(a)),
+    admitted' = admitted, published' = published, reissued' = reissued,
+    backupLineage' = backupLineage, backupKnown' = backupKnown, currentReissue' = currentReissue,
+  }
+  // Every issue source under one guard (the reopen rule stays "frontier").
+  action issuanceStepWith(guard: str): bool = any {
+    nondet st = STORES.oneOf()
+    nondet a = AUTHORS.oneOf()
+    nondet kind = Set("ordinary", "fence").oneOf()
+    signWith(guard, kind, st, a),
+    nondet st = STORES.oneOf()
+    nondet a = AUTHORS.oneOf()
+    installWith(guard, st, a),
+    issueWith("frontier", "tabs", "alice"),
+    close,
+    takeBackup,
+    restoreBackup,
+  }
+  action issuanceStep = issuanceStepWith("everyIssue")
+  action brokenReopenOnly = issuanceStepWith("reopenOnly")
+  // Never re-sign an admitted slot with the frontier known; the known gap (a
+  // device behind every later close) re-signs only at a closed, inadmissible epoch.
+  val noCurrentReissue = not(currentReissue)
 
   action stepWith(rule: Rule): bool = any {
     nondet st = STORES.oneOf()
@@ -146,4 +238,28 @@ module creatorSuccessorLineageAdmission {
       .then(issueWith("frontier", "tabs", "alice")).then(close)
       .expect(not(reopenOk("frontier", lineage, admitted, "copy", "alice")) and
         reopenOk("frontier", lineage, admitted, "copy", "bob") and inv)
+
+  // ---- Issuance layer scenarios (backup restore, D.108d1b extended) ----
+  // Device A (tabs) issues Bob 0, a close admits it; device B restored from the
+  // pre-issue backup installs: the guarded fence refuses, nothing is re-signed.
+  run testRestoreInstallGuardRefuses =
+    init.then(takeBackup).then(signWith("everyIssue", "ordinary", "tabs", "bob")).then(close)
+      .then(restoreBackup).then(installWith("everyIssue", "copy", "bob"))
+      .expect(not(reissued) and known.get("copy").get("bob") == 0 and lineage.get("copy").get("bob") == 0)
+  // ... and ordinary work on the installed device is refused too.
+  run testRestoreInstalledOrdinaryRefused =
+    init.then(takeBackup).then(signWith("everyIssue", "ordinary", "tabs", "bob")).then(close)
+      .then(restoreBackup).then(installWith("everyIssue", "copy", "bob"))
+      .then(signWith("everyIssue", "ordinary", "copy", "bob")).fail()
+  // Broken control (before the guard): the install's fence re-signs Bob 0.
+  run testRestoreInstallReopenOnlyReissues =
+    init.then(takeBackup).then(signWith("everyIssue", "ordinary", "tabs", "bob")).then(close)
+      .then(restoreBackup).then(installWith("reopenOnly", "copy", "bob"))
+      .expect(currentReissue)
+  // Known gap: before it learns any later close, the restored device re-signs at
+  // its stale epoch (reissued, but not with the frontier known).
+  run testRestoreBeforeInstallKnownGap =
+    init.then(takeBackup).then(signWith("everyIssue", "ordinary", "tabs", "bob")).then(close)
+      .then(restoreBackup).then(signWith("everyIssue", "ordinary", "copy", "bob"))
+      .expect(reissued and not(currentReissue))
 }
