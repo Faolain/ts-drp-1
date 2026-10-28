@@ -850,6 +850,19 @@ async function recoverWithDurableStores(
 	});
 	const issuanceStore = decorateIssuanceStore?.(nativeStorageOwners ? rawIssuanceStore : baseIssuanceStore) ?? (nativeStorageOwners ? rawIssuanceStore : baseIssuanceStore);
 	const baseJournal: DurableLiveJournalStore = Object.freeze<DurableLiveJournalStore>({
+		// Native retirement/membership ports (ea4eb158: creator close records its membership
+		// through them). The image reader is passed as the ORIGINAL frozen function, whose
+		// identity carries its owner port; the wrapper only observes rows read by readPage.
+		...(rawJournal.readRetirementImage === undefined ? {} : { readRetirementImage: rawJournal.readRetirementImage }),
+		...(rawJournal.readClosedMembership === undefined
+			? {}
+			: { readClosedMembership: (input) => rawJournal.readClosedMembership!(input) }),
+		...(rawJournal.recordClosedMembership === undefined
+			? {}
+			: { recordClosedMembership: (input) => rawJournal.recordClosedMembership!(input) }),
+		...(rawJournal.acquireRetirementControl === undefined
+			? {}
+			: { acquireRetirementControl: (input) => rawJournal.acquireRetirementControl!(input) }),
 		appendAccepted: (input) => rawJournal.appendAccepted(input),
 		close: () => rawJournal.close(),
 		installEpochAnchor: (input) => rawJournal.installEpochAnchor(input),
