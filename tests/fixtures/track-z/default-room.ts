@@ -316,6 +316,11 @@ export async function openTrackZRoom(options: LongRoomOptions, kind: TrackZHost)
 			await endpoints[1].close();
 			await endpoints[0].close();
 			endpoints = await open(host, true);
+			// Decision B: the reopened Writer signs nothing until it is current; this harness passes
+			// offers by hand, so it also hands over the creator's statement (as the page delivery does).
+			const verdict = await endpoints[1].confirmCurrent?.(await endpoints[0].currencyStatement?.());
+			if (verdict !== undefined && verdict !== "current" && verdict !== "unsupported")
+				throw new TypeError(`TRACK_Z_REOPEN_NOT_CURRENT ${verdict}`);
 		},
 		close: async () => {
 			if (closed) return [];
