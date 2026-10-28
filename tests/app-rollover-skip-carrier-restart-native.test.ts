@@ -19,9 +19,11 @@ import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-h
 // member was catching up answered "unavailable": that member never recorded the departed scope's
 // closed membership, so the scope's received rows stayed protected, and enough such scopes make the
 // member's journal retirement refuse (maxScopes = 7) and close its session. Here the creator restarts
-// before each of the Writer's skip installs reaches it; the Writer must still hold the closed
-// membership of every scope it departed from. The control does the same without restarts.
+// before each of the Writer's skip installs reaches it; no scope the Writer departed from may stay
+// protected without its closed membership. The control does the same without restarts.
 const ROUNDS = Number(process.env.SKIP_RESTART_ROUNDS ?? 3);
+// Creator rollovers per skip (the departed scope is this many epochs behind the install's target).
+const GAP = Number(process.env.SKIP_RESTART_GAP ?? 2);
 
 const track = {
 	rooms: new Set<{ close(): Promise<void> }>(),
@@ -176,7 +178,7 @@ async function skipFollow(restart: boolean) {
 				await wire.pause();
 				const before = (await writer.authorityEpoch()) ?? 0;
 				epoch = await rollCreator(peers.creator, rows.toWriter, ordinal);
-				epoch = await rollCreator(peers.creator, async () => undefined, ordinal);
+				for (let roll = 1; roll < GAP; roll++) epoch = await rollCreator(peers.creator, async () => undefined, ordinal);
 				if (restart) {
 					// The creator restarts before the Writer's skip install reaches it.
 					await peers.creator.close();
@@ -202,12 +204,13 @@ async function skipFollow(restart: boolean) {
 			);
 			expect(departed).toHaveLength(ROUNDS);
 			expect(await writer.authorityEpoch()).toBe(epoch);
-			// Every scope the Writer departed from by a skip install holds its closed membership (or is
-			// already retired), so its received rows are collectible. (Whether the scope is then
-			// retired also depends on the Writer's own unsettled rows, which this test does not judge.)
-			expect(
-				departed.filter((scope) => journal.scopes.includes(scope) && !journal.membership.includes(scope))
-			).toEqual([]);
+			// No scope the Writer departed from by a skip install stays protected for want of its closed
+			// membership: each is retired, or holds its membership (a retired scope's header may stay,
+			// its membership cleared). A scope that holds its membership can still be protected by the
+			// Writer's own unsettled rows; this test does not judge that.
+			const isProtected = (scope: number) =>
+				journal.protectedScopes.includes(scope) || journal.activeProtected.includes(scope);
+			expect(departed.filter((scope) => isProtected(scope) && !journal.membership.includes(scope))).toEqual([]);
 		} finally {
 			await wire.stop();
 		}
