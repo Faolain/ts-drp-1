@@ -175,6 +175,61 @@ export function creatorSuccessorDepartedCarrierOf(exported: CreatorSuccessorExpo
 		: Object.freeze({ scope: Object.freeze({ epoch: cut.epoch, anchorDigest: cut.previousAnchor }), carrier });
 }
 
+/**
+ * fix/skip-scope-carrier: one past close's departed-scope carrier, rebuilt from durable state when
+ * the creator's in-memory list misses it (a restarted creator). The Cut, its commit QC and the
+ * successor trust record come from a native generation the store still retains (the recovery
+ * census), Adopted or Superseded only: a close whose successor this creator adopted, never one it
+ * may still abandon. The closed membership comes from this creator's journal, read exactly as the
+ * successor export reads it. Undefined when that close is no longer retained or its membership is
+ * absent; a miss leaves the member's departed scope with today's retention.
+ * @param input - The room's native store and journal, and the departed scope.
+ * @returns The carrier, or undefined.
+ */
+export async function readCreatorSuccessorDepartedCarrier(input: Readonly<{
+	store: AheDurableStore;
+	journalStore?: DurableLiveJournalStore;
+	objectId: StorageObjectId;
+	pinnedGenesisAnchorDigest: string;
+	scope: CreatorSuccessorDepartedScope;
+}>): Promise<CreatorSuccessorDepartedCarrier | undefined> {
+	const journalStore = input.journalStore;
+	if (journalStore?.readClosedMembership === undefined) return undefined;
+	const close = await withCreatorRecoveryCensus(input.store, input.objectId, async (reader) => {
+		for (const generation of reader.generations) {
+			if (generation.state !== "Adopted" && generation.state !== "Superseded") continue;
+			const candidates = recoveryCensusClosure(reader, generation.closure);
+			if (candidates === undefined) continue;
+			const cut = uniqueCandidateByKind(candidates, "drp-hard-epoch-cut");
+			const qc = uniqueCandidateByKind(candidates, "drp-seal-qc");
+			const trust = uniqueCandidateByKind(candidates, "drp-anchor-trust-state");
+			if (cut === undefined || qc === undefined || trust === undefined) continue;
+			if (cut.record.epoch !== input.scope.epoch || cut.record.previousAnchor !== input.scope.anchorDigest ||
+				trust.record.genesisAnchorDigest !== input.pinnedGenesisAnchorDigest ||
+				trust.record.currentEpoch !== input.scope.epoch + 1) continue;
+			return Object.freeze({ cut, qc, trust });
+		}
+		return undefined;
+	});
+	const parameters = close?.cut.record.parameters as Readonly<{ maxEpochVertices?: unknown }> | undefined;
+	if (close === undefined || typeof parameters?.maxEpochVertices !== "number") return undefined;
+	const observed = await journalStore.readClosedMembership({
+		scope: { objectId: input.objectId, epoch: input.scope.epoch, anchorDigest: input.scope.anchorDigest },
+		maxBytes: CREATOR_CLOSE_MEMBERSHIP_MAX_BYTES,
+	});
+	if (!observed.ok || observed.kind === "missing") return undefined;
+	const membership = await rewriteCreatorCloseMembershipWitnesses({
+		bytes: observed.exactCanonicalMembershipBytes, exactCanonicalCutValueBytes: close.cut.bytes,
+		maxEpochVertices: parameters.maxEpochVertices, localVertexWitnesses: [],
+	});
+	return captureCreatorSuccessorDepartedCarrier({
+		exactCanonicalCutValueBytes: close.cut.bytes,
+		exactCanonicalCommitQcBytes: close.qc.bytes,
+		exactCanonicalTrustStateRecordBytes: close.trust.bytes,
+		exactCanonicalCloseMembershipBytes: membership,
+	});
+}
+
 const PROFILE = Object.freeze({
 	maxManifestBytes: 212_387,
 	maxSnapshotBytes: 268_435_456,

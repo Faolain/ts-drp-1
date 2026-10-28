@@ -295,10 +295,12 @@ export function createCreatorSuccessorMaterialServer(
 		 */
 		admitResponse?(peerId: string, signal: AbortSignal): Promise<void>;
 		/**
-		 * The carrier of a closed epoch this creator still holds (CREATOR_DEPARTED_CARRIERS_RETAINED),
-		 * for a member's skip install from that epoch; undefined when it holds none.
+		 * The carrier of a closed epoch this creator still holds (in memory, or rebuilt from its
+		 * retained durable state), for a member's skip install from that epoch; undefined when it
+		 * holds none. A rejection is answered as unavailable.
 		 */
-		departed?(scope: CreatorSuccessorDepartedScope): CreatorSuccessorDepartedCarrier | undefined;
+		departed?(scope: CreatorSuccessorDepartedScope):
+			CreatorSuccessorDepartedCarrier | undefined | Promise<CreatorSuccessorDepartedCarrier | undefined>;
 	}>
 ): Readonly<{
 	authorization: SnapshotPeerAuthorization;
@@ -776,7 +778,9 @@ async function serveDeparted(
 		await refuse(stream, request.nonce, refusal ?? "unauthorized", input.localPeerId);
 		return;
 	}
-	const carrier = captureCreatorSuccessorDepartedCarrier(input.departed?.(scope));
+	const carrier = captureCreatorSuccessorDepartedCarrier(
+		await Promise.resolve().then(() => input.departed?.(scope)).catch(() => undefined)
+	);
 	const response = {
 		...(carrier === undefined ? { kind: DEPARTED_UNAVAILABLE_KIND } : { kind: DEPARTED_RESPONSE_KIND, ...carrier }),
 		version: 1,

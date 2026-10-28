@@ -14,6 +14,7 @@ import {
 	createCreatorSuccessorMaterialServer,
 	CreatorSuccessorExportUnavailable,
 	creatorSuccessorDepartedCarrierOf,
+	readCreatorSuccessorDepartedCarrier,
 	type CreatorSuccessorDepartedCarrier,
 	creatorRecipientRetirementResumeRequested,
 	type CreatorRecipientRecoveryContext,
@@ -3710,23 +3711,60 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 	};
 	// fix/skip-scope-carrier: the departed-scope carriers of this creator's last closes, for a
-	// member's skip install from one of those epochs. In memory only: a restarted creator answers
-	// "unavailable" and that member's departed scope keeps today's retention.
+	// member's skip install from one of those epochs. The in-memory list is a cache: on a miss (a
+	// restarted creator, or a close older than the list) the carrier is rebuilt from the native
+	// generations the store still retains and this creator's journal, and cached.
 	const departedCarriers = new Map<string, Readonly<{ epoch: number; carrier: CreatorSuccessorDepartedCarrier }>>();
-	const departedCarrier = (scope: Readonly<{ epoch: number; anchorDigest: string }>): CreatorSuccessorDepartedCarrier | undefined => {
+	const holdDepartedCarrier = (scope: Readonly<{ epoch: number; anchorDigest: string }>,
+		carrier: CreatorSuccessorDepartedCarrier): void => {
+		const key = `${scope.epoch}:${scope.anchorDigest}`;
+		departedCarriers.delete(key);
+		departedCarriers.set(key, Object.freeze({ epoch: scope.epoch, carrier }));
+		for (const oldest of departedCarriers.keys()) {
+			if (departedCarriers.size <= CREATOR_DEPARTED_CARRIERS_RETAINED) break;
+			departedCarriers.delete(oldest);
+		}
+	};
+	const readDurableDepartedCarrier = async (
+		scope: Readonly<{ epoch: number; anchorDigest: string }>
+	): Promise<CreatorSuccessorDepartedCarrier | undefined> => {
+		const store = aheStores[0];
+		if (closed || terminalFailure !== undefined || store === undefined) return undefined;
+		const task = readCreatorSuccessorDepartedCarrier({ store, journalStore, objectId: objectIdResult.value,
+			pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest, scope });
+		// Same close ordering as the successor export: a room close waits for this native read.
+		if (input.openCreatorArchive !== undefined) {
+			creatorArchiveRecoveryTasks.add(task);
+			void task.then(() => creatorArchiveRecoveryTasks.delete(task), () => creatorArchiveRecoveryTasks.delete(task));
+		}
+		return task.catch(() => undefined);
+	};
+	const departedCarrier = async (
+		scope: Readonly<{ epoch: number; anchorDigest: string }>
+	): Promise<CreatorSuccessorDepartedCarrier | undefined> => {
 		const held = departedCarriers.get(`${scope.epoch}:${scope.anchorDigest}`);
 		// Only a close whose successor this creator adopted: never a carrier it may still abandon.
-		const served = held !== undefined && creatorDepartedCloseAdopted(held.epoch, {
+		const adopted = (): boolean => creatorDepartedCloseAdopted(scope.epoch, {
 			serving: !closed && terminalFailure === undefined && startupServingReady,
 			projectionEpoch: successorProjectionAuthority?.epoch ?? null,
 			adopting: creatorSuccessorAdoptionTask !== undefined,
-		}) ? held.carrier : undefined;
+		});
+		let served = held !== undefined && adopted() ? held.carrier : undefined;
+		let outcome = served !== undefined ? "served" : held === undefined ? "not-held" : "not-adopted";
+		// The rebuilt carrier passes the same adoption check (its native generation may already be
+		// Adopted while that successor's adoption tail still runs).
+		if (held === undefined && adopted()) {
+			served = await readDurableDepartedCarrier(scope);
+			if (served !== undefined) {
+				holdDepartedCarrier(scope, served);
+				outcome = "served-durable";
+			}
+		}
 		// Observation only (the "__warmProofEvent" proof hook); never alters the answer.
 		try {
 			const observer = Reflect.get(globalThis, "__warmProofEvent");
 			if (typeof observer === "function")
-				observer({ kind: "creator-departed-carrier", departedEpoch: scope.epoch,
-					outcome: served !== undefined ? "served" : held === undefined ? "not-held" : "not-adopted",
+				observer({ kind: "creator-departed-carrier", departedEpoch: scope.epoch, outcome,
 					ring: [...departedCarriers.values()].map((value) => value.epoch) });
 		} catch { /* Diagnostics never alter the original owner outcome. */ }
 		return served;
@@ -3742,15 +3780,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			throw new TypeError("creator successor transport is unavailable");
 		const exported = await readSuccessorExport();
 		const departed = creatorSuccessorDepartedCarrierOf(exported);
-		if (departed !== undefined) {
-			const key = `${departed.scope.epoch}:${departed.scope.anchorDigest}`;
-			departedCarriers.delete(key);
-			departedCarriers.set(key, Object.freeze({ epoch: departed.scope.epoch, carrier: departed.carrier }));
-			for (const oldest of departedCarriers.keys()) {
-				if (departedCarriers.size <= CREATOR_DEPARTED_CARRIERS_RETAINED) break;
-				departedCarriers.delete(oldest);
-			}
-		}
+		if (departed !== undefined) holdDepartedCarrier(departed.scope, departed.carrier);
 		const manifestDigest = exported.declaration.scope.manifestDigest;
 		const closedEpoch = exported.declaration.scope.epoch;
 		// The replaced serving's held responses end before its port joins their handlers (row 61).
