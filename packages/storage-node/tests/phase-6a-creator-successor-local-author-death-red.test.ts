@@ -659,6 +659,10 @@ function runSkipBudgetChild(): ReturnType<typeof runD108e2eSkipBudgetChild> {
 	return skipBudgetChildResult;
 }
 
+// Each case joins one fresh-process child (the contract allows it 300 s under load); the
+// default 10 s test timeout cannot hold even an unloaded child.
+const LOCAL_AUTHOR_CASE_TIMEOUT_MS = 320_000;
+
 describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 	it("pins the complete child inventory to the genuine built-package launcher", () => {
 		expect(D108D1B_CHILD_BEHAVIORS).toEqual([
@@ -789,10 +793,11 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 			},
 			result: { lifecycle: "active", ok: true, recovery: "active-new" },
 		});
+		// ea4eb158 appends the recovery's own detail to the refusal kind ("kind: detail").
 		for (const [control, detail] of [
-			[forgedFuture, "creator predecessor recovery failed: admission-rejected"],
-			[malformedFuture, "creator predecessor recovery failed: admission-rejected"],
-			[backingFailure, "creator predecessor recovery failed: issuance-rejected"],
+			[forgedFuture, "creator predecessor recovery failed: admission-rejected: v3 recovery vertex is not authenticated"],
+			[malformedFuture, "creator predecessor recovery failed: admission-rejected: v3 recovery vertex is not authenticated"],
+			[backingFailure, "creator predecessor recovery failed: issuance-rejected: v3 recovery outbox read failed"],
 		] as const) {
 			expect(control).toMatchObject({
 				effects: {
@@ -810,7 +815,11 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 				result: { lifecycle: "active", ok: true, recovery: "active-new" },
 			});
 		}
-		for (const control of [currentBackingFailure, currentMismatch]) {
+		for (const [control, detail] of [
+			[currentBackingFailure, "creator predecessor recovery failed: issuance-rejected: v3 recovery issued record read failed"],
+			// The current row's outbox/issued cross-check still refuses before any live effect.
+			[currentMismatch, "creator predecessor recovery failed: issuance-rejected: v3 recovery issued record does not match"],
+		] as const) {
 			expect(control).toMatchObject({
 				effects: {
 					adoptionSwapCount: 0,
@@ -823,7 +832,7 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 					transactIssueCount: 0,
 				},
 				result: {
-					detail: "creator predecessor recovery failed: issuance-rejected",
+					detail,
 					kind: "recovery-rejected",
 					ok: false,
 				},
@@ -975,7 +984,7 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 				expect.soft(signerIndex).toBeLessThan(events?.indexOf(lineage) ?? -1);
 			}
 		}
-	});
+	}, LOCAL_AUTHOR_CASE_TIMEOUT_MS);
 
 	it(
 		D108E4_CHILD_BEHAVIORS[0],
@@ -1060,7 +1069,7 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 						capturedIssuedCount: 8_190,
 						installEpochAnchorCount: 1,
 						result: {
-							detail: "creator successor recovery failed: issuance-rejected",
+							detail: "creator successor recovery failed: issuance-rejected: v3 recovery outbox read failed",
 							kind: "recovery-rejected",
 							ok: false,
 						},
@@ -1071,7 +1080,7 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 						capturedIssuedCount: 8_190,
 						installEpochAnchorCount: 1,
 						result: {
-							detail: "creator successor recovery failed: issuance-rejected",
+							detail: "creator successor recovery failed: issuance-rejected: v3 recovery outbox read failed",
 							kind: "recovery-rejected",
 							ok: false,
 						},
@@ -1081,7 +1090,7 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 				],
 			});
 		},
-		150_000
+		LOCAL_AUTHOR_CASE_TIMEOUT_MS
 	);
 
 	it(D108E2D_CHILD_BEHAVIORS[0], async () => {
@@ -1100,29 +1109,33 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 				| undefined
 		)?.predecessorWindows;
 		expect(windows).toHaveLength(2);
-		expect.soft(windows?.[0]).toEqual({
+		// ea4eb158 pages recovery 64 rows at a time (it was 1), so the exact page sequence is no
+		// longer the contract. The contract is the read budget: inside the predecessor pass each
+		// distinct current row (read by the recovery through the copied scope) and each
+		// authenticated-future row (read by the filtered facade through the captured scope) has
+		// exactly one issued-record read, and no native page returns a row twice.
+		expect.soft(windows?.[0]).toMatchObject({
 			attempt: 0,
 			complete: true,
 			issuedReads: [{ authorSequence: 0, scopeIdentity: "copied" }],
-			pages: [
-				{ afterSequence: null, returnedSequences: [0] },
-				{ afterSequence: 0, returnedSequences: [] },
-			],
 		});
-		expect.soft(windows?.[1]).toEqual({
-			attempt: 1,
-			complete: true,
-			issuedReads: [
+		expect.soft(windows?.[1]).toMatchObject({ attempt: 1, complete: true });
+		expect
+			.soft(
+				[...((windows?.[1]?.issuedReads ?? []) as readonly Readonly<{ authorSequence: number; scopeIdentity: string }>[])]
+					.sort((left, right) => left.authorSequence - right.authorSequence)
+			)
+			.toEqual([
 				{ authorSequence: 0, scopeIdentity: "copied" },
 				{ authorSequence: 1, scopeIdentity: "captured" },
-			],
-			pages: [
-				{ afterSequence: null, returnedSequences: [0] },
-				{ afterSequence: 0, returnedSequences: [1] },
-				{ afterSequence: 1, returnedSequences: [] },
-			],
-		});
-	});
+			]);
+		for (const window of windows ?? []) {
+			const pages = window.pages as readonly Readonly<{ returnedSequences: readonly number[] }>[];
+			const returned = pages.flatMap(({ returnedSequences }) => returnedSequences);
+			expect.soft(new Set(returned).size, `attempt ${String(window.attempt)} re-read a row`).toBe(returned.length);
+			expect.soft(pages.at(-1)?.returnedSequences, `attempt ${String(window.attempt)} terminal page`).toEqual([]);
+		}
+	}, LOCAL_AUTHOR_CASE_TIMEOUT_MS);
 
 	it(
 		D108E2E_CHILD_BEHAVIORS[0],
@@ -1145,6 +1158,8 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 			expect(proof?.maxEpochVertices).toBe(8_192);
 			expect(proof?.maxCanonicalPreimageBytes).toBeLessThan(1_024);
 			const publicKeys = [
+				// ea4eb158: the native issuance owner and its facade expose the read reservation.
+				"acquireNativeReadReservation",
 				"close",
 				"compareAndMarkOutboxPublished",
 				"readIssued",
@@ -1190,7 +1205,7 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 				  }>
 				| undefined;
 			expect(equality?.result).toEqual({
-				detail: "creator successor recovery failed: issuance-rejected",
+				detail: "creator successor recovery failed: issuance-rejected: v3 recovery outbox read failed",
 				kind: "recovery-rejected",
 				ok: false,
 			});
@@ -1202,7 +1217,14 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 				snapshotOpenCount: 1,
 				subscribeCount: 0,
 			});
-			expect(equality?.telemetry).toEqual({
+			// ea4eb158 pages 64 rows at a time, so the page count is no longer one per row. The
+			// budget is unchanged: each of the 8,192 authenticated future rows is read once, the
+			// current row once, and no row is returned twice in the predecessor pass. (64-row
+			// pages over 8,193 rows, plus terminal empty pages, stay within 2 + ceil(8193 / 64).)
+			const { pageCount: equalityPageCount, ...equalityTelemetry } = (equality?.telemetry ?? {}) as Readonly<
+				Record<string, unknown>
+			>;
+			expect(equalityTelemetry).toEqual({
 				capturedIssuedCount: 8_192,
 				capturedIssuedFirst: 1,
 				capturedIssuedLast: 8_192,
@@ -1211,12 +1233,12 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 				copiedIssuedSequences: [0],
 				firstReturnedSequence: 0,
 				lastReturnedSequence: 8_192,
-				pageCount: 8_194,
 				returnedSequenceCount: 8_193,
 				returnedSequencesStrictlyIncreasing: true,
 				successorPageFaultCount: 1,
 				terminalEmpty: true,
 			});
+			expect(equalityPageCount).toBeLessThanOrEqual(2 + Math.ceil(8_193 / 64));
 
 			const mismatch = proof?.mismatch as
 				| Readonly<{
@@ -1226,7 +1248,7 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 				  }>
 				| undefined;
 			expect(mismatch?.result).toEqual({
-				detail: "creator predecessor recovery failed: admission-rejected",
+				detail: "creator predecessor recovery failed: admission-rejected: v3 recovery vertex is not authenticated",
 				kind: "recovery-rejected",
 				ok: false,
 			});
@@ -1244,10 +1266,12 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 				capturedIssuedLast: 1,
 				capturedIssuedStrictlyIncreasing: true,
 				capturedIssuedSum: 1,
-				copiedIssuedSequences: [0, 1],
+				// The facade hands its consumer only the row whose issued record did not match
+				// (one 64-row page), so the recovery refuses at row 1 without reading row 0.
+				copiedIssuedSequences: [1],
 				firstReturnedSequence: 0,
 				lastReturnedSequence: 1,
-				pageCount: 2,
+				pageCount: 1,
 				returnedSequenceCount: 2,
 				returnedSequencesStrictlyIncreasing: true,
 				successorPageFaultCount: 0,
@@ -1262,7 +1286,11 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 						telemetry?: Readonly<Record<string, unknown>>;
 				  }>
 				| undefined;
-			expect(overBudget?.separatorJournalAppended).toBe(true);
+			// With 64-row pages the facade refuses the page that carries the 8,193rd future row
+			// and hands its consumer only that row, so the separator (row 8,193) is never journaled
+			// before the refusal. The budget is still cumulative across the separator: the captured
+			// telemetry below counts rows 1..8,192 and 8,194 (8,193 rows) and skips the separator.
+			expect(overBudget?.separatorJournalAppended).toBe(false);
 			expect(overBudget?.effects).toMatchObject({
 				adoptionSwapCount: 0,
 				aheRecoverCount: 1,
@@ -1281,7 +1309,7 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 				returnedSequencesStrictlyIncreasing: true,
 			});
 			expect(overBudget?.result).toEqual({
-				detail: "creator predecessor recovery failed: admission-rejected",
+				detail: "creator predecessor recovery failed: admission-rejected: v3 recovery vertex is not authenticated",
 				kind: "recovery-rejected",
 				ok: false,
 			});
@@ -1299,16 +1327,17 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 				capturedIssuedLast: 8_194,
 				capturedIssuedStrictlyIncreasing: true,
 				capturedIssuedSum: 33_566_722,
-				copiedIssuedSequences: [0, 8_193, 8_194],
+				// The facade hands its consumer only the first over-budget row (129 pages of 64).
+				copiedIssuedSequences: [8_194],
 				firstReturnedSequence: 0,
 				lastReturnedSequence: 8_194,
-				pageCount: 8_195,
+				pageCount: 129,
 				returnedSequenceCount: 8_195,
 				returnedSequencesStrictlyIncreasing: true,
 				successorPageFaultCount: 0,
 				terminalEmpty: false,
 			});
 		},
-		150_000
+		LOCAL_AUTHOR_CASE_TIMEOUT_MS
 	);
 });

@@ -380,7 +380,15 @@ function instrumentIssuanceStore(raw, effects, input) {
 			const predecessorWindow = effects.predecessorWindows.find(
 				(window) => window.attempt === effects.authorityAttempt && !window.complete
 			);
-			if (predecessorWindow !== undefined) {
+			// The predecessor pass reads issued records through exactly two scope objects: the
+			// filtered facade's captured scope and the recovery's own copied scope. A third scope
+			// object is another owner (the successor recovery's journal replay), so the
+			// predecessor window has ended.
+			if (predecessorWindow !== undefined && scope !== predecessorWindow.scope) {
+				predecessorWindow.consumerScope ??= scope;
+				if (scope !== predecessorWindow.consumerScope) predecessorWindow.complete = true;
+			}
+			if (predecessorWindow !== undefined && !predecessorWindow.complete) {
 				predecessorWindow.issuedReads.push({
 					authorSequence,
 					scopeIdentity: scope === predecessorWindow.scope ? "captured" : "copied",
@@ -449,13 +457,21 @@ function instrumentIssuanceStore(raw, effects, input) {
 				};
 				effects.predecessorWindows.push(predecessorWindow);
 			}
+			// ea4eb158 pages recovery 64 rows at a time, and the creator's filtered predecessor
+			// facade reads native pages ahead of its consumer, so the predecessor pass's first empty
+			// native page now precedes the consumer's issued-record reads. The window is the whole
+			// predecessor validation pass instead: it ends when another owner reads an issued
+			// record (above) or the next recovery scan restarts from the first page.
+			const afterSequence = Array.isArray(request?.afterKey) ? request.afterKey[2] : null;
+			if (!predecessorWindow.complete && afterSequence === null && predecessorWindow.pages.length > 0) {
+				predecessorWindow.complete = true;
+			}
 			const rows = await raw.readOutboxPage(...args);
 			if (!predecessorWindow.complete && request?.scope === predecessorWindow.scope) {
 				predecessorWindow.pages.push({
-					afterSequence: Array.isArray(request?.afterKey) ? request.afterKey[2] : null,
+					afterSequence,
 					returnedSequences: rows.map((row) => row.commit.authorSequence),
 				});
-				if (rows.length === 0) predecessorWindow.complete = true;
 			}
 			if (!effects.repeatPhase || input.repeatOutboxFault === undefined) return rows;
 			return rows.map((row) =>
@@ -692,6 +708,8 @@ function boundedRecoveryStore(raw, rows, expectedScope, mismatchCommit, initialD
 		capturedIssuedSum: 0,
 		capturedScope: undefined,
 		copiedIssuedSequences: [],
+		copiedScope: undefined,
+		predecessorClosed: false,
 		firstReturnedSequence: null,
 		lastReturnedSequence: null,
 		pageCount: 0,
@@ -746,7 +764,18 @@ function boundedRecoveryStore(raw, rows, expectedScope, mismatchCommit, initialD
 			measureFacade("compareAndMarkOutboxPublished", () => raw.compareAndMarkOutboxPublished(...args)),
 		readIssued: (scope, authorSequence) =>
 			measureFacade("readIssued", () => {
-				const predecessorOpen = !telemetry.terminalEmpty;
+				// ea4eb158 pages recovery 64 rows at a time and the filtered predecessor facade
+				// reads native pages ahead of its consumer, so the first empty page no longer ends
+				// the predecessor pass. It ends at the successor-stage page fault, or when a third
+				// scope object (another owner, e.g. the successor's journal replay) reads.
+				if (
+					telemetry.capturedScope !== undefined &&
+					scope !== telemetry.capturedScope &&
+					(telemetry.copiedScope ??= scope) !== scope
+				) {
+					telemetry.predecessorClosed = true;
+				}
+				const predecessorOpen = !telemetry.predecessorClosed && telemetry.successorPageFaultCount === 0;
 				if (predecessorOpen && scope === telemetry.capturedScope) {
 					telemetry.capturedIssuedCount += 1;
 					telemetry.capturedIssuedFirst ??= authorSequence;
@@ -788,9 +817,9 @@ function boundedRecoveryStore(raw, rows, expectedScope, mismatchCommit, initialD
 					telemetry.successorPageFaultCount += 1;
 					return Promise.reject(new TypeError("D.108e2e successor-stage issuance sentinel"));
 				}
-				if (scope === telemetry.capturedScope && !telemetry.terminalEmpty) {
+				if (scope === telemetry.capturedScope && !telemetry.predecessorClosed) {
 					telemetry.pageCount += 1;
-					if (selected.length === 0) telemetry.terminalEmpty = true;
+					telemetry.terminalEmpty = selected.length === 0;
 					for (const row of selected) {
 						const sequence = row.commit.authorSequence;
 						telemetry.firstReturnedSequence ??= sequence;
