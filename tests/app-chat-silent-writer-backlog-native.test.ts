@@ -26,8 +26,10 @@ import { createShippingChatWindowGenesisStateBytes } from "../examples/chat/src/
 //           every given-back move offered again: live moves stay within the bound and the plan and
 //           outbox stop growing.
 // unsettled (RUN_SILENT_BACKLOG_UNSETTLED=1 alone) a few moves in one silent epoch, all given back by
-//           the window: once none is live, settlementStatus().unsettledEpochs is 0 even while the
-//           expired rows are still held (a resolved source is no longer waiting to settle).
+//           the window: with none live, settlementStatus().unsettledEpochs still reports the Writer
+//           as not reaching the host. Its displaced fences (one per install, resolved "expire" at
+//           once) are the only evidence of that once every move is given back; without it the
+//           rollover policy would offer its kept moves again every few epochs while it is silent.
 const RUN = process.env.RUN_SILENT_BACKLOG === "1";
 const STEADY = RUN && process.env.RUN_SILENT_BACKLOG_STEADY === "1";
 const UNSETTLED = process.env.RUN_SILENT_BACKLOG_UNSETTLED === "1";
@@ -252,7 +254,7 @@ it.skipIf(!STEADY)(
 );
 
 it.skipIf(!UNSETTLED)(
-	"a silent Chat Writer whose moves are all given back reports no unsettled epochs",
+	"a silent Chat Writer whose moves are all given back still reports that it is not reaching the host",
 	async () => {
 		const directory = mkdtempSync(join(tmpdir(), "app-chat-silent-backlog-unsettled-"));
 		directories.push(directory);
@@ -277,10 +279,9 @@ it.skipIf(!UNSETTLED)(
 			// Every move was given back by the window (none lost, none live).
 			const resolved = trace.filter((sample) => sample.live === 0 && sample.given === moves.length);
 			expect(resolved.length).toBeGreaterThan(0);
-			// With nothing live, nothing waits to settle: the held expired rows are resolved.
-			expect(resolved.map((sample) => [sample.epoch, sample.unsettled])).toEqual(
-				resolved.map((sample) => [sample.epoch, 0])
-			);
+			// Nothing live, yet still silent: the policy's not-reaching-host threshold (window - margin 2)
+			// holds on every such sample, so it keeps the given-back moves instead of offering them again.
+			for (const sample of resolved) expect([sample.epoch, sample.unsettled >= 2]).toEqual([sample.epoch, true]);
 		} finally {
 			expect(await closeChatSharesRooms()).toEqual([]);
 		}

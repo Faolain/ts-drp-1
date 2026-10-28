@@ -16630,6 +16630,7 @@ async function settledLocalSourceFacts(
 		// move and has no settlement entry: once the creator's frontier has passed it (terminal) or
 		// closed its epoch without it (expired), nothing replays or replaces it. Otherwise its journal
 		// scope 0 is never collectible, so it and every later own row stay retirement holes.
+		// Only "terminal" (or expired): an old-incarnation bootstrap still needs its own settlement entry.
 		const settledBootstrap = (expired || terminal === "terminal") && pinnedBytes !== undefined &&
 			selected.authenticated.admitted.epoch === 0 &&
 			authenticatedPinnedGenesisOutboxRow(row, scope, registration.payload, registration.payload.trust.trust.genesisAnchorDigest,
