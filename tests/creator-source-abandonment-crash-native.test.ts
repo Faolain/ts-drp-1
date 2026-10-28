@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type -- Native probe inference. */
 import { decodeCanonical } from "@ts-drp/canonical";
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync, StatementSync } from "node:sqlite";
@@ -70,7 +70,7 @@ it.runIf(INNER)("abandonment survives process death at its real committed bounda
 	const prepare = DatabaseSync.prototype.prepare, run = StatementSync.prototype.run, exec = DatabaseSync.prototype.exec;
 	const statements = new WeakMap<StatementSync, { database: DatabaseSync; sql: string }>();
 	const written = new WeakSet<DatabaseSync>();
-	const armed = { value: false, sequence: -1, author: "" };
+	const armed = { value: false, sequence: -1, author: "", issuance: "" };
 	if (mode === "mutate") {
 		DatabaseSync.prototype.prepare = function (sql: string) {
 			const statement = prepare.call(this, sql);
@@ -89,10 +89,13 @@ it.runIf(INNER)("abandonment survives process death at its real committed bounda
 					const control = decodeCanonical(args[0]) as { kind?: string;
 						active: { preparation: { protectedRecords: { author: string; authorSequence: number }[] } } | null };
 					// The member's original owner's preparation that no longer protects the abandoned source
-					// (the creator's own issuance owner prepares independently and is ignored).
+					// (the creator's own issuance owner prepares independently and is ignored). The owner is
+					// named by its file: once the removed author's retained FENCE is released it holds no
+					// hole for that author at all, so "still holds one of its holes" cannot name it.
 					const holes = control.active?.preparation.protectedRecords ?? [];
+					const location = (source.database as DatabaseSync & { location(): string | null }).location(); // Node >= 22.16; not in @types/node 22.14.
 					if (control.kind === "v3-issuance-retirement-control-1" && control.active !== null &&
-						holes.some(hole => hole.author === armed.author) &&
+						location !== null && realpathSync(location) === armed.issuance &&
 						!holes.some(hole => hole.author === armed.author && hole.authorSequence === armed.sequence)) written.add(source.database);
 				}
 			}
@@ -122,7 +125,7 @@ it.runIf(INNER)("abandonment survives process death at its real committed bounda
 			await creator.room.adoptCreatorSuccessor();
 			await f.install(member);
 			const unresolved = required((await member.room.unresolvedAcceptedWork())[0]);
-			armed.sequence = unresolved.sourceSequence; armed.author = author;
+			armed.sequence = unresolved.sourceSequence; armed.author = author; armed.issuance = realpathSync(issuanceFile(directory));
 			writeFileSync(setupFile, JSON.stringify({ selectors: f.localSelectors, unresolved }));
 			const selector = { sourceSequence: unresolved.sourceSequence, sourceDigest: unresolved.sourceDigest,
 				sourceContextDigest: unresolved.sourceContextDigest };
