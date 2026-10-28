@@ -2384,7 +2384,18 @@ export async function runCrossObjectActivationScenario(
 				commitFor(
 					source,
 					authorSequence,
-					Object.freeze({ action: "migrationActivation", decision: Object.freeze({ version: 1 }) }),
+					// The activation names its exact target (object, genesis anchor, blueprint);
+					// recovery refuses an activation for any other target.
+					Object.freeze({
+						action: "migrationActivation",
+						decision: Object.freeze({
+							targetAnchorDigest: target.anchorDigest,
+							targetBlueprintDigest: (decodeCanonical(target.exactCanonicalAnchorPreimageBytes) as { blueprintDigest: string })
+								.blueprintDigest,
+							targetObjectId,
+							version: 1,
+						}),
+					}),
 					7,
 					[lowerHex(sourceBootstrap.envelope.digest)]
 				)
