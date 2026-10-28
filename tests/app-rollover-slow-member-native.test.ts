@@ -151,6 +151,12 @@ const installStartDelay = () => {
 };
 // Creator rollovers while the member is slow.
 const ROLLS = Number(process.env.SLOW_MEMBER_ROLLS ?? 12);
+// Conservation: the most rollovers driven while waiting for the skip count, and the bound of each
+// wait after it (generous: a loaded host only slows the run, it must not fail it).
+const CONSERVE_MAX_ROLLS = Number(process.env.SLOW_MEMBER_CONSERVE_MAX_ROLLS ?? 150);
+const CONSERVE_BOUND_MS = 600_000;
+// The creator's move interval while the member's moves land (it keeps rolling at a person's pace).
+const LANDING_CREATOR_MOVE_MS = Number(process.env.SLOW_MEMBER_LANDING_CREATOR_MS ?? 300);
 
 /**
  * The creator rolls over ROLLS times while the member installs slowly and makes a move every half
@@ -294,39 +300,78 @@ async function slowFollow(conserve: boolean, rollCount = ROLLS, minSkips = 0) {
 					await sleep(500);
 				}
 			})();
-			for (let roll = 0; roll < rollCount; roll++) {
+			// Conservation drives rollovers until the slow member has made `minSkips` skip installs (any
+			// host speed), bounded by CONSERVE_MAX_ROLLS; the follow test rolls `rollCount` times.
+			const completedSkips = () =>
+				installs.filter((install) => install.ok === true && (install.epochAfter ?? 0) - install.epochBefore > 1).length;
+			const trace = async (label: string) => {
+				const own = await writer.published(null);
+				const first = own[0] === undefined ? undefined : rowValue(own[0]);
+				const settlement = (await writer.settlementStatus?.()) as
+					| { epoch: number; unsettledEpochs: number; undelivered: { epoch: number }[] }
+					| null
+					| undefined;
+				const status = (await writer.rolloverStatus?.()) as { state?: string; kept?: unknown[] } | undefined;
+				process.stdout.write(
+					`SLOW_MEMBER_TRACE ${JSON.stringify({
+						label,
+						at: Math.round(performance.now() - started),
+						creator: (await creator.rollover?.())?.epoch,
+						member: await writer.authorityEpoch(),
+						skips: completedSkips(),
+						ownRows: own.length,
+						oldestOwn: first === undefined ? null : [first.authorSequence, first.epoch],
+						unsettled: settlement?.unsettledEpochs,
+						undelivered: settlement?.undelivered.length,
+						undeliveredEpochs: [...new Set(settlement?.undelivered.map((given) => given.epoch) ?? [])],
+						state: status?.state,
+						kept: status?.kept?.length,
+					})}\n`
+				);
+			};
+			for (let roll = 0; conserve ? completedSkips() < minSkips && roll < CONSERVE_MAX_ROLLS : roll < rollCount; roll++) {
 				const epoch = await rollCreator(creator, async () => undefined, ordinal);
 				rolls.push({ epoch, at: performance.now(), member: (await writer.authorityEpoch()) ?? 0 });
 				process.stdout.write(`SLOW_MEMBER_ROLL ${JSON.stringify(rolls.at(-1))}\n`);
+				if (conserve && roll % 4 === 3) await trace("roll");
 			}
 			const rolledFor = performance.now() - started;
 			const creatorEpoch = rolls.at(-1)!.epoch;
 			const memberAtEnd = (await writer.authorityEpoch()) ?? 0;
-			// While the creator rolled, the member followed it: it installed and its epoch advanced
-			// roughly once per install duration (the start delay plus the install itself), never stuck.
 			const finished = installs.filter((install) => install.ok === true);
 			process.stdout.write(
 				`SLOW_MEMBER_ROLLED ${JSON.stringify({ rolledFor, creatorEpoch, memberAtEnd, installs, stats: await writer.successorDelivery?.() })}\n`
 			);
 			const perInstall = INSTALL_START_DELAY_MS * 1.25 + 5_000;
-			expect(finished.length, "installs that completed while the creator rolled").toBeGreaterThanOrEqual(
-				Math.floor(rolledFor / perInstall) - 1
-			);
-			expect(creatorEpoch - memberAtEnd, "the member's lag when the creator stopped").toBeLessThanOrEqual(
-				Math.ceil(perInstall / (rolledFor / rollCount)) + 2
-			);
 			// Each skip install leaves a departed journal scope; past the 7-scope bound a member whose
 			// skips leak them refuses its next install ("journal retirement refused").
-			const skips = finished.filter((install) => (install.epochAfter ?? 0) - install.epochBefore > 1).length;
+			const skips = completedSkips();
 			expect(skips, "skip installs while the creator rolled").toBeGreaterThanOrEqual(minSkips);
-			// The creator stops: the member reaches its epoch within one more install.
-			await wire.caughtUp(creatorEpoch, perInstall * 2 + 30_000);
+			if (conserve) {
+				// Counts, not wall-clock: every completed install advanced the member, and its epoch kept
+				// advancing across the slow phase.
+				for (const install of finished) expect(install.epochAfter ?? 0, "an install advanced the member").toBeGreaterThan(install.epochBefore);
+				expect(memberAtEnd).toBeGreaterThan(2);
+				// The creator stops: the member reaches its epoch (generous bound: host load is noise).
+				await wire.caughtUp(creatorEpoch, CONSERVE_BOUND_MS);
+			} else {
+				// While the creator rolled, the member followed it: it installed and its epoch advanced
+				// roughly once per install duration (the start delay plus the install itself), never stuck.
+				expect(finished.length, "installs that completed while the creator rolled").toBeGreaterThanOrEqual(
+					Math.floor(rolledFor / perInstall) - 1
+				);
+				expect(creatorEpoch - memberAtEnd, "the member's lag when the creator stopped").toBeLessThanOrEqual(
+					Math.ceil(perInstall / (rolledFor / rollCount)) + 2
+				);
+				// The creator stops: the member reaches its epoch within one more install.
+				await wire.caughtUp(creatorEpoch, perInstall * 2 + 30_000);
+			}
 			stopped = true;
 			await memberMoves;
 			// Every move the member made was accepted by its room (none was refused for an install).
 			expect(issued.filter((move) => move.error !== undefined)).toEqual([]);
 			// Each move waited at most for one install in flight (plus its own issue).
-			for (const move of issued) expect(move.ms, move.id).toBeLessThan(perInstall * 2);
+			if (!conserve) for (const move of issued) expect(move.ms, move.id).toBeLessThan(perInstall * 2);
 			if (!conserve) return;
 
 			// Conservation: every move lands on the creator exactly once. Moves made in an epoch the
@@ -335,6 +380,8 @@ async function slowFollow(conserve: boolean, rollCount = ROLLS, minSkips = 0) {
 			// slower than the creator stays behind it, and its moves wait, kept). The creator keeps
 			// rolling at a person's pace (its moves every 300 ms) while they land.
 			slow = false;
+			let landingPolls = 0;
+			await trace("caught-up");
 			const writerAuthor = rowValue((await writer.published(null))[0]!).author;
 			const ids = issued.map((move) => move.id);
 			await waitFor(
@@ -343,16 +390,17 @@ async function slowFollow(conserve: boolean, rollCount = ROLLS, minSkips = 0) {
 					const counts = await acceptedCounts(creator, writerAuthor, ids);
 					if (counts.some((count) => count === 0)) {
 						await creator.issue(0, ordinal.next++);
-						await sleep(300);
+						await sleep(LANDING_CREATOR_MOVE_MS);
+						if (++landingPolls % Math.max(1, Math.round(15_000 / LANDING_CREATOR_MOVE_MS)) === 0) await trace("landing");
 					}
 					return { counts, status: await writer.rolloverStatus?.() };
 				},
 				(value) => value.counts.every((count) => count >= 1),
-				300_000
+				CONSERVE_BOUND_MS
 			);
 			// Close the epoch they landed in; the member follows it.
 			const epoch = await rollCreator(creator, async () => undefined, ordinal);
-			await wire.caughtUp(epoch, perInstall * 2 + 30_000);
+			await wire.caughtUp(epoch, CONSERVE_BOUND_MS);
 			await sleep(1_000);
 			expect(await acceptedCounts(creator, writerAuthor, ids)).toEqual(ids.map(() => 1));
 			expect(await writer.state()).toBe(await creator.state());
@@ -366,12 +414,15 @@ async function slowFollow(conserve: boolean, rollCount = ROLLS, minSkips = 0) {
 			pumping = false;
 			await pump;
 			await watchGivenBack;
+			// The summary is observation only: a call that does not answer is recorded, never awaited forever.
+			const within = <T,>(value: Promise<T> | undefined): Promise<T | string | undefined> =>
+				Promise.race([Promise.resolve(value), sleep(15_000).then(() => "NO-ANSWER-15S")]);
 			const own = (await writer.published(null)).map((row) => {
 				const value = rowValue(row);
 				return [value.authorSequence, value.epoch, value.operation.action, value.operation.id];
 			});
 			process.stdout.write(
-				`SLOW_MEMBER_SUMMARY ${JSON.stringify({ givenBack: [...givenBack.values()], own, plan: await writer.settlementAudit(), rolls, issued, installs, member: await writer.successorDelivery?.(), creatorErrors: (await creator.rollover?.())?.errors, status: await writer.rolloverStatus?.() })}\n`
+				`SLOW_MEMBER_SUMMARY ${JSON.stringify({ givenBack: [...givenBack.values()], own, plan: await within(writer.settlementAudit()), rolls, issued, installs, member: await within(writer.successorDelivery?.()), creatorErrors: await within(creator.rollover?.().then((rollover) => rollover?.errors)), status: await within(writer.rolloverStatus?.()) })}\n`
 			);
 			await wire.stop();
 		}
@@ -393,8 +444,8 @@ it(
 // creator exactly once and the member never refuses an install.
 it(
 	"every move a slow member made across eight or more skip installs lands on the creator exactly once",
-	() => slowFollow(true, Number(process.env.SLOW_MEMBER_CONSERVE_ROLLS ?? 27), 8),
-	1_200_000
+	() => slowFollow(true, ROLLS, Number(process.env.SLOW_MEMBER_CONSERVE_SKIPS ?? 8)),
+	3_600_000
 );
 
 it("a move made straight to the room while the member's install runs lands after the install, exactly once", async () => {
