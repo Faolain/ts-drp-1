@@ -25,8 +25,12 @@ import { createShippingChatWindowGenesisStateBytes } from "../examples/chat/src/
 //   steady  (RUN_SILENT_BACKLOG_STEADY=1) one message per epoch for STEADY_EPOCHS silent epochs,
 //           every given-back move offered again: live moves stay within the bound and the plan and
 //           outbox stop growing.
+// unsettled (RUN_SILENT_BACKLOG_UNSETTLED=1 alone) a few moves in one silent epoch, all given back by
+//           the window: once none is live, settlementStatus().unsettledEpochs is 0 even while the
+//           expired rows are still held (a resolved source is no longer waiting to settle).
 const RUN = process.env.RUN_SILENT_BACKLOG === "1";
 const STEADY = RUN && process.env.RUN_SILENT_BACKLOG_STEADY === "1";
+const UNSETTLED = process.env.RUN_SILENT_BACKLOG_UNSETTLED === "1";
 const BOUND = 64;
 const BURST = 65;
 // Past the window (4) and far enough that a move kept live by the record bound would outgrow the
@@ -245,4 +249,41 @@ it.skipIf(!STEADY)(
 		}
 	},
 	86_400_000
+);
+
+it.skipIf(!UNSETTLED)(
+	"a silent Chat Writer whose moves are all given back reports no unsettled epochs",
+	async () => {
+		const directory = mkdtempSync(join(tmpdir(), "app-chat-silent-backlog-unsettled-"));
+		directories.push(directory);
+		try {
+			const { member, census, epoch } = await openRoom(directory);
+			const moves = Array.from({ length: 4 }, (_, index) => `few-${index}`);
+			for (const id of moves) await member.room.issue(message(id));
+			const trace: { epoch: number; live: number; given: number; outboxRows: number; unsettled: number }[] = [];
+			for (let seal = 0; seal < 8; seal++) {
+				await epoch();
+				const now = await census(member);
+				const unsettled = required(member.room.settlementStatus?.()).unsettledEpochs;
+				trace.push({
+					epoch: now.epoch,
+					live: now.live.size,
+					given: now.given.size,
+					outboxRows: now.outboxRows,
+					unsettled,
+				});
+				process.stdout.write(`SILENT_BACKLOG_UNSETTLED ${JSON.stringify(trace.at(-1))}\n`);
+			}
+			// Every move was given back by the window (none lost, none live).
+			const resolved = trace.filter((sample) => sample.live === 0 && sample.given === moves.length);
+			expect(resolved.length).toBeGreaterThan(0);
+			// With nothing live, nothing waits to settle: the held expired rows are resolved.
+			expect(resolved.map((sample) => [sample.epoch, sample.unsettled])).toEqual(
+				resolved.map((sample) => [sample.epoch, 0])
+			);
+		} finally {
+			expect(await closeChatSharesRooms()).toEqual([]);
+		}
+	},
+	14_400_000
 );
