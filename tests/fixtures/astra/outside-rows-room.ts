@@ -6,6 +6,7 @@ import { expect } from "vitest";
 import { hex, required } from "../track-m/room-retention-fixture.js";
 import { settlementDelivery, type SettlementRoom } from "./settlement-room.js";
 import { readinessHoldRoom, type ReadinessHoldPeer, type ReadinessHoldRoom } from "./readiness-hold-room.js";
+import { creatorCurrency } from "../creator-currency.js";
 
 // Track X, decision row 60 (R5, R5b, R5-chain, R6): the creator and one or more Writers on the node
 // SQLite host (Grid zone application, creator-trusted-settlement-v1), with manual delivery of
@@ -151,7 +152,7 @@ export async function install(room: OutsideRowsRoom, writer: number): Promise<st
 	const transfer = await settlementDelivery(room.fixture as unknown as SettlementRoom, writer);
 	const peer = required(room.peers[writer]);
 	Reflect.set(peer.networkNode, "createSnapshotChunkProtocolHost", () => transfer.port);
-	return peer.room.installCreatorSuccessor({ offer: transfer.offer, peers: transfer.peers }).then(
+	return peer.room.installCreatorSuccessor({ offer: transfer.offer, peers: transfer.peers, ...creatorCurrency(required(room.peers[0]).room) }).then(
 		() => "ok",
 		(error: unknown) => `failed: ${error instanceof Error ? error.message : String(error)}`
 	);

@@ -28,6 +28,7 @@ import { createNodeRoomHeadAuthority } from "../../../packages/storage-node/src/
 import { fakeNetwork } from "../phase-4b-v3/live-snapshot.js";
 import { ScriptedSnapshotChunkPort } from "../phase-4c-v3/snapshot-pull-transport.js";
 import { directories, heads, hex, ports, required, roomHost, rooms } from "../track-m/room-retention-fixture.js";
+import { creatorCurrency } from "../creator-currency.js";
 
 // Track M: Track N's long-room settlement room (tests/recipient-long-room-issuance-retention-
 // native.test.ts: Grid zone application, the settlement-v1 creator profile, the creator and
@@ -361,5 +362,5 @@ export async function settlementTransition(
 	await creator.room.adoptCreatorSuccessor();
 	const transfer = await settlementDelivery(fixture);
 	Reflect.set(recipient.networkNode, "createSnapshotChunkProtocolHost", () => transfer.port);
-	await recipient.room.installCreatorSuccessor({ offer: transfer.offer, peers: transfer.peers });
+	await recipient.room.installCreatorSuccessor({ offer: transfer.offer, peers: transfer.peers, ...creatorCurrency(creator.room) });
 }

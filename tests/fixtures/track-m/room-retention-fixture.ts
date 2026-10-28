@@ -25,6 +25,7 @@ import { parseStorageObjectId } from "../../../packages/storage/src/index.js";
 import { createNodeRoomHeadAuthority } from "../../../packages/storage-node/src/room-head.js";
 import { fakeNetwork } from "../phase-4b-v3/live-snapshot.js";
 import { ScriptedSnapshotChunkPort } from "../phase-4c-v3/snapshot-pull-transport.js";
+import { creatorCurrency } from "../creator-currency.js";
 
 // Track M (slice 14b): the R3 room-database lull fixture (tests/room-database-retirement-
 // native.test.ts), shared by the Track M tests. One creator and one receive-only recipient
@@ -364,7 +365,7 @@ export async function transition(fixture: LullFixture, creator: OpenedRoom, reci
 	await creator.room.adoptCreatorSuccessor();
 	const transfer = await delivery(fixture, creator);
 	Reflect.set(recipient.networkNode, "createSnapshotChunkProtocolHost", () => transfer.port);
-	await recipient.room.installCreatorSuccessor({ offer: transfer.offer, peers: transfer.peers });
+	await recipient.room.installCreatorSuccessor({ offer: transfer.offer, peers: transfer.peers, ...creatorCurrency(creator.room) });
 	expect(recipient.room.authority()).toMatchObject({ epoch: epoch + 1, objectId: fixture.objectId });
 }
 

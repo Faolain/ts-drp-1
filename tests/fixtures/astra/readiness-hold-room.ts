@@ -136,6 +136,7 @@ export async function readinessHoldRoom(
 		signGenesisAnchorDigest: (digest) => Promise.resolve(ed25519.sign(digest, creator.seed)),
 	});
 	const storageHost = createNodeV3RoomStorageHost({ directory, initialization: () => "create" });
+	let creatorRoom: Awaited<ReturnType<typeof createV3RoomSession>> | undefined;
 	const open = async (
 		index: number,
 		openOptions: Readonly<{
@@ -278,6 +279,13 @@ export async function readinessHoldRoom(
 		rooms.add(room);
 		resolveSession(room);
 		await waitForV3RoomStartupForDiagnostics(room);
+		if (index === 0) creatorRoom = room;
+		// Decision B (sync before sending): a reopened Writer signs nothing until it is current. The
+		// pages' successor delivery hands it the creator's statement on bind; this fixture does it.
+		else if (openOptions.reopen === true && creatorRoom !== undefined && rooms.has(creatorRoom)) {
+			const statement = creatorRoom.currencyStatement?.();
+			if (statement !== undefined) await room.confirmCurrent?.(statement);
+		}
 		/**
 		 * Delivers signed rows of another peer and waits until the last one is accepted.
 		 * @param rows - Signed rows of the sender, in issue order.

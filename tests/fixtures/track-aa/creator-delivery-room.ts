@@ -219,6 +219,7 @@ export async function creatorDeliveryRoom(options: RoomOptions = {}) {
 		if (byDigest === undefined) sent.set(from, (byDigest = new Map()));
 		if (!byDigest.has(digest)) byDigest.set(digest, message);
 	});
+	let creatorRoom: Awaited<ReturnType<typeof createV3RoomSession>> | undefined;
 	const open = async (index: number, openOptions: Readonly<{ reopen?: true }> = {}) => {
 		const identity = required(identities[index]);
 		const name = `peer-${index}`;
@@ -272,6 +273,13 @@ export async function creatorDeliveryRoom(options: RoomOptions = {}) {
 		const room = await createV3RoomSession(input);
 		rooms.add(room);
 		await waitForV3RoomStartupForDiagnostics(room);
+		if (index === 0) creatorRoom = room;
+		// Decision B (sync before sending): a reopened Writer signs nothing until it is current. The
+		// pages' successor delivery hands it the creator's statement on bind; this fixture does it.
+		else if (openOptions.reopen === true && creatorRoom !== undefined && rooms.has(creatorRoom)) {
+			const statement = creatorRoom.currencyStatement?.();
+			if (statement !== undefined) await room.confirmCurrent?.(statement);
+		}
 		return { index, name, peerId, room, floor, networkNode, adapter, accepted: seen };
 	};
 	/**
