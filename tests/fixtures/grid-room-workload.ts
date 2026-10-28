@@ -1262,8 +1262,28 @@ async function assertRetainedRollbackPair(peer: Peer) {
 	const retained = facts.generations.filter((generation) => generation.state === "Superseded");
 	// Cleanup retains physical generations, including preparation/close ancestors.
 	const expected = 2;
-	expect(retained, "F5B_C13_C24C_PRODUCT_TRUE_BOUNDED_ROLLBACK_WINDOW").toHaveLength(expected);
-	expect(facts.generations, "F5B_C13_BOUNDED_ACTIVE_AND_ROLLBACK_GENERATIONS").toHaveLength(expected + 1);
+	// ea4eb158: cleanup also keeps the caller-authenticated independent source
+	// generations (at most four, closed-epoch-cleanup), outside the rollback pair.
+	// Read them from the cleanup that produced this exact head: a peer's own latest
+	// cleanup can lag the store observed here by one close.
+	type CleanupPlan = {
+		activeGenerationId: string;
+		rollbackGenerationIds: readonly string[];
+		independentSourceGenerations?: readonly { generationId: string }[];
+	};
+	const plan = observed.cleanup
+		.map((event) => (event.result as { plan?: CleanupPlan }).plan)
+		.findLast((candidate) => candidate?.activeGenerationId === facts.head.generationId);
+	const independent = (plan?.independentSourceGenerations ?? []).map((generation) => generation.generationId);
+	expect(independent.length, "F5B_C13_INDEPENDENT_SOURCES_BOUNDED").toBeLessThanOrEqual(4);
+	expect(required(plan).rollbackGenerationIds, "F5B_C13_C24C_PRODUCT_TRUE_BOUNDED_ROLLBACK_WINDOW").toHaveLength(expected);
+	expect(
+		retained.map((generation) => generation.generationId).sort(),
+		"F5B_C13_RETAINED_EXACTLY_ROLLBACK_PAIR_AND_INDEPENDENT_SOURCES"
+	).toEqual([...required(plan).rollbackGenerationIds, ...independent].sort());
+	expect(facts.generations, "F5B_C13_BOUNDED_ACTIVE_AND_ROLLBACK_GENERATIONS").toHaveLength(
+		expected + independent.length + 1
+	);
 	const active = required(facts.generations.find((generation) => generation.generationId === facts.head.generationId));
 	expect(active.state).toBe("Adopted");
 	let base = active.baseExpectedHead;
