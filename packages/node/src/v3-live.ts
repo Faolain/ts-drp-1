@@ -7865,6 +7865,54 @@ function releasePendingIngress(registration: V3PlaneRegistration, digest: string
 	registration.pendingIngressBytes -= pending.pendingByteCharge;
 }
 
+/**
+ * Case 1 backstop: the encoded pending roots a creator issuance census may carry. The
+ * 64-Writer continuation measured 732554 of the 786432-byte native image (53878 bytes of
+ * headroom, storage AHE_BOUNDED_READ_LIMITS); pending ingress was empty there, so its
+ * roots get a fixed share well inside that headroom. A lossy, non-adversarial episode
+ * holds a few Writer moves; only a flood reaches this bound.
+ */
+const CREATOR_ISSUE_PENDING_CENSUS_BYTES = 16_384;
+
+/**
+ * Whether pending ingress holds a row of the creator's own issuance author (never expected).
+ * @param registration - The creator's current plane.
+ * @returns True when any pending row is the creator's own.
+ */
+function creatorOwnPendingIngress(registration: V3PlaneRegistration): boolean {
+	for (const pending of registration.pendingIngress.values())
+		if (pending.evidence.authenticated.author === registration.issuanceScope.author) return true;
+	return false;
+}
+
+/**
+ * Before a local issue seals its census: when the pending roots' exact encoded width
+ * exceeds CREATOR_ISSUE_PENDING_CENSUS_BYTES, release the newest foreign entries
+ * (insertion order) until it fits. Admitted and own rows are never touched. A released
+ * row stays a delivery-repair target until admitted, so its copy is fetched again.
+ * @param registration - The creator's current plane.
+ */
+function evictCreatorPendingIngressForCensus(registration: V3PlaneRegistration): void {
+	if (registration.drainingPendingIngress || registration.pendingIngress.size === 0) return;
+	const scope = liveJournalScope(registration.payload);
+	const entries = [...registration.pendingIngress].map(([digest, pending]) => {
+		const evidence = pending.evidence;
+		return { digest, own: evidence.authenticated.author === registration.issuanceScope.author,
+			width: encodeCanonical({ dependencyKind: "authenticated-unadmitted-pending-ingress", digest,
+				exactCanonicalPreimageBytes: evidence.exactCanonicalPreimageBytes, signature: evidence.signature,
+				wireByteCharge: pending.pendingByteCharge,
+				missingParents: evidence.authenticated.vertex.dependencies.filter((dependency) => !registration.index.has(dependency)),
+				scope }).byteLength };
+	});
+	let width = entries.reduce((sum, entry) => sum + entry.width, 0);
+	for (let index = entries.length - 1; index >= 0 && width > CREATOR_ISSUE_PENDING_CENSUS_BYTES; index--) {
+		const entry = entries[index];
+		if (entry === undefined || entry.own) continue;
+		releasePendingIngress(registration, entry.digest);
+		width -= entry.width;
+	}
+}
+
 /** Ordinary admission is closed while the creator's own interrupted close is on disk. */
 function creatorInterruptedClosePending(registration: V3PlaneRegistration): boolean {
 	return registration.creatorInterruptedClose === true && registration.creatorMaintenanceBound === true;
@@ -19571,8 +19619,10 @@ function prospectiveCreatorRuntimeCensusOverhead(
 		facts.releasing ||
 		facts.retirementAllowed ||
 		!currentRegistration(registration) ||
-		(facts.receivedAppend === undefined && (registration.pendingIngress.size !== 0 ||
-		registration.pendingIngressBytes !== 0 || registration.drainingPendingIngress)) ||
+		// Case 1: a local append carries foreign pending ingress in its census (exact roots,
+		// below). It still refuses while a drain runs or when a pending row is its own.
+		(facts.receivedAppend === undefined && (registration.drainingPendingIngress ||
+		creatorOwnPendingIngress(registration))) ||
 		(registration.rebaseSnapshot?.length ?? 0) !== 0 ||
 		registration.rebaseCursor !== undefined
 	)
@@ -19590,7 +19640,7 @@ function prospectiveCreatorRuntimeCensusOverhead(
 		!ArrayIsArray(census.nativeIssuance.rows.plans) ||
 		!prospectiveCensusRecord(census.pendingIngress) ||
 		!ArrayIsArray(census.pendingIngress.roots) ||
-		(facts.receivedAppend === undefined && census.pendingIngress.roots.length !== 0) ||
+		(facts.receivedAppend === undefined && census.pendingIngress.roots.length !== registration.pendingIngress.size) ||
 		!prospectiveCensusRecord(census.activeUnsettled) ||
 		!ArrayIsArray(census.activeUnsettled.sources) ||
 		census.activeUnsettled.cursor !== null ||
@@ -19690,6 +19740,12 @@ function prospectiveCreatorRuntimeCensusOverhead(
 		...capturedPending, roots: pendingRoots,
 		wireByteCharge: pendingRoots.reduce((sum, root) => sum + Number(root.wireByteCharge), 0),
 		graphClosure: pendingRoots.length === 0 ? "no-pending-roots" : "incomplete"};
+	// Existing isolated diagnostic hook only (case 1): the pending roots this census charges.
+	try {
+		const observer = Reflect.get(globalThis, "__warmProofEvent");
+		if (typeof observer === "function") observer({kind: "creator-census-pending-charge", received: facts.receivedAppend !== undefined,
+			roots: (pendingIngress.roots as unknown[]).length, wireByteCharge: pendingIngress.wireByteCharge});
+	} catch { /* Diagnostics cannot alter sizing. */ }
 	// Exclude the separately charged native leaf, not its enclosing key/map entry.
 	const originalWidth = prospectiveCensusRecordWidth(
 			{
@@ -21845,6 +21901,7 @@ function creatorCloseRegistration(
 		// source is reflected at once (decision row 73).
 		hasMigrationSourceForOrdinaryPrime: (): boolean => migrationDisplacedSource(registration) !== undefined,
 		sealIssuanceMaintenanceDependencies: (receipt?: object) => {
+			if (receipt === undefined) evictCreatorPendingIngressForCensus(registration);
 			const received = receipt === undefined ? undefined : receivedAppendFacts(registration, receipt);
 			return sealCreatorRecoveryDependencies(registration, true, undefined, closePlane,
 				received === undefined ? "issuance-preview" : "received-append", undefined, received?.custody, received);

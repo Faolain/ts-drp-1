@@ -110,7 +110,23 @@ describe("case 1: the creator issues while a lost Writer copy leaves later moves
 			await sleep(50);
 		}
 
-		await fixture.issue(creator, "lossy-creator-while-pending");
+		const charges: Record<string, unknown>[] = [];
+		expect(Reflect.get(globalThis, "__warmProofEvent"), "CASE1_DIAGNOSTIC_OBSERVER_UNOWNED").toBeUndefined();
+		Reflect.set(globalThis, "__warmProofEvent", (event: Record<string, unknown>) => {
+			if (event.kind === "creator-census-pending-charge") charges.push(event);
+		});
+		try {
+			await fixture.issue(creator, "lossy-creator-while-pending");
+		} finally {
+			Reflect.deleteProperty(globalThis, "__warmProofEvent");
+		}
+		// The local append's census charges every pending root, at its wire bytes.
+		const local = charges.filter((event) => event.received === false);
+		expect(local.length, "CASE1_LOCAL_APPEND_CENSUS_SIZED").toBeGreaterThan(0);
+		for (const event of local) {
+			expect(event.roots, "CASE1_CENSUS_CHARGES_EVERY_PENDING_ROOT").toBe(pendingMoves.length);
+			expect(event.wireByteCharge, "CASE1_CENSUS_CHARGES_PENDING_WIRE_BYTES").toBeGreaterThan(0);
+		}
 
 		const issued = required(ownCommits(creator).at(-1));
 		const dependencies = record(issued.envelope.canonicalPreimageBytes).dependencies as string[];
@@ -119,6 +135,64 @@ describe("case 1: the creator issues while a lost Writer copy leaves later moves
 		for (const digest of [...pendingMoves, ...digests.filter((_, index) => lost(index))])
 			expect(fixture.received.has(digest), "CASE1_PENDING_AND_LOST_MOVES_STAY_UNADMITTED").toBe(false);
 		expect(readV3RuntimeOwnerCensus(plane)?.pendingIngress, "CASE1_PENDING_ROWS_STAY_HELD").toBe(pendingMoves.length);
+		await Promise.all(fixture.peers.map(fixture.stop));
+	});
+
+	it("keeps the pending census within its budget by releasing the newest foreign rows, which repair readmits", async () => {
+		const fixture = await openRoom(2);
+		const creator = required(fixture.peers[0]);
+		const writer = required(fixture.peers[1]);
+		await fixture.issue(creator, "budget-creator");
+		await fixture.issue(writer, "budget-prefix");
+		fixture.held.add(writer.databaseName);
+		const digests: string[] = [];
+		const moves = [];
+		// Move 0 is lost; moves 1..12 (about 2 KiB of census root each) arrive and stay pending.
+		for (let index = 0; index <= 12; index += 1) {
+			await writer.room.issue({ action: "message", clientOperationId: `budget-${index}`, text: "b".repeat(1200) });
+			const digest = hex(required(ownCommits(writer).at(-1)).envelope.digest);
+			digests.push(digest);
+			moves.push(
+				required(
+					fixture.envelopes.find(
+						(message) =>
+							hex(hashDomain("ts-drp/vertex/v3", V3Envelope.decode(message.data).canonicalPreimage)) === digest
+					)
+				)
+			);
+		}
+		for (const envelope of moves.slice(1)) fixture.deliver(envelope);
+		const plane = required(observed.planes.get(creator.databaseName));
+		const deadline = Date.now() + 60_000;
+		while (
+			readV3RuntimeOwnerCensus(plane)?.pendingIngress !== 12 ||
+			readV3RuntimeOwnerCensus(plane)?.drainingPendingIngress !== 0
+		) {
+			expect(Date.now(), "CASE1_BUDGET_CREATOR_HOLDS_TWELVE_PENDING").toBeLessThan(deadline);
+			await sleep(50);
+		}
+
+		await fixture.issue(creator, "budget-creator-while-pending");
+
+		const kept = required(readV3RuntimeOwnerCensus(plane)?.pendingIngress);
+		expect(kept, "CASE1_BUDGET_RELEASES_SOME_PENDING_ROWS").toBeLessThan(12);
+		expect(kept, "CASE1_BUDGET_KEEPS_THE_OLDEST_PENDING_ROWS").toBeGreaterThan(0);
+		// Redeliver only the lost move: it admits exactly the kept (oldest) pending rows.
+		fixture.deliver(required(moves[0]));
+		const admittedPrefix = digests.slice(0, kept + 1);
+		while (!admittedPrefix.every((digest) => fixture.received.has(digest))) {
+			expect(Date.now(), "CASE1_BUDGET_KEPT_ROWS_DRAIN").toBeLessThan(deadline + 60_000);
+			await sleep(50);
+		}
+		for (const digest of digests.slice(kept + 1))
+			expect(fixture.received.has(digest), "CASE1_BUDGET_RELEASED_THE_NEWEST_ROWS").toBe(false);
+		// Repair resends the released rows; they are admitted in order.
+		for (const envelope of moves.slice(kept + 1)) fixture.deliver(envelope);
+		while (!digests.every((digest) => fixture.received.has(digest))) {
+			expect(Date.now(), "CASE1_BUDGET_RELEASED_ROWS_READMIT").toBeLessThan(deadline + 120_000);
+			await sleep(50);
+		}
+		await fixture.issue(creator, "budget-creator-after-repair");
 		await Promise.all(fixture.peers.map(fixture.stop));
 	});
 });
