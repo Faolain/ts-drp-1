@@ -23,12 +23,18 @@ import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-h
 // issued rows must retire back to a flat level: its oldest own row advances, its journal scope 0 is
 // collected and its plan entries stop growing.
 //
+// SKIP_MEMBER_ONLY=adjacent|skip runs one of the two.
+//
 // The slow-member measurement (fix/skip-scope-carrier, conserve-counts-settle-01): after the first
 // skip install the member's oldest own row stayed (epoch 0, sequence 0) for good, its own rows grew
-// 22 -> 128 and its plan entries 57 -> 153, and its journal scope 0 stayed protected. Adjacent installs
-// (app-rollover-silent-writer-catchup-native) keep them bounded.
+// 22 -> 128 and its plan entries 57 -> 153, and its journal scope 0 stayed protected. Measured here, a
+// Grid Writer that follows adjacently from the start leaks the same way: its own pinned bootstrap
+// (sequence 0, epoch 0, terminal under the creator's frontier, no plan entry) never counts as settled
+// for its journal scope 0, so that scope is never collected, its rows 0 and 1 stay retirement holes
+// and the prefix pruner never passes them (two own rows and one plan entry more per epoch).
 const SKIPS = Number(process.env.SKIP_MEMBER_SKIPS ?? 5);
 const DELIVERING = Number(process.env.SKIP_MEMBER_DELIVERING ?? 8);
+const ONLY = process.env.SKIP_MEMBER_ONLY;
 const WINDOW = 4;
 
 const track = {
@@ -80,7 +86,16 @@ function issuanceRetirement(directory: string, name: string) {
 			through = value.completed.throughEpoch;
 			holes = value.completed.protectedRecords.map((hole) => [hole.author.slice(0, 8), hole.authorSequence]);
 		}
-		return { pruned, through, holes: holes.slice(0, 12), holeCount: holes.length };
+		const head = db
+			.prepare(
+				"SELECT o.author_sequence AS sequence, o.publish_state AS state, i.canonical_preimage AS preimage FROM issuance_outbox o JOIN issued_records i ON i.object_id = o.object_id AND i.author = o.author AND i.author_sequence = o.author_sequence ORDER BY o.author_sequence LIMIT 3"
+			)
+			.all()
+			.map((row) => {
+				const value = decodeCanonical(row.preimage as Uint8Array) as RowValue;
+				return [row.sequence, value.epoch, String(value.operation.action), row.state];
+			});
+		return { pruned, through, holes: holes.slice(0, 12), holeCount: holes.length, head };
 	} finally {
 		db.close();
 	}
@@ -165,8 +180,13 @@ async function rollCreator(creator: RoleEndpoint, carry: () => Promise<void>, or
 	}
 }
 
-it("a Writer that followed by skip installs retires its own rows once it delivers again", async () => {
+async function followThenDeliver(SKIPS: number, DELIVERING: number) {
 	const restore = await installEnvironment("node", () => undefined);
+	if (process.env.SKIP_MEMBER_OBSERVE === "1")
+		Reflect.set(globalThis, "__warmProofEvent", (event: { kind: string }) => {
+			if (event.kind === "closed-retirement-issuance-holes" || event.kind === "DEBUG-prefix")
+				process.stdout.write(`SKIP_MEMBER_OBSERVE ${JSON.stringify(event)}\n`);
+		});
 	const directory = mkdtempSync(join(tmpdir(), "app-rollover-skip-member-retirement-"));
 	directories.push(directory);
 	try {
@@ -263,4 +283,19 @@ it("a Writer that followed by skip installs retires its own rows once it deliver
 	} finally {
 		restore();
 	}
-}, 1_800_000);
+}
+
+// Control: a Writer that follows adjacently from the start. Its first own rows (its own pinned bootstrap
+// and its epoch-0 fence, both terminal under the creator's frontier) must retire too, so its journal
+// scope 0 is collected and its own rows stay flat.
+it.skipIf(ONLY === "skip")(
+	"an adjacent Grid Writer retires its own rows",
+	() => followThenDeliver(0, DELIVERING + 2),
+	1_800_000
+);
+
+it.skipIf(ONLY === "adjacent")(
+	"a Writer that followed by skip installs retires its own rows once it delivers again",
+	() => followThenDeliver(SKIPS, DELIVERING),
+	1_800_000
+);
