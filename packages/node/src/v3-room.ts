@@ -596,6 +596,8 @@ export interface CreateV3RoomSessionInput<Projection extends V3RoomProjectionAut
 	 * after it; none are dropped.
 	 */
 	readonly recoveryPoolScheduledLull?: boolean;
+	/** Sync before sending: how long a not-yet-current move is held (default V3_ROOM_NOT_YET_CURRENT_HOLD_MS). */
+	readonly localIssueCurrencyHoldMs?: number;
 	/**
 	 * Opt-in speculative presentation: local moves show at once, remote moves
 	 * show once authenticated (signature + current Writer), both before durable
@@ -683,6 +685,16 @@ export interface V3RoomSession<Projection extends V3RoomProjectionAuthority = V3
 	maintainRecoveryPool(): Promise<CreatorRecoveryPoolResult>;
 	sealEpoch(): Promise<CreatorLiveCloseResult>;
 	status(): CreatorLiveCloseStatus;
+	/**
+	 * Sync before sending: "current" once this session may sign new moves. A writer that reopened
+	 * its own lineage from storage is "not-yet-current" until it installs a creator successor in this
+	 * session or confirms the creator's currency statement.
+	 */
+	localIssueCurrency?(): "current" | "not-yet-current";
+	/** Creator: its currency statement (current epoch and admitted frontiers) for a member to confirm. */
+	currencyStatement?(): V3RoomCurrencyStatement;
+	/** Member: confirms the creator's statement (see V3RoomCurrencyStatement for its authenticity). */
+	confirmCurrent?(statement: V3RoomCurrencyStatement): Promise<V3RoomCurrencyResult>;
 }
 
 export type CreateV3LocalRoomSessionInput<Projection extends V3RoomProjectionAuthority = V3RoomProjectionAuthority> =
@@ -1108,6 +1120,50 @@ export const V3_ROOM_CLOSE_PENDING = "close-pending";
 export function isV3RoomClosePendingRefusal(error: unknown): boolean {
 	return error instanceof Error && error.message.includes(`: ${V3_ROOM_CLOSE_PENDING}: `);
 }
+
+/**
+ * Sync before sending (owner decision B, 2026-10-28): how long a move made by a writer that is not
+ * yet current waits before it is refused with V3RoomNotYetCurrent. The bound of a member's install.
+ */
+export const V3_ROOM_NOT_YET_CURRENT_HOLD_MS = 120_000;
+
+/**
+ * A move refused because this writer reopened its own lineage from storage and is not current: it
+ * did not catch up to the room's current epoch within the hold ("hold-expired"), or the creator
+ * admitted this author's work above its lineage in that epoch ("behind-frontier": a stale copy, such
+ * as a restored backup). Nothing was signed; the caller still owns the move.
+ */
+export class V3RoomNotYetCurrent extends TypeError {
+	readonly code = "V3_ROOM_NOT_YET_CURRENT";
+	/**
+	 * @param reason - Why the move was refused.
+	 * @param detail - What the writer waited for, or the frontier it is behind.
+	 */
+	constructor(
+		readonly reason: "hold-expired" | "behind-frontier",
+		detail: string
+	) {
+		super(`V3_ROOM_NOT_YET_CURRENT: ${reason}: ${detail}`);
+		this.name = "V3RoomNotYetCurrent";
+	}
+}
+
+/**
+ * The creator's statement of the room's current epoch (the creator defines it) and of each author's
+ * highest admitted sequence in that epoch. It carries no signature: the room accepts it only from its
+ * own application, which received it from the creator's authenticated peer in answer to this
+ * session's request (examples/v3-room successor delivery).
+ */
+export type V3RoomCurrencyStatement = Readonly<{
+	objectId: string;
+	epoch: number;
+	anchorDigest: string;
+	/** [author, highest admitted authorSequence in `epoch`] for each author with admitted work in it. */
+	frontiers: readonly (readonly [author: string, admittedThrough: number])[];
+}>;
+
+/** What confirmCurrent concluded. Only "current" lets held and later moves be signed. */
+export type V3RoomCurrencyResult = "current" | "other-epoch" | "behind-frontier";
 
 /**
  * Authenticates a bounded signed invite against a host-registered application before host acquisition.
@@ -2773,6 +2829,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	let prepared: PreparedRoomState | undefined;
 	let recovered: RecoveredRoomState | undefined;
 	let retainedBootstrapHeld = false;
+	let freshLocalLineage = false;
 	const creatorCloseStoreClosers: Array<() => Promise<void>> = [];
 	if (releaseOwnedRoomHeadAuthority !== undefined) creatorCloseStoreClosers.push(releaseOwnedRoomHeadAuthority);
 	let creatorArchiveTask: Promise<NonNullable<BindCreatorLiveCloseInput["archive"]>> | undefined;
@@ -2995,6 +3052,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		prepared = durable.prepared;
 		recovered = durable.recovered;
 		retainedBootstrapHeld = durable.retainedBootstrapHeld;
+		freshLocalLineage = durable.freshLineage;
 	} else if (discoveredStores !== undefined) {
 		aheStores = Object.freeze([discoveredStores.ahe]);
 		issuanceStore = discoveredStores.issuance;
@@ -4487,6 +4545,52 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	let pendingInputEntries = 0;
 	let pendingInputBytes = 0;
 	let pendingIssues: PendingIssue[] = [];
+	// Sync before sending (owner decision B, 2026-10-28). A writer that reopened its own lineage from
+	// storage may hold a stale copy of it (a restored backup): a signature at a slot the room already
+	// admitted would be a second vertex for it. Such a session signs no new move until it is current:
+	// it installed a creator successor in this session (the successor plane carries this author's
+	// authenticated frontier, which every local signature then respects), or it confirmed the
+	// creator's statement of the current epoch with this author's admitted frontier in it below its
+	// lineage. Moves made before that wait, in order, and are refused with V3RoomNotYetCurrent after
+	// the hold; none is signed. The creator (it defines the current epoch), a receive-only session
+	// and a lineage this open created (nothing it signed can exist elsewhere) start current.
+	let localIssueCurrent = input.creatorFinalitySigner !== undefined || input.receiveOnly === true || freshLocalLineage;
+	let localIssueRefusal: V3RoomNotYetCurrent | undefined;
+	const currentEpoch = (): number => successorProjectionAuthority?.epoch ?? 0;
+	const notYetCurrentHoldMs = input.localIssueCurrencyHoldMs ?? V3_ROOM_NOT_YET_CURRENT_HOLD_MS;
+	const heldUntilCurrent = new Map<PendingIssue, ReturnType<typeof setTimeout>>();
+	const refuseHeldUntilCurrent = (reason: unknown): void => {
+		for (const [request, timer] of [...heldUntilCurrent]) {
+			clearTimeout(timer);
+			heldUntilCurrent.delete(request);
+			request.reject(reason);
+			request.releasePublicInput?.();
+		}
+	};
+	const holdUntilCurrent = (request: PendingIssue): void => {
+		heldUntilCurrent.set(
+			request,
+			setTimeout(() => {
+				if (!heldUntilCurrent.delete(request)) return;
+				request.reject(
+					new V3RoomNotYetCurrent("hold-expired", `not current within ${notYetCurrentHoldMs} ms at epoch ${currentEpoch()}`)
+				);
+				request.releasePublicInput?.();
+			}, notYetCurrentHoldMs)
+		);
+	};
+	const becomeLocalIssueCurrent = (): void => {
+		if (localIssueCurrent || localIssueRefusal !== undefined) return;
+		localIssueCurrent = true;
+		const released = [...heldUntilCurrent.keys()].sort((left, right) => left.logicalTime - right.logicalTime);
+		for (const request of released) clearTimeout(heldUntilCurrent.get(request));
+		heldUntilCurrent.clear();
+		pendingIssues = [...released, ...pendingIssues];
+		scheduleDrain();
+	};
+	sessionLifetime.signal.addEventListener("abort", () => refuseHeldUntilCurrent(sessionLifetime.signal.reason), {
+		once: true,
+	});
 	let drainScheduled = false;
 	let draining = false;
 	let drainPromise: Promise<void> = Promise.resolve();
@@ -7246,11 +7350,13 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 		if (creatorSuccessorAdoptionTask !== undefined)
 			return Promise.reject(new TypeError("creator recipient installation is already owned"));
+		let installFromEpoch: number | undefined;
 		const attempt = enqueueLifetimeTransition(async () => {
 			assertSessionOpen();
 			await rebasePromise;
 			await migrationCompletionBarrier;
 			await refreshRoomHeadState();
+			installFromEpoch = currentEpoch();
 			// Exact repeated installation is acknowledged only by the fully verified
 			// native successor export. Epoch/anchor equality alone is never sufficient.
 			const matchesInstalledOffer = async (): Promise<boolean> => {
@@ -7370,6 +7476,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		});
 		const shared = attempt.finally(() => {
 			if (creatorSuccessorAdoptionTask === shared) creatorSuccessorAdoptionTask = undefined;
+			// Sync before sending: an adopted successor plane holds this author's authenticated frontier.
+			if (installFromEpoch !== undefined && currentEpoch() > installFromEpoch) becomeLocalIssueCurrent();
 		});
 		creatorSuccessorAdoptionTask = shared;
 		return shared;
@@ -7565,6 +7673,49 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		authority(): V3RoomSuccessorAuthority | null {
 			return redirectedSession?.authority() ?? successorProjectionAuthority;
 		},
+		localIssueCurrency(): "current" | "not-yet-current" {
+			return redirectedSession?.localIssueCurrency?.() ?? (localIssueCurrent ? "current" : "not-yet-current");
+		},
+		currencyStatement(): V3RoomCurrencyStatement {
+			if (input.creatorFinalitySigner === undefined) throw new TypeError("v3 room currency statement is the creator's");
+			const epoch = currentEpoch();
+			const frontiers = new Map<string, number>();
+			for (const vertex of acceptedVertices.values())
+				if (vertex.epoch === epoch && vertex.authorSequence > (frontiers.get(vertex.author) ?? -1))
+					frontiers.set(vertex.author, vertex.authorSequence);
+			return Object.freeze({
+				objectId: input.objectId,
+				epoch,
+				anchorDigest: successorProjectionAuthority?.anchorDigest ?? material.pinnedGenesisAnchorDigest,
+				frontiers: Object.freeze(
+					[...frontiers].sort(([left], [right]) => compareText(left, right)).map((entry) => Object.freeze(entry))
+				),
+			});
+		},
+		async confirmCurrent(statement: V3RoomCurrencyStatement): Promise<V3RoomCurrencyResult> {
+			if (localIssueCurrent) return "current";
+			if (localIssueRefusal !== undefined) return "behind-frontier";
+			const epoch = currentEpoch();
+			const anchorDigest = successorProjectionAuthority?.anchorDigest ?? material.pinnedGenesisAnchorDigest;
+			if (statement.objectId !== input.objectId || statement.epoch !== epoch || statement.anchorDigest !== anchorDigest)
+				return "other-epoch";
+			const admitted = statement.frontiers.find(([author]) => author === input.author)?.[1];
+			if (admitted !== undefined) {
+				const lineage = await issuanceStore.readLineage(settlementScope);
+				if (localIssueCurrent) return "current";
+				if (lineage.exhausted || !Number.isSafeInteger(lineage.next) || lineage.next <= admitted) {
+					localIssueRefusal = new V3RoomNotYetCurrent(
+						"behind-frontier",
+						`the room admitted sequence ${admitted} of this author in epoch ${epoch}; local lineage is at ${lineage.next}`
+					);
+					refuseHeldUntilCurrent(localIssueRefusal);
+					return "behind-frontier";
+				}
+			}
+			if (currentEpoch() !== epoch) return "other-epoch";
+			becomeLocalIssueCurrent();
+			return "current";
+		},
 		get invite(): string {
 			return redirectedSession?.invite ?? invite;
 		},
@@ -7721,17 +7872,18 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 						const id = presented;
 						presentationHook((overlay) => overlay.bindLocal(id, current));
 					}
+					if (localIssueRefusal !== undefined) throw localIssueRefusal;
 					const promise = new Promise<void>((resolve, reject) => {
-						pendingIssues.push(
-							Object.freeze({
-								source: "public-new",
-								logicalTime: current,
-								operation: captured,
-								releasePublicInput,
-								reject,
-								resolve,
-							})
-						);
+						const request: PendingIssue = Object.freeze({
+							source: "public-new",
+							logicalTime: current,
+							operation: captured,
+							releasePublicInput,
+							reject,
+							resolve,
+						});
+						if (localIssueCurrent) pendingIssues.push(request);
+						else holdUntilCurrent(request);
 						transferred = true;
 					});
 					scheduleDrain();
@@ -8108,6 +8260,8 @@ async function prepareDurableRoomState<Projection extends V3RoomProjectionAuthor
 		readonly prepared: Extract<Awaited<ReturnType<typeof prepareV3LiveGeneration>>, { readonly ok: true }>;
 		readonly recovered: Extract<Awaited<ReturnType<typeof recoverV3LiveReplica>>, { readonly ok: true }>;
 		readonly retainedBootstrapHeld: boolean;
+		/** This open found no local lineage and signed its deterministic bootstrap (sync before sending). */
+		readonly freshLineage: boolean;
 	}>
 > {
 	const exactCanonicalPinnedGenesisBootstrapOperationBytes = encodeCanonical(
@@ -8342,6 +8496,7 @@ async function prepareDurableRoomState<Projection extends V3RoomProjectionAuthor
 				...(retainedBootstrapHold ? { retainedBootstrapHold: true as const } : {}),
 			});
 		let retainedBootstrapHeld = false;
+		let freshLineage = false;
 		let recovered = await recoverPrepared();
 		if (
 			redirectSource !== undefined &&
@@ -8402,6 +8557,7 @@ async function prepareDurableRoomState<Projection extends V3RoomProjectionAuthor
 					objectId: input.objectId,
 					operation: input.application.bootstrapOperation,
 				});
+				freshLineage = true;
 				recovered = await recoverPrepared();
 			}
 		}
@@ -8414,6 +8570,7 @@ async function prepareDurableRoomState<Projection extends V3RoomProjectionAuthor
 			prepared,
 			recovered,
 			retainedBootstrapHeld,
+			freshLineage,
 		});
 	} catch (error) {
 		if (ownedStores !== undefined) throw error;
