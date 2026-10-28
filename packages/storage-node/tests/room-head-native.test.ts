@@ -63,9 +63,12 @@ test("SQLite room floor noncreating reopen, exact scope/CAS and persisted contin
 		ok: false,
 		reason: "conflict",
 	});
+	// 1515daab: a pending successor must be strictly later than stable with a new anchor; it no
+	// longer has to be adjacent (catch-up may skip epochs). The not-later case is checked below,
+	// once stable is past genesis; here, a later successor that keeps the stable anchor.
 	await expect(
-		owner.begin({ scope, expected: created.state, next: { ...head, epoch: 2, currentAnchorDigest: "2".repeat(64) } })
-	).rejects.toThrow();
+		owner.begin({ scope, expected: created.state, next: { ...head, epoch: 1 } })
+	).rejects.toThrow("ROOM_HEAD_INVALID_ADJACENCY");
 	expect(await owner.read({ scope })).toEqual(created);
 	const begun = await owner.begin({
 		scope,
@@ -80,6 +83,15 @@ test("SQLite room floor noncreating reopen, exact scope/CAS and persisted contin
 	expect(await resumed.create({ scope, stable: head })).toEqual({ ok: false, reason: "conflict" });
 	const committed = await resumed.commit({ scope, expected: begun.state });
 	expect(committed).toMatchObject({ ok: true, state: { stable: { epoch: 1 }, pending: null } });
+	if (!committed.ok || committed.state === null) throw new Error("commit failed");
+	await expect(
+		resumed.begin({
+			scope,
+			expected: committed.state,
+			next: { ...head, epoch: 1, currentAnchorDigest: "3".repeat(64) },
+		})
+	).rejects.toThrow("ROOM_HEAD_INVALID_ADJACENCY");
+	expect(await resumed.read({ scope })).toEqual(committed);
 	await resumed.close();
 	expect(await open(file, { kind: "reopen" }).read({ scope })).toEqual(committed);
 });
