@@ -13357,14 +13357,15 @@ function settlementOwnRowFenceGuarded(fences: ReadonlyMap<number, number>, epoch
  * @param sourceEpoch - The retained row's own signed epoch.
  * @returns The proven outcome, or undefined.
  */
-async function frontierRetainedResolution(registration: V3PlaneRegistration, sourceSequence: number, sourceEpoch: number):
+async function frontierRetainedResolution(registration: V3PlaneRegistration, sourceSequence: number, sourceEpoch: number,
+	scan?: () => ReturnType<typeof scanOwnFences>):
 	Promise<"committed" | "never-admitted" | undefined> {
 	const frontier = settlementFrontierFromHistory(registration.historicalIssuance);
 	if (frontier === undefined || !validSettlementFrontierContext(registration.payload, frontier) ||
 		!NumberIsSafeInteger(sourceEpoch) || sourceEpoch >= frontier.currentEpoch) return undefined;
 	const rowClass = settlementOwnRowClass(sourceEpoch, frontier.currentEpoch, sourceSequence, frontier.admissionEpoch,
 		frontier.terminalThrough);
-	const fences = await scanOwnFences(creatorOriginalIssuanceStore(registration), registration.issuanceScope);
+	const fences = await (scan ?? (() => scanOwnFences(creatorOriginalIssuanceStore(registration), registration.issuanceScope)))();
 	if (rowClass === "displaced" && settlementOwnRowFenceGuarded(fences.lowest, sourceEpoch, sourceSequence, frontier.terminalThrough))
 		return "never-admitted";
 	if (rowClass === "terminal" && frontier.terminalThrough !== null && sourceSequence <= frontier.terminalThrough &&
@@ -24114,6 +24115,10 @@ export async function inspectV3RetainedWorkFrontier(plane: V3PlaneHandle): Promi
 		if (!plan?.entries.some(entry => entry.sourceContextDigest !== undefined)) return ObjectFreeze([]);
 		const sources = await prepareCreatorRetainedSourceContracts(plan, payload.trust.trust, payload.input.catalog);
 		const result: V3RetainedWorkFrontier[] = [];
+		// One own-fence scan for the whole inspection (one registration task; the image check below
+		// refuses a changed store), not one full outbox scan per retained entry.
+		let fences: ReturnType<typeof scanOwnFences> | undefined;
+		const scan = (): ReturnType<typeof scanOwnFences> => (fences ??= scanOwnFences(store, scope));
 		for (const entry of plan.entries) {
 			if (entry.sourceContextDigest === undefined || entry.replacementSequence !== null || entry.replacementProgress !== undefined) continue;
 			const resolved = entry.disposition === "expire" && entry.sourceResolutionDigest !== undefined;
@@ -24130,7 +24135,7 @@ export async function inspectV3RetainedWorkFrontier(plane: V3PlaneHandle): Promi
 			if (authenticated.vertex.epoch !== sourceEpoch) continue;
 			result.push(ObjectFreeze({sourceSequence: entry.sourceSequence, sourceDigest: authenticated.digest,
 				sourceContextDigest: lowerHexDigest(entry.sourceContextDigest)!, sourceEpoch, resolved,
-				frontier: await frontierRetainedResolution(registration, entry.sourceSequence, sourceEpoch),
+				frontier: await frontierRetainedResolution(registration, entry.sourceSequence, sourceEpoch, scan),
 				operations: ObjectFreeze(intents.map(intent => intent.operation))}));
 		}
 		const after = await read(readInput);
