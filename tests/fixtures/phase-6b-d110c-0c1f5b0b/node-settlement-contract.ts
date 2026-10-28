@@ -45,7 +45,8 @@ export async function runNativeHistoricalReplacement(
 	reverse = false,
 	fallback = false,
 	fabricatedMembership = false,
-	splitProgress = false
+	splitProgress = false,
+	retryLinked = false
 ): Promise<Readonly<Record<string, unknown>>> {
 	const directory = mkdtempSync(path.join(tmpdir(), "drp-r8-historical-source-"));
 	const followerSeed = "42".repeat(32);
@@ -370,6 +371,28 @@ export async function runNativeHistoricalReplacement(
 				signRegisteredVertexDigest:async value=>{signerCalls++;return signer(value);},
 			});
 			if(!finalSplitReplacement.ok)throw new TypeError(`native final split chunk refused:${JSON.stringify(finalSplitReplacement)}`);
+		}
+		// Same-epoch retry of an already linked source through the same genuine owner:
+		// it must refuse without issuing or advancing the lineage.
+		let linkedRetry: Readonly<Record<string, unknown>> | undefined;
+		if (retryLinked && replacement.ok && !splitProgress) {
+			const linkedPlan = await issuanceStore.readSettlementPlan(scope);
+			const linkedLineage = await issuanceStore.readLineage(scope);
+			const retry = await source.issueReplacement({
+				operations: [{ logicalTime: 7, operation: { action: "add", value: 10 } }],
+				planEffect: { kind: "replacement", sourceSequence: 1 },
+				signRegisteredVertexDigest: async (value) => {
+					signerCalls++;
+					return signer(value);
+				},
+			});
+			linkedRetry = {
+				retry,
+				linkedPlan,
+				linkedLineage,
+				retryPlan: await issuanceStore.readSettlementPlan(scope),
+				retryLineage: await issuanceStore.readLineage(scope),
+			};
 		}
 		let remoteResult: Readonly<Record<string, unknown>> | undefined;
 		if (remote) {
@@ -843,6 +866,7 @@ export async function runNativeHistoricalReplacement(
 			sourceIssued,
 			replacement,
 			...(finalSplitReplacement===undefined?{}:{finalSplitReplacement}),
+			...(linkedRetry === undefined ? {} : { linkedRetry }),
 			signerCalls,
 			ordinaryNew,
 			newSignerCalls,
