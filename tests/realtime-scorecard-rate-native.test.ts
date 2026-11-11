@@ -232,12 +232,31 @@ it.skipIf(!enabled)(
 		if (countsEnabled) {
 			const sqlite = (await import("node:sqlite")) as unknown as Record<string, { prototype: Record<string, unknown> }>;
 			const keyword = (sql: unknown) => (typeof sql === "string" ? (/^\s*([A-Za-z]+)/u.exec(sql)?.[1] ?? "?").toUpperCase() : "?");
-			const patch = (target: Record<string, unknown> | undefined, method: string, label: (self: unknown, args: unknown[]) => string) => {
+			// Synchronous SQLite calls also accumulate their main-thread time (ms.sql.*: the call blocks the event
+			// loop for exactly that long, including any fsync on the real disk).
+			const patch = (
+				target: Record<string, unknown> | undefined,
+				method: string,
+				label: (self: unknown, args: unknown[]) => string,
+				timed = false
+			) => {
 				const original = target?.[method];
 				if (target === undefined || typeof original !== "function") return;
 				target[method] = function (this: unknown, ...args: unknown[]) {
-					bump(label(this, args));
-					return (original as (...values: unknown[]) => unknown).apply(this, args);
+					const key = label(this, args);
+					bump(key);
+					if (!timed) return (original as (...values: unknown[]) => unknown).apply(this, args);
+					const started = performance.now();
+					try {
+						return (original as (...values: unknown[]) => unknown).apply(this, args);
+					} finally {
+						const name = phaseOf();
+						let row = counts.get(name);
+						if (row === undefined) counts.set(name, (row = {}));
+						const spent = performance.now() - started;
+						row["ms.sql"] = (row["ms.sql"] ?? 0) + spent;
+						if (key === "sql.exec.COMMIT" || key === "sql.COMMIT") row["ms.sql.commit"] = (row["ms.sql.commit"] ?? 0) + spent;
+					}
 				};
 				restores.push(() => {
 					target[method] = original;
@@ -247,9 +266,10 @@ it.skipIf(!enabled)(
 				const sql = String(args[0] ?? "");
 				const word = keyword(sql);
 				return word === "BEGIN" ? (/IMMEDIATE/iu.test(sql) ? "sql.beginWrite" : "sql.beginRead") : `sql.exec.${word}`;
-			});
-			for (const method of ["run", "get", "all", "iterate"])
-				patch(sqlite.StatementSync?.prototype, method, (self) => `sql.${keyword((self as { sourceSQL?: string }).sourceSQL)}`);
+			}, true);
+			for (const method of ["run", "get", "all"])
+				patch(sqlite.StatementSync?.prototype, method, (self) => `sql.${keyword((self as { sourceSQL?: string }).sourceSQL)}`, true);
+			patch(sqlite.StatementSync?.prototype, "iterate", (self) => `sql.${keyword((self as { sourceSQL?: string }).sourceSQL)}`);
 			const subtle = (globalThis.crypto?.subtle as unknown as { constructor: { prototype: Record<string, unknown> } } | undefined)
 				?.constructor.prototype;
 			for (const method of ["sign", "verify", "digest", "importKey"]) patch(subtle, method, () => `webcrypto.${method}`);
