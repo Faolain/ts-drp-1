@@ -129,12 +129,14 @@ describe("hold-unavailable (A): a transiently refused Writer move retained with 
 		expect(fixture.received.has(digest), "RETAINED_ROW_NOT_ADMITTED_WHILE_REFUSED").toBe(false);
 		observed.failRecoveryReadFor = "";
 
-		const issued = await creator.room.issue({
-			action: "message",
-			clientOperationId: "retained-creator-1",
-			text: "retained-creator-1",
-		});
-		expect(issued, "RETAINED_ROW_LOCAL_ISSUE_SUCCEEDS").toMatchObject({ ok: true });
+		// room.issue resolves on success and rejects with the refusal ("hold unavailable:replay").
+		const issued = await creator.room
+			.issue({ action: "message", clientOperationId: "retained-creator-1", text: "retained-creator-1" })
+			.then(
+				() => "ok",
+				(error: unknown) => (error instanceof Error ? error.message : String(error))
+			);
+		expect(issued, "RETAINED_ROW_LOCAL_ISSUE_SUCCEEDS").toBe("ok");
 		const own = required(ownCommits(creator).at(-1));
 		expect(
 			record(own.envelope.canonicalPreimageBytes).dependencies as string[],
