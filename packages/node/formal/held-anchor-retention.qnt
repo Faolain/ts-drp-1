@@ -392,6 +392,18 @@ module heldAnchorRetention {
     admit(s),
   }
 
+  // stepBounded without installAwaiting: what a native room reaches on 4fc28f1d. A member that can
+  // issue at an epoch above 0 always has a valid frontier, and its retained rows are of epochs the
+  // installed frontier closed, so no retained row is "awaiting-frontier" there.
+  action stepReachable = any {
+    move,
+    nondet k = 1.to(GAP).oneOf()
+    any { install(k, false), installLost(k) },
+    lull,
+    nondet s = 0.to(MAX_SEQ).oneOf()
+    admit(s),
+  }
+
   // The step with hand-back records that always fit (no stuck rows): what remains without the overflow.
   action stepNoOverflow = any {
     move,
@@ -414,6 +426,14 @@ module heldAnchorRetention {
   val safety = releaseSafe and noLostMove and sourceSafe and guardSound and handBackSound
   val liveness = noUnexcusedRefusal and boundedGens and boundedAge
   val allProps = safety and liveness
+  // fenceOverLost on stepBounded: an awaited epoch has no plan fence, so a completed `rebase` entry
+  // still pins its resolved source (P1's mechanism) until the next fenced lull. If the first lull after
+  // more than CAP installs falls in an awaited epoch, that source's anchor is uncovered: boundedAge and
+  // noUnexcusedRefusal fail there (p6; TLC at MAX_E=11). Safety and boundedGens hold. Release (b) ends
+  // it (releaseFenceOverLost keeps allProps on stepBounded). On stepReachable (no awaited install,
+  // what a native room reaches) fenceOverLost keeps allProps.
+  val holdProps = safety and noUnexcusedRefusal and boundedGens
+  val holdSafety = safety and boundedGens
 
   // ---- Witnesses ----
   action adj = install(1, false).then(lull)
@@ -502,6 +522,16 @@ module heldAnchorRetention {
     .then(all { assert(refusedUnexcused), unchangedAll })
   run fenceOverLostAfterHoldKeepsTest = p5("fenceOverLost").then(adj).then(move).then(adj3).then(adj3).then(adj3)
     .then(all { assert(not(refusedUnexcused)), assert(safety), assert(boundedGens), assert(boundedAge), unchangedAll })
+  // TLC counterexample (MAX_E=11, MAX_SEQ=10, GAP=2, AGE=6): a completed rebase entry's source (2,
+  // epoch 1) whose replacement (4) was later proven never admitted stays pinned at a lull of an awaited
+  // epoch (no plan fence) after more than CAP installs: its anchor is uncovered. A lull in any of the
+  // fenced epochs in between would have released it. Release (b) ends it.
+  action p6(r: str): bool =
+    initWith(r).then(install(1, false)).then(move).then(install(1, false)).then(installAwaiting(2))
+      .then(install(1, false)).then(install(1, false)).then(install(1, false)).then(move).then(installAwaiting(2)).then(lull)
+  run fenceOverLostAwaitedLullRefusesTest = p6("fenceOverLost").then(all { assert(refusedUnexcused), unchangedAll })
+  run releaseFenceOverLostAwaitedLullKeepsTest = p6("releaseFenceOverLost")
+    .then(all { assert(not(refusedUnexcused)), assert(safety), unchangedAll })
   // Broken (f): retirement drops the proven row before its hand-back record exists: the move is lost.
   run proveDropLosesMoveTest = p1("proveDrop").then(all { assert(lostMove), unchangedAll })
   run releaseProveFirstKeepsP1Test = p1("releaseProveFirst")
