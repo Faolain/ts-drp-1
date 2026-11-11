@@ -96,7 +96,7 @@ import { awaitNativeWriterFree, holdNativeWriter, nativeWriterHeld } from "./nat
 import type { NodeNativeReadPort } from "../index.js";
 import { iterateSqliteRows } from "./sqlite-iterator.js";
 import { sqliteFilename } from "./sqlite-filename.js";
-import { configuredStatement } from "./sqlite-statement-cache.js";
+import { configuredStatement, iterationStatement } from "./sqlite-statement-cache.js";
 
 const DATABASE_SUFFIX = ".drp-issuance-v1.sqlite";
 const SCHEMA_VERSION = 5;
@@ -271,10 +271,9 @@ function capturePrimaryFilename(value: unknown): { primaryFilename: string; init
 	}
 }
 
+/** A readBigInts=false statement for one iterateSqliteRows iteration (exclusively checked out). */
 function statement(database: DatabaseSync, sql: string): StatementSync {
-	const prepared = database.prepare(sql);
-	prepared.setReadBigInts(false);
-	return prepared;
+	return iterationStatement(database, sql);
 }
 
 function scalar(database: DatabaseSync, sql: string): unknown {
