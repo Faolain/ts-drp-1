@@ -105,6 +105,8 @@ export async function driveActiveAppEndurance(
 	const carriedKinds = { lateExact: 0, replaced: 0 };
 	// Every dropped first copy, from its drop to the admission that carries it (accountDroppedRows).
 	const droppedRowLatencies: number[] = [];
+	// App mode: every expiry of appSettle's bounded re-offer wait (reported, never silent).
+	const appSettleWaitExpired: { from: number; epoch: number; digest: string }[] = [];
 	const droppedRowClock = {
 		now: () => performance.timeOrigin + performance.now(),
 		sleep: (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
@@ -436,9 +438,18 @@ export async function driveActiveAppEndurance(
 				if (final === undefined) continue;
 				markInjected(rows);
 				await receiver.inject(rows);
+				let admitted = false;
 				for (const deadline = performance.now() + 5_000; performance.now() < deadline; ) {
-					if ((await receiver.acceptance([final.digest]))[0] === true) break;
+					if ((admitted = (await receiver.acceptance([final.digest]))[0] === true)) break;
 					await new Promise((resolve) => setTimeout(resolve, 10));
+				}
+				// The conservation check waits for each dropped row itself (accountDroppedRows); this wait
+				// only paces the re-offer, and its expiry is reported, not passed over.
+				if (!admitted) {
+					appSettleWaitExpired.push({ from, epoch: current, digest: final.digest });
+					console.warn(
+						`ENDURANCE_APP_SETTLE_WAIT_EXPIRED from=${from} epoch=${current} digest=${final.digest} waitedMs=5000`
+					);
 				}
 			}
 		};
@@ -924,6 +935,16 @@ export async function driveActiveAppEndurance(
 						},
 					}
 				: {}),
+			// Each dropped first copy, from its drop to the admission that carries it. Above 5 s the creator's
+			// admission is slower than the old settle wait (a real latency problem, even when load-induced).
+			droppedRowAdmissionMs: {
+				count: droppedRowLatencies.length,
+				p50: droppedRowLatencies.length ? q(droppedRowLatencies, 0.5) : null,
+				p95: droppedRowLatencies.length ? q(droppedRowLatencies, 0.95) : null,
+				max: droppedRowLatencies.length ? Math.max(...droppedRowLatencies) : null,
+				over5s: droppedRowLatencies.filter((value) => value > 5_000).length,
+			},
+			...(appMode ? { appSettleWaitExpired: appSettleWaitExpired.length } : {}),
 			transitionMs: {
 				p50: q(transitionTimes, 0.5),
 				p95: q(transitionTimes, 0.95),
@@ -940,6 +961,9 @@ export async function driveActiveAppEndurance(
 			error: String(error),
 			stack: (error as Error).stack,
 			...(appMode ? { rolloversByTrigger } : {}),
+			// The dropped rows accounted before the failure, so a failed run still reports their admission latency.
+			droppedRowAdmissionMs: droppedRowLatencies,
+			...(appMode ? { appSettleWaitExpired: appSettleWaitExpired.length } : {}),
 		});
 		throw error;
 	} finally {
