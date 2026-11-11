@@ -210,7 +210,7 @@ const once = (values: readonly string[], value: string) => values.filter((entry)
 /**
  * The equivocation: O signs o-3, o-4 (only m1 receives them) and stops; R reopens from the backup and
  * signs r-3 (and r-4, r-5 when `rAhead`) before any member is reachable; both members receive R's
- * rows, m2 also O's rows, and m2 moves on top of what it holds.
+ * rows, m2 also O's rows, and m2 moves on top of what it holds (m1 receives that move).
  */
 async function equivocation(options: { rAhead?: boolean } = {}) {
 	const { f, net, creator, members, restore } = await backedUpCreator(["genesis", "genesis"]);
@@ -233,6 +233,8 @@ async function equivocation(options: { rAhead?: boolean } = {}) {
 	expect(await m1.receive(restoredNew, 0)).toBe(true);
 	expect(await m2.receive(originalNew, 0)).toBe(true);
 	await m2.room.issue(message("m2-on-original"));
+	// Members exchange their own moves as they would over gossip.
+	expect(await m1.receive(await f.issuedAfter(2, null), 2)).toBe(true);
 	const originalHighest = Math.max(...originalNew.map((row) => row.commit.authorSequence));
 	return { f, net, restored, m1, m2, originalNew, restoredNew, originalHighest };
 }
@@ -306,13 +308,24 @@ describe("creator move equivocation recovery", () => {
 		const sealed = await restored.room.sealEpoch();
 		expect((sealed as { ok?: boolean }).ok, JSON.stringify(sealed)).toBe(true);
 		await restored.room.adoptCreatorSuccessor();
+		const m2Before = (await f.issuedAfter(2, null)).length;
 		for (const member of [m1, m2]) {
 			await f.install(member);
 			expect(member.room.authority()?.epoch).toBe(1);
 		}
+		// Work conservation: m2's move built on the original's copy was outside the cut; m2 re-offers it
+		// in the new epoch (the displaced-move settlement), and the room converges with it.
+		for (const deadline = performance.now() + 30_000; performance.now() < deadline; await sleep(200))
+			if ((await f.issuedAfter(2, null)).length > m2Before) break;
+		const reoffered = (await f.issuedAfter(2, null)).slice(m2Before);
+		expect(reoffered.length).toBeGreaterThan(0);
+		expect(await restored.receive(reoffered, 2)).toBe(true);
+		expect(await m1.receive(reoffered, 2)).toBe(true);
+		expect(texts(m1)).toEqual(texts(restored));
+		expect(texts(m2)).toEqual(texts(restored));
 		expect(m1.stateBytes()).toEqual(restored.stateBytes());
 		expect(m2.stateBytes()).toEqual(restored.stateBytes());
-		for (const text of ["creator-before-backup", "r-3", "o-3", "o-4"]) expect(once(texts(m1), text)).toBe(1);
+		for (const text of ["creator-before-backup", "r-3", "o-3", "o-4", "m2-on-original"]) expect(once(texts(m1), text)).toBe(1);
 	}, 300_000);
 
 	it("2: the resumed creator continues issuing above the original's slots, and members accept it", async () => {
