@@ -413,11 +413,12 @@ async function slowFollow(conserve: boolean, rollCount = ROLLS, minSkips = 0) {
 				// The creator stops: the member reaches its epoch (generous bound: host load is noise).
 				await wire.caughtUp(creatorEpoch, CONSERVE_BOUND_MS);
 			} else {
-				// While the creator rolled, the member followed it: it installed and its epoch advanced
-				// roughly once per install duration (the start delay plus the install itself), never stuck.
-				expect(finished.length, "installs that completed while the creator rolled").toBeGreaterThanOrEqual(
-					Math.floor(rolledFor / perInstall) - 1
-				);
+				// While the creator rolled, the member followed it: it installed repeatedly and every
+				// install advanced its epoch, never stuck. Counts, not wall clock: how many installs fit in
+				// the rolling period depends on the host's speed (the creator's rolls and the member's
+				// installs scale differently), so only "at least two" is host independent.
+				expect(finished.length, "installs that completed while the creator rolled").toBeGreaterThanOrEqual(2);
+				for (const install of finished) expect(install.epochAfter ?? 0, "an install advanced the member").toBeGreaterThan(install.epochBefore);
 				expect(creatorEpoch - memberAtEnd, "the member's lag when the creator stopped").toBeLessThanOrEqual(
 					Math.ceil(perInstall / (rolledFor / rollCount)) + 2
 				);
