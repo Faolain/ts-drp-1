@@ -90,10 +90,13 @@ module creatorRestoreCurrency {
   // The member receives O's signatures up to some slot (it may lag).
   action memberReceives = all {
     oNext > 0,
-    nondet upTo = oneOf((memberSeen + 1).to(oNext - 1).union(Set(memberSeen)))
-    memberSeen' = upTo,
-    oNext' = oNext, oRunning' = oRunning, backupNext' = backupNext, mu' = mu, memberHonest' = memberHonest,
-    signedBy' = signedBy, unchangedR,
+    nondet upTo = oneOf(0.to(MAX_SLOT))
+    all {
+      upTo >= memberSeen, upTo <= oNext - 1,
+      memberSeen' = upTo,
+      oNext' = oNext, oRunning' = oRunning, backupNext' = backupNext, mu' = mu, memberHonest' = memberHonest,
+      signedBy' = signedBy, unchangedR,
+    },
   }
 
   // The restored copy reopens: O is gone; R's next slot is the backup's.
