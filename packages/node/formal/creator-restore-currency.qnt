@@ -21,6 +21,13 @@
 //   - Members are watched until one attests: a member that connects later is asked, and its
 //     verified newer view refuses the creator from then on (also after the finality bound).
 //   - Unverifiable (unsigned or forged) answers count as no answer: they neither refuse nor attest.
+//   - Resume after supersession (coordinator decision 2026-11-11): a refusal is final unless the
+//     operator confirms the original device is retired (room.resumeAfterSupersession()). Until then
+//     R signs nothing ("superseded-awaiting-resume"). Confirmation resumes only a move-level refusal
+//     (the member's view holds no epoch at or above R's next): an epoch-level supersession stays
+//     refused for good, since R holds none of the original's close artifacts. After confirmation R
+//     signs over the original's move slots on purpose (re-issuing its operations); the closing cut
+//     resolves that duplicate (creator-move-equivocation-recovery.qnt).
 //
 // Abstraction: two counters of creator slots, moves (author sequence) and epochs (finality). O is
 // the original device, R the restored copy (its next slots are the backup's). O stops when R
@@ -38,6 +45,7 @@
 //                          (the zero-wait lone rule).
 //     ignoreAwaiting     - provisional without waiting for an asked member's answer window (a
 //                          round that ends on a timer before a slower member answers).
+//     resumeEpochLevel   - confirmation also resumes an epoch-level supersession.
 //
 // Residual (witnessed, not an invariant): with no member connected until the hold has passed (or a
 // solo stored roster), R signs moves (and, after the finality bound, finality) before any view; a
@@ -45,8 +53,8 @@
 module creatorRestoreCurrency {
   pure val MAX_SLOT = 4
 
-  type Mutants = { noGate: bool, trustUnsigned: bool, reopenAfterRefusal: bool, forgedAttests: bool, finalityWhileProvisional: bool, noHold: bool, ignoreAwaiting: bool }
-  pure val SOUND: Mutants = { noGate: false, trustUnsigned: false, reopenAfterRefusal: false, forgedAttests: false, finalityWhileProvisional: false, noHold: false, ignoreAwaiting: false }
+  type Mutants = { noGate: bool, trustUnsigned: bool, reopenAfterRefusal: bool, forgedAttests: bool, finalityWhileProvisional: bool, noHold: bool, ignoreAwaiting: bool, resumeEpochLevel: bool }
+  pure val SOUND: Mutants = { noGate: false, trustUnsigned: false, reopenAfterRefusal: false, forgedAttests: false, finalityWhileProvisional: false, noHold: false, ignoreAwaiting: false, resumeEpochLevel: false }
 
   var mu: Mutants
   var oMove: int              // the original's next move slot
@@ -73,6 +81,8 @@ module creatorRestoreCurrency {
   var awaiting: bool          // the connected member was asked and its answer window is open
   var rMovesWhileHeld: int    // R moves signed while its connectivity was unresolved
   var coveredInsideHold: bool // an honest member whose view covered every O slot connected inside the hold
+  var confirmed: bool         // the operator confirmed the original device is retired (resumeAfterSupersession)
+  var epochRefusal: bool      // the refusal's evidence held an epoch at or above R's next
   var moveSigners: int -> Set[str]
   var epochSigners: int -> Set[str]
 
@@ -84,7 +94,8 @@ module creatorRestoreCurrency {
       { ...SOUND, forgedAttests: true },
       { ...SOUND, finalityWhileProvisional: true },
       { ...SOUND, noHold: true },
-      { ...SOUND, ignoreAwaiting: true }))
+      { ...SOUND, ignoreAwaiting: true },
+      { ...SOUND, resumeEpochLevel: true }))
     nondet honest = oneOf(Set(true, false))
     nondet solo = oneOf(Set(true, false))
     all {
@@ -96,6 +107,7 @@ module creatorRestoreCurrency {
       rMove' = 0, rEpoch' = 0, rSignedAfterRefusal' = 0, rFinalityWhileProvisional' = 0,
       everRefused' = false, coveredAtReopen' = false,
       rosterSolo' = solo, unresolved' = false, awaiting' = false, rMovesWhileHeld' = 0, coveredInsideHold' = false,
+      confirmed' = false, epochRefusal' = false,
       moveSigners' = 0.to(MAX_SLOT).mapBy(_ => Set()),
       epochSigners' = 0.to(MAX_SLOT).mapBy(_ => Set()),
     }
@@ -115,8 +127,9 @@ module creatorRestoreCurrency {
   action keepR = all {
     rPhase' = rPhase, attested' = attested, forgedRelease' = forgedRelease, rMove' = rMove, rEpoch' = rEpoch,
     rSignedAfterRefusal' = rSignedAfterRefusal, rFinalityWhileProvisional' = rFinalityWhileProvisional,
-    everRefused' = everRefused, coveredAtReopen' = coveredAtReopen, keepHold,
+    everRefused' = everRefused, coveredAtReopen' = coveredAtReopen, keepHold, keepResume,
   }
+  action keepResume = all { confirmed' = confirmed, epochRefusal' = epochRefusal }
   action keepSigners = all { moveSigners' = moveSigners, epochSigners' = epochSigners }
 
   action originalMoves = all {
@@ -168,7 +181,7 @@ module creatorRestoreCurrency {
     memberMove' = memberMove, memberEpoch' = memberEpoch, memberHonest' = memberHonest, connectedAtReopen' = connectedAtReopen,
     rPhase' = rPhase, attested' = attested, forgedRelease' = forgedRelease, rMove' = rMove, rEpoch' = rEpoch,
     rSignedAfterRefusal' = rSignedAfterRefusal, rFinalityWhileProvisional' = rFinalityWhileProvisional,
-    everRefused' = everRefused, coveredAtReopen' = coveredAtReopen,
+    everRefused' = everRefused, coveredAtReopen' = coveredAtReopen, keepResume,
     mu' = mu, keepO, keepSigners,
   }
 
@@ -190,7 +203,7 @@ module creatorRestoreCurrency {
     oMove' = oMove, oEpoch' = oEpoch, backupMove' = backupMove, backupEpoch' = backupEpoch, rosterSolo' = rosterSolo,
     memberMove' = memberMove, memberEpoch' = memberEpoch, memberHonest' = memberHonest, memberConnected' = memberConnected,
     mu' = mu, attested' = attested, forgedRelease' = forgedRelease, rSignedAfterRefusal' = rSignedAfterRefusal,
-    rFinalityWhileProvisional' = rFinalityWhileProvisional, everRefused' = everRefused, keepSigners,
+    rFinalityWhileProvisional' = rFinalityWhileProvisional, everRefused' = everRefused, keepSigners, keepResume,
   }
 
   pure def watching(phase: str, att: bool): bool =
@@ -204,6 +217,7 @@ module creatorRestoreCurrency {
       rPhase' = if (newer) "refused" else "current",
       attested' = not(newer),
       everRefused' = (everRefused or newer),
+      epochRefusal' = (epochRefusal or (newer and memberEpoch >= rEpoch)), confirmed' = confirmed,
       forgedRelease' = forgedRelease,
       rMove' = rMove, rEpoch' = rEpoch, rSignedAfterRefusal' = rSignedAfterRefusal,
       rFinalityWhileProvisional' = rFinalityWhileProvisional, coveredAtReopen' = coveredAtReopen,
@@ -221,7 +235,7 @@ module creatorRestoreCurrency {
       rPhase' = if (lock) "refused" else if (mu.forgedAttests) "current" else rPhase,
       attested' = if (mu.forgedAttests and not(lock)) true else attested,
       forgedRelease' = (forgedRelease or (mu.forgedAttests and not(lock) and rPhase != "current")),
-      everRefused' = (everRefused or lock),
+      everRefused' = (everRefused or lock), keepResume,
       rMove' = rMove, rEpoch' = rEpoch, rSignedAfterRefusal' = rSignedAfterRefusal,
       rFinalityWhileProvisional' = rFinalityWhileProvisional, coveredAtReopen' = coveredAtReopen,
       awaiting' = false, unresolved' = unresolved, rMovesWhileHeld' = rMovesWhileHeld, coveredInsideHold' = coveredInsideHold,
@@ -235,7 +249,7 @@ module creatorRestoreCurrency {
     unresolved' = false, awaiting' = awaiting, rMovesWhileHeld' = rMovesWhileHeld, coveredInsideHold' = coveredInsideHold,
     rPhase' = rPhase, attested' = attested, forgedRelease' = forgedRelease, everRefused' = everRefused,
     rMove' = rMove, rEpoch' = rEpoch, rSignedAfterRefusal' = rSignedAfterRefusal,
-    rFinalityWhileProvisional' = rFinalityWhileProvisional, coveredAtReopen' = coveredAtReopen,
+    rFinalityWhileProvisional' = rFinalityWhileProvisional, coveredAtReopen' = coveredAtReopen, keepResume,
     mu' = mu, keepO, keepMember, keepSigners,
   }
 
@@ -245,7 +259,7 @@ module creatorRestoreCurrency {
     unresolved' = false, awaiting' = awaiting, rMovesWhileHeld' = rMovesWhileHeld, coveredInsideHold' = coveredInsideHold,
     rPhase' = rPhase, attested' = attested, forgedRelease' = forgedRelease, everRefused' = everRefused,
     rMove' = rMove, rEpoch' = rEpoch, rSignedAfterRefusal' = rSignedAfterRefusal,
-    rFinalityWhileProvisional' = rFinalityWhileProvisional, coveredAtReopen' = coveredAtReopen,
+    rFinalityWhileProvisional' = rFinalityWhileProvisional, coveredAtReopen' = coveredAtReopen, keepResume,
     mu' = mu, keepO, keepMember, keepSigners,
   }
 
@@ -255,7 +269,7 @@ module creatorRestoreCurrency {
     awaiting' = false, unresolved' = unresolved, rMovesWhileHeld' = rMovesWhileHeld, coveredInsideHold' = coveredInsideHold,
     rPhase' = rPhase, attested' = attested, forgedRelease' = forgedRelease, everRefused' = everRefused,
     rMove' = rMove, rEpoch' = rEpoch, rSignedAfterRefusal' = rSignedAfterRefusal,
-    rFinalityWhileProvisional' = rFinalityWhileProvisional, coveredAtReopen' = coveredAtReopen,
+    rFinalityWhileProvisional' = rFinalityWhileProvisional, coveredAtReopen' = coveredAtReopen, keepResume,
     mu' = mu, keepO, keepMember, keepSigners,
   }
 
@@ -265,7 +279,7 @@ module creatorRestoreCurrency {
     rPhase' = "provisional",
     attested' = attested, forgedRelease' = forgedRelease, everRefused' = everRefused,
     rMove' = rMove, rEpoch' = rEpoch, rSignedAfterRefusal' = rSignedAfterRefusal,
-    rFinalityWhileProvisional' = rFinalityWhileProvisional, coveredAtReopen' = coveredAtReopen, keepHold,
+    rFinalityWhileProvisional' = rFinalityWhileProvisional, coveredAtReopen' = coveredAtReopen, keepHold, keepResume,
     mu' = mu, keepO, keepMember, keepSigners,
   }
 
@@ -275,36 +289,48 @@ module creatorRestoreCurrency {
     rPhase' = "current",
     attested' = attested, forgedRelease' = forgedRelease, everRefused' = everRefused,
     rMove' = rMove, rEpoch' = rEpoch, rSignedAfterRefusal' = rSignedAfterRefusal,
-    rFinalityWhileProvisional' = rFinalityWhileProvisional, coveredAtReopen' = coveredAtReopen, keepHold,
+    rFinalityWhileProvisional' = rFinalityWhileProvisional, coveredAtReopen' = coveredAtReopen, keepHold, keepResume,
     mu' = mu, keepO, keepMember, keepSigners,
   }
 
   action restoredMoves = all {
-    rPhase == "provisional" or rPhase == "current", rMove <= MAX_SLOT,
+    rPhase == "provisional" or rPhase == "current" or rPhase == "resumed", rMove <= MAX_SLOT,
     moveSigners' = moveSigners.setBy(rMove, s => s.union(Set("R"))), epochSigners' = epochSigners,
     rMove' = rMove + 1,
-    rSignedAfterRefusal' = rSignedAfterRefusal + (if (everRefused) 1 else 0),
+    rSignedAfterRefusal' = rSignedAfterRefusal + (if (everRefused and not(confirmed)) 1 else 0),
     // An attested view resolves the member's connection (the connected-peer rule); until then the hold
     // applies. After it, a late member is asked while moves continue (the residual).
-    rMovesWhileHeld' = rMovesWhileHeld + (if (unresolved and not(attested)) 1 else 0),
+    rMovesWhileHeld' = rMovesWhileHeld + (if (unresolved and not(attested) and not(confirmed)) 1 else 0),
     unresolved' = unresolved, awaiting' = awaiting, coveredInsideHold' = coveredInsideHold,
     rPhase' = rPhase, attested' = attested, forgedRelease' = forgedRelease, rEpoch' = rEpoch,
     rFinalityWhileProvisional' = rFinalityWhileProvisional, everRefused' = everRefused, coveredAtReopen' = coveredAtReopen,
-    mu' = mu, keepO, keepMember,
+    keepResume, mu' = mu, keepO, keepMember,
   }
 
   action restoredSeals = all {
-    rPhase == "current" or (mu.finalityWhileProvisional and rPhase == "provisional"), rEpoch <= MAX_SLOT,
+    rPhase == "current" or rPhase == "resumed" or (mu.finalityWhileProvisional and rPhase == "provisional"), rEpoch <= MAX_SLOT,
     epochSigners' = epochSigners.setBy(rEpoch, s => s.union(Set("R"))), moveSigners' = moveSigners,
     rEpoch' = rEpoch + 1,
-    rSignedAfterRefusal' = rSignedAfterRefusal + (if (everRefused) 1 else 0),
+    rSignedAfterRefusal' = rSignedAfterRefusal + (if (everRefused and not(confirmed)) 1 else 0),
     rFinalityWhileProvisional' = rFinalityWhileProvisional + (if (rPhase == "provisional") 1 else 0),
     rPhase' = rPhase, attested' = attested, forgedRelease' = forgedRelease, rMove' = rMove,
-    everRefused' = everRefused, coveredAtReopen' = coveredAtReopen, keepHold,
+    everRefused' = everRefused, coveredAtReopen' = coveredAtReopen, keepHold, keepResume,
     mu' = mu, keepO, keepMember,
   }
 
+  // The operator confirms the original device is retired (room.resumeAfterSupersession()). Only a
+  // move-level refusal resumes (resumeEpochLevel: an epoch-level one too).
+  action operatorConfirms = all {
+    rPhase == "refused", not(epochRefusal) or mu.resumeEpochLevel,
+    rPhase' = "resumed", confirmed' = true,
+    attested' = attested, forgedRelease' = forgedRelease, everRefused' = everRefused, epochRefusal' = epochRefusal,
+    rMove' = rMove, rEpoch' = rEpoch, rSignedAfterRefusal' = rSignedAfterRefusal,
+    rFinalityWhileProvisional' = rFinalityWhileProvisional, coveredAtReopen' = coveredAtReopen, keepHold,
+    mu' = mu, keepO, keepMember, keepSigners,
+  }
+
   action step = any {
+    operatorConfirms,
     originalMoves, originalSeals, takeBackup, memberReceives, memberConnects, restore,
     honestAnswer, forgedAnswer, holdExpires, transportUnreachable, answerWindowCloses, becomeProvisional,
     finalityBoundExpires, restoredMoves, restoredSeals,
@@ -316,18 +342,22 @@ module creatorRestoreCurrency {
 
   // An honest member connected at reopen whose view covered every slot O signed: R never equivocates.
   // Also when it connected while R's connectivity was unresolved (inside the hold bound).
-  val safeWhenCovered = (mu == SOUND and (coveredAtReopen or coveredInsideHold)) implies not(equivocated)
+  // (Without the operator's confirmation: after it, R signs over O's move slots on purpose.)
+  val safeWhenCovered = (mu == SOUND and (coveredAtReopen or coveredInsideHold) and not(confirmed)) implies not(equivocated)
   // No move signature while R's connectivity is unresolved: inside the hold bound, no unreachable
   // report and no attested view. (Becoming provisional also waits for every asked member's answer
   // window: safeWhenCovered with coveredInsideHold.)
   val noMoveWhileUnresolved = mu == SOUND implies rMovesWhileHeld == 0
   // A refusal always has proof behind it: O really signed at or above one of R's next slots.
   val refusedOnlyWithProof = (mu == SOUND and rPhase == "refused") implies (oMove > rMove or oEpoch > rEpoch)
-  // A refused session signs nothing more.
+  // A refused session signs nothing more unless the operator confirmed (superseded-awaiting-resume).
   val refusedStays = mu == SOUND implies rSignedAfterRefusal == 0
   // The finality key is never used while provisional, and never released by an unverifiable answer.
   val finalityHeld = mu == SOUND implies (rFinalityWhileProvisional == 0 and not(forgedRelease))
+  // R leaves a refusal only by the operator's confirmation, and never after an epoch-level one.
+  val resumeOnlyConfirmed = mu == SOUND implies ((everRefused and rPhase != "refused") implies (confirmed and not(epochRefusal)))
   val allSafety = safeWhenCovered and noMoveWhileUnresolved and refusedOnlyWithProof and refusedStays and finalityHeld
+    and resumeOnlyConfirmed
 
   // Controls (each must be violated by its mutant).
   val noGateSafe = (mu.noGate and coveredAtReopen) implies not(equivocated)
@@ -339,6 +369,7 @@ module creatorRestoreCurrency {
   val holdProtectsLateConnect = (mu.noHold and coveredInsideHold) implies not(equivocated)
   // An asked member's answer window is waited for before anything is signed.
   val awaitProtects = (mu.ignoreAwaiting and coveredInsideHold) implies not(equivocated)
+  val epochRefusalFinal = mu.resumeEpochLevel implies not(confirmed and epochRefusal)
 
   // Witnesses (negate to find a trace).
   val reachedRefusalAtReopen = not(mu == SOUND and rPhase == "refused" and coveredAtReopen)
@@ -347,4 +378,5 @@ module creatorRestoreCurrency {
   val reachedSoloImmediate = not(mu == SOUND and rosterSolo and not(connectedAtReopen) and rMove > backupMove and rPhase == "provisional")
   val reachedCoveredCurrent = not(mu == SOUND and rPhase == "current" and coveredAtReopen and rMove > backupMove)
   val reachedLoneResidual = not(mu == SOUND and not(connectedAtReopen) and movesEquivocated)
+  val reachedConfirmedResume = not(mu == SOUND and confirmed and rPhase == "resumed" and rMove > backupMove + 1)
 }

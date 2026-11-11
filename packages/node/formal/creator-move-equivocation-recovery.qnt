@@ -67,9 +67,10 @@ module creatorMoveEquivocationRecovery {
 
   type Vertex = { author: str, slot: int, op: int, deps: Set[int], genuine: bool }
   type Mutants = { parkOwn: bool, admitOriginal: bool, excludeDivergence: bool, noReissue: bool, trustForged: bool,
-                   memberLocalChoice: bool, admitDependents: bool, noOriginalHalt: bool }
+                   memberLocalChoice: bool, admitDependents: bool, noOriginalHalt: bool, autoResume: bool }
   pure val SOUND: Mutants = { parkOwn: false, admitOriginal: false, excludeDivergence: false, noReissue: false,
-                              trustForged: false, memberLocalChoice: false, admitDependents: false, noOriginalHalt: false }
+                              trustForged: false, memberLocalChoice: false, admitDependents: false, noOriginalHalt: false,
+                              autoResume: false }
 
   var mu: Mutants
   var vs: int -> Vertex
@@ -89,6 +90,8 @@ module creatorMoveEquivocationRecovery {
   var blockedCloses: int
   var cut: Set[int]
   var installed: str -> Set[int]  // a member's installed state: operation ids
+  var confirmed: bool         // the operator confirmed the original is retired (resumeAfterSupersession)
+  var rSignedAwaiting: int    // R signatures after it knew of O and before confirmation
 
   pure def isCreator(v: Vertex): bool = v.author == "O" or v.author == "R"
   pure def slotOf(m: int -> Vertex, id: int): int = if (id == 0) 0 else m.get(id).slot
@@ -106,13 +109,14 @@ module creatorMoveEquivocationRecovery {
     held' = Set("M1", "M2", "R").mapBy(_ => Set()), rPhase' = "off", oAlive' = false, oHalted' = false,
     oClosed' = false, oClosedKnowing' = false, knownO' = Set(), reissued' = Set(), memberMoves' = 0,
     blockedIssues' = 0, blockedCloses' = 0, cut' = Set(), installed' = MEMBERS.mapBy(_ => Set()),
+    confirmed' = false, rSignedAwaiting' = 0,
   }
   // The simulator explores every variant at once; Apalache runs one variant per init (--init).
   action init = all {
     nondet m = oneOf(Set(SOUND,
       { ...SOUND, parkOwn: true }, { ...SOUND, admitOriginal: true }, { ...SOUND, excludeDivergence: true },
       { ...SOUND, noReissue: true }, { ...SOUND, trustForged: true }, { ...SOUND, memberLocalChoice: true },
-      { ...SOUND, admitDependents: true }, { ...SOUND, noOriginalHalt: true }))
+      { ...SOUND, admitDependents: true }, { ...SOUND, noOriginalHalt: true }, { ...SOUND, autoResume: true }))
     initWith(m)
   }
   action initSound = initWith(SOUND)
@@ -124,6 +128,7 @@ module creatorMoveEquivocationRecovery {
   action initMemberLocalChoice = initWith({ ...SOUND, memberLocalChoice: true })
   action initAdmitDependents = initWith({ ...SOUND, admitDependents: true })
   action initNoOriginalHalt = initWith({ ...SOUND, noOriginalHalt: true })
+  action initAutoResume = initWith({ ...SOUND, autoResume: true })
 
   // O signs its next slot (before the restore, or after it while it still runs and has not halted).
   action oSigns = all {
@@ -134,7 +139,7 @@ module creatorMoveEquivocationRecovery {
     nextId' = nextId + 1, oTip' = nextId,
     mu' = mu, rTip' = rTip, held' = held, rPhase' = rPhase, oAlive' = oAlive, oHalted' = oHalted, oClosed' = oClosed,
     oClosedKnowing' = oClosedKnowing, knownO' = knownO, reissued' = reissued, memberMoves' = memberMoves,
-    blockedIssues' = blockedIssues, blockedCloses' = blockedCloses, cut' = cut, installed' = installed,
+    blockedIssues' = blockedIssues, blockedCloses' = blockedCloses, cut' = cut, installed' = installed, confirmed' = confirmed, rSignedAwaiting' = rSignedAwaiting,
   }
 
   // The stale copy reopens from the restore point; O is retired, or (misconfiguration) still running.
@@ -146,11 +151,13 @@ module creatorMoveEquivocationRecovery {
     mu' = mu, vs' = vs, nextId' = nextId, oTip' = oTip, rTip' = rTip, held' = held, oHalted' = oHalted,
     oClosed' = oClosed, oClosedKnowing' = oClosedKnowing, knownO' = knownO, reissued' = reissued,
     memberMoves' = memberMoves, blockedIssues' = blockedIssues, blockedCloses' = blockedCloses, cut' = cut,
-    installed' = installed,
+    installed' = installed, confirmed' = confirmed, rSignedAwaiting' = rSignedAwaiting,
   }
 
   // parkOwn (today): an O copy R received sits in its own pending ingress; every issue then fails.
   def rParked: bool = mu.parkOwn and knownO != Set()
+  // Superseded-awaiting-resume: R knows O's vertices and the operator has not confirmed (autoResume: no wait).
+  def rResumed: bool = confirmed or mu.autoResume
 
   action rSignsOp(op: int): bool = all {
     rPhase == "open", nextId <= MAX_V, slotOf(vs, rTip) < R_SLOTS,
@@ -164,20 +171,22 @@ module creatorMoveEquivocationRecovery {
       held' = held.setBy("R", s => s.union(Set(nextId))),
       nextId' = nextId + 1, rTip' = nextId, blockedIssues' = blockedIssues,
     },
+    rSignedAwaiting' = rSignedAwaiting + (if (knownO != Set() and not(confirmed) and not(rParked)) 1 else 0),
     mu' = mu, oTip' = oTip, rPhase' = rPhase, oAlive' = oAlive, oHalted' = oHalted, oClosed' = oClosed,
     oClosedKnowing' = oClosedKnowing, knownO' = knownO, memberMoves' = memberMoves, blockedCloses' = blockedCloses,
-    cut' = cut, installed' = installed,
+    cut' = cut, installed' = installed, confirmed' = confirmed,
   }
 
-  // R signs a fresh creator move (before it knows of O, at most R_PROVISIONAL of them; after, freely).
+  // R signs a fresh creator move: before it knows of O, at most R_PROVISIONAL of them; after, only
+  // once resumed by the operator's confirmation.
   action rSigns = all {
-    knownO != Set() or slotOf(vs, rTip) < R_PROVISIONAL,
+    if (knownO == Set()) slotOf(vs, rTip) < R_PROVISIONAL else rResumed,
     rSignsOp(0), reissued' = reissued,
   }
 
   // R re-issues one verified O operation on its own chain.
   action rReissues = all {
-    knownO != Set(),
+    knownO != Set(), rResumed,
     nondet o = knownO.oneOf()
     all {
       not(reissued.contains(vs.get(o).op)), rSignsOp(vs.get(o).op),
@@ -196,7 +205,7 @@ module creatorMoveEquivocationRecovery {
       mu' = mu, vs' = vs, nextId' = nextId, oTip' = oTip, rTip' = rTip, rPhase' = rPhase, oAlive' = oAlive,
       oHalted' = oHalted, oClosed' = oClosed, oClosedKnowing' = oClosedKnowing, knownO' = knownO,
       reissued' = reissued, memberMoves' = memberMoves, blockedIssues' = blockedIssues,
-      blockedCloses' = blockedCloses, cut' = cut, installed' = installed,
+      blockedCloses' = blockedCloses, cut' = cut, installed' = installed, confirmed' = confirmed, rSignedAwaiting' = rSignedAwaiting,
     },
   }
 
@@ -213,7 +222,7 @@ module creatorMoveEquivocationRecovery {
       nextId' = nextId + 1, memberMoves' = memberMoves + 1,
       mu' = mu, oTip' = oTip, rTip' = rTip, rPhase' = rPhase, oAlive' = oAlive, oHalted' = oHalted,
       oClosed' = oClosed, oClosedKnowing' = oClosedKnowing, knownO' = knownO, reissued' = reissued,
-      blockedIssues' = blockedIssues, blockedCloses' = blockedCloses, cut' = cut, installed' = installed,
+      blockedIssues' = blockedIssues, blockedCloses' = blockedCloses, cut' = cut, installed' = installed, confirmed' = confirmed, rSignedAwaiting' = rSignedAwaiting,
     },
   }
 
@@ -229,7 +238,7 @@ module creatorMoveEquivocationRecovery {
       mu' = mu, vs' = vs, nextId' = nextId, oTip' = oTip, rTip' = rTip, rPhase' = rPhase, oAlive' = oAlive,
       oHalted' = oHalted, oClosed' = oClosed, oClosedKnowing' = oClosedKnowing, knownO' = knownO,
       reissued' = reissued, memberMoves' = memberMoves, blockedIssues' = blockedIssues,
-      blockedCloses' = blockedCloses, cut' = cut, installed' = installed,
+      blockedCloses' = blockedCloses, cut' = cut, installed' = installed, confirmed' = confirmed, rSignedAwaiting' = rSignedAwaiting,
     },
   }
 
@@ -245,7 +254,7 @@ module creatorMoveEquivocationRecovery {
       mu' = mu, vs' = vs, nextId' = nextId, oTip' = oTip, rTip' = rTip, rPhase' = rPhase, oAlive' = oAlive,
       oHalted' = oHalted, oClosed' = oClosed, oClosedKnowing' = oClosedKnowing, reissued' = reissued,
       memberMoves' = memberMoves, blockedIssues' = blockedIssues, blockedCloses' = blockedCloses, cut' = cut,
-      installed' = installed,
+      installed' = installed, confirmed' = confirmed, rSignedAwaiting' = rSignedAwaiting,
     },
   }
 
@@ -257,7 +266,7 @@ module creatorMoveEquivocationRecovery {
     knownO' = if (mu.trustForged) knownO.union(Set(nextId)) else knownO, nextId' = nextId + 1,
     mu' = mu, oTip' = oTip, rTip' = rTip, held' = held, rPhase' = rPhase, oAlive' = oAlive, oHalted' = oHalted,
     oClosed' = oClosed, oClosedKnowing' = oClosedKnowing, reissued' = reissued, memberMoves' = memberMoves,
-    blockedIssues' = blockedIssues, blockedCloses' = blockedCloses, cut' = cut, installed' = installed,
+    blockedIssues' = blockedIssues, blockedCloses' = blockedCloses, cut' = cut, installed' = installed, confirmed' = confirmed, rSignedAwaiting' = rSignedAwaiting,
   }
 
   // A live O receives an R vertex from a member: it halts issuing and sealing.
@@ -267,7 +276,7 @@ module creatorMoveEquivocationRecovery {
     mu' = mu, vs' = vs, nextId' = nextId, oTip' = oTip, rTip' = rTip, held' = held, rPhase' = rPhase,
     oAlive' = oAlive, oClosed' = oClosed, oClosedKnowing' = oClosedKnowing, knownO' = knownO, reissued' = reissued,
     memberMoves' = memberMoves, blockedIssues' = blockedIssues, blockedCloses' = blockedCloses, cut' = cut,
-    installed' = installed,
+    installed' = installed, confirmed' = confirmed, rSignedAwaiting' = rSignedAwaiting,
   }
 
   // A live O closes the same epoch (SOUND: only while it has not seen R; noOriginalHalt: regardless).
@@ -276,12 +285,12 @@ module creatorMoveEquivocationRecovery {
     oClosed' = true, oClosedKnowing' = oHalted,
     mu' = mu, vs' = vs, nextId' = nextId, oTip' = oTip, rTip' = rTip, held' = held, rPhase' = rPhase,
     oAlive' = oAlive, oHalted' = oHalted, knownO' = knownO, reissued' = reissued, memberMoves' = memberMoves,
-    blockedIssues' = blockedIssues, blockedCloses' = blockedCloses, cut' = cut, installed' = installed,
+    blockedIssues' = blockedIssues, blockedCloses' = blockedCloses, cut' = cut, installed' = installed, confirmed' = confirmed, rSignedAwaiting' = rSignedAwaiting,
   }
 
   // R closes the epoch once every verified O operation is re-issued; its cut is its graph.
   action rCloses = all {
-    rPhase == "open", not(rParked),
+    rPhase == "open", not(rParked), knownO == Set() or rResumed,
     mu.noReissue or opsOf(vs, knownO).subseteq(reissued),
     val graph = held.get("R")
     val voided = if (mu.excludeDivergence and knownO != Set()) closure(vs, graph.filter(i => vs.get(i).author == "R"))
@@ -294,7 +303,7 @@ module creatorMoveEquivocationRecovery {
     },
     mu' = mu, vs' = vs, nextId' = nextId, oTip' = oTip, rTip' = rTip, held' = held, oAlive' = oAlive,
     oHalted' = oHalted, oClosed' = oClosed, oClosedKnowing' = oClosedKnowing, knownO' = knownO,
-    reissued' = reissued, memberMoves' = memberMoves, blockedIssues' = blockedIssues, installed' = installed,
+    reissued' = reissued, memberMoves' = memberMoves, blockedIssues' = blockedIssues, installed' = installed, confirmed' = confirmed, rSignedAwaiting' = rSignedAwaiting,
   }
 
   // A member installs R's successor: its state is the cut (memberLocalChoice: its own creator copies too).
@@ -307,12 +316,22 @@ module creatorMoveEquivocationRecovery {
       mu' = mu, vs' = vs, nextId' = nextId, oTip' = oTip, rTip' = rTip, held' = held, rPhase' = rPhase,
       oAlive' = oAlive, oHalted' = oHalted, oClosed' = oClosed, oClosedKnowing' = oClosedKnowing,
       knownO' = knownO, reissued' = reissued, memberMoves' = memberMoves, blockedIssues' = blockedIssues,
-      blockedCloses' = blockedCloses, cut' = cut,
+      blockedCloses' = blockedCloses, cut' = cut, confirmed' = confirmed, rSignedAwaiting' = rSignedAwaiting,
     },
   }
 
+  // The operator confirms the original device is retired (room.resumeAfterSupersession()).
+  action operatorConfirms = all {
+    rPhase == "open", knownO != Set(), not(confirmed),
+    confirmed' = true,
+    mu' = mu, vs' = vs, nextId' = nextId, oTip' = oTip, rTip' = rTip, held' = held, rPhase' = rPhase,
+    oAlive' = oAlive, oHalted' = oHalted, oClosed' = oClosed, oClosedKnowing' = oClosedKnowing, knownO' = knownO,
+    reissued' = reissued, memberMoves' = memberMoves, blockedIssues' = blockedIssues, blockedCloses' = blockedCloses,
+    cut' = cut, installed' = installed, rSignedAwaiting' = rSignedAwaiting,
+  }
+
   action step = any {
-    oSigns, restore, rSigns, rReissues, memberReceives, memberIssues, rReceives, memberReachesR, forgedClaim,
+    operatorConfirms, oSigns, restore, rSigns, rReissues, memberReceives, memberIssues, rReceives, memberReachesR, forgedClaim,
     oLearnsR, oCloses, rCloses, install,
   }
 
@@ -333,8 +352,12 @@ module creatorMoveEquivocationRecovery {
   val currentAfterCatchUp = (knownO != Set() and opsOf(vs, knownO).subseteq(reissued)) implies
     slotOf(vs, rTip) + 1 > maxSlot(vs, knownO)
   val noKnowingSplit = not(oClosedKnowing and rPhase == "closed")
+  // Superseded-awaiting-resume signs nothing; a split after R knew of O needs the operator's confirmation.
+  val noSignWhileAwaiting = rSignedAwaiting == 0
+  val noSplitWithoutConfirmation = (oClosed and rPhase == "closed" and knownO != Set()) implies confirmed
   val allSafety = sound implies (convergence and closeNotBlocked and issueNotBlocked and cutClosed and memberWorkKept
-    and creatorOpsConserved and evidenceGenuine and reissuedOnlyGenuine and currentAfterCatchUp and noKnowingSplit)
+    and creatorOpsConserved and evidenceGenuine and reissuedOnlyGenuine and currentAfterCatchUp and noKnowingSplit
+    and noSignWhileAwaiting and noSplitWithoutConfirmation)
 
   // Controls: each must be violated by its mutant.
   val ctlParkOwn = mu.parkOwn implies issueNotBlocked
@@ -346,6 +369,8 @@ module creatorMoveEquivocationRecovery {
   val ctlMemberLocalChoice = mu.memberLocalChoice implies convergence
   val ctlAdmitDependents = mu.admitDependents implies cutClosed
   val ctlNoOriginalHalt = mu.noOriginalHalt implies noKnowingSplit
+  val ctlAutoResume = mu.autoResume implies noSplitWithoutConfirmation
+  val ctlAutoResumeSigns = mu.autoResume implies noSignWhileAwaiting
 
   // Witnesses (each must be violated, i.e. the trace exists).
   // Recovery: R signed over a slot O signed, re-issued O's operations, closed; a member installed.
@@ -357,6 +382,10 @@ module creatorMoveEquivocationRecovery {
   // Residual: an O vertex no member delivered to R is outside the cut after the close.
   val wResidualLostOriginal = not(sound and rPhase == "closed" and
     vs.keys().exists(i => vs.get(i).author == "O" and vs.get(i).genuine and not(knownO.contains(i))))
-  // Residual: a live O that never saw R closes the same epoch as R (two anchors).
-  val wSplitWhenOriginalUnaware = not(sound and oClosed and rPhase == "closed")
+  // Residual: after the operator confirmed wrongly, a live O that never saw R closes the same epoch
+  // as R (two anchors). Unreachable without confirmation (noSplitWithoutConfirmation).
+  val wSplitWhenOriginalUnaware = not(sound and oClosed and rPhase == "closed" and knownO != Set())
+  // Without confirmation R stays awaiting: it knows O's vertices and has signed nothing since.
+  val wAwaitingResume = not(sound and knownO != Set() and not(confirmed) and memberMoves > 0 and
+    MEMBERS.forall(m => held.get(m).exists(i => vs.get(i).author == "O")))
 }
