@@ -3,6 +3,10 @@ import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-
 import { type CloseSetHistoryCommitment, CompactMerkleAccumulator } from "@ts-drp/compaction";
 import { verifySnapshotStreamWithReceipt } from "@ts-drp/compaction/snapshot-quarantine-receipt";
 import { copySettlementPlan, type DurableIssuanceStore, type DurableIssueScope } from "@ts-drp/issuance-store";
+import {
+	durableIssuancePruningMaintenanceForStore,
+	ISSUANCE_RETIREMENT_LIMITS,
+} from "@ts-drp/issuance-store/maintenance";
 import type { DurableLiveJournalStore } from "@ts-drp/live-journal";
 import type { SnapshotChunkProtocolPort } from "@ts-drp/network/snapshot-transfer";
 import { type CurrentAnchorTrust, openCurrentAnchorTrust, type SignRegisteredVertexDigest } from "@ts-drp/protocol-v3";
@@ -1166,6 +1170,38 @@ async function journalDetailScopes(source: CreatorRecipientSource): Promise<Read
 	}
 }
 
+/** Whether a further settling pass can release one of the member's own rows: an entry of
+ * its own settlement plan whose source row is still a protected issuance hole and whose
+ * journal scope is among `removed` (drained after the issuance decision that kept the
+ * hole). A member that issues nothing (receive-only) has an empty plan and ends at the
+ * first read. A delivering Writer's committed rows of the drained scope are such rows:
+ * the further pass releases them, as the install's turnover did before the skip, which
+ * keeps its own rows and plan entries at that level. Observation only; an unreadable
+ * state answers true, so the passes go on settling as before. */
+async function settlementSourceHeldIn(source: CreatorRecipientSource, removed: ReadonlySet<string>): Promise<boolean> {
+	try {
+		const plan = await source.issuanceStore.readSettlementPlan(source.issuanceScope);
+		if (plan === null || plan.entries.length === 0) return false;
+		const census = await durableIssuancePruningMaintenanceForStore(source.issuanceStore)?.readBoundedRecoveryCensus?.(
+			{objectId: source.objectId, limits: ISSUANCE_RETIREMENT_LIMITS});
+		if (census === undefined) return true;
+		const holes = new Set((census.control?.completed?.protectedRecords ?? []).map(hole =>
+			JSON.stringify([hole.author, hole.authorSequence, hole.digest])));
+		for (const entry of plan.entries) {
+			const row = census.rows.issued.find(issued => issued.author === source.issuanceScope.author &&
+				issued.authorSequence === entry.sourceSequence);
+			if (row === undefined) continue;
+			const digest = Array.from(row.digest, byte => byte.toString(16).padStart(2, "0")).join("");
+			if (!holes.has(JSON.stringify([row.author, row.authorSequence, digest]))) continue;
+			const value = decodeCanonical(row.canonicalPreimageBytes) as {epoch?: unknown; anchor?: unknown};
+			if (removed.has(JSON.stringify([source.objectId, value.epoch, value.anchor]))) return true;
+		}
+		return false;
+	} catch {
+		return true;
+	}
+}
+
 /** The original bounded received turnover: one signing census bounds the passes;
  * each pass seals the received dependencies, reconciles, and joins its hold.
  *
@@ -1180,9 +1216,11 @@ async function journalDetailScopes(source: CreatorRecipientSource): Promise<Read
  * the source, so it decides afresh on the physical journal and releases the rows before
  * the install's cleanup and settlement write); with the skip, the release waited for the
  * next lull, and the rows, their settlement entries and the unsettled epoch they carry
- * outlived the settlement window by one epoch. `settled`: the last pass drained no
- * journal scope. An unreadable journal or the pass bound leaves it false, so the caller
- * records no boundary and the install turns over as before. */
+ * outlived the settlement window by one epoch. A further pass runs only when a drained
+ * scope still holds an own settlement source as a protected hole (settlementSourceHeldIn):
+ * a member with no own held row (receive-only) pays no extra pass.
+ * `settled`: no such source remains. An unreadable journal or the pass bound leaves it
+ * false, so the caller records no boundary and the install turns over as before. */
 async function runReceivedRecoveryTurnoverPasses(input: Readonly<{
 	source: CreatorRecipientSource;
 	snapshotStore: SnapshotRecoveryStore<SnapshotVerificationReceipt>;
@@ -1236,8 +1274,11 @@ async function runReceivedRecoveryTurnoverPasses(input: Readonly<{
 			if (input.settle !== true) break;
 			const after = await journalDetailScopes(source);
 			if (detail === undefined || after === undefined) break;
-			if (![...detail].some(scope => !after.has(scope))) { settled = true; break; }
-			// This pass drained a scope: one more pass decides the issuance on the drained journal.
+			const removed = new Set([...detail].filter(scope => !after.has(scope)));
+			// Settled unless a drained scope still holds an own settlement source (the
+			// member's own rows a further pass would release).
+			if (removed.size === 0 || !(await settlementSourceHeldIn(source, removed))) { settled = true; break; }
+			// One more pass decides the issuance on the drained journal.
 			detail = after;
 			drained = true;
 			if (pass === maxPasses - 1) break;

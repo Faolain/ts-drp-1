@@ -8,6 +8,24 @@ The task is incomplete. Passing a room test that pauses at each rollover does no
 establish uninterrupted play. A formal model proves its stated abstraction and bounds,
 not native storage or network behavior.
 
+## Member lull settling and receipt-only halts — 2026-11-11 (on integration-7)
+
+Decision rows 76 and 77; branch `fix/int7-turnover-skip-bounds`.
+- **Lull skip kept within the settlement window** (row 76). After 7125cdb1 a silent Writer's own work
+  outlived the 4-epoch window by one epoch (unsettled 5), and a delivering Writer kept one epoch more of
+  committed rows. 84917587 settles the lull with a further received-turnover pass; bcdbf6b5 runs that pass
+  only while a just-drained scope still holds one of the member's own settlement sources.
+  Passes per steady lull, 2d825dec / 84917587 / bcdbf6b5: delivering Writer 2 / 3 / 3, receive-only 2 / 3 / 2,
+  silent Writer 2 / 3 / 3 (max unsettled 5 / 4 / 4). The Writer's third pass releases its committed rows
+  (own rows 9 and plan entries 4 instead of 11 and 5). Dropping it for committed rows failed the
+  skip-member retention test, so it stays. It costs 20-50% more lull wall and CPU time in paired
+  sandbox runs, off the per-move path, with the longest block and install unchanged. Making it cheaper is a
+  retirement-order change (issuance decided on the post-drain journal within one pass) that needs a model.
+  Cost guard `tests/member-lull-turnover-cost-native.test.ts` (receive-only; RED c6ffb7f9).
+- **Receipt-only retirement halt** (row 77). A creator or member killed right after its snapshot store commits
+  a pool turnover reopened halted by the receipt alone. Creator fix aee798e3 (already merged); member RED
+  ed6147e6 (5/5 stall), fix f185fc0f (3/3).
+
 ## Creator restore currency — 2026-11-10 (on integration-7)
 
 User decision: a creator that reopens from storage asks its members for their creator-signed view and waits a
