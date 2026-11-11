@@ -173,6 +173,16 @@ export interface DurableIssueSignContext {
 	/** Mechanical currency from the same bounded capture; not quote authority. */
 	readonly expectedIssuanceImageDigest?: string;
 	readonly expectedIssuanceControlBytes?: Uint8Array | null;
+	/**
+	 * A settlement-profile Writer's own new move: admit it only if the store could still hold one
+	 * settlement replacement (issued + outbox rows, plan entry, dependency slack) for every own row
+	 * of this move's epoch, this one included, plus the next settlement's fence pair and plan row.
+	 * The creator closes the epoch without any of them it did not accept, and the Writer must then
+	 * replace each one at its successor's install; a move that would leave no room for that is
+	 * refused here, typed, instead of deadlocking the install. Settlement work (fence, replacement)
+	 * never carries it.
+	 */
+	readonly settlementReplacementReserve?: Readonly<{ readonly maxDependencies: number }>;
 }
 
 export type DurableUnsignedVertexSignAdmission = (

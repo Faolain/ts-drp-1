@@ -16273,6 +16273,19 @@ async function issueOneVertex(
 	}
 
 	const admittedFrontier = localAdmittedFrontier(registration, scope);
+	// A settlement-profile Writer's own new move (or a handed-back move offered again, or a join
+	// before either) reserves one settlement replacement per own row of this epoch in its store's
+	// admission: the creator may close the epoch without any of them, and the Writer must replace
+	// them at its successor's install under the same bound. Fence and replacement work never
+	// reserve (they are the settlement); the creator closes its own epoch and needs none.
+	const settlementReplacementReserve =
+		input.settlementSource === undefined &&
+		(planEffect === undefined || planEffect.kind === "hand-back") &&
+		!registration.creatorMaintenanceBound &&
+		registration.payload.trust.trust.profileId === "creator-trusted-settlement-v1" &&
+		resolveCreatorSettlementAuthor(registration.payload.trust.trust) !== scope.author
+			? ObjectFreeze({ maxDependencies: registration.payload.parameters.maxDependencies })
+			: undefined;
 	let commit: unknown;
 	let capacityRejected = false;
 	let cryptoEntered = false;
@@ -16373,7 +16386,10 @@ async function issueOneVertex(
 									return nativeSignAdmission(
 										bytes,
 										sourceSign,
-										replacementContext ?? (planEffect === undefined ? undefined : { planEffect })
+										replacementContext ??
+											(settlementReplacementReserve === undefined
+												? planEffect === undefined ? undefined : { planEffect }
+												: ObjectFreeze({ ...(planEffect === undefined ? {} : { planEffect }), settlementReplacementReserve }))
 									);
 								};
 					const builtCommit = await buildAndSign(authorSequence, admittedSign);

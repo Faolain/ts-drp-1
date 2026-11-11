@@ -50,6 +50,7 @@ import {
 	captureDurableIssuancePruningInput,
 	captureDurableIssuanceRecoveryCensusInput,
 	captureIssuanceNativeSignContext,
+	issuanceSettlementReplacementReserveCharge,
 	captureIssuanceNativeSignInput,
 	captureIssuancePendingUnsignedIntent,
 	captureIssuanceRetirementObject,
@@ -899,7 +900,8 @@ function reserveUnsignedIntent(
 		throw issuanceRetirementRefusal("native unsigned lineage changed");
 	if (
 		context !== undefined &&
-		!isClosedDurableIssuanceRecord(context, Object.hasOwn(context, "planEffect") ? ["planEffect"] : [])
+		!isClosedDurableIssuanceRecord(context, ["planEffect", "settlementReplacementReserve"]
+			.filter((key) => Object.hasOwn(context, key)))
 	)
 		throw invalid("native unsigned settlement context is malformed");
 	const planEffect = context?.planEffect === undefined ? undefined : copySettlementPlanEffect(context.planEffect);
@@ -966,6 +968,9 @@ function reserveUnsignedIntent(
 			canonicalPreimageBytes: captured.bytes, digest: captured.digest,
 		}, priorControl);
 	}
+	// A fresh Writer move only: a resumed intent is already durable and is never refused here.
+	if (old === undefined && context?.settlementReplacementReserve !== undefined)
+		issuanceSettlementReplacementReserveCharge(rows, scope, pending, context.settlementReplacementReserve);
 	assertRetirementRow(database, scope, captured.sequence, captured.bytes, captured.digest);
 	if (priorControl === null)
 		configuredStatement(database, "INSERT INTO retirement_controls (object_id,record) VALUES(?,?)").run(
@@ -2003,7 +2008,14 @@ class NodeIssuanceImplementation {
 					database,
 					detached,
 					captured,
-					capturedContext?.planEffect === undefined ? undefined : { planEffect: capturedContext.planEffect },
+					capturedContext?.planEffect === undefined && capturedContext?.settlementReplacementReserve === undefined
+						? undefined
+						: {
+								...(capturedContext.planEffect === undefined ? {} : { planEffect: capturedContext.planEffect }),
+								...(capturedContext.settlementReplacementReserve === undefined
+									? {}
+									: { settlementReplacementReserve: capturedContext.settlementReplacementReserve }),
+							},
 					ordinaryRows
 				);
 				ownedPending = prior.pendingUnsigned;

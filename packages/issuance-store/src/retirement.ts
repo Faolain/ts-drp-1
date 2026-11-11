@@ -627,6 +627,94 @@ export function issuanceUnsignedPostimageCharge(
 	return unsignedRowsWidth(unsignedFinalRows(rows, scope, pending));
 }
 
+const settlementReserveDigest = new Uint8Array(32);
+// One plan entry at its widest ordinary shape: every optional digest present and one
+// replacement-progress chunk. A replacement split into further chunks is not reserved.
+const SETTLEMENT_RESERVE_PLAN_ENTRY_BYTES = encodeCanonical({
+	sourceContextDigest: settlementReserveDigest,
+	sourceResolutionDigest: settlementReserveDigest,
+	sourceResolutionKind: "frontier",
+	sourceSequence: Number.MAX_SAFE_INTEGER,
+	sourceDigest: settlementReserveDigest,
+	disposition: "manual-review",
+	replacementSequence: Number.MAX_SAFE_INTEGER,
+	replacementProgress: {
+		version: 1,
+		intentCount: Number.MAX_SAFE_INTEGER,
+		intentDigest: settlementReserveDigest,
+		chunks: [{ replacementSequence: Number.MAX_SAFE_INTEGER, throughIntent: Number.MAX_SAFE_INTEGER,
+			lastLogicalTime: Number.MAX_SAFE_INTEGER }],
+	},
+}).byteLength;
+// A replacement's preimage differs from its source's in its dependencies (at most
+// maxDependencies lowercase-hex digests), its epoch, anchor and logical time. The anchor is a
+// digest of the same width; the scalars are each at most one maximal integer wider.
+const SETTLEMENT_RESERVE_DEPENDENCY_BYTES = encodeCanonical("0".repeat(64)).byteLength;
+const SETTLEMENT_RESERVE_SCALAR_BYTES = 3 * encodeCanonical(Number.MAX_SAFE_INTEGER).byteLength + 8;
+// The unsigned row of this move still lacks its 64-byte signature field.
+const SETTLEMENT_RESERVE_SIGNATURE_BYTES = encodeCanonical("signature").byteLength + 1 + unsignedVaruintWidth(64) + 64;
+// The next settlement's fence: a header-only vertex (small control operation) and its outbox row.
+const SETTLEMENT_RESERVE_FENCE_BYTES = 1_024;
+
+/**
+ * Admission of a settlement-profile Writer's own new move against its later settlement: the
+ * eventual postimage of this move, plus one settlement replacement for every own issued row of
+ * this move's epoch (this one included), plus the next settlement's fence pair and, when absent,
+ * its plan row, fits the same row and byte bound the replacements are issued under. The creator
+ * may close the epoch without any of these rows (it has accepted none of them yet, as far as this
+ * Writer knows); the Writer then replaces each one at its successor's install, which must not be
+ * refused. Own rows are ordered by author sequence and their epochs never decrease, so the epoch's
+ * rows are a suffix found by binary search over memoized preimage headers.
+ * @param rows - Complete normalized native rows before this move.
+ * @param scope - The move's lineage.
+ * @param pending - The move's exact pending intent.
+ * @param reserve - The caller's settlement replacement reserve parameters.
+ * @returns The reserved row and byte counts (diagnostic); throws the typed row/byte refusal.
+ */
+export function issuanceSettlementReplacementReserveCharge(
+	rows: IssuanceRetirementRows,
+	scope: DurableIssueScope,
+	pending: Pick<DurableIssuancePendingUnsignedIntent, "authorSequence" | "canonicalPreimageBytes" | "digest">,
+	reserve: Readonly<{ maxDependencies: number }>
+): Readonly<{ rowCount: number; logicalBytes: number; sources: number }> {
+	const { maxDependencies } = captureSettlementReplacementReserve(reserve);
+	const finalRows = unsignedFinalRows(rows, scope, pending);
+	const final = unsignedRowsWidth(finalRows);
+	const epochOf = (bytes: Uint8Array): number => {
+		const epoch = durablePreimageHeader(bytes).epoch;
+		if (typeof epoch !== "number" || !Number.isSafeInteger(epoch) || epoch < 0) throw invalid();
+		return epoch;
+	};
+	const epoch = epochOf(pending.canonicalPreimageBytes);
+	const own = finalRows.issued
+		.filter((row) => row.author === scope.author && row.objectId === scope.objectId)
+		.sort((left, right) => left.authorSequence - right.authorSequence);
+	let low = 0;
+	for (let high = own.length; low < high; ) {
+		const middle = (low + high) >>> 1;
+		if (epochOf((own[middle] as (typeof own)[number]).canonicalPreimageBytes) < epoch) low = middle + 1;
+		else high = middle;
+	}
+	const sources = own.slice(low);
+	const perSourceSlack = SETTLEMENT_RESERVE_PLAN_ENTRY_BYTES + SETTLEMENT_RESERVE_SCALAR_BYTES +
+		maxDependencies * SETTLEMENT_RESERVE_DEPENDENCY_BYTES + 1 + unsignedVaruintWidth(maxDependencies);
+	const hasPlan = finalRows.plans.some((plan) => plan.scope.author === scope.author && plan.scope.objectId === scope.objectId);
+	const rowCount = 2 * sources.length + 2 + (hasPlan ? 0 : 1);
+	let logicalBytes = 2 * (SETTLEMENT_RESERVE_FENCE_BYTES + maxDependencies * SETTLEMENT_RESERVE_DEPENDENCY_BYTES) +
+		(hasPlan ? 0 : SETTLEMENT_RESERVE_FENCE_BYTES);
+	for (const source of sources) {
+		const outbox = { ...scope, authorSequence: source.authorSequence, digest: source.digest, publishState: "published" };
+		logicalBytes += encodeCanonical(source, unsignedEncodingLimits).byteLength +
+			("signature" in source ? 0 : SETTLEMENT_RESERVE_SIGNATURE_BYTES) +
+			encodeCanonical(outbox, unsignedEncodingLimits).byteLength + perSourceSlack;
+	}
+	if (final.rowCount + rowCount > ISSUANCE_RETIREMENT_LIMITS.maxRows)
+		throw issuanceRetirementRefusal("unsigned postimage exceeds row bound with its settlement replacement reserve");
+	if (final.logicalBytes + logicalBytes > ISSUANCE_RETIREMENT_LIMITS.maxBytes)
+		throw issuanceRetirementRefusal("unsigned postimage exceeds byte bound with its settlement replacement reserve");
+	return Object.freeze({ rowCount, logicalBytes, sources: sources.length });
+}
+
 /**
  * Sizes complete original native reserve/entered/pair census carriers.
  * Unknown born incarnation STRING64, imageDigest STRING64 and signature BYTES64
@@ -1457,7 +1545,7 @@ export function captureIssuanceNativeSignContext(input: unknown): DurableIssueSi
 	if (input === undefined) return undefined;
 	if (typeof input !== "object" || input === null) throw invalid();
 	const keys = Reflect.ownKeys(input);
-	const allowed = ["planEffect", "expectedIssuanceImageDigest", "expectedIssuanceControlBytes"];
+	const allowed = ["planEffect", "expectedIssuanceImageDigest", "expectedIssuanceControlBytes", "settlementReplacementReserve"];
 	if (
 		keys.some((k) => typeof k !== "string" || !allowed.includes(k)) ||
 		!isClosedDurableIssuanceRecord(input, keys as string[])
@@ -1465,10 +1553,14 @@ export function captureIssuanceNativeSignContext(input: unknown): DurableIssueSi
 		throw invalid();
 	const effect = input.planEffect === undefined ? undefined : copySettlementPlanEffect(input.planEffect);
 	if (input.planEffect !== undefined && effect === undefined) throw invalid();
+	const reserve = Object.hasOwn(input, "settlementReplacementReserve")
+		? captureSettlementReplacementReserve(input.settlementReplacementReserve) : undefined;
+	if (reserve !== undefined && effect !== undefined && effect.kind !== "hand-back") throw invalid();
+	const reserved = reserve === undefined ? {} : { settlementReplacementReserve: reserve };
 	const hasImage = Object.hasOwn(input, "expectedIssuanceImageDigest");
 	const hasControl = Object.hasOwn(input, "expectedIssuanceControlBytes");
 	if (hasImage !== hasControl) throw invalid();
-	if (!hasImage) return Object.freeze(effect === undefined ? {} : { planEffect: effect });
+	if (!hasImage) return Object.freeze(effect === undefined ? reserved : { planEffect: effect, ...reserved });
 	const expectedIssuanceImageDigest = digest(input.expectedIssuanceImageDigest);
 	const rawControlBytes = input.expectedIssuanceControlBytes;
 	let controlView: Uint8Array | null = null;
@@ -1503,9 +1595,19 @@ export function captureIssuanceNativeSignContext(input: unknown): DurableIssueSi
 	}
 	return Object.freeze({
 		...(effect === undefined ? {} : { planEffect: effect }),
+		...reserved,
 		expectedIssuanceImageDigest,
 		expectedIssuanceControlBytes: bytes,
 	});
+}
+
+function captureSettlementReplacementReserve(input: unknown): Readonly<{ maxDependencies: number }> {
+	if (!isClosedDurableIssuanceRecord(input, ["maxDependencies"])) throw invalid();
+	const maxDependencies = input.maxDependencies;
+	if (typeof maxDependencies !== "number" || !Number.isSafeInteger(maxDependencies) || maxDependencies < 1 ||
+		maxDependencies > 1024)
+		throw invalid();
+	return Object.freeze({ maxDependencies });
 }
 
 /** Captures the original serializer's exact unsigned bytes; not source/ACL authority. */

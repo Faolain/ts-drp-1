@@ -48,6 +48,7 @@ import {
 	captureDurableIssuancePruningInput,
 	captureDurableIssuanceRecoveryCensusInput,
 	captureIssuanceNativeSignContext,
+	issuanceSettlementReplacementReserveCharge,
 	captureIssuanceNativeSignInput,
 	captureIssuancePendingUnsignedIntent,
 	captureIssuanceRetirementObject,
@@ -1736,6 +1737,9 @@ class BrowserIssuanceImplementation {
 			await browserRetirementRow(transaction, scope, prior.next, captured.bytes, captured.digest);
 			if (raw === undefined) rows = { ...rows, lineages: [...rows.lineages, { ...scope, ...lineage }] };
 			issuanceUnsignedPostimageCharge(rows, scope, pending);
+			// A fresh Writer move only: a resumed intent is already durable and is never refused here.
+			if (existing === undefined && capturedContext?.settlementReplacementReserve !== undefined)
+				issuanceSettlementReplacementReserveCharge(rows, scope, pending, capturedContext.settlementReplacementReserve);
 			const pendingRows = {
 				...rows,
 				lineages: rows.lineages.map((l) => (this.#sameScope(l, scope) ? { ...l, pendingUnsigned: pending } : l)),
