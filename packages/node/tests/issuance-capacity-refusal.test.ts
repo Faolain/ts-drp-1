@@ -14,6 +14,9 @@ describe("issuance capacity refusal", () => {
 		"issuance retirement refused: unsigned postimage exceeds row bound",
 		"creator issuance maintenance proof reserve is exhausted:4194000+512/4194304",
 		"creator next-epoch admission proof reserve is exhausted:4194305/4194304",
+		"creator issuance maintenance prefix sizing is unavailable: MAINTENANCE_SUMMARY_CONTINUATION_UNAVAILABLE:summary[]:creator maintenance encoded width exceeds its bound",
+		"v3 local issue transaction failed: creator closed rollback refusal: proof-budget-exceeded",
+		"issuance retirement refused: unsigned postimage exceeds row bound with its settlement replacement reserve",
 	])("types %s", reason => {
 		const typed = issuanceCapacityRefusal(reason)!;
 		expect(typed.startsWith(`${ISSUANCE_CAPACITY_FORECAST_EXCEEDED}:`)).toBe(true);
@@ -23,7 +26,9 @@ describe("issuance capacity refusal", () => {
 	});
 	it("leaves other refusals alone", () => {
 		for (const reason of ["v3 local issue signature was not admitted", "issuance retirement fence",
-			"creator incremental proof reserve is exhausted"])
+			"creator incremental proof reserve is exhausted", "creator maintenance encoded width is invalid",
+			"creator closed rollback refusal: chain-invalid",
+			"creator issuance maintenance prefix sizing is unavailable: MAINTENANCE_POST_ADOPTION_CENSUS_UNAVAILABLE"])
 			expect(issuanceCapacityRefusal(reason)).toBeUndefined();
 	});
 });

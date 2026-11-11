@@ -12025,13 +12025,11 @@ function maintenanceEncodedWidth(value: number | undefined,
 	if (maximumBytes !== undefined && maximumBytes !== AHE_BOUNDED_READ_LIMITS.maxUnionBytes &&
 		maximumBytes !== ISSUANCE_RETIREMENT_LIMITS.maxBytes && maximumBytes !== LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes)
 		throw new TypeError("creator maintenance native field entitlement is invalid");
-	if (
-		typeof value !== "number" ||
-		!Number.isSafeInteger(value) ||
-		value < 1 ||
-		value > limit
-	)
+	if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1)
 		throw new TypeError("creator maintenance encoded width is invalid");
+	// A well-formed width past its bound is capacity (this epoch's maintenance carrier is full;
+	// a rollover clears it), not a malformed value.
+	if (value > limit) throw new TypeError("creator maintenance encoded width exceeds its bound");
 	if (expanded !== undefined && (!Number.isSafeInteger(expanded.items) || expanded.items < 1 ||
 		expanded.items > 65_536 || !Number.isSafeInteger(expanded.maxDepth) ||
 		expanded.maxDepth < 0 || expanded.maxDepth > 128))
@@ -16159,6 +16157,7 @@ export async function captureCreatorOrdinaryFinishingCapacityTemplate(
 				ownCode.value.length <= 96 ? ownCode.value : undefined;
 			const safeMessages = ["Maximum call stack size exceeded", "Invalid array length",
 				"creator maintenance native field entitlement is invalid", "creator maintenance encoded width is invalid",
+				"creator maintenance encoded width exceeds its bound",
 				"creator maintenance encoded container shape is invalid", "creator maintenance encoded array count is invalid",
 				"creator maintenance count is invalid", "creator maintenance carrier nesting is invalid",
 				"creator maintenance encoded container nesting is invalid", "creator maintenance decoded container shape is invalid",

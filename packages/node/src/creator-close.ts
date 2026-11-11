@@ -3014,7 +3014,10 @@ const CREATOR_ISSUANCE_CAPACITY_REFUSAL = new RegExp("MAINTENANCE_NATIVE_IMAGE_E
 	"source custody (plan|native material|contexts) exceed|unsigned postimage exceeds (byte|row) bound|" +
 	// The creator's per-epoch maintenance proof book: this epoch's, or the room the next epoch's
 	// first cold admission needs after this one closes. Both clear with a rollover.
-	"creator (issuance maintenance|next-epoch admission) proof reserve is exhausted");
+	"creator (issuance maintenance|next-epoch admission) proof reserve is exhausted|" +
+	// This epoch's maintenance carrier is wider than its bound, or the creator's per-epoch closed
+	// rollback proof budget is spent: both clear with a rollover (several hot Writers reach them).
+	"creator maintenance encoded width exceeds its bound|creator closed rollback refusal: proof-budget-exceeded");
 /**
  * The one typed capacity reason for a local issue (creator or Writer) refused before signing because
  * the issuance image forecast would exceed its bound. A rollover clears it (retry after rollover).
