@@ -103,8 +103,8 @@ async function openApp(
  * @param recipient - The other role.
  * @param moves - Moves per role.
  * @param rolloverBudget - Test-only trigger values replacing the application's.
- * @param creatorMoves - The creator's own moves (default `moves`); fewer makes a Writer the hot author.
- * @param writerFrom - The first ordinal at which the Writer moves (default 0).
+ * @param creatorMoves - Which ordinals the creator moves at (default every one); a sparser creator makes a
+ * Writer the hot author. Its rows carry admission evidence of the Writer's moves (their causal past).
  * @returns The creator's policy observation.
  */
 async function playPastCeiling(
@@ -112,8 +112,7 @@ async function playPastCeiling(
 	recipient: Recipient,
 	moves: number,
 	rolloverBudget?: Readonly<{ movesPerAuthor: number; idleMs: number }>,
-	creatorMoves = moves,
-	writerFrom = 0
+	creatorMoves: (ordinal: number) => boolean = () => true
 ) {
 	const peers = await openApp(app, recipient === "receive-only" ? "receive-only" : "writer", rolloverBudget);
 	const [creator, other] = peers;
@@ -178,7 +177,7 @@ async function playPastCeiling(
 	}, 30_000);
 	try {
 		for (let ordinal = 0; ordinal < moves; ordinal++) {
-			if (ordinal < creatorMoves) {
+			if (creatorMoves(ordinal)) {
 				step = `creator#${ordinal}`;
 				await creator.issue(0, ordinal);
 				accepted.push({ role: 0, ordinal });
@@ -187,7 +186,7 @@ async function playPastCeiling(
 			// The member's own rows go to the creator even when it makes no move: each install
 			// publishes the member's settlement of the epoch it leaves.
 			await deliver(1);
-			if (!writer || ordinal < writerFrom) continue;
+			if (!writer) continue;
 			step = `writer#${ordinal}`;
 			await other.issue(0, ordinal);
 			accepted.push({ role: 1, ordinal });
@@ -288,14 +287,14 @@ it.each([
 it("grid with a hot writer: a received move refused at the creator's capacity triggers a rollover and is accepted", async () => {
 	const restore = await installEnvironment("node", () => undefined);
 	try {
-		// The creator alone first fills most of its per-epoch proof book (its own moves stop short of
-		// its own refusal); the Writer's received moves then fill the rest, so the creator refuses a
-		// received move. The Writer stays under its 64 undelivered own moves per epoch
-		// (V3RoomLocalBacklogFull), which a hot Writer otherwise meets before any capacity refusal.
-		const prefill = Number(process.env.HOT_WRITER_PREFILL ?? 150);
-		const writerMoves = Number(process.env.HOT_WRITER_MOVES ?? 60);
-		const policy = await playPastCeiling("grid", "writer", prefill + writerMoves,
-			{ movesPerAuthor: 100_000, idleMs: 3_600_000 }, prefill, prefill);
+		// The creator moves every few Writer moves: its rows are the admission evidence that keeps the
+		// Writer's admitted moves out of its undelivered bound (V3RoomLocalBacklogFull), and they fill
+		// the creator's per-epoch proof book with the Writer's received moves, so the creator refuses a
+		// received move before the Writer's own admission reaches its settlement reserve (the next case).
+		const writerMoves = Number(process.env.HOT_WRITER_MOVES ?? 300);
+		const creatorEvery = Number(process.env.HOT_WRITER_CREATOR_EVERY ?? 4);
+		const policy = await playPastCeiling("grid", "writer", writerMoves, { movesPerAuthor: 100_000, idleMs: 3_600_000 },
+			(ordinal) => ordinal % creatorEvery === 0);
 		expect(policy?.events.map((event) => event.trigger)).toContain("refusal");
 		expect(policy?.events.every((event) => event.trigger === "refusal")).toBe(true);
 	} finally {
@@ -314,7 +313,12 @@ it("grid with a hot writer: no admitted move's settlement is refused by the Writ
 	const restore = await installEnvironment("node", () => undefined);
 	try {
 		const writerMoves = Number(process.env.HOT_WRITER_SETTLEMENT_MOVES ?? 1200);
-		await playPastCeiling("grid", "writer", writerMoves, { movesPerAuthor: 100_000, idleMs: 20_000 }, 1);
+		// The creator moves every 8 Writer moves (admission evidence, as an online room has).
+		const creatorEvery = Number(process.env.HOT_WRITER_CREATOR_EVERY ?? 8);
+		const policy = await playPastCeiling("grid", "writer", writerMoves, { movesPerAuthor: 100_000, idleMs: 20_000 },
+			(ordinal) => ordinal % creatorEvery === 0);
+		process.stdout.write(`HOT_WRITER_SETTLEMENT ${JSON.stringify({ writerMoves, creatorEvery, rollovers: policy?.rollovers,
+			triggers: policy?.events.map((event) => event.trigger) })}\n`);
 	} finally {
 		restore();
 	}
