@@ -69,7 +69,15 @@ import { DatabaseSync, type StatementSync } from "node:sqlite";
 
 import { SqliteNativeReadReservationOwner } from "./internal/native-read-reservation.js";
 import { iterateSqliteRows } from "./internal/sqlite-iterator.js";
-import { journalImageRowKey, journalImageRowMatches, type JournalImageRowKey, journalRetirementImageMemo } from "./internal/journal-image-memo.js";
+import {
+	beginJournalTransaction,
+	type JournalImageCurrency,
+	journalImageCurrency,
+	journalImageRowKey,
+	journalImageRowMatches,
+	type JournalImageRowKey,
+	journalRetirementImageMemo,
+} from "./internal/journal-image-memo.js";
 import { sqliteFilename } from "./internal/sqlite-filename.js";
 import { enforceNativeLocalSessionFile, nativeLocalSessionSchemaRows, type LocalSessionLifetime } from "./internal/local-session-lifetime.js";
 import type { NodeNativeReadPort } from "./index.js";
@@ -390,15 +398,49 @@ function sameRetirementNativeCarriers(
 			: sameBytes(a.planBytes, b.planBytes))
 	);
 }
+type JournalMembershipWrite = Readonly<{
+	scope: LiveJournalScope;
+	bytes: Uint8Array;
+	clearScopes: readonly LiveJournalScope[];
+}>;
 function retirementImage(
 	database: DatabaseSync,
 	objectId: string,
 	frames?: Uint8Array[],
-	membershipWrite?: Readonly<{
-		scope: LiveJournalScope;
-		bytes: Uint8Array;
-		clearScopes: readonly LiveJournalScope[];
-	}>
+	membershipWrite?: JournalMembershipWrite
+): LiveJournalRetirementImage {
+	// Read first: it fixes the transaction's snapshot that every row below is read from.
+	const currency = membershipWrite === undefined ? journalImageCurrency(database) : undefined,
+		memo = journalRetirementImageMemo(database);
+	const unchanged = memo.unchanged(objectId, frames !== undefined, currency);
+	if (unchanged !== undefined) {
+		if (frames !== undefined) for (const frame of unchanged.frames!) frames.push(frame.slice());
+		return unchanged.image;
+	}
+	if (frames !== undefined) return captureRetirementImage(database, objectId, memo, currency, frames, true, membershipWrite);
+	// A frameless capture also keeps its rows' frames for a later point read of the same rows (which
+	// would otherwise capture and hash every row again). Frames add only their own byte ceiling: a
+	// capture refused there is redone exactly as a frameless capture, so it charges and refuses as before.
+	try {
+		return captureRetirementImage(database, objectId, memo, currency, [], false, membershipWrite);
+	} catch (error) {
+		if (!(error instanceof Error) || error.message !== "retirement-fenced") throw error;
+		return captureRetirementImage(database, objectId, memo, currency, undefined, false, membershipWrite);
+	}
+}
+/**
+ * One scan and capture of the object's native rows (see retirementImage).
+ * @param frames - Receives the rows' frames, when defined: the caller's, or a private array only the memo keeps.
+ * @param framesRequested - Whether the caller requested the frames (a remembered capture must then have them).
+ */
+function captureRetirementImage(
+	database: DatabaseSync,
+	objectId: string,
+	memo: ReturnType<typeof journalRetirementImageMemo>,
+	currency: JournalImageCurrency | undefined,
+	frames: Uint8Array[] | undefined,
+	framesRequested: boolean,
+	membershipWrite: JournalMembershipWrite | undefined
 ): LiveJournalRetirementImage {
 	const count = (table: string): number => {
 		const row = configuredStatement(database, `SELECT count(*) AS n FROM ${table} WHERE object_id=?`).get(objectId);
@@ -419,8 +461,7 @@ function retirementImage(
 	// scanned row matches it exactly and in order. Matched rows wait, bounded by
 	// that already-charged image, and are captured in their original order as
 	// soon as any row differs, so a changed image is charged exactly as before.
-	const memo = journalRetirementImageMemo(database),
-		known = memo.candidate(objectId, frames !== undefined),
+	const known = memo.candidate(objectId, framesRequested),
 		firstFrame = frames?.length ?? 0,
 		keys: JournalImageRowKey[] = [],
 		deferred: [table: "scopes" | "accepted_entries", row: Record<string, unknown>, key: unknown[] | undefined][] = [];
@@ -502,13 +543,13 @@ function retirementImage(
 		collect("scopes");
 		collect("accepted_entries");
 		if (matching && keys.length === known!.rows.length) {
-			memo.touch(objectId);
-			if (frames !== undefined) for (const frame of known!.frames!) frames.push(frame.slice());
+			memo.touch(objectId, currency);
+			if (framesRequested) for (const frame of known!.frames!) frames!.push(frame.slice());
 			return known!.image;
 		}
 		if (matching) diverge();
 		const image = capture.finish();
-		if (keyable) memo.remember(objectId, keys, image, frames?.slice(firstFrame));
+		if (keyable) memo.remember(objectId, keys, image, frames?.slice(firstFrame), currency);
 		return image;
 	} finally { capture.release(); }
 }
@@ -1344,7 +1385,7 @@ export function createNodeDurableLiveJournalStore(
 		let addressed = false;
 		let nativeImage: Readonly<{ imageDigest: string; controlBytes: Uint8Array | null }> | undefined;
 		try {
-			database.exec("BEGIN IMMEDIATE");
+			beginJournalTransaction(database, "BEGIN IMMEDIATE");
 			if (expectedNativeImage !== undefined) {
 				const image = retirementImage(database, candidate.scope.objectId),
 					control = readRetirementControl(database, candidate.scope.objectId, retirementCodec);
@@ -1557,7 +1598,7 @@ export function createNodeDurableLiveJournalStore(
 			if (nativeImage === undefined) return failed("internal-invariant");
 			let active = false;
 			try {
-				database.exec("BEGIN");
+				beginJournalTransaction(database, "BEGIN");
 				active = true;
 				const image = retirementImage(database, candidate.scope.objectId),
 					control = readRetirementControl(database, candidate.scope.objectId, retirementCodec);
@@ -2113,7 +2154,7 @@ export function createNodeDurableLiveJournalStore(
 					retirementCodec.decode(basis.controlBytes.slice(), basis.planBytes?.slice());
 			} else {
 				frames = [];
-				database.exec("BEGIN");
+				beginJournalTransaction(database, "BEGIN");
 				active = true;
 				image = retirementImage(database, objectId, frames);
 				control = readRetirementControl(database, objectId, retirementCodec);
