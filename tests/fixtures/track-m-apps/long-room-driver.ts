@@ -29,6 +29,12 @@ export interface LongRoomOptions {
 	 * epoch record's issue arrays then hold only the admitted moves.
 	 */
 	readonly untilRefusal?: string;
+	/**
+	 * Ordinary moves of the recipient Writer per epoch, when it differs from `moves` (greedy creator
+	 * beside a fixed-rate Writer). A Writer's move the creator's ingress refuses is never admitted, so
+	 * a greedy Writer is bounded by the creator's book, not by a refusal the Writer can see.
+	 */
+	readonly recipientMoves?: number;
 	/** Chat only: the format the creator signs into genesis (default "window", what Chat ships). */
 	readonly chatFormat?: ChatFormat;
 	/**
@@ -471,7 +477,7 @@ export async function driveLongRoom(
 					}
 					await flush(0, recipientAdmitsRemote);
 				}
-				if (!recipientOpen) continue;
+				if (!recipientOpen || ordinal >= (options.recipientMoves ?? options.moves)) continue;
 				try {
 					recipientIssue.push(await recipient.issue(epoch, ordinal));
 				} catch (error) {

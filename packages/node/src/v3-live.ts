@@ -191,6 +191,7 @@ import {
 	type CreatorRoomSettlementPreview,
 	type V3CreatorCloseRegistration,
 	inspectHead,
+	issuanceCapacityRefusal,
 } from "./creator-close.js";
 import { planClosedEpochCleanup, planClosedEpochRoleCleanup } from "./internal/closed-epoch-cleanup.js";
 import { inspectCreatorClosedCutSuccessorBinding } from "@ts-drp/protocol-v3/creator-close";
@@ -16483,7 +16484,11 @@ async function issueOneVertex(
 					? localIssueFailure("admission-rejected", "v3 local issue signature was not admitted")
 					: localIssueFailure(
 							"issuance-rejected",
-							`v3 local issue transaction failed: ${error instanceof Error ? error.message : String(error)}`
+							// A Writer's (or creator's) own store bound is the same typed capacity refusal.
+							`v3 local issue transaction failed: ${(() => {
+								const reason = error instanceof Error ? error.message : String(error);
+								return issuanceCapacityRefusal(reason) ?? reason;
+							})()}`
 						);
 		}
 		const committedFailure = (

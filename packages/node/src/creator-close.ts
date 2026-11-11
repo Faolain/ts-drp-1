@@ -3011,7 +3011,18 @@ function creatorNextEpochAdmissionForecast(
  * refuse later. */
 export const ISSUANCE_CAPACITY_FORECAST_EXCEEDED = "ISSUANCE_CAPACITY_FORECAST_EXCEEDED";
 const CREATOR_ISSUANCE_CAPACITY_REFUSAL = new RegExp("MAINTENANCE_NATIVE_IMAGE_EXHAUSTED:|MAINTENANCE_FUTURE_PROOF_ENVELOPE_EXHAUSTED:|" +
-	"source custody (plan|native material|contexts) exceed|unsigned postimage exceeds byte bound");
+	"source custody (plan|native material|contexts) exceed|unsigned postimage exceeds (byte|row) bound");
+/**
+ * The one typed capacity reason for a local issue (creator or Writer) refused before signing because
+ * the issuance image forecast would exceed its bound. A rollover clears it (retry after rollover).
+ * @param reason - The refusal's diagnostic text.
+ * @returns The typed text, or undefined when the reason is not an issuance capacity bound.
+ */
+export function issuanceCapacityRefusal(reason: string): string | undefined {
+	if (reason.includes(ISSUANCE_CAPACITY_FORECAST_EXCEEDED)) return reason;
+	return CREATOR_ISSUANCE_CAPACITY_REFUSAL.test(reason)
+		? `${ISSUANCE_CAPACITY_FORECAST_EXCEEDED}: issuance forecast exceeds its bound: ${reason}` : undefined;
+}
 
 async function chargeCreatorIssuanceMaintenanceQuote(
 	quote: CreatorIssuanceMaintenanceQuote,
