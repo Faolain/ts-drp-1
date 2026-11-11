@@ -100,7 +100,59 @@ export async function driveActiveAppEndurance(
 	const acceptedLiveTimes: number[] = [];
 	const carriedTimes: number[] = [];
 	const carriedKinds = { lateExact: 0, replaced: 0 };
-	const pendingCarried: { digest: string; from: number; receivedAt: number }[] = [];
+	const pendingCarried: { digest: string; from: number; receivedAt: number; epoch: number }[] = [];
+	// Carried-row waterfall (app mode, observation only; performance.timeOrigin-based ms). A replacement is
+	// published when its author accepts it (the room's own accept callback, acceptedAt); a 50 ms observer reads
+	// each role's in-memory authority epoch (no storage reads, so it does not perturb the rooms); the driver
+	// records when it delivers (injects) a row and when the creator closed each epoch. The replacement's wait
+	// between its publication and the driver's delivery is driver pacing (the 5 s poll and round boundaries
+	// block flush), not product work, and is excluded from the product latency.
+	const injectedAt = new Map<string, number>();
+	// Every delivery of each row: a copy the receiver dropped is admitted only from a later re-offer.
+	const injections = new Map<string, number[]>();
+	const epochClosedAt = new Map<number, number>();
+	const epochSeenAt: Map<number, number>[] = [new Map(), new Map()];
+	const carriedWaterfall: {
+		kind: "lateExact" | "replaced";
+		deliveredToClosed: number | null;
+		closedToInstalled: number | null;
+		installedToReplacementPublished: number | null;
+		replacementPublishedToDelivered: number | null;
+		replacementDeliveredToAdmitted: number | null;
+		totalMs: number;
+		driverWaitMs: number;
+		driverLullMs: number;
+		creatorRolloverMs: number;
+		productMs: number;
+		productExcludingDriverLullMs: number;
+		deliveries: number;
+		redeliveryWaitMs: number;
+		lastDeliveredToAdmitted: number | null;
+		at: {
+			delivered: number;
+			closed: number | null;
+			installed: number | null;
+			replacementDelivered: number | null;
+			admitted: number;
+		};
+	}[] = [];
+	// The driver's own maintenance-overlap lull (both peers' maintainRecoveryPool, called explicitly on top of
+	// the app's scheduled lull) and the creator's automatic rollovers, as absolute windows: a carried row's
+	// time inside the former is driver-imposed work, inside the latter product rollover work.
+	const driverLullWindows: { start: number; end: number }[] = [];
+	const creatorRolloverWindows: { start: number; end: number }[] = [];
+	const overlap = (from: number, to: number, windows: readonly { start: number; end: number }[]): number =>
+		windows.reduce((sum, window) => sum + Math.max(0, Math.min(to, window.end) - Math.max(from, window.start)), 0);
+	const now = (): number => performance.timeOrigin + performance.now();
+	const markInjected = (rows: readonly WireRow[]): void => {
+		const at = now();
+		for (const row of rows) {
+			if (!injectedAt.has(row.digest)) injectedAt.set(row.digest, at);
+			const times = injections.get(row.digest) ?? [];
+			times.push(at);
+			injections.set(row.digest, times);
+		}
+	};
 	const transitionTimes: number[] = [];
 	const accepted: { role: number; epoch: number; ordinal: number }[] = [];
 	const attempts: {
@@ -163,6 +215,27 @@ export async function driveActiveAppEndurance(
 		return evaluated;
 	};
 	const wire = appMode ? successorWire(() => peers) : undefined;
+	let observing = false;
+	const observer = appMode
+		? setInterval(() => {
+				if (observing) return;
+				observing = true;
+				void (async () => {
+					for (const role of [0, 1]) {
+						const peer = peers[role];
+						if (peer === undefined) continue;
+						const epoch = await peer.authorityEpoch();
+						const at = now();
+						if (epoch !== null && epoch !== undefined && !required(epochSeenAt[role]).has(epoch))
+							required(epochSeenAt[role]).set(epoch, at);
+					}
+				})()
+					.catch(() => undefined)
+					.finally(() => {
+						observing = false;
+					});
+			}, 50)
+		: undefined;
 	try {
 		const chatModel = app === "chat" ? new ChatWindowOracle(await required(peers[0]).state()) : undefined;
 		const delivered: (number | null)[] = [null, null];
@@ -185,6 +258,7 @@ export async function driveActiveAppEndurance(
 						// without is carried by its author's settlement after the install, so its acceptance
 						// is awaited for a bounded time, never joined.
 						const receivedAt = performance.now();
+						markInjected(chunk);
 						await required(peers[1 - from]).inject(chunk);
 						const final = chunk[last];
 						if (final !== undefined)
@@ -197,10 +271,17 @@ export async function driveActiveAppEndurance(
 						if (final !== undefined) {
 							if ((await required(peers[1 - from]).acceptance([final.digest]))[0] === true)
 								acceptedLiveTimes.push(waited);
-							else pendingCarried.push({ digest: final.digest, from, receivedAt: performance.timeOrigin + receivedAt });
+							else
+								pendingCarried.push({
+									digest: final.digest,
+									from,
+									receivedAt: performance.timeOrigin + receivedAt,
+									epoch: rowValue(final).epoch,
+								});
 						}
 						continue;
 					}
+					markInjected(chunk);
 					if (last >= 0) receiveTimes.push(await required(peers[1 - from]).receive(chunk.slice(0, last + 1)));
 					await required(peers[1 - from]).inject(chunk.slice(last + 1));
 				}
@@ -222,10 +303,66 @@ export async function driveActiveAppEndurance(
 				if (!disposition.carried) continue;
 				const times = await receiver.acceptedAt?.(disposition.acceptedDigests);
 				if (times === undefined || times.some((time) => time === null)) continue;
-				carriedTimes.push(Math.max(...(times as number[])) - row.receivedAt);
-				if (disposition.acceptedDigests.length === 1 && disposition.acceptedDigests[0] === row.digest)
-					carriedKinds.lateExact++;
+				const admittedAt = Math.max(...(times as number[]));
+				carriedTimes.push(admittedAt - row.receivedAt);
+				const lateExact = disposition.acceptedDigests.length === 1 && disposition.acceptedDigests[0] === row.digest;
+				if (lateExact) carriedKinds.lateExact++;
 				else carriedKinds.replaced++;
+				// Waterfall: the leaves' latest publication and delivery (a replacement chain completes with its last chunk).
+				const latest = (map: Map<string, number>): number | null => {
+					const values = disposition.acceptedDigests.map((digest) => map.get(digest));
+					return values.some((value) => value === undefined) ? null : Math.max(...(values as number[]));
+				};
+				const closedAt = epochClosedAt.get(row.epoch) ?? null;
+				// The author's first observed authority past the closed epoch (an install may skip epochs).
+				const later = [...required(epochSeenAt[row.from])].filter(([epoch]) => epoch > row.epoch).map(([, at]) => at);
+				const installedAt = later.length ? Math.min(...later) : null;
+				const authored = lateExact
+					? undefined
+					: await required(peers[row.from]).acceptedAt?.(disposition.acceptedDigests);
+				const replacementPublished =
+					authored === undefined || authored.some((time) => time === null) ? null : Math.max(...(authored as number[]));
+				const replacementDelivered = lateExact ? null : latest(injectedAt);
+				const span = (from: number | null, to: number | null): number | null =>
+					from === null || to === null ? null : to - from;
+				const driverWaitMs = Math.max(0, span(replacementPublished, replacementDelivered) ?? 0);
+				const totalMs = admittedAt - row.receivedAt;
+				const driverLullMs = overlap(row.receivedAt, admittedAt, driverLullWindows);
+				// The admitted copies' deliveries up to admission: the first delivery that was not admitted waits for
+				// the driver's re-offer (appSettle / a later flush), which a room's own resend would replace.
+				const leaves = lateExact ? [row.digest] : disposition.acceptedDigests;
+				const before = leaves.map((digest) => (injections.get(digest) ?? []).filter((at) => at <= admittedAt));
+				const firstDelivery = before.every((times) => times.length)
+					? Math.max(...before.map((times) => Math.min(...times)))
+					: null;
+				const lastDelivery = before.every((times) => times.length)
+					? Math.max(...before.map((times) => Math.max(...times)))
+					: null;
+				const redeliveryWaitMs = firstDelivery === null || lastDelivery === null ? 0 : lastDelivery - firstDelivery;
+				carriedWaterfall.push({
+					kind: lateExact ? "lateExact" : "replaced",
+					deliveredToClosed: span(row.receivedAt, closedAt),
+					closedToInstalled: span(closedAt, installedAt),
+					installedToReplacementPublished: span(installedAt, replacementPublished),
+					replacementPublishedToDelivered: span(replacementPublished, replacementDelivered),
+					replacementDeliveredToAdmitted: span(replacementDelivered, admittedAt),
+					totalMs,
+					driverWaitMs,
+					driverLullMs,
+					creatorRolloverMs: overlap(row.receivedAt, admittedAt, creatorRolloverWindows),
+					productMs: totalMs - driverWaitMs,
+					productExcludingDriverLullMs: totalMs - driverWaitMs - driverLullMs,
+					deliveries: Math.max(...before.map((times) => times.length)),
+					redeliveryWaitMs,
+					lastDeliveredToAdmitted: span(lastDelivery, admittedAt),
+					at: {
+						delivered: row.receivedAt,
+						closed: closedAt,
+						installed: installedAt,
+						replacementDelivered,
+						admitted: admittedAt,
+					},
+				});
 				pendingCarried.splice(pendingCarried.indexOf(row), 1);
 			}
 		};
@@ -240,6 +377,8 @@ export async function driveActiveAppEndurance(
 			rolloverEventsSeen = policy.events.length;
 			for (const event of events) {
 				rolloversByTrigger[event.trigger] = (rolloversByTrigger[event.trigger] ?? 0) + 1;
+				if (!epochClosedAt.has(event.epoch)) epochClosedAt.set(event.epoch, event.endedAt);
+				creatorRolloverWindows.push({ start: event.endedAt - event.ms, end: event.endedAt });
 				pendingWindows.push({
 					closed: event.epoch,
 					trigger: event.trigger,
@@ -286,6 +425,7 @@ export async function driveActiveAppEndurance(
 					(row, index) => known[index] !== true && !rowValue(row).operation.action.startsWith("$drp.")
 				);
 				if (final === undefined) continue;
+				markInjected(rows);
 				await receiver.inject(rows);
 				for (const deadline = performance.now() + 5_000; performance.now() < deadline; ) {
 					if ((await receiver.acceptance([final.digest]))[0] === true) break;
@@ -483,6 +623,7 @@ export async function driveActiveAppEndurance(
 			let maintenanceReceiverAfter = maintenanceReceiverBefore;
 			const lulls = joinAll(peers.map((peer) => peer.lull())).then(async (results) => {
 				maintenanceEnd = performance.timeOrigin + performance.now();
+				driverLullWindows.push({ start: maintenanceStart, end: maintenanceEnd });
 				maintenanceReceiverAfter = await joinAll(peers.map((peer) => peer.projectionAudit()));
 				return results;
 			});
@@ -664,9 +805,47 @@ export async function driveActiveAppEndurance(
 								p95: q(carriedTimes, 0.95),
 								max: carriedTimes.length ? Math.max(...carriedTimes) : null,
 							},
+							// Carried rows: each stage from timestamps; driverWaitMs is the replacement's wait for the
+							// driver's next delivery (poll deadline / round boundary / flush), productMs the rest.
+							carriedWaterfall: Object.fromEntries(
+								(
+									[
+										"deliveredToClosed",
+										"closedToInstalled",
+										"installedToReplacementPublished",
+										"replacementPublishedToDelivered",
+										"replacementDeliveredToAdmitted",
+										"totalMs",
+										"driverWaitMs",
+										"driverLullMs",
+										"creatorRolloverMs",
+										"productMs",
+										"productExcludingDriverLullMs",
+										"deliveries",
+										"redeliveryWaitMs",
+										"lastDeliveredToAdmitted",
+									] as const
+								).map((key) => {
+									const values = carriedWaterfall
+										.map((entry) => entry[key])
+										.filter((value): value is number => value !== null);
+									return [
+										key,
+										{
+											count: values.length,
+											p50: q(values, 0.5),
+											p95: q(values, 0.95),
+											max: values.length ? Math.max(...values) : null,
+										},
+									];
+								})
+							),
 							// Carried rows whose chain had not reached admission by the last settlement audit
 							// (or whose receiver was reopened, losing its acceptance times).
 							carriedUnresolved: pendingCarried.length,
+							carriedRows: carriedWaterfall,
+							driverLullWindows,
+							creatorRolloverWindows,
 						},
 					}
 				: {}),
@@ -689,6 +868,7 @@ export async function driveActiveAppEndurance(
 		});
 		throw error;
 	} finally {
+		if (observer !== undefined) clearInterval(observer);
 		await wire?.stop().catch(() => undefined);
 	}
 }
