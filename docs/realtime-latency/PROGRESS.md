@@ -8,6 +8,13 @@ The task is incomplete. Passing a room test that pauses at each rollover does no
 establish uninterrupted play. A formal model proves its stated abstraction and bounds,
 not native storage or network behavior.
 
+## Creator restore currency — 2026-11-10 (on integration-7)
+
+User decision: a creator that reopens from storage asks its members for their creator-signed view and waits a
+bounded time (5 s) before signing anything; verified newer state refuses it for the session
+(`V3RoomNotYetCurrent` "creator-superseded"), silence proceeds. Decision row 75; branch
+`fix/creator-restore-currency` (model, RED, fix). Active only where the application wires `creatorMemberView`.
+
 ## Integration-5 — 2026-10-26 evening (current)
 
 **All four 300-epoch runs pass on `f9a1f33c`**, merged into this root as `38682519`.
