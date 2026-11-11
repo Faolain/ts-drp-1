@@ -65,6 +65,7 @@ import {
 	resumeV3PendingIssuanceIntent,
 	carryV3PendingIngress,
 	reofferV3CarriedPendingIngress,
+	releaseV3CarriedPendingIngress,
 	inspectV3RetainedWorkFrontier,
 	resolveV3RetainedWorkFromFrontier,
 	inspectV3UnresolvedAcceptedWork,
@@ -6958,8 +6959,9 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		const predecessorClose = creatorCloseHandle;
 		if ((!receivedRetry && predecessor === undefined) || recoverStartupPlane === undefined)
 			throw new TypeError("v3 room recovery custody is unavailable");
-		// Deactivation clears the predecessor's pending ingress; the recovered successor of the same
-		// epoch re-offers those rows through its ordinary ingress (model plane-recovery-pending-carry.qnt).
+		// Deactivation clears the predecessor's pending ingress, and its in-flight ingress jobs end on a
+		// revoked plane; the carry takes both and the recovered successor of the same epoch re-offers
+		// them through its ordinary ingress (model plane-recovery-pending-carry.qnt).
 		const carried = predecessor === undefined ? undefined : carryV3PendingIngress(predecessor);
 		try {
 			await Promise.resolve(predecessor?.deactivate());
@@ -6983,6 +6985,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			if (receivedRetry) terminalFailure = undefined;
 		} catch (error) {
 			terminalFailure = error;
+			if (carried !== undefined) releaseV3CarriedPendingIngress(carried);
 			return throwAfterJoinedCleanup(error, [
 				shutdown,
 				(): Promise<void> => predecessorClose?.stop() ?? Promise.resolve(),

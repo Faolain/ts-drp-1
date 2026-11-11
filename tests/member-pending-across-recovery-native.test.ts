@@ -23,6 +23,7 @@ import { closeFixtures, required } from "./fixtures/track-m/room-retention-fixtu
 import { settlementDelivery, type SettlementRoom } from "./fixtures/track-m/settlement-room.js";
 import { isControl } from "./fixtures/track-x/outside-rows-room.js";
 import { type ReadinessHoldPeer, readinessHoldRoom } from "./fixtures/track-x/readiness-hold-room.js";
+import { openV3PendingIngressCarries } from "../packages/node/src/v3-live.js";
 
 afterEach(async () => {
 	expect(await closeFixtures(), "native admitted work and owners join").toEqual([]);
@@ -149,6 +150,9 @@ it.each([
 		const landedMs = member.accepted.has(held) ? Math.round(performance.now() - started) : null;
 		console.log("PENDING_ACROSS_RECOVERY", JSON.stringify({ mode, failed: fault.failed, landedMs }));
 		expect(landedMs, "B is admitted once its parent A arrives").not.toBeNull();
+		// The carry ended (its predecessor's last ingress job settled): the successor keeps no
+		// reference to the revoked plane, and the process holds no open carry.
+		expect(openV3PendingIngressCarries(), "no same-epoch recovery carry is left open").toBe(0);
 	},
 	300_000
 );
