@@ -81,15 +81,17 @@ it("a changed, added or removed authenticated base always folds from that base",
 		subject.projectAcceptedOperations({ authenticatedBase: base, currentEpochOperations: operations });
 	const bootstrap = accepted(subject.bootstrapOperation, 0);
 	const seed = [bootstrap, place(1), place(2)];
-	const baseFor = (operations: readonly Accepted[]): Base => {
+	const migration = subject.migration;
+	if (migration === undefined) throw new TypeError("zone application has no migration codec");
+	const baseFor = (operations: readonly Accepted[]): NonNullable<Base> => {
 		const projection = fresh(operations) as Parameters<NonNullable<App["migration"]>["canonicalStateBytes"]>[0];
 		return Object.freeze({
 			blueprintDigest: "0".repeat(64),
 			epoch: 1,
-			exactCanonicalApplicationStateBytes: subject.migration!.canonicalStateBytes(projection),
+			exactCanonicalApplicationStateBytes: migration.canonicalStateBytes(projection),
 			objectId: "zone-continuation",
 			stateDigest: "0".repeat(64),
-		}) as Base;
+		}) as NonNullable<Base>;
 	};
 	const baseA = baseFor(seed);
 	const baseB = baseFor([...seed, place(3, 42)]);
@@ -98,7 +100,12 @@ it("a changed, added or removed authenticated base always folds from that base",
 	expect(project([...tail, place(7)], baseB)).toEqual(fresh([...tail, place(7)], baseB));
 	expect(project([...tail, place(7), place(8)])).toEqual(fresh([...tail, place(7), place(8)]));
 	// Same base bytes in a new array: equal content continues; a flipped byte never does.
-	const copy = Object.freeze({ ...baseB!, exactCanonicalApplicationStateBytes: baseB!.exactCanonicalApplicationStateBytes.slice() }) as Base;
+	const copy = Object.freeze({
+		...baseB,
+		exactCanonicalApplicationStateBytes: baseB.exactCanonicalApplicationStateBytes.slice(),
+	}) as Base;
 	expect(project([...tail, place(7), place(8)], copy)).toEqual(fresh([...tail, place(7), place(8)], baseB));
-	expect(project([...tail, place(7), place(8), place(9)], baseA)).toEqual(fresh([...tail, place(7), place(8), place(9)], baseA));
+	expect(project([...tail, place(7), place(8), place(9)], baseA)).toEqual(
+		fresh([...tail, place(7), place(8), place(9)], baseA)
+	);
 });

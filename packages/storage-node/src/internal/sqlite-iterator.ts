@@ -28,7 +28,7 @@ export function iterateSqliteRows(
 		finished = true;
 		releaseIterationStatement(query);
 	};
-	rows.next = (...values: [] | [undefined]) => {
+	rows.next = (...values: [] | [undefined]): ReturnType<typeof next> => {
 		let result: ReturnType<typeof next>;
 		try {
 			result = next(...values);
@@ -40,7 +40,7 @@ export function iterateSqliteRows(
 		return result;
 	};
 	if (close !== undefined)
-		rows.return = (value?: unknown) => {
+		rows.return = (value?: unknown): ReturnType<NonNullable<typeof close>> => {
 			try {
 				return close(value as never);
 			} finally {

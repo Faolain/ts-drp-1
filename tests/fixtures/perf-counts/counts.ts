@@ -16,9 +16,12 @@
 //
 // Call sites: pass `onCall` to receive each key with a stack summary (`callSite()`), for attribution.
 
+import type * as Canonical from "@ts-drp/canonical";
+
 export type CountKeyListener = (key: string) => void;
 
-const keyword = (sql: unknown) => (typeof sql === "string" ? (/^\s*([A-Za-z]+)/u.exec(sql)?.[1] ?? "?").toUpperCase() : "?");
+const keyword = (sql: unknown) =>
+	typeof sql === "string" ? (/^\s*([A-Za-z]+)/u.exec(sql)?.[1] ?? "?").toUpperCase() : "?";
 
 /**
  * Installs the SQLite count seams.
@@ -30,7 +33,11 @@ export async function installSqliteCountSeams(bump: CountKeyListener): Promise<(
 	const restores: (() => void)[] = [];
 	// Open write transactions per connection, so a ROLLBACK can be told from a read rollback.
 	const writing = new WeakSet<object>();
-	const patch = (target: Record<string, unknown> | undefined, method: string, label: (self: object, args: unknown[]) => string) => {
+	const patch = (
+		target: Record<string, unknown> | undefined,
+		method: string,
+		label: (self: object, args: unknown[]) => string
+	) => {
 		const original = target?.[method];
 		if (target === undefined || typeof original !== "function") return;
 		target[method] = function (this: object, ...args: unknown[]) {
@@ -80,8 +87,8 @@ export async function installSqliteCountSeams(bump: CountKeyListener): Promise<(
 export async function countingCanonical(
 	importOriginal: <T>() => Promise<T>,
 	bump: CountKeyListener
-): Promise<typeof import("@ts-drp/canonical")> {
-	const original = await importOriginal<typeof import("@ts-drp/canonical")>();
+): Promise<typeof Canonical> {
+	const original = await importOriginal<typeof Canonical>();
 	return {
 		...original,
 		encodeCanonical: (...args: Parameters<typeof original.encodeCanonical>) => {

@@ -58,7 +58,7 @@ test("statements never cross connections or survive close", () => {
 	const b = open();
 	const fromA = iterationStatement(a, SQL);
 	expect(values(a)).toEqual([1, 2, 3]);
-	[...iterateSqliteRows(fromA, 1)];
+	expect([...iterateSqliteRows(fromA, 1)]).toHaveLength(3);
 	expect(iterationStatement(b, SQL)).not.toBe(fromA);
 	a.close();
 	const reopened = new DatabaseSync(":memory:");

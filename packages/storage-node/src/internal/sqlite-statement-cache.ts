@@ -112,8 +112,8 @@ export function iterationStatement(database: DatabaseSync, sql: string): Stateme
 	const statements = connections.get(database);
 	const idle = statements?.get(key);
 	let statement: StatementSync | undefined;
-	if (idle !== undefined) {
-		statements!.delete(key);
+	if (statements !== undefined && idle !== undefined) {
+		statements.delete(key);
 		if (live(idle)) statement = idle;
 	}
 	statement ??= configured(database.prepare(sql));
@@ -137,7 +137,8 @@ export function releaseIterationStatement(statement: StatementSync): void {
 		statements = new Map();
 		connections.set(owner.database, statements);
 	}
-	if (!statements.has(owner.key) && statements.size < MAX_STATEMENTS_PER_CONNECTION) statements.set(owner.key, statement);
+	if (!statements.has(owner.key) && statements.size < MAX_STATEMENTS_PER_CONNECTION)
+		statements.set(owner.key, statement);
 }
 
 function acquire(database: DatabaseSync, sql: string, configure: boolean): StatementSync {

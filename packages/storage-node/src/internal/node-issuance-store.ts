@@ -2122,12 +2122,17 @@ class NodeIssuanceImplementation {
 					this.#idleIssueWriter === undefined &&
 					(database as { isTransaction?: boolean }).isTransaction === false
 				)
-					this.#idleIssueWriter = Object.freeze({ database, dev: issueWriterIdentity.dev, ino: issueWriterIdentity.ino });
+					this.#idleIssueWriter = Object.freeze({
+						database,
+						dev: issueWriterIdentity.dev,
+						ino: issueWriterIdentity.ino,
+					});
 				else
 					try {
 						database.close();
 					} catch (error) {
-						cleanup = cleanup === undefined ? error : new AggregateError([cleanup, error], "native issue release failed");
+						cleanup =
+							cleanup === undefined ? error : new AggregateError([cleanup, error], "native issue release failed");
 					}
 				releaseWriter?.();
 				if (cleanup !== undefined)

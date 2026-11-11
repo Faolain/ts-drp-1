@@ -35,13 +35,17 @@ function raw(path: string): DatabaseSync {
 	});
 	return database;
 }
-/** Counts executions of statements whose SQL matches (a statement-level spy, restored after the test). */
+/**
+ * Counts executions of statements whose SQL matches (a statement-level spy, restored after the test).
+ * @param pattern
+ */
 function spy(pattern: RegExp): { readonly count: number } {
 	const counter = { count: 0 };
 	const prototype = StatementSync.prototype as unknown as Record<string, (...args: unknown[]) => unknown>;
 	for (const method of ["get", "all", "iterate", "run"]) {
-		const original = prototype[method]!;
-		prototype[method] = function (this: StatementSync, ...args: unknown[]) {
+		const original = prototype[method];
+		if (original === undefined) throw new TypeError(`StatementSync.${method} is missing`);
+		prototype[method] = function (this: StatementSync, ...args: unknown[]): unknown {
 			if (pattern.test(this.sourceSQL)) counter.count++;
 			return original.apply(this, args);
 		};
@@ -58,7 +62,8 @@ function signing(path: string, initialization: "create" | "reopen" = "create"): 
 	closers.push(() => database.close());
 	return database;
 }
-const read = (database: SqliteSigningDatabase): unknown => database.transact(false, () => database.getMeta("incarnation"));
+const read = (database: SqliteSigningDatabase): unknown =>
+	database.transact(false, () => database.getMeta("incarnation"));
 const incarnationBytes = (value: string): Uint8Array => encodeCanonical({ key: "incarnation", value });
 
 test("signing database: catalog and incarnation memos hit only at an unchanged revision", async () => {
@@ -171,7 +176,10 @@ function roomHead(path: string, kind: "create" | "reopen"): NodeRoomHeadAuthorit
 	closers.push(() => authority.close());
 	return authority;
 }
-/** readRetirementImage must always agree with the same connection's uncached read. */
+/**
+ * readRetirementImage must always agree with the same connection's uncached read.
+ * @param authority
+ */
 async function agrees(authority: NodeRoomHeadAuthority): Promise<unknown> {
 	const image = await authority.readRetirementImage({ scope });
 	const current = await authority.read({ scope });

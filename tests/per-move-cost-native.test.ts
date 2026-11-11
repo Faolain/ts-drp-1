@@ -126,7 +126,7 @@ it("per steady move (rollover off): bounded SQLite statements, transactions, pre
 	// statement object executed for the first time counts as one prepare.
 	const seen = new WeakSet<object>();
 	for (const method of TIMING ? [] : ["run", "get", "all", "iterate"]) {
-		const target = sqlite.StatementSync!.prototype;
+		const target = (sqlite.StatementSync as { prototype: Record<string, unknown> }).prototype;
 		const original = target[method] as (...values: unknown[]) => unknown;
 		target[method] = function (this: object, ...args: unknown[]) {
 			if (!seen.has(this)) {
@@ -161,7 +161,9 @@ it("per steady move (rollover off): bounded SQLite statements, transactions, pre
 		// Both protocol-v3 instances: the vite-aliased source this test's importers load, and the dist
 		// build the dist packages (storage, compaction, issuance-store) resolve through node.
 		const distVerifications = (
-			(await import(path.resolve(import.meta.dirname, "../packages/protocol-v3/dist/src/instrumentation.js"))) as { observeEd25519Verifications: typeof observeEd25519Verifications }
+			(await import(path.resolve(import.meta.dirname, "../packages/protocol-v3/dist/src/instrumentation.js"))) as {
+				observeEd25519Verifications: typeof observeEd25519Verifications;
+			}
 		).observeEd25519Verifications;
 		for (const [instance, observe] of [
 			["source", observeEd25519Verifications],
@@ -178,7 +180,10 @@ it("per steady move (rollover off): bounded SQLite statements, transactions, pre
 		const { HashMD } = (await import(pathToFileURL(path.join(path.dirname(nobleMd), "esm/_md.js")).href)) as {
 			HashMD: { prototype: Record<string, unknown> };
 		};
-		for (const prototype of [HashMD.prototype, Object.getPrototypeOf(createHash("sha256")) as Record<string, unknown>]) {
+		for (const prototype of [
+			HashMD.prototype,
+			Object.getPrototypeOf(createHash("sha256")) as Record<string, unknown>,
+		]) {
 			const update = prototype.update as (this: unknown, data: unknown, ...rest: unknown[]) => unknown;
 			prototype.update = function (this: unknown, data: unknown, ...rest: unknown[]) {
 				bump("hashedBytes", typeof data === "string" ? Buffer.byteLength(data) : (data as Uint8Array).byteLength);
@@ -192,9 +197,9 @@ it("per steady move (rollover off): bounded SQLite statements, transactions, pre
 
 	const profileOut = env.PERMOVE_CPU_PROFILE;
 	const session = profileOut === undefined ? undefined : new Session();
-	const post = (method: string, params?: object) =>
+	const post = (method: string, params?: object): Promise<unknown> =>
 		new Promise<unknown>((resolve, reject) =>
-			session!.post(method as never, params as never, (error: unknown, result: unknown) =>
+			(session as Session).post(method as never, params as never, (error: unknown, result: unknown) =>
 				error ? reject(error as Error) : resolve(result)
 			)
 		);
@@ -205,7 +210,7 @@ it("per steady move (rollover off): bounded SQLite statements, transactions, pre
 		recording = false;
 		if (session !== undefined) {
 			const result = (await post("Profiler.stop")) as Profiler.StopReturnType;
-			writeFileSync(profileOut!, JSON.stringify(result.profile));
+			writeFileSync(profileOut as string, JSON.stringify(result.profile));
 			session.disconnect();
 		}
 	};
@@ -281,7 +286,8 @@ it("per steady move (rollover off): bounded SQLite statements, transactions, pre
 			(error: unknown) => error
 		);
 		// The driver wraps a transition's refusal (cause: the sentinel).
-		if (stopped !== STOP && (stopped as { cause?: unknown } | undefined)?.cause !== STOP) throw new Error(`PERMOVE_RUN_FAILED at ordinal ${ordinal} step ${step}`, { cause: stopped });
+		if (stopped !== STOP && (stopped as { cause?: unknown } | undefined)?.cause !== STOP)
+			throw new Error(`PERMOVE_RUN_FAILED at ordinal ${ordinal} step ${step}`, { cause: stopped });
 	} finally {
 		for (const restore of restores.reverse()) restore();
 	}

@@ -24,7 +24,10 @@ function directory(): string {
 	return path;
 }
 
-function open(file = join(directory(), "db.sqlite"), mode = "WAL") {
+function open(
+	file = join(directory(), "db.sqlite"),
+	mode = "WAL"
+): { owner: DatabaseSync; other: DatabaseSync; file: string } {
 	const owner = new DatabaseSync(file);
 	owner.exec(`PRAGMA journal_mode=${mode}; CREATE TABLE IF NOT EXISTS t(k TEXT PRIMARY KEY, v BLOB)`);
 	owner.prepare("INSERT OR REPLACE INTO t VALUES('a', x'01')").run();
@@ -185,7 +188,9 @@ it("a file replaced under the same path never makes the memo differ from its own
 	other.close();
 	const replacement = join(directory(), "replacement.sqlite");
 	const built = new DatabaseSync(replacement);
-	built.exec("PRAGMA journal_mode=DELETE; CREATE TABLE t(k TEXT PRIMARY KEY, v BLOB); INSERT INTO t VALUES('a', x'0f')");
+	built.exec(
+		"PRAGMA journal_mode=DELETE; CREATE TABLE t(k TEXT PRIMARY KEY, v BLOB); INSERT INTO t VALUES('a', x'0f')"
+	);
 	built.close();
 	renameSync(replacement, file);
 	// The owner still reads its original file (whose identity the stores check separately): the memo

@@ -1582,8 +1582,11 @@ function continuableFold(
 	operations: readonly V3RoomAcceptedOperation[]
 ): ZoneFold | undefined {
 	if (prior === undefined || !prior.continuable || prior.operations.length > operations.length) return undefined;
-	if (baseBytes === undefined ? prior.baseBytes !== undefined : prior.baseBytes === undefined || !sameBytes(prior.baseBytes, baseBytes))
-		return undefined;
+	const sameBase =
+		baseBytes === undefined
+			? prior.baseBytes === undefined
+			: prior.baseBytes !== undefined && sameBytes(prior.baseBytes, baseBytes);
+	if (!sameBase) return undefined;
 	for (let index = 0; index < prior.operations.length; index++)
 		if (prior.operations[index] !== operations[index]) return undefined;
 	return prior;
@@ -1620,8 +1623,7 @@ function foldZone(
 					};
 	const acceptedDigests = new Set<string>(prior?.acceptedDigests);
 	const start = prior?.operations.length ?? 0;
-	for (let index = start; index < operations.length; index++) {
-		const accepted = operations[index]!;
+	for (const accepted of operations.slice(start)) {
 		acceptedDigests.add(accepted.vertexDigest);
 		// Signature and current-room admission remain owned by the authenticated
 		// boundary. The exact same pure transition owns live and folded state.
@@ -1634,8 +1636,10 @@ function foldZone(
 	// Continuable only over frozen records and a frozen (captured) state: identity then proves
 	// the prefix and its result are unchanged.
 	let continuable = Object.isFrozen(state);
-	for (let index = start; continuable && index < operations.length; index++)
-		continuable = Object.isFrozen(operations[index]) && Object.isFrozen(operations[index]!.operation);
+	for (let index = start; continuable && index < operations.length; index++) {
+		const record = operations[index];
+		continuable = Object.isFrozen(record) && Object.isFrozen(record?.operation);
+	}
 	return Object.freeze({
 		baseBytes: prior !== undefined ? prior.baseBytes : baseBytes === undefined ? undefined : baseBytes.slice(),
 		operations: Object.freeze([...operations]),

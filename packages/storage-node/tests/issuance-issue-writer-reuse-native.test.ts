@@ -5,9 +5,9 @@
 import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import type { DurableIssuanceStore, DurableIssueCommit, DurableIssueScope } from "@ts-drp/issuance-store";
 import { mkdtemp, rename, rm } from "node:fs/promises";
-import { StatementSync } from "node:sqlite";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { StatementSync } from "node:sqlite";
 import { afterEach, expect, it } from "vitest";
 
 import { createNodeDurableIssuanceStore } from "../src/issuance.js";
@@ -55,7 +55,12 @@ function commitFor(issueScope: DurableIssueScope, sequence: number): DurableIssu
 	};
 }
 
-/** Issues through the job's own private writer (its native sign admission). */
+/**
+ * Issues through the job's own private writer (its native sign admission).
+ * @param store
+ * @param issueScope
+ * @param gate
+ */
 function issue(store: DurableIssuanceStore, issueScope: DurableIssueScope, gate?: Promise<void>): Promise<unknown> {
 	return store.transactIssue(issueScope, async (sequence, admit) => {
 		const commit = commitFor(issueScope, sequence);
@@ -68,29 +73,42 @@ function issue(store: DurableIssuanceStore, issueScope: DurableIssueScope, gate?
 	});
 }
 
-/** Statement objects first executed while `run` runs (each one a fresh prepare). */
+/**
+ * The value, which must be present.
+ * @param value - A value that is present by construction.
+ * @returns The value.
+ */
+function required<T>(value: T | undefined): T {
+	if (value === undefined) throw new TypeError("expected value is missing");
+	return value;
+}
+
+/**
+ * Statement objects first executed while `run` runs (each one a fresh prepare).
+ * @param run
+ */
 async function freshStatements(run: () => Promise<unknown>): Promise<number> {
 	const methods = ["run", "get", "all", "iterate"] as const;
 	const prototype = StatementSync.prototype as unknown as Record<string, (...args: unknown[]) => unknown>;
-	const originals = methods.map((method) => prototype[method]!);
+	const originals = methods.map((method) => required(prototype[method]));
 	const seen = new Set<object>();
 	const known = statementsSeen;
 	let fresh = 0;
 	methods.forEach((method, index) => {
-		prototype[method] = function (this: object, ...args: unknown[]) {
+		prototype[method] = function (this: object, ...args: unknown[]): unknown {
 			if (!known.has(this) && !seen.has(this)) {
 				seen.add(this);
 				fresh++;
 			}
 			known.add(this);
-			return originals[index]!.apply(this, args);
+			return required(originals[index]).apply(this, args);
 		};
 	});
 	try {
 		await run();
 	} finally {
 		methods.forEach((method, index) => {
-			prototype[method] = originals[index]!;
+			prototype[method] = required(originals[index]);
 		});
 	}
 	return fresh;
