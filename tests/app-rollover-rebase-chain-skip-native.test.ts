@@ -392,4 +392,9 @@ it("a skip install resolving retained rows pays the native settlement turn once 
 	expect(large.work.recoveryCensusReads - small.work.recoveryCensusReads, "census reads per further row").toBeLessThanOrEqual(
 		(32 - 8) * 2.5
 	);
+	// Wall clock, generous: per-row time does not grow with the number of rows, and 32 rows resolve
+	// well inside the quiet-host time they took before (15.7-17.8 s; 1.1 s after the fix under host
+	// load ~30).
+	expect(large.perRowMs, "per-row time, 32 rows vs 8").toBeLessThanOrEqual(small.perRowMs * 1.5);
+	expect(large.installMs, "32-row skip install").toBeLessThanOrEqual(8_000);
 }, 1_500_000);
