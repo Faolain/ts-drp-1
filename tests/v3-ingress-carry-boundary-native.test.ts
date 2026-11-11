@@ -3,10 +3,10 @@
 // (a synthesized copy), and the re-offer takes only a copy carryV3PendingIngress minted in-process.
 import { afterEach, expect, it } from "vitest";
 
-import { reofferV3CarriedPendingIngress, type V3PlaneHandle } from "../packages/node/src/v3-live.js";
 import { closeFixtures, required } from "./fixtures/track-m/room-retention-fixture.js";
 import { isControl } from "./fixtures/track-x/outside-rows-room.js";
 import { readinessHoldRoom } from "./fixtures/track-x/readiness-hold-room.js";
+import { reofferV3CarriedPendingIngress, type V3PlaneHandle } from "../packages/node/src/v3-live.js";
 
 afterEach(async () => {
 	expect(await closeFixtures(), "native admitted work and owners join").toEqual([]);
