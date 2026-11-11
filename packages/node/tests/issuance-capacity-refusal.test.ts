@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import "../src/index.js";
 import { ISSUANCE_CAPACITY_FORECAST_EXCEEDED, issuanceCapacityRefusal } from "../src/creator-close.js";
 
 // One typed capacity reason for a local issue refused before signing, on the creator and on a
