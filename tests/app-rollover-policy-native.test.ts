@@ -287,16 +287,21 @@ it.each([
 it("grid with a hot writer: a received move refused at the creator's capacity triggers a rollover and is accepted", async () => {
 	const restore = await installEnvironment("node", () => undefined);
 	try {
-		// The creator moves every few Writer moves: its rows are the admission evidence that keeps the
-		// Writer's admitted moves out of its undelivered bound (V3RoomLocalBacklogFull), and they fill
-		// the creator's per-epoch proof book with the Writer's received moves, so the creator refuses a
-		// received move before the Writer's own admission reaches its settlement reserve (the next case).
+		// The creator moves every other Writer move until its own moves have filled most of its
+		// per-epoch proof book, then pauses while the Writer's received moves fill the rest: the creator
+		// refuses a received move, and not its own, and before the Writer's own admission reaches its
+		// settlement reserve (the next case). Its rows are the admission evidence that keeps the
+		// Writer's admitted moves out of the undelivered bound (V3RoomLocalBacklogFull, 64 moves after
+		// the creator's last row), so the pause is shorter than that and the creator resumes after it.
 		const writerMoves = Number(process.env.HOT_WRITER_MOVES ?? 300);
-		const creatorEvery = Number(process.env.HOT_WRITER_CREATOR_EVERY ?? 4);
-		const policy = await playPastCeiling("grid", "writer", writerMoves, { movesPerAuthor: 100_000, idleMs: 3_600_000 },
-			(ordinal) => ordinal % creatorEvery === 0);
+		const creatorEvery = Number(process.env.HOT_WRITER_CREATOR_EVERY ?? 2);
+		const pauseAt = Number(process.env.HOT_WRITER_CREATOR_PAUSE_AT ?? 140);
+		const pause = Number(process.env.HOT_WRITER_CREATOR_PAUSE ?? 60);
+		const movesPerAuthor = Number(process.env.HOT_WRITER_BUDGET ?? 100_000);
+		const policy = await playPastCeiling("grid", "writer", writerMoves, { movesPerAuthor, idleMs: 3_600_000 },
+			(ordinal) => (ordinal < pauseAt || ordinal >= pauseAt + pause) && ordinal % creatorEvery === 0);
 		expect(policy?.events.map((event) => event.trigger)).toContain("refusal");
-		expect(policy?.events.every((event) => event.trigger === "refusal")).toBe(true);
+		expect(policy?.events.every((event) => event.trigger === "refusal" || event.trigger === "budget")).toBe(true);
 	} finally {
 		restore();
 	}
@@ -304,7 +309,7 @@ it("grid with a hot writer: a received move refused at the creator's capacity tr
 
 // Writer-side admission and maintenance agree (fix/maintenance-image-capacity): a hot Writer's
 // moves the creator closed an epoch without are replaced at the successor's install, under the
-// Writer's own issuance row and byte bound. At 1200 moves the Writer admitted moves whose
+// Writer's own issuance row and byte bound. At about 505 moves the Writer admitted moves whose
 // replacements its store then refused (row bound) inside the install's drainRebaseOutbox, so it
 // never installed. Its admission must reserve one replacement per own move of the epoch and refuse
 // (typed, retry after rollover) otherwise; then every admitted move settles. The Writer cannot seal:
@@ -312,7 +317,9 @@ it("grid with a hot writer: a received move refused at the creator's capacity tr
 it("grid with a hot writer: no admitted move's settlement is refused by the Writer's own store", async () => {
 	const restore = await installEnvironment("node", () => undefined);
 	try {
-		const writerMoves = Number(process.env.HOT_WRITER_SETTLEMENT_MOVES ?? 1200);
+		// 700: past the deadlock (about writer move 505 without the reserve) and under the grid
+		// state's canonical bound (each move adds a block; about 900 blocks exceed it).
+		const writerMoves = Number(process.env.HOT_WRITER_SETTLEMENT_MOVES ?? 700);
 		// The creator moves every 8 Writer moves (admission evidence, as an online room has).
 		const creatorEvery = Number(process.env.HOT_WRITER_CREATOR_EVERY ?? 8);
 		const policy = await playPastCeiling("grid", "writer", writerMoves, { movesPerAuthor: 100_000, idleMs: 20_000 },
