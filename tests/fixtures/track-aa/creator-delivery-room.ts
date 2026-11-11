@@ -147,7 +147,9 @@ export interface RoomOptions {
 	/** Optional genuine network boundary for native transport composition checks. */
 	readonly network?: ReturnType<typeof memoryNetwork>;
 	readonly peerIds?: readonly string[];
-	onAccepted?(index: number, digest: string, author: string): void;
+	onAccepted?(index: number, digest: string, author: string, vertex?: Readonly<{ epoch: number; operation: Readonly<Record<string, unknown>> }>): void;
+	/** Extra session options for every opened peer (measurement harnesses, e.g. the scheduled lull). */
+	readonly sessionOptions?: Readonly<Partial<CreateV3RoomSessionInput<unknown>>>;
 }
 
 /**
@@ -254,7 +256,7 @@ export async function creatorDeliveryRoom(options: RoomOptions = {}) {
 			onProjection: () => undefined,
 			onAcceptedVertex: async (vertex) => {
 				seen.add(hex(vertex.digest));
-				options.onAccepted?.(index, hex(vertex.digest), vertex.author);
+				options.onAccepted?.(index, hex(vertex.digest), vertex.author, vertex);
 				if (index === 0) await creatorGate.pass();
 			},
 			// The genuine room transport, as `DRPNode.openRoomNetwork` opens it (the creator
@@ -269,6 +271,7 @@ export async function creatorDeliveryRoom(options: RoomOptions = {}) {
 				ports.set(index, port);
 				return port;
 			},
+			...(options.sessionOptions as object | undefined),
 		};
 		const room = await createV3RoomSession(input);
 		rooms.add(room);
