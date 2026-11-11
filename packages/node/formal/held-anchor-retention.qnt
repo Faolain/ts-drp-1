@@ -9,8 +9,11 @@
 // turnover census.
 //
 // Measured in the 4-author scorecard (ANCHOR_DEBUG dumps, .logs/realtime-resume-2026-11-10/anchor) and
-// reproduced without it (tests/creator-fenceless-rebase-entry-anchor-native.test.ts: P1,
-// tests/creator-skip-epoch-own-row-anchor-native.test.ts: P2). In every dump the member's plan has no
+// reproduced without it at 4e3c9b41 by two native REDs for P1 and P2 that reached the fenceless epoch
+// through hand-back record overflow. fix/int7-admitted-backlog bounds every move by the records, so
+// they are refused up front there and were dropped (copies: .logs/realtime-resume-2026-11-10/anchor/
+// dropped-p1p2). The path that remains (no overflow) is p4 below, tests/creator-readmitted-member-
+// anchor-native.test.ts. In every dump the member's plan has no
 // author fence because retained work stays unknown: its hand-back records do not fit
 // (SETTLEMENT_HAND_BACK_LIMITS.maxRecords, one record per operation; `hb` 51..64) and
 // drainSettlementOutbox withholds the fence while unknown retained work remains.
@@ -52,7 +55,11 @@
 //               (records full, frontier not installed yet), not for retained work no proof can ever reach
 //               (`lost`: an old incarnation's row, or a displaced unguarded row): a fence cannot make a
 //               lost row less provable, and withholding it leaves every later epoch fenceless.
+//               While retained work waits for a frontier a later install may bring (`awaiting`), the
+//               fence stays withheld and the member's new moves are refused (kept by the app's policy)
+//               until an install fences (`fenceAwaited`): no move is signed in an epoch with no own fence.
 //   releaseFenceOverLost  release + fenceOverLost.
+//   fenceOverLostNoHold  broken control: fenceOverLost that does not refuse moves while the fence is awaited.
 //   Broken controls:
 //   overRelease release that also drops the entry of a source that is NOT resolved.
 //   guardAny    release whose guard accepts an own fence of ANY epoch below the row. (On a base that
@@ -127,12 +134,17 @@ module heldAnchorRetention {
   var pending: Set[int]
   // Retained rows no proof can ever resolve (manual review for good): installLost.
   var lost: Set[int]
+  // Retained rows waiting for a frontier a later install may bring (installAwaiting): transient.
+  var awaiting: Set[int]
+  // This epoch's author fence is awaited: the hold refuses new moves (fenceOverLost).
+  var fenceAwaited: bool
 
   def releases(rl: str): bool =
     rl == "release" or rl == "releaseFenceFirst" or rl == "overRelease" or rl == "guardAny" or rl == "cutProof" or rl == "cutEarly" or
     rl == "releaseProveFirst" or rl == "proveAny" or rl == "proveDrop" or rl == "releaseFenceOverLost"
   def cuts(rl: str): bool = rl == "cutProof" or rl == "cutEarly"
-  def fencesOverLost(rl: str): bool = rl == "fenceOverLost" or rl == "releaseFenceOverLost"
+  def fencesOverLost(rl: str): bool = rl == "fenceOverLost" or rl == "releaseFenceOverLost" or rl == "fenceOverLostNoHold"
+  def holdsMoves(rl: str): bool = rl == "fenceOverLost" or rl == "releaseFenceOverLost"
   def provesFirst(rl: str): bool = rl == "proveFirst" or rl == "releaseProveFirst" or rl == "proveAny" or rl == "proveDrop"
   def fencesFirst(rl: str): bool = rl == "fenceFirst" or rl == "releaseFenceFirst"
 
@@ -209,14 +221,14 @@ module heldAnchorRetention {
     val needFence = fencesFirst(rule) and planFence < 0 and held.exists(s => s > tt and not(isFence(s)))
     val m = if (needFence) nextSeq + 1 else nextSeq
     all {
-      cur > 0, m <= MAX_SEQ,
+      cur > 0, m <= MAX_SEQ, not(holdsMoves(rule) and fenceAwaited),
       rows' = (if (needFence) rows.put(nextSeq, { e: cur, fence: true, src: -1, cap: false }) else rows)
         .put(m, { e: cur, fence: false, src: -1, cap: false }),
       held' = held.union(if (needFence) Set(nextSeq, m) else Set(m)),
       planFence' = if (needFence) nextSeq else planFence,
       nextSeq' = m + 1,
       rule' = rule, cur' = cur, gens' = gens, entries' = entries, expired' = expired, committed' = committed,
-      admitted' = admitted, tt' = tt, stuck' = stuck, cutProven' = cutProven, pending' = pending, lost' = lost,
+      admitted' = admitted, tt' = tt, stuck' = stuck, cutProven' = cutProven, pending' = pending, lost' = lost, awaiting' = awaiting, fenceAwaited' = fenceAwaited,
       keepFlags,
     }
   }
@@ -232,7 +244,7 @@ module heldAnchorRetention {
     refusedUnexcused' = refusedUnexcused, refusedReview' = refusedReview, unsafeRelease' = unsafeRelease,
     lostMove' = lostMove, lulled' = false,
     rule' = rule, cur' = cur, gens' = gens, rows' = rows, held' = held, nextSeq' = nextSeq, planFence' = planFence,
-    entries' = entries, expired' = expired, committed' = committed, stuck' = stuck, cutProven' = cutProven, pending' = pending, lost' = lost,
+    entries' = entries, expired' = expired, committed' = committed, stuck' = stuck, cutProven' = cutProven, pending' = pending, lost' = lost, awaiting' = awaiting, fenceAwaited' = fenceAwaited,
   }
 
   // A successor install k epochs ahead: the merge clears the fence. Live (not retained) displaced
@@ -247,6 +259,8 @@ module heldAnchorRetention {
   action install(k: int, ov: bool): bool = installMode(k, if (ov) 1 else 0)
   // A skip install whose retained rows no proof can ever resolve (an old incarnation's rows).
   action installLost(k: int): bool = all { k > 1, installMode(k, 2) }
+  // A skip install whose retained rows wait for a frontier a later install brings.
+  action installAwaiting(k: int): bool = all { k > 1, installMode(k, 3) }
   action installMode(k: int, mode: int): bool = {
     val c = cur + k
     val proven = if (cuts(rule) and k == 1)
@@ -260,14 +274,15 @@ module heldAnchorRetention {
     val retain = if (k == 1) Set() else live.exclude(expire)
     val wouldStick = if (mode == 1) stuck.union(retain) else stuck
     val nowLost = if (mode == 2) lost.union(retain) else lost
+    val nowAwaiting = if (mode == 3) retain else Set()
     val provedStuck = if (provesFirst(rule))
       wouldStick.filter(s => displaced(s, c) and (guarded(s) or rule == "proveAny"))
     else Set()
     val nowStuck = wouldStick.exclude(provedStuck)
-    val capOpen = open.filter(s => isCap(s)).union(retain).exclude(wouldStick).exclude(nowLost)
+    val capOpen = open.filter(s => isCap(s)).union(retain).exclude(wouldStick).exclude(nowLost).exclude(nowAwaiting)
     val capNever = capOpen.filter(s => displaced(s, c) and (guarded(s) or rule == "proveAny"))
     val capCommitted = capOpen.filter(s => s <= tt and not(held.exists(f => isFence(f) and f > s and f <= tt)))
-    val unknown = capOpen.exclude(capNever).exclude(capCommitted).union(nowStuck)
+    val unknown = capOpen.exclude(capNever).exclude(capCommitted).union(nowStuck).union(nowAwaiting)
     val withholding = if (fencesOverLost(rule)) unknown else unknown.union(nowLost)
     val settle = replace.size() > 0 or withholding.size() == 0 or fencesFirst(rule)
     val f = nextSeq
@@ -290,6 +305,7 @@ module heldAnchorRetention {
       committed' = committed.union(capCommitted),
       gens' = retireGens(gens.union(Set(c)), c, demanded(held, c)),
       rule' = rule, admitted' = admitted, tt' = tt, stuck' = nowStuck, cutProven' = cutProven.union(proven), pending' = pending.union(provedStuck), lost' = nowLost,
+      awaiting' = nowAwaiting, fenceAwaited' = (not(settle) and nowAwaiting.size() > 0),
       keepFlags,
     }
   }
@@ -315,14 +331,14 @@ module heldAnchorRetention {
       cutProven' = if (rule == "cutEarly")
         cutProven.union(held.filter(s => not(isFence(s)) and ep(s) == cur and not(admitted.contains(s))))
       else cutProven,
-      pending' = pending, lost' = lost,
+      pending' = pending, lost' = lost, awaiting' = awaiting, fenceAwaited' = fenceAwaited,
     }
   }
 
   // Hand-back records free (the application offered its given-back moves again): the stuck rows are
   // resolvable at the next install.
   action free = all {
-    stuck.size() > 0 or pending.size() > 0, stuck' = Set(), cutProven' = cutProven, pending' = Set(), lost' = lost,
+    stuck.size() > 0 or pending.size() > 0, stuck' = Set(), cutProven' = cutProven, pending' = Set(), lost' = lost, awaiting' = awaiting, fenceAwaited' = fenceAwaited,
     rule' = rule, cur' = cur, gens' = gens, rows' = rows, held' = held, nextSeq' = nextSeq, planFence' = planFence,
     entries' = entries, expired' = expired, committed' = committed, admitted' = admitted, tt' = tt,
     keepFlags,
@@ -333,7 +349,7 @@ module heldAnchorRetention {
     rows' = Map(0 -> { e: 0, fence: true, src: -1, cap: false }),
     entries' = Map(), expired' = Set(), committed' = Set(), admitted' = Set(0), tt' = 0,
     refusedUnexcused' = false, refusedReview' = false, unsafeRelease' = false, lostMove' = false,
-    replayNoSource' = false, lulled' = false, stuck' = Set(), cutProven' = Set(), pending' = Set(), lost' = Set(),
+    replayNoSource' = false, lulled' = false, stuck' = Set(), cutProven' = Set(), pending' = Set(), lost' = Set(), awaiting' = Set(), fenceAwaited' = false,
   }
   action init = initWith("releaseProveFirst")
   action initReleaseFenceFirst = initWith("releaseFenceFirst")
@@ -352,6 +368,7 @@ module heldAnchorRetention {
   action initProveDrop = initWith("proveDrop")
   action initFenceOverLost = initWith("fenceOverLost")
   action initReleaseFenceOverLost = initWith("releaseFenceOverLost")
+  action initFenceOverLostNoHold = initWith("fenceOverLostNoHold")
 
   action step = any {
     move,
@@ -369,7 +386,7 @@ module heldAnchorRetention {
   action stepBounded = any {
     move,
     nondet k = 1.to(GAP).oneOf()
-    any { install(k, false), installLost(k) },
+    any { install(k, false), installLost(k), installAwaiting(k) },
     lull,
     nondet s = 0.to(MAX_SEQ).oneOf()
     admit(s),
@@ -402,7 +419,7 @@ module heldAnchorRetention {
   action adj = install(1, false).then(lull)
   action adj3 = adj.then(adj).then(adj)
 
-  // P1 (tests/creator-fenceless-rebase-entry-anchor-native.test.ts): a member moves in epoch 1 (never
+  // P1 (the dropped 4e3c9b41 RED, dropped-p1p2/creator-fenceless-rebase-entry): a member moves in epoch 1 (never
   // delivered); install 2 replaces it (fence + batch); it moves again in epoch 2 (the test's burst),
   // falls behind and skip-installs epoch 5, retaining its epoch-2 rows, whose hand-back records do not
   // fit (the test's 16-operation row past 59 records): unknown, so no fence from then on. The resolved
@@ -410,7 +427,7 @@ module heldAnchorRetention {
   action p1Shape(r: str, ov: bool): bool =
     initWith(r).then(install(1, false)).then(move).then(adj).then(move).then(install(3, ov)).then(lull).then(adj3).then(adj3)
   action p1(r: str): bool = p1Shape(r, true)
-  // P2 (dumps-04, tests/creator-skip-epoch-own-row-anchor-native.test.ts): a move in epoch 1, a skip
+  // P2 (dumps-04, the dropped 4e3c9b41 RED, dropped-p1p2/creator-skip-epoch-own-row): a move in epoch 1, a skip
   // install 1 -> 4 that retains it and cannot hand it back (stuck: no fence), a fresh move in epoch 4
   // (no own fence of epoch 4 precedes it; tt is below it), install 5 replaces it, then adjacent
   // installs with a lull after each.
@@ -473,6 +490,18 @@ module heldAnchorRetention {
   run releaseProveFirstRefusesP4Test = p4("releaseProveFirst").then(all { assert(refusedUnexcused), unchangedAll })
   run releaseFenceOverLostKeepsP4Test = p4("releaseFenceOverLost")
     .then(all { assert(not(refusedUnexcused)), assert(boundedGens), assert(boundedAge), assert(safety), unchangedAll })
+  // The awaited fence: a skip install's retained row waits for a frontier (installAwaiting), so the
+  // fence is withheld; a move in that epoch would be unguarded. The hold refuses it (the app keeps it);
+  // without the hold the move is signed, replaced, and held for good.
+  action p5(r: str): bool =
+    initWith(r).then(install(1, false)).then(move).then(installAwaiting(3))
+  // (move's guard `not(holdsMoves(rule) and fenceAwaited)` refuses it here.)
+  run fenceOverLostHoldsMoveTest = p5("fenceOverLost")
+    .then(all { assert(fenceAwaited), assert(holdsMoves(rule)), assert(planFence < 0), unchangedAll })
+  run fenceOverLostNoHoldRefusesTest = p5("fenceOverLostNoHold").then(move).then(adj).then(adj3).then(adj3).then(adj3)
+    .then(all { assert(refusedUnexcused), unchangedAll })
+  run fenceOverLostAfterHoldKeepsTest = p5("fenceOverLost").then(adj).then(move).then(adj3).then(adj3).then(adj3)
+    .then(all { assert(not(refusedUnexcused)), assert(safety), assert(boundedGens), assert(boundedAge), unchangedAll })
   // Broken (f): retirement drops the proven row before its hand-back record exists: the move is lost.
   run proveDropLosesMoveTest = p1("proveDrop").then(all { assert(lostMove), unchangedAll })
   run releaseProveFirstKeepsP1Test = p1("releaseProveFirst")
@@ -488,6 +517,6 @@ module heldAnchorRetention {
   action unchangedAll = all {
     rule' = rule, cur' = cur, gens' = gens, rows' = rows, held' = held, nextSeq' = nextSeq, planFence' = planFence,
     entries' = entries, expired' = expired, committed' = committed, admitted' = admitted, tt' = tt,
-    stuck' = stuck, cutProven' = cutProven, pending' = pending, lost' = lost, keepFlags,
+    stuck' = stuck, cutProven' = cutProven, pending' = pending, lost' = lost, awaiting' = awaiting, fenceAwaited' = fenceAwaited, keepFlags,
   }
 }

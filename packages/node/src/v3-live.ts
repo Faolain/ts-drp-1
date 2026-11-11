@@ -9101,7 +9101,7 @@ interface CreatorRetainedSourceRow {
 	readonly expiry?: SettlementSourceContext;
 }
 
-interface SettlementFrontierContext {
+export interface SettlementFrontierContext {
 	readonly admissionEpoch: number;
 	readonly currentEpoch: number;
 	readonly terminalThrough: number | null;
@@ -13535,6 +13535,44 @@ async function frontierRetainedResolution(registration: V3PlaneRegistration, sou
 		sourceEpoch >= frontier.admissionEpoch && (fences.highest === undefined || fences.highest < sourceSequence ||
 			(fences.highest <= frontier.terminalThrough && fences.highestEpoch === sourceEpoch))) return "committed";
 	return undefined;
+}
+
+/**
+ * Why the creator's frontier proves nothing about a retained own row (frontierRetainedResolution
+ * returned undefined), and whether a later frontier still could.
+ * - "awaiting-frontier": no valid frontier for this author is installed, or the row's epoch is not
+ *   closed in it. A later install's frontier may prove the row, so the author fence stays withheld
+ *   (a fence admitted first would carry terminalThrough past the row and leave it unprovable).
+ * - "never": no frontier can ever prove it. An earlier incarnation's row (its epoch is before the
+ *   author's admission epoch, which only grows); a row within terminalThrough that an own fence of a
+ *   later epoch follows (terminalThrough and the author's fences only grow); or a displaced row no own
+ *   fence of its epoch precedes and that is not the lowest unsettled sequence (its epoch is closed, so
+ *   no fence of it can be signed now, and terminalThrough reaches it only through a later own fence).
+ *   A fence cannot make such a row less provable, so it does not withhold the author fence: it stays
+ *   manual-review for the user either way.
+ * - "provable": displaced and fence-guarded, so the frontier does prove it (never admitted), but its
+ *   resolution did not happen in this drain (for example, no hand-back record was free for it).
+ * @param frontier - The installed frontier for this author, if any is valid.
+ * @param sourceEpoch - The retained row's own signed epoch.
+ * @param sourceSequence - The retained row's author sequence.
+ * @param lowestFences - The author's lowest own fence sequence by epoch (scanOwnFences).
+ * @returns The classification.
+ */
+export function retainedRowUnprovenKind(frontier: SettlementFrontierContext | undefined, sourceEpoch: number,
+	sourceSequence: number, lowestFences: ReadonlyMap<number, number>): "awaiting-frontier" | "never" | "provable" {
+	if (frontier === undefined || !NumberIsSafeInteger(sourceEpoch) || sourceEpoch >= frontier.currentEpoch) return "awaiting-frontier";
+	const rowClass = settlementOwnRowClass(sourceEpoch, frontier.currentEpoch, sourceSequence, frontier.admissionEpoch,
+		frontier.terminalThrough);
+	if (rowClass === "displaced")
+		return settlementOwnRowFenceGuarded(lowestFences, sourceEpoch, sourceSequence, frontier.terminalThrough) ? "provable" : "never";
+	return rowClass === "current" ? "awaiting-frontier" : "never";
+}
+
+async function frontierRetainedUnproven(registration: V3PlaneRegistration, sourceSequence: number, sourceEpoch: number,
+	scan: () => ReturnType<typeof scanOwnFences>): Promise<"awaiting-frontier" | "never" | "provable"> {
+	const frontier = settlementFrontierFromHistory(registration.historicalIssuance);
+	const valid = frontier !== undefined && validSettlementFrontierContext(registration.payload, frontier) ? frontier : undefined;
+	return retainedRowUnprovenKind(valid, sourceEpoch, sourceSequence, valid === undefined ? new IntrinsicMap() : (await scan()).lowest);
 }
 
 /** One own-fence scan per rebase snapshot (the scan the settlement window classifies against). */
@@ -24376,6 +24414,11 @@ export interface V3RetainedWorkFrontier {
 	/** Already resolved by a signed local-author expiry receipt. */
 	readonly resolved: boolean;
 	readonly frontier: "committed" | "never-admitted" | undefined;
+	/**
+	 * When the frontier proves nothing (frontier undefined): whether a later frontier still could
+	 * (retainedRowUnprovenKind).
+	 */
+	readonly unproven: "awaiting-frontier" | "never" | "provable" | undefined;
 	readonly operations: readonly Readonly<Record<string, unknown>>[];
 }
 
@@ -24418,9 +24461,11 @@ export async function inspectV3RetainedWorkFrontier(plane: V3PlaneHandle): Promi
 			if (authenticated === undefined || intents === undefined || intents.length === 0) continue;
 			const sourceEpoch = retained.contract.identity.trust.currentEpoch;
 			if (authenticated.vertex.epoch !== sourceEpoch) continue;
+			const frontier = await frontierRetainedResolution(registration, entry.sourceSequence, sourceEpoch, scan);
 			result.push(ObjectFreeze({sourceSequence: entry.sourceSequence, sourceDigest: authenticated.digest,
-				sourceContextDigest: lowerHexDigest(entry.sourceContextDigest)!, sourceEpoch, resolved,
-				frontier: await frontierRetainedResolution(registration, entry.sourceSequence, sourceEpoch, scan),
+				sourceContextDigest: lowerHexDigest(entry.sourceContextDigest)!, sourceEpoch, resolved, frontier,
+				unproven: resolved || frontier !== undefined ? undefined
+					: await frontierRetainedUnproven(registration, entry.sourceSequence, sourceEpoch, scan),
 				operations: ObjectFreeze(intents.map(intent => intent.operation))}));
 		}
 		const after = await read(readInput);

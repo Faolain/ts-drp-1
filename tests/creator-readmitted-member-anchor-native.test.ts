@@ -1,10 +1,12 @@
 import { afterEach, expect, it } from "vitest";
 
-import { createShippingChatWindowGenesisStateBytes } from "../examples/chat/src/v3-chat-window.js";
 import { chatSharesRoomFixture, closeChatSharesRooms, required } from "./fixtures/chat-membership-shares/room.js";
+import { createShippingChatWindowGenesisStateBytes } from "../examples/chat/src/v3-chat-window.js";
 
 // RED for fix/creator-anchor-uncovered without hand-back record overflow (fix/int7-admitted-backlog
-// counts every move against the records, so the overflow path of the other two REDs is refused up front).
+// counts every move against the records, so the record-overflow path to a fenceless epoch is refused up front).
+// With the fix (g) the fence is not withheld for retained work no frontier can ever prove, so the
+// re-admission epoch has its own fence and the first move there is guarded.
 //
 // creator-rejoin-readmission-native "retains accepted pending work through removal and re-admission on
 // the same stores": a member's move made before its removal is retained, and the creator's frontier can
@@ -20,7 +22,7 @@ import { chatSharesRoomFixture, closeChatSharesRooms, required } from "./fixture
 
 afterEach(async () => expect(await closeChatSharesRooms()).toEqual([]));
 
-const message = (clientOperationId: string) => ({
+const message = (clientOperationId: string): Readonly<Record<string, unknown>> => ({
 	action: "message",
 	clientOperationId,
 	displayTimeMs: 1_791_662_400_000,
