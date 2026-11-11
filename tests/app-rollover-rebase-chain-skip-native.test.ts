@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type -- Native room helpers retain fixture types. */
 import { decodeCanonical } from "@ts-drp/canonical";
 import type { SnapshotChunkProtocolPort } from "@ts-drp/network/snapshot-transfer";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { Session } from "node:inspector/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, it } from "vitest";
@@ -465,3 +466,133 @@ async function givenBackMovesAreNotWaiting(count: number) {
 }
 
 it("moves given back by a skip install do not count as waiting, and land once when offered again", () => givenBackMovesAreNotWaiting(4), 900_000);
+
+/** CPU profile (the format of node --cpu-prof) of `run`, written when CATCH_UP_PROFILE_DIR is set. */
+async function profiled<T>(name: string, run: () => Promise<T>): Promise<T> {
+	const dir = process.env.CATCH_UP_PROFILE_DIR;
+	if (dir === undefined || dir === "") return run();
+	const session = new Session();
+	session.connect();
+	await session.post("Profiler.enable");
+	await session.post("Profiler.setSamplingInterval", { interval: 1000 });
+	await session.post("Profiler.start");
+	try {
+		return await run();
+	} finally {
+		const { profile } = await session.post("Profiler.stop");
+		mkdirSync(dir, { recursive: true });
+		writeFileSync(join(dir, `${name}.cpuprofile`), JSON.stringify(profile));
+		session.disconnect();
+	}
+}
+
+// Catch-up: a member falls `moves` moves and `epochs` creator epochs behind (its rows never reach
+// the creator; it follows by skip installs over two closed epochs each), then is connected again
+// while the creator keeps moving every 300 ms and rolls at its own policy's rate. Every move must
+// land on the creator exactly once; the time from reconnecting to the last move landing is the
+// catch-up time (printed with the native work counts of that phase). Fails on no progress for
+// CATCH_UP_STALL_MS, not on a fixed deadline.
+const CATCH_UP_STALL_MS = Number(process.env.CATCH_UP_STALL_MS ?? 300_000);
+async function catchUp(moves: number, epochs: number) {
+	const restore = await installEnvironment("node", () => undefined);
+	const directory = mkdtempSync(join(tmpdir(), "app-rollover-catch-up-"));
+	directories.push(directory);
+	try {
+		const { creator, writer } = await openPair(directory);
+		const wire = successorWire(() => [creator, writer] as const);
+		const rows = rowWire(creator, writer);
+		const ordinal = { next: 0 };
+		const ids: string[] = [];
+		const refusedAtIssue: string[] = [];
+		let epoch = 0;
+		let n = 0;
+		const issue = async () => {
+			const id = `block-1-${n}`;
+			try {
+				await writer.issue((await writer.authorityEpoch()) ?? 0, n++);
+			} catch (error) {
+				refusedAtIssue.push(`${id}: ${String(error).slice(0, 160)}`);
+			}
+			ids.push(id);
+		};
+		try {
+			while (epoch < 2) {
+				epoch = await rollCreator(creator, rows.toWriter, ordinal);
+				await wire.caughtUp(epoch);
+				await rows.toWriter();
+				await issue();
+				await rows.toCreator();
+			}
+			const writerAuthor = rowValue((await writer.published(null))[0]!).author;
+			// Behind: the member's rows never reach the creator; every two creator epochs it skip-installs.
+			const steps = Math.max(1, Math.floor(epochs / 2));
+			for (let step = 0; step < steps; step++) {
+				const quota = Math.round(((step + 1) * moves) / steps) - Math.round((step * moves) / steps);
+				for (let k = 0; k < quota; k++) await issue();
+				await wire.pause();
+				for (let roll = 0; roll < 2; roll++) epoch = await rollCreator(creator, rows.toWriter, ordinal);
+				wire.resume();
+				if (step < steps - 1) await wire.caughtUp(epoch, 600_000);
+			}
+			const behind = { creator: epoch, member: (await writer.authorityEpoch()) ?? 0 };
+			// Connected again: the creator keeps moving; the member's rows are carried both ways.
+			const before = readV3SettlementWorkCounts();
+			const started = performance.now();
+			let landedAt = started;
+			let landed = 0;
+			let counts: number[] = [];
+			await profiled(`catch-up-${moves}-${epochs}`, async () => {
+				for (;;) {
+					await rows.toWriter();
+					await rows.toCreator();
+					counts = await acceptedCounts(creator, writerAuthor, ids);
+					const now = counts.filter((count) => count >= 1).length;
+					if (now > landed) {
+						landed = now;
+						landedAt = performance.now();
+					}
+					if (now === ids.length) return;
+					if (performance.now() - landedAt > CATCH_UP_STALL_MS)
+						throw new Error(`catch-up stalled: ${now}/${ids.length} landed, ${JSON.stringify({ counts, creator: (await creator.rollover?.())?.epoch, member: await writer.authorityEpoch(), settlement: await writer.settlementStatus?.().then((value) => { const status = value as { unsettledEpochs?: number; undelivered?: unknown[] } | null; return [status?.unsettledEpochs, status?.undelivered?.length]; }), status: await writer.rolloverStatus?.() }).slice(0, 2000)}`);
+					await creator.issue(0, ordinal.next++);
+					await sleep(300);
+				}
+			});
+			const ms = performance.now() - started;
+			const after = readV3SettlementWorkCounts();
+			const caughtUpAt = { creator: (await creator.rollover?.())?.epoch ?? 0, member: (await writer.authorityEpoch()) ?? 0 };
+			const result = {
+				moves: ids.length,
+				epochsBehind: behind.creator - 2,
+				behind,
+				caughtUpAt,
+				catchUpMs: Math.round(ms),
+				creatorEpochsDuringCatchUp: caughtUpAt.creator - behind.creator,
+				msPerMove: Math.round(ms / ids.length),
+				refusedAtIssue: refusedAtIssue.length,
+				work: {
+					dependencyTurns: after.dependencyTurns - before.dependencyTurns,
+					recoveryCensusReads: after.recoveryCensusReads - before.recoveryCensusReads,
+					retainedContractPreparations: after.retainedContractPreparations - before.retainedContractPreparations,
+					sourceExpirySignatures: after.sourceExpirySignatures - before.sourceExpirySignatures,
+				},
+			};
+			process.stdout.write(`CATCH_UP ${JSON.stringify(result)}\n`);
+			// Exactly once, after one more epoch carried both ways; the member is at the creator's epoch.
+			epoch = await rollCreator(creator, rows.toWriter, ordinal);
+			await wire.caughtUp(epoch, 300_000);
+			await rows.toWriter();
+			await rows.toCreator();
+			expect(await acceptedCounts(creator, writerAuthor, ids)).toEqual(ids.map(() => 1));
+			return result;
+		} finally {
+			await wire.stop();
+		}
+	} finally {
+		restore();
+	}
+}
+
+const CATCH_UP_CASES = (process.env.CATCH_UP_CASES ?? "25x4,50x8,100x16").split(",").map((value) => value.split("x").map(Number) as [number, number]);
+for (const [moves, epochs] of CATCH_UP_CASES)
+	it(`catch-up: a member ${moves} moves and ${epochs} epochs behind lands every move once while the creator keeps rolling`, () => catchUp(moves, epochs), 3_600_000);
