@@ -386,6 +386,9 @@ export interface DRPNetworkHostFactoryContext {
 	readonly snapshot: DRPNetworkHostConfigSnapshot;
 }
 
+/** What a started node's own first bootstrap dials reached (`DRPNetworkNode.initialReach`). */
+export type DRPInitialReach = "reached" | "unreachable" | "none";
+
 export type DRPNetworkHostFactory = (context: DRPNetworkHostFactoryContext) => Promise<Libp2p>;
 
 type DenyDialMultiaddr = NonNullable<NonNullable<Libp2pOptions["connectionGater"]>["denyDialMultiaddr"]>;
@@ -678,6 +681,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private readonly _syncAdmissions = new WeakMap<Connection, SyncSendAdmission>();
 	private _metrics?: PrometheusMetricsRegister;
 	private _bootstrapRetryController?: AbortController;
+	private _initialReach: Promise<DRPInitialReach> = Promise.resolve("none");
 	private _relayPolicyController?: AbortController;
 	private _relayPolicy?: RelayPolicyDriver;
 	private _relayPolicyAcquirePromise: Promise<void> = Promise.resolve();
@@ -1520,12 +1524,27 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			transport: listenAddress === undefined ? "unknown" : sanitizedAddressFields(listenAddress).transport,
 		});
 
+		this._initialReach = Promise.resolve("none");
 		if (!this._config?.seed && bootstrapDiscovery) {
 			this._bootstrapRetryController?.abort();
 			this._bootstrapRetryController = new AbortController();
+			const firstAttempts: Promise<boolean>[] = [];
 			for (const addr of bootstrapNodes) {
-				void this._dialBootstrapWithRetry(multiaddr(addr), this._node, this._bootstrapRetryController.signal);
+				firstAttempts.push(
+					new Promise<boolean>((resolve) => {
+						void this._dialBootstrapWithRetry(
+							multiaddr(addr),
+							this._node!,
+							this._bootstrapRetryController!.signal,
+							resolve
+						);
+					})
+				);
 			}
+			if (firstAttempts.length > 0)
+				this._initialReach = Promise.all(firstAttempts).then((reached) =>
+					reached.some(Boolean) ? "reached" : "unreachable"
+				);
 		}
 
 		this._pubsub = this._node.services.pubsub as ConfigurableGossipSub;
@@ -2192,22 +2211,34 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		};
 	}
 
-	private async _dialBootstrapWithRetry(addr: Multiaddr, node: Libp2p, signal: AbortSignal): Promise<void> {
+	private async _dialBootstrapWithRetry(
+		addr: Multiaddr,
+		node: Libp2p,
+		signal: AbortSignal,
+		onFirstAttempt: (reached: boolean) => void = (): void => undefined
+	): Promise<void> {
 		const retryDelays = [1_000, 2_000, 4_000, 8_000];
 
-		for (let attempt = 0; attempt <= retryDelays.length; attempt++) {
-			if (signal.aborted || this._node !== node || node.status === "stopping" || node.status === "stopped") return;
+		try {
+			for (let attempt = 0; attempt <= retryDelays.length; attempt++) {
+				if (signal.aborted || this._node !== node || node.status === "stopping" || node.status === "stopped") return;
 
-			try {
-				await this.safeDial(addr, node, signal);
-				return;
-			} catch (e) {
-				log.error("::start::dial::error", e);
+				try {
+					await this.safeDial(addr, node, signal);
+					onFirstAttempt(true);
+					return;
+				} catch (e) {
+					log.error("::start::dial::error", e);
+				}
+				onFirstAttempt(false);
+
+				const retryDelay = retryDelays[attempt];
+				if (retryDelay === undefined) return;
+				await this._waitForBootstrapRetry(retryDelay, signal);
 			}
-
-			const retryDelay = retryDelays[attempt];
-			if (retryDelay === undefined) return;
-			await this._waitForBootstrapRetry(retryDelay, signal);
+		} finally {
+			// Stopped or aborted before a first attempt finished: nothing was reached.
+			onFirstAttempt(false);
 		}
 	}
 
@@ -2756,6 +2787,18 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	 */
 	getBootstrapNodes(): string[] {
 		return this._config?.bootstrap_peers ?? BOOTSTRAP_NODES;
+	}
+
+	/**
+	 * What this node's own first connection attempts reached since it started: "reached" once the
+	 * first dial of any configured bootstrap peer connected, "unreachable" once the first dial of every
+	 * one failed, "none" when it had nothing to dial (no bootstrap peers, bootstrap discovery off, or
+	 * a seed node). Inbound connections are not attempts: "none" and "reached" say nothing about who
+	 * else will connect. Retries continue in the background either way.
+	 * @returns The first attempts' outcome; settles once each first attempt finished.
+	 */
+	initialReach(): Promise<DRPInitialReach> {
+		return this._initialReach;
 	}
 
 	/**

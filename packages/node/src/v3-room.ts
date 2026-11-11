@@ -666,10 +666,16 @@ export interface CreateV3RoomSessionInput<Projection extends V3RoomProjectionAut
 	 */
 	readonly creatorRestoreCurrencyBoundMs?: number;
 	/**
-	 * Creator restore currency: how long a reopened creator holds its moves while connected peers have
-	 * not answered (default V3_ROOM_CREATOR_RESTORE_ANSWER_BOUND_MS). With no connected peer it does not wait.
+	 * Creator restore currency: how long a reopened creator gives each peer it asked to answer, from the
+	 * ask (default V3_ROOM_CREATOR_RESTORE_ANSWER_BOUND_MS).
 	 */
 	readonly creatorRestoreCurrencyAnswerBoundMs?: number;
+	/**
+	 * Creator restore currency: how long, from open, a reopened creator whose stored roster names other
+	 * members holds its first move while its connectivity is unresolved (default
+	 * V3_ROOM_CREATOR_RESTORE_HOLD_MS).
+	 */
+	readonly creatorRestoreCurrencyHoldMs?: number;
 	/**
 	 * Opt-in speculative presentation: local moves show at once, remote moves
 	 * show once authenticated (signature + current Writer), both before durable
@@ -970,10 +976,11 @@ function digest(domain: string, value: Uint8Array): string {
 // the room's members for their creator-signed view before it signs. Evidence counts only when this
 // creator verifies it under its own keys: a later epoch's anchor signed by its finality key, or a
 // vertex signed by its author key at or above its local next sequence. A forged or unsigned claim
-// never refuses it, and counts as no answer. Connected members answering is what it waits for; with
-// no peer connected, or none answering within the answer bound, it signs moves (not the finality
-// key, until a member attests or the bound passes) and keeps checking members that connect later.
-// Once refused it stays refused for the session.
+// never refuses it, and counts as no answer. Peers it asked answering is what it waits for, each for
+// at most the answer bound. Its first move is also held while its connectivity is unresolved: unless
+// the stored roster names nobody else, until the hold passes from open or the transport reports
+// that it reached nobody. Then it signs moves (not the finality key, until a member attests or the
+// bound passes) and keeps checking members that connect later. Once refused it stays refused.
 
 const CREATOR_EVIDENCE_DECODE_LIMITS = Object.freeze({ maxBytes: 1 << 20, maxDepth: 32, maxItems: 8192 });
 
@@ -1035,6 +1042,29 @@ function creatorRestoreLocalView(
 		anchorDigest: head.currentAnchorDigest,
 		next: lineage.exhausted || !Number.isSafeInteger(lineage.next) ? Number.MAX_SAFE_INTEGER : lineage.next,
 	});
+}
+
+/**
+ * Whether the room's genesis roster (its latched ACL) names no member but the creator: not
+ * permissionless, and every member is the creator. Anything unreadable is "not solo" (wait). Used
+ * only at epoch 0 (a later epoch's ACL may have granted members; this open does not read it). Not
+ * covered: receive-only peers outside the ACL, and members granted after this storage was written.
+ */
+function creatorRestoreRosterSolo(
+	material: Pick<V3RoomCreatorInviteMaterial, "exactCanonicalLatchedAclBytes">,
+	creator: string
+): boolean {
+	try {
+		const acl = decodeCanonical(material.exactCanonicalLatchedAclBytes) as unknown;
+		if (acl === null || typeof acl !== "object" || Reflect.get(acl, "permissionless") !== false) return false;
+		const members = Reflect.get(acl, "members") as unknown;
+		return (
+			Array.isArray(members) &&
+			members.every((member) => member !== null && typeof member === "object" && Reflect.get(member, "author") === creator)
+		);
+	} catch {
+		return false;
+	}
 }
 
 function signedPair(value: unknown): Readonly<{ preimage: Uint8Array; signature: Uint8Array }> | undefined {
@@ -1146,32 +1176,41 @@ interface CreatorRestoreCurrencyGate {
 /**
  * Starts one reopened creator's check (see above).
  *
- * - "checking": nothing is signed. The member view's first round is asked.
- * - Every asked member attested a view and none is newer: "current" (everything may be signed).
- * - Nobody to ask (no connected peer: the view's round settles with no answer), or no verifiable
- *   answer within `answerBoundMs`: "provisional". Moves (vertex signatures) may be signed; the
- *   finality key is not, until a member attests a view or `boundMs` passes ("current").
+ * - "checking": nothing is signed. Every connected peer is asked, and each peer as it connects.
+ * - A peer asked gets `answerBoundMs` from its ask to answer (a non-member never answers).
+ * - Some peer attested a view, none is newer, and no asked peer is still inside its answer window:
+ *   "current" (everything may be signed).
+ * - No attested view: "provisional" once the stored roster names no member but this creator (at
+ *   once), or once connectivity is resolved (`holdMs` from open passed, or the transport reported
+ *   that its first attempts reached nobody) and no asked peer is still inside its answer window.
+ *   Moves (vertex signatures) may be signed; the finality key is not, until a member attests a view
+ *   or `boundMs` from open passes ("current").
  * - Verified newer state, at any point while the view is watched: "refused" for the session; the
  *   finality signing exclusion is (re)taken and kept until the session closes.
  *
- * The view is watched (late peers asked and their answers verified) until a member attests a view,
- * the check refuses, or the session closes. A move signed while provisional precedes every view this
- * creator has seen; that is the residual risk of not blocking a lone creator's first signature.
+ * The view is watched until a member attests a view, the check refuses, or the session closes. A move
+ * signed while provisional precedes every view this creator has seen; that is the residual risk of not
+ * blocking a lone creator: a member that connects only after the hold.
  */
 function startCreatorRestoreCurrencyGate(input: Readonly<{
 	view: V3RoomCreatorMemberView;
 	boundMs: number;
 	answerBoundMs: number;
+	holdMs: number;
+	/** The stored roster names no member but this creator: nothing to wait for. */
+	rosterSolo: boolean;
 	local: CreatorRestoreLocalView;
 	finalitySigner?: NonNullable<CreateV3RoomSessionInput["creatorFinalitySigner"]>;
 }>): CreatorRestoreCurrencyGate {
 	let state: CreatorRestoreState = "checking";
 	let refusal: V3RoomNotYetCurrent | undefined;
 	let closedError: Error | undefined;
-	let roundSettled = false;
+	let connectivityResolved = input.rosterSolo;
 	let attested = false;
 	let verifying = 0;
 	let releasing = false;
+	// Peers asked and not yet answered: when each answer window closes.
+	const awaiting = new Map<string, number>();
 	const admittedListeners: (() => void)[] = [];
 	const refusedListeners: ((refusal: V3RoomNotYetCurrent) => void)[] = [];
 	const deferred = () => {
@@ -1225,9 +1264,11 @@ function startCreatorRestoreCurrencyGate(input: Readonly<{
 	const becomeCurrent = (): void => {
 		if ((state !== "checking" && state !== "provisional") || releasing || closedError !== undefined) return;
 		releasing = true;
-		clearTimers();
 		// A member attested: nothing more to watch. The bound passed without one: keep watching.
-		if (attested) lifetime.abort();
+		if (attested) {
+			clearTimers();
+			lifetime.abort();
+		}
 		void release().then(() => {
 			releasing = false;
 			if (closedError !== undefined || state === "refused") return;
@@ -1250,18 +1291,21 @@ function startCreatorRestoreCurrencyGate(input: Readonly<{
 		admittedListeners.splice(0);
 		for (const listener of refusedListeners.splice(0)) listener(refusal);
 	};
-	const decide = (): void => {
-		if (state === "refused" || closedError !== undefined || verifying > 0) return;
-		if (attested) {
-			// Every member asked in the first round answered (or its grace passed), or a late member attested.
-			if (roundSettled || state === "provisional") becomeCurrent();
-			return;
-		}
-		// The first round settled with no verifiable answer: nobody connected to ask, or none attested.
-		if (roundSettled && state === "checking") becomeProvisional();
+	/** Whether some asked peer may still answer (its window is open). */
+	const answerPending = (): boolean => {
+		const now = Date.now();
+		for (const [peerId, closesAt] of awaiting) if (closesAt <= now) awaiting.delete(peerId);
+		return awaiting.size > 0;
 	};
-	after(input.answerBoundMs, () => {
-		if (verifying === 0 && !attested) becomeProvisional();
+	const decide = (): void => {
+		if (state === "refused" || state === "current" || closedError !== undefined || verifying > 0) return;
+		if (answerPending()) return;
+		if (attested) return becomeCurrent();
+		if (connectivityResolved && state === "checking") becomeProvisional();
+	};
+	after(input.holdMs, () => {
+		connectivityResolved = true;
+		decide();
 	});
 	after(input.boundMs, () => {
 		if (verifying === 0) becomeCurrent();
@@ -1272,32 +1316,42 @@ function startCreatorRestoreCurrencyGate(input: Readonly<{
 				Object.freeze({
 					objectId: input.local.objectId,
 					signal: lifetime.signal,
-					answer: (evidence: V3RoomCreatorCurrencyEvidence): void => {
+					asked: (peerId: string): void => {
+						if (state === "refused" || state === "current" || closedError !== undefined) return;
+						awaiting.set(peerId, Date.now() + input.answerBoundMs);
+						after(input.answerBoundMs, decide);
+					},
+					unreachable: (): void => {
+						if (connectivityResolved) return;
+						connectivityResolved = true;
+						decide();
+					},
+					answer: (evidence: V3RoomCreatorCurrencyEvidence, peerId?: string): void => {
 						if (state === "refused" || closedError !== undefined) return;
 						verifying++;
 						void creatorEvidenceVerdict(evidence, input.local).then(
 							(verdict) => {
 								verifying--;
+								if (peerId !== undefined) awaiting.delete(peerId);
 								if (verdict.newer !== undefined) return refuse(verdict.newer);
 								if (verdict.attested) attested = true;
 								decide();
 							},
 							() => {
 								verifying--;
+								if (peerId !== undefined) awaiting.delete(peerId);
 								decide();
 							}
 						);
 					},
 				})
 			)
-		).then(
-			() => {
-				roundSettled = true;
-				decide();
-			},
+		).catch(
 			// A failed ask is "no answer": the bounds decide.
 			() => undefined
 		);
+		// Nothing to wait for: the stored roster names nobody else.
+		if (input.rosterSolo) decide();
 	} catch {
 		// A throwing member view is "no answer": the bounds decide.
 	}
@@ -1794,20 +1848,33 @@ export type V3RoomCurrencyResult = "current" | "other-epoch" | "behind-frontier"
 /**
  * Creator restore currency (user decision 2026-11-10, wait cut 2026-11-11): how long a creator that
  * reopened from storage holds finality-key signatures (seal, adoption, recovery maintenance) when no
- * member has attested a view. Its moves are not held by it: they wait only for connected members
- * (V3_ROOM_CREATOR_RESTORE_ANSWER_BOUND_MS) and not at all when no peer is connected. A member that
- * connects later is still asked, and its verified newer view refuses the creator from then on.
+ * member has attested a view. Its moves are held only while its connectivity is unresolved
+ * (V3_ROOM_CREATOR_RESTORE_HOLD_MS) and while a peer it asked may still answer
+ * (V3_ROOM_CREATOR_RESTORE_ANSWER_BOUND_MS). A member that connects later is still asked, and its
+ * verified newer view refuses the creator from then on.
  */
 export const V3_ROOM_CREATOR_RESTORE_CURRENCY_BOUND_MS = 5_000;
 
 /**
- * Creator restore currency: the longest a reopened creator's first move waits while connected peers
- * have not answered (peers that are not room members never answer). Every connected member answering
- * ends the wait at once. Measured in-process (native, in-memory channel, 20 reopens each with 1 and 3
- * members): first answer 0.9-2.2 ms after the ask, decision 30-77 ms; the rest is an allowance for a
- * stream open plus one round trip on a real network (not measured here).
+ * Creator restore currency: how long a reopened creator gives each peer it asked to answer, from the
+ * ask (peers that are not room members never answer; every asked peer answering ends it at once).
+ * Measured: ask to answer 55-295 ms with a 20 ms one-way delay (in-memory channel, the measurement
+ * agent's 7 reopens whose first ask was answered); a frame sent on genuine libp2p's connection event
+ * was delivered in 20/20 fresh connections, echoed in 12-30 ms on loopback
+ * (tests/creator-restore-connect-native.test.ts).
  */
 export const V3_ROOM_CREATOR_RESTORE_ANSWER_BOUND_MS = 1_000;
+
+/**
+ * Creator restore currency (connectivity-unresolved hold, 2026-11-11): how long from open a reopened
+ * creator whose stored roster names another member holds its first move while nobody has answered and
+ * its transport has not reported that it reached nobody. A peer that connects inside it is asked, and
+ * given V3_ROOM_CREATOR_RESTORE_ANSWER_BOUND_MS, before anything is signed. About four times the
+ * measured p99 of open to a connected member's first answer (125-356 ms, 7 reopens, 20 ms one-way
+ * delay); genuine libp2p loopback adds 11-46 ms open to connected (20/20). Not measured: how long a
+ * real member takes to learn that the creator is back and dial it.
+ */
+export const V3_ROOM_CREATOR_RESTORE_HOLD_MS = 1_500;
 
 /**
  * A member's view of the room for a reopened creator: only material the creator's own keys signed,
@@ -1826,13 +1893,21 @@ export type V3RoomCreatorCurrencyEvidence = Readonly<{
 /** How a reopened creator asks its room's members (examples/v3-room successor delivery wires it). */
 export interface V3RoomCreatorMemberView {
 	/**
-	 * Asks the room's connected peers for their view and hands each answer to `answer` as it arrives.
-	 * Settles its first round at once when no peer is connected, or once every peer asked answered (or
-	 * a short grace after the first answer). It keeps asking peers that connect later, and handing
-	 * their answers to `answer`, until `signal` aborts (the room aborts once a member attested a view,
-	 * once it refused, or at close).
+	 * Asks the room's connected peers (and each peer as it connects) for their view until `signal`
+	 * aborts (the room aborts once a member attested a view, once it refused, or at close), and settles
+	 * then. `asked` names each peer at its first ask on a connection; `answer` hands over each answer
+	 * with its sender as it arrives; `unreachable` reports that the transport's own first connection
+	 * attempts reached nobody and nobody is connected. The room decides how long to wait.
 	 */
-	ask(input: Readonly<{ objectId: string; signal: AbortSignal; answer(evidence: V3RoomCreatorCurrencyEvidence): void }>): Promise<void>;
+	ask(
+		input: Readonly<{
+			objectId: string;
+			signal: AbortSignal;
+			answer(evidence: V3RoomCreatorCurrencyEvidence, peerId?: string): void;
+			asked?(peerId: string): void;
+			unreachable?(): void;
+		}>
+	): Promise<void>;
 }
 
 /**
@@ -3294,7 +3369,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		!requireFreshTrust &&
 		!skipRoomHeadAuthority &&
 		redirectSource === undefined;
-	for (const bound of [input.creatorRestoreCurrencyBoundMs, input.creatorRestoreCurrencyAnswerBoundMs])
+	for (const bound of [
+		input.creatorRestoreCurrencyBoundMs,
+		input.creatorRestoreCurrencyAnswerBoundMs,
+		input.creatorRestoreCurrencyHoldMs,
+	])
 		if (bound !== undefined && (!Number.isSafeInteger(bound) || bound < 0))
 			throw new TypeError("v3 room creator restore currency bound is invalid");
 	const ungatedVertexSigner = input.signRegisteredVertexDigest;
@@ -5071,6 +5150,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				view: input.creatorMemberView,
 				boundMs: input.creatorRestoreCurrencyBoundMs ?? V3_ROOM_CREATOR_RESTORE_CURRENCY_BOUND_MS,
 				answerBoundMs: input.creatorRestoreCurrencyAnswerBoundMs ?? V3_ROOM_CREATOR_RESTORE_ANSWER_BOUND_MS,
+				holdMs: input.creatorRestoreCurrencyHoldMs ?? V3_ROOM_CREATOR_RESTORE_HOLD_MS,
+				rosterSolo: head.epoch === 0 && creatorRestoreRosterSolo(material, input.author),
 				local: creatorRestoreLocalView(input, material, head, lineage),
 				...(input.creatorFinalitySigner === undefined ? {} : { finalitySigner: input.creatorFinalitySigner }),
 			});
