@@ -50,6 +50,8 @@ const RESOURCE_MATERIAL_KEYS = [
 	"recoveryOperations",
 	"candidateOperation",
 ] as const;
+// The incremental projection's input: the same material without a candidate operation.
+const RESOURCE_PROJECTION_MATERIAL_KEYS = RESOURCE_MATERIAL_KEYS.filter((key) => key !== "candidateOperation");
 
 /**
  * Own data properties of a record with exactly `keys`; no accessor runs.
@@ -82,9 +84,14 @@ function resourceDataRecord(value: unknown, keys: readonly string[]): Readonly<R
  * (examples/grid/src/v3-zone.ts `captureResourceMaterial`); undefined for anything else.
  * @param input - The room's resource bound input.
  * @param expected - The composition's own resolved catalog entry, copied at composition.
+ * @param materialKeys - The material's exact keys (the incremental projection's omit the candidate).
  * @returns The non-empty dense list of base state byte strings, unvalidated.
  */
-function resourceBoundBases(input: unknown, expected: ResourceCatalog): readonly Uint8Array[] | undefined {
+function resourceBoundBases(
+	input: unknown,
+	expected: ResourceCatalog,
+	materialKeys: readonly string[] = RESOURCE_MATERIAL_KEYS
+): readonly Uint8Array[] | undefined {
 	const outer = resourceDataRecord(input, ["catalog", "material"]);
 	const entry = resourceDataRecord(outer?.catalog, [...RESOURCE_IDENTITY_KEYS, ...RESOURCE_CARRIER_KEYS]);
 	if (outer === undefined || entry === undefined || RESOURCE_IDENTITY_KEYS.some((key) => entry[key] !== expected[key]))
@@ -98,7 +105,7 @@ function resourceBoundBases(input: unknown, expected: ResourceCatalog): readonly
 		)
 			return undefined;
 	}
-	const material = resourceDataRecord(outer.material, RESOURCE_MATERIAL_KEYS);
+	const material = resourceDataRecord(outer.material, materialKeys);
 	if (
 		material === undefined ||
 		!Array.isArray(material.currentOperations) ||
@@ -164,17 +171,42 @@ export function createV3CanvasApplication(width: number, height: number): V3Room
 		exactArtifactBytes: resolved.exactArtifactBytes.slice(),
 		canonicalBlueprintPackageBytes: resolved.canonicalBlueprintPackageBytes.slice(),
 	});
-	const readOrdinaryApplicationResourceBound: ResourceBoundReader = (input): CanonicalResourceFootprint | undefined => {
-		try {
-			const bases = resourceBoundBases(input, resourceCatalog);
-			if (bases === undefined) return undefined;
-			// Only this composition's own authenticated states: exact dimensions, canonical bytes.
-			for (const base of bases) descriptor.restoreState(base);
-			return Object.freeze({ byteLength: widest.byteLength, items: widest.items, maxDepth: widest.maxDepth });
-		} catch {
-			return undefined;
-		}
+	const widestFootprint = (): CanonicalResourceFootprint =>
+		Object.freeze({ byteLength: widest.byteLength, items: widest.items, maxDepth: widest.maxDepth });
+	/** Only this composition's own authenticated states (exact dimensions, canonical bytes). */
+	const validBases = (input: unknown, materialKeys?: readonly string[]): boolean => {
+		const bases = resourceBoundBases(input, resourceCatalog, materialKeys);
+		if (bases === undefined) return false;
+		for (const base of bases) descriptor.restoreState(base);
+		return true;
 	};
+	// The incremental projection states the SAME theorem as the complete reader: the widest
+	// footprint bounds every base and every state any operations can produce, for any material,
+	// reading no operation. So the projection validates the bases once and every quote is that
+	// footprint; advancing by admitted operations cannot change it.
+	const readOrdinaryApplicationResourceBound: ResourceBoundReader = Object.assign(
+		(input: Parameters<ResourceBoundReader>[0]): CanonicalResourceFootprint | undefined => {
+			try {
+				return validBases(input) ? widestFootprint() : undefined;
+			} catch {
+				return undefined;
+			}
+		},
+		{
+			createIncrementalProjection: (input: unknown) => {
+				try {
+					if (!validBases(input, RESOURCE_PROJECTION_MATERIAL_KEYS)) return undefined;
+				} catch {
+					return undefined;
+				}
+				return Object.freeze({
+					advance: (operations: readonly unknown[]): boolean => Array.isArray(operations),
+					quote: (_candidateOperation: unknown): CanonicalResourceFootprint => widestFootprint(),
+					quoteWithoutApplicationCandidate: (): CanonicalResourceFootprint => widestFootprint(),
+				});
+			},
+		}
+	);
 	const gameplayRows = (rows: readonly V3RoomAcceptedOperation[]): readonly V3RoomAcceptedOperation[] =>
 		rows.filter(
 			({ operation }) => Reflect.get(operation, "action") === "paint" || Reflect.get(operation, "action") === "splash"

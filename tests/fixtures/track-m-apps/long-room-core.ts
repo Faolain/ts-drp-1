@@ -272,6 +272,9 @@ const PARAMETERS = Object.freeze({
 	snapshotChunkBytes: 131_072,
 });
 const CANVAS_SIDE = 10;
+// Measurement only: TRACK_M_APPS_CHAT_PAD=<n> appends n characters to every Chat message text, so a
+// short run fills the format's retained state (default 0: the unchanged short texts).
+const CHAT_PAD = Number(process.env.TRACK_M_APPS_CHAT_PAD ?? 0);
 
 // A measurement-only true upper bound (both applications' whole retained state is far below
 // it), so the creator's explicit lull is supported as on the Grid; neither shipped
@@ -351,7 +354,7 @@ function operationFor(app: AppKind, role: number, epoch: number, ordinal: number
 		action: "message",
 		clientOperationId: `m-${role}-${epoch}-${ordinal}`,
 		displayTimeMs: 1_791_662_400_000 + epoch * 1000 + ordinal * 10 + role,
-		text: `e${epoch} o${ordinal}`,
+		text: `e${epoch} o${ordinal}` + "x".repeat(CHAT_PAD),
 	});
 }
 

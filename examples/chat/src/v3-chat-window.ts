@@ -1,11 +1,6 @@
 import type { TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog/bytes";
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
-import type { CanonicalResourceFootprint } from "@ts-drp/canonical/resource";
-import type {
-	V3OperationAdmissionPolicy,
-	V3OperationAdmissionPolicyFactory,
-	V3OperationAdmissionReservation,
-} from "@ts-drp/node/v3-live";
+import type { V3OperationAdmissionPolicy, V3OperationAdmissionReservation } from "@ts-drp/node/v3-live";
 import type { V3RoomApplication, V3RoomProjectionInput } from "@ts-drp/node/v3-room";
 import { prepareBlueprintAdmission, prepareBlueprintRuntime } from "@ts-drp/protocol-v3";
 import { applyPreparedBlueprintOperation } from "@ts-drp/protocol-v3/blueprint-application";
@@ -24,6 +19,7 @@ import {
 	shippingChatWriters,
 } from "./v3-chat-capacity.js";
 import { captureShippingChatOperation, type ShippingChatMessage } from "./v3-chat-message.js";
+import { shippingChatCeilingResourceBound } from "./v3-chat-resource-bound.js";
 
 // Track W: the shipped Chat's new-room format (state version 4, artifact `v3-shipping-chat.v4`,
 // examples/chat/window-blueprint). The replicated state is a rolling window: each member's
@@ -52,7 +48,9 @@ type ResourceCatalog = Parameters<ResourceBoundReader>[0]["catalog"];
 /** Track Q's exact-entry check (v3-chat-application.ts `resourceBoundBases`), passed in by the caller. */
 export type ShippingChatResourceBoundBases = (
 	input: unknown,
-	expected: ResourceCatalog
+	expected: ResourceCatalog,
+	/** True for the incremental projection's input (its material has no candidate). */
+	projection?: boolean
 ) => readonly Uint8Array[] | undefined;
 const OPERATION_LIMITS = Object.freeze({ maxBytes: 65_536, maxDepth: 16, maxItems: 16_384 });
 const AUTHOR = /^[0-9a-f]{64}$/u;
@@ -539,17 +537,14 @@ export async function createShippingChatWindowApplication(
 		exactArtifactBytes: resolved.exactArtifactBytes.slice(),
 		canonicalBlueprintPackageBytes: resolved.canonicalBlueprintPackageBytes.slice(),
 	});
-	const readOrdinaryApplicationResourceBound: ResourceBoundReader = (value): CanonicalResourceFootprint | undefined => {
-		try {
-			const bases = readResourceBases(value, resourceCatalog);
-			if (bases === undefined) return undefined;
-			// Only authenticated window states: captured, canonical, within the ceiling.
-			for (const base of bases) restoreShippingChatWindowState(base);
-			return Object.freeze({ byteLength: LIMITS.maxBytes, items: LIMITS.maxItems, maxDepth: LIMITS.maxDepth });
-		} catch {
-			return undefined;
-		}
-	};
+	const resourceBound = shippingChatCeilingResourceBound((value, projection) => {
+		const bases = readResourceBases(value, resourceCatalog, projection);
+		if (bases === undefined) return false;
+		// Only authenticated window states: captured, canonical, within the ceiling.
+		for (const base of bases) restoreShippingChatWindowState(base);
+		return true;
+	}, LIMITS);
+	const readOrdinaryApplicationResourceBound = resourceBound.reader;
 	const project = (projection: V3RoomProjectionInput): ShippingChatProjection => {
 		let state: unknown =
 			projection.authenticatedBase === undefined
@@ -599,8 +594,9 @@ export async function createShippingChatWindowApplication(
 			return id;
 		},
 		projectAcceptedOperations: project,
-		createOperationAdmissionPolicy: (context: Parameters<V3OperationAdmissionPolicyFactory>[0]) =>
-			createShippingChatWindowAdmissionPolicy({ ...context, exactCanonicalGenesisStateBytes: genesisBytes }),
+		createOperationAdmissionPolicy: resourceBound.admissionPolicy((context) =>
+			createShippingChatWindowAdmissionPolicy({ ...context, exactCanonicalGenesisStateBytes: genesisBytes })
+		),
 		migration: Object.freeze({
 			inheritAuthenticatedState: true as const,
 			canonicalStateBytes(projection: ShippingChatProjection): Uint8Array {
