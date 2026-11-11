@@ -17,6 +17,10 @@
 // prepare, so the per-connection statement cache stays native), and the canonical codec's public
 // call counts (@ts-drp/canonical/instrumentation: every importer, dist packages included).
 //
+// PERMOVE_TIMING=1 installs NO seam at all and reports process CPU (user+system) and wall time of the
+// early and deep windows instead (PERMOVE_TIMING JSON line; counts and budgets are skipped): the
+// interleaved A/B cost check behind every count fix.
+//
 // PERMOVE_ATTRIBUTE=1 attributes every counted call of the measured window to its repository stack
 // (PERMOVE_SITES_OUT, default /dev/shm/permove-sites.json); PERMOVE_CPU_PROFILE=<file> profiles it.
 import { observeCanonicalCalls } from "@ts-drp/canonical/instrumentation";
@@ -39,7 +43,8 @@ const MEASURED = Number(env.PERMOVE_MEASURED ?? 16);
 // A second window deeper into the same epoch: per-move work must not grow with epoch history.
 const DEEP_AT = Number(env.PERMOVE_DEEP_AT ?? 64);
 const CREATOR_MOVES = Number(env.PERMOVE_CREATOR_MOVES ?? 1);
-const ASSERT = (env.PERMOVE_ASSERT ?? "1") === "1";
+const TIMING = env.PERMOVE_TIMING === "1";
+const ASSERT = !TIMING && (env.PERMOVE_ASSERT ?? "1") === "1";
 
 // Budgets per steady Writer move (writer.issue + creator.admit), early window (moves 8-23). Base
 // 89426d0a, exact and identical across runs: SELECT 779, read transactions 72, write transactions 13
@@ -80,23 +85,31 @@ it("per steady move (rollover off): bounded SQLite statements, transactions, pre
 		}
 		return ours.join(" < ");
 	};
-	const bump = (key: string) => {
+	const bump = (key: string, amount = 1) => {
 		const name = `${ordinal}:${step}`;
 		let row = counts.get(name);
 		if (row === undefined) counts.set(name, (row = {}));
-		row[key] = (row[key] ?? 0) + 1;
+		row[key] = (row[key] ?? 0) + amount;
 		if (!attribute || !recording || step === "harness") return;
 		const site = `${step} | ${callSite()}`;
 		let siteRow = sites.get(site);
 		if (siteRow === undefined) sites.set(site, (siteRow = {}));
-		siteRow[key] = (siteRow[key] ?? 0) + 1;
+		siteRow[key] = (siteRow[key] ?? 0) + amount;
+	};
+	// Timing marks (PERMOVE_TIMING): process CPU and wall clock at window boundaries.
+	const marks = new Map<string, { cpu: number; wall: number }>();
+	const mark = (name: string) => {
+		if (!TIMING) return;
+		const cpu = process.cpuUsage();
+		marks.set(name, { cpu: (cpu.user + cpu.system) / 1000, wall: performance.now() });
 	};
 	// Shared SQLite counters (tests/fixtures/perf-counts): statements by keyword, transactions by mode.
-	const restores: (() => void)[] = [await installSqliteCountSeams(bump)];
+	const restores: (() => void)[] = [];
+	if (!TIMING) restores.push(await installSqliteCountSeams(bump));
 	// Prepares (the shared seam never touches prepare, so the statement cache stays native): a
 	// statement object executed for the first time counts as one prepare.
 	const seen = new WeakSet<object>();
-	for (const method of ["run", "get", "all", "iterate"]) {
+	for (const method of TIMING ? [] : ["run", "get", "all", "iterate"]) {
 		const target = sqlite.StatementSync!.prototype;
 		const original = target[method] as (...values: unknown[]) => unknown;
 		target[method] = function (this: object, ...args: unknown[]) {
@@ -104,14 +117,32 @@ it("per steady move (rollover off): bounded SQLite statements, transactions, pre
 				seen.add(this);
 				bump("prepare");
 			}
-			return original.apply(this, args);
+			const result = original.apply(this, args);
+			// Rows read: get() of a row, every row of all(); iterate() rows are counted as consumed.
+			if (method === "get" && result !== undefined) bump("rows");
+			else if (method === "all") bump("rows", (result as unknown[]).length);
+			else if (method === "iterate") {
+				const iterator = result as IterableIterator<unknown>;
+				const next = iterator.next.bind(iterator);
+				iterator.next = (...values: [] | [unknown]) => {
+					const item = next(...values);
+					if (item.done !== true) bump("rows");
+					return item;
+				};
+			}
+			return result;
 		};
 		restores.push(() => {
 			target[method] = original;
 		});
 	}
-	observeCanonicalCalls((kind) => bump(`canonical.${kind}`));
-	restores.push(() => observeCanonicalCalls(undefined));
+	if (!TIMING) {
+		observeCanonicalCalls((kind, byteLength) => {
+			bump(`canonical.${kind}`);
+			bump(`canonical.${kind}Bytes`, byteLength);
+		});
+		restores.push(() => observeCanonicalCalls(undefined));
+	}
 
 	const profileOut = env.PERMOVE_CPU_PROFILE;
 	const session = profileOut === undefined ? undefined : new Session();
@@ -150,6 +181,7 @@ it("per steady move (rollover off): bounded SQLite statements, transactions, pre
 			async (args) => {
 				if (role !== "creator") return;
 				ordinal = Number(args[1]);
+				if (ordinal === WARMUP || ordinal === WARMUP + MEASURED || ordinal === DEEP_AT) mark(`at${ordinal}`);
 				if (ordinal === WARMUP) {
 					recording = true;
 					if (session !== undefined) {
@@ -177,7 +209,10 @@ it("per steady move (rollover off): bounded SQLite statements, transactions, pre
 		);
 		label(role === "creator" ? "creator.admit" : "writer.receive", "receive");
 		label("harness", "published");
-		wrapped.seal = () => Promise.reject(STOP);
+		wrapped.seal = () => {
+			if (role === "creator") mark("seal");
+			return Promise.reject(STOP);
+		};
 		return wrapped as unknown as RoleEndpoint;
 	};
 	try {
@@ -192,6 +227,24 @@ it("per steady move (rollover off): bounded SQLite statements, transactions, pre
 		if (stopped !== STOP && (stopped as { cause?: unknown } | undefined)?.cause !== STOP) throw new Error(`PERMOVE_RUN_FAILED at ordinal ${ordinal} step ${step}`, { cause: stopped });
 	} finally {
 		for (const restore of restores.reverse()) restore();
+	}
+	if (TIMING) {
+		const window = (from: string, to: string) => {
+			const a = marks.get(from),
+				b = marks.get(to);
+			if (a === undefined || b === undefined) throw new Error(`PERMOVE_TIMING_MARK_MISSING ${from}..${to}`);
+			return { cpuMsPerMove: (b.cpu - a.cpu) / MEASURED, wallMsPerMove: (b.wall - a.wall) / MEASURED };
+		};
+		console.info(
+			`PERMOVE_TIMING ${JSON.stringify({
+				warmup: WARMUP,
+				measured: MEASURED,
+				deepAt: DEEP_AT,
+				early: window(`at${WARMUP}`, `at${WARMUP + MEASURED}`),
+				deep: window(`at${DEEP_AT}`, "seal"),
+			})}`
+		);
+		return;
 	}
 	const windowCounts = (from: number, to: number, names: readonly string[]): Counts => {
 		const out: Counts = {};
@@ -214,6 +267,9 @@ it("per steady move (rollover off): bounded SQLite statements, transactions, pre
 		prepares: per.prepare ?? 0,
 		encodes: per["canonical.encode"] ?? 0,
 		decodes: per["canonical.decode"] ?? 0,
+		encodedBytes: per["canonical.encodeBytes"] ?? 0,
+		decodedBytes: per["canonical.decodeBytes"] ?? 0,
+		rows: per.rows ?? 0,
 	});
 	const WRITER_MOVE = ["writer.issue", "creator.admit"];
 	// The creator issues nothing; anything it publishes back is delivered and counted in writer.receive.
