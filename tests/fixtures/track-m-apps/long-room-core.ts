@@ -698,6 +698,7 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 		roomHeadAuthority: floor,
 		signRegisteredVertexDigest: (digest: Uint8Array) => Promise.resolve(ed25519.sign(digest, identity.seed)),
 		onProjection: observe,
+		onIngressCapacityRefusal: (reason: string) => policy?.refused(reason),
 		onAcceptedVertex: (
 			vertex: Readonly<{ digest: Uint8Array; author: string; epoch: number; authorSequence?: number; operation?: unknown }>
 		) => {

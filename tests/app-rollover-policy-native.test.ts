@@ -103,13 +103,15 @@ async function openApp(
  * @param recipient - The other role.
  * @param moves - Moves per role.
  * @param rolloverBudget - Test-only trigger values replacing the application's.
+ * @param creatorMoves - The creator's own moves (default `moves`); fewer makes a Writer the hot author.
  * @returns The creator's policy observation.
  */
 async function playPastCeiling(
 	app: AppKind,
 	recipient: Recipient,
 	moves: number,
-	rolloverBudget?: Readonly<{ movesPerAuthor: number; idleMs: number }>
+	rolloverBudget?: Readonly<{ movesPerAuthor: number; idleMs: number }>,
+	creatorMoves = moves
 ) {
 	const peers = await openApp(app, recipient === "receive-only" ? "receive-only" : "writer", rolloverBudget);
 	const [creator, other] = peers;
@@ -174,10 +176,12 @@ async function playPastCeiling(
 	}, 30_000);
 	try {
 		for (let ordinal = 0; ordinal < moves; ordinal++) {
-			step = `creator#${ordinal}`;
-			await creator.issue(0, ordinal);
-			accepted.push({ role: 0, ordinal });
-			await deliver(0);
+			if (ordinal < creatorMoves) {
+				step = `creator#${ordinal}`;
+				await creator.issue(0, ordinal);
+				accepted.push({ role: 0, ordinal });
+				await deliver(0);
+			}
 			// The member's own rows go to the creator even when it makes no move: each install
 			// publishes the member's settlement of the epoch it leaves.
 			await deliver(1);
@@ -273,3 +277,20 @@ it.each([
 	},
 	1_200_000
 );
+
+// A hot Writer (fix/maintenance-image-capacity): with trigger values too high to fire, the creator
+// refuses the Writer's received moves once its per-epoch maintenance proof book (or issuance
+// forecast) is full. That refusal is the typed capacity reason and the creator's policy seals at
+// once, so the Writer's held moves land in the successor through the existing re-delivery and
+// settlement: every move is accepted, nothing waits for a successor that never comes.
+it("grid with a hot writer: a received move refused at the creator's capacity triggers a rollover and is accepted", async () => {
+	const restore = await installEnvironment("node", () => undefined);
+	try {
+		const writerMoves = Number(process.env.HOT_WRITER_MOVES ?? 300);
+		const policy = await playPastCeiling("grid", "writer", writerMoves, { movesPerAuthor: 100_000, idleMs: 3_600_000 }, 1);
+		expect(policy?.events.map((event) => event.trigger)).toContain("refusal");
+		expect(policy?.events.every((event) => event.trigger === "refusal")).toBe(true);
+	} finally {
+		restore();
+	}
+}, 1_800_000);
