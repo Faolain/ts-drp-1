@@ -104,6 +104,7 @@ async function openApp(
  * @param moves - Moves per role.
  * @param rolloverBudget - Test-only trigger values replacing the application's.
  * @param creatorMoves - The creator's own moves (default `moves`); fewer makes a Writer the hot author.
+ * @param writerFrom - The first ordinal at which the Writer moves (default 0).
  * @returns The creator's policy observation.
  */
 async function playPastCeiling(
@@ -111,7 +112,8 @@ async function playPastCeiling(
 	recipient: Recipient,
 	moves: number,
 	rolloverBudget?: Readonly<{ movesPerAuthor: number; idleMs: number }>,
-	creatorMoves = moves
+	creatorMoves = moves,
+	writerFrom = 0
 ) {
 	const peers = await openApp(app, recipient === "receive-only" ? "receive-only" : "writer", rolloverBudget);
 	const [creator, other] = peers;
@@ -185,7 +187,7 @@ async function playPastCeiling(
 			// The member's own rows go to the creator even when it makes no move: each install
 			// publishes the member's settlement of the epoch it leaves.
 			await deliver(1);
-			if (!writer) continue;
+			if (!writer || ordinal < writerFrom) continue;
 			step = `writer#${ordinal}`;
 			await other.issue(0, ordinal);
 			accepted.push({ role: 1, ordinal });
@@ -286,10 +288,14 @@ it.each([
 it("grid with a hot writer: a received move refused at the creator's capacity triggers a rollover and is accepted", async () => {
 	const restore = await installEnvironment("node", () => undefined);
 	try {
-		// 400: past the creator's received-move refusal (about writer move 330) and short of the
-		// Writer's own settlement row bound (the next case).
-		const writerMoves = Number(process.env.HOT_WRITER_MOVES ?? 400);
-		const policy = await playPastCeiling("grid", "writer", writerMoves, { movesPerAuthor: 100_000, idleMs: 3_600_000 }, 1);
+		// The creator alone first fills most of its per-epoch proof book (its own moves stop short of
+		// its own refusal); the Writer's received moves then fill the rest, so the creator refuses a
+		// received move. The Writer stays under its 64 undelivered own moves per epoch
+		// (V3RoomLocalBacklogFull), which a hot Writer otherwise meets before any capacity refusal.
+		const prefill = Number(process.env.HOT_WRITER_PREFILL ?? 150);
+		const writerMoves = Number(process.env.HOT_WRITER_MOVES ?? 60);
+		const policy = await playPastCeiling("grid", "writer", prefill + writerMoves,
+			{ movesPerAuthor: 100_000, idleMs: 3_600_000 }, prefill, prefill);
 		expect(policy?.events.map((event) => event.trigger)).toContain("refusal");
 		expect(policy?.events.every((event) => event.trigger === "refusal")).toBe(true);
 	} finally {
