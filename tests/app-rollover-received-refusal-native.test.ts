@@ -18,6 +18,8 @@
 // under 64 moves per Writer and span about 330 received moves of the epoch, which is why it takes
 // several Writers (two or three never reached the received refusal on bx_6ytwadfw before the
 // creator's own; four reached it in one of two runs).
+import { appendFileSync } from "node:fs";
+
 import { expect, it } from "vitest";
 
 import { nativePlayNetwork } from "./fixtures/active-endurance/native-network.js";
@@ -55,6 +57,8 @@ it("several hot Writers: a received move the creator refuses at capacity trigger
 	let failure: unknown;
 	let progress: Readonly<Record<string, unknown>> = {};
 	let report: () => Readonly<Record<string, unknown>> = () => ({});
+	const stages: string[] = [];
+	let watchdog: ReturnType<typeof setInterval> | undefined;
 	try {
 		const fixture = await creatorDeliveryRoom({
 			profile: "settlement",
@@ -110,7 +114,31 @@ it("several hot Writers: a received move the creator refuses at capacity trigger
 				},
 			});
 			policies[index] = policy;
-			policy.bind(peer.room as never);
+			// Diagnostics only: the creator's rollover stages (seal, adopt, export) with their times.
+			const staged = new Set(["sealEpoch", "adoptCreatorSuccessor", "exportCreatorSuccessor"]);
+			policy.bind(
+				(index !== 0
+					? peer.room
+					: new Proxy(peer.room, {
+							get(target, property) {
+								const value = Reflect.get(target, property, target) as unknown;
+								if (typeof value !== "function") return value;
+								if (typeof property !== "string" || !staged.has(property)) return value.bind(target);
+								return async (...input: unknown[]) => {
+									const at = () => Math.round(performance.now() / 1000);
+									stages.push(`${property}:start@${at()}`);
+									try {
+										const result = await (value as (...args: unknown[]) => Promise<unknown>).apply(target, input);
+										stages.push(`${property}:ok@${at()}`);
+										return result;
+									} catch (error) {
+										stages.push(`${property}:failed@${at()}:${errorText(error).slice(0, 160)}`);
+										throw error;
+									}
+								};
+							},
+						})) as never
+			);
 			const room = peer.room;
 			// HARNESS ARTIFACT GUARD (as realtime-scorecard-rate-native): snapshot pulls are bounded per
 			// process, so in-process Writers installing the same successor at once refuse each other and
@@ -145,11 +173,18 @@ it("several hot Writers: a received move the creator refuses at capacity trigger
 			seconds: Math.round((performance.now() - started) / 1000),
 			epochs: peers.map((peer) => peer.room.authority()?.epoch ?? null),
 			stats: policies.map((policy) => policy?.stats()),
+			deliveries: deliveries.map((delivery) => delivery?.stats()),
 			ingressRefusals: ingressRefusals.length,
+			stages: stages.slice(-6),
 			events,
 			errors: errors.slice(-4),
 		});
 		report = state;
+		// Every 15 s the room's state goes to the state file, so a stall shows where it stopped.
+		watchdog = setInterval(() => {
+			if (env.RECEIVED_REFUSAL_STATE_FILE !== undefined)
+				appendFileSync(env.RECEIVED_REFUSAL_STATE_FILE, `RECEIVED_REFUSAL_STATE ${JSON.stringify({ ...progress, ...state() })}\n`);
+		}, 15_000);
 		for (let move = 0; move < MOVES_PER_WRITER * WRITERS; move++) {
 			progress = { move, epochMoves };
 			const current = required(peers[0]).room.authority()?.epoch;
