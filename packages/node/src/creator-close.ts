@@ -3642,6 +3642,9 @@ export async function bindCreatorLiveClose(
 				releaseForeground();
 				maintenanceJobs.delete(joined);
 				finish();
+				// As the readiness and recovery-pool jobs do: received moves refused while this
+				// job held the consumer were retained, not dropped; admit them now.
+				registration.resumePendingIngress();
 			};
 			return Promise.resolve().then(async () => {
 				let quote: CreatorIssuanceMaintenanceQuote | CreatorOrdinaryIssuanceMaintenanceQuote | CreatorIncrementalIssuanceMaintenanceQuote | undefined;
