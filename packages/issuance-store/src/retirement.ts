@@ -2492,8 +2492,9 @@ export function openIssuanceRetirementPlanBefore(bytes: Uint8Array | null, objec
 		value.kind !== PLAN_BEFORE_KIND || value.objectId !== objectId || value.decisionDigest !== p.decisionDigest ||
 		value.targetImageDigest !== rewrite.targetImageDigest || !Array.isArray(value.plans) ||
 		value.plans.length !== rewrite.plans.length) throw issuanceRetirementRefusal("issuance retirement plan before is stale");
+	const stored = value.plans as readonly unknown[];
 	return Object.freeze(rewrite.plans.map((change, index) => {
-		const verified = verifiedRetirementPlan(value.plans[index]);
+		const verified = verifiedRetirementPlan(stored[index]);
 		if (verified.plan.scope.objectId !== objectId || verified.plan.scope.author !== change.author ||
 			issuanceRetirementPlanDigest(verified.bytes) !== change.beforeDigest)
 			throw issuanceRetirementRefusal("issuance retirement plan before is stale");

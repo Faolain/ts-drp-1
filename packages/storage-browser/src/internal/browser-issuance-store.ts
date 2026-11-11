@@ -632,7 +632,8 @@ async function browserWriteRetirementPlanBefore(transaction: IDBTransaction, cur
 	if (planBefore === undefined) return;
 	const store = transaction.objectStore(roomStoreName(transaction.db, "issuance", "retirementControls"));
 	const key = browserRetirementPlanBeforeKey(current.objectId);
-	await requestResult(planBefore === null ? store.delete(key) : store.put({ objectId: key, record: planBefore }));
+	if (planBefore === null) await requestResult(store.delete(key));
+	else await requestResult(store.put({ objectId: key, record: planBefore }));
 }
 
 /**
