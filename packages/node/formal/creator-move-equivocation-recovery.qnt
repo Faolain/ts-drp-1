@@ -1,60 +1,75 @@
 // Creator move equivocation after a stale restore: recovery (design under review, 2026-11-11).
 //
-// Two incarnations of the one creator key: O (the original device, gone once R reopens) and R (a
-// copy restored from an older backup). Both sign creator moves from the same restore point, so
-// creator author slots overlap: O's slot s and R's slot s are two distinct creator-signed vertices.
-// Members admit any authenticated vertex whose dependencies they hold (both copies; observed on
-// integration-7, tests/creator-move-equivocation-probe.test.ts). Both copies carry the same key:
-// no member can tell the incarnations apart from signatures. The only signed tie-breaker is the
+// Two incarnations of the one creator key: O (the original device) and R (a copy restored from an
+// older backup). Both sign creator moves from the same restore point, so creator author slots
+// overlap: O's slot s and R's slot s are distinct creator-signed vertices. Members admit any
+// authenticated vertex whose dependencies they hold, so they hold both copies; a member's close graph
+// requires unique slots only for its own author (v3-live.ts ~21500), and install keeps the closed
+// epoch's extra vertices out of the successor projection. Both copies carry the same key: no member
+// can tell the incarnations apart. The only arbiter every member applies identically is the
 // finality-signed cut of the creator that closes the epoch.
 //
-// Rule under test (SOUND, "live chain canonical"):
-//   - R never admits another incarnation's creator vertex into its graph (today's ingress), so a
-//     member move depending on one never enters R's graph either: they are void for R.
-//   - Refused (a member's verified view holds an O vertex at a slot R signs from), R catches up:
-//     it records the O vertices it verified (self-authenticating, under its own author key) and
-//     resumes. Its next slot is above every creator slot it knows (own or O's), the jump carried by
-//     an author fence (the existing $drp.author-fence.v1), so it signs no further slot it knows O
-//     signed. It re-issues each verified O vertex's operation on its own chain before it closes.
-//   - The close cuts R's graph (only R's chain and moves built on it). Members install that cut;
-//     a member's own moves outside it are re-offered in the next epoch (existing path).
+// Today (integration-7, tests/creator-move-equivocation-probe.test.ts): R's received-append
+// maintenance trial close throws "creator issuance-frontier author slot is ambiguous" on O's copy,
+// which then sits in R's pending ingress under R's own author; every later cold-path issue at R
+// throws ("prospective runtime census has unresolved ingress"), nothing evicts it, and R is refused
+// by the restore gate besides: the room stalls for good (control parkOwn).
+//
+// Rule under test (SOUND, "the live incarnation's chain is canonical"):
+//   R1 R never indexes or parks a vertex under its own key that it did not sign: it verifies the
+//      signature and keeps it as superseded-incarnation evidence (knownO), outside its graph and
+//      outside pending ingress. A member move that depends on one never enters R's graph.
+//   R2 R re-issues each verified O operation on its own chain (same operation bytes, so the same
+//      (author, clientOperationId): members' chat window collapses the copies), at its own next
+//      sequences. Its lineage only moves by one, so it signs over O's later slots too; that is a
+//      further duplicate only members hold, which the cut resolves. Once every known O operation is
+//      re-issued R's next sequence is above every O slot it knows, so the restore gate's rule
+//      (refuse while a member holds sequence >= next) is satisfied: R is current again.
+//   R3 R closes only after every known O operation is re-issued. Its cut is its own graph. Members
+//      install it; their own moves outside the cut are re-offered by the existing displaced-move
+//      settlement (same operation payload, up to 4 epochs).
+//   R4 O (if it is in fact still running) halts issuing and sealing once it sees a vertex under its
+//      own key that it did not sign. This cannot prevent a split when O hears nothing (witnessed
+//      residual wSplitWhenOriginalUnaware), which is why automatic resume rests on "restoring from a
+//      backup retires the original device".
 //
 // Properties (SOUND):
-//   convergence          every member that installed holds the same state (the cut's operations)
-//   closeNotBlocked      the close never meets two creator vertices at one slot (today: the throw
-//                        "creator issuance-frontier author slot is ambiguous")
+//   convergence          every member that installed shows the same state (the cut's operations)
+//   closeNotBlocked      R's close never meets two creator vertices at one slot
+//   issueNotBlocked      R is never stuck unable to issue after it sees O's vertices
 //   cutClosed            the cut is causally closed
-//   memberWorkKept       every member move in R's graph is in the cut (non-conflicting moves are
-//                        never excluded; void ones are re-offered by their authors)
-//   creatorOpsConserved  every operation R signed, and every O operation R verified, is in the cut
-//   reissuedOnlyGenuine  a re-issued operation always comes from a genuine O vertex (a forged or
-//                        unsigned claim cannot inject or exclude creator operations)
-//   noKnownConflict      after the refusal R never signs a slot it knows O signed
-//   frontierValid        the cut's creator slots run contiguously except where an author fence jumps
-//   evidenceGenuine      R refuses, skips and re-issues only on genuine creator-signed O vertices
+//   memberWorkKept       every member move in R's graph is in the cut (the rest are re-offered)
+//   creatorOpsConserved  every operation R signed and every O operation R verified is in the cut
+//   evidenceGenuine      R acts only on genuine creator-signed O vertices (a forged or unsigned
+//                        claim cannot inject, exclude or re-sequence creator operations)
+//   reissuedOnlyGenuine  every re-issued operation comes from a genuine O vertex
+//   currentAfterCatchUp  once every known O operation is re-issued, R's next slot is above every
+//                        O slot it knows (the restore gate no longer refuses on them)
+//   noKnowingSplit       O never closes an epoch after seeing R's vertex
 // Broken controls (each violates the property in brackets):
+//   parkOwn           today's ingress: O's copy parks in R's own pending ingress [issueNotBlocked]
 //   admitOriginal     R admits O's vertices into its graph            [closeNotBlocked]
-//   excludeDivergence the close voids both forks above the restore point [memberWorkKept]
+//   excludeDivergence the close voids R's divergent chain and dependents [memberWorkKept]
 //   noReissue         R closes without re-issuing O's operations     [creatorOpsConserved]
 //   trustForged       an unsigned claim counts as an O vertex         [evidenceGenuine, reissuedOnlyGenuine]
-//   noSkip            R resumes at its own next slot                  [noKnownConflict]
-//   noFence           R jumps its next slot without a fence           [frontierValid]
 //   memberLocalChoice a member keeps its own creator copies, not the cut [convergence]
 //   admitDependents   R admits a member move whose O parent it lacks  [cutClosed]
-// Residual (witnessed): an O vertex that no member delivers to R before the close is dropped at
-// install (nobody else can sign it again).
+//   noOriginalHalt    a live O keeps sealing after it sees R's vertex [noKnowingSplit]
+// Residuals (witnessed): an O vertex no member delivers to R before the close is dropped at install
+// (wResidualLostOriginal); a live O that never hears of R closes too (wSplitWhenOriginalUnaware).
 module creatorMoveEquivocationRecovery {
   pure val MAX_V = 9
   pure val MEMBERS = Set("M1", "M2")
   pure val O_SLOTS = 2        // O signs at most this many slots after the restore point
-  pure val R_PROVISIONAL = 2  // R signs at most this many slots before it is refused
+  pure val R_SLOTS = 5        // R's chain length bound
+  pure val R_PROVISIONAL = 2  // R signs at most this many fresh slots before it learns of O
   pure val MEMBER_MOVES = 2
 
-  type Vertex = { author: str, slot: int, op: int, deps: Set[int], fence: bool, genuine: bool }
-  type Mutants = { admitOriginal: bool, excludeDivergence: bool, noReissue: bool, trustForged: bool,
-                   noSkip: bool, noFence: bool, memberLocalChoice: bool, admitDependents: bool }
-  pure val SOUND: Mutants = { admitOriginal: false, excludeDivergence: false, noReissue: false, trustForged: false,
-                              noSkip: false, noFence: false, memberLocalChoice: false, admitDependents: false }
+  type Vertex = { author: str, slot: int, op: int, deps: Set[int], genuine: bool }
+  type Mutants = { parkOwn: bool, admitOriginal: bool, excludeDivergence: bool, noReissue: bool, trustForged: bool,
+                   memberLocalChoice: bool, admitDependents: bool, noOriginalHalt: bool }
+  pure val SOUND: Mutants = { parkOwn: false, admitOriginal: false, excludeDivergence: false, noReissue: false,
+                              trustForged: false, memberLocalChoice: false, admitDependents: false, noOriginalHalt: false }
 
   var mu: Mutants
   var vs: int -> Vertex
@@ -62,20 +77,23 @@ module creatorMoveEquivocationRecovery {
   var oTip: int               // 0 = the restore point (common prefix)
   var rTip: int
   var held: str -> Set[int]   // M1, M2, R: admitted vertices
-  var rPhase: str             // "off" (O alive) | "provisional" | "refused" | "resumed" | "closed"
-  var knownO: Set[int]        // creator vertices of another incarnation R verified (void for R)
+  var rPhase: str             // "off" (before the restore) | "open" | "closed"
+  var oAlive: bool            // O keeps running after R reopens (misconfiguration)
+  var oHalted: bool
+  var oClosed: bool
+  var oClosedKnowing: bool    // O closed after it had seen an R vertex
+  var knownO: Set[int]        // O vertices R verified (superseded-incarnation evidence)
   var reissued: Set[int]      // op ids R re-issued
   var memberMoves: int
-  var signedKnownSlot: int    // R signed a slot it knew O signed (after the refusal)
+  var blockedIssues: int
   var blockedCloses: int
   var cut: Set[int]
   var installed: str -> Set[int]  // a member's installed state: operation ids
 
   pure def isCreator(v: Vertex): bool = v.author == "O" or v.author == "R"
   pure def slotOf(m: int -> Vertex, id: int): int = if (id == 0) 0 else m.get(id).slot
-  pure def creatorSlots(m: int -> Vertex, ids: Set[int]): Set[int] =
-    ids.filter(i => isCreator(m.get(i))).map(i => m.get(i).slot)
   pure def opsOf(m: int -> Vertex, ids: Set[int]): Set[int] = ids.map(i => m.get(i).op)
+  pure def maxSlot(m: int -> Vertex, ids: Set[int]): int = ids.fold(0, (acc, i) => if (m.get(i).slot > acc) m.get(i).slot else acc)
   // Every vertex in `base` and every vertex depending on one (ids grow along dependencies).
   pure def closure(m: int -> Vertex, base: Set[int]): Set[int] =
     range(1, MAX_V + 1).foldl(base, (acc, i) =>
@@ -83,91 +101,88 @@ module creatorMoveEquivocationRecovery {
   pure def hasCreatorDuplicate(m: int -> Vertex, ids: Set[int]): bool =
     ids.exists(i => ids.exists(j => i != j and isCreator(m.get(i)) and isCreator(m.get(j)) and m.get(i).slot == m.get(j).slot))
 
-  action keepAll = all {
-    mu' = mu, vs' = vs, nextId' = nextId, oTip' = oTip, rTip' = rTip, held' = held, rPhase' = rPhase,
-    knownO' = knownO, reissued' = reissued, memberMoves' = memberMoves, signedKnownSlot' = signedKnownSlot,
-    blockedCloses' = blockedCloses, cut' = cut, installed' = installed,
-  }
-
   action initWith(m: Mutants): bool = all {
     mu' = m, vs' = Map(), nextId' = 1, oTip' = 0, rTip' = 0,
-    held' = Set("M1", "M2", "R").mapBy(_ => Set()), rPhase' = "off", knownO' = Set(), reissued' = Set(),
-    memberMoves' = 0, signedKnownSlot' = 0, blockedCloses' = 0, cut' = Set(),
-    installed' = MEMBERS.mapBy(_ => Set()),
+    held' = Set("M1", "M2", "R").mapBy(_ => Set()), rPhase' = "off", oAlive' = false, oHalted' = false,
+    oClosed' = false, oClosedKnowing' = false, knownO' = Set(), reissued' = Set(), memberMoves' = 0,
+    blockedIssues' = 0, blockedCloses' = 0, cut' = Set(), installed' = MEMBERS.mapBy(_ => Set()),
   }
   // The simulator explores every variant at once; Apalache runs one variant per init (--init).
   action init = all {
     nondet m = oneOf(Set(SOUND,
-      { ...SOUND, admitOriginal: true }, { ...SOUND, excludeDivergence: true }, { ...SOUND, noReissue: true },
-      { ...SOUND, trustForged: true }, { ...SOUND, noSkip: true }, { ...SOUND, noFence: true },
-      { ...SOUND, memberLocalChoice: true }, { ...SOUND, admitDependents: true }))
+      { ...SOUND, parkOwn: true }, { ...SOUND, admitOriginal: true }, { ...SOUND, excludeDivergence: true },
+      { ...SOUND, noReissue: true }, { ...SOUND, trustForged: true }, { ...SOUND, memberLocalChoice: true },
+      { ...SOUND, admitDependents: true }, { ...SOUND, noOriginalHalt: true }))
     initWith(m)
   }
   action initSound = initWith(SOUND)
+  action initParkOwn = initWith({ ...SOUND, parkOwn: true })
   action initAdmitOriginal = initWith({ ...SOUND, admitOriginal: true })
   action initExcludeDivergence = initWith({ ...SOUND, excludeDivergence: true })
   action initNoReissue = initWith({ ...SOUND, noReissue: true })
   action initTrustForged = initWith({ ...SOUND, trustForged: true })
-  action initNoSkip = initWith({ ...SOUND, noSkip: true })
-  action initNoFence = initWith({ ...SOUND, noFence: true })
   action initMemberLocalChoice = initWith({ ...SOUND, memberLocalChoice: true })
   action initAdmitDependents = initWith({ ...SOUND, admitDependents: true })
+  action initNoOriginalHalt = initWith({ ...SOUND, noOriginalHalt: true })
 
-  // O signs its next slot (it publishes; members may receive it later).
+  // O signs its next slot (before the restore, or after it while it still runs and has not halted).
   action oSigns = all {
-    rPhase == "off", nextId <= MAX_V, slotOf(vs, oTip) < O_SLOTS,
-    vs' = vs.put(nextId, { author: "O", slot: slotOf(vs, oTip) + 1, op: nextId, deps: if (oTip == 0) Set() else Set(oTip),
-                           fence: false, genuine: true }),
+    rPhase == "off" or (oAlive and not(oHalted) and not(oClosed)),
+    nextId <= MAX_V, slotOf(vs, oTip) < O_SLOTS,
+    vs' = vs.put(nextId, { author: "O", slot: slotOf(vs, oTip) + 1, op: nextId,
+                           deps: if (oTip == 0) Set() else Set(oTip), genuine: true }),
     nextId' = nextId + 1, oTip' = nextId,
-    mu' = mu, rTip' = rTip, held' = held, rPhase' = rPhase, knownO' = knownO, reissued' = reissued,
-    memberMoves' = memberMoves, signedKnownSlot' = signedKnownSlot, blockedCloses' = blockedCloses, cut' = cut,
+    mu' = mu, rTip' = rTip, held' = held, rPhase' = rPhase, oAlive' = oAlive, oHalted' = oHalted, oClosed' = oClosed,
+    oClosedKnowing' = oClosedKnowing, knownO' = knownO, reissued' = reissued, memberMoves' = memberMoves,
+    blockedIssues' = blockedIssues, blockedCloses' = blockedCloses, cut' = cut, installed' = installed,
+  }
+
+  // The stale copy reopens from the restore point; O is retired, or (misconfiguration) still running.
+  action restore = all {
+    rPhase == "off",
+    nondet alive = Set(false, true).oneOf()
+    oAlive' = alive,
+    rPhase' = "open",
+    mu' = mu, vs' = vs, nextId' = nextId, oTip' = oTip, rTip' = rTip, held' = held, oHalted' = oHalted,
+    oClosed' = oClosed, oClosedKnowing' = oClosedKnowing, knownO' = knownO, reissued' = reissued,
+    memberMoves' = memberMoves, blockedIssues' = blockedIssues, blockedCloses' = blockedCloses, cut' = cut,
     installed' = installed,
   }
 
-  // The stale copy reopens from the restore point; O is gone.
-  action restore = all {
-    rPhase == "off",
-    rPhase' = "provisional",
-    mu' = mu, vs' = vs, nextId' = nextId, oTip' = oTip, rTip' = rTip, held' = held, knownO' = knownO,
-    reissued' = reissued, memberMoves' = memberMoves, signedKnownSlot' = signedKnownSlot,
-    blockedCloses' = blockedCloses, cut' = cut, installed' = installed,
-  }
-
-  // R's next slot: provisional, its own next; resumed, above every creator slot it knows (unless noSkip).
-  def rNextSlot: int =
-    val own = slotOf(vs, rTip) + 1
-    if (rPhase == "resumed" and not(mu.noSkip))
-      creatorSlots(vs, held.get("R").union(knownO)).fold(own, (acc, s) => if (s + 1 > acc) s + 1 else acc)
-    else own
+  // parkOwn (today): an O copy R received sits in its own pending ingress; every issue then fails.
+  def rParked: bool = mu.parkOwn and knownO != Set()
 
   action rSignsOp(op: int): bool = all {
-    nextId <= MAX_V,
-    val slot = rNextSlot
-    val jump = slot != slotOf(vs, rTip) + 1
+    rPhase == "open", nextId <= MAX_V, slotOf(vs, rTip) < R_SLOTS,
     nondet extra = held.get("R").filter(i => not(isCreator(vs.get(i)))).union(Set(0)).oneOf()
-    all {
-      vs' = vs.put(nextId, { author: "R", slot: slot, op: if (op == 0) nextId else op,
+    if (rParked) all {
+      vs' = vs, held' = held, nextId' = nextId, rTip' = rTip, blockedIssues' = blockedIssues + 1,
+    } else all {
+      vs' = vs.put(nextId, { author: "R", slot: slotOf(vs, rTip) + 1, op: if (op == 0) nextId else op,
                              deps: (if (rTip == 0) Set() else Set(rTip)).union(if (extra == 0) Set() else Set(extra)),
-                             fence: jump and not(mu.noFence), genuine: true }),
+                             genuine: true }),
       held' = held.setBy("R", s => s.union(Set(nextId))),
-      signedKnownSlot' = signedKnownSlot + (if (creatorSlots(vs, knownO).contains(slot)) 1 else 0),
+      nextId' = nextId + 1, rTip' = nextId, blockedIssues' = blockedIssues,
     },
-    nextId' = nextId + 1, rTip' = nextId,
-    mu' = mu, oTip' = oTip, rPhase' = rPhase, knownO' = knownO, memberMoves' = memberMoves,
-    blockedCloses' = blockedCloses, cut' = cut, installed' = installed,
+    mu' = mu, oTip' = oTip, rPhase' = rPhase, oAlive' = oAlive, oHalted' = oHalted, oClosed' = oClosed,
+    oClosedKnowing' = oClosedKnowing, knownO' = knownO, memberMoves' = memberMoves, blockedCloses' = blockedCloses,
+    cut' = cut, installed' = installed,
   }
 
-  // R signs a fresh creator move (provisional: on its stale fork; resumed: on its chain).
+  // R signs a fresh creator move (before it knows of O, at most R_PROVISIONAL of them; after, freely).
   action rSigns = all {
-    (rPhase == "provisional" and slotOf(vs, rTip) < R_PROVISIONAL) or (rPhase == "resumed" and slotOf(vs, rTip) < 5),
+    knownO != Set() or slotOf(vs, rTip) < R_PROVISIONAL,
     rSignsOp(0), reissued' = reissued,
   }
 
-  // Resumed R re-issues one verified O operation on its own chain.
+  // R re-issues one verified O operation on its own chain.
   action rReissues = all {
-    rPhase == "resumed", knownO != Set(),
+    knownO != Set(),
     nondet o = knownO.oneOf()
-    all { not(reissued.contains(vs.get(o).op)), rSignsOp(vs.get(o).op), reissued' = reissued.union(Set(vs.get(o).op)) },
+    all {
+      not(reissued.contains(vs.get(o).op)), rSignsOp(vs.get(o).op),
+      reissued' = if (rParked) reissued else reissued.union(Set(vs.get(o).op)),
+    },
   }
 
   // A member receives any vertex whose dependencies it holds (any order, either copy).
@@ -178,13 +193,14 @@ module creatorMoveEquivocationRecovery {
     all {
       rPhase != "closed", vs.get(v).genuine, not(held.get(m).contains(v)), vs.get(v).deps.subseteq(held.get(m)),
       held' = held.setBy(m, s => s.union(Set(v))),
-      mu' = mu, vs' = vs, nextId' = nextId, oTip' = oTip, rTip' = rTip, rPhase' = rPhase, knownO' = knownO,
-      reissued' = reissued, memberMoves' = memberMoves, signedKnownSlot' = signedKnownSlot,
+      mu' = mu, vs' = vs, nextId' = nextId, oTip' = oTip, rTip' = rTip, rPhase' = rPhase, oAlive' = oAlive,
+      oHalted' = oHalted, oClosed' = oClosed, oClosedKnowing' = oClosedKnowing, knownO' = knownO,
+      reissued' = reissued, memberMoves' = memberMoves, blockedIssues' = blockedIssues,
       blockedCloses' = blockedCloses, cut' = cut, installed' = installed,
     },
   }
 
-  // A member moves on top of one vertex it holds (and its own previous move).
+  // A member moves on top of one vertex it holds (and its own previous moves).
   action memberIssues = all {
     rPhase != "closed", nextId <= MAX_V, memberMoves < MEMBER_MOVES,
     nondet m = MEMBERS.oneOf()
@@ -192,83 +208,96 @@ module creatorMoveEquivocationRecovery {
     val own = held.get(m).filter(i => vs.get(i).author == m)
     val deps = own.union(if (on == 0) Set() else Set(on))
     all {
-      vs' = vs.put(nextId, { author: m, slot: 0, op: nextId, deps: deps, fence: false, genuine: true }),
+      vs' = vs.put(nextId, { author: m, slot: 0, op: nextId, deps: deps, genuine: true }),
       held' = held.setBy(m, s => s.union(Set(nextId))),
       nextId' = nextId + 1, memberMoves' = memberMoves + 1,
-      mu' = mu, oTip' = oTip, rTip' = rTip, rPhase' = rPhase, knownO' = knownO, reissued' = reissued,
-      signedKnownSlot' = signedKnownSlot, blockedCloses' = blockedCloses, cut' = cut, installed' = installed,
+      mu' = mu, oTip' = oTip, rTip' = rTip, rPhase' = rPhase, oAlive' = oAlive, oHalted' = oHalted,
+      oClosed' = oClosed, oClosedKnowing' = oClosedKnowing, knownO' = knownO, reissued' = reissued,
+      blockedIssues' = blockedIssues, blockedCloses' = blockedCloses, cut' = cut, installed' = installed,
     },
   }
 
   // R admits a member move whose dependencies it holds (admitDependents: even without its O parent).
   action rReceives = all {
-    rPhase != "off", rPhase != "closed", vs.keys() != Set(),
+    rPhase == "open", vs.keys() != Set(),
     nondet v = vs.keys().oneOf()
     val x = vs.get(v)
     all {
       not(isCreator(x)), x.genuine, not(held.get("R").contains(v)),
       x.deps.subseteq(held.get("R")) or (mu.admitDependents and x.deps.subseteq(held.get("R").union(knownO))),
       held' = held.setBy("R", s => s.union(Set(v))),
-      mu' = mu, vs' = vs, nextId' = nextId, oTip' = oTip, rTip' = rTip, rPhase' = rPhase, knownO' = knownO,
-      reissued' = reissued, memberMoves' = memberMoves, signedKnownSlot' = signedKnownSlot,
+      mu' = mu, vs' = vs, nextId' = nextId, oTip' = oTip, rTip' = rTip, rPhase' = rPhase, oAlive' = oAlive,
+      oHalted' = oHalted, oClosed' = oClosed, oClosedKnowing' = oClosedKnowing, knownO' = knownO,
+      reissued' = reissued, memberMoves' = memberMoves, blockedIssues' = blockedIssues,
       blockedCloses' = blockedCloses, cut' = cut, installed' = installed,
     },
   }
 
-  // A member holding an O vertex reaches R: R verifies it and learns every O vertex that member holds.
-  // While refused or resumed, members that reach R add what they hold (R keeps learning).
+  // A member delivers to R the O vertices it holds (its view answer, retained history, parent fetches).
   action memberReachesR = all {
-    rPhase == "provisional" or rPhase == "refused" or rPhase == "resumed",
+    rPhase == "open",
     nondet m = MEMBERS.oneOf()
     val seen = held.get(m).filter(i => vs.get(i).author == "O")
     all {
       seen != Set(), not(seen.subseteq(knownO)),
       knownO' = knownO.union(seen),
-      rPhase' = if (rPhase == "provisional") "refused" else rPhase,
       held' = if (mu.admitOriginal) held.setBy("R", s => s.union(seen)) else held,
-      mu' = mu, vs' = vs, nextId' = nextId, oTip' = oTip, rTip' = rTip, reissued' = reissued,
-      memberMoves' = memberMoves, signedKnownSlot' = signedKnownSlot, blockedCloses' = blockedCloses, cut' = cut,
+      mu' = mu, vs' = vs, nextId' = nextId, oTip' = oTip, rTip' = rTip, rPhase' = rPhase, oAlive' = oAlive,
+      oHalted' = oHalted, oClosed' = oClosed, oClosedKnowing' = oClosedKnowing, reissued' = reissued,
+      memberMoves' = memberMoves, blockedIssues' = blockedIssues, blockedCloses' = blockedCloses, cut' = cut,
       installed' = installed,
     },
   }
 
   // A peer sends an unsigned or forged claim of an O vertex at R's next slot. SOUND: R verifies the
-  // creator signature and ignores it. trustForged: R believes it (refuses, skips, re-issues its op).
+  // creator signature and ignores it. trustForged: R believes it (and re-issues its operation).
   action forgedClaim = all {
-    rPhase == "provisional" or rPhase == "refused" or rPhase == "resumed", nextId <= MAX_V,
-    vs' = vs.put(nextId, { author: "O", slot: slotOf(vs, rTip) + 1, op: nextId, deps: Set(), fence: false, genuine: false }),
+    rPhase == "open", nextId <= MAX_V,
+    vs' = vs.put(nextId, { author: "O", slot: slotOf(vs, rTip) + 1, op: nextId, deps: Set(), genuine: false }),
     knownO' = if (mu.trustForged) knownO.union(Set(nextId)) else knownO, nextId' = nextId + 1,
-    rPhase' = if (mu.trustForged and rPhase == "provisional") "refused" else rPhase,
-    mu' = mu, oTip' = oTip, rTip' = rTip, held' = held, reissued' = reissued, memberMoves' = memberMoves,
-    signedKnownSlot' = signedKnownSlot, blockedCloses' = blockedCloses, cut' = cut, installed' = installed,
+    mu' = mu, oTip' = oTip, rTip' = rTip, held' = held, rPhase' = rPhase, oAlive' = oAlive, oHalted' = oHalted,
+    oClosed' = oClosed, oClosedKnowing' = oClosedKnowing, reissued' = reissued, memberMoves' = memberMoves,
+    blockedIssues' = blockedIssues, blockedCloses' = blockedCloses, cut' = cut, installed' = installed,
   }
 
-  // Caught up: resume as the creator.
-  action catchUp = all {
-    rPhase == "refused", knownO != Set(),
-    rPhase' = "resumed",
-    mu' = mu, vs' = vs, nextId' = nextId, oTip' = oTip, rTip' = rTip, held' = held, knownO' = knownO,
-    reissued' = reissued, memberMoves' = memberMoves, signedKnownSlot' = signedKnownSlot,
-    blockedCloses' = blockedCloses, cut' = cut, installed' = installed,
+  // A live O receives an R vertex from a member: it halts issuing and sealing.
+  action oLearnsR = all {
+    oAlive, not(oHalted), MEMBERS.exists(m => held.get(m).exists(i => vs.get(i).author == "R")),
+    oHalted' = true,
+    mu' = mu, vs' = vs, nextId' = nextId, oTip' = oTip, rTip' = rTip, held' = held, rPhase' = rPhase,
+    oAlive' = oAlive, oClosed' = oClosed, oClosedKnowing' = oClosedKnowing, knownO' = knownO, reissued' = reissued,
+    memberMoves' = memberMoves, blockedIssues' = blockedIssues, blockedCloses' = blockedCloses, cut' = cut,
+    installed' = installed,
   }
 
-  // R closes the epoch: SOUND cuts its whole graph, once every verified O operation is re-issued.
+  // A live O closes the same epoch (SOUND: only while it has not seen R; noOriginalHalt: regardless).
+  action oCloses = all {
+    oAlive, not(oClosed), not(oHalted) or mu.noOriginalHalt,
+    oClosed' = true, oClosedKnowing' = oHalted,
+    mu' = mu, vs' = vs, nextId' = nextId, oTip' = oTip, rTip' = rTip, held' = held, rPhase' = rPhase,
+    oAlive' = oAlive, oHalted' = oHalted, knownO' = knownO, reissued' = reissued, memberMoves' = memberMoves,
+    blockedIssues' = blockedIssues, blockedCloses' = blockedCloses, cut' = cut, installed' = installed,
+  }
+
+  // R closes the epoch once every verified O operation is re-issued; its cut is its graph.
   action rCloses = all {
-    rPhase == "resumed" or (rPhase == "provisional" and knownO == Set()),
+    rPhase == "open", not(rParked),
     mu.noReissue or opsOf(vs, knownO).subseteq(reissued),
     val graph = held.get("R")
-    val voided = if (mu.excludeDivergence) closure(vs, graph.filter(i => vs.get(i).author == "R")) else Set()
+    val voided = if (mu.excludeDivergence and knownO != Set()) closure(vs, graph.filter(i => vs.get(i).author == "R"))
+                 else Set()
     val c = graph.exclude(voided)
     if (hasCreatorDuplicate(vs, c)) all {
       blockedCloses' = blockedCloses + 1, rPhase' = rPhase, cut' = cut,
     } else all {
       blockedCloses' = blockedCloses, rPhase' = "closed", cut' = c,
     },
-    mu' = mu, vs' = vs, nextId' = nextId, oTip' = oTip, rTip' = rTip, held' = held, knownO' = knownO,
-    reissued' = reissued, memberMoves' = memberMoves, signedKnownSlot' = signedKnownSlot, installed' = installed,
+    mu' = mu, vs' = vs, nextId' = nextId, oTip' = oTip, rTip' = rTip, held' = held, oAlive' = oAlive,
+    oHalted' = oHalted, oClosed' = oClosed, oClosedKnowing' = oClosedKnowing, knownO' = knownO,
+    reissued' = reissued, memberMoves' = memberMoves, blockedIssues' = blockedIssues, installed' = installed,
   }
 
-  // A member installs the successor: its state is the cut (memberLocalChoice: its own creator copies too).
+  // A member installs R's successor: its state is the cut (memberLocalChoice: its own creator copies too).
   action install = all {
     rPhase == "closed",
     nondet m = MEMBERS.oneOf()
@@ -276,14 +305,15 @@ module creatorMoveEquivocationRecovery {
     all {
       installed' = installed.set(m, opsOf(vs, cut.union(local))),
       mu' = mu, vs' = vs, nextId' = nextId, oTip' = oTip, rTip' = rTip, held' = held, rPhase' = rPhase,
-      knownO' = knownO, reissued' = reissued, memberMoves' = memberMoves, signedKnownSlot' = signedKnownSlot,
+      oAlive' = oAlive, oHalted' = oHalted, oClosed' = oClosed, oClosedKnowing' = oClosedKnowing,
+      knownO' = knownO, reissued' = reissued, memberMoves' = memberMoves, blockedIssues' = blockedIssues,
       blockedCloses' = blockedCloses, cut' = cut,
     },
   }
 
   action step = any {
     oSigns, restore, rSigns, rReissues, memberReceives, memberIssues, rReceives, memberReachesR, forgedClaim,
-    catchUp, rCloses, install,
+    oLearnsR, oCloses, rCloses, install,
   }
 
   // ---- Properties ----
@@ -291,41 +321,42 @@ module creatorMoveEquivocationRecovery {
   val installedMembers = MEMBERS.filter(m => installed.get(m) != Set())
   val convergence = installedMembers.forall(a => installedMembers.forall(b => installed.get(a) == installed.get(b)))
   val closeNotBlocked = blockedCloses == 0
+  val issueNotBlocked = blockedIssues == 0
   val cutClosed = rPhase == "closed" implies cut.forall(i => vs.get(i).deps.subseteq(cut))
   val memberWorkKept = rPhase == "closed" implies
     held.get("R").filter(i => not(isCreator(vs.get(i)))).subseteq(cut)
   val creatorOpsConserved = rPhase == "closed" implies
     opsOf(vs, vs.keys().filter(i => vs.get(i).author == "R")).union(opsOf(vs, knownO)).subseteq(opsOf(vs, cut))
-  val reissuedOnlyGenuine = reissued.forall(op => vs.keys().exists(i => vs.get(i).author == "O" and vs.get(i).op == op and vs.get(i).genuine))
-  val noKnownConflict = signedKnownSlot == 0
-  // Creator slots in the cut, ascending, run contiguously from the restore point; a gap is allowed
-  // only where the vertex after it is an author fence.
-  val frontierValid = rPhase == "closed" implies cut.forall(i =>
-    not(isCreator(vs.get(i))) or vs.get(i).slot == 1 or vs.get(i).fence or
-      cut.exists(j => isCreator(vs.get(j)) and vs.get(j).slot == vs.get(i).slot - 1))
   val evidenceGenuine = knownO.forall(i => vs.get(i).genuine)
-  val allSafety = sound implies (convergence and closeNotBlocked and cutClosed and memberWorkKept and creatorOpsConserved
-    and reissuedOnlyGenuine and noKnownConflict and frontierValid and evidenceGenuine)
+  val reissuedOnlyGenuine =
+    reissued.forall(op => vs.keys().exists(i => vs.get(i).author == "O" and vs.get(i).op == op and vs.get(i).genuine))
+  val currentAfterCatchUp = (knownO != Set() and opsOf(vs, knownO).subseteq(reissued)) implies
+    slotOf(vs, rTip) + 1 > maxSlot(vs, knownO)
+  val noKnowingSplit = not(oClosedKnowing and rPhase == "closed")
+  val allSafety = sound implies (convergence and closeNotBlocked and issueNotBlocked and cutClosed and memberWorkKept
+    and creatorOpsConserved and evidenceGenuine and reissuedOnlyGenuine and currentAfterCatchUp and noKnowingSplit)
 
   // Controls: each must be violated by its mutant.
+  val ctlParkOwn = mu.parkOwn implies issueNotBlocked
   val ctlAdmitOriginal = mu.admitOriginal implies closeNotBlocked
   val ctlExcludeDivergence = mu.excludeDivergence implies memberWorkKept
   val ctlNoReissue = mu.noReissue implies creatorOpsConserved
   val ctlTrustForged = mu.trustForged implies reissuedOnlyGenuine
   val ctlTrustForgedEvidence = mu.trustForged implies evidenceGenuine
-  val ctlNoSkip = mu.noSkip implies noKnownConflict
-  val ctlNoFence = mu.noFence implies frontierValid
   val ctlMemberLocalChoice = mu.memberLocalChoice implies convergence
   val ctlAdmitDependents = mu.admitDependents implies cutClosed
+  val ctlNoOriginalHalt = mu.noOriginalHalt implies noKnowingSplit
 
-  // Witnesses (negate to find a trace).
-  // Recovery: R signed a duplicate, was refused, caught up, re-issued O's move and closed; a member installed.
+  // Witnesses (each must be violated, i.e. the trace exists).
+  // Recovery: R signed over a slot O signed, re-issued O's operations, closed; a member installed.
   val wRecovered = not(sound and rPhase == "closed" and knownO != Set() and installedMembers != Set()
-    and vs.keys().exists(i => vs.get(i).author == "R" and creatorSlots(vs, knownO).contains(vs.get(i).slot)))
-  // A member move built on R's stale-fork vertex is kept in the cut.
-  val wMemberOnStaleForkKept = not(sound and rPhase == "closed" and cut.exists(i => vs.get(i).author != "R" and
-    vs.get(i).author != "O" and vs.get(i).deps.exists(d => vs.get(d).author == "R")))
+    and vs.keys().exists(i => vs.get(i).author == "R" and knownO.exists(o => vs.get(o).slot == vs.get(i).slot)))
+  // A member move built on R's divergent vertex is kept in the cut.
+  val wMemberOnRForkKept = not(sound and rPhase == "closed" and cut.exists(i => not(isCreator(vs.get(i))) and
+    vs.get(i).deps.exists(d => vs.get(d).author == "R")))
   // Residual: an O vertex no member delivered to R is outside the cut after the close.
   val wResidualLostOriginal = not(sound and rPhase == "closed" and
     vs.keys().exists(i => vs.get(i).author == "O" and vs.get(i).genuine and not(knownO.contains(i))))
+  // Residual: a live O that never saw R closes the same epoch as R (two anchors).
+  val wSplitWhenOriginalUnaware = not(sound and oClosed and rPhase == "closed")
 }
