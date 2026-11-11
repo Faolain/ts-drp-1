@@ -23,6 +23,12 @@ export interface LongRoomOptions {
 	readonly epochs: number;
 	/** Ordinary moves per Writer per epoch. */
 	readonly moves: number;
+	/**
+	 * Greedy admission: each Writer issues up to `moves` per epoch but stops at its first refusal whose
+	 * message carries `refusal` (a typed capacity refusal); any other refusal still fails the run. The
+	 * epoch record's issue arrays then hold only the admitted moves.
+	 */
+	readonly untilRefusal?: string;
 	/** Chat only: the format the creator signs into genesis (default "window", what Chat ships). */
 	readonly chatFormat?: ChatFormat;
 	/**
@@ -450,11 +456,28 @@ export async function driveLongRoom(
 			const recipientIssue: number[] = [];
 			const creatorAdmitsRemote: number[] = [];
 			const recipientAdmitsRemote: number[] = [];
-			for (let ordinal = 0; ordinal < options.moves; ordinal++) {
-				creatorIssue.push(await creator.issue(epoch, ordinal));
-				await flush(0, recipientAdmitsRemote);
-				if (!writerRecipient) continue;
-				recipientIssue.push(await recipient.issue(epoch, ordinal));
+			// Greedy mode: a typed capacity refusal ends that Writer's moves for the epoch.
+			const refused = (error: unknown): boolean =>
+				options.untilRefusal !== undefined && error instanceof Error &&
+				`${error.message} ${String((error as { cause?: unknown }).cause)}`.includes(options.untilRefusal);
+			let creatorOpen = true, recipientOpen = writerRecipient;
+			for (let ordinal = 0; ordinal < options.moves && (creatorOpen || recipientOpen); ordinal++) {
+				if (creatorOpen) {
+					try {
+						creatorIssue.push(await creator.issue(epoch, ordinal));
+					} catch (error) {
+						if (!refused(error)) throw error;
+						creatorOpen = false;
+					}
+					await flush(0, recipientAdmitsRemote);
+				}
+				if (!recipientOpen) continue;
+				try {
+					recipientIssue.push(await recipient.issue(epoch, ordinal));
+				} catch (error) {
+					if (!refused(error)) throw error;
+					recipientOpen = false;
+				}
 				await flush(1, creatorAdmitsRemote);
 			}
 			await sameState();
