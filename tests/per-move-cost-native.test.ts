@@ -15,7 +15,10 @@
 // (statements by leading keyword; BEGIN vs BEGIN IMMEDIATE/EXCLUSIVE; each transaction's COMMIT or
 // ROLLBACK classified per connection; a statement object executed for the first time counts as one
 // prepare, so the per-connection statement cache stays native), and the canonical codec's public
-// call counts (@ts-drp/canonical/instrumentation: every importer, dist packages included).
+// call counts and bytes (@ts-drp/canonical/instrumentation: every importer, dist packages included),
+// Ed25519 verifications computed or answered by the exact-byte memo (@ts-drp/protocol-v3/instrumentation,
+// source and dist instances),
+// bytes hashed (SHA-256 updates: @noble/hashes HashMD, the codec's hash, and node:crypto Hash) and rows read.
 //
 // PERMOVE_TIMING=1 installs NO seam at all and reports process CPU (user+system) and wall time of the
 // early and deep windows instead (PERMOVE_TIMING JSON line; counts and budgets are skipped): the
@@ -24,8 +27,13 @@
 // PERMOVE_ATTRIBUTE=1 attributes every counted call of the measured window to its repository stack
 // (PERMOVE_SITES_OUT, default /dev/shm/permove-sites.json); PERMOVE_CPU_PROFILE=<file> profiles it.
 import { observeCanonicalCalls } from "@ts-drp/canonical/instrumentation";
+import { observeEd25519Verifications } from "@ts-drp/protocol-v3/instrumentation";
+import { createHash } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import { type Profiler, Session } from "node:inspector";
+import { createRequire } from "node:module";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { afterEach, expect, it } from "vitest";
 
 import { installSqliteCountSeams } from "./fixtures/perf-counts/counts.js";
@@ -142,6 +150,36 @@ it("per steady move (rollover off): bounded SQLite statements, transactions, pre
 			bump(`canonical.${kind}Bytes`, byteLength);
 		});
 		restores.push(() => observeCanonicalCalls(undefined));
+		// Both protocol-v3 instances: the vite-aliased source this test's importers load, and the dist
+		// build the dist packages (storage, compaction, issuance-store) resolve through node.
+		const distVerifications = (
+			(await import(path.resolve(import.meta.dirname, "../packages/protocol-v3/dist/src/instrumentation.js"))) as { observeEd25519Verifications: typeof observeEd25519Verifications }
+		).observeEd25519Verifications;
+		for (const [instance, observe] of [
+			["source", observeEd25519Verifications],
+			["dist", distVerifications],
+		] as const) {
+			observe((outcome) => bump(`${outcome === "computed" ? "verify" : "verifyMemo"}.${instance}`));
+			restores.push(() => observe(undefined));
+		}
+		// Bytes hashed: every SHA-256 update of the codec's @noble/hashes (the ESM instance every
+		// importer shares) and of node:crypto.
+		const nobleMd = createRequire(new URL("../packages/canonical/package.json", import.meta.url)).resolve(
+			"@noble/hashes/_md"
+		);
+		const { HashMD } = (await import(pathToFileURL(path.join(path.dirname(nobleMd), "esm/_md.js")).href)) as {
+			HashMD: { prototype: Record<string, unknown> };
+		};
+		for (const prototype of [HashMD.prototype, Object.getPrototypeOf(createHash("sha256")) as Record<string, unknown>]) {
+			const update = prototype.update as (this: unknown, data: unknown, ...rest: unknown[]) => unknown;
+			prototype.update = function (this: unknown, data: unknown, ...rest: unknown[]) {
+				bump("hashedBytes", typeof data === "string" ? Buffer.byteLength(data) : (data as Uint8Array).byteLength);
+				return update.call(this, data, ...rest);
+			};
+			restores.push(() => {
+				prototype.update = update;
+			});
+		}
 	}
 
 	const profileOut = env.PERMOVE_CPU_PROFILE;
@@ -152,6 +190,17 @@ it("per steady move (rollover off): bounded SQLite statements, transactions, pre
 				error ? reject(error as Error) : resolve(result)
 			)
 		);
+	// The recorded (and profiled) window ends at ordinal WARMUP + MEASURED, or at the seal when that
+	// ordinal is the last (PERMOVE_WARMUP = PERMOVE_DEEP_AT profiles the deep window).
+	const endRecording = async () => {
+		if (!recording) return;
+		recording = false;
+		if (session !== undefined) {
+			const result = (await post("Profiler.stop")) as Profiler.StopReturnType;
+			writeFileSync(profileOut!, JSON.stringify(result.profile));
+			session.disconnect();
+		}
+	};
 	const steps = (role: "creator" | "writer", endpoint: RoleEndpoint): RoleEndpoint => {
 		const wrapped: Record<string, unknown> = { ...endpoint };
 		const label = (
@@ -181,7 +230,8 @@ it("per steady move (rollover off): bounded SQLite statements, transactions, pre
 			async (args) => {
 				if (role !== "creator") return;
 				ordinal = Number(args[1]);
-				if (ordinal === WARMUP || ordinal === WARMUP + MEASURED || ordinal === DEEP_AT) mark(`at${ordinal}`);
+				if (ordinal === WARMUP || ordinal === WARMUP + MEASURED || ordinal === DEEP_AT || ordinal % MEASURED === 0)
+					mark(`at${ordinal}`);
 				if (ordinal === WARMUP) {
 					recording = true;
 					if (session !== undefined) {
@@ -192,12 +242,7 @@ it("per steady move (rollover off): bounded SQLite statements, transactions, pre
 					}
 				}
 				if (ordinal === WARMUP + MEASURED) {
-					recording = false;
-					if (session !== undefined) {
-						const result = (await post("Profiler.stop")) as Profiler.StopReturnType;
-						writeFileSync(profileOut!, JSON.stringify(result.profile));
-						session.disconnect();
-					}
+					await endRecording();
 				}
 			},
 			role === "creator"
@@ -209,9 +254,13 @@ it("per steady move (rollover off): bounded SQLite statements, transactions, pre
 		);
 		label(role === "creator" ? "creator.admit" : "writer.receive", "receive");
 		label("harness", "published");
-		wrapped.seal = () => {
-			if (role === "creator") mark("seal");
-			return Promise.reject(STOP);
+		wrapped.seal = async () => {
+			if (role === "creator") {
+				mark("seal");
+				if (WARMUP + MEASURED === DEEP_AT + MEASURED) mark(`at${WARMUP + MEASURED}`);
+				await endRecording();
+			}
+			throw STOP;
 		};
 		return wrapped as unknown as RoleEndpoint;
 	};
@@ -242,6 +291,14 @@ it("per steady move (rollover off): bounded SQLite statements, transactions, pre
 				deepAt: DEEP_AT,
 				early: window(`at${WARMUP}`, `at${WARMUP + MEASURED}`),
 				deep: window(`at${DEEP_AT}`, "seal"),
+				// Per-move cost by epoch depth: every MEASURED-move window from the first.
+				curve: Array.from({ length: Math.floor(DEEP_AT / MEASURED) + 1 }, (_, index) => {
+					const from = index * MEASURED;
+					const to = from + MEASURED;
+					return marks.has(`at${from}`) && marks.has(to === DEEP_AT + MEASURED ? "seal" : `at${to}`)
+						? { from, ...window(`at${from}`, to === DEEP_AT + MEASURED ? "seal" : `at${to}`) }
+						: { from };
+				}),
 			})}`
 		);
 		return;
@@ -270,6 +327,10 @@ it("per steady move (rollover off): bounded SQLite statements, transactions, pre
 		encodedBytes: per["canonical.encodeBytes"] ?? 0,
 		decodedBytes: per["canonical.decodeBytes"] ?? 0,
 		rows: per.rows ?? 0,
+		hashedBytes: per.hashedBytes ?? 0,
+		verifies: (per["verify.source"] ?? 0) + (per["verify.dist"] ?? 0),
+		verifiesDist: per["verify.dist"] ?? 0,
+		verifyMemoHits: (per["verifyMemo.source"] ?? 0) + (per["verifyMemo.dist"] ?? 0),
 	});
 	const WRITER_MOVE = ["writer.issue", "creator.admit"];
 	// The creator issues nothing; anything it publishes back is delivered and counted in writer.receive.
