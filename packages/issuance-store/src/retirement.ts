@@ -312,18 +312,25 @@ export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueSc
 		throw issuanceRetirementRefusal("source custody contexts exceed original plan bound");
 	// Hand-back records already in the plan are charged exactly. A frontier resolution of any
 	// unresolved entry or potential source may add records (model issuance-image-capacity.qnt, HB):
-	// while any such source exists, every free record slot is reserved, its operation bytes bounded
-	// by the widest own source preimage (an intent's operation is part of its row's operation).
+	// while any such source exists, every free record slot is reserved. A record's operation is at
+	// most the widest own source preimage (an intent's operation is part of its row's operation), and
+	// the plan codec bounds all records' operations together by maxOperationBytes: the reserve takes
+	// each free record's fixed fields at the widest length header plus the shared operation budget.
 	const existingHandBacks = captured?.handBacks ?? [];
-	const freeHandBacks = either === 0 ? 0 : Math.max(0, SETTLEMENT_HAND_BACK_LIMITS.maxRecords - existingHandBacks.length);
+	const operationBudget = Math.max(0, SETTLEMENT_HAND_BACK_LIMITS.maxOperationBytes -
+		existingHandBacks.reduce((sum, record) => sum + record.exactCanonicalOperationBytes.byteLength, 0));
+	const freeHandBacks = either === 0 ? 0 : Math.min(operationBudget,
+		Math.max(0, SETTLEMENT_HAND_BACK_LIMITS.maxRecords - existingHandBacks.length));
+	const recordOperation = Math.min(operationBudget, maxHandBackOperationByteLength);
 	const handBackFields = {sourceSequence: integer, sourceDigest: digest, sourceEpoch: integer, intent: integer,
-		exactCanonicalOperationBytes: bytesWidth(Math.min(SETTLEMENT_HAND_BACK_LIMITS.maxOperationBytes, maxHandBackOperationByteLength)),
-		reissueSequence: integer};
-	const handBackWidth = unsignedRecordWidth({}, handBackFields);
+		exactCanonicalOperationBytes: bytesWidth(recordOperation), reissueSequence: integer};
+	const handBackOverhead = unsignedRecordWidth({}, handBackFields) - recordOperation;
+	const reservedOperation = Math.min(operationBudget, freeHandBacks * recordOperation);
 	const handBackShape = unsignedRecordShape({}, Object.fromEntries(Object.keys(handBackFields).map(key => [key, leaf])));
 	const handBacks = existingHandBacks.length + freeHandBacks === 0 ? undefined : {
 		width: unsignedArrayWidth([...existingHandBacks.map(record => encodeCanonical(record, unsignedEncodingLimits).byteLength),
-			...Array.from({length: freeHandBacks}, () => handBackWidth)]),
+			...Array.from({length: freeHandBacks}, (_, index) => handBackOverhead +
+				Math.floor(reservedOperation / freeHandBacks) + Number(index < reservedOperation % freeHandBacks))]),
 		shape: unsignedArrayShape([...existingHandBacks.map(unsignedCanonicalShape),
 			...Array.from({length: freeHandBacks}, () => handBackShape)]),
 	};
