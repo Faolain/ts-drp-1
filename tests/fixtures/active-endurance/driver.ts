@@ -101,12 +101,12 @@ export async function driveActiveAppEndurance(
 	const carriedTimes: number[] = [];
 	const carriedKinds = { lateExact: 0, replaced: 0 };
 	const pendingCarried: { digest: string; from: number; receivedAt: number; epoch: number }[] = [];
-	// Carried-row waterfall (app mode, observation only; performance.timeOrigin-based ms). A 50 ms observer
-	// timestamps each row when its author first publishes it and each role's authority epoch when first seen;
-	// the driver records when it delivers (injects) a row and when the creator closed each epoch. The
-	// replacement's wait between its publication and the driver's delivery is driver pacing (the 5 s poll
-	// and round boundaries block flush), not product work, and is excluded from the product latency.
-	const publishedAt = new Map<string, number>();
+	// Carried-row waterfall (app mode, observation only; performance.timeOrigin-based ms). A replacement is
+	// published when its author accepts it (the room's own accept callback, acceptedAt); a 50 ms observer reads
+	// each role's in-memory authority epoch (no storage reads, so it does not perturb the rooms); the driver
+	// records when it delivers (injects) a row and when the creator closed each epoch. The replacement's wait
+	// between its publication and the driver's delivery is driver pacing (the 5 s poll and round boundaries
+	// block flush), not product work, and is excluded from the product latency.
 	const injectedAt = new Map<string, number>();
 	const epochClosedAt = new Map<number, number>();
 	const epochSeenAt: Map<number, number>[] = [new Map(), new Map()];
@@ -205,7 +205,6 @@ export async function driveActiveAppEndurance(
 		return evaluated;
 	};
 	const wire = appMode ? successorWire(() => peers) : undefined;
-	const observed: (number | null)[] = [null, null];
 	let observing = false;
 	const observer = appMode
 		? setInterval(() => {
@@ -215,11 +214,8 @@ export async function driveActiveAppEndurance(
 					for (const role of [0, 1]) {
 						const peer = peers[role];
 						if (peer === undefined) continue;
-						const rows = await peer.published(observed[role] ?? null);
-						const at = now();
-						for (const row of rows) if (!publishedAt.has(row.digest)) publishedAt.set(row.digest, at);
-						if (rows.length) observed[role] = required(rows.at(-1)).authorSequence;
 						const epoch = await peer.authorityEpoch();
+						const at = now();
 						if (epoch !== null && epoch !== undefined && !required(epochSeenAt[role]).has(epoch))
 							required(epochSeenAt[role]).set(epoch, at);
 					}
@@ -311,7 +307,11 @@ export async function driveActiveAppEndurance(
 				// The author's first observed authority past the closed epoch (an install may skip epochs).
 				const later = [...required(epochSeenAt[row.from])].filter(([epoch]) => epoch > row.epoch).map(([, at]) => at);
 				const installedAt = later.length ? Math.min(...later) : null;
-				const replacementPublished = lateExact ? null : latest(publishedAt);
+				const authored = lateExact
+					? undefined
+					: await required(peers[row.from]).acceptedAt?.(disposition.acceptedDigests);
+				const replacementPublished =
+					authored === undefined || authored.some((time) => time === null) ? null : Math.max(...(authored as number[]));
 				const replacementDelivered = lateExact ? null : latest(injectedAt);
 				const span = (from: number | null, to: number | null): number | null =>
 					from === null || to === null ? null : to - from;
