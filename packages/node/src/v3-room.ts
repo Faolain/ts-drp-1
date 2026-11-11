@@ -1805,6 +1805,14 @@ export class V3RoomNotYetCurrent extends TypeError {
 /**
  * The most undelivered own moves a Writer keeps: the settlement plan's hand-back record bound
  * (SETTLEMENT_HAND_BACK_LIMITS.maxRecords), so the window can give back every move it holds.
+ *
+ * Between installs a Writer counts each new own move until it has authenticated evidence that the
+ * creator admitted it: a received creator row whose causal past reaches the move's row (an admitted
+ * row is in the epoch's seal and never needs a hand-back record). So the documented bound is 64 own
+ * moves without admission evidence between installs. Every install's plan write clears the count, and
+ * shipped apps roll over every few moves per author (budget.movesPerAuthor), so a healthy Writer stays
+ * far below it; a single-epoch run whose creator never moves reaches it at the 65th move. The creator's
+ * own moves are admitted when issued and never count. The refusal is the typed V3RoomLocalBacklogFull.
  */
 export const V3_ROOM_LOCAL_BACKLOG_LIMIT = SETTLEMENT_HAND_BACK_LIMITS.maxRecords;
 
@@ -1812,10 +1820,11 @@ export const V3_ROOM_LOCAL_BACKLOG_LIMIT = SETTLEMENT_HAND_BACK_LIMITS.maxRecord
  * A new local move refused up front because the Writer's undelivered own moves have reached
  * V3_ROOM_LOCAL_BACKLOG_LIMIT: its moves are not reaching the host. The backlog is the Writer's live
  * replaced moves (displaced rows the room re-offers), its retained work, and the settlement plan's
- * hand-back records, as of the last install; a move accepted in the current epoch counts once an install
- * displaces it, so a Writer whose moves are delivered every epoch never reaches it. Nothing is accepted,
- * so nothing can be lost later. It clears once an install settles delivered moves, or a given-back move's
- * reissued row settles. A given-back move offered again with its hand-back record is never refused here.
+ * hand-back records, as of the last install, plus the moves accepted since then that have no admission
+ * evidence yet (a received creator row reaching them). Nothing is accepted, so nothing can be lost later.
+ * It clears as creator rows prove moves admitted, once an install settles delivered moves, or once a
+ * given-back move's reissued row settles. A given-back move offered again with its hand-back record is
+ * never refused here. Apps match it by class (or name "V3RoomLocalBacklogFull") and re-offer the move later.
  */
 export class V3RoomLocalBacklogFull extends Error {
 	/**
@@ -4014,6 +4023,22 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	};
 	let logicalTime = input.initialLogicalTime;
 	const roomCreatorAuthor = roomInviteAuthority === undefined ? input.author : roomInviteAuthority.creatorAuthor;
+	// Admission evidence for the local backlog (V3RoomLocalBacklogFull): the rows of this epoch in the
+	// causal past of a received creator row. The creator signed a row depending on them, so it admitted
+	// them and they are in this epoch's seal. Cleared with acceptedVertices; each row is walked once.
+	const creatorReachedRows = new Set<string>();
+	let noteCreatorReachedOwnRow: ((identity: string) => void) | undefined;
+	const markCreatorReached = (creatorRow: V3RoomAcceptedVertex): void => {
+		const pending = [hex(creatorRow.digest)];
+		for (let identity = pending.pop(); identity !== undefined; identity = pending.pop()) {
+			if (creatorReachedRows.has(identity)) continue;
+			const reached = acceptedVertices.get(identity);
+			if (reached === undefined) continue;
+			creatorReachedRows.add(identity);
+			if (reached.author === input.author) noteCreatorReachedOwnRow?.(identity);
+			pending.push(...reached.dependencies);
+		}
+	};
 	// Creator restore currency, member side: the highest creator-authored vertex this replica received
 	// in this session (exact envelope, its creator signature verified), for a reopened creator's check.
 	let heldCreatorVertex: Readonly<{ preimage: Uint8Array; signature: Uint8Array; sequence: number }> | undefined;
@@ -4278,6 +4303,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 		authenticatedProjectionBase = base;
 		acceptedVertices.clear();
+		creatorReachedRows.clear();
 		acceptedOperationRows.clear();
 		presentationHook((overlay) => overlay.epochChanged(authority.epoch));
 	};
@@ -4303,6 +4329,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			acceptedVertices.set(identity, vertex);
 			logicalTime = Math.max(logicalTime, vertex.logicalTime + 2);
 		}
+		if (input.author !== roomCreatorAuthor)
+			for (const { vertex } of candidate.additions) if (vertex.author === roomCreatorAuthor) markCreatorReached(vertex);
 		projection = candidate.projection;
 		// Confirmation is atomic with the durable projection that now contains the
 		// move: one synchronous step removes the pending copy and re-bases the rest.
@@ -5569,7 +5597,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		operation: Readonly<Record<string, unknown>>;
 		releasePublicInput?(): void;
 		reject(reason: unknown): void;
-		resolve(): void;
+		/** @param row - The identity of the own row that carried the move. */
+		resolve(row?: string): void;
 	}>;
 	// The signed pending allowance bounds private public-input custody, not
 	// cumulative proof charges, encoding temporaries, or physical heap memory.
@@ -6097,7 +6126,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		if (owned.some((request) => request.handBack !== undefined)) await refreshHandBackListing().catch(() => undefined);
 		try {
 			await publishAccepted();
-			for (const request of owned) request.resolve();
+			for (const request of owned) request.resolve(issued.digest);
 		} catch (error) {
 			rejectOwned(owned, error);
 		}
@@ -6293,8 +6322,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	// needs one hand-back record for each (a retained row past the record bound stays unresolved,
 	// withholds the author fence, and leaves the Writer's later rows unprovable). Counted by the epoch
 	// the room was in when the move was accepted (never earlier than the epoch it was signed in), plus
-	// those still in flight; an epoch leaves the count once a plan write at a later epoch counts it.
+	// those still in flight; an epoch leaves the count once a plan write at a later epoch counts it. A
+	// move leaves it earlier once a received creator row reaches its row (markCreatorReached): the
+	// creator admitted it, so no window expiry can hold it. Moves without that evidence keep counting.
 	const uncountedLocalMoves = new Map<number, number>();
+	// The counted moves of each own row (by identity), for the evidence that removes them.
+	const uncountedLocalRows = new Map<string, Readonly<{ epoch: number; moves: number }>>();
 	let uncountedLocalMovesInFlight = 0;
 	let localMovesCountedBelow = 0;
 	const undeliveredLocalMoves = (): number => {
@@ -6306,6 +6339,15 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		if (epoch <= localMovesCountedBelow) return;
 		localMovesCountedBelow = epoch;
 		for (const counted of [...uncountedLocalMoves.keys()]) if (counted < epoch) uncountedLocalMoves.delete(counted);
+		for (const [row, counted] of [...uncountedLocalRows]) if (counted.epoch < epoch) uncountedLocalRows.delete(row);
+	};
+	noteCreatorReachedOwnRow = (row: string): void => {
+		const counted = uncountedLocalRows.get(row);
+		if (counted === undefined) return;
+		uncountedLocalRows.delete(row);
+		const left = (uncountedLocalMoves.get(counted.epoch) ?? 0) - counted.moves;
+		if (left > 0) uncountedLocalMoves.set(counted.epoch, left);
+		else uncountedLocalMoves.delete(counted.epoch);
 	};
 	let settlementDisplaced: ReadonlySet<number> = new Set();
 	// The displaced sources of the last rebase scan (recordSettlementStatus), for a status recomputed
@@ -7594,7 +7636,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 							logicalTime: selectedLogicalTime,
 							operation: selected,
 							reject,
-							resolve,
+							resolve: (): void => resolve(),
 						})
 					);
 				})
@@ -9427,13 +9469,17 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				if (backlog >= V3_ROOM_LOCAL_BACKLOG_LIMIT) throw new V3RoomLocalBacklogFull(backlog, V3_ROOM_LOCAL_BACKLOG_LIMIT);
 			}
 			let countedAccepted = false;
-			const settleBacklogCount = (accepted: boolean): void => {
+			const settleBacklogCount = (accepted: boolean, row?: string): void => {
 				if (!countsAgainstBacklog || countedAccepted) return;
 				countedAccepted = true;
 				uncountedLocalMovesInFlight -= 1;
 				if (!accepted) return;
-				const epoch = Math.max(activeHandle?.epoch ?? 0, localMovesCountedBelow);
+				// Admitted already: the creator's own row, or a row a creator row has reached.
+				if (input.author === roomCreatorAuthor || (row !== undefined && creatorReachedRows.has(row))) return;
+				const prior = row === undefined ? undefined : uncountedLocalRows.get(row);
+				const epoch = prior?.epoch ?? Math.max(activeHandle?.epoch ?? 0, localMovesCountedBelow);
 				uncountedLocalMoves.set(epoch, (uncountedLocalMoves.get(epoch) ?? 0) + 1);
+				if (row !== undefined) uncountedLocalRows.set(row, Object.freeze({ epoch, moves: (prior?.moves ?? 0) + 1 }));
 			};
 			if (redirectPromise === undefined && redirectedSession === undefined) {
 				if (terminalFailure !== undefined) throw terminalFailure;
@@ -9531,7 +9577,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 						presentationHook((overlay) => overlay.bindLocal(id, current));
 					}
 					if (localIssueRefusal !== undefined) throw localIssueRefusal;
-					const promise = new Promise<void>((resolve, reject) => {
+					const promise = new Promise<string | undefined>((resolve, reject) => {
 						const request: PendingIssue = Object.freeze({
 							source: "public-new",
 							// A given-back move is its own row: its issuance transaction consumes the record.
@@ -9552,9 +9598,9 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 						transferred = true;
 					});
 					if (!held) scheduleDrain();
-					await promise;
+					const row = await promise;
 					issued = true;
-					settleBacklogCount(true);
+					settleBacklogCount(true, row);
 					settleFollower?.(Object.freeze({ ok: true }));
 					if (presented !== undefined) {
 						const id = presented;
