@@ -279,33 +279,9 @@ it.each([
 	1_200_000
 );
 
-// A hot Writer (fix/maintenance-image-capacity): with trigger values too high to fire, the creator
-// refuses the Writer's received moves once its per-epoch maintenance proof book (or issuance
-// forecast) is full. That refusal is the typed capacity reason and the creator's policy seals at
-// once, so the Writer's held moves land in the successor through the existing re-delivery and
-// settlement: every move is accepted, nothing waits for a successor that never comes.
-it("grid with a hot writer: a received move refused at the creator's capacity triggers a rollover and is accepted", async () => {
-	const restore = await installEnvironment("node", () => undefined);
-	try {
-		// The creator moves every other Writer move until its own moves have filled most of its
-		// per-epoch proof book, then pauses while the Writer's received moves fill the rest: the creator
-		// refuses a received move, and not its own, and before the Writer's own admission reaches its
-		// settlement reserve (the next case). Its rows are the admission evidence that keeps the
-		// Writer's admitted moves out of the undelivered bound (V3RoomLocalBacklogFull, 64 moves after
-		// the creator's last row), so the pause is shorter than that and the creator resumes after it.
-		const writerMoves = Number(process.env.HOT_WRITER_MOVES ?? 300);
-		const creatorEvery = Number(process.env.HOT_WRITER_CREATOR_EVERY ?? 2);
-		const pauseAt = Number(process.env.HOT_WRITER_CREATOR_PAUSE_AT ?? 140);
-		const pause = Number(process.env.HOT_WRITER_CREATOR_PAUSE ?? 60);
-		const movesPerAuthor = Number(process.env.HOT_WRITER_BUDGET ?? 100_000);
-		const policy = await playPastCeiling("grid", "writer", writerMoves, { movesPerAuthor, idleMs: 3_600_000 },
-			(ordinal) => (ordinal < pauseAt || ordinal >= pauseAt + pause) && ordinal % creatorEvery === 0);
-		expect(policy?.events.map((event) => event.trigger)).toContain("refusal");
-		expect(policy?.events.every((event) => event.trigger === "refusal" || event.trigger === "budget")).toBe(true);
-	} finally {
-		restore();
-	}
-}, 1_800_000);
+// The received-move refusal path (liveness (a)/(b)) needs several Writers' combined load: see
+// app-rollover-received-refusal-native.test.ts. One hot Writer reaches its own settlement reserve
+// first (the next case).
 
 // Writer-side admission and maintenance agree (fix/maintenance-image-capacity): a hot Writer's
 // moves the creator closed an epoch without are replaced at the successor's install, under the
