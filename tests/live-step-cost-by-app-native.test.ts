@@ -10,7 +10,8 @@
 // Environment: LIVE_APP (grid | canvas | chat, default grid), LIVE_EPOCHS (default 8), LIVE_MOVES
 // (ordinary moves per Writer per epoch, default 12), LIVE_ROLLOVER (harness | app, default harness).
 // Prints one `LIVE_STEPS {json}` line: per step and position bucket (0 = the first such step after
-// the boundary, then 1, 2-3, 4+), the count and the median/p95 wall and CPU in ms.
+// the boundary, then 1, 2-3, 4+; "span" = an app-rollover step during which the role's epoch
+// changed), the count and the median/p95 wall and CPU in ms.
 import { afterEach, expect, it } from "vitest";
 
 import {
@@ -32,6 +33,8 @@ const ROLLOVER = (env.LIVE_ROLLOVER ?? "harness") as "harness" | "app";
 
 interface StepSample {
 	readonly step: string;
+	/** App rollover: the role's epoch changed while this step was awaited (it spanned a rollover). */
+	spanned: boolean;
 	readonly position: number;
 	readonly rows: number;
 	readonly wallMs: number;
@@ -67,6 +70,7 @@ it(`live step cost by position after the epoch boundary (${APP}, ${ROLLOVER} rol
 					const used = process.cpuUsage(cpu);
 					samples.push({
 						step,
+						spanned: false,
 						position,
 						rows: method === "receive" ? (args[0] as readonly unknown[]).length : 1,
 						wallMs: performance.now() - wall,
@@ -103,14 +107,21 @@ it(`live step cost by position after the epoch boundary (${APP}, ${ROLLOVER} rol
 					seen = epoch;
 				}
 			};
-			wrapped.issue = async (...args: unknown[]) => {
+			const spanning = async (step: string, call: () => Promise<unknown>) => {
 				await check();
-				return issue(...args);
+				const before = seen;
+				try {
+					return await call();
+				} finally {
+					if ((await endpoint.authorityEpoch()) !== before) {
+						const last = samples.findLast((sample) => sample.step === step);
+						if (last !== undefined) last.spanned = true;
+					}
+				}
 			};
-			wrapped.receive = async (...args: unknown[]) => {
-				await check();
-				return receive(...args);
-			};
+			wrapped.issue = (...args: unknown[]) => spanning(`${role}.issue`, () => issue(...args));
+			wrapped.receive = (...args: unknown[]) =>
+				spanning(role === "creator" ? "creator.admit" : "writer.receive", () => receive(...args));
 		}
 		return wrapped as unknown as RoleEndpoint;
 	};
@@ -128,7 +139,7 @@ it(`live step cost by position after the epoch boundary (${APP}, ${ROLLOVER} rol
 	);
 	const groups = new Map<string, StepSample[]>();
 	for (const sample of samples) {
-		const key = `${sample.step}@${bucket(sample.position)}`;
+		const key = `${sample.step}@${sample.spanned ? "span" : bucket(sample.position)}`;
 		groups.set(key, [...(groups.get(key) ?? []), sample]);
 	}
 	const out: Record<string, unknown> = {};
