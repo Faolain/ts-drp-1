@@ -48,6 +48,11 @@
 //               The proven row stays held (`pending`: it carries the move's intents) until its record is
 //               written, so retirement cannot drop the accepted move before it is given back (G3).
 //   releaseProveFirst  release + proveFirst.
+//   fenceOverLost  candidate (g): the fence is withheld only for retained work that may still be proven
+//               (records full, frontier not installed yet), not for retained work no proof can ever reach
+//               (`lost`: an old incarnation's row, or a displaced unguarded row): a fence cannot make a
+//               lost row less provable, and withholding it leaves every later epoch fenceless.
+//   releaseFenceOverLost  release + fenceOverLost.
 //   Broken controls:
 //   overRelease release that also drops the entry of a source that is NOT resolved.
 //   guardAny    release whose guard accepts an own fence of ANY epoch below the row. (On a base that
@@ -120,11 +125,14 @@ module heldAnchorRetention {
   var cutProven: Set[int]
   // Proven never admitted, hand-back record not yet written (proveFirst): held until records free.
   var pending: Set[int]
+  // Retained rows no proof can ever resolve (manual review for good): installLost.
+  var lost: Set[int]
 
   def releases(rl: str): bool =
     rl == "release" or rl == "releaseFenceFirst" or rl == "overRelease" or rl == "guardAny" or rl == "cutProof" or rl == "cutEarly" or
-    rl == "releaseProveFirst" or rl == "proveAny" or rl == "proveDrop"
+    rl == "releaseProveFirst" or rl == "proveAny" or rl == "proveDrop" or rl == "releaseFenceOverLost"
   def cuts(rl: str): bool = rl == "cutProof" or rl == "cutEarly"
+  def fencesOverLost(rl: str): bool = rl == "fenceOverLost" or rl == "releaseFenceOverLost"
   def provesFirst(rl: str): bool = rl == "proveFirst" or rl == "releaseProveFirst" or rl == "proveAny" or rl == "proveDrop"
   def fencesFirst(rl: str): bool = rl == "fenceFirst" or rl == "releaseFenceFirst"
 
@@ -208,7 +216,7 @@ module heldAnchorRetention {
       planFence' = if (needFence) nextSeq else planFence,
       nextSeq' = m + 1,
       rule' = rule, cur' = cur, gens' = gens, entries' = entries, expired' = expired, committed' = committed,
-      admitted' = admitted, tt' = tt, stuck' = stuck, cutProven' = cutProven, pending' = pending,
+      admitted' = admitted, tt' = tt, stuck' = stuck, cutProven' = cutProven, pending' = pending, lost' = lost,
       keepFlags,
     }
   }
@@ -224,7 +232,7 @@ module heldAnchorRetention {
     refusedUnexcused' = refusedUnexcused, refusedReview' = refusedReview, unsafeRelease' = unsafeRelease,
     lostMove' = lostMove, lulled' = false,
     rule' = rule, cur' = cur, gens' = gens, rows' = rows, held' = held, nextSeq' = nextSeq, planFence' = planFence,
-    entries' = entries, expired' = expired, committed' = committed, stuck' = stuck, cutProven' = cutProven, pending' = pending,
+    entries' = entries, expired' = expired, committed' = committed, stuck' = stuck, cutProven' = cutProven, pending' = pending, lost' = lost,
   }
 
   // A successor install k epochs ahead: the merge clears the fence. Live (not retained) displaced
@@ -236,7 +244,10 @@ module heldAnchorRetention {
   // retained work is unknown (fenceFirst: always). AHE then rolls.
   def up(s: int): int = if (rows.get(s).src >= 0) rows.get(s).src else s
   def root(s: int): int = ep(up(up(up(up(up(up(up(up(s)))))))))
-  action install(k: int, ov: bool): bool = {
+  action install(k: int, ov: bool): bool = installMode(k, if (ov) 1 else 0)
+  // A skip install whose retained rows no proof can ever resolve (an old incarnation's rows).
+  action installLost(k: int): bool = all { k > 1, installMode(k, 2) }
+  action installMode(k: int, mode: int): bool = {
     val c = cur + k
     val proven = if (cuts(rule) and k == 1)
       held.filter(s => not(isFence(s)) and ep(s) == cur and not(admitted.contains(s)))
@@ -247,16 +258,18 @@ module heldAnchorRetention {
     val expire = live.filter(s => (if (rule == "chainAge") root(s) else ep(s)) <= c - W and guarded(s))
     val replace = if (k == 1) live.exclude(expire) else Set()
     val retain = if (k == 1) Set() else live.exclude(expire)
-    val wouldStick = if (ov) stuck.union(retain) else stuck
+    val wouldStick = if (mode == 1) stuck.union(retain) else stuck
+    val nowLost = if (mode == 2) lost.union(retain) else lost
     val provedStuck = if (provesFirst(rule))
       wouldStick.filter(s => displaced(s, c) and (guarded(s) or rule == "proveAny"))
     else Set()
     val nowStuck = wouldStick.exclude(provedStuck)
-    val capOpen = open.filter(s => isCap(s)).union(retain).exclude(wouldStick)
+    val capOpen = open.filter(s => isCap(s)).union(retain).exclude(wouldStick).exclude(nowLost)
     val capNever = capOpen.filter(s => displaced(s, c) and (guarded(s) or rule == "proveAny"))
     val capCommitted = capOpen.filter(s => s <= tt and not(held.exists(f => isFence(f) and f > s and f <= tt)))
     val unknown = capOpen.exclude(capNever).exclude(capCommitted).union(nowStuck)
-    val settle = replace.size() > 0 or unknown.size() == 0 or fencesFirst(rule)
+    val withholding = if (fencesOverLost(rule)) unknown else unknown.union(nowLost)
+    val settle = replace.size() > 0 or withholding.size() == 0 or fencesFirst(rule)
     val f = nextSeq
     val b = nextSeq + 1
     val batch = replace.size() > 0
@@ -276,7 +289,7 @@ module heldAnchorRetention {
       expired' = expired.union(expire).union(capNever).union(provedStuck),
       committed' = committed.union(capCommitted),
       gens' = retireGens(gens.union(Set(c)), c, demanded(held, c)),
-      rule' = rule, admitted' = admitted, tt' = tt, stuck' = nowStuck, cutProven' = cutProven.union(proven), pending' = pending.union(provedStuck),
+      rule' = rule, admitted' = admitted, tt' = tt, stuck' = nowStuck, cutProven' = cutProven.union(proven), pending' = pending.union(provedStuck), lost' = nowLost,
       keepFlags,
     }
   }
@@ -302,14 +315,14 @@ module heldAnchorRetention {
       cutProven' = if (rule == "cutEarly")
         cutProven.union(held.filter(s => not(isFence(s)) and ep(s) == cur and not(admitted.contains(s))))
       else cutProven,
-      pending' = pending,
+      pending' = pending, lost' = lost,
     }
   }
 
   // Hand-back records free (the application offered its given-back moves again): the stuck rows are
   // resolvable at the next install.
   action free = all {
-    stuck.size() > 0 or pending.size() > 0, stuck' = Set(), cutProven' = cutProven, pending' = Set(),
+    stuck.size() > 0 or pending.size() > 0, stuck' = Set(), cutProven' = cutProven, pending' = Set(), lost' = lost,
     rule' = rule, cur' = cur, gens' = gens, rows' = rows, held' = held, nextSeq' = nextSeq, planFence' = planFence,
     entries' = entries, expired' = expired, committed' = committed, admitted' = admitted, tt' = tt,
     keepFlags,
@@ -320,7 +333,7 @@ module heldAnchorRetention {
     rows' = Map(0 -> { e: 0, fence: true, src: -1, cap: false }),
     entries' = Map(), expired' = Set(), committed' = Set(), admitted' = Set(0), tt' = 0,
     refusedUnexcused' = false, refusedReview' = false, unsafeRelease' = false, lostMove' = false,
-    replayNoSource' = false, lulled' = false, stuck' = Set(), cutProven' = Set(), pending' = Set(),
+    replayNoSource' = false, lulled' = false, stuck' = Set(), cutProven' = Set(), pending' = Set(), lost' = Set(),
   }
   action init = initWith("releaseProveFirst")
   action initReleaseFenceFirst = initWith("releaseFenceFirst")
@@ -337,6 +350,8 @@ module heldAnchorRetention {
   action initReleaseProveFirst = initWith("releaseProveFirst")
   action initProveAny = initWith("proveAny")
   action initProveDrop = initWith("proveDrop")
+  action initFenceOverLost = initWith("fenceOverLost")
+  action initReleaseFenceOverLost = initWith("releaseFenceOverLost")
 
   action step = any {
     move,
@@ -344,6 +359,17 @@ module heldAnchorRetention {
     nondet ov = Set(true, false).oneOf()
     install(k, ov),
     free,
+    lull,
+    nondet s = 0.to(MAX_SEQ).oneOf()
+    admit(s),
+  }
+
+  // fix/int7-admitted-backlog (4fc28f1d): records always fit, but a skip install can still retain rows
+  // no proof will ever resolve.
+  action stepBounded = any {
+    move,
+    nondet k = 1.to(GAP).oneOf()
+    any { install(k, false), installLost(k) },
     lull,
     nondet s = 0.to(MAX_SEQ).oneOf()
     admit(s),
@@ -437,6 +463,16 @@ module heldAnchorRetention {
   run proveFirstHandsBackRetainedTest =
     initWith("proveFirst").then(install(1, false)).then(move).then(install(3, true)).then(move).then(admit(3))
       .then(all { assert(planFence == 3), assert(expired.contains(2)), assert(not(review(2))), assert(stuck == Set()), unchangedAll })
+  // On fix/int7-admitted-backlog 4fc28f1d (no overflow; tests/creator-readmitted-member-anchor-native):
+  // an install retains a row no proof reaches (lost: the member's row from before its removal, an
+  // earlier incarnation); the install withholds the fence, and the P2 shape follows (the re-admitted
+  // member's first move of that fenceless epoch, replaced, unguarded).
+  action p4(r: str): bool =
+    initWith(r).then(install(1, false)).then(move).then(installLost(3)).then(move).then(adj).then(adj3).then(adj3).then(adj3)
+  run shippedRefusesP4Test = p4("shipped").then(all { assert(refusedUnexcused), unchangedAll })
+  run releaseProveFirstRefusesP4Test = p4("releaseProveFirst").then(all { assert(refusedUnexcused), unchangedAll })
+  run releaseFenceOverLostKeepsP4Test = p4("releaseFenceOverLost")
+    .then(all { assert(not(refusedUnexcused)), assert(boundedGens), assert(boundedAge), assert(safety), unchangedAll })
   // Broken (f): retirement drops the proven row before its hand-back record exists: the move is lost.
   run proveDropLosesMoveTest = p1("proveDrop").then(all { assert(lostMove), unchangedAll })
   run releaseProveFirstKeepsP1Test = p1("releaseProveFirst")
@@ -452,6 +488,6 @@ module heldAnchorRetention {
   action unchangedAll = all {
     rule' = rule, cur' = cur, gens' = gens, rows' = rows, held' = held, nextSeq' = nextSeq, planFence' = planFence,
     entries' = entries, expired' = expired, committed' = committed, admitted' = admitted, tt' = tt,
-    stuck' = stuck, cutProven' = cutProven, pending' = pending, keepFlags,
+    stuck' = stuck, cutProven' = cutProven, pending' = pending, lost' = lost, keepFlags,
   }
 }
