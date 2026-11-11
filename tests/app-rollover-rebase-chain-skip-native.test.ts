@@ -366,7 +366,17 @@ async function retainedResolutionCost(count: number) {
 				sourceExpirySignatures: after.sourceExpirySignatures - before.sourceExpirySignatures,
 			};
 			const status = (await writer.settlementStatus?.()) as { undelivered?: unknown[] } | null;
-			const result = { count, installMs: Math.round(ms), perRowMs: Math.round(ms / count), givenBack: status?.undelivered?.length, work };
+			// The next one-epoch install, with the resolved rows still unretired: what each of its census
+			// reads costs in own-fence outbox scans.
+			const nextBefore = readV3SettlementWorkCounts();
+			epoch = await rollCreator(creator, rows.toWriter, ordinal);
+			await wire.caughtUp(epoch, 1_200_000);
+			const nextAfter = readV3SettlementWorkCounts();
+			const next = {
+				recoveryCensusReads: nextAfter.recoveryCensusReads - nextBefore.recoveryCensusReads,
+				ownFenceScans: nextAfter.ownFenceScans - nextBefore.ownFenceScans,
+			};
+			const result = { count, installMs: Math.round(ms), perRowMs: Math.round(ms / count), givenBack: status?.undelivered?.length, work, next };
 			process.stdout.write(`RETAINED_COST ${JSON.stringify(result)}\n`);
 			return result;
 		} finally {
@@ -596,3 +606,60 @@ async function catchUp(moves: number, epochs: number) {
 const CATCH_UP_CASES = (process.env.CATCH_UP_CASES ?? "25x4,50x8,100x16").split(",").map((value) => value.split("x").map(Number) as [number, number]);
 for (const [moves, epochs] of CATCH_UP_CASES)
 	it(`catch-up: a member ${moves} moves and ${epochs} epochs behind lands every move once while the creator keeps rolling`, () => catchUp(moves, epochs), 3_600_000);
+
+// A move that waited the settlement window through one-epoch installs is expired and given back;
+// its rows (the original and each replacement) stay in the outbox until retirement. Every complete
+// recovery census classifies each such row as settled (ownSourceSettlementIsComplete), and that
+// check scanned the author's whole outbox for its own fences once per row: a census cost the number
+// of expired rows times the outbox, and the member runs several census reads per row it settles.
+async function windowExpiredCensusCost(count: number) {
+	const restore = await installEnvironment("node", () => undefined);
+	const directory = mkdtempSync(join(tmpdir(), "app-rollover-window-expired-"));
+	directories.push(directory);
+	try {
+		const { creator, writer } = await openPair(directory);
+		const wire = successorWire(() => [creator, writer] as const);
+		const rows = rowWire(creator, writer);
+		const ordinal = { next: 0 };
+		let epoch = 0;
+		try {
+			while (epoch < 2) {
+				epoch = await rollCreator(creator, rows.toWriter, ordinal);
+				await wire.caughtUp(epoch);
+				await rows.toWriter();
+			}
+			for (let k = 0; k < count; k++) await writer.issue(epoch, k);
+			// One-epoch installs past the window: the moves are replaced, then expired and given back.
+			for (let roll = 0; roll < 6; roll++) {
+				epoch = await rollCreator(creator, rows.toWriter, ordinal);
+				await wire.caughtUp(epoch, 600_000);
+				await rows.toWriter();
+			}
+			const before = readV3SettlementWorkCounts();
+			epoch = await rollCreator(creator, rows.toWriter, ordinal);
+			await wire.caughtUp(epoch, 600_000);
+			const after = readV3SettlementWorkCounts();
+			const status = (await writer.settlementStatus?.()) as { undelivered?: unknown[] } | null;
+			const result = {
+				count,
+				givenBack: status?.undelivered?.length,
+				plan: (await writer.settlementAudit()).dispositions,
+				recoveryCensusReads: after.recoveryCensusReads - before.recoveryCensusReads,
+				ownFenceScans: after.ownFenceScans - before.ownFenceScans,
+			};
+			process.stdout.write(`WINDOW_EXPIRED_COST ${JSON.stringify(result)}\n`);
+			return result;
+		} finally {
+			await wire.stop();
+		}
+	} finally {
+		restore();
+	}
+}
+
+it("a census does not rescan the author's outbox for each expired row", async () => {
+	const result = await windowExpiredCensusCost(16);
+	expect((result.plan as Record<string, number>).expire ?? 0, "rows expired by the window").toBeGreaterThanOrEqual(16);
+	// One own-fence scan answers every row of one census read.
+	expect(result.ownFenceScans, "own-fence scans per census read").toBeLessThanOrEqual(result.recoveryCensusReads * 2);
+}, 900_000);

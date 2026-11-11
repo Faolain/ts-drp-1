@@ -5303,10 +5303,12 @@ function releaseOrdinaryIssuanceRuntimeHold(value: unknown): Promise<void> {
  * Observation only (tests): how much native settlement work this process has done. Counts of
  * charged dependency turns (withActiveRebaseDependencies), complete recovery census reads
  * (readCreatorRecoveryDependencyCensus), retained source contract preparations
- * (prepareCreatorRetainedSourceContracts) and local-author expiry receipts signed. Monotonic
+ * (prepareCreatorRetainedSourceContracts), local-author expiry receipts signed and own-fence outbox
+ * scans (scanOwnFences). Monotonic
  * process-wide scalars; never authority, never reset by the runtime.
  */
-const v3SettlementWorkCounts = {dependencyTurns: 0, recoveryCensusReads: 0, retainedContractPreparations: 0, sourceExpirySignatures: 0};
+const v3SettlementWorkCounts = {dependencyTurns: 0, recoveryCensusReads: 0, retainedContractPreparations: 0, sourceExpirySignatures: 0,
+	ownFenceScans: 0};
 export function readV3SettlementWorkCounts(): Readonly<typeof v3SettlementWorkCounts> {
 	return ObjectFreeze({...v3SettlementWorkCounts});
 }
@@ -13410,6 +13412,7 @@ async function ownEpochFences(store: DurableIssuanceStore, scope: DurableIssueSc
 /** The own fence scan of ownEpochFences, with the highest own fence row (any epoch) and its epoch. */
 async function scanOwnFences(store: DurableIssuanceStore, scope: DurableIssueScope):
 	Promise<Readonly<{ lowest: ReadonlyMap<number, number>; highest: number | undefined; highestEpoch: number | undefined }>> {
+	v3SettlementWorkCounts.ownFenceScans += 1;
 	const fences = new Map<number, number>();
 	let highest: number | undefined;
 	let highestEpoch: number | undefined;
