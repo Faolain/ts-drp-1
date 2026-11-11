@@ -14,7 +14,10 @@ import type { BrowserContext } from "@playwright/test";
 
 const PRELUDE =
 	"const __tsDrpObservation = globalThis.__TS_DRP_ROLLOVER_OBSERVATION__ ?? " +
-	"{ stage: (_name, run) => run(), bindDelivery: () => undefined };\n";
+	"{ stage: (_name, run) => run(), bindDelivery: () => undefined };\n" +
+	// Brackets one method call with its own receiver and arguments (the call's text is left in place).
+	"const __tsDrpStageCall = (name, receiver, method, ...args) => " +
+	"__tsDrpObservation.stage(name, () => receiver[method](...args));\n";
 
 interface Anchor {
 	readonly name: string;
@@ -50,10 +53,10 @@ const ROLLOVER_ANCHORS: readonly Anchor[] = [
 const DELIVERY_ANCHORS: readonly Anchor[] = [
 	{
 		name: "member-install",
-		pattern:
-			/await selectedRoom\.installCreatorSuccessor\(\{\s*offer: selected\.offer,\s*peers: \[creatorPeer\]\s*\}\);/gu,
-		replace: () =>
-			'await __tsDrpObservation.stage("member-install", () => selectedRoom.installCreatorSuccessor({ offer: selected.offer, peers: [creatorPeer] }));',
+		// The install call carries a multi-line options object (currency, newest); only its callee is
+		// rewritten, so the original argument text and closing parenthesis are kept exactly.
+		pattern: /await selectedRoom\.installCreatorSuccessor\(/gu,
+		replace: () => 'await __tsDrpStageCall("member-install", selectedRoom, "installCreatorSuccessor", ',
 	},
 	{
 		name: "delivery-bind",
