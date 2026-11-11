@@ -18965,6 +18965,37 @@ function deriveApplicationProjectionOrder(
 	}
 }
 
+const applicationProjectionOrderMemo = new WeakMap<
+	V3PlaneRegistration,
+	Readonly<{
+		payload: PreparedV3LivePayload;
+		graphVersion: number;
+		index: CausalityIndex;
+		indexSize: number;
+		closeVertices: Map<string, EpochVertex>;
+		closeSize: number;
+		controlVertices: ReadonlySet<string>;
+		controlSize: number;
+		result: V3ApplicationProjectionOrderResult;
+	}>
+>();
+
+/** A fresh frozen copy of a memoized order result: every read returns its own detached arrays. */
+function detachedApplicationProjectionOrder(
+	result: V3ApplicationProjectionOrderResult
+): V3ApplicationProjectionOrderResult {
+	if (!result.ok) return ObjectFreeze({ ...result });
+	const order = result.order;
+	return ObjectFreeze({
+		ok: true,
+		order: ObjectFreeze({
+			...order,
+			digests: ObjectFreeze([...order.digests]),
+			controlDigests: ObjectFreeze([...order.controlDigests]),
+		}),
+	});
+}
+
 /**
  * Reads the canonical application order from one authenticated active plane.
  * @param input - Exact capability-bearing request; copied handles have no provenance.
@@ -18987,15 +19018,45 @@ export function readV3ApplicationProjectionOrder(
 		if (!currentRegistration(registration)) {
 			return ObjectFreeze({ ok: false, kind: "not-active", detail: "v3 application order plane is not active" });
 		}
+		// The order is a pure function of the plane's payload, close vertices, control vertices and
+		// causality index. Those only grow (append, each with a graphVersion bump) or are replaced
+		// whole (a new index object); the memo key carries every one of them, so a hit proves the
+		// derivation inputs are the ones the memoized order was derived from.
+		const memo = applicationProjectionOrderMemo.get(registration);
+		if (
+			memo !== undefined &&
+			memo.payload === registration.payload &&
+			memo.graphVersion === registration.graphVersion &&
+			memo.index === registration.index &&
+			memo.indexSize === registration.index.size &&
+			memo.closeVertices === registration.closeVertices &&
+			memo.closeSize === registration.closeVertices.size &&
+			memo.controlVertices === registration.controlVertices &&
+			memo.controlSize === registration.controlVertices.size
+		)
+			return detachedApplicationProjectionOrder(memo.result);
 		const projection = deriveApplicationProjectionOrder(
 			registration.payload,
 			registration.closeVertices,
 			registration.controlVertices,
 			registration.index
 		);
-		return projection === undefined
-			? ObjectFreeze({ ok: false, kind: "graph-rejected", detail: "v3 application order graph is unavailable" })
-			: ObjectFreeze({ ok: true, order: projection.order });
+		const result: V3ApplicationProjectionOrderResult =
+			projection === undefined
+				? ObjectFreeze({ ok: false, kind: "graph-rejected", detail: "v3 application order graph is unavailable" })
+				: ObjectFreeze({ ok: true, order: projection.order });
+		applicationProjectionOrderMemo.set(registration, {
+			payload: registration.payload,
+			graphVersion: registration.graphVersion,
+			index: registration.index,
+			indexSize: registration.index.size,
+			closeVertices: registration.closeVertices,
+			closeSize: registration.closeVertices.size,
+			controlVertices: registration.controlVertices,
+			controlSize: registration.controlVertices.size,
+			result,
+		});
+		return detachedApplicationProjectionOrder(result);
 	} catch {
 		return ObjectFreeze({ ok: false, kind: "malformed-input", detail: "v3 application order input is invalid" });
 	}

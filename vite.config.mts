@@ -121,6 +121,7 @@ const config = defineConfig({
 			),
 			"@ts-drp/protocol-v3/latched-acl": path.resolve(__dirname, "packages/protocol-v3/src/latched-acl.ts"),
 			"@ts-drp/protocol-v3/snapshot-transfer": path.resolve(__dirname, "packages/protocol-v3/src/snapshot-transfer.ts"),
+			"@ts-drp/protocol-v3/instrumentation": path.resolve(__dirname, "packages/protocol-v3/src/instrumentation.ts"),
 			"@ts-drp/protocol-v3/registry/registry-v1.json": path.resolve(
 				__dirname,
 				"packages/protocol-v3/registry/registry-v1.json"

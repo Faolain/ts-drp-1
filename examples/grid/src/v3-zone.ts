@@ -1458,6 +1458,10 @@ export function createV3ZoneApplication(
 ): Parameters<typeof createV3RoomSession<ZoneProjection>>[0]["application"] {
 	const material = applicationMaterial(blueprintDigest);
 	const kernel = createZoneStateKernel(creatorAuthor, creatorPeerId, material.artifactVersion);
+	// The projection is a pure fold. Keep this application's last fold so the next projection over
+	// the same base and an exact prefix of the same frozen accepted-operation records continues it
+	// instead of replaying the whole epoch.
+	let lastFold: ZoneFold | undefined;
 	const resolved = material.catalog.resolve(material.blueprintDigest);
 	// Capture this application's exact resolved entry once. Public catalog/package
 	// readouts cannot mutate these private expected carriers between invocations.
@@ -1547,13 +1551,45 @@ export function createV3ZoneApplication(
 			},
 		}),
 		projectAcceptedOperations: (input: V3RoomProjectionInput) => {
+			const baseBytes = input.authenticatedBase?.exactCanonicalApplicationStateBytes;
+			const prior = continuableFold(lastFold, baseBytes, input.currentEpochOperations);
 			const base =
-				input.authenticatedBase === undefined
-					? undefined
-					: decodeZoneState(input.authenticatedBase.exactCanonicalApplicationStateBytes, kernel);
-			return projectZone(input.currentEpochOperations, kernel, base);
+				prior !== undefined || baseBytes === undefined ? undefined : decodeZoneState(baseBytes, kernel);
+			const fold = foldZone(input.currentEpochOperations, kernel, base, prior, baseBytes);
+			lastFold = fold;
+			return zoneProjection([...fold.acceptedDigests], fold.state);
 		},
 	});
+}
+
+/** One completed fold: its base bytes (a private copy), its exact operation records and its result. */
+type ZoneFold = Readonly<{
+	baseBytes: Uint8Array | undefined;
+	operations: readonly V3RoomAcceptedOperation[];
+	acceptedDigests: ReadonlySet<string>;
+	state: ZoneState;
+	continuable: boolean;
+}>;
+
+/**
+ * The prior fold, when the new projection only appends to it: equal base bytes, and the prior
+ * operations are the new list's prefix by identity of frozen accepted-operation records (whose
+ * operation is a frozen detached copy). Otherwise undefined: the caller folds from the base.
+ */
+function continuableFold(
+	prior: ZoneFold | undefined,
+	baseBytes: Uint8Array | undefined,
+	operations: readonly V3RoomAcceptedOperation[]
+): ZoneFold | undefined {
+	if (prior === undefined || !prior.continuable || prior.operations.length > operations.length) return undefined;
+	const sameBase =
+		baseBytes === undefined
+			? prior.baseBytes === undefined
+			: prior.baseBytes !== undefined && sameBytes(prior.baseBytes, baseBytes);
+	if (!sameBase) return undefined;
+	for (let index = 0; index < prior.operations.length; index++)
+		if (prior.operations[index] !== operations[index]) return undefined;
+	return prior;
 }
 
 function projectZone(
@@ -1561,19 +1597,33 @@ function projectZone(
 	kernel: ZoneStateKernel,
 	base?: ZoneProjection
 ): ZoneProjection {
+	const fold = foldZone(operations, kernel, base);
+	return zoneProjection([...fold.acceptedDigests], fold.state);
+}
+
+function foldZone(
+	operations: readonly V3RoomAcceptedOperation[],
+	kernel: ZoneStateKernel,
+	base?: ZoneProjection,
+	prior?: ZoneFold,
+	baseBytes?: Uint8Array
+): ZoneFold {
 	let state: ZoneState =
-		base === undefined
-			? kernel.emptyState()
-			: {
-					version: 2,
-					creatorAuthor: base.creatorAuthor,
-					creatorPeerId: base.creatorPeerId,
-					blocks: base.blocks,
-					outcomes: base.outcomes,
-					roster: base.roster,
-				};
-	const acceptedDigests = new Set<string>();
-	for (const accepted of operations) {
+		prior !== undefined
+			? prior.state
+			: base === undefined
+				? kernel.emptyState()
+				: {
+						version: 2,
+						creatorAuthor: base.creatorAuthor,
+						creatorPeerId: base.creatorPeerId,
+						blocks: base.blocks,
+						outcomes: base.outcomes,
+						roster: base.roster,
+					};
+	const acceptedDigests = new Set<string>(prior?.acceptedDigests);
+	const start = prior?.operations.length ?? 0;
+	for (const accepted of operations.slice(start)) {
 		acceptedDigests.add(accepted.vertexDigest);
 		// Signature and current-room admission remain owned by the authenticated
 		// boundary. The exact same pure transition owns live and folded state.
@@ -1583,7 +1633,20 @@ function projectZone(
 				: accepted.operation;
 		state = kernel.apply(state, operation, accepted.author).state;
 	}
-	return zoneProjection([...acceptedDigests], state);
+	// Continuable only over frozen records and a frozen (captured) state: identity then proves
+	// the prefix and its result are unchanged.
+	let continuable = Object.isFrozen(state);
+	for (let index = start; continuable && index < operations.length; index++) {
+		const record = operations[index];
+		continuable = Object.isFrozen(record) && Object.isFrozen(record?.operation);
+	}
+	return Object.freeze({
+		baseBytes: prior !== undefined ? prior.baseBytes : baseBytes === undefined ? undefined : baseBytes.slice(),
+		operations: Object.freeze([...operations]),
+		acceptedDigests,
+		state,
+		continuable,
+	});
 }
 
 function zoneProjection(acceptedDigests: readonly string[], state: ZoneState): ZoneProjection {

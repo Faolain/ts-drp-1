@@ -90,6 +90,57 @@ export function configuredStatement(database: DatabaseSync, sql: string): Statem
 	return acquire(database, sql, true);
 }
 
+// Iteration statements. A live cursor must never be shared, so an iteration statement is checked out
+// exclusively: it leaves the per-connection map while its iteration runs and returns to it only when
+// that iteration finished (exhausted, or closed early through return()), see sqlite-iterator.ts. An
+// iterator abandoned mid-way never returns its statement, which is then simply not reused. Idle
+// iteration statements live in the same per-connection map (and sweep) under a distinct key, one idle
+// statement per SQL text; a concurrent second iteration of the same text gets a fresh statement.
+const ITERATION_KEY = "\u0000iterate\u0000";
+const checkedOut = new WeakMap<StatementSync, Readonly<{ database: DatabaseSync; key: string }>>();
+
+/**
+ * Checks out a readBigInts=false statement for exactly one iteration through iterateSqliteRows.
+ * Use only with iterateSqliteRows; never run, get, all or change its options.
+ * @param database - Owning connection.
+ * @param sql - Exact SQL text.
+ * @returns A reset statement no other iteration holds.
+ */
+export function iterationStatement(database: DatabaseSync, sql: string): StatementSync {
+	if (NATIVE_PREPARE === undefined || database.prepare !== NATIVE_PREPARE) return configured(database.prepare(sql));
+	const key = ITERATION_KEY + sql;
+	const statements = connections.get(database);
+	const idle = statements?.get(key);
+	let statement: StatementSync | undefined;
+	if (statements !== undefined && idle !== undefined) {
+		statements.delete(key);
+		if (live(idle)) statement = idle;
+	}
+	statement ??= configured(database.prepare(sql));
+	checkedOut.set(statement, Object.freeze({ database, key }));
+	return statement;
+}
+
+/**
+ * Returns a checked-out iteration statement after its iteration finished. No effect for any other
+ * statement, a finalized one, or when an idle statement for the same text is already present.
+ * @param statement - The statement whose iteration finished.
+ */
+export function releaseIterationStatement(statement: StatementSync): void {
+	const owner = checkedOut.get(statement);
+	if (owner === undefined) return;
+	checkedOut.delete(statement);
+	if (!live(statement)) return;
+	let statements = connections.get(owner.database);
+	if (statements === undefined) {
+		if (connections.size >= sweepAt) sweepClosedConnections();
+		statements = new Map();
+		connections.set(owner.database, statements);
+	}
+	if (!statements.has(owner.key) && statements.size < MAX_STATEMENTS_PER_CONNECTION)
+		statements.set(owner.key, statement);
+}
+
 function acquire(database: DatabaseSync, sql: string, configure: boolean): StatementSync {
 	if (NATIVE_PREPARE === undefined || database.prepare !== NATIVE_PREPARE) {
 		const interposed = database.prepare(sql);

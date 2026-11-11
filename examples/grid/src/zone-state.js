@@ -196,7 +196,15 @@ function createZoneStateKernel(creatorAuthor, creatorPeerId, artifactVersion = "
 			? entries
 			: undefined;
 	}
+	// States and blocks this kernel itself captured. Each is a deeply frozen data value (its byte
+	// arrays are fixed-length copies whose contents captureState never inspects), so capturing it
+	// again would return a field-for-field identical value: the capture is reused instead.
+	// A state captured with an uninstalled roster allowed is reused only where that is allowed.
+	const capturedStates = new WeakMap();
+	const capturedBlocks = new WeakSet();
 	function captureState(value, allowUninstalledRoster = false) {
+		const prior = capturedStates.get(value);
+		if (prior !== undefined && (prior === false || allowUninstalledRoster)) return value;
 		if (
 			!exactKeys(value, ["version", "creatorAuthor", "creatorPeerId", "blocks", "outcomes", "roster"]) ||
 			value.version !== 2 ||
@@ -215,10 +223,11 @@ function createZoneStateKernel(creatorAuthor, creatorPeerId, artifactVersion = "
 		if (roster === undefined) throw new TypeError("v3 zone authenticated roster is invalid");
 		const blocks = [];
 		for (const candidate of value.blocks) {
-			const block = blockValue(candidate, false);
+			const block = capturedBlocks.has(candidate) ? candidate : blockValue(candidate, false);
 			if (block === undefined || (blocks.length !== 0 && compareText(blocks[blocks.length - 1].id, block.id) >= 0)) {
 				throw new TypeError("v3 zone authenticated projection state is invalid");
 			}
+			capturedBlocks.add(block);
 			blocks.push(block);
 		}
 		const outcomes = [];
@@ -231,7 +240,7 @@ function createZoneStateKernel(creatorAuthor, creatorPeerId, artifactVersion = "
 			outcomeIds.add(outcome.proof.clientOperationId);
 			outcomes.push(outcome);
 		}
-		return Object.freeze({
+		const captured = Object.freeze({
 			version: 2,
 			creatorAuthor,
 			creatorPeerId,
@@ -239,6 +248,8 @@ function createZoneStateKernel(creatorAuthor, creatorPeerId, artifactVersion = "
 			outcomes: Object.freeze(outcomes),
 			roster,
 		});
+		capturedStates.set(captured, allowUninstalledRoster);
+		return captured;
 	}
 	function apply(state, operation, author) {
 		const capturedState = captureState(state, true);

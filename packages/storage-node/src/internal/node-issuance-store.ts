@@ -89,6 +89,7 @@ import {
 	settlementEntryIsAuthenticatedExpiry,
 	settlementPlanPermitsAuthenticatedPruning,
 } from "@ts-drp/issuance-store/maintenance";
+import { statSync } from "node:fs";
 import { DatabaseSync, type StatementSync } from "node:sqlite";
 
 import { SqliteNativeReadReservationOwner } from "./native-read-reservation.js";
@@ -96,7 +97,7 @@ import { awaitNativeWriterFree, holdNativeWriter, nativeWriterHeld } from "./nat
 import type { NodeNativeReadPort } from "../index.js";
 import { iterateSqliteRows } from "./sqlite-iterator.js";
 import { sqliteFilename } from "./sqlite-filename.js";
-import { configuredStatement } from "./sqlite-statement-cache.js";
+import { configuredStatement, iterationStatement } from "./sqlite-statement-cache.js";
 
 const DATABASE_SUFFIX = ".drp-issuance-v1.sqlite";
 const SCHEMA_VERSION = 5;
@@ -271,10 +272,9 @@ function capturePrimaryFilename(value: unknown): { primaryFilename: string; init
 	}
 }
 
+/** A readBigInts=false statement for one iterateSqliteRows iteration (exclusively checked out). */
 function statement(database: DatabaseSync, sql: string): StatementSync {
-	const prepared = database.prepare(sql);
-	prepared.setReadBigInts(false);
-	return prepared;
+	return iterationStatement(database, sql);
 }
 
 function scalar(database: DatabaseSync, sql: string): unknown {
@@ -980,6 +980,13 @@ class NodeIssuanceImplementation {
 	readonly #database: DatabaseSync;
 	readonly #filename: string;
 	readonly #readReservations: SqliteNativeReadReservationOwner;
+	// Persistent (session-less) stores keep the last issue job's private writer connection for the
+	// next job instead of reopening one. Released only after its job ended with no failure and no
+	// transaction open, it holds nothing and grants nothing: every job still takes the in-process
+	// writer gate and BEGIN IMMEDIATE on it, and re-enforces custody exactly as on open. It is reused
+	// only while the path still names the file it opened (dev/ino), so a lost or replaced store
+	// reaches the original open and fails exactly as before. Disposable-session stores never park.
+	#idleIssueWriter?: Readonly<{ database: DatabaseSync; dev: number; ino: number }>;
 	readonly #signOperations = new Set<Promise<unknown>>();
 	readonly #signReleases = new Set<() => Promise<void>>();
 	#closed = false;
@@ -1394,6 +1401,27 @@ class NodeIssuanceImplementation {
 		}
 	}
 
+	/** The parked issue writer, only while the path still names the file it opened; else closed. */
+	#takeIdleIssueWriter(): Readonly<{ database: DatabaseSync; dev: number; ino: number }> | undefined {
+		const idle = this.#idleIssueWriter;
+		this.#idleIssueWriter = undefined;
+		if (idle === undefined) return undefined;
+		let same = false;
+		try {
+			const now = statSync(this.#filename);
+			same = now.dev === idle.dev && now.ino === idle.ino;
+		} catch {
+			same = false;
+		}
+		if (same) return idle;
+		try {
+			idle.database.close();
+		} catch {
+			/* A stale parked connection holds nothing; the fresh open decides. */
+		}
+		return undefined;
+	}
+
 	close(): Promise<void> {
 		if (this.#closePromise !== undefined) return this.#closePromise;
 		this.#closed = true;
@@ -1404,6 +1432,12 @@ class NodeIssuanceImplementation {
 		} catch {
 			// Close is an idempotent, non-rejecting capability operation.
 		}
+		try {
+			this.#idleIssueWriter?.database.close();
+		} catch {
+			// Parked connections hold no transaction; close stays non-rejecting.
+		}
+		this.#idleIssueWriter = undefined;
 		const releases = Array.from(this.#signReleases);
 		const readJoined = this.session || this.#censusLease === undefined
 			? this.#readReservations.close()
@@ -1786,6 +1820,7 @@ class NodeIssuanceImplementation {
 		}
 		if (prior.exhausted) throw failure("ISSUANCE_EXHAUSTED", "author sequence is exhausted");
 		let database: DatabaseSync | undefined;
+		let issueWriterIdentity: Readonly<{ dev: number; ino: number }> | undefined;
 		let releaseWriter: (() => void) | undefined;
 		let admitted: ReturnType<typeof captureIssuanceNativeSignInput> | undefined;
 		let hookEnded = false;
@@ -1823,15 +1858,26 @@ class NodeIssuanceImplementation {
 				}
 				enter();
 				admitted = captured;
-				database = new DatabaseSync(this.#filename, {
-					allowExtension: false,
-					enableDoubleQuotedStringLiterals: false,
-					enableForeignKeyConstraints: false,
-				});
-				enforceNativeLocalSessionFile(database, this.#filename, this.session, false);
-				database.exec(`PRAGMA busy_timeout=${BUSY_TIMEOUT}`);
-				database.exec("PRAGMA synchronous=FULL");
-				registerRetirementConnection(database);
+				const idle = this.#takeIdleIssueWriter();
+				if (idle !== undefined) {
+					database = idle.database;
+					issueWriterIdentity = idle;
+					enforceNativeLocalSessionFile(database, this.#filename, this.session, false);
+				} else {
+					database = new DatabaseSync(this.#filename, {
+						allowExtension: false,
+						enableDoubleQuotedStringLiterals: false,
+						enableForeignKeyConstraints: false,
+					});
+					if (this.session === undefined) {
+						const opened = statSync(this.#filename);
+						issueWriterIdentity = { dev: opened.dev, ino: opened.ino };
+					}
+					enforceNativeLocalSessionFile(database, this.#filename, this.session, false);
+					database.exec(`PRAGMA busy_timeout=${BUSY_TIMEOUT}`);
+					database.exec("PRAGMA synchronous=FULL");
+					registerRetirementConnection(database);
+				}
 				releaseWriter = holdNativeWriter(this.#filename);
 				database.exec("BEGIN IMMEDIATE");
 				verifyAuthority(database);
@@ -2067,11 +2113,27 @@ class NodeIssuanceImplementation {
 				} catch (error) {
 					cleanup = error;
 				}
-				try {
-					database.close();
-				} catch (error) {
-					cleanup = cleanup === undefined ? error : new AggregateError([cleanup, error], "native issue release failed");
-				}
+				if (
+					!primaryFailed &&
+					cleanup === undefined &&
+					issueWriterIdentity !== undefined &&
+					this.session === undefined &&
+					!this.#closed &&
+					this.#idleIssueWriter === undefined &&
+					(database as { isTransaction?: boolean }).isTransaction === false
+				)
+					this.#idleIssueWriter = Object.freeze({
+						database,
+						dev: issueWriterIdentity.dev,
+						ino: issueWriterIdentity.ino,
+					});
+				else
+					try {
+						database.close();
+					} catch (error) {
+						cleanup =
+							cleanup === undefined ? error : new AggregateError([cleanup, error], "native issue release failed");
+					}
 				releaseWriter?.();
 				if (cleanup !== undefined)
 					throw primaryFailed

@@ -73,7 +73,7 @@ import { journalImageRowKey, journalImageRowMatches, type JournalImageRowKey, jo
 import { sqliteFilename } from "./internal/sqlite-filename.js";
 import { enforceNativeLocalSessionFile, nativeLocalSessionSchemaRows, type LocalSessionLifetime } from "./internal/local-session-lifetime.js";
 import type { NodeNativeReadPort } from "./index.js";
-import { configuredStatement } from "./internal/sqlite-statement-cache.js";
+import { configuredStatement, iterationStatement } from "./internal/sqlite-statement-cache.js";
 
 export interface NodeDurableLiveJournalStoreOptions {
 	readonly primaryFilename: string;
@@ -205,10 +205,9 @@ function captureOptions(value: unknown): { primaryFilename: string; initializati
 	}
 }
 
+/** A readBigInts=false statement for one iterateSqliteRows iteration (exclusively checked out). */
 function statement(database: DatabaseSync, sql: string): StatementSync {
-	const result = database.prepare(sql);
-	result.setReadBigInts(false);
-	return result;
+	return iterationStatement(database, sql);
 }
 
 function scalar(database: DatabaseSync, sql: string): unknown {
