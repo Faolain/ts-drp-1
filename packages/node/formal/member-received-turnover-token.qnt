@@ -23,6 +23,15 @@
 //             header's protection inside the install's turnover and is retired there; no
 //             lull (which has no received successor) can retire it. The window slides at
 //             every head advance, so an edge scope may appear at each commit;
+//   owed      own issued rows a pass's journal drain left protected. A pass that drains
+//             a closed journal scope decides the issuance holes from the journal as it was
+//             before the drain, so the member's own rows of that scope stay protected until
+//             a pass decides afresh on the drained journal. A pass at an unchanged boundary
+//             resumes the unacknowledged drain's reconstruction, re-derives the same
+//             decision and keeps them; the install's turnover decides afresh (its received
+//             closed membership changes the source) and releases them before its cleanup and
+//             settlement write. Skipping it holds them, their settlement entries and the
+//             unsettled epoch they carry one epoch past the settlement window;
 //   token     what a completed lull leaves for the next install: the plane, the head
 //             epoch, the inventory and the work it reconciled (NONE epoch: no token).
 // The code keys the token by the plane handle (a WeakMap), so a reopen or a successor
@@ -34,7 +43,9 @@
 // settlement-plan image the classification reads for the member's own held work. The
 // edge check is the install's own: at its decision point it reads the journal and turns
 // over while an unprotected closed scope sits at or below the edge. The token shipped in
-// 7125cdb1 had neither (SHIPPED below).
+// 7125cdb1 had neither (SHIPPED below). The settling lull (fix/int7-turnover-skip-bounds):
+// a lull acknowledges its completed drain and runs passes until one drains nothing, so
+// it leaves nothing owed; 509d145d's lull did one round (UNSETTLED below).
 //
 // Ghost state:
 //   cleanAt     the head epoch whose complete reconciliation the durable state still
@@ -49,10 +60,12 @@
 //                        reconciliation of the same head, with completed = head - 1;
 //   skipSeesWork       - an install never skips a turnover that would change protection
 //                        or retirement: at a skip the durable state is the reconciliation
-//                        of the CURRENT work, and no edge scope is left for the install's
-//                        own classification (the header-coverage regression: SHIPPED skips
-//                        the edge retirement at every head once the window is full, and an
-//                        abandonment between the lull and the install);
+//                        of the CURRENT work, no edge scope is left for the install's own
+//                        classification, and no own row a drain left protected is owed
+//                        (the header-coverage regression: SHIPPED skips the edge retirement
+//                        at every head once the window is full, and an abandonment between
+//                        the lull and the install; the silent-Writer regression: UNSETTLED
+//                        skips the release of the rows its lull's drain left protected);
 //   noLeftUnreconciled - no install leaves a head (epoch >= 2) whose Cut it did not
 //                        see reconciled;
 //   refusalEscapable   - the stuck-member property: a refused member can always
@@ -75,6 +88,8 @@
 //                      skipSeesWork: every plan mutator must invalidate);
 //   allMutators      - edge check; no work binding; every plan mutator invalidates the
 //                      boundary (the alternative fix; holds);
+//   UNSETTLED        - 509d145d: work binding and edge check, but the lull runs one round
+//                      and leaves what its drain unprotected owed (violates skipSeesWork);
 //   base             - no token: the install always turns over (violates noRedundant);
 //   STALE            - a room-level "the lull ran" flag: not keyed by plane, epoch or
 //                      inventory, never consumed or cleared (violates skipSound and
@@ -95,15 +110,17 @@ module memberReceivedTurnoverToken {
   // The token's bindings, each its own flag so each can be removed alone.
   type Mutants = { token: bool, skipWithoutToken: bool, noDischarge: bool,
     matchPlane: bool, matchEpoch: bool, matchInv: bool, consume: bool, clearOnEntry: bool,
-    matchWork: bool, checkEdge: bool, invalidateOnAbandon: bool, invalidateOnSettle: bool }
+    matchWork: bool, checkEdge: bool, invalidateOnAbandon: bool, invalidateOnSettle: bool, settleLull: bool }
   pure val SOUND: Mutants = { token: true, skipWithoutToken: false, noDischarge: false,
     matchPlane: true, matchEpoch: true, matchInv: true, consume: true, clearOnEntry: true,
-    matchWork: true, checkEdge: true, invalidateOnAbandon: false, invalidateOnSettle: false }
+    matchWork: true, checkEdge: true, invalidateOnAbandon: false, invalidateOnSettle: false, settleLull: true }
   // The token shipped in 7125cdb1: no binding to the member's own work, no edge check.
-  pure val SHIPPED: Mutants = { ...SOUND, matchWork: false, checkEdge: false }
+  pure val SHIPPED: Mutants = { ...SOUND, matchWork: false, checkEdge: false, settleLull: false }
+  // 509d145d: the sound token, but a lull runs one round of passes (no settling).
+  pure val UNSETTLED: Mutants = { ...SOUND, settleLull: false }
   // A room-level "the lull ran" flag: no binding at all.
   pure val STALE: Mutants = { ...SOUND, matchPlane: false, matchEpoch: false, matchInv: false, consume: false,
-    clearOnEntry: false, matchWork: false, checkEdge: false }
+    clearOnEntry: false, matchWork: false, checkEdge: false, settleLull: false }
   type Token = { e: int, p: int, i: int, w: int }
   pure val NO_TOKEN: Token = { e: NONE, p: NONE, i: NONE, w: NONE }
   // Bounded plan rewrites (abandonments and settlement resolutions) per behavior.
@@ -130,6 +147,7 @@ module memberReceivedTurnoverToken {
   var cleanWork: int
   var staleSkip: bool
   var edge: bool
+  var owed: bool
   var reconciled: Set[int]
   var lulledAt: int
   var badSkip: bool
@@ -147,7 +165,7 @@ module memberReceivedTurnoverToken {
     completed' = NONE, recoveryRequired' = false, phase' = "idle", target' = NONE, candidate' = NONE,
     terminal' = false, failures' = 0, deaths' = 0, plane' = 0, inv' = 0, token' = NO_TOKEN, cleanAt' = NONE,
     reconciled' = Set(), lulledAt' = NONE, badSkip' = false, leftUnreconciled' = false, redundant' = false, recovered' = false,
-    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false,
+    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false, owed' = false,
     m' = SOUND,
   }
   action initBase = all {
@@ -155,7 +173,7 @@ module memberReceivedTurnoverToken {
     completed' = NONE, recoveryRequired' = false, phase' = "idle", target' = NONE, candidate' = NONE,
     terminal' = false, failures' = 0, deaths' = 0, plane' = 0, inv' = 0, token' = NO_TOKEN, cleanAt' = NONE,
     reconciled' = Set(), lulledAt' = NONE, badSkip' = false, leftUnreconciled' = false, redundant' = false, recovered' = false,
-    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false,
+    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false, owed' = false,
     m' = { ...SOUND, token: false },
   }
   action initStaleToken = all {
@@ -163,7 +181,7 @@ module memberReceivedTurnoverToken {
     completed' = NONE, recoveryRequired' = false, phase' = "idle", target' = NONE, candidate' = NONE,
     terminal' = false, failures' = 0, deaths' = 0, plane' = 0, inv' = 0, token' = NO_TOKEN, cleanAt' = NONE,
     reconciled' = Set(), lulledAt' = NONE, badSkip' = false, leftUnreconciled' = false, redundant' = false, recovered' = false,
-    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false,
+    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false, owed' = false,
     m' = STALE,
   }
   action initNoPlane = all {
@@ -171,7 +189,7 @@ module memberReceivedTurnoverToken {
     completed' = NONE, recoveryRequired' = false, phase' = "idle", target' = NONE, candidate' = NONE,
     terminal' = false, failures' = 0, deaths' = 0, plane' = 0, inv' = 0, token' = NO_TOKEN, cleanAt' = NONE,
     reconciled' = Set(), lulledAt' = NONE, badSkip' = false, leftUnreconciled' = false, redundant' = false, recovered' = false,
-    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false,
+    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false, owed' = false,
     m' = { ...SOUND, matchPlane: false },
   }
   action initNoEpoch = all {
@@ -179,7 +197,7 @@ module memberReceivedTurnoverToken {
     completed' = NONE, recoveryRequired' = false, phase' = "idle", target' = NONE, candidate' = NONE,
     terminal' = false, failures' = 0, deaths' = 0, plane' = 0, inv' = 0, token' = NO_TOKEN, cleanAt' = NONE,
     reconciled' = Set(), lulledAt' = NONE, badSkip' = false, leftUnreconciled' = false, redundant' = false, recovered' = false,
-    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false,
+    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false, owed' = false,
     m' = { ...SOUND, matchEpoch: false },
   }
   action initNoInv = all {
@@ -187,7 +205,7 @@ module memberReceivedTurnoverToken {
     completed' = NONE, recoveryRequired' = false, phase' = "idle", target' = NONE, candidate' = NONE,
     terminal' = false, failures' = 0, deaths' = 0, plane' = 0, inv' = 0, token' = NO_TOKEN, cleanAt' = NONE,
     reconciled' = Set(), lulledAt' = NONE, badSkip' = false, leftUnreconciled' = false, redundant' = false, recovered' = false,
-    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false,
+    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false, owed' = false,
     m' = { ...SOUND, matchInv: false },
   }
   action initNoConsume = all {
@@ -195,7 +213,7 @@ module memberReceivedTurnoverToken {
     completed' = NONE, recoveryRequired' = false, phase' = "idle", target' = NONE, candidate' = NONE,
     terminal' = false, failures' = 0, deaths' = 0, plane' = 0, inv' = 0, token' = NO_TOKEN, cleanAt' = NONE,
     reconciled' = Set(), lulledAt' = NONE, badSkip' = false, leftUnreconciled' = false, redundant' = false, recovered' = false,
-    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false,
+    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false, owed' = false,
     m' = { ...SOUND, consume: false },
   }
   action initNoClear = all {
@@ -203,7 +221,7 @@ module memberReceivedTurnoverToken {
     completed' = NONE, recoveryRequired' = false, phase' = "idle", target' = NONE, candidate' = NONE,
     terminal' = false, failures' = 0, deaths' = 0, plane' = 0, inv' = 0, token' = NO_TOKEN, cleanAt' = NONE,
     reconciled' = Set(), lulledAt' = NONE, badSkip' = false, leftUnreconciled' = false, redundant' = false, recovered' = false,
-    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false,
+    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false, owed' = false,
     m' = { ...SOUND, clearOnEntry: false },
   }
   action initNoPlaneNoClear = all {
@@ -211,7 +229,7 @@ module memberReceivedTurnoverToken {
     completed' = NONE, recoveryRequired' = false, phase' = "idle", target' = NONE, candidate' = NONE,
     terminal' = false, failures' = 0, deaths' = 0, plane' = 0, inv' = 0, token' = NO_TOKEN, cleanAt' = NONE,
     reconciled' = Set(), lulledAt' = NONE, badSkip' = false, leftUnreconciled' = false, redundant' = false, recovered' = false,
-    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false,
+    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false, owed' = false,
     m' = { ...SOUND, matchPlane: false, clearOnEntry: false },
   }
   action initOnlyInv = all {
@@ -219,7 +237,7 @@ module memberReceivedTurnoverToken {
     completed' = NONE, recoveryRequired' = false, phase' = "idle", target' = NONE, candidate' = NONE,
     terminal' = false, failures' = 0, deaths' = 0, plane' = 0, inv' = 0, token' = NO_TOKEN, cleanAt' = NONE,
     reconciled' = Set(), lulledAt' = NONE, badSkip' = false, leftUnreconciled' = false, redundant' = false, recovered' = false,
-    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false,
+    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false, owed' = false,
     m' = { ...SOUND, matchPlane: false, matchEpoch: false, consume: false, clearOnEntry: false },
   }
   action initSkipWithoutToken = all {
@@ -227,7 +245,7 @@ module memberReceivedTurnoverToken {
     completed' = NONE, recoveryRequired' = false, phase' = "idle", target' = NONE, candidate' = NONE,
     terminal' = false, failures' = 0, deaths' = 0, plane' = 0, inv' = 0, token' = NO_TOKEN, cleanAt' = NONE,
     reconciled' = Set(), lulledAt' = NONE, badSkip' = false, leftUnreconciled' = false, redundant' = false, recovered' = false,
-    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false,
+    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false, owed' = false,
     m' = { ...SOUND, skipWithoutToken: true },
   }
   action initNoDischarge = all {
@@ -235,7 +253,7 @@ module memberReceivedTurnoverToken {
     completed' = NONE, recoveryRequired' = false, phase' = "idle", target' = NONE, candidate' = NONE,
     terminal' = false, failures' = 0, deaths' = 0, plane' = 0, inv' = 0, token' = NO_TOKEN, cleanAt' = NONE,
     reconciled' = Set(), lulledAt' = NONE, badSkip' = false, leftUnreconciled' = false, redundant' = false, recovered' = false,
-    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false,
+    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false, owed' = false,
     m' = { ...SOUND, noDischarge: true },
   }
   action initShipped = all {
@@ -243,7 +261,7 @@ module memberReceivedTurnoverToken {
     completed' = NONE, recoveryRequired' = false, phase' = "idle", target' = NONE, candidate' = NONE,
     terminal' = false, failures' = 0, deaths' = 0, plane' = 0, inv' = 0, token' = NO_TOKEN, cleanAt' = NONE,
     reconciled' = Set(), lulledAt' = NONE, badSkip' = false, leftUnreconciled' = false, redundant' = false, recovered' = false,
-    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false,
+    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false, owed' = false,
     m' = SHIPPED,
   }
   action initAbandonOnly = all {
@@ -251,7 +269,7 @@ module memberReceivedTurnoverToken {
     completed' = NONE, recoveryRequired' = false, phase' = "idle", target' = NONE, candidate' = NONE,
     terminal' = false, failures' = 0, deaths' = 0, plane' = 0, inv' = 0, token' = NO_TOKEN, cleanAt' = NONE,
     reconciled' = Set(), lulledAt' = NONE, badSkip' = false, leftUnreconciled' = false, redundant' = false, recovered' = false,
-    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false,
+    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false, owed' = false,
     m' = { ...SHIPPED, checkEdge: true, invalidateOnAbandon: true },
   }
   action initAllMutators = all {
@@ -259,23 +277,31 @@ module memberReceivedTurnoverToken {
     completed' = NONE, recoveryRequired' = false, phase' = "idle", target' = NONE, candidate' = NONE,
     terminal' = false, failures' = 0, deaths' = 0, plane' = 0, inv' = 0, token' = NO_TOKEN, cleanAt' = NONE,
     reconciled' = Set(), lulledAt' = NONE, badSkip' = false, leftUnreconciled' = false, redundant' = false, recovered' = false,
-    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false,
-    m' = { ...SHIPPED, checkEdge: true, invalidateOnAbandon: true, invalidateOnSettle: true },
+    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false, owed' = false,
+    m' = { ...SHIPPED, checkEdge: true, invalidateOnAbandon: true, invalidateOnSettle: true, settleLull: true },
   }
   action initWorkOnly = all {
     creatorEpoch' = 0, headEpoch' = 0, headPending' = false, regEpoch' = 0, regStatus' = "active",
     completed' = NONE, recoveryRequired' = false, phase' = "idle", target' = NONE, candidate' = NONE,
     terminal' = false, failures' = 0, deaths' = 0, plane' = 0, inv' = 0, token' = NO_TOKEN, cleanAt' = NONE,
     reconciled' = Set(), lulledAt' = NONE, badSkip' = false, leftUnreconciled' = false, redundant' = false, recovered' = false,
-    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false,
+    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false, owed' = false,
     m' = { ...SOUND, checkEdge: false },
+  }
+  action initUnsettled = all {
+    creatorEpoch' = 0, headEpoch' = 0, headPending' = false, regEpoch' = 0, regStatus' = "active",
+    completed' = NONE, recoveryRequired' = false, phase' = "idle", target' = NONE, candidate' = NONE,
+    terminal' = false, failures' = 0, deaths' = 0, plane' = 0, inv' = 0, token' = NO_TOKEN, cleanAt' = NONE,
+    reconciled' = Set(), lulledAt' = NONE, badSkip' = false, leftUnreconciled' = false, redundant' = false, recovered' = false,
+    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false, owed' = false,
+    m' = UNSETTLED,
   }
   action initEdgeOnly = all {
     creatorEpoch' = 0, headEpoch' = 0, headPending' = false, regEpoch' = 0, regStatus' = "active",
     completed' = NONE, recoveryRequired' = false, phase' = "idle", target' = NONE, candidate' = NONE,
     terminal' = false, failures' = 0, deaths' = 0, plane' = 0, inv' = 0, token' = NO_TOKEN, cleanAt' = NONE,
     reconciled' = Set(), lulledAt' = NONE, badSkip' = false, leftUnreconciled' = false, redundant' = false, recovered' = false,
-    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false,
+    work' = 0, cleanWork' = NONE, staleSkip' = false, edge' = false, owed' = false,
     m' = { ...SOUND, matchWork: false },
   }
 
@@ -285,7 +311,7 @@ module memberReceivedTurnoverToken {
     leftUnreconciled' = leftUnreconciled, redundant' = redundant, m' = m,
   }
   // The member's own work and the reconciliation's view of it.
-  action keepWork = all { work' = work, cleanWork' = cleanWork, staleSkip' = staleSkip, edge' = edge }
+  action keepWork = all { work' = work, cleanWork' = cleanWork, staleSkip' = staleSkip, edge' = edge, owed' = owed }
   action keepMember = all {
     headEpoch' = headEpoch, headPending' = headPending, regEpoch' = regEpoch, regStatus' = regStatus,
     completed' = completed, recoveryRequired' = recoveryRequired, phase' = phase, target' = target,
@@ -293,8 +319,8 @@ module memberReceivedTurnoverToken {
   }
 
   // A complete reconciliation at the current head: redundant when the state already is one.
-  pure def redundantNow(clean: int, cw: int, h: int, w: int, e: bool, f: int, d: int, was: bool): bool =
-    if (clean == h and cw == w and not(e) and f == 0 and d == 0) true else was
+  pure def redundantNow(clean: int, cw: int, h: int, w: int, e: bool, o: bool, f: int, d: int, was: bool): bool =
+    if (clean == h and cw == w and not(e) and not(o) and f == 0 and d == 0) true else was
 
   action creatorAdvance: bool = all {
     creatorEpoch < MAX_EPOCH, creatorEpoch' = creatorEpoch + 1, candidate' = candidate, keepMember, keepGhost,
@@ -323,7 +349,7 @@ module memberReceivedTurnoverToken {
       cleanWork' = if (discharged) work else cleanWork,
       reconciled' = if (discharged) reconciled.union(Set(headEpoch)) else reconciled,
     },
-    work' = work, staleSkip' = staleSkip, edge' = edge,
+    work' = work, staleSkip' = staleSkip, edge' = edge, owed' = owed,
     regEpoch' = headEpoch, recoveryRequired' = false, phase' = "recovered", plane' = plane + 1,
     token' = token,
     creatorEpoch' = creatorEpoch, headEpoch' = headEpoch, headPending' = headPending, completed' = completed,
@@ -373,29 +399,33 @@ module memberReceivedTurnoverToken {
   // A lull-view reconciliation of this head and this work is the durable state.
   val lullReconciledNow = cleanAt == headEpoch and cleanWork == work
   // The install's turnover would change nothing: the lull-view reconciliation, and no edge.
-  val reconciledNow = lullReconciledNow and not(edge)
+  val reconciledNow = lullReconciledNow and not(edge) and not(owed)
   val skips = headEpoch >= 2 and (m.skipWithoutToken or (m.token and tokenMatches))
   action turnover: bool = {
     nondet retires = Set(true, false).oneOf()
+    nondet drains = Set(true, false).oneOf()
     all {
       phase == "fetched", phase' = "turned",
       token' = if (m.consume) NO_TOKEN else token,
       work' = work,
       if (headEpoch < 2) all {
         completed' = completed, inv' = inv, cleanAt' = cleanAt, reconciled' = reconciled, recovered' = recovered, redundant' = redundant,
-        badSkip' = badSkip, cleanWork' = cleanWork, staleSkip' = staleSkip, edge' = edge,
+        badSkip' = badSkip, cleanWork' = cleanWork, staleSkip' = staleSkip, edge' = edge, owed' = owed,
       } else if (skips) all {
         completed' = completed, inv' = inv, cleanAt' = cleanAt, reconciled' = reconciled, recovered' = recovered, redundant' = redundant,
         badSkip' = if (cleanAt == headEpoch and completed == headEpoch - 1) badSkip else true,
-        cleanWork' = cleanWork, edge' = edge,
-        // The skipped turnover would classify the current work, or the edge, differently.
-        staleSkip' = if (cleanWork == work and not(edge)) staleSkip else true,
+        cleanWork' = cleanWork, edge' = edge, owed' = owed,
+        // The skipped turnover would classify the current work, or the edge, differently,
+        // or release own rows a drain left protected.
+        staleSkip' = if (cleanWork == work and not(edge) and not(owed)) staleSkip else true,
       } else all {
         // The install's classification retires the edge scope (a header retirement).
         completed' = max(completed, headEpoch - 1), inv' = if ((retires and not(lullReconciledNow)) or edge) inv + 1 else inv,
         cleanAt' = headEpoch, cleanWork' = work, edge' = false, reconciled' = reconciled.union(Set(headEpoch)),
+        // Its fresh decision releases what was owed; a drain of its own leaves its rows owed.
+        owed' = drains,
         recovered' = recovered,
-        redundant' = if (recovered) redundant else redundantNow(cleanAt, cleanWork, headEpoch, work, edge, failures, deaths, redundant),
+        redundant' = if (recovered) redundant else redundantNow(cleanAt, cleanWork, headEpoch, work, edge, owed, failures, deaths, redundant),
         badSkip' = badSkip, staleSkip' = staleSkip,
       },
       creatorEpoch' = creatorEpoch, headEpoch' = headEpoch, headPending' = headPending, regEpoch' = regEpoch,
@@ -456,12 +486,18 @@ module memberReceivedTurnoverToken {
   // The member's scheduled recovery-pool lull at an idle head (one per adopted epoch):
   // clears the token on entry, runs the complete passes, leaves a token for this plane,
   // head and the inventory it leaves.
+  // What a lull leaves owed. Settling: it acknowledges each completed drain and runs a
+  // further pass until one drains nothing, so nothing is owed. One round (UNSETTLED): at an
+  // unchanged boundary its pass resumes the same decision and keeps what was owed; after a
+  // change it decides afresh (releasing what was owed) and its own drain may leave rows owed.
+  def lullOwed(drains: bool): bool = if (m.settleLull) false else if (lullReconciledNow) owed else drains
   val lullBoundary = not(terminal) and phase == "idle" and resolves and headEpoch >= 2 and not(recoveryRequired)
   val lullEnabled = lullBoundary and lulledAt != headEpoch
   // An application's explicit maintainRecoveryPool() (or a session without scheduled
   // lulls): the same passes at any idle boundary; not counted as redundant.
   action explicitLull: bool = {
     nondet retires = Set(true, false).oneOf()
+    nondet drains = Set(true, false).oneOf()
     // A reconciliation of an already reconciled state retires nothing.
     val nextInv = if (retires and not(lullReconciledNow)) inv + 1 else inv
     all {
@@ -469,6 +505,24 @@ module memberReceivedTurnoverToken {
       completed' = max(completed, headEpoch - 1), inv' = nextInv,
       token' = if (m.token) { e: headEpoch, p: plane, i: nextInv, w: work } else NO_TOKEN,
       cleanAt' = headEpoch, cleanWork' = work, work' = work, staleSkip' = staleSkip, edge' = edge, reconciled' = reconciled.union(Set(headEpoch)), lulledAt' = lulledAt,
+      owed' = lullOwed(drains),
+      recovered' = recovered, redundant' = redundant,
+      creatorEpoch' = creatorEpoch, headEpoch' = headEpoch, headPending' = headPending, regEpoch' = regEpoch,
+      regStatus' = regStatus, recoveryRequired' = recoveryRequired, phase' = phase, target' = target,
+      candidate' = candidate, terminal' = terminal, failures' = failures, deaths' = deaths, plane' = plane,
+      badSkip' = badSkip, leftUnreconciled' = leftUnreconciled, m' = m,
+    }
+  }
+  // The scheduled lull's step for one choice of what its passes retire and drain.
+  action lullStep(retires: bool, drains: bool): bool = {
+    // A reconciliation of an already reconciled state retires nothing.
+    val nextInv = if (retires and not(lullReconciledNow)) inv + 1 else inv
+    all {
+      lullEnabled,
+      completed' = max(completed, headEpoch - 1), inv' = nextInv,
+      token' = if (m.token) { e: headEpoch, p: plane, i: nextInv, w: work } else NO_TOKEN,
+      cleanAt' = headEpoch, cleanWork' = work, work' = work, staleSkip' = staleSkip, edge' = edge, reconciled' = reconciled.union(Set(headEpoch)), lulledAt' = headEpoch,
+      owed' = lullOwed(drains),
       recovered' = recovered, redundant' = redundant,
       creatorEpoch' = creatorEpoch, headEpoch' = headEpoch, headPending' = headPending, regEpoch' = regEpoch,
       regStatus' = regStatus, recoveryRequired' = recoveryRequired, phase' = phase, target' = target,
@@ -478,19 +532,8 @@ module memberReceivedTurnoverToken {
   }
   action lull: bool = {
     nondet retires = Set(true, false).oneOf()
-    // A reconciliation of an already reconciled state retires nothing.
-    val nextInv = if (retires and not(lullReconciledNow)) inv + 1 else inv
-    all {
-      lullEnabled,
-      completed' = max(completed, headEpoch - 1), inv' = nextInv,
-      token' = if (m.token) { e: headEpoch, p: plane, i: nextInv, w: work } else NO_TOKEN,
-      cleanAt' = headEpoch, cleanWork' = work, work' = work, staleSkip' = staleSkip, edge' = edge, reconciled' = reconciled.union(Set(headEpoch)), lulledAt' = headEpoch,
-      recovered' = recovered, redundant' = redundant,
-      creatorEpoch' = creatorEpoch, headEpoch' = headEpoch, headPending' = headPending, regEpoch' = regEpoch,
-      regStatus' = regStatus, recoveryRequired' = recoveryRequired, phase' = phase, target' = target,
-      candidate' = candidate, terminal' = terminal, failures' = failures, deaths' = deaths, plane' = plane,
-      badSkip' = badSkip, leftUnreconciled' = leftUnreconciled, m' = m,
-    }
+    nondet drains = Set(true, false).oneOf()
+    lullStep(retires, drains)
   }
   // A failed lull: admission halts and the next install recovers first. Its passes may
   // have completed the control or retired a scope before the failure; the state is dirty.
@@ -522,7 +565,7 @@ module memberReceivedTurnoverToken {
       cleanWork' = if (halted) work else cleanWork,
       reconciled' = if (halted) reconciled.union(Set(h)) else reconciled,
     },
-    work' = work, staleSkip' = staleSkip, edge' = edge,
+    work' = work, staleSkip' = staleSkip, edge' = edge, owed' = owed,
     headPending' = false, regStatus' = "active", phase' = "idle", candidate' = NONE, recoveryRequired' = false,
     terminal' = false, plane' = plane + 1, token' = token,
     creatorEpoch' = creatorEpoch, completed' = completed, target' = target, failures' = failures, inv' = inv,
@@ -537,7 +580,7 @@ module memberReceivedTurnoverToken {
   action rewritePlan(invalidates: bool): bool = all {
     not(terminal), work < MAX_WORK, work' = work + 1,
     token' = if (invalidates) NO_TOKEN else token,
-    cleanWork' = cleanWork, staleSkip' = staleSkip, edge' = edge,
+    cleanWork' = cleanWork, staleSkip' = staleSkip, edge' = edge, owed' = owed,
     creatorEpoch' = creatorEpoch, headEpoch' = headEpoch, headPending' = headPending, regEpoch' = regEpoch,
     regStatus' = regStatus, completed' = completed, recoveryRequired' = recoveryRequired, phase' = phase,
     target' = target, candidate' = candidate, terminal' = terminal, failures' = failures, deaths' = deaths,
@@ -558,7 +601,7 @@ module memberReceivedTurnoverToken {
   // The head advance slides the bounded window: an edge scope may now exist.
   action commitW = {
     nondet slid = Set(true, false).oneOf()
-    all { commit, work' = work, cleanWork' = cleanWork, staleSkip' = staleSkip, edge' = slid }
+    all { commit, work' = work, cleanWork' = cleanWork, staleSkip' = staleSkip, edge' = slid, owed' = owed }
   }
   action activateW = all { activate, keepWork }
   action adoptionFailsW = all { adoptionFails, keepWork }
@@ -587,7 +630,7 @@ module memberReceivedTurnoverToken {
 
   val vars = (creatorEpoch, headEpoch, headPending, regEpoch, regStatus, completed, recoveryRequired, phase, target,
     candidate, terminal, failures, deaths, plane, inv, token, cleanAt, reconciled, lulledAt, badSkip, leftUnreconciled,
-    redundant, m, work, cleanWork, staleSkip, edge)
+    redundant, m, work, cleanWork, staleSkip, edge, owed)
   // Liveness: under weak fairness of the member's own steps, every head >= 2 a member
   // behind the creator is at is reconciled once (its Cut), or the session is terminal.
   // (A member that stays at its last head after a failed lull and a restart reconciles
@@ -600,8 +643,8 @@ module memberReceivedTurnoverToken {
     always(headEpoch < creatorEpoch implies eventually(terminal or headEpoch == creatorEpoch))
 
   // Witnesses (deterministic head advances: the window slides only where stated).
-  action commitQuiet = all { commit, work' = work, cleanWork' = cleanWork, staleSkip' = staleSkip, edge' = false }
-  action commitSlid = all { commit, work' = work, cleanWork' = cleanWork, staleSkip' = staleSkip, edge' = true }
+  action commitQuiet = all { commit, work' = work, cleanWork' = cleanWork, staleSkip' = staleSkip, edge' = false, owed' = owed }
+  action commitSlid = all { commit, work' = work, cleanWork' = cleanWork, staleSkip' = staleSkip, edge' = true, owed' = owed }
   action installToTurnover = offerW.then(startW).then(skipRecoverW).then(precheckW).then(fetchW)
   action follow = installToTurnover.then(turnover).then(pendingW).then(commitQuiet).then(activateW)
   action followSlid = installToTurnover.then(turnover).then(pendingW).then(commitSlid).then(activateW)
@@ -622,7 +665,8 @@ module memberReceivedTurnoverToken {
   run soundAbandonTurnsOverTest = init.then(creatorAdvanceW).then(follow).then(creatorAdvanceW).then(follow)
     .then(lull).then(abandon).then(creatorAdvanceW).then(installToTurnover)
     .then(all { assert(not(skips) and not(tokenMatches)), turnover })
-    .then(all { assert(reconciledNow and safety and not(redundant)), creatorAdvanceW })
+    // (Its own drain may leave rows owed to the next lull: not a skip input until a lull settles.)
+    .then(all { assert(lullReconciledNow and not(edge) and safety and not(redundant)), creatorAdvanceW })
   run abandonOnlyMissesSettleTest = initAbandonOnly.then(creatorAdvanceW).then(follow).then(creatorAdvanceW).then(follow)
     .then(lull).then(settle).then(creatorAdvanceW).then(installToTurnover)
     .then(all { assert(skips), turnover })
@@ -644,5 +688,16 @@ module memberReceivedTurnoverToken {
   run soundEdgeTurnsOverTest = init.then(creatorAdvanceW).then(follow).then(creatorAdvanceW).then(followSlid)
     .then(lull).then(creatorAdvanceW).then(installToTurnover)
     .then(all { assert(not(skips) and tokenMatches == false), turnover })
-    .then(all { assert(not(edge) and reconciledNow and safety and not(redundant)), creatorAdvanceW })
+    .then(all { assert(not(edge) and lullReconciledNow and safety and not(redundant)), creatorAdvanceW })
+  // The silent-Writer regression: a lull whose drain leaves own rows protected. One round
+  // (509d145d) leaves them owed and the install skips their release; the settling lull leaves
+  // nothing owed, and the install still skips (no slowdown).
+  run unsettledLullSkipsOwedTest = initUnsettled.then(creatorAdvanceW).then(follow).then(creatorAdvanceW).then(follow)
+    .then(lullStep(false, true)).then(all { assert(owed), creatorAdvanceW }).then(installToTurnover)
+    .then(all { assert(skips and tokenMatches and not(reconciledNow)), turnover })
+    .then(all { assert(not(skipSeesWork) and safetyWithoutWork), creatorAdvanceW })
+  run settledLullSkipsTest = init.then(creatorAdvanceW).then(follow).then(creatorAdvanceW).then(follow)
+    .then(lullStep(false, true)).then(all { assert(not(owed)), creatorAdvanceW }).then(installToTurnover)
+    .then(all { assert(skips and tokenMatches and reconciledNow), turnover })
+    .then(all { assert(skipSeesWork and safety and not(redundant)), creatorAdvanceW })
 }

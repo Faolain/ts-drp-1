@@ -24786,11 +24786,15 @@ export async function reconcileCreatorSnapshotRecoveryRoles(
  * @param closeHold - Genuine received seal's joined native dependency census.
  * @param requireClosedWorkflowCompletion - A durable-reopen resume must reach the
  * original terminal retirement result, exactly as the creator's resume does.
+ * @param acknowledgeCompletedJournalDrain - A recipient lull acknowledges its completed
+ * journal drain, as the creator's readiness and pool boundaries do, so its next pass
+ * decides afresh on the drained journal instead of resuming the drain's reconstruction.
  */
 export async function reconcileCreatorReceivedSnapshotRecoveryRoles(
 	value: CreatorClosedRollbackDataInput,
 	closeHold: CreatorSnapshotRecoveryCloseHold,
-	requireClosedWorkflowCompletion = false
+	requireClosedWorkflowCompletion = false,
+	acknowledgeCompletedJournalDrain = false
 ): Promise<"complete" | "fresh-summary-required"> {
 	try {
 		// Slice 14b stage 2: an opted-in room host's ledger decision on this same sealed hold;
@@ -24799,7 +24803,8 @@ export async function reconcileCreatorReceivedSnapshotRecoveryRoles(
 			const ledger = await reconcileCreatorReceivedRoomRetentionFromLedger(value, closeHold);
 			if (ledger !== undefined) return ledger;
 		}
-		return (await reconcileSnapshotRecoveryRoles(value, closeHold, false, requireClosedWorkflowCompletion, undefined, undefined, true))
+		return (await reconcileSnapshotRecoveryRoles(value, closeHold, acknowledgeCompletedJournalDrain, requireClosedWorkflowCompletion,
+			undefined, undefined, true))
 			? "fresh-summary-required" : "complete";
 	} catch (error) {
 		throwCreatorSnapshotRecoveryFailure(error);
