@@ -71,6 +71,9 @@ it(
 				durableDuringExchanges.push(acceptedVertices() - vertices);
 			};
 
+			// Both channels exist (and so receive) before anyone sends.
+			channelFor(0);
+			channelFor(1);
 			await exchange("start");
 			for (let rollover = 1; rollover <= ROLLOVERS; rollover++) {
 				await writer.room.issue({ action: "placeBlock", id: `move-${rollover}`, kind: "stone", x: 1 + rollover, y: 1 });
