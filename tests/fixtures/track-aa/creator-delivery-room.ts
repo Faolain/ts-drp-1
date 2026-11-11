@@ -156,7 +156,7 @@ export interface RoomOptions {
 	/** Measurement seam: called for every author-key vertex signature a peer makes. */
 	onSign?(index: number): void;
 	/** Extra session options for every opened peer (measurement harnesses, e.g. the scheduled lull). */
-	readonly sessionOptions?: Readonly<Partial<CreateV3RoomSessionInput<unknown>>>;
+	readonly sessionOptions?: Readonly<{ recoveryPoolScheduledLull?: boolean }>;
 }
 
 /**
