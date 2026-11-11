@@ -2027,6 +2027,28 @@ export function issuanceRetirementFenceIsReleasable(rows: IssuanceRetirementRows
 		retirementFenceIsReleasable(plan, entry, rows);
 }
 
+/** Retirement is permanent. An entry whose own completion stands (retirementEntryIsCustody:
+ * a retained FENCE, an expiry, a commit, or a replaced source) and whose local source a
+ * completed retirement already retired is custody, never a dependency again. The laws that
+ * let the source go (FENCE release R1/R2; pruning under a current fence) are judged again at
+ * every retirement, and a Writer's epoch-change merge clears its fence and adds new work, so
+ * they can turn false afterwards; the closure then tried to protect a row no retirement can
+ * protect and every later install refused. Nothing needs the row again: a released fence is
+ * never the bounding fence of later work (model removed-author-fence-release,
+ * writerReleaseThenWorkTest: unresolvedBounded), and a replaced source's replacement is issued
+ * (a portable replacement that still names it keeps it through its own clause above, unchanged).
+ * An entry with no completion (rebase or transform with no replacement, manual review) is not
+ * covered: a lost source there still refuses. Only the completed control decides (an in-flight
+ * preparation grants nothing), and the plan's current fence is never covered here. */
+function retirementCustodyAlreadyRetired(control: DurableIssuanceRetirementControl | null, plan: SettlementPlan,
+	entry: SettlementPlan["entries"][number], rows: IssuanceRetirementRows): boolean {
+	if (control?.completed == null || plan.fenceSequence === entry.sourceSequence || !retirementEntryIsCustody(entry))
+		return false;
+	const row = retirementLocalSource(plan, entry, rows);
+	return row !== undefined && !issuanceRetirementAllows({ ...control, active: null }, row, row.authorSequence,
+		row.canonicalPreimageBytes, row.digest);
+}
+
 /** A completed local entry is custody while the store still holds its source. Logical
  * retirement and the prefix pruner are separate commits, and the creator recovery
  * census classifies every held displaced source by its completed entry, so the entry
@@ -2046,7 +2068,7 @@ function retirementEntryIsRetained(control: DurableIssuanceRetirementControl | n
 	rows: IssuanceRetirementRows): boolean {
 	if (entry.sourceObjectId !== undefined || entry.disposition === "inherited" ||
 		!settlementPlanPermitsAuthenticatedPruning({ fenceSequence: plan.fenceSequence, entries: [entry] }) &&
-		!retirementFenceIsReleasable(plan, entry, rows)) return true;
+		!retirementFenceIsReleasable(plan, entry, rows) && !retirementCustodyAlreadyRetired(control, plan, entry, rows)) return true;
 	const source = retirementLocalSource(plan, entry, rows);
 	return source !== undefined && retirementKeepsRow(control, p, source);
 }

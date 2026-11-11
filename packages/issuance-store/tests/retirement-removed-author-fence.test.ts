@@ -140,3 +140,94 @@ describe("removed author's retained FENCE release", () => {
 		expect(held(rows)).toEqual([]);
 	});
 });
+
+// A Writer's retained FENCE released between its epoch-change merge and its next fence
+// (model run writerEpochChangeTest) is gone for good: the completed retirement no longer
+// allows its row. The Writer then fences again at lineage.next and issues new work. In the
+// model every later unresolved source is bounded by that newer fence (unresolvedBounded), so
+// nothing needs the released row again; the next retirement must not try to protect it.
+// Seen in a slow member's catch-up: "issuance retirement retained plan dependency is absent
+// or permanently retired" on every install after the release, so the member never caught up.
+describe("a Writer's released FENCE stays released", () => {
+	function released() {
+		const rows = image();
+		expect(held(rows)).toEqual([]);
+		const p = issuanceRetirementPreparationWithPlanRewrite(control, { ...labels, protectedRecords: [] }, rows);
+		const target = issuanceRetirementCommitRows(control, p, rows);
+		const completed: DurableIssuanceRetirementControl = { ...control, revision: 2, sequence: 1, completed: p };
+		// The Writer's fresh fence at lineage.next (seq 3, epoch 4) and its next move (seq 4, epoch 4).
+		const issued = [...target.issued, row(3, 4, FENCE(3)), row(4, 4, { action: "message" })];
+		const base: IssuanceRetirementRows = { ...target, issued, lineages: [{ ...target.lineages[0]!, next: 5 }],
+			outbox: [...target.outbox,
+				...issued.slice(-2).map(value => ({ ...scope, authorSequence: value.authorSequence, digest: value.digest,
+					publishState: "published" as const }))] };
+		return { completed, base, issued };
+	}
+	const closeAt = (completed: DurableIssuanceRetirementControl, rows: IssuanceRetirementRows, throughEpoch: number) =>
+		closeIssuanceRetirementProtectedRecords({ control: completed, rows, throughEpoch, protectedRecords: [] })
+			.map(value => value.authorSequence);
+
+	it("a new current fence protects itself, not the released one", () => {
+		const { completed, base } = released();
+		const rows: IssuanceRetirementRows = { ...base, plans: [{ ...base.plans[0]!, fenceSequence: 3 }] };
+		expect(closeAt(completed, rows, 5)).toEqual([3]);
+	});
+
+	it("new unresolved work is bounded by the new fence; the released fence is not needed", () => {
+		const { completed, base, issued } = released();
+		const rows: IssuanceRetirementRows = { ...base, plans: [{ ...base.plans[0]!, fenceSequence: null,
+			entries: [...base.plans[0]!.entries,
+				{ sourceSequence: 3, sourceDigest: issued[3]!.digest, sourceContextDigest: sourceContext.digest,
+					disposition: "expire", replacementSequence: null },
+				{ sourceSequence: 4, sourceDigest: issued[4]!.digest, sourceContextDigest: sourceContext.digest,
+					disposition: "manual-review", replacementSequence: null }] }] };
+		expect(closeAt(completed, rows, 5)).toEqual([3, 4]);
+	});
+});
+
+// The same permanence for a completed entry. A replaced source (rebase, replacement issued)
+// retires while the plan has a current fence; the Writer's next epoch-change merge clears the
+// fence, and the pruning law then calls the entry retained again. Its source is already gone, so
+// the closure refused every later install ("issuance retirement retained plan dependency is absent
+// or permanently retired"; seen in test 2 of the slow-member file: entry 94 rebase -> 128, fence
+// cleared, completed retirement through 26). A completed entry is custody, not a dependency.
+describe("a completed entry whose source already retired stays custody", () => {
+	const entry2 = (rows: IssuanceRetirementRows): Entry => ({ sourceSequence: 2, sourceDigest: rows.issued[2]!.digest,
+		disposition: "rebase", replacementSequence: 3 });
+	function retiredUnderFence() {
+		const issued = [row(0, 0, { action: "causalJoin" }), row(1, 0, FENCE(1)), row(2, 1, { action: "message" }),
+			row(3, 5, { action: "message", rebased: true })];
+		const base: IssuanceRetirementRows = {
+			lineages: [{ ...scope, next: 4, exhausted: false, prunedThroughAuthorSequence: null }],
+			issued,
+			outbox: issued.map(value => ({ ...scope, authorSequence: value.authorSequence, digest: value.digest,
+				publishState: "published" as const })),
+			plans: [{ scope, revision: 4, fenceSequence: 1, entries: [], sourceContexts: [] }],
+		};
+		const fenced: IssuanceRetirementRows = { ...base, plans: [{ ...base.plans[0]!, entries: [entry2(base)] }] };
+		const p = issuanceRetirementPreparationWithPlanRewrite(control, { ...labels, protectedRecords:
+			closeIssuanceRetirementProtectedRecords({ control, rows: fenced, throughEpoch: labels.throughEpoch, protectedRecords: [] }) },
+		fenced);
+		expect(p.protectedRecords.map(value => value.authorSequence)).toEqual([1]);
+		const target = issuanceRetirementCommitRows(control, p, fenced);
+		return { completed: { ...control, revision: 2, sequence: 1, completed: p } as DurableIssuanceRetirementControl, target };
+	}
+
+	it("the merge clears the fence: the replaced source is not protected again", () => {
+		const { completed, target } = retiredUnderFence();
+		const fenceEntry: Entry = { sourceSequence: 1, sourceDigest: target.issued[1]!.digest,
+			sourceContextDigest: sourceContext.digest, disposition: "expire", replacementSequence: null };
+		const cleared: IssuanceRetirementRows = { ...target, plans: [{ ...target.plans[0]!, fenceSequence: null,
+			entries: [fenceEntry, ...target.plans[0]!.entries], sourceContexts: [sourceContext] }] };
+		expect(closeIssuanceRetirementProtectedRecords({ control: completed, rows: cleared, throughEpoch: 5,
+			protectedRecords: [] }).map(value => value.authorSequence)).toEqual([1]);
+	});
+
+	it("an unreplaced source that a retirement lost still refuses (no completion to stand on)", () => {
+		const { completed, target } = retiredUnderFence();
+		const lost: IssuanceRetirementRows = { ...target, plans: [{ ...target.plans[0]!, fenceSequence: null,
+			entries: [{ ...entry2(target), replacementSequence: null }] }] };
+		expect(() => closeIssuanceRetirementProtectedRecords({ control: completed, rows: lost, throughEpoch: 5,
+			protectedRecords: [] })).toThrow(/absent or permanently retired/);
+	});
+});
