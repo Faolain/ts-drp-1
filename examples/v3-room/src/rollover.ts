@@ -293,6 +293,10 @@ export function createV3RoomRolloverPolicy(
 	const weights = new Map<string, number>();
 	let idleTimer: ReturnType<typeof setTimeout> | undefined;
 	let rolling: Promise<void> | undefined;
+	// The cut of the rollover in flight: its seal and adoption. A move waits for this, not for the
+	// export and publish that follow (they serve the adopted successor; a move then is in its epoch).
+	// Resolves true once adopted, false if the seal or adoption failed.
+	let cutting: Promise<boolean> | undefined;
 	let scheduled = false;
 	let retryAt = 0;
 	let failures = 0;
@@ -381,9 +385,21 @@ export function createV3RoomRolloverPolicy(
 		if (selected === undefined || closed || role !== "creator") return Promise.resolve();
 		const started = performance.now();
 		const closing = { epoch: currentEpoch(), moves: most(moves), weight: most(weights) };
-		const task = (async (): Promise<void> => {
+		const cut = (async () => {
 			const sealed = await selected.sealEpoch();
 			await selected.adoptCreatorSuccessor();
+			return sealed;
+		})();
+		const cutDone = cut.then(
+			() => true,
+			() => false
+		);
+		cutting = cutDone;
+		void cutDone.then(() => {
+			if (cutting === cutDone) cutting = undefined;
+		});
+		const task = (async (): Promise<void> => {
+			const sealed = await cut;
 			const offer = await selected.exportCreatorSuccessor();
 			rollovers++;
 			failures = 0;
@@ -556,8 +572,10 @@ export function createV3RoomRolloverPolicy(
 		}
 		let closingSince: number | undefined;
 		for (let offer = 1; ; offer++) {
-			// A move never enters the creator's own rollover between its seal and its adoption.
-			if (rolling !== undefined) await rolling;
+			// A move never enters the creator's own rollover between its seal and its adoption. A failed
+			// cut also waits for the roll's own failure handling (backoff, close) before the offer.
+			const cut = cutting;
+			if (cut !== undefined && !(await cut) && rolling !== undefined) await rolling;
 			const attempted = currentEpoch();
 			try {
 				const handBack = handBackOf.get(operation);
