@@ -639,4 +639,6 @@ Notes:
   restarted since it last received a creator move attests only its epoch anchor, not same-epoch creator moves).
   Two creator devices live at once are not covered: the check runs only at reopen. A room-head floor kept off the
   device (account-held) should already refuse an epoch-level rollback (not verified here). A refused creator stays read-only until
-  an operator retires the stale copy; healing it from members is a separate future decision.
+  an operator retires the stale copy; healing it from members is a separate future decision. A creator that
+  reopens mid-transition (pending room-head recovery) waits for the decision before recovering, and a refusal
+  there fails the open instead of leaving a readable session.
