@@ -6,6 +6,7 @@ import { copySettlementPlan, type DurableIssuanceStore, type DurableIssueScope }
 import {
 	durableIssuancePruningMaintenanceForStore,
 	ISSUANCE_RETIREMENT_LIMITS,
+	issuanceRetirementFloor,
 } from "@ts-drp/issuance-store/maintenance";
 import type { DurableLiveJournalStore } from "@ts-drp/live-journal";
 import type { SnapshotChunkProtocolPort } from "@ts-drp/network/snapshot-transfer";
@@ -1185,15 +1186,19 @@ async function settlementSourceHeldIn(source: CreatorRecipientSource, removed: R
 		const census = await durableIssuancePruningMaintenanceForStore(source.issuanceStore)?.readBoundedRecoveryCensus?.(
 			{objectId: source.objectId, limits: ISSUANCE_RETIREMENT_LIMITS});
 		if (census === undefined) return true;
-		const holes = new Set((census.control?.completed?.protectedRecords ?? []).map(hole =>
+		const completed = census.control?.completed;
+		const holes = new Set((completed?.protectedRecords ?? []).map(hole =>
 			JSON.stringify([hole.author, hole.authorSequence, hole.digest])));
 		for (const entry of plan.entries) {
 			const row = census.rows.issued.find(issued => issued.author === source.issuanceScope.author &&
 				issued.authorSequence === entry.sourceSequence);
 			if (row === undefined) continue;
 			const digest = Array.from(row.digest, byte => byte.toString(16).padStart(2, "0")).join("");
-			if (!holes.has(JSON.stringify([row.author, row.authorSequence, digest]))) continue;
 			const value = decodeCanonical(row.canonicalPreimageBytes) as {epoch?: unknown; anchor?: unknown};
+			// Rule H: a row above the completed floor is held without a listed hole.
+			const aboveFloor = completed != null && typeof value.epoch === "number" && value.epoch > issuanceRetirementFloor(completed) &&
+				value.epoch <= completed.throughEpoch;
+			if (!aboveFloor && !holes.has(JSON.stringify([row.author, row.authorSequence, digest]))) continue;
 			if (removed.has(JSON.stringify([source.objectId, value.epoch, value.anchor]))) return true;
 		}
 		return false;

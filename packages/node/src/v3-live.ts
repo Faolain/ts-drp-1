@@ -60,6 +60,7 @@ import {
 	issuanceRetirementPlanRewriteResourceForSizing,
 	issuancePotentialSourceCustody,
 	settlementPlanPermitsAuthenticatedPruning,
+	issuanceRetirementFloor,
 } from "@ts-drp/issuance-store/maintenance";
 import {
 	type DurableLiveJournalStore,
@@ -4194,7 +4195,9 @@ function resolveRecoveryCloseHold(
 			const acquire = native?.acquireRetirementControl?.bind(native);
 			if (acquire === undefined) throw new TypeError("native issuance retirement is unsupported");
 			const scope = ObjectFreeze({ objectId: facts.context.payload.trust.trust.objectId });
-			return ObjectFreeze({ signing: facts.captureSigning(), issuance: () => acquire(scope) });
+			const readPlanBefore = native?.readRetirementPlanBefore?.bind(native);
+			return ObjectFreeze({ signing: facts.captureSigning(), issuance: ObjectFreeze(Object.assign(() => acquire(scope),
+				readPlanBefore === undefined ? {} : { readPlanBefore: () => readPlanBefore(scope) })) });
 		},
 		captureIssuanceRetirementOwner: function (this: CreatorSnapshotRecoveryCloseLifetime) {
 			if (this !== lifetime || !available() || !facts.retirementAllowed)
@@ -4207,8 +4210,10 @@ function resolveRecoveryCloseHold(
 			// the eventual native view supplies CAS, not caller-selected authority.
 			// Slice 14a: a room retirement session acts only for the owner of this same
 			// maintenance capability (a filtered facade is re-bound to it, never minted).
+			const readPlanBefore = native?.readRetirementPlanBefore?.bind(native);
 			return ObjectFreeze(Object.assign(() => acquire(scope), {
 				acquireIn: (session: V3RoomRetirementSession) => session.acquireIssuance(scope, native),
+				...(readPlanBefore === undefined ? {} : { readPlanBefore: () => readPlanBefore(scope) }),
 			}));
 		},
 		captureSigningRetirementOwners: function (this: CreatorSnapshotRecoveryCloseLifetime) {
@@ -23325,7 +23330,8 @@ async function cleanupCreatorSettlementSuccessor(
 					observed.control.completed.sourceProofDigest !== control.completed.sourceProofDigest ||
 					control.completed.generationDrain?.phase === "pending") return;
 				coordinatedIssuance = observed.control.completed.protectedRecords;
-				coordinatedThroughEpoch = observed.control.completed.throughEpoch;
+				// Rule H: rows above the completed floor are kept by the floor, not listed as holes.
+				coordinatedThroughEpoch = issuanceRetirementFloor(observed.control.completed);
 			} finally {await observed.release();}
 		}
 	}
@@ -23556,6 +23562,14 @@ async function cleanupCreatorSettlementSuccessor(
 				const row = outboxRowSnapshot(raw, material.issuanceScope);
 				if (row === undefined) throw new TypeError("creator cleanup issuance row is invalid");
 				if (coordinatedIssuance?.some(hole => hole.author === row.scope.author && hole.authorSequence === row.authorSequence)) {
+					done = true;
+					break;
+				}
+				// Rule H: a row above the coordinated floor is protected without a listed hole.
+				const rowEpoch = coordinatedIssuance === undefined ? undefined :
+					(decodeCanonical(row.canonicalPreimageBytes) as {epoch?: unknown}).epoch;
+				if (coordinatedThroughEpoch !== undefined && (typeof rowEpoch !== "number" || rowEpoch > coordinatedThroughEpoch) &&
+					coordinatedIssuance !== undefined) {
 					done = true;
 					break;
 				}

@@ -267,6 +267,8 @@ export interface RoomRetentionAheSelection {
 
 /** The issuance part: the protected records of the new checkpoint. Role 16 deletes nothing. */
 export interface RoomRetentionIssuanceSelection {
+	/** Rule H: the preparation's floor; absent only to resume a legacy (control-1) active preparation. */
+	readonly floorEpoch?: number;
 	readonly protectedRecords: readonly Readonly<{ author: string; authorSequence: number; digest: string }>[];
 }
 

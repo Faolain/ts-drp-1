@@ -196,8 +196,13 @@ export interface V3RoomRolloverPolicy {
 	close(): void;
 }
 
-/** Native refusals that end with the epoch: the creator's issuance image and proof capacities. */
-const ROLLOVER_REFUSAL = /MAINTENANCE_[A-Z_]+|maintenance prefix sizing is unavailable|proof capacity refused/u;
+/**
+ * Native refusals that end with the epoch: the creator's issuance image and proof capacities, and
+ * ISSUANCE_CAPACITY_FORECAST_EXCEEDED (a creator's or Writer's admission refused before signing
+ * because the issuance maintenance forecast would exceed its bound; a rollover clears it).
+ */
+const ROLLOVER_REFUSAL =
+	/ISSUANCE_CAPACITY_FORECAST_EXCEEDED|MAINTENANCE_[A-Z_]+|maintenance prefix sizing is unavailable|proof capacity refused/u;
 /** Refusals that clear once admitted work joins, without a rollover. */
 const TRANSIENT_REFUSAL = /retry after admitted work joins/u;
 /**

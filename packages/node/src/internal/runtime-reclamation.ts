@@ -19,6 +19,8 @@ import type { V3RoomRetirementSession } from "./room-retirement.js";
 export type CreatorIssuanceRetirementOwner = (() => Promise<DurableIssuanceRetirementControlRead>) & {
 	/** Slice 14a: the same owner's original read through a room retirement session. */
 	readonly acquireIn?: (session: V3RoomRetirementSession) => Promise<DurableIssuanceRetirementControlRead>;
+	/** Rule A: the native plan-before side row, read only to reconstruct a committed source. */
+	readonly readPlanBefore?: () => Promise<Uint8Array | null>;
 };
 
 const INPUT_KEYS = Object.freeze(["aheReceipt", "issuanceReceipt", "successor"] as const);
@@ -361,7 +363,7 @@ export type CreatorSnapshotRecoveryCloseLifetime = Readonly<{
 	 * composition. Active hold remains read-only for completeRetirement. These
 	 * factories are not narrowed grants: the original planner must select no drains. */
 	captureClassificationMetadataOwners(): Readonly<{signing: CreatorSigningRetirementOwners;
-		issuance: () => Promise<DurableIssuanceRetirementControlRead>}>;
+		issuance: CreatorIssuanceRetirementOwner}>;
 	check(): Promise<void>;
 	acquireNativeIssuanceReservation(): Promise<NativeReadReservation>;
 	completeRetirement(observation: object): Promise<void>;

@@ -81,7 +81,9 @@ import {
 	issuanceRetirementImage,
 	issuanceRetirementRefusal,
 	issuanceRetirementPreparationWithPlanRewrite,
+	issuanceRetirementFloor,
 	issuanceRetirementTransitionRows,
+	issuanceRetirementTransitionPlanBefore,
 	type IssuanceRetirementRows,
 	issuanceUnsignedPostimageCharge,
 	joinIssuanceNativeSign,
@@ -606,6 +608,48 @@ async function browserRetirementRows(
 	};
 }
 
+/**
+ * Rule A's one plan-before side row per object lives in the retirement-control store under a key no
+ * object id can take (an object id never contains U+0000), so neither IndexedDB layout changes
+ * schema; legacy code never reads it, and refuses the control-2 control beside it.
+ * @param objectId - The addressed object.
+ * @returns The side row's key.
+ */
+function browserRetirementPlanBeforeKey(objectId: string): string {
+	return `${objectId}\u0000plan-before`;
+}
+
+/**
+ * Applies a control transition's side-row effect in the transition's own transaction.
+ * @param transaction - The transition transaction.
+ * @param current - The actual current control.
+ * @param next - The proposed control.
+ * @param rows - The native rows before the transition.
+ */
+async function browserWriteRetirementPlanBefore(transaction: IDBTransaction, current: DurableIssuanceRetirementControl,
+	next: DurableIssuanceRetirementControl, rows: IssuanceRetirementRows): Promise<void> {
+	const planBefore = issuanceRetirementTransitionPlanBefore(current, next, rows);
+	if (planBefore === undefined) return;
+	const store = transaction.objectStore(roomStoreName(transaction.db, "issuance", "retirementControls"));
+	const key = browserRetirementPlanBeforeKey(current.objectId);
+	await requestResult(planBefore === null ? store.delete(key) : store.put({ objectId: key, record: planBefore }));
+}
+
+/**
+ * Reads rule A's side row.
+ * @param transaction - A readonly or readwrite transaction over the control store.
+ * @param objectId - The addressed object.
+ * @returns The exact side-row bytes, or null.
+ */
+async function browserReadRetirementPlanBefore(transaction: IDBTransaction, objectId: string): Promise<Uint8Array | null> {
+	const raw: unknown = await requestResult(transaction.objectStore(roomStoreName(transaction.db, "issuance",
+		"retirementControls")).get(browserRetirementPlanBeforeKey(objectId)));
+	if (raw === undefined) return null;
+	const record = typeof raw === "object" && raw !== null ? Reflect.get(raw, "record") : undefined;
+	if (!(record instanceof Uint8Array)) throw issuanceRetirementRefusal("issuance retirement plan before is malformed");
+	return new Uint8Array(record);
+}
+
 async function browserWriteRetirementPlanChanges(transaction: IDBTransaction,
 	before: IssuanceRetirementRows, after: IssuanceRetirementRows): Promise<void> {
 	for (let index = 0; index < before.plans.length; index++) {
@@ -898,6 +942,19 @@ class BrowserIssuanceImplementation {
 	acquireRetirementControl(input: { readonly objectId: string }): Promise<DurableIssuanceRetirementControlRead> {
 		return this.#trackRetirement(this.#acquireRetirementControl(input));
 	}
+	async readRetirementPlanBefore(input: { readonly objectId: string }): Promise<Uint8Array | null> {
+		this.#assertAvailable();
+		const objectId = captureIssuanceRetirementObject(input);
+		const transaction = this.#startTransaction("readonly"), terminal = transactionResult(transaction);
+		try {
+			const bytes = await browserReadRetirementPlanBefore(transaction, objectId);
+			await terminal;
+			return bytes;
+		} catch (error) {
+			await terminal.catch(() => undefined);
+			throw error;
+		}
+	}
 	/**
 	 * Slice 14a: the original acquisition inside a room retirement session, with this
 	 * store's lifetime and held-view refusals checked before every session operation.
@@ -1008,6 +1065,7 @@ class BrowserIssuanceImplementation {
 			const targetRows = issuanceRetirementTransitionRows(current, next, rows);
 			if (issuanceRetirementImage(targetRows, objectId).imageDigest !== expectedImage.imageDigest)
 				throw issuanceRetirementRefusal("issuance retirement target stale");
+			await browserWriteRetirementPlanBefore(transaction, current, next, rows);
 			await browserWriteRetirementPlanChanges(transaction, rows, targetRows);
 			await requestResult(
 				transaction.objectStore(roomStoreName(transaction.db, "issuance", "retirementControls")).put({ objectId, record: encodeIssuanceRetirementControl(next) })
@@ -2902,18 +2960,22 @@ export function browserRoomIssuanceRetentionSection(databaseName: string, store?
 						}).byteLength
 					);
 				const protectedRecords = chosen.protectedRecords.map((record) => ({ ...record }));
+				// Rule H: the selection's floor (present exactly when it selected under control-2).
+				const floorEpoch = chosen.floorEpoch;
 				const preparation = (labels: Readonly<{ decisionDigest: string; sourceProofDigest: string }>) =>
 					issuanceRetirementPreparationWithPlanRewrite(control, captureIssuanceRetirementPreparation({
 						decisionDigest: labels.decisionDigest,
 						sourceProofDigest: labels.sourceProofDigest,
 						throughEpoch: through,
+						...(floorEpoch === undefined ? {} : { floorEpoch }),
 						protectedRecords,
 					}), rows);
 				const current = control;
 				const probe = preparation({ decisionDigest: "0".repeat(64), sourceProofDigest: "0".repeat(64) });
 				// The original preparation row law, label-independent, before anything is written.
 				try {
-					if (current.completed !== null && probe.throughEpoch < current.completed.throughEpoch)
+					if (current.completed !== null && (probe.throughEpoch < current.completed.throughEpoch ||
+						issuanceRetirementFloor(probe) < issuanceRetirementFloor(current.completed)))
 						return retentionStale("issuance:advance");
 					assertIssuanceRetirementPreparationRows(current, probe, rows);
 				} catch (cause) {
@@ -2932,6 +2994,7 @@ export function browserRoomIssuanceRetentionSection(databaseName: string, store?
 						after: retentionValueDigest("settlementPlans", key, value), value})];
 				}));
 				const { revision: _revision, ...state } = current;
+				let planBefore: Uint8Array | null | undefined;
 				const section: RoomRetentionSectionDraft = Object.freeze({
 					owner: "issuance" as const,
 					// Ordinary mutations advance only the revision counter: the base is the rest.
@@ -2947,6 +3010,7 @@ export function browserRoomIssuanceRetentionSection(databaseName: string, store?
 								preparation(labels)
 							);
 							committed = await createIssuanceRetirementControlRead(prepared, image, async (next) => next).commitPrepared();
+							planBefore = issuanceRetirementTransitionPlanBefore(prepared, committed, rows);
 						} catch {
 							return retentionStale("issuance:transition");
 						}
@@ -2965,9 +3029,12 @@ export function browserRoomIssuanceRetentionSection(databaseName: string, store?
 								await requestResult(writer.objectStore(roomStoreName(writer.db, "issuance", "settlementPlans")).put(row.value));
 							}
 							writeBook.write({ kind: "control", owner: "issuance" });
-							await requestResult(
-								writer.objectStore(roomStoreName(writer.db, "issuance", "retirementControls")).put(target.value)
-							);
+							const controls = writer.objectStore(roomStoreName(writer.db, "issuance", "retirementControls"));
+							// Rule A: the committed preparation's BEFORE images (or none) in the same transaction.
+							if (planBefore === null) await requestResult(controls.delete(browserRetirementPlanBeforeKey(objectId)));
+							else if (planBefore !== undefined)
+								await requestResult(controls.put({ objectId: browserRetirementPlanBeforeKey(objectId), record: planBefore }));
+							await requestResult(controls.put(target.value));
 						}),
 				});
 				return section;
@@ -3028,6 +3095,7 @@ async function createIssuanceStoreOver(
 				implementation.withNativeSignAdmission(input, sign),
 			acquireRetirementControl: (input: { readonly objectId: string }) =>
 				implementation.acquireRetirementControl(input),
+			readRetirementPlanBefore: (input: { readonly objectId: string }) => implementation.readRetirementPlanBefore(input),
 			inspectPruningState: (scope: DurableIssueScope) => implementation.inspectPruningState(scope),
 			pruneAuthenticatedSettledPrefix: (input: unknown) => implementation.pruneAuthenticatedSettledPrefix(input),
 			prunePublishedPrefix: (input: unknown) => implementation.prunePublishedPrefix(input),
@@ -3074,6 +3142,7 @@ export function browserIssuancePruningMaintenanceForStore(store: DurableIssuance
 	return Object.freeze({
 		readBoundedRecoveryCensus: (input: unknown) => implementation.readBoundedRecoveryCensus(input),
 		acquireRetirementControl: (input: { readonly objectId: string }) => implementation.acquireRetirementControl(input),
+		readRetirementPlanBefore: (input: { readonly objectId: string }) => implementation.readRetirementPlanBefore(input),
 		inspectPruningState: (scope: DurableIssueScope) => implementation.inspectPruningState(scope),
 		pruneAuthenticatedSettledPrefix: (input: unknown) => implementation.pruneAuthenticatedSettledPrefix(input),
 		prunePublishedPrefix: (input: unknown) => implementation.prunePublishedPrefix(input),
@@ -3140,6 +3209,7 @@ export async function acquireBrowserRoomIssuanceRetirement(
 			const targetRows = issuanceRetirementTransitionRows(current, next, rows);
 			if (issuanceRetirementImage(targetRows, objectId).imageDigest !== expectedImage.imageDigest)
 				throw issuanceRetirementRefusal("issuance retirement target stale");
+			await browserWriteRetirementPlanBefore(transaction, current, next, rows);
 			await browserWriteRetirementPlanChanges(transaction, rows, targetRows);
 			await requestResult(
 				transaction

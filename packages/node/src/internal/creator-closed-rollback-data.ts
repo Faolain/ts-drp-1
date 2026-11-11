@@ -27,6 +27,7 @@ import {
 	issuanceUnsignedContinuationWidths,
 	issuanceOrdinaryFinishingCapacityWidths,
 	issuanceRetirementControlFields,
+	issuanceRetirementFloor,
 	closeIssuanceRetirementProtectedRecords,
 	issuanceRetirementImage,
 	issuanceRetirementPreparationWithPlanRewrite,
@@ -14439,7 +14440,7 @@ function buildCreatorOrdinaryFinishingResourceProgramForSizing(input: Readonly<{
 		const summarySource = record({entries: summaryEntries, sourceDataDigest: digest, resumeBasisDigest: digest, eligibilityFence: signingPrep});
 		const summaryPrep = record({...labels, protectedEpochs: array(signingEpochCountTerm, integer), summarySource});
 		const participantPreps = [record({...labels, protectedScopes: array(protectedSnapshotCountTerm, pair)}), record({...labels, protectedScopes: protectedHeaders}),
-			record({...labels, protectedRecords, planRewrite: inputResource("issuance.planRewrite",
+			record({...labels, floorEpoch: integer, protectedRecords, planRewrite: inputResource("issuance.planRewrite",
 				issuance.planRewriteResource ?? nil)}), maximum(signingPrep, summaryPrep)];
 		const preparation = record({head, floorEpoch: integer, floorAnchor: digest, decisionDigest: digest, sourceProofDigest: digest,
 			generationRecordDigests: recordDigests, snapshotScopes: snapshotHoles, protectedIndices: array(snapshotCountTerm, integer),
@@ -18165,7 +18166,8 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
 		const preparationSeeds: Readonly<Record<string, unknown>>[] = [
 			{ ...labels, protectedScopes: sourceSnapshots },
 			{ ...labels, protectedScopes: protectedJournalScopes },
-			{ ...labels, protectedRecords, planRewrite: finalPlanRewriteResource === undefined ? null :
+			// Rule H: the issuance preparation's floor never exceeds its cut, so the cut's width bounds it.
+			{ ...labels, floorEpoch: labels.throughEpoch, protectedRecords, planRewrite: finalPlanRewriteResource === undefined ? null :
 				maintenanceEncodedWidth(finalPlanRewriteResource.byteLength, finalPlanRewriteResource) },
 			{ ...labels, protectedEpochs: signingEpochs },
 		];
@@ -20038,6 +20040,23 @@ function composeProspectiveCreatorMaintenancePrefixesForSizing(
  * leave protection in a NEW checkpoint. SAME-intent retries retain its exact
  * holes, and prior permanent retirement is never resurrected. No deletion or
  * ordinary admission authority is returned. */
+/**
+ * Rule H (model issuance-image-capacity.qnt): the floor of the next issuance preparation. Rows above
+ * it are kept by the floor itself (never retired: retirement needs epoch <= through - 2), so only
+ * exceptions at or below it are listed. Monotone: never below the completed preparation's floor. A
+ * legacy (control-1) active preparation resumes exactly as it was prepared, without a floor.
+ * @param control - The actual native issuance control.
+ * @param throughEpoch - The cut being retired through.
+ * @returns The floor, or undefined to keep a legacy active preparation's form.
+ */
+function closedIssuanceRetirementFloor(control: DurableIssuanceRetirementControl | null | undefined,
+	throughEpoch: number): number | undefined {
+	const active = control?.active?.preparation;
+	if (active != null) return active.floorEpoch;
+	const completed = control?.completed;
+	return Math.min(throughEpoch, Math.max(completed == null ? 0 : issuanceRetirementFloor(completed), throughEpoch - 2, 0));
+}
+
 function closedIssuanceProtectedRecordsForRetirement(input: Readonly<{
 	objectId: string; throughEpoch: number; rows: IssuanceRetirementRows;
 	intent: Readonly<{decisionDigest: string; sourceProofDigest: string}> | undefined;
@@ -20060,16 +20079,19 @@ function closedIssuanceProtectedRecordsForRetirement(input: Readonly<{
 	// authenticated source after the last journal consumer disappears can release
 	// old holes at that same cut. An incomplete intent must still resume exactly.
 	requireLaw(input.control?.active == null || same === input.control.active.preparation, "chain-invalid");
+	const floorEpoch = closedIssuanceRetirementFloor(input.control, input.throughEpoch);
+	const floor = floorEpoch ?? input.throughEpoch;
 	const selected = Object.freeze(input.rows.issued.filter(row => {
 		const value = record(row.canonicalPreimageBytes), epoch = value.epoch;
 		requireLaw(typeof epoch === "number" && Number.isSafeInteger(epoch) && epoch >= 0, "chain-invalid");
 		requireLaw(row.objectId === input.objectId && value.objectId === input.objectId && value.author === row.author &&
 			value.authorSequence === row.authorSequence, "chain-invalid");
-		if (epoch > input.throughEpoch) return false;
+		if (epoch > floor) return false;
 		const digest = Array.from(row.digest, byte => byte.toString(16).padStart(2, "0")).join("");
 		const hasHole = (p: NonNullable<DurableIssuanceRetirementControl["completed"]>) => p.protectedRecords.some(
 			hole => hole.author === row.author && hole.authorSequence === row.authorSequence && hole.digest === digest);
-		if (input.control?.completed != null && epoch <= input.control.completed.throughEpoch && !hasHole(input.control.completed)) return false;
+		if (input.control?.completed != null && epoch <= issuanceRetirementFloor(input.control.completed) &&
+			!hasHole(input.control.completed)) return false;
 		if (same !== undefined) return hasHole(same);
 		if (!input.dependenciesClassified) return true;
 		const covered = classified.filter(proof => proof?.scope?.objectId === input.objectId && proof.scope.author === row.author &&
@@ -20095,8 +20117,9 @@ function closedIssuanceProtectedRecordsForRetirement(input: Readonly<{
 			const left = JSON.stringify([a.author, a.authorSequence, a.digest]), right = JSON.stringify([b.author, b.authorSequence, b.digest]);
 			return left < right ? -1 : left > right ? 1 : 0;
 		}));
-	return closeIssuanceRetirementProtectedRecords({control: input.control, rows: input.rows,
-		throughEpoch: input.throughEpoch, protectedRecords: selected});
+	return Object.freeze({...(floorEpoch === undefined ? {} : {floorEpoch}) as {floorEpoch?: number},
+		protectedRecords: closeIssuanceRetirementProtectedRecords({control: input.control, rows: input.rows,
+			throughEpoch: input.throughEpoch, ...(floorEpoch === undefined ? {} : {floorEpoch}), protectedRecords: selected})});
 }
 
 /** Installation consumes only the original native image's exact-byte syntax
@@ -20316,8 +20339,11 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 	// An active global intent must resume its exact image. Once globally complete,
 	// later authenticated physical maintenance may establish a fresh source instead.
 	if (priorRewrite !== undefined && source.aheControl?.active != null) requireLaw(exactRewriteTarget, "floor-stale");
+	// Rule A: a digest rewrite's BEFORE images come from the native side row, read only here.
 	const restoredIssuanceRows = exactRewriteTarget ?
-		reconstructIssuanceRetirementSourceRows(issuanceControl!, priorRewrite!, native.rows) : undefined;
+		reconstructIssuanceRetirementSourceRows(issuanceControl!, priorRewrite!, native.rows,
+			priorRewrite!.planRewrite!.kind === "v3-issuance-retirement-plan-rewrite-2"
+				? await source.acquireIssuance.readPlanBefore?.() ?? null : null) : undefined;
 	const signingData = closedSigningDataRows(source.signingRows, input.objectId);
 	const journalPrefixes: readonly LiveJournalRetirementLocalPrefix[] = Object.freeze(
 		(source.signingSummaries === undefined && source.generationSource === undefined
@@ -20623,7 +20649,7 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 			});
 		}
 	};
-	const protectedRecords = closedIssuanceProtectedRecordsForRetirement({objectId: input.objectId, throughEpoch: cut.epoch,
+	const {floorEpoch: issuanceFloorEpoch, protectedRecords} = closedIssuanceProtectedRecordsForRetirement({objectId: input.objectId, throughEpoch: cut.epoch,
 		rows: issuanceRows, control: issuanceControl, intent: labels,
 		censusRows: census.rows, protectedReplayScopes: source.journalDetails.protectedReplayScopes,
 		physicalJournalRows: source.journalPhysical.canonicalRows,
@@ -20637,7 +20663,8 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 				epoch: record(row.canonicalPreimageBytes).epoch})),
 			classifications: Array.isArray(census.rows) ? [...new Set(census.rows.map(row => `${row.classification}:${row.dependencyKind}`))] : []});
 	} catch { /* Observation neither unprotects nor prunes any record. */ }
-	const issuancePreparation = issuanceRetirementPreparationWithPlanRewrite(issuanceControl, {...labels, protectedRecords}, issuanceRows);
+	const issuancePreparation = issuanceRetirementPreparationWithPlanRewrite(issuanceControl, {...labels,
+		...(issuanceFloorEpoch === undefined ? {} : {floorEpoch: issuanceFloorEpoch}), protectedRecords}, issuanceRows);
 	requireLaw(accounting.charge(closedRetirementBytes(issuancePreparation)), "proof-budget-exceeded");
 	const issuanceCompletedImage = issuancePreparation.planRewrite?.targetImageDigest ?? issuanceImage.imageDigest;
 	const issuanceNative = async (): Promise<ClosedEpochRetirementMetadataRead> => {
@@ -22182,12 +22209,12 @@ function buildRoomRetentionPassPlan(source: Readonly<{
 	const censusFacts = record(source.census);
 	const nativeIssuance = censusFacts.nativeIssuance as Readonly<{ rows: IssuanceRetirementRows; control?: unknown }> | undefined;
 	requireLaw(nativeIssuance !== undefined && nativeIssuance !== null && nativeIssuance.control !== undefined, "snapshot-unavailable");
-	const issuance = Object.freeze({ protectedRecords: closedIssuanceProtectedRecordsForRetirement({ objectId: input.objectId,
+	const issuance = Object.freeze(closedIssuanceProtectedRecordsForRetirement({ objectId: input.objectId,
 		throughEpoch: through, rows: nativeIssuance.rows, control: nativeIssuance.control as DurableIssuanceRetirementControl | null,
 		intent: (nativeIssuance.control as DurableIssuanceRetirementControl | null)?.active?.preparation,
 		censusRows: censusFacts.rows, protectedReplayScopes: journalDetails.protectedReplayScopes,
 		physicalJournalRows: journal.canonicalRows,
-		dependenciesClassified: !source.unclassifiedSigning && !source.unclassifiedGenerationReplay }) });
+		dependenciesClassified: !source.unclassifiedSigning && !source.unclassifiedGenerationReplay }));
 	const snapshot: RoomRetentionSelection["snapshot"] = source.turnover === undefined
 		? Object.freeze({ retire: Object.freeze([]), turnover: null })
 		: Object.freeze({
