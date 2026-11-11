@@ -286,7 +286,9 @@ it.each([
 it("grid with a hot writer: a received move refused at the creator's capacity triggers a rollover and is accepted", async () => {
 	const restore = await installEnvironment("node", () => undefined);
 	try {
-		const writerMoves = Number(process.env.HOT_WRITER_MOVES ?? 300);
+		// 400: past the creator's received-move refusal (about writer move 330) and short of the
+		// Writer's own settlement row bound (the next case).
+		const writerMoves = Number(process.env.HOT_WRITER_MOVES ?? 400);
 		const policy = await playPastCeiling("grid", "writer", writerMoves, { movesPerAuthor: 100_000, idleMs: 3_600_000 }, 1);
 		expect(policy?.events.map((event) => event.trigger)).toContain("refusal");
 		expect(policy?.events.every((event) => event.trigger === "refusal")).toBe(true);
@@ -294,3 +296,20 @@ it("grid with a hot writer: a received move refused at the creator's capacity tr
 		restore();
 	}
 }, 1_800_000);
+
+// Writer-side admission and maintenance agree (fix/maintenance-image-capacity): a hot Writer's
+// moves the creator closed an epoch without are replaced at the successor's install, under the
+// Writer's own issuance row and byte bound. At 1200 moves the Writer admitted moves whose
+// replacements its store then refused (row bound) inside the install's drainRebaseOutbox, so it
+// never installed. Its admission must reserve one replacement per own move of the epoch and refuse
+// (typed, retry after rollover) otherwise; then every admitted move settles. The Writer cannot seal:
+// its refused move waits for the creator's next rollover (a received refusal, or the idle timer).
+it("grid with a hot writer: no admitted move's settlement is refused by the Writer's own store", async () => {
+	const restore = await installEnvironment("node", () => undefined);
+	try {
+		const writerMoves = Number(process.env.HOT_WRITER_SETTLEMENT_MOVES ?? 1200);
+		await playPastCeiling("grid", "writer", writerMoves, { movesPerAuthor: 100_000, idleMs: 20_000 }, 1);
+	} finally {
+		restore();
+	}
+}, 3_600_000);
