@@ -571,9 +571,16 @@ async function catchUp(moves: number, epochs: number) {
 					await rows.toCreator();
 					counts = await acceptedCounts(creator, writerAuthor, ids);
 					const memberEpoch = (await writer.authorityEpoch()) ?? 0;
-					if (memberEpoch !== memberEpochs.at(-1)?.member)
+					if (memberEpoch !== memberEpochs.at(-1)?.member) {
 						memberEpochs.push({ at: Math.round(performance.now() - started), member: memberEpoch,
 							creator: (await creator.rollover?.())?.epoch ?? 0 });
+						const dumpDir = process.env.CATCH_UP_DUMP_DIR;
+						if (dumpDir !== undefined && dumpDir !== "") {
+							mkdirSync(dumpDir, { recursive: true });
+							writeFileSync(join(dumpDir, `plan-${moves}x${epochs}-m${memberEpoch}.json`), JSON.stringify({
+								...memberEpochs.at(-1), plan: await writer.settlementPlanDump?.() }));
+						}
+					}
 					const now = counts.filter((count) => count >= 1).length;
 					if (now > landed) {
 						landed = now;

@@ -867,6 +867,43 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 				await store.close();
 			}
 		},
+		// Diagnostic: the author's settlement plan with each source row's epoch (null: retired).
+		settlementPlanDump: async () => {
+			const store = await host.observe.openIssuance(name);
+			try {
+				const scope = { objectId, author: identity.author };
+				const plan = await store.readSettlementPlan(scope);
+				const epochOf = async (sequence: number | null) => {
+					if (sequence === null) return undefined;
+					const row = await store.readIssued(scope, sequence);
+					if (row === null) return null;
+					return Reflect.get(decodeCanonical(row.envelope.canonicalPreimageBytes) as object, "epoch") as number;
+				};
+				const entries = [];
+				for (const entry of plan?.entries ?? []) {
+					entries.push({
+						s: entry.sourceSequence,
+						e: entry.sourceObjectId === undefined ? await epochOf(entry.sourceSequence) : undefined,
+						d: entry.disposition,
+						r: entry.replacementSequence,
+						re: await epochOf(entry.replacementSequence),
+						...(entry.replacementProgress === undefined ? {} : { prog: entry.replacementProgress.chunks.length }),
+						...(entry.sourceContextDigest === undefined ? {} : { ctx: true }),
+						...(entry.sourceResolutionDigest === undefined ? {} : { res: entry.sourceResolutionKind ?? "local" }),
+						...(entry.inheritance === undefined ? {} : { inh: true }),
+					});
+				}
+				return {
+					revision: plan?.revision,
+					fence: plan?.fenceSequence ?? null,
+					fenceEpoch: await epochOf(plan?.fenceSequence ?? null),
+					handBacks: plan?.handBacks?.filter((record) => record.reissueSequence === null).length ?? 0,
+					entries,
+				};
+			} finally {
+				await store.close();
+			}
+		},
 		issue: async (epoch: number, ordinal: number) => {
 			const started = performance.now();
 			const operation = operationFor(options.app, index, epoch, ordinal);
