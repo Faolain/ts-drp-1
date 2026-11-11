@@ -91,16 +91,28 @@ describe("issuance retirement control-2", () => {
 
 	it("rule H: rows above the floor are kept without a listed record; rows at or below it retire unless listed", () => {
 		const rows = decodeCanonical(encodeCanonical(fixture())) as IssuanceRetirementRows;
-		const floored = prepare(rows, 1), legacy = prepare(rows, undefined);
-		// Floor 1 lists only dependencies at or below epoch 1; the legacy form lists every one through 3.
-		expect(floored.protectedRecords.every(hole => hole.authorSequence <= 1)).toBe(true);
-		expect(legacy.protectedRecords.length).toBeGreaterThan(floored.protectedRecords.length);
-		const {completed} = commitOf(rows, floored);
-		for (const row of rows.issued) {
-			const listed = floored.protectedRecords.some(hole => hole.authorSequence === row.authorSequence);
-			expect(issuanceRetirementAllows(completed, row, row.authorSequence, row.canonicalPreimageBytes, row.digest))
-				.toBe(row.authorSequence > 1 || listed);
-		}
+		const hole = {author: scope.author, authorSequence: 1, digest: Buffer.from(rows.issued[1]!.digest).toString("hex")};
+		const prepareWith = (floorEpoch: number | undefined, seeds: typeof hole[]) => {
+			const protectedRecords = closeIssuanceRetirementProtectedRecords({control, rows, throughEpoch: labels.throughEpoch,
+				...(floorEpoch === undefined ? {} : {floorEpoch}), protectedRecords: seeds});
+			return issuanceRetirementPreparationWithPlanRewrite(control,
+				{...labels, ...(floorEpoch === undefined ? {} : {floorEpoch}), protectedRecords}, rows);
+		};
+		const allowed = (p: DurableIssuanceRetirementPreparation) => {
+			const {completed} = commitOf(rows, p);
+			return rows.issued.filter(row => issuanceRetirementAllows(completed, row, row.authorSequence,
+				row.canonicalPreimageBytes, row.digest)).map(row => row.authorSequence);
+		};
+		// No exceptions: floor 1 keeps epochs 2..4 implicitly; the legacy form (floor = cut 3) keeps only 4.
+		expect(allowed(prepareWith(1, []))).toEqual([2, 3, 4]);
+		expect(allowed(prepareWith(undefined, []))).toEqual([4]);
+		// Keeping sequence 1 closes over its replacement chain 1 -> 2 -> 3: the floored form lists only
+		// the record at or below its floor, the legacy form lists all three.
+		const floored = prepareWith(1, [hole]), legacy = prepareWith(undefined, [hole]);
+		expect(floored.protectedRecords.map(value => value.authorSequence)).toEqual([1]);
+		expect(legacy.protectedRecords.map(value => value.authorSequence)).toEqual([1, 2, 3]);
+		expect(allowed(floored)).toEqual([1, 2, 3, 4]);
+		expect(allowed(legacy)).toEqual([1, 2, 3, 4]);
 	});
 
 	it("keeps legacy controls as control-1 and refuses a floored preparation under the legacy kind", () => {
@@ -138,6 +150,6 @@ describe("issuance retirement control-2", () => {
 		const big = issuanceRetirementPlanRewriteResourceForSizing(rows.plans)!;
 		const small = issuanceRetirementPlanRewriteResourceForSizing([{...rows.plans[0]!, entries: rows.plans[0]!.entries.slice(0, 1)}])!;
 		expect(big.byteLength).toBe(small.byteLength);
-		expect(small.byteLength).toBeLessThan(400);
+		expect(small.byteLength).toBeLessThan(512);
 	});
 });

@@ -116,7 +116,8 @@ describe("accepted source custody numerical reserve", () => {
 			sourceCustody: geometry});
 		expect(exact.final.canonicalRowsBytes - plain.final.canonicalRowsBytes).toBeGreaterThan(geometry.maxContextByteLength);
 		expect(warmed.ordinaryFinal.canonicalRowsBytes).toBeGreaterThanOrEqual(exact.final.canonicalRowsBytes);
-		expect(warmed.planRewriteResource!.byteLength).toBeGreaterThan(2 * geometry.maxContextByteLength);
+		// Rule A: the control names custody plans by digest; their images are charged in the rows above.
+		expect(warmed.planRewriteResource!.byteLength).toBeLessThan(geometry.maxContextByteLength);
 	});
 	it("accepts the exact native carrier ceiling and refuses one byte below with maximum source and completion contexts", () => {
 		const size = issuanceSourceCustodyPlanResourceForSizing(scope, null, 128, geometry, OPERATION);
