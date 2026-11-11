@@ -11,6 +11,8 @@ describe("issuance capacity refusal", () => {
 		"issuance source custody plan exceeds original native read bound",
 		"issuance retirement refused: unsigned postimage exceeds byte bound",
 		"issuance retirement refused: unsigned postimage exceeds row bound",
+		"creator issuance maintenance proof reserve is exhausted:4194000+512/4194304",
+		"creator next-epoch admission proof reserve is exhausted:4194305/4194304",
 	])("types %s", reason => {
 		const typed = issuanceCapacityRefusal(reason)!;
 		expect(typed.startsWith(`${ISSUANCE_CAPACITY_FORECAST_EXCEEDED}:`)).toBe(true);
@@ -20,7 +22,7 @@ describe("issuance capacity refusal", () => {
 	});
 	it("leaves other refusals alone", () => {
 		for (const reason of ["v3 local issue signature was not admitted", "issuance retirement fence",
-			"creator issuance maintenance proof reserve is exhausted"])
+			"creator incremental proof reserve is exhausted"])
 			expect(issuanceCapacityRefusal(reason)).toBeUndefined();
 	});
 });

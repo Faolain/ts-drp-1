@@ -3011,7 +3011,10 @@ function creatorNextEpochAdmissionForecast(
  * refuse later. */
 export const ISSUANCE_CAPACITY_FORECAST_EXCEEDED = "ISSUANCE_CAPACITY_FORECAST_EXCEEDED";
 const CREATOR_ISSUANCE_CAPACITY_REFUSAL = new RegExp("MAINTENANCE_NATIVE_IMAGE_EXHAUSTED:|MAINTENANCE_FUTURE_PROOF_ENVELOPE_EXHAUSTED:|" +
-	"source custody (plan|native material|contexts) exceed|unsigned postimage exceeds (byte|row) bound");
+	"source custody (plan|native material|contexts) exceed|unsigned postimage exceeds (byte|row) bound|" +
+	// The creator's per-epoch maintenance proof book: this epoch's, or the room the next epoch's
+	// first cold admission needs after this one closes. Both clear with a rollover.
+	"creator (issuance maintenance|next-epoch admission) proof reserve is exhausted");
 /**
  * The one typed capacity reason for a local issue (creator or Writer) refused before signing because
  * the issuance image forecast would exceed its bound. A rollover clears it (retry after rollover).
@@ -3051,8 +3054,10 @@ async function chargeCreatorIssuanceMaintenanceQuote(
 		...(prefixes.knownCarriers ?? []),
 		...receivedSignature,
 	];
+	const exhausted = (need: number): TypeError => new TypeError(
+		`creator issuance maintenance proof reserve is exhausted:${accounting.chargedBytes}+${need}/${accounting.maxBytes}`);
 	for (const bytes of known)
-		if (!accounting.charge(bytes)) throw new TypeError("creator issuance maintenance proof reserve is exhausted");
+		if (!accounting.charge(bytes)) throw exhausted(bytes.byteLength);
 	// The private source owner has reserved complete future close/adopt and
 	// maintenance lifetimes against their fixed maintenance entitlement. They are not retained
 	// by this current issuance job; charge only its complete immediate phases.
@@ -3061,8 +3066,7 @@ async function chargeCreatorIssuanceMaintenanceQuote(
 		...prefixes.unknownEncodedLengths,
 	];
 	for (const length of unknown)
-		if (!accounting.chargeUnknownEncodedLength(length))
-			throw new TypeError("creator issuance maintenance proof reserve is exhausted");
+		if (!accounting.chargeUnknownEncodedLength(length)) throw exhausted(length);
 	// Admission must leave the next epoch's first cold admission room in the
 	// same ordinary book after this epoch closes and adopts; otherwise retained
 	// material strands admission with no protocol drain.
@@ -3073,7 +3077,7 @@ async function chargeCreatorIssuanceMaintenanceQuote(
 			chargedBytes: accounting.chargedBytes, maxBytes: accounting.maxBytes, nextEpochForecastBytes: forecast});
 	} catch { /* Diagnostics cannot alter admission. */ }
 	if (forecast !== undefined && forecast > accounting.maxBytes)
-		throw new TypeError("creator next-epoch admission proof reserve is exhausted");
+		throw new TypeError(`creator next-epoch admission proof reserve is exhausted:${forecast}/${accounting.maxBytes}`);
 	return captured?.captured ?? false;
 }
 
