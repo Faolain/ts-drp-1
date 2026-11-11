@@ -31,7 +31,11 @@ function raw(path: string): DatabaseSync {
 	const database = new DatabaseSync(path);
 	database.exec("PRAGMA busy_timeout=1000");
 	closers.push(() => {
-		if (database.isOpen) database.close();
+		try {
+			database.close();
+		} catch {
+			// Already closed by the test.
+		}
 	});
 	return database;
 }
