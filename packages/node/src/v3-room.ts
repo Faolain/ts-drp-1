@@ -6349,32 +6349,38 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		if (left > 0) uncountedLocalMoves.set(counted.epoch, left);
 		else uncountedLocalMoves.delete(counted.epoch);
 	};
-	let settlementDisplaced: ReadonlySet<number> = new Set();
+	// The displaced own rows of the last rebase scan, each with its number of moves (intents).
+	let settlementDisplaced: ReadonlyMap<number, number> = new Map();
 	// The displaced sources of the last rebase scan (recordSettlementStatus), for a status recomputed
 	// after the same drain resolves retained rows.
 	let settlementSources: readonly DisplacedSource[] = [];
 	/**
-	 * The backlog V3RoomLocalBacklogFull bounds: each live replaced move once (the entry of its newest
-	 * displaced row, whose replacement is not itself displaced, or which is not yet replaced), each
-	 * retained source (manual-review), and every hand-back record (a consumed one keeps its reissued
-	 * move's slot until the next merge drops it and the reissued row is counted live, if displaced).
+	 * The backlog V3RoomLocalBacklogFull bounds, in moves (as hand-back records count them, one per
+	 * intent): each live replaced move once (the entry of its newest displaced row, whose replacement is
+	 * not itself displaced, or which is not yet replaced), each retained source's moves (manual-review),
+	 * and every hand-back record (a consumed one keeps its reissued move's slot until the next merge
+	 * drops it and the reissued row is counted live, if displaced). A row counts all its moves: Grid
+	 * batches moves made together into one row, and each of them needs its own record when the window
+	 * gives it back, so counting the row once let the Writer accept moves past the record bound.
 	 * @param plan - The durable plan.
-	 * @param displaced - The displaced own rows of the last rebase scan.
+	 * @param displaced - The displaced own rows of the last rebase scan, with their moves.
 	 * @returns The backlog.
 	 */
-	const settlementBacklogOf = (plan: RoomSettlementPlan | null, displaced: ReadonlySet<number>): number => {
+	const settlementBacklogOf = (plan: RoomSettlementPlan | null, displaced: ReadonlyMap<number, number>): number => {
+		// A row the scan no longer lists counts one move (it is retired or proven, never more than its record).
+		const moves = (sequence: number): number => Math.max(1, displaced.get(sequence) ?? 1);
 		let live = 0;
 		for (const entry of plan?.entries ?? []) {
 			if (entry.sourceObjectId !== undefined) continue;
 			if (entry.disposition === "manual-review") {
-				live++;
+				live += moves(entry.sourceSequence);
 				continue;
 			}
 			if (entry.disposition !== "rebase" && entry.disposition !== "transform") continue;
 			if (!displaced.has(entry.sourceSequence)) continue;
 			if (entry.replacementSequence !== null && displaced.has(entry.replacementSequence)) continue;
 			if (entry.replacementProgress?.chunks.some((chunk) => displaced.has(chunk.replacementSequence)) === true) continue;
-			live++;
+			live += moves(entry.sourceSequence);
 		}
 		return live + (plan?.handBacks?.length ?? 0);
 	};
@@ -6767,7 +6773,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			.filter((source) => source.frontierDisplaced && !moveEnded(source.authorSequence))
 			.map((source) => source.epoch);
 		settlementSources = sources;
-		settlementDisplaced = new Set(sources.map((source) => source.authorSequence));
+		settlementDisplaced = new Map(sources.map((source) => [source.authorSequence, source.intents.length] as const));
 		settlementBacklog = settlementBacklogOf(plan, settlementDisplaced);
 		// This plan write at `epoch` settled every own row of the epochs before it.
 		localMovesCountedFrom(epoch);
