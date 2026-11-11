@@ -57,7 +57,11 @@ const idOf = (operation: string): string | undefined => {
 
 type MemberHooks = Pick<RoleEnvironment, "deliveryRoom"> & Readonly<{ relay?(request: string, forward: () => Promise<string[]>): Promise<string[]> }>;
 
-async function openPair(directory: string, member: MemberHooks = {}) {
+async function openPair(
+	directory: string,
+	member: MemberHooks = {},
+	rolloverBudget?: Readonly<{ movesPerAuthor: number; idleMs: number }>
+) {
 	const options = {
 		app: "grid" as const,
 		host: "node" as const,
@@ -67,6 +71,7 @@ async function openPair(directory: string, member: MemberHooks = {}) {
 		moves: 1,
 		chatFormat: "shares" as const,
 		rollover: "app" as const,
+		...(rolloverBudget === undefined ? {} : { rolloverBudget }),
 	};
 	const env = {
 		host: nodeHostFor("node", directory),
@@ -808,3 +813,69 @@ async function backlogBoundHoldsAtInstall(offered: number) {
 
 it("an offline Writer's moves of one epoch are bounded by the hand-back records its next skip install needs", () =>
 	backlogBoundHoldsAtInstall(V3_ROOM_LOCAL_BACKLOG_LIMIT + 6), 1_800_000);
+
+// The bound counts moves without admission evidence, not every move of the epoch. With rollover off a
+// healthy online Writer stays in one epoch indefinitely; the creator admits every move and, whenever
+// it moves, signs a row whose causal past reaches the Writer's rows. Those moves need no hand-back
+// record (they are in the epoch's seal), so they must not count: 474946c9 counted every own move of
+// the epoch until the next install and refused this Writer at its 65th move. The control continues in
+// the same epoch with the creator silent: from the last creator row on, moves count again and the
+// Writer is refused at the bound.
+async function admittedMovesLeaveTheBacklog(moves: number, creatorEvery: number) {
+	const restore = await installEnvironment("node", () => undefined);
+	const directory = mkdtempSync(join(tmpdir(), "app-rollover-backlog-admitted-"));
+	directories.push(directory);
+	try {
+		// Rollover off: no app trigger fires in this run.
+		const { creator, writer } = await openPair(directory, {}, { movesPerAuthor: 1_000_000, idleMs: 3_600_000 });
+		const rows = rowWire(creator, writer);
+		const epoch = (await creator.authorityEpoch()) ?? 0;
+		let ordinal = 0;
+		let n = 0;
+		let accepted = 0;
+		const refusals: string[] = [];
+		let unprovenAtEnd = 0;
+		for (let k = 0; k < moves; k++) {
+			if (k % creatorEvery === 0) {
+				await creator.issueRoom!(epoch, ordinal++);
+				await rows.toWriter();
+				unprovenAtEnd = 0;
+			}
+			try {
+				await writer.issueRoom!(epoch, n++);
+				accepted++;
+				unprovenAtEnd++;
+			} catch (error) {
+				refusals.push(String((error as Error).name ?? error));
+			}
+			await rows.toCreator();
+		}
+		const writerAuthor = (await writer.acceptedVertices!()).find((vertex) => vertex.epoch === epoch)?.author;
+		const admitted = (await creator.acceptedVertices!()).filter((vertex) => vertex.author === writerAuthor).length;
+		// Control: the creator falls silent; the Writer's further moves have no evidence and count.
+		let silentAccepted = 0;
+		let silentRefusal: string | undefined;
+		for (let k = 0; k < V3_ROOM_LOCAL_BACKLOG_LIMIT + creatorEvery + 8 && silentRefusal === undefined; k++) {
+			try {
+				await writer.issueRoom!(epoch, n++);
+				silentAccepted++;
+			} catch (error) {
+				silentRefusal = String((error as Error).name ?? error);
+			}
+		}
+		const epochAfter = (await writer.authorityEpoch()) ?? 0;
+		const summary = { moves, creatorEvery, accepted, refused: refusals.length, refusals: [...new Set(refusals)], admitted, unprovenAtEnd, silentAccepted, silentRefusal, epoch, epochAfter };
+		process.stdout.write(`BACKLOG_ADMITTED ${JSON.stringify(summary)}\n`);
+		expect(epochAfter, "rollover off: one epoch throughout").toBe(epoch);
+		expect(admitted, "the creator admitted the Writer's moves").toBeGreaterThanOrEqual(moves);
+		expect(summary.refused, "admitted moves refused as undelivered").toBe(0);
+		// The bound still holds for moves without evidence: unproven moves since the last creator row.
+		expect(silentRefusal, "the silent creator's Writer is refused at the bound").toBe("V3RoomLocalBacklogFull");
+		expect(unprovenAtEnd + silentAccepted, "moves without admission evidence accepted").toBe(V3_ROOM_LOCAL_BACKLOG_LIMIT);
+	} finally {
+		restore();
+	}
+}
+
+it("an online Writer's admitted moves do not count against the undelivered bound (rollover off)", () =>
+	admittedMovesLeaveTheBacklog(V3_ROOM_LOCAL_BACKLOG_LIMIT + 36, 8), 1_800_000);
