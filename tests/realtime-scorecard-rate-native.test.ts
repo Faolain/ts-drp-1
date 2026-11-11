@@ -141,6 +141,9 @@ interface IssueRecord {
 	outcome?: string;
 	epochAtOffer: number;
 	creatorAdmittedAt?: number;
+	/** Epoch of the vertex the creator admitted this move in, and of the author's own accepted vertex. */
+	creatorAdmittedEpoch?: number;
+	localEpoch?: number;
 	acceptedBy: Record<number, number>;
 	wireBy: Record<number, number>;
 }
@@ -359,11 +362,15 @@ it.skipIf(!enabled)(
 				for (const operation of operations) {
 					if (operation?.action !== "placeBlock") continue;
 					const issue = byKey.get(`${operation.id}:${operation.x}`);
+					if (issue !== undefined && issue.peer === receiver) issue.localEpoch ??= vertex?.epoch;
 					if (issue === undefined || issue.peer === receiver || issue.acceptedBy[receiver] !== undefined) continue;
 					if (receiver >= peersCount) continue;
 					bump("accept.remoteMove");
 					issue.acceptedBy[receiver] = at;
-					if (receiver === 0) issue.creatorAdmittedAt = at;
+					if (receiver === 0) {
+						issue.creatorAdmittedAt = at;
+						issue.creatorAdmittedEpoch = vertex?.epoch;
+					}
 				}
 			},
 		});
