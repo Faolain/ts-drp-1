@@ -3358,6 +3358,9 @@ interface V3PlaneRegistration {
 	 * exist (`bindV3MissingDependencyRequest`), including before the first live row.
 	 */
 	deliveryRepair?: V3PlaneDeliveryRepair;
+	/** Creator move equivocation recovery (R1): vertices under this creator's own key that it did not
+	 * sign, and every vertex depending on one. Never indexed, never parked; this plane only. */
+	creatorSupersededClosure?: Set<string>;
 	pendingIngressBytes: number;
 	publicationCursor: number | undefined;
 	/** The native egress pool bounds distinct selectors. Targeted retained replies
@@ -3467,6 +3470,9 @@ function releaseIdleEgressAdmissionOwner(registration: V3PlaneRegistration, owne
 // The room transport's bounded retained-history request, per network node and stable
 // room topic (the topic outlives every successor plane of one room session).
 const v3MissingDependencyRequests = new WeakMap<DRPNetworkNode, Map<string, (gap?: V3DeliveryGap) => void>>();
+// Creator move equivocation recovery (R1): the room session's sink for an authenticated vertex under
+// the creator's own key that this creator did not sign, per network node and stable room topic.
+const v3CreatorSupersessionSinks = new WeakMap<DRPNetworkNode, Map<string, (vertex: V3CreatorSupersededVertex) => void>>();
 const v3HandleRegistrations = new WeakMap<V3PlaneHandle, V3PlaneRegistration>();
 const preparedMigrationTargetFloors = new WeakMap<V3PlaneRegistration, Readonly<{ read(): Promise<Uint8Array> }>>();
 
@@ -7753,6 +7759,104 @@ export function bindV3MissingDependencyRequest(
 	};
 }
 
+/** An authenticated vertex under the creator's own key that this creator did not sign (R1). */
+export interface V3CreatorSupersededVertex {
+	readonly digest: string;
+	readonly authorSequence: number;
+	readonly epoch: number;
+	readonly dependencies: readonly string[];
+	/** The signed operation, as the vertex carries it. */
+	readonly operation: unknown;
+	/** Every dependency was admitted (or is itself such a vertex) when it arrived. */
+	readonly dependenciesKnown: boolean;
+}
+
+/**
+ * Binds a creator room session's sink for vertices under its own key that it did not sign (another
+ * incarnation of the creator: a stale restore, or the original after one). Such a vertex is never
+ * indexed or parked on that creator, and neither is anything depending on it; the sink receives each.
+ * @param networkNode - The room's network node.
+ * @param topic - The room's stable live topic.
+ * @param sink - The session's sink; it must not throw into ingress.
+ * @returns Unbind.
+ */
+export function bindV3CreatorSupersession(
+	networkNode: DRPNetworkNode,
+	topic: string,
+	sink: (vertex: V3CreatorSupersededVertex) => void
+): () => void {
+	if (typeof topic !== "string" || topic.length === 0 || typeof sink !== "function")
+		throw new TypeError("v3 creator supersession binding is invalid");
+	let byTopic = v3CreatorSupersessionSinks.get(networkNode);
+	if (byTopic === undefined) {
+		byTopic = new IntrinsicMap<string, (vertex: V3CreatorSupersededVertex) => void>();
+		v3CreatorSupersessionSinks.set(networkNode, byTopic);
+	}
+	const bound = byTopic;
+	ReflectApply(MapPrototypeSet, bound, [topic, sink]);
+	return (): void => {
+		if (ReflectApply(MapPrototypeGet, bound, [topic]) === sink) ReflectApply(MapPrototypeDelete, bound, [topic]);
+	};
+}
+
+/**
+ * R1, before admission or parking: a vertex under the creator's own key that is not its own durable
+ * row at that sequence is another incarnation's (recorded and handed to the session's sink); a vertex
+ * depending on one is refused with it. Pending rows depending on a newly recorded one are released.
+ * @param registration - The creator's current plane.
+ * @param authenticated - The authenticated, not yet admitted vertex.
+ * @returns True when the vertex must not enter this plane.
+ */
+async function refuseCreatorSuperseded(
+	registration: V3PlaneRegistration,
+	authenticated: AuthenticatedRecoveryVertex
+): Promise<boolean> {
+	if (registration.creatorMaintenanceBound !== true) return false;
+	const closure = registration.creatorSupersededClosure;
+	const dependencies = authenticated.vertex.dependencies;
+	if (authenticated.author !== registration.issuanceScope.author) {
+		if (closure === undefined || !dependencies.some((dependency) => closure.has(dependency))) return false;
+		closure.add(authenticated.digest);
+		return true;
+	}
+	let own: DurableIssueCommit | null;
+	try {
+		own = await registration.issuanceStore.readIssued(registration.issuanceScope, authenticated.authorSequence);
+	} catch {
+		return false;
+	}
+	if (own !== null && lowerHexDigest(own.envelope.digest) === authenticated.digest) return false;
+	if (!currentRegistration(registration)) return true;
+	const superseded = closure ?? (registration.creatorSupersededClosure = new IntrinsicSet<string>());
+	const known = dependencies.every((dependency) => registration.index.has(dependency) || superseded.has(dependency));
+	superseded.add(authenticated.digest);
+	for (let released = true; released; ) {
+		released = false;
+		for (const [digest, pending] of [...registration.pendingIngress])
+			if (pending.evidence.authenticated.vertex.dependencies.some((dependency) => superseded.has(dependency))) {
+				releasePendingIngress(registration, digest);
+				superseded.add(digest);
+				released = true;
+			}
+	}
+	const byTopic = v3CreatorSupersessionSinks.get(registration.networkNode);
+	const sink = byTopic === undefined ? undefined : (ReflectApply(MapPrototypeGet, byTopic, [registration.topic]) as
+		((vertex: V3CreatorSupersededVertex) => void) | undefined);
+	try {
+		sink?.(ObjectFreeze({
+			digest: authenticated.digest,
+			authorSequence: authenticated.authorSequence,
+			epoch: authenticated.vertex.epoch,
+			dependencies: ObjectFreeze([...dependencies]),
+			operation: authenticated.vertex.operation,
+			dependenciesKnown: known,
+		}));
+	} catch {
+		// The sink must not throw into ingress.
+	}
+	return true;
+}
+
 function requestMissingDependencies(registration: V3PlaneRegistration, peerId: string, digest: string): void {
 	if (!currentRegistration(registration)) return;
 	// The held row remains a target until admission; send success cannot clear it.
@@ -7790,7 +7894,8 @@ function attachDeliveryRepair(registration: V3PlaneRegistration): V3PlaneDeliver
 			maxBytes: registration.payload.parameters.maxPendingBytes,
 			isAdmitted: (digest: string): boolean => {
 				const current = plane.deref();
-				return current === undefined || !currentRegistration(current) || current.index.has(digest);
+				return current === undefined || !currentRegistration(current) || current.index.has(digest) ||
+					current.creatorSupersededClosure?.has(digest) === true;
 			},
 		}),
 		capacity: (): V3DeliveryRepairCapacity => {
@@ -8498,6 +8603,9 @@ async function authenticateV3Ingress(registration: V3PlaneRegistration, captured
 			signature: new Uint8ArrayConstructor(signature),
 			transportSender: captured.sender,
 		});
+		// R1: another incarnation of this creator, or work built on it: kept out of this plane.
+		if (!registration.index.has(authenticated.digest) && await refuseCreatorSuperseded(registration, authenticated))
+			return ingressFailureLog("admission-rejected", "creator-superseded-incarnation");
 		// Refused, not retained: held work would block the interrupted close's own
 		// recovery dependency hold (it requires an empty pending ingress). The
 		// sender's row stays in its outbox and is redelivered after the close.
