@@ -14,6 +14,7 @@ import {
 	successorWire,
 	type WireRow,
 } from "./fixtures/track-m-apps/long-room-driver.js";
+import { readV3SettlementWorkCounts } from "../packages/node/src/v3-live.js";
 import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-head.js";
 
 // Found by fix/int7-slow-member-landing (tests/app-rollover-slow-member-native.test.ts under host
@@ -325,12 +326,13 @@ it(
 	1_800_000
 );
 
-// Cost probe (observation; asserts only that every retained row is given back): a skip install
-// resolving N retained rows from the creator's frontier. Measured on a quiet 8-vCPU host
-// (fix/int7-slow-member-landing, cost-02): 8 rows 1.4 s, 16 rows 4.7 s, 32 rows 17.8 s -- quadratic;
-// ~90% of it in each row's own native dependency custody turn (abandonCreatorUnresolvedSource:
-// withActiveRebaseDependencies + withOwnedCreatorSourceExpiryRequest, whose cost grows with the
-// author's whole settlement state).
+// A skip install resolving N retained rows from the creator's frontier (each never admitted: its
+// move is given back). Measured before the fix on a quiet 8-vCPU host (cost-02, int7 2d825dec):
+// 8 rows 1.4 s, 16 rows 4.7 s, 32 rows 17.8 s -- quadratic. Each row ran its own charged native
+// dependency turn (withActiveRebaseDependencies: about six complete recovery census reads, each
+// costing time in proportion to the author's whole settlement state), its own retained contract
+// preparations and its own plan write, so the work per row grew with the number of rows. The
+// assertions count native work (host independent); the wall clock is printed for the record.
 async function retainedResolutionCost(count: number) {
 	const restore = await installEnvironment("node", () => undefined);
 	const directory = mkdtempSync(join(tmpdir(), "app-rollover-retained-cost-"));
@@ -350,15 +352,22 @@ async function retainedResolutionCost(count: number) {
 			for (let k = 0; k < count; k++) await writer.issue(epoch, k);
 			await wire.pause();
 			for (let roll = 0; roll < 3; roll++) epoch = await rollCreator(creator, async () => undefined, ordinal);
+			const before = readV3SettlementWorkCounts();
 			const started = performance.now();
 			wire.resume();
 			await wire.caughtUp(epoch, 1_200_000);
 			const ms = performance.now() - started;
+			const after = readV3SettlementWorkCounts();
+			const work = {
+				dependencyTurns: after.dependencyTurns - before.dependencyTurns,
+				recoveryCensusReads: after.recoveryCensusReads - before.recoveryCensusReads,
+				retainedContractPreparations: after.retainedContractPreparations - before.retainedContractPreparations,
+				sourceExpirySignatures: after.sourceExpirySignatures - before.sourceExpirySignatures,
+			};
 			const status = (await writer.settlementStatus?.()) as { undelivered?: unknown[] } | null;
-			process.stdout.write(
-				`RETAINED_COST ${JSON.stringify({ count, installMs: Math.round(ms), perRowMs: Math.round(ms / count), givenBack: status?.undelivered?.length })}\n`
-			);
-			expect(status?.undelivered?.length).toBe(count);
+			const result = { count, installMs: Math.round(ms), perRowMs: Math.round(ms / count), givenBack: status?.undelivered?.length, work };
+			process.stdout.write(`RETAINED_COST ${JSON.stringify(result)}\n`);
+			return result;
 		} finally {
 			await wire.stop();
 		}
@@ -367,4 +376,20 @@ async function retainedResolutionCost(count: number) {
 	}
 }
 
-for (const count of [8, 16, 32]) it(`cost probe: a skip install resolves ${count} retained rows`, () => retainedResolutionCost(count), 1_500_000);
+it("a skip install resolving retained rows pays the native settlement turn once per drain, not once per row", async () => {
+	const small = await retainedResolutionCost(8);
+	const large = await retainedResolutionCost(32);
+	// Every retained row is resolved: signed once, its move given back once.
+	expect([small.givenBack, large.givenBack]).toEqual([8, 32]);
+	expect([small.work.sourceExpirySignatures, large.work.sourceExpirySignatures]).toEqual([8, 32]);
+	// The charged dependency turn and the retained contract preparation do not repeat per row.
+	expect(large.work.dependencyTurns, "dependency turns, 32 rows vs 8").toBeLessThanOrEqual(small.work.dependencyTurns + 2);
+	expect(large.work.retainedContractPreparations, "retained contract preparations, 32 rows vs 8").toBeLessThanOrEqual(
+		small.work.retainedContractPreparations + 2
+	);
+	// Each further row adds at most its own signature's currency checks (two complete census reads
+	// around the signing), not another turn's.
+	expect(large.work.recoveryCensusReads - small.work.recoveryCensusReads, "census reads per further row").toBeLessThanOrEqual(
+		(32 - 8) * 2.5
+	);
+}, 1_500_000);

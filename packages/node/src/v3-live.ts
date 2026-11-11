@@ -5300,6 +5300,18 @@ function releaseOrdinaryIssuanceRuntimeHold(value: unknown): Promise<void> {
 }
 
 /**
+ * Observation only (tests): how much native settlement work this process has done. Counts of
+ * charged dependency turns (withActiveRebaseDependencies), complete recovery census reads
+ * (readCreatorRecoveryDependencyCensus), retained source contract preparations
+ * (prepareCreatorRetainedSourceContracts) and local-author expiry receipts signed. Monotonic
+ * process-wide scalars; never authority, never reset by the runtime.
+ */
+const v3SettlementWorkCounts = {dependencyTurns: 0, recoveryCensusReads: 0, retainedContractPreparations: 0, sourceExpirySignatures: 0};
+export function readV3SettlementWorkCounts(): Readonly<typeof v3SettlementWorkCounts> {
+	return ObjectFreeze({...v3SettlementWorkCounts});
+}
+
+/**
  * Reads scalar diagnostics from an already-owned handle without retaining owners.
  * Gate presence is not queue depth: a settled completion promise can remain installed.
  * @param plane Existing live-plane handle.
@@ -10019,6 +10031,7 @@ async function retainCreatorAcceptedSourceCustody(registration: V3PlaneRegistrat
 
 async function prepareCreatorRetainedSourceContracts(plan: SettlementPlan | null, currentTrust: CurrentAnchorTrust,
 	catalogOwner: TrustedBlueprintCatalog): Promise<ReadonlyMap<number, CreatorRetainedSourceRow>> {
+	v3SettlementWorkCounts.retainedContractPreparations += 1;
 	const contexts = new Map<string, CreatorRetainedSourceContract>();
 	for (const context of plan?.sourceContexts ?? []) {
 		if (!plan?.entries.some(entry => entry.sourceContextDigest !== undefined && sameBytes(entry.sourceContextDigest, context.digest))) continue;
@@ -11031,6 +11044,7 @@ async function readCreatorRecoveryDependencyCensus(
 	  }>
 	| undefined
 > {
+	v3SettlementWorkCounts.recoveryCensusReads += 1;
 	const vertexFacts = creatorReplayReads.get(observation.replay)?.vertexFacts;
 	// This read walk retains its original native reservations and live
 	// predicate. A checkpoint neither releases custody nor caches permission.
@@ -12929,6 +12943,7 @@ async function withActiveRebaseDependencies(
 	additionalProtectedBytes: readonly Uint8Array[] = []
 ): Promise<void> {
 	if (typeof consume !== "function") throw new TypeError("active dependency consumer is invalid");
+	v3SettlementWorkCounts.dependencyTurns += 1;
 	const reservations: NativeReadReservation[] = [];
 	let reader: AheBoundedActiveRead | undefined;
 	let lifetime: CreatorSnapshotRecoveryCloseLifetime | undefined;
@@ -24579,6 +24594,7 @@ async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
 		signature = copyDetachedBytes(await withOwnedCreatorSourceExpiryRequest(registration, custody, read, bytes, valid,
 			request => sign(new Uint8ArrayConstructor(digest), request)));
 	}), custody, [bytes, new Uint8ArrayConstructor(64)]);
+	if (signature !== undefined) v3SettlementWorkCounts.sourceExpirySignatures += 1;
 	const expiry = signature === undefined || signature.byteLength !== 64 ? undefined : captureCreatorSourceExpiry(bytes, signature);
 	if (expiry === undefined || openCreatorSourceExpiry(first.retained.contract.capability, expiry,
 		{sourceAuthor: scope.author, sourceSequence: first.entry.sourceSequence, sourceDigest: first.entry.sourceDigest}) === undefined)
