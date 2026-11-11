@@ -3058,10 +3058,13 @@ async function chargeCreatorIssuanceMaintenanceQuote(
 	// Measurement only: the book's standing material before this quote and this quote's terms.
 	const report = (outcome: string, nextEpochForecastBytes?: number): void => {
 		try {
-			const observer = Reflect.get(globalThis, "__warmProofEvent");
-			if (typeof observer === "function") observer({kind: "creator-issuance-maintenance-book", outcome,
+			const event = {kind: "creator-issuance-maintenance-book", outcome,
 				baselineBytes, chargedBytes: accounting.chargedBytes, maxBytes: accounting.maxBytes, nextEpochForecastBytes,
-				known: known.map(bytes => bytes.byteLength), unknown: [...unknownBasis, ...prefixes.unknownEncodedLengths]});
+				known: known.map(bytes => bytes.byteLength), unknown: [...unknownBasis, ...prefixes.unknownEncodedLengths]};
+			const observer = Reflect.get(globalThis, "__warmProofEvent");
+			if (typeof observer === "function") observer(event);
+			// A refusal is rare and ends the epoch's admission: say what filled the book.
+			if (outcome !== "charged") console.warn("::v3-issuance-book", JSON.stringify(event));
 		} catch { /* Diagnostics cannot alter admission. */ }
 	};
 	const exhausted = (need: number): TypeError => {
