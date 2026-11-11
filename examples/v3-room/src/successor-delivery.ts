@@ -41,9 +41,10 @@ import type { V3RoomSuccessorOffer } from "./rollover.js";
  *   its connected peers for their view (`creatorMemberView`, handed to the room at open). A member
  *   answers with creator-signed material its room holds (its current epoch anchor and the highest
  *   creator vertex it received); the creator's room verifies it under its own keys.
- *   The ask settles once every asked peer answered, or V3_ROOM_CREATOR_VIEW_GRACE_MS after the
- *   first answer (a connected peer that is not a room member never answers); the room's bound
- *   covers the rest.
+ *   The first round settles at once with no connected peer, once every asked peer answered, or a
+ *   grace after the first answer (four times its round trip, at most V3_ROOM_CREATOR_VIEW_GRACE_MS;
+ *   a connected peer that is not a room member never answers). Peers that connect later are asked
+ *   too, until the room stops watching.
  *
  * Size: `/drp/message` and the creator-successor material protocol do not run on limited (relayed)
  * connections, so a member reachable only over a relay waits for a direct connection, as live
@@ -66,9 +67,16 @@ const REQUEST_KIND = "ts-drp-v3-successor-offer-request";
 const CURRENCY_KIND = "ts-drp-v3-room-currency";
 const VIEW_REQUEST_KIND = "ts-drp-v3-room-creator-view-request";
 const VIEW_KIND = "ts-drp-v3-room-creator-view";
-/** After a reopened creator's first member answer, how long it waits for the other peers it asked. */
-export const V3_ROOM_CREATOR_VIEW_GRACE_MS = 500;
+/**
+ * After a reopened creator's first member answer, the longest it waits for the other peers it asked
+ * before its first round settles. The grace is four times the first answer's own round trip, at
+ * least VIEW_GRACE_MIN_MS and at most this.
+ */
+export const V3_ROOM_CREATOR_VIEW_GRACE_MS = 250;
+const VIEW_GRACE_MIN_MS = 25;
 const VIEW_RESEND_MS = 1_000;
+/** A connected peer that never answers (not a room member) is asked at most this many times per connection. */
+const VIEW_ASKS_PER_PEER = 3;
 // Depth 3: a currency frame's frontiers are [author, sequence] pairs.
 const FRAME_LIMITS = { maxBytes: V3_ROOM_SUCCESSOR_OFFER_MAX_BYTES, maxDepth: 3, maxItems: 64 };
 const OFFER_KEYS = ["cut", "kind", "manifest", "qc", "successorEpoch", "trust", "version"];
@@ -695,53 +703,66 @@ export function createV3RoomSuccessorDelivery(
 	const creatorMemberView: V3RoomCreatorMemberView = Object.freeze({
 		ask: (request: Parameters<V3RoomCreatorMemberView["ask"]>[0]): Promise<void> =>
 			new Promise<void>((resolve) => {
-				const asked = new Set<string>();
+				const asks = new Map<string, number>();
 				const answered = new Set<string>();
 				const cleanup: (() => void)[] = [];
-				let finished = false;
-				const done = (): void => {
-					if (finished) return;
-					finished = true;
-					for (const stop of cleanup.splice(0)) stop();
+				let settled = false;
+				let stopped = false;
+				const startedAt = Date.now();
+				// The first round: the room decides on it; answers after it still reach the room.
+				const settle = (): void => {
+					if (settled) return;
+					settled = true;
 					resolve();
 				};
-				if (role !== "creator" || closed || request.signal.aborted) return done();
+				const stop = (): void => {
+					if (stopped) return;
+					stopped = true;
+					for (const end of cleanup.splice(0)) end();
+					settle();
+				};
+				if (role !== "creator" || closed || request.signal.aborted) return stop();
 				const requestBytes = encodeCanonical({ kind: VIEW_REQUEST_KIND, version: 1 }, FRAME_LIMITS);
-				const ask = (peerId: string): void => {
-					if (finished || peerId === channel.localPeerId || answered.has(peerId)) return;
-					asked.add(peerId);
+				const ask = (peerId: string, connected = false): void => {
+					if (stopped || peerId === channel.localPeerId || answered.has(peerId)) return;
+					const count = connected ? 0 : (asks.get(peerId) ?? 0);
+					if (count >= VIEW_ASKS_PER_PEER) return;
+					asks.set(peerId, count + 1);
 					void send(peerId, requestBytes);
 				};
-				const check = (): void => {
-					if (answered.size > 0 && [...asked].every((peerId) => answered.has(peerId))) done();
+				const roundComplete = (): void => {
+					if (answered.size > 0 && [...asks.keys()].every((peerId) => answered.has(peerId))) settle();
 				};
 				cleanup.push(
 					channel.listen((sender, bytes) => {
-						if (finished || bytes.byteLength > V3_ROOM_SUCCESSOR_OFFER_MAX_BYTES || !asked.has(sender) || answered.has(sender))
+						if (stopped || bytes.byteLength > V3_ROOM_SUCCESSOR_OFFER_MAX_BYTES || !asks.has(sender) || answered.has(sender))
 							return;
 						const frame = decodeFrame(bytes);
 						if (frame?.kind !== "view" || frame.evidence.objectId !== request.objectId) return;
 						answered.add(sender);
 						request.answer(frame.evidence);
-						if (answered.size === 1) {
-							const grace = setTimeout(done, V3_ROOM_CREATOR_VIEW_GRACE_MS);
+						if (answered.size === 1 && !settled) {
+							const roundTrip = Date.now() - startedAt;
+							const grace = setTimeout(settle, Math.min(V3_ROOM_CREATOR_VIEW_GRACE_MS, Math.max(VIEW_GRACE_MIN_MS, 4 * roundTrip)));
 							cleanup.push(() => clearTimeout(grace));
 						}
-						check();
+						roundComplete();
 					})
 				);
-				cleanup.push(channel.onPeerConnected(ask));
+				cleanup.push(channel.onPeerConnected((peerId) => ask(peerId, true)));
 				// A request lost on a fresh connection, or a peer that connected without a connection event, is asked again.
 				const resend = setInterval(() => {
-					for (const peerId of channel.peers()) if (!answered.has(peerId)) ask(peerId);
+					for (const peerId of channel.peers()) ask(peerId);
 				}, VIEW_RESEND_MS);
 				cleanup.push(() => clearInterval(resend));
-				const abort = (): void => done();
-				request.signal.addEventListener("abort", abort, { once: true });
-				cleanup.push(() => request.signal.removeEventListener("abort", abort));
-				lifetime.signal.addEventListener("abort", abort, { once: true });
-				cleanup.push(() => lifetime.signal.removeEventListener("abort", abort));
-				for (const peerId of channel.peers()) ask(peerId);
+				request.signal.addEventListener("abort", stop, { once: true });
+				cleanup.push(() => request.signal.removeEventListener("abort", stop));
+				lifetime.signal.addEventListener("abort", stop, { once: true });
+				cleanup.push(() => lifetime.signal.removeEventListener("abort", stop));
+				const connected = channel.peers().filter((peerId) => peerId !== channel.localPeerId);
+				for (const peerId of connected) ask(peerId);
+				// Nobody to ask: the first round is over at once (the room keeps watching for late peers).
+				if (connected.length === 0) settle();
 			}),
 	});
 

@@ -660,8 +660,16 @@ export interface CreateV3RoomSessionInput<Projection extends V3RoomProjectionAut
 	 * `creatorMemberView`). Without it a reopened creator is current at once, as before.
 	 */
 	readonly creatorMemberView?: V3RoomCreatorMemberView;
-	/** Creator restore currency: how long a reopened creator waits for members (default V3_ROOM_CREATOR_RESTORE_CURRENCY_BOUND_MS). */
+	/**
+	 * Creator restore currency: how long a reopened creator holds finality-key signatures (seal,
+	 * adoption, recovery) when no member attested a view (default V3_ROOM_CREATOR_RESTORE_CURRENCY_BOUND_MS).
+	 */
 	readonly creatorRestoreCurrencyBoundMs?: number;
+	/**
+	 * Creator restore currency: how long a reopened creator holds its moves while connected peers have
+	 * not answered (default V3_ROOM_CREATOR_RESTORE_ANSWER_BOUND_MS). With no connected peer it does not wait.
+	 */
+	readonly creatorRestoreCurrencyAnswerBoundMs?: number;
 	/**
 	 * Opt-in speculative presentation: local moves show at once, remote moves
 	 * show once authenticated (signature + current Writer), both before durable
@@ -772,10 +780,12 @@ export interface V3RoomSession<Projection extends V3RoomProjectionAuthority = V3
 	confirmCurrent?(statement: V3RoomCurrencyStatement): Promise<V3RoomCurrencyResult>;
 	/**
 	 * Creator restore currency: "checking" while a creator that reopened from storage waits for its
-	 * members' view, "refused" once a member proved newer creator-signed state (it signs nothing more
-	 * in this session), "current" otherwise.
+	 * connected members' view (it signs nothing); "provisional" when no member attested a view yet (no
+	 * peer connected, or none answered within the answer bound): it signs moves but not with the
+	 * finality key, and a member's later view is still checked; "refused" once a member proved newer
+	 * creator-signed state (it signs nothing more in this session); "current" otherwise.
 	 */
-	creatorCurrency?(): "current" | "checking" | "refused";
+	creatorCurrency?(): "current" | "provisional" | "checking" | "refused";
 	/** Member: the creator-signed material this replica holds, for a reopened creator's check. */
 	creatorCurrencyEvidence?(): Promise<V3RoomCreatorCurrencyEvidence>;
 }
@@ -957,12 +967,13 @@ function digest(domain: string, value: Uint8Array): string {
 
 // Creator restore currency (user decision 2026-11-10) -----------------------------------------
 // A creator that reopens from storage, with a member-view channel wired (creatorMemberView), asks
-// the room's members for their creator-signed view before it signs anything. Evidence counts only
-// when this creator verifies it under its own keys: a later epoch's anchor signed by its finality
-// key, or a vertex signed by its author key at or above its local next sequence. A forged or
-// unsigned claim never refuses it; a member that withholds material is "no answer". With no answer
-// within the bound it proceeds (indistinguishable from a lone creator, whose room must stay
-// usable). Once refused it stays refused for the session.
+// the room's members for their creator-signed view before it signs. Evidence counts only when this
+// creator verifies it under its own keys: a later epoch's anchor signed by its finality key, or a
+// vertex signed by its author key at or above its local next sequence. A forged or unsigned claim
+// never refuses it, and counts as no answer. Connected members answering is what it waits for; with
+// no peer connected, or none answering within the answer bound, it signs moves (not the finality
+// key, until a member attests or the bound passes) and keeps checking members that connect later.
+// Once refused it stays refused for the session.
 
 const CREATOR_EVIDENCE_DECODE_LIMITS = Object.freeze({ maxBytes: 1 << 20, maxDepth: 32, maxItems: 8192 });
 
@@ -1044,12 +1055,22 @@ function evidenceRecord(preimage: Uint8Array): Record<string, unknown> | undefin
 	}
 }
 
+type CreatorEvidenceVerdict = Readonly<{
+	/** Set when the evidence proves newer creator-signed state than this creator's local view. */
+	newer?: string;
+	/** True when at least one item verified under this creator's keys (the member attests a view). */
+	attested: boolean;
+}>;
+
 /**
  * What a member's evidence proves against this creator's local view, after verifying it under the
- * creator's own keys: a detail when it shows newer creator-signed state, otherwise undefined.
+ * creator's own keys: newer creator-signed state (a detail), an attested view that is not newer, or
+ * nothing verifiable (treated as no answer).
  */
-async function creatorEvidenceNewer(evidence: unknown, local: CreatorRestoreLocalView): Promise<string | undefined> {
-	if (evidence === null || typeof evidence !== "object" || Reflect.get(evidence, "objectId") !== local.objectId) return undefined;
+async function creatorEvidenceVerdict(evidence: unknown, local: CreatorRestoreLocalView): Promise<CreatorEvidenceVerdict> {
+	if (evidence === null || typeof evidence !== "object" || Reflect.get(evidence, "objectId") !== local.objectId)
+		return { attested: false };
+	let attested = false;
 	const anchor = signedPair(Reflect.get(evidence, "anchor"));
 	if (anchor !== undefined && local.finalityPublicKey !== undefined) {
 		const record = evidenceRecord(anchor.preimage);
@@ -1064,10 +1085,14 @@ async function creatorEvidenceNewer(evidence: unknown, local: CreatorRestoreLoca
 		) {
 			const anchorDigest = hashDomain("ts-drp/epoch-anchor/v3", anchor.preimage);
 			if (await verifyCreatorSignature(local.finalityPublicKey, anchorDigest, anchor.signature)) {
+				attested = true;
 				if ((epoch as number) > local.epoch)
-					return `a member holds this creator's signed anchor for epoch ${String(epoch)}; this creator reopened at epoch ${local.epoch}`;
+					return {
+						attested,
+						newer: `a member holds this creator's signed anchor for epoch ${String(epoch)}; this creator reopened at epoch ${local.epoch}`,
+					};
 				if (epoch === local.epoch && hex(anchorDigest) !== local.anchorDigest)
-					return `a member holds a different anchor this creator signed for epoch ${local.epoch}`;
+					return { attested, newer: `a member holds a different anchor this creator signed for epoch ${local.epoch}` };
 			}
 		}
 	}
@@ -1083,89 +1108,158 @@ async function creatorEvidenceNewer(evidence: unknown, local: CreatorRestoreLoca
 			record.author === local.author &&
 			Number.isSafeInteger(sequence) &&
 			Number.isSafeInteger(epoch) &&
-			((sequence as number) >= local.next || (epoch as number) > local.epoch) &&
 			(await verifyCreatorSignature(local.authorPublicKey, digestReceivedVertexPreimage(vertex.preimage), vertex.signature))
-		)
-			return `a member holds this creator's signed vertex at sequence ${String(sequence)} (epoch ${String(epoch)}); this creator reopened with next sequence ${local.next} at epoch ${local.epoch}`;
+		) {
+			attested = true;
+			if ((sequence as number) >= local.next || (epoch as number) > local.epoch)
+				return {
+					attested,
+					newer: `a member holds this creator's signed vertex at sequence ${String(sequence)} (epoch ${String(epoch)}); this creator reopened with next sequence ${local.next} at epoch ${local.epoch}`,
+				};
+		}
 	}
-	return undefined;
+	return { attested };
 }
 
+type CreatorRestoreState = "checking" | "provisional" | "current" | "refused";
+
 interface CreatorRestoreCurrencyGate {
-	state(): "current" | "checking" | "refused";
+	state(): CreatorRestoreState;
 	refusal(): V3RoomNotYetCurrent | undefined;
-	/** Resolves once this session may sign; rejects with the refusal (or the session's close). */
+	/** Vertex signatures (moves, fences): resolves once provisional or current; rejects with the refusal or the close. */
 	admit(): Promise<void>;
-	/** Runs `listener` once the check decides (at once when it already has). */
-	onDecided(listener: (refusal: V3RoomNotYetCurrent | undefined) => void): void;
+	/** Finality-key signatures (seal, adoption, recovery): resolves once current; rejects with the refusal or the close. */
+	admitFinality(): Promise<void>;
+	/** Runs `listener` once moves may be signed (at once when they already may). */
+	onAdmitted(listener: () => void): void;
+	/** Runs `listener` once the check refuses, also after it had admitted moves (a late member's view). */
+	onRefused(listener: (refusal: V3RoomNotYetCurrent) => void): void;
 	close(): void;
 }
 
 /**
- * Starts one reopened creator's check (see above). While it runs, the keychain's finality signing
- * exclusion is held, so no path of this session can sign with the finality key; it is released when
- * the check decides "current" and kept after a refusal until the session closes.
+ * Starts one reopened creator's check (see above).
+ *
+ * - "checking": nothing is signed. The member view's first round is asked.
+ * - Every asked member attested a view and none is newer: "current" (everything may be signed).
+ * - Nobody to ask (no connected peer: the view's round settles with no answer), or no verifiable
+ *   answer within `answerBoundMs`: "provisional". Moves (vertex signatures) may be signed; the
+ *   finality key is not, until a member attests a view or `boundMs` passes ("current").
+ * - Verified newer state, at any point while the view is watched: "refused" for the session; the
+ *   finality signing exclusion is (re)taken and kept until the session closes.
+ *
+ * The view is watched (late peers asked and their answers verified) until a member attests a view,
+ * the check refuses, or the session closes. A move signed while provisional precedes every view this
+ * creator has seen; that is the residual risk of not blocking a lone creator's first signature.
  */
 function startCreatorRestoreCurrencyGate(input: Readonly<{
 	view: V3RoomCreatorMemberView;
 	boundMs: number;
+	answerBoundMs: number;
 	local: CreatorRestoreLocalView;
 	finalitySigner?: NonNullable<CreateV3RoomSessionInput["creatorFinalitySigner"]>;
 }>): CreatorRestoreCurrencyGate {
-	let state: "current" | "checking" | "refused" = "checking";
+	let state: CreatorRestoreState = "checking";
 	let refusal: V3RoomNotYetCurrent | undefined;
 	let closedError: Error | undefined;
-	let asked = false;
-	let expired = false;
+	let roundSettled = false;
+	let attested = false;
 	let verifying = 0;
 	let releasing = false;
-	const listeners: ((refusal: V3RoomNotYetCurrent | undefined) => void)[] = [];
-	let settle!: (outcome: V3RoomNotYetCurrent | Error | undefined) => void;
-	const decided = new Promise<V3RoomNotYetCurrent | Error | undefined>((resolve) => {
-		settle = resolve;
-	});
+	const admittedListeners: (() => void)[] = [];
+	const refusedListeners: ((refusal: V3RoomNotYetCurrent) => void)[] = [];
+	const deferred = () => {
+		let resolve!: () => void;
+		let reject!: (error: Error) => void;
+		const promise = new Promise<void>((done, fail) => {
+			resolve = done;
+			reject = fail;
+		});
+		// Observed: a rejection nobody awaited is not unhandled.
+		promise.catch(() => undefined);
+		return { promise, resolve, reject };
+	};
+	const moves = deferred();
+	const finality = deferred();
 	const lifetime = new AbortController();
+	const timers: ReturnType<typeof setTimeout>[] = [];
 	// Unref'd: a pending check never keeps a host process alive.
-	const timer = setTimeout(() => {
-		expired = true;
-		decide();
-	}, input.boundMs);
-	(timer as { unref?: () => void }).unref?.();
-	let exclusion: Promise<FinalitySigningExclusion | undefined> = Promise.resolve(undefined);
-	if (input.finalitySigner !== undefined) {
-		// A signer outside the keychain's custody (a test double) has no exclusion; the session's own
-		// choke points still hold.
-		exclusion = acquireFinalitySigningExclusion({ signer: input.finalitySigner }).catch(() => undefined);
-	}
-	const release = (): Promise<void> =>
-		exclusion.then((held) => held?.release()).then(
+	const after = (delayMs: number, run: () => void): void => {
+		const timer = setTimeout(run, delayMs);
+		(timer as { unref?: () => void }).unref?.();
+		timers.push(timer);
+	};
+	const clearTimers = (): void => {
+		for (const timer of timers.splice(0)) clearTimeout(timer);
+	};
+	const acquire = (): Promise<FinalitySigningExclusion | undefined> =>
+		input.finalitySigner === undefined
+			? Promise.resolve(undefined)
+			: // A signer outside the keychain's custody (a test double) has no exclusion; the session's
+				// own choke points still hold.
+				acquireFinalitySigningExclusion({ signer: input.finalitySigner }).catch(() => undefined);
+	let exclusion: Promise<FinalitySigningExclusion | undefined> | undefined = acquire();
+	const release = (): Promise<void> => {
+		const held = exclusion;
+		exclusion = undefined;
+		return (held ?? Promise.resolve(undefined)).then((value) => value?.release()).then(
 			() => undefined,
 			() => undefined
 		);
-	const finish = (outcome: V3RoomNotYetCurrent | undefined): void => {
-		for (const listener of listeners.splice(0)) listener(outcome);
-		settle(outcome);
 	};
-	const decide = (): void => {
-		if (state !== "checking" || releasing || closedError !== undefined) return;
-		if (!(asked || expired) || verifying > 0) return;
+	const admitMoves = (): void => {
+		moves.resolve();
+		for (const listener of admittedListeners.splice(0)) listener();
+	};
+	const becomeProvisional = (): void => {
+		if (state !== "checking" || closedError !== undefined) return;
+		state = "provisional";
+		admitMoves();
+	};
+	const becomeCurrent = (): void => {
+		if ((state !== "checking" && state !== "provisional") || releasing || closedError !== undefined) return;
 		releasing = true;
-		lifetime.abort();
-		clearTimeout(timer);
+		clearTimers();
+		// A member attested: nothing more to watch. The bound passed without one: keep watching.
+		if (attested) lifetime.abort();
 		void release().then(() => {
-			if (closedError !== undefined || state !== "checking") return;
+			releasing = false;
+			if (closedError !== undefined || state === "refused") return;
+			const wasChecking = state === "checking";
 			state = "current";
-			finish(undefined);
+			finality.resolve();
+			if (wasChecking) admitMoves();
 		});
 	};
 	const refuse = (detail: string): void => {
-		if (state !== "checking" || closedError !== undefined) return;
+		if (state === "refused" || closedError !== undefined) return;
 		state = "refused";
 		refusal = new V3RoomNotYetCurrent("creator-superseded", detail);
+		clearTimers();
 		lifetime.abort();
-		clearTimeout(timer);
-		finish(refusal);
+		// A creator that had released the finality key takes it back; it is kept until the session closes.
+		exclusion ??= acquire();
+		moves.reject(refusal);
+		finality.reject(refusal);
+		admittedListeners.splice(0);
+		for (const listener of refusedListeners.splice(0)) listener(refusal);
 	};
+	const decide = (): void => {
+		if (state === "refused" || closedError !== undefined || verifying > 0) return;
+		if (attested) {
+			// Every member asked in the first round answered (or its grace passed), or a late member attested.
+			if (roundSettled || state === "provisional") becomeCurrent();
+			return;
+		}
+		// The first round settled with no verifiable answer: nobody connected to ask, or none attested.
+		if (roundSettled && state === "checking") becomeProvisional();
+	};
+	after(input.answerBoundMs, () => {
+		if (verifying === 0 && !attested) becomeProvisional();
+	});
+	after(input.boundMs, () => {
+		if (verifying === 0) becomeCurrent();
+	});
 	try {
 		void Promise.resolve(
 			input.view.ask(
@@ -1173,13 +1267,14 @@ function startCreatorRestoreCurrencyGate(input: Readonly<{
 					objectId: input.local.objectId,
 					signal: lifetime.signal,
 					answer: (evidence: V3RoomCreatorCurrencyEvidence): void => {
-						if (state !== "checking") return;
+						if (state === "refused" || closedError !== undefined) return;
 						verifying++;
-						void creatorEvidenceNewer(evidence, input.local).then(
-							(detail) => {
+						void creatorEvidenceVerdict(evidence, input.local).then(
+							(verdict) => {
 								verifying--;
-								if (detail !== undefined) refuse(detail);
-								else decide();
+								if (verdict.newer !== undefined) return refuse(verdict.newer);
+								if (verdict.attested) attested = true;
+								decide();
 							},
 							() => {
 								verifying--;
@@ -1191,38 +1286,47 @@ function startCreatorRestoreCurrencyGate(input: Readonly<{
 			)
 		).then(
 			() => {
-				asked = true;
+				roundSettled = true;
 				decide();
 			},
-			// A failed ask is "no answer": the bound decides.
+			// A failed ask is "no answer": the bounds decide.
 			() => undefined
 		);
 	} catch {
-		// A throwing member view is "no answer": the bound decides.
+		// A throwing member view is "no answer": the bounds decide.
 	}
 	return Object.freeze({
 		state: () => state,
 		refusal: () => refusal,
 		admit: (): Promise<void> => {
-			if (state === "current") return Promise.resolve();
 			if (refusal !== undefined) return Promise.reject(refusal);
 			if (closedError !== undefined) return Promise.reject(closedError);
-			return decided.then((outcome) => {
-				if (outcome !== undefined) throw outcome;
-			});
+			if (state === "provisional" || state === "current") return Promise.resolve();
+			return moves.promise;
 		},
-		onDecided: (listener: (refusal: V3RoomNotYetCurrent | undefined) => void): void => {
-			if (state === "current") listener(undefined);
-			else if (state === "refused") listener(refusal);
-			else listeners.push(listener);
+		admitFinality: (): Promise<void> => {
+			if (refusal !== undefined) return Promise.reject(refusal);
+			if (closedError !== undefined) return Promise.reject(closedError);
+			if (state === "current") return Promise.resolve();
+			return finality.promise;
+		},
+		onAdmitted: (listener: () => void): void => {
+			if (state === "provisional" || state === "current") listener();
+			else if (state === "checking") admittedListeners.push(listener);
+		},
+		onRefused: (listener: (refusal: V3RoomNotYetCurrent) => void): void => {
+			if (refusal !== undefined) listener(refusal);
+			else refusedListeners.push(listener);
 		},
 		close: (): void => {
 			if (closedError !== undefined) return;
 			closedError = new TypeError("v3 room session is closed");
 			lifetime.abort();
-			clearTimeout(timer);
-			listeners.splice(0);
-			settle(refusal ?? closedError);
+			clearTimers();
+			admittedListeners.splice(0);
+			refusedListeners.splice(0);
+			moves.reject(refusal ?? closedError);
+			finality.reject(refusal ?? closedError);
 			void release();
 		},
 	});
@@ -1682,14 +1786,22 @@ export type V3RoomCurrencyStatement = Readonly<{
 export type V3RoomCurrencyResult = "current" | "other-epoch" | "behind-frontier";
 
 /**
- * Creator restore currency (user decision 2026-11-10): how long a creator that reopened from storage
- * waits for its members' view before it proceeds alone. It waits only until every member it asked
- * has answered; the full bound is paid only when no member answers (a lone creator, or a device that
- * has not reconnected yet), once per session and only by its first signature. Long enough for a
- * reloaded page to redial its room peers and answer one request; short enough that a lone creator's
- * first move after a reload is merely late.
+ * Creator restore currency (user decision 2026-11-10, wait cut 2026-11-11): how long a creator that
+ * reopened from storage holds finality-key signatures (seal, adoption, recovery maintenance) when no
+ * member has attested a view. Its moves are not held by it: they wait only for connected members
+ * (V3_ROOM_CREATOR_RESTORE_ANSWER_BOUND_MS) and not at all when no peer is connected. A member that
+ * connects later is still asked, and its verified newer view refuses the creator from then on.
  */
 export const V3_ROOM_CREATOR_RESTORE_CURRENCY_BOUND_MS = 5_000;
+
+/**
+ * Creator restore currency: the longest a reopened creator's first move waits while connected peers
+ * have not answered (peers that are not room members never answer). Every connected member answering
+ * ends the wait at once. Measured in-process (native, in-memory channel, 20 reopens each with 1 and 3
+ * members): first answer 0.9-2.2 ms after the ask, decision 30-77 ms; the rest is an allowance for a
+ * stream open plus one round trip on a real network (not measured here).
+ */
+export const V3_ROOM_CREATOR_RESTORE_ANSWER_BOUND_MS = 1_000;
 
 /**
  * A member's view of the room for a reopened creator: only material the creator's own keys signed,
@@ -1708,9 +1820,11 @@ export type V3RoomCreatorCurrencyEvidence = Readonly<{
 /** How a reopened creator asks its room's members (examples/v3-room successor delivery wires it). */
 export interface V3RoomCreatorMemberView {
 	/**
-	 * Asks the room's connected members (and members that connect while it runs) for their view and
-	 * hands each answer to `answer` as it arrives. Settles once every member asked has answered (at
-	 * least one); the room stops waiting at its bound or when `signal` aborts.
+	 * Asks the room's connected peers for their view and hands each answer to `answer` as it arrives.
+	 * Settles its first round at once when no peer is connected, or once every peer asked answered (or
+	 * a short grace after the first answer). It keeps asking peers that connect later, and handing
+	 * their answers to `answer`, until `signal` aborts (the room aborts once a member attested a view,
+	 * once it refused, or at close).
 	 */
 	ask(input: Readonly<{ objectId: string; signal: AbortSignal; answer(evidence: V3RoomCreatorCurrencyEvidence): void }>): Promise<void>;
 }
@@ -3174,9 +3288,9 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		!requireFreshTrust &&
 		!skipRoomHeadAuthority &&
 		redirectSource === undefined;
-	if (input.creatorRestoreCurrencyBoundMs !== undefined &&
-		(!Number.isSafeInteger(input.creatorRestoreCurrencyBoundMs) || input.creatorRestoreCurrencyBoundMs < 0))
-		throw new TypeError("v3 room creator restore currency bound is invalid");
+	for (const bound of [input.creatorRestoreCurrencyBoundMs, input.creatorRestoreCurrencyAnswerBoundMs])
+		if (bound !== undefined && (!Number.isSafeInteger(bound) || bound < 0))
+			throw new TypeError("v3 room creator restore currency bound is invalid");
 	const ungatedVertexSigner = input.signRegisteredVertexDigest;
 	input = Object.freeze({
 		...input,
@@ -4950,6 +5064,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			creatorRestoreGate = startCreatorRestoreCurrencyGate({
 				view: input.creatorMemberView,
 				boundMs: input.creatorRestoreCurrencyBoundMs ?? V3_ROOM_CREATOR_RESTORE_CURRENCY_BOUND_MS,
+				answerBoundMs: input.creatorRestoreCurrencyAnswerBoundMs ?? V3_ROOM_CREATOR_RESTORE_ANSWER_BOUND_MS,
 				local: creatorRestoreLocalView(input, material, head, lineage),
 				...(input.creatorFinalitySigner === undefined ? {} : { finalitySigner: input.creatorFinalitySigner }),
 			});
@@ -5010,7 +5125,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 							const pending = Object.freeze({ pending: selectedPending, stable: openedRoomHeadState.stable });
 							// Pending recovery may sign with the finality key: a creator restore currency check
 							// decides first (its local head is this pending transition), and a refusal fails the open.
-							if (input.creatorFinalitySigner !== undefined) await creatorRestoreGate?.admit();
+							if (input.creatorFinalitySigner !== undefined) await creatorRestoreGate?.admitFinality();
 							const nativeSigning =
 								input.creatorFinalitySigner === undefined ? undefined : await ownCreatorSigningStores();
 							const recoveredPending = await consumeCreatorAdoptionPendingRecovery({
@@ -5341,7 +5456,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	// A creator whose restore currency check is still running holds its moves exactly as a
 	// not-yet-current writer does (below), and is refused with the check's refusal.
 	let localIssueCurrent =
-		(input.creatorFinalitySigner !== undefined && (creatorRestoreGate?.state() ?? "current") === "current") ||
+		(input.creatorFinalitySigner !== undefined &&
+			["current", "provisional"].includes(creatorRestoreGate?.state() ?? "current")) ||
 		input.receiveOnly === true ||
 		freshLocalLineage ||
 		(skipRoomHeadAuthority && input.author === roomCreatorAuthor);
@@ -5443,11 +5559,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	});
 	// Creator restore currency: the check's decision releases the held moves (and a startup drain
 	// left for currency) or refuses them, as a writer's currency does.
-	creatorRestoreGate?.onDecided((refusal) => {
-		if (refusal === undefined) {
-			becomeLocalIssueCurrent();
-			return;
-		}
+	// A late member's verified newer view refuses a creator that had admitted moves: no move after it.
+	creatorRestoreGate?.onAdmitted(() => becomeLocalIssueCurrent());
+	creatorRestoreGate?.onRefused((refusal) => {
+		localIssueCurrent = false;
 		localIssueRefusal ??= refusal;
 		refuseHeldUntilCurrent(localIssueRefusal);
 	});
@@ -8332,7 +8447,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	const afterCreatorRestoreDecision = <Result>(transition: () => Promise<Result>): Promise<Result> =>
 		creatorRestoreGate === undefined || creatorRestoreGate.state() === "current"
 			? transition()
-			: creatorRestoreGate.admit().then(transition);
+			: creatorRestoreGate.admitFinality().then(transition);
 	const adoptCreatorSuccessor = (): Promise<void> => {
 		if (creatorSuccessorAdoptionTask !== undefined) return creatorSuccessorAdoptionTask;
 		// Adoption signs the successor anchor: a creator restore currency check decides first.
@@ -8944,7 +9059,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		localIssueCurrency(): "current" | "not-yet-current" {
 			return redirectedSession?.localIssueCurrency?.() ?? (localIssueCurrent ? "current" : "not-yet-current");
 		},
-		creatorCurrency(): "current" | "checking" | "refused" {
+		creatorCurrency(): "current" | "provisional" | "checking" | "refused" {
 			return redirectedSession?.creatorCurrency?.() ?? creatorRestoreGate?.state() ?? "current";
 		},
 		async creatorCurrencyEvidence(): Promise<V3RoomCreatorCurrencyEvidence> {

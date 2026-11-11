@@ -29,6 +29,7 @@ import { createBrowserSnapshotQuarantineStore } from "@ts-drp/storage-browser/sn
 
 export {
 	createV3RoomCreatorInviteMaterial,
+	V3_ROOM_CREATOR_RESTORE_ANSWER_BOUND_MS,
 	V3_ROOM_CREATOR_RESTORE_CURRENCY_BOUND_MS,
 	V3_ROOM_LOCAL_BACKLOG_LIMIT,
 	V3RoomLocalBacklogFull,
