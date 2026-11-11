@@ -14,10 +14,15 @@ import { chatSharesRoomFixture, closeChatSharesRooms } from "./fixtures/chat-mem
 // The member view is wrapped to time the ask, each member answer and the ask's settle; the check's
 // decision is read from creatorCurrency(). Native SQLite rooms, the genuine delivery over an in-memory
 // channel (so the answer time is the members' evidence read plus the creator's verification, with no
-// network latency). Prints one JSON line per sample: "[creator currency timing] {...}".
+// network latency unless CREATOR_CURRENCY_TIMING_DELAY_MS sets a one-way delay). Prints one JSON line
+// per sample: "[creator currency timing] {...}". Connectivity-unresolved hold scenarios: a solo stored
+// roster, a roster with members and nobody reachable, and a member at the same state connecting
+// CREATOR_CURRENCY_TIMING_LATE_MS (default 300) after open.
 const enabled = process.env.CREATOR_CURRENCY_TIMING === "1";
 const SAMPLES = Number(process.env.CREATOR_CURRENCY_TIMING_SAMPLES ?? 10);
 const LONE_SAMPLES = Number(process.env.CREATOR_CURRENCY_TIMING_LONE_SAMPLES ?? 3);
+const DELAY_MS = Number(process.env.CREATOR_CURRENCY_TIMING_DELAY_MS ?? 0);
+const LATE_MS = Number(process.env.CREATOR_CURRENCY_TIMING_LATE_MS ?? 300);
 
 afterEach(async () => {
 	for (const delivery of deliveries) delivery.close();
@@ -40,15 +45,23 @@ const ms = (value: number | undefined) => (value === undefined ? null : Math.rou
 function network() {
 	const listeners = new Map<string, Set<Listener>>();
 	const connected = new Map<string, Set<string>>();
+	const connections = new Map<string, Set<(peerId: string) => void>>();
 	const link = (left: string, right: string) => {
 		(connected.get(left) ?? connected.set(left, new Set()).get(left)!).add(right);
 		(connected.get(right) ?? connected.set(right, new Set()).get(right)!).add(left);
+		for (const listener of [...(connections.get(left) ?? [])]) listener(right);
+		for (const listener of [...(connections.get(right) ?? [])]) listener(left);
+	};
+	const disconnect = (left: string, right: string) => {
+		connected.get(left)?.delete(right);
+		connected.get(right)?.delete(left);
 	};
 	const channel = (localPeerId: string): V3RoomSuccessorChannel => ({
 		localPeerId,
 		peers: () => [...(connected.get(localPeerId) ?? [])],
 		send: async (peerId, bytes) => {
 			await Promise.resolve();
+			if (DELAY_MS > 0) await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
 			if (!connected.get(localPeerId)?.has(peerId)) throw new Error("not connected");
 			for (const listener of listeners.get(peerId) ?? []) listener(localPeerId, bytes);
 		},
@@ -58,10 +71,15 @@ function network() {
 			listeners.set(localPeerId, set);
 			return () => set.delete(listener);
 		},
-		onPeerConnected: () => () => undefined,
+		onPeerConnected: (listener) => {
+			const set = connections.get(localPeerId) ?? new Set();
+			set.add(listener);
+			connections.set(localPeerId, set);
+			return () => set.delete(listener);
+		},
 		close: () => undefined,
 	});
-	return { channel, link };
+	return { channel, link, disconnect };
 }
 
 type Marks = { ask?: number; answers: number[]; settled?: number };
@@ -102,12 +120,14 @@ async function measuredReopen(
 	creatorDelivery: V3RoomSuccessorDelivery,
 	scenario: string,
 	sample: number,
-	bound?: number
+	bound?: number,
+	afterOpenStarted?: () => void
 ) {
 	const marks: Marks = { answers: [] };
 	let origin = 0;
 	const view = timedView(creatorDelivery, marks, () => origin);
 	origin = now();
+	afterOpenStarted?.();
 	const creator = await f.open(0, {
 		reopen: true,
 		creatorMemberView: view,
@@ -162,6 +182,50 @@ describe.skipIf(!enabled)("creator restore currency timing (measurement)", () =>
 				"[creator currency timing]",
 				JSON.stringify({ scenario: "new-room", sample, openMs: ms(opened), stateAtOpen: state, asked: marks.ask !== undefined, firstIssueMs: ms(now() - issueStart), openToFirstSignatureMs: ms(now() - origin) })
 			);
+			await f.stop(creator);
+		}
+	}, 600_000);
+
+	it("a solo stored roster (nobody but the creator in the ACL): no hold", async () => {
+		const { f, net } = await roomWith(0);
+		let creator = await f.open(0);
+		await creator.room.issue(message("before"));
+		await f.stop(creator);
+		const delivery = createV3RoomSuccessorDelivery({ role: "creator", objectId: f.objectId, channel: net.channel(CREATOR_PEER) });
+		deliveries.add(delivery);
+		for (let sample = 0; sample < LONE_SAMPLES; sample++) {
+			creator = await measuredReopen(f, delivery, "solo-roster", sample);
+			await f.stop(creator);
+		}
+	}, 600_000);
+
+	it(`a member at the same state connecting ${LATE_MS} ms after open`, async () => {
+		const { f, net } = await roomWith(1);
+		let creator = await f.open(0);
+		await creator.room.issue(message("before"));
+		const member = await f.open(1);
+		expect(await member.receive(await f.issuedAfter(0, null), 0)).toBe(true);
+		await f.stop(creator);
+		const memberDelivery = createV3RoomSuccessorDelivery({
+			role: "member",
+			objectId: f.objectId,
+			creatorPeer: CREATOR_PEER,
+			channel: net.channel("chat-member-1"),
+			pollMs: 600_000,
+		});
+		deliveries.add(memberDelivery);
+		memberDelivery.bind(member.room as never);
+		const delivery = createV3RoomSuccessorDelivery({ role: "creator", objectId: f.objectId, channel: net.channel(CREATOR_PEER) });
+		deliveries.add(delivery);
+		for (let sample = 0; sample < SAMPLES; sample++) {
+			net.disconnect(CREATOR_PEER, "chat-member-1");
+			await new Promise((resolve) => setTimeout(resolve, 600));
+			let timer: ReturnType<typeof setTimeout> | undefined;
+			creator = await measuredReopen(f, delivery, `member-late-${LATE_MS}`, sample, undefined, () => {
+				timer = setTimeout(() => net.link(CREATOR_PEER, "chat-member-1"), LATE_MS);
+			});
+			clearTimeout(timer);
+			expect(await member.receive(await f.issuedAfter(0, null), 0)).toBe(true);
 			await f.stop(creator);
 		}
 	}, 600_000);
