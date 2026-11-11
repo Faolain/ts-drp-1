@@ -90,11 +90,18 @@ it(
 			moves: GREEDY_LIMIT,
 			untilRefusal: CAPACITY_REFUSAL,
 		});
+		// Every epoch rolled over, so each epoch filled exactly to its cap (its last admitted move) was
+		// maintained by the next ones; the driver rethrows any refusal but the typed one.
 		expect(run.epochs.length).toBe(GREEDY_EPOCHS);
 		for (const epoch of run.epochs) {
 			expect(epoch.latency.creatorIssue.length, `epoch ${epoch.epoch}`).toBeGreaterThanOrEqual(PROFILE_MOVES);
 			expect(epoch.latency.recipientIssue.length, `epoch ${epoch.epoch}`).toBeGreaterThanOrEqual(PROFILE_MOVES);
+			// Above the cap: each Writer was refused with the typed reason before GREEDY_LIMIT.
+			expect(epoch.latency.creatorIssue.length, `epoch ${epoch.epoch}`).toBeLessThan(GREEDY_LIMIT);
+			expect(epoch.latency.recipientIssue.length, `epoch ${epoch.epoch}`).toBeLessThan(GREEDY_LIMIT);
 		}
+		console.log("IMAGE_CAPACITY_GREEDY_CAPS", JSON.stringify(run.epochs.map(epoch =>
+			[epoch.epoch, epoch.latency.creatorIssue.length, epoch.latency.recipientIssue.length])));
 	},
 	7_200_000
 );
