@@ -16,6 +16,7 @@ import {
 	type WireRow,
 } from "./fixtures/track-m-apps/long-room-driver.js";
 import { readV3SettlementWorkCounts } from "../packages/node/src/v3-live.js";
+import { V3_ROOM_LOCAL_BACKLOG_LIMIT } from "../packages/node/src/v3-room.js";
 import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-head.js";
 
 // Found by fix/int7-slow-member-landing (tests/app-rollover-slow-member-native.test.ts under host
@@ -713,3 +714,97 @@ it("a census does not rescan the author's outbox for each expired row", async ()
 	// One own-fence scan answers every row of one census read.
 	expect(result.ownFenceScans, "own-fence scans per census read").toBeLessThanOrEqual(result.recoveryCensusReads + 8);
 }, 900_000);
+
+// The undelivered-move bound must hold at the install that settles them. A Writer's moves of its
+// current epoch are undelivered until an install says otherwise, but the room counted them only from
+// that install on, so an offline Writer accepted any number of moves in one epoch. Its next skip
+// install proves every retained row never admitted and gives its move back, one hand-back record
+// each, but records are bounded (SETTLEMENT_HAND_BACK_LIMITS.maxRecords): the rows past the bound
+// stay manual-review (unknown retained work), which withholds the author fence, so the Writer's next
+// epoch has no fence and its rows there can never be proven either. Measured in the 100-move,
+// 16-epoch catch-up: 64 records, 11 rows of epoch 12 left manual-review, no fence at epochs 14 and
+// 16, one more protected journal scope per epoch until the retirement preparation refused the
+// eighth ("journal retirement refused: malformed-input") or the recovery certificate no longer
+// covered the oldest (RECOVERY_DEPENDENCY_ANCHOR_UNCOVERED).
+async function backlogBoundHoldsAtInstall(offered: number) {
+	const restore = await installEnvironment("node", () => undefined);
+	const directory = mkdtempSync(join(tmpdir(), "app-rollover-backlog-bound-"));
+	directories.push(directory);
+	try {
+		const { creator, writer } = await openPair(directory);
+		const wire = successorWire(() => [creator, writer] as const);
+		const rows = rowWire(creator, writer);
+		const ordinal = { next: 0 };
+		let epoch = 0;
+		let n = 0;
+		try {
+			while (epoch < 2) {
+				epoch = await rollCreator(creator, rows.toWriter, ordinal);
+				await wire.caughtUp(epoch);
+				await rows.toWriter();
+				await writer.issue(epoch, n++);
+				await rows.toCreator();
+			}
+			const plan = async () => (await writer.settlementPlanDump?.()) as { fence: number | null; entries: { e: number; d: string }[] };
+			const status = async () => (await writer.settlementStatus?.()) as { undelivered: unknown[] } | null;
+			// Offline: moves the creator never receives, straight to the room.
+			let accepted = 0;
+			const refusals: string[] = [];
+			for (let k = 0; k < offered; k++) {
+				try {
+					await writer.issueRoom!(epoch, n++);
+					accepted++;
+				} catch (error) {
+					refusals.push(String((error as Error).name ?? error));
+				}
+			}
+			// A skip install past three creator epochs retains them; the frontier proves each never admitted.
+			await wire.pause();
+			for (let roll = 0; roll < 3; roll++) epoch = await rollCreator(creator, async () => undefined, ordinal);
+			wire.resume();
+			await wire.caughtUp(epoch, 600_000);
+			// The install's settlement drain resolves the retained rows; give it up to a minute.
+			const settled = async () => {
+				const deadline = performance.now() + 60_000;
+				for (;;) {
+					const value = await plan();
+					if (!value.entries.some((entry) => entry.d === "manual-review") || performance.now() > deadline) return value;
+					await sleep(250);
+				}
+			};
+			const afterFirst = await settled();
+			const givenBack = (await status())?.undelivered.length ?? 0;
+			// One more offline move and skip install: its row is proven never admitted only if the Writer
+			// fenced its epoch first.
+			await writer.issueRoom!(epoch, n++).catch(() => undefined);
+			await wire.pause();
+			for (let roll = 0; roll < 3; roll++) epoch = await rollCreator(creator, async () => undefined, ordinal);
+			wire.resume();
+			await wire.caughtUp(epoch, 600_000);
+			const afterSecond = await settled();
+			const summary = {
+				accepted,
+				refusals: [...new Set(refusals)],
+				refused: refusals.length,
+				givenBack,
+				manualReviewAfterFirst: afterFirst.entries.filter((entry) => entry.d === "manual-review").length,
+				manualReviewAfterSecond: afterSecond.entries.filter((entry) => entry.d === "manual-review").length,
+				fenceAfterSecond: afterSecond.fence,
+			};
+			process.stdout.write(`BACKLOG_BOUND ${JSON.stringify(summary)}\n`);
+			// The room refuses new moves at the bound, so every retained move fits a record ...
+			expect(accepted, "new moves accepted in one undelivered epoch").toBeLessThanOrEqual(V3_ROOM_LOCAL_BACKLOG_LIMIT);
+			expect(summary.manualReviewAfterFirst, "retained rows left unresolved by the skip install").toBe(0);
+			expect(givenBack, "moves given back").toBe(accepted);
+			// ... and the Writer keeps fencing, so its later rows stay provable.
+			expect(summary.manualReviewAfterSecond, "retained rows unresolved after the next skip install").toBe(0);
+		} finally {
+			await wire.stop();
+		}
+	} finally {
+		restore();
+	}
+}
+
+it("an offline Writer's moves of one epoch are bounded by the hand-back records its next skip install needs", () =>
+	backlogBoundHoldsAtInstall(V3_ROOM_LOCAL_BACKLOG_LIMIT + 6), 1_800_000);
