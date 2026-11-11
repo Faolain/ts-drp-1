@@ -47,36 +47,52 @@ never delivered) it is delivered once and the same bytes again are refused; at e
 
 The fixed-rate scorecard (`tests/realtime-scorecard-rate-native.test.ts`): genuine native rooms in one
 process, shipped rollover policy, 2 durable moves/s, every peer publishing movement at 30 Hz, 42 rollovers,
-boat sandboxes (8 vCPU, RAM disk). "2 peers" is the creator and one Writer; "4 peers" is the creator and
+one boat sandbox (8 vCPU, RAM disk). "2 peers" is the creator and one Writer; "4 peers" is the creator and
 three Writers. Delivery counts every frame published to an authorized peer.
 
-| Build | Peers | Run | Delivery | Gaps > 100 ms | Max gap | `authorityMismatch` | Member installs failed |
+### Final pair: integration head 65b50b42, run 5, sequential on one sandbox, installs healthy on both sides
+
+| Build | Peers | Delivery | Gaps > 100 ms | Max gap | Gaps > 1 s | `authorityMismatch` | Installs failed |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| base f9f7a582 | 2 | 1 | 91.84% | 272 | 919 ms | 1,522 | - |
-| fix | 2 | 1 | **100.00%** | 152 | **203 ms** | **0** | - |
-| base f1538d32 | 2 | 4 | 90.22% | 611 | 2,325 ms | 1,802 | - |
-| fix (rebased) | 2 | 4 | **100.00%** | 304 | **371 ms** | **0** | - |
+| base 65b50b42 | 2 | 91.86% | 260 | 924 ms | 0 | 1,496 | 0 of 42 |
+| fix 89b9a63e | 2 | **100.00%** | 234 | **249 ms** | 0 | **0** | 0 of 42 |
+| base 65b50b42 | 4 | 86.27% | 9,280 | 14,163 ms | 426 | 21,587 | 2 of 128 |
+| fix 89b9a63e | 4 | **100.00%** | 14,297 | **405 ms** | **0** | **0** | 0 of 126 |
+
+No run accepted a durable vertex during the ephemeral-only window.
+
+The count of gaps over 100 ms goes up with the fix because many more frames are delivered: a blackout is
+one long gap, while continuous delivery on a busy event loop produces many short ones. All peers run in one
+Node process whose event loop p99 is about 130 ms during play; that, not authority, is what the remaining
+100-400 ms gaps reflect (fix, 4 peers: p95 129 ms, p99 194 ms).
+
+### Earlier runs and the four-peer install fault
+
+| Build | Peers | Run | Delivery | Gaps > 100 ms | Max gap | `authorityMismatch` | Installs failed |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| base f9f7a582 | 2 | 1 | 91.84% | 272 | 919 ms | 1,522 | 0 |
+| fix | 2 | 1 | 100.00% | 152 | 203 ms | 0 | 0 |
+| base f1538d32 | 2 | 4 | 90.22% | 611 | 2,325 ms | 1,802 | 0 |
+| fix | 2 | 4 | 100.00% | 304 | 371 ms | 0 | 0 |
 | base f9f7a582 | 4 | 1 | 81.83% | 11,274 | 11,108 ms | 25,044 | 2 of 128 |
 | base f9f7a582 | 4 | 2 | 86.02% | 10,850 | 8,593 ms | 20,822 | 0 of 126 |
 | fix | 4 | 1 | 77.63% | 15,433 | 169,904 ms | 42,027 | 4 of 118 |
 | fix | 4 | 2 | 87.48% | 15,998 | 158,839 ms | 25,910 | 5 of 123 |
 | base f1538d32 | 4 | 3 | 23.22% | 3,670 | 478,738 ms | 175,420 | 50 of 106 |
-| fix (rebased) | 4 | 3 | 38.30% | 8,914 | 694,961 ms | 119,941 | 15 of 70 |
+| fix | 4 | 3 | 38.30% | 8,914 | 694,961 ms | 119,941 | 15 of 70 |
 | base f1538d32 | 4 | 4 | 22.58% | 5,110 | 342,460 ms | 165,235 | 71 of 127 |
-| fix (rebased) | 4 | 4 | **99.98%** | 16,661 | **590 ms** | **27** | 2 of 128 |
+| fix | 4 | 4 | 99.98% | 16,661 | 590 ms | 27 | 2 of 128 |
 
-No run accepted a durable vertex during the ephemeral-only window.
-
-Four-peer runs are dominated by a durable-path fault that is not this change: members' successor installs
-fail ("creator recovery dependency hold unavailable", "database is locked", adoption hold expired after
-120 s), members fall two or more epochs behind the creator, and every frame between peers that far apart
-is refused by design. It strikes base and fix alike (runs 3 and 4 ran base and fix at the same time on two
-sandboxes; in run 4 the base collapsed and the fix did not) and is much more frequent at f1538d32 than at
-f9f7a582. Raw delivery percentages for four peers therefore measure install health, not this change.
+Some four-peer runs are dominated by a durable-path fault that is not this change: members' successor
+installs fail ("creator recovery dependency hold unavailable", "database is locked", adoption hold expired
+after 120 s), members fall two or more epochs behind the creator, and every frame between peers that far
+apart is refused by design. It strikes base and fix alike (runs 3 and 4 ran base and fix at the same time on
+two sandboxes; in run 4 the base collapsed and the fix did not) and was frequent at f1538d32. Raw delivery
+in those runs measures install health, not this change.
 
 To separate the two, every recorded gap is classed by the largest sender/receiver epoch distance at any
-moment inside it (from the run's rollover timeline; runs 1-3 record the first 2,000 gaps over 100 ms,
-run 4 records all of them):
+moment inside it, from the run's rollover timeline (runs 1-3 record the first 2,000 gaps over 100 ms; runs 4
+and 5 record all of them):
 
 | Run (4 peers) | Base: gaps > 1 s inside the window | Base: max | Fix: gaps > 1 s inside the window | Fix: max |
 | --- | --- | --- | --- | --- |
@@ -84,19 +100,42 @@ run 4 records all of them):
 | 2 (first ~180 s) | 86 | 8,457 ms | 0 | 329 ms |
 | 3 (first ~150 s) | 64 | 9,451 ms | 0 | 497 ms |
 | 4 (whole run) | 154 | 17,114 ms | 0 | 590 ms |
+| 5 (whole run) | 426 | 14,163 ms | 0 | 405 ms |
 
-Among the recorded gaps, no fix gap inside the window (peers on the same or adjacent epochs) exceeds 590 ms;
-the fix's longer gaps (runs 1-3, after the recorded span) fall in the stretches where installs had failed
-and members were two or more epochs behind.
+No recorded fix gap inside the window (peers on the same or adjacent epochs) exceeds 590 ms. The fix's longer
+gaps (runs 1-3, after the recorded span) fall where installs had failed and members were two or more epochs
+behind.
 
-The count of gaps over 100 ms goes up with the fix because many more frames are delivered: a blackout is one
-long gap, while continuous delivery on a busy event loop produces many short ones. All peers run in one
-Node process; its event loop p99 is about 130 ms during play, which is what the remaining 100-600 ms gaps
-reflect.
+### Grid continued play (gate test)
+
+`tests/active-app-continued-play-native.test.ts`, 32 epochs with a reopen at 30, fix at the same source as
+89b9a63e (before the last rebase), RAM disk: harness mode and app mode both pass, including its check that a
+stale frame from the previous epoch, injected after both peers installed, is refused as `authorityMismatch`.
+Every published frame reached the other peer (harness 16,716 of 16,716; app 12,134 of 12,134); longest raw
+receive gap 939 ms (harness) and 968 ms (app), both at the scripted reopen. For reference, the m2 gate runs at
+fc88a547 (100 epochs, not a strict pair) received 96.8% (harness) and 88.4% (app), longest gaps 1.5 s and 3.5 s.
+
+### Commands
+
+Scorecard (sandbox side; logs under `.logs/realtime-resume-2026-11-10/ephemeral/runs/`):
+
+```
+SCORECARD=1 SCORECARD_WRITERS=1|3 SCORECARD_OPS=2 SCORECARD_EPHEMERAL_HZ=30 SCORECARD_EPHEMERAL_ONLY_S=10 \
+SCORECARD_ROLLOVERS=42 SCORECARD_MAX_S=900 SCORECARD_OUT=<dir> \
+pnpm exec vitest run tests/realtime-scorecard-rate-native.test.ts --coverage.enabled=false --maxWorkers=1 --minWorkers=1
+```
+
+Runs 4 and 5 used a measurement-only harness change that is not part of this branch (record threshold and
+cap from `SCORECARD_LONG_GAP_MS` / `SCORECARD_LONG_GAP_CAP`, set to 100 and 200,000) so every gap is kept
+for the window split.
 
 ## Residual risks
 
-- The window is one epoch. A member two or more epochs behind is still blacked out, as before.
+- The window is one epoch. A member two or more epochs behind is still blacked out, as before; the
+  four-peer install fault above puts members there, so it caps what players see until it is fixed.
+- Against the real-time bar: with the fix the stream no longer stops at rollovers, but in the one-process
+  four-peer run 10% of inter-frame gaps exceed 100 ms (p99 194 ms, max 405 ms) because of main-thread load
+  during seal, adoption, install and lull, which this track does not address.
 - "Previous context" is the last context the channel itself observed (lazily, on publish or receive).
   A channel that saw no traffic during an epoch holds no window for the next change.
 - Unordered (reliable) frames had no replay protection inside an epoch; inside the window that class
