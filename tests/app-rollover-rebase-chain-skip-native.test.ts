@@ -398,3 +398,70 @@ it("a skip install resolving retained rows pays the native settlement turn once 
 	expect(large.perRowMs, "per-row time, 32 rows vs 8").toBeLessThanOrEqual(small.perRowMs * 1.5);
 	expect(large.installMs, "32-row skip install").toBeLessThanOrEqual(8_000);
 }, 1_500_000);
+
+// A move given back is no longer waiting in the room: the application holds it. Its expired row
+// only waits for retirement, so it must not count as unsettled. Counting it kept the member in
+// "not-reaching-host" (unsettledEpochs >= window - 2) for epochs after every move had been given
+// back, and in that state the application does not offer the given-back moves again
+// (tests/app-rollover-slow-member-native.test.ts: 45 given-back moves never re-offered).
+async function givenBackMovesAreNotWaiting(count: number) {
+	const restore = await installEnvironment("node", () => undefined);
+	const directory = mkdtempSync(join(tmpdir(), "app-rollover-given-back-"));
+	directories.push(directory);
+	try {
+		const { creator, writer } = await openPair(directory);
+		const wire = successorWire(() => [creator, writer] as const);
+		const rows = rowWire(creator, writer);
+		const ordinal = { next: 0 };
+		const ids: string[] = [];
+		let epoch = 0;
+		let n = 0;
+		try {
+			while (epoch < 2) {
+				epoch = await rollCreator(creator, rows.toWriter, ordinal);
+				await wire.caughtUp(epoch);
+				await rows.toWriter();
+				await writer.issue(epoch, n);
+				ids.push(`block-1-${n++}`);
+				await rows.toCreator();
+			}
+			const writerAuthor = rowValue((await writer.published(null))[0]!).author;
+			// Moves the creator never receives, then a skip install past three creator epochs: the
+			// retained rows are resolved from the frontier (never admitted) and every move is given back.
+			for (let k = 0; k < count; k++) {
+				await writer.issue(epoch, n);
+				ids.push(`block-1-${n++}`);
+			}
+			await wire.pause();
+			for (let roll = 0; roll < 3; roll++) epoch = await rollCreator(creator, async () => undefined, ordinal);
+			wire.resume();
+			await wire.caughtUp(epoch);
+			const settlement = (await writer.settlementStatus?.()) as { unsettledEpochs: number; undelivered: unknown[] } | null;
+			const status = (await writer.rolloverStatus?.()) as { state: string } | null;
+			process.stdout.write(`GIVEN_BACK ${JSON.stringify({ epoch, settlement: { unsettledEpochs: settlement?.unsettledEpochs, undelivered: settlement?.undelivered.length }, status, plan: (await writer.settlementAudit()).dispositions })}\n`);
+			expect(settlement?.undelivered.length, "moves given back").toBe(count);
+			expect(settlement?.unsettledEpochs, "epochs any own move still waits").toBe(0);
+			expect(status?.state, "the member's rollover state").not.toBe("not-reaching-host");
+			// Connected again: the application offers the given-back moves again and each lands once.
+			for (let follow = 0; follow < 8; follow++) {
+				await rows.toWriter();
+				await rows.toCreator();
+				const counts = await acceptedCounts(creator, writerAuthor, ids);
+				if (counts.every((value) => value >= 1)) break;
+				epoch = await rollCreator(creator, rows.toWriter, ordinal);
+				await wire.caughtUp(epoch, 120_000);
+			}
+			epoch = await rollCreator(creator, rows.toWriter, ordinal);
+			await wire.caughtUp(epoch, 120_000);
+			await rows.toWriter();
+			await rows.toCreator();
+			expect(await acceptedCounts(creator, writerAuthor, ids)).toEqual(ids.map(() => 1));
+		} finally {
+			await wire.stop();
+		}
+	} finally {
+		restore();
+	}
+}
+
+it("moves given back by a skip install do not count as waiting, and land once when offered again", () => givenBackMovesAreNotWaiting(4), 900_000);
