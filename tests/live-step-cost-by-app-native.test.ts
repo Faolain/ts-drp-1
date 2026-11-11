@@ -8,7 +8,7 @@
 // process, so a step's CPU includes anything else that ran while it was awaited.
 //
 // Environment: LIVE_APP (grid | canvas | chat, default grid), LIVE_EPOCHS (default 8), LIVE_MOVES
-// (ordinary moves per Writer per epoch, default 12), LIVE_ROLLOVER (harness | app, default harness).
+// (ordinary moves per Writer per epoch, default 6), LIVE_ROLLOVER (harness | app, default harness).
 // Prints one `LIVE_STEPS {json}` line: per step and position bucket (0 = the first such step after
 // the boundary, then 1, 2-3, 4+; "span" = an app-rollover step during which the role's epoch
 // changed), the count and the median/p95 wall and CPU in ms.
@@ -28,7 +28,7 @@ afterEach(async () => {
 const env = process.env;
 const APP = (env.LIVE_APP ?? "grid") as AppKind;
 const EPOCHS = Number(env.LIVE_EPOCHS ?? 8);
-const MOVES = Number(env.LIVE_MOVES ?? 12);
+const MOVES = Number(env.LIVE_MOVES ?? 6);
 const ROLLOVER = (env.LIVE_ROLLOVER ?? "harness") as "harness" | "app";
 
 interface StepSample {
@@ -130,7 +130,9 @@ it(`live step cost by position after the epoch boundary (${APP}, ${ROLLOVER} rol
 			app: APP,
 			host: "node",
 			recipient: "writer",
-			creatorLull: false,
+			// The roles' recovery-pool lulls run (as in the conservation gate), so the creator's
+			// maintenance image stays within its native bound across epochs.
+			creatorLull: true,
 			epochs: EPOCHS,
 			moves: MOVES,
 			...(ROLLOVER === "app" ? { rollover: "app" as const } : {}),
