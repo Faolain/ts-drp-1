@@ -12,6 +12,9 @@
 // Prints one `LIVE_STEPS {json}` line: per step and position bucket (0 = the first such step after
 // the boundary, then 1, 2-3, 4+; "span" = an app-rollover step during which the role's epoch
 // changed), the count and the median/p95 wall and CPU in ms.
+import { mkdirSync, writeFileSync } from "node:fs";
+import { type Profiler, Session } from "node:inspector";
+import { join } from "node:path";
 import { afterEach, expect, it } from "vitest";
 
 import {
@@ -30,6 +33,10 @@ const APP = (env.LIVE_APP ?? "grid") as AppKind;
 const EPOCHS = Number(env.LIVE_EPOCHS ?? 8);
 const MOVES = Number(env.LIVE_MOVES ?? 6);
 const ROLLOVER = (env.LIVE_ROLLOVER ?? "harness") as "harness" | "app";
+// LIVE_PROFILE=<step>@<bucket> (e.g. creator.admit@0) with LIVE_PROFILE_OUT=<dir>: a CPU profile of
+// every such step (one .cpuprofile each); the profiled steps' timings include the profiler.
+const PROFILE = env.LIVE_PROFILE;
+const PROFILE_OUT = env.LIVE_PROFILE_OUT ?? "/dev/shm/live-profiles";
 
 interface StepSample {
 	readonly step: string;
@@ -53,6 +60,18 @@ it(`live step cost by position after the epoch boundary (${APP}, ${ROLLOVER} rol
 	const samples: StepSample[] = [];
 	// Steps of each kind since the last boundary (creator: its adoption; Writer: its install).
 	const since = new Map<string, number>();
+	const session = PROFILE === undefined ? undefined : new Session();
+	if (session !== undefined) {
+		session.connect();
+		mkdirSync(PROFILE_OUT, { recursive: true });
+	}
+	const post = (method: string, params?: object): Promise<unknown> =>
+		new Promise<unknown>((resolve, reject) =>
+			(session as Session).post(method as never, params as never, (error: unknown, result: unknown) =>
+				error ? reject(error as Error) : resolve(result)
+			)
+		);
+	let profiled = 0;
 	const boundary = (role: string) => {
 		for (const key of [...since.keys()]) if (key.startsWith(`${role}.`)) since.set(key, 0);
 	};
@@ -62,6 +81,12 @@ it(`live step cost by position after the epoch boundary (${APP}, ${ROLLOVER} rol
 			const original = endpoint[method] as (...args: unknown[]) => Promise<unknown>;
 			wrapped[method] = async (...args: unknown[]) => {
 				const position = since.get(step) ?? 0;
+				const profiling = session !== undefined && PROFILE === `${step}@${bucket(position)}`;
+				if (profiling) {
+					await post("Profiler.enable");
+					await post("Profiler.setSamplingInterval", { interval: 250 });
+					await post("Profiler.start");
+				}
 				const cpu = process.cpuUsage();
 				const wall = performance.now();
 				try {
@@ -77,6 +102,10 @@ it(`live step cost by position after the epoch boundary (${APP}, ${ROLLOVER} rol
 						cpuMs: (used.user + used.system) / 1000,
 					});
 					since.set(step, position + 1);
+					if (profiling) {
+						const result = (await post("Profiler.stop")) as Profiler.StopReturnType;
+						writeFileSync(join(PROFILE_OUT, `${step}-${profiled++}.cpuprofile`), JSON.stringify(result.profile));
+					}
 				}
 			};
 		};
@@ -139,6 +168,7 @@ it(`live step cost by position after the epoch boundary (${APP}, ${ROLLOVER} rol
 		},
 		(creator, writer) => [wrap("creator", creator), wrap("writer", writer)]
 	);
+	session?.disconnect();
 	const groups = new Map<string, StepSample[]>();
 	for (const sample of samples) {
 		const key = `${sample.step}@${sample.spanned ? "span" : bucket(sample.position)}`;
