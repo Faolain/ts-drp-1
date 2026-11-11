@@ -3,6 +3,7 @@ import { decodeCanonical } from "@ts-drp/canonical";
 import assert from "node:assert/strict";
 
 import { ChatWindowOracle } from "./chat-oracle.js";
+import { lostRowDisposition } from "./lost-disposition.js";
 import {
 	type AppKind,
 	fromBase64,
@@ -429,16 +430,14 @@ export async function driveActiveAppEndurance(
 			for (const value of settlement) assert.deepEqual(value.missing, [], "no dangling settlement-plan dependency");
 			const lostDisposition: { sourceDigest: string; acceptedDigests: readonly string[] }[] = [];
 			for (const row of lost) {
-				const replacement = required(settlement[1]).replacements.find((entry) => entry.sourceDigest === row.digest);
-				const candidates = [row.digest, ...(replacement?.replacementDigests ?? [])];
-				const admitted = await required(peers[0]).acceptance(candidates);
-				const exact = admitted[0] === true;
-				const completeReplacement = candidates.length > 1 && admitted.slice(1).every(Boolean);
+				const disposition = await lostRowDisposition(row.digest, required(settlement[1]).replacements, (digests) =>
+					required(peers[0]).acceptance([...digests])
+				);
 				assert.ok(
-					exact || completeReplacement,
+					disposition.carried,
 					`dropped source ${row.digest} admitted exactly or by every durable replacement chunk`
 				);
-				lostDisposition.push({ sourceDigest: row.digest, acceptedDigests: exact ? [row.digest] : candidates.slice(1) });
+				lostDisposition.push({ sourceDigest: row.digest, acceptedDigests: disposition.acceptedDigests });
 			}
 			stage = `epoch-${epoch}-maintenance-overlap`;
 			const maintenanceStart = performance.timeOrigin + performance.now();
