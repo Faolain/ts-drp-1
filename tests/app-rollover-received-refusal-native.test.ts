@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/explicit-function-return-type -- Native fixture inference preserves the owners' signatures. */
+/* eslint-disable @typescript-eslint/explicit-function-return-type, @typescript-eslint/no-non-null-assertion -- Native fixture inference preserves the owners' signatures; optional room methods are checked before use. */
 // Liveness (a)/(b) at the application level (fix/maintenance-image-capacity): several Writers'
 // combined moves fill the creator's per-epoch maintenance proof book. The creator then refuses a
 // received move with the typed capacity reason (a), reports it through the session's observation-only
@@ -57,6 +57,8 @@ it("several hot Writers: a received move the creator refuses at capacity trigger
 			network: network as never,
 			peerIds: network.peerIds,
 			writers: WRITERS,
+			// One native storage host per peer, as on separate devices.
+			separateStorage: true,
 			onIngressCapacityRefusal: (reason) => {
 				ingressRefusals.push(reason);
 				policies[0]?.refused(reason);
@@ -79,6 +81,7 @@ it("several hot Writers: a received move the creator refuses at capacity trigger
 		const peers: Awaited<ReturnType<typeof fixture.open>>[] = [];
 		for (let index = 0; index <= WRITERS; index++) peers.push(await fixture.open(index));
 		const creatorPeer = required(peers[0]).peerId;
+		let installTail: Promise<void> = Promise.resolve();
 		const budget = Object.freeze({ ...GRID_ROLLOVER_BUDGET, movesPerAuthor: 1_000_000, idleMs: 3_600_000 });
 		for (const [index, peer] of peers.entries()) {
 			const role = index === 0 ? "creator" : "member";
@@ -103,7 +106,30 @@ it("several hot Writers: a received move the creator refuses at capacity trigger
 			});
 			policies[index] = policy;
 			policy.bind(peer.room as never);
-			delivery.bind(peer.room as never);
+			const room = peer.room;
+			// HARNESS ARTIFACT GUARD (as realtime-scorecard-rate-native): snapshot pulls are bounded per
+			// process, so in-process Writers installing the same successor at once refuse each other and
+			// back off for seconds; separate devices never share that bound. Installs run one at a time.
+			delivery.bind(
+				index === 0
+					? room
+					: ({
+							authority: () => room.authority(),
+							connectedPeers: () => room.connectedPeers(),
+							currencyStatement: room.currencyStatement === undefined ? undefined : () => room.currencyStatement!(),
+							confirmCurrent:
+								room.confirmCurrent === undefined ? undefined : (statement: never) => room.confirmCurrent!(statement),
+							localIssueCurrency: room.localIssueCurrency === undefined ? undefined : () => room.localIssueCurrency!(),
+							installCreatorSuccessor: (input: never) => {
+								const result = installTail.then(() => room.installCreatorSuccessor(input));
+								installTail = result.then(
+									() => undefined,
+									() => undefined
+								);
+								return result;
+							},
+						} as never)
+			);
 		}
 		const last = new Map<string, number>();
 		let creatorSeq = 0;
