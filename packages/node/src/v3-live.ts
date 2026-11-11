@@ -58,6 +58,7 @@ import {
 	issuanceOrdinaryFinishingCapacityWidths,
 	issuanceRetirementAllows,
 	issuanceRetirementPlanRewriteResourceForSizing,
+	issuancePotentialSourceCustody,
 	settlementPlanPermitsAuthenticatedPruning,
 } from "@ts-drp/issuance-store/maintenance";
 import {
@@ -20805,9 +20806,14 @@ function prospectiveCreatorPostAdoptionCensusSizing(
 		plan === candidatePlan && settlement?.planEffect !== undefined && !receivedAppend ?
 			applySettlementPlanEffect(plan, settlement.planEffect, candidate.sequence,
 				settlementReplacementLastLogicalTimeFromPreimage(candidate.bytes)) : plan);
-	const custodySourceCount = nativeRows.issued.filter(row => sameScope(row, candidate.scope)).length + Number(!receivedAppend) + futureJobs.length;
+	// Rule B/HB (issuance-image-capacity.qnt): only rows that can still become sources, and the
+	// widest own source preimage bounds a hand-back record's operation.
+	const potentialSources = issuancePotentialSourceCustody({issued: nativeRows.issued, plans: nativeRows.plans}, candidate.scope, sourceCustody);
+	const custodySourceCount = potentialSources.count + Number(!receivedAppend) + futureJobs.length;
+	const handBackOperationBytes = Math.max(potentialSources.maxPreimageByteLength, candidate.bytes.byteLength,
+		...futureJobs.map(job => job.intent.canonicalPreimageBytes.byteLength));
 	const currentPlanRewriteResource = issuanceRetirementPlanRewriteResourceForSizing(currentPlans, sourceCustody === undefined ? undefined :
-		{scope: candidate.scope, maxSourceCount: custodySourceCount, geometry: sourceCustody});
+		{scope: candidate.scope, maxSourceCount: custodySourceCount, geometry: sourceCustody, maxHandBackOperationByteLength: handBackOperationBytes});
 	const currentPublishedCensusSizing = ObjectFreeze({
 		runtimeCensusOverheadByteLength: currentRuntimeOverhead,
 		nativeRowsByteLength: currentNativeRowsByteLength,
@@ -21271,7 +21277,8 @@ function prospectiveCreatorPostAdoptionCensusSizing(
 			planIndex: planOrder.findIndex((row) => row.scope.author === author),
 		}));
 		const nativePlanRewriteResource = issuanceRetirementPlanRewriteResourceForSizing(plans, sourceCustody === undefined ? undefined :
-			{scope: candidate.scope, maxSourceCount: custodySourceCount + 1 + adoptionReserve, geometry: sourceCustody});
+			{scope: candidate.scope, maxSourceCount: custodySourceCount + 1 + adoptionReserve, geometry: sourceCustody,
+				maxHandBackOperationByteLength: handBackOperationBytes});
 		const results: CreatorPostAdoptionCensusSizing[] = [];
 		// An original signed settlement frontier selects the raw successor
 		// store (installCreatorSuccessorLive); unlike the no-settlement branch

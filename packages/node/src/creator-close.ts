@@ -3005,6 +3005,14 @@ function creatorNextEpochAdmissionForecast(
 	return chargedBytes + sink.delta + snapshotEvidence + signing + CREATOR_NEXT_EPOCH_FIXED_CUSTODY_BYTES;
 }
 
+/** Typed admission refusal (model issuance-image-capacity.qnt, maintenanceAdmits): ordinary admission
+ * sizes the same maintenance forecast the creator's maintenance later charges, so a move whose
+ * forecast exceeds a bound is refused here, before signing, and never admitted for maintenance to
+ * refuse later. */
+export const ISSUANCE_CAPACITY_FORECAST_EXCEEDED = "ISSUANCE_CAPACITY_FORECAST_EXCEEDED";
+const CREATOR_ISSUANCE_CAPACITY_REFUSAL = new RegExp("MAINTENANCE_NATIVE_IMAGE_EXHAUSTED:|MAINTENANCE_FUTURE_PROOF_ENVELOPE_EXHAUSTED:|" +
+	"source custody (plan|native material|contexts) exceed|unsigned postimage exceeds byte bound");
+
 async function chargeCreatorIssuanceMaintenanceQuote(
 	quote: CreatorIssuanceMaintenanceQuote,
 	unsignedBytes: Uint8Array,
@@ -3022,7 +3030,9 @@ async function chargeCreatorIssuanceMaintenanceQuote(
 	// fallback retains original exact sizing, without the extra diagnostic pass.
 	const { ordinaryFinishingCapacityDimensions: _diagnosticDimensions, ...exactPrefixInput } = prefixInput;
 	const prefixes = captured?.prefixes ?? await readProspectiveCreatorMaintenancePrefixesForSizing(exactPrefixInput);
-	if (!prefixes.ok) throw new TypeError(`creator issuance maintenance prefix sizing is unavailable: ${prefixes.reason}`);
+	if (!prefixes.ok) throw new TypeError(CREATOR_ISSUANCE_CAPACITY_REFUSAL.test(prefixes.reason)
+		? `${ISSUANCE_CAPACITY_FORECAST_EXCEEDED}: creator issuance maintenance forecast exceeds its bound: ${prefixes.reason}`
+		: `creator issuance maintenance prefix sizing is unavailable: ${prefixes.reason}`);
 	// Known original encodings receive only the existing byte-exact dedup law.
 	// Unknown signature/control leaves never receive identity or refund credit.
 	const known = [
