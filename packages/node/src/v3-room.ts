@@ -35,6 +35,7 @@ import {
 } from "@ts-drp/node/creator-adoption-stage";
 import {
 	bindCreatorLiveClose,
+	inspectHead,
 	maintainCreatorRecoveryPool,
 	prepareCreatorOrdinaryReadiness,
 	type BindCreatorLiveCloseInput,
@@ -98,6 +99,9 @@ import {
 	prepareBlueprintAdmission,
 	type SignRegisteredVertexDigest,
 } from "@ts-drp/protocol-v3";
+import { digestReceivedVertexPreimage } from "@ts-drp/protocol-v3/internal/received-vertex-authentication";
+import { acquireFinalitySigningExclusion, type FinalitySigningExclusion } from "@ts-drp/keychain/finality";
+import { publicKeyFromRaw } from "@libp2p/crypto/keys";
 import { openCanonicalLatchedAclSnapshot } from "@ts-drp/protocol-v3/latched-acl";
 import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
 import { type NativeReadReservation, parseStorageObjectId, type StorageObjectId } from "@ts-drp/storage";
@@ -109,7 +113,7 @@ import type {
 	RoomHeadScope as V3RoomHeadScope,
 	RoomHeadState as V3RoomHeadState,
 } from "@ts-drp/storage/room-head";
-import type { DRPNetworkNode, Message } from "@ts-drp/types";
+import { type DRPNetworkNode, type Message, MessageType, V3Envelope } from "@ts-drp/types";
 
 import { beginForegroundWork, createWorkCheckpoint, yieldToHost } from "./internal/cooperative-work.js";
 import { CREATOR_MAINTENANCE_PROOF_MAX_BYTES, createCreatorClosedRollbackProofAccounting, type CreatorLocalSessionWithdrawal } from "./internal/creator-closed-rollback-data.js";
@@ -651,6 +655,14 @@ export interface CreateV3RoomSessionInput<Projection extends V3RoomProjectionAut
 	/** Sync before sending: how long a not-yet-current move is held (default V3_ROOM_NOT_YET_CURRENT_HOLD_MS). */
 	readonly localIssueCurrencyHoldMs?: number;
 	/**
+	 * Creator restore currency (user decision 2026-11-10): how a creator that reopens from storage asks
+	 * the room's members for their view before it signs anything (examples/v3-room successor delivery's
+	 * `creatorMemberView`). Without it a reopened creator is current at once, as before.
+	 */
+	readonly creatorMemberView?: V3RoomCreatorMemberView;
+	/** Creator restore currency: how long a reopened creator waits for members (default V3_ROOM_CREATOR_RESTORE_CURRENCY_BOUND_MS). */
+	readonly creatorRestoreCurrencyBoundMs?: number;
+	/**
 	 * Opt-in speculative presentation: local moves show at once, remote moves
 	 * show once authenticated (signature + current Writer), both before durable
 	 * admission. Memory-only and display-only; projection() stays authoritative.
@@ -758,6 +770,14 @@ export interface V3RoomSession<Projection extends V3RoomProjectionAuthority = V3
 	currencyStatement?(): V3RoomCurrencyStatement;
 	/** Member: confirms the creator's statement (see V3RoomCurrencyStatement for its authenticity). */
 	confirmCurrent?(statement: V3RoomCurrencyStatement): Promise<V3RoomCurrencyResult>;
+	/**
+	 * Creator restore currency: "checking" while a creator that reopened from storage waits for its
+	 * members' view, "refused" once a member proved newer creator-signed state (it signs nothing more
+	 * in this session), "current" otherwise.
+	 */
+	creatorCurrency?(): "current" | "checking" | "refused";
+	/** Member: the creator-signed material this replica holds, for a reopened creator's check. */
+	creatorCurrencyEvidence?(): Promise<V3RoomCreatorCurrencyEvidence>;
 }
 
 export type CreateV3LocalRoomSessionInput<Projection extends V3RoomProjectionAuthority = V3RoomProjectionAuthority> =
@@ -933,6 +953,279 @@ function successorAuthority(trust: unknown, handle: RoomPlaneHandle): V3RoomSucc
 
 function digest(domain: string, value: Uint8Array): string {
 	return hex(hashDomain(domain, value));
+}
+
+// Creator restore currency (user decision 2026-11-10) -----------------------------------------
+// A creator that reopens from storage, with a member-view channel wired (creatorMemberView), asks
+// the room's members for their creator-signed view before it signs anything. Evidence counts only
+// when this creator verifies it under its own keys: a later epoch's anchor signed by its finality
+// key, or a vertex signed by its author key at or above its local next sequence. A forged or
+// unsigned claim never refuses it; a member that withholds material is "no answer". With no answer
+// within the bound it proceeds (indistinguishable from a lone creator, whose room must stay
+// usable). Once refused it stays refused for the session.
+
+const CREATOR_EVIDENCE_DECODE_LIMITS = Object.freeze({ maxBytes: 1 << 20, maxDepth: 32, maxItems: 8192 });
+
+/** Whether `haystack` contains `needle` (a short byte pattern). */
+function containsBytes(haystack: Uint8Array, needle: Uint8Array): boolean {
+	const first = needle[0];
+	if (first === undefined) return true;
+	const last = haystack.byteLength - needle.byteLength;
+	outer: for (let start = haystack.indexOf(first); start !== -1 && start <= last; start = haystack.indexOf(first, start + 1)) {
+		for (let offset = 1; offset < needle.byteLength; offset++) if (haystack[start + offset] !== needle[offset]) continue outer;
+		return true;
+	}
+	return false;
+}
+
+/** Ed25519 over a registered digest; any malformed input is simply not verified. */
+async function verifyCreatorSignature(publicKey: Uint8Array, registeredDigest: Uint8Array, signature: Uint8Array): Promise<boolean> {
+	try {
+		if (publicKey.byteLength !== 32 || signature.byteLength !== 64 || registeredDigest.byteLength !== 32) return false;
+		return (await publicKeyFromRaw(publicKey).verify(registeredDigest, signature)) === true;
+	} catch {
+		return false;
+	}
+}
+
+type CreatorRestoreLocalView = Readonly<{
+	objectId: string;
+	author: string;
+	authorPublicKey: Uint8Array;
+	finalityPublicKey: Uint8Array | undefined;
+	signerSetDigest: string;
+	epoch: number;
+	anchorDigest: string;
+	/** The creator's next author sequence (its local lineage). */
+	next: number;
+}>;
+
+function creatorRestoreLocalView(
+	input: Pick<CreateV3RoomSessionInput, "author" | "objectId" | "publicKeyBytes">,
+	material: Pick<V3RoomCreatorInviteMaterial, "exactCanonicalSignerSetBytes">,
+	head: Readonly<{ epoch: number; currentAnchorDigest: string }>,
+	lineage: Readonly<{ next: number; exhausted: boolean }>
+): CreatorRestoreLocalView {
+	let finalityPublicKey: Uint8Array | undefined;
+	try {
+		const signers = decodeCanonical(material.exactCanonicalSignerSetBytes) as unknown;
+		const key = Array.isArray(signers) && signers.length === 1 ? Reflect.get(signers[0] as object, "publicKey") : undefined;
+		finalityPublicKey = typeof key === "string" && /^[0-9a-f]{64}$/u.test(key) ? bytes(key) : undefined;
+	} catch {
+		finalityPublicKey = undefined;
+	}
+	return Object.freeze({
+		objectId: input.objectId,
+		author: input.author,
+		authorPublicKey: new Uint8Array(input.publicKeyBytes),
+		finalityPublicKey,
+		signerSetDigest: digest("ts-drp/signer-set/v3", material.exactCanonicalSignerSetBytes),
+		epoch: head.epoch,
+		anchorDigest: head.currentAnchorDigest,
+		next: lineage.exhausted || !Number.isSafeInteger(lineage.next) ? Number.MAX_SAFE_INTEGER : lineage.next,
+	});
+}
+
+function signedPair(value: unknown): Readonly<{ preimage: Uint8Array; signature: Uint8Array }> | undefined {
+	if (value === null || typeof value !== "object") return undefined;
+	const preimage = Reflect.get(value, "preimage");
+	const signature = Reflect.get(value, "signature");
+	return preimage instanceof Uint8Array && signature instanceof Uint8Array && preimage.byteLength <= CREATOR_EVIDENCE_DECODE_LIMITS.maxBytes
+		? { preimage, signature }
+		: undefined;
+}
+
+function evidenceRecord(preimage: Uint8Array): Record<string, unknown> | undefined {
+	try {
+		const value = decodeCanonical(preimage, CREATOR_EVIDENCE_DECODE_LIMITS);
+		return value !== null && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+/**
+ * What a member's evidence proves against this creator's local view, after verifying it under the
+ * creator's own keys: a detail when it shows newer creator-signed state, otherwise undefined.
+ */
+async function creatorEvidenceNewer(evidence: unknown, local: CreatorRestoreLocalView): Promise<string | undefined> {
+	if (evidence === null || typeof evidence !== "object" || Reflect.get(evidence, "objectId") !== local.objectId) return undefined;
+	const anchor = signedPair(Reflect.get(evidence, "anchor"));
+	if (anchor !== undefined && local.finalityPublicKey !== undefined) {
+		const record = evidenceRecord(anchor.preimage);
+		const epoch = record?.epoch;
+		if (
+			record?.kind === "drp-epoch-anchor" &&
+			record.protocolMajor === 3 &&
+			record.objectId === local.objectId &&
+			record.signerSetDigest === local.signerSetDigest &&
+			Number.isSafeInteger(epoch) &&
+			(epoch as number) >= 0
+		) {
+			const anchorDigest = hashDomain("ts-drp/epoch-anchor/v3", anchor.preimage);
+			if (await verifyCreatorSignature(local.finalityPublicKey, anchorDigest, anchor.signature)) {
+				if ((epoch as number) > local.epoch)
+					return `a member holds this creator's signed anchor for epoch ${String(epoch)}; this creator reopened at epoch ${local.epoch}`;
+				if (epoch === local.epoch && hex(anchorDigest) !== local.anchorDigest)
+					return `a member holds a different anchor this creator signed for epoch ${local.epoch}`;
+			}
+		}
+	}
+	const vertex = signedPair(Reflect.get(evidence, "creatorVertex"));
+	if (vertex !== undefined) {
+		const record = evidenceRecord(vertex.preimage);
+		const sequence = record?.authorSequence;
+		const epoch = record?.epoch;
+		if (
+			record?.kind === "drp-vertex" &&
+			record.protocolMajor === 3 &&
+			record.objectId === local.objectId &&
+			record.author === local.author &&
+			Number.isSafeInteger(sequence) &&
+			Number.isSafeInteger(epoch) &&
+			((sequence as number) >= local.next || (epoch as number) > local.epoch) &&
+			(await verifyCreatorSignature(local.authorPublicKey, digestReceivedVertexPreimage(vertex.preimage), vertex.signature))
+		)
+			return `a member holds this creator's signed vertex at sequence ${String(sequence)} (epoch ${String(epoch)}); this creator reopened with next sequence ${local.next} at epoch ${local.epoch}`;
+	}
+	return undefined;
+}
+
+interface CreatorRestoreCurrencyGate {
+	state(): "current" | "checking" | "refused";
+	refusal(): V3RoomNotYetCurrent | undefined;
+	/** Resolves once this session may sign; rejects with the refusal (or the session's close). */
+	admit(): Promise<void>;
+	/** Runs `listener` once the check decides (at once when it already has). */
+	onDecided(listener: (refusal: V3RoomNotYetCurrent | undefined) => void): void;
+	close(): void;
+}
+
+/**
+ * Starts one reopened creator's check (see above). While it runs, the keychain's finality signing
+ * exclusion is held, so no path of this session can sign with the finality key; it is released when
+ * the check decides "current" and kept after a refusal until the session closes.
+ */
+function startCreatorRestoreCurrencyGate(input: Readonly<{
+	view: V3RoomCreatorMemberView;
+	boundMs: number;
+	local: CreatorRestoreLocalView;
+	finalitySigner?: NonNullable<CreateV3RoomSessionInput["creatorFinalitySigner"]>;
+}>): CreatorRestoreCurrencyGate {
+	let state: "current" | "checking" | "refused" = "checking";
+	let refusal: V3RoomNotYetCurrent | undefined;
+	let closedError: Error | undefined;
+	let asked = false;
+	let expired = false;
+	let verifying = 0;
+	let releasing = false;
+	const listeners: ((refusal: V3RoomNotYetCurrent | undefined) => void)[] = [];
+	let settle!: (outcome: V3RoomNotYetCurrent | Error | undefined) => void;
+	const decided = new Promise<V3RoomNotYetCurrent | Error | undefined>((resolve) => {
+		settle = resolve;
+	});
+	const lifetime = new AbortController();
+	// Unref'd: a pending check never keeps a host process alive.
+	const timer = setTimeout(() => {
+		expired = true;
+		decide();
+	}, input.boundMs);
+	(timer as { unref?: () => void }).unref?.();
+	let exclusion: Promise<FinalitySigningExclusion | undefined> = Promise.resolve(undefined);
+	if (input.finalitySigner !== undefined) {
+		// A signer outside the keychain's custody (a test double) has no exclusion; the session's own
+		// choke points still hold.
+		exclusion = acquireFinalitySigningExclusion({ signer: input.finalitySigner }).catch(() => undefined);
+	}
+	const release = (): Promise<void> =>
+		exclusion.then((held) => held?.release()).then(
+			() => undefined,
+			() => undefined
+		);
+	const finish = (outcome: V3RoomNotYetCurrent | undefined): void => {
+		for (const listener of listeners.splice(0)) listener(outcome);
+		settle(outcome);
+	};
+	const decide = (): void => {
+		if (state !== "checking" || releasing || closedError !== undefined) return;
+		if (!(asked || expired) || verifying > 0) return;
+		releasing = true;
+		lifetime.abort();
+		clearTimeout(timer);
+		void release().then(() => {
+			if (closedError !== undefined || state !== "checking") return;
+			state = "current";
+			finish(undefined);
+		});
+	};
+	const refuse = (detail: string): void => {
+		if (state !== "checking" || closedError !== undefined) return;
+		state = "refused";
+		refusal = new V3RoomNotYetCurrent("creator-superseded", detail);
+		lifetime.abort();
+		clearTimeout(timer);
+		finish(refusal);
+	};
+	try {
+		void Promise.resolve(
+			input.view.ask(
+				Object.freeze({
+					objectId: input.local.objectId,
+					signal: lifetime.signal,
+					answer: (evidence: V3RoomCreatorCurrencyEvidence): void => {
+						if (state !== "checking") return;
+						verifying++;
+						void creatorEvidenceNewer(evidence, input.local).then(
+							(detail) => {
+								verifying--;
+								if (detail !== undefined) refuse(detail);
+								else decide();
+							},
+							() => {
+								verifying--;
+								decide();
+							}
+						);
+					},
+				})
+			)
+		).then(
+			() => {
+				asked = true;
+				decide();
+			},
+			// A failed ask is "no answer": the bound decides.
+			() => undefined
+		);
+	} catch {
+		// A throwing member view is "no answer": the bound decides.
+	}
+	return Object.freeze({
+		state: () => state,
+		refusal: () => refusal,
+		admit: (): Promise<void> => {
+			if (state === "current") return Promise.resolve();
+			if (refusal !== undefined) return Promise.reject(refusal);
+			if (closedError !== undefined) return Promise.reject(closedError);
+			return decided.then((outcome) => {
+				if (outcome !== undefined) throw outcome;
+			});
+		},
+		onDecided: (listener: (refusal: V3RoomNotYetCurrent | undefined) => void): void => {
+			if (state === "current") listener(undefined);
+			else if (state === "refused") listener(refusal);
+			else listeners.push(listener);
+		},
+		close: (): void => {
+			if (closedError !== undefined) return;
+			closedError = new TypeError("v3 room session is closed");
+			lifetime.abort();
+			clearTimeout(timer);
+			listeners.splice(0);
+			settle(refusal ?? closedError);
+			void release();
+		},
+	});
 }
 
 function strictDetachedBytes(value: unknown, name: string, expectedLength?: number): Uint8Array {
@@ -1322,6 +1615,10 @@ export const V3_ROOM_NOT_YET_CURRENT_HOLD_MS = 120_000;
  * did not catch up to the room's current epoch within the hold ("hold-expired"), or the creator
  * admitted this author's work above its lineage in that epoch ("behind-frontier": a stale copy, such
  * as a restored backup). Nothing was signed; the caller still owns the move.
+ * "creator-superseded" (creator restore currency): this creator reopened from storage and a member
+ * holds creator-signed state newer than its own (a later epoch's anchor, or a creator vertex at or
+ * above its next sequence): it is a stale copy of the creator, such as a restored backup. It signs
+ * nothing (moves, seals, adoptions) for the rest of the session; the session stays readable.
  */
 export class V3RoomNotYetCurrent extends TypeError {
 	readonly code = "V3_ROOM_NOT_YET_CURRENT";
@@ -1330,7 +1627,7 @@ export class V3RoomNotYetCurrent extends TypeError {
 	 * @param detail - What the writer waited for, or the frontier it is behind.
 	 */
 	constructor(
-		readonly reason: "hold-expired" | "behind-frontier" | "statement-required",
+		readonly reason: "hold-expired" | "behind-frontier" | "statement-required" | "creator-superseded",
 		detail: string
 	) {
 		super(`V3_ROOM_NOT_YET_CURRENT: ${reason}: ${detail}`);
@@ -1383,6 +1680,40 @@ export type V3RoomCurrencyStatement = Readonly<{
 
 /** What confirmCurrent concluded. Only "current" lets held and later moves be signed. */
 export type V3RoomCurrencyResult = "current" | "other-epoch" | "behind-frontier";
+
+/**
+ * Creator restore currency (user decision 2026-11-10): how long a creator that reopened from storage
+ * waits for its members' view before it proceeds alone. It waits only until every member it asked
+ * has answered; the full bound is paid only when no member answers (a lone creator, or a device that
+ * has not reconnected yet), once per session and only by its first signature. Long enough for a
+ * reloaded page to redial its room peers and answer one request; short enough that a lone creator's
+ * first move after a reload is merely late.
+ */
+export const V3_ROOM_CREATOR_RESTORE_CURRENCY_BOUND_MS = 5_000;
+
+/**
+ * A member's view of the room for a reopened creator: only material the creator's own keys signed,
+ * so the creator verifies it itself and a member cannot forge it. Either part may be absent; an
+ * answer with neither is "nothing newer". A member that withholds material only reduces to "no
+ * answer".
+ */
+export type V3RoomCreatorCurrencyEvidence = Readonly<{
+	objectId: string;
+	/** The member's current epoch anchor (exact preimage and the creator's detached signature); absent at epoch 0. */
+	anchor?: Readonly<{ preimage: Uint8Array; signature: Uint8Array }>;
+	/** The highest creator-authored vertex this replica accepted in this session (exact envelope preimage and signature). */
+	creatorVertex?: Readonly<{ preimage: Uint8Array; signature: Uint8Array }>;
+}>;
+
+/** How a reopened creator asks its room's members (examples/v3-room successor delivery wires it). */
+export interface V3RoomCreatorMemberView {
+	/**
+	 * Asks the room's connected members (and members that connect while it runs) for their view and
+	 * hands each answer to `answer` as it arrives. Settles once every member asked has answered (at
+	 * least one); the room stops waiting at its bound or when `signal` aborts.
+	 */
+	ask(input: Readonly<{ objectId: string; signal: AbortSignal; answer(evidence: V3RoomCreatorCurrencyEvidence): void }>): Promise<void>;
+}
 
 /**
  * Authenticates a bounded signed invite against a host-registered application before host acquisition.
@@ -2828,6 +3159,25 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			}),
 		};
 	}
+	// Creator restore currency (user decision 2026-11-10): a creator that reopens from storage may be a
+	// stale copy of the creator (a restored backup that still holds its keys). When the application
+	// wired a way to ask the room's members (creatorMemberView), the session checks their
+	// creator-signed view before it signs anything (startCreatorRestoreCurrencyGate). Every vertex
+	// signature of this session passes this one signer (moves, fences, replacements, resumed intents,
+	// approvals); the finality key's choke points are below (seal, adoption, recovery pool) plus the
+	// keychain's signing exclusion while the check runs or after a refusal.
+	let creatorRestoreGate: CreatorRestoreCurrencyGate | undefined;
+	const creatorRestoreEligible =
+		input.creatorFinalitySigner !== undefined &&
+		input.receiveOnly !== true &&
+		input.creatorMemberView !== undefined &&
+		!requireFreshTrust &&
+		!skipRoomHeadAuthority &&
+		redirectSource === undefined;
+	if (input.creatorRestoreCurrencyBoundMs !== undefined &&
+		(!Number.isSafeInteger(input.creatorRestoreCurrencyBoundMs) || input.creatorRestoreCurrencyBoundMs < 0))
+		throw new TypeError("v3 room creator restore currency bound is invalid");
+	const ungatedVertexSigner = input.signRegisteredVertexDigest;
 	input = Object.freeze({
 		...input,
 		storageHost: captureV3RoomStorageHost(input.storageHost),
@@ -2835,6 +3185,16 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			...input.application,
 			displacementPolicies: Object.freeze({ ...input.application.displacementPolicies }),
 		}),
+		...(creatorRestoreEligible
+			? {
+					signRegisteredVertexDigest: async (
+						...args: Parameters<SignRegisteredVertexDigest>
+					): Promise<Uint8Array> => {
+						if (creatorRestoreGate !== undefined) await creatorRestoreGate.admit();
+						return Reflect.apply(ungatedVertexSigner, undefined, args) as Promise<Uint8Array>;
+					},
+				}
+			: {}),
 	});
 	const captureInvite = (
 		creatorInvite: string | V3RoomCreatorInviteMaterial
@@ -3406,6 +3766,41 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	};
 	let logicalTime = input.initialLogicalTime;
 	const roomCreatorAuthor = roomInviteAuthority === undefined ? input.author : roomInviteAuthority.creatorAuthor;
+	// Creator restore currency, member side: the highest creator-authored vertex this replica received
+	// in this session (exact envelope, its creator signature verified), for a reopened creator's check.
+	let heldCreatorVertex: Readonly<{ preimage: Uint8Array; signature: Uint8Array; sequence: number }> | undefined;
+	let heldCreatorAnchor:
+		| Readonly<{ authority: V3RoomSuccessorAuthority; anchor: Readonly<{ preimage: Uint8Array; signature: Uint8Array }> | undefined }>
+		| undefined;
+	const creatorAuthorBytes = new TextEncoder().encode(roomCreatorAuthor);
+	const creatorAuthorKey = /^[0-9a-f]{64}$/u.test(roomCreatorAuthor) ? bytes(roomCreatorAuthor) : undefined;
+	const observeCreatorVertex = (message: Message): void => {
+		if (input.author === roomCreatorAuthor || creatorAuthorKey === undefined) return;
+		if (message.type !== MessageType.MESSAGE_TYPE_V3_ENVELOPE || !(message.data instanceof Uint8Array)) return;
+		// Cheap filter first: only an envelope that carries the creator's author text is decoded.
+		if (!containsBytes(message.data, creatorAuthorBytes)) return;
+		try {
+			const envelope = V3Envelope.decode(message.data);
+			const preimage = decodeCanonical(envelope.canonicalPreimage, CREATOR_EVIDENCE_DECODE_LIMITS) as Record<string, unknown>;
+			const sequence = preimage.authorSequence;
+			if (preimage.author !== roomCreatorAuthor || preimage.objectId !== input.objectId || !Number.isSafeInteger(sequence))
+				return;
+			if (heldCreatorVertex !== undefined && (sequence as number) <= heldCreatorVertex.sequence) return;
+			const candidate = Object.freeze({
+				preimage: new Uint8Array(envelope.canonicalPreimage),
+				signature: new Uint8Array(envelope.signature),
+				sequence: sequence as number,
+			});
+			void verifyCreatorSignature(creatorAuthorKey, digestReceivedVertexPreimage(candidate.preimage), candidate.signature).then(
+				(verified) => {
+					if (verified && (heldCreatorVertex === undefined || candidate.sequence > heldCreatorVertex.sequence))
+						heldCreatorVertex = candidate;
+				}
+			);
+		} catch {
+			// Not a creator vertex this replica can attest: nothing is kept.
+		}
+	};
 	const currentMigrationRecordAuthority = (): MigrationRecordAuthority | undefined =>
 		input.application.migration === undefined
 			? undefined
@@ -4184,6 +4579,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		if (closePromise !== undefined) return closePromise;
 		closed = true;
 		endSessionWaits();
+		creatorRestoreGate?.close();
 		closePresentation();
 		revokeTransport();
 		cancelRedirectCreation();
@@ -4545,6 +4941,19 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 	};
 	try {
+		// Creator restore currency: armed once the local head and lineage are known and before anything
+		// of this open can sign (the startup plane, its drains and the creator close binding follow).
+		// A room this open created (fresh lineage) has nothing signed elsewhere: it starts current.
+		if (creatorRestoreEligible && !freshLocalLineage && input.creatorMemberView !== undefined) {
+			const head = openedRoomHeadState?.pending?.next ?? openedRoomHeadState?.stable ?? genesisRoomHead;
+			const lineage = await issuanceStore.readLineage(Object.freeze({ author: input.author, objectId: input.objectId }));
+			creatorRestoreGate = startCreatorRestoreCurrencyGate({
+				view: input.creatorMemberView,
+				boundMs: input.creatorRestoreCurrencyBoundMs ?? V3_ROOM_CREATOR_RESTORE_CURRENCY_BOUND_MS,
+				local: creatorRestoreLocalView(input, material, head, lineage),
+				...(input.creatorFinalitySigner === undefined ? {} : { finalitySigner: input.creatorFinalitySigner }),
+			});
+		}
 		const openedTransport = input.openTransport(input.objectId);
 		transport = openedTransport;
 		if (authorizeSettlementSource === undefined && openedTransport.requestSettlementSourceAuthorization !== undefined) {
@@ -4740,10 +5149,15 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					localOwner?.assertCurrent();
 					presentRemoteIngress(message);
 					routeV3Ingress(openedTransport.networkNode, message);
+					observeCreatorVertex(message);
 				}
 			},
 			(message) => {
-				if (!closed && activeHandle !== undefined) { localOwner?.assertCurrent(); routeV3RetainedIngress(activeHandle, message); }
+				if (!closed && activeHandle !== undefined) {
+					localOwner?.assertCurrent();
+					routeV3RetainedIngress(activeHandle, message);
+					observeCreatorVertex(message);
+				}
 			}
 		);
 		// The live topic is stable across successors, so one binding serves every epoch.
@@ -4921,12 +5335,14 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	// a migration rehearsal's scratch target (opened internally, with no room head and a transport
 	// that publishes nothing) when this author is that target's creator: it is the creator of a room
 	// no one else has joined yet, re-entered only to resume its own exact authenticated prefix.
+	// A creator whose restore currency check is still running holds its moves exactly as a
+	// not-yet-current writer does (below), and is refused with the check's refusal.
 	let localIssueCurrent =
-		input.creatorFinalitySigner !== undefined ||
+		(input.creatorFinalitySigner !== undefined && (creatorRestoreGate?.state() ?? "current") === "current") ||
 		input.receiveOnly === true ||
 		freshLocalLineage ||
 		(skipRoomHeadAuthority && input.author === roomCreatorAuthor);
-	let localIssueRefusal: V3RoomNotYetCurrent | undefined;
+	let localIssueRefusal: V3RoomNotYetCurrent | undefined = creatorRestoreGate?.refusal();
 	// A pending unsigned intent the settlement drain left for currency (C03 layer 2), and the drain
 	// that resumes it once the session is current, before any held move is released.
 	let pendingIntentAwaitsCurrency = false;
@@ -5021,6 +5437,16 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	};
 	sessionLifetime.signal.addEventListener("abort", () => refuseHeldUntilCurrent(sessionLifetime.signal.reason), {
 		once: true,
+	});
+	// Creator restore currency: the check's decision releases the held moves (and a startup drain
+	// left for currency) or refuses them, as a writer's currency does.
+	creatorRestoreGate?.onDecided((refusal) => {
+		if (refusal === undefined) {
+			becomeLocalIssueCurrent();
+			return;
+		}
+		localIssueRefusal ??= refusal;
+		refuseHeldUntilCurrent(localIssueRefusal);
 	});
 	// A move made while a member's install owns the plane under the settlement profile: held, not
 	// refused, and issued once that install has settled, in logical-time order, on the plane it left
@@ -7899,7 +8325,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	};
 	const adoptCreatorSuccessor = (): Promise<void> => {
 		if (creatorSuccessorAdoptionTask !== undefined) return creatorSuccessorAdoptionTask;
-		const attempt = enqueueLifetimeTransition(async () => {
+		// Adoption signs the successor anchor: a creator restore currency check decides first.
+		const attempt = (creatorRestoreGate?.admit() ?? Promise.resolve()).then(() => enqueueLifetimeTransition(async () => {
 			if (redirectPromise !== undefined) await redirectPromise;
 			assertSessionOpen();
 			if (redirectedSession !== undefined) {
@@ -7907,7 +8334,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			}
 			await performCreatorSuccessorAdoption();
 			scheduledLulls?.schedule();
-		});
+		}));
 		const shared = attempt.finally(() => {
 			if (creatorSuccessorAdoptionTask === shared) creatorSuccessorAdoptionTask = undefined;
 			releaseHeldIssues();
@@ -8427,9 +8854,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			}
 		};
 	}
-	// One creator close of the current epoch, in the lifetime FIFO.
+	// One creator close of the current epoch, in the lifetime FIFO. A creator restore currency check
+	// decides first (sealing signs with the finality key); a refused creator never seals.
 	const sealEpochNow = (): Promise<CreatorLiveCloseResult> =>
-		enqueueLifetimeTransition(async () => {
+		(creatorRestoreGate?.admit() ?? Promise.resolve()).then(() => enqueueLifetimeTransition(async () => {
 			if (redirectPromise !== undefined) await redirectPromise;
 			if (redirectedSession !== undefined) return redirectedSession.sealEpoch();
 			assertSessionOpen();
@@ -8448,7 +8876,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			await yieldToHost();
 			await serveAvailableSuccessor();
 			return result;
-		});
+		}));
 	const session: V3RoomSession<Projection> = Object.freeze({
 		...(localOwner === undefined ? {} : { localSession: localOwner.control }),
 		activateMigration,
@@ -8505,6 +8933,39 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		},
 		localIssueCurrency(): "current" | "not-yet-current" {
 			return redirectedSession?.localIssueCurrency?.() ?? (localIssueCurrent ? "current" : "not-yet-current");
+		},
+		creatorCurrency(): "current" | "checking" | "refused" {
+			return redirectedSession?.creatorCurrency?.() ?? creatorRestoreGate?.state() ?? "current";
+		},
+		async creatorCurrencyEvidence(): Promise<V3RoomCreatorCurrencyEvidence> {
+			if (redirectedSession?.creatorCurrencyEvidence !== undefined) return redirectedSession.creatorCurrencyEvidence();
+			assertSessionOpen();
+			// The current epoch's signed anchor, from this replica's durable head (read once per epoch).
+			const authority = successorProjectionAuthority;
+			if (authority !== null && heldCreatorAnchor?.authority !== authority) {
+				let anchor: Readonly<{ preimage: Uint8Array; signature: Uint8Array }> | undefined;
+				try {
+					const head = await inspectHead(aheStores[0]!, objectIdResult.value);
+					const record = decodeCanonical(
+						head.candidates.find(({ ref }) => ref.digest === head.trustRef.digest)?.bytes ?? new Uint8Array()
+					) as Record<string, unknown>;
+					const preimage = record.exactCanonicalCurrentAnchorPreimageBytes;
+					const signature = record.detachedCurrentAnchorSignature;
+					if (record.currentEpoch === authority.epoch && preimage instanceof Uint8Array && signature instanceof Uint8Array)
+						anchor = Object.freeze({ preimage: new Uint8Array(preimage), signature: new Uint8Array(signature) });
+				} catch {
+					anchor = undefined;
+				}
+				heldCreatorAnchor = Object.freeze({ authority, anchor });
+			}
+			const anchor = authority === null ? undefined : heldCreatorAnchor?.anchor;
+			return Object.freeze({
+				objectId: input.objectId,
+				...(anchor === undefined ? {} : { anchor }),
+				...(heldCreatorVertex === undefined
+					? {}
+					: { creatorVertex: Object.freeze({ preimage: new Uint8Array(heldCreatorVertex.preimage), signature: new Uint8Array(heldCreatorVertex.signature) }) }),
+			});
 		},
 		currencyStatement(): V3RoomCurrencyStatement {
 			if (redirectedSession?.currencyStatement !== undefined) return redirectedSession.currencyStatement();
@@ -8924,6 +9385,9 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				assertSessionOpen();
 				const lull = async (): Promise<CreatorRecoveryPoolResult> => {
 					if (input.receiveOnly || creatorCloseHandle === undefined) return maintainRecipientRecoveryPool();
+					// Creator maintenance signs retirements: deferred while a restore currency check runs or after a refusal.
+					if (creatorRestoreGate !== undefined && creatorRestoreGate.state() !== "current")
+						return Object.freeze({ kind: "deferred" as const, reason: "busy" as const });
 					await rebasePromise;
 					await migrationCompletionBarrier;
 					let open!: () => void;

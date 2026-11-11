@@ -774,6 +774,8 @@ export function createV3ZoneApi(
 				creatorInvite,
 				...(approveSettlementSourceSelection === undefined ? {} : { approveSettlementSourceSelection }),
 				...(creatorFinalitySigner === undefined ? {} : { creatorFinalitySigner }),
+				// Creator restore currency: a reopened creator asks the zone's members before it signs.
+				...(delivery?.role === "creator" ? { creatorMemberView: delivery.creatorMemberView } : {}),
 				createOperationAdmissionPolicy: (context) =>
 					createOutcomeCommitAdmissionPolicy({
 						aclDigest: context.aclDigest,

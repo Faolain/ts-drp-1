@@ -1,5 +1,10 @@
 import { compareBytes, decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
-import type { V3RoomCurrencyStatement, V3RoomSession } from "@ts-drp/node/v3-room";
+import type {
+	V3RoomCreatorCurrencyEvidence,
+	V3RoomCreatorMemberView,
+	V3RoomCurrencyStatement,
+	V3RoomSession,
+} from "@ts-drp/node/v3-room";
 import { Message, MessageType } from "@ts-drp/types";
 
 import type { V3RoomSuccessorOffer } from "./rollover.js";
@@ -32,6 +37,13 @@ import type { V3RoomSuccessorOffer } from "./rollover.js";
  *   creator's currency statement instead (its current epoch, anchor and admitted frontiers). The
  *   member hands it to its room (`confirmCurrent`) only when it came from the creator's peer, the
  *   stream's authenticated sender; the room checks the epoch, anchor and its own frontier.
+ * - Creator restore currency (user decision 2026-11-10): a creator that reopens from storage asks
+ *   its connected peers for their view (`creatorMemberView`, handed to the room at open). A member
+ *   answers with creator-signed material its room holds (its current epoch anchor and the highest
+ *   creator vertex it received); the creator's room verifies it under its own keys.
+ *   The ask settles once every asked peer answered, or V3_ROOM_CREATOR_VIEW_GRACE_MS after the
+ *   first answer (a connected peer that is not a room member never answers); the room's bound
+ *   covers the rest.
  *
  * Size: `/drp/message` and the creator-successor material protocol do not run on limited (relayed)
  * connections, so a member reachable only over a relay waits for a direct connection, as live
@@ -52,11 +64,18 @@ const RETRY_BACKOFF_MS = [2_000, 5_000, 15_000, 30_000] as const;
 const OFFER_KIND = "ts-drp-v3-successor-offer";
 const REQUEST_KIND = "ts-drp-v3-successor-offer-request";
 const CURRENCY_KIND = "ts-drp-v3-room-currency";
+const VIEW_REQUEST_KIND = "ts-drp-v3-room-creator-view-request";
+const VIEW_KIND = "ts-drp-v3-room-creator-view";
+/** After a reopened creator's first member answer, how long it waits for the other peers it asked. */
+export const V3_ROOM_CREATOR_VIEW_GRACE_MS = 500;
+const VIEW_RESEND_MS = 1_000;
 // Depth 3: a currency frame's frontiers are [author, sequence] pairs.
 const FRAME_LIMITS = { maxBytes: V3_ROOM_SUCCESSOR_OFFER_MAX_BYTES, maxDepth: 3, maxItems: 64 };
 const OFFER_KEYS = ["cut", "kind", "manifest", "qc", "successorEpoch", "trust", "version"];
 const REQUEST_KEYS = ["epoch", "kind", "version"];
 const CURRENCY_KEYS = ["anchorDigest", "epoch", "frontiers", "kind", "objectId", "version"];
+const VIEW_REQUEST_KEYS = ["kind", "version"];
+const VIEW_KEYS = ["anchor", "kind", "objectId", "version", "vertex"];
 
 /** The page's network node as the delivery uses it (a `DRPNode`). */
 export interface V3RoomSuccessorNode {
@@ -180,11 +199,17 @@ export interface V3RoomSuccessorDeliveryHooks {
 }
 
 type DeliveryRoom = Pick<V3RoomSession, "authority" | "connectedPeers" | "installCreatorSuccessor"> &
-	Partial<Pick<V3RoomSession, "currencyStatement" | "confirmCurrent" | "localIssueCurrency">>;
+	Partial<Pick<V3RoomSession, "currencyStatement" | "confirmCurrent" | "localIssueCurrency" | "creatorCurrencyEvidence">>;
 
 export interface V3RoomSuccessorDelivery {
 	readonly role: "creator" | "member";
 	bind(room: DeliveryRoom): void;
+	/**
+	 * Creator: how its room, reopened from storage, asks the room's members for their view before it
+	 * signs anything (creator restore currency). Hand it to the room at open (`creatorMemberView`);
+	 * it needs no bound room.
+	 */
+	readonly creatorMemberView: V3RoomCreatorMemberView;
 	/** Creator: the adopted successor's offer (the rollover policy's `publishSuccessor`). */
 	publish(offer: V3RoomSuccessorOffer, successorEpoch: number): Promise<void>;
 	/** Member: ask the creator for its latest offer now (rate limited). */
@@ -218,7 +243,55 @@ function encodeOffer(offer: V3RoomSuccessorOffer, successorEpoch: number): Uint8
 type Frame =
 	| Readonly<{ kind: "offer"; offer: V3RoomSuccessorOffer; successorEpoch: number; bytes: Uint8Array }>
 	| Readonly<{ kind: "request"; epoch: number }>
-	| Readonly<{ kind: "currency"; statement: V3RoomCurrencyStatement }>;
+	| Readonly<{ kind: "currency"; statement: V3RoomCurrencyStatement }>
+	| Readonly<{ kind: "view-request" }>
+	| Readonly<{ kind: "view"; evidence: V3RoomCreatorCurrencyEvidence }>;
+
+const signedPairBytes = (pair: Readonly<{ preimage: Uint8Array; signature: Uint8Array }> | undefined): Uint8Array[] =>
+	pair === undefined ? [] : [pair.preimage, pair.signature];
+
+function encodeView(evidence: V3RoomCreatorCurrencyEvidence): Uint8Array {
+	const frame = (vertex: boolean): Uint8Array =>
+		encodeCanonical(
+			{
+				kind: VIEW_KIND,
+				version: 1,
+				objectId: evidence.objectId,
+				anchor: signedPairBytes(evidence.anchor),
+				vertex: vertex ? signedPairBytes(evidence.creatorVertex) : [],
+			},
+			FRAME_LIMITS
+		);
+	// A creator vertex too large for one frame is left out (its anchor still travels).
+	try {
+		return frame(true);
+	} catch {
+		return frame(false);
+	}
+}
+
+function decodeSignedPair(value: unknown): Readonly<{ preimage: Uint8Array; signature: Uint8Array }> | null | undefined {
+	if (!Array.isArray(value)) return null;
+	if (value.length === 0) return undefined;
+	const [preimage, signature] = value as unknown[];
+	return value.length === 2 && preimage instanceof Uint8Array && signature instanceof Uint8Array
+		? Object.freeze({ preimage, signature })
+		: null;
+}
+
+function decodeView(record: Record<string, unknown>): Frame | undefined {
+	const anchor = decodeSignedPair(record.anchor);
+	const vertex = decodeSignedPair(record.vertex);
+	if (typeof record.objectId !== "string" || anchor === null || vertex === null) return undefined;
+	return {
+		kind: "view",
+		evidence: Object.freeze({
+			objectId: record.objectId,
+			...(anchor === undefined ? {} : { anchor }),
+			...(vertex === undefined ? {} : { creatorVertex: vertex }),
+		}),
+	};
+}
 
 function encodeCurrency(statement: V3RoomCurrencyStatement): Uint8Array {
 	return encodeCanonical(
@@ -269,6 +342,8 @@ function decodeFrame(bytes: Uint8Array): Frame | undefined {
 	const keys = Object.keys(record).sort().join(",");
 	if (record.version !== 1) return undefined;
 	if (record.kind === CURRENCY_KIND && keys === CURRENCY_KEYS.join(",")) return decodeCurrency(record);
+	if (record.kind === VIEW_REQUEST_KIND && keys === VIEW_REQUEST_KEYS.join(",")) return { kind: "view-request" };
+	if (record.kind === VIEW_KIND && keys === VIEW_KEYS.join(",")) return decodeView(record);
 	if (record.kind === REQUEST_KIND && keys === REQUEST_KEYS.join(",")) {
 		return Number.isSafeInteger(record.epoch) && Number(record.epoch) >= 0
 			? { kind: "request", epoch: Number(record.epoch) }
@@ -358,6 +433,8 @@ export function createV3RoomSuccessorDelivery(
 	let latest: Readonly<{ successorEpoch: number; bytes: Uint8Array }> | undefined;
 	const known = new Set<string>();
 	const answeredAt = new Map<string, number>();
+	// Member: when it last answered each peer's member-view request (creator restore currency).
+	const viewAnsweredAt = new Map<string, number>();
 	// Member.
 	let candidate: Extract<Frame, { kind: "offer" }> | undefined;
 	// Sync before sending (live install rule): the creator's statement for an epoch ahead of the
@@ -517,6 +594,24 @@ export function createV3RoomSuccessorDelivery(
 			stats.malformed++;
 			return;
 		}
+		// Creator restore currency: a member answers its creator's request with its room's
+		// creator-signed material. A creator's own ask (creatorMemberView) listens for answers.
+		if (frame.kind === "view") return;
+		if (frame.kind === "view-request") {
+			// Any requester is answered (a restored creator device may come back under a new peer id):
+			// the material is creator-signed and public, and the creator verifies it. Rate limited.
+			const evidence = room?.creatorCurrencyEvidence;
+			if (role !== "member" || evidence === undefined || room === undefined) return;
+			const now = Date.now();
+			if (now - (viewAnsweredAt.get(sender) ?? 0) < ANSWER_MIN_INTERVAL_MS) return;
+			viewAnsweredAt.set(sender, now);
+			if (viewAnsweredAt.size > KNOWN_PEERS_MAX) viewAnsweredAt.delete(viewAnsweredAt.keys().next().value as string);
+			void Promise.resolve()
+				.then(() => evidence.call(room))
+				.then((value) => send(sender, encodeView(value)))
+				.catch((error: unknown) => report(error));
+			return;
+		}
 		if (frame.kind === "request") {
 			if (role !== "creator") return;
 			remember(sender);
@@ -597,8 +692,62 @@ export function createV3RoomSuccessorDelivery(
 		install();
 	};
 
+	const creatorMemberView: V3RoomCreatorMemberView = Object.freeze({
+		ask: (request: Parameters<V3RoomCreatorMemberView["ask"]>[0]): Promise<void> =>
+			new Promise<void>((resolve) => {
+				const asked = new Set<string>();
+				const answered = new Set<string>();
+				const cleanup: (() => void)[] = [];
+				let finished = false;
+				const done = (): void => {
+					if (finished) return;
+					finished = true;
+					for (const stop of cleanup.splice(0)) stop();
+					resolve();
+				};
+				if (role !== "creator" || closed || request.signal.aborted) return done();
+				const requestBytes = encodeCanonical({ kind: VIEW_REQUEST_KIND, version: 1 }, FRAME_LIMITS);
+				const ask = (peerId: string): void => {
+					if (finished || peerId === channel.localPeerId || answered.has(peerId)) return;
+					asked.add(peerId);
+					void send(peerId, requestBytes);
+				};
+				const check = (): void => {
+					if (answered.size > 0 && [...asked].every((peerId) => answered.has(peerId))) done();
+				};
+				cleanup.push(
+					channel.listen((sender, bytes) => {
+						if (finished || bytes.byteLength > V3_ROOM_SUCCESSOR_OFFER_MAX_BYTES || !asked.has(sender) || answered.has(sender))
+							return;
+						const frame = decodeFrame(bytes);
+						if (frame?.kind !== "view" || frame.evidence.objectId !== request.objectId) return;
+						answered.add(sender);
+						request.answer(frame.evidence);
+						if (answered.size === 1) {
+							const grace = setTimeout(done, V3_ROOM_CREATOR_VIEW_GRACE_MS);
+							cleanup.push(() => clearTimeout(grace));
+						}
+						check();
+					})
+				);
+				cleanup.push(channel.onPeerConnected(ask));
+				// A request lost on a fresh connection, or a peer that connected without a connection event, is asked again.
+				const resend = setInterval(() => {
+					for (const peerId of channel.peers()) if (!answered.has(peerId)) ask(peerId);
+				}, VIEW_RESEND_MS);
+				cleanup.push(() => clearInterval(resend));
+				const abort = (): void => done();
+				request.signal.addEventListener("abort", abort, { once: true });
+				cleanup.push(() => request.signal.removeEventListener("abort", abort));
+				lifetime.signal.addEventListener("abort", abort, { once: true });
+				cleanup.push(() => lifetime.signal.removeEventListener("abort", abort));
+				for (const peerId of channel.peers()) ask(peerId);
+			}),
+	});
+
 	return Object.freeze({
 		role,
+		creatorMemberView,
 		bind(selected: DeliveryRoom): void {
 			if (room !== undefined) throw new TypeError("v3 room successor delivery is already bound");
 			if (closed) return;

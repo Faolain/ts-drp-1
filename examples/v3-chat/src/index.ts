@@ -810,6 +810,8 @@ async function joinRoom(input: RoomJoinInput): Promise<ActiveChat> {
 			application,
 			author,
 			...(input.creatorFinalitySigner === undefined ? {} : { creatorFinalitySigner: input.creatorFinalitySigner }),
+			// Creator restore currency: a creator reopened from storage asks the members first.
+			...(delivery?.role === "creator" ? { creatorMemberView: delivery.creatorMemberView } : {}),
 			creatorInvite: input.creatorInvite,
 			databaseName: input.databaseName,
 			initialLogicalTime: selected.logicalTime,

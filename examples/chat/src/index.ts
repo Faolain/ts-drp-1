@@ -453,7 +453,11 @@ async function openSession(
 			initialLogicalTime: 3,
 			...(receiveOnly ? { receiveOnly: true as const } : {}),
 			...(operation === "create"
-				? { creatorFinalitySigner: await selectedNode.keychain.acquireLocalAuthorFinalitySigner() }
+				? {
+						creatorFinalitySigner: await selectedNode.keychain.acquireLocalAuthorFinalitySigner(),
+						// Creator restore currency: a creator reopened from storage asks the members first.
+						creatorMemberView: successors.creatorMemberView,
+					}
 				: {}),
 			roomHeadAuthority: authority,
 			publicKeyBytes: bytes(author),

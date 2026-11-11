@@ -259,6 +259,8 @@ async function openCanvas(operation: "create" | "join"): Promise<void> {
 						creatorFinalitySigner: await selectedNode.keychain.acquireLocalAuthorFinalitySigner(),
 					}),
 			roomHeadAuthority: authority,
+			// Creator restore currency: a reopened creator asks the canvas's members before it signs.
+			...(successors.role === "creator" ? { creatorMemberView: successors.creatorMemberView } : {}),
 			...(approveSettlementSourceSelection === undefined ? {} : { approveSettlementSourceSelection }),
 			publicKeyBytes: bytes(author),
 			signRegisteredVertexDigest: (digest) => selectedNode.keychain.signWithLocalAuthor(digest),
