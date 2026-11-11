@@ -970,7 +970,8 @@ function reserveUnsignedIntent(
 	}
 	// A fresh Writer move only: a resumed intent is already durable and is never refused here.
 	if (old === undefined && context?.settlementReplacementReserve !== undefined)
-		issuanceSettlementReplacementReserveCharge(rows, scope, pending, context.settlementReplacementReserve);
+		issuanceSettlementReplacementReserveCharge(rows, scope, pending,
+			context.settlementReplacementReserve as Readonly<{ maxDependencies: number }>);
 	assertRetirementRow(database, scope, captured.sequence, captured.bytes, captured.digest);
 	if (priorControl === null)
 		configuredStatement(database, "INSERT INTO retirement_controls (object_id,record) VALUES(?,?)").run(
