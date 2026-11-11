@@ -72,6 +72,10 @@ it(`live step cost by position after the epoch boundary (${APP}, ${ROLLOVER} rol
 			)
 		);
 	let profiled = 0;
+	// Creator diagnostics (the room's __warmProofEvent observations: kind and reason) drained after
+	// each creator step, tallied per step bucket. Draining moves them out of the driver's per-epoch
+	// event tally; measurement only.
+	const events = new Map<string, Record<string, number>>();
 	const boundary = (role: string) => {
 		for (const key of [...since.keys()]) if (key.startsWith(`${role}.`)) since.set(key, 0);
 	};
@@ -102,6 +106,15 @@ it(`live step cost by position after the epoch boundary (${APP}, ${ROLLOVER} rol
 						cpuMs: (used.user + used.system) / 1000,
 					});
 					since.set(step, position + 1);
+					if (role === "creator") {
+						const key = `${step}@${bucket(position)}`;
+						const tally = events.get(key) ?? {};
+						for (const event of await endpoint.drainEvents()) {
+							const name = event.reason === undefined ? event.kind : `${event.kind}:${event.reason}`;
+							tally[name] = (tally[name] ?? 0) + 1;
+						}
+						events.set(key, tally);
+					}
 					if (profiling) {
 						const result = (await post("Profiler.stop")) as Profiler.StopReturnType;
 						writeFileSync(join(PROFILE_OUT, `${step}-${profiled++}.cpuprofile`), JSON.stringify(result.profile));
@@ -184,5 +197,14 @@ it(`live step cost by position after the epoch boundary (${APP}, ${ROLLOVER} rol
 			cpuP50: Math.round(100 * quantile(group.map((s) => s.cpuMs), 0.5)) / 100,
 			cpuP95: Math.round(100 * quantile(group.map((s) => s.cpuMs), 0.95)) / 100,
 		};
-	console.info(`LIVE_STEPS ${JSON.stringify({ app: APP, rollover: ROLLOVER, epochs: EPOCHS, moves: MOVES, steps: out })}`);
+	console.info(
+		`LIVE_STEPS ${JSON.stringify({
+			app: APP,
+			rollover: ROLLOVER,
+			epochs: EPOCHS,
+			moves: MOVES,
+			steps: out,
+			events: Object.fromEntries(events),
+		})}`
+	);
 }, 1_800_000);
