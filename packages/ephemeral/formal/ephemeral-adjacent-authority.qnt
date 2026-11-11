@@ -7,8 +7,11 @@
 //   - A receiver delivers a frame only if (a) its authority is available (not the replacement gap),
 //     (b) the authenticated sender maps to a writer under the receiver's CURRENT authority, (c) one of
 //     the frame's tags equals a context the receiver itself installed: its current one, or the one it
-//     held immediately before (epoch - 1), and (d) the frame's context epoch is not below the latest
-//     context epoch the receiver has accepted from that sender.
+//     held immediately before (epoch - 1), and (d) a frame that matches only that previous context is
+//     refused once the receiver has accepted the sender under its current context (the per-sender
+//     floor records the receiver-installed context each accepted frame matched).
+//   - The sender attaches the preceding context only while some writer peer has not yet been accepted
+//     by it under its current context (such a peer may still hold only the preceding one).
 //   - A channel holds the preceding context only after observing an adjacent change (epoch + 1, same
 //     object). Any other change (a skipped epoch, a same-epoch replacement, a reopened channel) drops
 //     it and every sender floor.
@@ -25,7 +28,7 @@
 // broken controls, each must violate one safety property:
 //   ahead    also accepts any frame whose context epoch is the receiver's + 1, unverified;
 //   prevAcl  checks a behind frame's sender against the receiver's PREVIOUS writer set;
-//   nofloor  drops the per-sender floor;
+//   nofloor  drops the per-sender floor (a previous-context frame after the current one);
 //   anyPast  accepts any genuine context up to the receiver's current one (no window bound).
 module ephemeralAdjacentAuthority {
   pure val PEERS = Set("c", "a", "b", "x")
@@ -41,18 +44,20 @@ module ephemeralAdjacentAuthority {
   pure def ctx(e: int): Ctx = { e: e, br: 0 }
 
   type Frame = { sender: str, cur: Ctx, prev: Ctx, honest: bool }
-  type Event = { kind: str, r: str, f: Frame, rEpoch: int, rPrev: bool, seenBefore: int }
+  type Event = { kind: str, r: str, f: Frame, rEpoch: int, rPrev: bool, matched: int, seenBefore: int }
   pure val NOFRAME: Frame = { sender: "", cur: NONE, prev: NONE, honest: false }
-  pure val NOEVENT: Event = { kind: "none", r: "", f: NOFRAME, rEpoch: -1, rPrev: false, seenBefore: -1 }
+  pure val NOEVENT: Event = { kind: "none", r: "", f: NOFRAME, rEpoch: -1, rPrev: false, matched: -1, seenBefore: -1 }
 
   var installed: str -> int          // genuine epoch each peer has installed ("c" is the creator)
   var bound: str -> bool             // authority available (false inside the replacement gap)
   var hasPrev: str -> bool           // the channel holds the installed context of epoch installed - 1
-  var floor: str -> (str -> int)     // receiver -> sender -> latest accepted context epoch (-1: none)
+  var floor: str -> (str -> int)     // receiver -> sender -> latest matched installed context (-1: none)
   var wire: Set[Frame]               // every frame ever sent
-  // Ghost: the latest accepted context epoch per receiver/sender, never pruned, reset only when the
+  // Ghost: the latest matched context per receiver/sender, never pruned, reset only when the
   // receiver's channel loses its window (independent of the implementation's floor).
   var seen: str -> (str -> int)
+  // Ghost: the same, counting only honest frames (a forger can claim to be ahead of where it is).
+  var honestSeen: str -> (str -> int)
   var last: Event
 
   pure def noFloors: str -> int = PEERS.mapBy(_ => -1)
@@ -64,6 +69,7 @@ module ephemeralAdjacentAuthority {
     floor' = PEERS.mapBy(_ => noFloors),
     wire' = Set(),
     seen' = PEERS.mapBy(_ => noFloors),
+    honestSeen' = PEERS.mapBy(_ => noFloors),
     last' = NOEVENT,
   }
 
@@ -83,7 +89,7 @@ module ephemeralAdjacentAuthority {
       // Floors below target - 1 can never matter again; the implementation forgets them.
       floor' = floor.set(p, floor.get(p).keys().mapBy(s => if (floor.get(p).get(s) < target - 1) -1 else floor.get(p).get(s))),
       wire' = wire,
-      seen' = seen,
+      seen' = seen, honestSeen' = honestSeen,
       last' = NOEVENT,
     }
   }
@@ -92,12 +98,12 @@ module ephemeralAdjacentAuthority {
   action gap(p: str): bool = all {
     bound.get(p),
     bound' = bound.set(p, false),
-    installed' = installed, hasPrev' = hasPrev, floor' = floor, wire' = wire, seen' = seen, last' = NOEVENT,
+    installed' = installed, hasPrev' = hasPrev, floor' = floor, wire' = wire, seen' = seen, honestSeen' = honestSeen, last' = NOEVENT,
   }
   action rebind(p: str): bool = all {
     not(bound.get(p)),
     bound' = bound.set(p, true),
-    installed' = installed, hasPrev' = hasPrev, floor' = floor, wire' = wire, seen' = seen, last' = NOEVENT,
+    installed' = installed, hasPrev' = hasPrev, floor' = floor, wire' = wire, seen' = seen, honestSeen' = honestSeen, last' = NOEVENT,
   }
 
   // A channel that never observed the intermediate epoch (or was reopened) holds no window.
@@ -112,28 +118,35 @@ module ephemeralAdjacentAuthority {
       hasPrev' = hasPrev.set(p, false),
       floor' = floor.set(p, noFloors),
       wire' = wire,
-      seen' = seen.set(p, noFloors),
+      seen' = seen.set(p, noFloors), honestSeen' = honestSeen.set(p, noFloors),
       last' = NOEVENT,
     }
   }
   action reopen(p: str): bool = all {
     hasPrev' = hasPrev.set(p, false),
     floor' = floor.set(p, noFloors),
-    seen' = seen.set(p, noFloors),
+    seen' = seen.set(p, noFloors), honestSeen' = honestSeen.set(p, noFloors),
     installed' = installed, bound' = bound, wire' = wire, last' = NOEVENT,
   }
 
   // ---- Sending ------------------------------------------------------------------------------
 
-  // An honest send: the current context, plus the preceding one while held and still a writer.
-  action send(s: str): bool = {
+  // An honest send: the current context, plus the preceding one while held, still a writer, and some
+  // writer peer has not been accepted under the current context yet.
+  def claimsPrevious(s: str): bool = {
     val e = installed.get(s)
-    val f = { sender: s, cur: ctx(e),
-              prev: if (hasPrev.get(s) and writers(e).contains(s)) ctx(e - 1) else NONE, honest: true }
+    hasPrev.get(s) and writers(e).contains(s) and writers(e).exclude(Set(s)).exists(p => floor.get(s).get(p) < e)
+  }
+  def frameOf(s: str): Frame = {
+    val e = installed.get(s)
+    { sender: s, cur: ctx(e), prev: if (claimsPrevious(s)) ctx(e - 1) else NONE, honest: true }
+  }
+  action send(s: str): bool = {
+    val f = frameOf(s)
     all {
       bound.get(s),
       wire' = wire.union(Set(f)),
-      installed' = installed, bound' = bound, hasPrev' = hasPrev, floor' = floor, seen' = seen, last' = NOEVENT,
+      installed' = installed, bound' = bound, hasPrev' = hasPrev, floor' = floor, seen' = seen, honestSeen' = honestSeen, last' = NOEVENT,
     }
   }
 
@@ -144,7 +157,7 @@ module ephemeralAdjacentAuthority {
     not(withPrev) or ce >= 1,
     wire' = wire.union(Set({ sender: s, cur: { e: ce, br: cb },
                             prev: if (withPrev) { e: ce - 1, br: pb } else NONE, honest: false })),
-    installed' = installed, bound' = bound, hasPrev' = hasPrev, floor' = floor, seen' = seen, last' = NOEVENT,
+    installed' = installed, bound' = bound, hasPrev' = hasPrev, floor' = floor, seen' = seen, honestSeen' = honestSeen, last' = NOEVENT,
   }
 
   // ---- Receiving ----------------------------------------------------------------------------
@@ -158,10 +171,16 @@ module ephemeralAdjacentAuthority {
     }
   }
 
+  // The receiver-installed context a frame matches: the current one, else the previous one.
+  def matchedOf(r: str, f: Frame): int = {
+    val e = installed.get(r)
+    if (f.cur == ctx(e) or f.prev == ctx(e)) e else e - 1
+  }
+
   def accepts(rule: str, r: str, f: Frame): bool = {
     val e = installed.get(r)
     val writer = writers(e).contains(f.sender)
-    val fresh = f.cur.e >= floor.get(r).get(f.sender)
+    val fresh = matchedOf(r, f) >= floor.get(r).get(f.sender)
     val base = bound.get(r) and f.sender != r
     if (rule == "exact") base and writer and f.cur == ctx(e)
     else if (rule == "ahead") base and writer and fresh and (tagsMatch(r, f) or f.cur.e == e + 1)
@@ -176,15 +195,18 @@ module ephemeralAdjacentAuthority {
 
   action receive(rule: str, r: str, f: Frame): bool = {
     val ok = accepts(rule, r, f)
+    val m = matchedOf(r, f)
     val before = seen.get(r).get(f.sender)
     all {
       wire.contains(f),
       bound.get(r),
-      floor' = if (ok and f.cur.e > floor.get(r).get(f.sender))
-                 floor.set(r, floor.get(r).set(f.sender, f.cur.e)) else floor,
-      seen' = if (ok and f.cur.e > before) seen.set(r, seen.get(r).set(f.sender, f.cur.e)) else seen,
+      floor' = if (ok and m > floor.get(r).get(f.sender))
+                 floor.set(r, floor.get(r).set(f.sender, m)) else floor,
+      seen' = if (ok and m > before) seen.set(r, seen.get(r).set(f.sender, m)) else seen,
+      honestSeen' = if (ok and f.honest and m > honestSeen.get(r).get(f.sender))
+                      honestSeen.set(r, honestSeen.get(r).set(f.sender, m)) else honestSeen,
       last' = { kind: if (ok) "deliver" else "refuse", r: r, f: f, rEpoch: installed.get(r),
-                rPrev: hasPrev.get(r), seenBefore: before },
+                rPrev: hasPrev.get(r), matched: m, seenBefore: before },
       installed' = installed, bound' = bound, hasPrev' = hasPrev, wire' = wire,
     }
   }
@@ -230,9 +252,15 @@ module ephemeralAdjacentAuthority {
   }
   // S3: bounded window - nothing is accepted from a context more than one epoch away.
   val boundedWindow = delivered implies (last.f.cur.e >= last.rEpoch - 1 and last.f.cur.e <= last.rEpoch + 1)
-  // S4: per sender, a receiver never goes back to an earlier context once it has accepted a later one.
-  val senderMonotone = delivered implies last.f.cur.e >= last.seenBefore
-  val safety = and { authorizedDelivery, removedRefused, verifiedContext, boundedWindow, senderMonotone }
+  // S4: once a receiver has accepted a sender under its current context, it never again accepts a frame
+  // of that sender that matches only its previous context (no going back across the boundary).
+  val senderMonotone = delivered implies last.matched >= last.seenBefore
+  // S5: the sender bound is sound - a peer this sender has accepted, on an honest frame, under its
+  // current context has itself installed that context (so it no longer needs the preceding tag). A
+  // forger can claim to be ahead and so lose the preceding tag toward itself; that harms only it.
+  val seenImpliesInstalled = PEERS.forall(s => PEERS.forall(r =>
+    honestSeen.get(s).get(r) >= installed.get(s) implies installed.get(r) >= installed.get(s)))
+  val safety = and { authorizedDelivery, removedRefused, verifiedContext, boundedWindow, senderMonotone, seenImpliesInstalled }
 
   // ---- Continuity (the blackout this change removes) ----------------------------------------
 
@@ -245,18 +273,13 @@ module ephemeralAdjacentAuthority {
     writers(ev.f.cur.e).contains(ev.f.sender),
     ev.f.cur.e >= ev.rEpoch - 1,
     ev.f.cur.e <= ev.rEpoch + 1,
-    ev.f.cur.e >= ev.seenBefore,
+    (if (ev.f.cur.e >= ev.rEpoch) ev.rEpoch else ev.rEpoch - 1) >= ev.seenBefore,
     ev.f.cur.e > ev.rEpoch implies ev.f.prev != NONE,
     ev.f.cur.e < ev.rEpoch implies ev.rPrev,
   }
   val noContinuingRefusal = (last.kind == "refuse" and bound.get(last.r)) implies not(continuingFrame(last))
 
   // ---- Scenario tests ----------------------------------------------------------------------
-
-  def frameOf(s: str): Frame = {
-    val e = installed.get(s)
-    { sender: s, cur: ctx(e), prev: if (hasPrev.get(s) and writers(e).contains(s)) ctx(e - 1) else NONE, honest: true }
-  }
 
   // Creator adopts, members install one after another; frames cross in both directions throughout.
   run creatorAheadBothDirectionsTest =

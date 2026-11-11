@@ -51,6 +51,8 @@ class Room {
 	readonly peers = new Map<string, Peer>();
 	readonly roster = new Map<string, string>();
 	readonly wire: Wire[] = [];
+	/** Receivers whose ingress is held (frames stay on the wire, undelivered, until injected). */
+	readonly held = new Set<string>();
 	/** Delivered payloads by receiver, then sender. */
 	readonly delivered = new Map<string, Map<string, string[]>>();
 
@@ -107,7 +109,7 @@ class Peer {
 					for (const to of recipients) {
 						const wire = { bytes: input.bytes.slice(), sender: this.peerId, senderEpoch: this.authority?.epoch, to };
 						room.wire.push(wire);
-						room.inject(to, wire);
+						if (!room.held.has(to)) room.inject(to, wire);
 					}
 					return Promise.resolve(recipients.length > 0);
 				},
@@ -127,11 +129,11 @@ class Peer {
 		this.authority = authorityAt(epoch);
 	}
 
-	async move(label: string): Promise<void> {
+	async move(label: string, key: string | null = "movement"): Promise<void> {
 		this.sent += 1;
 		await this.channel.publish({
-			class: "unreliable-sequenced",
-			key: "movement",
+			class: key === null ? "reliable-unordered" : "unreliable-sequenced",
+			key,
 			payload: new TextEncoder().encode(`${this.peerId}:${label}`),
 		});
 	}
@@ -275,5 +277,59 @@ describe("authority-bound ephemeral stream across epoch rollovers", () => {
 		await forger.move("foreign-e1-again");
 		expect(room.deliveredFrom("peer-c", "peer-f")).toEqual([]);
 		expect(room.deliveredFrom("peer-a", "peer-f")).toEqual([]);
+	});
+
+	it("still delivers a frame under the receiver's current context after the sender's successor-tagged frame overtook it", async () => {
+		const { room, c, a } = setup();
+		// A's reliable event is still in flight (another route) when A installs epoch 1 and its next
+		// position, tagged epoch 1 with epoch 0 as preceding context, reaches C (still on epoch 0) first.
+		room.held.add("peer-c");
+		await a.move("event-e0", null);
+		const inFlight = room.wire.filter((entry) => entry.sender === "peer-a" && entry.to === "peer-c").at(-1) as Wire;
+		room.held.delete("peer-c");
+		a.install(1);
+		await a.move("position-e1");
+		expect(room.deliveredFrom("peer-c", "peer-a")).toEqual(["peer-a:position-e1"]);
+		room.inject("peer-c", inFlight);
+		expect(room.deliveredFrom("peer-c", "peer-a")).toEqual(["peer-a:position-e1", "peer-a:event-e0"]);
+		expect(c.stats().authorityMismatch).toBe(0);
+	});
+
+	it("never delivers a sequenced frame twice across the receiver's install, for any key", async () => {
+		const { room, c, a } = setup();
+		await a.move("k1-e0", "k1");
+		await a.move("k2-e0", "k2");
+		a.install(1);
+		await a.move("k2-e1-ahead", "k2"); // tagged 1 (+0): accepted by C on epoch 0
+		await a.move("k1-e1-ahead", "k1");
+		const sent = room.wire.filter((entry) => entry.sender === "peer-a" && entry.to === "peer-c");
+		expect(room.deliveredFrom("peer-c", "peer-a")).toHaveLength(4);
+		c.install(1);
+		await a.move("k1-e1", "k1"); // first frame under C's new context: older replay state is retired
+		const deliveredBefore = room.deliveredFrom("peer-c", "peer-a").length;
+		for (const wire of sent) room.inject("peer-c", wire);
+		expect(room.deliveredFrom("peer-c", "peer-a")).toHaveLength(deliveredBefore);
+		expect(c.stats().stale + c.stats().authorityMismatch).toBe(sent.length);
+	});
+
+	it("claims the preceding context only while some recipient has not been seen under the current one", async () => {
+		const { room, c, a, b } = setup();
+		room.peers.delete("peer-x");
+		room.roster.delete("peer-x");
+		const versions = (sender: string, from: number): number[] =>
+			room.wire.slice(from).filter((entry) => entry.sender === sender).map((entry) => entry.bytes[0] ?? -1);
+		for (const peer of [c, a, b]) await peer.move("e0");
+		c.install(1);
+		let mark = room.wire.length;
+		await c.move("e1-lagging");
+		expect(versions("peer-c", mark)).toEqual([3, 3]);
+		a.install(1);
+		b.install(1);
+		await a.move("e1");
+		await b.move("e1");
+		mark = room.wire.length;
+		await c.move("e1-all-seen");
+		expect(versions("peer-c", mark)).toEqual([2, 2]);
+		expect(room.deliveredFrom("peer-a", "peer-c")).toContain("peer-c:e1-all-seen");
 	});
 });
