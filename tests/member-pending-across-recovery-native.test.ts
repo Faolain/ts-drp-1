@@ -32,12 +32,18 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 const digestOf = (row: { commit: { envelope: { digest: Uint8Array } } }): string =>
 	Buffer.from(row.commit.envelope.digest).toString("hex");
 
+// "held": B is already pending ingress when the recovery starts. "in-flight": B reaches Writer 1
+// inside the failing settlement signature, so its ingress job is queued in the predecessor's FIFO
+// behind that issue and runs while the recovery replaces the plane (the st2 trace's
+// "received-maintenance-capture: ... admission was revoked" is the creator-side form of this).
 it.each([
-	["[RED] a move held as pending ingress at a same-epoch plane recovery is admitted once its parent arrives", true],
-	["[control] the same install without the recovery: the held move is admitted once its parent arrives", false],
-])(
+	["[RED] a move held as pending ingress at a same-epoch plane recovery is admitted once its parent arrives", "held"],
+	["[RED] a move in flight in the predecessor's ingress at a same-epoch plane recovery is admitted once its parent arrives", "in-flight"],
+	["[control] the same install without the recovery: the held move is admitted once its parent arrives", "control"],
+] as const)(
 	"%s",
-	async (_name, recover) => {
+	async (_name, mode) => {
+		const recover = mode !== "control";
 		const fixture = await readinessHoldRoom({ writers: 2 });
 		// Writer 1's hooks: inject B at its successor projection, then fail its next operation signature once.
 		const hold = { rows: undefined as Parameters<ReadinessHoldPeer["inject"]>[0] | undefined, injected: 0 };
@@ -47,16 +53,23 @@ it.each([
 		const member = await fixture.open(1, {
 			onProjection: (hook) => {
 				if (hold.rows === undefined) return;
+				fault.armed = recover;
+				if (mode === "in-flight") return;
 				const rows = hold.rows;
 				hold.rows = undefined;
 				hook.inject(rows, 2);
 				hold.injected += 1;
-				fault.armed = recover;
 			},
 			sign: async (digest, _request, sign) => {
 				if (!fault.armed) return sign(digest);
 				fault.armed = false;
 				fault.failed += 1;
+				if (mode === "in-flight" && hold.rows !== undefined) {
+					// Queued behind this issue in the predecessor's FIFO.
+					member.inject(hold.rows, 2);
+					hold.rows = undefined;
+					hold.injected += 1;
+				}
 				fault.heldAtFault = target.held !== undefined && !member.accepted.has(target.held);
 				// 63 bytes: the issue is refused after its signer resolved, with no plan change.
 				return (await sign(digest)).slice(0, 63);
@@ -124,7 +137,7 @@ it.each([
 		expect(member.accepted.has(held), "B is held while A is missing").toBe(false);
 		if (recover) {
 			expect(fault.failed, "one settlement signature failed, so the room recovered the plane").toBe(1);
-			expect(fault.heldAtFault, "B was held when the plane was recovered").toBe(true);
+			expect(fault.heldAtFault, "B was not admitted when the plane was recovered").toBe(true);
 		}
 
 		// A (and the rest of Writer 2's epoch-1 rows before B) arrives; the creator's epoch-1 rows too.
@@ -134,7 +147,7 @@ it.each([
 		for (const deadline = started + 15_000; performance.now() < deadline && !member.accepted.has(held); )
 			await sleep(50);
 		const landedMs = member.accepted.has(held) ? Math.round(performance.now() - started) : null;
-		console.log("PENDING_ACROSS_RECOVERY", JSON.stringify({ recover, failed: fault.failed, landedMs }));
+		console.log("PENDING_ACROSS_RECOVERY", JSON.stringify({ mode, failed: fault.failed, landedMs }));
 		expect(landedMs, "B is admitted once its parent A arrives").not.toBeNull();
 	},
 	300_000
