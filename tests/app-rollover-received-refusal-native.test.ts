@@ -51,8 +51,10 @@ it("several hot Writers: a received move the creator refuses at capacity trigger
 	const deliveries: (V3RoomSuccessorDelivery | undefined)[] = [];
 	// The creator's latest admitted position of every Writer block.
 	const admitted = new Map<string, number>();
-	const events: { epoch: number; trigger: string; moves: number }[] = [];
+	const events: { peer: number; epoch: number; trigger: string; moves: number; at: number }[] = [];
 	let failure: unknown;
+	let progress: Readonly<Record<string, unknown>> = {};
+	let report: () => Readonly<Record<string, unknown>> = () => ({});
 	try {
 		const fixture = await creatorDeliveryRoom({
 			profile: "settlement",
@@ -103,7 +105,8 @@ it("several hot Writers: a received move the creator refuses at capacity trigger
 					requestSuccessor: () => delivery.request(),
 					creatorReachable: () => delivery.creatorReachable(),
 					onError: (error) => errors.push(`policy ${index}: ${errorText(error)}`),
-					onRollover: (event) => events.push({ epoch: event.epoch, trigger: event.trigger, moves: event.moves }),
+					onRollover: (event) =>
+						events.push({ peer: index, epoch: event.epoch, trigger: event.trigger, moves: event.moves, at: Math.round(performance.now() / 1000) }),
 				},
 			});
 			policies[index] = policy;
@@ -137,9 +140,21 @@ it("several hot Writers: a received move the creator refuses at capacity trigger
 		let creatorSeq = 0;
 		let epoch = required(peers[0]).room.authority()?.epoch;
 		let epochMoves = 0;
+		const started = performance.now();
+		const state = () => ({
+			seconds: Math.round((performance.now() - started) / 1000),
+			epochs: peers.map((peer) => peer.room.authority()?.epoch ?? null),
+			stats: policies.map((policy) => policy?.stats()),
+			ingressRefusals: ingressRefusals.length,
+			events,
+			errors: errors.slice(-4),
+		});
+		report = state;
 		for (let move = 0; move < MOVES_PER_WRITER * WRITERS; move++) {
+			progress = { move, epochMoves };
 			const current = required(peers[0]).room.authority()?.epoch;
 			if (current !== epoch) {
+				process.stdout.write(`RECEIVED_REFUSAL_EPOCH ${JSON.stringify({ move, epochMoves, ...state() })}\n`);
 				epoch = current;
 				epochMoves = 0;
 			}
