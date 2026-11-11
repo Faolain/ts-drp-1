@@ -759,7 +759,7 @@ it.skipIf(!enabled)(
 			const completedRollovers = () => rollovers.filter((r) => r.publishEnd !== undefined).length;
 			const joinAt = [...lateJoins];
 			const joining: Promise<void>[] = [];
-			const join = async (index: number, atRollovers: number) => {
+			const lateJoin = async (index: number, atRollovers: number) => {
 				const started = performance.now();
 				const creatorEpochAtStart = epochOf[0] ?? 0;
 				const peer = await fixture.open(index);
@@ -823,7 +823,7 @@ it.skipIf(!enabled)(
 				if (due !== undefined && completedRollovers() >= due) {
 					joinAt.shift();
 					const index = peersCount + (lateJoins.length - joinAt.length - 1);
-					joining.push(join(index, completedRollovers()).catch((error: unknown) => {
+					joining.push(lateJoin(index, completedRollovers()).catch((error: unknown) => {
 						joins.push({ kind: "late-join", index, error: errorText(error) });
 					}));
 				}
