@@ -44,6 +44,10 @@ const settle = <T>(task: Promise<T>) =>
 		() => "issued",
 		(error: unknown) => String((error as Error)?.message ?? error)
 	);
+// The shipped defaults (V3_ROOM_CREATOR_RESTORE_CURRENCY_BOUND_MS, V3_ROOM_CREATOR_RESTORE_ANSWER_BOUND_MS),
+// restated so this file also loads where the answer bound does not exist yet.
+const V3_ROOM_CREATOR_RESTORE_CURRENCY_BOUND_MS = 5_000;
+const V3_ROOM_CREATOR_RESTORE_ANSWER_BOUND_MS = 1_000;
 const CREATOR_PEER = "chat-creator";
 const MEMBER_PEER = "chat-member-1";
 
@@ -100,6 +104,7 @@ function memberDelivery(net: ReturnType<typeof network>, objectId: string, room:
 }
 
 const memberView = (delivery: V3RoomSuccessorDelivery) => Reflect.get(delivery, "creatorMemberView") as unknown;
+const currency = (room: unknown): unknown => Reflect.get(room as object, "creatorCurrency")?.call(room) ?? "current";
 
 // The node host names each store file sha256(JSON([family, name])); the floor is the fixture's own file.
 const FAMILIES = ["ahe", "issuance", "journal", "snapshots", "signing", "room-head"];
@@ -235,23 +240,124 @@ describe("creator restore currency: a restored creator checks the members' view 
 		expect(creator.room.authority()?.epoch).toBe(1);
 	}, 300_000);
 
-	it("[control] a creator reopening alone (no member answers) proceeds after the bound", async () => {
+	it("[RED-wait] a lone reopen (no peer connected) signs its first move at once; only its finality key waits the bound", async () => {
 		const { f, net } = await room();
 		let creator = await f.open(0);
 		await creator.room.issue(message("creator-1"));
 		await f.stop(creator);
 		const view = creatorDelivery(net, f.objectId);
 		const started = performance.now();
-		creator = await f.open(0, { reopen: true, creatorMemberView: memberView(view), creatorRestoreCurrencyBoundMs: 1_500 });
+		// Default bounds: before the wait cut a lone creator's first move waited the whole 5 s bound.
+		creator = await f.open(0, { reopen: true, creatorMemberView: memberView(view) });
+		const opened = performance.now();
 		expect(await settle(creator.room.issue(message("creator-alone")))).toBe("issued");
-		console.info("[creator currency] lone reopen: open + first issue in", Math.round(performance.now() - started), "ms (bound 1500 ms)");
-		expect(Reflect.get(creator.room, "creatorCurrency")?.call(creator.room) ?? "current").toBe("current");
+		const issueMs = Math.round(performance.now() - opened);
+		const state = currency(creator.room);
+		const sealStarted = performance.now();
 		expect((await creator.room.sealEpoch()).ok).toBe(true);
+		const sealedAt = Math.round(performance.now() - started);
+		console.info("[creator currency] lone reopen:", JSON.stringify({ openMs: Math.round(opened - started), issueMs, state, sealMs: Math.round(performance.now() - sealStarted), sealedAt }));
+		expect(issueMs).toBeLessThan(1_000);
+		expect(state).toBe("provisional");
+		// The finality key (seal) waited for the bound from open: no member attested a view.
+		expect(sealedAt).toBeGreaterThanOrEqual(V3_ROOM_CREATOR_RESTORE_CURRENCY_BOUND_MS - 50);
+		expect(currency(creator.room)).toBe("current");
 	}, 300_000);
 
-	it("[control] the bound counts from open: a lone creator's first move waits only the remainder", async () => {
+	it("[RED-wait] a lone restored creator that a member with newer state reaches later is refused from then on", async () => {
+		const { f, net, creator, member, restore, backupNext } = await backedUpCreator();
+		await creator.room.issue(message("original-after-backup-1"));
+		await creator.room.issue(message("original-after-backup-2"));
+		const original = await f.issuedAfter(0, null);
+		expect(await member.receive(original, 0)).toBe(true);
+		await f.stop(creator);
+		restore();
+		const view = creatorDelivery(net, f.objectId);
+		// Nobody connected at open: the restored copy is provisional and signs its first move at once.
+		const restored = await f.open(0, { reopen: true, creatorMemberView: memberView(view) });
+		expect(await settle(restored.room.issue(message("restored-before-the-member-connects")))).toBe("issued");
+		expect(currency(restored.room)).toBe("provisional");
+		// The residual risk of not blocking a lone creator: that move takes a sequence the original signed.
+		expect((await conflictingWith(f, original)).length).toBe(1);
+		// The member connects; the delivery asks it (late peers are asked) and its view refuses the creator.
+		memberDelivery(net, f.objectId, member.room);
+		net.link(CREATOR_PEER, MEMBER_PEER);
+		for (const deadline = performance.now() + 10_000; currency(restored.room) !== "refused" && performance.now() < deadline; )
+			await new Promise((resolve) => setTimeout(resolve, 20));
+		expect(currency(restored.room)).toBe("refused");
+		expect(await settle(restored.room.issue(message("restored-after-the-view")))).toMatch(/V3_ROOM_NOT_YET_CURRENT: creator-superseded/u);
+		expect(await settle(restored.room.sealEpoch())).toMatch(/V3_ROOM_NOT_YET_CURRENT: creator-superseded/u);
+		// Nothing after the view: only the one provisional move beyond the backup.
+		expect((await f.issuedAfter(0, null)).length).toBe(backupNext + 1);
+		expect(restored.room.projection().messages.map((entry) => entry.clientOperationId)).toContain("creator-before-backup");
+	}, 300_000);
+
+	it("[RED-wait] connected peers that never answer hold the first move only for the answer bound", async () => {
+		const { f, net } = await room();
+		let creator = await f.open(0);
+		await creator.room.issue(message("creator-1"));
+		await f.stop(creator);
+		// A connected peer that is not a room member: it never answers a view request.
+		net.channel("chat-relay");
+		net.link(CREATOR_PEER, "chat-relay");
+		const view = creatorDelivery(net, f.objectId);
+		const opened = performance.now();
+		creator = await f.open(0, { reopen: true, creatorMemberView: memberView(view) });
+		const openMs = performance.now() - opened;
+		const issueStarted = performance.now();
+		expect(await settle(creator.room.issue(message("creator-with-a-silent-peer")))).toBe("issued");
+		const issueMs = Math.round(performance.now() - issueStarted);
+		console.info("[creator currency] silent connected peer:", JSON.stringify({ openMs: Math.round(openMs), issueMs, state: currency(creator.room) }));
+		expect(issueMs + openMs).toBeLessThan(V3_ROOM_CREATOR_RESTORE_ANSWER_BOUND_MS + 1_000);
+		expect(currency(creator.room)).toBe("provisional");
+	}, 300_000);
+
+	it("[control] a new room's creator never waits: it is current at open and never asks", async () => {
+		const { f, net } = await room();
+		const delivery = creatorDelivery(net, f.objectId);
+		let asked = 0;
+		const inner = memberView(delivery) as { ask(request: unknown): Promise<void> };
+		const view = { ask: (request: unknown) => (asked++, inner.ask(request)) };
+		const started = performance.now();
+		const creator = await f.open(0, { creatorMemberView: view });
+		expect(currency(creator.room)).toBe("current");
+		expect(await settle(creator.room.issue(message("new-room-first")))).toBe("issued");
+		console.info("[creator currency] new room: open + first issue in", Math.round(performance.now() - started), "ms");
+		expect(asked).toBe(0);
+	}, 300_000);
+
+	it("[control] while the check waits, reads and member ingress are not held (only signing is)", async () => {
+		const { f, net } = await room();
+		let creator = await f.open(0);
+		await creator.room.issue(message("creator-1"));
+		const member = await f.open(1);
+		expect(await member.receive(await f.issuedAfter(0, null), 0)).toBe(true);
+		await f.stop(creator);
+		net.channel("chat-relay");
+		net.link(CREATOR_PEER, "chat-relay");
+		const view = creatorDelivery(net, f.objectId);
+		// A silent connected peer and a long answer bound keep the check waiting for the whole test.
+		creator = await f.open(0, { reopen: true, creatorMemberView: memberView(view), creatorRestoreCurrencyAnswerBoundMs: 60_000, creatorRestoreCurrencyBoundMs: 60_000 });
+		expect(currency(creator.room)).toBe("checking");
+		const held = settle(creator.room.issue(message("creator-held")));
+		// Reads answer while it waits.
+		expect(creator.room.projection().messages.map((entry) => entry.clientOperationId)).toContain("creator-1");
+		expect(creator.room.authority()?.epoch ?? 0).toBe(0);
+		// A member's move is received and admitted while it waits.
+		await member.room.issue(message("member-while-creator-checks"));
+		const started = performance.now();
+		expect(await creator.receive(await f.issuedAfter(1, null), 1)).toBe(true);
+		console.info("[creator currency] member move admitted while checking in", Math.round(performance.now() - started), "ms");
+		expect(creator.room.projection().messages.map((entry) => entry.clientOperationId)).toContain("member-while-creator-checks");
+		// Its own move is still held: nothing signed.
+		expect(currency(creator.room)).toBe("checking");
+		expect(await Promise.race([held, new Promise((resolve) => setTimeout(() => resolve("still-held"), 200))])).toBe("still-held");
+		await f.stop(creator);
+		expect(await held).toMatch(/closed|NOT_YET_CURRENT|hold/iu);
+	}, 300_000);
+
+	it("[control] the bound counts from open: a lone creator's first move waits at most the remainder", async () => {
 		const bound = 6_000;
-		const currency = (room: unknown): unknown => Reflect.get(room as object, "creatorCurrency")?.call(room) ?? "current";
 		const { f, net } = await room();
 		let creator = await f.open(0);
 		await creator.room.issue(message("creator-1"));
@@ -315,7 +421,8 @@ describe("creator restore currency: a restored creator checks the members' view 
 		const view = creatorDelivery(net, f.objectId);
 		creator = await f.open(0, { reopen: true, creatorMemberView: memberView(view), creatorRestoreCurrencyBoundMs: 3_000 });
 		expect(await settle(creator.room.issue(message("creator-after-forgery")))).toBe("issued");
-		expect(Reflect.get(creator.room, "creatorCurrency")?.call(creator.room) ?? "current").toBe("current");
+		// Forged material verifies under none of its keys: no answer, not an attested view (provisional).
+		expect(["provisional", "current"]).toContain(currency(creator.room));
 		console.info("[creator currency] forging peer asked", requests, "time(s)");
 		expect((await creator.room.sealEpoch()).ok).toBe(true);
 	}, 300_000);

@@ -286,6 +286,7 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 			/** Creator restore currency: how this (creator) open asks members for their view. */
 			creatorMemberView?: unknown;
 			creatorRestoreCurrencyBoundMs?: number;
+			creatorRestoreCurrencyAnswerBoundMs?: number;
 		} = {}
 	) => {
 		const reopening = openOptions.reopen === true || openOptions.promote === true;
@@ -342,6 +343,9 @@ export async function chatSharesRoomFixture(options: ChatSharesRoomOptions) {
 			...(openOptions.creatorRestoreCurrencyBoundMs === undefined
 				? {}
 				: { creatorRestoreCurrencyBoundMs: openOptions.creatorRestoreCurrencyBoundMs }),
+			...(openOptions.creatorRestoreCurrencyAnswerBoundMs === undefined
+				? {}
+				: { creatorRestoreCurrencyAnswerBoundMs: openOptions.creatorRestoreCurrencyAnswerBoundMs }),
 			createOperationAdmissionPolicy: application.createOperationAdmissionPolicy,
 			creatorInvite: invite,
 			databaseName: name,
