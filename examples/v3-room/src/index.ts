@@ -29,8 +29,10 @@ import { createBrowserSnapshotQuarantineStore } from "@ts-drp/storage-browser/sn
 
 export {
 	createV3RoomCreatorInviteMaterial,
+	V3_ROOM_CREATOR_RESTORE_CURRENCY_BOUND_MS,
 	V3_ROOM_LOCAL_BACKLOG_LIMIT,
 	V3RoomLocalBacklogFull,
+	V3RoomNotYetCurrent,
 	waitForV3RoomStartupForDiagnostics,
 } from "@ts-drp/node/v3-room";
 export type {
@@ -38,7 +40,9 @@ export type {
 	V3RoomAcceptedVertex,
 	V3RoomApplication,
 	V3RoomAuthenticatedProjectionBase,
+	V3RoomCreatorCurrencyEvidence,
 	V3RoomCreatorInviteMaterial,
+	V3RoomCreatorMemberView,
 	V3RoomCreatorInviteMaterialInput,
 	V3RoomEphemeralAuthorizationProvider,
 	V3RoomHead,
@@ -79,6 +83,7 @@ export {
 	createV3RoomSuccessorChannel,
 	createV3RoomSuccessorDelivery,
 	openV3RoomSuccessorDelivery,
+	V3_ROOM_CREATOR_VIEW_GRACE_MS,
 	V3_ROOM_SUCCESSOR_OFFER_MAX_BYTES,
 	V3_ROOM_SUCCESSOR_POLL_MS,
 	v3RoomCreatorPeer,
