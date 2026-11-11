@@ -16490,7 +16490,7 @@ async function ownSourceSettlementIsComplete(
 	plan: SettlementPlan | null,
 	vertexFacts?: CreatorCensusVertexFacts,
 	sharedAccounting?: CreatorClosedRollbackProofAccounting,
-	ownFences: OwnEpochFenceReader = ownEpochFences
+	ownFences?: OwnEpochFenceReader
 ): Promise<boolean> {
 	const source = selected.authenticated;
 	const scope = registration.issuanceScope;
@@ -16526,7 +16526,7 @@ async function ownSourceSettlementIsComplete(
 			settlementOwnRowClass(source.admitted.epoch, frontier.currentEpoch, source.authorSequence,
 				frontier.admissionEpoch, frontier.terminalThrough) !== "current" &&
 			entry.replacementSequence === null && entry.replacementProgress === undefined && entry.transformRefusal === undefined &&
-			settlementOwnRowFenceGuarded(await ownFences(creatorOriginalIssuanceStore(registration), scope),
+			settlementOwnRowFenceGuarded(await (ownFences ?? ownEpochFences)(creatorOriginalIssuanceStore(registration), scope),
 				source.admitted.epoch, source.authorSequence, frontier.terminalThrough);
 	}
 	if (derived.disposition !== entry.disposition || derived.disposition === "manual-review") return false;
