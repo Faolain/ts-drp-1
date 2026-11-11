@@ -64,6 +64,21 @@ const PLACE_MS = 400;
 const PAINT_MS = 350;
 const CHAT_MS = 300;
 const ROLLOVER_TAIL_MS = 1_000;
+// Measurement only. BROWSER_FPS_CPU_THROTTLE=<rate>: Chromium DevTools CPU throttling (Emulation.setCPUThrottlingRate)
+// on both pages; other engines have no equivalent and record "unsupported". BROWSER_FPS_TRACE_EPOCHS="<a>-<b>":
+// a Chromium performance trace (both renderers, JS sampling) from creator epoch a to b, written to OUT.
+const CPU_THROTTLE = Number(process.env.BROWSER_FPS_CPU_THROTTLE ?? 1);
+const TRACE_EPOCHS = (process.env.BROWSER_FPS_TRACE_EPOCHS ?? "").split("-").filter((value) => value !== "").map(Number);
+const TRACE_CATEGORIES = [
+	"devtools.timeline",
+	"disabled-by-default-devtools.timeline",
+	"disabled-by-default-devtools.timeline.frame",
+	"v8.execute",
+	"disabled-by-default-v8.cpu_profiler",
+	"blink.user_timing",
+	"toplevel",
+];
+if (!(Number.isFinite(CPU_THROTTLE) && CPU_THROTTLE >= 1)) throw new Error("BROWSER_FPS_CPU_THROTTLE");
 for (const app of APPS) if (!["grid", "canvas", "chat"].includes(app)) throw new Error(`BROWSER_FPS_APP ${app}`);
 if (!Number.isSafeInteger(EPOCHS) || EPOCHS < 1) throw new Error("BROWSER_FPS_EPOCHS");
 if (INJECT !== "" && !(Number.isFinite(INJECT_MS) && (INJECT_MS as number) > 0 && Number.isSafeInteger(INJECT_EVERY)))
@@ -960,6 +975,8 @@ for (const app of APPS)
 			memberRolloverIssueBoundMs: APP_MEMBER_ROLLOVER_ISSUE_BOUND_MS,
 			rolloverWindowTailMs: ROLLOVER_TAIL_MS,
 			thresholdsStatus: FPS_THRESHOLDS_STATUS,
+			cpuThrottle: CPU_THROTTLE === 1 ? null : { rate: CPU_THROTTLE, applied: browserName === "chromium" ? "chromium Emulation.setCPUThrottlingRate" : "unsupported on this engine" },
+			traceEpochs: TRACE_EPOCHS.length === 2 ? TRACE_EPOCHS : null,
 			hostLoadAverageAtStart: loadavg(),
 			startedAt: new Date().toISOString(),
 		};
@@ -978,6 +995,13 @@ for (const app of APPS)
 		}
 		const creator = await contexts[0].newPage();
 		const member = await contexts[1].newPage();
+		if (CPU_THROTTLE > 1 && browserName === "chromium")
+			for (const [page, context] of [
+				[creator, contexts[0]],
+				[member, contexts[1]],
+			] as const)
+				await (await context.newCDPSession(page)).send("Emulation.setCPUThrottlingRate", { rate: CPU_THROTTLE });
+		let tracing: "idle" | "on" | "done" = "idle";
 		const pageErrors: string[] = [];
 		const consoleTail: string[] = [];
 		const refusals: string[] = [];
@@ -986,6 +1010,10 @@ for (const app of APPS)
 			["member", member],
 		] as const) {
 			page.on("pageerror", (error) => pageErrors.push(`${name}: ${String(error).slice(0, 600)}`));
+			page.on("response", (response) => {
+				if (response.status() >= 400)
+					consoleTail.push(`${new Date().toISOString()} ${name} http ${response.status()} ${response.url().slice(0, 300)}`);
+			});
 			page.on("console", (message) => {
 				if (message.type() !== "warning" && message.type() !== "error") return;
 				const at = new Date().toISOString();
@@ -1054,6 +1082,20 @@ for (const app of APPS)
 							`BROWSER_FPS ${browserName} ${app} creator epoch ${creatorEpoch}/${EPOCHS} member ${memberEpoch}`
 						);
 				}
+				if (browserName === "chromium" && TRACE_EPOCHS.length === 2) {
+					if (tracing === "idle" && creatorEpoch >= (TRACE_EPOCHS[0] as number)) {
+						await browser.startTracing(undefined, {
+							path: join(OUT, `${base}-trace-e${TRACE_EPOCHS[0]}-e${TRACE_EPOCHS[1]}.json`),
+							categories: TRACE_CATEGORIES,
+						});
+						appendFileSync(epochLog, JSON.stringify({ traceStart: Date.now(), performanceOrigin: "wall" }) + "\n");
+						tracing = "on";
+					} else if (tracing === "on" && creatorEpoch >= (TRACE_EPOCHS[1] as number)) {
+						await browser.stopTracing();
+						appendFileSync(epochLog, JSON.stringify({ traceStop: Date.now() }) + "\n");
+						tracing = "done";
+					}
+				}
 				if (creatorEpoch >= EPOCHS && memberEpoch >= EPOCHS) break;
 				const playFailure = play.failure();
 				if (playFailure !== undefined) throw new Error(`BROWSER_FPS_PLAY_FAILED ${playFailure}`);
@@ -1121,6 +1163,7 @@ for (const app of APPS)
 				rolloversObserved: windows.length,
 				stageCounts,
 				stageDurationsMs: meter.stageDurations(),
+				stageBrackets: meter.stages,
 				pages,
 				rolloverIssueLatency,
 				app: { ...driver.report(meter), name: app },
@@ -1147,6 +1190,7 @@ for (const app of APPS)
 			throw error;
 		} finally {
 			await play?.stop().catch(() => undefined);
+			if (tracing === "on") await browser.stopTracing().catch(() => undefined);
 			if (failure !== undefined)
 				summary = {
 					...summary,

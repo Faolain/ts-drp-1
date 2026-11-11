@@ -40,6 +40,9 @@ interface PageAccumulator {
 	readonly stallsIn: TaskCounter;
 	readonly stallsOut: TaskCounter;
 	pendingFrames: number[];
+	/** Frames > 50 ms and long tasks, each with the stage it overlapped (bounded; measurement only). */
+	readonly longFrames: [number, number, string][];
+	readonly longTaskRows: [number, number, string][];
 	pendingTasks: number[];
 	pendingStalls: number[];
 	timeOrigin: number;
@@ -63,6 +66,8 @@ const accumulator = (): PageAccumulator => ({
 	stallsIn: new TaskCounter(),
 	stallsOut: new TaskCounter(),
 	pendingFrames: [],
+	longFrames: [],
+	longTaskRows: [],
 	pendingTasks: [],
 	pendingStalls: [],
 	timeOrigin: 0,
@@ -100,6 +105,9 @@ export interface PageReport {
 	readonly droppedRingEntries: Readonly<Record<string, number>>;
 	readonly hiddenObserved: boolean;
 	readonly visibility: string;
+	/** [end or start (absolute ms), duration, overlapped stage or "outside"], frames > 50 ms and long tasks. */
+	readonly longFrames: readonly (readonly [number, number, string])[];
+	readonly longTaskRows: readonly (readonly [number, number, string])[];
 }
 
 /** Drains and classifies both pages. */
@@ -249,6 +257,17 @@ export class RolloverMeter {
 		return false;
 	}
 
+	/**
+	 * The name of a stage (either page) overlapping [from, to], "open:<name>" for one still open, or "outside".
+	 * @param from
+	 * @param to
+	 */
+	stageAt(from: number, to: number): string {
+		for (const stage of this.stages) if (stage.start <= to && stage.end >= from) return stage.name;
+		for (const rows of this.open.values()) for (const [name, start] of rows) if (start <= to) return `open:${name}`;
+		return "outside";
+	}
+
 	private classify(final = false): void {
 		const cutoff = final
 			? Number.POSITIVE_INFINITY
@@ -264,6 +283,8 @@ export class RolloverMeter {
 					continue;
 				}
 				page.framesAll.add(interval);
+				if (interval > 50 && page.longFrames.length < 50_000)
+					page.longFrames.push([end, interval, this.stageAt(end - interval, end)]);
 				(this.overlapsWindow(end - interval, end) ? page.framesIn : page.framesOut).add(interval);
 			}
 			page.pendingFrames = keepFrames;
@@ -283,6 +304,12 @@ export class RolloverMeter {
 				}
 				return keep;
 			};
+			for (let index = 0; index + 1 < page.pendingTasks.length; index += 2) {
+				const at = page.pendingTasks[index] as number;
+				const duration = page.pendingTasks[index + 1] as number;
+				if (at + duration <= cutoff && page.longTaskRows.length < 50_000)
+					page.longTaskRows.push([at, duration, this.stageAt(at, at + duration)]);
+			}
 			page.pendingTasks = fold(page.pendingTasks, page.tasksIn, page.tasksOut, false);
 			page.pendingStalls = fold(page.pendingStalls, page.stallsIn, page.stallsOut, true);
 		}
@@ -339,6 +366,8 @@ export class RolloverMeter {
 			droppedRingEntries: page.dropped,
 			hiddenObserved: page.hiddenObserved,
 			visibility: page.visibility,
+			longFrames: page.longFrames,
+			longTaskRows: page.longTaskRows,
 		};
 	}
 
