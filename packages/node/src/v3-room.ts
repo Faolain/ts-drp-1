@@ -8326,10 +8326,17 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			retainedReadPause?.finish(restoreRetainedReads ? "restored" : "unavailable");
 		}
 	};
+	// A creator restore currency check decides before a finality signature. Only while one is still
+	// running (or refused) is the transition deferred; otherwise it is enqueued in this same turn, so the
+	// lifetime FIFO order of a seal or adoption against work enqueued right after it is unchanged.
+	const afterCreatorRestoreDecision = <Result>(transition: () => Promise<Result>): Promise<Result> =>
+		creatorRestoreGate === undefined || creatorRestoreGate.state() === "current"
+			? transition()
+			: creatorRestoreGate.admit().then(transition);
 	const adoptCreatorSuccessor = (): Promise<void> => {
 		if (creatorSuccessorAdoptionTask !== undefined) return creatorSuccessorAdoptionTask;
 		// Adoption signs the successor anchor: a creator restore currency check decides first.
-		const attempt = (creatorRestoreGate?.admit() ?? Promise.resolve()).then(() => enqueueLifetimeTransition(async () => {
+		const attempt = afterCreatorRestoreDecision(() => enqueueLifetimeTransition(async () => {
 			if (redirectPromise !== undefined) await redirectPromise;
 			assertSessionOpen();
 			if (redirectedSession !== undefined) {
@@ -8860,7 +8867,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	// One creator close of the current epoch, in the lifetime FIFO. A creator restore currency check
 	// decides first (sealing signs with the finality key); a refused creator never seals.
 	const sealEpochNow = (): Promise<CreatorLiveCloseResult> =>
-		(creatorRestoreGate?.admit() ?? Promise.resolve()).then(() => enqueueLifetimeTransition(async () => {
+		afterCreatorRestoreDecision(() => enqueueLifetimeTransition(async () => {
 			if (redirectPromise !== undefined) await redirectPromise;
 			if (redirectedSession !== undefined) return redirectedSession.sealEpoch();
 			assertSessionOpen();
