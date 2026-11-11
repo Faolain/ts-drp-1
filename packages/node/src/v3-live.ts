@@ -7962,6 +7962,26 @@ function retainPendingIngress(
 	registration.pendingIngressBytes += pendingByteCharge;
 }
 
+/**
+ * Schedules one drain of retained pending ingress through the original FIFO and full admission
+ * path, when a retained row has become admissible. Never inside a drain: the drain's own admission
+ * job ends while it runs, and a row it could not admit must not schedule a retry loop.
+ * @param registration - The plane.
+ */
+function resumePendingIngress(registration: V3PlaneRegistration): void {
+	if (!currentRegistration(registration) || registration.drainingPendingIngress || registration.pendingIngress.size === 0)
+		return;
+	let ready = false;
+	for (const pending of registration.pendingIngress.values())
+		if (pending.evidence.authenticated.vertex.dependencies.every((dependency) => registration.index.has(dependency))) {
+			ready = true;
+			break;
+		}
+	if (!ready) return;
+	void enqueueRegistrationTask(registration, () => () => drainPendingIngress(registration))
+		.catch(() => ingressFailureLog("admission-rejected"));
+}
+
 async function drainPendingIngress(registration: V3PlaneRegistration): Promise<void> {
 	if (registration.drainingPendingIngress || !currentRegistration(registration)) return;
 	registration.drainingPendingIngress = true;
@@ -8243,6 +8263,9 @@ async function handleV3IngressWithSource(
 				canonicalPreimage: evidence.exactCanonicalPreimageBytes, signature: evidence.signature}).finish().byteLength);
 			ingressFailureLog("admission-rejected", `received-maintenance-${maintenancePhase}:${
 				creatorClosedRollbackRefusalDiagnostic(error) ?? (error instanceof Error ? error.message : "unavailable")}`);
+			// This job already ended (its release ran above): retry the retained row once, after
+			// this turn, so a refusal that clears ends in an admission rather than a held row.
+			resumePendingIngress(registration);
 			return false;
 		} finally { receivedAppendReceipts.delete(receipt); }
 	}
@@ -11102,8 +11125,10 @@ async function readCreatorRecoveryDependencyCensus(
 				}).finish().byteLength !== pending.pendingByteCharge
 			)
 				return undefined;
+			// A row whose parents are all admitted (a received append retained after a refused
+			// maintenance capture) is still unadmitted foreign work: carry it as a root like any
+			// other until a drain admits it. Local dependencies stay on the admitted index.
 			const missingParents = authenticated.vertex.dependencies.filter((dependency) => !index.has(dependency));
-			if (missingParents.length === 0 && active.enteredReceivedDigest === undefined) return undefined;
 			wireByteCharge += pending.pendingByteCharge;
 			if (!NumberIsSafeInteger(wireByteCharge) || wireByteCharge > registration.payload.parameters.maxPendingBytes)
 				return undefined;
@@ -22118,7 +22143,16 @@ function creatorCloseRegistration(
 			registration.blueprintClosing = true;
 			return enqueueRegistrationTask(registration, () => () => {
 				const current = currentRegistration(registration);
-				if (current) registration.receivedTransition = true;
+				if (current) {
+					registration.receivedTransition = true;
+					// The closing plane admits no more ingress, and its received recovery hold
+					// requires an empty pending ingress. Release the retained rows now: the hot
+					// handoff clears them anyway. A released copy counts as lost here; the
+					// successor snapshot or its author's re-offer delivers the move (model:
+					// member-received-close-pending-release.qnt).
+					registration.pendingIngress.clear();
+					registration.pendingIngressBytes = 0;
+				}
 				return Promise.resolve(current);
 			});
 		},
@@ -22296,14 +22330,10 @@ function creatorCloseRegistration(
 			if (!currentRegistration(registration)) throw new TypeError("creator ordinary readiness owner is unavailable");
 			return registration.operationAdmissionHalted || creatorRetirementResumeRequested(registration);
 		},
-		resumePendingIngress: (): void => {
-			// Received work refused while a maintenance job held the consumer stays
-			// retained, authenticated and charged. Drain it through the original
-			// queue and full admission path once that job joins; never a grant.
-			if (!currentRegistration(registration) || registration.pendingIngress.size === 0) return;
-			void enqueueRegistrationTask(registration, () => () => drainPendingIngress(registration))
-				.catch(() => ingressFailureLog("admission-rejected"));
-		},
+		// Received work refused while a maintenance job held the consumer stays
+		// retained, authenticated and charged. Drain it through the original
+		// queue and full admission path once that job joins; never a grant.
+		resumePendingIngress: (): void => resumePendingIngress(registration),
 		holdIngressForReadiness: (): Promise<(successful: boolean) => void> => holdV3IngressForReadiness(registration),
 		runOrdinaryReadinessMaintenance: (
 			snapshots: Parameters<V3CreatorCloseRegistration["runOrdinaryReadinessMaintenance"]>[0],
