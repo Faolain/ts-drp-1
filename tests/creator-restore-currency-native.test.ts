@@ -249,6 +249,38 @@ describe("creator restore currency: a restored creator checks the members' view 
 		expect((await creator.room.sealEpoch()).ok).toBe(true);
 	}, 300_000);
 
+	it("[control] the bound counts from open: a lone creator's first move waits only the remainder", async () => {
+		const bound = 6_000;
+		const currency = (room: unknown): unknown => Reflect.get(room as object, "creatorCurrency")?.call(room) ?? "current";
+		const { f, net } = await room();
+		let creator = await f.open(0);
+		await creator.room.issue(message("creator-1"));
+		await f.stop(creator);
+		const view = creatorDelivery(net, f.objectId);
+		const opened = performance.now();
+		creator = await f.open(0, { reopen: true, creatorMemberView: memberView(view), creatorRestoreCurrencyBoundMs: bound });
+		const openMs = performance.now() - opened;
+		// No signature has been asked for: the check runs in the background from open.
+		await new Promise((resolve) => setTimeout(resolve, Math.max(0, bound - 1_000 - (performance.now() - opened))));
+		const issueAt = performance.now() - opened;
+		const stateAtIssue = currency(creator.room);
+		const issueStarted = performance.now();
+		expect(await settle(creator.room.issue(message("creator-late")))).toBe("issued");
+		const issueMs = performance.now() - issueStarted;
+		console.info(
+			"[creator currency] bound from open:",
+			JSON.stringify({ bound, openMs: Math.round(openMs), issueAt: Math.round(issueAt), stateAtIssue, issueMs: Math.round(issueMs) })
+		);
+		// Lazily started, the first move would wait the whole bound (>= 6 s); from open it waits about bound - issueAt.
+		expect(issueMs).toBeLessThan(bound / 2);
+		await f.stop(creator);
+		// With no move at all, the check still decides once the bound has passed since open.
+		const again = performance.now();
+		creator = await f.open(0, { reopen: true, creatorMemberView: memberView(view), creatorRestoreCurrencyBoundMs: 1_500 });
+		await new Promise((resolve) => setTimeout(resolve, Math.max(0, 2_500 - (performance.now() - again))));
+		expect(currency(creator.room)).toBe("current");
+	}, 300_000);
+
 	it("[control] a member presenting unsigned or forged newer evidence does not lock the creator out", async () => {
 		const { f, net } = await room();
 		let creator = await f.open(0);
