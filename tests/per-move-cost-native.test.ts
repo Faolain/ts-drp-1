@@ -60,13 +60,21 @@ const ASSERT = !TIMING && (env.PERMOVE_ASSERT ?? "1") === "1";
 // itself and never writes), prepares 71, canonical encodes 1480 (2264 in the deep window, moves
 // 64-79), decodes 273. Budgets: at least 5x fewer SELECTs, transactions and encodes, prepares only
 // where a statement is genuinely new, no rolled-back write beyond the reservations' exclusion, and
-// no growth of encodes with epoch history.
+// no growth of encodes with epoch history. Cost budgets (same base, test 3723013e counters): canonical
+// bytes encoded 351220 (821440 deep), decoded 46833, rows read 1094, bytes hashed 37189 (137407 deep),
+// Ed25519 verifications computed 1 (plus 3 exact-byte memo hits): 5x fewer bytes and rows, no growth
+// of encoded or hashed bytes with history, and never more than the one verification the move needs.
 const BUDGET = Object.freeze({
 	select: Number(env.PERMOVE_BUDGET_SELECT ?? 155),
 	transactions: Number(env.PERMOVE_BUDGET_TX ?? 17),
 	rolledBackWrites: Number(env.PERMOVE_BUDGET_ROLLBACK ?? 4),
 	prepares: Number(env.PERMOVE_BUDGET_PREPARE ?? 10),
 	encodes: Number(env.PERMOVE_BUDGET_ENCODE ?? 296),
+	encodedBytes: Number(env.PERMOVE_BUDGET_ENCODED_BYTES ?? 70_244),
+	decodedBytes: Number(env.PERMOVE_BUDGET_DECODED_BYTES ?? 9_367),
+	rows: Number(env.PERMOVE_BUDGET_ROWS ?? 219),
+	hashedBytes: Number(env.PERMOVE_BUDGET_HASHED_BYTES ?? 7_438),
+	verifies: Number(env.PERMOVE_BUDGET_VERIFIES ?? 1),
 	// Deep-window counts over the early window: O(1) per move in epoch history.
 	growth: Number(env.PERMOVE_BUDGET_GROWTH ?? 1.25),
 });
@@ -378,6 +386,11 @@ it("per steady move (rollover off): bounded SQLite statements, transactions, pre
 		.toBeLessThanOrEqual(BUDGET.rolledBackWrites);
 	expect.soft(e.prepares, "statement prepares per Writer move").toBeLessThanOrEqual(BUDGET.prepares);
 	expect.soft(e.encodes, "canonical encodes per Writer move").toBeLessThanOrEqual(BUDGET.encodes);
+	expect.soft(e.encodedBytes, "canonical bytes encoded per Writer move").toBeLessThanOrEqual(BUDGET.encodedBytes);
+	expect.soft(e.decodedBytes, "canonical bytes decoded per Writer move").toBeLessThanOrEqual(BUDGET.decodedBytes);
+	expect.soft(e.rows, "SQLite rows read per Writer move").toBeLessThanOrEqual(BUDGET.rows);
+	expect.soft(e.hashedBytes, "bytes hashed per Writer move").toBeLessThanOrEqual(BUDGET.hashedBytes);
+	expect.soft(e.verifies, "Ed25519 verifications computed per Writer move").toBeLessThanOrEqual(BUDGET.verifies);
 	const d = deep.writerMove;
 	expect
 		.soft(d.select, "deep-window SELECT per Writer move (history growth)")
@@ -385,4 +398,13 @@ it("per steady move (rollover off): bounded SQLite statements, transactions, pre
 	expect
 		.soft(d.encodes, "deep-window canonical encodes per Writer move (history growth)")
 		.toBeLessThanOrEqual(Math.max(BUDGET.encodes, e.encodes * BUDGET.growth));
+	expect
+		.soft(d.encodedBytes, "deep-window canonical bytes encoded per Writer move (history growth)")
+		.toBeLessThanOrEqual(Math.max(BUDGET.encodedBytes, e.encodedBytes * BUDGET.growth));
+	expect
+		.soft(d.hashedBytes, "deep-window bytes hashed per Writer move (history growth)")
+		.toBeLessThanOrEqual(Math.max(BUDGET.hashedBytes, e.hashedBytes * BUDGET.growth));
+	expect
+		.soft(d.rows, "deep-window SQLite rows read per Writer move (history growth)")
+		.toBeLessThanOrEqual(Math.max(BUDGET.rows, e.rows * BUDGET.growth));
 }, 900_000);
