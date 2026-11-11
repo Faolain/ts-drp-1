@@ -6288,6 +6288,25 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	// The Writer's undelivered own moves (V3RoomLocalBacklogFull) as of its last plan write, and the
 	// displaced rows of the last rebase scan that counted them.
 	let settlementBacklog = 0;
+	// New own moves the plan does not count yet: a move is in no plan until the first install after its
+	// epoch settles it, but it is undelivered until then, and an offline Writer's next skip install
+	// needs one hand-back record for each (a retained row past the record bound stays unresolved,
+	// withholds the author fence, and leaves the Writer's later rows unprovable). Counted by the epoch
+	// the room was in when the move was accepted (never earlier than the epoch it was signed in), plus
+	// those still in flight; an epoch leaves the count once a plan write at a later epoch counts it.
+	const uncountedLocalMoves = new Map<number, number>();
+	let uncountedLocalMovesInFlight = 0;
+	let localMovesCountedBelow = 0;
+	const undeliveredLocalMoves = (): number => {
+		let count = uncountedLocalMovesInFlight;
+		for (const [epoch, moves] of uncountedLocalMoves) if (epoch >= localMovesCountedBelow) count += moves;
+		return count;
+	};
+	const localMovesCountedFrom = (epoch: number): void => {
+		if (epoch <= localMovesCountedBelow) return;
+		localMovesCountedBelow = epoch;
+		for (const counted of [...uncountedLocalMoves.keys()]) if (counted < epoch) uncountedLocalMoves.delete(counted);
+	};
 	let settlementDisplaced: ReadonlySet<number> = new Set();
 	// The displaced sources of the last rebase scan (recordSettlementStatus), for a status recomputed
 	// after the same drain resolves retained rows.
@@ -6708,6 +6727,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		settlementSources = sources;
 		settlementDisplaced = new Set(sources.map((source) => source.authorSequence));
 		settlementBacklog = settlementBacklogOf(plan, settlementDisplaced);
+		// This plan write at `epoch` settled every own row of the epochs before it.
+		localMovesCountedFrom(epoch);
 		settlementStatusSnapshot = Object.freeze({
 			epoch,
 			unsettledEpochs: waiting.length === 0 ? 0 : Math.max(0, epoch - Math.min(...waiting)),
@@ -9399,13 +9420,21 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			if (input.receiveOnly) throw new TypeError("v3 room is receive-only");
 			// Back-pressure: a new move is refused up front while the Writer's undelivered moves fill the
 			// backlog; a given-back move's reissue keeps its own slot (its record) and is never refused.
-			if (
-				handBack === undefined &&
-				redirectPromise === undefined &&
-				redirectedSession === undefined &&
-				settlementBacklog >= V3_ROOM_LOCAL_BACKLOG_LIMIT
-			)
-				throw new V3RoomLocalBacklogFull(settlementBacklog, V3_ROOM_LOCAL_BACKLOG_LIMIT);
+			// The backlog includes the new moves the plan does not count yet (undeliveredLocalMoves).
+			const countsAgainstBacklog = handBack === undefined && redirectPromise === undefined && redirectedSession === undefined;
+			if (countsAgainstBacklog) {
+				const backlog = settlementBacklog + undeliveredLocalMoves();
+				if (backlog >= V3_ROOM_LOCAL_BACKLOG_LIMIT) throw new V3RoomLocalBacklogFull(backlog, V3_ROOM_LOCAL_BACKLOG_LIMIT);
+			}
+			let countedAccepted = false;
+			const settleBacklogCount = (accepted: boolean): void => {
+				if (!countsAgainstBacklog || countedAccepted) return;
+				countedAccepted = true;
+				uncountedLocalMovesInFlight -= 1;
+				if (!accepted) return;
+				const epoch = Math.max(activeHandle?.epoch ?? 0, localMovesCountedBelow);
+				uncountedLocalMoves.set(epoch, (uncountedLocalMoves.get(epoch) ?? 0) + 1);
+			};
 			if (redirectPromise === undefined && redirectedSession === undefined) {
 				if (terminalFailure !== undefined) throw terminalFailure;
 				if (closed) throw new TypeError("v3 room session is closed");
@@ -9424,6 +9453,9 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				pendingInputEntries -= 1;
 				pendingInputBytes -= byteCharge;
 			};
+			// Synchronous since the backlog check above: no other issue counted in between.
+			if (countsAgainstBacklog) uncountedLocalMovesInFlight += 1;
+			let issued = false;
 			try {
 				let capture: ReturnType<typeof captureRoomOperation>;
 				try {
@@ -9521,6 +9553,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					});
 					if (!held) scheduleDrain();
 					await promise;
+					issued = true;
+					settleBacklogCount(true);
 					settleFollower?.(Object.freeze({ ok: true }));
 					if (presented !== undefined) {
 						const id = presented;
@@ -9538,6 +9572,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				}
 			} finally {
 				if (!transferred) releasePublicInput();
+				settleBacklogCount(issued);
 			}
 		},
 		issueWithReceipt(operation: Readonly<Record<string, unknown>>): V3RoomIssueReceipt {

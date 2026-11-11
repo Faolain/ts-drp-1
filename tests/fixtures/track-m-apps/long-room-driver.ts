@@ -301,6 +301,8 @@ export interface RoleEndpoint {
 			}>[];
 		}>
 	>;
+	/** Diagnostic: the author's settlement plan with each source row's epoch (null: retired). */
+	settlementPlanDump?(): Promise<unknown>;
 	/** Hex of the canonical application state of the current projection. */
 	state(): Promise<string>;
 	/** Creator: seals `epoch` (throws on refusal); returns its wall time. */

@@ -368,6 +368,11 @@ async function slowFollow(conserve: boolean, rollCount = ROLLS, minSkips = 0) {
 					| null
 					| undefined;
 				const status = (await writer.rolloverStatus?.()) as { state?: string; kept?: unknown[] } | undefined;
+				// Observation only, bounded: the member plan's dispositions and its policy's latest errors.
+				const bounded = <T,>(value: Promise<T> | undefined): Promise<T | string | undefined> =>
+					Promise.race([Promise.resolve(value), sleep(5_000).then(() => "NO-ANSWER-5S")]);
+				const audit = (await bounded(writer.settlementAudit())) as { dispositions?: unknown } | string | undefined;
+				const policy = (await bounded(writer.rollover?.())) as { errors?: readonly string[] } | string | undefined;
 				process.stdout.write(
 					`SLOW_MEMBER_TRACE ${JSON.stringify({
 						label,
@@ -382,6 +387,11 @@ async function slowFollow(conserve: boolean, rollCount = ROLLS, minSkips = 0) {
 						undeliveredEpochs: [...new Set(settlement?.undelivered.map((given) => given.epoch) ?? [])],
 						state: status?.state,
 						kept: status?.kept?.length,
+						dispositions: typeof audit === "object" ? audit.dispositions : audit,
+						memberErrors:
+							typeof policy === "object"
+								? { count: policy.errors?.length ?? 0, last: (policy.errors ?? []).slice(-3).map((error) => error.slice(0, 300)) }
+								: policy,
 						journal: journalRetirement(directory, "recipient"),
 						carriers: carrierTally(carrierEvents),
 					})}\n`
@@ -481,7 +491,7 @@ async function slowFollow(conserve: boolean, rollCount = ROLLS, minSkips = 0) {
 				return [value.authorSequence, value.epoch, value.operation.action, value.operation.id];
 			});
 			process.stdout.write(
-				`SLOW_MEMBER_SUMMARY ${JSON.stringify({ givenBack: [...givenBack.values()], carrierEvents, journal: journalRetirement(directory, "recipient"), own, plan: await within(writer.settlementAudit()), rolls, issued, installs, member: await within(writer.successorDelivery?.()), creatorErrors: await within(creator.rollover?.().then((rollover) => rollover?.errors)), status: await within(writer.rolloverStatus?.()) })}\n`
+				`SLOW_MEMBER_SUMMARY ${JSON.stringify({ givenBack: [...givenBack.values()], carrierEvents, journal: journalRetirement(directory, "recipient"), own, plan: await within(writer.settlementAudit()), rolls, issued, installs, member: await within(writer.successorDelivery?.()), creatorErrors: await within(creator.rollover?.().then((rollover) => rollover?.errors)), memberErrors: await within(writer.rollover?.().then((rollover) => rollover?.errors)), status: await within(writer.rolloverStatus?.()) })}\n`
 			);
 			await wire.stop();
 		}
