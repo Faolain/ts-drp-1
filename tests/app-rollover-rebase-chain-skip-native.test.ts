@@ -529,6 +529,33 @@ async function catchUp(moves: number, epochs: number) {
 			}
 			ids.push(id);
 		};
+		// Diagnostic (CATCH_UP_DUMP_DIR): the member's plan, all its rows [sequence, epoch, action] and the
+		// creator's admitted rows of the member.
+		const dumpPlan = async (label: string) => {
+			const dumpDir = process.env.CATCH_UP_DUMP_DIR;
+			if (dumpDir === undefined || dumpDir === "") return;
+			const action = (operation: unknown) => {
+				const value = (typeof operation === "string" ? JSON.parse(operation) : operation) as Record<string, unknown> | null;
+				return typeof value?.action === "string" ? value.action : "?";
+			};
+			const published: [number, number, string][] = [];
+			for (let after: number | null = null; ; ) {
+				const page = await writer.published(after);
+				if (page.length === 0) break;
+				for (const row of page) {
+					const value = rowValue(row);
+					published.push([value.authorSequence, value.epoch, action(value.operation)]);
+				}
+				after = page.at(-1)!.authorSequence;
+			}
+			const author = rowValue((await writer.published(null))[0]!).author;
+			mkdirSync(dumpDir, { recursive: true });
+			writeFileSync(join(dumpDir, `plan-${moves}x${epochs}-${label}.json`), JSON.stringify({
+				label, creator: (await creator.rollover?.())?.epoch, member: await writer.authorityEpoch(),
+				plan: await writer.settlementPlanDump?.(), published,
+				creatorAccepted: ((await creator.acceptedVertices?.()) ?? []).filter((vertex) => vertex.author === author)
+					.map((vertex) => [vertex.authorSequence, vertex.epoch, action(vertex.operation)]) }));
+		};
 		try {
 			while (epoch < 2) {
 				epoch = await rollCreator(creator, rows.toWriter, ordinal);
@@ -543,6 +570,7 @@ async function catchUp(moves: number, epochs: number) {
 			for (let step = 0; step < steps; step++) {
 				const quota = Math.round(((step + 1) * moves) / steps) - Math.round((step * moves) / steps);
 				for (let k = 0; k < quota; k++) await issue();
+				await dumpPlan(`behind-${step}`);
 				await wire.pause();
 				for (let roll = 0; roll < 2; roll++) epoch = await rollCreator(creator, rows.toWriter, ordinal);
 				wire.resume();
@@ -574,21 +602,7 @@ async function catchUp(moves: number, epochs: number) {
 					if (memberEpoch !== memberEpochs.at(-1)?.member) {
 						memberEpochs.push({ at: Math.round(performance.now() - started), member: memberEpoch,
 							creator: (await creator.rollover?.())?.epoch ?? 0 });
-						const dumpDir = process.env.CATCH_UP_DUMP_DIR;
-						if (dumpDir !== undefined && dumpDir !== "") {
-							mkdirSync(dumpDir, { recursive: true });
-							const action = (operation: unknown) => {
-								const value = (typeof operation === "string" ? JSON.parse(operation) : operation) as Record<string, unknown> | null;
-								return typeof value?.action === "string" ? value.action : "?";
-							};
-							writeFileSync(join(dumpDir, `plan-${moves}x${epochs}-m${memberEpoch}.json`), JSON.stringify({
-								...memberEpochs.at(-1), plan: await writer.settlementPlanDump?.(),
-								// [authorSequence, epoch, action] of the member's rows: published, and admitted by the creator.
-								published: (await writer.published(null)).map((row) => { const value = rowValue(row);
-									return [value.authorSequence, value.epoch, action(value.operation)]; }),
-								creatorAccepted: ((await creator.acceptedVertices?.()) ?? []).filter((vertex) => vertex.author === writerAuthor)
-									.map((vertex) => [vertex.authorSequence, vertex.epoch, action(vertex.operation)]) }));
-						}
+						await dumpPlan(`m${memberEpoch}`);
 					}
 					const now = counts.filter((count) => count >= 1).length;
 					if (now > landed) {
