@@ -1,14 +1,16 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type -- Test helpers: inference keeps the reader's input shape. */
 /* eslint-disable @typescript-eslint/no-non-null-assertion -- Each asserted value was produced a line earlier by the test. */
 import { openTrustedBlueprintCatalogBytes, type TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog/bytes";
-import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
+import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { canonicalCarrierResourceForSizing, type CanonicalResourceFootprint } from "@ts-drp/canonical/resource";
 import { describe, expect, it } from "vitest";
 
 import catalogMaterial from "../examples/chat/src/chat-catalog-material.json";
+import { openShippingChatCatalogs } from "../examples/chat/src/chat-catalogs.js";
 import {
 	createShippingChatGenesisStateBytes,
 	createShippingV3ChatApplication,
+	type ShippingChatApplication,
 } from "../examples/chat/src/v3-chat-application.js";
 import {
 	captureShippingChatCapacityState,
@@ -112,8 +114,9 @@ function expectSameTheoremProjection(read: Reader, input: ReaderInput, foreignBa
 	// The complete reader's input (with a candidate) is not the projection's shape.
 	expect(create(input)).toBeUndefined();
 	expect(create({ ...projectionInput, catalog: { ...input.catalog, blueprintDigest: "unknown" } })).toBeUndefined();
-	expect(create({ ...projectionInput, material: { ...withoutCandidate, exactCanonicalBaseStateBytes: [foreignBase] } }))
-		.toBeUndefined();
+	expect(
+		create({ ...projectionInput, material: { ...withoutCandidate, exactCanonicalBaseStateBytes: [foreignBase] } })
+	).toBeUndefined();
 }
 
 /** Refusals every reader must give: foreign identity, mutated carrier, missing or accessor field, foreign material shape. */
@@ -344,9 +347,9 @@ function chatCatalog(): TrustedBlueprintCatalog {
 	});
 }
 
-function chatAcl(objectId = CHAT_OBJECT): Uint8Array {
+function chatAcl(objectId = CHAT_OBJECT, epoch = 0): Uint8Array {
 	return encodeCanonical({
-		epoch: 0,
+		epoch,
 		kind: "drp-v3-latched-acl",
 		members: [
 			{ author: AUTHORS[0], finalityKey: AUTHORS[0], groups: ["admin", "finality", "writer"] },
@@ -398,11 +401,43 @@ describe("Chat ordinary resource bound", () => {
 		expect(typeof read).toBe("function");
 		if (read === undefined) return;
 		const canvas = createV3CanvasDescriptor(2, 2);
-		expectSameTheoremProjection(
-			read,
-			{ catalog: catalogInput(application.catalog), material: material([genesis]) },
-			canvas.canonicalStateBytes(canvas.initialState)
-		);
+		const input = { catalog: catalogInput(application.catalog), material: material([genesis]) };
+		// No projection until the room has built this composition's own admission policy.
+		const { candidateOperation: _candidate, ...withoutCandidate } = input.material;
+		expect(createProjectionOf(read)({ catalog: input.catalog, material: withoutCandidate })).toBeUndefined();
+		installChatPolicy(application, chatAcl());
+		expectSameTheoremProjection(read, input, canvas.canonicalStateBytes(canvas.initialState));
+	});
+
+	it("offers its incremental projection only once the room built the composition's own admission policy", async () => {
+		for (const format of ["lifetime", "window", "shares"] as const) {
+			const catalog = SHIPPING_CHAT_CATALOGS[format];
+			const application = await createShippingV3ChatApplication({
+				catalog: catalog.catalog,
+				blueprintDigest: catalog.blueprintDigest,
+				exactCanonicalGenesisLatchedAclBytes: chatAcl(),
+			});
+			const read = application.readOrdinaryApplicationResourceBound!;
+			const genesis = application.createGenesisApplicationStateBytes({
+				objectId: CHAT_OBJECT,
+				exactCanonicalLatchedAclBytes: chatAcl(),
+			});
+			const input = { catalog: catalogInput(application.catalog), material: projectionMaterial([genesis]) };
+			// The complete reader keeps Track Q's value; only the incremental theorem waits for the policy.
+			expect(read({ ...input, material: { ...input.material, candidateOperation: null } })).toBeDefined();
+			expect(createProjectionOf(read)(input), format).toBeUndefined();
+			// A policy built from another composition's factory does not enable this one.
+			const other = await createShippingV3ChatApplication({
+				catalog: catalog.catalog,
+				blueprintDigest: catalog.blueprintDigest,
+				exactCanonicalGenesisLatchedAclBytes: chatAcl(),
+			});
+			installChatPolicy(other, chatAcl());
+			expect(createProjectionOf(read)(input), format).toBeUndefined();
+			expect(createProjectionOf(other.readOrdinaryApplicationResourceBound!)(input), format).toBeDefined();
+			installChatPolicy(application, chatAcl());
+			expect(createProjectionOf(read)(input), format).toBeDefined();
+		}
 	});
 
 	it("equals the ceiling the Chat capture enforces on every state, and dominates every state it accepts", async () => {
@@ -467,3 +502,46 @@ describe("Chat ordinary resource bound", () => {
 		expect(read({ ...input, catalog: canvasCatalog })).toBeUndefined();
 	});
 });
+
+// ---------------------------------------------------------------------------------------
+// Helpers for the Chat projection's admission-policy dependency.
+
+const SHIPPING_CHAT_CATALOGS = openShippingChatCatalogs();
+
+type Projection = Readonly<{
+	advance(operations: readonly unknown[]): boolean;
+	quote(candidateOperation: unknown): CanonicalResourceFootprint | undefined;
+	quoteWithoutApplicationCandidate(): CanonicalResourceFootprint | undefined;
+}>;
+
+function createProjectionOf(read: Reader): (input: unknown) => Projection | undefined {
+	const create = Object.getOwnPropertyDescriptor(read, "createIncrementalProjection")?.value as
+		| ((input: unknown) => Projection | undefined)
+		| undefined;
+	if (create === undefined) throw new TypeError("incremental projection unavailable");
+	return create;
+}
+
+function projectionMaterial(bases: readonly Uint8Array[]) {
+	return {
+		exactCanonicalBaseStateBytes: [...bases],
+		currentOperations: [],
+		protectedOperations: [],
+		recoveryOperations: [],
+	};
+}
+
+function hexOf(bytes: Uint8Array): string {
+	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+/** The admission policy the room builds from the composition's own factory (epoch 0, genesis). */
+function installChatPolicy(application: ShippingChatApplication, acl: Uint8Array) {
+	return application.createOperationAdmissionPolicy({
+		aclDigest: hexOf(hashDomain("ts-drp/latched-acl/v3", acl)),
+		anchorDigest: "0".repeat(64),
+		epoch: 0,
+		objectId: CHAT_OBJECT,
+		exactCanonicalLatchedAclBytes: acl,
+	});
+}

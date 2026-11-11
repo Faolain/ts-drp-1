@@ -1,10 +1,6 @@
 import type { TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog/bytes";
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
-import type {
-	V3OperationAdmissionPolicy,
-	V3OperationAdmissionPolicyFactory,
-	V3OperationAdmissionReservation,
-} from "@ts-drp/node/v3-live";
+import type { V3OperationAdmissionPolicy, V3OperationAdmissionReservation } from "@ts-drp/node/v3-live";
 import type { V3RoomApplication, V3RoomProjectionInput } from "@ts-drp/node/v3-room";
 import { prepareBlueprintAdmission, prepareBlueprintRuntime } from "@ts-drp/protocol-v3";
 import { applyPreparedBlueprintOperation } from "@ts-drp/protocol-v3/blueprint-application";
@@ -730,13 +726,14 @@ export async function createShippingChatSharesApplication(
 		exactArtifactBytes: resolved.exactArtifactBytes.slice(),
 		canonicalBlueprintPackageBytes: resolved.canonicalBlueprintPackageBytes.slice(),
 	});
-	const readOrdinaryApplicationResourceBound = shippingChatCeilingResourceBound((value, projection) => {
+	const resourceBound = shippingChatCeilingResourceBound((value, projection) => {
 		const bases = readResourceBases(value, resourceCatalog, projection);
 		if (bases === undefined) return false;
 		// Only authenticated v5 states: captured, canonical, within the ceiling.
 		for (const base of bases) restoreShippingChatSharesState(base);
 		return true;
 	}, LIMITS);
+	const readOrdinaryApplicationResourceBound = resourceBound.reader;
 	const project = (projection: V3RoomProjectionInput): ShippingChatProjection => {
 		let state: unknown =
 			projection.authenticatedBase === undefined
@@ -784,8 +781,9 @@ export async function createShippingChatSharesApplication(
 		displacementPolicies: Object.freeze({ capacityAllocation: "expire" as const, message: "rebase" as const }),
 		displacedOperationIdentity,
 		projectAcceptedOperations: project,
-		createOperationAdmissionPolicy: (context: Parameters<V3OperationAdmissionPolicyFactory>[0]) =>
-			createShippingChatSharesAdmissionPolicy({ ...context, exactCanonicalGenesisStateBytes: genesisBytes }),
+		createOperationAdmissionPolicy: resourceBound.admissionPolicy((context) =>
+			createShippingChatSharesAdmissionPolicy({ ...context, exactCanonicalGenesisStateBytes: genesisBytes })
+		),
 		migration: Object.freeze({
 			inheritAuthenticatedState: true as const,
 			canonicalStateBytes(projection: ShippingChatProjection): Uint8Array {
