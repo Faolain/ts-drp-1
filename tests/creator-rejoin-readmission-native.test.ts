@@ -311,7 +311,11 @@ describe("native same-replica creator recovery", () => {
 		} finally {database.close();}
 	}, 120_000);
 
-	it("rejoins after two missed installs and preserves accepted offline work", async () => {
+	// Since 1803f975 the creator's signed frontier in the installed checkpoint resolves the offline row:
+	// the creator closed epochs 0 and 1 without it and the row is displaced and fence-guarded (the lowest
+	// unsettled own sequence), so it is proven never admitted. It is resolved with the author's own expiry
+	// receipt (no manual review) and the move is given back to the app, which offers it again exactly once.
+	it("rejoins after two missed installs and gives back the offline move the creator never admitted", async () => {
 		const f = await fixture();
 		const creator = await f.open(0); let member = await f.open(1);
 		await member.room.issue(message("offline-accepted"));
@@ -322,23 +326,35 @@ describe("native same-replica creator recovery", () => {
 		}
 		await f.install(member);
 		expect(member.room.authority().epoch).toBe(2);
-		const unresolved = await member.room.unresolvedAcceptedWork();
-		expect(unresolved).toMatchObject([{sourceSequence: original.commit.authorSequence, sourceEpoch: 0,
-			commitment: "unknown", disposition: "manual-review", operations: [message("offline-accepted")]}]);
-		expect(creator.room.projection().messages.map(row => row.clientOperationId)).not.toContain("offline-accepted");
+		const ids = () => creator.room.projection().messages.map(row => row.clientOperationId);
+		const undelivered = () => required(member.room.settlementStatus?.()).undelivered;
+		expect(ids()).not.toContain("offline-accepted");
+		expect(await member.room.unresolvedAcceptedWork(), "proven never admitted: not manual review").toEqual([]);
+		const given = undelivered();
+		expect(given).toMatchObject([{operations: [message("offline-accepted")],
+			handBack: {sourceSequence: original.commit.authorSequence}}]);
 		await f.stop(member);
 		member = await f.open(1, {reopen: true, promote: true});
-		expect(await member.room.unresolvedAcceptedWork()).toEqual(unresolved);
+		expect(await member.room.unresolvedAcceptedWork()).toEqual([]);
+		expect(undelivered(), "the hand-back record is durable").toEqual(given);
 		await member.room.issue(message("fresh-after-gap"));
-		expect(await member.room.unresolvedAcceptedWork()).toEqual(unresolved);
-		const fresh = (await f.issuedAfter(1, original.commit.authorSequence));
+		const record = required(given[0]);
+		await member.room.issue(required(record.operations[0]), {handBack: record.handBack});
+		expect(undelivered(), "the reissue consumed the record").toEqual([]);
+		const fresh = await f.issuedAfter(1, original.commit.authorSequence);
 		expect(await creator.receive(fresh, 1, 10_000)).toBe(true);
-		expect(creator.room.projection().messages.map(row => row.clientOperationId)).toContain("fresh-after-gap");
+		expect(ids()).toContain("fresh-after-gap");
+		expect(ids().filter(id => id === "offline-accepted"), "the given-back move admitted once").toHaveLength(1);
+		// The late original can never be admitted: its epoch is closed.
+		await creator.receive([original], 1, 2_000).catch(() => false);
+		expect(ids().filter(id => id === "offline-accepted"), "the late original is not admitted").toHaveLength(1);
 		expect((await creator.room.sealEpoch()).ok).toBe(true);
 		await creator.room.adoptCreatorSuccessor();
 		await f.install(member);
 		expect(member.room.authority().epoch).toBe(3);
-		expect(await member.room.unresolvedAcceptedWork()).toEqual(unresolved);
+		expect(await member.room.unresolvedAcceptedWork()).toEqual([]);
+		expect(undelivered()).toEqual([]);
+		expect(ids().filter(id => id === "offline-accepted")).toHaveLength(1);
 	}, 120_000);
 
 	it("retains accepted pending work through removal and re-admission on the same stores", async () => {
