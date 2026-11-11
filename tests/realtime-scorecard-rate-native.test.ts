@@ -45,6 +45,20 @@ const countsEnabled = (env.SCORECARD_COUNTS ?? "1") === "1";
 const output = env.SCORECARD_OUT ?? join(tmpdir(), `realtime-scorecard-${Date.now()}`);
 const writers = Number(env.SCORECARD_WRITERS ?? 3);
 const offeredOps = Number(env.SCORECARD_OPS ?? 5);
+// Closed loop: every issuing peer keeps SCORECARD_INFLIGHT moves outstanding and offers the next as soon as
+// one settles (no fixed rate). Measures the ceiling instead of latency at an offered rate.
+const closedLoop = env.SCORECARD_CLOSED_LOOP === "1";
+const inflight = Number(env.SCORECARD_INFLIGHT ?? 1);
+// The creator also offers moves (round robin) unless SCORECARD_CREATOR_WRITES=0.
+const creatorWrites = (env.SCORECARD_CREATOR_WRITES ?? "1") === "1";
+// Rollover budget override (measurement of per-op cost without the epoch machinery): a very high
+// SCORECARD_BUDGET_MOVES / SCORECARD_IDLE_MS suppresses budget and idle rollovers. Refusal rollovers
+// (the native admission ceiling) still happen and are reported by trigger.
+const rolloverBudget = Object.freeze({
+	...GRID_ROLLOVER_BUDGET,
+	movesPerAuthor: Number(env.SCORECARD_BUDGET_MOVES ?? GRID_ROLLOVER_BUDGET.movesPerAuthor),
+	idleMs: Number(env.SCORECARD_IDLE_MS ?? GRID_ROLLOVER_BUDGET.idleMs),
+});
 const targetRollovers = Number(env.SCORECARD_ROLLOVERS ?? 40);
 const maxSeconds = Number(env.SCORECARD_MAX_S ?? 900);
 const burstOps = Number(env.SCORECARD_BURST_OPS ?? 0);
@@ -74,7 +88,7 @@ const lateJoins = (env.SCORECARD_LATE_JOINS ?? "")
 	.filter((value) => value.trim() !== "")
 	.map(Number);
 if (!["scheduled", "none"].includes(lull)) throw new Error(`SCORECARD_LULL:${lull}`);
-for (const value of [writers, targetRollovers, maxSeconds, slots])
+for (const value of [writers, targetRollovers, maxSeconds, slots, inflight, rolloverBudget.movesPerAuthor])
 	if (!Number.isSafeInteger(value) || value < 1) throw new Error("SCORECARD_POSITIVE_INTEGER");
 if (!(offeredOps >= 0)) throw new Error("SCORECARD_OPS");
 
@@ -167,7 +181,10 @@ it.skipIf(!enabled)(
 			lull,
 			slotsPerAuthor: slots,
 			netDelayMs,
-			budget: GRID_ROLLOVER_BUDGET,
+			budget: rolloverBudget,
+			closedLoop,
+			inflight,
+			creatorWrites,
 			profile: "creator-trusted-settlement-v1",
 			directory,
 			cpu: cpus()[0]?.model,
@@ -326,7 +343,8 @@ it.skipIf(!enabled)(
 		directories.delete(directory);
 		// Per-move waterfall: the first time each move's envelope reaches each receiver's ingress (before
 		// the network's 20 ms delivery delay), expanding batched vertices.
-		network.observe(({ to, message }) => {
+		network.observe(({ to, message, kind }) => {
+			bump(`wire.${kind}`);
 			const vertex = envelopeVertex(message) as { operation?: Record<string, unknown> } | undefined;
 			const root = vertex?.operation as { action?: string; batch?: { entries?: { operation?: unknown }[] } } | undefined;
 			if (root === undefined) return;
@@ -382,7 +400,7 @@ it.skipIf(!enabled)(
 			const room = peer.room;
 			const policy = createV3RoomRolloverPolicy({
 				role,
-				budget: GRID_ROLLOVER_BUDGET,
+				budget: rolloverBudget,
 				hooks: {
 					publishSuccessor: async (offer, successorEpoch) => {
 						try {
@@ -558,7 +576,7 @@ it.skipIf(!enabled)(
 		let roundRobin = 0;
 		let ephemeralSequence = 0;
 		let offering = true;
-		const offer = (peer: number) => {
+		const offer = (peer: number): boolean => {
 			let slot = -1;
 			for (let candidate = 0; candidate < slots; candidate++) {
 				const index = (nextSeq[peer]! + candidate) % slots;
@@ -569,7 +587,7 @@ it.skipIf(!enabled)(
 			}
 			if (slot < 0) {
 				backlogSkips[peer] = (backlogSkips[peer] ?? 0) + 1;
-				return;
+				return false;
 			}
 			const seq = nextSeq[peer]!;
 			nextSeq[peer] = seq + 1;
@@ -607,7 +625,10 @@ it.skipIf(!enabled)(
 				.finally(() => {
 					issue.completedAt = performance.now();
 					required(busySlots[peer]).delete(slot);
+					const at = performance.now();
+					if (closedLoop && offering && at >= durableStart && at < durableStop) offer(peer);
 				});
+			return true;
 		};
 		eventLoop.enable();
 		timer = setInterval(() => {
@@ -662,13 +683,17 @@ it.skipIf(!enabled)(
 							}
 						);
 				}
-			if (offering && at >= durableStart && at < durableStop) {
+			if (closedLoop && offering && at >= durableStart && at < durableStop) {
+				for (let peer = creatorWrites ? 0 : 1; peer < peersCount; peer++)
+					while (required(busySlots[peer]).size < inflight && offer(peer));
+			} else if (offering && at >= durableStart && at < durableStop) {
 				const elapsed = (at - durableStart) / 1000;
 				const rate =
 					burstOps > 0 && elapsed >= burstAtSeconds && elapsed < burstAtSeconds + burstSeconds ? burstOps : offeredOps;
 				durableCredit += (gap * rate) / 1000;
 				while (durableCredit >= 1) {
 					durableCredit -= 1;
+					if (!creatorWrites && roundRobin % peersCount === 0) roundRobin++;
 					offer(roundRobin % peersCount);
 					roundRobin++;
 				}
