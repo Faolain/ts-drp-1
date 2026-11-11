@@ -57,6 +57,12 @@ const netDelayMs = Number(env.SCORECARD_NET_DELAY_MS ?? 20);
 const drainSeconds = Number(env.SCORECARD_DRAIN_S ?? 180);
 // Cold join / zone enter: extra roster Writers (in the genesis ACL) whose room is first opened, on empty
 // storage, once this many rollovers have completed; each is timed to its install and first issued move.
+// HARNESS ARTIFACT GUARD: snapshot pulls are bounded per PROCESS (packages/node/src/snapshot-transfer.ts
+// module-global activeScopePeers / SNAPSHOT_PULL_MAX_GLOBAL_SESSIONS), so in-process Writers pulling the same
+// successor from the creator refuse each other ("session capacity is exhausted") and the page's delivery backs
+// off 2-30 s. Separate devices never share that state. With the mutex (default) member installs run one at a
+// time in this process; each install's own time and its queue wait are recorded separately.
+const installMutex = (env.SCORECARD_INSTALL_MUTEX ?? "1") === "1";
 const lateJoins = (env.SCORECARD_LATE_JOINS ?? "")
 	.split(",")
 	.filter((value) => value.trim() !== "")
@@ -149,6 +155,7 @@ it.skipIf(!enabled)(
 			ephemeralHz,
 			ephemeralOnlySeconds,
 			lateJoins,
+			installMutex,
 			lull,
 			slotsPerAuthor: slots,
 			netDelayMs,
@@ -207,6 +214,8 @@ it.skipIf(!enabled)(
 		const deliveries: (V3RoomSuccessorDelivery | undefined)[] = [];
 		const epochOf: number[] = Array.from({ length: totalPeers }, () => 0);
 		const joins: Record<string, unknown>[] = [];
+		const installs: { peer: number; queuedAt: number; startedAt: number; endedAt: number; ok: boolean; error?: string }[] = [];
+		let installTail: Promise<void> = Promise.resolve();
 		const t0 = performance.now();
 		let failure: unknown;
 		let timer: ReturnType<typeof setInterval> | undefined;
@@ -309,7 +318,48 @@ it.skipIf(!enabled)(
 						}
 					: room;
 			policy.bind(bound as never);
-			delivery.bind(room);
+			delivery.bind(
+				index === 0
+					? room
+					: ({
+							authority: () => room.authority(),
+							connectedPeers: () => room.connectedPeers(),
+							currencyStatement: room.currencyStatement === undefined ? undefined : () => room.currencyStatement!(),
+							confirmCurrent:
+								room.confirmCurrent === undefined
+									? undefined
+									: (statement: never) => room.confirmCurrent!(statement),
+							localIssueCurrency: room.localIssueCurrency === undefined ? undefined : () => room.localIssueCurrency!(),
+							installCreatorSuccessor: (input: never) => {
+								const queuedAt = performance.now();
+								const run = async () => {
+									const startedAt = performance.now();
+									try {
+										const value = await room.installCreatorSuccessor(input);
+										installs.push({ peer: index, queuedAt, startedAt, endedAt: performance.now(), ok: true });
+										return value;
+									} catch (error) {
+										installs.push({
+											peer: index,
+											queuedAt,
+											startedAt,
+											endedAt: performance.now(),
+											ok: false,
+											error: errorText(error).slice(0, 200),
+										});
+										throw error;
+									}
+								};
+								if (!installMutex) return run();
+								const result = installTail.then(run);
+								installTail = result.then(
+									() => undefined,
+									() => undefined
+								);
+								return result;
+							},
+						} as never)
+			);
 			return policy;
 		};
 		policies = peers.map((peer, index) => compose(peer, index));
@@ -838,6 +888,13 @@ it.skipIf(!enabled)(
 			visibleToAllPeersMs: span(peerVisibleAll),
 			acceptedNeverSeenByAllPeers: neverSeenByAll,
 			rolloverPhases,
+			memberInstalls: {
+				count: installs.length,
+				failed: installs.filter((value) => !value.ok).length,
+				failures: [...new Set(installs.filter((value) => !value.ok).map((value) => value.error))].slice(0, 6),
+				ownMs: span(installs.filter((value) => value.ok).map((value) => value.endedAt - value.startedAt)),
+				queuedMs: span(installs.map((value) => value.startedAt - value.queuedAt)),
+			},
 			lateJoins: joins,
 			lull: {
 				mode: lull,
