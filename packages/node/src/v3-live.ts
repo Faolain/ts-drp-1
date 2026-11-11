@@ -8723,6 +8723,34 @@ function enqueueV3Ingress(
 	message: Message,
 	transport: "gossip" | "retained" = "gossip"
 ): Promise<void> {
+	let rawMessage: Message | undefined = message;
+	// Track AA: the transport identity a capacity refusal reports (a routing hint only).
+	let sender: string | undefined;
+	try {
+		sender = typeof message.sender === "string" ? message.sender : undefined;
+	} catch {
+		sender = undefined;
+	}
+	return enqueueCapturedV3Ingress(registration, transport, sender, (custody) => {
+		const selected = rawMessage;
+		rawMessage = undefined;
+		if (selected === undefined) throw new TypeError("v3 ingress input custody is unavailable");
+		return captureV3Ingress(registration, selected, transport, custody);
+	});
+}
+
+/**
+ * The FIFO entry every arrival takes: capture (charged to the bounded input pool), then full
+ * authentication and admission. Network input reaches it only through enqueueV3Ingress, whose
+ * capture revalidates the message's native provenance; the only other caller re-offers rows
+ * copied out of a predecessor plane of this process (reofferV3CarriedPendingIngress).
+ */
+function enqueueCapturedV3Ingress(
+	registration: V3PlaneRegistration,
+	transport: "gossip" | "retained",
+	sender: string | undefined,
+	capture: (custody: InputCaptureCustody) => CapturedV3Ingress | undefined
+): Promise<void> {
 	// A readiness boundary keeps the epoch: queue behind it in FIFO order (the
 	// same bounded input pool) instead of dropping. Authentication and every
 	// admission check run after it releases; a failed boundary leaves the
@@ -8738,14 +8766,6 @@ function enqueueV3Ingress(
 	const terminal = registration.terminalBarrier;
 	const barrier = hold === undefined ? terminal :
 		terminal === undefined ? hold : Promise.all([terminal, hold]).then(() => undefined);
-	let rawMessage: Message | undefined = message;
-	// Track AA: the transport identity a capacity refusal reports (a routing hint only).
-	let sender: string | undefined;
-	try {
-		sender = typeof message.sender === "string" ? message.sender : undefined;
-	} catch {
-		sender = undefined;
-	}
 	const refuse = (): void => {
 		// The route attached the state if the room transport is bound to this plane's topic.
 		if (registration.deliveryRepair !== undefined) noteDeliveryRefusal(registration, sender);
@@ -8756,15 +8776,11 @@ function enqueueV3Ingress(
 		(custody): (() => Promise<void>) | Readonly<{ join: Promise<void> }> => {
 			let captured: CapturedV3Ingress | undefined;
 			try {
-				const message = rawMessage;
-				if (message === undefined || custody === undefined)
-					throw new TypeError("v3 ingress input custody is unavailable");
-				captured = captureV3Ingress(registration, message, transport, custody);
+				if (custody === undefined) throw new TypeError("v3 ingress input custody is unavailable");
+				captured = capture(custody);
 			} catch (error) {
 				if (error instanceof InputCaptureCapacityError) throw error;
 				ingressFailureLog("envelope-rejected");
-			} finally {
-				rawMessage = undefined;
 			}
 			if (
 				captured !== undefined &&
@@ -8784,6 +8800,95 @@ function enqueueV3Ingress(
 			...(barrier === undefined ? {} : { barrier }),
 		}
 	);
+}
+
+
+/**
+ * A same-epoch recovery's copy of its predecessor plane's pending ingress (decision: carry, model
+ * packages/node/formal/plane-recovery-pending-carry.qnt). Opaque: only carryV3PendingIngress mints
+ * one, from rows the live plane already holds in memory, and reofferV3CarriedPendingIngress takes
+ * each once. Nothing of the predecessor's verdict crosses: every row re-enters the successor's
+ * ordinary capture, authentication and admission.
+ */
+export interface V3CarriedPendingIngress {
+	readonly rows: number;
+}
+
+const carriedPendingIngress = new WeakMap<
+	object,
+	Readonly<{
+		objectId: string;
+		epoch: number;
+		anchorDigest: string;
+		rows: readonly Readonly<{ exactWireBytes: Uint8Array; sender: string }>[];
+	}>
+>();
+
+/**
+ * Copies the exact signed rows a live plane holds as pending ingress, before the room deactivates
+ * it for a same-epoch recovery (deactivation clears them). In memory only, within the plane's own
+ * maxPendingEntries/maxPendingBytes.
+ * @param plane - The live plane about to be deactivated.
+ * @returns The copy, or undefined when the plane holds none.
+ */
+export function carryV3PendingIngress(plane: V3PlaneHandle): V3CarriedPendingIngress | undefined {
+	const registration = v3HandleRegistrations.get(plane);
+	if (registration === undefined || !currentRegistration(registration) || registration.pendingIngress.size === 0)
+		return undefined;
+	const { maxPendingBytes, maxPendingEntries } = registration.payload.parameters;
+	const rows: Readonly<{ exactWireBytes: Uint8Array; sender: string }>[] = [];
+	let bytes = 0;
+	for (const pending of registration.pendingIngress.values()) {
+		const exactWireBytes = V3Envelope.encode({
+			canonicalPreimage: new Uint8ArrayConstructor(pending.evidence.exactCanonicalPreimageBytes),
+			signature: new Uint8ArrayConstructor(pending.evidence.signature),
+		}).finish();
+		if (rows.length >= maxPendingEntries || bytes + exactWireBytes.byteLength > maxPendingBytes) break;
+		bytes += exactWireBytes.byteLength;
+		rows.push(ObjectFreeze({ exactWireBytes, sender: pending.evidence.transportSender }));
+	}
+	const provenance = registration.payload.provenance;
+	const carried: V3CarriedPendingIngress = ObjectFreeze({ rows: rows.length });
+	carriedPendingIngress.set(
+		carried,
+		ObjectFreeze({
+			objectId: provenance.objectId,
+			epoch: provenance.epoch,
+			anchorDigest: provenance.anchorDigest,
+			rows: ObjectFreeze(rows),
+		})
+	);
+	return carried;
+}
+
+/**
+ * Re-offers a carried copy to the recovered successor, only when it is a plane of the same object,
+ * epoch and anchor (an epoch change carries nothing: a closed epoch's rows outside its cut are the
+ * author's settlement work). Each row is charged to the successor's bounded input pool and goes
+ * through the same authentication and admission as any arrival: deduplicated against its index,
+ * admitted with its parents, held as pending, or refused at a bound.
+ * @param plane - The recovered successor.
+ * @param carried - A copy from carryV3PendingIngress (each copy is taken once).
+ * @returns How many rows were re-offered.
+ */
+export function reofferV3CarriedPendingIngress(plane: V3PlaneHandle, carried: V3CarriedPendingIngress): number {
+	const record = carriedPendingIngress.get(carried);
+	carriedPendingIngress.delete(carried);
+	const registration = v3HandleRegistrations.get(plane);
+	if (record === undefined || registration === undefined || !currentRegistration(registration)) return 0;
+	const provenance = registration.payload.provenance;
+	if (
+		provenance.objectId !== record.objectId ||
+		provenance.epoch !== record.epoch ||
+		provenance.anchorDigest !== record.anchorDigest
+	)
+		return 0;
+	for (const row of record.rows)
+		void enqueueCapturedV3Ingress(registration, "retained", row.sender, (custody) => {
+			custody.chargeBytes(row.exactWireBytes.byteLength);
+			return ObjectFreeze({ exactWireBytes: row.exactWireBytes, sender: row.sender, transport: "retained" as const });
+		}).catch(() => ingressFailureLog("admission-rejected"));
+	return record.rows.length;
 }
 
 /** Decision row 51: a creator's ordinary readiness preparation holds its plane's
