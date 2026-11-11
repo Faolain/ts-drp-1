@@ -6234,6 +6234,9 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	// displaced rows of the last rebase scan that counted them.
 	let settlementBacklog = 0;
 	let settlementDisplaced: ReadonlySet<number> = new Set();
+	// The displaced sources of the last rebase scan (recordSettlementStatus), for a status recomputed
+	// after the same drain resolves retained rows.
+	let settlementSources: readonly DisplacedSource[] = [];
 	/**
 	 * The backlog V3RoomLocalBacklogFull bounds: each live replaced move once (the entry of its newest
 	 * displaced row, whose replacement is not itself displaced, or which is not yet replaced), each
@@ -6629,7 +6632,25 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	const recordSettlementStatus = (sources: readonly DisplacedSource[], plan: RoomSettlementPlan): void => {
 		const epoch = activeHandle?.epoch;
 		if (epoch === undefined) return;
-		const waiting = sources.filter((source) => source.frontierDisplaced).map((source) => source.epoch);
+		// A row still waits while its move is still in the room. A row whose move ended (given back or
+		// expired, committed, inherited), directly or at the end of its replacement chain, only waits
+		// for retirement: the application holds a given-back move, so it is not counted.
+		const entryBySequence = new Map(plan.entries.map((entry) => [entry.sourceSequence, entry] as const));
+		const moveEnded = (sequence: number): boolean => {
+			const seen = new Set<number>();
+			for (let entry = entryBySequence.get(sequence); entry !== undefined && !seen.has(entry.sourceSequence); ) {
+				seen.add(entry.sourceSequence);
+				if (entry.disposition === "expire" || entry.disposition === "committed" || entry.disposition === "inherited")
+					return true;
+				if (entry.replacementSequence === null) return false;
+				entry = entryBySequence.get(entry.replacementSequence);
+			}
+			return false;
+		};
+		const waiting = sources
+			.filter((source) => source.frontierDisplaced && !moveEnded(source.authorSequence))
+			.map((source) => source.epoch);
+		settlementSources = sources;
 		settlementDisplaced = new Set(sources.map((source) => source.authorSequence));
 		settlementBacklog = settlementBacklogOf(plan, settlementDisplaced);
 		settlementStatusSnapshot = Object.freeze({
@@ -6702,8 +6723,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		const current = changed ? await issuanceStore.readSettlementPlan(settlementScope) : plan;
 		if (current === null) throw new TypeError("v3 room settlement plan is unavailable after retained resolution");
 		settlementBacklog = settlementBacklogOf(current, settlementDisplaced);
-		if (settlementStatusSnapshot !== undefined)
-			settlementStatusSnapshot = Object.freeze({ ...settlementStatusSnapshot, undelivered: handBackListing(current) });
+		// The status reflects this drain's resolutions (given-back moves no longer wait).
+		recordSettlementStatus(settlementSources, current);
 		return current;
 	};
 	const readSettlementEffect = (
