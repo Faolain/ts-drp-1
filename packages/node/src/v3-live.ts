@@ -3358,8 +3358,10 @@ interface V3PlaneRegistration {
 	 * exist (`bindV3MissingDependencyRequest`), including before the first live row.
 	 */
 	deliveryRepair?: V3PlaneDeliveryRepair;
-	/** Creator move equivocation recovery (R1): vertices under this creator's own key that it did not
-	 * sign, and every vertex depending on one. Never indexed, never parked; this plane only. */
+	/**
+	 * Creator move equivocation recovery (R1): vertices under this creator's own key that it did not
+	 * sign, and every vertex depending on one. Never indexed, never parked; this plane only.
+	 */
 	creatorSupersededClosure?: Set<string>;
 	pendingIngressBytes: number;
 	publicationCursor: number | undefined;
@@ -3472,7 +3474,10 @@ function releaseIdleEgressAdmissionOwner(registration: V3PlaneRegistration, owne
 const v3MissingDependencyRequests = new WeakMap<DRPNetworkNode, Map<string, (gap?: V3DeliveryGap) => void>>();
 // Creator move equivocation recovery (R1): the room session's sink for an authenticated vertex under
 // the creator's own key that this creator did not sign, per network node and stable room topic.
-const v3CreatorSupersessionSinks = new WeakMap<DRPNetworkNode, Map<string, (vertex: V3CreatorSupersededVertex) => void>>();
+const v3CreatorSupersessionSinks = new WeakMap<
+	DRPNetworkNode,
+	Map<string, (vertex: V3CreatorSupersededVertex) => void>
+>();
 const v3HandleRegistrations = new WeakMap<V3PlaneHandle, V3PlaneRegistration>();
 const preparedMigrationTargetFloors = new WeakMap<V3PlaneRegistration, Readonly<{ read(): Promise<Uint8Array> }>>();
 
@@ -7840,17 +7845,23 @@ async function refuseCreatorSuperseded(
 			}
 	}
 	const byTopic = v3CreatorSupersessionSinks.get(registration.networkNode);
-	const sink = byTopic === undefined ? undefined : (ReflectApply(MapPrototypeGet, byTopic, [registration.topic]) as
-		((vertex: V3CreatorSupersededVertex) => void) | undefined);
+	const sink =
+		byTopic === undefined
+			? undefined
+			: (ReflectApply(MapPrototypeGet, byTopic, [registration.topic]) as
+					| ((vertex: V3CreatorSupersededVertex) => void)
+					| undefined);
 	try {
-		sink?.(ObjectFreeze({
-			digest: authenticated.digest,
-			authorSequence: authenticated.authorSequence,
-			epoch: authenticated.vertex.epoch,
-			dependencies: ObjectFreeze([...dependencies]),
-			operation: authenticated.vertex.operation,
-			dependenciesKnown: known,
-		}));
+		sink?.(
+			ObjectFreeze({
+				digest: authenticated.digest,
+				authorSequence: authenticated.authorSequence,
+				epoch: authenticated.vertex.epoch,
+				dependencies: ObjectFreeze([...dependencies]),
+				operation: authenticated.vertex.operation,
+				dependenciesKnown: known,
+			})
+		);
 	} catch {
 		// The sink must not throw into ingress.
 	}
@@ -7894,8 +7905,12 @@ function attachDeliveryRepair(registration: V3PlaneRegistration): V3PlaneDeliver
 			maxBytes: registration.payload.parameters.maxPendingBytes,
 			isAdmitted: (digest: string): boolean => {
 				const current = plane.deref();
-				return current === undefined || !currentRegistration(current) || current.index.has(digest) ||
-					current.creatorSupersededClosure?.has(digest) === true;
+				return (
+					current === undefined ||
+					!currentRegistration(current) ||
+					current.index.has(digest) ||
+					current.creatorSupersededClosure?.has(digest) === true
+				);
 			},
 		}),
 		capacity: (): V3DeliveryRepairCapacity => {
@@ -8604,7 +8619,7 @@ async function authenticateV3Ingress(registration: V3PlaneRegistration, captured
 			transportSender: captured.sender,
 		});
 		// R1: another incarnation of this creator, or work built on it: kept out of this plane.
-		if (!registration.index.has(authenticated.digest) && await refuseCreatorSuperseded(registration, authenticated))
+		if (!registration.index.has(authenticated.digest) && (await refuseCreatorSuperseded(registration, authenticated)))
 			return ingressFailureLog("admission-rejected", "creator-superseded-incarnation");
 		// Refused, not retained: held work would block the interrupted close's own
 		// recovery dependency hold (it requires an empty pending ingress). The

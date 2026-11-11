@@ -1043,7 +1043,7 @@ type CreatorRestoreLocalView = Readonly<{
 	/** The creator's next author sequence (its local lineage). */
 	next: number;
 	/** This creator's own durable vertex digest at a sequence, if it signed one (read when checked). */
-	ownVertexDigest?: (sequence: number) => Promise<string | undefined>;
+	ownVertexDigest?(sequence: number): Promise<string | undefined>;
 }>;
 
 function creatorRestoreLocalView(
@@ -5884,7 +5884,15 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		refusal: V3RoomNotYetCurrent
 	): void {
 		if (supersession === undefined)
-			supersession = { level, state: "awaiting-resume", highestSequence, epoch, refusal, vertices: new Map(), reissued: new Set() };
+			supersession = {
+				level,
+				state: "awaiting-resume",
+				highestSequence,
+				epoch,
+				refusal,
+				vertices: new Map(),
+				reissued: new Set(),
+			};
 		else {
 			if (level === "epoch") supersession.level = "epoch";
 			supersession.highestSequence = Math.max(supersession.highestSequence, highestSequence);
@@ -5898,7 +5906,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		refuseHeldUntilCurrent(localIssueRefusal);
 		creatorRestoreGate?.supersede(supersession.refusal.message);
 	}
-	/** The canonical operation bytes of this creator's own rows from `from` on (re-issue is idempotent). */
+	/**
+	 * The canonical operation bytes of this creator's own rows from `from` on (re-issue is idempotent).
+	 * @param from - The first author sequence to read.
+	 * @returns The hex canonical bytes of each own row's operation.
+	 */
 	const ownOperationsFrom = async (from: number): Promise<Set<string>> => {
 		const lineage = await issuanceStore.readLineage(settlementScope);
 		const own = new Set<string>();
@@ -5909,7 +5921,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 		return own;
 	};
-	/** Re-issues, in sequence order, every staged move of the other incarnation not already on this chain. */
+	/**
+	 * Re-issues, in sequence order, every staged move of the other incarnation not already on this chain.
+	 * @returns Settles once every staged move is re-issued (one run at a time).
+	 */
 	const reissueSuperseded = (): Promise<void> => {
 		const run = async (): Promise<void> => {
 			const current = supersession;
@@ -5930,7 +5945,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		supersessionReissue = next.catch(() => undefined);
 		return next;
 	};
-	/** v3-live's sink (R1): another incarnation's vertex of this epoch. */
+	/**
+	 * v3-live's sink (R1): another incarnation's vertex of this epoch.
+	 * @param vertex - The vertex v3-live kept out of the plane.
+	 */
 	const onSupersededVertex = (vertex: V3CreatorSupersededVertex): void => {
 		if (closed || vertex.epoch !== currentEpoch()) return;
 		enterSupersession(
@@ -5957,7 +5975,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			);
 		if (current.state !== "awaiting-resume") {
 			await supersessionReissue;
-			return supersessionView()!;
+			return supersessionView() as V3RoomCreatorSupersession;
 		}
 		// The other incarnation's moves held here must reach back to this chain, up to the highest one known.
 		const staged = [...current.vertices.values()].sort((left, right) => left.authorSequence - right.authorSequence);
@@ -5975,7 +5993,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		current.state = "resuming";
 		reissueOperation = issue;
 		creatorRestoreGate?.resume("moves");
-		if (localIssueRefusal === current.refusal || localIssueRefusal === creatorRestoreGate?.refusal()) localIssueRefusal = undefined;
+		if (localIssueRefusal === current.refusal || localIssueRefusal === creatorRestoreGate?.refusal())
+			localIssueRefusal = undefined;
 		localIssueCurrent = true;
 		try {
 			await reissueSuperseded();
@@ -5987,7 +6006,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 		creatorRestoreGate?.resume("finality");
 		current.state = "resumed";
-		return supersessionView()!;
+		return supersessionView() as V3RoomCreatorSupersession;
 	};
 	// A move made while a member's install owns the plane under the settlement profile: held, not
 	// refused, and issued once that install has settled, in logical-time order, on the plane it left
@@ -10083,7 +10102,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				const lull = async (): Promise<CreatorRecoveryPoolResult> => {
 					if (input.receiveOnly || creatorCloseHandle === undefined) return maintainRecipientRecoveryPool();
 					// Creator maintenance signs retirements: deferred while a restore currency check runs or after a refusal.
-					if ((creatorRestoreGate !== undefined && creatorRestoreGate.state() !== "current") || supersessionRefusal() !== undefined)
+					if (
+						(creatorRestoreGate !== undefined && creatorRestoreGate.state() !== "current") ||
+						supersessionRefusal() !== undefined
+					)
 						return Object.freeze({ kind: "deferred" as const, reason: "busy" as const });
 					await rebasePromise;
 					await migrationCompletionBarrier;

@@ -118,14 +118,18 @@ const FAMILIES = ["ahe", "issuance", "journal", "snapshots", "signing", "room-he
 const peerFile = (peer: number) => {
 	const prefixes = FAMILIES.flatMap((family) =>
 		[`peer-${peer}`, `peer-${peer}--ahe`].map((name) =>
-			createHash("sha256").update(JSON.stringify([family, name])).digest("hex")
+			createHash("sha256")
+				.update(JSON.stringify([family, name]))
+				.digest("hex")
 		)
 	);
 	return (file: string) => file.startsWith(`peer-${peer}-`) || prefixes.some((prefix) => file.startsWith(prefix));
 };
 const files = (directory: string) => readdirSync(directory).filter((file) => statSync(join(directory, file)).isFile());
 
-async function room(options: { members?: readonly ("genesis" | "late")[]; reach?: "reached" | "unreachable" | "none" } = {}) {
+async function room(
+	options: { members?: readonly ("genesis" | "late")[]; reach?: "reached" | "unreachable" | "none" } = {}
+) {
 	const f = await chatSharesRoomFixture({
 		members: options.members ?? ["genesis"],
 		format: "window",
@@ -191,12 +195,17 @@ const supersession = (room: unknown): Supersession | undefined =>
 	(Reflect.get(room as object, "creatorSupersession") as undefined | (() => Supersession | undefined))?.call(room);
 const resumeAfterSupersession = (room: unknown): Promise<unknown> => {
 	const resume = Reflect.get(room as object, "resumeAfterSupersession") as undefined | (() => Promise<unknown>);
-	return resume === undefined ? Promise.reject(new TypeError("resumeAfterSupersession is not implemented")) : resume.call(room);
+	return resume === undefined
+		? Promise.reject(new TypeError("resumeAfterSupersession is not implemented"))
+		: resume.call(room);
 };
 const refusal = (task: Promise<unknown>) =>
 	task.then(
 		() => ({ reason: "issued", message: "" }),
-		(error: unknown) => ({ reason: String(Reflect.get(error as object, "reason") ?? "untyped"), message: String((error as Error)?.message) })
+		(error: unknown) => ({
+			reason: String(Reflect.get(error as object, "reason") ?? "untyped"),
+			message: String((error as Error)?.message),
+		})
 	);
 const within = <T>(task: Promise<T>, ms: number, fallback: T) =>
 	Promise.race([task, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
@@ -225,7 +234,11 @@ async function equivocation(options: { rAhead?: boolean } = {}) {
 	await f.stop(creator);
 	restore();
 	const view = creatorDelivery(net, f.objectId);
-	const restored = await f.open(0, { reopen: true, creatorMemberView: memberView(view), creatorRestoreCurrencyHoldMs: 200 });
+	const restored = await f.open(0, {
+		reopen: true,
+		creatorMemberView: memberView(view),
+		creatorRestoreCurrencyHoldMs: 200,
+	});
 	for (const text of options.rAhead === true ? ["r-3", "r-4", "r-5"] : ["r-3"])
 		expect(await settle(restored.room.issue(message(text)))).toBe("issued");
 	const restoredNew = (await f.issuedAfter(0, null)).filter((row) => !backupSequences.has(row.commit.authorSequence));
@@ -283,7 +296,10 @@ describe("creator move equivocation recovery", () => {
 		reachM1(scenario);
 		await sleep(1_500);
 		expect(await deliverOriginal(scenario)).toBe(true);
-		expect(supersession(restored.room)).toMatchObject({ state: "awaiting-resume", highestSequence: scenario.originalHighest });
+		expect(supersession(restored.room)).toMatchObject({
+			state: "awaiting-resume",
+			highestSequence: scenario.originalHighest,
+		});
 		const refused = await refusal(restored.room.issue(message("r-after-original")));
 		expect(refused.reason).toBe("creator-superseded");
 		expect(refused.message).not.toMatch(/unresolved ingress/u);
@@ -325,7 +341,8 @@ describe("creator move equivocation recovery", () => {
 		expect(texts(m2)).toEqual(texts(restored));
 		expect(m1.stateBytes()).toEqual(restored.stateBytes());
 		expect(m2.stateBytes()).toEqual(restored.stateBytes());
-		for (const text of ["creator-before-backup", "r-3", "o-3", "o-4", "m2-on-original"]) expect(once(texts(m1), text)).toBe(1);
+		for (const text of ["creator-before-backup", "r-3", "o-3", "o-4", "m2-on-original"])
+			expect(once(texts(m1), text)).toBe(1);
 	}, 300_000);
 
 	it("2: the resumed creator continues issuing above the original's slots, and members accept it", async () => {
@@ -407,7 +424,11 @@ describe("creator move equivocation recovery", () => {
 		await f.stop(creator);
 		restore();
 		const view = creatorDelivery(net, f.objectId);
-		const restored = await f.open(0, { reopen: true, creatorMemberView: memberView(view), creatorRestoreCurrencyHoldMs: 200 });
+		const restored = await f.open(0, {
+			reopen: true,
+			creatorMemberView: memberView(view),
+			creatorRestoreCurrencyHoldMs: 200,
+		});
 		memberDelivery(net, f.objectId, member.room);
 		net.link(CREATOR_PEER, MEMBER_PEER);
 		expect(await until(() => currency(restored.room) === "refused")).toBe(true);
