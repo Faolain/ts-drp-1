@@ -1,6 +1,5 @@
 import type { TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog/bytes";
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
-import type { CanonicalResourceFootprint } from "@ts-drp/canonical/resource";
 import type {
 	V3OperationAdmissionPolicy,
 	V3OperationAdmissionPolicyFactory,
@@ -17,6 +16,7 @@ import {
 	shippingChatWriters,
 } from "./v3-chat-capacity.js";
 import { captureShippingChatOperation, type ShippingChatMessage } from "./v3-chat-message.js";
+import { shippingChatCeilingResourceBound } from "./v3-chat-resource-bound.js";
 import type { ShippingChatResourceBoundBases } from "./v3-chat-window.js";
 
 // Track W2: the shipped Chat's membership-aware format (state version 5, artifact
@@ -730,17 +730,13 @@ export async function createShippingChatSharesApplication(
 		exactArtifactBytes: resolved.exactArtifactBytes.slice(),
 		canonicalBlueprintPackageBytes: resolved.canonicalBlueprintPackageBytes.slice(),
 	});
-	const readOrdinaryApplicationResourceBound: ResourceBoundReader = (value): CanonicalResourceFootprint | undefined => {
-		try {
-			const bases = readResourceBases(value, resourceCatalog);
-			if (bases === undefined) return undefined;
-			// Only authenticated v5 states: captured, canonical, within the ceiling.
-			for (const base of bases) restoreShippingChatSharesState(base);
-			return Object.freeze({ byteLength: LIMITS.maxBytes, items: LIMITS.maxItems, maxDepth: LIMITS.maxDepth });
-		} catch {
-			return undefined;
-		}
-	};
+	const readOrdinaryApplicationResourceBound = shippingChatCeilingResourceBound((value, projection) => {
+		const bases = readResourceBases(value, resourceCatalog, projection);
+		if (bases === undefined) return false;
+		// Only authenticated v5 states: captured, canonical, within the ceiling.
+		for (const base of bases) restoreShippingChatSharesState(base);
+		return true;
+	}, LIMITS);
 	const project = (projection: V3RoomProjectionInput): ShippingChatProjection => {
 		let state: unknown =
 			projection.authenticatedBase === undefined

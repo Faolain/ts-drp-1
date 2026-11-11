@@ -1,6 +1,5 @@
 import type { TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog/bytes";
 import { decodeCanonical } from "@ts-drp/canonical";
-import type { CanonicalResourceFootprint } from "@ts-drp/canonical/resource";
 import type { V3OperationAdmissionPolicyFactory } from "@ts-drp/node/v3-live";
 import type { V3RoomApplication, V3RoomProjectionInput } from "@ts-drp/node/v3-room";
 import { prepareBlueprintAdmission, prepareBlueprintRuntime } from "@ts-drp/protocol-v3";
@@ -20,6 +19,7 @@ import {
 	SHIPPING_CHAT_SHARES_ARTIFACT_ID,
 	type ShippingChatShares,
 } from "./v3-chat-shares.js";
+import { shippingChatCeilingResourceBound } from "./v3-chat-resource-bound.js";
 import { createShippingChatWindowApplication, SHIPPING_CHAT_WINDOW_ARTIFACT_ID } from "./v3-chat-window.js";
 
 export { createShippingChatGenesisStateBytes } from "./v3-chat-capacity.js";
@@ -72,6 +72,8 @@ const RESOURCE_MATERIAL_KEYS = [
 	"recoveryOperations",
 	"candidateOperation",
 ] as const;
+// The incremental projection's input: the same material without a candidate operation.
+const RESOURCE_PROJECTION_MATERIAL_KEYS = RESOURCE_MATERIAL_KEYS.filter((key) => key !== "candidateOperation");
 
 /**
  * Own data properties of a record with exactly `keys`; no accessor runs.
@@ -105,9 +107,10 @@ function resourceDataRecord(value: unknown, keys: readonly string[]): Readonly<R
  * The same check as packages/node/src/applications/canvas.ts `resourceBoundBases`.
  * @param input - The room's resource bound input.
  * @param expected - The composition's own resolved catalog entry, copied at composition.
+ * @param projection - True for the incremental projection's input (its material has no candidate).
  * @returns The non-empty dense list of base state byte strings, unvalidated.
  */
-function resourceBoundBases(input: unknown, expected: ResourceCatalog): readonly Uint8Array[] | undefined {
+function resourceBoundBases(input: unknown, expected: ResourceCatalog, projection = false): readonly Uint8Array[] | undefined {
 	const outer = resourceDataRecord(input, ["catalog", "material"]);
 	const entry = resourceDataRecord(outer?.catalog, [...RESOURCE_IDENTITY_KEYS, ...RESOURCE_CARRIER_KEYS]);
 	if (outer === undefined || entry === undefined || RESOURCE_IDENTITY_KEYS.some((key) => entry[key] !== expected[key]))
@@ -121,7 +124,10 @@ function resourceBoundBases(input: unknown, expected: ResourceCatalog): readonly
 		)
 			return undefined;
 	}
-	const material = resourceDataRecord(outer.material, RESOURCE_MATERIAL_KEYS);
+	const material = resourceDataRecord(
+		outer.material,
+		projection ? RESOURCE_PROJECTION_MATERIAL_KEYS : RESOURCE_MATERIAL_KEYS
+	);
 	if (
 		material === undefined ||
 		!Array.isArray(material.currentOperations) ||
@@ -197,21 +203,16 @@ export async function createShippingV3ChatApplication(
 		exactArtifactBytes: resolved.exactArtifactBytes.slice(),
 		canonicalBlueprintPackageBytes: resolved.canonicalBlueprintPackageBytes.slice(),
 	});
-	const readOrdinaryApplicationResourceBound: ResourceBoundReader = (input): CanonicalResourceFootprint | undefined => {
-		try {
-			const bases = resourceBoundBases(input, resourceCatalog);
-			if (bases === undefined) return undefined;
+	const readOrdinaryApplicationResourceBound = shippingChatCeilingResourceBound(
+		(input, projection) => {
+			const bases = resourceBoundBases(input, resourceCatalog, projection);
+			if (bases === undefined) return false;
 			// Only authenticated shipping Chat states: captured, canonical, within the ceiling.
 			for (const base of bases) restoreShippingChatCapacityState(base);
-			return Object.freeze({
-				byteLength: SHIPPING_CHAT_CAPACITY_STATE_LIMITS.maxBytes,
-				items: SHIPPING_CHAT_CAPACITY_STATE_LIMITS.maxItems,
-				maxDepth: SHIPPING_CHAT_CAPACITY_STATE_LIMITS.maxDepth,
-			});
-		} catch {
-			return undefined;
-		}
-	};
+			return true;
+		},
+		SHIPPING_CHAT_CAPACITY_STATE_LIMITS
+	);
 	const project = (projection: V3RoomProjectionInput): ShippingChatProjection => {
 		let state: unknown =
 			projection.authenticatedBase === undefined

@@ -86,6 +86,36 @@ function material(bases: readonly Uint8Array[], operations: readonly unknown[] =
 	};
 }
 
+/**
+ * The incremental projection states the reader's theorem: built only from this composition's own
+ * catalog and bases (the material without a candidate), every quote equals the complete reader's
+ * value for any candidate, advancing never changes it, and foreign input builds no projection.
+ */
+function expectSameTheoremProjection(read: Reader, input: ReaderInput, foreignBase: Uint8Array): void {
+	const create = Object.getOwnPropertyDescriptor(read, "createIncrementalProjection")?.value as
+		| ((input: unknown) => Record<string, (...args: unknown[]) => unknown> | undefined)
+		| undefined;
+	expect(typeof create).toBe("function");
+	if (create === undefined) return;
+	const { candidateOperation: _candidate, ...withoutCandidate } = input.material;
+	const projectionInput = { catalog: input.catalog, material: withoutCandidate };
+	const value = read(input);
+	expect(value).toBeDefined();
+	const projection = create(projectionInput);
+	expect(projection).toBeDefined();
+	expect(Reflect.ownKeys(projection ?? {}).sort()).toEqual(["advance", "quote", "quoteWithoutApplicationCandidate"]);
+	expect(projection?.quoteWithoutApplicationCandidate?.()).toEqual(value);
+	for (const candidate of [null, { action: "anything" }, "x".repeat(1024)])
+		expect(projection?.quote?.(candidate)).toEqual(value);
+	expect(projection?.advance?.([{ action: "anything" }])).toBe(true);
+	expect(projection?.quoteWithoutApplicationCandidate?.()).toEqual(value);
+	// The complete reader's input (with a candidate) is not the projection's shape.
+	expect(create(input)).toBeUndefined();
+	expect(create({ ...projectionInput, catalog: { ...input.catalog, blueprintDigest: "unknown" } })).toBeUndefined();
+	expect(create({ ...projectionInput, material: { ...withoutCandidate, exactCanonicalBaseStateBytes: [foreignBase] } }))
+		.toBeUndefined();
+}
+
 /** Refusals every reader must give: foreign identity, mutated carrier, missing or accessor field, foreign material shape. */
 function expectBindingRefusals(read: Reader, input: ReaderInput, foreignBase: Uint8Array): void {
 	expect(read(input)).toBeDefined();
@@ -176,10 +206,21 @@ function reachableCanvasStates(width: number, height: number, start: CanvasState
 }
 
 describe("Canvas ordinary resource bound", () => {
-	it("is supplied by the shipped composition as a reader without an incremental projection", () => {
-		const read = createV3CanvasApplication(10, 10).readOrdinaryApplicationResourceBound;
+	it("is supplied by the shipped composition with an incremental projection of the same theorem", () => {
+		const application = createV3CanvasApplication(10, 10);
+		const descriptor = createV3CanvasDescriptor(10, 10);
+		const read = application.readOrdinaryApplicationResourceBound;
 		expect(typeof read).toBe("function");
-		expect(Object.getOwnPropertyDescriptor(read ?? {}, "createIncrementalProjection")).toBeUndefined();
+		if (read === undefined) return;
+		const otherSize = createV3CanvasDescriptor(2, 2);
+		expectSameTheoremProjection(
+			read,
+			{
+				catalog: catalogInput(application.catalog),
+				material: material([descriptor.canonicalStateBytes(descriptor.initialState)]),
+			},
+			otherSize.canonicalStateBytes(otherSize.initialState)
+		);
 	});
 
 	it.each([
@@ -351,11 +392,17 @@ function fullChatStates(genesis: Uint8Array, text: string): Uint8Array[] {
 }
 
 describe("Chat ordinary resource bound", () => {
-	it("is supplied by the shipped composition as a reader without an incremental projection", async () => {
-		const { application } = await shippingChat();
+	it("is supplied by the shipped composition with an incremental projection of the same theorem", async () => {
+		const { application, genesis } = await shippingChat();
 		const read = application.readOrdinaryApplicationResourceBound;
 		expect(typeof read).toBe("function");
-		expect(Object.getOwnPropertyDescriptor(read ?? {}, "createIncrementalProjection")).toBeUndefined();
+		if (read === undefined) return;
+		const canvas = createV3CanvasDescriptor(2, 2);
+		expectSameTheoremProjection(
+			read,
+			{ catalog: catalogInput(application.catalog), material: material([genesis]) },
+			canvas.canonicalStateBytes(canvas.initialState)
+		);
 	});
 
 	it("equals the ceiling the Chat capture enforces on every state, and dominates every state it accepts", async () => {
