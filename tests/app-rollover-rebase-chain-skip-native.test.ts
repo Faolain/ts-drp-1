@@ -591,13 +591,16 @@ async function catchUp(moves: number, epochs: number) {
 			let counts: number[] = [];
 			// The member's epoch over the catch-up: when each install landed and how far behind it was.
 			const memberEpochs: { at: number; member: number; creator: number }[] = [];
+			let traceLast = "";
 			const describe = async () => {
 				const status = (await writer.rolloverStatus?.()) as Record<string, unknown> | undefined;
 				const settlement = (await writer.settlementStatus?.()) as { unsettledEpochs?: number; undelivered?: unknown[] } | null;
 				return JSON.stringify({ creator: (await creator.rollover?.())?.epoch, member: await writer.authorityEpoch(),
 					settlement: [settlement?.unsettledEpochs, settlement?.undelivered?.length],
 					state: status?.state, kept: Array.isArray(status?.kept) ? status.kept.length : undefined,
-					delivery: await writer.successorDelivery?.(), memberEpochs: memberEpochs.slice(-12) });
+					delivery: await writer.successorDelivery?.(), memberEpochs: memberEpochs.slice(-12),
+					creatorErrors: ((await creator.rollover?.())?.errors ?? []).slice(-3).map((error) => String(error).slice(0, 300)),
+					memberErrors: ((await writer.rollover?.())?.errors ?? []).slice(-3).map((error) => String(error).slice(0, 300)) });
 			};
 			await profiled(`catch-up-${moves}-${epochs}`, async () => {
 				for (;;) {
@@ -611,6 +614,31 @@ async function catchUp(moves: number, epochs: number) {
 						await dumpPlan(`m${memberEpoch}`);
 					}
 					const now = counts.filter((count) => count >= 1).length;
+					// CATCH_UP_TRACE=1: the member's policy gate each step (state, kept, unsettled epochs, the
+					// settlement window, given-back records) beside the epochs and moves landed.
+					if (process.env.CATCH_UP_TRACE === "1") {
+						const status = (await writer.rolloverStatus?.()) as
+							| { state?: string; kept?: unknown[]; unsettledEpochs?: number; window?: number }
+							| undefined;
+						const settlement = (await writer.settlementStatus?.()) as
+							| { unsettledEpochs?: number; undelivered?: unknown[]; deferred?: number }
+							| null;
+						const line = JSON.stringify({
+							at: Math.round(performance.now() - started),
+							creator: (await creator.rollover?.())?.epoch,
+							member: await writer.authorityEpoch(),
+							landed: now,
+							state: status?.state,
+							kept: status?.kept?.length,
+							unsettled: settlement?.unsettledEpochs,
+							window: status?.window,
+							undelivered: settlement?.undelivered?.length,
+							deferred: settlement?.deferred,
+							memberErrors: ((await writer.rollover?.())?.errors ?? []).length,
+						});
+						if (line.replace(/"at":\d+,/u, "") !== traceLast) process.stdout.write(`CATCH_UP_TRACE ${line}\n`);
+						traceLast = line.replace(/"at":\d+,/u, "");
+					}
 					if (now > landed) {
 						landed = now;
 						landedAt = performance.now();
