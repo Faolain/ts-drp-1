@@ -39,7 +39,10 @@ const digestOf = (row: { commit: { envelope: { digest: Uint8Array } } }): string
 // "received-maintenance-capture: ... admission was revoked" is the creator-side form of this).
 it.each([
 	["[RED] a move held as pending ingress at a same-epoch plane recovery is admitted once its parent arrives", "held"],
-	["[RED] a move in flight in the predecessor's ingress at a same-epoch plane recovery is admitted once its parent arrives", "in-flight"],
+	[
+		"[RED] a move in flight in the predecessor's ingress at a same-epoch plane recovery is admitted once its parent arrives",
+		"in-flight",
+	],
 	["[control] the same install without the recovery: the held move is admitted once its parent arrives", "control"],
 ] as const)(
 	"%s",

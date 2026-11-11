@@ -8761,6 +8761,11 @@ function enqueueV3Ingress(
  * authentication and admission. Network input reaches it only through enqueueV3Ingress, whose
  * capture revalidates the message's native provenance; the only other caller re-offers rows
  * copied out of a predecessor plane of this process (reofferV3CarriedPendingIngress).
+ * @param registration - The plane whose FIFO takes the job.
+ * @param transport - How the row arrived.
+ * @param sender - The transport identity a refusal reports.
+ * @param capture - Captures the exact bytes, charged to the plane's bounded input pool.
+ * @returns Completion when the job has settled.
  */
 function enqueueCapturedV3Ingress(
 	registration: V3PlaneRegistration,
@@ -8820,7 +8825,6 @@ function enqueueCapturedV3Ingress(
 		}
 	).finally(() => settleIngressJob(registration));
 }
-
 
 /**
  * A same-epoch recovery's carry of its predecessor plane's pending ingress (decision: carry, model
@@ -8931,7 +8935,8 @@ function collectLateIngress(registration: V3PlaneRegistration, exactWireBytes: U
 	const carry = pendingIngressCarries.get(registration);
 	if (carry === undefined) return false;
 	if (carry.successor !== undefined) {
-		if (sameCarryPlane(carry, carry.successor)) reofferCarriedRow(carry.successor, ObjectFreeze({ exactWireBytes, sender }));
+		if (sameCarryPlane(carry, carry.successor))
+			reofferCarriedRow(carry.successor, ObjectFreeze({ exactWireBytes, sender }));
 		else {
 			closePendingIngressCarry(registration);
 			refuseCarriedRow(registration, sender);
