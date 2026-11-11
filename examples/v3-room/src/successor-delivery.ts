@@ -41,9 +41,12 @@ import type { V3RoomSuccessorOffer } from "./rollover.js";
  *   its connected peers for their view (`creatorMemberView`, handed to the room at open). A member
  *   answers with creator-signed material its room holds (its current epoch anchor and the highest
  *   creator vertex it received); the creator's room verifies it under its own keys.
- *   The ask settles once every asked peer answered, or V3_ROOM_CREATOR_VIEW_GRACE_MS after the
- *   first answer (a connected peer that is not a room member never answers); the room's bound
- *   covers the rest.
+ *   Every connected peer except configured bootstrap peers is asked once per connection, as it
+ *   connects (and again on a resend, at most VIEW_ASKS_PER_PEER times per connection); the room is
+ *   told whom it asked and who answered, and decides how long to wait (v3-room). A request the
+ *   transport could not deliver is retried after VIEW_RETRY_MS. The transport's own first
+ *   connection attempts failing everywhere (initialReach "unreachable") with nobody connected is
+ *   reported to the room. Asking continues until the room stops watching.
  *
  * Size: `/drp/message` and the creator-successor material protocol do not run on limited (relayed)
  * connections, so a member reachable only over a relay waits for a direct connection, as live
@@ -66,9 +69,11 @@ const REQUEST_KIND = "ts-drp-v3-successor-offer-request";
 const CURRENCY_KIND = "ts-drp-v3-room-currency";
 const VIEW_REQUEST_KIND = "ts-drp-v3-room-creator-view-request";
 const VIEW_KIND = "ts-drp-v3-room-creator-view";
-/** After a reopened creator's first member answer, how long it waits for the other peers it asked. */
-export const V3_ROOM_CREATOR_VIEW_GRACE_MS = 500;
 const VIEW_RESEND_MS = 1_000;
+/** A member-view request the transport failed to send (a connection not yet usable) is retried after this. */
+const VIEW_RETRY_MS = 100;
+/** A connected peer that never answers (not a room member) is asked at most this many times per connection. */
+const VIEW_ASKS_PER_PEER = 3;
 // Depth 3: a currency frame's frontiers are [author, sequence] pairs.
 const FRAME_LIMITS = { maxBytes: V3_ROOM_SUCCESSOR_OFFER_MAX_BYTES, maxDepth: 3, maxItems: 64 };
 const OFFER_KEYS = ["cut", "kind", "manifest", "qc", "successorEpoch", "trust", "version"];
@@ -84,6 +89,10 @@ export interface V3RoomSuccessorNode {
 		getAllPeers(): string[];
 		sendMessage(peerId: string, message: Message, options?: { readonly signal?: AbortSignal }): Promise<void>;
 		subscribeToPeerConnections?(handler: (peerId: string) => void): () => void;
+		/** What the node's own first bootstrap dials reached (DRPNetworkNode.initialReach). */
+		initialReach?(): Promise<"reached" | "unreachable" | "none">;
+		/** The configured bootstrap peers' addresses (infrastructure, never room members). */
+		getBootstrapNodes?(): string[];
 	}>;
 	readonly messageQueueManager: Readonly<{
 		subscribe(queueId: string, handler: (message: Message) => void | Promise<void>): void;
@@ -99,6 +108,13 @@ export interface V3RoomSuccessorChannel {
 	send(peerId: string, bytes: Uint8Array, signal: AbortSignal): Promise<void>;
 	listen(listener: (sender: string, bytes: Uint8Array) => void): () => void;
 	onPeerConnected(listener: (peerId: string) => void): () => void;
+	/**
+	 * What the transport's own first connection attempts reached (absent: it cannot tell). Only
+	 * "unreachable" carries information for a reopened creator: every first attempt failed.
+	 */
+	initialReach?(): Promise<"reached" | "unreachable" | "none">;
+	/** Whether a peer is transport infrastructure (a configured bootstrap peer), never a room member. */
+	infrastructure?(peerId: string): boolean;
 	close(): void;
 }
 
@@ -127,6 +143,14 @@ export function createV3RoomSuccessorChannel(node: V3RoomSuccessorNode, objectId
 		});
 	const listeners = new Set<(sender: string, bytes: Uint8Array) => void>();
 	let closed = false;
+	const bootstrapPeers = new Set(
+		(typeof node.networkNode.getBootstrapNodes === "function" ? node.networkNode.getBootstrapNodes() : []).flatMap(
+			(address) => {
+				const at = address.lastIndexOf("/p2p/");
+				return at < 0 ? [] : [address.slice(at + 5)];
+			}
+		)
+	);
 	node.messageQueueManager.subscribe(queueId, (message) => {
 		if (closed || message.type !== MessageType.MESSAGE_TYPE_CUSTOM || message.objectId !== queueId) return;
 		if (!(message.data instanceof Uint8Array) || message.data.byteLength > V3_ROOM_SUCCESSOR_OFFER_MAX_BYTES) return;
@@ -152,6 +176,10 @@ export function createV3RoomSuccessorChannel(node: V3RoomSuccessorNode, objectId
 		},
 		onPeerConnected: (listener: (peerId: string) => void): (() => void) =>
 			node.networkNode.subscribeToPeerConnections?.(listener) ?? ((): void => undefined),
+		...(typeof node.networkNode.initialReach === "function"
+			? { initialReach: (): Promise<"reached" | "unreachable" | "none"> => node.networkNode.initialReach!() }
+			: {}),
+		infrastructure: (peerId: string): boolean => bootstrapPeers.has(peerId),
 		close: (): void => {
 			if (closed) return;
 			closed = true;
@@ -435,6 +463,8 @@ export function createV3RoomSuccessorDelivery(
 	const answeredAt = new Map<string, number>();
 	// Member: when it last answered each peer's member-view request (creator restore currency).
 	const viewAnsweredAt = new Map<string, number>();
+	// Member: a request inside the rate limit is answered when the limit passes, never dropped.
+	const viewDeferred = new Map<string, ReturnType<typeof setTimeout>>();
 	// Member.
 	let candidate: Extract<Frame, { kind: "offer" }> | undefined;
 	// Sync before sending (live install rule): the creator's statement for an epoch ahead of the
@@ -583,6 +613,30 @@ export function createV3RoomSuccessorDelivery(
 		});
 	};
 
+	const answerView = (sender: string): void => {
+		const selected = room;
+		const evidence = selected?.creatorCurrencyEvidence;
+		if (closed || role !== "member" || selected === undefined || evidence === undefined || viewDeferred.has(sender)) return;
+		const wait = (viewAnsweredAt.get(sender) ?? -Infinity) + ANSWER_MIN_INTERVAL_MS - Date.now();
+		if (wait > 0) {
+			if (viewDeferred.size >= KNOWN_PEERS_MAX) return;
+			viewDeferred.set(
+				sender,
+				setTimeout(() => {
+					viewDeferred.delete(sender);
+					answerView(sender);
+				}, wait)
+			);
+			return;
+		}
+		viewAnsweredAt.set(sender, Date.now());
+		if (viewAnsweredAt.size > KNOWN_PEERS_MAX) viewAnsweredAt.delete(viewAnsweredAt.keys().next().value as string);
+		void Promise.resolve()
+			.then(() => evidence.call(selected))
+			.then((value) => send(sender, encodeView(value)))
+			.catch((error: unknown) => report(error));
+	};
+
 	const receive = (sender: string, bytes: Uint8Array): void => {
 		if (closed) return;
 		if (bytes.byteLength > V3_ROOM_SUCCESSOR_OFFER_MAX_BYTES) {
@@ -599,17 +653,11 @@ export function createV3RoomSuccessorDelivery(
 		if (frame.kind === "view") return;
 		if (frame.kind === "view-request") {
 			// Any requester is answered (a restored creator device may come back under a new peer id):
-			// the material is creator-signed and public, and the creator verifies it. Rate limited.
-			const evidence = room?.creatorCurrencyEvidence;
-			if (role !== "member" || evidence === undefined || room === undefined) return;
-			const now = Date.now();
-			if (now - (viewAnsweredAt.get(sender) ?? 0) < ANSWER_MIN_INTERVAL_MS) return;
-			viewAnsweredAt.set(sender, now);
-			if (viewAnsweredAt.size > KNOWN_PEERS_MAX) viewAnsweredAt.delete(viewAnsweredAt.keys().next().value as string);
-			void Promise.resolve()
-				.then(() => evidence.call(room))
-				.then((value) => send(sender, encodeView(value)))
-				.catch((error: unknown) => report(error));
+			// the material is creator-signed and public, and the creator verifies it. Rate limited: a
+			// request inside the limit is answered once it passes (a lost first answer would cost the
+			// creator a whole resend interval), and a new connection starts the limit afresh.
+			if (role !== "member" || room?.creatorCurrencyEvidence === undefined) return;
+			answerView(sender);
 			return;
 		}
 		if (frame.kind === "request") {
@@ -695,53 +743,60 @@ export function createV3RoomSuccessorDelivery(
 	const creatorMemberView: V3RoomCreatorMemberView = Object.freeze({
 		ask: (request: Parameters<V3RoomCreatorMemberView["ask"]>[0]): Promise<void> =>
 			new Promise<void>((resolve) => {
-				const asked = new Set<string>();
+				const asks = new Map<string, number>();
 				const answered = new Set<string>();
 				const cleanup: (() => void)[] = [];
-				let finished = false;
-				const done = (): void => {
-					if (finished) return;
-					finished = true;
-					for (const stop of cleanup.splice(0)) stop();
+				let stopped = false;
+				const stop = (): void => {
+					if (stopped) return;
+					stopped = true;
+					for (const end of cleanup.splice(0)) end();
 					resolve();
 				};
-				if (role !== "creator" || closed || request.signal.aborted) return done();
+				if (role !== "creator" || closed || request.signal.aborted) return stop();
 				const requestBytes = encodeCanonical({ kind: VIEW_REQUEST_KIND, version: 1 }, FRAME_LIMITS);
-				const ask = (peerId: string): void => {
-					if (finished || peerId === channel.localPeerId || answered.has(peerId)) return;
-					asked.add(peerId);
-					void send(peerId, requestBytes);
-				};
-				const check = (): void => {
-					if (answered.size > 0 && [...asked].every((peerId) => answered.has(peerId))) done();
+				const member = (peerId: string): boolean => peerId !== channel.localPeerId && channel.infrastructure?.(peerId) !== true;
+				const ask = (peerId: string, connected = false): void => {
+					if (stopped || !member(peerId) || answered.has(peerId)) return;
+					const count = connected ? 0 : (asks.get(peerId) ?? 0);
+					if (count >= VIEW_ASKS_PER_PEER) return;
+					asks.set(peerId, count + 1);
+					// The room's answer window for this peer starts at its first ask on this connection.
+					if (count === 0) request.asked?.(peerId);
+					void send(peerId, requestBytes).then((sent) => {
+						if (sent || stopped) return;
+						const retry = setTimeout(() => ask(peerId), VIEW_RETRY_MS);
+						cleanup.push(() => clearTimeout(retry));
+					});
 				};
 				cleanup.push(
 					channel.listen((sender, bytes) => {
-						if (finished || bytes.byteLength > V3_ROOM_SUCCESSOR_OFFER_MAX_BYTES || !asked.has(sender) || answered.has(sender))
+						if (stopped || bytes.byteLength > V3_ROOM_SUCCESSOR_OFFER_MAX_BYTES || !asks.has(sender) || answered.has(sender))
 							return;
 						const frame = decodeFrame(bytes);
 						if (frame?.kind !== "view" || frame.evidence.objectId !== request.objectId) return;
 						answered.add(sender);
 						request.answer(frame.evidence);
-						if (answered.size === 1) {
-							const grace = setTimeout(done, V3_ROOM_CREATOR_VIEW_GRACE_MS);
-							cleanup.push(() => clearTimeout(grace));
-						}
-						check();
+						request.answered?.(sender);
 					})
 				);
-				cleanup.push(channel.onPeerConnected(ask));
+				cleanup.push(channel.onPeerConnected((peerId) => ask(peerId, true)));
 				// A request lost on a fresh connection, or a peer that connected without a connection event, is asked again.
 				const resend = setInterval(() => {
-					for (const peerId of channel.peers()) if (!answered.has(peerId)) ask(peerId);
+					for (const peerId of channel.peers()) ask(peerId);
 				}, VIEW_RESEND_MS);
 				cleanup.push(() => clearInterval(resend));
-				const abort = (): void => done();
-				request.signal.addEventListener("abort", abort, { once: true });
-				cleanup.push(() => request.signal.removeEventListener("abort", abort));
-				lifetime.signal.addEventListener("abort", abort, { once: true });
-				cleanup.push(() => lifetime.signal.removeEventListener("abort", abort));
+				request.signal.addEventListener("abort", stop, { once: true });
+				cleanup.push(() => request.signal.removeEventListener("abort", stop));
+				lifetime.signal.addEventListener("abort", stop, { once: true });
+				cleanup.push(() => lifetime.signal.removeEventListener("abort", stop));
 				for (const peerId of channel.peers()) ask(peerId);
+				void channel.initialReach?.().then(
+					(reach) => {
+						if (!stopped && reach === "unreachable" && !channel.peers().some(member)) request.unreachable?.();
+					},
+					() => undefined
+				);
 			}),
 	});
 
@@ -756,6 +811,8 @@ export function createV3RoomSuccessorDelivery(
 			if (role === "member") {
 				unsubscribe.push(
 					channel.onPeerConnected((peerId) => {
+						// A new connection (a reopened creator) is answered at once.
+						viewAnsweredAt.delete(peerId);
 						if (peerId === creatorPeer) {
 							requestedAt = 0;
 							request();
@@ -795,6 +852,8 @@ export function createV3RoomSuccessorDelivery(
 			closed = true;
 			lifetime.abort(new TypeError("v3 room successor delivery is closed"));
 			if (pollTimer !== undefined) clearTimeout(pollTimer);
+			for (const timer of viewDeferred.values()) clearTimeout(timer);
+			viewDeferred.clear();
 			for (const stop of unsubscribe.splice(0)) stop();
 			channel.close();
 		},

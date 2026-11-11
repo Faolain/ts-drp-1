@@ -17,6 +17,18 @@ bounded time (5 s) before signing anything; verified newer state refuses it for 
 Sandbox runs: RED on `efe4d128` fails (a) and (b) (the restored copy re-signs authorSequence 3) with the three
 controls passing; GREEN on head 5/5. Grid endurance smoke (12 epochs, reopen at 5) passes on head and on base with
 `TMPDIR=/dev/shm`; on the sandbox disk base fails the same member-starvation bound, so that is the environment.
+Wait cut (user decision 2026-11-11): the wait follows connected members (all answered, or a round-trip grace;
+silent peers at most 1 s); with no peer connected the creator signs moves at once and holds only the finality key
+(5 s or a member's attested view); late members are still asked and refuse it. Open to first signature p50: lone
+5072 -> 110 ms, 1 member 120 -> 171 ms, 3 members 132 -> 150 ms (in-memory channel; noise about +-50 ms).
+Connectivity hold (lead review 2026-11-11): the zero-wait lone rule signed moves a member connecting a moment later
+would refuse. Unless the stored roster is solo, the first move now waits for a peer's answer, the transport
+reporting it reached nobody (`DRPNetworkNode.initialReach`), or 1.5 s from open; each asked peer gets its own 1 s
+answer window (the round-trip grace could end the round before a slower member's newer view). The lost first ask
+(~40% of the scorecard's connected reopens) was the member's 500 ms answer rate limit dropping a reopened creator's
+request; it now answers when the limit passes and a new connection resets it. RED `1a6c46ff` (3 fail), GREEN 14/14.
+Open to first signature p50 (20 ms delay): nobody reachable 154 -> 1576 ms, solo roster 117 ms, member 300 ms late
+398 ms (nothing signed before its view), 1 member 116 ms, 3 members 144 ms.
 
 ## Integration-5 — 2026-10-26 evening (current)
 
