@@ -3034,6 +3034,7 @@ async function chargeCreatorIssuanceMaintenanceQuote(
 	source?: CreatorOrdinaryIssuanceProofSource
 ): Promise<boolean> {
 	const {proof} = quote, accounting = proof.accounting;
+	const baselineBytes = accounting.chargedBytes;
 	const {knownBasis, receivedSignature, unknownBasis, fields} = creatorIssuanceMaintenanceQuoteSizing(quote, unsignedBytes, planEffect);
 	const nextEpochAdmissionForecast: CreatorNextEpochAdmissionForecastSink = {};
 	const prefixInput = {...fields, proof, nextEpochAdmissionForecast};
@@ -3054,8 +3055,20 @@ async function chargeCreatorIssuanceMaintenanceQuote(
 		...(prefixes.knownCarriers ?? []),
 		...receivedSignature,
 	];
-	const exhausted = (need: number): TypeError => new TypeError(
-		`creator issuance maintenance proof reserve is exhausted:${accounting.chargedBytes}+${need}/${accounting.maxBytes}`);
+	// Measurement only: the book's standing material before this quote and this quote's terms.
+	const report = (outcome: string, nextEpochForecastBytes?: number): void => {
+		try {
+			const observer = Reflect.get(globalThis, "__warmProofEvent");
+			if (typeof observer === "function") observer({kind: "creator-issuance-maintenance-book", outcome,
+				baselineBytes, chargedBytes: accounting.chargedBytes, maxBytes: accounting.maxBytes, nextEpochForecastBytes,
+				known: known.map(bytes => bytes.byteLength), unknown: [...unknownBasis, ...prefixes.unknownEncodedLengths]});
+		} catch { /* Diagnostics cannot alter admission. */ }
+	};
+	const exhausted = (need: number): TypeError => {
+		report("exhausted");
+		return new TypeError(
+			`creator issuance maintenance proof reserve is exhausted:${accounting.chargedBytes}+${need}/${accounting.maxBytes}`);
+	};
 	for (const bytes of known)
 		if (!accounting.charge(bytes)) throw exhausted(bytes.byteLength);
 	// The private source owner has reserved complete future close/adopt and
@@ -3071,11 +3084,7 @@ async function chargeCreatorIssuanceMaintenanceQuote(
 	// same ordinary book after this epoch closes and adopts; otherwise retained
 	// material strands admission with no protocol drain.
 	const forecast = creatorNextEpochAdmissionForecast(quote, accounting.chargedBytes, nextEpochAdmissionForecast, planEffect);
-	try {
-		const observer = Reflect.get(globalThis, "__warmProofEvent");
-		if (typeof observer === "function") observer({kind: "creator-issuance-maintenance-book",
-			chargedBytes: accounting.chargedBytes, maxBytes: accounting.maxBytes, nextEpochForecastBytes: forecast});
-	} catch { /* Diagnostics cannot alter admission. */ }
+	report(forecast !== undefined && forecast > accounting.maxBytes ? "next-epoch-exhausted" : "charged", forecast);
 	if (forecast !== undefined && forecast > accounting.maxBytes)
 		throw new TypeError(`creator next-epoch admission proof reserve is exhausted:${forecast}/${accounting.maxBytes}`);
 	return captured?.captured ?? false;
