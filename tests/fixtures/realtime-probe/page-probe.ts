@@ -332,6 +332,12 @@ export function realtimeProbeInitScript(options: RealtimeProbeOptions): void {
 						? (Reflect.get(value, "successorEpoch") as number)
 						: -1;
 				stageRing.push([name, started, now(), ok ? 1 : 0, epochOf(), successor]);
+				// A User Timing measure per stage, so a Chromium trace carries the brackets on its own clock.
+				try {
+					performance.measure(`ts-drp:${name}`, { start: started, end: now() });
+				} catch {
+					// Engines without measure options keep the ring row only.
+				}
 				emit("lifecycle-stage-complete", name);
 			};
 			let pending: Promise<Value>;
