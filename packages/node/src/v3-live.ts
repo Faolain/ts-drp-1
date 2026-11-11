@@ -3512,15 +3512,34 @@ function captureCreatorOrdinaryPreparedVertex(registration: V3PlaneRegistration,
 			format: key.format, bytes: new Uint8ArrayConstructor(key.bytes)})})});
 }
 
+// Current keys resolved within one synchronous pass, bound to the exact authorization object they were
+// resolved from. resolveV3AuthorizedAuthor is a pure function of that object and the author.
+type CreatorOrdinaryAuthorKeys = Readonly<{authorization: V3LiveAuthorization,
+	keys: Map<string, ReturnType<typeof resolveV3AuthorizedAuthor>>}>;
 function creatorOrdinaryPreparedVertexCurrent(registration: V3PlaneRegistration,
-	row: CreatorOrdinaryPreparedAdmission["vertices"][number]): boolean {
+	row: CreatorOrdinaryPreparedAdmission["vertices"][number], authorKeys?: CreatorOrdinaryAuthorKeys): boolean {
 	if (registration.closeVertices.get(row.digest) !== row.vertex || registration.closeAuthors.get(row.digest) !== row.identity ||
 		registration.closeCharges.get(row.digest) !== row.charge || !row.intact()) return false;
 	if (row.authorKey !== undefined) {
-		const key = resolveV3AuthorizedAuthor(registration.authorization, row.authorKey.author);
+		const author = row.authorKey.author, authorization = registration.authorization;
+		// A replaced authorization (never expected mid-pass) resolves afresh, as without the memo.
+		const keys = authorKeys?.authorization === authorization ? authorKeys.keys : undefined;
+		let key = keys?.get(author);
+		if (key === undefined && !keys?.has(author)) {
+			key = resolveV3AuthorizedAuthor(authorization, author);
+			keys?.set(author, key);
+		}
 		if (key === undefined || key.format !== row.authorKey.format || !sameBytes(key.bytes, row.authorKey.bytes)) return false;
 	}
 	return true;
+}
+
+/** Every prepared vertex is current. Each author's current key is resolved once per synchronous
+ * pass of the same authorization object, never carried to a later pass. */
+function creatorOrdinaryPreparedVerticesCurrent(registration: V3PlaneRegistration,
+	rows: readonly CreatorOrdinaryPreparedAdmission["vertices"][number][]): boolean {
+	const authorKeys: CreatorOrdinaryAuthorKeys = ObjectFreeze({authorization: registration.authorization, keys: new Map()});
+	return rows.every(row => creatorOrdinaryPreparedVertexCurrent(registration, row, authorKeys));
 }
 
 function captureCreatorOrdinaryPreparedAdmission(registration: V3PlaneRegistration,
@@ -3553,7 +3572,7 @@ function creatorOrdinaryPreparedGraphCurrent(registration: V3PlaneRegistration,
 	prepared: CreatorOrdinaryPreparedAdmission): boolean {
 	return prepared.applicationIntact() && prepared.admission === registration.payload.admission &&
 		vertexRegistry.domain === V3_VERTEX_DOMAIN && prepared.index === registration.index && registration.closeVertices.size === prepared.vertices.length &&
-		registration.closeCharges.size === prepared.vertices.length && prepared.vertices.every(row => creatorOrdinaryPreparedVertexCurrent(registration, row)) &&
+		registration.closeCharges.size === prepared.vertices.length && creatorOrdinaryPreparedVerticesCurrent(registration, prepared.vertices) &&
 		registration.controlVertices.size === prepared.controls.length && prepared.controls.every(digest => registration.controlVertices.has(digest));
 }
 
@@ -3624,7 +3643,7 @@ function advanceCreatorOrdinaryPreparedAdmission(registration: V3PlaneRegistrati
 		issued !== undefined && (issued.authorSequence >= Number.MAX_SAFE_INTEGER || lowerHexDigest(issued.digest) !== row.digest ||
 			!sameBytes(issued.canonicalPreimageBytes, row.exactCanonicalPreimageBytes) || !sameBytes(issued.signature, row.detachedSignature)))
 		throw new TypeError("ordinary accepted effect is incomplete");
-	if (!previous.vertices.every(vertex => creatorOrdinaryPreparedVertexCurrent(registration, vertex)))
+	if (!creatorOrdinaryPreparedVerticesCurrent(registration, previous.vertices))
 		throw new TypeError("ordinary accepted prefix was changed");
 	const vertex = captureCreatorOrdinaryPreparedVertex(registration, row.digest);
 	if (vertex.identity === undefined || vertex.identity.sourceAuthorized || !sameBytes(encodeCanonical(vertex.vertex), row.exactCanonicalVertexBytes))
@@ -10942,7 +10961,7 @@ function prepareCreatorUnchangedHeldCensusRead(registration: V3PlaneRegistration
 			if (current === undefined) return replay.verify();
 			if (!current || graphVertices === undefined || registration.closeVertices.size !== graphVertices.length ||
 				registration.closeCharges.size !== graphVertices.length) return false;
-			return graphVertices.every(vertex => creatorOrdinaryPreparedVertexCurrent(registration, vertex));
+			return creatorOrdinaryPreparedVerticesCurrent(registration, graphVertices);
 		};
 		const context = () => {
 			const history = (value: HistoricalIssuanceContext | undefined) => {
