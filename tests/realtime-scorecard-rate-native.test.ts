@@ -18,14 +18,17 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync, mkdirSync, mkdtempSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { type Profiler, Session } from "node:inspector";
 import { cpus, loadavg, tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, join as join_ } from "node:path";
 import { monitorEventLoopDelay, performance as nodePerformance } from "node:perf_hooks";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 
 import { DurationDistribution } from "./fixtures/active-endurance/continued-play-observations.js";
 import { nativePlayNetwork } from "./fixtures/active-endurance/native-network.js";
 import { creatorDeliveryRoom, sleep } from "./fixtures/track-aa/creator-delivery-room.js";
 import { closeFixtures, directories, required } from "./fixtures/track-m/room-retention-fixture.js";
+import * as scheduledLullModule from "../packages/node/src/internal/recovery-pool-scheduled.js";
+
+const originalFactory = scheduledLullModule.createScheduledRecoveryPoolLull;
 import { GRID_ROLLOVER_BUDGET } from "../examples/grid/src/rollover.js";
 import { createV3RoomRolloverPolicy, type V3RoomRolloverPolicy } from "../examples/v3-room/src/rollover.js";
 import {
@@ -52,6 +55,12 @@ const cpuProfileSeconds = Number(env.SCORECARD_CPU_PROFILE_S ?? 0);
 const cpuProfileAtSeconds = Number(env.SCORECARD_CPU_PROFILE_AT_S ?? 30);
 const netDelayMs = Number(env.SCORECARD_NET_DELAY_MS ?? 20);
 const drainSeconds = Number(env.SCORECARD_DRAIN_S ?? 180);
+// Cold join / zone enter: extra roster Writers (in the genesis ACL) whose room is first opened, on empty
+// storage, once this many rollovers have completed; each is timed to its install and first issued move.
+const lateJoins = (env.SCORECARD_LATE_JOINS ?? "")
+	.split(",")
+	.filter((value) => value.trim() !== "")
+	.map(Number);
 if (!["scheduled", "none"].includes(lull)) throw new Error(`SCORECARD_LULL:${lull}`);
 for (const value of [writers, targetRollovers, maxSeconds, slots])
 	if (!Number.isSafeInteger(value) || value < 1) throw new Error("SCORECARD_POSITIVE_INTEGER");
@@ -127,6 +136,7 @@ it.skipIf(!enabled)(
 		const record = (value: Readonly<Record<string, unknown>>) =>
 			appendFileSync(join(output, "scorecard.jsonl"), JSON.stringify(value) + "\n");
 		const peersCount = writers + 1;
+		const totalPeers = peersCount + lateJoins.length;
 		const configuration = {
 			kind: "configuration",
 			sourceHead: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
@@ -138,6 +148,7 @@ it.skipIf(!enabled)(
 			burst: burstOps > 0 ? { ops: burstOps, seconds: burstSeconds, atSeconds: burstAtSeconds } : null,
 			ephemeralHz,
 			ephemeralOnlySeconds,
+			lateJoins,
 			lull,
 			slotsPerAuthor: slots,
 			netDelayMs,
@@ -150,7 +161,7 @@ it.skipIf(!enabled)(
 			harnessLimit: "creator and every Writer share one single-threaded Node process",
 		};
 		record(configuration);
-		const network = await nativePlayNetwork(netDelayMs, peersCount);
+		const network = await nativePlayNetwork(netDelayMs, totalPeers);
 		const eventLoop = monitorEventLoopDelay({ resolution: 10 });
 		const issues: IssueRecord[] = [];
 		const byKey = new Map<string, IssueRecord>();
@@ -163,13 +174,39 @@ it.skipIf(!enabled)(
 		const uncertainSlots = new Set<string>();
 		const latest = new Map<string, { id: string; kind: string; x: number; y: number }>();
 		let acceptedVertexCount = 0;
+		let censusWindow: Record<string, number> | undefined;
+		const windowCensus: Record<string, Record<string, number>> = {};
 		let lullActive = 0;
 		let lullRuns = 0;
 		const lullSpans: { peer: number; start: number; end: number; result: string }[] = [];
+		// The session is frozen; its scheduled lull is observed through the lull factory instead.
+		const lullSpy = vi
+			.spyOn(scheduledLullModule, "createScheduledRecoveryPoolLull")
+			.mockImplementation((input) => {
+				const original = originalFactory(input);
+				return Object.freeze({
+					...original,
+					run: async (scheduled: boolean, run: () => Promise<never>) => {
+						const start = performance.now();
+						lullActive++;
+						lullRuns++;
+						let result = "error";
+						try {
+							const value = await original.run(scheduled, run);
+							result = `${scheduled ? "scheduled" : "explicit"}:${String((value as { kind?: string }).kind)}`;
+							return value;
+						} finally {
+							lullActive--;
+							lullSpans.push({ peer: -1, start, end: performance.now(), result });
+						}
+					},
+				}) as never;
+			});
 		let creatorStage: "idle" | "seal" | "adopt" | "export" | "publish" = "idle";
 		let policies: (V3RoomRolloverPolicy | undefined)[] = [];
 		const deliveries: (V3RoomSuccessorDelivery | undefined)[] = [];
-		const epochOf: number[] = Array.from({ length: peersCount }, () => 0);
+		const epochOf: number[] = Array.from({ length: totalPeers }, () => 0);
+		const joins: Record<string, unknown>[] = [];
 		const t0 = performance.now();
 		let failure: unknown;
 		let timer: ReturnType<typeof setInterval> | undefined;
@@ -179,23 +216,29 @@ it.skipIf(!enabled)(
 			directory,
 			network: network as never,
 			peerIds: network.peerIds,
-			writers,
+			writers: writers + lateJoins.length,
 			...(lull === "scheduled" ? { sessionOptions: { recoveryPoolScheduledLull: true } } : {}),
 			onAccepted: (receiver, _digest, author, vertex) => {
 				acceptedVertexCount++;
 				const at = performance.now();
+				if (censusWindow !== undefined) {
+					const action = `${receiver}:${String((vertex?.operation as { action?: string } | undefined)?.action)}`;
+					censusWindow[action] = (censusWindow[action] ?? 0) + 1;
+				}
 				if (vertex !== undefined) policies[receiver]?.observe({ ...(vertex as object), author, epoch: vertex.epoch } as never);
 				const operation = vertex?.operation as { action?: string; id?: string; x?: number } | undefined;
 				if (operation?.action !== "placeBlock") return;
 				const issue = byKey.get(`${operation.id}:${operation.x}`);
 				if (issue === undefined || issue.peer === receiver || issue.acceptedBy[receiver] !== undefined) return;
+				if (receiver >= peersCount) return;
 				issue.acceptedBy[receiver] = at;
 				if (receiver === 0) issue.creatorAdmittedAt = at;
 			},
 		});
 		directories.delete(directory);
-		const peers = [];
+		const peers: Awaited<ReturnType<typeof fixture.open>>[] = [];
 		for (let index = 0; index < peersCount; index++) peers.push(await fixture.open(index));
+		const openedCount = () => peers.length;
 		const creatorPeer = required(peers[0]).peerId;
 		// The page's composition on every peer: successor delivery and the shipped rollover policy.
 		const timed =
@@ -217,7 +260,7 @@ it.skipIf(!enabled)(
 					} else creatorStage = name === "seal" ? "adopt" : "export";
 				}
 			};
-		policies = peers.map((peer, index) => {
+		const compose = (peer: (typeof peers)[number], index: number) => {
 			const role = index === 0 ? "creator" : "member";
 			const delivery = createV3RoomSuccessorDelivery({
 				role,
@@ -267,28 +310,9 @@ it.skipIf(!enabled)(
 					: room;
 			policy.bind(bound as never);
 			delivery.bind(room);
-			// Observe the scheduled lull where the session lets a harness wrap it.
-			try {
-				const original = room.maintainRecoveryPool.bind(room);
-				(room as { maintainRecoveryPool: typeof original }).maintainRecoveryPool = async () => {
-					const start = performance.now();
-					lullActive++;
-					lullRuns++;
-					let result = "error";
-					try {
-						const value = await original();
-						result = String((value as { kind?: string }).kind);
-						return value;
-					} finally {
-						lullActive--;
-						lullSpans.push({ peer: index, start, end: performance.now(), result });
-					}
-				};
-			} catch {
-				record({ kind: "note", note: "maintainRecoveryPool is not wrappable; lull spans unobserved" });
-			}
 			return policy;
-		});
+		};
+		policies = peers.map((peer, index) => compose(peer, index));
 		// Ephemeral movement channels (re-read every tick: a room may hand out a new channel).
 		const channels = new Map<number, EphemeralChannel>();
 		const unsubscribe = new Map<number, () => void>();
@@ -310,7 +334,7 @@ it.skipIf(!enabled)(
 		const phase = () => {
 			if (creatorStage !== "idle") return creatorStage;
 			const creatorEpoch = epochOf[0] ?? 0;
-			if (epochOf.some((epoch) => epoch < creatorEpoch)) return "install";
+			if (epochOf.slice(0, openedCount()).some((epoch) => epoch < creatorEpoch)) return "install";
 			if (lullActive > 0) return "lull";
 			return "steady";
 		};
@@ -429,7 +453,7 @@ it.skipIf(!enabled)(
 			lastTick = at;
 			const elu = nodePerformance.eventLoopUtilization(lastElu);
 			lastElu = nodePerformance.eventLoopUtilization();
-			for (let index = 0; index < peersCount; index++) {
+			for (let index = 0; index < openedCount(); index++) {
 				const epoch = required(peers[index]).room.authority()?.epoch ?? 0;
 				if (epoch !== epochOf[index]) {
 					epochOf[index] = epoch;
@@ -498,9 +522,20 @@ it.skipIf(!enabled)(
 		let converged: Record<string, unknown> = {};
 		try {
 			if (ephemeralHz > 0 && ephemeralOnlySeconds > 0) {
+				// Control first: the same length with no traffic at all (startup rows still settling), then
+				// ephemeral movement only. Every accepted vertex in each window is counted by action.
+				offering = false;
+				phaseNow = "quiet-control";
+				censusWindow = {};
+				await sleep(ephemeralOnlySeconds * 1000);
+				windowCensus.quietControl = censusWindow;
+				offering = true;
 				phaseNow = "ephemeral-only";
+				censusWindow = {};
 				const before = acceptedVertexCount;
 				await sleep(ephemeralOnlySeconds * 1000);
+				windowCensus.ephemeralOnly = censusWindow;
+				censusWindow = undefined;
 				ephemeral.durableVerticesDuringEphemeralOnly = acceptedVertexCount - before;
 			}
 			if (cpuProfileSeconds > 0) {
@@ -532,7 +567,76 @@ it.skipIf(!enabled)(
 			durableStart = measuredFrom;
 			durableStop = measuredFrom + maxSeconds * 1000;
 			const completedRollovers = () => rollovers.filter((r) => r.publishEnd !== undefined).length;
-			while (performance.now() < durableStop && completedRollovers() < targetRollovers) await sleep(250);
+			const joinAt = [...lateJoins];
+			const joining: Promise<void>[] = [];
+			const join = async (index: number, atRollovers: number) => {
+				const started = performance.now();
+				const creatorEpochAtStart = epochOf[0] ?? 0;
+				const peer = await fixture.open(index);
+				const openedMs = performance.now() - started;
+				peers[index] = peer;
+				policies[index] = compose(peer, index);
+				let installedMs: number | null = null;
+				const deadline = started + 120_000;
+				while (performance.now() < deadline) {
+					if ((peer.room.authority()?.epoch ?? 0) >= creatorEpochAtStart && creatorEpochAtStart > 0) {
+						installedMs = performance.now() - started;
+						break;
+					}
+					await sleep(10);
+				}
+				let firstIssueMs: number | null = null;
+				let firstIssueError: string | null = null;
+				const block = Object.freeze({ id: `join-${index}`, kind: "stone", x: 1, y: index });
+				try {
+					await required(policies[index]).issue({ action: "placeBlock", ...block });
+					firstIssueMs = performance.now() - started;
+					latest.set(block.id, block);
+				} catch (error) {
+					firstIssueError = errorText(error);
+					uncertainSlots.add(block.id);
+				}
+				let creatorAdmittedMs: number | null = null;
+				while (performance.now() < deadline + 60_000) {
+					if (required(peers[0]).room.projection().blocks.some((value) => value.id === block.id)) {
+						creatorAdmittedMs = performance.now() - started;
+						break;
+					}
+					await sleep(10);
+				}
+				const files = readdirSync(directory).filter((name) => name.startsWith(`peer-${index}`) || name.includes(`peer-${index}-`));
+				const storageBytes = files.reduce((sum, name) => sum + statSync(join_(directory, name)).size, 0);
+				const value = {
+					kind: "late-join",
+					index,
+					atRollovers,
+					creatorEpochAtStart,
+					epochAfter: peer.room.authority()?.epoch ?? 0,
+					openedMs,
+					installedMs,
+					firstIssueMs,
+					firstIssueError,
+					creatorAdmittedMs,
+					storageFiles: files,
+					storageBytes,
+					largestOfferBytes: deliveries[0]?.stats().largestOfferBytes,
+					memberDelivery: deliveries[index]?.stats(),
+				};
+				joins.push(value);
+				record(value);
+			};
+			while (performance.now() < durableStop && completedRollovers() < targetRollovers) {
+				const due = joinAt[0];
+				if (due !== undefined && completedRollovers() >= due) {
+					joinAt.shift();
+					const index = peersCount + (lateJoins.length - joinAt.length - 1);
+					joining.push(join(index, completedRollovers()).catch((error: unknown) => {
+						joins.push({ kind: "late-join", index, error: errorText(error) });
+					}));
+				}
+				await sleep(250);
+			}
+			await Promise.all(joining);
 			durableStop = performance.now();
 			measuredTo = durableStop;
 			record({ kind: "offering-stopped", atMs: measuredTo - t0, offered: issues.length });
@@ -551,18 +655,27 @@ it.skipIf(!enabled)(
 				const expected = [...latest.values()]
 					.filter((block) => !uncertainSlots.has(block.id))
 					.sort((a, b) => a.id.localeCompare(b.id));
-				const states = peers.map(({ room }) =>
+				const states = peers.filter(Boolean).map(({ room }) =>
 					[...room.projection().blocks]
 						.filter((block) => !uncertainSlots.has(block.id))
 						.sort((a, b) => a.id.localeCompare(b.id))
 				);
-				const epochs = peers.map(({ room }) => room.authority()?.epoch ?? 0);
+				const epochs = peers.filter(Boolean).map(({ room }) => room.authority()?.epoch ?? 0);
 				matched =
 					epochs.every((epoch) => epoch === creatorEpoch) &&
 					states.every((state) => JSON.stringify(state) === JSON.stringify(expected));
 				if (matched) break;
+				const actual = states[0] ?? [];
+				const expectedById = new Map(expected.map((block) => [block.id, block]));
 				mismatch = {
 					epochs,
+					samples: states.map((state) =>
+						state
+							.filter((block) => JSON.stringify(expectedById.get(block.id)) !== JSON.stringify(block))
+							.slice(0, 4)
+							.map((block) => ({ actual: block, expected: expectedById.get(block.id) ?? null }))
+					),
+					missing: expected.filter((block) => !actual.some((value) => value.id === block.id)).slice(0, 4),
 					expected: expected.length,
 					differing: states.map(
 						(state) =>
@@ -593,6 +706,7 @@ it.skipIf(!enabled)(
 			for (const policy of policies) policy?.close();
 			for (const delivery of deliveries) delivery?.close();
 			profiler?.disconnect();
+			lullSpy.mockRestore();
 		}
 		// Summary.
 		const seconds = (measuredTo - measuredFrom) / 1000;
@@ -724,6 +838,7 @@ it.skipIf(!enabled)(
 			visibleToAllPeersMs: span(peerVisibleAll),
 			acceptedNeverSeenByAllPeers: neverSeenByAll,
 			rolloverPhases,
+			lateJoins: joins,
 			lull: {
 				mode: lull,
 				runs: lullRuns,
@@ -762,6 +877,7 @@ it.skipIf(!enabled)(
 							gapsByPhase: Object.fromEntries([...ephemeral.gapsByPhase].map(([name, value]) => [name, value.summary()])),
 							gapsOver100ms: ephemeral.longGapCount,
 							durableVerticesDuringEphemeralOnly: ephemeral.durableVerticesDuringEphemeralOnly,
+							acceptedVertexCensusByWindow: windowCensus,
 							channelStats: [...channels].map(([index, channel]) => ({ index, ...channel.stats() })),
 						}
 					: null,
