@@ -12,7 +12,7 @@
 //               dialling. Nothing is dialled by hand except the restarted creator's bootstrap.
 //
 // HARNESS LIMIT: one process, loopback; no WebRTC, relay, NAT or real RTT. Real links only add time.
-import { generateKeyPair } from "@libp2p/crypto/keys";
+import { ed25519 } from "@noble/curves/ed25519.js";
 import { type Message, MessageType, Message as MessageValue } from "@ts-drp/types";
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -80,17 +80,19 @@ it.skipIf(!enabled)(
 			appendFileSync(join(output, "connect.jsonl"), JSON.stringify(value) + "\n");
 			console.info("[creator connect]", JSON.stringify(value));
 		};
-		const creatorKey = (await generateKeyPair("Ed25519")).raw;
+		// libp2p raw Ed25519 private key: seed || public key (64 bytes).
+		const seed = new Uint8Array(32).fill(0x5a);
+		const creatorKey = new Uint8Array([...seed, ...ed25519.getPublicKey(seed)]);
 		const results: Record<string, unknown>[] = [];
 		for (const mode of modes) {
 			const running: DRPNetworkNode[] = [];
 			try {
 				let bootstrapAddress: string[] = [];
 				if (mode === "bootstrap") {
-					const seed = pageNode([], true);
-					running.push(seed);
-					await seed.start();
-					bootstrapAddress = seed.getMultiaddrs().filter((address) => address.includes("/p2p/"));
+					const bootstrapNode = pageNode([], true);
+					running.push(bootstrapNode);
+					await bootstrapNode.start();
+					bootstrapAddress = bootstrapNode.getMultiaddrs().filter((address) => address.includes("/p2p/"));
 				}
 				const member = mode === "direct" ? directNode() : pageNode(bootstrapAddress);
 				running.push(member);
