@@ -14,6 +14,9 @@ User decision: a creator that reopens from storage asks its members for their cr
 bounded time (5 s) before signing anything; verified newer state refuses it for the session
 (`V3RoomNotYetCurrent` "creator-superseded"), silence proceeds. Decision row 75; branch
 `fix/creator-restore-currency` (model, RED, fix). Active only where the application wires `creatorMemberView`.
+Sandbox runs: RED on `efe4d128` fails (a) and (b) (the restored copy re-signs authorSequence 3) with the three
+controls passing; GREEN on head 5/5. Grid endurance smoke (12 epochs, reopen at 5) passes on head and on base with
+`TMPDIR=/dev/shm`; on the sandbox disk base fails the same member-starvation bound, so that is the environment.
 
 ## Integration-5 — 2026-10-26 evening (current)
 
