@@ -908,7 +908,8 @@ async function backlogCountsBatchedMoves(batch: number) {
 				await rows.toCreator();
 			}
 			const plan = async () => (await writer.settlementPlanDump?.()) as { fence: number | null; entries: { e: number; d: string }[] };
-			const status = async () => (await writer.settlementStatus?.()) as { undelivered: unknown[]; unsettledEpochs: number } | null;
+			const status = async () =>
+				(await writer.settlementStatus?.()) as { undelivered: unknown[]; unsettledEpochs: number; deferred?: number } | null;
 			// Offline (the creator never receives them): moves made together, which Grid batches into one row.
 			const together = await Promise.allSettled(Array.from({ length: batch }, () => writer.issueRoom!(epoch, n++)));
 			const acceptedTogether = together.filter((result) => result.status === "fulfilled").length;
@@ -952,6 +953,7 @@ async function backlogCountsBatchedMoves(batch: number) {
 				refusals,
 				givenBack: after?.undelivered.length ?? 0,
 				unsettledEpochs: after?.unsettledEpochs,
+				deferred: after?.deferred,
 				dispositions: settled.entries.reduce<Record<string, number>>((counts, entry) => ((counts[entry.d] = (counts[entry.d] ?? 0) + 1), counts), {}),
 				fence: settled.fence,
 			};
@@ -960,6 +962,8 @@ async function backlogCountsBatchedMoves(batch: number) {
 			expect(accepted, "undelivered moves accepted (the batched ones counted per move)").toBeLessThanOrEqual(V3_ROOM_LOCAL_BACKLOG_LIMIT);
 			// ... so the skip install gives every one of them back and leaves nothing unresolved.
 			expect(summary.dispositions["manual-review"] ?? 0, "rows left unresolved").toBe(0);
+			// The room's safety net agrees: no move waits for a hand-back record.
+			expect(summary.deferred, "moves deferred for want of a hand-back record").toBe(0);
 		} finally {
 			await wire.stop();
 		}

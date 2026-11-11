@@ -473,6 +473,8 @@ async function slowFollow(conserve: boolean, rollCount = ROLLS, minSkips = 0) {
 			await sleep(1_000);
 			expect(await acceptedCounts(creator, writerAuthor, ids)).toEqual(ids.map(() => 1));
 			expect(await writer.state()).toBe(await creator.state());
+			// Safety net: no move of the member waited for a hand-back record (the bound counts every move).
+			expect(((await writer.settlementStatus?.()) as { deferred?: number } | null)?.deferred ?? 0, "deferred moves").toBe(0);
 			const delivery = (await writer.successorDelivery?.()) as { refusals?: readonly string[] } | undefined;
 			expect(
 				(delivery?.refusals ?? []).filter((refusal) => refusal.includes("journal retirement refused")),

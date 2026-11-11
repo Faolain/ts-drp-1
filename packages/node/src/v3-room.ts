@@ -377,6 +377,15 @@ export type V3RoomSettlementStatus = Readonly<{
 		/** The record's key: pass it back with the operation to consume the record. */
 		handBack: V3RoomHandBack;
 	}>[];
+	/**
+	 * Safety net (observation only), expected 0: moves the window or the creator's frontier would give
+	 * back but no hand-back record was free for. The undelivered-move bound (V3RoomLocalBacklogFull)
+	 * counts every move against the records, so a window expiry always fits; a nonzero value means that
+	 * bound was broken, and those rows stay live (replaced again) or retained (withholding the author
+	 * fence) until records are free. Counts the window's unrecorded moves, plus, while no record is
+	 * free, the moves of retained rows still unresolved.
+	 */
+	deferred: number;
 }>;
 
 /** The key of one durable hand-back record (V3RoomSettlementStatus.undelivered). */
@@ -6405,11 +6414,35 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					})
 				)
 		);
+	// The window's moves of the last plan merge that no free hand-back record fitted (expected 0).
+	let windowDeferredMoves = 0;
+	/**
+	 * Settlement status `deferred` (a safety net, expected 0): the window's unrecorded moves, plus, while
+	 * no hand-back record is free for them, the moves of retained rows still unresolved (the frontier
+	 * resolution keeps such a row retained when its records do not fit).
+	 * @param plan - The durable plan.
+	 * @returns The deferred moves.
+	 */
+	const deferredMovesOf = (plan: RoomSettlementPlan | null): number => {
+		const unconsumed = (plan?.handBacks ?? []).filter((record) => record.reissueSequence === null).length;
+		const free = SETTLEMENT_HAND_BACK_LIMITS.maxRecords - unconsumed;
+		let retained = 0;
+		for (const entry of plan?.entries ?? []) {
+			if (entry.sourceContextDigest === undefined || entry.disposition !== "manual-review") continue;
+			const moves = Math.max(1, settlementDisplaced.get(entry.sourceSequence) ?? 1);
+			if (moves > free) retained += moves;
+		}
+		return windowDeferredMoves + retained;
+	};
 	const refreshHandBackListing = async (): Promise<void> => {
 		const plan = await issuanceStore.readSettlementPlan(settlementScope);
 		settlementBacklog = settlementBacklogOf(plan, settlementDisplaced);
 		if (settlementStatusSnapshot !== undefined)
-			settlementStatusSnapshot = Object.freeze({ ...settlementStatusSnapshot, undelivered: handBackListing(plan) });
+			settlementStatusSnapshot = Object.freeze({
+				...settlementStatusSnapshot,
+				undelivered: handBackListing(plan),
+				deferred: deferredMovesOf(plan),
+			});
 	};
 	const authenticatedSettlementInheritance = (
 		sources: readonly DisplacedSource[]
@@ -6695,6 +6728,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			(record) => record.reissueSequence === null
 		);
 		const expired = new Set<number>();
+		windowDeferredMoves = 0;
 		for (const source of [...sources].sort((left, right) => left.authorSequence - right.authorSequence)) {
 			if (!windowExpired.has(source.authorSequence)) continue;
 			if (current?.entries.find((entry) => entry.sourceSequence === source.authorSequence)?.disposition === "expire") {
@@ -6714,7 +6748,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					})
 				)
 			);
-			if (recorded === undefined) continue;
+			if (recorded === undefined) {
+				windowDeferredMoves += source.intents.length;
+				continue;
+			}
 			handBacks = recorded;
 			expired.add(source.authorSequence);
 		}
@@ -6782,6 +6819,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			unsettledEpochs: waiting.length === 0 ? 0 : Math.max(0, epoch - Math.min(...waiting)),
 			window: V3_SETTLEMENT_OWN_WINDOW_EPOCHS,
 			undelivered: handBackListing(plan),
+			deferred: deferredMovesOf(plan),
 		});
 	};
 	/**
@@ -9713,6 +9751,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					unsettledEpochs: 0,
 					window: V3_SETTLEMENT_OWN_WINDOW_EPOCHS,
 					undelivered: Object.freeze([]),
+					deferred: 0,
 				})
 			);
 		},
