@@ -20,10 +20,11 @@ class ReopenableRawOwner extends ControlledRawOwner {
 	}
 }
 
-export async function nativePlayNetwork(delayMs = 20) {
+export async function nativePlayNetwork(delayMs = 20, peers = 2) {
+	if (!Number.isSafeInteger(peers) || peers < 2) throw new Error("NATIVE_PLAY_PEER_COUNT");
 	const raw = new ControlledRawBus(64);
 	const running = Array.from(
-		{ length: 2 },
+		{ length: peers },
 		() =>
 			new DRPNetworkNode(
 				{
@@ -67,10 +68,15 @@ export async function nativePlayNetwork(delayMs = 20) {
 		const starts = await Promise.allSettled(running.map((node) => node.start()));
 		const failed = starts.find((result) => result.status === "rejected");
 		if (failed?.status === "rejected") throw failed.reason;
-		const [left, right] = running;
-		if (left === undefined || right === undefined) throw new Error("NATIVE_PLAY_PEERS_MISSING");
-		await left.connect(right.getMultiaddrs());
-		raw.connect(left.peerId, right.peerId);
+		// A full mesh (two peers: the original single connection).
+		for (let left = 0; left < running.length; left++)
+			for (let right = left + 1; right < running.length; right++) {
+				const from = running[left],
+					to = running[right];
+				if (from === undefined || to === undefined) throw new Error("NATIVE_PLAY_PEERS_MISSING");
+				await from.connect(to.getMultiaddrs());
+				raw.connect(from.peerId, to.peerId);
+			}
 		for (const network of running) {
 			const ephemeral = new NodeEphemeralAdapter(network, new ReopenableRawOwner(raw, network.peerId));
 			const adapter = new NodeRoomNetworkAdapter(network, ephemeral);

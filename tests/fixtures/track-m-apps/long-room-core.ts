@@ -547,6 +547,7 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 	let ingress: ((message: Message) => void) | undefined;
 	let topic: string | undefined;
 	const accepted = new Set<string>();
+	const acceptedTimes = new Map<string, number>();
 	let acceptedCount = 0;
 	let lastAcceptedAt: number | null = null;
 	let remoteAcceptedCount = 0;
@@ -715,6 +716,7 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 				}
 			}
 			accepted.add(digest);
+			if (!acceptedTimes.has(digest)) acceptedTimes.set(digest, performance.timeOrigin + performance.now());
 			acknowledged.get(digest)?.();
 		},
 		openTransport: () => {
@@ -798,6 +800,7 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 	return Object.freeze({
 		inject,
 		acceptance: async (digests: readonly string[]) => digests.map((digest) => accepted.has(digest)),
+		acceptedAt: async (digests: readonly string[]) => digests.map((digest) => acceptedTimes.get(digest) ?? null),
 		acceptedVertices: async () => acceptedVertices.map((vertex) => ({ ...vertex })),
 		// The room's own settlement observation (V3RoomSession.settlementStatus), when it has one.
 		settlementStatus: async () =>
