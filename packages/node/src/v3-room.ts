@@ -2144,11 +2144,21 @@ const PROJECTION_BASE_RESULT_KEYS = Object.freeze([
 ]);
 const LOWER_HEX_256 = /^[0-9a-f]{64}$/u;
 
-// Validated application projection orders (frozen orders only): order -> its rank and control tables.
-const validatedProjectionOrders = new WeakMap<
-	object,
-	Readonly<{ anchor: string; ranks: Map<string, number>; controls: Set<string> }>
->();
+/** A validated frozen application projection order: its exact digests and the tables built from them. */
+type ValidatedProjectionOrder = Readonly<{
+	anchor: string;
+	digests: readonly string[];
+	controlDigests: readonly string[];
+	ranks: Map<string, number>;
+	controls: Set<string>;
+}>;
+
+/** True when both digest lists hold the identical strings in the identical order. */
+function sameDigestList(left: readonly unknown[], right: readonly string[]): boolean {
+	if (left.length !== right.length) return false;
+	for (let index = 0; index < right.length; index += 1) if (left[index] !== right[index]) return false;
+	return true;
+}
 
 /** The order's digest ranks and sorted control set, exactly as validated before use. */
 function validateProjectionOrder(
@@ -4060,6 +4070,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					signerSetDigest: migrationActivationAuthority.signerSetDigest,
 				});
 	};
+	let lastValidatedProjectionOrder: ValidatedProjectionOrder | undefined;
 	const orderedProjectionVertices = (
 		selected: ReadonlyMap<string, V3RoomAcceptedVertex>,
 		recoveryOrder?: V3ApplicationProjectionOrder
@@ -4087,16 +4098,32 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		) {
 			throw new TypeError("v3 room application projection order scope differs");
 		}
-		// The validated rank and control tables are a pure function of the frozen order and the expected
-		// scope; the plane returns the same frozen order object until its graph changes.
-		const validated = validatedProjectionOrders.get(order);
+		// The validated rank and control tables are a pure function of the order's digest lists and the
+		// expected anchor: a frozen order whose lists hold exactly the strings last validated (same
+		// anchor) reuses that validation; any other order is validated in full.
+		const frozenOrder =
+			Object.isFrozen(order) && Object.isFrozen(order.digests) && Object.isFrozen(order.controlDigests);
+		const validated = lastValidatedProjectionOrder;
 		let ranks: Map<string, number>;
 		let controls: Set<string>;
-		if (validated !== undefined && validated.anchor === expectedAnchor) ({ ranks, controls } = validated);
+		if (
+			frozenOrder &&
+			validated !== undefined &&
+			validated.anchor === expectedAnchor &&
+			sameDigestList(order.digests, validated.digests) &&
+			sameDigestList(order.controlDigests, validated.controlDigests)
+		)
+			({ ranks, controls } = validated);
 		else {
 			({ ranks, controls } = validateProjectionOrder(order, expectedAnchor));
-			if (Object.isFrozen(order) && Object.isFrozen(order.digests) && Object.isFrozen(order.controlDigests))
-				validatedProjectionOrders.set(order, { anchor: expectedAnchor, ranks, controls });
+			if (frozenOrder)
+				lastValidatedProjectionOrder = {
+					anchor: expectedAnchor,
+					digests: order.digests as readonly string[],
+					controlDigests: order.controlDigests as readonly string[],
+					ranks,
+					controls,
+				};
 		}
 		for (const [digest, vertex] of selected) {
 			if (

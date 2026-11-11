@@ -18942,6 +18942,22 @@ const applicationProjectionOrderMemo = new WeakMap<
 	}>
 >();
 
+/** A fresh frozen copy of a memoized order result: every read returns its own detached arrays. */
+function detachedApplicationProjectionOrder(
+	result: V3ApplicationProjectionOrderResult
+): V3ApplicationProjectionOrderResult {
+	if (!result.ok) return ObjectFreeze({ ...result });
+	const order = result.order;
+	return ObjectFreeze({
+		ok: true,
+		order: ObjectFreeze({
+			...order,
+			digests: ObjectFreeze([...order.digests]),
+			controlDigests: ObjectFreeze([...order.controlDigests]),
+		}),
+	});
+}
+
 /**
  * Reads the canonical application order from one authenticated active plane.
  * @param input - Exact capability-bearing request; copied handles have no provenance.
@@ -18980,7 +18996,7 @@ export function readV3ApplicationProjectionOrder(
 			memo.controlVertices === registration.controlVertices &&
 			memo.controlSize === registration.controlVertices.size
 		)
-			return memo.result;
+			return detachedApplicationProjectionOrder(memo.result);
 		const projection = deriveApplicationProjectionOrder(
 			registration.payload,
 			registration.closeVertices,
@@ -19002,7 +19018,7 @@ export function readV3ApplicationProjectionOrder(
 			controlSize: registration.controlVertices.size,
 			result,
 		});
-		return result;
+		return detachedApplicationProjectionOrder(result);
 	} catch {
 		return ObjectFreeze({ ok: false, kind: "malformed-input", detail: "v3 application order input is invalid" });
 	}
