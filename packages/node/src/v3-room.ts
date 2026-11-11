@@ -5832,17 +5832,6 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	sessionLifetime.signal.addEventListener("abort", () => refuseHeldUntilCurrent(sessionLifetime.signal.reason), {
 		once: true,
 	});
-	// Creator restore currency: the check's decision releases the held moves (and a startup drain
-	// left for currency) or refuses them, as a writer's currency does.
-	// A late member's verified newer view refuses a creator that had admitted moves: no move after it.
-	creatorRestoreGate?.onAdmitted(() => becomeLocalIssueCurrent());
-	creatorRestoreGate?.onRefused((refusal) => {
-		localIssueCurrent = false;
-		localIssueRefusal ??= refusal;
-		refuseHeldUntilCurrent(localIssueRefusal);
-		const by = creatorRestoreGate?.supersededBy();
-		if (by !== undefined) enterSupersession(by.level, by.sequence ?? -1, by.epoch, refusal);
-	});
 	// Creator move equivocation recovery (creator-move-equivocation-recovery.qnt, coordinator decision
 	// 2026-11-11). Another incarnation of this creator's key exists: a member's newer creator-signed
 	// view, or a vertex under this key that this creator did not sign (v3-live keeps it, and anything
@@ -5865,6 +5854,17 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		| undefined;
 	let supersessionReissue: Promise<void> | undefined;
 	let reissueOperation: ((operation: Readonly<Record<string, unknown>>) => Promise<void>) | undefined;
+	// Creator restore currency: the check's decision releases the held moves (and a startup drain
+	// left for currency) or refuses them, as a writer's currency does.
+	// A late member's verified newer view refuses a creator that had admitted moves: no move after it.
+	creatorRestoreGate?.onAdmitted(() => becomeLocalIssueCurrent());
+	creatorRestoreGate?.onRefused((refusal) => {
+		localIssueCurrent = false;
+		localIssueRefusal ??= refusal;
+		refuseHeldUntilCurrent(localIssueRefusal);
+		const by = creatorRestoreGate?.supersededBy();
+		if (by !== undefined) enterSupersession(by.level, by.sequence ?? -1, by.epoch, refusal);
+	});
 	function supersessionRefusal(): V3RoomNotYetCurrent | undefined {
 		return supersession === undefined || supersession.state === "resumed" ? undefined : supersession.refusal;
 	}
