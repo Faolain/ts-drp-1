@@ -2027,6 +2027,24 @@ export function issuanceRetirementFenceIsReleasable(rows: IssuanceRetirementRows
 		retirementFenceIsReleasable(plan, entry, rows);
 }
 
+/** A retained FENCE that a completed retirement already released stays released. The
+ * release law (R1, R2) is judged again at every retirement, but release is permanent:
+ * in the model (releaseFence) the row leaves and nothing brings it back, and every source
+ * left unresolved after it is bounded by a newer fence (R2 held at the release, and a
+ * Writer issues only under a current fence signed at lineage.next), so unresolvedBounded
+ * never needs the released row. Without this, a Writer's next unresolved work turned the
+ * released entry back into a dependency that no retirement can protect, and every later
+ * install refused. Only the completed control decides (an in-flight preparation grants
+ * nothing), and the plan's current fence is never released here. */
+function retirementFenceWasReleased(control: DurableIssuanceRetirementControl | null, plan: SettlementPlan,
+	entry: SettlementPlan["entries"][number], rows: IssuanceRetirementRows): boolean {
+	if (control?.completed == null || plan.fenceSequence === entry.sourceSequence ||
+		!retirementEntryIsRetainedFence(plan, entry, rows)) return false;
+	const row = retirementLocalSource(plan, entry, rows);
+	return row !== undefined && !issuanceRetirementAllows({ ...control, active: null }, row, row.authorSequence,
+		row.canonicalPreimageBytes, row.digest);
+}
+
 /** A completed local entry is custody while the store still holds its source. Logical
  * retirement and the prefix pruner are separate commits, and the creator recovery
  * census classifies every held displaced source by its completed entry, so the entry
@@ -2046,7 +2064,7 @@ function retirementEntryIsRetained(control: DurableIssuanceRetirementControl | n
 	rows: IssuanceRetirementRows): boolean {
 	if (entry.sourceObjectId !== undefined || entry.disposition === "inherited" ||
 		!settlementPlanPermitsAuthenticatedPruning({ fenceSequence: plan.fenceSequence, entries: [entry] }) &&
-		!retirementFenceIsReleasable(plan, entry, rows)) return true;
+		!retirementFenceIsReleasable(plan, entry, rows) && !retirementFenceWasReleased(control, plan, entry, rows)) return true;
 	const source = retirementLocalSource(plan, entry, rows);
 	return source !== undefined && retirementKeepsRow(control, p, source);
 }

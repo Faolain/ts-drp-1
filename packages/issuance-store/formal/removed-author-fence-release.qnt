@@ -195,6 +195,14 @@ module removedAuthorFenceRelease {
   run writerEpochChangeTest = init.then(settle(2)).then(seal).then(seal).then(clearFence).then(releaseFence(1))
     .then(writerFence).then(all { assert(planFence == 3), assert(safety), unchangedAll })
 
+  // A Writer's fence released at its epoch change stays released: R2 held at the release
+  // and the Writer issues only under its next fence, so that fence bounds the new work and
+  // nothing needs the released row again (the store law retirementFenceWasReleased).
+  run writerReleaseThenWorkTest = init.then(settle(2)).then(seal).then(seal).then(clearFence).then(releaseFence(1))
+    .then(writerFence).then(issue)
+    .then(all { assert(not(rows.contains(1))), assert(unresolved == Set(4)), assert(fenceOf(fences, 4) == 3),
+      assert(safety), unchangedAll })
+
   action initAllowCurrentFence = initWith({ ...SOUND, allowCurrentFence: true })
   action initAllowUnresolved = initWith({ ...SOUND, allowUnresolved: true })
   action initIgnoreWindow = initWith({ ...SOUND, ignoreWindow: true })
