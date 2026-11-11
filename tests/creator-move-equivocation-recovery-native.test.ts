@@ -381,7 +381,7 @@ describe("creator move equivocation recovery", () => {
 		const restored = await f.open(0, { reopen: true });
 		const row = required(original.at(-1));
 		const signature = new Uint8Array(row.commit.envelope.signature);
-		signature[0] = signature[0]! ^ 0xff;
+		signature[0] = required(signature[0]) ^ 0xff;
 		const forged = { ...row, commit: { ...row.commit, envelope: { ...row.commit.envelope, signature } } } as typeof row;
 		await within(restored.receive([forged], 1, 1_000), 1_500, false);
 		await sleep(500);
