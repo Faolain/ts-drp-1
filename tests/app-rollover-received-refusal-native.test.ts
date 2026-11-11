@@ -6,7 +6,7 @@
 // held moves reach the successor through the existing re-delivery and settlement (c), so every move
 // is admitted and nothing waits for a successor that never comes.
 //
-// Four Writers of a settlement-profile Grid zone room and the creator, on genuine local libp2p
+// Five Writers of a settlement-profile Grid zone room and the creator, on genuine local libp2p
 // (nativePlayNetwork) with each page's own composition: the shipped rollover policy and successor
 // delivery. The budget and idle triggers are set too high to fire, so a capacity refusal is the only
 // rollover cause. One Writer alone cannot reach the creator's received-move refusal: its own
@@ -15,8 +15,9 @@
 // one (its quote is larger), so the creator moves every few Writer moves (its rows are the
 // admission evidence that keeps the Writers' admitted moves out of their 64-move undelivered
 // bound) and then pauses while the Writers' received moves fill the rest. The pause must stay
-// under 64 moves per Writer, which is why it takes four Writers (two or three never reached the
-// received refusal on bx_6ytwadfw before the creator's own).
+// under 64 moves per Writer and span about 330 received moves of the epoch, which is why it takes
+// several Writers (two or three never reached the received refusal on bx_6ytwadfw before the
+// creator's own; four reached it in one of two runs).
 import { expect, it } from "vitest";
 
 import { nativePlayNetwork } from "./fixtures/active-endurance/native-network.js";
@@ -31,13 +32,14 @@ import {
 } from "../examples/v3-room/src/successor-delivery.js";
 
 const env = process.env;
-const WRITERS = Number(env.RECEIVED_REFUSAL_WRITERS ?? 4);
+const WRITERS = Number(env.RECEIVED_REFUSAL_WRITERS ?? 5);
 const MOVES_PER_WRITER = Number(env.RECEIVED_REFUSAL_MOVES ?? 300);
 const CREATOR_EVERY = Number(env.RECEIVED_REFUSAL_CREATOR_EVERY ?? 16);
-// The creator pauses for PAUSE combined Writer moves from PAUSE_AT on (0: never), so the Writers'
-// received moves, not its own, are what fill its proof book's last room.
-const PAUSE_AT = Number(env.RECEIVED_REFUSAL_PAUSE_AT ?? 88);
-const PAUSE = Number(env.RECEIVED_REFUSAL_PAUSE ?? 212);
+// In every epoch the creator pauses for PAUSE combined Writer moves from the epoch's PAUSE_AT-th on
+// (0: never), so the Writers' received moves, not its own, are what fill its proof book's last room.
+// PAUSE / WRITERS must stay under the Writers' 64-move undelivered bound.
+const PAUSE_AT = Number(env.RECEIVED_REFUSAL_PAUSE_AT ?? 100);
+const PAUSE = Number(env.RECEIVED_REFUSAL_PAUSE ?? 280);
 const SLOTS = 16;
 const errorText = (error: unknown) => (error instanceof Error ? `${error.name}: ${error.message}` : String(error));
 
@@ -133,8 +135,16 @@ it("several hot Writers: a received move the creator refuses at capacity trigger
 		}
 		const last = new Map<string, number>();
 		let creatorSeq = 0;
+		let epoch = required(peers[0]).room.authority()?.epoch;
+		let epochMoves = 0;
 		for (let move = 0; move < MOVES_PER_WRITER * WRITERS; move++) {
-			const paused = PAUSE_AT > 0 && move >= PAUSE_AT && move < PAUSE_AT + PAUSE;
+			const current = required(peers[0]).room.authority()?.epoch;
+			if (current !== epoch) {
+				epoch = current;
+				epochMoves = 0;
+			}
+			const paused = PAUSE_AT > 0 && epochMoves >= PAUSE_AT && epochMoves < PAUSE_AT + PAUSE;
+			epochMoves++;
 			if (move % CREATOR_EVERY === 0 && !paused) {
 				const slot = creatorSeq % SLOTS;
 				await required(policies[0]).issue({ action: "placeBlock", id: `c-${slot}`, kind: "stone", x: creatorSeq++, y: 0 });
