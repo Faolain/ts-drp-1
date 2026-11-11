@@ -12319,7 +12319,13 @@ async function runCreatorOrdinaryReadinessMaintenance(registration: V3PlaneRegis
 	// the request itself discharges no halt and authorizes no new selection.
 	// The trusted close owner below must reach terminal native verification,
 	// and every admitted hold/release must join before the gate can reopen.
-	const recoveryRequestMatches = (): boolean => resumeControl !== undefined &&
+	// A turnover receipt with no resumable native control is the same request: the
+	// snapshot pool turned over before the native store recorded that turnover's
+	// intent (a death in between), so a durable reopen halts on the receipt alone.
+	// The close resumes it (creatorCloseRetirementResumeRequired); this boundary
+	// must too, or the reopened owner can never prepare readiness. It is
+	// discharged only by the same original reconstruction completing.
+	const recoveryRequestMatches = (): boolean => (resumeControl === undefined ? reconstruction !== undefined :
 		resumeControl.objectId === payload.provenance.objectId &&
 		(resumeControl.active !== null
 			? resumeControl.active.preparation?.head.kind === "present" &&
@@ -12328,10 +12334,11 @@ async function runCreatorOrdinaryReadinessMaintenance(registration: V3PlaneRegis
 				resumeControl.active.preparation.floorEpoch + 1 === epoch && resumeControl.nominee == null
 			: resumeControl.completed !== null &&
 				(resumeControl.completed.domains !== undefined || registration.roomRetentionResumeControl === resumeControl) &&
-				resumeControl.completed.throughEpoch + 1 === epoch) &&
+				resumeControl.completed.throughEpoch + 1 === epoch)) &&
 		(reconstruction === undefined || sameHead(reconstruction.head, payload.trust.head) &&
 			sameCreatorRoomHead(reconstruction.roomHead, trust)) && creatorRetirementResumeRequested(registration);
-	const recoveryResume = registration.operationAdmissionHalted && recoveryRequestMatches() ? resumeControl : undefined;
+	const recoveryResume = registration.operationAdmissionHalted && recoveryRequestMatches()
+		? resumeControl ?? reconstruction : undefined;
 	const admissionStateCurrent = (): boolean => registration.retirementResumeControl === resumeControl &&
 		registration.retirementReconstruction === reconstruction && (recoveryResume === undefined
 			? !registration.operationAdmissionHalted
