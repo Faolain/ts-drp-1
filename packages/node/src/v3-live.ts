@@ -7805,6 +7805,28 @@ export function bindV3CreatorSupersession(
 }
 
 /**
+ * R1's synchronous screen, so the ingress hot path does not await for an ordinary member vertex: only
+ * a vertex under the creator's own key, or one depending on a recorded other-incarnation vertex, can
+ * be refused.
+ * @param registration - The plane receiving the vertex.
+ * @param authenticated - The authenticated, not yet admitted vertex.
+ * @returns True when refuseCreatorSuperseded must decide.
+ */
+function creatorSupersessionCandidate(
+	registration: V3PlaneRegistration,
+	authenticated: AuthenticatedRecoveryVertex
+): boolean {
+	if (registration.creatorMaintenanceBound !== true) return false;
+	if (authenticated.author === registration.issuanceScope.author) return true;
+	const closure = registration.creatorSupersededClosure;
+	return (
+		closure !== undefined &&
+		closure.size > 0 &&
+		authenticated.vertex.dependencies.some((dependency) => closure.has(dependency))
+	);
+}
+
+/**
  * R1, before admission or parking: a vertex under the creator's own key that is not its own durable
  * row at that sequence is another incarnation's (recorded and handed to the session's sink); a vertex
  * depending on one is refused with it. Pending rows depending on a newly recorded one are released.
@@ -8619,7 +8641,11 @@ async function authenticateV3Ingress(registration: V3PlaneRegistration, captured
 			transportSender: captured.sender,
 		});
 		// R1: another incarnation of this creator, or work built on it: kept out of this plane.
-		if (!registration.index.has(authenticated.digest) && (await refuseCreatorSuperseded(registration, authenticated)))
+		if (
+			!registration.index.has(authenticated.digest) &&
+			creatorSupersessionCandidate(registration, authenticated) &&
+			(await refuseCreatorSuperseded(registration, authenticated))
+		)
 			return ingressFailureLog("admission-rejected", "creator-superseded-incarnation");
 		// Refused, not retained: held work would block the interrupted close's own
 		// recovery dependency hold (it requires an empty pending ingress). The
