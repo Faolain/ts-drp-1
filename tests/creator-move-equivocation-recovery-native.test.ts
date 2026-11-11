@@ -4,13 +4,13 @@ import { copyFileSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs"
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { chatSharesRoomFixture, closeChatSharesRooms, required } from "./fixtures/chat-membership-shares/room.js";
 import { createShippingChatWindowGenesisStateBytes } from "../examples/chat/src/v3-chat-window.js";
 import {
 	createV3RoomSuccessorDelivery,
 	type V3RoomSuccessorChannel,
 	type V3RoomSuccessorDelivery,
 } from "../examples/v3-room/src/index.js";
-import { chatSharesRoomFixture, closeChatSharesRooms } from "./fixtures/chat-membership-shares/room.js";
 
 // Creator move equivocation recovery (coordinator decision 2026-11-11): see the rule below the
 // helpers. Helpers from creator-restore-currency-native.test.ts: the shipped successor delivery's
@@ -51,13 +51,19 @@ const deliveries = new Set<V3RoomSuccessorDelivery>();
  * `reach` is what the creator's transport reports about its own first connection attempts.
  */
 function network(options: { reach?: "reached" | "unreachable" | "none" } = {}) {
+	const reach = options.reach;
 	const listeners = new Map<string, Set<Listener>>();
 	const connected = new Map<string, Set<string>>();
 	const connections = new Map<string, Set<(peerId: string) => void>>();
 	const delays = new Map<string, number>();
 	const link = (left: string, right: string) => {
-		(connected.get(left) ?? connected.set(left, new Set()).get(left)!).add(right);
-		(connected.get(right) ?? connected.set(right, new Set()).get(right)!).add(left);
+		const peersOf = (peerId: string) => {
+			const set = connected.get(peerId) ?? new Set<string>();
+			connected.set(peerId, set);
+			return set;
+		};
+		peersOf(left).add(right);
+		peersOf(right).add(left);
 		for (const listener of [...(connections.get(left) ?? [])]) listener(right);
 		for (const listener of [...(connections.get(right) ?? [])]) listener(left);
 	};
@@ -83,7 +89,7 @@ function network(options: { reach?: "reached" | "unreachable" | "none" } = {}) {
 			connections.set(localPeerId, set);
 			return () => set.delete(listener);
 		},
-		...(options.reach === undefined ? {} : { initialReach: () => Promise.resolve(options.reach!) }),
+		...(reach === undefined ? {} : { initialReach: () => Promise.resolve(reach) }),
 		close: () => undefined,
 	});
 	return { channel, link, listeners, delays };
@@ -158,7 +164,7 @@ async function backedUpCreator(members: readonly "genesis"[] = ["genesis"]) {
 	creator = await f.open(0, { reopen: true });
 	const opened = [];
 	for (let peer = 1; peer <= members.length; peer++) opened.push(await f.open(peer));
-	const member = opened[0]!;
+	const member = required(opened[0]);
 	/** Replaces the creator device's files with the backup (the original device is stopped). */
 	const restore = () => {
 		for (const file of files(f.directory).filter(creatorFile)) rmSync(join(f.directory, file));
@@ -356,7 +362,7 @@ describe("creator move equivocation recovery", () => {
 		expect(await settle(restored.room.issue(message("r-after-resume")))).toBe("issued");
 		const next = (await f.issuedAfter(0, null)).slice(before);
 		expect(next.length).toBe(1);
-		expect(next[0]!.commit.authorSequence).toBeGreaterThan(scenario.originalHighest);
+		expect(required(next[0]).commit.authorSequence).toBeGreaterThan(scenario.originalHighest);
 		const all = (await f.issuedAfter(0, null)).filter((row) => row.commit.authorSequence > 2);
 		for (const member of [m1, m2]) expect(await member.receive(all, 0)).toBe(true);
 		expect(texts(m1)).toEqual(texts(m2));
@@ -373,7 +379,7 @@ describe("creator move equivocation recovery", () => {
 		await f.stop(creator);
 		restore();
 		const restored = await f.open(0, { reopen: true });
-		const row = original.at(-1)!;
+		const row = required(original.at(-1));
 		const signature = new Uint8Array(row.commit.envelope.signature);
 		signature[0] = signature[0]! ^ 0xff;
 		const forged = { ...row, commit: { ...row.commit, envelope: { ...row.commit.envelope, signature } } } as typeof row;
