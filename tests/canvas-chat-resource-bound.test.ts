@@ -6,7 +6,7 @@ import { canonicalCarrierResourceForSizing, type CanonicalResourceFootprint } fr
 import { describe, expect, it } from "vitest";
 
 import catalogMaterial from "../examples/chat/src/chat-catalog-material.json";
-import { openShippingChatCatalogs } from "../examples/chat/src/chat-catalogs.js";
+import { openShippingChatCatalogs, type ShippingChatCatalog } from "../examples/chat/src/chat-catalogs.js";
 import {
 	createShippingChatGenesisStateBytes,
 	createShippingV3ChatApplication,
@@ -23,8 +23,12 @@ import {
 	CANVAS_SNAPSHOT_LIMITS,
 	type CanvasState,
 	createV3CanvasDescriptor,
+	toCanvasWireOperation,
 } from "../packages/blueprints/src/v3-canvas.js";
 import { createV3CanvasApplication } from "../packages/node/src/applications/canvas.js";
+import type { V3RoomProjectionInput } from "../packages/node/src/v3-room.js";
+
+type V3RoomProjectionInputRow = V3RoomProjectionInput["currentEpochOperations"][number];
 
 // Track Q (Canvas and Chat creator lull), RED first. The shipped Canvas and Chat
 // compositions supply `readOrdinaryApplicationResourceBound`, derived by ONE rule from each
@@ -504,7 +508,14 @@ describe("Chat ordinary resource bound", () => {
 });
 
 // ---------------------------------------------------------------------------------------
-// Helpers for the Chat projection's admission-policy dependency.
+// The incremental projection under real admitted work. The creator's warm path
+// (packages/node/src/internal/creator-closed-rollback-data.ts, the prior projection's
+// `advance` then `quote(candidate)`) quotes the next REAL candidate after every authenticated
+// delta. Each format is driven with real operations (Canvas paints and splashes through the
+// kernel; Chat messages reserved by the composition's own admission policy and folded by the
+// genuine compiled reducer), the projection is built over several bases, and after N advances
+// every quote of the next real candidate must equal the complete reader's value for that input
+// and dominate the exact footprint of the fullest state those operations reach.
 
 const SHIPPING_CHAT_CATALOGS = openShippingChatCatalogs();
 
@@ -545,3 +556,212 @@ function installChatPolicy(application: ShippingChatApplication, acl: Uint8Array
 		exactCanonicalLatchedAclBytes: acl,
 	});
 }
+
+function dominates(quote: CanonicalResourceFootprint | undefined, state: CanonicalResourceFootprint): boolean {
+	return (
+		quote !== undefined &&
+		quote.byteLength >= state.byteLength &&
+		quote.items >= state.items &&
+		quote.maxDepth >= state.maxDepth
+	);
+}
+
+/**
+ * Advances the projection through `operations` in growing steps (1, 1, 2, 4, ...) and after
+ * every step quotes the next real candidate (the next admitted operation; the last one again at
+ * the end). Each quote equals the complete reader's value for the material plus that candidate
+ * and dominates `fullest` and the state reached so far.
+ */
+function expectQuotesAfterAdvances(
+	read: Reader,
+	input: Readonly<{ catalog: ReaderInput["catalog"]; bases: readonly Uint8Array[] }>,
+	operations: readonly unknown[],
+	reached: (count: number) => CanonicalResourceFootprint,
+	fullest: CanonicalResourceFootprint
+): number {
+	const projection = createProjectionOf(read)({ catalog: input.catalog, material: projectionMaterial(input.bases) });
+	expect(projection).toBeDefined();
+	if (projection === undefined) return 0;
+	let count = 0,
+		quotes = 0;
+	for (let step = 1; count < operations.length; step = Math.min(step * 2, 32)) {
+		const chunk = operations.slice(count, count + (count === 0 ? 1 : step));
+		expect(projection.advance(chunk)).toBe(true);
+		count += chunk.length;
+		const candidate = operations[count] ?? operations.at(-1);
+		const quote = projection.quote(candidate);
+		const complete = read({
+			catalog: input.catalog,
+			material: {
+				...projectionMaterial(input.bases),
+				currentOperations: operations.slice(0, count),
+				candidateOperation: candidate,
+			},
+		} as ReaderInput);
+		expect(quote, `quote after ${count} operations`).toEqual(complete);
+		expect(dominates(quote, fullest), `quote after ${count} operations dominates the fullest reachable state`).toBe(
+			true
+		);
+		expect(dominates(quote, reached(count)), `quote after ${count} operations dominates the state reached`).toBe(true);
+		expect(dominates(projection.quoteWithoutApplicationCandidate(), fullest)).toBe(true);
+		quotes++;
+	}
+	return quotes;
+}
+
+function maxFootprint(footprints: readonly CanonicalResourceFootprint[]): CanonicalResourceFootprint {
+	return {
+		byteLength: Math.max(...footprints.map((value) => value.byteLength)),
+		items: Math.max(...footprints.map((value) => value.items)),
+		maxDepth: Math.max(...footprints.map((value) => value.maxDepth)),
+	};
+}
+
+describe("Incremental projection quotes after real admitted operations", () => {
+	it("Canvas: real paints and splashes over several bases, quoted after N advances", () => {
+		const width = 10,
+			height = 10;
+		const application = createV3CanvasApplication(width, height);
+		const descriptor = createV3CanvasDescriptor(width, height);
+		const read = application.readOrdinaryApplicationResourceBound!;
+		let seed = 0x1234_5678;
+		const next = (bound: number) => {
+			seed = (Math.imul(seed, 1_103_515_245) + 12_345) >>> 0;
+			return seed % bound;
+		};
+		// A walk of admitted operations from the initial state (a refused one produces no state).
+		let state = descriptor.initialState;
+		const operations: unknown[] = [];
+		const states: Uint8Array[] = [];
+		for (let index = 0; operations.length < 300; index++) {
+			const rgb = [next(256), next(256), next(256)] as const;
+			const offset = [next(width), next(height)] as const;
+			const operation =
+				next(2) === 0
+					? { action: "paint" as const, offset, rgb }
+					: {
+							action: "splash" as const,
+							offset,
+							size: [1 + next(width - offset[0]), 1 + next(height - offset[1])] as const,
+							rgb,
+						};
+			try {
+				state = descriptor.kernel.apply(state, operation).state;
+			} catch {
+				continue;
+			}
+			operations.push(toCanvasWireOperation(operation, `walk-${index}`));
+			states.push(descriptor.canonicalStateBytes(state));
+		}
+		const footprints = states.map((bytes) => exactFootprint(bytes, CANVAS_SNAPSHOT_LIMITS.maxDepth));
+		// The fullest state Canvas admits: every counter at its ceiling (the theorem's own state).
+		const widest = exactFootprint(
+			descriptor.canonicalStateBytes(widestCanvas(width, height)),
+			CANVAS_SNAPSHOT_LIMITS.maxDepth
+		);
+		const fullest = maxFootprint([widest, ...footprints]);
+		const initial = descriptor.canonicalStateBytes(descriptor.initialState);
+		const quotes = expectQuotesAfterAdvances(
+			read,
+			{ catalog: catalogInput(application.catalog), bases: [initial, states[40]!, states[120]!] },
+			operations,
+			(count) => footprints[count - 1]!,
+			fullest
+		);
+		expect(quotes).toBeGreaterThan(8);
+	});
+
+	it.each(["lifetime", "window", "shares"] as const)(
+		"Chat %s format: real messages admitted by its own policy over many epochs, quoted after N advances",
+		async (format) => {
+			const catalog: ShippingChatCatalog = SHIPPING_CHAT_CATALOGS[format];
+			const application = await createShippingV3ChatApplication({
+				catalog: catalog.catalog,
+				blueprintDigest: catalog.blueprintDigest,
+				exactCanonicalGenesisLatchedAclBytes: chatAcl(),
+			});
+			const read = application.readOrdinaryApplicationResourceBound!;
+			let seed = 0x0bad_cafe;
+			const next = (bound: number) => {
+				seed = (Math.imul(seed, 1_103_515_245) + 12_345) >>> 0;
+				return (seed >>> 8) % bound;
+			};
+			// Each epoch the room builds the composition's own policy over the epoch's authenticated
+			// base; real messages are reserved and committed by it, and the genuine compiled reducer
+			// folds the admitted ones into the next epoch's base.
+			const operations: Readonly<Record<string, unknown>>[] = [];
+			const epochOfOperation: number[] = [];
+			const bases: Uint8Array[] = [];
+			let base: Uint8Array | undefined;
+			for (let epoch = 0; epoch < 24; epoch++) {
+				const acl = chatAcl(CHAT_OBJECT, epoch);
+				const policy = application.createOperationAdmissionPolicy({
+					aclDigest: hexOf(hashDomain("ts-drp/latched-acl/v3", acl)),
+					anchorDigest: epoch.toString(16).padStart(64, "0"),
+					epoch,
+					objectId: CHAT_OBJECT,
+					exactCanonicalLatchedAclBytes: acl,
+					...(base === undefined ? {} : { authenticatedApplicationStateBytes: base }),
+				});
+				const rows: V3RoomProjectionInputRow[] = [];
+				for (let index = 0; index < 8; index++) {
+					const author = AUTHORS[index % AUTHORS.length]!;
+					const operation = {
+						action: "message",
+						clientOperationId: `e${epoch}-${index}`,
+						displayTimeMs: 1_791_662_400_000 + epoch * 1_000 + index,
+						text: "m".repeat(40 + next(900)),
+					};
+					const reservation = policy.reserve(operation, { author });
+					if (reservation.kind !== "fresh") continue;
+					reservation.commit();
+					rows.push({
+						author,
+						authorSequence: rows.length + 1,
+						logicalTime: rows.length + 3,
+						operation,
+						operationCount: 1,
+						operationIndex: 0,
+						vertexDigest: (epoch * 64 + rows.length).toString(16).padStart(64, "0"),
+					});
+					operations.push(operation);
+					epochOfOperation.push(epoch);
+				}
+				base = application.migration!.canonicalStateBytes(
+					application.projectAcceptedOperations({
+						authenticatedBase:
+							base === undefined
+								? undefined
+								: {
+										blueprintDigest: catalog.blueprintDigest,
+										epoch: epoch - 1,
+										exactCanonicalApplicationStateBytes: base,
+										objectId: CHAT_OBJECT,
+										stateDigest: hexOf(hashDomain("ts-drp/state/v3", base)),
+									},
+						currentEpochOperations: rows,
+					})
+				);
+				bases.push(base);
+			}
+			const footprints = bases.map((bytes) => exactFootprint(bytes, 16));
+			const fullest = maxFootprint(footprints);
+			// The walk fills the format: its fullest state is most of the 32 KiB ceiling.
+			expect(fullest.byteLength).toBeGreaterThan(SHIPPING_CHAT_RETAINED_BYTES * 0.8);
+			expect(operations.length).toBeGreaterThan(24);
+			const genesis = application.createGenesisApplicationStateBytes({
+				objectId: CHAT_OBJECT,
+				exactCanonicalLatchedAclBytes: chatAcl(),
+			});
+			const quotes = expectQuotesAfterAdvances(
+				read,
+				{ catalog: catalogInput(application.catalog), bases: [genesis, bases[5]!, bases[11]!, bases.at(-1)!] },
+				operations,
+				(count) => footprints[epochOfOperation[count - 1]!]!,
+				fullest
+			);
+			expect(quotes).toBeGreaterThan(5);
+		},
+		60_000
+	);
+});
