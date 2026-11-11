@@ -3,7 +3,7 @@ import { ed25519 } from "@noble/curves/ed25519.js";
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { type DRPNetworkNode, Message, MessageType, V3Envelope } from "@ts-drp/types";
 import { createHash } from "node:crypto";
-import { mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -148,6 +148,11 @@ export interface RoomOptions {
 	readonly network?: ReturnType<typeof memoryNetwork>;
 	readonly peerIds?: readonly string[];
 	onAccepted?(index: number, digest: string, author: string, vertex?: Readonly<{ epoch: number; operation: Readonly<Record<string, unknown>> }>): void;
+	/**
+	 * One native storage host and directory per peer (as on separate devices) instead of one shared
+	 * host for every peer in this process. Reopen is not supported with it.
+	 */
+	readonly separateStorage?: boolean;
 	/** Extra session options for every opened peer (measurement harnesses, e.g. the scheduled lull). */
 	readonly sessionOptions?: Readonly<Partial<CreateV3RoomSessionInput<unknown>>>;
 }
@@ -239,7 +244,12 @@ export async function creatorDeliveryRoom(options: RoomOptions = {}) {
 			application,
 			storageHost: openOptions.reopen
 				? createNodeV3RoomStorageHost({ directory, initialization: () => "reopen" })
-				: storageHost,
+				: options.separateStorage === true
+					? createNodeV3RoomStorageHost({
+							directory: mkdirSync(join(directory, name), { recursive: true }) ?? join(directory, name),
+							initialization: () => "create",
+						})
+					: storageHost,
 			author: identity.author,
 			...(index === 0
 				? { creatorFinalitySigner: (await createRecoverableFinalitySigner({ seed: creator.seed })).signer }

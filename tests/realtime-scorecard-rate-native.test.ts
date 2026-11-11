@@ -63,6 +63,9 @@ const drainSeconds = Number(env.SCORECARD_DRAIN_S ?? 180);
 // off 2-30 s. Separate devices never share that state. With the mutex (default) member installs run one at a
 // time in this process; each install's own time and its queue wait are recorded separately.
 const installMutex = (env.SCORECARD_INSTALL_MUTEX ?? "1") === "1";
+// HARNESS ARTIFACT GUARD: by default every peer gets its own native storage host and directory (separate
+// devices never share SQLite files or a host); "0" restores the fixture's single shared host.
+const separateStorage = (env.SCORECARD_SEPARATE_STORAGE ?? "1") === "1";
 const lateJoins = (env.SCORECARD_LATE_JOINS ?? "")
 	.split(",")
 	.filter((value) => value.trim() !== "")
@@ -156,6 +159,7 @@ it.skipIf(!enabled)(
 			ephemeralOnlySeconds,
 			lateJoins,
 			installMutex,
+			separateStorage,
 			lull,
 			slotsPerAuthor: slots,
 			netDelayMs,
@@ -227,6 +231,7 @@ it.skipIf(!enabled)(
 			network: network as never,
 			peerIds: network.peerIds,
 			writers: writers + lateJoins.length,
+			separateStorage,
 			...(lull === "scheduled" ? { sessionOptions: { recoveryPoolScheduledLull: true } } : {}),
 			onAccepted: (receiver, _digest, author, vertex) => {
 				acceptedVertexCount++;
@@ -662,8 +667,11 @@ it.skipIf(!enabled)(
 					}
 					await sleep(10);
 				}
-				const files = readdirSync(directory).filter((name) => name.startsWith(`peer-${index}`) || name.includes(`peer-${index}-`));
-				const storageBytes = files.reduce((sum, name) => sum + statSync(join_(directory, name)).size, 0);
+				const own = separateStorage ? join_(directory, `peer-${index}`) : directory;
+				const files = readdirSync(own).filter(
+					(name) => separateStorage || name.startsWith(`peer-${index}`) || name.includes(`peer-${index}-`)
+				);
+				const storageBytes = files.reduce((sum, name) => sum + statSync(join_(own, name)).size, 0);
 				const value = {
 					kind: "late-join",
 					index,
@@ -850,7 +858,7 @@ it.skipIf(!enabled)(
 					pairs.push({ receiver, sender, received: ephemeral.received[receiver]?.[sender] ?? 0 });
 		const publishedTotal = ephemeral.published.reduce((a, b) => a + b, 0);
 		const receivedTotal = ephemeral.received.flat().reduce((a, b) => a + b, 0);
-		const physical = readdirSync(directory)
+		const physical = (readdirSync(directory, { recursive: true }) as string[])
 			.map((name) => statSync(join(directory, name)))
 			.filter((stat) => stat.isFile())
 			.reduce((sum, stat) => sum + stat.size, 0);
