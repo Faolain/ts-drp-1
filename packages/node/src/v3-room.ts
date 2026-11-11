@@ -64,6 +64,7 @@ import {
 	abandonV3UnresolvedAcceptedWork,
 	resumeV3PendingIssuanceIntent,
 	inspectV3RetainedWorkFrontier,
+	resolveV3RetainedWorkFromFrontier,
 	inspectV3UnresolvedAcceptedWork,
 	type V3SourceAbandonment,
 	type V3SourceAbandonmentRequest,
@@ -6657,21 +6658,45 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		if (input.receiveOnly === true) return plan;
 		localOwner?.assertCurrent();
 		const work = await inspectV3RetainedWorkFrontier(owner);
-		let changed = false;
-		for (const item of work) {
-			if (item.resolved || item.frontier === undefined) continue;
-			assertSessionOpen();
-			try {
-				await abandonV3UnresolvedAcceptedWork(owner, {
+		// Every row the frontier proves is resolved in one native turn and one plan write
+		// (resolveV3RetainedWorkFromFrontier), not one turn per row.
+		const selectors = work
+			.filter((item) => !item.resolved && item.frontier !== undefined)
+			.map((item) =>
+				Object.freeze({
 					sourceSequence: item.sourceSequence,
 					sourceDigest: item.sourceDigest,
 					sourceContextDigest: item.sourceContextDigest,
-					frontierProof: true,
-					signRegisteredVertexDigest: input.signRegisteredVertexDigest,
-				});
-				changed = true;
+				})
+			);
+		let changed = false;
+		if (selectors.length !== 0) {
+			assertSessionOpen();
+			try {
+				changed =
+					(
+						await resolveV3RetainedWorkFromFrontier(owner, {
+							selectors: Object.freeze(selectors),
+							signRegisteredVertexDigest: input.signRegisteredVertexDigest,
+						})
+					).length !== 0;
 			} catch (error) {
 				if (activeHandle !== owner) throw error;
+				// A refused batch leaves every row retained; each row is then tried on its own, so one row
+				// that cannot be resolved now never holds back the others.
+				for (const selector of selectors) {
+					assertSessionOpen();
+					try {
+						await abandonV3UnresolvedAcceptedWork(owner, {
+							...selector,
+							frontierProof: true,
+							signRegisteredVertexDigest: input.signRegisteredVertexDigest,
+						});
+						changed = true;
+					} catch (rowError) {
+						if (activeHandle !== owner) throw rowError;
+					}
+				}
 			}
 		}
 		const current = changed ? await issuanceStore.readSettlementPlan(settlementScope) : plan;

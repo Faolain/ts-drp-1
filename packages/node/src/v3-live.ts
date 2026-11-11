@@ -24661,3 +24661,262 @@ async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
 	if (recorded === undefined) throw new TypeError("creator source abandonment plan readback differs");
 	return creatorSourceAbandonmentResult(scope.author, recorded);
 }
+
+/** One retained row selected for frontier resolution (inspectV3RetainedWorkFrontier). */
+export interface V3RetainedFrontierSelector {
+	readonly sourceSequence: number;
+	readonly sourceDigest: string;
+	readonly sourceContextDigest: string;
+}
+
+/**
+ * Resolves retained own rows on the creator's signed frontier in ONE registration turn: what
+ * abandonV3UnresolvedAcceptedWork with frontierProof does for one row, done for every selected
+ * row with one native source read, one retained contract preparation, one whole-floor custody,
+ * one charged dependency turn (each receipt still signed under its own exact owned request and
+ * currency checks) and one settlement plan write. Per row, the same checks decide: the row is
+ * retained work of a closed epoch, still unresolved, and the frontier proves it committed or
+ * never admitted; a never-admitted row's moves are given back in the same plan write. A row the
+ * frontier proves nothing about, or whose hand-back records do not fit, stays retained (the next
+ * drain tries again). Rows already resolved return their existing receipt, never a second one.
+ * @param plane - Original live handle.
+ * @param raw - The selected retained rows and the owned signer.
+ * @returns The terminal record of every row resolved (now or before).
+ */
+export function resolveV3RetainedWorkFromFrontier(plane: V3PlaneHandle, raw: Readonly<{
+	selectors: readonly V3RetainedFrontierSelector[];
+	signRegisteredVertexDigest: SignRegisteredVertexDigest;
+}>): Promise<readonly V3SourceAbandonment[]> {
+	const registration = v3HandleRegistrations.get(plane);
+	if (registration === undefined || !currentRegistration(registration))
+		return Promise.reject(new TypeError("creator source frontier resolution owner is unavailable"));
+	return enqueueRegistrationTask(registration, (inputCustody) => {
+		const input = snapshotClosedRecord(raw, ["selectors", "signRegisteredVertexDigest"]);
+		const listed: unknown = input?.selectors;
+		if (input === undefined || !ArrayIsArray(listed) || listed.length === 0 || listed.length > ISSUANCE_RETIREMENT_LIMITS.maxRows ||
+			typeof input.signRegisteredVertexDigest !== "function" || inputCustody === undefined)
+			throw new TypeError("creator source frontier resolution input is invalid");
+		const selectors: Readonly<{sourceSequence: number; sourceDigest: Uint8Array; sourceContextDigest: Uint8Array}>[] = [];
+		for (let index = 0; index < listed.length; index += 1) {
+			const value = snapshotClosedRecord(listed[index], ["sourceSequence", "sourceDigest", "sourceContextDigest"]);
+			if (value === undefined || !NumberIsSafeInteger(value.sourceSequence) || (value.sourceSequence as number) < 0 ||
+				!isDigestHex(value.sourceDigest) || !isDigestHex(value.sourceContextDigest) ||
+				selectors.some(selected => selected.sourceSequence === value.sourceSequence))
+				throw new TypeError("creator source frontier resolution input is invalid");
+			selectors.push(ObjectFreeze({sourceSequence: value.sourceSequence as number, sourceDigest: digestBytesFromHex(value.sourceDigest as string),
+				sourceContextDigest: digestBytesFromHex(value.sourceContextDigest as string)}));
+		}
+		const scope = registration.issuanceScope;
+		// The exact receipt geometry of abandonV3UnresolvedAcceptedWork, charged once per selected row.
+		const receiptBound = encodeCanonical(creatorSourceExpiryFields({objectId: scope.objectId,
+			pinnedGenesisAnchorDigest: registration.payload.input.pinnedGenesisAnchorDigest, sourceAuthor: scope.author,
+			sourceSequence: Number.MAX_SAFE_INTEGER, sourceDigest: new Uint8ArrayConstructor(32), sourceContextDigest: new Uint8ArrayConstructor(32),
+			signingEpoch: Number.MAX_SAFE_INTEGER, signingAnchorDigest: "0".repeat(64), signingNativeHeadDigest: new Uint8ArrayConstructor(32),
+			signingFloorDigest: new Uint8ArrayConstructor(32)})).byteLength;
+		inputCustody.chargeBytes((receiptBound + 64 + 72) * selectors.length);
+		const sign = input.signRegisteredVertexDigest as SignRegisteredVertexDigest;
+		return async () => {
+			const controller = new AbortController();
+			registration.settlementSelectionControllers ??= new Set();
+			registration.settlementSelectionControllers.add(controller);
+			let custody: LocalReplacementCustody | undefined;
+			try {
+				return await resolveCreatorRetainedSourcesFromFrontier(registration, ObjectFreeze(selectors), sign, controller.signal,
+					(owned) => { custody = owned; });
+			} finally {
+				registration.settlementSelectionControllers.delete(controller);
+				await custody?.release();
+			}
+		};
+	}, {
+		pool: "input",
+		refuse: (): never => { throw new TypeError("creator source frontier resolution task capacity exhausted"); },
+		refuseCapture: (): never => { throw new TypeError("creator source frontier resolution input capacity exhausted"); },
+	});
+}
+
+async function resolveCreatorRetainedSourcesFromFrontier(registration: V3PlaneRegistration,
+	selectors: readonly Readonly<{sourceSequence: number; sourceDigest: Uint8Array; sourceContextDigest: Uint8Array}>[],
+	sign: SignRegisteredVertexDigest, aborted: AbortSignal, own: (custody: LocalReplacementCustody) => void): Promise<readonly V3SourceAbandonment[]> {
+	const payload = registration.payload, scope = registration.issuanceScope, history = registration.historicalIssuance,
+		frontierCapability = history?.capability;
+	// The frontier verdicts read the installed history's verified capability; it must stay the same.
+	const current = (): boolean => !aborted.aborted && currentRegistration(registration) && registration.payload === payload &&
+		registration.issuanceScope === scope && registration.historicalIssuance === history &&
+		registration.historicalIssuance?.capability === frontierCapability;
+	if (!current()) throw new TypeError("creator source frontier resolution owner is unavailable");
+	const store = creatorOriginalIssuanceStore(registration);
+	const census = durableIssuancePruningMaintenanceForStore(store)?.readBoundedRecoveryCensus;
+	if (census === undefined) throw new TypeError("creator source frontier resolution census is unavailable");
+	const censusInput = {objectId: scope.objectId, limits: {maxRows: ISSUANCE_RETIREMENT_LIMITS.maxRows,
+		maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes}};
+	// Fresh native source state for every selected row: one census, one contract preparation and one
+	// own-fence scan per read (abandonCreatorUnresolvedSource's inspect, for all rows at once).
+	const inspect = async () => {
+		const read = await census(censusInput);
+		const plan = read.rows.plans.find(value => sameScope(value.scope, scope)) ?? null;
+		if (plan === null) throw new TypeError("creator source frontier resolution plan is unavailable");
+		const sources = await prepareCreatorRetainedSourceContracts(plan, payload.trust.trust, payload.input.catalog);
+		let fences: ReturnType<typeof scanOwnFences> | undefined;
+		const scan = (): ReturnType<typeof scanOwnFences> => (fences ??= scanOwnFences(store, scope));
+		const rows = selectors.map(selector => {
+			const entry = plan.entries.find(value => value.sourceSequence === selector.sourceSequence);
+			if (entry === undefined || !sameBytes(entry.sourceDigest, selector.sourceDigest) || entry.sourceContextDigest === undefined ||
+				!sameBytes(entry.sourceContextDigest, selector.sourceContextDigest))
+				throw new TypeError("creator source frontier resolution selector differs from the retained source");
+			const retained = sources.get(entry.sourceSequence);
+			if (retained === undefined || !creatorRetainedSourceMatchesPlan(retained, entry.sourceSequence, plan))
+				throw new TypeError("creator source frontier resolution retained contract is unavailable");
+			return ObjectFreeze({selector, entry, retained});
+		});
+		return {read, plan, rows, scan};
+	};
+	type Inspection = Awaited<ReturnType<typeof inspect>>;
+	type Row = Inspection["rows"][number];
+	// abandonCreatorUnresolvedSource's `unresolved` with frontierProof, per row of one inspection.
+	const unresolved = async (value: Inspection, row: Row): Promise<boolean> => {
+		const {read, scan} = value, {entry, retained} = row;
+		if (entry.disposition === "expire" || entry.disposition === "committed" || entry.disposition === "inherited" ||
+			entry.replacementSequence !== null || entry.replacementProgress !== undefined || entry.sourceResolutionDigest !== undefined) return false;
+		const issued = read.rows.issued.filter(candidate => sameScope(candidate, scope) && candidate.authorSequence === entry.sourceSequence);
+		const outbox = read.rows.outbox.filter(candidate => sameScope(candidate, scope) && candidate.authorSequence === entry.sourceSequence);
+		if (issued.length !== 1 || outbox.length !== 1 || !sameBytes(issued[0]!.digest, entry.sourceDigest) ||
+			!sameBytes(outbox[0]!.digest, entry.sourceDigest)) return false;
+		const authenticated = authenticateRetainedSourceVertex(retained.contract, issued[0]!.canonicalPreimageBytes, issued[0]!.signature,
+			issued[0]!.digest, scope.author, issued[0]!.authorSequence);
+		if (authenticated === undefined || authenticated.digest !== lowerHexDigest(entry.sourceDigest)) return false;
+		return authenticated.vertex.epoch === retained.contract.identity.trust.currentEpoch &&
+			await frontierRetainedResolution(registration, entry.sourceSequence, authenticated.vertex.epoch, scan) !== undefined;
+	};
+	const first = await inspect();
+	if (!current()) throw new TypeError("creator source frontier resolution owner changed during native read");
+	const results: V3SourceAbandonment[] = [];
+	const pending: Row[] = [];
+	for (const row of first.rows) {
+		// Idempotent retry: the same authenticated receipt, never a second signature.
+		if (row.entry.disposition === "expire" && row.entry.sourceResolutionDigest !== undefined) {
+			if (row.retained.expiry === undefined) throw new TypeError("creator source expiry proof is invalid");
+			results.push(creatorSourceAbandonmentResult(scope.author, row.entry));
+			continue;
+		}
+		if (payload.trust.trust.currentEpoch > row.retained.contract.identity.trust.currentEpoch && await unresolved(first, row))
+			pending.push(row);
+	}
+	if (pending.length === 0) return ObjectFreeze(results);
+	// Whole-floor capture under the original native custody, without the issuance reservation.
+	const floor = payload.input.settlementFloor;
+	if (floor === undefined) throw new TypeError("creator source frontier resolution whole-floor owner is unavailable");
+	const image = await floor.readRetirementImage({scope: {objectId: scope.objectId,
+		pinnedGenesisAnchorDigest: payload.input.pinnedGenesisAnchorDigest}});
+	if (image.state.pending !== null || !sameCreatorRoomHead(image.state.stable, payload.trust.trust) || !isDigestHex(image.imageDigest))
+		throw new TypeError("creator source frontier resolution whole-floor is stale");
+	const custody = await acquireLocalReplacementCustody(registration, encodeCanonical(image));
+	own(custody);
+	await custody.check();
+	const receipts = pending.map(row => {
+		const bytes = encodeCanonical(creatorSourceExpiryFields({objectId: scope.objectId,
+			pinnedGenesisAnchorDigest: payload.input.pinnedGenesisAnchorDigest, sourceAuthor: scope.author,
+			sourceSequence: row.entry.sourceSequence, sourceDigest: new Uint8ArrayConstructor(row.entry.sourceDigest),
+			sourceContextDigest: new Uint8ArrayConstructor(row.entry.sourceContextDigest!), signingEpoch: payload.trust.trust.currentEpoch,
+			signingAnchorDigest: payload.trust.trust.currentAnchorDigest,
+			signingNativeHeadDigest: hashDomain(CREATOR_SOURCE_EXPIRY_HEAD_DOMAIN, encodeHeadRecordV1(payload.trust.head)),
+			signingFloorDigest: digestBytesFromHex(image.imageDigest)}));
+		return ObjectFreeze({row, bytes, digest: creatorSourceExpiryDigest(bytes)});
+	});
+	// Every currency check reads the native source afresh. The per-row facts (selected entry, retained
+	// contract, unresolved and frontier verdicts) are a function of the native image, the owning
+	// payload and its installed history; with all three unchanged they are the facts verified above.
+	const valid = async (): Promise<boolean> => {
+		if (!current()) return false;
+		try {
+			const now = await census(censusInput);
+			return current() && now.image.imageDigest === first.read.image.imageDigest;
+		} catch { return false; }
+	};
+	const signatures: (Uint8Array | undefined)[] = [];
+	await withActiveRebaseDependencies(registration, undefined, (read) => read.checkWhile(async () => {
+		if (!(await valid())) throw new TypeError("creator source frontier resolution source currency changed");
+		for (const receipt of receipts) {
+			const signature = copyDetachedBytes(await withOwnedCreatorSourceExpiryRequest(registration, custody, read, receipt.bytes, valid,
+				request => sign(new Uint8ArrayConstructor(receipt.digest), request)));
+			if (signature !== undefined) v3SettlementWorkCounts.sourceExpirySignatures += 1;
+			signatures.push(signature);
+		}
+	}), custody, receipts.flatMap(receipt => [receipt.bytes, new Uint8ArrayConstructor(64)]));
+	const expiries = receipts.map((receipt, index) => {
+		const signature = signatures[index];
+		const expiry = signature === undefined || signature.byteLength !== 64 ? undefined : captureCreatorSourceExpiry(receipt.bytes, signature);
+		if (expiry === undefined || openCreatorSourceExpiry(receipt.row.retained.contract.capability, expiry,
+			{sourceAuthor: scope.author, sourceSequence: receipt.row.entry.sourceSequence, sourceDigest: receipt.row.entry.sourceDigest}) === undefined)
+			throw new TypeError("creator source frontier resolution signed receipt is invalid");
+		return expiry;
+	});
+	// Plan CAS after leaving the charged dependency turn (outside the issuance read reservation),
+	// still under the original whole-floor custody.
+	await custody.check();
+	const second = await inspect();
+	if (!current() || second.read.image.imageDigest !== first.read.image.imageDigest || second.plan.revision !== first.plan.revision)
+		throw new TypeError("creator source frontier resolution source currency changed");
+	const prior = second.plan;
+	let handBacks = prior.handBacks;
+	const resolved = new Map<number, (typeof expiries)[number]>();
+	const pinnedBootstrap = registration.exactCanonicalPinnedGenesisBootstrapOperationBytes;
+	for (let index = 0; index < receipts.length; index += 1) {
+		const row = second.rows.find(candidate => candidate.selector.sourceSequence === receipts[index]!.row.selector.sourceSequence);
+		if (row === undefined || !await unresolved(second, row)) throw new TypeError("creator source frontier resolution source currency changed");
+		// The moves of a row the frontier proves was never admitted are given back in this same plan
+		// write; the author's pinned bootstrap row is expired unrecorded (abandonCreatorUnresolvedSource).
+		const issued = second.read.rows.issued.find(value => sameScope(value, scope) && value.authorSequence === row.selector.sourceSequence);
+		const authenticated = issued === undefined ? undefined : authenticateRetainedSourceVertex(row.retained.contract,
+			issued.canonicalPreimageBytes, issued.signature, issued.digest, scope.author, issued.authorSequence);
+		const intents = authenticated === undefined ? undefined : rebaseIntents(row.retained.contract, authenticated);
+		const bootstrapRow = pinnedBootstrap !== undefined && authenticated !== undefined && intents?.length === 1 &&
+			authenticated.vertex.epoch === 0 && authenticated.vertex.anchor === payload.trust.trust.genesisAnchorDigest &&
+			sameBytes(encodeCanonical(intents[0].operation), pinnedBootstrap);
+		if (authenticated !== undefined && intents !== undefined && intents.length > 0 && !bootstrapRow &&
+			await frontierRetainedResolution(registration, row.selector.sourceSequence, authenticated.vertex.epoch, second.scan) === "never-admitted") {
+			const next = settlementHandBacksWith(handBacks, intents.map((intent, intentIndex) => ObjectFreeze({
+				sourceSequence: row.selector.sourceSequence, sourceDigest: new Uint8ArrayConstructor(row.entry.sourceDigest),
+				sourceEpoch: authenticated.vertex.epoch, intent: intentIndex, exactCanonicalOperationBytes: encodeCanonical(intent.operation),
+				reissueSequence: null})));
+			// An accepted move is never expired unrecorded: with no free hand-back record the source stays
+			// retained (the next drain resolves it once a record is free).
+			if (next === undefined) continue;
+			handBacks = next;
+		}
+		resolved.set(row.selector.sourceSequence, expiries[index]!);
+	}
+	if (resolved.size === 0) return ObjectFreeze(results);
+	const entries = prior.entries.map(entry => {
+		const expiry = resolved.get(entry.sourceSequence);
+		return expiry === undefined ? entry : {...entry, disposition: "expire" as const, replacementSequence: null,
+			sourceResolutionDigest: new Uint8ArrayConstructor(expiry.digest), sourceResolutionKind: "frontier" as const};
+	});
+	const contexts = [...(prior.sourceContexts ?? [])];
+	for (const expiry of resolved.values())
+		if (!contexts.some(value => sameBytes(value.digest, expiry.digest))) contexts.push(expiry);
+	contexts.sort((a, b) => lowerHexDigest(a.digest)!.localeCompare(lowerHexDigest(b.digest)!));
+	const plan = copySettlementPlan({scope, revision: prior.revision + 1, fenceSequence: prior.fenceSequence, entries,
+		sourceContexts: contexts, ...(handBacks === undefined ? {} : {handBacks})}, scope);
+	if (plan == null) throw new TypeError("creator source frontier resolution plan is invalid");
+	const future = {...second.read.rows, plans: [...second.read.rows.plans.filter(value => !sameScope(value.scope, scope)), plan]};
+	encodeCanonical(future, {maxBytes: censusInput.limits.maxBytes, maxDepth: 32, maxItems: 65536});
+	const nativeBytes = future.issued.reduce((sum, row) => sum + row.canonicalPreimageBytes.byteLength + row.signature.byteLength + row.digest.byteLength, 0) +
+		future.plans.reduce((sum, value) => sum + issuanceSettlementPlanStorageByteLength(value), 0) +
+		future.lineages.reduce((sum, value) => sum + (value.pendingUnsigned === undefined ? 0 : encodeCanonical(value.pendingUnsigned).byteLength), 0);
+	if (nativeBytes > censusInput.limits.maxBytes) throw new TypeError("creator source frontier resolution exceeds reserved native material");
+	const written = await store.transactWriteSettlementPlan({expectedRevision: prior.revision, plan, scope});
+	const limits = {maxBytes: AHE_BOUNDED_READ_LIMITS.maxUnionBytes, maxDepth: 32, maxItems: 65536};
+	const after = await census(censusInput);
+	const stored = after.rows.plans.find(value => sameScope(value.scope, scope)) ?? null;
+	if (written === null || stored === null || !sameBytes(encodeCanonical(written, limits), encodeCanonical(plan, limits)) ||
+		!sameBytes(encodeCanonical(stored, limits), encodeCanonical(plan, limits)))
+		throw new TypeError("creator source frontier resolution plan readback differs");
+	await custody.check();
+	for (const sequence of resolved.keys()) {
+		const recorded = plan.entries.find(entry => entry.sourceSequence === sequence);
+		if (recorded === undefined) throw new TypeError("creator source frontier resolution plan readback differs");
+		results.push(creatorSourceAbandonmentResult(scope.author, recorded));
+	}
+	return ObjectFreeze(results);
+}
