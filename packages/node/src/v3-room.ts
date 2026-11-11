@@ -5008,6 +5008,9 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 						const selectedPending = openedRoomHeadState.pending;
 						if (selectedPending !== null) {
 							const pending = Object.freeze({ pending: selectedPending, stable: openedRoomHeadState.stable });
+							// Pending recovery may sign with the finality key: a creator restore currency check
+							// decides first (its local head is this pending transition), and a refusal fails the open.
+							if (input.creatorFinalitySigner !== undefined) await creatorRestoreGate?.admit();
 							const nativeSigning =
 								input.creatorFinalitySigner === undefined ? undefined : await ownCreatorSigningStores();
 							const recoveredPending = await consumeCreatorAdoptionPendingRecovery({
