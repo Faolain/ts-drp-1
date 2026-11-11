@@ -786,6 +786,10 @@ export function createEphemeralChannel(
 					return;
 				}
 			}
+			if (senderWatermarks === undefined) {
+				counters.malformed += 1;
+				return;
+			}
 			if (advancing) for (const [key, retained] of senderWatermarks) if (retired(retained)) senderWatermarks.delete(key);
 			senderWatermarks.set(frame.key, { epoch: tagEpoch, sequence: frame.sequence });
 		} else if (advancing) {
