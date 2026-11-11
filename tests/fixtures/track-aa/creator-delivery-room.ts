@@ -147,7 +147,12 @@ export interface RoomOptions {
 	/** Optional genuine network boundary for native transport composition checks. */
 	readonly network?: ReturnType<typeof memoryNetwork>;
 	readonly peerIds?: readonly string[];
-	onAccepted?(index: number, digest: string, author: string, vertex?: Readonly<{ epoch: number; operation: Readonly<Record<string, unknown>> }>): void;
+	onAccepted?(
+		index: number,
+		digest: string,
+		author: string,
+		vertex?: Readonly<{ epoch: number; operation: Readonly<Record<string, unknown>> }>
+	): void;
 	/**
 	 * One native storage host and directory per peer (as on separate devices) instead of one shared
 	 * host for every peer in this process. Reopen is not supported with it.
@@ -396,6 +401,10 @@ export function historyRequestMessage(objectId: string, sender: string): Message
 	});
 }
 
+/**
+ *
+ * @param ms
+ */
 export const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**

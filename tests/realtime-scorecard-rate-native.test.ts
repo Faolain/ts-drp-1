@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/explicit-function-return-type -- Opt-in measurement harness; native capability inference. */
+/* eslint-disable @typescript-eslint/explicit-function-return-type, @typescript-eslint/no-non-null-assertion -- Opt-in measurement harness; native capability inference; indices are in range by construction. */
 // Real-time scorecard: a fixed offered durable move rate through the shipped Grid rollover policy.
 //
 // One creator and SCORECARD_WRITERS Writers of a settlement-profile Grid zone room on native SQLite,
@@ -18,7 +18,7 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync, mkdirSync, mkdtempSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { type Profiler, Session } from "node:inspector";
 import { cpus, loadavg, tmpdir } from "node:os";
-import { join, join as join_ } from "node:path";
+import { join } from "node:path";
 import { monitorEventLoopDelay, performance as nodePerformance } from "node:perf_hooks";
 import { expect, it, vi } from "vitest";
 
@@ -26,9 +26,6 @@ import { DurationDistribution } from "./fixtures/active-endurance/continued-play
 import { nativePlayNetwork } from "./fixtures/active-endurance/native-network.js";
 import { creatorDeliveryRoom, envelopeVertex, sleep } from "./fixtures/track-aa/creator-delivery-room.js";
 import { closeFixtures, directories, required } from "./fixtures/track-m/room-retention-fixture.js";
-import * as scheduledLullModule from "../packages/node/src/internal/recovery-pool-scheduled.js";
-
-const originalFactory = scheduledLullModule.createScheduledRecoveryPoolLull;
 import { GRID_ROLLOVER_BUDGET } from "../examples/grid/src/rollover.js";
 import { createV3RoomRolloverPolicy, type V3RoomRolloverPolicy } from "../examples/v3-room/src/rollover.js";
 import {
@@ -36,6 +33,9 @@ import {
 	createV3RoomSuccessorDelivery,
 	type V3RoomSuccessorDelivery,
 } from "../examples/v3-room/src/successor-delivery.js";
+import * as scheduledLullModule from "../packages/node/src/internal/recovery-pool-scheduled.js";
+
+const originalFactory = scheduledLullModule.createScheduledRecoveryPoolLull;
 
 const env = process.env;
 const enabled = env.SCORECARD === "1";
@@ -109,7 +109,8 @@ function percentiles(values: readonly number[]) {
 	};
 }
 function errorText(error: unknown): string {
-	if (error instanceof Error) return `${error.name}: ${error.message}${error.cause ? ` <- ${errorText(error.cause)}` : ""}`;
+	if (error instanceof Error)
+		return `${error.name}: ${error.message}${error.cause ? ` <- ${errorText(error.cause)}` : ""}`;
 	return String(error);
 }
 function refusalClass(error: unknown): string {
@@ -213,28 +214,26 @@ it.skipIf(!enabled)(
 		let lullRuns = 0;
 		const lullSpans: { peer: number; start: number; end: number; result: string }[] = [];
 		// The session is frozen; its scheduled lull is observed through the lull factory instead.
-		const lullSpy = vi
-			.spyOn(scheduledLullModule, "createScheduledRecoveryPoolLull")
-			.mockImplementation((input) => {
-				const original = originalFactory(input);
-				return Object.freeze({
-					...original,
-					run: async (scheduled: boolean, run: () => Promise<never>) => {
-						const start = performance.now();
-						lullActive++;
-						lullRuns++;
-						let result = "error";
-						try {
-							const value = await original.run(scheduled, run);
-							result = `${scheduled ? "scheduled" : "explicit"}:${String((value as { kind?: string }).kind)}`;
-							return value;
-						} finally {
-							lullActive--;
-							lullSpans.push({ peer: -1, start, end: performance.now(), result });
-						}
-					},
-				}) as never;
-			});
+		const lullSpy = vi.spyOn(scheduledLullModule, "createScheduledRecoveryPoolLull").mockImplementation((input) => {
+			const original = originalFactory(input);
+			return Object.freeze({
+				...original,
+				run: async (scheduled: boolean, run: () => Promise<never>) => {
+					const start = performance.now();
+					lullActive++;
+					lullRuns++;
+					let result = "error";
+					try {
+						const value = await original.run(scheduled, run);
+						result = `${scheduled ? "scheduled" : "explicit"}:${String((value as { kind?: string }).kind)}`;
+						return value;
+					} finally {
+						lullActive--;
+						lullSpans.push({ peer: -1, start, end: performance.now(), result });
+					}
+				},
+			}) as never;
+		});
 		// Count seams (measurement only; restored at the end). Each count is attributed to the phase at the
 		// moment of the call (see phase()).
 		const counts = new Map<string, Record<string, number>>();
@@ -248,7 +247,8 @@ it.skipIf(!enabled)(
 		const restores: (() => void)[] = [];
 		if (countsEnabled) {
 			const sqlite = (await import("node:sqlite")) as unknown as Record<string, { prototype: Record<string, unknown> }>;
-			const keyword = (sql: unknown) => (typeof sql === "string" ? (/^\s*([A-Za-z]+)/u.exec(sql)?.[1] ?? "?").toUpperCase() : "?");
+			const keyword = (sql: unknown) =>
+				typeof sql === "string" ? (/^\s*([A-Za-z]+)/u.exec(sql)?.[1] ?? "?").toUpperCase() : "?";
 			// Synchronous SQLite calls also accumulate their main-thread time (ms.sql.*: the call blocks the event
 			// loop for exactly that long, including any fsync on the real disk).
 			const patch = (
@@ -272,31 +272,55 @@ it.skipIf(!enabled)(
 						if (row === undefined) counts.set(name, (row = {}));
 						const spent = performance.now() - started;
 						row["ms.sql"] = (row["ms.sql"] ?? 0) + spent;
-						if (key === "sql.exec.COMMIT" || key === "sql.COMMIT") row["ms.sql.commit"] = (row["ms.sql.commit"] ?? 0) + spent;
+						if (key === "sql.exec.COMMIT" || key === "sql.COMMIT")
+							row["ms.sql.commit"] = (row["ms.sql.commit"] ?? 0) + spent;
 					}
 				};
 				restores.push(() => {
 					target[method] = original;
 				});
 			};
-			patch(sqlite.DatabaseSync?.prototype, "exec", (_self, args) => {
-				const sql = String(args[0] ?? "");
-				const word = keyword(sql);
-				return word === "BEGIN" ? (/IMMEDIATE/iu.test(sql) ? "sql.beginWrite" : "sql.beginRead") : `sql.exec.${word}`;
-			}, true);
+			patch(
+				sqlite.DatabaseSync?.prototype,
+				"exec",
+				(_self, args) => {
+					const sql = String(args[0] ?? "");
+					const word = keyword(sql);
+					return word === "BEGIN" ? (/IMMEDIATE/iu.test(sql) ? "sql.beginWrite" : "sql.beginRead") : `sql.exec.${word}`;
+				},
+				true
+			);
 			for (const method of ["run", "get", "all"])
-				patch(sqlite.StatementSync?.prototype, method, (self) => `sql.${keyword((self as { sourceSQL?: string }).sourceSQL)}`, true);
-			patch(sqlite.StatementSync?.prototype, "iterate", (self) => `sql.${keyword((self as { sourceSQL?: string }).sourceSQL)}`);
-			const subtle = (globalThis.crypto?.subtle as unknown as { constructor: { prototype: Record<string, unknown> } } | undefined)
-				?.constructor.prototype;
-			for (const method of ["sign", "verify", "digest", "importKey"]) patch(subtle, method, () => `webcrypto.${method}`);
+				patch(
+					sqlite.StatementSync?.prototype,
+					method,
+					(self) => `sql.${keyword((self as { sourceSQL?: string }).sourceSQL)}`,
+					true
+				);
+			patch(
+				sqlite.StatementSync?.prototype,
+				"iterate",
+				(self) => `sql.${keyword((self as { sourceSQL?: string }).sourceSQL)}`
+			);
+			const subtle = (
+				globalThis.crypto?.subtle as unknown as { constructor: { prototype: Record<string, unknown> } } | undefined
+			)?.constructor.prototype;
+			for (const method of ["sign", "verify", "digest", "importKey"])
+				patch(subtle, method, () => `webcrypto.${method}`);
 		}
 		let creatorStage: "idle" | "seal" | "adopt" | "export" | "publish" = "idle";
 		let policies: (V3RoomRolloverPolicy | undefined)[] = [];
 		const deliveries: (V3RoomSuccessorDelivery | undefined)[] = [];
 		const epochOf: number[] = Array.from({ length: totalPeers }, () => 0);
 		const joins: Record<string, unknown>[] = [];
-		const installs: { peer: number; queuedAt: number; startedAt: number; endedAt: number; ok: boolean; error?: string }[] = [];
+		const installs: {
+			peer: number;
+			queuedAt: number;
+			startedAt: number;
+			endedAt: number;
+			ok: boolean;
+			error?: string;
+		}[] = [];
 		let installTail: Promise<void> = Promise.resolve();
 		// Installs that have started and not settled (a hung install would otherwise hold the mutex forever).
 		const pendingInstalls = new Map<number, { peer: number; startedAt: number }>();
@@ -322,9 +346,12 @@ it.skipIf(!enabled)(
 					const action = `${receiver}:${String((vertex?.operation as { action?: string } | undefined)?.action)}`;
 					censusWindow[action] = (censusWindow[action] ?? 0) + 1;
 				}
-				if (vertex !== undefined) policies[receiver]?.observe({ ...(vertex as object), author, epoch: vertex.epoch } as never);
+				if (vertex !== undefined)
+					policies[receiver]?.observe({ ...(vertex as object), author, epoch: vertex.epoch } as never);
 				// Queued moves travel as one "applicationBatch" vertex (Grid batches placeBlock): expand it.
-				const root = vertex?.operation as { action?: string; batch?: { entries?: { operation?: unknown }[] } } | undefined;
+				const root = vertex?.operation as
+					| { action?: string; batch?: { entries?: { operation?: unknown }[] } }
+					| undefined;
 				const operations = (
 					root?.action === "applicationBatch" ? (root.batch?.entries ?? []).map((entry) => entry.operation) : [root]
 				) as ({ action?: string; id?: string; x?: number } | undefined)[];
@@ -346,7 +373,9 @@ it.skipIf(!enabled)(
 		network.observe(({ to, message, kind }) => {
 			bump(`wire.${kind}`);
 			const vertex = envelopeVertex(message) as { operation?: Record<string, unknown> } | undefined;
-			const root = vertex?.operation as { action?: string; batch?: { entries?: { operation?: unknown }[] } } | undefined;
+			const root = vertex?.operation as
+				| { action?: string; batch?: { entries?: { operation?: unknown }[] } }
+				| undefined;
 			if (root === undefined) return;
 			const operations = (
 				root.action === "applicationBatch" ? (root.batch?.entries ?? []).map((entry) => entry.operation) : [root]
@@ -368,25 +397,23 @@ it.skipIf(!enabled)(
 		const creatorPeer = required(peers[0]).peerId;
 		const peerIndexOf = new Map<string, number>(network.peerIds.map((peerId, index) => [peerId, index]));
 		// The page's composition on every peer: successor delivery and the shipped rollover policy.
-		const timed =
-			(name: "seal" | "adopt" | "export", work: () => Promise<unknown>) =>
-			async (): Promise<never> => {
-				creatorStage = name;
-				const now = performance.now();
-				if (name === "seal") rollovers.push({ closing: epochOf[0] ?? 0, sealStart: now, installedAt: {} });
-				const current = required(rollovers.at(-1));
-				try {
-					return (await work()) as never;
-				} finally {
-					const end = performance.now();
-					if (name === "seal") current.sealEnd = end;
-					if (name === "adopt") current.adoptEnd = end;
-					if (name === "export") {
-						current.exportEnd = end;
-						creatorStage = "publish";
-					} else creatorStage = name === "seal" ? "adopt" : "export";
-				}
-			};
+		const timed = (name: "seal" | "adopt" | "export", work: () => Promise<unknown>) => async (): Promise<never> => {
+			creatorStage = name;
+			const now = performance.now();
+			if (name === "seal") rollovers.push({ closing: epochOf[0] ?? 0, sealStart: now, installedAt: {} });
+			const current = required(rollovers.at(-1));
+			try {
+				return (await work()) as never;
+			} finally {
+				const end = performance.now();
+				if (name === "seal") current.sealEnd = end;
+				if (name === "adopt") current.adoptEnd = end;
+				if (name === "export") {
+					current.exportEnd = end;
+					creatorStage = "publish";
+				} else creatorStage = name === "seal" ? "adopt" : "export";
+			}
+		};
 		const compose = (peer: (typeof peers)[number], index: number) => {
 			const role = index === 0 ? "creator" : "member";
 			const delivery = createV3RoomSuccessorDelivery({
@@ -444,9 +471,7 @@ it.skipIf(!enabled)(
 							connectedPeers: () => room.connectedPeers(),
 							currencyStatement: room.currencyStatement === undefined ? undefined : () => room.currencyStatement!(),
 							confirmCurrent:
-								room.confirmCurrent === undefined
-									? undefined
-									: (statement: never) => room.confirmCurrent!(statement),
+								room.confirmCurrent === undefined ? undefined : (statement: never) => room.confirmCurrent!(statement),
 							localIssueCurrency: room.localIssueCurrency === undefined ? undefined : () => room.localIssueCurrency!(),
 							installCreatorSuccessor: (input: never) => {
 								const queuedAt = performance.now();
@@ -544,12 +569,21 @@ it.skipIf(!enabled)(
 							ephemeral.gaps.add(gap);
 							const name = phaseNow;
 							let distribution = ephemeral.gapsByPhase.get(name);
-							if (distribution === undefined) ephemeral.gapsByPhase.set(name, (distribution = new DurationDistribution()));
+							if (distribution === undefined)
+								ephemeral.gapsByPhase.set(name, (distribution = new DurationDistribution()));
 							distribution.add(gap);
 							if (gap > LONG_EPHEMERAL_GAP_MS) {
 								ephemeral.longGapCount++;
 								if (ephemeral.longGaps.length < 2000)
-									ephemeral.longGaps.push({ receiver: index, sender: payload.s, from: previous, to: at, gap, phaseAtEnd: name, epochs: [...epochOf] });
+									ephemeral.longGaps.push({
+										receiver: index,
+										sender: payload.s,
+										from: previous,
+										to: at,
+										gap,
+										phaseAtEnd: name,
+										epochs: [...epochOf],
+									});
 							}
 						}
 					})
@@ -631,6 +665,7 @@ it.skipIf(!enabled)(
 			return true;
 		};
 		eventLoop.enable();
+		// eslint-disable-next-line prefer-const -- declared before the try so the finally block can clear it.
 		timer = setInterval(() => {
 			const at = performance.now();
 			const gap = at - lastTick;
@@ -788,17 +823,21 @@ it.skipIf(!enabled)(
 				}
 				let creatorAdmittedMs: number | null = null;
 				while (performance.now() < deadline + 60_000) {
-					if (required(peers[0]).room.projection().blocks.some((value) => value.id === block.id)) {
+					if (
+						required(peers[0])
+							.room.projection()
+							.blocks.some((value) => value.id === block.id)
+					) {
 						creatorAdmittedMs = performance.now() - started;
 						break;
 					}
 					await sleep(10);
 				}
-				const own = separateStorage ? join_(directory, `peer-${index}`) : directory;
+				const own = separateStorage ? join(directory, `peer-${index}`) : directory;
 				const files = readdirSync(own).filter(
 					(name) => separateStorage || name.startsWith(`peer-${index}`) || name.includes(`peer-${index}-`)
 				);
-				const storageBytes = files.reduce((sum, name) => sum + statSync(join_(own, name)).size, 0);
+				const storageBytes = files.reduce((sum, name) => sum + statSync(join(own, name)).size, 0);
 				const value = {
 					kind: "late-join",
 					index,
@@ -823,9 +862,11 @@ it.skipIf(!enabled)(
 				if (due !== undefined && completedRollovers() >= due) {
 					joinAt.shift();
 					const index = peersCount + (lateJoins.length - joinAt.length - 1);
-					joining.push(lateJoin(index, completedRollovers()).catch((error: unknown) => {
-						joins.push({ kind: "late-join", index, error: errorText(error) });
-					}));
+					joining.push(
+						lateJoin(index, completedRollovers()).catch((error: unknown) => {
+							joins.push({ kind: "late-join", index, error: errorText(error) });
+						})
+					);
 				}
 				await sleep(250);
 			}
@@ -848,11 +889,13 @@ it.skipIf(!enabled)(
 				const expected = [...latest.values()]
 					.filter((block) => !uncertainSlots.has(block.id))
 					.sort((a, b) => a.id.localeCompare(b.id));
-				const states = peers.filter(Boolean).map(({ room }) =>
-					[...room.projection().blocks]
-						.filter((block) => !uncertainSlots.has(block.id))
-						.sort((a, b) => a.id.localeCompare(b.id))
-				);
+				const states = peers
+					.filter(Boolean)
+					.map(({ room }) =>
+						[...room.projection().blocks]
+							.filter((block) => !uncertainSlots.has(block.id))
+							.sort((a, b) => a.id.localeCompare(b.id))
+					);
 				const epochs = peers.filter(Boolean).map(({ room }) => room.authority()?.epoch ?? 0);
 				matched =
 					epochs.every((epoch) => epoch === creatorEpoch) &&
@@ -912,7 +955,8 @@ it.skipIf(!enabled)(
 		for (const rollover of completedRollovers)
 			for (let peer = 1; peer < peersCount; peer++) {
 				const change = authorityChanges.find(
-					(value) => value.peer === peer && value.epoch >= required(rollover.successorEpoch) && value.at >= rollover.sealStart
+					(value) =>
+						value.peer === peer && value.epoch >= required(rollover.successorEpoch) && value.at >= rollover.sealStart
 				);
 				if (change !== undefined) rollover.installedAt[peer] = change.at;
 			}
@@ -945,10 +989,14 @@ it.skipIf(!enabled)(
 		const rolloverPhases = {
 			sealMs: span(completedRollovers.flatMap((r) => (r.sealEnd === undefined ? [] : [r.sealEnd - r.sealStart]))),
 			adoptMs: span(
-				completedRollovers.flatMap((r) => (r.adoptEnd === undefined || r.sealEnd === undefined ? [] : [r.adoptEnd - r.sealEnd]))
+				completedRollovers.flatMap((r) =>
+					r.adoptEnd === undefined || r.sealEnd === undefined ? [] : [r.adoptEnd - r.sealEnd]
+				)
 			),
 			exportMs: span(
-				completedRollovers.flatMap((r) => (r.exportEnd === undefined || r.adoptEnd === undefined ? [] : [r.exportEnd - r.adoptEnd]))
+				completedRollovers.flatMap((r) =>
+					r.exportEnd === undefined || r.adoptEnd === undefined ? [] : [r.exportEnd - r.adoptEnd]
+				)
 			),
 			publishMs: span(
 				completedRollovers.flatMap((r) =>
@@ -1036,9 +1084,12 @@ it.skipIf(!enabled)(
 			counts: (() => {
 				const byPhase = Object.fromEntries([...counts].map(([name, row]) => [name, row]));
 				const total: Record<string, number> = {};
-				for (const row of counts.values()) for (const [key, value] of Object.entries(row)) total[key] = (total[key] ?? 0) + value;
+				for (const row of counts.values())
+					for (const [key, value] of Object.entries(row)) total[key] = (total[key] ?? 0) + value;
 				const per = (divisor: number) =>
-					Object.fromEntries(Object.entries(total).map(([key, value]) => [key, Math.round((value / Math.max(1, divisor)) * 100) / 100]));
+					Object.fromEntries(
+						Object.entries(total).map(([key, value]) => [key, Math.round((value / Math.max(1, divisor)) * 100) / 100])
+					);
 				return {
 					byPhase,
 					total,
@@ -1048,7 +1099,11 @@ it.skipIf(!enabled)(
 				};
 			})(),
 			waterfall: (() => {
-				const segment = (list: readonly IssueRecord[], from: (issue: IssueRecord) => number | undefined, to: (issue: IssueRecord) => number | undefined) =>
+				const segment = (
+					list: readonly IssueRecord[],
+					from: (issue: IssueRecord) => number | undefined,
+					to: (issue: IssueRecord) => number | undefined
+				) =>
 					percentiles(
 						list.flatMap((issue) => {
 							const a = from(issue),
@@ -1060,18 +1115,54 @@ it.skipIf(!enabled)(
 				const creator = acceptedIssues.filter((issue) => issue.peer === 0);
 				return {
 					memberMove: {
-						offerToLocalAccept: segment(member, (i) => i.offeredAt, (i) => i.completedAt),
-						offerToWireAtCreator: segment(member, (i) => i.offeredAt, (i) => i.wireBy[0]),
-						localAcceptToWireAtCreator: segment(member, (i) => i.completedAt, (i) => i.wireBy[0]),
-						wireToCreatorAdmitted: segment(member, (i) => i.wireBy[0], (i) => i.creatorAdmittedAt),
-						offerToCreatorAdmitted: segment(member, (i) => i.offeredAt, (i) => i.creatorAdmittedAt),
+						offerToLocalAccept: segment(
+							member,
+							(i) => i.offeredAt,
+							(i) => i.completedAt
+						),
+						offerToWireAtCreator: segment(
+							member,
+							(i) => i.offeredAt,
+							(i) => i.wireBy[0]
+						),
+						localAcceptToWireAtCreator: segment(
+							member,
+							(i) => i.completedAt,
+							(i) => i.wireBy[0]
+						),
+						wireToCreatorAdmitted: segment(
+							member,
+							(i) => i.wireBy[0],
+							(i) => i.creatorAdmittedAt
+						),
+						offerToCreatorAdmitted: segment(
+							member,
+							(i) => i.offeredAt,
+							(i) => i.creatorAdmittedAt
+						),
 						notSeenOnWire: member.filter((i) => i.wireBy[0] === undefined).length,
 					},
 					creatorMove: {
-						offerToLocalAccept: segment(creator, (i) => i.offeredAt, (i) => i.completedAt),
-						localAcceptToWireAtMember: segment(creator, (i) => i.completedAt, (i) => i.wireBy[1]),
-						wireToMemberAccepted: segment(creator, (i) => i.wireBy[1], (i) => i.acceptedBy[1]),
-						offerToMemberAccepted: segment(creator, (i) => i.offeredAt, (i) => i.acceptedBy[1]),
+						offerToLocalAccept: segment(
+							creator,
+							(i) => i.offeredAt,
+							(i) => i.completedAt
+						),
+						localAcceptToWireAtMember: segment(
+							creator,
+							(i) => i.completedAt,
+							(i) => i.wireBy[1]
+						),
+						wireToMemberAccepted: segment(
+							creator,
+							(i) => i.wireBy[1],
+							(i) => i.acceptedBy[1]
+						),
+						offerToMemberAccepted: segment(
+							creator,
+							(i) => i.offeredAt,
+							(i) => i.acceptedBy[1]
+						),
 						notSeenOnWire: creator.filter((i) => i.wireBy[1] === undefined).length,
 					},
 				};
@@ -1123,7 +1214,9 @@ it.skipIf(!enabled)(
 							pairs,
 							latencyMs: percentiles(ephemeral.latencyValues),
 							gaps: ephemeral.gaps.summary(),
-							gapsByPhase: Object.fromEntries([...ephemeral.gapsByPhase].map(([name, value]) => [name, value.summary()])),
+							gapsByPhase: Object.fromEntries(
+								[...ephemeral.gapsByPhase].map(([name, value]) => [name, value.summary()])
+							),
 							gapsOver100ms: ephemeral.longGapCount,
 							durableVerticesDuringEphemeralOnly: ephemeral.durableVerticesDuringEphemeralOnly,
 							acceptedVertexCensusByWindow: windowCensus,

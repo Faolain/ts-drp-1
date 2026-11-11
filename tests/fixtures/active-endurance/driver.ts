@@ -214,8 +214,10 @@ export async function driveActiveAppEndurance(
 		): Promise<void> => {
 			for (const row of [...pendingCarried]) {
 				const receiver = required(peers[1 - row.from]);
-				const disposition = await lostRowDisposition(row.digest, required(settlement[row.from]).replacements, (digests) =>
-					receiver.acceptance([...digests])
+				const disposition = await lostRowDisposition(
+					row.digest,
+					required(settlement[row.from]).replacements,
+					(digests) => receiver.acceptance([...digests])
 				);
 				if (!disposition.carried) continue;
 				const times = await receiver.acceptedAt?.(disposition.acceptedDigests);

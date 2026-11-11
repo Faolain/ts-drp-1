@@ -10,13 +10,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, it } from "vitest";
 
+import { chatSharesRoomFixture, closeChatSharesRooms } from "./fixtures/chat-membership-shares/room.js";
 import { createShippingChatWindowGenesisStateBytes } from "../examples/chat/src/v3-chat-window.js";
 import {
 	createV3RoomSuccessorDelivery,
 	type V3RoomSuccessorChannel,
 	type V3RoomSuccessorDelivery,
 } from "../examples/v3-room/src/index.js";
-import { chatSharesRoomFixture, closeChatSharesRooms } from "./fixtures/chat-membership-shares/room.js";
 
 const enabled = process.env.SCORECARD === "1" && process.env.SCORECARD_RESTORE === "1";
 const output = process.env.SCORECARD_OUT ?? join(tmpdir(), `scorecard-restore-${Date.now()}`);
@@ -45,8 +45,14 @@ function network() {
 	const listeners = new Map<string, Set<Listener>>();
 	const connected = new Map<string, Set<string>>();
 	const link = (left: string, right: string) => {
-		(connected.get(left) ?? connected.set(left, new Set()).get(left)!).add(right);
-		(connected.get(right) ?? connected.set(right, new Set()).get(right)!).add(left);
+		for (const [from, to] of [
+			[left, right],
+			[right, left],
+		] as const) {
+			let set = connected.get(from);
+			if (set === undefined) connected.set(from, (set = new Set()));
+			set.add(to);
+		}
 	};
 	const unlink = () => connected.clear();
 	const channel = (localPeerId: string): V3RoomSuccessorChannel => ({
@@ -103,7 +109,11 @@ it.skipIf(!enabled)(
 			await f.stop(creator);
 			if (mode === "connected") net.link(CREATOR_PEER, MEMBER_PEER);
 			else net.unlink();
-			const view = createV3RoomSuccessorDelivery({ role: "creator", objectId: f.objectId, channel: net.channel(CREATOR_PEER) });
+			const view = createV3RoomSuccessorDelivery({
+				role: "creator",
+				objectId: f.objectId,
+				channel: net.channel(CREATOR_PEER),
+			});
 			deliveries.add(view);
 			const original = Reflect.get(view, "creatorMemberView") as {
 				ask(request: { answer(evidence: unknown): void } & Record<string, unknown>): Promise<void>;
@@ -142,7 +152,9 @@ it.skipIf(!enabled)(
 		for (let run = 0; run < connectedRuns; run++) await reopen("connected", run);
 		for (let run = 0; run < loneRuns; run++) await reopen("lone", run);
 		const pick = (mode: string, key: string) =>
-			results.filter((value) => value.mode === mode && typeof value[key] === "number").map((value) => value[key] as number);
+			results
+				.filter((value) => value.mode === mode && typeof value[key] === "number")
+				.map((value) => value[key] as number);
 		const summary = Object.fromEntries(
 			["connected", "lone"].map((mode) => [
 				mode,
