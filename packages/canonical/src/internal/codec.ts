@@ -772,6 +772,23 @@ function writeValue(writer: ByteWriter, value: unknown, active: Set<object>, dep
 	}
 }
 
+/** Observer of public encoder/decoder calls (measurement only). */
+export type CanonicalCallObserver = (kind: "encode" | "decode", byteLength: number) => void;
+
+/* Measurement seam: unset unless a count-based cost test installs it. The hot path only compares
+ * this module binding with undefined; no counter, no property lookup, and the encoder's output never
+ * depends on it. */
+let callObserver: CanonicalCallObserver | undefined;
+
+/**
+ * Installs (or, with undefined, removes) the observer of public encode/decode calls. Measurement
+ * only: never authority, never consulted for any result.
+ * @param observer - Called once per successful encode and once per decode entry.
+ */
+export function observeCanonicalCalls(observer: CanonicalCallObserver | undefined): void {
+	callObserver = observer;
+}
+
 /**
  * Encodes a value with the frozen reference tag codec.
  * @param value - Value in the canonical data domain.
@@ -787,6 +804,7 @@ export function encodeCanonical(value: unknown, limits: Partial<CanonicalLimits>
 		if (writer.offset > configured.maxBytes) {
 			throw new CanonicalEncodingError("canonical value exceeds byte limit");
 		}
+		if (callObserver !== undefined) callObserver("encode", writer.offset);
 		return writer.buffer.slice(0, writer.offset);
 	} finally {
 		if (writer.buffer.byteLength <= POOLED_WRITER_MAX_BYTES && WRITER_POOL.length < 8) WRITER_POOL.push(writer);
@@ -1277,6 +1295,7 @@ function decodeInternal(reader: Reader, depth: number): unknown {
  * @returns The decoded canonical value.
  */
 export function decodeCanonical(input: Uint8Array, limits: Partial<CanonicalLimits> = {}): unknown {
+	if (callObserver !== undefined) callObserver("decode", input.byteLength);
 	const bytes = new Uint8Array(input);
 	const configured: CanonicalLimits = { ...DEFAULT_LIMITS, ...limits };
 	if (bytes.byteLength > configured.maxBytes) {
@@ -1307,6 +1326,7 @@ export interface CanonicalExactDecoding {
  * @returns The decoded value and its exactness.
  */
 export function decodeCanonicalExactness(input: Uint8Array, limits: Partial<CanonicalLimits> = {}): CanonicalExactDecoding {
+	if (callObserver !== undefined) callObserver("decode", input.byteLength);
 	const bytes = new Uint8Array(input);
 	const configured: CanonicalLimits = { ...DEFAULT_LIMITS, ...limits };
 	if (bytes.byteLength > configured.maxBytes) {
