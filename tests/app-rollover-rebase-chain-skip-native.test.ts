@@ -551,11 +551,25 @@ async function catchUp(moves: number, epochs: number) {
 			let landedAt = started;
 			let landed = 0;
 			let counts: number[] = [];
+			// The member's epoch over the catch-up: when each install landed and how far behind it was.
+			const memberEpochs: { at: number; member: number; creator: number }[] = [];
+			const describe = async () => {
+				const status = (await writer.rolloverStatus?.()) as Record<string, unknown> | undefined;
+				const settlement = (await writer.settlementStatus?.()) as { unsettledEpochs?: number; undelivered?: unknown[] } | null;
+				return JSON.stringify({ creator: (await creator.rollover?.())?.epoch, member: await writer.authorityEpoch(),
+					settlement: [settlement?.unsettledEpochs, settlement?.undelivered?.length],
+					state: status?.state, kept: Array.isArray(status?.kept) ? status.kept.length : undefined,
+					delivery: await writer.successorDelivery?.(), memberEpochs: memberEpochs.slice(-12) });
+			};
 			await profiled(`catch-up-${moves}-${epochs}`, async () => {
 				for (;;) {
 					await rows.toWriter();
 					await rows.toCreator();
 					counts = await acceptedCounts(creator, writerAuthor, ids);
+					const memberEpoch = (await writer.authorityEpoch()) ?? 0;
+					if (memberEpoch !== memberEpochs.at(-1)?.member)
+						memberEpochs.push({ at: Math.round(performance.now() - started), member: memberEpoch,
+							creator: (await creator.rollover?.())?.epoch ?? 0 });
 					const now = counts.filter((count) => count >= 1).length;
 					if (now > landed) {
 						landed = now;
@@ -563,7 +577,7 @@ async function catchUp(moves: number, epochs: number) {
 					}
 					if (now === ids.length) return;
 					if (performance.now() - landedAt > CATCH_UP_STALL_MS)
-						throw new Error(`catch-up stalled: ${now}/${ids.length} landed, ${JSON.stringify({ counts, creator: (await creator.rollover?.())?.epoch, member: await writer.authorityEpoch(), settlement: await writer.settlementStatus?.().then((value) => { const status = value as { unsettledEpochs?: number; undelivered?: unknown[] } | null; return [status?.unsettledEpochs, status?.undelivered?.length]; }), status: await writer.rolloverStatus?.() }).slice(0, 2000)}`);
+						throw new Error(`catch-up stalled: ${now}/${ids.length} landed, ${(await describe()).slice(0, 6000)}`);
 					await creator.issue(0, ordinal.next++);
 					await sleep(300);
 				}
@@ -580,6 +594,8 @@ async function catchUp(moves: number, epochs: number) {
 				creatorEpochsDuringCatchUp: caughtUpAt.creator - behind.creator,
 				msPerMove: Math.round(ms / ids.length),
 				refusedAtIssue: refusedAtIssue.length,
+				memberInstalls: memberEpochs.length,
+				memberEpochs: memberEpochs.slice(0, 40),
 				work: {
 					dependencyTurns: after.dependencyTurns - before.dependencyTurns,
 					recoveryCensusReads: after.recoveryCensusReads - before.recoveryCensusReads,
