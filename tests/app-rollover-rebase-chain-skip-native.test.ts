@@ -355,9 +355,13 @@ async function retainedResolutionCost(count: number) {
 			for (let roll = 0; roll < 3; roll++) epoch = await rollCreator(creator, async () => undefined, ordinal);
 			const before = readV3SettlementWorkCounts();
 			const started = performance.now();
+			// Process CPU over the install (user + system), the cost that matters on a device.
+			const cpuBefore = process.cpuUsage();
 			wire.resume();
 			await wire.caughtUp(epoch, 1_200_000);
 			const ms = performance.now() - started;
+			const cpu = process.cpuUsage(cpuBefore);
+			const cpuMs = Math.round((cpu.user + cpu.system) / 1000);
 			const after = readV3SettlementWorkCounts();
 			const work = {
 				dependencyTurns: after.dependencyTurns - before.dependencyTurns,
@@ -376,7 +380,7 @@ async function retainedResolutionCost(count: number) {
 				recoveryCensusReads: nextAfter.recoveryCensusReads - nextBefore.recoveryCensusReads,
 				ownFenceScans: nextAfter.ownFenceScans - nextBefore.ownFenceScans,
 			};
-			const result = { count, installMs: Math.round(ms), perRowMs: Math.round(ms / count), givenBack: status?.undelivered?.length, work, next };
+			const result = { count, installMs: Math.round(ms), cpuMs, perRowMs: Math.round(ms / count), givenBack: status?.undelivered?.length, work, next };
 			process.stdout.write(`RETAINED_COST ${JSON.stringify(result)}\n`);
 			return result;
 		} finally {
