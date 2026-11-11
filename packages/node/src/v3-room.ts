@@ -2143,6 +2143,40 @@ const PROJECTION_BASE_RESULT_KEYS = Object.freeze([
 	"stateDigest",
 ]);
 const LOWER_HEX_256 = /^[0-9a-f]{64}$/u;
+
+// Validated application projection orders (frozen orders only): order -> its rank and control tables.
+const validatedProjectionOrders = new WeakMap<
+	object,
+	Readonly<{ anchor: string; ranks: Map<string, number>; controls: Set<string> }>
+>();
+
+/** The order's digest ranks and sorted control set, exactly as validated before use. */
+function validateProjectionOrder(
+	order: Readonly<{ digests: readonly unknown[]; controlDigests: readonly unknown[] }>,
+	expectedAnchor: string
+): Readonly<{ ranks: Map<string, number>; controls: Set<string> }> {
+	const ranks = new Map<string, number>();
+	for (const [index, digest] of order.digests.entries()) {
+		if (typeof digest !== "string" || !LOWER_HEX_256.test(digest) || digest === expectedAnchor || ranks.has(digest)) {
+			throw new TypeError("v3 room application projection order is invalid");
+		}
+		ranks.set(digest, index);
+	}
+	const controls = new Set<string>();
+	for (const [index, digest] of order.controlDigests.entries()) {
+		if (
+			typeof digest !== "string" ||
+			!LOWER_HEX_256.test(digest) ||
+			digest === expectedAnchor ||
+			ranks.has(digest) ||
+			(index > 0 && (order.controlDigests[index - 1] as string) >= digest)
+		) {
+			throw new TypeError("v3 room application projection order controls are invalid");
+		}
+		controls.add(digest);
+	}
+	return { ranks, controls };
+}
 const PROJECTION_REFUSED_ISSUE = "v3 room issued operation was not accepted by projection";
 
 function roomHeadFailure(code: string): never {
@@ -4053,25 +4087,16 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		) {
 			throw new TypeError("v3 room application projection order scope differs");
 		}
-		const ranks = new Map<string, number>();
-		for (const [index, digest] of order.digests.entries()) {
-			if (typeof digest !== "string" || !LOWER_HEX_256.test(digest) || digest === expectedAnchor || ranks.has(digest)) {
-				throw new TypeError("v3 room application projection order is invalid");
-			}
-			ranks.set(digest, index);
-		}
-		const controls = new Set<string>();
-		for (const [index, digest] of order.controlDigests.entries()) {
-			if (
-				typeof digest !== "string" ||
-				!LOWER_HEX_256.test(digest) ||
-				digest === expectedAnchor ||
-				ranks.has(digest) ||
-				(index > 0 && (order.controlDigests[index - 1] as string) >= digest)
-			) {
-				throw new TypeError("v3 room application projection order controls are invalid");
-			}
-			controls.add(digest);
+		// The validated rank and control tables are a pure function of the frozen order and the expected
+		// scope; the plane returns the same frozen order object until its graph changes.
+		const validated = validatedProjectionOrders.get(order);
+		let ranks: Map<string, number>;
+		let controls: Set<string>;
+		if (validated !== undefined && validated.anchor === expectedAnchor) ({ ranks, controls } = validated);
+		else {
+			({ ranks, controls } = validateProjectionOrder(order, expectedAnchor));
+			if (Object.isFrozen(order) && Object.isFrozen(order.digests) && Object.isFrozen(order.controlDigests))
+				validatedProjectionOrders.set(order, { anchor: expectedAnchor, ranks, controls });
 		}
 		for (const [digest, vertex] of selected) {
 			if (
@@ -4082,9 +4107,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				throw new TypeError("v3 room application projection order omits an accepted vertex");
 			}
 		}
+		// One hex identity per vertex (not one per comparison).
 		return [...selected.values()]
-			.filter((vertex) => !controls.has(hex(vertex.digest)))
-			.sort((left, right) => (ranks.get(hex(left.digest)) as number) - (ranks.get(hex(right.digest)) as number));
+			.map((vertex) => ({ identity: hex(vertex.digest), vertex }))
+			.filter(({ identity }) => !controls.has(identity))
+			.sort((left, right) => (ranks.get(left.identity) as number) - (ranks.get(right.identity) as number))
+			.map(({ vertex }) => vertex);
 	};
 	const expand = (vertex: V3RoomAcceptedVertex): readonly V3RoomAcceptedOperation[] | undefined => {
 		const identity = hex(vertex.digest);
