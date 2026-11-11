@@ -181,6 +181,7 @@ it.skipIf(!enabled)(
 		const uncertainSlots = new Set<string>();
 		const latest = new Map<string, { id: string; kind: string; x: number; y: number }>();
 		let acceptedVertexCount = 0;
+		let batchedVertices = 0;
 		let censusWindow: Record<string, number> | undefined;
 		const windowCensus: Record<string, Record<string, number>> = {};
 		let lullActive = 0;
@@ -235,13 +236,20 @@ it.skipIf(!enabled)(
 					censusWindow[action] = (censusWindow[action] ?? 0) + 1;
 				}
 				if (vertex !== undefined) policies[receiver]?.observe({ ...(vertex as object), author, epoch: vertex.epoch } as never);
-				const operation = vertex?.operation as { action?: string; id?: string; x?: number } | undefined;
-				if (operation?.action !== "placeBlock") return;
-				const issue = byKey.get(`${operation.id}:${operation.x}`);
-				if (issue === undefined || issue.peer === receiver || issue.acceptedBy[receiver] !== undefined) return;
-				if (receiver >= peersCount) return;
-				issue.acceptedBy[receiver] = at;
-				if (receiver === 0) issue.creatorAdmittedAt = at;
+				// Queued moves travel as one "applicationBatch" vertex (Grid batches placeBlock): expand it.
+				const root = vertex?.operation as { action?: string; batch?: { entries?: { operation?: unknown }[] } } | undefined;
+				const operations = (
+					root?.action === "applicationBatch" ? (root.batch?.entries ?? []).map((entry) => entry.operation) : [root]
+				) as ({ action?: string; id?: string; x?: number } | undefined)[];
+				if (root?.action === "applicationBatch") batchedVertices++;
+				for (const operation of operations) {
+					if (operation?.action !== "placeBlock") continue;
+					const issue = byKey.get(`${operation.id}:${operation.x}`);
+					if (issue === undefined || issue.peer === receiver || issue.acceptedBy[receiver] !== undefined) continue;
+					if (receiver >= peersCount) continue;
+					issue.acceptedBy[receiver] = at;
+					if (receiver === 0) issue.creatorAdmittedAt = at;
+				}
 			},
 		});
 		directories.delete(directory);
@@ -887,6 +895,7 @@ it.skipIf(!enabled)(
 			remoteAcceptMs: span(remote),
 			visibleToAllPeersMs: span(peerVisibleAll),
 			acceptedNeverSeenByAllPeers: neverSeenByAll,
+			acceptedBatchVertices: batchedVertices,
 			rolloverPhases,
 			memberInstalls: {
 				count: installs.length,
