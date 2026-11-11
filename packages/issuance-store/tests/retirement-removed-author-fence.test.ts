@@ -140,3 +140,47 @@ describe("removed author's retained FENCE release", () => {
 		expect(held(rows)).toEqual([]);
 	});
 });
+
+// A Writer's retained FENCE released between its epoch-change merge and its next fence
+// (model run writerEpochChangeTest) is gone for good: the completed retirement no longer
+// allows its row. The Writer then fences again at lineage.next and issues new work. In the
+// model every later unresolved source is bounded by that newer fence (unresolvedBounded), so
+// nothing needs the released row again; the next retirement must not try to protect it.
+// Seen in a slow member's catch-up: "issuance retirement retained plan dependency is absent
+// or permanently retired" on every install after the release, so the member never caught up.
+describe("a Writer's released FENCE stays released", () => {
+	function released() {
+		const rows = image();
+		expect(held(rows)).toEqual([]);
+		const p = issuanceRetirementPreparationWithPlanRewrite(control, { ...labels, protectedRecords: [] }, rows);
+		const target = issuanceRetirementCommitRows(control, p, rows);
+		const completed: DurableIssuanceRetirementControl = { ...control, revision: 2, sequence: 1, completed: p };
+		// The Writer's fresh fence at lineage.next (seq 3, epoch 4) and its next move (seq 4, epoch 4).
+		const issued = [...target.issued, row(3, 4, FENCE(3)), row(4, 4, { action: "message" })];
+		const base: IssuanceRetirementRows = { ...target, issued, lineages: [{ ...target.lineages[0]!, next: 5 }],
+			outbox: [...target.outbox,
+				...issued.slice(-2).map(value => ({ ...scope, authorSequence: value.authorSequence, digest: value.digest,
+					publishState: "published" as const }))] };
+		return { completed, base, issued };
+	}
+	const closeAt = (completed: DurableIssuanceRetirementControl, rows: IssuanceRetirementRows, throughEpoch: number) =>
+		closeIssuanceRetirementProtectedRecords({ control: completed, rows, throughEpoch, protectedRecords: [] })
+			.map(value => value.authorSequence);
+
+	it("a new current fence protects itself, not the released one", () => {
+		const { completed, base } = released();
+		const rows: IssuanceRetirementRows = { ...base, plans: [{ ...base.plans[0]!, fenceSequence: 3 }] };
+		expect(closeAt(completed, rows, 5)).toEqual([3]);
+	});
+
+	it("new unresolved work is bounded by the new fence; the released fence is not needed", () => {
+		const { completed, base, issued } = released();
+		const rows: IssuanceRetirementRows = { ...base, plans: [{ ...base.plans[0]!, fenceSequence: null,
+			entries: [...base.plans[0]!.entries,
+				{ sourceSequence: 3, sourceDigest: issued[3]!.digest, sourceContextDigest: sourceContext.digest,
+					disposition: "expire", replacementSequence: null },
+				{ sourceSequence: 4, sourceDigest: issued[4]!.digest, sourceContextDigest: sourceContext.digest,
+					disposition: "manual-review", replacementSequence: null }] }] };
+		expect(closeAt(completed, rows, 5)).toEqual([3, 4]);
+	});
+});
