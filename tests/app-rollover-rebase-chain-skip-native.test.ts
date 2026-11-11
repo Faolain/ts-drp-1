@@ -577,8 +577,17 @@ async function catchUp(moves: number, epochs: number) {
 						const dumpDir = process.env.CATCH_UP_DUMP_DIR;
 						if (dumpDir !== undefined && dumpDir !== "") {
 							mkdirSync(dumpDir, { recursive: true });
+							const action = (operation: unknown) => {
+								const value = (typeof operation === "string" ? JSON.parse(operation) : operation) as Record<string, unknown> | null;
+								return typeof value?.action === "string" ? value.action : "?";
+							};
 							writeFileSync(join(dumpDir, `plan-${moves}x${epochs}-m${memberEpoch}.json`), JSON.stringify({
-								...memberEpochs.at(-1), plan: await writer.settlementPlanDump?.() }));
+								...memberEpochs.at(-1), plan: await writer.settlementPlanDump?.(),
+								// [authorSequence, epoch, action] of the member's rows: published, and admitted by the creator.
+								published: (await writer.published(null)).map((row) => { const value = rowValue(row);
+									return [value.authorSequence, value.epoch, action(value.operation)]; }),
+								creatorAccepted: ((await creator.acceptedVertices?.()) ?? []).filter((vertex) => vertex.author === writerAuthor)
+									.map((vertex) => [vertex.authorSequence, vertex.epoch, action(vertex.operation)]) }));
 						}
 					}
 					const now = counts.filter((count) => count >= 1).length;
