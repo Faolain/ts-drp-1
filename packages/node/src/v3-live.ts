@@ -9561,6 +9561,7 @@ async function captureCreatorOrdinarySourceLinkedApplicationEffects(registration
 	};
 	const verifiedSources = new Set<number>();
 	const vertexFacts = createCreatorCensusVertexFacts();
+	const settledFences = createOwnEpochFenceReader();
 	for (const row of targets) {
 		if (!sameScope(row, own)) return undefined; // Local completion law is never foreign authority.
 		const target = await snapshot(row), classified = target === undefined ? undefined : classifyRebaseRow(registration, target, undefined, vertexFacts);
@@ -9575,7 +9576,7 @@ async function captureCreatorOrdinarySourceLinkedApplicationEffects(registration
 		if (!verifiedSources.has(sources[0]!.authorSequence)) {
 			const original = await snapshot(sources[0]!), selected = original === undefined ? undefined : classifyRebaseRow(registration, original, undefined, vertexFacts);
 			if (selected === undefined || !validRebaseRow(registration, selected) ||
-				!await ownSourceSettlementIsComplete(registration, selected, plan, vertexFacts, accounting)) return undefined;
+				!await ownSourceSettlementIsComplete(registration, selected, plan, vertexFacts, accounting, settledFences)) return undefined;
 			verifiedSources.add(sources[0]!.authorSequence);
 		}
 		const entry = plan?.entries.find(entry => entry.sourceSequence === source.sourceSequence);
@@ -11208,8 +11209,9 @@ async function readCreatorRecoveryDependencyCensus(
 	if (sourceTrust !== undefined) anchors.set(sourceTrust.currentEpoch, sourceTrust.currentAnchorDigest);
 	let afterKey: DurableOutboxPageInput["afterKey"] = null;
 	let scanned = 0;
-	// The author's own fences per epoch, read once when a row first reaches the settlement window.
-	let windowFences: Promise<ReadonlyMap<number, number>> | undefined;
+	// The author's own fences per epoch, read once for this walk when a row first reaches the
+	// settlement window or is classified as settled (ownSourceSettlementIsComplete).
+	const settledFences = createOwnEpochFenceReader();
 	for (;;) {
 		await checkpoint();
 		if (!live()) return undefined;
@@ -11480,7 +11482,9 @@ async function readCreatorRecoveryDependencyCensus(
 						observation.liveRegistration,
 						ObjectFreeze({ ...classified, row }),
 						inheritancePlan,
-						vertexFacts
+						vertexFacts,
+						undefined,
+						settledFences
 					);
 				}
 
@@ -11581,8 +11585,8 @@ async function readCreatorRecoveryDependencyCensus(
 					settlementOwnRowClass(classified.authenticated.vertex.epoch, windowFrontier.currentEpoch, row.authorSequence,
 						windowFrontier.admissionEpoch, windowFrontier.terminalThrough) === "displaced" &&
 					settlementOwnRowWindowExpired(classified.authenticated.vertex.epoch, windowFrontier.currentEpoch) &&
-					settlementOwnRowFenceGuarded(await (windowFences ??= ownEpochFences(
-						creatorOriginalIssuanceStore(registration), registration.issuanceScope)),
+					settlementOwnRowFenceGuarded(await settledFences(
+						creatorOriginalIssuanceStore(registration), registration.issuanceScope),
 					classified.authenticated.vertex.epoch, row.authorSequence, windowFrontier.terminalThrough);
 				if (windowExpired) dependencyKind = "source-authenticated-expiry";
 			}
@@ -13407,6 +13411,21 @@ function settlementOwnRowWindowExpired(epoch: number, currentEpoch: number): boo
  */
 async function ownEpochFences(store: DurableIssuanceStore, scope: DurableIssueScope): Promise<ReadonlyMap<number, number>> {
 	return (await scanOwnFences(store, scope)).lowest;
+}
+
+/** ownEpochFences for one read walk: the same (store, scope) is scanned once and every row of the walk
+ * reads that scan, as the walk's own windowFences. Lives only as long as the walk that created it. */
+type OwnEpochFenceReader = (store: DurableIssuanceStore, scope: DurableIssueScope) => Promise<ReadonlyMap<number, number>>;
+function createOwnEpochFenceReader(): OwnEpochFenceReader {
+	const scans = new Map<DurableIssuanceStore, Map<string, Promise<ReadonlyMap<number, number>>>>();
+	return (store, scope) => {
+		let byScope = scans.get(store);
+		if (byScope === undefined) scans.set(store, byScope = new Map());
+		const key = `${scope.author}\u0000${scope.objectId}`;
+		let scan = byScope.get(key);
+		if (scan === undefined) byScope.set(key, scan = ownEpochFences(store, scope));
+		return scan;
+	};
 }
 
 /** The own fence scan of ownEpochFences, with the highest own fence row (any epoch) and its epoch. */
@@ -16470,7 +16489,8 @@ async function ownSourceSettlementIsComplete(
 	selected: ClassifiedRebaseRow,
 	plan: SettlementPlan | null,
 	vertexFacts?: CreatorCensusVertexFacts,
-	sharedAccounting?: CreatorClosedRollbackProofAccounting
+	sharedAccounting?: CreatorClosedRollbackProofAccounting,
+	ownFences: OwnEpochFenceReader = ownEpochFences
 ): Promise<boolean> {
 	const source = selected.authenticated;
 	const scope = registration.issuanceScope;
@@ -16506,7 +16526,7 @@ async function ownSourceSettlementIsComplete(
 			settlementOwnRowClass(source.admitted.epoch, frontier.currentEpoch, source.authorSequence,
 				frontier.admissionEpoch, frontier.terminalThrough) !== "current" &&
 			entry.replacementSequence === null && entry.replacementProgress === undefined && entry.transformRefusal === undefined &&
-			settlementOwnRowFenceGuarded(await ownEpochFences(creatorOriginalIssuanceStore(registration), scope),
+			settlementOwnRowFenceGuarded(await ownFences(creatorOriginalIssuanceStore(registration), scope),
 				source.admitted.epoch, source.authorSequence, frontier.terminalThrough);
 	}
 	if (derived.disposition !== entry.disposition || derived.disposition === "manual-review") return false;

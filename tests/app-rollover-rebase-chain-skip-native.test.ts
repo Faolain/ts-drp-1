@@ -661,5 +661,5 @@ it("a census does not rescan the author's outbox for each expired row", async ()
 	const result = await windowExpiredCensusCost(16);
 	expect((result.plan as Record<string, number>).expire ?? 0, "rows expired by the window").toBeGreaterThanOrEqual(16);
 	// One own-fence scan answers every row of one census read.
-	expect(result.ownFenceScans, "own-fence scans per census read").toBeLessThanOrEqual(result.recoveryCensusReads * 2);
+	expect(result.ownFenceScans, "own-fence scans per census read").toBeLessThanOrEqual(result.recoveryCensusReads + 8);
 }, 900_000);
