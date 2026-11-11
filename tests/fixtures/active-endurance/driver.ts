@@ -119,8 +119,25 @@ export async function driveActiveAppEndurance(
 		replacementDeliveredToAdmitted: number | null;
 		totalMs: number;
 		driverWaitMs: number;
+		driverLullMs: number;
+		creatorRolloverMs: number;
 		productMs: number;
+		productExcludingDriverLullMs: number;
+		at: {
+			delivered: number;
+			closed: number | null;
+			installed: number | null;
+			replacementDelivered: number | null;
+			admitted: number;
+		};
 	}[] = [];
+	// The driver's own maintenance-overlap lull (both peers' maintainRecoveryPool, called explicitly on top of
+	// the app's scheduled lull) and the creator's automatic rollovers, as absolute windows: a carried row's
+	// time inside the former is driver-imposed work, inside the latter product rollover work.
+	const driverLullWindows: { start: number; end: number }[] = [];
+	const creatorRolloverWindows: { start: number; end: number }[] = [];
+	const overlap = (from: number, to: number, windows: readonly { start: number; end: number }[]): number =>
+		windows.reduce((sum, window) => sum + Math.max(0, Math.min(to, window.end) - Math.max(from, window.start)), 0);
 	const now = (): number => performance.timeOrigin + performance.now();
 	const markInjected = (rows: readonly WireRow[]): void => {
 		const at = now();
@@ -282,8 +299,7 @@ export async function driveActiveAppEndurance(
 				if (times === undefined || times.some((time) => time === null)) continue;
 				const admittedAt = Math.max(...(times as number[]));
 				carriedTimes.push(admittedAt - row.receivedAt);
-				const lateExact =
-					disposition.acceptedDigests.length === 1 && disposition.acceptedDigests[0] === row.digest;
+				const lateExact = disposition.acceptedDigests.length === 1 && disposition.acceptedDigests[0] === row.digest;
 				if (lateExact) carriedKinds.lateExact++;
 				else carriedKinds.replaced++;
 				// Waterfall: the leaves' latest publication and delivery (a replacement chain completes with its last chunk).
@@ -301,6 +317,7 @@ export async function driveActiveAppEndurance(
 					from === null || to === null ? null : to - from;
 				const driverWaitMs = Math.max(0, span(replacementPublished, replacementDelivered) ?? 0);
 				const totalMs = admittedAt - row.receivedAt;
+				const driverLullMs = overlap(row.receivedAt, admittedAt, driverLullWindows);
 				carriedWaterfall.push({
 					kind: lateExact ? "lateExact" : "replaced",
 					deliveredToClosed: span(row.receivedAt, closedAt),
@@ -310,7 +327,17 @@ export async function driveActiveAppEndurance(
 					replacementDeliveredToAdmitted: span(replacementDelivered, admittedAt),
 					totalMs,
 					driverWaitMs,
+					driverLullMs,
+					creatorRolloverMs: overlap(row.receivedAt, admittedAt, creatorRolloverWindows),
 					productMs: totalMs - driverWaitMs,
+					productExcludingDriverLullMs: totalMs - driverWaitMs - driverLullMs,
+					at: {
+						delivered: row.receivedAt,
+						closed: closedAt,
+						installed: installedAt,
+						replacementDelivered,
+						admitted: admittedAt,
+					},
 				});
 				pendingCarried.splice(pendingCarried.indexOf(row), 1);
 			}
@@ -327,6 +354,7 @@ export async function driveActiveAppEndurance(
 			for (const event of events) {
 				rolloversByTrigger[event.trigger] = (rolloversByTrigger[event.trigger] ?? 0) + 1;
 				if (!epochClosedAt.has(event.epoch)) epochClosedAt.set(event.epoch, event.endedAt);
+				creatorRolloverWindows.push({ start: event.endedAt - event.ms, end: event.endedAt });
 				pendingWindows.push({
 					closed: event.epoch,
 					trigger: event.trigger,
@@ -571,6 +599,7 @@ export async function driveActiveAppEndurance(
 			let maintenanceReceiverAfter = maintenanceReceiverBefore;
 			const lulls = joinAll(peers.map((peer) => peer.lull())).then(async (results) => {
 				maintenanceEnd = performance.timeOrigin + performance.now();
+				driverLullWindows.push({ start: maintenanceStart, end: maintenanceEnd });
 				maintenanceReceiverAfter = await joinAll(peers.map((peer) => peer.projectionAudit()));
 				return results;
 			});
@@ -764,7 +793,10 @@ export async function driveActiveAppEndurance(
 										"replacementDeliveredToAdmitted",
 										"totalMs",
 										"driverWaitMs",
+										"driverLullMs",
+										"creatorRolloverMs",
 										"productMs",
+										"productExcludingDriverLullMs",
 									] as const
 								).map((key) => {
 									const values = carriedWaterfall
@@ -784,6 +816,9 @@ export async function driveActiveAppEndurance(
 							// Carried rows whose chain had not reached admission by the last settlement audit
 							// (or whose receiver was reopened, losing its acceptance times).
 							carriedUnresolved: pendingCarried.length,
+							carriedRows: carriedWaterfall,
+							driverLullWindows,
+							creatorRolloverWindows,
 						},
 					}
 				: {}),
