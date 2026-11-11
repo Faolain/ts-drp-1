@@ -32,9 +32,11 @@ const read = new Function("bindings", `const {${Object.keys(bindings).join(",")}
 async function fixture(floorEpoch?: number) {
 	const scope = {objectId: "retirement-room", author: "writer"};
 	const commits = Array.from({length: 5}, (_, sequence) => d109bCommit(scope, sequence, sequence));
-	const rows: IssuanceRetirementRows = {lineages: [{...scope, next: 5, exhausted: false, prunedThroughAuthorSequence: null}],
-		issued: commits.map(commit => ({...scope, authorSequence: commit.authorSequence, ...commit.envelope})),
-		outbox: commits.map(commit => ({...scope, authorSequence: commit.authorSequence, digest: commit.envelope.digest, publishState: "published"})),
+	// The prefix pruner already removed row 0: its completed entry is no longer custody, so the
+	// retirement rewrites the plan (a completed entry whose source is still held stays custody).
+	const rows: IssuanceRetirementRows = {lineages: [{...scope, next: 5, exhausted: false, prunedThroughAuthorSequence: 0}],
+		issued: commits.slice(1).map(commit => ({...scope, authorSequence: commit.authorSequence, ...commit.envelope})),
+		outbox: commits.slice(1).map(commit => ({...scope, authorSequence: commit.authorSequence, digest: commit.envelope.digest, publishState: "published"})),
 		plans: [{scope, revision: 7, fenceSequence: 4, entries: [0, 1, 2].map(sequence => ({sourceSequence: sequence,
 			sourceDigest: commits[sequence]!.envelope.digest, disposition: "rebase", replacementSequence: sequence + 1}))}]};
 	const control: DurableIssuanceRetirementControl = {kind: "v3-issuance-retirement-control-1", objectId: scope.objectId,
