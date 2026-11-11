@@ -92,6 +92,15 @@ export async function driveActiveAppEndurance(
 	const started = performance.now();
 	const issueTimes: number[] = [];
 	const receiveTimes: number[] = [];
+	// App mode: `receiveTimes` holds the bounded 5 s acceptance poll below, so a row the creator closed its
+	// epoch without (carried later by its author's settlement) reads as ~5 s. Split for reporting only:
+	// rows accepted inside the poll ("accepted live"), and rows carried by settlement, timed from delivery
+	// to the receiver's actual admission of the exact row or of every replacement chunk that carries it
+	// (lostRowDisposition's chain), resolved at each epoch's settlement audit.
+	const acceptedLiveTimes: number[] = [];
+	const carriedTimes: number[] = [];
+	const carriedKinds = { lateExact: 0, replaced: 0 };
+	const pendingCarried: { digest: string; from: number; receivedAt: number }[] = [];
 	const transitionTimes: number[] = [];
 	const accepted: { role: number; epoch: number; ordinal: number }[] = [];
 	const attempts: {
@@ -183,7 +192,13 @@ export async function driveActiveAppEndurance(
 								if ((await required(peers[1 - from]).acceptance([final.digest]))[0] === true) break;
 								await new Promise((resolve) => setTimeout(resolve, 10));
 							}
-						receiveTimes.push(performance.now() - receivedAt);
+						const waited = performance.now() - receivedAt;
+						receiveTimes.push(waited);
+						if (final !== undefined) {
+							if ((await required(peers[1 - from]).acceptance([final.digest]))[0] === true)
+								acceptedLiveTimes.push(waited);
+							else pendingCarried.push({ digest: final.digest, from, receivedAt: performance.timeOrigin + receivedAt });
+						}
 						continue;
 					}
 					if (last >= 0) receiveTimes.push(await required(peers[1 - from]).receive(chunk.slice(0, last + 1)));
@@ -191,6 +206,25 @@ export async function driveActiveAppEndurance(
 				}
 				delivered[from] = required(rows.at(-1)).authorSequence;
 				if (ahead >= 0) return;
+			}
+		};
+		// Observation only (app mode): carried rows whose chain has reached admission get their latency.
+		const resolveCarried = async (
+			settlement: readonly Awaited<ReturnType<RoleEndpoint["settlementAudit"]>>[]
+		): Promise<void> => {
+			for (const row of [...pendingCarried]) {
+				const receiver = required(peers[1 - row.from]);
+				const disposition = await lostRowDisposition(row.digest, required(settlement[row.from]).replacements, (digests) =>
+					receiver.acceptance([...digests])
+				);
+				if (!disposition.carried) continue;
+				const times = await receiver.acceptedAt?.(disposition.acceptedDigests);
+				if (times === undefined || times.some((time) => time === null)) continue;
+				carriedTimes.push(Math.max(...(times as number[])) - row.receivedAt);
+				if (disposition.acceptedDigests.length === 1 && disposition.acceptedDigests[0] === row.digest)
+					carriedKinds.lateExact++;
+				else carriedKinds.replaced++;
+				pendingCarried.splice(pendingCarried.indexOf(row), 1);
 			}
 		};
 		// App mode: every rollover the creator's policy finished is taken once, in order. Chat's oracle
@@ -428,6 +462,7 @@ export async function driveActiveAppEndurance(
 			await appSettle();
 			const settlement = await joinAll(peers.map((peer) => peer.settlementAudit()));
 			for (const value of settlement) assert.deepEqual(value.missing, [], "no dangling settlement-plan dependency");
+			if (appMode) await resolveCarried(settlement);
 			const lostDisposition: { sourceDigest: string; acceptedDigests: readonly string[] }[] = [];
 			for (const row of lost) {
 				const disposition = await lostRowDisposition(row.digest, required(settlement[1]).replacements, (digests) =>
@@ -608,7 +643,31 @@ export async function driveActiveAppEndurance(
 				p99: q(issueTimes, 0.99),
 				max: Math.max(...issueTimes),
 			},
+			// App mode: includes the bounded acceptance poll (a carried row reads ~5 s); see receiveSplit.
 			receiveMs: { p50: q(receiveTimes, 0.5), p95: q(receiveTimes, 0.95), max: Math.max(...receiveTimes) },
+			...(appMode
+				? {
+						receiveSplit: {
+							acceptedLiveMs: {
+								count: acceptedLiveTimes.length,
+								p50: q(acceptedLiveTimes, 0.5),
+								p95: q(acceptedLiveTimes, 0.95),
+								p99: q(acceptedLiveTimes, 0.99),
+								max: acceptedLiveTimes.length ? Math.max(...acceptedLiveTimes) : null,
+							},
+							carriedBySettlementMs: {
+								count: carriedTimes.length,
+								...carriedKinds,
+								p50: q(carriedTimes, 0.5),
+								p95: q(carriedTimes, 0.95),
+								max: carriedTimes.length ? Math.max(...carriedTimes) : null,
+							},
+							// Carried rows whose chain had not reached admission by the last settlement audit
+							// (or whose receiver was reopened, losing its acceptance times).
+							carriedUnresolved: pendingCarried.length,
+						},
+					}
+				: {}),
 			transitionMs: {
 				p50: q(transitionTimes, 0.5),
 				p95: q(transitionTimes, 0.95),

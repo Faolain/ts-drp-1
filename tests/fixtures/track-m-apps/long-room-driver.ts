@@ -282,6 +282,11 @@ export interface RoleEndpoint {
 		}>
 	>;
 	acceptance(digests: readonly string[]): Promise<readonly boolean[]>;
+	/**
+	 * Observation only: when each digest was first accepted here (performance.timeOrigin-based ms), or
+	 * null if it has not been. Lets a measurement time a row to its actual admission.
+	 */
+	acceptedAt?(digests: readonly string[]): Promise<readonly (number | null)[]>;
 	/** Every live plan reference is still backed by its paired original issuance row. */
 	settlementAudit(): Promise<
 		Readonly<{
