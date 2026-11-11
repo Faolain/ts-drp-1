@@ -221,6 +221,10 @@ it.skipIf(!enabled)(
 		const joins: Record<string, unknown>[] = [];
 		const installs: { peer: number; queuedAt: number; startedAt: number; endedAt: number; ok: boolean; error?: string }[] = [];
 		let installTail: Promise<void> = Promise.resolve();
+		// Installs that have started and not settled (a hung install would otherwise hold the mutex forever).
+		const pendingInstalls = new Map<number, { peer: number; startedAt: number }>();
+		let installIds = 0;
+		const MUTEX_RELEASE_MS = 30_000;
 		const t0 = performance.now();
 		let failure: unknown;
 		let timer: ReturnType<typeof setInterval> | undefined;
@@ -347,6 +351,8 @@ it.skipIf(!enabled)(
 								const queuedAt = performance.now();
 								const run = async () => {
 									const startedAt = performance.now();
+									const id = installIds++;
+									pendingInstalls.set(id, { peer: index, startedAt });
 									try {
 										const value = await room.installCreatorSuccessor(input);
 										installs.push({ peer: index, queuedAt, startedAt, endedAt: performance.now(), ok: true });
@@ -361,14 +367,20 @@ it.skipIf(!enabled)(
 											error: errorText(error).slice(0, 200),
 										});
 										throw error;
+									} finally {
+										pendingInstalls.delete(id);
 									}
 								};
 								if (!installMutex) return run();
 								const result = installTail.then(run);
-								installTail = result.then(
-									() => undefined,
-									() => undefined
-								);
+								// The next install waits for this one, at most MUTEX_RELEASE_MS (a hung install is reported, not inherited).
+								installTail = Promise.race([
+									result.then(
+										() => undefined,
+										() => undefined
+									),
+									installTail.then(() => sleep(MUTEX_RELEASE_MS)),
+								]);
 								return result;
 							},
 						} as never)
@@ -911,6 +923,10 @@ it.skipIf(!enabled)(
 				failures: [...new Set(installs.filter((value) => !value.ok).map((value) => value.error))].slice(0, 6),
 				ownMs: span(installs.filter((value) => value.ok).map((value) => value.endedAt - value.startedAt)),
 				queuedMs: span(installs.map((value) => value.startedAt - value.queuedAt)),
+				unsettledAtEnd: [...pendingInstalls.values()].map((value) => ({
+					peer: value.peer,
+					ageMs: performance.now() - value.startedAt,
+				})),
 			},
 			lateJoins: joins,
 			lull: {
