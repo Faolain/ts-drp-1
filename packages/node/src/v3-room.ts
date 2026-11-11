@@ -1326,20 +1326,22 @@ function startCreatorRestoreCurrencyGate(input: Readonly<{
 						connectivityResolved = true;
 						decide();
 					},
-					answer: (evidence: V3RoomCreatorCurrencyEvidence, peerId?: string): void => {
+					// The view names the sender right after its answer; the decision waits for the verdict (verifying).
+					answered: (peerId: string): void => {
+						awaiting.delete(peerId);
+					},
+					answer: (evidence: V3RoomCreatorCurrencyEvidence): void => {
 						if (state === "refused" || closedError !== undefined) return;
 						verifying++;
 						void creatorEvidenceVerdict(evidence, input.local).then(
 							(verdict) => {
 								verifying--;
-								if (peerId !== undefined) awaiting.delete(peerId);
 								if (verdict.newer !== undefined) return refuse(verdict.newer);
 								if (verdict.attested) attested = true;
 								decide();
 							},
 							() => {
 								verifying--;
-								if (peerId !== undefined) awaiting.delete(peerId);
 								decide();
 							}
 						);
@@ -1896,14 +1898,16 @@ export interface V3RoomCreatorMemberView {
 	 * Asks the room's connected peers (and each peer as it connects) for their view until `signal`
 	 * aborts (the room aborts once a member attested a view, once it refused, or at close), and settles
 	 * then. `asked` names each peer at its first ask on a connection; `answer` hands over each answer
-	 * with its sender as it arrives; `unreachable` reports that the transport's own first connection
-	 * attempts reached nobody and nobody is connected. The room decides how long to wait.
+	 * as it arrives, and `answered` then names its sender; `unreachable` reports that the transport's
+	 * own first connection attempts reached nobody and nobody is connected. The room decides how long
+	 * to wait.
 	 */
 	ask(
 		input: Readonly<{
 			objectId: string;
 			signal: AbortSignal;
-			answer(evidence: V3RoomCreatorCurrencyEvidence, peerId?: string): void;
+			answer(evidence: V3RoomCreatorCurrencyEvidence): void;
+			answered?(peerId: string): void;
 			asked?(peerId: string): void;
 			unreachable?(): void;
 		}>

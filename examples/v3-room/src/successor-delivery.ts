@@ -776,7 +776,8 @@ export function createV3RoomSuccessorDelivery(
 						const frame = decodeFrame(bytes);
 						if (frame?.kind !== "view" || frame.evidence.objectId !== request.objectId) return;
 						answered.add(sender);
-						request.answer(frame.evidence, sender);
+						request.answer(frame.evidence);
+						request.answered?.(sender);
 					})
 				);
 				cleanup.push(channel.onPeerConnected((peerId) => ask(peerId, true)));
