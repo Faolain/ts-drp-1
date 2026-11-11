@@ -108,6 +108,8 @@ export async function driveActiveAppEndurance(
 	// between its publication and the driver's delivery is driver pacing (the 5 s poll and round boundaries
 	// block flush), not product work, and is excluded from the product latency.
 	const injectedAt = new Map<string, number>();
+	// Every delivery of each row: a copy the receiver dropped is admitted only from a later re-offer.
+	const injections = new Map<string, number[]>();
 	const epochClosedAt = new Map<number, number>();
 	const epochSeenAt: Map<number, number>[] = [new Map(), new Map()];
 	const carriedWaterfall: {
@@ -123,6 +125,9 @@ export async function driveActiveAppEndurance(
 		creatorRolloverMs: number;
 		productMs: number;
 		productExcludingDriverLullMs: number;
+		deliveries: number;
+		redeliveryWaitMs: number;
+		lastDeliveredToAdmitted: number | null;
 		at: {
 			delivered: number;
 			closed: number | null;
@@ -141,7 +146,12 @@ export async function driveActiveAppEndurance(
 	const now = (): number => performance.timeOrigin + performance.now();
 	const markInjected = (rows: readonly WireRow[]): void => {
 		const at = now();
-		for (const row of rows) if (!injectedAt.has(row.digest)) injectedAt.set(row.digest, at);
+		for (const row of rows) {
+			if (!injectedAt.has(row.digest)) injectedAt.set(row.digest, at);
+			const times = injections.get(row.digest) ?? [];
+			times.push(at);
+			injections.set(row.digest, times);
+		}
 	};
 	const transitionTimes: number[] = [];
 	const accepted: { role: number; epoch: number; ordinal: number }[] = [];
@@ -318,6 +328,17 @@ export async function driveActiveAppEndurance(
 				const driverWaitMs = Math.max(0, span(replacementPublished, replacementDelivered) ?? 0);
 				const totalMs = admittedAt - row.receivedAt;
 				const driverLullMs = overlap(row.receivedAt, admittedAt, driverLullWindows);
+				// The admitted copies' deliveries up to admission: the first delivery that was not admitted waits for
+				// the driver's re-offer (appSettle / a later flush), which a room's own resend would replace.
+				const leaves = lateExact ? [row.digest] : disposition.acceptedDigests;
+				const before = leaves.map((digest) => (injections.get(digest) ?? []).filter((at) => at <= admittedAt));
+				const firstDelivery = before.every((times) => times.length)
+					? Math.max(...before.map((times) => Math.min(...times)))
+					: null;
+				const lastDelivery = before.every((times) => times.length)
+					? Math.max(...before.map((times) => Math.max(...times)))
+					: null;
+				const redeliveryWaitMs = firstDelivery === null || lastDelivery === null ? 0 : lastDelivery - firstDelivery;
 				carriedWaterfall.push({
 					kind: lateExact ? "lateExact" : "replaced",
 					deliveredToClosed: span(row.receivedAt, closedAt),
@@ -331,6 +352,9 @@ export async function driveActiveAppEndurance(
 					creatorRolloverMs: overlap(row.receivedAt, admittedAt, creatorRolloverWindows),
 					productMs: totalMs - driverWaitMs,
 					productExcludingDriverLullMs: totalMs - driverWaitMs - driverLullMs,
+					deliveries: Math.max(...before.map((times) => times.length)),
+					redeliveryWaitMs,
+					lastDeliveredToAdmitted: span(lastDelivery, admittedAt),
 					at: {
 						delivered: row.receivedAt,
 						closed: closedAt,
@@ -797,6 +821,9 @@ export async function driveActiveAppEndurance(
 										"creatorRolloverMs",
 										"productMs",
 										"productExcludingDriverLullMs",
+										"deliveries",
+										"redeliveryWaitMs",
+										"lastDeliveredToAdmitted",
 									] as const
 								).map((key) => {
 									const values = carriedWaterfall
