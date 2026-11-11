@@ -3404,6 +3404,21 @@ interface VerifiedV3IngressEvidence {
 }
 
 const v3PlaneRegistrations = new WeakMap<DRPNetworkNode, Map<string, V3PlaneRegistration>>();
+/** Room-local observers of a creator's received-move capacity refusals, keyed by the plane's admitted sink. */
+const ingressCapacityRefusalListeners = new WeakMap<object, (reason: string) => void>();
+
+/**
+ * Observes the creator refusing a received move at a capacity a rollover clears (the typed
+ * ISSUANCE_CAPACITY_FORECAST_EXCEEDED reason: the issuance image forecast or the per-epoch
+ * maintenance proof book). Observation only: it grants nothing, and the move stays held as pending
+ * ingress and is offered again; a room's rollover policy may seal sooner so the Writer's move lands
+ * in the successor rather than waiting for the room's budget or idle trigger.
+ * @param sink - The admitted-vertex sink the room activates its planes with.
+ * @param listener - Called with the typed reason; its failures are ignored.
+ */
+export function bindV3IngressCapacityRefusalListener(sink: object, listener: (reason: string) => void): void {
+	ingressCapacityRefusalListeners.set(sink, listener);
+}
 interface V3EgressAdmissionOwner {
 	jobs: number;
 	bufferedBytes: number;
@@ -8443,8 +8458,13 @@ async function handleV3IngressWithSource(
 			releaseOperationReservation(reservation);
 			retainPendingIngress(registration, evidence, V3Envelope.encode({
 				canonicalPreimage: evidence.exactCanonicalPreimageBytes, signature: evidence.signature}).finish().byteLength);
-			ingressFailureLog("admission-rejected", `received-maintenance-${maintenancePhase}:${
-				creatorClosedRollbackRefusalDiagnostic(error) ?? (error instanceof Error ? error.message : "unavailable")}`);
+			const reason = creatorClosedRollbackRefusalDiagnostic(error) ?? (error instanceof Error ? error.message : "unavailable");
+			const capacity = issuanceCapacityRefusal(reason);
+			ingressFailureLog("admission-rejected", `received-maintenance-${maintenancePhase}:${capacity ?? reason}`);
+			if (capacity !== undefined) {
+				try { ingressCapacityRefusalListeners.get(registration.onAdmittedVertex)?.(capacity); }
+				catch { /* Observation cannot alter admission. */ }
+			}
 			// This job already ended (its release ran above): retry the retained row once, after
 			// this turn, so a refusal that clears ends in an admission rather than a held row.
 			resumePendingIngress(registration);

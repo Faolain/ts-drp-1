@@ -468,6 +468,7 @@ async function openSession(
 			signRegisteredVertexDigest: (digest) => selectedNode.keychain.signWithLocalAuthor(digest),
 			openTransport: (id) => selectedNode.openRoomNetwork(id),
 			onAcceptedVertex: (vertex) => policy?.observe(vertex),
+			onIngressCapacityRefusal: (reason) => policy?.refused(reason),
 			onProjection: (value) => {
 				projection = value;
 				// O(1): the archive writes in a later task, off this callback.

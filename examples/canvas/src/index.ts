@@ -266,6 +266,7 @@ async function openCanvas(operation: "create" | "join"): Promise<void> {
 			signRegisteredVertexDigest: (digest) => selectedNode.keychain.signWithLocalAuthor(digest),
 			openTransport: (id) => selectedNode.openRoomNetwork(id),
 			onAcceptedVertex: (vertex) => policy?.observe(vertex),
+			onIngressCapacityRefusal: (reason) => policy?.refused(reason),
 			onProjection: (value) => {
 				projection = value;
 				render();
