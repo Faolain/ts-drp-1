@@ -153,6 +153,8 @@ export interface RoomOptions {
 	 * host for every peer in this process. Reopen is not supported with it.
 	 */
 	readonly separateStorage?: boolean;
+	/** Measurement seam: called for every author-key vertex signature a peer makes. */
+	onSign?(index: number): void;
 	/** Extra session options for every opened peer (measurement harnesses, e.g. the scheduled lull). */
 	readonly sessionOptions?: Readonly<Partial<CreateV3RoomSessionInput<unknown>>>;
 }
@@ -262,7 +264,10 @@ export async function creatorDeliveryRoom(options: RoomOptions = {}) {
 			objectId,
 			publicKeyBytes: ed25519.getPublicKey(identity.seed),
 			roomHeadAuthority: floor,
-			signRegisteredVertexDigest: (digest) => Promise.resolve(ed25519.sign(digest, identity.seed)),
+			signRegisteredVertexDigest: (digest) => {
+				options.onSign?.(index);
+				return Promise.resolve(ed25519.sign(digest, identity.seed));
+			},
 			onProjection: () => undefined,
 			onAcceptedVertex: async (vertex) => {
 				seen.add(hex(vertex.digest));
