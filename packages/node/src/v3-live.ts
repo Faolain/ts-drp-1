@@ -21878,8 +21878,17 @@ async function runCreatorReceivedRecoveryMaintenance(registration: V3PlaneRegist
 		sameHead(resumeControl.active.preparation.head, payload.trust.head) &&
 		(reconstruction === undefined || sameHead(reconstruction.head, payload.trust.head) &&
 			sameCreatorRoomHead(reconstruction.roomHead, trust)) && creatorRetirementResumeRequested(registration);
-	const requestMatches = (): boolean => completedRequestMatches() || activeRequestMatches();
-	const completedResume = resume && registration.operationAdmissionHalted && requestMatches() ? resumeControl : undefined;
+	// A turnover receipt with no resumable native control is the same request: the
+	// snapshot pool turned over before the native store recorded that turnover's
+	// intent (a death in between), so a durable reopen halts on the receipt alone.
+	// The creator's readiness boundary discharges it the same way; without this the
+	// member's resume defers, the halt stays and the reopened session fails.
+	const receiptRequestMatches = (): boolean => resumeControl === undefined && reconstruction !== undefined &&
+		sameHead(reconstruction.head, payload.trust.head) && sameCreatorRoomHead(reconstruction.roomHead, trust) &&
+		creatorRetirementResumeRequested(registration);
+	const requestMatches = (): boolean => completedRequestMatches() || activeRequestMatches() || receiptRequestMatches();
+	const completedResume = resume && registration.operationAdmissionHalted && requestMatches()
+		? resumeControl ?? reconstruction : undefined;
 	if (resume && completedResume === undefined) return "deferred";
 	const admissionStateCurrent = (): boolean => completedResume === undefined
 		? !registration.operationAdmissionHalted
