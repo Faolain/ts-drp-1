@@ -1101,6 +1101,10 @@ async function creatorEvidenceVerdict(evidence: unknown, local: CreatorRestoreLo
 		const record = evidenceRecord(vertex.preimage);
 		const sequence = record?.authorSequence;
 		const epoch = record?.epoch;
+		const newer =
+			Number.isSafeInteger(sequence) &&
+			Number.isSafeInteger(epoch) &&
+			((sequence as number) >= local.next || (epoch as number) > local.epoch);
 		if (
 			record?.kind === "drp-vertex" &&
 			record.protocolMajor === 3 &&
@@ -1108,10 +1112,12 @@ async function creatorEvidenceVerdict(evidence: unknown, local: CreatorRestoreLo
 			record.author === local.author &&
 			Number.isSafeInteger(sequence) &&
 			Number.isSafeInteger(epoch) &&
+			// A vertex that cannot be newer is verified only when nothing else attested the view.
+			(newer || !attested) &&
 			(await verifyCreatorSignature(local.authorPublicKey, digestReceivedVertexPreimage(vertex.preimage), vertex.signature))
 		) {
 			attested = true;
-			if ((sequence as number) >= local.next || (epoch as number) > local.epoch)
+			if (newer)
 				return {
 					attested,
 					newer: `a member holds this creator's signed vertex at sequence ${String(sequence)} (epoch ${String(epoch)}); this creator reopened with next sequence ${local.next} at epoch ${local.epoch}`,
