@@ -8,7 +8,8 @@
 // process, so a step's CPU includes anything else that ran while it was awaited.
 //
 // Environment: LIVE_APP (grid | canvas | chat, default grid), LIVE_EPOCHS (default 8), LIVE_MOVES
-// (ordinary moves per Writer per epoch, default 6), LIVE_ROLLOVER (harness | app, default harness).
+// (ordinary moves per Writer per epoch, default 6), LIVE_ROLLOVER (harness | app, default harness),
+// LIVE_READER (product: the app's own resource bound reader, default | harness).
 // Prints one `LIVE_STEPS {json}` line: per step and position bucket (0 = the first such step after
 // the boundary, then 1, 2-3, 4+; "span" = an app-rollover step during which the role's epoch
 // changed), the count and the median/p95 wall and CPU in ms.
@@ -172,9 +173,10 @@ it(`live step cost by position after the epoch boundary (${APP}, ${ROLLOVER} rol
 			app: APP,
 			host: "node",
 			recipient: "writer",
-			// The roles' recovery-pool lulls run (as in the conservation gate), so the creator's
-			// maintenance image stays within its native bound across epochs.
-			creatorLull: true,
+			// false = each app's own ordinary resource bound reader (what the pages ship); true = the
+			// harness's measurement-only reader (LIVE_READER=harness). The driver runs both roles'
+			// lulls after every install either way.
+			creatorLull: env.LIVE_READER === "harness",
 			epochs: EPOCHS,
 			moves: MOVES,
 			...(ROLLOVER === "app" ? { rollover: "app" as const } : {}),
