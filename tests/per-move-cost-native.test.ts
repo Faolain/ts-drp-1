@@ -11,6 +11,13 @@
 // (the creator receiving and admitting that row), "creator.issue", "writer.receive". The driver's own
 // observation reads (published(): a separate observation handle) are counted apart and excluded.
 //
+// The run stays below 64 Writer moves (moves 0-63, deep window 48-63): the creator is silent after its
+// first move, so the Writer never receives a creator row proving its moves admitted, and it counts
+// every move of the epoch against V3_ROOM_LOCAL_BACKLOG_LIMIT (64 own moves without admission evidence
+// between installs; one hand-back record each if a window expiry ever held them). Its 65th move is
+// refused with V3RoomLocalBacklogFull. Shipped apps roll over every few moves per author, and each
+// install clears the count, so only an artificial single-epoch run with a silent creator reaches it.
+//
 // Seams (restored after the test): node:sqlite DatabaseSync.exec and StatementSync run/get/all/iterate
 // (statements by leading keyword; BEGIN vs BEGIN IMMEDIATE/EXCLUSIVE; each transaction's COMMIT or
 // ROLLBACK classified per connection; a statement object executed for the first time counts as one
@@ -54,7 +61,8 @@ if (attribute) Error.stackTraceLimit = 80;
 const WARMUP = Number(env.PERMOVE_WARMUP ?? 8);
 const MEASURED = Number(env.PERMOVE_MEASURED ?? 16);
 // A second window deeper into the same epoch: per-move work must not grow with epoch history.
-const DEEP_AT = Number(env.PERMOVE_DEEP_AT ?? 64);
+// 48, not 64: moves DEEP_AT..DEEP_AT+15 must stay within the 64-move bound (see the header).
+const DEEP_AT = Number(env.PERMOVE_DEEP_AT ?? 48);
 const CREATOR_MOVES = Number(env.PERMOVE_CREATOR_MOVES ?? 1);
 // PERMOVE_APP: the application (grid by default; canvas and chat for the per-app comparison).
 const APP = (env.PERMOVE_APP ?? "grid") as AppKind;
@@ -91,12 +99,14 @@ const BUDGET = Object.freeze({
 	// Deep-window counts over the early window: O(1) per move in epoch history.
 	growth: Number(env.PERMOVE_BUDGET_GROWTH ?? 1.25),
 });
-// Regression mode only: the deep window (moves 64-79) still grows with history on 43e9d159 (encodes 1536,
+// Regression mode only: the deep window still grows with history (on 43e9d159, window 64-79: encodes 1536,
 // bytes encoded 702376, bytes hashed 137407, rows 1277.5 vs early 1088 / 288491 / 37189 / 661.5). That growth
-// is an open cost item; these ceilings (~10% over) only stop it getting worse. PERMOVE_TARGETS=1 requires O(1).
+// is an open cost item; these ceilings only stop it getting worse. Since the deep window moved to 48-63
+// (the 64-move bound, see the header) they are the window-48 counts measured on c56daab6 plus ~10%.
+// PERMOVE_TARGETS=1 requires O(1).
 const DEEP_CEILING: Partial<Record<"select" | "encodes" | "encodedBytes" | "hashedBytes" | "rows", number>> = TARGETS
 	? {}
-	: { encodes: 1_700, encodedBytes: 780_000, hashedBytes: 152_000, rows: 1_420 };
+	: { encodes: 1_550, encodedBytes: 645_000, hashedBytes: 120_000, rows: 1_215 };
 const deepCap = (key: "select" | "encodes" | "encodedBytes" | "hashedBytes" | "rows", early: number): number =>
 	DEEP_CEILING[key] ?? Math.max(BUDGET[key], early * BUDGET.growth);
 

@@ -741,6 +741,19 @@ it.skipIf(!enabled)(
 				}
 			}
 		}, TICK_MS);
+		// Safety net (expected 0): each Writer's largest settlementStatus().deferred, moves no free
+		// hand-back record fitted, observed every 250 ms.
+		const deferredMax: number[] = Array.from({ length: peersCount }, () => 0);
+		const deferredPoll = setInterval(() => {
+			for (let index = 1; index < peersCount; index++) {
+				try {
+					const room = peers[index]?.room as { settlementStatus?: () => { deferred?: number } | null } | undefined;
+					deferredMax[index] = Math.max(deferredMax[index] ?? 0, room?.settlementStatus?.()?.deferred ?? 0);
+				} catch {
+					continue;
+				}
+			}
+		}, 250);
 		const progress = setInterval(() => {
 			const accepted = issues.filter((issue) => issue.outcome === "accepted").length;
 			const outstanding = issues.filter((issue) => issue.completedAt === undefined).length;
@@ -943,6 +956,7 @@ it.skipIf(!enabled)(
 		} finally {
 			offering = false;
 			clearInterval(progress);
+			clearInterval(deferredPoll);
 			if (timer !== undefined) clearInterval(timer);
 			eventLoop.disable();
 			for (const stop of unsubscribe.values()) stop();
@@ -1054,6 +1068,7 @@ it.skipIf(!enabled)(
 			offered: issues.length,
 			offeredPerSecond: issues.length / Math.max(1e-9, seconds),
 			accepted: acceptedIssues.length,
+			deferredMax,
 			acceptedPerSecond: acceptedIssues.length / Math.max(1e-9, seconds),
 			creatorAdmittedMemberMoves: memberAdmitted.length,
 			memberMovesAccepted: acceptedIssues.filter((issue) => issue.peer !== 0).length,
@@ -1293,6 +1308,8 @@ it.skipIf(!enabled)(
 		const cleanup = [...(await closeFixtures()), ...(await network.close())];
 		if (failure !== undefined) throw failure;
 		expect(cleanup.length, cleanup.map(String).join("; ")).toBe(0);
+		// Safety net: no Writer ever deferred a move for want of a hand-back record.
+		expect(deferredMax, "settlementStatus().deferred per Writer (largest seen)").toEqual(deferredMax.map(() => 0));
 	},
 	(maxSeconds + drainSeconds + 600) * 1000
 );

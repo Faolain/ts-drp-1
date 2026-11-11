@@ -57,7 +57,11 @@ const idOf = (operation: string): string | undefined => {
 
 type MemberHooks = Pick<RoleEnvironment, "deliveryRoom"> & Readonly<{ relay?(request: string, forward: () => Promise<string[]>): Promise<string[]> }>;
 
-async function openPair(directory: string, member: MemberHooks = {}) {
+async function openPair(
+	directory: string,
+	member: MemberHooks = {},
+	rolloverBudget?: Readonly<{ movesPerAuthor: number; idleMs: number }>
+) {
 	const options = {
 		app: "grid" as const,
 		host: "node" as const,
@@ -67,6 +71,7 @@ async function openPair(directory: string, member: MemberHooks = {}) {
 		moves: 1,
 		chatFormat: "shares" as const,
 		rollover: "app" as const,
+		...(rolloverBudget === undefined ? {} : { rolloverBudget }),
 	};
 	const env = {
 		host: nodeHostFor("node", directory),
@@ -808,3 +813,164 @@ async function backlogBoundHoldsAtInstall(offered: number) {
 
 it("an offline Writer's moves of one epoch are bounded by the hand-back records its next skip install needs", () =>
 	backlogBoundHoldsAtInstall(V3_ROOM_LOCAL_BACKLOG_LIMIT + 6), 1_800_000);
+
+// The bound counts moves without admission evidence, not every move of the epoch. With rollover off a
+// healthy online Writer stays in one epoch indefinitely; the creator admits every move and, whenever
+// it moves, signs a row whose causal past reaches the Writer's rows. Those moves need no hand-back
+// record (they are in the epoch's seal), so they must not count: 474946c9 counted every own move of
+// the epoch until the next install and refused this Writer at its 65th move. The control continues in
+// the same epoch with the creator silent: from the last creator row on, moves count again and the
+// Writer is refused at the bound.
+async function admittedMovesLeaveTheBacklog(moves: number, creatorEvery: number) {
+	const restore = await installEnvironment("node", () => undefined);
+	const directory = mkdtempSync(join(tmpdir(), "app-rollover-backlog-admitted-"));
+	directories.push(directory);
+	try {
+		// Rollover off: no app trigger fires in this run.
+		const { creator, writer } = await openPair(directory, {}, { movesPerAuthor: 1_000_000, idleMs: 3_600_000 });
+		const rows = rowWire(creator, writer);
+		const epoch = (await creator.authorityEpoch()) ?? 0;
+		let ordinal = 0;
+		let n = 0;
+		let accepted = 0;
+		const refusals: string[] = [];
+		let unprovenAtEnd = 0;
+		for (let k = 0; k < moves; k++) {
+			if (k % creatorEvery === 0) {
+				await creator.issueRoom!(epoch, ordinal++);
+				await rows.toWriter();
+				unprovenAtEnd = 0;
+			}
+			try {
+				await writer.issueRoom!(epoch, n++);
+				accepted++;
+				unprovenAtEnd++;
+			} catch (error) {
+				refusals.push(String((error as Error).name ?? error));
+			}
+			await rows.toCreator();
+		}
+		const writerAuthor = (await writer.acceptedVertices!()).find((vertex) => vertex.epoch === epoch)?.author;
+		const admitted = (await creator.acceptedVertices!()).filter((vertex) => vertex.author === writerAuthor).length;
+		// Control: the creator falls silent; the Writer's further moves have no evidence and count.
+		let silentAccepted = 0;
+		let silentRefusal: string | undefined;
+		for (let k = 0; k < V3_ROOM_LOCAL_BACKLOG_LIMIT + creatorEvery + 8 && silentRefusal === undefined; k++) {
+			try {
+				await writer.issueRoom!(epoch, n++);
+				silentAccepted++;
+			} catch (error) {
+				silentRefusal = String((error as Error).name ?? error);
+			}
+		}
+		const epochAfter = (await writer.authorityEpoch()) ?? 0;
+		const summary = { moves, creatorEvery, accepted, refused: refusals.length, refusals: [...new Set(refusals)], admitted, unprovenAtEnd, silentAccepted, silentRefusal, epoch, epochAfter };
+		process.stdout.write(`BACKLOG_ADMITTED ${JSON.stringify(summary)}\n`);
+		expect(epochAfter, "rollover off: one epoch throughout").toBe(epoch);
+		expect(admitted, "the creator admitted the Writer's moves").toBeGreaterThanOrEqual(moves);
+		expect(summary.refused, "admitted moves refused as undelivered").toBe(0);
+		// The bound still holds for moves without evidence: unproven moves since the last creator row.
+		expect(silentRefusal, "the silent creator's Writer is refused at the bound").toBe("V3RoomLocalBacklogFull");
+		expect(unprovenAtEnd + silentAccepted, "moves without admission evidence accepted").toBe(V3_ROOM_LOCAL_BACKLOG_LIMIT);
+	} finally {
+		restore();
+	}
+}
+
+it("an online Writer's admitted moves do not count against the undelivered bound (rollover off)", () =>
+	admittedMovesLeaveTheBacklog(V3_ROOM_LOCAL_BACKLOG_LIMIT + 36, 8), 1_800_000);
+
+// The undelivered-move bound counts moves, as hand-back records do. Grid batches the moves issued
+// together into one row ("applicationBatch"), and the backlog counted the plan's entries, one per
+// row: once an install's plan write counted a batched row as one, the Writer accepted more new moves,
+// and when the window expired them they needed more hand-back records than the bound had left. The
+// rows past the record bound stay live (replaced again) or retained (withholding the author fence),
+// and a member whose waiting rows never clear is not reaching its host (decoded in the 4-author
+// scorecard, .logs/realtime-resume-2026-11-10/landing/hold-sc/anchor-w3-o5-01: 64 records from 45
+// rows, one row with 16 moves, 16 rows left unresolved, no fence, RECOVERY_DEPENDENCY_ANCHOR_UNCOVERED).
+async function backlogCountsBatchedMoves(batch: number) {
+	const restore = await installEnvironment("node", () => undefined);
+	const directory = mkdtempSync(join(tmpdir(), "app-rollover-backlog-batched-"));
+	directories.push(directory);
+	try {
+		const { creator, writer } = await openPair(directory);
+		const wire = successorWire(() => [creator, writer] as const);
+		const rows = rowWire(creator, writer);
+		const ordinal = { next: 0 };
+		let epoch = 0;
+		let n = 0;
+		try {
+			while (epoch < 2) {
+				epoch = await rollCreator(creator, rows.toWriter, ordinal);
+				await wire.caughtUp(epoch);
+				await rows.toWriter();
+				await writer.issue(epoch, n++);
+				await rows.toCreator();
+			}
+			const plan = async () => (await writer.settlementPlanDump?.()) as { fence: number | null; entries: { e: number; d: string }[] };
+			const status = async () =>
+				(await writer.settlementStatus?.()) as { undelivered: unknown[]; unsettledEpochs: number; deferred?: number } | null;
+			// Offline (the creator never receives them): moves made together, which Grid batches into one row.
+			const together = await Promise.allSettled(Array.from({ length: batch }, () => writer.issueRoom!(epoch, n++)));
+			const acceptedTogether = together.filter((result) => result.status === "fulfilled").length;
+			const ownRows = (await writer.published(null)).filter((row) => rowValue(row).epoch === epoch).length;
+			// A one-epoch install displaces that row; its plan write counts the Writer's backlog.
+			epoch = await rollCreator(creator, async () => undefined, ordinal);
+			await wire.caughtUp(epoch, 600_000);
+			for (let waited = 0; waited < 60_000 && !(await plan()).entries.some((entry) => entry.e >= 0); waited += 250) await sleep(250);
+			await sleep(2_000);
+			// Then one move at a time until the room refuses at the bound.
+			let acceptedAfter = 0;
+			const refusals: string[] = [];
+			for (let k = 0; k < V3_ROOM_LOCAL_BACKLOG_LIMIT + 8; k++) {
+				try {
+					await writer.issueRoom!(epoch, n++);
+					acceptedAfter++;
+				} catch (error) {
+					refusals.push(String((error as Error).name ?? error));
+					break;
+				}
+			}
+			const accepted = acceptedTogether + acceptedAfter;
+			// A skip install past three creator epochs: the window gives every undelivered move back.
+			await wire.pause();
+			for (let roll = 0; roll < 3; roll++) epoch = await rollCreator(creator, async () => undefined, ordinal);
+			wire.resume();
+			await wire.caughtUp(epoch, 600_000);
+			const deadline = performance.now() + 60_000;
+			let settled = await plan();
+			while (settled.entries.some((entry) => entry.d === "manual-review") && performance.now() < deadline) {
+				await sleep(250);
+				settled = await plan();
+			}
+			const after = await status();
+			const summary = {
+				batch,
+				acceptedTogether,
+				rowsForThem: ownRows,
+				acceptedAfter,
+				accepted,
+				refusals,
+				givenBack: after?.undelivered.length ?? 0,
+				unsettledEpochs: after?.unsettledEpochs,
+				deferred: after?.deferred,
+				dispositions: settled.entries.reduce<Record<string, number>>((counts, entry) => ((counts[entry.d] = (counts[entry.d] ?? 0) + 1), counts), {}),
+				fence: settled.fence,
+			};
+			process.stdout.write(`BACKLOG_BATCHED ${JSON.stringify(summary)}\n`);
+			// The bound counts moves: no more undelivered moves than hand-back records ...
+			expect(accepted, "undelivered moves accepted (the batched ones counted per move)").toBeLessThanOrEqual(V3_ROOM_LOCAL_BACKLOG_LIMIT);
+			// ... so the skip install gives every one of them back and leaves nothing unresolved.
+			expect(summary.dispositions["manual-review"] ?? 0, "rows left unresolved").toBe(0);
+			// The room's safety net agrees: no move waits for a hand-back record.
+			expect(summary.deferred, "moves deferred for want of a hand-back record").toBe(0);
+		} finally {
+			await wire.stop();
+		}
+	} finally {
+		restore();
+	}
+}
+
+it("the undelivered-move bound counts each move of a batched row, as hand-back records do", () =>
+	backlogCountsBatchedMoves(24), 1_800_000);
