@@ -22143,7 +22143,16 @@ function creatorCloseRegistration(
 			registration.blueprintClosing = true;
 			return enqueueRegistrationTask(registration, () => () => {
 				const current = currentRegistration(registration);
-				if (current) registration.receivedTransition = true;
+				if (current) {
+					registration.receivedTransition = true;
+					// The closing plane admits no more ingress, and its received recovery hold
+					// requires an empty pending ingress. Release the retained rows now: the hot
+					// handoff clears them anyway. A released copy counts as lost here; the
+					// successor snapshot or its author's re-offer delivers the move (model:
+					// member-received-close-pending-release.qnt).
+					registration.pendingIngress.clear();
+					registration.pendingIngressBytes = 0;
+				}
 				return Promise.resolve(current);
 			});
 		},
