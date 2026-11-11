@@ -37,7 +37,12 @@ import { pathToFileURL } from "node:url";
 import { afterEach, expect, it } from "vitest";
 
 import { installSqliteCountSeams } from "./fixtures/perf-counts/counts.js";
-import { closeLongRooms, type RoleEndpoint, runLongRoom } from "./fixtures/track-m-apps/app-long-room.js";
+import {
+	type AppKind,
+	closeLongRooms,
+	type RoleEndpoint,
+	runLongRoom,
+} from "./fixtures/track-m-apps/app-long-room.js";
 
 afterEach(async () => {
 	expect(await closeLongRooms()).toEqual([]);
@@ -51,6 +56,8 @@ const MEASURED = Number(env.PERMOVE_MEASURED ?? 16);
 // A second window deeper into the same epoch: per-move work must not grow with epoch history.
 const DEEP_AT = Number(env.PERMOVE_DEEP_AT ?? 64);
 const CREATOR_MOVES = Number(env.PERMOVE_CREATOR_MOVES ?? 1);
+// PERMOVE_APP: the application (grid by default; canvas and chat for the per-app comparison).
+const APP = (env.PERMOVE_APP ?? "grid") as AppKind;
 const TIMING = env.PERMOVE_TIMING === "1";
 const ASSERT = !TIMING && (env.PERMOVE_ASSERT ?? "1") === "1";
 
@@ -279,7 +286,7 @@ it("per steady move (rollover off): bounded SQLite statements, transactions, pre
 	};
 	try {
 		const stopped = await runLongRoom(
-			{ app: "grid", host: "node", recipient: "writer", creatorLull: false, epochs: 1, moves: DEEP_AT + MEASURED },
+			{ app: APP, host: "node", recipient: "writer", creatorLull: false, epochs: 1, moves: DEEP_AT + MEASURED },
 			(creator, writer) => [steps("creator", creator), steps("writer", writer)]
 		).then(
 			() => new Error("PERMOVE_SEAL_NOT_REACHED"),
