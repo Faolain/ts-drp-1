@@ -1146,8 +1146,43 @@ async function receivedWindowEdgeScopeRetained(source: CreatorRecipientSource): 
 	}
 }
 
+/** The closed journal scopes that still hold accepted entries (the physical replay detail
+ * the issuance classification reads: closedIssuanceProtectedRecordsForRetirement keeps an
+ * own issued row while its epoch's scope holds any). Observation only; undefined when
+ * unreadable. */
+async function journalDetailScopes(source: CreatorRecipientSource): Promise<ReadonlySet<string> | undefined> {
+	try {
+		const read = await source.liveJournalStore.readRetirementImage?.({objectId: source.objectId});
+		if (read === undefined || !read.ok) return undefined;
+		const scopes = new Set<string>();
+		for (const bytes of read.value.canonicalRows) {
+			const frame = decodeCanonical(bytes);
+			if (Array.isArray(frame) && (frame[0] === "acceptedEntries" || frame[0] === "accepted_entries") && Array.isArray(frame[1]))
+				scopes.add(JSON.stringify(frame[1].slice(0, 3)));
+		}
+		return scopes;
+	} catch {
+		return undefined;
+	}
+}
+
 /** The original bounded received turnover: one signing census bounds the passes;
- * each pass seals the received dependencies, reconciles, and joins its hold. */
+ * each pass seals the received dependencies, reconciles, and joins its hold.
+ *
+ * With `settle` (a lull: its boundary lets the next install skip its own turnover) the
+ * passes run to the fixpoint of the journal drain, and each pass acknowledges its completed
+ * drain, as the creator's own readiness and pool boundaries do. A pass that drains a
+ * closed journal scope decided the issuance holes from the journal as it was before that
+ * drain, so the member's own issued rows of the drained scope stay protected. While the
+ * drain is unacknowledged, a further pass at the same boundary resumes the drain's
+ * reconstruction, re-derives the same decision and keeps those holes. Before the skip,
+ * the install's turnover was that further pass (its received closed membership changes
+ * the source, so it decides afresh on the physical journal and releases the rows before
+ * the install's cleanup and settlement write); with the skip, the release waited for the
+ * next lull, and the rows, their settlement entries and the unsettled epoch they carry
+ * outlived the settlement window by one epoch. `settled`: the last pass drained no
+ * journal scope. An unreadable journal or the pass bound leaves it false, so the caller
+ * records no boundary and the install turns over as before. */
 async function runReceivedRecoveryTurnoverPasses(input: Readonly<{
 	source: CreatorRecipientSource;
 	snapshotStore: SnapshotRecoveryStore<SnapshotVerificationReceipt>;
@@ -1155,7 +1190,8 @@ async function runReceivedRecoveryTurnoverPasses(input: Readonly<{
 	context: CreatorRecipientRecoveryContext;
 	signing: ReceivedSigningOwner;
 	requireClosedWorkflowCompletion?: boolean;
-}>, seal: () => Promise<ReceivedRecoverySeal | undefined>): Promise<readonly GenerationRecord[]> {
+	settle?: boolean;
+}>, seal: () => Promise<ReceivedRecoverySeal | undefined>): Promise<Readonly<{ retired: readonly GenerationRecord[]; settled: boolean }>> {
 	const { source, context } = input;
 	const census = await input.signing.captureRetirementOwners().acquireEvidence();
 	const epochs = new Set<number>();
@@ -1170,7 +1206,10 @@ async function runReceivedRecoveryTurnoverPasses(input: Readonly<{
 	finally {await releaseCreatorRecoveryReader(census, censusFailed, censusPrimary, "creator recipient signing census cleanup failed");}
 	const retired: GenerationRecord[] = [];
 	const maxPasses = 2 + epochs.size + AHE_BOUNDED_READ_LIMITS.maxObjectGenerations;
+	let detail = input.settle === true ? await journalDetailScopes(source) : undefined;
+	let settled = input.settle !== true, drained = false, passes = 0;
 	for (let pass = 0; pass < maxPasses; pass++) {
+		passes = pass + 1;
 		const sealed = await seal();
 		if (sealed === undefined) throw new TypeError("creator recipient recovery dependencies unavailable");
 		const lifetime = resolveCreatorSnapshotRecoveryCloseHold(sealed.hold,
@@ -1188,14 +1227,36 @@ async function runReceivedRecoveryTurnoverPasses(input: Readonly<{
 				exactCanonicalPinnedGenesisTrustStateRecordBytes: context.exactCanonicalPinnedGenesisTrustStateRecordBytes,
 				catalog: input.catalog,
 				objectId: source.objectId, store: source.store, snapshotStore: input.snapshotStore,
-				liveJournalStore: source.liveJournalStore}, sealed.hold, input.requireClosedWorkflowCompletion === true);
+				liveJournalStore: source.liveJournalStore}, sealed.hold, input.requireClosedWorkflowCompletion === true,
+				input.settle === true);
 			retired.push(...sealed.readRetiredGenerations());
 		} catch (error) {retirementFailed = true; retirementPrimary = error; throw error;}
 		finally {await releaseCreatorRecoveryReader(lifetime, retirementFailed, retirementPrimary, "creator recipient retirement dependencies cleanup failed");}
-		if (checkpoint === "complete") break;
-		if (pass === maxPasses - 1) throw new TypeError("creator recipient bounded retirement did not stabilize");
+		if (checkpoint === "complete") {
+			if (input.settle !== true) break;
+			const after = await journalDetailScopes(source);
+			if (detail === undefined || after === undefined) break;
+			if (![...detail].some(scope => !after.has(scope))) { settled = true; break; }
+			// This pass drained a scope: one more pass decides the issuance on the drained journal.
+			detail = after;
+			drained = true;
+			if (pass === maxPasses - 1) break;
+			continue;
+		}
+		// After a completed pass, the bound ends the settling unsettled; it is never a failure.
+		if (pass === maxPasses - 1) {
+			if (drained) break;
+			throw new TypeError("creator recipient bounded retirement did not stabilize");
+		}
 	}
-	return retired;
+	if (input.settle === true) {
+		try {
+			const observer = Reflect.get(globalThis, "__warmProofEvent");
+			if (typeof observer === "function")
+				observer({kind: "recipient-lull-turnover-settle", epoch: source.currentTrust.currentEpoch, passes, settled});
+		} catch { /* Diagnostics never alter the original owner outcome. */ }
+	}
+	return Object.freeze({retired, settled});
 }
 
 /**
@@ -1253,13 +1314,16 @@ export async function maintainCreatorRecipientRecoveryPool(input: Readonly<{
 		voteStore: context.voteStore, evidenceStore: context.evidenceStore, storageIncarnation: context.storageIncarnation});
 	if (!opened.ok) throw new TypeError(`creator recipient signing custody unavailable: ${opened.reason}`);
 	let outcome: "ran" | "deferred";
+	// A lull runs its passes to the journal-drain fixpoint, since its boundary lets the next
+	// install skip its own turnover; a resume records no boundary and keeps the original passes.
+	let settled = false;
 	try {
 		outcome = await source.runReceivedRecoveryMaintenance(opened.owner, input.snapshotStore, (seal, requireClosedWorkflowCompletion) => {
 			// These generations belong to this stable boundary. The next install's
 			// own turnover (if any) classifies from the state it then observes.
 			const passes = async (): Promise<"complete"> => {
-				await runReceivedRecoveryTurnoverPasses({source, snapshotStore: input.snapshotStore, catalog: input.catalog,
-					context, signing: opened.owner, requireClosedWorkflowCompletion}, seal);
+				settled = (await runReceivedRecoveryTurnoverPasses({source, snapshotStore: input.snapshotStore, catalog: input.catalog,
+					context, signing: opened.owner, requireClosedWorkflowCompletion, settle: !resume}, seal)).settled;
 				return "complete";
 			};
 			// A lull is background: its walks defer host turns behind co-located
@@ -1269,8 +1333,9 @@ export async function maintainCreatorRecipientRecoveryPool(input: Readonly<{
 	} finally {
 		await opened.owner.stop();
 	}
-	// Record what the completed passes reconciled (a resume discharges a halt; it records nothing).
-	if (outcome === "ran" && !resume) {
+	// Record what the completed passes reconciled (a resume discharges a halt; it records nothing;
+	// passes that did not settle record nothing either, and the install turns over).
+	if (outcome === "ran" && !resume && settled) {
 		try {
 			const boundary = await captureReceivedTurnoverBoundary(source, input.snapshotStore,
 				(await source.inspectQueuedNativeHead()).candidates);
@@ -1434,9 +1499,9 @@ export async function receiveCreatorSuccessorAdoption(
 			await promotionSource.release();
 			promotionSource = undefined;
 		}
-		retiredGenerations.push(...await runReceivedRecoveryTurnoverPasses({source, snapshotStore: input.snapshotStore,
+		retiredGenerations.push(...(await runReceivedRecoveryTurnoverPasses({source, snapshotStore: input.snapshotStore,
 			catalog: input.catalog, context, signing: openedCustody.owner},
-			() => source.sealReceivedRecoveryDependencies(openedCustody.owner, input.snapshotStore)));
+			() => source.sealReceivedRecoveryDependencies(openedCustody.owner, input.snapshotStore))).retired);
 		observeReceivedTurnover("ran");
 		return true;
 	};
