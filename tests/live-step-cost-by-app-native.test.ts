@@ -9,7 +9,8 @@
 //
 // Environment: LIVE_APP (grid | canvas | chat, default grid), LIVE_EPOCHS (default 8), LIVE_MOVES
 // (ordinary moves per Writer per epoch, default 6), LIVE_ROLLOVER (harness | app, default harness),
-// LIVE_READER (product: the app's own resource bound reader, default | harness).
+// LIVE_READER (product: the app's own resource bound reader, default | harness), LIVE_CHAT_FORMAT
+// (window, the long room's default | shares, what the shipped Chat signs | lifetime).
 // Prints one `LIVE_STEPS {json}` line: per step and position bucket (0 = the first such step after
 // the boundary, then 1, 2-3, 4+; "span" = an app-rollover step during which the role's epoch
 // changed), the count and the median/p95 wall and CPU in ms.
@@ -180,6 +181,9 @@ it(`live step cost by position after the epoch boundary (${APP}, ${ROLLOVER} rol
 			epochs: EPOCHS,
 			moves: MOVES,
 			...(ROLLOVER === "app" ? { rollover: "app" as const } : {}),
+			...(env.LIVE_CHAT_FORMAT === undefined
+				? {}
+				: { chatFormat: env.LIVE_CHAT_FORMAT as "window" | "shares" | "lifetime" }),
 		},
 		(creator, writer) => [wrap("creator", creator), wrap("writer", writer)]
 	);
