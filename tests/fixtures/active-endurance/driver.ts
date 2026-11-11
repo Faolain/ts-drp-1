@@ -3,7 +3,7 @@ import { decodeCanonical } from "@ts-drp/canonical";
 import assert from "node:assert/strict";
 
 import { ChatWindowOracle } from "./chat-oracle.js";
-import { lostRowDisposition } from "./lost-disposition.js";
+import { accountDroppedRows, type DroppedRow, type DroppedRowProbe, lostRowDisposition } from "./lost-disposition.js";
 import {
 	type AppKind,
 	fromBase64,
@@ -39,6 +39,9 @@ export const APP_ROLLOVER_WINDOW_TAIL_MS = 1_000;
  * member issue in a window, 12 adopted epochs per app: Canvas 803 ms, Grid 515 ms, Chat 517 ms.
  */
 export const APP_MEMBER_ROLLOVER_ISSUE_BOUND_MS = 5_000;
+/** A dropped first copy is accounted for by the next adoption plus this cap after its epoch's check. */
+const DROPPED_ROW_CAP_MS = 30_000;
+const DROPPED_ROW_POLL_MS = 250;
 const q = (values: number[], p: number): number =>
 	[...values].sort((a, b) => a - b)[Math.min(values.length - 1, Math.floor(values.length * p))] ?? 0;
 const rowValue = (row: WireRow) =>
@@ -100,6 +103,12 @@ export async function driveActiveAppEndurance(
 	const acceptedLiveTimes: number[] = [];
 	const carriedTimes: number[] = [];
 	const carriedKinds = { lateExact: 0, replaced: 0 };
+	// Every dropped first copy, from its drop to the admission that carries it (accountDroppedRows).
+	const droppedRowLatencies: number[] = [];
+	const droppedRowClock = {
+		now: () => performance.timeOrigin + performance.now(),
+		sleep: (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
+	};
 	const pendingCarried: { digest: string; from: number; receivedAt: number; epoch: number }[] = [];
 	// Carried-row waterfall (app mode, observation only; performance.timeOrigin-based ms). A replacement is
 	// published when its author accepts it (the room's own accept callback, acceptedAt); a 50 ms observer reads
@@ -490,6 +499,73 @@ export async function driveActiveAppEndurance(
 				rows: state.messages?.length ?? state.blocks?.length ?? required(state.counters).length,
 			};
 		};
+		// The Writer's dropped first copies, as the creator and the Writer's settlement account for them.
+		const droppedRowProbe = (): DroppedRowProbe => ({
+			replacements: async () => (await required(peers[1]).settlementAudit()).replacements,
+			accepted: (digests) => required(peers[0]).acceptance([...digests]),
+			...(required(peers[0]).acceptedAt === undefined
+				? {}
+				: { admittedAt: (digests: readonly string[]) => required(required(peers[0]).acceptedAt)([...digests]) }),
+			// The driver never re-offers a given-back move, so a hand-back record stays pending.
+			handBack: async (digests) => {
+				const status = (await required(peers[1]).settlementStatus?.()) as
+					| { undelivered?: readonly { vertexDigest: string }[] }
+					| null
+					| undefined;
+				return (status?.undelivered ?? []).some((record) => digests.has(record.vertexDigest)) ? "pending" : "none";
+			},
+			adoptions: adopted,
+			progress: async () => {
+				await flush(0);
+				await flush(1);
+				await appSettle();
+			},
+			diag: async (row) => {
+				const writer = required(peers[1]);
+				const creator = required(peers[0]);
+				const audit = await writer.settlementAudit();
+				const bySource = new Map(audit.replacements.map((entry) => [entry.sourceDigest, entry]));
+				const chain: unknown[] = [];
+				const seen = new Set<string>();
+				const walk = async (digest: string, depth: number): Promise<void> => {
+					if (seen.has(digest) || depth > 8) return;
+					seen.add(digest);
+					const entry = bySource.get(digest);
+					chain.push({
+						digest,
+						depth,
+						admitted: (await creator.acceptance([digest]))[0],
+						planEntry:
+							entry === undefined
+								? null
+								: {
+										sourceSequence: entry.sourceSequence,
+										disposition: entry.disposition,
+										replacements: entry.replacementDigests,
+									},
+					});
+					for (const next of entry?.replacementDigests ?? []) await walk(next, depth + 1);
+				};
+				await walk(row.digest, 0);
+				const status = (await writer.settlementStatus?.()) as
+					| { epoch: number; unsettledEpochs: number; undelivered: readonly { vertexDigest: string; epoch: number }[] }
+					| null
+					| undefined;
+				const outbox = (await writer.published(null)).find((value) => value.digest === row.digest);
+				return {
+					droppedAt: row.droppedAt,
+					rowEpoch: outbox === undefined ? null : rowValue(outbox).epoch,
+					authorSequence: outbox?.authorSequence ?? null,
+					inWriterOutbox: outbox !== undefined,
+					creatorEpoch: await creator.authorityEpoch(),
+					writerEpoch: await writer.authorityEpoch(),
+					chain,
+					handBack: (status?.undelivered ?? []).filter((record) => seen.has(record.vertexDigest)),
+					undelivered: status?.undelivered.length ?? null,
+					unsettledEpochs: status?.unsettledEpochs ?? null,
+				};
+			},
+		});
 		firstEpoch = (await required(peers[0]).authorityEpoch()) ?? 0;
 		const adopted = async () => ((await required(peers[0]).authorityEpoch()) ?? 0) - firstEpoch;
 		let reopenedOnce = false;
@@ -528,7 +604,7 @@ export async function driveActiveAppEndurance(
 			const receiverBefore = await joinAll(peers.map((peer) => peer.projectionAudit()));
 			let rolloverEndedAt = 0;
 			let rolloverReceiverAfter = receiverBefore;
-			const lost: WireRow[] = [];
+			const lost: DroppedRow[] = [];
 			// App mode: the creator's own rollovers of this epoch, which ran during play.
 			const appWindows: { start: number; end: number }[] = [];
 			const stream = (async () => {
@@ -544,7 +620,8 @@ export async function driveActiveAppEndurance(
 					// arrive without blocking the sender on the sealed creator.
 					const rows = await required(peers[1]).published(required(delivered[1]));
 					if (n % 3 !== 0) await required(peers[0]).inject(rows);
-					else if (rows.length) lost.push(required(rows.at(-1)));
+					else if (rows.length)
+						lost.push({ digest: required(rows.at(-1)).digest, droppedAt: performance.timeOrigin + performance.now() });
 				}
 			})();
 			const rollover = (async () => {
@@ -605,17 +682,15 @@ export async function driveActiveAppEndurance(
 			const settlement = await joinAll(peers.map((peer) => peer.settlementAudit()));
 			for (const value of settlement) assert.deepEqual(value.missing, [], "no dangling settlement-plan dependency");
 			if (appMode) await resolveCarried(settlement);
-			const lostDisposition: { sourceDigest: string; acceptedDigests: readonly string[] }[] = [];
-			for (const row of lost) {
-				const disposition = await lostRowDisposition(row.digest, required(settlement[1]).replacements, (digests) =>
-					required(peers[0]).acceptance([...digests])
-				);
-				assert.ok(
-					disposition.carried,
-					`dropped source ${row.digest} admitted exactly or by every durable replacement chunk`
-				);
-				lostDisposition.push({ sourceDigest: row.digest, acceptedDigests: disposition.acceptedDigests });
-			}
+			const lostDisposition = (
+				await accountDroppedRows(lost, droppedRowProbe(), droppedRowClock, {
+					capMs: DROPPED_ROW_CAP_MS,
+					pollMs: DROPPED_ROW_POLL_MS,
+				})
+			).map((row) => {
+				droppedRowLatencies.push(row.latencyMs);
+				return { sourceDigest: row.digest, acceptedDigests: row.acceptedDigests };
+			});
 			stage = `epoch-${epoch}-maintenance-overlap`;
 			const maintenanceStart = performance.timeOrigin + performance.now();
 			const maintenanceReceiverBefore = await joinAll(peers.map((peer) => peer.projectionAudit()));

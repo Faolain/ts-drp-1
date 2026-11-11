@@ -52,3 +52,80 @@ export async function lostRowDisposition(
 	const result = await carried(sourceDigest, new Set());
 	return { carried: result, acceptedDigests: result ? leaves : [] };
 }
+
+/** A dropped first copy the conservation check must account for, and when it was dropped (ms, the probe's clock). */
+export interface DroppedRow {
+	readonly digest: string;
+	readonly droppedAt: number;
+}
+
+/** The peers' state the dropped-row accounting reads. */
+export interface DroppedRowProbe {
+	/** The author's durable settlement plan entries (re-read on each evaluation). */
+	replacements(): Promise<readonly LostRowReplacement[]>;
+	/** The receiver's admission of each digest, in order. */
+	accepted(digests: readonly string[]): Promise<readonly boolean[]>;
+	/** When the receiver admitted each digest (same clock as `droppedAt`), or null; optional. */
+	admittedAt?(digests: readonly string[]): Promise<readonly (number | null)[]>;
+	/** Whether the author holds a durable hand-back record for one of these digests, and whether it was re-offered and admitted. */
+	handBack(digests: ReadonlySet<string>): Promise<"none" | "pending" | "reoffered-admitted">;
+	/** How many adoptions the receiver has made so far. */
+	adoptions(): Promise<number>;
+	/** Drives delivery between evaluations (flush, re-offer, install published offers). */
+	progress(): Promise<void>;
+	/** The diagnostic dump a failure carries. */
+	diag(row: DroppedRow): Promise<Readonly<Record<string, unknown>>>;
+}
+
+export interface DroppedRowClock {
+	now(): number;
+	sleep(ms: number): Promise<void>;
+}
+
+export interface DroppedRowOptions {
+	/** The fixed cap added to the start of the wait, or to the next adoption when one happens during it. */
+	readonly capMs: number;
+	readonly pollMs: number;
+}
+
+export interface DroppedRowAccounted {
+	readonly digest: string;
+	readonly how: "exact" | "replaced" | "handed-back";
+	readonly acceptedDigests: readonly string[];
+	/** From the drop to the admission that carries the move. */
+	readonly latencyMs: number;
+}
+
+/**
+ * Accounts for every dropped first copy at an epoch's conservation check: each must be admitted exactly
+ * or carried by a complete replacement chain (lostRowDisposition).
+ * @param rows - The dropped first copies of this epoch.
+ * @param probe - The peers' state.
+ * @param clock - Time source.
+ * @param _options - Wait bound.
+ * @returns How each row was carried.
+ */
+export async function accountDroppedRows(
+	rows: readonly DroppedRow[],
+	probe: DroppedRowProbe,
+	clock: DroppedRowClock,
+	_options: DroppedRowOptions
+): Promise<readonly DroppedRowAccounted[]> {
+	const accounted: DroppedRowAccounted[] = [];
+	const replacements = await probe.replacements();
+	for (const row of rows) {
+		const disposition = await lostRowDisposition(row.digest, replacements, (digests) => probe.accepted(digests));
+		if (!disposition.carried)
+			throw new Error(`dropped source ${row.digest} admitted exactly or by every durable replacement chunk`);
+		accounted.push({
+			digest: row.digest,
+			how:
+				disposition.acceptedDigests.length === 1 && disposition.acceptedDigests[0] === row.digest
+					? "exact"
+					: "replaced",
+			acceptedDigests: disposition.acceptedDigests,
+			latencyMs: clock.now() - row.droppedAt,
+		});
+	}
+	return accounted;
+}
