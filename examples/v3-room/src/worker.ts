@@ -6,8 +6,9 @@
  * - v3RoomWorkerNodeConfig: the node config a worker-hosted room needs (the identity seed from the
  *   page, the browser-local peer cache through the page's mirrored storage, no devtools inspector).
  *
- * The harness's rollover observation lives in ./worker-observation.ts: it must load before the room's
- * modules in the worker, so it imports nothing.
+ * Exported from the package's main entry. The harness's rollover observation is also the subpath
+ * `@ts-drp/example-v3-room/worker-observation`: a worker installs it before the room's modules load,
+ * so it imports nothing.
  */
 import { DRPError } from "@ts-drp/errors";
 import {

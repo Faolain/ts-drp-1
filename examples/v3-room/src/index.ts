@@ -104,6 +104,13 @@ export {
 	v3RoomLegacyDatabaseName,
 	v3RoomPlayerDatabaseName,
 } from "./player-database.js";
+export {
+	V3_ROOM_WORKER_ERROR_CODECS,
+	v3RoomWorkerNodeConfig,
+	type V3RoomWorkerIdentity,
+	v3RoomWorkerPeerCacheKeys,
+} from "./worker.js";
+export { forwardV3RoomWorkerObservation } from "./worker-observation.js";
 
 const browserStorageHost: V3RoomStorageHost = Object.freeze({
 	openAhe: (databaseName: string) => createBrowserAheDurableStore({ databaseName }),

@@ -86,6 +86,7 @@ declare global {
 	interface Window {
 		readonly __TS_DRP_GRID_SESSION__?: { snapshot(): NetworkSnapshot };
 		readonly __TS_DRP_V3_ZONE__?: ZoneApi;
+		readonly __TS_DRP_GRID_ROOM_WORKER__?: unknown;
 	}
 }
 
@@ -641,8 +642,17 @@ function escaped(value: string): string {
 	return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 }
 
-async function openGrid(page: Page): Promise<void> {
-	await page.goto("/");
+/**
+ * D9346_ROOM_WORKER opts the two-client scenario's pages into the room worker (`?roomWorker`):
+ * "both", or one role ("creator" or "joiner") for a main-thread tab beside a worker tab. Unset,
+ * every page runs the zone on the main thread, as before.
+ */
+const ROOM_WORKER_ROLES = process.env.D9346_ROOM_WORKER ?? "";
+
+async function openGrid(page: Page, role?: "creator" | "joiner"): Promise<void> {
+	const worker = role !== undefined && (ROOM_WORKER_ROLES === "both" || ROOM_WORKER_ROLES === role);
+	await page.goto(worker ? "/?roomWorker" : "/");
+	if (worker) await page.waitForFunction(() => window.__TS_DRP_GRID_ROOM_WORKER__ !== undefined);
 	await page.waitForFunction(() => window.__TS_DRP_GRID_SESSION__ !== undefined);
 	await expect(page.locator("#loadingMessage")).toBeHidden();
 	await page.waitForFunction(() => window.__TS_DRP_V3_ZONE__ !== undefined, undefined, { timeout: 10_000 });
@@ -739,7 +749,7 @@ test("two real network clients recover and converge one durable v3 zone while mo
 	const creator = await creatorContext.newPage();
 	let joiner = await joinerContext.newPage();
 	try {
-		await Promise.all([openGrid(creator), openGrid(joiner)]);
+		await Promise.all([openGrid(creator, "creator"), openGrid(joiner, "joiner")]);
 		const [creatorNetwork, joinerNetwork] = await Promise.all([networkSnapshot(creator), networkSnapshot(joiner)]);
 		expectWithinInstalledBudget(creatorNetwork);
 		expectWithinInstalledBudget(joinerNetwork);
@@ -819,7 +829,7 @@ test("two real network clients recover and converge one durable v3 zone while mo
 		await expect(creator.locator('[data-block-id="offline"]')).toBeVisible();
 
 		joiner = await joinerContext.newPage();
-		await openGrid(joiner);
+		await openGrid(joiner, "joiner");
 		const reopened = await zone(joiner);
 		expect(reopened.enrollment).toBe(joinerEnrollment.enrollment);
 		expect(reopened.localAuthor).toBe(joinerEnrollment.localAuthor);
@@ -879,7 +889,7 @@ test("two real network clients recover and converge one durable v3 zone while mo
 		});
 		await expect.poll(async () => (await zone(creator)).zoneId).toBe(targetObjectId);
 		joiner = await joinerContext.newPage();
-		await openGrid(joiner);
+		await openGrid(joiner, "joiner");
 		await joiner.fill("#gridInput", created.invite);
 		await joiner.click("#joinGrid");
 		await expect.poll(async () => (await zone(joiner)).zoneId).toBe(targetObjectId);
@@ -898,7 +908,7 @@ test("two real network clients recover and converge one durable v3 zone while mo
 		await joiner.evaluate(() => window.__TS_DRP_V3_ZONE__?.close());
 		await joiner.close();
 		joiner = await joinerContext.newPage();
-		await openGrid(joiner);
+		await openGrid(joiner, "joiner");
 		await joiner.fill("#gridInput", created.invite);
 		await joiner.click("#joinGrid");
 		await expect.poll(async () => (await zone(joiner)).zoneId).toBe(targetObjectId);
