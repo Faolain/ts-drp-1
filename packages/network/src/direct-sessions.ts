@@ -31,8 +31,8 @@ import {
 	DIRECT_MESSAGE_MAX_PREFIX_BYTES,
 	DIRECT_SESSION_LIMITS,
 	DIRECT_SESSION_PROTOCOLS,
-	type DirectSessionClass,
 	DirectMessageSendError,
+	type DirectSessionClass,
 	DRP_MESSAGE_PROTOCOL,
 	LEGACY_CLOSE_DEADLINE_MS,
 	LEGACY_MAX_CONCURRENT,
@@ -53,20 +53,20 @@ export interface DirectSendOptions {
 	/** Sync-family messages keep the legacy protocol (the negotiated sync fallback). */
 	readonly legacyOnly?: boolean;
 	/** Measurement hook: the frame starts its write (after queueing and credit). */
-	readonly onWriteStart?: () => void;
+	onWriteStart?(): void;
 }
 
 interface Pending {
 	readonly bytes: Uint8Array;
 	readonly signal?: AbortSignal;
-	readonly onWriteStart?: () => void;
-	readonly resolve: () => void;
-	readonly reject: (error: unknown) => void;
+	onWriteStart?(): void;
+	resolve(): void;
+	reject(error: unknown): void;
 	started: boolean;
 	settled: boolean;
 	/** Removes the frame from whichever queue holds it now. */
-	cancel?: () => void;
-	detachAbort?: () => void;
+	cancel?(): void;
+	detachAbort?(): void;
 }
 
 const CREDIT_MAX_BYTES = 16;

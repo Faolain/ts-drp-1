@@ -89,9 +89,6 @@ import {
 	type ExplicitDialTicket,
 	resolveConnectionBudget,
 } from "./connection-budget.js";
-import { createMetricsRegister, type PrometheusMetricsRegister } from "./metrics/prometheus.js";
-import { PeerSelector } from "./peer-selector.js";
-import { resolveWebRtcConfiguration, type WebRtcConfigurationOwner } from "./webrtc-configuration.js";
 import {
 	DIRECT_SESSION_MAX_STREAMS,
 	DirectMessageSendError,
@@ -101,7 +98,17 @@ import {
 	LEGACY_MAX_OUTBOUND_STREAMS,
 } from "./direct-message.js";
 import { DirectMessageSessions } from "./direct-sessions.js";
+import { createMetricsRegister, type PrometheusMetricsRegister } from "./metrics/prometheus.js";
+import { PeerSelector } from "./peer-selector.js";
+import { resolveWebRtcConfiguration, type WebRtcConfigurationOwner } from "./webrtc-configuration.js";
 import { SEAL_EVIDENCE_PROTOCOL, type SealEvidenceProtocolPort } from "./seal.js";
+import {
+	CREATOR_SUCCESSOR_PROTOCOL,
+	SNAPSHOT_CHUNK_PROTOCOL,
+	SNAPSHOT_PROTOCOL_MAX_STREAMS,
+	type SnapshotChunkProtocolPort,
+	type SnapshotChunkProtocolStream,
+} from "./snapshot-transfer.js";
 import {
 	callerOf,
 	countReceiveClass,
@@ -110,17 +117,10 @@ import {
 	instrumentConnection,
 	recordReceive,
 	recordSend,
+	streamDiagnosticsEnabled,
 	type StreamReceiveSample,
 	type StreamSendSample,
-	streamDiagnosticsEnabled,
 } from "./stream-diagnostics.js";
-import {
-	CREATOR_SUCCESSOR_PROTOCOL,
-	SNAPSHOT_CHUNK_PROTOCOL,
-	SNAPSHOT_PROTOCOL_MAX_STREAMS,
-	type SnapshotChunkProtocolPort,
-	type SnapshotChunkProtocolStream,
-} from "./snapshot-transfer.js";
 import { readUint8ArrayFrame, streamToUint8Array, uint8ArrayToStream, writeUint8ArrayFrame } from "./stream.js";
 import {
 	createDirectSyncIngress,

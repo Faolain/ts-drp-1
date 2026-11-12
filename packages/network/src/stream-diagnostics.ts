@@ -72,7 +72,7 @@ interface Store {
 type DiagnosticsGlobal = typeof globalThis & {
 	__DRP_STREAM_DIAGNOSTICS__?: boolean;
 	__drpStreamDiagnostics?: Store;
-	process?: { env?: Record<string, string | undefined>; getBuiltinModule?: (id: string) => unknown };
+	process?: { env?: Record<string, string | undefined>; getBuiltinModule?(id: string): unknown };
 };
 
 const root = globalThis as DiagnosticsGlobal;
@@ -91,7 +91,7 @@ function store(): Store {
 		root.__drpStreamDiagnostics = current;
 		const out = root.process?.env?.DRP_STREAM_DIAGNOSTICS_OUT;
 		if (out !== undefined && out !== "") {
-			const timer = setInterval(flushStreamDiagnostics, 5_000) as unknown as { unref?: () => void };
+			const timer = setInterval(flushStreamDiagnostics, 5_000) as unknown as { unref?(): void };
 			timer.unref?.();
 		}
 	}
