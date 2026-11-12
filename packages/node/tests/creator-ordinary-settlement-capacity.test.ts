@@ -736,9 +736,11 @@ describe("ordinary settlement finite capacity through existing owners (no proof 
 			canonicalRowsShape: {ordinaryFinal: {items: 10, maxDepth: 4}, successorPending: {items: 30, maxDepth: 6}, successorFinal: {items: 20, maxDepth: 7}}},
 			runtimeWidths: {successorReserved: 11, successorEntered: 12, successorFinal: 13}};
 		const none = future({current: {successorFenceCount: 0}}, native, 0);
-		expect(none).toEqual({rows: {byteLength: 100, items: 10, maxDepth: 4}, futureLeaf: 0});
+		expect(none).toEqual({rows: {byteLength: 100, items: 10, maxDepth: 4}, unionRows: {byteLength: 100, items: 10, maxDepth: 4}, futureLeaf: 0});
 		const v1 = future({current: {successorFenceCount: 1}}, native, 99), width = (length: number) => canonicalBytesResourceForSizing(length, limits).byteLength;
 		expect(v1.rows).toEqual({byteLength: 200, items: 30, maxDepth: 7});
+		// The union-limited census point image holds FINAL rows only (ordinaryFinal or successorFinal).
+		expect(v1.unionRows).toEqual({byteLength: 180, items: 20, maxDepth: 7});
 		expect(v1.futureLeaf).toBe(width(512) + width(64) + width(32) + 99);
 		for (const bytes of [127, 128, 16383, 16384]) expect(future({current: {successorFenceCount: 1}}, {...native, fencePreimage: bytes}, 99).futureLeaf)
 			.toBeGreaterThanOrEqual(bytes);
