@@ -28,6 +28,12 @@
 //   noDedupe (a re-offer of a move the successor already holds is admitted again),
 //   noReoffer (the author never re-offers a move outside the cut).
 //
+// The creator's own close (v3-live stageClosedBlueprintEpoch adopt) is the same receiver-side
+// rule with the cut taken at the closing plane's OWN admitted index: ownClose folds, cuts at mAdm
+// and (SOUND) releases the pending rows at once; its inline maintenance hold (pool full,
+// generation pressure) requires an empty pending ingress just as the received install does.
+// BASE keeps them and the close strands (ownCloseStrandsTest).
+//
 // Properties: exactlyOnce (no move is admitted twice in the successor), releaseKeeps
 // Admitted (the release never removes an admitted row of the closing plane), noStrand
 // (the install never fails on pending ingress), allLand (once the successor settles,
@@ -178,6 +184,17 @@ module memberReceivedClosePendingRelease {
     mutants' = mutants, unchangedSucc,
   }
 
+  // The creator's own close: the closing plane is the receiver; the fold cuts at its own admitted
+  // index and (SOUND) releases its pending rows (copies count as lost).
+  action ownClose: bool = all {
+    not(closed), phase == LIVE,
+    closed' = true, cut' = mAdm, phase' = CLOSING, mAdmAtBegin' = mAdm,
+    mPend' = if (mutants.keepPending) mPend else Set(),
+    mAdm' = if (mutants.releaseAdmitted and mAdm.size() > 0) mAdm.exclude(Set(WRITERS.filter(i => mAdm.contains(i)).fold(0, (a, b) => if (b > a) b else a))) else mAdm,
+    net' = WRITERS.mapBy(i => if (not(mutants.keepPending) and mPend.contains(i)) LOST else net.get(i)),
+    wIssued' = wIssued, cAdm' = cAdm, losses' = losses, refusedIssue' = refusedIssue, mutants' = mutants, unchangedSucc,
+  }
+
   // The received recovery hold requires an empty pending ingress; otherwise the install fails.
   action install: bool = all {
     phase == CLOSING,
@@ -245,6 +262,7 @@ module memberReceivedClosePendingRelease {
     ownIssue,
     creatorClose,
     beginReceived,
+    ownClose,
     install,
     settle,
     stutter,
@@ -288,6 +306,24 @@ module memberReceivedClosePendingRelease {
     .then(writerIssue).then(deliver(1, true))
     .then(all { assert(mPend == Set(1)), ownIssue })
     .then(all { assert(mAdm == Set(1) and mPend == Set() and noAdmissibleRefusal), creatorClose })
+  // The creator's own close with w3 pending (w2 lost): SOUND releases w3, the cut is {1}, and
+  // w2, w3 land once through re-offer. BASE keeps w3 and the close's hold strands it.
+  run ownCloseReleaseLandsTest = init
+    .then(writerIssue).then(deliver(1, false))
+    .then(writerIssue).then(lose(2))
+    .then(writerIssue).then(deliver(3, false))
+    .then(all { assert(mPend == Set(3) and mAdm == Set(1)), ownClose })
+    .then(all { assert(mPend == Set() and cut == Set(1)), install })
+    .then(all { assert(phase == INSTALLED and reoffer.get(2) == FLIGHT and reoffer.get(3) == FLIGHT), succAdmit(2) })
+    .then(succAdmit(3))
+    .then(all { assert(succ == Set(1, 2, 3) and exactlyOnce), settle })
+    .then(all { assert(all_), stutter })
+  run ownCloseStrandsTest = initBase
+    .then(writerIssue).then(deliver(1, false))
+    .then(writerIssue).then(lose(2))
+    .then(writerIssue).then(deliver(3, false))
+    .then(ownClose).then(install)
+    .then(all { assert(not(noStrand)), stutter })
   run releaseAdmittedTest = initReleaseAdmitted
     .then(writerIssue).then(creatorAdmit(1)).then(deliver(1, false))
     .then(creatorClose).then(beginReceived)

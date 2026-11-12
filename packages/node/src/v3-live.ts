@@ -20318,6 +20318,16 @@ function stageClosedBlueprintEpoch(
 			try {
 				const snapshot = staged.adopt();
 				registration.blueprintFolded = true;
+				// A folded plane never admits ingress again: the fold is never undone, and
+				// authenticateV3Ingress drops every row once blueprintClosing is set. Its
+				// closing recovery hold (the close's inline pool and generation maintenance)
+				// requires an empty pending ingress, so a retained row would refuse every
+				// retry of the close. Release the retained rows now: the hot handoff clears
+				// them anyway. A released copy counts as lost for this plane; the successor
+				// snapshot or its author's re-offer delivers the move (the same rule as the
+				// received close; model: member-received-close-pending-release.qnt).
+				registration.pendingIngress.clear();
+				registration.pendingIngressBytes = 0;
 				return ObjectFreeze({ kind: "adopted" as const, ok: true as const, snapshot });
 			} catch {
 				return blueprintAdoptFailure("adopt-rejected", "v3 blueprint fold adoption was rejected");
