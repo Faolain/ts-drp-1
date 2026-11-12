@@ -3092,8 +3092,13 @@ function createRoomOperationAdmissionPolicy(
 	return Object.freeze({
 		createApplicationStateBound: (exactCanonicalBaseStateBytes: Uint8Array) =>
 			createRoomApplicationStateBound(input.application, authority.blueprintDigest, exactCanonicalBaseStateBytes),
-		beginApplicationStateBound: (exactCanonicalBaseStateBytes: Uint8Array) =>
-			beginRoomApplicationStateBound(input.application, authority.blueprintDigest, exactCanonicalBaseStateBytes),
+		// Only for an application with a resumable seed: otherwise the plane seeds at install, as before.
+		...(typeof input.application.readOrdinaryApplicationResourceBound?.beginIncrementalProjection !== "function"
+			? {}
+			: {
+					beginApplicationStateBound: (exactCanonicalBaseStateBytes: Uint8Array) =>
+						beginRoomApplicationStateBound(input.application, authority.blueprintDigest, exactCanonicalBaseStateBytes),
+				}),
 		reserve(operation: Readonly<Record<string, unknown>>, authenticated?: Readonly<{ author: string }>) {
 			const expanded =
 				operation.action === "applicationBatch"

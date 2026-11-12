@@ -22384,9 +22384,16 @@ function seedApplicationStateBoundAtInstall(registration: V3PlaneRegistration): 
 		const payload = registration.payload;
 		applicationStateBoundSeeds.begin(registration, {
 			start: () => {
-				const seed: unknown = ReflectApply(begin, policy, [base.snapshot().exactCanonicalStateBytes]);
-				if (!isObject(seed) || typeof Reflect.get(seed, "step") !== "function" || typeof Reflect.get(seed, "finish") !== "function")
-					return undefined;
+				const exactCanonicalStateBytes = base.snapshot().exactCanonicalStateBytes;
+				const seed: unknown = ReflectApply(begin, policy, [exactCanonicalStateBytes]);
+				if (!isObject(seed) || typeof Reflect.get(seed, "step") !== "function" || typeof Reflect.get(seed, "finish") !== "function") {
+					// No resumable seed for this base: the synchronous seed, in this deferred turn.
+					const create = Reflect.get(policy as object, "createApplicationStateBound");
+					return typeof create !== "function" ? undefined : ObjectFreeze({
+						step: () => true,
+						finish: () => fittingApplicationStateBound(ReflectApply(create, policy, [exactCanonicalStateBytes])),
+					});
+				}
 				return ObjectFreeze({
 					step: (byteBudget: number) => ReflectApply(Reflect.get(seed, "step") as (budget: number) => unknown, seed, [byteBudget]) === true,
 					finish: () => fittingApplicationStateBound(ReflectApply(Reflect.get(seed, "finish") as () => unknown, seed, [])),
