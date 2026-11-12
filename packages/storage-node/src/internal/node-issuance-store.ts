@@ -78,6 +78,7 @@ import {
 	issuanceRetirementBytesEqual,
 	issuanceRetirementHex,
 	issuanceRetirementImage,
+	issuanceRetirementImageBound,
 	issuanceRetirementRefusal,
 	issuanceRetirementTransitionRows,
 	issuanceUnsignedPostimageCharge,
@@ -928,7 +929,8 @@ function reserveUnsignedIntent(
 			: [...priorRows.lineages, normalized],
 	};
 	if (ordinaryRows === undefined) {
-		issuanceRetirementImage(rows, scope.objectId); // reserved postimage, including exact unknown debt bytes
+		// Reserved postimage gate, including exact unknown debt bytes; the image itself is not needed.
+		issuanceRetirementImageBound(rows, scope.objectId);
 		issuanceUnsignedPostimageCharge(rows, scope, pending); // eventual pair + exact prospective plan
 	} else {
 		// The exact initial native image is still held by this writer. NONE's
