@@ -18,7 +18,9 @@ import * as cooperativeWork from "../packages/node/src/internal/cooperative-work
 // ran while the creator was rolling over. Each happens only in a gap between registrations (a
 // join between seal, serve, adopt and export, or the close's wait for the creator's own
 // maintenance job, which must not defer behind the close that waits for it). Resumes at the
-// idle window or the hard bound are the scheduler's liveness guarantee and are reported apart.
+// idle window or the hard bound are the scheduler's liveness guarantee and are reported apart;
+// that a walk still completes under back-to-back foreground is a scheduler case
+// (cooperative-work-foreground.test.ts).
 
 afterEach(async () => expect(await closeFixtures()).toEqual([]));
 
@@ -41,13 +43,13 @@ function delta(before: Counts, after: Counts) {
 const GAPS = 5;
 
 /**
- * A co-located background-lane walk: one counted host turn per step until stopped.
+ * A co-located background-lane walk: one host turn per step until stopped.
  * @returns Its state and completion.
  */
-function backgroundWalk(steps = Number.POSITIVE_INFINITY) {
+function backgroundWalk() {
 	const state = { turns: 0, stop: false };
 	const done = cooperativeWork.runInBackgroundLane(async () => {
-		while (!state.stop && state.turns < steps) {
+		while (!state.stop) {
 			state.turns++;
 			await cooperativeWork.yieldToHost();
 		}
@@ -81,14 +83,10 @@ async function rolloverRoom() {
 
 it("a co-located background walk takes no host turn inside the creator's rollover window beyond one per gap", async () => {
 	const { rollover } = await rolloverRoom();
-	const windows: (ReturnType<typeof delta> & { walkTurns: number })[] = [];
+	const windows: ReturnType<typeof delta>[] = [];
 	for (let index = 0; index < 4; index++) {
 		const walk = backgroundWalk();
-		let walkBefore = 0;
-		const window = await rollover(() => {
-			walkBefore = walk.state.turns;
-		});
-		windows.push({ ...window, walkTurns: walk.state.turns - walkBefore });
+		windows.push(await rollover());
 		walk.state.stop = true;
 		await walk.done;
 	}
@@ -98,29 +96,6 @@ it("a co-located background walk takes no host turn inside the creator's rollove
 		// registration the walk turns at every one of them.
 		expect(window.ran + window.released, JSON.stringify(window)).toBeLessThanOrEqual(GAPS);
 	}
-}, 300_000);
-
-it("a background walk still completes while rollovers run back to back", async () => {
-	const { rollover } = await rolloverRoom();
-	// Each deferred turn waits only for the foreground cohort it found (one registration), or
-	// at most BACKGROUND_DEFERRAL_BOUND_MS, so every gap or released registration lets a waiting
-	// walk take one more turn: a walk of STEPS turns finishes within STEPS windows even when no
-	// lull separates them.
-	const STEPS = 6;
-	const walk = backgroundWalk(STEPS);
-	let finished = false;
-	void walk.done.then(() => {
-		finished = true;
-	});
-	let rollovers = 0;
-	while (!finished && rollovers < STEPS) {
-		await rollover();
-		rollovers++;
-	}
-	await walk.done;
-	console.info(JSON.stringify({ rollovers, turns: walk.state.turns }));
-	expect(walk.state.turns).toBe(STEPS);
-	expect(rollovers).toBeLessThanOrEqual(STEPS);
 }, 300_000);
 
 it("a Writer's recovery-pool lull concurrent with the creator's rollover runs outside the creator's window (m11)", async () => {

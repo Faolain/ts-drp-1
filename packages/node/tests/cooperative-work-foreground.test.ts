@@ -162,6 +162,42 @@ describe("host-level foreground priority", () => {
 		expect(later?.resumed()).toBe(true);
 	});
 
+	it("completes a background walk under back-to-back foreground that never leaves the host unregistered", async () => {
+		// Rollover windows (or issue drains) back to back: each next registration starts before
+		// the previous one releases, and every segment keeps turning, so neither the idle window
+		// nor the hard bound resumes the walk. A deferred turn waits only for the cohort it
+		// found, so each released segment admits one more walk turn: STEPS turns finish within
+		// STEPS + 1 segments. Counted in segments, not time.
+		const STEPS = 8;
+		let turns = 0;
+		const walk = runInBackgroundLane(async () => {
+			while (turns < STEPS) {
+				turns++;
+				await yieldToHost();
+			}
+		});
+		let done = false;
+		void walk.then(() => {
+			done = true;
+		});
+		let segments = 0;
+		let current = foreground();
+		while (!done && segments < 4 * STEPS) {
+			for (let turn = 0; turn < 3; turn++) {
+				busy(2);
+				await yieldToHost();
+			}
+			const next = foreground();
+			current();
+			current = next;
+			segments++;
+		}
+		current();
+		await walk;
+		expect(turns).toBe(STEPS);
+		expect(segments).toBeLessThanOrEqual(STEPS + 1);
+	});
+
 	it("does not defer background work when no foreground work is registered", async () => {
 		const started = performance.now();
 		await backgroundTurn();
