@@ -213,6 +213,11 @@ export class BlueprintStateMachine implements IStagedStateMachine<BlueprintState
 		return output.value;
 	}
 
+	/** Byte length of the exact canonical state, without copying or digesting it. */
+	get exactStateByteLength(): number {
+		return this.#exactCanonicalStateBytes.byteLength;
+	}
+
 	#digest(): string {
 		return this.#stateDigest ??= stateDigest(this.#exactCanonicalStateBytes);
 	}

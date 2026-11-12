@@ -8446,7 +8446,7 @@ async function handleV3IngressWithSource(
 			dependencies: authenticated.vertex.dependencies,
 			operation: authenticated.vertex.operation as Readonly<Record<string, unknown>>,
 			byteCharge: authenticated.byteCharge,
-		})
+		}, "received")
 	) {
 		releaseOperationReservation(reservation);
 		ingressFailureLog("admission-rejected", "application-state-limit");
@@ -16447,17 +16447,21 @@ async function issueOneVertex(
 	let commit: unknown;
 	let capacityRejected = false;
 	let stateLimitRejected = false;
+	let stateBoundAdmitted: Uint8Array | undefined;
 	const stateBoundAdmits = (bytes: Uint8Array, author: string): boolean => {
-		if (controlOperation) return true;
+		// The pre-signing check already judged these exact bytes; judge each candidate once.
+		if (controlOperation || (stateBoundAdmitted !== undefined && sameBytes(stateBoundAdmitted, bytes))) return true;
 		const unsigned = decodeCanonical(bytes);
 		const unsignedDependencies = ownDataValue(unsigned, "dependencies");
-		return applicationStateAdmits(registration, {
+		const admitted = applicationStateAdmits(registration, {
 			digest: bytesToLowerHex(hashDomain("ts-drp/vertex/v3", bytes)),
 			author,
 			dependencies: ArrayIsArray(unsignedDependencies) ? (unsignedDependencies as string[]) : [],
 			operation,
 			byteCharge: bytes.byteLength,
-		});
+		}, "local");
+		if (admitted) stateBoundAdmitted = bytes;
+		return admitted;
 	};
 	let cryptoEntered = false;
 	let signerResolved = false;
@@ -21821,14 +21825,45 @@ function resolvePostAdoptionCensusSizing(
 	}
 }
 
+/** One plane's running application fold: its machine after folding the admitted epoch graph (at
+ * `graphVersion`, on `base`) in the derived projection order. Never adopted into the plane. */
+type ApplicationStateFold = Readonly<{
+	base: BlueprintStateMachine;
+	/** The epoch graph's index and payload: a reset plane replaces both, so a fold cannot outlive it. */
+	index: V3PlaneRegistration["index"];
+	payload: V3PlaneRegistration["payload"];
+	graphVersion: number;
+	digest: string | undefined;
+	machine: BlueprintStateMachine;
+	/** The running fold this one extends by one apply, when it was forked from it. */
+	from?: BlueprintStateMachine;
+}>;
+const applicationStateFolds = new WeakMap<
+	V3PlaneRegistration,
+	{ running?: ApplicationStateFold; pending?: ApplicationStateFold }
+>();
+
 /**
  * Whether this epoch's application fold, with one more non-control vertex, stays within the room's
- * application state limit. It folds exactly what the seal folds (the admitted epoch graph plus the
- * candidate, in the derived projection order, on a fork of the plane's machine, whose limits are the
- * room's), so a vertex this admits can never make the seal's fold refuse. Authorization and the
- * application's own admission are judged elsewhere; only the state bound is judged here.
+ * application state limit.
+ *
+ * Invariant: the fold judged here is exactly the fold the seal runs (the admitted epoch graph plus
+ * the candidate, in the derived projection order, on the plane's machine, whose limits are the
+ * room's). The creator is the authoritative admitter: every vertex that enters its epoch graph
+ * passes this check there, so no admitted vertex can make the seal's fold refuse. A Writer runs the
+ * same check on its own view; that refusal is early and advisory (another Writer's concurrent move
+ * may change the creator's fold), and correctness never rests on it.
+ *
+ * Incremental by construction. The plane keeps a running fold of its admitted graph. A candidate
+ * that depends on every tip of the epoch graph is a descendant of every vertex, so it sorts last in
+ * the derived order and the new fold is the running fold plus one apply: O(operation + state). The
+ * creator sequences, so its own and received moves are almost always such candidates. Otherwise
+ * (or when the running fold is stale) the epoch is refolded once and the running fold is rebuilt.
+ * Authorization and the application's own admission are judged elsewhere; only the state bound is
+ * judged here.
  * @param registration - The current plane.
  * @param candidate - The candidate vertex: its digest, author, dependencies, operation and byte charge.
+ * @param path - Diagnostics label of the admission path.
  * @returns False only when the fold passes the room's state limit.
  */
 function applicationStateAdmits(
@@ -21839,63 +21874,152 @@ function applicationStateAdmits(
 		dependencies: readonly string[];
 		operation: Readonly<Record<string, unknown>>;
 		byteCharge: number;
-	}>
+	}>,
+	path: "local" | "received"
 ): boolean {
 	const base = registration.blueprintMachine;
 	if (base === undefined || registration.blueprintClosing || registration.blueprintFolded) return true;
-	const vertices = copyCloseVertices(registration.closeVertices);
-	const authors = copyCloseAuthors(registration.closeAuthors);
-	if (vertices === undefined || authors === undefined || vertices.has(candidate.digest)) return true;
-	const charges = new IntrinsicMap(registration.closeCharges);
-	vertices.set(
-		candidate.digest,
-		ObjectFreeze({
-			hash: candidate.digest,
-			kind: "drp-vertex",
-			objectId: registration.payload.provenance.objectId,
-			epoch: registration.payload.provenance.epoch,
-			anchor: registration.payload.provenance.anchorDigest,
-			dependencies: [...candidate.dependencies],
-			operation: candidate.operation as NonNullable<EpochVertex["operation"]>,
-		})
-	);
-	authors.set(candidate.digest, ObjectFreeze({ author: candidate.author, authorSequence: 0 }));
-	charges.set(candidate.digest, candidate.byteCharge);
+	if (registration.closeVertices.has(candidate.digest)) return true;
+	const started = typeof performance === "undefined" ? 0 : performance.now();
+	const limitRefusal = (error: unknown): boolean =>
+		isObject(error) && Reflect.get(error, "code") === "INVALID_APPLICATION_STATE";
+	const context = ObjectFreeze({ author: candidate.author });
+	let cache = applicationStateFolds.get(registration);
+	if (cache === undefined) {
+		cache = {};
+		applicationStateFolds.set(registration, cache);
+	}
+	const graphVersion = registration.graphVersion;
+	if (
+		cache.pending !== undefined &&
+		cache.pending.base === base &&
+		cache.pending.index === registration.index &&
+		cache.pending.payload === registration.payload &&
+		cache.pending.graphVersion === graphVersion &&
+		cache.pending.digest !== undefined &&
+		registration.closeVertices.has(cache.pending.digest)
+	) {
+		const pending = cache.pending;
+		const previous = cache.running;
+		let machine: BlueprintStateMachine | undefined = pending.machine;
+		if (previous !== undefined && pending.from === previous.machine) {
+			// Advance the running machine in place, so an admission never retains the previous state
+			// through its fork's parent link: memory stays one running state per plane.
+			try {
+				previous.machine.adopt(pending.machine);
+				machine = previous.machine;
+			} catch {
+				machine = undefined;
+			}
+		}
+		cache.running = machine === undefined ? undefined : ObjectFreeze({ base, index: registration.index,
+			payload: registration.payload, graphVersion, digest: pending.digest, machine });
+	}
+	cache.pending = undefined;
+	let running = cache.running !== undefined && cache.running.base === base && cache.running.graphVersion === graphVersion &&
+		cache.running.index === registration.index && cache.running.payload === registration.payload
+		? cache.running : undefined;
+	const tips = registration.index.tips();
+	const sortsLast = tips.every((tip) => candidate.dependencies.includes(tip));
+	let refolded = false;
+	let admitted = true;
+	try {
+		if (running === undefined) {
+			// Rebuild the running fold of the admitted graph, in the seal's order.
+			const vertices = copyCloseVertices(registration.closeVertices);
+			const authors = copyCloseAuthors(registration.closeAuthors);
+			if (vertices === undefined || authors === undefined) return true;
+			const fold = foldApplicationProjection(registration, base, vertices, authors, new IntrinsicMap(registration.closeCharges));
+			if (fold === undefined) return true;
+			running = ObjectFreeze({ base, index: registration.index, payload: registration.payload, graphVersion,
+				digest: undefined, machine: fold });
+			cache.running = running;
+			refolded = true;
+		}
+		let next: BlueprintStateMachine | undefined;
+		let from: BlueprintStateMachine | undefined;
+		if (sortsLast) {
+			from = running.machine;
+			next = running.machine.fork();
+			next.apply(candidate.operation, context);
+		} else {
+			refolded = true;
+			const vertices = copyCloseVertices(registration.closeVertices);
+			const authors = copyCloseAuthors(registration.closeAuthors);
+			if (vertices === undefined || authors === undefined) return true;
+			vertices.set(
+				candidate.digest,
+				ObjectFreeze({
+					hash: candidate.digest,
+					kind: "drp-vertex",
+					objectId: registration.payload.provenance.objectId,
+					epoch: registration.payload.provenance.epoch,
+					anchor: registration.payload.provenance.anchorDigest,
+					dependencies: [...candidate.dependencies],
+					operation: candidate.operation as NonNullable<EpochVertex["operation"]>,
+				})
+			);
+			authors.set(candidate.digest, ObjectFreeze({ author: candidate.author, authorSequence: 0 }));
+			const charges = new IntrinsicMap(registration.closeCharges);
+			charges.set(candidate.digest, candidate.byteCharge);
+			next = foldApplicationProjection(registration, base, vertices, authors, charges);
+		}
+		if (next !== undefined)
+			cache.pending = ObjectFreeze({ base, index: registration.index, payload: registration.payload,
+				graphVersion: graphVersion + 1, digest: candidate.digest, machine: next,
+				...(from === undefined ? {} : { from }) });
+	} catch (error) {
+		// Only the state bound is judged here; any other fold failure is another check's to refuse.
+		if (limitRefusal(error)) admitted = false;
+	}
+	try {
+		const observer = Reflect.get(globalThis, "__warmProofEvent");
+		if (typeof observer === "function") {
+			const durationUs = typeof performance === "undefined" ? 0 : Math.round((performance.now() - started) * 1000);
+			const staged = cache.pending?.digest === candidate.digest ? cache.pending.machine : undefined;
+			observer({ kind: "application-state-bound", path, refolded, admitted, sortsLast,
+				author: candidate.author, receiver: registration.issuanceScope.author, durationUs,
+				...(staged === undefined ? {} : { stateBytes: staged.exactStateByteLength }) });
+		}
+	} catch { /* Diagnostics cannot alter admission. */ }
+	return admitted;
+}
+
+/**
+ * The plane's machine after folding the given epoch graph in the derived projection order, exactly
+ * as the seal folds it, on a staged fork that is never adopted.
+ * @returns The staged machine, or undefined when the graph has no projection order.
+ */
+function foldApplicationProjection(
+	registration: V3PlaneRegistration,
+	base: BlueprintStateMachine,
+	vertices: Map<string, EpochVertex>,
+	authors: Map<string, CloseVertexIdentity>,
+	charges: Map<string, number>
+): BlueprintStateMachine | undefined {
+	const anchorDigest = registration.payload.provenance.anchorDigest;
 	let projection: ReturnType<typeof deriveApplicationProjectionOrder>;
 	try {
-		const index = new CausalityIndex(vertices, topologicalOrder(vertices, registration.payload.provenance.anchorDigest), {
+		const index = new CausalityIndex(vertices, topologicalOrder(vertices, anchorDigest), {
 			initialByteCharges: charges,
 			maxEpochBytes: registration.payload.parameters.maxEpochBytes,
 			maxEpochVertices: registration.payload.parameters.maxEpochVertices,
 		});
-		projection = deriveApplicationProjectionOrder(
-			registration.payload,
-			vertices,
-			new IntrinsicSet(registration.controlVertices),
-			index
-		);
+		projection = deriveApplicationProjectionOrder(registration.payload, vertices, new IntrinsicSet(registration.controlVertices), index);
 	} catch {
 		// Graph capacity and shape are judged by their own checks, not by this bound.
-		return true;
+		return undefined;
 	}
-	if (projection === undefined) return true;
-	try {
-		foldBlueprintEpoch({
-			anchorHash: registration.payload.provenance.anchorDigest,
-			// The fold stages on its own fork and is never adopted: the plane's machine is unchanged.
-			machine: base,
-			vertices: projection.vertices,
-			authorize: () => true,
-			executionContext: ({ hash }) => {
-				const identity = authors.get(hash);
-				if (identity === undefined) throw new TypeError("application state bound author is unavailable");
-				return ObjectFreeze({ author: identity.author });
-			},
-		});
-	} catch (error) {
-		if (isObject(error) && Reflect.get(error, "code") === "INVALID_APPLICATION_STATE") return false;
+	if (projection === undefined) return undefined;
+	const machine = base.fork();
+	for (const hash of topologicalOrder(projection.vertices, anchorDigest)) {
+		if (hash === anchorDigest) continue;
+		const vertex = projection.vertices.get(hash);
+		const identity = authors.get(hash);
+		if (vertex === undefined || identity === undefined) return undefined;
+		machine.apply(vertex.operation, ObjectFreeze({ author: identity.author }));
 	}
-	return true;
+	return machine;
 }
 
 /**
