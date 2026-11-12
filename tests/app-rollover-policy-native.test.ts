@@ -258,11 +258,12 @@ it.each(cases)(
 );
 
 // The refusal path: with trigger values too high to fire, the creator's move at the native
-// ceiling (Canvas: the 41st) or at Chat's allowance (the 15th short message, for the creator and
+// ceiling (Canvas: the 169th since fix/maintenance-image-capacity; the 41st before, when the next
+// two epochs then admitted none) or at Chat's allowance (the 15th short message, for the creator and
 // for a Writer, who cannot seal and waits for the next installed epoch) is refused, rolled over
 // and offered again, and is accepted.
 it.each([
-	["canvas", "receive-only", 60],
+	["canvas", "receive-only", 200],
 	["chat", "writer", 25],
 ] as const)(
 	"%s with a %s recipient: a move refused at the ceiling is accepted after the rollover it triggers",
