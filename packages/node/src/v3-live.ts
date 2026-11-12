@@ -25359,9 +25359,14 @@ async function readSettlementSources(
 			ok: false as const,
 		});
 	}
+	// Open work keeps its source in the scan even once the frontier makes its row terminal: progress,
+	// a retained context, or an unreplaced replacement decision a refused replay left live because no
+	// hand-back record was free (it is retried, or given back, at the next drain; its row is proven never
+	// admitted, so replaying or giving back its intents keeps every move exactly once).
 	const openProgressSources = new Set(
 		plan?.entries
-			.filter((entry) => (entry.replacementProgress !== undefined || entry.sourceContextDigest !== undefined) &&
+			.filter((entry) => (entry.replacementProgress !== undefined || entry.sourceContextDigest !== undefined ||
+				entry.disposition === "rebase" || entry.disposition === "transform") &&
 				entry.disposition !== "expire" && entry.disposition !== "committed" && entry.disposition !== "inherited" && entry.replacementSequence === null)
 			.map((entry) => entry.sourceSequence) ?? []
 	);
