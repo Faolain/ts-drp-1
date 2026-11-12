@@ -22,6 +22,7 @@ import {
 	type V3RoomSession,
 	type V3RoomSuccessorDelivery,
 	prepareV3RoomPlayerDatabase,
+	V3RoomBusy,
 	V3RoomSuccessorUnavailable,
 } from "@ts-drp/example-v3-room";
 import { DRPNode } from "@ts-drp/node";
@@ -337,6 +338,10 @@ async function paintPixel(pixel: HTMLDivElement): Promise<void> {
 				"Can't paint: the canvas host is unreachable. This paint is kept and sent once it is back.",
 				"error"
 			);
+			return;
+		}
+		if (error instanceof V3RoomBusy) {
+			connectionStatus("The canvas is busy catching up. This paint is kept and sent once it is done.", "error");
 			return;
 		}
 		if (error instanceof V3RoomSuccessorUnavailable) {

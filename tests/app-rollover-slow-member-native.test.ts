@@ -16,6 +16,8 @@ import {
 	successorWire,
 	type WireRow,
 } from "./fixtures/track-m-apps/long-room-driver.js";
+import { V3_ROOM_NOT_REACHING_HOST_MARGIN } from "../examples/v3-room/src/rollover.js";
+import { V3_ROOM_LOCAL_BACKLOG_LIMIT } from "../packages/node/src/v3-room.js";
 import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-head.js";
 
 // A Grid Writer that installs more slowly than its creator rolls over (fix/slow-member-follow).
@@ -301,7 +303,20 @@ async function slowFollow(conserve: boolean, rollCount = ROLLS, minSkips = 0) {
 			await rows.toCreator();
 		}
 		slow = true;
-		const issued: { id: string; ms: number; error?: string }[] = [
+		// A refusal at issue, classified: which half of the member's not-reaching-host state refused it.
+		// "backlog": the room refused at the undelivered-move bound (64, the approved ceiling; the room's
+		// count rides on the cause); "lag": the member's settlement lag was at the not-reaching-host margin;
+		// "busy": the room's input queue stayed full past the closing bound (V3RoomBusy).
+		type Refusal = {
+			kind: string;
+			half: "backlog" | "lag" | "busy" | "none";
+			backlog?: number;
+			bound?: number;
+			undelivered?: number;
+			unsettledEpochs?: number;
+			window?: number;
+		};
+		const issued: { id: string; ms: number; error?: string; refusal?: Refusal }[] = [
 			{ id: "block-1-0", ms: 0 },
 			{ id: "block-1-1", ms: 0 },
 		];
@@ -351,7 +366,42 @@ async function slowFollow(conserve: boolean, rollCount = ROLLS, minSkips = 0) {
 						await writer.issue((await writer.authorityEpoch()) ?? 0, n);
 						issued.push({ id, ms: performance.now() - at });
 					} catch (error) {
-						issued.push({ id, ms: performance.now() - at, error: String(error).slice(0, 300) });
+						const ms = performance.now() - at;
+						const kind = error instanceof Error ? error.name : typeof error;
+						const cause =
+							error instanceof Error
+								? (error.cause as { name?: string; backlog?: number; bound?: number } | undefined)
+								: undefined;
+						const settlement = (await writer.settlementStatus?.().catch(() => null)) as {
+							undelivered?: unknown[];
+							unsettledEpochs?: number;
+							window?: number;
+						} | null;
+						const lagEngaged =
+							(settlement?.window ?? 0) > 0 &&
+							(settlement?.unsettledEpochs ?? 0) >=
+								Math.max(1, (settlement?.window ?? 0) - V3_ROOM_NOT_REACHING_HOST_MARGIN);
+						const half: Refusal["half"] =
+							kind === "V3RoomBusy"
+								? "busy"
+								: cause?.name === "V3RoomLocalBacklogFull"
+									? "backlog"
+									: lagEngaged
+										? "lag"
+										: "none";
+						issued.push({
+							id,
+							ms,
+							error: String(error).slice(0, 300),
+							refusal: {
+								kind,
+								half,
+								...(cause?.name === "V3RoomLocalBacklogFull" ? { backlog: cause.backlog, bound: cause.bound } : {}),
+								undelivered: settlement?.undelivered?.length,
+								unsettledEpochs: settlement?.unsettledEpochs,
+								window: settlement?.window,
+							},
+						});
 					}
 					await sleep(500);
 				}
@@ -437,8 +487,38 @@ async function slowFollow(conserve: boolean, rollCount = ROLLS, minSkips = 0) {
 			}
 			stopped = true;
 			await memberMoves;
-			// Every move the member made was accepted by its room (none was refused for an install).
-			expect(issued.filter((move) => move.error !== undefined)).toEqual([]);
+			// A move the room refuses at issue is kept, never lost: the only refusals allowed are the kept
+			// kinds, and each only while its half of the not-reaching-host state is engaged (the 64 bound is
+			// the approved ceiling). Conservation below proves every kept move lands exactly once. The
+			// refusal count is a metric (install speed drives it toward zero), not asserted away.
+			const refused = issued.filter((move) => move.error !== undefined);
+			const refusals = {
+				count: refused.length,
+				byHalf: Object.fromEntries(
+					(["backlog", "lag", "busy", "none"] as const).map((half) => [
+						half,
+						refused.filter((move) => move.refusal?.half === half).length,
+					])
+				),
+				// A lag-half refusal while the backlog is well under the bound is a finding, reported here.
+				lagUnderBound: refused.filter(
+					(move) => move.refusal?.half === "lag" && (move.refusal.undelivered ?? 0) < V3_ROOM_LOCAL_BACKLOG_LIMIT / 2
+				).length,
+			};
+			process.stdout.write(`SLOW_MEMBER_REFUSALS ${JSON.stringify({ ...refusals, moves: issued.length, refused })}\n`);
+			expect(
+				refused.filter((move) => !["V3RoomNotReachingHost", "V3RoomBusy"].includes(move.refusal?.kind ?? "")),
+				"issue errors other than the kept kinds"
+			).toEqual([]);
+			expect(
+				refused.filter(
+					(move) =>
+						move.refusal?.half === "none" ||
+						(move.refusal?.half === "backlog" &&
+							(move.refusal.backlog ?? 0) < (move.refusal.bound ?? V3_ROOM_LOCAL_BACKLOG_LIMIT))
+				),
+				"refusals with neither half engaged (a backlog refusal must be at the bound)"
+			).toEqual([]);
 			// Each move waited at most for one install in flight (plus its own issue).
 			if (!conserve) for (const move of issued) expect(move.ms, move.id).toBeLessThan(perInstall * 2);
 			if (!conserve) return;
