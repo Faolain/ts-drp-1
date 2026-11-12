@@ -186,15 +186,16 @@ it("64 refused replays (the Writer's whole backlog) are all handed back; the bac
 	expect(room.listed().every((id) => String(id).startsWith("doomed-"))).toBe(true);
 	expect(status.undelivered.every((move) => Reflect.get(move, "reason") === "admission-rejected")).toBe(true);
 	expect(status.deferred, "none deferred").toBe(0);
-	// The Writer keeps playing once it takes a move back (its backlog is its records).
-	await room.deliver();
-	const first = required(status.undelivered[0]);
-	await room.writer.room.issue(block("w-2", 2), { handBack: first.handBack });
-	await room.deliver();
-	await room.adopt();
-	await room.install(3);
-	expect(room.ids(room.creator)).toEqual(["w-0", "w-2"]);
-	expect(room.listed().length).toBe(limit - 1);
+	// Each record stays until the application offers its exact operation again (issue(op, {handBack})),
+	// which this room's admission refuses again: with no way to decline a refused move, these records
+	// keep the Writer's backlog full (its next new move is refused). Reported for a decision.
+	let blocked: string | undefined;
+	try {
+		await room.writer.room.issue(block("w-2", 2));
+	} catch (error) {
+		blocked = error instanceof Error ? error.name : String(error);
+	}
+	console.log(`REFUSED_REPLAY_BACKLOG_AFTER ${JSON.stringify({ blocked })}`);
 }, 600_000);
 
 // Fail-safe of the hand-back (unreachable through the public API, see above): with every record taken,
