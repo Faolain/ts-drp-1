@@ -838,9 +838,12 @@ export type V3EgressResult =
 /**
  * Rows one drain dependency turn may carry (per-drain batching). The turn's native reservations
  * exclude every issuance and journal writer while it runs (publication marks included), so a drain
- * of more rows runs one turn per chunk of this many and yields between them.
+ * of more rows runs one turn per chunk of this many and yields between them (lull rule iii): ingress,
+ * local moves and installs queued meanwhile run between chunks, so a chunk stays well under an epoch.
+ * Chosen by the 100x16 / slow-member A/B (4 vs 8; 32 held the registration gate long enough to lose
+ * the member its epochs).
  */
-export const V3_SETTLEMENT_DRAIN_TURN_ROWS = 32;
+export const V3_SETTLEMENT_DRAIN_TURN_ROWS = 8;
 // The genuine rebase sources this module minted, with their runtime and held source: a batched
 // preparation accepts only these, never a look-alike.
 const rebaseSourceOwners = new WeakMap<object, Readonly<{ registration: V3PlaneRegistration; source: ClassifiedRebaseRow }>>();
