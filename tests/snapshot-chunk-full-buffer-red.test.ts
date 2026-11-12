@@ -23,7 +23,9 @@ const DIGEST = "a".repeat(64);
 
 function encoded(payloadBytes: number) {
 	// A canonical byte-string payload of the requested total size.
-	const payload = encodeCanonical(new Uint8Array(payloadBytes - 5).map((_, index) => index % 251));
+	const bytesOf = (length: number) => encodeCanonical(new Uint8Array(length).map((_, index) => index % 251));
+	const header = bytesOf(payloadBytes).byteLength - payloadBytes;
+	const payload = bytesOf(payloadBytes - header);
 	expect(payload.byteLength).toBe(payloadBytes);
 	return encodeSnapshotTransfer({
 		aclDigest: DIGEST,
