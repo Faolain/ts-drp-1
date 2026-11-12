@@ -1,4 +1,4 @@
-import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { CanonicalEncodingError, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 
 import {
 	applySettlementPlanEffect,
@@ -1822,16 +1822,103 @@ export function issuanceRetirementImage(
 	rows: IssuanceRetirementRows,
 	objectId: string
 ): DurableIssuanceRetirementImage {
+	classifyIssuanceRetirementRows(rows, objectId, false);
+	const bytes = encodeCanonical(rows, ISSUANCE_RETIREMENT_IMAGE_LIMITS);
+	return Object.freeze({
+		imageDigest: issuanceRetirementHex(hashDomain("ts-drp/issuance-retirement-image/v1", bytes)),
+		logicalBytes: bytes.length,
+		lineageCount: rows.lineages.length,
+		issuedCount: rows.issued.length,
+		outboxCount: rows.outbox.length,
+		planCount: rows.plans.length,
+	});
+}
+
+const ISSUANCE_RETIREMENT_ROW_LIMITS = Object.freeze({
+	maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes,
+	maxDepth: 16,
+	maxItems: ISSUANCE_RETIREMENT_LIMITS.maxRows * 32,
+});
+const ISSUANCE_RETIREMENT_IMAGE_LIMITS = Object.freeze({
+	maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes,
+	maxDepth: 16,
+	maxItems: ISSUANCE_RETIREMENT_LIMITS.maxRows * 128,
+});
+const ISSUANCE_RETIREMENT_ROW_KEYS = ["lineages", "issued", "outbox", "plans"] as const;
+const CANONICAL_DEPTH_MESSAGE = "canonical value exceeds maximum nesting depth";
+
+/**
+ * The gate form of {@link issuanceRetirementImage} for callers that discard the image: it throws
+ * exactly when issuanceRetirementImage throws, with the same message at the same check, and
+ * otherwise returns the image's logicalBytes, without encoding the whole image or hashing it.
+ *
+ * The whole image is a record of the four row arrays. Canonical encoding is compositional: a
+ * container's bytes are its tag and varuint count followed by its children's own canonical bytes,
+ * so its width is the record and array headers plus the per-row widths the row census already
+ * measured. Its item limit (per collection) cannot fail once the row census passed: the four
+ * arrays hold at most maxRows rows and every nested collection was bounded tighter per row. Its
+ * depth limit fails exactly for a row nested more than 14 deep (rows sit two levels inside the
+ * image), and the encoder reports that before the byte limit. Any other record shape takes the
+ * whole-image path.
+ * @param rows - The census rows, as for issuanceRetirementImage.
+ * @param objectId - The object, as for issuanceRetirementImage.
+ * @returns The whole image's canonical byte length.
+ */
+export function issuanceRetirementImageBound(rows: IssuanceRetirementRows, objectId: string): number {
+	const { charge, deep } = classifyIssuanceRetirementRows(rows, objectId, true);
+	const record = rows as unknown as Record<string, unknown>;
+	const keys = Object.keys(record);
+	if (
+		Object.getPrototypeOf(record) !== Object.prototype ||
+		Object.getOwnPropertySymbols(record).length !== 0 ||
+		keys.length !== ISSUANCE_RETIREMENT_ROW_KEYS.length ||
+		!ISSUANCE_RETIREMENT_ROW_KEYS.every((key) => {
+			const descriptor = Object.getOwnPropertyDescriptor(record, key);
+			return descriptor !== undefined && descriptor.enumerable === true && Object.hasOwn(descriptor, "value") &&
+				Array.isArray(descriptor.value);
+		})
+	)
+		return encodeCanonical(rows, ISSUANCE_RETIREMENT_IMAGE_LIMITS).byteLength;
+	if (deep) throw new CanonicalEncodingError(CANONICAL_DEPTH_MESSAGE);
+	let width = 1 + unsignedVaruintWidth(keys.length) + charge;
+	for (const key of ISSUANCE_RETIREMENT_ROW_KEYS)
+		width += issuanceRetirementKeyWidth(key) + 1 + unsignedVaruintWidth((record[key] as unknown[]).length);
+	if (width > ISSUANCE_RETIREMENT_LIMITS.maxBytes) throw new CanonicalEncodingError("canonical value exceeds byte limit");
+	return width;
+}
+const issuanceRetirementKeyWidths = new Map<string, number>();
+function issuanceRetirementKeyWidth(key: string): number {
+	let width = issuanceRetirementKeyWidths.get(key);
+	if (width === undefined) issuanceRetirementKeyWidths.set(key, (width = encodeCanonical(key).byteLength));
+	return width;
+}
+
+/** The row census and classification shared by the image and its gate form (checks in order:
+ * row count, per-row encode with a running byte charge, scope, lineage, issued row and plan
+ * classification). `probeDepth` also reports whether some row is nested deeper than the whole
+ * image allows; the per-row result and every refusal stay exactly the original's. */
+function classifyIssuanceRetirementRows(
+	rows: IssuanceRetirementRows,
+	objectId: string,
+	probeDepth: boolean
+): { charge: number; deep: boolean } {
 	const all = [...rows.lineages, ...rows.issued, ...rows.outbox, ...rows.plans];
 	if (all.length > ISSUANCE_RETIREMENT_LIMITS.maxRows)
 		throw issuanceRetirementRefusal("issuance retirement census exceeds bound");
-	let charge = 0;
+	let charge = 0, deep = false;
 	for (const row of all) {
-		charge += encodeCanonical(row, {
-			maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes,
-			maxDepth: 16,
-			maxItems: ISSUANCE_RETIREMENT_LIMITS.maxRows * 32,
-		}).byteLength;
+		charge += probeDepth ? (() => {
+			// Up to its first failure, an encode at depth 14 walks exactly as one at depth 16; any
+			// other failure is the original's. Only a row deeper than 14 encodes again at 16.
+			try {
+				return encodeCanonical(row, { ...ISSUANCE_RETIREMENT_ROW_LIMITS, maxDepth: 14 }).byteLength;
+			} catch (error) {
+				if (!(error instanceof CanonicalEncodingError) || error.message !== CANONICAL_DEPTH_MESSAGE) throw error;
+				const width = encodeCanonical(row, ISSUANCE_RETIREMENT_ROW_LIMITS).byteLength;
+				deep = true;
+				return width;
+			}
+		})() : encodeCanonical(row, ISSUANCE_RETIREMENT_ROW_LIMITS).byteLength;
 		if (charge > ISSUANCE_RETIREMENT_LIMITS.maxBytes)
 			throw issuanceRetirementRefusal("issuance retirement image exceeds bound");
 	}
@@ -1923,19 +2010,7 @@ export function issuanceRetirementImage(
 				throw issuanceRetirementRefusal("issuance retirement plan source is unclassified");
 		}
 	}
-	const bytes = encodeCanonical(rows, {
-		maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes,
-		maxDepth: 16,
-		maxItems: ISSUANCE_RETIREMENT_LIMITS.maxRows * 128,
-	});
-	return Object.freeze({
-		imageDigest: issuanceRetirementHex(hashDomain("ts-drp/issuance-retirement-image/v1", bytes)),
-		logicalBytes: bytes.length,
-		lineageCount: rows.lineages.length,
-		issuedCount: rows.issued.length,
-		outboxCount: rows.outbox.length,
-		planCount: rows.plans.length,
-	});
+	return { charge, deep };
 }
 
 type RetirementIssuedRow = IssuanceRetirementRows["issued"][number];
