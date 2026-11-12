@@ -276,6 +276,96 @@ describe("direct message sessions", () => {
 		expect(f.arrivals).not.toContain("sync-on-session");
 		expect(f.arrivals).not.toContain("oversized-on-rt");
 	});
+
+	// Review findings (codex, track 46): each was reproduced before its fix.
+	it("resets a session stream whose length prefix never terminates, at either end", { timeout: 30_000 }, async () => {
+		const f = await pair();
+		// Receiver side: an unterminated frame-length prefix on each session class.
+		for (const protocol of [RT, BULK]) {
+			const stream = await f.connection().newStream(protocol);
+			stream.send(new Uint8Array(64).fill(0x80));
+			expect(await until(() => stream.status !== "open", 2_000), protocol).toBe(true);
+		}
+		// Sender side: a receiver that answers credit with an unterminated prefix loses the session, and
+		// the sender reopens it for the next frame.
+		await host(f.receiver).unhandle(RT);
+		await host(f.receiver).handle(RT, (stream: Stream) => void stream.send(new Uint8Array(64).fill(0x80)), {
+			maxInboundStreams: 4,
+		});
+		await f.sender.sendMessage(f.receiver.peerId, message("first", 100));
+		await new Promise((resolve) => setTimeout(resolve, 300));
+		await f.sender.sendMessage(f.receiver.peerId, message("second", 100)).catch(() => undefined);
+		expect(await until(() => f.opened.filter((protocol) => protocol === RT).length >= 2, 2_000)).toBe(true);
+	});
+
+	it("falls back to legacy after consecutive session opens that each run to their deadline", { timeout: 60_000 }, async () => {
+		const f = await pair();
+		const watched = f.connection();
+		const open = watched.newStream.bind(watched);
+		let sessionAttempts = 0;
+		// Each attempt fails after 6 s, so no three failures ever fall inside one 10 s window.
+		watched.newStream = (async (protocols: string | string[], options?: object) => {
+			if (protocols === RT) {
+				sessionAttempts++;
+				await new Promise((resolve) => setTimeout(resolve, 6_000));
+				throw Object.assign(new Error("negotiation deadline"), { name: "TimeoutError" });
+			}
+			return open(protocols, options);
+		}) as Connection["newStream"];
+		await expect(f.sender.sendMessage(f.receiver.peerId, message("eventually", 100))).resolves.toBeUndefined();
+		expect(sessionAttempts).toBe(3);
+		expect(await until(() => f.arrivals.includes("eventually"))).toBe(true);
+		expect(f.evidence.get("eventually")).toBe(LEGACY);
+	});
+
+	it("a cancelled head waiting for byte credit lets a frame that fits go", { timeout: 120_000 }, async () => {
+		const f = await pair();
+		const release = f.hold();
+		const { sends } = await fillUntilBlocked(f);
+		// The receiver's queue is full, so bulk frames stay unadmitted and their credit does not return.
+		await f.sender.sendMessage(f.receiver.peerId, message("bulk-3mib", 3 * 1024 * 1024));
+		const controller = new AbortController();
+		const head = f.sender.sendMessage(f.receiver.peerId, message("bulk-2mib", 2 * 1024 * 1024), { signal: controller.signal });
+		void head.catch(() => undefined);
+		const small = f.sender.sendMessage(f.receiver.peerId, message("bulk-64kib", 64 * 1024));
+		const smallState = small.then(
+			() => "resolved",
+			() => "rejected"
+		);
+		await new Promise((resolve) => setTimeout(resolve, 300));
+		controller.abort(new Error("caller gave up"));
+		await expect(head).rejects.toThrow("caller gave up");
+		const state = await Promise.race([smallState, new Promise((resolve) => setTimeout(() => resolve("pending"), 3_000))]);
+		release();
+		await Promise.all(sends);
+		expect(state).toBe("resolved");
+	});
+
+	it("closing the sessions while a legacy stream negotiates refuses that frame", { timeout: 30_000 }, async () => {
+		const f = await pair();
+		await host(f.receiver).unhandle([RT, BULK]);
+		const watched = f.connection();
+		const open = watched.newStream.bind(watched);
+		let entered!: () => void;
+		const negotiating = new Promise<void>((resolve) => (entered = resolve));
+		watched.newStream = (async (protocols: string | string[], options?: object) => {
+			if (protocols === LEGACY) {
+				entered();
+				await new Promise((resolve) => setTimeout(resolve, 500));
+			}
+			return open(protocols, options);
+		}) as Connection["newStream"];
+		const sending = f.sender.sendMessage(f.receiver.peerId, message("late-legacy", 100)).then(
+			() => "resolved",
+			(error: unknown) => codeOf(error)
+		);
+		await negotiating;
+		// What node stop does first (node.ts stop), without closing the connection under the stream.
+		(Reflect.get(f.sender, "_directSessions") as { closeAll(): void }).closeAll();
+		expect(await sending).not.toBe("resolved");
+		await new Promise((resolve) => setTimeout(resolve, 300));
+		expect(f.arrivals).not.toContain("late-legacy");
+	});
 });
 
 describe("direct message compatibility", () => {
