@@ -5355,7 +5355,9 @@ function releaseOrdinaryIssuanceRuntimeHold(value: unknown): Promise<void> {
  * process-wide scalars; never authority, never reset by the runtime.
  */
 const v3SettlementWorkCounts = {dependencyTurns: 0, recoveryCensusReads: 0, retainedContractPreparations: 0, sourceExpirySignatures: 0,
-	ownFenceScans: 0, ownFenceAuthentications: 0};
+	ownFenceScans: 0, ownFenceAuthentications: 0, dependencyTurnCensusReads: 0, maxDependencyTurnCensusReads: 0};
+// The complete census reads each recovery close hold made (its seal and every full check), by hold.
+const recoveryCloseHoldCensusReads = new WeakMap<CreatorSnapshotRecoveryCloseHold, () => number>();
 export function readV3SettlementWorkCounts(): Readonly<typeof v3SettlementWorkCounts> {
 	return ObjectFreeze({...v3SettlementWorkCounts});
 }
@@ -13411,8 +13413,10 @@ async function sealCreatorRecoveryDependencies(
 				}
 			: {}),
 	};
+	let completeCensusReads = 0;
 	const captureCensus = async (heldIssuance?: CreatorHeldIssuanceCensusRead,
 		capturedInputs?: CreatorRecoveryCensusInputCapture): Promise<Uint8Array | undefined> => {
+		completeCensusReads += 1;
 		try {
 			const result = await readCreatorRecoveryDependencyCensus(registration, censusObservation, heldIssuance, capturedInputs);
 			if (result === undefined) return undefined;
@@ -13509,6 +13513,7 @@ async function sealCreatorRecoveryDependencies(
 			runtime.nativeBranchSource === undefined && runtime.migrationSource === undefined;
 		let unchangedHeldCensus: ReturnType<typeof prepareCreatorUnchangedHeldCensusRead>;
 		const capability = ObjectFreeze({});
+		recoveryCloseHoldCensusReads.set(capability, () => completeCensusReads);
 		recoveryCloseHolds.set(capability, {
 			kind: "full-census",
 			...(ownedReceivedAppend === undefined ? {} : {receivedAppend: ownedReceivedAppend}),
@@ -13685,6 +13690,8 @@ async function withActiveRebaseDependencies(
 	let child: CreatorSnapshotRecoveryCloseDependencyRead | undefined;
 	let failed = false,
 		primary: unknown;
+	let issuanceReservationIndex: number | undefined;
+	let turnHold: CreatorSnapshotRecoveryCloseHold | undefined;
 	try {
 		if (!currentRegistration(registration)) throw new TypeError("active dependency owner is stale");
 		for (const owner of [registration.payload.input.store, registration.liveJournalStore, registration.issuanceStore]) {
@@ -13694,6 +13701,7 @@ async function withActiveRebaseDependencies(
 			}
 			const acquire: unknown = Reflect.get(owner, "acquireNativeReadReservation");
 			if (typeof acquire !== "function") throw new TypeError("active native dependency exclusion is unsupported");
+			if (owner === registration.issuanceStore) issuanceReservationIndex = reservations.length;
 			reservations.push(
 				(await ReflectApply(acquire, owner, [
 					{ objectId: registration.payload.provenance.objectId },
@@ -13727,6 +13735,27 @@ async function withActiveRebaseDependencies(
 			currentTrust: registration.payload.trust.trust,
 		});
 		if (lifetime === undefined) throw new TypeError("active dependency custody is unavailable");
+		turnHold = hold;
+		// The turn's own issuance reservation becomes the hold's held issuance read, so the hold's
+		// checks in this turn may use the unchanged-held census (prepareCreatorUnchangedHeldCensusRead).
+		// Safety: this reservation is the issuance store's native write exclusion; it was acquired
+		// before the seal and is released only after the child, the lifetime and the reader are
+		// released below, so it is held for every check of this turn and no writer can change the
+		// issuance store between them. The first check after enrollment stays the complete held walk
+		// (it alone initializes reuse), every later check still verifies the native current probe,
+		// replay, context and graph bindings, and any input the reuse does not bind (an active source,
+		// source or migration dependencies, pending ingress, a rebase snapshot) keeps the complete read.
+		// Enrollment is optional reuse: a hold that refuses it keeps the original reservation.
+		if (issuanceReservationIndex !== undefined) {
+			const original = reservations[issuanceReservationIndex]!;
+			let enrolled: NativeReadReservation | undefined;
+			try {
+				enrolled = hold === undefined ? undefined : fullRecoveryCloseHoldFacts(hold)?.ownIssuanceReservation?.(original);
+			} catch {
+				enrolled = undefined;
+			}
+			if (enrolled !== undefined) reservations[issuanceReservationIndex] = enrolled;
+		}
 		child = await lifetime.borrowDependencies();
 		// This owner authenticates already-admitted historical settlement work,
 		// not a new ordinary operation. Use its existing maintenance entitlement;
@@ -13783,6 +13812,14 @@ async function withActiveRebaseDependencies(
 	} catch (error) {
 		failed = true;
 		primary = error;
+	}
+	const turnCensusReads = turnHold === undefined ? undefined : recoveryCloseHoldCensusReads.get(turnHold)?.();
+	if (turnCensusReads !== undefined) {
+		v3SettlementWorkCounts.dependencyTurnCensusReads += turnCensusReads;
+		v3SettlementWorkCounts.maxDependencyTurnCensusReads = Math.max(
+			v3SettlementWorkCounts.maxDependencyTurnCensusReads,
+			turnCensusReads
+		);
 	}
 	const heldChild = child,
 		heldLifetime = lifetime,

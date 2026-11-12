@@ -98,6 +98,7 @@ import { awaitNativeWriterFree, holdNativeWriter, nativeWriterHeld } from "./nat
 import type { NodeNativeReadPort } from "../index.js";
 import { iterateSqliteRows } from "./sqlite-iterator.js";
 import { sqliteFilename } from "./sqlite-filename.js";
+import { connectionRevision, RevisionReadMemo } from "./sqlite-revision.js";
 import { configuredStatement, iterationStatement } from "./sqlite-statement-cache.js";
 
 const DATABASE_SUFFIX = ".drp-issuance-v1.sqlite";
@@ -979,8 +980,51 @@ function bumpRetirement(database: DatabaseSync, objectId: string): void {
 import type { LocalSessionLifetime } from "./local-session-lifetime.js";
 import { enforceNativeLocalSessionFile, nativeLocalSessionSchemaRows } from "./local-session-lifetime.js";
 
+// Recovery census work counts (diagnostics): every census read, and those that read and classified
+// the rows (the others were proven unchanged by the connection's exact revision).
+const recoveryCensusCounts = { reads: 0, fullReads: 0 };
+/**
+ * Reads the recovery census work counts since the process started.
+ * @returns A snapshot: census reads, and the full reads among them.
+ */
+export function nodeRecoveryCensusCounts(): Readonly<{ reads: number; fullReads: number }> {
+	return Object.freeze({ ...recoveryCensusCounts });
+}
+// Issuance read work counts (diagnostics), per read kind: every read, and those that read the rows
+// (the others were proven unchanged by the connection's exact revision under a held reservation).
+type IssuanceReadKind = "page" | "issued" | "plan" | "lineage";
+const issuanceReadCounts: Record<IssuanceReadKind, { reads: number; fullReads: number }> = {
+	page: { reads: 0, fullReads: 0 },
+	issued: { reads: 0, fullReads: 0 },
+	plan: { reads: 0, fullReads: 0 },
+	lineage: { reads: 0, fullReads: 0 },
+};
+/**
+ * Reads the issuance read work counts since the process started.
+ * @returns A snapshot per read kind: reads, and the full reads among them.
+ */
+export function nodeIssuanceReadCounts(): Readonly<
+	Record<IssuanceReadKind, Readonly<{ reads: number; fullReads: number }>>
+> {
+	return Object.freeze(
+		Object.fromEntries(Object.entries(issuanceReadCounts).map(([kind, row]) => [kind, Object.freeze({ ...row })]))
+	) as Readonly<Record<IssuanceReadKind, Readonly<{ reads: number; fullReads: number }>>>;
+}
+// A census observation (rows, image and control: up to the census byte entitlement) and its exact
+// encoding, for one census input, retained as private copies.
+const RECOVERY_CENSUS_MEMO_ENTRIES = 1024;
+const RECOVERY_CENSUS_MEMO_BYTES = 16 * 1024 * 1024;
+
 class NodeIssuanceImplementation {
 	readonly #database: DatabaseSync;
+	// The recovery census is a pure read of this connection's database. Inside the census's own read
+	// transaction, an equal connection revision (sqlite-revision.ts: total_changes, data_version,
+	// schema_version) proves no row and no schema changed since the remembered read, so the remembered
+	// rows, image and control are exactly what the full read would return. Any write, by this
+	// connection (rolled back too) or another, misses. Every hit is a private deep copy. The memo lives
+	// only while one native read reservation is held: acquiring or releasing a reservation clears it,
+	// so an ended reservation retains no observation and no encoded image.
+	readonly #censusMemo = new RevisionReadMemo(RECOVERY_CENSUS_MEMO_ENTRIES, RECOVERY_CENSUS_MEMO_BYTES);
 	readonly #filename: string;
 	readonly #readReservations: SqliteNativeReadReservationOwner;
 	// Persistent (session-less) stores keep the last issue job's private writer connection for the
@@ -1016,6 +1060,52 @@ class NodeIssuanceImplementation {
 		this.#readReservations = new SqliteNativeReadReservationOwner(filename, session);
 	}
 
+	// True while this store's native read reservation is held: the WAL writer lock excludes every
+	// write, and the census memo (with its revision check behind it) may serve exact repeats.
+	#memoReserved(): boolean {
+		const holder = this.#censusLease;
+		return holder !== undefined && !holder.releasing && this.#readReservations.current() === holder.native;
+	}
+	// One pure read inside the caller's open read transaction: remembered for the connection's exact
+	// revision while a reservation is held, read through otherwise. Every hit is a private deep copy.
+	#memoLoad<T>(kind: IssuanceReadKind, key: string, read: () => T): T {
+		issuanceReadCounts[kind].reads += 1;
+		const full = (): T => {
+			issuanceReadCounts[kind].fullReads += 1;
+			return read();
+		};
+		if (!this.#memoReserved()) return full();
+		const memo = this.#censusMemo;
+		memo.begin(this.#database);
+		try {
+			return memo.load(`${kind}\u0000${key}`, full);
+		} finally {
+			memo.end();
+		}
+	}
+	// The same, opening its own read transaction (for reads that run as single statements).
+	// `read(opened)`: opened is true when this call opened the transaction the read runs in.
+	#memoTransaction<T>(kind: IssuanceReadKind, key: string, read: (opened: boolean) => T): T {
+		if (!this.#memoReserved() || (this.#database as { isTransaction?: boolean }).isTransaction === true) {
+			issuanceReadCounts[kind].reads += 1;
+			issuanceReadCounts[kind].fullReads += 1;
+			return read(false);
+		}
+		this.#database.exec("BEGIN");
+		try {
+			const value = this.#memoLoad(kind, key, () => read(true));
+			this.#database.exec("COMMIT");
+			return value;
+		} catch (error) {
+			try {
+				this.#database.exec("ROLLBACK");
+			} catch {
+				/* Preserve the read failure. */
+			}
+			throw error;
+		}
+	}
+
 	async acquireNativeReadReservation(
 		input: Readonly<{ objectId: string }>
 	): ReturnType<SqliteNativeReadReservationOwner["acquire"]> {
@@ -1024,11 +1114,13 @@ class NodeIssuanceImplementation {
 		const native = await this.#readReservations.acquire();
 		const pending = new Set<Promise<boolean>>(), token = Object.freeze({});
 		let terminal: Promise<void> | undefined;
+		this.#censusMemo.clear();
 		const lease = {native, pending, token, releasing: false, release: (): Promise<void> => {
 			// Revoke before the first await. Escaping probes retain tokens only,
 			// never an observation, its encoded image, or this native lease.
 			lease.releasing = true;
 			if (this.#censusEnrollment?.leaseToken === token) this.#censusEnrollment = undefined;
+			if (this.#censusLease === lease) this.#censusMemo.clear();
 			return terminal ??= Promise.allSettled([...pending]).then(async () => {
 				try { await native.release(); }
 				finally { if (this.#censusLease === lease) this.#censusLease = undefined; }
@@ -1055,15 +1147,40 @@ class NodeIssuanceImplementation {
 		try {
 			this.#database.exec("BEGIN");
 			began = true;
-			const rows = retirementRows(this.#database, captured.objectId, captured.limits);
-			const image = issuanceRetirementImage(rows, captured.objectId);
-			const control = readRetirementControl(this.#database, captured.objectId);
-			if (image.logicalBytes > captured.limits.maxBytes)
-				throw issuanceRetirementRefusal("issuance recovery census exceeds byte entitlement");
+			recoveryCensusCounts.reads += 1;
+			const key = `${captured.objectId}\u0000${String(captured.limits.maxRows)}\u0000${String(captured.limits.maxBytes)}`;
+			const memo = this.#censusMemo;
+			const holder = this.#censusLease;
+			const reserved = holder !== undefined && !holder.releasing && this.#readReservations.current() === holder.native;
+			// Outside a held reservation every read is full (the memo is not begun: load reads through).
+			if (reserved) memo.begin(this.#database);
+			let observation: DurableIssuanceRecoveryCensus;
+			let exactValueBytes: Uint8Array | undefined;
+			try {
+				observation = memo.load(`census\u0000${key}`, () => {
+					recoveryCensusCounts.fullReads += 1;
+					const rows = retirementRows(this.#database, captured.objectId, captured.limits);
+					const image = issuanceRetirementImage(rows, captured.objectId);
+					const control = readRetirementControl(this.#database, captured.objectId);
+					return { rows, image, control };
+				});
+				if (observation.image.logicalBytes > captured.limits.maxBytes)
+					throw issuanceRetirementRefusal("issuance recovery census exceeds byte entitlement");
+				// The enrollment's exact encoding is a pure function of the observation: remembered with it.
+				const value = observation;
+				if (reserved)
+					try {
+						exactValueBytes = memo.load(`bytes\u0000${key}`, () => encodeCanonical(value));
+					} catch {
+						/* Optional capture: retried below exactly as before. */
+					}
+			} finally {
+				memo.end();
+			}
 			this.#database.exec("COMMIT");
 			began = false;
 			this.#assertAvailable();
-			const observation = { rows, image, control }, lease = this.#censusLease;
+			const lease = this.#censusLease;
 			if (lease !== undefined && !lease.releasing && this.#readReservations.current() === lease.native) {
 				// The original complete native read above has validated every row,
 				// preimage, plan and issued/outbox pair. Enrollment is optional DATA
@@ -1072,7 +1189,7 @@ class NodeIssuanceImplementation {
 					const observations = new WeakMap<DurableIssuanceRecoveryCensus, Readonly<{
 						input: DurableIssuanceRecoveryCensusInput; exactValueBytes: Uint8Array;
 					}>>();
-					observations.set(observation, {input: captured, exactValueBytes: encodeCanonical(observation)});
+					observations.set(observation, {input: captured, exactValueBytes: exactValueBytes ?? encodeCanonical(observation)});
 					this.#censusEnrollment = {leaseToken: lease.token, token: Object.freeze({}), observations};
 				} catch { /* Optional capture cannot narrow the original full read. */ }
 			}
@@ -1106,30 +1223,36 @@ class NodeIssuanceImplementation {
 				this.#readReservations.current() !== lease.native) return undefined;
 		} catch { return undefined; }
 		basis.observations.delete(observation);
-		return this.#createCensusCurrentProbe(lease.token, basis.token);
+		return this.#createCensusCurrentProbe(lease.token, basis.token, connectionRevision(this.#database));
 	}
 
-	#createCensusCurrentProbe(leaseToken: object, imageToken: object): DurableIssuanceRecoveryCensusCurrentProbe {
+	#createCensusCurrentProbe(leaseToken: object, imageToken: object, revision: string): DurableIssuanceRecoveryCensusCurrentProbe {
 		const implementation = this;
 		const probe: DurableIssuanceRecoveryCensusCurrentProbe = Object.freeze({
 			checkCurrent: function (this: DurableIssuanceRecoveryCensusCurrentProbe): Promise<boolean> {
 				if (this !== probe) return Promise.reject(invalid("native census probe is foreign"));
-				return implementation.#checkCensusCurrent(leaseToken, imageToken);
+				return implementation.#checkCensusCurrent(leaseToken, imageToken, revision);
 			},
 		});
 		return probe;
 	}
 
-	#checkCensusCurrent(leaseToken: object, imageToken: object): Promise<boolean> {
+	#checkCensusCurrent(leaseToken: object, imageToken: object, revision: string): Promise<boolean> {
 		const lease = this.#censusLease;
+		// The probe's image is current while its enrollment is the latest, or, under the same held
+		// reservation, while the connection's exact revision is the one it was captured at: an
+		// unchanged database gives the same census, so a later census read of the same lease (its
+		// enrollment replaced) does not make it stale.
+		const currentImage = (): boolean =>
+			this.#censusEnrollment?.token === imageToken || connectionRevision(this.#database) === revision;
 		const task = Promise.resolve().then(async () => {
 			this.#assertAvailable();
 			if (lease === undefined || lease.releasing || lease.token !== leaseToken ||
-				this.#censusEnrollment?.token !== imageToken || this.#readReservations.current() !== lease.native) return false;
+				!currentImage() || this.#readReservations.current() !== lease.native) return false;
 			try {
 				await lease.native.check();
 				this.#assertAvailable();
-				return this.#censusLease === lease && !lease.releasing && this.#censusEnrollment?.token === imageToken &&
+				return this.#censusLease === lease && !lease.releasing && currentImage() &&
 					this.#readReservations.current() === lease.native;
 			} catch (cause) { this.#censusEnrollment = undefined; throw cause; }
 		});
@@ -1532,7 +1655,9 @@ class NodeIssuanceImplementation {
 		assertDurableIssueScope(scope);
 		const detached = copyDurableIssueScope(scope);
 		try {
-			const lineage = readNativeLineage(this.#database, detached);
+			const lineage = this.#memoTransaction("lineage", JSON.stringify([detached.objectId, detached.author]), () =>
+				readNativeLineage(this.#database, detached)
+			);
 			if (lineage === undefined) throw this.#latchCorruption("stored lineage is malformed");
 			return { exhausted: lineage.exhausted, next: lineage.next };
 		} catch (error) {
@@ -1549,7 +1674,15 @@ class NodeIssuanceImplementation {
 		const detached = copyDurableIssueScope(scope);
 		let observation: TerminalReadback;
 		try {
-			observation = this.#readTerminal(detached, authorSequence);
+			observation = this.#memoTransaction(
+				"issued",
+				JSON.stringify([detached.objectId, detached.author, authorSequence]),
+				// Inside the transaction opened here, the same queries #readTerminal runs in its own.
+				(opened) =>
+					opened
+						? this.#queryTerminal(detached, authorSequence, this.#database)
+						: this.#readTerminal(detached, authorSequence)
+			);
 		} catch (error) {
 			throw this.#mapOperationError(error, "issued-record read failed");
 		}
@@ -1588,7 +1721,9 @@ class NodeIssuanceImplementation {
 		assertDurableIssueScope(scope);
 		const detached = copyDurableIssueScope(scope);
 		try {
-			const plan = readSettlementPlanRow(this.#database, detached);
+			const plan = this.#memoTransaction("plan", JSON.stringify([detached.objectId, detached.author]), () =>
+				readSettlementPlanRow(this.#database, detached)
+			);
 			if (plan === undefined) throw this.#latchCorruption("stored settlement plan is malformed");
 			return plan === null ? null : cloneSettlementPlan(plan);
 		} catch (error) {
@@ -1683,87 +1818,94 @@ class NodeIssuanceImplementation {
 		const parsed = this.#parsePageInput(input);
 		try {
 			this.#database.exec("BEGIN");
-			const lineageRows = iterateSqliteRows(
-				statement(this.#database, "SELECT object_id,author,next,exhausted,pruned_through_author_sequence FROM lineages")
-			);
-			// Even unused foreign lineages remain part of global validation.
-			for (const raw of lineageRows) {
-				const row = copyLineageRow(raw);
-				if (row === undefined) throw this.#latchCorruption("stored lineage is malformed");
-			}
-			const issuedRows = iterateSqliteRows(
-				statement(
+			const pageKey = JSON.stringify([parsed.scope ?? null, parsed.afterKey, parsed.limit]);
+			const page = this.#memoLoad("page", pageKey, () => {
+				const lineageRows = iterateSqliteRows(
+					statement(
+						this.#database,
+						"SELECT object_id,author,next,exhausted,pruned_through_author_sequence FROM lineages"
+					)
+				);
+				// Even unused foreign lineages remain part of global validation.
+				for (const raw of lineageRows) {
+					const row = copyLineageRow(raw);
+					if (row === undefined) throw this.#latchCorruption("stored lineage is malformed");
+				}
+				const issuedRows = iterateSqliteRows(
+					statement(
+						this.#database,
+						"SELECT i.object_id,i.author,i.author_sequence,i.canonical_preimage,i.digest,i.signature," +
+							"o.digest AS outbox_digest,o.publish_state,l.next AS lineage_next,l.exhausted AS lineage_exhausted," +
+							"l.pruned_through_author_sequence AS lineage_watermark FROM issued_records AS i " +
+							"LEFT JOIN issuance_outbox AS o ON o.object_id=i.object_id AND o.author=i.author AND o.author_sequence=i.author_sequence " +
+							"LEFT JOIN lineages AS l ON l.object_id=i.object_id AND l.author=i.author"
+					)
+				);
+				const records: { issued: NativeIssuedRow; publishState: "pending" | "published" }[] = [];
+				for (const raw of issuedRows) {
+					const issued = copyIssuedRow(raw);
+					if (issued === undefined) throw this.#latchCorruption("stored issued record is malformed");
+					const row = copyOutboxRow({
+						object_id: raw.object_id,
+						author: raw.author,
+						author_sequence: raw.author_sequence,
+						digest: raw.outbox_digest,
+						publish_state: raw.publish_state,
+					});
+					if (row === undefined) throw this.#latchCorruption("stored outbox row is malformed");
+					if (!bytesEqual(issued.digest, row.digest)) {
+						throw this.#latchCorruption("outbox has no matching issued record");
+					}
+					const lineage = copyLineageRow({
+						object_id: raw.object_id,
+						author: raw.author,
+						next: raw.lineage_next,
+						exhausted: raw.lineage_exhausted,
+						pruned_through_author_sequence: raw.lineage_watermark,
+					});
+					if (
+						lineage === undefined ||
+						!durableIssuanceLineageConsumed(lineage, row.authorSequence) ||
+						durableIssuanceAddressIsPruned(lineage.prunedThroughAuthorSequence, row.authorSequence)
+					) {
+						throw this.#latchCorruption("stored outbox closure was not consumed by lineage");
+					}
+					const key = this.#issuedKey(issued);
+					if (
+						(parsed.scope !== undefined && !this.#sameScope(issued, parsed.scope)) ||
+						(parsed.afterKey !== null && compareDurableIssuanceCompoundKeys(key, parsed.afterKey) <= 0)
+					)
+						continue;
+					// SQLite BINARY order is not the shared UTF-16 order. Select the
+					// smallest requested page without retaining or sorting all history.
+					let low = 0,
+						high = records.length;
+					while (low < high) {
+						const middle = Math.floor((low + high) / 2);
+						const prior = records[middle];
+						if (prior === undefined) throw new Error("outbox page selection changed");
+						if (compareDurableIssuanceCompoundKeys(this.#issuedKey(prior.issued), key) < 0) low = middle + 1;
+						else high = middle;
+					}
+					if (low < parsed.limit) {
+						records.splice(low, 0, { issued, publishState: row.publishState });
+						if (records.length > parsed.limit) records.pop();
+					}
+				}
+				const orphan = configuredStatement(
 					this.#database,
-					"SELECT i.object_id,i.author,i.author_sequence,i.canonical_preimage,i.digest,i.signature," +
-						"o.digest AS outbox_digest,o.publish_state,l.next AS lineage_next,l.exhausted AS lineage_exhausted," +
-						"l.pruned_through_author_sequence AS lineage_watermark FROM issued_records AS i " +
-						"LEFT JOIN issuance_outbox AS o ON o.object_id=i.object_id AND o.author=i.author AND o.author_sequence=i.author_sequence " +
-						"LEFT JOIN lineages AS l ON l.object_id=i.object_id AND l.author=i.author"
-				)
-			);
-			const records: { issued: NativeIssuedRow; publishState: "pending" | "published" }[] = [];
-			for (const raw of issuedRows) {
-				const issued = copyIssuedRow(raw);
-				if (issued === undefined) throw this.#latchCorruption("stored issued record is malformed");
-				const row = copyOutboxRow({
-					object_id: raw.object_id,
-					author: raw.author,
-					author_sequence: raw.author_sequence,
-					digest: raw.outbox_digest,
-					publish_state: raw.publish_state,
-				});
-				if (row === undefined) throw this.#latchCorruption("stored outbox row is malformed");
-				if (!bytesEqual(issued.digest, row.digest)) {
-					throw this.#latchCorruption("outbox has no matching issued record");
-				}
-				const lineage = copyLineageRow({
-					object_id: raw.object_id,
-					author: raw.author,
-					next: raw.lineage_next,
-					exhausted: raw.lineage_exhausted,
-					pruned_through_author_sequence: raw.lineage_watermark,
-				});
-				if (
-					lineage === undefined ||
-					!durableIssuanceLineageConsumed(lineage, row.authorSequence) ||
-					durableIssuanceAddressIsPruned(lineage.prunedThroughAuthorSequence, row.authorSequence)
-				) {
-					throw this.#latchCorruption("stored outbox closure was not consumed by lineage");
-				}
-				const key = this.#issuedKey(issued);
-				if (
-					(parsed.scope !== undefined && !this.#sameScope(issued, parsed.scope)) ||
-					(parsed.afterKey !== null && compareDurableIssuanceCompoundKeys(key, parsed.afterKey) <= 0)
-				)
-					continue;
-				// SQLite BINARY order is not the shared UTF-16 order. Select the
-				// smallest requested page without retaining or sorting all history.
-				let low = 0,
-					high = records.length;
-				while (low < high) {
-					const middle = Math.floor((low + high) / 2);
-					const prior = records[middle];
-					if (prior === undefined) throw new Error("outbox page selection changed");
-					if (compareDurableIssuanceCompoundKeys(this.#issuedKey(prior.issued), key) < 0) low = middle + 1;
-					else high = middle;
-				}
-				if (low < parsed.limit) {
-					records.splice(low, 0, { issued, publishState: row.publishState });
-					if (records.length > parsed.limit) records.pop();
-				}
-			}
-			const orphan = configuredStatement(
-				this.#database,
-				"SELECT o.object_id FROM issuance_outbox AS o LEFT JOIN issued_records AS i " +
-					"ON i.object_id=o.object_id AND i.author=o.author AND i.author_sequence=o.author_sequence " +
-					"WHERE i.object_id IS NULL LIMIT 1"
-			).get();
-			if (orphan !== undefined) throw this.#latchCorruption("outbox has no matching issued record");
+					"SELECT o.object_id FROM issuance_outbox AS o LEFT JOIN issued_records AS i " +
+						"ON i.object_id=o.object_id AND i.author=o.author AND i.author_sequence=o.author_sequence " +
+						"WHERE i.object_id IS NULL LIMIT 1"
+				).get();
+				if (orphan !== undefined) throw this.#latchCorruption("outbox has no matching issued record");
+				return records.map(({ issued, publishState }) => ({
+					commit: cloneDurableIssueCommit(issuedCommit(issued)),
+					publishState,
+				}));
+			});
 			this.#database.exec("COMMIT");
-			return records.map(({ issued, publishState }) => ({
-				commit: cloneDurableIssueCommit(issuedCommit(issued)),
-				publishState,
-			}));
+			return page;
 		} catch (error) {
 			try {
 				this.#database.exec("ROLLBACK");
