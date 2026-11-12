@@ -132,7 +132,7 @@ function sameVerdict(create: CreateWalker, bytes: Uint8Array, label: string, lim
 	const whole = bytes.byteLength;
 	for (const splitDepth of [0, 1, 2, 3, 128]) {
 		for (const budget of [1, 2, 7, 64, whole === 0 ? 1 : whole]) {
-			const walked = walk(create, bytes, budget, { splitDepth, limits });
+			const walked = walk(create, bytes, budget, { splitDepth, ...(limits === undefined ? {} : { limits }) });
 			const where = `${label} split ${splitDepth} budget ${budget}`;
 			expect(walked.ok, where).toBe(expected.ok);
 			if (walked.ok && expected.ok) expect(walked.value, where).toStrictEqual(expected.value);
