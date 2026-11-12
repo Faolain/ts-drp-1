@@ -1,7 +1,7 @@
 # Track 45: apps can host their room in a background worker (opt-in)
 
-Branch `feat/room-worker` (from 22a7b582, plus the FPS harness commits 076f8858..5691794c). Decision row 84.
-Not merged: it merges after the integration-7 gate, not into it.
+Branch `feat/room-worker` (from 22a7b582, plus the FPS harness commits 076f8858..5691794c).
+Not merged: it merges after the integration-7 regression bisect.
 
 ## Problem
 
