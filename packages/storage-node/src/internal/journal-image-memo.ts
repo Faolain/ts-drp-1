@@ -2,22 +2,43 @@ import { compareBytes } from "@ts-drp/canonical";
 import type { LiveJournalRetirementImage } from "@ts-drp/live-journal";
 import type { DatabaseSync } from "node:sqlite";
 
+import { configuredStatement } from "./sqlite-statement-cache.js";
+
 // Verify-once memo for live-journal retirement images, keyed by the exact
 // native rows of one object.
 //
 // An image (its digest, counts and byte charge, plus the per-row frames when
 // requested) is a pure function of the ordered sequence of rows it captured:
-// table, column names and the exact column values. Every capture still scans
-// those rows freshly under its original transaction, runs every fence and
-// count check, and compares each row with a private copy of the rows that
-// produced a remembered image. Only a complete, in-order, value-exact match of
-// every row returns the remembered result; any write, rollback, reopen or
-// other connection's commit that changes a row changes what is scanned, and the
-// capture then runs as before. Nothing is keyed by revision or row identity,
-// so nothing needs invalidating for soundness; bounds only cap memory.
+// table, column names and the exact column values. Unless the database is
+// provably unchanged (below), a capture scans those rows freshly under its
+// original transaction, runs every fence and count check, and compares each
+// row with a private copy of the rows that produced a remembered image. Only a
+// complete, in-order, value-exact match of every row returns the remembered
+// result; any write, rollback, reopen or other connection's commit that changes
+// a row changes what is scanned, and the capture then runs as before. Rows are
+// not keyed by revision or row identity, so a scan needs no invalidation for
+// soundness; bounds only cap memory. A frameless capture also keeps its rows'
+// frames, so a later point read of the same rows needs no second capture.
 //
 // Remembered results are frozen primitives (the image) and private byte copies
 // (frames and key values); callers receive fresh frame copies on every hit.
+//
+// Unchanged-database answers (no scan). A capture of committed rows also
+// records the connection's currency: PRAGMA data_version (moves on every commit
+// by any other connection this connection observes), total_changes() (moves on
+// every row this connection inserts, updates or deletes, including writes later
+// rolled back, and never moves back) and schema_version (catches DDL, which
+// total_changes() does not count). Rows are committed rows when this connection
+// has changed no row and run no DDL since a moment it was outside every
+// transaction (beginJournalTransaction, recorded right after a successful BEGIN):
+// otherwise an own uncommitted write could still roll back. While all three
+// values equal a recorded currency and the rows are committed, the committed
+// database the remembered capture scanned is the one a scan would read now, so
+// the remembered result is returned without the scan. Any change, rollback,
+// reopen, DDL or other commit moves a value, and the capture then runs as above.
+
+/** A connection's change currency (see above): equal currencies of committed rows mean unchanged rows. */
+export type JournalImageCurrency = Readonly<{ dataVersion: number; totalChanges: number; schemaVersion: number }>;
 
 type NativeValue = string | number | null | Uint8Array;
 /** One captured row: table, then alternating column names and private value copies. */
@@ -39,6 +60,8 @@ export class JournalRetirementImageMemo {
 	readonly #maxBytes: number;
 	// Map insertion order is the eviction order; a hit refreshes its object.
 	readonly #entries = new Map<string, JournalImageEntry>();
+	// The currency of committed rows each remembered capture equals, when one was observed.
+	readonly #currencies = new Map<string, JournalImageCurrency>();
 	#bytes = 0;
 
 	/**
@@ -61,14 +84,36 @@ export class JournalRetirementImageMemo {
 	}
 
 	/**
+	 * The remembered result for an unchanged database, without a scan.
+	 * @param objectId - Object about to be captured.
+	 * @param withFrames - Whether the capture must also deliver per-row frames.
+	 * @param currency - The connection's currency now, defined only for committed rows.
+	 * @returns The remembered entry when its recorded currency equals `currency`, refreshed; otherwise undefined.
+	 */
+	public unchanged(
+		objectId: string,
+		withFrames: boolean,
+		currency: JournalImageCurrency | undefined
+	): Readonly<JournalImageEntry> | undefined {
+		if (currency === undefined) return undefined;
+		const entry = this.candidate(objectId, withFrames),
+			recorded = this.#currencies.get(objectId);
+		if (entry === undefined || recorded === undefined || !sameCurrency(recorded, currency)) return undefined;
+		this.touch(objectId);
+		return entry;
+	}
+
+	/**
 	 * Refreshes recency after a complete exact match of every scanned row.
 	 * @param objectId - Matched object.
+	 * @param currency - The currency of the committed rows just scanned, if they were committed.
 	 */
-	public touch(objectId: string): void {
+	public touch(objectId: string, currency?: JournalImageCurrency): void {
 		const entry = this.#entries.get(objectId);
 		if (entry === undefined) return;
 		this.#entries.delete(objectId);
 		this.#entries.set(objectId, entry);
+		if (currency !== undefined) this.#currencies.set(objectId, currency);
 	}
 
 	/**
@@ -77,14 +122,17 @@ export class JournalRetirementImageMemo {
 	 * @param rows - Row keys from {@link journalImageRowKey}, in capture order.
 	 * @param image - The finished frozen image.
 	 * @param frames - The frames that capture produced, when requested.
+	 * @param currency - The currency of the committed rows captured, if they were committed.
 	 */
 	public remember(
 		objectId: string,
 		rows: readonly JournalImageRowKey[],
 		image: LiveJournalRetirementImage,
-		frames: readonly Uint8Array[] | undefined
+		frames: readonly Uint8Array[] | undefined,
+		currency?: JournalImageCurrency
 	): void {
 		const prior = this.#entries.get(objectId);
+		this.#currencies.delete(objectId);
 		if (prior !== undefined) {
 			this.#entries.delete(objectId);
 			this.#bytes -= prior.bytes;
@@ -100,9 +148,11 @@ export class JournalRetirementImageMemo {
 		this.#entries.set(objectId, Object.freeze({ rows: Object.freeze([...rows]), image,
 			frames: copies === undefined ? undefined : Object.freeze(copies), bytes }));
 		this.#bytes += bytes;
+		if (currency !== undefined) this.#currencies.set(objectId, currency);
 		while (this.#entries.size > this.#maxObjects || this.#bytes > this.#maxBytes) {
 			const [oldest, entry] = this.#entries.entries().next().value!;
 			this.#entries.delete(oldest);
+			this.#currencies.delete(oldest);
 			this.#bytes -= entry.bytes;
 		}
 	}
@@ -111,6 +161,69 @@ export class JournalRetirementImageMemo {
 	public size(): Readonly<{ objects: number; bytes: number }> {
 		return { objects: this.#entries.size, bytes: this.#bytes };
 	}
+}
+
+function sameCurrency(left: JournalImageCurrency, right: JournalImageCurrency): boolean {
+	return (
+		left.dataVersion === right.dataVersion &&
+		left.totalChanges === right.totalChanges &&
+		left.schemaVersion === right.schemaVersion
+	);
+}
+
+// The currency of each connection right after its last successful BEGIN: a
+// moment it was outside every transaction, so every own change before it is
+// committed or rolled back. Retained per connection object, unreachable with it.
+const outsideTransaction = new WeakMap<DatabaseSync, JournalImageCurrency>();
+
+function readCurrency(database: DatabaseSync): JournalImageCurrency {
+	const row = configuredStatement(
+		database,
+		"SELECT (SELECT data_version FROM pragma_data_version) AS d,total_changes() AS t,(SELECT schema_version FROM pragma_schema_version) AS s"
+	).get();
+	const dataVersion = row?.d,
+		totalChanges = row?.t,
+		schemaVersion = row?.s;
+	if (!Number.isSafeInteger(dataVersion) || !Number.isSafeInteger(totalChanges) || !Number.isSafeInteger(schemaVersion))
+		throw new Error("store-poisoned");
+	return Object.freeze({
+		dataVersion: dataVersion as number,
+		totalChanges: totalChanges as number,
+		schemaVersion: schemaVersion as number,
+	});
+}
+
+/**
+ * Begins a transaction and records the connection's change count at that moment
+ * (BEGIN itself changes no row, and succeeds only outside every transaction).
+ * @param database - The connection.
+ * @param sql - "BEGIN" or "BEGIN IMMEDIATE".
+ */
+export function beginJournalTransaction(database: DatabaseSync, sql: "BEGIN" | "BEGIN IMMEDIATE"): void {
+	database.exec(sql);
+	try {
+		outsideTransaction.set(database, readCurrency(database));
+	} catch (error) {
+		database.exec("ROLLBACK");
+		throw error;
+	}
+}
+
+/**
+ * The connection's currency, read before any row of the capture: the first read
+ * of a transaction fixes its snapshot, and data_version then describes it.
+ * @param database - The connection, inside a transaction begun by {@link beginJournalTransaction} or later.
+ * @returns The currency when every visible row is committed (no own row change and
+ * no DDL since the connection was last outside a transaction); otherwise undefined.
+ */
+export function journalImageCurrency(database: DatabaseSync): JournalImageCurrency | undefined {
+	const currency = readCurrency(database),
+		outside = outsideTransaction.get(database);
+	return outside !== undefined &&
+		outside.totalChanges === currency.totalChanges &&
+		outside.schemaVersion === currency.schemaVersion
+		? currency
+		: undefined;
 }
 
 function valueBytes(value: unknown): number {

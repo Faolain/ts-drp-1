@@ -20,7 +20,8 @@ function execute<T>(body: string, bindings: Record<string, unknown>): T {
 }
 type Owner = (...args: unknown[]) => unknown;
 function fixture(operation: unknown = Object.freeze({action: "app", bytes: Uint8Array.of(7)}), sourcePositive = false) {
-	const state = {encodes: 0, key: Uint8Array.of(1), identity: {}, live: true, replay: 0,
+	const state = {encodes: 0, key: Uint8Array.of(1), identity: {}, live: true, replay: 0, resolves: 0,
+		onResolve: undefined as (() => void) | undefined,
 		beforeEncode: undefined as ((value: unknown) => void) | undefined,
 		afterEncode: undefined as ((value: unknown) => void) | undefined};
 	const scope = Object.freeze({objectId: "room", epoch: 3, anchorDigest: "anchor"});
@@ -48,7 +49,7 @@ function fixture(operation: unknown = Object.freeze({action: "app", bytes: Uint8
 	const typed = Object.getPrototypeOf(Uint8Array.prototype);
 	const names = ["isInstanceOf", "typedArrayBuffer", "typedArrayByteLength", "copyDetachedBytes",
 		"captureCreatorOrdinaryDimensionIntegrity", "captureCreatorOrdinaryPreparedVertex",
-		"creatorOrdinaryPreparedVertexCurrent", "captureCreatorOrdinaryPreparedAdmission",
+		"creatorOrdinaryPreparedVertexCurrent", "creatorOrdinaryPreparedVerticesCurrent", "captureCreatorOrdinaryPreparedAdmission",
 		"creatorOrdinaryPreparedGraphCurrent", "creatorOrdinaryPreparedIssuedEqual",
 		"creatorOrdinaryPreparedNativeCurrent", "advanceCreatorOrdinaryPreparedAdmission",
 		"advanceCreatorOrdinaryRuntimeCapacityGeometry"];
@@ -67,7 +68,7 @@ function fixture(operation: unknown = Object.freeze({action: "app", bytes: Uint8
 		ReflectOwnKeys: Reflect.ownKeys, ReflectApply: Reflect.apply, ArrayIsArray: Array.isArray,
 		sameBytes: (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((byte, i) => byte === b[i]),
 		copyCanonicalForAdmittedView,
-		resolveV3AuthorizedAuthor: () => ({format: "raw", bytes: state.key}),
+		resolveV3AuthorizedAuthor: () => {state.resolves++; const bytes = state.key; state.onResolve?.(); return {format: "raw", bytes};},
 		liveJournalScope: () => scope, sameLiveJournalScope: (a: unknown, b: unknown) =>
 			JSON.stringify(a) === JSON.stringify(b),
 		lowerHexDigest: (bytes: Uint8Array) => bytes[0] === 1 ? "one" : bytes[0] === 2 ? "two" : undefined,
@@ -152,6 +153,32 @@ describe("existing ordinary prepared-capacity DATA owner", () => {
 			if (change === "vertex") f.registration.closeVertices.set("one", {...f.vertex});
 			expect(f.functions.creatorOrdinaryPreparedNativeCurrent(f.registration, f.prepared, f.rows, f.native), change).toBe(false);
 		}
+	});
+	function sameAuthorTwice() {
+		const f = fixture(), two = Object.freeze({...f.vertex, hash: "two"});
+		f.registration.closeVertices.set("two", two);
+		f.registration.closeAuthors.set("two", Object.freeze({author: "alice", authorSequence: 1}));
+		f.registration.closeCharges.set("two", 4);
+		const prepared = f.functions.captureCreatorOrdinaryPreparedAdmission(f.registration, [f.replay], f.native, f.application);
+		expect(prepared).toBeDefined();
+		return {f, current: () => f.functions.creatorOrdinaryPreparedGraphCurrent(f.registration, prepared)};
+	}
+	it("resolves each author's key once per pass and afresh on every later pass", () => {
+		const {f, current} = sameAuthorTwice();
+		f.state.resolves = 0;
+		expect(current()).toBe(true); expect(f.state.resolves).toBe(1);
+		expect(current()).toBe(true); expect(f.state.resolves).toBe(2);
+		f.state.key = Uint8Array.of(2);
+		expect(current()).toBe(false);
+		f.state.key = Uint8Array.of(1);
+		expect(current()).toBe(true);
+	});
+	it("re-resolves after the authorization object is replaced within a pass", () => {
+		const {f, current} = sameAuthorTwice();
+		f.state.resolves = 0;
+		f.state.onResolve = () => {f.state.onResolve = undefined; f.registration.authorization = {}; f.state.key = Uint8Array.of(2);};
+		// The first vertex passes against the key read before the replacement; the second must see the new one.
+		expect(current()).toBe(false); expect(f.state.resolves).toBe(2);
 	});
 	it("rejects same-count native corruption and local/received provenance changes", () => {
 		for (const change of ["preimage", "signature", "digest", "provenance", "ordinal", "scope"] as const) {

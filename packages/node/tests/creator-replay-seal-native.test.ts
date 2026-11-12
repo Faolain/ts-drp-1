@@ -514,7 +514,7 @@ describe("same-held census immutable input reuse", () => {
 		const runtime = {currentTrust: trust, sourceBound: true}, held = Object.freeze({store, objectId: "room", available: () => state.alive});
 		const captured = {pages: [{afterKey: null, bytes: encodeCanonical(state.pages)}], applicationPolicyRead: false, retainedBytes: 1, overCapacity: false};
 		const prepare = executeLiveOwner<any>(["captureCreatorOrdinaryPreparedVertex", "creatorOrdinaryPreparedVertexCurrent",
-			"prepareCreatorUnchangedHeldCensusRead"], "prepareCreatorUnchangedHeldCensusRead", {
+			"creatorOrdinaryPreparedVerticesCurrent", "prepareCreatorUnchangedHeldCensusRead"], "prepareCreatorUnchangedHeldCensusRead", {
 			ObjectIsFrozen: Object.isFrozen, ObjectFreeze: Object.freeze, Uint8ArrayConstructor: Uint8Array,
 			ReflectApply: Reflect.apply, SetPrototypeValues: Set.prototype.values,
 			SetIteratorNext: Object.getPrototypeOf(new Set().values()).next,

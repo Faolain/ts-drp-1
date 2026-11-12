@@ -2,6 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { encodeJournalRetirementControl } from "@ts-drp/live-journal";
 import { describe, expect, test, vi } from "vitest";
 
 import { anchorMaterial } from "../../../tests/fixtures/journal-anchor-read/material.js";
@@ -14,6 +15,20 @@ import { createNodeDurableLiveJournalStore } from "../src/live-journal.js";
 // function of the exact rows. Byte-identical rows need capturing once; any row
 // change (own write, another connection, deletion, insertion) is captured again.
 const work = vi.hoisted(() => ({ captured: 0, imageHash: 0 }));
+// Native rows the store iterates (every full image scan reads each scope and accepted row).
+const scans = vi.hoisted(() => ({ rows: 0 }));
+vi.mock("../src/internal/sqlite-iterator.js", async (importOriginal) => {
+	const original = await importOriginal<typeof import("../src/internal/sqlite-iterator.js")>();
+	return {
+		...original,
+		iterateSqliteRows: function* (...args: Parameters<typeof original.iterateSqliteRows>) {
+			for (const row of original.iterateSqliteRows(...args)) {
+				scans.rows++;
+				yield row;
+			}
+		},
+	};
+});
 vi.mock("@ts-drp/canonical/encoding-capture", async (importOriginal) => {
 	const original = await importOriginal<typeof import("@ts-drp/canonical/encoding-capture")>();
 	return {
@@ -103,6 +118,93 @@ describe("native live-journal retirement image verify-once work counts", () => {
 		} finally {
 			raw.close();
 			await store.close();
+			await rm(directory, { recursive: true, force: true });
+		}
+	});
+});
+
+describe("native live-journal retirement image unchanged-database answers", () => {
+	test("unchanged committed rows answer without a scan; any commit, DDL or own write scans again", async () => {
+		const { directory, current, selector, store, raw } = await journal();
+		const scanned = async <T>(operation: () => Promise<T>): Promise<[T, number, Readonly<{ captured: number; imageHash: number }>]> => {
+			scans.rows = 0;
+			const [result, counted] = await measure(operation);
+			return [result, scans.rows, counted];
+		};
+		try {
+			const first = must(await store.readRetirementImage(selector));
+			// The read that verified the rows recorded the committed currency: no further scan.
+			const [reads, readRows] = await scanned(async () => {
+				const out = [];
+				for (let read = 0; read < 4; read++) out.push(must(await store.readRetirementImage(selector)));
+				return out;
+			});
+			expect(readRows).toBe(0);
+			for (const read of reads) {
+				expect(read.image).toEqual(first.image);
+				expect(read.canonicalRows).toEqual(first.canonicalRows);
+			}
+			// Another connection's DDL that changes no row: scanned (and matched) again, then answered unscanned.
+			raw.exec("CREATE TABLE unrelated(x)");
+			const [afterDdl, ddlRows, ddlWork] = await scanned(async () => must(await store.readRetirementImage(selector)));
+			expect(ddlRows).toBeGreaterThanOrEqual(ROWS + 1);
+			expect(ddlWork).toEqual({ captured: 0, imageHash: 0 });
+			expect(afterDdl.image).toEqual(first.image);
+			expect((await scanned(async () => must(await store.readRetirementImage(selector))))[1]).toBe(0);
+			// Another connection's commit that rewrites a value with itself: scanned again.
+			raw.prepare("UPDATE accepted_entries SET vertex_digest=vertex_digest WHERE object_id=?").run(selector.objectId);
+			const [, sameRows, sameWork] = await scanned(async () => must(await store.readRetirementImage(selector)));
+			expect(sameRows).toBeGreaterThanOrEqual(ROWS + 1);
+			expect(sameWork).toEqual({ captured: 0, imageHash: 0 });
+			// Another connection's commit that changes a value: scanned, captured and hashed again.
+			raw.prepare("UPDATE accepted_entries SET vertex_digest=? WHERE object_id=? AND local_author_sequence=?")
+				.run("f".repeat(64), selector.objectId, 1);
+			const [rewritten, rewriteRows, rewriteWork] = await scanned(async () => must(await store.readRetirementImage(selector)));
+			expect(rewriteRows).toBeGreaterThanOrEqual(ROWS + 1);
+			expect(rewriteWork.imageHash).toBe(1);
+			expect(rewritten.image.imageDigest).not.toBe(first.image.imageDigest);
+			// This connection's own append: scanned, captured and hashed again.
+			expect(await store.appendAccepted({ scope: current.scope, sourceKind: "local-issued", author: "creator",
+				authorSequence: ROWS, vertexDigest: "e".repeat(64) })).toMatchObject({ ok: true });
+			const [appended, appendRows, appendWork] = await scanned(async () => must(await store.readRetirementImage(selector)));
+			expect(appendRows).toBeGreaterThanOrEqual(ROWS + 2);
+			expect(appendWork.imageHash).toBe(1);
+			expect(appended.image.rowCount).toBe(ROWS + 1);
+			expect((await scanned(async () => must(await store.readRetirementImage(selector))))[1]).toBe(0);
+		} finally {
+			raw.close();
+			await store.close();
+			await rm(directory, { recursive: true, force: true });
+		}
+	});
+});
+
+describe("native live-journal retirement image after a source-bound append", () => {
+	test("the append's own postimage capture answers the next point read: no second capture, hash or scan", async () => {
+		const { directory, current, selector, store, raw, open } = await journal();
+		let reopened: ReturnType<typeof open> | undefined;
+		try {
+			const before = must(await store.readRetirementImage(selector));
+			const appended = await store.appendAccepted({ scope: current.scope, sourceKind: "local-issued", author: "creator",
+				authorSequence: ROWS, vertexDigest: "e".repeat(64),
+				expectedNativeImage: { imageDigest: before.image.imageDigest,
+					controlBytes: before.control === null ? null : encodeJournalRetirementControl(before.control) } });
+			if (!appended.ok || appended.nativeImage === undefined) throw new Error(`source-bound append refused: ${JSON.stringify(appended)}`);
+			scans.rows = 0;
+			const [after, afterWork] = await measure(async () => must(await store.readRetirementImage(selector)));
+			expect(afterWork).toEqual({ captured: 0, imageHash: 0 });
+			expect(scans.rows).toBe(0);
+			expect(after.image.imageDigest).toBe(appended.nativeImage.imageDigest);
+			expect(after.image.rowCount).toBe(ROWS + 1);
+			// The remembered frames are exactly what a brand-new connection captures from scratch.
+			await store.close();
+			reopened = open();
+			const fresh = must(await reopened.readRetirementImage(selector));
+			expect(fresh.image).toEqual(after.image);
+			expect(fresh.canonicalRows).toEqual(after.canonicalRows);
+		} finally {
+			raw.close();
+			await (reopened ?? store).close();
 			await rm(directory, { recursive: true, force: true });
 		}
 	});
