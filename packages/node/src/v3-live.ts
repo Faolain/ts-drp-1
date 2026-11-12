@@ -21882,12 +21882,14 @@ function applicationStateBoundAdmits(
 	registration: V3PlaneRegistration,
 	base: BlueprintStateMachine,
 	candidate: Readonly<{ digest: string; operation: Readonly<Record<string, unknown>> }>
-): Readonly<{ admitted: boolean; quoted: number }> | undefined {
+): Readonly<{ admitted: boolean; quoted: number; rebuilt: boolean }> | undefined {
 	const policy = registration.operationAdmissionPolicy;
 	const create = policy === undefined ? undefined : Reflect.get(policy, "createApplicationStateBound");
 	if (typeof create !== "function") return undefined;
 	let cache = applicationStateBounds.get(registration);
+	let rebuilt = false;
 	if (cache === undefined || cache.base !== base || cache.index !== registration.index || cache.payload !== registration.payload) {
+		rebuilt = true;
 		let bound: V3ApplicationStateBound | undefined;
 		try {
 			const created: unknown = ReflectApply(create, policy, [base.snapshot().exactCanonicalStateBytes]);
@@ -21937,7 +21939,7 @@ function applicationStateBoundAdmits(
 			cache.pending = ObjectFreeze({ digest: candidate.digest, operation: candidate.operation });
 			cache.admittedByBound = true;
 		}
-		return ObjectFreeze({ admitted, quoted });
+		return ObjectFreeze({ admitted, quoted, rebuilt });
 	} catch {
 		return disable();
 	}
@@ -22021,7 +22023,7 @@ function applicationStateAdmits(
 	// The application's own state bound, when it covers this material: O(operation), no fold.
 	const bounded = applicationStateBoundAdmits(registration, base, candidate);
 	if (bounded !== undefined) {
-		emit({ mode: "bound", refolded: false, admitted: bounded.admitted, sortsLast: true, stateBytes: bounded.quoted });
+		emit({ mode: "bound", refolded: bounded.rebuilt, admitted: bounded.admitted, sortsLast: true, stateBytes: bounded.quoted });
 		return bounded.admitted;
 	}
 	const limitRefusal = (error: unknown): boolean =>
