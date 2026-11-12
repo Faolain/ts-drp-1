@@ -118,7 +118,8 @@ function fixture() {
 			canonicalRows: {byteLength: 5000 + input.maxAdditionalCurrentRows * 9000, items: 10 + input.maxAdditionalCurrentRows * 2, maxDepth: 1}, successorFenceFrameByteLength: 9000};},
 		issuanceOrdinaryFinishingCapacityWidths: (input: any) => {calls.push(["issuer", input]); const phase = {nativeCensusBytes: 1000 + input.maxAdditionalCurrentIssued * 9000};
 			return {ordinaryPending: phase, ordinaryFinal: phase, nativeImageByteLength: 1000, nativeImageShape: {items: 30, maxDepth: 5}};},
-		creatorOrdinaryFutureNativeResourceForSizing: () => ({rows: {byteLength: 5000, items: 50, maxDepth: 5}, futureLeaf: 9000}),
+		creatorOrdinaryFutureNativeResourceForSizing: () => ({rows: {byteLength: 5000, items: 50, maxDepth: 5},
+			unionRows: {byteLength: 4000, items: 40, maxDepth: 5}, futureLeaf: 9000}),
 		creatorOrdinaryFinishingLifetimeMaterialForSizing: () => ({currentTurnover: 20000, closeAdopt: 30000, successorJob: 20000, serial: 20000, cold: 20000}),
 	});
 	return {run: () => {

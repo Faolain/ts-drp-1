@@ -32,12 +32,19 @@
 // carry (bounded; one refused at the bound is named to repair) and re-offers them to the same-
 // epoch successor, also after it is live.
 //
+// The durable append: a job that passed its currency check on the live plane can still append after
+// the recovery revoked it (the custody path awaits its journal reads in between). Appended then, the
+// row is durable but in no live index (the successor already rebuilt from the journal): a ghost,
+// whose child is held until delivery repair. SOUND re-checks currency right before the append and
+// hands the row to the carry instead.
+//
 // The carry's end: once the epoch changes, a late row of the old plane is refused and named to
 // repair (a refusing tombstone until the predecessor's last job settles), never carried across and
 // never silently dropped.
 //
 // Broken controls:
 //   snapshotOnly    - the carry is a snapshot of pending at deactivation; a row in flight is lost;
+//   noRecheck       - a checked job appends after the recovery: the row is a ghost;
 //   noTombstone     - after the epoch-change end a late row finds no carry and is silently dropped;
 //   forwardAcrossEpoch - after the epoch-change end a late row is still carried, into the next epoch;
 //   releaseAdmitted - the successor starts without the newest admitted row;
@@ -70,8 +77,8 @@ module planeRecoveryPendingCarry {
 
   pure val MOVES = 1.to(NW)
 
-  type Mutants = { dropPending: bool, snapshotOnly: bool, noTombstone: bool, forwardAcrossEpoch: bool, releaseAdmitted: bool, trustedCarry: bool, noDedupe: bool, carryAcrossEpoch: bool }
-  pure val SOUND: Mutants = { dropPending: false, snapshotOnly: false, noTombstone: false, forwardAcrossEpoch: false, releaseAdmitted: false, trustedCarry: false, noDedupe: false, carryAcrossEpoch: false }
+  type Mutants = { dropPending: bool, snapshotOnly: bool, noRecheck: bool, noTombstone: bool, forwardAcrossEpoch: bool, releaseAdmitted: bool, trustedCarry: bool, noDedupe: bool, carryAcrossEpoch: bool }
+  pure val SOUND: Mutants = { dropPending: false, snapshotOnly: false, noRecheck: false, noTombstone: false, forwardAcrossEpoch: false, releaseAdmitted: false, trustedCarry: false, noDedupe: false, carryAcrossEpoch: false }
   pure val BASE: Mutants = { ...SOUND, dropPending: true, snapshotOnly: true }
 
   var issued: int
@@ -83,6 +90,9 @@ module planeRecoveryPendingCarry {
   var carried: Set[int]
   var fifo: Set[int]     // copies inside the live plane's ingress jobs
   var stale: Set[int]    // copies inside a deactivated predecessor's ingress jobs
+  var checked: Set[int]  // admissible copies past the live plane's currency check, before their append
+  var checkedStale: Set[int] // the same, whose plane a recovery revoked before the append
+  var ghost: Set[int]    // durable in the journal but in no live index
   var phase: int
   var losses: int
   var recoveries: int
@@ -100,20 +110,22 @@ module planeRecoveryPendingCarry {
 
   action initWith(mu: Mutants): bool = all {
     issued' = 0, net' = MOVES.mapBy(_ => NONE), adm' = Set(), admEver' = Set(), admCount' = MOVES.mapBy(_ => 0),
-    pend' = Set(), carried' = Set(), fifo' = Set(), stale' = Set(), phase' = LIVE, losses' = 0, recoveries' = 0, crossEpoch' = false,
+    pend' = Set(), carried' = Set(), fifo' = Set(), stale' = Set(),
+    checked' = Set(), checkedStale' = Set(), ghost' = Set(), phase' = LIVE, losses' = 0, recoveries' = 0, crossEpoch' = false,
     settled' = false, mutants' = mu,
   }
   action init = initWith(SOUND)
   action initBase = initWith(BASE)
   action initSnapshotOnly = initWith({ ...SOUND, snapshotOnly: true })
   action initNoTombstone = initWith({ ...SOUND, noTombstone: true })
+  action initNoRecheck = initWith({ ...SOUND, noRecheck: true })
   action initForwardAcrossEpoch = initWith({ ...SOUND, forwardAcrossEpoch: true })
   action initReleaseAdmitted = initWith({ ...SOUND, releaseAdmitted: true })
   action initTrustedCarry = initWith({ ...SOUND, trustedCarry: true })
   action initNoDedupe = initWith({ ...SOUND, noDedupe: true })
   action initCarryAcrossEpoch = initWith({ ...SOUND, carryAcrossEpoch: true })
 
-  action keepRest: bool = all { fifo' = fifo, stale' = stale, losses' = losses, recoveries' = recoveries, crossEpoch' = crossEpoch, settled' = settled, mutants' = mutants }
+  action keepRest: bool = all { fifo' = fifo, stale' = stale, checked' = checked, checkedStale' = checkedStale, ghost' = ghost, losses' = losses, recoveries' = recoveries, crossEpoch' = crossEpoch, settled' = settled, mutants' = mutants }
 
   action issue: bool = all {
     phase != CLOSED, not(settled), issued < NW,
@@ -125,7 +137,8 @@ module planeRecoveryPendingCarry {
     phase != CLOSED, not(settled), net.get(i) == FLIGHT, losses < MAX_LOSSES,
     net' = net.set(i, LOST), losses' = losses + 1,
     issued' = issued, adm' = adm, admEver' = admEver, admCount' = admCount, pend' = pend, carried' = carried, phase' = phase,
-    fifo' = fifo, stale' = stale, recoveries' = recoveries, crossEpoch' = crossEpoch, settled' = settled, mutants' = mutants,
+    fifo' = fifo, stale' = stale, checked' = checked, checkedStale' = checkedStale, ghost' = ghost,
+    recoveries' = recoveries, crossEpoch' = crossEpoch, settled' = settled, mutants' = mutants,
   }
 
   // Repair (a missing hint, a refusal hint, or the sweep) re-sends a lost copy. A DROPPED copy
@@ -162,7 +175,7 @@ module planeRecoveryPendingCarry {
     phase == LIVE, not(settled), net.get(i) == FLIGHT,
     net' = net.set(i, CAPTURED), fifo' = fifo.union(Set(i)),
     issued' = issued, adm' = adm, admEver' = admEver, admCount' = admCount, pend' = pend, carried' = carried, phase' = phase,
-    stale' = stale, losses' = losses, recoveries' = recoveries, crossEpoch' = crossEpoch, settled' = settled, mutants' = mutants,
+    stale' = stale, checked' = checked, checkedStale' = checkedStale, ghost' = ghost, losses' = losses, recoveries' = recoveries, crossEpoch' = crossEpoch, settled' = settled, mutants' = mutants,
   }
 
   // Its job gives the verdict on the plane that captured it, still live.
@@ -172,7 +185,7 @@ module planeRecoveryPendingCarry {
     val r = offer(adm, pend, admCount, net.set(i, ARRIVED), i, true)
     all { net' = r.n, adm' = r.a, admEver' = admEver.union(r.a), admCount' = r.c, pend' = r.p },
     issued' = issued, carried' = carried, phase' = phase,
-    stale' = stale, losses' = losses, recoveries' = recoveries, crossEpoch' = crossEpoch, settled' = settled, mutants' = mutants,
+    stale' = stale, checked' = checked, checkedStale' = checkedStale, ghost' = ghost, losses' = losses, recoveries' = recoveries, crossEpoch' = crossEpoch, settled' = settled, mutants' = mutants,
   }
 
   // A job captured by a deactivated predecessor ends (dropped before authentication, or retained
@@ -190,7 +203,41 @@ module planeRecoveryPendingCarry {
     else if (carried.size() < MAX_PENDING) all { net' = net.set(i, ARRIVED), carried' = carried.union(Set(i)), crossEpoch' = crossEpoch }
     else all { net' = net.set(i, LOST), carried' = carried, crossEpoch' = crossEpoch },
     issued' = issued, adm' = adm, admEver' = admEver, admCount' = admCount, pend' = pend, phase' = phase,
-    fifo' = fifo, losses' = losses, recoveries' = recoveries, settled' = settled, mutants' = mutants,
+    fifo' = fifo, checked' = checked, checkedStale' = checkedStale, ghost' = ghost,
+    losses' = losses, recoveries' = recoveries, settled' = settled, mutants' = mutants,
+  }
+
+  // An admissible copy's job passes the live plane's currency check; its durable append follows.
+  action pass(i: int): bool = all {
+    phase == LIVE, not(settled), fifo.contains(i), ready(i, adm), not(adm.contains(i)), not(pend.contains(i)),
+    fifo' = fifo.exclude(Set(i)), checked' = checked.union(Set(i)),
+    issued' = issued, net' = net, adm' = adm, admEver' = admEver, admCount' = admCount, pend' = pend, carried' = carried,
+    phase' = phase, stale' = stale, checkedStale' = checkedStale, ghost' = ghost,
+    losses' = losses, recoveries' = recoveries, crossEpoch' = crossEpoch, settled' = settled, mutants' = mutants,
+  }
+
+  // The append on the plane that checked it, still live: admitted (and pending rows drained).
+  action appendLive(i: int): bool = all {
+    phase == LIVE, not(settled), checked.contains(i),
+    checked' = checked.exclude(Set(i)),
+    val r = offer(adm, pend, admCount, net.set(i, ARRIVED), i, true)
+    all { net' = r.n, adm' = r.a, admEver' = admEver.union(r.a), admCount' = r.c, pend' = r.p },
+    issued' = issued, carried' = carried, phase' = phase, fifo' = fifo, stale' = stale, checkedStale' = checkedStale,
+    ghost' = ghost, losses' = losses, recoveries' = recoveries, crossEpoch' = crossEpoch, settled' = settled, mutants' = mutants,
+  }
+
+  // The append of a job whose plane was revoked after its check. SOUND re-checks and hands the row to
+  // the carry (refused at the bound or after the epoch-change end: named to repair); noRecheck appends
+  // it: durable, in no live index, and the transport counted it delivered.
+  action appendStale(i: int): bool = all {
+    not(settled), checkedStale.contains(i),
+    checkedStale' = checkedStale.exclude(Set(i)),
+    if (mutants.noRecheck) all { net' = net.set(i, ARRIVED), carried' = carried, ghost' = ghost.union(Set(i)) }
+    else if (phase != CLOSED and carried.size() < MAX_PENDING) all { net' = net.set(i, ARRIVED), carried' = carried.union(Set(i)), ghost' = ghost }
+    else all { net' = net.set(i, LOST), carried' = carried, ghost' = ghost },
+    issued' = issued, adm' = adm, admEver' = admEver, admCount' = admCount, pend' = pend, phase' = phase,
+    fifo' = fifo, stale' = stale, checked' = checked,
+    losses' = losses, recoveries' = recoveries, crossEpoch' = crossEpoch, settled' = settled, mutants' = mutants,
   }
 
   // A copy the receiver already holds is sent again (a republication, the sweep).
@@ -209,6 +256,7 @@ module planeRecoveryPendingCarry {
     carried' = if (mutants.dropPending) carried else carried.union(pend),
     net' = MOVES.mapBy(i => if (mutants.dropPending and pend.contains(i)) DROPPED else net.get(i)),
     fifo' = Set(), stale' = stale.union(fifo),
+    checked' = Set(), checkedStale' = checkedStale.union(checked), ghost' = ghost,
     issued' = issued, adm' = adm, admEver' = admEver, admCount' = admCount,
     losses' = losses, crossEpoch' = crossEpoch, settled' = settled, mutants' = mutants,
   }
@@ -241,13 +289,14 @@ module planeRecoveryPendingCarry {
     phase' = CLOSED,
     crossEpoch' = (mutants.carryAcrossEpoch and (pend.union(carried)).size() > 0),
     issued' = issued, net' = net, adm' = adm, admEver' = admEver, admCount' = admCount, pend' = pend, carried' = carried,
-    fifo' = fifo, stale' = stale, losses' = losses, recoveries' = recoveries, settled' = settled, mutants' = mutants,
+    fifo' = fifo, stale' = stale, checked' = checked, checkedStale' = checkedStale, ghost' = ghost,
+    losses' = losses, recoveries' = recoveries, settled' = settled, mutants' = mutants,
   }
 
   // Fairness: once recoveries are over and every ingress job has ended, repair and re-offer
   // deliver every outstanding copy in order (a DROPPED copy has no repair hint and stays out).
   action settle: bool = all {
-    phase == LIVE, not(settled), fifo == Set(), stale == Set(),
+    phase == LIVE, not(settled), fifo == Set(), stale == Set(), checked == Set(), checkedStale == Set(),
     val reach = MOVES.filter(i => i <= issued and net.get(i) != DROPPED and (net.get(i) != ARRIVED or pend.contains(i) or carried.contains(i)))
     val st = range(1, NW + 1).foldl({ a: adm, c: admCount, stop: false }, (s, i) =>
       if (s.stop or s.a.contains(i)) s
@@ -260,7 +309,8 @@ module planeRecoveryPendingCarry {
       admEver' = admEver.union(st.a),
     },
     issued' = issued, phase' = phase,
-    fifo' = fifo, stale' = stale, losses' = losses, recoveries' = recoveries, crossEpoch' = crossEpoch, mutants' = mutants,
+    fifo' = fifo, stale' = stale, checked' = checked, checkedStale' = checkedStale, ghost' = ghost,
+    losses' = losses, recoveries' = recoveries, crossEpoch' = crossEpoch, mutants' = mutants,
   }
 
   action stutter: bool = all {
@@ -272,7 +322,7 @@ module planeRecoveryPendingCarry {
   action step = any {
     issue,
     nondet i = MOVES.oneOf()
-    any { lose(i), repair(i), deliver(i), capture(i), judge(i), lateVerdict(i), duplicate(i), reoffer(i) },
+    any { lose(i), repair(i), deliver(i), capture(i), judge(i), pass(i), appendLive(i), appendStale(i), lateVerdict(i), duplicate(i), reoffer(i) },
     beginRecover,
     endRecover,
     epochClose,
@@ -287,9 +337,10 @@ module planeRecoveryPendingCarry {
   val pendingDisjoint: bool = adm.intersect(pend) == Set()
   val heldNotDropped: bool = MOVES.forall(i => net.get(i) != DROPPED)
   val epochBound: bool = not(crossEpoch)
+  val noGhost: bool = ghost == Set()
   val allLand: bool = settled implies MOVES.forall(i => i <= issued implies (adm.contains(i) and admCount.get(i) == 1))
   val safety: bool = exactlyOnce and admittedKept and parentsFirst and pendingDisjoint and epochBound
-  val all_: bool = safety and heldNotDropped and allLand
+  val all_: bool = safety and heldNotDropped and noGhost and allLand
 
   // ---- Witness tests ----
   // w1 admitted, w2 lost, w3 pending; a same-epoch recovery. SOUND carries w3; after repair
@@ -379,6 +430,26 @@ module planeRecoveryPendingCarry {
     .then(epochClose)
     .then(lateVerdict(1))
     .then(all { assert(not(epochBound)), stutter })
+  // w2's job passes its check, a recovery revokes the plane, then w2's append: SOUND re-checks and
+  // carries it; the successor admits it, so w3 (its child) lands without repair.
+  run appendRecheckTest = init
+    .then(issue).then(deliver(1))
+    .then(issue).then(capture(2)).then(pass(2))
+    .then(beginRecover).then(endRecover)
+    .then(all { assert(checkedStale == Set(2)), appendStale(2) })
+    .then(all { assert(carried == Set(2) and ghost == Set()), reoffer(2) })
+    .then(issue).then(deliver(3))
+    .then(all { assert(adm == Set(1, 2, 3) and exactlyOnce), settle })
+    .then(all { assert(all_), stutter })
+  run noRecheckGhostTest = initNoRecheck
+    .then(issue).then(deliver(1))
+    .then(issue).then(capture(2)).then(pass(2))
+    .then(beginRecover).then(endRecover)
+    .then(appendStale(2))
+    .then(all { assert(not(noGhost)), issue })
+    .then(deliver(3))
+    .then(all { assert(pend == Set(3)), settle })
+    .then(all { assert(not(allLand)), stutter })
   run carryAcrossEpochTest = initCarryAcrossEpoch
     .then(issue).then(lose(1))
     .then(issue).then(deliver(2))

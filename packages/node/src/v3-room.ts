@@ -110,7 +110,12 @@ import { acquireFinalitySigningExclusion, type FinalitySigningExclusion } from "
 import { publicKeyFromRaw } from "@libp2p/crypto/keys";
 import { openCanonicalLatchedAclSnapshot } from "@ts-drp/protocol-v3/latched-acl";
 import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
-import { type NativeReadReservation, parseStorageObjectId, type StorageObjectId } from "@ts-drp/storage";
+import {
+	AHE_BOUNDED_READ_LIMITS,
+	type NativeReadReservation,
+	parseStorageObjectId,
+	type StorageObjectId,
+} from "@ts-drp/storage";
 import type {
 	RoomHead as V3RoomHead,
 	RoomHeadAuthority as V3RoomHeadAuthority,
@@ -391,6 +396,12 @@ export type V3RoomSettlementStatus = Readonly<{
 	 * free, the moves of retained rows still unresolved.
 	 */
 	deferred: number;
+	/**
+	 * This epoch's author fence is awaited (settlementAuthorFenceDecision "await-fence"): retained work
+	 * waits for a frontier a later install may bring, so the fence is withheld, and new moves are refused
+	 * up front with V3RoomAwaitingAuthorFence (not accepted, so not lost) until an install fences.
+	 */
+	awaitingFence: boolean;
 }>;
 
 /** The key of one durable hand-back record (V3RoomSettlementStatus.undelivered). */
@@ -642,6 +653,11 @@ export interface CreateV3RoomSessionInput<Projection extends V3RoomProjectionAut
 	 */
 	onAcceptedVertex(vertex: AdmittedReceivedVertexView): void | Promise<void>;
 	onMigrationTarget?(session: V3RoomSession<Projection>, objectId: string): void;
+	/**
+	 * Observation only: typed diagnostics of paths the room is not expected to reach
+	 * (V3RoomDiagnosticEvent). Never alters the room's behaviour; a throwing hook is ignored.
+	 */
+	onDiagnostic?(event: V3RoomDiagnosticEvent): void;
 	onProjection(projection: Projection): void;
 	readonly publicKeyBytes: Uint8Array;
 	readonly rebaseSourceInvite?: string | V3RoomCreatorInviteMaterial;
@@ -1925,6 +1941,110 @@ export class V3RoomLocalBacklogFull extends Error {
 		super(`v3 room local backlog is full: ${backlog} of ${bound} own moves are not reaching the host`);
 		this.name = "V3RoomLocalBacklogFull";
 	}
+}
+
+/**
+ * A new local move refused up front because this epoch's author fence is awaited
+ * (settlementAuthorFenceDecision "await-fence"): the Writer's retained work waits for a creator
+ * frontier a later install may bring, so the fence is withheld, and a move signed now would be in an
+ * epoch with no own fence before it, which no frontier could ever prove never admitted. Nothing is
+ * accepted, so nothing can be lost. It clears at the next install that fences. Apps match it by class
+ * (or name "V3RoomAwaitingAuthorFence") and re-offer the move after the room installs a later epoch,
+ * as for V3RoomLocalBacklogFull.
+ */
+export class V3RoomAwaitingAuthorFence extends Error {
+	/**
+	 * @param epoch - The epoch whose author fence is awaited.
+	 */
+	constructor(readonly epoch: number) {
+		super(
+			`v3 room author fence is awaited in epoch ${epoch}: retained work waits for the creator's frontier; the move is not accepted`
+		);
+		this.name = "V3RoomAwaitingAuthorFence";
+	}
+}
+
+/**
+ * The author-fence decision of one settlement drain (drainSettlementOutbox) after its merge and its
+ * retained-work frontier resolution.
+ * - "fence": nothing withholds the fence: no retained work, a replacement to issue (eligible), or a
+ *   current member whose unresolved retained rows no frontier can ever prove (unproven "never": a fence
+ *   cannot make them less provable; they stay manual-review for the user).
+ * - "await-fence": a current member's unresolved retained row waits for a frontier a later install may
+ *   bring ("awaiting-frontier"): the fence stays withheld (a fence admitted first would carry
+ *   terminalThrough past the row and leave it unprovable), and new moves are refused until it lands.
+ * - "withhold": as before this decision existed: the fence stays withheld (a non-member, or retained
+ *   work that is provable but unresolved now, or that the inspection could not read).
+ * @param input - The plan's retained entries with their frontier classification, whether any entry is
+ * eligible for a replacement, and whether the author is a current member.
+ * @returns The decision.
+ */
+export function settlementAuthorFenceDecision(
+	input: Readonly<{
+		retained: readonly Readonly<{
+			disposition: string;
+			unproven: "awaiting-frontier" | "never" | "provable" | undefined;
+		}>[];
+		eligible: boolean;
+		currentMember: boolean;
+	}>
+): "fence" | "await-fence" | "withhold" {
+	if (input.retained.length === 0 || input.eligible) return "fence";
+	if (!input.currentMember) return "withhold";
+	const unresolved = input.retained.filter((entry) => entry.disposition !== "committed" && entry.disposition !== "expire");
+	if (unresolved.every((entry) => entry.unproven === "never")) return "fence";
+	return unresolved.some((entry) => entry.unproven === "awaiting-frontier") ? "await-fence" : "withhold";
+}
+
+/**
+ * A settlement drain awaited this epoch's author fence ("await-fence": a retained row is
+ * "awaiting-frontier", which a native room is not expected to reach) while a completed replacement
+ * entry still pins a source more than `generationBound` installs old. Without a plan fence that entry
+ * keeps its source retained, and if a lull falls in this awaited epoch the source's anchor may no
+ * longer be covered by the retained AHE generations (held-anchor-retention.qnt p6). Observation only.
+ */
+export type V3RoomAwaitingFencePinnedSourceDiagnostic = Readonly<{
+	kind: "awaiting-fence-pinned-source";
+	/** The epoch whose author fence is awaited. */
+	epoch: number;
+	/** The retained rows waiting for a frontier (author sequences). */
+	awaitingSequences: readonly number[];
+	/** The completed replacement entries' sources older than the bound, oldest first. */
+	pinnedSources: readonly Readonly<{ sourceSequence: number; sourceEpoch: number }>[];
+	/** AHE_BOUNDED_READ_LIMITS.maxObjectGenerations: the retained AHE generations (the model's CAP). */
+	generationBound: number;
+}>;
+
+/** Typed diagnostics a room reports through `onDiagnostic` (CreateV3RoomSessionInput). */
+export type V3RoomDiagnosticEvent = V3RoomAwaitingFencePinnedSourceDiagnostic;
+
+/**
+ * The diagnostic of one settlement drain's author-fence decision, if any (pure).
+ * @param input - The decision, the room's epoch, the awaiting rows, the completed replacement entries'
+ * sources with their epochs, and the generation bound.
+ * @returns The event when the fence is awaited and a pinned source is more than the bound old.
+ */
+export function awaitingFencePinnedSourceDiagnostic(
+	input: Readonly<{
+		decision: "fence" | "await-fence" | "withhold";
+		epoch: number;
+		awaitingSequences: readonly number[];
+		pinnedSources: readonly Readonly<{ sourceSequence: number; sourceEpoch: number }>[];
+		generationBound: number;
+	}>
+): V3RoomAwaitingFencePinnedSourceDiagnostic | undefined {
+	if (input.decision !== "await-fence") return undefined;
+	const old = input.pinnedSources
+		.filter((source) => input.epoch - source.sourceEpoch > input.generationBound)
+		.sort((left, right) => left.sourceEpoch - right.sourceEpoch || left.sourceSequence - right.sourceSequence);
+	if (old.length === 0) return undefined;
+	return Object.freeze({
+		kind: "awaiting-fence-pinned-source",
+		epoch: input.epoch,
+		awaitingSequences: Object.freeze([...input.awaitingSequences]),
+		pinnedSources: Object.freeze(old.map((source) => Object.freeze({ ...source }))),
+		generationBound: input.generationBound,
+	});
 }
 
 /**
@@ -6328,6 +6448,17 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			for (const request of owned) holdIssue(request);
 			return;
 		}
+		// Moves accepted before the drain found this epoch's author fence awaited (held across the install)
+		// are refused before signing, exactly as a new one would be: nothing is signed, so nothing is lost.
+		if (
+			activeHandle !== undefined &&
+			!installPreDrain &&
+			authorFenceAwaited() &&
+			owned.every(({ source }) => source === "public-new")
+		) {
+			rejectOwned(owned, new V3RoomAwaitingAuthorFence(activeHandle.epoch));
+			return;
+		}
 		if (activeHandle === undefined || (adoptionHoldsIssues() && !installPreDrain)) {
 			rejectOwned(owned, new TypeError("v3 room live plane is unavailable"));
 			return;
@@ -6589,6 +6720,19 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	// The Writer's undelivered own moves (V3RoomLocalBacklogFull) as of its last plan write, and the
 	// displaced rows of the last rebase scan that counted them.
 	let settlementBacklog = 0;
+	// The epoch whose author fence the last drain awaits (settlementAuthorFenceDecision "await-fence"):
+	// new moves in it are refused (V3RoomAwaitingAuthorFence) until an install fences. Each drain
+	// decides again; a later epoch clears it.
+	let authorFenceAwaitedEpoch: number | undefined;
+	const authorFenceAwaited = (): boolean =>
+		authorFenceAwaitedEpoch !== undefined && authorFenceAwaitedEpoch === activeHandle?.epoch;
+	const setAuthorFenceAwaited = (epoch: number | undefined): void => {
+		authorFenceAwaitedEpoch = epoch;
+		if (settlementStatusSnapshot !== undefined && settlementStatusSnapshot.awaitingFence !== authorFenceAwaited())
+			settlementStatusSnapshot = Object.freeze({ ...settlementStatusSnapshot, awaitingFence: authorFenceAwaited() });
+	};
+	// The last drain's frontier classification of unproven retained rows, by source sequence.
+	let retainedUnproven: ReadonlyMap<number, "awaiting-frontier" | "never" | "provable" | undefined> = new Map();
 	// New own moves the plan does not count yet: a move is in no plan until the first install after its
 	// epoch settles it, but it is undelivered until then, and an offline Writer's next skip install
 	// needs one hand-back record for each (a retained row past the record bound stays unresolved,
@@ -6705,6 +6849,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				...settlementStatusSnapshot,
 				undelivered: handBackListing(plan),
 				deferred: deferredMovesOf(plan),
+				awaitingFence: authorFenceAwaited(),
 			});
 	};
 	const authenticatedSettlementInheritance = (
@@ -7083,6 +7228,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			window: V3_SETTLEMENT_OWN_WINDOW_EPOCHS,
 			undelivered: handBackListing(plan),
 			deferred: deferredMovesOf(plan),
+			awaitingFence: authorFenceAwaited(),
 		});
 	};
 	/**
@@ -7098,12 +7244,14 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	 */
 	const resolveRetainedFromFrontier = async (plan: RoomSettlementPlan): Promise<RoomSettlementPlan> => {
 		const owner = activeHandle;
+		retainedUnproven = new Map();
 		if (owner === undefined || !plan.entries.some((entry) => entry.sourceContextDigest !== undefined)) return plan;
 		// The drain signs this author's own settlement with its own key (as its fences); a local owner, when
 		// the host has one, must still be current.
 		if (input.receiveOnly === true) return plan;
 		localOwner?.assertCurrent();
 		const work = await inspectV3RetainedWorkFrontier(owner);
+		retainedUnproven = new Map(work.map((item) => [item.sourceSequence, item.unproven] as const));
 		// Every row the frontier proves is resolved in one native turn and one plan write
 		// (resolveV3RetainedWorkFromFrontier), not one turn per row.
 		const selectors = work
@@ -7311,7 +7459,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		const issued =
 			effect.kind === "replacement"
 				? await (source as DisplacedSource).issueReplacement(localInput)
-				: await activeHandle.issueLocal(localInput);
+				: // The settlement lane: received rows and caller moves can never refuse this mandatory fence.
+					await (activeHandle.issueSettlementLocal ?? activeHandle.issueLocal)(localInput);
 		if (!issued.ok) {
 			if (issued.kind === "split-required") return issued;
 			const observed = await issuanceStore.readSettlementPlan(settlementScope);
@@ -7388,7 +7537,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 		let plan = await writeMergedSettlementPlan(sources);
 		settlementHeld = plan.entries.some(entry => entry.disposition === "manual-review" && entry.sourceContextDigest === undefined);
-		if (settlementHeld) return;
+		// A held settlement already refuses new moves (assertSettlementUnheld) until the user decides.
+		if (settlementHeld) {
+			setAuthorFenceAwaited(undefined);
+			return;
+		}
 		plan = await resolveRetainedFromFrontier(plan);
 		// A retained source context preserves unknown work, including pre-existing
 		// policy/progress metadata. Its presence grants no replacement decision, and
@@ -7399,14 +7552,50 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		const eligible = (entry: RoomSettlementPlan["entries"][number]): boolean => entry.sourceContextDigest === undefined &&
 			entry.disposition !== "expire" && entry.disposition !== "committed" && entry.disposition !== "inherited" && entry.disposition !== "manual-review" &&
 			entry.replacementSequence === null;
-		const retained = plan.entries.filter((entry) => entry.sourceContextDigest !== undefined);
-		const terminalOnly = retained.every((entry) => entry.disposition === "committed" || entry.disposition === "expire");
-		if (
-			retained.length !== 0 &&
-			!plan.entries.some(eligible) &&
-			(!terminalOnly || activeHandle?.currentEphemeralAuthority()?.isCurrentMember(settlementScope.author) !== true)
-		)
+		// Unknown retained work withholds the fence only while a later frontier may still prove it: a row
+		// no frontier can ever prove (an earlier incarnation's, or a displaced row no own fence of its epoch
+		// precedes) stays manual-review either way, and withholding the fence for it would leave this and
+		// every later epoch with no own fence, so no later move could be proven never admitted either
+		// (held for good, demanding an anchor the recovery certificate stops covering).
+		const decision = settlementAuthorFenceDecision({
+			retained: plan.entries
+				.filter((entry) => entry.sourceContextDigest !== undefined)
+				.map((entry) => ({ disposition: entry.disposition, unproven: retainedUnproven.get(entry.sourceSequence) })),
+			eligible: plan.entries.some(eligible),
+			currentMember: activeHandle?.currentEphemeralAuthority()?.isCurrentMember(settlementScope.author) === true,
+		});
+		if (decision !== "fence") {
+			setAuthorFenceAwaited(decision === "await-fence" ? activeHandle?.epoch : undefined);
+			// Observation only (onDiagnostic): never alters the decision.
+			if (decision === "await-fence" && input.onDiagnostic !== undefined) {
+				try {
+					const epochOf = new Map(sources.map((source) => [source.authorSequence, source.epoch] as const));
+					const event = awaitingFencePinnedSourceDiagnostic({
+						decision,
+						epoch: activeHandle?.epoch ?? 0,
+						awaitingSequences: [...retainedUnproven]
+							.filter(([, unproven]) => unproven === "awaiting-frontier")
+							.map(([sequence]) => sequence),
+						pinnedSources: plan.entries.flatMap((entry) => {
+							const sourceEpoch = epochOf.get(entry.sourceSequence);
+							return entry.sourceContextDigest === undefined &&
+								entry.replacementSequence !== null &&
+								entry.disposition !== "manual-review" &&
+								entry.disposition !== "inherited" &&
+								sourceEpoch !== undefined
+								? [{ sourceSequence: entry.sourceSequence, sourceEpoch }]
+								: [];
+						}),
+						generationBound: AHE_BOUNDED_READ_LIMITS.maxObjectGenerations,
+					});
+					if (event !== undefined) input.onDiagnostic(event);
+				} catch {
+					/* Diagnostics never alter the drain. */
+				}
+			}
 			return;
+		}
+		setAuthorFenceAwaited(undefined);
 		const sourceBySequence = new Map(sources.map((source) => [source.authorSequence, source] as const));
 		let sourceOwner = activeHandle;
 		const refreshSourceOwner = async (): Promise<void> => {
@@ -9797,6 +9986,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				const backlog = settlementBacklog + undeliveredLocalMoves();
 				if (backlog >= V3_ROOM_LOCAL_BACKLOG_LIMIT) throw new V3RoomLocalBacklogFull(backlog, V3_ROOM_LOCAL_BACKLOG_LIMIT);
 			}
+			// A move (a given-back one too) signed while this epoch's author fence is awaited would have no
+			// own fence before it: refused up front, not accepted.
+			if (redirectPromise === undefined && redirectedSession === undefined && authorFenceAwaited())
+				throw new V3RoomAwaitingAuthorFence(activeHandle?.epoch ?? 0);
 			let countedAccepted = false;
 			const settleBacklogCount = (accepted: boolean, row?: string): void => {
 				if (!countsAgainstBacklog || countedAccepted) return;
@@ -10037,6 +10230,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					window: V3_SETTLEMENT_OWN_WINDOW_EPOCHS,
 					undelivered: Object.freeze([]),
 					deferred: 0,
+					awaitingFence: false,
 				})
 			);
 		},
