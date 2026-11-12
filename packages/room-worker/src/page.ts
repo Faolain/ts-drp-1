@@ -145,8 +145,9 @@ export function openRoomWorker<Commands extends CommandMap = CommandMap>(
 	const handle = Object.create(client) as RoomWorkerHandle<Commands>;
 	Object.defineProperty(handle, "terminate", {
 		value: (reason = "terminated by the page") => {
-			client.crash(reason);
+			// The worker is terminated before onCrash listeners release what the page lent it.
 			terminateWorker();
+			client.crash(reason);
 		},
 	});
 	return handle;

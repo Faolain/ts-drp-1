@@ -94,6 +94,11 @@ export interface RoomWorkerClient<Commands extends CommandMap = CommandMap> {
 	latest(stream: string): unknown;
 	on(stream: string, listener: (value: unknown) => void): () => void;
 	onRefused(listener: (refusal: RoomWorkerSendRefusal) => void): () => void;
+	/**
+	 * Listens for the worker stopping without a close. Listeners run after the client stopped for
+	 * good (after onStopped, where openRoomWorker terminates the worker), never because a call is
+	 * slow: the bridge has no timeout that stops a worker.
+	 */
 	onCrash(listener: (error: RoomWorkerCrashed) => void): () => void;
 	/** Closes the app's room in the worker (it joins admitted work), then stops. */
 	close(): Promise<void>;
@@ -224,8 +229,12 @@ export function createRoomWorkerClient<Commands extends CommandMap = CommandMap>
 		pending.clear();
 		queued.length = 0;
 		closeResolve?.();
-		for (const listener of crashListeners) listener(crashError);
+		// Stopped for good first (onStopped: the page terminates the worker, and no message of this
+		// session is handled again), then the listeners: what they release (a native read reservation
+		// the page lent the worker) can no longer be used by a live worker.
+		const error = crashError;
 		stop();
+		for (const listener of crashListeners) listener(error);
 	};
 
 	const finishClose = (): void => {
