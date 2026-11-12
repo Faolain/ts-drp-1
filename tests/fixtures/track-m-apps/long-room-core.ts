@@ -742,7 +742,26 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 	};
 	const room = await createV3RoomSession(input as unknown as Parameters<typeof createV3RoomSession>[0]);
 	track.rooms.add(room);
-	policy?.bind(room);
+	// Diagnostic: the policy's offers to the room (with or without a hand-back record) and outcomes.
+	const policyOffers: { at: number; epoch: number | undefined; handBack: boolean; outcome: string }[] = [];
+	policy?.bind(
+		new Proxy(room, {
+			get(target, key, receiver) {
+				if (key !== "issue") return Reflect.get(target, key, receiver) as unknown;
+				return async (operation: Readonly<Record<string, unknown>>, issueOptions?: { handBack?: unknown }) => {
+					const entry = { at: Math.round(performance.now()), epoch: target.authority()?.epoch, handBack: issueOptions?.handBack !== undefined, outcome: "pending" };
+					if (policyOffers.length < 2000) policyOffers.push(entry);
+					try {
+						await target.issue(operation, issueOptions as never);
+						entry.outcome = "ok";
+					} catch (error) {
+						entry.outcome = describeError(error).slice(0, 200);
+						throw error;
+					}
+				};
+			},
+		})
+	);
 	await waitForV3RoomStartupForDiagnostics(room);
 	delivery?.bind(env.deliveryRoom?.(room) ?? room);
 	observe(room.projection());
@@ -811,6 +830,7 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 			(Reflect.get(room, "settlementStatus") as (() => unknown) | undefined)?.call(room) ?? null,
 		// Diagnostic: offers the room's first listed given-back move again with its record, straight to
 		// the room (past the policy); the refusal's message, or null when the room accepted it.
+		policyOffers: async () => policyOffers.slice(),
 		reissueFirstGivenBack: async () => {
 			const status = (Reflect.get(room, "settlementStatus") as (() => V3RoomSettlementStatus | undefined) | undefined)?.call(room);
 			const given = status?.undelivered[0];

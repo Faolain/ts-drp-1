@@ -1088,6 +1088,15 @@ async function deliveredReissuesLeaveTheBacklog() {
 			await phase("next-epoch");
 			await sleep(3_000);
 			await phase("next-epoch+3s");
+			{
+				const offers = (await writer.policyOffers?.()) ?? [];
+				const summary = new Map<string, number>();
+				for (const offer of offers) {
+					const key = `${offer.epoch}:${offer.handBack ? "hb" : "new"}:${offer.outcome}`;
+					summary.set(key, (summary.get(key) ?? 0) + 1);
+				}
+				process.stdout.write(`BACKLOG_REISSUED_OFFERS ${JSON.stringify(Object.fromEntries(summary))}\n`);
+			}
 			if (process.env.REISSUE_PROBE === "1")
 				process.stdout.write(`BACKLOG_REISSUED_PROBE ${JSON.stringify(await writer.reissueFirstGivenBack?.())}\n`);
 			const writerAuthor = rowValue((await writer.published(null))[0]!).author;

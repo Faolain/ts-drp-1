@@ -361,6 +361,8 @@ export interface RoleEndpoint {
 	settlementStatus?(): Promise<unknown>;
 	/** Diagnostic: the first listed given-back move offered again straight to the room; its refusal or null. */
 	reissueFirstGivenBack?(): Promise<string | null>;
+	/** Diagnostic: the application policy's offers to the room, with their outcomes. */
+	policyOffers?(): Promise<readonly Readonly<{ at: number; epoch: number | undefined; handBack: boolean; outcome: string }>[]>;
 	/** App mode: the application policy's status (examples/v3-room rollover status()), or null. */
 	rolloverStatus?(): Promise<unknown>;
 	/** App mode: takes the other peer off (false) or back onto (true) this role's successor channel. */
