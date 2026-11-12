@@ -73,6 +73,10 @@ it("a displaced move whose replay the room refuses is handed back typed, and the
 	await deliver(); // the Writer's epoch-1 fence reaches the creator
 	// Epoch 1: the doomed move is admitted by the Writer but never reaches the creator.
 	await writer.room.issue(block("doomed-1", 1));
+	// It is lost on the way: the creator never receives it (the stale row is never delivered later).
+	const lost = await fixture.publishedAfter(1, delivered);
+	expect(lost.filter((row) => !isControl(row)).length).toBe(1);
+	delivered = required(lost.at(-1)).commit.authorSequence;
 	const failures: string[] = [];
 	try {
 		await rollover(2); // the install replays the displaced move; the epoch-2 rule refuses it
