@@ -80,6 +80,7 @@ import {
 	routeV3Ingress,
 	routeV3RetainedIngress,
 	speculateV3IngressVertex,
+	ROOM_APPLICATION_STATE_BYTES,
 	V3_SETTLEMENT_OWN_WINDOW_EPOCHS,
 	type V3AdmittedVertexSink,
 	type V3CreatorSupersededVertex,
@@ -88,6 +89,7 @@ import {
 	type V3LiveDescriptor,
 	type V3LocalSettlementFloor,
 	type V3LocalSettlementPolicy,
+	type V3ApplicationStateBound,
 	type V3OperationAdmissionPolicy,
 	type V3PlaneHandle,
 	type V3RetainedHashPage,
@@ -564,7 +566,17 @@ export interface V3RoomTransport {
 
 export interface V3RoomApplication<Projection extends V3RoomProjectionAuthority = V3RoomProjectionAuthority> {
 	/** Optional pure, artifact-bound LOCAL planning bound. Undefined retains the
-	 * exact original forecast; this is not shared operation validity/admission. */
+	 * exact original forecast; this is not shared operation validity.
+	 *
+	 * The room's application state limit also reads it: where its incremental projection covers the
+	 * epoch's base (its base quote is within the limit), each node's local admission refuses a move
+	 * whose quoted bound passes the limit, instead of folding the exact state (the creator's refusal
+	 * is the authoritative one; a Writer's is advisory). So the state a room can actually reach near
+	 * its limit is bounded by this bound, not by the exact encoding: a conservative bound (Grid's
+	 * keeps the widest version of each re-placed block) refuses some moves whose exact state would
+	 * fit. A bound must dominate every exact state it covers; one that does not surfaces at the seal
+	 * as APPLICATION_STATE_BOUND_UNSOUND. Where the projection is absent or declines (undefined), the
+	 * room keeps the exact fold. */
 	readonly readOrdinaryApplicationResourceBound?: CreatorOrdinaryApplicationResourceBoundReader;
 	/** Local capacity ceilings, not an acceptance promise. Explicit preparation
 	 * may certify a smaller window; ordinary calls meter that window and refuse
@@ -638,6 +650,8 @@ export interface CreateV3RoomSessionInput<Projection extends V3RoomProjectionAut
 				admissionEpoch: number,
 				terminalThrough: number | null,
 			])[];
+			/** The room's application state limit in canonical bytes; the room refuses any operation past it. */
+			readonly maxApplicationStateBytes?: number;
 		}>
 	): V3OperationAdmissionPolicy;
 	readonly databaseName: string;
@@ -2857,10 +2871,67 @@ function validMigrationRecordOperation(
 function roomOrdinaryFinishingWindowForEpoch(application: V3RoomApplication,
 	context: Readonly<{objectId: string; epoch: number}>): CreatorOrdinaryFinishingWindowLimits | undefined {
 	const policy = application.ordinaryFinishingWindow;
-	if (typeof policy !== "function") return policy;
-	const selected = Reflect.apply(policy, application, [Object.freeze({objectId: context.objectId, epoch: context.epoch})]);
-	if (selected === undefined) throw new TypeError("v3 room finishing window selector did not return limits");
+	const selected = typeof policy !== "function" ? policy :
+		Reflect.apply(policy, application, [Object.freeze({objectId: context.objectId, epoch: context.epoch})]) as
+			CreatorOrdinaryFinishingWindowLimits | undefined;
+	if (typeof policy === "function" && selected === undefined) throw new TypeError("v3 room finishing window selector did not return limits");
+	// A window can never describe a state past the room's application state limit (admission refuses
+	// any fold past it), and the creator's window capture declines one that declares more: refused here,
+	// at the close binding, rather than opening a room whose every ordinary move is refused.
+	if (selected !== undefined && !(selected.maxApplicationBytes <= ROOM_APPLICATION_STATE_BYTES))
+		throw new TypeError("v3 room finishing window passes the room's application state limit");
 	return selected;
+}
+
+/**
+ * The application's own state bound (readOrdinaryApplicationResourceBound, the bound the creator's
+ * ordinary proof book charges) seeded with a plane's exact base state, as the live plane's admission
+ * reads it: the canonical byte length of every state reachable from the base and the operations advanced
+ * into it. Undefined when the application has no incremental bound for this blueprint; the live plane
+ * then judges the exact fold.
+ * @param application - The room's application.
+ * @param blueprintDigest - The room's blueprint.
+ * @param exactCanonicalBaseStateBytes - The plane's exact base state.
+ * @returns The bound, or undefined.
+ */
+function createRoomApplicationStateBound(
+	application: V3RoomApplication,
+	blueprintDigest: string,
+	exactCanonicalBaseStateBytes: Uint8Array
+): V3ApplicationStateBound | undefined {
+	const reader = application.readOrdinaryApplicationResourceBound;
+	const create = reader?.createIncrementalProjection;
+	if (typeof create !== "function") return undefined;
+	let resolved: ReturnType<V3RoomApplication["catalog"]["resolve"]>;
+	try {
+		resolved = application.catalog.resolve(blueprintDigest);
+	} catch {
+		return undefined;
+	}
+	if (resolved.blueprintDigest !== blueprintDigest) return undefined;
+	const projection = create({
+		catalog: Object.freeze({
+			blueprintDigest: resolved.blueprintDigest,
+			artifactId: resolved.artifactId,
+			artifactDigest: resolved.artifactDigest,
+			catalogDigest: resolved.evidence.catalogDigest,
+			runtimeProfile: resolved.runtimeProfile,
+			exactArtifactBytes: resolved.exactArtifactBytes,
+			canonicalBlueprintPackageBytes: resolved.canonicalBlueprintPackageBytes,
+		}),
+		material: Object.freeze({
+			exactCanonicalBaseStateBytes: Object.freeze([new Uint8Array(exactCanonicalBaseStateBytes)]),
+			currentOperations: Object.freeze([]),
+			protectedOperations: Object.freeze([]),
+			recoveryOperations: Object.freeze([]),
+		}),
+	} as Parameters<typeof create>[0]);
+	if (projection === undefined) return undefined;
+	return Object.freeze({
+		advance: (operations: readonly unknown[]) => projection.advance(operations),
+		quote: (candidateOperation: unknown) => projection.quote(candidateOperation)?.byteLength,
+		quoteBase: () => projection.quoteWithoutApplicationCandidate?.()?.byteLength,
+	});
 }
 
 function createRoomOperationAdmissionPolicy(
@@ -2869,7 +2940,9 @@ function createRoomOperationAdmissionPolicy(
 	context: Parameters<NonNullable<CreateV3RoomSessionInput["createOperationAdmissionPolicy"]>>[0]
 ): V3OperationAdmissionPolicy {
 	const authority = migrationInviteAuthority(material);
-	const applicationPolicy = input.createOperationAdmissionPolicy?.(context);
+	const applicationPolicy = input.createOperationAdmissionPolicy?.(
+		Object.freeze({ ...context, maxApplicationStateBytes: ROOM_APPLICATION_STATE_BYTES })
+	);
 	let inherited = false;
 	let migrationPrefixOnly = context.epoch === 0 && context.authenticatedApplicationStateBytes === undefined;
 	const imports: Readonly<Record<string, unknown>>[] = [];
@@ -2881,6 +2954,8 @@ function createRoomOperationAdmissionPolicy(
 	const maxImportBytes = parameters.maxEpochBytes as number;
 	const maxImports = (parameters.maxEpochVertices as number) * 16;
 	return Object.freeze({
+		createApplicationStateBound: (exactCanonicalBaseStateBytes: Uint8Array) =>
+			createRoomApplicationStateBound(input.application, authority.blueprintDigest, exactCanonicalBaseStateBytes),
 		reserve(operation: Readonly<Record<string, unknown>>, authenticated?: Readonly<{ author: string }>) {
 			const expanded =
 				operation.action === "applicationBatch"
@@ -3580,6 +3655,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	ownsLocalSession = false
 ): Promise<V3RoomSession<Projection>> {
 	localOwner?.assertCurrent();
+	// A fixed finishing window past the room's application state limit is refused before anything opens
+	// (a selector's window is refused at each close binding, roomOrdinaryFinishingWindowForEpoch).
+	const fixedWindow = input.application.ordinaryFinishingWindow;
+	if (fixedWindow !== undefined && typeof fixedWindow !== "function" && !(fixedWindow.maxApplicationBytes <= ROOM_APPLICATION_STATE_BYTES))
+		throw new TypeError("CREATOR_ORDINARY_FINISHING_WINDOW_INVALID: the finishing window passes the room's application state limit");
 	// The trusted application owns displacement semantics for this room lifetime.
 	if (input.receiveOnly !== undefined && input.receiveOnly !== true)
 		throw new TypeError("v3 room receive-only restriction is invalid");
@@ -3689,14 +3769,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	decodeCanonical(exactCanonicalPinnedGenesisBootstrapOperationBytes, APPLICATION_BATCH_LIMITS);
 	const { invite, material, settlementProfile } = captureInvite(input.creatorInvite);
 	const ownedSettlementPolicy = localSettlementPolicy(input.application, material);
-	// A successor's projection base comes from the native plane, which bounds application state by
-	// the room's maxSnapshotBytes (with at most 16,384 items); the room accepts every state it seals.
-	const successorStateMaxBytes = Reflect.get(
-		decodeCanonical(material.exactCanonicalParametersCarrierBytes) as object,
-		"maxSnapshotBytes"
-	) as unknown;
-	if (!Number.isSafeInteger(successorStateMaxBytes) || (successorStateMaxBytes as number) < 32_768)
-		throw new TypeError("v3 room snapshot bound is invalid");
+	// A successor's projection base comes from the native plane, whose fold carries the room's
+	// application state limit and whose admission refuses any operation past it (with at most 16,384
+	// items); the room accepts every state it seals.
+	const successorStateMaxBytes = ROOM_APPLICATION_STATE_BYTES;
 	if (
 		input.createOperationAdmissionPolicy !== undefined &&
 		typeof input.createOperationAdmissionPolicy !== "function"
@@ -4476,7 +4552,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		const exactCanonicalApplicationStateBytes = normalizeApplicationStateBytes(
 			projectionBaseResult.exactCanonicalApplicationStateBytes,
 			"migration",
-			successorStateMaxBytes as number
+			successorStateMaxBytes
 		);
 		if (
 			projectionBaseResult.objectId !== input.objectId ||
@@ -4503,7 +4579,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		const projectedStateBytes = normalizeApplicationStateBytes(
 			Reflect.apply(canonicalStateBytes, input.application.migration, [baseProjection]) as Uint8Array,
 			"migration",
-			successorStateMaxBytes as number
+			successorStateMaxBytes
 		);
 		if (!sameBytes(projectedStateBytes, exactCanonicalApplicationStateBytes)) {
 			throw new TypeError("v3 room successor projection state differs");

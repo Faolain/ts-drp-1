@@ -87,6 +87,10 @@ export async function readinessHoldRoom(
 		parameters?: Partial<typeof defaultParameters>;
 		/** Non-creator Writers (default 1; row 60 R5 refusal case c uses 2). */
 		writers?: number;
+		/** The shipped zone's per-epoch admission policy factory (Grid wires outcome-commit's). */
+		createOperationAdmissionPolicy?: CreateV3RoomSessionInput["createOperationAdmissionPolicy"];
+		/** Replaces parts of every peer's zone application (for example, its resource bound reader). */
+		wrapApplication?: (zone: ReturnType<typeof createV3ZoneApplication>) => ReturnType<typeof createV3ZoneApplication>;
 	}> = {}
 ) {
 	const directory = options.directory ?? mkdtempSync(join(tmpdir(), "track-x-readiness-hold-"));
@@ -98,8 +102,9 @@ export async function readinessHoldRoom(
 	const creator = required(identities[0]);
 	const roster = identities.map(({ author }, order) => ({ author, order, peerId: `track-x-hold-peer-${order}` }));
 	const zone = createV3ZoneApplication(roster, required(roster[0]).peerId, creator.author);
-	const application: typeof zone =
+	const windowed: typeof zone =
 		options.window === undefined ? zone : { ...zone, ordinaryFinishingWindow: options.window };
+	const application: typeof zone = options.wrapApplication?.(windowed) ?? windowed;
 	const parameters = Object.freeze({ ...defaultParameters, ...options.parameters });
 	const objectId = `creator:${hex(hashDomain("track-x-readiness-hold-object/v1", new TextEncoder().encode(directory))).slice(0, 32)}`;
 	const signers = [{ publicKey: creator.author, signerId: "creator" }];
@@ -254,6 +259,9 @@ export async function readinessHoldRoom(
 				? { creatorFinalitySigner: (await createRecoverableFinalitySigner({ seed: creator.seed })).signer }
 				: {}),
 			creatorInvite: openOptions.room?.invite ?? invite,
+			...(options.createOperationAdmissionPolicy === undefined
+				? {}
+				: { createOperationAdmissionPolicy: options.createOperationAdmissionPolicy }),
 			databaseName: name,
 			issuanceDatabaseName: name,
 			migrationDatabaseNamespace: name,
