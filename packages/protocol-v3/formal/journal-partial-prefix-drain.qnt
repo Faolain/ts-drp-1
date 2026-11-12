@@ -76,6 +76,15 @@ module journalPartialPrefixDrain {
   action init = initWith("healthy")
   action initResidualMutant = initWith("residual")
   action initIneligibleMutant = initWith("ineligible")
+  // The same mutant from a shallow state for Apalache: scope 0 already retired, scope 1 covered, so the first
+  // episode's selection reaches scope 1's unauthentic row (the run test reaches it only after scope 0's episodes).
+  action initIneligibleMutantShallow = {
+    val start = ROWS.filter(r => r.scope == 1)
+    s' = { mode:"ineligible", journal:start, appended:start, retired:Set(), count:ROWS.mapBy(r => 0),
+      covered:Set(0, 1), authentic:ROWS.exclude(Set({scope:1,seq:2})), active:false, plan:List(),
+      base:Set(), cursor:0, crashed:false, mismatch:false, refused:false,
+      maxCarrier:width(start) + OVERHEAD, maxClassifier:0, episodes:0 }
+  }
   // Mutant "shortReserve": readiness reserves less than the fence horizon (only the current close's rows, as
   // before j22): an admitted append leaves the mandatory fence refused.
   action initShortReserveMutant = initWith("shortReserve")
@@ -159,5 +168,7 @@ module journalPartialPrefixDrain {
   run shortReserveMutantTest = initShortReserveMutant.then(appendRow({scope:2,seq:0})).expect(not(readinessBound))
   // Mutant: the selection skips the authentic class: an ineligible row is retired.
   run ineligibleRetirementMutantTest = initIneligibleMutant.then(cover).then(30.reps(_ => drive))
+    .expect(not(noIneligibleRetired))
+  run ineligibleShallowMutantTest = initIneligibleMutantShallow.then(begin).then(batch).then(batch).then(batch)
     .expect(not(noIneligibleRetired))
 }
