@@ -3917,9 +3917,15 @@ export async function bindCreatorLiveClose(
 			const finishRetainedReplayClose = registration.beginRetainedReplayClose();
 			maintenanceClosing = true;
 			ordinaryProofSource = undefined; ordinaryTemplateReady = false;
+			let releaseForeground: (() => void) | undefined;
 			closeTask = (async (): Promise<CreatorLiveCloseResult> => {
 				await Promise.all([...maintenanceJobs]);
 				if (maintenanceReleaseFailure !== undefined) throw maintenanceReleaseFailure;
+				// The close is the host's foreground from here until it settles: co-located
+				// background walks (another room's or a peer's recovery-pool lull) defer their
+				// host turns behind it. Not before the join above: a pool-maintenance job of this
+				// creator is background, and the close waits for it.
+				releaseForeground = beginForegroundWork();
 				// Stage before any promotion or recovery source. A source holds the live
 				// journal's native read reservation, which excludes every journal writer;
 				// the stage closes admission and then waits for the plane's admitted tasks,
@@ -4757,7 +4763,9 @@ export async function bindCreatorLiveClose(
 				}
 				finishRetainedReplayClose(true);
 				return result;
-			})().catch((error) => {
+			})().finally(() => {
+				releaseForeground?.();
+			}).catch((error) => {
 				closeTask = undefined;
 				if (stagedSnapshot === undefined && registration.abortSnapshotStage()) lifecycle = "active";
 				else {

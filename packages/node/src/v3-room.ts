@@ -9209,6 +9209,17 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			: creatorRestoreGate === undefined || creatorRestoreGate.state() === "current"
 				? transition()
 				: creatorRestoreGate.admitFinality().then(transition);
+	// The creator's rollover window (close, serve, adoption, export) is the host's foreground,
+	// registered only while its transition runs (never while it waits in the FIFO behind a lull):
+	// co-located background walks defer their host turns behind it, as they do behind an issue drain.
+	const asHostForeground = async <Result>(work: () => Promise<Result>): Promise<Result> => {
+		const releaseForeground = beginForegroundWork();
+		try {
+			return await work();
+		} finally {
+			releaseForeground();
+		}
+	};
 	const adoptCreatorSuccessor = (): Promise<void> => {
 		if (creatorSuccessorAdoptionTask !== undefined) return creatorSuccessorAdoptionTask;
 		// Adoption signs the successor anchor: a creator restore currency check decides first.
@@ -9218,7 +9229,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			if (redirectedSession !== undefined) {
 				return redirectedSession.adoptCreatorSuccessor();
 			}
-			await performCreatorSuccessorAdoption();
+			await asHostForeground(() => performCreatorSuccessorAdoption());
 			scheduledLulls?.schedule();
 		}));
 		const shared = attempt.finally(() => {
@@ -9771,11 +9782,14 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			// plane can still publish it. Historical replay is not an ACK.
 			await publishCurrentGenesisBootstrap();
 			assertSessionOpen();
+			// The close registers itself once it joins this creator's own maintenance.
 			const result = await creatorCloseHandle.close();
 			// The successor and its adoption facts are installed. Serving reads its
 			// export afresh in a later host turn of this same lifetime transition.
-			await yieldToHost();
-			await serveAvailableSuccessor();
+			await asHostForeground(async () => {
+				await yieldToHost();
+				await serveAvailableSuccessor();
+			});
 			return result;
 		}));
 	const session: V3RoomSession<Projection> = Object.freeze({
@@ -9827,7 +9841,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				assertSessionOpen();
 				// A migrated source seals and adopts on its target, so the successor it serves is the target's.
 				if (redirectedSession !== undefined) return redirectedSession.exportCreatorSuccessor();
-				return serveSuccessor();
+				return asHostForeground(serveSuccessor);
 			}, true),
 		authority(): V3RoomSuccessorAuthority | null {
 			return redirectedSession?.authority() ?? successorProjectionAuthority;
