@@ -90,6 +90,25 @@
 //   sourceSafe          a replacement is never admitted while its source is released (G5).
 //   guardSound          a displaced row the guard calls never-admitted was never admitted.
 //   handBackSound       a move is never both handed back and admitted (exactly once).
+//
+// Checking. The constants below are the simulation constants (quint run, 30 steps, seed 7). The
+// merge check for (g) and the hold is exhaustive TLC (quint verify --backend tlc) at REDUCED
+// constants, because Apalache at these constants did not finish step 3 of 4 in 14 minutes, and at
+// any reduced constants it was killed for memory (about 10-13 GB) by depth 3 on a 15 GB machine.
+// TLC needs a standalone init per rule (tlaInit*: initWith's body with the rule fixed), because
+// initWith also appears in the runs below (QNT409). Reduced constants and why:
+//   MAX_E 14 -> 11, MAX_SEQ 24 -> 10, GAP 3 -> 2: a finite state space TLC exhausts (33-58M states).
+//     MAX_E 11 is the smallest that keeps both controls discriminating: at MAX_E 8 the
+//     fenceOverLostNoHold control cannot violate, because the unguarded move's anchor goes uncovered
+//     only after more than CAP installs.
+//   AGE 9 -> 6: keeps boundedAge non-vacuous (cur - AGE > 0) within MAX_E.
+//   W 4, CAP 5, TOP 3 unchanged. A CAP 5 -> 3 variant was also checked for the reachable step.
+// Results (.logs/realtime-resume-2026-11-10/anchor/model-tlc):
+//   fenceOverLost         stepReachable allProps   no violation (33,554,045 states; also CAP=3)
+//   fenceOverLost         stepBounded   holdProps  violation: noUnexcusedRefusal (p6)
+//   releaseFenceOverLost  stepBounded   allProps   no violation (58,101,794 states)
+//   shipped               stepReachable allProps   violation (control)
+//   fenceOverLostNoHold   stepBounded   holdProps  violation (control: the hold is needed)
 module heldAnchorRetention {
   pure val MAX_E = 14
   pure val MAX_SEQ = 24
