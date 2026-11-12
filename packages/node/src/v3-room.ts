@@ -6623,8 +6623,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	// The Writer's undelivered own moves (V3RoomLocalBacklogFull) as of its last plan write, and the
 	// displaced rows of the last rebase scan that counted them.
 	let settlementBacklog = 0;
-	// The reissued rows (author sequences) of the plan's consumed hand-back records as of that write.
-	let settlementConsumedReissues: readonly number[] = [];
+	// The plan's undelivered moves whose newest row exists (a replacement, or a consumed hand-back
+	// record's reissue), as of that write: they leave the backlog once a creator row reaches every such
+	// row (settlementBacklogNow).
+	let settlementPendingRows: readonly Readonly<{ rows: readonly number[]; moves: number }>[] = [];
 	// New own moves the plan does not count yet: a move is in no plan until the first install after its
 	// epoch settles it, but it is undelivered until then, and an offline Writer's next skip install
 	// needs one hand-back record for each (a retained row past the record bound stays unresolved,
@@ -6666,44 +6668,58 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	 * The backlog V3RoomLocalBacklogFull bounds, in moves (as hand-back records count them, one per
 	 * intent): each live replaced move once (the entry of its newest displaced row, whose replacement is
 	 * not itself displaced, or which is not yet replaced), each retained source's moves (manual-review),
-	 * and every unconsumed hand-back record. A consumed record keeps its reissued move's slot until the
-	 * next merge drops it (and the reissued row is counted live, if displaced) unless a creator row
-	 * reaches the reissued row first: those slots are counted at check time (settlementBacklogNow), not
-	 * here. A row counts all its moves: Grid
-	 * batches moves made together into one row, and each of them needs its own record when the window
-	 * gives it back, so counting the row once let the Writer accept moves past the record bound.
+	 * and every hand-back record, unconsumed or consumed (a consumed one keeps its reissued move's slot
+	 * until the next merge drops it and the reissued row is counted live, if displaced). A move whose
+	 * newest row is a replacement or a reissue is `pending`: it leaves the count once a creator row
+	 * reaches every such row (the creator admitted it; settlementBacklogNow), the evidence that removes
+	 * new moves (markCreatorReached). A row counts all its moves: Grid batches moves made together into
+	 * one row, and each of them needs its own record when the window gives it back, so counting the row
+	 * once let the Writer accept moves past the record bound.
 	 * @param plan - The durable plan.
 	 * @param displaced - The displaced own rows of the last rebase scan, with their moves.
-	 * @returns The backlog.
+	 * @returns The moves counted until the next plan write, and the pending ones.
 	 */
-	const settlementBacklogOf = (plan: RoomSettlementPlan | null, displaced: ReadonlyMap<number, number>): number => {
+	const settlementBacklogOf = (
+		plan: RoomSettlementPlan | null,
+		displaced: ReadonlyMap<number, number>
+	): Readonly<{ fixed: number; pending: readonly Readonly<{ rows: readonly number[]; moves: number }>[] }> => {
 		// A row the scan no longer lists counts one move (it is retired or proven, never more than its record).
 		const moves = (sequence: number): number => Math.max(1, displaced.get(sequence) ?? 1);
-		let live = 0;
+		let fixed = 0;
+		const pending: Readonly<{ rows: readonly number[]; moves: number }>[] = [];
 		for (const entry of plan?.entries ?? []) {
 			if (entry.sourceObjectId !== undefined) continue;
 			if (entry.disposition === "manual-review") {
-				live += moves(entry.sourceSequence);
+				fixed += moves(entry.sourceSequence);
 				continue;
 			}
 			if (entry.disposition !== "rebase" && entry.disposition !== "transform") continue;
 			if (!displaced.has(entry.sourceSequence)) continue;
 			if (entry.replacementSequence !== null && displaced.has(entry.replacementSequence)) continue;
 			if (entry.replacementProgress?.chunks.some((chunk) => displaced.has(chunk.replacementSequence)) === true) continue;
-			live += moves(entry.sourceSequence);
+			const rows = [
+				...(entry.replacementSequence === null ? [] : [entry.replacementSequence]),
+				...(entry.replacementProgress?.chunks.map((chunk) => chunk.replacementSequence) ?? []),
+			];
+			if (rows.length === 0) fixed += moves(entry.sourceSequence);
+			else pending.push(Object.freeze({ rows: Object.freeze([...new Set(rows)]), moves: moves(entry.sourceSequence) }));
 		}
-		return live + (plan?.handBacks?.filter((record) => record.reissueSequence === null).length ?? 0);
+		for (const record of plan?.handBacks ?? []) {
+			if (record.reissueSequence === null) fixed += 1;
+			else pending.push(Object.freeze({ rows: Object.freeze([record.reissueSequence]), moves: 1 }));
+		}
+		return Object.freeze({ fixed, pending: Object.freeze(pending) });
 	};
 	const recordSettlementBacklog = (plan: RoomSettlementPlan | null): void => {
-		settlementBacklog = settlementBacklogOf(plan, settlementDisplaced);
-		settlementConsumedReissues = Object.freeze(
-			(plan?.handBacks ?? []).flatMap((record) => (record.reissueSequence === null ? [] : [record.reissueSequence]))
-		);
+		const backlog = settlementBacklogOf(plan, settlementDisplaced);
+		settlementBacklog = backlog.fixed;
+		settlementPendingRows = backlog.pending;
 	};
-	// The plan's backlog now: a consumed record whose reissued row a creator row reached is delivered.
+	// The plan's backlog now: a pending move whose newest rows a creator row reached is delivered.
 	const settlementBacklogNow = (): number => {
 		let undelivered = settlementBacklog;
-		for (const sequence of settlementConsumedReissues) if (!creatorReachedOwnSequences.has(sequence)) undelivered++;
+		for (const move of settlementPendingRows)
+			if (!move.rows.every((sequence) => creatorReachedOwnSequences.has(sequence))) undelivered += move.moves;
 		return undelivered;
 	};
 	/**
