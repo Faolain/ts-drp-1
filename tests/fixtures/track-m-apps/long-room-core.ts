@@ -213,7 +213,9 @@ async function prefixCensus(prefix: string): Promise<StoreCensus> {
  * @returns The host, its observation handles and its census.
  */
 export function browserHostFor(kind: Exclude<HostKind, "node">, unique: string): LongRoomHost {
-	const prefix = `tma-${kind === "browser" ? "b" : "r"}-${hex(hashDomain("track-m-apps-host/v1", new TextEncoder().encode(unique))).slice(0, 16)}`;
+	const prefix = `tma-${kind === "browser" ? "b" : "r"}-${hex(
+		hashDomain("track-m-apps-host/v1", new TextEncoder().encode(unique))
+	).slice(0, 16)}`;
 	const name = (value: string) => `${prefix}-${value}`;
 	if (kind === "browser") {
 		const storageHost = Object.freeze({
@@ -336,8 +338,8 @@ async function applicationFor(
 			chatFormat === "lifetime"
 				? createShippingChatGenesisStateBytes({ exactCanonicalLatchedAclBytes })
 				: chatFormat === "shares"
-					? createShippingChatSharesGenesisStateBytes({ exactCanonicalLatchedAclBytes })
-					: createShippingChatWindowGenesisStateBytes({ exactCanonicalLatchedAclBytes }),
+				? createShippingChatSharesGenesisStateBytes({ exactCanonicalLatchedAclBytes })
+				: createShippingChatWindowGenesisStateBytes({ exactCanonicalLatchedAclBytes }),
 		admission: chat.createOperationAdmissionPolicy,
 		catalog,
 	};
@@ -426,8 +428,8 @@ function appRolloverPolicy(
 		app === "canvas"
 			? CANVAS_ROLLOVER_BUDGET
 			: app === "grid"
-				? GRID_ROLLOVER_BUDGET
-				: shippingChatRolloverBudget({ objectId: context.objectId, shares: context.chatFormat === "shares" });
+			? GRID_ROLLOVER_BUDGET
+			: shippingChatRolloverBudget({ objectId: context.objectId, shares: context.chatFormat === "shares" });
 	return createV3RoomRolloverPolicy({
 		role,
 		budget: context.override ?? shipped,
@@ -476,7 +478,10 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 	const identity = required(identities[index]);
 	const peers = [`${options.app}-creator`, `${options.app}-recipient`] as const;
 	const name = (["creator", "recipient"] as const)[index];
-	const objectId = `creator:${hex(hashDomain("track-m-apps-object/v1", new TextEncoder().encode(env.unique))).slice(0, 32)}`;
+	const objectId = `creator:${hex(hashDomain("track-m-apps-object/v1", new TextEncoder().encode(env.unique))).slice(
+		0,
+		32
+	)}`;
 	const writerRecipient = options.recipient === "writer";
 	const genesisProfile = genesisProfileFor(options);
 	const exactCanonicalLatchedAclBytes = encodeCanonical({
@@ -570,8 +575,13 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 	// model an unreachable creator; the delivery then reports the creator unreachable).
 	let otherPeerConnected = true;
 	// Every accepted vertex's identity and operation, own and remote (observation only).
-	const acceptedVertices: { digest: string; author: string; epoch: number; authorSequence: number; operation: string }[] =
-		[];
+	const acceptedVertices: {
+		digest: string;
+		author: string;
+		epoch: number;
+		authorSequence: number;
+		operation: string;
+	}[] = [];
 	const successorChannel: V3RoomSuccessorChannel = {
 		localPeerId: peers[index],
 		peers: () => (otherPeerConnected ? [peers[1 - index]] : []),
@@ -598,7 +608,7 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 				hooks: {
 					onRefused: (error) => deliveryRefusals.push(describeError(error)),
 				},
-			})
+		  })
 		: undefined;
 	const rolloverEvents: (V3RoomRolloverEvent & Readonly<{ endedAt: number }>)[] = [];
 	const rolloverErrors: string[] = [];
@@ -617,7 +627,7 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 					onRollover: (event) => rolloverEvents.push({ ...event, endedAt: performance.timeOrigin + performance.now() }),
 					onError: (error) => rolloverErrors.push(error instanceof Error ? error.message : String(error)),
 				}
-			)
+		  )
 		: undefined;
 	if (appMode && index === 0)
 		// The creator's successor material host: a fresh scripted port per serving (the seal and the
@@ -699,7 +709,13 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 		signRegisteredVertexDigest: (digest: Uint8Array) => Promise.resolve(ed25519.sign(digest, identity.seed)),
 		onProjection: observe,
 		onAcceptedVertex: (
-			vertex: Readonly<{ digest: Uint8Array; author: string; epoch: number; authorSequence?: number; operation?: unknown }>
+			vertex: Readonly<{
+				digest: Uint8Array;
+				author: string;
+				epoch: number;
+				authorSequence?: number;
+				operation?: unknown;
+			}>
 		) => {
 			policy?.observe(vertex);
 			const digest = hex(vertex.digest);
@@ -823,7 +839,7 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 						: {
 								epoch: value.authenticatedBase.epoch,
 								state: hex(value.authenticatedBase.exactCanonicalApplicationStateBytes),
-							},
+						  },
 				operations: value.currentEpochOperations.map(({ author, operation }) => ({ author, operation })),
 				acceptedCount,
 				lastAcceptedAt,
@@ -901,6 +917,10 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 					fence: plan?.fenceSequence ?? null,
 					fenceEpoch: await epochOf(plan?.fenceSequence ?? null),
 					handBacks: plan?.handBacks?.filter((record) => record.reissueSequence === null).length ?? 0,
+					// Every hand-back record: [sourceSequence, intent, reissueSequence].
+					handBackRecords: (plan?.handBacks ?? []).map(
+						(record) => [record.sourceSequence, record.intent, record.reissueSequence] as const
+					),
 					entries,
 				};
 			} finally {
