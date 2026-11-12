@@ -5979,7 +5979,7 @@ export async function captureCreatorOrdinaryIssuanceProofSource(proof: CreatorIs
 		headerScopes: Object.freeze(capture.protectedJournalHeaderScopes.map(scope => Object.freeze({...scope}))),
 		anchorPreimages: Object.freeze(anchorPreimages), snapshotMaterials, retiredClassifiedSnapshotScopes, material, maintenanceResourceFacts,
 		nativeIssuance: native,
-		journal: detach(capture.journal), capacity: {material: createCreatorOrdinaryFinishingMaterialIndex(knownMaterial, knownMaterialUses)},
+		journal: detachClosedCaptureJournal(capture.journal), capacity: {material: createCreatorOrdinaryFinishingMaterialIndex(knownMaterial, knownMaterialUses)},
 	}));
 	available();
 	let enrollReadiness: (() => void) | undefined;
@@ -6076,7 +6076,7 @@ export async function prepareCreatorOrdinaryIssuanceProofSourceReadiness(
 			// original metadata and COMPLETE use vector above.
 			...(oldRuntimeObservation === undefined || !knownMaterial.some(bytes => compareBytes(bytes, oldRuntimeObservation.bytes) === 0)
 				? {} : {runtimeCensusObservation: oldRuntimeObservation}),
-			nativeIssuance: detach(capture.nativeIssuance), journal: detach(capture.journal),
+			nativeIssuance: detach(capture.nativeIssuance), journal: detachClosedCaptureJournal(capture.journal),
 			capacity: {material: createCreatorOrdinaryFinishingMaterialIndex(knownMaterial, knownMaterialUses)},
 		});
 		const enroll = await prepareCreatorOrdinarySourceReadinessForSizing(sourceFacts, prepared.preparation,
@@ -7022,6 +7022,17 @@ function creatorIssuanceMaintenanceObservationCarriers(input: Readonly<{
 		canonicalRows: input.journal.canonicalRows,
 	};
 	return [journal, input.snapshot, input.ahe, input.floor, input.floorImage, input.snapshotInventory];
+}
+
+/** Detaches a maintenance capture's journal through the closed encoder WITHOUT its in-memory drainSource.
+ * The capture keeps that reconstruction (the adapter's pre-drain journal, a deterministic function of the
+ * observed control, image and rows) only for the raw supplement sizing; encoded beside the residual rows it
+ * holds a mid-drain journal about twice under the one encode cap. The capture's own frozen copy rides beside
+ * the detached fields, unencoded and never persisted. */
+function detachClosedCaptureJournal<T extends Readonly<{ drainSource?: unknown }>>(journal: T): T {
+	const { drainSource, ...observed } = journal;
+	const detached = decodeCanonical(closedRetirementBytes(observed)) as Omit<T, "drainSource">;
+	return (drainSource === undefined ? detached : { ...detached, drainSource }) as T;
 }
 
 /** Actual detached native control carriers; materialized controls are not
