@@ -66,6 +66,7 @@ it("the state bound's per-move cost and refold rate, per admission path and stat
 	const creator = await fixture.open(0);
 	const writer = await fixture.open(1);
 	const samples: Sample[] = [];
+	const seeds: { covered: boolean; durationUs: number; receiver: string }[] = [];
 	let site = "none";
 	let phase = "grow";
 	let stateBytes = 0;
@@ -76,6 +77,8 @@ it("the state bound's per-move cost and refold rate, per admission path and stat
 			samples.push({ ...bound, site, phase });
 			if (bound.admitted && bound.stateBytes !== undefined && site === "creator-issue") stateBytes = bound.stateBytes;
 		}
+		if (event.kind === "application-state-bound-seed")
+			seeds.push({ covered: event.covered === true, durationUs: Number(event.durationUs), receiver: String(event.receiver) });
 		if (typeof previous === "function") previous(event);
 	});
 	const delivered: (number | null)[] = [null, null];
@@ -181,6 +184,13 @@ it("the state bound's per-move cost and refold rate, per admission path and stat
 	console.log(
 		`STATE_BOUND_COST ${JSON.stringify({
 			idBytes: ID_BYTES,
+			seeds: {
+				count: seeds.length,
+				covered: seeds.filter((seed) => seed.covered).length,
+				p50Us: percentile(seeds.map((seed) => seed.durationUs), 0.5),
+				p95Us: percentile(seeds.map((seed) => seed.durationUs), 0.95),
+				maxUs: Math.max(0, ...seeds.map((seed) => seed.durationUs)),
+			},
 			rounds: ROUNDS,
 			epochs: epoch,
 			refusal,

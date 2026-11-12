@@ -21871,6 +21871,56 @@ type ApplicationStateBoundCache = {
 const applicationStateBounds = new WeakMap<V3PlaneRegistration, ApplicationStateBoundCache>();
 
 /**
+ * Seeds a plane's application state bound over its base: the application decodes the base state once.
+ * Called when the plane's machine is installed (genesis bind, successor or recovery install), so no
+ * move's admission check pays the base decode; a check that finds no current seed seeds itself.
+ * @returns The seeded cache, or undefined when the plane's policy offers no bound.
+ */
+function seedApplicationStateBound(
+	registration: V3PlaneRegistration,
+	base: BlueprintStateMachine
+): ApplicationStateBoundCache | undefined {
+	const policy = registration.operationAdmissionPolicy;
+	const create = policy === undefined ? undefined : Reflect.get(policy, "createApplicationStateBound");
+	if (typeof create !== "function") return undefined;
+	const started = typeof performance === "undefined" ? 0 : performance.now();
+	let bound: V3ApplicationStateBound | undefined;
+	try {
+		const created: unknown = ReflectApply(create, policy, [base.snapshot().exactCanonicalStateBytes]);
+		bound = isObject(created) && typeof Reflect.get(created, "advance") === "function" &&
+			typeof Reflect.get(created, "quote") === "function" && typeof Reflect.get(created, "quoteBase") === "function"
+			? created as V3ApplicationStateBound : undefined;
+		// A bound that does not fit the limit even before any operation (a constant ceiling above the
+		// room's limit) cannot decide this room's moves: the exact fold judges them.
+		const quotedBase = bound?.quoteBase();
+		if (quotedBase === undefined || !NumberIsSafeInteger(quotedBase) || quotedBase < 1 || quotedBase > ROOM_APPLICATION_STATE_BYTES)
+			bound = undefined;
+	} catch {
+		bound = undefined;
+	}
+	const cache: ApplicationStateBoundCache = { base, index: registration.index, payload: registration.payload, bound,
+		advanced: new IntrinsicSet(), admittedByBound: false };
+	cache.advanced.add(registration.payload.provenance.anchorDigest);
+	applicationStateBounds.set(registration, cache);
+	try {
+		const observer = Reflect.get(globalThis, "__warmProofEvent");
+		if (typeof observer === "function")
+			observer({ kind: "application-state-bound-seed", receiver: registration.issuanceScope.author, covered: bound !== undefined,
+				durationUs: typeof performance === "undefined" ? 0 : Math.round((performance.now() - started) * 1000) });
+	} catch { /* Diagnostics cannot alter admission. */ }
+	return cache;
+}
+
+/** Seeds the plane's application state bound when its machine is installed (never fails the install). */
+function seedApplicationStateBoundAtInstall(registration: V3PlaneRegistration): void {
+	try {
+		const base = registration.blueprintMachine;
+		if (base === undefined || registration.blueprintClosing || registration.blueprintFolded) return;
+		seedApplicationStateBound(registration, base);
+	} catch { /* A seed is an optimization: the first admission check seeds instead. */ }
+}
+
+/**
  * The bound path of the application state check: whether the application's own state bound, over this
  * plane's base and admitted operations plus the candidate, stays within the room's limit. O(operation).
  * The exact state is at most the bound (the application's theorem, property-tested per shipped app), so
@@ -21883,31 +21933,13 @@ function applicationStateBoundAdmits(
 	base: BlueprintStateMachine,
 	candidate: Readonly<{ digest: string; operation: Readonly<Record<string, unknown>> }>
 ): Readonly<{ admitted: boolean; quoted: number; rebuilt: boolean }> | undefined {
-	const policy = registration.operationAdmissionPolicy;
-	const create = policy === undefined ? undefined : Reflect.get(policy, "createApplicationStateBound");
-	if (typeof create !== "function") return undefined;
 	let cache = applicationStateBounds.get(registration);
 	let rebuilt = false;
 	if (cache === undefined || cache.base !== base || cache.index !== registration.index || cache.payload !== registration.payload) {
+		// Not seeded when the plane's machine was installed (or the plane was reset since): seed now.
+		cache = seedApplicationStateBound(registration, base);
+		if (cache === undefined) return undefined;
 		rebuilt = true;
-		let bound: V3ApplicationStateBound | undefined;
-		try {
-			const created: unknown = ReflectApply(create, policy, [base.snapshot().exactCanonicalStateBytes]);
-			bound = isObject(created) && typeof Reflect.get(created, "advance") === "function" &&
-				typeof Reflect.get(created, "quote") === "function" && typeof Reflect.get(created, "quoteBase") === "function"
-				? created as V3ApplicationStateBound : undefined;
-			// A bound that does not fit the limit even before any operation (a constant ceiling above the
-			// room's limit) cannot decide this room's moves: the exact fold judges them.
-			const quotedBase = bound?.quoteBase();
-			if (quotedBase === undefined || !NumberIsSafeInteger(quotedBase) || quotedBase < 1 || quotedBase > ROOM_APPLICATION_STATE_BYTES)
-				bound = undefined;
-		} catch {
-			bound = undefined;
-		}
-		cache = { base, index: registration.index, payload: registration.payload, bound, advanced: new IntrinsicSet(),
-			admittedByBound: false };
-		cache.advanced.add(registration.payload.provenance.anchorDigest);
-		applicationStateBounds.set(registration, cache);
 	}
 	const disable = (): undefined => {
 		cache.bound = undefined;
@@ -22502,6 +22534,7 @@ function bindV3BlueprintLivePlane(rawInput: V3BlueprintLiveBindingInput): V3Blue
 		});
 		const handle = makeV3BlueprintLiveHandle(registration);
 		registration.blueprintHandle = handle;
+		seedApplicationStateBoundAtInstall(registration);
 		return ObjectFreeze({ handle, ok: true as const });
 	} catch {
 		return activationFailure("internal-invariant", "v3 blueprint binding failed");
@@ -23799,6 +23832,7 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 			};
 			registration.handle = makeV3PlaneHandle(registration);
 			if (snapshotMachine !== undefined) registration.blueprintHandle = makeV3BlueprintLiveHandle(registration);
+			seedApplicationStateBoundAtInstall(registration);
 			v3HandleRegistrations.set(registration.handle, registration);
 			registrations ??= new IntrinsicMap<string, V3PlaneRegistration>();
 			if (reusesTransport) {
