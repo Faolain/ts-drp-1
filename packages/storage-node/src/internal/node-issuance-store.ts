@@ -531,7 +531,8 @@ function copyOutboxRow(value: unknown): NativeOutboxRow | undefined {
 }
 
 function settlementPlanEntriesJson(plan: SettlementPlan): string {
-	if (plan.sourceContexts !== undefined || plan.handBacks !== undefined || plan.memberFrontier !== undefined) return JSON.stringify({kind: CANONICAL_SETTLEMENT_PLAN_STORAGE_KIND,
+	if (plan.sourceContexts !== undefined || plan.handBacks !== undefined || plan.memberFrontier !== undefined ||
+		plan.completedSourceCustody !== undefined) return JSON.stringify({kind: CANONICAL_SETTLEMENT_PLAN_STORAGE_KIND,
 		bytes: Buffer.from(encodeCanonical(plan, {maxBytes: ISSUANCE_RETIREMENT_LIMITS.maxBytes, maxDepth: 12,
 			maxItems: ISSUANCE_RETIREMENT_LIMITS.maxRows * 32})).toString("base64")});
 	return issuanceLegacySettlementPlanEntriesJson(plan);
