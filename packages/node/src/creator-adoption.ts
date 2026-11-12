@@ -1417,6 +1417,90 @@ export async function maintainCreatorRecipientRecoveryPool(input: Readonly<{
 	return Object.freeze(outcome === "deferred" ? {kind: "deferred", reason: "busy"} : {kind: "maintained"});
 }
 
+/** One recipient lull's turnover progress, resumed by the next step while the epoch is unchanged. */
+const recipientLullProgress = new WeakMap<object, Readonly<{epoch: number; state: ReceivedTurnoverPassState}>>();
+
+/**
+ * One bounded step of the recipient lull (lull "A"): the SAME original turnover passes as
+ * maintainCreatorRecipientRecoveryPool, one pass per queued quiescent boundary. Between steps the
+ * caller releases the lifecycle FIFO and the issue barrier, so an install or a local move waits for at
+ * most one pass, never the whole turnover. The pass state is kept for this plane and epoch: "more"
+ * means the next step continues it; an epoch change (an install, which runs its own turnover when no
+ * current boundary was recorded) drops it. "deferred" means the boundary was unavailable before entry
+ * (nothing ran). A failure after entry is recovery work, exactly as for the whole lull.
+ * @param input - The recipient's genuine live plane, catalog, current room head and native ports.
+ * @returns The step's progress and, when done, the lull's result.
+ */
+export async function stepCreatorRecipientRecoveryPool(input: Readonly<{
+	plane: V3PlaneHandle;
+	catalog: TrustedBlueprintCatalog;
+	expectedRoomHead: Readonly<{ objectId: string; epoch: number; currentAnchorDigest: string }>;
+	snapshotStore: SnapshotRecoveryStore<SnapshotVerificationReceipt>;
+	recoveryContext: CreatorRecipientRecoveryContext;
+}>): Promise<Readonly<{step: "done" | "more" | "deferred"; result: CreatorRecoveryPoolResult}>> {
+	const deferredBusy = Object.freeze({step: "deferred" as const, result: Object.freeze({kind: "deferred" as const, reason: "busy" as const})});
+	// Any lull entry, even one that defers, ends the previous lull's boundary.
+	reconciledReceivedTurnovers.delete(input.plane);
+	const source = resolveCreatorRecipientRegistration(input.plane, false);
+	if (source === undefined || input.snapshotStore.captureRecoveryRoleInventory === undefined)
+		return Object.freeze({step: "done", result: Object.freeze({kind: "deferred", reason: "unsupported"})});
+	if (!sameCreatorRoomHead(input.expectedRoomHead, source.currentTrust)) return deferredBusy;
+	const epoch = source.currentTrust.currentEpoch;
+	// Written inside the boundary's callback, so held in an object (not narrowed across it).
+	const run: {progress?: Readonly<{epoch: number; state: ReceivedTurnoverPassState}>; input?: ReceivedTurnoverPassInput} = {};
+	run.progress = recipientLullProgress.get(input.plane);
+	if (run.progress !== undefined && run.progress.epoch !== epoch) {
+		recipientLullProgress.delete(input.plane);
+		run.progress = undefined;
+	}
+	if (run.progress === undefined &&
+		!(await receivedRecoveryTurnoverDue(source, input.snapshotStore, (await source.inspectQueuedNativeHead()).candidates)))
+		return Object.freeze({step: "done", result: Object.freeze({kind: "not-needed"})});
+	const context = input.recoveryContext;
+	const opened = await createCreatorSigningRecoveryOwner({currentTrust: source.currentTrust,
+		voteStore: context.voteStore, evidenceStore: context.evidenceStore, storageIncarnation: context.storageIncarnation});
+	if (!opened.ok) throw new TypeError(`creator recipient signing custody unavailable: ${opened.reason}`);
+	let outcome: "ran" | "deferred";
+	try {
+		outcome = await source.runReceivedRecoveryMaintenance(opened.owner, input.snapshotStore, (seal, requireClosedWorkflowCompletion) =>
+			runInBackgroundLane(async (): Promise<"complete"> => {
+				const passInput: ReceivedTurnoverPassInput = {source, snapshotStore: input.snapshotStore, catalog: input.catalog,
+					context, signing: opened.owner, requireClosedWorkflowCompletion, settle: true};
+				run.input = passInput;
+				const progress = run.progress ?? Object.freeze({epoch, state: await beginReceivedRecoveryTurnoverPasses(passInput)});
+				run.progress = progress;
+				await runReceivedRecoveryTurnoverPass(passInput, progress.state, seal);
+				return "complete";
+			}), {deferrable: true});
+	} catch (error) {
+		recipientLullProgress.delete(input.plane);
+		throw error;
+	} finally {
+		await opened.owner.stop();
+	}
+	const progress = run.progress, passInput = run.input;
+	if (outcome === "deferred") {
+		if (progress !== undefined) recipientLullProgress.set(input.plane, progress);
+		return deferredBusy;
+	}
+	if (progress === undefined || passInput === undefined) throw new TypeError("creator recipient lull pass did not run");
+	const state = progress.state;
+	if (!state.done && state.pass < state.maxPasses) {
+		recipientLullProgress.set(input.plane, progress);
+		return Object.freeze({step: "more", result: Object.freeze({kind: "maintained"})});
+	}
+	recipientLullProgress.delete(input.plane);
+	observeTurnoverSettle(passInput, state);
+	if (state.settled) {
+		try {
+			const boundary = await captureReceivedTurnoverBoundary(source, input.snapshotStore,
+				(await source.inspectQueuedNativeHead()).candidates);
+			if (boundary !== undefined) reconciledReceivedTurnovers.set(input.plane, boundary);
+		} catch { /* No boundary: the next install turns over as before. */ }
+	}
+	return Object.freeze({step: "done", result: Object.freeze({kind: "maintained"})});
+}
+
 /**
  * D.108d1b at the install boundary (G6). The successor's settlement capability carries the
  * creator-signed frontier of this author: the highest of its sequences the room admitted. That
