@@ -76,7 +76,7 @@ interface NetworkSnapshot {
 	readonly connectionBudget: Readonly<{
 		readonly maxConnections: number;
 		readonly maxParallelDials: number;
-		readonly role: "browser";
+		readonly role: "browser" | "worker";
 	}>;
 	readonly connections: readonly unknown[];
 	readonly peerId: string;
@@ -734,8 +734,10 @@ async function expectOneMeasuredRawMovement(input: {
 	}
 }
 
-function expectWithinInstalledBudget(snapshot: NetworkSnapshot): void {
-	expect(snapshot.connectionBudget).toEqual({ maxConnections: 48, maxParallelDials: 6, role: "browser" });
+function expectWithinInstalledBudget(snapshot: NetworkSnapshot, role?: "creator" | "joiner"): void {
+	// A room worker's node resolves the worker profile, the same budget as the browser's.
+	const worker = role !== undefined && (ROOM_WORKER_ROLES === "both" || ROOM_WORKER_ROLES === role);
+	expect(snapshot.connectionBudget).toEqual({ maxConnections: 48, maxParallelDials: 6, role: worker ? "worker" : "browser" });
 	expect(snapshot.connections.length).toBeLessThanOrEqual(snapshot.connectionBudget.maxConnections);
 }
 
@@ -751,8 +753,8 @@ test("two real network clients recover and converge one durable v3 zone while mo
 	try {
 		await Promise.all([openGrid(creator, "creator"), openGrid(joiner, "joiner")]);
 		const [creatorNetwork, joinerNetwork] = await Promise.all([networkSnapshot(creator), networkSnapshot(joiner)]);
-		expectWithinInstalledBudget(creatorNetwork);
-		expectWithinInstalledBudget(joinerNetwork);
+		expectWithinInstalledBudget(creatorNetwork, "creator");
+		expectWithinInstalledBudget(joinerNetwork, "joiner");
 		const creatorPeerId = creatorNetwork.peerId;
 		const joinerPeerId = joinerNetwork.peerId;
 		const [creatorEnrollment, joinerEnrollment] = await Promise.all([zone(creator), zone(joiner)]);
