@@ -112,11 +112,22 @@ function rowWire(creator: RoleEndpoint, writer: RoleEndpoint) {
 	};
 }
 
+// The creator's moves place Grid blocks from a fixed set of CREATOR_BLOCK_IDS ids (x carries the
+// ordinal, so every move is a distinct operation). Grid keeps one block per id and its state is
+// bounded (32 KiB canonical, about 850 blocks): a creator placing a new id per move would reach that
+// bound in a long run (about 850 moves) and fail as "outside the bounded canonical domain" instead of
+// on what the test measures.
+const CREATOR_BLOCK_IDS = 64;
+function creatorMove(creator: RoleEndpoint, ordinal: { next: number }) {
+	const k = ordinal.next++;
+	return creator.issue(k, k % CREATOR_BLOCK_IDS);
+}
+
 /** Creator moves (with the creator's rows carried to the Writer) until its policy rolls the epoch. */
 async function rollCreator(creator: RoleEndpoint, carry: () => Promise<void>, ordinal: { next: number }) {
 	const before = (await creator.rollover?.())?.epoch ?? 0;
 	for (;;) {
-		await creator.issue(0, ordinal.next++);
+		await creatorMove(creator, ordinal);
 		await carry();
 		const epoch = (await creator.rollover?.())?.epoch ?? 0;
 		if (epoch > before) return epoch;
@@ -510,9 +521,18 @@ async function profiled<T>(name: string, run: () => Promise<T>): Promise<T> {
 // the creator; it follows by skip installs over two closed epochs each), then is connected again
 // while the creator keeps moving every 300 ms and rolls at its own policy's rate. Every move must
 // land on the creator exactly once; the time from reconnecting to the last move landing is the
-// catch-up time (printed with the native work counts of that phase). Fails on no progress for
-// CATCH_UP_STALL_MS, not on a fixed deadline.
+// catch-up time (printed with the native work counts of that phase).
+//
+// Two failures, each named: "catch-up stalled" (no move landed for CATCH_UP_STALL_MS) and "catch-up
+// too slow" (not every move landed within the time budget, CATCH_UP_S_PER_MOVE seconds per move).
+// The budget is 12 s per move: about 1.5x the slowest passing 100x16 run on the boat boxes (633-800 s
+// for 102 moves, 6.2-7.8 s per move; 50x8 passed at 4.3-9.0 s per move). 100x16 gets 1,224 s, 50x8
+// 624 s, 25x4 324 s. It trips before any other bound: the creator's state stays far below Grid's
+// 32 KiB (CREATOR_BLOCK_IDS), and budget plus the behind phase and the final exactly-once check stay
+// inside the test's 1 h timeout. The real-time bar is far tighter than this; the budget names a slow
+// catch-up as slow rather than measuring it (the CATCH_UP line does that).
 const CATCH_UP_STALL_MS = Number(process.env.CATCH_UP_STALL_MS ?? 300_000);
+const CATCH_UP_S_PER_MOVE = Number(process.env.CATCH_UP_S_PER_MOVE ?? 12);
 async function catchUp(moves: number, epochs: number) {
 	const restore = await installEnvironment("node", () => undefined);
 	const directory = mkdtempSync(join(tmpdir(), "app-rollover-catch-up-"));
@@ -586,6 +606,7 @@ async function catchUp(moves: number, epochs: number) {
 			// Connected again: the creator keeps moving; the member's rows are carried both ways.
 			const before = readV3SettlementWorkCounts();
 			const started = performance.now();
+			const budgetS = CATCH_UP_S_PER_MOVE * ids.length;
 			let landedAt = started;
 			let landed = 0;
 			let counts: number[] = [];
@@ -646,7 +667,14 @@ async function catchUp(moves: number, epochs: number) {
 					if (now === ids.length) return;
 					if (performance.now() - landedAt > CATCH_UP_STALL_MS)
 						throw new Error(`catch-up stalled: ${now}/${ids.length} landed, ${(await describe()).slice(0, 6000)}`);
-					await creator.issue(0, ordinal.next++);
+					const elapsed = (performance.now() - started) / 1000;
+					if (elapsed > budgetS)
+						throw new Error(
+							`catch-up too slow: ${now}/${ids.length} landed after ${Math.round(elapsed)} s ` +
+								`(${now === 0 ? "no move landed" : `${(elapsed / now).toFixed(1)} s per landed move`}; ` +
+								`budget ${budgetS} s = ${CATCH_UP_S_PER_MOVE} s x ${ids.length} moves), ${(await describe()).slice(0, 6000)}`
+						);
+					await creatorMove(creator, ordinal);
 					await sleep(300);
 				}
 			});
