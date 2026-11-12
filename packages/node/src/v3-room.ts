@@ -7459,7 +7459,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		const issued =
 			effect.kind === "replacement"
 				? await (source as DisplacedSource).issueReplacement(localInput)
-				: await activeHandle.issueLocal(localInput);
+				: // The settlement lane: received rows and caller moves can never refuse this mandatory fence.
+					await (activeHandle.issueSettlementLocal ?? activeHandle.issueLocal)(localInput);
 		if (!issued.ok) {
 			if (issued.kind === "split-required") return issued;
 			const observed = await issuanceStore.readSettlementPlan(settlementScope);

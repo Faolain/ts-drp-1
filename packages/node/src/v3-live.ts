@@ -641,6 +641,12 @@ export interface V3PlaneHandle {
 		  }
 		| undefined;
 	issueLocal(input: V3LocalIssueInput): Promise<V3LocalIssueResult>;
+	/**
+	 * The room's own settlement drain (its author fence at adoption or install, a replacement): the
+	 * same issue as issueLocal, admitted through the settlement lane that received rows and caller
+	 * moves never consume, so a mandatory fence is never refused for input capacity.
+	 */
+	issueSettlementLocal?(input: V3LocalIssueInput): Promise<V3LocalIssueResult>;
 	authorizeSettlementSourceSelection?(
 		input: V3SettlementSourceSelectionRequest &
 			Readonly<{
@@ -3344,6 +3350,10 @@ interface V3PlaneRegistration {
 	admittedInputJobs: number;
 	/** Exact encoded private local/replacement operations held by those jobs. */
 	admittedInputBytes: number;
+	/** Entered plus queued settlement-drain jobs (own fence, replacement, frontier resolution): their own lane. */
+	admittedSettlementJobs: number;
+	/** Exact encoded operations held by those settlement jobs, bounded by settlementLaneBytes. */
+	admittedSettlementBytes: number;
 	/** Caller-requested dependency/source reads; not mandatory transition control. */
 	admittedReadControlJobs: number;
 	/** Fresh caller-requested publication turns, retained through native join. */
@@ -5376,6 +5386,7 @@ export function readV3RuntimeOwnerCensus(plane: V3PlaneHandle): Readonly<Record<
 		terminalPublicationInputBytes: registration.terminalPublicationInputBytes,
 		admittedInputJobs: registration.admittedInputJobs,
 		admittedInputBytes: registration.admittedInputBytes,
+		admittedSettlementJobs: registration.admittedSettlementJobs,
 		admittedReadControlJobs: registration.admittedReadControlJobs,
 		admittedPendingPublicationJobs: registration.admittedPendingPublicationJobs,
 		admittedEgressControlJobs: registration.admittedEgressControlJobs,
@@ -8731,6 +8742,30 @@ async function authenticateV3Ingress(registration: V3PlaneRegistration, captured
 // Keep mandatory control/maintenance schedulable so a full input pool cannot
 // prevent a terminal barrier or recovery operation from joining.
 const MAX_ADMITTED_INPUT_JOBS = 32;
+// The room's own settlement drain (an author's mandatory fence at adoption or install, its
+// replacements and frontier resolutions) is admitted through its own lane: received rows and caller
+// moves keep their MAX_ADMITTED_INPUT_JOBS bound and byte account and never consume this one, so a
+// full input pool at a roll cannot refuse the fence that completes it.
+// Jobs: the room's drain awaits every settlement issue (one in flight), plus one overlapping
+// recovery re-issue of the same drain step (v3-room issueSettlement's recovered-source retry).
+const MAX_ADMITTED_SETTLEMENT_JOBS = 2;
+/**
+ * The settlement lane's own captured-bytes share. A fence captures one AUTHOR_FENCE operation and a
+ * frontier resolution only selectors; the widest single settlement issue is a replacement, whose
+ * operations are one displaced source's: one vertex, whose byte charge is bounded by the epoch's
+ * parameters.maxEpochBytes (the per-vertex limit: nextEpochBytes / byteCharge > maxEpochBytes), and
+ * which was itself admitted once through the input account (<= maxPendingBytes). So every legal
+ * settlement issue fits min(maxEpochBytes, maxPendingBytes), and the share admits the lane's two jobs
+ * at that width: a mandatory replacement is never refused for bytes (no retry livelock).
+ * Per-plane captured input bound: input account maxPendingBytes + this share
+ * (<= min(maxPendingBytes, 2 x maxEpochBytes)) + the gossip queue's maxPendingBytes; read-control and
+ * egress lanes capture no bytes. Grid zone (maxEpochBytes 8 MiB, maxPendingBytes 16 MiB): 48 MiB.
+ * @param parameters - The plane's registered parameters.
+ * @returns The lane's byte share.
+ */
+function settlementLaneBytes(parameters: Readonly<{ maxEpochBytes: number; maxPendingBytes: number }>): number {
+	return Math.min(parameters.maxPendingBytes, MAX_ADMITTED_SETTLEMENT_JOBS * parameters.maxEpochBytes);
+}
 const MAX_ADMITTED_READ_CONTROL_JOBS = 32;
 // Explicit local admission policy; no payload is captured by publishPending.
 // Durable row/proof bytes remain charged by their original native owners.
@@ -8784,7 +8819,7 @@ function enqueueRegistrationTask<Result>(
 	registration: V3PlaneRegistration,
 	capture: (custody?: InputCaptureCustody) => (() => Promise<Result>) | Readonly<{ join: Promise<Result> }>,
 	inputAdmission?: Readonly<{
-		pool?: "input" | "read-control" | "pending-publication" | "egress-control";
+		pool?: "input" | "settlement" | "read-control" | "pending-publication" | "egress-control";
 		refuse(): Result;
 		refuseCapture?(capacity: "byte" | "entry"): Result;
 		barrier?: Promise<void>;
@@ -8798,7 +8833,13 @@ function enqueueRegistrationTask<Result>(
 				? "admittedEgressControlJobs"
 				: inputAdmission?.pool === "pending-publication"
 					? "admittedPendingPublicationJobs"
-					: "admittedInputJobs";
+					: inputAdmission?.pool === "settlement"
+						? "admittedSettlementJobs"
+						: "admittedInputJobs";
+	const bytes = inputAdmission?.pool === "settlement" ? "admittedSettlementBytes" : "admittedInputBytes";
+	const byteLimit = inputAdmission?.pool === "settlement"
+		? settlementLaneBytes(registration.payload.parameters)
+		: registration.payload.parameters.maxPendingBytes;
 	const limit =
 		inputAdmission?.pool === "read-control"
 			? MAX_ADMITTED_READ_CONTROL_JOBS
@@ -8806,7 +8847,9 @@ function enqueueRegistrationTask<Result>(
 				? MAX_ADMITTED_EGRESS_CONTROL_JOBS
 				: inputAdmission?.pool === "pending-publication"
 					? MAX_ADMITTED_PENDING_PUBLICATION_JOBS
-					: MAX_ADMITTED_INPUT_JOBS;
+					: inputAdmission?.pool === "settlement"
+						? MAX_ADMITTED_SETTLEMENT_JOBS
+						: MAX_ADMITTED_INPUT_JOBS;
 	const egressOwner = inputAdmission?.pool === "egress-control" ? egressAdmissionOwner(registration) : undefined;
 	if (inputAdmission !== undefined) {
 		if ((egressOwner?.jobs ?? registration[counter]) >= limit) {
@@ -8828,7 +8871,7 @@ function enqueueRegistrationTask<Result>(
 			inputReservationReleased = true;
 			registration[counter]--;
 			if (egressOwner !== undefined) releaseEgressAdmission(registration, egressOwner);
-			registration.admittedInputBytes -= capturedBytes;
+			registration[bytes] -= capturedBytes;
 			if (counter === "admittedInputJobs" && registration.deliveryRepair?.wake === true)
 				noteDeliveryCapacity(registration);
 		};
@@ -8837,13 +8880,13 @@ function enqueueRegistrationTask<Result>(
 				? undefined
 				: {
 						entryLimit: registration.payload.parameters.maxPendingEntries,
-						remainingBytes: () => registration.payload.parameters.maxPendingBytes - registration.admittedInputBytes,
-						chargeBytes: (bytes): void => {
+						remainingBytes: () => byteLimit - registration[bytes],
+						chargeBytes: (charge): void => {
 							// Canonical caller inspection may reenter; use current remaining credit.
-							if (bytes > registration.payload.parameters.maxPendingBytes - registration.admittedInputBytes)
+							if (charge > byteLimit - registration[bytes])
 								throw new InputCaptureCapacityError("byte");
-							registration.admittedInputBytes += bytes;
-							capturedBytes += bytes;
+							registration[bytes] += charge;
+							capturedBytes += charge;
 						},
 					};
 		if (inputAdmission?.captureBeforeBarrier === true) {
@@ -17080,7 +17123,8 @@ async function issueLocal(
 
 function enqueueLocalIssue(
 	registration: V3PlaneRegistration,
-	rawInput: V3LocalIssueInput
+	rawInput: V3LocalIssueInput,
+	pool: "input" | "settlement" = "input"
 ): Promise<V3LocalIssueResult> {
 	if (registration.receiveOnly)
 		return Promise.resolve(localIssueFailure("authorization-rejected", "v3 plane is receive-only"));
@@ -17101,6 +17145,7 @@ function enqueueLocalIssue(
 					};
 		},
 		{
+			pool,
 			refuse: () =>
 				localIssueFailure("admission-rejected", "v3 input task capacity exhausted; retry after admitted work joins"),
 			refuseCapture: (capacity) =>
@@ -18274,6 +18319,8 @@ async function readRebaseOutbox(
 				};
 			},
 			{
+				// A replacement is the settlement drain's own work: the settlement lane.
+				pool: "settlement",
 				refuse: () =>
 					localIssueFailure("admission-rejected", "v3 input task capacity exhausted; retry after admitted work joins"),
 				refuseCapture: (capacity) =>
@@ -23081,6 +23128,10 @@ function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
 			registration.receiveOnly || registration.mode === "snapshot-closed"
 				? Promise.resolve(localIssueFailure("not-active", "v3 plane is not accepting local issues"))
 				: enqueueLocalIssue(registration, input),
+		issueSettlementLocal: (input: V3LocalIssueInput): Promise<V3LocalIssueResult> =>
+			registration.receiveOnly || registration.mode === "snapshot-closed"
+				? Promise.resolve(localIssueFailure("not-active", "v3 plane is not accepting local issues"))
+				: enqueueLocalIssue(registration, input, "settlement"),
 		readRebaseOutbox: (): Promise<V3RebaseOutboxResult> =>
 			registration.receiveOnly || registration.mode === "snapshot-closed" || !currentRegistration(registration)
 				? Promise.resolve(
@@ -23346,6 +23397,8 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 				joinedWork: new IntrinsicSet<Promise<void>>(),
 				admittedInputJobs: 0,
 				admittedInputBytes: 0,
+				admittedSettlementJobs: 0,
+				admittedSettlementBytes: 0,
 				admittedReadControlJobs: 0,
 				admittedPendingPublicationJobs: 0,
 				admittedEgressControlJobs: 0,
@@ -25473,7 +25526,8 @@ export function resolveV3RetainedWorkFromFrontier(plane: V3PlaneHandle, raw: Rea
 			}
 		};
 	}, {
-		pool: "input",
+		// Only the settlement drain resolves rows from its frontier: the settlement lane.
+		pool: "settlement",
 		refuse: (): never => { throw new TypeError("creator source frontier resolution task capacity exhausted"); },
 		refuseCapture: (): never => { throw new TypeError("creator source frontier resolution input capacity exhausted"); },
 	});
