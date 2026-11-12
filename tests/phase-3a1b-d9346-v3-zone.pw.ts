@@ -659,10 +659,12 @@ async function openGrid(page: Page, role?: "creator" | "joiner"): Promise<void> 
 }
 
 async function zone(page: Page): Promise<ZoneSnapshot> {
-	return page.evaluate(() => {
+	return page.evaluate(async () => {
 		const api = window.__TS_DRP_V3_ZONE__;
 		if (api === undefined) throw new Error("D9346_V3_ZONE_API_ABSENT");
-		return api.snapshot();
+		// A room-worker zone's snapshot() is the zone it last published; refresh() reads the current one.
+		const refresh = Reflect.get(api, "refresh") as (() => Promise<ZoneSnapshot>) | undefined;
+		return refresh === undefined ? api.snapshot() : await refresh.call(api);
 	});
 }
 

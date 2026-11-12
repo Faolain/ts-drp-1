@@ -158,10 +158,13 @@ interface ZoneView {
 }
 
 const zone = (page: Page): Promise<ZoneView> =>
-	page.evaluate(() => {
-		const api = Reflect.get(window, "__TS_DRP_V3_ZONE__") as { snapshot(): ZoneView } | undefined;
+	page.evaluate(async () => {
+		const api = Reflect.get(window, "__TS_DRP_V3_ZONE__") as
+			| { snapshot(): ZoneView; refresh?(): Promise<ZoneView> }
+			| undefined;
 		if (api === undefined) throw new Error("BROWSER_FPS_ZONE_API_ABSENT");
-		const value = api.snapshot();
+		// A room-worker zone's snapshot() is the zone it last published; refresh() reads the current one.
+		const value = api.refresh === undefined ? api.snapshot() : await api.refresh();
 		return {
 			blocks: value.blocks.map(({ id, kind, x, y }) => ({ id, kind, x, y })),
 			durableVertexCount: value.durableVertexCount,
@@ -1197,6 +1200,16 @@ for (const app of APPS)
 			const playMs = Date.now() - playStarted;
 			await play.stop();
 			play = undefined;
+			// Read before conservation, whose zone reads would count as bridge work.
+			const roomWorkerReport = roomWorker
+				? await roomWorkerSummary(
+						new Map<Role, Page>([
+							["creator", creator],
+							["member", member],
+						]),
+						playMs
+					)
+				: null;
 			await meter.drain();
 			driver.consume(meter);
 			const conservation = await driver.conserve(creator, member, meter);
@@ -1221,9 +1234,6 @@ for (const app of APPS)
 					)
 				)
 			).flat();
-			const roomWorkerReport = roomWorker
-				? await roomWorkerSummary(new Map<Role, Page>([["creator", creator], ["member", member]]), playMs)
-				: null;
 			const pages = { creator: meter.report("creator"), member: meter.report("member") };
 			const { windows, memberOverBound, rolloverIssueLatency } = issueLatency(meter, driver);
 			const stageCounts = {
