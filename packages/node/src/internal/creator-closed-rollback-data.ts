@@ -1,6 +1,6 @@
 import { CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE, creatorSourceCustodyGeometryForSizing } from "./creator-source-custody.js";
 import type { TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog";
-import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { CanonicalEncodingError, compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { canonicalRecordResourceForSizing,
 	canonicalPrimitiveResourceForSizing, canonicalBytesResourceForSizing, canonicalArrayResourceForSizing,
 	canonicalArrayResourcesForSizing, canonicalCarrierResourceForSizing, canonicalValueResourceForSizing,
@@ -6750,8 +6750,8 @@ export async function acquireCreatorOrdinaryIssuanceMaintenanceProof(value: Crea
 		const signingRows = Object.freeze(signing.readExactCanonicalRows().map(bytes => bytes.slice()));
 		for (const bytes of signingRows) requireLaw(accounting.charge(bytes), "proof-budget-exceeded");
 		for (const bytes of creatorIssuanceMaintenanceObservationCarriers({journal: journal.value, snapshot, ahe: ahe.value,
-			floor: floorImage.state, floorImage, snapshotInventory: {scopes: inventory.scopes, owner: inventory.owner}}).map(closedRetirementBytes))
-			requireLaw(chargeProofObservation(accounting, bytes), "proof-budget-exceeded");
+			floor: floorImage.state, floorImage, snapshotInventory: {scopes: inventory.scopes, owner: inventory.owner}}).map(closedObservationCarrierBytes))
+			requireLaw(bytes !== undefined && chargeProofObservation(accounting, bytes), "proof-budget-exceeded");
 		for (const bytes of closedJournalNativeControlCarriers(journal.value))
 			requireLaw(chargeProofObservation(accounting, bytes), "proof-budget-exceeded");
 		requireLaw(chargeProofObservation(accounting, closedRetirementBytes(nativeIssuance)), "proof-budget-exceeded");
@@ -7165,8 +7165,8 @@ export async function acquireCreatorIssuanceMaintenanceProof(
 			let original: Awaited<ReturnType<typeof captureNativeImages>> | undefined = await captureNativeImages();
 			for (const bytes of creatorIssuanceMaintenanceObservationCarriers({journal: original.journal.value,
 				snapshot: original.snapshot, ahe: original.ahe.value, floor: original.floorImage.state, floorImage: original.floorImage,
-				snapshotInventory: {scopes: snapshotInventory.scopes, owner: snapshotInventory.owner}}).map(closedRetirementBytes))
-				requireLaw(chargeProofObservation(accounting, bytes), "proof-budget-exceeded");
+				snapshotInventory: {scopes: snapshotInventory.scopes, owner: snapshotInventory.owner}}).map(closedObservationCarrierBytes))
+				requireLaw(bytes !== undefined && chargeProofObservation(accounting, bytes), "proof-budget-exceeded");
 			for (const reservation of reservations) await reservation.check();
 			await joinSourceReleases(reservations.map(reservation => () => reservation.release()));
 			reservations.length = 0; issuer = undefined; terminalFloor = undefined; journalHeaderHold = undefined;
@@ -7226,8 +7226,8 @@ export async function acquireCreatorIssuanceMaintenanceProof(
 				for (const bytes of creatorIssuanceMaintenanceObservationCarriers({
 					journal: actual.journal.value, snapshot: actual.snapshot, ahe: actual.ahe.value,
 					floor: actual.floorImage.state, floorImage: actual.floorImage,
-					snapshotInventory: {scopes: actualInventory.scopes, owner: actualInventory.owner}}).map(closedRetirementBytes))
-					requireLaw(chargeProofObservation(accounting, bytes), "proof-budget-exceeded");
+					snapshotInventory: {scopes: actualInventory.scopes, owner: actualInventory.owner}}).map(closedObservationCarrierBytes))
+					requireLaw(bytes !== undefined && chargeProofObservation(accounting, bytes), "proof-budget-exceeded");
 				requireLaw(closedJournalNativeObservationEqual(actual.journal.value, prepared.journal.value), "anchor-unavailable");
 				requireLaw(closedRetirementEqual(actual.snapshot, prepared.snapshot), "snapshot-invalid");
 				requireLaw(closedRetirementEqual(actual.ahe.value, prepared.ahe.value), "ahe-rejected");
@@ -7319,8 +7319,8 @@ export async function acquireCreatorIssuanceMaintenanceProof(
 			floor: forward.wholeFloor,
 			floorImage,
 			snapshotInventory: { scopes: snapshotInventory.scopes, owner: snapshotInventory.owner },
-		}).map(closedRetirementBytes))
-			requireLaw(chargeProofObservation(frame.accounting, bytes), "proof-budget-exceeded");
+		}).map(closedObservationCarrierBytes))
+			requireLaw(bytes !== undefined && chargeProofObservation(frame.accounting, bytes), "proof-budget-exceeded");
 		// The SAME close owner may reuse the complete, already charged native
 		// journal observation for its original fresh currency checks. Enrollment
 		// supplies no authority and cannot replace the initial replay comparison.
@@ -10716,6 +10716,22 @@ const CLOSED_RETIREMENT_BYTES = Object.freeze({
 	maxDepth: 128,
 });
 function closedRetirementBytes(value: unknown): Uint8Array { return encodeCanonical(value, CLOSED_RETIREMENT_BYTES); }
+/**
+ * One maintenance observation carrier under the close's per-carrier encode cap. A wider carrier
+ * is the proof's typed budget refusal (callers charge undefined as "proof-budget-exceeded"), never
+ * an untyped codec failure. Readiness sizing charges the same carriers under the same cap, so
+ * admission refuses before one grows past it. Any other codec failure is rethrown unchanged.
+ * @param value - One carrier from creatorIssuanceMaintenanceObservationCarriers.
+ * @returns Its exact canonical bytes, or undefined past the cap.
+ */
+function closedObservationCarrierBytes(value: unknown): Uint8Array | undefined {
+	try { return closedRetirementBytes(value); }
+	catch (error) {
+		if (error instanceof CanonicalEncodingError &&
+			(error.message === "canonical value exceeds byte limit" || error.message === "string exceeds byte limit")) return undefined;
+		throw error;
+	}
+}
 function closedRetirementEqual(left: unknown, right: unknown): boolean {
 	return compareBytes(closedRetirementBytes(left), closedRetirementBytes(right)) === 0;
 }
@@ -13752,6 +13768,11 @@ function prepareCreatorOrdinaryFinishingWindowForSizing(input: Readonly<{
 			const freshObservations = sum(freshJournal.byteLength, journalContextBound, nativeJournalControlBound, currentNativeUnknown);
 			const finishingJournal = canonicalRecordResourceForSizing({...state.journalObservationFields, canonicalRows: journal.canonicalRows}, resourceLimits);
 			const finishingObservations = sum(finishingJournal.byteLength, journalContextBound, nativeJournalControlBound, nativeUnknown);
+			// The close encodes this journal carrier with closedRetirementBytes: one per-carrier cap, so
+			// admission refuses (typed) before the carrier grows past what the close can encode.
+			if (Math.max(freshJournal.byteLength, finishingJournal.byteLength) > CLOSED_RETIREMENT_BYTES.maxBytes)
+				return decline(`${stage}:observation-carrier`, {freshJournal: freshJournal.byteLength,
+					finishingJournal: finishingJournal.byteLength, limit: CLOSED_RETIREMENT_BYTES.maxBytes});
 			for (const phase of ["currentTurnover", "closeAdopt", "successorJob", "serial", "cold"] as const)
 				parameters.set(`material.${phase}`, sum(lifetime[phase], protectedGrowth, phase === "closeAdopt" ? finishingObservations : 0));
 			parameters.set("material.priorUnknown", input.knownResourceTotals.unknownEncodedBytes);
@@ -14006,6 +14027,7 @@ function creatorOrdinarySuffixCapacityForSizing(facts: CreatorOrdinaryResourceDi
 			capture.journal.control === null ? 0 : state.journalObservationFields.control!.byteLength,
 			2 * nativeUnknown, runtimeWidths.currentClose);
 		if (projectedI > CREATOR_ORDINARY_PROOF_MAX_BYTES) return undefined;
+		if (freshJournalObservation.byteLength > CLOSED_RETIREMENT_BYTES.maxBytes) return undefined; // The close's per-carrier encode cap.
 		const envelopes = Object.freeze([0, 1, 2, 3].map(index => Math.max(actual.capacity.fullFutureProofEnvelopeByteLengths[index]!, output(values, `envelope.${index}`))));
 		if (envelopes.some(value => value > CREATOR_MAINTENANCE_PROOF_MAX_BYTES)) return undefined;
 		const knownCarriers = Object.freeze([...actual.capacity.knownCarriers, encodedOperation.slice()]);
@@ -14678,7 +14700,7 @@ function buildCreatorOrdinaryFinishingResourceProgramForSizing(input: Readonly<{
 					snapshotRetirementContract.controlLimits.maxItems, snapshotRetirementContract.controlLimits.maxDepth],
 				[participantBounds[2]!, ISSUANCE_RETIREMENT_LIMITS.maxBytes, ISSUANCE_RETIREMENT_LIMITS.maxRows * 16 + 64, 12],
 				[snapshotWrapper, snapshotRetirementContract.maxImageBytes, 65_536, 128],
-				[journalWrapper, LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes, 65_536, 128], [nativeRows, CREATOR_MAINTENANCE_PROOF_MAX_BYTES, 65_536, 16],
+				[journalWrapper, CLOSED_RETIREMENT_BYTES.maxBytes, 65_536, 128], [nativeRows, CREATOR_MAINTENANCE_PROOF_MAX_BYTES, 65_536, 16],
 			] as const) {
 				const refs = compiler.references(value);
 				compiler.limit(refs.byteLength, maxBytes, 1); compiler.limit(refs.items, maxItems, 1); compiler.limit(refs.maxDepth, maxDepth);
@@ -14694,7 +14716,7 @@ function buildCreatorOrdinaryFinishingResourceProgramForSizing(input: Readonly<{
 			participantBounds[2]!.byteLength > ISSUANCE_RETIREMENT_LIMITS.maxBytes ||
 			participantBounds[2]!.items > ISSUANCE_RETIREMENT_LIMITS.maxRows * 16 + 64 || participantBounds[2]!.maxDepth > 12 ||
 			snapshotWrapper.byteLength > snapshotRetirementContract.maxImageBytes ||
-			journalWrapper.byteLength > LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes || nativeRows.items > 65_536 || nativeRows.maxDepth > 16)
+			journalWrapper.byteLength > CLOSED_RETIREMENT_BYTES.maxBytes || nativeRows.items > 65_536 || nativeRows.maxDepth > 16)
 			return undefined;
 		// Original classifier pages are reached only for all-local native scopes;
 		// mixed/received scopes refuse before paging (or use authenticated prefix
@@ -14890,8 +14912,8 @@ function buildCreatorOrdinaryFinishingResourceProgramForSizing(input: Readonly<{
 					observations: successorObservations.map(width),
 					signingData: [inputNumber("signing.rawBytes", sum(...signingData.map(raw => raw.byteLength)))],
 					finalSigning: compiler.output("signing.finalPhaseBytes"), signingControl: width(signingControlFrame), aheControl: width(aheFrame)})));
-			successorObservations.forEach((value, index) => compiler.limit(compiler.references(value).byteLength, index === 0
-				? LIVE_JOURNAL_RETIREMENT_LIMITS.maxImageBytes : AHE_BOUNDED_READ_LIMITS.maxUnionBytes, 1));
+			// Each observation is one carrier the job encodes with closedRetirementBytes: the same cap.
+			successorObservations.forEach(value => compiler.limit(compiler.references(value).byteLength, CLOSED_RETIREMENT_BYTES.maxBytes, 1));
 			const roots = [compiler.maximum(compiler.sum(lifetimeBaseTerm("closeAdopt"), rawSourcePhysicalTerm, currentTurnoverTerm, generationTransitions, compiler.product(2, width(floorImage)), compiler.product(6, width(aheControl))),
 				compiler.sum(lifetimeBaseTerm("currentTurnover"), rawSourcePhysicalTerm, currentTurnoverTerm, generationTransitions, compiler.product(2, width(floorImage)), compiler.product(6, width(aheControl))), ...successorJobTerms),
 				compiler.sum(lifetimeBaseTerm("serial"), rawSourcePhysicalTerm, metadataTerm, drainTerm),

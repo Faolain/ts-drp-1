@@ -2788,6 +2788,7 @@ const declarationCode = ["closedRetirementEqual", "selectClosedSigningSummaryEpo
 function execute<T>(code: string, context: Record<string, unknown>): T {
 	const js = ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText;
 	const imports = { createWorkCheckpoint, encodeCanonical, decodeCanonical, closedRetirementBytes: encodeCanonical,
+		closedObservationCarrierBytes: encodeCanonical,
 		CREATOR_ORDINARY_PROOF_MAX_BYTES, CREATOR_MAINTENANCE_PROOF_MAX_BYTES: maintenanceProofMaxBytes(),
 		compareBytes: (a: Uint8Array, b: Uint8Array) => Buffer.compare(Buffer.from(a), Buffer.from(b)), ...context };
 	// Execute in the codec's realm. A separate VM realm would produce foreign

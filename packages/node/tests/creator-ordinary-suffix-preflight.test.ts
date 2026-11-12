@@ -105,6 +105,8 @@ function fixture() {
 		creatorOrdinarySizingRecordValue: decodeCanonical, closedRetirementEqual: equal, record: decodeCanonical,
 		settlementProfileFor: () => "v1", CREATOR_MAINTENANCE_PROOF_MAX_BYTES: 4194304, CREATOR_ORDINARY_PROOF_MAX_BYTES: 1310720,
 		LIVE_JOURNAL_RETIREMENT_LIMITS: {maxRows: 8192},
+		// The close's per-carrier encode cap (CLOSED_RETIREMENT_BYTES, AHE maxUnionBytes).
+		CLOSED_RETIREMENT_BYTES: {maxBytes: 786_432, maxItems: 65_536, maxDepth: 128},
 		maintenanceWidthSum: (parts: readonly number[]) => {const n = parts.reduce((a, b) => a + b, 0); if (n > 4194304) throw Error("finite arithmetic"); return n;},
 		creatorOrdinaryPreimageResourceGeometryForSizing: ({canonicalOperationByteLength: n}: any) =>
 			({canonicalPreimageByteLength: Math.max(512, n) + 1536, canonicalEpochVertexByteLength: Math.max(512, n) + 1400}),

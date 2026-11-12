@@ -112,7 +112,7 @@ const compiled = execute<(f: any, compiler: any) => {program: any; parameters: M
 	 const successorJobTerms=${initializers.get("successorJobTerms")};${observationLimits}
 	 const roots=${initializers.get("roots")};roots.forEach((root,i)=>compiler.outputNumber("envelope."+i,root));
 	 return {program:compiler.finish(),parameters};};`, {sum, AHE_BOUNDED_READ_LIMITS: {maxUnionBytes: 786432},
-	LIVE_JOURNAL_RETIREMENT_LIMITS: {maxImageBytes: 786432}});
+	LIVE_JOURNAL_RETIREMENT_LIMITS: {maxImageBytes: 786432}, CLOSED_RETIREMENT_BYTES: {maxBytes: 786432, maxItems: 65_536, maxDepth: 128}});
 
 describe("successor native jobs use distinct complete proof lifetimes", () => {
 	it("matches the unchanged original formula, retaining six observations and every repeated readback within each job", () => {
@@ -154,6 +154,9 @@ describe("successor native jobs use distinct complete proof lifetimes", () => {
 	it("preserves observation and program limits and leaves NONE without successor jobs", () => {
 		const f = fixture(), {program, parameters} = compiled(f, original.compiler());
 		parameters.set("observation.5.bytes", 786433); expect(original.evaluate(program, parameters)).toBeUndefined();
+		// The journal observation (index 0) is one carrier under the close's per-carrier encode cap too.
+		const journal = compiled(f, original.compiler());
+		journal.parameters.set("observation.0.bytes", 786433); expect(original.evaluate(journal.program, journal.parameters)).toBeUndefined();
 		const none = fixture(4, 512, 2, 0), result = scalar(none), compiledNone = compiled(none, original.compiler());
 		expect(result[0]).toBe(none.base + none.physical + none.currentTurnover + none.generationTransitions +
 			2 * none.floorImage.byteLength + 6 * none.aheControl.byteLength);
