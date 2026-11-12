@@ -1142,6 +1142,12 @@ export function openVerifiedCreatorHistoricalIssuance(
 		readonly floorTrust: CurrentAnchorTrust;
 		readonly sourceTrust?: CurrentAnchorTrust;
 		readonly retainedSourceCustody?: VerifiedCreatorSourceCustody;
+		/**
+		 * The plane's OWN install or recovery open: keep the verbatim signed member frontier for a later
+		 * removing close (SettlementPlan.memberFrontier) and register its width for sizing. Per-member
+		 * frontier selection (the cold fallback) leaves it unset and pays nothing for it.
+		 */
+		readonly captureMemberFrontier?: true;
 	}>
 ): VerifiedCreatorHistoricalIssuance | undefined {
 	try {
@@ -1227,7 +1233,8 @@ export function openVerifiedCreatorHistoricalIssuance(
 				exactCanonicalSourceAnchorPreimageBytes: new Uint8Array(sourceAnchor), detachedSourceAnchorSignature: new Uint8Array(sourceSignature),
 			} : {}),
 			...(evidence.settlement === undefined ? {} : {settlement:evidence.settlement.capability}),
-			...(evidence.settlement !== undefined && selected.admissionEpoch !== undefined && selected.admittedAuthorSequence !== null
+			...(input.captureMemberFrontier === true && evidence.settlement !== undefined && selected.admissionEpoch !== undefined &&
+				selected.admittedAuthorSequence !== null
 				? (() => {
 						const anchor = readCreatorSettlementSourceAnchor(input.floorTrust);
 						if (anchor === undefined) return {};

@@ -10970,6 +10970,7 @@ async function sealCreatorPendingClassificationDependencies(
 		author: input.owners.author,
 		closure: { candidates: input.generation.candidates, closure: input.generation.references },
 		floorTrust: input.generation.trust,
+		captureMemberFrontier: true,
 	});
 	const identity = capability === undefined ? undefined : resolveVerifiedCreatorHistoricalIssuance(capability);
 	if (
@@ -23917,6 +23918,7 @@ async function activateCreatorSuccessorLive(
 				floorTrust: material.successor.trust,
 				sourceTrust: closedTrust,
 				...(retainedSourceCustody === undefined ? {} : {retainedSourceCustody}),
+				captureMemberFrontier: true,
 			});
 			const identity = capability === undefined ? undefined : resolveVerifiedCreatorHistoricalIssuance(capability);
 			return capability === undefined ||
