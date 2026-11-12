@@ -14638,6 +14638,9 @@ function buildCreatorOrdinaryFinishingResourceProgramForSizing(input: Readonly<{
 			control: participantBounds[2]});
 		if (unionCensus.byteLength > AHE_BOUNDED_READ_LIMITS.maxUnionBytes) return undefined;
 		compiler?.limit(compiler.references(unionCensus).byteLength, AHE_BOUNDED_READ_LIMITS.maxUnionBytes, 1);
+		// Successor reserved/entered phases hold PENDING successor rows; currentClose
+		// and successorFinal hold FINAL rows (the exact composer's post-adoption census).
+		const phaseCensus = (phase: string) => phase === "successorReserved" || phase === "successorEntered" ? census : unionCensus;
 		const runtimeEnvelopeTerms = ["currentClose", "successorReserved", "successorEntered", "successorFinal"].map(key => {
 			const phase = key as keyof typeof runtimeWidths.runtimeCensusOverheadShape, shape = runtimeWidths.runtimeCensusOverheadShape[phase];
 			if (shape.items + census.items > 65_536 || Math.max(shape.maxDepth, 1 + census.maxDepth) > 128)
@@ -14645,11 +14648,17 @@ function buildCreatorOrdinaryFinishingResourceProgramForSizing(input: Readonly<{
 			if (compiler !== undefined) {
 				compiler.limit(compiler.sum(inputNumber(`runtime.${phase}.items`, shape.items), compiler.references(census).items), 65_536);
 				compiler.limit(compiler.maximum(inputNumber(`runtime.${phase}.depth`, shape.maxDepth), compiler.sum(1, compiler.references(census).maxDepth)), 128);
-				return compiler.sum(inputNumber(`runtime.${phase}.bytes`, runtimeWidths[phase]), width(census));
+				return compiler.sum(inputNumber(`runtime.${phase}.bytes`, runtimeWidths[phase]), width(phaseCensus(phase)));
 			}
-			return sum(runtimeWidths[phase], census.byteLength);
+			return sum(runtimeWidths[phase], phaseCensus(phase).byteLength);
 		});
-		const runtimeEnvelopeTerm = compiler?.maximum(...runtimeEnvelopeTerms) ?? Math.max(...runtimeEnvelopeTerms.map(value => typeof value === "number" ? value : value.value));
+		// Close/adopt, turnover and serial lifetimes carry the exact composer's
+		// post-adoption census: the currentClose or successorFinal runtime with the
+		// FINAL-row census. Successor reserved/entered censuses (pending rows) are
+		// charged in their own successor job lifetimes below, as the exact composer
+		// charges them in its separate successor job envelopes.
+		const finalRuntimeTerms = [runtimeEnvelopeTerms[0]!, runtimeEnvelopeTerms[3]!];
+		const runtimeEnvelopeTerm = compiler?.maximum(...finalRuntimeTerms) ?? Math.max(...finalRuntimeTerms.map(value => typeof value === "number" ? value : value.value));
 		const runtimeEnvelope = typeof runtimeEnvelopeTerm === "number" ? runtimeEnvelopeTerm : runtimeEnvelopeTerm.value;
 		const snapshotImage = record({imageDigest: digest, scopeCount: integer, chunkCount: integer, metadataBytes: integer, scopes: snapshotPairs});
 		const snapshotWrapper = record({control: participantBounds[0], image: snapshotImage});
