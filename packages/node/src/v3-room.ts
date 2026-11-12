@@ -2871,9 +2871,15 @@ function validMigrationRecordOperation(
 function roomOrdinaryFinishingWindowForEpoch(application: V3RoomApplication,
 	context: Readonly<{objectId: string; epoch: number}>): CreatorOrdinaryFinishingWindowLimits | undefined {
 	const policy = application.ordinaryFinishingWindow;
-	if (typeof policy !== "function") return policy;
-	const selected = Reflect.apply(policy, application, [Object.freeze({objectId: context.objectId, epoch: context.epoch})]);
-	if (selected === undefined) throw new TypeError("v3 room finishing window selector did not return limits");
+	const selected = typeof policy !== "function" ? policy :
+		Reflect.apply(policy, application, [Object.freeze({objectId: context.objectId, epoch: context.epoch})]) as
+			CreatorOrdinaryFinishingWindowLimits | undefined;
+	if (typeof policy === "function" && selected === undefined) throw new TypeError("v3 room finishing window selector did not return limits");
+	// A window can never describe a state past the room's application state limit (admission refuses
+	// any fold past it), and the creator's window capture declines one that declares more: refused here,
+	// at the close binding, rather than opening a room whose every ordinary move is refused.
+	if (selected !== undefined && !(selected.maxApplicationBytes <= ROOM_APPLICATION_STATE_BYTES))
+		throw new TypeError("v3 room finishing window passes the room's application state limit");
 	return selected;
 }
 
@@ -3649,6 +3655,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	ownsLocalSession = false
 ): Promise<V3RoomSession<Projection>> {
 	localOwner?.assertCurrent();
+	// A fixed finishing window past the room's application state limit is refused before anything opens
+	// (a selector's window is refused at each close binding, roomOrdinaryFinishingWindowForEpoch).
+	const fixedWindow = input.application.ordinaryFinishingWindow;
+	if (fixedWindow !== undefined && typeof fixedWindow !== "function" && !(fixedWindow.maxApplicationBytes <= ROOM_APPLICATION_STATE_BYTES))
+		throw new TypeError("CREATOR_ORDINARY_FINISHING_WINDOW_INVALID: the finishing window passes the room's application state limit");
 	// The trusted application owns displacement semantics for this room lifetime.
 	if (input.receiveOnly !== undefined && input.receiveOnly !== true)
 		throw new TypeError("v3 room receive-only restriction is invalid");

@@ -31,9 +31,10 @@ describe("room-local finishing-window preparation policy", () => {
 		ts.isFunctionDeclaration(node) && node.name?.text === "roomOrdinaryFinishingWindowForEpoch");
 	if (selectOwner === undefined) throw new Error("missing original room-local finishing policy owner");
 	const select = execute<(application: any, context: any) => any>(selectOwner.getText(roomTree) +
-		"\nreturn roomOrdinaryFinishingWindowForEpoch;", {});
+		"\nreturn roomOrdinaryFinishingWindowForEpoch;", {ROOM_APPLICATION_STATE_BYTES: 32_768});
 	it("keeps static/absent configuration and selects startup versus genuine successor/reopen context only at preparation", () => {
-		const startup = Object.freeze({local: 8, received: 192}), successor = Object.freeze({local: 5, received: 128});
+		const startup = Object.freeze({local: 8, received: 192, maxApplicationBytes: 32_768}),
+			successor = Object.freeze({local: 5, received: 128, maxApplicationBytes: 16_384});
 		expect(select({}, {objectId: "room", epoch: 0})).toBeUndefined();
 		expect(select({ordinaryFinishingWindow: startup}, {objectId: "room", epoch: 3})).toBe(startup);
 		const calls: any[] = [], configured = {ordinaryFinishingWindow(this: unknown, context: any) {
@@ -48,6 +49,11 @@ describe("room-local finishing-window preparation policy", () => {
 		expect(select(application, {objectId: "room", epoch: 3})).toBe(successor);
 		expect(select(application, {objectId: "room", epoch: 3})).toBe(successor); // persisted reopen
 		expect(calls).toHaveLength(3);
+	});
+	it("refuses a window past the room's application state limit, fixed or selected", () => {
+		const wide = Object.freeze({local: 8, received: 192, maxApplicationBytes: 32_769});
+		expect(() => select({ordinaryFinishingWindow: wide}, {objectId: "room", epoch: 0})).toThrow("application state limit");
+		expect(() => select({ordinaryFinishingWindow: () => wide}, {objectId: "room", epoch: 3})).toThrow("application state limit");
 	});
 	it("does not turn an absent/throwing selector result into disabled enforcement", () => {
 		expect(() => select({ordinaryFinishingWindow: () => undefined}, {objectId: "room", epoch: 0})).toThrow("did not return limits");
