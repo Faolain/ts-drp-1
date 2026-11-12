@@ -17,7 +17,10 @@ import {
 } from "./fixtures/track-m-apps/long-room-driver.js";
 import { readV3SettlementWorkCounts } from "../packages/node/src/v3-live.js";
 import { V3_ROOM_LOCAL_BACKLOG_LIMIT } from "../packages/node/src/v3-room.js";
-import { nodeIssuanceReadCounts, nodeRecoveryCensusCounts } from "../packages/storage-node/src/internal/node-issuance-store.js";
+import {
+	nodeIssuanceReadCounts,
+	nodeRecoveryCensusCounts,
+} from "../packages/storage-node/src/internal/node-issuance-store.js";
 import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-head.js";
 
 // Found by fix/int7-slow-member-landing (tests/app-rollover-slow-member-native.test.ts under host
@@ -362,8 +365,13 @@ async function retainedResolutionCost(count: number) {
 			for (let roll = 0; roll < 3; roll++) epoch = await rollCreator(creator, async () => undefined, ordinal);
 			const before = readV3SettlementWorkCounts();
 			const censusBefore = nodeRecoveryCensusCounts();
-			const issuanceReads = () => Object.values(nodeIssuanceReadCounts()).reduce((sum, row) => ({ reads: sum.reads + row.reads, full: sum.full + row.fullReads }), { reads: 0, full: 0 });
+			const issuanceReads = () =>
+				Object.values(nodeIssuanceReadCounts()).reduce(
+					(sum, row) => ({ reads: sum.reads + row.reads, full: sum.full + row.fullReads }),
+					{ reads: 0, full: 0 }
+				);
 			const issuanceBefore = issuanceReads();
+			const byKindBefore = nodeIssuanceReadCounts();
 			const started = performance.now();
 			// Process CPU over the install (user + system), the cost that matters on a device.
 			const cpuBefore = process.cpuUsage();
@@ -375,6 +383,7 @@ async function retainedResolutionCost(count: number) {
 			const after = readV3SettlementWorkCounts();
 			const censusAfter = nodeRecoveryCensusCounts();
 			const issuanceAfter = issuanceReads();
+			const byKindAfter = nodeIssuanceReadCounts();
 			const work = {
 				dependencyTurns: after.dependencyTurns - before.dependencyTurns,
 				recoveryCensusReads: after.recoveryCensusReads - before.recoveryCensusReads,
@@ -384,6 +393,15 @@ async function retainedResolutionCost(count: number) {
 				// Issuance store reads (outbox pages, issued closures, plans, lineages) by both roles' stores.
 				issuanceReads: issuanceAfter.reads - issuanceBefore.reads,
 				fullIssuanceReads: issuanceAfter.full - issuanceBefore.full,
+				issuanceByKind: Object.fromEntries(
+					Object.entries(byKindAfter).map(([kind, row]) => [
+						kind,
+						[
+							row.reads - byKindBefore[kind as keyof typeof byKindBefore].reads,
+							row.fullReads - byKindBefore[kind as keyof typeof byKindBefore].fullReads,
+						],
+					])
+				),
 				retainedContractPreparations: after.retainedContractPreparations - before.retainedContractPreparations,
 				sourceExpirySignatures: after.sourceExpirySignatures - before.sourceExpirySignatures,
 			};
@@ -429,7 +447,17 @@ it("a skip install resolving retained rows pays the native settlement turn once 
 	// the connection's revision, they read and encode no row, so the census reads that read every row
 	// do not grow with the number of rows (they grew by two per row, each costing time in proportion to
 	// the author's whole settlement state: O(rows x state) per install).
-	expect(large.work.fullCensusReads, "full census reads, 32 rows vs 8").toBeLessThanOrEqual(small.work.fullCensusReads + 2);
+	expect(large.work.fullCensusReads, "full census reads, 32 rows vs 8").toBeLessThanOrEqual(
+		small.work.fullCensusReads + 2
+	);
+	// The same holds for the issuance reads the turn's dependency checks repeat (outbox pages, plans,
+	// lineages, issued closures already read): under the reservation they read no row again, so each
+	// further row adds only its own reads (about 12 full reads per row; 23 when every re-read read
+	// every row).
+	expect(
+		large.work.fullIssuanceReads - small.work.fullIssuanceReads,
+		"full issuance reads per further row"
+	).toBeLessThanOrEqual((32 - 8) * 16);
 	// Wall clock, generous: per-row time does not grow with the number of rows, and 32 rows resolve
 	// well inside the quiet-host time they took before (15.7-17.8 s; 1.1 s after the fix under host
 	// load ~30).
