@@ -110,16 +110,13 @@ it("a displaced move whose replay the room refuses is handed back typed, and the
 	console.log(`REFUSED_REPLAY_ROWS ${replays.length}`);
 }, 600_000);
 
-// With every hand-back record taken (64 unconsumed), a refused replay cannot be given back: the source
-// is NOT expired (no move is ever expired unrecorded). It stays live, the install completes, and the
-// next install retries it once a record is free. The public API cannot reach this state: the Writer's
-// backlog bound (V3_ROOM_LOCAL_BACKLOG_LIMIT = maxRecords) counts live displaced moves and unconsumed
-// records together, and a refusal turns one live move into one record. So the test takes the records
-// directly in the Writer's own store (64 genuine-shape records of an earlier source), between the
-// creator's adoption and the Writer's install.
-it("with all 64 hand-back records taken, a refused replay stays live, the install completes, and the next install hands it back", async () => {
-	const directory = mkdtempSync(join(tmpdir(), "refused-replay-full-"));
-	const fixture = await readinessHoldRoom({ directory, writers: 1, createOperationAdmissionPolicy: doomingPolicy as never });
+/** A creator and one Writer under the dooming policy, with manual delivery and rollover. */
+async function doomingRoom(directory?: string) {
+	const fixture = await readinessHoldRoom({
+		...(directory === undefined ? {} : { directory }),
+		writers: 1,
+		createOperationAdmissionPolicy: doomingPolicy as never,
+	});
 	const creator = await fixture.open(0);
 	const writer = await fixture.open(1);
 	let delivered: number | null = null;
@@ -132,6 +129,12 @@ it("with all 64 hand-back records taken, a refused replay stays live, the instal
 			creator.inject(chunk.slice(last + 1), 1);
 		}
 		if (rows.length !== 0) delivered = required(rows.at(-1)).commit.authorSequence;
+	};
+	/** Marks every row the Writer published so far as lost: it never reaches the creator. */
+	const lose = async (): Promise<number> => {
+		const lost = await fixture.publishedAfter(1, delivered);
+		if (lost.length !== 0) delivered = required(lost.at(-1)).commit.authorSequence;
+		return lost.filter((row) => !isControl(row)).length;
 	};
 	const install = async (epoch: number): Promise<void> => {
 		const transfer = await settlementDelivery(fixture as unknown as SettlementRoom, 1);
@@ -146,21 +149,71 @@ it("with all 64 hand-back records taken, a refused replay stays live, the instal
 	};
 	const ids = (room: typeof creator): string[] =>
 		(room.room.projection() as { blocks: readonly { id: string }[] }).blocks.map((value) => value.id).sort();
-	const listed = () => required(writer.room.settlementStatus?.()).undelivered.map((move) => move.operations[0]?.id);
+	const status = () => required(writer.room.settlementStatus?.());
+	const listed = () => status().undelivered.map((move) => move.operations[0]?.id);
+	return { fixture, creator, writer, deliver, lose, install, adopt, ids, status, listed };
+}
 
-	await writer.room.issue(block("w-0", 0));
-	await deliver();
-	await adopt();
-	await install(1);
-	await deliver();
-	await writer.room.issue(block("doomed-1", 1));
-	const lost = await fixture.publishedAfter(1, delivered);
-	delivered = required(lost.at(-1)).commit.authorSequence;
-	await adopt();
+// The hand-back records always suffice for refused replays: the Writer's backlog bound
+// (V3_ROOM_LOCAL_BACKLOG_LIMIT = SETTLEMENT_HAND_BACK_LIMITS.maxRecords) counts its live displaced moves
+// and its unconsumed records together and refuses a new move at the bound, and a refusal turns each
+// live move into at most one record. Here the Writer fills the bound with 64 lost moves (the 65th is
+// refused up front); every one of their replays is refused at the next install, and all 64 are given
+// back, none deferred.
+it("64 refused replays (the Writer's whole backlog) are all handed back; the backlog bound refused the 65th move", async () => {
+	const room = await doomingRoom();
+	await room.writer.room.issue(block("w-0", 0));
+	await room.deliver();
+	await room.adopt();
+	await room.install(1);
+	await room.deliver();
+	const limit = SETTLEMENT_HAND_BACK_LIMITS.maxRecords;
+	for (let index = 0; index < limit; index++)
+		await room.writer.room.issue(block(`doomed-${String(index).padStart(2, "0")}`, 1 + index));
+	let refused: string | undefined;
+	try {
+		await room.writer.room.issue(block("doomed-64", 99));
+	} catch (error) {
+		refused = error instanceof Error ? error.name : String(error);
+	}
+	expect(refused, "the 65th undelivered move is refused up front").toBe("V3RoomLocalBacklogFull");
+	expect(await room.lose()).toBeGreaterThanOrEqual(1);
+	await room.adopt();
+	await room.install(2);
+	const status = room.status();
+	console.log(`REFUSED_REPLAY_BOUND ${JSON.stringify({ listed: status.undelivered.length, deferred: status.deferred })}`);
+	expect(room.listed().length).toBe(limit);
+	expect(room.listed().every((id) => String(id).startsWith("doomed-"))).toBe(true);
+	expect(status.undelivered.every((move) => Reflect.get(move, "reason") === "admission-rejected")).toBe(true);
+	expect(status.deferred, "none deferred").toBe(0);
+	// The Writer keeps playing once it takes a move back (its backlog is its records).
+	await room.deliver();
+	const first = required(status.undelivered[0]);
+	await room.writer.room.issue(block("w-2", 2), { handBack: first.handBack });
+	await room.deliver();
+	await room.adopt();
+	await room.install(3);
+	expect(room.ids(room.creator)).toEqual(["w-0", "w-2"]);
+	expect(room.listed().length).toBe(limit - 1);
+}, 600_000);
 
-	// Take every record: 64 unconsumed hand-backs of the Writer's first row.
-	const author = required(fixture.identities[1]).author;
-	const scope = { author, objectId: fixture.objectId };
+// Fail-safe of the hand-back (unreachable through the public API, see above): with every record taken,
+// a refused replay is NOT expired (no move is ever expired unrecorded): its source stays live, reported
+// deferred, and the install completes. The records are taken directly in the Writer's own store (64
+// genuine-shape records of an earlier source), between the creator's adoption and the Writer's install.
+it("with all 64 hand-back records taken, a refused replay stays live and the install completes", async () => {
+	const directory = mkdtempSync(join(tmpdir(), "refused-replay-full-"));
+	const room = await doomingRoom(directory);
+	await room.writer.room.issue(block("w-0", 0));
+	await room.deliver();
+	await room.adopt();
+	await room.install(1);
+	await room.deliver();
+	await room.writer.room.issue(block("doomed-1", 1));
+	expect(await room.lose()).toBe(1);
+	await room.adopt();
+	const author = required(room.fixture.identities[1]).author;
+	const scope = { author, objectId: room.fixture.objectId };
 	const issuance = await createNodeV3RoomStorageHost({ directory, initialization: () => "reopen" }).openIssuance("peer-1");
 	try {
 		const plan = required(await issuance.readSettlementPlan(scope));
@@ -182,36 +235,17 @@ it("with all 64 hand-back records taken, a refused replay stays live, the instal
 	} finally {
 		await issuance.close();
 	}
-
 	const failures: string[] = [];
 	try {
-		await install(2); // the replay is refused; no record is free
+		await room.install(2); // the replay is refused; no record is free
 	} catch (error) {
 		failures.push(`install 2: ${explain(error)}`);
 	}
-	const full = required(writer.room.settlementStatus?.());
-	console.log(`REFUSED_REPLAY_FULL ${JSON.stringify({ failures, listed: listed().length, deferred: full.deferred })}`);
+	const status = room.status();
+	console.log(`REFUSED_REPLAY_FULL ${JSON.stringify({ failures, listed: status.undelivered.length, deferred: status.deferred })}`);
 	expect(failures, "the install completes").toEqual([]);
-	expect(listed(), "not given back: no record was free").not.toContain("doomed-1");
-	expect(listed().length).toBe(SETTLEMENT_HAND_BACK_LIMITS.maxRecords);
-	expect(full.deferred, "the live move is reported deferred").toBeGreaterThanOrEqual(1);
-
-	// The application consumes one record (offers that move again); a record is free.
-	await deliver();
-	await writer.room.issue(block("filler-00", 2), { handBack: { sourceSequence: 0, intent: 0 } });
-	await deliver();
-	await adopt();
-	await install(3); // retried: refused again, now given back
-	const after = listed();
-	console.log(`REFUSED_REPLAY_FULL_RETRY ${JSON.stringify({ listed: after.length, doomed: after.includes("doomed-1") })}`);
-	expect(after).toContain("doomed-1");
-	const doomed = required(writer.room.settlementStatus?.()).undelivered.find((move) => move.operations[0]?.id === "doomed-1");
-	expect(Reflect.get(required(doomed), "reason")).toBe("admission-rejected");
-	expect(after.length).toBe(SETTLEMENT_HAND_BACK_LIMITS.maxRecords);
-	await deliver();
-	await adopt();
-	await install(4);
-	expect(ids(creator)).toEqual(["filler-00", "w-0"]);
-	expect(ids(writer)).toEqual(["filler-00", "w-0"]);
-	expect(listed().filter((id) => id === "doomed-1"), "listed once, never replayed").toEqual(["doomed-1"]);
+	expect(room.listed(), "not given back: no record was free").not.toContain("doomed-1");
+	expect(room.listed().length).toBe(SETTLEMENT_HAND_BACK_LIMITS.maxRecords);
+	expect(status.deferred, "the live move is reported deferred").toBe(1);
+	expect(room.ids(room.creator)).toEqual(["w-0"]);
 }, 600_000);
