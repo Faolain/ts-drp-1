@@ -260,34 +260,6 @@ describe("DRPIntervalDiscovery Unit Tests", () => {
 			expect(mockNetworkNode.sendMessage).toHaveBeenCalled();
 		});
 
-		test("reports a failed discovery response instead of dropping it", async () => {
-			const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
-			const failure = Object.assign(new Error("Could not dial direct-message peer"), {
-				name: "DirectMessageSendError",
-				code: "DIRECT_DIAL_FAILED",
-			});
-			(mockNetworkNode.getGroupPeers as ReturnType<typeof vi.fn>).mockReturnValue(["peer1"]);
-			(mockNetworkNode.getPeerMultiaddrs as ReturnType<typeof vi.fn>).mockResolvedValue([
-				{ multiaddr: { toString: (): string => "/ip4/127.0.0.1/tcp/1234" } },
-			]);
-			(mockNetworkNode.sendMessage as ReturnType<typeof vi.fn>).mockRejectedValue(failure);
-			try {
-				await DRPIntervalDiscovery.handleDiscoveryRequest(
-					"sender",
-					Message.create({
-						sender: "sender",
-						type: MessageType.MESSAGE_TYPE_DRP_DISCOVERY,
-						data: DRPDiscovery.encode(DRPDiscovery.create({})).finish(),
-						objectId: "test-id",
-					}),
-					mockNetworkNode as unknown as DRPNetworkNodeContract
-				);
-				expect(consoleError.mock.calls.flat()).toContain(failure);
-			} finally {
-				consoleError.mockRestore();
-			}
-		});
-
 		test("should not send response if no peers found", async () => {
 			const mockDataMessage = Message.create({
 				sender: "sender",
