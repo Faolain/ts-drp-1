@@ -6365,6 +6365,92 @@ describe("same-hold issuance census data and joined lifetime affected controls",
 		await f.lifetime.check(); expect(f.events.at(-1)).toBe("unheld-census"); expect(f.state.captures).toBe(before.captures + 1);
 		await f.lifetime.release(); expect(f.state.releases).toBe(1);
 	});
+	// D1: a dependency turn enrolls its own issuance reservation in the turn's close hold
+	// (facts.ownIssuanceReservation), so the hold's later checks in that turn use the unchanged-held
+	// census. Actual check, enrollment factory and unchanged-held cell; only the complete census read,
+	// the native reservation and the storage currency probe are controlled. Every input the cell binds,
+	// changed between two checks of one turn, makes the next check the complete census again.
+	let turnSeam: ReturnType<typeof seam> | undefined;
+	function turnHold() {
+		const s = turnSeam ??= seam(), cell = cellInputs(), sealed = cell.sealed, capability = {}, registry = new WeakMap();
+		const state = {captures: 0, probes: 0, probeCurrent: true};
+		const probe = Object.freeze({checkCurrent: async () => {state.probes++; return state.probeCurrent;}});
+		const original: Reservation = {check: async () => {}, release: async () => {}};
+		const prepare = execute<(...args: unknown[]) => unknown>(`${["captureCreatorOrdinaryPreparedVertex", "creatorOrdinaryPreparedVertexCurrent",
+			"creatorOrdinaryPreparedVerticesCurrent", "prepareCreatorUnchangedHeldCensusRead"].map(name => s.fn(name).getText(s.file)).join("\n")}
+			prepareCreatorUnchangedHeldCensusRead;`, cell.bindings);
+		const owner = execute<{facts: {check(): Promise<void>; ownIssuanceReservation(original: Reservation): Reservation}}>(`
+			let issuanceRead, unchangedHeldCensus, mayPrepareUnchanged = false, journalCurrent;
+			const census = ${s.variable(s.fn("sealCreatorRecoveryDependencies"), "census").split(" = ").slice(1).join(" = ")};
+			const facts = {kind: "full-census", context: registration, pending: new Set(), releasing: false, dependencyAnchors: [], exactCanonicalCensusBytes: sealed, ${s.check}, ${s.factory}};
+			recoveryCloseHolds.set(capability, facts);
+			${s.fn("fullRecoveryCloseHoldFacts").getText(s.file)}
+			({facts});`, {
+			ObjectFreeze: Object.freeze, registration: cell.registration, currentTrust: cell.trust, capability, recoveryCloseHolds: registry, sealed,
+			live: () => true, sameBytes: (a: Uint8Array, b: Uint8Array) => Buffer.compare(a, b) === 0,
+			sourceDependencies: undefined, activeSource: undefined, runtime: cell.runtime, replay: {verify: async () => true}, readJournalCurrent: undefined,
+			prepareCreatorUnchangedHeldCensusRead: prepare,
+			// The complete held walk, as readCreatorRecoveryDependencyCensus does it: it fills the
+			// captured input view (pages read, the storage census probe) and returns the sealed bytes.
+			captureCensus: async (_held: unknown, captured?: {pages: unknown[]; retainedBytes: number; nativeCurrent?: unknown}) => {
+				state.captures++;
+				if (captured !== undefined) {captured.pages.push({afterKey: null, bytes: encodeCanonical(cell.pages)}); captured.retainedBytes = 1; captured.nativeCurrent = probe;}
+				return sealed;
+			},
+		});
+		owner.facts.ownIssuanceReservation(original);
+		return {facts: owner.facts, state, cell};
+	}
+	function cellInputs() {
+		const native = {rows: {issued: [{preimage: Uint8Array.of(7), signature: new Uint8Array(64)}], lineages: [], plans: [], outbox: []}, image: {digest: "actual"}, control: null};
+		const pages: unknown[] = [], state = {identity: {}, key: {format: "raw", bytes: new Uint8Array(32).fill(4)}};
+		const store = Object.freeze({readOutboxPage: async () => pages, acquireNativeReadReservation: async () => undefined});
+		const maintenance = Object.freeze({readBoundedRecoveryCensus: async () => native});
+		const floors = new WeakMap(), trust = {objectId: "room", currentEpoch: 3}, counted = new Set([1]);
+		const registration: any = {issuanceStore: store, liveJournalStore: Object.freeze({readiness: () => {}, readPage: () => {}}),
+			closeVertices: new Map([["vertex", {kind: "drp-vertex", hash: "vertex", operation: {bytes: Uint8Array.of(3)}}]]),
+			closeCharges: new Map([["vertex", 80]]), closeAuthors: new Map([["vertex", {author: "writer", authorSequence: 1}]]),
+			pendingIngress: new Map(), pendingIngressBytes: 0,
+			payload: {trust: {trust}, provenance: {epoch: 3}, parameters: {maxEpochVertices: 64},
+				exactProjectionBytes: Uint8Array.of(1), catalog: {canonicalBlueprintPackageBytes: Uint8Array.of(2), exactArtifactBytes: Uint8Array.of(3)}},
+			authorization: {kind: "latched-acl", value: {writers: ["writer"]}}, issuanceScope: {objectId: "room", author: "writer"},
+			historicalIssuance: {capability: {}, originalIssuanceStore: store, count: 1, countedSequences: counted, maxEpochVertices: 64, scopeAuthorMatches: true}};
+		const bindings = {ObjectIsFrozen: Object.isFrozen, ObjectFreeze: Object.freeze, Uint8ArrayConstructor: Uint8Array,
+			ReflectApply: Reflect.apply, SetPrototypeValues: Set.prototype.values, SetIteratorNext: Object.getPrototypeOf(new Set().values()).next,
+			ISSUANCE_RETIREMENT_LIMITS: {maxRows: 4096}, AHE_BOUNDED_READ_LIMITS, preparedMigrationTargetFloors: floors,
+			creatorOriginalIssuanceStore: () => store, durableIssuancePruningMaintenanceForStore: (value: unknown) => value === store ? maintenance : undefined,
+			creatorOrdinaryIssuanceSourceIdentity: () => state.identity, resolveVerifiedCreatorHistoricalIssuance: () => Object.freeze({closedEpoch: 2, author: "writer"}),
+			resolveV3AuthorizedAuthor: () => state.key,
+			captureCreatorOrdinaryDimensionIntegrity: (value: unknown) => {
+				const bytes = encodeCanonical(value);
+				return () => {try {return Buffer.compare(encodeCanonical(value), bytes) === 0;} catch {return false;}};
+			}, sameBytes: (a: Uint8Array, b: Uint8Array) => Buffer.compare(a, b) === 0};
+		return {sealed: encodeCanonical({nativeIssuance: native}), registration, trust, runtime: {currentTrust: trust, sourceBound: true,
+			nativeBranchSource: undefined, migrationSource: undefined}, pages, state, floors, counted, bindings};
+	}
+	it("a turn's checks after enrollment use the unchanged-held census; a bound input changed between checks forces the complete census", async () => {
+		// Positive control: first check after enrollment is complete (prepares the cell), later checks are not.
+		const control = turnHold();
+		await control.facts.check(); expect(control.state.captures, "first check after enrollment").toBe(1);
+		for (let k = 0; k < 3; k++) await control.facts.check();
+		expect(control.state.captures, "later checks of the same turn").toBe(1); expect(control.state.probes).toBe(3);
+		const changes: Record<string, (cell: ReturnType<typeof cellInputs>, state: {probeCurrent: boolean}) => void> = {
+			"storage census probe (issuance store moved)": (_cell, state) => {state.probeCurrent = false;},
+			"source identity": cell => {cell.state.identity = {};},
+			"authorization": cell => {cell.registration.authorization.value.writers.push("foreign");},
+			"history counters": cell => {cell.counted.add(2);},
+			"epoch parameters": cell => {cell.registration.payload.parameters = {maxEpochVertices: 63};},
+			"issuance scope": cell => {cell.registration.issuanceScope = {objectId: "foreign", author: "writer"};},
+			"prepared migration floor": cell => {cell.floors.set(cell.registration, {});},
+			"carrier artifact bytes": cell => {cell.registration.payload.catalog.exactArtifactBytes[0] ^= 1;},
+		};
+		for (const [change, apply] of Object.entries(changes)) {
+			const turn = turnHold();
+			await turn.facts.check(); await turn.facts.check(); expect(turn.state.captures, `${change}: before`).toBe(1);
+			apply(turn.cell, turn.state);
+			await turn.facts.check(); expect(turn.state.captures, `${change}: the next check is complete`).toBe(2);
+		}
+	}, 120_000);
 });
 
 describe("transition inspect-tree synchronous syntax reuse affected controls", () => {

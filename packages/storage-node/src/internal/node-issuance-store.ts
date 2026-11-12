@@ -98,7 +98,7 @@ import { awaitNativeWriterFree, holdNativeWriter, nativeWriterHeld } from "./nat
 import type { NodeNativeReadPort } from "../index.js";
 import { iterateSqliteRows } from "./sqlite-iterator.js";
 import { sqliteFilename } from "./sqlite-filename.js";
-import { RevisionReadMemo } from "./sqlite-revision.js";
+import { connectionRevision, RevisionReadMemo } from "./sqlite-revision.js";
 import { configuredStatement, iterationStatement } from "./sqlite-statement-cache.js";
 
 const DATABASE_SUFFIX = ".drp-issuance-v1.sqlite";
@@ -1222,30 +1222,36 @@ class NodeIssuanceImplementation {
 				this.#readReservations.current() !== lease.native) return undefined;
 		} catch { return undefined; }
 		basis.observations.delete(observation);
-		return this.#createCensusCurrentProbe(lease.token, basis.token);
+		return this.#createCensusCurrentProbe(lease.token, basis.token, connectionRevision(this.#database));
 	}
 
-	#createCensusCurrentProbe(leaseToken: object, imageToken: object): DurableIssuanceRecoveryCensusCurrentProbe {
+	#createCensusCurrentProbe(leaseToken: object, imageToken: object, revision: string): DurableIssuanceRecoveryCensusCurrentProbe {
 		const implementation = this;
 		const probe: DurableIssuanceRecoveryCensusCurrentProbe = Object.freeze({
 			checkCurrent: function (this: DurableIssuanceRecoveryCensusCurrentProbe): Promise<boolean> {
 				if (this !== probe) return Promise.reject(invalid("native census probe is foreign"));
-				return implementation.#checkCensusCurrent(leaseToken, imageToken);
+				return implementation.#checkCensusCurrent(leaseToken, imageToken, revision);
 			},
 		});
 		return probe;
 	}
 
-	#checkCensusCurrent(leaseToken: object, imageToken: object): Promise<boolean> {
+	#checkCensusCurrent(leaseToken: object, imageToken: object, revision: string): Promise<boolean> {
 		const lease = this.#censusLease;
+		// The probe's image is current while its enrollment is the latest, or, under the same held
+		// reservation, while the connection's exact revision is the one it was captured at: an
+		// unchanged database gives the same census, so a later census read of the same lease (its
+		// enrollment replaced) does not make it stale.
+		const currentImage = (): boolean =>
+			this.#censusEnrollment?.token === imageToken || connectionRevision(this.#database) === revision;
 		const task = Promise.resolve().then(async () => {
 			this.#assertAvailable();
 			if (lease === undefined || lease.releasing || lease.token !== leaseToken ||
-				this.#censusEnrollment?.token !== imageToken || this.#readReservations.current() !== lease.native) return false;
+				!currentImage() || this.#readReservations.current() !== lease.native) return false;
 			try {
 				await lease.native.check();
 				this.#assertAvailable();
-				return this.#censusLease === lease && !lease.releasing && this.#censusEnrollment?.token === imageToken &&
+				return this.#censusLease === lease && !lease.releasing && currentImage() &&
 					this.#readReservations.current() === lease.native;
 			} catch (cause) { this.#censusEnrollment = undefined; throw cause; }
 		});

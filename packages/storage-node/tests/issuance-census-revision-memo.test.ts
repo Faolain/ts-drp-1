@@ -322,3 +322,32 @@ it("the connection revision moves with every write the memo must not survive", a
 		"another connection's DDL"
 	).toBe(1);
 }, 60_000);
+
+// The census currency probe (captureCurrentProbe) lets a creator's later checks under one held reservation
+// skip the complete census when nothing changed. It was current only while its own enrollment was the
+// latest, so any later census read of the same reservation (the turn reads the census several times)
+// made it stale and every later check re-read everything. It is now also current while the connection's
+// exact revision is the one it was captured at, under the same held reservation: equal revisions prove no
+// row changed (the memo above rests on the same fact). It never outlives its reservation.
+it("a census probe stays current across later census reads of its reservation, and never outlives it", async () => {
+	const { store } = await populatedStore();
+	const read = durableIssuancePruningMaintenanceForStore(store)!.readBoundedRecoveryCensus! as unknown as {
+		(input: unknown): Promise<object>;
+		captureCurrentProbe(input: unknown, observation: object): { checkCurrent(): Promise<boolean> } | undefined;
+	};
+	const input = { objectId: scope.objectId, limits: ISSUANCE_RETIREMENT_LIMITS };
+	let probe: { checkCurrent(): Promise<boolean> } | undefined;
+	await held(store, async () => {
+		const observation = await read(input);
+		probe = read.captureCurrentProbe.call(read, input, observation);
+		expect(probe, "a probe for the latest enrolled observation").toBeDefined();
+		expect(await probe!.checkCurrent(), "right after capture").toBe(true);
+		for (let k = 0; k < 3; k++) await read(input);
+		expect(await probe!.checkCurrent(), "after later census reads of the same reservation").toBe(true);
+	});
+	expect(await probe!.checkCurrent(), "after its reservation ended").toBe(false);
+	await held(store, async () => {
+		await read(input);
+		expect(await probe!.checkCurrent(), "under a later reservation").toBe(false);
+	});
+}, 60_000);

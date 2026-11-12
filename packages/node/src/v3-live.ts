@@ -13516,6 +13516,26 @@ async function withActiveRebaseDependencies(
 		});
 		if (lifetime === undefined) throw new TypeError("active dependency custody is unavailable");
 		turnHold = hold;
+		// The turn's own issuance reservation becomes the hold's held issuance read, so the hold's
+		// checks in this turn may use the unchanged-held census (prepareCreatorUnchangedHeldCensusRead).
+		// Safety: this reservation is the issuance store's native write exclusion; it was acquired
+		// before the seal and is released only after the child, the lifetime and the reader are
+		// released below, so it is held for every check of this turn and no writer can change the
+		// issuance store between them. The first check after enrollment stays the complete held walk
+		// (it alone initializes reuse), every later check still verifies the native current probe,
+		// replay, context and graph bindings, and any input the reuse does not bind (an active source,
+		// source or migration dependencies, pending ingress, a rebase snapshot) keeps the complete read.
+		// Enrollment is optional reuse: a hold that refuses it keeps the original reservation.
+		if (issuanceReservationIndex !== undefined) {
+			const original = reservations[issuanceReservationIndex]!;
+			let enrolled: NativeReadReservation | undefined;
+			try {
+				enrolled = hold === undefined ? undefined : fullRecoveryCloseHoldFacts(hold)?.ownIssuanceReservation?.(original);
+			} catch {
+				enrolled = undefined;
+			}
+			if (enrolled !== undefined) reservations[issuanceReservationIndex] = enrolled;
+		}
 		child = await lifetime.borrowDependencies();
 		// This owner authenticates already-admitted historical settlement work,
 		// not a new ordinary operation. Use its existing maintenance entitlement;
