@@ -6157,6 +6157,18 @@ const CREATOR_CLOSE_PENDING = "close-pending: v3 creator's interrupted epoch clo
  * closed frontier. Such a store is a stale copy or a restored backup of this key; a
  * signature there would be a second vertex for a slot the room already admitted.
  */
+/**
+ * A creator recovery dependency hold could not be taken now (the plane's boundary moved, its census is
+ * unavailable, or other work owns it). Scheduling, never a fault: a lull pass that meets it reports
+ * "deferred" and runs again at a later lull. The message keeps the original text.
+ */
+export class CreatorRecoveryHoldUnavailable extends TypeError {
+	readonly code = "recovery-hold-unavailable";
+	constructor(message: string) {
+		super(message);
+	}
+}
+
 export class V3LocalLineageBehindFrontier extends TypeError {
 	readonly code = "V3_LOCAL_LINEAGE_BEHIND_FRONTIER";
 	constructor(
@@ -13418,7 +13430,7 @@ async function sealCreatorRecoveryDependencies(
 		registration.terminalPublicationEntered;
 	let stage = "live";
 	const unavailable = (): undefined => {
-		if (required) throw new TypeError(`creator recovery dependency hold unavailable:${stage}`);
+		if (required) throw new CreatorRecoveryHoldUnavailable(`creator recovery dependency hold unavailable:${stage}`);
 		return undefined;
 	};
 	if (quiescentBoundary !== undefined && (activeObservation || received !== undefined || !quiescentBoundary.available()))

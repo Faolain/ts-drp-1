@@ -148,7 +148,7 @@ import {
 	type VerifiedCreatorCheckpointAttachment,
 } from "./internal/creator-transition-advance.js";
 import { createV3SnapshotTransferOwner } from "./snapshot-transfer.js";
-import { sealCreatorReceivedRecoveryReplay, type V3PlaneHandle, V3LocalLineageBehindFrontier } from "./v3-live.js";
+import { CreatorRecoveryHoldUnavailable, sealCreatorReceivedRecoveryReplay, type V3PlaneHandle, V3LocalLineageBehindFrontier } from "./v3-live.js";
 import { reconcileCreatorReceivedSnapshotRecoveryRoles, reconcileCreatorSnapshotRecoveryRoles } from "./internal/creator-closed-rollback-data.js";
 import { acquireCreatorPendingClassificationCustody, resolveCreatorSnapshotRecoveryCloseHold } from "./internal/runtime-reclamation.js";
 import type { CreatorRecoveryPoolResult } from "./internal/creator-recovery-pool.js";
@@ -1226,7 +1226,7 @@ async function settlementSourceHeldIn(source: CreatorRecipientSource, removed: R
  * a member with no own held row (receive-only) pays no extra pass.
  * `settled`: no such source remains. An unreadable journal or the pass bound leaves it
  * false, so the caller records no boundary and the install turns over as before. */
-async function runReceivedRecoveryTurnoverPasses(input: Readonly<{
+type ReceivedTurnoverPassInput = Readonly<{
 	source: CreatorRecipientSource;
 	snapshotStore: SnapshotRecoveryStore<SnapshotVerificationReceipt>;
 	catalog: TrustedBlueprintCatalog;
@@ -1234,8 +1234,19 @@ async function runReceivedRecoveryTurnoverPasses(input: Readonly<{
 	signing: ReceivedSigningOwner;
 	requireClosedWorkflowCompletion?: boolean;
 	settle?: boolean;
-}>, seal: () => Promise<ReceivedRecoverySeal | undefined>): Promise<Readonly<{ retired: readonly GenerationRecord[]; settled: boolean }>> {
-	const { source, context } = input;
+}>;
+/** The original turnover passes' progress, carried across passes (and, for a lull, across lulls). */
+type ReceivedTurnoverPassState = {
+	readonly maxPasses: number;
+	pass: number;
+	detail: ReadonlySet<string> | undefined;
+	settled: boolean;
+	drained: boolean;
+	done: boolean;
+	readonly retired: GenerationRecord[];
+};
+
+async function beginReceivedRecoveryTurnoverPasses(input: ReceivedTurnoverPassInput): Promise<ReceivedTurnoverPassState> {
 	const census = await input.signing.captureRetirementOwners().acquireEvidence();
 	const epochs = new Set<number>();
 	let censusFailed = false, censusPrimary: unknown;
@@ -1247,62 +1258,77 @@ async function runReceivedRecoveryTurnoverPasses(input: Readonly<{
 		await census.check();
 	} catch (error) {censusFailed = true; censusPrimary = error; throw error;}
 	finally {await releaseCreatorRecoveryReader(census, censusFailed, censusPrimary, "creator recipient signing census cleanup failed");}
-	const retired: GenerationRecord[] = [];
-	const maxPasses = 2 + epochs.size + AHE_BOUNDED_READ_LIMITS.maxObjectGenerations;
-	let detail = input.settle === true ? await journalDetailScopes(source) : undefined;
-	let settled = input.settle !== true, drained = false, passes = 0;
-	for (let pass = 0; pass < maxPasses; pass++) {
-		passes = pass + 1;
-		const sealed = await seal();
-		if (sealed === undefined) throw new TypeError("creator recipient recovery dependencies unavailable");
-		const lifetime = resolveCreatorSnapshotRecoveryCloseHold(sealed.hold,
-			{store: source.store, liveJournalStore: source.liveJournalStore, currentTrust: source.currentTrust});
-		if (lifetime === undefined) throw new TypeError("creator recipient recovery dependency custody differs");
-		let checkpoint: "complete" | "fresh-summary-required";
-		let retirementFailed = false, retirementPrimary: unknown;
-		try {
-			// A recipient runs no other maintenance inside the journal membership
-			// window, so a generation drain that suppressed this pass's collectible
-			// journal prefixes requests one more fresh pass (still bounded below).
-			checkpoint = await reconcileCreatorReceivedSnapshotRecoveryRoles({
-				...(context.signal === undefined ? {} : {signal: context.signal}),
-				roomHeadAuthority: context.roomHeadAuthority, pinnedGenesisAnchorDigest: context.pinnedGenesisAnchorDigest,
-				exactCanonicalPinnedGenesisTrustStateRecordBytes: context.exactCanonicalPinnedGenesisTrustStateRecordBytes,
-				catalog: input.catalog,
-				objectId: source.objectId, store: source.store, snapshotStore: input.snapshotStore,
-				liveJournalStore: source.liveJournalStore}, sealed.hold, input.requireClosedWorkflowCompletion === true,
-				input.settle === true);
-			retired.push(...sealed.readRetiredGenerations());
-		} catch (error) {retirementFailed = true; retirementPrimary = error; throw error;}
-		finally {await releaseCreatorRecoveryReader(lifetime, retirementFailed, retirementPrimary, "creator recipient retirement dependencies cleanup failed");}
-		if (checkpoint === "complete") {
-			if (input.settle !== true) break;
-			const after = await journalDetailScopes(source);
-			if (detail === undefined || after === undefined) break;
-			const removed = new Set([...detail].filter(scope => !after.has(scope)));
-			// Settled unless a drained scope still holds an own settlement source (the
-			// member's own rows a further pass would release).
-			if (removed.size === 0 || !(await settlementSourceHeldIn(source, removed))) { settled = true; break; }
-			// One more pass decides the issuance on the drained journal.
-			detail = after;
-			drained = true;
-			if (pass === maxPasses - 1) break;
-			continue;
-		}
-		// After a completed pass, the bound ends the settling unsettled; it is never a failure.
-		if (pass === maxPasses - 1) {
-			if (drained) break;
-			throw new TypeError("creator recipient bounded retirement did not stabilize");
-		}
+	return {maxPasses: 2 + epochs.size + AHE_BOUNDED_READ_LIMITS.maxObjectGenerations, pass: 0,
+		detail: input.settle === true ? await journalDetailScopes(input.source) : undefined,
+		settled: input.settle !== true, drained: false, done: false, retired: []};
+}
+
+/** One original turnover pass (one sealed census, one reconciliation). Sets `state.done` at the end. */
+async function runReceivedRecoveryTurnoverPass(input: ReceivedTurnoverPassInput, state: ReceivedTurnoverPassState,
+	seal: () => Promise<ReceivedRecoverySeal | undefined>): Promise<void> {
+	const { source, context } = input;
+	const pass = state.pass;
+	state.pass = pass + 1;
+	const sealed = await seal();
+	if (sealed === undefined) throw new CreatorRecoveryHoldUnavailable("creator recipient recovery dependencies unavailable");
+	const lifetime = resolveCreatorSnapshotRecoveryCloseHold(sealed.hold,
+		{store: source.store, liveJournalStore: source.liveJournalStore, currentTrust: source.currentTrust});
+	if (lifetime === undefined) throw new TypeError("creator recipient recovery dependency custody differs");
+	let checkpoint: "complete" | "fresh-summary-required";
+	let retirementFailed = false, retirementPrimary: unknown;
+	try {
+		// A recipient runs no other maintenance inside the journal membership
+		// window, so a generation drain that suppressed this pass's collectible
+		// journal prefixes requests one more fresh pass (still bounded below).
+		checkpoint = await reconcileCreatorReceivedSnapshotRecoveryRoles({
+			...(context.signal === undefined ? {} : {signal: context.signal}),
+			roomHeadAuthority: context.roomHeadAuthority, pinnedGenesisAnchorDigest: context.pinnedGenesisAnchorDigest,
+			exactCanonicalPinnedGenesisTrustStateRecordBytes: context.exactCanonicalPinnedGenesisTrustStateRecordBytes,
+			catalog: input.catalog,
+			objectId: source.objectId, store: source.store, snapshotStore: input.snapshotStore,
+			liveJournalStore: source.liveJournalStore}, sealed.hold, input.requireClosedWorkflowCompletion === true,
+			input.settle === true);
+		state.retired.push(...sealed.readRetiredGenerations());
+	} catch (error) {retirementFailed = true; retirementPrimary = error; throw error;}
+	finally {await releaseCreatorRecoveryReader(lifetime, retirementFailed, retirementPrimary, "creator recipient retirement dependencies cleanup failed");}
+	if (checkpoint === "complete") {
+		if (input.settle !== true) { state.done = true; return; }
+		const after = await journalDetailScopes(source);
+		if (state.detail === undefined || after === undefined) { state.done = true; return; }
+		const detail = state.detail;
+		const removed = new Set([...detail].filter(scope => !after.has(scope)));
+		// Settled unless a drained scope still holds an own settlement source (the
+		// member's own rows a further pass would release).
+		if (removed.size === 0 || !(await settlementSourceHeldIn(source, removed))) { state.settled = true; state.done = true; return; }
+		// One more pass decides the issuance on the drained journal.
+		state.detail = after;
+		state.drained = true;
+		if (pass === state.maxPasses - 1) state.done = true;
+		return;
 	}
-	if (input.settle === true) {
-		try {
-			const observer = Reflect.get(globalThis, "__warmProofEvent");
-			if (typeof observer === "function")
-				observer({kind: "recipient-lull-turnover-settle", epoch: source.currentTrust.currentEpoch, passes, settled});
-		} catch { /* Diagnostics never alter the original owner outcome. */ }
+	// After a completed pass, the bound ends the settling unsettled; it is never a failure.
+	if (pass === state.maxPasses - 1) {
+		if (state.drained) { state.done = true; return; }
+		throw new TypeError("creator recipient bounded retirement did not stabilize");
 	}
-	return Object.freeze({retired, settled});
+}
+
+function observeTurnoverSettle(input: ReceivedTurnoverPassInput, state: ReceivedTurnoverPassState): void {
+	if (input.settle !== true) return;
+	try {
+		const observer = Reflect.get(globalThis, "__warmProofEvent");
+		if (typeof observer === "function")
+			observer({kind: "recipient-lull-turnover-settle", epoch: input.source.currentTrust.currentEpoch, passes: state.pass,
+				settled: state.settled});
+	} catch { /* Diagnostics never alter the original owner outcome. */ }
+}
+
+async function runReceivedRecoveryTurnoverPasses(input: ReceivedTurnoverPassInput,
+	seal: () => Promise<ReceivedRecoverySeal | undefined>): Promise<Readonly<{ retired: readonly GenerationRecord[]; settled: boolean }>> {
+	const state = await beginReceivedRecoveryTurnoverPasses(input);
+	while (!state.done && state.pass < state.maxPasses) await runReceivedRecoveryTurnoverPass(input, state, seal);
+	observeTurnoverSettle(input, state);
+	return Object.freeze({retired: state.retired, settled: state.settled});
 }
 
 /**
