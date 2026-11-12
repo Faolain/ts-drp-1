@@ -55,8 +55,9 @@ When the worker dies, calls in flight reject with `RoomWorkerCrashed`, but the r
 have durably admitted that work. The outcome is unknown, never assumed. Before re-offering, reopen
 the room and look for the operation's own identity in the durable state (its id in the
 projection, or in the room's unresolved accepted work or settlement status): present means it
-landed and must not be offered again; absent means re-offer. A fresh operation id would turn one
-intent into two operations.
+landed and must not be offered again; absent means re-offer, once. A re-offer the room refuses
+but keeps (a member not yet reaching its host) is offered by the room itself later: the app must
+not offer it again. A fresh operation id would turn one intent into two operations.
 
 ## Cost
 

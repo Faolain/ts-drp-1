@@ -15,6 +15,9 @@ import { acquireBrowserIdentity } from "@ts-drp/example-browser-network";
 import {
 	forwardV3RoomWorkerObservation,
 	V3_ROOM_WORKER_ERROR_CODECS,
+	V3RoomNotReachingHost,
+	V3RoomReadOnly,
+	V3RoomSuccessorUnavailable,
 	v3RoomWorkerPeerCacheKeys,
 } from "@ts-drp/example-v3-room";
 import { RoomWorkerUnsupported } from "@ts-drp/room-worker";
@@ -73,7 +76,7 @@ export interface GridRoomWorkerControl {
 	 */
 	observe(stream: "projection" | "transient" | "network", listener: (value: unknown) => void): () => void;
 	/** recoverBlockPlacement on this page's zone (reopen first). */
-	recoverBlockPlacement(block: ZoneBlock): Promise<boolean>;
+	recoverBlockPlacement(block: ZoneBlock): Promise<BlockPlacementRecovery>;
 	/** The worker's send refusals, newest last (bounded). */
 	readonly refusals: readonly Readonly<{ id: number; command: string; name: string; message: string }>[];
 }
@@ -95,17 +98,37 @@ const REFUSAL_LIMIT = 64;
 const METER_FRAME_LIMIT = 100_000;
 
 /**
- * Recover a placement whose call ended without an answer (the worker crashed): reopen first, then
- * call this. A block already in the zone landed and is not offered again; otherwise it is offered.
+ * How a recovered placement was resolved: it had already landed (not offered again), it was offered
+ * again and accepted, or it was offered again and the room kept it (a member that does not reach its
+ * creator yet: the room offers it itself once it can, so the app must not offer it a third time).
+ */
+export type BlockPlacementRecovery = "landed" | "offered" | "kept";
+
+/**
+ * Recover a placement whose call ended without an answer (the worker crashed): reopen and rejoin
+ * first, then call this. The reopened room's durable projection includes every move this author's
+ * room admitted, delivered or not, so a block already there landed and is not offered again;
+ * otherwise it is offered once.
  * @param zone - The reopened zone.
  * @param block - The placement whose outcome is unknown.
- * @returns Whether the block had already landed.
+ * @returns How the placement was resolved.
  */
-export async function recoverBlockPlacement(zone: V3ZoneWorkerApi, block: ZoneBlock): Promise<boolean> {
+export async function recoverBlockPlacement(zone: V3ZoneWorkerApi, block: ZoneBlock): Promise<BlockPlacementRecovery> {
 	const current = await zone.refresh();
-	if (current.blocks.some((placed) => placed.id === block.id)) return true;
-	await zone.placeBlock(block);
-	return false;
+	if (current.blocks.some((placed) => placed.id === block.id)) return "landed";
+	try {
+		await zone.placeBlock(block);
+		return "offered";
+	} catch (error) {
+		// Typed room refusals cross the worker boundary as their own classes.
+		if (
+			error instanceof V3RoomReadOnly ||
+			error instanceof V3RoomSuccessorUnavailable ||
+			error instanceof V3RoomNotReachingHost
+		)
+			return "kept";
+		throw error;
+	}
 }
 
 interface BridgeMeter extends RoomWorkerMeter {

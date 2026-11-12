@@ -38,7 +38,7 @@ interface RoomWorkerControl {
 	terminate(reason?: string): void;
 	reopen(): Promise<void>;
 	observe(stream: "projection", listener: (value: unknown) => void): () => void;
-	recoverBlockPlacement(block: Block): Promise<boolean>;
+	recoverBlockPlacement(block: Block): Promise<"landed" | "offered" | "kept">;
 	rtcStats(): Promise<Readonly<{ channelsCreated: number; channelsReceived: number; attachMs: readonly number[] }>>;
 }
 
@@ -147,11 +147,11 @@ test("A: a placement whose reply is lost to a worker crash after local durable a
 		await member.evaluate(() => window.__TS_DRP_GRID_ROOM_WORKER__?.reopen());
 		await member.evaluate((invite) => window.__TS_DRP_V3_ZONE__?.join(invite), created.invite);
 		await expect.poll(async () => (await zone(member)).zoneId).toBe(created.zoneId);
-		const alreadyLanded = await member.evaluate(
+		const recovered = await member.evaluate(
 			(placed) => window.__TS_DRP_GRID_ROOM_WORKER__?.recoverBlockPlacement(placed),
 			block
 		);
-		expect(alreadyLanded).toBe(true);
+		expect(recovered).toBe("landed");
 		await expectLandedOnce(creator, member, block, before + 1);
 
 		// The reopened worker is a working member: its next placement lands once too.
@@ -187,12 +187,17 @@ test("A control: a placement lost to a crash before the worker admitted it is of
 		await member.evaluate((invite) => window.__TS_DRP_V3_ZONE__?.join(invite), created.invite);
 		await expect.poll(async () => (await zone(member)).zoneId).toBe(created.zoneId);
 		expect((await zone(creator)).blocks.some((placed) => placed.id === block.id)).toBe(false);
-		const alreadyLanded = await member.evaluate(
+		// Offered again: accepted at once, or kept by the room until the member reaches its creator.
+		const recovered = await member.evaluate(
 			(placed) => window.__TS_DRP_GRID_ROOM_WORKER__?.recoverBlockPlacement(placed),
 			block
 		);
-		expect(alreadyLanded).toBe(false);
+		expect(["offered", "kept"]).toContain(recovered);
 		await expectLandedOnce(creator, member, block, before + 1);
+		// No late second copy: a kept move is offered by the room itself, once.
+		await new Promise((resolve) => setTimeout(resolve, 5_000));
+		expect((await zone(creator)).durableVertexCount).toBe(before + 1);
+		expect((await zone(member)).durableVertexCount).toBe(before + 1);
 	} finally {
 		await closeAll([creator, member], contexts);
 	}
@@ -232,6 +237,8 @@ test("@engines a worker-hosted zone opens, creates and places a block", async ({
 		const created = await zone(creator);
 		expect(created.ready).toBe(true);
 		await member.evaluate((invite) => window.__TS_DRP_V3_ZONE__?.join(invite), created.invite);
+		await expect.poll(async () => (await zone(creator)).durableVertexCount).toBe(2);
+		await expect.poll(async () => (await zone(member)).durableVertexCount).toBe(2);
 		const block: Block = { id: "engine-smoke", kind: "stone", x: 1, y: 1 };
 		await member.evaluate((placed) => window.__TS_DRP_V3_ZONE__?.placeBlock(placed), block);
 		await expectLandedOnce(creator, member, block, 3);
