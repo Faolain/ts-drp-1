@@ -110,7 +110,12 @@ import { acquireFinalitySigningExclusion, type FinalitySigningExclusion } from "
 import { publicKeyFromRaw } from "@libp2p/crypto/keys";
 import { openCanonicalLatchedAclSnapshot } from "@ts-drp/protocol-v3/latched-acl";
 import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
-import { AHE_BOUNDED_READ_LIMITS, type NativeReadReservation, parseStorageObjectId, type StorageObjectId } from "@ts-drp/storage";
+import {
+	AHE_BOUNDED_READ_LIMITS,
+	type NativeReadReservation,
+	parseStorageObjectId,
+	type StorageObjectId,
+} from "@ts-drp/storage";
 import type {
 	RoomHead as V3RoomHead,
 	RoomHeadAuthority as V3RoomHeadAuthority,
@@ -7572,15 +7577,20 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 							.map(([sequence]) => sequence),
 						pinnedSources: plan.entries.flatMap((entry) => {
 							const sourceEpoch = epochOf.get(entry.sourceSequence);
-							return entry.sourceContextDigest === undefined && entry.replacementSequence !== null &&
-								entry.disposition !== "manual-review" && entry.disposition !== "inherited" && sourceEpoch !== undefined
+							return entry.sourceContextDigest === undefined &&
+								entry.replacementSequence !== null &&
+								entry.disposition !== "manual-review" &&
+								entry.disposition !== "inherited" &&
+								sourceEpoch !== undefined
 								? [{ sourceSequence: entry.sourceSequence, sourceEpoch }]
 								: [];
 						}),
 						generationBound: AHE_BOUNDED_READ_LIMITS.maxObjectGenerations,
 					});
 					if (event !== undefined) input.onDiagnostic(event);
-				} catch { /* Diagnostics never alter the drain. */ }
+				} catch {
+					/* Diagnostics never alter the drain. */
+				}
 			}
 			return;
 		}
