@@ -69,6 +69,7 @@ import {
 	releaseV3CarriedPendingIngress,
 	inspectV3RetainedWorkFrontier,
 	resolveV3RetainedWorkFromFrontier,
+	resolveV3ReplacedSources,
 	inspectV3UnresolvedAcceptedWork,
 	type V3SourceAbandonment,
 	type V3SourceAbandonmentRequest,
@@ -7196,6 +7197,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		sameBytes(encodeCanonical(left.sourceContextDigest ?? null), encodeCanonical(right.sourceContextDigest ?? null)) &&
 		sameBytes(encodeCanonical(left.sourceResolutionDigest ?? null), encodeCanonical(right.sourceResolutionDigest ?? null)) &&
 		left.sourceResolutionKind === right.sourceResolutionKind &&
+		left.sourceResolutionScope === right.sourceResolutionScope &&
 		sameBytes(encodeCanonical(left.handedBack ?? null), encodeCanonical(right.handedBack ?? null)) &&
 		sameBytes(encodeCanonical(left.transformRefusal ?? null), encodeCanonical(right.transformRefusal ?? null)) &&
 		sameBytes(encodeCanonical(left.inheritance ?? null), encodeCanonical(right.inheritance ?? null)) &&
@@ -7261,6 +7263,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					...(prior?.sourceContextDigest === undefined ? {} : { sourceContextDigest: prior.sourceContextDigest }),
 					...(prior?.sourceResolutionDigest === undefined ? {} : { sourceResolutionDigest: prior.sourceResolutionDigest }),
 					...(prior?.sourceResolutionKind === undefined ? {} : { sourceResolutionKind: prior.sourceResolutionKind }),
+					...(prior?.sourceResolutionScope === undefined ? {} : { sourceResolutionScope: prior.sourceResolutionScope }),
 					replacementSequence: prior?.replacementSequence ?? null,
 					sourceDigest,
 					sourceSequence: source.authorSequence,
@@ -7580,6 +7583,38 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		settlementHandBackSlots = unconsumedHandBacks(current);
 		// The status reflects this drain's resolutions (given-back moves no longer wait).
 		recordSettlementStatus(settlementSources, current);
+		return current;
+	};
+	/**
+	 * Replaced-source resolution (v3-live resolveV3ReplacedSources) for a drain whose author fence is
+	 * withheld or awaited: each completed replacement entry whose replacement is proven committed (the
+	 * creator-signed completion, no signature), or whose source the installed frontier proves settled (the
+	 * author's signed replaced-source receipt), is resolved, so retirement stops protecting the source
+	 * without the plan's fence. A stored resolution that no longer authenticates
+	 * refuses the drain (fails closed); any other refusal leaves the sources retained for the next drain.
+	 * @param plan - The durable plan after this drain's merge and retained resolution.
+	 * @returns The plan after any resolution.
+	 */
+	const resolveReplacedSources = async (plan: RoomSettlementPlan): Promise<RoomSettlementPlan> => {
+		const owner = activeHandle;
+		if (owner === undefined || input.receiveOnly === true) return plan;
+		if (!plan.entries.some((entry) => entry.sourceResolutionScope !== undefined ||
+			(entry.replacementSequence !== null && entry.sourceResolutionDigest === undefined &&
+				(entry.disposition === "rebase" || entry.disposition === "transform")))) return plan;
+		localOwner?.assertCurrent();
+		assertSessionOpen();
+		let resolved: readonly number[];
+		try {
+			resolved = await resolveV3ReplacedSources(owner, {
+				signRegisteredVertexDigest: input.signRegisteredVertexDigest,
+			});
+		} catch (error) {
+			if (activeHandle !== owner || (error instanceof Error && error.message === "creator replaced source proof is invalid")) throw error;
+			return plan;
+		}
+		if (resolved.length === 0) return plan;
+		const current = await issuanceStore.readSettlementPlan(settlementScope);
+		if (current === null) throw new TypeError("v3 room settlement plan is unavailable after replaced-source resolution");
 		return current;
 	};
 	const readSettlementEffect = (
@@ -7988,6 +8023,9 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		});
 		if (decision !== "fence") {
 			setAuthorFenceAwaited(decision === "await-fence" ? activeHandle?.epoch : undefined);
+			// Without the plan's fence, a completed replacement entry keeps its source protected until its
+			// replacement is proven committed, or the installed frontier proves that source settled (design (b)).
+			plan = await resolveReplacedSources(plan);
 			// Observation only (onDiagnostic): never alters the decision.
 			if (decision === "await-fence" && input.onDiagnostic !== undefined) {
 				try {

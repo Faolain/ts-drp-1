@@ -95,8 +95,22 @@ export interface SettlementPlanEntry {
 	 * the source committed or never admitted in its closed epoch (an `expire` with the author's signed
 	 * receipt). Unlike a local-author abandonment it may follow publication. Absent: the original
 	 * resolution kinds. Older readers refuse the field (closed record).
+	 * "replacement" (only with sourceResolutionScope "replaced-source"): the replaced source is released
+	 * because its replacement is committed: the resolution names the replacement's own completion proof
+	 * (the creator-signed Cut membership already stored on the replacement's `committed` entry). No new
+	 * signature; Node proves the replacement link from signed content on every install.
 	 */
-	readonly sourceResolutionKind?: "frontier";
+	readonly sourceResolutionKind?: "frontier" | "replacement";
+	/**
+	 * "replaced-source": the frontier resolution sits on a completed replacement entry (`rebase` or
+	 * `transform`, its replacement issued), not on an expiry: the author's signed receipt that the
+	 * creator's signed frontier proves the replaced source settled (the frontier passed it, or it is
+	 * displaced, fence-guarded and past the settlement window). The move stays with the replacement; the
+	 * receipt only lets retirement stop protecting the source without the plan's current fence. It
+	 * arrives once, after the replacement, and never changes. Older readers refuse the field (closed
+	 * record): a downgrade after a release fails closed on first open.
+	 */
+	readonly sourceResolutionScope?: "replaced-source";
 	readonly sourceSequence: number;
 	readonly sourceDigest: Uint8Array;
 	readonly disposition: SettlementDisposition;
