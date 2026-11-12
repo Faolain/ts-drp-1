@@ -720,6 +720,10 @@ test.each([[64, 0], [128, 0], [128, 2]])("R10 received append capacity widths pr
 			const fenceQuote = journalFutureAppendPostimageWidths(frames(installed.canonicalRows), fenceAppend, nextUnsigned, nextFence);
 			expect(horizon, shape).toEqual({ afterSuccessor: fenceQuote.afterSuccessor, afterSuccessorLocal: fenceQuote.afterSuccessorLocal });
 		}
+		expect(() => journalFutureAppendPostimageWidths(before.canonicalRows, candidate, unsigned, fence, continuations,
+			{ ...options, fenceHorizon: 1 as unknown as boolean })).toThrow("malformed-input");
+		expect(journalFutureAppendPostimageWidths(before.canonicalRows, candidate, unsigned, fence, continuations,
+			{ ...options, fenceHorizon: false }).fenceHorizon).toBeUndefined();
 		const nativeRows = final.canonicalRows.map(bytes => decodeCanonical(bytes) as [string, unknown, Record<string, unknown>]);
 		expect(nativeRows.filter(([table, , row]) => table !== "scopes" && row.source_kind === "received")).toHaveLength(writers);
 		expect(nativeRows.filter(([table, , row]) => table !== "scopes" && row.source_kind === "local-issued")).toHaveLength(2 + continuationCount);

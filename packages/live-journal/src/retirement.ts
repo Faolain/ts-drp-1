@@ -1297,9 +1297,10 @@ export function journalFutureAppendPostimageWidths(
 	let localIssuer = localIssued ? {objectId: local.scope.objectId, author: local.author,
 		nextAuthorSequence: local.authorSequence + 1} : undefined;
 	let completedScopes: readonly LiveJournalScope[] = [],
-		membershipByteLength = 0;
+		membershipByteLength = 0,
+		fenceHorizon = false;
 	if (sizingOptions !== undefined) {
-		const present = ["control", "closedMembershipByteLength", "localIssuerBasis"].filter(
+		const present = ["control", "closedMembershipByteLength", "localIssuerBasis", "fenceHorizon"].filter(
 			(key) => Object.getOwnPropertyDescriptor(sizingOptions, key) !== undefined
 		);
 		const options = record(sizingOptions, present);
@@ -1310,6 +1311,10 @@ export function journalFutureAppendPostimageWidths(
 				throw new TypeError("malformed-input");
 			localIssuer = {objectId: basis.objectId as string, author: basis.author,
 				nextAuthorSequence: integer(basis.nextAuthorSequence)};
+		}
+		if (present.includes("fenceHorizon")) {
+			if (typeof options.fenceHorizon !== "boolean") throw new TypeError("malformed-input");
+			fenceHorizon = options.fenceHorizon;
 		}
 		if (present.includes("closedMembershipByteLength")) {
 			membershipByteLength = integer(options.closedMembershipByteLength);
@@ -1563,7 +1568,7 @@ export function journalFutureAppendPostimageWidths(
 	updated.push(successorEntry);
 	updated.sort(compareFrameKeys);
 	const afterSuccessorLocal = futureWidths(updated, updated.indexOf(finalHeader), updated.indexOf(successorEntry), measurements);
-	if (sizingOptions?.fenceHorizon !== true) return Object.freeze({ afterLocal, afterSuccessor, afterSuccessorLocal });
+	if (!fenceHorizon) return Object.freeze({ afterLocal, afterSuccessor, afterSuccessorLocal });
 	// The next successor has the same structural anchor and parameters carriers as this one (an epoch-chain
 	// anchor's fields have fixed widths), one epoch on; a wider epoch integer widens its preimage by as much.
 	if (s.scope.epoch >= Number.MAX_SAFE_INTEGER - 1 || integer(futureLocal.authorSequence) === Number.MAX_SAFE_INTEGER)
