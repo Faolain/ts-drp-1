@@ -8844,9 +8844,11 @@ type CarriedV3Row = Readonly<{ exactWireBytes: Uint8Array; sender: string }>;
  * predecessor had when the recovery began, plus every row one of the predecessor's own ingress jobs
  * ends with after the plane is no longer current (dropped before authentication, or retained onto
  * the revoked plane: the creator's received append refused because its close actor stopped). Once
- * the successor is bound it forwards such late rows straight to it. It ends when the predecessor's
- * last ingress job settles or the successor is deactivated (an epoch change), whichever is first;
- * a row it cannot take after that, or past its bound, is refused and named to delivery repair.
+ * the successor is bound it forwards such late rows straight to it, one at a time through the
+ * successor's ordinary ingress (the input pool is bounded). It ends when the predecessor's last
+ * ingress job settles or the successor is deactivated (an epoch change), whichever is first. After
+ * an epoch-change end it stays as a refusing tombstone until the predecessor's last job settles:
+ * a late row then, or one past the bound, is refused and named to delivery repair.
  */
 interface PendingIngressCarry {
 	readonly objectId: string;
@@ -8858,6 +8860,9 @@ interface PendingIngressCarry {
 	bytes: number;
 	readonly refused: string[];
 	successor: V3PlaneRegistration | undefined;
+	refusing: boolean;
+	// The successor's re-offers, one ingress job at a time.
+	reoffers: Promise<void>;
 }
 
 // Ingress jobs each plane has admitted to its FIFO and not yet settled.
@@ -8875,18 +8880,35 @@ export function openV3PendingIngressCarries(): number {
 	return openPendingIngressCarries;
 }
 
-function closePendingIngressCarry(predecessor: V3PlaneRegistration): void {
+function deletePendingIngressCarry(predecessor: V3PlaneRegistration): void {
 	const carry = pendingIngressCarries.get(predecessor);
 	if (carry === undefined) return;
 	pendingIngressCarries.delete(predecessor);
+	detachForwarding(carry, predecessor);
+	carry.rows.length = 0;
+	openPendingIngressCarries -= 1;
+}
+
+function detachForwarding(carry: PendingIngressCarry, predecessor: V3PlaneRegistration): void {
 	const forwarding = carry.successor === undefined ? undefined : carriesForwardingTo.get(carry.successor);
 	if (forwarding !== undefined) {
 		const at = forwarding.indexOf(predecessor);
 		if (at >= 0) forwarding.splice(at, 1);
 	}
 	carry.successor = undefined;
-	carry.rows.length = 0;
-	openPendingIngressCarries -= 1;
+}
+
+// Ends a carry without a successor to take its rows: what it holds is refused and named to repair;
+// while the predecessor still has ingress jobs in flight it refuses what they end with too.
+function endPendingIngressCarry(predecessor: V3PlaneRegistration): void {
+	const carry = pendingIngressCarries.get(predecessor);
+	if (carry === undefined) return;
+	detachForwarding(carry, predecessor);
+	const refused = [...carry.refused.splice(0), ...carry.rows.splice(0).map((row) => row.sender)];
+	carry.bytes = 0;
+	if (ingressJobsInFlight.has(predecessor)) carry.refusing = true;
+	else deletePendingIngressCarry(predecessor);
+	for (const sender of refused) refuseCarriedRow(predecessor, sender);
 }
 
 // A successor's deactivation (an epoch change, or another recovery) ends the carries forwarding to it.
@@ -8894,10 +8916,12 @@ function closePendingIngressCarriesTo(successor: V3PlaneRegistration): void {
 	const forwarding = carriesForwardingTo.get(successor);
 	if (forwarding === undefined) return;
 	carriesForwardingTo.delete(successor);
-	for (const predecessor of [...forwarding]) closePendingIngressCarry(predecessor);
+	for (const predecessor of [...forwarding]) endPendingIngressCarry(predecessor);
 }
 
-function sameCarryPlane(carry: PendingIngressCarry, registration: V3PlaneRegistration): boolean {
+type CarryPlane = Readonly<{ objectId: string; epoch: number; anchorDigest: string }>;
+
+function sameCarryPlane(carry: CarryPlane, registration: V3PlaneRegistration): boolean {
 	const provenance = registration.payload.provenance;
 	return (
 		currentRegistration(registration) &&
@@ -8907,18 +8931,31 @@ function sameCarryPlane(carry: PendingIngressCarry, registration: V3PlaneRegistr
 	);
 }
 
-// A row the carry cannot take is refused and named to repair on the topic's current plane.
+// A row the carry cannot take is refused and named to repair on the topic's current plane (repair
+// attaches there as routeV3RetainedIngress attaches it).
 function refuseCarriedRow(predecessor: V3PlaneRegistration, sender: string): void {
 	ingressFailureLog("admission-rejected", "carried-ingress-refused");
 	const current = v3PlaneRegistrations.get(predecessor.networkNode)?.get(predecessor.topic);
-	if (current !== undefined && current.deliveryRepair !== undefined) noteDeliveryRefusal(current, sender);
+	if (current !== undefined && currentRegistration(current)) noteDeliveryRefusal(current, sender);
 }
 
-function reofferCarriedRow(successor: V3PlaneRegistration, row: CarriedV3Row): void {
-	void enqueueCapturedV3Ingress(successor, "retained", row.sender, (custody) => {
-		custody.chargeBytes(row.exactWireBytes.byteLength);
-		return ObjectFreeze({ exactWireBytes: row.exactWireBytes, sender: row.sender, transport: "retained" as const });
-	}).catch(() => ingressFailureLog("admission-rejected"));
+// One re-offer at a time through the successor's ordinary ingress: a carry larger than the input
+// pool would otherwise be refused at it. A row whose successor is no longer the carry's plane when
+// its turn comes is refused and named to repair.
+function reofferCarriedRow(
+	predecessor: V3PlaneRegistration,
+	carry: PendingIngressCarry,
+	successor: V3PlaneRegistration,
+	row: CarriedV3Row
+): void {
+	const plane: CarryPlane = { objectId: carry.objectId, epoch: carry.epoch, anchorDigest: carry.anchorDigest };
+	carry.reoffers = carry.reoffers.then(async (): Promise<void> => {
+		if (!sameCarryPlane(plane, successor)) return refuseCarriedRow(predecessor, row.sender);
+		await enqueueCapturedV3Ingress(successor, "retained", row.sender, (custody) => {
+			custody.chargeBytes(row.exactWireBytes.byteLength);
+			return ObjectFreeze({ exactWireBytes: row.exactWireBytes, sender: row.sender, transport: "retained" as const });
+		}).catch(() => ingressFailureLog("admission-rejected"));
+	});
 }
 
 /**
@@ -8934,11 +8971,15 @@ function collectLateIngress(registration: V3PlaneRegistration, exactWireBytes: U
 	if (currentRegistration(registration)) return false;
 	const carry = pendingIngressCarries.get(registration);
 	if (carry === undefined) return false;
+	if (carry.refusing) {
+		refuseCarriedRow(registration, sender);
+		return true;
+	}
 	if (carry.successor !== undefined) {
 		if (sameCarryPlane(carry, carry.successor))
-			reofferCarriedRow(carry.successor, ObjectFreeze({ exactWireBytes, sender }));
+			reofferCarriedRow(registration, carry, carry.successor, ObjectFreeze({ exactWireBytes, sender }));
 		else {
-			closePendingIngressCarry(registration);
+			endPendingIngressCarry(registration);
 			refuseCarriedRow(registration, sender);
 		}
 		return true;
@@ -8959,7 +9000,8 @@ function settleIngressJob(registration: V3PlaneRegistration): void {
 		return;
 	}
 	ingressJobsInFlight.delete(registration);
-	if (pendingIngressCarries.get(registration)?.successor !== undefined) closePendingIngressCarry(registration);
+	const carry = pendingIngressCarries.get(registration);
+	if (carry !== undefined && (carry.successor !== undefined || carry.refusing)) deletePendingIngressCarry(registration);
 }
 
 /**
@@ -8991,6 +9033,8 @@ export function carryV3PendingIngress(plane: V3PlaneHandle): V3CarriedPendingIng
 		bytes: 0,
 		refused: [],
 		successor: undefined,
+		refusing: false,
+		reoffers: Promise.resolve(),
 	};
 	for (const pending of registration.pendingIngress.values()) {
 		const exactWireBytes = V3Envelope.encode({
@@ -9026,23 +9070,23 @@ export function reofferV3CarriedPendingIngress(plane: V3PlaneHandle, carried: V3
 	const predecessor = carryPredecessors.get(carried);
 	carryPredecessors.delete(carried);
 	const carry = predecessor === undefined ? undefined : pendingIngressCarries.get(predecessor);
-	if (predecessor === undefined || carry === undefined || carry.successor !== undefined) return 0;
+	if (predecessor === undefined || carry === undefined || carry.successor !== undefined || carry.refusing) return 0;
 	const registration = v3HandleRegistrations.get(plane);
 	if (registration === undefined || registration === predecessor || !sameCarryPlane(carry, registration)) {
-		const refused = [...carry.refused, ...carry.rows.map((row) => row.sender)];
-		closePendingIngressCarry(predecessor);
-		for (const sender of refused) refuseCarriedRow(predecessor, sender);
+		endPendingIngressCarry(predecessor);
 		return 0;
 	}
+	// Refusals at the successor's input pool are named to repair (as routeV3RetainedIngress attaches it).
+	attachDeliveryRepair(registration);
 	const rows = carry.rows.splice(0);
 	carry.bytes = 0;
 	carry.successor = registration;
 	const forwarding = carriesForwardingTo.get(registration);
 	if (forwarding === undefined) carriesForwardingTo.set(registration, [predecessor]);
 	else forwarding.push(predecessor);
-	for (const row of rows) reofferCarriedRow(registration, row);
+	for (const row of rows) reofferCarriedRow(predecessor, carry, registration, row);
 	for (const sender of carry.refused.splice(0)) refuseCarriedRow(predecessor, sender);
-	if (!ingressJobsInFlight.has(predecessor)) closePendingIngressCarry(predecessor);
+	if (!ingressJobsInFlight.has(predecessor)) deletePendingIngressCarry(predecessor);
 	return rows.length;
 }
 
@@ -9054,10 +9098,8 @@ export function releaseV3CarriedPendingIngress(carried: V3CarriedPendingIngress)
 	const predecessor = carryPredecessors.get(carried);
 	carryPredecessors.delete(carried);
 	const carry = predecessor === undefined ? undefined : pendingIngressCarries.get(predecessor);
-	if (predecessor === undefined || carry === undefined || carry.successor !== undefined) return;
-	const refused = [...carry.refused, ...carry.rows.map((row) => row.sender)];
-	closePendingIngressCarry(predecessor);
-	for (const sender of refused) refuseCarriedRow(predecessor, sender);
+	if (predecessor === undefined || carry === undefined || carry.successor !== undefined || carry.refusing) return;
+	endPendingIngressCarry(predecessor);
 }
 
 /** Decision row 51: a creator's ordinary readiness preparation holds its plane's
