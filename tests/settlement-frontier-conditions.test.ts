@@ -96,21 +96,22 @@ describe("settlement frontier conditions", () => {
 		}
 	});
 
-	// Condition (ii) as stated: every own row of an epoch depends on the previous one, so an admitted row
-	// implies every earlier own row of its epoch was admitted. FALSE for causalJoin rows: a join depends on
-	// tips.slice(0, maxDependencies) of the hash-sorted frontier (v3-live issueLocal frontier reduction),
-	// which need not include the author's previous row. A join delivered before its predecessor and cut by
-	// the seal is admitted above a gap; the frontier stops below it.
-	it("(ii) a causalJoin row need not depend on the author's previous row (gap-free admission does not hold)", async () => {
-		const result = await runFrontierScenario(64);
-		const closure = predecessorClosure(result);
-		expect(closure.map(({ action }) => action)).toEqual(["causalJoin", "causalJoin", "causalJoin", "add"]);
-		expect(closure.filter(({ action }) => action === "add").every(({ dependsOnPrevious }) => dependsOnPrevious)).toBe(
-			true
-		);
-		const skipping = closure.filter(({ dependsOnPrevious }) => !dependsOnPrevious);
-		// Measured: the genuine 64-tip reduction issues at least one join that skips its predecessor.
-		expect(skipping.length).toBeGreaterThan(0);
-		expect(skipping.every(({ action }) => action === "causalJoin")).toBe(true);
-	});
+	// Condition (ii): every own row of an epoch depends on the author's previous own row, so admitting any
+	// row admits every earlier own row of its epoch and the creator's contiguous frontier separates admitted
+	// rows from rows that never entered history. A causalJoin used to depend on tips.slice(0, maxDependencies)
+	// of the hash-sorted frontier, which need not reach the author's previous row (64 tips: join 66 did not
+	// depend on join 65): a join delivered before its predecessor, or whose predecessor admission refused,
+	// was admitted above a gap. A join now always covers the author's latest own row.
+	for (const width of [17, 33, 49, 64])
+		it(`(ii) every own row depends on the author's previous own row (${width}-tip reduction)`, async () => {
+			const result = await runFrontierScenario(width);
+			expect(result.result).toMatchObject({ ok: true, kind: "accepted" });
+			const closure = predecessorClosure(result);
+			expect(closure.at(-1)?.action).toBe("add");
+			expect(closure.filter(({ dependsOnPrevious }) => !dependsOnPrevious)).toEqual([]);
+			// Each issued row stays within the dependency bound.
+			expect(result.issued.every(({ dependencies }) => dependencies.length > 0 && dependencies.length <= 16)).toBe(
+				true
+			);
+		});
 });
