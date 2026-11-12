@@ -99,12 +99,14 @@ describe("existing ordinary prepared-capacity DATA owner", () => {
 				"releaseIdleEgressAdmissionOwner",
 				"retireRetainedReplay",
 				"releaseRetainedReplayPrefix",
+				"closePendingIngressCarriesTo",
 			]
 				.map((name) => declaration(name).getText(tree))
 				.join("\n") + "\nreturn deactivateRegistration;",
 			{
 				ordinaryRuntimeCapacityGeometry: geometry,
 				v3EgressAdmissionOwners: new WeakMap(),
+				carriesForwardingTo: new WeakMap(),
 				v3PlaneRegistrations: new WeakMap([[registration.networkNode, registrations]]),
 				topicMembership: () => false, hasQueueGuarded: () => false,
 			});

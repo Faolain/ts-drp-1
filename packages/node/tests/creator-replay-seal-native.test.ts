@@ -773,11 +773,12 @@ describe("same adoption verification facts through original close custody", () =
 					"releaseIdleEgressAdmissionOwner",
 					"retireRetainedReplay",
 					"releaseRetainedReplayPrefix",
+					"closePendingIngressCarriesTo",
 				],
 				"deactivateRegistration(registration)",
 				{
 			registration: value, ordinaryRuntimeCapacityGeometry: new WeakMap(), v3PlaneRegistrations: new WeakMap(),
-					v3EgressAdmissionOwners: new WeakMap(),
+					v3EgressAdmissionOwners: new WeakMap(), carriesForwardingTo: new WeakMap(),
 			topicMembership: () => false, hasQueueGuarded: () => false});
 		deactivate(registration({vertexFacts: old.facts}));
 		expect(predecessorValidation.vertexFacts).toBe(successorRuntime.vertexFacts);
