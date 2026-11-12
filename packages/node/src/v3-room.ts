@@ -184,6 +184,24 @@ const CREATOR_INVITE_BYTE_FIELDS = Object.freeze([
 const CREATOR_INVITE_MATERIAL_KEYS = Object.freeze([...CREATOR_INVITE_BYTE_FIELDS, "pinnedGenesisAnchorDigest"]);
 const UNSUPPORTED_LINEAGE_POLICY = "D110C_LINEAGE_POLICY_UNSUPPORTED";
 const SETTLEMENT_MANUAL_REVIEW_MESSAGE = "v3 room settlement plan requires manual review";
+// Diagnostics (measurement only): wall time of each successor-install and settlement-drain stage, by
+// role ("creator." / "member."), summed over this process's rooms. Nested stages overlap their parent.
+const v3RoomStageTimes = new Map<string, { ms: number; count: number }>();
+/**
+ * Reads the stage timing diagnostics (milliseconds and entries per stage since the process started).
+ * @returns A snapshot.
+ */
+export function readV3RoomStageTimes(): Readonly<Record<string, Readonly<{ ms: number; count: number }>>> {
+	return Object.freeze(Object.fromEntries([...v3RoomStageTimes].map(([stage, row]) => [stage, Object.freeze({ ...row })])));
+}
+const noteV3RoomStage = (stage: string, started: number): void => {
+	const row = v3RoomStageTimes.get(stage);
+	if (row === undefined) v3RoomStageTimes.set(stage, { ms: performance.now() - started, count: 1 });
+	else {
+		row.ms += performance.now() - started;
+		row.count += 1;
+	}
+};
 const settlementManualReviewErrors = new WeakSet<TypeError>();
 // Object framing plus the nine encoded keys and the fixed kind, digest and version values.
 // The retained exact 65_536/65_537 boundary pair pins this codec-specific arithmetic.
@@ -4230,10 +4248,22 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	};
 	let logicalTime = input.initialLogicalTime;
 	const roomCreatorAuthor = roomInviteAuthority === undefined ? input.author : roomInviteAuthority.creatorAuthor;
+	const stageRole = input.author === roomCreatorAuthor ? "creator" : "member";
+	const timedStage = async <T>(stage: string, run: () => Promise<T>): Promise<T> => {
+		const started = performance.now();
+		try {
+			return await run();
+		} finally {
+			noteV3RoomStage(`${stageRole}.${stage}`, started);
+		}
+	};
 	// Admission evidence for the local backlog (V3RoomLocalBacklogFull): the rows of this epoch in the
 	// causal past of a received creator row. The creator signed a row depending on them, so it admitted
 	// them and they are in this epoch's seal. Cleared with acceptedVertices; each row is walked once.
 	const creatorReachedRows = new Set<string>();
+	// The own rows among them, by author sequence: a consumed hand-back record whose reissued row is
+	// here is delivered and leaves the backlog (settlementBacklogNow).
+	const creatorReachedOwnSequences = new Set<number>();
 	let noteCreatorReachedOwnRow: ((identity: string) => void) | undefined;
 	const markCreatorReached = (creatorRow: V3RoomAcceptedVertex): void => {
 		const pending = [hex(creatorRow.digest)];
@@ -4242,7 +4272,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			const reached = acceptedVertices.get(identity);
 			if (reached === undefined) continue;
 			creatorReachedRows.add(identity);
-			if (reached.author === input.author) noteCreatorReachedOwnRow?.(identity);
+			if (reached.author === input.author) {
+				creatorReachedOwnSequences.add(reached.authorSequence);
+				noteCreatorReachedOwnRow?.(identity);
+			}
 			pending.push(...reached.dependencies);
 		}
 	};
@@ -4511,6 +4544,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		authenticatedProjectionBase = base;
 		acceptedVertices.clear();
 		creatorReachedRows.clear();
+		creatorReachedOwnSequences.clear();
 		acceptedOperationRows.clear();
 		presentationHook((overlay) => overlay.epochChanged(authority.epoch));
 	};
@@ -6720,6 +6754,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	// The Writer's undelivered own moves (V3RoomLocalBacklogFull) as of its last plan write, and the
 	// displaced rows of the last rebase scan that counted them.
 	let settlementBacklog = 0;
+	// The plan's undelivered moves whose newest row exists (a replacement, or a consumed hand-back
+	// record's reissue), as of that write: they leave the backlog once a creator row reaches every such
+	// row (settlementBacklogNow).
+	let settlementPendingRows: readonly Readonly<{ rows: readonly number[]; moves: number }>[] = [];
 	// The epoch whose author fence the last drain awaits (settlementAuthorFenceDecision "await-fence"):
 	// new moves in it are refused (V3RoomAwaitingAuthorFence) until an install fences. Each drain
 	// decides again; a later epoch clears it.
@@ -6774,31 +6812,59 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	 * The backlog V3RoomLocalBacklogFull bounds, in moves (as hand-back records count them, one per
 	 * intent): each live replaced move once (the entry of its newest displaced row, whose replacement is
 	 * not itself displaced, or which is not yet replaced), each retained source's moves (manual-review),
-	 * and every hand-back record (a consumed one keeps its reissued move's slot until the next merge
-	 * drops it and the reissued row is counted live, if displaced). A row counts all its moves: Grid
-	 * batches moves made together into one row, and each of them needs its own record when the window
-	 * gives it back, so counting the row once let the Writer accept moves past the record bound.
+	 * and every hand-back record, unconsumed or consumed (a consumed one keeps its reissued move's slot
+	 * until the next merge drops it and the reissued row is counted live, if displaced). A move whose
+	 * newest row is a replacement or a reissue is `pending`: it leaves the count once a creator row
+	 * reaches every such row (the creator admitted it; settlementBacklogNow), the evidence that removes
+	 * new moves (markCreatorReached). A row counts all its moves: Grid batches moves made together into
+	 * one row, and each of them needs its own record when the window gives it back, so counting the row
+	 * once let the Writer accept moves past the record bound.
 	 * @param plan - The durable plan.
 	 * @param displaced - The displaced own rows of the last rebase scan, with their moves.
-	 * @returns The backlog.
+	 * @returns The moves counted until the next plan write, and the pending ones.
 	 */
-	const settlementBacklogOf = (plan: RoomSettlementPlan | null, displaced: ReadonlyMap<number, number>): number => {
+	const settlementBacklogOf = (
+		plan: RoomSettlementPlan | null,
+		displaced: ReadonlyMap<number, number>
+	): Readonly<{ fixed: number; pending: readonly Readonly<{ rows: readonly number[]; moves: number }>[] }> => {
 		// A row the scan no longer lists counts one move (it is retired or proven, never more than its record).
 		const moves = (sequence: number): number => Math.max(1, displaced.get(sequence) ?? 1);
-		let live = 0;
+		let fixed = 0;
+		const pending: Readonly<{ rows: readonly number[]; moves: number }>[] = [];
 		for (const entry of plan?.entries ?? []) {
 			if (entry.sourceObjectId !== undefined) continue;
 			if (entry.disposition === "manual-review") {
-				live += moves(entry.sourceSequence);
+				fixed += moves(entry.sourceSequence);
 				continue;
 			}
 			if (entry.disposition !== "rebase" && entry.disposition !== "transform") continue;
 			if (!displaced.has(entry.sourceSequence)) continue;
 			if (entry.replacementSequence !== null && displaced.has(entry.replacementSequence)) continue;
 			if (entry.replacementProgress?.chunks.some((chunk) => displaced.has(chunk.replacementSequence)) === true) continue;
-			live += moves(entry.sourceSequence);
+			const rows = [
+				...(entry.replacementSequence === null ? [] : [entry.replacementSequence]),
+				...(entry.replacementProgress?.chunks.map((chunk) => chunk.replacementSequence) ?? []),
+			];
+			if (rows.length === 0) fixed += moves(entry.sourceSequence);
+			else pending.push(Object.freeze({ rows: Object.freeze([...new Set(rows)]), moves: moves(entry.sourceSequence) }));
 		}
-		return live + (plan?.handBacks?.length ?? 0);
+		for (const record of plan?.handBacks ?? []) {
+			if (record.reissueSequence === null) fixed += 1;
+			else pending.push(Object.freeze({ rows: Object.freeze([record.reissueSequence]), moves: 1 }));
+		}
+		return Object.freeze({ fixed, pending: Object.freeze(pending) });
+	};
+	const recordSettlementBacklog = (plan: RoomSettlementPlan | null): void => {
+		const backlog = settlementBacklogOf(plan, settlementDisplaced);
+		settlementBacklog = backlog.fixed;
+		settlementPendingRows = backlog.pending;
+	};
+	// The plan's backlog now: a pending move whose newest rows a creator row reached is delivered.
+	const settlementBacklogNow = (): number => {
+		let undelivered = settlementBacklog;
+		for (const move of settlementPendingRows)
+			if (!move.rows.every((sequence) => creatorReachedOwnSequences.has(sequence))) undelivered += move.moves;
+		return undelivered;
 	};
 	/**
 	 * The given-back moves: the plan's unconsumed hand-back records (written with the window's expiry or
@@ -6843,7 +6909,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	};
 	const refreshHandBackListing = async (): Promise<void> => {
 		const plan = await issuanceStore.readSettlementPlan(settlementScope);
-		settlementBacklog = settlementBacklogOf(plan, settlementDisplaced);
+		recordSettlementBacklog(plan);
 		if (settlementStatusSnapshot !== undefined)
 			settlementStatusSnapshot = Object.freeze({
 				...settlementStatusSnapshot,
@@ -7223,7 +7289,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			.map((source) => source.epoch);
 		settlementSources = sources;
 		settlementDisplaced = new Map(sources.map((source) => [source.authorSequence, source.intents.length] as const));
-		settlementBacklog = settlementBacklogOf(plan, settlementDisplaced);
+		recordSettlementBacklog(plan);
 		// This plan write at `epoch` settled every own row of the epochs before it.
 		localMovesCountedFrom(epoch);
 		settlementStatusSnapshot = Object.freeze({
@@ -7299,7 +7365,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 		const current = changed ? await issuanceStore.readSettlementPlan(settlementScope) : plan;
 		if (current === null) throw new TypeError("v3 room settlement plan is unavailable after retained resolution");
-		settlementBacklog = settlementBacklogOf(current, settlementDisplaced);
+		recordSettlementBacklog(current);
 		// The status reflects this drain's resolutions (given-back moves no longer wait).
 		recordSettlementStatus(settlementSources, current);
 		return current;
@@ -7539,14 +7605,14 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			)
 				return;
 		}
-		let plan = await writeMergedSettlementPlan(sources);
+		let plan = await timedStage("drain.mergePlan", () => writeMergedSettlementPlan(sources));
 		settlementHeld = plan.entries.some(entry => entry.disposition === "manual-review" && entry.sourceContextDigest === undefined);
 		// A held settlement already refuses new moves (assertSettlementUnheld) until the user decides.
 		if (settlementHeld) {
 			setAuthorFenceAwaited(undefined);
 			return;
 		}
-		plan = await resolveRetainedFromFrontier(plan);
+		plan = await timedStage("drain.resolveRetained", () => resolveRetainedFromFrontier(plan));
 		// A retained source context preserves unknown work, including pre-existing
 		// policy/progress metadata. Its presence grants no replacement decision, and
 		// unknown retained work still withholds the author fence. Retained terminal
@@ -7966,6 +8032,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
 		if (settlementProfile === "v1" && !(await resumePendingIssuanceIntent())) return;
 		const sources: DisplacedSource[] = [];
+		const scanStarted = performance.now();
 		for (;;) {
 			await checkpoint();
 			assertSessionOpen();
@@ -7994,10 +8061,13 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				if (!completed.ok) throw new TypeError(`v3 room rebase completion failed: ${completed.kind}`);
 			}
 		}
+		noteV3RoomStage(`${stageRole}.drain.outboxScan`, scanStarted);
 		if (settlementProfile === "v1") {
 			settlementDrainPublication = publication;
 			try {
-				await drainSettlementOutbox(sources);
+				await timedStage("drain.settlement", () => drainSettlementOutbox(sources));
+				// The drain's replacements are in the plan now: their moves are pending (settlementBacklogOf).
+				recordSettlementBacklog(await issuanceStore.readSettlementPlan(settlementScope));
 			} finally {
 				settlementDrainPublication = "immediate";
 				// These nominal sources authorize only this joined drain. Do not
@@ -9029,10 +9099,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			}
 			assertSessionOpen();
 			restoreRetainedReads = false;
+			const stageStarted = performance.now();
 			const staged = await stageCreatorSuccessorAdoption({
 				handle: adoptionOwner,
 				intent: verified.intent,
 			});
+			noteV3RoomStage(`${stageRole}.adopt.stage`, stageStarted);
 			if (!staged.ok)
 				throw new TypeError(`v3 room successor stage failed: ${String(staged.kind)}`, {
 					cause: staged.cause === undefined ? staged : staged.cause,
@@ -9062,6 +9134,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			}
 			assertSessionOpen();
 			startupReplay = [];
+			const activateStarted = performance.now();
 			const activated = await activateCreatorSuccessorAdoption({
 				createOperationAdmissionPolicy: successorAdmissionFactory,
 				...(classifyTerminalVertex === undefined ? {} : { classifyTerminalVertex }),
@@ -9072,6 +9145,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				networkNode: transport.networkNode,
 				onAdmittedVertex: admittedSink as unknown as V3AdmittedVertexSink,
 			});
+			noteV3RoomStage(`${stageRole}.adopt.activate`, activateStarted);
 			if (activated.ok !== true) {
 				startupReplay = undefined;
 				const failure = new TypeError(
@@ -9170,17 +9244,17 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			creatorCloseUnavailableContinuity = "continuous";
 			try {
 				installSuccessorProjectionBase(replacement, authority);
-				await commitSuccessorProjection();
+				await timedStage("adopt.projection", () => commitSuccessorProjection());
 				// The native floor and exposed authority now name the same successor.
 				await yieldToHost();
 				assertSessionOpen();
 				if (!input.receiveOnly && settlementProfile === "v1") {
-					await publishAccepted();
-					await drainRebaseOutbox();
+					await timedStage("adopt.publishAccepted", () => publishAccepted());
+					await timedStage("adopt.drain", () => drainRebaseOutbox());
 				}
 				await yieldToHost();
 				assertSessionOpen();
-				await prepareCurrentCreatorOrdinaryReadiness();
+				await timedStage("adopt.readiness", () => prepareCurrentCreatorOrdinaryReadiness());
 			} catch (error) {
 				startupReplay = undefined;
 				terminalFailure = error;
@@ -9562,6 +9636,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					if (!localIssueCurrent) await checkInstallCurrency(selected.offer, selected.currency);
 					({ offer, peers } = selected);
 				}
+				const receiveStarted = performance.now();
 				received = await receiveCreatorSuccessorAdoption({
 					plane: activeHandle,
 					catalog: input.application.catalog,
@@ -9577,6 +9652,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					...(recoveryContext === undefined ? {} : { recoveryContext }),
 					retryUntil: AbortSignal.any([sessionLifetime.signal, installDeadline.signal]),
 				});
+				noteV3RoomStage(`${stageRole}.install.receive`, receiveStarted);
 			} catch (error) {
 				// A failed receive may own native retention despite a lost acknowledgement.
 				// Retry must reacquire native custody before preparing any old/new writer.
@@ -9610,10 +9686,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				clearTimeout(installTimer);
 			}
 			try {
-				await withCreatorReceivedPromotionDependencies(received, async () => {
-					assertSessionOpen();
-					await performCreatorSuccessorAdoption(received);
-				});
+				await timedStage("install.adopt", () =>
+					withCreatorReceivedPromotionDependencies(received, async () => {
+						assertSessionOpen();
+						await performCreatorSuccessorAdoption(received);
+					})
+				);
 			} catch (error) {
 				// Received native dependency already exists: never resume the old writer on ambiguous publication.
 				terminalFailure = error;
@@ -10020,7 +10098,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			// The backlog includes the new moves the plan does not count yet (undeliveredLocalMoves).
 			const countsAgainstBacklog = handBack === undefined && redirectPromise === undefined && redirectedSession === undefined;
 			if (countsAgainstBacklog) {
-				const backlog = settlementBacklog + undeliveredLocalMoves();
+				const backlog = settlementBacklogNow() + undeliveredLocalMoves();
 				if (backlog >= V3_ROOM_LOCAL_BACKLOG_LIMIT) throw new V3RoomLocalBacklogFull(backlog, V3_ROOM_LOCAL_BACKLOG_LIMIT);
 			}
 			// A move (a given-back one too) signed while this epoch's author fence is awaited would have no

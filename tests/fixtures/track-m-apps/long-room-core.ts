@@ -901,6 +901,12 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 					fence: plan?.fenceSequence ?? null,
 					fenceEpoch: await epochOf(plan?.fenceSequence ?? null),
 					handBacks: plan?.handBacks?.filter((record) => record.reissueSequence === null).length ?? 0,
+					// Consumed records still in the plan: [reissue sequence, its row's epoch].
+					consumed: await Promise.all(
+						(plan?.handBacks ?? [])
+							.filter((record) => record.reissueSequence !== null)
+							.map(async (record) => [record.reissueSequence, await epochOf(record.reissueSequence)] as const)
+					),
 					entries,
 				};
 			} finally {

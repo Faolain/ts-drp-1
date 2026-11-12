@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type -- Native room helpers retain fixture types. */
 import { decodeCanonical } from "@ts-drp/canonical";
+import { observeCanonicalCalls } from "@ts-drp/canonical/instrumentation";
+import { observeEd25519Verifications } from "@ts-drp/protocol-v3/instrumentation";
 import type { SnapshotChunkProtocolPort } from "@ts-drp/network/snapshot-transfer";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { Session } from "node:inspector/promises";
@@ -7,6 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, it } from "vitest";
 
+import { callSite, installSqliteCountSeams } from "./fixtures/perf-counts/counts.js";
 import { installEnvironment, nodeHostFor } from "./fixtures/track-m-apps/app-long-room.js";
 import { openRole, type RoleEnvironment } from "./fixtures/track-m-apps/long-room-core.js";
 import {
@@ -17,7 +20,7 @@ import {
 } from "./fixtures/track-m-apps/long-room-driver.js";
 import { observeEd25519Verifications } from "@ts-drp/protocol-v3/instrumentation";
 import { readV3SettlementWorkCounts } from "../packages/node/src/v3-live.js";
-import { V3_ROOM_LOCAL_BACKLOG_LIMIT } from "../packages/node/src/v3-room.js";
+import { readV3RoomStageTimes, V3_ROOM_LOCAL_BACKLOG_LIMIT } from "../packages/node/src/v3-room.js";
 import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-head.js";
 
 // Found by fix/int7-slow-member-landing (tests/app-rollover-slow-member-native.test.ts under host
@@ -128,11 +131,22 @@ function rowWire(creator: RoleEndpoint, writer: RoleEndpoint) {
 	};
 }
 
+// The creator's moves place Grid blocks from a fixed set of CREATOR_BLOCK_IDS ids (x carries the
+// ordinal, so every move is a distinct operation). Grid keeps one block per id and its state is
+// bounded (32 KiB canonical, about 850 blocks): a creator placing a new id per move would reach that
+// bound in a long run (about 850 moves) and fail as "outside the bounded canonical domain" instead of
+// on what the test measures.
+const CREATOR_BLOCK_IDS = 64;
+function creatorMove(creator: RoleEndpoint, ordinal: { next: number }) {
+	const k = ordinal.next++;
+	return creator.issue(k, k % CREATOR_BLOCK_IDS);
+}
+
 /** Creator moves (with the creator's rows carried to the Writer) until its policy rolls the epoch. */
 async function rollCreator(creator: RoleEndpoint, carry: () => Promise<void>, ordinal: { next: number }) {
 	const before = (await creator.rollover?.())?.epoch ?? 0;
 	for (;;) {
-		await creator.issue(0, ordinal.next++);
+		await creatorMove(creator, ordinal);
 		await carry();
 		const epoch = (await creator.rollover?.())?.epoch ?? 0;
 		if (epoch > before) return epoch;
@@ -530,9 +544,18 @@ async function profiled<T>(name: string, run: () => Promise<T>): Promise<T> {
 // the creator; it follows by skip installs over two closed epochs each), then is connected again
 // while the creator keeps moving every 300 ms and rolls at its own policy's rate. Every move must
 // land on the creator exactly once; the time from reconnecting to the last move landing is the
-// catch-up time (printed with the native work counts of that phase). Fails on no progress for
-// CATCH_UP_STALL_MS, not on a fixed deadline.
+// catch-up time (printed with the native work counts of that phase).
+//
+// Two failures, each named: "catch-up stalled" (no move landed for CATCH_UP_STALL_MS) and "catch-up
+// too slow" (not every move landed within the time budget, CATCH_UP_S_PER_MOVE seconds per move).
+// The budget is 12 s per move: about 1.5x the slowest passing 100x16 run on the boat boxes (633-800 s
+// for 102 moves, 6.2-7.8 s per move; 50x8 passed at 4.3-9.0 s per move). 100x16 gets 1,224 s, 50x8
+// 624 s, 25x4 324 s. It trips before any other bound: the creator's state stays far below Grid's
+// 32 KiB (CREATOR_BLOCK_IDS), and budget plus the behind phase and the final exactly-once check stay
+// inside the test's 1 h timeout. The real-time bar is far tighter than this; the budget names a slow
+// catch-up as slow rather than measuring it (the CATCH_UP line does that).
 const CATCH_UP_STALL_MS = Number(process.env.CATCH_UP_STALL_MS ?? 300_000);
+const CATCH_UP_S_PER_MOVE = Number(process.env.CATCH_UP_S_PER_MOVE ?? 12);
 async function catchUp(moves: number, epochs: number) {
 	const restore = await installEnvironment("node", () => undefined);
 	const directory = mkdtempSync(join(tmpdir(), "app-rollover-catch-up-"));
@@ -606,18 +629,22 @@ async function catchUp(moves: number, epochs: number) {
 			// Connected again: the creator keeps moving; the member's rows are carried both ways.
 			const before = readV3SettlementWorkCounts();
 			const started = performance.now();
+			const budgetS = CATCH_UP_S_PER_MOVE * ids.length;
 			let landedAt = started;
 			let landed = 0;
 			let counts: number[] = [];
 			// The member's epoch over the catch-up: when each install landed and how far behind it was.
 			const memberEpochs: { at: number; member: number; creator: number }[] = [];
+			let traceLast = "";
 			const describe = async () => {
 				const status = (await writer.rolloverStatus?.()) as Record<string, unknown> | undefined;
 				const settlement = (await writer.settlementStatus?.()) as { unsettledEpochs?: number; undelivered?: unknown[] } | null;
 				return JSON.stringify({ creator: (await creator.rollover?.())?.epoch, member: await writer.authorityEpoch(),
 					settlement: [settlement?.unsettledEpochs, settlement?.undelivered?.length],
 					state: status?.state, kept: Array.isArray(status?.kept) ? status.kept.length : undefined,
-					delivery: await writer.successorDelivery?.(), memberEpochs: memberEpochs.slice(-12) });
+					delivery: await writer.successorDelivery?.(), memberEpochs: memberEpochs.slice(-12),
+					creatorErrors: ((await creator.rollover?.())?.errors ?? []).slice(-3).map((error) => String(error).slice(0, 300)),
+					memberErrors: ((await writer.rollover?.())?.errors ?? []).slice(-3).map((error) => String(error).slice(0, 300)) });
 			};
 			await profiled(`catch-up-${moves}-${epochs}`, async () => {
 				for (;;) {
@@ -631,6 +658,31 @@ async function catchUp(moves: number, epochs: number) {
 						await dumpPlan(`m${memberEpoch}`);
 					}
 					const now = counts.filter((count) => count >= 1).length;
+					// CATCH_UP_TRACE=1: the member's policy gate each step (state, kept, unsettled epochs, the
+					// settlement window, given-back records) beside the epochs and moves landed.
+					if (process.env.CATCH_UP_TRACE === "1") {
+						const status = (await writer.rolloverStatus?.()) as
+							| { state?: string; kept?: unknown[]; unsettledEpochs?: number; window?: number }
+							| undefined;
+						const settlement = (await writer.settlementStatus?.()) as
+							| { unsettledEpochs?: number; undelivered?: unknown[]; deferred?: number }
+							| null;
+						const line = JSON.stringify({
+							at: Math.round(performance.now() - started),
+							creator: (await creator.rollover?.())?.epoch,
+							member: await writer.authorityEpoch(),
+							landed: now,
+							state: status?.state,
+							kept: status?.kept?.length,
+							unsettled: settlement?.unsettledEpochs,
+							window: status?.window,
+							undelivered: settlement?.undelivered?.length,
+							deferred: settlement?.deferred,
+							memberErrors: ((await writer.rollover?.())?.errors ?? []).length,
+						});
+						if (line.replace(/"at":\d+,/u, "") !== traceLast) process.stdout.write(`CATCH_UP_TRACE ${line}\n`);
+						traceLast = line.replace(/"at":\d+,/u, "");
+					}
 					if (now > landed) {
 						landed = now;
 						landedAt = performance.now();
@@ -638,7 +690,14 @@ async function catchUp(moves: number, epochs: number) {
 					if (now === ids.length) return;
 					if (performance.now() - landedAt > CATCH_UP_STALL_MS)
 						throw new Error(`catch-up stalled: ${now}/${ids.length} landed, ${(await describe()).slice(0, 6000)}`);
-					await creator.issue(0, ordinal.next++);
+					const elapsed = (performance.now() - started) / 1000;
+					if (elapsed > budgetS)
+						throw new Error(
+							`catch-up too slow: ${now}/${ids.length} landed after ${Math.round(elapsed)} s ` +
+								`(${now === 0 ? "no move landed" : `${(elapsed / now).toFixed(1)} s per landed move`}; ` +
+								`budget ${budgetS} s = ${CATCH_UP_S_PER_MOVE} s x ${ids.length} moves), ${(await describe()).slice(0, 6000)}`
+						);
+					await creatorMove(creator, ordinal);
 					await sleep(300);
 				}
 			});
@@ -997,3 +1056,270 @@ async function backlogCountsBatchedMoves(batch: number) {
 
 it("the undelivered-move bound counts each move of a batched row, as hand-back records do", () =>
 	backlogCountsBatchedMoves(24), 1_800_000);
+
+// A given-back move counts against the undelivered bound only while its newest row has no admission
+// evidence. An offline Writer's GIVEN_BACK moves are given back by a skip install (that many records);
+// in the next epoch its policy offers them again (each reissue consumes its record). In this run the
+// creator rolls once more before the reissued rows reach it, so the Writer's next install replaces
+// them; the creator admits every replacement and signs a row reaching them: those moves are
+// delivered. The Writer, offline again, must then be accepted for the bound's full 64 new moves in
+// that epoch. 4109c500 counted a consumed record until the next plan merge dropped it, and a replaced
+// move until the next plan write (the cached count also predated the drain's replacements), so it
+// refused the Writer after 64 - GIVEN_BACK new moves (in the 100x16 catch-up, about 24 kept moves per
+// install). The creator's budget (20 moves per author, under its own epoch's capacity of about 25)
+// holds the check in one epoch: the Writer's rows count 16 there and the creator signs one row.
+const GIVEN_BACK = 16;
+async function deliveredReissuesLeaveTheBacklog() {
+	const restore = await installEnvironment("node", () => undefined);
+	const directory = mkdtempSync(join(tmpdir(), "app-rollover-backlog-reissued-"));
+	directories.push(directory);
+	try {
+		const { creator, writer } = await openPair(directory, {}, { movesPerAuthor: 20, idleMs: 3_600_000 });
+		const wire = successorWire(() => [creator, writer] as const);
+		const rows = rowWire(creator, writer);
+		const both = async () => {
+			await rows.toWriter();
+			await rows.toCreator();
+		};
+		const ordinal = { next: 0 };
+		const ids: string[] = [];
+		let epoch = 0;
+		let n = 0;
+		const status = async () => (await writer.settlementStatus?.()) as { undelivered: unknown[] } | null;
+		const phase = async (label: string) =>
+			process.stdout.write(
+				`BACKLOG_REISSUED_PHASE ${JSON.stringify({
+					label,
+					epoch,
+					creator: await creator.authorityEpoch(),
+					writer: await writer.authorityEpoch(),
+					undelivered: (await status())?.undelivered.length,
+					kept: ((await writer.rolloverStatus?.()) as { kept?: unknown[] } | null)?.kept?.length,
+					plan: await writer.settlementPlanDump?.(),
+				})}\n`
+			);
+		try {
+			while (epoch < 2) {
+				epoch = await rollCreator(creator, both, ordinal);
+				await wire.caughtUp(epoch);
+				await both();
+			}
+			// Offline: moves the creator never receives, straight to the room; a skip install gives them back.
+			for (let k = 0; k < GIVEN_BACK; k++) {
+				await writer.issueRoom!(epoch, n);
+				ids.push(`block-1-${n++}`);
+			}
+			await wire.pause();
+			for (let roll = 0; roll < 3; roll++) epoch = await rollCreator(creator, async () => undefined, ordinal);
+			wire.resume();
+			await wire.caughtUp(epoch, 600_000);
+			const givenBack = (await waitFor("moves given back", status, (value) => value?.undelivered.length === GIVEN_BACK, 120_000))
+				?.undelivered.length;
+			await phase("given-back");
+			// Connected: the next epoch, where the policy offers the given-back moves again.
+			await both();
+			epoch = await rollCreator(creator, both, ordinal);
+			await wire.caughtUp(epoch, 600_000);
+			const writerAuthor = rowValue((await writer.published(null))[0]!).author;
+			await waitFor(
+				"every reissued move admitted",
+				async () => {
+					await both();
+					return {
+						landed: (await acceptedCounts(creator, writerAuthor, ids)).filter((count) => count >= 1).length,
+						epochs: [await creator.authorityEpoch(), await writer.authorityEpoch()],
+						undelivered: (await status())?.undelivered.length,
+					};
+				},
+				(value) => value.landed === ids.length,
+				120_000
+			);
+			await phase("reissues-admitted");
+			// Evidence: a creator row of this epoch whose causal past reaches every reissued row.
+			await creator.issueRoom!(epoch, ordinal.next++);
+			await rows.toWriter();
+			await phase("delivered");
+			// Offline again: new moves until the room refuses one at the bound.
+			let accepted = 0;
+			let refusal: string | undefined;
+			while (refusal === undefined && accepted <= V3_ROOM_LOCAL_BACKLOG_LIMIT) {
+				try {
+					await writer.issueRoom!(epoch, n++);
+					accepted++;
+				} catch (error) {
+					refusal = String((error as Error).name ?? error);
+				}
+			}
+			const epochs = { creator: (await creator.authorityEpoch()) ?? 0, writer: (await writer.authorityEpoch()) ?? 0 };
+			const summary = { givenBack, accepted, refusal, epoch, epochs };
+			process.stdout.write(`BACKLOG_REISSUED ${JSON.stringify(summary)}\n`);
+			expect(givenBack, "moves given back").toBe(GIVEN_BACK);
+			expect(epochs, "one epoch from the reissues to the refusal").toEqual({ creator: epoch, writer: epoch });
+			expect(refusal, "refused at the bound").toBe("V3RoomLocalBacklogFull");
+			expect(accepted, "new moves accepted after every reissued move was delivered").toBe(V3_ROOM_LOCAL_BACKLOG_LIMIT);
+		} finally {
+			await wire.stop();
+		}
+	} finally {
+		restore();
+	}
+}
+
+it("a consumed hand-back record whose reissued row the creator admitted leaves the undelivered bound", () =>
+	deliveredReissuesLeaveTheBacklog(), 1_800_000);
+
+// Profile (SKIP_PROFILE=1; measurement only, no budget): the skip install of the 100x16 catch-up's
+// steady state, which carries about 60 hand-back records. An offline Writer's SKIP_PROFILE_MOVES moves
+// are given back by a skip install over two closed epochs (install A: retained rows resolved from the
+// frontier); in the next epoch its policy offers them again, but those rows never reach the creator;
+// the next skip install over two closed epochs (install B) finds every reissued row displaced and gives
+// each move back again. For each install: deterministic counts (SQLite statements by keyword and
+// transactions by mode, canonical encodes and decodes with bytes, Ed25519 verifications computed and
+// memoized, the settlement work counters), per record, and wall and process CPU time per stage
+// (readV3RoomStageTimes; nested stages overlap their parent). One process holds both roles: the
+// creator only serves the successor material during the window, and its stages are listed apart.
+async function profileHandBackSkipInstall(moves: number) {
+	const restore = await installEnvironment("node", () => undefined);
+	const directory = mkdtempSync(join(tmpdir(), "app-rollover-skip-profile-"));
+	directories.push(directory);
+	const counts = new Map<string, number>();
+	// SKIP_PROFILE_ATTRIBUTE=1: each canonical encode (and its bytes) and each SELECT by its call site.
+	const attribute = process.env.SKIP_PROFILE_ATTRIBUTE === "1";
+	const sites = new Map<string, number>();
+	const bump = (key: string, amount = 1) => {
+		counts.set(key, (counts.get(key) ?? 0) + amount);
+		if (!attribute || (key !== "canonical.encode" && key !== "canonical.encodeBytes" && key !== "sql.SELECT")) return;
+		const site = `${key} | ${callSite(Number(process.env.SKIP_PROFILE_DEPTH ?? 5))}`;
+		sites.set(site, (sites.get(site) ?? 0) + amount);
+	};
+	const restores: (() => void)[] = [await installSqliteCountSeams((key) => bump(key))];
+	observeCanonicalCalls((kind, byteLength) => {
+		bump(`canonical.${kind}`);
+		bump(`canonical.${kind}Bytes`, byteLength);
+	});
+	restores.push(() => observeCanonicalCalls(undefined));
+	// Both protocol-v3 instances: the source this test's importers load, and the dist build the dist
+	// packages (storage, compaction, issuance-store) resolve through node.
+	const distVerifications = (
+		(await import(join(import.meta.dirname, "../packages/protocol-v3/dist/src/instrumentation.js"))) as {
+			observeEd25519Verifications: typeof observeEd25519Verifications;
+		}
+	).observeEd25519Verifications;
+	for (const observe of [observeEd25519Verifications, distVerifications]) {
+		observe((outcome) => bump(outcome === "computed" ? "ed25519.verify" : "ed25519.verifyMemo"));
+		restores.push(() => observe(undefined));
+	}
+	try {
+		const { creator, writer } = await openPair(directory);
+		const wire = successorWire(() => [creator, writer] as const);
+		const rows = rowWire(creator, writer);
+		const ordinal = { next: 0 };
+		let epoch = 0;
+		let n = 0;
+		const status = async () =>
+			(await writer.settlementStatus?.()) as { undelivered: unknown[]; unsettledEpochs: number } | null;
+		const plan = async () => (await writer.settlementPlanDump?.()) as { handBacks: number; entries: { d: string }[] } | null;
+		// One measured skip install: from resuming the wire until the member's install (adoption and
+		// settlement drain) has completed and the room lists `listed` given-back moves.
+		const measured = async (label: string, listed: number) => {
+			const stagesBefore = readV3RoomStageTimes();
+			const workBefore = readV3SettlementWorkCounts();
+			const adoptsBefore = stagesBefore["member.install.adopt"]?.count ?? 0;
+			counts.clear();
+			sites.clear();
+			const cpuBefore = process.cpuUsage();
+			const started = performance.now();
+			wire.resume();
+			await wire.caughtUp(epoch, 1_200_000);
+			await waitFor(
+				`${label}: install and drain complete`,
+				async () => ({ adopts: readV3RoomStageTimes()["member.install.adopt"]?.count ?? 0, listed: (await status())?.undelivered.length }),
+				(value) => value.adopts > adoptsBefore && value.listed === listed,
+				600_000
+			);
+			const wallMs = performance.now() - started;
+			const cpu = process.cpuUsage(cpuBefore);
+			const snapshot = Object.fromEntries([...counts].sort(([a], [b]) => a.localeCompare(b)));
+			const workAfter = readV3SettlementWorkCounts();
+			const work = Object.fromEntries(
+				Object.keys(workAfter).map((key) => [key, workAfter[key as keyof typeof workAfter] - workBefore[key as keyof typeof workBefore]])
+			);
+			const stagesAfter = readV3RoomStageTimes();
+			const stages = Object.fromEntries(
+				Object.entries(stagesAfter)
+					.map(([stage, row]) => [stage, { ms: Math.round(row.ms - (stagesBefore[stage]?.ms ?? 0)), count: row.count - (stagesBefore[stage]?.count ?? 0) }] as const)
+					.filter(([, row]) => row.count > 0)
+			);
+			const records = Math.max(1, listed);
+			const perRecord = Object.fromEntries(
+				[
+					["sqlStatements", Object.entries(snapshot).filter(([key]) => key.startsWith("sql.") && !/begin|commit|rollback|stmt/u.test(key)).reduce((sum, [, value]) => sum + value, 0)],
+					["sqlWriteTransactions", snapshot["sql.beginWrite"] ?? 0],
+					["sqlReadTransactions", snapshot["sql.beginRead"] ?? 0],
+					["canonicalEncodes", snapshot["canonical.encode"] ?? 0],
+					["canonicalEncodedBytes", snapshot["canonical.encodeBytes"] ?? 0],
+					["ed25519Verify", snapshot["ed25519.verify"] ?? 0],
+					["dependencyTurns", work.dependencyTurns ?? 0],
+					["recoveryCensusReads", work.recoveryCensusReads ?? 0],
+				].map(([key, value]) => [key, Math.round(((value as number) / records) * 10) / 10])
+			);
+			const result = {
+				label,
+				epoch,
+				records: listed,
+				wallMs: Math.round(wallMs),
+				cpuMs: Math.round((cpu.user + cpu.system) / 1000),
+				stages,
+				work,
+				counts: snapshot,
+				perRecord,
+				plan: await plan(),
+			};
+			process.stdout.write(`SKIP_PROFILE ${JSON.stringify(result)}\n`);
+			if (attribute)
+				for (const kind of ["canonical.encode |", "canonical.encodeBytes |", "sql.SELECT |"])
+					process.stdout.write(
+						`SKIP_PROFILE_SITES ${JSON.stringify({ label, kind, top: [...sites].filter(([site]) => site.startsWith(kind)).sort((a, b) => b[1] - a[1]).slice(0, 12) })}\n`
+					);
+			return result;
+		};
+		try {
+			while (epoch < 2) {
+				epoch = await rollCreator(creator, rows.toWriter, ordinal);
+				await wire.caughtUp(epoch);
+				await rows.toWriter();
+				await rows.toCreator();
+			}
+			// Offline: moves the creator never receives, straight to the room.
+			for (let k = 0; k < moves; k++) await writer.issueRoom!(epoch, n++);
+			await wire.pause();
+			for (let roll = 0; roll < 2; roll++) epoch = await rollCreator(creator, async () => undefined, ordinal);
+			const installA = await measured("A: retained rows resolved", moves);
+			// The next epoch: the policy offers the given-back moves again; their rows never reach the creator.
+			epoch = await rollCreator(creator, rows.toWriter, ordinal);
+			await wire.caughtUp(epoch, 600_000);
+			const reissued = await waitFor(
+				"given-back moves offered again (records consumed)",
+				async () => ({ listed: (await status())?.undelivered.length ?? -1, policy: (({ state, kept }) => ({ state, kept: kept?.length }))(((await writer.rolloverStatus?.()) ?? {}) as { state?: string; kept?: unknown[] }) }),
+				(value) => value.listed === 0,
+				300_000
+			).catch((error: unknown) => ({ timedOut: String(error).slice(0, 600) }));
+			process.stdout.write(`SKIP_PROFILE_REISSUED ${JSON.stringify(reissued)}\n`);
+			await wire.pause();
+			for (let roll = 0; roll < 2; roll++) epoch = await rollCreator(creator, rows.toWriter, ordinal);
+			const installB = await measured("B: reissued rows displaced, given back again", moves);
+			return { installA, installB };
+		} finally {
+			await wire.stop();
+		}
+	} finally {
+		for (const undo of restores.splice(0).reverse()) undo();
+		restore();
+	}
+}
+
+it.runIf(process.env.SKIP_PROFILE === "1")(
+	"profile: a skip install carrying about 60 hand-back records (deterministic counts and stage times)",
+	() => profileHandBackSkipInstall(Number(process.env.SKIP_PROFILE_MOVES ?? 60)),
+	1_800_000
+);
