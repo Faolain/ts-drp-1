@@ -4402,6 +4402,8 @@ interface CreatorOrdinaryIssuanceSourceFacts {
 	readonly journal: CreatorIssuanceMaintenanceProof["journal"];
 	/** Sole finite numerical expression; no retained original proof or credit. */
 	readonly capacity: { template?: object; material: CreatorOrdinaryFinishingMaterialIndex;
+		/** Roles whose cold quote has asked for a program on this source (no numbers). */
+		templateRequests?: Set<"local" | "received">;
 		readiness?: Readonly<{reader: CreatorOrdinaryApplicationResourceBoundReader; sourceIdentity: object;
 			geometry: CreatorOrdinaryReadinessGeometry;
 			window?: Readonly<{declaredLimits: CreatorOrdinaryFinishingWindowLimits; limits: CreatorOrdinaryFinishingWindowLimits;
@@ -16044,7 +16046,8 @@ function creatorFinishingAuthenticatedTrustContextEqual(
  * temporary compiler/source observations are gone before this numeric program
  * enters the existing immutable source's sole capacity cell. */
 export async function captureCreatorOrdinaryFinishingCapacityTemplate(
-	input: ProspectiveCreatorMaintenancePrefixInput, source: CreatorOrdinaryIssuanceProofSource
+	input: ProspectiveCreatorMaintenancePrefixInput, source: CreatorOrdinaryIssuanceProofSource,
+	options?: Readonly<{deferFirstCompile?: boolean}>
 ): Promise<CreatorFinishingTemplateCaptureResult> {
 	let stage = "eligibility";
 	let prefixes: CreatorFinishingValidatedPrefixes | undefined;
@@ -16121,6 +16124,21 @@ export async function captureCreatorOrdinaryFinishingCapacityTemplate(
 				if (typeof observer === "function") observer({kind: "ordinary-finishing-template-retained", role});
 			} catch { /* Existing diagnostics cannot affect admission or cleanup. */ }
 			return Object.freeze({captured: true});
+		}
+		// A retained source's first cold quote of a role takes the original exact
+		// cold forecast and compiles nothing: a program is only worth its compile when
+		// the SAME source sees that role's cold quote again (most sources see one and
+		// are replaced at the next boundary, so their program was never evaluated).
+		if (options?.deferFirstCompile === true) {
+			const requested = seed.capacity.templateRequests ??= new Set();
+			if (!requested.has(role)) {
+				requested.add(role);
+				try {
+					const observer = Reflect.get(globalThis, "__warmProofEvent");
+					if (typeof observer === "function") observer({kind: "ordinary-finishing-template-deferred", role});
+				} catch { /* Existing diagnostics cannot affect admission or cleanup. */ }
+				return Object.freeze({captured: false});
+			}
 		}
 		try {
 			const observer = Reflect.get(globalThis, "__warmProofEvent");

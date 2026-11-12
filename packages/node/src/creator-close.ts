@@ -3009,7 +3009,8 @@ async function chargeCreatorIssuanceMaintenanceQuote(
 	quote: CreatorIssuanceMaintenanceQuote,
 	unsignedBytes: Uint8Array,
 	planEffect?: NonNullable<DurableIssueCommit["planEffect"]>,
-	source?: CreatorOrdinaryIssuanceProofSource
+	source?: CreatorOrdinaryIssuanceProofSource,
+	deferFirstCompile = false
 ): Promise<boolean> {
 	const {proof} = quote, accounting = proof.accounting;
 	const {knownBasis, receivedSignature, unknownBasis, fields} = creatorIssuanceMaintenanceQuoteSizing(quote, unsignedBytes, planEffect);
@@ -3017,7 +3018,7 @@ async function chargeCreatorIssuanceMaintenanceQuote(
 	const prefixInput = {...fields, proof, nextEpochAdmissionForecast};
 	// Source capture and compilation precede every NEW UNKNOWN charge. The
 	// compiler retains numerical fields only in this handle's one source cell.
-	const captured = source === undefined ? undefined : await captureCreatorOrdinaryFinishingCapacityTemplate(prefixInput, source);
+	const captured = source === undefined ? undefined : await captureCreatorOrdinaryFinishingCapacityTemplate(prefixInput, source, {deferFirstCompile});
 	// The verified bound is used only through its genuine per-call owner. Cold
 	// fallback retains original exact sizing, without the extra diagnostic pass.
 	const { ordinaryFinishingCapacityDimensions: _diagnosticDimensions, ...exactPrefixInput } = prefixInput;
@@ -3734,7 +3735,9 @@ export async function bindCreatorLiveClose(
 							capture = await captureCreatorOrdinaryIssuanceProofSource(cold.proof);
 							report({kind: "ordinary-finishing-source-capture", ok: capture !== undefined});
 						}
-						const compiled = await chargeCreatorIssuanceMaintenanceQuote(cold, unsignedBytes, planEffect, capture);
+						// Only the retained source defers its first compile of a role; a
+						// fresh capture is kept only if it compiles, as before.
+						const compiled = await chargeCreatorIssuanceMaintenanceQuote(cold, unsignedBytes, planEffect, capture, capture !== undefined && capture === ordinaryProofSource);
 						await cooperate();
 						if (fenceSource !== undefined) {
 							ordinaryProofSource = fenceSource; ordinaryTemplateReady = false;
