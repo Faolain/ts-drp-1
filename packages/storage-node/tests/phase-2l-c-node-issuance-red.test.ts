@@ -64,6 +64,8 @@ const CURRENT_LINEAGES_DDL =
 	"CREATE TABLE lineages (\n  object_id TEXT NOT NULL,\n  author TEXT NOT NULL,\n  next INTEGER NOT NULL CHECK(next BETWEEN 0 AND 9007199254740991),\n  exhausted INTEGER NOT NULL CHECK(exhausted IN (0,1)),\n  pruned_through_author_sequence INTEGER CHECK(pruned_through_author_sequence IS NULL OR pruned_through_author_sequence BETWEEN 0 AND 9007199254740991),\n  pending_unsigned BLOB CHECK(pending_unsigned IS NULL OR (typeof(pending_unsigned) = 'blob' AND length(pending_unsigned) > 0)),\n  PRIMARY KEY (object_id,author)\n) WITHOUT ROWID";
 const RETIREMENT_CONTROLS_DDL =
 	"CREATE TABLE retirement_controls (object_id TEXT PRIMARY KEY NOT NULL, record BLOB NOT NULL) WITHOUT ROWID";
+const RETIREMENT_PLAN_BEFORE_DDL =
+	"CREATE TABLE retirement_plan_before (object_id TEXT PRIMARY KEY NOT NULL, record BLOB NOT NULL) WITHOUT ROWID";
 const ISSUANCE_FENCE_TRIGGERS = ["issuance_outbox", "issued_records", "lineages", "settlement_plans"]
 	.flatMap((table) =>
 		(["delete", "insert", "update"] as const).map((op) => {
@@ -88,7 +90,7 @@ const CURRENT_ISSUANCE_TABLE_DDL = Object.freeze([
 	PHASE_2L_C_DDL.issuance_outbox,
 	PHASE_2L_C_V3_DDL.settlement_plans,
 	RETIREMENT_CONTROLS_DDL,
-	"CREATE TABLE retirement_plan_before (object_id TEXT PRIMARY KEY NOT NULL, record BLOB NOT NULL) WITHOUT ROWID",
+	RETIREMENT_PLAN_BEFORE_DDL,
 ] as const);
 
 const admissionObserverFixture = new URL("./fixtures/phase-2l-c-node-admission-observer-child.mjs", import.meta.url);
@@ -1151,6 +1153,7 @@ describe("Phase 2l-c synchronous factory and exact SQLite admission", () => {
 			{ name: "issued_records", sql: PHASE_2L_C_DDL.issued_records, tbl_name: "issued_records", type: "table" },
 			{ name: "lineages", sql: CURRENT_LINEAGES_DDL, tbl_name: "lineages", type: "table" },
 			{ name: "retirement_controls", sql: RETIREMENT_CONTROLS_DDL, tbl_name: "retirement_controls", type: "table" },
+			{ name: "retirement_plan_before", sql: RETIREMENT_PLAN_BEFORE_DDL, tbl_name: "retirement_plan_before", type: "table" },
 			{ name: "settlement_plans", sql: PHASE_2L_C_V3_DDL.settlement_plans, tbl_name: "settlement_plans", type: "table" },
 			...ISSUANCE_FENCE_TRIGGERS,
 		]);

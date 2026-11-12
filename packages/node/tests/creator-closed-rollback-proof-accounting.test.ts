@@ -30,7 +30,7 @@ import {
 	type LiveJournalRetirementControl,
 } from "@ts-drp/live-journal";
 import { describe, expect, it } from "vitest";
-import { ISSUANCE_RETIREMENT_LIMITS, closeIssuanceRetirementProtectedRecords } from "../../issuance-store/src/retirement.js";
+import { ISSUANCE_RETIREMENT_LIMITS, closeIssuanceRetirementProtectedRecords, issuanceRetirementFloor } from "../../issuance-store/src/retirement.js";
 
 import {
 	createCreatorClosedRollbackProofAccounting,
@@ -81,8 +81,10 @@ describe("private issuance hole selection", () => {
 		expect(run({authenticatedSettlementSourceRow: () => ({digest: "altered"})}).covered).toBe(false);
 	});
 	it("requires covered published work, physical absence and complete replay exclusion; preserves SAME-intent and permanent holes", () => {
-		const select = execute<(input: any) => readonly unknown[]>(`${declaration("closedIssuanceProtectedRecordsForRetirement")}\nclosedIssuanceProtectedRecordsForRetirement;`, {
-			record: decodeCanonical, requireLaw: (value: unknown) => {if (!value) throw Error("chain-invalid");},
+		// fix/maintenance-image-capacity: the selection returns {floorEpoch?, protectedRecords} and
+		// selects only rows at or below the retirement floor (closedIssuanceRetirementFloor).
+		const select = execute<(input: any) => readonly unknown[]>(`${declaration("closedIssuanceRetirementFloor")}\n${declaration("closedIssuanceProtectedRecordsForRetirement")}\n(input) => closedIssuanceProtectedRecordsForRetirement(input).protectedRecords;`, {
+			record: decodeCanonical, requireLaw: (value: unknown) => {if (!value) throw Error("chain-invalid");}, issuanceRetirementFloor,
 			closeIssuanceRetirementProtectedRecords: (input: {protectedRecords: readonly unknown[]}) => input.protectedRecords,
 		});
 		const digest = new Uint8Array(32).fill(3), scope = {objectId: "room", author: "author"};
@@ -4649,6 +4651,7 @@ const nativeProtectedRecords = unique(
 function issuanceProtectedRecordsForSource(sourceEpoch: number): {
 	forecast: unknown;
 	native: unknown;
+	floored: unknown;
 	before: Uint8Array;
 	after: Uint8Array;
 } {
@@ -4684,7 +4687,7 @@ function issuanceProtectedRecordsForSource(sourceEpoch: number): {
 		CREATOR_SETTLEMENT_RETAINED_FENCE_RESERVE: 2,
 	});
 	const native = execute(`${declaration("closedIssuanceRetirementFloor")}\n${declaration("closedIssuanceProtectedRecordsForRetirement")}\nconst ${nativeProtectedRecords.getText(parsed)}; protectedRecords;`, {
-		issuanceRetirementFloor: () => 0,
+		issuanceRetirementFloor,
 		// 8f21d1fd/07252cc7: retirement reads the (possibly restored) issuanceRows
 		// and the exact retirement intent labels, not nativeIssuance.rows.
 		issuanceRows: {
@@ -4704,23 +4707,29 @@ function issuanceProtectedRecordsForSource(sourceEpoch: number): {
 			if (!condition) throw Error("native-control-input");
 		},
 	});
-	return { forecast, native, before, after: encodeCanonical(issued) };
+	// fix/maintenance-image-capacity: retirement selects protected records only at or below its floor
+	// (no completed control: two epochs behind the Cut); rows above it stay physically retained, so the
+	// sizing forecast, which protects every row through the source epoch, over-reserves them.
+	const epochOf = new Map([[1, 4], [2, 5], [3, 6], [unsigned.authorSequence, unsigned.epoch]]);
+	const floor = Math.max(0, sourceEpoch - 2);
+	const floored = (forecast as { authorSequence: number }[]).filter((entry) => (epochOf.get(entry.authorSequence) ?? Infinity) <= floor);
+	return { forecast, native, floored, before, after: encodeCanonical(issued) };
 }
 describe("R8 source-floor issuance metadata chronology affected controls", () => {
 	it("CURRENT uses original Cut4 protection while retaining every physical issued input", () => {
 		const result = issuanceProtectedRecordsForSource(4);
-		expect(result.forecast).toEqual(result.native);
+		expect(result.native).toEqual(result.floored);
 		expect((result.forecast as unknown[]).length).toBe(1);
 		expect(result.after).toEqual(result.before);
 	});
 	it("FUTURE Cut5 includes the original new epoch5 candidate exactly once", () => {
 		const result = issuanceProtectedRecordsForSource(5);
-		expect(result.forecast).toEqual(result.native);
+		expect(result.native).toEqual(result.floored);
 		expect((result.forecast as unknown[]).length).toBe(3);
 		expect(result.after).toEqual(result.before);
 	});
 	it("the selected protection feeds complete PRE and completed controls without changing the prior descriptor", () => {
-		const { forecast, native } = issuanceProtectedRecordsForSource(4);
+		const { floored: forecast, native } = issuanceProtectedRecordsForSource(4);
 		const old = { revision: 7, sequence: 3, active: null, completed: { fullPriorDescriptor: ["all", "PRE"] } };
 		const controls = (protectedRecords: unknown): unknown[] => {
 			const preparation = {
