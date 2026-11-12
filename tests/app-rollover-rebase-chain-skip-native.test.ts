@@ -386,6 +386,8 @@ async function retainedResolutionCost(count: number) {
 			const byKindAfter = nodeIssuanceReadCounts();
 			const work = {
 				dependencyTurns: after.dependencyTurns - before.dependencyTurns,
+				// Complete census reads by the turns' own holds (the seal and each full check).
+				dependencyTurnCensusReads: after.dependencyTurnCensusReads - before.dependencyTurnCensusReads,
 				recoveryCensusReads: after.recoveryCensusReads - before.recoveryCensusReads,
 				// Native census reads by both roles' stores, and those that read and classified every row.
 				nativeCensusReads: censusAfter.reads - censusBefore.reads,
@@ -450,6 +452,15 @@ it("a skip install resolving retained rows pays the native settlement turn once 
 	expect(large.work.fullCensusReads, "full census reads, 32 rows vs 8").toBeLessThanOrEqual(
 		small.work.fullCensusReads + 2
 	);
+	// One dependency turn reads its census completely twice: the seal, and the first check after the
+	// hold owns the turn's issuance reservation. Every later check of the turn (the turn's own two,
+	// and the two around its signing) reuses that held read: the reservation excludes every issuance
+	// writer for the whole turn, and each reuse still checks the native current probe, the replay
+	// and the bound context (six complete reads per turn before).
+	expect(
+		[small.work.dependencyTurnCensusReads, large.work.dependencyTurnCensusReads],
+		"complete census reads per dependency turn"
+	).toEqual([2 * small.work.dependencyTurns, 2 * large.work.dependencyTurns]);
 	// The same holds for the issuance reads the turn's dependency checks repeat (outbox pages, plans,
 	// lineages, issued closures already read): under the reservation they read no row again, so each
 	// further row adds only its own reads (about 12 full reads per row; 23 when every re-read read

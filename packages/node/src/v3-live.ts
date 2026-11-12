@@ -5338,7 +5338,9 @@ function releaseOrdinaryIssuanceRuntimeHold(value: unknown): Promise<void> {
  * process-wide scalars; never authority, never reset by the runtime.
  */
 const v3SettlementWorkCounts = {dependencyTurns: 0, recoveryCensusReads: 0, retainedContractPreparations: 0, sourceExpirySignatures: 0,
-	ownFenceScans: 0};
+	ownFenceScans: 0, dependencyTurnCensusReads: 0, maxDependencyTurnCensusReads: 0};
+// The complete census reads each recovery close hold made (its seal and every full check), by hold.
+const recoveryCloseHoldCensusReads = new WeakMap<CreatorSnapshotRecoveryCloseHold, () => number>();
 export function readV3SettlementWorkCounts(): Readonly<typeof v3SettlementWorkCounts> {
 	return ObjectFreeze({...v3SettlementWorkCounts});
 }
@@ -13191,8 +13193,10 @@ async function sealCreatorRecoveryDependencies(
 				}
 			: {}),
 	};
+	let completeCensusReads = 0;
 	const captureCensus = async (heldIssuance?: CreatorHeldIssuanceCensusRead,
 		capturedInputs?: CreatorRecoveryCensusInputCapture): Promise<Uint8Array | undefined> => {
+		completeCensusReads += 1;
 		try {
 			const result = await readCreatorRecoveryDependencyCensus(registration, censusObservation, heldIssuance, capturedInputs);
 			if (result === undefined) return undefined;
@@ -13289,6 +13293,7 @@ async function sealCreatorRecoveryDependencies(
 			runtime.nativeBranchSource === undefined && runtime.migrationSource === undefined;
 		let unchangedHeldCensus: ReturnType<typeof prepareCreatorUnchangedHeldCensusRead>;
 		const capability = ObjectFreeze({});
+		recoveryCloseHoldCensusReads.set(capability, () => completeCensusReads);
 		recoveryCloseHolds.set(capability, {
 			kind: "full-census",
 			...(ownedReceivedAppend === undefined ? {} : {receivedAppend: ownedReceivedAppend}),
@@ -13465,6 +13470,8 @@ async function withActiveRebaseDependencies(
 	let child: CreatorSnapshotRecoveryCloseDependencyRead | undefined;
 	let failed = false,
 		primary: unknown;
+	let issuanceReservationIndex: number | undefined;
+	let turnHold: CreatorSnapshotRecoveryCloseHold | undefined;
 	try {
 		if (!currentRegistration(registration)) throw new TypeError("active dependency owner is stale");
 		for (const owner of [registration.payload.input.store, registration.liveJournalStore, registration.issuanceStore]) {
@@ -13474,6 +13481,7 @@ async function withActiveRebaseDependencies(
 			}
 			const acquire: unknown = Reflect.get(owner, "acquireNativeReadReservation");
 			if (typeof acquire !== "function") throw new TypeError("active native dependency exclusion is unsupported");
+			if (owner === registration.issuanceStore) issuanceReservationIndex = reservations.length;
 			reservations.push(
 				(await ReflectApply(acquire, owner, [
 					{ objectId: registration.payload.provenance.objectId },
@@ -13507,6 +13515,7 @@ async function withActiveRebaseDependencies(
 			currentTrust: registration.payload.trust.trust,
 		});
 		if (lifetime === undefined) throw new TypeError("active dependency custody is unavailable");
+		turnHold = hold;
 		child = await lifetime.borrowDependencies();
 		// This owner authenticates already-admitted historical settlement work,
 		// not a new ordinary operation. Use its existing maintenance entitlement;
@@ -13563,6 +13572,14 @@ async function withActiveRebaseDependencies(
 	} catch (error) {
 		failed = true;
 		primary = error;
+	}
+	const turnCensusReads = turnHold === undefined ? undefined : recoveryCloseHoldCensusReads.get(turnHold)?.();
+	if (turnCensusReads !== undefined) {
+		v3SettlementWorkCounts.dependencyTurnCensusReads += turnCensusReads;
+		v3SettlementWorkCounts.maxDependencyTurnCensusReads = Math.max(
+			v3SettlementWorkCounts.maxDependencyTurnCensusReads,
+			turnCensusReads
+		);
 	}
 	const heldChild = child,
 		heldLifetime = lifetime,
