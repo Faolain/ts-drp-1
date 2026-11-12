@@ -32,9 +32,13 @@ const read = new Function("bindings", `const {${Object.keys(bindings).join(",")}
 function fixture() {
 	const scope = {objectId: "retirement-room", author: "writer"};
 	const commits = Array.from({length: 5}, (_, sequence) => d109bCommit(scope, sequence, sequence));
-	const rows: IssuanceRetirementRows = {lineages: [{...scope, next: 5, exhausted: false, prunedThroughAuthorSequence: null}],
-		issued: commits.map(commit => ({...scope, authorSequence: commit.authorSequence, ...commit.envelope})),
-		outbox: commits.map(commit => ({...scope, authorSequence: commit.authorSequence, digest: commit.envelope.digest, publishState: "published"})),
+	// Rows 0 and 1 are already pruned: their completed entries are the rewrite's drops. A completed
+	// entry whose source the store still holds is custody and stays (578ad4ef), so a fixture whose
+	// sources are all held has no plan rewrite to recover.
+	const held = commits.filter(commit => commit.authorSequence > 1);
+	const rows: IssuanceRetirementRows = {lineages: [{...scope, next: 5, exhausted: false, prunedThroughAuthorSequence: 1}],
+		issued: held.map(commit => ({...scope, authorSequence: commit.authorSequence, ...commit.envelope})),
+		outbox: held.map(commit => ({...scope, authorSequence: commit.authorSequence, digest: commit.envelope.digest, publishState: "published"})),
 		plans: [{scope, revision: 7, fenceSequence: 4, entries: [0, 1, 2].map(sequence => ({sourceSequence: sequence,
 			sourceDigest: commits[sequence]!.envelope.digest, disposition: "rebase", replacementSequence: sequence + 1}))}]};
 	const control: DurableIssuanceRetirementControl = {kind: "v3-issuance-retirement-control-1", objectId: scope.objectId,
@@ -49,6 +53,7 @@ function fixture() {
 		journalPhysical: journal, journalReconstructed: false};
 	const cut = {epoch: 3}, labels = read(source, cut).labels;
 	const p = issuanceRetirementPreparationWithPlanRewrite(control, {...labels, protectedRecords: []}, rows);
+	if (p.planRewrite === undefined) throw new Error("fixture must exercise a plan rewrite");
 	const target = issuanceRetirementCommitRows(control, p, rows), completed = {...control, revision: 2, sequence: 1, completed: p};
 	const retry = {...source, census: census(target, completed), aheControl: {active: null, completed: labels}};
 	return {source, retry, target, completed, census, labels, p, cut};
@@ -57,6 +62,9 @@ function fixture() {
 describe("issuance rewrite source recovery", () => {
 	it("reconstructs the exact old source only for a matching whole-source retry", () => {
 		const f = fixture();
+		// The rewrite drops the pruned sources' completed entries and keeps the held one (custody).
+		expect(f.target.plans[0]!.entries.map(entry => entry.sourceSequence)).toEqual([2]);
+		expect(f.p.planRewrite!.sourceImageDigest).not.toBe(f.p.planRewrite!.targetImageDigest);
 		expect(read(f.retry, f.cut)).toMatchObject({labels: f.labels, completedRewrite: f.p,
 			issuanceImage: {imageDigest: f.p.planRewrite!.sourceImageDigest}});
 		expect(read({...f.retry, aheControl: {active: {preparation: f.labels}, completed: null}}, f.cut).labels).toEqual(f.labels);
