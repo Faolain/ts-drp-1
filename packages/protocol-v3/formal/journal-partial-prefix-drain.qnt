@@ -28,6 +28,9 @@ module journalPartialPrefixDrain {
   pure val C = 12        // the carrier's encode cap
   pure val OVERHEAD = 1  // control + image beside the rows
   pure val RESERVE = 3   // the widest single row's plan width (w <= 2, metadata 1)
+  // The successor's mandatory fence quote checks J + FENCE_HORIZON + c <= C (its fence, the next successor's
+  // header and that successor's fence). Readiness reserves exactly that horizon; it covers the drain reserve.
+  pure val FENCE_HORIZON = 3
   pure val CURRENT = 2   // the open epoch's scope: never covered
   pure val ALL:List[Row] = [
     {scope:0,seq:0},{scope:0,seq:1},{scope:0,seq:2},
@@ -73,12 +76,16 @@ module journalPartialPrefixDrain {
   action init = initWith("healthy")
   action initResidualMutant = initWith("residual")
   action initIneligibleMutant = initWith("ineligible")
+  // Mutant "shortReserve": readiness reserves less than the fence horizon (only the current close's rows, as
+  // before j22): an admitted append leaves the mandatory fence refused.
+  action initShortReserveMutant = initWith("shortReserve")
+  def reserveOf(st:State):int = if (st.mode == "shortReserve") FENCE_HORIZON - 1 else FENCE_HORIZON
 
   // Readiness: an ordinary append keeps J + c + RESERVE <= C; none while a drain is active.
   action appendRow(r:Row):bool = s' =
     if (not(s.crashed) and not(s.active) and r.scope == CURRENT and not(s.appended.contains(r)) and
       ROWS.forall(q => (q.scope == r.scope and q.seq < r.seq).implies(s.appended.contains(q))) and
-      width(s.journal) + w(r) + OVERHEAD + RESERVE <= C)
+      width(s.journal) + w(r) + OVERHEAD + reserveOf(s) <= C)
       s.with("journal", s.journal.union(Set(r))).with("appended", s.appended.union(Set(r)))
     else s.with("refused", true)
   action cover = s' = s.with("covered", s.covered.union(Set(1)))
@@ -130,7 +137,8 @@ module journalPartialPrefixDrain {
     s.journal.forall(q => (q.scope == r.scope and q.seq < r.seq).implies(eligible(s.covered, s.authentic, q))))
   val progress = (not(s.active) and not(s.crashed) and not(s.mismatch) and reachable != Set())
     .implies(selection(s, s.journal).length() > 0)
-  val readinessBound = width(s.journal) + OVERHEAD + RESERVE <= C
+  // The reserve equals the fence horizon: the successor's mandatory fence always fits, and so does a drain.
+  val readinessBound = width(s.journal) + OVERHEAD + FENCE_HORIZON <= C and FENCE_HORIZON >= RESERVE
   val safety = noIneligibleRetired and exactlyOnce and resumeReproduces and carrierBound and progress and readinessBound
 
   // Deterministic drain loop for the run tests: finish, else batch, else begin.
@@ -148,6 +156,7 @@ module journalPartialPrefixDrain {
   // Mutant: resume re-selects over the residual journal (a bigger budget): the plan differs.
   run residualSelectionMutantTest = initResidualMutant.then(cover).then(begin).then(batch).then(crash).then(reopen)
     .expect(not(resumeReproduces))
+  run shortReserveMutantTest = initShortReserveMutant.then(appendRow({scope:2,seq:0})).expect(not(readinessBound))
   // Mutant: the selection skips the authentic class: an ineligible row is retired.
   run ineligibleRetirementMutantTest = initIneligibleMutant.then(cover).then(30.reps(_ => drive))
     .expect(not(noIneligibleRetired))
