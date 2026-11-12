@@ -17,7 +17,9 @@
 // bound) and then pauses while the Writers' received moves fill the rest. The pause must stay
 // under 64 moves per Writer and span about 330 received moves of the epoch, which is why it takes
 // several Writers (two or three never reached the received refusal on bx_6ytwadfw before the
-// creator's own; four reached it in one of two runs).
+// creator's own; four reached it in one of two runs). Five Writers installing one successor need
+// fix/creator-material-session-bound: before it the creator served material to four members per epoch
+// and the fifth's install expired again and again.
 import { appendFileSync } from "node:fs";
 
 import { expect, it } from "vitest";
@@ -57,7 +59,6 @@ it("several hot Writers: a received move the creator refuses at capacity trigger
 	let failure: unknown;
 	let progress: Readonly<Record<string, unknown>> = {};
 	let report: () => Readonly<Record<string, unknown>> = () => ({});
-	const stages: string[] = [];
 	let watchdog: ReturnType<typeof setInterval> | undefined;
 	try {
 		const fixture = await creatorDeliveryRoom({
@@ -110,37 +111,17 @@ it("several hot Writers: a received move the creator refuses at capacity trigger
 					creatorReachable: () => delivery.creatorReachable(),
 					onError: (error) => errors.push(`policy ${index}: ${errorText(error)}`),
 					onRollover: (event) =>
-						events.push({ peer: index, epoch: event.epoch, trigger: event.trigger, moves: event.moves, at: Math.round(performance.now() / 1000) }),
+						events.push({
+							peer: index,
+							epoch: event.epoch,
+							trigger: event.trigger,
+							moves: event.moves,
+							at: Math.round(performance.now() / 1000),
+						}),
 				},
 			});
 			policies[index] = policy;
-			// Diagnostics only: the creator's rollover stages (seal, adopt, export) with their times. The
-			// session is frozen and its methods close over their state, so a copy carries the wrappers.
-			const stage =
-				(name: string, run: (...input: never[]) => Promise<unknown>) =>
-				async (...input: never[]) => {
-					const at = () => Math.round(performance.now() / 1000);
-					stages.push(`${name}:start@${at()}`);
-					try {
-						const result = await run(...input);
-						stages.push(`${name}:ok@${at()}`);
-						return result;
-					} catch (error) {
-						stages.push(`${name}:failed@${at()}:${errorText(error).slice(0, 160)}`);
-						throw error;
-					}
-				};
-			const session = peer.room as unknown as Record<string, (...input: never[]) => Promise<unknown>>;
-			policy.bind(
-				(index !== 0
-					? peer.room
-					: {
-							...peer.room,
-							sealEpoch: stage("sealEpoch", session.sealEpoch!),
-							adoptCreatorSuccessor: stage("adoptCreatorSuccessor", session.adoptCreatorSuccessor!),
-							exportCreatorSuccessor: stage("exportCreatorSuccessor", session.exportCreatorSuccessor!),
-						}) as never
-			);
+			policy.bind(peer.room as never);
 			const room = peer.room;
 			// HARNESS ARTIFACT GUARD (as realtime-scorecard-rate-native): snapshot pulls are bounded per
 			// process, so in-process Writers installing the same successor at once refuse each other and
@@ -177,7 +158,6 @@ it("several hot Writers: a received move the creator refuses at capacity trigger
 			stats: policies.map((policy) => policy?.stats()),
 			deliveries: deliveries.map((delivery) => delivery?.stats()),
 			ingressRefusals: ingressRefusals.length,
-			stages: stages.slice(-6),
 			events,
 			errors: errors.slice(-4),
 		});
@@ -185,7 +165,10 @@ it("several hot Writers: a received move the creator refuses at capacity trigger
 		// Every 15 s the room's state goes to the state file, so a stall shows where it stopped.
 		watchdog = setInterval(() => {
 			if (env.RECEIVED_REFUSAL_STATE_FILE !== undefined)
-				appendFileSync(env.RECEIVED_REFUSAL_STATE_FILE, `RECEIVED_REFUSAL_STATE ${JSON.stringify({ ...progress, ...state() })}\n`);
+				appendFileSync(
+					env.RECEIVED_REFUSAL_STATE_FILE,
+					`RECEIVED_REFUSAL_STATE ${JSON.stringify({ ...progress, ...state() })}\n`
+				);
 		}, 15_000);
 		for (let move = 0; move < MOVES_PER_WRITER * WRITERS; move++) {
 			progress = { move, epochMoves };
