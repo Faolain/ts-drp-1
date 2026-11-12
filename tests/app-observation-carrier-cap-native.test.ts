@@ -15,7 +15,7 @@
 // - the creator is silent: its close (the rollover's seal) is.
 // Five Writers and the creator of a settlement-profile Grid zone room on genuine local libp2p, each
 // page with the shipped rollover policy and successor delivery, one native storage host per peer.
-// The creator rolls on the budget (CARRIER_MOVES moves per author); a typed capacity refusal of a
+// The creator rolls on the budget (CARRIER_MOVES moves of one author); a typed capacity refusal of a
 // received or own move rolls it over too. Every move must be admitted.
 import { expect, it } from "vitest";
 
@@ -79,7 +79,18 @@ async function carrierRoom(label: string, creatorMoves: boolean) {
 		for (let index = 0; index <= WRITERS; index++) peers.push(await fixture.open(index));
 		const creatorPeer = required(peers[0]).peerId;
 		let installTail: Promise<void> = Promise.resolve();
-		const budget = Object.freeze({ ...GRID_ROLLOVER_BUDGET, movesPerAuthor: MOVES, idleMs: 3_600_000 });
+		// A Writer's moves reach the creator batched (up to 16 per vertex): the budget counts every move
+		// of a vertex (weight), not vertices.
+		const movesOf = (vertex: { operation?: unknown }) => {
+			const root = vertex.operation as { action?: string; batch?: { entries?: unknown[] } } | undefined;
+			return root?.action === "applicationBatch" ? (root.batch?.entries?.length ?? 1) : 1;
+		};
+		const budget = Object.freeze({
+			...GRID_ROLLOVER_BUDGET,
+			movesPerAuthor: 1_000_000,
+			idleMs: 3_600_000,
+			weight: Object.freeze({ perAuthor: MOVES, of: movesOf }),
+		});
 		for (const [index, peer] of peers.entries()) {
 			const role = index === 0 ? "creator" : "member";
 			const delivery = createV3RoomSuccessorDelivery({
