@@ -1,8 +1,15 @@
-import { call, defineRoomWorkerContract, errorCodec, latest, send, type RoomWorkerPort } from "@ts-drp/room-worker";
+import { call, defineRoomWorkerContract, errorCodec, latest, type RoomWorkerPort, send } from "@ts-drp/room-worker";
 import { createRoomWorkerClient, type RoomWorkerClientOptions } from "@ts-drp/room-worker/page";
 import { createRoomWorkerServer, defineRoomWorkerApp, type RoomWorkerContext } from "@ts-drp/room-worker/worker";
 
+/**
+ *
+ */
 export class FieldError extends Error {
+	/**
+	 *
+	 * @param epoch
+	 */
 	constructor(readonly epoch: number) {
 		super(`field error at ${epoch}`);
 		this.name = "FieldError";
@@ -15,18 +22,18 @@ export const contract = defineRoomWorkerContract({
 	name: "test-room",
 	version: 1,
 	commands: {
-		echo: call(),
-		fail: call(),
-		emitThenReturn: call(),
-		hold: call(),
-		useHook: call(),
-		abortHook: call(),
-		storage: call(),
+		"echo": call(),
+		"fail": call(),
+		"emitThenReturn": call(),
+		"hold": call(),
+		"useHook": call(),
+		"abortHook": call(),
+		"storage": call(),
 		"nested.ping": call(),
-		move: send((dx: unknown, dy: unknown) => {
+		"move": send((dx: unknown, dy: unknown) => {
 			if (!Number.isInteger(dx) || !Number.isInteger(dy)) throw new TypeError("move is not an integer step");
 		}),
-		refuse: send(),
+		"refuse": send(),
 	},
 	streams: { projection: latest(), transient: latest() },
 	hooks: ["authority", "approve"],
@@ -64,8 +71,16 @@ function asPort(port: MessagePort): RoomWorkerPort {
 	return port as unknown as RoomWorkerPort;
 }
 
-/** A page client and a worker server joined by a MessageChannel, around a scripted app. */
-export function harness(options: Partial<RoomWorkerClientOptions<TestCommands>> = {}, serverOptions: { version?: number } = {}): Harness {
+/**
+ * A page client and a worker server joined by a MessageChannel, around a scripted app.
+ * @param options
+ * @param serverOptions
+ * @param serverOptions.version
+ */
+export function harness(
+	options: Partial<RoomWorkerClientOptions<TestCommands>> = {},
+	serverOptions: { version?: number } = {}
+): Harness {
 	const channel = new MessageChannel();
 	const log: unknown[] = [];
 	const frames: (() => void)[] = [];
@@ -75,25 +90,25 @@ export function harness(options: Partial<RoomWorkerClientOptions<TestCommands>> 
 	const pageAbortSignals: AbortSignal[] = [];
 	const app = defineRoomWorkerApp({
 		contract: serverOptions.version === undefined ? contract : { ...contract, version: serverOptions.version },
-		async open(context) {
+		open(context) {
 			captured = context;
 			log.push(["open", context.init]);
 			return {
 				info: { opened: true },
 				commands: {
-					echo: async (value: unknown) => value,
-					fail: async (epoch: number) => {
+					"echo": (value: unknown): unknown => value,
+					"fail": (epoch: number): never => {
 						throw new FieldError(epoch);
 					},
-					emitThenReturn: async (value: number) => {
+					"emitThenReturn": (value: number): number => {
 						for (let index = 1; index <= value; index++) context.emit("projection", { value: index });
 						return value;
 					},
-					hold: () =>
+					"hold": (): Promise<string> =>
 						new Promise<string>((resolve) => {
 							release = resolve;
 						}),
-					useHook: async () => {
+					"useHook": async (): Promise<unknown> => {
 						const authority = context.hook("authority");
 						if (authority === undefined) return "no hook";
 						const handle = (await authority({ objectId: "o1" })) as {
@@ -111,7 +126,7 @@ export function harness(options: Partial<RoomWorkerClientOptions<TestCommands>> 
 						}
 						return { scope: handle.scope, bytes: Array.from(handle.bytes), doubled, refused: String(refused) };
 					},
-					abortHook: async () => {
+					"abortHook": async (): Promise<string> => {
 						const approve = context.hook("approve");
 						if (approve === undefined) throw new Error("no approve hook");
 						const controller = new AbortController();
@@ -124,22 +139,23 @@ export function harness(options: Partial<RoomWorkerClientOptions<TestCommands>> 
 							return (error as Error).message;
 						}
 					},
-					storage: async (key: string, value: string) => {
+					"storage": (key: string, value: string): string | null => {
 						const before = context.storage.getItem(key);
 						context.storage.setItem(`${key}-written`, value);
 						return before;
 					},
-					"nested.ping": async () => "pong",
-					move: (dx: number, dy: number) => {
+					"nested.ping": (): string => "pong",
+					"move": (dx: number, dy: number): void => {
 						log.push(["move", dx, dy]);
 					},
-					refuse: async (epoch: number) => {
+					"refuse": (epoch: number): never => {
 						throw new FieldError(epoch);
 					},
 				},
-				close: async () => {
+				close: (): Promise<void> => {
 					closed.count++;
 					log.push(["close"]);
+					return Promise.resolve();
 				},
 			};
 		},
@@ -154,12 +170,13 @@ export function harness(options: Partial<RoomWorkerClientOptions<TestCommands>> 
 			frames.push(callback);
 		},
 		hooks: {
-			authority: async (context: unknown) => ({
-				scope: `scope:${(context as { objectId: string }).objectId}`,
-				bytes: new Uint8Array([1, 2, 3]),
-				read: async (n: number) => n * 2,
-			}),
-			approve: (request: unknown) => {
+			authority: (context: unknown): Promise<unknown> =>
+				Promise.resolve({
+					scope: `scope:${(context as { objectId: string }).objectId}`,
+					bytes: new Uint8Array([1, 2, 3]),
+					read: (n: number): Promise<number> => Promise.resolve(n * 2),
+				}),
+			approve: (request: unknown): Promise<never> => {
 				pageAbortSignals.push((request as { cancellationSignal: AbortSignal }).cancellationSignal);
 				return new Promise(() => undefined);
 			},
@@ -170,14 +187,14 @@ export function harness(options: Partial<RoomWorkerClientOptions<TestCommands>> 
 		client,
 		log,
 		frames,
-		flushFrames: () => {
+		flushFrames: (): void => {
 			for (const callback of frames.splice(0)) callback();
 		},
 		releaseHold: (value) => release?.(value),
 		closed,
 		page: channel.port1,
 		worker: channel.port2,
-		context: () => {
+		context: (): RoomWorkerContext => {
 			if (captured === undefined) throw new Error("not open");
 			return captured;
 		},
@@ -185,6 +202,10 @@ export function harness(options: Partial<RoomWorkerClientOptions<TestCommands>> 
 	};
 }
 
+/**
+ *
+ * @param turns
+ */
 export const settle = async (turns = 8): Promise<void> => {
 	for (let index = 0; index < turns; index++) await new Promise((resolve) => setTimeout(resolve, 0));
 };

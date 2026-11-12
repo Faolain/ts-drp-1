@@ -1,5 +1,3 @@
-import { afterEach, describe, expect, it } from "vitest";
-
 import {
 	ROOM_WORKER_PROTOCOL,
 	RoomWorkerClosed,
@@ -7,8 +5,9 @@ import {
 	RoomWorkerLimit,
 	RoomWorkerProtocolError,
 } from "@ts-drp/room-worker";
+import { afterEach, describe, expect, it } from "vitest";
 
-import { FieldError, harness, settle, type Harness } from "./fixture.js";
+import { FieldError, type Harness, harness, settle } from "./fixture.js";
 
 const open: Harness[] = [];
 const make = (...args: Parameters<typeof harness>): Harness => {
@@ -82,7 +81,7 @@ describe("room worker bridge: commands", () => {
 		await client.ready;
 		expect(() => client.send("echo" as "move", 1, 1)).toThrow(TypeError);
 		await expect(client.call("move" as "echo", 1)).rejects.toThrow(TypeError);
-		await expect(client.call("toString" as "echo")).rejects.toThrow(TypeError);
+		await expect(client.call("toString" as "echo", undefined)).rejects.toThrow(TypeError);
 	});
 
 	it("the worker refuses a forged command outside the contract", async () => {
@@ -91,7 +90,7 @@ describe("room worker bridge: commands", () => {
 		const session = (client as unknown as { session: number }).session;
 		const replies: unknown[] = [];
 		page.addEventListener("message", (event) => replies.push(event.data));
-		page.postMessage({ p: ROOM_WORKER_PROTOCOL, s: session, k: "call", id: 999_999, name: "constructor", args: [] });
+		page.postMessage({ p: ROOM_WORKER_PROTOCOL, s: session, k: "call", id: 999_999, name: "secret", args: [] });
 		await settle();
 		const reply = replies.find((entry) => (entry as { id?: number }).id === 999_999) as { ok: boolean } | undefined;
 		expect(reply?.ok).toBe(false);
@@ -186,7 +185,13 @@ describe("room worker bridge: lifecycle", () => {
 		const { client, worker } = make();
 		await client.ready;
 		const session = (client as unknown as { session: number }).session;
-		worker.postMessage({ p: ROOM_WORKER_PROTOCOL, s: session + 1, k: "stream", name: "projection", value: { forged: true } });
+		worker.postMessage({
+			p: ROOM_WORKER_PROTOCOL,
+			s: session + 1,
+			k: "stream",
+			name: "projection",
+			value: { forged: true },
+		});
 		await settle();
 		expect(client.latest("projection")).toBeUndefined();
 	});
@@ -196,7 +201,12 @@ describe("room worker bridge: host hooks, storage, diagnostics", () => {
 	it("a page hook returns data and a handle whose own methods only the worker may call", async () => {
 		const { client } = make();
 		await client.ready;
-		const result = (await client.call("useHook")) as { scope: string; bytes: number[]; doubled: number; refused: string };
+		const result = (await client.call("useHook")) as {
+			scope: string;
+			bytes: number[];
+			doubled: number;
+			refused: string;
+		};
 		expect(result.scope).toBe("scope:o1");
 		expect(result.bytes).toEqual([1, 2, 3]);
 		expect(result.doubled).toBe(42);
@@ -215,13 +225,17 @@ describe("room worker bridge: host hooks, storage, diagnostics", () => {
 		await expect(client.call("abortHook")).resolves.toBe("cancelled by the room");
 		await settle();
 		expect(pageAbortSignals).toHaveLength(1);
-		expect(pageAbortSignals[0]!.aborted).toBe(true);
+		expect(pageAbortSignals[0]?.aborted).toBe(true);
 	});
 
 	it("worker storage is seeded from the page and writes through to it", async () => {
 		const written: [string, string][] = [];
 		const { client } = make({
-			storage: { entries: [["peer-cache", "cached"]], set: (key, value) => written.push([key, value]), remove: () => undefined },
+			storage: {
+				entries: [["peer-cache", "cached"]],
+				set: (key, value) => written.push([key, value]),
+				remove: () => undefined,
+			},
 		});
 		await client.ready;
 		await expect(client.call("storage", "peer-cache", "fresh")).resolves.toBe("cached");

@@ -17,7 +17,7 @@ const spyStorage = (): StorageSpy & { reads: string[] } => {
 	const reads: string[] = [];
 	return {
 		reads,
-		getItem: (key: string) => {
+		getItem: (key: string): string | null => {
 			reads.push(key);
 			return null;
 		},
@@ -55,7 +55,10 @@ describe("browser-local peer cache storage", () => {
 	it("keeps using globalThis.localStorage when the config names no adapter", async () => {
 		const ambient = spyStorage();
 		vi.stubGlobal("localStorage", ambient);
-		const cache = await cacheFactory()({ enabled: true, max: 4, persistence: "browser-local", key: "page-cache" }, () => ({}));
+		const cache = await cacheFactory()(
+			{ enabled: true, max: 4, persistence: "browser-local", key: "page-cache" },
+			() => ({})
+		);
 		await cache.list("ns", new AbortController().signal);
 		expect(ambient.reads).toEqual(["page-cache"]);
 	});

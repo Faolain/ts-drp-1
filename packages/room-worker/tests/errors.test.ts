@@ -1,17 +1,16 @@
-import { describe, expect, it } from "vitest";
-
 import {
 	decodeError,
 	encodeError,
 	errorCodec,
+	ROOM_WORKER_MAX_CAUSE_DEPTH,
 	RoomWorkerClosed,
 	RoomWorkerCrashed,
 	RoomWorkerLimit,
 	RoomWorkerProtocolError,
 	RoomWorkerRemoteError,
 	RoomWorkerUnsupported,
-	ROOM_WORKER_MAX_CAUSE_DEPTH,
 } from "@ts-drp/room-worker";
+import { describe, expect, it } from "vitest";
 
 // The wire is the structured clone algorithm: every round trip below goes through it, as a
 // postMessage between a worker and its page does.
@@ -32,7 +31,10 @@ class KeptMove extends Error {
 
 class Refused extends TypeError {
 	readonly code = "REFUSED";
-	constructor(readonly reason: "a" | "b", detail: string) {
+	constructor(
+		readonly reason: "a" | "b",
+		detail: string
+	) {
 		super(`REFUSED: ${reason}: ${detail}`);
 		this.name = "Refused";
 	}
@@ -41,7 +43,11 @@ class Refused extends TypeError {
 const BRAND = Symbol.for("test/branded");
 class Branded extends Error {
 	readonly [BRAND] = true;
-	constructor(readonly code: string, message?: string, options?: ErrorOptions) {
+	constructor(
+		readonly code: string,
+		message?: string,
+		options?: ErrorOptions
+	) {
 		super(message, options);
 		this.name = "Branded";
 	}
@@ -78,7 +84,8 @@ describe("room worker error codec", () => {
 		expect((kept.cause as Error).message).toBe("capacity");
 
 		let deep: Error = new Error("root");
-		for (let index = 0; index < ROOM_WORKER_MAX_CAUSE_DEPTH + 3; index++) deep = new Error(`level ${index}`, { cause: deep });
+		for (let index = 0; index < ROOM_WORKER_MAX_CAUSE_DEPTH + 3; index++)
+			deep = new Error(`level ${index}`, { cause: deep });
 		let decoded = roundTrip(deep) as Error | undefined;
 		let depth = 0;
 		while (decoded !== undefined) {
@@ -154,8 +161,8 @@ describe("room worker error codec", () => {
 	});
 
 	it("refuses two codecs with one id", () => {
-		expect(() =>
-			encodeError(new Error("x"), [errorCodec("Same", KeptMove), errorCodec("Same", Refused)])
-		).toThrow(TypeError);
+		expect(() => encodeError(new Error("x"), [errorCodec("Same", KeptMove), errorCodec("Same", Refused)])).toThrow(
+			TypeError
+		);
 	});
 });
