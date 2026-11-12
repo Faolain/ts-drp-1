@@ -8458,6 +8458,29 @@ async function handleV3IngressWithSource(
 				!sameBytes(encodeCanonical(custodyImage.controlBytes), encodeCanonical(maintenanceImage.controlBytes))))
 			throw new TypeError("received journal contexts disagree");
 		const expectedNativeImage = custodyImage ?? maintenanceImage;
+		// A same-epoch recovery revoked this plane after the job's currency check (the custody path
+		// awaits its journal reads in between): an append now could land after the successor rebuilt
+		// from the journal, leaving the row in no index. The carry takes it instead. Both journals open
+		// their write transaction synchronously inside appendAccepted, so an append already called is
+		// ordered before the successor's later journal read. The creator's received append is gated
+		// by its close actor's maintenance admission, which the recovery joins before it rebuilds.
+		if (
+			!alreadyAccepted &&
+			maintenanceAdmission === undefined &&
+			!currentRegistration(registration) &&
+			pendingIngressCarries.has(registration)
+		) {
+			releaseOperationReservation(reservation);
+			collectLateIngress(
+				registration,
+				V3Envelope.encode({
+					canonicalPreimage: new Uint8ArrayConstructor(evidence.exactCanonicalPreimageBytes),
+					signature: new Uint8ArrayConstructor(evidence.signature),
+				}).finish(),
+				evidence.transportSender
+			);
+			return false;
+		}
 		appended = await registration.liveJournalStore.appendAccepted({
 			detachedSignature: new Uint8ArrayConstructor(evidence.signature),
 			exactCanonicalPreimageBytes: new Uint8ArrayConstructor(evidence.exactCanonicalPreimageBytes),
@@ -9029,8 +9052,9 @@ interface PendingIngressCarry {
 	readonly refused: string[];
 	successor: V3PlaneRegistration | undefined;
 	refusing: boolean;
-	// The successor's re-offers, one ingress job at a time.
+	// The successor's re-offers past the direct share, one ingress job at a time.
 	reoffers: Promise<void>;
+	chained: number;
 }
 
 // Ingress jobs each plane has admitted to its FIFO and not yet settled.
@@ -9107,9 +9131,11 @@ function refuseCarriedRow(predecessor: V3PlaneRegistration, sender: string): voi
 	if (current !== undefined && currentRegistration(current)) noteDeliveryRefusal(current, sender);
 }
 
-// One re-offer at a time through the successor's ordinary ingress: a carry larger than the input
-// pool would otherwise be refused at it. A row whose successor is no longer the carry's plane when
-// its turn comes is refused and named to repair.
+// Carried rows enter the successor's FIFO at once, in order, ahead of later arrivals (their children
+// would otherwise be held and ask repair for a parent the carry is bringing), while the successor's
+// input pool is under half full; past that, one at a time behind each other, so a carry larger than
+// the pool is not refused at it and arrivals keep their share. A row whose successor is no longer the
+// carry's plane when its turn comes is refused and named to repair.
 function reofferCarriedRow(
 	predecessor: V3PlaneRegistration,
 	carry: PendingIngressCarry,
@@ -9117,12 +9143,24 @@ function reofferCarriedRow(
 	row: CarriedV3Row
 ): void {
 	const plane: CarryPlane = { objectId: carry.objectId, epoch: carry.epoch, anchorDigest: carry.anchorDigest };
-	carry.reoffers = carry.reoffers.then(async (): Promise<void> => {
-		if (!sameCarryPlane(plane, successor)) return refuseCarriedRow(predecessor, row.sender);
-		await enqueueCapturedV3Ingress(successor, "retained", row.sender, (custody) => {
-			custody.chargeBytes(row.exactWireBytes.byteLength);
-			return ObjectFreeze({ exactWireBytes: row.exactWireBytes, sender: row.sender, transport: "retained" as const });
-		}).catch(() => ingressFailureLog("admission-rejected"));
+	const reoffer = (): Promise<void> =>
+		sameCarryPlane(plane, successor)
+			? enqueueCapturedV3Ingress(successor, "retained", row.sender, (custody) => {
+					custody.chargeBytes(row.exactWireBytes.byteLength);
+					return ObjectFreeze({
+						exactWireBytes: row.exactWireBytes,
+						sender: row.sender,
+						transport: "retained" as const,
+					});
+				}).catch(() => ingressFailureLog("admission-rejected"))
+			: Promise.resolve(refuseCarriedRow(predecessor, row.sender));
+	if (carry.chained === 0 && successor.admittedInputJobs < MAX_ADMITTED_INPUT_JOBS / 2) {
+		void reoffer();
+		return;
+	}
+	carry.chained += 1;
+	carry.reoffers = carry.reoffers.then(reoffer).finally(() => {
+		carry.chained -= 1;
 	});
 }
 
@@ -9203,6 +9241,7 @@ export function carryV3PendingIngress(plane: V3PlaneHandle): V3CarriedPendingIng
 		successor: undefined,
 		refusing: false,
 		reoffers: Promise.resolve(),
+		chained: 0,
 	};
 	for (const pending of registration.pendingIngress.values()) {
 		const exactWireBytes = V3Envelope.encode({
