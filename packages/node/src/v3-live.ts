@@ -7538,6 +7538,7 @@ function deactivateRegistration(registration: V3PlaneRegistration): boolean {
 	registration.terminalBarrier = undefined;
 	registration.pendingIngress.clear();
 	registration.pendingIngressBytes = 0;
+	closePendingIngressCarriesTo(registration);
 	const registrations = v3PlaneRegistrations.get(registration.networkNode);
 	if (registrations?.get(registration.topic) === registration) registrations.delete(registration.topic);
 	releaseIdleEgressAdmissionOwner(registration);
@@ -8106,6 +8107,19 @@ function retainPendingIngress(
 	pendingByteCharge: number
 ): void {
 	const authenticated = evidence.authenticated;
+	if (
+		!currentRegistration(registration) &&
+		pendingIngressCarries.has(registration) &&
+		collectLateIngress(
+			registration,
+			V3Envelope.encode({
+				canonicalPreimage: new Uint8ArrayConstructor(evidence.exactCanonicalPreimageBytes),
+				signature: new Uint8ArrayConstructor(evidence.signature),
+			}).finish(),
+			evidence.transportSender
+		)
+	)
+		return;
 	if (registration.pendingIngress.has(authenticated.digest)) return;
 	if (
 		registration.pendingIngress.size >= registration.payload.parameters.maxPendingEntries ||
@@ -8604,7 +8618,10 @@ async function authenticateV3Ingress(registration: V3PlaneRegistration, captured
 		// The existing FIFO owns only captured input here. Start the native and
 		// admission work in a host turn, then recheck the original live owner.
 		await yieldToHost();
-		if (!currentRegistration(registration) || registration.blueprintClosing) return;
+		if (!currentRegistration(registration) || registration.blueprintClosing) {
+			collectLateIngress(registration, captured.exactWireBytes, captured.sender);
+			return;
+		}
 		if (registration.retainedBootstrapHold && captured.transport === "gossip") {
 			ingressFailureLog("admission-rejected");
 			return;
@@ -8891,6 +8908,39 @@ function enqueueV3Ingress(
 	message: Message,
 	transport: "gossip" | "retained" = "gossip"
 ): Promise<void> {
+	let rawMessage: Message | undefined = message;
+	// Track AA: the transport identity a capacity refusal reports (a routing hint only).
+	let sender: string | undefined;
+	try {
+		sender = typeof message.sender === "string" ? message.sender : undefined;
+	} catch {
+		sender = undefined;
+	}
+	return enqueueCapturedV3Ingress(registration, transport, sender, (custody) => {
+		const selected = rawMessage;
+		rawMessage = undefined;
+		if (selected === undefined) throw new TypeError("v3 ingress input custody is unavailable");
+		return captureV3Ingress(registration, selected, transport, custody);
+	});
+}
+
+/**
+ * The FIFO entry every arrival takes: capture (charged to the bounded input pool), then full
+ * authentication and admission. Network input reaches it only through enqueueV3Ingress, whose
+ * capture revalidates the message's native provenance; the only other caller re-offers rows
+ * copied out of a predecessor plane of this process (reofferV3CarriedPendingIngress).
+ * @param registration - The plane whose FIFO takes the job.
+ * @param transport - How the row arrived.
+ * @param sender - The transport identity a refusal reports.
+ * @param capture - Captures the exact bytes, charged to the plane's bounded input pool.
+ * @returns Completion when the job has settled.
+ */
+function enqueueCapturedV3Ingress(
+	registration: V3PlaneRegistration,
+	transport: "gossip" | "retained",
+	sender: string | undefined,
+	capture: (custody: InputCaptureCustody) => CapturedV3Ingress | undefined
+): Promise<void> {
 	// A readiness boundary keeps the epoch: queue behind it in FIFO order (the
 	// same bounded input pool) instead of dropping. Authentication and every
 	// admission check run after it releases; a failed boundary leaves the
@@ -8906,33 +8956,23 @@ function enqueueV3Ingress(
 	const terminal = registration.terminalBarrier;
 	const barrier = hold === undefined ? terminal :
 		terminal === undefined ? hold : Promise.all([terminal, hold]).then(() => undefined);
-	let rawMessage: Message | undefined = message;
-	// Track AA: the transport identity a capacity refusal reports (a routing hint only).
-	let sender: string | undefined;
-	try {
-		sender = typeof message.sender === "string" ? message.sender : undefined;
-	} catch {
-		sender = undefined;
-	}
 	const refuse = (): void => {
 		// The route attached the state if the room transport is bound to this plane's topic.
 		if (registration.deliveryRepair !== undefined) noteDeliveryRefusal(registration, sender);
 		ingressFailureLog("admission-rejected");
 	};
+	// Counted until settled: a same-epoch recovery's carry forwards what these jobs end with.
+	ingressJobsInFlight.set(registration, (ingressJobsInFlight.get(registration) ?? 0) + 1);
 	return enqueueRegistrationTask(
 		registration,
 		(custody): (() => Promise<void>) | Readonly<{ join: Promise<void> }> => {
 			let captured: CapturedV3Ingress | undefined;
 			try {
-				const message = rawMessage;
-				if (message === undefined || custody === undefined)
-					throw new TypeError("v3 ingress input custody is unavailable");
-				captured = captureV3Ingress(registration, message, transport, custody);
+				if (custody === undefined) throw new TypeError("v3 ingress input custody is unavailable");
+				captured = capture(custody);
 			} catch (error) {
 				if (error instanceof InputCaptureCapacityError) throw error;
 				ingressFailureLog("envelope-rejected");
-			} finally {
-				rawMessage = undefined;
 			}
 			if (
 				captured !== undefined &&
@@ -8951,7 +8991,283 @@ function enqueueV3Ingress(
 			captureBeforeBarrier: true,
 			...(barrier === undefined ? {} : { barrier }),
 		}
+	).finally(() => settleIngressJob(registration));
+}
+
+/**
+ * A same-epoch recovery's carry of its predecessor plane's pending ingress (decision: carry, model
+ * packages/node/formal/plane-recovery-pending-carry.qnt). Opaque: only carryV3PendingIngress opens
+ * one, from rows the live plane holds in memory and rows its own ingress jobs end with after it is
+ * revoked; reofferV3CarriedPendingIngress binds each once. Nothing of the predecessor's verdict
+ * crosses: every row re-enters the successor's ordinary capture, authentication and admission.
+ */
+export interface V3CarriedPendingIngress {
+	readonly rows: number;
+}
+
+type CarriedV3Row = Readonly<{ exactWireBytes: Uint8Array; sender: string }>;
+
+/**
+ * One same-epoch recovery's carry, keyed by its predecessor plane. It holds the pending rows the
+ * predecessor had when the recovery began, plus every row one of the predecessor's own ingress jobs
+ * ends with after the plane is no longer current (dropped before authentication, or retained onto
+ * the revoked plane: the creator's received append refused because its close actor stopped). Once
+ * the successor is bound it forwards such late rows straight to it, one at a time through the
+ * successor's ordinary ingress (the input pool is bounded). It ends when the predecessor's last
+ * ingress job settles or the successor is deactivated (an epoch change), whichever is first. After
+ * an epoch-change end it stays as a refusing tombstone until the predecessor's last job settles:
+ * a late row then, or one past the bound, is refused and named to delivery repair.
+ */
+interface PendingIngressCarry {
+	readonly objectId: string;
+	readonly epoch: number;
+	readonly anchorDigest: string;
+	readonly maxEntries: number;
+	readonly maxBytes: number;
+	readonly rows: CarriedV3Row[];
+	bytes: number;
+	readonly refused: string[];
+	successor: V3PlaneRegistration | undefined;
+	refusing: boolean;
+	// The successor's re-offers, one ingress job at a time.
+	reoffers: Promise<void>;
+}
+
+// Ingress jobs each plane has admitted to its FIFO and not yet settled.
+const ingressJobsInFlight = new WeakMap<V3PlaneRegistration, number>();
+const pendingIngressCarries = new WeakMap<V3PlaneRegistration, PendingIngressCarry>();
+const carriesForwardingTo = new WeakMap<V3PlaneRegistration, V3PlaneRegistration[]>();
+const carryPredecessors = new WeakMap<object, V3PlaneRegistration>();
+let openPendingIngressCarries = 0;
+
+/**
+ * How many same-epoch recovery carries are still open in this process (observation only).
+ * @returns The count.
+ */
+export function openV3PendingIngressCarries(): number {
+	return openPendingIngressCarries;
+}
+
+function deletePendingIngressCarry(predecessor: V3PlaneRegistration): void {
+	const carry = pendingIngressCarries.get(predecessor);
+	if (carry === undefined) return;
+	pendingIngressCarries.delete(predecessor);
+	detachForwarding(carry, predecessor);
+	carry.rows.length = 0;
+	openPendingIngressCarries -= 1;
+}
+
+function detachForwarding(carry: PendingIngressCarry, predecessor: V3PlaneRegistration): void {
+	const forwarding = carry.successor === undefined ? undefined : carriesForwardingTo.get(carry.successor);
+	if (forwarding !== undefined) {
+		const at = forwarding.indexOf(predecessor);
+		if (at >= 0) forwarding.splice(at, 1);
+	}
+	carry.successor = undefined;
+}
+
+// Ends a carry without a successor to take its rows: what it holds is refused and named to repair;
+// while the predecessor still has ingress jobs in flight it refuses what they end with too.
+function endPendingIngressCarry(predecessor: V3PlaneRegistration): void {
+	const carry = pendingIngressCarries.get(predecessor);
+	if (carry === undefined) return;
+	detachForwarding(carry, predecessor);
+	const refused = [...carry.refused.splice(0), ...carry.rows.splice(0).map((row) => row.sender)];
+	carry.bytes = 0;
+	if (ingressJobsInFlight.has(predecessor)) carry.refusing = true;
+	else deletePendingIngressCarry(predecessor);
+	for (const sender of refused) refuseCarriedRow(predecessor, sender);
+}
+
+// A successor's deactivation (an epoch change, or another recovery) ends the carries forwarding to it.
+function closePendingIngressCarriesTo(successor: V3PlaneRegistration): void {
+	const forwarding = carriesForwardingTo.get(successor);
+	if (forwarding === undefined) return;
+	carriesForwardingTo.delete(successor);
+	for (const predecessor of [...forwarding]) endPendingIngressCarry(predecessor);
+}
+
+type CarryPlane = Readonly<{ objectId: string; epoch: number; anchorDigest: string }>;
+
+function sameCarryPlane(carry: CarryPlane, registration: V3PlaneRegistration): boolean {
+	const provenance = registration.payload.provenance;
+	return (
+		currentRegistration(registration) &&
+		provenance.objectId === carry.objectId &&
+		provenance.epoch === carry.epoch &&
+		provenance.anchorDigest === carry.anchorDigest
 	);
+}
+
+// A row the carry cannot take is refused and named to repair on the topic's current plane (repair
+// attaches there as routeV3RetainedIngress attaches it).
+function refuseCarriedRow(predecessor: V3PlaneRegistration, sender: string): void {
+	ingressFailureLog("admission-rejected", "carried-ingress-refused");
+	const current = v3PlaneRegistrations.get(predecessor.networkNode)?.get(predecessor.topic);
+	if (current !== undefined && currentRegistration(current)) noteDeliveryRefusal(current, sender);
+}
+
+// One re-offer at a time through the successor's ordinary ingress: a carry larger than the input
+// pool would otherwise be refused at it. A row whose successor is no longer the carry's plane when
+// its turn comes is refused and named to repair.
+function reofferCarriedRow(
+	predecessor: V3PlaneRegistration,
+	carry: PendingIngressCarry,
+	successor: V3PlaneRegistration,
+	row: CarriedV3Row
+): void {
+	const plane: CarryPlane = { objectId: carry.objectId, epoch: carry.epoch, anchorDigest: carry.anchorDigest };
+	carry.reoffers = carry.reoffers.then(async (): Promise<void> => {
+		if (!sameCarryPlane(plane, successor)) return refuseCarriedRow(predecessor, row.sender);
+		await enqueueCapturedV3Ingress(successor, "retained", row.sender, (custody) => {
+			custody.chargeBytes(row.exactWireBytes.byteLength);
+			return ObjectFreeze({ exactWireBytes: row.exactWireBytes, sender: row.sender, transport: "retained" as const });
+		}).catch(() => ingressFailureLog("admission-rejected"));
+	});
+}
+
+/**
+ * One of a revoked plane's own ingress jobs ended without a verdict. When a same-epoch recovery's
+ * carry is open for that plane, the row's exact signed bytes join it (or go straight to the bound
+ * successor); otherwise nothing changes.
+ * @param registration - The plane whose job ended.
+ * @param exactWireBytes - The row's exact envelope bytes, as captured.
+ * @param sender - The transport identity it arrived from.
+ * @returns Whether a carry took (or refused) the row.
+ */
+function collectLateIngress(registration: V3PlaneRegistration, exactWireBytes: Uint8Array, sender: string): boolean {
+	if (currentRegistration(registration)) return false;
+	const carry = pendingIngressCarries.get(registration);
+	if (carry === undefined) return false;
+	if (carry.refusing) {
+		refuseCarriedRow(registration, sender);
+		return true;
+	}
+	if (carry.successor !== undefined) {
+		if (sameCarryPlane(carry, carry.successor))
+			reofferCarriedRow(registration, carry, carry.successor, ObjectFreeze({ exactWireBytes, sender }));
+		else {
+			endPendingIngressCarry(registration);
+			refuseCarriedRow(registration, sender);
+		}
+		return true;
+	}
+	if (carry.rows.length >= carry.maxEntries || carry.bytes + exactWireBytes.byteLength > carry.maxBytes) {
+		carry.refused.push(sender);
+		return true;
+	}
+	carry.bytes += exactWireBytes.byteLength;
+	carry.rows.push(ObjectFreeze({ exactWireBytes, sender }));
+	return true;
+}
+
+function settleIngressJob(registration: V3PlaneRegistration): void {
+	const left = (ingressJobsInFlight.get(registration) ?? 1) - 1;
+	if (left > 0) {
+		ingressJobsInFlight.set(registration, left);
+		return;
+	}
+	ingressJobsInFlight.delete(registration);
+	const carry = pendingIngressCarries.get(registration);
+	if (carry !== undefined && (carry.successor !== undefined || carry.refusing)) deletePendingIngressCarry(registration);
+}
+
+/**
+ * Opens a same-epoch recovery's carry on the live plane about to be deactivated: copies the exact
+ * signed rows it holds as pending ingress (deactivation clears them) and collects the rows its
+ * in-flight ingress jobs end with after deactivation. In memory only, within the plane's own
+ * maxPendingEntries/maxPendingBytes.
+ * @param plane - The live plane about to be deactivated.
+ * @returns The carry, or undefined when the plane holds no pending row and no ingress job.
+ */
+export function carryV3PendingIngress(plane: V3PlaneHandle): V3CarriedPendingIngress | undefined {
+	const registration = v3HandleRegistrations.get(plane);
+	if (
+		registration === undefined ||
+		!currentRegistration(registration) ||
+		pendingIngressCarries.has(registration) ||
+		(registration.pendingIngress.size === 0 && !ingressJobsInFlight.has(registration))
+	)
+		return undefined;
+	const { maxPendingBytes, maxPendingEntries } = registration.payload.parameters;
+	const provenance = registration.payload.provenance;
+	const carry: PendingIngressCarry = {
+		objectId: provenance.objectId,
+		epoch: provenance.epoch,
+		anchorDigest: provenance.anchorDigest,
+		maxEntries: maxPendingEntries,
+		maxBytes: maxPendingBytes,
+		rows: [],
+		bytes: 0,
+		refused: [],
+		successor: undefined,
+		refusing: false,
+		reoffers: Promise.resolve(),
+	};
+	for (const pending of registration.pendingIngress.values()) {
+		const exactWireBytes = V3Envelope.encode({
+			canonicalPreimage: new Uint8ArrayConstructor(pending.evidence.exactCanonicalPreimageBytes),
+			signature: new Uint8ArrayConstructor(pending.evidence.signature),
+		}).finish();
+		if (carry.rows.length >= maxPendingEntries || carry.bytes + exactWireBytes.byteLength > maxPendingBytes) {
+			carry.refused.push(pending.evidence.transportSender);
+			continue;
+		}
+		carry.bytes += exactWireBytes.byteLength;
+		carry.rows.push(ObjectFreeze({ exactWireBytes, sender: pending.evidence.transportSender }));
+	}
+	pendingIngressCarries.set(registration, carry);
+	openPendingIngressCarries += 1;
+	const carried: V3CarriedPendingIngress = ObjectFreeze({ rows: carry.rows.length });
+	carryPredecessors.set(carried, registration);
+	return carried;
+}
+
+/**
+ * Binds a carry to the recovered successor, only when it is a plane of the same object, epoch and
+ * anchor (an epoch change carries nothing: a closed epoch's rows outside its cut are the author's
+ * settlement work), and re-offers what it holds. Each row is charged to the successor's bounded
+ * input pool and goes through the same authentication and admission as any arrival: deduplicated
+ * against its index, admitted with its parents, held as pending, or refused at a bound. Rows the
+ * predecessor's remaining ingress jobs end with are forwarded until the last of them settles.
+ * @param plane - The recovered successor.
+ * @param carried - A carry from carryV3PendingIngress (each is bound once).
+ * @returns How many rows were re-offered now.
+ */
+export function reofferV3CarriedPendingIngress(plane: V3PlaneHandle, carried: V3CarriedPendingIngress): number {
+	const predecessor = carryPredecessors.get(carried);
+	carryPredecessors.delete(carried);
+	const carry = predecessor === undefined ? undefined : pendingIngressCarries.get(predecessor);
+	if (predecessor === undefined || carry === undefined || carry.successor !== undefined || carry.refusing) return 0;
+	const registration = v3HandleRegistrations.get(plane);
+	if (registration === undefined || registration === predecessor || !sameCarryPlane(carry, registration)) {
+		endPendingIngressCarry(predecessor);
+		return 0;
+	}
+	// Refusals at the successor's input pool are named to repair (as routeV3RetainedIngress attaches it).
+	attachDeliveryRepair(registration);
+	const rows = carry.rows.splice(0);
+	carry.bytes = 0;
+	carry.successor = registration;
+	const forwarding = carriesForwardingTo.get(registration);
+	if (forwarding === undefined) carriesForwardingTo.set(registration, [predecessor]);
+	else forwarding.push(predecessor);
+	for (const row of rows) reofferCarriedRow(predecessor, carry, registration, row);
+	for (const sender of carry.refused.splice(0)) refuseCarriedRow(predecessor, sender);
+	if (!ingressJobsInFlight.has(predecessor)) deletePendingIngressCarry(predecessor);
+	return rows.length;
+}
+
+/**
+ * Ends a carry whose recovery produced no successor: its rows are refused and named to repair.
+ * @param carried - A carry from carryV3PendingIngress that was never bound.
+ */
+export function releaseV3CarriedPendingIngress(carried: V3CarriedPendingIngress): void {
+	const predecessor = carryPredecessors.get(carried);
+	carryPredecessors.delete(carried);
+	const carry = predecessor === undefined ? undefined : pendingIngressCarries.get(predecessor);
+	if (predecessor === undefined || carry === undefined || carry.successor !== undefined || carry.refusing) return;
+	endPendingIngressCarry(predecessor);
 }
 
 /** Decision row 51: a creator's ordinary readiness preparation holds its plane's

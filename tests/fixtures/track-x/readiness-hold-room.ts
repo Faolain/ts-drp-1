@@ -168,6 +168,15 @@ export async function readinessHoldRoom(
 			 * fault); unlike the hooks above, it may change results.
 			 */
 			host?: (host: V3RoomStorageHost) => V3RoomStorageHost;
+			/**
+			 * The test's own wrapper of this peer's vertex signer (for example, to fail one signature);
+			 * it may change results. `sign` is the peer's genuine Ed25519 signer.
+			 */
+			sign?: (
+				digest: Uint8Array,
+				request: unknown,
+				sign: (digest: Uint8Array) => Promise<Uint8Array>
+			) => Promise<Uint8Array>;
 		}> = {}
 	) => {
 		const identity = required(identities[index]);
@@ -252,7 +261,10 @@ export async function readinessHoldRoom(
 			objectId: openOptions.room?.objectId ?? objectId,
 			publicKeyBytes: ed25519.getPublicKey(identity.seed),
 			roomHeadAuthority: floor,
-			signRegisteredVertexDigest: (digest) => Promise.resolve(ed25519.sign(digest, identity.seed)),
+			signRegisteredVertexDigest: (digest, request) => {
+				const genuine = (value: Uint8Array): Promise<Uint8Array> => Promise.resolve(ed25519.sign(value, identity.seed));
+				return openOptions.sign === undefined ? genuine(digest) : openOptions.sign(digest, request, genuine);
+			},
 			onProjection: () => openOptions.onProjection?.(hookPeer),
 			onAcceptedVertex: (vertex) => {
 				const digest = hex(vertex.digest);
