@@ -15,6 +15,39 @@ const message = (clientOperationId: string) => ({ action: "message", clientOpera
 const fixture = () => chatSharesRoomFixture({ members: ["genesis"], format: "window",
 	genesisStateBytes: createShippingChatWindowGenesisStateBytes });
 
+/**
+ * The member's durable settlement plan (read after unresolvedAcceptedWork(), which awaits the drain).
+ * @param f - The room fixture.
+ * @returns peer-1's plan.
+ */
+async function memberPlan(f: Awaited<ReturnType<typeof fixture>>) {
+	const store = await createNodeV3RoomStorageHost({directory: f.directory, initialization: () => "reopen"}).openIssuance("peer-1");
+	try {return await store.readSettlementPlan({objectId: f.objectId, author: required(f.identities[1]).author});}
+	finally {await store.close();}
+}
+
+/**
+ * A move retained by a skip install (or a recovery that completes one) that the creator's signed frontier
+ * in the installed checkpoint proves was never admitted (v3-live frontierRetainedResolution): its epoch is
+ * closed, the frontier's terminalThrough stops below it (null here: the creator received none of this
+ * author's rows), and the author's own epoch-0 fence precedes it, so it is in no closed Cut and ingress,
+ * which admits only the current anchor, can never admit it. It is no longer unknown: its row is resolved
+ * with a signed expiry (sourceResolutionKind "frontier") and its move is handed back to the application
+ * exactly once, in a durable record that stays until the move is reissued.
+ * @param f - The room fixture.
+ * @returns The unconsumed hand-backs (clientOperationId and source epoch) and the frontier-resolved entries.
+ */
+async function frontierHandBacks(f: Awaited<ReturnType<typeof fixture>>) {
+	const plan = await memberPlan(f);
+	return {
+		handBacks: (plan?.handBacks ?? []).filter(record => record.reissueSequence === null).map(record => ({
+			sourceSequence: record.sourceSequence, sourceEpoch: record.sourceEpoch,
+			clientOperationId: (decodeCanonical(record.exactCanonicalOperationBytes) as Record<string, unknown>).clientOperationId})),
+		resolved: (plan?.entries ?? []).filter(entry => entry.sourceResolutionKind === "frontier").map(entry => ({
+			sourceSequence: entry.sourceSequence, disposition: entry.disposition, signed: entry.sourceResolutionDigest?.byteLength})),
+	};
+}
+
 async function retainedPointRoles(f: Awaited<ReturnType<typeof fixture>>, index: number) {
 	const host = createNodeV3RoomStorageHost({directory: f.directory, initialization: () => "reopen"});
 	const ahe = await host.openAhe(`peer-${index}--ahe`), snapshots = await host.openSnapshots(`peer-${index}`);
@@ -81,10 +114,17 @@ describe("native same-replica creator recovery", () => {
 				expect((await creator.room.sealEpoch()).ok).toBe(true); await creator.room.adoptCreatorSuccessor();
 			}
 			try {await f.install(member);} catch (cause) {throw new Error(`checkpoint install at epoch ${sourceEpoch + 2} failed`, {cause});}
+			// Every source epoch's move is kept: the frontier proves each never admitted, so each is handed
+			// back (one durable record per source epoch) rather than left unknown.
 			const unresolved = await member.room.unresolvedAcceptedWork();
-			expect(unresolved.map(row => row.sourceEpoch)).toEqual(Array.from({length: sourceEpoch / 2 + 1}, (_, n) => n * 2));
+			expect(unresolved).toEqual([]);
+			const given = await frontierHandBacks(f);
+			expect(given.handBacks.map(row => [row.sourceEpoch, row.clientOperationId])).toEqual(
+				Array.from({length: sourceEpoch / 2 + 1}, (_, n) => [n * 2, `unknown-epoch-${n * 2}`]));
+			expect(creator.room.projection().messages.map(row => row.clientOperationId)).not.toContain(`unknown-epoch-${sourceEpoch}`);
 			await f.stop(member); member = await f.open(1, {reopen: true, promote: true});
 			expect(await member.room.unresolvedAcceptedWork()).toEqual(unresolved);
+			expect((await frontierHandBacks(f)).handBacks).toEqual(given.handBacks);
 			const census = await retainedPointRoles(f, 1), epoch = sourceEpoch + 2;
 			expect(census.roles).toEqual(epoch === 2 ? [2, 0] : [epoch, epoch - 2, epoch - 4]);
 			expect(census.generations).toBeLessThanOrEqual(AHE_BOUNDED_READ_LIMITS.maxObjectGenerations);
@@ -254,7 +294,9 @@ describe("native same-replica creator recovery", () => {
 		await f.stop(member); member = await f.open(1, {reopen: true, promote: true});
 		expect(member.room.authority()?.epoch).toBe(14);
 		expect((await retainedPointRoles(f, 1)).roles).toEqual([14, 12, 10]);
-		expect(await member.room.unresolvedAcceptedWork()).toMatchObject([{sourceEpoch: 0, commitment: "unknown", operations: [message("normalized-base-custody")]}]);
+		expect(await member.room.unresolvedAcceptedWork()).toEqual([]);
+		expect((await frontierHandBacks(f)).handBacks).toMatchObject([{sourceEpoch: 0, clientOperationId: "normalized-base-custody"}]);
+		expect(creator.room.projection().messages.map(row => row.clientOperationId)).not.toContain("normalized-base-custody");
 		await member.room.issue(message("after-normalized-reopen"));
 	}, 180_000);
 
@@ -277,8 +319,11 @@ describe("native same-replica creator recovery", () => {
 		await f.stop(member);
 		const reopened = await f.open(1, {reopen: true, promote: true});
 		expect(reopened.room.authority().epoch).toBe(2);
-		expect(await reopened.room.unresolvedAcceptedWork()).toMatchObject([{sourceSequence: original.commit.authorSequence,
-			operations: [message("checkpoint-crash-custody")], commitment: "unknown"}]);
+		expect(await reopened.room.unresolvedAcceptedWork()).toEqual([]);
+		expect(await frontierHandBacks(f)).toEqual({
+			handBacks: [{sourceSequence: original.commit.authorSequence, sourceEpoch: 0, clientOperationId: "checkpoint-crash-custody"}],
+			resolved: [{sourceSequence: original.commit.authorSequence, disposition: "expire", signed: 32}]});
+		expect(creator.room.projection().messages.map(row => row.clientOperationId)).not.toContain("checkpoint-crash-custody");
 		await reopened.room.issue(message("after-checkpoint-recovery"));
 	}, 120_000);
 
