@@ -2,6 +2,8 @@
 // creator quote with an ordinary source compiles the source's numeric finishing template
 // (captureCreatorOrdinaryFinishingCapacityTemplate) unless a matching one is retained. A compile
 // runs the original composer under the width compiler, which is the browser's longest task.
+// A compile is only worth it when the same source sees that role's cold quote again: the
+// assertion below requires every compile to be followed by a warm hit on some program.
 //
 // Host: TEMPLATE_COMPILES_HOST (browser | node | room, default browser). EPOCHS / MOVES env.
 // Observation only: product `__warmProofEvent` diagnostics, no product seam.
@@ -46,6 +48,7 @@ it(`finishing template compiles per epoch (${HOST})`, async () => {
 				bump(`refusal:${String(e.stage)}:${String(e.reason)}${Array.isArray(e.failed) ? `:${e.failed.join("+")}` : ""}`);
 				break;
 			case "ordinary-finishing-template-compile": bump(`captured:${String(e.ok)}`); break;
+			case "ordinary-finishing-template-deferred": bump(`deferred:${String(e.role)}`); break;
 			default: return;
 		}
 		sequence.push(`e${epoch}:${kind}${e.reason === undefined ? "" : `:${String(e.reason)}`}${e.ok === undefined ? "" : `:${String(e.ok)}`}`);
@@ -78,4 +81,8 @@ it(`finishing template compiles per epoch (${HOST})`, async () => {
 	console.info(`TEMPLATE_COMPILES_TOTAL ${JSON.stringify({ compiling: total("compiling:"), capturedTrue: total("captured:true"),
 		capturedFalse: total("captured:false"), warmHit: total("warmHit"), retained: total("retained:"), incMiss: total("incMiss:") })}`);
 	console.info(`TEMPLATE_COMPILES_SEQUENCE ${JSON.stringify(sequence)}`);
+	// A compiled program must be worth its compile: every compile is followed by at least one
+	// warm evaluation that admits on it. A source that sees one cold quote of a role and is then
+	// replaced at the boundary must not compile for it.
+	expect(total("compiling:")).toBeLessThanOrEqual(total("warmHit"));
 }, 3_600_000);
