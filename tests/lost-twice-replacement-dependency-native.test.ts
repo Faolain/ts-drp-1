@@ -253,4 +253,45 @@ describe("a move lost twice across two epochs", () => {
 		expect(count(member, MOVE)).toBe(1);
 		expect(await member.room.unresolvedAcceptedWork()).toEqual([]);
 	}, 300_000);
+
+	// The chain's tail window-expires (never delivered past the own-row settlement window): the link's entry
+	// is an `expire` with no replacement, a terminal chain end (not live work, not a re-offer path). Every
+	// later install still passes the census through the chain; the chain is never extended again; the move is
+	// handed back and only the application's single re-offer lands, exactly once.
+	it("never delivered: the tail window-expires; handed back once, never re-offered by the chain; lands exactly once", async () => {
+		const f = await fixture();
+		const creator = await f.open(0), member = await f.open(1);
+		const publish = Reflect.get(member.networkNode, "publishMessage") as (...args: unknown[]) => unknown;
+		Reflect.set(member.networkNode, "publishMessage", () => Promise.resolve(false));
+		await member.room.issue(message(MOVE)).catch(() => undefined);
+		Reflect.set(member.networkNode, "publishMessage", (...args: unknown[]) => publish.apply(member.networkNode, args));
+		let given: { operations: readonly Readonly<Record<string, unknown>>[]; handBack: unknown } | undefined;
+		for (let epoch = 1; epoch <= 10 && given === undefined; epoch++) {
+			await roll(f, creator, member, `expiring-${epoch}`);
+			given = member.room.settlementStatus?.().undelivered.find(record => record.operations[0]?.clientOperationId === MOVE) as typeof given;
+		}
+		const handedBack = await nativeImage(f);
+		const links = handedBack.outbox.filter(row => row.id === MOVE);
+		const tail = required(links.at(-1));
+		// Every link but the tail is a completed replacement; the tail is a terminal expire.
+		for (const link of links.slice(0, -1))
+			expect(handedBack.plan?.entries.find(entry => entry.sequence === link.sequence)?.replacement).not.toBeNull();
+		expect(handedBack.plan?.entries.find(entry => entry.sequence === tail.sequence)).toMatchObject({ disposition: "expire", replacement: null });
+		expect(count(creator, MOVE)).toBe(0);
+		// The chain is not extended again by later installs (the census accepts the root through the terminal tail).
+		const later = async (after: number) => (await nativeImage(f)).outbox.filter(row => row.id === MOVE && row.sequence > after);
+		await roll(f, creator, member, "expired-1");
+		expect(await later(tail.sequence)).toEqual([]);
+		// The application's one re-offer, with its hand-back key, lands exactly once.
+		await member.room.issue(required(given).operations[0] as never, { handBack: required(given).handBack } as never);
+		const epoch = member.room.authority().epoch;
+		const reissued = await later(tail.sequence);
+		expect(reissued).toHaveLength(1);
+		expect(await deliverEpoch(f, creator, 0, epoch)).toBeGreaterThan(0);
+		for (let seal = 0; seal < 2; seal++) await roll(f, creator, member, `expired-settled-${seal}`);
+		expect(await later(required(reissued[0]).sequence)).toEqual([]);
+		expect(count(creator, MOVE)).toBe(1);
+		expect(count(member, MOVE)).toBe(1);
+		expect(await member.room.unresolvedAcceptedWork()).toEqual([]);
+	}, 300_000);
 });
