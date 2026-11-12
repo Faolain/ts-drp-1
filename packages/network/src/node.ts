@@ -92,6 +92,15 @@ import {
 import { createMetricsRegister, type PrometheusMetricsRegister } from "./metrics/prometheus.js";
 import { PeerSelector } from "./peer-selector.js";
 import { resolveWebRtcConfiguration, type WebRtcConfigurationOwner } from "./webrtc-configuration.js";
+import {
+	DIRECT_SESSION_MAX_STREAMS,
+	DirectMessageSendError,
+	DRP_MESSAGE_SESSION_BULK_PROTOCOL,
+	DRP_MESSAGE_SESSION_RT_PROTOCOL,
+	LEGACY_MAX_INBOUND_STREAMS,
+	LEGACY_MAX_OUTBOUND_STREAMS,
+} from "./direct-message.js";
+import { DirectMessageSessions } from "./direct-sessions.js";
 import { SEAL_EVIDENCE_PROTOCOL, type SealEvidenceProtocolPort } from "./seal.js";
 import {
 	callerOf,
@@ -116,6 +125,7 @@ import { readUint8ArrayFrame, streamToUint8Array, uint8ArrayToStream, writeUint8
 import {
 	createDirectSyncIngress,
 	type DirectSyncIngress,
+	DRP_HEADS_CHUNK_PROTOCOL,
 	DRP_MESSAGE_PROTOCOL,
 	DRP_SYNC_PROTOCOLS,
 	isDirectSyncIngress,
@@ -137,6 +147,13 @@ import {
 const BOUND_ERRORS: ReadonlySet<string> = new Set(["InvalidDataLengthError", "InvalidDataLengthLengthError", "InvalidMessageLengthError"]);
 
 export * from "./stream.js";
+export {
+	DirectMessageSendError,
+	type DirectMessageSendErrorCode,
+	DRP_MESSAGE_SESSION_BULK_PROTOCOL,
+	DRP_MESSAGE_SESSION_RT_PROTOCOL,
+	isDirectMessageProtocol,
+} from "./direct-message.js";
 export {
 	directSyncProtocolFor,
 	DRP_HEADS_CHUNK_PROTOCOL,
@@ -695,6 +712,8 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private _messageStructuralAdmission?: (structure: RawMessageStructure) => void;
 	private readonly _syncAdmissions = new WeakMap<Connection, SyncSendAdmission>();
 	private _metrics?: PrometheusMetricsRegister;
+	/** The one owner of direct-message transport (sessions, legacy fallback); replaced on stop. */
+	private _directSessions: DirectMessageSessions;
 	private _bootstrapRetryController?: AbortController;
 	private _initialReach: Promise<DRPInitialReach> = Promise.resolve("none");
 	private _relayPolicyController?: AbortController;
@@ -749,6 +768,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			id: "network",
 			logConfig: config?.log_config,
 		});
+		this._directSessions = this.createDirectSessions();
 		this._unreliableWebRtcOwner = Object.freeze({
 			close: (): void => this._resetUnreliableWebRtcOwner(),
 			openUnreliableWebRtcRoute: (routeId: string) => {
@@ -2310,6 +2330,8 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		await relayPolicy?.stop();
 		await this._relayMaintenanceTail;
 		this._relayMaintenanceTail = Promise.resolve();
+		this._directSessions.closeAll();
+		this._directSessions = this.createDirectSessions();
 		await this._node?.stop();
 		this._messageQueue.close();
 		this._metrics?.stop();
@@ -3003,7 +3025,10 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	}
 
 	/**
-	 * Send a message to a peer.
+	 * Send a message to a peer over its direct-message session (or the legacy protocol for a peer that
+	 * has none). Resolves once the frame was accepted by the stream; it is not a delivery receipt.
+	 * Every failure rejects: the abort reason when the caller's signal aborted, otherwise a
+	 * {@link DirectMessageSendError} naming the cause. A failed send never resolves.
 	 * @param peerId - The peer ID to send the message to.
 	 * @param message - The message to send.
 	 * @param options
@@ -3015,7 +3040,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			? recordSend({
 					local: this.peerId,
 					remote: peerId,
-					protocol: DRP_MESSAGE_PROTOCOL,
+					protocol: "direct",
 					cls: MessageType[message.type] ?? String(message.type),
 					caller: callerOf(new Error().stack),
 					hash: hashBytes(messageBuffer),
@@ -3023,33 +3048,64 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 					t0: diagnosticsNow(),
 				})
 			: undefined;
-		let stream: Stream | undefined;
-		const abort = (): void => {
-			if (stream === undefined) return;
-			stream.abort(
-				options.signal?.reason instanceof Error ? options.signal.reason : new Error("direct message send aborted")
-			);
-		};
 		try {
 			options.signal?.throwIfAborted();
-			const connection = await this.safeDial([multiaddr(`/p2p/${peerId}`)], this._node, options.signal);
+			let connection: Connection | undefined;
+			try {
+				connection = await this.safeDial([multiaddr(`/p2p/${peerId}`)], this._node, options.signal);
+			} catch (cause) {
+				options.signal?.throwIfAborted();
+				throw new DirectMessageSendError("DIRECT_DIAL_FAILED", "Could not dial direct-message peer", { cause });
+			}
+			if (connection === undefined)
+				throw new DirectMessageSendError("DIRECT_DIAL_FAILED", "Could not dial direct-message peer");
 			if (probe !== undefined) {
 				probe.dialed = diagnosticsNow();
-				if (connection !== undefined) instrumentConnection(this.peerId, connection);
+				instrumentConnection(this.peerId, connection);
 			}
-			options.signal?.throwIfAborted();
-			stream = <Stream>await connection?.newStream(DRP_MESSAGE_PROTOCOL, { signal: options.signal });
-			if (probe !== undefined) probe.opened = diagnosticsNow();
-			options.signal?.addEventListener("abort", abort, { once: true });
-			options.signal?.throwIfAborted();
-			await uint8ArrayToStream(stream, messageBuffer, probe);
-		} catch (e) {
-			if (probe !== undefined) probe.error = e instanceof Error ? e.name : String(e);
-			log.error("::sendMessage:", e);
-			if (options.signal !== undefined) throw e;
-		} finally {
-			options.signal?.removeEventListener("abort", abort);
+			await this._directSessions.send(connection, messageBuffer, {
+				signal: options.signal,
+				legacyOnly: isSyncProtocolMessage(message),
+				onWriteStart:
+					probe === undefined
+						? undefined
+						: (): void => {
+								probe.opened = diagnosticsNow();
+							},
+			});
+			if (probe !== undefined) probe.written = probe.closed = diagnosticsNow();
+		} catch (error) {
+			if (probe !== undefined)
+				probe.error = error instanceof DirectMessageSendError ? error.code : error instanceof Error ? error.name : String(error);
+			throw error;
 		}
+	}
+
+	private createDirectSessions(): DirectMessageSessions {
+		return new DirectMessageSessions((frame, sender, protocol) => this.admitDirectFrame(frame, sender, protocol));
+	}
+
+	/**
+	 * Admit one frame read from an inbound direct-message session: the same decode, structural
+	 * admission, evidence and queue admission as a legacy stream's frame. Sync-family messages are
+	 * refused here (they keep their own negotiated protocols).
+	 * @param frame - The frame body.
+	 * @param sender - The connection's authenticated remote peer.
+	 * @param protocol - The negotiated session protocol.
+	 */
+	private async admitDirectFrame(frame: Uint8Array, sender: string, protocol: string): Promise<void> {
+		const probe: StreamReceiveSample | undefined = streamDiagnosticsEnabled
+			? recordReceive({ local: this.peerId, remote: sender, protocol, hash: hashBytes(frame), entered: diagnosticsNow() })
+			: undefined;
+		if (probe !== undefined) probe.framed = probe.entered;
+		const { message, structure } = this.decodeAttributedMessage(frame, sender);
+		if (probe !== undefined) countReceiveClass(probe, MessageType[message.type] ?? String(message.type));
+		if (isSyncProtocolMessage(message)) {
+			throw new SyncTransportError("SYNC_PROTOCOL_VIOLATION", "Sync-family messages are not carried on a direct-message session");
+		}
+		this.recordIngressEvidence(message, { kind: "authenticated-stream", protocol, sender }, structure);
+		await this._messageQueue.enqueue(message);
+		if (probe !== undefined) probe.admitted = probe.closed = diagnosticsNow();
 	}
 
 	/**
@@ -3229,18 +3285,10 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	 * @param message - The message to send.
 	 */
 	async sendGroupMessageRandomPeer(group: string, message: Message): Promise<void> {
-		const messageBuffer = this.encodeEligibleMessage(message);
-		try {
-			const peers = this.getGroupPeers(group, "mesh");
-			if (peers.length === 0) return;
-			const peerId = peers[Math.floor(Math.random() * peers.length)];
-
-			const connection = await this.safeDial(peerId);
-			const stream: Stream = (await connection?.newStream(DRP_MESSAGE_PROTOCOL)) as Stream;
-			await uint8ArrayToStream(stream, messageBuffer);
-		} catch (e) {
-			log.error("::sendGroupMessageRandomPeer:", e);
-		}
+		const peers = this.getGroupPeers(group, "mesh");
+		if (peers.length === 0) return;
+		const peerId = peers[Math.floor(Math.random() * peers.length)];
+		await this.sendMessage(peerId, message);
 	}
 
 	/**
@@ -3332,10 +3380,25 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			{ maxInboundStreams: 1, maxOutboundStreams: 1 }
 		);
 		await this._node?.handle(
-			[...DRP_SYNC_PROTOCOLS],
+			DRP_HEADS_CHUNK_PROTOCOL,
 			(stream, connection) => this.handleStream(stream, connection.remotePeer.toString()),
 			{ maxInboundStreams: 3, maxOutboundStreams: 3 }
 		);
+		// The legacy direct-message protocol (also the negotiated sync fallback) has its own bound:
+		// direct-message.ts LEGACY_MAX_INBOUND_STREAMS explains why it stays at three.
+		await this._node?.handle(
+			DRP_MESSAGE_PROTOCOL,
+			(stream, connection) => this.handleStream(stream, connection.remotePeer.toString()),
+			{ maxInboundStreams: LEGACY_MAX_INBOUND_STREAMS, maxOutboundStreams: LEGACY_MAX_OUTBOUND_STREAMS }
+		);
+		for (const [protocol, cls] of [
+			[DRP_MESSAGE_SESSION_RT_PROTOCOL, "rt"],
+			[DRP_MESSAGE_SESSION_BULK_PROTOCOL, "bulk"],
+		] as const)
+			await this._node?.handle(protocol, (stream, connection) => this._directSessions.serve(stream, connection, cls), {
+				maxInboundStreams: DIRECT_SESSION_MAX_STREAMS,
+				maxOutboundStreams: DIRECT_SESSION_MAX_STREAMS,
+			});
 	}
 
 	private async handleSignedGossipsubMessage(message: SignedMessage): Promise<void> {
