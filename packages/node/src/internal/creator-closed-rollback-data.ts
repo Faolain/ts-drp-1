@@ -10735,6 +10735,22 @@ function closedObservationCarrierBytes(value: unknown): Uint8Array | undefined {
 function closedRetirementEqual(left: unknown, right: unknown): boolean {
 	return compareBytes(closedRetirementBytes(left), closedRetirementBytes(right)) === 0;
 }
+/**
+ * Canonical equality of two live-journal row arrays, row by row: equal length, then each row's
+ * canonical bytes. Exactly as strict as the whole-array closedRetirementEqual (a canonical array is
+ * its length and its elements' canonical bytes), without one encode of the whole journal under the
+ * close's per-carrier cap: a member's retained journal is bounded by the journal's own image bound
+ * (LIVE_JOURNAL_RETIREMENT_LIMITS), not by that carrier cap, and each row stays under it.
+ * @param left - One journal's exact canonical rows.
+ * @param right - The other's.
+ * @returns Whether both hold the same rows in the same order.
+ */
+function closedJournalRowsEqual(left: readonly unknown[], right: readonly unknown[]): boolean {
+	if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+	for (let index = 0; index < left.length; index++)
+		if (!closedRetirementEqual(left[index], right[index])) return false;
+	return true;
+}
 
 /** Exact comparison of already captured native components, not a new enclosing
  * proof/wire record. A residual plus its OLD reconstruction can legitimately
@@ -11481,7 +11497,7 @@ async function drainClosedJournalDetails(input: Readonly<{
 			const state = read.control.drain;
 			if (state == null) {
 				requireLaw(closedRetirementEqual(read.image, source.journal.image) &&
-					closedRetirementEqual(read.readExactCanonicalRows(), source.journal.canonicalRows), "floor-stale");
+					closedJournalRowsEqual(read.readExactCanonicalRows(), source.journal.canonicalRows), "floor-stale");
 			} else {
 				requireLaw(closedRetirementEqual(state.plan.prefixes, prefixes) &&
 					closedJournalDrainHeadersEqual(state.plan, source.journalHeaders) &&
@@ -11489,7 +11505,7 @@ async function drainClosedJournalDetails(input: Readonly<{
 					read.drainSource !== undefined &&
 					closedRetirementEqual(read.drainSource.control, state.plan.baseControl) &&
 					closedRetirementEqual(read.drainSource.image, source.journal.image) &&
-					closedRetirementEqual(read.drainSource.canonicalRows, source.journal.canonicalRows), "floor-stale");
+					closedJournalRowsEqual(read.drainSource.canonicalRows, source.journal.canonicalRows), "floor-stale");
 			}
 			for (const bytes of [...read.readExactCanonicalRows(), ...closedJournalNativeControlCarriers(read)])
 				requireLaw(source.accounting.charge(bytes), "proof-budget-exceeded");
@@ -11596,7 +11612,7 @@ async function acknowledgeClosedJournalDrain(input: Readonly<{
 		await joinedClosedRetirementRead(read, async () => {
 			requireLaw(expected !== undefined && image !== undefined && rows !== undefined &&
 				closedRetirementEqual(read.control, expected) && read.control.drain == null && read.drainSource === undefined &&
-				closedRetirementEqual(read.image, image) && closedRetirementEqual(read.readExactCanonicalRows(), rows), "floor-stale");
+				closedRetirementEqual(read.image, image) && closedJournalRowsEqual(read.readExactCanonicalRows(), rows), "floor-stale");
 			for (const bytes of [...read.readExactCanonicalRows(), ...closedJournalNativeControlCarriers(read),
 				closedRetirementBytes(read.image)]) requireLaw(accounting.charge(bytes), "proof-budget-exceeded");
 		});
@@ -20650,7 +20666,7 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 				? read.drainSource!
 				: { control: read.control, image: read.image, canonicalRows: read.readExactCanonicalRows() };
 			checkSourceImage(original.image.imageDigest, source.journal.image.imageDigest);
-			requireLaw(closedRetirementEqual(original.canonicalRows, source.journal.canonicalRows), "floor-stale");
+			requireLaw(closedJournalRowsEqual(original.canonicalRows, source.journal.canonicalRows), "floor-stale");
 			if (sameDrain)
 				requireLaw(closedRetirementEqual(read.control.drain!.plan.prefixes, journalPrefixes) &&
 					closedJournalDrainHeadersEqual(read.control.drain!.plan, source.journalHeaders), "chain-invalid");
@@ -21158,7 +21174,7 @@ async function installClosedRetirementSource(source: ClosedRetirementSource, ack
 				);
 			const originalJournal = sameDrain ? journal.value.drainSource! : journal.value;
 			requireLaw(
-				closedRetirementEqual(originalJournal.canonicalRows, source.journal.canonicalRows) &&
+				closedJournalRowsEqual(originalJournal.canonicalRows, source.journal.canonicalRows) &&
 					closedRetirementEqual(originalJournal.image, source.journal.image),
 				"floor-stale"
 			);
