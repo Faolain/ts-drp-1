@@ -1058,6 +1058,11 @@ async function deliveredReissuesLeaveTheBacklog() {
 				await rows.toWriter();
 				await rows.toCreator();
 			}
+			const phase = async (label: string) =>
+				process.stdout.write(
+					`BACKLOG_REISSUED_PHASE ${JSON.stringify({ label, epoch, creator: await creator.authorityEpoch(), writer: await writer.authorityEpoch(), settlement: (({ epoch: at, unsettledEpochs, undelivered }) => ({ at, unsettledEpochs, undelivered: undelivered?.length }))(((await writer.settlementStatus?.()) ?? {}) as { epoch?: number; unsettledEpochs?: number; undelivered?: unknown[] }), policy: (({ state, epoch: at, kept }) => ({ state, at, kept: kept?.length }))(((await writer.rolloverStatus?.()) ?? {}) as { state?: string; epoch?: number; kept?: unknown[] }) })}\n`
+				);
+			await phase("warm");
 			// Offline: the bound's worth of moves the creator never receives, straight to the room.
 			for (let k = 0; k < V3_ROOM_LOCAL_BACKLOG_LIMIT; k++) {
 				await writer.issueRoom!(epoch, n);
@@ -1068,6 +1073,7 @@ async function deliveredReissuesLeaveTheBacklog() {
 			wire.resume();
 			await wire.caughtUp(epoch, 600_000);
 			const status = async () => (await writer.settlementStatus?.()) as { undelivered: unknown[] } | null;
+			await phase("skip-installed");
 			const givenBack = (await waitFor("moves given back", status, (value) => (value?.undelivered.length ?? 0) === ids.length, 120_000))?.undelivered.length;
 			// Connected again (the Writer's own rows of this epoch reach the creator). The next epoch: the
 			// policy offers the given-back moves again (each consumes its record).
@@ -1075,9 +1081,13 @@ async function deliveredReissuesLeaveTheBacklog() {
 				await rows.toWriter();
 				await rows.toCreator();
 			};
+			await phase("given-back");
 			await both();
 			epoch = await rollCreator(creator, both, ordinal);
 			await wire.caughtUp(epoch, 600_000);
+			await phase("next-epoch");
+			await sleep(3_000);
+			await phase("next-epoch+3s");
 			const writerAuthor = rowValue((await writer.published(null))[0]!).author;
 			await waitFor(
 				"every reissued move admitted",
