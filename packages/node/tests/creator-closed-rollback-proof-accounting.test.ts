@@ -2755,8 +2755,18 @@ function unique<T extends ts.Node>(predicate: (node: ts.Node) => node is T): T {
 	if (found.length !== 1) throw Error(`PRIVATE_STATEMENT_NOT_UNIQUE:${found.length}:${predicate.toString()}`);
 	return found[0]!;
 }
+// The source is read and parsed once, so an extracted declaration's text is fixed for the run. Each
+// lookup walks the whole owner file (26k lines, ~18 ms per walk on the sandbox), and harnesses that
+// rebuild their program per case (sizing widths, CURRENT phase maps) looked the same names up
+// hundreds of times: that, not the code under test, took them past the 10 s test timeout.
+const declarations = new Map<string, string>();
 function declaration(name: string): string {
-	return unique((node): node is ts.FunctionDeclaration => ts.isFunctionDeclaration(node) && node.name?.text === name).getText(parsed);
+	let text = declarations.get(name);
+	if (text === undefined) {
+		text = unique((node): node is ts.FunctionDeclaration => ts.isFunctionDeclaration(node) && node.name?.text === name).getText(parsed);
+		declarations.set(name, text);
+	}
+	return text;
 }
 function maintenanceProofMaxBytes(): number {
 	return CREATOR_MAINTENANCE_PROOF_MAX_BYTES;
@@ -2783,8 +2793,14 @@ const consume = unique((node): node is ts.VariableDeclaration => ts.isVariableDe
 	ts.isIdentifier(node.name) && node.name.text === "signingData" &&
 	node.initializer?.getText(parsed).includes("precloseControls?.signingPhysicalRows") === true);
 const declarationCode = ["closedRetirementEqual", "selectClosedSigningSummaryEpoch", "closedSigningSummaryResidualRows"].map(declaration).join("\n");
+// Transpiling is a pure function of the program text; each call still evaluates a fresh program.
+const transpiled = new Map<string, string>();
 function execute<T>(code: string, context: Record<string, unknown>): T {
-	const js = ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText;
+	let js = transpiled.get(code);
+	if (js === undefined) {
+		js = ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText;
+		transpiled.set(code, js);
+	}
 	const imports = { createWorkCheckpoint, encodeCanonical, decodeCanonical, closedRetirementBytes: encodeCanonical,
 		CREATOR_ORDINARY_PROOF_MAX_BYTES, CREATOR_MAINTENANCE_PROOF_MAX_BYTES: maintenanceProofMaxBytes(),
 		compareBytes: (a: Uint8Array, b: Uint8Array) => Buffer.compare(Buffer.from(a), Buffer.from(b)), ...context };
@@ -3500,8 +3516,16 @@ describe("actual CURRENT/FUTURE journal recipe freshly validates complete native
 });
 
 describe("CURRENT job phases reuse only identical same-schedule journal widths", () => {
-	const variable = (name: string) => unique((node): node is ts.VariableDeclaration => ts.isVariableDeclaration(node) &&
-		ts.isIdentifier(node.name) && node.name.text === name);
+	const variables = new Map<string, ts.VariableDeclaration>();
+	const variable = (name: string) => {
+		let found = variables.get(name);
+		if (found === undefined) {
+			found = unique((node): node is ts.VariableDeclaration => ts.isVariableDeclaration(node) &&
+				ts.isIdentifier(node.name) && node.name.text === name);
+			variables.set(name, found);
+		}
+		return found;
+	};
 	const journalReuse = unique((node): node is ts.IfStatement => ts.isIfStatement(node) &&
 		node.expression.getText(parsed) === "currentJobJournal?.jobIndex !== jobIndex");
 	const assignment = (journalReuse.thenStatement as ts.ExpressionStatement).expression as ts.BinaryExpression;
