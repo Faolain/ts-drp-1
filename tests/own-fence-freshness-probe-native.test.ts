@@ -125,13 +125,15 @@ async function probe(loss: Loss) {
 	log("rows-after-reopen", (await f.issuedAfter(1, null)).map(describeRow));
 	log("currency-after-reopen", member.room.localIssueCurrency?.());
 	log("status-after-reopen", member.room.settlementStatus?.());
-	log("plan-after-reopen", plan());
+	const planAtReopen = plan();
+	log("plan-after-reopen", planAtReopen);
 	const installed = await outcome(() => f.install(member));
 	log("install-current", installed);
 	log("rows-after-current-install", (await f.issuedAfter(1, null)).map(describeRow));
 	log("status-after-current-install", member.room.settlementStatus?.());
 	log("authority-after-current-install", member.room.authority()?.epoch ?? 0);
-	log("plan-after-current-install", plan());
+	const planAfterInstall = plan();
+	log("plan-after-current-install", planAfterInstall);
 	const issued = await outcome(() => member.room.issue(message("m2")));
 	log("issue-after", issued);
 	const after = await f.issuedAfter(1, null);
@@ -146,7 +148,7 @@ async function probe(loss: Loss) {
 	);
 	log("m1-given-back", givenBack);
 	await f.stop(member);
-	return { f, loss, reopen: "opened", installed, issued, givenBack };
+	return { f, loss, reopen: "opened", installed, issued, givenBack, planAtReopen, planAfterInstall };
 }
 
 /** The Writer's stored settlement plan: [sourceSequence, disposition, replacementSequence] per entry. */
@@ -182,3 +184,18 @@ it.each(["delete-row", "suffix", "restore", "restore-undelivered", "restore-fenc
 	},
 	240_000
 );
+
+// RED (G6, fail closed). A Writer brought back from a backup taken before its epoch-1 fence, when only
+// that fence reached the creator: the creator's frontier (4) is at or above the backup's lineage
+// (next 4), and m1 (sequence 3) was never admitted. The install is refused at its first signature
+// (V3_LOCAL_LINEAGE_BEHIND_FRONTIER), which is right, but only after the install rewrote the stored
+// settlement plan (revision 1 -> 4: m1 "expire" with no hand-back record) and adopted epoch 2. A
+// refused install must change nothing: m1 stays pending, recoverable once the device is healed,
+// instead of dropped without being given back (G2).
+it("[RED] a Writer refused for being behind its frontier keeps its settlement plan", async () => {
+	const result = await probe("restore-fence-only");
+	expect(result.reopen).toBe("opened");
+	expect(result.installed).toMatchObject({ ok: false });
+	expect(String((result.installed as { error?: string }).error)).toContain("V3_LOCAL_LINEAGE_BEHIND_FRONTIER");
+	expect(result.planAfterInstall).toEqual(result.planAtReopen);
+}, 240_000);
