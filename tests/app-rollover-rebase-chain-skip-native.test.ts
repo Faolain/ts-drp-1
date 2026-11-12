@@ -1035,39 +1035,51 @@ it("the undelivered-move bound counts each move of a batched row, as hand-back r
 	backlogCountsBatchedMoves(24), 1_800_000);
 
 // A consumed hand-back record counts against the undelivered bound only while its reissued row has no
-// admission evidence. An offline Writer fills the bound (64 moves), a skip install gives every move
-// back (64 records), and in the next epoch its policy offers them again: each reissue consumes its
-// record, the creator admits every reissued row and signs a row reaching them. Those moves are
-// delivered, so a new move must be accepted in that same epoch. 4109c500 counted every consumed record
-// until the next plan merge dropped it, refused the Writer at the bound in an epoch where nothing of
-// its own was undelivered, and (in the 100x16 catch-up) refused about 24 kept moves per install.
-// The creator's budget (100 moves per author, idle off) keeps every step of the check in one epoch.
+// admission evidence. An offline Writer's GIVEN_BACK moves are given back by a skip install (that many
+// records); in the next epoch its policy offers them again (each reissue consumes its record), the
+// creator admits every reissued row and signs a row reaching them: those moves are delivered. The
+// Writer, offline again, must then be accepted for the bound's full 64 new moves in that epoch.
+// 4109c500 counted every consumed record until the next plan merge dropped it, so it refused the
+// Writer after 64 - GIVEN_BACK new moves (in the 100x16 catch-up, about 24 kept moves per install).
+// The creator's budget (20 moves per author, under its own epoch's capacity) holds the check in one
+// epoch: the Writer's reissues count 16 there and the creator signs one row.
+const GIVEN_BACK = 16;
 async function deliveredReissuesLeaveTheBacklog() {
 	const restore = await installEnvironment("node", () => undefined);
 	const directory = mkdtempSync(join(tmpdir(), "app-rollover-backlog-reissued-"));
 	directories.push(directory);
 	try {
-		const { creator, writer } = await openPair(directory, {}, { movesPerAuthor: 100, idleMs: 3_600_000 });
+		const { creator, writer } = await openPair(directory, {}, { movesPerAuthor: 20, idleMs: 3_600_000 });
 		const wire = successorWire(() => [creator, writer] as const);
 		const rows = rowWire(creator, writer);
+		const both = async () => {
+			await rows.toWriter();
+			await rows.toCreator();
+		};
 		const ordinal = { next: 0 };
 		const ids: string[] = [];
 		let epoch = 0;
 		let n = 0;
+		const status = async () => (await writer.settlementStatus?.()) as { undelivered: unknown[] } | null;
+		const phase = async (label: string) =>
+			process.stdout.write(
+				`BACKLOG_REISSUED_PHASE ${JSON.stringify({
+					label,
+					epoch,
+					creator: await creator.authorityEpoch(),
+					writer: await writer.authorityEpoch(),
+					undelivered: (await status())?.undelivered.length,
+					kept: ((await writer.rolloverStatus?.()) as { kept?: unknown[] } | null)?.kept?.length,
+				})}\n`
+			);
 		try {
 			while (epoch < 2) {
-				epoch = await rollCreator(creator, rows.toWriter, ordinal);
+				epoch = await rollCreator(creator, both, ordinal);
 				await wire.caughtUp(epoch);
-				await rows.toWriter();
-				await rows.toCreator();
+				await both();
 			}
-			const phase = async (label: string) =>
-				process.stdout.write(
-					`BACKLOG_REISSUED_PHASE ${JSON.stringify({ label, epoch, creator: await creator.authorityEpoch(), writer: await writer.authorityEpoch(), settlement: (({ epoch: at, unsettledEpochs, undelivered }) => ({ at, unsettledEpochs, undelivered: undelivered?.length }))(((await writer.settlementStatus?.()) ?? {}) as { epoch?: number; unsettledEpochs?: number; undelivered?: unknown[] }), policy: (({ state, epoch: at, kept }) => ({ state, at, kept: kept?.length }))(((await writer.rolloverStatus?.()) ?? {}) as { state?: string; epoch?: number; kept?: unknown[] }) })}\n`
-				);
-			await phase("warm");
-			// Offline: the bound's worth of moves the creator never receives, straight to the room.
-			for (let k = 0; k < V3_ROOM_LOCAL_BACKLOG_LIMIT; k++) {
+			// Offline: moves the creator never receives, straight to the room; a skip install gives them back.
+			for (let k = 0; k < GIVEN_BACK; k++) {
 				await writer.issueRoom!(epoch, n);
 				ids.push(`block-1-${n++}`);
 			}
@@ -1075,33 +1087,13 @@ async function deliveredReissuesLeaveTheBacklog() {
 			for (let roll = 0; roll < 3; roll++) epoch = await rollCreator(creator, async () => undefined, ordinal);
 			wire.resume();
 			await wire.caughtUp(epoch, 600_000);
-			const status = async () => (await writer.settlementStatus?.()) as { undelivered: unknown[] } | null;
-			await phase("skip-installed");
-			const givenBack = (await waitFor("moves given back", status, (value) => (value?.undelivered.length ?? 0) === ids.length, 120_000))?.undelivered.length;
-			// Connected again (the Writer's own rows of this epoch reach the creator). The next epoch: the
-			// policy offers the given-back moves again (each consumes its record).
-			const both = async () => {
-				await rows.toWriter();
-				await rows.toCreator();
-			};
+			const givenBack = (await waitFor("moves given back", status, (value) => value?.undelivered.length === GIVEN_BACK, 120_000))
+				?.undelivered.length;
 			await phase("given-back");
+			// Connected: the next epoch, where the policy offers the given-back moves again.
 			await both();
 			epoch = await rollCreator(creator, both, ordinal);
 			await wire.caughtUp(epoch, 600_000);
-			await phase("next-epoch");
-			await sleep(3_000);
-			await phase("next-epoch+3s");
-			{
-				const offers = (await writer.policyOffers?.()) ?? [];
-				const summary = new Map<string, number>();
-				for (const offer of offers) {
-					const key = `${offer.epoch}:${offer.handBack ? "hb" : "new"}:${offer.outcome}`;
-					summary.set(key, (summary.get(key) ?? 0) + 1);
-				}
-				process.stdout.write(`BACKLOG_REISSUED_OFFERS ${JSON.stringify(Object.fromEntries(summary))}\n`);
-			}
-			if (process.env.REISSUE_PROBE === "1")
-				process.stdout.write(`BACKLOG_REISSUED_PROBE ${JSON.stringify(await writer.reissueFirstGivenBack?.())}\n`);
 			const writerAuthor = rowValue((await writer.published(null))[0]!).author;
 			await waitFor(
 				"every reissued move admitted",
@@ -1111,32 +1103,33 @@ async function deliveredReissuesLeaveTheBacklog() {
 						landed: (await acceptedCounts(creator, writerAuthor, ids)).filter((count) => count >= 1).length,
 						epochs: [await creator.authorityEpoch(), await writer.authorityEpoch()],
 						undelivered: (await status())?.undelivered.length,
-						policy: (({ state, kept }) => ({ state, kept: kept?.length }))(
-							((await writer.rolloverStatus?.()) ?? {}) as { state?: string; kept?: unknown[] }
-						),
-						errors: ((await writer.rollover?.())?.errors ?? []).slice(-3).map((error) => String(error).slice(0, 400)),
 					};
 				},
 				(value) => value.landed === ids.length,
-				300_000
+				120_000
 			);
 			// Evidence: a creator row of this epoch whose causal past reaches every reissued row.
 			await creator.issueRoom!(epoch, ordinal.next++);
 			await rows.toWriter();
-			const epochs = { creator: (await creator.authorityEpoch()) ?? 0, writer: (await writer.authorityEpoch()) ?? 0 };
-			const undelivered = (await status())?.undelivered.length;
+			await phase("delivered");
+			// Offline again: new moves until the room refuses one at the bound.
+			let accepted = 0;
 			let refusal: string | undefined;
-			try {
-				await writer.issueRoom!(epoch, n++);
-			} catch (error) {
-				refusal = String((error as Error).name ?? error);
+			while (refusal === undefined && accepted <= V3_ROOM_LOCAL_BACKLOG_LIMIT) {
+				try {
+					await writer.issueRoom!(epoch, n++);
+					accepted++;
+				} catch (error) {
+					refusal = String((error as Error).name ?? error);
+				}
 			}
-			const summary = { givenBack, undelivered, epoch, epochs, refusal, plan: await writer.settlementPlanDump?.() };
-			process.stdout.write(`BACKLOG_REISSUED ${JSON.stringify(summary).slice(0, 4000)}\n`);
-			expect(givenBack, "moves given back").toBe(V3_ROOM_LOCAL_BACKLOG_LIMIT);
-			expect(epochs, "one epoch from the reissues to the new move").toEqual({ creator: epoch, writer: epoch });
-			expect(undelivered, "records left unconsumed").toBe(0);
-			expect(refusal, "a new move after every reissued move was admitted").toBeUndefined();
+			const epochs = { creator: (await creator.authorityEpoch()) ?? 0, writer: (await writer.authorityEpoch()) ?? 0 };
+			const summary = { givenBack, accepted, refusal, epoch, epochs };
+			process.stdout.write(`BACKLOG_REISSUED ${JSON.stringify(summary)}\n`);
+			expect(givenBack, "moves given back").toBe(GIVEN_BACK);
+			expect(epochs, "one epoch from the reissues to the refusal").toEqual({ creator: epoch, writer: epoch });
+			expect(refusal, "refused at the bound").toBe("V3RoomLocalBacklogFull");
+			expect(accepted, "new moves accepted after every reissued move was delivered").toBe(V3_ROOM_LOCAL_BACKLOG_LIMIT);
 		} finally {
 			await wire.stop();
 		}
