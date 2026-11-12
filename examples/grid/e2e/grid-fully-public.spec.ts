@@ -26,6 +26,7 @@ interface Snapshot {
 		readonly outcome?: string;
 		readonly [k: string]: unknown;
 	}[];
+	readonly controlPlaneEventsDropped: number;
 	readonly peerId: string;
 	readonly relayPolicy?: {
 		readonly attempts: readonly Record<string, unknown>[];
@@ -89,7 +90,9 @@ test("two browsers establish public relay and rendezvous readiness", async ({ br
 		if (!creatorPublished) {
 			const s = await readSnapshot(creatorPage);
 			const regEvents = s.controlPlaneEvents.filter((e) => e.kind === "rendezvous-registration");
-			log(`[creator] registration events (${regEvents.length}): ${JSON.stringify(regEvents.slice(-8))}`);
+			log(
+				`[creator] registration events (${regEvents.length} retained, ${s.controlPlaneEventsDropped} events dropped): ${JSON.stringify(regEvents.slice(-8))}`
+			);
 			log(`[creator] rendezvous trace: ${JSON.stringify(s.rendezvous ?? {}).slice(0, 2000)}`);
 		}
 		expect(creatorPublished, "creator registered on public Nostr").toBe(true);
@@ -217,7 +220,9 @@ async function dumpRelayEvidence(page: Page, label: string): Promise<void> {
 		log(`[${label}] relay-reservation event: ${JSON.stringify(event)}`);
 	}
 	const admissionEvents = s.controlPlaneEvents.filter((e) => e.kind === "address-admission");
-	log(`[${label}] address-admission events: ${admissionEvents.length} total`);
+	log(
+		`[${label}] address-admission events: ${admissionEvents.length} retained (${s.controlPlaneEventsDropped} control-plane events dropped)`
+	);
 	for (const event of admissionEvents.slice(-25)) {
 		log(`[${label}] address-admission: ${JSON.stringify(event)}`);
 	}
