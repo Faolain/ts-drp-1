@@ -114,30 +114,32 @@ it("several hot Writers: a received move the creator refuses at capacity trigger
 				},
 			});
 			policies[index] = policy;
-			// Diagnostics only: the creator's rollover stages (seal, adopt, export) with their times.
-			const staged = new Set(["sealEpoch", "adoptCreatorSuccessor", "exportCreatorSuccessor"]);
+			// Diagnostics only: the creator's rollover stages (seal, adopt, export) with their times. The
+			// session is frozen and its methods close over their state, so a copy carries the wrappers.
+			const stage =
+				(name: string, run: (...input: never[]) => Promise<unknown>) =>
+				async (...input: never[]) => {
+					const at = () => Math.round(performance.now() / 1000);
+					stages.push(`${name}:start@${at()}`);
+					try {
+						const result = await run(...input);
+						stages.push(`${name}:ok@${at()}`);
+						return result;
+					} catch (error) {
+						stages.push(`${name}:failed@${at()}:${errorText(error).slice(0, 160)}`);
+						throw error;
+					}
+				};
+			const session = peer.room as unknown as Record<string, (...input: never[]) => Promise<unknown>>;
 			policy.bind(
 				(index !== 0
 					? peer.room
-					: new Proxy(peer.room, {
-							get(target, property) {
-								const value = Reflect.get(target, property, target) as unknown;
-								if (typeof value !== "function") return value;
-								if (typeof property !== "string" || !staged.has(property)) return value.bind(target);
-								return async (...input: unknown[]) => {
-									const at = () => Math.round(performance.now() / 1000);
-									stages.push(`${property}:start@${at()}`);
-									try {
-										const result = await (value as (...args: unknown[]) => Promise<unknown>).apply(target, input);
-										stages.push(`${property}:ok@${at()}`);
-										return result;
-									} catch (error) {
-										stages.push(`${property}:failed@${at()}:${errorText(error).slice(0, 160)}`);
-										throw error;
-									}
-								};
-							},
-						})) as never
+					: {
+							...peer.room,
+							sealEpoch: stage("sealEpoch", session.sealEpoch!),
+							adoptCreatorSuccessor: stage("adoptCreatorSuccessor", session.adoptCreatorSuccessor!),
+							exportCreatorSuccessor: stage("exportCreatorSuccessor", session.exportCreatorSuccessor!),
+						}) as never
 			);
 			const room = peer.room;
 			// HARNESS ARTIFACT GUARD (as realtime-scorecard-rate-native): snapshot pulls are bounded per
