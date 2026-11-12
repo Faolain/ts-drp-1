@@ -59,8 +59,15 @@ async function roll(f: Fixture, creator: Peer, member: Peer, label: string) {
 	await creator.room.adoptCreatorSuccessor();
 	await f.install(member);
 	const image = await nativeImage(f);
-	console.info(`REMOVED_REPLACED ${label} epoch=${member.room.authority().epoch} ${JSON.stringify(image)}`);
+	console.info(`REMOVED_REPLACED ${label} epoch=${member.room.authority().epoch} rows=${image.outbox.length} ${JSON.stringify(image)}`);
 	return image;
+}
+
+/** Delivers the Writer's rows above `after` to the creator; returns the last delivered sequence. */
+async function deliver(f: Fixture, creator: Peer, after: number | null) {
+	const rows = await f.issuedAfter(1, after);
+	if (rows.length !== 0) expect(await creator.receive(rows, 1, 30_000)).toBe(true);
+	return rows.at(-1)?.commit.authorSequence ?? after;
 }
 
 /** m1 signed in epoch 0 and lost; epoch 0 closes without it; the adjacent install replays it and the creator admits the replay. */
@@ -119,6 +126,29 @@ describe("a Writer removed in epoch 1 with an earlier own row installs every lat
 		expect(count(creator, MOVE)).toBe(1);
 	}, 300_000);
 
+	it("removed in epoch 3 while its delivered epoch-0 move still lingers: the next installs succeed", async () => {
+		const f = await fixture();
+		const creator = await f.open(0), member = await f.open(1);
+		// One delivered move per epoch, as a player plays; the epoch-0 move is admitted at the first close.
+		await member.room.issue(message(`${MOVE}-0`));
+		let delivered = await deliver(f, creator, null);
+		for (let epoch = 1; epoch <= 3; epoch++) {
+			await roll(f, creator, member, `played-${epoch}`);
+			await member.room.issue(message(`${MOVE}-${epoch}`));
+			delivered = await deliver(f, creator, delivered);
+		}
+		const before = await nativeImage(f);
+		console.info(`REMOVED_REPLACED before-removal epoch=${member.room.authority().epoch} rows=${before.outbox.length}`);
+		// Reachability: the settled epoch-0 move is still physically present at the removing close (E = 3).
+		expect(before.outbox.find(row => row.id === `${MOVE}-0`)).toMatchObject({ epoch: 0, publishState: "published" });
+		await revoke(f, creator);
+		for (let seal = 0; seal < 4; seal++) await roll(f, creator, member, `removed-late-${seal}`);
+		expect(member.room.authority().epoch).toBe(7);
+		expect((await nativeImage(f)).lineage).toEqual(before.lineage);
+		expect(await member.room.unresolvedAcceptedWork()).toEqual([]);
+		for (let epoch = 0; epoch <= 3; epoch++) expect(count(creator, `${MOVE}-${epoch}`)).toBe(1);
+	}, 300_000);
+
 	it("control: the same replayed move without the revocation installs every later epoch", async () => {
 		const f = await fixture();
 		const creator = await f.open(0), member = await f.open(1);
@@ -126,5 +156,19 @@ describe("a Writer removed in epoch 1 with an earlier own row installs every lat
 		for (let seal = 0; seal < 4; seal++) await roll(f, creator, member, `member-${seal}`);
 		expect(member.room.authority().epoch).toBe(5);
 		expect(count(creator, MOVE)).toBe(1);
+	}, 300_000);
+
+	// Storage growth (measurement, no bound asserted): a member that plays one delivered move per epoch;
+	// the log reports how many own rows its issuance outbox still holds after each install.
+	it("measure: own rows still present after each of 10 epochs for a playing member", async () => {
+		const f = await fixture();
+		const creator = await f.open(0), member = await f.open(1);
+		let delivered: number | null = null;
+		for (let epoch = 0; epoch < 10; epoch++) {
+			await member.room.issue(message(`${MOVE}-m${epoch}`));
+			delivered = await deliver(f, creator, delivered);
+			await roll(f, creator, member, `measure-${epoch}`);
+		}
+		expect(member.room.authority().epoch).toBe(10);
 	}, 300_000);
 });
