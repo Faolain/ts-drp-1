@@ -52,7 +52,13 @@ describe("Phase 3f-c node-owned application batching RED", () => {
 			"applicationBatch",
 		]);
 		expect(result).toMatchObject({ signerCalls: 2, journalAppends: 2 });
-		expect(result.issued[1]?.dependencies).toEqual([result.initialTips.at(-1), result.issued[0]?.digest].sort());
+		// The join covers the author's latest own row (v3-live causalJoinDependencies); the batch depends on
+		// the one initial tip the join left and on the join.
+		const joined = new Set(result.issued[0]?.dependencies);
+		expect(joined.has(result.initialTipsBySequence.at(-1) as string)).toBe(true);
+		const left = result.initialTips.filter((tip) => !joined.has(tip));
+		expect(left).toHaveLength(1);
+		expect(result.issued[1]?.dependencies).toEqual([left[0], result.issued[0]?.digest].sort());
 	});
 
 	it("returns an exact entry-count split before signing seventeen application operations", async () => {
