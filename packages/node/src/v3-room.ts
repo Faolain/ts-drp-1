@@ -6967,6 +6967,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				...(sourceContexts === undefined ? {} : {sourceContexts}),
 				fenceSequence,
 				...(selectedHandBacks === undefined ? {} : { handBacks: Object.freeze([...selectedHandBacks]) }),
+				// The last-member frontier is written once and never changed or cleared.
+				...(current?.memberFrontier === undefined ? {} : { memberFrontier: current.memberFrontier }),
 				revision: expectedRevision === null ? 0 : expectedRevision + 1,
 				scope: settlementScope,
 			});

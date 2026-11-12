@@ -22,6 +22,7 @@ import {
 	type DurableIssueScope,
 	type DurableIssueSignContext,
 	type DurableLineage,
+	SETTLEMENT_MEMBER_FRONTIER_MAX_BYTES,
 	SETTLEMENT_REPLACEMENT_DIGEST_LIMITS,
 	type SettlementPlan,
 } from "./types.js";
@@ -151,6 +152,8 @@ export interface IssuanceSourceCustodyGeometry {
 	readonly maxCompletionMemberByteLength: number;
 	readonly maxExpiryByteLength: number;
 	readonly maxNativeReadByteLength: number;
+	/** The last-member frontier a removing close may persist once (absent: none charged). */
+	readonly maxMemberFrontierByteLength?: number;
 }
 
 export const CANONICAL_SETTLEMENT_PLAN_STORAGE_KIND = "canonical-settlement-plan-1";
@@ -195,7 +198,7 @@ export function issuanceLegacySettlementPlanEntriesJson(plan: SettlementPlan): s
 }
 
 export function issuanceSettlementPlanStorageByteLength(plan: SettlementPlan): number {
-	return plan.sourceContexts === undefined && plan.handBacks === undefined
+	return plan.sourceContexts === undefined && plan.handBacks === undefined && plan.memberFrontier === undefined
 		? new TextEncoder().encode(issuanceLegacySettlementPlanEntriesJson(plan)).byteLength
 		: issuanceCanonicalSettlementPlanStorageByteLength(encodeCanonical(plan, unsignedEncodingLimits).byteLength);
 }
@@ -209,7 +212,11 @@ export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueSc
 	}> {
 	assertDurableIssueScope(scope);
 	const captured = prior === null ? null : copySettlementPlan(prior, scope);
-	if (captured === undefined || !isClosedDurableIssuanceRecord(geometry, ["maxContextByteLength", "maxCompletionByteLength", "maxCompletionMemberByteLength", "maxExpiryByteLength", "maxNativeReadByteLength"]) ||
+	const hasMemberFrontierGeometry = typeof geometry === "object" && geometry !== null && Object.hasOwn(geometry, "maxMemberFrontierByteLength");
+	if (captured === undefined || !isClosedDurableIssuanceRecord(geometry, ["maxContextByteLength", "maxCompletionByteLength", "maxCompletionMemberByteLength", "maxExpiryByteLength", "maxNativeReadByteLength",
+		...(hasMemberFrontierGeometry ? ["maxMemberFrontierByteLength"] : [])]) ||
+		(hasMemberFrontierGeometry && (!Number.isSafeInteger(geometry.maxMemberFrontierByteLength) ||
+			Number(geometry.maxMemberFrontierByteLength) < 1 || Number(geometry.maxMemberFrontierByteLength) > SETTLEMENT_MEMBER_FRONTIER_MAX_BYTES)) ||
 		!Number.isSafeInteger(maxSourceCount) || maxSourceCount < 0 || maxSourceCount > ISSUANCE_RETIREMENT_LIMITS.maxRows ||
 		!Number.isSafeInteger(geometry.maxContextByteLength) || geometry.maxContextByteLength < 1 ||
 		!Number.isSafeInteger(geometry.maxCompletionByteLength) || geometry.maxCompletionByteLength < 1 ||
@@ -255,9 +262,14 @@ export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueSc
 	const contextShapes = [...contexts.map(unsignedCanonicalShape)];
 	const expiryCount = maxSourceCount + originalEntries.filter(entry => entry.sourceResolutionDigest === undefined &&
 		entry.disposition !== "expire" && entry.disposition !== "inherited" && entry.replacementSequence === null).length;
+	// A completed replacement entry still without a context may gain its displaced source's context
+	// once, at the close that removes its author: one more context (one displaced plane per close).
+	const completedWithoutContext = originalEntries.some(entry => entry.sourceContextDigest === undefined &&
+		entry.replacementSequence !== null && (entry.disposition === "rebase" || entry.disposition === "transform"));
 	const additionalContexts = [geometry.maxContextByteLength, geometry.maxCompletionByteLength +
 		(maxSourceCount + originalEntries.length) * geometry.maxCompletionMemberByteLength,
-		...Array.from({length: expiryCount}, () => geometry.maxExpiryByteLength)];
+		...Array.from({length: expiryCount}, () => geometry.maxExpiryByteLength),
+		...(completedWithoutContext ? [geometry.maxContextByteLength] : [])];
 	for (const length of additionalContexts) {
 		contextWidths.push(unsignedRecordWidth({}, {digest, exactCanonicalContextBytes: bytesWidth(length)}));
 		contextShapes.push(contextShape);
@@ -273,12 +285,19 @@ export function issuanceSourceCustodyPlanResourceForSizing(scope: DurableIssueSc
 		width: encodeCanonical(existingHandBacks, unsignedEncodingLimits).byteLength,
 		shape: unsignedCanonicalShape(existingHandBacks),
 	};
+	// The last-member frontier: the stored record exactly, or the one a removing close may persist.
+	const memberFrontierLength = captured?.memberFrontier?.exactCanonicalContextBytes.byteLength ??
+		(hasMemberFrontierGeometry ? Number(geometry.maxMemberFrontierByteLength) : undefined);
+	const memberFrontier = memberFrontierLength === undefined ? undefined
+		: unsignedRecordWidth({}, {digest, exactCanonicalContextBytes: bytesWidth(memberFrontierLength)});
 	const byteLength = unsignedRecordWidth({scope}, {revision: integer, fenceSequence: integer,
 		entries: unsignedArrayWidth(entryWidths), sourceContexts: unsignedArrayWidth(contextWidths),
-		...(handBacks === undefined ? {} : {handBacks: handBacks.width})});
+		...(handBacks === undefined ? {} : {handBacks: handBacks.width}),
+		...(memberFrontier === undefined ? {} : {memberFrontier})});
 	const shape = unsignedRecordShape({scope}, {revision: leaf, fenceSequence: leaf,
 		entries: unsignedArrayShape(entryShapes), sourceContexts: unsignedArrayShape(contextShapes),
-		...(handBacks === undefined ? {} : {handBacks: handBacks.shape})});
+		...(handBacks === undefined ? {} : {handBacks: handBacks.shape}),
+		...(memberFrontier === undefined ? {} : {memberFrontier: contextShape})});
 	const nativeStorageByteLength = issuanceCanonicalSettlementPlanStorageByteLength(byteLength);
 	if (byteLength > geometry.maxNativeReadByteLength || nativeStorageByteLength > geometry.maxNativeReadByteLength)
 		throw issuanceRetirementRefusal("source custody plan exceeds original native read bound");
@@ -1564,8 +1583,10 @@ function verifiedRetirementPlan(input: unknown): Readonly<{ plan: SettlementPlan
 		const value = decodeCanonical(bytes);
 		const hasContexts = typeof value === "object" && value !== null && Object.hasOwn(value, "sourceContexts");
 		const hasHandBacks = typeof value === "object" && value !== null && Object.hasOwn(value, "handBacks");
+		const hasMemberFrontier = typeof value === "object" && value !== null && Object.hasOwn(value, "memberFrontier");
 		if (!isClosedDurableIssuanceRecord(value, ["scope", "revision", "fenceSequence", "entries",
-			...(hasContexts ? ["sourceContexts"] : []), ...(hasHandBacks ? ["handBacks"] : [])])) throw invalid();
+			...(hasContexts ? ["sourceContexts"] : []), ...(hasHandBacks ? ["handBacks"] : []),
+			...(hasMemberFrontier ? ["memberFrontier"] : [])])) throw invalid();
 		assertDurableIssueScope(value.scope);
 		const verified = copySettlementPlan(value, value.scope);
 		if (verified === undefined || !issuanceRetirementBytesEqual(bytes, retirementPlanBytes(verified))) throw invalid();

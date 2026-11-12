@@ -1,7 +1,7 @@
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 
 import { durablePreimageHeader } from "./preimage-header.js";
-import { MAXIMUM_DURABLE_ISSUANCE_SCOPE_UTF16_UNITS, SETTLEMENT_HAND_BACK_LIMITS, SETTLEMENT_REPLACEMENT_MAX_INTENTS, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS } from "./types.js";
+import { MAXIMUM_DURABLE_ISSUANCE_SCOPE_UTF16_UNITS, SETTLEMENT_HAND_BACK_LIMITS, SETTLEMENT_MEMBER_FRONTIER_MAX_BYTES, SETTLEMENT_REPLACEMENT_MAX_INTENTS, SETTLEMENT_REPLACEMENT_DIGEST_LIMITS } from "./types.js";
 import type {
 	DurableIssuanceError,
 	DurableIssuanceErrorCode,
@@ -690,9 +690,11 @@ function settlementHandBacksEqual(left: SettlementHandBack, right: SettlementHan
 export function copySettlementPlan(value: unknown, scope: DurableIssueScope): SettlementPlan | undefined {
 	const hasContexts = typeof value === "object" && value !== null && Object.hasOwn(value, "sourceContexts");
 	const hasHandBacks = typeof value === "object" && value !== null && Object.hasOwn(value, "handBacks");
+	const hasMemberFrontier = typeof value === "object" && value !== null && Object.hasOwn(value, "memberFrontier");
 	if (
 		!isClosedDurableIssuanceRecord(value, ["entries", "fenceSequence", "revision", "scope",
-			...(hasContexts ? ["sourceContexts"] : []), ...(hasHandBacks ? ["handBacks"] : [])]) ||
+			...(hasContexts ? ["sourceContexts"] : []), ...(hasHandBacks ? ["handBacks"] : []),
+			...(hasMemberFrontier ? ["memberFrontier"] : [])]) ||
 		!Array.isArray(value.entries) ||
 		!isValidDurableAuthorSequence(value.revision) ||
 		(value.fenceSequence !== null && !isValidDurableAuthorSequence(value.fenceSequence))
@@ -707,6 +709,8 @@ export function copySettlementPlan(value: unknown, scope: DurableIssueScope): Se
 	if (!durableIssueScopesEqual(value.scope, scope)) return undefined;
 	const handBacks = hasHandBacks ? copySettlementHandBacks(value.handBacks) : undefined;
 	if (hasHandBacks && handBacks === undefined) return undefined;
+	const memberFrontier = hasMemberFrontier ? copySettlementMemberFrontier(value.memberFrontier) : undefined;
+	if (hasMemberFrontier && memberFrontier === undefined) return undefined;
 	const entries: SettlementPlanEntry[] = [];
 	let prior = -1;
 	for (const rawEntry of value.entries) {
@@ -748,9 +752,28 @@ export function copySettlementPlan(value: unknown, scope: DurableIssueScope): Se
 		...(hasContexts ? { sourceContexts } : {}),
 		fenceSequence: value.fenceSequence,
 		...(handBacks === undefined ? {} : { handBacks }),
+		...(memberFrontier === undefined ? {} : { memberFrontier }),
 		revision: value.revision,
 		scope: copyDurableIssueScope(scope),
 	};
+}
+
+/**
+ * Validates and detaches a plan's last-member frontier record: exact bytes within
+ * SETTLEMENT_MEMBER_FRONTIER_MAX_BYTES whose digest is their source-context-domain hash. The store
+ * checks only shape; Node authenticates the signed statement on every open.
+ * @param value - Untrusted record.
+ * @returns The detached record, or undefined when invalid.
+ */
+function copySettlementMemberFrontier(value: unknown): SettlementSourceContext | undefined {
+	if (!isClosedDurableIssuanceRecord(value, ["digest", "exactCanonicalContextBytes"])) return undefined;
+	const digest = copyDurableIssuanceBytes(value.digest);
+	const bytes = copyDurableIssuanceBytes(value.exactCanonicalContextBytes);
+	return digest?.byteLength !== 32 || bytes === undefined || bytes.byteLength === 0 ||
+		bytes.byteLength > SETTLEMENT_MEMBER_FRONTIER_MAX_BYTES ||
+		!durableIssuanceBytesEqual(digest, hashDomain("ts-drp/settlement-source-context/v1", bytes))
+		? undefined
+		: { digest, exactCanonicalContextBytes: bytes };
 }
 
 /** Last-consumer projection for the original atomic retirement/plan owners. */
@@ -820,6 +843,8 @@ export function cloneSettlementPlan(plan: SettlementPlan): SettlementPlan {
 						sourceSequence: record.sourceSequence,
 					})),
 				}),
+		...(plan.memberFrontier === undefined ? {} : {memberFrontier: {digest: new Uint8Array(plan.memberFrontier.digest),
+			exactCanonicalContextBytes: new Uint8Array(plan.memberFrontier.exactCanonicalContextBytes)}}),
 		revision: plan.revision,
 		scope: copyDurableIssueScope(plan.scope),
 	};
@@ -848,6 +873,11 @@ export function assertSettlementPlanProgressTransition(current: SettlementPlan |
 			throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement hand-back changed");
 	}
 	if (current === null) return;
+	// The last-member frontier is written once and never changed or cleared.
+	if (current.memberFrontier !== undefined && (next.memberFrontier === undefined ||
+		!durableIssuanceBytesEqual(current.memberFrontier.digest, next.memberFrontier.digest) ||
+		!durableIssuanceBytesEqual(current.memberFrontier.exactCanonicalContextBytes, next.memberFrontier.exactCanonicalContextBytes)))
+		throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement member frontier changed");
 	for (const prior of current.entries) {
 		const candidate = next.entries.find((entry) => entry.sourceSequence === prior.sourceSequence);
 		if (candidate === undefined) {
@@ -865,6 +895,11 @@ export function assertSettlementPlanProgressTransition(current: SettlementPlan |
 			candidate.sourceObjectId !== prior.sourceObjectId ||
 			(prior.sourceContextDigest !== undefined && (candidate.sourceContextDigest === undefined ||
 				!durableIssuanceBytesEqual(prior.sourceContextDigest, candidate.sourceContextDigest))) ||
+			// A source context arrives once: on unresolved work (custody of retained work), or on a completed
+			// replacement entry (custody of its still-present source when its author is removed). An entry
+			// already terminal (expire, committed, inherited) never gains one.
+			(prior.sourceContextDigest === undefined && candidate.sourceContextDigest !== undefined &&
+				!settlementEntryMayGainSourceContext(prior)) ||
 			(prior.sourceResolutionDigest !== undefined && (candidate.sourceResolutionDigest === undefined ||
 				!durableIssuanceBytesEqual(prior.sourceResolutionDigest, candidate.sourceResolutionDigest))) ||
 			// A resolution arrives only with the one-way unresolved->terminal change above;
@@ -926,6 +961,20 @@ export function assertSettlementPlanProgressTransition(current: SettlementPlan |
 			}
 		}
 	}
+}
+
+/**
+ * Whether an entry without a source context may gain one in a plan write: unresolved work (no
+ * replacement yet; custody of retained work), or a completed replacement entry (`rebase`/`transform`
+ * with its replacement; a progress record, if any, is complete; custody of its source when its author
+ * is removed).
+ * @param prior - The entry as currently stored.
+ * @returns Whether the context may arrive.
+ */
+export function settlementEntryMayGainSourceContext(prior: SettlementPlanEntry): boolean {
+	if (prior.disposition === "expire" || prior.disposition === "committed" || prior.disposition === "inherited") return false;
+	if (prior.replacementSequence === null) return true;
+	return prior.disposition === "rebase" || prior.disposition === "transform";
 }
 
 /**

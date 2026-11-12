@@ -148,7 +148,17 @@ export interface SettlementPlan {
 	readonly sourceContexts?: readonly SettlementSourceContext[];
 	/** Sorted by (sourceSequence, intent); absent when empty. */
 	readonly handBacks?: readonly SettlementHandBack[];
+	/**
+	 * The author's last-member frontier: the creator-signed settlement statement the author held at its
+	 * last install as a member (verbatim signed bytes; Node opens and re-verifies them on every open).
+	 * Written once, at the close that removes the author; never changed or cleared. Its digest uses the
+	 * source-context domain. Older readers refuse the field (closed record).
+	 */
+	readonly memberFrontier?: SettlementSourceContext;
 }
+
+/** Byte ceiling of a plan's last-member frontier record (anchor, settlement record, Cut, commit QC). */
+export const SETTLEMENT_MEMBER_FRONTIER_MAX_BYTES = 131_072;
 
 export interface DurableIssueCommit {
 	readonly authorSequence: number;

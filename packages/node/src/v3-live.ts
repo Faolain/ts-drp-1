@@ -223,7 +223,10 @@ import {
 	installCreatorSuccessorRetainedReadPause,
 } from "./internal/creator-successor-live.js";
 import {
+	captureCreatorMemberFrontier,
+	openCreatorMemberFrontier,
 	openVerifiedCreatorHistoricalIssuance,
+	resolveCreatorMemberFrontier,
 	resolveVerifiedCreatorHistoricalIssuance,
 	resolveVerifiedHistoricalSourceAcl,
 	resolveVerifiedHistoricalSourceContext,
@@ -232,6 +235,7 @@ import {
 	resolveCreatorCheckpointAttachment,
 	type VerifiedCreatorCheckpointAttachment,
 	type VerifiedCreatorHistoricalIssuance,
+	type VerifiedCreatorMemberFrontier,
 } from "./internal/creator-transition-advance.js";
 import {
 	acceptCreatorCloseRecoveryRetirement,
@@ -9567,6 +9571,8 @@ type ClassifiedPlaneVertex = Readonly<{
 	authenticated: AuthenticatedRecoveryVertex;
 	kind: "covered-historical" | "current" | "displaced" | "pinned-genesis";
 	sourceContract?: CreatorRetainedSourceContract;
+	/** Admitted under the persisted last-member frontier: settled history, never applied or re-offered. */
+	terminal?: true;
 }>;
 
 interface CreatorRetainedSourceContract {
@@ -9608,6 +9614,12 @@ interface HistoricalIssuanceContext {
 	readonly capability: VerifiedCreatorHistoricalIssuance;
 	readonly checkpoint?: VerifiedCreatorCheckpointAttachment;
 	readonly retainedSources?: ReadonlyMap<number, CreatorRetainedSourceRow>;
+	/**
+	 * The author's persisted last-member frontier (SettlementPlan.memberFrontier), re-verified at this
+	 * open. Classification uses it only through the covered-historical path, for own rows it proves
+	 * admitted (seq <= its admitted sequence): terminal, never applied, never re-offered.
+	 */
+	readonly memberFrontier?: VerifiedCreatorMemberFrontier;
 	readonly originalIssuanceStore: DurableIssuanceStore;
 	/** Same private adoption's bounded facts, never historical/admission authority. */
 	readonly vertexFacts?: CreatorCensusVertexFacts;
@@ -10404,7 +10416,8 @@ async function retainCreatorAcceptedSourceCustody(registration: V3PlaneRegistrat
 		expectedObjectId: targetTrust.objectId, expectedProfileId: targetTrust.profileId});
 	if (!targetAcl.ok) throw new TypeError("creator source custody target is not authenticated");
 	const writer = authorizeLatchedApplicationWrite({author: registration.issuanceScope.author, snapshot: targetAcl.snapshot});
-	const requiresApplicationCustody = targetTrust.currentEpoch !== payload.provenance.epoch + 1 || !writer.ok || !writer.authorized;
+	const removedAuthor = !writer.ok || !writer.authorized;
+	const requiresApplicationCustody = targetTrust.currentEpoch !== payload.provenance.epoch + 1 || removedAuthor;
 	let committedMembers: ReadonlySet<string> | undefined;
 	if (receivedMembership !== undefined) {
 		// The SAME original membership owner verified the complete Cut membership.
@@ -10444,6 +10457,18 @@ async function retainCreatorAcceptedSourceCustody(registration: V3PlaneRegistrat
 	const retained = await prepareCreatorRetainedSourceContracts(prior, payload.trust.trust, payload.input.catalog);
 	if (!current()) throw new TypeError("creator source custody changed during contract preparation");
 	let added = false;
+	// The close that removes this author persists, once, the creator-signed settlement frontier it holds
+	// from its install as a member of this epoch (verbatim signed bytes, SettlementPlan.memberFrontier):
+	// after removal no creator statement names it, and that frontier proves which of its own rows were
+	// admitted (seq <= its admitted sequence). Later opens re-verify it.
+	const memberIdentity = registration.historicalIssuance === undefined ? undefined
+		: resolveVerifiedCreatorHistoricalIssuance(registration.historicalIssuance.capability);
+	const memberThrough = memberIdentity?.admissionEpoch !== undefined && memberIdentity.successorEpoch === payload.provenance.epoch &&
+		memberIdentity.successorAnchorDigest === payload.provenance.anchorDigest ? memberIdentity.admittedAuthorSequence : null;
+	const memberFrontier = !removedAuthor || prior?.memberFrontier !== undefined || memberThrough === null ||
+		registration.historicalIssuance === undefined ? undefined
+		: captureCreatorMemberFrontier(registration.historicalIssuance.capability, payload.trust.trust);
+	if (memberFrontier !== undefined) added = true;
 	for (const issued of before.rows.issued) {
 		if (!sameScope(issued, scope)) continue;
 		const outbox = before.rows.outbox.filter(row => sameScope(row, scope) && row.authorSequence === issued.authorSequence);
@@ -10471,6 +10496,26 @@ async function retainCreatorAcceptedSourceCustody(registration: V3PlaneRegistrat
 		// They have no application intent to retry or abandon. This also preserves
 		// old fences if a later ACL removes the author before native retirement.
 		if (!requiresApplicationCustody && !currentFence) continue;
+		// A completed replacement entry's source still present at the removing close and not covered by
+		// the last-member frontier (its replacement was admitted only in this epoch): custody of the
+		// source under its displaced plane's authenticated context, written once on the completed entry.
+		// The drain still treats the entry as done; nothing is re-offered.
+		if (removedAuthor && existing !== undefined && existing.sourceContextDigest === undefined &&
+			existing.replacementSequence !== null && (existing.disposition === "rebase" || existing.disposition === "transform") &&
+			retainedVertex === undefined && classified.kind === "displaced" &&
+			(memberThrough === null || issued.authorSequence > memberThrough)) {
+			const displaced = registration.displacedSource;
+			const original = displaced?.prepared, originalAuthorization = displaced?.authorization;
+			if (original === undefined || originalAuthorization?.kind !== "latched-acl" ||
+				classified.authenticated.vertex.epoch !== original.provenance.epoch ||
+				classified.authenticated.vertex.anchor !== original.provenance.anchorDigest) continue;
+			const replacedContext = captureCreatorSourceContext(original.trust.trust, encodeCanonical(originalAuthorization.value),
+				original.provenance.blueprintDigest, original.input.exactCanonicalParametersCarrierBytes);
+			if (!contexts.some(value => sameBytes(value.digest, replacedContext.digest))) contexts.push(replacedContext);
+			entries[entries.indexOf(existing)] = {...existing, sourceContextDigest: new Uint8ArrayConstructor(replacedContext.digest)};
+			added = true;
+			continue;
+		}
 		// The complete signed membership is transferred into the original plan,
 		// once per source epoch. A terminal label alone never supplies this proof.
 		const knownCommitted = classified.authenticated.vertex.epoch === payload.provenance.epoch &&
@@ -10514,9 +10559,11 @@ async function retainCreatorAcceptedSourceCustody(registration: V3PlaneRegistrat
 	if (added) {
 		entries.sort((a, b) => a.sourceSequence - b.sourceSequence);
 		contexts.sort((a, b) => lowerHexDigest(a.digest)!.localeCompare(lowerHexDigest(b.digest)!));
+		const persistedFrontier = memberFrontier ?? prior?.memberFrontier;
 		const plan = copySettlementPlan({scope, revision: prior === null ? 0 : prior.revision + 1,
-			fenceSequence: prior?.fenceSequence ?? null, entries, sourceContexts: contexts,
-			...(prior?.handBacks === undefined ? {} : {handBacks: prior.handBacks})}, scope);
+			fenceSequence: prior?.fenceSequence ?? null, entries, ...(contexts.length === 0 ? {} : {sourceContexts: contexts}),
+			...(prior?.handBacks === undefined ? {} : {handBacks: prior.handBacks}),
+			...(persistedFrontier === undefined ? {} : {memberFrontier: persistedFrontier})}, scope);
 		if (plan == null) throw new TypeError("creator source custody plan is invalid");
 		const future = {...before.rows, plans: [...before.rows.plans.filter(value => !sameScope(value.scope, scope)), plan]};
 		encodeCanonical(future, {maxBytes: censusInput.limits.maxBytes, maxDepth: 32, maxItems: 65536});
@@ -10933,14 +10980,23 @@ async function sealCreatorPendingClassificationDependencies(
 		identity.successorAnchorDigest !== input.generation.trust.currentAnchorDigest
 	)
 		return undefined;
+	// The persisted last-member frontier, re-verified under this generation's trust (fails closed).
+	const pendingScope = ObjectFreeze({ objectId: identity.objectId, author: input.owners.author });
+	const rawPendingPlan = await input.issuanceStore.readSettlementPlan(pendingScope);
+	const pendingPlan = rawPendingPlan === null ? null : copySettlementPlan(rawPendingPlan, pendingScope);
+	if (pendingPlan === undefined) return undefined;
+	const memberFrontier = pendingPlan?.memberFrontier === undefined ? undefined : openCreatorMemberFrontier({
+		currentTrust: input.generation.trust, context: pendingPlan.memberFrontier, author: input.owners.author});
+	if (pendingPlan?.memberFrontier !== undefined && memberFrontier === undefined) return undefined;
 	const context: CreatorRecoveryCensusContext = {
 		payload,
 		authorization,
 		issuanceStore: input.issuanceStore,
 		liveJournalStore: input.liveJournalStore,
-		issuanceScope: ObjectFreeze({ objectId: identity.objectId, author: input.owners.author }),
+		issuanceScope: pendingScope,
 		historicalIssuance: {
 			capability,
+			...(memberFrontier === undefined ? {} : {memberFrontier}),
 			originalIssuanceStore: input.issuanceStore,
 			count: 0,
 			countedSequences: new IntrinsicSet(),
@@ -11282,6 +11338,7 @@ export async function prepareV3TerminalMigrationSource(
 				: {
 						historicalIssuance: {
 							capability: history.capability,
+							...(history.memberFrontier === undefined ? {} : {memberFrontier: history.memberFrontier}),
 							originalIssuanceStore: history.originalIssuanceStore,
 							count: 0,
 							countedSequences: new IntrinsicSet<number>(),
@@ -11384,7 +11441,7 @@ function prepareCreatorUnchangedHeldCensusRead(registration: V3PlaneRegistration
 			// The original resolver intentionally returns a detached identity per
 			// call. Compare its complete typed value, never its allocation identity.
 			const identity = resolveVerifiedCreatorHistoricalIssuance(value.capability);
-			return [value, value.capability, identity?.admissionEpoch, identity?.admittedAuthorSequence, identity?.author,
+			return [value, value.capability, value.memberFrontier, identity?.admissionEpoch, identity?.admittedAuthorSequence, identity?.author,
 				identity?.closedAnchorDigest, identity?.closedEpoch, identity?.objectId,
 				identity?.successorAnchorDigest, identity?.successorEpoch,
 				value.maxEpochVertices, value.scopeAuthorMatches, value.count, value.countedSequences, ...sequences];
@@ -11941,6 +11998,22 @@ async function readCreatorRecoveryDependencyCensus(
 					terminalFrontier,
 					vertexFacts
 				)?.digest === classified.authenticated.digest;
+			// A completed replacement entry's source that the close removing its author took custody of:
+			// pending, never published, and terminal because every replacement chunk is durably committed
+			// in its own epoch (that chunk's retained completion proof). Retained and charged as the same
+			// protected dependency, never re-offered (its entry stays completed).
+			const replacedEntry = scope.author === registration.issuanceScope.author && classified?.kind === "displaced" &&
+				row.publishState === "pending" && retainedCompletion !== undefined && retainedCompletion.completion === undefined &&
+				retainedCompletion.expiry === undefined && sameBytes(retainedCompletion.sourceDigest, row.digest)
+				? inheritancePlan?.entries.find(entry => entry.sourceSequence === row.authorSequence) : undefined;
+			const committedReplacementPending = replacedEntry !== undefined && replacedEntry.sourceContextDigest !== undefined &&
+				sameBytes(replacedEntry.sourceDigest, row.digest) && replacedEntry.replacementSequence !== null &&
+				(replacedEntry.disposition === "rebase" || replacedEntry.disposition === "transform") &&
+				(replacedEntry.replacementProgress?.chunks.map(chunk => chunk.replacementSequence) ?? [replacedEntry.replacementSequence])
+					.every(sequence => {
+						const replacement = registration.historicalIssuance?.retainedSources?.get(sequence);
+						return replacement?.completion !== undefined && creatorRetainedCompletionMatchesPlan(replacement, sequence, inheritancePlan);
+					});
 			// C03 layer 3: the exact own author fence of a closed epoch whose startup drain committed it
 			// (published only after readiness) and died before publishing it. No plane admits it any
 			// more, it has nothing to replan (no intents, so no plan entry), and the new epoch's fence
@@ -11974,6 +12047,7 @@ async function readCreatorRecoveryDependencyCensus(
 					!openSource &&
 					!inheritedComplete &&
 					!terminalCoveredPending &&
+					!committedReplacementPending &&
 					!unpublishedHistoricalFence)
 			)
 				return undefined;
@@ -11997,7 +12071,9 @@ async function readCreatorRecoveryDependencyCensus(
 					);
 				}
 
-				if (completedBranch) dependencyKind = "source-bound-completed-issuance";
+				// A pending completed-replacement source (committedReplacementPending above) is the same
+				// completed own settlement, proven by its replacements' retained completions.
+				if (completedBranch || committedReplacementPending) dependencyKind = "source-bound-completed-issuance";
 				const adjacent =
 					sourceBound && displacedSource !== undefined && sourceDependencyTrust !== undefined
 						? authenticateRecoveryVertex(
@@ -12061,7 +12137,8 @@ async function readCreatorRecoveryDependencyCensus(
 				const retainedClosedIssuance =
 					closedCovered !== undefined && closedCovered.digest === classified.authenticated.digest;
 				if (retainedClosedIssuance) dependencyKind = "authenticated-closed-issuance";
-				if (!retainedAdjacentFence && !retainedHistoricalFence && !retainedClosedIssuance && !completedBranch && !durablyExpired) {
+				if (!retainedAdjacentFence && !retainedHistoricalFence && !retainedClosedIssuance && !completedBranch && !durablyExpired &&
+					!committedReplacementPending) {
 					const frontier = settlementFrontierFromHistory(registration.historicalIssuance);
 					if (
 						scope.author !== registration.issuanceScope.author ||
@@ -13723,8 +13800,13 @@ function classifyPlaneVertex(
 				);
 	if (matches(pinned)) return ObjectFreeze({ authenticated: pinned, kind: "pinned-genesis" as const });
 	const historical = authenticatedCoveredHistoricalOutboxRow(row, row.scope, payload, historicalIssuance, undefined, vertexFacts);
-	return matches(historical)
-		? ObjectFreeze({ authenticated: historical, kind: "covered-historical" as const })
+	if (matches(historical)) return ObjectFreeze({ authenticated: historical, kind: "covered-historical" as const });
+	// A removed author's own row admitted before its removal: the creator's signed admitted sequence
+	// from its last install as a member (persisted once at the removing close) covers it.
+	const settled = historicalIssuance?.memberFrontier === undefined ? undefined :
+		authenticatedCoveredHistoricalOutboxRow(row, row.scope, payload, historicalIssuance, "member-frontier", vertexFacts);
+	return matches(settled)
+		? ObjectFreeze({ authenticated: settled, kind: "covered-historical" as const, terminal: true as const })
 		: undefined;
 }
 
@@ -14167,12 +14249,12 @@ function authenticatedCoveredHistoricalOutboxRow(
 	issuanceScope: DurableIssueScope,
 	filterPayload: PreparedV3LivePayload,
 	historicalIssuance: HistoricalIssuanceContext | undefined,
-	coverage: "historical" | "closed" = "historical",
+	coverage: "historical" | "closed" | "member-frontier" = "historical",
 	vertexFacts?: CreatorCensusVertexFacts
 ): AuthenticatedRecoveryVertex | undefined {
 	try {
 		if (
-			(coverage === "historical" && row.authorSequence === 0) ||
+			(coverage !== "closed" && row.authorSequence === 0) ||
 			historicalIssuance === undefined ||
 			V3_VERTEX_DOMAIN !== vertexRegistry.domain ||
 			typeof V3_VERTEX_SUITE_ID !== "string"
@@ -14180,10 +14262,12 @@ function authenticatedCoveredHistoricalOutboxRow(
 			return undefined;
 		}
 		const suiteId = V3_VERTEX_SUITE_ID;
-		const identity = resolveVerifiedCreatorHistoricalIssuance(historicalIssuance.capability);
+		const identity = coverage === "member-frontier"
+			? historicalIssuance.memberFrontier === undefined ? undefined : resolveCreatorMemberFrontier(historicalIssuance.memberFrontier)
+			: resolveVerifiedCreatorHistoricalIssuance(historicalIssuance.capability);
 		if (
 			identity === undefined ||
-			historicalIssuance.scopeAuthorMatches !== true ||
+			(coverage !== "member-frontier" && historicalIssuance.scopeAuthorMatches !== true) ||
 			identity.objectId !== issuanceScope.objectId ||
 			identity.author !== issuanceScope.author ||
 			identity.admittedAuthorSequence === null ||
@@ -14199,7 +14283,9 @@ function authenticatedCoveredHistoricalOutboxRow(
 			!isDigestHex(anchor) ||
 			!NumberIsSafeInteger(epoch) ||
 			(epoch as number) < 0 ||
-			(coverage === "historical"
+			(coverage === "member-frontier"
+				? epoch > identity.closedEpoch
+				: coverage === "historical"
 				? epoch >= identity.closedEpoch
 				: filterPayload.trust.trust.profileId !== "creator-trusted-v1" ||
 					identity.admissionEpoch !== undefined ||
@@ -14225,7 +14311,7 @@ function authenticatedCoveredHistoricalOutboxRow(
 		});
 		if (
 			!extracted.ok ||
-			(coverage === "historical" && extracted.vertex.authorSequence === 0) ||
+			(coverage !== "closed" && extracted.vertex.authorSequence === 0) ||
 			extracted.vertex.anchor !== anchor ||
 			extracted.vertex.epoch !== epoch ||
 			extracted.vertex.objectId !== issuanceScope.objectId ||
@@ -15338,6 +15424,11 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 						afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, row.authorSequence] as const);
 						continue;
 					}
+				}
+				if (classified?.terminal === true) {
+					// Settled before the author's removal (persisted last-member frontier): terminal history.
+					afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, row.authorSequence] as const);
+					continue;
 				}
 				if (classified?.kind === "covered-historical" || classified?.kind === "pinned-genesis") {
 					if (
@@ -17026,6 +17117,7 @@ type ClassifiedRebaseRow = Readonly<{
 	kind: "covered-historical" | "current" | "displaced" | "pinned-genesis";
 	row: SnapshottedOutboxRow;
 	sourceContract?: CreatorRetainedSourceContract;
+	terminal?: true;
 }>;
 
 const verifiedNestedNativeSources = new WeakSet<ClassifiedRebaseRow>();
@@ -17888,6 +17980,8 @@ async function readRebaseOutbox(
 					});
 				}
 				afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, classified.row.authorSequence] as const);
+				// Settled before the author's removal (persisted last-member frontier): never re-offered.
+				if (classified.terminal === true) continue;
 				if (settlementFrontier !== undefined) {
 					const ownRowClass = settlementOwnRowClass(
 						classified.authenticated.admitted.epoch,
@@ -23805,6 +23899,12 @@ async function activateCreatorSuccessorLive(
 		if (sourcePlan === undefined) return rejected("preparation-rejected", "creator source custody plan is invalid");
 		const retainedSources = await prepareCreatorRetainedSourceContracts(sourcePlan, material.successor.trust, material.catalog);
 		const retainedSourceCustody = retainedSources.values().next().value?.contract.capability;
+		// The persisted last-member frontier is re-verified at every open; a stored one that does not
+		// verify under the installed trust fails the install closed.
+		const memberFrontier = sourcePlan?.memberFrontier === undefined ? undefined : openCreatorMemberFrontier({
+			currentTrust: material.successor.trust, context: sourcePlan.memberFrontier, author: material.issuanceScope.author});
+		if (sourcePlan?.memberFrontier !== undefined && memberFrontier === undefined)
+			return rejected("preparation-rejected", "creator member frontier proof is invalid");
 		const attachment = material.checkpoint === undefined ? undefined : resolveCreatorCheckpointAttachment(material.checkpoint);
 		const closedTrust = attachment?.remoteCheckpoint.predecessorTrust ?? material.predecessor.trust;
 		const openHistoricalIssuance = (): HistoricalIssuanceContext | undefined => {
@@ -23831,6 +23931,7 @@ async function activateCreatorSuccessorLive(
 						capability,
 						...(material.checkpoint === undefined ? {} : {checkpoint: material.checkpoint}),
 						retainedSources,
+						...(memberFrontier === undefined ? {} : {memberFrontier}),
 						originalIssuanceStore: nativeIssuanceStore,
 						vertexFacts,
 						count: 0,
@@ -25293,7 +25394,8 @@ async function abandonCreatorUnresolvedSource(registration: V3PlaneRegistration,
 	if (!contexts.some(value => sameBytes(value.digest, expiry.digest))) contexts.push(expiry);
 	contexts.sort((a, b) => lowerHexDigest(a.digest)!.localeCompare(lowerHexDigest(b.digest)!));
 	const plan = copySettlementPlan({scope, revision: prior.revision + 1, fenceSequence: prior.fenceSequence, entries,
-		sourceContexts: contexts, ...(handBacks === undefined ? {} : {handBacks})}, scope);
+		sourceContexts: contexts, ...(handBacks === undefined ? {} : {handBacks}),
+		...(prior.memberFrontier === undefined ? {} : {memberFrontier: prior.memberFrontier})}, scope);
 	if (plan == null) throw new TypeError("creator source abandonment plan is invalid");
 	const future = {...second.read.rows, plans: [...second.read.rows.plans.filter(value => !sameScope(value.scope, scope)), plan]};
 	encodeCanonical(future, {maxBytes: censusInput.limits.maxBytes, maxDepth: 32, maxItems: 65536});
@@ -25549,7 +25651,8 @@ async function resolveCreatorRetainedSourcesFromFrontier(registration: V3PlaneRe
 		if (!contexts.some(value => sameBytes(value.digest, expiry.digest))) contexts.push(expiry);
 	contexts.sort((a, b) => lowerHexDigest(a.digest)!.localeCompare(lowerHexDigest(b.digest)!));
 	const plan = copySettlementPlan({scope, revision: prior.revision + 1, fenceSequence: prior.fenceSequence, entries,
-		sourceContexts: contexts, ...(handBacks === undefined ? {} : {handBacks})}, scope);
+		sourceContexts: contexts, ...(handBacks === undefined ? {} : {handBacks}),
+		...(prior.memberFrontier === undefined ? {} : {memberFrontier: prior.memberFrontier})}, scope);
 	if (plan == null) throw new TypeError("creator source frontier resolution plan is invalid");
 	const future = {...second.read.rows, plans: [...second.read.rows.plans.filter(value => !sameScope(value.scope, scope)), plan]};
 	encodeCanonical(future, {maxBytes: censusInput.limits.maxBytes, maxDepth: 32, maxItems: 65536});
