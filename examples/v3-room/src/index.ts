@@ -78,6 +78,7 @@ export {
 	type V3RoomRolloverHooks,
 	type V3RoomRolloverPolicy,
 	type V3RoomRolloverStatus,
+	V3RoomMoveDeclined,
 	V3RoomSuccessorUnavailable,
 	type V3RoomSuccessorOffer,
 } from "./rollover.js";

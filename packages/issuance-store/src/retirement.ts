@@ -199,7 +199,7 @@ export function issuanceLegacySettlementPlanEntriesJson(plan: SettlementPlan): s
 
 export function issuanceSettlementPlanStorageByteLength(plan: SettlementPlan): number {
 	return plan.sourceContexts === undefined && plan.handBacks === undefined && plan.memberFrontier === undefined &&
-		plan.completedSourceCustody === undefined
+		plan.completedSourceCustody === undefined && !plan.entries.some(entry => entry.handedBack !== undefined)
 		? new TextEncoder().encode(issuanceLegacySettlementPlanEntriesJson(plan)).byteLength
 		: issuanceCanonicalSettlementPlanStorageByteLength(encodeCanonical(plan, unsignedEncodingLimits).byteLength);
 }
