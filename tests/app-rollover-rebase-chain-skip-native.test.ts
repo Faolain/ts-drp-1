@@ -17,7 +17,7 @@ import {
 } from "./fixtures/track-m-apps/long-room-driver.js";
 import { readV3SettlementWorkCounts } from "../packages/node/src/v3-live.js";
 import { V3_ROOM_LOCAL_BACKLOG_LIMIT } from "../packages/node/src/v3-room.js";
-import { nodeRecoveryCensusCounts } from "../packages/storage-node/src/internal/node-issuance-store.js";
+import { nodeIssuanceReadCounts, nodeRecoveryCensusCounts } from "../packages/storage-node/src/internal/node-issuance-store.js";
 import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-head.js";
 
 // Found by fix/int7-slow-member-landing (tests/app-rollover-slow-member-native.test.ts under host
@@ -362,6 +362,8 @@ async function retainedResolutionCost(count: number) {
 			for (let roll = 0; roll < 3; roll++) epoch = await rollCreator(creator, async () => undefined, ordinal);
 			const before = readV3SettlementWorkCounts();
 			const censusBefore = nodeRecoveryCensusCounts();
+			const issuanceReads = () => Object.values(nodeIssuanceReadCounts()).reduce((sum, row) => ({ reads: sum.reads + row.reads, full: sum.full + row.fullReads }), { reads: 0, full: 0 });
+			const issuanceBefore = issuanceReads();
 			const started = performance.now();
 			// Process CPU over the install (user + system), the cost that matters on a device.
 			const cpuBefore = process.cpuUsage();
@@ -372,12 +374,16 @@ async function retainedResolutionCost(count: number) {
 			const cpuMs = Math.round((cpu.user + cpu.system) / 1000);
 			const after = readV3SettlementWorkCounts();
 			const censusAfter = nodeRecoveryCensusCounts();
+			const issuanceAfter = issuanceReads();
 			const work = {
 				dependencyTurns: after.dependencyTurns - before.dependencyTurns,
 				recoveryCensusReads: after.recoveryCensusReads - before.recoveryCensusReads,
 				// Native census reads by both roles' stores, and those that read and classified every row.
 				nativeCensusReads: censusAfter.reads - censusBefore.reads,
 				fullCensusReads: censusAfter.fullReads - censusBefore.fullReads,
+				// Issuance store reads (outbox pages, issued closures, plans, lineages) by both roles' stores.
+				issuanceReads: issuanceAfter.reads - issuanceBefore.reads,
+				fullIssuanceReads: issuanceAfter.full - issuanceBefore.full,
 				retainedContractPreparations: after.retainedContractPreparations - before.retainedContractPreparations,
 				sourceExpirySignatures: after.sourceExpirySignatures - before.sourceExpirySignatures,
 			};

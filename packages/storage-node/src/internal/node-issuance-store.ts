@@ -989,9 +989,27 @@ const recoveryCensusCounts = { reads: 0, fullReads: 0 };
 export function nodeRecoveryCensusCounts(): Readonly<{ reads: number; fullReads: number }> {
 	return Object.freeze({ ...recoveryCensusCounts });
 }
+// Issuance read work counts (diagnostics), per read kind: every read, and those that read the rows
+// (the others were proven unchanged by the connection's exact revision under a held reservation).
+type IssuanceReadKind = "page" | "issued" | "plan" | "lineage";
+const issuanceReadCounts: Record<IssuanceReadKind, { reads: number; fullReads: number }> = {
+	page: { reads: 0, fullReads: 0 },
+	issued: { reads: 0, fullReads: 0 },
+	plan: { reads: 0, fullReads: 0 },
+	lineage: { reads: 0, fullReads: 0 },
+};
+/**
+ * Reads the issuance read work counts since the process started.
+ * @returns A snapshot per read kind: reads, and the full reads among them.
+ */
+export function nodeIssuanceReadCounts(): Readonly<Record<IssuanceReadKind, Readonly<{ reads: number; fullReads: number }>>> {
+	return Object.freeze(
+		Object.fromEntries(Object.entries(issuanceReadCounts).map(([kind, row]) => [kind, Object.freeze({ ...row })]))
+	) as Readonly<Record<IssuanceReadKind, Readonly<{ reads: number; fullReads: number }>>>;
+}
 // A census observation (rows, image and control: up to the census byte entitlement) and its exact
 // encoding, for one census input, retained as private copies.
-const RECOVERY_CENSUS_MEMO_ENTRIES = 4;
+const RECOVERY_CENSUS_MEMO_ENTRIES = 1024;
 const RECOVERY_CENSUS_MEMO_BYTES = 16 * 1024 * 1024;
 
 class NodeIssuanceImplementation {
@@ -1037,6 +1055,52 @@ class NodeIssuanceImplementation {
 		this.#database = database;
 		this.#filename = filename;
 		this.#readReservations = new SqliteNativeReadReservationOwner(filename, session);
+	}
+
+	// True while this store's native read reservation is held: the WAL writer lock excludes every
+	// write, and the census memo (with its revision check behind it) may serve exact repeats.
+	#memoReserved(): boolean {
+		const holder = this.#censusLease;
+		return holder !== undefined && !holder.releasing && this.#readReservations.current() === holder.native;
+	}
+	// One pure read inside the caller's open read transaction: remembered for the connection's exact
+	// revision while a reservation is held, read through otherwise. Every hit is a private deep copy.
+	#memoLoad<T>(kind: IssuanceReadKind, key: string, read: () => T): T {
+		issuanceReadCounts[kind].reads += 1;
+		const full = (): T => {
+			issuanceReadCounts[kind].fullReads += 1;
+			return read();
+		};
+		if (true || !this.#memoReserved()) return full();
+		const memo = this.#censusMemo;
+		memo.begin(this.#database);
+		try {
+			return memo.load(`${kind}\u0000${key}`, full);
+		} finally {
+			memo.end();
+		}
+	}
+	// The same, opening its own read transaction (for reads that run as single statements).
+	// `read(opened)`: opened is true when this call opened the transaction the read runs in.
+	#memoTransaction<T>(kind: IssuanceReadKind, key: string, read: (opened: boolean) => T): T {
+		if (true || !this.#memoReserved() || (this.#database as { isTransaction?: boolean }).isTransaction === true) {
+			issuanceReadCounts[kind].reads += 1;
+			issuanceReadCounts[kind].fullReads += 1;
+			return read(false);
+		}
+		this.#database.exec("BEGIN");
+		try {
+			const value = this.#memoLoad(kind, key, () => read(true));
+			this.#database.exec("COMMIT");
+			return value;
+		} catch (error) {
+			try {
+				this.#database.exec("ROLLBACK");
+			} catch {
+				/* Preserve the read failure. */
+			}
+			throw error;
+		}
 	}
 
 	async acquireNativeReadReservation(
@@ -1582,7 +1646,9 @@ class NodeIssuanceImplementation {
 		assertDurableIssueScope(scope);
 		const detached = copyDurableIssueScope(scope);
 		try {
-			const lineage = readNativeLineage(this.#database, detached);
+			const lineage = this.#memoTransaction("lineage", JSON.stringify([detached.objectId, detached.author]), () =>
+				readNativeLineage(this.#database, detached)
+			);
 			if (lineage === undefined) throw this.#latchCorruption("stored lineage is malformed");
 			return { exhausted: lineage.exhausted, next: lineage.next };
 		} catch (error) {
@@ -1599,7 +1665,10 @@ class NodeIssuanceImplementation {
 		const detached = copyDurableIssueScope(scope);
 		let observation: TerminalReadback;
 		try {
-			observation = this.#readTerminal(detached, authorSequence);
+			observation = this.#memoTransaction("issued", JSON.stringify([detached.objectId, detached.author, authorSequence]),
+				// Inside the transaction opened here, the same queries #readTerminal runs in its own.
+				(opened) => (opened ? this.#queryTerminal(detached, authorSequence, this.#database) : this.#readTerminal(detached, authorSequence))
+			);
 		} catch (error) {
 			throw this.#mapOperationError(error, "issued-record read failed");
 		}
@@ -1638,7 +1707,9 @@ class NodeIssuanceImplementation {
 		assertDurableIssueScope(scope);
 		const detached = copyDurableIssueScope(scope);
 		try {
-			const plan = readSettlementPlanRow(this.#database, detached);
+			const plan = this.#memoTransaction("plan", JSON.stringify([detached.objectId, detached.author]), () =>
+				readSettlementPlanRow(this.#database, detached)
+			);
 			if (plan === undefined) throw this.#latchCorruption("stored settlement plan is malformed");
 			return plan === null ? null : cloneSettlementPlan(plan);
 		} catch (error) {
@@ -1733,6 +1804,8 @@ class NodeIssuanceImplementation {
 		const parsed = this.#parsePageInput(input);
 		try {
 			this.#database.exec("BEGIN");
+			const pageKey = JSON.stringify([parsed.scope ?? null, parsed.afterKey, parsed.limit]);
+			const page = this.#memoLoad("page", pageKey, () => {
 			const lineageRows = iterateSqliteRows(
 				statement(this.#database, "SELECT object_id,author,next,exhausted,pruned_through_author_sequence FROM lineages")
 			);
@@ -1809,11 +1882,13 @@ class NodeIssuanceImplementation {
 					"WHERE i.object_id IS NULL LIMIT 1"
 			).get();
 			if (orphan !== undefined) throw this.#latchCorruption("outbox has no matching issued record");
-			this.#database.exec("COMMIT");
 			return records.map(({ issued, publishState }) => ({
 				commit: cloneDurableIssueCommit(issuedCommit(issued)),
 				publishState,
 			}));
+			});
+			this.#database.exec("COMMIT");
+			return page;
 		} catch (error) {
 			try {
 				this.#database.exec("ROLLBACK");
