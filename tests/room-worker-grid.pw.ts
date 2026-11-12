@@ -22,7 +22,6 @@ interface ZoneSnapshot {
 	readonly enrollment: string;
 	readonly invite: string;
 	readonly ready: boolean;
-	readonly rawTransport: Readonly<{ links: readonly unknown[] }>;
 	readonly zoneId: string;
 }
 
@@ -196,21 +195,24 @@ test("A control: a placement lost to a crash before the worker admitted it is of
 		await member.evaluate((invite) => window.__TS_DRP_V3_ZONE__?.join(invite), created.invite);
 		await expect.poll(async () => (await zone(member)).zoneId).toBe(created.zoneId);
 		expect((await zone(creator)).blocks.some((placed) => placed.id === block.id)).toBe(false);
-		// The reopened member's own link to the creator, before it offers anything.
+		// The reopened member reaches its creator again before it offers anything: a creator placement
+		// reaches it (a member offering earlier is read-only, and the room keeps its move to the next epoch).
+		const marker: Block = { id: "creator-after-reopen", kind: "sand", x: 0, y: 7 };
+		await creator.evaluate((placed) => window.__TS_DRP_V3_ZONE__?.placeBlock(placed), marker);
 		await expect
-			.poll(async () => (await zone(member)).rawTransport.links.length, { timeout: 60_000 })
-			.toBeGreaterThan(0);
+			.poll(async () => (await zone(member)).blocks.some((placed) => placed.id === marker.id), { timeout: 60_000 })
+			.toBe(true);
 		// Offered again: accepted at once, or kept by the room until the member reaches its creator.
 		const recovered = await member.evaluate(
 			(placed) => window.__TS_DRP_GRID_ROOM_WORKER__?.recoverBlockPlacement(placed),
 			block
 		);
 		expect(["offered", "kept"]).toContain(recovered);
-		await expectLandedOnce(creator, member, block, before + 1, 120_000);
+		await expectLandedOnce(creator, member, block, before + 2, 120_000);
 		// No late second copy: a kept move is offered by the room itself, once.
 		await new Promise((resolve) => setTimeout(resolve, 5_000));
-		expect((await zone(creator)).durableVertexCount).toBe(before + 1);
-		expect((await zone(member)).durableVertexCount).toBe(before + 1);
+		expect((await zone(creator)).durableVertexCount).toBe(before + 2);
+		expect((await zone(member)).durableVertexCount).toBe(before + 2);
 	} finally {
 		await closeAll([creator, member], contexts);
 	}
