@@ -978,6 +978,17 @@ function bumpRetirement(database: DatabaseSync, objectId: string): void {
 import type { LocalSessionLifetime } from "./local-session-lifetime.js";
 import { enforceNativeLocalSessionFile, nativeLocalSessionSchemaRows } from "./local-session-lifetime.js";
 
+// Recovery census work counts (diagnostics): every census read, and those that read and classified
+// the rows.
+const recoveryCensusCounts = { reads: 0, fullReads: 0 };
+/**
+ * Reads the recovery census work counts since the process started.
+ * @returns A snapshot: census reads, and the full reads among them.
+ */
+export function nodeRecoveryCensusCounts(): Readonly<{ reads: number; fullReads: number }> {
+	return Object.freeze({ ...recoveryCensusCounts });
+}
+
 class NodeIssuanceImplementation {
 	readonly #database: DatabaseSync;
 	readonly #filename: string;
@@ -1054,6 +1065,8 @@ class NodeIssuanceImplementation {
 		try {
 			this.#database.exec("BEGIN");
 			began = true;
+			recoveryCensusCounts.reads += 1;
+			recoveryCensusCounts.fullReads += 1;
 			const rows = retirementRows(this.#database, captured.objectId, captured.limits);
 			const image = issuanceRetirementImage(rows, captured.objectId);
 			const control = readRetirementControl(this.#database, captured.objectId);

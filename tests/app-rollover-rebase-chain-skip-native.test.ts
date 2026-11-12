@@ -17,6 +17,7 @@ import {
 } from "./fixtures/track-m-apps/long-room-driver.js";
 import { readV3SettlementWorkCounts } from "../packages/node/src/v3-live.js";
 import { V3_ROOM_LOCAL_BACKLOG_LIMIT } from "../packages/node/src/v3-room.js";
+import { nodeRecoveryCensusCounts } from "../packages/storage-node/src/internal/node-issuance-store.js";
 import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-head.js";
 
 // Found by fix/int7-slow-member-landing (tests/app-rollover-slow-member-native.test.ts under host
@@ -360,6 +361,7 @@ async function retainedResolutionCost(count: number) {
 			await wire.pause();
 			for (let roll = 0; roll < 3; roll++) epoch = await rollCreator(creator, async () => undefined, ordinal);
 			const before = readV3SettlementWorkCounts();
+			const censusBefore = nodeRecoveryCensusCounts();
 			const started = performance.now();
 			// Process CPU over the install (user + system), the cost that matters on a device.
 			const cpuBefore = process.cpuUsage();
@@ -369,9 +371,13 @@ async function retainedResolutionCost(count: number) {
 			const cpu = process.cpuUsage(cpuBefore);
 			const cpuMs = Math.round((cpu.user + cpu.system) / 1000);
 			const after = readV3SettlementWorkCounts();
+			const censusAfter = nodeRecoveryCensusCounts();
 			const work = {
 				dependencyTurns: after.dependencyTurns - before.dependencyTurns,
 				recoveryCensusReads: after.recoveryCensusReads - before.recoveryCensusReads,
+				// Native census reads by both roles' stores, and those that read and classified every row.
+				nativeCensusReads: censusAfter.reads - censusBefore.reads,
+				fullCensusReads: censusAfter.fullReads - censusBefore.fullReads,
 				retainedContractPreparations: after.retainedContractPreparations - before.retainedContractPreparations,
 				sourceExpirySignatures: after.sourceExpirySignatures - before.sourceExpirySignatures,
 			};
@@ -408,11 +414,16 @@ it("a skip install resolving retained rows pays the native settlement turn once 
 	expect(large.work.retainedContractPreparations, "retained contract preparations, 32 rows vs 8").toBeLessThanOrEqual(
 		small.work.retainedContractPreparations + 2
 	);
-	// Each further row adds at most its own signature's currency checks (two complete census reads
-	// around the signing), not another turn's.
+	// Each further row adds at most its own signature's currency checks (two census reads around the
+	// signing), not another turn's.
 	expect(large.work.recoveryCensusReads - small.work.recoveryCensusReads, "census reads per further row").toBeLessThanOrEqual(
 		(32 - 8) * 2.5
 	);
+	// Those currency checks read a database the settlement turn's reservation holds unchanged: proven by
+	// the connection's revision, they read and encode no row, so the census reads that read every row
+	// do not grow with the number of rows (they grew by two per row, each costing time in proportion to
+	// the author's whole settlement state: O(rows x state) per install).
+	expect(large.work.fullCensusReads, "full census reads, 32 rows vs 8").toBeLessThanOrEqual(small.work.fullCensusReads + 2);
 	// Wall clock, generous: per-row time does not grow with the number of rows, and 32 rows resolve
 	// well inside the quiet-host time they took before (15.7-17.8 s; 1.1 s after the fix under host
 	// load ~30).
