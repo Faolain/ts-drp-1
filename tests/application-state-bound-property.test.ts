@@ -74,7 +74,14 @@ describe("Grid's state bound dominates every exact state", () => {
 			const random = prng(seed);
 			const pool = 1 + Math.floor(random() * 24);
 			// A base state reached by some admitted prefix (sealed exactly as the room seals it).
-			let base = kernel.emptyState();
+				// A room's state always starts with the creator's roster installed (its first move); a state with
+				// blocks and no installed roster is not a room state, and the bound declines it (undefined: the
+				// admission falls back to the exact fold).
+			let base = kernel.apply(
+					kernel.emptyState(),
+					{ action: "installRoster", roster: { entries: [{ author: CREATOR, peerId: PEER, order: 0 }] } },
+					CREATOR
+				).state;
 			for (let count = Math.floor(random() * 12); count > 0; count--) {
 				try {
 					base = kernel.apply(base, randomOperation(random, pool), CREATOR).state;
