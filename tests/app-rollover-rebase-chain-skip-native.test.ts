@@ -1034,15 +1034,17 @@ async function backlogCountsBatchedMoves(batch: number) {
 it("the undelivered-move bound counts each move of a batched row, as hand-back records do", () =>
 	backlogCountsBatchedMoves(24), 1_800_000);
 
-// A consumed hand-back record counts against the undelivered bound only while its reissued row has no
-// admission evidence. An offline Writer's GIVEN_BACK moves are given back by a skip install (that many
-// records); in the next epoch its policy offers them again (each reissue consumes its record), the
-// creator admits every reissued row and signs a row reaching them: those moves are delivered. The
-// Writer, offline again, must then be accepted for the bound's full 64 new moves in that epoch.
-// 4109c500 counted every consumed record until the next plan merge dropped it, so it refused the
-// Writer after 64 - GIVEN_BACK new moves (in the 100x16 catch-up, about 24 kept moves per install).
-// The creator's budget (20 moves per author, under its own epoch's capacity) holds the check in one
-// epoch: the Writer's reissues count 16 there and the creator signs one row.
+// A given-back move counts against the undelivered bound only while its newest row has no admission
+// evidence. An offline Writer's GIVEN_BACK moves are given back by a skip install (that many records);
+// in the next epoch its policy offers them again (each reissue consumes its record). In this run the
+// creator rolls once more before the reissued rows reach it, so the Writer's next install replaces
+// them; the creator admits every replacement and signs a row reaching them: those moves are
+// delivered. The Writer, offline again, must then be accepted for the bound's full 64 new moves in
+// that epoch. 4109c500 counted a consumed record until the next plan merge dropped it, and a replaced
+// move until the next plan write (the cached count also predated the drain's replacements), so it
+// refused the Writer after 64 - GIVEN_BACK new moves (in the 100x16 catch-up, about 24 kept moves per
+// install). The creator's budget (20 moves per author, under its own epoch's capacity of about 25)
+// holds the check in one epoch: the Writer's rows count 16 there and the creator signs one row.
 const GIVEN_BACK = 16;
 async function deliveredReissuesLeaveTheBacklog() {
 	const restore = await installEnvironment("node", () => undefined);
