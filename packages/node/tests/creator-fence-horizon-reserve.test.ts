@@ -40,6 +40,8 @@ it("an ordinary admission whose own phases fit but whose successor fence's horiz
 		journal, journalAfterLocalControl: { revision: 10 }, journalAfterSuccessorControl: { revision: 11 },
 		finalJournalControl: { revision: 12 }, digest: "d".repeat(64), nativeObservations, preclose: false,
 		finalJournalCapacity: undefined, capacityDimensions: undefined,
+		// The carrier's control owner (C1: a drain plan rides by digest); these controls hold no drain.
+		closedJournalObservationControl: (control: unknown) => control,
 		maintenanceEncodedWidth: (width: number) => new Uint8Array(width),
 		maintenanceCanonicalWidth: (value: unknown) => encodeCanonical(value, { maxBytes: 4 * 1024 * 1024 }).byteLength,
 		LIVE_JOURNAL_RETIREMENT_LIMITS: { maxImageBytes: 2_097_152 },
