@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/explicit-function-return-type -- Local test helpers keep their inferred shapes. */
 // The ends of a same-epoch recovery's ingress carry (model packages/node/formal/plane-recovery-pending-carry.qnt),
 // on genuine planes of one object, epoch and anchor: P (the predecessor), S (the recovered successor) and T (the
 // plane after S, standing in for the next epoch's plane on the room's stable topic).
@@ -59,9 +60,9 @@ async function room() {
 			capability,
 			messageQueueManager: new MessageQueueManager({ logConfig: { level: "silent" } }),
 			networkNode: network,
-			onAdmittedVertex: vi.fn(async ({ vertex }: { vertex: { digest: Uint8Array } }) => {
+			onAdmittedVertex: vi.fn(({ vertex }: { vertex: { digest: Uint8Array } }) => {
 				seen.push(Buffer.from(vertex.digest).toString("hex"));
-				return Object.freeze({ kind: "continue" as const });
+				return Promise.resolve(Object.freeze({ kind: "continue" as const }));
 			}) as never,
 		});
 		if (!activation.ok) throw new TypeError(`activation failed: ${activation.kind}`);
