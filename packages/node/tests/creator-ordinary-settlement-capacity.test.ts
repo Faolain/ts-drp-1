@@ -262,7 +262,7 @@ describe("ordinary settlement finite capacity through existing owners (no proof 
 		const overhead = encodeCanonical(journal(0)).byteLength + 4;
 		expect(carrier(journal(CLOSED_OBSERVATION_CARRIER_CAP - overhead))?.byteLength).toBeLessThanOrEqual(CLOSED_OBSERVATION_CARRIER_CAP);
 		expect(carrier(journal(CLOSED_OBSERVATION_CARRIER_CAP))).toBeUndefined();
-		expect(() => carrier({value: 1n})).toThrow(); // Any other codec failure is unchanged.
+		expect(() => carrier({value: BigInt(1)})).toThrow(); // Any other codec failure is unchanged.
 	});
 	it("compares a retained journal's rows row by row: as strict as the whole array, without one encode under the carrier cap", () => {
 		// A member's successor install (received recovery turnover → installClosedRetirementSource)
@@ -293,7 +293,7 @@ describe("ordinary settlement finite capacity through existing owners (no proof 
 		// Under the cap the row-by-row answer is the whole-array answer.
 		for (const [left, right] of [[rows(3, 100), rows(3, 100)], [rows(3, 100), rows(3, 100, 1)], [rows(3, 100), rows(2, 100)], [[], []]] as const)
 			expect(rowsEqual(left, right)).toBe(wholeEqual(left, right));
-		expect(() => rowsEqual([1n], [1n])).toThrow(); // A non-canonical row still fails as before.
+		expect(() => rowsEqual([BigInt(1)], [BigInt(1)])).toThrow(); // A non-canonical row still fails as before.
 	});
 	it("reserves one prospective row-plan plus independent header-only drain, retaining distinct OLD plans and all progress", () => {
 		// Actual original reservation bodies, native encoder and accounting union.
