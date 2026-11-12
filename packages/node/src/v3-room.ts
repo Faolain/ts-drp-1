@@ -179,6 +179,24 @@ const CREATOR_INVITE_BYTE_FIELDS = Object.freeze([
 const CREATOR_INVITE_MATERIAL_KEYS = Object.freeze([...CREATOR_INVITE_BYTE_FIELDS, "pinnedGenesisAnchorDigest"]);
 const UNSUPPORTED_LINEAGE_POLICY = "D110C_LINEAGE_POLICY_UNSUPPORTED";
 const SETTLEMENT_MANUAL_REVIEW_MESSAGE = "v3 room settlement plan requires manual review";
+// Diagnostics (measurement only): wall time of each successor-install and settlement-drain stage, by
+// role ("creator." / "member."), summed over this process's rooms. Nested stages overlap their parent.
+const v3RoomStageTimes = new Map<string, { ms: number; count: number }>();
+/**
+ * Reads the stage timing diagnostics (milliseconds and entries per stage since the process started).
+ * @returns A snapshot.
+ */
+export function readV3RoomStageTimes(): Readonly<Record<string, Readonly<{ ms: number; count: number }>>> {
+	return Object.freeze(Object.fromEntries([...v3RoomStageTimes].map(([stage, row]) => [stage, Object.freeze({ ...row })])));
+}
+const noteV3RoomStage = (stage: string, started: number): void => {
+	const row = v3RoomStageTimes.get(stage);
+	if (row === undefined) v3RoomStageTimes.set(stage, { ms: performance.now() - started, count: 1 });
+	else {
+		row.ms += performance.now() - started;
+		row.count += 1;
+	}
+};
 const settlementManualReviewErrors = new WeakSet<TypeError>();
 // Object framing plus the nine encoded keys and the fixed kind, digest and version values.
 // The retained exact 65_536/65_537 boundary pair pins this codec-specific arithmetic.
@@ -4110,6 +4128,15 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	};
 	let logicalTime = input.initialLogicalTime;
 	const roomCreatorAuthor = roomInviteAuthority === undefined ? input.author : roomInviteAuthority.creatorAuthor;
+	const stageRole = input.author === roomCreatorAuthor ? "creator" : "member";
+	const timedStage = async <T>(stage: string, run: () => Promise<T>): Promise<T> => {
+		const started = performance.now();
+		try {
+			return await run();
+		} finally {
+			noteV3RoomStage(`${stageRole}.${stage}`, started);
+		}
+	};
 	// Admission evidence for the local backlog (V3RoomLocalBacklogFull): the rows of this epoch in the
 	// causal past of a received creator row. The creator signed a row depending on them, so it admitted
 	// them and they are in this epoch's seal. Cleared with acceptedVertices; each row is walked once.
@@ -7409,10 +7436,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			)
 				return;
 		}
-		let plan = await writeMergedSettlementPlan(sources);
+		let plan = await timedStage("drain.mergePlan", () => writeMergedSettlementPlan(sources));
 		settlementHeld = plan.entries.some(entry => entry.disposition === "manual-review" && entry.sourceContextDigest === undefined);
 		if (settlementHeld) return;
-		plan = await resolveRetainedFromFrontier(plan);
+		plan = await timedStage("drain.resolveRetained", () => resolveRetainedFromFrontier(plan));
 		// A retained source context preserves unknown work, including pre-existing
 		// policy/progress metadata. Its presence grants no replacement decision, and
 		// unknown retained work still withholds the author fence. Retained terminal
@@ -7792,6 +7819,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
 		if (settlementProfile === "v1" && !(await resumePendingIssuanceIntent())) return;
 		const sources: DisplacedSource[] = [];
+		const scanStarted = performance.now();
 		for (;;) {
 			await checkpoint();
 			assertSessionOpen();
@@ -7820,10 +7848,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				if (!completed.ok) throw new TypeError(`v3 room rebase completion failed: ${completed.kind}`);
 			}
 		}
+		noteV3RoomStage(`${stageRole}.drain.outboxScan`, scanStarted);
 		if (settlementProfile === "v1") {
 			settlementDrainPublication = publication;
 			try {
-				await drainSettlementOutbox(sources);
+				await timedStage("drain.settlement", () => drainSettlementOutbox(sources));
 			} finally {
 				settlementDrainPublication = "immediate";
 				// These nominal sources authorize only this joined drain. Do not
@@ -8855,10 +8884,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			}
 			assertSessionOpen();
 			restoreRetainedReads = false;
+			const stageStarted = performance.now();
 			const staged = await stageCreatorSuccessorAdoption({
 				handle: adoptionOwner,
 				intent: verified.intent,
 			});
+			noteV3RoomStage(`${stageRole}.adopt.stage`, stageStarted);
 			if (!staged.ok)
 				throw new TypeError(`v3 room successor stage failed: ${String(staged.kind)}`, {
 					cause: staged.cause === undefined ? staged : staged.cause,
@@ -8888,6 +8919,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			}
 			assertSessionOpen();
 			startupReplay = [];
+			const activateStarted = performance.now();
 			const activated = await activateCreatorSuccessorAdoption({
 				createOperationAdmissionPolicy: successorAdmissionFactory,
 				...(classifyTerminalVertex === undefined ? {} : { classifyTerminalVertex }),
@@ -8898,6 +8930,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				networkNode: transport.networkNode,
 				onAdmittedVertex: admittedSink as unknown as V3AdmittedVertexSink,
 			});
+			noteV3RoomStage(`${stageRole}.adopt.activate`, activateStarted);
 			if (activated.ok !== true) {
 				startupReplay = undefined;
 				const failure = new TypeError(
@@ -8996,17 +9029,17 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			creatorCloseUnavailableContinuity = "continuous";
 			try {
 				installSuccessorProjectionBase(replacement, authority);
-				await commitSuccessorProjection();
+				await timedStage("adopt.projection", () => commitSuccessorProjection());
 				// The native floor and exposed authority now name the same successor.
 				await yieldToHost();
 				assertSessionOpen();
 				if (!input.receiveOnly && settlementProfile === "v1") {
-					await publishAccepted();
-					await drainRebaseOutbox();
+					await timedStage("adopt.publishAccepted", () => publishAccepted());
+					await timedStage("adopt.drain", () => drainRebaseOutbox());
 				}
 				await yieldToHost();
 				assertSessionOpen();
-				await prepareCurrentCreatorOrdinaryReadiness();
+				await timedStage("adopt.readiness", () => prepareCurrentCreatorOrdinaryReadiness());
 			} catch (error) {
 				startupReplay = undefined;
 				terminalFailure = error;
@@ -9377,6 +9410,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					if (!localIssueCurrent) await checkInstallCurrency(selected.offer, selected.currency);
 					({ offer, peers } = selected);
 				}
+				const receiveStarted = performance.now();
 				received = await receiveCreatorSuccessorAdoption({
 					plane: activeHandle,
 					catalog: input.application.catalog,
@@ -9392,6 +9426,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					...(recoveryContext === undefined ? {} : { recoveryContext }),
 					retryUntil: AbortSignal.any([sessionLifetime.signal, installDeadline.signal]),
 				});
+				noteV3RoomStage(`${stageRole}.install.receive`, receiveStarted);
 			} catch (error) {
 				// A failed receive may own native retention despite a lost acknowledgement.
 				// Retry must reacquire native custody before preparing any old/new writer.
@@ -9410,10 +9445,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				clearTimeout(installTimer);
 			}
 			try {
-				await withCreatorReceivedPromotionDependencies(received, async () => {
-					assertSessionOpen();
-					await performCreatorSuccessorAdoption(received);
-				});
+				await timedStage("install.adopt", () =>
+					withCreatorReceivedPromotionDependencies(received, async () => {
+						assertSessionOpen();
+						await performCreatorSuccessorAdoption(received);
+					})
+				);
 			} catch (error) {
 				// Received native dependency already exists: never resume the old writer on ambiguous publication.
 				terminalFailure = error;
