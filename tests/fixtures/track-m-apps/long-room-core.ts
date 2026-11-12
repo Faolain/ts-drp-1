@@ -70,7 +70,6 @@ import { toCanvasWireOperation } from "../../../packages/blueprints/src/v3-canva
 import { createRecoverableFinalitySigner } from "../../../packages/keychain/src/finality.js";
 import { createV3CanvasApplication } from "../../../packages/node/src/applications/canvas.js";
 import { readCreatorSuccessorExport } from "../../../packages/node/src/creator-adoption.js";
-import type { V3RoomSettlementStatus } from "../../../packages/node/src/v3-room.js";
 import { parseStorageObjectId } from "../../../packages/storage/src/index.js";
 import { ScriptedSnapshotChunkPort } from "../phase-4c-v3/snapshot-pull-transport.js";
 
@@ -742,30 +741,7 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 	};
 	const room = await createV3RoomSession(input as unknown as Parameters<typeof createV3RoomSession>[0]);
 	track.rooms.add(room);
-	// Diagnostic: the policy's offers to the room (with or without a hand-back record) and outcomes.
-	const policyOffers: { at: number; epoch: number | undefined; handBack: boolean; outcome: string }[] = [];
-	policy?.bind(
-		new Proxy({} as typeof room, {
-			get(_, key) {
-				const target = room;
-				if (key !== "issue") {
-					const value = Reflect.get(target, key) as unknown;
-					return typeof value === "function" ? (value as (...args: unknown[]) => unknown).bind(target) : value;
-				}
-				return async (operation: Readonly<Record<string, unknown>>, issueOptions?: { handBack?: unknown }) => {
-					const entry = { at: Math.round(performance.now()), epoch: target.authority()?.epoch, handBack: issueOptions?.handBack !== undefined, outcome: "pending" };
-					if (policyOffers.length < 2000) policyOffers.push(entry);
-					try {
-						await target.issue(operation, issueOptions as never);
-						entry.outcome = "ok";
-					} catch (error) {
-						entry.outcome = describeError(error).slice(0, 200);
-						throw error;
-					}
-				};
-			},
-		})
-	);
+	policy?.bind(room);
 	await waitForV3RoomStartupForDiagnostics(room);
 	delivery?.bind(env.deliveryRoom?.(room) ?? room);
 	observe(room.projection());
@@ -832,20 +808,6 @@ export async function openRole(options: LongRoomOptions, index: 0 | 1, env: Role
 		// The room's own settlement observation (V3RoomSession.settlementStatus), when it has one.
 		settlementStatus: async () =>
 			(Reflect.get(room, "settlementStatus") as (() => unknown) | undefined)?.call(room) ?? null,
-		// Diagnostic: offers the room's first listed given-back move again with its record, straight to
-		// the room (past the policy); the refusal's message, or null when the room accepted it.
-		policyOffers: async () => policyOffers.slice(),
-		reissueFirstGivenBack: async () => {
-			const status = (Reflect.get(room, "settlementStatus") as (() => V3RoomSettlementStatus | undefined) | undefined)?.call(room);
-			const given = status?.undelivered[0];
-			if (given === undefined) return "nothing listed";
-			try {
-				await room.issue(required(given.operations[0]), { handBack: given.handBack });
-				return null;
-			} catch (error) {
-				return describeError(error);
-			}
-		},
 		// The application policy's status line (examples/v3-room rollover status()).
 		rolloverStatus: async () => policy?.status() ?? null,
 		// Takes the other peer off (or back onto) this role's successor channel.
