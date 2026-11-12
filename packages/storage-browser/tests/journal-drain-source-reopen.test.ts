@@ -1,9 +1,9 @@
 import "fake-indexeddb/auto";
-import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
+import { readFileSync } from "node:fs";
+import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { journalRetirementFrameDigest } from "@ts-drp/live-journal";
 import { expect, test } from "vitest";
 
-import { anchorMaterial } from "../../../tests/fixtures/journal-anchor-read/material.js";
 import { createBrowserDurableLiveJournalStore } from "../src/live-journal.js";
 
 // Browser parity for storage-node's "R10 exact empty header drain ... reconstructs original source after
@@ -12,6 +12,20 @@ import { createBrowserDurableLiveJournalStore } from "../src/live-journal.js";
 // read.drainSource, which each adapter rebuilds from (control, image, residual rows) in its own frame format
 // (browser: camelCase acceptedEntries). This pins that the browser reconstruction equals the pre-drain read,
 // between batches and across a reopen. Mechanism test over fake-indexeddb, not native browser evidence (G28).
+
+// The storage fixture carriers of tests/fixtures/journal-anchor-read/material.ts (signatures are storage fixtures,
+// not external authority), built on the package's own codec import so the clean tracked-file gate needs no dist.
+const archived = JSON.parse(readFileSync(new URL("../../../tests/fixtures/phase-3a1b-p4/material.json", import.meta.url), "utf8")) as
+	{ anchorHex: string; objectId: string; parametersHex: string; signatureHex: string };
+const fromHex = (hex: string): Uint8Array => Uint8Array.from(hex.match(/../gu) ?? [], part => Number.parseInt(part, 16));
+function anchorMaterial(epoch: number) {
+	const genesis = fromHex(archived.anchorHex);
+	const bytes = epoch === 0 ? genesis : encodeCanonical({ ...(decodeCanonical(genesis) as Record<string, unknown>), epoch });
+	const anchorDigest = Array.from(hashDomain("ts-drp/epoch-anchor/v3", bytes), byte => byte.toString(16).padStart(2, "0")).join("");
+	return { scope: { objectId: archived.objectId, epoch, anchorDigest }, install: { objectId: archived.objectId,
+		exactCanonicalAnchorPreimageBytes: bytes, detachedAnchorSignature: fromHex(archived.signatureHex),
+		exactCanonicalParametersCarrierBytes: fromHex(archived.parametersHex) } };
+}
 
 type Store = Awaited<ReturnType<typeof createBrowserDurableLiveJournalStore>>;
 type Result<T> = Readonly<{ ok: true; value: T }> | Readonly<{ ok: false; kind?: string }>;
