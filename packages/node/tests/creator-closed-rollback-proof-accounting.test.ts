@@ -7962,7 +7962,7 @@ describe("ordinary current-dimensions nominal ownership affected controls", () =
 			TypedArrayBufferGetter: Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Uint8Array.prototype), "buffer")!.get,
 			ObjectGetPrototypeOf: Object.getPrototypeOf, ObjectPrototype: Object.prototype, ReflectOwnKeys: Reflect.ownKeys,
 			ObjectCreate: Object.create, ObjectGetOwnPropertyDescriptor: Object.getOwnPropertyDescriptor,
-			settlementProfileFor, APPLICATION_BATCH_ACTION: "applicationBatch", APPLICATION_BATCH_LIMITS: {maxBytes: 65536, maxDepth: 8, maxItems: 1024},
+			settlementProfileFor, APPLICATION_BATCH_ACTION: "applicationBatch", APPLICATION_BATCH_LIMITS: {maxBytes: 65536, maxDepth: 8, maxItems: 1024}, ROOM_APPLICATION_STATE_BYTES: 32_768,
 			ordinaryPreviewAppendCandidate: (_registration: unknown, bytes: Uint8Array) => ({bytes: bytes.slice(), digest: new Uint8Array(32),
 				scope: {objectId: "room", epoch: 3, anchorDigest: "a".repeat(64), author: "1".repeat(64)}, sequence: 1}),
 			isDigestHex: (value: string) => /^[a-f0-9]{64}$/u.test(value), detachedCanonicalOperation: (value: unknown) => value,

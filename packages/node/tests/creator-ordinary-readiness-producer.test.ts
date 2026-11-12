@@ -115,7 +115,7 @@ function fixture(profileId = "creator-trusted-v1", oldPayloadBytes = 700) {
 		isObject: (value: unknown) => value !== null && typeof value === "object",
 		lowerHexDigest: (value: Uint8Array) => Buffer.from(value).toString("hex"),
 		settlementProfileFor: (id: string) => id === "creator-trusted-settlement-v1" ? "v1" : undefined,
-		AHE_BOUNDED_READ_LIMITS: {maxBlobBytes: 786432}, preparedMigrationTargetFloors: new WeakMap(),
+		AHE_BOUNDED_READ_LIMITS: {maxBlobBytes: 786432}, preparedMigrationTargetFloors: new WeakMap(), ROOM_APPLICATION_STATE_BYTES: 32_768,
 		captureCreatorRecoveryRuntime: () => runtime, creatorOrdinaryIssuanceSourceIdentity: () => state.identity,
 		fullRecoveryCloseHoldFacts: (value: object) => value === hold && state.owned ? facts : undefined,
 		resolveCreatorOrdinarySourceCapture,
