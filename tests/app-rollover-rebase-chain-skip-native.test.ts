@@ -510,6 +510,75 @@ it("a skip install resolving retained rows pays the native settlement turn once 
 	expect(large.installMs, "32-row skip install").toBeLessThanOrEqual(8_000);
 }, 1_500_000);
 
+// A one-epoch install replacing `count` displaced rows (moves the creator never received): the
+// drain prepares and issues each replacement. Each row used to pay its own dependency turns (a
+// preparation turn, then the issue's), each re-reading the author's whole census: census reads per
+// drain grew by about a dozen per row, each costing time in proportion to the author's settlement
+// state (O(rows^2) per install).
+async function rebaseDrainCost(count: number) {
+	const restore = await installEnvironment("node", () => undefined);
+	const directory = mkdtempSync(join(tmpdir(), "app-rollover-rebase-drain-cost-"));
+	directories.push(directory);
+	try {
+		const { creator, writer } = await openPair(directory);
+		const wire = successorWire(() => [creator, writer] as const);
+		const rows = rowWire(creator, writer);
+		const ordinal = { next: 0 };
+		let epoch = 0;
+		try {
+			while (epoch < 2) {
+				epoch = await rollCreator(creator, rows.toWriter, ordinal);
+				await wire.caughtUp(epoch);
+				await rows.toWriter();
+			}
+			for (let k = 0; k < count; k++) await writer.issue(epoch, k);
+			const before = readV3SettlementWorkCounts();
+			const censusBefore = nodeRecoveryCensusCounts();
+			const started = performance.now();
+			epoch = await rollCreator(creator, rows.toWriter, ordinal);
+			await wire.caughtUp(epoch, 1_200_000);
+			const plan = await waitFor(
+				"every displaced row is replaced",
+				async () => (await writer.settlementAudit()).dispositions,
+				(dispositions) => (dispositions.rebase ?? 0) >= count,
+				600_000
+			);
+			const ms = performance.now() - started;
+			const after = readV3SettlementWorkCounts();
+			const censusAfter = nodeRecoveryCensusCounts();
+			const work = {
+				dependencyTurns: after.dependencyTurns - before.dependencyTurns,
+				dependencyTurnCensusReads: after.dependencyTurnCensusReads - before.dependencyTurnCensusReads,
+				recoveryCensusReads: after.recoveryCensusReads - before.recoveryCensusReads,
+				nativeCensusReads: censusAfter.reads - censusBefore.reads,
+				fullCensusReads: censusAfter.fullReads - censusBefore.fullReads,
+			};
+			const result = { count, installMs: Math.round(ms), perRowMs: Math.round(ms / count), plan, work };
+			process.stdout.write(`REBASE_DRAIN_COST ${JSON.stringify(result)}\n`);
+			return result;
+		} finally {
+			await wire.stop();
+		}
+	} finally {
+		restore();
+	}
+}
+
+it("a drain replacing displaced rows pays its dependency turns once per drain, not once per row", async () => {
+	const small = await rebaseDrainCost(4);
+	const large = await rebaseDrainCost(16);
+	expect([small.plan.rebase, large.plan.rebase], "replaced rows").toEqual([4, 16]);
+	// The drain's dependency turns do not repeat per row: one preparation turn and one issue turn
+	// (chunked: one more per chunk of rows).
+	expect(large.work.dependencyTurns, "dependency turns, 16 rows vs 4").toBeLessThanOrEqual(small.work.dependencyTurns + 2);
+	// The drain's complete census reads are bounded: they do not grow with the rows it replaces (six
+	// per row before: each row's own turn sealed, borrowed and checked the author's whole census).
+	expect(
+		[small.work.recoveryCensusReads, large.work.recoveryCensusReads],
+		"complete census reads per drain, 4 rows vs 16"
+	).toSatisfy(([few, many]: number[]) => many! <= few! + 2);
+}, 1_500_000);
+
 // A move given back is no longer waiting in the room: the application holds it. Its expired row
 // only waits for retirement, so it must not count as unsettled. Counting it kept the member in
 // "not-reaching-host" (unsettledEpochs >= window - 2) for epochs after every move had been given
