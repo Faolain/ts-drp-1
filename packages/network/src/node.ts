@@ -3076,7 +3076,8 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			if (probe !== undefined) probe.written = probe.closed = diagnosticsNow();
 		} catch (error) {
 			if (probe !== undefined)
-				probe.error = error instanceof DirectMessageSendError ? error.code : error instanceof Error ? error.name : String(error);
+				probe.error =
+					error instanceof DirectMessageSendError ? error.code : error instanceof Error ? error.name : String(error);
 			throw error;
 		}
 	}
@@ -3095,13 +3096,22 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	 */
 	private async admitDirectFrame(frame: Uint8Array, sender: string, protocol: string): Promise<void> {
 		const probe: StreamReceiveSample | undefined = streamDiagnosticsEnabled
-			? recordReceive({ local: this.peerId, remote: sender, protocol, hash: hashBytes(frame), entered: diagnosticsNow() })
+			? recordReceive({
+					local: this.peerId,
+					remote: sender,
+					protocol,
+					hash: hashBytes(frame),
+					entered: diagnosticsNow(),
+				})
 			: undefined;
 		if (probe !== undefined) probe.framed = probe.entered;
 		const { message, structure } = this.decodeAttributedMessage(frame, sender);
 		if (probe !== undefined) countReceiveClass(probe, MessageType[message.type] ?? String(message.type));
 		if (isSyncProtocolMessage(message)) {
-			throw new SyncTransportError("SYNC_PROTOCOL_VIOLATION", "Sync-family messages are not carried on a direct-message session");
+			throw new SyncTransportError(
+				"SYNC_PROTOCOL_VIOLATION",
+				"Sync-family messages are not carried on a direct-message session"
+			);
 		}
 		this.recordIngressEvidence(message, { kind: "authenticated-stream", protocol, sender }, structure);
 		await this._messageQueue.enqueue(message);

@@ -104,7 +104,11 @@ describe("room network: direct v3 ingress (room-network.ts route)", () => {
 			() => undefined
 		);
 		const received: Message[] = [];
-		port.setIngressHandler("ingress-46", () => undefined, (message) => received.push(message));
+		port.setIngressHandler(
+			"ingress-46",
+			() => undefined,
+			(message) => received.push(message)
+		);
 		const envelope = Message.create({
 			data: Uint8Array.of(1, 2, 3),
 			objectId: "ingress-46",
@@ -250,7 +254,12 @@ describe("ephemeral: direct E1 ingress (ephemeral.ts route)", () => {
 			"zone",
 			{
 				authorForPeer: (peerId) => roster.get(peerId),
-				currentAuthority: () => ({ aclDigest: "22".repeat(32), anchorDigest: "11".repeat(32), epoch: 0, objectId: "zone" }),
+				currentAuthority: () => ({
+					aclDigest: "22".repeat(32),
+					anchorDigest: "11".repeat(32),
+					epoch: 0,
+					objectId: "zone",
+				}),
 				isCurrentWriter: (author) => author === "author-writer",
 			},
 			{ maxMessageBytes: 65_536, maxSequencedKeys: 1, maxSequencedSenders: 4_095 }

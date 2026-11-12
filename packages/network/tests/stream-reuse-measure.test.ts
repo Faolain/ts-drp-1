@@ -32,7 +32,8 @@ type Arrivals = Map<string, number>;
 
 function quantiles(values: readonly number[]) {
 	const sorted = [...values].sort((a, b) => a - b);
-	const at = (q: number) => (sorted.length === 0 ? NaN : sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))]);
+	const at = (q: number) =>
+		sorted.length === 0 ? NaN : sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))];
 	const round = (value: number) => Math.round(value * 1000) / 1000;
 	return {
 		n: sorted.length,
@@ -72,7 +73,14 @@ describe.skipIf(!enabled)("measure: per-message stream open vs one long-lived st
 		const [sender, receiver] = nodes;
 		await Promise.all(nodes.map((node) => node.start()));
 		const results: Record<string, unknown> = {
-			config: { count, bytes, hz, burst, node: process.version, diagnostics: process.env.DRP_STREAM_DIAGNOSTICS === "1" },
+			config: {
+				count,
+				bytes,
+				hz,
+				burst,
+				node: process.version,
+				diagnostics: process.env.DRP_STREAM_DIAGNOSTICS === "1",
+			},
 		};
 		try {
 			await sender.connect(receiver.getMultiaddrs());
@@ -169,9 +177,17 @@ describe.skipIf(!enabled)("measure: per-message stream open vs one long-lived st
 			flushStreamDiagnostics();
 			const diag = (globalThis as { __drpStreamDiagnostics?: { opens: Record<string, number>; sends: unknown[] } })
 				.__drpStreamDiagnostics;
-			if (diag !== undefined) results.diagnostics = { opens: diag.opens, sends: diag.sends, receives: (diag as unknown as { receives: unknown[] }).receives, openSamples: (diag as unknown as { openSamples: unknown[] }).openSamples };
+			if (diag !== undefined)
+				results.diagnostics = {
+					opens: diag.opens,
+					sends: diag.sends,
+					receives: (diag as unknown as { receives: unknown[] }).receives,
+					openSamples: (diag as unknown as { openSamples: unknown[] }).openSamples,
+				};
 			if (out !== "") writeFileSync(out, JSON.stringify(results, null, 1));
-			console.log(JSON.stringify(Object.fromEntries(Object.entries(results).filter(([key]) => key !== "diagnostics")), null, 1));
+			console.log(
+				JSON.stringify(Object.fromEntries(Object.entries(results).filter(([key]) => key !== "diagnostics")), null, 1)
+			);
 			expect((results["fresh-seq-1"] as { delivered: number }).delivered).toBeGreaterThan(0);
 		} finally {
 			await Promise.allSettled(nodes.map((node) => node.stop()));

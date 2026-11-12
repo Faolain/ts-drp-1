@@ -47,7 +47,10 @@ async function pair() {
 		await gate;
 		arrivals.push(message.objectId);
 		const claimed = receiver.claimIngressEvidence(message);
-		evidence.set(message.objectId, claimed?.transport.kind === "authenticated-stream" ? claimed.transport.protocol : undefined);
+		evidence.set(
+			message.objectId,
+			claimed?.transport.kind === "authenticated-stream" ? claimed.transport.protocol : undefined
+		);
 	});
 	const connection = (): Connection => {
 		const selected = host(sender).getConnections(host(receiver).peerId)[0];
@@ -110,7 +113,10 @@ async function fillUntilBlocked(f: Awaited<ReturnType<typeof pair>>) {
 		const id = `fill-${index}`;
 		const sending = track(id, f.sender.sendMessage(f.receiver.peerId, message(id, 100)), settled);
 		sends.push(sending);
-		const done = await Promise.race([sending.then(() => true), new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 500))]);
+		const done = await Promise.race([
+			sending.then(() => true),
+			new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 500)),
+		]);
 		written.push(id);
 		if (!done) return { written, settled, sends };
 	}
@@ -175,69 +181,84 @@ describe("direct message sessions", () => {
 		expect(outcome).toEqual({ name: "DirectMessageSendError", code: "DIRECT_DIAL_FAILED" });
 	});
 
-	it("bounds a blocked receiver: typed queue-full refusal, abort while queued, FIFO and nothing silently lost", { timeout: 120_000 }, async () => {
-		const f = await pair();
-		const release = f.hold();
-		const { written, settled, sends } = await fillUntilBlocked(f);
-		// The receiver holds its queue (1000) plus one window; the sender's bounded queue takes the next
-		// frames (one of them is aborted there), and refuses beyond it.
-		expect(written.length).toBeGreaterThan(1_000);
-		const queued = Array.from({ length: 40 }, (_, index) => `queued-${index}`);
-		for (const id of queued.slice(0, 20)) sends.push(track(id, f.sender.sendMessage(f.receiver.peerId, message(id, 100)), settled));
-		const controller = new AbortController();
-		const aborted = f.sender
-			.sendMessage(f.receiver.peerId, message("aborted-while-queued", 100), { signal: controller.signal })
-			.then(
-				() => "resolved",
-				(error: unknown) => (error as Error).message
+	it(
+		"bounds a blocked receiver: typed queue-full refusal, abort while queued, FIFO and nothing silently lost",
+		{ timeout: 120_000 },
+		async () => {
+			const f = await pair();
+			const release = f.hold();
+			const { written, settled, sends } = await fillUntilBlocked(f);
+			// The receiver holds its queue (1000) plus one window; the sender's bounded queue takes the next
+			// frames (one of them is aborted there), and refuses beyond it.
+			expect(written.length).toBeGreaterThan(1_000);
+			const queued = Array.from({ length: 40 }, (_, index) => `queued-${index}`);
+			for (const id of queued.slice(0, 20))
+				sends.push(track(id, f.sender.sendMessage(f.receiver.peerId, message(id, 100)), settled));
+			const controller = new AbortController();
+			const aborted = f.sender
+				.sendMessage(f.receiver.peerId, message("aborted-while-queued", 100), { signal: controller.signal })
+				.then(
+					() => "resolved",
+					(error: unknown) => (error as Error).message
+				);
+			for (const id of queued.slice(20))
+				sends.push(track(id, f.sender.sendMessage(f.receiver.peerId, message(id, 100)), settled));
+			const overflow = Array.from({ length: 40 }, (_, index) => `overflow-${index}`);
+			for (const id of overflow)
+				sends.push(track(id, f.sender.sendMessage(f.receiver.peerId, message(id, 100)), settled));
+			expect(await until(() => settled.some(({ status }) => status === "rejected"), 5_000)).toBe(true);
+			controller.abort(new Error("caller gave up"));
+			expect(await aborted).toBe("caller gave up");
+			release();
+			await Promise.all(sends);
+			const resolved = settled.filter(({ status }) => status === "resolved").map(({ id }) => id);
+			const rejected = settled.filter(
+				(entry): entry is Extract<Settled, { status: "rejected" }> => entry.status === "rejected"
 			);
-		for (const id of queued.slice(20)) sends.push(track(id, f.sender.sendMessage(f.receiver.peerId, message(id, 100)), settled));
-		const overflow = Array.from({ length: 40 }, (_, index) => `overflow-${index}`);
-		for (const id of overflow) sends.push(track(id, f.sender.sendMessage(f.receiver.peerId, message(id, 100)), settled));
-		expect(await until(() => settled.some(({ status }) => status === "rejected"), 5_000)).toBe(true);
-		controller.abort(new Error("caller gave up"));
-		expect(await aborted).toBe("caller gave up");
-		release();
-		await Promise.all(sends);
-		const resolved = settled.filter(({ status }) => status === "resolved").map(({ id }) => id);
-		const rejected = settled.filter((entry): entry is Extract<Settled, { status: "rejected" }> => entry.status === "rejected");
-		expect(rejected.length).toBeGreaterThan(0);
-		expect(new Set(rejected.map(({ error }) => JSON.stringify(codeOf(error))))).toEqual(
-			new Set([JSON.stringify({ name: "DirectMessageSendError", code: "DIRECT_SEND_QUEUE_FULL" })])
-		);
-		// Every queued frame was carried once the receiver drained; only overflow was refused.
-		expect(resolved).toEqual(expect.arrayContaining(queued));
-		expect(rejected.every(({ id }) => id.startsWith("overflow-"))).toBe(true);
-		expect(await until(() => f.arrivals.length >= resolved.length, 30_000)).toBe(true);
-		await new Promise((resolve) => setTimeout(resolve, 200));
-		// Every resolved send arrived exactly once, in send order; nothing else arrived.
-		expect(f.arrivals).toEqual([...written, ...queued, ...overflow].filter((id) => resolved.includes(id)));
-		expect(f.arrivals).not.toContain("aborted-while-queued");
-		// The receiver never overflowed and reset the session.
-		expect(f.opened.filter((protocol) => protocol === RT)).toHaveLength(1);
-	});
+			expect(rejected.length).toBeGreaterThan(0);
+			expect(new Set(rejected.map(({ error }) => JSON.stringify(codeOf(error))))).toEqual(
+				new Set([JSON.stringify({ name: "DirectMessageSendError", code: "DIRECT_SEND_QUEUE_FULL" })])
+			);
+			// Every queued frame was carried once the receiver drained; only overflow was refused.
+			expect(resolved).toEqual(expect.arrayContaining(queued));
+			expect(rejected.every(({ id }) => id.startsWith("overflow-"))).toBe(true);
+			expect(await until(() => f.arrivals.length >= resolved.length, 30_000)).toBe(true);
+			await new Promise((resolve) => setTimeout(resolve, 200));
+			// Every resolved send arrived exactly once, in send order; nothing else arrived.
+			expect(f.arrivals).toEqual([...written, ...queued, ...overflow].filter((id) => resolved.includes(id)));
+			expect(f.arrivals).not.toContain("aborted-while-queued");
+			// The receiver never overflowed and reset the session.
+			expect(f.opened.filter((protocol) => protocol === RT)).toHaveLength(1);
+		}
+	);
 
-	it("rejects queued frames when the connection closes and never delivers them later", { timeout: 60_000 }, async () => {
-		const f = await pair();
-		const release = f.hold();
-		const { settled, sends } = await fillUntilBlocked(f);
-		const queued = Array.from({ length: 20 }, (_, index) => `closing-${index}`);
-		for (const id of queued) sends.push(track(id, f.sender.sendMessage(f.receiver.peerId, message(id, 100)), settled));
-		await new Promise((resolve) => setTimeout(resolve, 100));
-		await f.connection().close();
-		release();
-		await Promise.all(sends);
-		const closed = settled.filter(
-			(entry) =>
-				entry.status === "rejected" &&
-				JSON.stringify(codeOf(entry.error)) === JSON.stringify({ name: "DirectMessageSendError", code: "DIRECT_CONNECTION_CLOSED" })
-		);
-		expect(closed.map(({ id }) => id)).toEqual(expect.arrayContaining(queued));
-		await f.sender.connect(f.receiver.getMultiaddrs());
-		await f.sender.sendMessage(f.receiver.peerId, message("after-reconnect"));
-		expect(await until(() => f.arrivals.includes("after-reconnect"))).toBe(true);
-		for (const { id } of closed) expect(f.arrivals).not.toContain(id);
-	});
+	it(
+		"rejects queued frames when the connection closes and never delivers them later",
+		{ timeout: 60_000 },
+		async () => {
+			const f = await pair();
+			const release = f.hold();
+			const { settled, sends } = await fillUntilBlocked(f);
+			const queued = Array.from({ length: 20 }, (_, index) => `closing-${index}`);
+			for (const id of queued)
+				sends.push(track(id, f.sender.sendMessage(f.receiver.peerId, message(id, 100)), settled));
+			await new Promise((resolve) => setTimeout(resolve, 100));
+			await f.connection().close();
+			release();
+			await Promise.all(sends);
+			const closed = settled.filter(
+				(entry) =>
+					entry.status === "rejected" &&
+					JSON.stringify(codeOf(entry.error)) ===
+						JSON.stringify({ name: "DirectMessageSendError", code: "DIRECT_CONNECTION_CLOSED" })
+			);
+			expect(closed.map(({ id }) => id)).toEqual(expect.arrayContaining(queued));
+			await f.sender.connect(f.receiver.getMultiaddrs());
+			await f.sender.sendMessage(f.receiver.peerId, message("after-reconnect"));
+			expect(await until(() => f.arrivals.includes("after-reconnect"))).toBe(true);
+			for (const { id } of closed) expect(f.arrivals).not.toContain(id);
+		}
+	);
 
 	it("reopens the session after the receiver resets it", { timeout: 30_000 }, async () => {
 		const f = await pair();
@@ -252,7 +273,13 @@ describe("direct message sessions", () => {
 		await new Promise((resolve) => setTimeout(resolve, 100));
 		for (let index = 0; index < 5; index++) await f.sender.sendMessage(f.receiver.peerId, message(`after-${index}`));
 		await until(() => f.arrivals.includes("after-4"));
-		expect(f.arrivals.filter((id) => id.startsWith("after-"))).toEqual(["after-0", "after-1", "after-2", "after-3", "after-4"]);
+		expect(f.arrivals.filter((id) => id.startsWith("after-"))).toEqual([
+			"after-0",
+			"after-1",
+			"after-2",
+			"after-3",
+			"after-4",
+		]);
 		expect(f.opened.filter((protocol) => protocol === RT)).toHaveLength(2);
 	});
 
@@ -298,25 +325,29 @@ describe("direct message sessions", () => {
 		expect(await until(() => f.opened.filter((protocol) => protocol === RT).length >= 2, 2_000)).toBe(true);
 	});
 
-	it("falls back to legacy after consecutive session opens that each run to their deadline", { timeout: 60_000 }, async () => {
-		const f = await pair();
-		const watched = f.connection();
-		const open = watched.newStream.bind(watched);
-		let sessionAttempts = 0;
-		// Each attempt fails after 6 s, so no three failures ever fall inside one 10 s window.
-		watched.newStream = (async (protocols: string | string[], options?: object) => {
-			if (protocols === RT) {
-				sessionAttempts++;
-				await new Promise((resolve) => setTimeout(resolve, 6_000));
-				throw Object.assign(new Error("negotiation deadline"), { name: "TimeoutError" });
-			}
-			return open(protocols, options);
-		}) as Connection["newStream"];
-		await expect(f.sender.sendMessage(f.receiver.peerId, message("eventually", 100))).resolves.toBeUndefined();
-		expect(sessionAttempts).toBe(3);
-		expect(await until(() => f.arrivals.includes("eventually"))).toBe(true);
-		expect(f.evidence.get("eventually")).toBe(LEGACY);
-	});
+	it(
+		"falls back to legacy after consecutive session opens that each run to their deadline",
+		{ timeout: 60_000 },
+		async () => {
+			const f = await pair();
+			const watched = f.connection();
+			const open = watched.newStream.bind(watched);
+			let sessionAttempts = 0;
+			// Each attempt fails after 6 s, so no three failures ever fall inside one 10 s window.
+			watched.newStream = (async (protocols: string | string[], options?: object) => {
+				if (protocols === RT) {
+					sessionAttempts++;
+					await new Promise((resolve) => setTimeout(resolve, 6_000));
+					throw Object.assign(new Error("negotiation deadline"), { name: "TimeoutError" });
+				}
+				return open(protocols, options);
+			}) as Connection["newStream"];
+			await expect(f.sender.sendMessage(f.receiver.peerId, message("eventually", 100))).resolves.toBeUndefined();
+			expect(sessionAttempts).toBe(3);
+			expect(await until(() => f.arrivals.includes("eventually"))).toBe(true);
+			expect(f.evidence.get("eventually")).toBe(LEGACY);
+		}
+	);
 
 	it("a cancelled head waiting for byte credit lets a frame that fits go", { timeout: 120_000 }, async () => {
 		const f = await pair();
@@ -325,7 +356,9 @@ describe("direct message sessions", () => {
 		// The receiver's queue is full, so bulk frames stay unadmitted and their credit does not return.
 		await f.sender.sendMessage(f.receiver.peerId, message("bulk-3mib", 3 * 1024 * 1024));
 		const controller = new AbortController();
-		const head = f.sender.sendMessage(f.receiver.peerId, message("bulk-2mib", 2 * 1024 * 1024), { signal: controller.signal });
+		const head = f.sender.sendMessage(f.receiver.peerId, message("bulk-2mib", 2 * 1024 * 1024), {
+			signal: controller.signal,
+		});
 		void head.catch(() => undefined);
 		const small = f.sender.sendMessage(f.receiver.peerId, message("bulk-64kib", 64 * 1024));
 		const smallState = small.then(
@@ -335,7 +368,10 @@ describe("direct message sessions", () => {
 		await new Promise((resolve) => setTimeout(resolve, 300));
 		controller.abort(new Error("caller gave up"));
 		await expect(head).rejects.toThrow("caller gave up");
-		const state = await Promise.race([smallState, new Promise((resolve) => setTimeout(() => resolve("pending"), 3_000))]);
+		const state = await Promise.race([
+			smallState,
+			new Promise((resolve) => setTimeout(() => resolve("pending"), 3_000)),
+		]);
 		release();
 		await Promise.all(sends);
 		expect(state).toBe("resolved");

@@ -190,9 +190,13 @@ class ConnectionDirect {
 	recordFailure(open: boolean): void {
 		const now = Date.now();
 		this.#failures.push(now);
-		while (this.#failures.length > 0 && now - (this.#failures[0] ?? now) > SESSION_FAILURE_WINDOW_MS) this.#failures.shift();
+		while (this.#failures.length > 0 && now - (this.#failures[0] ?? now) > SESSION_FAILURE_WINDOW_MS)
+			this.#failures.shift();
 		if (open) this.#openFailures++;
-		if (this.#failures.length >= SESSION_FAILURES_BEFORE_LEGACY || this.#openFailures >= SESSION_FAILURES_BEFORE_LEGACY) {
+		if (
+			this.#failures.length >= SESSION_FAILURES_BEFORE_LEGACY ||
+			this.#openFailures >= SESSION_FAILURES_BEFORE_LEGACY
+		) {
 			this.#failures.length = 0;
 			this.#openFailures = 0;
 			this.#legacyUntil = now + SESSION_LEGACY_COOLDOWN_MS;
@@ -404,8 +408,14 @@ class LegacySender {
 
 	enqueue(pending: Pending): void {
 		if (this.#closed !== undefined) return settle(pending, this.#closed);
-		if (this.#queue.length >= LEGACY_QUEUE_FRAMES || this.#queuedBytes + pending.bytes.byteLength > LEGACY_QUEUE_BYTES) {
-			return settle(pending, new DirectMessageSendError("DIRECT_SEND_QUEUE_FULL", "Direct-message legacy send queue is full"));
+		if (
+			this.#queue.length >= LEGACY_QUEUE_FRAMES ||
+			this.#queuedBytes + pending.bytes.byteLength > LEGACY_QUEUE_BYTES
+		) {
+			return settle(
+				pending,
+				new DirectMessageSendError("DIRECT_SEND_QUEUE_FULL", "Direct-message legacy send queue is full")
+			);
 		}
 		this.#queue.push(pending);
 		this.#queuedBytes += pending.bytes.byteLength;
@@ -434,7 +444,9 @@ class LegacySender {
 		let stream: Stream | undefined;
 		const abort = (): void => {
 			if (stream !== undefined && isOpen(stream))
-				stream.abort(pending.signal?.reason instanceof Error ? pending.signal.reason : new Error("direct message send aborted"));
+				stream.abort(
+					pending.signal?.reason instanceof Error ? pending.signal.reason : new Error("direct message send aborted")
+				);
 		};
 		const opening = new AbortController();
 		this.#opening.add(opening);
@@ -596,7 +608,8 @@ export class DirectMessageSessions {
 			await grants.catch(() => undefined);
 			if (isOpen(stream)) await stream.close();
 		} catch (error) {
-			if (isOpen(stream) || stream.status === "closing") stream.abort(error instanceof Error ? error : new Error(String(error)));
+			if (isOpen(stream) || stream.status === "closing")
+				stream.abort(error instanceof Error ? error : new Error(String(error)));
 		} finally {
 			this.#inbound.delete(stream);
 		}

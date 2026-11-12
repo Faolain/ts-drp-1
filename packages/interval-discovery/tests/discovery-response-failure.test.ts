@@ -17,7 +17,9 @@ test("reports a failed discovery response instead of dropping it", async () => {
 		peerId: "local-peer",
 		getGroupPeers: vi.fn().mockReturnValue(["peer1"]),
 		getSubscribedTopics: vi.fn().mockReturnValue([]),
-		getPeerMultiaddrs: vi.fn().mockResolvedValue([{ multiaddr: { toString: (): string => "/ip4/127.0.0.1/tcp/1234" } }]),
+		getPeerMultiaddrs: vi
+			.fn()
+			.mockResolvedValue([{ multiaddr: { toString: (): string => "/ip4/127.0.0.1/tcp/1234" } }]),
 		sendMessage: vi.fn().mockRejectedValue(failure),
 	} as unknown as DRPNetworkNode;
 	try {
