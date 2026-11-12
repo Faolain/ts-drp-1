@@ -57,6 +57,7 @@ export const ZONE_WORKER_CONTRACT = defineRoomWorkerContract({
 		"fabric.runTrial": call(),
 		"fabric.snapshot": call(),
 		"rtcStats": call(),
+		"session": call(),
 	},
 	streams: { projection: latest(), transient: latest(), network: latest() },
 	hooks: ["roomHeadAuthorityForOpen", "approveSettlementSourceSelection", "publishSuccessor"],
@@ -80,10 +81,23 @@ export interface ZoneWorkerReady {
 	readonly session: ZoneWorkerSessionSnapshot;
 }
 
-/** The network stream: the page's network panel, the node's dialability and the session diagnostics. */
+/**
+ * The network stream: the page's network panel and the node's dialability, sent when they change. The
+ * session diagnostics are not streamed: their control-plane event log grows for the session's life, so
+ * the page reads them on demand with the `session` call, as the main-thread page does.
+ */
 export interface ZoneWorkerNetwork extends NetworkInfo {
 	readonly dialable: boolean;
-	readonly session: ZoneWorkerSessionSnapshot;
+}
+
+/**
+ * Builds the network stream's value.
+ * @param info - The network panel.
+ * @param dialable - Whether the node is dialable.
+ * @returns The stream value.
+ */
+export function zoneWorkerNetwork(info: NetworkInfo, dialable: boolean): ZoneWorkerNetwork {
+	return { peerId: info.peerId, peers: info.peers, topics: info.topics, dialable };
 }
 
 /** The contract's commands, typed as the worker implements them. */
@@ -111,4 +125,5 @@ export interface ZoneWorkerCommands {
 	"fabric.runTrial": ZoneFabricWorkbench["runTrial"];
 	"fabric.snapshot": ZoneFabricWorkbench["snapshot"];
 	"rtcStats"(): RoomWorkerRtcStats;
+	"session"(): ZoneWorkerSessionSnapshot;
 }

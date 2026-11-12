@@ -263,7 +263,8 @@ export async function mainWithRoomWorker(fallback: () => Promise<void>): Promise
 	const target = window as typeof window & {
 		__TS_DRP_GRID_SESSION__?: Readonly<{
 			node: undefined;
-			snapshot(): ZoneWorkerSessionSnapshot;
+			/** The session diagnostics, read from the worker on demand. */
+			snapshot(): Promise<ZoneWorkerSessionSnapshot>;
 			stop(): Promise<void>;
 		}>;
 		__TS_DRP_V3_ZONE__?: V3ZoneWorkerApi;
@@ -284,7 +285,6 @@ export async function mainWithRoomWorker(fallback: () => Promise<void>): Promise
 	let current: OpenedZoneWorker | undefined;
 	let snapshot: ZoneSnapshot | undefined;
 	let transient: ZoneTransientSnapshot | undefined;
-	let network: ZoneWorkerNetwork | undefined;
 	let controlsEnabled = false;
 
 	// The native read reservations the worker holds through the page's authority: released when the
@@ -329,7 +329,6 @@ export async function mainWithRoomWorker(fallback: () => Promise<void>): Promise
 		});
 		handle.on("network", (value) => {
 			const next = value as ZoneWorkerNetwork;
-			network = next;
 			render(() => renderNetworkInfo(next));
 			if (next.dialable && !controlsEnabled) {
 				controlsEnabled = true;
@@ -408,7 +407,8 @@ export async function mainWithRoomWorker(fallback: () => Promise<void>): Promise
 
 	const session = Object.freeze({
 		node: undefined,
-		snapshot: (): ZoneWorkerSessionSnapshot => network?.session ?? current?.ready.session ?? { peerId: "" },
+		// Asynchronous here: the diagnostics live in the worker and are read on demand.
+		snapshot: (): Promise<ZoneWorkerSessionSnapshot> => call("session"),
 		stop: (): Promise<void> => call("stop"),
 	});
 	let unloadHandler: (() => void) | undefined;

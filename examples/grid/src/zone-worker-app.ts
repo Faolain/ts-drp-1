@@ -21,7 +21,7 @@ import {
 	ZONE_WORKER_CONTRACT,
 	type ZoneWorkerCommands,
 	type ZoneWorkerInit,
-	type ZoneWorkerNetwork,
+	zoneWorkerNetwork,
 	type ZoneWorkerReady,
 	type ZoneWorkerSessionSnapshot,
 } from "./zone-worker-contract";
@@ -53,13 +53,13 @@ export default defineRoomWorkerApp<ZoneWorkerInit>({
 			publish === undefined ? undefined : (((offer, epoch) => publish(offer, epoch)) as V3ZoneSuccessorPublisher)
 		);
 		// The network panel: sent when it changes, at the page's render interval (the main-thread
-		// page polls the node at the same interval).
+		// page polls the node at the same interval). The session diagnostics are the `session` call.
 		let dialable = false;
 		let lastNetwork = "";
 		const session = (): ZoneWorkerSessionSnapshot =>
 			(modular?.snapshot() as ZoneWorkerSessionSnapshot | undefined) ?? { peerId: node.networkNode.peerId };
 		const pushNetwork = (): void => {
-			const info: ZoneWorkerNetwork = { ...networkInfo(node), dialable, session: session() };
+			const info = zoneWorkerNetwork(networkInfo(node), dialable);
 			const text = JSON.stringify(info);
 			if (text === lastNetwork) return;
 			lastNetwork = text;
@@ -105,6 +105,7 @@ export default defineRoomWorkerApp<ZoneWorkerInit>({
 			"fabric.runTrial": (input: Parameters<typeof zone.fabric.runTrial>[0]) => zone.fabric.runTrial(input),
 			"fabric.snapshot": (trialId: string) => zone.fabric.snapshot(trialId),
 			"rtcStats": () => roomWorkerRtcStats(),
+			"session": () => session(),
 		};
 		return {
 			info: ready,
