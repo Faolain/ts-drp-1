@@ -110,7 +110,7 @@ import { acquireFinalitySigningExclusion, type FinalitySigningExclusion } from "
 import { publicKeyFromRaw } from "@libp2p/crypto/keys";
 import { openCanonicalLatchedAclSnapshot } from "@ts-drp/protocol-v3/latched-acl";
 import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
-import { type NativeReadReservation, parseStorageObjectId, type StorageObjectId } from "@ts-drp/storage";
+import { AHE_BOUNDED_READ_LIMITS, type NativeReadReservation, parseStorageObjectId, type StorageObjectId } from "@ts-drp/storage";
 import type {
 	RoomHead as V3RoomHead,
 	RoomHeadAuthority as V3RoomHeadAuthority,
@@ -648,6 +648,11 @@ export interface CreateV3RoomSessionInput<Projection extends V3RoomProjectionAut
 	 */
 	onAcceptedVertex(vertex: AdmittedReceivedVertexView): void | Promise<void>;
 	onMigrationTarget?(session: V3RoomSession<Projection>, objectId: string): void;
+	/**
+	 * Observation only: typed diagnostics of paths the room is not expected to reach
+	 * (V3RoomDiagnosticEvent). Never alters the room's behaviour; a throwing hook is ignored.
+	 */
+	onDiagnostic?(event: V3RoomDiagnosticEvent): void;
 	onProjection(projection: Projection): void;
 	readonly publicKeyBytes: Uint8Array;
 	readonly rebaseSourceInvite?: string | V3RoomCreatorInviteMaterial;
@@ -1984,6 +1989,57 @@ export function settlementAuthorFenceDecision(
 	const unresolved = input.retained.filter((entry) => entry.disposition !== "committed" && entry.disposition !== "expire");
 	if (unresolved.every((entry) => entry.unproven === "never")) return "fence";
 	return unresolved.some((entry) => entry.unproven === "awaiting-frontier") ? "await-fence" : "withhold";
+}
+
+/**
+ * A settlement drain awaited this epoch's author fence ("await-fence": a retained row is
+ * "awaiting-frontier", which a native room is not expected to reach) while a completed replacement
+ * entry still pins a source more than `generationBound` installs old. Without a plan fence that entry
+ * keeps its source retained, and if a lull falls in this awaited epoch the source's anchor may no
+ * longer be covered by the retained AHE generations (held-anchor-retention.qnt p6). Observation only.
+ */
+export type V3RoomAwaitingFencePinnedSourceDiagnostic = Readonly<{
+	kind: "awaiting-fence-pinned-source";
+	/** The epoch whose author fence is awaited. */
+	epoch: number;
+	/** The retained rows waiting for a frontier (author sequences). */
+	awaitingSequences: readonly number[];
+	/** The completed replacement entries' sources older than the bound, oldest first. */
+	pinnedSources: readonly Readonly<{ sourceSequence: number; sourceEpoch: number }>[];
+	/** AHE_BOUNDED_READ_LIMITS.maxObjectGenerations: the retained AHE generations (the model's CAP). */
+	generationBound: number;
+}>;
+
+/** Typed diagnostics a room reports through `onDiagnostic` (CreateV3RoomSessionInput). */
+export type V3RoomDiagnosticEvent = V3RoomAwaitingFencePinnedSourceDiagnostic;
+
+/**
+ * The diagnostic of one settlement drain's author-fence decision, if any (pure).
+ * @param input - The decision, the room's epoch, the awaiting rows, the completed replacement entries'
+ * sources with their epochs, and the generation bound.
+ * @returns The event when the fence is awaited and a pinned source is more than the bound old.
+ */
+export function awaitingFencePinnedSourceDiagnostic(
+	input: Readonly<{
+		decision: "fence" | "await-fence" | "withhold";
+		epoch: number;
+		awaitingSequences: readonly number[];
+		pinnedSources: readonly Readonly<{ sourceSequence: number; sourceEpoch: number }>[];
+		generationBound: number;
+	}>
+): V3RoomAwaitingFencePinnedSourceDiagnostic | undefined {
+	if (input.decision !== "await-fence") return undefined;
+	const old = input.pinnedSources
+		.filter((source) => input.epoch - source.sourceEpoch > input.generationBound)
+		.sort((left, right) => left.sourceEpoch - right.sourceEpoch || left.sourceSequence - right.sourceSequence);
+	if (old.length === 0) return undefined;
+	return Object.freeze({
+		kind: "awaiting-fence-pinned-source",
+		epoch: input.epoch,
+		awaitingSequences: Object.freeze([...input.awaitingSequences]),
+		pinnedSources: Object.freeze(old.map((source) => Object.freeze({ ...source }))),
+		generationBound: input.generationBound,
+	});
 }
 
 /**
@@ -7504,6 +7560,28 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		});
 		if (decision !== "fence") {
 			setAuthorFenceAwaited(decision === "await-fence" ? activeHandle?.epoch : undefined);
+			// Observation only (onDiagnostic): never alters the decision.
+			if (decision === "await-fence" && input.onDiagnostic !== undefined) {
+				try {
+					const epochOf = new Map(sources.map((source) => [source.authorSequence, source.epoch] as const));
+					const event = awaitingFencePinnedSourceDiagnostic({
+						decision,
+						epoch: activeHandle?.epoch ?? 0,
+						awaitingSequences: [...retainedUnproven]
+							.filter(([, unproven]) => unproven === "awaiting-frontier")
+							.map(([sequence]) => sequence),
+						pinnedSources: plan.entries.flatMap((entry) => {
+							const sourceEpoch = epochOf.get(entry.sourceSequence);
+							return entry.sourceContextDigest === undefined && entry.replacementSequence !== null &&
+								entry.disposition !== "manual-review" && entry.disposition !== "inherited" && sourceEpoch !== undefined
+								? [{ sourceSequence: entry.sourceSequence, sourceEpoch }]
+								: [];
+						}),
+						generationBound: AHE_BOUNDED_READ_LIMITS.maxObjectGenerations,
+					});
+					if (event !== undefined) input.onDiagnostic(event);
+				} catch { /* Diagnostics never alter the drain. */ }
+			}
 			return;
 		}
 		setAuthorFenceAwaited(undefined);
