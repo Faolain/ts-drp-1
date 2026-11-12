@@ -18,6 +18,7 @@ import {
 	successorWire,
 	type WireRow,
 } from "./fixtures/track-m-apps/long-room-driver.js";
+import { observeEd25519Verifications } from "@ts-drp/protocol-v3/instrumentation";
 import { readV3SettlementWorkCounts } from "../packages/node/src/v3-live.js";
 import { readV3RoomStageTimes, V3_ROOM_LOCAL_BACKLOG_LIMIT } from "../packages/node/src/v3-room.js";
 import { createNodeRoomHeadAuthority } from "../packages/storage-node/src/room-head.js";
@@ -40,6 +41,21 @@ const track = {
 	ports: new Set<SnapshotChunkProtocolPort>(),
 };
 const directories: string[] = [];
+
+// Reported, not asserted: Ed25519 checks made by scanOwnFences' own-fence row authentication over a
+// window, split into computed and answered by the exact-byte memo (attributed by stack).
+const ownFenceVerifies = { computed: 0, memo: 0 };
+observeEd25519Verifications((outcome) => {
+	const limit = Error.stackTraceLimit;
+	Error.stackTraceLimit = 80;
+	const stack = new Error().stack ?? "";
+	Error.stackTraceLimit = limit;
+	if (stack.includes("authenticateOwnFenceRow")) ownFenceVerifies[outcome === "computed" ? "computed" : "memo"] += 1;
+});
+const ownFenceVerifiesSince = (before: { computed: number; memo: number }) => ({
+	computed: ownFenceVerifies.computed - before.computed,
+	memo: ownFenceVerifies.memo - before.memo,
+});
 afterEach(async () => {
 	await Promise.allSettled([...track.rooms].map((room) => room.close()));
 	await Promise.allSettled([...track.heads].map((head) => head.close()));
@@ -393,12 +409,16 @@ async function retainedResolutionCost(count: number) {
 			// The next one-epoch install, with the resolved rows still unretired: what each of its census
 			// reads costs in own-fence outbox scans.
 			const nextBefore = readV3SettlementWorkCounts();
+			const nextVerifiesBefore = { ...ownFenceVerifies };
 			epoch = await rollCreator(creator, rows.toWriter, ordinal);
 			await wire.caughtUp(epoch, 1_200_000);
 			const nextAfter = readV3SettlementWorkCounts();
 			const next = {
 				recoveryCensusReads: nextAfter.recoveryCensusReads - nextBefore.recoveryCensusReads,
 				ownFenceScans: nextAfter.ownFenceScans - nextBefore.ownFenceScans,
+				// Reported, not asserted: own fence rows authenticated (one memoised Ed25519 check each).
+				ownFenceAuthentications: nextAfter.ownFenceAuthentications - nextBefore.ownFenceAuthentications,
+				ownFenceVerifies: ownFenceVerifiesSince(nextVerifiesBefore),
 			};
 			const result = { count, installMs: Math.round(ms), cpuMs, perRowMs: Math.round(ms / count), givenBack: status?.undelivered?.length, work, next };
 			process.stdout.write(`RETAINED_COST ${JSON.stringify(result)}\n`);
@@ -751,6 +771,7 @@ async function windowExpiredCensusCost(count: number) {
 				await rows.toWriter();
 			}
 			const before = readV3SettlementWorkCounts();
+			const verifiesBefore = { ...ownFenceVerifies };
 			epoch = await rollCreator(creator, rows.toWriter, ordinal);
 			await wire.caughtUp(epoch, 600_000);
 			const after = readV3SettlementWorkCounts();
@@ -761,6 +782,8 @@ async function windowExpiredCensusCost(count: number) {
 				plan: (await writer.settlementAudit()).dispositions,
 				recoveryCensusReads: after.recoveryCensusReads - before.recoveryCensusReads,
 				ownFenceScans: after.ownFenceScans - before.ownFenceScans,
+				ownFenceAuthentications: after.ownFenceAuthentications - before.ownFenceAuthentications,
+				ownFenceVerifies: ownFenceVerifiesSince(verifiesBefore),
 			};
 			process.stdout.write(`WINDOW_EXPIRED_COST ${JSON.stringify(result)}\n`);
 			return result;

@@ -2755,8 +2755,18 @@ function unique<T extends ts.Node>(predicate: (node: ts.Node) => node is T): T {
 	if (found.length !== 1) throw Error(`PRIVATE_STATEMENT_NOT_UNIQUE:${found.length}:${predicate.toString()}`);
 	return found[0]!;
 }
+// The source is read and parsed once, so an extracted declaration's text is fixed for the run. Each
+// lookup walks the whole owner file (26k lines, ~18 ms per walk on the sandbox), and harnesses that
+// rebuild their program per case (sizing widths, CURRENT phase maps) looked the same names up
+// hundreds of times: that, not the code under test, took them past the 10 s test timeout.
+const declarations = new Map<string, string>();
 function declaration(name: string): string {
-	return unique((node): node is ts.FunctionDeclaration => ts.isFunctionDeclaration(node) && node.name?.text === name).getText(parsed);
+	let text = declarations.get(name);
+	if (text === undefined) {
+		text = unique((node): node is ts.FunctionDeclaration => ts.isFunctionDeclaration(node) && node.name?.text === name).getText(parsed);
+		declarations.set(name, text);
+	}
+	return text;
 }
 function maintenanceProofMaxBytes(): number {
 	return CREATOR_MAINTENANCE_PROOF_MAX_BYTES;
@@ -2783,8 +2793,14 @@ const consume = unique((node): node is ts.VariableDeclaration => ts.isVariableDe
 	ts.isIdentifier(node.name) && node.name.text === "signingData" &&
 	node.initializer?.getText(parsed).includes("precloseControls?.signingPhysicalRows") === true);
 const declarationCode = ["closedRetirementEqual", "selectClosedSigningSummaryEpoch", "closedSigningSummaryResidualRows"].map(declaration).join("\n");
+// Transpiling is a pure function of the program text; each call still evaluates a fresh program.
+const transpiled = new Map<string, string>();
 function execute<T>(code: string, context: Record<string, unknown>): T {
-	const js = ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText;
+	let js = transpiled.get(code);
+	if (js === undefined) {
+		js = ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText;
+		transpiled.set(code, js);
+	}
 	const imports = { createWorkCheckpoint, encodeCanonical, decodeCanonical, closedRetirementBytes: encodeCanonical,
 		CREATOR_ORDINARY_PROOF_MAX_BYTES, CREATOR_MAINTENANCE_PROOF_MAX_BYTES: maintenanceProofMaxBytes(),
 		compareBytes: (a: Uint8Array, b: Uint8Array) => Buffer.compare(Buffer.from(a), Buffer.from(b)), ...context };
@@ -3500,8 +3516,16 @@ describe("actual CURRENT/FUTURE journal recipe freshly validates complete native
 });
 
 describe("CURRENT job phases reuse only identical same-schedule journal widths", () => {
-	const variable = (name: string) => unique((node): node is ts.VariableDeclaration => ts.isVariableDeclaration(node) &&
-		ts.isIdentifier(node.name) && node.name.text === name);
+	const variables = new Map<string, ts.VariableDeclaration>();
+	const variable = (name: string) => {
+		let found = variables.get(name);
+		if (found === undefined) {
+			found = unique((node): node is ts.VariableDeclaration => ts.isVariableDeclaration(node) &&
+				ts.isIdentifier(node.name) && node.name.text === name);
+			variables.set(name, found);
+		}
+		return found;
+	};
 	const journalReuse = unique((node): node is ts.IfStatement => ts.isIfStatement(node) &&
 		node.expression.getText(parsed) === "currentJobJournal?.jobIndex !== jobIndex");
 	const assignment = (journalReuse.thenStatement as ts.ExpressionStatement).expression as ts.BinaryExpression;
@@ -6143,16 +6167,31 @@ describe("same-hold issuance census data and joined lifetime affected controls",
 	type Reservation = {check(): Promise<void>; release(): Promise<void>};
 	type Held = {store: object; objectId: string; available(): boolean; read(consume: () => Promise<Uint8Array | undefined>): Promise<Uint8Array | undefined>};
 	type Lifetime = {acquireNativeIssuanceReservation(): Promise<Reservation>; check(): Promise<void>; release(): Promise<void>};
-	function seam() {
+	// Parsing v3-live.ts and walking it are pure functions of the source text, so
+	// the seam and its lookups are memoized per describe. Every case still builds
+	// its own state, registration and execute() bindings in fixture() or inline.
+	let seamCache: ReturnType<typeof readSeam> | undefined;
+	const seam = () => seamCache ??= readSeam();
+	function readSeam() {
 		const path = new URL("../src/v3-live.ts", import.meta.url);
 		const file = ts.createSourceFile(path.pathname, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 		const one = <T extends ts.Node>(root: ts.Node, predicate: (node: ts.Node) => node is T): T => {
 			const found: T[] = []; const visit = (node: ts.Node): void => {if (predicate(node)) found.push(node); ts.forEachChild(node, visit);}; visit(root);
 			if (found.length !== 1) throw Error(`HELD_ISSUANCE_SEAM_NOT_UNIQUE:${found.length}`); return found[0]!;
 		};
-		const fn = (name: string) => one(file, (node): node is ts.FunctionDeclaration => ts.isFunctionDeclaration(node) && node.name?.text === name);
+		const functions = new Map<string, ts.FunctionDeclaration>(), variables = new Map<ts.Node, Map<string, string>>();
+		const fn = (name: string) => {
+			let found = functions.get(name);
+			if (found === undefined) functions.set(name, found = one(file, (node): node is ts.FunctionDeclaration => ts.isFunctionDeclaration(node) && node.name?.text === name));
+			return found;
+		};
 		const seal = fn("sealCreatorRecoveryDependencies"), census = fn("readCreatorRecoveryDependencyCensus");
-		const variable = (root: ts.Node, name: string) => one(root, (node): node is ts.VariableDeclaration => ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === name).getText(file);
+		const variable = (root: ts.Node, name: string) => {
+			let byName = variables.get(root); if (byName === undefined) variables.set(root, byName = new Map());
+			let text = byName.get(name);
+			if (text === undefined) byName.set(name, text = one(root, (node): node is ts.VariableDeclaration => ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === name).getText(file));
+			return text;
+		};
 		const factory = one(seal, (node): node is ts.PropertyAssignment => ts.isPropertyAssignment(node) && node.name.getText(file) === "ownIssuanceReservation");
 		const check = one(factory.parent, (node): node is ts.PropertyAssignment => ts.isPropertyAssignment(node) && node.name.getText(file) === "check" && ts.isArrowFunction(node.initializer));
 		return {file, census, fn, variable, factory: factory.getText(file), check: check.getText(file)};
@@ -7396,17 +7435,34 @@ describe("ordinary runtime-only nominal custody affected controls", () => {
 		borrowCurrentNativeReservation?(owner: "ahe" | "journal" | "floor"): Promise<Native | undefined>;
 		acquireNativeIssuanceReservation(): Promise<Native>; release(): Promise<void>};
 	function gate() {let resolve!: () => void; const promise = new Promise<void>(done => {resolve = done;}); return {promise, resolve};}
-	function fixture(received = false, epoch = 3) {
-		const path = new URL("../src/v3-live.ts", import.meta.url), file = ts.createSourceFile(path.pathname, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-		const kernelPath = new URL("../src/internal/runtime-reclamation.ts", import.meta.url), kernelFile = ts.createSourceFile(kernelPath.pathname,
-			readFileSync(kernelPath, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-		const rollbackPath = new URL("../src/internal/creator-closed-rollback-data.ts", import.meta.url), rollbackFile = ts.createSourceFile(rollbackPath.pathname,
-			readFileSync(rollbackPath, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+	// The extracted helper text is a pure function of the three source files, so it
+	// is parsed and extracted once per describe. fixture() still builds fresh state,
+	// registration, registries and execute() bindings for every case.
+	let helperCache: {live: string; rollback: string; kernel: string} | undefined;
+	function helpers() {
+		if (helperCache !== undefined) return helperCache;
+		const parse = (relative: string) => {
+			const path = new URL(relative, import.meta.url);
+			return ts.createSourceFile(path.pathname, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+		};
+		const file = parse("../src/v3-live.ts"), kernelFile = parse("../src/internal/runtime-reclamation.ts");
+		const rollbackFile = parse("../src/internal/creator-closed-rollback-data.ts");
 		const extract = (input: ts.SourceFile, name: string) => {
 			const matches = input.statements.filter((node): node is ts.FunctionDeclaration => ts.isFunctionDeclaration(node) && node.name?.text === name);
 			if (matches.length !== 1) throw Error(`ORDINARY_RUNTIME_HELPER:${name}:${matches.length}`);
 			return matches[0]!.getText(input).replace(/^export /, "");
 		};
+		return helperCache = {
+			live: ["currentRegistration", "sameScope", "creatorOriginalIssuanceStore", "nativeBranchDisplacedSource", "receivedAppendFacts",
+				"fullRecoveryCloseHoldFacts", "captureCreatorRecoveryRuntime", "creatorOrdinaryIssuanceRetainedSourceBindings", "creatorOrdinaryIssuanceSourceIdentity", "sealCreatorOrdinaryIssuanceRuntime", "resolveOrdinaryIssuanceRuntimeHold",
+				"resolveRecoveryCloseHold", "prospectiveAppendCandidate"].map(name => extract(file, name)).join("\n"),
+			rollback: extract(rollbackFile, "creatorOrdinaryIssuanceProofFacts"),
+			kernel: ["installV3RuntimeReclamationKernel", "resolveCreatorOrdinaryIssuanceRuntimeHold", "resolveCreatorSnapshotRecoveryCloseHold",
+				"installCreatorCloseRuntimeRelease", "borrowCreatorCloseSigningDependencies"].map(name => extract(kernelFile, name)).join("\n"),
+		};
+	}
+	function fixture(received = false, epoch = 3) {
+		const source = helpers();
 		const state: {member: boolean; signingAcquire?: () => Promise<void>; signingRelease?: () => Promise<void>;
 			nativeAcquire?: () => Promise<void>; nativeRelease?: () => Promise<void>; currentBorrow?: () => Promise<void>} = {member: true};
 		const calls = {signingAcquires: 0, signingChecks: 0, signingReleases: 0, nativeAcquires: 0, nativeChecks: 0, nativeReleases: 0, currentBorrows: 0,
@@ -7444,12 +7500,9 @@ describe("ordinary runtime-only nominal custody affected controls", () => {
 			fullFacts(value: object): unknown; proofFacts(value: object): unknown;
 			prospective(registration: any, bytes: Uint8Array, hold: object): unknown}>(`
 			let runtimeKernel, creatorCloseReleaseOwner;
-			${["currentRegistration", "sameScope", "creatorOriginalIssuanceStore", "nativeBranchDisplacedSource", "receivedAppendFacts",
-				"fullRecoveryCloseHoldFacts", "captureCreatorRecoveryRuntime", "creatorOrdinaryIssuanceRetainedSourceBindings", "creatorOrdinaryIssuanceSourceIdentity", "sealCreatorOrdinaryIssuanceRuntime", "resolveOrdinaryIssuanceRuntimeHold",
-				"resolveRecoveryCloseHold", "prospectiveAppendCandidate"].map(name => extract(file, name)).join("\n")}
-			${extract(rollbackFile, "creatorOrdinaryIssuanceProofFacts")}
-			${["installV3RuntimeReclamationKernel", "resolveCreatorOrdinaryIssuanceRuntimeHold", "resolveCreatorSnapshotRecoveryCloseHold",
-				"installCreatorCloseRuntimeRelease", "borrowCreatorCloseSigningDependencies"].map(name => extract(kernelFile, name)).join("\n")}
+			${source.live}
+			${source.rollback}
+			${source.kernel}
 			const owner = Object.assign(async () => {throw Error("UNEXPECTED_RECLAMATION");}, {resolveRecoveryCloseHold, resolveOrdinaryIssuanceRuntimeHold});
 			if (!installV3RuntimeReclamationKernel(owner) || installV3RuntimeReclamationKernel(owner)) throw Error("ORDINARY_RUNTIME_KERNEL_NOT_SINGLE");
 			if (!installCreatorCloseRuntimeRelease(Object.assign(() => undefined, {borrowSigningDependencies: controlledSigningBorrow}))) throw Error("ORDINARY_SIGNING_KERNEL_MISSING");

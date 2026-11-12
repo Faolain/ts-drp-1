@@ -13261,15 +13261,23 @@ function creatorOrdinaryFutureNativeResourceForSizing(facts: Readonly<{current: 
 	capacity: ReturnType<typeof creatorOrdinaryResourceNativeCapacityForSizing>, successorFenceFrameByteLength: number) {
 	const phases = facts.current.successorFenceCount === 0 ? ["ordinaryFinal" as const] :
 		["ordinaryFinal", "successorPending", "successorFinal"] as const;
-	const rows = Object.freeze({byteLength: Math.max(...phases.map(phase => capacity.issuance[phase].canonicalRowsBytes)),
-		items: Math.max(...phases.map(phase => capacity.issuance.canonicalRowsShape[phase].items)),
-		maxDepth: Math.max(...phases.map(phase => capacity.issuance.canonicalRowsShape[phase].maxDepth))});
+	const rowsOver = (selected: readonly ("ordinaryFinal" | "successorPending" | "successorFinal")[]) => Object.freeze({
+		byteLength: Math.max(...selected.map(phase => capacity.issuance[phase].canonicalRowsBytes)),
+		items: Math.max(...selected.map(phase => capacity.issuance.canonicalRowsShape[phase].items)),
+		maxDepth: Math.max(...selected.map(phase => capacity.issuance.canonicalRowsShape[phase].maxDepth))});
+	const rows = rowsOver(phases);
+	// The exact composer bounds the issuance census point image by the AHE union
+	// limit only with FINAL rows: ordinaryFinal before the close and successorFinal
+	// after it (its old/prepared/completed controls and its pre-close candidate
+	// image). Pending successor rows enter only the successor jobs' runtime census,
+	// whose bound is the proof envelope; `rows` above still covers that census.
+	const unionRows = rowsOver(facts.current.successorFenceCount === 0 ? ["ordinaryFinal"] : ["ordinaryFinal", "successorFinal"]);
 	const bytes = (length: number) => canonicalBytesResourceForSizing(length,
 		{maxBytes: CREATOR_MAINTENANCE_PROOF_MAX_BYTES, maxItems: 65_536, maxDepth: 128}).byteLength;
 	const futureLeaf = facts.current.successorFenceCount === 0 ? 0 : maintenanceWidthSum([
 		bytes(capacity.fencePreimage), bytes(64), bytes(32), successorFenceFrameByteLength,
 	], "ordinary-settlement-leaf");
-	return Object.freeze({rows, futureLeaf});
+	return Object.freeze({rows, unionRows, futureLeaf});
 }
 
 /** A resumed close/serial source charges reconstructed RAW rows/native controls,
@@ -13440,7 +13448,7 @@ function deriveCreatorOrdinarySourceResourceProgramForSizing(profile: CreatorOrd
 			{receivedPreimages, preimage, fencePreimage, runtimeWidths, issuance}, journal.successorFenceFrameByteLength);
 		parameters.set("settlement.futureLeaf", futureNative.futureLeaf);
 		parameters.set("settlement.fencePreimage", fencePreimage);
-		setResource("journal.rows", journal.canonicalRows); setResource("native.rows", futureNative.rows);
+		setResource("journal.rows", journal.canonicalRows); setResource("native.rows", futureNative.rows); setResource("native.unionRows", futureNative.unionRows);
 		parameters.set("journal.rawSupplement", creatorOrdinaryJournalRawSupplementForSizing(capture.journal, source.knownProtectedMaterial));
 		setResource("native.image", Object.freeze({byteLength: issuance.nativeImageByteLength, ...issuance.nativeImageShape}));
 		for (const phase of ["currentClose", "successorReserved", "successorEntered", "successorFinal"] as const) {
@@ -13728,7 +13736,7 @@ function prepareCreatorOrdinaryFinishingWindowForSizing(input: Readonly<{
 			parameters.set("journal.scopes", journal.scopeCount); parameters.set("journal.successor.count", fence);
 			parameters.set("journal.successor.frame", journal.successorFenceFrameByteLength);
 			parameters.set("journal.rawSupplement", creatorOrdinaryJournalRawSupplementForSizing(capture.journal, source.knownProtectedMaterial));
-			setResource("journal.rows", journal.canonicalRows); setResource("native.rows", futureNative.rows);
+			setResource("journal.rows", journal.canonicalRows); setResource("native.rows", futureNative.rows); setResource("native.unionRows", futureNative.unionRows);
 			setResource("native.image", {byteLength: issuance.nativeImageByteLength, ...issuance.nativeImageShape});
 			for (const phase of ["currentClose", "successorReserved", "successorEntered", "successorFinal"] as const) {
 				parameters.set(`runtime.${phase}.bytes`, runtimeWidths[phase]);
@@ -13980,7 +13988,7 @@ function creatorOrdinarySuffixCapacityForSizing(facts: CreatorOrdinaryResourceDi
 		setResource("journal.headerDrain", headerDrain.descriptors);
 		parameters.set("journal.rowCount", journal.rowCount); parameters.set("journal.rawBytes", journal.canonicalRowByteLengthsTotal);
 		parameters.set("journal.scopes", journal.scopeCount); parameters.set("journal.successor.frame", journal.successorFenceFrameByteLength);
-		setResource("journal.rows", journal.canonicalRows); setResource("native.rows", futureNative.rows);
+		setResource("journal.rows", journal.canonicalRows); setResource("native.rows", futureNative.rows); setResource("native.unionRows", futureNative.unionRows);
 		parameters.set("journal.rawSupplement", creatorOrdinaryJournalRawSupplementForSizing(capture.journal, source.knownProtectedMaterial));
 		setResource("native.image", Object.freeze({byteLength: issuance.nativeImageByteLength, ...issuance.nativeImageShape}));
 		parameters.set("settlement.futureLeaf", futureNative.futureLeaf); parameters.set("settlement.fencePreimage", fencePreimage);
@@ -14620,12 +14628,19 @@ function buildCreatorOrdinaryFinishingResourceProgramForSizing(input: Readonly<{
 		const nativeRows = inputResource("native.rows", futureNative.rows);
 		const nativeImage = inputResource("native.image", Object.freeze({byteLength: issuance.nativeImageByteLength, ...issuance.nativeImageShape}));
 		const census = record({rows: nativeRows, image: nativeImage, control: participantBounds[2]});
-		// The exact composer observes this same issuance census (rows, image and a
-		// control holding both completed and active preparations) as one native
-		// point image under the AHE union bound. The reservation keeps that bound;
-		// a miss falls back to the exact composer rather than admitting past it.
-		if (census.byteLength > AHE_BOUNDED_READ_LIMITS.maxUnionBytes) return undefined;
-		compiler?.limit(compiler.references(census).byteLength, AHE_BOUNDED_READ_LIMITS.maxUnionBytes, 1);
+		// The exact composer observes the issuance census (FINAL rows, image and
+		// each of the old/prepared/completed controls, which this control bound
+		// covers) as one native point image under the AHE union bound. The
+		// reservation keeps that bound over the FINAL-row census; a miss falls back
+		// to the exact composer rather than admitting past it. The complete census
+		// above, with pending successor rows, stays in every successor job census.
+		const unionCensus = record({rows: inputResource("native.unionRows", futureNative.unionRows), image: nativeImage,
+			control: participantBounds[2]});
+		if (unionCensus.byteLength > AHE_BOUNDED_READ_LIMITS.maxUnionBytes) return undefined;
+		compiler?.limit(compiler.references(unionCensus).byteLength, AHE_BOUNDED_READ_LIMITS.maxUnionBytes, 1);
+		// Successor reserved/entered phases hold PENDING successor rows; currentClose
+		// and successorFinal hold FINAL rows (the exact composer's post-adoption census).
+		const phaseCensus = (phase: string) => phase === "successorReserved" || phase === "successorEntered" ? census : unionCensus;
 		const runtimeEnvelopeTerms = ["currentClose", "successorReserved", "successorEntered", "successorFinal"].map(key => {
 			const phase = key as keyof typeof runtimeWidths.runtimeCensusOverheadShape, shape = runtimeWidths.runtimeCensusOverheadShape[phase];
 			if (shape.items + census.items > 65_536 || Math.max(shape.maxDepth, 1 + census.maxDepth) > 128)
@@ -14633,11 +14648,17 @@ function buildCreatorOrdinaryFinishingResourceProgramForSizing(input: Readonly<{
 			if (compiler !== undefined) {
 				compiler.limit(compiler.sum(inputNumber(`runtime.${phase}.items`, shape.items), compiler.references(census).items), 65_536);
 				compiler.limit(compiler.maximum(inputNumber(`runtime.${phase}.depth`, shape.maxDepth), compiler.sum(1, compiler.references(census).maxDepth)), 128);
-				return compiler.sum(inputNumber(`runtime.${phase}.bytes`, runtimeWidths[phase]), width(census));
+				return compiler.sum(inputNumber(`runtime.${phase}.bytes`, runtimeWidths[phase]), width(phaseCensus(phase)));
 			}
-			return sum(runtimeWidths[phase], census.byteLength);
+			return sum(runtimeWidths[phase], phaseCensus(phase).byteLength);
 		});
-		const runtimeEnvelopeTerm = compiler?.maximum(...runtimeEnvelopeTerms) ?? Math.max(...runtimeEnvelopeTerms.map(value => typeof value === "number" ? value : value.value));
+		// Close/adopt, turnover and serial lifetimes carry the exact composer's
+		// post-adoption census: the currentClose or successorFinal runtime with the
+		// FINAL-row census. Successor reserved/entered censuses (pending rows) are
+		// charged in their own successor job lifetimes below, as the exact composer
+		// charges them in its separate successor job envelopes.
+		const finalRuntimeTerms = [runtimeEnvelopeTerms[0]!, runtimeEnvelopeTerms[3]!];
+		const runtimeEnvelopeTerm = compiler?.maximum(...finalRuntimeTerms) ?? Math.max(...finalRuntimeTerms.map(value => typeof value === "number" ? value : value.value));
 		const runtimeEnvelope = typeof runtimeEnvelopeTerm === "number" ? runtimeEnvelopeTerm : runtimeEnvelopeTerm.value;
 		const snapshotImage = record({imageDigest: digest, scopeCount: integer, chunkCount: integer, metadataBytes: integer, scopes: snapshotPairs});
 		const snapshotWrapper = record({control: participantBounds[0], image: snapshotImage});

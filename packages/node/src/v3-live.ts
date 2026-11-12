@@ -641,6 +641,12 @@ export interface V3PlaneHandle {
 		  }
 		| undefined;
 	issueLocal(input: V3LocalIssueInput): Promise<V3LocalIssueResult>;
+	/**
+	 * The room's own settlement drain (its author fence at adoption or install, a replacement): the
+	 * same issue as issueLocal, admitted through the settlement lane that received rows and caller
+	 * moves never consume, so a mandatory fence is never refused for input capacity.
+	 */
+	issueSettlementLocal?(input: V3LocalIssueInput): Promise<V3LocalIssueResult>;
 	authorizeSettlementSourceSelection?(
 		input: V3SettlementSourceSelectionRequest &
 			Readonly<{
@@ -3344,6 +3350,10 @@ interface V3PlaneRegistration {
 	admittedInputJobs: number;
 	/** Exact encoded private local/replacement operations held by those jobs. */
 	admittedInputBytes: number;
+	/** Entered plus queued settlement-drain jobs (own fence, replacement, frontier resolution): their own lane. */
+	admittedSettlementJobs: number;
+	/** Exact encoded operations held by those settlement jobs, bounded by settlementLaneBytes. */
+	admittedSettlementBytes: number;
 	/** Caller-requested dependency/source reads; not mandatory transition control. */
 	admittedReadControlJobs: number;
 	/** Fresh caller-requested publication turns, retained through native join. */
@@ -5333,12 +5343,13 @@ function releaseOrdinaryIssuanceRuntimeHold(value: unknown): Promise<void> {
  * Observation only (tests): how much native settlement work this process has done. Counts of
  * charged dependency turns (withActiveRebaseDependencies), complete recovery census reads
  * (readCreatorRecoveryDependencyCensus), retained source contract preparations
- * (prepareCreatorRetainedSourceContracts), local-author expiry receipts signed and own-fence outbox
- * scans (scanOwnFences). Monotonic
+ * (prepareCreatorRetainedSourceContracts), local-author expiry receipts signed, own-fence outbox
+ * scans (scanOwnFences) and the own fence rows those scans authenticate (ownFenceAuthentications: one
+ * registered-digest Ed25519 check each, through the exact-bytes verify memo). Monotonic
  * process-wide scalars; never authority, never reset by the runtime.
  */
 const v3SettlementWorkCounts = {dependencyTurns: 0, recoveryCensusReads: 0, retainedContractPreparations: 0, sourceExpirySignatures: 0,
-	ownFenceScans: 0};
+	ownFenceScans: 0, ownFenceAuthentications: 0};
 export function readV3SettlementWorkCounts(): Readonly<typeof v3SettlementWorkCounts> {
 	return ObjectFreeze({...v3SettlementWorkCounts});
 }
@@ -5375,6 +5386,7 @@ export function readV3RuntimeOwnerCensus(plane: V3PlaneHandle): Readonly<Record<
 		terminalPublicationInputBytes: registration.terminalPublicationInputBytes,
 		admittedInputJobs: registration.admittedInputJobs,
 		admittedInputBytes: registration.admittedInputBytes,
+		admittedSettlementJobs: registration.admittedSettlementJobs,
 		admittedReadControlJobs: registration.admittedReadControlJobs,
 		admittedPendingPublicationJobs: registration.admittedPendingPublicationJobs,
 		admittedEgressControlJobs: registration.admittedEgressControlJobs,
@@ -8458,6 +8470,29 @@ async function handleV3IngressWithSource(
 				!sameBytes(encodeCanonical(custodyImage.controlBytes), encodeCanonical(maintenanceImage.controlBytes))))
 			throw new TypeError("received journal contexts disagree");
 		const expectedNativeImage = custodyImage ?? maintenanceImage;
+		// A same-epoch recovery revoked this plane after the job's currency check (the custody path
+		// awaits its journal reads in between): an append now could land after the successor rebuilt
+		// from the journal, leaving the row in no index. The carry takes it instead. Both journals open
+		// their write transaction synchronously inside appendAccepted, so an append already called is
+		// ordered before the successor's later journal read. The creator's received append is gated
+		// by its close actor's maintenance admission, which the recovery joins before it rebuilds.
+		if (
+			!alreadyAccepted &&
+			maintenanceAdmission === undefined &&
+			!currentRegistration(registration) &&
+			pendingIngressCarries.has(registration)
+		) {
+			releaseOperationReservation(reservation);
+			collectLateIngress(
+				registration,
+				V3Envelope.encode({
+					canonicalPreimage: new Uint8ArrayConstructor(evidence.exactCanonicalPreimageBytes),
+					signature: new Uint8ArrayConstructor(evidence.signature),
+				}).finish(),
+				evidence.transportSender
+			);
+			return false;
+		}
 		appended = await registration.liveJournalStore.appendAccepted({
 			detachedSignature: new Uint8ArrayConstructor(evidence.signature),
 			exactCanonicalPreimageBytes: new Uint8ArrayConstructor(evidence.exactCanonicalPreimageBytes),
@@ -8707,6 +8742,30 @@ async function authenticateV3Ingress(registration: V3PlaneRegistration, captured
 // Keep mandatory control/maintenance schedulable so a full input pool cannot
 // prevent a terminal barrier or recovery operation from joining.
 const MAX_ADMITTED_INPUT_JOBS = 32;
+// The room's own settlement drain (an author's mandatory fence at adoption or install, its
+// replacements and frontier resolutions) is admitted through its own lane: received rows and caller
+// moves keep their MAX_ADMITTED_INPUT_JOBS bound and byte account and never consume this one, so a
+// full input pool at a roll cannot refuse the fence that completes it.
+// Jobs: the room's drain awaits every settlement issue (one in flight), plus one overlapping
+// recovery re-issue of the same drain step (v3-room issueSettlement's recovered-source retry).
+const MAX_ADMITTED_SETTLEMENT_JOBS = 2;
+/**
+ * The settlement lane's own captured-bytes share. A fence captures one AUTHOR_FENCE operation and a
+ * frontier resolution only selectors; the widest single settlement issue is a replacement, whose
+ * operations are one displaced source's: one vertex, whose byte charge is bounded by the epoch's
+ * parameters.maxEpochBytes (the per-vertex limit: nextEpochBytes / byteCharge > maxEpochBytes), and
+ * which was itself admitted once through the input account (<= maxPendingBytes). So every legal
+ * settlement issue fits min(maxEpochBytes, maxPendingBytes), and the share admits the lane's two jobs
+ * at that width: a mandatory replacement is never refused for bytes (no retry livelock).
+ * Per-plane captured input bound: input account maxPendingBytes + this share
+ * (<= min(maxPendingBytes, 2 x maxEpochBytes)) + the gossip queue's maxPendingBytes; read-control and
+ * egress lanes capture no bytes. Grid zone (maxEpochBytes 8 MiB, maxPendingBytes 16 MiB): 48 MiB.
+ * @param parameters - The plane's registered parameters.
+ * @returns The lane's byte share.
+ */
+function settlementLaneBytes(parameters: Readonly<{ maxEpochBytes: number; maxPendingBytes: number }>): number {
+	return Math.min(parameters.maxPendingBytes, MAX_ADMITTED_SETTLEMENT_JOBS * parameters.maxEpochBytes);
+}
 const MAX_ADMITTED_READ_CONTROL_JOBS = 32;
 // Explicit local admission policy; no payload is captured by publishPending.
 // Durable row/proof bytes remain charged by their original native owners.
@@ -8760,7 +8819,7 @@ function enqueueRegistrationTask<Result>(
 	registration: V3PlaneRegistration,
 	capture: (custody?: InputCaptureCustody) => (() => Promise<Result>) | Readonly<{ join: Promise<Result> }>,
 	inputAdmission?: Readonly<{
-		pool?: "input" | "read-control" | "pending-publication" | "egress-control";
+		pool?: "input" | "settlement" | "read-control" | "pending-publication" | "egress-control";
 		refuse(): Result;
 		refuseCapture?(capacity: "byte" | "entry"): Result;
 		barrier?: Promise<void>;
@@ -8774,7 +8833,13 @@ function enqueueRegistrationTask<Result>(
 				? "admittedEgressControlJobs"
 				: inputAdmission?.pool === "pending-publication"
 					? "admittedPendingPublicationJobs"
-					: "admittedInputJobs";
+					: inputAdmission?.pool === "settlement"
+						? "admittedSettlementJobs"
+						: "admittedInputJobs";
+	const bytes = inputAdmission?.pool === "settlement" ? "admittedSettlementBytes" : "admittedInputBytes";
+	const byteLimit = inputAdmission?.pool === "settlement"
+		? settlementLaneBytes(registration.payload.parameters)
+		: registration.payload.parameters.maxPendingBytes;
 	const limit =
 		inputAdmission?.pool === "read-control"
 			? MAX_ADMITTED_READ_CONTROL_JOBS
@@ -8782,7 +8847,9 @@ function enqueueRegistrationTask<Result>(
 				? MAX_ADMITTED_EGRESS_CONTROL_JOBS
 				: inputAdmission?.pool === "pending-publication"
 					? MAX_ADMITTED_PENDING_PUBLICATION_JOBS
-					: MAX_ADMITTED_INPUT_JOBS;
+					: inputAdmission?.pool === "settlement"
+						? MAX_ADMITTED_SETTLEMENT_JOBS
+						: MAX_ADMITTED_INPUT_JOBS;
 	const egressOwner = inputAdmission?.pool === "egress-control" ? egressAdmissionOwner(registration) : undefined;
 	if (inputAdmission !== undefined) {
 		if ((egressOwner?.jobs ?? registration[counter]) >= limit) {
@@ -8804,7 +8871,7 @@ function enqueueRegistrationTask<Result>(
 			inputReservationReleased = true;
 			registration[counter]--;
 			if (egressOwner !== undefined) releaseEgressAdmission(registration, egressOwner);
-			registration.admittedInputBytes -= capturedBytes;
+			registration[bytes] -= capturedBytes;
 			if (counter === "admittedInputJobs" && registration.deliveryRepair?.wake === true)
 				noteDeliveryCapacity(registration);
 		};
@@ -8813,13 +8880,13 @@ function enqueueRegistrationTask<Result>(
 				? undefined
 				: {
 						entryLimit: registration.payload.parameters.maxPendingEntries,
-						remainingBytes: () => registration.payload.parameters.maxPendingBytes - registration.admittedInputBytes,
-						chargeBytes: (bytes): void => {
+						remainingBytes: () => byteLimit - registration[bytes],
+						chargeBytes: (charge): void => {
 							// Canonical caller inspection may reenter; use current remaining credit.
-							if (bytes > registration.payload.parameters.maxPendingBytes - registration.admittedInputBytes)
+							if (charge > byteLimit - registration[bytes])
 								throw new InputCaptureCapacityError("byte");
-							registration.admittedInputBytes += bytes;
-							capturedBytes += bytes;
+							registration[bytes] += charge;
+							capturedBytes += charge;
 						},
 					};
 		if (inputAdmission?.captureBeforeBarrier === true) {
@@ -9029,8 +9096,9 @@ interface PendingIngressCarry {
 	readonly refused: string[];
 	successor: V3PlaneRegistration | undefined;
 	refusing: boolean;
-	// The successor's re-offers, one ingress job at a time.
+	// The successor's re-offers past the direct share, one ingress job at a time.
 	reoffers: Promise<void>;
+	chained: number;
 }
 
 // Ingress jobs each plane has admitted to its FIFO and not yet settled.
@@ -9107,9 +9175,11 @@ function refuseCarriedRow(predecessor: V3PlaneRegistration, sender: string): voi
 	if (current !== undefined && currentRegistration(current)) noteDeliveryRefusal(current, sender);
 }
 
-// One re-offer at a time through the successor's ordinary ingress: a carry larger than the input
-// pool would otherwise be refused at it. A row whose successor is no longer the carry's plane when
-// its turn comes is refused and named to repair.
+// Carried rows enter the successor's FIFO at once, in order, ahead of later arrivals (their children
+// would otherwise be held and ask repair for a parent the carry is bringing), while the successor's
+// input pool is under half full; past that, one at a time behind each other, so a carry larger than
+// the pool is not refused at it and arrivals keep their share. A row whose successor is no longer the
+// carry's plane when its turn comes is refused and named to repair.
 function reofferCarriedRow(
 	predecessor: V3PlaneRegistration,
 	carry: PendingIngressCarry,
@@ -9117,12 +9187,24 @@ function reofferCarriedRow(
 	row: CarriedV3Row
 ): void {
 	const plane: CarryPlane = { objectId: carry.objectId, epoch: carry.epoch, anchorDigest: carry.anchorDigest };
-	carry.reoffers = carry.reoffers.then(async (): Promise<void> => {
-		if (!sameCarryPlane(plane, successor)) return refuseCarriedRow(predecessor, row.sender);
-		await enqueueCapturedV3Ingress(successor, "retained", row.sender, (custody) => {
-			custody.chargeBytes(row.exactWireBytes.byteLength);
-			return ObjectFreeze({ exactWireBytes: row.exactWireBytes, sender: row.sender, transport: "retained" as const });
-		}).catch(() => ingressFailureLog("admission-rejected"));
+	const reoffer = (): Promise<void> =>
+		sameCarryPlane(plane, successor)
+			? enqueueCapturedV3Ingress(successor, "retained", row.sender, (custody) => {
+					custody.chargeBytes(row.exactWireBytes.byteLength);
+					return ObjectFreeze({
+						exactWireBytes: row.exactWireBytes,
+						sender: row.sender,
+						transport: "retained" as const,
+					});
+				}).catch(() => ingressFailureLog("admission-rejected"))
+			: Promise.resolve(refuseCarriedRow(predecessor, row.sender));
+	if (carry.chained === 0 && successor.admittedInputJobs < MAX_ADMITTED_INPUT_JOBS / 2) {
+		void reoffer();
+		return;
+	}
+	carry.chained += 1;
+	carry.reoffers = carry.reoffers.then(reoffer).finally(() => {
+		carry.chained -= 1;
 	});
 }
 
@@ -9203,6 +9285,7 @@ export function carryV3PendingIngress(plane: V3PlaneHandle): V3CarriedPendingIng
 		successor: undefined,
 		refusing: false,
 		reoffers: Promise.resolve(),
+		chained: 0,
 	};
 	for (const pending of registration.pendingIngress.values()) {
 		const exactWireBytes = V3Envelope.encode({
@@ -9585,7 +9668,7 @@ interface CreatorRetainedSourceRow {
 	readonly expiry?: SettlementSourceContext;
 }
 
-interface SettlementFrontierContext {
+export interface SettlementFrontierContext {
 	readonly admissionEpoch: number;
 	readonly currentEpoch: number;
 	readonly terminalThrough: number | null;
@@ -13937,8 +14020,59 @@ function createOwnEpochFenceReader(): OwnEpochFenceReader {
 	};
 }
 
-/** The own fence scan of ownEpochFences, with the highest own fence row (any epoch) and its epoch. */
-async function scanOwnFences(store: DurableIssuanceStore, scope: DurableIssueScope):
+/**
+ * A stored own fence row that does not authenticate as this author's own signed vertex (G5: durable
+ * store bytes are carriers, not authenticity). Closed reasons: "signature" (the exact preimage does not
+ * verify under the author's key, or is not a well-formed fence vertex), "digest" (the stored digest is
+ * not the preimage's registered digest) and "identity" (the preimage names another object, author or
+ * sequence than the row it is stored as). Terminal for the scan: no settlement decision is made on it.
+ */
+export class V3OwnFenceUnauthenticated extends TypeError {
+	readonly code = "V3_OWN_FENCE_UNAUTHENTICATED";
+	constructor(
+		readonly author: string,
+		readonly authorSequence: number,
+		readonly reason: "signature" | "digest" | "identity"
+	) {
+		super(`V3_OWN_FENCE_UNAUTHENTICATED: own fence row ${authorSequence} does not authenticate (${reason})`);
+		this.name = "V3OwnFenceUnauthenticated";
+	}
+}
+
+/**
+ * Authenticates one stored own fence row before the scan reports it: its exact preimage verifies under
+ * the author's own key (verifyReceivedVertex: registered digest, Ed25519 through the exact-bytes verify
+ * memo, well-formed fence operation), the stored digest is that registered digest, and the preimage
+ * names the row's own object, author and sequence. Authenticity only: whether the fence was admitted is
+ * the creator's frontier's to say.
+ * @param row - The shape-checked outbox row.
+ * @param preimage - Its decoded preimage.
+ * @param scope - The author's own scope.
+ */
+function authenticateOwnFenceRow(row: SnapshottedOutboxRow, preimage: Readonly<Record<string, unknown>>,
+	scope: DurableIssueScope): void {
+	v3SettlementWorkCounts.ownFenceAuthentications += 1;
+	if (preimage.objectId !== scope.objectId || preimage.author !== scope.author || preimage.authorSequence !== row.authorSequence)
+		throw new V3OwnFenceUnauthenticated(scope.author, row.authorSequence, "identity");
+	const anchor = preimage.anchor;
+	const key = publicKeyBytes(scope.author);
+	const verified = typeof anchor !== "string" || key === undefined || typeof V3_VERTEX_SUITE_ID !== "string" ? undefined :
+		verifyReceivedVertex({domain: V3_VERTEX_DOMAIN, expectedAnchor: anchor, receivedCanonicalPreimageBytes: row.canonicalPreimageBytes,
+			signature: row.signature, suiteId: V3_VERTEX_SUITE_ID,
+			resolveAuthorPublicKey: candidate => candidate === scope.author ? ObjectFreeze({bytes: key, format: "raw" as const}) : undefined});
+	if (verified?.accepted !== true || verified.digest === undefined)
+		throw new V3OwnFenceUnauthenticated(scope.author, row.authorSequence, "signature");
+	if (!sameBytes(verified.digest, row.digest)) throw new V3OwnFenceUnauthenticated(scope.author, row.authorSequence, "digest");
+}
+
+/**
+ * The own fence scan of ownEpochFences, with the highest own fence row (any epoch) and its epoch. Every
+ * fence row it reports is authenticated first (authenticateOwnFenceRow); one that does not authenticate
+ * ends the scan with V3OwnFenceUnauthenticated, so no guard, expiry, hand-back, frontier resolution or
+ * pruning decision rests on unauthenticated store bytes, whatever the caller or call order.
+ * Internal: exported for the native authentication tests.
+ */
+export async function scanOwnFences(store: DurableIssuanceStore, scope: DurableIssueScope):
 	Promise<Readonly<{ lowest: ReadonlyMap<number, number>; highest: number | undefined; highestEpoch: number | undefined }>> {
 	v3SettlementWorkCounts.ownFenceScans += 1;
 	const fences = new Map<number, number>();
@@ -13959,9 +14093,10 @@ async function scanOwnFences(store: DurableIssuanceStore, scope: DurableIssueSco
 			const preimage = decodeCanonical(row.canonicalPreimageBytes) as Record<string, unknown>;
 			const operation = preimage.operation;
 			const epoch = preimage.epoch;
+			const fenceRow = isObject(operation) && Reflect.get(operation, "action") === AUTHOR_FENCE_ACTION;
+			if (fenceRow) authenticateOwnFenceRow(row, preimage, scope);
 			// Any own fence row (whatever its fenceSequence) bounds what contiguity can prove.
-			if (isObject(operation) && Reflect.get(operation, "action") === AUTHOR_FENCE_ACTION &&
-				(highest === undefined || row.authorSequence > highest)) {
+			if (fenceRow && (highest === undefined || row.authorSequence > highest)) {
 				highest = row.authorSequence;
 				highestEpoch = typeof epoch === "number" && NumberIsSafeInteger(epoch) ? epoch : undefined;
 			}
@@ -14019,6 +14154,44 @@ async function frontierRetainedResolution(registration: V3PlaneRegistration, sou
 		sourceEpoch >= frontier.admissionEpoch && (fences.highest === undefined || fences.highest < sourceSequence ||
 			(fences.highest <= frontier.terminalThrough && fences.highestEpoch === sourceEpoch))) return "committed";
 	return undefined;
+}
+
+/**
+ * Why the creator's frontier proves nothing about a retained own row (frontierRetainedResolution
+ * returned undefined), and whether a later frontier still could.
+ * - "awaiting-frontier": no valid frontier for this author is installed, or the row's epoch is not
+ *   closed in it. A later install's frontier may prove the row, so the author fence stays withheld
+ *   (a fence admitted first would carry terminalThrough past the row and leave it unprovable).
+ * - "never": no frontier can ever prove it. An earlier incarnation's row (its epoch is before the
+ *   author's admission epoch, which only grows); a row within terminalThrough that an own fence of a
+ *   later epoch follows (terminalThrough and the author's fences only grow); or a displaced row no own
+ *   fence of its epoch precedes and that is not the lowest unsettled sequence (its epoch is closed, so
+ *   no fence of it can be signed now, and terminalThrough reaches it only through a later own fence).
+ *   A fence cannot make such a row less provable, so it does not withhold the author fence: it stays
+ *   manual-review for the user either way.
+ * - "provable": displaced and fence-guarded, so the frontier does prove it (never admitted), but its
+ *   resolution did not happen in this drain (for example, no hand-back record was free for it).
+ * @param frontier - The installed frontier for this author, if any is valid.
+ * @param sourceEpoch - The retained row's own signed epoch.
+ * @param sourceSequence - The retained row's author sequence.
+ * @param lowestFences - The author's lowest own fence sequence by epoch (scanOwnFences).
+ * @returns The classification.
+ */
+export function retainedRowUnprovenKind(frontier: SettlementFrontierContext | undefined, sourceEpoch: number,
+	sourceSequence: number, lowestFences: ReadonlyMap<number, number>): "awaiting-frontier" | "never" | "provable" {
+	if (frontier === undefined || !NumberIsSafeInteger(sourceEpoch) || sourceEpoch >= frontier.currentEpoch) return "awaiting-frontier";
+	const rowClass = settlementOwnRowClass(sourceEpoch, frontier.currentEpoch, sourceSequence, frontier.admissionEpoch,
+		frontier.terminalThrough);
+	if (rowClass === "displaced")
+		return settlementOwnRowFenceGuarded(lowestFences, sourceEpoch, sourceSequence, frontier.terminalThrough) ? "provable" : "never";
+	return rowClass === "current" ? "awaiting-frontier" : "never";
+}
+
+async function frontierRetainedUnproven(registration: V3PlaneRegistration, sourceSequence: number, sourceEpoch: number,
+	scan: () => ReturnType<typeof scanOwnFences>): Promise<"awaiting-frontier" | "never" | "provable"> {
+	const frontier = settlementFrontierFromHistory(registration.historicalIssuance);
+	const valid = frontier !== undefined && validSettlementFrontierContext(registration.payload, frontier) ? frontier : undefined;
+	return retainedRowUnprovenKind(valid, sourceEpoch, sourceSequence, valid === undefined ? new IntrinsicMap() : (await scan()).lowest);
 }
 
 /** One own-fence scan per rebase snapshot (the scan the settlement window classifies against). */
@@ -16950,7 +17123,8 @@ async function issueLocal(
 
 function enqueueLocalIssue(
 	registration: V3PlaneRegistration,
-	rawInput: V3LocalIssueInput
+	rawInput: V3LocalIssueInput,
+	pool: "input" | "settlement" = "input"
 ): Promise<V3LocalIssueResult> {
 	if (registration.receiveOnly)
 		return Promise.resolve(localIssueFailure("authorization-rejected", "v3 plane is receive-only"));
@@ -16971,6 +17145,7 @@ function enqueueLocalIssue(
 					};
 		},
 		{
+			pool,
 			refuse: () =>
 				localIssueFailure("admission-rejected", "v3 input task capacity exhausted; retry after admitted work joins"),
 			refuseCapture: (capacity) =>
@@ -18144,6 +18319,8 @@ async function readRebaseOutbox(
 				};
 			},
 			{
+				// A replacement is the settlement drain's own work: the settlement lane.
+				pool: "settlement",
 				refuse: () =>
 					localIssueFailure("admission-rejected", "v3 input task capacity exhausted; retry after admitted work joins"),
 				refuseCapture: (capacity) =>
@@ -22951,6 +23128,10 @@ function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
 			registration.receiveOnly || registration.mode === "snapshot-closed"
 				? Promise.resolve(localIssueFailure("not-active", "v3 plane is not accepting local issues"))
 				: enqueueLocalIssue(registration, input),
+		issueSettlementLocal: (input: V3LocalIssueInput): Promise<V3LocalIssueResult> =>
+			registration.receiveOnly || registration.mode === "snapshot-closed"
+				? Promise.resolve(localIssueFailure("not-active", "v3 plane is not accepting local issues"))
+				: enqueueLocalIssue(registration, input, "settlement"),
 		readRebaseOutbox: (): Promise<V3RebaseOutboxResult> =>
 			registration.receiveOnly || registration.mode === "snapshot-closed" || !currentRegistration(registration)
 				? Promise.resolve(
@@ -23216,6 +23397,8 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 				joinedWork: new IntrinsicSet<Promise<void>>(),
 				admittedInputJobs: 0,
 				admittedInputBytes: 0,
+				admittedSettlementJobs: 0,
+				admittedSettlementBytes: 0,
 				admittedReadControlJobs: 0,
 				admittedPendingPublicationJobs: 0,
 				admittedEgressControlJobs: 0,
@@ -24860,6 +25043,11 @@ export interface V3RetainedWorkFrontier {
 	/** Already resolved by a signed local-author expiry receipt. */
 	readonly resolved: boolean;
 	readonly frontier: "committed" | "never-admitted" | undefined;
+	/**
+	 * When the frontier proves nothing (frontier undefined): whether a later frontier still could
+	 * (retainedRowUnprovenKind).
+	 */
+	readonly unproven: "awaiting-frontier" | "never" | "provable" | undefined;
 	readonly operations: readonly Readonly<Record<string, unknown>>[];
 }
 
@@ -24902,9 +25090,11 @@ export async function inspectV3RetainedWorkFrontier(plane: V3PlaneHandle): Promi
 			if (authenticated === undefined || intents === undefined || intents.length === 0) continue;
 			const sourceEpoch = retained.contract.identity.trust.currentEpoch;
 			if (authenticated.vertex.epoch !== sourceEpoch) continue;
+			const frontier = await frontierRetainedResolution(registration, entry.sourceSequence, sourceEpoch, scan);
 			result.push(ObjectFreeze({sourceSequence: entry.sourceSequence, sourceDigest: authenticated.digest,
-				sourceContextDigest: lowerHexDigest(entry.sourceContextDigest)!, sourceEpoch, resolved,
-				frontier: await frontierRetainedResolution(registration, entry.sourceSequence, sourceEpoch, scan),
+				sourceContextDigest: lowerHexDigest(entry.sourceContextDigest)!, sourceEpoch, resolved, frontier,
+				unproven: resolved || frontier !== undefined ? undefined
+					: await frontierRetainedUnproven(registration, entry.sourceSequence, sourceEpoch, scan),
 				operations: ObjectFreeze(intents.map(intent => intent.operation))}));
 		}
 		const after = await read(readInput);
@@ -25336,7 +25526,8 @@ export function resolveV3RetainedWorkFromFrontier(plane: V3PlaneHandle, raw: Rea
 			}
 		};
 	}, {
-		pool: "input",
+		// Only the settlement drain resolves rows from its frontier: the settlement lane.
+		pool: "settlement",
 		refuse: (): never => { throw new TypeError("creator source frontier resolution task capacity exhausted"); },
 		refuseCapture: (): never => { throw new TypeError("creator source frontier resolution input capacity exhausted"); },
 	});

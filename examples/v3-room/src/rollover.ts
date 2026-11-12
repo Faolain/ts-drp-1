@@ -1,4 +1,4 @@
-import { isV3RoomClosePendingRefusal, V3RoomLocalBacklogFull } from "@ts-drp/node/v3-room";
+import { isV3RoomClosePendingRefusal, V3RoomAwaitingAuthorFence, V3RoomLocalBacklogFull } from "@ts-drp/node/v3-room";
 import type { V3RoomAcceptedVertex, V3RoomHandBack, V3RoomSession, V3RoomSettlementStatus } from "@ts-drp/node/v3-room";
 
 /** The adopted successor's offer (the four exact canonical byte strings a member installs). */
@@ -73,9 +73,12 @@ export interface V3RoomRolloverHooks {
  * then; at `window` unsettled epochs the room stops re-offering a move and gives it back, and the
  * policy keeps it (`kept`) until the member's moves reach the creator again.
  * "read-only": the creator is unreachable (hooks.creatorReachable); moves are kept, not issued.
+ * "awaiting-fence": the room refused a move because this epoch's author fence is awaited
+ * (V3RoomAwaitingFence): the member's retained work waits for the creator's frontier of a later
+ * install. Moves are kept and offered again, in order, once the room installs a later epoch.
  */
 export type V3RoomRolloverStatus = Readonly<{
-	state: "ready" | "waiting" | "successor-unavailable" | "not-reaching-host" | "read-only";
+	state: "ready" | "waiting" | "successor-unavailable" | "not-reaching-host" | "awaiting-fence" | "read-only";
 	epoch: number;
 	kept: readonly Readonly<Record<string, unknown>>[];
 	/** A member's own settlement lag (V3RoomSettlementStatus); 0 for a creator or an unknown room. */
@@ -186,6 +189,32 @@ export const V3_ROOM_NOT_REACHING_HOST_MARGIN = 2;
 export const V3_ROOM_MEMBER_SUCCESSOR_WAIT_MS = 30_000;
 /** How often a member with kept moves looks for a later epoch. */
 const KEPT_POLL_MS = 1_000;
+
+/**
+ * A member's new move the room refused because this epoch's author fence is awaited
+ * (V3RoomAwaitingAuthorFence, the `cause`): its retained work waits for the creator's frontier of a
+ * later install, and a move signed now could never be proven never admitted. The room did not accept
+ * the move; this policy keeps it (`status().kept`, state "awaiting-fence") and offers it again, in
+ * order, once the room has installed a later epoch. The app shows it as pending, not lost.
+ */
+export class V3RoomAwaitingFence extends Error {
+	/**
+	 * @param operation - The move kept until a later epoch.
+	 * @param epoch - The epoch whose author fence is awaited.
+	 * @param options - The room's refusal as `cause`.
+	 */
+	constructor(
+		readonly operation: Readonly<Record<string, unknown>>,
+		readonly epoch: number,
+		options?: ErrorOptions
+	) {
+		super(
+			"the room refused this move: this epoch's author fence is awaited; the policy keeps the move and sends it after the next install",
+			options
+		);
+		this.name = "V3RoomAwaitingFence";
+	}
+}
 
 type RolloverRoom = Pick<
 	V3RoomSession,
@@ -368,17 +397,23 @@ export function createV3RoomRolloverPolicy(
 			(settlement !== undefined &&
 				settlement.window > 0 &&
 				settlement.unsettledEpochs >= Math.max(1, settlement.window - V3_ROOM_NOT_REACHING_HOST_MARGIN)));
+	// The epoch in which the room last refused a new move because its author fence was awaited.
+	let awaitingFenceEpoch: number | undefined;
+	const awaitingFence = (): boolean =>
+		role === "member" && awaitingFenceEpoch !== undefined && currentEpoch() <= awaitingFenceEpoch;
 	const status = (): V3RoomRolloverStatus =>
 		Object.freeze({
 			state: readOnly()
 				? "read-only"
 				: notReachingHost()
 					? "not-reaching-host"
-					: kept.length > 0
-						? "successor-unavailable"
-						: successorWaits > 0
-							? "waiting"
-							: "ready",
+					: awaitingFence()
+						? "awaiting-fence"
+						: kept.length > 0
+							? "successor-unavailable"
+							: successorWaits > 0
+								? "waiting"
+								: "ready",
 			epoch: currentEpoch(),
 			kept: Object.freeze([...kept]),
 			unsettledEpochs: role === "member" ? (settlement?.unsettledEpochs ?? 0) : 0,
@@ -678,8 +713,10 @@ export function createV3RoomRolloverPolicy(
 				await selected.issue(operation, handBack === undefined ? undefined : { handBack });
 				handBackOf.delete(operation);
 				// A given-back move's reissue never counted against the bound; only a new move reopens it.
-				if (handBack === undefined && backlogFullEpoch !== undefined) {
+				// Any move, a reissue too, still waits for the author fence (the node refuses it until then).
+				if ((handBack === undefined && backlogFullEpoch !== undefined) || awaitingFenceEpoch !== undefined) {
 					backlogFullEpoch = undefined;
+					awaitingFenceEpoch = undefined;
 					reportStatus();
 				}
 				return;
@@ -693,6 +730,15 @@ export function createV3RoomRolloverPolicy(
 					backlogFullEpoch = attempted;
 					keep(operation, attempted);
 					throw new V3RoomNotReachingHost(operation, attempted, { cause: error });
+				}
+				if (
+					error instanceof V3RoomAwaitingAuthorFence ||
+					(error instanceof Error && error.name === "V3RoomAwaitingAuthorFence")
+				) {
+					// Refused before acceptance: this epoch's author fence is awaited. Keep it for a later epoch.
+					awaitingFenceEpoch = attempted;
+					keep(operation, attempted);
+					throw new V3RoomAwaitingFence(operation, attempted, { cause: error });
 				}
 				if (isV3RoomClosePendingRefusal(error)) {
 					// Not an offer of the move, and no seal: the room retries its interrupted close by itself.
