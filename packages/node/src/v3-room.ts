@@ -566,7 +566,17 @@ export interface V3RoomTransport {
 
 export interface V3RoomApplication<Projection extends V3RoomProjectionAuthority = V3RoomProjectionAuthority> {
 	/** Optional pure, artifact-bound LOCAL planning bound. Undefined retains the
-	 * exact original forecast; this is not shared operation validity/admission. */
+	 * exact original forecast; this is not shared operation validity.
+	 *
+	 * The room's application state limit also reads it: where its incremental projection covers the
+	 * epoch's base (its base quote is within the limit), each node's local admission refuses a move
+	 * whose quoted bound passes the limit, instead of folding the exact state (the creator's refusal
+	 * is the authoritative one; a Writer's is advisory). So the state a room can actually reach near
+	 * its limit is bounded by this bound, not by the exact encoding: a conservative bound (Grid's
+	 * keeps the widest version of each re-placed block) refuses some moves whose exact state would
+	 * fit. A bound must dominate every exact state it covers; one that does not surfaces at the seal
+	 * as APPLICATION_STATE_BOUND_UNSOUND. Where the projection is absent or declines (undefined), the
+	 * room keeps the exact fold. */
 	readonly readOrdinaryApplicationResourceBound?: CreatorOrdinaryApplicationResourceBoundReader;
 	/** Local capacity ceilings, not an acceptance promise. Explicit preparation
 	 * may certify a smaller window; ordinary calls meter that window and refuse
