@@ -110,4 +110,55 @@ describe("accepted source custody numerical reserve", () => {
 		expect(() => issuanceSourceCustodyPlanResourceForSizing(scope, null, 1,
 			{...geometry, maxNativeReadByteLength: size.byteLength})).toThrow("native read bound");
 	});
+	// fix/creator-replaced-source-resolution (b): a completed replacement entry may later carry a write-once
+	// replaced-source frontier resolution (the scope and frontier kind on a `rebase`/`transform` with its
+	// replacement) and its signed receipt context. Both forms are charged: every potential row, and every
+	// existing completed replacement entry that is still unresolved.
+	const receipts = (count: number) => Array.from({length: count}, (_, index) => {
+		const exactCanonicalContextBytes = new Uint8Array(geometry.maxExpiryByteLength).fill(index % 251, 0, 4);
+		exactCanonicalContextBytes.set(new Uint8Array(new Uint32Array([index]).buffer), 4);
+		return {digest: hashDomain("ts-drp/settlement-source-context/v1", exactCanonicalContextBytes), exactCanonicalContextBytes};
+	});
+	it.each([64, 128])("bounds %i potential sources replaced and resolved as replaced sources beside a maximum completion", count => {
+		const bytes = new Uint8Array(geometry.maxContextByteLength), digest = hashDomain("ts-drp/settlement-source-context/v1", bytes);
+		const proof = new Uint8Array(geometry.maxCompletionByteLength + count * geometry.maxCompletionMemberByteLength), completion = hashDomain("ts-drp/settlement-source-context/v1", proof);
+		const resolutions = receipts(count - 1), base = Number.MAX_SAFE_INTEGER - count;
+		const raw = {scope, revision: Number.MAX_SAFE_INTEGER, fenceSequence: null,
+			entries: [{sourceSequence: base, sourceDigest: new Uint8Array(32), sourceContextDigest: digest,
+				sourceResolutionDigest: completion, disposition: "committed" as const, replacementSequence: null},
+			...resolutions.map((receipt, index) => ({sourceSequence: base + 1 + index, sourceDigest: new Uint8Array(32),
+				sourceContextDigest: digest, sourceResolutionDigest: receipt.digest, sourceResolutionKind: "frontier" as const,
+				sourceResolutionScope: "replaced-source" as const, disposition: "transform" as const,
+				replacementSequence: Number.MAX_SAFE_INTEGER - index}))],
+			sourceContexts: [{digest, exactCanonicalContextBytes: bytes}, {digest: completion, exactCanonicalContextBytes: proof}, ...resolutions]
+				.sort((a, b) => Buffer.compare(a.digest, b.digest))};
+		const canonical = encodeCanonical(raw), resource = issuanceSourceCustodyPlanResourceForSizing(scope, null, count, geometry);
+		expect(canonical.byteLength, "the replaced-source form of every potential row is charged").toBeLessThanOrEqual(resource.byteLength);
+		const native = JSON.stringify({kind: "canonical-settlement-plan-1", bytes: Buffer.from(canonical).toString("base64")});
+		expect(Buffer.byteLength(native)).toBeLessThanOrEqual(resource.nativeStorageByteLength);
+		expect(copySettlementPlan(raw as never, scope)?.entries.filter(entry => Reflect.get(entry, "sourceResolutionScope") === "replaced-source"))
+			.toHaveLength(count - 1);
+	});
+	it.each([1, 64])("charges the resolution and receipt an existing completed replacement entry may still gain (%i entries)", count => {
+		const base = 1_000;
+		const completed = Array.from({length: count}, (_, index) => ({sourceSequence: base + index, sourceDigest: new Uint8Array(32).fill(index),
+			disposition: "transform" as const, replacementSequence: Number.MAX_SAFE_INTEGER - index}));
+		const prior = copySettlementPlan({scope, revision: 7, fenceSequence: null, entries: completed}, scope)!;
+		expect(prior).toBeDefined();
+		const resolutions = receipts(count);
+		// The reserve always holds one current-epoch context and one completion beside them: the receipts
+		// are charged on top of both, not inside their slack.
+		const bytes = new Uint8Array(geometry.maxContextByteLength).fill(1), proof = new Uint8Array(geometry.maxCompletionByteLength +
+			count * geometry.maxCompletionMemberByteLength).fill(2);
+		const reserved = [bytes, proof].map(exactCanonicalContextBytes => ({digest: hashDomain("ts-drp/settlement-source-context/v1",
+			exactCanonicalContextBytes), exactCanonicalContextBytes}));
+		const raw = {...prior, revision: 8, entries: completed.map((entry, index) => ({...entry,
+			sourceResolutionDigest: resolutions[index]!.digest, sourceResolutionKind: "frontier" as const,
+			sourceResolutionScope: "replaced-source" as const})),
+		sourceContexts: [...reserved, ...resolutions].sort((a, b) => Buffer.compare(a.digest, b.digest))};
+		const canonical = encodeCanonical(raw), resource = issuanceSourceCustodyPlanResourceForSizing(scope, prior, 0, geometry);
+		expect(canonical.byteLength, "the existing entries' replaced-source form and receipts are charged").toBeLessThanOrEqual(resource.byteLength);
+		const native = JSON.stringify({kind: "canonical-settlement-plan-1", bytes: Buffer.from(canonical).toString("base64")});
+		expect(Buffer.byteLength(native)).toBeLessThanOrEqual(resource.nativeStorageByteLength);
+	});
 });

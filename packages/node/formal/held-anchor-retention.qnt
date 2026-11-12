@@ -60,6 +60,10 @@
 //               until an install fences (`fenceAwaited`): no move is signed in an epoch with no own fence.
 //   releaseFenceOverLost  release + fenceOverLost.
 //   fenceOverLostNoHold  broken control: fenceOverLost that does not refuse moves while the fence is awaited.
+//   releaseNoWindow  control: release whose resolution drops the window clause (a displaced, fence-guarded
+//               source of a completed entry counts as resolved at any age).
+//   releaseNoGuard  control: release whose resolution drops the guard clause (a displaced, window-expired
+//               source counts as resolved even when no own fence of its epoch precedes it).
 //   Broken controls:
 //   overRelease release that also drops the entry of a source that is NOT resolved.
 //   guardAny    release whose guard accepts an own fence of ANY epoch below the row. (On a base that
@@ -109,6 +113,16 @@
 //   releaseFenceOverLost  stepBounded   allProps   no violation (58,101,794 states)
 //   shipped               stepReachable allProps   violation (control)
 //   fenceOverLostNoHold   stepBounded   holdProps  violation (control: the hold is needed)
+// The release (b) controls (fix/creator-replaced-source-resolution; quint run, 30,000 samples x 30 steps,
+// seed 7, on step and stepBounded):
+//   releaseNoWindow, releaseNoGuard  safety  no violation. Neither clause is load-bearing for safety here,
+//   and neither was overRelease (model-sim-04: it violates only noUnexcusedRefusal and boundedAge). A
+//   completed entry's source was replaced on an adjacent install because it was absent from the closed
+//   epoch, so it is never admitted (admit needs ep(s) == cur); and the lull releases it only at
+//   ep(s) <= cur - 3, when its replacement's epoch (ep(s) + 1) is closed too, so no replacement is admitted
+//   after its source is released. The resolution (terminal, or displaced + guarded + window-expired) is
+//   the conservative authenticated statement the native receipt signs, not a safety boundary.
+// Native-shaped witness (tests/replaced-source-resolution-withhold-native): p6Native.
 module heldAnchorRetention {
   pure val MAX_E = 14
   pure val MAX_SEQ = 24
@@ -160,9 +174,11 @@ module heldAnchorRetention {
 
   def releases(rl: str): bool =
     rl == "release" or rl == "releaseFenceFirst" or rl == "overRelease" or rl == "guardAny" or rl == "cutProof" or rl == "cutEarly" or
-    rl == "releaseProveFirst" or rl == "proveAny" or rl == "proveDrop" or rl == "releaseFenceOverLost"
+    rl == "releaseProveFirst" or rl == "proveAny" or rl == "proveDrop" or rl == "releaseFenceOverLost" or rl == "releaseNoWindow" or
+    rl == "releaseNoGuard"
   def cuts(rl: str): bool = rl == "cutProof" or rl == "cutEarly"
-  def fencesOverLost(rl: str): bool = rl == "fenceOverLost" or rl == "releaseFenceOverLost" or rl == "fenceOverLostNoHold"
+  def fencesOverLost(rl: str): bool =
+    rl == "fenceOverLost" or rl == "releaseFenceOverLost" or rl == "fenceOverLostNoHold"
   def holdsMoves(rl: str): bool = rl == "fenceOverLost" or rl == "releaseFenceOverLost"
   def provesFirst(rl: str): bool = rl == "proveFirst" or rl == "releaseProveFirst" or rl == "proveAny" or rl == "proveDrop"
   def fencesFirst(rl: str): bool = rl == "fenceFirst" or rl == "releaseFenceFirst"
@@ -185,7 +201,8 @@ module heldAnchorRetention {
   // The census and retirement coverage of one held row.
   def resolved(s: int, c: int): bool =
     terminal(s) or (isFence(s) and s != planFence) or
-    (displaced(s, c) and guarded(s) and ep(s) <= c - W and (entries.keys().contains(s) or expired.contains(s)))
+    (displaced(s, c) and (guarded(s) or rule == "releaseNoGuard") and (ep(s) <= c - W or rule == "releaseNoWindow") and
+      (entries.keys().contains(s) or expired.contains(s)))
 
   // The retirement closure (closeIssuanceRetirementProtectedRecords) over the selection: through =
   // cur - 1; resolved rows of epochs <= through - 2 are candidates, everything else is kept. A fence is
@@ -280,6 +297,10 @@ module heldAnchorRetention {
   action installLost(k: int): bool = all { k > 1, installMode(k, 2) }
   // A skip install whose retained rows wait for a frontier a later install brings.
   action installAwaiting(k: int): bool = all { k > 1, installMode(k, 3) }
+  // An install after the member's removal (native "withhold": a non-member): it never fences and
+  // replaces nothing (a non-member issues nothing). Only the native-shaped witness uses it; after it
+  // the witness never moves again (a removed member cannot).
+  action installRemoved(k: int): bool = installMode(k, 4)
   action installMode(k: int, mode: int): bool = {
     val c = cur + k
     val proven = if (cuts(rule) and k == 1)
@@ -289,7 +310,7 @@ module heldAnchorRetention {
       not(entries.keys().contains(s)) and not(expired.contains(s)) and not(committed.contains(s)))
     val live = open.filter(s => not(isCap(s)) and displaced(s, c))
     val expire = live.filter(s => (if (rule == "chainAge") root(s) else ep(s)) <= c - W and guarded(s))
-    val replace = if (k == 1) live.exclude(expire) else Set()
+    val replace = if (k == 1 and mode != 4) live.exclude(expire) else Set()
     val retain = if (k == 1) Set() else live.exclude(expire)
     val wouldStick = if (mode == 1) stuck.union(retain) else stuck
     val nowLost = if (mode == 2) lost.union(retain) else lost
@@ -303,7 +324,7 @@ module heldAnchorRetention {
     val capCommitted = capOpen.filter(s => s <= tt and not(held.exists(f => isFence(f) and f > s and f <= tt)))
     val unknown = capOpen.exclude(capNever).exclude(capCommitted).union(nowStuck).union(nowAwaiting)
     val withholding = if (fencesOverLost(rule)) unknown else unknown.union(nowLost)
-    val settle = replace.size() > 0 or withholding.size() == 0 or fencesFirst(rule)
+    val settle = mode != 4 and (replace.size() > 0 or withholding.size() == 0 or fencesFirst(rule))
     val f = nextSeq
     val b = nextSeq + 1
     val batch = replace.size() > 0
@@ -388,6 +409,8 @@ module heldAnchorRetention {
   action initFenceOverLost = initWith("fenceOverLost")
   action initReleaseFenceOverLost = initWith("releaseFenceOverLost")
   action initFenceOverLostNoHold = initWith("fenceOverLostNoHold")
+  action initReleaseNoWindow = initWith("releaseNoWindow")
+  action initReleaseNoGuard = initWith("releaseNoGuard")
 
   action step = any {
     move,
@@ -551,6 +574,20 @@ module heldAnchorRetention {
   run fenceOverLostAwaitedLullRefusesTest = p6("fenceOverLost").then(all { assert(refusedUnexcused), unchangedAll })
   run releaseFenceOverLostAwaitedLullKeepsTest = p6("releaseFenceOverLost")
     .then(all { assert(not(refusedUnexcused)), assert(safety), unchangedAll })
+  // Native-shaped (tests/replaced-source-resolution-withhold-native): a move in epoch 1 never reaches the
+  // creator; the adjacent install replaces it (fence + batch) and both are admitted; the member is then
+  // removed, so every later install withholds the fence ("withhold": no plan fence, nothing replaced).
+  // The source is terminal (tt passed it through the admitted fence), so no anchor is demanded for it,
+  // but its completed entry keeps it held for good without (b): one protected hole per such source.
+  action p6Native(r: str): bool =
+    initWith(r).then(install(1, false)).then(move).then(install(1, false)).then(admit(3)).then(admit(4))
+      .then(installRemoved(1)).then(lull).then(installRemoved(1)).then(lull).then(installRemoved(1)).then(lull)
+      .then(installRemoved(1)).then(lull).then(installRemoved(1)).then(lull).then(installRemoved(1)).then(lull)
+  run fenceOverLostRemovedKeepsSourceTest = p6Native("fenceOverLost")
+    .then(all { assert(entries.get(2) == 4), assert(tt >= 4), assert(held.contains(2)), assert(planFence < 0), assert(safety), unchangedAll })
+  run releaseFenceOverLostRemovedReleasesSourceTest = p6Native("releaseFenceOverLost")
+    .then(all { assert(entries.get(2) == 4), assert(not(held.contains(2))), assert(planFence < 0), assert(safety),
+      assert(not(refusedUnexcused)), unchangedAll })
   // Broken (f): retirement drops the proven row before its hand-back record exists: the move is lost.
   run proveDropLosesMoveTest = p1("proveDrop").then(all { assert(lostMove), unchangedAll })
   run releaseProveFirstKeepsP1Test = p1("releaseProveFirst")
