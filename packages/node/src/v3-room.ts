@@ -9562,6 +9562,21 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				// A failed receive may own native retention despite a lost acknowledgement.
 				// Retry must reacquire native custody before preparing any old/new writer.
 				creatorRecipientRecoveryRequired = true;
+				// G6: the authenticated successor's creator-signed frontier is at or above this store's
+				// lineage (an older copy). Refused before anything was retained, adopted or planned; the
+				// session stays not current (sync before sending, decision B) and signs nothing, and its
+				// settlement drain stays undone, until the store is healed.
+				const behind = [error, error instanceof AggregateError ? error.cause : undefined].find(
+					(value): value is Error & { readonly next: number; readonly admitted: number } =>
+						value instanceof Error && Reflect.get(value, "code") === "V3_LOCAL_LINEAGE_BEHIND_FRONTIER"
+				);
+				if (behind !== undefined) {
+					localIssueRefusal ??= new V3RoomNotYetCurrent(
+						"behind-frontier",
+						`the room admitted sequence ${behind.admitted} of this author; local lineage is at ${behind.next}`
+					);
+					refuseHeldUntilCurrent(localIssueRefusal);
+				}
 				// Only the material fetch's own failure at the deadline is the typed expiry; any other
 				// failure, and a close, keep their own outcome.
 				if (

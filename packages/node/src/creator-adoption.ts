@@ -147,7 +147,7 @@ import {
 	type VerifiedCreatorCheckpointAttachment,
 } from "./internal/creator-transition-advance.js";
 import { createV3SnapshotTransferOwner } from "./snapshot-transfer.js";
-import { sealCreatorReceivedRecoveryReplay, type V3PlaneHandle } from "./v3-live.js";
+import { sealCreatorReceivedRecoveryReplay, type V3PlaneHandle, V3LocalLineageBehindFrontier } from "./v3-live.js";
 import { reconcileCreatorReceivedSnapshotRecoveryRoles, reconcileCreatorSnapshotRecoveryRoles } from "./internal/creator-closed-rollback-data.js";
 import { acquireCreatorPendingClassificationCustody, resolveCreatorSnapshotRecoveryCloseHold } from "./internal/runtime-reclamation.js";
 import type { CreatorRecoveryPoolResult } from "./internal/creator-recovery-pool.js";
@@ -1386,6 +1386,56 @@ export async function maintainCreatorRecipientRecoveryPool(input: Readonly<{
 	return Object.freeze(outcome === "deferred" ? {kind: "deferred", reason: "busy"} : {kind: "maintained"});
 }
 
+/**
+ * D.108d1b at the install boundary (G6). The successor's settlement capability carries the
+ * creator-signed frontier of this author: the highest of its sequences the room admitted. That
+ * frontier is held outside this origin, so a local store whose lineage is at or below it is an
+ * older copy (a restored backup, a clone) whatever its own rows say. Such a store is refused here,
+ * once the successor is authenticated and before anything is retained, adopted or written to the
+ * settlement plan; the signing-time check alone ran after the plan was already rewritten. A store
+ * whose lineage is above the frontier is unaffected, as is a receive-only member (no own lineage).
+ * Model: packages/node/formal/own-fence-freshness.qnt (MINIMAL).
+ * @param source - The recipient's current registration (its issuance store and scope).
+ * @param closure - The authenticated successor closure.
+ * @param successorTrust - The authenticated successor trust.
+ * @param closedTrust - The closed epoch's trust (the checkpoint predecessor for a checkpoint).
+ * @param closedAclBytes - The closed epoch's latched ACL (this member's current one, or the
+ * checkpoint predecessor's): the received closure does not carry it until staging, and the
+ * historical issuance binds the settlement's ACL digest to it.
+ */
+async function assertReceivedLineageAboveAdmittedFrontier(
+	source: CreatorRecipientSource,
+	received: CreatorTransitionClosure,
+	successorTrust: CurrentAnchorTrust,
+	closedTrust: CurrentAnchorTrust | undefined,
+	closedAclBytes: Uint8Array | undefined
+): Promise<void> {
+	if (closedAclBytes === undefined) return;
+	const aclDigest = digestBlob(closedAclBytes);
+	if (!aclDigest.ok) return;
+	const acl = Object.freeze({ bytes: Uint8Array.from(closedAclBytes),
+		ref: Object.freeze({ digest: aclDigest.value, byteLength: closedAclBytes.byteLength }) });
+	const kept = received.candidates.filter(candidate => canonicalRecord(candidate.bytes)?.kind !== "drp-v3-latched-acl");
+	const closure: CreatorTransitionClosure = { candidates: [...kept, acl], closure: [...received.closure.filter(ref =>
+		kept.some(candidate => sameRef(candidate.ref, ref))), acl.ref] };
+	if (source.receiveOnly || closedTrust === undefined) return;
+	const scope = source.issuanceScope;
+	const historical = openVerifiedCreatorHistoricalIssuance({ author: scope.author, closure, floorTrust: successorTrust,
+		sourceTrust: closedTrust });
+	const identity = historical === undefined ? undefined : resolveVerifiedCreatorHistoricalIssuance(historical);
+	if (
+		identity === undefined ||
+		identity.admittedAuthorSequence === null ||
+		identity.author !== scope.author ||
+		identity.objectId !== scope.objectId ||
+		identity.successorEpoch !== successorTrust.currentEpoch
+	)
+		return;
+	const lineage = await source.issuanceStore.readLineage(scope);
+	if (lineage.exhausted !== false || !Number.isSafeInteger(lineage.next) || lineage.next <= identity.admittedAuthorSequence)
+		throw new V3LocalLineageBehindFrontier(scope.author, lineage.next, identity.admittedAuthorSequence);
+}
+
 // Receive-time currency is the native head record alone: its closure digest binds
 // every content-addressed blob that the initial inspection already authenticated.
 async function nativeHeadUnchanged(
@@ -1886,6 +1936,11 @@ export async function receiveCreatorSuccessorAdoption(
 			receivedCandidates: Object.freeze([...advance.proposed.candidates]),
 			proposedReferences: advance.proposed.closure,
 		});
+		// Before any native custody below: a store behind its creator-signed frontier is refused.
+		const remoteCheckpoint = checkpoint === undefined ? undefined : resolveCreatorCheckpointAttachment(checkpoint)?.remoteCheckpoint;
+		await assertReceivedLineageAboveAdmittedFrontier(source, advance.proposed, receivedTrust,
+			checkpoint === undefined ? source.currentTrust : remoteCheckpoint?.predecessorTrust,
+			checkpoint === undefined ? source.exactCanonicalLatchedAclBytes : remoteCheckpoint?.exactCanonicalPredecessorAclBytes);
 		// Native custody may already exist after a lost acknowledgement. An unknown
 		// lookup outcome cannot release the predecessor receive gate either.
 		const retained = await input.snapshotStore.lookupReceivedRecoveryCertificate(selector);

@@ -1,17 +1,19 @@
 // Own-fence freshness (G6 follow-up to G5's own-fence authentication). Measurement model: no fix
 // is merged; FIXED below is the proposed guard.
 //
-// Design notes (WIP, G6 report pending). Probes (tests/own-fence-freshness-probe-native.test.ts):
+// Design notes. Probes (tests/own-fence-freshness-probe-native.test.ts):
 // a deleted own row or truncated suffix is refused at reopen by journal replay authentication;
 // an older restored store opens, and install adopts the successor and rewrites the settlement
 // plan BEFORE D.108d1b (V3_LOCAL_LINEAGE_BEHIND_FRONTIER) refuses at first signature (the RED).
-// Smallest guard (MINIMAL): run lineage.next > creator-signed admittedAuthorSequence right after
-// the successor authenticates, before adoption and the plan write; refuse with the existing
+// Guard (MINIMAL, implemented in creator-adoption.ts assertReceivedLineageAboveAdmittedFrontier):
+// lineage.next > creator-signed admittedAuthorSequence right after the successor authenticates,
+// before native custody, adoption and the plan write; refuse with the existing
 // V3LocalLineageBehindFrontier / decision B "behind-frontier" path, no state change. The creator's
 // signed frontier is the out-of-origin high-water mark already delivered with every successor
 // (reuses D.108d1b + decision B; no new crypto or wire format). Optional gapCheck (FIXED): own
 // sequences in (prune watermark, T] must all be present, only needed if journal retention may
-// miss a deleted fence behind a deferred row (ce972d7f). Residual (inherent to G6): a restored
+// miss a deleted fence behind a deferred row (ce972d7f); not implemented: no failing case exists
+// (deleted rows and truncated suffixes are refused at reopen by journal replay authentication). Residual (inherent to G6): a restored
 // copy can re-sign slots of lost rows; if an original escaped, sequence-based frontier commit
 // can resolve the wrong move (witness reachedOrphanFalseCommit).
 //
