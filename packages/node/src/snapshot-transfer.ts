@@ -132,6 +132,8 @@ export interface V3SnapshotTransferOwner {
 	serve(
 		input: Readonly<{
 			control?(stream: SnapshotChunkProtocolStream, request: Uint8Array): Promise<boolean>;
+			/** Observation: these chunk indices were written to this peer and its stream closed. */
+			onServed?(peerId: string, indices: readonly number[]): void;
 			readonly authorization: SnapshotPeerAuthorization;
 			readonly descriptors: readonly SnapshotChunkDescriptor[];
 			readonly exactCanonicalManifestBytes: Uint8Array;
@@ -669,6 +671,7 @@ export function createV3SnapshotTransferOwner(
 		}
 		const authorization = captureAuthorization(rawInput.authorization);
 		const control = rawInput.control;
+		const onServed = rawInput.onServed;
 		const quarantine = rawInput.quarantine;
 		const installed = installServer(async (stream) => {
 			try {
@@ -772,6 +775,11 @@ export function createV3SnapshotTransferOwner(
 					await port.discard();
 				}
 				await stream.close();
+				try {
+					onServed?.(stream.peerId, Object.freeze(requested.map(({ index }) => index)));
+				} catch {
+					// Observation only: it never alters a served request.
+				}
 			} catch (error) {
 				const code = nestedFailureCode(error) ?? "protocol-violation";
 				stream.abort(failure(code, "snapshot serving request was rejected", error));

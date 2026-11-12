@@ -4684,6 +4684,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			manifestDigest,
 			material: exported.material,
 			departed: departedCarrier,
+			chunkCount: exported.declaration.chunks.length,
 			connectedPeers: () => port.connectedPeers(),
 			// Only an authorized request's response waits for the adoption; a refusal is written at once.
 			admitResponse: async (peerId: string, signal: AbortSignal): Promise<void> => {
@@ -4700,6 +4701,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					successorServingAdopted(serving) ? server.authorization.authorForPeer(peer) : undefined,
 				isAuthorizedAuthor: (author: string): boolean => server.authorization.isAuthorizedAuthor(author),
 			}),
+			// A member's serving session ends once every chunk has been served to it (concurrent bound).
+			onServed: (peerId, indices) => server.served(peerId, indices),
 			control: (stream, bytes) =>
 				server.control(
 					Object.freeze({

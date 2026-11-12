@@ -121,6 +121,9 @@ import {
 	type DRPUnreliableWebRtcOwner,
 } from "./unreliable-webrtc.js";
 
+/** The length-prefixed stream decoder's refusals of a frame outside its byte bound. */
+const BOUND_ERRORS: ReadonlySet<string> = new Set(["InvalidDataLengthError", "InvalidDataLengthLengthError", "InvalidMessageLengthError"]);
+
 export * from "./stream.js";
 export {
 	directSyncProtocolFor,
@@ -872,8 +875,14 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 						return new Uint8Array(bytes);
 					} catch (error) {
 						if (signal.aborted) throw failure("aborted", "snapshot stream was aborted", signal.reason);
-						abort(failure("protocol-violation", "snapshot frame violates its byte bound", error));
-						throw failure("protocol-violation", "snapshot frame violates its byte bound", error);
+						// Only the length-prefix decoder's own refusal is a bound violation; a stream the remote
+						// reset, aborted or ended before a whole frame is reported as such (same code, so every
+						// caller's classification is unchanged; the reason is no longer hidden).
+						const message = BOUND_ERRORS.has((error as { name?: unknown } | null)?.name as string)
+							? "snapshot frame violates its byte bound"
+							: "snapshot stream ended before its frame";
+						abort(failure("protocol-violation", message, error));
+						throw failure("protocol-violation", message, error);
 					} finally {
 						signal.removeEventListener("abort", onAbort);
 					}
