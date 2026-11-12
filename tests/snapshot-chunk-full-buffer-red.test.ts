@@ -46,6 +46,10 @@ async function verify(transfer: ReturnType<typeof encoded>) {
 		expectedManifestDigest: transfer.manifestDigest,
 		profile: PROFILE,
 		quarantine: {
+			discard: () => {
+				writes.clear();
+				return Promise.resolve();
+			},
 			read: (descriptor: SnapshotChunkDescriptor) => Promise.resolve(writes.get(descriptor.index)),
 			write: (descriptor: SnapshotChunkDescriptor, bytes: Uint8Array) => {
 				writes.set(descriptor.index, bytes);
