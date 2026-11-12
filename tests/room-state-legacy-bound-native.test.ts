@@ -19,6 +19,7 @@ import { readinessHoldRoom } from "./fixtures/track-x/readiness-hold-room.js";
 // sealing, adopting and installing, and a move that does not grow the state is still admitted.
 
 afterEach(async () => {
+	Reflect.deleteProperty(globalThis, "__warmProofEvent");
 	expect(await closeFixtures(), "native admitted work and owners join").toEqual([]);
 });
 
@@ -94,21 +95,51 @@ it("a creator's move that would pass 32 KiB is refused at issue, and the room ke
 	expect(Math.max(...seen), "no signed state passes the limit").toBeLessThanOrEqual(LIMIT);
 }, 900_000);
 
-it("a Writer's move that would pass 32 KiB is refused, the creator never admits one, and both keep rolling", async () => {
+it("concurrent Writers whose moves together pass 32 KiB: the creator refuses the crossing one, and all keep rolling", async () => {
+	// Invariant: a Writer's own check is advisory (it sees only its own view); the creator's admission is
+	// authoritative. Each Writer's moves fit its own view, but together they pass the limit: the creator
+	// refuses the crossing move at ingress, never signs a state past the limit, and the room keeps rolling.
 	const seen: number[] = [];
 	const fixture = await readinessHoldRoom({ writers: 2, createOperationAdmissionPolicy: zonePolicy(seen) as never });
 	const creator = await fixture.open(0);
 	const writers = [await fixture.open(1), await fixture.open(2)];
+	const creatorRefusals: string[] = [];
+	let onCreatorRefusal: (() => void) | undefined;
+	let receiving = false;
+	const previous = Reflect.get(globalThis, "__warmProofEvent");
+	Reflect.set(globalThis, "__warmProofEvent", (event: Readonly<Record<string, unknown>>) => {
+		if (event.kind === "application-state-bound" && event.path === "received" && event.admitted === false && receiving) {
+			creatorRefusals.push(String(event.author));
+			onCreatorRefusal?.();
+		}
+		if (typeof previous === "function") previous(event);
+	});
 	const delivered: (number | null)[] = [null, null, null];
+	const stranded: number[] = [0, 0, 0];
+	/** Delivers a Writer's rows one by one; after the creator refuses one, its descendants are stranded. */
 	const deliver = async (from: number, to: typeof creator): Promise<void> => {
 		const rows: readonly DurableIssuanceOutboxRecord[] = await fixture.publishedAfter(from, delivered[from] ?? null);
-		for (let start = 0; start < rows.length; start += 16) {
-			const chunk = rows.slice(start, start + 16);
-			const last = chunk.findLastIndex((row) => !isControl(row));
-			if (last >= 0) await to.receive(chunk.slice(0, last + 1), from);
-			to.inject(chunk.slice(last + 1), from);
+		if (rows.length === 0) return;
+		delivered[from] = required(rows.at(-1)).commit.authorSequence;
+		for (const [position, row] of rows.entries()) {
+			if (isControl(row)) {
+				to.inject([row], from);
+				continue;
+			}
+			const refused = new Promise<"refused">((resolve) => {
+				onCreatorRefusal = () => resolve("refused");
+			});
+			receiving = true;
+			const received = to.receive([row], from);
+			const outcome = await Promise.race([received.then(() => "accepted" as const), refused]);
+			receiving = false;
+			onCreatorRefusal = undefined;
+			if (outcome === "refused") {
+				received.catch(() => undefined);
+				stranded[from] = required(stranded[from]) + rows.length - position - 1;
+				return;
+			}
 		}
-		if (rows.length !== 0) delivered[from] = required(rows.at(-1)).commit.authorSequence;
 	};
 	const install = async (writer: typeof creator, index: number, epoch: number): Promise<void> => {
 		const transfer = await settlementDelivery(fixture as unknown as SettlementRoom, index);
@@ -146,9 +177,14 @@ it("a Writer's move that would pass 32 KiB is refused, the creator never admits 
 			failures.push(`epoch ${epoch}: ${explain(error)}`);
 		}
 	}
-	console.log(`LEGACY_BOUND_WRITERS ${JSON.stringify({ failures, refusals, ordinals, seen })}`);
+	const blocks = creator.room.projection().blocks.length;
+	console.log(
+		`LEGACY_BOUND_WRITERS ${JSON.stringify({ failures, refusals, creatorRefusals, stranded, ordinals, blocks, seen })}`
+	);
 	expect(failures, "every epoch seals, adopts and installs").toEqual([]);
-	expect(refusals.length, "a Writer's crossing move is refused").toBeGreaterThan(0);
+	expect(creatorRefusals.length, "the creator refuses the concurrent crossing move at ingress").toBeGreaterThan(0);
+	expect(refusals.length, "a Writer refuses its own crossing move once its view reaches the limit").toBeGreaterThan(0);
 	for (const refusal of refusals) expect(refusal).toMatch(LIMIT_ERROR);
 	expect(Math.max(...seen), "no signed state passes the limit").toBeLessThanOrEqual(LIMIT);
+	for (const writer of writers) expect(writer.room.projection().blocks.length, "Writers converge on the creator").toBe(blocks);
 }, 900_000);
