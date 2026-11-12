@@ -15896,6 +15896,22 @@ function creatorFinishingTemplateShapeMatches(template: CreatorFinishingCapacity
 		input.signingFrames.every((row, index) => `${row.store}:${row.phase}:${JSON.stringify(row.key)}` === template.signingLayout[index]);
 }
 
+/** Diagnostics only: the first shape field on which a retained template differs. */
+function creatorFinishingTemplateShapeMismatch(template: CreatorFinishingCapacityTemplate,
+	input: CreatorFinishingCommonInput): string | undefined {
+	if (input.planEffect !== undefined) return "plan-effect";
+	if (input.archiveConstruction !== undefined) return "archive";
+	if (input.ordinaryFinishingCapacityDimensions === undefined) return "dimensions";
+	if (input.ordinaryFinishingCapacityDimensions.successorFenceCount !== template.successorFenceCount) return "successor-fence-count";
+	if (input.postAdoptionCensusSizing?.length !== template.postAdoptionVariantCount) return "post-adoption-variants";
+	if (input.exactCanonicalSnapshotChunks.length !== template.chunkCount) return `chunks:${template.chunkCount}->${input.exactCanonicalSnapshotChunks.length}`;
+	if (input.metadata.length !== template.metadataLayout.length) return `metadata:${template.metadataLayout.length}->${input.metadata.length}`;
+	if (!input.metadata.every((row, index) => row.priorRef?.digest === template.metadataLayout[index]?.prior)) return "metadata-prior";
+	if (input.signingFrames.length !== template.signingLayout.length) return `signing:${template.signingLayout.length}->${input.signingFrames.length}`;
+	const index = input.signingFrames.findIndex((row, index) => `${row.store}:${row.phase}:${JSON.stringify(row.key)}` !== template.signingLayout[index]);
+	return index === -1 ? undefined : `signing-layout:${index}`;
+}
+
 /** Existing ordinary I law: fresh byte-exact ownership plus every UNKNOWN
  * occurrence, without a charge, refund, or retained projection. */
 function creatorFinishingPrefixesFitOrdinaryBook(accounting: CreatorClosedRollbackProofAccounting,
@@ -16106,6 +16122,12 @@ export async function captureCreatorOrdinaryFinishingCapacityTemplate(
 			} catch { /* Existing diagnostics cannot affect admission or cleanup. */ }
 			return Object.freeze({captured: true});
 		}
+		try {
+			const observer = Reflect.get(globalThis, "__warmProofEvent");
+			if (typeof observer === "function") observer({kind: "ordinary-finishing-template-compiling", role,
+				reason: existing?.kind !== "creator-finishing-field-program-1" ? "absent" : "shape-mismatch",
+				...(existing?.kind !== "creator-finishing-field-program-1" ? {} : {mismatch: creatorFinishingTemplateShapeMismatch(existing, input)})});
+		} catch { /* Existing diagnostics cannot affect admission or cleanup. */ }
 		stage = "input-parameters";
 		const compiler = createCreatorFinishingWidthCompiler();
 		creatorFinishingInputParameters(input, compiler);
