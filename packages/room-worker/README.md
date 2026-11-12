@@ -30,6 +30,11 @@ One module both sides import declares a closed allowlist (`defineRoomWorkerContr
 
 Commands outside the contract, malformed messages and messages of another session are dropped.
 
+A stopped worker is a dead process. Whatever the page lent it through hooks and still holds for it
+(a native read reservation, say) must be released by the page when the worker stops, as the OS
+releases a dead process's locks: `onCrash` is where. The v3 room binding's
+`createV3RoomWorkerReservations` does this for the room-head authority.
+
 ## Errors
 
 Typed errors cross by codec (`errorCodec(id, Class)`), keeping class, name, message, fields and

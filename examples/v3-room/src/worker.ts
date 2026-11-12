@@ -105,3 +105,80 @@ export function v3RoomWorkerPeerCacheKeys(config: DRPNodeConfig): readonly strin
 	const cache = config.network_config?.control_plane?.rendezvous?.cache;
 	return cache?.persistence === "browser-local" ? [cache.key] : [];
 }
+
+interface HeldReservation {
+	release(): Promise<void>;
+}
+
+/** The native read reservations a worker-hosted room holds through the page's room-head authority. */
+export interface V3RoomWorkerReservations {
+	/**
+	 * Wraps the page's room-head authority factory (the room worker hook): every native read
+	 * reservation the worker acquires through it is tracked until the worker releases it.
+	 */
+	wrap<Context, Authority>(
+		factory: (context: Context) => Authority | Promise<Authority>
+	): (context: Context) => Promise<Authority>;
+	/**
+	 * Releases every reservation a stopped worker still holds. A stopped worker is a dead process: its
+	 * native locks go with it, or the external authority stays locked for every other writer.
+	 */
+	releaseAll(): Promise<void>;
+	/** Reservations acquired and not yet released. */
+	readonly held: number;
+}
+
+/**
+ * Track the native read reservations a worker-hosted room holds, so the page releases them when the
+ * worker stops (crash, terminate) before it opens the room again.
+ * @returns The tracker; pass `wrap(factory)` as the room-head authority hook.
+ */
+export function createV3RoomWorkerReservations(): V3RoomWorkerReservations {
+	const held = new Map<HeldReservation, () => Promise<void>>();
+	const track = (reservation: HeldReservation): HeldReservation => {
+		let released = false;
+		const release = async (): Promise<void> => {
+			held.delete(reservation);
+			if (released) return;
+			released = true;
+			await reservation.release();
+		};
+		held.set(reservation, release);
+		return new Proxy(reservation, {
+			get(target, key): unknown {
+				if (key === "release") return release;
+				const value: unknown = Reflect.get(target, key, target);
+				return typeof value === "function" ? (value as (...args: unknown[]) => unknown).bind(target) : value;
+			},
+		});
+	};
+	const wrapAuthority = <Authority>(authority: Authority): Authority => {
+		if (typeof authority !== "object" || authority === null) return authority;
+		return new Proxy(authority, {
+			get(target, key): unknown {
+				const value: unknown = Reflect.get(target, key, target);
+				if (typeof value !== "function") return value;
+				const method = value as (...args: unknown[]) => unknown;
+				if (key !== "acquireNativeReadReservation") return method.bind(target);
+				return async (...args: unknown[]): Promise<HeldReservation> =>
+					track((await method.apply(target, args)) as HeldReservation);
+			},
+		});
+	};
+	return {
+		wrap:
+			<Context, Authority>(factory: (context: Context) => Authority | Promise<Authority>) =>
+			async (context: Context): Promise<Authority> =>
+				wrapAuthority(await factory(context)),
+		async releaseAll(): Promise<void> {
+			const releases = [...held.values()];
+			const results = await Promise.allSettled(releases.map((release) => release()));
+			for (const result of results)
+				if (result.status === "rejected")
+					console.error("Failed to release a stopped room worker's reservation", result.reason);
+		},
+		get held(): number {
+			return held.size;
+		},
+	};
+}

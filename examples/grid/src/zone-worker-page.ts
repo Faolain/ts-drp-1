@@ -13,6 +13,7 @@
  */
 import { acquireBrowserIdentity } from "@ts-drp/example-browser-network";
 import {
+	createV3RoomWorkerReservations,
 	forwardV3RoomWorkerObservation,
 	V3_ROOM_WORKER_ERROR_CODECS,
 	V3RoomNotReachingHost,
@@ -239,15 +240,18 @@ export async function mainWithRoomWorker(fallback: () => Promise<void>): Promise
 	let network: ZoneWorkerNetwork | undefined;
 	let controlsEnabled = false;
 
+	// The native read reservations the worker holds through the page's authority: released when the
+	// worker stops, as a dead process's native locks are.
+	const reservations = createV3RoomWorkerReservations();
 	const hooks: Record<string, (...args: never[]) => unknown> = {
-		roomHeadAuthorityForOpen: ((context) => {
+		roomHeadAuthorityForOpen: reservations.wrap((context: Parameters<V3ZoneRoomHeadAuthorityForOpen>[0]) => {
 			const factory = window.__TS_DRP_GRID_ROOM_HEAD_AUTHORITY_FOR_OPEN__;
 			if (typeof factory !== "function")
 				throw new TypeError(
 					"v3 zone room-head authority is unavailable: the application host must configure its factory"
 				);
 			return factory(context);
-		}) as V3ZoneRoomHeadAuthorityForOpen,
+		}),
 	};
 	const approve: V3ZoneSettlementSourceApproval | undefined = window.__TS_DRP_GRID_SETTLEMENT_SOURCE_APPROVAL__;
 	if (approve !== undefined) hooks.approveSettlementSourceSelection = approve;
@@ -295,7 +299,10 @@ export async function mainWithRoomWorker(fallback: () => Promise<void>): Promise
 			});
 			console.error(`room worker refused ${refusal.command} #${refusal.id}`, refusal.error);
 		});
-		handle.onCrash((error) => console.error("Grid room worker stopped", error));
+		handle.onCrash((error) => {
+			console.error("Grid room worker stopped", error);
+			void reservations.releaseAll();
+		});
 		const ready = (await handle.ready) as ZoneWorkerReady;
 		snapshot = ready.snapshot;
 		transient = undefined;
@@ -378,6 +385,7 @@ export async function mainWithRoomWorker(fallback: () => Promise<void>): Promise
 				current = undefined;
 				snapshot = undefined;
 				transient = undefined;
+				await reservations.releaseAll();
 				current = await open();
 			},
 			rtcStats: () => call("rtcStats"),

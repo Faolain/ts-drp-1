@@ -105,8 +105,10 @@ export {
 	v3RoomPlayerDatabaseName,
 } from "./player-database.js";
 export {
+	createV3RoomWorkerReservations,
 	V3_ROOM_WORKER_ERROR_CODECS,
 	v3RoomWorkerNodeConfig,
+	type V3RoomWorkerReservations,
 	type V3RoomWorkerIdentity,
 	v3RoomWorkerPeerCacheKeys,
 } from "./worker.js";
