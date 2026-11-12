@@ -154,7 +154,8 @@ function readPlan(path: string) {
 	const database = new DatabaseSync(path, { readOnly: true });
 	try {
 		return database.prepare("SELECT revision, fence_sequence, entries_json FROM settlement_plans").all().map((row) => {
-			const carrier = JSON.parse(String(row.entries_json)) as { bytes: string };
+			const carrier = JSON.parse(String(row.entries_json)) as { bytes?: string };
+			if (typeof carrier.bytes !== "string") return { revision: row.revision, fence: row.fence_sequence, raw: String(row.entries_json).slice(0, 200) };
 			const value = decodeCanonical(Buffer.from(carrier.bytes, "base64")) as { entries?: Record<string, unknown>[] };
 			return {
 				revision: row.revision,
