@@ -88,7 +88,7 @@ All runs are on boat sandbox bx_e28t8ews (8 vCPU x86_64).
 - d9346 v3-zone in worker mode (both, creator, joiner): passes to the migration-target rejoin (line 899).
   Main-thread head and base fail at the same known load-dependent step. It is the same on 026e9cb6,
   where the session snapshot became a call.
-- 026e9cb6: grid-6 passes 6/6.
+- 026e9cb6: grid-6 passes 6/6. 2984d84f (Grid contract v2): grid-7 passes 6/6.
 - Packages vitest: 22 of 403 files fail. 16 fail identically at base; the other 6 pass when rerun alone in
   three alternating head/base passes.
 - The package's own tests: 38/38, including `stop-order.test.ts`.
@@ -127,7 +127,24 @@ ab4 (026e9cb6), two pairs per throttle:
   - the host-calls of the page-owned room-head authority, about 75 per second at 0.01–0.03 ms each. That
     is the harness's stand-in for an app host's native store.
   - Library plus render p99 is 0.7–0.9 ms, inside Profile M's 2 ms.
-- **Condition E's 0.5 ms library p99**: the creator meets it (0.5 ms). The member is just above it (0.6–0.8 ms).
+- **Condition E's 0.5 ms library p99**: the creator meets it (0.5 ms). The member is just above it (0.6–0.8 ms),
+  and that is accepted for now. What puts the member's frames over 0.5 ms (throttle 1, 171 such frames
+  in about 6,560):
+
+  | Message kind | Frames over 0.5 ms it is in | Its ms in them | Mean per message |
+  |---|---|---|---|
+  | `rtc:createDataChannel` (page) | 89 | 108 | 0.59 ms (max 8.6) |
+  | `post:host-result` (authority) | 86 | 24 | 0.024 ms |
+  | `post:send:move` | 34 | 18 | 0.035 ms |
+  | `stream:transient` | 55 | 18 | 0.045 ms |
+  | `post:credit:transient` | 61 | 14 | 0.025 ms |
+  | authority host-calls (`readRetirementImage`, `check`, ...) | 47 or fewer | 2.5 or less | 0.023 ms |
+
+  Data-channel creation dominates. The network node opens a new libp2p stream per message (direct
+  messages, v3 vertex egress, sync), and over WebRTC each stream is one `RTCDataChannel`, which only the
+  page can create. That costs main-thread time in both modes, at 4–9 opens/s per page. Batching the
+  authority's host-calls would not reach 0.5 ms. Stream reuse is the network track's work, not this
+  branch's.
 
 Main-thread busy time per frame, traced (creator epochs 3–5, one run per cell, both pages, `trace.py`).
 This is the same method in both modes. It counts every top-level main-thread task: the library, Grid,
@@ -150,8 +167,39 @@ At throttle 1, the gap between the traced worker p99 (3.6–4.4 ms) and the untr
 | 4 | main | 17–23 / 36–55 / 50–490 | 6,053–6,509 |
 | 4 | worker | 23–38 / 49–53 / 60–140 | 5,843–6,747 |
 
-- Worker mode adds about 15 ms at p95 to movement. That is two bridge hops, plus at most one page frame
-  for the latest-value stream and the transient render.
+- In ab4, worker mode added about 15 ms at p95 to movement. The bridge latency meter (6a286b2c) split the
+  path from the worker emitting a remote move to the page rendering it (lat2, throttle 1):
+
+  | Stage | p50 | p95 | p99 |
+  |---|---|---|---|
+  | Transient value waiting for the page's frame credit | 0 | 25–29 ms | 31–34 ms |
+  | Worker to page hop | 1.2 ms | 15 ms | 17–19 ms |
+  | Page handling to its render frame (main mode has it too) | 15.7 ms | 18 ms | 20 ms |
+  | Sender's page to worker move hop | 0.1–0.2 ms | 2–4.6 ms | 7–29 ms |
+
+  The credit was the cause. Credit came back only at the page's next frame, plus a round trip.
+  2984d84f adds `latest({ pace: "message" })`: the page asks for the next value as soon as it has handled
+  one, and one value stays in flight. Grid's transient stream uses it. After the change (lat3):
+
+  - the credit wait is p95 9.5–11.8 ms, p99 14–15 ms;
+  - the hop tail is unchanged and frame-aligned. Main mode's data-channel message meets the same
+    main-thread task queue, so it is not a worker cost.
+
+  ab5 (2984d84f, two pairs per throttle), input to remote render:
+
+  | Throttle | Mode | p50 (ms) | p95 (ms) | p99 (ms) |
+  |---|---|---|---|---|
+  | 1 | main | 14–17 | 32–35 | 34–62 |
+  | 1 | worker | 18–19 | 33–35 | 35–70 |
+  | 4 | main | 16–22 | 36–45 | 56–110 |
+  | 4 | worker | 19–22 | 33–38 | 40–55 |
+
+  - Throttle 1, paired p95 (worker minus main): −1 and 0 (pair 1), −1 and +3 (pair 2). The p50 is about
+    +2 ms on average.
+  - ab5 library p99: 0.5–0.8 ms at throttle 1. At throttle 4 it was 1.7–2.0 ms in one run and 5.7–5.9 ms in
+    a disturbed one (open 15.9 s, attach p50 4–5 ms, load 4.6).
+  - The creator's move hop has a p99 tail of 340–380 ms. That is the creator's worker busy with room work
+    such as seal and adoption, the same work that blocks the main thread in main mode.
 - Open includes worker boot. Neither mode keeps a cold join under 5 s on this box.
 
 ### Data channels (condition C)
@@ -199,8 +247,7 @@ At throttle 1, the gap between the traced worker p99 (3.6–4.4 ms) and the untr
 - Canvas and Chat adoption. Their pages mix the room and the DOM in one module, so each needs a room API
   module like Grid's `v3-zone.ts` first. The package itself is generic.
 - The three.js example can start on the worker page from day one.
-- Movement latency in worker mode (+15 ms p95): measure whether pacing the transient stream by credit
-  costs a frame.
-- Data-channel churn of 4–9 opens/s, a network-layer property, is now the largest library item on the page.
+- Data-channel churn of 4–9 opens/s, one libp2p stream per message, is the largest library item on the
+  page in both modes. Stream reuse is a separate network track.
 - ab3's main-thread t4 run failed once on `V3RoomAdoptionHoldExpired` (120 s), and its rerun passed.
   Recorded by the coordinator as main-thread adoption starvation under 4x throttle.
