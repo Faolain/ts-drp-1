@@ -7869,6 +7869,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			settlementDrainPublication = publication;
 			try {
 				await timedStage("drain.settlement", () => drainSettlementOutbox(sources));
+				// The drain's replacements are in the plan now: their moves are pending (settlementBacklogOf).
+				recordSettlementBacklog(await issuanceStore.readSettlementPlan(settlementScope));
 			} finally {
 				settlementDrainPublication = "immediate";
 				// These nominal sources authorize only this joined drain. Do not
