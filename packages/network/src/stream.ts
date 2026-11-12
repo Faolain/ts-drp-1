@@ -82,10 +82,16 @@ function framedStreamSession(stream: Stream): FramedStreamSession {
  * @param stream - The stream to write to.
  * @param input - The Uint8Array to write.
  */
-export async function uint8ArrayToStream(stream: Stream, input: Uint8Array): Promise<void> {
+export async function uint8ArrayToStream(
+	stream: Stream,
+	input: Uint8Array,
+	probe?: { written?: number; closed?: number }
+): Promise<void> {
 	const lp = lpStream(stream);
 	await lp.write(input);
+	if (probe !== undefined) probe.written = performance.timeOrigin + performance.now();
 	await lp.unwrap().close();
+	if (probe !== undefined) probe.closed = performance.timeOrigin + performance.now();
 }
 
 /**

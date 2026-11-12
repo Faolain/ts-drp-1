@@ -94,6 +94,18 @@ import { PeerSelector } from "./peer-selector.js";
 import { resolveWebRtcConfiguration, type WebRtcConfigurationOwner } from "./webrtc-configuration.js";
 import { SEAL_EVIDENCE_PROTOCOL, type SealEvidenceProtocolPort } from "./seal.js";
 import {
+	callerOf,
+	countReceiveClass,
+	diagnosticsNow,
+	hashBytes,
+	instrumentConnection,
+	recordReceive,
+	recordSend,
+	type StreamReceiveSample,
+	type StreamSendSample,
+	streamDiagnosticsEnabled,
+} from "./stream-diagnostics.js";
+import {
 	CREATOR_SUCCESSOR_PROTOCOL,
 	SNAPSHOT_CHUNK_PROTOCOL,
 	SNAPSHOT_PROTOCOL_MAX_STREAMS,
@@ -1563,6 +1575,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		log.info("::start: Successfuly started DRP network w/ peer_id", this.peerId);
 
 		this._node.addEventListener("connection:open", (event: CustomEvent<Connection>) => {
+			if (streamDiagnosticsEnabled) instrumentConnection(this.peerId, event.detail);
 			const peerId = event.detail.remotePeer.toString();
 			log.info("::start::connection::open", peerId);
 			this.notifyPeerConnection(peerId);
@@ -2998,6 +3011,18 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	 */
 	async sendMessage(peerId: string, message: Message, options: { readonly signal?: AbortSignal } = {}): Promise<void> {
 		const messageBuffer = this.encodeEligibleMessage(message);
+		const probe: StreamSendSample | undefined = streamDiagnosticsEnabled
+			? recordSend({
+					local: this.peerId,
+					remote: peerId,
+					protocol: DRP_MESSAGE_PROTOCOL,
+					cls: MessageType[message.type] ?? String(message.type),
+					caller: callerOf(new Error().stack),
+					hash: hashBytes(messageBuffer),
+					bytes: messageBuffer.byteLength,
+					t0: diagnosticsNow(),
+				})
+			: undefined;
 		let stream: Stream | undefined;
 		const abort = (): void => {
 			if (stream === undefined) return;
@@ -3008,12 +3033,18 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		try {
 			options.signal?.throwIfAborted();
 			const connection = await this.safeDial([multiaddr(`/p2p/${peerId}`)], this._node, options.signal);
+			if (probe !== undefined) {
+				probe.dialed = diagnosticsNow();
+				if (connection !== undefined) instrumentConnection(this.peerId, connection);
+			}
 			options.signal?.throwIfAborted();
 			stream = <Stream>await connection?.newStream(DRP_MESSAGE_PROTOCOL, { signal: options.signal });
+			if (probe !== undefined) probe.opened = diagnosticsNow();
 			options.signal?.addEventListener("abort", abort, { once: true });
 			options.signal?.throwIfAborted();
-			await uint8ArrayToStream(stream, messageBuffer);
+			await uint8ArrayToStream(stream, messageBuffer, probe);
 		} catch (e) {
+			if (probe !== undefined) probe.error = e instanceof Error ? e.name : String(e);
 			log.error("::sendMessage:", e);
 			if (options.signal !== undefined) throw e;
 		} finally {
@@ -3080,6 +3111,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			throw this.syncFailure(signal, deadlineSignal, "SYNC_DIAL_FAILED", "Could not dial sync peer", cause);
 		}
 		if (connection === undefined) throw new SyncTransportError("SYNC_DIAL_FAILED", "Could not dial sync peer");
+		if (streamDiagnosticsEnabled) instrumentConnection(this.peerId, connection);
 		let admission = this._syncAdmissions.get(connection);
 		if (admission === undefined) {
 			admission = new SyncSendAdmission(connection);
@@ -3127,7 +3159,19 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			}
 			const messageBuffer = this.encodeEligibleMessage(message);
 			validateNegotiatedSync(message, stream.protocol, messageBuffer.byteLength);
-			await uint8ArrayToStream(stream, messageBuffer);
+			const probe: StreamSendSample | undefined = streamDiagnosticsEnabled
+				? recordSend({
+						local: this.peerId,
+						remote: connection.remotePeer.toString(),
+						protocol: stream.protocol,
+						cls: MessageType[message.type] ?? String(message.type),
+						caller: "sync",
+						hash: hashBytes(messageBuffer),
+						bytes: messageBuffer.byteLength,
+						t0: diagnosticsNow(),
+					})
+				: undefined;
+			await uint8ArrayToStream(stream, messageBuffer, probe);
 			if (selection.mode === "heads-chunk") {
 				await this.waitForRemoteSyncAdmission(stream, signal, deadlineSignal);
 			}
@@ -3365,9 +3409,22 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	}
 
 	private async handleStream(stream: Stream, authenticatedSender: string): Promise<void> {
+		const probe: StreamReceiveSample | undefined = streamDiagnosticsEnabled
+			? recordReceive({
+					local: this.peerId,
+					remote: authenticatedSender,
+					protocol: stream.protocol,
+					entered: diagnosticsNow(),
+				})
+			: undefined;
 		try {
 			const data = await streamToUint8Array(stream);
+			if (probe !== undefined) {
+				(probe as { hash?: string }).hash = hashBytes(data);
+				probe.framed = diagnosticsNow();
+			}
 			const { message, structure } = this.decodeAttributedMessage(data, authenticatedSender);
+			if (probe !== undefined) countReceiveClass(probe, MessageType[message.type] ?? String(message.type));
 			const selection = selectedSyncProtocol(stream.protocol);
 			if (selection.mode === "heads-chunk" && !isSyncProtocolMessage(message)) {
 				throw new SyncTransportError(
@@ -3393,8 +3450,11 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 				);
 				await this._messageQueue.enqueue(message);
 			}
+			if (probe !== undefined) probe.admitted = diagnosticsNow();
 			await stream.close();
+			if (probe !== undefined) probe.closed = diagnosticsNow();
 		} catch (e) {
+			if (probe !== undefined) probe.error = e instanceof Error ? e.name : String(e);
 			if (stream.status === "open" || stream.status === "closing") {
 				stream.abort(e instanceof Error ? e : new Error(String(e)));
 			}
