@@ -13621,8 +13621,11 @@ function createOwnEpochFenceReader(): OwnEpochFenceReader {
 	};
 }
 
-/** The own fence scan of ownEpochFences, with the highest own fence row (any epoch) and its epoch. */
-async function scanOwnFences(store: DurableIssuanceStore, scope: DurableIssueScope):
+/**
+ * The own fence scan of ownEpochFences, with the highest own fence row (any epoch) and its epoch.
+ * Internal: exported for the native authentication tests.
+ */
+export async function scanOwnFences(store: DurableIssuanceStore, scope: DurableIssueScope):
 	Promise<Readonly<{ lowest: ReadonlyMap<number, number>; highest: number | undefined; highestEpoch: number | undefined }>> {
 	v3SettlementWorkCounts.ownFenceScans += 1;
 	const fences = new Map<number, number>();
